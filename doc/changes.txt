@@ -1,0 +1,657 @@
+/**
+
+@page changes Release Notes
+
+
+@par
+<B>Version 1.1.0</B> - <I>April 4 2013</I>
+- The @vdblink::tools::resampleToMatch() resampleToMatch@endlink tool,
+  the Resample SOP and the Combine SOP now use level set rebuild to correctly
+  and safely resample level sets.  Previously, scaling a level set would
+  invalidate the signed distance field, leading to holes and other artifacts.
+- Added a mask-based topological
+  @vdblink::tools::erodeVoxels erosion tool@endlink, and rewrote and
+  simplified the @vdblink::tools::dilateVoxels dilation tool@endlink.
+- The @vdblink::tools::LevelSetAdvection LevelSetAdvection@endlink tool
+  can now advect forward or backward in time.
+- @vdblink::tree::Tree::pruneLevelSet() Tree::pruneLevelSet@endlink now
+  replaces each pruned node with a tile having the inside or outside
+  background value, instead of arbitrarily selecting one of the node's
+  tile or voxel values.
+- When a grid is saved to a file with
+  @vdblink::Grid::saveFloatAsHalf() saveFloatAsHalf@endlink set to @c true,
+  the grid's background value is now also quantized to 16 bits.
+  (Not quantizing the background value caused a mismatch with the values
+  of background tiles.)
+- As with @vdblink::tools::foreach() tools::foreach@endlink, it is now
+  possible to specify whether functors passed to
+  @vdblink::tools::transformValues() tools::transformValues@endlink
+  should be shared across threads.
+- @vdblink::tree::LeafManager tree::LeafManager@endlink can now be
+  instantiated with a @const tree, although buffer swapping with @const trees
+  is disabled.
+- Added a @vdblink::Grid::signedFloodFill() Grid::signedFloodFill@endlink
+  overload that allows one to specify inside and outside values.
+- Fixed a bug in @vdblink::Grid::setBackground() Grid::setBackground@endlink
+  so that now only the values of inactive voxels change.
+- Fixed @vdblink::Grid::topologyUnion() Grid::topologyUnion@endlink so that
+  it actually unions tree topology, instead of just the active states
+  of tiles and voxels.  The previous behavior broke multithreaded code
+  that relied on input and output grids having compatible tree topology.
+- @vdblink::math::Transform math::Transform@endlink now includes an
+  @vdblink::math::Transform::isIdentity() isIdentity@endlink predicate
+  and methods to @vdblink::math::Transform::preMult(const Mat4d&) pre-@endlink
+  and @vdblink::math::Transform::postMult(const Mat4d&) postmultiply@endlink
+  by a matrix.
+- Modified the @link NodeMasks.h node mask@endlink classes to permit
+  octree-like tree configurations (i.e., with a branching factor of two).
+- Implemented a new, more efficient
+  @vdblink::math::closestPointOnTriangleToPoint() closest point
+  on triangle@endlink algorithm.
+- Implemented a new vertex normal scheme in the volume to mesh
+  converter, and resolved some overlapping polygon issues. 
+- The volume to mesh converter now meshes not just active voxels
+  but also active tiles.
+- Fixed a bug in the mesh to volume converter that caused unsigned
+  distance field conversion to produce empty grids.
+- Fixed a bug in the level set fracture tool whereby the cutter overlap
+  toggle was ignored.
+- Fixed an infinite loop bug in @c vdb_view.
+- Updated @c vdb_view to use the faster and less memory-intensive
+  OpenVDB volume to mesh converter instead of marching cubes,
+  and rewrote the shader to be OpenGL 3.2 and GLSL 1.2 compatible.
+- Given multiple input files or a file containing multiple grids,
+  @c vdb_view now displays one grid at a time.  The left and right
+  arrow keys cycle between grids.
+- The To Polygons SOP now has an option to associate the input grid&rsquo;s
+  name with each output polygon.
+
+
+@par
+<B>Version 1.0.0</B> - <I>March 14 2013</I>
+- @vdblink::tools::levelSetRebuild() tools::levelSetRebuild@endlink
+  now throws an exception when given a non-scalar or non-floating-point grid.
+- The tools in tools/GridOperators.h are now interruptible, as is
+  the Analysis SOP.
+- Added a
+  @vdblink::tree::LeafManager::LeafRange::Iterator leaf node iterator@endlink
+  and a TBB-compatible
+  @vdblink::tree::LeafManager::LeafRange range class@endlink
+  to the LeafManager.
+- Modified the @vdblink::tools::VolumeToMesh VolumeToMesh@endlink tool
+  to handle surface topology issues around fracture seam lines.
+- Modified the Makefile to allow @c vdb_view to compile on OS X systems
+  (provided that GLFW is available).
+- Fixed a bug in the Create SOP that resulted in "invalid parameter name"
+  warnings.
+- The Combine SOP now optionally resamples the A grid into the B grid's
+  index space (or vice-versa) if the A and B transforms differ.
+- The Vector Split and Vector Merge SOPs now skip inactive voxels
+  by default, but they can optionally be made to include inactive voxels,
+  as they did before.
+- The @vdblink::tools::LevelSetFracture LevelSetFracture@endlink tool now
+  supports custom rotations for each cutter instance, and the Fracture SOP
+  now uses quaternions to generate uniformly-distributed random rotations.
+
+
+@par
+<B>Version 0.104.0</B> - <I>February 15 2013</I>
+- Added a @vdblink::tools::levelSetRebuild() tool@endlink and a SOP
+  to rebuild a level set from any scalar volume.
+- @c .vdb files are now saved using a mask-based compression scheme
+  that is an order of magnitude faster than Zip and produces comparable
+  file sizes for level set and fog volume grids.  (Zip compression
+  is still enabled by default for other classes of grids).
+- The @vdblink::tools::Filter Filter@endlink and
+  @vdblink::tools::LevelSetFilter LevelSetFilter@endlink tools now
+  include a Gaussian filter, and mean (box) filtering is now 10-50x faster.
+- The isosurface @vdblink::tools::VolumeToMesh meshing tool@endlink
+  is now more robust (to level sets with one voxel wide narrow bands,
+  for example).
+- Mesh to volume conversion is on average 1.5x faster and up to 5.5x
+  faster for high-resolution meshes where the polygon/voxel size ratio
+  is small.
+- Added @vdblink::createLevelSet() createLevelSet@endlink and
+  @vdblink::createLevelSetSphere() createLevelSetSphere@endlink
+  factory functions for level set grids.
+- @vdblink::tree::ValueAccessor tree::ValueAccessor@endlink is now faster
+  for trees of height 2, 3 and 4 (the latter is the default), and it now
+  allows one to specify, via a template argument, the number of node levels
+  to be cached, which can also improve performance in special cases.
+- Added a toggle to @vdblink::tools::foreach() tools::foreach@endlink
+  to specify whether or not the functor should be shared across threads.
+- Added @vdblink::Mat4SMetadata Mat4s@endlink and
+  @vdblink::Mat4DMetadata Mat4d@endlink metadata types.
+- Added explicit pre- and postmultiplication methods to the @c Transform,
+  @c Map and @c Mat4 classes and deprecated the old accumulation methods. 
+- Modified @vdblink::math::NonlinearFrustumMap NonlinearFrustumMap@endlink
+  to be more compatible with Houdini&rsquo;s frustum transform.
+- Fixed a @vdblink::tools::GridTransformer GridTransformer@endlink bug
+  that caused it to translate the output grid incorrectly in some cases.
+- Fixed a bug in the tree-level
+  @vdblink::tree::LeafIteratorBase LeafIterator@endlink that resulted in
+  intermittent crashes in
+  @vdblink::tools::dilateVoxels() tools::dilateVoxels@endlink.
+- The @c Hermite data type and Hermite grids are no longer supported.
+- Added tools/GridOperators.h, which includes new, cleaner implementations
+  of the @vdblink::tools::cpt() closest point transform@endlink,
+  @vdblink::tools::curl() curl@endlink,
+  @vdblink::tools::divergence() divergence@endlink,
+  @vdblink::tools::gradient() gradient@endlink,
+  @vdblink::tools::laplacian() Laplacian@endlink, 
+  @vdblink::tools::magnitude() magnitude@endlink,
+  @vdblink::tools::meanCurvature() mean curvature@endlink and
+  @vdblink::tools::normalize() normalize@endlink tools.
+- Interrupt support has been improved in several tools, including
+  @vdblink::tools::ParticlesToLevelSet tools::ParticlesToLevelSet@endlink.
+- Simplified the API of the @vdblink::math::BaseStencil Stencil@endlink class
+  and added an @vdblink::math::BaseStencil::intersects() intersects@endlink
+  method to test for intersection with a specified isovalue.
+- Renamed @c voxelDimensions to @c voxelSize in transform classes
+  and elsewhere.
+- Deprecated @c houdini_utils::ParmFactory::setChoiceList in favor of
+  @c houdini_utils::ParmFactory::setChoiceListItems, which requires
+  a list of <I>token, label</I> string pairs.
+- Made various changes for Visual C++ compatibility.
+  <I>[Contributed by SESI]</I>
+- Fixed a bug in @c houdini_utils::getNodeChain() that caused the
+  Offset Level Set, Smooth Level Set and Renormalize Level Set SOPs
+  to ignore frame changes.
+  <I>[Contributed by SESI]</I>
+- The From Particles SOP now provides the option to write into
+  an existing grid.
+- Added a SOP to edit grid metadata.
+- The Fracture SOP now supports multiple cutter objects.
+- Added a To Polygons SOP that complements the Fracture SOP and allows
+  for elimination of seam lines, generation of correct vertex normals
+  and grouping of polygons when surfacing fracture fragments, using
+  the original level set or mesh as a reference.
+
+
+@par
+<B>Version 0.103.1</B> - <I>January 15 2013</I>
+- @vdblink::tree::ValueAccessor tree::ValueAccessor@endlink read operations
+  are now faster for four-level trees.
+  (Preliminary benchmark tests suggest a 30-40% improvement.)
+- For vector-valued grids, @vdblink::tools::compMin() tools::compMin@endlink
+  and @vdblink::tools::compMax() tools::compMax@endlink now compare
+  vector magnitudes instead of individual components.
+- Migrated grid sampling code to a new file, Interpolation.h,
+  and deprecated old files and classes.
+- Added a level-set @vdblink::tools::LevelSetFracture fracture tool@endlink
+  and a Fracture SOP.
+- Added @vdblink::tools::sdfInteriorMask() tools::sdfInteriorMask@endlink,
+  which creates a mask of the interior region of a level set grid.
+- Fixed a bug in the mesh to volume converter that produced unexpected
+  nonzero values for voxels at the intersection of two polygons,
+  and another bug that produced narrow-band widths that didn't respect
+  the background value when the half-band width was less than three voxels.
+- @c houdini_utils::ParmFactory can now correctly generate ramp multi-parms.
+- Made various changes for Visual C++ compatibility.
+  <I>[Contributed by SESI]</I>
+- The Convert SOP can now convert between signed distance fields and
+  fog volumes and from volumes to meshes.
+  <I>[Contributed by SESI]</I>
+- For level sets, the From Mesh and From Particles SOPs now match
+  the reference grid's narrow-band width.
+- The Scatter SOP can now optionally scatter points in the interior
+  of a level set.
+
+
+@par
+<B>Version 0.103.0</B> - <I>December 21 2012</I>
+- The mesh to volume converter is now 60% faster at generating
+  level sets with wide bands, and the From Mesh SOP is now interruptible.
+- Fixed a threading bug in the recently-added 
+  @vdblink::tools::compReplace() compReplace@endlink tool
+  that caused it to produce incorrect output.
+- Added a @vdblink::tree::Tree::probeConstLeaf() probeConstLeaf@endlink
+  method to the @vdblink::tree::Tree::probeConstLeaf() Tree@endlink,
+  @vdblink::tree::ValueAccessor::probeConstLeaf() ValueAccessor@endlink
+  and @vdblink::tree::RootNode::probeConstLeaf() node@endlink classes.
+- The Houdini VDB primitive doesn't create a @c name attribute
+  unnecessarily (i.e., if its grid's name is empty), but it now
+  correctly allows the name to be changed to the empty string.
+- Fixed a crash in the Vector Merge SOP when fewer than three grids
+  were merged.
+- The From Particles SOP now features a "maximum half-width" parameter
+  to help avoid runaway computations.
+
+
+@par
+<B>Version 0.102.0</B> - <I>December 13 2012</I>
+- Added @vdblink::tools::compReplace() tools::compReplace@endlink,
+  which copies the active values of one grid into another, and added
+  a "Replace A With Active B" mode to the Combine SOP.
+- @vdblink::Grid::signedFloodFill() Grid::signedFloodFill@endlink
+  no longer enters an infinite loop when filling an empty grid.
+- Fixed a bug in the particle to level set converter that sometimes
+  produced level sets with holes, and fixed a bug in the SOP that
+  could result in random output.
+- Fixed an issue in the frustum preview feature of the Create SOP
+  whereby rendering very large frustums could cause high CPU usage.
+- Added streamline support to the constrained advection scheme
+  in the Advect Points SOP.
+- Added an Advect Level Set SOP.
+
+
+@par
+<B>Version 0.101.1</B> - <I>December 11 2012</I> (DWA internal release)
+- Partially reverted the Houdini VDB primitive's grid accessor methods
+  to their pre-0.98.0 behavior.  A primitive's grid can once again
+  be accessed by shared pointer, but now also by reference.
+  Accessor methods for grid metadata have also been added, and the
+  primitive now ensures that metadata and transforms are never shared.
+- Fixed an intermittent crash in the From Particles SOP.
+
+
+@par
+<B>Version 0.101.0</B> - <I>December 6 2012</I> (DWA internal release)
+- Partially reverted the @vdblink::Grid Grid@endlink's
+  @vdblink::Grid::tree() tree@endlink and
+  @vdblink::Grid::transform() transform@endlink accessor methods
+  to their pre-0.98.0 behavior, eliminating copy-on-write but
+  preserving their return-by-reference semantics.  These methods
+  are now supplemented with a suite of
+  @vdblink::Grid::treePtr() shared@endlink
+  @vdblink::Grid::baseTreePtr() pointer@endlink
+  @vdblink::Grid::transformPtr() accessors@endlink.
+- Restructured the @vdblink::tools::MeshToVolume
+  mesh to volume converter@endlink for a 40% speedup
+  and to be more robust to non-manifold geometry, to better preserve
+  sharp features, to support arbitrary tree configurations and
+  to respect narrow-band limits.
+- Added a @c getNodeBoundingBox method to
+  @vdblink::tree::RootNode::getNodeBoundingBox() RootNode@endlink,
+  @vdblink::tree::InternalNode::getNodeBoundingBox() InternalNode@endlink
+  and @vdblink::tree::LeafNode::getNodeBoundingBox() LeafNode@endlink
+  that returns the index space spanned by a node.
+- Made various changes for Visual C++ compatibility.
+  <I>[Contributed by SESI]</I>
+- Renamed the Reshape Level Set SOP to Offset Level Set.
+- Fixed a crash in the Convert SOP and added support for conversion
+  of empty grids.
+
+
+@par
+<B>Version 0.100.0</B> - <I>November 30 2012</I> (DWA internal release)
+- Greatly improved the performance of the level set to fog volume
+  @vdblink::tools::sdfToFogVolume() converter@endlink.
+- Improved the performance of the
+  @vdblink::tools::Filter::median() median filter@endlink
+  and of level set @vdblink::tools::csgUnion() CSG@endlink operations.
+- Reintroduced
+  @vdblink::tree::Tree::pruneLevelSet() Tree::pruneLevelSet@endlink,
+  a specialized @vdblink::tree::Tree::pruneInactive() pruneInactive@endlink
+  for level-set grids.
+- Added utilities to the @c houdini_utils library to facilitate the
+  collection of a chain of adjacent nodes of a particular type
+  so that they can be cooked in a single step.  (For example,
+  adjacent @c xform SOPs could be collapsed by composing their
+  transformation matrices into a single matrix.)
+- Added pruning and flood-filling options to the Convert SOP.
+- Reimplemented the Filter SOP, omitting level-set-specific filters
+  and adding node chaining (to reduce memory usage when applying
+  several filters in sequence).
+- Added a toggle to the Read SOP to read grid metadata and
+  transforms only.
+- Changed the attribute transfer scheme on the From Mesh and
+  From Particles SOPs to allow for custom grid names and
+  vector type metadata.
+
+
+@par
+<B>Version 0.99.0</B> - <I>November 21 2012</I>
+- Added @vdblink::Grid Grid@endlink methods that return non-<TT>const</TT>
+  tree and transform references without triggering deep copies,
+  as well as @c const methods that return @c const shared pointers.
+- Added @c Grid methods to @vdblink::Grid::addStatsMetadata populate@endlink
+  a grid's metadata with statistics like the active voxel count, and to
+  @vdblink::Grid::getStatsMetadata retrieve@endlink that metadata.
+  By default, statistics are now computed and added to grids
+  whenever they are written to <TT>.vdb</TT> files.
+- Added @vdblink::io::File::readGridMetadata io::File::readGridMetadata@endlink
+  and @vdblink::io::File::readAllGridMetadata
+  io::File::readAllGridMetadata@endlink methods to read just the
+  grid metadata and transforms from a <TT>.vdb</TT> file.
+- Fixed numerical precision issues in the
+  @vdblink::tools::csgUnion csgUnion@endlink,
+  @vdblink::tools::csgIntersection csgIntersection@endlink
+  and @vdblink::tools::csgDifference csgDifference@endlink
+  tools, and added toggles to optionally disable postprocess pruning.
+- Fixed an issue in @c vdb_view with the ordering of GL vertex buffer calls.
+  <I>[Contributed by Bill Katz]</I>
+- Fixed an intermittent crash in the
+  @vdblink::tools::ParticlesToLevelSet ParticlesToLevelSet@endlink tool,
+  as well as a race condition that could cause data corruption.
+- The @vdblink::tools::ParticlesToLevelSetAndId ParticlesToLevelSet@endlink
+  tool and From Particles SOP can now transfer arbitrary point attribute
+  values from the input particles to output voxels.
+- Fixed a bug in the Convert SOP whereby the names of primitives
+  were lost during conversion, and another bug that resulted in
+  arithmetic errors when converting empty grids.
+- Fixed a bug in the Combine SOP that caused the Operation selection
+  to be lost.
+
+
+@par
+<B>Version 0.98.0</B> - <I>November 16 2012</I>
+- @vdblink::tree::Tree Tree@endlink and
+  @vdblink::math::Transform Transform@endlink objects (and
+  @vdblink::Grid Grid@endlink objects in the context of Houdini SOPs)
+  are now passed and accessed primarily by reference rather than by
+  shared pointer.  See @subpage api_0_98_0 "Porting to OpenVDB 0.98.0"
+  for details about this important API change.
+  <I>[Contributed by SESI]</I>
+- Reimplemented @vdblink::math::CoordBBox CoordBBox@endlink to address several
+  off-by-one bugs related to bounding box dimensions.
+- Fixed an off-by-one bug in @vdblink::Grid::evalActiveVoxelBoundingBox()
+  evalActiveVoxelBoundingBox@endlink.
+- Introduced the @vdblink::tree::LeafManager LeafManager@endlink class,
+  which will eventually replace the @c LeafArray class.  @c LeafManager supports
+  dynamic buffers stored as a structure of arrays (SOA), unlike @c LeafArray,
+  which supports only static buffers stored as an array of structures (AOS).
+- Improved the performance of the
+  @vdblink::tools::LevelSetFilter LevelSetFilter@endlink and
+  @vdblink::tools::LevelSetTracker LevelSetTracker@endlink tools by rewriting
+  them to use the new @vdblink::tree::LeafManager LeafManager@endlink class.
+- Added @vdblink::tree::Tree::setValueOnly() Tree::setValueOnly@endlink and
+  @vdblink::tree::ValueAccessor::setValueOnly()
+  ValueAccessor::setValueOnly@endlink methods, which change the value of
+  a voxel without changing its active state, and
+  @vdblink::tree::Tree::probeLeaf() Tree::probeLeaf@endlink and
+  @vdblink::tree::ValueAccessor::probeLeaf() ValueAccessor::probeLeaf@endlink
+  methods that return the leaf node that contains a given voxel (unless
+  the voxel is represented by a tile).
+- Added a @vdblink::tools::LevelSetAdvection LevelSetAdvection@endlink tool
+  that propagates and tracks narrow-band level sets.
+- Introduced a new @vdblink::tools::GridSampler GridSampler@endlink class
+  that supports world-space (or index-space) sampling of grid values.
+- Changed the interpretation of the
+  @vdblink::math::NonlinearFrustumMap NonlinearFrustumMap@endlink's
+  @em taper parameter to be the ratio of the near and far plane depths.
+- Added a @c ParmFactory::setChoiceList() overload that accepts
+  (@em token, @em label) string pairs, and a @c setDefault() overload that
+  accepts an STL string.
+- Fixed a crash in the Combine SOP in Copy B mode.
+- Split the Level Set Filter SOP into three separate SOPs,
+  Level Set Smooth, Level Set Reshape and Level Set Renormalize.
+  When two or more of these nodes are connected in sequence, they interact
+  to reduce memory usage: the last node in the sequence performs
+  all of the operations in one step.
+- The Advect Points SOP can now output polyline streamlines
+  that trace the paths of the points.
+- Added an option to the Analysis SOP to specify names for output grids.
+- Added camera-derived frustum transform support to the Create SOP.
+
+
+@par
+<B>Version 0.97.0</B> - <I>October 18 2012</I>
+- Added a narrow-band @vdblink::tools::LevelSetTracker level set
+  interface tracking tool@endlink (up to fifth-order in space but currently
+  only first-order in time, with higher temporal orders to be added soon).
+- Added a @vdblink::tools::LevelSetFilter level set filter tool@endlink
+  to perform unrestricted surface smoothing (e.g., Laplacian flow),
+  filtering (e.g., mean value) and morphological operations (e.g.,
+  morphological opening).
+- Added adaptivity to the @vdblink::tools::VolumeToMesh
+  level set meshing tool@endlink for faster mesh extraction with fewer
+  polygons, without postprocessing.
+- Added a @vdblink::tree::ValueAccessor::touchLeaf()
+  ValueAccessor::touchLeaf@endlink method that creates (if necessary)
+  and returns the leaf node containing a given voxel.  It can be used
+  to preallocate leaf nodes over which to run parallel algorithms.
+- Fixed a bug in @vdblink::Grid::merge() Grid::merge@endlink whereby
+  active tiles were sometimes lost.
+- Added @vdblink::tree::LeafManager LeafManager@endlink, which is similar
+  to @c LeafArray but supports a dynamic buffer count and allocates buffers
+  more efficiently.  Useful for temporal integration (e.g., for level set
+  propagation and interface tracking), @c LeafManager is meant to replace
+  @c LeafArray, which will be deprecated in the next release.
+- Added a @vdblink::tree::LeafNode::fill() LeafNode::fill@endlink method
+  to efficiently populate leaf nodes with constant values.
+- Added a @vdblink::tree::Tree::visitActiveBBox() Tree::visitActiveBBox@endlink
+  method that applies a functor to the bounding boxes of all active tiles
+  and leaf nodes and that can be used to improve the performance of
+  ray intersection tests, rendering of bounding boxes, etc.
+- Added a @vdblink::tree::Tree::voxelizeActiveTiles()
+  Tree::voxelizeActiveTiles@endlink method to densify active tiles.
+  While convenient and fast, this can produce large dense grids, so use
+  it with caution.
+- Repackaged @c Tree::pruneLevelSet() as a
+  @vdblink::tree::Tree::pruneOp() Tree::pruneOp()@endlink-compatible
+  functor.  @vdblink::tree::LevelSetPrune LevelSetPrune@endlink is a
+  specialized @vdblink::tree::Tree::pruneInactive() pruneInactive@endlink
+  for level-set grids and is used in interface tracking.
+- Added a @vdblink::GridBase::pruneGrid() GridBase::pruneGrid@endlink method.
+- Added a @vdblink::Grid::hasUniformVoxels() Grid:hasUniformVoxels@endlink
+  method.
+- Renamed @c tools::dilate to
+  @vdblink::tools::dilateVoxels() dilateVoxels@endlink and improved its
+  performance.  The new name reflects the fact that the current
+  implementation ignores active tiles.
+- Added a @vdblink::tools::resampleToMatch() tools::resampleToMatch@endlink
+  function that resamples an input grid into an output grid with a
+  different transform such that, after resampling, the input and output grids
+  coincide, but the output grid's transform is preserved.
+- Significantly improved the performance of depth-bounded value
+  iterators (@vdblink::tree::Tree::ValueOnIter ValueOnIter@endlink,
+  @vdblink::tree::Tree::ValueAllIter ValueAllIter@endlink, etc.)
+  when the depth bound excludes leaf nodes.
+- Exposed the value buffers inside leaf nodes with
+  @vdblink::tree::LeafNode::buffer() LeafNode::buffer@endlink.
+  This allows for very fast access (const and non-const) to voxel
+  values using linear array offsets instead of @ijk coordinates. 
+- In openvdb_houdini/UT_VDBTools.h, added operators for use with
+  @c processTypedGrid that resample grids in several different ways.
+- Added a policy mechanism to @c houdini_utils::OpFactory that allows for
+  customization of operator names, icons, and Help URLs.
+- Renamed many of the Houdini SOPs to make the names more consistent.
+- Added an Advect Points SOP.
+- Added a Level Set Filter SOP that allows for unrestricted surface
+  deformations, unlike the older Filter SOP, which restricts surface
+  motion to the initial narrow band.
+- Added staggered vector sampling to the Sample Points SOP.
+- Added a minimum radius threshold to the particle voxelization tool
+  and SOP.
+- Merged the Composite and CSG SOPs into a single Combine SOP.
+- Added a tool and a SOP to efficiently generate narrow-band level set
+  representations of spheres.
+- In the Visualize SOP, improved the performance of tree topology
+  generation, which is now enabled by default.
+
+
+@par
+<B>Version 0.96.0</B> - <I>September 24 2012</I>
+- Fixed a memory corruption bug in the mesh voxelizer tool.
+- Temporarily removed the optional clipping feature from the level set mesher.
+- Added "Staggered Vector Field" to the list of grid classes in the Create SOP.
+
+
+@par
+<B>Version 0.95.0</B> - <I>September 20 2012</I>
+- Added a quad @vdblink::tools::VolumeToMesh meshing@endlink tool for
+  higher-quality level set meshing and updated the Visualizer SOP
+  to use it.
+- Fixed a precision error in the @vdblink::tools::MeshToVolume
+  mesh voxelizer@endlink and improved the quality of inside/outside
+  voxel classification.  Output grids are now also
+  @vdblink::Grid::setGridClass() classified@endlink as either level sets
+  or fog volumes.
+- Modified the @vdblink::tools::GridResampler GridResampler@endlink
+  to use the signed flood fill optimization only on grids that are
+  tagged as level sets.
+- Added a @vdblink::math::Quat quaternion@endlink class to the
+  math library and a method to return the
+  @vdblink::math::Mat3::trace trace@endlink of a @c Mat3.
+- Fixed a bug in the
+  @vdblink::tree::ValueAccessor::ValueAccessor(const ValueAccessor&)
+  ValueAccessor@endlink copy constructor that caused the copy to reference
+  the original.
+- Fixed a bug in @vdblink::tree::RootNode::setActiveState()
+  RootNode::setActiveState@endlink that caused a crash
+  when marking a (virtual) background voxel as inactive.
+- Added a @c Tree::pruneLevelSet method that is similar to but faster than
+  @vdblink::tree::Tree::pruneInactive() pruneInactive@endlink
+  for level set grids.
+- Added fast leaf node voxel access
+  @vdblink::tree::LeafNode::getValue(Index) const methods@endlink
+  that index by linear offset (as returned by
+  @vdblink::tree::LeafNode::ValueOnIter::pos() ValueIter::pos@endlink)
+  instead of by @ijk coordinates.
+- Added a @vdblink::tree::Tree::touchLeaf() Tree::touchLeaf@endlink
+  method that can be used to preallocate a static tree topology over which
+  to safely perform multithreaded processing.
+- Added a grain size argument to @c LeafArray for finer control of parallelism.
+- Modified the Makefile to make it easier to omit the <TT>doc</TT>,
+  @c vdb_test and @c vdb_view targets.
+- Added utility functions (in <TT>houdini/UT_VDBUtils.h</TT>) to convert
+  between Houdini and OpenVDB matrix and vector types.
+  <I>[Contributed by SESI]</I>
+- Added accessors to @c GEO_PrimVDB that make it easier to directly access
+  voxel data and that are used by the HScript volume expression functions
+  in Houdini 12.5.  <I>[Contributed by SESI]</I>
+- As of Houdini 12.1.77, the native transform SOP operates on OpenVDB
+  primitives.  <I>[Contributed by SESI]</I>
+- Added a Convert SOP that converts OpenVDB grids to Houdini volumes
+  and vice-versa.
+
+
+@par
+<B>Version 0.94.1</B> - <I>September 7 2012</I>
+- Fixed bugs in @vdblink::tree::RootNode RootNode@endlink and
+  @vdblink::tree::InternalNode InternalNode@endlink @c setValue*() and
+  @c fill() methods that could cause neighboring voxels to become inactive.
+- Fixed a bug in
+  @vdblink::tree::Tree::hasSameTopology() Tree::hasSameTopology@endlink
+  that caused false positives when only active states and not values differed.
+- Added a @vdblink::tree::Tree::hasActiveTiles() Tree::hasActiveTiles@endlink
+  method.
+- For better cross-platform consistency, substituted bitwise AND operations
+  for right shifts in the @vdblink::tree::ValueAccessor ValueAccessor@endlink
+  hash key computation.
+- @c vdb_view no longer aborts when asked to surface a vector-valued
+  grid&mdash;but it still doesn't render the surface.
+- Made various changes for Visual C++ compatibility.
+  <I>[Contributed by SESI]</I>
+- Added an option to the MeshVoxelizer SOP to convert both open and
+  closed surfaces to unsigned distance fields.
+- The Filter SOP now allows multiple filters to be applied in
+  user-specified order.
+
+
+@par
+<B>Version 0.94.0</B> - <I>August 30 2012</I>
+- Added a @vdblink::Grid::topologyUnion() method@endlink to union
+  just the active states of voxels from one grid with those of
+  another grid of a possibly different type.
+- Fixed an incorrect scale factor in the Laplacian diffusion
+  @vdblink::tools::Filter::laplacian() filter@endlink.
+- Fixed a bug in @vdblink::tree::Tree::merge() Tree::merge@endlink
+  that could leave a tree with invalid value accessors.
+- Added @vdblink::tree::TreeValueIteratorBase::setActiveState()
+  TreeValueIteratorBase::setActiveState@endlink and deprecated
+  @c setValueOn.
+- Removed @c tools/FastSweeping.h.  It will be replaced with a much more
+  efficient implementation in the near future.
+- ZIP compression of <TT>.vdb</TT> files is now
+  @vdblink::io::File::setCompressionEnabled() optional@endlink,
+  but enabled by default.  <I>[Contributed by SESI]</I>
+- Made various changes for Clang and Visual C++ compatibility.
+  <I>[Contributed by SESI]</I>
+- The MeshVoxelizer SOP can now transfer arbitrary point and primitive
+  attribute values from the input mesh to output voxels.
+
+
+@par
+<B>Version 0.93.0</B> - <I>August 24 2012</I>
+- Renamed symbols in math/Operators.h to avoid ambiguities that
+  GCC&nbsp;4.4 reports as errors.
+- Simplified the API for the stencil version of the
+  closest-point transform @vdblink::math::CPT operator@endlink.
+- Added logic to
+  @vdblink::io::Archive::readGrid() io::Archive::readGrid@endlink
+  to set the grid name metadata from the descriptor if the metadata
+  doesn't already exist.
+- Added guards to prevent nesting of @c openvdb_houdini::Interrupter::start()
+  and @c end() calls.
+
+
+@par
+<B>Version 0.92.0</B> - <I>August 23 2012</I>
+- Added a Laplacian diffusion
+  @vdblink::tools::Filter::laplacian() filter@endlink.
+- Fixed a bug in the initialization of the sparse contour tracer
+  that caused mesh-to-volume conversion to fail in certain cases.
+- Fixed a bug in the curvature stencil that caused mean curvature
+  filtering to produce wrong results.
+- Increased the speed of the
+  @vdblink::tools::GridTransformer GridTransformer@endlink
+  by as much as 20% for fog volumes.
+- Added optional pruning to the Resample SOP.
+- Modified the PointSample SOP to allow it to work with ungrouped,
+  anonymous grids.
+- Fixed a crash in the LevelSetNoise SOP.
+
+
+@par
+<B>Version 0.91.0</B> - <I>August 16 2012</I>
+- @vdblink::tools::GridTransformer tools::GridTransformer@endlink
+  and @vdblink::tools::GridResampler tools::GridResampler@endlink
+  now correctly (but not yet efficiently) process tiles in sparse grids.
+- Added an optional @vdblink::CopyPolicy CopyPolicy@endlink argument
+  to @vdblink::GridBase::copyGrid() GridBase::copyGrid@endlink
+  and to @vdblink::Grid::copy() Grid::copy@endlink that specifies
+  whether and how the grid's tree should be copied.
+- Added a @vdblink::GridBase::newTree() GridBase::newTree@endlink
+  method that replaces a grid's tree with a new, empty tree of the
+  correct type.
+- Fixed a crash in
+  @vdblink::tree::Tree::setValueOff(const Coord& xyz, const ValueType& value)
+  Tree::setValueOff@endlink when the new value was equal to the
+  background value.
+- Fixed bugs in @vdblink::tree::Tree::prune() Tree::prune@endlink
+  that could result in output tiles with incorrect active states.
+- Added @c librt to the link dependencies to address build failures
+  on Ubuntu systems.
+- Made various small changes to the Makefile and the source code
+  that should help with Mac OS&nbsp;X compatibility.
+- The Composite and Resample SOPs now correctly copy the input grid's
+  metadata to the output grid.
+
+
+@par
+<B>Version 0.90.1</B> - <I>August 7 2012</I>
+- Fixed a bug in the
+  @vdblink::math::BBox::getCenter() BBox::getCenter()@endlink method.
+- Added missing header files to various files.
+- @vdblink::io::File::NameIterator::gridName()
+  io::File::NameIterator::gridName()@endlink now returns a unique name
+  of the form <TT>"name[1]"</TT>, <TT>"name[2]"</TT>, etc. if a file
+  contains multiple grids with the same name.
+- Fixed a bug in the Writer SOP that caused grid names to be discarded.
+- The Resample SOP now correctly sets the background value of the
+  output grid.
+
+
+@par
+<B>Version 0.90.0</B> - <I>August 3 2012</I> (initial public release)
+- Added a basic GL viewer for OpenVDB files.
+- Greatly improved the performance of two commonly-used @c Tree methods,
+  @vdblink::tree::Tree::evalActiveVoxelBoundingBox()
+  evalActiveVoxelBoundingBox()@endlink
+  and @vdblink::tree::Tree::memUsage() memUsage()@endlink.
+- Eliminated the @c GridMap class.  File I/O now uses STL containers
+  of grid pointers instead.
+- Refactored stencil-based tools (Gradient, Laplacian, etc.) and rewrote
+  some of them for generality and better performance.  Most now behave
+  correctly for grids with nonlinear index-to-world transforms.
+- Added a @link FiniteDifference.h library@endlink of index-space finite
+  difference operators.
+- Added a @vdblink::math::Hermite "Hermite"@endlink grid type that compactly
+  stores each voxel's upwind normals and can be used to convert volumes
+  to and from polygonal meshes.
+- Added a @link PointScatter.h tool@endlink (and a Houdini SOP)
+  to scatter points randomly throughout a volume.
+
+*/

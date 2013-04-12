@@ -1,0 +1,2162 @@
+///////////////////////////////////////////////////////////////////////////
+//
+// Copyright (c) 2012-2013 DreamWorks Animation LLC
+//
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
+//
+// Redistributions of source code must retain the above copyright
+// and license notice and the following restrictions and disclaimer.
+//
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
+// from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
+// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
+//
+///////////////////////////////////////////////////////////////////////////
+//
+/// @file ValueAccessor.h
+///
+/// When traversing a grid in a spatially coherent pattern (e.g., iterating
+/// over neighboring voxels), request a @c ValueAccessor from the grid
+/// (with Grid::getAccessor()) and use the accessor's @c getValue() and
+/// @c setValue() methods.  These will typically be significantly faster
+/// than accessing voxels directly in the grid's tree.
+///
+/// @par Example:
+///
+/// @code
+/// FloatGrid grid;
+/// FloatGrid::Accessor acc = grid.getAccessor();
+/// // First access is slow:
+/// acc.setValue(Coord(0, 0, 0), 100);
+/// // Subsequent nearby accesses are fast, since the accessor now holds pointers
+/// // to nodes that contain (0, 0, 0) along the path from the root of the grid's
+/// // tree to the leaf:
+/// acc.setValue(Coord(0, 0, 1), 100);
+/// acc.getValue(Coord(0, 2, 0), 100);
+/// // Slow, because the accessor must be repopulated:
+/// acc.getValue(Coord(-1, -1, -1));
+/// // Fast:
+/// acc.getValue(Coord(-1, -1, -2));
+/// acc.setValue(Coord(-1, -2, 0), -100);
+/// @endcode
+
+#ifndef OPENVDB_TREE_VALUEACCESSOR_HAS_BEEN_INCLUDED
+#define OPENVDB_TREE_VALUEACCESSOR_HAS_BEEN_INCLUDED
+
+#include <boost/mpl/front.hpp>
+#include <boost/mpl/pop_front.hpp>
+#include <boost/mpl/push_back.hpp>
+#include <boost/mpl/size.hpp>
+#include <boost/mpl/at.hpp>
+#include <boost/mpl/equal_to.hpp>
+#include <boost/mpl/comparison.hpp>
+#include <boost/mpl/vector.hpp>
+#include <boost/mpl/assert.hpp>
+#include <boost/mpl/erase.hpp>
+#include <boost/mpl/find.hpp>
+#include <boost/static_assert.hpp>
+#include <boost/type_traits/is_const.hpp>
+#include <tbb/null_mutex.h>
+#include <tbb/spin_mutex.h>
+#include <openvdb/version.h>
+#include <openvdb/Types.h>
+
+namespace openvdb {
+OPENVDB_USE_VERSION_NAMESPACE
+namespace OPENVDB_VERSION_NAME {
+namespace tree {
+
+// Forward declarations of local classes that are not intended for general use
+template<typename TreeType> class ValueAccessor0;
+template<typename TreeType, Index L0 = 0> class ValueAccessor1;
+template<typename TreeType, Index L0 = 0, Index L1 = 1> class ValueAccessor2;
+template<typename TreeType, Index L0 = 0, Index L1 = 1, Index L2 = 2> class ValueAccessor3;
+template<typename HeadT, int HeadLevel> struct InvertedTree;
+template<typename TreeCacheT, typename NodeVecT, bool AtRoot> class CacheItem;
+
+
+/// @brief This base class for ValueAccessors manages registration of an accessor
+/// with a tree so that the tree can automatically clear the accessor whenever
+/// one of its nodes is deleted.
+/// @internal A base class is needed because ValueAccessor is templated on both
+/// a Tree type and a mutex type.  The various instantiations of the template
+/// are distinct, unrelated types, so they can't easily be stored in a container
+/// such as the Tree's CacheRegistry.  This base class, in contrast, is templated
+/// only on the Tree type, so for any given Tree, only two distinct instantiations
+/// are possible, ValueAccessorBase<Tree> and ValueAccessorBase<const Tree>.
+template<typename TreeType>
+class ValueAccessorBase
+{
+public:
+    static const bool IsConstTree = boost::is_const<TreeType>::value;
+
+    ValueAccessorBase(TreeType& tree): mTree(&tree) { tree.attachAccessor(*this); }
+
+    virtual ~ValueAccessorBase() { if (mTree) mTree->releaseAccessor(*this); }
+
+    /// @return a pointer to the tree associated by this ValueAccessor
+    TreeType* getTree() const { return mTree; }
+
+    ValueAccessorBase(const ValueAccessorBase& other): mTree(other.mTree)
+    {
+        if (mTree) mTree->attachAccessor(*this);
+    }
+
+    ValueAccessorBase& operator=(const ValueAccessorBase& other)
+    {
+        if (&other != this) {
+            if (mTree) mTree->releaseAccessor(*this);
+            mTree = other.mTree;
+            if (mTree) mTree->attachAccessor(*this);
+        }
+        return *this;
+    }
+
+    virtual void clear() = 0;
+
+protected:
+    // Allow trees to deregister themselves.
+    template<typename> friend class Tree;
+
+    virtual void release() { mTree = NULL; }
+
+    TreeType* mTree;
+}; // class ValueAccessorBase
+
+
+////////////////////////////////////////
+
+
+/// When traversing a grid in a spatially coherent pattern (e.g., iterating
+/// over neighboring voxels), request a @c ValueAccessor from the grid
+/// (with Grid::getAccessor()) and use the accessor's @c getValue() and
+/// @c setValue() methods.  These will typically be significantly faster
+/// than accessing voxels directly in the grid's tree.
+/// @note If @c MutexType is a TBB-compatible mutex, then multiple threads
+/// may safely access a single, shared accessor.  However, it is
+/// highly recommended that, instead, each thread be assigned its own,
+/// non-mutex-protected accessor.
+///
+/// Conceptually this ValueAccessor is a node-cache with accessor
+/// methods. Specefically the tree nodes from a previous access are
+/// cached and re-used starting with the LeafNode and moving up
+/// throug the node levels of the tree. Thus this node caching
+/// essentiall leads to acceleration of spatially coherent
+/// access by means of inverted tree traversal!
+///
+/// @param _TreeType This is the only template paramter that
+///        always has to be specified.
+/// @param CacheLevels Used to specify the number of bottom nodes
+///        that are cached. The default caches all (non-root)
+///        nodes. The maximum allowed number of CacheLevels
+///        correspond to the number of non-root nodes, i.e.
+///        CacheLevels <= DEPTH-1!
+/// @param MutexType This defines the type of mutex-lock and
+///        should almost always be left untouched (unless you're
+///        and expert!)
+template<typename _TreeType,
+         Index CacheLevels = _TreeType::DEPTH-1,
+         typename MutexType = tbb::null_mutex>
+class ValueAccessor: public ValueAccessorBase<_TreeType>
+{
+public:
+    BOOST_STATIC_ASSERT(CacheLevels <= _TreeType::DEPTH-1);
+    typedef _TreeType                       TreeType;
+    typedef typename TreeType::RootNodeType RootNodeT;
+    typedef typename TreeType::LeafNodeType LeafNodeT;
+    typedef typename RootNodeT::ValueType   ValueType;
+    typedef ValueAccessorBase<TreeType>     BaseT;
+    typedef typename MutexType::scoped_lock LockT;
+    using BaseT::IsConstTree;
+
+    ValueAccessor(TreeType& tree): BaseT(tree), mCache(*this)
+    {
+        mCache.insert(Coord(), &tree.getRootNode());
+    }
+
+    ValueAccessor(const ValueAccessor& other): BaseT(other), mCache(*this, other.mCache) {}
+
+    ValueAccessor& operator=(const ValueAccessor& other)
+    {
+        if (&other != this) {
+            this->BaseT::operator=(other);
+            mCache.copy(*this, other.mCache);
+        }
+        return *this;
+    }
+    virtual ~ValueAccessor() {}
+
+    /// Return the number of cache levels employed by this ValueAccessor
+    static Index numCacheLevels() { return CacheLevels; }
+
+    /// Return @c true if nodes along the path to the given voxel have been cached.
+    bool isCached(const Coord& xyz) const { LockT lock(mMutex); return mCache.isCached(xyz); }
+
+    /// Return the value of the voxel at the given coordinates.
+    const ValueType& getValue(const Coord& xyz) const
+    {
+        LockT lock(mMutex);
+        return mCache.getValue(xyz);
+    }
+
+    /// Return the active state of the voxel at the given coordinates.
+    bool isValueOn(const Coord& xyz) const { LockT lock(mMutex); return mCache.isValueOn(xyz); }
+
+    /// Return the active state of the voxel as well as its value
+    bool probeValue(const Coord& xyz, ValueType& value) const
+    {
+        LockT lock(mMutex);
+        return mCache.probeValue(xyz,value);
+    }
+
+    /// Return the tree depth (0 = root) at which the value of voxel (x, y, z) resides,
+    /// or -1 if (x, y, z) isn't explicitly represented in the tree (i.e., if it is
+    /// implicitly a background voxel).
+    int getValueDepth(const Coord& xyz) const
+    {
+        LockT lock(mMutex);
+        return mCache.getValueDepth(xyz);
+    }
+
+    /// Return @c true if the value of voxel (x, y, z) resides at the leaf level
+    /// of the tree, i.e., if it is not a tile value.
+    bool isVoxel(const Coord& xyz) const { LockT lock(mMutex); return mCache.isVoxel(xyz); }
+
+    //@{
+    /// Set the value of the voxel at the given coordinates and mark the voxel as active.
+    void setValue(const Coord& xyz, const ValueType& value)
+    {
+        LockT lock(mMutex);
+        mCache.setValue(xyz, value);
+    }
+    void setValueOn(const Coord& xyz, const ValueType& value) { this->setValue(xyz, value); }
+    //@}
+
+    /// Set the value of the voxel at the given coordinate but preserves its active state.
+    void setValueOnly(const Coord& xyz, const ValueType& value)
+    {
+        LockT lock(mMutex);
+        mCache.setValueOnly(xyz, value);
+    }
+
+    /// Set the value of the voxel at the given coordinates and mark the voxel
+    /// as active.  [Experimental]
+    void newSetValue(const Coord& xyz, const ValueType& value)
+    {
+        LockT lock(mMutex);
+        mCache.newSetValue(xyz, value);
+    }
+
+    /// Set the value of the voxel at the given coordinates and mark the voxel as inactive.
+    void setValueOff(const Coord& xyz, const ValueType& value)
+    {
+        LockT lock(mMutex);
+        mCache.setValueOff(xyz, value);
+    }
+
+    /// Set the value of the voxel at the given coordinates to the sum of its current
+    /// value and the given value, and mark the voxel as active.
+    void setValueOnSum(const Coord& xyz, const ValueType& value)
+    {
+        LockT lock(mMutex);
+        mCache.setValueOnSum(xyz, value);
+    }
+
+    /// Set the active state of the voxel at the given coordinates without changing its value.
+    void setActiveState(const Coord& xyz, bool on = true)
+    {
+        LockT lock(mMutex);
+        mCache.setActiveState(xyz, on);
+    }
+    /// Mark the voxel at the given coordinates as active without changing its value.
+    void setValueOn(const Coord& xyz) { this->setActiveState(xyz, true); }
+    /// Mark the voxel at the given coordinates as inactive without changing its value.
+    void setValueOff(const Coord& xyz) { this->setActiveState(xyz, false); }
+
+    /// Return the cached node of type @a NodeType.  [Mainly for internal use]
+    template<typename NodeType>
+    NodeType* getNode()
+    {
+        LockT lock(mMutex);
+        NodeType* node = NULL;
+        mCache.getNode(node);
+        return node;
+    }
+
+    /// Cache the given node, which should lie along the path from the root node to
+    /// the node containing voxel (x, y, z).  [Mainly for internal use]
+    template<typename NodeType>
+    void insertNode(const Coord& xyz, NodeType& node)
+    {
+        LockT lock(mMutex);
+        mCache.insert(xyz, &node);
+    }
+
+    /// If a node of the given type exists in the cache, remove it, so that
+    /// isCached(xyz) returns @c false for any voxel (x, y, z) contained in
+    /// that node.  [Mainly for internal use]
+    template<typename NodeType>
+    void eraseNode() { LockT lock(mMutex); NodeType* node = NULL; mCache.erase(node); }
+
+    /// @brief @return the leaf node that contains voxel (x, y, z) and
+    /// if it doesn't exist, create it, but preserve the values and
+    /// active states of all voxels.
+    ///
+    /// Use this method to preallocate a static tree topology over which to
+    /// safely perform multithreaded processing.
+    LeafNodeT* touchLeaf(const Coord& xyz)
+    {
+        LockT lock(mMutex);
+        return mCache.touchLeaf(xyz);
+    }
+
+    /// @brief @return a pointer to the leaf node that contains
+    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    LeafNodeT* probeLeaf(const Coord& xyz)
+    {
+        LockT lock(mMutex);
+        return mCache.probeLeaf(xyz);
+    }
+
+    /// @brief @return a const pointer to the leaf node that contains
+    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    const LeafNodeT* probeConstLeaf(const Coord& xyz)
+    {
+        LockT lock(mMutex);
+        return mCache.probeConstLeaf(xyz);
+    }
+
+    /// Remove all nodes from this cache, then reinsert the root node.
+    virtual void clear()
+    {
+        LockT lock(mMutex);
+        mCache.clear();
+        if (this->mTree) mCache.insert(Coord(), &(this->mTree->getRootNode()));
+    }
+
+private:
+    // Allow nodes to insert themselves into the cache.
+    template<typename> friend class RootNode;
+    template<typename, Index> friend class InternalNode;
+    template<typename, Index> friend class LeafNode;
+    // Allow trees to deregister themselves.
+    template<typename> friend class Tree;
+
+    /// Prevent this accessor from calling Tree::releaseCache() on a tree that
+    /// no longer exists.  (Called by mTree when it is destroyed.)
+    virtual void release()
+    {
+        LockT lock(mMutex);
+        this->BaseT::release();
+        mCache.clear();
+    }
+    /// Cache the given node, which should lie along the path from the root node to
+    /// the node containing voxel (x, y, z).
+    /// @note This operation is not mutex-protected and is intended to be called
+    /// only by nodes and only in the context of a getValue() or setValue() call.
+    template<typename NodeType>
+    void insert(const Coord& xyz, NodeType* node) { mCache.insert(xyz, node); }
+
+    // Define a list of all tree node types from LeafNode to RootNode
+    typedef typename InvertedTree<RootNodeT, RootNodeT::LEVEL>::Type InvTreeT;
+    // Remove all tree node types that are excluded from the cache
+    typedef typename boost::mpl::begin<InvTreeT>::type BeginT;
+    typedef typename boost::mpl::advance<BeginT,boost::mpl::int_<CacheLevels> >::type FirstT;
+    typedef typename boost::mpl::find<InvTreeT, RootNodeT>::type LastT;
+    typedef typename boost::mpl::erase<InvTreeT,FirstT,LastT>::type SubtreeT;
+    typedef CacheItem<ValueAccessor, SubtreeT, boost::mpl::size<SubtreeT>::value==1> CacheItemT;
+
+    // Private member data
+    mutable CacheItemT mCache;
+    mutable MutexType  mMutex;
+
+}; // class ValueAccessor
+
+
+/// Template specialization of the ValueAccessor with no mutex and no cache levels
+///
+/// @note This specialization is mosty useful for benchmark comparisions
+/// since the cached versions (above) are always expected to be faster.
+template<typename TreeType>
+struct ValueAccessor<TreeType, 0, tbb::null_mutex>: public ValueAccessor0<TreeType>
+{
+    ValueAccessor(TreeType& tree): ValueAccessor0<TreeType>(tree) {}
+    ValueAccessor(const ValueAccessor& other): ValueAccessor0<TreeType>(other) {}
+    virtual ~ValueAccessor() {}
+};
+
+
+/// Template specialization of the ValueAccessor with no mutex and 1 cache level
+template<typename TreeType>
+struct ValueAccessor<TreeType, 1, tbb::null_mutex>: public ValueAccessor1<TreeType>
+{
+    ValueAccessor(TreeType& tree): ValueAccessor1<TreeType>(tree) {}
+    ValueAccessor(const ValueAccessor& other): ValueAccessor1<TreeType>(other) {}
+    virtual ~ValueAccessor() {}
+};
+
+
+/// Template specialization of the ValueAccessor with no mutex and 2 cache levels
+template<typename TreeType>
+struct ValueAccessor<TreeType, 2, tbb::null_mutex>: public ValueAccessor2<TreeType>
+{
+    ValueAccessor(TreeType& tree): ValueAccessor2<TreeType>(tree) {}
+    ValueAccessor(const ValueAccessor& other): ValueAccessor2<TreeType>(other) {}
+    virtual ~ValueAccessor() {}
+};
+
+
+/// Template specialization of the ValueAccessor with no mutex and 3 cache levels
+template<typename TreeType>
+struct ValueAccessor<TreeType, 3, tbb::null_mutex>: public ValueAccessor3<TreeType>
+{
+    ValueAccessor(TreeType& tree): ValueAccessor3<TreeType>(tree) {}
+    ValueAccessor(const ValueAccessor& other): ValueAccessor3<TreeType>(other) {}
+    virtual ~ValueAccessor() {}
+};
+
+
+////////////////////////////////////////
+
+
+/// This accessor is thread-safe (at the cost of speed) for both reading and
+/// writing to a tree.  That is, multiple threads may safely access a single,
+/// shared ValueAccessorRW.  For better performance, however, it is recommended
+/// that, instead, each thread be assigned its own (non-mutex protected) accessor.
+template<typename TreeType>
+struct ValueAccessorRW: public ValueAccessor<TreeType, TreeType::DEPTH-1, tbb::spin_mutex>
+{
+    ValueAccessorRW(TreeType& tree)
+        : ValueAccessor<TreeType, TreeType::DEPTH-1, tbb::spin_mutex>(tree)
+    {
+    }
+};
+
+
+////////////////////////////////////////
+
+
+/////////////////////////////////////////////////////////////////////////////////
+/// The classes below are for experts only and should rarely be used directly ///
+/////////////////////////////////////////////////////////////////////////////////
+
+/// InvertedTree<RootNodeType, RootNodeType::LEVEL>::Type is a boost::mpl::vector
+/// that lists the types of the nodes of the tree rooted at RootNodeType
+/// in reverse order, from LeafNode to RootNode.  For example, for RootNodeType
+/// RootNode<InternalNode<InternalNode<LeafNode> > >, InvertedTree::Type is
+///     boost::mpl::vector<
+///         LeafNode,
+///         InternalNode<LeafNode>,
+///         InternalNode<InternalNode<LeafNode> >,
+///         RootNode<InternalNode<InternalNode<LeafNode> > > >.
+template<typename HeadT, int HeadLevel>
+struct InvertedTree {
+    typedef typename InvertedTree<typename HeadT::ChildNodeType, HeadLevel-1>::Type SubtreeT;
+    typedef typename boost::mpl::push_back<SubtreeT, HeadT>::type Type;
+};
+/// For level one nodes (either RootNode<LeafNode> or InternalNode<LeafNode>),
+/// InvertedTree::Type is either boost::mpl::vector<LeafNode, RootNode<LeafNode> >
+/// or boost::mpl::vector<LeafNode, InternalNode<LeafNode> >.
+template<typename HeadT>
+struct InvertedTree<HeadT, /*HeadLevel=*/1> {
+    typedef typename boost::mpl::vector<typename HeadT::ChildNodeType, HeadT>::type Type;
+};
+
+
+// An element of a compile-time linked list of node pointers, ordered from LeafNode to RootNode
+template<typename TreeCacheT, typename NodeVecT, bool AtRoot>
+class CacheItem
+{
+public:
+    typedef typename boost::mpl::front<NodeVecT>::type NodeType;
+    typedef typename NodeType::ValueType               ValueType;
+    typedef typename NodeType::LeafNodeType            LeafNodeType;
+    typedef std::numeric_limits<Int32>                 CoordLimits;
+
+    CacheItem(TreeCacheT& parent):
+        mParent(&parent),
+        mHash(CoordLimits::max()),
+        mNode(NULL),
+        mNext(parent)
+    {
+    }
+
+    //@{
+    /// Copy another CacheItem's node pointers and hash keys, but not its parent pointer.
+    CacheItem(TreeCacheT& parent, const CacheItem& other):
+        mParent(&parent),
+        mHash(other.mHash),
+        mNode(other.mNode),
+        mNext(parent, other.mNext)
+    {
+    }
+
+    CacheItem& copy(TreeCacheT& parent, const CacheItem& other)
+    {
+        mParent = &parent;
+        mHash = other.mHash;
+        mNode = other.mNode;
+        mNext.copy(parent, other.mNext);
+        return *this;
+    }
+    //@}
+
+    bool isCached(const Coord& xyz) const
+    {
+        return (this->isHashed(xyz) || mNext.isCached(xyz));
+    }
+
+    /// Cache the given node at this level.
+    void insert(const Coord& xyz, const NodeType* node)
+    {
+        mHash = (node != NULL) ? xyz & ~(NodeType::DIM-1) : Coord::max();
+        mNode = node;
+    }
+    /// Forward the given node to another level of the cache.
+    template<typename OtherNodeType>
+    void insert(const Coord& xyz, const OtherNodeType* node) { mNext.insert(xyz, node); }
+
+    /// Erase the node at this level.
+    void erase(const NodeType*) { mHash = Coord::max(); mNode = NULL; }
+    /// Erase the node at another level of the cache.
+    template<typename OtherNodeType>
+    void erase(const OtherNodeType* node) { mNext.erase(node); }
+
+    /// Erase the nodes at this and lower levels of the cache.
+    void clear() { mHash = Coord::max(); mNode = NULL; mNext.clear(); }
+
+    /// Return the cached node (if any) at this level.
+    void getNode(const NodeType*& node) const { node = mNode; }
+    void getNode(const NodeType*& node) { node = mNode; }
+    void getNode(NodeType*& node)
+    {
+        // This combination of a static assertion and a const_cast might not be elegant,
+        // but it is a lot simpler than specializing TreeCache for const Trees.
+        BOOST_STATIC_ASSERT(!TreeCacheT::IsConstTree);
+        node = const_cast<NodeType*>(mNode);
+    }
+    /// Forward the request to another level of the cache.
+    template<typename OtherNodeType>
+    void getNode(OtherNodeType*& node) { mNext.getNode(node); }
+
+    /// Return the value of the voxel at the given coordinates.
+    const ValueType& getValue(const Coord& xyz)
+    {
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            return mNode->getValueAndCache(xyz, *mParent);
+        }
+        return mNext.getValue(xyz);
+    }
+
+    LeafNodeType* touchLeaf(const Coord& xyz)
+    {
+        BOOST_STATIC_ASSERT(!TreeCacheT::IsConstTree);
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            return const_cast<NodeType*>(mNode)->touchLeafAndCache(xyz, *mParent);
+        }
+        return mNext.touchLeaf(xyz);
+    }
+
+    LeafNodeType* probeLeaf(const Coord& xyz)
+    {
+        BOOST_STATIC_ASSERT(!TreeCacheT::IsConstTree);
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            return const_cast<NodeType*>(mNode)->probeLeafAndCache(xyz, *mParent);
+        }
+        return mNext.probeLeaf(xyz);
+    }
+
+    const LeafNodeType* probeConstLeaf(const Coord& xyz)
+    {
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            return mNode->probeConstLeafAndCache(xyz, *mParent);
+        }
+        return mNext.probeConstLeaf(xyz);
+    }
+
+    /// Return the active state of the voxel at the given coordinates.
+    bool isValueOn(const Coord& xyz)
+    {
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            return mNode->isValueOnAndCache(xyz, *mParent);
+        }
+        return mNext.isValueOn(xyz);
+    }
+
+    /// Return the active state and value of the voxel at the given coordinates.
+    bool probeValue(const Coord& xyz, ValueType& value)
+    {
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            return mNode->probeValueAndCache(xyz, value, *mParent);
+        }
+        return mNext.probeValue(xyz, value);
+    }
+
+     int getValueDepth(const Coord& xyz)
+    {
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            return static_cast<int>(TreeCacheT::RootNodeT::LEVEL) -
+                   static_cast<int>(mNode->getValueLevelAndCache(xyz, *mParent));
+        } else {
+            return mNext.getValueDepth(xyz);
+        }
+    }
+
+    bool isVoxel(const Coord& xyz)
+    {
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            return mNode->getValueLevelAndCache(xyz, *mParent)==0;
+        } else {
+            return mNext.isVoxel(xyz);
+        }
+    }
+
+    /// Set the value of the voxel at the given coordinates and mark the voxel as active.
+    void setValue(const Coord& xyz, const ValueType& value)
+    {
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            BOOST_STATIC_ASSERT(!TreeCacheT::IsConstTree);
+            const_cast<NodeType*>(mNode)->setValueAndCache(xyz, value, *mParent);
+        } else {
+            mNext.setValue(xyz, value);
+        }
+    }
+    void setValueOnly(const Coord& xyz, const ValueType& value)
+    {
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            BOOST_STATIC_ASSERT(!TreeCacheT::IsConstTree);
+            const_cast<NodeType*>(mNode)->setValueOnlyAndCache(xyz, value, *mParent);
+        } else {
+            mNext.setValueOnly(xyz, value);
+        }
+    }
+    void setValueOn(const Coord& xyz, const ValueType& value) { this->setValue(xyz, value); }
+
+    /// Set the value of the voxel at the given coordinates to the sum of its current
+    /// value and the given value, and mark the voxel as active.
+    void setValueOnSum(const Coord& xyz, const ValueType& value)
+    {
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            BOOST_STATIC_ASSERT(!TreeCacheT::IsConstTree);
+            const_cast<NodeType*>(mNode)->setValueOnSumAndCache(xyz, value, *mParent);
+        } else {
+            mNext.setValueOnSum(xyz, value);
+        }
+    }
+
+    /// Set the value of the voxel at the given coordinates and mark the voxel as inactive.
+    void setValueOff(const Coord& xyz, const ValueType& value)
+    {
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            BOOST_STATIC_ASSERT(!TreeCacheT::IsConstTree);
+            const_cast<NodeType*>(mNode)->setValueOffAndCache(xyz, value, *mParent);
+        } else {
+            mNext.setValueOff(xyz, value);
+        }
+    }
+
+    /// Set the active state of the voxel at the given coordinates.
+    void setActiveState(const Coord& xyz, bool on)
+    {
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            BOOST_STATIC_ASSERT(!TreeCacheT::IsConstTree);
+            const_cast<NodeType*>(mNode)->setActiveStateAndCache(xyz, on, *mParent);
+        } else {
+            mNext.setActiveState(xyz, on);
+        }
+    }
+
+private:
+    CacheItem(const CacheItem&);
+    CacheItem& operator=(const CacheItem&);
+
+    bool isHashed(const Coord& xyz) const
+    {
+        return (xyz[0] & ~Coord::ValueType(NodeType::DIM-1)) == mHash[0]
+            && (xyz[1] & ~Coord::ValueType(NodeType::DIM-1)) == mHash[1]
+            && (xyz[2] & ~Coord::ValueType(NodeType::DIM-1)) == mHash[2];
+    }
+
+    TreeCacheT* mParent;
+    Coord mHash;
+    const NodeType* mNode;
+    typedef typename boost::mpl::pop_front<NodeVecT>::type RestT; // NodeVecT minus its first item
+    CacheItem<TreeCacheT, RestT, /*AtRoot=*/boost::mpl::size<RestT>::value == 1> mNext;
+};// end of CacheItem
+
+
+/// The tail of a compile-time list of cached node pointers, ordered from LeafNode to RootNode
+template<typename TreeCacheT, typename NodeVecT>
+class CacheItem<TreeCacheT, NodeVecT, /*AtRoot=*/true>
+{
+public:
+    typedef typename boost::mpl::front<NodeVecT>::type RootNodeType;
+    typedef typename RootNodeType::ValueType           ValueType;
+    typedef typename RootNodeType::LeafNodeType        LeafNodeType;
+
+    CacheItem(TreeCacheT& parent): mParent(&parent), mRoot(NULL) {}
+    CacheItem(TreeCacheT& parent, const CacheItem& other): mParent(&parent), mRoot(other.mRoot) {}
+
+    CacheItem& copy(TreeCacheT& parent, const CacheItem& other)
+    {
+        mParent = &parent;
+        mRoot = other.mRoot;
+        return *this;
+    }
+
+    bool isCached(const Coord& xyz) const { return this->isHashed(xyz); }
+
+    void insert(const Coord&, const RootNodeType* root) { mRoot = root; }
+
+    // Needed for node types that are not cached
+    template <typename OtherNodeType>
+    void insert(const Coord&, const OtherNodeType*) {}
+
+    void erase(const RootNodeType*) { mRoot = NULL; }
+
+    void clear() { mRoot = NULL; }
+
+    void getNode(RootNodeType*& node)
+    {
+        BOOST_STATIC_ASSERT(!TreeCacheT::IsConstTree);
+        node = const_cast<RootNodeType*>(mRoot);
+    }
+    void getNode(const RootNodeType*& node) const { node = mRoot; }
+
+    LeafNodeType* touchLeaf(const Coord& xyz)
+    {
+        assert(mRoot);
+        BOOST_STATIC_ASSERT(!TreeCacheT::IsConstTree);
+        return const_cast<RootNodeType*>(mRoot)->touchLeafAndCache(xyz, *mParent);
+    }
+
+    LeafNodeType* probeLeaf(const Coord& xyz)
+    {
+        assert(mRoot);
+        BOOST_STATIC_ASSERT(!TreeCacheT::IsConstTree);
+        return const_cast<RootNodeType*>(mRoot)->probeLeafAndCache(xyz, *mParent);
+    }
+
+    const LeafNodeType* probeConstLeaf(const Coord& xyz)
+    {
+        assert(mRoot);
+        return mRoot->probeConstLeafAndCache(xyz, *mParent);
+    }
+
+    int getValueDepth(const Coord& xyz)
+    {
+        assert(mRoot);
+        return mRoot->getValueDepthAndCache(xyz, *mParent);
+    }
+    bool isValueOn(const Coord& xyz)
+    {
+        assert(mRoot);
+        return mRoot->isValueOnAndCache(xyz, *mParent);
+    }
+
+    bool probeValue(const Coord& xyz, ValueType& value)
+    {
+        assert(mRoot);
+        return mRoot->probeValueAndCache(xyz, value, *mParent);
+    }
+    bool isVoxel(const Coord& xyz)
+    {
+        assert(mRoot);
+        return mRoot->getValueDepthAndCache(xyz, *mParent) ==
+               static_cast<int>(RootNodeType::LEVEL);
+    }
+    const ValueType& getValue(const Coord& xyz)
+    {
+        assert(mRoot);
+        return mRoot->getValueAndCache(xyz, *mParent);
+    }
+
+    void setValue(const Coord& xyz, const ValueType& value)
+    {
+        assert(mRoot);
+        BOOST_STATIC_ASSERT(!TreeCacheT::IsConstTree);
+        const_cast<RootNodeType*>(mRoot)->setValueAndCache(xyz, value, *mParent);
+    }
+    void setValueOnly(const Coord& xyz, const ValueType& value)
+    {
+        assert(mRoot);
+        BOOST_STATIC_ASSERT(!TreeCacheT::IsConstTree);
+        const_cast<RootNodeType*>(mRoot)->setValueOnlyAndCache(xyz, value, *mParent);
+    }
+    void setValueOn(const Coord& xyz, const ValueType& value) { this->setValue(xyz, value); }
+
+    void setValueOnSum(const Coord& xyz, const ValueType& value)
+    {
+        assert(mRoot);
+        BOOST_STATIC_ASSERT(!TreeCacheT::IsConstTree);
+        const_cast<RootNodeType*>(mRoot)->setValueOnSumAndCache(xyz, value, *mParent);
+    }
+
+    void setValueOff(const Coord& xyz, const ValueType& value)
+    {
+        assert(mRoot);
+        BOOST_STATIC_ASSERT(!TreeCacheT::IsConstTree);
+        const_cast<RootNodeType*>(mRoot)->setValueOffAndCache(xyz, value, *mParent);
+    }
+
+    void setActiveState(const Coord& xyz, bool on)
+    {
+        assert(mRoot);
+        BOOST_STATIC_ASSERT(!TreeCacheT::IsConstTree);
+        const_cast<RootNodeType*>(mRoot)->setActiveStateAndCache(xyz, on, *mParent);
+    }
+
+private:
+    CacheItem(const CacheItem&);
+    CacheItem& operator=(const CacheItem&);
+
+    bool isHashed(const Coord&) const { return false; }
+
+    TreeCacheT* mParent;
+    const RootNodeType* mRoot;
+};// end of CacheItem specialized for RootNode
+
+
+////////////////////////////////////////
+
+
+/// @brief ValueAccessor with no mutex and no node caching.
+///
+/// @note This specialization is mostly useful for benchmark comparisons,
+/// since the cached versions are always expected to be faster.
+template<typename _TreeType>
+class ValueAccessor0 : public ValueAccessorBase<_TreeType>
+{
+public:
+    typedef _TreeType                       TreeType;
+    typedef typename TreeType::ValueType    ValueType;
+    typedef typename TreeType::RootNodeType RootNodeT;
+    typedef typename TreeType::LeafNodeType LeafNodeT;
+    typedef ValueAccessorBase<TreeType>     BaseT;
+
+    ValueAccessor0(TreeType& tree) : BaseT(tree) {}
+
+    ValueAccessor0(const ValueAccessor0& other) : BaseT(other) {}
+
+    /// Return the number of cache levels employed by this ValueAccessor
+    static Index numCacheLevels() { return 0; }
+
+    ValueAccessor0& operator=(const ValueAccessor0& other)
+    {
+        if (&other != this) this->BaseT::operator=(other);
+        return *this;
+    }
+
+    virtual ~ValueAccessor0() {}
+
+    /// Return @c true if nodes along the path to the given voxel have been cached.
+    bool isCached(const Coord&) const { return false; }
+
+    /// Return the value of the voxel at the given coordinates.
+    const ValueType& getValue(const Coord& xyz) const
+    {
+        assert(BaseT::mTree);
+        return BaseT::mTree->getValue(xyz);
+    }
+
+    /// Return the active state of the voxel at the given coordinates.
+    bool isValueOn(const Coord& xyz) const
+    {
+        assert(BaseT::mTree);
+        return BaseT::mTree->isValueOn(xyz);
+    }
+
+    /// Return the active state of the voxel as well as its value
+    bool probeValue(const Coord& xyz, ValueType& value) const
+    {
+        assert(BaseT::mTree);
+        return BaseT::mTree->probeValue(xyz, value);
+    }
+
+    /// Return the tree depth (0 = root) at which the value of voxel (x, y, z) resides,
+    /// or -1 if (x, y, z) isn't explicitly represented in the tree (i.e., if it is
+    /// implicitly a background voxel).
+    int getValueDepth(const Coord& xyz) const
+    {
+        assert(BaseT::mTree);
+        return BaseT::mTree->getValueDepth(xyz);
+    }
+
+    /// Return @c true if the value of voxel (x, y, z) resides at the leaf level
+    /// of the tree, i.e., if it is not a tile value.
+    bool isVoxel(const Coord& xyz) const
+    {
+        assert(BaseT::mTree);
+        return BaseT::mTree->getValueDepth(xyz) == static_cast<int>(RootNodeT::LEVEL);
+    }
+
+    //@{
+    /// Set the value of the voxel at the given coordinates and mark the voxel as active.
+    void setValue(const Coord& xyz, const ValueType& value)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        BaseT::mTree->setValue(xyz, value);
+    }
+    void setValueOn(const Coord& xyz, const ValueType& value) { this->setValue(xyz, value); }
+    //@}
+
+    /// Set the value of the voxel at the given coordinate but preserves its active state.
+    void setValueOnly(const Coord& xyz, const ValueType& value)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        BaseT::mTree->setValueOnly(xyz, value);
+    }
+
+    /// Set the value of the voxel at the given coordinates and mark the voxel as inactive.
+    void setValueOff(const Coord& xyz, const ValueType& value)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        BaseT::mTree->getRootNode().setValueOff(xyz, value);
+    }
+
+    /// Set the value of the voxel at the given coordinates to the sum of its current
+    /// value and the given value, and mark the voxel as active.
+    void setValueOnSum(const Coord& xyz, const ValueType& value)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        BaseT::mTree->setValueOnSum(xyz, value);
+    }
+
+    /// Set the active state of the voxel at the given coordinates without changing its value.
+    void setActiveState(const Coord& xyz, bool on = true)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        BaseT::mTree->setActiveState(xyz, on);
+    }
+    /// Mark the voxel at the given coordinates as active without changing its value.
+    void setValueOn(const Coord& xyz) { this->setActiveState(xyz, true); }
+    /// Mark the voxel at the given coordinates as inactive without changing its value.
+    void setValueOff(const Coord& xyz) { this->setActiveState(xyz, false); }
+
+    /// Return the cached node of type @a NodeType.  [Mainly for internal use]
+    template<typename NodeT> NodeT* getNode() { return NULL; }
+
+    /// Cache the given node, which should lie along the path from the root node to
+    /// the node containing voxel (x, y, z).  [Mainly for internal use]
+    template<typename NodeT> void insertNode(const Coord&, NodeT&) {}
+
+    /// If a node of the given type exists in the cache, remove it, so that
+    /// isCached(xyz) returns @c false for any voxel (x, y, z) contained in
+    /// that node.  [Mainly for internal use]
+    template<typename NodeT> void eraseNode() {}
+
+    LeafNodeT* touchLeaf(const Coord& xyz)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        return BaseT::mTree->touchLeaf(xyz);
+    }
+
+    LeafNodeT* probeLeaf(const Coord& xyz)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        return BaseT::mTree->probeLeaf(xyz);
+    }
+
+    const LeafNodeT* probeConstLeaf(const Coord& xyz)
+    {
+        assert(BaseT::mTree);
+        return BaseT::mTree->probeConstLeaf(xyz);
+    }
+
+    /// Remove all nodes from this cache, then reinsert the root node.
+    virtual void clear() {}
+
+private:
+    // Allow trees to deregister themselves.
+    template<typename> friend class Tree;
+
+    /// Prevent this accessor from calling Tree::releaseCache() on a tree that
+    /// no longer exists.  (Called by mTree when it is destroyed.)
+    virtual void release() { this->BaseT::release(); }
+
+}; // ValueAccessor0
+
+
+/// @brief Value accessor with one level of node caching.
+/// @details The node cache level is specified by L0 with the default value 0
+/// (defined in the forward declaration) corresponding to a LeafNode.
+///
+/// @note This class is for experts only and should rarely be used
+/// directly. Instead use ValueAccessor with its default template arguments.
+template<typename _TreeType, Index L0>
+class ValueAccessor1 : public ValueAccessorBase<_TreeType>
+{
+public:
+    BOOST_STATIC_ASSERT(_TreeType::DEPTH >= 2);
+    BOOST_STATIC_ASSERT( L0 < _TreeType::RootNodeType::LEVEL );
+    typedef _TreeType                       TreeType;
+    typedef typename TreeType::ValueType    ValueType;
+    typedef typename TreeType::RootNodeType RootNodeT;
+    typedef typename TreeType::LeafNodeType LeafNodeT;
+    typedef ValueAccessorBase<TreeType>     BaseT;
+    typedef typename InvertedTree<RootNodeT, RootNodeT::LEVEL>::Type InvTreeT;
+    typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L0> >::type NodeT0;
+
+    /// Constructor from a tree
+    ValueAccessor1(TreeType& tree) : BaseT(tree), mKey0(Coord::max()), mNode0(NULL)
+    {
+    }
+
+    /// Copy constructor
+    ValueAccessor1(const ValueAccessor1& other) : BaseT(other) { this->copy(other); }
+
+    /// Return the number of cache levels employed by this ValueAccessor
+    static Index numCacheLevels() { return 1; }
+
+    /// Asignment operator
+    ValueAccessor1& operator=(const ValueAccessor1& other)
+    {
+        if (&other != this) {
+            this->BaseT::operator=(other);
+            this->copy(other);
+        }
+        return *this;
+    }
+
+    /// Virtual destructor
+    virtual ~ValueAccessor1() {}
+
+    /// Return @c true if any of the nodes along the path to the given
+    /// voxel have been cached.
+    bool isCached(const Coord& xyz) const
+    {
+        assert(BaseT::mTree);
+        return this->isHashed(xyz);
+    }
+
+    /// Return the value of the voxel at the given coordinates.
+    const ValueType& getValue(const Coord& xyz) const
+    {
+        assert(BaseT::mTree);
+        if (this->isHashed(xyz)) {
+            assert(mNode0);
+            return mNode0->getValueAndCache(xyz, this->self());
+        }
+        return BaseT::mTree->getRootNode().getValueAndCache(xyz, this->self());
+    }
+
+    /// Return the active state of the voxel at the given coordinates.
+    bool isValueOn(const Coord& xyz) const
+    {
+        assert(BaseT::mTree);
+        if (this->isHashed(xyz)) {
+            assert(mNode0);
+            return mNode0->isValueOnAndCache(xyz, this->self());
+        }
+        return BaseT::mTree->getRootNode().isValueOnAndCache(xyz, this->self());
+    }
+
+    /// Return the active state of the voxel as well as its value
+    bool probeValue(const Coord& xyz, ValueType& value) const
+    {
+        assert(BaseT::mTree);
+        if (this->isHashed(xyz)) {
+            assert(mNode0);
+            return mNode0->probeValueAndCache(xyz, value, this->self());
+        }
+        return BaseT::mTree->getRootNode().probeValueAndCache(xyz, value, this->self());
+    }
+
+    /// Return the tree depth (0 = root) at which the value of voxel (x, y, z) resides,
+    /// or -1 if (x, y, z) isn't explicitly represented in the tree (i.e., if it is
+    /// implicitly a background voxel).
+    int getValueDepth(const Coord& xyz) const
+    {
+        assert(BaseT::mTree);
+        if (this->isHashed(xyz)) {
+            assert(mNode0);
+            return RootNodeT::LEVEL - mNode0->getValueLevelAndCache(xyz, this->self());
+        }
+        return BaseT::mTree->getRootNode().getValueDepthAndCache(xyz, this->self());
+    }
+
+    /// Return @c true if the value of voxel (x, y, z) resides at the leaf level
+    /// of the tree, i.e., if it is not a tile value.
+    bool isVoxel(const Coord& xyz) const
+    {
+        assert(BaseT::mTree);
+        if (this->isHashed(xyz)) {
+            assert(mNode0);
+            return mNode0->getValueLevelAndCache(xyz, this->self()) == 0;
+        }
+        return BaseT::mTree->getRootNode().getValueDepthAndCache(xyz, this->self()) ==
+               static_cast<int>(RootNodeT::LEVEL);
+    }
+
+    //@{
+    /// Set the value of the voxel at the given coordinates and mark the voxel as active.
+    void setValue(const Coord& xyz, const ValueType& value)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        if (this->isHashed(xyz)) {
+            assert(mNode0);
+            const_cast<NodeT0*>(mNode0)->setValueAndCache(xyz, value, *this);
+        } else {
+            BaseT::mTree->getRootNode().setValueAndCache(xyz, value, *this);
+        }
+    }
+    void setValueOn(const Coord& xyz, const ValueType& value) { this->setValue(xyz, value); }
+    //@}
+
+    /// Set the value of the voxel at the given coordinate but preserves its active state.
+    void setValueOnly(const Coord& xyz, const ValueType& value)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        if (this->isHashed(xyz)) {
+            assert(mNode0);
+            const_cast<NodeT0*>(mNode0)->setValueOnlyAndCache(xyz, value, *this);
+        } else {
+            BaseT::mTree->getRootNode().setValueOnlyAndCache(xyz, value, *this);
+        }
+    }
+
+    /// Set the value of the voxel at the given coordinates and mark the voxel as inactive.
+    void setValueOff(const Coord& xyz, const ValueType& value)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        if (this->isHashed(xyz)) {
+            assert(mNode0);
+            const_cast<NodeT0*>(mNode0)->setValueOffAndCache(xyz, value, *this);
+        } else {
+            BaseT::mTree->getRootNode().setValueOffAndCache(xyz, value, *this);
+        }
+    }
+
+    /// Set the value of the voxel at the given coordinates to the sum of its current
+    /// value and the given value, and mark the voxel as active.
+    void setValueOnSum(const Coord& xyz, const ValueType& value)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        if (this->isHashed(xyz)) {
+            assert(mNode0);
+            const_cast<NodeT0*>(mNode0)->setValueOnSumAndCache(xyz, value, *this);
+        } else {
+            BaseT::mTree->getRootNode().setValueOnSumAndCache(xyz, value, *this);
+        }
+    }
+
+    /// Set the active state of the voxel at the given coordinates without changing its value.
+    void setActiveState(const Coord& xyz, bool on = true)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        if (this->isHashed(xyz)) {
+            assert(mNode0);
+            const_cast<NodeT0*>(mNode0)->setActiveStateAndCache(xyz, on, *this);
+        } else {
+            BaseT::mTree->getRootNode().setActiveStateAndCache(xyz, on, *this);
+        }
+    }
+    /// Mark the voxel at the given coordinates as active without changing its value.
+    void setValueOn(const Coord& xyz) { this->setActiveState(xyz, true); }
+    /// Mark the voxel at the given coordinates as inactive without changing its value.
+    void setValueOff(const Coord& xyz) { this->setActiveState(xyz, false); }
+
+    /// Return the cached node of type @a NodeType.  [Mainly for internal use]
+    template<typename NodeT>
+    NodeT* getNode()
+    {
+        const NodeT* node = NULL;
+        this->getNode(node);
+        return const_cast<NodeT*>(node);
+    }
+
+    /// Cache the given node, which should lie along the path from the root node to
+    /// the node containing voxel (x, y, z).  [Mainly for internal use]
+    template<typename NodeT>
+    void insertNode(const Coord& xyz, NodeT& node) { this->insert(xyz, &node); }
+
+    /// If a node of the given type exists in the cache, remove it, so that
+    /// isCached(xyz) returns @c false for any voxel (x, y, z) contained in
+    /// that node.  [Mainly for internal use]
+    template<typename NodeT>
+    void eraseNode()
+    {
+        const NodeT* node = NULL;
+        this->eraseNode(node);
+    }
+
+    /// @brief @return the leaf node that contains voxel (x, y, z) and
+    /// if it doesn't exist, create it, but preserve the values and
+    /// active states of all voxels.
+    ///
+    /// Use this method to preallocate a static tree topology over which to
+    /// safely perform multithreaded processing.
+    LeafNodeT* touchLeaf(const Coord& xyz)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        if (this->isHashed(xyz)) {
+            assert(mNode0);
+            return const_cast<NodeT0*>(mNode0)->touchLeafAndCache(xyz, *this);
+        }
+        return BaseT::mTree->getRootNode().touchLeafAndCache(xyz, *this);
+    }
+
+    /// @brief @return a pointer to the leaf node that contains
+    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    LeafNodeT* probeLeaf(const Coord& xyz)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        if (this->isHashed(xyz)) {
+            assert(mNode0);
+            return const_cast<NodeT0*>(mNode0)->probeLeafAndCache(xyz, *this);
+        }
+        return BaseT::mTree->getRootNode().probeLeafAndCache(xyz, *this);
+    }
+
+    /// @brief @return a const pointer to the leaf node that contains
+    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    const LeafNodeT* probeConstLeaf(const Coord& xyz)
+    {
+        assert(BaseT::mTree);
+        if (this->isHashed(xyz)) {
+            assert(mNode0);
+            return mNode0->probeLeafAndCache(xyz, *this);
+        }
+        return BaseT::mTree->getRootNode().probeConstLeafAndCache(xyz, *this);
+    }
+
+    /// Remove all the cached nodes and invalidate the corresponding hash-keys.
+    virtual void clear()
+    {
+        mKey0  = Coord::max();
+        mNode0 = NULL;
+    }
+
+private:
+    // Allow nodes to insert themselves into the cache.
+    template<typename> friend class RootNode;
+    template<typename, Index> friend class InternalNode;
+    template<typename, Index> friend class LeafNode;
+    // Allow trees to deregister themselves.
+    template<typename> friend class Tree;
+
+    // This private method is merely for convenience.
+    inline ValueAccessor1& self() const { return const_cast<ValueAccessor1&>(*this); }
+
+    void getNode(const NodeT0*& node) { node = mNode0; }
+    void getNode(const RootNodeT*& node)
+    {
+        node = (BaseT::mTree ? &BaseT::mTree->getRootNode() : NULL);
+    }
+    template <typename OtherNodeType> void getNode(const OtherNodeType*& node) { node = NULL; }
+    void eraseNode(const NodeT0*) { mKey0 = Coord::max(); mNode0 = NULL; }
+    template <typename OtherNodeType> void eraseNode(const OtherNodeType*) {}
+
+    /// Private copy method
+    inline void copy(const ValueAccessor1& other)
+    {
+        mKey0  = other.mKey0;
+        mNode0 = other.mNode0;
+    }
+
+    /// Prevent this accessor from calling Tree::releaseCache() on a tree that
+    /// no longer exists.  (Called by mTree when it is destroyed.)
+    virtual void release()
+    {
+        this->BaseT::release();
+        this->clear();
+    }
+    /// Cache the given node, which should lie along the path from the root node to
+    /// the node containing voxel (x, y, z).
+    /// @note This operation is not mutex-protected and is intended to be called
+    /// only by nodes and only in the context of a getValue() or setValue() call.
+    inline void insert(const Coord& xyz, const NodeT0* node)
+    {
+        assert(node);
+        mKey0  = xyz & ~(NodeT0::DIM-1);
+        mNode0 = node;
+    }
+
+    /// No-op in case a tree traversal attemps to insert a node that
+    /// is not cached by the ValueAccessor
+    template<typename OtherNodeType> inline void insert(const Coord&, const OtherNodeType*) {}
+
+    inline bool isHashed(const Coord& xyz) const
+    {
+        return (xyz[0] & ~Coord::ValueType(NodeT0::DIM-1)) == mKey0[0]
+            && (xyz[1] & ~Coord::ValueType(NodeT0::DIM-1)) == mKey0[1]
+            && (xyz[2] & ~Coord::ValueType(NodeT0::DIM-1)) == mKey0[2];
+    }
+    mutable Coord mKey0;
+    mutable const NodeT0* mNode0;
+}; // ValueAccessor1
+
+
+/// @brief Value accessor with two levels of node caching.
+/// @details The node cache levels are specified by L0 and L1
+/// with the default values 0 and 1 (defined in the forward declaration)
+/// corresponding to a LeafNode and its parent InternalNode.
+///
+/// @note This class is for experts only and should rarely be used directly.
+/// Instead use ValueAccessor with its default template arguments.
+template<typename _TreeType, Index L0, Index L1>
+class ValueAccessor2 : public ValueAccessorBase<_TreeType>
+{
+public:
+    BOOST_STATIC_ASSERT(_TreeType::DEPTH >= 3);
+    BOOST_STATIC_ASSERT( L0 < L1 && L1 < _TreeType::RootNodeType::LEVEL );
+    typedef _TreeType                       TreeType;
+    typedef typename TreeType::ValueType    ValueType;
+    typedef typename TreeType::RootNodeType RootNodeT;
+    typedef typename TreeType::LeafNodeType LeafNodeT;
+    typedef ValueAccessorBase<TreeType>     BaseT;
+    typedef typename InvertedTree<RootNodeT, RootNodeT::LEVEL>::Type InvTreeT;
+    typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L0> >::type NodeT0;
+    typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L1> >::type NodeT1;
+
+    /// Constructor from a tree
+    ValueAccessor2(TreeType& tree) : BaseT(tree),
+                                     mKey0(Coord::max()), mNode0(NULL),
+                                     mKey1(Coord::max()), mNode1(NULL) {}
+
+    /// Copy constructor
+    ValueAccessor2(const ValueAccessor2& other) : BaseT(other) { this->copy(other); }
+
+    /// Return the number of cache levels employed by this ValueAccessor
+    static Index numCacheLevels() { return 2; }
+
+    /// Asignment operator
+    ValueAccessor2& operator=(const ValueAccessor2& other)
+    {
+        if (&other != this) {
+            this->BaseT::operator=(other);
+            this->copy(other);
+        }
+        return *this;
+    }
+
+    /// Virtual destructor
+    virtual ~ValueAccessor2() {}
+
+    /// Return @c true if any of the nodes along the path to the given
+    /// voxel have been cached.
+    bool isCached(const Coord& xyz) const
+    {
+        assert(BaseT::mTree);
+        return this->isHashed1(xyz) || this->isHashed0(xyz);
+    }
+
+    /// Return the value of the voxel at the given coordinates.
+    const ValueType& getValue(const Coord& xyz) const
+    {
+        assert(BaseT::mTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            return mNode0->getValueAndCache(xyz, this->self());
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            return mNode1->getValueAndCache(xyz, this->self());
+        }
+        return BaseT::mTree->getRootNode().getValueAndCache(xyz, this->self());
+    }
+
+    /// Return the active state of the voxel at the given coordinates.
+    bool isValueOn(const Coord& xyz) const
+    {
+        assert(BaseT::mTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            return mNode0->isValueOnAndCache(xyz, this->self());
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            return mNode1->isValueOnAndCache(xyz, this->self());
+        }
+        return BaseT::mTree->getRootNode().isValueOnAndCache(xyz, this->self());
+    }
+
+    /// Return the active state of the voxel as well as its value
+    bool probeValue(const Coord& xyz, ValueType& value) const
+    {
+        assert(BaseT::mTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            return mNode0->probeValueAndCache(xyz, value, this->self());
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            return mNode1->probeValueAndCache(xyz, value, this->self());
+        }
+        return BaseT::mTree->getRootNode().probeValueAndCache(xyz, value, this->self());
+    }
+
+    /// Return the tree depth (0 = root) at which the value of voxel (x, y, z) resides,
+    /// or -1 if (x, y, z) isn't explicitly represented in the tree (i.e., if it is
+    /// implicitly a background voxel).
+    int getValueDepth(const Coord& xyz) const
+    {
+        assert(BaseT::mTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            return RootNodeT::LEVEL - mNode0->getValueLevelAndCache(xyz, this->self());
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            return RootNodeT::LEVEL - mNode1->getValueLevelAndCache(xyz, this->self());
+        }
+        return BaseT::mTree->getRootNode().getValueDepthAndCache(xyz, this->self());
+    }
+
+    /// Return @c true if the value of voxel (x, y, z) resides at the leaf level
+    /// of the tree, i.e., if it is not a tile value.
+    bool isVoxel(const Coord& xyz) const
+    {
+        assert(BaseT::mTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            return mNode0->getValueLevelAndCache(xyz, this->self())==0;
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            return mNode1->getValueLevelAndCache(xyz, this->self())==0;
+        }
+        return BaseT::mTree->getRootNode().getValueDepthAndCache(xyz, this->self()) ==
+               static_cast<int>(RootNodeT::LEVEL);
+    }
+
+    //@{
+    /// Set the value of the voxel at the given coordinates and mark the voxel as active.
+    void setValue(const Coord& xyz, const ValueType& value)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            const_cast<NodeT0*>(mNode0)->setValueAndCache(xyz, value, *this);
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            const_cast<NodeT1*>(mNode1)->setValueAndCache(xyz, value, *this);
+        } else {
+            BaseT::mTree->getRootNode().setValueAndCache(xyz, value, *this);
+        }
+    }
+    void setValueOn(const Coord& xyz, const ValueType& value) { this->setValue(xyz, value); }
+    //@}
+
+    /// Set the value of the voxel at the given coordinate but preserves its active state.
+    void setValueOnly(const Coord& xyz, const ValueType& value)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            const_cast<NodeT0*>(mNode0)->setValueOnlyAndCache(xyz, value, *this);
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            const_cast<NodeT1*>(mNode1)->setValueOnlyAndCache(xyz, value, *this);
+        } else {
+            BaseT::mTree->getRootNode().setValueOnlyAndCache(xyz, value, *this);
+        }
+    }
+
+    /// Set the value of the voxel at the given coordinates and mark the voxel as inactive.
+    void setValueOff(const Coord& xyz, const ValueType& value)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            const_cast<NodeT0*>(mNode0)->setValueOffAndCache(xyz, value, *this);
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            const_cast<NodeT1*>(mNode1)->setValueOffAndCache(xyz, value, *this);
+        } else {
+            BaseT::mTree->getRootNode().setValueOffAndCache(xyz, value, *this);
+        }
+    }
+
+    /// Set the value of the voxel at the given coordinates to the sum of its current
+    /// value and the given value, and mark the voxel as active.
+    void setValueOnSum(const Coord& xyz, const ValueType& value)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            const_cast<NodeT0*>(mNode0)->setValueOnSumAndCache(xyz, value, *this);
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            const_cast<NodeT1*>(mNode1)->setValueOnSumAndCache(xyz, value, *this);
+        } else {
+            BaseT::mTree->getRootNode().setValueOnSumAndCache(xyz, value, *this);
+        }
+    }
+
+    /// Set the active state of the voxel at the given coordinates without changing its value.
+    void setActiveState(const Coord& xyz, bool on = true)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            const_cast<NodeT0*>(mNode0)->setActiveStateAndCache(xyz, on, *this);
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            const_cast<NodeT1*>(mNode1)->setActiveStateAndCache(xyz, on, *this);
+        } else {
+            BaseT::mTree->getRootNode().setActiveStateAndCache(xyz, on, *this);
+        }
+    }
+    /// Mark the voxel at the given coordinates as active without changing its value.
+    void setValueOn(const Coord& xyz) { this->setActiveState(xyz, true); }
+    /// Mark the voxel at the given coordinates as inactive without changing its value.
+    void setValueOff(const Coord& xyz) { this->setActiveState(xyz, false); }
+
+    /// Return the cached node of type @a NodeType.  [Mainly for internal use]
+    template<typename NodeT>
+    NodeT* getNode()
+    {
+        const NodeT* node = NULL;
+        this->getNode(node);
+        return const_cast<NodeT*>(node);
+    }
+
+    /// Cache the given node, which should lie along the path from the root node to
+    /// the node containing voxel (x, y, z).  [Mainly for internal use]
+    template<typename NodeT>
+    void insertNode(const Coord& xyz, NodeT& node) { this->insert(xyz, &node); }
+
+    /// If a node of the given type exists in the cache, remove it, so that
+    /// isCached(xyz) returns @c false for any voxel (x, y, z) contained in
+    /// that node.  [Mainly for internal use]
+    template<typename NodeT>
+    void eraseNode()
+    {
+        const NodeT* node = NULL;
+        this->eraseNode(node);
+    }
+
+    /// @brief @return the leaf node that contains voxel (x, y, z) and
+    /// if it doesn't exist, create it, but preserve the values and
+    /// active states of all voxels.
+    ///
+    /// Use this method to preallocate a static tree topology over which to
+    /// safely perform multithreaded processing.
+    LeafNodeT* touchLeaf(const Coord& xyz)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            return const_cast<NodeT0*>(mNode0)->touchLeafAndCache(xyz, *this);
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            return const_cast<NodeT1*>(mNode1)->touchLeafAndCache(xyz, *this);
+        }
+        return BaseT::mTree->getRootNode().touchLeafAndCache(xyz, *this);
+    }
+
+    /// @brief @return a pointer to the leaf node that contains
+    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    LeafNodeT* probeLeaf(const Coord& xyz)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            return const_cast<NodeT0*>(mNode0)->probeLeafAndCache(xyz, *this);
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            return const_cast<NodeT1*>(mNode1)->probeLeafAndCache(xyz, *this);
+        }
+        return BaseT::mTree->getRootNode().probeLeafAndCache(xyz, *this);
+    }
+
+    /// @brief @return a const pointer to the leaf node that contains
+    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    const LeafNodeT* probeConstLeaf(const Coord& xyz)
+    {
+        assert(BaseT::mTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            return mNode0->probeConstLeafAndCache(xyz, *this);
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            return mNode1->probeConstLeafAndCache(xyz, *this);
+        }
+        return BaseT::mTree->getRootNode().probeConstLeafAndCache(xyz, *this);
+    }
+
+    /// Remove all the cached nodes and invalidate the corresponding hash-keys.
+    virtual void clear()
+    {
+        mKey0  = Coord::max();
+        mNode0 = NULL;
+        mKey1  = Coord::max();
+        mNode1 = NULL;
+    }
+
+private:
+    // Allow nodes to insert themselves into the cache.
+    template<typename> friend class RootNode;
+    template<typename, Index> friend class InternalNode;
+    template<typename, Index> friend class LeafNode;
+    // Allow trees to deregister themselves.
+    template<typename> friend class Tree;
+
+    // This private method is merely for convenience.
+    inline ValueAccessor2& self() const { return const_cast<ValueAccessor2&>(*this); }
+
+    void getNode(const NodeT0*& node) { node = mNode0; }
+    void getNode(const NodeT1*& node) { node = mNode1; }
+    void getNode(const RootNodeT*& node)
+    {
+        node = (BaseT::mTree ? &BaseT::mTree->getRootNode() : NULL);
+    }
+    template <typename OtherNodeType> void getNode(const OtherNodeType*& node) { node = NULL; }
+
+    void eraseNode(const NodeT0*) { mKey0 = Coord::max(); mNode0 = NULL; }
+    void eraseNode(const NodeT1*) { mKey1 = Coord::max(); mNode1 = NULL; }
+    template <typename OtherNodeType> void eraseNode(const OtherNodeType*) {}
+
+    /// Private copy method
+    inline void copy(const ValueAccessor2& other)
+    {
+        mKey0  = other.mKey0;
+        mNode0 = other.mNode0;
+        mKey1  = other.mKey1;
+        mNode1 = other.mNode1;
+    }
+
+    /// Prevent this accessor from calling Tree::releaseCache() on a tree that
+    /// no longer exists.  (Called by mTree when it is destroyed.)
+    virtual void release()
+    {
+        this->BaseT::release();
+        this->clear();
+    }
+
+    /// Cache the given node, which should lie along the path from the root node to
+    /// the node containing voxel (x, y, z).
+    /// @note This operation is not mutex-protected and is intended to be called
+    /// only by nodes and only in the context of a getValue() or setValue() call.
+    inline void insert(const Coord& xyz, const NodeT0* node)
+    {
+        assert(node);
+        mKey0  = xyz & ~(NodeT0::DIM-1);
+        mNode0 = node;
+    }
+    inline void insert(const Coord& xyz, const NodeT1* node)
+    {
+        assert(node);
+        mKey1  = xyz & ~(NodeT1::DIM-1);
+        mNode1 = node;
+    }
+    /// No-op in case a tree traversal attemps to insert a node that
+    /// is not cached by the ValueAccessor
+    template<typename NodeT> inline void insert(const Coord&, const NodeT*) {}
+
+    inline bool isHashed0(const Coord& xyz) const
+    {
+        return (xyz[0] & ~Coord::ValueType(NodeT0::DIM-1)) == mKey0[0]
+            && (xyz[1] & ~Coord::ValueType(NodeT0::DIM-1)) == mKey0[1]
+            && (xyz[2] & ~Coord::ValueType(NodeT0::DIM-1)) == mKey0[2];
+    }
+    inline bool isHashed1(const Coord& xyz) const
+    {
+        return (xyz[0] & ~Coord::ValueType(NodeT1::DIM-1)) == mKey1[0]
+            && (xyz[1] & ~Coord::ValueType(NodeT1::DIM-1)) == mKey1[1]
+            && (xyz[2] & ~Coord::ValueType(NodeT1::DIM-1)) == mKey1[2];
+    }
+    mutable Coord mKey0;
+    mutable const NodeT0* mNode0;
+    mutable Coord mKey1;
+    mutable const NodeT1* mNode1;
+}; // ValueAccessor2
+
+
+/// @brief Value accessor with three levels of node caching.
+/// @details The node cache levels are specified by L0, L1, and L2
+/// with the default values 0, 1 and 2 (defined in the forward declaration)
+/// corresponding to a LeafNode, its parent InternalNode, and its parent InternalNode.
+/// Since the default configuration of all typed trees and grids, e.g.,
+/// FloatTree or FloatGrid, has a depth of four, this value accessor is the one
+/// used by default.
+///
+/// @note This class is for experts only and should rarely be used
+/// directly. Instead use ValueAccessor with its default template arguments
+template<typename _TreeType, Index L0, Index L1, Index L2>
+class ValueAccessor3 : public ValueAccessorBase<_TreeType>
+{
+public:
+    BOOST_STATIC_ASSERT(_TreeType::DEPTH >= 4);
+    BOOST_STATIC_ASSERT(L0 < L1 && L1 < L2 && L2 < _TreeType::RootNodeType::LEVEL);
+    typedef _TreeType                       TreeType;
+    typedef typename TreeType::ValueType    ValueType;
+    typedef typename TreeType::RootNodeType RootNodeT;
+    typedef typename TreeType::LeafNodeType LeafNodeT;
+    typedef ValueAccessorBase<TreeType>     BaseT;
+    typedef typename InvertedTree<RootNodeT, RootNodeT::LEVEL>::Type InvTreeT;
+    typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L0> >::type NodeT0;
+    typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L1> >::type NodeT1;
+    typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L2> >::type NodeT2;
+
+    /// Constructor from a tree
+    ValueAccessor3(TreeType& tree) : BaseT(tree),
+                                     mKey0(Coord::max()), mNode0(NULL),
+                                     mKey1(Coord::max()), mNode1(NULL),
+                                     mKey2(Coord::max()), mNode2(NULL) {}
+
+    /// Copy constructor
+    ValueAccessor3(const ValueAccessor3& other) : BaseT(other) { this->copy(other); }
+
+    /// Asignment operator
+    ValueAccessor3& operator=(const ValueAccessor3& other)
+    {
+        if (&other != this) {
+            this->BaseT::operator=(other);
+            this->copy(other);
+        }
+        return *this;
+    }
+
+    /// Return the number of cache levels employed by this ValueAccessor
+    static Index numCacheLevels() { return 3; }
+
+    /// Virtual destructor
+    virtual ~ValueAccessor3() {}
+
+    /// Return @c true if any of the nodes along the path to the given
+    /// voxel have been cached.
+    bool isCached(const Coord& xyz) const
+    {
+        assert(BaseT::mTree);
+        return this->isHashed2(xyz) || this->isHashed1(xyz) || this->isHashed0(xyz);
+    }
+
+    /// Return the value of the voxel at the given coordinates.
+    const ValueType& getValue(const Coord& xyz) const
+    {
+        assert(BaseT::mTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            return mNode0->getValueAndCache(xyz, this->self());
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            return mNode1->getValueAndCache(xyz, this->self());
+        } else if (this->isHashed2(xyz)) {
+            assert(mNode2);
+            return mNode2->getValueAndCache(xyz, this->self());
+        }
+        return BaseT::mTree->getRootNode().getValueAndCache(xyz, this->self());
+    }
+
+    /// Return the active state of the voxel at the given coordinates.
+    bool isValueOn(const Coord& xyz) const
+    {
+        assert(BaseT::mTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            return mNode0->isValueOnAndCache(xyz, this->self());
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            return mNode1->isValueOnAndCache(xyz, this->self());
+        } else if (this->isHashed2(xyz)) {
+            assert(mNode2);
+            return mNode2->isValueOnAndCache(xyz, this->self());
+        }
+        return BaseT::mTree->getRootNode().isValueOnAndCache(xyz, this->self());
+    }
+
+    /// Return the active state of the voxel as well as its value
+    bool probeValue(const Coord& xyz, ValueType& value) const
+    {
+        assert(BaseT::mTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            return mNode0->probeValueAndCache(xyz, value, this->self());
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            return mNode1->probeValueAndCache(xyz, value, this->self());
+        } else if (this->isHashed2(xyz)) {
+            assert(mNode2);
+            return mNode2->probeValueAndCache(xyz, value, this->self());
+        }
+        return BaseT::mTree->getRootNode().probeValueAndCache(xyz, value, this->self());
+    }
+
+    /// Return the tree depth (0 = root) at which the value of voxel (x, y, z) resides,
+    /// or -1 if (x, y, z) isn't explicitly represented in the tree (i.e., if it is
+    /// implicitly a background voxel).
+    int getValueDepth(const Coord& xyz) const
+    {
+        assert(BaseT::mTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            return RootNodeT::LEVEL - mNode0->getValueLevelAndCache(xyz, this->self());
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            return RootNodeT::LEVEL - mNode1->getValueLevelAndCache(xyz, this->self());
+        } else if (this->isHashed2(xyz)) {
+            assert(mNode2);
+            return RootNodeT::LEVEL - mNode2->getValueLevelAndCache(xyz, this->self());
+        }
+        return BaseT::mTree->getRootNode().getValueDepthAndCache(xyz, this->self());
+    }
+
+    /// Return @c true if the value of voxel (x, y, z) resides at the leaf level
+    /// of the tree, i.e., if it is not a tile value.
+    bool isVoxel(const Coord& xyz) const
+    {
+        assert(BaseT::mTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            return mNode0->getValueLevelAndCache(xyz, this->self())==0;
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            return mNode1->getValueLevelAndCache(xyz, this->self())==0;
+        } else if (this->isHashed2(xyz)) {
+            assert(mNode2);
+            return mNode2->getValueLevelAndCache(xyz, this->self())==0;
+        }
+        return BaseT::mTree->getRootNode().getValueDepthAndCache(xyz, this->self()) ==
+               static_cast<int>(RootNodeT::LEVEL);
+    }
+
+    //@{
+    /// Set the value of the voxel at the given coordinates and mark the voxel as active.
+    void setValue(const Coord& xyz, const ValueType& value)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            const_cast<NodeT0*>(mNode0)->setValueAndCache(xyz, value, *this);
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            const_cast<NodeT1*>(mNode1)->setValueAndCache(xyz, value, *this);
+        } else if (this->isHashed2(xyz)) {
+            assert(mNode2);
+            const_cast<NodeT2*>(mNode2)->setValueAndCache(xyz, value, *this);
+        } else {
+            BaseT::mTree->getRootNode().setValueAndCache(xyz, value, *this);
+        }
+    }
+    void setValueOn(const Coord& xyz, const ValueType& value) { this->setValue(xyz, value); }
+    //@}
+
+    /// Set the value of the voxel at the given coordinate but preserves its active state.
+    void setValueOnly(const Coord& xyz, const ValueType& value)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            const_cast<NodeT0*>(mNode0)->setValueOnlyAndCache(xyz, value, *this);
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            const_cast<NodeT1*>(mNode1)->setValueOnlyAndCache(xyz, value, *this);
+        } else if (this->isHashed2(xyz)) {
+            assert(mNode2);
+            const_cast<NodeT2*>(mNode2)->setValueOnlyAndCache(xyz, value, *this);
+        } else {
+            BaseT::mTree->getRootNode().setValueOnlyAndCache(xyz, value, *this);
+        }
+    }
+
+    /// Set the value of the voxel at the given coordinates and mark the voxel as inactive.
+    void setValueOff(const Coord& xyz, const ValueType& value)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            const_cast<NodeT0*>(mNode0)->setValueOffAndCache(xyz, value, *this);
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            const_cast<NodeT1*>(mNode1)->setValueOffAndCache(xyz, value, *this);
+        } else if (this->isHashed2(xyz)) {
+            assert(mNode2);
+            const_cast<NodeT2*>(mNode2)->setValueOffAndCache(xyz, value, *this);
+        } else {
+            BaseT::mTree->getRootNode().setValueOffAndCache(xyz, value, *this);
+        }
+    }
+
+    /// Set the value of the voxel at the given coordinates to the sum of its current
+    /// value and the given value, and mark the voxel as active.
+    void setValueOnSum(const Coord& xyz, const ValueType& value)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            const_cast<NodeT0*>(mNode0)->setValueOnSumAndCache(xyz, value, *this);
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            const_cast<NodeT1*>(mNode1)->setValueOnSumAndCache(xyz, value, *this);
+        } else if (this->isHashed2(xyz)) {
+            assert(mNode2);
+            const_cast<NodeT2*>(mNode2)->setValueOnSumAndCache(xyz, value, *this);
+        } else {
+            BaseT::mTree->getRootNode().setValueOnSumAndCache(xyz, value, *this);
+        }
+    }
+
+    /// Set the active state of the voxel at the given coordinates without changing its value.
+    void setActiveState(const Coord& xyz, bool on = true)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            const_cast<NodeT0*>(mNode0)->setActiveStateAndCache(xyz, on, *this);
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            const_cast<NodeT1*>(mNode1)->setActiveStateAndCache(xyz, on, *this);
+        } else if (this->isHashed2(xyz)) {
+            assert(mNode2);
+            const_cast<NodeT2*>(mNode2)->setActiveStateAndCache(xyz, on, *this);
+        } else {
+            BaseT::mTree->getRootNode().setActiveStateAndCache(xyz, on, *this);
+        }
+    }
+    /// Mark the voxel at the given coordinates as active without changing its value.
+    void setValueOn(const Coord& xyz) { this->setActiveState(xyz, true); }
+    /// Mark the voxel at the given coordinates as inactive without changing its value.
+    void setValueOff(const Coord& xyz) { this->setActiveState(xyz, false); }
+
+    /// Return the cached node of type @a NodeType.  [Mainly for internal use]
+    template<typename NodeT>
+    NodeT* getNode()
+    {
+        const NodeT* node = NULL;
+        this->getNode(node);
+        return const_cast<NodeT*>(node);
+    }
+
+    /// Cache the given node, which should lie along the path from the root node to
+    /// the node containing voxel (x, y, z).  [Mainly for internal use]
+    template<typename NodeT>
+    void insertNode(const Coord& xyz, NodeT& node) { this->insert(xyz, &node); }
+
+    /// If a node of the given type exists in the cache, remove it, so that
+    /// isCached(xyz) returns @c false for any voxel (x, y, z) contained in
+    /// that node.  [Mainly for internal use]
+    template<typename NodeT>
+    void eraseNode()
+    {
+        const NodeT* node = NULL;
+        this->eraseNode(node);
+    }
+
+    /// @brief @return the leaf node that contains voxel (x, y, z) and
+    /// if it doesn't exist, create it, but preserve the values and
+    /// active states of all voxels.
+    ///
+    /// Use this method to preallocate a static tree topology over which to
+    /// safely perform multithreaded processing.
+    LeafNodeT* touchLeaf(const Coord& xyz)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            return const_cast<NodeT0*>(mNode0)->touchLeafAndCache(xyz, *this);
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            return const_cast<NodeT1*>(mNode1)->touchLeafAndCache(xyz, *this);
+        } else if (this->isHashed2(xyz)) {
+            assert(mNode2);
+            return const_cast<NodeT2*>(mNode2)->touchLeafAndCache(xyz, *this);
+        }
+        return BaseT::mTree->getRootNode().touchLeafAndCache(xyz, *this);
+    }
+
+    /// @brief @return a pointer to the leaf node that contains
+    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    LeafNodeT* probeLeaf(const Coord& xyz)
+    {
+        assert(BaseT::mTree);
+        BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            return const_cast<NodeT0*>(mNode0)->probeLeafAndCache(xyz, *this);
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            return const_cast<NodeT1*>(mNode1)->probeLeafAndCache(xyz, *this);
+        } else if (this->isHashed2(xyz)) {
+            assert(mNode2);
+            return const_cast<NodeT2*>(mNode2)->probeLeafAndCache(xyz, *this);
+        }
+        return BaseT::mTree->getRootNode().probeLeafAndCache(xyz, *this);
+    }
+
+    /// @brief @return a const pointer to the leaf node that contains
+    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    const LeafNodeT* probeConstLeaf(const Coord& xyz)
+    {
+        assert(BaseT::mTree);
+        if (this->isHashed0(xyz)) {
+            assert(mNode0);
+            return mNode0->probeConstLeafAndCache(xyz, *this);
+        } else if (this->isHashed1(xyz)) {
+            assert(mNode1);
+            return mNode1->probeConstLeafAndCache(xyz, *this);
+        } else if (this->isHashed2(xyz)) {
+            assert(mNode2);
+            return mNode2->probeConstLeafAndCache(xyz, *this);
+        }
+        return BaseT::mTree->getRootNode().probeConstLeafAndCache(xyz, *this);
+    }
+
+    /// Remove all the cached nodes and invalidate the corresponding hash-keys.
+    virtual void clear()
+    {
+        mKey0  = Coord::max();
+        mNode0 = NULL;
+        mKey1  = Coord::max();
+        mNode1 = NULL;
+        mKey2  = Coord::max();
+        mNode2 = NULL;
+    }
+
+private:
+    // Allow nodes to insert themselves into the cache.
+    template<typename> friend class RootNode;
+    template<typename, Index> friend class InternalNode;
+    template<typename, Index> friend class LeafNode;
+    // Allow trees to deregister themselves.
+    template<typename> friend class Tree;
+
+    // This private method is merely for convenience.
+    inline ValueAccessor3& self() const { return const_cast<ValueAccessor3&>(*this); }
+
+    /// Private copy method
+    inline void copy(const ValueAccessor3& other)
+    {
+        mKey0  = other.mKey0;
+        mNode0 = other.mNode0;
+        mKey1  = other.mKey1;
+        mNode1 = other.mNode1;
+        mKey2  = other.mKey2;
+        mNode2 = other.mNode2;
+    }
+
+    /// Prevent this accessor from calling Tree::releaseCache() on a tree that
+    /// no longer exists.  (Called by mTree when it is destroyed.)
+    virtual void release()
+    {
+        this->BaseT::release();
+        this->clear();
+    }
+    void getNode(const NodeT0*& node) { node = mNode0; }
+    void getNode(const NodeT1*& node) { node = mNode1; }
+    void getNode(const NodeT2*& node) { node = mNode2; }
+    void getNode(const RootNodeT*& node)
+    {
+        node = (BaseT::mTree ? &BaseT::mTree->getRootNode() : NULL);
+    }
+    template <typename OtherNodeType> void getNode(const OtherNodeType*& node) { node = NULL; }
+
+    void eraseNode(const NodeT0*) { mKey0 = Coord::max(); mNode0 = NULL; }
+    void eraseNode(const NodeT1*) { mKey1 = Coord::max(); mNode1 = NULL; }
+    void eraseNode(const NodeT2*) { mKey2 = Coord::max(); mNode2 = NULL; }
+    template <typename OtherNodeType> void eraseNode(const OtherNodeType*) {}
+
+    /// Cache the given node, which should lie along the path from the root node to
+    /// the node containing voxel (x, y, z).
+    /// @note This operation is not mutex-protected and is intended to be called
+    /// only by nodes and only in the context of a getValue() or setValue() call.
+    inline void insert(const Coord& xyz, const NodeT0* node)
+    {
+        assert(node);
+        mKey0  = xyz & ~(NodeT0::DIM-1);
+        mNode0 = node;
+    }
+    inline void insert(const Coord& xyz, const NodeT1* node)
+    {
+        assert(node);
+        mKey1  = xyz & ~(NodeT1::DIM-1);
+        mNode1 = node;
+    }
+    inline void insert(const Coord& xyz, const NodeT2* node)
+    {
+        assert(node);
+        mKey2  = xyz & ~(NodeT2::DIM-1);
+        mNode2 = node;
+    }
+    /// No-op in case a tree traversal attemps to insert a node that
+    /// is not cached by the ValueAccessor
+    template<typename OtherNodeType>
+    inline void insert(const Coord&, const OtherNodeType*)
+    {
+    }
+    inline bool isHashed0(const Coord& xyz) const
+    {
+        return (xyz[0] & ~Coord::ValueType(NodeT0::DIM-1)) == mKey0[0]
+            && (xyz[1] & ~Coord::ValueType(NodeT0::DIM-1)) == mKey0[1]
+            && (xyz[2] & ~Coord::ValueType(NodeT0::DIM-1)) == mKey0[2];
+    }
+    inline bool isHashed1(const Coord& xyz) const
+    {
+        return (xyz[0] & ~Coord::ValueType(NodeT1::DIM-1)) == mKey1[0]
+            && (xyz[1] & ~Coord::ValueType(NodeT1::DIM-1)) == mKey1[1]
+            && (xyz[2] & ~Coord::ValueType(NodeT1::DIM-1)) == mKey1[2];
+    }
+    inline bool isHashed2(const Coord& xyz) const
+    {
+        return (xyz[0] & ~Coord::ValueType(NodeT2::DIM-1)) == mKey2[0]
+            && (xyz[1] & ~Coord::ValueType(NodeT2::DIM-1)) == mKey2[1]
+            && (xyz[2] & ~Coord::ValueType(NodeT2::DIM-1)) == mKey2[2];
+    }
+    mutable Coord mKey0;
+    mutable const NodeT0* mNode0;
+    mutable Coord mKey1;
+    mutable const NodeT1* mNode1;
+    mutable Coord mKey2;
+    mutable const NodeT2* mNode2;
+}; // ValueAccessor3
+
+} // namespace tree
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
+
+#endif // OPENVDB_TREE_VALUEACCESSOR_HAS_BEEN_INCLUDED
+
+// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
