@@ -1,0 +1,132 @@
+Installing OpenVDB
+==================
+
+Requirements
+------------
+- GNU GCC (gcc.gnu.org), version 4.1 or later
+  or Intel ICC (software.intel.com), version 11.1 or later
+
+- GNU gmake (www.gnu.org/software/make/), version 3.81 or later
+
+- Boost (www.boost.org), version 1.42.0 or later
+  (Linux: yum install boost-devel)
+
+- libz (zlib.net)
+  (Linux: yum install zlib-devel)
+
+- OpenEXR (www.openexr.com), for the 16-bit float Half class in half.h
+
+- Intel Threading Building Blocks (threadingbuildingblocks.org),
+  version 3.0 or later
+
+- Doxygen (www.stack.nl/~dimitri/doxygen/), version 1.4.7 or later
+
+Other compilers or versions might work but have not been tested.
+
+
+Optional:
+
+- CppUnit (www.freedesktop.org/wiki/Software/cppunit), version 1.10 or later
+  (Linux: yum install cppunit-devel)
+
+- Ghostscript (www.ghostscript.com), version 8.70 or later, for documentation
+  in PDF format
+
+- pdfLaTeX (www.pdftex.org), version 1.21 or later, for documentation
+  in PDF format
+
+- GLFW (www.glfw.org), version 2.7.5 or later, for the OpenVDB viewer
+
+- OpenGL 3.2 or later, for the OpenVDB viewer
+
+Other versions might work but have not been tested.
+
+
+Installation
+------------
+1.  Set values appropriate to your environment for the following variables
+    at the top of the Makefile:
+
+    INSTALL_DIR          the directory into which to install libraries,
+                         executables and header files (e.g., /usr/local)
+
+    BOOST_INCL_DIR       the parent directory of the boost/ header directory
+                         (e.g., /usr/include)
+
+    HALF_INCL_DIR        the parent directory of the OpenEXR/ header directory
+                         (which contains half.h)
+    HALF_LIB_DIR         the directory containing libHalf.so and/or libHalf.a
+    HALF_LIB             the linker flag for the Half library (e.g., -lHalf)
+
+    TBB_INCL_DIR         the parent directory of the tbb/ header directory
+    TBB_LIB_DIR          the directory containing libtbb
+    TBB_LIB              the linker flag for the TBB library (e.g., -ltbb)
+
+    CPPUNIT_INCL_DIR     the parent directory of the cppunit/ header directory
+                         (leave blank if CppUnit is not available)
+    CPPUNIT_LIB_DIR      the directory containing libcppunit.so and/or
+                         libcppunit.a
+    CPPUNIT_LIB          the linker flag for the cppunit library
+                         (e.g., -lcppunit
+
+    GLFW_INCL_DIR        the directory containing glfw.h
+    GLFW_LIB_DIR         the directory containing libglfw
+    GLFW_LIB             the linker flag for the GLFW library (e.g., -lglfw)
+
+
+2.  From the top-level openvdb/ directory, type "make" (or "make -s" for
+    less verbose output) to locally build the library and commands.
+    The Makefile supports parallel builds (e.g. "make -j 8").
+
+    A default local build generates the following libraries and executables
+    (but see the Makefile for additional targets and build options):
+
+    openvdb/libopenvdb.so.1.1           the OpenVDB library
+    openvdb/libopenvdb.so               symlink to libopenvdb.so.1.1
+    openvdb/vdb_print                   command-line tool that prints info
+                                        about OpenVDB .vdb files
+    openvdb/vdb_test                    unit test runner for libopenvdb
+                                        (if CppUnit is available)
+
+    From the openvdb/ directory, type "make test" to run the unit tests
+    and verify that the library is working correctly.  Alternatively,
+    run the unit test executable directly with "./vdb_test"
+    (or "./vdb_test -v" for more verbose output).
+
+3.  From the openvdb/ directory, type "make doc" (or "make -s doc")
+    to generate HTML library documentation, then open the file
+    openvdb/doc/html/index.html in a browser.
+
+4.  From the openvdb/ directory, type "make install" (or "make -s install")
+    to copy generated files into the directory tree rooted at $(INSTALL_DIR).
+    This creates the following distribution:
+
+    $(INSTALL_DIR)/
+        bin/
+            vdb_print
+            ...
+        include/
+            openvdb/
+                Exceptions.h
+                ...
+                openvdb.h
+                tools/
+                tree/
+                ...
+                version.h
+        lib/
+            libopenvdb.so
+            libopenvdb.so.1.1
+
+        share/
+            doc/
+                openvdb/
+                    html/
+                        index.html
+                        ...
+
+5.  Optionally (if OpenGL and GLFW are available), from the top-level openvdb/
+    directory, type "make vdb_view" (or "make -s vdb_view") to locally build
+    the OpenVDB viewer tool.  Then type "./vdb_view" for usage information.
+
+EOF

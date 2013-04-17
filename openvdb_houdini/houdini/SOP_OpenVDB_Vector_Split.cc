@@ -1,0 +1,304 @@
+///////////////////////////////////////////////////////////////////////////
+//
+// Copyright (c) 2012-2013 DreamWorks Animation LLC
+//
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
+//
+// Redistributions of source code must retain the above copyright
+// and license notice and the following restrictions and disclaimer.
+//
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
+// from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
+// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
+//
+///////////////////////////////////////////////////////////////////////////
+//
+/// @file SOP_OpenVDB_Vector_Split.cc
+///
+/// @author FX R&D OpenVDB team
+///
+/// @brief Split vector grids into component scalar grids.
+
+#include <houdini_utils/ParmFactory.h>
+#include <openvdb_houdini/Utils.h>
+#include <openvdb_houdini/SOP_NodeVDB.h>
+#include <UT/UT_Interrupt.h>
+#include <set>
+#include <sstream>
+
+namespace hvdb = openvdb_houdini;
+namespace hutil = houdini_utils;
+
+
+class SOP_OpenVDB_Vector_Split: public hvdb::SOP_NodeVDB
+{
+public:
+    SOP_OpenVDB_Vector_Split(OP_Network*, const char* name, OP_Operator*);
+    virtual ~SOP_OpenVDB_Vector_Split() {};
+
+    static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
+
+protected:
+    virtual OP_ERROR cookMySop(OP_Context&);
+};
+
+
+void
+newSopOperator(OP_OperatorTable* table)
+{
+    if (table == NULL) return;
+
+    hutil::ParmList parms;
+
+    // Input vector grid group name
+    parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
+        .setHelpText(
+            "Specify a subset of the input VDB grids to be split.\n"
+            "Vector-valued grids will be split into component scalar grids;\n"
+            "all other grids will be unchanged.")
+        .setChoiceList(&hutil::PrimGroupMenu));
+
+    // Toggle to keep/remove source grids
+    parms.add(
+        hutil::ParmFactory(PRM_TOGGLE, "remove_sources", "Remove Source VDBs")
+        .setDefault(PRMoneDefaults)
+        .setHelpText("Remove vector grids that have been split."));
+
+    // Toggle to copy inactive values in addition to active values
+    parms.add(
+        hutil::ParmFactory(PRM_TOGGLE, "copyinactive", "Copy Inactive Values")
+        .setDefault(PRMzeroDefaults)
+        .setHelpText(
+            "If enabled, split the values of both active and inactive voxels.\n"
+            "If disabled, split the values of active voxels only."));
+
+    // Verbosity toggle
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "verbose", "Verbose"));
+
+    // Register this operator.
+    hvdb::OpenVDBOpFactory("OpenVDB Vector Split",
+        SOP_OpenVDB_Vector_Split::factory, parms, *table)
+        .addInput("VDB vector grids to be split");
+}
+
+
+OP_Node*
+SOP_OpenVDB_Vector_Split::factory(OP_Network* net,
+    const char* name, OP_Operator* op)
+{
+    return new SOP_OpenVDB_Vector_Split(net, name, op);
+}
+
+
+SOP_OpenVDB_Vector_Split::SOP_OpenVDB_Vector_Split(OP_Network* net,
+    const char* name, OP_Operator* op):
+    SOP_NodeVDB(net, name, op)
+{
+}
+
+
+////////////////////////////////////////
+
+
+namespace {
+
+class VectorGridSplitter
+{
+private:
+    GU_Detail& mGdp;
+    const GEO_PrimVDB& mInVdb;
+    hvdb::GridPtr mXGrid, mYGrid, mZGrid;
+    bool mCopyInactiveValues;
+
+public:
+    VectorGridSplitter(GU_Detail& _gdp, const GEO_PrimVDB& _vdb, bool _inactive):
+        mGdp(_gdp), mInVdb(_vdb), mCopyInactiveValues(_inactive) {}
+
+    const hvdb::GridPtr& getXGrid() { return mXGrid; }
+    const hvdb::GridPtr& getYGrid() { return mYGrid; }
+    const hvdb::GridPtr& getZGrid() { return mZGrid; }
+
+    template<typename VecGridT>
+    void operator()(const VecGridT& vecGrid)
+    {
+        const std::string gridName = mInVdb.getGridName();
+
+        typedef typename VecGridT::ValueType        VecT;
+        typedef typename VecGridT::TreeType::template ValueConverter<
+            typename VecT::value_type>::Type        ScalarTreeT;
+        typedef typename openvdb::Grid<ScalarTreeT> ScalarGridT;
+        typedef typename ScalarGridT::Ptr           ScalarGridPtr;
+
+        const VecT bkgd = vecGrid.background();
+
+        // Construct the output scalar grids, with background values taken from
+        // the components of the input vector grid's background value.
+        ScalarGridPtr
+            xGrid = ScalarGridT::create(bkgd.x()),
+            yGrid = ScalarGridT::create(bkgd.y()),
+            zGrid = ScalarGridT::create(bkgd.z());
+        mXGrid = xGrid; mYGrid = yGrid; mZGrid = zGrid;
+
+        // The output scalar grids share the input vector grid's transform.
+        if (openvdb::math::Transform::Ptr xform = vecGrid.transform().copy()) {
+            xGrid->setTransform(xform);
+            yGrid->setTransform(xform);
+            zGrid->setTransform(xform);
+        }
+
+        // Use accessors for fast sequential voxel access.
+        typename ScalarGridT::Accessor
+            xAccessor = xGrid->getAccessor(),
+            yAccessor = yGrid->getAccessor(),
+            zAccessor = zGrid->getAccessor();
+
+        // For each tile or voxel value in the input vector tree,
+        // set a corresponding value in each of the output scalar trees.
+        openvdb::CoordBBox bbox;
+        if (mCopyInactiveValues) {
+            for (typename VecGridT::ValueAllCIter it = vecGrid.cbeginValueAll(); it; ++it) {
+                if (!it.getBoundingBox(bbox)) continue;
+
+                const VecT& val = it.getValue();
+                const bool active = it.isValueOn();
+
+                if (it.isTileValue()) {
+                    xGrid->fill(bbox, val.x(), active);
+                    yGrid->fill(bbox, val.y(), active);
+                    zGrid->fill(bbox, val.z(), active);
+                } else { // it.isVoxelValue()
+                    xAccessor.setValue(bbox.min(), val.x());
+                    yAccessor.setValue(bbox.min(), val.y());
+                    zAccessor.setValue(bbox.min(), val.z());
+                    if (!active) {
+                        xAccessor.setValueOff(bbox.min());
+                        yAccessor.setValueOff(bbox.min());
+                        zAccessor.setValueOff(bbox.min());
+                    }
+                }
+            }
+        } else {
+            for (typename VecGridT::ValueOnCIter it = vecGrid.cbeginValueOn(); it; ++it) {
+                if (!it.getBoundingBox(bbox)) continue;
+
+                const VecT& val = it.getValue();
+
+                if (it.isTileValue()) {
+                    xGrid->fill(bbox, val.x());
+                    yGrid->fill(bbox, val.y());
+                    zGrid->fill(bbox, val.z());
+                } else { // it.isVoxelValue()
+                    xAccessor.setValueOn(bbox.min(), val.x());
+                    yAccessor.setValueOn(bbox.min(), val.y());
+                    zAccessor.setValueOn(bbox.min(), val.z());
+                }
+            }
+        }
+    }
+}; // class VectorGridSplitter
+
+} // unnamed namespace
+
+
+////////////////////////////////////////
+
+
+OP_ERROR
+SOP_OpenVDB_Vector_Split::cookMySop(OP_Context& context)
+{
+    try {
+        hutil::ScopedInputLock lock(*this, context);
+
+        const fpreal time = context.getTime();
+
+        duplicateSource(0, context);
+
+        const bool copyInactiveValues = evalInt("copyinactive", 0, time);
+        const bool removeSourceGrids = evalInt("remove_sources", 0, time);
+        const bool verbose = evalInt("verbose", 0, time);
+
+        UT_AutoInterrupt progress("Splitting VDB grids");
+
+        typedef std::set<GEO_PrimVDB*> PrimVDBSet;
+        PrimVDBSet primsToRemove;
+
+        // Get the group of grids to split.
+        const GA_PrimitiveGroup* splitGroup = NULL;
+        {
+            UT_String groupStr;
+            evalString(groupStr, "group", 0, time);
+            splitGroup = matchGroup(*gdp, groupStr.toStdString());
+        }
+
+        // Iterate over VDB primitives in the selected group.
+        for (hvdb::VdbPrimIterator it(gdp, splitGroup); it; ++it) {
+            if (progress.wasInterrupted()) return error();
+
+            GU_PrimVDB* vdb = *it;
+
+            const std::string gridName = vdb->getGridName();
+
+            VectorGridSplitter op(*gdp, *vdb, copyInactiveValues);
+            bool ok = GEOvdbProcessTypedGridVec3(*vdb, op);
+
+            if (!ok) {
+                if (verbose && !gridName.empty()) {
+                    addWarning(SOP_MESSAGE, (gridName + " is not a vector grid").c_str());
+                }
+                continue;
+            }
+
+            // Add the new scalar grids to the detail, copying attributes and
+            // group membership from the input vector grid.
+            const std::string
+                xGridName = gridName.empty() ? "x" : gridName + ".x",
+                yGridName = gridName.empty() ? "y" : gridName + ".y",
+                zGridName = gridName.empty() ? "z" : gridName + ".z";
+            GU_PrimVDB::buildFromGrid(*gdp, op.getXGrid(), vdb, xGridName.c_str());
+            GU_PrimVDB::buildFromGrid(*gdp, op.getYGrid(), vdb, yGridName.c_str());
+            GU_PrimVDB::buildFromGrid(*gdp, op.getZGrid(), vdb, zGridName.c_str());
+
+            if (verbose) {
+                std::ostringstream ostr;
+                ostr << "Split ";
+                if (!gridName.empty()) ostr << gridName << " ";
+                ostr << "into " << xGridName << ", " << yGridName << " and " << zGridName;
+                addMessage(SOP_MESSAGE, ostr.str().c_str());
+            }
+
+            primsToRemove.insert(vdb);
+        }
+        if (removeSourceGrids) {
+            // Remove vector grids that were split.
+            for (PrimVDBSet::iterator i = primsToRemove.begin(), e = primsToRemove.end();
+                i != e; ++i)
+            {
+                gdp->destroyPrimitive(*(*i), /*andPoints=*/true);
+            }
+        }
+        primsToRemove.clear();
+
+    } catch (std::exception& e) {
+        addError(SOP_MESSAGE, e.what());
+    }
+    return error();
+}
+
+// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

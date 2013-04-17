@@ -1,0 +1,420 @@
+///////////////////////////////////////////////////////////////////////////
+//
+// Copyright (c) 2012-2013 DreamWorks Animation LLC
+//
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
+//
+// Redistributions of source code must retain the above copyright
+// and license notice and the following restrictions and disclaimer.
+//
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
+// from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
+// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
+//
+///////////////////////////////////////////////////////////////////////////
+
+#include <vector>
+#include <cppunit/extensions/HelperMacros.h>
+#include <openvdb/openvdb.h>
+#include <openvdb/Exceptions.h>
+#include <openvdb/Types.h>
+#include <openvdb/tree/LeafNode.h>
+#include <openvdb/tools/ParticlesToLevelSet.h>
+
+#define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
+    CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
+
+
+class TestParticlesToLevelSet: public CppUnit::TestFixture
+{
+public:
+    virtual void setUp() {openvdb::initialize();}
+    virtual void tearDown() {openvdb::uninitialize();}
+
+    void writeGrid(openvdb::GridBase::Ptr grid, std::string fileName) const
+    {
+        grid->setName("TestParticlesToLevelSet");
+        openvdb::GridPtrVec grids;
+        grids.push_back(grid);
+        openvdb::io::File file("/tmp/" + fileName + ".vdb");
+        file.write(grids);
+        file.close();
+    }
+
+    CPPUNIT_TEST_SUITE(TestParticlesToLevelSet);
+    CPPUNIT_TEST(testMyParticleList);
+    CPPUNIT_TEST(testRasterizeSpheres);
+    CPPUNIT_TEST(testRasterizeSpheresAndId);
+    CPPUNIT_TEST(testRasterizeTrails);
+    CPPUNIT_TEST(testRasterizeTrailsAndId);
+    CPPUNIT_TEST_SUITE_END();
+
+    void testMyParticleList();
+    void testRasterizeSpheres();
+    void testRasterizeSpheresAndId();
+    void testRasterizeTrails();
+    void testRasterizeTrailsAndId();
+};
+
+
+CPPUNIT_TEST_SUITE_REGISTRATION(TestParticlesToLevelSet);
+
+class MyParticleList
+{
+protected:
+    struct MyParticle {
+        openvdb::Vec3R p, v;
+        openvdb::Real  r;
+    };
+    openvdb::Real           mRadiusScale;
+    openvdb::Real           mVelocityScale;
+    std::vector<MyParticle> mParticleList;
+public:
+    MyParticleList(openvdb::Real rScale=1, openvdb::Real vScale=1)
+        : mRadiusScale(rScale), mVelocityScale(vScale) {}
+    void add(const openvdb::Vec3R &p, const openvdb::Real &r,
+             const openvdb::Vec3R &v=openvdb::Vec3R(0,0,0))
+    {
+        MyParticle pa;
+        pa.p = p;
+        pa.r = r;
+        pa.v = v;
+        mParticleList.push_back(pa);
+    }
+    /// @return coordinate bbox in the space of the specified transfrom
+    openvdb::CoordBBox getBBox(const openvdb::GridBase& grid) {
+        openvdb::CoordBBox bbox;
+        openvdb::Coord &min= bbox.min(), &max = bbox.max();
+        for (int n=0, e=this->size(); n<e; ++n) {
+            const openvdb::Vec3d xyz = grid.worldToIndex(this->pos(n));
+            const openvdb::Real   r  = this->radius(n) / grid.voxelSize()[0];
+            for (int i=0; i<3; ++i) {
+                min[i] = openvdb::math::Min(min[i], openvdb::math::Floor(xyz[i] - r));
+                max[i] = openvdb::math::Max(max[i], openvdb::math::Ceil( xyz[i] + r));
+            }
+        }
+        return bbox;
+    }
+    /// The methods below are the only ones required by tools::ParticleToLevelSet
+    /// @note We return by value since the radius and velocities are modified
+    /// by the scaling factors! Also these methods are all assumed to
+    /// be thread-safe.
+    int size() const { return mParticleList.size(); }
+    openvdb::Vec3R pos(int n)   const {return mParticleList[n].p;}
+    openvdb::Vec3R vel(int n)   const {return mVelocityScale*mParticleList[n].v;}
+    openvdb::Real radius(int n) const {return mRadiusScale*mParticleList[n].r;}
+};
+
+
+void
+TestParticlesToLevelSet::testMyParticleList()
+{
+    MyParticleList pa;
+    CPPUNIT_ASSERT_EQUAL(0, pa.size());
+    pa.add(openvdb::Vec3R(10,10,10), 2, openvdb::Vec3R(1,0,0));
+    CPPUNIT_ASSERT_EQUAL(1, pa.size());
+    ASSERT_DOUBLES_EXACTLY_EQUAL(10, pa.pos(0)[0]);
+    ASSERT_DOUBLES_EXACTLY_EQUAL(10, pa.pos(0)[1]);
+    ASSERT_DOUBLES_EXACTLY_EQUAL(10, pa.pos(0)[2]);
+    ASSERT_DOUBLES_EXACTLY_EQUAL(1 , pa.vel(0)[0]);
+    ASSERT_DOUBLES_EXACTLY_EQUAL(0 , pa.vel(0)[1]);
+    ASSERT_DOUBLES_EXACTLY_EQUAL(0 , pa.vel(0)[2]);
+    ASSERT_DOUBLES_EXACTLY_EQUAL(2 , pa.radius(0));
+    pa.add(openvdb::Vec3R(20,20,20), 3);
+    CPPUNIT_ASSERT_EQUAL(2, pa.size());
+    ASSERT_DOUBLES_EXACTLY_EQUAL(20, pa.pos(1)[0]);
+    ASSERT_DOUBLES_EXACTLY_EQUAL(20, pa.pos(1)[1]);
+    ASSERT_DOUBLES_EXACTLY_EQUAL(20, pa.pos(1)[2]);
+    ASSERT_DOUBLES_EXACTLY_EQUAL(0 , pa.vel(1)[0]);
+    ASSERT_DOUBLES_EXACTLY_EQUAL(0 , pa.vel(1)[1]);
+    ASSERT_DOUBLES_EXACTLY_EQUAL(0 , pa.vel(1)[2]);
+    ASSERT_DOUBLES_EXACTLY_EQUAL(3 , pa.radius(1));
+    
+    const float voxelSize = 0.5f, halfWidth = 4.0f;
+    openvdb::FloatGrid::Ptr ls = openvdb::createLevelSet<openvdb::FloatGrid>(voxelSize, halfWidth);
+    openvdb::CoordBBox bbox = pa.getBBox(*ls);
+    ASSERT_DOUBLES_EXACTLY_EQUAL((10-2)/voxelSize, bbox.min()[0]);
+    ASSERT_DOUBLES_EXACTLY_EQUAL((10-2)/voxelSize, bbox.min()[1]);
+    ASSERT_DOUBLES_EXACTLY_EQUAL((10-2)/voxelSize, bbox.min()[2]);
+    ASSERT_DOUBLES_EXACTLY_EQUAL((20+3)/voxelSize, bbox.max()[0]);
+    ASSERT_DOUBLES_EXACTLY_EQUAL((20+3)/voxelSize, bbox.max()[1]);
+    ASSERT_DOUBLES_EXACTLY_EQUAL((20+3)/voxelSize, bbox.max()[2]);
+}
+
+
+void
+TestParticlesToLevelSet::testRasterizeSpheres()
+{
+    const float voxelSize = 1.0f, halfWidth = 2.0f;
+    openvdb::FloatGrid::Ptr ls = openvdb::createLevelSet<openvdb::FloatGrid>(voxelSize, halfWidth);
+
+    MyParticleList pa;
+    pa.add(openvdb::Vec3R(10,10,10), 2);
+    pa.add(openvdb::Vec3R(20,20,20), 2);
+    // testing CSG
+    pa.add(openvdb::Vec3R(31.0,31,31), 5);
+    pa.add(openvdb::Vec3R(31.5,31,31), 5);
+    pa.add(openvdb::Vec3R(32.0,31,31), 5);
+    pa.add(openvdb::Vec3R(32.5,31,31), 5);
+    pa.add(openvdb::Vec3R(33.0,31,31), 5);
+    pa.add(openvdb::Vec3R(33.5,31,31), 5);
+    pa.add(openvdb::Vec3R(34.0,31,31), 5);
+    pa.add(openvdb::Vec3R(34.5,31,31), 5);
+    pa.add(openvdb::Vec3R(35.0,31,31), 5);
+    pa.add(openvdb::Vec3R(35.5,31,31), 5);
+    pa.add(openvdb::Vec3R(36.0,31,31), 5);
+    CPPUNIT_ASSERT_EQUAL(13, pa.size());
+    
+    openvdb::tools::ParticlesToLevelSet<openvdb::FloatGrid, MyParticleList> raster(*ls);
+    raster.setGrainSize(1);//a value of zero disables threading
+    raster.rasterizeSpheres(pa);
+
+    //ls->tree().print(std::cout,4);
+    //this->writeGrid(*ls, "testRasterizeSpheres");
+
+    ASSERT_DOUBLES_EXACTLY_EQUAL(halfWidth * voxelSize,
+        ls->tree().getValue(openvdb::Coord( 0, 0, 0)));
+
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 2, ls->tree().getValue(openvdb::Coord( 6,10,10)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 1, ls->tree().getValue(openvdb::Coord( 7,10,10)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 0, ls->tree().getValue(openvdb::Coord( 8,10,10)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL(-1, ls->tree().getValue(openvdb::Coord( 9,10,10)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL(-2, ls->tree().getValue(openvdb::Coord(10,10,10)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL(-1, ls->tree().getValue(openvdb::Coord(11,10,10)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 0, ls->tree().getValue(openvdb::Coord(12,10,10)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 1, ls->tree().getValue(openvdb::Coord(13,10,10)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 2, ls->tree().getValue(openvdb::Coord(14,10,10)));
+    
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 2, ls->tree().getValue(openvdb::Coord(20,16,20)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 1, ls->tree().getValue(openvdb::Coord(20,17,20)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 0, ls->tree().getValue(openvdb::Coord(20,18,20)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL(-1, ls->tree().getValue(openvdb::Coord(20,19,20)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL(-2, ls->tree().getValue(openvdb::Coord(20,20,20)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL(-1, ls->tree().getValue(openvdb::Coord(20,21,20)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 0, ls->tree().getValue(openvdb::Coord(20,22,20)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 1, ls->tree().getValue(openvdb::Coord(20,23,20)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 2, ls->tree().getValue(openvdb::Coord(20,24,20)));
+    {// full but slow test of all voxels
+        openvdb::CoordBBox bbox = pa.getBBox(*ls);
+        bbox.expand(static_cast<int>(halfWidth)+1);
+        openvdb::Index64 count=0;
+        const float outside = ls->background(), inside = -outside;
+        const openvdb::Coord &min=bbox.min(), &max=bbox.max();
+        for (openvdb::Coord ijk=min; ijk[0]<max[0]; ++ijk[0]) {
+            for (ijk[1]=min[1]; ijk[1]<max[1]; ++ijk[1]) {
+                for (ijk[2]=min[2]; ijk[2]<max[2]; ++ijk[2]) {
+                    const openvdb::Vec3d xyz = ls->indexToWorld(ijk.asVec3d());
+                    double dist = (xyz-pa.pos(0)).length()-pa.radius(0);
+                    for (int i=1, s=pa.size(); i<s; ++i) {
+                        dist=openvdb::math::Min(dist,(xyz-pa.pos(i)).length()-pa.radius(i));
+                    }
+                    const float val = ls->tree().getValue(ijk);
+                    if (dist >= outside) {
+                        CPPUNIT_ASSERT_DOUBLES_EQUAL(outside, val, 0.0001);
+                        CPPUNIT_ASSERT(ls->tree().isValueOff(ijk));
+                    } else if( dist <= inside ) {
+                        CPPUNIT_ASSERT_DOUBLES_EQUAL(inside, val, 0.0001);
+                        CPPUNIT_ASSERT(ls->tree().isValueOff(ijk));
+                    } else {
+                        CPPUNIT_ASSERT_DOUBLES_EQUAL(  dist, val, 0.0001);
+                        CPPUNIT_ASSERT(ls->tree().isValueOn(ijk));
+                        ++count;
+                    }
+                }
+            }
+        }
+        //std::cerr << "\nExpected active voxel count = " << count
+        //    << ", actual active voxle count = "
+        //    << ls->activeVoxelCount() << std::endl;
+        CPPUNIT_ASSERT_EQUAL(count, ls->activeVoxelCount());
+    }
+}
+
+
+void
+TestParticlesToLevelSet::testRasterizeSpheresAndId()
+{
+    const float voxelSize = 1.0f, halfWidth = 2.0f;
+    openvdb::FloatGrid::Ptr ls = openvdb::createLevelSet<openvdb::FloatGrid>(voxelSize, halfWidth);
+
+    MyParticleList pa(0.5f);
+    pa.add(openvdb::Vec3R(10,10,10), 4);
+    pa.add(openvdb::Vec3R(20,20,20), 4);
+    // testing CSG
+    pa.add(openvdb::Vec3R(31.0,31,31),10);
+    pa.add(openvdb::Vec3R(31.5,31,31),10);
+    pa.add(openvdb::Vec3R(32.0,31,31),10);
+    pa.add(openvdb::Vec3R(32.5,31,31),10);
+    pa.add(openvdb::Vec3R(33.0,31,31),10);
+    pa.add(openvdb::Vec3R(33.5,31,31),10);
+    pa.add(openvdb::Vec3R(34.0,31,31),10);
+    pa.add(openvdb::Vec3R(34.5,31,31),10);
+    pa.add(openvdb::Vec3R(35.0,31,31),10);
+    pa.add(openvdb::Vec3R(35.5,31,31),10);
+    pa.add(openvdb::Vec3R(36.0,31,31),10);
+    CPPUNIT_ASSERT_EQUAL(13, pa.size());
+    
+    typedef openvdb::tools::ParticlesToLevelSetAndId<openvdb::FloatGrid, MyParticleList> RasterT;
+    RasterT raster(*ls);
+    raster.setGrainSize(1);//a value of zero disables threading
+    raster.rasterizeSpheres(pa);
+    const RasterT::IndxGridT::Ptr id = raster.rasterizeSpheres(pa);
+
+    int minVal = std::numeric_limits<int>::max(), maxVal = -minVal;
+    for (RasterT::IndxGridT::ValueOnCIter i=id->cbeginValueOn(); i; ++i) {
+        minVal = openvdb::math::Min(minVal, int(*i));
+        maxVal = openvdb::math::Max(maxVal, int(*i));
+    }
+    CPPUNIT_ASSERT_EQUAL(0 , minVal);
+    CPPUNIT_ASSERT_EQUAL(12, maxVal);
+
+    //grid.tree().print(std::cout,4);
+    //id->print(std::cout,4);
+    //this->writeGrid(*ls, "testRasterizeSpheres");
+
+    ASSERT_DOUBLES_EXACTLY_EQUAL(halfWidth * voxelSize,
+                                 ls->tree().getValue(openvdb::Coord( 0, 0, 0)));
+
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 2, ls->tree().getValue(openvdb::Coord( 6,10,10)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 1, ls->tree().getValue(openvdb::Coord( 7,10,10)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 0, ls->tree().getValue(openvdb::Coord( 8,10,10)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL(-1, ls->tree().getValue(openvdb::Coord( 9,10,10)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL(-2, ls->tree().getValue(openvdb::Coord(10,10,10)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL(-1, ls->tree().getValue(openvdb::Coord(11,10,10)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 0, ls->tree().getValue(openvdb::Coord(12,10,10)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 1, ls->tree().getValue(openvdb::Coord(13,10,10)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 2, ls->tree().getValue(openvdb::Coord(14,10,10)));
+
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 2, ls->tree().getValue(openvdb::Coord(20,16,20)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 1, ls->tree().getValue(openvdb::Coord(20,17,20)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 0, ls->tree().getValue(openvdb::Coord(20,18,20)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL(-1, ls->tree().getValue(openvdb::Coord(20,19,20)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL(-2, ls->tree().getValue(openvdb::Coord(20,20,20)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL(-1, ls->tree().getValue(openvdb::Coord(20,21,20)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 0, ls->tree().getValue(openvdb::Coord(20,22,20)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 1, ls->tree().getValue(openvdb::Coord(20,23,20)));
+    ASSERT_DOUBLES_EXACTLY_EQUAL( 2, ls->tree().getValue(openvdb::Coord(20,24,20)));
+
+    {// full but slow test of all voxels
+        openvdb::CoordBBox bbox = pa.getBBox(*ls);
+        bbox.expand(static_cast<int>(halfWidth)+1);
+        openvdb::Index64 count = 0;
+        const float outside = ls->background(), inside = -outside;
+        const openvdb::Coord &min=bbox.min(), &max=bbox.max();
+        for (openvdb::Coord ijk=min; ijk[0]<max[0]; ++ijk[0]) {
+            for (ijk[1]=min[1]; ijk[1]<max[1]; ++ijk[1]) {
+                for (ijk[2]=min[2]; ijk[2]<max[2]; ++ijk[2]) {
+                    const openvdb::Vec3d xyz = ls->indexToWorld(ijk.asVec3d());
+                    double dist = (xyz-pa.pos(0)).length()-pa.radius(0);
+                    openvdb::Index32 k =0;
+                    for (int i=1, s=pa.size(); i<s; ++i) {
+                        double d = (xyz-pa.pos(i)).length()-pa.radius(i);
+                        if (d<dist) {
+                            k = openvdb::Index32(i);
+                            dist = d;
+                        }
+                    }
+                    const float val = ls->tree().getValue(ijk);
+                    openvdb::Index32 m = id->tree().getValue(ijk);
+                    if (dist >= outside) {
+                        CPPUNIT_ASSERT_DOUBLES_EQUAL(outside, val, 0.0001);
+                        CPPUNIT_ASSERT(ls->tree().isValueOff(ijk));
+                        CPPUNIT_ASSERT_EQUAL(openvdb::util::INVALID_IDX, m);
+                        CPPUNIT_ASSERT(id->tree().isValueOff(ijk));
+                    } else if( dist <= inside ) {
+                        CPPUNIT_ASSERT_DOUBLES_EQUAL(inside, val, 0.0001);
+                        CPPUNIT_ASSERT(ls->tree().isValueOff(ijk));
+                        CPPUNIT_ASSERT_EQUAL(openvdb::util::INVALID_IDX, m);
+                        CPPUNIT_ASSERT(id->tree().isValueOff(ijk));
+                    } else {
+                        CPPUNIT_ASSERT_DOUBLES_EQUAL(  dist, val, 0.0001);
+                        CPPUNIT_ASSERT(ls->tree().isValueOn(ijk));
+                        CPPUNIT_ASSERT_EQUAL(k, m);
+                        CPPUNIT_ASSERT(id->tree().isValueOn(ijk));
+                        ++count;
+                    }
+                }
+            }
+        }
+        //std::cerr << "\nExpected active voxel count = " << count
+        //    << ", actual active voxle count = "
+        //    << ls->activeVoxelCount() << std::endl;
+        CPPUNIT_ASSERT_EQUAL(count, ls->activeVoxelCount());
+    }
+}
+
+
+/// This is not really a conventional unit-test since the result of
+/// the tests are written to a file and need to be visually verified!
+void
+TestParticlesToLevelSet::testRasterizeTrails()
+{
+    const float voxelSize = 1.0f, halfWidth = 2.0f;
+    openvdb::FloatGrid::Ptr ls = openvdb::createLevelSet<openvdb::FloatGrid>(voxelSize, halfWidth);
+
+    MyParticleList pa(1,5);
+
+    // This particle radius = 1 < 1.5 i.e. it's below the Nyquist frequency and hence ignored
+    pa.add(openvdb::Vec3R(  0,  0,  0), 1, openvdb::Vec3R( 0, 1, 0));
+    pa.add(openvdb::Vec3R(-10,-10,-10), 2, openvdb::Vec3R( 2, 0, 0));
+    pa.add(openvdb::Vec3R( 10, 10, 10), 3, openvdb::Vec3R( 0, 1, 0));
+    pa.add(openvdb::Vec3R(  0,  0,  0), 6, openvdb::Vec3R( 0, 0,-5));
+    
+    openvdb::tools::ParticlesToLevelSet<openvdb::FloatGrid, MyParticleList> raster(*ls);
+    raster.rasterizeTrails(pa, 0.75);//scale offset between two instances
+
+    //ls->tree().print(std::cout, 4);
+    //this->writeGrid(*ls, "testRasterizeTrails");
+}
+
+
+void
+TestParticlesToLevelSet::testRasterizeTrailsAndId()
+{
+    const float voxelSize = 1.0f, halfWidth = 2.0f;
+    openvdb::FloatGrid::Ptr ls = openvdb::createLevelSet<openvdb::FloatGrid>(voxelSize, halfWidth);
+
+    MyParticleList pa(1,5);
+
+    // This particle radius = 1 < 1.5 i.e. it's below the Nyquist frequency and hence ignored
+    pa.add(openvdb::Vec3R(  0,  0,  0), 1, openvdb::Vec3R( 0, 1, 0));
+    pa.add(openvdb::Vec3R(-10,-10,-10), 2, openvdb::Vec3R( 2, 0, 0));
+    pa.add(openvdb::Vec3R( 10, 10, 10), 3, openvdb::Vec3R( 0, 1, 0));
+    pa.add(openvdb::Vec3R(  0,  0,  0), 6, openvdb::Vec3R( 0, 0,-5));
+    
+    typedef openvdb::tools::ParticlesToLevelSetAndId<openvdb::FloatGrid, MyParticleList> RasterT;
+    RasterT raster(*ls);
+
+    const RasterT::IndxGridT::Ptr id =
+        raster.rasterizeTrails(pa, 0.75);//scale offset between two instances
+
+    int min = std::numeric_limits<int>::max(), max = -min;
+    for (RasterT::IndxGridT::ValueOnCIter i=id->cbeginValueOn(); i; ++i) {
+        min = openvdb::math::Min(min, int(*i));
+        max = openvdb::math::Max(max, int(*i));
+    }
+    CPPUNIT_ASSERT_EQUAL(1, min);//first particle is ignored because of its small rdadius!
+    CPPUNIT_ASSERT_EQUAL(3, max);
+
+    //ls->tree().print(std::cout, 4);
+    //this->writeGrid(*ls, "testRasterizeTrails");
+}
+
+// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

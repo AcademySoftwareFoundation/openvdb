@@ -1,0 +1,266 @@
+///////////////////////////////////////////////////////////////////////////
+//
+// Copyright (c) 2012-2013 DreamWorks Animation LLC
+//
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
+//
+// Redistributions of source code must retain the above copyright
+// and license notice and the following restrictions and disclaimer.
+//
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
+// from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
+// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
+//
+///////////////////////////////////////////////////////////////////////////
+
+/*
+ * PROPRIETARY INFORMATION.  This software is proprietary to
+ * Side Effects Software Inc., and is not to be reproduced,
+ * transmitted, or disclosed in any way without written permission.
+ *
+ * Produced by:
+ *	Jeff Lait
+ *	Side Effects Software Inc
+ *	477 Richmond Street West
+ *	Toronto, Ontario
+ *	Canada   M5V 3E7
+ *	416-504-9876
+ *
+ * NAME:	GU_PrimVDB.h ( GU Library, C++)
+ *
+ * COMMENTS: Custom VDB primitive.
+ */
+
+#include <UT/UT_Version.h>
+#if !defined(SESI_OPENVDB) && (UT_VERSION_INT >= 0x0c050157) // 12.5.343 or later
+
+#include <GU/GU_PrimVDB.h>
+
+namespace openvdb_houdini {
+using ::GU_PrimVDB;
+}
+
+#else // earlier than 12.5.343
+
+#ifndef __HDK_GU_PrimVDB__
+#define __HDK_GU_PrimVDB__
+
+//#include "GU_API.h"
+#include <GA/GA_PrimitiveDefinition.h>
+#include "GEO_PrimVDB.h"
+#include <GU/GU_Detail.h>
+#include <GU/GU_Prim.h>
+#include <UT/UT_Matrix4.h>
+#include <UT/UT_VoxelArray.h>
+#include <openvdb/Platform.h>
+#include <stddef.h>
+
+
+class GA_Attribute;
+class GEO_PrimVolume;
+
+
+class OPENVDB_HOUDINI_API GU_PrimVDB : public GEO_PrimVDB, public GU_Primitive
+{
+public:
+    // This constructor creates a new GU_PrimVDB but does
+    // not append it to the detail
+    GU_PrimVDB(GU_Detail *gdp, GA_Offset offset=GA_INVALID_OFFSET)
+	: GEO_PrimVDB(gdp, offset)
+	, GU_Primitive()
+    { }
+
+
+    GU_PrimVDB(const GA_MergeMap &map, GA_Detail &detail,
+               GA_Offset offset, const GU_PrimVDB &src_prim)
+	: GEO_PrimVDB(map, detail, offset, src_prim)
+	, GU_Primitive()
+    { }
+
+    virtual ~GU_PrimVDB();
+
+#ifndef SESI_OPENVDB
+    /// Allows you to find out what this primitive type was named.
+    static GA_PrimitiveTypeId	 theTypeId() { return theDefinition->getId(); }
+
+    /// Must be invoked during the factory callback to add us to the
+    /// list of primitives
+    static void		registerMyself(GA_PrimitiveFactory *factory);
+#endif
+
+    virtual const GA_PrimitiveDefinition	&getTypeDef() const
+						{
+						    UT_ASSERT(theDefinition);
+						    return *theDefinition;
+						}
+
+    // Conversion Methods
+
+    virtual GEO_Primitive	*convert(GU_ConvertParms &parms,
+					 GA_PointGroup *usedpts = 0);
+    virtual GEO_Primitive	*convertNew(GU_ConvertParms &parms);
+
+    /// Convert all GEO_PrimVolume primitives in geometry to
+    /// GEO_PrimVDB, preserving prim/vertex/point attributes (and prim/point
+    /// groups if requested).
+    static void			convertVolumesToVDBs(
+					GU_Detail &dst_geo,
+					const GU_Detail &src_geo,
+					GU_ConvertParms &parms,
+					bool flood,
+					bool prune,
+					fpreal tolerance,
+					bool keep_original);
+
+    /// Convert all GEO_PrimVDB primitives in geometry to parms.toType,
+    /// preserving prim/vertex/point attributes (and prim/point groups if
+    /// requested).
+    static void			convertVDBs(
+					GU_Detail &dst_geo,
+					const GU_Detail &src_geo,
+					GU_ConvertParms &parms,
+					fpreal adaptivity,
+					bool keep_original);
+
+    virtual void		*castTo (void) const;
+    virtual const GEO_Primitive	*castToGeo(void) const;
+
+    // NOTE:  For static member functions please call in the following
+    //        manner.  <ptrvalue> = GU_PrimVDB::<functname>
+    //        i.e.        partptr = GU_PrimVDB::build(params...);
+
+    // Optional Build Method
+
+    static GU_PrimVDB *	build(GU_Detail *gdp, bool append_points = true);
+
+    /// Store a VDB grid in a new VDB primitive and add the primitive
+    /// to a geometry detail.
+    /// @param src
+    ///     if non-null, copy attributes and groups from this primitive
+    /// @param name
+    ///     if non-null, set the new primitive's @c name attribute to
+    ///     this string; otherwise, if @a src is non-null, use its name
+    static GU_PrimVDB* buildFromGrid(GU_Detail& gdp, openvdb::GridBase::Ptr grid,
+	const GEO_PrimVDB* src = NULL, const char* name = NULL)
+    {
+	return GU_PrimVDB::buildFromGridAdapter(gdp, &grid, src, name);
+    }
+
+    /// Create new VDB primitive from the given native volume primitive
+    static GU_PrimVDB *	buildFromPrimVolume(
+			    GU_Detail &geo,
+			    const GEO_PrimVolume &vol,
+			    const char *name,
+			    const bool flood = false,
+			    const bool prune = false,
+			    const float tolerance = 0.0);
+
+    virtual void	normal(NormalComp &output) const;
+
+    virtual int		intersectRay(const UT_Vector3 &o, const UT_Vector3 &d,
+				float tmax = 1E17F, float tol = 1E-12F,
+				float *distance = 0, UT_Vector3 *pos = 0,
+				UT_Vector3 *nml = 0, int accurate = 0,
+				float *u = 0, float *v = 0,
+				int ignoretrim = 1) const;
+
+    // Persistent is true if the returned cache is not to be deleted by
+    // the caller.
+    virtual GU_RayIntersect	*createRayCache(int &persistent);
+
+
+    /// @brief Transfer any metadata associated with this primitive's
+    /// VDB grid to primitive attributes.
+    void syncAttrsFromMetadata();
+
+    /// @brief Transfer any metadata associated with a VDB grid
+    /// to primitive attributes on a VDB primitive.
+    /// @param prim  the primitive to be populated with attributes
+    /// @param grid  the grid whose metadata should be transferred
+    /// @param gdp   the detail to which to transfer attributes
+    static void createGridAttrsFromMetadata(
+	const GEO_PrimVDB& prim,
+	const openvdb::GridBase& grid,
+	GEO_Detail& gdp)
+    {
+	GU_PrimVDB::createGridAttrsFromMetadataAdapter(prim, &grid, gdp);
+    }
+
+    /// @brief Transfer a VDB primitive's attributes to a VDB grid as metadata.
+    /// @param grid  the grid to be populated with metadata
+    /// @param prim  the primitive whose attributes should be transferred
+    /// @param gdp   the detail from which to retrieve primitive attributes
+    static void createMetadataFromGridAttrs(
+	openvdb::GridBase& grid,
+	const GEO_PrimVDB& prim,
+	const GEO_Detail& gdp)
+    {
+	GU_PrimVDB::createMetadataFromGridAttrsAdapter(&grid, prim, gdp);
+    }
+
+private: // METHODS
+
+    GEO_Primitive *	convertToNewPrim(
+			    GEO_Detail &dst_geo,
+			    GU_ConvertParms &parms,
+			    fpreal adaptivity,
+			    bool &success) const;
+    GEO_Primitive *	convertToPrimVolume(
+			    GEO_Detail &dst_geo,
+			    GU_ConvertParms &parms) const;
+    GEO_Primitive *	convertToPoly(
+			    GEO_Detail &dst_geo,
+			    GU_ConvertParms &parms,
+			    fpreal adaptivity,
+			    bool buildpolysoup,
+			    bool &success) const;
+
+    static GU_PrimVDB*	buildFromGridAdapter(
+			    GU_Detail& gdp,
+			    void* grid,
+			    const GEO_PrimVDB*,
+			    const char* name);
+    static void		createGridAttrsFromMetadataAdapter(
+			    const GEO_PrimVDB& prim,
+			    const void* grid,
+			    GEO_Detail& gdp);
+    static void		createMetadataFromGridAttrsAdapter(
+			    void* grid,
+			    const GEO_PrimVDB&,
+			    const GEO_Detail&);
+
+private: // DATA
+
+    static GA_PrimitiveDefinition	*theDefinition;
+    friend class			 GU_PrimitiveFactory;
+};
+
+
+#ifndef SESI_OPENVDB
+namespace openvdb_houdini {
+using ::GU_PrimVDB;
+}
+#endif
+
+#endif // __HDK_GU_PrimVDB__
+
+#endif // UT_VERSION_INT < 0x0c050157 // earlier than 12.5.343
+
+// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
