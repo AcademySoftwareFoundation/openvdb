@@ -29,6 +29,7 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include "Viewer.h"
+#include <openvdb/util/Formats.h> // for formattedInt()
 #include <iomanip> // for std::setprecision()
 #include <iostream>
 #include <sstream>
@@ -37,6 +38,7 @@
 
 
 ////////////////////////////////////////
+
 
 class BitmapFont13
 {
@@ -58,104 +60,104 @@ private:
 GLuint BitmapFont13::sOffset = 0;
 
 GLubyte BitmapFont13::sCharacters[95][13] = {
-    {0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00}, 
-    {0X00, 0X00, 0X18, 0X18, 0X00, 0X00, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18}, 
-    {0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X36, 0X36, 0X36, 0X36}, 
-    {0X00, 0X00, 0X00, 0X66, 0X66, 0XFF, 0X66, 0X66, 0XFF, 0X66, 0X66, 0X00, 0X00}, 
-    {0X00, 0X00, 0X18, 0X7E, 0XFF, 0X1B, 0X1F, 0X7E, 0XF8, 0XD8, 0XFF, 0X7E, 0X18}, 
-    {0X00, 0X00, 0X0E, 0X1B, 0XDB, 0X6E, 0X30, 0X18, 0X0C, 0X76, 0XDB, 0XD8, 0X70}, 
-    {0X00, 0X00, 0X7F, 0XC6, 0XCF, 0XD8, 0X70, 0X70, 0XD8, 0XCC, 0XCC, 0X6C, 0X38}, 
-    {0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X18, 0X1C, 0X0C, 0X0E}, 
-    {0X00, 0X00, 0X0C, 0X18, 0X30, 0X30, 0X30, 0X30, 0X30, 0X30, 0X30, 0X18, 0X0C}, 
-    {0X00, 0X00, 0X30, 0X18, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0X18, 0X30}, 
-    {0X00, 0X00, 0X00, 0X00, 0X99, 0X5A, 0X3C, 0XFF, 0X3C, 0X5A, 0X99, 0X00, 0X00}, 
-    {0X00, 0X00, 0X00, 0X18, 0X18, 0X18, 0XFF, 0XFF, 0X18, 0X18, 0X18, 0X00, 0X00}, 
-    {0X00, 0X00, 0X30, 0X18, 0X1C, 0X1C, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00}, 
-    {0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0XFF, 0XFF, 0X00, 0X00, 0X00, 0X00, 0X00}, 
-    {0X00, 0X00, 0X00, 0X38, 0X38, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00}, 
-    {0X00, 0X60, 0X60, 0X30, 0X30, 0X18, 0X18, 0X0C, 0X0C, 0X06, 0X06, 0X03, 0X03}, 
-    {0X00, 0X00, 0X3C, 0X66, 0XC3, 0XE3, 0XF3, 0XDB, 0XCF, 0XC7, 0XC3, 0X66, 0X3C}, 
-    {0X00, 0X00, 0X7E, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X78, 0X38, 0X18}, 
-    {0X00, 0X00, 0XFF, 0XC0, 0XC0, 0X60, 0X30, 0X18, 0X0C, 0X06, 0X03, 0XE7, 0X7E}, 
-    {0X00, 0X00, 0X7E, 0XE7, 0X03, 0X03, 0X07, 0X7E, 0X07, 0X03, 0X03, 0XE7, 0X7E}, 
-    {0X00, 0X00, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0XFF, 0XCC, 0X6C, 0X3C, 0X1C, 0X0C}, 
-    {0X00, 0X00, 0X7E, 0XE7, 0X03, 0X03, 0X07, 0XFE, 0XC0, 0XC0, 0XC0, 0XC0, 0XFF}, 
-    {0X00, 0X00, 0X7E, 0XE7, 0XC3, 0XC3, 0XC7, 0XFE, 0XC0, 0XC0, 0XC0, 0XE7, 0X7E}, 
-    {0X00, 0X00, 0X30, 0X30, 0X30, 0X30, 0X18, 0X0C, 0X06, 0X03, 0X03, 0X03, 0XFF}, 
-    {0X00, 0X00, 0X7E, 0XE7, 0XC3, 0XC3, 0XE7, 0X7E, 0XE7, 0XC3, 0XC3, 0XE7, 0X7E}, 
-    {0X00, 0X00, 0X7E, 0XE7, 0X03, 0X03, 0X03, 0X7F, 0XE7, 0XC3, 0XC3, 0XE7, 0X7E}, 
-    {0X00, 0X00, 0X00, 0X38, 0X38, 0X00, 0X00, 0X38, 0X38, 0X00, 0X00, 0X00, 0X00}, 
-    {0X00, 0X00, 0X30, 0X18, 0X1C, 0X1C, 0X00, 0X00, 0X1C, 0X1C, 0X00, 0X00, 0X00}, 
-    {0X00, 0X00, 0X06, 0X0C, 0X18, 0X30, 0X60, 0XC0, 0X60, 0X30, 0X18, 0X0C, 0X06}, 
-    {0X00, 0X00, 0X00, 0X00, 0XFF, 0XFF, 0X00, 0XFF, 0XFF, 0X00, 0X00, 0X00, 0X00}, 
-    {0X00, 0X00, 0X60, 0X30, 0X18, 0X0C, 0X06, 0X03, 0X06, 0X0C, 0X18, 0X30, 0X60}, 
-    {0X00, 0X00, 0X18, 0X00, 0X00, 0X18, 0X18, 0X0C, 0X06, 0X03, 0XC3, 0XC3, 0X7E}, 
-    {0X00, 0X00, 0X3F, 0X60, 0XCF, 0XDB, 0XD3, 0XDD, 0XC3, 0X7E, 0X00, 0X00, 0X00}, 
-    {0X00, 0X00, 0XC3, 0XC3, 0XC3, 0XC3, 0XFF, 0XC3, 0XC3, 0XC3, 0X66, 0X3C, 0X18}, 
-    {0X00, 0X00, 0XFE, 0XC7, 0XC3, 0XC3, 0XC7, 0XFE, 0XC7, 0XC3, 0XC3, 0XC7, 0XFE}, 
-    {0X00, 0X00, 0X7E, 0XE7, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XE7, 0X7E}, 
-    {0X00, 0X00, 0XFC, 0XCE, 0XC7, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XC7, 0XCE, 0XFC}, 
-    {0X00, 0X00, 0XFF, 0XC0, 0XC0, 0XC0, 0XC0, 0XFC, 0XC0, 0XC0, 0XC0, 0XC0, 0XFF}, 
-    {0X00, 0X00, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XFC, 0XC0, 0XC0, 0XC0, 0XFF}, 
-    {0X00, 0X00, 0X7E, 0XE7, 0XC3, 0XC3, 0XCF, 0XC0, 0XC0, 0XC0, 0XC0, 0XE7, 0X7E}, 
-    {0X00, 0X00, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XFF, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3}, 
-    {0X00, 0X00, 0X7E, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X7E}, 
-    {0X00, 0X00, 0X7C, 0XEE, 0XC6, 0X06, 0X06, 0X06, 0X06, 0X06, 0X06, 0X06, 0X06}, 
-    {0X00, 0X00, 0XC3, 0XC6, 0XCC, 0XD8, 0XF0, 0XE0, 0XF0, 0XD8, 0XCC, 0XC6, 0XC3}, 
-    {0X00, 0X00, 0XFF, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0}, 
-    {0X00, 0X00, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XDB, 0XFF, 0XFF, 0XE7, 0XC3}, 
-    {0X00, 0X00, 0XC7, 0XC7, 0XCF, 0XCF, 0XDF, 0XDB, 0XFB, 0XF3, 0XF3, 0XE3, 0XE3}, 
-    {0X00, 0X00, 0X7E, 0XE7, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XE7, 0X7E}, 
-    {0X00, 0X00, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XFE, 0XC7, 0XC3, 0XC3, 0XC7, 0XFE}, 
-    {0X00, 0X00, 0X3F, 0X6E, 0XDF, 0XDB, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0X66, 0X3C}, 
-    {0X00, 0X00, 0XC3, 0XC6, 0XCC, 0XD8, 0XF0, 0XFE, 0XC7, 0XC3, 0XC3, 0XC7, 0XFE}, 
-    {0X00, 0X00, 0X7E, 0XE7, 0X03, 0X03, 0X07, 0X7E, 0XE0, 0XC0, 0XC0, 0XE7, 0X7E}, 
-    {0X00, 0X00, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0XFF}, 
-    {0X00, 0X00, 0X7E, 0XE7, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3}, 
-    {0X00, 0X00, 0X18, 0X3C, 0X3C, 0X66, 0X66, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3}, 
-    {0X00, 0X00, 0XC3, 0XE7, 0XFF, 0XFF, 0XDB, 0XDB, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3}, 
-    {0X00, 0X00, 0XC3, 0X66, 0X66, 0X3C, 0X3C, 0X18, 0X3C, 0X3C, 0X66, 0X66, 0XC3}, 
-    {0X00, 0X00, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X3C, 0X3C, 0X66, 0X66, 0XC3}, 
-    {0X00, 0X00, 0XFF, 0XC0, 0XC0, 0X60, 0X30, 0X7E, 0X0C, 0X06, 0X03, 0X03, 0XFF}, 
-    {0X00, 0X00, 0X3C, 0X30, 0X30, 0X30, 0X30, 0X30, 0X30, 0X30, 0X30, 0X30, 0X3C}, 
-    {0X00, 0X03, 0X03, 0X06, 0X06, 0X0C, 0X0C, 0X18, 0X18, 0X30, 0X30, 0X60, 0X60}, 
-    {0X00, 0X00, 0X3C, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0X3C}, 
-    {0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0XC3, 0X66, 0X3C, 0X18}, 
-    {0XFF, 0XFF, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00}, 
-    {0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X18, 0X38, 0X30, 0X70}, 
-    {0X00, 0X00, 0X7F, 0XC3, 0XC3, 0X7F, 0X03, 0XC3, 0X7E, 0X00, 0X00, 0X00, 0X00}, 
-    {0X00, 0X00, 0XFE, 0XC3, 0XC3, 0XC3, 0XC3, 0XFE, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0}, 
-    {0X00, 0X00, 0X7E, 0XC3, 0XC0, 0XC0, 0XC0, 0XC3, 0X7E, 0X00, 0X00, 0X00, 0X00}, 
-    {0X00, 0X00, 0X7F, 0XC3, 0XC3, 0XC3, 0XC3, 0X7F, 0X03, 0X03, 0X03, 0X03, 0X03}, 
-    {0X00, 0X00, 0X7F, 0XC0, 0XC0, 0XFE, 0XC3, 0XC3, 0X7E, 0X00, 0X00, 0X00, 0X00}, 
-    {0X00, 0X00, 0X30, 0X30, 0X30, 0X30, 0X30, 0XFC, 0X30, 0X30, 0X30, 0X33, 0X1E}, 
-    {0X7E, 0XC3, 0X03, 0X03, 0X7F, 0XC3, 0XC3, 0XC3, 0X7E, 0X00, 0X00, 0X00, 0X00}, 
-    {0X00, 0X00, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XFE, 0XC0, 0XC0, 0XC0, 0XC0}, 
-    {0X00, 0X00, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X00, 0X00, 0X18, 0X00}, 
-    {0X38, 0X6C, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0X00, 0X00, 0X0C, 0X00}, 
-    {0X00, 0X00, 0XC6, 0XCC, 0XF8, 0XF0, 0XD8, 0XCC, 0XC6, 0XC0, 0XC0, 0XC0, 0XC0}, 
-    {0X00, 0X00, 0X7E, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X78}, 
-    {0X00, 0X00, 0XDB, 0XDB, 0XDB, 0XDB, 0XDB, 0XDB, 0XFE, 0X00, 0X00, 0X00, 0X00}, 
-    {0X00, 0X00, 0XC6, 0XC6, 0XC6, 0XC6, 0XC6, 0XC6, 0XFC, 0X00, 0X00, 0X00, 0X00}, 
-    {0X00, 0X00, 0X7C, 0XC6, 0XC6, 0XC6, 0XC6, 0XC6, 0X7C, 0X00, 0X00, 0X00, 0X00}, 
-    {0XC0, 0XC0, 0XC0, 0XFE, 0XC3, 0XC3, 0XC3, 0XC3, 0XFE, 0X00, 0X00, 0X00, 0X00}, 
-    {0X03, 0X03, 0X03, 0X7F, 0XC3, 0XC3, 0XC3, 0XC3, 0X7F, 0X00, 0X00, 0X00, 0X00}, 
-    {0X00, 0X00, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XE0, 0XFE, 0X00, 0X00, 0X00, 0X00}, 
-    {0X00, 0X00, 0XFE, 0X03, 0X03, 0X7E, 0XC0, 0XC0, 0X7F, 0X00, 0X00, 0X00, 0X00}, 
-    {0X00, 0X00, 0X1C, 0X36, 0X30, 0X30, 0X30, 0X30, 0XFC, 0X30, 0X30, 0X30, 0X00}, 
-    {0X00, 0X00, 0X7E, 0XC6, 0XC6, 0XC6, 0XC6, 0XC6, 0XC6, 0X00, 0X00, 0X00, 0X00}, 
-    {0X00, 0X00, 0X18, 0X3C, 0X3C, 0X66, 0X66, 0XC3, 0XC3, 0X00, 0X00, 0X00, 0X00}, 
-    {0X00, 0X00, 0XC3, 0XE7, 0XFF, 0XDB, 0XC3, 0XC3, 0XC3, 0X00, 0X00, 0X00, 0X00}, 
-    {0X00, 0X00, 0XC3, 0X66, 0X3C, 0X18, 0X3C, 0X66, 0XC3, 0X00, 0X00, 0X00, 0X00}, 
-    {0XC0, 0X60, 0X60, 0X30, 0X18, 0X3C, 0X66, 0X66, 0XC3, 0X00, 0X00, 0X00, 0X00}, 
-    {0X00, 0X00, 0XFF, 0X60, 0X30, 0X18, 0X0C, 0X06, 0XFF, 0X00, 0X00, 0X00, 0X00}, 
-    {0X00, 0X00, 0X0F, 0X18, 0X18, 0X18, 0X38, 0XF0, 0X38, 0X18, 0X18, 0X18, 0X0F}, 
-    {0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18}, 
-    {0X00, 0X00, 0XF0, 0X18, 0X18, 0X18, 0X1C, 0X0F, 0X1C, 0X18, 0X18, 0X18, 0XF0}, 
-    {0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X06, 0X8F, 0XF1, 0X60, 0X00, 0X00, 0X00}
+    { 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00 },
+    { 0X00, 0X00, 0X18, 0X18, 0X00, 0X00, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18 },
+    { 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X36, 0X36, 0X36, 0X36 },
+    { 0X00, 0X00, 0X00, 0X66, 0X66, 0XFF, 0X66, 0X66, 0XFF, 0X66, 0X66, 0X00, 0X00 },
+    { 0X00, 0X00, 0X18, 0X7E, 0XFF, 0X1B, 0X1F, 0X7E, 0XF8, 0XD8, 0XFF, 0X7E, 0X18 },
+    { 0X00, 0X00, 0X0E, 0X1B, 0XDB, 0X6E, 0X30, 0X18, 0X0C, 0X76, 0XDB, 0XD8, 0X70 },
+    { 0X00, 0X00, 0X7F, 0XC6, 0XCF, 0XD8, 0X70, 0X70, 0XD8, 0XCC, 0XCC, 0X6C, 0X38 },
+    { 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X18, 0X1C, 0X0C, 0X0E },
+    { 0X00, 0X00, 0X0C, 0X18, 0X30, 0X30, 0X30, 0X30, 0X30, 0X30, 0X30, 0X18, 0X0C },
+    { 0X00, 0X00, 0X30, 0X18, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0X18, 0X30 },
+    { 0X00, 0X00, 0X00, 0X00, 0X99, 0X5A, 0X3C, 0XFF, 0X3C, 0X5A, 0X99, 0X00, 0X00 },
+    { 0X00, 0X00, 0X00, 0X18, 0X18, 0X18, 0XFF, 0XFF, 0X18, 0X18, 0X18, 0X00, 0X00 },
+    { 0X00, 0X00, 0X30, 0X18, 0X1C, 0X1C, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00 },
+    { 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0XFF, 0XFF, 0X00, 0X00, 0X00, 0X00, 0X00 },
+    { 0X00, 0X00, 0X00, 0X38, 0X38, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00 },
+    { 0X00, 0X60, 0X60, 0X30, 0X30, 0X18, 0X18, 0X0C, 0X0C, 0X06, 0X06, 0X03, 0X03 },
+    { 0X00, 0X00, 0X3C, 0X66, 0XC3, 0XE3, 0XF3, 0XDB, 0XCF, 0XC7, 0XC3, 0X66, 0X3C },
+    { 0X00, 0X00, 0X7E, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X78, 0X38, 0X18 },
+    { 0X00, 0X00, 0XFF, 0XC0, 0XC0, 0X60, 0X30, 0X18, 0X0C, 0X06, 0X03, 0XE7, 0X7E },
+    { 0X00, 0X00, 0X7E, 0XE7, 0X03, 0X03, 0X07, 0X7E, 0X07, 0X03, 0X03, 0XE7, 0X7E },
+    { 0X00, 0X00, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0XFF, 0XCC, 0X6C, 0X3C, 0X1C, 0X0C },
+    { 0X00, 0X00, 0X7E, 0XE7, 0X03, 0X03, 0X07, 0XFE, 0XC0, 0XC0, 0XC0, 0XC0, 0XFF },
+    { 0X00, 0X00, 0X7E, 0XE7, 0XC3, 0XC3, 0XC7, 0XFE, 0XC0, 0XC0, 0XC0, 0XE7, 0X7E },
+    { 0X00, 0X00, 0X30, 0X30, 0X30, 0X30, 0X18, 0X0C, 0X06, 0X03, 0X03, 0X03, 0XFF },
+    { 0X00, 0X00, 0X7E, 0XE7, 0XC3, 0XC3, 0XE7, 0X7E, 0XE7, 0XC3, 0XC3, 0XE7, 0X7E },
+    { 0X00, 0X00, 0X7E, 0XE7, 0X03, 0X03, 0X03, 0X7F, 0XE7, 0XC3, 0XC3, 0XE7, 0X7E },
+    { 0X00, 0X00, 0X00, 0X38, 0X38, 0X00, 0X00, 0X38, 0X38, 0X00, 0X00, 0X00, 0X00 },
+    { 0X00, 0X00, 0X30, 0X18, 0X1C, 0X1C, 0X00, 0X00, 0X1C, 0X1C, 0X00, 0X00, 0X00 },
+    { 0X00, 0X00, 0X06, 0X0C, 0X18, 0X30, 0X60, 0XC0, 0X60, 0X30, 0X18, 0X0C, 0X06 },
+    { 0X00, 0X00, 0X00, 0X00, 0XFF, 0XFF, 0X00, 0XFF, 0XFF, 0X00, 0X00, 0X00, 0X00 },
+    { 0X00, 0X00, 0X60, 0X30, 0X18, 0X0C, 0X06, 0X03, 0X06, 0X0C, 0X18, 0X30, 0X60 },
+    { 0X00, 0X00, 0X18, 0X00, 0X00, 0X18, 0X18, 0X0C, 0X06, 0X03, 0XC3, 0XC3, 0X7E },
+    { 0X00, 0X00, 0X3F, 0X60, 0XCF, 0XDB, 0XD3, 0XDD, 0XC3, 0X7E, 0X00, 0X00, 0X00 },
+    { 0X00, 0X00, 0XC3, 0XC3, 0XC3, 0XC3, 0XFF, 0XC3, 0XC3, 0XC3, 0X66, 0X3C, 0X18 },
+    { 0X00, 0X00, 0XFE, 0XC7, 0XC3, 0XC3, 0XC7, 0XFE, 0XC7, 0XC3, 0XC3, 0XC7, 0XFE },
+    { 0X00, 0X00, 0X7E, 0XE7, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XE7, 0X7E },
+    { 0X00, 0X00, 0XFC, 0XCE, 0XC7, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XC7, 0XCE, 0XFC },
+    { 0X00, 0X00, 0XFF, 0XC0, 0XC0, 0XC0, 0XC0, 0XFC, 0XC0, 0XC0, 0XC0, 0XC0, 0XFF },
+    { 0X00, 0X00, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XFC, 0XC0, 0XC0, 0XC0, 0XFF },
+    { 0X00, 0X00, 0X7E, 0XE7, 0XC3, 0XC3, 0XCF, 0XC0, 0XC0, 0XC0, 0XC0, 0XE7, 0X7E },
+    { 0X00, 0X00, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XFF, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3 },
+    { 0X00, 0X00, 0X7E, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X7E },
+    { 0X00, 0X00, 0X7C, 0XEE, 0XC6, 0X06, 0X06, 0X06, 0X06, 0X06, 0X06, 0X06, 0X06 },
+    { 0X00, 0X00, 0XC3, 0XC6, 0XCC, 0XD8, 0XF0, 0XE0, 0XF0, 0XD8, 0XCC, 0XC6, 0XC3 },
+    { 0X00, 0X00, 0XFF, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0 },
+    { 0X00, 0X00, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XDB, 0XFF, 0XFF, 0XE7, 0XC3 },
+    { 0X00, 0X00, 0XC7, 0XC7, 0XCF, 0XCF, 0XDF, 0XDB, 0XFB, 0XF3, 0XF3, 0XE3, 0XE3 },
+    { 0X00, 0X00, 0X7E, 0XE7, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XE7, 0X7E },
+    { 0X00, 0X00, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XFE, 0XC7, 0XC3, 0XC3, 0XC7, 0XFE },
+    { 0X00, 0X00, 0X3F, 0X6E, 0XDF, 0XDB, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0X66, 0X3C },
+    { 0X00, 0X00, 0XC3, 0XC6, 0XCC, 0XD8, 0XF0, 0XFE, 0XC7, 0XC3, 0XC3, 0XC7, 0XFE },
+    { 0X00, 0X00, 0X7E, 0XE7, 0X03, 0X03, 0X07, 0X7E, 0XE0, 0XC0, 0XC0, 0XE7, 0X7E },
+    { 0X00, 0X00, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0XFF },
+    { 0X00, 0X00, 0X7E, 0XE7, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3 },
+    { 0X00, 0X00, 0X18, 0X3C, 0X3C, 0X66, 0X66, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3 },
+    { 0X00, 0X00, 0XC3, 0XE7, 0XFF, 0XFF, 0XDB, 0XDB, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3 },
+    { 0X00, 0X00, 0XC3, 0X66, 0X66, 0X3C, 0X3C, 0X18, 0X3C, 0X3C, 0X66, 0X66, 0XC3 },
+    { 0X00, 0X00, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X3C, 0X3C, 0X66, 0X66, 0XC3 },
+    { 0X00, 0X00, 0XFF, 0XC0, 0XC0, 0X60, 0X30, 0X7E, 0X0C, 0X06, 0X03, 0X03, 0XFF },
+    { 0X00, 0X00, 0X3C, 0X30, 0X30, 0X30, 0X30, 0X30, 0X30, 0X30, 0X30, 0X30, 0X3C },
+    { 0X00, 0X03, 0X03, 0X06, 0X06, 0X0C, 0X0C, 0X18, 0X18, 0X30, 0X30, 0X60, 0X60 },
+    { 0X00, 0X00, 0X3C, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0X3C },
+    { 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0XC3, 0X66, 0X3C, 0X18 },
+    { 0XFF, 0XFF, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00 },
+    { 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X18, 0X38, 0X30, 0X70 },
+    { 0X00, 0X00, 0X7F, 0XC3, 0XC3, 0X7F, 0X03, 0XC3, 0X7E, 0X00, 0X00, 0X00, 0X00 },
+    { 0X00, 0X00, 0XFE, 0XC3, 0XC3, 0XC3, 0XC3, 0XFE, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0 },
+    { 0X00, 0X00, 0X7E, 0XC3, 0XC0, 0XC0, 0XC0, 0XC3, 0X7E, 0X00, 0X00, 0X00, 0X00 },
+    { 0X00, 0X00, 0X7F, 0XC3, 0XC3, 0XC3, 0XC3, 0X7F, 0X03, 0X03, 0X03, 0X03, 0X03 },
+    { 0X00, 0X00, 0X7F, 0XC0, 0XC0, 0XFE, 0XC3, 0XC3, 0X7E, 0X00, 0X00, 0X00, 0X00 },
+    { 0X00, 0X00, 0X30, 0X30, 0X30, 0X30, 0X30, 0XFC, 0X30, 0X30, 0X30, 0X33, 0X1E },
+    { 0X7E, 0XC3, 0X03, 0X03, 0X7F, 0XC3, 0XC3, 0XC3, 0X7E, 0X00, 0X00, 0X00, 0X00 },
+    { 0X00, 0X00, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XC3, 0XFE, 0XC0, 0XC0, 0XC0, 0XC0 },
+    { 0X00, 0X00, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X00, 0X00, 0X18, 0X00 },
+    { 0X38, 0X6C, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0X0C, 0X00, 0X00, 0X0C, 0X00 },
+    { 0X00, 0X00, 0XC6, 0XCC, 0XF8, 0XF0, 0XD8, 0XCC, 0XC6, 0XC0, 0XC0, 0XC0, 0XC0 },
+    { 0X00, 0X00, 0X7E, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X78 },
+    { 0X00, 0X00, 0XDB, 0XDB, 0XDB, 0XDB, 0XDB, 0XDB, 0XFE, 0X00, 0X00, 0X00, 0X00 },
+    { 0X00, 0X00, 0XC6, 0XC6, 0XC6, 0XC6, 0XC6, 0XC6, 0XFC, 0X00, 0X00, 0X00, 0X00 },
+    { 0X00, 0X00, 0X7C, 0XC6, 0XC6, 0XC6, 0XC6, 0XC6, 0X7C, 0X00, 0X00, 0X00, 0X00 },
+    { 0XC0, 0XC0, 0XC0, 0XFE, 0XC3, 0XC3, 0XC3, 0XC3, 0XFE, 0X00, 0X00, 0X00, 0X00 },
+    { 0X03, 0X03, 0X03, 0X7F, 0XC3, 0XC3, 0XC3, 0XC3, 0X7F, 0X00, 0X00, 0X00, 0X00 },
+    { 0X00, 0X00, 0XC0, 0XC0, 0XC0, 0XC0, 0XC0, 0XE0, 0XFE, 0X00, 0X00, 0X00, 0X00 },
+    { 0X00, 0X00, 0XFE, 0X03, 0X03, 0X7E, 0XC0, 0XC0, 0X7F, 0X00, 0X00, 0X00, 0X00 },
+    { 0X00, 0X00, 0X1C, 0X36, 0X30, 0X30, 0X30, 0X30, 0XFC, 0X30, 0X30, 0X30, 0X00 },
+    { 0X00, 0X00, 0X7E, 0XC6, 0XC6, 0XC6, 0XC6, 0XC6, 0XC6, 0X00, 0X00, 0X00, 0X00 },
+    { 0X00, 0X00, 0X18, 0X3C, 0X3C, 0X66, 0X66, 0XC3, 0XC3, 0X00, 0X00, 0X00, 0X00 },
+    { 0X00, 0X00, 0XC3, 0XE7, 0XFF, 0XDB, 0XC3, 0XC3, 0XC3, 0X00, 0X00, 0X00, 0X00 },
+    { 0X00, 0X00, 0XC3, 0X66, 0X3C, 0X18, 0X3C, 0X66, 0XC3, 0X00, 0X00, 0X00, 0X00 },
+    { 0XC0, 0X60, 0X60, 0X30, 0X18, 0X3C, 0X66, 0X66, 0XC3, 0X00, 0X00, 0X00, 0X00 },
+    { 0X00, 0X00, 0XFF, 0X60, 0X30, 0X18, 0X0C, 0X06, 0XFF, 0X00, 0X00, 0X00, 0X00 },
+    { 0X00, 0X00, 0X0F, 0X18, 0X18, 0X18, 0X38, 0XF0, 0X38, 0X18, 0X18, 0X18, 0X0F },
+    { 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18, 0X18 },
+    { 0X00, 0X00, 0XF0, 0X18, 0X18, 0X18, 0X1C, 0X0F, 0X1C, 0X18, 0X18, 0X18, 0XF0 },
+    { 0X00, 0X00, 0X00, 0X00, 0X00, 0X00, 0X06, 0X8F, 0XF1, 0X60, 0X00, 0X00, 0X00 }
 }; // sCharacters
 
-void 
+void
 BitmapFont13::initialize()
 {
     OPENVDB_START_THREADSAFE_STATIC_WRITE
@@ -356,7 +358,7 @@ Viewer::Camera::aim()
     // Set up modelview matrix
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-        
+
     gluLookAt(mEye[0], mEye[1], mEye[2],
               mLookAt[0], mLookAt[1], mLookAt[2],
               mUp[0], mUp[1], mUp[2]);
@@ -466,7 +468,7 @@ struct Viewer::ClipBox
     void disableClipping() const;
 
     void setBBox(const openvdb::BBoxd&);
-    void setStepSize(const openvdb::Vec3d& s) { mSeptSize = s; }
+    void setStepSize(const openvdb::Vec3d& s) { mStepSize = s; }
 
 
     void render();
@@ -484,18 +486,19 @@ struct Viewer::ClipBox
     bool& ctrlIsDown() { return mCtrlIsDown; }
 
 private:
-    
+
     void update() const;
 
-    openvdb::Vec3d mSeptSize;
+    openvdb::Vec3d mStepSize;
     openvdb::BBoxd mBBox;
     bool mXIsActive, mYIsActive, mZIsActive, mShiftIsDown, mCtrlIsDown;
-    GLdouble mFrontPlane[4], mBackPlane[4], mLeftPlane[4], mRightPlane[4], mTopPlane[4], mBottomPlane[4];
+    GLdouble mFrontPlane[4], mBackPlane[4], mLeftPlane[4], mRightPlane[4],
+        mTopPlane[4], mBottomPlane[4];
 };
 
 
 Viewer::ClipBox::ClipBox()
-    : mSeptSize(1.0)
+    : mStepSize(1.0)
     , mBBox()
     , mXIsActive(false)
     , mYIsActive(false)
@@ -522,6 +525,7 @@ Viewer::ClipBox::ClipBox()
     std::copy(bottom, bottom + 4, mBottomPlane);
 }
 
+
 void
 Viewer::ClipBox::setBBox(const openvdb::BBoxd& bbox)
 {
@@ -529,61 +533,63 @@ Viewer::ClipBox::setBBox(const openvdb::BBoxd& bbox)
     reset();
 }
 
+
 void
 Viewer::ClipBox::update(double steps)
 {
     if (mXIsActive) {
-        GLdouble s = steps * mSeptSize.x() * 4.0;
+        GLdouble s = steps * mStepSize.x() * 4.0;
 
         if (mShiftIsDown || mCtrlIsDown) {
             mLeftPlane[3] -= s;
-            mLeftPlane[3] = -std::min(-mLeftPlane[3], (mRightPlane[3] - mSeptSize.x()));
+            mLeftPlane[3] = -std::min(-mLeftPlane[3], (mRightPlane[3] - mStepSize.x()));
             mLeftPlane[3] = -std::max(-mLeftPlane[3], mBBox.min().x());
         }
 
         if (!mShiftIsDown || mCtrlIsDown) {
             mRightPlane[3] += s;
             mRightPlane[3] = std::min(mRightPlane[3], mBBox.max().x());
-            mRightPlane[3] = std::max(mRightPlane[3], (-mLeftPlane[3] + mSeptSize.x()));
+            mRightPlane[3] = std::max(mRightPlane[3], (-mLeftPlane[3] + mStepSize.x()));
         }
 
     }
 
      if (mYIsActive) {
-        GLdouble s = steps * mSeptSize.y() * 4.0;
+        GLdouble s = steps * mStepSize.y() * 4.0;
 
         if (mShiftIsDown || mCtrlIsDown) {
             mTopPlane[3] -= s;
-            mTopPlane[3] = -std::min(-mTopPlane[3], (mBottomPlane[3] - mSeptSize.y()));
+            mTopPlane[3] = -std::min(-mTopPlane[3], (mBottomPlane[3] - mStepSize.y()));
             mTopPlane[3] = -std::max(-mTopPlane[3], mBBox.min().y());
         }
 
         if (!mShiftIsDown || mCtrlIsDown) {
             mBottomPlane[3] += s;
             mBottomPlane[3] = std::min(mBottomPlane[3], mBBox.max().y());
-            mBottomPlane[3] = std::max(mBottomPlane[3], (-mTopPlane[3] + mSeptSize.y()));
+            mBottomPlane[3] = std::max(mBottomPlane[3], (-mTopPlane[3] + mStepSize.y()));
         }
 
     }
 
      if (mZIsActive) {
-        GLdouble s = steps * mSeptSize.z() * 4.0;
+        GLdouble s = steps * mStepSize.z() * 4.0;
 
         if (mShiftIsDown || mCtrlIsDown) {
             mFrontPlane[3] -= s;
-            mFrontPlane[3] = -std::min(-mFrontPlane[3], (mBackPlane[3] - mSeptSize.z()));
+            mFrontPlane[3] = -std::min(-mFrontPlane[3], (mBackPlane[3] - mStepSize.z()));
             mFrontPlane[3] = -std::max(-mFrontPlane[3], mBBox.min().z());
         }
 
         if (!mShiftIsDown || mCtrlIsDown) {
             mBackPlane[3] += s;
             mBackPlane[3] = std::min(mBackPlane[3], mBBox.max().z());
-            mBackPlane[3] = std::max(mBackPlane[3], (-mFrontPlane[3] + mSeptSize.z()));
+            mBackPlane[3] = std::max(mBackPlane[3], (-mFrontPlane[3] + mStepSize.z()));
         }
 
     }
 
 }
+
 
 void
 Viewer::ClipBox::reset()
@@ -598,6 +604,7 @@ Viewer::ClipBox::reset()
     mBottomPlane[3] = mBBox.max().y();
 }
 
+
 void
 Viewer::ClipBox::update() const
 {
@@ -608,6 +615,7 @@ Viewer::ClipBox::update() const
     glClipPlane(GL_CLIP_PLANE4, mTopPlane);
     glClipPlane(GL_CLIP_PLANE5, mBottomPlane);
 }
+
 
 void
 Viewer::ClipBox::enableClipping() const
@@ -621,6 +629,7 @@ Viewer::ClipBox::enableClipping() const
     if (mBottomPlane[3] < mBBox.max().y())  glEnable(GL_CLIP_PLANE5);
 }
 
+
 void
 Viewer::ClipBox::disableClipping() const
 {
@@ -631,6 +640,7 @@ Viewer::ClipBox::disableClipping() const
     glDisable(GL_CLIP_PLANE4);
     glDisable(GL_CLIP_PLANE5);
 }
+
 
 void
 Viewer::ClipBox::render()
@@ -728,6 +738,7 @@ Viewer::ClipBox::render()
     }
 }
 
+
 ////////////////////////////////////////
 
 
@@ -798,7 +809,7 @@ Viewer::setWindowTitle(double fps)
     std::ostringstream ss;
     ss  << mProgName << ": "
         << (mGridName.empty() ? std::string("OpenVDB") : mGridName)
-        << " (grid " << (mGridIdx + 1) << " of " << mGrids.size() << ") @ "
+        << " (" << (mGridIdx + 1) << " of " << mGrids.size() << ") @ "
         << std::setprecision(1) << std::fixed << fps << " fps";
     glfwSetWindowTitle(ss.str().c_str());
 }
@@ -817,7 +828,7 @@ Viewer::render()
 
     mClipBox->render();
     mClipBox->enableClipping();
-    
+
     for (size_t n = 1, N = mRenderModules.size(); n < N; ++n) {
         mRenderModules[n]->render();
     }
@@ -827,16 +838,18 @@ Viewer::render()
     // Render text
 
     if (mShowInfo) {
+        BitmapFont13::enableFontRendering();
 
-    BitmapFont13::enableFontRendering();
+        glColor3f (0.2, 0.2, 0.2);
 
-    glColor3f (0.2, 0.2, 0.2);
+        int width, height;
+        glfwGetWindowSize(&width, &height);
 
-    BitmapFont13::print(10, 50, mGridInfo);
-    BitmapFont13::print(10, 30, mTransformInfo);
-    BitmapFont13::print(10, 10, mTreeInfo);
+        BitmapFont13::print(10, height - 13 - 10, mGridInfo);
+        BitmapFont13::print(10, height - 13 - 30, mTransformInfo);
+        BitmapFont13::print(10, height - 13 - 50, mTreeInfo);
 
-    BitmapFont13::disableFontRendering();
+        BitmapFont13::disableFontRendering();
     }
 }
 
@@ -849,6 +862,7 @@ Viewer::view(const openvdb::GridCPtrVec& gridList, int width, int height)
 {
     sViewer->viewGrids(gridList, width, height);
 }
+
 
 openvdb::BBoxd
 worldSpaceBBox(const openvdb::math::Transform& xform, const openvdb::CoordBBox& bbox)
@@ -886,7 +900,7 @@ worldSpaceBBox(const openvdb::math::Transform& xform, const openvdb::CoordBBox& 
         if (ptn[i] < pMin[i]) pMin[i] = ptn[i];
         if (ptn[i] > pMax[i]) pMax[i] = ptn[i];
     }
-    
+
     // corner 4
     ijk[0] = max.x();
     ijk[1] = min.y();
@@ -938,6 +952,7 @@ worldSpaceBBox(const openvdb::math::Transform& xform, const openvdb::CoordBBox& 
     return openvdb::BBoxd(pMin, pMax);
 }
 
+
 void
 Viewer::viewGrids(const openvdb::GridCPtrVec& gridList, int width, int height)
 {
@@ -975,8 +990,8 @@ Viewer::viewGrids(const openvdb::GridCPtrVec& gridList, int width, int height)
         openvdb::Vec3d voxelSize = gridList[0]->voxelSize();
 
         for (size_t n = 1; n < gridList.size(); ++n) {
-            bbox.expand(
-                worldSpaceBBox(gridList[n]->transform(), gridList[n]->evalActiveVoxelBoundingBox()));
+            bbox.expand(worldSpaceBBox(gridList[n]->transform(),
+                gridList[n]->evalActiveVoxelBoundingBox()));
 
             voxelSize = minComponent(voxelSize, gridList[n]->voxelSize());
         }
@@ -1011,7 +1026,7 @@ Viewer::viewGrids(const openvdb::GridCPtrVec& gridList, int width, int height)
 
     // Screen color
     glClearColor(0.85, 0.85, 0.85, 0.0f);
-    
+
     glDepthFunc(GL_LESS);
     glEnable(GL_DEPTH_TEST);
     glShadeModel(GL_SMOOTH);
@@ -1054,6 +1069,7 @@ Viewer::viewGrids(const openvdb::GridCPtrVec& gridList, int width, int height)
 
 
 ////////////////////////////////////////
+
 
 void
 Viewer::updateCutPlanes(int wheelPos)
@@ -1117,31 +1133,31 @@ Viewer::showNthGrid(size_t n)
         }
     }
 
-
-
-    
-
     // Collect info
     {
-        std::stringstream stream;
-        stream << "Gid name: " << mGrids[n]->getName() << " Grid class: ";
-        stream << openvdb::GridBase::gridClassToMenuName(mGrids[n]->getGridClass());
-        stream << " Value type: " << mGrids[n]->valueType();
-        mGridInfo = stream.str();
+        std::ostringstream ostrm;
+        std::string s = mGrids[n]->getName();
+        const openvdb::GridClass cls = mGrids[n]->getGridClass();
+        if (!s.empty()) ostrm << s << " / ";
+        ostrm << mGrids[n]->valueType() << " / ";
+        if (cls == openvdb::GRID_UNKNOWN) ostrm << " class unknown";
+        else ostrm << " " << openvdb::GridBase::gridClassToString(cls);
+        mGridInfo = ostrm.str();
     }
     {
         openvdb::Coord dim = mGrids[n]->evalActiveVoxelDim();
-        std::stringstream stream;
-        stream << "Voxel resolution: " << dim[0] << "x" << dim[1] << "x" << dim[2];
-        stream << " Voxel size: " << mGrids[n]->voxelSize()[0];
-        stream << " Transform: " << mGrids[n]->transform().mapType();
-        mTransformInfo = stream.str();
+        std::ostringstream ostrm;
+        ostrm << dim[0] << " x " << dim[1] << " x " << dim[2]
+            << " / voxel size " << std::setprecision(4) << mGrids[n]->voxelSize()[0]
+            << " (" << mGrids[n]->transform().mapType() << ")";
+        mTransformInfo = ostrm.str();
     }
-
     {
-        std::stringstream stream;
-        stream << "Active voxels: " << mGrids[n]->activeVoxelCount();
-        mTreeInfo = stream.str();
+        std::ostringstream ostrm;
+        const openvdb::Index64 count = mGrids[n]->activeVoxelCount();
+        ostrm << openvdb::util::formattedInt(count)
+            << " active voxel" << (count == 1 ? "" : "s");
+        mTreeInfo = ostrm.str();
     }
 
     setWindowTitle();
@@ -1192,7 +1208,7 @@ Viewer::keyCallback(int key, int action)
             break;
         }
     }
-    
+
     switch (key) {
     case 'x': case 'X':
         sViewer->mClipBox->activateXPlanes() = keyPress;
@@ -1213,6 +1229,7 @@ Viewer::keyCallback(int key, int action)
     OPENVDB_FINISH_THREADSAFE_STATIC_WRITE
 }
 
+
 void
 Viewer::mouseButtonCallback(int button, int action)
 {
@@ -1220,12 +1237,14 @@ Viewer::mouseButtonCallback(int button, int action)
     if (sViewer->mCamera->needsDisplay()) sViewer->setNeedsDisplay();
 }
 
+
 void
 Viewer::mousePosCallback(int x, int y)
 {
     sViewer->mCamera->mousePosCallback(x, y);
     if (sViewer->mCamera->needsDisplay()) sViewer->setNeedsDisplay();
 }
+
 
 void
 Viewer::mouseWheelCallback(int pos)
@@ -1236,9 +1255,10 @@ Viewer::mouseWheelCallback(int pos)
         sViewer->mCamera->mouseWheelCallback(pos, sViewer->mWheelPos);
         if (sViewer->mCamera->needsDisplay()) sViewer->setNeedsDisplay();
     }
-    
+
     sViewer->mWheelPos = pos;
 }
+
 
 void
 Viewer::windowSizeCallback(int, int)
@@ -1267,18 +1287,19 @@ Viewer::setNeedsDisplay()
     sViewer->mUpdates = 0;
 }
 
+
 void
 Viewer::toggleRenderModule(size_t n)
 {
     mRenderModules[n]->visible() = !mRenderModules[n]->visible();
 }
 
+
 void
 Viewer::toggleInfoText()
 {
     mShowInfo = !mShowInfo;
 }
-
 
 // Copyright (c) 2012-2013 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

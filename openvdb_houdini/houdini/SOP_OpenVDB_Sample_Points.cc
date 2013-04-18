@@ -283,8 +283,10 @@ SOP_OpenVDB_Sample_Points::sample(OP_Context& context)
     const int nPoints = aGdp->getNumPoints();
 
     // sanity checks
-    if (mVerbose && nPoints == 0) {
-        std::cout << "No points found in first input port" << std::endl;
+    if (nPoints == 0) {
+        const std::string msg("No points found in first input port");
+        addWarning(SOP_MESSAGE, msg.c_str());
+        if (mVerbose) std::cout << msg << std::endl;
     }
 
     // Get the group of grids to process

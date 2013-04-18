@@ -42,6 +42,7 @@
 #include <openvdb/tools/PointScatter.h>
 #include <openvdb/tools/LevelSetUtil.h>
 #include <boost/random/mersenne_twister.hpp>
+#include <boost/algorithm/string/join.hpp>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -294,6 +295,8 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
 
         const int pmode = evalInt("pointmode", 0, time);
 
+        std::vector<std::string> emptyGrids;
+
         // Process each VDB primitive (with a non-null grid pointer)
         // that belongs to the selected group.
         for (hvdb::VdbPrimCIterator primIter(vdbgeo, group); primIter; ++primIter) {
@@ -304,6 +307,11 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
             const openvdb::GridClass gridClass = grid.getGridClass();
             const bool isSignedDistance = (gridClass == openvdb::GRID_LEVEL_SET);
             const std::string gridName = primIter.getPrimitiveName().toStdString();
+
+            if (grid.empty()) {
+                emptyGrids.push_back(gridName);
+                continue;
+            }
 
             if (pmode == 0) { // fixed point count
 
@@ -370,6 +378,12 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
             }
 
         } // for each grid
+        
+        if (!emptyGrids.empty()) {
+            std::string s = "The following grids were empty: "
+                + boost::algorithm::join(emptyGrids, ", ");
+            addWarning(SOP_MESSAGE, s.c_str());
+        }
 
         // add points to a group if requested
         if (1 == evalInt("dogroup", 0, time)) {

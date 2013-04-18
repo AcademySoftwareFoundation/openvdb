@@ -385,10 +385,9 @@ public:
     {
         typedef typename TreeType::LeafNodeType::ValueOnCIter ValueOnCIter;
 
-        openvdb::Coord ijk;
         openvdb::Vec3d pos;
         unsigned index = 0;
-        size_t counter, activeVoxels = 0;
+        size_t activeVoxels = 0;
 
         for (size_t n = range.begin(); n < range.end(); ++n) {
 
@@ -398,24 +397,38 @@ public:
             activeVoxels = mLeafs.leaf(n).onVoxelCount();
 
             if (activeVoxels <= mVoxelsPerLeaf) {
+
                 for ( ; it; ++it) {
-                    ijk = it.getCoord();
-                    pos = mTransform.indexToWorld(ijk);
+                    pos = mTransform.indexToWorld(it.getCoord());
                     insertPoint(pos, index);
                     ++index;
                 }
+
+            } if (1 == mVoxelsPerLeaf) {
+
+                 pos = mTransform.indexToWorld(it.getCoord());
+                 insertPoint(pos, index);
+
             } else {
+    
+                std::vector<openvdb::Coord> coords;
+                coords.reserve(activeVoxels);
+                for ( ; it; ++it) { coords.push_back(it.getCoord()); }
 
-                ///@todo uniform distribution
-                counter = 0;
-                for ( ; it; ++it) {
-                    ijk = it.getCoord();
-                    pos = mTransform.indexToWorld(ijk);
+                pos = mTransform.indexToWorld(coords[0]);
+                insertPoint(pos, index);
+                ++index;
+
+                pos = mTransform.indexToWorld(coords[activeVoxels-1]);
+                insertPoint(pos, index);
+                ++index;
+
+                int r = int(std::floor(mVoxelsPerLeaf / activeVoxels));
+                for (int i = 1, I = mVoxelsPerLeaf - 2; i < I; ++i) {
+                    pos = mTransform.indexToWorld(coords[i * r]);
                     insertPoint(pos, index);
                     ++index;
-                    if(++counter >= mVoxelsPerLeaf) break;
                 }
-
             }
         }
     }

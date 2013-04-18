@@ -392,7 +392,7 @@ public:
     /// representation of the filled box.  Follow fill operations with a prune()
     /// operation for optimal sparseness.
     void fill(const CoordBBox& bbox, const ValueType& value, bool active = true);
-    
+
     /// Call the @c PruneOp functor for each non-root node in the tree.
     /// If the functor returns @c true, prune the node and replace it with a tile.
     ///
@@ -422,6 +422,17 @@ public:
     /// useful for narrow-band level set applications where inactive
     /// values are limited to either an inside or outside value.
     void pruneLevelSet();
+
+    /// @brief Add the given leaf node to this tree, creating a new branch if necessary.
+    /// If a leaf node with the same origin already exists, replace it.
+    void addLeaf(LeafNodeType& leaf) { mRoot.addLeaf(&leaf); }
+
+    /// @brief Add a tile containing voxel (x, y, z) at the specified tree level,
+    /// creating a new branch if necessary.  Delete any existing lower-level nodes
+    /// that contain (x, y, z).
+    /// @note @c Level must be greater than zero (i.e., the level of leaf nodes)
+    /// and less than this tree's depth.
+    template<Index Level> void addTile(const Coord& xyz, const ValueType& value, bool active);
 
     /// @brief @return the leaf node that contains voxel (x, y, z) and
     /// if it doesn't exist, create it, but preserve the values and
@@ -486,35 +497,22 @@ public:
     void signedFloodFill() { mRoot.signedFloodFill(); }
 
     /// @brief Set the values of all inactive voxels and tiles of a narrow-band
-    /// level set from the signs of the active voxels, setting outside values to
-    /// "outside" and inside values to "inside. The background value of the grid
-    /// will be set to the "outside" value.
+    /// level set from the signs of the active voxels, setting exterior values to
+    /// @a outside and interior values to @a inside.  Set the background value
+    /// of this tree to @a outside.
     ///
     /// @note This method should only be used on closed, narrow-band level sets!
-    void signedFloodFill(const ValueType& outside, const ValueType& inside)
-    {
-        mRoot.signedFloodFill(outside, inside);
-    }
+    void signedFloodFill(const ValueType& outside, const ValueType& inside);
 
     /// Move child nodes from the other tree into this tree wherever those nodes
     /// correspond to constant-value tiles in this tree, and replace leaf-level
     /// inactive voxels in this tree with corresponding voxels in the other tree
     /// that are active.
     /// @note This operation always empties the other tree.
-    void merge(Tree& other)
-    {
-        this->clearAllAccessors();
-        other.clearAllAccessors();
-        mRoot.merge(other.mRoot);
-    }
+    void merge(Tree& other);
 
     /// Turns active tiles into dense voxels, i.e. active leaf nodes
-    void voxelizeActiveTiles()
-    {
-        this->clearAllAccessors();
-        mRoot.voxelizeActiveTiles();
-    }
-
+    void voxelizeActiveTiles();
 
     /// @brief Union this tree's set of active values with the active values
     /// of the other tree, whose @c ValueType may be different.
@@ -530,11 +528,7 @@ public:
     /// tiles or voxels that were inactive in this tree but active in the other tree
     /// are marked as active in this tree but left with their original values.
     template<typename OtherRootNodeType>
-    void topologyUnion(const Tree<OtherRootNodeType>& other)
-    {
-        this->clearAllAccessors();
-        mRoot.topologyUnion(other.getRootNode());
-    }
+    void topologyUnion(const Tree<OtherRootNodeType>& other);
 
     /*! For a given function @c f, use sparse traversal to compute <tt>f(this, other)</tt>
      *  over all corresponding pairs of values (tile or voxel) of this tree and the other tree
@@ -760,12 +754,7 @@ public:
      *  @endcode
      *  @see openvdb/unittest/TestTree.cc for another example.
      */
-
-    template<typename BBoxOp> void visitActiveBBox(BBoxOp& op) const
-    {
-        mRoot.visitActiveBBox(op);
-    }
-
+    template<typename BBoxOp> void visitActiveBBox(BBoxOp& op) const { mRoot.visitActiveBBox(op); }
 
     /*! Traverse this tree in depth-first order, and at each node call the given functor
      *  with a @c DenseIterator (see Iterator.h) that points to either a child node or a
@@ -988,7 +977,7 @@ public:
 protected:
     typedef tbb::concurrent_hash_map<ValueAccessorBase<Tree>*, bool> AccessorRegistry;
     typedef tbb::concurrent_hash_map<ValueAccessorBase<const Tree>*, bool> ConstAccessorRegistry;
-    
+
     // Disallow assignment of instances of this class.
     Tree& operator=(const Tree&);
 
@@ -1430,6 +1419,7 @@ Tree<RootNodeType>::pruneInactive()
     this->pruneInactive(this->background());
 }
 
+
 template<typename RootNodeType>
 inline void
 Tree<RootNodeType>::pruneLevelSet()
@@ -1438,12 +1428,23 @@ Tree<RootNodeType>::pruneLevelSet()
     this->pruneOp(op);
 }
 
+
+template<typename RootNodeType>
+template<Index Level>
+inline void
+Tree<RootNodeType>::addTile(const Coord& xyz, const ValueType& value, bool active)
+{
+    mRoot.addTile<Level>(xyz, value, active);
+}
+
+
 template<typename RootNodeType>
 inline typename RootNodeType::LeafNodeType*
 Tree<RootNodeType>::touchLeaf(const Coord& xyz)
 {
     return mRoot.touchLeaf(xyz);
 }
+
 
 template<typename RootNodeType>
 inline typename RootNodeType::LeafNodeType*
@@ -1452,12 +1453,14 @@ Tree<RootNodeType>::probeLeaf(const Coord& xyz)
     return mRoot.probeLeaf(xyz);
 }
 
+
 template<typename RootNodeType>
 inline const typename RootNodeType::LeafNodeType*
 Tree<RootNodeType>::probeConstLeaf(const Coord& xyz) const
 {
     return mRoot.probeConstLeaf(xyz);
 }
+
 
 ////////////////////////////////////////
 
@@ -1468,6 +1471,14 @@ Tree<RootNodeType>::fill(const CoordBBox& bbox, const ValueType& value, bool act
 {
     this->clearAllAccessors();
     return mRoot.fill(bbox, value, active);
+}
+
+
+template<typename RootNodeType>
+inline void
+Tree<RootNodeType>::signedFloodFill(const ValueType& outside, const ValueType& inside)
+{
+    mRoot.signedFloodFill(outside, inside);
 }
 
 
@@ -1484,6 +1495,38 @@ Tree<RootNodeType>::getBackgroundValue() const
         }
     }
     return result;
+}
+
+
+////////////////////////////////////////
+
+
+template<typename RootNodeType>
+inline void
+Tree<RootNodeType>::merge(Tree& other)
+{
+    this->clearAllAccessors();
+    other.clearAllAccessors();
+    mRoot.merge(other.mRoot);
+}
+
+
+template<typename RootNodeType>
+inline void
+Tree<RootNodeType>::voxelizeActiveTiles()
+{
+    this->clearAllAccessors();
+    mRoot.voxelizeActiveTiles();
+}
+
+
+template<typename RootNodeType>
+template<typename OtherRootNodeType>
+inline void
+Tree<RootNodeType>::topologyUnion(const Tree<OtherRootNodeType>& other)
+{
+    this->clearAllAccessors();
+    mRoot.topologyUnion(other.getRootNode());
 }
 
 

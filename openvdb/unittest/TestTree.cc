@@ -80,6 +80,8 @@ public:
     CPPUNIT_TEST(testPruneLevelSet);
     CPPUNIT_TEST(testTouchLeaf);
     CPPUNIT_TEST(testProbeLeaf);
+    CPPUNIT_TEST(testAddLeaf);
+    CPPUNIT_TEST(testAddTile);
     CPPUNIT_TEST(testLeafManager);
     CPPUNIT_TEST(testProcessBBox);
     CPPUNIT_TEST_SUITE_END();
@@ -105,6 +107,8 @@ public:
     void testPruneInactive();
     void testTouchLeaf();
     void testProbeLeaf();
+    void testAddLeaf();
+    void testAddTile();
     void testLeafManager();
     void testProcessBBox();
 
@@ -336,12 +340,13 @@ TestTree::testSetValue()
     // Test the extremes of the coordinate range
     ASSERT_DOUBLES_EXACTLY_EQUAL(background, tree.getValue(openvdb::Coord::min()));
     ASSERT_DOUBLES_EXACTLY_EQUAL(background, tree.getValue(openvdb::Coord::max()));
-    //std::cerr << "min=" << openvdb::Coord::min() << " max= " << openvdb::Coord::max() << std::endl;
+    //std::cerr << "min=" << openvdb::Coord::min() << " max= " << openvdb::Coord::max() << "\n";
     tree.setValue(openvdb::Coord::min(), 1.0f);
     tree.setValue(openvdb::Coord::max(), 2.0f);
     ASSERT_DOUBLES_EXACTLY_EQUAL(1.0f, tree.getValue(openvdb::Coord::min()));
     ASSERT_DOUBLES_EXACTLY_EQUAL(2.0f, tree.getValue(openvdb::Coord::max()));
 }
+
 
 void
 TestTree::testSetValueOnly()
@@ -403,7 +408,8 @@ namespace {
 
 /// Helper function to test openvdb::tree::Tree::evalMinMax() for various tree types
 template<typename TreeT>
-void evalMinMaxTest()
+void
+evalMinMaxTest()
 {
     typedef typename TreeT::ValueType ValueT;
 
@@ -453,7 +459,8 @@ void evalMinMaxTest()
 
 /// Specialization for boolean trees
 template<>
-void evalMinMaxTest<openvdb::BoolTree>()
+void
+evalMinMaxTest<openvdb::BoolTree>()
 {
     openvdb::BoolTree tree(/*background=*/false);
 
@@ -487,7 +494,8 @@ void evalMinMaxTest<openvdb::BoolTree>()
 
 /// Specialization for string trees
 template<>
-void evalMinMaxTest<openvdb::StringTree>()
+void
+evalMinMaxTest<openvdb::StringTree>()
 {
     const std::string
         echidna("echidna"), loris("loris"), pangolin("pangolin");
@@ -860,9 +868,6 @@ TestTree::testIO()
 }
 
 
-
-
-
 void
 TestTree::testNegativeIndexing()
 {
@@ -964,6 +969,7 @@ TestTree::testDeepCopy()
     ASSERT_DOUBLES_EXACTLY_EQUAL(1.0f, pTree2->getValue(changeCoord));
 }
 
+
 void
 TestTree::testMerge()
 {
@@ -1030,6 +1036,7 @@ TestTree::testMerge()
 
 }
 
+
 void
 TestTree::testVoxelizeActiveTiles()
 {
@@ -1066,6 +1073,7 @@ TestTree::testVoxelizeActiveTiles()
         CPPUNIT_ASSERT_EQUAL(3      ,tree.getValueDepth(xyz[1]));
     }
 }
+
 
 void
 TestTree::testTopologyUnion()
@@ -1255,9 +1263,11 @@ TestTree::testTopologyUnion()
     }
 }
 
+
 void
 TestTree::testSignedFloodFill()
-{//Employs a custom tree configuration to ensure we flood-fill at all levels!
+{
+    // Use a custom tree configuration to ensure we flood-fill at all levels!
     typedef openvdb::tree::LeafNode<float,2>     LeafT;//4^3
     typedef openvdb::tree::InternalNode<LeafT,2> InternalT;//4^3
     typedef openvdb::tree::RootNode<InternalT>   RootT;// child nodes are 16^3
@@ -1408,6 +1418,7 @@ TestTree::testPruneInactive()
     CPPUNIT_ASSERT(tree.empty());
 }
 
+
 void
 TestTree::testPruneLevelSet()
 {
@@ -1461,7 +1472,7 @@ TestTree::testPruneLevelSet()
     //std::cerr << "Leaf count=" << tree.leafCount() << std::endl;
     CPPUNIT_ASSERT_EQUAL(tree.activeVoxelCount(), count-removed);
     CPPUNIT_ASSERT_EQUAL(tree.activeLeafVoxelCount(), count-removed);
-    
+
     tree.pruneLevelSet();
 
     CPPUNIT_ASSERT(tree.leafCount() < leafCount);
@@ -1490,6 +1501,7 @@ TestTree::testPruneLevelSet()
     }
 }
 
+
 void
 TestTree::testTouchLeaf()
 {
@@ -1517,6 +1529,7 @@ TestTree::testTouchLeaf()
         ASSERT_DOUBLES_EXACTLY_EQUAL(background, acc.getValue(xyz));
     }
 }
+
 
 void
 TestTree::testProbeLeaf()
@@ -1596,6 +1609,54 @@ TestTree::testProbeLeaf()
     }
 }
 
+
+void
+TestTree::testAddLeaf()
+{
+    using namespace openvdb;
+
+    typedef FloatTree::LeafNodeType LeafT;
+
+    const Coord ijk(100);
+    FloatGrid grid;
+    FloatTree& tree = grid.tree();
+
+    tree.setValue(ijk, 5.0);
+    const LeafT* oldLeaf = tree.probeLeaf(ijk);
+    CPPUNIT_ASSERT(oldLeaf != NULL);
+    ASSERT_DOUBLES_EXACTLY_EQUAL(5.0, oldLeaf->getValue(ijk));
+
+    LeafT* newLeaf = new LeafT;
+    newLeaf->setOrigin(oldLeaf->origin());
+    newLeaf->fill(3.0);
+
+    tree.addLeaf(*newLeaf);
+    CPPUNIT_ASSERT_EQUAL(newLeaf, tree.probeLeaf(ijk));
+    ASSERT_DOUBLES_EXACTLY_EQUAL(3.0, tree.getValue(ijk));
+}
+
+
+void
+TestTree::testAddTile()
+{
+    using namespace openvdb;
+
+    const Coord ijk(100);
+    FloatGrid grid;
+    FloatTree& tree = grid.tree();
+
+    tree.setValue(ijk, 5.0);
+    CPPUNIT_ASSERT(tree.probeLeaf(ijk) != NULL);
+
+    const Index lvl = FloatTree::DEPTH >> 1;
+    if (lvl > 0) tree.addTile<lvl>(ijk, 3.0, /*active=*/true);
+    else tree.addTile<Index(1)>(ijk, 3.0, /*active=*/true);
+
+    CPPUNIT_ASSERT(tree.probeLeaf(ijk) == NULL);
+    ASSERT_DOUBLES_EXACTLY_EQUAL(3.0, tree.getValue(ijk));
+}
+
+
 struct BBoxOp
 {
     std::vector<openvdb::CoordBBox> bbox;
@@ -1615,6 +1676,7 @@ struct BBoxOp
         level.push_back(LEVEL);
     }
 };
+
 void
 TestTree::testProcessBBox()
 {
@@ -1646,6 +1708,7 @@ TestTree::testProcessBBox()
         }
     }
 }
+
 
 void
 TestTree::testLeafManager()

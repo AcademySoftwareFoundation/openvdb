@@ -44,28 +44,30 @@ usage(const char* progName, int status)
 "Which: displays OpenVDB grids\n" <<
 "Options:\n" <<
 "    -i            print grid info\n" <<
-"    -d            print debug info\n" <<
+"    -d            print debugging info\n" <<
 "Controls:\n" <<
-"    -> (Right)    show next grid\n" <<
-"    <- (Left)     show previous grid\n" <<
-"    1             toggle tree topology view on/off\n" <<
-"    2             toggle surface view on/off\n" <<
-"    3             toggle data view on/off\n" <<
-"    H             (\"home\") look at origin\n" <<
-"    G             (\"geometry\") look at center of geometry\n" <<
-"    I             toggle on-screen grid info on/off\n" <<
-"    Esc           exit\n" <<
-"    left mouse    tumble\n" <<
-"    scroll wheel  zoom\n" <<
-"    right mouse   pan\n" <<
-"Cut planes:\n" <<
-"    X + scroll wheel               move right cut plane\n" <<
-"    Shift + X + scroll wheel       move left cut plane\n" <<
-"    Y + scroll wheel               move top cut plane\n" <<
-"    Shift + Y + scroll wheel       move bottom cut plane\n" <<
-"    Z + scroll wheel               move front cut plane\n" <<
-"    Shift + Z + scroll wheel       move back cut plane\n" <<
-"    Ctrl + {X,Y,Z} + scroll wheel  move both {X,Y,Z} cut planes\n";
+"    Esc                exit\n" <<
+"    -> (Right)         show next grid\n" <<
+"    <- (Left)          show previous grid\n" <<
+"    1                  toggle tree topology view on/off\n" <<
+"    2                  toggle surface view on/off\n" <<
+"    3                  toggle data view on/off\n" <<
+"    G                  (\"geometry\") look at center of geometry\n" <<
+"    H                  (\"home\") look at origin\n" <<
+"    I                  toggle on-screen grid info on/off\n" <<
+"    left mouse         tumble\n" <<
+"    right mouse        pan\n" <<
+"    mouse wheel        zoom\n" <<
+"\n" <<
+"    X + wheel          move right cut plane\n" <<
+"    Shift + X + wheel  move left cut plane\n" <<
+"    Y + wheel          move top cut plane\n" <<
+"    Shift + Y + wheel  move bottom cut plane\n" <<
+"    Z + wheel          move front cut plane\n" <<
+"    Shift + Z + wheel  move back cut plane\n" <<
+"    Ctrl + X + wheel   move both X cut planes\n" <<
+"    Ctrl + Y + wheel   move both Y cut planes\n" <<
+"    Ctrl + Z + wheel   move both Z cut planes\n";
     exit(status);
 }
 
@@ -83,7 +85,6 @@ main(int argc, char * const argv[])
 
     try {
         openvdb::initialize();
-        
 
         bool printInfo = false, printDebugInfo = false;
 

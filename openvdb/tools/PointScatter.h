@@ -245,7 +245,7 @@ public:
     void operator()(const GridT& grid)
     {
         mVoxelCount = grid.activeVoxelCount();
-        if (mVoxelCount == 0) throw std::runtime_error("No voxels in which to scatter points!");
+        if (mVoxelCount == 0) return;//throw std::runtime_error("No voxels in which to scatter points!");
         if (mInterrupter) mInterrupter->start("Non-uniform scattering with local point density");
         const openvdb::Vec3d dim = grid.voxelSize();
         const double volumePerVoxel = dim[0]*dim[1]*dim[2],
