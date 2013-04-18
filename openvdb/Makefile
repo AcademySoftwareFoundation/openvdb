@@ -414,6 +414,9 @@ ALL_TARGETS := \
 
 .PHONY: all clean depend doc install lib pdfdoc test
 
+# Allow users to customize the rules by providing "config.mak"
+-include config.mak
+
 .cc.o:
 	@echo "Building $@ because of $(call list_deps)"
 	$(CXX) -c $(CXXFLAGS) -fPIC -o $@ $<
