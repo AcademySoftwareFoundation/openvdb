@@ -98,6 +98,10 @@ GLFW_INCL_DIR := /rel/third_party/glfw/current/include
 GLFW_LIB_DIR := /rel/third_party/glfw/current/lib
 GLFW_LIB := -lglfw
 
+# The directory containing libXrandr
+XRANDR_LIB_DIR := /usr/lib64
+XRANDR_LIB := -lXrandr
+
 # The Doxygen executable
 # (leave blank if Doxygen is unavailable)
 DOXYGEN := doxygen
@@ -493,7 +497,8 @@ vdb_view: $(LIBOPENVDB) $(VIEWER_OBJ_NAMES)
 	$(CXX) $(CXXFLAGS) -o $@ $(VIEWER_OBJ_NAMES) -I . \
 	    -Wl,-rpath,$(GLFW_LIB_DIR) -L$(GLFW_LIB_DIR) $(GLFW_LIB) -lGL -lGLU \
 	    $(LIBS_RPATH) $(TBBMALLOC_LIB) \
-	    $(LIBOPENVDB_RPATH) -L$(PWD) $(LIBOPENVDB)
+	    $(LIBOPENVDB_RPATH) -L$(PWD) $(LIBOPENVDB) \
+	    -L$(XRANDR_LIB_DIR) $(XRANDR_LIB)
 endif
 endif
 
