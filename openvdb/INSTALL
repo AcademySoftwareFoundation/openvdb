@@ -73,6 +73,10 @@ Installation
     GLFW_LIB_DIR         the directory containing libglfw
     GLFW_LIB             the linker flag for the GLFW library (e.g., -lglfw)
 
+    XRANDR_LIB_DIR       the directory containing libXrandr.so
+    XRANDR_LIB           the linker flag for the Xrandr library
+                         (e.g., -lXrandr)
+
 
 2.  From the top-level openvdb/ directory, type "make" (or "make -s" for
     less verbose output) to locally build the library and commands.
