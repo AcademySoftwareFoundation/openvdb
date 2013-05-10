@@ -485,36 +485,56 @@ public:
     /// @brief Add the specified leaf to this node, possibly creating a child branch
     /// in the process.  If the leaf node already exists, replace it.
     void addLeaf(LeafNodeType* leaf);
+
     /// @brief Same as addLeaf except, if necessary, it update the accessor with pointers
     /// to the nodes along the path from the root node to the node containing the coordinate.
     template<typename AccessorT>
     void addLeafAndCache(LeafNodeType* leaf, AccessorT&);
 
-    /// @brief Add a tile at the specified tree level that contains
-    /// xyz, possibly creating a child branch in the process. If a
-    /// Node that contains xyz already exists it is replaced by a tile.
-    template<Index TileLevel>
-    void addTile(const Coord& xyz, const ValueType& value, bool state);
-    /// @brief Same as addTile except, if necessary, it update the accessor with pointers
-    /// to the nodes along the path from the root node to the node containing the coordinate.
-    template<Index TileLevel, typename AccessorT>
-    void addTileAndCache(const Coord& xyz, const ValueType& value, bool state, AccessorT&);
+    /// @brief Return a pointer to the node of type @c NodeT that contains voxel (x, y, z)
+    /// and replace it with a tile of the specified value and state.
+    /// If no such node exists, leave the tree unchanged and return @c NULL.
+    ///
+    /// @note The caller takes ownership of the node and is responsible for deleting it.
+    ///
+    /// @warning Since this method potentially removes nodes and branches of the tree,
+    /// it is important to clear the caches of all ValueAccessors associated with this tree.
+    template<typename NodeT>
+    NodeT* stealNode(const Coord& xyz, const ValueType& value, bool state);
+
+    /// @brief Add a tile at the specified tree level that contains voxel (x, y, z),
+    /// possibly creating a parent branch or deleting a child branch in the process.
+    void addTile(Index level, const Coord& xyz, const ValueType& value, bool state);
+
+    /// @brief Same as addTile() except, if necessary, update the accessor with pointers
+    /// to the nodes along the path from the root node to the node containing (x, y, z).
+    template<typename AccessorT>
+    void addTileAndCache(Index level, const Coord& xyz, const ValueType& value,
+        bool state, AccessorT&);
 
     /// @brief Return a pointer to the leaf node that contains voxel (x, y, z).
     /// If no such node exists, return NULL.
     LeafNodeType* probeLeaf(const Coord& xyz);
+
+    /// @brief Return a const pointer to the leaf node that contains voxel (x, y, z).
+    /// If no such node exists, return NULL.
+    const LeafNodeType* probeConstLeaf(const Coord& xyz) const;
+    const LeafNodeType* probeLeaf(const Coord& xyz) const { return this->probeConstLeaf(xyz); }
+
     /// @brief Same as probeLeaf except, if necessary, it update the accessor with pointers
     /// to the nodes along the path from the root node to the node containing the coordinate.
     template<typename AccessorT>
     LeafNodeType* probeLeafAndCache(const Coord& xyz, AccessorT&);
 
-    /// @brief Return a const pointer to the leaf node that contains voxel (x, y, z).
-    /// If no such node exists, return NULL.
-    const LeafNodeType* probeConstLeaf(const Coord& xyz) const;
-    /// @brief Same as probeConstLeaf except, if necessary, it update the accessor with pointers
+    /// @brief Same as probeLeaf except, if necessary, it update the accessor with pointers
     /// to the nodes along the path from the root node to the node containing the coordinate.
     template<typename AccessorT>
-    const LeafNodeType* probeConstLeafAndCache(const Coord& xyz, AccessorT&) const;
+    const LeafNodeType* probeConstLeafAndCache(const Coord& xyz, AccessorT& acc) const;
+    template<typename AccessorT>
+    const LeafNodeType* probeLeafAndCache(const Coord& xyz, AccessorT& acc) const
+    {
+        return this->probeConstLeafAndCache(xyz, acc);
+    }
 
     /// @brief Return the leaf node that contains voxel (x, y, z).
     /// If no such node exists, create one, but preserve the values and
@@ -523,6 +543,7 @@ public:
     /// @details Use this method to preallocate a static tree topology
     /// over which to safely perform multithreaded processing.
     LeafNodeType* touchLeaf(const Coord& xyz);
+
     /// @brief Same as touchLeaf except, if necessary, it update the accessor with pointers
     /// to the nodes along the path from the root node to the node containing the coordinate.
     template<typename AccessorT>
@@ -569,6 +590,9 @@ protected:
     void makeChildNodeEmpty(Index n, const ValueType& value);
     void setChildNode(Index i, ChildNodeType* child);
     ChildNodeType* unsetChildNode(Index i, const ValueType& value);
+
+    template<typename NodeT>
+    NodeT* doStealNode(const Coord& xyz, const ValueType& value, bool state);
 
     template<typename NodeT, typename VisitorOp, typename ChildAllIterT>
     static inline void doVisit(NodeT&, VisitorOp&);
@@ -842,6 +866,47 @@ InternalNode<ChildT, Log2Dim>::pruneInactive()
 ////////////////////////////////////////
 
 
+// Helper method that implements stealNode()
+template<typename ChildT, Index Log2Dim>
+template<typename NodeT>
+inline NodeT*
+InternalNode<ChildT, Log2Dim>::doStealNode(const Coord& xyz, const ValueType& value, bool state)
+{
+    const Index n = this->coord2offset(xyz);
+    if (mChildMask.isOff(n)) return NULL;
+    ChildT* child = mNodes[n].getChild();
+    if (boost::is_same<NodeT, ChildT>::value) {
+        mChildMask.setOff(n);
+        mValueMask.set(n, state);
+        mNodes[n].setValue(value);
+    }
+    return (boost::is_same<NodeT, ChildT>::value)
+        ? reinterpret_cast<NodeT*>(child)
+        : child->template stealNode<NodeT>(xyz, value, state);
+}
+
+
+template<typename ChildT, Index Log2Dim>
+template<typename NodeT>
+inline NodeT*
+InternalNode<ChildT, Log2Dim>::stealNode(const Coord& xyz, const ValueType& value, bool state)
+{
+    // The following conditional is resolved at compile time, and the ternary operator
+    // and helper method are used to avoid "unreachable code" warnings (with
+    // "if (<cond>) { <A> } else { <B> }", either <A> or <B> is unreachable if <cond>
+    // is a compile-time constant expression).  Partial specialization on NodeT would be
+    // impractical because a method template can't be specialized without also
+    // specializing its class template.
+    return (NodeT::LEVEL > ChildT::LEVEL ||
+        (NodeT::LEVEL == ChildT::LEVEL && !(boost::is_same<NodeT, ChildT>::value)))
+        ? static_cast<NodeT*>(NULL)
+        : this->doStealNode<NodeT>(xyz, value, state);
+}
+
+
+////////////////////////////////////////
+
+
 template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::addLeaf(LeafNodeType* leaf)
@@ -905,28 +970,32 @@ InternalNode<ChildT, Log2Dim>::addLeafAndCache(LeafNodeType* leaf, AccessorT& ac
 }
 
 
+////////////////////////////////////////
+
+
 template<typename ChildT, Index Log2Dim>
-template<Index TileLevel>
 inline void
-InternalNode<ChildT, Log2Dim>::addTile(const Coord& xyz, const ValueType& value, bool state)
+InternalNode<ChildT, Log2Dim>::addTile(Index level, const Coord& xyz,
+                                       const ValueType& value, bool state)
 {
-    if (LEVEL >= TileLevel) {
+    assert(level > 0);
+    if (LEVEL >= level) {
         const Index n = this->coord2offset(xyz);
         if (mChildMask.isOff(n)) {// tile case
-            if (LEVEL > TileLevel) {
+            if (LEVEL > level) {
                 ChildT* child = new ChildT(xyz, mNodes[n].getValue(), mValueMask.isOn(n));
                 mNodes[n].setChild(child);
                 mChildMask.setOn(n);
                 mValueMask.setOff(n);
-                child->addTile<TileLevel>(xyz, value, state);
+                child->addTile(level, xyz, value, state);
             } else {
                 mValueMask.set(n, state);
                 mNodes[n].setValue(value);
             }
         } else {// child branch case
             ChildT* child = mNodes[n].getChild();
-            if (LEVEL > TileLevel) {
-                child->addTile<TileLevel>(xyz, value, state);
+            if (LEVEL > level) {
+                child->addTile(level, xyz, value, state);
             } else {
                 delete child;
                 mChildMask.setOff(n);
@@ -939,38 +1008,43 @@ InternalNode<ChildT, Log2Dim>::addTile(const Coord& xyz, const ValueType& value,
 
 
 template<typename ChildT, Index Log2Dim>
-template<Index TileLevel, typename AccessorT>
+template<typename AccessorT>
 inline void
-InternalNode<ChildT, Log2Dim>::addTileAndCache(const Coord& xyz, const ValueType& value,
-                                               bool state, AccessorT& acc)
+InternalNode<ChildT, Log2Dim>::addTileAndCache(Index level, const Coord& xyz,
+    const ValueType& value, bool state, AccessorT& acc)
 {
-    if (LEVEL < TileLevel) return;
-    const Index n = this->coord2offset(xyz);
-    if (mChildMask.isOff(n)) {// tile case
-        if (LEVEL > TileLevel) {
-            ChildT* child = new ChildT(xyz, mNodes[n].getValue(), mValueMask.isOn(n));
-            mNodes[n].setChild(child);
-            mChildMask.setOn(n);
-            mValueMask.setOff(n);
-            acc.insert(xyz, child);
-            child->addTileAndCache<TileLevel>(xyz, value, state, acc);
-        } else {
-            mValueMask.set(n, state);
-            mNodes[n].setValue(value);
-        }
-    } else {// child branch case
-        ChildT* child = mNodes[n].getChild();
-        if (LEVEL > TileLevel) {
-            acc.insert(xyz, child);
-            child->addTileAndCache<TileLevel>(xyz, value, state, acc);
-        } else {
-            delete child;
-            mChildMask.setOff(n);
-            mValueMask.set(n, state);
-            mNodes[n].setValue(value);
+    assert(level > 0);
+    if (LEVEL >= level) {
+        const Index n = this->coord2offset(xyz);
+        if (mChildMask.isOff(n)) {// tile case
+            if (LEVEL > level) {
+                ChildT* child = new ChildT(xyz, mNodes[n].getValue(), mValueMask.isOn(n));
+                mNodes[n].setChild(child);
+                mChildMask.setOn(n);
+                mValueMask.setOff(n);
+                acc.insert(xyz, child);
+                child->addTileAndCache(level, xyz, value, state, acc);
+            } else {
+                mValueMask.set(n, state);
+                mNodes[n].setValue(value);
+            }
+        } else {// child branch case
+            ChildT* child = mNodes[n].getChild();
+            if (LEVEL > level) {
+                acc.insert(xyz, child);
+                child->addTileAndCache(level, xyz, value, state, acc);
+            } else {
+                delete child;
+                mChildMask.setOff(n);
+                mValueMask.set(n, state);
+                mNodes[n].setValue(value);
+            }
         }
     }
 }
+
+
+////////////////////////////////////////
 
 
 template<typename ChildT, Index Log2Dim>
@@ -1003,8 +1077,11 @@ InternalNode<ChildT, Log2Dim>::touchLeafAndCache(const Coord& xyz, AccessorT& ac
         mValueMask.setOff(n);
     }
     acc.insert(xyz, mNodes[n].getChild());
-    return mNodes[n].getChild()->touchLeafAndCache(xyz,acc);
+    return mNodes[n].getChild()->touchLeafAndCache(xyz, acc);
 }
+
+
+////////////////////////////////////////
 
 
 template<typename ChildT, Index Log2Dim>
@@ -1033,7 +1110,7 @@ InternalNode<ChildT, Log2Dim>::probeLeafAndCache(const Coord& xyz, AccessorT& ac
     const Index n = this->coord2offset(xyz);
     if (mChildMask.isOff(n)) return NULL;
     acc.insert(xyz, mNodes[n].getChild());
-    return mNodes[n].getChild()->probeLeafAndCache(xyz,acc);
+    return mNodes[n].getChild()->probeLeafAndCache(xyz, acc);
 }
 
 
@@ -1045,7 +1122,7 @@ InternalNode<ChildT, Log2Dim>::probeConstLeafAndCache(const Coord& xyz, Accessor
     const Index n = this->coord2offset(xyz);
     if (mChildMask.isOff(n)) return NULL;
     acc.insert(xyz, mNodes[n].getChild());
-    return mNodes[n].getChild()->probeConstLeafAndCache(xyz,acc);
+    return mNodes[n].getChild()->probeConstLeafAndCache(xyz, acc);
 }
 
 

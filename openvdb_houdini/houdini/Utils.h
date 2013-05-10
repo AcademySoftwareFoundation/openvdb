@@ -137,7 +137,6 @@ protected:
 class OPENVDB_HOUDINI_API VdbPrimIterator: public VdbPrimCIterator
 {
 public:
-    //@{
     /// @param gdp
     ///     the geometry detail over which to iterate
     /// @param group
@@ -150,11 +149,19 @@ public:
     explicit VdbPrimIterator(GEO_Detail* gdp, const GA_PrimitiveGroup* group = NULL,
         FilterFunc filter = FilterFunc()):
         VdbPrimCIterator(gdp, group, filter) {}
-    /// Allow primitives to be deleted during iteration.
+    /// @brief Allow primitives to be deleted during iteration.
+    /// @param gdp
+    ///     the geometry detail over which to iterate
+    /// @param group
+    ///     a group in the detail over which to iterate (if @c NULL,
+    ///     iterate over all VDB primitives)
+    /// @param filter
+    ///     an optional function or functor that takes a @c const reference
+    ///     to a GU_PrimVDB and returns a boolean specifying whether
+    ///     that primitive should be visited (@c true) or not (@c false)
     VdbPrimIterator(GEO_Detail* gdp, GA_Range::safedeletions,
         const GA_PrimitiveGroup* group = NULL, FilterFunc filter = FilterFunc()):
         VdbPrimCIterator(gdp, GA_Range::safedeletions(), group, filter) {}
-    //@}
 
     /// Advance to the next VDB primitive.
     VdbPrimIterator& operator++() { advance(); return *this; }

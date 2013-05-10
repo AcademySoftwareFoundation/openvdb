@@ -101,7 +101,7 @@ public:
     /// @param bbox  the bounding box of the (signed) coordinate range of this grid
     /// @throw ValueError if the bounding box is empty.
     Dense(const CoordBBox& bbox)
-        : mBbox(bbox), mArray(new ValueT[bbox.volume()]), mData(mArray.get()),
+        : mBBox(bbox), mArray(new ValueT[bbox.volume()]), mData(mArray.get()),
           mY(bbox.dim()[2]), mX(mY*bbox.dim()[1])
     {
         if (bbox.empty()) {
@@ -118,9 +118,9 @@ public:
     /// @note The data array is assumed to have a stride of one in the @e z direction.
     /// @throw ValueError if the bounding box is empty.
     Dense(const CoordBBox& bbox, ValueT* data)
-        : mBbox(bbox), mData(data), mY(bbox.dim()[2]), mX(mY*bbox.dim()[1])
+        : mBBox(bbox), mData(data), mY(mBBox.dim()[2]), mX(mY*mBBox.dim()[1])
     {
-        if (bbox.empty()) {
+        if (mBBox.empty()) {
             OPENVDB_THROW(ValueError, "can't construct a dense grid with an empty bounding box");
         }
     }
@@ -131,10 +131,10 @@ public:
     /// @param min  the signed coordinates of the first voxel in the dense grid
     /// @throw ValueError if any of the dimensions are zero.
     Dense(const Coord& dim, const Coord& min = Coord(0))
-        : mBbox(min, min+dim.offsetBy(-1)), mArray(new ValueT[mBbox.volume()]),
-          mData(mArray.get()), mY(bbox.dim()[2]), mX(mY*bbox.dim()[1])
+        : mBBox(min, min+dim.offsetBy(-1)), mArray(new ValueT[mBBox.volume()]),
+          mData(mArray.get()), mY(mBBox.dim()[2]), mX(mY*mBBox.dim()[1])
     {
-        if (bbox.empty()) {
+        if (mBBox.empty()) {
             OPENVDB_THROW(ValueError, "can't construct a dense grid of size zero");
         }
     }
@@ -152,7 +152,7 @@ public:
     /// @brief Return the bounding box of the signed index domain of this grid.
     ///
     /// @note This method is required by both CopyToDense and CopyFromDense.
-    const CoordBBox& bbox() const { return mBbox; }
+    const CoordBBox& bbox() const { return mBBox; }
 
     /// @brief Return the stride of the array in the x direction ( = dimY*dimZ).
     ///
@@ -165,38 +165,42 @@ public:
     size_t yStride() const { return mY; }
 
     /// @brief Return the number of voxels contained in this grid.
-    size_t valueCount() const { return mBbox.volume(); }
+    size_t valueCount() const { return mBBox.volume(); }
 
     /// @brief Set the value of the voxel at the given array offset.
     void setValue(size_t offset, const ValueT& value) { mData[offset] = value; }
+
     /// @brief Return the value of the voxel at the given array offset.
     const ValueT& getValue(size_t offset) const { return mData[offset]; }
+
     /// @brief Set the value of the voxel at unsigned index coordinates (i, j, k).
     /// @note This is somewhat slower than using an array offset.
     void setValue(size_t i, size_t j, size_t k, const ValueT& value)
     {
         mData[this->coordToOffset(i,j,k)] = value;
     }
+    
     /// @brief Return the value of the voxel at unsigned index coordinates (i, j, k).
     /// @note This is somewhat slower than using an array offset.
     const ValueT& getValue(size_t i, size_t j, size_t k) const
     {
         return mData[this->coordToOffset(i,j,k)];
     }
+    
     /// @brief Set the value of the voxel at the given signed coordinates.
     /// @note This is slower than using either an array offset or unsigned index coordinates.
     void setValue(const Coord& xyz, const ValueT& value)
     {
         mData[this->coordToOffset(xyz)] = value;
     }
-
+    
     /// @brief Return the value of the voxel at the given signed coordinates.
     /// @note This is slower than using either an array offset or unsigned index coordinates.
     const ValueT& getValue(const Coord& xyz) const
     {
         return mData[this->coordToOffset(xyz)];
     }
-
+    
     /// @brief Fill this grid with a constant value.
     void fill(const ValueT& value)
     {
@@ -204,7 +208,7 @@ public:
         ValueT* a = mData;
         while(size--) *a++ = value;
     }
-
+    
     /// @brief Return the linear offset into this grid's value array given by
     /// unsigned coordinates (i, j, k), i.e., coordinates relative to
     /// the origin of this grid's bounding box.
@@ -215,7 +219,7 @@ public:
     {
         return k + j*mY + i*mX;
     }
-
+    
     /// @brief Return the linear offset into this grid's value array given by
     /// the specified signed coordinates, i.e., coordinates in the space of
     /// this grid's bounding box.
@@ -224,17 +228,17 @@ public:
     /// layout of values as an OpenVDB grid, i.e., the fastest coordinate is @e z.
     inline size_t coordToOffset(Coord xyz) const
     {
-        assert(mBbox.isInside(xyz));
-        xyz -= mBbox.min();
-        return this->coordToOffset(size_t(xyz[0]), size_t(xyz[1]), size_t(xyz[2]));
+        assert(mBBox.isInside(xyz));
+        return this->coordToOffset(size_t(xyz[0]-mBBox.min()[0]),
+                                   size_t(xyz[1]-mBBox.min()[1]),
+                                   size_t(xyz[2]-mBBox.min()[2]));
     }
-
+    
 private:
-
-    const CoordBBox mBbox;
+    const CoordBBox mBBox;//signed coordinates of the domain represented by the grid
     boost::shared_array<ValueT> mArray;
-    ValueT*         mData;
-    const size_t    mY, mX;//strides in x and y
+    ValueT*         mData;//raw c-style pointer to values
+    const size_t    mY, mX;//strides in x and y (by design it's 1 in z)
 };// end of Dense
 
 
@@ -339,27 +343,15 @@ public:
             tbb::parallel_for(tbb::blocked_range<size_t>(0, blocks.size()), *this);
         }
         // Post-process: Insert leaf nodes and tiles into the tree, and prune the tiles only!
-        /*
-        for (size_t m=0, size = blocks.size(); m<size; ++m) {
-            Block& block = blocks[m];
-            if (block.leaf) {
-                mTree.root().addLeaf(block.leaf);
-            } else if (block.tile.second) {//only background tiles are inactive
-                mTree.root().template addTile<1>(block.bbox.min(), block.tile.first, true);//leaf tile
-            }
-            }
-        */
-        ////////////////
         tree::ValueAccessor<TreeT> acc(mTree);
         for (size_t m=0, size = blocks.size(); m<size; ++m) {
             Block& block = blocks[m];
             if (block.leaf) {
                 acc.addLeaf(block.leaf);
             } else if (block.tile.second) {//only background tiles are inactive
-                acc.template addTile<1>(block.bbox.min(), block.tile.first, true);//leaf tile
+                acc.addTile(1, block.bbox.min(), block.tile.first, true);//leaf tile
             }
         }
-        ////////////////
         mTree.root().pruneTiles(mTolerance);
     }
 

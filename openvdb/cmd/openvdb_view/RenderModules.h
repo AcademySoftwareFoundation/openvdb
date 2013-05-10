@@ -39,10 +39,7 @@
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/math/Operators.h>
 
-#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/random/mersenne_twister.hpp>
-
-using namespace boost::posix_time;
 
 #if defined(__APPLE__) || defined(MACOSX)
 #include <OpenGL/gl.h>
@@ -404,13 +401,13 @@ public:
                     ++index;
                 }
 
-            } if (1 == mVoxelsPerLeaf) {
+            } else if (1 == mVoxelsPerLeaf) {
 
                  pos = mTransform.indexToWorld(it.getCoord());
                  insertPoint(pos, index);
 
             } else {
-    
+
                 std::vector<openvdb::Coord> coords;
                 coords.reserve(activeVoxels);
                 for ( ; it; ++it) { coords.push_back(it.getCoord()); }
@@ -592,7 +589,7 @@ private:
     const GridType& mGrid;
     openvdb::tree::ValueAccessor<const typename GridType::TreeType> mAccessor;
 
-    ValueType mMinValue, mMaxValue; 
+    ValueType mMinValue, mMaxValue;
     openvdb::Vec3s (&mColorMap)[4];
     const bool mIsLevelSet;
 
@@ -645,7 +642,7 @@ public:
             maxValue = minmax.maxVoxel();
         }
 
-        size_t voxelsPerLeaf = TreeType::LeafNodeType::NUM_VOXELS;                
+        size_t voxelsPerLeaf = TreeType::LeafNodeType::NUM_VOXELS;
 
         if (!isLevelSetGrid) {
 
@@ -672,7 +669,8 @@ public:
                 std::vector<GLfloat> points(voxelCount * 3), colors(voxelCount * 3);
                 std::vector<GLuint> indices(voxelCount);
 
-                PointGenerator<BoolTreeT> pointGen(points, indices, maskleafs, indexMap, grid->transform(), voxelsPerLeaf);
+                PointGenerator<BoolTreeT> pointGen(
+                    points, indices, maskleafs, indexMap, grid->transform(), voxelsPerLeaf);
                 pointGen.runParallel();
 
 
@@ -685,7 +683,7 @@ public:
                 mInteriorBuffer->genVertexBuffer(points);
                 mInteriorBuffer->genColorBuffer(colors);
                 mInteriorBuffer->genIndexBuffer(indices, GL_POINTS);
-            }        
+            }
 
             { // Generate Surface Points
                 typename BoolTreeT::Ptr surfaceMask(new BoolTreeT(false));
@@ -693,7 +691,9 @@ public:
                 surfaceMask->voxelizeActiveTiles();
 
                 openvdb::tree::ValueAccessor<BoolTreeT> interiorAcc(*interiorMask);
-                for (typename BoolTreeT::LeafIter leafIt = surfaceMask->beginLeaf(); leafIt; ++leafIt) {
+                for (typename BoolTreeT::LeafIter leafIt = surfaceMask->beginLeaf();
+                    leafIt; ++leafIt)
+                {
                     const typename BoolTreeT::LeafNodeType* leaf =
                         interiorAcc.probeConstLeaf(leafIt->getOrigin());
                     if (leaf) leafIt->topologyDifference(*leaf, false);
@@ -708,10 +708,14 @@ public:
                     voxelCount += std::min(maskleafs.leaf(l).onVoxelCount(), voxelsPerLeaf);
                 }
 
-                std::vector<GLfloat> points(voxelCount * 3), colors(voxelCount * 3), normals(voxelCount * 3);
+                std::vector<GLfloat>
+                    points(voxelCount * 3),
+                    colors(voxelCount * 3),
+                    normals(voxelCount * 3);
                 std::vector<GLuint> indices(voxelCount);
 
-                PointGenerator<BoolTreeT> pointGen(points, indices, maskleafs, indexMap, grid->transform(), voxelsPerLeaf);
+                PointGenerator<BoolTreeT> pointGen(
+                    points, indices, maskleafs, indexMap, grid->transform(), voxelsPerLeaf);
                 pointGen.runParallel();
 
                 PointAttributeGenerator<GridType> attributeGen(
@@ -739,10 +743,14 @@ public:
             voxelCount += std::min(leafs.leaf(l).onVoxelCount(), voxelsPerLeaf);
         }
 
-        std::vector<GLfloat> points(voxelCount * 3), colors(voxelCount * 3), normals(voxelCount * 3);
+        std::vector<GLfloat>
+            points(voxelCount * 3),
+            colors(voxelCount * 3),
+            normals(voxelCount * 3);
         std::vector<GLuint> indices(voxelCount);
 
-        PointGenerator<const TreeType> pointGen(points, indices, leafs, indexMap, grid->transform(), voxelsPerLeaf);
+        PointGenerator<const TreeType> pointGen(
+            points, indices, leafs, indexMap, grid->transform(), voxelsPerLeaf);
         pointGen.runParallel();
 
         PointAttributeGenerator<GridType> attributeGen(
@@ -754,7 +762,7 @@ public:
         mSurfaceBuffer->genNormalBuffer(normals);
         mSurfaceBuffer->genIndexBuffer(indices, GL_POINTS);
     }
-    
+
 private:
     BufferObject *mInteriorBuffer;
     BufferObject *mSurfaceBuffer;
@@ -824,7 +832,7 @@ public:
 
                 ++pt;
                 double w = vec.length() / length;
-                vec.normalize(); 
+                vec.normalize();
                 pos += grid->voxelSize()[0] * 0.9 * vec;
 
                 points[idx++] = pos[0];
@@ -832,7 +840,8 @@ public:
                 points[idx++] = pos[2];
 
 
-                color = w * openvdb::Vec3d(0.9, 0.3, 0.3) + (1.0 - w) * openvdb::Vec3d(0.3, 0.3, 0.9);
+                color = w * openvdb::Vec3d(0.9, 0.3, 0.3)
+                    + (1.0 - w) * openvdb::Vec3d(0.3, 0.3, 0.9);
 
                 colors[cc++] = color[0]  * 0.3;
                 colors[cc++] = color[1]  * 0.3;
@@ -865,7 +874,7 @@ public:
 
     template<typename GridType>
     void operator()(typename GridType::ConstPtr grid)
-    {    
+    {
         openvdb::tools::VolumeToMesh mesher(
             grid->getGridClass() == openvdb::GRID_LEVEL_SET ? 0.0 : 0.01);
         mesher(*grid);

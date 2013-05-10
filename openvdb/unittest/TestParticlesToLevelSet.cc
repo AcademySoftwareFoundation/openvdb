@@ -185,7 +185,7 @@ TestParticlesToLevelSet::testRasterizeSpheres()
     raster.rasterizeSpheres(pa);
 
     //ls->tree().print(std::cout,4);
-    //this->writeGrid(*ls, "testRasterizeSpheres");
+    //this->writeGrid(ls, "testRasterizeSpheres");
 
     ASSERT_DOUBLES_EXACTLY_EQUAL(halfWidth * voxelSize,
         ls->tree().getValue(openvdb::Coord( 0, 0, 0)));
@@ -285,7 +285,7 @@ TestParticlesToLevelSet::testRasterizeSpheresAndId()
 
     //grid.tree().print(std::cout,4);
     //id->print(std::cout,4);
-    //this->writeGrid(*ls, "testRasterizeSpheres");
+    //this->writeGrid(ls, "testRasterizeSpheres");
 
     ASSERT_DOUBLES_EXACTLY_EQUAL(halfWidth * voxelSize,
                                  ls->tree().getValue(openvdb::Coord( 0, 0, 0)));
@@ -374,12 +374,13 @@ TestParticlesToLevelSet::testRasterizeTrails()
     pa.add(openvdb::Vec3R(-10,-10,-10), 2, openvdb::Vec3R( 2, 0, 0));
     pa.add(openvdb::Vec3R( 10, 10, 10), 3, openvdb::Vec3R( 0, 1, 0));
     pa.add(openvdb::Vec3R(  0,  0,  0), 6, openvdb::Vec3R( 0, 0,-5));
+    pa.add(openvdb::Vec3R( 20,  0,  0), 2, openvdb::Vec3R( 0, 0, 0));
     
     openvdb::tools::ParticlesToLevelSet<openvdb::FloatGrid, MyParticleList> raster(*ls);
     raster.rasterizeTrails(pa, 0.75);//scale offset between two instances
 
     //ls->tree().print(std::cout, 4);
-    //this->writeGrid(*ls, "testRasterizeTrails");
+    //this->writeGrid(ls, "testRasterizeTrails");
 }
 
 
@@ -412,7 +413,7 @@ TestParticlesToLevelSet::testRasterizeTrailsAndId()
     CPPUNIT_ASSERT_EQUAL(3, max);
 
     //ls->tree().print(std::cout, 4);
-    //this->writeGrid(*ls, "testRasterizeTrails");
+    //this->writeGrid(ls, "testRasterizeTrails");
 }
 
 // Copyright (c) 2012-2013 DreamWorks Animation LLC

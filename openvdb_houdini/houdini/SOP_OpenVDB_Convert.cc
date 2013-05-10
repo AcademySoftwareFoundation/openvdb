@@ -161,6 +161,10 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_FLT_J, "internaladaptivity", "Internal Adaptivity")
         .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_RESTRICTED, 1.0));
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "transferattributes", "Transfer Surface Attributes"));
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "smoothseams", "Smooth Seams")
+        .setDefault(PRMoneDefaults)
+        .setHelpText("Smooth seam line edges during mesh extraction, "
+            "removes staircase artifacts"));
     parms.add(hutil::ParmFactory(PRM_STRING, "surfacegroup", "Surface Group")
         .setDefault("surface_polygons"));
     parms.add(hutil::ParmFactory(PRM_STRING, "interiorgroup", "Interior Group")
@@ -574,6 +578,7 @@ SOP_OpenVDB_Convert::updateParmsFlags()
 
     bool refexists = (nInputs() == 2);
     changed |= enableParm("transferattributes", toPoly && refexists);
+    changed |= enableParm("smoothseams", toPoly && refexists);
     changed |= enableParm("internaladaptivity", toPoly && refexists);
     changed |= enableParm("surfacegroup", toPoly && refexists);
     changed |= enableParm("interiorgroup", toPoly && refexists);
@@ -617,6 +622,7 @@ SOP_OpenVDB_Convert::referenceMeshing(
     typedef typename GridType::ValueType ValueType;
 
     const bool transferAttributes = evalInt("transferattributes", 0, time);
+    const bool smoothseams = evalInt("smoothseams", 0, time);
 
     // Get the first grid's transform and background value.
     openvdb::math::Transform::Ptr transform = grids.front()->transform().copy();
@@ -690,7 +696,7 @@ SOP_OpenVDB_Convert::referenceMeshing(
     if (boss.wasInterrupted()) return;
 
     const double iadaptivity = double(evalFloat("internaladaptivity", 0, time));
-    mesher.setRefGrid(refGrid, iadaptivity);
+    mesher.setRefGrid(refGrid, iadaptivity, smoothseams);
 
 
     std::vector<std::string> badTransformList, badBackgroundList, badTypeList;

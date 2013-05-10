@@ -82,7 +82,14 @@ TBB_INCL_DIR := $(HT)/include
 # The directory containing libtbb
 TBB_LIB_DIR := $(HDSO)
 TBB_LIB := -ltbb
-TBBMALLOC_LIB := -ltbbmalloc_proxy -ltbbmalloc
+
+# A scalable, concurrent malloc replacement library
+# such as jemalloc (included in the Houdini HDK) or TBB malloc
+# (leave blank if unavailable)
+CONCURRENT_MALLOC_LIB := -ljemalloc
+#CONCURRENT_MALLOC_LIB := -ltbbmalloc_proxy -ltbbmalloc
+# The directory containing the malloc replacement library
+CONCURRENT_MALLOC_LIB_DIR := $(HDSO)
 
 # The parent directory of the cppunit/ header directory
 # (leave blank if CppUnit is unavailable)
@@ -154,9 +161,14 @@ LIBS_RPATH := \
     -Wl,-rpath,$(HALF_LIB_DIR) -L$(HALF_LIB_DIR) $(HALF_LIB) \
     -Wl,-rpath,$(TBB_LIB_DIR) -L$(TBB_LIB_DIR) $(TBB_LIB) \
 #
+ifneq (,$(strip $(CONCURRENT_MALLOC_LIB)))
+ifneq (,$(strip $(CONCURRENT_MALLOC_LIB_DIR)))
+    LIBS_RPATH += -Wl,-rpath,$(CONCURRENT_MALLOC_LIB_DIR) -L$(CONCURRENT_MALLOC_LIB_DIR)
+endif
+endif
 ifdef LINUX
-  LIBS += -lrt
-  LIBS_RPATH += -lrt
+    LIBS += -lrt
+    LIBS_RPATH += -lrt
 endif
 
 INCLUDE_NAMES := \
@@ -181,6 +193,7 @@ INCLUDE_NAMES := \
     math/Proximity.h \
     math/QuantizedUnitVec.h \
     math/Quat.h \
+    math/Stats.h \
     math/Stencils.h \
     math/Transform.h\
     math/Tuple.h\
@@ -212,6 +225,7 @@ INCLUDE_NAMES := \
     tools/ParticlesToLevelSet.h \
     tools/PointAdvect.h \
     tools/PointScatter.h \
+    tools/Statistics.h \
     tools/ValueTransformer.h \
     tools/VolumeToMesh.h \
     tree/InternalNode.h \
@@ -305,6 +319,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestQuadraticInterp.cc \
     unittest/TestQuantizedUnitVec.cc \
     unittest/TestQuat.cc \
+    unittest/TestStats.cc \
     unittest/TestStream.cc \
     unittest/TestStringMetadata.cc \
     unittest/TestTools.cc \
@@ -467,7 +482,7 @@ endif
 vdb_print: $(LIBOPENVDB) cmd/openvdb_print/main.cc
 	@echo "Building $@ because of $(call list_deps)"
 	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_print/main.cc -I . \
-	    $(LIBS_RPATH) $(TBBMALLOC_LIB) \
+	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
 	    $(LIBOPENVDB_RPATH) -L$(PWD) $(LIBOPENVDB)
 
 $(VIEWER_OBJ_NAMES): $(VIEWER_INCLUDE_NAMES)
@@ -485,14 +500,14 @@ vdb_view: $(LIBOPENVDB) $(VIEWER_OBJ_NAMES)
 	$(CXX) $(CXXFLAGS) -o $@ $(VIEWER_OBJ_NAMES) -I . \
 	    -Wl,-rpath,$(GLFW_LIB_DIR) -L$(GLFW_LIB_DIR) $(GLFW_LIB) \
 	    -framework Cocoa -framework OpenGL -framework IOKit \
-	    $(LIBS_RPATH) $(TBBMALLOC_LIB) \
+	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
 	    $(LIBOPENVDB_RPATH) -L$(PWD) $(LIBOPENVDB)
 else
 vdb_view: $(LIBOPENVDB) $(VIEWER_OBJ_NAMES)
 	@echo "Building $@ because of $(call list_deps)"
 	$(CXX) $(CXXFLAGS) -o $@ $(VIEWER_OBJ_NAMES) -I . \
 	    -Wl,-rpath,$(GLFW_LIB_DIR) -L$(GLFW_LIB_DIR) $(GLFW_LIB) -lGL -lGLU \
-	    $(LIBS_RPATH) $(TBBMALLOC_LIB) \
+	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
 	    $(LIBOPENVDB_RPATH) -L$(PWD) $(LIBOPENVDB)
 endif
 endif
@@ -505,7 +520,7 @@ ifneq ($(strip $(CPPUNIT_INCL_DIR)),)
 vdb_test: $(LIBOPENVDB) $(UNITTEST_OBJ_NAMES)
 	@echo "Building $@ because of $(call list_deps)"
 	$(CXX) $(CXXFLAGS) -o $@ $(UNITTEST_OBJ_NAMES) \
-	    $(LIBS_RPATH) $(TBBMALLOC_LIB) \
+	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
 	    -Wl,-rpath,$(CPPUNIT_LIB_DIR) -L$(CPPUNIT_LIB_DIR) $(CPPUNIT_LIB) \
 	    $(LIBOPENVDB_RPATH) -L$(PWD) $(LIBOPENVDB)
 

@@ -28,12 +28,16 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+//#define BENCHMARK_TEST
+
 #include <openvdb/openvdb.h>
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/tools/Dense.h>
-//#include <boost/date_time/posix_time/posix_time.hpp>
 #include <sstream>
+#ifdef BENCHMARK_TEST
+#include <boost/date_time/posix_time/posix_time.hpp>
+#endif
 
 
 class TestDense: public CppUnit::TestCase
@@ -41,13 +45,13 @@ class TestDense: public CppUnit::TestCase
 public:
     CPPUNIT_TEST_SUITE(TestDense);
     CPPUNIT_TEST(testDense);
-    CPPUNIT_TEST(testConvert);
-    CPPUNIT_TEST(testConvertBool);
+    CPPUNIT_TEST(testCopy);
+    CPPUNIT_TEST(testCopyBool);
     CPPUNIT_TEST_SUITE_END();
 
     void testDense();
-    void testConvert();
-    void testConvertBool();
+    void testCopy();
+    void testCopyBool();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestDense);
@@ -148,13 +152,17 @@ private:
 
 
 void
-TestDense::testConvert()
+TestDense::testCopy()
 {
     CheckDense<openvdb::FloatTree> checkDense;
     const float radius = 10.0f, tolerance = 0.00001f;
     const openvdb::Vec3f center(0.0f);
     // decrease the voxelSize to test larger grids
+#ifdef BENCHMARK_TEST
+    const float voxelSize = 0.05f, width = 5.0f;
+#else
     const float voxelSize = 0.2f, width = 5.0f;
+#endif
 
     // Create a VDB containing a level set of a sphere
     openvdb::FloatGrid::Ptr grid =
@@ -163,36 +171,50 @@ TestDense::testConvert()
 
     // Create an empty dense grid
     openvdb::tools::Dense<float> dense(grid->evalActiveVoxelBoundingBox());
-    //std::cerr << "\nBBox = " << grid->evalActiveVoxelBoundingBox() << std::endl;
-
+#ifdef BENCHMARK_TEST
+    std::cerr << "\nBBox = " << grid->evalActiveVoxelBoundingBox() << std::endl;
+#endif
+    
     {//check Dense::fill
         dense.fill(voxelSize);
+#ifndef BENCHMARK_TEST
         checkDense.check(openvdb::FloatTree(voxelSize), dense);
+#endif
     }
 
     {// parallel convert to dense
-        //boost::posix_time::ptime mst1 = boost::posix_time::microsec_clock::local_time();
+#ifdef BENCHMARK_TEST
+        boost::posix_time::ptime mst1 = boost::posix_time::microsec_clock::local_time();
+#endif
         openvdb::tools::copyToDense(*grid, dense);
-        //boost::posix_time::ptime mst2 = boost::posix_time::microsec_clock::local_time();
-        //boost::posix_time::time_duration msdiff = mst2 - mst1;
-        //std::cerr << "\nCopyToDense took " << msdiff.total_milliseconds() << " ms\n";
+#ifdef BENCHMARK_TEST
+        boost::posix_time::ptime mst2 = boost::posix_time::microsec_clock::local_time();
+        boost::posix_time::time_duration msdiff = mst2 - mst1;
+        std::cerr << "\nCopyToDense took " << msdiff.total_milliseconds() << " ms\n";
+#else
         checkDense.check(tree0, dense);
+#endif
     }
 
     {// Parallel create from dense
-        //boost::posix_time::ptime mst1 = boost::posix_time::microsec_clock::local_time();
+#ifdef BENCHMARK_TEST
+        boost::posix_time::ptime mst1 = boost::posix_time::microsec_clock::local_time();
+#endif
         openvdb::FloatTree tree1(tree0.background());
         openvdb::tools::copyFromDense(dense, tree1, tolerance);
-        //boost::posix_time::ptime mst2 = boost::posix_time::microsec_clock::local_time();
-        //boost::posix_time::time_duration msdiff = mst2 - mst1;
-        //std::cerr << "\nCopyFromDense took " << msdiff.total_milliseconds() << " ms\n";
+#ifdef BENCHMARK_TEST
+        boost::posix_time::ptime mst2 = boost::posix_time::microsec_clock::local_time();
+        boost::posix_time::time_duration msdiff = mst2 - mst1;
+        std::cerr << "\nCopyFromDense took " << msdiff.total_milliseconds() << " ms\n";
+#else
         checkDense.check(tree1, dense);
+#endif
     }
 }
 
 
 void
-TestDense::testConvertBool()
+TestDense::testCopyBool()
 {
     using namespace openvdb;
 

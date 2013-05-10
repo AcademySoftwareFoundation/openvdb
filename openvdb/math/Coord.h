@@ -260,8 +260,9 @@ private:
 class CoordBBox
 {
 public:
+    typedef uint64_t         Index64;
     typedef Coord::ValueType ValueType;
-
+    
     /// @brief The default constructor produces an empty bounding box.
     CoordBBox(): mMin(Coord::max()), mMax(Coord::min()) {}
     /// @brief Construct a bounding box with the given @a min and @a max bounds.
@@ -319,7 +320,11 @@ public:
     Coord extents() const { return this->dim(); }
     /// @brief Return the integer volume of coordinates spanned by this bounding box.
     /// @note Since coordinates are inclusive, a bounding box with min = max has volume one.
-    ValueType volume() const { const Coord d = this->dim(); return d[0] * d[1] * d[2]; }
+    Index64 volume() const
+    {
+        const Coord d = this->dim();
+        return Index64(d[0]) * Index64(d[1]) * Index64(d[2]);
+    }
     /// Return @c true if this bounding box can be subdivided [mainly for use by TBB].
     bool is_divisible() const { return mMin[0]<mMax[0] && mMin[1]<mMax[1] && mMin[2]<mMax[2]; }
 

@@ -36,7 +36,7 @@
 /// The leaf array is useful for multithreaded computations over
 /// leaf voxels in a tree with static topology but varying voxel values.
 /// The auxiliary buffers are convenient for temporal integration.
-/// Efficient methods are provided for multithreaded swapping and sync'ing
+/// Efficient methods are provided for multithreaded swapping and synching
 /// (i.e., copying the contents) of these buffers.
 
 #ifndef OPENVDB_TREE_LEAFMANAGER_HAS_BEEN_INCLUDED
@@ -142,7 +142,11 @@ public:
             size_t pos() const { return mPos; }
             bool isValid() const { return mPos>=mRange.mBegin && mPos<=mRange.mEnd; }
             /// Return @c true if this iterator is not yet exhausted.
-            operator bool() const { return mPos < mRange.mEnd; }
+            bool test() const { return mPos < mRange.mEnd; }
+            /// Return @c true if this iterator is not yet exhausted.
+            operator bool() const { return this->test(); }
+            /// Return @c true if this iterator is exhausted.
+            bool empty() const { return !this->test(); }
             //bool operator<( const Iterator& other ) const { return mPos < other.mPos; }
             void operator=( const Iterator& other) { mRange = other.mRange; mPos = other.mPos; }
             bool operator!=(const Iterator& other) const

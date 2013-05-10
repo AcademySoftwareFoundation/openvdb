@@ -202,6 +202,73 @@ simplify(AffineMap::Ptr affine)
     return boost::static_pointer_cast<MapBase, AffineMap>(affine);
 }
 
+Mat4d 
+approxInverse(const Mat4d& mat4d)
+{
+    if (std::abs(mat4d.det()) >= 3 * tolerance<double>::value()) {
+        try {
+            Mat4d result = mat4d.inverse();
+            return result;
+        } catch (ArithmeticError& ) {
+            // Mat4 code couldn't invert. 
+        }
+    }
+
+    const Mat3d mat3 = mat4d.getMat3();
+    const Mat3d mat3T = mat3.transpose();
+    const Vec3d trans = mat4d.getTranslation();
+    
+    // absolute tolerance used for the symmetric test.
+    const double tol = 1.e-6;
+
+    // only create the pseudoInverse for symmetric 
+    bool symmetric = true;
+    for (int i = 0; i < 3; ++i ) {
+        for (int j = 0; j < 3; ++j ) {
+            if (!isApproxEqual(mat3[i][j], mat3T[i][j], tol)) {
+                symmetric = false;
+            }
+        }
+    }
+    
+    if (!symmetric) { 
+
+        // not symmetric, so just zero out the mat3 inverse and reverse the translation
+
+        Mat4d result = Mat4d::zero();
+        result.setTranslation(-trans);
+        result[3][3] = 1.f;
+        return result;
+
+    } else {
+        
+        // compute the pseudo inverse
+
+        Mat3d eigenVectors;
+        Vec3d eigenValues;
+        
+        diagonalizeSymmetricMatrix(mat3, eigenVectors, eigenValues);
+        
+        Mat3d d = Mat3d::identity();
+        for (int i = 0; i < 3; ++i ) {
+            if (std::abs(eigenValues[i]) < 10.*tolerance<double>::value() ) {
+                d[i][i] = 0.f;
+            } else {
+                d[i][i] = 1.f/eigenValues[i];
+            }
+        }
+        // assemble the pseudo inverse
+        
+        Mat3d pseudoInv = eigenVectors * d *  eigenVectors.transpose();
+        Vec3d invTrans = -trans * pseudoInv;
+    
+        Mat4d result = Mat4d::identity();
+        result.setMat3(pseudoInv);
+        result.setTranslation(invTrans);
+        
+        return result;
+    }
+}
 
 ////////////////////////////////////////
 

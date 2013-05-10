@@ -84,6 +84,7 @@ public:
     CPPUNIT_TEST(testAddTile);
     CPPUNIT_TEST(testLeafManager);
     CPPUNIT_TEST(testProcessBBox);
+    CPPUNIT_TEST(testStealNode);
     CPPUNIT_TEST_SUITE_END();
 
     void testBackground();
@@ -111,6 +112,7 @@ public:
     void testAddTile();
     void testLeafManager();
     void testProcessBBox();
+    void testStealNode();
 
 private:
     template<class TreeType> void testWriteHalf();
@@ -1649,8 +1651,8 @@ TestTree::testAddTile()
     CPPUNIT_ASSERT(tree.probeLeaf(ijk) != NULL);
 
     const Index lvl = FloatTree::DEPTH >> 1;
-    if (lvl > 0) tree.addTile<lvl>(ijk, 3.0, /*active=*/true);
-    else tree.addTile<Index(1)>(ijk, 3.0, /*active=*/true);
+    if (lvl > 0) tree.addTile(lvl,ijk, 3.0, /*active=*/true);
+    else tree.addTile(1,ijk, 3.0, /*active=*/true);
 
     CPPUNIT_ASSERT(tree.probeLeaf(ijk) == NULL);
     ASSERT_DOUBLES_EXACTLY_EQUAL(3.0, tree.getValue(ijk));
@@ -1838,6 +1840,92 @@ TestTree::testLeafManager()
                 }
             }
         }
+    }
+}
+
+void
+TestTree::testStealNode()
+{
+    using openvdb::Index;
+    using openvdb::FloatTree;
+
+    const float background=0.0f, value = 5.6f, epsilon=0.000001f;
+    const openvdb::Coord xyz(-23,42,70);
+
+    {// stal a LeafNode
+        typedef FloatTree::LeafNodeType NodeT;
+        CPPUNIT_ASSERT_EQUAL(Index(0), NodeT::getLevel());
+
+        FloatTree tree(background);
+        CPPUNIT_ASSERT_EQUAL(Index(0), tree.leafCount());
+        CPPUNIT_ASSERT(!tree.isValueOn(xyz));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(background, tree.getValue(xyz), epsilon);
+        CPPUNIT_ASSERT(tree.root().stealNode<NodeT>(xyz, value, false)==NULL);
+        
+        tree.setValue(xyz, value);
+        CPPUNIT_ASSERT_EQUAL(Index(1), tree.leafCount());
+        CPPUNIT_ASSERT(tree.isValueOn(xyz));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(value, tree.getValue(xyz), epsilon);
+        
+        NodeT* node = tree.root().stealNode<NodeT>(xyz, background, false);
+        CPPUNIT_ASSERT(node != NULL);
+        CPPUNIT_ASSERT_EQUAL(Index(0), tree.leafCount());
+        CPPUNIT_ASSERT(!tree.isValueOn(xyz));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(background, tree.getValue(xyz), epsilon);
+        CPPUNIT_ASSERT(tree.root().stealNode<NodeT>(xyz, value, false)==NULL);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(value, node->getValue(xyz), epsilon);
+        CPPUNIT_ASSERT(node->isValueOn(xyz));
+        delete node;
+    }
+    {// steal a bottom InternalNode
+        typedef FloatTree::RootNodeType::ChildNodeType::ChildNodeType NodeT;
+        CPPUNIT_ASSERT_EQUAL(Index(1), NodeT::getLevel());
+
+        FloatTree tree(background);
+        CPPUNIT_ASSERT_EQUAL(Index(0), tree.leafCount());
+        CPPUNIT_ASSERT(!tree.isValueOn(xyz));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(background, tree.getValue(xyz), epsilon);
+        CPPUNIT_ASSERT(tree.root().stealNode<NodeT>(xyz, value, false)==NULL);
+        
+        tree.setValue(xyz, value);
+        CPPUNIT_ASSERT_EQUAL(Index(1), tree.leafCount());
+        CPPUNIT_ASSERT(tree.isValueOn(xyz));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(value, tree.getValue(xyz), epsilon);
+        
+        NodeT* node = tree.root().stealNode<NodeT>(xyz, background, false);
+        CPPUNIT_ASSERT(node != NULL);
+        CPPUNIT_ASSERT_EQUAL(Index(0), tree.leafCount());
+        CPPUNIT_ASSERT(!tree.isValueOn(xyz));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(background, tree.getValue(xyz), epsilon);
+        CPPUNIT_ASSERT(tree.root().stealNode<NodeT>(xyz, value, false)==NULL);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(value, node->getValue(xyz), epsilon);
+        CPPUNIT_ASSERT(node->isValueOn(xyz));
+        delete node;
+    }
+    {// steal a top InternalNode
+        typedef FloatTree::RootNodeType::ChildNodeType NodeT;
+        CPPUNIT_ASSERT_EQUAL(Index(2), NodeT::getLevel());
+
+        FloatTree tree(background);
+        CPPUNIT_ASSERT_EQUAL(Index(0), tree.leafCount());
+        CPPUNIT_ASSERT(!tree.isValueOn(xyz));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(background, tree.getValue(xyz), epsilon);
+        CPPUNIT_ASSERT(tree.root().stealNode<NodeT>(xyz, value, false)==NULL);
+        
+        tree.setValue(xyz, value);
+        CPPUNIT_ASSERT_EQUAL(Index(1), tree.leafCount());
+        CPPUNIT_ASSERT(tree.isValueOn(xyz));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(value, tree.getValue(xyz), epsilon);
+        
+        NodeT* node = tree.root().stealNode<NodeT>(xyz, background, false);
+        CPPUNIT_ASSERT(node != NULL);
+        CPPUNIT_ASSERT_EQUAL(Index(0), tree.leafCount());
+        CPPUNIT_ASSERT(!tree.isValueOn(xyz));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(background, tree.getValue(xyz), epsilon);
+        CPPUNIT_ASSERT(tree.root().stealNode<NodeT>(xyz, value, false)==NULL);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(value, node->getValue(xyz), epsilon);
+        CPPUNIT_ASSERT(node->isValueOn(xyz));
+        delete node;
     }
 }
 

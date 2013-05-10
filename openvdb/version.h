@@ -105,12 +105,21 @@ OPENVDB_API VersionId getLibraryVersion(std::istream&);
 OPENVDB_API std::string getVersion(std::istream&);
 // Associate the current file format and library version numbers with the given input stream.
 OPENVDB_API void setCurrentVersion(std::istream&);
+// Associate specific file format and library version numbers with the given stream.
+OPENVDB_API void setVersion(std::ios_base&, const VersionId& libraryVersion, uint32_t fileVersion);
 // Return a bitwise OR of compression option flags (COMPRESS_ZIP, COMPRESS_ACTIVE_MASK, etc.)
 // specifying whether and how input data is compressed or output data should be compressed.
 OPENVDB_API uint32_t getDataCompression(std::ios_base&);
+// Associate with the given stream a bitwise OR of compression option flags (COMPRESS_ZIP,
+// COMPRESS_ACTIVE_MASK, etc.) specifying whether and how input data is compressed
+// or output data should be compressed.
+OPENVDB_API void setDataCompression(std::ios_base&, uint32_t compressionFlags);
 // Return the class (GRID_LEVEL_SET, GRID_UNKNOWN, etc.) of the grid
 // currently being read from or written to the given stream.
 OPENVDB_API uint32_t getGridClass(std::ios_base&);
+// brief Associate with the given stream the class (GRID_LEVEL_SET, GRID_UNKNOWN, etc.)
+// of the grid currently being read or written.
+OPENVDB_API void setGridClass(std::ios_base&, uint32_t);
 // Return a pointer to the background value of the grid currently being
 // read from or written to the given stream.
 OPENVDB_API const void* getGridBackgroundValuePtr(std::ios_base&);

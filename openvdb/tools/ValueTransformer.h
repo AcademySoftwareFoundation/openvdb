@@ -36,8 +36,15 @@
 /// the transformation is done in-place on the input grid, whereas with
 /// tools::transformValues(), transformed values are written to an output grid
 /// (which can, for example, have a different value type than the input grid).
-/// Both functions can optionally transform multiple values of the grid in
-/// parallel.
+/// Both functions can optionally transform multiple values of the grid in parallel.
+///
+/// tools::accumulate() can be used to accumulate the results of applying a functor
+/// at each step of a grid iteration.  (The functor is responsible for storing and
+/// updating intermediate results.)  When the iteration is done serially the behavior is
+/// the same as with tools::foreach(), but when multiple values are processed in parallel,
+/// an additional step is performed: when any two threads finish processing,
+/// @c op.join(otherOp) is called on one thread's functor to allow it to coalesce
+/// its intermediate result with the other thread's.
 
 #ifndef OPENVDB_TOOLS_VALUETRANSFORMER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_VALUETRANSFORMER_HAS_BEEN_INCLUDED
@@ -60,7 +67,7 @@ namespace tools {
 ///                  the type of @a iter
 /// @param threaded  if true, transform multiple values of the grid in parallel
 /// @param shareOp   if true and @a threaded is true, all threads use the same functor;
-///                  otherwise, each thread gets its own copy of the functor
+///                  otherwise, each thread gets its own copy of the @e original functor
 ///
 /// @par Example:
 /// Multiply all values (both set and unset) of a scalar, floating-point grid by two.
@@ -70,7 +77,7 @@ namespace tools {
 ///         iter.setValue(*iter * 2);
 ///     }
 /// };
-/// FloatGrid grid;
+/// FloatGrid grid = ...;
 /// tools::foreach(grid.beginValueAll(), Local::op);
 /// @endcode
 ///
@@ -87,7 +94,7 @@ namespace tools {
 ///     };
 /// }
 /// {
-///     VectorGrid grid;
+///     VectorGrid grid = ...;
 ///     tools::foreach(grid.beginValueOn(),
 ///         MatMul(math::rotation<math::Mat3s>(math::Y, M_PI_4)));
 /// }
@@ -116,7 +123,7 @@ inline void foreach(const IterT& iter, const XformOp& op,
 ///                  where @c InIterT is the type of @a inIter
 /// @param threaded  if true, transform multiple values of the input grid in parallel
 /// @param shareOp   if true and @a threaded is true, all threads use the same functor;
-///                  otherwise, each thread gets its own copy of the functor
+///                  otherwise, each thread gets its own copy of the @e original functor
 ///
 /// @par Example:
 /// Populate a scalar floating-point grid with the lengths of the vectors from all
@@ -136,7 +143,7 @@ inline void foreach(const IterT& iter, const XformOp& op,
 ///         }
 ///     }
 /// };
-/// Vec3fGrid inGrid;
+/// Vec3fGrid inGrid = ...;
 /// FloatGrid outGrid;
 /// tools::transformValues(inGrid.cbeginValueOn(), outGrid, Local::op);
 /// @endcode
@@ -153,6 +160,54 @@ template<typename InIterT, typename OutGridT, typename XformOp>
 inline void transformValues(const InIterT& inIter, OutGridT& outGrid,
     const XformOp& op, bool threaded = true, bool shareOp = true);
 #endif
+
+
+/// Iterate over a grid and at each step call @c op(iter).  If threading is enabled,
+/// call @c op.join(otherOp) to accumulate intermediate results from pairs of threads.
+/// @param iter      an iterator over a grid or its tree (@c Grid::ValueOnCIter,
+///                  @c Tree::NodeIter, etc.)
+/// @param op        a functor with a join method of the form <tt>void join(XformOp&)</tt>
+///                  and a call method of the form <tt>void op(const IterT&)</tt>,
+///                  where @c IterT is the type of @a iter
+/// @param threaded  if true, transform multiple values of the grid in parallel
+/// @note If @a threaded is true, each thread gets its own copy of the @e original functor.
+/// The order in which threads are joined is unspecified.
+/// @note If @a threaded is false, the join method is never called.
+///
+/// @par Example:
+/// Compute the average of the active values of a scalar, floating-point grid
+/// using the math::Stats class.
+/// @code
+/// namespace {
+///     struct Average {
+///         math::Stats stats;
+///
+///         // Accumulate voxel and tile values into this functor's Stats object.
+///         inline void operator()(const FloatGrid::ValueOnCIter& iter) {
+///             if (iter.isVoxelValue()) stats.add(*iter);
+///             else stats.add(*iter, iter.getVoxelCount());
+///         }
+///
+///         // Accumulate another functor's Stats object into this functor's.
+///         inline void join(Average& other) { stats.add(other.stats); }
+///
+///         // Return the cumulative result.
+///         inline double average() const { return stats.mean(); }
+///     };
+/// }
+/// {
+///     FloatGrid grid = ...;
+///     Average op;
+///     tools::accumulate(grid.cbeginValueOn(), op);
+///     double average = op.average();
+/// }
+/// @endcode
+///
+/// @note For more complex operations that require finer control over threading,
+/// consider using @c tbb::parallel_for() or @c tbb::parallel_reduce() in conjunction
+/// with a tree::IteratorRange that wraps a grid or tree iterator.
+template<typename IterT, typename XformOp>
+inline void accumulate(const IterT& iter, XformOp& op, bool threaded = true);
 
 
 ////////////////////////////////////////
@@ -452,6 +507,75 @@ transformValues(const InIterT& inIter, OutGridT& outGrid, const XformOp& op,
     proc.process(threaded);
 }
 #endif
+
+
+////////////////////////////////////////
+
+
+namespace valxform {
+
+template<typename IterT, typename OpT>
+class OpAccumulator
+{
+public:
+    typedef typename tree::IteratorRange<IterT> IterRange;
+
+    // The root task makes a const copy of the original functor (mOrigOp)
+    // and keeps a pointer to the original functor (mOp), which it then modifies.
+    // Each subtask keeps a const pointer to the root task's mOrigOp
+    // and makes and then modifies a non-const copy (mOp) of it.
+    OpAccumulator(const IterT& iter, OpT& op):
+        mIsRoot(true),
+        mIter(iter),
+        mOp(&op),
+        mOrigOp(new OpT(op))
+    {}
+
+    // When splitting this task, give the subtask a copy of the original functor,
+    // not of this task's functor, which might have been modified arbitrarily.
+    OpAccumulator(OpAccumulator& other, tbb::split):
+        mIsRoot(false),
+        mIter(other.mIter),
+        mOp(new OpT(*other.mOrigOp)),
+        mOrigOp(other.mOrigOp)
+    {}
+
+    ~OpAccumulator() { if (mIsRoot) delete mOrigOp; else delete mOp; }
+
+    void process(bool threaded = true)
+    {
+        IterRange range(mIter);
+        if (threaded) {
+            tbb::parallel_reduce(range, *this);
+        } else {
+            (*this)(range);
+        }
+    }
+
+    void operator()(IterRange& r) { for ( ; r; ++r) (*mOp)(r.iterator()); }
+
+    void join(OpAccumulator& other) { mOp->join(*other.mOp); }
+
+private:
+    bool mIsRoot;
+    IterT mIter;
+    OpT* mOp; // pointer to original functor, which might get modified
+    OpT const * const mOrigOp; // const copy of original functor
+}; // class OpAccumulator
+
+} // namespace valxform
+
+
+////////////////////////////////////////
+
+
+template<typename IterT, typename XformOp>
+inline void
+accumulate(const IterT& iter, XformOp& op, bool threaded)
+{
+    typename valxform::OpAccumulator<IterT, XformOp> proc(iter, op);
+    proc.process(threaded);
+}
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

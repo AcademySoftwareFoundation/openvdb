@@ -68,6 +68,11 @@ OPENVDB_API std::string getVersion(std::istream&);
 /// Associate the current file format and library version numbers with the given input stream.
 OPENVDB_API void setCurrentVersion(std::istream&);
 
+/// @brief Associate specific file format and library version numbers with the given stream.
+/// @details This is typically called immediately after reading a header that contains
+/// the version numbers.  Data read subsequently can then be interpreted appropriately.
+OPENVDB_API void setVersion(std::ios_base&, const VersionId& libraryVersion, uint32_t fileVersion);
+
 /// Return @c true if grid statistics (active voxel count and bounding box, etc.)
 /// should be computed and stored as grid metadata on output to the given stream.
 OPENVDB_API bool getWriteGridStatsMetadata(std::ostream&);
@@ -77,9 +82,18 @@ OPENVDB_API bool getWriteGridStatsMetadata(std::ostream&);
 /// or output data should be compressed.
 OPENVDB_API uint32_t getDataCompression(std::ios_base&);
 
+/// @brief Associate with the given stream a bitwise OR of compression option flags
+/// (COMPRESS_ZIP, COMPRESS_ACTIVE_MASK, etc.) specifying whether and how input data
+/// is compressed or output data should be compressed.
+OPENVDB_API void setDataCompression(std::ios_base&, uint32_t compressionFlags);
+
 /// @brief Return the class (GRID_LEVEL_SET, GRID_UNKNOWN, etc.) of the grid
 /// currently being read from or written to the given stream.
 OPENVDB_API uint32_t getGridClass(std::ios_base&);
+
+/// @brief Associate with the given stream the class (GRID_LEVEL_SET, GRID_UNKNOWN, etc.)
+/// of the grid currently being read or written.
+OPENVDB_API void setGridClass(std::ios_base&, uint32_t);
 
 /// @brief Return a pointer to the background value of the grid
 /// currently being read from or written to the given stream.
@@ -91,20 +105,13 @@ OPENVDB_API const void* getGridBackgroundValuePtr(std::ios_base&);
 OPENVDB_API void setGridBackgroundValuePtr(std::ios_base&, const void* background);
 
 
+////////////////////////////////////////
+
+
 /// Grid serializer/unserializer
 class OPENVDB_API Archive
 {
 public:
-    // Indices into a stream's internal extensible array of values of use to readers and writers
-    // (VC9 requires these declarations to be on separate lines.)
-    static const int sFormatVersionIndex;
-    static const int sLibraryMajorVersionIndex;
-    static const int sLibraryMinorVersionIndex;
-    static const int sDataCompressionIndex;
-    static const int sWriteGridStatsMetadataIndex;
-    static const int sGridBackgroundIndex;
-    static const int sGridClassIndex;
-
     static const uint32_t DEFAULT_COMPRESSION_FLAGS;
 
     Archive();

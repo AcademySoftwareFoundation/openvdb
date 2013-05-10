@@ -64,6 +64,37 @@
     #define OPENVDB_STATIC_SPECIALIZATION static
 #endif
 
+
+/// Bracket code with OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN/_END,
+/// as in the following example, to inhibit ICC remarks about unreachable code:
+/// @code
+/// template<typename NodeType>
+/// void processNode(NodeType& node)
+/// {
+///     OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+///     if (NodeType::LEVEL == 0) return; // ignore leaf nodes
+///     int i = 0;
+///     ...
+///     OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+/// }
+/// @endcode
+/// In the above, <tt>NodeType::LEVEL == 0</tt> is a compile-time constant expression,
+/// so for some template instantiations, the line below it is unreachable.
+#if defined(__INTEL_COMPILER)
+    // Disable ICC remark #111 ("statement is unreachable") and
+    // remark #185 ("dynamic initialization in unreachable code").
+    #define OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN \
+        _Pragma("warning (push)") \
+        _Pragma("warning (disable:111)") \
+        _Pragma("warning (disable:185)")
+    #define OPENVDB_NO_UNREACHABLE_CODE_WARNING_END \
+        _Pragma("warning (pop)")
+#else
+    #define OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+    #define OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+#endif
+
+
 /// Visual C++ does not have constants like M_PI unless this is defined.
 /// @note This is needed even though the core library is built with this but
 /// hcustom 12.1 doesn't define it. So this is needed for HDK operators.

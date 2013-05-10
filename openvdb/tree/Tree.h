@@ -432,7 +432,14 @@ public:
     /// that contain (x, y, z).
     /// @note @c Level must be greater than zero (i.e., the level of leaf nodes)
     /// and less than this tree's depth.
-    template<Index Level> void addTile(const Coord& xyz, const ValueType& value, bool active);
+    void addTile(Index level, const Coord& xyz, const ValueType& value, bool active);
+
+    /// @brief Return a pointer to the node of type @c NodeT that contains voxel (x, y, z)
+    /// and replace it with a tile of the specified value and state.
+    /// If no such node exists, leave the tree unchanged and return @c NULL.
+    /// @note The caller takes ownership of the node and is responsible for deleting it.
+    template<typename NodeT>
+    NodeT* stealNode(const Coord& xyz, const ValueType& value, bool active);
 
     /// @brief @return the leaf node that contains voxel (x, y, z) and
     /// if it doesn't exist, create it, but preserve the values and
@@ -445,10 +452,11 @@ public:
     /// @brief @return a pointer to the leaf node that contains
     /// voxel (x, y, z) and if it doesn't exist, return NULL.
     LeafNodeType* probeLeaf(const Coord& xyz);
+
     /// @brief @return a const pointer to the leaf node that contains
     /// voxel (x, y, z) and if it doesn't exist, return NULL.
     const LeafNodeType* probeConstLeaf(const Coord& xyz) const;
-
+    const LeafNodeType* probeLeaf(const Coord& xyz) const { return this->probeConstLeaf(xyz); }
 
     //
     // Aux methods
@@ -1430,13 +1438,21 @@ Tree<RootNodeType>::pruneLevelSet()
 
 
 template<typename RootNodeType>
-template<Index Level>
 inline void
-Tree<RootNodeType>::addTile(const Coord& xyz, const ValueType& value, bool active)
+Tree<RootNodeType>::addTile(Index level, const Coord& xyz,
+                            const ValueType& value, bool active)
 {
-    mRoot.addTile<Level>(xyz, value, active);
+    mRoot.addTile(level, xyz, value, active);
 }
 
+template<typename RootNodeType>
+template<typename NodeT>
+inline NodeT*
+Tree<RootNodeType>::stealNode(const Coord& xyz, const ValueType& value, bool active)
+{
+    this->clearAllAccessors();
+    return mRoot.template stealNode<NodeT>(xyz, value, active);
+}
 
 template<typename RootNodeType>
 inline typename RootNodeType::LeafNodeType*

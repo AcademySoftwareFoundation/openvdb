@@ -150,11 +150,11 @@ public:
 
     /// Store a VDB grid in a new VDB primitive and add the primitive
     /// to a geometry detail.
-    /// @param src
-    ///     if non-null, copy attributes and groups from this primitive
-    /// @param name
-    ///     if non-null, set the new primitive's @c name attribute to
-    ///     this string; otherwise, if @a src is non-null, use its name
+    /// @param gdp   the detail to which to add the new primitive
+    /// @param grid  a grid to be associated with the new primitive
+    /// @param src   if non-null, copy attributes and groups from this primitive
+    /// @param name  if non-null, set the new primitive's @c name attribute to
+    ///              this string; otherwise, if @a src is non-null, use its name
     static GU_PrimVDB* buildFromGrid(GU_Detail& gdp, openvdb::GridBase::Ptr grid,
 	const GEO_PrimVDB* src = NULL, const char* name = NULL)
     {

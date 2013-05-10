@@ -772,13 +772,14 @@ public:
     void addLeaf(LeafNode*) {}
     template<typename AccessorT>
     void addLeafAndCache(LeafNode*, AccessorT&) {}
-    template<Index TileLevel>
-    void addTile(const Coord&, const ValueType&, bool) {}
-    template<Index TileLevel, typename AccessorT>
-    void addTileAndCache(const Coord&, const ValueType&, bool, AccessorT&) {}
+    template<typename NodeT>
+    NodeT* stealNode(const Coord&, const ValueType&, bool) { return NULL; }
+    void addTile(Index, const Coord&, const ValueType&, bool) {}
+    template<typename AccessorT>
+    void addTileAndCache(Index, const Coord&, const ValueType&, bool, AccessorT&) {}
     //@}
     //@{
-    /// @brief return a pointer to itself
+    /// @brief Return a pointer to this node.
     LeafNode* touchLeaf(const Coord&) { return this; }
     template<typename AccessorT>
     LeafNode* touchLeafAndCache(const Coord&, AccessorT&) { return this; }
@@ -787,10 +788,13 @@ public:
     LeafNode* probeLeafAndCache(const Coord&, AccessorT&) { return this; }
     //@}
     //@{
-    /// @brief return a const pointer to itself
+    /// @brief Return a @const pointer to this node.
     const LeafNode* probeConstLeaf(const Coord&) const { return this; }
     template<typename AccessorT>
     const LeafNode* probeConstLeafAndCache(const Coord&, AccessorT&) const { return this; }
+    template<typename AccessorT>
+    const LeafNode* probeLeafAndCache(const Coord&, AccessorT&) const { return this; }
+    const LeafNode* probeLeaf(const Coord&) const { return this; }
     //@}
 
     /// Return @c true if all of this node's values have the same active state

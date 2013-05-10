@@ -45,6 +45,7 @@ public:
     CPPUNIT_TEST(testDecomposition);
     CPPUNIT_TEST(testFrustum);
     CPPUNIT_TEST(testCalcBoundingBox);
+    CPPUNIT_TEST(testApproxInverse);
     CPPUNIT_TEST_SUITE_END();
 
     void testTranslation();
@@ -54,11 +55,62 @@ public:
     void testDecomposition();
     void testFrustum();
     void testCalcBoundingBox();
+    void testApproxInverse();
     //void testIsType();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestMaps);
+void
+TestMaps::testApproxInverse()
+{
+    using namespace openvdb::math;
+        
+    Mat4d singular = Mat4d::identity();
+    singular[1][1] = 0.f;
+    {
+        Mat4d singularInv = approxInverse(singular);
+        
+        CPPUNIT_ASSERT( singular == singularInv );
+    }
+    { 
+        Mat4d rot = Mat4d::identity();
+        rot.setToRotation(X_AXIS, M_PI/4.);
+        
+        Mat4d rotInv = rot.inverse();
+        Mat4d mat = rotInv * singular * rot;
+        
+        Mat4d singularInv = approxInverse(mat);
 
+        // this matrix is equal to its own singular inverse
+        CPPUNIT_ASSERT( mat == singularInv );
+
+    }
+    { 
+        Mat4d m = Mat4d::identity();
+        m[0][1] = 1;
+        
+        // should give true inverse, since this matrix has det=1
+        Mat4d minv = approxInverse(m);
+        
+        Mat4d prod = m * minv;
+        CPPUNIT_ASSERT( prod.eq( Mat4d::identity() ) );
+    }
+    {
+        Mat4d m = Mat4d::identity();
+        m[0][1] = 1;
+        m[1][1] = 0;
+        // should give true inverse, since this matrix has det=1
+        Mat4d minv = approxInverse(m);
+        
+        Mat4d expected = Mat4d::zero();
+        expected[3][3] = 1;
+        CPPUNIT_ASSERT( minv.eq(expected ) );
+    }
+    
+  
+}
+    
+    
 
 void
 TestMaps::testTranslation()

@@ -139,7 +139,7 @@ public:
         mDx(grid.transform().voxelSize()[0]),
         mHalfWidth(local::DualTrait<ValueT>::split(grid.background()) / mDx),
         mRmin(1.5),// corresponds to the Nyquist grid sampling frequency
-        mRmax(100.0f),// corresponds to a huge particle (probably too large!)
+        mRmax(100.0),// corresponds to a huge particle (probably too large!)
         mGrainSize(1),
         mInterrupter(interrupt),
         mMinCount(0),
@@ -396,7 +396,7 @@ private:
             const Vec3R N = -V*inv_speed;// inverse normalized direction
             Vec3R  P = P0;// local position of instance
             RealT R = R0, d=0;// local radius and length of trail
-            for (size_t m=0; run && d < speed ; ++m) {
+            for (size_t m=0; run && d <= speed ; ++m) {
                 run = this->rasterSphere(P, R, id, accessor);
                 P += 0.5*delta*R*N;// adaptive offset along inverse velocity direction
                 d  = (P-P0).length();// current length of trail

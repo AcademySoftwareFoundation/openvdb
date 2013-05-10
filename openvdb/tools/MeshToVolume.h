@@ -43,9 +43,9 @@
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
-
 #include <deque>
 #include <limits>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -1060,10 +1060,13 @@ class IntersectingVoxelCleaner
 public:
     typedef typename DistTreeT::ValueType DistValueT;
     typedef typename tree::ValueAccessor<DistTreeT> DistAccessorT;
+    typedef typename DistTreeT::LeafNodeType DistLeafT;
     typedef typename DistTreeT::template ValueConverter<Int32>::Type IndexTreeT;
     typedef typename tree::ValueAccessor<IndexTreeT> IndexAccessorT;
+    typedef typename IndexTreeT::LeafNodeType IndexLeafT;
     typedef typename DistTreeT::template ValueConverter<bool>::Type StencilTreeT;
     typedef typename tree::ValueAccessor<StencilTreeT> StencilAccessorT;
+    typedef typename StencilTreeT::LeafNodeType StencilLeafT;
     typedef tree::LeafManager<StencilTreeT> StencilArrayT;
 
     IntersectingVoxelCleaner(DistTreeT& distTree, IndexTreeT& indexTree,
@@ -1081,13 +1084,8 @@ private:
     void operator=(const IntersectingVoxelCleaner<DistTreeT>&) {}
 
     DistTreeT& mDistTree;
-    DistAccessorT mDistAccessor;
-
     IndexTreeT& mIndexTree;
-    IndexAccessorT mIndexAccessor;
-
     StencilTreeT& mIntersectionTree;
-    StencilAccessorT mIntersectionAccessor;
     StencilArrayT& mLeafs;
 };
 
@@ -1114,11 +1112,8 @@ IntersectingVoxelCleaner<DistTreeT>::IntersectingVoxelCleaner(
     StencilTreeT& intersectionTree,
     StencilArrayT& leafs)
     : mDistTree(distTree)
-    , mDistAccessor(mDistTree)
     , mIndexTree(indexTree)
-    , mIndexAccessor(mIndexTree)
     , mIntersectionTree(intersectionTree)
-    , mIntersectionAccessor(mIntersectionTree)
     , mLeafs(leafs)
 {
 }
@@ -1127,11 +1122,8 @@ template<typename DistTreeT>
 IntersectingVoxelCleaner<DistTreeT>::IntersectingVoxelCleaner(
     const IntersectingVoxelCleaner<DistTreeT>& rhs)
     : mDistTree(rhs.mDistTree)
-    , mDistAccessor(mDistTree)
     , mIndexTree(rhs.mIndexTree)
-    , mIndexAccessor(mIndexTree)
     , mIntersectionTree(rhs.mIntersectionTree)
-    , mIntersectionAccessor(mIntersectionTree)
     , mLeafs(rhs.mLeafs)
 {
 }
@@ -1143,31 +1135,46 @@ IntersectingVoxelCleaner<DistTreeT>::operator()(
 {
     Coord ijk, m_ijk;
     bool turnOff;
-    DistValueT value, bg = mDistTree.background();
+    DistValueT value;
+    Index offset;
 
-    typename StencilTreeT::LeafNodeType::ValueOnCIter iter;
+    typename StencilLeafT::ValueOnCIter iter;
+
+    IndexAccessorT      indexAcc(mIndexTree);
+    DistAccessorT       distAcc(mDistTree);
+    StencilAccessorT    maskAcc(mIntersectionTree);
 
     for (size_t n = range.begin(); n < range.end(); ++n) {
 
-        typename StencilTreeT::LeafNodeType& leaf = mLeafs.leaf(n);
-        iter = leaf.cbeginValueOn();
+        StencilLeafT& maskLeaf = mLeafs.leaf(n);
 
+        ijk = maskLeaf.getOrigin();
+
+        DistLeafT& distLeaf = *distAcc.probeLeaf(ijk);
+
+        iter = maskLeaf.cbeginValueOn();
         for (; iter; ++iter) {
 
-            ijk = iter.getCoord();
+            offset = iter.pos();
 
+            if(distLeaf.getValue(offset) > 0.1) continue;
+
+            ijk = iter.getCoord();
             turnOff = true;
             for (Int32 m = 0; m < 26; ++m) {
                 m_ijk = ijk + util::COORD_OFFSETS[m];
-                if (mDistAccessor.probeValue(m_ijk, value)) {
-                    if (value > 0.0) {
+                if (distAcc.probeValue(m_ijk, value)) {
+                    if (value > 0.1) {
                         turnOff = false;
                         break;
                     }
                 }
             }
 
-            if (turnOff) leaf.setValueOff(ijk, bg);
+            if (turnOff) {
+                maskLeaf.setValueOff(offset);
+                distLeaf.setValueOn(offset, -0.86602540378443861);
+            }
         }
     }
 }
@@ -1185,11 +1192,14 @@ class ShellVoxelCleaner
 public:
     typedef typename DistTreeT::ValueType DistValueT;
     typedef typename tree::ValueAccessor<DistTreeT> DistAccessorT;
+    typedef typename DistTreeT::LeafNodeType DistLeafT;
     typedef tree::LeafManager<DistTreeT> DistArrayT;
     typedef typename DistTreeT::template ValueConverter<Int32>::Type IndexTreeT;
     typedef typename tree::ValueAccessor<IndexTreeT> IndexAccessorT;
+    typedef typename IndexTreeT::LeafNodeType IndexLeafT;
     typedef typename DistTreeT::template ValueConverter<bool>::Type StencilTreeT;
     typedef typename tree::ValueAccessor<StencilTreeT> StencilAccessorT;
+    typedef typename StencilTreeT::LeafNodeType StencilLeafT;
 
     ShellVoxelCleaner(DistTreeT& distTree, DistArrayT& leafs, IndexTreeT& indexTree,
         StencilTreeT& intersectionTree);
@@ -1207,13 +1217,8 @@ private:
 
     DistTreeT& mDistTree;
     DistArrayT& mLeafs;
-    DistAccessorT mDistAccessor;
-
     IndexTreeT& mIndexTree;
-    IndexAccessorT mIndexAccessor;
-
     StencilTreeT& mIntersectionTree;
-    StencilAccessorT mIntersectionAccessor;
 };
 
 template<typename DistTreeT>
@@ -1242,11 +1247,8 @@ ShellVoxelCleaner<DistTreeT>::ShellVoxelCleaner(
     StencilTreeT& intersectionTree)
     : mDistTree(distTree)
     , mLeafs(leafs)
-    , mDistAccessor(mDistTree)
     , mIndexTree(indexTree)
-    , mIndexAccessor(mIndexTree)
     , mIntersectionTree(intersectionTree)
-    , mIntersectionAccessor(mIntersectionTree)
 {
 }
 
@@ -1255,11 +1257,8 @@ ShellVoxelCleaner<DistTreeT>::ShellVoxelCleaner(
     const ShellVoxelCleaner<DistTreeT> &rhs)
     : mDistTree(rhs.mDistTree)
     , mLeafs(rhs.mLeafs)
-    , mDistAccessor(mDistTree)
     , mIndexTree(rhs.mIndexTree)
-    , mIndexAccessor(mIndexTree)
     , mIntersectionTree(rhs.mIntersectionTree)
-    , mIntersectionAccessor(mIntersectionTree)
 {
 }
 
@@ -1268,46 +1267,51 @@ void
 ShellVoxelCleaner<DistTreeT>::operator()(
     const tbb::blocked_range<size_t>& range) const
 {
-
     Coord ijk, m_ijk;
     bool turnOff;
     DistValueT value;
+    Index offset;
 
-    const DistValueT distC = -0.86602540378443861;
+    typename DistLeafT::ValueOnCIter iter;
     const DistValueT distBG = mDistTree.background();
     const Int32 indexBG = mIntersectionTree.background();
 
-    typename DistTreeT::LeafNodeType::ValueOnCIter iter;
+    IndexAccessorT      indexAcc(mIndexTree);
+    DistAccessorT       distAcc(mDistTree);
+    StencilAccessorT    maskAcc(mIntersectionTree);
+
+
     for (size_t n = range.begin(); n < range.end(); ++n) {
 
-        typename DistTreeT::LeafNodeType& leaf = mLeafs.leaf(n);
-        iter = leaf.cbeginValueOn();
+        DistLeafT& distLeaf = mLeafs.leaf(n);
+
+        ijk = distLeaf.getOrigin();
+
+        const StencilLeafT* maskLeaf = maskAcc.probeConstLeaf(ijk);
+        IndexLeafT& indexLeaf = *indexAcc.probeLeaf(ijk);
+
+        iter = distLeaf.cbeginValueOn();
         for (; iter; ++iter) {
 
             value = iter.getValue();
             if(value > 0.0) continue;
 
-            ijk = iter.getCoord();
-            if (mIntersectionAccessor.isValueOn(ijk)) continue;
+            offset = iter.pos();
+            if (maskLeaf && maskLeaf->isValueOn(offset)) continue;
 
+            ijk = iter.getCoord();
             turnOff = true;
             for (Int32 m = 0; m < 18; ++m) {
                 m_ijk = ijk + util::COORD_OFFSETS[m];
-
-                if (mIntersectionAccessor.isValueOn(m_ijk)) {
+                if (maskAcc.isValueOn(m_ijk)) {
                     turnOff = false;
                     break;
                 }
             }
 
             if (turnOff) {
-                leaf.setValueOff(ijk, distBG);
-
-                const_cast<ShellVoxelCleaner<DistTreeT> *>(this)->
-                    mIndexAccessor.setValueOff(ijk, indexBG);
-
-            } else {
-                if (value > distC) leaf.setValue(ijk, distC);
+                distLeaf.setValueOff(offset, distBG);
+                indexLeaf.setValueOff(offset, indexBG);
             }
         }
     }
@@ -1332,6 +1336,10 @@ public:
     typedef typename tree::ValueAccessor<StencilTreeT> StencilAccessorT;
     typedef tree::LeafManager<StencilTreeT> StencilArrayT;
 
+    typedef typename DistTreeT::LeafNodeType DistLeafT;
+    typedef typename IndexTreeT::LeafNodeType IndexLeafT;
+    typedef typename StencilTreeT::LeafNodeType StencilLeafT;
+
     ExpandNB(const std::vector<Vec3s>& pointList, const std::vector<Vec4I>& polygonList,
         DistTreeT& distTree, IndexTreeT& indexTree, StencilTreeT& maskTree, StencilArrayT& leafs,
         DistValueT exteriorBandWidth, DistValueT interiorBandWidth, DistValueT voxelSize);
@@ -1347,7 +1355,13 @@ public:
 
 private:
     void operator=(const ExpandNB<DistTreeT>&) {}
-    double getDist(const Coord&, DistAccessorT&, IndexAccessorT&, Int32& primIndex) const;
+
+    double getDist(const Coord&, DistAccessorT&, IndexAccessorT&, StencilAccessorT&,
+        Int32& primIndex) const;
+
+    double getDist(const Coord&, DistLeafT&, IndexLeafT&, StencilLeafT&,
+        Int32& primIndex) const;
+
     double getDistToPrim(const Coord& ijk, const Int32 polyIdx) const;
 
     std::vector<Vec3s> const * const mPointList;
@@ -1417,67 +1431,72 @@ template<typename DistTreeT>
 void
 ExpandNB<DistTreeT>::operator()(const tbb::blocked_range<size_t>& range) const
 {
-    typedef typename DistTreeT::LeafNodeType DistLeafT;
-    typedef typename IndexTreeT::LeafNodeType IndexLeafT;
-    typedef typename StencilTreeT::LeafNodeType StencilLeafT;
 
-    Coord ijk, n_ijk;
+
+    Coord ijk;
     Int32 closestPrimIndex = 0;
+    Index pos;
+    DistValueT distance;
+    bool inside;
 
     DistAccessorT distAcc(mDistTree);
     IndexAccessorT indexAcc(mIndexTree);
+    StencilAccessorT maskAcc(mMaskTree);
+
+    CoordBBox bbox;
 
     for (size_t n = range.begin(); n < range.end(); ++n) {
 
         StencilLeafT& maskLeaf = mLeafs.leaf(n);
 
-        const Coord origin = maskLeaf.getOrigin();
+        if (maskLeaf.isEmpty()) continue;
 
-        DistLeafT* distLeafPt = distAcc.probeLeaf(origin);
-        IndexLeafT* indexLeafPt = indexAcc.probeLeaf(origin);
+        ijk = maskLeaf.getOrigin();
 
-        if (distLeafPt != NULL && indexLeafPt != NULL) {
+        DistLeafT& distLeaf = *distAcc.probeLeaf(ijk);
+        IndexLeafT& indexLeaf = *indexAcc.probeLeaf(ijk);
 
-            DistLeafT& distLeaf = *distLeafPt;
-            IndexLeafT& indexLeaf = *indexLeafPt;
+        bbox = maskLeaf.getNodeBoundingBox();
+        bbox.expand(-1);
 
+        typename StencilLeafT::ValueOnIter iter = maskLeaf.beginValueOn();
+        for (; iter; ++iter) {
 
-            typename StencilLeafT::ValueOnIter iter = maskLeaf.beginValueOn();
-            for (; iter; ++iter) {
+            ijk = iter.getCoord();
 
-                const Index pos = iter.pos();
+            distance = Tolerance<DistValueT>::epsilon();
 
-                if (distLeaf.isValueOn(pos)) {
-                    iter.setValueOff();
-                    continue;
-                }
-
-                DistValueT distance = Tolerance<DistValueT>::epsilon() +
-                    getDist(iter.getCoord(), distAcc, indexAcc, closestPrimIndex);
-
-                const bool inside = distLeaf.getValue(pos) < DistValueT(0.0);
-
-                if (!inside && distance < mExteriorBandWidth) {
-                    distLeaf.setValueOn(pos, distance);
-                    indexLeaf.setValueOn(pos, closestPrimIndex);
-                } else if (inside && distance < mInteriorBandWidth) {
-                    distLeaf.setValueOn(pos, -distance);
-                    indexLeaf.setValueOn(pos, closestPrimIndex);
-                } else {
-                    iter.setValueOff();
-                }
+            if (bbox.isInside(ijk)) {
+                distance += getDist(ijk, distLeaf, indexLeaf, maskLeaf, closestPrimIndex);
+            } else {
+                distance += getDist(ijk, distAcc, indexAcc, maskAcc, closestPrimIndex);
             }
+ 
+            pos = iter.pos();
 
-        } else {
-            maskLeaf.setValuesOff();
+            inside = distLeaf.getValue(pos) < DistValueT(0.0);
+
+            if (!inside && distance < mExteriorBandWidth) {
+                distLeaf.setValueOn(pos, distance);
+                indexLeaf.setValueOn(pos, closestPrimIndex);
+            } else if (inside && distance < mInteriorBandWidth) {
+                distLeaf.setValueOn(pos, -distance);
+                indexLeaf.setValueOn(pos, closestPrimIndex);
+            } else {
+                iter.setValueOff();
+            }
         }
     }
 }
 
 template<typename DistTreeT>
 double
-ExpandNB<DistTreeT>::getDist(const Coord& ijk, DistAccessorT& distAcc,
-    IndexAccessorT& indexAcc, Int32& primIndex) const
+ExpandNB<DistTreeT>::getDist(
+    const Coord& ijk,
+    DistAccessorT& distAcc,
+    IndexAccessorT& indexAcc,
+    StencilAccessorT& maskAcc,
+    Int32& primIndex) const
 {
     Vec3d voxelCenter(ijk[0], ijk[1], ijk[2]);
     DistValueT nDist, dist = std::numeric_limits<double>::max();
@@ -1486,7 +1505,7 @@ ExpandNB<DistTreeT>::getDist(const Coord& ijk, DistAccessorT& distAcc,
     Coord n_ijk;
     for (Int32 n = 0; n < 18; ++n) {
         n_ijk = ijk + util::COORD_OFFSETS[n];
-        if (distAcc.probeValue(n_ijk, nDist)) {
+        if (!maskAcc.isValueOn(n_ijk) && distAcc.probeValue(n_ijk, nDist)) {
             nDist = std::abs(nDist);
             if (nDist < dist) {
                 dist = nDist;
@@ -1496,7 +1515,40 @@ ExpandNB<DistTreeT>::getDist(const Coord& ijk, DistAccessorT& distAcc,
     }
 
     // Calc. this voxels distance to the closest primitive.
-    return getDistToPrim(ijk, primIndex);
+    DistValueT newDist = getDistToPrim(ijk, primIndex);
+
+    // Forces the gradient to be monotonic for non-manifold
+    // polygonal models with self-intersections.
+    return newDist > dist ? newDist : dist + mVoxelSize;
+}
+
+template<typename DistTreeT>
+double
+ExpandNB<DistTreeT>::getDist(
+    const Coord& ijk,
+    DistLeafT& distLeaf,
+    IndexLeafT& indexLeaf,
+    StencilLeafT& maskLeaf,
+    Int32& primIndex) const
+{
+    Vec3d voxelCenter(ijk[0], ijk[1], ijk[2]);
+    DistValueT nDist, dist = std::numeric_limits<double>::max();
+
+    Index pos;
+    for (Int32 n = 0; n < 18; ++n) {
+        pos = DistLeafT::coord2offset(ijk + util::COORD_OFFSETS[n]);
+        if (!maskLeaf.isValueOn(pos) && distLeaf.probeValue(pos, nDist)) {
+            nDist = std::abs(nDist);
+            if (nDist < dist) {
+                dist = nDist;
+                primIndex = indexLeaf.getValue(pos);
+            }
+        }
+    }
+
+    DistValueT newDist = getDistToPrim(ijk, primIndex);
+
+    return newDist > dist ? newDist : dist + mVoxelSize;
 }
 
 
@@ -1714,7 +1766,7 @@ struct TrimOp
             if (inside && !(val > -mInBandWidth)) {
                 iter.setValue(-mInBandWidth);
                 iter.setValueOff();
-            } else if (!inside && !(val < mInBandWidth)) {
+            } else if (!inside && !(val < mExBandWidth)) {
                 iter.setValue(mExBandWidth);
                 iter.setValueOff();
             }
@@ -1849,6 +1901,33 @@ private:
     const size_t mBufferIndex;
 };
 
+
+template<typename TreeType>
+struct LeafTopologyDiffOp
+{
+    typedef typename tree::ValueAccessor<TreeType> AccessorT;
+    typedef typename TreeType::LeafNodeType LeafNodeT;
+
+    LeafTopologyDiffOp(TreeType& tree) : mTree(tree) { }
+
+    template <typename LeafNodeType>
+    void operator()(LeafNodeType &leaf, size_t) const
+    {
+        const LeafNodeT* rhsLeaf = mTree.probeConstLeaf(leaf.getOrigin());
+
+        if (rhsLeaf) {
+            leaf.topologyDifference(*rhsLeaf, false);
+        } else {
+            // special case required for the ExpandNB scheme.
+            leaf.setValuesOff();
+        }
+    }
+
+private:
+    TreeType& mTree;
+};
+
+
 } // internal namespace
 
 
@@ -1974,6 +2053,7 @@ MeshToVolume<DistGridT, InterruptT>::doConvert(
             internal::IntersectingVoxelCleaner<DistTreeT> cleaner(mDistGrid->tree(),
                 mIndexGrid->tree(), mIntersectingVoxelsGrid->tree(), leafs);
 
+            
             cleaner.runParallel();
         }
 
@@ -1998,7 +2078,8 @@ MeshToVolume<DistGridT, InterruptT>::doConvert(
     }
 
     if (mDistGrid->activeVoxelCount() == 0) return;
-
+    
+    mIntersectingVoxelsGrid->clear();
     const DistValueT voxelSize(mTransform->voxelSize()[0]);
 
     // Transform values (world space scaling etc.)
@@ -2022,72 +2103,34 @@ MeshToVolume<DistGridT, InterruptT>::doConvert(
         if (mInterrupter && mInterrupter->wasInterrupted()) return;
 
         // Update the background value (inactive values)
-        {
-            tree::LeafManager<DistTreeT> leafs(mDistGrid->tree());
+        tree::LeafManager<DistTreeT> leafs(mDistGrid->tree());
 
-            typedef internal::VoxelSignOp<DistValueT> SignXForm;
-            SignXForm op(exBandWidth, inBandWidth);
+        typedef internal::VoxelSignOp<DistValueT> SignXForm;
+        SignXForm op(exBandWidth, inBandWidth);
 
-            LeafTransformer<DistTreeT, SignXForm> transform(leafs, op);
-            transform.runParallel();
+        LeafTransformer<DistTreeT, SignXForm> transform(leafs, op);
+        transform.runParallel();
 
-            if (mInterrupter && mInterrupter->wasInterrupted()) return;
+        if (mInterrupter && mInterrupter->wasInterrupted()) return;
 
-            DistValueT bgValues[2];
-            bgValues[0] = exBandWidth;
-            bgValues[1] = -inBandWidth;
+        DistValueT bgValues[2];
+        bgValues[0] = exBandWidth;
+        bgValues[1] = -inBandWidth;
 
-            typename DistTreeT::ValueAllIter tileIt(mDistGrid->tree());
-            tileIt.setMaxDepth(DistTreeT::ValueAllIter::LEAF_DEPTH - 1);
+        typename DistTreeT::ValueAllIter tileIt(mDistGrid->tree());
+        tileIt.setMaxDepth(DistTreeT::ValueAllIter::LEAF_DEPTH - 1);
 
-            for ( ; tileIt; ++tileIt) {
-                DistValueT& val = const_cast<DistValueT&>(tileIt.getValue());
-                val = bgValues[int(val < DistValueT(0.0))];
-            }
-
-            if (mInterrupter && mInterrupter->wasInterrupted()) return;
-
-            // fast bg value swap
-            typename DistTreeT::Ptr newTree(new DistTreeT(/*background=*/exBandWidth));
-            newTree->merge(mDistGrid->tree());
-            mDistGrid->setTree(newTree);
+        for ( ; tileIt; ++tileIt) {
+            DistValueT& val = const_cast<DistValueT&>(tileIt.getValue());
+            val = bgValues[int(val < DistValueT(0.0))];
         }
 
-        // Smooth out bumps caused by self-intersecting and
-        // overlapping portions of the mesh and renormalize the level set.
-        {
-            typedef internal::OffsetOp<DistValueT> OffsetOp;
-            typedef internal::RenormOp<DistGridT, DistValueT> RenormOp;
-            typedef internal::MinOp<DistTreeT, DistValueT> MinOp;
-            typedef internal::MergeBufferOp<DistTreeT, DistValueT> MergeBufferOp;
+        if (mInterrupter && mInterrupter->wasInterrupted()) return;
 
-            tree::LeafManager<DistTreeT> leafs(mDistGrid->tree(), 1);
-
-            const DistValueT offset = 0.8 * voxelSize;
-
-            if (mInterrupter && mInterrupter->wasInterrupted()) return;
-
-            OffsetOp offsetOp(-offset);
-            LeafTransformer<DistTreeT, OffsetOp> offsetXform(leafs, offsetOp);
-            offsetXform.runParallel();
-
-            if (mInterrupter && mInterrupter->wasInterrupted()) return;
-
-            RenormOp renormOp(*mDistGrid, leafs, voxelSize);
-            LeafTransformer<DistTreeT, RenormOp> renormXform(leafs, renormOp);
-            renormXform.runParallel();
-
-            MinOp minOp(leafs);
-            LeafTransformer<DistTreeT, MinOp> minXform(leafs, minOp);
-            minXform.runParallel();
-
-            if (mInterrupter && mInterrupter->wasInterrupted()) return;
-
-            offsetOp.resetOffset(offset - internal::Tolerance<DistValueT>::epsilon());
-            offsetXform.runParallel();
-        }
-
-        mIntersectingVoxelsGrid->clear();
+        // fast bg value swap
+        typename DistTreeT::Ptr newTree(new DistTreeT(/*background=*/exBandWidth));
+        newTree->merge(mDistGrid->tree());
+        mDistGrid->setTree(newTree);
     }
 
     if (mInterrupter && mInterrupter->wasInterrupted()) return;
@@ -2184,12 +2227,18 @@ MeshToVolume<DistGridT, InterruptT>::doConvert(
 
         mIndexGrid->tree().topologyUnion(mDistGrid->tree());
 
+        typedef internal::LeafTopologyDiffOp<DistTreeT> TopologyDiffOp;
+        TopologyDiffOp diffOp(mDistGrid->tree());
+
         while (maskTree.activeVoxelCount() > 0) {
 
             if (mInterrupter && mInterrupter->wasInterrupted()) break;
 
             openvdb::tools::dilateVoxels(maskTree);
             tree::LeafManager<StencilTreeT> leafs(maskTree);
+
+            LeafTransformer<StencilTreeT, TopologyDiffOp> diff(leafs, diffOp);
+            diff.runParallel();
 
             internal::ExpandNB<DistTreeT> expand(pointList, polygonList, mDistGrid->tree(),
                 mIndexGrid->tree(), maskTree, leafs, exBandWidth, inBandWidth, voxelSize);
@@ -2199,6 +2248,40 @@ MeshToVolume<DistGridT, InterruptT>::doConvert(
     }
 
     if (!bool(GENERATE_PRIM_INDEX_GRID & mConversionFlags)) mIndexGrid->clear();
+
+    // Smooth out bumps caused by self-intersecting and overlapping portions
+    // of the mesh and renormalize the level set.
+    if (!unsignedDistField) {
+        typedef internal::OffsetOp<DistValueT> OffsetOp;
+        typedef internal::RenormOp<DistGridT, DistValueT> RenormOp;
+        typedef internal::MinOp<DistTreeT, DistValueT> MinOp;
+        typedef internal::MergeBufferOp<DistTreeT, DistValueT> MergeBufferOp;
+
+        tree::LeafManager<DistTreeT> leafs(mDistGrid->tree(), 1);
+
+        const DistValueT offset = 0.8 * voxelSize;
+
+        if (mInterrupter && mInterrupter->wasInterrupted()) return;
+
+        OffsetOp offsetOp(-offset);
+        LeafTransformer<DistTreeT, OffsetOp> offsetXform(leafs, offsetOp);
+        offsetXform.runParallel();
+
+        if (mInterrupter && mInterrupter->wasInterrupted()) return;
+
+        RenormOp renormOp(*mDistGrid, leafs, voxelSize);
+        LeafTransformer<DistTreeT, RenormOp> renormXform(leafs, renormOp);
+        renormXform.runParallel();
+
+        MinOp minOp(leafs);
+        LeafTransformer<DistTreeT, MinOp> minXform(leafs, minOp);
+        minXform.runParallel();
+
+        if (mInterrupter && mInterrupter->wasInterrupted()) return;
+
+        offsetOp.resetOffset(offset - internal::Tolerance<DistValueT>::epsilon());
+        offsetXform.runParallel();
+    }
 
     const DistValueT minTrimWidth = voxelSize * 4.0;
     if (inBandWidth < minTrimWidth || exBandWidth < minTrimWidth) {

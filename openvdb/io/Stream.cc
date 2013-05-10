@@ -48,11 +48,10 @@ Stream::Stream(std::istream& is)
 
     readHeader(is);
 
-    // Tag the input stream with the file format and library version numbers.
-    is.iword(Archive::sFormatVersionIndex) = fileVersion();
-    is.iword(Archive::sLibraryMajorVersionIndex) = libraryVersion().first;
-    is.iword(Archive::sLibraryMinorVersionIndex) = libraryVersion().second;
-    is.iword(Archive::sDataCompressionIndex) = compressionFlags();
+    // Tag the input stream with the library and file format version numbers
+    // and the compression options specified in the header.
+    io::setVersion(is, libraryVersion(), fileVersion());
+    io::setDataCompression(is, compressionFlags());
 
     // Read in the VDB metadata.
     mMeta.reset(new MetaMap);

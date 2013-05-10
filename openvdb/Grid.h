@@ -518,12 +518,11 @@ public:
     virtual ~Grid() {}
 
     //@{
-    /// Return a new grid of the same type as this grid and whose
+    /// @brief Return a new grid of the same type as this grid and whose
     /// metadata and transform are deep copies of this grid's.
-    /// @param treePolicy
-    ///     if @c CP_NEW, give the new grid a new, empty tree;
-    ///     if @c CP_SHARE, the new grid shares this grid's tree and transform;
-    ///     if @c CP_COPY, the new grid's tree is a deep copy of this grid's tree and transform
+    /// @details If @a treePolicy is @c CP_NEW, give the new grid a new, empty tree;
+    /// if @c CP_SHARE, the new grid shares this grid's tree and transform;
+    /// if @c CP_COPY, the new grid's tree is a deep copy of this grid's tree and transform
     Ptr copy(CopyPolicy treePolicy = CP_SHARE) const;
     virtual GridBase::Ptr copyGrid(CopyPolicy treePolicy = CP_SHARE) const;
     //@}

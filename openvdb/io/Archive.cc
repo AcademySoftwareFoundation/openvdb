@@ -48,18 +48,84 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace io {
 
-/// Allocate storage for per-stream file format and library version numbers
-/// and other values of use to readers and writers.
-const int
-    Archive::sFormatVersionIndex = std::ios_base::xalloc(),
-    Archive::sLibraryMajorVersionIndex = std::ios_base::xalloc(),
-    Archive::sLibraryMinorVersionIndex = std::ios_base::xalloc(),
-    Archive::sDataCompressionIndex = std::ios_base::xalloc(),
-    Archive::sWriteGridStatsMetadataIndex = std::ios_base::xalloc(),
-    Archive::sGridBackgroundIndex = std::ios_base::xalloc(),
-    Archive::sGridClassIndex = std::ios_base::xalloc();
+// Indices into a stream's internal extensible array of values used by readers and writers
+struct StreamState
+{
+    static const long MAGIC_NUMBER;
+
+    StreamState();
+
+    int magicNumber;
+    int fileVersion;
+    int libraryMajorVersion;
+    int libraryMinorVersion;
+    int dataCompression;
+    int writeGridStatsMetadata;
+    int gridBackground;
+    int gridClass;
+}
+sStreamState;
+
+const long StreamState::MAGIC_NUMBER =
+    long((uint64_t(OPENVDB_MAGIC) << 32) | (uint64_t(OPENVDB_MAGIC)));
 
 const uint32_t Archive::DEFAULT_COMPRESSION_FLAGS = (COMPRESS_ZIP | COMPRESS_ACTIVE_MASK);
+
+
+////////////////////////////////////////
+
+
+StreamState::StreamState(): magicNumber(std::ios_base::xalloc())
+{
+    // Having reserved an entry (the one at index magicNumber) in the extensible array
+    // associated with every stream, store a magic number at that location in the
+    // array belonging to the cout stream.
+    std::cout.iword(magicNumber) = MAGIC_NUMBER;
+    std::cout.pword(magicNumber) = this;
+
+    // Search for a lower-numbered entry in cout's array that already contains the magic number.
+    /// @todo This assumes that the indices returned by xalloc() increase monotonically.
+    int existingArray = -1;
+    for (int i = 0; i < magicNumber; ++i) {
+        if (std::cout.iword(i) == MAGIC_NUMBER) {
+            existingArray = i;
+            break;
+        }
+    }
+
+    if (existingArray >= 0 && std::cout.pword(existingArray) != NULL) {
+        // If a lower-numbered entry was found to contain the magic number,
+        // a coexisting version of this library must have registered it.
+        // In that case, the corresponding pointer should point to an existing
+        // StreamState struct.  Copy the other array indices from that StreamState
+        // into this one, so as to share state with the other library.
+        const StreamState& other =
+            *static_cast<const StreamState*>(std::cout.pword(existingArray));
+        fileVersion =            other.fileVersion;
+        libraryMajorVersion =    other.libraryMajorVersion;
+        libraryMinorVersion =    other.libraryMinorVersion;
+        dataCompression =        other.dataCompression;
+        writeGridStatsMetadata = other.writeGridStatsMetadata;
+        gridBackground =         other.gridBackground;
+        gridClass =              other.gridClass;
+    } else {
+        // Reserve storage for per-stream file format and library version numbers
+        // and other values of use to readers and writers.  Each of the following
+        // values is an index into the extensible arrays associated with all streams.
+        // The indices are common to all streams, but the values stored at those indices
+        // are unique to each stream.
+        fileVersion =            std::ios_base::xalloc();
+        libraryMajorVersion =    std::ios_base::xalloc();
+        libraryMinorVersion =    std::ios_base::xalloc();
+        dataCompression =        std::ios_base::xalloc();
+        writeGridStatsMetadata = std::ios_base::xalloc();
+        gridBackground =         std::ios_base::xalloc();
+        gridClass =              std::ios_base::xalloc();
+    }
+}
+
+
+////////////////////////////////////////
 
 
 Archive::Archive():
@@ -107,14 +173,14 @@ Archive::isIdentical(const std::string& uuidStr) const
 uint32_t
 getFormatVersion(std::istream& is)
 {
-    return static_cast<uint32_t>(is.iword(Archive::sFormatVersionIndex));
+    return static_cast<uint32_t>(is.iword(sStreamState.fileVersion));
 }
 
 
 void
 Archive::setFormatVersion(std::istream& is)
 {
-    is.iword(sFormatVersionIndex) = mFileVersion;
+    is.iword(sStreamState.fileVersion) = mFileVersion;
 }
 
 
@@ -122,8 +188,8 @@ VersionId
 getLibraryVersion(std::istream& is)
 {
     VersionId version;
-    version.first = static_cast<uint32_t>(is.iword(Archive::sLibraryMajorVersionIndex));
-    version.second = static_cast<uint32_t>(is.iword(Archive::sLibraryMinorVersionIndex));
+    version.first = static_cast<uint32_t>(is.iword(sStreamState.libraryMajorVersion));
+    version.second = static_cast<uint32_t>(is.iword(sStreamState.libraryMinorVersion));
     return version;
 }
 
@@ -131,8 +197,8 @@ getLibraryVersion(std::istream& is)
 void
 Archive::setLibraryVersion(std::istream& is)
 {
-    is.iword(sLibraryMajorVersionIndex) = mLibraryVersion.first;
-    is.iword(sLibraryMinorVersionIndex) = mLibraryVersion.second;
+    is.iword(sStreamState.libraryMajorVersion) = mLibraryVersion.first;
+    is.iword(sStreamState.libraryMinorVersion) = mLibraryVersion.second;
 }
 
 
@@ -149,9 +215,18 @@ getVersion(std::istream& is)
 void
 setCurrentVersion(std::istream& is)
 {
-    is.iword(Archive::sFormatVersionIndex) = OPENVDB_FILE_VERSION;
-    is.iword(Archive::sLibraryMajorVersionIndex) = OPENVDB_LIBRARY_MAJOR_VERSION;
-    is.iword(Archive::sLibraryMinorVersionIndex) = OPENVDB_LIBRARY_MINOR_VERSION;
+    is.iword(sStreamState.fileVersion) = OPENVDB_FILE_VERSION;
+    is.iword(sStreamState.libraryMajorVersion) = OPENVDB_LIBRARY_MAJOR_VERSION;
+    is.iword(sStreamState.libraryMinorVersion) = OPENVDB_LIBRARY_MINOR_VERSION;
+}
+
+
+void
+setVersion(std::ios_base& strm, const VersionId& libraryVersion, uint32_t fileVersion)
+{
+    strm.iword(sStreamState.fileVersion) = fileVersion;
+    strm.iword(sStreamState.libraryMajorVersion) = libraryVersion.first;
+    strm.iword(sStreamState.libraryMinorVersion) = libraryVersion.second;
 }
 
 
@@ -170,14 +245,21 @@ Archive::version() const
 uint32_t
 getDataCompression(std::ios_base& strm)
 {
-    return uint32_t(strm.iword(Archive::sDataCompressionIndex));
+    return uint32_t(strm.iword(sStreamState.dataCompression));
+}
+
+
+void
+setDataCompression(std::ios_base& strm, uint32_t compression)
+{
+    strm.iword(sStreamState.dataCompression) = compression;
 }
 
 
 void
 Archive::setDataCompression(std::istream& is)
 {
-    is.iword(Archive::sDataCompressionIndex) = mCompression;
+    io::setDataCompression(is, mCompression);
 }
 
 
@@ -212,7 +294,7 @@ Archive::setGridCompression(std::ostream& os, const GridBase& grid) const
         default:
             break;
     }
-    os.iword(Archive::sDataCompressionIndex) = compression;
+    io::setDataCompression(os, compression);
 
     os.write(reinterpret_cast<const char*>(&compression), sizeof(uint32_t));
 }
@@ -224,7 +306,7 @@ Archive::readGridCompression(std::istream& is)
     if (getFormatVersion(is) >= OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
         uint32_t compression = COMPRESS_NONE;
         is.read(reinterpret_cast<char*>(&compression), sizeof(uint32_t));
-        is.iword(Archive::sDataCompressionIndex) = compression;
+        io::setDataCompression(is, compression);
     }
 }
 
@@ -235,14 +317,14 @@ Archive::readGridCompression(std::istream& is)
 bool
 getWriteGridStatsMetadata(std::ostream& os)
 {
-    return os.iword(Archive::sWriteGridStatsMetadataIndex) != 0;
+    return os.iword(sStreamState.writeGridStatsMetadata) != 0;
 }
 
 
 void
 Archive::setWriteGridStatsMetadata(std::ostream& os)
 {
-    os.iword(Archive::sWriteGridStatsMetadataIndex) = mEnableGridStats;
+    os.iword(sStreamState.writeGridStatsMetadata) = mEnableGridStats;
 }
 
 
@@ -252,23 +334,30 @@ Archive::setWriteGridStatsMetadata(std::ostream& os)
 uint32_t
 getGridClass(std::ios_base& strm)
 {
-    const uint32_t val = strm.iword(Archive::sGridClassIndex);
+    const uint32_t val = strm.iword(sStreamState.gridClass);
     if (val >= NUM_GRID_CLASSES) return GRID_UNKNOWN;
     return val;
+}
+
+
+void
+setGridClass(std::ios_base& strm, uint32_t cls)
+{
+    strm.iword(sStreamState.gridClass) = long(cls);
 }
 
 
 const void*
 getGridBackgroundValuePtr(std::ios_base& strm)
 {
-    return strm.pword(Archive::sGridBackgroundIndex);
+    return strm.pword(sStreamState.gridBackground);
 }
 
 
 void
 setGridBackgroundValuePtr(std::ios_base& strm, const void* background)
 {
-    strm.pword(Archive::sGridBackgroundIndex) = const_cast<void*>(background);
+    strm.pword(sStreamState.gridBackground) = const_cast<void*>(background);
 }
 
 
@@ -434,8 +523,8 @@ Archive::readGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is
     // so that downstream functions can reference them.
     readGridCompression(is);
 
-    is.iword(Archive::sGridClassIndex) = GRID_UNKNOWN;
-    is.pword(Archive::sGridBackgroundIndex) = NULL;
+    io::setGridClass(is, GRID_UNKNOWN);
+    io::setGridBackgroundValuePtr(is, NULL);
 
     grid->readMeta(is);
 
@@ -446,7 +535,7 @@ Archive::readGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is
     //    StringMetadata(compressionToString(compression)));
 
     const GridClass gridClass = grid->getGridClass();
-    is.iword(Archive::sGridClassIndex) = gridClass;
+    io::setGridClass(is, gridClass);
 
     if (getFormatVersion(is) >= OPENVDB_FILE_VERSION_GRID_INSTANCING) {
         grid->readTransform(is);
@@ -483,8 +572,8 @@ Archive::write(std::ostream& os, const GridCPtrVec& grids, bool seekable,
     const MetaMap& metadata) const
 {
     // Set stream flags so that downstream functions can reference them.
-    os.iword(Archive::sDataCompressionIndex) = compressionFlags();
-    os.iword(Archive::sWriteGridStatsMetadataIndex) = isGridStatsMetadataEnabled();
+    io::setDataCompression(os, compressionFlags());
+    os.iword(sStreamState.writeGridStatsMetadata) = isGridStatsMetadataEnabled();
 
     this->writeHeader(os, seekable);
 
@@ -547,7 +636,7 @@ Archive::write(std::ostream& os, const GridCPtrVec& grids, bool seekable,
 
         // Some compression options (e.g., mask compression) are set per grid.
         // Restore the original settings before writing the next grid.
-        os.iword(Archive::sDataCompressionIndex) = compressionFlags();
+        io::setDataCompression(os, compressionFlags());
     }
 }
 

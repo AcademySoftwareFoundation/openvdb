@@ -69,6 +69,7 @@ public:
     CPPUNIT_TEST(testPointScatter);
     CPPUNIT_TEST(testTransformValues);
     CPPUNIT_TEST(testVectorApply);
+    CPPUNIT_TEST(testAccumulate);
     CPPUNIT_TEST(testUtil);
 
     CPPUNIT_TEST_SUITE_END();
@@ -85,6 +86,7 @@ public:
     void testPointScatter();
     void testTransformValues();
     void testVectorApply();
+    void testAccumulate();
     void testUtil();
 };
 
@@ -676,47 +678,8 @@ TestTools::testLevelSetAdvect()
     */
 }
 
-void
-TestTools::testFloatApply()
-{
-    typedef openvdb::FloatTree::ValueOnIter ValueIter;
 
-    struct Local {
-        static inline float op(float x) { return x * 2.0; }
-        static inline void visit(const ValueIter& it) { it.setValue(op(*it)); }
-    };
-
-    const float background = 1.0;
-    openvdb::FloatTree tree(background);
-
-    const int MIN = -1000, MAX = 1000, STEP = 50;
-    openvdb::Coord xyz;
-    for (int z = MIN; z < MAX; z += STEP) {
-        xyz.setZ(z);
-        for (int y = MIN; y < MAX; y += STEP) {
-            xyz.setY(y);
-            for (int x = MIN; x < MAX; x += STEP) {
-                xyz.setX(x);
-                tree.setValue(xyz, x + y + z);
-            }
-        }
-    }
-    /// @todo set some tile values
-
-    openvdb::tools::foreach(tree.begin<ValueIter>(), Local::visit, /*threaded=*/true);
-
-    float expected = Local::op(background);
-    //CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, tree.background(), /*tolerance=*/0.0);
-    //expected = Local::op(-background);
-    //CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, -tree.background(), /*tolerance=*/0.0);
-
-    for (openvdb::FloatTree::ValueOnCIter it = tree.cbeginValueOn(); it; ++it) {
-        xyz = it.getCoord();
-        expected = Local::op(xyz[0] + xyz[1] + xyz[2]);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, it.getValue(), /*tolerance=*/0.0);
-    }
-}
-
+////////////////////////////////////////
 
 
 void
@@ -794,6 +757,10 @@ TestTools::testNormalize()
     //std::cerr << "\nPassed testNormalize(" << xyz << ")=" << v.length() << std::endl;
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, v.length(), 0.0001);
 }
+
+
+////////////////////////////////////////
+
 
 void
 TestTools::testPointAdvect()
@@ -930,7 +897,9 @@ TestTools::testPointAdvect()
     }
 }
 
+
 ////////////////////////////////////////
+
 
 struct PointList
 {
@@ -938,6 +907,7 @@ struct PointList
     std::vector<Point> list;
     void add(const openvdb::Vec3R &p) { Point q={p[0],p[1],p[2]}; list.push_back(q); }
 };
+
 
 void
 TestTools::testPointScatter()
@@ -978,6 +948,52 @@ TestTools::testPointScatter()
         CPPUNIT_ASSERT_EQUAL( scatter.getPointCount(), int(points.list.size()) );
     }
 }
+
+
+////////////////////////////////////////
+
+
+void
+TestTools::testFloatApply()
+{
+    typedef openvdb::FloatTree::ValueOnIter ValueIter;
+
+    struct Local {
+        static inline float op(float x) { return x * 2.0; }
+        static inline void visit(const ValueIter& it) { it.setValue(op(*it)); }
+    };
+
+    const float background = 1.0;
+    openvdb::FloatTree tree(background);
+
+    const int MIN = -1000, MAX = 1000, STEP = 50;
+    openvdb::Coord xyz;
+    for (int z = MIN; z < MAX; z += STEP) {
+        xyz.setZ(z);
+        for (int y = MIN; y < MAX; y += STEP) {
+            xyz.setY(y);
+            for (int x = MIN; x < MAX; x += STEP) {
+                xyz.setX(x);
+                tree.setValue(xyz, x + y + z);
+            }
+        }
+    }
+    /// @todo set some tile values
+
+    openvdb::tools::foreach(tree.begin<ValueIter>(), Local::visit, /*threaded=*/true);
+
+    float expected = Local::op(background);
+    //CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, tree.background(), /*tolerance=*/0.0);
+    //expected = Local::op(-background);
+    //CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, -tree.background(), /*tolerance=*/0.0);
+
+    for (openvdb::FloatTree::ValueOnCIter it = tree.cbeginValueOn(); it; ++it) {
+        xyz = it.getCoord();
+        expected = Local::op(xyz[0] + xyz[1] + xyz[2]);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, it.getValue(), /*tolerance=*/0.0);
+    }
+}
+
 
 ////////////////////////////////////////
 
@@ -1034,8 +1050,67 @@ TestTools::testVectorApply()
 
 namespace {
 
+struct AccumSum {
+    int64_t sum; int joins;
+    AccumSum(): sum(0), joins(0) {}
+    void operator()(const openvdb::Int32Tree::ValueOnCIter& it)
+    {
+        if (it.isVoxelValue()) sum += *it;
+        else sum += (*it) * it.getVoxelCount();
+    }
+    void join(AccumSum& other) { sum += other.sum; joins += 1 + other.joins; }
+};
+
+
+struct AccumLeafVoxelCount {
+    typedef openvdb::tree::LeafManager<openvdb::Int32Tree>::LeafRange LeafRange;
+    openvdb::Index64 count;
+    AccumLeafVoxelCount(): count(0) {}
+    void operator()(const LeafRange::Iterator& it) { count += it->onVoxelCount(); }
+    void join(AccumLeafVoxelCount& other) { count += other.count; }
+};
+
+}
+
+
+void
+TestTools::testAccumulate()
+{
+    using namespace openvdb;
+
+    const int value = 2;
+    Int32Tree tree(/*background=*/0);
+    tree.fill(CoordBBox::createCube(Coord(0), 198), value, /*active=*/true);
+
+    const int64_t expected = tree.activeVoxelCount() * value;
+    {
+        AccumSum op;
+        tools::accumulate(tree.cbeginValueOn(), op, /*threaded=*/false);
+        CPPUNIT_ASSERT_EQUAL(expected, op.sum);
+        CPPUNIT_ASSERT_EQUAL(0, op.joins);
+    }
+    {
+        AccumSum op;
+        tools::accumulate(tree.cbeginValueOn(), op, /*threaded=*/true);
+        CPPUNIT_ASSERT_EQUAL(expected, op.sum);
+    }
+    {
+        AccumLeafVoxelCount op;
+        tree::LeafManager<Int32Tree> mgr(tree);
+        tools::accumulate(mgr.leafRange().begin(), op, /*threaded=*/true);
+        CPPUNIT_ASSERT_EQUAL(tree.activeLeafVoxelCount(), op.count);
+    }
+}
+
+
+////////////////////////////////////////
+
+
+namespace {
+
 template<typename InIterT, typename OutTreeT>
-struct FloatToVec {
+struct FloatToVec
+{
     typedef typename InIterT::ValueT ValueT;
     typedef typename openvdb::tree::ValueAccessor<OutTreeT> Accessor;
 
@@ -1115,6 +1190,10 @@ TestTools::testTransformValues()
     }
 }
 
+
+////////////////////////////////////////
+
+
 void
 TestTools::testUtil()
 {
@@ -1124,7 +1203,6 @@ TestTools::testUtil()
 
     typedef openvdb::tree::Tree4<bool, 3, 2, 3>::Type CharTree;
 
-
     // Test boolean operators
     CharTree treeA(false), treeB(false);
 
@@ -1133,26 +1211,26 @@ TestTools::testUtil()
 
     treeB.fill(CoordBBox(Coord(-10), Coord(10)), true);
     treeB.voxelizeActiveTiles();
-    
+
     const size_t voxelCountA = treeA.activeVoxelCount();
     const size_t voxelCountB = treeB.activeVoxelCount();
 
     CPPUNIT_ASSERT_EQUAL(voxelCountA, voxelCountB);
-    
+
     CharTree::Ptr tree = openvdb::util::leafTopologyDifference(treeA, treeB);
     CPPUNIT_ASSERT(tree->activeVoxelCount() == 0);
-    
+
     tree = openvdb::util::leafTopologyIntersection(treeA, treeB);
     CPPUNIT_ASSERT(tree->activeVoxelCount() == voxelCountA);
-    
+
     treeA.fill(CoordBBox(Coord(-10), Coord(22)), true);
     treeA.voxelizeActiveTiles();
-    
+
     const size_t voxelCount = treeA.activeVoxelCount();
-    
+
     tree = openvdb::util::leafTopologyDifference(treeA, treeB);
     CPPUNIT_ASSERT(tree->activeVoxelCount() == (voxelCount - voxelCountA));
-    
+
     tree = openvdb::util::leafTopologyIntersection(treeA, treeB);
     CPPUNIT_ASSERT(tree->activeVoxelCount() == voxelCountA);
 }

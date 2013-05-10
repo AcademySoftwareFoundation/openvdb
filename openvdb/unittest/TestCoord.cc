@@ -171,8 +171,8 @@ TestCoord::testCoordBBox()
         const openvdb::CoordBBox a(c, c), b(c, c.offsetBy(0,-1,0));
         CPPUNIT_ASSERT( a.hasVolume() && !a.empty());
         CPPUNIT_ASSERT(!b.hasVolume() &&  b.empty());
-        CPPUNIT_ASSERT_EQUAL(1, a.volume());
-        CPPUNIT_ASSERT_EQUAL(0, b.volume());
+        CPPUNIT_ASSERT_EQUAL(uint64_t(1), a.volume());
+        CPPUNIT_ASSERT_EQUAL(uint64_t(0), b.volume());
     }
     {// volume and split constructor
         const openvdb::Coord min(-1,-2,30), max(20,30,55);
@@ -187,6 +187,17 @@ TestCoord::testCoordBBox()
         const openvdb::CoordBBox b(min, max);
         CPPUNIT_ASSERT_EQUAL(openvdb::Vec3d(3.5, 6.0, 9.0), b.getCenter());
     }
+    {// a volume that overflows Int32.
+        typedef openvdb::Int32  Int32;
+        Int32 maxInt32 = std::numeric_limits<Int32>::max();
+        const openvdb::Coord min(Int32(0), Int32(0), Int32(0));
+        const openvdb::Coord max(maxInt32-Int32(2), Int32(2), Int32(2));
+        
+        const openvdb::CoordBBox b(min, max);
+        uint64_t volume = UINT64_C(19327352814);
+        CPPUNIT_ASSERT_EQUAL(volume, b.volume());
+    }
+
 }
 
 // Copyright (c) 2012-2013 DreamWorks Animation LLC

@@ -388,10 +388,10 @@ Type Pow(Type x, int n)
 {
     Type ans = 1;
     if (n < 0) {
-        n=-n;
-        x=1/x;
+        n = -n;
+        x = Type(1)/x;
     }
-    for (int i = 0; i < n; i++) ans *= x;
+    while(n--) ans *= x;
     return ans;
 }
 

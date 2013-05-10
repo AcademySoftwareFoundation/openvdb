@@ -324,11 +324,10 @@ public:
     /// @brief Add a tile at the specified tree level that contains
     /// xyz, possibly creating a child branch in the process. If a
     /// Node that contains xyz already exists it is replaced by a tile.
-    template<Index TileLevel>
-    void addTile(const Coord& xyz, const ValueType& value, bool state)
+    void addTile(Index level, const Coord& xyz, const ValueType& value, bool state)
     {
         LockT lock(mMutex);
-        mCache.template addTile<TileLevel>(xyz, value, state);
+        mCache.addTile(level, xyz, value, state);
     }
     
     /// @brief @return the leaf node that contains voxel (x, y, z) and
@@ -353,10 +352,14 @@ public:
 
     /// @brief @return a const pointer to the leaf node that contains
     /// voxel (x, y, z) and if it doesn't exist, return NULL.
-    const LeafNodeT* probeConstLeaf(const Coord& xyz)
+    const LeafNodeT* probeConstLeaf(const Coord& xyz) const
     {
         LockT lock(mMutex);
         return mCache.probeConstLeaf(xyz);
+    }
+    const LeafNodeT* probeLeaf(const Coord& xyz) const
+    {
+        return this->probeConstLeaf(xyz);
     }
 
     /// Remove all nodes from this cache, then reinsert the root node.
@@ -593,16 +596,15 @@ public:
         mNext.addLeaf(leaf);
     }
     
-    template<Index TileLevel>
-    void addTile(const Coord& xyz, const ValueType& value, bool state)
+    void addTile(Index level, const Coord& xyz, const ValueType& value, bool state)
     {
         BOOST_STATIC_ASSERT(!TreeCacheT::IsConstTree);
-        if (NodeType::LEVEL < TileLevel) return;
+        if (NodeType::LEVEL < level) return;
         if (this->isHashed(xyz)) {
             assert(mNode);
-            return const_cast<NodeType*>(mNode)->template addTileAndCache<TileLevel>(xyz, value, state, *mParent);
+            return const_cast<NodeType*>(mNode)->addTileAndCache(level, xyz, value, state, *mParent);
         }
-        mNext.template addTile<TileLevel>(xyz, value, state);
+        mNext.addTile(level, xyz, value, state);
     }
     
     LeafNodeType* touchLeaf(const Coord& xyz)
@@ -799,12 +801,11 @@ public:
         const_cast<RootNodeType*>(mRoot)->addLeafAndCache(leaf, *mParent);
     }
     
-    template<Index TileLevel>
-    void addTile(const Coord& xyz, const ValueType& value, bool state)
+    void addTile(Index level, const Coord& xyz, const ValueType& value, bool state)
     {
         assert(mRoot);
         BOOST_STATIC_ASSERT(!TreeCacheT::IsConstTree);
-        const_cast<RootNodeType*>(mRoot)->template addTileAndCache<TileLevel>(xyz, value, state, *mParent);
+        const_cast<RootNodeType*>(mRoot)->addTileAndCache(level, xyz, value, state, *mParent);
     }
     
     LeafNodeType* touchLeaf(const Coord& xyz)
@@ -1041,12 +1042,11 @@ public:
     /// @brief Add a tile at the specified tree level that contains
     /// xyz, possibly creating a child branch in the process. If a
     /// Node that contains xyz already exists it is replaced by a tile.
-    template<Index TileLevel>
-    void addTile(const Coord& xyz, const ValueType& value, bool state)
+    void addTile(Index level, const Coord& xyz, const ValueType& value, bool state)
     {
         assert(BaseT::mTree);
         BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
-        BaseT::mTree->root().template addTile<TileLevel>(xyz, value, state);
+        BaseT::mTree->root().addTile(level, xyz, value, state);
     }
 
     /// If a node of the given type exists in the cache, remove it, so that
@@ -1068,10 +1068,15 @@ public:
         return BaseT::mTree->probeLeaf(xyz);
     }
 
-    const LeafNodeT* probeConstLeaf(const Coord& xyz)
+    const LeafNodeT* probeConstLeaf(const Coord& xyz) const
     {
         assert(BaseT::mTree);
         return BaseT::mTree->probeConstLeaf(xyz);
+    }
+
+    const LeafNodeT* probeLeaf(const Coord& xyz) const
+    {
+        return this->probeConstLeaf(xyz);
     }
 
     /// Remove all nodes from this cache, then reinsert the root node.
@@ -1308,12 +1313,11 @@ public:
     /// @brief Add a tile at the specified tree level that contains
     /// xyz, possibly creating a child branch in the process. If a
     /// Node that contains xyz already exists it is replaced by a tile.
-    template<Index TileLevel>
-    void addTile(const Coord& xyz, const ValueType& value, bool state)
+    void addTile(Index level, const Coord& xyz, const ValueType& value, bool state)
     {
         assert(BaseT::mTree);
         BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
-        BaseT::mTree->root().template addTile<TileLevel>(xyz, value, state);
+        BaseT::mTree->root().addTile(level, xyz, value, state);
     }
 
     /// @brief @return the leaf node that contains voxel (x, y, z) and
@@ -1348,15 +1352,16 @@ public:
 
     /// @brief @return a const pointer to the leaf node that contains
     /// voxel (x, y, z) and if it doesn't exist, return NULL.
-    const LeafNodeT* probeConstLeaf(const Coord& xyz)
+    const LeafNodeT* probeConstLeaf(const Coord& xyz) const
     {
         assert(BaseT::mTree);
         if (this->isHashed(xyz)) {
             assert(mNode0);
-            return mNode0->probeLeafAndCache(xyz, *this);
+            return mNode0->probeConstLeafAndCache(xyz, this->self());
         }
-        return BaseT::mTree->getRootNode().probeConstLeafAndCache(xyz, *this);
+        return BaseT::mTree->getRootNode().probeConstLeafAndCache(xyz, this->self());
     }
+    const LeafNodeT* probeLeaf(const Coord& xyz) const { return this->probeConstLeaf(xyz); }
 
     /// Remove all the cached nodes and invalidate the corresponding hash-keys.
     virtual void clear()
@@ -1681,16 +1686,15 @@ public:
     /// @brief Add a tile at the specified tree level that contains
     /// xyz, possibly creating a child branch in the process. If a
     /// Node that contains xyz already exists it is replaced by a tile.
-    template<Index TileLevel>
-    void addTile(const Coord& xyz, const ValueType& value, bool state)
+    void addTile(Index level, const Coord& xyz, const ValueType& value, bool state)
     {
         assert(BaseT::mTree);
         BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
         if (this->isHashed1(xyz)) {
             assert(mNode1);
-            return const_cast<NodeT1*>(mNode1)->addTileAndCache(xyz, value, state, *this);
+            return const_cast<NodeT1*>(mNode1)->addTileAndCache(level, xyz, value, state, *this);
         }
-        BaseT::mTree->root().template addTileAndCache<TileLevel>(xyz, value, state, *this);
+        BaseT::mTree->root().addTileAndCache(level, xyz, value, state, *this);
     }
     
     /// @brief @return the leaf node that contains voxel (x, y, z) and
@@ -1731,18 +1735,19 @@ public:
 
     /// @brief @return a const pointer to the leaf node that contains
     /// voxel (x, y, z) and if it doesn't exist, return NULL.
-    const LeafNodeT* probeConstLeaf(const Coord& xyz)
+    const LeafNodeT* probeConstLeaf(const Coord& xyz) const
     {
         assert(BaseT::mTree);
         if (this->isHashed0(xyz)) {
             assert(mNode0);
-            return mNode0->probeConstLeafAndCache(xyz, *this);
+            return mNode0->probeConstLeafAndCache(xyz, this->self());
         } else if (this->isHashed1(xyz)) {
             assert(mNode1);
-            return mNode1->probeConstLeafAndCache(xyz, *this);
+            return mNode1->probeConstLeafAndCache(xyz, this->self());
         }
-        return BaseT::mTree->getRootNode().probeConstLeafAndCache(xyz, *this);
+        return BaseT::mTree->getRootNode().probeConstLeafAndCache(xyz, this->self());
     }
+    const LeafNodeT* probeLeaf(const Coord& xyz) const { return this->probeConstLeaf(xyz); }
 
     /// Remove all the cached nodes and invalidate the corresponding hash-keys.
     virtual void clear()
@@ -2126,19 +2131,18 @@ public:
     /// @brief Add a tile at the specified tree level that contains
     /// xyz, possibly creating a child branch in the process. If a
     /// Node that contains xyz already exists it is replaced by a tile.
-    template<Index TileLevel>
-    void addTile(const Coord& xyz, const ValueType& value, bool state)
+    void addTile(Index level, const Coord& xyz, const ValueType& value, bool state)
     {
         assert(BaseT::mTree);
         BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
         if (this->isHashed1(xyz)) {
             assert(mNode1);
-            return const_cast<NodeT1*>(mNode1)->template addTileAndCache<TileLevel>(xyz, value, state, *this);
+            return const_cast<NodeT1*>(mNode1)->addTileAndCache(level, xyz, value, state, *this);
         } if (this->isHashed2(xyz)) {
             assert(mNode2);
-            return const_cast<NodeT2*>(mNode2)->template addTileAndCache<TileLevel>(xyz, value, state, *this);
+            return const_cast<NodeT2*>(mNode2)->addTileAndCache(level, xyz, value, state, *this);
         }
-        BaseT::mTree->root().template addTileAndCache<TileLevel>(xyz, value, state, *this);
+        BaseT::mTree->root().addTileAndCache(level, xyz, value, state, *this);
     }
 
     /// @brief @return the leaf node that contains voxel (x, y, z) and
@@ -2185,21 +2189,22 @@ public:
 
     /// @brief @return a const pointer to the leaf node that contains
     /// voxel (x, y, z) and if it doesn't exist, return NULL.
-    const LeafNodeT* probeConstLeaf(const Coord& xyz)
+    const LeafNodeT* probeConstLeaf(const Coord& xyz) const
     {
         assert(BaseT::mTree);
         if (this->isHashed0(xyz)) {
             assert(mNode0);
-            return mNode0->probeConstLeafAndCache(xyz, *this);
+            return mNode0->probeConstLeafAndCache(xyz, this->self());
         } else if (this->isHashed1(xyz)) {
             assert(mNode1);
-            return mNode1->probeConstLeafAndCache(xyz, *this);
+            return mNode1->probeConstLeafAndCache(xyz, this->self());
         } else if (this->isHashed2(xyz)) {
             assert(mNode2);
-            return mNode2->probeConstLeafAndCache(xyz, *this);
+            return mNode2->probeConstLeafAndCache(xyz, this->self());
         }
-        return BaseT::mTree->getRootNode().probeConstLeafAndCache(xyz, *this);
+        return BaseT::mTree->getRootNode().probeConstLeafAndCache(xyz, this->self());
     }
+    const LeafNodeT* probeLeaf(const Coord& xyz) const { return this->probeConstLeaf(xyz); }
 
     /// Remove all the cached nodes and invalidate the corresponding hash-keys.
     virtual void clear()

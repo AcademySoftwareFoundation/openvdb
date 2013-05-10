@@ -87,7 +87,7 @@ protected:
 
     template <class GridType>
     void referenceMeshing(
-        std::list<openvdb::GridBase::ConstPtr>& grids,
+        std::list<openvdb::GridBase::Ptr>& grids,
         openvdb::tools::VolumeToMesh& mesher,
         const GU_Detail* refGeo,
         hvdb::Interrupter& boss,
@@ -132,7 +132,12 @@ newSopOperator(OP_OperatorTable* table)
             "interior to the reference surface."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "transferattributes", "Transfer Surface Attributes"));
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "reconstruct", "Reconstruct Sharp Features"));
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "smoothseams", "Smooth Seams")
+        .setDefault(PRMoneDefaults)
+        .setHelpText("Smooth seam line edges during mesh extraction, "
+            "removes staircase artifacts"));
+
+    //parms.add(hutil::ParmFactory(PRM_TOGGLE, "reconstruct", "Reconstruct Sharp Features"));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "surfacegroup", "Surface Group")
         .setDefault("surface_polygons")
@@ -188,8 +193,8 @@ SOP_OpenVDB_To_Polygons::disableParms()
     changed += enableParm("interiorgroup", refexists);
     changed += enableParm("seamlinegroup", refexists);
     changed += enableParm("transferattributes", refexists);
-    changed += enableParm("reconstruct", refexists);
-
+    changed += enableParm("smoothseams", refexists);
+    //changed += enableParm("reconstruct", refexists);
     return changed;
 }
 
@@ -335,7 +340,7 @@ SOP_OpenVDB_To_Polygons::cookMySop(OP_Context& context)
         if (refGeo) {
 
             // Collect all level set grids.
-            std::list<openvdb::GridBase::ConstPtr> grids;
+            std::list<openvdb::GridBase::Ptr> grids;
             std::vector<std::string> nonLevelSetList, nonLinearList;
             for (; vdbIt; ++vdbIt) {
                 if (boss.wasInterrupted()) break;
@@ -351,7 +356,9 @@ SOP_OpenVDB_To_Polygons::cookMySop(OP_Context& context)
                     continue;
                 }
 
-                grids.push_back(vdbIt->getConstGridPtr());
+                // (We need a shallow copy to sync primitive & grid names).
+                grids.push_back(vdbIt->getGrid().copyGrid());
+                grids.back()->setName(vdbIt->getGridName());
             }
 
             if (!nonLevelSetList.empty()) {
@@ -411,159 +418,10 @@ SOP_OpenVDB_To_Polygons::cookMySop(OP_Context& context)
 }
 
 
-////////////////////////////////////////
-////////////////////////////////////////
-template<class GridType>
-class SharpFeatureOp
-{
-public:
-    SharpFeatureOp(
-        const GU_Detail& sourceGeo, GU_Detail& targetGeo,
-        const GridType& indexGrid, const GA_PrimitiveGroup* surfacePrims = NULL);
-
-    void operator()(const GA_SplittableRange&) const;
-private:
-    const GU_Detail& mSourceGeo;
-    GU_Detail& mTargetGeo;
-    const GridType& mIndexGrid;
-    const GA_PrimitiveGroup* mSurfacePrims;
-};
-
-template<class GridType>
-SharpFeatureOp<GridType>::SharpFeatureOp(
-    const GU_Detail& sourceGeo, GU_Detail& targetGeo,
-    const GridType& indexGrid, const GA_PrimitiveGroup* surfacePrims)
-    : mSourceGeo(sourceGeo)
-    , mTargetGeo(targetGeo)
-    , mIndexGrid(indexGrid)
-    , mSurfacePrims(surfacePrims)
-{
-}
-
-
-inline bool
-pointInAABB(const UT_Vector3& p, const  openvdb::Vec3d& bmin, const  openvdb::Vec3d& bmax)
-{
-    for (int i = 0; i < 3; ++i) {
-        if (p[i] < bmin[i] || p[i] > bmax[i]) {
-            return false;
-        }
-    }
-    return true;
-}
-
-
-/*void
-edgeIntersections(
-    const GU_Detail& geo,
-    const std::set<GA_Index>& primitives,
-    const openvdb::vec3s& bmin,
-    const openvdb::vec3s& bmax,
-    std::vector<openvdb::vec3s>& points,
-    std::vector<openvdb::vec3s>& normals)
-{
-
-}*/
-    
-
-template<class GridType>
-void
-SharpFeatureOp<GridType>::operator()(const GA_SplittableRange& range) const
-{
-    GA_Offset start, end, vtxOffset, primOffset, target, v0, v1, v2;
-
-    typename GridType::ConstAccessor acc = mIndexGrid.getConstAccessor();
-    const openvdb::math::Transform& transform = mIndexGrid.transform();
-    openvdb::Vec3d pos, indexPos, uvw, bmin, bmax;
-    openvdb::Coord ijk, coord;
-
-    for (GA_PageIterator pageIt = range.beginPages(); !pageIt.atEnd(); ++pageIt) {
-        for (GA_Iterator blockIt(pageIt.begin()); blockIt.blockAdvance(start, end); ) {
-            for (target = start; target < end; ++target) {
-
-
-                vtxOffset = mTargetGeo.pointVertex(target);
-
-                // Check if point is referenced by a surface primitive.
-                if (mSurfacePrims) {
-                    bool surfacePrim = false;
-
-                    while (GAisValid(vtxOffset)) {
-
-                        primOffset = mTargetGeo.vertexPrimitive(vtxOffset);
-
-                        if (mSurfacePrims->containsIndex(mTargetGeo.primitiveIndex(primOffset))) {
-                            surfacePrim = true;
-                            break;
-                        }
-
-                        vtxOffset = mTargetGeo.vertexToNextVertex(vtxOffset);
-                    }
-
-                    if (!surfacePrim) continue;
-                }
-
-                const UT_Vector3 p = mTargetGeo.getPos3(target);
-                pos[0] = p.x();
-                pos[1] = p.y();
-                pos[2] = p.z();
-
-                indexPos = transform.worldToIndex(pos);
-                coord[0] = int(std::floor(indexPos[0]));
-                coord[1] = int(std::floor(indexPos[1]));
-                coord[2] = int(std::floor(indexPos[2]));
-
-                std::set<GA_Index> primitives;
-                int primIndex;
-
-                for (int d = 0; d < 8; ++d) {
-                    ijk[0] = coord[0] + ((d & 0x02) >> 1 ^ d & 0x01);
-                    ijk[1] = coord[1] + ((d & 0x02) >> 1);
-                    ijk[2] = coord[2] + ((d & 0x04) >> 2);
-
-                    if (acc.probeValue(ijk, primIndex) &&
-                        primIndex != openvdb::util::INVALID_IDX) {
-                        primitives.insert(primIndex);
-                    }
-                }
-
-                if (!primitives.empty()) {
-                    hvdb::findClosestPrimitiveToPoint(mSourceGeo, primitives, pos, v0, v1, v2, uvw);
-                    v0 = mSourceGeo.vertexPoint(v0);
-                    v1 = mSourceGeo.vertexPoint(v1);
-                    v2 = mSourceGeo.vertexPoint(v2);
-
-                    bmin = transform.indexToWorld(ijk);
-                    bmax = bmin + transform.voxelSize()[0];
-
-                    UT_Vector3 p0 = mSourceGeo.getPos3(v0);
-                    UT_Vector3 p1 = mSourceGeo.getPos3(v1);
-                    UT_Vector3 p2 = mSourceGeo.getPos3(v2);
-
-                    UT_Vector3 ptn = p0 * uvw[0] + p1 * uvw[1] + p2 * uvw[2];
-
-                    bool inCell = true;
-
-                    for (int i = 0; i < 10; ++i) {
-                        inCell = pointInAABB(ptn, bmin, bmax);
-                        if (inCell) break;
-                        ptn += p;
-                        ptn *= 0.5;
-                    }
-
-                    if (inCell) mTargetGeo.setPos3(target, ptn);          
-                }
-            }
-        }
-    }
-}
-////////////////////////////////////////
-////////////////////////////////////////
-
 template<class GridType>
 void
 SOP_OpenVDB_To_Polygons::referenceMeshing(
-    std::list<openvdb::GridBase::ConstPtr>& grids,
+    std::list<openvdb::GridBase::Ptr>& grids,
     openvdb::tools::VolumeToMesh& mesher,
     const GU_Detail* refGeo,
     hvdb::Interrupter& boss,
@@ -573,7 +431,8 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
     const bool computeNormals = evalInt("computenormals", 0, time);
     const bool transferAttributes = evalInt("transferattributes", 0, time);
     const bool keepVdbName = evalInt("keepvdbname", 0, time);
-    const bool reconstruct = evalInt("reconstruct", 0, time);
+    const bool smoothseams = evalInt("smoothseams", 0, time);
+    //const bool reconstruct = evalInt("reconstruct", 0, time);
 
     typedef typename GridType::TreeType TreeType;
     typedef typename GridType::ValueType ValueType;
@@ -650,10 +509,10 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
     if (boss.wasInterrupted()) return;
 
     const double iadaptivity = double(evalFloat("internaladaptivity", 0, time));
-    mesher.setRefGrid(refGrid, iadaptivity);
+    mesher.setRefGrid(refGrid, iadaptivity, smoothseams);
 
 
-    std::list<openvdb::GridBase::ConstPtr>::iterator it = grids.begin();
+    std::list<openvdb::GridBase::Ptr>::iterator it = grids.begin();
     std::vector<std::string> badTransformList, badBackgroundList, badTypeList;
 
     GA_PrimitiveGroup *surfaceGroup = NULL, *interiorGroup = NULL, *seamGroup = NULL;
@@ -709,10 +568,10 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
     grids.clear();
 
     // Reconstruct sharp fetures
-    if (!boss.wasInterrupted() && reconstruct) {
+    /*if (!boss.wasInterrupted() && reconstruct) {
         UTparallelFor(GA_SplittableRange(gdp->getPointRange()),
             SharpFeatureOp<IndexGridT>(*refGeo, *gdp, *indexGrid, surfaceGroup));
-    }
+    }*/
 
 
     // Compute vertex normals

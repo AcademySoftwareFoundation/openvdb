@@ -498,10 +498,10 @@ public:
     void addLeaf(LeafNode*) {}
     template<typename AccessorT>
     void addLeafAndCache(LeafNode*, AccessorT&) {}
-    template<Index TileLevel>
-    void addTile(const Coord&, bool, bool) {}
-    template<Index TileLevel, typename AccessorT>
-    void addTileAndCache(const Coord&, const ValueType&, bool, AccessorT&) {}
+    LeafNode* stealLeaf(const Coord&, bool, bool) { return this; }
+    void addTile(Index, const Coord&, bool, bool) {}
+    template<typename AccessorT>
+    void addTileAndCache(Index, const Coord&, const ValueType&, bool, AccessorT&) {}
     //@}
 
     //@{
@@ -515,11 +515,14 @@ public:
     //@}
     //@{
     /// @brief return a const pointer to itself
+    const LeafNode* probeLeaf(const Coord&) const { return this; }
+    template<typename AccessorT>
+    const LeafNode* probeLeafAndCache(const Coord&, AccessorT&) const { return this; }
     const LeafNode* probeConstLeaf(const Coord&) const { return this; }
     template<typename AccessorT>
     const LeafNode* probeConstLeafAndCache(const Coord&, AccessorT&) const { return this; }
     //@}
-
+    
     void merge(const LeafNode& other, bool, bool) { this->merge(other); }
 
     //

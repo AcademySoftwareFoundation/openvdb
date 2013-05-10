@@ -218,7 +218,9 @@ public:
     ///                         that do not exist in the reference grid. (Parts of the
     ///                         fragment surface that are not coincident with the
     ///                         reference surface.)
-    void setRefGrid(const GridBase::ConstPtr& grid, double secAdaptivity = 0);
+    /// @param  smoothSeams     toggle to smooth seam line edges during mesh extraction,
+    ///                         removes staircase artifacts.
+    void setRefGrid(const GridBase::ConstPtr& grid, double secAdaptivity = 0, bool smoothSeams = true);
 
 private:
 
@@ -230,7 +232,7 @@ private:
 
     GridBase::ConstPtr mRefGrid;
     TreeBase::Ptr mRefEdgeTree, mRefTopologyMaskTree, mSeamPointTree;
-    bool mRefDataCached;
+    bool mSmoothSeams;
 };
 
 
@@ -2439,7 +2441,7 @@ VolumeToMesh::polygonPoolListSize() const
 
 
 inline void
-VolumeToMesh::setRefGrid(const GridBase::ConstPtr& grid, double secAdaptivity)
+VolumeToMesh::setRefGrid(const GridBase::ConstPtr& grid, double secAdaptivity, bool smoothSeams)
 {
     mRefGrid = grid;
     mSecAdaptivity = secAdaptivity;
@@ -2447,6 +2449,7 @@ VolumeToMesh::setRefGrid(const GridBase::ConstPtr& grid, double secAdaptivity)
     mRefEdgeTree = TreeBase::Ptr();
     mRefTopologyMaskTree = TreeBase::Ptr();
     mSeamPointTree = TreeBase::Ptr();
+    mSmoothSeams = smoothSeams;
 }
 
 
@@ -2581,7 +2584,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
     }
 
     // Smooth seam line edges
-    if (refData.isValid()) {
+    if (mSmoothSeams && refData.isValid()) {
         refData.mSmoothingMaskTree->pruneInactive();
         internal::LeafPtrList<BoolTreeT> leafs(*refData.mSmoothingMaskTree);
         internal::EdgeSmooth<DistTreeT> op(leafs, edgeMaskTree, *auxTree, mPoints, transform);

@@ -598,21 +598,33 @@ public:
     /// @brief Add the specified leaf to this node, possibly creating a child branch
     /// in the process.  If the leaf node already exists, replace it.
     void addLeaf(LeafNodeType* leaf);
+
     /// @brief Same as addLeaf except, if necessary, it update the accessor with pointers
     /// to the nodes along the path from the root node to the node containing the coordinate.
     template<typename AccessorT>
     void addLeafAndCache(LeafNodeType* leaf, AccessorT&);
 
-    /// @brief Add a tile at the specified tree level that contains
-    /// xyz, possibly creating a child branch in the process. If a
-    /// Node that contains xyz already exists it is replaced by a tile.
-    template<Index TileLevel>
-    void addTile(const Coord& xyz, const ValueType& value, bool state);
-    /// @brief Same as addTile except, if necessary, it update the accessor with pointers
-    /// to the nodes along the path from the root node to the node containing the coordinate.
-    template<Index TileLevel, typename AccessorT>
-    void addTileAndCache(const Coord& xyz, const ValueType& value, bool state, AccessorT&);
-    
+    /// @brief Return a pointer to the node of type @c NodeT that contains voxel (x, y, z)
+    /// and replace it with a tile of the specified value and state.
+    /// If no such node exists, leave the tree unchanged and return @c NULL.
+    ///
+    /// @note The caller takes ownership of the node and is responsible for deleting it.
+    ///
+    /// @warning Since this method potentially removes nodes and branches of the tree,
+    /// it is important to clear the caches of all ValueAccessors associated with this tree.
+    template<typename NodeT>
+    NodeT* stealNode(const Coord& xyz, const ValueType& value, bool state);
+
+    /// @brief Add a tile at the specified tree level that contains voxel (x, y, z),
+    /// possibly creating a parent branch or deleting a child branch in the process.
+    void addTile(Index level, const Coord& xyz, const ValueType& value, bool state);
+
+    /// @brief Same as addTile() except, if necessary, update the accessor with pointers
+    /// to the nodes along the path from the root node to the node containing (x, y, z).
+    template<typename AccessorT>
+    void addTileAndCache(Index level, const Coord& xyz, const ValueType& value,
+        bool state, AccessorT&);
+
     /// @brief Return the leaf node that contains voxel (x, y, z).
     /// If no such node exists, create one, but preserve the values and
     /// active states of all voxels.
@@ -620,26 +632,35 @@ public:
     /// @details Use this method to preallocate a static tree topology
     /// over which to safely perform multithreaded processing.
     LeafNodeType* touchLeaf(const Coord& xyz);
+
     /// @brief Same as touchLeaf except, if necessary, it update the accessor with pointers
     /// to the nodes along the path from the root node to the node containing the coordinate.
     template<typename AccessorT>
-    LeafNodeType* touchLeafAndCache(const Coord& xyz, AccessorT&);
+    LeafNodeType* touchLeafAndCache(const Coord& xyz, AccessorT& acc);
 
     /// @brief Return a pointer to the leaf node that contains voxel (x, y, z).
     /// If no such node exists, return NULL.
     LeafNodeType* probeLeaf(const Coord& xyz);
-    /// @brief Same as probeLeaf except, if necessary, it update the accessor with pointers
-    /// to the nodes along the path from the root node to the node containing the coordinate.
-    template<typename AccessorT>
-    LeafNodeType* probeLeafAndCache(const Coord& xyz, AccessorT&);
-    
+
     /// @brief Return a const pointer to the leaf node that contains voxel (x, y, z).
     /// If no such node exists, return NULL.
     const LeafNodeType* probeConstLeaf(const Coord& xyz) const;
+    const LeafNodeType* probeLeaf(const Coord& xyz) const { return this->probeConstLeaf(xyz); }
+
+    /// @brief Same as probeLeaf except, if necessary, it update the accessor with pointers
+    /// to the nodes along the path from the root node to the node containing the coordinate.
+    template<typename AccessorT>
+    LeafNodeType* probeLeafAndCache(const Coord& xyz, AccessorT& acc);
+
     /// @brief Same as probeConstLeaf except, if necessary, it update the accessor with pointers
     /// to the nodes along the path from the root node to the node containing the coordinate.
     template<typename AccessorT>
-    const LeafNodeType* probeConstLeafAndCache(const Coord& xyz, AccessorT&) const;
+    const LeafNodeType* probeConstLeafAndCache(const Coord& xyz, AccessorT& acc) const;
+    template<typename AccessorT>
+    const LeafNodeType* probeLeafAndCache(const Coord& xyz, AccessorT& acc) const
+    {
+        return this->probeConstLeafAndCache(xyz, acc);
+    }
 
     /// @brief Set the values of all inactive voxels and tiles of a narrow-band
     /// level set from the signs of the active voxels, setting outside values to
@@ -649,9 +670,9 @@ public:
     void signedFloodFill();
 
     /// @brief Set the values of all inactive voxels and tiles of a narrow-band
-    /// level set from the signs of the active voxels, setting outside values to
-    /// "outside" and inside values to "inside. The background value of the grid
-    /// will be set to the "outside" value.
+    /// level set from the signs of the active voxels, setting exterior values to
+    /// @a outside and interior values to @a inside.  Set the background value
+    /// of this tree to @a outside.
     ///
     /// @note This method should only be used on closed, narrow-band level sets!
     void signedFloodFill(const ValueType& outside, const ValueType& inside);
@@ -747,6 +768,9 @@ private:
     /// @details If the key is not found, insert a background tile with that key.
     /// @return an iterator pointing to the matching mTable entry.
     MapIter findOrAddCoord(const Coord& xyz);
+
+    template<typename NodeT>
+    NodeT* doStealNode(const Coord&, const ValueType&, bool state);
 
     /// @throw TypeError if the other node's dimensions don't match this node's.
     template<typename OtherChildType>
@@ -1946,6 +1970,41 @@ RootNode<ChildT>::pruneTiles(const ValueType& tolerance)
 ////////////////////////////////////////
 
 
+// Helper method that implements stealNode()
+template<typename ChildT>
+template<typename NodeT>
+inline NodeT*
+RootNode<ChildT>::doStealNode(const Coord& xyz, const ValueType& value, bool state)
+{
+    MapIter iter = this->findCoord(xyz);
+    if (iter == mTable.end() || isTile(iter)) return NULL;
+    return (boost::is_same<NodeT, ChildT>::value)
+        ? reinterpret_cast<NodeT*>(&stealChild(iter, Tile(value, state)))
+        : getChild(iter).template stealNode<NodeT>(xyz, value, state);
+}
+
+
+template<typename ChildT>
+template<typename NodeT>
+inline NodeT*
+RootNode<ChildT>::stealNode(const Coord& xyz, const ValueType& value, bool state)
+{
+    // The following conditional is resolved at compile time, and the ternary operator
+    // and helper method are used to avoid "unreachable code" warnings (with
+    // "if (<cond>) { <A> } else { <B> }", either <A> or <B> is unreachable if <cond>
+    // is a compile-time constant expression).  Partial specialization on NodeT would be
+    // impractical because a method template can't be specialized without also
+    // specializing its class template.
+    return (NodeT::LEVEL > ChildT::LEVEL ||
+        (NodeT::LEVEL == ChildT::LEVEL && !(boost::is_same<NodeT, ChildT>::value)))
+        ? static_cast<NodeT*>(NULL)
+        : this->doStealNode<NodeT>(xyz, value, state);
+}
+
+
+////////////////////////////////////////
+
+
 template<typename ChildT>
 inline void
 RootNode<ChildT>::addLeaf(LeafNodeType* leaf)
@@ -1978,6 +2037,7 @@ RootNode<ChildT>::addLeaf(LeafNodeType* leaf)
     }
     child->addLeaf(leaf);
 }
+
 
 template<typename ChildT>
 template<typename AccessorT>
@@ -2014,74 +2074,82 @@ RootNode<ChildT>::addLeafAndCache(LeafNodeType* leaf, AccessorT& acc)
     child->addLeafAndCache(leaf, acc);
 }
 
+
 template<typename ChildT>
-template<Index TileLevel>
 inline void
-RootNode<ChildT>::addTile(const Coord& xyz, const ValueType& value, bool state)
+RootNode<ChildT>::addTile(Index level, const Coord& xyz,
+                          const ValueType& value, bool state)
 {
-    BOOST_STATIC_ASSERT(LEVEL >= TileLevel && TileLevel > 0);
-    MapIter iter = this->findCoord(xyz);
-    if (iter == mTable.end()) {//background
-        if (LEVEL > TileLevel) {
-            ChildT* child = new ChildT(xyz, mBackground, false);
-            mTable[this->coordToKey(xyz)] = NodeStruct(*child);
-            child->addTile<TileLevel>(xyz, value, state);
-        } else {
-            mTable[this->coordToKey(xyz)] = NodeStruct(Tile(value, state));
-        }
-    } else if (isChild(iter)) {//child
-        if (LEVEL > TileLevel) {
-            getChild(iter).addTile<TileLevel>(xyz, value, state);
-        } else {
-            setTile(iter, Tile(value, state));//this also deletes the existing child node
-        }
-    } else {//tile
-        if (LEVEL > TileLevel) {
-            ChildT* child = new ChildT(xyz, getTile(iter).value, isTileOn(iter));
-            setChild(iter, *child);
-            child->addTile<TileLevel>(xyz, value, state);
-        } else {
-            setTile(iter, Tile(value, state));
+    if (LEVEL >= level && level > 0) {
+        MapIter iter = this->findCoord(xyz);
+        if (iter == mTable.end()) {//background
+            if (LEVEL > level) {
+                ChildT* child = new ChildT(xyz, mBackground, false);
+                mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+                child->addTile(level, xyz, value, state);
+            } else {
+                mTable[this->coordToKey(xyz)] = NodeStruct(Tile(value, state));
+            }
+        } else if (isChild(iter)) {//child
+            if (LEVEL > level) {
+                getChild(iter).addTile(level, xyz, value, state);
+            } else {
+                setTile(iter, Tile(value, state));//this also deletes the existing child node
+            }
+        } else {//tile
+            if (LEVEL > level) {
+                ChildT* child = new ChildT(xyz, getTile(iter).value, isTileOn(iter));
+                setChild(iter, *child);
+                child->addTile(level, xyz, value, state);
+            } else {
+                setTile(iter, Tile(value, state));
+            }
         }
     }
 }
 
+
 template<typename ChildT>
-template<Index TileLevel, typename AccessorT>
+template<typename AccessorT>
 inline void
-RootNode<ChildT>::addTileAndCache(const Coord& xyz, const ValueType& value,
+RootNode<ChildT>::addTileAndCache(Index level, const Coord& xyz, const ValueType& value,
                                   bool state, AccessorT& acc)
 {
-    BOOST_STATIC_ASSERT(LEVEL >= TileLevel && TileLevel > 0);
-    MapIter iter = this->findCoord(xyz);
-    if (iter == mTable.end()) {//background
-        if (LEVEL > TileLevel) {
-            ChildT* child = new ChildT(xyz, mBackground, false);
-            acc.insert(xyz, child);
-            mTable[this->coordToKey(xyz)] = NodeStruct(*child);
-            child->addTileAndCache<TileLevel>(xyz, value, state, acc);
-        } else {
-            mTable[this->coordToKey(xyz)] = NodeStruct(Tile(value, state));
-        }
-    } else if (isChild(iter)) {//child
-        if (LEVEL > TileLevel) {
-            ChildT* child = &getChild(iter);
-            acc.insert(xyz, child);
-            child->addTileAndCache<TileLevel>(xyz, value, state, acc);
-        } else {
-            setTile(iter, Tile(value, state));//this also deletes the existing child node
-        }
-    } else {//tile
-        if (LEVEL > TileLevel) {
-            ChildT* child = new ChildT(xyz, getTile(iter).value, isTileOn(iter));
-            acc.insert(xyz, child);
-            setChild(iter, *child);
-            child->addTileAndCache<TileLevel>(xyz, value, state, acc);
-        } else {
-            setTile(iter, Tile(value, state));
+    if (LEVEL >= level && level > 0) {
+        MapIter iter = this->findCoord(xyz);
+        if (iter == mTable.end()) {//background
+            if (LEVEL > level) {
+                ChildT* child = new ChildT(xyz, mBackground, false);
+                acc.insert(xyz, child);
+                mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+                child->addTileAndCache(level, xyz, value, state, acc);
+            } else {
+                mTable[this->coordToKey(xyz)] = NodeStruct(Tile(value, state));
+            }
+        } else if (isChild(iter)) {//child
+            if (LEVEL > level) {
+                ChildT* child = &getChild(iter);
+                acc.insert(xyz, child);
+                child->addTileAndCache(level, xyz, value, state, acc);
+            } else {
+                setTile(iter, Tile(value, state));//this also deletes the existing child node
+            }
+        } else {//tile
+            if (LEVEL > level) {
+                ChildT* child = new ChildT(xyz, getTile(iter).value, isTileOn(iter));
+                acc.insert(xyz, child);
+                setChild(iter, *child);
+                child->addTileAndCache(level, xyz, value, state, acc);
+            } else {
+                setTile(iter, Tile(value, state));
+            }
         }
     }
 }
+
+
+////////////////////////////////////////
+
 
 template<typename ChildT>
 inline typename ChildT::LeafNodeType*
@@ -2100,6 +2168,7 @@ RootNode<ChildT>::touchLeaf(const Coord& xyz)
     }
     return child->touchLeaf(xyz);
 }
+
 
 template<typename ChildT>
 template<typename AccessorT>
@@ -2134,17 +2203,6 @@ RootNode<ChildT>::probeLeaf(const Coord& xyz)
     return getChild(iter).probeLeaf(xyz);
 }
 
-
-template<typename ChildT>
-inline const typename ChildT::LeafNodeType*
-RootNode<ChildT>::probeConstLeaf(const Coord& xyz) const
-{
-    MapCIter iter = this->findCoord(xyz);
-    if (iter == mTable.end() || isTile(iter)) return NULL;
-    return getChild(iter).probeConstLeaf(xyz);
-}
-
-
 template<typename ChildT>
 template<typename AccessorT>
 inline typename ChildT::LeafNodeType*
@@ -2157,6 +2215,14 @@ RootNode<ChildT>::probeLeafAndCache(const Coord& xyz, AccessorT& acc)
     return child->probeLeafAndCache(xyz, acc);
 }
 
+template<typename ChildT>
+inline const typename ChildT::LeafNodeType*
+RootNode<ChildT>::probeConstLeaf(const Coord& xyz) const
+{
+    MapCIter iter = this->findCoord(xyz);
+    if (iter == mTable.end() || isTile(iter)) return NULL;
+    return getChild(iter).probeConstLeaf(xyz);
+}
 
 template<typename ChildT>
 template<typename AccessorT>

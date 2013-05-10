@@ -1,26 +1,39 @@
 OpenVDB Version History
 =======================
 
-Version 1.1.1 - In development
+Version 1.1.1 - May 10 2013
     - Added a simple dense grid class and tools to copy data from
       dense voxel arrays into OpenVDB grids and vice-versa.
+    - Starting with Houdini 12.5.396, plugins built with this version
+      of OpenVDB can coexist with native Houdini OpenVDB nodes.
     - The level set fracture tool now smooths seam line edges during
       mesh extraction, eliminating staircase artifacts.
-    - Houdini plugins built with a version of OpenVDB newer than the one
-      that ships with Houdini 12.5 can now coexist with native Houdini
-      OpenVDB nodes.
     - Significantly improved the performance of the
       util::leafTopologyIntersection() and util::leafTopologyDifference()
       utilities and added a LeafNode::topologyDifference() method.
     - Added convenience functions that provide simplified interfaces
       to the mesh to volume and volume to mesh converters.
+    - Added a tools::accumulate() function that is similar to tools::foreach()
+      but can be used to accumulate the results of computations over
+      the values of a grid.
+    - Added tools::statistics(), tools::opStatistics() and tools::histogram(),
+      which efficiently compute statistics (mean, variance, etc.) and
+      histograms of grid values (using math::Stats and math::Histogram).
     - Modified CoordBBox to adhere to TBB's splittable type requirements,
       so that, for example, a CoordBBox can be used as a blocked
       iteration range.
-    - Added Tree::addTile() and Tree::addLeaf(), for fine control over
-      tree construction.
+    - Added Tree::addTile(), Tree::addLeaf() and Tree::stealNode(), for 
+      fine control over tree construction.
     - Addressed a numerical stability issue when performing Gaussian
       filtering of level set grids.
+    - Changed the return type of CoordBBox::volume() to reduce the risk
+      of overflow.
+    - When the input mesh is self-intersecting, the mesh to volume converter
+      now produces a level set with a monotonic gradient field.
+    - Fixed a threading bug in the mesh to volume converter that caused it
+      to produce different results for the same input.
+    - Fixed a bug in the particle to level set converter that prevented
+      particles with zero velocity from being rasterized in Trail mode.
     - Added an optional input to the Create SOP into which to merge
       newly-created grids.
     - Fixed a bug in the Resample SOP that caused it to produce incorrect
@@ -29,8 +42,8 @@ Version 1.1.1 - In development
       when the optional reference input was connected.
     - Fixed a bug in the Advect Level Set SOP that caused a crash
       when the velocity input was connected but empty.
-    - The Scatter and Sample Point SOPs throw a warning (vs an error) when 
-      processing empty grids. 
+    - The Scatter and Sample Point SOPs now warn instead of erroring
+      when given empty grids. 
     - Fixed a crash in vdb_view when stepping through multiple grids
       after changing render modes.
     - vdb_view can now render fog volumes and vector fields, and it now

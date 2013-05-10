@@ -5,14 +5,13 @@
 
 @htmlonly <a name="v1_1_1_changes"></a>@endhtmlonly
 @par
-<B>Version 1.1.1</B> - <I>In development</I>
+<B>Version 1.1.1</B> - <I>May 10 2013</I>
 - Added a simple @vdblink::tools::Dense dense grid class@endlink and tools
   to copy data from dense voxel arrays into OpenVDB grids and vice-versa.
+- Starting with Houdini 12.5.396, plugins built with this version
+  of OpenVDB can coexist with native Houdini OpenVDB nodes.
 - The level set fracture tool now smooths seam line edges during
   mesh extraction, eliminating staircase artifacts.
-- Houdini plugins built with a version of OpenVDB newer than the one
-  that ships with Houdini 12.5 can now coexist with native Houdini
-  OpenVDB nodes.
 - Significantly improved the performance of the
   @vdblink::util::leafTopologyIntersection()
   leafTopologyIntersection@endlink and
@@ -22,14 +21,33 @@
 - Added convenience functions that provide simplified interfaces
   to the @vdblink::tools::meshToLevelSet() mesh to volume@endlink
   and @vdblink::tools::volumeToMesh() volume to mesh@endlink converters.
+- Added a @vdblink::tools::accumulate() tools::accumulate@endlink function
+  that is similar to @vdblink::tools::foreach() tools::foreach@endlink
+  but can be used to accumulate the results of computations over the values
+  of a grid.
+- Added @vdblink::tools::statistics() tools::statistics@endlink,
+  @vdblink::tools::opStatistics() tools::opStatistics@endlink and 
+  @vdblink::tools::histogram() tools::histogram@endlink, which efficiently
+  compute statistics (mean, variance, etc.) and histograms of grid values
+  (using @vdblink::math::Stats math::Stats@endlink and
+  @vdblink::math::Histogram math::Histogram@endlink).
 - Modified @vdblink::math::CoordBBox CoordBBox@endlink to adhere to
   TBB&rsquo;s splittable type requirements, so that, for example,
   a @c CoordBBox can be used as a blocked iteration range.
-- Added @vdblink::tree::Tree::addTile() Tree::addTile@endlink and
-  @vdblink::tree::Tree::addLeaf() Tree::addLeaf@endlink, for fine control
-  over tree construction.
+- Added @vdblink::tree::Tree::addTile() Tree::addTile@endlink,
+  @vdblink::tree::Tree::addLeaf() Tree::addLeaf@endlink and 
+  @vdblink::tree::Tree::stealNode() Tree::stealNode@endlink, for fine 
+  control over tree construction.
 - Addressed a numerical stability issue when performing Gaussian
   filtering of level set grids.
+- Changed the return type of @vdblink::math::CoordBBox::volume()
+  CoordBBox::volume@endlink to reduce the risk of overflow.
+- When the input mesh is self-intersecting, the mesh to volume converter
+  now produces a level set with a monotonic gradient field.
+- Fixed a threading bug in the mesh to volume converter that caused it
+  to produce different results for the same input.
+- Fixed a bug in the particle to level set converter that prevented
+  particles with zero velocity from being rasterized in Trail mode.
 - Added an optional input to the Create SOP into which to merge
   newly-created grids.
 - Fixed a bug in the Resample SOP that caused it to produce incorrect
@@ -38,8 +56,8 @@
   when the optional reference input was connected.
 - Fixed a bug in the Advect Level Set SOP that caused a crash
   when the velocity input was connected but empty.
-- The Scatter and Sample Point SOPs new throw a warning (vs an error) 
-  when processing empty grids.
+- The Scatter and Sample Point SOPs now warn instead of erroring
+  when given empty grids. 
 - Fixed a crash in @c vdb_view when stepping through multiple grids
   after changing render modes.
 - @c vdb_view can now render fog volumes and vector fields, and it now
@@ -88,8 +106,8 @@
   and methods to @vdblink::math::Transform::preMult(const Mat4d&) pre-@endlink
   and @vdblink::math::Transform::postMult(const Mat4d&) postmultiply@endlink
   by a matrix.
-- Modified the @link NodeMasks.h node mask@endlink classes to permit 
-  octree-like tree configurations (i.e., with a branching factor of two) 
+- Modified the @link NodeMasks.h node mask@endlink classes to permit
+  octree-like tree configurations (i.e., with a branching factor of two)
   and to use 64-bit operations instead of 32-bit operations.
 - Implemented a new, more efficient
   @vdblink::math::closestPointOnTriangleToPoint() closest point
