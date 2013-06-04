@@ -48,6 +48,7 @@ public:
 
     void writeGrid(openvdb::GridBase::Ptr grid, std::string fileName) const
     {
+        std::cout << "\nWriting \""<<fileName<<"\" to file\n";
         grid->setName("TestParticlesToLevelSet");
         openvdb::GridPtrVec grids;
         grids.push_back(grid);
@@ -100,9 +101,12 @@ public:
     openvdb::CoordBBox getBBox(const openvdb::GridBase& grid) {
         openvdb::CoordBBox bbox;
         openvdb::Coord &min= bbox.min(), &max = bbox.max();
-        for (int n=0, e=this->size(); n<e; ++n) {
-            const openvdb::Vec3d xyz = grid.worldToIndex(this->pos(n));
-            const openvdb::Real   r  = this->radius(n) / grid.voxelSize()[0];
+        openvdb::Vec3R pos;
+        openvdb::Real rad, invDx = 1/grid.voxelSize()[0];
+        for (size_t n=0, e=this->size(); n<e; ++n) {
+            this->getPosRad(n, pos, rad);
+            const openvdb::Vec3d xyz = grid.worldToIndex(pos);
+            const openvdb::Real   r  = rad * invDx;
             for (int i=0; i<3; ++i) {
                 min[i] = openvdb::math::Min(min[i], openvdb::math::Floor(xyz[i] - r));
                 max[i] = openvdb::math::Max(max[i], openvdb::math::Ceil( xyz[i] + r));
@@ -110,14 +114,38 @@ public:
         }
         return bbox;
     }
+    //typedef int AttributeType;
+    // The methods below are only required for the unit-tests
+    openvdb::Vec3R pos(int n)   const {return mParticleList[n].p;}
+    openvdb::Vec3R vel(int n)   const {return mVelocityScale*mParticleList[n].v;}
+    openvdb::Real radius(int n) const {return mRadiusScale*mParticleList[n].r;}
+
+    //////////////////////////////////////////////////////////////////////////////
     /// The methods below are the only ones required by tools::ParticleToLevelSet
     /// @note We return by value since the radius and velocities are modified
     /// by the scaling factors! Also these methods are all assumed to
     /// be thread-safe.
-    int size() const { return mParticleList.size(); }
-    openvdb::Vec3R pos(int n)   const {return mParticleList[n].p;}
-    openvdb::Vec3R vel(int n)   const {return mVelocityScale*mParticleList[n].v;}
-    openvdb::Real radius(int n) const {return mRadiusScale*mParticleList[n].r;}
+
+    /// Return the total number of particles in list.
+    ///  Always required!
+    size_t size() const { return mParticleList.size(); }
+
+    /// Get the world space position of n'th particle.
+    /// Required by ParticledToLevelSet::rasterizeSphere(*this,radius).
+    void getPos(size_t n,  openvdb::Vec3R&pos) const { pos = mParticleList[n].p; }
+
+    
+    void getPosRad(size_t n,  openvdb::Vec3R& pos, openvdb::Real& rad) const {
+        pos = mParticleList[n].p;
+        rad = mRadiusScale*mParticleList[n].r;
+    }
+    void getPosRadVel(size_t n,  openvdb::Vec3R& pos, openvdb::Real& rad, openvdb::Vec3R& vel) const {
+        pos = mParticleList[n].p;
+        rad = mRadiusScale*mParticleList[n].r;
+        vel = mVelocityScale*mParticleList[n].v;
+    }
+    // The method below is only required for attribute transfer
+    void getAtt(size_t n, openvdb::Index32& att) const { att = n; }
 };
 
 
@@ -125,9 +153,9 @@ void
 TestParticlesToLevelSet::testMyParticleList()
 {
     MyParticleList pa;
-    CPPUNIT_ASSERT_EQUAL(0, pa.size());
+    CPPUNIT_ASSERT_EQUAL(0, int(pa.size()));
     pa.add(openvdb::Vec3R(10,10,10), 2, openvdb::Vec3R(1,0,0));
-    CPPUNIT_ASSERT_EQUAL(1, pa.size());
+    CPPUNIT_ASSERT_EQUAL(1, int(pa.size()));
     ASSERT_DOUBLES_EXACTLY_EQUAL(10, pa.pos(0)[0]);
     ASSERT_DOUBLES_EXACTLY_EQUAL(10, pa.pos(0)[1]);
     ASSERT_DOUBLES_EXACTLY_EQUAL(10, pa.pos(0)[2]);
@@ -136,7 +164,7 @@ TestParticlesToLevelSet::testMyParticleList()
     ASSERT_DOUBLES_EXACTLY_EQUAL(0 , pa.vel(0)[2]);
     ASSERT_DOUBLES_EXACTLY_EQUAL(2 , pa.radius(0));
     pa.add(openvdb::Vec3R(20,20,20), 3);
-    CPPUNIT_ASSERT_EQUAL(2, pa.size());
+    CPPUNIT_ASSERT_EQUAL(2, int(pa.size()));
     ASSERT_DOUBLES_EXACTLY_EQUAL(20, pa.pos(1)[0]);
     ASSERT_DOUBLES_EXACTLY_EQUAL(20, pa.pos(1)[1]);
     ASSERT_DOUBLES_EXACTLY_EQUAL(20, pa.pos(1)[2]);
@@ -160,9 +188,6 @@ TestParticlesToLevelSet::testMyParticleList()
 void
 TestParticlesToLevelSet::testRasterizeSpheres()
 {
-    const float voxelSize = 1.0f, halfWidth = 2.0f;
-    openvdb::FloatGrid::Ptr ls = openvdb::createLevelSet<openvdb::FloatGrid>(voxelSize, halfWidth);
-
     MyParticleList pa;
     pa.add(openvdb::Vec3R(10,10,10), 2);
     pa.add(openvdb::Vec3R(20,20,20), 2);
@@ -178,11 +203,16 @@ TestParticlesToLevelSet::testRasterizeSpheres()
     pa.add(openvdb::Vec3R(35.0,31,31), 5);
     pa.add(openvdb::Vec3R(35.5,31,31), 5);
     pa.add(openvdb::Vec3R(36.0,31,31), 5);
-    CPPUNIT_ASSERT_EQUAL(13, pa.size());
-    
-    openvdb::tools::ParticlesToLevelSet<openvdb::FloatGrid, MyParticleList> raster(*ls);
+    CPPUNIT_ASSERT_EQUAL(13, int(pa.size()));
+
+    const float voxelSize = 1.0f, halfWidth = 2.0f;
+    openvdb::FloatGrid::Ptr ls = openvdb::createLevelSet<openvdb::FloatGrid>(voxelSize, halfWidth);
+    openvdb::tools::ParticlesToLevelSet<openvdb::FloatGrid> raster(*ls);
+
     raster.setGrainSize(1);//a value of zero disables threading
     raster.rasterizeSpheres(pa);
+    raster.finalize();
+    //openvdb::FloatGrid::Ptr ls = raster.getSdfGrid();
 
     //ls->tree().print(std::cout,4);
     //this->writeGrid(ls, "testRasterizeSpheres");
@@ -249,9 +279,6 @@ TestParticlesToLevelSet::testRasterizeSpheres()
 void
 TestParticlesToLevelSet::testRasterizeSpheresAndId()
 {
-    const float voxelSize = 1.0f, halfWidth = 2.0f;
-    openvdb::FloatGrid::Ptr ls = openvdb::createLevelSet<openvdb::FloatGrid>(voxelSize, halfWidth);
-
     MyParticleList pa(0.5f);
     pa.add(openvdb::Vec3R(10,10,10), 4);
     pa.add(openvdb::Vec3R(20,20,20), 4);
@@ -267,16 +294,20 @@ TestParticlesToLevelSet::testRasterizeSpheresAndId()
     pa.add(openvdb::Vec3R(35.0,31,31),10);
     pa.add(openvdb::Vec3R(35.5,31,31),10);
     pa.add(openvdb::Vec3R(36.0,31,31),10);
-    CPPUNIT_ASSERT_EQUAL(13, pa.size());
+    CPPUNIT_ASSERT_EQUAL(13, int(pa.size()));
+
+    typedef openvdb::tools::ParticlesToLevelSet<openvdb::FloatGrid, openvdb::Index32> RasterT;
+    const float voxelSize = 1.0f, halfWidth = 2.0f;
+    openvdb::FloatGrid::Ptr ls = openvdb::createLevelSet<openvdb::FloatGrid>(voxelSize, halfWidth);
     
-    typedef openvdb::tools::ParticlesToLevelSetAndId<openvdb::FloatGrid, MyParticleList> RasterT;
     RasterT raster(*ls);
     raster.setGrainSize(1);//a value of zero disables threading
     raster.rasterizeSpheres(pa);
-    const RasterT::IndxGridT::Ptr id = raster.rasterizeSpheres(pa);
+    raster.finalize();
+    const RasterT::AttGridType::Ptr id = raster.attributeGrid();
 
     int minVal = std::numeric_limits<int>::max(), maxVal = -minVal;
-    for (RasterT::IndxGridT::ValueOnCIter i=id->cbeginValueOn(); i; ++i) {
+    for (RasterT::AttGridType::ValueOnCIter i=id->cbeginValueOn(); i; ++i) {
         minVal = openvdb::math::Min(minVal, int(*i));
         maxVal = openvdb::math::Max(maxVal, int(*i));
     }
@@ -328,18 +359,18 @@ TestParticlesToLevelSet::testRasterizeSpheresAndId()
                             k = openvdb::Index32(i);
                             dist = d;
                         }
-                    }
+                    }//loop over particles
                     const float val = ls->tree().getValue(ijk);
                     openvdb::Index32 m = id->tree().getValue(ijk);
                     if (dist >= outside) {
                         CPPUNIT_ASSERT_DOUBLES_EQUAL(outside, val, 0.0001);
                         CPPUNIT_ASSERT(ls->tree().isValueOff(ijk));
-                        CPPUNIT_ASSERT_EQUAL(openvdb::util::INVALID_IDX, m);
+                        //CPPUNIT_ASSERT_EQUAL(openvdb::util::INVALID_IDX, m);
                         CPPUNIT_ASSERT(id->tree().isValueOff(ijk));
                     } else if( dist <= inside ) {
                         CPPUNIT_ASSERT_DOUBLES_EQUAL(inside, val, 0.0001);
                         CPPUNIT_ASSERT(ls->tree().isValueOff(ijk));
-                        CPPUNIT_ASSERT_EQUAL(openvdb::util::INVALID_IDX, m);
+                        //CPPUNIT_ASSERT_EQUAL(openvdb::util::INVALID_IDX, m);
                         CPPUNIT_ASSERT(id->tree().isValueOff(ijk));
                     } else {
                         CPPUNIT_ASSERT_DOUBLES_EQUAL(  dist, val, 0.0001);
@@ -376,7 +407,7 @@ TestParticlesToLevelSet::testRasterizeTrails()
     pa.add(openvdb::Vec3R(  0,  0,  0), 6, openvdb::Vec3R( 0, 0,-5));
     pa.add(openvdb::Vec3R( 20,  0,  0), 2, openvdb::Vec3R( 0, 0, 0));
     
-    openvdb::tools::ParticlesToLevelSet<openvdb::FloatGrid, MyParticleList> raster(*ls);
+    openvdb::tools::ParticlesToLevelSet<openvdb::FloatGrid> raster(*ls);
     raster.rasterizeTrails(pa, 0.75);//scale offset between two instances
 
     //ls->tree().print(std::cout, 4);
@@ -387,9 +418,6 @@ TestParticlesToLevelSet::testRasterizeTrails()
 void
 TestParticlesToLevelSet::testRasterizeTrailsAndId()
 {
-    const float voxelSize = 1.0f, halfWidth = 2.0f;
-    openvdb::FloatGrid::Ptr ls = openvdb::createLevelSet<openvdb::FloatGrid>(voxelSize, halfWidth);
-
     MyParticleList pa(1,5);
 
     // This particle radius = 1 < 1.5 i.e. it's below the Nyquist frequency and hence ignored
@@ -397,15 +425,20 @@ TestParticlesToLevelSet::testRasterizeTrailsAndId()
     pa.add(openvdb::Vec3R(-10,-10,-10), 2, openvdb::Vec3R( 2, 0, 0));
     pa.add(openvdb::Vec3R( 10, 10, 10), 3, openvdb::Vec3R( 0, 1, 0));
     pa.add(openvdb::Vec3R(  0,  0,  0), 6, openvdb::Vec3R( 0, 0,-5));
-    
-    typedef openvdb::tools::ParticlesToLevelSetAndId<openvdb::FloatGrid, MyParticleList> RasterT;
+
+    typedef openvdb::tools::ParticlesToLevelSet<openvdb::FloatGrid, openvdb::Index> RasterT;
+    const float voxelSize = 1.0f, halfWidth = 2.0f;
+    openvdb::FloatGrid::Ptr ls = openvdb::createLevelSet<openvdb::FloatGrid>(voxelSize, halfWidth);
     RasterT raster(*ls);
-
-    const RasterT::IndxGridT::Ptr id =
-        raster.rasterizeTrails(pa, 0.75);//scale offset between two instances
-
+    raster.rasterizeTrails(pa, 0.75);//scale offset between two instances
+    raster.finalize();
+    const RasterT::AttGridType::Ptr id = raster.attributeGrid();
+    CPPUNIT_ASSERT(!ls->empty());
+    CPPUNIT_ASSERT(!id->empty());
+    CPPUNIT_ASSERT_EQUAL(ls->activeVoxelCount(),id->activeVoxelCount());
+    
     int min = std::numeric_limits<int>::max(), max = -min;
-    for (RasterT::IndxGridT::ValueOnCIter i=id->cbeginValueOn(); i; ++i) {
+    for (RasterT::AttGridType::ValueOnCIter i=id->cbeginValueOn(); i; ++i) {
         min = openvdb::math::Min(min, int(*i));
         max = openvdb::math::Max(max, int(*i));
     }

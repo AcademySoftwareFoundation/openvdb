@@ -36,7 +36,10 @@
 #define OPENVDB_HOUDINI_GEOMETRY_UTIL_HAS_BEEN_INCLUDED
 
 #include <openvdb/Types.h>
+#include <openvdb/tools/VolumeToMesh.h>
+#include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/util/Util.h>
+
 #include <GA/GA_SplittableRange.h>
 #include <GU/GU_Detail.h>
 #include <boost/shared_ptr.hpp>
@@ -45,10 +48,22 @@
 
 namespace openvdb_houdini {
 
-/// Add geometry to the given detail to indicate the extents of a frustum transform.
+
+/// @brief  Add geometry to the given detail to indicate the extents
+///         of a frustum transform.
 OPENVDB_HOUDINI_API
 void drawFrustum(GU_Detail&, const openvdb::math::Transform&,
     const UT_Vector3* boxColor, const UT_Vector3* tickColor, bool shaded);
+
+
+////////////////////////////////////////
+
+
+/// @brief  Utility method to check if a point is referenced by primitives
+///         from a certain primitive group.
+OPENVDB_HOUDINI_API
+bool pointInPrimGroup(
+    GA_Offset ptnOffset, GU_Detail& geo, const GA_PrimitiveGroup& group);
 
 
 ////////////////////////////////////////
@@ -66,7 +81,8 @@ validateGeometry(const GU_Detail& geometry, std::string& warning, Interrupter*);
 ////////////////////////////////////////
 
 
-/// Threaded transform and copy of points.
+/// @brief  TBB body object for threaded world to voxel space
+///         transformation and copy of points.
 class OPENVDB_HOUDINI_API TransformOp
 {
 public:
@@ -86,7 +102,8 @@ private:
 ////////////////////////////////////////
 
 
-/// Threaded primitive copy (converts to custom representation)
+/// @brief  TBB body object for threaded primitive copy.
+/// @note   Produces a primitive-vertex index list.
 class OPENVDB_HOUDINI_API PrimCpyOp
 {
 public:
@@ -102,6 +119,9 @@ private:
 ////////////////////////////////////////
 
 
+/// @brief  TBB body object for threaded vertex normal generation.
+/// @note   Averages face normals from all similarly oriented primitives,
+///         that share the same vertex-point, to maintain sharp features.
 class OPENVDB_HOUDINI_API VertexNormalOp
 {
 public:
@@ -119,7 +139,34 @@ private:
     }
 };
 
+
+////////////////////////////////////////
+
+
+/// @brief  TBB body object for threaded sharp feature construction.
+class OPENVDB_HOUDINI_API SharpenFeaturesOp
+{
+public:
+    typedef openvdb::tools::MeshToVoxelEdgeData EdgeData;
+
+    SharpenFeaturesOp(GU_Detail& meshGeo, const GU_Detail& refGeo, EdgeData& edgeData,
+        const openvdb::math::Transform& xform, const GA_PrimitiveGroup *surfacePrims = NULL);
+
+    void operator()(const GA_SplittableRange&) const;
+
+private:
+    GU_Detail& mMeshGeo;
+    const GU_Detail& mRefGeo;
+    EdgeData& mEdgeData;
+    const openvdb::math::Transform& mXForm;
+    const GA_PrimitiveGroup *mSurfacePrims;
+};
+
+
 } // namespace openvdb_houdini
+
+
+////////////////////////////////////////
 
 
 #if (UT_VERSION_INT < 0x0c0500F5) // Prior to 12.5.245
@@ -182,9 +229,12 @@ using GU_Convert_H12_5::GUconvertCopySingleVertexPrimAttribsAndGroups;
 
 #endif // Prior to 12.5.245
 
+
 ////////////////////////////////////////
 
+
 #endif // OPENVDB_HOUDINI_GEOMETRY_UTIL_HAS_BEEN_INCLUDED
+
 
 // Copyright (c) 2012-2013 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

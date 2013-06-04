@@ -32,7 +32,8 @@
 #include <openvdb/util/logging.h>
 #include <math.h>
 
-////////////////////////////////////////
+
+namespace openvdb_viewer {
 
 // BufferObject
 
@@ -595,6 +596,8 @@ MeshModule::render()
 
     mShader.stopShading();
 }
+
+} // namespace openvdb_viewer
 
 // Copyright (c) 2012-2013 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

@@ -335,28 +335,41 @@ UNITTEST_SRC_NAMES := \
     unittest/TestVolumeToMesh.cc \
 #
 
-DOC_FILES := doc/doc.txt doc/faq.txt doc/changes.txt doc/examplecode.txt doc/api_0_98_0.txt doc/math.txt
+DOC_FILES := doc/doc.txt doc/faq.txt doc/changes.txt doc/codingstyle.txt doc/examplecode.txt doc/api_0_98_0.txt doc/math.txt
 DOC_INDEX := doc/html/index.html
 DOC_PDF := doc/latex/refman.pdf
 
-VIEWER_INCLUDE_NAMES := \
-    cmd/openvdb_view/RenderModules.h \
-    cmd/openvdb_view/Viewer.h \
+LIBVIEWER_INCLUDE_NAMES := \
+    viewer/Camera.h \
+    viewer/ClipBox.h \
+    viewer/Font.h \
+    viewer/RenderModules.h \
+    viewer/Viewer.h \
 #
+# Used for "install" target only
+LIBVIEWER_PUBLIC_INCLUDE_NAMES := \
+    viewer/Viewer.h \
+#
+LIBVIEWER_SRC_NAMES := \
+    viewer/Camera.cc \
+    viewer/ClipBox.cc \
+    viewer/Font.cc \
+    viewer/RenderModules.cc \
+    viewer/Viewer.cc \
+#
+ifdef MBSD
+	LIBVIEWER_FLAGS := -framework Cocoa -framework OpenGL -framework IOKit
+else
+	LIBVIEWER_FLAGS := -lGL -lGLU
+endif
 
-VIEWER_SRC_NAMES := \
-    cmd/openvdb_view/main.cc \
-    cmd/openvdb_view/RenderModules.cc \
-    cmd/openvdb_view/Viewer.cc \
-#
 
 CMD_INCLUDE_NAMES := \
-    $(VIEWER_INCLUDE_NAMES) \
 #
 
 CMD_SRC_NAMES := \
     cmd/openvdb_print/main.cc \
-    $(VIEWER_SRC_NAMES) \
+    cmd/openvdb_view/main.cc \
 #
 
 HEADER_SUBDIRS := $(dir $(INCLUDE_NAMES))
@@ -365,17 +378,19 @@ ALL_INCLUDE_FILES := \
     $(INCLUDE_NAMES) \
     $(UNITTEST_INCLUDE_NAMES) \
     $(CMD_INCLUDE_NAMES) \
+    $(LIBVIEWER_INCLUDE_NAMES) \
 #
 SRC_FILES := \
     $(SRC_NAMES) \
     $(UNITTEST_SRC_NAMES) \
     $(CMD_SRC_NAMES) \
+    $(LIBVIEWER_SRC_NAMES) \
 #
 ALL_SRC_FILES := $(SRC_FILES)
 
 OBJ_NAMES := $(SRC_NAMES:.cc=.o)
 UNITTEST_OBJ_NAMES := $(UNITTEST_SRC_NAMES:.cc=.o)
-VIEWER_OBJ_NAMES := $(VIEWER_SRC_NAMES:.cc=.o)
+LIBVIEWER_OBJ_NAMES := $(LIBVIEWER_SRC_NAMES:.cc=.o)
 
 LIB_MAJOR_VERSION=$(shell grep 'OPENVDB_LIBRARY_MAJOR_VERSION = ' \
     version.h | sed 's/[^0-9]*//g')
@@ -390,10 +405,16 @@ LIBOPENVDB_NAME=libopenvdb
 LIBOPENVDB_STATIC := $(LIBOPENVDB_NAME).a
 LIBOPENVDB_SHARED := $(LIBOPENVDB_NAME).so.$(LIB_VERSION)
 
+LIBVIEWER_NAME=libopenvdb_viewer
+LIBVIEWER_STATIC := $(LIBVIEWER_NAME).a
+LIBVIEWER_SHARED := $(LIBVIEWER_NAME).so.$(LIB_VERSION)
+
 ifeq (no,$(strip $(shared)))
     LIBOPENVDB := $(LIBOPENVDB_STATIC)
+    LIBVIEWER := $(LIBVIEWER_STATIC)
 else
     LIBOPENVDB := $(LIBOPENVDB_SHARED)
+    LIBVIEWER := $(LIBVIEWER_SHARED)
 
     # For debugging, pass "rpath=yes" to encode the path to libopenvdb.so
     # into commands.  With "rpath=no" (the default setting), the directory
@@ -423,7 +444,7 @@ ALL_TARGETS := \
 
 .SUFFIXES: .o .cc
 
-.PHONY: all clean depend doc install lib pdfdoc test
+.PHONY: all clean depend doc install lib pdfdoc test viewerlib
 
 .cc.o:
 	@echo "Building $@ because of $(call list_deps)"
@@ -485,31 +506,27 @@ vdb_print: $(LIBOPENVDB) cmd/openvdb_print/main.cc
 	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
 	    $(LIBOPENVDB_RPATH) -L$(PWD) $(LIBOPENVDB)
 
-$(VIEWER_OBJ_NAMES): $(VIEWER_INCLUDE_NAMES)
-$(VIEWER_OBJ_NAMES): %.o: %.cc
+ifneq (3,$(words $(strip $(GLFW_LIB_DIR) $(GLFW_INCL_DIR) $(GLFW_LIB))))
+vdb_view:
+	@echo "$@"': GLFW is unavailable'
+else
+# Create an openvdb_viewer/ symlink to the viewer/ subdirectory,
+# to mirror the DWA directory structure.
+openvdb_viewer:
+	ln -f -s viewer openvdb_viewer
+$(LIBVIEWER_INCLUDE_NAMES): openvdb_viewer
+
+$(LIBVIEWER_OBJ_NAMES): $(LIBVIEWER_INCLUDE_NAMES)
+$(LIBVIEWER_OBJ_NAMES): %.o: %.cc
 	@echo "Building $@ because of $(call list_deps)"
 	$(CXX) -c $(CXXFLAGS) -I . -I $(GLFW_INCL_DIR) -DGL_GLEXT_PROTOTYPES=1 -fPIC -o $@ $<
 
-ifneq (3,$(words $(strip $(GLFW_LIB_DIR) $(GLFW_INCL_DIR) $(GLFW_LIB))))
-vdb_view:
-	@echo "$@"': $$GLFW_INCL_DIR is undefined'
-else
-ifdef MBSD
-vdb_view: $(LIBOPENVDB) $(VIEWER_OBJ_NAMES)
+vdb_view: $(LIBOPENVDB) $(LIBVIEWER_OBJ_NAMES) cmd/openvdb_view/main.cc
 	@echo "Building $@ because of $(call list_deps)"
-	$(CXX) $(CXXFLAGS) -o $@ $(VIEWER_OBJ_NAMES) -I . \
-	    -Wl,-rpath,$(GLFW_LIB_DIR) -L$(GLFW_LIB_DIR) $(GLFW_LIB) \
-	    -framework Cocoa -framework OpenGL -framework IOKit \
-	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
+	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_view/main.cc $(LIBVIEWER_OBJ_NAMES) \
+		-I . -Wl,-rpath,$(GLFW_LIB_DIR) -L$(GLFW_LIB_DIR) $(GLFW_LIB) \
+		$(LIBVIEWER_FLAGS) $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
 	    $(LIBOPENVDB_RPATH) -L$(PWD) $(LIBOPENVDB)
-else
-vdb_view: $(LIBOPENVDB) $(VIEWER_OBJ_NAMES)
-	@echo "Building $@ because of $(call list_deps)"
-	$(CXX) $(CXXFLAGS) -o $@ $(VIEWER_OBJ_NAMES) -I . \
-	    -Wl,-rpath,$(GLFW_LIB_DIR) -L$(GLFW_LIB_DIR) $(GLFW_LIB) -lGL -lGLU \
-	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
-	    $(LIBOPENVDB_RPATH) -L$(PWD) $(LIBOPENVDB)
-endif
 endif
 
 $(UNITTEST_OBJ_NAMES): %.o: %.cc
@@ -540,6 +557,7 @@ install: lib vdb_print vdb_view doc
 	    mkdir -p $(HEADER_SUBDIRS); popd > /dev/null
 	for f in $(INCLUDE_NAMES); \
 	    do cp -f $$f $(INSTALL_DIR)/include/openvdb/$$f; done
+	@echo "Copied header files to $(INSTALL_DIR)/include"
 	@#
 	mkdir -p $(INSTALL_DIR)/lib
 	@echo "Created $(INSTALL_DIR)/lib/"
@@ -593,7 +611,7 @@ clean:
 	$(RM) $(OBJ_NAMES) $(ALL_TARGETS) $(DEPEND)
 	$(RM) $(LIBOPENVDB_STATIC)
 	$(RM) $(LIBOPENVDB_SHARED)
-	$(RM) $(VIEWER_OBJ_NAMES)
+	$(RM) $(LIBVIEWER_OBJ_NAMES)
 	$(RM) $(UNITTEST_OBJ_NAMES)
 	$(RM) -r ./doc/html ./doc/latex
 

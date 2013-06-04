@@ -120,11 +120,11 @@ private:
     {
         const int n = BaseType::getGrainSize();
         if (n>0) {
-            tbb::parallel_for(BaseType::mLeafs->getRange(n), *this);
+            tbb::parallel_for(BaseType::leafs().getRange(n), *this);
         } else {
-            (*this)(BaseType::mLeafs->getRange());
+            (*this)(BaseType::leafs().getRange());
         }
-        if (swap) BaseType::mLeafs->swapLeafBuffer(1, n==0);
+        if (swap) BaseType::leafs().swapLeafBuffer(1, n==0);
     }
 
     // Prive driver method for mean and gaussian filtering
@@ -150,7 +150,7 @@ LevelSetFilter<GridT, InterruptT>::median(int width)
 {
     BaseType::startInterrupter("Median-value flow of level set");
 
-    BaseType::mLeafs->rebuildAuxBuffers(1, BaseType::getGrainSize()==0);
+    BaseType::leafs().rebuildAuxBuffers(1, BaseType::getGrainSize()==0);
 
     mTask = boost::bind(&LevelSetFilter::doMedian, _1, _2, std::max(1, width));
     this->cook(true);
@@ -187,7 +187,7 @@ template<typename GridT, typename InterruptT>
 inline void
 LevelSetFilter<GridT, InterruptT>::box(int width)
 {
-    BaseType::mLeafs->rebuildAuxBuffers(1, BaseType::getGrainSize()==0);
+    BaseType::leafs().rebuildAuxBuffers(1, BaseType::getGrainSize()==0);
 
     width = std::max(1, width);
 
@@ -210,7 +210,7 @@ LevelSetFilter<GridT, InterruptT>::meanCurvature()
 {
     BaseType::startInterrupter("Mean-curvature flow of level set");
 
-    BaseType::mLeafs->rebuildAuxBuffers(1, BaseType::getGrainSize()==0);
+    BaseType::leafs().rebuildAuxBuffers(1, BaseType::getGrainSize()==0);
 
     mTask = boost::bind(&LevelSetFilter::doMeanCurvature, _1, _2);
     this->cook(true);
@@ -226,7 +226,7 @@ LevelSetFilter<GridT, InterruptT>::laplacian()
 {
     BaseType::startInterrupter("Laplacian flow of level set");
 
-    BaseType::mLeafs->rebuildAuxBuffers(1, BaseType::getGrainSize()==0);
+    BaseType::leafs().rebuildAuxBuffers(1, BaseType::getGrainSize()==0);
 
     mTask = boost::bind(&LevelSetFilter::doLaplacian, _1, _2);
     this->cook(true);
@@ -243,7 +243,7 @@ LevelSetFilter<GridT, InterruptT>::offset(ValueType value)
 {
     BaseType::startInterrupter("Offsetting level set");
 
-    BaseType::mLeafs->removeAuxBuffers();// no auxiliary buffers required
+    BaseType::leafs().removeAuxBuffers();// no auxiliary buffers required
 
     const ValueType CFL = ValueType(0.5) * BaseType::voxelSize(), offset = openvdb::math::Abs(value);
     ValueType dist = 0.0;
@@ -272,10 +272,10 @@ LevelSetFilter<GridT, InterruptT>::doMeanCurvature(const RangeType& range)
     BaseType::checkInterrupter();
     //const float CFL = 0.9f, dt = CFL * mDx * mDx / 6.0f;
     const ValueType dx = BaseType::voxelSize(),dt = math::Pow2(dx) / ValueType(3.0);
-    math::CurvatureStencil<GridType> stencil(BaseType::mGrid, dx);
+    math::CurvatureStencil<GridType> stencil(BaseType::grid(), dx);
     for (size_t n=range.begin(), e=range.end(); n != e; ++n) {
-        BufferType& buffer = BaseType::mLeafs->getBuffer(n,1);
-        for (VoxelIterT iter = BaseType::mLeafs->leaf(n).cbeginValueOn(); iter; ++iter) {
+        BufferType& buffer = BaseType::leafs().getBuffer(n,1);
+        for (VoxelIterT iter = BaseType::leafs().leaf(n).cbeginValueOn(); iter; ++iter) {
             stencil.moveTo(iter);
             buffer.setValue(iter.pos(), stencil.getValue() + dt * stencil.meanCurvatureNormGrad());
         }
@@ -297,10 +297,10 @@ LevelSetFilter<GridT, InterruptT>::doLaplacian(const RangeType& range)
     BaseType::checkInterrupter();
     //const float CFL = 0.9f, half_dt = CFL * mDx * mDx / 12.0f;
     const ValueType dx = BaseType::voxelSize(), dt = math::Pow2(dx) / ValueType(6.0);
-    math::GradStencil<GridType> stencil(BaseType::mGrid, dx);
+    math::GradStencil<GridType> stencil(BaseType::grid(), dx);
     for (size_t n=range.begin(), e=range.end(); n != e; ++n) {
-        BufferType& buffer = BaseType::mLeafs->getBuffer(n,1);
-        for (VoxelIterT iter = BaseType::mLeafs->leaf(n).cbeginValueOn(); iter; ++iter) {
+        BufferType& buffer = BaseType::leafs().getBuffer(n,1);
+        for (VoxelIterT iter = BaseType::leafs().leaf(n).cbeginValueOn(); iter; ++iter) {
             stencil.moveTo(iter);
             buffer.setValue(iter.pos(), stencil.getValue() + dt * stencil.laplacian());
         }
@@ -314,7 +314,7 @@ LevelSetFilter<GridT, InterruptT>::doOffset(const RangeType& range, ValueType va
 {
     BaseType::checkInterrupter();
     for (size_t n=range.begin(), e=range.end(); n != e; ++n)
-        BaseType::mLeafs->leaf(n).addValue(value);
+        BaseType::leafs().leaf(n).addValue(value);
 }
 
 /// Performs simple but slow median-value diffusion
@@ -324,10 +324,10 @@ LevelSetFilter<GridT, InterruptT>::doMedian(const RangeType& range, int width)
 {
     typedef typename LeafType::ValueOnCIter VoxelIterT;
     BaseType::checkInterrupter();
-    typename math::DenseStencil<GridType> stencil(BaseType::mGrid, width);//creates local cache!
+    typename math::DenseStencil<GridType> stencil(BaseType::grid(), width);//creates local cache!
     for (size_t n=range.begin(), e=range.end(); n != e; ++n) {
-        BufferType& buffer = BaseType::mLeafs->getBuffer(n,1);
-        for (VoxelIterT iter=BaseType::mLeafs->leaf(n).cbeginValueOn(); iter; ++iter) {
+        BufferType& buffer = BaseType::leafs().getBuffer(n,1);
+        for (VoxelIterT iter=BaseType::leafs().leaf(n).cbeginValueOn(); iter; ++iter) {
             stencil.moveTo(iter);
             buffer.setValue(iter.pos(), stencil.median());
         }
@@ -341,10 +341,10 @@ LevelSetFilter<GridT, InterruptT>::doBoxX(const RangeType& range, Int32 w)
 {
     this->checkInterrupter();
     const ValueType frac = ValueType(1)/ValueType(2*w+1);
-    typename GridT::ConstAccessor acc = BaseType::mGrid.getConstAccessor();
+    typename GridT::ConstAccessor acc = BaseType::grid().getConstAccessor();
     for (size_t n=range.begin(), nLast = range.end(); n != nLast; ++n) {
-        const LeafType& leaf = BaseType::mLeafs->leaf(n);
-        BufferType& buffer   = BaseType::mLeafs->getBuffer(n, 1);
+        const LeafType& leaf = BaseType::leafs().leaf(n);
+        BufferType& buffer   = BaseType::leafs().getBuffer(n, 1);
         for (typename LeafType::ValueOnCIter iter = leaf.cbeginValueOn(); iter; ++iter) {
             ValueType sum = zeroVal<ValueType>();
             math::Coord xyz = iter.getCoord();
@@ -363,10 +363,10 @@ LevelSetFilter<GridT, InterruptT>::doBoxY(const RangeType& range, Int32 w)
 {
     this->checkInterrupter();
     const ValueType frac = ValueType(1)/ValueType(2*w+1);
-    typename GridT::ConstAccessor acc = BaseType::mGrid.getConstAccessor();
+    typename GridT::ConstAccessor acc = BaseType::grid().getConstAccessor();
     for (size_t n=range.begin(), nLast = range.end(); n != nLast; ++n) {
-        const LeafType& leaf = BaseType::mLeafs->leaf(n);
-        BufferType& buffer   = BaseType::mLeafs->getBuffer(n, 1);
+        const LeafType& leaf = BaseType::leafs().leaf(n);
+        BufferType& buffer   = BaseType::leafs().getBuffer(n, 1);
         for (typename LeafType::ValueOnCIter iter = leaf.cbeginValueOn(); iter; ++iter) {
             ValueType sum = zeroVal<ValueType>();
             math::Coord xyz = iter.getCoord();
@@ -385,10 +385,10 @@ LevelSetFilter<GridT, InterruptT>::doBoxZ(const RangeType& range, Int32 w)
 {
     this->checkInterrupter();
     const ValueType frac = ValueType(1)/ValueType(2*w+1);
-    typename GridT::ConstAccessor acc = BaseType::mGrid.getConstAccessor();
+    typename GridT::ConstAccessor acc = BaseType::grid().getConstAccessor();
     for (size_t n=range.begin(), nLast = range.end(); n != nLast; ++n) {
-        const LeafType& leaf = BaseType::mLeafs->leaf(n);
-        BufferType& buffer   = BaseType::mLeafs->getBuffer(n, 1);
+        const LeafType& leaf = BaseType::leafs().leaf(n);
+        BufferType& buffer   = BaseType::leafs().getBuffer(n, 1);
         for (typename LeafType::ValueOnCIter iter = leaf.cbeginValueOn(); iter; ++iter) {
             ValueType sum = zeroVal<ValueType>();
             math::Coord xyz = iter.getCoord();

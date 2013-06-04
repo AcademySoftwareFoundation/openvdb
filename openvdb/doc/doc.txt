@@ -29,7 +29,10 @@ See the @subpage faq "FAQ" for frequently asked questions about @b OpenVDB.
 
 See the @subpage codeExamples "Cookbook" to get started using @b OpenVDB.
 
-See the @subpage changes "Release Notes" for what's new in this version
+See the @subpage changes "Release Notes" for what's new in this version.
+
+See @subpage codingStyle "Coding Style" for coding standards and practices.
+
 of @b OpenVDB.
 
 

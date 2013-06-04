@@ -46,6 +46,7 @@ public:
     CPPUNIT_TEST(testFrustum);
     CPPUNIT_TEST(testCalcBoundingBox);
     CPPUNIT_TEST(testApproxInverse);
+    CPPUNIT_TEST(testUniformScale);
     CPPUNIT_TEST_SUITE_END();
 
     void testTranslation();
@@ -56,6 +57,7 @@ public:
     void testFrustum();
     void testCalcBoundingBox();
     void testApproxInverse();
+    void testUniformScale();
     //void testIsType();
 };
 
@@ -110,7 +112,30 @@ TestMaps::testApproxInverse()
   
 }
     
+void
+TestMaps::testUniformScale()
+{
+    using namespace openvdb::math;
+
+    AffineMap map;
     
+    CPPUNIT_ASSERT(map.hasUniformScale());
+
+    // Apply uniform scale: should still have square voxels
+    map.accumPreScale(Vec3d(2, 2, 2));
+
+    CPPUNIT_ASSERT(map.hasUniformScale());
+
+    // Apply a rotation, should still have squaure voxels.
+    map.accumPostRotation(X_AXIS, 2.5);
+
+    CPPUNIT_ASSERT(map.hasUniformScale());
+
+    // non uniform scaling will stretch the voxels
+    map.accumPostScale(Vec3d(1, 3, 1) );
+
+    CPPUNIT_ASSERT(!map.hasUniformScale());
+}
 
 void
 TestMaps::testTranslation()

@@ -33,6 +33,7 @@
 #ifndef OPENVDB_MATH_MAPS_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_MAPS_HAS_BEEN_INCLUDED
 
+#include "Math.h"
 #include "Mat4.h"
 #include "Vec3.h"
 #include "BBox.h"
@@ -350,7 +351,16 @@ public:
     bool isLinear() const { return true; }
 
     /// Return @c false ( test if this is unitary with translation )
-    bool hasUniformScale() const { return isUnitary(mMatrix.getMat3());}
+    bool hasUniformScale() const {
+        Mat3d mat = mMatrix.getMat3();
+        const double det = mat.det();
+        if ( isApproxEqual( det, double(0)) ) {
+            return false;
+        } else {
+            mat *= (1.f / pow(std::abs(det),1./3.));
+            return isUnitary(mat);
+        }
+    }
 
     virtual bool isEqual(const MapBase& other) const { return isEqualBase(*this, other); }
 

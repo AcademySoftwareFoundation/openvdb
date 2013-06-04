@@ -856,7 +856,7 @@ inline bool isUnitary(const MatType& m) {
     if (!isApproxEqual(std::abs(m.det()), value_type(1.0))) return false;
     // check that the matrix transpose is the inverse
     MatType temp = m * m.transpose();
-    return temp.eq(MatType::identity(), toleranceValue<value_type>());
+    return temp.eq(MatType::identity());
 }
 
 /// Determine if a matrix is diagonal

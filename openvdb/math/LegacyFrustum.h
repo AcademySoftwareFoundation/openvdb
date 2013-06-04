@@ -34,6 +34,7 @@
 #define OPENVDB_MATH_LEGACYFRUSTUM_HAS_BEEN_INCLUDED
 
 #include <iostream>
+#include <openvdb/Types.h> // for Real typedef
 #include "Coord.h"
 #include "Mat4.h"
 #include "Vec3.h"
@@ -53,12 +54,15 @@ public:
     {
         // First read in the old transform's base class.
         // the "extents"
-        Coord tmpMin, tmpMax;
-        is.read(reinterpret_cast<char*>(&tmpMin), sizeof(Coord::ValueType) * 3);
-        is.read(reinterpret_cast<char*>(&tmpMax), sizeof(Coord::ValueType) * 3);
+        Vec3i tmpMin, tmpMax;
+        is.read(reinterpret_cast<char*>(&tmpMin), sizeof(Vec3i::ValueType) * 3);
+        is.read(reinterpret_cast<char*>(&tmpMax), sizeof(Vec3i::ValueType) * 3);
+        
+        Coord tmpMinCoord(tmpMin);
+        Coord tmpMaxCoord(tmpMax);
 
         // set the extents
-        mExtents = CoordBBox(tmpMin, tmpMax);
+        mExtents = CoordBBox(tmpMinCoord, tmpMaxCoord);
 
         // read the old-frustum class member data
         //Mat4d tmpW2C;

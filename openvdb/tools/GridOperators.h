@@ -215,10 +215,10 @@ public:
     {
         if (mInterrupt) mInterrupt->start("Processing grid");
         // Derive background value of the output grid
-        typename InGridT::TreeType tmp(mAcc.getTree()->background());
+        typename InGridT::TreeType tmp(mAcc.tree().background());
         typename OutGridT::ValueType backg = OperatorT::result(mMap, tmp, math::Coord(0));
         // output tree = topology copy of input tree!
-        typename OutTreeT::Ptr tree(new OutTreeT(*mAcc.getTree(), backg, TopologyCopy()));
+        typename OutTreeT::Ptr tree(new OutTreeT(mAcc.tree(), backg, TopologyCopy()));
         // create grid with output tree and unit transform
         typename OutGridT::Ptr result(new OutGridT(tree));
         // transform of output grid = transform of input grid

@@ -1,6 +1,27 @@
 OpenVDB Version History
 =======================
 
+Version 1.2.0 - In development
+    - Implemented sharp feature extraction for level set surfacing.
+      This enhances the quality of the output mesh and reduces aliasing
+      artifacts.
+    - Rewrote the particle to level set converter, simplifying the API,
+      improving performance (especially when particles have a fixed radius),
+      adding the capability to transfer arbitrary point attributes,
+      and fixing a velocity trail bug.
+    - Doubled the speed of the mesh to volume converter (which also improves
+      the performance of the fracture and level set rebuild tools) and
+      improved its inside/outside voxel classification near edges and corners.
+    - tools::GridSampler now accepts either a grid, a tree or a value accessor,
+      and it offers faster index-based access methods and much better
+      performance in cases where many instances are allocated.
+    - Extended tools::Dense to make it more compatible with existing tools. 
+    - Added a Prune SOP with several pruning schemes.
+    - Fixed a bug in GU_PrimVDB::buildFromPrimVolume(), seen during the
+      conversion from Houdini volumes to OpenVDB grids, that could cause 
+      signed flood fill to be applied to non-level set grids, resulting in
+      active tiles with incorrect values.
+
 Version 1.1.1 - May 10 2013
     - Added a simple dense grid class and tools to copy data from
       dense voxel arrays into OpenVDB grids and vice-versa.

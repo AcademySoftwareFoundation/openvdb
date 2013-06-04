@@ -96,6 +96,8 @@ template<typename ValueT>
 class Dense
 {
 public:
+    typedef ValueT ValueType;
+    
     /// @brief Construct a dense grid with a given range of coordinates.
     ///
     /// @param bbox  the bounding box of the (signed) coordinate range of this grid
@@ -107,6 +109,21 @@ public:
         if (bbox.empty()) {
             OPENVDB_THROW(ValueError, "can't construct a dense grid with an empty bounding box");
         }
+    }
+
+    /// @brief Construct a dense grid with a given range of coordinates and initial value
+    ///
+    /// @param bbox  the bounding box of the (signed) coordinate range of this grid
+    /// @param value the initial value of the grid.
+    /// @throw ValueError if the bounding box is empty.
+    Dense(const CoordBBox& bbox, const ValueT& value)
+        : mBBox(bbox), mArray(new ValueT[bbox.volume()]), mData(mArray.get()),
+          mY(bbox.dim()[2]), mX(mY*bbox.dim()[1])
+    {
+        if (bbox.empty()) {
+            OPENVDB_THROW(ValueError, "can't construct a dense grid with an empty bounding box");
+        }
+        this->fill(value);
     }
 
     /// @brief Construct a dense grid that wraps an external array.
@@ -233,6 +250,8 @@ public:
                                    size_t(xyz[1]-mBBox.min()[1]),
                                    size_t(xyz[2]-mBBox.min()[2]));
     }
+
+    Index64 memUsage() const{ return sizeof(*this) + mBBox.volume() * sizeof(ValueType); }
     
 private:
     const CoordBBox mBBox;//signed coordinates of the domain represented by the grid

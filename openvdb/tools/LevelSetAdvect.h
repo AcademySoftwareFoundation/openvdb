@@ -66,21 +66,23 @@ template <typename VelGridT, typename Interpolator = BoxSampler>
 class DiscreteField
 {
 public:
-    typedef typename VelGridT::ConstAccessor AccessorType;
     typedef typename VelGridT::ValueType     VectorType;
     typedef typename VectorType::ValueType   ScalarType;
 
-    DiscreteField(const VelGridT &vel):
-        mAccessor(vel.getConstAccessor()),
-        mTransform(vel.transform()) {}
+    DiscreteField(const VelGridT &vel): mAccessor(vel.tree()), mTransform(&vel.transform()) {}
 
     /// @return const reference to the transfrom between world and index space
     /// @note Use this method to determine if a client grid is
     /// aligned with the coordinate space of the velocity grid.
-    const math::Transform& transform() const { return mTransform; }
+    const math::Transform& transform() const { return *mTransform; }
 
     /// @return the interpolated velocity at the world space position xyz
-    inline VectorType operator() (const Vec3d& xyz, ScalarType) const;
+    inline VectorType operator() (const Vec3d& xyz, ScalarType) const
+    {
+        VectorType result = zeroVal<VectorType>();
+        Interpolator::sample(mAccessor, mTransform->worldToIndex(xyz), result);
+        return result;
+    }
 
     /// @return the velocity at the coordinate space position ijk
     inline VectorType operator() (const Coord& ijk, ScalarType) const
@@ -89,8 +91,8 @@ public:
     }
 
 private:
-    const AccessorType     mAccessor;
-    const math::Transform& mTransform;
+    const typename VelGridT::ConstAccessor mAccessor;//Not thread-safe
+    const math::Transform*                 mTransform;
 
 }; // end of DiscreteField
 
@@ -108,7 +110,7 @@ public:
     /// @return const reference to the identity transfrom between world and index space
     /// @note Use this method to determine if a client grid is
     /// aligned with the coordinate space of this velocity field
-    const math::Transform& transform() const { return mTransform; }
+    math::Transform transform() const { return math::Transform(); }
 
     /// @return the velocity in world units, evaluated at the world
     /// position xyz and at the specified time
@@ -119,10 +121,6 @@ public:
     {
         return (*this)(ijk.asVec3d(), time);
     }
-
-private:
-    const math::Transform mTransform;//identity transform between world and index space
-
 }; // end of EnrightField
 
 /// @brief  Hyperbolic advection of narrow-band level sets in an
@@ -265,7 +263,7 @@ private:
         VectorType**       mVec;
         const ScalarType   mMinAbsV;
         ScalarType         mMaxAbsV;
-        const MapT&        mMap;
+        const MapT*        mMap;
         FuncType           mTask;
         const bool         mIsMaster;
         /// Enum to defeing the type of multi-threading
@@ -378,15 +376,7 @@ LevelSetAdvection<GridT, FieldT, InterruptT>::advect3(ScalarType time0, ScalarTy
     return tmp.advect(time0, time1);
 }
 
-template <typename VelGridT, typename Interpolator>
-inline typename VelGridT::ValueType
-DiscreteField<VelGridT,Interpolator>::operator() (const Vec3d& xyz, ScalarType time) const
-{
-    const VectorType coord = mTransform.worldToIndex(xyz);
-    VectorType result;
-    Interpolator::template sample<AccessorType>(mAccessor, coord, result);
-    return result;
-}
+///////////////////////////////////////////////////////////////////////
 
 template <typename ScalarT>
 inline math::Vec3<ScalarT>
@@ -418,7 +408,7 @@ LevelSetAdvect(LevelSetAdvection& parent):
     mParent(parent),
     mVec(NULL),
     mMinAbsV(1e-6),
-    mMap(*(parent.mTracker.grid().transform().template constMap<MapT>())),
+    mMap(parent.mTracker.grid().transform().template constMap<MapT>().get()),
     mTask(0),
     mIsMaster(true)
 {
@@ -471,7 +461,7 @@ advect(ScalarType time0, ScalarType time1)
     const bool isForward = time0 < time1;
     while ((isForward ? time0<time1 : time0>time1) && mParent.mTracker.checkInterrupter()) {
         /// Make sure we have enough temporal auxiliary buffers
-        mParent.mTracker.mLeafs->rebuildAuxBuffers(TemporalScheme == math::TVD_RK3 ? 2 : 1);
+        mParent.mTracker.leafs().rebuildAuxBuffers(TemporalScheme == math::TVD_RK3 ? 2 : 1);
 
         const ScalarType dt = this->sampleField(time0, time1);
         if ( math::isZero(dt) ) break;//V is essentially zero so terminate
@@ -521,7 +511,7 @@ advect(ScalarType time0, ScalarType time1)
         }
         time0 += isForward ? dt : -dt;
         ++countCFL;
-        mParent.mTracker.mLeafs->removeAuxBuffers();
+        mParent.mTracker.leafs().removeAuxBuffers();
         this->clearField();
         /// Track the narrow band
         mParent.mTracker.track();
@@ -538,10 +528,10 @@ LevelSetAdvect<MapT, SpatialScheme, TemporalScheme>::
 sampleField(ScalarType time0, ScalarType time1)
 {
     mMaxAbsV = mMinAbsV;
-    const size_t leafCount = mParent.mTracker.mLeafs->leafCount();
+    const size_t leafCount = mParent.mTracker.leafs().leafCount();
     if (leafCount==0) return ScalarType(0.0);
     mVec = new VectorType*[leafCount];
-    if (mParent.mField.transform() == mParent.mTracker.mGrid.transform()) {
+    if (mParent.mField.transform() == mParent.mTracker.grid().transform()) {
         mTask = boost::bind(&LevelSetAdvect::sampleAlignedField, _1, _2, time0, time1);
     } else {
         mTask = boost::bind(&LevelSetAdvect::sampleXformedField, _1, _2, time0, time1);
@@ -565,10 +555,10 @@ sampleXformedField(const RangeType& range, ScalarType time0, ScalarType time1)
 {
     const bool isForward = time0 < time1;
     typedef typename LeafType::ValueOnCIter VoxelIterT;
-    const MapT& map = mMap;
+    const MapT& map = *mMap;
     mParent.mTracker.checkInterrupter();
     for (size_t n=range.begin(), e=range.end(); n != e; ++n) {
-        const LeafType& leaf = mParent.mTracker.mLeafs->leaf(n);
+        const LeafType& leaf = mParent.mTracker.leafs().leaf(n);
         VectorType* vec = new VectorType[leaf.onVoxelCount()];
         int m = 0;
         for (VoxelIterT iter = leaf.cbeginValueOn(); iter; ++iter, ++m) {
@@ -592,7 +582,7 @@ sampleAlignedField(const RangeType& range, ScalarType time0, ScalarType time1)
     typedef typename LeafType::ValueOnCIter VoxelIterT;
     mParent.mTracker.checkInterrupter();
     for (size_t n=range.begin(), e=range.end(); n != e; ++n) {
-        const LeafType& leaf = mParent.mTracker.mLeafs->leaf(n);
+        const LeafType& leaf = mParent.mTracker.leafs().leaf(n);
         VectorType* vec = new VectorType[leaf.onVoxelCount()];
         int m = 0;
         for (VoxelIterT iter = leaf.cbeginValueOn(); iter; ++iter, ++m) {
@@ -613,7 +603,7 @@ LevelSetAdvect<MapT, SpatialScheme, TemporalScheme>::
 clearField()
 {
     if (mVec == NULL) return;
-    for (size_t n=0, e=mParent.mTracker.mLeafs->leafCount(); n<e; ++n) delete [] mVec[n];
+    for (size_t n=0, e=mParent.mTracker.leafs().leafCount(); n<e; ++n) delete [] mVec[n];
     delete [] mVec;
     mVec = NULL;
 }
@@ -629,16 +619,16 @@ cook(ThreadingMode mode, size_t swapBuffer)
     mParent.mTracker.startInterrupter("Advecting level set");
 
     if (mParent.mTracker.getGrainSize()==0) {
-        (*this)(mParent.mTracker.mLeafs->getRange());
+        (*this)(mParent.mTracker.leafs().getRange());
     } else if (mode == PARALLEL_FOR) {
-        tbb::parallel_for(mParent.mTracker.mLeafs->getRange(mParent.mTracker.getGrainSize()), *this);
+        tbb::parallel_for(mParent.mTracker.leafs().getRange(mParent.mTracker.getGrainSize()), *this);
     } else if (mode == PARALLEL_REDUCE) {
-        tbb::parallel_reduce(mParent.mTracker.mLeafs->getRange(mParent.mTracker.getGrainSize()), *this);
+        tbb::parallel_reduce(mParent.mTracker.leafs().getRange(mParent.mTracker.getGrainSize()), *this);
     } else {
         throw std::runtime_error("Undefined threading mode");
     }
 
-    mParent.mTracker.mLeafs->swapLeafBuffer(swapBuffer, mParent.mTracker.getGrainSize()==0);
+    mParent.mTracker.leafs().swapLeafBuffer(swapBuffer, mParent.mTracker.getGrainSize()==0);
 
     mParent.mTracker.endInterrupter();
 }
@@ -657,13 +647,14 @@ euler1(const RangeType& range, ScalarType dt, Index resultBuffer)
     typedef typename Scheme::template ISStencil<GridType>::StencilType   Stencil;
     typedef typename LeafType::ValueOnCIter VoxelIterT;
     mParent.mTracker.checkInterrupter();
-    const MapT& map = mMap;
-    Stencil stencil(mParent.mTracker.mGrid);
+    const MapT& map = *mMap;
+    typename TrackerT::LeafManagerType& leafs = mParent.mTracker.leafs();
+    Stencil stencil(mParent.mTracker.grid());
     for (size_t n=range.begin(), e=range.end(); n != e; ++n) {
-        BufferType& result = mParent.mTracker.mLeafs->getBuffer(n, resultBuffer);
+        BufferType& result = leafs.getBuffer(n, resultBuffer);
         const VectorType* vec = mVec[n];
         int m=0;
-        for (VoxelIterT iter = mParent.mTracker.mLeafs->leaf(n).cbeginValueOn(); iter; ++iter, ++m) {
+        for (VoxelIterT iter = leafs.leaf(n).cbeginValueOn(); iter; ++iter, ++m) {
             stencil.moveTo(iter);
             const VectorType V = vec[m], G = math::GradientBiased<MapT, SpatialScheme>::result(map, stencil, V);
             result.setValue(iter.pos(), *iter - dt * V.dot(G));
@@ -685,15 +676,16 @@ euler2(const RangeType& range, ScalarType dt, ScalarType alpha, Index phiBuffer,
     typedef typename Scheme::template ISStencil<GridType>::StencilType   Stencil;
     typedef typename LeafType::ValueOnCIter VoxelIterT;
     mParent.mTracker.checkInterrupter();
-    const MapT& map = mMap;
+    const MapT& map = *mMap;
+    typename TrackerT::LeafManagerType& leafs = mParent.mTracker.leafs();
     const ScalarType beta = ScalarType(1.0) - alpha;
-    Stencil stencil(mParent.mTracker.mGrid);
+    Stencil stencil(mParent.mTracker.grid());
     for (size_t n=range.begin(), e=range.end(); n != e; ++n) {
-        const BufferType& phi = mParent.mTracker.mLeafs->getBuffer(n, phiBuffer);
-        BufferType& result = mParent.mTracker.mLeafs->getBuffer(n, resultBuffer);
+        const BufferType& phi = leafs.getBuffer(n, phiBuffer);
+        BufferType& result = leafs.getBuffer(n, resultBuffer);
         const VectorType* vec = mVec[n];
         int m=0;
-        for (VoxelIterT iter = mParent.mTracker.mLeafs->leaf(n).cbeginValueOn(); iter; ++iter, ++m) {
+        for (VoxelIterT iter = leafs.leaf(n).cbeginValueOn(); iter; ++iter, ++m) {
             stencil.moveTo(iter);
             const VectorType V = vec[m], G = math::GradientBiased<MapT, SpatialScheme>::result(map, stencil, V);
             result.setValue(iter.pos(), alpha*phi[iter.pos()] + beta*(*iter - dt * V.dot(G)));

@@ -87,6 +87,9 @@ public:
     explicit VdbPrimCIterator(const GEO_Detail* gdp, const GA_PrimitiveGroup* group = NULL,
         FilterFunc filter = FilterFunc());
 
+    VdbPrimCIterator(const VdbPrimCIterator&);
+    VdbPrimCIterator& operator=(const VdbPrimCIterator&);
+
     //@{
     /// Advance to the next VDB primitive.
     void advance();
@@ -162,6 +165,9 @@ public:
     VdbPrimIterator(GEO_Detail* gdp, GA_Range::safedeletions,
         const GA_PrimitiveGroup* group = NULL, FilterFunc filter = FilterFunc()):
         VdbPrimCIterator(gdp, GA_Range::safedeletions(), group, filter) {}
+
+    VdbPrimIterator(const VdbPrimIterator&);
+    VdbPrimIterator& operator=(const VdbPrimIterator&);
 
     /// Advance to the next VDB primitive.
     VdbPrimIterator& operator++() { advance(); return *this; }

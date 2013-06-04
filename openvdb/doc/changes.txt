@@ -3,6 +3,29 @@
 @page changes Release Notes
 
 
+@htmlonly <a name="v1_2_0_changes"></a>@endhtmlonly
+@par
+<B>Version 1.2.0</B> - <I>In development</I>
+- Implemented sharp feature extraction for level set surfacing.  This enhances
+  the quality of the output mesh and reduces aliasing artifacts.
+- Rewrote the particle to level set converter, simplifying the API,
+  improving performance (especially when particles have a fixed radius),
+  adding the capability to transfer arbitrary point attributes,
+  and fixing a velocity trail bug.
+- Doubled the speed of the mesh to volume converter (which also improves
+  the performance of the fracture and level set rebuild tools) and improved
+  its inside/outside voxel classification near edges and corners.
+- @vdblink::tools::GridSampler GridSampler@endlink now accepts either a grid,
+  a tree or a value accessor, and it offers faster index-based access methods
+  and much better performance in cases where many instances are allocated.
+- Extended @vdblink::tools::Dense tools::Dense@endlink to make it more
+  compatible with existing tools. 
+- Added a Prune SOP with several pruning schemes.
+- Fixed a bug in @c GU_PrimVDB::buildFromPrimVolume(), seen during the
+  conversion from Houdini volumes to OpenVDB grids, that could cause 
+  signed flood fill to be applied to non-level set grids, resulting in
+  active tiles with incorrect values.
+
 @htmlonly <a name="v1_1_1_changes"></a>@endhtmlonly
 @par
 <B>Version 1.1.1</B> - <I>May 10 2013</I>
@@ -397,9 +420,8 @@
 - Fixed an intermittent crash in the
   @vdblink::tools::ParticlesToLevelSet ParticlesToLevelSet@endlink tool,
   as well as a race condition that could cause data corruption.
-- The @vdblink::tools::ParticlesToLevelSetAndId ParticlesToLevelSet@endlink
-  tool and From Particles SOP can now transfer arbitrary point attribute
-  values from the input particles to output voxels.
+- The @c ParticlesToLevelSet tool and From Particles SOP can now transfer
+  arbitrary point attribute values from the input particles to output voxels.
 - Fixed a bug in the Convert SOP whereby the names of primitives
   were lost during conversion, and another bug that resulted in
   arithmetic errors when converting empty grids.

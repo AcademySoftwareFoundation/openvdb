@@ -28,16 +28,10 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-#ifndef OPENVDB_VIEWER_VIEWER_HAS_BEEN_INCLUDED
-#define OPENVDB_VIEWER_VIEWER_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_VIEWER_CLIPBOX_HAS_BEEN_INCLUDED
+#define OPENVDB_VIEWER_CLIPBOX_HAS_BEEN_INCLUDED
 
-#include "RenderModules.h"
-#include <openvdb/openvdb.h>
-#include <tbb/mutex.h>
-#include <boost/shared_ptr.hpp>
-#include <iostream>
-#include <string>
-#include <vector>
+#include <openvdb/Types.h>
 
 #if defined(__APPLE__) || defined(MACOSX)
 #include <OpenGL/gl.h>
@@ -47,67 +41,51 @@
 #include <GL/glu.h>
 #endif
 
-#include <GL/glfw.h>
 
+namespace openvdb_viewer {
 
-class Viewer
+class ClipBox
 {
 public:
-    static Viewer& init(const std::string& progName, bool verbose = false);
+    ClipBox();
 
-    static void view(const openvdb::GridCPtrVec&, int width = 900, int height = 800);
+    void enableClipping() const;
+    void disableClipping() const;
 
-    //@{
-    /// input callback functions
-    static void keyCallback(int key, int action);
-    static void mouseButtonCallback(int button, int action);
-    static void mousePosCallback(int x, int y);
-    static void mouseWheelCallback(int pos);
-    static void windowSizeCallback(int, int);
-    //@}
+    void setBBox(const openvdb::BBoxd&);
+    void setStepSize(const openvdb::Vec3d& s) { mStepSize = s; }
 
-    bool needsDisplay();
-    void setNeedsDisplay();
-    
-    void toggleRenderModule(size_t n);
-    void toggleInfoText();
+    void render();
 
-    void showPrevGrid();
-    void showNextGrid();
-    
+    void update(double steps);
+    void reset();
+
+    bool isActive() const { return (mXIsActive || mYIsActive ||mZIsActive); }
+
+    bool& activateXPlanes() { return mXIsActive;  }
+    bool& activateYPlanes() { return mYIsActive;  }
+    bool& activateZPlanes() { return mZIsActive;  }
+
+    bool& shiftIsDown() { return mShiftIsDown; }
+    bool& ctrlIsDown() { return mCtrlIsDown; }
+
+    bool mouseButtonCallback(int button, int action);
+    bool mousePosCallback(int x, int y);
 
 private:
-    struct Camera;
-    struct ClipBox;
-    typedef boost::shared_ptr<Camera> CameraPtr;
-    typedef boost::shared_ptr<ClipBox> ClipBoxPtr;
-    typedef boost::shared_ptr<RenderModule> RenderModulePtr;
+    void update() const;
 
+    openvdb::Vec3d mStepSize;
+    openvdb::BBoxd mBBox;
+    bool mXIsActive, mYIsActive, mZIsActive, mShiftIsDown, mCtrlIsDown;
+    GLdouble mFrontPlane[4], mBackPlane[4], mLeftPlane[4], mRightPlane[4],
+        mTopPlane[4], mBottomPlane[4];
+    double mMouseXPos, mMouseYPos;
+}; // class ClipBox
 
-    Viewer();
-    static Viewer* sViewer;
+} // namespace openvdb_viewer
 
-    void setWindowTitle(double fps = 0.0);
-    void viewGrids(const openvdb::GridCPtrVec&, int width, int height);
-    void render();
-    void showNthGrid(size_t n);
-    void updateCutPlanes(int wheelPos);
-
-
-    CameraPtr mCamera;
-    ClipBoxPtr mClipBox;
-
-    std::vector<RenderModulePtr> mRenderModules;
-    openvdb::GridCPtrVec mGrids;
-
-    size_t mGridIdx, mUpdates;
-    std::string mGridName, mProgName, mGridInfo, mTransformInfo, mTreeInfo;
-    int mWheelPos;
-    bool mShiftIsDown, mCtrlIsDown, mShowInfo; 
-};
-
-
-#endif // OPENVDB_VIEWER_VIEWER_HAS_BEEN_INCLUDED
+#endif // OPENVDB_VIEWER_CLIPBOX_HAS_BEEN_INCLUDED
 
 // Copyright (c) 2012-2013 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

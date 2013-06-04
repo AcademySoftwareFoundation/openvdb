@@ -239,6 +239,106 @@ private:
 ////////////////////////////////////////
 
 
+/// @brief  Given a set of tangent elements, @c points with corresponding @c normals,
+///         this method returns the intersection point of all tangent elements.
+///
+/// @note   Used to extract surfaces with sharp edges and corners from volume data,
+///         see the following paper for details: "Feature Sensitive Surface
+///         Extraction from Volume Data, Kobbelt et al. 2001".
+inline Vec3d findFeaturePoint(
+    const std::vector<Vec3d>& points,
+    const std::vector<Vec3d>& normals)
+{
+    typedef math::Mat3d Mat3d;
+
+    Vec3d avgPos(0.0);
+
+    if (points.empty()) return avgPos;
+
+    for (size_t n = 0, N = points.size(); n < N; ++n) {
+        avgPos += points[n];
+    }
+
+    avgPos /= double(points.size());
+
+    // Unique components of the 3x3 A^TA matrix, where A is
+    // the matrix of normals.
+    double m00=0,m01=0,m02=0,
+           m11=0,m12=0,
+           m22=0;
+
+    // The rhs vector, A^Tb, where b = n dot p
+    Vec3d rhs(0.0);
+
+    for (size_t n = 0, N = points.size(); n < N; ++n) {
+
+        const Vec3d& n_ref = normals[n];
+
+        // A^TA
+        m00 += n_ref[0] * n_ref[0]; // diagonal
+        m11 += n_ref[1] * n_ref[1];
+        m22 += n_ref[2] * n_ref[2];
+
+        m01 += n_ref[0] * n_ref[1]; // Upper-tri
+        m02 += n_ref[0] * n_ref[2];
+        m12 += n_ref[1] * n_ref[2];
+
+        // A^Tb (centered around the origin)
+        rhs += n_ref * n_ref.dot(points[n] - avgPos);
+    }
+
+    Mat3d A(m00,m01,m02,
+            m01,m11,m12, 
+            m02,m12,m22);
+
+    /*
+    // Inverse
+    const double det = A.det();
+    if (det > 0.01) {
+        Mat3d A_inv = A.adjoint();
+        A_inv *= (1.0 / det);
+
+        return avgPos + A_inv * rhs;
+    }
+    */
+
+    // Compute the pseudo inverse
+
+    math::Mat3d eigenVectors;
+    Vec3d eigenValues;
+
+    diagonalizeSymmetricMatrix(A, eigenVectors, eigenValues, 300);
+
+    Mat3d D = Mat3d::identity();
+
+
+    double tolerance = std::max(std::abs(eigenValues[0]), std::abs(eigenValues[1]));
+    tolerance = std::max(tolerance, std::abs(eigenValues[2]));
+    tolerance *= 0.01;
+
+    int clamped = 0;
+    for (int i = 0; i < 3; ++i ) {
+        if (std::abs(eigenValues[i]) < tolerance) {
+            D[i][i] = 0.0;
+            ++clamped;
+        } else {
+            D[i][i] = 1.0 / eigenValues[i];
+        }
+    }
+
+    // Assemble the pseudo inverse and calc. the intersection point
+    if (clamped < 3) {
+        Mat3d pseudoInv = eigenVectors * D *  eigenVectors.transpose();
+        return avgPos + pseudoInv * rhs;
+    }
+
+    return avgPos;
+}
+
+
+////////////////////////////////////////
+
+
 // Internal utility methods
 
 

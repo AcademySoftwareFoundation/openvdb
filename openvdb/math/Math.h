@@ -641,6 +641,26 @@ template<typename T> struct tolerance { static T value() { return 0; } };
 template<> struct tolerance<float>    { static float value() { return 1e-8f; } };
 template<> struct tolerance<double>   { static double value() { return 1e-15; } };
 
+/// @brief Return the index [0,1,2] of the smallest value in a 3D vector.
+/// @note This methods assumes operator[] exists and avoids branching.
+template<typename Vec3T>
+size_t MinIndex(const Vec3T& v)
+{
+    static const size_t hashTable[8]={2, 1, 9, 1, 2, 9, 0, 0};//9 is a dummy value
+    const size_t hashKey = ((v[0] < v[1]) << 2) + ((v[0] < v[2]) << 1) + (v[1] < v[2]);// ?*4+?*2+?*1
+    return hashTable[hashKey];
+}
+
+/// @brief Return the index [0,1,2] of the largest value in a 3D vector.
+/// @note This methods assumes operator[] exists and avoids branching.
+template<typename Vec3T>
+size_t MaxIndex(const Vec3T& v)
+{
+    static const size_t hashTable[8]={2, 1, 9, 1, 2, 9, 0, 0};//9 is a dummy value
+    const size_t hashKey = ((v[0] > v[1]) << 2) + ((v[0] > v[2]) << 1) + (v[1] > v[2]);// ?*4+?*2+?*1
+    return hashTable[hashKey];
+}   
+
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

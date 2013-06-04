@@ -50,6 +50,8 @@ public:
     SOP_OpenVDB_Write(OP_Network*, const char* name, OP_Operator*);
     virtual ~SOP_OpenVDB_Write() {};
 
+    virtual void getDescriptiveParmName(UT_String& s) const { s = "file_name"; }
+
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
     static int writeNowCallback(void* data, int index, float now, const PRM_Template*);
 

@@ -110,7 +110,13 @@ public:
     virtual ~ValueAccessorBase() { if (mTree) mTree->releaseAccessor(*this); }
 
     /// @return a pointer to the tree associated by this ValueAccessor
+    /// @note The only circumstance under which the return value can
+    /// be NULL is if the tree from which the ValueAccessor is
+    /// constructed was subsequently deleted - which generally leaves the
+    /// ValueAccessor in an unsafe state!
     TreeType* getTree() const { return mTree; }
+    /// @return a reference to the tree associated by this ValueAccessor
+    TreeType& tree() const { assert(mTree); return *mTree; }
 
     ValueAccessorBase(const ValueAccessorBase& other): mTree(other.mTree)
     {

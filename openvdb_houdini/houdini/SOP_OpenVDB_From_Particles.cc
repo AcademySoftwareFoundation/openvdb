@@ -57,7 +57,7 @@ namespace hutil = houdini_utils;
 
 namespace {
 
-// This class is required by openvdb::tools::ParticlesToLeveSet
+// This wrapper class is required by openvdb::tools::ParticlesToLeveSet
 class ParticleList
 {
 public:
@@ -74,31 +74,53 @@ public:
     {
     }
 
+    // Do the particles have non-constant radius
     bool hasRadius()   const { return mHasRadius;}
+
+    // Do the particles have velocity
     bool hasVelocity() const { return mHasVelocity;}
+
+    // Multiplier for the radius
+    openvdb::Real getRadiusMult() const { return mRadiusMult; }
 
     // The public methods below are the only ones required
     // by tools::ParticlesToLevelSet
     size_t size() const { return mGdp->getNumPoints(); }
-    openvdb::Vec3R pos(int n) const
+
+    // Position of particle in world space
+    // This is required by ParticlesToLevelSet::rasterizeSpheres(*this,radius)
+    void getPos(size_t n, openvdb::Vec3R& xyz) const
     {
-        UT_Vector3 p = mGdp->getPos3( this->offset(n) );
-        return openvdb::Vec3R(p[0], p[1], p[2]);
+        const UT_Vector3 p = mGdp->getPos3(mGdp->pointOffset(n));
+        xyz[0] = p[0], xyz[1] = p[1], xyz[2] = p[2];
     }
-    openvdb::Vec3R vel(int n) const
+    // Position and radius of particle in world space
+    // This is required by ParticlesToLevelSet::rasterizeSpheres(*this)
+    void getPosRad(size_t n, openvdb::Vec3R& xyz, openvdb::Real& rad) const
     {
-        if (!mHasVelocity) return openvdb::Vec3R(0, 0, 0);
-        UT_Vector3 v = mVelHandle.get(this->offset(n));
-        return mVelocityMult*openvdb::Vec3R(v[0], v[1], v[2]);
+        assert(mHasRadius);
+        const GA_Offset m = mGdp->pointOffset(n);
+        const UT_Vector3 p = mGdp->getPos3(m);
+        xyz[0] = p[0], xyz[1] = p[1], xyz[2] = p[2];
+        rad = mRadiusMult*mScaleHandle.get(m);
     }
-    openvdb::Real radius(int n) const
+    // Position, radius and velocity of particle in world space
+    // This is required by ParticlesToLevelSet::rasterizeTrails
+    void getPosRadVel(size_t n, openvdb::Vec3R& xyz,
+                      openvdb::Real& rad, openvdb::Vec3R& vel) const
     {
-        if (!mHasRadius) return mRadiusMult;
-        return mRadiusMult*mScaleHandle.get(this->offset(n));
+        assert(mHasVelocity);
+        const GA_Offset m = mGdp->pointOffset(n);
+        const UT_Vector3 p = mGdp->getPos3(m);
+        xyz[0] = p[0], xyz[1] = p[1], xyz[2] = p[2];
+        rad = mHasRadius ? mRadiusMult*mScaleHandle.get(m) : mRadiusMult;
+        const UT_Vector3 v = mVelHandle.get(m);
+        vel[0] = mVelocityMult*v[0], vel[1] = mVelocityMult*v[1], vel[2] = mVelocityMult*v[2];
     }
+    // Required for attribute transfer
+    void getAtt(int n, openvdb::Int32& att) const { att = n; }
 
 protected:
-    GA_Offset offset(int n) const { return mGdp->pointOffset(n); }
 
     const GU_Detail*    mGdp;
     GA_ROHandleF        mScaleHandle;
@@ -704,12 +726,11 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
 
 
 void
-SOP_OpenVDB_From_Particles::convert(
-    openvdb::FloatGrid::Ptr outputGrid,
-    ParticleList& paList,
-    const Settings& settings)
+SOP_OpenVDB_From_Particles::convert(openvdb::FloatGrid::Ptr outputGrid,
+                                    ParticleList& paList,
+                                    const Settings& settings)
 {
-    openvdb::tools::ParticlesToLevelSet<openvdb::FloatGrid, ParticleList, hvdb::Interrupter>
+    openvdb::tools::ParticlesToLevelSet<openvdb::FloatGrid, void, hvdb::Interrupter>
         raster(*outputGrid, &mBoss);
 
     raster.setRmin(evalFloat("Rmin", 0,  mTime));
@@ -717,9 +738,14 @@ SOP_OpenVDB_From_Particles::convert(
 
     if (settings.mRasterizeTrails && paList.hasVelocity()) {
         raster.rasterizeTrails(paList, settings.mDx);
-    } else {
+    } else if (paList.hasRadius()){
         raster.rasterizeSpheres(paList);
+    } else {
+        raster.rasterizeSpheres(paList, paList.getRadiusMult());
     }
+
+    raster.finalize();
+
     if (raster.ignoredParticles()) {
         std::ostringstream ostr;
         ostr << "Ignored " << raster.getMinCount() << " small and " << raster.getMaxCount()
@@ -730,27 +756,27 @@ SOP_OpenVDB_From_Particles::convert(
 
 
 void
-SOP_OpenVDB_From_Particles::convertWithAttributes(
-    openvdb::FloatGrid::Ptr outputGrid,
-    ParticleList& paList,
-    const Settings& settings,
-    const GU_Detail& ptGeo)
+SOP_OpenVDB_From_Particles::convertWithAttributes(openvdb::FloatGrid::Ptr outputGrid,
+                                                  ParticleList& paList,
+                                                  const Settings& settings,
+                                                  const GU_Detail& ptGeo)
 {
-
-    typedef openvdb::tools::ParticlesToLevelSetAndId<
-        openvdb::FloatGrid, ParticleList, hvdb::Interrupter> RasterT;
-
-    RasterT raster(*outputGrid, &mBoss);
+    openvdb::tools::ParticlesToLevelSet<openvdb::FloatGrid, openvdb::Int32, hvdb::Interrupter>
+        raster(*outputGrid, &mBoss);
 
     raster.setRmin(evalFloat("Rmin", 0,  mTime));
     raster.setRmax(1e15f);
-
-    openvdb::Int32Grid::Ptr closestPtnIdxGrid;
+    
     if (settings.mRasterizeTrails && paList.hasVelocity()) {
-        closestPtnIdxGrid = raster.rasterizeTrails(paList, settings.mDx);
+        raster.rasterizeTrails(paList, settings.mDx);
+    } else if (paList.hasRadius()){
+        raster.rasterizeSpheres(paList);
     } else {
-        closestPtnIdxGrid = raster.rasterizeSpheres(paList);
+        raster.rasterizeSpheres(paList, paList.getRadiusMult());
     }
+    raster.finalize();
+
+    openvdb::Int32Grid::Ptr closestPtnIdxGrid = raster.attributeGrid();
 
     if (raster.ignoredParticles()) {
         std::ostringstream ostr;

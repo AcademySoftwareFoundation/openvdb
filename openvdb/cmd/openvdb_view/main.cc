@@ -28,8 +28,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-
-#include "Viewer.h"
+#include <openvdb_viewer/Viewer.h>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -105,7 +104,7 @@ main(int argc, char * const argv[])
             }
         }
 
-        Viewer::init(progName, printDebugInfo);
+        openvdb_viewer::Viewer viewer = openvdb_viewer::init(progName, printDebugInfo);
 
         const size_t numFiles = filenames.size();
         if (numFiles == 0) usage(progName, EXIT_FAILURE);
@@ -137,7 +136,7 @@ main(int argc, char * const argv[])
             }
         }
 
-        Viewer::view(allGrids);
+        viewer.view(allGrids);
 
     } catch (const char* s) {
         OPENVDB_LOG_ERROR(progName << ": " << s);

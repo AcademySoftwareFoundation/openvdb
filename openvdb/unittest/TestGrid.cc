@@ -81,8 +81,8 @@ public:
     typedef boost::shared_ptr<ProxyTree> Ptr;
     typedef boost::shared_ptr<const ProxyTree> ConstPtr;
 
-    static const openvdb::Index DEPTH = 0;
-    static const ValueType backg = 0;
+    static const openvdb::Index DEPTH;
+    static const ValueType backg;
 
     ProxyTree() {}
     ProxyTree(const ValueType&) {}
@@ -124,6 +124,9 @@ public:
     virtual openvdb::Index64 activeLeafVoxelCount() const { return 0UL; }
     virtual openvdb::Index64 inactiveLeafVoxelCount() const { return 0UL; }
 };
+
+const openvdb::Index ProxyTree::DEPTH = 0;
+const ProxyTree::ValueType ProxyTree::backg = 0;
 
 typedef openvdb::Grid<ProxyTree> ProxyGrid;
 

@@ -36,7 +36,12 @@
 #define OPENVDB_MATH_STATS_HAS_BEEN_INCLUDED
 
 #include <iosfwd> // for ostringstream
-
+#include <openvdb/version.h>
+#include <iostream>
+#include <iomanip>
+#include <sstream>
+#include <vector>
+#include "Math.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

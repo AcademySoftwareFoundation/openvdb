@@ -121,7 +121,10 @@ public:
     /// @return false if the process was interrupted
     bool checkInterrupter();
 
-    const GridType& grid() const { return mGrid; }
+    const GridType& grid() const { return *mGrid; }
+
+    LeafManagerType& leafs() { return *mLeafs; }
+    const LeafManagerType& leafs() const { return *mLeafs; }
 
     /// @brief Public functor called by tbb::parallel_for()
     /// @note Never call this method directly
@@ -130,8 +133,8 @@ public:
         if (mTask) mTask(const_cast<LevelSetTracker*>(this), r);
         else OPENVDB_THROW(ValueError, "task is undefined - call track(), etc");
     }
-
-protected:
+    
+private:
 
     template<math::BiasedGradientScheme      SpatialScheme,
              math::TemporalIntegrationScheme TemporalScheme>
@@ -148,21 +151,7 @@ protected:
         void euler2(const RangeType& range, ValueType dt, ValueType alpha,
                     Index phiBuffer, Index resultBuffer);
     }; // end of protected Normalizer class
-
-    // required to access mLeafs
-    template<typename, typename, typename>
-    friend class LevelSetAdvection;
-
-    GridType&         mGrid;
-    // Throughout the methods below mLeafs is always assumed to contain
-    // a list of the current LeafNodes! The auxiliary buffers on the
-    // other hand always have to be allocated locally, since some
-    // methods need them and others don't!
-    LeafManagerType*  mLeafs;
-    InterruptT*       mInterrupter;
-    const ValueType   mDx;
-
-private:
+    
     typedef typename boost::function<void (LevelSetTracker*, const RangeType&)> FuncType;
 
     void trim(const RangeType& r);
@@ -173,7 +162,15 @@ private:
     template<math::BiasedGradientScheme SpatialScheme,
              math::TemporalIntegrationScheme TemporalScheme>
     void normalize2();
-
+     
+    // Throughout the methods below mLeafs is always assumed to contain
+    // a list of the current LeafNodes! The auxiliary buffers on the
+    // other hand always have to be allocated locally, since some
+    // methods need them and others don't!
+    GridType*                       mGrid;
+    LeafManagerType*                mLeafs;
+    InterruptT*                     mInterrupter;
+    const ValueType                 mDx;
     math::BiasedGradientScheme      mSpatialScheme;
     math::TemporalIntegrationScheme mTemporalScheme;
     int                             mNormCount;// Number of iteratations of normalization
@@ -188,7 +185,7 @@ private:
 
 template<typename GridT, typename InterruptT>
 LevelSetTracker<GridT, InterruptT>::LevelSetTracker(GridT& grid, InterruptT* interrupt):
-    mGrid(grid),
+    mGrid(&grid),
     mLeafs(new LeafManagerType(grid.tree())),
     mInterrupter(interrupt),
     mDx(grid.voxelSize()[0]),
@@ -240,7 +237,7 @@ LevelSetTracker<GridT, InterruptT>::prune()
     }
 
     // Remove inactive nodes from tree
-    mGrid.tree().pruneLevelSet();
+    mGrid->tree().pruneLevelSet();
 
     // The tree topology has changes so rebuild the list of leafs
     mLeafs->rebuildLeafArray();
@@ -293,7 +290,7 @@ LevelSetTracker<GridT, InterruptT>::trim(const RangeType& range)
 {
     typedef typename LeafType::ValueOnIter VoxelIterT;
     const_cast<LevelSetTracker*>(this)->checkInterrupter();
-    const ValueType gamma = mGrid.background();
+    const ValueType gamma = mGrid->background();
     for (size_t n=range.begin(), e=range.end(); n != e; ++n) {
         LeafType &leaf = mLeafs->leaf(n);
         for (VoxelIterT iter = leaf.beginValueOn(); iter; ++iter) {

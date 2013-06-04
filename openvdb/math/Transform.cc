@@ -123,20 +123,34 @@ Transform::read(std::istream& is)
             internal::LegacyFrustum legacyFrustum(is);
 
             CoordBBox bb      = legacyFrustum.getBBox();
-            BBoxd   bbox(bb.min().asVec3d(), bb.max().asVec3d());
+            BBoxd   bbox(bb.min().asVec3d(), bb.max().asVec3d()
+                         /* -Vec3d(1,1,1) */
+                         );
             double  taper     = legacyFrustum.getTaper();
             double  depth     = legacyFrustum.getDepth();
 
             double nearPlaneWidth = legacyFrustum.getNearPlaneWidth();
             double nearPlaneDist  = legacyFrustum.getNearPlaneDist();
-            Mat4d camxform        = legacyFrustum.getCamXForm();
+            const Mat4d& camxform        = legacyFrustum.getCamXForm();
 
             // create the new frustum with these parameters
             Mat4d xform(Mat4d::identity());
             xform.setToTranslation(Vec3d(0,0, -nearPlaneDist));
             xform.preScale(Vec3d(nearPlaneWidth, nearPlaneWidth, -nearPlaneWidth));
+            
+            // create the linear part of the frustum (the second map)
+            Mat4d second = xform * camxform;
+          
+            // we might have precision problems, the constructor for the
+            // affine map is not forgiving (so we fix here).
+            const Vec4d col3 = second.col(3);
+            const Vec4d ref(0, 0, 0, 1);
 
-            MapBase::Ptr linearMap(simplify(AffineMap(xform * camxform).getAffineMap()));
+            if (ref.eq(col3) ) { 
+                second.setCol(3, ref);
+            }
+          
+            MapBase::Ptr linearMap(simplify(AffineMap(second).getAffineMap()));
 
             // note that the depth is scaled on the nearPlaneSize.
             // the linearMap will uniformly scale the frustum to the correct size

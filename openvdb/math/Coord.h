@@ -235,6 +235,13 @@ public:
     {
             return (a[0] < b[0] || a[1] < b[1] || a[2] < b[2]);
     }
+
+    /// @brief Return the index [0,1,2] with the smallest value
+    size_t minIndex() const { return MinIndex(mVec); }
+
+    /// @brief Return the index [0,1,2] with the largest value
+    size_t maxIndex() const { return MaxIndex(mVec); }
+    
     void read(std::istream& is) { is.read(reinterpret_cast<char*>(mVec), sizeof(mVec)); }
     void write(std::ostream& os) const
     {
@@ -328,12 +335,11 @@ public:
     /// Return @c true if this bounding box can be subdivided [mainly for use by TBB].
     bool is_divisible() const { return mMin[0]<mMax[0] && mMin[1]<mMax[1] && mMin[2]<mMax[2]; }
 
-    /// Return the index (0, 1 or 2) of the longest axis.
-    size_t maxExtent() const
-    {
-        const Coord d = this->dim();
-        return (d[0] > d[1] && d[0] > d[2]) ? 0 : (d[1] > d[2]) ? 1 : 2;
-    }
+    /// @brief Return the index (0, 1 or 2) of the shortest axis.
+    size_t minExtent() const { return this->dim().minIndex(); }
+   
+    /// @brief Return the index (0, 1 or 2) of the longest axis.
+    size_t maxExtent() const { return this->dim().maxIndex(); }
 
     /// Return @c true if point (x, y, z) is inside this bounding box.
     bool isInside(const Coord& xyz) const
@@ -393,6 +399,7 @@ public:
     void write(std::ostream& os) const { mMin.write(os); mMax.write(os); }
 
 private:
+    
     Coord mMin, mMax;
 }; // class CoordBBox
 

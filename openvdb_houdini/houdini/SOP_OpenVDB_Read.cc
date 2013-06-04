@@ -49,6 +49,8 @@ public:
     SOP_OpenVDB_Read(OP_Network*, const char* name, OP_Operator*);
     virtual ~SOP_OpenVDB_Read() {};
 
+    virtual void getDescriptiveParmName(UT_String& s) const { s = "file_name"; }
+
     static void registerSop(OP_OperatorTable*);
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 

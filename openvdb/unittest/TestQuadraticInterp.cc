@@ -29,8 +29,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
 /// @file TestQuadraticInterp.cc
-///
-/// @author Peter Cucka
 
 #include <sstream>
 #include <cppunit/extensions/HelperMacros.h>
@@ -57,19 +55,18 @@ const double TOLERANCE = 1.0e-5;
 ////////////////////////////////////////
 
 
-template<typename TreeType>
+template<typename GridType>
 class TestQuadraticInterp: public CppUnit::TestCase
 {
 public:
-    typedef typename TreeType::ValueType ValueT;
-    typedef typename TreeType::Ptr TreePtr;
+    typedef typename GridType::ValueType ValueT;
+    typedef typename GridType::Ptr GridPtr;
     struct TestVal { float x, y, z; ValueT expected; };
 
     static std::string testSuiteName()
     {
         std::string name = openvdb::typeNameAsString<ValueT>();
         if (!name.empty()) name[0] = ::toupper(name[0]);
-        // alternatively, "std::string name = TreeType::treeType();"
         return "TestQuadraticInterp" + name;
     }
 
@@ -86,7 +83,7 @@ public:
     void testNegativeIndices();
 
 private:
-    void executeTest(const TreePtr&, const TestVal*, size_t numVals) const;
+    void executeTest(const GridPtr&, const TestVal*, size_t numVals) const;
 
     /// Initialize an arbitrary ValueType from a scalar.
     static inline ValueT constValue(double d) { return ValueT(d); }
@@ -96,26 +93,26 @@ private:
         { return fabs(v1 - v2) <= TOLERANCE; }
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestQuadraticInterp<openvdb::FloatTree>);
-CPPUNIT_TEST_SUITE_REGISTRATION(TestQuadraticInterp<openvdb::DoubleTree>);
-CPPUNIT_TEST_SUITE_REGISTRATION(TestQuadraticInterp<openvdb::Vec3STree>);
+CPPUNIT_TEST_SUITE_REGISTRATION(TestQuadraticInterp<openvdb::FloatGrid>);
+CPPUNIT_TEST_SUITE_REGISTRATION(TestQuadraticInterp<openvdb::DoubleGrid>);
+CPPUNIT_TEST_SUITE_REGISTRATION(TestQuadraticInterp<openvdb::Vec3SGrid>);
 
 
 ////////////////////////////////////////
 
 
-/// Specialization for Vec3s trees
+/// Specialization for Vec3s grids
 template<>
 inline openvdb::Vec3s
-TestQuadraticInterp<openvdb::Vec3STree>::constValue(double d)
+TestQuadraticInterp<openvdb::Vec3SGrid>::constValue(double d)
 {
     return openvdb::Vec3s(d, d, d);
 }
 
-/// Specialization for Vec3s trees
+/// Specialization for Vec3s grids
 template<>
 inline bool
-TestQuadraticInterp<openvdb::Vec3STree>::relEq(
+TestQuadraticInterp<openvdb::Vec3SGrid>::relEq(
     const openvdb::Vec3s& v1, const openvdb::Vec3s& v2)
 {
     return v1.eq(v2, TOLERANCE);
@@ -124,13 +121,13 @@ TestQuadraticInterp<openvdb::Vec3STree>::relEq(
 
 /// Sample the given tree at various locations and assert if
 /// any of the sampled values don't match the expected values.
-template<typename TreeType>
+template<typename GridType>
 void
-TestQuadraticInterp<TreeType>::executeTest(const TreePtr& tree,
+TestQuadraticInterp<GridType>::executeTest(const GridPtr& grid,
     const TestVal* testVals, size_t numVals) const
 {
-    openvdb::tools::GridSampler<TreeType, openvdb::tools::QuadraticSampler> interpolator(*tree);
-    //openvdb::tools::QuadraticInterp<TreeType> interpolator(*tree);
+    openvdb::tools::GridSampler<GridType, openvdb::tools::QuadraticSampler> interpolator(*grid);
+    //openvdb::tools::QuadraticInterp<GridType> interpolator(*tree);
 
     for (size_t i = 0; i < numVals; ++i) {
         const TestVal& val = testVals[i];
@@ -146,9 +143,9 @@ TestQuadraticInterp<TreeType>::executeTest(const TreePtr& tree,
 }
 
 
-template<typename TreeType>
+template<typename GridType>
 void
-TestQuadraticInterp<TreeType>::test()
+TestQuadraticInterp<GridType>::test()
 {
     const ValueT
         one = constValue(1),
@@ -157,38 +154,39 @@ TestQuadraticInterp<TreeType>::test()
         four = constValue(4),
         fillValue = constValue(256);
 
-    TreePtr tree(new TreeType(fillValue));
+    GridPtr grid(new GridType(fillValue));
+    typename GridType::TreeType& tree = grid->tree();
 
-    tree->setValue(openvdb::Coord(10, 10, 10), one);
+    tree.setValue(openvdb::Coord(10, 10, 10), one);
 
-    tree->setValue(openvdb::Coord(11, 10, 10), two);
-    tree->setValue(openvdb::Coord(11, 11, 10), two);
-    tree->setValue(openvdb::Coord(10, 11, 10), two);
-    tree->setValue(openvdb::Coord( 9, 11, 10), two);
-    tree->setValue(openvdb::Coord( 9, 10, 10), two);
-    tree->setValue(openvdb::Coord( 9,  9, 10), two);
-    tree->setValue(openvdb::Coord(10,  9, 10), two);
-    tree->setValue(openvdb::Coord(11,  9, 10), two);
+    tree.setValue(openvdb::Coord(11, 10, 10), two);
+    tree.setValue(openvdb::Coord(11, 11, 10), two);
+    tree.setValue(openvdb::Coord(10, 11, 10), two);
+    tree.setValue(openvdb::Coord( 9, 11, 10), two);
+    tree.setValue(openvdb::Coord( 9, 10, 10), two);
+    tree.setValue(openvdb::Coord( 9,  9, 10), two);
+    tree.setValue(openvdb::Coord(10,  9, 10), two);
+    tree.setValue(openvdb::Coord(11,  9, 10), two);
 
-    tree->setValue(openvdb::Coord(10, 10, 11), three);
-    tree->setValue(openvdb::Coord(11, 10, 11), three);
-    tree->setValue(openvdb::Coord(11, 11, 11), three);
-    tree->setValue(openvdb::Coord(10, 11, 11), three);
-    tree->setValue(openvdb::Coord( 9, 11, 11), three);
-    tree->setValue(openvdb::Coord( 9, 10, 11), three);
-    tree->setValue(openvdb::Coord( 9,  9, 11), three);
-    tree->setValue(openvdb::Coord(10,  9, 11), three);
-    tree->setValue(openvdb::Coord(11,  9, 11), three);
+    tree.setValue(openvdb::Coord(10, 10, 11), three);
+    tree.setValue(openvdb::Coord(11, 10, 11), three);
+    tree.setValue(openvdb::Coord(11, 11, 11), three);
+    tree.setValue(openvdb::Coord(10, 11, 11), three);
+    tree.setValue(openvdb::Coord( 9, 11, 11), three);
+    tree.setValue(openvdb::Coord( 9, 10, 11), three);
+    tree.setValue(openvdb::Coord( 9,  9, 11), three);
+    tree.setValue(openvdb::Coord(10,  9, 11), three);
+    tree.setValue(openvdb::Coord(11,  9, 11), three);
 
-    tree->setValue(openvdb::Coord(10, 10, 9), four);
-    tree->setValue(openvdb::Coord(11, 10, 9), four);
-    tree->setValue(openvdb::Coord(11, 11, 9), four);
-    tree->setValue(openvdb::Coord(10, 11, 9), four);
-    tree->setValue(openvdb::Coord( 9, 11, 9), four);
-    tree->setValue(openvdb::Coord( 9, 10, 9), four);
-    tree->setValue(openvdb::Coord( 9,  9, 9), four);
-    tree->setValue(openvdb::Coord(10,  9, 9), four);
-    tree->setValue(openvdb::Coord(11,  9, 9), four);
+    tree.setValue(openvdb::Coord(10, 10, 9), four);
+    tree.setValue(openvdb::Coord(11, 10, 9), four);
+    tree.setValue(openvdb::Coord(11, 11, 9), four);
+    tree.setValue(openvdb::Coord(10, 11, 9), four);
+    tree.setValue(openvdb::Coord( 9, 11, 9), four);
+    tree.setValue(openvdb::Coord( 9, 10, 9), four);
+    tree.setValue(openvdb::Coord( 9,  9, 9), four);
+    tree.setValue(openvdb::Coord(10,  9, 9), four);
+    tree.setValue(openvdb::Coord(11,  9, 9), four);
 
     const TestVal testVals[] = {
         { 10.5, 10.5, 10.5, constValue(1.703125) },
@@ -207,50 +205,51 @@ TestQuadraticInterp<TreeType>::test()
     };
     const size_t numVals = sizeof(testVals) / sizeof(TestVal);
 
-    executeTest(tree, testVals, numVals);
+    executeTest(grid, testVals, numVals);
 }
 
 
-template<typename TreeType>
+template<typename GridType>
 void
-TestQuadraticInterp<TreeType>::testConstantValues()
+TestQuadraticInterp<GridType>::testConstantValues()
 {
     const ValueT
         two = constValue(2),
         fillValue = constValue(256);
+    
+    GridPtr grid(new GridType(fillValue));
+    typename GridType::TreeType& tree = grid->tree();
 
-    TreePtr tree(new TreeType(fillValue));
+    tree.setValue(openvdb::Coord(10, 10, 10), two);
 
-    tree->setValue(openvdb::Coord(10, 10, 10), two);
+    tree.setValue(openvdb::Coord(11, 10, 10), two);
+    tree.setValue(openvdb::Coord(11, 11, 10), two);
+    tree.setValue(openvdb::Coord(10, 11, 10), two);
+    tree.setValue(openvdb::Coord( 9, 11, 10), two);
+    tree.setValue(openvdb::Coord( 9, 10, 10), two);
+    tree.setValue(openvdb::Coord( 9,  9, 10), two);
+    tree.setValue(openvdb::Coord(10,  9, 10), two);
+    tree.setValue(openvdb::Coord(11,  9, 10), two);
 
-    tree->setValue(openvdb::Coord(11, 10, 10), two);
-    tree->setValue(openvdb::Coord(11, 11, 10), two);
-    tree->setValue(openvdb::Coord(10, 11, 10), two);
-    tree->setValue(openvdb::Coord( 9, 11, 10), two);
-    tree->setValue(openvdb::Coord( 9, 10, 10), two);
-    tree->setValue(openvdb::Coord( 9,  9, 10), two);
-    tree->setValue(openvdb::Coord(10,  9, 10), two);
-    tree->setValue(openvdb::Coord(11,  9, 10), two);
+    tree.setValue(openvdb::Coord(10, 10, 11), two);
+    tree.setValue(openvdb::Coord(11, 10, 11), two);
+    tree.setValue(openvdb::Coord(11, 11, 11), two);
+    tree.setValue(openvdb::Coord(10, 11, 11), two);
+    tree.setValue(openvdb::Coord( 9, 11, 11), two);
+    tree.setValue(openvdb::Coord( 9, 10, 11), two);
+    tree.setValue(openvdb::Coord( 9,  9, 11), two);
+    tree.setValue(openvdb::Coord(10,  9, 11), two);
+    tree.setValue(openvdb::Coord(11,  9, 11), two);
 
-    tree->setValue(openvdb::Coord(10, 10, 11), two);
-    tree->setValue(openvdb::Coord(11, 10, 11), two);
-    tree->setValue(openvdb::Coord(11, 11, 11), two);
-    tree->setValue(openvdb::Coord(10, 11, 11), two);
-    tree->setValue(openvdb::Coord( 9, 11, 11), two);
-    tree->setValue(openvdb::Coord( 9, 10, 11), two);
-    tree->setValue(openvdb::Coord( 9,  9, 11), two);
-    tree->setValue(openvdb::Coord(10,  9, 11), two);
-    tree->setValue(openvdb::Coord(11,  9, 11), two);
-
-    tree->setValue(openvdb::Coord(10, 10, 9), two);
-    tree->setValue(openvdb::Coord(11, 10, 9), two);
-    tree->setValue(openvdb::Coord(11, 11, 9), two);
-    tree->setValue(openvdb::Coord(10, 11, 9), two);
-    tree->setValue(openvdb::Coord( 9, 11, 9), two);
-    tree->setValue(openvdb::Coord( 9, 10, 9), two);
-    tree->setValue(openvdb::Coord( 9,  9, 9), two);
-    tree->setValue(openvdb::Coord(10,  9, 9), two);
-    tree->setValue(openvdb::Coord(11,  9, 9), two);
+    tree.setValue(openvdb::Coord(10, 10, 9), two);
+    tree.setValue(openvdb::Coord(11, 10, 9), two);
+    tree.setValue(openvdb::Coord(11, 11, 9), two);
+    tree.setValue(openvdb::Coord(10, 11, 9), two);
+    tree.setValue(openvdb::Coord( 9, 11, 9), two);
+    tree.setValue(openvdb::Coord( 9, 10, 9), two);
+    tree.setValue(openvdb::Coord( 9,  9, 9), two);
+    tree.setValue(openvdb::Coord(10,  9, 9), two);
+    tree.setValue(openvdb::Coord(11,  9, 9), two);
 
     const TestVal testVals[] = {
         { 10.5, 10.5, 10.5, two },
@@ -264,17 +263,17 @@ TestQuadraticInterp<TreeType>::testConstantValues()
     };
     const size_t numVals = sizeof(testVals) / sizeof(TestVal);
 
-    executeTest(tree, testVals, numVals);
+    executeTest(grid, testVals, numVals);
 }
 
 
-template<typename TreeType>
+template<typename GridType>
 void
-TestQuadraticInterp<TreeType>::testFillValues()
+TestQuadraticInterp<GridType>::testFillValues()
 {
     const ValueT fillValue = constValue(256);
 
-    TreePtr tree(new TreeType(fillValue));
+    GridPtr grid(new GridType(fillValue));
 
     const TestVal testVals[] = {
         { 10.5, 10.5, 10.5, fillValue },
@@ -288,13 +287,13 @@ TestQuadraticInterp<TreeType>::testFillValues()
     };
     const size_t numVals = sizeof(testVals) / sizeof(TestVal);
 
-    executeTest(tree, testVals, numVals);
+    executeTest(grid, testVals, numVals);
 }
 
 
-template<typename TreeType>
+template<typename GridType>
 void
-TestQuadraticInterp<TreeType>::testNegativeIndices()
+TestQuadraticInterp<GridType>::testNegativeIndices()
 {
     const ValueT
         one = constValue(1),
@@ -303,38 +302,39 @@ TestQuadraticInterp<TreeType>::testNegativeIndices()
         four = constValue(4),
         fillValue = constValue(256);
 
-    TreePtr tree(new TreeType(fillValue));
+    GridPtr grid(new GridType(fillValue));
+    typename GridType::TreeType& tree = grid->tree();
 
-    tree->setValue(openvdb::Coord(-10, -10, -10), one);
+    tree.setValue(openvdb::Coord(-10, -10, -10), one);
 
-    tree->setValue(openvdb::Coord(-11, -10, -10), two);
-    tree->setValue(openvdb::Coord(-11, -11, -10), two);
-    tree->setValue(openvdb::Coord(-10, -11, -10), two);
-    tree->setValue(openvdb::Coord( -9, -11, -10), two);
-    tree->setValue(openvdb::Coord( -9, -10, -10), two);
-    tree->setValue(openvdb::Coord( -9,  -9, -10), two);
-    tree->setValue(openvdb::Coord(-10,  -9, -10), two);
-    tree->setValue(openvdb::Coord(-11,  -9, -10), two);
+    tree.setValue(openvdb::Coord(-11, -10, -10), two);
+    tree.setValue(openvdb::Coord(-11, -11, -10), two);
+    tree.setValue(openvdb::Coord(-10, -11, -10), two);
+    tree.setValue(openvdb::Coord( -9, -11, -10), two);
+    tree.setValue(openvdb::Coord( -9, -10, -10), two);
+    tree.setValue(openvdb::Coord( -9,  -9, -10), two);
+    tree.setValue(openvdb::Coord(-10,  -9, -10), two);
+    tree.setValue(openvdb::Coord(-11,  -9, -10), two);
 
-    tree->setValue(openvdb::Coord(-10, -10, -11), three);
-    tree->setValue(openvdb::Coord(-11, -10, -11), three);
-    tree->setValue(openvdb::Coord(-11, -11, -11), three);
-    tree->setValue(openvdb::Coord(-10, -11, -11), three);
-    tree->setValue(openvdb::Coord( -9, -11, -11), three);
-    tree->setValue(openvdb::Coord( -9, -10, -11), three);
-    tree->setValue(openvdb::Coord( -9,  -9, -11), three);
-    tree->setValue(openvdb::Coord(-10,  -9, -11), three);
-    tree->setValue(openvdb::Coord(-11,  -9, -11), three);
+    tree.setValue(openvdb::Coord(-10, -10, -11), three);
+    tree.setValue(openvdb::Coord(-11, -10, -11), three);
+    tree.setValue(openvdb::Coord(-11, -11, -11), three);
+    tree.setValue(openvdb::Coord(-10, -11, -11), three);
+    tree.setValue(openvdb::Coord( -9, -11, -11), three);
+    tree.setValue(openvdb::Coord( -9, -10, -11), three);
+    tree.setValue(openvdb::Coord( -9,  -9, -11), three);
+    tree.setValue(openvdb::Coord(-10,  -9, -11), three);
+    tree.setValue(openvdb::Coord(-11,  -9, -11), three);
 
-    tree->setValue(openvdb::Coord(-10, -10, -9), four);
-    tree->setValue(openvdb::Coord(-11, -10, -9), four);
-    tree->setValue(openvdb::Coord(-11, -11, -9), four);
-    tree->setValue(openvdb::Coord(-10, -11, -9), four);
-    tree->setValue(openvdb::Coord( -9, -11, -9), four);
-    tree->setValue(openvdb::Coord( -9, -10, -9), four);
-    tree->setValue(openvdb::Coord( -9,  -9, -9), four);
-    tree->setValue(openvdb::Coord(-10,  -9, -9), four);
-    tree->setValue(openvdb::Coord(-11,  -9, -9), four);
+    tree.setValue(openvdb::Coord(-10, -10, -9), four);
+    tree.setValue(openvdb::Coord(-11, -10, -9), four);
+    tree.setValue(openvdb::Coord(-11, -11, -9), four);
+    tree.setValue(openvdb::Coord(-10, -11, -9), four);
+    tree.setValue(openvdb::Coord( -9, -11, -9), four);
+    tree.setValue(openvdb::Coord( -9, -10, -9), four);
+    tree.setValue(openvdb::Coord( -9,  -9, -9), four);
+    tree.setValue(openvdb::Coord(-10,  -9, -9), four);
+    tree.setValue(openvdb::Coord(-11,  -9, -9), four);
 
     const TestVal testVals[] = {
         { -10.5, -10.5, -10.5, constValue(-104.75586) },
@@ -353,7 +353,7 @@ TestQuadraticInterp<TreeType>::testNegativeIndices()
     };
     const size_t numVals = sizeof(testVals) / sizeof(TestVal);
 
-    executeTest(tree, testVals, numVals);
+    executeTest(grid, testVals, numVals);
 }
 
 // Copyright (c) 2012-2013 DreamWorks Animation LLC

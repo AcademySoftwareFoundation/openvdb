@@ -197,6 +197,45 @@ TestCoord::testCoordBBox()
         uint64_t volume = UINT64_C(19327352814);
         CPPUNIT_ASSERT_EQUAL(volume, b.volume());
     }
+    {// minExtent and maxExtent
+        const openvdb::Coord min(1,2,3);
+        {
+            const openvdb::Coord max = min + openvdb::Coord(1,2,3);
+            const openvdb::CoordBBox b(min, max);
+            CPPUNIT_ASSERT_EQUAL(int(b.minExtent()), 0);
+            CPPUNIT_ASSERT_EQUAL(int(b.maxExtent()), 2);
+        }
+        {
+            const openvdb::Coord max = min + openvdb::Coord(1,3,2);
+            const openvdb::CoordBBox b(min, max);
+            CPPUNIT_ASSERT_EQUAL(int(b.minExtent()), 0);
+            CPPUNIT_ASSERT_EQUAL(int(b.maxExtent()), 1);
+        }
+        {
+            const openvdb::Coord max = min + openvdb::Coord(2,1,3);
+            const openvdb::CoordBBox b(min, max);
+            CPPUNIT_ASSERT_EQUAL(int(b.minExtent()), 1);
+            CPPUNIT_ASSERT_EQUAL(int(b.maxExtent()), 2);
+        }
+        {
+            const openvdb::Coord max = min + openvdb::Coord(2,3,1);
+            const openvdb::CoordBBox b(min, max);
+            CPPUNIT_ASSERT_EQUAL(int(b.minExtent()), 2);
+            CPPUNIT_ASSERT_EQUAL(int(b.maxExtent()), 1);
+        }
+        {
+            const openvdb::Coord max = min + openvdb::Coord(3,1,2);
+            const openvdb::CoordBBox b(min, max);
+            CPPUNIT_ASSERT_EQUAL(int(b.minExtent()), 1);
+            CPPUNIT_ASSERT_EQUAL(int(b.maxExtent()), 0);
+        }
+        {
+            const openvdb::Coord max = min + openvdb::Coord(3,2,1);
+            const openvdb::CoordBBox b(min, max);
+            CPPUNIT_ASSERT_EQUAL(int(b.minExtent()), 2);
+            CPPUNIT_ASSERT_EQUAL(int(b.maxExtent()), 0);
+        }
+    }
 
 }
 

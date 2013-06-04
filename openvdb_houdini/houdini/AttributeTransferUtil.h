@@ -998,6 +998,85 @@ findClosestPrimitiveToPoint(
 }
 
 
+// Faster for small primitive counts
+inline GA_Offset
+findClosestPrimitiveToPoint(
+    const GU_Detail& geo, std::vector<GA_Index>& primitives, const openvdb::Vec3d& p,
+    GA_Offset& vert0, GA_Offset& vert1, GA_Offset& vert2, openvdb::Vec3d& uvw)
+{
+    GA_Offset primOffset;
+    const GA_Primitive * primRef = NULL;
+    double minDist = std::numeric_limits<double>::max();
+
+    openvdb::Vec3d a, b, c, d, tmpUVW;
+    UT_Vector3 tmpPoint;
+
+    std::sort(primitives.begin(), primitives.end());
+
+    GA_Index lastPrim = -1;
+    for (size_t n = 0, N = primitives.size(); n < N; ++n) {
+        if (primitives[n] == lastPrim) continue;
+        lastPrim = primitives[n];
+
+        const GA_Offset offset = geo.primitiveOffset(lastPrim);
+        primRef = geo.getPrimitiveList().get(offset);
+
+        const GA_Size vertexCount = primRef->getVertexCount();
+
+
+        if (vertexCount == 3 || vertexCount == 4) {
+
+            tmpPoint = geo.getPos3(primRef->getPointOffset(0));
+            a[0] = tmpPoint.x();
+            a[1] = tmpPoint.y();
+            a[2] = tmpPoint.z();
+
+            tmpPoint = geo.getPos3(primRef->getPointOffset(1));
+            b[0] = tmpPoint.x();
+            b[1] = tmpPoint.y();
+            b[2] = tmpPoint.z();
+
+            tmpPoint = geo.getPos3(primRef->getPointOffset(2));
+            c[0] = tmpPoint.x();
+            c[1] = tmpPoint.y();
+            c[2] = tmpPoint.z();
+
+            double tmpDist =
+                (p - openvdb::math::closestPointOnTriangleToPoint(a, c, b, p, tmpUVW)).lengthSqr();
+
+            if (tmpDist < minDist) {
+                minDist = tmpDist;
+                primOffset = offset;
+                uvw = tmpUVW;
+                vert0 = primRef->getVertexOffset(0);
+                vert1 = primRef->getVertexOffset(2);
+                vert2 = primRef->getVertexOffset(1);
+            }
+
+            if (vertexCount == 4) {
+                tmpPoint = geo.getPos3(primRef->getPointOffset(3));
+                d[0] = tmpPoint.x();
+                d[1] = tmpPoint.y();
+                d[2] = tmpPoint.z();
+
+                tmpDist = (p - openvdb::math::closestPointOnTriangleToPoint(
+                    a, d, c, p, tmpUVW)).lengthSqr();
+                if (tmpDist < minDist) {
+                    minDist = tmpDist;
+                    primOffset = offset;
+                    uvw = tmpUVW;
+                    vert0 = primRef->getVertexOffset(0);
+                    vert1 = primRef->getVertexOffset(3);
+                    vert2 = primRef->getVertexOffset(2);
+                }
+            }
+
+        }
+    }
+
+    return primOffset;
+}
+
 ////////////////////////////////////////
 
 
@@ -1045,6 +1124,7 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
     const openvdb::math::Transform& transform = mIndexGrid.transform();
     openvdb::Vec3d pos, indexPos, uvw;
     openvdb::Coord ijk, coord;
+    std::vector<GA_Index> primitives(8);
     int count;
 
     for (GA_PageIterator pageIt = range.beginPages(); !pageIt.atEnd(); ++pageIt) {
@@ -1076,7 +1156,7 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
                     coord[1] = int(std::floor(indexPos[1]));
                     coord[2] = int(std::floor(indexPos[2]));
 
-                    std::set<GA_Index> primitives;
+                    primitives.clear();
                     int primIndex;
 
                     for (int d = 0; d < 8; ++d) {
@@ -1086,7 +1166,7 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
 
                         if (acc.probeValue(ijk, primIndex) &&
                             primIndex != openvdb::util::INVALID_IDX) {
-                            primitives.insert(primIndex);
+                            primitives.push_back(primIndex);
                         }
                     }
 
@@ -1115,8 +1195,8 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
                         coord[1] = int(std::floor(indexPos[1]));
                         coord[2] = int(std::floor(indexPos[2]));
 
-                        std::set<GA_Index> primitives;
                         int primIndex;
+                        primitives.clear();
 
                         for (int d = 0; d < 8; ++d) {
                             ijk[0] = coord[0] + ((d & 0x02) >> 1 ^ d & 0x01);
@@ -1125,7 +1205,7 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
 
                             if (acc.probeValue(ijk, primIndex) &&
                                 primIndex != openvdb::util::INVALID_IDX) {
-                                primitives.insert(primIndex);
+                                primitives.push_back(primIndex);
                             }
                         }
 
@@ -1187,6 +1267,7 @@ TransferPointAttributesOp<GridType>::operator()(const GA_SplittableRange& range)
     typename GridType::ConstAccessor acc = mIndexGrid.getConstAccessor();
     const openvdb::math::Transform& transform = mIndexGrid.transform();
     openvdb::Vec3d pos, indexPos, uvw;
+    std::vector<GA_Index> primitives(8);
     openvdb::Coord ijk, coord;
 
     for (GA_PageIterator pageIt = range.beginPages(); !pageIt.atEnd(); ++pageIt) {
@@ -1225,7 +1306,7 @@ TransferPointAttributesOp<GridType>::operator()(const GA_SplittableRange& range)
                 coord[1] = int(std::floor(indexPos[1]));
                 coord[2] = int(std::floor(indexPos[2]));
 
-                std::set<GA_Index> primitives;
+                primitives.clear();
                 int primIndex;
 
                 for (int d = 0; d < 8; ++d) {
@@ -1235,7 +1316,7 @@ TransferPointAttributesOp<GridType>::operator()(const GA_SplittableRange& range)
 
                     if (acc.probeValue(ijk, primIndex) &&
                         primIndex != openvdb::util::INVALID_IDX) {
-                        primitives.insert(primIndex);
+                        primitives.push_back(primIndex);
                     }
                 }
 

@@ -61,6 +61,24 @@ VdbPrimCIterator::VdbPrimCIterator(const GEO_Detail* gdp, GA_Range::safedeletion
 }
 
 
+VdbPrimCIterator::VdbPrimCIterator(const VdbPrimCIterator& other):
+    mIter(other.mIter ? new GA_GBPrimitiveIterator(*other.mIter) : NULL),
+    mFilter(other.mFilter)
+{
+}
+
+
+VdbPrimCIterator&
+VdbPrimCIterator::operator=(const VdbPrimCIterator& other)
+{
+    if (&other != this) {
+        mIter.reset(other.mIter ? new GA_GBPrimitiveIterator(*other.mIter) : NULL);
+        mFilter = other.mFilter;
+    }
+    return *this;
+}
+
+
 void
 VdbPrimCIterator::advance()
 {
@@ -113,6 +131,22 @@ VdbPrimCIterator::getPrimitiveNameOrIndex() const
     UT_String name;
     name.itoa(this->getIndex());
     return this->getPrimitiveName(/*defaultName=*/name);
+}
+
+
+////////////////////////////////////////
+
+
+VdbPrimIterator::VdbPrimIterator(const VdbPrimIterator& other): VdbPrimCIterator(other)
+{
+}
+
+
+VdbPrimIterator&
+VdbPrimIterator::operator=(const VdbPrimIterator& other)
+{
+    if (&other != this) VdbPrimCIterator::operator=(other);
+    return *this;
 }
 
 

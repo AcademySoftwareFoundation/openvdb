@@ -72,7 +72,8 @@
 #include <openvdb/version.h> // for OPENVDB_VERSION_NAME
 #include <openvdb/Platform.h> // for round()
 #include <openvdb/math/Transform.h> // for Transform
-
+#include <openvdb/Grid.h>
+#include <openvdb/tree/ValueAccessor.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -201,37 +202,67 @@ struct StaggeredQuadraticSampler
 ////////////////////////////////////////
 
 
-/// @brief Base class that provides the interface for continuous sampling
-/// of values in a grid.
-/// @details Since grids support only discrete voxel sampling, GridSampler
-/// must be used to sample arbitrary continuous points in (world or index) space.
-template<typename TreeOrAccessorType, typename SamplerType>
+/// @brief Class that provides the interface for continuous sampling
+/// of values in a tree. Consider using the GridSampler below instead.
+///
+/// @details Since trees support only discrete voxel sampling, TreeSampler
+/// must be used to sample arbitrary continuous points in (world or
+/// index) space.
+///
+/// @warning This implementation of the GridSampler stores a pointer
+/// to a Tree for value access. While this is thread-safe it is
+/// uncached and hence slow compared to using a
+/// ValueAccessor. Consequently is it normally advisable to use the
+/// template specialization below that employs a
+/// ValueAccessor. However case must be taken when dealing with
+/// multi-threading (see warning below).
+template<typename GridOrTreeType, typename SamplerType>
 class GridSampler
 {
 public:
-    typedef boost::shared_ptr<GridSampler>          Ptr;
-    typedef typename TreeOrAccessorType::ValueType  ValueType;
+    typedef boost::shared_ptr<GridSampler>                      Ptr;
+    typedef typename GridOrTreeType::ValueType                  ValueType;
+    typedef typename TreeAdapter<GridOrTreeType>::GridType      GridType;
+    typedef typename TreeAdapter<GridOrTreeType>::TreeType      TreeType;
+    typedef typename TreeAdapter<GridOrTreeType>::AccessorType  AccessorType;
+
+     /// @param grid  a grid to be sampled
+    explicit GridSampler(const GridType& grid)
+        : mTree(&(grid.tree())), mTransform(&(grid.transform())) {}
 
     /// @param tree  a tree to be sampled, or a ValueAccessor for the tree
     /// @param transform is used when sampling world space locations.
-    ///     (by default an identity transform is used)
-    explicit GridSampler(const TreeOrAccessorType& tree,
-        const math::Transform& transform = math::Transform()):
-        mTree(&tree), mTransform(transform) {}
+    GridSampler(const TreeType& tree, const math::Transform& transform)
+        : mTree(&tree), mTransform(&transform) {}
 
-    ~GridSampler() {};
+    const math::Transform& transform() const { return *mTransform; }
 
     /// @brief Sample a point in index space in the grid.
-    /// @param x x-coordinate of point in index-coordinates of grid
-    /// @param y y-coordinate of point in index-coordinates of grid
-    /// @param z z-coordinate of point in index-coordinates of grid
+    /// @param x Fractional x-coordinate of point in index-coordinates of grid
+    /// @param y Fractional y-coordinate of point in index-coordinates of grid
+    /// @param z Fractional z-coordinate of point in index-coordinates of grid
     template<typename RealType>
     ValueType sampleVoxel(const RealType& x, const RealType& y, const RealType& z) const
     {
-        return isSample(Vec3d(x,y,z));
+        return this->isSample(Vec3d(x,y,z));
     }
 
-    /// @brief Sample in index space
+    /// @brief Sample value in integer index space
+    /// @param i Integer x-coordinate in index space
+    /// @param j Integer y-coordinate in index space
+    /// @param k Integer x-coordinate in index space
+    ValueType sampleVoxel(typename Coord::ValueType i,
+                          typename Coord::ValueType j,
+                          typename Coord::ValueType k) const
+    {
+        return this->isSample(Coord(i,j,k));
+    }
+
+    /// @brief Sample value in integer index space
+    /// @param ijk the location in index space
+    ValueType isSample(const Coord& ijk) const { return mTree->getValue(ijk); }
+
+    /// @brief Sample in fractional index space
     /// @param ispoint the location in index space
     ValueType isSample(const Vec3d& ispoint) const
     {
@@ -245,13 +276,91 @@ public:
     ValueType wsSample(const Vec3d& wspoint) const
     {
         ValueType result = zeroVal<ValueType>();
-        SamplerType::sample(*mTree, mTransform.worldToIndex(wspoint), result);
+        SamplerType::sample(*mTree, mTransform->worldToIndex(wspoint), result);
         return result;
     }
 
 private:
-    const TreeOrAccessorType* mTree;
-    const math::Transform     mTransform;
+    const TreeType*        mTree;
+    const math::Transform* mTransform;
+}; // class GridSampler
+
+
+/// @brief Specialization of GridSampler for construction from a ValueAccessor type
+///
+/// @note This version should normally be favoured over the one above
+/// that takes a Grid or Tree. The reason is this version uses a
+/// ValueAccessor that performs fast (cached) access where the
+/// tree-based flavour performs slower (uncached) access.
+///
+/// @warning Since this version stores a pointer to an (externally
+/// allocated) value accessor it is not threadsafe. Hence each thread
+/// should have it own instance of a GridSampler constructed from a
+/// local ValueAccessor. Alternatively the Grid/Tree-based GridSampler
+/// is threadsafe, but also slower.
+template<typename TreeT, typename SamplerType>
+class GridSampler<tree::ValueAccessor<TreeT>, SamplerType>
+{
+public:
+    typedef boost::shared_ptr<GridSampler>      Ptr;
+    typedef typename TreeT::ValueType           ValueType;
+    typedef TreeT                               TreeType;
+    typedef Grid<TreeType>                      GridType;
+    typedef typename tree::ValueAccessor<TreeT> AccessorType;
+
+    /// @param acc  a ValueAccessor to be sampled
+    /// @param transform is used when sampling world space locations.
+    GridSampler(const AccessorType& acc, const math::Transform& transform)
+        : mAccessor(&acc), mTransform(&transform) {}
+
+     const math::Transform& transform() const { return *mTransform; }
+
+    /// @brief Sample a point in index space in the grid.
+    /// @param x Fractional x-coordinate of point in index-coordinates of grid
+    /// @param y Fractional y-coordinate of point in index-coordinates of grid
+    /// @param z Fractional z-coordinate of point in index-coordinates of grid
+    template<typename RealType>
+    ValueType sampleVoxel(const RealType& x, const RealType& y, const RealType& z) const
+    {
+        return this->isSample(Vec3d(x,y,z));
+    }
+
+    /// @brief Sample value in integer index space
+    /// @param i Integer x-coordinate in index space
+    /// @param j Integer y-coordinate in index space
+    /// @param k Integer x-coordinate in index space
+    ValueType sampleVoxel(typename Coord::ValueType i,
+                          typename Coord::ValueType j,
+                          typename Coord::ValueType k) const
+    {
+        return this->isSample(Coord(i,j,k));
+    }
+
+    /// @brief Sample value in integer index space
+    /// @param ijk the location in index space
+    ValueType isSample(const Coord& ijk) const { return mAccessor->getValue(ijk); }
+
+    /// @brief Sample in fractional index space
+    /// @param ispoint the location in index space
+    ValueType isSample(const Vec3d& ispoint) const
+    {
+        ValueType result = zeroVal<ValueType>();
+        SamplerType::sample(*mAccessor, ispoint, result);
+        return result;
+    }
+
+    /// @brief Sample in world space
+    /// @param wspoint the location in world space
+    ValueType wsSample(const Vec3d& wspoint) const
+    {
+        ValueType result = zeroVal<ValueType>();
+        SamplerType::sample(*mAccessor, mTransform->worldToIndex(wspoint), result);
+        return result;
+    }
+
+private:
+    const AccessorType*    mAccessor;//not thread-safe!
+    const math::Transform* mTransform;
 };
 
 

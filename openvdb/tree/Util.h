@@ -34,6 +34,7 @@
 #define OPENVDB_TREE_UTIL_HAS_BEEN_INCLUDED
 
 #include <openvdb/math/Math.h> // for zeroVal
+#include <openvdb/Types.h> // for Index typedef
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

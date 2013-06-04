@@ -48,80 +48,86 @@ namespace {
 const double TOLERANCE = 1.e-6;
 }
 
-template<typename TreeType>
+template<typename GridType>
 class TestLinearInterp: public CppUnit::TestCase
 {
 public:
     static std::string testSuiteName()
     {
-        std::string name = openvdb::typeNameAsString<typename TreeType::ValueType>();
+        std::string name = openvdb::typeNameAsString<typename GridType::ValueType>();
         if (!name.empty()) name[0] = ::toupper(name[0]);
-        // alternatively, "std::string name = TreeType::treeType();"
         return "TestLinearInterp" + name;
     }
 
     CPPUNIT_TEST_SUITE(TestLinearInterp);
     CPPUNIT_TEST(test);
+    CPPUNIT_TEST(testTree);
+    CPPUNIT_TEST(testAccessor);
     CPPUNIT_TEST(testConstantValues);
     CPPUNIT_TEST(testFillValues);
     CPPUNIT_TEST(testNegativeIndices);
     CPPUNIT_TEST_SUITE_END();
 
     void test();
+    void testTree();
+    void testAccessor();
     void testConstantValues();
     void testFillValues();
     void testNegativeIndices();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestLinearInterp<openvdb::FloatTree>);
-CPPUNIT_TEST_SUITE_REGISTRATION(TestLinearInterp<openvdb::DoubleTree>);
-CPPUNIT_TEST_SUITE_REGISTRATION(TestLinearInterp<openvdb::Vec3STree>);
+CPPUNIT_TEST_SUITE_REGISTRATION(TestLinearInterp<openvdb::FloatGrid>);
+CPPUNIT_TEST_SUITE_REGISTRATION(TestLinearInterp<openvdb::DoubleGrid>);
+CPPUNIT_TEST_SUITE_REGISTRATION(TestLinearInterp<openvdb::Vec3SGrid>);
 
 
-template<typename TreeType>
+template<typename GridType>
 void
-TestLinearInterp<TreeType>::test()
+TestLinearInterp<GridType>::test()
 {
+    typename GridType::TreeType TreeType;
     float fillValue = 256.0f;
 
-    typename TreeType::Ptr tree(new TreeType(fillValue));
+    GridType grid(fillValue);
+    typename GridType::TreeType& tree = grid.tree();
 
-    tree->setValue(openvdb::Coord(10, 10, 10), 1.0);
+    tree.setValue(openvdb::Coord(10, 10, 10), 1.0);
 
-    tree->setValue(openvdb::Coord(11, 10, 10), 2.0);
-    tree->setValue(openvdb::Coord(11, 11, 10), 2.0);
-    tree->setValue(openvdb::Coord(10, 11, 10), 2.0);
-    tree->setValue(openvdb::Coord( 9, 11, 10), 2.0);
-    tree->setValue(openvdb::Coord( 9, 10, 10), 2.0);
-    tree->setValue(openvdb::Coord( 9,  9, 10), 2.0);
-    tree->setValue(openvdb::Coord(10,  9, 10), 2.0);
-    tree->setValue(openvdb::Coord(11,  9, 10), 2.0);
+    tree.setValue(openvdb::Coord(11, 10, 10), 2.0);
+    tree.setValue(openvdb::Coord(11, 11, 10), 2.0);
+    tree.setValue(openvdb::Coord(10, 11, 10), 2.0);
+    tree.setValue(openvdb::Coord( 9, 11, 10), 2.0);
+    tree.setValue(openvdb::Coord( 9, 10, 10), 2.0);
+    tree.setValue(openvdb::Coord( 9,  9, 10), 2.0);
+    tree.setValue(openvdb::Coord(10,  9, 10), 2.0);
+    tree.setValue(openvdb::Coord(11,  9, 10), 2.0);
 
-    tree->setValue(openvdb::Coord(10, 10, 11), 3.0);
-    tree->setValue(openvdb::Coord(11, 10, 11), 3.0);
-    tree->setValue(openvdb::Coord(11, 11, 11), 3.0);
-    tree->setValue(openvdb::Coord(10, 11, 11), 3.0);
-    tree->setValue(openvdb::Coord( 9, 11, 11), 3.0);
-    tree->setValue(openvdb::Coord( 9, 10, 11), 3.0);
-    tree->setValue(openvdb::Coord( 9,  9, 11), 3.0);
-    tree->setValue(openvdb::Coord(10,  9, 11), 3.0);
-    tree->setValue(openvdb::Coord(11,  9, 11), 3.0);
+    tree.setValue(openvdb::Coord(10, 10, 11), 3.0);
+    tree.setValue(openvdb::Coord(11, 10, 11), 3.0);
+    tree.setValue(openvdb::Coord(11, 11, 11), 3.0);
+    tree.setValue(openvdb::Coord(10, 11, 11), 3.0);
+    tree.setValue(openvdb::Coord( 9, 11, 11), 3.0);
+    tree.setValue(openvdb::Coord( 9, 10, 11), 3.0);
+    tree.setValue(openvdb::Coord( 9,  9, 11), 3.0);
+    tree.setValue(openvdb::Coord(10,  9, 11), 3.0);
+    tree.setValue(openvdb::Coord(11,  9, 11), 3.0);
 
-    tree->setValue(openvdb::Coord(10, 10, 9), 4.0);
-    tree->setValue(openvdb::Coord(11, 10, 9), 4.0);
-    tree->setValue(openvdb::Coord(11, 11, 9), 4.0);
-    tree->setValue(openvdb::Coord(10, 11, 9), 4.0);
-    tree->setValue(openvdb::Coord( 9, 11, 9), 4.0);
-    tree->setValue(openvdb::Coord( 9, 10, 9), 4.0);
-    tree->setValue(openvdb::Coord( 9,  9, 9), 4.0);
-    tree->setValue(openvdb::Coord(10,  9, 9), 4.0);
-    tree->setValue(openvdb::Coord(11,  9, 9), 4.0);
+    tree.setValue(openvdb::Coord(10, 10, 9), 4.0);
+    tree.setValue(openvdb::Coord(11, 10, 9), 4.0);
+    tree.setValue(openvdb::Coord(11, 11, 9), 4.0);
+    tree.setValue(openvdb::Coord(10, 11, 9), 4.0);
+    tree.setValue(openvdb::Coord( 9, 11, 9), 4.0);
+    tree.setValue(openvdb::Coord( 9, 10, 9), 4.0);
+    tree.setValue(openvdb::Coord( 9,  9, 9), 4.0);
+    tree.setValue(openvdb::Coord(10,  9, 9), 4.0);
+    tree.setValue(openvdb::Coord(11,  9, 9), 4.0);
 
     // transform used for worldspace interpolation)
-    openvdb::tools::GridSampler<TreeType, openvdb::tools::BoxSampler>  interpolator(*tree); 
-    //openvdb::tools::LinearInterp<TreeType> interpolator(*tree);
+    openvdb::tools::GridSampler<GridType, openvdb::tools::BoxSampler>
+        interpolator(grid); 
+    //openvdb::tools::LinearInterp<GridType> interpolator(*tree);
 
-    typename TreeType::ValueType val =
+    typename GridType::ValueType val =
         interpolator.sampleVoxel(10.5, 10.5, 10.5);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.375, val, TOLERANCE);
 
@@ -165,50 +171,52 @@ TestLinearInterp<TreeType>::test()
 
 template<>
 void
-TestLinearInterp<openvdb::Vec3STree>::test()
+TestLinearInterp<openvdb::Vec3SGrid>::test()
 {
     using namespace openvdb;
 
     Vec3s fillValue = Vec3s(256.0f, 256.0f, 256.0f);
 
-    Vec3STree::Ptr tree(new Vec3STree(fillValue));
+    Vec3SGrid grid(fillValue);
+    Vec3STree& tree = grid.tree();
 
-    tree->setValue(openvdb::Coord(10, 10, 10), Vec3s(1.0, 1.0, 1.0));
+    tree.setValue(openvdb::Coord(10, 10, 10), Vec3s(1.0, 1.0, 1.0));
 
-    tree->setValue(openvdb::Coord(11, 10, 10), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord(11, 11, 10), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord(10, 11, 10), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord( 9, 11, 10), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord( 9, 10, 10), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord( 9,  9, 10), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord(10,  9, 10), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord(11,  9, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(11, 10, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(11, 11, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(10, 11, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord( 9, 11, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord( 9, 10, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord( 9,  9, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(10,  9, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(11,  9, 10), Vec3s(2.0, 2.0, 2.0));
 
-    tree->setValue(openvdb::Coord(10, 10, 11), Vec3s(3.0, 3.0, 3.0));
-    tree->setValue(openvdb::Coord(11, 10, 11), Vec3s(3.0, 3.0, 3.0));
-    tree->setValue(openvdb::Coord(11, 11, 11), Vec3s(3.0, 3.0, 3.0));
-    tree->setValue(openvdb::Coord(10, 11, 11), Vec3s(3.0, 3.0, 3.0));
-    tree->setValue(openvdb::Coord( 9, 11, 11), Vec3s(3.0, 3.0, 3.0));
-    tree->setValue(openvdb::Coord( 9, 10, 11), Vec3s(3.0, 3.0, 3.0));
-    tree->setValue(openvdb::Coord( 9,  9, 11), Vec3s(3.0, 3.0, 3.0));
-    tree->setValue(openvdb::Coord(10,  9, 11), Vec3s(3.0, 3.0, 3.0));
-    tree->setValue(openvdb::Coord(11,  9, 11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord(10, 10, 11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord(11, 10, 11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord(11, 11, 11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord(10, 11, 11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord( 9, 11, 11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord( 9, 10, 11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord( 9,  9, 11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord(10,  9, 11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord(11,  9, 11), Vec3s(3.0, 3.0, 3.0));
 
-    tree->setValue(openvdb::Coord(10, 10, 9), Vec3s(4.0, 4.0, 4.0));
-    tree->setValue(openvdb::Coord(11, 10, 9), Vec3s(4.0, 4.0, 4.0));
-    tree->setValue(openvdb::Coord(11, 11, 9), Vec3s(4.0, 4.0, 4.0));
-    tree->setValue(openvdb::Coord(10, 11, 9), Vec3s(4.0, 4.0, 4.0));
-    tree->setValue(openvdb::Coord( 9, 11, 9), Vec3s(4.0, 4.0, 4.0));
-    tree->setValue(openvdb::Coord( 9, 10, 9), Vec3s(4.0, 4.0, 4.0));
-    tree->setValue(openvdb::Coord( 9,  9, 9), Vec3s(4.0, 4.0, 4.0));
-    tree->setValue(openvdb::Coord(10,  9, 9), Vec3s(4.0, 4.0, 4.0));
-    tree->setValue(openvdb::Coord(11,  9, 9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord(10, 10, 9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord(11, 10, 9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord(11, 11, 9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord(10, 11, 9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord( 9, 11, 9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord( 9, 10, 9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord( 9,  9, 9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord(10,  9, 9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord(11,  9, 9), Vec3s(4.0, 4.0, 4.0));
 
-    openvdb::tools::GridSampler<Vec3STree, openvdb::tools::BoxSampler>  interpolator(*tree); 
+    openvdb::tools::GridSampler<Vec3SGrid, openvdb::tools::BoxSampler>
+        interpolator(grid); 
     
     //openvdb::tools::LinearInterp<Vec3STree> interpolator(*tree);
 
-    Vec3STree::ValueType val = interpolator.sampleVoxel(10.5, 10.5, 10.5);
+    Vec3SGrid::ValueType val = interpolator.sampleVoxel(10.5, 10.5, 10.5);
     CPPUNIT_ASSERT(val.eq(Vec3s(2.375, 2.375, 2.375)));
 
     val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
@@ -248,51 +256,397 @@ TestLinearInterp<openvdb::Vec3STree>::test()
     CPPUNIT_ASSERT(val.eq(Vec3s(2.01, 2.01, 2.01)));
 }
 
-
-template<typename TreeType>
+template<typename GridType>
 void
-TestLinearInterp<TreeType>::testConstantValues()
+TestLinearInterp<GridType>::testTree()
+{
+    float fillValue = 256.0f;
+    typedef typename GridType::TreeType TreeType;
+    TreeType tree(fillValue);
+
+    tree.setValue(openvdb::Coord(10, 10, 10), 1.0);
+
+    tree.setValue(openvdb::Coord(11, 10, 10), 2.0);
+    tree.setValue(openvdb::Coord(11, 11, 10), 2.0);
+    tree.setValue(openvdb::Coord(10, 11, 10), 2.0);
+    tree.setValue(openvdb::Coord( 9, 11, 10), 2.0);
+    tree.setValue(openvdb::Coord( 9, 10, 10), 2.0);
+    tree.setValue(openvdb::Coord( 9,  9, 10), 2.0);
+    tree.setValue(openvdb::Coord(10,  9, 10), 2.0);
+    tree.setValue(openvdb::Coord(11,  9, 10), 2.0);
+
+    tree.setValue(openvdb::Coord(10, 10, 11), 3.0);
+    tree.setValue(openvdb::Coord(11, 10, 11), 3.0);
+    tree.setValue(openvdb::Coord(11, 11, 11), 3.0);
+    tree.setValue(openvdb::Coord(10, 11, 11), 3.0);
+    tree.setValue(openvdb::Coord( 9, 11, 11), 3.0);
+    tree.setValue(openvdb::Coord( 9, 10, 11), 3.0);
+    tree.setValue(openvdb::Coord( 9,  9, 11), 3.0);
+    tree.setValue(openvdb::Coord(10,  9, 11), 3.0);
+    tree.setValue(openvdb::Coord(11,  9, 11), 3.0);
+
+    tree.setValue(openvdb::Coord(10, 10, 9), 4.0);
+    tree.setValue(openvdb::Coord(11, 10, 9), 4.0);
+    tree.setValue(openvdb::Coord(11, 11, 9), 4.0);
+    tree.setValue(openvdb::Coord(10, 11, 9), 4.0);
+    tree.setValue(openvdb::Coord( 9, 11, 9), 4.0);
+    tree.setValue(openvdb::Coord( 9, 10, 9), 4.0);
+    tree.setValue(openvdb::Coord( 9,  9, 9), 4.0);
+    tree.setValue(openvdb::Coord(10,  9, 9), 4.0);
+    tree.setValue(openvdb::Coord(11,  9, 9), 4.0);
+
+    // transform used for worldspace interpolation)
+    openvdb::tools::GridSampler<TreeType, openvdb::tools::BoxSampler>
+        interpolator(tree, openvdb::math::Transform());
+
+    typename GridType::ValueType val =
+        interpolator.sampleVoxel(10.5, 10.5, 10.5);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.375, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(11.0, 10.0, 10.0);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(11.0, 11.0, 10.0);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(11.0, 11.0, 11.0);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(9.0, 11.0, 9.0);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(9.0, 10.0, 9.0);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.1, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.792, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.41, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.41, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.71, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.01, val, TOLERANCE);
+}
+
+
+template<>
+void
+TestLinearInterp<openvdb::Vec3SGrid>::testTree()
+{
+    using namespace openvdb;
+
+    Vec3s fillValue = Vec3s(256.0f, 256.0f, 256.0f);
+    
+    Vec3STree tree(fillValue);
+
+    tree.setValue(openvdb::Coord(10, 10, 10), Vec3s(1.0, 1.0, 1.0));
+
+    tree.setValue(openvdb::Coord(11, 10, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(11, 11, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(10, 11, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord( 9, 11, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord( 9, 10, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord( 9,  9, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(10,  9, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(11,  9, 10), Vec3s(2.0, 2.0, 2.0));
+
+    tree.setValue(openvdb::Coord(10, 10, 11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord(11, 10, 11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord(11, 11, 11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord(10, 11, 11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord( 9, 11, 11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord( 9, 10, 11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord( 9,  9, 11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord(10,  9, 11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord(11,  9, 11), Vec3s(3.0, 3.0, 3.0));
+
+    tree.setValue(openvdb::Coord(10, 10, 9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord(11, 10, 9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord(11, 11, 9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord(10, 11, 9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord( 9, 11, 9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord( 9, 10, 9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord( 9,  9, 9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord(10,  9, 9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord(11,  9, 9), Vec3s(4.0, 4.0, 4.0));
+
+    openvdb::tools::GridSampler<Vec3STree, openvdb::tools::BoxSampler>
+        interpolator(tree, openvdb::math::Transform()); 
+    
+    //openvdb::tools::LinearInterp<Vec3STree> interpolator(*tree);
+
+    Vec3SGrid::ValueType val = interpolator.sampleVoxel(10.5, 10.5, 10.5);
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.375, 2.375, 2.375)));
+
+    val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
+    CPPUNIT_ASSERT(val.eq(Vec3s(1.0, 1.0, 1.0)));
+
+    val = interpolator.sampleVoxel(11.0, 10.0, 10.0);
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.0, 2.0, 2.0)));
+
+    val = interpolator.sampleVoxel(11.0, 11.0, 10.0);
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.0, 2.0, 2.0)));
+
+    val = interpolator.sampleVoxel(11.0, 11.0, 11.0);
+    CPPUNIT_ASSERT(val.eq(Vec3s(3.0, 3.0, 3.0)));
+
+    val = interpolator.sampleVoxel(9.0, 11.0, 9.0);
+    CPPUNIT_ASSERT(val.eq(Vec3s(4.0, 4.0, 4.0)));
+
+    val = interpolator.sampleVoxel(9.0, 10.0, 9.0);
+    CPPUNIT_ASSERT(val.eq(Vec3s(4.0, 4.0, 4.0)));
+
+    val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
+    CPPUNIT_ASSERT(val.eq(Vec3s(1.1, 1.1, 1.1)));
+
+    val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.792, 2.792, 2.792)));
+
+    val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.41, 2.41, 2.41)));
+
+    val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.41, 2.41, 2.41)));
+
+    val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.71, 2.71, 2.71)));
+
+    val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.01, 2.01, 2.01)));
+}
+
+template<typename GridType>
+void
+TestLinearInterp<GridType>::testAccessor()
 {
     float fillValue = 256.0f;
 
-    typename TreeType::Ptr tree(new TreeType(fillValue));
+    GridType grid(fillValue);
+    typedef typename GridType::Accessor AccessorType;
+
+    AccessorType acc = grid.getAccessor();
+
+    acc.setValue(openvdb::Coord(10, 10, 10), 1.0);
+
+    acc.setValue(openvdb::Coord(11, 10, 10), 2.0);
+    acc.setValue(openvdb::Coord(11, 11, 10), 2.0);
+    acc.setValue(openvdb::Coord(10, 11, 10), 2.0);
+    acc.setValue(openvdb::Coord( 9, 11, 10), 2.0);
+    acc.setValue(openvdb::Coord( 9, 10, 10), 2.0);
+    acc.setValue(openvdb::Coord( 9,  9, 10), 2.0);
+    acc.setValue(openvdb::Coord(10,  9, 10), 2.0);
+    acc.setValue(openvdb::Coord(11,  9, 10), 2.0);
+
+    acc.setValue(openvdb::Coord(10, 10, 11), 3.0);
+    acc.setValue(openvdb::Coord(11, 10, 11), 3.0);
+    acc.setValue(openvdb::Coord(11, 11, 11), 3.0);
+    acc.setValue(openvdb::Coord(10, 11, 11), 3.0);
+    acc.setValue(openvdb::Coord( 9, 11, 11), 3.0);
+    acc.setValue(openvdb::Coord( 9, 10, 11), 3.0);
+    acc.setValue(openvdb::Coord( 9,  9, 11), 3.0);
+    acc.setValue(openvdb::Coord(10,  9, 11), 3.0);
+    acc.setValue(openvdb::Coord(11,  9, 11), 3.0);
+
+    acc.setValue(openvdb::Coord(10, 10, 9), 4.0);
+    acc.setValue(openvdb::Coord(11, 10, 9), 4.0);
+    acc.setValue(openvdb::Coord(11, 11, 9), 4.0);
+    acc.setValue(openvdb::Coord(10, 11, 9), 4.0);
+    acc.setValue(openvdb::Coord( 9, 11, 9), 4.0);
+    acc.setValue(openvdb::Coord( 9, 10, 9), 4.0);
+    acc.setValue(openvdb::Coord( 9,  9, 9), 4.0);
+    acc.setValue(openvdb::Coord(10,  9, 9), 4.0);
+    acc.setValue(openvdb::Coord(11,  9, 9), 4.0);
+
+    // transform used for worldspace interpolation)
+    openvdb::tools::GridSampler<AccessorType, openvdb::tools::BoxSampler>
+        interpolator(acc, grid.transform());
+
+    typename GridType::ValueType val =
+        interpolator.sampleVoxel(10.5, 10.5, 10.5);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.375, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(11.0, 10.0, 10.0);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(11.0, 11.0, 10.0);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(11.0, 11.0, 11.0);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(9.0, 11.0, 9.0);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(9.0, 10.0, 9.0);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.1, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.792, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.41, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.41, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.71, val, TOLERANCE);
+
+    val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.01, val, TOLERANCE);
+}
+
+
+template<>
+void
+TestLinearInterp<openvdb::Vec3SGrid>::testAccessor()
+{
+    using namespace openvdb;
+
+    Vec3s fillValue = Vec3s(256.0f, 256.0f, 256.0f);
+
+    Vec3SGrid grid(fillValue);
+    typedef Vec3SGrid::Accessor AccessorType;
+    AccessorType acc = grid.getAccessor();
+
+    acc.setValue(openvdb::Coord(10, 10, 10), Vec3s(1.0, 1.0, 1.0));
+
+    acc.setValue(openvdb::Coord(11, 10, 10), Vec3s(2.0, 2.0, 2.0));
+    acc.setValue(openvdb::Coord(11, 11, 10), Vec3s(2.0, 2.0, 2.0));
+    acc.setValue(openvdb::Coord(10, 11, 10), Vec3s(2.0, 2.0, 2.0));
+    acc.setValue(openvdb::Coord( 9, 11, 10), Vec3s(2.0, 2.0, 2.0));
+    acc.setValue(openvdb::Coord( 9, 10, 10), Vec3s(2.0, 2.0, 2.0));
+    acc.setValue(openvdb::Coord( 9,  9, 10), Vec3s(2.0, 2.0, 2.0));
+    acc.setValue(openvdb::Coord(10,  9, 10), Vec3s(2.0, 2.0, 2.0));
+    acc.setValue(openvdb::Coord(11,  9, 10), Vec3s(2.0, 2.0, 2.0));
+
+    acc.setValue(openvdb::Coord(10, 10, 11), Vec3s(3.0, 3.0, 3.0));
+    acc.setValue(openvdb::Coord(11, 10, 11), Vec3s(3.0, 3.0, 3.0));
+    acc.setValue(openvdb::Coord(11, 11, 11), Vec3s(3.0, 3.0, 3.0));
+    acc.setValue(openvdb::Coord(10, 11, 11), Vec3s(3.0, 3.0, 3.0));
+    acc.setValue(openvdb::Coord( 9, 11, 11), Vec3s(3.0, 3.0, 3.0));
+    acc.setValue(openvdb::Coord( 9, 10, 11), Vec3s(3.0, 3.0, 3.0));
+    acc.setValue(openvdb::Coord( 9,  9, 11), Vec3s(3.0, 3.0, 3.0));
+    acc.setValue(openvdb::Coord(10,  9, 11), Vec3s(3.0, 3.0, 3.0));
+    acc.setValue(openvdb::Coord(11,  9, 11), Vec3s(3.0, 3.0, 3.0));
+
+    acc.setValue(openvdb::Coord(10, 10, 9), Vec3s(4.0, 4.0, 4.0));
+    acc.setValue(openvdb::Coord(11, 10, 9), Vec3s(4.0, 4.0, 4.0));
+    acc.setValue(openvdb::Coord(11, 11, 9), Vec3s(4.0, 4.0, 4.0));
+    acc.setValue(openvdb::Coord(10, 11, 9), Vec3s(4.0, 4.0, 4.0));
+    acc.setValue(openvdb::Coord( 9, 11, 9), Vec3s(4.0, 4.0, 4.0));
+    acc.setValue(openvdb::Coord( 9, 10, 9), Vec3s(4.0, 4.0, 4.0));
+    acc.setValue(openvdb::Coord( 9,  9, 9), Vec3s(4.0, 4.0, 4.0));
+    acc.setValue(openvdb::Coord(10,  9, 9), Vec3s(4.0, 4.0, 4.0));
+    acc.setValue(openvdb::Coord(11,  9, 9), Vec3s(4.0, 4.0, 4.0));
+
+    openvdb::tools::GridSampler<AccessorType, openvdb::tools::BoxSampler>
+        interpolator(acc, grid.transform());
+
+    Vec3SGrid::ValueType val = interpolator.sampleVoxel(10.5, 10.5, 10.5);
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.375, 2.375, 2.375)));
+
+    val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
+    CPPUNIT_ASSERT(val.eq(Vec3s(1.0, 1.0, 1.0)));
+
+    val = interpolator.sampleVoxel(11.0, 10.0, 10.0);
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.0, 2.0, 2.0)));
+
+    val = interpolator.sampleVoxel(11.0, 11.0, 10.0);
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.0, 2.0, 2.0)));
+
+    val = interpolator.sampleVoxel(11.0, 11.0, 11.0);
+    CPPUNIT_ASSERT(val.eq(Vec3s(3.0, 3.0, 3.0)));
+
+    val = interpolator.sampleVoxel(9.0, 11.0, 9.0);
+    CPPUNIT_ASSERT(val.eq(Vec3s(4.0, 4.0, 4.0)));
+
+    val = interpolator.sampleVoxel(9.0, 10.0, 9.0);
+    CPPUNIT_ASSERT(val.eq(Vec3s(4.0, 4.0, 4.0)));
+
+    val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
+    CPPUNIT_ASSERT(val.eq(Vec3s(1.1, 1.1, 1.1)));
+
+    val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.792, 2.792, 2.792)));
+
+    val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.41, 2.41, 2.41)));
+
+    val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.41, 2.41, 2.41)));
+
+    val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.71, 2.71, 2.71)));
+
+    val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.01, 2.01, 2.01)));
+}
+
+template<typename GridType>
+void
+TestLinearInterp<GridType>::testConstantValues()
+{
+    typedef typename GridType::TreeType TreeType;
+    float fillValue = 256.0f;
+
+    GridType grid(fillValue);
+    TreeType& tree = grid.tree();
 
     // Add values to buffer zero.
-    tree->setValue(openvdb::Coord(10, 10, 10), 2.0);
+    tree.setValue(openvdb::Coord(10, 10, 10), 2.0);
 
-    tree->setValue(openvdb::Coord(11, 10, 10), 2.0);
-    tree->setValue(openvdb::Coord(11, 11, 10), 2.0);
-    tree->setValue(openvdb::Coord(10, 11, 10), 2.0);
-    tree->setValue(openvdb::Coord( 9, 11, 10), 2.0);
-    tree->setValue(openvdb::Coord( 9, 10, 10), 2.0);
-    tree->setValue(openvdb::Coord( 9,  9, 10), 2.0);
-    tree->setValue(openvdb::Coord(10,  9, 10), 2.0);
-    tree->setValue(openvdb::Coord(11,  9, 10), 2.0);
+    tree.setValue(openvdb::Coord(11, 10, 10), 2.0);
+    tree.setValue(openvdb::Coord(11, 11, 10), 2.0);
+    tree.setValue(openvdb::Coord(10, 11, 10), 2.0);
+    tree.setValue(openvdb::Coord( 9, 11, 10), 2.0);
+    tree.setValue(openvdb::Coord( 9, 10, 10), 2.0);
+    tree.setValue(openvdb::Coord( 9,  9, 10), 2.0);
+    tree.setValue(openvdb::Coord(10,  9, 10), 2.0);
+    tree.setValue(openvdb::Coord(11,  9, 10), 2.0);
 
-    tree->setValue(openvdb::Coord(10, 10, 11), 2.0);
-    tree->setValue(openvdb::Coord(11, 10, 11), 2.0);
-    tree->setValue(openvdb::Coord(11, 11, 11), 2.0);
-    tree->setValue(openvdb::Coord(10, 11, 11), 2.0);
-    tree->setValue(openvdb::Coord( 9, 11, 11), 2.0);
-    tree->setValue(openvdb::Coord( 9, 10, 11), 2.0);
-    tree->setValue(openvdb::Coord( 9,  9, 11), 2.0);
-    tree->setValue(openvdb::Coord(10,  9, 11), 2.0);
-    tree->setValue(openvdb::Coord(11,  9, 11), 2.0);
+    tree.setValue(openvdb::Coord(10, 10, 11), 2.0);
+    tree.setValue(openvdb::Coord(11, 10, 11), 2.0);
+    tree.setValue(openvdb::Coord(11, 11, 11), 2.0);
+    tree.setValue(openvdb::Coord(10, 11, 11), 2.0);
+    tree.setValue(openvdb::Coord( 9, 11, 11), 2.0);
+    tree.setValue(openvdb::Coord( 9, 10, 11), 2.0);
+    tree.setValue(openvdb::Coord( 9,  9, 11), 2.0);
+    tree.setValue(openvdb::Coord(10,  9, 11), 2.0);
+    tree.setValue(openvdb::Coord(11,  9, 11), 2.0);
 
-    tree->setValue(openvdb::Coord(10, 10, 9), 2.0);
-    tree->setValue(openvdb::Coord(11, 10, 9), 2.0);
-    tree->setValue(openvdb::Coord(11, 11, 9), 2.0);
-    tree->setValue(openvdb::Coord(10, 11, 9), 2.0);
-    tree->setValue(openvdb::Coord( 9, 11, 9), 2.0);
-    tree->setValue(openvdb::Coord( 9, 10, 9), 2.0);
-    tree->setValue(openvdb::Coord( 9,  9, 9), 2.0);
-    tree->setValue(openvdb::Coord(10,  9, 9), 2.0);
-    tree->setValue(openvdb::Coord(11,  9, 9), 2.0);
+    tree.setValue(openvdb::Coord(10, 10, 9), 2.0);
+    tree.setValue(openvdb::Coord(11, 10, 9), 2.0);
+    tree.setValue(openvdb::Coord(11, 11, 9), 2.0);
+    tree.setValue(openvdb::Coord(10, 11, 9), 2.0);
+    tree.setValue(openvdb::Coord( 9, 11, 9), 2.0);
+    tree.setValue(openvdb::Coord( 9, 10, 9), 2.0);
+    tree.setValue(openvdb::Coord( 9,  9, 9), 2.0);
+    tree.setValue(openvdb::Coord(10,  9, 9), 2.0);
+    tree.setValue(openvdb::Coord(11,  9, 9), 2.0);
 
-    openvdb::tools::GridSampler<TreeType, openvdb::tools::BoxSampler>  interpolator(*tree); 
-    //openvdb::tools::LinearInterp<TreeType> interpolator(*tree);
+    openvdb::tools::GridSampler<TreeType, openvdb::tools::BoxSampler>  interpolator(grid); 
+    //openvdb::tools::LinearInterp<GridType> interpolator(*tree);
 
-    typename TreeType::ValueType val =
+    typename GridType::ValueType val =
         interpolator.sampleVoxel(10.5, 10.5, 10.5);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
 
@@ -321,50 +675,51 @@ TestLinearInterp<TreeType>::testConstantValues()
 
 template<>
 void
-TestLinearInterp<openvdb::Vec3STree>::testConstantValues()
+TestLinearInterp<openvdb::Vec3SGrid>::testConstantValues()
 {
     using namespace openvdb;
 
     Vec3s fillValue = Vec3s(256.0f, 256.0f, 256.0f);
 
-    Vec3STree::Ptr tree(new Vec3STree(fillValue));
+    Vec3SGrid grid(fillValue);
+    Vec3STree& tree = grid.tree();
 
     // Add values to buffer zero.
-    tree->setValue(openvdb::Coord(10, 10, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(10, 10, 10), Vec3s(2.0, 2.0, 2.0));
 
-    tree->setValue(openvdb::Coord(11, 10, 10), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord(11, 11, 10), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord(10, 11, 10), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord( 9, 11, 10), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord( 9, 10, 10), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord( 9,  9, 10), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord(10,  9, 10), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord(11,  9, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(11, 10, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(11, 11, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(10, 11, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord( 9, 11, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord( 9, 10, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord( 9,  9, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(10,  9, 10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(11,  9, 10), Vec3s(2.0, 2.0, 2.0));
 
-    tree->setValue(openvdb::Coord(10, 10, 11), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord(11, 10, 11), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord(11, 11, 11), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord(10, 11, 11), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord( 9, 11, 11), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord( 9, 10, 11), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord( 9,  9, 11), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord(10,  9, 11), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord(11,  9, 11), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(10, 10, 11), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(11, 10, 11), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(11, 11, 11), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(10, 11, 11), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord( 9, 11, 11), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord( 9, 10, 11), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord( 9,  9, 11), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(10,  9, 11), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(11,  9, 11), Vec3s(2.0, 2.0, 2.0));
 
-    tree->setValue(openvdb::Coord(10, 10, 9), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord(11, 10, 9), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord(11, 11, 9), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord(10, 11, 9), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord( 9, 11, 9), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord( 9, 10, 9), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord( 9,  9, 9), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord(10,  9, 9), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord(11,  9, 9), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(10, 10, 9), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(11, 10, 9), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(11, 11, 9), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(10, 11, 9), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord( 9, 11, 9), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord( 9, 10, 9), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord( 9,  9, 9), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(10,  9, 9), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(11,  9, 9), Vec3s(2.0, 2.0, 2.0));
 
-    openvdb::tools::GridSampler<Vec3STree, openvdb::tools::BoxSampler>  interpolator(*tree); 
+    openvdb::tools::GridSampler<Vec3STree, openvdb::tools::BoxSampler>  interpolator(grid); 
     //openvdb::tools::LinearInterp<Vec3STree> interpolator(*tree);
 
-    Vec3STree::ValueType val = interpolator.sampleVoxel(10.5, 10.5, 10.5);
+    Vec3SGrid::ValueType val = interpolator.sampleVoxel(10.5, 10.5, 10.5);
     CPPUNIT_ASSERT(val.eq(Vec3s(2.0, 2.0, 2.0)));
 
     val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
@@ -390,18 +745,21 @@ TestLinearInterp<openvdb::Vec3STree>::testConstantValues()
 }
 
 
-template<typename TreeType>
+template<typename GridType>
 void
-TestLinearInterp<TreeType>::testFillValues()
+TestLinearInterp<GridType>::testFillValues()
 {
+    typedef typename GridType::TreeType TreeType;
     float fillValue = 256.0f;
 
-    typename TreeType::Ptr tree(new TreeType(fillValue));
+    GridType grid(fillValue);
+    //typename GridType::TreeType& tree = grid.tree();
 
-    openvdb::tools::GridSampler<TreeType, openvdb::tools::BoxSampler>  interpolator(*tree); 
-    //openvdb::tools::LinearInterp<TreeType> interpolator(*tree);
+    openvdb::tools::GridSampler<GridType, openvdb::tools::BoxSampler>
+        interpolator(grid); 
+    //openvdb::tools::LinearInterp<GridType> interpolator(*tree);
 
-    typename TreeType::ValueType val =
+    typename GridType::ValueType val =
         interpolator.sampleVoxel(10.5, 10.5, 10.5);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(256.0, val, TOLERANCE);
 
@@ -430,18 +788,20 @@ TestLinearInterp<TreeType>::testFillValues()
 
 template<>
 void
-TestLinearInterp<openvdb::Vec3STree>::testFillValues()
+TestLinearInterp<openvdb::Vec3SGrid>::testFillValues()
 {
     using namespace openvdb;
 
     Vec3s fillValue = Vec3s(256.0f, 256.0f, 256.0f);
 
-    Vec3STree::Ptr tree(new Vec3STree(fillValue));
+    Vec3SGrid grid(fillValue);
+    //Vec3STree& tree = grid.tree();
 
-    openvdb::tools::GridSampler<Vec3STree, openvdb::tools::BoxSampler>  interpolator(*tree); 
+    openvdb::tools::GridSampler<Vec3SGrid, openvdb::tools::BoxSampler>
+        interpolator(grid); 
     //openvdb::tools::LinearInterp<Vec3STree> interpolator(*tree);
 
-    Vec3STree::ValueType val = interpolator.sampleVoxel(10.5, 10.5, 10.5);
+    Vec3SGrid::ValueType val = interpolator.sampleVoxel(10.5, 10.5, 10.5);
     CPPUNIT_ASSERT(val.eq(Vec3s(256.0, 256.0, 256.0)));
 
     val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
@@ -467,49 +827,51 @@ TestLinearInterp<openvdb::Vec3STree>::testFillValues()
 }
 
 
-template<typename TreeType>
+template<typename GridType>
 void
-TestLinearInterp<TreeType>::testNegativeIndices()
+TestLinearInterp<GridType>::testNegativeIndices()
 {
+    typedef typename GridType::TreeType TreeType;
     float fillValue = 256.0f;
 
-    typename TreeType::Ptr tree(new TreeType(fillValue));
+    GridType grid(fillValue);
+    TreeType& tree = grid.tree();
 
-    tree->setValue(openvdb::Coord(-10, -10, -10), 1.0);
+    tree.setValue(openvdb::Coord(-10, -10, -10), 1.0);
 
-    tree->setValue(openvdb::Coord(-11, -10, -10), 2.0);
-    tree->setValue(openvdb::Coord(-11, -11, -10), 2.0);
-    tree->setValue(openvdb::Coord(-10, -11, -10), 2.0);
-    tree->setValue(openvdb::Coord( -9, -11, -10), 2.0);
-    tree->setValue(openvdb::Coord( -9, -10, -10), 2.0);
-    tree->setValue(openvdb::Coord( -9,  -9, -10), 2.0);
-    tree->setValue(openvdb::Coord(-10,  -9, -10), 2.0);
-    tree->setValue(openvdb::Coord(-11,  -9, -10), 2.0);
+    tree.setValue(openvdb::Coord(-11, -10, -10), 2.0);
+    tree.setValue(openvdb::Coord(-11, -11, -10), 2.0);
+    tree.setValue(openvdb::Coord(-10, -11, -10), 2.0);
+    tree.setValue(openvdb::Coord( -9, -11, -10), 2.0);
+    tree.setValue(openvdb::Coord( -9, -10, -10), 2.0);
+    tree.setValue(openvdb::Coord( -9,  -9, -10), 2.0);
+    tree.setValue(openvdb::Coord(-10,  -9, -10), 2.0);
+    tree.setValue(openvdb::Coord(-11,  -9, -10), 2.0);
 
-    tree->setValue(openvdb::Coord(-10, -10, -11), 3.0);
-    tree->setValue(openvdb::Coord(-11, -10, -11), 3.0);
-    tree->setValue(openvdb::Coord(-11, -11, -11), 3.0);
-    tree->setValue(openvdb::Coord(-10, -11, -11), 3.0);
-    tree->setValue(openvdb::Coord( -9, -11, -11), 3.0);
-    tree->setValue(openvdb::Coord( -9, -10, -11), 3.0);
-    tree->setValue(openvdb::Coord( -9,  -9, -11), 3.0);
-    tree->setValue(openvdb::Coord(-10,  -9, -11), 3.0);
-    tree->setValue(openvdb::Coord(-11,  -9, -11), 3.0);
+    tree.setValue(openvdb::Coord(-10, -10, -11), 3.0);
+    tree.setValue(openvdb::Coord(-11, -10, -11), 3.0);
+    tree.setValue(openvdb::Coord(-11, -11, -11), 3.0);
+    tree.setValue(openvdb::Coord(-10, -11, -11), 3.0);
+    tree.setValue(openvdb::Coord( -9, -11, -11), 3.0);
+    tree.setValue(openvdb::Coord( -9, -10, -11), 3.0);
+    tree.setValue(openvdb::Coord( -9,  -9, -11), 3.0);
+    tree.setValue(openvdb::Coord(-10,  -9, -11), 3.0);
+    tree.setValue(openvdb::Coord(-11,  -9, -11), 3.0);
 
-    tree->setValue(openvdb::Coord(-10, -10, -9), 4.0);
-    tree->setValue(openvdb::Coord(-11, -10, -9), 4.0);
-    tree->setValue(openvdb::Coord(-11, -11, -9), 4.0);
-    tree->setValue(openvdb::Coord(-10, -11, -9), 4.0);
-    tree->setValue(openvdb::Coord( -9, -11, -9), 4.0);
-    tree->setValue(openvdb::Coord( -9, -10, -9), 4.0);
-    tree->setValue(openvdb::Coord( -9,  -9, -9), 4.0);
-    tree->setValue(openvdb::Coord(-10,  -9, -9), 4.0);
-    tree->setValue(openvdb::Coord(-11,  -9, -9), 4.0);
+    tree.setValue(openvdb::Coord(-10, -10, -9), 4.0);
+    tree.setValue(openvdb::Coord(-11, -10, -9), 4.0);
+    tree.setValue(openvdb::Coord(-11, -11, -9), 4.0);
+    tree.setValue(openvdb::Coord(-10, -11, -9), 4.0);
+    tree.setValue(openvdb::Coord( -9, -11, -9), 4.0);
+    tree.setValue(openvdb::Coord( -9, -10, -9), 4.0);
+    tree.setValue(openvdb::Coord( -9,  -9, -9), 4.0);
+    tree.setValue(openvdb::Coord(-10,  -9, -9), 4.0);
+    tree.setValue(openvdb::Coord(-11,  -9, -9), 4.0);
 
-    //openvdb::tools::LinearInterp<TreeType> interpolator(*tree);
-    openvdb::tools::GridSampler<TreeType, openvdb::tools::BoxSampler>  interpolator(*tree); 
+    //openvdb::tools::LinearInterp<GridType> interpolator(*tree);
+    openvdb::tools::GridSampler<TreeType, openvdb::tools::BoxSampler>  interpolator(grid); 
 
-    typename TreeType::ValueType val =
+    typename GridType::ValueType val =
         interpolator.sampleVoxel(-10.5, -10.5, -10.5);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.375, val, TOLERANCE);
 
@@ -553,49 +915,50 @@ TestLinearInterp<TreeType>::testNegativeIndices()
 
 template<>
 void
-TestLinearInterp<openvdb::Vec3STree>::testNegativeIndices()
+TestLinearInterp<openvdb::Vec3SGrid>::testNegativeIndices()
 {
     using namespace openvdb;
 
     Vec3s fillValue = Vec3s(256.0f, 256.0f, 256.0f);
 
-    Vec3STree::Ptr tree(new Vec3STree(fillValue));
+    Vec3SGrid grid(fillValue);
+    Vec3STree& tree = grid.tree();
 
-    tree->setValue(openvdb::Coord(-10, -10, -10), Vec3s(1.0, 1.0, 1.0));
+    tree.setValue(openvdb::Coord(-10, -10, -10), Vec3s(1.0, 1.0, 1.0));
 
-    tree->setValue(openvdb::Coord(-11, -10, -10), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord(-11, -11, -10), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord(-10, -11, -10), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord( -9, -11, -10), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord( -9, -10, -10), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord( -9,  -9, -10), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord(-10,  -9, -10), Vec3s(2.0, 2.0, 2.0));
-    tree->setValue(openvdb::Coord(-11,  -9, -10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(-11, -10, -10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(-11, -11, -10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(-10, -11, -10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord( -9, -11, -10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord( -9, -10, -10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord( -9,  -9, -10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(-10,  -9, -10), Vec3s(2.0, 2.0, 2.0));
+    tree.setValue(openvdb::Coord(-11,  -9, -10), Vec3s(2.0, 2.0, 2.0));
 
-    tree->setValue(openvdb::Coord(-10, -10, -11), Vec3s(3.0, 3.0, 3.0));
-    tree->setValue(openvdb::Coord(-11, -10, -11), Vec3s(3.0, 3.0, 3.0));
-    tree->setValue(openvdb::Coord(-11, -11, -11), Vec3s(3.0, 3.0, 3.0));
-    tree->setValue(openvdb::Coord(-10, -11, -11), Vec3s(3.0, 3.0, 3.0));
-    tree->setValue(openvdb::Coord( -9, -11, -11), Vec3s(3.0, 3.0, 3.0));
-    tree->setValue(openvdb::Coord( -9, -10, -11), Vec3s(3.0, 3.0, 3.0));
-    tree->setValue(openvdb::Coord( -9,  -9, -11), Vec3s(3.0, 3.0, 3.0));
-    tree->setValue(openvdb::Coord(-10,  -9, -11), Vec3s(3.0, 3.0, 3.0));
-    tree->setValue(openvdb::Coord(-11,  -9, -11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord(-10, -10, -11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord(-11, -10, -11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord(-11, -11, -11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord(-10, -11, -11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord( -9, -11, -11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord( -9, -10, -11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord( -9,  -9, -11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord(-10,  -9, -11), Vec3s(3.0, 3.0, 3.0));
+    tree.setValue(openvdb::Coord(-11,  -9, -11), Vec3s(3.0, 3.0, 3.0));
 
-    tree->setValue(openvdb::Coord(-10, -10, -9), Vec3s(4.0, 4.0, 4.0));
-    tree->setValue(openvdb::Coord(-11, -10, -9), Vec3s(4.0, 4.0, 4.0));
-    tree->setValue(openvdb::Coord(-11, -11, -9), Vec3s(4.0, 4.0, 4.0));
-    tree->setValue(openvdb::Coord(-10, -11, -9), Vec3s(4.0, 4.0, 4.0));
-    tree->setValue(openvdb::Coord( -9, -11, -9), Vec3s(4.0, 4.0, 4.0));
-    tree->setValue(openvdb::Coord( -9, -10, -9), Vec3s(4.0, 4.0, 4.0));
-    tree->setValue(openvdb::Coord( -9,  -9, -9), Vec3s(4.0, 4.0, 4.0));
-    tree->setValue(openvdb::Coord(-10,  -9, -9), Vec3s(4.0, 4.0, 4.0));
-    tree->setValue(openvdb::Coord(-11,  -9, -9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord(-10, -10, -9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord(-11, -10, -9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord(-11, -11, -9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord(-10, -11, -9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord( -9, -11, -9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord( -9, -10, -9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord( -9,  -9, -9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord(-10,  -9, -9), Vec3s(4.0, 4.0, 4.0));
+    tree.setValue(openvdb::Coord(-11,  -9, -9), Vec3s(4.0, 4.0, 4.0));
 
-    openvdb::tools::GridSampler<Vec3STree, openvdb::tools::BoxSampler>  interpolator(*tree); 
+    openvdb::tools::GridSampler<Vec3SGrid, openvdb::tools::BoxSampler>  interpolator(grid); 
     //openvdb::tools::LinearInterp<Vec3STree> interpolator(*tree);
 
-    Vec3STree::ValueType val = interpolator.sampleVoxel(-10.5, -10.5, -10.5);
+    Vec3SGrid::ValueType val = interpolator.sampleVoxel(-10.5, -10.5, -10.5);
     CPPUNIT_ASSERT(val.eq(Vec3s(2.375, 2.375, 2.375)));
 
     val = interpolator.sampleVoxel(-10.0, -10.0, -10.0);

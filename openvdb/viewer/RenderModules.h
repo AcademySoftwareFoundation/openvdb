@@ -28,8 +28,8 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-#ifndef OPENVDB_VIEWER_MODULE_HAS_BEEN_INCLUDED
-#define OPENVDB_VIEWER_MODULE_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_VIEWER_RENDERMODULES_HAS_BEEN_INCLUDED
+#define OPENVDB_VIEWER_RENDERMODULES_HAS_BEEN_INCLUDED
 
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/VolumeToMesh.h>
@@ -49,7 +49,8 @@
 #include <GL/glu.h>
 #endif
 
-////////////////////////////////////////
+
+namespace openvdb_viewer {
 
 // OpenGL helper objects.
 
@@ -207,8 +208,10 @@ public:
     template<typename GridType>
     void operator()(typename GridType::ConstPtr grid)
     {
-        size_t nodeCount = grid->tree().leafCount() + grid->tree().nonLeafCount();
-        const size_t N = nodeCount * 8 * 3;
+        using openvdb::Index64;
+
+        Index64 nodeCount = grid->tree().leafCount() + grid->tree().nonLeafCount();
+        const Index64 N = nodeCount * 8 * 3;
 
         std::vector<GLfloat> points(N);
         std::vector<GLfloat> colors(N);
@@ -218,7 +221,7 @@ public:
         openvdb::Vec3d ptn;
         openvdb::Vec3s color;
         openvdb::CoordBBox bbox;
-        size_t pOffset = 0, iOffset = 0,  cOffset = 0, idx = 0;
+        Index64 pOffset = 0, iOffset = 0,  cOffset = 0, idx = 0;
 
         for (typename GridType::TreeType::NodeCIter iter = grid->tree().cbeginNode(); iter; ++iter)
         {
@@ -325,7 +328,7 @@ public:
             const int level = iter.getLevel();
             color = sNodeColors[(level == 0) ? 3 : (level == 1) ? 2 : 1];
 
-            for (size_t n = 0; n < 8; ++n) {
+            for (Index64 n = 0; n < 8; ++n) {
                 colors[cOffset++] = color[0];
                 colors[cOffset++] = color[1];
                 colors[cOffset++] = color[2];
@@ -362,7 +365,7 @@ public:
         LeafManagerType& leafs,
         std::vector<unsigned>& indexMap,
         const openvdb::math::Transform& transform,
-        size_t voxelsPerLeaf = TreeType::LeafNodeType::NUM_VOXELS)
+        openvdb::Index64 voxelsPerLeaf = TreeType::LeafNodeType::NUM_VOXELS)
         : mPoints(points)
         , mIndices(indices)
         , mLeafs(leafs)
@@ -378,15 +381,17 @@ public:
     }
 
 
-    inline void operator()(const tbb::blocked_range<size_t>& range) const
+    inline void operator()(const tbb::blocked_range<openvdb::Index64>& range) const
     {
+        using openvdb::Index64;
+
         typedef typename TreeType::LeafNodeType::ValueOnCIter ValueOnCIter;
 
         openvdb::Vec3d pos;
         unsigned index = 0;
-        size_t activeVoxels = 0;
+        Index64 activeVoxels = 0;
 
-        for (size_t n = range.begin(); n < range.end(); ++n) {
+        for (Index64 n = range.begin(); n < range.end(); ++n) {
 
             index = mIndexMap[n];
             ValueOnCIter it = mLeafs.leaf(n).cbeginValueOn();
@@ -445,7 +450,7 @@ private:
     LeafManagerType& mLeafs;
     std::vector<unsigned>& mIndexMap;
     const openvdb::math::Transform& mTransform;
-    const size_t mVoxelsPerLeaf;
+    const openvdb::Index64 mVoxelsPerLeaf;
 }; // PointGenerator
 
 
@@ -503,18 +508,20 @@ public:
     void runParallel()
     {
         tbb::parallel_for(
-            tbb::blocked_range<size_t>(0, (mPoints.size() / 3)), *this);
+            tbb::blocked_range<openvdb::Index64>(0, (mPoints.size() / 3)), *this);
     }
 
-    inline void operator()(const tbb::blocked_range<size_t>& range) const
+    inline void operator()(const tbb::blocked_range<openvdb::Index64>& range) const
     {
+        using openvdb::Index64;
+
         openvdb::Coord ijk;
         openvdb::Vec3d pos, tmpNormal, normal(0.0, -1.0, 0.0);
         openvdb::Vec3s color(0.9, 0.3, 0.3);
         float w = 0.0;
 
-        size_t e1, e2, e3, voxelNum = 0;
-        for (size_t n = range.begin(); n < range.end(); ++n) {
+        Index64 e1, e2, e3, voxelNum = 0;
+        for (Index64 n = range.begin(); n < range.end(); ++n) {
 
             e1 = 3 * n;
             e2 = e1 + 1;
@@ -615,7 +622,9 @@ public:
     template<typename GridType>
     void operator()(typename GridType::ConstPtr grid)
     {
-        const size_t maxVoxelPoints = 26000000;
+        using openvdb::Index64;
+
+        const Index64 maxVoxelPoints = 26000000;
 
         openvdb::Vec3s colorMap[4];
         colorMap[0] = openvdb::Vec3s(0.3, 0.9, 0.3); // green
@@ -642,7 +651,7 @@ public:
             maxValue = minmax.maxVoxel();
         }
 
-        size_t voxelsPerLeaf = TreeType::LeafNodeType::NUM_VOXELS;
+        openvdb::Index64 voxelsPerLeaf = TreeType::LeafNodeType::NUM_VOXELS;
 
         if (!isLevelSetGrid) {
 
@@ -653,7 +662,8 @@ public:
                 interiorMask->voxelizeActiveTiles();
 
                 if (interiorMask->activeLeafVoxelCount() > maxVoxelPoints) {
-                    voxelsPerLeaf = std::max((maxVoxelPoints / interiorMask->leafCount()), size_t(1));
+                    voxelsPerLeaf = std::max<Index64>(1,
+                        (maxVoxelPoints / interiorMask->leafCount()));
                 }
 
                 openvdb::tools::erodeVoxels(*interiorMask, 2);
@@ -661,7 +671,7 @@ public:
                 openvdb::tree::LeafManager<BoolTreeT> maskleafs(*interiorMask);
                 std::vector<unsigned> indexMap(maskleafs.leafCount());
                 unsigned voxelCount = 0;
-                for (size_t l = 0, L = maskleafs.leafCount(); l < L; ++l) {
+                for (Index64 l = 0, L = maskleafs.leafCount(); l < L; ++l) {
                     indexMap[l] = voxelCount;
                     voxelCount += std::min(maskleafs.leaf(l).onVoxelCount(), voxelsPerLeaf);
                 }
@@ -703,7 +713,7 @@ public:
                 openvdb::tree::LeafManager<BoolTreeT> maskleafs(*surfaceMask);
                 std::vector<unsigned> indexMap(maskleafs.leafCount());
                 unsigned voxelCount = 0;
-                for (size_t l = 0, L = maskleafs.leafCount(); l < L; ++l) {
+                for (Index64 l = 0, L = maskleafs.leafCount(); l < L; ++l) {
                     indexMap[l] = voxelCount;
                     voxelCount += std::min(maskleafs.leaf(l).onVoxelCount(), voxelsPerLeaf);
                 }
@@ -733,12 +743,12 @@ public:
 
         // Level set rendering
         if (tree.activeLeafVoxelCount() > maxVoxelPoints) {
-            voxelsPerLeaf = std::max((maxVoxelPoints / tree.leafCount()), size_t(1));
+            voxelsPerLeaf = std::max<Index64>(1, (maxVoxelPoints / tree.leafCount()));
         }
 
         std::vector<unsigned> indexMap(leafs.leafCount());
         unsigned voxelCount = 0;
-        for (size_t l = 0, L = leafs.leafCount(); l < L; ++l) {
+        for (Index64 l = 0, L = leafs.leafCount(); l < L; ++l) {
             indexMap[l] = voxelCount;
             voxelCount += std::min(leafs.leaf(l).onVoxelCount(), voxelsPerLeaf);
         }
@@ -781,6 +791,8 @@ public:
     template<typename GridType>
     void operator()(typename GridType::ConstPtr grid)
     {
+        using openvdb::Index64;
+
         typedef typename GridType::ValueType ValueType;
         typedef typename GridType::TreeType TreeType;
         typedef typename TreeType::template ValueConverter<bool>::Type BoolTreeT;
@@ -801,9 +813,9 @@ public:
 
         ///@todo thread and restructure.
 
-        const size_t voxelCount = mask->activeLeafVoxelCount();
+        const Index64 voxelCount = mask->activeLeafVoxelCount();
 
-        const size_t pointCount = voxelCount * 2;
+        const Index64 pointCount = voxelCount * 2;
         std::vector<GLfloat> points(pointCount*3), colors(pointCount*3);
         std::vector<GLuint> indices(pointCount);
 
@@ -813,8 +825,8 @@ public:
 
         openvdb::tree::ValueAccessor<const TreeType> acc(tree);
 
-        size_t idx = 0, pt = 0, cc = 0;
-        for (size_t l = 0, L = leafs.leafCount(); l < L; ++l) {
+        Index64 idx = 0, pt = 0, cc = 0;
+        for (Index64 l = 0, L = leafs.leafCount(); l < L; ++l) {
             typename BoolTreeT::LeafNodeType::ValueOnIter iter = leafs.leaf(l).beginValueOn();
             for (; iter; ++iter) {
                 ijk = iter.getCoord();
@@ -875,6 +887,8 @@ public:
     template<typename GridType>
     void operator()(typename GridType::ConstPtr grid)
     {
+        using openvdb::Index64;
+
         openvdb::tools::VolumeToMesh mesher(
             grid->getGridClass() == openvdb::GRID_LEVEL_SET ? 0.0 : 0.01);
         mesher(*grid);
@@ -888,7 +902,7 @@ public:
         openvdb::math::GenericMap map(grid->transform());
         openvdb::Coord ijk;
 
-        for (size_t n = 0, i = 0,  N = mesher.pointListSize(); n < N; ++n) {
+        for (Index64 n = 0, i = 0,  N = mesher.pointListSize(); n < N; ++n) {
             const openvdb::Vec3s& p = mesher.pointList()[n];
             points[i++] = p[0];
             points[i++] = p[1];
@@ -897,8 +911,8 @@ public:
 
         // Copy primitives
         openvdb::tools::PolygonPoolList& polygonPoolList = mesher.polygonPoolList();
-        size_t numQuads = 0;
-        for (size_t n = 0, N = mesher.polygonPoolListSize(); n < N; ++n) {
+        Index64 numQuads = 0;
+        for (Index64 n = 0, N = mesher.polygonPoolListSize(); n < N; ++n) {
             numQuads += polygonPoolList[n].numQuads();
         }
 
@@ -906,9 +920,9 @@ public:
         indices.reserve(numQuads * 4);
         openvdb::Vec3d normal, e1, e2;
 
-        for (size_t n = 0, N = mesher.polygonPoolListSize(); n < N; ++n) {
+        for (Index64 n = 0, N = mesher.polygonPoolListSize(); n < N; ++n) {
             const openvdb::tools::PolygonPool& polygons = polygonPoolList[n];
-            for (size_t i = 0, I = polygons.numQuads(); i < I; ++i) {
+            for (Index64 i = 0, I = polygons.numQuads(); i < I; ++i) {
                 const openvdb::Vec4I& quad = polygons.quad(i);
                 indices.push_back(quad[0]);
                 indices.push_back(quad[1]);
@@ -924,7 +938,7 @@ public:
                 const double length = normal.length();
                 if (length > 1.0e-7) normal *= (1.0 / length);
 
-                for (size_t v = 0; v < 4; ++v) {
+                for (Index64 v = 0; v < 4; ++v) {
                     normals[quad[v]*3]    = -normal[0];
                     normals[quad[v]*3+1]  = -normal[1];
                     normals[quad[v]*3+2]  = -normal[2];
@@ -1067,7 +1081,9 @@ processTypedVectorGrid(GridPtrType grid, OpType& op)
 
 } // namespace util
 
-#endif // OPENVDB_VIEWER_MODULE_HAS_BEEN_INCLUDED
+} // namespace openvdb_viewer
+
+#endif // OPENVDB_VIEWER_RENDERMODULES_HAS_BEEN_INCLUDED
 
 // Copyright (c) 2012-2013 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

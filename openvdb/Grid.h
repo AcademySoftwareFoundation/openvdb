@@ -93,7 +93,7 @@ inline typename Grid<typename TreePtrType::element_type>::Ptr createGrid(TreePtr
 /// that is larger than one voxel unit, otherwise zero crossings are not guaranteed.
 template<typename GridType>
 typename GridType::Ptr createLevelSet(
-    double voxelSize = 1.0, double halfWidth = LEVEL_SET_HALF_WIDTH);
+    Real voxelSize = 1.0, Real halfWidth = LEVEL_SET_HALF_WIDTH);
 
 
 ////////////////////////////////////////
@@ -812,6 +812,9 @@ struct TreeAdapter
     typedef typename NonConstGridType::Ptr      NonConstGridPtrType;
     typedef typename GridType::ConstPtr         ConstGridPtrType;
     typedef typename TreeType::ValueType        ValueType;
+    typedef typename tree::ValueAccessor<TreeType>         AccessorType;
+    typedef typename tree::ValueAccessor<const TreeType>   ConstAccessorType;
+    typedef typename tree::ValueAccessor<NonConstTreeType> NonConstAccessorType;
 
     static TreeType& tree(TreeType& t) { return t; }
     static TreeType& tree(GridType& g) { return g.tree(); }
@@ -839,6 +842,9 @@ struct TreeAdapter<Grid<_TreeType> >
     typedef typename NonConstGridType::Ptr      NonConstGridPtrType;
     typedef typename GridType::ConstPtr         ConstGridPtrType;
     typedef typename TreeType::ValueType        ValueType;
+    typedef typename tree::ValueAccessor<TreeType>         AccessorType;
+    typedef typename tree::ValueAccessor<const TreeType>   ConstAccessorType;
+    typedef typename tree::ValueAccessor<NonConstTreeType> NonConstAccessorType;
 
     static TreeType& tree(TreeType& t) { return t; }
     static TreeType& tree(GridType& g) { return g.tree(); }
@@ -849,6 +855,38 @@ struct TreeAdapter<Grid<_TreeType> >
     static const TreeType& constTree(const TreeType& t) { return t; }
     static const TreeType& constTree(const GridType& g) { return g.constTree(); }
 };
+
+/// Partial specialization for ValueAccessor types
+template<typename _TreeType>
+struct TreeAdapter<tree::ValueAccessor<_TreeType> >
+{
+    typedef _TreeType                           TreeType;
+    typedef typename boost::remove_const<TreeType>::type NonConstTreeType;
+    typedef typename TreeType::Ptr              TreePtrType;
+    typedef typename TreeType::ConstPtr         ConstTreePtrType;
+    typedef typename NonConstTreeType::Ptr      NonConstTreePtrType;
+    typedef Grid<TreeType>                      GridType;
+    typedef Grid<NonConstTreeType>              NonConstGridType;
+    typedef typename GridType::Ptr              GridPtrType;
+    typedef typename NonConstGridType::Ptr      NonConstGridPtrType;
+    typedef typename GridType::ConstPtr         ConstGridPtrType;
+    typedef typename TreeType::ValueType        ValueType;
+    typedef typename tree::ValueAccessor<TreeType>         AccessorType;
+    typedef typename tree::ValueAccessor<const TreeType>   ConstAccessorType;
+    typedef typename tree::ValueAccessor<NonConstTreeType> NonConstAccessorType;
+
+    static TreeType& tree(TreeType& t) { return t; }
+    static TreeType& tree(GridType& g) { return g.tree(); }
+    static TreeType& tree(AccessorType& a) { return a.tree(); }
+    static const TreeType& tree(const TreeType& t) { return t; }
+    static const TreeType& tree(const GridType& g) { return g.tree(); }
+    static const TreeType& tree(const AccessorType& a) { return a.tree(); }
+    static const TreeType& constTree(TreeType& t) { return t; }
+    static const TreeType& constTree(GridType& g) { return g.constTree(); }
+    static const TreeType& constTree(const TreeType& t) { return t; }
+    static const TreeType& constTree(const GridType& g) { return g.constTree(); }
+};
+
 //@}
 
 
@@ -1191,7 +1229,7 @@ createGrid(TreePtrType tree)
 
 template<typename GridType>
 typename GridType::Ptr
-createLevelSet(double voxelSize, double halfWidth)
+createLevelSet(Real voxelSize, Real halfWidth)
 {
     typedef typename GridType::ValueType ValueType;
 

@@ -122,11 +122,11 @@ newSopOperator(OP_OperatorTable* table)
     hutil::ParmList parms;
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setHelpText("Specify a subset primitives to process")
+        .setHelpText("Specify a subset of the input VDB grids to surface.")
         .setChoiceList(&hutil::PrimGroupMenu));
 
-    {
-        // @todo add "OpenVDB to Houdini simdata file"
+
+    { // Convert To Menu
         const char* items[] = {
             "volume",   "Volume",
             "vdb",      "VDB",
@@ -136,61 +136,106 @@ newSopOperator(OP_OperatorTable* table)
 #endif
             NULL
         };
+
         parms.add(hutil::ParmFactory(PRM_ORD, "conversion", "Convert To")
             .setDefault(PRMzeroDefaults)
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
 
-    // SDF <-> Fog Volume
-    const char* class_items[] = {
-        "none", "No Change",
-        "sdf",  "Convert Fog to SDF",
-        "fog",  "Convert SDF to Fog",
-        NULL
-    };
-    parms.add(hutil::ParmFactory(PRM_ORD, "vdbclass", "VDB Class")
-        .setDefault(PRMzeroDefaults)
-        .setChoiceListItems(PRM_CHOICELIST_SINGLE, class_items));
+    { // Grid Class Menu
+        const char* class_items[] = {
+            "none", "No Change",
+            "sdf",  "Convert Fog to SDF",
+            "fog",  "Convert SDF to Fog",
+            NULL
+        };
+
+        parms.add(hutil::ParmFactory(PRM_ORD, "vdbclass", "VDB Class")
+            .setDefault(PRMzeroDefaults)
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, class_items));
+    }
+
+    //////////
 
     // Parms for converting to polygons
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "isoValue", "Iso Value")
-        .setRange(PRM_RANGE_UI, -1.0, PRM_RANGE_UI, 1.0));
+
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "isoValue", "Isovalue")
+        .setRange(PRM_RANGE_UI, -1.0, PRM_RANGE_UI, 1.0)
+        .setHelpText("The crossing point of the VDB values that is considered "
+            "the surface. The zero default value works for signed distance "
+            "fields while fog volumes require a larger positive value, 0.5 is "
+            "a good initial guess."));
+
     parms.add(hutil::ParmFactory(PRM_FLT_J, "adaptivity", "Adaptivity")
-        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_RESTRICTED, 1.0));
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "computenormals", "Compute Vertex Normals"));
+        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_RESTRICTED, 1.0)
+        .setHelpText("When converting to polygons the adaptivity threshold determines "
+            "how closely the isosurface is matched by the resulting mesh. Higher "
+            "thresholds will allow more variation in polygon size, using fewer "
+            "polygons to express the surface."));
+
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "computenormals", "Compute Vertex Normals")
+        .setHelpText("Computes edge preserving vertex normals."));
+
     parms.add(hutil::ParmFactory(PRM_FLT_J, "internaladaptivity", "Internal Adaptivity")
-        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_RESTRICTED, 1.0));
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "transferattributes", "Transfer Surface Attributes"));
+        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_RESTRICTED, 1.0)
+        .setHelpText("When converting to polygons with a second input, this overrides "
+            "the adaptivity threshold for all internal surfaces."));
+
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "transferattributes", "Transfer Surface Attributes")
+        .setHelpText("When converting to polygons with a second input, this transfers "
+            "all attributes (primitive, vertex and point) from the reference surface. "
+            "Will override computed vertex normals for primitives in the surface group."));
+
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "smoothseams", "Smooth Seams")
         .setDefault(PRMoneDefaults)
         .setHelpText("Smooth seam line edges during mesh extraction, "
-            "removes staircase artifacts"));
-    parms.add(hutil::ParmFactory(PRM_STRING, "surfacegroup", "Surface Group")
-        .setDefault("surface_polygons"));
-    parms.add(hutil::ParmFactory(PRM_STRING, "interiorgroup", "Interior Group")
-        .setDefault("interior_polygons"));
-    parms.add(hutil::ParmFactory(PRM_STRING, "seamlinegroup", "Seam Line Group")
-        .setDefault("seam_polygons"));
+            "removes staircase artifacts for fractured pieces."));
 
-    // Prune toggle
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "sharpenfeatures", "Sharpen Features")
+        .setHelpText("Sharpen edges and corners."));
+
+    parms.add(hutil::ParmFactory(PRM_STRING, "surfacegroup", "Surface Group")
+        .setDefault("surface_polygons")
+        .setHelpText("When converting to polygons with a second input, this "
+            "specifies a group for all polygons that are coincident with the "
+            "reference surface. This group is useful for transferring attributes such "
+            "as uv coordinates, normals etc. from the reference surface."));
+
+    parms.add(hutil::ParmFactory(PRM_STRING, "interiorgroup", "Interior Group")
+        .setDefault("interior_polygons")
+        .setHelpText("When converting to polygons with a second input, this "
+            "specifies a group for all polygons that are interior to the "
+            "reference surface. This group can be used to identify surface regions "
+            "that might require projected uv coordinates or new materials."));
+
+    parms.add(hutil::ParmFactory(PRM_STRING, "seamlinegroup", "Seam Line Group")
+        .setDefault("seam_polygons")
+        .setHelpText("When converting to polygons with a second input, this "
+            "specifies a group for all polygons that are in proximity to "
+            "the seam lines. This group can be used to drive secondary elements such "
+            "as debris and dust."));
+
+
+    //////////
+
+    // Parms for converting to volumes
+
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "prune", "")
         .setDefault(PRMoneDefaults)
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-        .setHelpText(
-            "Collapse regions of constant value in output grids.\n"
-            "Voxel values are considered equal if they differ\n"
+        .setHelpText("Collapse regions of constant value in output grids. "
+            "Voxel values are considered equal if they differ "
             "by less than the specified threshold."));
 
-    // Pruning tolerance slider
     parms.add(hutil::ParmFactory(PRM_FLT_J, "tolerance", "Prune Tolerance")
         .setDefault(PRMzeroDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1));
 
-    // Flood fill toggle
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "flood", "Signed-Flood Fill Output")
         .setDefault(PRMoneDefaults)
         .setHelpText("Reclassify inactive output voxels as either inside or outside."));
 
+    //////////
 
     // Obsolete parameters
     hutil::ParmList obsoleteParms;
@@ -201,7 +246,9 @@ newSopOperator(OP_OperatorTable* table)
         SOP_OpenVDB_Convert::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("VDBs to convert")
-        .addOptionalInput("Optional reference surface");
+        .addOptionalInput("Optional reference surface. Can be used "
+            "to transfer attributes, sharpen features and to "
+            "eliminate seams from fractured pieces.");
 }
 
 
@@ -564,9 +611,12 @@ SOP_OpenVDB_Convert::updateParmsFlags()
     ConvertTo target = static_cast<ConvertTo>(evalInt("conversion", 0, time));
     bool toOpenVDB = (target == OPENVDB);
     bool toPoly = (target == POLYGONS);
+    bool toPolySoup = false;
 #if HAVE_POLYSOUP
-    toPoly |= (target == POLYSOUP);
+    toPolySoup = (target == POLYSOUP);
+    toPoly |= toPolySoup;
 #endif
+
     bool toSDF = (evalInt("vdbclass", 0, time) == CLASS_SDF);
 
     changed |= enableParm("adaptivity", toPoly);
@@ -577,12 +627,14 @@ SOP_OpenVDB_Convert::updateParmsFlags()
     }
 
     bool refexists = (nInputs() == 2);
-    changed |= enableParm("transferattributes", toPoly && refexists);
-    changed |= enableParm("smoothseams", toPoly && refexists);
+    changed |= enableParm("computenormals", toPoly && !toPolySoup);
     changed |= enableParm("internaladaptivity", toPoly && refexists);
     changed |= enableParm("surfacegroup", toPoly && refexists);
     changed |= enableParm("interiorgroup", toPoly && refexists);
     changed |= enableParm("seamlinegroup", toPoly && refexists);
+    changed |= enableParm("transferattributes", toPoly && refexists);
+    changed |= enableParm("smoothseams", toPoly && refexists);
+    changed |= enableParm("sharpenfeatures", toPoly && refexists);
 
     setVisibleState("adaptivity", toPoly);
     setVisibleState("isoValue", toPoly || toOpenVDB);
@@ -591,6 +643,9 @@ SOP_OpenVDB_Convert::updateParmsFlags()
     setVisibleState("surfacegroup", toPoly);
     setVisibleState("interiorgroup", toPoly);
     setVisibleState("seamlinegroup", toPoly);
+    setVisibleState("transferattributes", toPoly);
+    setVisibleState("smoothseams", toPoly);
+    setVisibleState("sharpenfeatures", toPoly);
 
     setVisibleState("flood", toOpenVDB);
     setVisibleState("prune", toOpenVDB);
@@ -623,6 +678,7 @@ SOP_OpenVDB_Convert::referenceMeshing(
 
     const bool transferAttributes = evalInt("transferattributes", 0, time);
     const bool smoothseams = evalInt("smoothseams", 0, time);
+    const bool sharpenFeatures = evalInt("sharpenfeatures", 0, time);
 
     // Get the first grid's transform and background value.
     openvdb::math::Transform::Ptr transform = grids.front()->transform().copy();
@@ -638,8 +694,9 @@ SOP_OpenVDB_Convert::referenceMeshing(
     const openvdb::GridClass gridClass = firstGrid->getGridClass();
 
     typename GridType::ConstPtr refGrid;
-    typedef typename openvdb::tools::MeshToVolume<GridType>::IndexGridT IndexGridT;
-    typename IndexGridT::Ptr indexGrid;
+    typedef typename openvdb::tools::MeshToVolume<GridType>::IntGridT IntGridT;
+    typename IntGridT::Ptr indexGrid;
+    openvdb::tools::MeshToVoxelEdgeData edgeData;
 
     // Check for reference VDB
     {
@@ -691,6 +748,7 @@ SOP_OpenVDB_Convert::referenceMeshing(
 
         refGrid = converter.distGridPtr();
         indexGrid = converter.indexGridPtr();
+        if (sharpenFeatures) edgeData.convert(pointList, primList);
     }
 
     if (boss.wasInterrupted()) return;
@@ -768,6 +826,12 @@ SOP_OpenVDB_Convert::referenceMeshing(
             surfaceGroup, interiorGroup, seamGroup);
     }
 
+    // Sharpen Features
+    if (!boss.wasInterrupted() && sharpenFeatures) { 
+        UTparallelFor(GA_SplittableRange(gdp->getPointRange()),
+            hvdb::SharpenFeaturesOp(*gdp, *refGeo, edgeData, *transform, surfaceGroup));
+    }
+
     // Compute vertex normals
     if (!boss.wasInterrupted() && computeNormals) {
 
@@ -815,7 +879,7 @@ SOP_OpenVDB_Convert::convertToPoly(
     bool buildpolysoup,
     hvdb::Interrupter &boss)
 {
-    const bool          computeNormals = (evalInt("computenormals", 0, time) != 0);
+    const bool          computeNormals = !buildpolysoup && (evalInt("computenormals", 0, time) != 0);
     const fpreal        adaptivity = evalFloat("adaptivity", 0, time);
     const fpreal        iso = evalFloat("isoValue", 0, time);
     const GU_Detail*    refGeo = inputGeo(1);
@@ -966,17 +1030,6 @@ SOP_OpenVDB_Convert::cookMySop(OP_Context& context)
             }
 #endif
 
-#if 0
-            case SIMDATA: {
-                addWarning(SOP_MESSAGE, "Not implemented");
-
-                //hvdb::VdbPrimIterator it(gdp, group);
-                //std::string filename;
-                //convertToSimDataFile(*gdp, it, interrupter, filename);
-
-                break;
-            }
-#endif
             default: {
                 addWarning(SOP_MESSAGE, "Unrecognized conversion type");
                 break;

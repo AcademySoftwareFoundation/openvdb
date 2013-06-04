@@ -1127,7 +1127,7 @@ struct FloatToVec
             numTiles.fetch_and_increment();
             openvdb::CoordBBox bbox;
             it.getBoundingBox(bbox);
-            if (acc.getTree()) acc.getTree()->fill(bbox, toVec(*it));
+            acc.tree().fill(bbox, toVec(*it));
         }
     }
 
