@@ -629,7 +629,8 @@ public:
     typedef boost::shared_ptr<const ScaleMap> ConstPtr;
 
     ScaleMap(): MapBase(), mScaleValues(Vec3d(1,1,1)), mVoxelSize(Vec3d(1,1,1)),
-                mInvScaleSqr(1,1,1), mInvTwiceScale(0.5,0.5,0.5){}
+                mScaleValuesInverse(1,1,1), mInvScaleSqr(1,1,1), 
+                mInvTwiceScale(0.5,0.5,0.5){}
 
     ScaleMap(const Vec3d& scale):
         MapBase(),
