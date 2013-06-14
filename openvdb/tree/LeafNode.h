@@ -513,9 +513,9 @@ public:
     }
 
     /// Add the given value to all active voxels, leaving inactive voxels unchanged.
-    void addValue(const ValueType& val);
+    OPENVDB_DEPRECATED void addValue(const ValueType& val);
     /// Multiply all active voxels by the given value, leaving inactive voxels unchanged.
-    void scaleValue(const ValueType& scale);
+    OPENVDB_DEPRECATED void scaleValue(const ValueType& scale);
 
     /// Mark all voxels as active, but don't change their values.
     void setValuesOn() { mValueMask.setOn(); }

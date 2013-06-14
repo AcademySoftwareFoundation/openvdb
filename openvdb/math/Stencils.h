@@ -145,10 +145,7 @@ public:
     inline const Coord& getCenterCoord() const { return mCenter; }
 
     /// Return the value at the center of the stencil
-    inline const ValueType& getCenterValue() const
-    {
-        return this->getValue<0,0,0>();
-    }
+    inline const ValueType& getCenterValue() const { return mStencil[0]; }
 
     /// Return true if the center of the stencil intersects the
     /// iso-contour specified by the isoValue

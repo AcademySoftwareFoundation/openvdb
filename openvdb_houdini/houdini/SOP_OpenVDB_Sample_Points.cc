@@ -96,7 +96,28 @@ struct BoxSampler<true> {
     }
 };
 
-template<typename GridType, typename GA_RWPageHandleType, bool staggered = false>
+template <bool staggered = false>
+struct NearestNeighborSampler {
+    template <class Accessor>
+    static bool sample(const Accessor& in, const cvdb::Vec3R& inCoord,
+        typename Accessor::ValueType& result)
+    {
+        return cvdb::tools::PointSampler::sample<Accessor>(in, inCoord, result);
+    }
+};
+
+template<>
+struct NearestNeighborSampler<true> {
+    template <class Accessor>
+    static bool sample(const Accessor& in, const cvdb::Vec3R& inCoord,
+        typename Accessor::ValueType& result)
+    {
+        return cvdb::tools::StaggeredPointSampler::sample<Accessor>(in, inCoord, result);
+    }
+};
+
+
+template<typename GridType, typename GA_RWPageHandleType, bool staggered = false, bool NearestNeighbor = false>
 class PointSampler
 {
 public:
@@ -174,8 +195,11 @@ public:
                     // find the interpolated value
                     point = mGrid.worldToIndex(cvdb::Vec3R(pos[0], pos[1], pos[2]));
 
-                    BoxSampler<staggered>::template sample<Accessor>(accessor, point, value);
-
+                    if (NearestNeighbor) {
+                        NearestNeighborSampler<staggered>::template sample<Accessor>(accessor, point, value);
+                    } else {
+                        BoxSampler<staggered>::template sample<Accessor>(accessor, point, value);
+                    }
                     // set the value
                     v_ph.value(offset) = translateValue(value);
                 }
@@ -298,7 +322,7 @@ SOP_OpenVDB_Sample_Points::sample(OP_Context& context)
 
     // scratch variables used in the loop
     GEO_AttributeHandle attribHandle;
-    GA_Defaults defaultFloat(0.0);
+    GA_Defaults defaultFloat(0.0), defaultInt(0);
 
     int numScalarGrids  = 0;
     int numVectorGrids  = 0;
@@ -350,19 +374,52 @@ SOP_OpenVDB_Sample_Points::sample(OP_Context& context)
                     << grid.valueType() << std::endl;
             }
 
-            UT_AutoInterrupt scalarInterrupt("Sampling from VDB scalar-type grids");
+            UT_AutoInterrupt scalarInterrupt("Sampling from VDB floating-type grids");
             // do the sampling
             if (gridType == UT_VDB_FLOAT) {
                 // float scalar
                 PointSampler<cvdb::FloatGrid, GA_RWPageHandleF> theSampler(
                     grid, threaded, aGdp, attribHandle, &scalarInterrupt);
                 theSampler.sample();
+
             } else {
                 // double scalar
                 PointSampler<cvdb::DoubleGrid, GA_RWPageHandleF> theSampler(
                     grid, threaded, aGdp, attribHandle, &scalarInterrupt);
                 theSampler.sample();
             }
+
+        } else if (gridType == UT_VDB_INT32 || gridType == UT_VDB_INT64) {
+            numScalarGrids++;
+
+            //find or create integer attribute
+            GA_RWAttributeRef attribHandle =
+                aGdp->findIntTuple(GA_ATTRIB_POINT, gridName.c_str(), 1);
+            if (!attribHandle.isValid()) {
+                attribHandle =
+                    aGdp->addIntTuple(GA_ATTRIB_POINT, gridName.c_str(), 1, defaultInt);
+            }
+            aGdp->addVariableName(gridName.c_str(), gridVariableName.c_str());
+
+             // user feedback
+            if (mVerbose) {
+                std::cout << "Sampling grid " << gridName << " of type "
+                    << grid.valueType() << std::endl;
+            }
+
+            UT_AutoInterrupt scalarInterrupt("Sampling from VDB integer-type grids");
+            if (gridType == UT_VDB_INT32) {
+
+                PointSampler<cvdb::Int32Grid, GA_RWPageHandleF, false, true>
+                    theSampler(grid, threaded, aGdp, attribHandle, &scalarInterrupt);
+                theSampler.sample();
+
+            } else {
+                PointSampler<cvdb::Int64Grid, GA_RWPageHandleF, false, true>
+                    theSampler(grid, threaded, aGdp, attribHandle, &scalarInterrupt);
+                theSampler.sample();
+            }
+
         } else if (gridType == UT_VDB_VEC3F || gridType == UT_VDB_VEC3D) {
             // a grid that holds Vec3 data (as either float or double)
             // count

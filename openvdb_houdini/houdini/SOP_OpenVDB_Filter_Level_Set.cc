@@ -36,6 +36,8 @@
 /// interface tracking. These unrestricted deformations include
 /// surface smoothing (e.g., Laplacian flow), filtering (e.g., mean
 /// value) and morphological operations (e.g., morphological opening).
+/// All these operations can optionally be masked with another grid that
+/// acts as an alpha-mask.
 ///
 /// @note Works with level set grids of floating point type (float/double).
 
@@ -290,6 +292,7 @@ struct FilterParms {
         , mStencilWidth(0)
         , mVoxelOffset(0.0)
         , mAccuracy(ACCURACY_UPWIND_FIRST)
+        , mMaskGrid(openvdb::FloatGrid::ConstPtr())
     {
     }
 
@@ -299,6 +302,7 @@ struct FilterParms {
     int mIterations, mStencilWidth;
     float mVoxelOffset;
     Accuracy mAccuracy;
+    openvdb::FloatGrid::ConstPtr mMaskGrid;
 };
 
 } // namespace
@@ -386,6 +390,19 @@ newSopOperator(OP_OperatorTable* table)
             .setChoiceList(&hutil::PrimGroupMenu));
 
         if (OP_TYPE_RENORM != op) { // Filter menu
+
+/*        
+            parms.add(hutil::ParmFactory(PRM_TOGGLE, "mask", "")
+                  .setDefault(PRMoneDefaults)
+                  .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
+                  .setHelpText("Enable / disable the mask."));
+
+            parms.add(hutil::ParmFactory(PRM_STRING, "maskname", "Alpha Mask")
+                  .setHelpText("Optional VDB used for alpha masking. Assumes values 0->1.")
+                  .setSpareData(&SOP_Node::theSecondInput)
+                  .setChoiceList(&hutil::PrimGroupMenu));
+*/
+
             std::vector<std::string> items;
 
             buildFilterMenu(items, op);
@@ -455,6 +472,7 @@ newSopOperator(OP_OperatorTable* table)
                 SOP_OpenVDB_Filter_Level_Set::factoryReshape, parms, *table)
                 .setObsoleteParms(obsoleteParms)
                 .addInput("Input with VDB grids to process");
+//                .addOptionalInput("Optional VDB Mask (for alpha masking)");
 
         } else if (OP_TYPE_SMOOTH == op) {
 
@@ -462,6 +480,7 @@ newSopOperator(OP_OperatorTable* table)
                 SOP_OpenVDB_Filter_Level_Set::factorySmooth, parms, *table)
                 .setObsoleteParms(obsoleteParms)
                 .addInput("Input with VDB grids to process");
+//                .addOptionalInput("Optional VDB Mask (for alpha masking)");
         }
     }
  }
@@ -506,7 +525,7 @@ unsigned
 SOP_OpenVDB_Filter_Level_Set::disableParms()
 {
     unsigned changed = 0;
-
+    
     bool stencil = false, reshape = mOpType == OP_TYPE_RESHAPE;
 
     if (mOpType != OP_TYPE_RENORM) {
@@ -518,6 +537,12 @@ SOP_OpenVDB_Filter_Level_Set::disableParms()
         stencil = operation == FILTER_TYPE_MEAN_VALUE ||
                   operation == FILTER_TYPE_GAUSSIAN   ||
                   operation == FILTER_TYPE_MEDIAN_VALUE;
+
+        /*                  
+        bool hasMask = (this->nInputs() == 2);
+        changed += enableParm("mask", hasMask);
+        changed += enableParm("maskname", hasMask &&  bool(evalInt("mask", 0, 0)));
+        */
     }
 
     changed += enableParm("iterations", !reshape);
@@ -560,12 +585,14 @@ SOP_OpenVDB_Filter_Level_Set::cookMySop(OP_Context& context)
             }
         }
         if (lock.lock(*startNode, context) >= UT_ERROR_ABORT) return error();
+
         // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
         if (startNode->duplicateSource(0, context, gdp) >= UT_ERROR_ABORT) return error();
 
         BossT boss("Processing level sets");
 
-        const bool verbose = bool(evalInt("verbose", 0, context.getTime()));
+        const fpreal time = context.getTime();
+        const bool verbose = bool(evalInt("verbose", 0, time));
 
         if (verbose) std::cout << "--- " << this->getName() << " ---\n";
 
@@ -588,10 +615,10 @@ SOP_OpenVDB_Filter_Level_Set::cookMySop(OP_Context& context)
 
             if (boss.wasInterrupted()) break;
 
-            if (!wasFiltered) {
+            /*if (!wasFiltered) {
                 wasFiltered = applyFilters<openvdb::DoubleGrid>(
                     *it, filterParms, boss, context, *gdp, verbose);
-            }
+            }*/
 
             if (boss.wasInterrupted()) break;
 
@@ -623,17 +650,7 @@ SOP_OpenVDB_Filter_Level_Set::evalFilterParms(OP_Context& context,
     FilterParms& parms)
 {
     hutil::OP_EvalScope eval_scope(*this, context);
-    fpreal  now = context.getTime();
-
-    /// @todo Add mask functionality, not implemented in the library yet.
-    /*
-    const GU_Detail* refGdp = inputGeo(1);
-    mSecondInputConnected = refGdp != NULL;
-    hvdb::ConstGridPt diffusionMask, morphologyMask;
-    if (mSecondInputConnected) {
-        // Get mask
-    }
-    */
+    fpreal now = context.getTime();
 
     parms.mIterations = evalInt("iterations", 0, now);
     parms.mStencilWidth = evalInt("stencilWidth", 0, now);
@@ -654,7 +671,37 @@ SOP_OpenVDB_Filter_Level_Set::evalFilterParms(OP_Context& context,
 
     evalString(str, "group", 0, now);
     parms.mGroup = str.toStdString();
+    
+    
+    // Optional Alpha Mask
+    /*
+    if (OP_TYPE_SMOOTH == mOpType || OP_TYPE_RESHAPE == mOpType) {
+        const GU_Detail* maskGeo = inputGeo(1);
+        if (maskGeo) {
+            if (evalInt("mask", 0, now)) {
+                UT_String maskStr;
+                evalString(maskStr, "maskname", 0, now);
+                const GA_PrimitiveGroup * maskGroup =
+                parsePrimitiveGroups(maskStr.buffer(), const_cast<GU_Detail*>(maskGeo));
 
+                if (!maskGroup && maskStr.length() > 0) {
+                    addWarning(SOP_MESSAGE, "Mask not found.");
+                } else {
+                    hvdb::VdbPrimCIterator maskIt(maskGeo, maskGroup);
+                    if (maskIt) {
+                        if (maskIt->getStorageType() == UT_VDB_FLOAT) {
+                            parms.mMaskGrid = openvdb::gridConstPtrCast<openvdb::FloatGrid>(maskIt->getGridPtr());
+                        } else {
+                            addWarning(SOP_MESSAGE, "The mask grid has to be a FloatGrid.");
+                        }
+                    } else {
+                        addWarning(SOP_MESSAGE, "The mask input is empty.");
+                    }
+                }
+            }
+        }
+    }
+    */
     return error();
 }
 
@@ -691,12 +738,14 @@ SOP_OpenVDB_Filter_Level_Set::applyFilters(
     }
 
     for (size_t n = 0, N = filterParms.size(); n < N; ++n) {
-
+        
         const GA_PrimitiveGroup *group = matchGroup(*gdp, filterParms[n].mGroup);
 
         // Skip this node if it doesn't operate on this primitive
         if (group && !group->containsOffset(vdbPrim->getMapOffset()))
             continue;
+
+        
 
         filterGrid(context, filter, filterParms[n], voxelSize, boss, verbose);
 
@@ -777,7 +826,7 @@ SOP_OpenVDB_Filter_Level_Set::offset(const FilterParms& parms, FilterT& filter,
             << " by the offset " << offset << std::endl;
     }
 
-    filter.offset(offset);
+    filter.offset(offset, parms.mMaskGrid.get());
 }
 
 template<typename FilterT>
@@ -791,7 +840,7 @@ SOP_OpenVDB_Filter_Level_Set::mean(const FilterParms& parms, FilterT& filter,
             std::cout << "Mean filter of radius " <<  parms.mStencilWidth << std::endl;
         }
 
-        filter.mean(parms.mStencilWidth);
+        filter.mean(parms.mStencilWidth, parms.mMaskGrid.get());
     }
 }
 
@@ -806,7 +855,7 @@ SOP_OpenVDB_Filter_Level_Set::gaussian(const FilterParms& parms, FilterT& filter
             std::cout << "Gaussian filter of radius " <<  parms.mStencilWidth << std::endl;
         }
 
-        filter.gaussian(parms.mStencilWidth);
+        filter.gaussian(parms.mStencilWidth, parms.mMaskGrid.get());
     }
 }
 
@@ -821,7 +870,7 @@ SOP_OpenVDB_Filter_Level_Set::median(const FilterParms& parms, FilterT& filter,
             std::cout << "Median filter of radius " << parms.mStencilWidth << std::endl;
         }
 
-        filter.median(parms.mStencilWidth);
+        filter.median(parms.mStencilWidth, parms.mMaskGrid.get());
     }
 }
 
@@ -834,7 +883,7 @@ SOP_OpenVDB_Filter_Level_Set::meanCurvature(const FilterParms& parms, FilterT& f
 
         if (verbose) std::cout << "Mean-curvature flow" << (n+1) << std::endl;
 
-        filter.meanCurvature();
+        filter.meanCurvature(parms.mMaskGrid.get());
     }
 }
 
@@ -847,7 +896,7 @@ SOP_OpenVDB_Filter_Level_Set::laplacian(const FilterParms& parms, FilterT& filte
 
         if (verbose) std::cout << "Laplacian flow" << (n+1) << std::endl;
 
-        filter.laplacian();
+        filter.laplacian(parms.mMaskGrid.get());
     }
 }
 

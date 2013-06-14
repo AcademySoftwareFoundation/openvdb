@@ -6,8 +6,11 @@
 @htmlonly <a name="v1_2_0_changes"></a>@endhtmlonly
 @par
 <B>Version 1.2.0</B> - <I>In development</I>
+- Added options for alpha-masking in the level set filters.
 - Implemented sharp feature extraction for level set surfacing.  This enhances
   the quality of the output mesh and reduces aliasing artifacts.
+- Added masking options, a spatial multiplier for the adaptivity threshold
+  and automatic partitioning to the meshing tools.
 - Rewrote the particle to level set converter, simplifying the API,
   improving performance (especially when particles have a fixed radius),
   adding the capability to transfer arbitrary point attributes,
@@ -20,6 +23,9 @@
   and much better performance in cases where many instances are allocated.
 - Extended @vdblink::tools::Dense tools::Dense@endlink to make it more
   compatible with existing tools. 
+- Fixed a crash in @vdblink::io::Archive io::Archive@endlink whenever
+  the library was unloaded from memory and then reloaded.
+  <I>[Contributed by Ollie Harding]</I>
 - Added a Prune SOP with several pruning schemes.
 - Fixed a bug in @c GU_PrimVDB::buildFromPrimVolume(), seen during the
   conversion from Houdini volumes to OpenVDB grids, that could cause 

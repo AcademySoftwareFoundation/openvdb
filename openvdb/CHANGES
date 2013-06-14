@@ -2,9 +2,12 @@ OpenVDB Version History
 =======================
 
 Version 1.2.0 - In development
+    - Added options for alpha-masking in the level set filters.
     - Implemented sharp feature extraction for level set surfacing.
       This enhances the quality of the output mesh and reduces aliasing
       artifacts.
+    - Added masking options, a spatial multiplier for the adaptivity threshold
+      and automatic partitioning to the meshing tools.
     - Rewrote the particle to level set converter, simplifying the API,
       improving performance (especially when particles have a fixed radius),
       adding the capability to transfer arbitrary point attributes,
@@ -16,6 +19,9 @@ Version 1.2.0 - In development
       and it offers faster index-based access methods and much better
       performance in cases where many instances are allocated.
     - Extended tools::Dense to make it more compatible with existing tools. 
+    - Fixed a crash in io::Archive whenever the library was unloaded
+      from memory and then reloaded.
+      [Contributed by Ollie Harding]
     - Added a Prune SOP with several pruning schemes.
     - Fixed a bug in GU_PrimVDB::buildFromPrimVolume(), seen during the
       conversion from Houdini volumes to OpenVDB grids, that could cause 

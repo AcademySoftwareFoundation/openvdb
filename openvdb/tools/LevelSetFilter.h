@@ -36,11 +36,14 @@
 /// interface tracking. These unrestricted deformations include
 /// surface smoothing (e.g., Laplacian flow), filtering (e.g., mean
 /// value) and morphological operations (e.g., morphological opening).
+/// All these operations can optionally be masked with another grid that
+/// acts as an alpha-mask.
 
 #ifndef OPENVDB_TOOLS_LEVELSETFILTER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_LEVELSETFILTER_HAS_BEEN_INCLUDED
 
 #include "LevelSetTracker.h"
+#include "Interpolation.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -56,84 +59,145 @@ template<typename GridT,
 class LevelSetFilter : public LevelSetTracker<GridT, InterruptT>
 {
 public:
-    typedef boost::shared_ptr<LevelSetFilter>     Ptr;
-    typedef LevelSetTracker<GridT, InterruptT>    BaseType;
-    typedef GridT                                 GridType;
-    typedef typename GridType::TreeType           TreeType;
-    typedef typename TreeType::LeafNodeType       LeafType;
-    typedef typename LeafType::ValueType          ValueType;
-    typedef typename tree::LeafManager<TreeType>  LeafManagerType;
-    typedef typename LeafManagerType::RangeType   RangeType;
-    typedef typename LeafManagerType::BufferType  BufferType;
+    typedef LevelSetTracker<GridT, InterruptT>              BaseType;
+    typedef GridT                                           GridType;
+    typedef typename GridType::TreeType                     TreeType;
+    typedef typename TreeType::ValueType                    ValueType;
+    typedef typename tree::LeafManager<TreeType>::LeafRange RangeType;
 
-    /// Main constructor
+    /// @brief Main constructor from a grid
+    /// @param grid The level set to be filtered.
+    /// @param interrupt Optional interrupter.
     LevelSetFilter(GridType& grid, InterruptT* interrupt = NULL)
-        : BaseType(grid, interrupt), mTask(0)
+        : BaseType(grid, interrupt), mTask(0), mMask(NULL)
     {
     }
-    /// Shallow copy constructor called by tbb::parallel_for() threads during filtering
+    /// @brief Shallow copy constructor called by tbb::parallel_for()
+    /// threads during filtering.
+    /// @param other The other LevelSetFilter from which to copy.
     LevelSetFilter(const LevelSetFilter& other)
-        : BaseType(other), mTask(other.mTask)
+        : BaseType(other), mTask(other.mTask), mMask(other.mMask)
     {
     }
+    /// @brief Destructor
     virtual ~LevelSetFilter() {};
 
-    /// Used internally by tbb::parallel_for()
-    void operator()(const RangeType& r) const
+    /// @brief Used internally by tbb::parallel_for().
+    /// @param range The range over which to perform multi-threading.
+    /// @warning Never call this method directly!
+    void operator()(const RangeType& range) const
     {
-        if (mTask) mTask(const_cast<LevelSetFilter*>(this), r);
+        if (mTask) mTask(const_cast<LevelSetFilter*>(this), range);
         else OPENVDB_THROW(ValueError, "task is undefined - call offset(), etc");
     }
 
-    /// @brief One iteration of mean-curvature flow of the level set
-    void meanCurvature();
+    /// @brief One iteration of mean-curvature flow of the level set.
+    /// @param mask Optional alpha mask.
+    void meanCurvature(const GridT* mask = NULL);
 
-    /// @brief One iteration of laplacian flow of the level set
-    void laplacian();
+    /// @brief One iteration of laplacian flow of the level set.
+    /// @param mask Optional alpha mask.
+    void laplacian(const GridT* mask = NULL);
 
     /// @brief One iteration of a fast separable gaussian filter.
+    /// @param width Width of the gaussian kernel in voxel units.
+    /// @param mask Optional alpha mask.
     ///
     /// @note This is approximated as 4 iterations of a separable mean filter
     /// which typically leads an approximation that's better than 95%!
-    void gaussian(int width = 1);
+    void gaussian(int width = 1, const GridT* mask = NULL);
 
-    /// @brief Offset the level set by the specified (world) distance
-    void offset(ValueType offset);
+    /// @brief Offset the level set by the specified (world) distance.
+    /// @param offset Value of the offset.
+    /// @param mask Optional alpha mask.
+    void offset(ValueType offset, const GridT* mask = NULL);
 
-    /// @brief One iteration of median-value flow of the level set
+    /// @brief One iteration of median-value flow of the level set.
+    /// @param width Width of the median-value kernel in voxel units.
+    /// @param mask Optional alpha mask.
     ///
-    /// @note This filter is not separable and is hence relatively slow!
-    void median(int width = 1);
+    /// @warning This filter is not separable and is hence relatively
+    /// slow!
+    void median(int width = 1, const GridT* mask = NULL);
 
-    /// @brief One iteration of mean-value flow of the level set
+    /// @brief One iteration of mean-value flow of the level set.
+    /// @param width Width of the mean-value kernel in voxel units.
+    /// @param mask Optional alpha mask.
     ///
     /// @note This filter is separable so it's fast!
-    void mean(int width = 1);
+    void mean(int width = 1, const GridT* mask = NULL);
 
 private:
-    typedef typename boost::function<void (LevelSetFilter*, const RangeType&)> FuncType;
+    typedef typename GridT::ConstAccessor                    AccT;
+    typedef typename TreeType::LeafNodeType                  LeafT;
+    typedef typename LeafT::ValueOnIter                      VoxelIterT;
+    typedef typename LeafT::ValueOnCIter                     VoxelCIterT;
+    typedef typename tree::LeafManager<TreeType>::BufferType BufferT;
+    typedef typename RangeType::Iterator                     LeafIterT;
 
-    FuncType mTask;
+    // Only two private member data
+    typename boost::function<void (LevelSetFilter*, const RangeType&)> mTask;
+    const GridT* mMask;
 
     // Private cook method calling tbb::parallel_for
     void cook(bool swap)
     {
         const int n = BaseType::getGrainSize();
         if (n>0) {
-            tbb::parallel_for(BaseType::leafs().getRange(n), *this);
+            tbb::parallel_for(BaseType::leafs().leafRange(n), *this);
         } else {
-            (*this)(BaseType::leafs().getRange());
+            (*this)(BaseType::leafs().leafRange());
         }
         if (swap) BaseType::leafs().swapLeafBuffer(1, n==0);
     }
 
-    // Prive driver method for mean and gaussian filtering
+    // Private class to perform interpolated alpha-blending
+    struct AffineCombine
+    {
+        AffineCombine(const GridT& grid, const GridT* mask)
+            : mGrid(&grid), mMask(mask), mAcc(mask ? new AccT(mask->tree()) : NULL) {}
+        ~AffineCombine() { delete mAcc; }
+        inline ValueType alpha(const Coord& xyz) const
+        {
+            assert(mMask);
+            const Vec3R world = mGrid->indexToWorld(xyz);
+            const Vec3R voxel = mMask->worldToIndex(world);
+            return tools::BoxSampler::sample<AccT>(*mAcc, voxel);
+        }
+        inline ValueType operator()(const Coord& xyz, ValueType unfiltered, ValueType filtered) const
+        {
+            if (mMask==NULL) return filtered;
+            const ValueType alpha = this->alpha(xyz);
+            return alpha*filtered + (1-alpha)*unfiltered;
+        }
+        const GridT* mGrid;
+        const GridT* mMask;
+        const AccT*  mAcc;
+    };
+
+    // Private driver method for mean and gaussian filtering
     void box(int width);
 
+    template <size_t Axis>
+    struct Avg {
+        Avg(const GridT& grid, Int32 w) : acc(grid.tree()), width(w), frac(1/ValueType(2*w+1)) {}
+        ValueType operator()(Coord xyz) {
+            ValueType sum = zeroVal<ValueType>();
+            Int32& i = xyz[Axis], j = i + width;
+            for (i -= width; i <= j; ++i) sum += acc.getValue(xyz);
+            return sum*frac;
+        }
+        typename GridT::ConstAccessor acc;
+        const Int32 width;
+        const ValueType frac;
+    };
+   
     // Private methods called by tbb::parallel_for threads
-    void doBoxX(const RangeType&, Int32);
-    void doBoxY(const RangeType&, Int32);
-    void doBoxZ(const RangeType&, Int32);
+    template <typename AvgT>
+    void doBox( const RangeType& r, Int32 w);
+    void doBoxX(const RangeType& r, Int32 w) { this->doBox<Avg<0> >(r,w); }
+    void doBoxZ(const RangeType& r, Int32 w) { this->doBox<Avg<1> >(r,w); }
+    void doBoxY(const RangeType& r, Int32 w) { this->doBox<Avg<2> >(r,w); }
     void doMedian(const RangeType&, int);
     void doMeanCurvature(const RangeType&);
     void doLaplacian(const RangeType&);
@@ -146,8 +210,10 @@ private:
 
 template<typename GridT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, InterruptT>::median(int width)
+LevelSetFilter<GridT, InterruptT>::median(int width, const GridT* mask)
 {
+    mMask = mask;
+    
     BaseType::startInterrupter("Median-value flow of level set");
 
     BaseType::leafs().rebuildAuxBuffers(1, BaseType::getGrainSize()==0);
@@ -163,8 +229,10 @@ LevelSetFilter<GridT, InterruptT>::median(int width)
 
 template<typename GridT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, InterruptT>::mean(int width)
+LevelSetFilter<GridT, InterruptT>::mean(int width, const GridT* mask)
 {
+    mMask = mask;
+    
     BaseType::startInterrupter("Mean-value flow of level set");
 
     this->box(width);
@@ -174,8 +242,10 @@ LevelSetFilter<GridT, InterruptT>::mean(int width)
 
 template<typename GridT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, InterruptT>::gaussian(int width)
+LevelSetFilter<GridT, InterruptT>::gaussian(int width, const GridT* mask)
 {
+    mMask = mask;
+    
     BaseType::startInterrupter("Gaussian flow of level set");
 
     for (int n=0; n<4; ++n) this->box(width);
@@ -206,8 +276,10 @@ LevelSetFilter<GridT, InterruptT>::box(int width)
 
 template<typename GridT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, InterruptT>::meanCurvature()
+LevelSetFilter<GridT, InterruptT>::meanCurvature(const GridT* mask)
 {
+    mMask = mask;
+    
     BaseType::startInterrupter("Mean-curvature flow of level set");
 
     BaseType::leafs().rebuildAuxBuffers(1, BaseType::getGrainSize()==0);
@@ -222,8 +294,10 @@ LevelSetFilter<GridT, InterruptT>::meanCurvature()
 
 template<typename GridT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, InterruptT>::laplacian()
+LevelSetFilter<GridT, InterruptT>::laplacian(const GridT* mask)
 {
+    mMask = mask;
+    
     BaseType::startInterrupter("Laplacian flow of level set");
 
     BaseType::leafs().rebuildAuxBuffers(1, BaseType::getGrainSize()==0);
@@ -239,8 +313,10 @@ LevelSetFilter<GridT, InterruptT>::laplacian()
 
 template<typename GridT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, InterruptT>::offset(ValueType value)
+LevelSetFilter<GridT, InterruptT>::offset(ValueType value, const GridT* mask)
 {
+    mMask = mask;
+    
     BaseType::startInterrupter("Offsetting level set");
 
     BaseType::leafs().removeAuxBuffers();// no auxiliary buffers required
@@ -251,7 +327,7 @@ LevelSetFilter<GridT, InterruptT>::offset(ValueType value)
         const ValueType delta = openvdb::math::Min(offset-dist, CFL);
         dist += delta;
 
-        mTask = boost::bind(&LevelSetFilter::doOffset, _1, _2, copysign(delta,value));
+        mTask = boost::bind(&LevelSetFilter::doOffset, _1, _2, copysign(delta, value));
         this->cook(false);
 
         BaseType::track();
@@ -268,16 +344,17 @@ template<typename GridT, typename InterruptT>
 inline void
 LevelSetFilter<GridT, InterruptT>::doMeanCurvature(const RangeType& range)
 {
-    typedef typename LeafType::ValueOnCIter VoxelIterT;
     BaseType::checkInterrupter();
     //const float CFL = 0.9f, dt = CFL * mDx * mDx / 6.0f;
     const ValueType dx = BaseType::voxelSize(),dt = math::Pow2(dx) / ValueType(3.0);
     math::CurvatureStencil<GridType> stencil(BaseType::grid(), dx);
-    for (size_t n=range.begin(), e=range.end(); n != e; ++n) {
-        BufferType& buffer = BaseType::leafs().getBuffer(n,1);
-        for (VoxelIterT iter = BaseType::leafs().leaf(n).cbeginValueOn(); iter; ++iter) {
+    AffineCombine comb(BaseType::grid(), mMask);
+    for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
+        BufferT& buffer = leafIter.buffer(1);
+        for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
             stencil.moveTo(iter);
-            buffer.setValue(iter.pos(), stencil.getValue() + dt * stencil.meanCurvatureNormGrad());
+            ValueType A = stencil.getCenterValue(), B = A + dt * stencil.meanCurvatureNormGrad();
+            buffer.setValue(iter.pos(), comb(stencil.getCenterCoord(), A, B));
         }
     }
 }
@@ -293,16 +370,17 @@ template<typename GridT, typename InterruptT>
 inline void
 LevelSetFilter<GridT, InterruptT>::doLaplacian(const RangeType& range)
 {
-    typedef typename LeafType::ValueOnCIter VoxelIterT;
     BaseType::checkInterrupter();
     //const float CFL = 0.9f, half_dt = CFL * mDx * mDx / 12.0f;
     const ValueType dx = BaseType::voxelSize(), dt = math::Pow2(dx) / ValueType(6.0);
     math::GradStencil<GridType> stencil(BaseType::grid(), dx);
-    for (size_t n=range.begin(), e=range.end(); n != e; ++n) {
-        BufferType& buffer = BaseType::leafs().getBuffer(n,1);
-        for (VoxelIterT iter = BaseType::leafs().leaf(n).cbeginValueOn(); iter; ++iter) {
+    AffineCombine comb(BaseType::grid(), mMask);
+    for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
+        BufferT& buffer = leafIter.buffer(1);
+        for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
             stencil.moveTo(iter);
-            buffer.setValue(iter.pos(), stencil.getValue() + dt * stencil.laplacian());
+            const ValueType A = stencil.getCenterValue(), B = A + dt * stencil.laplacian();
+            buffer.setValue(iter.pos(), comb(stencil.getCenterCoord(), A, B));
         }
     }
 }
@@ -310,11 +388,23 @@ LevelSetFilter<GridT, InterruptT>::doLaplacian(const RangeType& range)
 /// Offsets the values by a constant
 template<typename GridT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, InterruptT>::doOffset(const RangeType& range, ValueType value)
+LevelSetFilter<GridT, InterruptT>::doOffset(const RangeType& range, ValueType offset)
 {
     BaseType::checkInterrupter();
-    for (size_t n=range.begin(), e=range.end(); n != e; ++n)
-        BaseType::leafs().leaf(n).addValue(value);
+    if (mMask) {
+        AffineCombine comb(BaseType::grid(), mMask);
+        for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
+            for (VoxelIterT iter = leafIter->beginValueOn(); iter; ++iter) {
+                iter.setValue(*iter + comb.alpha(iter.getCoord())*offset);
+            }
+        }
+    } else {
+        for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
+            for (VoxelIterT iter = leafIter->beginValueOn(); iter; ++iter) {
+                iter.setValue(*iter + offset);
+            }
+        }
+    }
 }
 
 /// Performs simple but slow median-value diffusion
@@ -322,84 +412,37 @@ template<typename GridT, typename InterruptT>
 inline void
 LevelSetFilter<GridT, InterruptT>::doMedian(const RangeType& range, int width)
 {
-    typedef typename LeafType::ValueOnCIter VoxelIterT;
     BaseType::checkInterrupter();
     typename math::DenseStencil<GridType> stencil(BaseType::grid(), width);//creates local cache!
-    for (size_t n=range.begin(), e=range.end(); n != e; ++n) {
-        BufferType& buffer = BaseType::leafs().getBuffer(n,1);
-        for (VoxelIterT iter=BaseType::leafs().leaf(n).cbeginValueOn(); iter; ++iter) {
+    AffineCombine comb(BaseType::grid(), mMask);
+    for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
+        BufferT& buffer = leafIter.buffer(1);
+        for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
             stencil.moveTo(iter);
-            buffer.setValue(iter.pos(), stencil.median());
+            const ValueType A = stencil.getCenterValue(), B = stencil.median();
+            buffer.setValue(iter.pos(), comb(stencil.getCenterCoord(), A, B));
         }
     }
 }
 
-/// X convolution of a separable box filter
+/// One dimensional convolution of a separable box filter
 template<typename GridT, typename InterruptT>
+template <typename AvgT>
 inline void
-LevelSetFilter<GridT, InterruptT>::doBoxX(const RangeType& range, Int32 w)
+LevelSetFilter<GridT, InterruptT>::doBox(const RangeType& range, Int32 w)
 {
-    this->checkInterrupter();
-    const ValueType frac = ValueType(1)/ValueType(2*w+1);
-    typename GridT::ConstAccessor acc = BaseType::grid().getConstAccessor();
-    for (size_t n=range.begin(), nLast = range.end(); n != nLast; ++n) {
-        const LeafType& leaf = BaseType::leafs().leaf(n);
-        BufferType& buffer   = BaseType::leafs().getBuffer(n, 1);
-        for (typename LeafType::ValueOnCIter iter = leaf.cbeginValueOn(); iter; ++iter) {
-            ValueType sum = zeroVal<ValueType>();
-            math::Coord xyz = iter.getCoord();
-            for (Int32 x = xyz.x()-w, xLast = xyz.x()+w; x <= xLast; ++x) {
-                sum += acc.getValue(xyz.setX(x));
-            }
-            buffer.setValue(iter.pos(), sum*frac);
+    BaseType::checkInterrupter();
+    AvgT avg(BaseType::grid(), w);
+    AffineCombine comb(BaseType::grid(), mMask);
+    for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
+        BufferT& buffer = leafIter.buffer(1);
+        for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
+            const Coord xyz = iter.getCoord();
+            buffer.setValue(iter.pos(), comb(xyz, *iter, avg(xyz)));
         }
     }
 }
-
-/// Y convolution of a separable box filter
-template<typename GridT, typename InterruptT>
-inline void
-LevelSetFilter<GridT, InterruptT>::doBoxY(const RangeType& range, Int32 w)
-{
-    this->checkInterrupter();
-    const ValueType frac = ValueType(1)/ValueType(2*w+1);
-    typename GridT::ConstAccessor acc = BaseType::grid().getConstAccessor();
-    for (size_t n=range.begin(), nLast = range.end(); n != nLast; ++n) {
-        const LeafType& leaf = BaseType::leafs().leaf(n);
-        BufferType& buffer   = BaseType::leafs().getBuffer(n, 1);
-        for (typename LeafType::ValueOnCIter iter = leaf.cbeginValueOn(); iter; ++iter) {
-            ValueType sum = zeroVal<ValueType>();
-            math::Coord xyz = iter.getCoord();
-            for (Int32 y = xyz.y()-w, yLast = xyz.y()+w; y <= yLast; ++y) {
-                sum += acc.getValue(xyz.setY(y));
-            }
-            buffer.setValue(iter.pos(), sum*frac);
-        }
-    }
-}
-
-/// Z convolution of a separable box filter
-template<typename GridT, typename InterruptT>
-inline void
-LevelSetFilter<GridT, InterruptT>::doBoxZ(const RangeType& range, Int32 w)
-{
-    this->checkInterrupter();
-    const ValueType frac = ValueType(1)/ValueType(2*w+1);
-    typename GridT::ConstAccessor acc = BaseType::grid().getConstAccessor();
-    for (size_t n=range.begin(), nLast = range.end(); n != nLast; ++n) {
-        const LeafType& leaf = BaseType::leafs().leaf(n);
-        BufferType& buffer   = BaseType::leafs().getBuffer(n, 1);
-        for (typename LeafType::ValueOnCIter iter = leaf.cbeginValueOn(); iter; ++iter) {
-            ValueType sum = zeroVal<ValueType>();
-            math::Coord xyz = iter.getCoord();
-            for (Int32 z = xyz.z()-w, zLast = xyz.z()+w; z <= zLast; ++z) {
-                sum += acc.getValue(xyz.setZ(z));
-            }
-            buffer.setValue(iter.pos(), sum*frac);
-        }
-    }
-}
-
+  
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

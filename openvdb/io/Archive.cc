@@ -54,6 +54,7 @@ struct StreamState
     static const long MAGIC_NUMBER;
 
     StreamState();
+    ~StreamState();
 
     int magicNumber;
     int fileVersion;
@@ -122,6 +123,14 @@ StreamState::StreamState(): magicNumber(std::ios_base::xalloc())
         gridBackground =         std::ios_base::xalloc();
         gridClass =              std::ios_base::xalloc();
     }
+}
+
+
+StreamState::~StreamState()
+{
+    // Ensure that this StreamState struct can no longer be accessed.
+    std::cout.iword(magicNumber) = 0;
+    std::cout.pword(magicNumber) = NULL;
 }
 
 

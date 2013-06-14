@@ -5,7 +5,9 @@
 @section Contents
 - @ref sWhatIsVDB
 - @ref sWhatLicense
+- @ref sWhatCLA
 - @ref sWhyUseVDB
+- @ref sVersionNumbering
 - @ref sGeneralizedOctree
 - @ref sLevelSet
 - @ref sCustomizeVDB
@@ -47,6 +49,12 @@ concerns of proprietary and open source developers. For more information
 about this license, see the 
 <a href="http://www.mozilla.org/MPL" target="_blank">Mozilla FAQ</a>. 
 
+@section sWhatCLA Is there a Contributor License Agreement for OpenVDB?
+Yes, developers who wish to contribute code to be considered for inclusion 
+in the OpenVDB distribution must first complete this 
+<a href="http://www.openvdb.org//download/OpenVDBContributorLicenseAgreement.pdf" target="_blank">Contributor License Agreement</a>
+and submit it to DreamWorks (directions are in the CLA).
+
 @section sWhyUseVDB Why should I use OpenVDB?
 The typical reasons to adopt OpenVDB are if you are <b>storing sparse
 data</b> and/or if you are performing <b>sparse computations</b>.  OpenVDB
@@ -56,6 +64,23 @@ many existing sparse data structures, OpenVDB is also optimized for
 numerical simulations, multithreaded volume compositing, near real-time
 boolean CSG operations, fast random and sequential data access and
 voxelization of points and polygons.
+
+@section sVersionNumbering What is the version numbering system for OpenVDB?
+We currently use a <I>major.minor.patch</I> version numbering system,
+and with every release of OpenVDB we change one or more of the three numbers.
+The patch number is incremented for new features and bug fixes that change
+neither the API nor the file format of the library nor the ABIs of the @c Grid
+and @c Transform classes and their constituent classes.
+The minor version is incremented for releases that change the API without
+changing the @c Grid or @c Transform ABIs, and for releases that change
+the file format in such a way that older files can still be read.
+The major version is incremented when the @c Grid or @c Transform ABIs
+change, or when the file format changes in a non-backward-compatible way
+(which should be rare).
+No release of OpenVDB guarantees ABI compatibility across the entire library,
+but rather only for the @c Grid and @c Transform classes, and primarily
+to allow third-party app plugins compiled against different versions of
+the library to coexist and exchange data.
 
 @section sCustomizeVDB Can I customize the configuration of OpenVDB?
 Yes!  OpenVDB is specifically developed to be highly customizable.  That is,
@@ -207,7 +232,7 @@ suggestions and preferences.
 
 @section sContribute How can I contribute to OpenVDB?
 If you have bug reports or ideas for improvements or new features,
-please contact us! We will work to accommodate your suggestions and
-source code contributions.
+please contact us!  If you want to contribute code, please see our
+<a href="http://www.openvdb.org/license/index.html" target="_blank">License page</a>.
 
 */

@@ -523,7 +523,7 @@ unsigned
 SOP_OpenVDB_From_Particles::disableParms()
 {
     unsigned changed = 0;
-    int refexists = (nInputs() == 2);
+    int refexists = (this->nInputs() == 2);
 
     changed += enableParm("group", refexists);
     changed += enableParm("writeintoref", refexists);

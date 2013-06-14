@@ -1,6 +1,6 @@
-========================================================================
-                      OpenVDB Development Repository
-========================================================================
+================================================================================
+                          OpenVDB Development Repository
+================================================================================
 
 This GitHub repository hosts the trunk of the OpenVDB development. This implies
 that it is the newest public version with the latest features and bug fixes.
@@ -15,7 +15,10 @@ General discussion forum:
 http://www.openvdb.org/forum
 
 
-Contributor License Agreement
+================================================================================
+                           Contributor License Agreement
+================================================================================
+
 Developers who wish to contribute code to be considered for inclusion in the
 OpenVDB distribution must first complete this Contributor License Agreement:
 http://www.openvdb.org/download/OpenVDBContributorLicenseAgreement.pdf

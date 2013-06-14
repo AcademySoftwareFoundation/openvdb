@@ -1124,14 +1124,17 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
     const openvdb::math::Transform& transform = mIndexGrid.transform();
     openvdb::Vec3d pos, indexPos, uvw;
     openvdb::Coord ijk, coord;
-    std::vector<GA_Index> primitives(8);
+    std::vector<GA_Index> primitives(8), similar_primitives(8);
     int count;
+ 
+    UT_Vector3 targetN, sourceN;
 
     for (GA_PageIterator pageIt = range.beginPages(); !pageIt.atEnd(); ++pageIt) {
         for (GA_Iterator blockIt(pageIt.begin()); blockIt.blockAdvance(start, end); ) {
             for (target = start; target < end; ++target) {
 
                 primRef = mTargetGeo.getPrimitiveList().get(target);
+                targetN = mTargetGeo.getGEOPrimitive(target)->computeNormal();
 
                 if (mPrimAttributes.size() != 0 ) {
 
@@ -1157,6 +1160,7 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
                     coord[2] = int(std::floor(indexPos[2]));
 
                     primitives.clear();
+                    similar_primitives.clear();
                     int primIndex;
 
                     for (int d = 0; d < 8; ++d) {
@@ -1166,13 +1170,27 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
 
                         if (acc.probeValue(ijk, primIndex) &&
                             primIndex != openvdb::util::INVALID_IDX) {
-                            primitives.push_back(primIndex);
+
+                            GA_Offset tmpOffset = mSourceGeo.primitiveOffset(primIndex);
+                            sourceN = mSourceGeo.getGEOPrimitive(tmpOffset)->computeNormal();
+
+                            if (sourceN.dot(targetN) > 0.5) {
+                                similar_primitives.push_back(primIndex);
+                            } else {
+                                primitives.push_back(primIndex);
+                            }
                         }
                     }
 
-                    if (!primitives.empty()) {
-                        source = findClosestPrimitiveToPoint(
-                            mSourceGeo, primitives, pos, v0, v1, v2, uvw);
+                    if (!primitives.empty() || !similar_primitives.empty()) {
+
+                        if (!similar_primitives.empty()) {
+                            source = findClosestPrimitiveToPoint(
+                                mSourceGeo, similar_primitives, pos, v0, v1, v2, uvw);
+                        } else {
+                            source = findClosestPrimitiveToPoint(
+                                mSourceGeo, primitives, pos, v0, v1, v2, uvw);
+                        }
 
                         // Transfer attributes
                         for (size_t n = 0, N = mPrimAttributes.size(); n < N; ++n) {
@@ -1197,6 +1215,7 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
 
                         int primIndex;
                         primitives.clear();
+                        similar_primitives.clear();
 
                         for (int d = 0; d < 8; ++d) {
                             ijk[0] = coord[0] + ((d & 0x02) >> 1 ^ d & 0x01);
@@ -1205,13 +1224,25 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
 
                             if (acc.probeValue(ijk, primIndex) &&
                                 primIndex != openvdb::util::INVALID_IDX) {
-                                primitives.push_back(primIndex);
+
+                                GA_Offset tmpOffset = mSourceGeo.primitiveOffset(primIndex);
+                                sourceN = mSourceGeo.getGEOPrimitive(tmpOffset)->computeNormal();
+
+                                if (sourceN.dot(targetN) > 0.5) {
+                                    primitives.push_back(primIndex);
+                                }
                             }
                         }
 
-                        if (!primitives.empty()) {
-                            findClosestPrimitiveToPoint(
-                                mSourceGeo, primitives, pos, v0, v1, v2, uvw);
+                        if (!primitives.empty() || !similar_primitives.empty()) {
+
+                            if (!similar_primitives.empty()) {
+                                findClosestPrimitiveToPoint(
+                                    mSourceGeo, similar_primitives, pos, v0, v1, v2, uvw);
+                            } else {
+                                findClosestPrimitiveToPoint(
+                                    mSourceGeo, primitives, pos, v0, v1, v2, uvw);
+                            }
 
                             for (size_t n = 0, N = mVertAttributes.size(); n < N; ++n) {
                                 mVertAttributes[n]->copy(v0, v1, v2, vtxIt.getVertexOffset(), uvw);

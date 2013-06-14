@@ -56,7 +56,7 @@ public:
     CPPUNIT_TEST(testMerge);
     CPPUNIT_TEST(testCombine);
     CPPUNIT_TEST(testBoolTree);
-    CPPUNIT_TEST(testFilter);
+    //CPPUNIT_TEST(testFilter);
     CPPUNIT_TEST_SUITE_END();
 
     void testGetValue();
@@ -72,7 +72,7 @@ public:
     void testMerge();
     void testCombine();
     void testBoolTree();
-    void testFilter();
+    //void testFilter();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestLeafBool);
@@ -503,42 +503,42 @@ TestLeafBool::testBoolTree()
 }
 
 
-void
-TestLeafBool::testFilter()
-{
-    using namespace openvdb;
+// void
+// TestLeafBool::testFilter()
+// {
+//     using namespace openvdb;
 
-    BoolGrid::Ptr grid = BoolGrid::create();
-    CPPUNIT_ASSERT(grid.get() != NULL);
-    BoolTree::Ptr tree = grid->treePtr();
-    CPPUNIT_ASSERT(tree.get() != NULL);
-    grid->setName("filtered");
+//     BoolGrid::Ptr grid = BoolGrid::create();
+//     CPPUNIT_ASSERT(grid.get() != NULL);
+//     BoolTree::Ptr tree = grid->treePtr();
+//     CPPUNIT_ASSERT(tree.get() != NULL);
+//     grid->setName("filtered");
 
-    unittest_util::makeSphere<BoolGrid>(/*dim=*/Coord(32),
-                                        /*ctr=*/Vec3f(0, 0, 0),
-                                        /*radius=*/10,
-                                        *grid, unittest_util::SPHERE_DENSE);
+//     unittest_util::makeSphere<BoolGrid>(/*dim=*/Coord(32),
+//                                         /*ctr=*/Vec3f(0, 0, 0),
+//                                         /*radius=*/10,
+//                                         *grid, unittest_util::SPHERE_DENSE);
 
-    BoolTree::Ptr copyOfTree(new BoolTree(*tree));
-    BoolGrid::Ptr copyOfGrid = BoolGrid::create(copyOfTree);
-    copyOfGrid->setName("original");
+//     BoolTree::Ptr copyOfTree(new BoolTree(*tree));
+//     BoolGrid::Ptr copyOfGrid = BoolGrid::create(copyOfTree);
+//     copyOfGrid->setName("original");
 
-    tools::Filter<BoolGrid> filter(*grid);
-    filter.offset(1);
+//     tools::Filter<BoolGrid> filter(*grid);
+//     filter.offset(1);
 
-#if 0
-    GridPtrVec grids;
-    grids.push_back(copyOfGrid);
-    grids.push_back(grid);
-    io::File vdbFile("/tmp/TestLeafBool::testFilter.vdb2");
-    vdbFile.write(grids);
-    vdbFile.close();
-#endif
+// #if 0
+//     GridPtrVec grids;
+//     grids.push_back(copyOfGrid);
+//     grids.push_back(grid);
+//     io::File vdbFile("/tmp/TestLeafBool::testFilter.vdb2");
+//     vdbFile.write(grids);
+//     vdbFile.close();
+// #endif
 
-    // Verify that offsetting all active voxels by 1 (true) has no effect,
-    // since the active voxels were all true to begin with.
-    CPPUNIT_ASSERT(tree->hasSameTopology(*copyOfTree));
-}
+//     // Verify that offsetting all active voxels by 1 (true) has no effect,
+//     // since the active voxels were all true to begin with.
+//     CPPUNIT_ASSERT(tree->hasSameTopology(*copyOfTree));
+// }
 
 // Copyright (c) 2012-2013 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

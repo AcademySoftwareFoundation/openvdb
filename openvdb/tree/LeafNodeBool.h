@@ -284,9 +284,9 @@ public:
     void setValueOnly(Index offset, bool val) { assert(offset<SIZE); mBuffer.setValue(offset,val); }
 
     /// Add the given value to all active voxels, leaving inactive voxels unchanged.
-    void addValue(bool val);
+    OPENVDB_DEPRECATED void addValue(bool val);
     /// Multiply all active voxels by the given value, leaving inactive voxels unchanged.
-    void scaleValue(bool scale);
+    OPENVDB_DEPRECATED void scaleValue(bool scale);
 
     /// Mark all voxels as active, but don't change their values.
     void setValuesOn() { mValueMask.setOn(); }

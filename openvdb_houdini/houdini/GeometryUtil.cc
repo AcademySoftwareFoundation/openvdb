@@ -479,8 +479,15 @@ VertexNormalOp::operator()(const GA_SplittableRange& range) const
 
 SharpenFeaturesOp::SharpenFeaturesOp(
     GU_Detail& meshGeo, const GU_Detail& refGeo, EdgeData& edgeData,
-    const openvdb::math::Transform& xform, const GA_PrimitiveGroup *surfacePrims)
-    : mMeshGeo(meshGeo), mRefGeo(refGeo), mEdgeData(edgeData), mXForm(xform), mSurfacePrims(surfacePrims)
+    const openvdb::math::Transform& xform,
+    const GA_PrimitiveGroup * surfacePrims,
+    const openvdb::BoolTree * mask)
+    : mMeshGeo(meshGeo)
+    , mRefGeo(refGeo)
+    , mEdgeData(edgeData)
+    , mXForm(xform)
+    , mSurfacePrims(surfacePrims)
+    , mMaskTree(mask)
 {
 }
 
@@ -488,6 +495,13 @@ void
 SharpenFeaturesOp::operator()(const GA_SplittableRange& range) const
 {
     openvdb::tools::MeshToVoxelEdgeData::Accessor acc = mEdgeData.getAccessor();
+    
+    typedef openvdb::tree::ValueAccessor<const openvdb::BoolTree> BoolAccessor;
+    boost::scoped_ptr<BoolAccessor> maskAcc;
+
+    if (mMaskTree) {
+        maskAcc.reset(new BoolAccessor(*mMaskTree));
+    }
 
     GA_Offset start, end, ptnOffset, primOffset;
 
@@ -496,7 +510,7 @@ SharpenFeaturesOp::operator()(const GA_SplittableRange& range) const
 
     openvdb::Vec3d pos, normal;
     openvdb::Coord ijk;
-
+    
     std::vector<openvdb::Vec3d> points(12), normals(12);
     std::vector<openvdb::Index32> primitives(12);
  
@@ -517,6 +531,9 @@ SharpenFeaturesOp::operator()(const GA_SplittableRange& range) const
                 ijk[0] = int(std::floor(pos[0]));
                 ijk[1] = int(std::floor(pos[1]));
                 ijk[2] = int(std::floor(pos[2]));
+                
+                
+                if (maskAcc && !maskAcc->isValueOn(ijk)) continue;
 
                 points.clear();
                 normals.clear();
@@ -555,6 +572,8 @@ SharpenFeaturesOp::operator()(const GA_SplittableRange& range) const
                     cell.setBounds(double(ijk[0]), double(ijk[1]), double(ijk[2]),
                         double(ijk[0]+1), double(ijk[1]+1), double(ijk[2]+1));
 
+                    cell.expandBounds(0.3, 0.3, 0.3);
+
                     if (!cell.isInside(pos[0], pos[1], pos[2])) {
 
                         UT_Vector3 org(pos[0], pos[1], pos[2]);
@@ -573,7 +592,6 @@ SharpenFeaturesOp::operator()(const GA_SplittableRange& range) const
                             pos[2] = tmpP.z();
                         }
                     }
-
 
                     pos = mXForm.indexToWorld(pos);
 

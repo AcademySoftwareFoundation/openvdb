@@ -455,8 +455,7 @@ public:
 
     ~MeshVoxelizer() {}
 
-    void runParallel();
-    void runSerial();
+    void run(bool threaded = true);
 
     MeshVoxelizer(MeshVoxelizer<FloatTreeT, InterruptT>& rhs, tbb::split);
     void operator() (const tbb::blocked_range<size_t> &range);
@@ -504,16 +503,13 @@ private:
 
 template<typename FloatTreeT, typename InterruptT>
 void
-MeshVoxelizer<FloatTreeT, InterruptT>::runParallel()
+MeshVoxelizer<FloatTreeT, InterruptT>::run(bool threaded)
 {
-    tbb::parallel_reduce(tbb::blocked_range<size_t>(0, mPolygonList.size()), *this);
-}
-
-template<typename FloatTreeT, typename InterruptT>
-void
-MeshVoxelizer<FloatTreeT, InterruptT>::runSerial()
-{
-    (*this)(tbb::blocked_range<size_t>(0, mPolygonList.size()));
+    if (threaded) {
+        tbb::parallel_reduce(tbb::blocked_range<size_t>(0, mPolygonList.size()), *this);
+    } else {
+        (*this)(tbb::blocked_range<size_t>(0, mPolygonList.size()));
+    }
 }
 
 template<typename FloatTreeT, typename InterruptT>
@@ -631,9 +627,12 @@ MeshVoxelizer<FloatTreeT, InterruptT>::evalPrimitive(const Coord& ijk, const Pri
         if (secondDist < dist) dist = secondDist;
     }
 
-    FloatValueT newDist(-dist), oldDist;
-    if (!mSqrDistAccessor.probeValue(ijk, oldDist) || newDist > oldDist) {
-        mSqrDistAccessor.setValue(ijk, newDist);
+    FloatValueT oldDist = mSqrDistAccessor.getValue(ijk);
+
+    //FloatValueT newDist(-dist), oldDist;
+    //if (!mSqrDistAccessor.probeValue(ijk, oldDist) || newDist > oldDist) {
+    if (std::abs(oldDist) > dist) {
+        mSqrDistAccessor.setValue(ijk, -dist);
         mPrimIndexAccessor.setValue(ijk, prim.index);
     }
 
@@ -1854,7 +1853,7 @@ ExpandNB<FloatTreeT>::operator()(const tbb::blocked_range<size_t>& range)
 
             pos = iter.pos();
 
-            inside = distAcc.getValue(ijk) < FloatValueT(0.0);
+            inside = distLeaf.getValue(ijk) < FloatValueT(0.0);
 
             if (!inside && distance < mExteriorBandWidth) {
                 distLeaf.setValueOn(pos, distance);
@@ -2065,14 +2064,14 @@ struct TrimOp
         typename LeafNodeType::ValueOnIter iter = leaf.beginValueOn();
 
         for (; iter; ++iter) {
-            const ValueType& val = iter.getValue();
+            ValueType& val = const_cast<ValueType&>(iter.getValue());
             const bool inside = val < ValueType(0.0);
 
             if (inside && !(val > -mInBandWidth)) {
-                iter.setValue(-mInBandWidth);
+                val = -mInBandWidth;
                 iter.setValueOff();
             } else if (!inside && !(val < mExBandWidth)) {
-                iter.setValue(mExBandWidth);
+                val = mExBandWidth;
                 iter.setValueOff();
             }
         }
@@ -2288,7 +2287,6 @@ MeshToVolume<FloatGridT, InterruptT>::convertToUnsignedDistanceField(
     mDistGrid->setGridClass(GRID_UNKNOWN);
 }
 
-
 template<typename FloatGridT, typename InterruptT>
 void
 MeshToVolume<FloatGridT, InterruptT>::doConvert(
@@ -2309,7 +2307,7 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
         internal::MeshVoxelizer<FloatTreeT, InterruptT>
             voxelizer(pointList, polygonList, mInterrupter);
 
-        voxelizer.runParallel();
+        voxelizer.run();
 
         if (wasInterrupted(18)) return;
 
@@ -2318,14 +2316,12 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
         mIntersectingVoxelsGrid->tree().merge(voxelizer.intersectionTree());
     }
 
-
     if (!unsignedDistField) {
         // Determine the inside/outside state for the narrow band of voxels.
         {
             // Slices up the volume and label the exterior contour of each slice in parallel.
             internal::ContourTracer<FloatTreeT, InterruptT> trace(
                 mDistGrid->tree(), mIntersectingVoxelsGrid->tree(), mInterrupter);
-
             for (int i = 0; i < mSignSweeps; ++i) {
 
                 if (wasInterrupted(19)) return;
@@ -2372,7 +2368,6 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
 
             sign.runParallel();
 
-
             if (wasInterrupted(34)) return;
 
             // Remove mesh intersecting voxels that where set by rasterizing
@@ -2416,7 +2411,6 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
 
         transform.runParallel();
     }
-
 
     if (wasInterrupted(40)) return;
 
@@ -2507,6 +2501,7 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
         }
     }
 
+
     if (!bool(GENERATE_PRIM_INDEX_GRID & mConversionFlags)) mIndexGrid->clear();
 
     if (wasInterrupted(80)) return;
@@ -2557,7 +2552,6 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
         tree::LeafManager<FloatTreeT> leafs(mDistGrid->tree());
 
         typedef internal::TrimOp<FloatValueT> TrimOp;
-
         TrimOp op(exBandWidth, unsignedDistField ? exBandWidth : inBandWidth);
         LeafTransformer<FloatTreeT, TrimOp> transform(leafs, op);
         transform.runParallel();
@@ -2566,6 +2560,7 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
     if (wasInterrupted(99)) return;
 
     mDistGrid->tree().pruneLevelSet();
+    mDistGrid->tree().signedFloodFill();
 }
 
 

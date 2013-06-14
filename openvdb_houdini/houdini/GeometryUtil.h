@@ -150,7 +150,8 @@ public:
     typedef openvdb::tools::MeshToVoxelEdgeData EdgeData;
 
     SharpenFeaturesOp(GU_Detail& meshGeo, const GU_Detail& refGeo, EdgeData& edgeData,
-        const openvdb::math::Transform& xform, const GA_PrimitiveGroup *surfacePrims = NULL);
+        const openvdb::math::Transform& xform, const GA_PrimitiveGroup *surfacePrims = NULL,
+        const openvdb::BoolTree * mask = NULL);
 
     void operator()(const GA_SplittableRange&) const;
 
@@ -160,6 +161,7 @@ private:
     EdgeData& mEdgeData;
     const openvdb::math::Transform& mXForm;
     const GA_PrimitiveGroup *mSurfacePrims;
+    const openvdb::BoolTree * mMaskTree;
 };
 
 

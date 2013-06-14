@@ -31,6 +31,9 @@
 /// @author Ken Museth
 ///
 /// @file Filter.h
+///
+/// @brief Filtering of VDB volumes. Note that only the values in the
+/// grid are changed, not its topology! 
 
 #ifndef OPENVDB_TOOLS_FILTER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_FILTER_HAS_BEEN_INCLUDED
@@ -54,6 +57,7 @@ namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
 /// @brief Filtering of VDB volumes
+/// @note Only the values in the grid are changed, not its topology!
 template<typename GridT, typename InterruptT = util::NullInterrupter>
 class Filter
 {
@@ -67,34 +71,48 @@ public:
     typedef typename LeafManagerType::BufferType   BufferType;
 
     /// Constructor
+    /// @param grid Grid to be filtered.
+    /// @param interrupt Optional interrupter.
     Filter(GridT& grid, InterruptT* interrupt = NULL) :
         mGrid(grid), mTask(0), mInterrupter(interrupt)
     {
     }
 
     /// @brief One iteration of a fast separable mean-value (i.e. box) filter.
+    /// @param width The width of the mean-value filter is 2*width+1 voxels.
+    /// @param iterations Number of times the mean-value filter is applied.
+    /// @param serial False if multi-threading is enabled.
     void mean(int width = 1, int iterations = 1, bool serial = false);
 
     /// @brief One iteration of a fast separable gaussian filter.
     ///
     /// @note This is approximated as 4 iterations of a separable mean filter
     /// which typically leads an approximation that's better than 95%!
+    /// @param width The width of the mean-value filter is 2*width+1 voxels.
+    /// @param iterations Numer of times the mean-value filter is applied.
+    /// @param serial False if multi-threading is enabled.
     void gaussian(int width = 1, int iterations = 1, bool serial = false);
 
     /// @brief One iteration of a median-value filter
     ///
     /// @note This filter is not separable and is hence relatively slow!
+    /// @param width The width of the mean-value filter is 2*width+1 voxels.
+    /// @param iterations Numer of times the mean-value filter is applied.
+    /// @param serial False if multi-threading is enabled.
     void median(int width = 1, int iterations = 1, bool serial = false);
 
     /// Offsets (i.e. adds) a constant value to all active voxels.
+    /// @param offset Offset in world units
+    /// @param serial False if multi-threading is enabled.
     void offset(float offset, bool serial = false);
 
     /// @brief Used internally by tbb::parallel_for()
+    /// @param range Range of LeafNodes over which to multi-thread.
     ///
-    /// @note Never call this method directly!
-    void operator()(const RangeType& r) const
+    /// @warning Never call this method directly!
+    void operator()(const RangeType& range) const
     {
-        if (mTask) mTask(const_cast<Filter*>(this), r);
+        if (mTask) mTask(const_cast<Filter*>(this), range);
         else OPENVDB_THROW(ValueError, "task is undefined - call median(), mean(), etc.");
     }
 
@@ -103,10 +121,26 @@ private:
 
     void cook(bool serial, LeafManagerType& leafs);
 
+    template <size_t Axis>
+    struct Avg {
+        Avg(const GridT& grid, Int32 w) : acc(grid.tree()), width(w), frac(1/ValueType(2*w+1)) {}
+        ValueType operator()(Coord xyz) {
+            ValueType sum = zeroVal<ValueType>();
+            Int32& i = xyz[Axis], j = i + width;
+            for (i -= width; i <= j; ++i) sum += acc.getValue(xyz);
+            return sum*frac;
+        }
+        typename GridT::ConstAccessor acc;
+        const Int32 width;
+        const ValueType frac;
+    };
+
     // Private filter methods called by tbb::parallel_for threads
-    void doBoxX(const RangeType&, Int32);
-    void doBoxY(const RangeType&, Int32);
-    void doBoxZ(const RangeType&, Int32);
+    template <typename AvgT>
+    void doBox( const RangeType& r, Int32 w);
+    void doBoxX(const RangeType& r, Int32 w) { this->doBox<Avg<0> >(r,w); }
+    void doBoxZ(const RangeType& r, Int32 w) { this->doBox<Avg<1> >(r,w); }
+    void doBoxY(const RangeType& r, Int32 w) { this->doBox<Avg<2> >(r,w); }
     void doMedian(const RangeType&, int);
     void doOffset(const RangeType&, float);
     /// @return true if the process was interrupted
@@ -215,69 +249,22 @@ Filter<GridT, InterruptT>::cook(bool serial, LeafManagerType& leafs)
     leafs.swapLeafBuffer(1, serial);
 }
 
-/// X convolution of a separable box filter
+/// One dimensional convolution of a separable box filter
 template<typename GridT, typename InterruptT>
+template <typename AvgT>
 inline void
-Filter<GridT, InterruptT>::doBoxX(const RangeType& range, Int32 w)
+Filter<GridT, InterruptT>::doBox(const RangeType& range, Int32 w)
 {
     this->wasInterrupted();
-    const ValueType frac = ValueType(1)/ValueType(2*w+1);
-    typename GridT::ConstAccessor acc = mGrid.getConstAccessor();
+    AvgT avg(mGrid, w);
     for (typename RangeType::Iterator lIter=range.begin(); lIter; ++lIter) {
         BufferType& buffer = lIter.buffer(1);
         for (typename LeafType::ValueOnCIter vIter = lIter->cbeginValueOn(); vIter; ++vIter) {
-            ValueType sum = zeroVal<ValueType>();
-            math::Coord xyz = vIter.getCoord();
-            for (Int32 x = xyz.x()-w, xLast = xyz.x()+w; x <= xLast; ++x) {
-                sum += acc.getValue(xyz.setX(x));
-            }
-            buffer.setValue(vIter.pos(), sum*frac);
+            buffer.setValue(vIter.pos(), avg(vIter.getCoord()));
         }
     }
 }
-
-/// Y convolution of a separable box filter
-template<typename GridT, typename InterruptT>
-inline void
-Filter<GridT, InterruptT>::doBoxY(const RangeType& range, Int32 w)
-{
-    this->wasInterrupted();
-    const ValueType frac = ValueType(1)/ValueType(2*w+1);
-    typename GridT::ConstAccessor acc = mGrid.getConstAccessor();
-    for (typename RangeType::Iterator lIter=range.begin(); lIter; ++lIter) {
-        BufferType& buffer = lIter.buffer(1);
-        for (typename LeafType::ValueOnCIter vIter = lIter->cbeginValueOn(); vIter; ++vIter) {
-            ValueType sum = zeroVal<ValueType>();
-            math::Coord xyz = vIter.getCoord();
-            for (Int32 y = xyz.y()-w, yLast = xyz.y()+w; y <= yLast; ++y) {
-                sum += acc.getValue(xyz.setY(y));
-            }
-            buffer.setValue(vIter.pos(), sum*frac);
-        }
-    }
-}
-
-/// Z convolution of a separable box filter
-template<typename GridT, typename InterruptT>
-inline void
-Filter<GridT, InterruptT>::doBoxZ(const RangeType& range, Int32 w)
-{
-    this->wasInterrupted();
-    const ValueType frac = ValueType(1)/ValueType(2*w+1);
-    typename GridT::ConstAccessor acc = mGrid.getConstAccessor();
-    for (typename RangeType::Iterator lIter=range.begin(); lIter; ++lIter) {
-        BufferType& buffer = lIter.buffer(1);
-        for (typename LeafType::ValueOnCIter vIter = lIter->cbeginValueOn(); vIter; ++vIter) {
-            ValueType sum = zeroVal<ValueType>();
-            math::Coord xyz = vIter.getCoord();
-            for (Int32 z = xyz.z()-w, zLast = xyz.z()+w; z <= zLast; ++z) {
-                sum += acc.getValue(xyz.setZ(z));
-            }
-            buffer.setValue(vIter.pos(), sum*frac);
-        }
-    }
-}
-
+   
 /// Performs simple but slow median-value diffusion
 template<typename GridT, typename InterruptT>
 inline void
@@ -299,8 +286,12 @@ template<typename GridT, typename InterruptT>
 inline void
 Filter<GridT, InterruptT>::doOffset(const RangeType& range, float floatVal)
 {
-    const ValueType value = static_cast<ValueType>(floatVal);
-    for (typename RangeType::Iterator lIter=range.begin(); lIter; ++lIter) lIter->addValue(value);
+    const ValueType offset = static_cast<ValueType>(floatVal);
+    for (typename RangeType::Iterator  leafIter=range.begin(); leafIter; ++leafIter) {
+        for (typename LeafType::ValueOnIter  iter = leafIter->beginValueOn(); iter; ++iter) {
+            iter.setValue(*iter + offset);
+        }
+    }
 }
 
 template<typename GridT, typename InterruptT>

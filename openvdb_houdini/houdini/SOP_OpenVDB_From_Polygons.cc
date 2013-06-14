@@ -718,7 +718,6 @@ SOP_OpenVDB_From_Polygons::cookMySop(OP_Context& context)
 
             if (wsUnits) exBand = evalFloat("exteriorBandWidthWS", 0, time) / mVoxelSize;
             else exBand = static_cast<float>(evalInt("exteriorBandWidth", 0, time));
-
             if (!bool(evalInt("fillInterior", 0, time))) {
                 if (wsUnits) inBand = evalFloat("interiorBandWidthWS", 0, time) / mVoxelSize;
                 else inBand = static_cast<float>(evalInt("interiorBandWidth", 0, time));
