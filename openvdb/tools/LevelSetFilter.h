@@ -419,8 +419,7 @@ LevelSetFilter<GridT, InterruptT>::doMedian(const RangeType& range, int width)
         BufferT& buffer = leafIter.buffer(1);
         for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
             stencil.moveTo(iter);
-            const ValueType A = stencil.getCenterValue(), B = stencil.median();
-            buffer.setValue(iter.pos(), comb(stencil.getCenterCoord(), A, B));
+            buffer.setValue(iter.pos(), comb(stencil.getCenterCoord(), *iter, stencil.median()));
         }
     }
 }
