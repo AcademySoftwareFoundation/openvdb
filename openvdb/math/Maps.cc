@@ -29,11 +29,24 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include "Maps.h"
+#include <tbb/mutex.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace math {
+
+namespace {
+
+typedef tbb::mutex Mutex;
+typedef Mutex::scoped_lock Lock;
+
+// Declare this at file scope to ensure thread-safe initialization.
+// NOTE: Do *NOT* move this into Maps.h or else we will need to pull in
+//       Windows.h with things like 'rad2' defined!
+Mutex sInitMapRegistryMutex;
+
+} // unnamed namespace
 
 
 ////////////////////////////////////////
@@ -41,68 +54,77 @@ namespace math {
 
 MapRegistry* MapRegistry::mInstance = NULL;
 
-// Declare this at file scope to ensure thread-safe initialization.
-tbb::mutex sInitMapRegistryMutex;
 
+// Caller is responsible for calling this function serially.
 MapRegistry*
-MapRegistry::instance()
+MapRegistry::staticInstance()
 {
-    Lock lock(sInitMapRegistryMutex);
-
-    if(mInstance == NULL) {
+    if (mInstance == NULL) {
         OPENVDB_START_THREADSAFE_STATIC_WRITE
             mInstance = new MapRegistry();
         OPENVDB_FINISH_THREADSAFE_STATIC_WRITE
             return mInstance;
     }
-
     return mInstance;
 }
+
+
+MapRegistry*
+MapRegistry::instance()
+{
+    Lock lock(sInitMapRegistryMutex);
+    return staticInstance();
+}
+
 
 MapBase::Ptr
 MapRegistry::createMap(const Name& name)
 {
-    Lock lock(instance()->mMutex);
-    MapDictionary::const_iterator iter = instance()->mMap.find(name);
+    Lock lock(sInitMapRegistryMutex);
+    MapDictionary::const_iterator iter = staticInstance()->mMap.find(name);
 
-    if (iter == instance()->mMap.end()) {
+    if (iter == staticInstance()->mMap.end()) {
         OPENVDB_THROW(LookupError, "Cannot create map of unregistered type " << name);
     }
 
     return (iter->second)();
 }
 
+
 bool
 MapRegistry::isRegistered(const Name& name)
 {
-    Lock lock(instance()->mMutex);
-    return (instance()->mMap.find(name) != instance()->mMap.end());
+    Lock lock(sInitMapRegistryMutex);
+    return (staticInstance()->mMap.find(name) != staticInstance()->mMap.end());
 }
+
 
 void
 MapRegistry::registerMap(const Name& name, MapBase::MapFactory factory)
 {
-    Lock lock(instance()->mMutex);
+    Lock lock(sInitMapRegistryMutex);
 
-    if (instance()->mMap.find(name) != instance()->mMap.end()) {
+    if (staticInstance()->mMap.find(name) != staticInstance()->mMap.end()) {
         OPENVDB_THROW(KeyError, "Map type " << name << " is already registered");
     }
 
-    instance()->mMap[name] = factory;
+    staticInstance()->mMap[name] = factory;
 }
+
 
 void
 MapRegistry::unregisterMap(const Name& name)
 {
-    Lock lock(instance()->mMutex);
-    instance()->mMap.erase(name);
+    Lock lock(sInitMapRegistryMutex);
+    staticInstance()->mMap.erase(name);
 }
+
 
 void
 MapRegistry::clear()
 {
-    Lock lock(instance()->mMutex);
-    instance()->mMap.clear();
+    Lock lock(sInitMapRegistryMutex);
+    staticInstance()->mMap.clear();
 }
 
 
@@ -130,7 +152,7 @@ createSymmetricMap(const Mat3d& m)
     UnitaryMap rotation(Umatrix);
     ScaleMap diagonal(eigenValues);
     CompoundMap<UnitaryMap, ScaleMap> first(rotation, diagonal);
-   
+
     UnitaryMap rotationInv(Umatrix.transpose());
     return SymmetricMap::Ptr( new SymmetricMap(first, rotationInv));
 }
@@ -143,7 +165,7 @@ createPolarDecomposedMap(const Mat3d& m)
     // we are constructing  M  = Symmetric * Unitary instead of the more
     // standard M = Unitary * Symmetric
     Mat3d unitary, symmetric, mat3 = m.transpose();
-    
+
     // factor mat3 = U * S  where U is unitary and S is symmetric
     bool gotPolar = math::polarDecomposition(mat3, unitary, symmetric);
     if (!gotPolar) {
@@ -152,7 +174,7 @@ createPolarDecomposedMap(const Mat3d& m)
     // put the result in a polar map and then copy it into the output polar
     UnitaryMap unitary_map(unitary.transpose());
     SymmetricMap::Ptr symmetric_map = createSymmetricMap(symmetric);
-    
+
     return PolarDecomposedMap::Ptr(new PolarDecomposedMap(*symmetric_map, unitary_map));
 }
 
@@ -167,7 +189,7 @@ createFullyDecomposedMap(const Mat4d& m)
 
     TranslationMap translate(m.getTranslation());
     PolarDecomposedMap::Ptr polar = createPolarDecomposedMap(m.getMat3());
-    
+
     UnitaryAndTranslationMap rotationAndTranslate(polar->secondMap(), translate);
 
     return FullyDecomposedMap::Ptr(new FullyDecomposedMap(polar->firstMap(), rotationAndTranslate));
@@ -185,7 +207,7 @@ simplify(AffineMap::Ptr affine)
         } else {
             return MapBase::Ptr(new ScaleMap(scale));
         }
-        
+
     } else if (affine->isScaleTranslate()) { // can be simplified into a ScaleTranslateMap
 
         Vec3d translate = affine->applyMap(Vec3d(0,0,0));
@@ -202,7 +224,8 @@ simplify(AffineMap::Ptr affine)
     return boost::static_pointer_cast<MapBase, AffineMap>(affine);
 }
 
-Mat4d 
+
+Mat4d
 approxInverse(const Mat4d& mat4d)
 {
     if (std::abs(mat4d.det()) >= 3 * tolerance<double>::value()) {
@@ -210,18 +233,18 @@ approxInverse(const Mat4d& mat4d)
             Mat4d result = mat4d.inverse();
             return result;
         } catch (ArithmeticError& ) {
-            // Mat4 code couldn't invert. 
+            // Mat4 code couldn't invert.
         }
     }
 
     const Mat3d mat3 = mat4d.getMat3();
     const Mat3d mat3T = mat3.transpose();
     const Vec3d trans = mat4d.getTranslation();
-    
+
     // absolute tolerance used for the symmetric test.
     const double tol = 1.e-6;
 
-    // only create the pseudoInverse for symmetric 
+    // only create the pseudoInverse for symmetric
     bool symmetric = true;
     for (int i = 0; i < 3; ++i ) {
         for (int j = 0; j < 3; ++j ) {
@@ -230,8 +253,8 @@ approxInverse(const Mat4d& mat4d)
             }
         }
     }
-    
-    if (!symmetric) { 
+
+    if (!symmetric) {
 
         // not symmetric, so just zero out the mat3 inverse and reverse the translation
 
@@ -241,14 +264,14 @@ approxInverse(const Mat4d& mat4d)
         return result;
 
     } else {
-        
+
         // compute the pseudo inverse
 
         Mat3d eigenVectors;
         Vec3d eigenValues;
-        
+
         diagonalizeSymmetricMatrix(mat3, eigenVectors, eigenValues);
-        
+
         Mat3d d = Mat3d::identity();
         for (int i = 0; i < 3; ++i ) {
             if (std::abs(eigenValues[i]) < 10.*tolerance<double>::value() ) {
@@ -258,25 +281,21 @@ approxInverse(const Mat4d& mat4d)
             }
         }
         // assemble the pseudo inverse
-        
+
         Mat3d pseudoInv = eigenVectors * d *  eigenVectors.transpose();
         Vec3d invTrans = -trans * pseudoInv;
-    
+
         Mat4d result = Mat4d::identity();
         result.setMat3(pseudoInv);
         result.setTranslation(invTrans);
-        
+
         return result;
     }
 }
 
-////////////////////////////////////////
-
-
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
-
 
 // Copyright (c) 2012-2013 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

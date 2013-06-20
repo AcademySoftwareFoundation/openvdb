@@ -43,6 +43,7 @@
 
 #include <openvdb/tools/VolumeToMesh.h>
 #include <openvdb/tools/MeshToVolume.h>
+#include <openvdb/tools/LevelSetUtil.h>
 #include <openvdb/math/Operators.h>
 #include <openvdb/math/Mat3.h>
 
@@ -169,8 +170,7 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "automaticpartitions", "Automatic Partitions")
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 20)
-        .setHelpText("Subdivide volume and mesh into disjoint parts. "
-            "(Still in development, does not work with adaptivity yet.)")
+        .setHelpText("Subdivide volume and mesh into disjoint parts.")
         .setDefault(PRMoneDefaults)
         .setCallbackFunc(&checkActivePartCB));
 

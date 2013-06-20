@@ -35,7 +35,6 @@
 #include <openvdb/math/FiniteDifference.h>
 #include <openvdb/math/Operators.h> // for ISGradientNormSqrd
 #include <openvdb/math/Proximity.h> // for closestPointOnTriangleToPoint()
-#include <openvdb/tools/LevelSetUtil.h> // for LeafTransformer
 #include <openvdb/tools/Morphology.h> // for dilateVoxels()
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Util.h> // for nearestCoord()
@@ -2402,14 +2401,11 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
 
     // Transform values (world space scaling etc.)
     {
-        typedef internal::SqrtAndScaleOp<FloatValueT> XForm;
         tree::LeafManager<FloatTreeT> leafs(mDistGrid->tree());
-        XForm op(voxelSize, unsignedDistField);
-        LeafTransformer<FloatTreeT, XForm> transform(leafs, op);
-
+        leafs.transformLeafs(
+            internal::SqrtAndScaleOp<FloatValueT>(voxelSize, unsignedDistField));
+        
         if (wasInterrupted(39)) return;
-
-        transform.runParallel();
     }
 
     if (wasInterrupted(40)) return;
@@ -2423,12 +2419,9 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
         // Update the background value (inactive values)
         tree::LeafManager<FloatTreeT> leafs(mDistGrid->tree());
 
-        typedef internal::VoxelSignOp<FloatValueT> SignXForm;
-        SignXForm op(exBandWidth, inBandWidth);
-
-        LeafTransformer<FloatTreeT, SignXForm> transform(leafs, op);
-        transform.runParallel();
-
+        leafs.transformLeafs(
+            internal::VoxelSignOp<FloatValueT>(exBandWidth, inBandWidth));
+        
         if (wasInterrupted(43)) return;
 
         FloatValueT bgValues[2];
@@ -2464,8 +2457,7 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
 
         if (wasInterrupted(48)) return;
 
-        typedef internal::LeafTopologyDiffOp<FloatTreeT> TopologyDiffOp;
-        TopologyDiffOp diffOp(mDistGrid->tree());
+        internal::LeafTopologyDiffOp<FloatTreeT> diffOp(mDistGrid->tree());
         openvdb::tools::dilateVoxels(maskTree);
 
 
@@ -2486,9 +2478,8 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
             tree::LeafManager<BoolTreeT> leafs(maskTree);
 
             if (leafs.leafCount() == 0) break;
-
-            LeafTransformer<BoolTreeT, TopologyDiffOp> diff(leafs, diffOp);
-            diff.runParallel();
+            
+            leafs.transformLeafs(diffOp);
 
             internal::ExpandNB<FloatTreeT> expand(
                 leafs, mDistGrid->tree(), mIndexGrid->tree(), maskTree,
@@ -2509,10 +2500,6 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
     // Smooth out bumps caused by self-intersecting and overlapping portions
     // of the mesh and renormalize the level set.
     if (!unsignedDistField) {
-        typedef internal::OffsetOp<FloatValueT> OffsetOp;
-        typedef internal::RenormOp<FloatGridT, FloatValueT> RenormOp;
-        typedef internal::MinOp<FloatTreeT, FloatValueT> MinOp;
-        typedef internal::MergeBufferOp<FloatTreeT, FloatValueT> MergeBufferOp;
 
         mDistGrid->tree().pruneLevelSet();
         tree::LeafManager<FloatTreeT> leafs(mDistGrid->tree(), 1);
@@ -2520,24 +2507,22 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
         const FloatValueT offset = 0.8 * voxelSize;
         if (wasInterrupted(82)) return;
 
-        OffsetOp offsetOp(-offset);
-        LeafTransformer<FloatTreeT, OffsetOp> offsetXform(leafs, offsetOp);
-        offsetXform.runParallel();
+        internal::OffsetOp<FloatValueT> offsetOp(-offset);
+        
+        leafs.transformLeafs(offsetOp);
 
         if (wasInterrupted(84)) return;
 
-        RenormOp renormOp(*mDistGrid, leafs, voxelSize);
-        LeafTransformer<FloatTreeT, RenormOp> renormXform(leafs, renormOp);
-        renormXform.runParallel();
+        leafs.transformLeafs(
+            internal::RenormOp<FloatGridT, FloatValueT>(*mDistGrid, leafs, voxelSize));
 
-        MinOp minOp(leafs);
-        LeafTransformer<FloatTreeT, MinOp> minXform(leafs, minOp);
-        minXform.runParallel();
+        leafs.transformLeafs(
+            internal::MinOp<FloatTreeT, FloatValueT>(leafs));
 
         if (wasInterrupted(92)) return;
 
         offsetOp.resetOffset(offset - internal::Tolerance<FloatValueT>::epsilon());
-        offsetXform.runParallel();
+        leafs.transformLeafs(offsetOp);
     }
 
     if (wasInterrupted(95)) return;
@@ -2550,12 +2535,10 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
         // (The mesh voxelization step generates some extra 'shell' voxels)
 
         tree::LeafManager<FloatTreeT> leafs(mDistGrid->tree());
-
-        typedef internal::TrimOp<FloatValueT> TrimOp;
-        TrimOp op(exBandWidth, unsignedDistField ? exBandWidth : inBandWidth);
-        LeafTransformer<FloatTreeT, TrimOp> transform(leafs, op);
-        transform.runParallel();
+        leafs.transformLeafs(
+            internal::TrimOp<FloatValueT>(exBandWidth, unsignedDistField ? exBandWidth : inBandWidth));
     }
+
 
     if (wasInterrupted(99)) return;
 

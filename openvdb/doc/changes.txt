@@ -11,6 +11,11 @@
   the quality of the output mesh and reduces aliasing artifacts.
 - Added masking options, a spatial multiplier for the adaptivity threshold
   and automatic partitioning to the meshing tools.
+- Edges and corners can now be preserved when mesh adaptivity is applied.
+- The attribute transferring scheme now takes the surface orientation into
+  account, which improves the accuracy in proximity to edges and corners.
+- Added a utility method tools::LeafManager::transformLeafs that applies a
+  user-supplied functor to each leaf node in parallel.
 - Rewrote the particle to level set converter, simplifying the API,
   improving performance (especially when particles have a fixed radius),
   adding the capability to transfer arbitrary point attributes,

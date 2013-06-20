@@ -100,7 +100,7 @@ Transform::read(std::istream& is)
     if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NEW_TRANSFORM) {
         // Handle old-style transforms.
 
-        if(type == "LinearTransform") {
+        if (type == "LinearTransform") {
             // First read in the old transform's base class.
             Coord tmpMin, tmpMax;
             is.read(reinterpret_cast<char*>(&tmpMin), sizeof(Coord::ValueType) * 3);
@@ -137,19 +137,19 @@ Transform::read(std::istream& is)
             Mat4d xform(Mat4d::identity());
             xform.setToTranslation(Vec3d(0,0, -nearPlaneDist));
             xform.preScale(Vec3d(nearPlaneWidth, nearPlaneWidth, -nearPlaneWidth));
-            
+
             // create the linear part of the frustum (the second map)
             Mat4d second = xform * camxform;
-          
+
             // we might have precision problems, the constructor for the
             // affine map is not forgiving (so we fix here).
             const Vec4d col3 = second.col(3);
             const Vec4d ref(0, 0, 0, 1);
 
-            if (ref.eq(col3) ) { 
+            if (ref.eq(col3) ) {
                 second.setCol(3, ref);
             }
-          
+
             MapBase::Ptr linearMap(simplify(AffineMap(second).getAffineMap()));
 
             // note that the depth is scaled on the nearPlaneSize.
@@ -158,18 +158,17 @@ Transform::read(std::istream& is)
             mMap = MapBase::Ptr(new NonlinearFrustumMap(
                 bbox, taper, depth/nearPlaneWidth, linearMap));
 
-
         } else {
             OPENVDB_THROW(IoError, "Transforms of type " + type + " are no longer supported");
         }
     } else {
         // Check if the map has been registered.
-        if (!MapRegistry::instance()->isRegistered(type)) {
+        if (!MapRegistry::isRegistered(type)) {
             OPENVDB_THROW(KeyError, "Map " << type << " is not registered");
         }
 
         // Create the map of the type and then read it in.
-        mMap = math::MapRegistry::instance()->createMap(type);
+        mMap = math::MapRegistry::createMap(type);
         mMap->read(is);
     }
 }
@@ -189,19 +188,24 @@ Transform::write(std::ostream& os) const
 
 ////////////////////////////////////////
 
+
 bool
-Transform::isIdentity() const 
+Transform::isIdentity() const
 {
     if (mMap->isLinear()) {
         return mMap->getAffineMap()->isIdentity();
     } else if ( mMap->isType<NonlinearFrustumMap>() ) {
-        NonlinearFrustumMap::Ptr frustum 
+        NonlinearFrustumMap::Ptr frustum
             = boost::static_pointer_cast<NonlinearFrustumMap, MapBase>(mMap);
         return frustum->isIdentity();
     }
     // unknown nonlinear map type
     return false;
 }
+
+
+////////////////////////////////////////
+
 
 void
 Transform::preRotate(double radians, const Axis axis)
@@ -236,33 +240,33 @@ Transform::preShear(double shear, Axis axis0, Axis axis1)
 
 void
 Transform::preMult(const Mat4d& m)
-{   
+{
     if (mMap->isLinear()) {
 
         const Mat4d currentMat4 = mMap->getAffineMap()->getMat4();
         const Mat4d newMat4 = m * currentMat4;
-                
+
         AffineMap::Ptr affineMap( new AffineMap( newMat4) );
         mMap = simplify(affineMap);
 
     } else if (mMap->isType<NonlinearFrustumMap>() ) {
-        
-        NonlinearFrustumMap::Ptr currentFrustum =  
+
+        NonlinearFrustumMap::Ptr currentFrustum =
             boost::static_pointer_cast<NonlinearFrustumMap, MapBase>(mMap);
-        
+
         const Mat4d currentMat4 = currentFrustum->secondMap().getMat4();
         const Mat4d newMat4 = m * currentMat4;
 
         AffineMap affine(newMat4);
-        
+
         NonlinearFrustumMap::Ptr frustum( new NonlinearFrustumMap( currentFrustum->getBBox(),
                                                                    currentFrustum->getTaper(),
                                                                    currentFrustum->getDepth(),
                                                                    affine.copy() ) );
         mMap = boost::static_pointer_cast<MapBase, NonlinearFrustumMap>( frustum );
     }
-        
-}    
+
+}
 
 void
 Transform::preMult(const Mat3d& m)
@@ -306,33 +310,33 @@ Transform::postShear(double shear, Axis axis0, Axis axis1)
 
 void
 Transform::postMult(const Mat4d& m)
-{   
+{
     if (mMap->isLinear()) {
 
         const Mat4d currentMat4 = mMap->getAffineMap()->getMat4();
         const Mat4d newMat4 = currentMat4 * m;
-                
+
         AffineMap::Ptr affineMap( new AffineMap( newMat4) );
         mMap = simplify(affineMap);
 
     } else if (mMap->isType<NonlinearFrustumMap>() ) {
-        
-        NonlinearFrustumMap::Ptr currentFrustum =  
+
+        NonlinearFrustumMap::Ptr currentFrustum =
             boost::static_pointer_cast<NonlinearFrustumMap, MapBase>(mMap);
-        
+
         const Mat4d currentMat4 = currentFrustum->secondMap().getMat4();
         const Mat4d newMat4 =  currentMat4 * m;
 
         AffineMap affine(newMat4);
-        
+
         NonlinearFrustumMap::Ptr frustum( new NonlinearFrustumMap( currentFrustum->getBBox(),
                                                                    currentFrustum->getTaper(),
                                                                    currentFrustum->getDepth(),
                                                                    affine.copy() ) );
         mMap = boost::static_pointer_cast<MapBase, NonlinearFrustumMap>( frustum );
     }
-        
-}    
+
+}
 
 void
 Transform::postMult(const Mat3d& m)

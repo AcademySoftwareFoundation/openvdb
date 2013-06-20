@@ -60,7 +60,7 @@ public:
     typedef std::vector<ValueType>        BufferType;
     typedef typename BufferType::iterator IterType;
 
-    /// Initialize the stencil buffer with the values of voxel (x, y, z)
+    /// @brief Initialize the stencil buffer with the values of voxel (x, y, z)
     /// and its neighbors.
     inline void moveTo(const Coord& ijk)
     {
@@ -82,33 +82,34 @@ public:
     }
 
     /// @brief Return the value from the stencil buffer with linear
-    /// offset pos.
+    /// offset pos. 
     ///
-    /// The default (@a pos = 0) corresponds to the center point of the stencil.
+    /// @note The default (@a pos = 0) corresponds to the first element
+    /// which is typically the center point of the stencil.
     inline ValueType getValue(unsigned int pos = 0) const
     {
         assert(pos < mStencil.size());
         return mStencil[pos];
     }
 
-    /// Return the value at the specified location relative to the center of the stencil
+    /// @brief Return the value at the specified location relative to the center of the stencil
     template<int i, int j, int k>
     const ValueType& getValue() const
     {
         return mStencil[static_cast<const StencilType&>(*this).template pos<i,j,k>()];
     }
 
-    /// Set the value at the specified location relative to the center of the stencil
+    /// @brief Set the value at the specified location relative to the center of the stencil
     template<int i, int j, int k>
     void setValue(const ValueType& value)
     {
         mStencil[static_cast<const StencilType&>(*this).template pos<i,j,k>()] = value;
     }
 
-    /// Return the size of the stencil buffer.
+    /// @brief Return the size of the stencil buffer.
     inline int size() { return mStencil.size(); }
 
-    /// Return the median value of the current stencil.
+    /// @brief Return the median value of the current stencil.
     inline ValueType median() const
     {
         std::vector<ValueType> tmp(mStencil);//local copy
@@ -119,35 +120,35 @@ public:
         return tmp[midpoint];
     }
 
-    /// Return the mean value of the current stencil.
+    /// @brief Return the mean value of the current stencil.
     inline ValueType mean() const
     {
-        double sum = 0.0;
+        ValueType sum = 0.0;
         for (int n=0, s=mStencil.size(); n<s; ++n) sum += mStencil[n];
-        return ValueType(sum / mStencil.size());
+        return sum / mStencil.size();
     }
 
-    /// Return the smallest value in the stencil buffer.
+    /// @brief Return the smallest value in the stencil buffer.
     inline ValueType min() const
     {
         IterType iter = std::min_element(mStencil.begin(), mStencil.end());
         return *iter;
     }
 
-    /// Return the largest value in the stencil buffer.
+    /// @brief Return the largest value in the stencil buffer.
     inline ValueType max() const
     {
         IterType iter = std::max_element(mStencil.begin(), mStencil.end());
         return *iter;
     }
 
-    /// Return the coordinates of the center point of the stencil.
+    /// @brief Return the coordinates of the center point of the stencil.
     inline const Coord& getCenterCoord() const { return mCenter; }
 
-    /// Return the value at the center of the stencil
+    /// @brief Return the value at the center of the stencil
     inline const ValueType& getCenterValue() const { return mStencil[0]; }
 
-    /// Return true if the center of the stencil intersects the
+    /// @brief Return true if the center of the stencil intersects the
     /// iso-contour specified by the isoValue
     inline bool intersects(const ValueType &isoValue = zeroVal<ValueType>()) const
     {
@@ -212,8 +213,6 @@ public:
 private:
     inline void init(const Coord& ijk)
     {
-        BaseType::template setValue< 0, 0, 0>(mCache.getValue(ijk));
-
         BaseType::template setValue<-1, 0, 0>(mCache.getValue(ijk.offsetBy(-1, 0, 0)));
         BaseType::template setValue< 1, 0, 0>(mCache.getValue(ijk.offsetBy( 1, 0, 0)));
 
@@ -286,8 +285,6 @@ public:
 private:
     inline void init(const Coord& ijk)
     {
-        mStencil[DensePt< 0, 0, 0>::idx] = mCache.getValue(ijk.offsetBy( 0,  0,  0));
-
         mStencil[DensePt< 1, 0, 0>::idx] = mCache.getValue(ijk.offsetBy( 1,  0,  0));
         mStencil[DensePt< 0, 1, 0>::idx] = mCache.getValue(ijk.offsetBy( 0,  1,  0));
         mStencil[DensePt< 0, 0, 1>::idx] = mCache.getValue(ijk.offsetBy( 0,  0,  1));
@@ -366,8 +363,6 @@ public:
 private:
     inline void init(const Coord& ijk)
     {
-        mStencil[ThirteenPt< 0, 0, 0>::idx] = mCache.getValue(ijk.offsetBy( 0,  0,  0));
-
         mStencil[ThirteenPt< 2, 0, 0>::idx] = mCache.getValue(ijk.offsetBy( 2,  0,  0));
         mStencil[ThirteenPt< 1, 0, 0>::idx] = mCache.getValue(ijk.offsetBy( 1,  0,  0));
         mStencil[ThirteenPt<-1, 0, 0>::idx] = mCache.getValue(ijk.offsetBy(-1,  0,  0));
@@ -497,8 +492,6 @@ public:
 private:
     inline void init(const Coord& ijk)
     {
-        mStencil[FourthDensePt< 0, 0, 0>::idx] = mCache.getValue(ijk);
-
         mStencil[FourthDensePt<-2, 2, 0>::idx] = mCache.getValue(ijk.offsetBy(-2, 2, 0));
         mStencil[FourthDensePt<-1, 2, 0>::idx] = mCache.getValue(ijk.offsetBy(-1, 2, 0));
         mStencil[FourthDensePt< 0, 2, 0>::idx] = mCache.getValue(ijk.offsetBy( 0, 2, 0));
@@ -649,7 +642,6 @@ private:
         mStencil[NineteenPt< 0,-1, 0>::idx] = mCache.getValue(ijk.offsetBy( 0, -1,  0));
         mStencil[NineteenPt< 0,-2, 0>::idx] = mCache.getValue(ijk.offsetBy( 0, -2,  0));
         mStencil[NineteenPt< 0,-3, 0>::idx] = mCache.getValue(ijk.offsetBy( 0, -3,  0));
-
 
         mStencil[NineteenPt< 0, 0, 3>::idx] = mCache.getValue(ijk.offsetBy( 0,  0,  3));
         mStencil[NineteenPt< 0, 0, 2>::idx] = mCache.getValue(ijk.offsetBy( 0,  0,  2));
@@ -851,8 +843,6 @@ public:
 private:
     inline void init(const Coord& ijk)
     {
-        mStencil[SixthDensePt< 0, 0, 0>::idx] = mCache.getValue(ijk);
-
         mStencil[SixthDensePt<-3, 3, 0>::idx] = mCache.getValue(ijk.offsetBy(-3, 3, 0));
         mStencil[SixthDensePt<-2, 3, 0>::idx] = mCache.getValue(ijk.offsetBy(-2, 3, 0));
         mStencil[SixthDensePt<-1, 3, 0>::idx] = mCache.getValue(ijk.offsetBy(-1, 3, 0));
@@ -1112,6 +1102,7 @@ public:
     }
 
 private:
+    
     inline void init(const Coord& ijk)
     {
         mStencil[1] = mCache.getValue(ijk.offsetBy(-1,  0,  0));
@@ -1123,7 +1114,7 @@ private:
         mStencil[5] = mCache.getValue(ijk.offsetBy( 0,  0, -1));
         mStencil[6] = mCache.getValue(ijk.offsetBy( 0,  0,  1));
     }
-
+    
     template<typename, typename> friend class BaseStencil; // allow base class to call init()
     using BaseType::mCache;
     using BaseType::mStencil;
@@ -1426,20 +1417,37 @@ public:
         BaseType(grid, /*size=*/math::Pow3(2 * halfWidth + 1)),
         mHalfWidth(halfWidth)
     {
-        //assert(halfWidth>0);//should this be allowed?
+        assert(halfWidth>0);
+    }
+
+    inline const ValueType& getCenterValue() const { return mStencil[(mStencil.size()-1)>>1]; }
+
+    /// @brief Initialize the stencil buffer with the values of voxel (x, y, z)
+    /// and its neighbors.
+    inline void moveTo(const Coord& ijk)
+    {
+        BaseType::mCenter = ijk;
+        this->init(ijk);
+    }
+    /// @brief Initialize the stencil buffer with the values of voxel
+    /// (x, y, z) and its neighbors.
+    template<typename IterType>
+    inline void moveTo(const IterType& iter)
+    {
+        BaseType::mCenter = iter.getCoord();
+        this->init(BaseType::mCenter);
     }
 
 private:
-    /// Initialize the stencil buffer centered at (x, y, z).
+    /// Initialize the stencil buffer centered at (i, j, k).
+    /// @warning The center point is NOT at mStencil[0] for this DenseStencil!
     inline void init(const Coord& ijk)
     {
-        for (int n=0, i=ijk[0]-mHalfWidth, ie = ijk[0]+mHalfWidth; i <= ie; ++i) {
-            Coord sample_ijk(i,0,0);
-            for (int j = ijk[1]-mHalfWidth, je = ijk[1]+mHalfWidth; j <= je; ++j) {
-                sample_ijk.setY(j);
-                for (int k = ijk[2]-mHalfWidth, ke = ijk[2] + mHalfWidth; k <= ke; ++k) {
-                    sample_ijk.setZ(k);
-                    mStencil[n++] = mCache.getValue(sample_ijk);
+        int n = 0;
+        for (Coord p=ijk.offsetBy(-mHalfWidth), q=ijk.offsetBy(mHalfWidth); p[0] <= q[0]; ++p[0]) {
+            for (p[1] = ijk[1]-mHalfWidth; p[1] <= q[1]; ++p[1]) {
+                for (p[2] = ijk[2]-mHalfWidth; p[2] <= q[2]; ++p[2]) {
+                    mStencil[n++] = mCache.getValue(p);
                 }
             }
         }

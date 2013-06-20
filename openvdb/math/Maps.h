@@ -41,7 +41,6 @@
 #include <openvdb/util/Name.h>
 #include <openvdb/Types.h>
 #include <boost/shared_ptr.hpp>
-#include <tbb/mutex.h>
 #include <map>
 
 namespace openvdb {
@@ -240,8 +239,6 @@ class OPENVDB_API MapRegistry
 {
 public:
     typedef std::map<Name, MapBase::MapFactory> MapDictionary;
-    typedef tbb::mutex Mutex;
-    typedef Mutex::scoped_lock Lock;
 
     static MapRegistry* instance();
 
@@ -262,9 +259,11 @@ public:
 
 private:
     MapRegistry() {}
+
+    static MapRegistry* staticInstance();
+
     static MapRegistry* mInstance;
 
-    mutable Mutex mMutex;
     MapDictionary mMap;
 };
 
@@ -351,10 +350,11 @@ public:
     bool isLinear() const { return true; }
 
     /// Return @c false ( test if this is unitary with translation )
-    bool hasUniformScale() const {
+    bool hasUniformScale() const
+    {
         Mat3d mat = mMatrix.getMat3();
         const double det = mat.det();
-        if ( isApproxEqual( det, double(0)) ) {
+        if (isApproxEqual(det, double(0))) {
             return false;
         } else {
             mat *= (1.f / pow(std::abs(det),1./3.));
@@ -391,10 +391,10 @@ public:
     /// Return the pre-image of @c in under the map
     Vec3d applyInverseMap(const Vec3d& in) const {return in * mMatrixInv; }
 
-     /// Return the Jacobian of the map applied to @a in.
+    /// Return the Jacobian of the map applied to @a in.
     Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const { return applyJacobian(in); }
     /// Return the Jacobian of the map applied to @a in.
-    Vec3d applyJacobian(const Vec3d& in) const { 
+    Vec3d applyJacobian(const Vec3d& in) const {
         const double* m = mMatrix.asPointer();
         return Vec3d( m[ 0] * in[0] + m[ 4] * in[1] + m[ 8] * in[2],
                       m[ 1] * in[0] + m[ 5] * in[1] + m[ 9] * in[2],
@@ -437,8 +437,7 @@ public:
     // Methods that modify the existing affine map
 
     //@{
-    /// @brief Methods that modify the existing
-    /// affine map by pre-applying the given operation.
+    /// @brief Modify the existing affine map by pre-applying the given operation.
     void accumPreRotation(Axis axis, double radians)
     {
         mMatrix.preRotate(axis, radians);
@@ -463,8 +462,7 @@ public:
 
 
     //@{
-    /// @brief Methods that modify the existing
-    /// affine map by post-applying the given operation.
+    /// @brief Modify the existing affine map by post-applying the given operation.
     void accumPostRotation(Axis axis, double radians)
     {
         mMatrix.postRotate(axis, radians);
@@ -678,11 +676,13 @@ public:
     bool isLinear() const { return true; }
 
     /// Return @c true if the values have the same magitude (eg. -1, 1, -1 would be a rotation).
-    bool hasUniformScale() const {
-        bool value;
-        value =          isApproxEqual(std::abs(mScaleValues.x()), std::abs(mScaleValues.y()), double(5e-7));
-        value = value && isApproxEqual(std::abs(mScaleValues.x()), std::abs(mScaleValues.z()), double(5e-7));
-        return value; 
+    bool hasUniformScale() const
+    {
+        bool value = isApproxEqual(
+            std::abs(mScaleValues.x()), std::abs(mScaleValues.y()), double(5e-7));
+        value = value && isApproxEqual(
+            std::abs(mScaleValues.x()), std::abs(mScaleValues.z()), double(5e-7));
+        return value;
     }
 
     /// Return the image of @c in under the map
@@ -704,44 +704,41 @@ public:
     /// Return the Jacobian of the map applied to @a in.
     Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const { return applyJacobian(in); }
     /// Return the Jacobian of the map applied to @a in.
-    Vec3d applyJacobian(const Vec3d& in) const { 
-        return applyMap(in);
-    }
-    
+    Vec3d applyJacobian(const Vec3d& in) const { return applyMap(in); }
+
 
     /// @brief Return the transpose of the inverse Jacobian of the map applied to @a in.
     /// @details Ignores second argument
-    Vec3d applyIJT(const Vec3d& in, const Vec3d& ) const { return applyIJT(in);}
+    Vec3d applyIJT(const Vec3d& in, const Vec3d&) const { return applyIJT(in);}
     /// Return the transpose of the inverse Jacobian of the map applied to @c in
     Vec3d applyIJT(const Vec3d& in) const { return applyInverseMap(in); }
     /// Return the Jacobian Curvature: zero for a linear map
-    Mat3d applyIJC(const Mat3d& in) const {
+    Mat3d applyIJC(const Mat3d& in) const
+    {
         Mat3d tmp;
-        for (int i=0; i<3; i++){
-            tmp.setRow(i, in.row(i)*mScaleValuesInverse(i));
+        for (int i = 0; i < 3; i++) {
+            tmp.setRow(i, in.row(i) * mScaleValuesInverse(i));
         }
-        for (int i=0; i<3; i++){
-            tmp.setCol(i, tmp.col(i)*mScaleValuesInverse(i));
+        for (int i = 0; i < 3; i++) {
+            tmp.setCol(i, tmp.col(i) * mScaleValuesInverse(i));
         }
         return tmp;
     }
-    Mat3d applyIJC(const Mat3d& in, const Vec3d&, const Vec3d& ) const {
-        return applyIJC(in);
-    }
+    Mat3d applyIJC(const Mat3d& in, const Vec3d&, const Vec3d&) const { return applyIJC(in); }
     /// Return the product of the scale values, ignores argument
-    double determinant(const Vec3d& ) const { return determinant(); }
+    double determinant(const Vec3d&) const { return determinant(); }
     /// Return the product of the scale values
-    double determinant() const { return mScaleValues.x()*mScaleValues.y()*mScaleValues.z(); }
+    double determinant() const { return mScaleValues.x() * mScaleValues.y() * mScaleValues.z(); }
 
     /// Return the scale values that define the map
     const Vec3d& getScale() const {return mScaleValues;}
 
     /// Return the square of the scale.  Used to optimize some finite difference calculations
-    const Vec3d& getInvScaleSqr() const {return mInvScaleSqr;}
+    const Vec3d& getInvScaleSqr() const { return mInvScaleSqr; }
     /// Return 1/(2 scale). Used to optimize some finite difference calculations
-    const Vec3d& getInvTwiceScale() const {return mInvTwiceScale;}
+    const Vec3d& getInvTwiceScale() const { return mInvTwiceScale; }
     /// Return 1/(scale)
-    const Vec3d& getInvScale() const {return mScaleValuesInverse; }
+    const Vec3d& getInvScale() const { return mScaleValuesInverse; }
 
     //@{
     /// @brief Returns the lengths of the images
@@ -749,7 +746,7 @@ public:
     /// \f$(0,0,0)-(1,0,0)\f$, \f$(0,0,0)-(0,1,0)\f$, \f$(0,0,0)-(0,0,1)\f$
     /// this is equivalent to the absolute values of the scale values
     Vec3d voxelSize() const { return mVoxelSize; }
-    Vec3d voxelSize(const Vec3d&) const { return voxelSize();}
+    Vec3d voxelSize(const Vec3d&) const { return voxelSize(); }
     //@}
 
     /// read serialization
@@ -959,10 +956,8 @@ public:
     /// Return the Jacobian of the map applied to @a in.
     Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const { return applyJacobian(in); }
     /// Return the Jacobian of the map applied to @a in.
-    Vec3d applyJacobian(const Vec3d& in) const { 
-        return in;
-    }
-    
+    Vec3d applyJacobian(const Vec3d& in) const { return in; }
+
     /// @brief Return the transpose of the inverse Jacobian (Identity for TranslationMap)
     /// of the map applied to @c in, ignores second argument
     Vec3d applyIJT(const Vec3d& in, const Vec3d& ) const { return applyIJT(in);}
@@ -971,9 +966,7 @@ public:
     Vec3d applyIJT(const Vec3d& in) const {return in;}
     /// Return the Jacobian Curvature: zero for a linear map
     Mat3d applyIJC(const Mat3d& mat) const {return mat;}
-    Mat3d applyIJC(const Mat3d& mat, const Vec3d&, const Vec3d&) const {
-        return applyIJC(mat);
-    }
+    Mat3d applyIJC(const Mat3d& mat, const Vec3d&, const Vec3d&) const { return applyIJC(mat); }
 
     /// Return @c 1
     double determinant(const Vec3d& ) const { return determinant(); }
@@ -1005,8 +998,7 @@ public:
     bool operator==(const TranslationMap& other) const
     {
         // ::eq() uses a tolerance
-        if (!mTranslation.eq(other.mTranslation)) { return false; }
-        return true;
+        return mTranslation.eq(other.mTranslation);
     }
 
     bool operator!=(const TranslationMap& other) const { return !(*this == other); }
@@ -1161,11 +1153,12 @@ public:
 
     /// @brief Return @c true if the scale values have the same magnitude
     /// (eg. -1, 1, -1 would be a rotation).
-    bool hasUniformScale() const {
-        bool value;
-        value =          isApproxEqual(std::abs(mScaleValues.x()), std::abs(mScaleValues.y()), double(5e-7));
-        value = value && isApproxEqual(std::abs(mScaleValues.x()), std::abs(mScaleValues.z()), double(5e-7));
-       
+    bool hasUniformScale() const
+    {
+        bool value = isApproxEqual(
+            std::abs(mScaleValues.x()), std::abs(mScaleValues.y()), double(5e-7));
+        value = value && isApproxEqual(
+            std::abs(mScaleValues.x()), std::abs(mScaleValues.z()), double(5e-7));
         return value;
     }
 
@@ -1189,10 +1182,8 @@ public:
     /// Return the Jacobian of the map applied to @a in.
     Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const { return applyJacobian(in); }
     /// Return the Jacobian of the map applied to @a in.
-    Vec3d applyJacobian(const Vec3d& in) const { 
-        return in * mScaleValues;
-    }
-    
+    Vec3d applyJacobian(const Vec3d& in) const { return in * mScaleValues; }
+
     /// @brief Return the transpose of the inverse Jacobian of the map applied to @a in
     /// @details Ignores second argument
     Vec3d applyIJT(const Vec3d& in, const Vec3d& ) const { return applyIJT(in);}
@@ -1205,7 +1196,8 @@ public:
             in.z() / mScaleValues.z());
     }
     /// Return the Jacobian Curvature: zero for a linear map
-    Mat3d applyIJC(const Mat3d& in) const {
+    Mat3d applyIJC(const Mat3d& in) const
+    {
         Mat3d tmp;
         for (int i=0; i<3; i++){
             tmp.setRow(i, in.row(i)*mScaleValuesInverse(i));
@@ -1215,9 +1207,7 @@ public:
         }
         return tmp;
     }
-    Mat3d applyIJC(const Mat3d& in, const Vec3d&, const Vec3d& ) const {
-        return applyIJC(in);
-    }
+    Mat3d applyIJC(const Mat3d& in, const Vec3d&, const Vec3d& ) const { return applyIJC(in); }
 
     /// Return the product of the scale values, ignores argument
     double determinant(const Vec3d& ) const { return determinant(); }
@@ -1447,6 +1437,7 @@ UniformScaleMap::preTranslate(const Vec3d& t) const
     return MapBase::Ptr(new UniformScaleTranslateMap(scale, scale*t));
 }
 
+
 inline MapBase::Ptr
 TranslationMap::preScale(const Vec3d& v) const
 {
@@ -1456,6 +1447,7 @@ TranslationMap::preScale(const Vec3d& v) const
         return MapBase::Ptr(new ScaleTranslateMap(v, mTranslation));
     }
 }
+
 
 inline MapBase::Ptr
 TranslationMap::postScale(const Vec3d& v) const
@@ -1470,6 +1462,7 @@ TranslationMap::postScale(const Vec3d& v) const
     }
 }
 
+
 inline MapBase::Ptr
 ScaleTranslateMap::preScale(const Vec3d& v) const
 {
@@ -1480,6 +1473,7 @@ ScaleTranslateMap::preScale(const Vec3d& v) const
         return MapBase::Ptr( new ScaleTranslateMap(new_scale, mTranslation));
     }
 }
+
 
 inline MapBase::Ptr
 ScaleTranslateMap::postScale(const Vec3d& v) const
@@ -1615,25 +1609,19 @@ public:
     Vec3d applyMap(const Vec3d& in) const { return mAffineMap.applyMap(in); }
     /// Return the pre-image of @c in under the map
     Vec3d applyInverseMap(const Vec3d& in) const { return mAffineMap.applyInverseMap(in); }
-    
+
     Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const { return applyJacobian(in); }
     /// Return the Jacobian of the map applied to @a in.
-    Vec3d applyJacobian(const Vec3d& in) const { 
-        return applyMap(in);
-    }
-    
+    Vec3d applyJacobian(const Vec3d& in) const { return applyMap(in); }
+
     /// @brief Return the transpose of the inverse Jacobian of the map applied to @a in
     /// @details Ignores second argument
     Vec3d applyIJT(const Vec3d& in, const Vec3d& ) const { return applyIJT(in);}
     /// Return the transpose of the inverse Jacobian of the map applied to @c in
     Vec3d applyIJT(const Vec3d& in) const { return mAffineMap.applyIJT(in); }
        /// Return the Jacobian Curvature: zero for a linear map
-    Mat3d applyIJC(const Mat3d& in) const {
-        return mAffineMap.applyIJC(in);
-    }
-    Mat3d applyIJC(const Mat3d& in, const Vec3d&, const Vec3d& ) const {
-        return applyIJC(in);
-    }
+    Mat3d applyIJC(const Mat3d& in) const { return mAffineMap.applyIJC(in); }
+    Mat3d applyIJC(const Mat3d& in, const Vec3d&, const Vec3d& ) const { return applyIJC(in); }
     /// Return the determinant of the Jacobian, ignores argument
     double determinant(const Vec3d& ) const { return determinant(); }
     /// Return the determinant of the Jacobian
@@ -1890,24 +1878,24 @@ public:
 
     /// Return @c false (by convention false)
     bool hasUniformScale() const { return false; }
-    
-    /// Return @c true if the map is equivalent to an identity 
-    bool isIdentity() const {
-        
+
+    /// Return @c true if the map is equivalent to an identity
+    bool isIdentity() const
+    {
         // The frustum can only be consistent with a linear map if the taper value is 1
         if (!isApproxEqual(mTaper, double(1)) ) return false;
-        
+
         // There are various ways an identity can decomposed between the two parts of the
         // map.  Best to just check that the principle vectors are stationary.
         const Vec3d e1(1,0,0);
         if (!applyMap(e1).eq(e1)) return false;
-     
+
         const Vec3d e2(0,1,0);
         if (!applyMap(e2).eq(e2)) return false;
-       
+
         const Vec3d e3(0,0,1);
         if (!applyMap(e3).eq(e3)) return false;
-    
+
         return true;
     }
 
@@ -1951,8 +1939,8 @@ public:
     /// Return the Jacobian of the linear second map applied to @c in
     Vec3d applyJacobian(const Vec3d& in) const { return mSecondMap.applyJacobian(in); }
     /// Return the Jacobian of the linear second map applied to @c in
-    Vec3d applyJacobian(const Vec3d& in, const Vec3d& loc) const { 
-        
+    Vec3d applyJacobian(const Vec3d& in, const Vec3d& loc) const
+    {
         // Move the center of the x-face of the bbox
         // to the origin in index space.
         Vec3d centered(loc);
@@ -1966,14 +1954,13 @@ public:
         const double scale = (mGamma * zprime + 1.) / mLx;
         const double scale2 = mGamma * mDepthOnLz / mLx;
 
-
         const Vec3d tmp(scale * in.x() + scale2 * centered.x()* in.z(),
                         scale * in.y() + scale2 * centered.y()* in.z(),
                         mDepthOnLz * in.z());
 
-        return mSecondMap.applyJacobian(tmp); 
+        return mSecondMap.applyJacobian(tmp);
     }
-    
+
     /// Return the transpose of the inverse Jacobian of the linear second map applied to @c in
     Vec3d applyIJT(const Vec3d& in) const { return mSecondMap.applyIJT(in); }
 
@@ -2045,7 +2032,6 @@ public:
         const double pt2 = pt1 * sinv;   // gamma * Lx / ( z*gamma +1)**2
         const double pt3 = pt2 * sinv;   // gamma * Lx / ( z*gamma +1)**3
 
-
         const Mat3d& jacinv = mSecondMap.getConstJacobianInv();
 
         // compute \frac{\partial^2 E_i}{\partial x_j \partial x_k}
@@ -2109,7 +2095,8 @@ public:
     }
 
     /// Return the size of a voxel at the center of the near plane
-    Vec3d voxelSize() const {
+    Vec3d voxelSize() const
+    {
         const Vec3d loc( 0.5*(mBBox.min().x() + mBBox.max().x()),
                          0.5*(mBBox.min().y() + mBBox.max().y()),
                          mBBox.min().z());
@@ -2122,7 +2109,8 @@ public:
     /// from @a loc to @a loc + (1,0,0), from @a loc to @a loc + (0,1,0)
     /// and from @a loc to @a loc + (0,0,1)
     /// @param loc  a location in the pre-image space (e.g., index space)
-    Vec3d voxelSize(const Vec3d& loc) const {
+    Vec3d voxelSize(const Vec3d& loc) const
+    {
         Vec3d out, pos = applyMap(loc);
         out(0) = (applyMap(loc + Vec3d(1,0,0)) - pos).length();
         out(1) = (applyMap(loc + Vec3d(0,1,0)) - pos).length();
@@ -2130,10 +2118,7 @@ public:
         return out;
     }
 
-    AffineMap::Ptr getAffineMap()  const
-    {
-        return mSecondMap.getAffineMap();
-    }
+    AffineMap::Ptr getAffineMap() const { return mSecondMap.getAffineMap(); }
 
     /// set the taper value, the ratio of nearplane width / far plane width
     void setTaper(double t) { mTaper = t; init();}
@@ -2260,9 +2245,9 @@ public:
     }
     //@}
 
-
 private:
-    void init() {
+    void init()
+    {
         // set up as a frustum
         mLx = mBBox.extents().x();
         mLy = mBBox.extents().y();
@@ -2414,7 +2399,8 @@ public:
         return *this;
     }
 
-    bool isIdentity() const {
+    bool isIdentity() const
+    {
         if (is_linear<MyType>::value) {
             return mAffineMap.isIdentity();
         } else {
@@ -2429,6 +2415,7 @@ public:
             return mFirstMap.isDiagonal()&&mSecondMap.isDiagonal();
         }
     }
+
     AffineMap::Ptr getAffineMap() const
     {
         if (is_linear<MyType>::value) {
