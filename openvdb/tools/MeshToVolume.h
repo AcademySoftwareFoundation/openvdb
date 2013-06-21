@@ -1499,30 +1499,31 @@ IntersectingVoxelCleaner<FloatTreeT>::operator()(
 
         ijk = maskLeaf.getOrigin();
 
-        DistLeafT& distLeaf = *distAcc.probeLeaf(ijk);
+        DistLeafT * distLeaf = distAcc.probeLeaf(ijk);
+        if (distLeaf) {
+            iter = maskLeaf.cbeginValueOn();
+            for (; iter; ++iter) {
 
-        iter = maskLeaf.cbeginValueOn();
-        for (; iter; ++iter) {
+                offset = iter.pos();
 
-            offset = iter.pos();
+                if(distLeaf->getValue(offset) > 0.1) continue;
 
-            if(distLeaf.getValue(offset) > 0.1) continue;
-
-            ijk = iter.getCoord();
-            turnOff = true;
-            for (Int32 m = 0; m < 26; ++m) {
-                m_ijk = ijk + util::COORD_OFFSETS[m];
-                if (distAcc.probeValue(m_ijk, value)) {
-                    if (value > 0.1) {
-                        turnOff = false;
-                        break;
+                ijk = iter.getCoord();
+                turnOff = true;
+                for (Int32 m = 0; m < 26; ++m) {
+                    m_ijk = ijk + util::COORD_OFFSETS[m];
+                    if (distAcc.probeValue(m_ijk, value)) {
+                        if (value > 0.1) {
+                            turnOff = false;
+                            break;
+                        }
                     }
                 }
-            }
 
-            if (turnOff) {
-                maskLeaf.setValueOff(offset);
-                distLeaf.setValueOn(offset, -0.86602540378443861);
+                if (turnOff) {
+                    maskLeaf.setValueOff(offset);
+                    distLeaf->setValueOn(offset, -0.86602540378443861);
+                }
             }
         }
     }
