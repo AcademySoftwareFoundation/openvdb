@@ -1084,37 +1084,45 @@ Merge<DistTreeT>::operator()(const tbb::blocked_range<size_t>& range) const
             mergeVoxels(auxLeaf, origin, LeafDim, regionId++);
         }
 
+        if (mPointMask) {
+            const BoolLeafT * ptnMaskLeaf = mPointMask->probeConstLeaf(auxLeaf.getOrigin());
 
-        const BoolLeafT * ptnMaskLeaf = NULL;
-        if (mPointMask) ptnMaskLeaf = mPointMask->probeConstLeaf(auxLeaf.getOrigin());
-    
-        if (ptnMaskLeaf) { // remove unused regions
-            for (IntIterT it = auxLeaf.beginValueOn(); it; ++it) {
-                if (it.getValue() == 0 && !ptnMaskLeaf->isValueOn(it.pos())) {
-                    it.setValueOff();
-                }
-            }
+            if (ptnMaskLeaf) { // remove unused regions
 
-            IntLeafT tmpLeaf(auxLeaf);
-
-            while (tmpLeaf.onVoxelCount() > 0) {
-
-                IntIterT it = tmpLeaf.beginValueOn();
-                regionId = it.getValue();
-                bool removeRegion = true;
-                for (; it; ++it) {
-                    if (it.getValue() == regionId) {
-                        if (ptnMaskLeaf->isValueOn(it.pos())) removeRegion = false;
+                for (IntIterT it = auxLeaf.beginValueOn(); it; ++it) {
+                    if (it.getValue() == 0 && !ptnMaskLeaf->isValueOn(it.pos())) {
                         it.setValueOff();
                     }
                 }
 
-                if (removeRegion) {
-                    it = auxLeaf.beginValueOn();
+                IntLeafT tmpLeaf(auxLeaf);
+
+                while (tmpLeaf.onVoxelCount() > 0) {
+
+                    IntIterT it = tmpLeaf.beginValueOn();
+                    regionId = it.getValue();
+                    bool removeRegion = true;
                     for (; it; ++it) {
-                        if (it.getValue() == regionId) it.setValueOff();
+                        if (it.getValue() == regionId) {
+                            if (ptnMaskLeaf->isValueOn(it.pos())) {
+                                removeRegion = false;
+                            }
+                            it.setValueOff();
+                        }
+                    }
+
+                    if (removeRegion) {
+                        it = auxLeaf.beginValueOn();
+                        for (; it; ++it) {
+                            if (it.getValue() == regionId) {
+                                it.setValueOff();
+                            }
+                        }
                     }
                 }
+            } else {
+                mLeafRegionCount[n] = 0;
+                continue;
             }
         }
 
@@ -1869,7 +1877,7 @@ struct PartOp
     {
         size_t leafSegments = leafCount / partitions;
         mStart = leafSegments * activePart;
-        mEnd = mStart + leafSegments;
+        mEnd = activePart >= (partitions - 1) ? leafCount : mStart + leafSegments;
     }
 
     template <typename LeafNodeType>
@@ -1917,10 +1925,10 @@ PartGen<SrcTreeT>::PartGen(const LeafManagerT& leafs, size_t partitions, size_t 
     : mLeafManager(leafs)
     , mTree(false)
 {
-    size_t leafSegments = leafs.leafCount() / partitions;
+    size_t leafCount = leafs.leafCount();
+    size_t leafSegments = leafCount / partitions;
     mStart = leafSegments * activePart;
-    mEnd = mStart + leafSegments;
-
+    mEnd = activePart >= (partitions - 1) ? leafCount : mStart + leafSegments;
 }
 
 template<typename SrcTreeT>
@@ -3113,7 +3121,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
     if (mAdaptivityGrid) {
         adaptivityField = static_cast<const FloatGridT*>(mAdaptivityGrid.get());
     }
-    
+
     // Collect auxiliary data
     {
         if (surfaceMask || mPartitions > 1) {
@@ -3157,24 +3165,30 @@ VolumeToMesh::operator()(const GridT& distGrid)
                 auxTree = op.auxTree();
             }
 
+
             if (!noAdaptivity) {
-
-                tree::LeafManager<const IntTreeT> auxLeafs(*auxTree);
-                internal::BoundaryMaskGen<DistTreeT> boundary(auxLeafs, distTree, valueMask);
-                boundary.run();
-
                 pointMask = typename BoolTreeT::Ptr(new BoolTreeT(false));
                 pointMask->topologyUnion(*auxTree);
 
-                {
-                    tree::LeafManager<BoolTreeT> leafs(boundary.tree());
-                    internal::AuxiliaryData<DistTreeT, tree::LeafManager<BoolTreeT> >
-                        op(distTree, leafs, mIsovalue, extraSignCheck);
-                    op.run();
+//                tree::LeafManager<const IntTreeT> auxLeafs(*auxTree);
+//                    internal::BoundaryMaskGen<DistTreeT> boundary(auxLeafs, distTree, valueMask);
+//                boundary.run();
 
-                    leafs.transformLeafs(
+                {
+//                    tree::LeafManager<BoolTreeT> leafs(boundary.tree());
+//                    internal::AuxiliaryData<DistTreeT, tree::LeafManager<BoolTreeT> >
+//                        op(distTree, leafs, mIsovalue, extraSignCheck);
+
+                    tree::LeafManager<const DistTreeT> leafs(distTree);
+                    internal::AuxiliaryData<DistTreeT> op(distTree, leafs, mIsovalue, extraSignCheck);
+
+                    tree::LeafManager<const IntTreeT> auxLeafs(*auxTree);
+
+                    op.run();
+                    auxLeafs.transformLeafs(
                         internal::BoundaryMergeOp<IntTreeT>(*auxTree, *op.auxTree()));
                 }
+
             }
 
         } else {

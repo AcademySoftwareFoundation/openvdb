@@ -170,7 +170,7 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "automaticpartitions", "Automatic Partitions")
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 20)
-        .setHelpText("Subdivide volume and mesh into disjoint parts.")
+        .setHelpText("Subdivide volume and mesh into disjoint parts. (In development)")
         .setDefault(PRMoneDefaults)
         .setCallbackFunc(&checkActivePartCB));
 
