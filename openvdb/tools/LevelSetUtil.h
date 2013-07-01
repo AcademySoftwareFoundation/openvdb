@@ -39,7 +39,6 @@
 #include <openvdb/Grid.h>
 #include <openvdb/tree/LeafManager.h>
 #include <tbb/blocked_range.h>
-#include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 #include <limits>
 
@@ -311,7 +310,7 @@ sdfToFogVolume(GridType& grid, typename GridType::ValueType cutoffDistance)
             cutoffDistance = minmax.minVoxel();
         }
 
-        leafs.transformLeafs(internal::FogVolumeOp<ValueType>(cutoffDistance));
+        leafs.foreach(internal::FogVolumeOp<ValueType>(cutoffDistance));
     }
 
     // Transform all tile values (serial, but the iteration
@@ -370,8 +369,7 @@ sdfInteriorMask(const GridType& grid, typename GridType::ValueType iso)
 
         tree::LeafManager<BoolTreeType> leafs(maskTree);
 
-        leafs.transformLeafs(
-            internal::InteriorMaskOp<typename GridType::TreeType>(grid.tree(), iso));
+        leafs.foreach(internal::InteriorMaskOp<typename GridType::TreeType>(grid.tree(), iso));
     }
 
     // Evaluate tile values (serial, but the iteration

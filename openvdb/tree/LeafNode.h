@@ -774,6 +774,10 @@ public:
     void addLeafAndCache(LeafNode*, AccessorT&) {}
     template<typename NodeT>
     NodeT* stealNode(const Coord&, const ValueType&, bool) { return NULL; }
+    template<typename NodeT>
+    NodeT* probeNode(const Coord&) { return NULL; }
+    template<typename NodeT>
+    const NodeT* probeConstNode(const Coord&) const { return NULL; }
     void addTile(Index, const Coord&, const ValueType&, bool) {}
     template<typename AccessorT>
     void addTileAndCache(Index, const Coord&, const ValueType&, bool, AccessorT&) {}
@@ -783,6 +787,14 @@ public:
     LeafNode* touchLeaf(const Coord&) { return this; }
     template<typename AccessorT>
     LeafNode* touchLeafAndCache(const Coord&, AccessorT&) { return this; }
+    template<typename NodeT, typename AccessorT>
+    NodeT* probeNodeAndCache(const Coord&, AccessorT&)
+    {
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+        if (!(boost::is_same<NodeT,LeafNode>::value)) return NULL;
+        return reinterpret_cast<NodeT*>(this);
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+    }
     LeafNode* probeLeaf(const Coord&) { return this; }
     template<typename AccessorT>
     LeafNode* probeLeafAndCache(const Coord&, AccessorT&) { return this; }
@@ -795,7 +807,19 @@ public:
     template<typename AccessorT>
     const LeafNode* probeLeafAndCache(const Coord&, AccessorT&) const { return this; }
     const LeafNode* probeLeaf(const Coord&) const { return this; }
+    template<typename NodeT, typename AccessorT>
+    const NodeT* probeConstNodeAndCache(const Coord&, AccessorT&) const
+    {
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+        if (!(boost::is_same<NodeT,LeafNode>::value)) return NULL;
+        return reinterpret_cast<const NodeT*>(this);
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+    }
     //@}
+
+    /// @brief Return true if the specified node type is part of this tree-branch configuration
+    template<typename NodeT>
+    static bool hasNodeType() { return (boost::is_same<NodeT,LeafNode>::value); }
 
     /// Return @c true if all of this node's values have the same active state
     /// and are equal to within the given tolerance, and return the value in @a constValue

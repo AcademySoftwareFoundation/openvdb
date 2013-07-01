@@ -498,7 +498,12 @@ public:
     void addLeaf(LeafNode*) {}
     template<typename AccessorT>
     void addLeafAndCache(LeafNode*, AccessorT&) {}
-    LeafNode* stealLeaf(const Coord&, bool, bool) { return this; }
+    template<typename NodeT>
+    NodeT* stealNode(const Coord&, const ValueType&, bool) { return NULL; }
+    template<typename NodeT>
+    NodeT* probeNode(const Coord&) { return NULL; }
+    template<typename NodeT>
+    const NodeT* probeConstNode(const Coord&) const { return NULL; }
     void addTile(Index, const Coord&, bool, bool) {}
     template<typename AccessorT>
     void addTileAndCache(Index, const Coord&, const ValueType&, bool, AccessorT&) {}
@@ -512,6 +517,14 @@ public:
     LeafNode* probeLeaf(const Coord&) { return this; }
     template<typename AccessorT>
     LeafNode* probeLeafAndCache(const Coord&, AccessorT&) { return this; }
+    template<typename NodeT, typename AccessorT>
+    NodeT* probeNodeAndCache(const Coord&, AccessorT&)
+    {
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+        if (!(boost::is_same<NodeT,LeafNode>::value)) return NULL;
+        return reinterpret_cast<NodeT*>(this);
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+    }
     //@}
     //@{
     /// @brief return a const pointer to itself
@@ -521,7 +534,18 @@ public:
     const LeafNode* probeConstLeaf(const Coord&) const { return this; }
     template<typename AccessorT>
     const LeafNode* probeConstLeafAndCache(const Coord&, AccessorT&) const { return this; }
+    template<typename NodeT, typename AccessorT>
+    const NodeT* probeConstNodeAndCache(const Coord&, AccessorT&) const
+    {
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+        if (!(boost::is_same<NodeT,LeafNode>::value)) return NULL;
+        return reinterpret_cast<const NodeT*>(this);
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+    }
     //@}
+    /// @brief Return true if the specified node type is part of this tree-branch configuration
+    template<typename NodeT>
+    static bool hasNodeType() { return (boost::is_same<NodeT,LeafNode>::value); }
     
     void merge(const LeafNode& other, bool, bool) { this->merge(other); }
 

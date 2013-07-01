@@ -638,29 +638,62 @@ public:
     template<typename AccessorT>
     LeafNodeType* touchLeafAndCache(const Coord& xyz, AccessorT& acc);
 
+    /// @brief Return a pointer to the node that contains voxel (x, y, z).
+    /// If no such node exists, return NULL.
+    template <typename NodeT>
+    NodeT* probeNode(const Coord& xyz);
+    template <typename NodeT>
+    const NodeT* probeConstNode(const Coord& xyz) const;
+
+    /// @brief Same as probeNode except, if necessary, it update the accessor with pointers
+    /// to the nodes along the path from the root node to the node
+    /// containing the coordinate.
+    template<typename NodeT, typename AccessorT>
+    NodeT* probeNodeAndCache(const Coord& xyz, AccessorT& acc);
+
+    /// @brief Same as probeConstNode except, if necessary, it update the accessor with pointers
+    /// to the nodes along the path from the root node to the node containing the coordinate.
+    template<typename NodeT, typename AccessorT>
+    const NodeT* probeConstNodeAndCache(const Coord& xyz, AccessorT& acc) const;
+    
     /// @brief Return a pointer to the leaf node that contains voxel (x, y, z).
     /// If no such node exists, return NULL.
-    LeafNodeType* probeLeaf(const Coord& xyz);
+    LeafNodeType* probeLeaf(const Coord& xyz) {return this->template probeNode<LeafNodeType>(xyz);}
 
     /// @brief Return a const pointer to the leaf node that contains voxel (x, y, z).
     /// If no such node exists, return NULL.
-    const LeafNodeType* probeConstLeaf(const Coord& xyz) const;
+    const LeafNodeType* probeConstLeaf(const Coord& xyz) const
+    {
+        return this->template probeConstNode<LeafNodeType>(xyz);
+    }
+    /// @brief Same as probeConstLeaf
     const LeafNodeType* probeLeaf(const Coord& xyz) const { return this->probeConstLeaf(xyz); }
 
     /// @brief Same as probeLeaf except, if necessary, it update the accessor with pointers
     /// to the nodes along the path from the root node to the node containing the coordinate.
     template<typename AccessorT>
-    LeafNodeType* probeLeafAndCache(const Coord& xyz, AccessorT& acc);
+    LeafNodeType* probeLeafAndCache(const Coord& xyz, AccessorT& acc)
+    {
+        return this->template probeNodeAndCache<LeafNodeType>(xyz, acc);
+    }
 
     /// @brief Same as probeConstLeaf except, if necessary, it update the accessor with pointers
     /// to the nodes along the path from the root node to the node containing the coordinate.
     template<typename AccessorT>
-    const LeafNodeType* probeConstLeafAndCache(const Coord& xyz, AccessorT& acc) const;
+    const LeafNodeType* probeConstLeafAndCache(const Coord& xyz, AccessorT& acc) const
+    {
+        return this->template probeConstNodeAndCache<LeafNodeType>(xyz, acc);
+    }
+    /// @brief Same as probeConstLeafAndCache
     template<typename AccessorT>
     const LeafNodeType* probeLeafAndCache(const Coord& xyz, AccessorT& acc) const
     {
         return this->probeConstLeafAndCache(xyz, acc);
     }
+
+    /// @brief Return true if the specified node type is part of this tree configuration
+    template<typename NodeT>
+    static bool hasNodeType();
 
     /// @brief Set the values of all inactive voxels and tiles of a narrow-band
     /// level set from the signs of the active voxels, setting outside values to
@@ -768,9 +801,6 @@ private:
     /// @details If the key is not found, insert a background tile with that key.
     /// @return an iterator pointing to the matching mTable entry.
     MapIter findOrAddCoord(const Coord& xyz);
-
-    template<typename NodeT>
-    NodeT* doStealNode(const Coord&, const ValueType&, bool state);
 
     /// @throw TypeError if the other node's dimensions don't match this node's.
     template<typename OtherChildType>
@@ -1969,36 +1999,20 @@ RootNode<ChildT>::pruneTiles(const ValueType& tolerance)
 
 ////////////////////////////////////////
 
-
-// Helper method that implements stealNode()
-template<typename ChildT>
-template<typename NodeT>
-inline NodeT*
-RootNode<ChildT>::doStealNode(const Coord& xyz, const ValueType& value, bool state)
-{
-    MapIter iter = this->findCoord(xyz);
-    if (iter == mTable.end() || isTile(iter)) return NULL;
-    return (boost::is_same<NodeT, ChildT>::value)
-        ? reinterpret_cast<NodeT*>(&stealChild(iter, Tile(value, state)))
-        : getChild(iter).template stealNode<NodeT>(xyz, value, state);
-}
-
-
 template<typename ChildT>
 template<typename NodeT>
 inline NodeT*
 RootNode<ChildT>::stealNode(const Coord& xyz, const ValueType& value, bool state)
 {
-    // The following conditional is resolved at compile time, and the ternary operator
-    // and helper method are used to avoid "unreachable code" warnings (with
-    // "if (<cond>) { <A> } else { <B> }", either <A> or <B> is unreachable if <cond>
-    // is a compile-time constant expression).  Partial specialization on NodeT would be
-    // impractical because a method template can't be specialized without also
-    // specializing its class template.
-    return (NodeT::LEVEL > ChildT::LEVEL ||
-        (NodeT::LEVEL == ChildT::LEVEL && !(boost::is_same<NodeT, ChildT>::value)))
-        ? static_cast<NodeT*>(NULL)
-        : this->doStealNode<NodeT>(xyz, value, state);
+    if ((NodeT::LEVEL == ChildT::LEVEL && !(boost::is_same<NodeT, ChildT>::value)) ||
+         NodeT::LEVEL >  ChildT::LEVEL) return NULL;
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+    MapIter iter = this->findCoord(xyz);
+    if (iter == mTable.end() || isTile(iter)) return NULL;
+    return (boost::is_same<NodeT, ChildT>::value)
+        ? reinterpret_cast<NodeT*>(&stealChild(iter, Tile(value, state)))
+        : getChild(iter).template stealNode<NodeT>(xyz, value, state);
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
 
 
@@ -2193,49 +2207,87 @@ RootNode<ChildT>::touchLeafAndCache(const Coord& xyz, AccessorT& acc)
 
 ////////////////////////////////////////
 
-
 template<typename ChildT>
-inline typename ChildT::LeafNodeType*
-RootNode<ChildT>::probeLeaf(const Coord& xyz)
+template<typename NodeT>
+inline bool
+RootNode<ChildT>::hasNodeType()
 {
-    MapIter iter = this->findCoord(xyz);
-    if (iter == mTable.end() || isTile(iter)) return NULL;
-    return getChild(iter).probeLeaf(xyz);
+    if ((NodeT::LEVEL == ChildT::LEVEL && !(boost::is_same<NodeT, ChildT>::value)) ||
+         NodeT::LEVEL >  ChildT::LEVEL) return false;
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+    return ChildT::template hasNodeType<NodeT>();
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
 
+////////////////////////////////////////
+
 template<typename ChildT>
-template<typename AccessorT>
-inline typename ChildT::LeafNodeType*
-RootNode<ChildT>::probeLeafAndCache(const Coord& xyz, AccessorT& acc)
+template<typename NodeT>
+inline NodeT*
+RootNode<ChildT>::probeNode(const Coord& xyz)
 {
+    if ((NodeT::LEVEL == ChildT::LEVEL && !(boost::is_same<NodeT, ChildT>::value)) ||
+         NodeT::LEVEL >  ChildT::LEVEL) return NULL;
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+    MapIter iter = this->findCoord(xyz);
+    if (iter == mTable.end() || isTile(iter)) return NULL;
+    ChildT* child = &getChild(iter);
+    return (boost::is_same<NodeT, ChildT>::value)
+        ? reinterpret_cast<NodeT*>(child)
+        : child->template probeNode<NodeT>(xyz);
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+}
+template<typename ChildT>
+template<typename NodeT>
+inline const NodeT*
+RootNode<ChildT>::probeConstNode(const Coord& xyz) const
+{
+    if ((NodeT::LEVEL == ChildT::LEVEL && !(boost::is_same<NodeT, ChildT>::value)) ||
+         NodeT::LEVEL >  ChildT::LEVEL) return NULL;
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+    MapCIter iter = this->findCoord(xyz);
+    if (iter == mTable.end() || isTile(iter)) return NULL;
+    const ChildT* child = &getChild(iter);
+    return (boost::is_same<NodeT, ChildT>::value)
+        ? reinterpret_cast<const NodeT*>(child)
+        : child->template probeConstNode<NodeT>(xyz);
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+}
+template<typename ChildT>
+template<typename NodeT, typename AccessorT>
+inline NodeT*
+RootNode<ChildT>::probeNodeAndCache(const Coord& xyz, AccessorT& acc)
+{
+    if ((NodeT::LEVEL == ChildT::LEVEL && !(boost::is_same<NodeT, ChildT>::value)) ||
+         NodeT::LEVEL >  ChildT::LEVEL) return NULL;
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
     MapIter iter = this->findCoord(xyz);
     if (iter == mTable.end() || isTile(iter)) return NULL;
     ChildT* child = &getChild(iter);
     acc.insert(xyz, child);
-    return child->probeLeafAndCache(xyz, acc);
+    return (boost::is_same<NodeT, ChildT>::value)
+        ? reinterpret_cast<NodeT*>(child)
+        : child->template probeNodeAndCache<NodeT>(xyz, acc);
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
 
 template<typename ChildT>
-inline const typename ChildT::LeafNodeType*
-RootNode<ChildT>::probeConstLeaf(const Coord& xyz) const
+template<typename NodeT,typename AccessorT>
+inline const NodeT*
+RootNode<ChildT>::probeConstNodeAndCache(const Coord& xyz, AccessorT& acc) const
 {
-    MapCIter iter = this->findCoord(xyz);
-    if (iter == mTable.end() || isTile(iter)) return NULL;
-    return getChild(iter).probeConstLeaf(xyz);
-}
-
-template<typename ChildT>
-template<typename AccessorT>
-inline const typename ChildT::LeafNodeType*
-RootNode<ChildT>::probeConstLeafAndCache(const Coord& xyz, AccessorT& acc) const
-{
+    if ((NodeT::LEVEL == ChildT::LEVEL && !(boost::is_same<NodeT, ChildT>::value)) ||
+         NodeT::LEVEL >  ChildT::LEVEL) return NULL;
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
     MapCIter iter = this->findCoord(xyz);
     if (iter == mTable.end() || isTile(iter)) return NULL;
     const ChildT* child = &getChild(iter);
     acc.insert(xyz, child);
-    return child->probeConstLeafAndCache(xyz, acc);
+    return (boost::is_same<NodeT, ChildT>::value)
+        ? reinterpret_cast<const NodeT*>(child)
+        : child->template probeConstNodeAndCache<NodeT>(xyz, acc);
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
-
 
 ////////////////////////////////////////
 

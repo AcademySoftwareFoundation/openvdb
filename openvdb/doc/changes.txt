@@ -5,24 +5,40 @@
 
 @htmlonly <a name="v1_2_0_changes"></a>@endhtmlonly
 @par
-<B>Version 1.2.0</B> - <I>In development</I>
-- Added options for alpha-masking in the level set filters.
-- Implemented sharp feature extraction for level set surfacing.  This enhances
-  the quality of the output mesh and reduces aliasing artifacts.
-- Added masking options, a spatial multiplier for the adaptivity threshold
-  and automatic partitioning to the meshing tools.
-- Edges and corners can now be preserved when mesh adaptivity is applied.
-- The attribute transferring scheme now takes the surface orientation into
-  account, which improves the accuracy in proximity to edges and corners.
-- Added a utility method tools::LeafManager::transformLeafs that applies a
-  user-supplied functor to each leaf node in parallel.
+<B>Version 1.2.0</B> - <I>June 28 2013</I>
+- @vdblink::tools::LevelSetFilter Level set filters@endlink now accept
+  an optional alpha mask grid.
+- Implemented sharp feature extraction for level set surfacing.
+  This enhances the quality of the output mesh and reduces aliasing
+  artifacts.
+- Added masking options to the meshing tools, as well as a spatial
+  multiplier for the adaptivity threshold, automatic partitioning,
+  and the ability to preserve edges and corners when mesh adaptivity
+  is applied.
+- The mesh to volume attribute transfer scheme now takes surface
+  orientation into account, which improves accuracy in proximity to
+  edges and corners.
+- Added a @vdblink::tree::LeafManager::foreach() foreach@endlink method
+  to @vdblink::tree::LeafManager tree::LeafManager@endlink that, like
+  @vdblink::tools::foreach() tools::foreach@endlink, applies a user-supplied
+  functor to each leaf node in parallel.
 - Rewrote the particle to level set converter, simplifying the API,
   improving performance (especially when particles have a fixed radius),
   adding the capability to transfer arbitrary point attributes,
   and fixing a velocity trail bug.
+- Added utility methods @vdblink::math::Sign() Sign@endlink,
+  @vdblink::math::SignChange() SignChange@endlink,
+  @vdblink::math::isApproxZero() isApproxZero@endlink,
+  @vdblink::math::Cbrt() Cbrt@endlink and
+  @vdblink::math::ZeroCrossing() ZeroCrossing@endlink to math/Math.h.
+- Added a @vdblink::tree::ValueAccessor3::probeNode() probeNode@endlink method
+  to the value accessor and to tree nodes that returns a pointer to the node
+  that contains a given voxel.
+- Deprecated @vdblink::tree::LeafNode::addValue() LeafNode::addValue@endlink
+  and @vdblink::tree::LeafNode::scaleValue() LeafNode::scaleValue@endlink.
 - Doubled the speed of the mesh to volume converter (which also improves
-  the performance of the fracture and level set rebuild tools) and improved
-  its inside/outside voxel classification near edges and corners.
+  the performance of the fracture and level set rebuild tools) and
+  improved its inside/outside voxel classification near edges and corners.
 - @vdblink::tools::GridSampler GridSampler@endlink now accepts either a grid,
   a tree or a value accessor, and it offers faster index-based access methods
   and much better performance in cases where many instances are allocated.
@@ -31,11 +47,12 @@
 - Fixed a crash in @vdblink::io::Archive io::Archive@endlink whenever
   the library was unloaded from memory and then reloaded.
   <I>[Contributed by Ollie Harding]</I>
-- Added a Prune SOP with several pruning schemes.
 - Fixed a bug in @c GU_PrimVDB::buildFromPrimVolume(), seen during the
   conversion from Houdini volumes to OpenVDB grids, that could cause 
   signed flood fill to be applied to non-level set grids, resulting in
   active tiles with incorrect values.
+- Added a Prune SOP with several pruning schemes.
+
 
 @htmlonly <a name="v1_1_1_changes"></a>@endhtmlonly
 @par

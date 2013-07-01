@@ -417,7 +417,7 @@ public:
     ///     typedef tree::ValueAccessor<const TreeType> Accessor;
     ///
     ///     OffsetOp(const TreeType& tree): mRhsTreeAcc(tree) {}
-    /// 
+    ///
     ///     template <typename LeafNodeType>
     ///     void operator()(LeafNodeType &lhsLeaf, size_t) const
     ///     {
@@ -434,17 +434,17 @@ public:
     /// };
     ///
     /// // usage:
-    /// tree::LeafManager<FloatTree> leafs(lhsTree);
-    /// transformLeafs(leafs, OffsetOp<FloatTree>(rhsTree));
+    /// tree::LeafManager<FloatTree> leafNodes(lhsTree);
+    /// leafNodes.foreach(OffsetOp<FloatTree>(rhsTree));
     ///
     /// // A functor that performs a min operation between different auxiliary buffers.
     /// template<typename LeafManagerType>
     /// struct MinOp
     /// {
     ///     typedef typename LeafManagerType::BufferType BufferType;
-    /// 
-    ///     MinOp(LeafManagerType& leafs): mLeafs(leafs) {}
-    /// 
+    ///
+    ///     MinOp(LeafManagerType& leafNodes): mLeafs(leafNodes) {}
+    ///
     ///     template <typename LeafNodeType>
     ///     void operator()(LeafNodeType &leaf, size_t leafIndex) const
     ///     {
@@ -458,12 +458,12 @@ public:
     /// };
     /// @endcode
     template<typename LeafOp>
-    void transformLeafs(const LeafOp& op, bool threaded = true)
+    void foreach(const LeafOp& op, bool threaded = true)
     {
         LeafTransformer<LeafOp> transform(*this, op);
         transform.run(threaded);
     }
-    
+
     ////////////////////////////////////////////////////////////////////////////////////
     // All methods below are for internal use only and should never be called directly
 
@@ -474,7 +474,7 @@ public:
         else OPENVDB_THROW(ValueError, "task is undefined");
     }
 
-   
+
 
 private:
     void initLeafArray()
@@ -557,7 +557,7 @@ private:
     /// functor to all the leaf nodes.
     template<typename LeafOp>
     struct LeafTransformer
-    { 
+    {
         LeafTransformer(LeafManager& leafs, const LeafOp& leafOp)
             : mLeafManager(&leafs), mLeafOp(leafOp) {}
         void run(bool threaded = true)

@@ -1,37 +1,45 @@
 OpenVDB Version History
 =======================
 
-Version 1.2.0 - In development
-    - Added options for alpha-masking in the level set filters.
+Version 1.2.0 - June 28, 2013
+    - Level set filters now accept an optional alpha mask grid.
     - Implemented sharp feature extraction for level set surfacing.
       This enhances the quality of the output mesh and reduces aliasing
       artifacts.
-    - Added masking options, a spatial multiplier for the adaptivity threshold
-      and automatic partitioning to the meshing tools.
-    - Edges and corners can now be preserved when mesh adaptivity is applied.
-    - The attribute transferring scheme now takes the surface orientation into
-      account, which improves the accuracy in proximity to edges and corners.
-    - Added a utility method tools::LeafManager::transformLeafs that applies a
-      user-supplied functor to each leaf node in parallel.
+    - Added masking options to the meshing tools, as well as a spatial
+      multiplier for the adaptivity threshold, automatic partitioning,
+      and the ability to preserve edges and corners when mesh adaptivity
+      is applied.
+    - The mesh to volume attribute transfer scheme now takes surface
+      orientation into account, which improves accuracy in proximity to
+      edges and corners.
+    - Added a foreach() method to tools::LeafManager that, like
+      tools::foreach(), applies a user-supplied functor to each leaf node
+      in parallel.
     - Rewrote the particle to level set converter, simplifying the API,
       improving performance (especially when particles have a fixed radius),
       adding the capability to transfer arbitrary point attributes,
       and fixing a velocity trail bug.
+    - Added utility methods Sign(), SignChange(), isApproxZero(), Cbrt()
+      and ZeroCrossing() to math/Math.h.
+    - Added a probeNode() method to the value accessor and to tree nodes
+      that returns a pointer to the node that contains a given voxel.
+    - Deprecated LeafNode::addValue() and LeafNode::scaleValue().
     - Doubled the speed of the mesh to volume converter (which also improves
       the performance of the fracture and level set rebuild tools) and
       improved its inside/outside voxel classification near edges and corners.
     - tools::GridSampler now accepts either a grid, a tree or a value accessor,
       and it offers faster index-based access methods and much better
       performance in cases where many instances are allocated.
-    - Extended tools::Dense to make it more compatible with existing tools. 
+    - Extended tools::Dense to make it more compatible with existing tools.
     - Fixed a crash in io::Archive whenever the library was unloaded
       from memory and then reloaded.
       [Contributed by Ollie Harding]
-    - Added a Prune SOP with several pruning schemes.
     - Fixed a bug in GU_PrimVDB::buildFromPrimVolume(), seen during the
       conversion from Houdini volumes to OpenVDB grids, that could cause 
       signed flood fill to be applied to non-level set grids, resulting in
       active tiles with incorrect values.
+    - Added a Prune SOP with several pruning schemes.
 
 Version 1.1.1 - May 10 2013
     - Added a simple dense grid class and tools to copy data from

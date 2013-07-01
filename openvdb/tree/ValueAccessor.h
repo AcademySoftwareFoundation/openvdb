@@ -192,7 +192,7 @@ public:
 
     ValueAccessor(TreeType& tree): BaseT(tree), mCache(*this)
     {
-        mCache.insert(Coord(), &tree.getRootNode());
+        mCache.insert(Coord(), &tree.root());
     }
 
     ValueAccessor(const ValueAccessor& other): BaseT(other), mCache(*this, other.mCache) {}
@@ -373,7 +373,7 @@ public:
     {
         LockT lock(mMutex);
         mCache.clear();
-        if (this->mTree) mCache.insert(Coord(), &(this->mTree->getRootNode()));
+        if (this->mTree) mCache.insert(Coord(), &(this->mTree->root()));
     }
 
 private:
@@ -1005,7 +1005,7 @@ public:
     {
         assert(BaseT::mTree);
         BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
-        BaseT::mTree->getRootNode().setValueOff(xyz, value);
+        BaseT::mTree->root().setValueOff(xyz, value);
     }
 
     /// Set the value of the voxel at the given coordinates to the sum of its current
@@ -1067,17 +1067,29 @@ public:
         return BaseT::mTree->touchLeaf(xyz);
     }
 
-    LeafNodeT* probeLeaf(const Coord& xyz)
+    template <typename NodeT>
+    NodeT* probeNode(const Coord& xyz)
     {
         assert(BaseT::mTree);
         BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
-        return BaseT::mTree->probeLeaf(xyz);
+        return BaseT::mTree->template probeNode<NodeT>(xyz);
+    }
+    
+    template <typename NodeT>
+    const NodeT* probeConstNode(const Coord& xyz) const
+    {
+        assert(BaseT::mTree);
+        return BaseT::mTree->template probeConstNode<NodeT>(xyz);
+    }
+
+    LeafNodeT* probeLeaf(const Coord& xyz)
+    {
+        return this->template probeNode<LeafNodeT>(xyz);
     }
 
     const LeafNodeT* probeConstLeaf(const Coord& xyz) const
     {
-        assert(BaseT::mTree);
-        return BaseT::mTree->probeConstLeaf(xyz);
+        return this->template probeConstNode<LeafNodeT>(xyz);
     }
 
     const LeafNodeT* probeLeaf(const Coord& xyz) const
@@ -1159,7 +1171,7 @@ public:
             assert(mNode0);
             return mNode0->getValueAndCache(xyz, this->self());
         }
-        return BaseT::mTree->getRootNode().getValueAndCache(xyz, this->self());
+        return BaseT::mTree->root().getValueAndCache(xyz, this->self());
     }
 
     /// Return the active state of the voxel at the given coordinates.
@@ -1170,7 +1182,7 @@ public:
             assert(mNode0);
             return mNode0->isValueOnAndCache(xyz, this->self());
         }
-        return BaseT::mTree->getRootNode().isValueOnAndCache(xyz, this->self());
+        return BaseT::mTree->root().isValueOnAndCache(xyz, this->self());
     }
 
     /// Return the active state of the voxel as well as its value
@@ -1181,7 +1193,7 @@ public:
             assert(mNode0);
             return mNode0->probeValueAndCache(xyz, value, this->self());
         }
-        return BaseT::mTree->getRootNode().probeValueAndCache(xyz, value, this->self());
+        return BaseT::mTree->root().probeValueAndCache(xyz, value, this->self());
     }
 
     /// Return the tree depth (0 = root) at which the value of voxel (x, y, z) resides,
@@ -1194,7 +1206,7 @@ public:
             assert(mNode0);
             return RootNodeT::LEVEL - mNode0->getValueLevelAndCache(xyz, this->self());
         }
-        return BaseT::mTree->getRootNode().getValueDepthAndCache(xyz, this->self());
+        return BaseT::mTree->root().getValueDepthAndCache(xyz, this->self());
     }
 
     /// Return @c true if the value of voxel (x, y, z) resides at the leaf level
@@ -1206,7 +1218,7 @@ public:
             assert(mNode0);
             return mNode0->getValueLevelAndCache(xyz, this->self()) == 0;
         }
-        return BaseT::mTree->getRootNode().getValueDepthAndCache(xyz, this->self()) ==
+        return BaseT::mTree->root().getValueDepthAndCache(xyz, this->self()) ==
                static_cast<int>(RootNodeT::LEVEL);
     }
 
@@ -1220,7 +1232,7 @@ public:
             assert(mNode0);
             const_cast<NodeT0*>(mNode0)->setValueAndCache(xyz, value, *this);
         } else {
-            BaseT::mTree->getRootNode().setValueAndCache(xyz, value, *this);
+            BaseT::mTree->root().setValueAndCache(xyz, value, *this);
         }
     }
     void setValueOn(const Coord& xyz, const ValueType& value) { this->setValue(xyz, value); }
@@ -1235,7 +1247,7 @@ public:
             assert(mNode0);
             const_cast<NodeT0*>(mNode0)->setValueOnlyAndCache(xyz, value, *this);
         } else {
-            BaseT::mTree->getRootNode().setValueOnlyAndCache(xyz, value, *this);
+            BaseT::mTree->root().setValueOnlyAndCache(xyz, value, *this);
         }
     }
 
@@ -1248,7 +1260,7 @@ public:
             assert(mNode0);
             const_cast<NodeT0*>(mNode0)->setValueOffAndCache(xyz, value, *this);
         } else {
-            BaseT::mTree->getRootNode().setValueOffAndCache(xyz, value, *this);
+            BaseT::mTree->root().setValueOffAndCache(xyz, value, *this);
         }
     }
 
@@ -1262,7 +1274,7 @@ public:
             assert(mNode0);
             const_cast<NodeT0*>(mNode0)->setValueOnSumAndCache(xyz, value, *this);
         } else {
-            BaseT::mTree->getRootNode().setValueOnSumAndCache(xyz, value, *this);
+            BaseT::mTree->root().setValueOnSumAndCache(xyz, value, *this);
         }
     }
 
@@ -1275,7 +1287,7 @@ public:
             assert(mNode0);
             const_cast<NodeT0*>(mNode0)->setActiveStateAndCache(xyz, on, *this);
         } else {
-            BaseT::mTree->getRootNode().setActiveStateAndCache(xyz, on, *this);
+            BaseT::mTree->root().setActiveStateAndCache(xyz, on, *this);
         }
     }
     /// Mark the voxel at the given coordinates as active without changing its value.
@@ -1340,32 +1352,52 @@ public:
             assert(mNode0);
             return const_cast<NodeT0*>(mNode0)->touchLeafAndCache(xyz, *this);
         }
-        return BaseT::mTree->getRootNode().touchLeafAndCache(xyz, *this);
+        return BaseT::mTree->root().touchLeafAndCache(xyz, *this);
     }
 
-    /// @brief @return a pointer to the leaf node that contains
+    /// @brief @return a pointer to the node that contains
     /// voxel (x, y, z) and if it doesn't exist, return NULL.
-    LeafNodeT* probeLeaf(const Coord& xyz)
+    template <typename NodeT>
+    NodeT* probeNode(const Coord& xyz)
     {
         assert(BaseT::mTree);
         BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
-        if (this->isHashed(xyz)) {
-            assert(mNode0);
-            return const_cast<NodeT0*>(mNode0)->probeLeafAndCache(xyz, *this);
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+        if ((boost::is_same<NodeT, NodeT0>::value)) {
+            if (this->isHashed(xyz)) {
+                assert(mNode0);
+                return reinterpret_cast<NodeT*>(const_cast<NodeT0*>(mNode0));
+            }
+            return BaseT::mTree->root().template probeNodeAndCache<NodeT>(xyz, *this);
         }
-        return BaseT::mTree->getRootNode().probeLeafAndCache(xyz, *this);
+        return NULL;
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+    }
+    LeafNodeT* probeLeaf(const Coord& xyz)
+    {
+        return this->template probeNode<LeafNodeT>(xyz);
     }
 
-    /// @brief @return a const pointer to the leaf node that contains
+    /// @brief @return a const pointer to the node that contains
     /// voxel (x, y, z) and if it doesn't exist, return NULL.
-    const LeafNodeT* probeConstLeaf(const Coord& xyz) const
+    template <typename NodeT>
+    const NodeT* probeConstNode(const Coord& xyz) const
     {
         assert(BaseT::mTree);
-        if (this->isHashed(xyz)) {
-            assert(mNode0);
-            return mNode0->probeConstLeafAndCache(xyz, this->self());
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+        if ((boost::is_same<NodeT, NodeT0>::value)) {
+            if (this->isHashed(xyz)) {
+                assert(mNode0);
+                return reinterpret_cast<const NodeT*>(mNode0);
+            }
+            return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
         }
-        return BaseT::mTree->getRootNode().probeConstLeafAndCache(xyz, this->self());
+        return NULL;
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+    }
+    const LeafNodeT* probeConstLeaf(const Coord& xyz) const
+    {
+        return this->template probeConstNode<LeafNodeT>(xyz);
     }
     const LeafNodeT* probeLeaf(const Coord& xyz) const { return this->probeConstLeaf(xyz); }
 
@@ -1390,7 +1422,7 @@ private:
     void getNode(const NodeT0*& node) { node = mNode0; }
     void getNode(const RootNodeT*& node)
     {
-        node = (BaseT::mTree ? &BaseT::mTree->getRootNode() : NULL);
+        node = (BaseT::mTree ? &BaseT::mTree->root() : NULL);
     }
     template <typename OtherNodeType> void getNode(const OtherNodeType*& node) { node = NULL; }
     void eraseNode(const NodeT0*) { mKey0 = Coord::max(); mNode0 = NULL; }
@@ -1501,7 +1533,7 @@ public:
             assert(mNode1);
             return mNode1->getValueAndCache(xyz, this->self());
         }
-        return BaseT::mTree->getRootNode().getValueAndCache(xyz, this->self());
+        return BaseT::mTree->root().getValueAndCache(xyz, this->self());
     }
 
     /// Return the active state of the voxel at the given coordinates.
@@ -1515,7 +1547,7 @@ public:
             assert(mNode1);
             return mNode1->isValueOnAndCache(xyz, this->self());
         }
-        return BaseT::mTree->getRootNode().isValueOnAndCache(xyz, this->self());
+        return BaseT::mTree->root().isValueOnAndCache(xyz, this->self());
     }
 
     /// Return the active state of the voxel as well as its value
@@ -1529,7 +1561,7 @@ public:
             assert(mNode1);
             return mNode1->probeValueAndCache(xyz, value, this->self());
         }
-        return BaseT::mTree->getRootNode().probeValueAndCache(xyz, value, this->self());
+        return BaseT::mTree->root().probeValueAndCache(xyz, value, this->self());
     }
 
     /// Return the tree depth (0 = root) at which the value of voxel (x, y, z) resides,
@@ -1545,7 +1577,7 @@ public:
             assert(mNode1);
             return RootNodeT::LEVEL - mNode1->getValueLevelAndCache(xyz, this->self());
         }
-        return BaseT::mTree->getRootNode().getValueDepthAndCache(xyz, this->self());
+        return BaseT::mTree->root().getValueDepthAndCache(xyz, this->self());
     }
 
     /// Return @c true if the value of voxel (x, y, z) resides at the leaf level
@@ -1560,7 +1592,7 @@ public:
             assert(mNode1);
             return mNode1->getValueLevelAndCache(xyz, this->self())==0;
         }
-        return BaseT::mTree->getRootNode().getValueDepthAndCache(xyz, this->self()) ==
+        return BaseT::mTree->root().getValueDepthAndCache(xyz, this->self()) ==
                static_cast<int>(RootNodeT::LEVEL);
     }
 
@@ -1577,7 +1609,7 @@ public:
             assert(mNode1);
             const_cast<NodeT1*>(mNode1)->setValueAndCache(xyz, value, *this);
         } else {
-            BaseT::mTree->getRootNode().setValueAndCache(xyz, value, *this);
+            BaseT::mTree->root().setValueAndCache(xyz, value, *this);
         }
     }
     void setValueOn(const Coord& xyz, const ValueType& value) { this->setValue(xyz, value); }
@@ -1595,7 +1627,7 @@ public:
             assert(mNode1);
             const_cast<NodeT1*>(mNode1)->setValueOnlyAndCache(xyz, value, *this);
         } else {
-            BaseT::mTree->getRootNode().setValueOnlyAndCache(xyz, value, *this);
+            BaseT::mTree->root().setValueOnlyAndCache(xyz, value, *this);
         }
     }
 
@@ -1611,7 +1643,7 @@ public:
             assert(mNode1);
             const_cast<NodeT1*>(mNode1)->setValueOffAndCache(xyz, value, *this);
         } else {
-            BaseT::mTree->getRootNode().setValueOffAndCache(xyz, value, *this);
+            BaseT::mTree->root().setValueOffAndCache(xyz, value, *this);
         }
     }
 
@@ -1628,7 +1660,7 @@ public:
             assert(mNode1);
             const_cast<NodeT1*>(mNode1)->setValueOnSumAndCache(xyz, value, *this);
         } else {
-            BaseT::mTree->getRootNode().setValueOnSumAndCache(xyz, value, *this);
+            BaseT::mTree->root().setValueOnSumAndCache(xyz, value, *this);
         }
     }
 
@@ -1644,7 +1676,7 @@ public:
             assert(mNode1);
             const_cast<NodeT1*>(mNode1)->setActiveStateAndCache(xyz, on, *this);
         } else {
-            BaseT::mTree->getRootNode().setActiveStateAndCache(xyz, on, *this);
+            BaseT::mTree->root().setActiveStateAndCache(xyz, on, *this);
         }
     }
     /// Mark the voxel at the given coordinates as active without changing its value.
@@ -1720,38 +1752,69 @@ public:
             assert(mNode1);
             return const_cast<NodeT1*>(mNode1)->touchLeafAndCache(xyz, *this);
         }
-        return BaseT::mTree->getRootNode().touchLeafAndCache(xyz, *this);
+        return BaseT::mTree->root().touchLeafAndCache(xyz, *this);
     }
-
-    /// @brief @return a pointer to the leaf node that contains
+    /// @brief @return a pointer to the node of the specified type that contains
     /// voxel (x, y, z) and if it doesn't exist, return NULL.
-    LeafNodeT* probeLeaf(const Coord& xyz)
+    template <typename NodeT>
+    NodeT* probeNode(const Coord& xyz)
     {
         assert(BaseT::mTree);
         BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
-        if (this->isHashed0(xyz)) {
-            assert(mNode0);
-            return const_cast<NodeT0*>(mNode0)->probeLeafAndCache(xyz, *this);
-        } else if (this->isHashed1(xyz)) {
-            assert(mNode1);
-            return const_cast<NodeT1*>(mNode1)->probeLeafAndCache(xyz, *this);
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+        if ((boost::is_same<NodeT, NodeT0>::value)) {
+            if (this->isHashed0(xyz)) {
+                assert(mNode0);
+                return reinterpret_cast<NodeT*>(const_cast<NodeT0*>(mNode0));
+            } else if (this->isHashed1(xyz)) {
+                assert(mNode1);
+                return const_cast<NodeT1*>(mNode1)->template probeNodeAndCache<NodeT>(xyz, *this);
+            }
+            return BaseT::mTree->root().template probeNodeAndCache<NodeT>(xyz, *this);
+        } else if ((boost::is_same<NodeT, NodeT1>::value)) {
+            if (this->isHashed1(xyz)) {
+                assert(mNode1);
+                return reinterpret_cast<NodeT*>(const_cast<NodeT1*>(mNode1));
+            }
+            return BaseT::mTree->root().template probeNodeAndCache<NodeT>(xyz, *this);
         }
-        return BaseT::mTree->getRootNode().probeLeafAndCache(xyz, *this);
+        return NULL;
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
+    /// @brief @return a pointer to the leaf node that contains
+    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    LeafNodeT* probeLeaf(const Coord& xyz) { return this->template probeNode<LeafNodeT>(xyz); }
 
+    /// @brief @return a const pointer to the node of the specified type that contains
+    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    template <typename NodeT>
+    const NodeT* probeConstLeaf(const Coord& xyz) const
+    {
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+        if ((boost::is_same<NodeT, NodeT0>::value)) {
+            if (this->isHashed0(xyz)) {
+                assert(mNode0);
+                return reinterpret_cast<const NodeT*>(mNode0);
+            } else if (this->isHashed1(xyz)) {
+                assert(mNode1);
+                return mNode1->template probeConstNodeAndCache<NodeT>(xyz, this->self());
+            }
+            return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
+        } else if ((boost::is_same<NodeT, NodeT1>::value)) {
+            if (this->isHashed1(xyz)) {
+                assert(mNode1);
+                return reinterpret_cast<const NodeT*>(mNode1);
+            }
+            return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
+        }
+        return NULL;
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+    }
     /// @brief @return a const pointer to the leaf node that contains
     /// voxel (x, y, z) and if it doesn't exist, return NULL.
     const LeafNodeT* probeConstLeaf(const Coord& xyz) const
     {
-        assert(BaseT::mTree);
-        if (this->isHashed0(xyz)) {
-            assert(mNode0);
-            return mNode0->probeConstLeafAndCache(xyz, this->self());
-        } else if (this->isHashed1(xyz)) {
-            assert(mNode1);
-            return mNode1->probeConstLeafAndCache(xyz, this->self());
-        }
-        return BaseT::mTree->getRootNode().probeConstLeafAndCache(xyz, this->self());
+        return this->template probeConstNode<LeafNodeT>(xyz);
     }
     const LeafNodeT* probeLeaf(const Coord& xyz) const { return this->probeConstLeaf(xyz); }
 
@@ -1779,7 +1842,7 @@ private:
     void getNode(const NodeT1*& node) { node = mNode1; }
     void getNode(const RootNodeT*& node)
     {
-        node = (BaseT::mTree ? &BaseT::mTree->getRootNode() : NULL);
+        node = (BaseT::mTree ? &BaseT::mTree->root() : NULL);
     }
     template <typename OtherNodeType> void getNode(const OtherNodeType*& node) { node = NULL; }
 
@@ -1916,7 +1979,7 @@ public:
             assert(mNode2);
             return mNode2->getValueAndCache(xyz, this->self());
         }
-        return BaseT::mTree->getRootNode().getValueAndCache(xyz, this->self());
+        return BaseT::mTree->root().getValueAndCache(xyz, this->self());
     }
 
     /// Return the active state of the voxel at the given coordinates.
@@ -1933,7 +1996,7 @@ public:
             assert(mNode2);
             return mNode2->isValueOnAndCache(xyz, this->self());
         }
-        return BaseT::mTree->getRootNode().isValueOnAndCache(xyz, this->self());
+        return BaseT::mTree->root().isValueOnAndCache(xyz, this->self());
     }
 
     /// Return the active state of the voxel as well as its value
@@ -1950,7 +2013,7 @@ public:
             assert(mNode2);
             return mNode2->probeValueAndCache(xyz, value, this->self());
         }
-        return BaseT::mTree->getRootNode().probeValueAndCache(xyz, value, this->self());
+        return BaseT::mTree->root().probeValueAndCache(xyz, value, this->self());
     }
 
     /// Return the tree depth (0 = root) at which the value of voxel (x, y, z) resides,
@@ -1969,7 +2032,7 @@ public:
             assert(mNode2);
             return RootNodeT::LEVEL - mNode2->getValueLevelAndCache(xyz, this->self());
         }
-        return BaseT::mTree->getRootNode().getValueDepthAndCache(xyz, this->self());
+        return BaseT::mTree->root().getValueDepthAndCache(xyz, this->self());
     }
 
     /// Return @c true if the value of voxel (x, y, z) resides at the leaf level
@@ -1987,7 +2050,7 @@ public:
             assert(mNode2);
             return mNode2->getValueLevelAndCache(xyz, this->self())==0;
         }
-        return BaseT::mTree->getRootNode().getValueDepthAndCache(xyz, this->self()) ==
+        return BaseT::mTree->root().getValueDepthAndCache(xyz, this->self()) ==
                static_cast<int>(RootNodeT::LEVEL);
     }
 
@@ -2007,7 +2070,7 @@ public:
             assert(mNode2);
             const_cast<NodeT2*>(mNode2)->setValueAndCache(xyz, value, *this);
         } else {
-            BaseT::mTree->getRootNode().setValueAndCache(xyz, value, *this);
+            BaseT::mTree->root().setValueAndCache(xyz, value, *this);
         }
     }
     void setValueOn(const Coord& xyz, const ValueType& value) { this->setValue(xyz, value); }
@@ -2028,7 +2091,7 @@ public:
             assert(mNode2);
             const_cast<NodeT2*>(mNode2)->setValueOnlyAndCache(xyz, value, *this);
         } else {
-            BaseT::mTree->getRootNode().setValueOnlyAndCache(xyz, value, *this);
+            BaseT::mTree->root().setValueOnlyAndCache(xyz, value, *this);
         }
     }
 
@@ -2047,7 +2110,7 @@ public:
             assert(mNode2);
             const_cast<NodeT2*>(mNode2)->setValueOffAndCache(xyz, value, *this);
         } else {
-            BaseT::mTree->getRootNode().setValueOffAndCache(xyz, value, *this);
+            BaseT::mTree->root().setValueOffAndCache(xyz, value, *this);
         }
     }
 
@@ -2067,7 +2130,7 @@ public:
             assert(mNode2);
             const_cast<NodeT2*>(mNode2)->setValueOnSumAndCache(xyz, value, *this);
         } else {
-            BaseT::mTree->getRootNode().setValueOnSumAndCache(xyz, value, *this);
+            BaseT::mTree->root().setValueOnSumAndCache(xyz, value, *this);
         }
     }
 
@@ -2086,7 +2149,7 @@ public:
             assert(mNode2);
             const_cast<NodeT2*>(mNode2)->setActiveStateAndCache(xyz, on, *this);
         } else {
-            BaseT::mTree->getRootNode().setActiveStateAndCache(xyz, on, *this);
+            BaseT::mTree->root().setActiveStateAndCache(xyz, on, *this);
         }
     }
     /// Mark the voxel at the given coordinates as active without changing its value.
@@ -2163,7 +2226,7 @@ public:
         BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
         if (this->isHashed0(xyz)) {
             assert(mNode0);
-            return const_cast<NodeT0*>(mNode0)->touchLeafAndCache(xyz, *this);
+            return const_cast<NodeT0*>(mNode0);
         } else if (this->isHashed1(xyz)) {
             assert(mNode1);
             return const_cast<NodeT1*>(mNode1)->touchLeafAndCache(xyz, *this);
@@ -2171,44 +2234,94 @@ public:
             assert(mNode2);
             return const_cast<NodeT2*>(mNode2)->touchLeafAndCache(xyz, *this);
         }
-        return BaseT::mTree->getRootNode().touchLeafAndCache(xyz, *this);
+        return BaseT::mTree->root().touchLeafAndCache(xyz, *this);
     }
-
-    /// @brief @return a pointer to the leaf node that contains
+    /// @brief @return a pointer to the node of the specified type that contains
     /// voxel (x, y, z) and if it doesn't exist, return NULL.
-    LeafNodeT* probeLeaf(const Coord& xyz)
+    template <typename NodeT>
+    NodeT* probeNode(const Coord& xyz)
     {
         assert(BaseT::mTree);
         BOOST_STATIC_ASSERT(!BaseT::IsConstTree);
-        if (this->isHashed0(xyz)) {
-            assert(mNode0);
-            return const_cast<NodeT0*>(mNode0)->probeLeafAndCache(xyz, *this);
-        } else if (this->isHashed1(xyz)) {
-            assert(mNode1);
-            return const_cast<NodeT1*>(mNode1)->probeLeafAndCache(xyz, *this);
-        } else if (this->isHashed2(xyz)) {
-            assert(mNode2);
-            return const_cast<NodeT2*>(mNode2)->probeLeafAndCache(xyz, *this);
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+        if ((boost::is_same<NodeT, NodeT0>::value)) {
+            if (this->isHashed0(xyz)) {
+                assert(mNode0);
+                return reinterpret_cast<NodeT*>(const_cast<NodeT0*>(mNode0));
+            } else if (this->isHashed1(xyz)) {
+                assert(mNode1);
+                return const_cast<NodeT1*>(mNode1)->template probeNodeAndCache<NodeT>(xyz, *this);
+            } else if (this->isHashed2(xyz)) {
+                assert(mNode2);
+                return const_cast<NodeT2*>(mNode2)->template probeNodeAndCache<NodeT>(xyz, *this);
+            }
+            return BaseT::mTree->root().template probeNodeAndCache<NodeT>(xyz, *this);
+        } else if ((boost::is_same<NodeT, NodeT1>::value)) {
+            if (this->isHashed1(xyz)) {
+                assert(mNode1);
+                return reinterpret_cast<NodeT*>(const_cast<NodeT1*>(mNode1));
+            } else if (this->isHashed2(xyz)) {
+                assert(mNode2);
+                return const_cast<NodeT2*>(mNode2)->template probeNodeAndCache<NodeT>(xyz, *this);
+            }
+            return BaseT::mTree->root().template probeNodeAndCache<NodeT>(xyz, *this);
+        } else if ((boost::is_same<NodeT, NodeT2>::value)) {
+            if (this->isHashed2(xyz)) {
+                assert(mNode2);
+                return reinterpret_cast<NodeT*>(const_cast<NodeT2*>(mNode2));
+            }
+            return BaseT::mTree->root().template probeNodeAndCache<NodeT>(xyz, *this);
         }
-        return BaseT::mTree->getRootNode().probeLeafAndCache(xyz, *this);
+        return NULL;
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
+    /// @brief @return a pointer to the leaf node that contains
+    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    LeafNodeT* probeLeaf(const Coord& xyz) { return this->template probeNode<LeafNodeT>(xyz); }
 
+    /// @brief @return a const pointer to the node of the specified type that contains
+    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    template <typename NodeT>
+    const NodeT* probeConstNode(const Coord& xyz) const
+    {
+        assert(BaseT::mTree);
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+        if ((boost::is_same<NodeT, NodeT0>::value)) {
+            if (this->isHashed0(xyz)) {
+                assert(mNode0);
+                return reinterpret_cast<const NodeT*>(mNode0);
+            } else if (this->isHashed1(xyz)) {
+                assert(mNode1);
+                return mNode1->template probeConstNodeAndCache<NodeT>(xyz, this->self());
+            } else if (this->isHashed2(xyz)) {
+                assert(mNode2);
+                return mNode2->template probeConstNodeAndCache<NodeT>(xyz, this->self());
+            }
+            return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
+        } else if ((boost::is_same<NodeT, NodeT1>::value)) {
+            if (this->isHashed1(xyz)) {
+                assert(mNode1);
+                return reinterpret_cast<const NodeT*>(mNode1);
+            } else if (this->isHashed2(xyz)) {
+                assert(mNode2);
+                return mNode2->template probeConstNodeAndCache<NodeT>(xyz, this->self());
+            }
+            return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
+        } else if ((boost::is_same<NodeT, NodeT2>::value)) {
+            if (this->isHashed2(xyz)) {
+                assert(mNode2);
+                return reinterpret_cast<const NodeT*>(mNode2);
+            }
+            return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
+        }
+        return NULL;
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+    }
     /// @brief @return a const pointer to the leaf node that contains
     /// voxel (x, y, z) and if it doesn't exist, return NULL.
     const LeafNodeT* probeConstLeaf(const Coord& xyz) const
     {
-        assert(BaseT::mTree);
-        if (this->isHashed0(xyz)) {
-            assert(mNode0);
-            return mNode0->probeConstLeafAndCache(xyz, this->self());
-        } else if (this->isHashed1(xyz)) {
-            assert(mNode1);
-            return mNode1->probeConstLeafAndCache(xyz, this->self());
-        } else if (this->isHashed2(xyz)) {
-            assert(mNode2);
-            return mNode2->probeConstLeafAndCache(xyz, this->self());
-        }
-        return BaseT::mTree->getRootNode().probeConstLeafAndCache(xyz, this->self());
+        return this->template probeConstNode<LeafNodeT>(xyz);
     }
     const LeafNodeT* probeLeaf(const Coord& xyz) const { return this->probeConstLeaf(xyz); }
 
@@ -2257,7 +2370,7 @@ private:
     void getNode(const NodeT2*& node) { node = mNode2; }
     void getNode(const RootNodeT*& node)
     {
-        node = (BaseT::mTree ? &BaseT::mTree->getRootNode() : NULL);
+        node = (BaseT::mTree ? &BaseT::mTree->root() : NULL);
     }
     template <typename OtherNodeType> void getNode(const OtherNodeType*& node) { node = NULL; }
 

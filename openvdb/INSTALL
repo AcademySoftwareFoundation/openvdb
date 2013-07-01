@@ -81,8 +81,8 @@ Installation
     A default local build generates the following libraries and executables
     (but see the Makefile for additional targets and build options):
 
-    openvdb/libopenvdb.so.1.1           the OpenVDB library
-    openvdb/libopenvdb.so               symlink to libopenvdb.so.1.1
+    openvdb/libopenvdb.so.1.2           the OpenVDB library
+    openvdb/libopenvdb.so               symlink to libopenvdb.so.1.2
     openvdb/vdb_print                   command-line tool that prints info
                                         about OpenVDB .vdb files
     openvdb/vdb_test                    unit test runner for libopenvdb
@@ -116,7 +116,7 @@ Installation
                 version.h
         lib/
             libopenvdb.so
-            libopenvdb.so.1.1
+            libopenvdb.so.1.2
 
         share/
             doc/
