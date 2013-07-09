@@ -54,11 +54,12 @@ template<typename _GridType, typename StencilType>
 class BaseStencil
 {
 public:
-    typedef _GridType                     GridType;
-    typedef typename GridType::TreeType   TreeType;
-    typedef typename GridType::ValueType  ValueType;
-    typedef std::vector<ValueType>        BufferType;
-    typedef typename BufferType::iterator IterType;
+    typedef _GridType                        GridType;
+    typedef typename GridType::TreeType      TreeType;
+    typedef typename GridType::ValueType     ValueType;
+    typedef std::vector<ValueType>           BufferType;
+    typedef typename BufferType::iterator    IterType;
+    typedef typename GridType::ConstAccessor AccessorType;
 
     /// @brief Initialize the stencil buffer with the values of voxel (x, y, z)
     /// and its neighbors.
@@ -66,6 +67,15 @@ public:
     {
         mCenter = ijk;
         mStencil[0] = mCache.getValue(ijk);
+        static_cast<StencilType&>(*this).init(mCenter);
+    }
+    /// @brief Initialize the stencil buffer with the values of voxel (x, y, z)
+    /// and its neighbors. The method also takes a value of the center
+    /// element of the stencil, assuming it is already known.
+    inline void moveTo(const Coord& ijk, const ValueType& centerValue)
+    {
+        mCenter = ijk;
+        mStencil[0] = centerValue;
         static_cast<StencilType&>(*this).init(mCenter);
     }
     /// @brief Initialize the stencil buffer with the values of voxel
@@ -86,7 +96,7 @@ public:
     ///
     /// @note The default (@a pos = 0) corresponds to the first element
     /// which is typically the center point of the stencil.
-    inline ValueType getValue(unsigned int pos = 0) const
+    inline const ValueType& getValue(unsigned int pos = 0) const
     {
         assert(pos < mStencil.size());
         return mStencil[pos];
@@ -94,14 +104,14 @@ public:
 
     /// @brief Return the value at the specified location relative to the center of the stencil
     template<int i, int j, int k>
-    const ValueType& getValue() const
+    inline const ValueType& getValue() const
     {
         return mStencil[static_cast<const StencilType&>(*this).template pos<i,j,k>()];
     }
 
     /// @brief Set the value at the specified location relative to the center of the stencil
     template<int i, int j, int k>
-    void setValue(const ValueType& value)
+    inline void setValue(const ValueType& value)
     {
         mStencil[static_cast<const StencilType&>(*this).template pos<i,j,k>()] = value;
     }
@@ -161,6 +171,8 @@ public:
                (less  ^  (this->getValue< 0, 0, 1>() < isoValue))  ;
     }
 
+    inline const AccessorType& accessor() const { return mCache; }
+
 protected:
     // Constructor is protected to prevent direct instantiation.
     BaseStencil(const GridType& grid, int size):
@@ -169,9 +181,9 @@ protected:
     {
     }
 
-    typename GridType::ConstAccessor mCache;
-    BufferType                       mStencil;
-    Coord                            mCenter;
+    AccessorType mCache;
+    BufferType   mStencil;
+    Coord        mCenter;
 
 }; // class BaseStencil
 
@@ -227,6 +239,94 @@ private:
     using BaseType::mCache;
     using BaseType::mStencil;
 };
+
+
+////////////////////////////////////////
+
+
+namespace { // anonymous namespace for stencil-layout map
+
+    // the eight point box stencil
+    template<int i, int j, int k> struct BoxPt {};
+    template<> struct BoxPt< 0, 0, 0> { enum { idx = 0 }; };
+    template<> struct BoxPt< 0, 0, 1> { enum { idx = 1 }; };
+    template<> struct BoxPt< 0, 1, 1> { enum { idx = 2 }; };
+    template<> struct BoxPt< 0, 1, 0> { enum { idx = 3 }; };
+    template<> struct BoxPt< 1, 0, 0> { enum { idx = 4 }; };
+    template<> struct BoxPt< 1, 0, 1> { enum { idx = 5 }; };
+    template<> struct BoxPt< 1, 1, 1> { enum { idx = 6 }; };
+    template<> struct BoxPt< 1, 1, 0> { enum { idx = 7 }; };
+}
+
+template<typename GridType>
+class BoxStencil: public BaseStencil<GridType, BoxStencil<GridType> >
+{
+public:
+    typedef BaseStencil<GridType, BoxStencil<GridType> > BaseType;
+    typedef typename BaseType::BufferType   BufferType;
+    typedef typename GridType::ValueType    ValueType;
+    typedef math::Vec3<ValueType>           Vec3Type;
+    static const int SIZE = 8;
+
+    BoxStencil(const GridType& grid): BaseType(grid, SIZE) {}
+
+    /// Return linear offset for the specified stencil point relative to its center
+    template<int i, int j, int k>
+    unsigned int pos() const { return BoxPt<i,j,k>::idx; }
+
+     /// @brief Return true if the center of the stencil intersects the
+    /// iso-contour specified by the isoValue
+    inline bool intersects(const ValueType &isoValue = zeroVal<ValueType>()) const
+    {
+        const bool less = mStencil[0] < isoValue;
+        return (less  ^  (mStencil[1] < isoValue)) ||
+               (less  ^  (mStencil[2] < isoValue)) ||
+               (less  ^  (mStencil[3] < isoValue)) ||
+               (less  ^  (mStencil[4] < isoValue)) ||
+               (less  ^  (mStencil[5] < isoValue)) ||
+               (less  ^  (mStencil[6] < isoValue)) ||
+               (less  ^  (mStencil[7] < isoValue))  ;
+    }
+
+    /// @brief Return the trilinear interpolation at the normalized position.
+    /// @param uvw Normalized position within the current voxel.
+    inline ValueType interpolation(const Vec3Type& uvw) const
+    {
+        //     v000 (1-u)(1-v)(1-w) + v001 (1-u)(1-v)w + v010 (1-u)v(1-w) + v011 (1-u)vw
+        //   + v100 u(1-v)(1-w)     + v101 u(1-v)w     + v110 uv(1-w)     + v111 uvw
+
+        ValueType V = BaseType::template getValue<0,0,0>();
+        ValueType A = V + (BaseType::template getValue<0,0,1>() - V) * uvw[2];
+        V = BaseType::template getValue< 0, 1, 0>();
+        ValueType B = V + (BaseType::template getValue<0,1,1>() - V) * uvw[2];
+        ValueType C = A + (B - A) * uvw[1];
+
+        V = BaseType::template getValue<1,0,0>();
+        A = V + (BaseType::template getValue<1,0,1>() - V) * uvw[2];
+        V = BaseType::template getValue<1,1,0>();
+        B = V + (BaseType::template getValue<1,1,1>() - V) * uvw[2];
+        ValueType D = A + (B - A) * uvw[1];
+        
+        return C + (D - C) * uvw[0];
+    }
+
+private:
+    inline void init(const Coord& ijk)
+    {
+        BaseType::template setValue< 0, 0, 1>(mCache.getValue(ijk.offsetBy( 0, 0, 1)));
+        BaseType::template setValue< 0, 1, 1>(mCache.getValue(ijk.offsetBy( 0, 1, 1)));
+
+        BaseType::template setValue< 0, 1, 0>(mCache.getValue(ijk.offsetBy( 0, 1, 0)));
+        BaseType::template setValue< 1, 0, 0>(mCache.getValue(ijk.offsetBy( 1, 0, 0)));
+
+        BaseType::template setValue< 1, 1, 1>(mCache.getValue(ijk.offsetBy( 1, 1, 1)));
+        BaseType::template setValue< 1, 1, 0>(mCache.getValue(ijk.offsetBy( 1, 1, 0)));
+    }
+
+    template<typename, typename> friend class BaseStencil; // allow base class to call init()
+    using BaseType::mCache;
+    using BaseType::mStencil;
+};    
 
 
 ////////////////////////////////////////

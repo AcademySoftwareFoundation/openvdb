@@ -39,6 +39,10 @@
 #include <set>
 #include <sstream>
 #include <boost/type_traits/remove_const.hpp>
+#include <boost/mpl/vector.hpp>//for boost::mpl::vector
+#include <boost/mpl/at.hpp>
+#include <boost/mpl/push_back.hpp>
+#include <boost/mpl/size.hpp>
 #include <openvdb/Exceptions.h>
 #include <openvdb/Types.h>
 #include <openvdb/io/Compression.h> // for truncateRealToHalf()
@@ -54,6 +58,11 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tree {
 
+/// @brief Helper class for compile-time construction of an inverted chain of
+/// the tree nodes, i.e. the first element is a LeafNode and the last
+/// element is of the type HeadType.
+template<typename HeadType, int HeadLevel> struct NodeChain;
+
 template<typename ChildType>
 class RootNode
 {
@@ -63,6 +72,10 @@ public:
     typedef typename ChildType::ValueType     ValueType;
 
     static const Index LEVEL = 1 + ChildType::LEVEL; // level 0 = leaf
+
+    /// Define a vector of node types, where the first element is a LeafNodeType
+    typedef typename NodeChain<RootNode, LEVEL>::Type NodeChainType;
+    BOOST_STATIC_ASSERT(boost::mpl::size<NodeChainType>::value == LEVEL + 1);
 
     /// @brief ValueConverter<T>::Type is the type of a RootNode having the same
     /// child hierarchy as this node but a different value type, T.
@@ -655,7 +668,7 @@ public:
     /// to the nodes along the path from the root node to the node containing the coordinate.
     template<typename NodeT, typename AccessorT>
     const NodeT* probeConstNodeAndCache(const Coord& xyz, AccessorT& acc) const;
-    
+
     /// @brief Return a pointer to the leaf node that contains voxel (x, y, z).
     /// If no such node exists, return NULL.
     LeafNodeType* probeLeaf(const Coord& xyz) {return this->template probeNode<LeafNodeType>(xyz);}
@@ -690,10 +703,6 @@ public:
     {
         return this->probeConstLeafAndCache(xyz, acc);
     }
-
-    /// @brief Return true if the specified node type is part of this tree configuration
-    template<typename NodeT>
-    static bool hasNodeType();
 
     /// @brief Set the values of all inactive voxels and tiles of a narrow-band
     /// level set from the signs of the active voxels, setting outside values to
@@ -817,6 +826,42 @@ private:
     MapType mTable;
     ValueType mBackground;
 }; // end of RootNode class
+
+
+////////////////////////////////////////
+
+
+/// @brief NodeChain<RootNodeType, RootNodeType::LEVEL>::Type is a boost::mpl::vector
+/// that lists the types of the nodes of the tree rooted at RootNodeType in reverse order,
+/// from LeafNode to RootNode.
+/// @details For example, if RootNodeType is
+/// @code
+/// RootNode<InternalNode<InternalNode<LeafNode> > >
+/// @endcode
+/// then NodeChain::Type is
+/// @code
+/// boost::mpl::vector<
+///     LeafNode,
+///     InternalNode<LeafNode>,
+///     InternalNode<InternalNode<LeafNode> >,
+///     RootNode<InternalNode<InternalNode<LeafNode> > > >
+/// @endcode
+///
+/// @note Use the following to get the Nth node type, where N=0 is the LeafNodeType:
+/// @code
+/// boost::mpl::at<NodeChainType, boost::mpl::int_<N> >::type
+/// @endcode
+template<typename HeadT, int HeadLevel>
+struct NodeChain {
+    typedef typename NodeChain<typename HeadT::ChildNodeType, HeadLevel-1>::Type SubtreeT;
+    typedef typename boost::mpl::push_back<SubtreeT, HeadT>::type Type;
+};
+
+/// Specialization to terminate NodeChain
+template<typename HeadT>
+struct NodeChain<HeadT, /*HeadLevel=*/1> {
+    typedef typename boost::mpl::vector<typename HeadT::ChildNodeType, HeadT>::type Type;
+};
 
 
 ////////////////////////////////////////
@@ -1999,6 +2044,7 @@ RootNode<ChildT>::pruneTiles(const ValueType& tolerance)
 
 ////////////////////////////////////////
 
+
 template<typename ChildT>
 template<typename NodeT>
 inline NodeT*
@@ -2207,19 +2253,6 @@ RootNode<ChildT>::touchLeafAndCache(const Coord& xyz, AccessorT& acc)
 
 ////////////////////////////////////////
 
-template<typename ChildT>
-template<typename NodeT>
-inline bool
-RootNode<ChildT>::hasNodeType()
-{
-    if ((NodeT::LEVEL == ChildT::LEVEL && !(boost::is_same<NodeT, ChildT>::value)) ||
-         NodeT::LEVEL >  ChildT::LEVEL) return false;
-    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-    return ChildT::template hasNodeType<NodeT>();
-    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
-}
-
-////////////////////////////////////////
 
 template<typename ChildT>
 template<typename NodeT>
@@ -2237,6 +2270,8 @@ RootNode<ChildT>::probeNode(const Coord& xyz)
         : child->template probeNode<NodeT>(xyz);
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
+
+
 template<typename ChildT>
 template<typename NodeT>
 inline const NodeT*
@@ -2253,6 +2288,8 @@ RootNode<ChildT>::probeConstNode(const Coord& xyz) const
         : child->template probeConstNode<NodeT>(xyz);
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
+
+
 template<typename ChildT>
 template<typename NodeT, typename AccessorT>
 inline NodeT*
@@ -2271,6 +2308,7 @@ RootNode<ChildT>::probeNodeAndCache(const Coord& xyz, AccessorT& acc)
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
 
+
 template<typename ChildT>
 template<typename NodeT,typename AccessorT>
 inline const NodeT*
@@ -2288,6 +2326,7 @@ RootNode<ChildT>::probeConstNodeAndCache(const Coord& xyz, AccessorT& acc) const
         : child->template probeConstNodeAndCache<NodeT>(xyz, acc);
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
+
 
 ////////////////////////////////////////
 

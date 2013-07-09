@@ -1,6 +1,25 @@
 OpenVDB Version History
 =======================
 
+Version 1.2.1 - In development
+    - Added a LevelSetRayIntersector for efficient hierarchical intersection
+      of rays with level sets.
+    - Added a Ray class and a Digital Differential Analyzer specialized for VDB.
+    - Added an option in the "From Particles" SOP to generate an alpha
+      mask that is very useful for constraining subsequent level set filtering
+      such that surface details are preserved.
+    - Improved the computational performance of masked Level Set filtering
+      by 20% for the most common cases.
+    - Added BoxStencil with support for trilinear interpolation.
+    - Fixed meshing issues relating to masking and automatic partitioning.
+    - Fixed a bug in the "Level Set Smooth", "Level Set Renormalize" and 
+      "Level Set Offset" SOPs that caused the Group name to be ignored.   
+    - Fixed a bug in the default constructor for ScaleMaps that would
+      leave some data used in the inverse unitialized.
+    - Fixed build issues under OSX and Windows [Contributed by Edward Lam].
+    - Fixed bugs in Stats::print and Histogram::print that could lead to
+      incorrect behavior if called before any elements were added.
+
 Version 1.2.0 - June 28, 2013
     - Level set filters now accept an optional alpha mask grid.
     - Implemented sharp feature extraction for level set surfacing.

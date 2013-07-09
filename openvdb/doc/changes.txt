@@ -3,6 +3,30 @@
 @page changes Release Notes
 
 
+@htmlonly <a name="v1_2_1_changes"></a>@endhtmlonly
+@par
+<B>Version 1.2.1</B> - <I>In development</I>
+- Added a LevelSetRayIntersector for efficient hierarchical intersection
+  of rays with level sets.
+- Added a Ray class and a Digital Differential Analyzer specialized for VDB.
+- Added an option in the "From Particles" SOP to generate an alpha
+  mask that is very useful for constraining subsequent level set filtering
+  such that surface details are preserved.
+- Improved the computational performance of masked filtering in
+  @vdblink::tools::LevelSetFilter tools::LevelSetFilter@endlink
+  by 20% for the most common cases.
+- Added @vdblink::math::BoxStencil math::BoxStencil@endlink, with support
+  for trilinear interpolation. 
+- Fixed meshing issues relating to masking and automatic partitioning.
+- Fixed a bug in the "Level Set Smooth", "Level Set Renormalize" and 
+  "Level Set Offset" SOPs that caused the Group name to be ignored. 
+- Fixed a bug in the default @vdblink::math::ScaleMap ScaleMap@endlink
+  constructor that left some data used in the inverse uninitialized.
+- Fixed build issues under OSX and Windows [Contributed by Edward Lam].
+- Fixed bugs in Stats::print and Histogram::print that could lead to
+  incorrect behavior if called before any elements were added.
+
+
 @htmlonly <a name="v1_2_0_changes"></a>@endhtmlonly
 @par
 <B>Version 1.2.0</B> - <I>June 28 2013</I>

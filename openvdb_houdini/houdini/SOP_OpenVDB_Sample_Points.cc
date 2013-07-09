@@ -131,6 +131,7 @@ public:
         mThreaded(threaded),
         mGdp(gdp),
         mAttribPageHandle(handle.getAttribute()),
+        mAttribute(handle.getAttribute()),
         mInterrupter(interrupter)
     {
     }
@@ -141,6 +142,7 @@ public:
         mThreaded(other.mThreaded),
         mGdp(other.mGdp),
         mAttribPageHandle(other.mAttribPageHandle),
+        mAttribute(other.mAttribute),
         mInterrupter(other.mInterrupter)
     {
     }
@@ -174,6 +176,9 @@ public:
 
         GA_ROPageHandleV3   p_ph(mGdp->getP());
         GA_RWPageHandleType v_ph = mAttribPageHandle;
+
+        std::cout << "# " << mAttribute << std::endl;
+
 
         if(!v_ph.isValid()) {
             throw std::runtime_error("new attribute not valid");
@@ -229,6 +234,7 @@ private:
     bool                 mThreaded;
     GU_Detail*           mGdp;
     GA_RWPageHandleType  mAttribPageHandle;
+    GA_Attribute* mAttribute;
     UT_AutoInterrupt*    mInterrupter;
 }; // class PointSampler
 
@@ -348,6 +354,9 @@ SOP_OpenVDB_Sample_Points::sample(OP_Context& context)
             ss << "VDB_" << numUnnamedGrids++;
             gridName = ss.str();
         }
+        
+        // remove any dot "." characters, attribute names can't contain this.
+        std::replace(gridName.begin(), gridName.end(), '.', '_');
 
         //convert gridName to uppercase so we can use it as a local variable name
         std::string gridVariableName = gridName;

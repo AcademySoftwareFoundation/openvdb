@@ -204,6 +204,10 @@ inline double Abs(double x) { return fabs(x); }
 inline long double Abs(long double x) { return fabs(x); }
 inline uint32_t Abs(uint32_t i) { return i; }
 inline uint64_t Abs(uint64_t i) { return i; }
+// On OSX size_t and uint64_t are different types
+#if defined(__APPLE__) || defined(MACOSX)
+inline size_t Abs(size_t i) { return i; }    
+#endif
 //@}
 
 
@@ -247,6 +251,10 @@ template<typename Type>
 inline bool
 isNegative(const Type& x) { return x < zeroVal<Type>(); }
 
+/// Dummy implementation for bool type    
+template<>
+inline bool isNegative<bool>(const bool&) { return false; }
+
 
 template<typename Type>
 inline bool
@@ -263,6 +271,14 @@ isApproxEqual(const Type& a, const Type& b, const Type& tolerance)
     return !(Abs(a - b) > tolerance);
 }
 
+/// @brief Return true if a is approximatly larger then b, i.e. b - a < tolerance    
+template<typename Type>
+inline bool
+isApproxLarger(const Type& a, const Type& b, const Type& tolerance)
+{
+    return (b - a < tolerance);
+}    
+    
 #define OPENVDB_EXACT_IS_APPROX_EQUAL(T) \
     template<> inline bool isApproxEqual<T>(const T& a, const T& b) { return a == b; } \
     template<> inline bool isApproxEqual<T>(const T& a, const T& b, const T&) { return a == b; } \
@@ -537,6 +553,16 @@ Min(const Type& a, const Type& b, const Type& c, const Type& d,
 {
     return std::min(Min(a,b,c,d), Min(e,f,g,h));
 }
+
+// ==========> Negate <==================
+
+/// Return the negation of the specified value
+template<typename Type>
+inline Type Negate(const Type& x) { return -x; }
+
+/// Dummy implementation for bool type   
+template<>
+inline bool Negate<bool>(const bool& x) { return x; }    
 
 
 ////////////////////////////////////////

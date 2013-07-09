@@ -582,10 +582,6 @@ public:
     template<typename OtherChildNodeType, Index OtherLog2Dim>
     bool hasSameTopology(const InternalNode<OtherChildNodeType, OtherLog2Dim>* other) const;
 
-    /// @brief Return true if the specified node type is part of this tree-branch configuration
-    template<typename NodeT>
-    static bool hasNodeType();
-
 protected:
     //@{
     /// Allow iterators to call mask accessor methods (setValueMask(), setChildMask(), etc.).
@@ -981,21 +977,6 @@ InternalNode<ChildT, Log2Dim>::probeConstNodeAndCache(const Coord& xyz, Accessor
     return (boost::is_same<NodeT, ChildT>::value)
             ? reinterpret_cast<const NodeT*>(child)
             : child->template probeConstNodeAndCache<NodeT>(xyz, acc);
-    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
-}
- 
-////////////////////////////////////////
-
-
-template<typename ChildT, Index Log2Dim>
-template<typename NodeT>
-inline bool
-InternalNode<ChildT, Log2Dim>::hasNodeType()
-{
-    if ((NodeT::LEVEL == ChildT::LEVEL && !(boost::is_same<NodeT, ChildT>::value)) ||
-         NodeT::LEVEL >  ChildT::LEVEL) return false;
-    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-    return ChildT::template hasNodeType<NodeT>();
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
 

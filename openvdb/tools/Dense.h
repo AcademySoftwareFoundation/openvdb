@@ -267,7 +267,8 @@ private:
 /// @brief Copy an OpenVDB tree into an existing dense grid.
 ///
 /// @note Only the voxels enclosed by the existing dense grid are copied
-/// from the OpenVDB tree.
+/// from the OpenVDB tree, meaning all exiting values in the dense
+/// grid are overwritten regardless of the tolopogy of the VDB tree.
 template<typename TreeT>
 class CopyToDense
 {

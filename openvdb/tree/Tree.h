@@ -248,7 +248,7 @@ public:
     /// Return the name of this type of tree.
     static const Name& treeType();
     /// Return the name of this type of tree.
-    virtual const Name& type() const { return treeType(); }
+    virtual const Name& type() const { return this->treeType(); }
 
     bool operator==(const Tree&) const { OPENVDB_THROW(NotImplementedError, ""); }
     bool operator!=(const Tree&) const { OPENVDB_THROW(NotImplementedError, ""); }
@@ -449,6 +449,11 @@ public:
     /// safely perform multithreaded processing.
     LeafNodeType* touchLeaf(const Coord& xyz);
 
+    /// @brief @return a pointer to the node of the specified type that contains
+    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    template<typename NodeType>
+    NodeType* probeNode(const Coord& xyz);
+
     /// @brief @return a pointer to the leaf node that contains
     /// voxel (x, y, z) and if it doesn't exist, return NULL.
     LeafNodeType* probeLeaf(const Coord& xyz);
@@ -458,6 +463,15 @@ public:
     const LeafNodeType* probeConstLeaf(const Coord& xyz) const;
     const LeafNodeType* probeLeaf(const Coord& xyz) const { return this->probeConstLeaf(xyz); }
 
+    /// @brief @return a const pointer to the node of the specified type that contains
+    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    template<typename NodeType>
+    const NodeType* probeConstNode(const Coord& xyz) const;
+    template<typename NodeType>
+    const NodeType* probeNode(const Coord& xyz) const
+    {
+        return this->template probeConstNode<NodeType>(xyz);
+    }
     //
     // Aux methods
     //
@@ -1469,6 +1483,14 @@ Tree<RootNodeType>::probeLeaf(const Coord& xyz)
     return mRoot.probeLeaf(xyz);
 }
 
+template<typename RootNodeType>
+template<typename NodeType>
+inline NodeType*
+Tree<RootNodeType>::probeNode(const Coord& xyz)
+{
+    return mRoot.template probeNode<NodeType>(xyz);
+}
+
 
 template<typename RootNodeType>
 inline const typename RootNodeType::LeafNodeType*
@@ -1477,6 +1499,13 @@ Tree<RootNodeType>::probeConstLeaf(const Coord& xyz) const
     return mRoot.probeConstLeaf(xyz);
 }
 
+template<typename RootNodeType>
+template<typename NodeType>
+inline const NodeType*
+Tree<RootNodeType>::probeConstNode(const Coord& xyz) const
+{
+    return mRoot.template probeConstNode<NodeType>(xyz);
+}
 
 ////////////////////////////////////////
 
@@ -1773,8 +1802,7 @@ Tree<RootNodeType>::treeType()
             ostr << "_" << dims[i];
         }
         Name* s = new Name(ostr.str());
-        sTypeName.compare_and_swap(s, NULL);
-        if (sTypeName != s) delete s;
+        if (sTypeName.compare_and_swap(s, NULL) != NULL) delete s;
     }
     return *sTypeName;
 }

@@ -86,7 +86,6 @@ template<typename TreeType> class ValueAccessor0;
 template<typename TreeType, Index L0 = 0> class ValueAccessor1;
 template<typename TreeType, Index L0 = 0, Index L1 = 1> class ValueAccessor2;
 template<typename TreeType, Index L0 = 0, Index L1 = 1, Index L2 = 2> class ValueAccessor3;
-template<typename HeadT, int HeadLevel> struct InvertedTree;
 template<typename TreeCacheT, typename NodeVecT, bool AtRoot> class CacheItem;
 
 
@@ -348,6 +347,29 @@ public:
         return mCache.touchLeaf(xyz);
     }
 
+    /// @brief @return a pointer to the node of the specified type that contains
+    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    template<typename NodeT>
+    NodeT* probeNode(const Coord& xyz)
+    {
+        LockT lock(mMutex);
+        return mCache.template probeNode<NodeT>(xyz);
+    }
+
+    /// @brief @return a pointer to the node of the specified type that contains
+    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    template<typename NodeT>
+    const NodeT* probeConstNode(const Coord& xyz) const
+    {
+        LockT lock(mMutex);
+        return mCache.template probeConstNode<NodeT>(xyz);
+    }
+    template<typename NodeT>
+    const NodeT* probeNode(const Coord& xyz) const
+    {
+        return this->template probeConstNode<NodeT>(xyz);
+    }
+    
     /// @brief @return a pointer to the leaf node that contains
     /// voxel (x, y, z) and if it doesn't exist, return NULL.
     LeafNodeT* probeLeaf(const Coord& xyz)
@@ -363,10 +385,7 @@ public:
         LockT lock(mMutex);
         return mCache.probeConstLeaf(xyz);
     }
-    const LeafNodeT* probeLeaf(const Coord& xyz) const
-    {
-        return this->probeConstLeaf(xyz);
-    }
+    const LeafNodeT* probeLeaf(const Coord& xyz) const {return this->probeConstLeaf(xyz);}
 
     /// Remove all nodes from this cache, then reinsert the root node.
     virtual void clear()
@@ -400,7 +419,7 @@ private:
     void insert(const Coord& xyz, NodeType* node) { mCache.insert(xyz, node); }
 
     // Define a list of all tree node types from LeafNode to RootNode
-    typedef typename InvertedTree<RootNodeT, RootNodeT::LEVEL>::Type InvTreeT;
+    typedef typename RootNodeT::NodeChainType InvTreeT;
     // Remove all tree node types that are excluded from the cache
     typedef typename boost::mpl::begin<InvTreeT>::type BeginT;
     typedef typename boost::mpl::advance<BeginT,boost::mpl::int_<CacheLevels> >::type FirstT;
@@ -461,10 +480,14 @@ struct ValueAccessor<TreeType, 3, tbb::null_mutex>: public ValueAccessor3<TreeTy
 ////////////////////////////////////////
 
 
-/// This accessor is thread-safe (at the cost of speed) for both reading and
+/// @brief This accessor is thread-safe (at the cost of speed) for both reading and
 /// writing to a tree.  That is, multiple threads may safely access a single,
-/// shared ValueAccessorRW.  For better performance, however, it is recommended
-/// that, instead, each thread be assigned its own (non-mutex protected) accessor.
+/// shared ValueAccessorRW.
+///
+/// @warning Since the mutex-locking employed by the ValueAccessorRW
+/// can seriously impair performance of multithreaded applications, it
+/// is recommended that, instead, each thread be assigned its own
+/// (non-mutex protected) accessor. 
 template<typename TreeType>
 struct ValueAccessorRW: public ValueAccessor<TreeType, TreeType::DEPTH-1, tbb::spin_mutex>
 {
@@ -481,29 +504,6 @@ struct ValueAccessorRW: public ValueAccessor<TreeType, TreeType::DEPTH-1, tbb::s
 /////////////////////////////////////////////////////////////////////////////////
 /// The classes below are for experts only and should rarely be used directly ///
 /////////////////////////////////////////////////////////////////////////////////
-
-/// InvertedTree<RootNodeType, RootNodeType::LEVEL>::Type is a boost::mpl::vector
-/// that lists the types of the nodes of the tree rooted at RootNodeType
-/// in reverse order, from LeafNode to RootNode.  For example, for RootNodeType
-/// RootNode<InternalNode<InternalNode<LeafNode> > >, InvertedTree::Type is
-///     boost::mpl::vector<
-///         LeafNode,
-///         InternalNode<LeafNode>,
-///         InternalNode<InternalNode<LeafNode> >,
-///         RootNode<InternalNode<InternalNode<LeafNode> > > >.
-template<typename HeadT, int HeadLevel>
-struct InvertedTree {
-    typedef typename InvertedTree<typename HeadT::ChildNodeType, HeadLevel-1>::Type SubtreeT;
-    typedef typename boost::mpl::push_back<SubtreeT, HeadT>::type Type;
-};
-/// For level one nodes (either RootNode<LeafNode> or InternalNode<LeafNode>),
-/// InvertedTree::Type is either boost::mpl::vector<LeafNode, RootNode<LeafNode> >
-/// or boost::mpl::vector<LeafNode, InternalNode<LeafNode> >.
-template<typename HeadT>
-struct InvertedTree<HeadT, /*HeadLevel=*/1> {
-    typedef typename boost::mpl::vector<typename HeadT::ChildNodeType, HeadT>::type Type;
-};
-
 
 // An element of a compile-time linked list of node pointers, ordered from LeafNode to RootNode
 template<typename TreeCacheT, typename NodeVecT, bool AtRoot>
@@ -640,6 +640,37 @@ public:
             return mNode->probeConstLeafAndCache(xyz, *mParent);
         }
         return mNext.probeConstLeaf(xyz);
+    }
+
+    template<typename NodeT>
+    NodeT* probeNode(const Coord& xyz)
+    {
+        BOOST_STATIC_ASSERT(!TreeCacheT::IsConstTree);
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+        if (this->isHashed(xyz)) {
+            if ((boost::is_same<NodeT, NodeType>::value)) {    
+                assert(mNode);
+                return reinterpret_cast<NodeT*>(const_cast<NodeType*>(mNode));
+            }
+            return const_cast<NodeType*>(mNode)->template probeNodeAndCache<NodeT>(xyz, *mParent);
+        }
+        return mNext.template probeNode<NodeT>(xyz);
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+    }
+
+    template<typename NodeT>
+    const NodeT* probeConstNode(const Coord& xyz)
+    {
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+        if (this->isHashed(xyz)) {
+            if ((boost::is_same<NodeT, NodeType>::value)) {    
+                assert(mNode);
+                return reinterpret_cast<const NodeT*>(mNode);
+            }
+            return mNode->template probeConstNodeAndCache<NodeT>(xyz, *mParent);
+        }
+        return mNext.template probeConstNode<NodeT>(xyz);
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
 
     /// Return the active state of the voxel at the given coordinates.
@@ -834,6 +865,21 @@ public:
         return mRoot->probeConstLeafAndCache(xyz, *mParent);
     }
 
+    template<typename NodeType>
+    NodeType* probeNode(const Coord& xyz)
+    {
+        assert(mRoot);
+        BOOST_STATIC_ASSERT(!TreeCacheT::IsConstTree);
+        return const_cast<RootNodeType*>(mRoot)->template probeNodeAndCache<NodeType>(xyz, *mParent);
+    }
+
+    template<typename NodeType>
+    const NodeType* probeConstNode(const Coord& xyz)
+    {
+        assert(mRoot);
+        return mRoot->template probeConstNodeAndCache<NodeType>(xyz, *mParent);
+    }
+    
     int getValueDepth(const Coord& xyz)
     {
         assert(mRoot);
@@ -1128,7 +1174,7 @@ public:
     typedef typename TreeType::RootNodeType RootNodeT;
     typedef typename TreeType::LeafNodeType LeafNodeT;
     typedef ValueAccessorBase<TreeType>     BaseT;
-    typedef typename InvertedTree<RootNodeT, RootNodeT::LEVEL>::Type InvTreeT;
+    typedef typename RootNodeT::NodeChainType InvTreeT;
     typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L0> >::type NodeT0;
 
     /// Constructor from a tree
@@ -1355,7 +1401,7 @@ public:
         return BaseT::mTree->root().touchLeafAndCache(xyz, *this);
     }
 
-    /// @brief @return a pointer to the node that contains
+    /// @brief @return a pointer to the node of the specified type that contains
     /// voxel (x, y, z) and if it doesn't exist, return NULL.
     template <typename NodeT>
     NodeT* probeNode(const Coord& xyz)
@@ -1378,7 +1424,7 @@ public:
         return this->template probeNode<LeafNodeT>(xyz);
     }
 
-    /// @brief @return a const pointer to the node that contains
+    /// @brief @return a const pointer to the nodeof the specified type that contains
     /// voxel (x, y, z) and if it doesn't exist, return NULL.
     template <typename NodeT>
     const NodeT* probeConstNode(const Coord& xyz) const
@@ -1481,12 +1527,12 @@ class ValueAccessor2 : public ValueAccessorBase<_TreeType>
 public:
     BOOST_STATIC_ASSERT(_TreeType::DEPTH >= 3);
     BOOST_STATIC_ASSERT( L0 < L1 && L1 < _TreeType::RootNodeType::LEVEL );
-    typedef _TreeType                       TreeType;
-    typedef typename TreeType::ValueType    ValueType;
-    typedef typename TreeType::RootNodeType RootNodeT;
-    typedef typename TreeType::LeafNodeType LeafNodeT;
-    typedef ValueAccessorBase<TreeType>     BaseT;
-    typedef typename InvertedTree<RootNodeT, RootNodeT::LEVEL>::Type InvTreeT;
+    typedef _TreeType                         TreeType;
+    typedef typename TreeType::ValueType      ValueType;
+    typedef typename TreeType::RootNodeType   RootNodeT;
+    typedef typename TreeType::LeafNodeType   LeafNodeT;
+    typedef ValueAccessorBase<TreeType>       BaseT;
+    typedef typename RootNodeT::NodeChainType InvTreeT;
     typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L0> >::type NodeT0;
     typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L1> >::type NodeT1;
 
@@ -1922,12 +1968,12 @@ class ValueAccessor3 : public ValueAccessorBase<_TreeType>
 public:
     BOOST_STATIC_ASSERT(_TreeType::DEPTH >= 4);
     BOOST_STATIC_ASSERT(L0 < L1 && L1 < L2 && L2 < _TreeType::RootNodeType::LEVEL);
-    typedef _TreeType                       TreeType;
-    typedef typename TreeType::ValueType    ValueType;
-    typedef typename TreeType::RootNodeType RootNodeT;
-    typedef typename TreeType::LeafNodeType LeafNodeT;
-    typedef ValueAccessorBase<TreeType>     BaseT;
-    typedef typename InvertedTree<RootNodeT, RootNodeT::LEVEL>::Type InvTreeT;
+    typedef _TreeType                         TreeType;
+    typedef typename TreeType::ValueType      ValueType;
+    typedef typename TreeType::RootNodeType   RootNodeT;
+    typedef typename TreeType::LeafNodeType   LeafNodeT;
+    typedef ValueAccessorBase<TreeType>       BaseT;
+    typedef typename RootNodeT::NodeChainType InvTreeT;
     typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L0> >::type NodeT0;
     typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L1> >::type NodeT1;
     typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L2> >::type NodeT2;

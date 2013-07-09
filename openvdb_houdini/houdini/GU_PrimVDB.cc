@@ -556,7 +556,6 @@ GU_PrimVDB::buildFromPrimVolume(
     }
     
     if (flood && vol.isSDF()) {
-        // only call signed flood fill on SDFs
         grid->signedFloodFill();
     }
 

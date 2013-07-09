@@ -647,12 +647,14 @@ void
 MeshVoxelizer<FloatTreeT, InterruptT>::join(MeshVoxelizer<FloatTreeT, InterruptT>& rhs)
 {
     typedef typename FloatTreeT::RootNodeType FloatRootNodeT;
-    typedef typename tree::InvertedTree<FloatRootNodeT, FloatRootNodeT::LEVEL>::Type FloatNodeTVec;
-    typedef typename boost::mpl::at<FloatNodeTVec, boost::mpl::int_<1> >::type FloatInternalNodeT;
+    typedef typename FloatRootNodeT::NodeChainType  FloatNodeChainT;
+    BOOST_STATIC_ASSERT(boost::mpl::size<FloatNodeChainT>::value > 1);
+    typedef typename boost::mpl::at<FloatNodeChainT, boost::mpl::int_<1> >::type FloatInternalNodeT;
 
     typedef typename IntTreeT::RootNodeType IntRootNodeT;
-    typedef typename tree::InvertedTree<IntRootNodeT, IntRootNodeT::LEVEL>::Type IntNodeTVec;
-    typedef typename boost::mpl::at<IntNodeTVec, boost::mpl::int_<1> >::type IntInternalNodeT;
+    typedef typename IntRootNodeT::NodeChainType  IntNodeChainT;
+    BOOST_STATIC_ASSERT(boost::mpl::size<IntNodeChainT>::value > 1);
+    typedef typename boost::mpl::at<IntNodeChainT, boost::mpl::int_<1> >::type IntInternalNodeT;
 
     Coord ijk;
     Index offset;
@@ -2859,9 +2861,10 @@ MeshToVoxelEdgeData::GenEdgeData::run(bool threaded)
 inline void
 MeshToVoxelEdgeData::GenEdgeData::join(GenEdgeData& rhs)
 {
-    typedef TreeType::RootNodeType RootNodeType;
-    typedef tree::InvertedTree<RootNodeType, RootNodeType::LEVEL>::Type NodeTypeVec;
-    typedef boost::mpl::at<NodeTypeVec, boost::mpl::int_<1> >::type InternalNodeType;
+    typedef TreeType::RootNodeType       RootNodeType;
+    typedef RootNodeType::NodeChainType  NodeChainType;
+    BOOST_STATIC_ASSERT(boost::mpl::size<NodeChainType>::value > 1);
+    typedef boost::mpl::at<NodeChainType, boost::mpl::int_<1> >::type InternalNodeType;
 
     Coord ijk;
     Index offset;

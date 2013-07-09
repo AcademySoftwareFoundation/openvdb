@@ -33,7 +33,7 @@
 #ifndef OPENVDB_TREE_UTIL_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_UTIL_HAS_BEEN_INCLUDED
 
-#include <openvdb/math/Math.h> // for zeroVal
+#include <openvdb/math/Math.h> // for isNegative and Negate
 #include <openvdb/Types.h> // for Index typedef
 
 namespace openvdb {
@@ -105,7 +105,7 @@ struct LevelSetPrune
     {
         child.pruneOp(*this);
         if (!child.isInactive()) return false;
-        value = child.getFirstValue() < zeroVal<ValueType>() ? -outside : outside;
+        value = math::isNegative(child.getFirstValue()) ? math::Negate(outside) : outside;
         return true;
     }
 

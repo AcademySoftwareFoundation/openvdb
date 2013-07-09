@@ -817,10 +817,6 @@ public:
     }
     //@}
 
-    /// @brief Return true if the specified node type is part of this tree-branch configuration
-    template<typename NodeT>
-    static bool hasNodeType() { return (boost::is_same<NodeT,LeafNode>::value); }
-
     /// Return @c true if all of this node's values have the same active state
     /// and are equal to within the given tolerance, and return the value in @a constValue
     /// and the active state in @a state.

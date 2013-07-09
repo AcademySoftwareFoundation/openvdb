@@ -193,6 +193,7 @@ INCLUDE_NAMES := \
     math/Proximity.h \
     math/QuantizedUnitVec.h \
     math/Quat.h \
+    math/Ray.h \
     math/Stats.h \
     math/Stencils.h \
     math/Transform.h\
@@ -216,6 +217,7 @@ INCLUDE_NAMES := \
     tools/LevelSetAdvect.h \
     tools/LevelSetFilter.h \
     tools/LevelSetFracture.h \
+    tools/LevelSetRayIntersector.h \
     tools/LevelSetRebuild.h \
     tools/LevelSetSphere.h \
     tools/LevelSetTracker.h \
@@ -302,10 +304,12 @@ UNITTEST_SRC_NAMES := \
     unittest/TestLeafBool.cc \
     unittest/TestLeafIO.cc \
     unittest/TestLeafOrigin.cc \
+    unittest/TestLevelSetRayIntersector.cc \
     unittest/TestLevelSetUtil.cc \
     unittest/TestLinearInterp.cc \
     unittest/TestMaps.cc \
     unittest/TestMat4Metadata.cc \
+    unittest/TestMath.cc \
     unittest/TestMeanCurvature.cc \
     unittest/TestMeshToVolume.cc \
     unittest/TestMetadata.cc \
@@ -319,6 +323,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestQuadraticInterp.cc \
     unittest/TestQuantizedUnitVec.cc \
     unittest/TestQuat.cc \
+    unittest/TestRay.cc \
     unittest/TestStats.cc \
     unittest/TestStream.cc \
     unittest/TestStringMetadata.cc \

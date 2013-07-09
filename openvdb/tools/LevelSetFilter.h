@@ -155,11 +155,15 @@ private:
     struct AffineCombine
     {
         AffineCombine(const GridT& grid, const GridT* mask)
-            : mGrid(&grid), mMask(mask), mAcc(mask ? new AccT(mask->tree()) : NULL) {}
+            : mGrid(&grid), mMask(mask), mAcc(mask ? new AccT(mask->tree()) : NULL),
+              mIdentical(mask ? grid.transform() == mask->transform() : false)
+        {
+        }
         ~AffineCombine() { delete mAcc; }
         inline ValueType alpha(const Coord& xyz) const
         {
             assert(mMask);
+            if (mIdentical) return mAcc->getValue(xyz);
             const Vec3R world = mGrid->indexToWorld(xyz);
             const Vec3R voxel = mMask->worldToIndex(world);
             return tools::BoxSampler::sample<AccT>(*mAcc, voxel);
@@ -173,6 +177,7 @@ private:
         const GridT* mGrid;
         const GridT* mMask;
         const AccT*  mAcc;
+        const bool   mIdentical;
     };
 
     // Private driver method for mean and gaussian filtering

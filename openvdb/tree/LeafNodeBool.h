@@ -543,9 +543,6 @@ public:
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
     //@}
-    /// @brief Return true if the specified node type is part of this tree-branch configuration
-    template<typename NodeT>
-    static bool hasNodeType() { return (boost::is_same<NodeT,LeafNode>::value); }
     
     void merge(const LeafNode& other, bool, bool) { this->merge(other); }
 
