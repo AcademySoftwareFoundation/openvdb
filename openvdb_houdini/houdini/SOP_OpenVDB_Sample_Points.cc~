@@ -348,7 +348,7 @@ SOP_OpenVDB_Sample_Points::sample(OP_Context& context)
         std::string gridName = it.getPrimitiveName().toStdString();
         if (gridName.empty()) {
             std::stringstream ss;
-            ss << "VDB_" << numUnnamedGrids++;
+            ss << "VDB_" << numUnnamedGrids++;cout
             gridName = ss.str();
         }
         
