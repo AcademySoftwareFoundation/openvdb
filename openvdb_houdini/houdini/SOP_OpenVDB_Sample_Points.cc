@@ -177,9 +177,6 @@ public:
         GA_ROPageHandleV3   p_ph(mGdp->getP());
         GA_RWPageHandleType v_ph = mAttribPageHandle;
 
-        std::cout << "# " << mAttribute << std::endl;
-
-
         if(!v_ph.isValid()) {
             throw std::runtime_error("new attribute not valid");
         }
@@ -351,7 +348,7 @@ SOP_OpenVDB_Sample_Points::sample(OP_Context& context)
         std::string gridName = it.getPrimitiveName().toStdString();
         if (gridName.empty()) {
             std::stringstream ss;
-            ss << "VDB_" << numUnnamedGrids++;
+            ss << "VDB_" << numUnnamedGrids++;cout
             gridName = ss.str();
         }
         
