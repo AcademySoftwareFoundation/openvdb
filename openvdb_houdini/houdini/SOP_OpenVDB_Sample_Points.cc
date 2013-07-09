@@ -427,6 +427,7 @@ SOP_OpenVDB_Sample_Points::sample(OP_Context& context)
             }
 
         } else if (gridType == UT_VDB_VEC3F || gridType == UT_VDB_VEC3D) {
+
             // a grid that holds Vec3 data (as either float or double)
             // count
             numVectorGrids++;
