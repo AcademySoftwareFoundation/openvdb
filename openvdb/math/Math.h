@@ -36,13 +36,17 @@
 #define OPENVDB_MATH_HAS_BEEN_INCLUDED
 
 #include <assert.h>
-#include <algorithm> //for std::max()
-#include <cmath>     //for floor(), ceil() and sqrt()
-#include <math.h>    //for pow(), fabs() etc
-#include <cstdlib>   //for srand, abs(int)
-#include <limits>    //for std::numeric_limits<Type>::max()
+#include <algorithm> // for std::max()
+#include <cmath>     // for floor(), ceil() and sqrt()
+#include <math.h>    // for pow(), fabs() etc
+#include <cstdlib>   // for srand(), abs(int)
+#include <limits>    // for std::numeric_limits<Type>::max()
 #include <string>
 #include <boost/numeric/conversion/conversion_traits.hpp>
+#include <boost/random/mersenne_twister.hpp> // for boost::random::mt19937
+#include <boost/random/uniform_01.hpp>
+#include <boost/random/uniform_int.hpp>
+#include <boost/version.hpp> // for BOOST_VERSION
 #include <openvdb/Platform.h>
 #include <openvdb/version.h>
 
@@ -121,27 +125,79 @@ namespace math {
 // ==========> Random Values <==================
 
 /// Initialize the random number generator.
-inline void randSeed(unsigned int seed) { srand(seed); }
-
+/// @deprecated Use math::Random01 or Boost.Random instead.
+OPENVDB_DEPRECATED inline void randSeed(unsigned int seed) { srand(seed); }
 
 /// Return a random number in the interval [0,1]
-inline double randUniform() { return (double)(rand() / (RAND_MAX + 1.0)); }
+/// @deprecated Use math::Random01 or Boost.Random instead.
+OPENVDB_DEPRECATED inline double randUniform() { return (double)(rand() / (RAND_MAX + 1.0)); }
 
 
-/// Simple random integer generator
-class RandomInt
+/// @brief Simple generator of random numbers over the range [0, 1)
+/// @details Thread-safe as long as each thread has its own Rand01 instance
+template<typename FloatType = double, typename EngineType = boost::mt19937>
+class Rand01
 {
-protected:
-    int my_min, my_range;
+private:
+    EngineType mEngine;
+    boost::uniform_01<FloatType> mRand;
+
 public:
-    RandomInt(unsigned int seed, int min, int max): my_min(min), my_range(max-min+1) {
-        assert(min<max && "RandomInt: invalid arguments");
-        randSeed(seed);
-    }
-    void setRange(int min, int max) { my_min = min; my_range = max-min+1; }
-    int operator()() const { return rand() % my_range + my_min; }
-    int operator()(int min, int max) const { return rand() % (max-min+1) + min; }
+    typedef FloatType ValueType;
+
+    /// @brief Initialize the generator.
+    /// @param seed  seed value for the random number generator
+    Rand01(unsigned int seed): mEngine(static_cast<typename EngineType::result_type>(seed)) {}
+
+    /// Return a uniformly distributed random number in the range [0, 1).
+    FloatType operator()() { return mRand(mEngine); }
 };
+
+typedef Rand01<double, boost::mt19937> Random01;
+
+
+/// @brief Simple random integer generator
+/// @details Thread-safe as long as each thread has its own RandInt instance
+template<typename EngineType = boost::mt19937>
+class RandInt
+{
+private:
+#if BOOST_VERSION >= 104700
+    typedef boost::random::uniform_int_distribution<int> Distr;
+#else
+    typedef boost::uniform_int<int> Distr;
+#endif
+    EngineType mEngine;
+    Distr mRand;
+
+public:
+    /// @brief Initialize the generator.
+    /// @param seed       seed value for the random number generator
+    /// @param imin,imax  generate integers that are uniformly distributed over [imin, imax]
+    RandInt(unsigned int seed, int imin, int imax):
+        mEngine(static_cast<typename EngineType::result_type>(seed)),
+        mRand(std::min(imin, imax), std::max(imin, imax))
+    {}
+
+    /// Change the range over which integers are distributed to [imin, imax].
+    void setRange(int imin, int imax) { mRand = Distr(std::min(imin, imax), std::max(imin, imax)); }
+
+    /// Return a randomly-generated integer in the current range.
+    int operator()() { return mRand(mEngine); }
+    /// @brief Return a randomly-generated integer in the new range [imin, imax],
+    /// without changing the current range.
+    int operator()(int imin, int imax)
+    {
+        const int lo = std::min(imin, imax), hi = std::max(imin, imax);
+#if BOOST_VERSION >= 104700
+        return mRand(mEngine, Distr::param_type(lo, hi));
+#else
+        return Distr(lo, hi)(mEngine);
+#endif
+    }
+};
+
+typedef RandInt<boost::mt19937> RandomInt;
 
 
 // ==========> Clamp <==================
@@ -206,7 +262,7 @@ inline uint32_t Abs(uint32_t i) { return i; }
 inline uint64_t Abs(uint64_t i) { return i; }
 // On OSX size_t and uint64_t are different types
 #if defined(__APPLE__) || defined(MACOSX)
-inline size_t Abs(size_t i) { return i; }    
+inline size_t Abs(size_t i) { return i; }
 #endif
 //@}
 
@@ -251,7 +307,7 @@ template<typename Type>
 inline bool
 isNegative(const Type& x) { return x < zeroVal<Type>(); }
 
-/// Dummy implementation for bool type    
+/// Dummy implementation for bool type
 template<>
 inline bool isNegative<bool>(const bool&) { return false; }
 
@@ -271,14 +327,14 @@ isApproxEqual(const Type& a, const Type& b, const Type& tolerance)
     return !(Abs(a - b) > tolerance);
 }
 
-/// @brief Return true if a is approximatly larger then b, i.e. b - a < tolerance    
+/// @brief Return true if a is approximatly larger then b, i.e. b - a < tolerance
 template<typename Type>
 inline bool
 isApproxLarger(const Type& a, const Type& b, const Type& tolerance)
 {
     return (b - a < tolerance);
-}    
-    
+}
+
 #define OPENVDB_EXACT_IS_APPROX_EQUAL(T) \
     template<> inline bool isApproxEqual<T>(const T& a, const T& b) { return a == b; } \
     template<> inline bool isApproxEqual<T>(const T& a, const T& b, const T&) { return a == b; } \
@@ -554,16 +610,6 @@ Min(const Type& a, const Type& b, const Type& c, const Type& d,
     return std::min(Min(a,b,c,d), Min(e,f,g,h));
 }
 
-// ==========> Negate <==================
-
-/// Return the negation of the specified value
-template<typename Type>
-inline Type Negate(const Type& x) { return -x; }
-
-/// Dummy implementation for bool type   
-template<>
-inline bool Negate<bool>(const bool& x) { return x; }    
-
 
 ////////////////////////////////////////
 
@@ -611,7 +657,7 @@ inline long double Cbrt(long double x) { return cbrtl(x); }
 
 //@{
 /// Return the remainder of @a x / @a y.
-inline int Mod(int x, int y) { return (x % y); };
+inline int Mod(int x, int y) { return (x % y); }
 inline float Mod(float x, float y) { return fmodf(x,y); }
 inline double Mod(double x, double y) { return fmod(x,y); }
 inline long double Mod(long double x, long double y) { return fmodl(x,y); }
@@ -736,6 +782,11 @@ struct promote {
 
 /// @brief Return the index [0,1,2] of the smallest value in a 3D vector.
 /// @note This methods assumes operator[] exists and avoids branching.
+/// @details If two components of the input vector are equal and smaller then the
+/// third component, the largest index of the two is always returned.
+/// If all three vector components are equal the largest index, i.e. 2, is 
+/// returned. In other words the return value corresponds to the largest index 
+/// of the of the smallest vector components.
 template<typename Vec3T>
 size_t
 MinIndex(const Vec3T& v)
@@ -749,6 +800,11 @@ MinIndex(const Vec3T& v)
 
 /// @brief Return the index [0,1,2] of the largest value in a 3D vector.
 /// @note This methods assumes operator[] exists and avoids branching.
+/// @details If two components of the input vector are equal and larger then the
+/// third component, the largest index of the two is always returned.
+/// If all three vector components are equal the largest index, i.e. 2, is 
+/// returned. In other words the return value corresponds to the largest index 
+/// of the of the largest vector components.
 template<typename Vec3T>
 size_t
 MaxIndex(const Vec3T& v)

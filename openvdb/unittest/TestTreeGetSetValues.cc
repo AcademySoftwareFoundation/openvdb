@@ -32,6 +32,7 @@
 #include <openvdb/Exceptions.h>
 #include <openvdb/Types.h>
 #include <openvdb/tree/Tree.h>
+#include <openvdb/tools/ValueTransformer.h> // for tools::setValueOnMin() et al.
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
@@ -425,17 +426,17 @@ TestTreeGetSetValues::testSetActiveStates()
     ASSERT_DOUBLES_EXACTLY_EQUAL(val, tree.getValue(xyz));
 
     RESET_TREE();
-    tree.setValueOnMin(xyz, val);
+    tools::setValueOnMin(tree, xyz, val);
     CPPUNIT_ASSERT_EQUAL(expectedActiveCount, int(tree.activeVoxelCount()));
     ASSERT_DOUBLES_EXACTLY_EQUAL(std::min(val, background), tree.getValue(xyz));
 
     RESET_TREE();
-    tree.setValueOnMax(xyz, val);
+    tools::setValueOnMax(tree, xyz, val);
     CPPUNIT_ASSERT_EQUAL(expectedActiveCount, int(tree.activeVoxelCount()));
     ASSERT_DOUBLES_EXACTLY_EQUAL(std::max(val, background), tree.getValue(xyz));
 
     RESET_TREE();
-    tree.setValueOnSum(xyz, val);
+    tools::setValueOnSum(tree, xyz, val);
     CPPUNIT_ASSERT_EQUAL(expectedActiveCount, int(tree.activeVoxelCount()));
     ASSERT_DOUBLES_EXACTLY_EQUAL(val + background, tree.getValue(xyz));
 

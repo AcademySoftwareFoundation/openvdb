@@ -267,7 +267,7 @@ public:
     // Tree methods
     //
     /// @brief Return @c true if the given tree has the same node and active value
-    /// topology as this tree (but possibly a different @c ValueType).
+    /// topology as this tree, whether or not it has the same @c ValueType.
     template<typename OtherRootNodeType>
     bool hasSameTopology(const Tree<OtherRootNodeType>& other) const;
 
@@ -337,39 +337,70 @@ public:
     template<typename AccessT> const ValueType& getValue(const Coord& xyz, AccessT&) const;
 
     /// @brief Return the tree depth (0 = root) at which the value of voxel (x, y, z) resides.
-    ///
-    /// If (x, y, z) isn't explicitly represented in the tree (i.e., it is implicitly
-    /// a background voxel), return -1.
+    /// @details If (x, y, z) isn't explicitly represented in the tree (i.e., it is
+    /// implicitly a background voxel), return -1.
     int getValueDepth(const Coord& xyz) const;
 
-    /// Set the value of the voxel at the given coordinates and mark the voxel as active.
-    void setValue(const Coord& xyz, const ValueType& value);
-    /// Set the value of the voxel at the given coordinates but preserve it active state.
+    /// Set the active state of the voxel at the given coordinates but don't change its value.
+    void setActiveState(const Coord& xyz, bool on);
+    /// Set the value of the voxel at the given coordinates but don't change its active state.
     void setValueOnly(const Coord& xyz, const ValueType& value);
-    /// @brief Set the value of the voxel at the given coordinates, mark the voxel as active,
-    /// and update the given accessor's node cache.
-    template<typename AccessT> void setValue(const Coord& xyz, const ValueType& value, AccessT&);
-    /// Mark the voxel at the given coordinates as active, but don't change its value.
+    /// Mark the voxel at the given coordinates as active but don't change its value.
     void setValueOn(const Coord& xyz);
     /// Set the value of the voxel at the given coordinates and mark the voxel as active.
     void setValueOn(const Coord& xyz, const ValueType& value);
-    /// @brief Set the value of the voxel at the given coordinates to the minimum
-    /// of its current value and the given value, and mark the voxel as active.
-    void setValueOnMin(const Coord& xyz, const ValueType& value);
-    /// @brief Set the value of the voxel at the given coordinates to the maximum
-    /// of its current value and the given value, and mark the voxel as active.
-    void setValueOnMax(const Coord& xyz, const ValueType& value);
-    /// @brief Set the value of the voxel at the given coordinates to the sum
-    /// of its current value and the given value, and mark the voxel as active.
-    void setValueOnSum(const Coord& xyz, const ValueType& value);
-
-    /// Mark the voxel at the given coordinates as inactive, but don't change its value.
+    /// Set the value of the voxel at the given coordinates and mark the voxel as active.
+    void setValue(const Coord& xyz, const ValueType& value);
+    /// @brief Set the value of the voxel at the given coordinates, mark the voxel as active,
+    /// and update the given accessor's node cache.
+    template<typename AccessT> void setValue(const Coord& xyz, const ValueType& value, AccessT&);
+    /// Mark the voxel at the given coordinates as inactive but don't change its value.
     void setValueOff(const Coord& xyz);
-    /// Change the value of the voxel at the given coordinates and mark the voxel as inactive.
+    /// Set the value of the voxel at the given coordinates and mark the voxel as inactive.
     void setValueOff(const Coord& xyz, const ValueType& value);
 
-    /// Set the active state of the voxel at the given coordinates, but don't change its value.
-    void setActiveState(const Coord& xyz, bool on);
+    /// @brief Apply a functor to the value of the voxel at the given coordinates
+    /// and mark the voxel as active.
+    /// @details Provided that the functor can be inlined, this is typically
+    /// significantly faster than calling getValue() followed by setValueOn().
+    /// @param xyz  the coordinates of a voxel whose value is to be modified
+    /// @param op   a functor of the form <tt>void op(ValueType&) const</tt> that modifies
+    ///             its argument in place
+    /// @par Example:
+    /// @code
+    /// Coord xyz(1, 0, -2);
+    /// // Multiply the value of a voxel by a constant and mark the voxel as active.
+    /// floatTree.modifyValue(xyz, [](float& f) { f *= 0.25; }); // C++11
+    /// // Set the value of a voxel to the maximum of its current value and 0.25,
+    /// // and mark the voxel as active.
+    /// floatTree.modifyValue(xyz, [](float& f) { f = std::max(f, 0.25f); }); // C++11
+    /// @endcode
+    /// @note The functor is not guaranteed to be called only once.
+    /// @see tools::foreach()
+    template<typename ModifyOp>
+    void modifyValue(const Coord& xyz, const ModifyOp& op);
+
+    /// @brief Apply a functor to the voxel at the given coordinates.
+    /// @details Provided that the functor can be inlined, this is typically
+    /// significantly faster than calling getValue() followed by setValue().
+    /// @param xyz  the coordinates of a voxel to be modified
+    /// @param op   a functor of the form <tt>void op(ValueType&, bool&) const</tt> that
+    ///             modifies its arguments, a voxel's value and active state, in place
+    /// @par Example:
+    /// @code
+    /// Coord xyz(1, 0, -2);
+    /// // Multiply the value of a voxel by a constant and mark the voxel as inactive.
+    /// floatTree.modifyValueAndActiveState(xyz,
+    ///     [](float& f, bool& b) { f *= 0.25; b = false; }); // C++11
+    /// // Set the value of a voxel to the maximum of its current value and 0.25,
+    /// // but don't change the voxel's active state.
+    /// floatTree.modifyValueAndActiveState(xyz,
+    ///     [](float& f, bool&) { f = std::max(f, 0.25f); }); // C++11
+    /// @endcode
+    /// @note The functor is not guaranteed to be called only once.
+    /// @see tools::foreach()
+    template<typename ModifyOp>
+    void modifyValueAndActiveState(const Coord& xyz, const ModifyOp& op);
 
     /// @brief Get the value of the voxel at the given coordinates.
     /// @return @c true if the value is active.
@@ -414,13 +445,12 @@ public:
     /// background tiles any nodes whose values are all inactive.
     void pruneInactive();
 
-    /// @brief Prune any descendants whose values are all inactive and replace them
-    /// with inactive tiles having a values equal to the first value
-    /// encountered in the (inactive) child.
-    ///
-    /// @note This method is faster then tolerance based prune and
+    /// @brief Reduce the memory footprint of this tree by replacing nodes
+    /// whose values are all inactive with inactive tiles having a value equal to
+    /// the first value encountered in the (inactive) child.
+    /// @details This method is faster than tolerance-based prune and
     /// useful for narrow-band level set applications where inactive
-    /// values are limited to either an inside or outside value.
+    /// values are limited to either an inside or an outside value.
     void pruneLevelSet();
 
     /// @brief Add the given leaf node to this tree, creating a new branch if necessary.
@@ -441,37 +471,30 @@ public:
     template<typename NodeT>
     NodeT* stealNode(const Coord& xyz, const ValueType& value, bool active);
 
-    /// @brief @return the leaf node that contains voxel (x, y, z) and
-    /// if it doesn't exist, create it, but preserve the values and
+    /// @brief Return a pointer to the leaf node that contains voxel (x, y, z).
+    /// If no such node exists, create one that preserves the values and
     /// active states of all voxels.
-    ///
-    /// Use this method to preallocate a static tree topology over which to
+    /// @details Use this method to preallocate a static tree topology over which to
     /// safely perform multithreaded processing.
     LeafNodeType* touchLeaf(const Coord& xyz);
 
-    /// @brief @return a pointer to the node of the specified type that contains
-    /// voxel (x, y, z) and if it doesn't exist, return NULL.
-    template<typename NodeType>
-    NodeType* probeNode(const Coord& xyz);
+    //@{
+    /// @brief Return a pointer to the node of type @c NodeType that contains
+    /// voxel (x, y, z).  If no such node exists, return NULL.
+    template<typename NodeType> NodeType* probeNode(const Coord& xyz);
+    template<typename NodeType> const NodeType* probeConstNode(const Coord& xyz) const;
+    template<typename NodeType> const NodeType* probeNode(const Coord& xyz) const;
+    //@}
 
-    /// @brief @return a pointer to the leaf node that contains
-    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    //@{
+    /// @brief Return a pointer to the leaf node that contains voxel (x, y, z).
+    /// If no such node exists, return NULL.
     LeafNodeType* probeLeaf(const Coord& xyz);
-
-    /// @brief @return a const pointer to the leaf node that contains
-    /// voxel (x, y, z) and if it doesn't exist, return NULL.
     const LeafNodeType* probeConstLeaf(const Coord& xyz) const;
     const LeafNodeType* probeLeaf(const Coord& xyz) const { return this->probeConstLeaf(xyz); }
+    //@}
 
-    /// @brief @return a const pointer to the node of the specified type that contains
-    /// voxel (x, y, z) and if it doesn't exist, return NULL.
-    template<typename NodeType>
-    const NodeType* probeConstNode(const Coord& xyz) const;
-    template<typename NodeType>
-    const NodeType* probeNode(const Coord& xyz) const
-    {
-        return this->template probeConstNode<NodeType>(xyz);
-    }
+
     //
     // Aux methods
     //
@@ -503,8 +526,6 @@ public:
 
     /// Return this tree's background value.
     const ValueType& background() const { return mRoot.background(); }
-    /// @deprecated Use background()
-    OPENVDB_DEPRECATED ValueType getBackground() const { return mRoot.background(); }
     /// Replace this tree's background value.
     void setBackground(const ValueType& background) { mRoot.setBackground(background); }
 
@@ -514,27 +535,27 @@ public:
     /// @brief Set the values of all inactive voxels and tiles of a narrow-band
     /// level set from the signs of the active voxels, setting outside values to
     /// +background and inside values to -background.
-    ///
-    /// @note This method should only be used on closed, narrow-band level sets!
+    /// @warning This method should only be used on closed, narrow-band level sets.
     void signedFloodFill() { mRoot.signedFloodFill(); }
 
     /// @brief Set the values of all inactive voxels and tiles of a narrow-band
     /// level set from the signs of the active voxels, setting exterior values to
     /// @a outside and interior values to @a inside.  Set the background value
     /// of this tree to @a outside.
-    ///
-    /// @note This method should only be used on closed, narrow-band level sets!
+    /// @warning This method should only be used on closed, narrow-band level sets.
     void signedFloodFill(const ValueType& outside, const ValueType& inside);
 
-    /// Move child nodes from the other tree into this tree wherever those nodes
-    /// correspond to constant-value tiles in this tree, and replace leaf-level
-    /// inactive voxels in this tree with corresponding voxels in the other tree
-    /// that are active.
-    /// @note This operation always empties the other tree.
-    void merge(Tree& other);
-
-    /// Turns active tiles into dense voxels, i.e. active leaf nodes
+    /// Densify active tiles, i.e., replace them with leaf-level active voxels.
     void voxelizeActiveTiles();
+
+    /// @brief Efficiently merge another tree into this tree using one of several schemes.
+    /// @details This operation is primarily intended to combine trees that are mostly
+    /// non-overlapping (for example, intermediate trees from computations that are
+    /// parallelized across disjoint regions of space).
+    /// @note This operation is not guaranteed to produce an optimally sparse tree.
+    /// Follow merge() with prune() for optimal sparseness.
+    /// @warning This operation always empties the other tree.
+    void merge(Tree& other, MergePolicy = MERGE_ACTIVE_STATES);
 
     /// @brief Union this tree's set of active values with the active values
     /// of the other tree, whose @c ValueType may be different.
@@ -1372,26 +1393,20 @@ Tree<RootNodeType>::setValueOn(const Coord& xyz, const ValueType& value)
 
 
 template<typename RootNodeType>
+template<typename ModifyOp>
 inline void
-Tree<RootNodeType>::setValueOnMin(const Coord& xyz, const ValueType& value)
+Tree<RootNodeType>::modifyValue(const Coord& xyz, const ModifyOp& op)
 {
-    mRoot.setValueOnMin(xyz, value);
+    mRoot.modifyValue(xyz, op);
 }
 
 
 template<typename RootNodeType>
+template<typename ModifyOp>
 inline void
-Tree<RootNodeType>::setValueOnMax(const Coord& xyz, const ValueType& value)
+Tree<RootNodeType>::modifyValueAndActiveState(const Coord& xyz, const ModifyOp& op)
 {
-    mRoot.setValueOnMax(xyz, value);
-}
-
-
-template<typename RootNodeType>
-inline void
-Tree<RootNodeType>::setValueOnSum(const Coord& xyz, const ValueType& value)
-{
-    mRoot.setValueOnSum(xyz, value);
+    mRoot.modifyValueAndActiveState(xyz, op);
 }
 
 
@@ -1459,6 +1474,7 @@ Tree<RootNodeType>::addTile(Index level, const Coord& xyz,
     mRoot.addTile(level, xyz, value, active);
 }
 
+
 template<typename RootNodeType>
 template<typename NodeT>
 inline NodeT*
@@ -1467,6 +1483,7 @@ Tree<RootNodeType>::stealNode(const Coord& xyz, const ValueType& value, bool act
     this->clearAllAccessors();
     return mRoot.template stealNode<NodeT>(xyz, value, active);
 }
+
 
 template<typename RootNodeType>
 inline typename RootNodeType::LeafNodeType*
@@ -1483,6 +1500,15 @@ Tree<RootNodeType>::probeLeaf(const Coord& xyz)
     return mRoot.probeLeaf(xyz);
 }
 
+
+template<typename RootNodeType>
+inline const typename RootNodeType::LeafNodeType*
+Tree<RootNodeType>::probeConstLeaf(const Coord& xyz) const
+{
+    return mRoot.probeConstLeaf(xyz);
+}
+
+
 template<typename RootNodeType>
 template<typename NodeType>
 inline NodeType*
@@ -1493,11 +1519,13 @@ Tree<RootNodeType>::probeNode(const Coord& xyz)
 
 
 template<typename RootNodeType>
-inline const typename RootNodeType::LeafNodeType*
-Tree<RootNodeType>::probeConstLeaf(const Coord& xyz) const
+template<typename NodeType>
+inline const NodeType*
+Tree<RootNodeType>::probeNode(const Coord& xyz) const
 {
-    return mRoot.probeConstLeaf(xyz);
+    return this->template probeConstNode<NodeType>(xyz);
 }
+
 
 template<typename RootNodeType>
 template<typename NodeType>
@@ -1506,6 +1534,7 @@ Tree<RootNodeType>::probeConstNode(const Coord& xyz) const
 {
     return mRoot.template probeConstNode<NodeType>(xyz);
 }
+
 
 ////////////////////////////////////////
 
@@ -1548,20 +1577,27 @@ Tree<RootNodeType>::getBackgroundValue() const
 
 template<typename RootNodeType>
 inline void
-Tree<RootNodeType>::merge(Tree& other)
+Tree<RootNodeType>::voxelizeActiveTiles()
 {
     this->clearAllAccessors();
-    other.clearAllAccessors();
-    mRoot.merge(other.mRoot);
+    mRoot.voxelizeActiveTiles();
 }
 
 
 template<typename RootNodeType>
 inline void
-Tree<RootNodeType>::voxelizeActiveTiles()
+Tree<RootNodeType>::merge(Tree& other, MergePolicy policy)
 {
     this->clearAllAccessors();
-    mRoot.voxelizeActiveTiles();
+    other.clearAllAccessors();
+    switch (policy) {
+        case MERGE_ACTIVE_STATES:
+            mRoot.template merge<MERGE_ACTIVE_STATES>(other.mRoot); break;
+        case MERGE_NODES:
+            mRoot.template merge<MERGE_NODES>(other.mRoot); break;
+        case MERGE_ACTIVE_STATES_AND_NODES:
+            mRoot.template merge<MERGE_ACTIVE_STATES_AND_NODES>(other.mRoot); break;
+    }
 }
 
 

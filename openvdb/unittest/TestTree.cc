@@ -34,6 +34,7 @@
 #include <openvdb/Exceptions.h>
 #include <openvdb/Types.h>
 #include <openvdb/math/Transform.h>
+#include <openvdb/tools/ValueTransformer.h> // for tools::setValueOnMin(), et al.
 #include <openvdb/tree/LeafNode.h>
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/io/Compression.h> // for io::RealToHalf
@@ -116,6 +117,7 @@ public:
 
 private:
     template<class TreeType> void testWriteHalf();
+    template<class TreeType> void doTestMerge(openvdb::MergePolicy);
 };
 
 
@@ -308,14 +310,20 @@ TestTree::testSetValue()
     CPPUNIT_ASSERT(tree.isValueOn(c0));
     CPPUNIT_ASSERT(tree.isValueOn(c1));
 
-    tree.setValueOnMin(c0, 15.0);
-    tree.setValueOnMin(c1, 15.0);
+    struct Local {
+        static inline void minOp(float& f, bool& b) { f = std::min(f, 15.f); b = true; }
+        static inline void maxOp(float& f, bool& b) { f = std::max(f, 12.f); b = true; }
+        static inline void sumOp(float& f, bool& b) { f += /*background=*/5.f; b = true; }
+    };
+
+    openvdb::tools::setValueOnMin(tree, c0, 15.0);
+    tree.modifyValueAndActiveState(c1, Local::minOp);
 
     ASSERT_DOUBLES_EXACTLY_EQUAL(10.0, tree.getValue(c0));
     ASSERT_DOUBLES_EXACTLY_EQUAL(15.0, tree.getValue(c1));
 
-    tree.setValueOnMax(c0, 12.0);
-    tree.setValueOnMax(c1, 12.0);
+    openvdb::tools::setValueOnMax(tree, c0, 12.0);
+    tree.modifyValueAndActiveState(c1, Local::maxOp);
 
     ASSERT_DOUBLES_EXACTLY_EQUAL(12.0, tree.getValue(c0));
     ASSERT_DOUBLES_EXACTLY_EQUAL(15.0, tree.getValue(c1));
@@ -332,8 +340,8 @@ TestTree::testSetValue()
     ASSERT_DOUBLES_EXACTLY_EQUAL(15.0, tree.getValue(c1));
     CPPUNIT_ASSERT_EQUAL(1, int(tree.activeVoxelCount()));
 
-    tree.setValueOnSum(c0, background);
-    tree.setValueOnSum(c1, background);
+    openvdb::tools::setValueOnSum(tree, c0, background);
+    tree.modifyValueAndActiveState(c1, Local::sumOp);
 
     ASSERT_DOUBLES_EXACTLY_EQUAL(2*background, tree.getValue(c0));
     ASSERT_DOUBLES_EXACTLY_EQUAL(15.0+background, tree.getValue(c1));
@@ -1006,7 +1014,7 @@ TestTree::testMerge()
     CPPUNIT_ASSERT(tree0.leafCount()!=tree2.leafCount());
 
     CPPUNIT_ASSERT(!tree2.empty());
-    tree1.merge(tree2);
+    tree1.merge(tree2, openvdb::MERGE_ACTIVE_STATES);
     CPPUNIT_ASSERT(tree2.empty());
     CPPUNIT_ASSERT(tree0.leafCount()==tree1.leafCount());
     CPPUNIT_ASSERT(tree0.nonLeafCount()==tree1.nonLeafCount());
@@ -1027,15 +1035,100 @@ TestTree::testMerge()
         treeA.fill(CoordBBox(Coord(16,16,16), Coord(31,31,31)), /*value*/1.0);
         treeB.fill(CoordBBox(Coord(0,0,0),    Coord(15,15,15)), /*value*/1.0);
 
-        CPPUNIT_ASSERT(4096 == treeA.activeVoxelCount());
-        CPPUNIT_ASSERT(4096 == treeB.activeVoxelCount());
+        CPPUNIT_ASSERT_EQUAL(4096, int(treeA.activeVoxelCount()));
+        CPPUNIT_ASSERT_EQUAL(4096, int(treeB.activeVoxelCount()));
 
-        treeA.merge(treeB);
+        treeA.merge(treeB, MERGE_ACTIVE_STATES);
 
-        CPPUNIT_ASSERT(8192 == treeA.activeVoxelCount());
-        CPPUNIT_ASSERT(0 == treeB.activeVoxelCount());
+        CPPUNIT_ASSERT_EQUAL(8192, int(treeA.activeVoxelCount()));
+        CPPUNIT_ASSERT_EQUAL(0, int(treeB.activeVoxelCount()));
     }
 
+    doTestMerge<openvdb::FloatTree>(openvdb::MERGE_NODES);
+    doTestMerge<openvdb::FloatTree>(openvdb::MERGE_ACTIVE_STATES);
+    doTestMerge<openvdb::FloatTree>(openvdb::MERGE_ACTIVE_STATES_AND_NODES);
+
+    doTestMerge<openvdb::BoolTree>(openvdb::MERGE_NODES);
+    doTestMerge<openvdb::BoolTree>(openvdb::MERGE_ACTIVE_STATES);
+    doTestMerge<openvdb::BoolTree>(openvdb::MERGE_ACTIVE_STATES_AND_NODES);
+}
+
+
+template<typename TreeType>
+void
+TestTree::doTestMerge(openvdb::MergePolicy policy)
+{
+    using namespace openvdb;
+
+    TreeType treeA, treeB;
+
+    typedef typename TreeType::RootNodeType RootT;
+    typedef typename TreeType::LeafNodeType LeafT;
+
+    const typename TreeType::ValueType val(1);
+    const int
+        depth = static_cast<int>(treeA.treeDepth()),
+        leafDim = static_cast<int>(LeafT::dim()),
+        leafSize = static_cast<int>(LeafT::size());
+    // Coords that are in a different top-level branch than (0, 0, 0)
+    const Coord pos(static_cast<int>(RootT::getChildDim()));
+
+    treeA.setValueOff(pos, val);
+    treeA.setValueOff(-pos, val);
+
+    treeB.setValueOff(Coord(0), val);
+    treeB.fill(CoordBBox(pos, pos.offsetBy(leafDim - 1)), val, /*active=*/true);
+    treeB.setValueOn(-pos, val);
+
+    //      treeA                  treeB            .
+    //                                              .
+    //        R                      R              .
+    //       / \                    /|\             .
+    //      I   I                  I I I            .
+    //     /     \                /  |  \           .
+    //    I       I              I   I   I          .
+    //   /         \            /    | on x SIZE    .
+    //  L           L          L     L              .
+    // off         off        on    off             .
+
+    CPPUNIT_ASSERT_EQUAL(0, int(treeA.activeVoxelCount()));
+    CPPUNIT_ASSERT_EQUAL(leafSize + 1, int(treeB.activeVoxelCount()));
+    CPPUNIT_ASSERT_EQUAL(2, int(treeA.leafCount()));
+    CPPUNIT_ASSERT_EQUAL(2, int(treeB.leafCount()));
+    CPPUNIT_ASSERT_EQUAL(2*(depth-2)+1, int(treeA.nonLeafCount())); // 2 branches (II+II+R)
+    CPPUNIT_ASSERT_EQUAL(3*(depth-2)+1, int(treeB.nonLeafCount())); // 3 branches (II+II+II+R)
+
+    treeA.merge(treeB, policy);
+
+    //   MERGE_NODES    MERGE_ACTIVE_STATES  MERGE_ACTIVE_STATES_AND_NODES  .
+    //                                                                      .
+    //        R                  R                         R                .
+    //       /|\                /|\                       /|\               .
+    //      I I I              I I I                     I I I              .
+    //     /  |  \            /  |  \                   /  |  \             .
+    //    I   I   I          I   I   I                 I   I   I            .
+    //   /    |    \        /    | on x SIZE          /    |    \           .
+    //  L     L     L      L     L                   L     L     L          .
+    // off   off   off    on    off                 on    off  on x SIZE    .
+
+    switch (policy) {
+    case MERGE_NODES:
+        CPPUNIT_ASSERT_EQUAL(0, int(treeA.activeVoxelCount()));
+        CPPUNIT_ASSERT_EQUAL(2 + 1, int(treeA.leafCount())); // 1 leaf node stolen from B
+        CPPUNIT_ASSERT_EQUAL(3*(depth-2)+1, int(treeA.nonLeafCount())); // 3 branches (II+II+II+R)
+        break;
+    case MERGE_ACTIVE_STATES:
+        CPPUNIT_ASSERT_EQUAL(2, int(treeA.leafCount())); // 1 leaf stolen, 1 replaced with tile
+        CPPUNIT_ASSERT_EQUAL(3*(depth-2)+1, int(treeA.nonLeafCount())); // 3 branches (II+II+II+R)
+        CPPUNIT_ASSERT_EQUAL(leafSize + 1, int(treeA.activeVoxelCount()));
+        break;
+    case MERGE_ACTIVE_STATES_AND_NODES:
+        CPPUNIT_ASSERT_EQUAL(2 + 1, int(treeA.leafCount())); // 1 leaf node stolen from B
+        CPPUNIT_ASSERT_EQUAL(3*(depth-2)+1, int(treeA.nonLeafCount())); // 3 branches (II+II+II+R)
+        CPPUNIT_ASSERT_EQUAL(leafSize + 1, int(treeA.activeVoxelCount()));
+        break;
+    }
+    CPPUNIT_ASSERT(treeB.empty());
 }
 
 
@@ -1861,12 +1954,12 @@ TestTree::testStealNode()
         CPPUNIT_ASSERT(!tree.isValueOn(xyz));
         CPPUNIT_ASSERT_DOUBLES_EQUAL(background, tree.getValue(xyz), epsilon);
         CPPUNIT_ASSERT(tree.root().stealNode<NodeT>(xyz, value, false)==NULL);
-        
+
         tree.setValue(xyz, value);
         CPPUNIT_ASSERT_EQUAL(Index(1), tree.leafCount());
         CPPUNIT_ASSERT(tree.isValueOn(xyz));
         CPPUNIT_ASSERT_DOUBLES_EQUAL(value, tree.getValue(xyz), epsilon);
-        
+
         NodeT* node = tree.root().stealNode<NodeT>(xyz, background, false);
         CPPUNIT_ASSERT(node != NULL);
         CPPUNIT_ASSERT_EQUAL(Index(0), tree.leafCount());
@@ -1886,12 +1979,12 @@ TestTree::testStealNode()
         CPPUNIT_ASSERT(!tree.isValueOn(xyz));
         CPPUNIT_ASSERT_DOUBLES_EQUAL(background, tree.getValue(xyz), epsilon);
         CPPUNIT_ASSERT(tree.root().stealNode<NodeT>(xyz, value, false)==NULL);
-        
+
         tree.setValue(xyz, value);
         CPPUNIT_ASSERT_EQUAL(Index(1), tree.leafCount());
         CPPUNIT_ASSERT(tree.isValueOn(xyz));
         CPPUNIT_ASSERT_DOUBLES_EQUAL(value, tree.getValue(xyz), epsilon);
-        
+
         NodeT* node = tree.root().stealNode<NodeT>(xyz, background, false);
         CPPUNIT_ASSERT(node != NULL);
         CPPUNIT_ASSERT_EQUAL(Index(0), tree.leafCount());
@@ -1911,12 +2004,12 @@ TestTree::testStealNode()
         CPPUNIT_ASSERT(!tree.isValueOn(xyz));
         CPPUNIT_ASSERT_DOUBLES_EQUAL(background, tree.getValue(xyz), epsilon);
         CPPUNIT_ASSERT(tree.root().stealNode<NodeT>(xyz, value, false)==NULL);
-        
+
         tree.setValue(xyz, value);
         CPPUNIT_ASSERT_EQUAL(Index(1), tree.leafCount());
         CPPUNIT_ASSERT(tree.isValueOn(xyz));
         CPPUNIT_ASSERT_DOUBLES_EQUAL(value, tree.getValue(xyz), epsilon);
-        
+
         NodeT* node = tree.root().stealNode<NodeT>(xyz, background, false);
         CPPUNIT_ASSERT(node != NULL);
         CPPUNIT_ASSERT_EQUAL(Index(0), tree.leafCount());

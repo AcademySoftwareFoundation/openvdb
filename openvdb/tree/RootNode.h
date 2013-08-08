@@ -58,10 +58,7 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tree {
 
-/// @brief Helper class for compile-time construction of an inverted chain of
-/// the tree nodes, i.e. the first element is a LeafNode and the last
-/// element is of the type HeadType.
-template<typename HeadType, int HeadLevel> struct NodeChain;
+template<typename HeadType, int HeadLevel> struct NodeChain; // forward declaration
 
 template<typename ChildType>
 class RootNode
@@ -73,7 +70,7 @@ public:
 
     static const Index LEVEL = 1 + ChildType::LEVEL; // level 0 = leaf
 
-    /// Define a vector of node types, where the first element is a LeafNodeType
+    /// NodeChainType is a list of this tree's node types, from LeafNodeType to RootNode.
     typedef typename NodeChain<RootNode, LEVEL>::Type NodeChainType;
     BOOST_STATIC_ASSERT(boost::mpl::size<NodeChainType>::value == LEVEL + 1);
 
@@ -93,14 +90,10 @@ public:
 
     RootNode(const RootNode& other) { *this = other; }
 
-    /// @brief Topology copy constructor that guarantees the
-    /// configuration of the constructed tree is topologically
-    /// identical to the other tree
-    ///
-    /// @details Reproduce the topology and active states of the other tree
-    /// (which may have a different ValueType), but don't copy values.
-    /// All values that are active in the other tree are set to the foreground value
-    /// and all other values to the background value.
+    /// @brief Construct a new tree that reproduces the topology and active states of
+    /// another tree (which may have a different ValueType), but not the other tree's values.
+    /// @details All tiles and voxels that are active in the other tree are set to
+    /// @a foreground in the new tree, and all inactive tiles and voxels are set to @a background.
     /// @param other       the root node of a tree having (possibly) a different ValueType
     /// @param background  the value to which inactive tiles and voxels are initialized
     /// @param foreground  the value to which active tiles and voxels are initialized
@@ -109,24 +102,17 @@ public:
         const ValueType& background, const ValueType& foreground,
              TopologyCopy);
 
-    /// @brief Topology copy constructor that guarantees the
-    /// configuration of the constructed tree is topologically
-    /// identical to the other tree
-    ///
-    /// @note this copy constructor is generally faster then the one
-    /// above that takes both a forground and a background value. Its
-    /// main application is multithreading where the topology of
-    /// the output tree exactly matches the input tree.
-    ///
-    /// @details Reproduce the topology and active states of the other node
-    /// (which may have a different ValueType), but don't copy values.
-    /// All values in the constructed tree are set to the background value
-    /// regardless of their active states.
+    /// @brief Construct a new tree that reproduces the topology and active states of
+    /// another tree (which may have a different ValueType), but not the other tree's values.
+    /// All tiles and voxels in the new tree are set to @a background regardless of
+    /// their active states in the other tree.
     /// @param other       the root node of a tree having (possibly) a different ValueType
     /// @param background  the value to which inactive tiles and voxels are initialized
+    /// @note This copy constructor is generally faster than the one that takes both
+    /// a foreground and a background value.  Its main application is in multithreaded
+    /// operations where the topology of the output tree exactly matches the input tree.
     template<typename OtherChildType>
-    RootNode(const RootNode<OtherChildType>& other, const ValueType& background,
-             TopologyCopy);
+    RootNode(const RootNode<OtherChildType>& other, const ValueType& background, TopologyCopy);
 
     RootNode& operator=(const RootNode& other);
 
@@ -140,7 +126,7 @@ private:
         bool      active;
     };
 
-    // This lightweight struct pairs child pointers and tiles
+    // This lightweight struct pairs child pointers and tiles.
     struct NodeStruct {
         ChildType* child;
         Tile       tile;
@@ -407,10 +393,8 @@ public:
     /// old background to the specified value (with the same sign). Active values
     /// are unchanged.
     void setBackground(const ValueType& value);
-    /// Return the background value
+    /// Return this node's background value.
     const ValueType& background() const { return mBackground; }
-    /// @deprecated Use background()
-    OPENVDB_DEPRECATED ValueType getBackground() const { return mBackground; }
 
     /// Return @c true if the given tile is inactive and has the background value.
     bool isBackgroundTile(const Tile&) const;
@@ -481,36 +465,41 @@ public:
     /// it is implicitly a background voxel), return -1.
     int getValueDepth(const Coord& xyz) const;
 
-    /// Set the active state of the voxel at the given coordinates, but don't change its value.
+    /// Set the active state of the voxel at the given coordinates but don't change its value.
     void setActiveState(const Coord& xyz, bool on);
-
-    /// Mark the voxel at the given coordinates as inactive, but don't change its value.
+    /// Set the value of the voxel at the given coordinates but don't change its active state.
+    void setValueOnly(const Coord& xyz, const ValueType& value);
+    /// Set the value of the voxel at the given coordinates and mark the voxel as active.
+    void setValueOn(const Coord& xyz, const ValueType& value);
+    /// Mark the voxel at the given coordinates as inactive but don't change its value.
     void setValueOff(const Coord& xyz);
-    /// Change the value of the voxel at the given coordinates and mark the voxel as inactive.
+    /// Set the value of the voxel at the given coordinates and mark the voxel as inactive.
     void setValueOff(const Coord& xyz, const ValueType& value);
 
-    void setValueOn(const Coord& xyz, const ValueType& value);
-    void setValueOnly(const Coord& xyz, const ValueType& value);
-    void setValueOnMin(const Coord& xyz, const ValueType& value);
-    void setValueOnMax(const Coord& xyz, const ValueType& value);
-    void setValueOnSum(const Coord& xyz, const ValueType& value);
+    /// @brief Apply a functor to the value of the voxel at the given coordinates
+    /// and mark the voxel as active.
+    template<typename ModifyOp>
+    void modifyValue(const Coord& xyz, const ModifyOp& op);
+    /// Apply a functor to the voxel at the given coordinates.
+    template<typename ModifyOp>
+    void modifyValueAndActiveState(const Coord& xyz, const ModifyOp& op);
 
     /// @brief Set all voxels within a given box to a constant value, if necessary
     /// subdividing tiles that intersect the box.
-    /// @param bbox           inclusive coordinates of opposite corners of an axis-aligned box
-    /// @param value          the value to which to set voxels within the box
-    /// @param active         if true, mark voxels within the box as active,
-    ///                       otherwise mark them as inactive
+    /// @param bbox    inclusive coordinates of opposite corners of an axis-aligned box
+    /// @param value   the value to which to set voxels within the box
+    /// @param active  if true, mark voxels within the box as active,
+    ///                otherwise mark them as inactive
     void fill(const CoordBBox& bbox, const ValueType& value, bool active = true);
 
     /// @brief Copy into a dense grid the values of all voxels, both active and inactive,
     /// that intersect a given bounding box.
-    ///
     /// @param bbox   inclusive bounding box of the voxels to be copied into the dense grid
     /// @param dense  dense grid with a stride in @e z of one (see tools::Dense
     ///               in tools/Dense.h for the required API)
     template<typename DenseT>
     void copyToDense(const CoordBBox& bbox, DenseT& dense) const;
+
 
     //
     // I/O
@@ -521,6 +510,10 @@ public:
     void writeBuffers(std::ostream&, bool toHalf = false) const;
     void readBuffers(std::istream&, bool fromHalf = false);
 
+
+    //
+    // Voxel access
+    //
     /// Return the value of the voxel at the given coordinates and, if necessary, update
     /// the accessor with pointers to the nodes along the path from the root node to
     /// the node containing the voxel.
@@ -541,20 +534,27 @@ public:
     template<typename AccessorT>
     void setValueAndCache(const Coord& xyz, const ValueType& value, AccessorT&);
 
-    /// Set the value of the voxel at the given coordinate but preserves its active state.
+    /// Set the value of the voxel at the given coordinates without changing its active state.
     /// If necessary, update the accessor with pointers to the nodes along the path
     /// from the root node to the node containing the voxel.
     /// @note Used internally by ValueAccessor.
     template<typename AccessorT>
     void setValueOnlyAndCache(const Coord& xyz, const ValueType& value, AccessorT&);
 
-    /// Set the value of the voxel at the given coordinates to the sum of its current
-    /// value and the given value, and mark the voxel as active.
+    /// Apply a functor to the value of the voxel at the given coordinates
+    /// and mark the voxel as active.
     /// If necessary, update the accessor with pointers to the nodes along the path
     /// from the root node to the node containing the voxel.
     /// @note Used internally by ValueAccessor.
-    template<typename AccessorT>
-    void setValueOnSumAndCache(const Coord& xyz, const ValueType& value, AccessorT&);
+    template<typename ModifyOp, typename AccessorT>
+    void modifyValueAndCache(const Coord& xyz, const ModifyOp& op, AccessorT&);
+
+    /// Apply a functor to the voxel at the given coordinates.
+    /// If necessary, update the accessor with pointers to the nodes along the path
+    /// from the root node to the node containing the voxel.
+    /// @note Used internally by ValueAccessor.
+    template<typename ModifyOp, typename AccessorT>
+    void modifyValueAndActiveStateAndCache(const Coord& xyz, const ModifyOp& op, AccessorT&);
 
     /// Change the value of the voxel at the given coordinates and mark it as inactive.
     /// If necessary, update the accessor with pointers to the nodes along the path
@@ -570,9 +570,10 @@ public:
     template<typename AccessorT>
     void setActiveStateAndCache(const Coord& xyz, bool on, AccessorT&);
 
-    /// Return @c true if the voxel at the given coordinates is active, assigns the voxel
-    /// value, and, if necessary, update the accessor with pointers to the nodes along
+    /// Return, in @a value, the value of the voxel at the given coordinates and,
+    /// if necessary, update the accessor with pointers to the nodes along
     /// the path from the root node to the node containing the voxel.
+    /// @return @c true if the voxel at the given coordinates is active
     /// @note Used internally by ValueAccessor.
     template<typename AccessorT>
     bool probeValueAndCache(const Coord& xyz, ValueType& value, AccessorT&) const;
@@ -606,13 +607,16 @@ public:
     /// background tiles any nodes whose values are all inactive.
     void pruneInactive();
 
-    void pruneTiles(const ValueType&);
+    /// @brief Reduce the memory footprint of this tree by replacing with tiles
+    /// any non-leaf nodes whose values are all the same (optionally to within a tolerance)
+    /// and have the same active state.
+    void pruneTiles(const ValueType& tolerance);
 
-    /// @brief Add the specified leaf to this node, possibly creating a child branch
-    /// in the process.  If the leaf node already exists, replace it.
+    /// @brief Add the given leaf node to this tree, creating a new branch if necessary.
+    /// If a leaf node with the same origin already exists, replace it.
     void addLeaf(LeafNodeType* leaf);
 
-    /// @brief Same as addLeaf except, if necessary, it update the accessor with pointers
+    /// @brief Same as addLeaf() but, if necessary, update the given accessor with pointers
     /// to the nodes along the path from the root node to the node containing the coordinate.
     template<typename AccessorT>
     void addLeafAndCache(LeafNodeType* leaf, AccessorT&);
@@ -628,106 +632,93 @@ public:
     template<typename NodeT>
     NodeT* stealNode(const Coord& xyz, const ValueType& value, bool state);
 
-    /// @brief Add a tile at the specified tree level that contains voxel (x, y, z),
-    /// possibly creating a parent branch or deleting a child branch in the process.
+    /// @brief Add a tile containing voxel (x, y, z) at the specified tree level,
+    /// creating a new branch if necessary.  Delete any existing lower-level nodes
+    /// that contain (x, y, z).
     void addTile(Index level, const Coord& xyz, const ValueType& value, bool state);
 
-    /// @brief Same as addTile() except, if necessary, update the accessor with pointers
-    /// to the nodes along the path from the root node to the node containing (x, y, z).
+    /// @brief Same as addTile() but, if necessary, update the given accessor with pointers
+    /// to the nodes along the path from the root node to the node containing the coordinate.
     template<typename AccessorT>
-    void addTileAndCache(Index level, const Coord& xyz, const ValueType& value,
-        bool state, AccessorT&);
+    void addTileAndCache(Index level, const Coord& xyz, const ValueType&, bool state, AccessorT&);
 
-    /// @brief Return the leaf node that contains voxel (x, y, z).
-    /// If no such node exists, create one, but preserve the values and
+    /// @brief Return a pointer to the leaf node that contains voxel (x, y, z).
+    /// If no such node exists, create one that preserves the values and
     /// active states of all voxels.
-    ///
     /// @details Use this method to preallocate a static tree topology
     /// over which to safely perform multithreaded processing.
     LeafNodeType* touchLeaf(const Coord& xyz);
 
-    /// @brief Same as touchLeaf except, if necessary, it update the accessor with pointers
+    /// @brief Same as touchLeaf() but, if necessary, update the given accessor with pointers
     /// to the nodes along the path from the root node to the node containing the coordinate.
     template<typename AccessorT>
     LeafNodeType* touchLeafAndCache(const Coord& xyz, AccessorT& acc);
 
+    //@{
     /// @brief Return a pointer to the node that contains voxel (x, y, z).
     /// If no such node exists, return NULL.
     template <typename NodeT>
     NodeT* probeNode(const Coord& xyz);
     template <typename NodeT>
     const NodeT* probeConstNode(const Coord& xyz) const;
+    //@}
 
-    /// @brief Same as probeNode except, if necessary, it update the accessor with pointers
-    /// to the nodes along the path from the root node to the node
-    /// containing the coordinate.
+    //@{
+    /// @brief Same as probeNode() but, if necessary, update the given accessor with pointers
+    /// to the nodes along the path from the root node to the node containing the coordinate.
     template<typename NodeT, typename AccessorT>
     NodeT* probeNodeAndCache(const Coord& xyz, AccessorT& acc);
-
-    /// @brief Same as probeConstNode except, if necessary, it update the accessor with pointers
-    /// to the nodes along the path from the root node to the node containing the coordinate.
     template<typename NodeT, typename AccessorT>
     const NodeT* probeConstNodeAndCache(const Coord& xyz, AccessorT& acc) const;
+    //@}
 
+    //@{
     /// @brief Return a pointer to the leaf node that contains voxel (x, y, z).
     /// If no such node exists, return NULL.
-    LeafNodeType* probeLeaf(const Coord& xyz) {return this->template probeNode<LeafNodeType>(xyz);}
+    LeafNodeType* probeLeaf(const Coord& xyz);
+    const LeafNodeType* probeConstLeaf(const Coord& xyz) const;
+    const LeafNodeType* probeLeaf(const Coord& xyz) const;
+    //@}
 
-    /// @brief Return a const pointer to the leaf node that contains voxel (x, y, z).
-    /// If no such node exists, return NULL.
-    const LeafNodeType* probeConstLeaf(const Coord& xyz) const
-    {
-        return this->template probeConstNode<LeafNodeType>(xyz);
-    }
-    /// @brief Same as probeConstLeaf
-    const LeafNodeType* probeLeaf(const Coord& xyz) const { return this->probeConstLeaf(xyz); }
-
-    /// @brief Same as probeLeaf except, if necessary, it update the accessor with pointers
+    //@{
+    /// @brief Same as probeLeaf() but, if necessary, update the given accessor with pointers
     /// to the nodes along the path from the root node to the node containing the coordinate.
     template<typename AccessorT>
-    LeafNodeType* probeLeafAndCache(const Coord& xyz, AccessorT& acc)
-    {
-        return this->template probeNodeAndCache<LeafNodeType>(xyz, acc);
-    }
-
-    /// @brief Same as probeConstLeaf except, if necessary, it update the accessor with pointers
-    /// to the nodes along the path from the root node to the node containing the coordinate.
+    LeafNodeType* probeLeafAndCache(const Coord& xyz, AccessorT& acc);
     template<typename AccessorT>
-    const LeafNodeType* probeConstLeafAndCache(const Coord& xyz, AccessorT& acc) const
-    {
-        return this->template probeConstNodeAndCache<LeafNodeType>(xyz, acc);
-    }
-    /// @brief Same as probeConstLeafAndCache
+    const LeafNodeType* probeConstLeafAndCache(const Coord& xyz, AccessorT& acc) const;
     template<typename AccessorT>
-    const LeafNodeType* probeLeafAndCache(const Coord& xyz, AccessorT& acc) const
-    {
-        return this->probeConstLeafAndCache(xyz, acc);
-    }
+    const LeafNodeType* probeLeafAndCache(const Coord& xyz, AccessorT& acc) const;
+    //@}
 
+
+    //
+    // Aux methods
+    //
     /// @brief Set the values of all inactive voxels and tiles of a narrow-band
     /// level set from the signs of the active voxels, setting outside values to
     /// +background and inside values to -background.
-    ///
-    /// @note This method should only be used on closed, narrow-band level sets!
+    /// @warning This method should only be used on closed, narrow-band level sets.
     void signedFloodFill();
 
     /// @brief Set the values of all inactive voxels and tiles of a narrow-band
     /// level set from the signs of the active voxels, setting exterior values to
     /// @a outside and interior values to @a inside.  Set the background value
     /// of this tree to @a outside.
-    ///
-    /// @note This method should only be used on closed, narrow-band level sets!
+    /// @warning This method should only be used on closed, narrow-band level sets.
     void signedFloodFill(const ValueType& outside, const ValueType& inside);
 
-    /// Move child nodes from the other tree into this tree wherever those nodes
-    /// correspond to constant-value tiles in this tree, and replace leaf-level
-    /// inactive voxels in this tree with corresponding voxels in the other tree
-    /// that are active.
-    /// @note This operation always empties the other tree, whether or not any nodes were moved.
-    void merge(RootNode& other);
-
-    /// Turn active tiles into dense voxels, i.e., into leaf nodes that are entirely active.
+    /// Densify active tiles, i.e., replace them with leaf-level active voxels.
     void voxelizeActiveTiles();
+
+    /// @brief Efficiently merge another tree into this tree using one of several schemes.
+    /// @details This operation is primarily intended to combine trees that are mostly
+    /// non-overlapping (for example, intermediate trees from computations that are
+    /// parallelized across disjoint regions of space).
+    /// @note This operation is not guaranteed to produce an optimally sparse tree.
+    /// Follow merge() with prune() for optimal sparseness.
+    /// @warning This operation always empties the other tree.
+    template<MergePolicy Policy> void merge(RootNode& other);
 
     /// @brief Union this tree's set of active values with the active values
     /// of the other tree, whose @c ValueType may be different.
@@ -752,11 +743,11 @@ public:
     void combine2(const RootNode& other0, const RootNode& other1,
                   CombineOp& op, bool prune = false);
 
-    /// @brief Calls the templated functor BBoxOp with bounding box
+    /// @brief Call the templated functor BBoxOp with bounding box
     /// information for all active tiles and leaf nodes in the tree.
     /// An additional level argument is provided for each callback.
     ///
-    /// @note The bounding boxes are guarenteed to be non-overlapping.
+    /// @note The bounding boxes are guaranteed to be non-overlapping.
     template<typename BBoxOp> void visitActiveBBox(BBoxOp&) const;
 
     template<typename VisitorOp> void visit(VisitorOp&);
@@ -1618,8 +1609,9 @@ RootNode<ChildT>::setValueOnlyAndCache(const Coord& xyz, const ValueType& value,
 
 
 template<typename ChildT>
+template<typename ModifyOp>
 inline void
-RootNode<ChildT>::setValueOnMin(const Coord& xyz, const ValueType& value)
+RootNode<ChildT>::modifyValue(const Coord& xyz, const ModifyOp& op)
 {
     ChildT* child = NULL;
     MapIter iter = this->findCoord(xyz);
@@ -1628,56 +1620,30 @@ RootNode<ChildT>::setValueOnMin(const Coord& xyz, const ValueType& value)
         mTable[this->coordToKey(xyz)] = NodeStruct(*child);
     } else if (isChild(iter)) {
         child = &getChild(iter);
-    } else if (isTileOff(iter) || getTile(iter).value > value) {
-        child = new ChildT(xyz, getTile(iter).value, isTileOn(iter));
-        setChild(iter, *child);
+    } else {
+        // Need to create a child if the tile is inactive,
+        // in order to activate voxel (x, y, z).
+        bool createChild = isTileOff(iter);
+        if (!createChild) {
+            // Need to create a child if applying the functor
+            // to the tile value produces a different value.
+            const ValueType& tileVal = getTile(iter).value;
+            ValueType modifiedVal = tileVal;
+            op(modifiedVal);
+            createChild = !math::isExactlyEqual(tileVal, modifiedVal);
+        }
+        if (createChild) {
+            child = new ChildT(xyz, getTile(iter).value, isTileOn(iter));
+            setChild(iter, *child);
+        }
     }
-    if (child) child->setValueOnMin(xyz, value);
-}
-
-
-template<typename ChildT>
-inline void
-RootNode<ChildT>::setValueOnMax(const Coord& xyz, const ValueType& value)
-{
-    ChildT* child = NULL;
-    MapIter iter = this->findCoord(xyz);
-    if (iter == mTable.end()) {
-        child = new ChildT(xyz, mBackground);
-        mTable[this->coordToKey(xyz)] = NodeStruct(*child);
-    } else if (isChild(iter)) {
-        child = &getChild(iter);
-    } else if (isTileOff(iter) || getTile(iter).value < value) {
-        child = new ChildT(xyz, getTile(iter).value, isTileOn(iter));
-        setChild(iter, *child);
-    }
-    if (child) child->setValueOnMax(xyz, value);
-}
-
-
-template<typename ChildT>
-inline void
-RootNode<ChildT>::setValueOnSum(const Coord& xyz, const ValueType& addend)
-{
-    ChildT* child = NULL;
-    MapIter iter = this->findCoord(xyz);
-    if (iter == mTable.end()) {
-        child = new ChildT(xyz, mBackground);
-        mTable[this->coordToKey(xyz)] = NodeStruct(*child);
-    } else if (isChild(iter)) {
-        child = &getChild(iter);
-    } else if (isTileOff(iter) || !math::isZero(addend)) {
-        child = new ChildT(xyz, getTile(iter).value, isTileOn(iter));
-        setChild(iter, *child);
-    }
-    if (child) child->setValueOnSum(xyz, addend);
+    if (child) child->modifyValue(xyz, op);
 }
 
 template<typename ChildT>
-template<typename AccessorT>
+template<typename ModifyOp, typename AccessorT>
 inline void
-RootNode<ChildT>::setValueOnSumAndCache(const Coord& xyz,
-    const ValueType& addend, AccessorT& acc)
+RootNode<ChildT>::modifyValueAndCache(const Coord& xyz, const ModifyOp& op, AccessorT& acc)
 {
     ChildT* child = NULL;
     MapIter iter = this->findCoord(xyz);
@@ -1686,13 +1652,85 @@ RootNode<ChildT>::setValueOnSumAndCache(const Coord& xyz,
         mTable[this->coordToKey(xyz)] = NodeStruct(*child);
     } else if (isChild(iter)) {
         child = &getChild(iter);
-    } else if (isTileOff(iter) || !math::isZero(addend)) {
-        child = new ChildT(xyz, getTile(iter).value, isTileOn(iter));
-        setChild(iter, *child);
+    } else {
+        // Need to create a child if the tile is inactive,
+        // in order to activate voxel (x, y, z).
+        bool createChild = isTileOff(iter);
+        if (!createChild) {
+            // Need to create a child if applying the functor
+            // to the tile value produces a different value.
+            const ValueType& tileVal = getTile(iter).value;
+            ValueType modifiedVal = tileVal;
+            op(modifiedVal);
+            createChild = !math::isExactlyEqual(tileVal, modifiedVal);
+        }
+        if (createChild) {
+            child = new ChildT(xyz, getTile(iter).value, isTileOn(iter));
+            setChild(iter, *child);
+        }
     }
     if (child) {
         acc.insert(xyz, child);
-        child->setValueOnSumAndCache(xyz, addend, acc);
+        child->modifyValueAndCache(xyz, op, acc);
+    }
+}
+
+
+template<typename ChildT>
+template<typename ModifyOp>
+inline void
+RootNode<ChildT>::modifyValueAndActiveState(const Coord& xyz, const ModifyOp& op)
+{
+    ChildT* child = NULL;
+    MapIter iter = this->findCoord(xyz);
+    if (iter == mTable.end()) {
+        child = new ChildT(xyz, mBackground);
+        mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+    } else if (isChild(iter)) {
+        child = &getChild(iter);
+    } else {
+        const Tile& tile = getTile(iter);
+        bool modifiedState = tile.active;
+        ValueType modifiedVal = tile.value;
+        op(modifiedVal, modifiedState);
+        // Need to create a child if applying the functor to the tile
+        // produces a different value or active state.
+        if (modifiedState != tile.active || !math::isExactlyEqual(modifiedVal, tile.value)) {
+            child = new ChildT(xyz, tile.value, tile.active);
+            setChild(iter, *child);
+        }
+    }
+    if (child) child->modifyValueAndActiveState(xyz, op);
+}
+
+template<typename ChildT>
+template<typename ModifyOp, typename AccessorT>
+inline void
+RootNode<ChildT>::modifyValueAndActiveStateAndCache(
+    const Coord& xyz, const ModifyOp& op, AccessorT& acc)
+{
+    ChildT* child = NULL;
+    MapIter iter = this->findCoord(xyz);
+    if (iter == mTable.end()) {
+        child = new ChildT(xyz, mBackground);
+        mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+    } else if (isChild(iter)) {
+        child = &getChild(iter);
+    } else {
+        const Tile& tile = getTile(iter);
+        bool modifiedState = tile.active;
+        ValueType modifiedVal = tile.value;
+        op(modifiedVal, modifiedState);
+        // Need to create a child if applying the functor to the tile
+        // produces a different value or active state.
+        if (modifiedState != tile.active || !math::isExactlyEqual(modifiedVal, tile.value)) {
+            child = new ChildT(xyz, tile.value, tile.active);
+            setChild(iter, *child);
+        }
+    }
+    if (child) {
+        acc.insert(xyz, child);
+        child->modifyValueAndActiveStateAndCache(xyz, op, acc);
     }
 }
 
@@ -2291,6 +2329,49 @@ RootNode<ChildT>::probeConstNode(const Coord& xyz) const
 
 
 template<typename ChildT>
+inline typename ChildT::LeafNodeType*
+RootNode<ChildT>::probeLeaf(const Coord& xyz)
+{
+    return this->template probeNode<LeafNodeType>(xyz);
+}
+
+
+template<typename ChildT>
+inline const typename ChildT::LeafNodeType*
+RootNode<ChildT>::probeConstLeaf(const Coord& xyz) const
+{
+    return this->template probeConstNode<LeafNodeType>(xyz);
+}
+
+
+template<typename ChildT>
+template<typename AccessorT>
+inline typename ChildT::LeafNodeType*
+RootNode<ChildT>::probeLeafAndCache(const Coord& xyz, AccessorT& acc)
+{
+    return this->template probeNodeAndCache<LeafNodeType>(xyz, acc);
+}
+
+
+template<typename ChildT>
+template<typename AccessorT>
+inline const typename ChildT::LeafNodeType*
+RootNode<ChildT>::probeConstLeafAndCache(const Coord& xyz, AccessorT& acc) const
+{
+    return this->template probeConstNodeAndCache<LeafNodeType>(xyz, acc);
+}
+
+
+template<typename ChildT>
+template<typename AccessorT>
+inline const typename ChildT::LeafNodeType*
+RootNode<ChildT>::probeLeafAndCache(const Coord& xyz, AccessorT& acc) const
+{
+    return this->probeConstLeafAndCache(xyz, acc);
+}
+
+
+template<typename ChildT>
 template<typename NodeT, typename AccessorT>
 inline NodeT*
 RootNode<ChildT>::probeNodeAndCache(const Coord& xyz, AccessorT& acc)
@@ -2397,27 +2478,108 @@ RootNode<ChildT>::voxelizeActiveTiles()
 
 
 template<typename ChildT>
+template<MergePolicy Policy>
 inline void
 RootNode<ChildT>::merge(RootNode& other)
 {
-    for (MapIter i = other.mTable.begin(), e = other.mTable.end(); i != e; ++i) {
-        MapIter j = mTable.find(i->first);
-        if (other.isChild(i)) {
-            if (j == mTable.end()) { // insert other child node
-                mTable[i->first]=NodeStruct(stealChild(i, Tile(other.mBackground, /*on=*/false)));
-            } else if (isTile(j)) { // replace tile with other child node
-                setChild(j, stealChild(i, Tile(other.mBackground, /*on=*/false)));
-            } else { // merge both child nodes
-                getChild(j).merge(getChild(i),other.mBackground, mBackground);
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+
+    switch (Policy) {
+
+    default:
+    case MERGE_ACTIVE_STATES:
+        for (MapIter i = other.mTable.begin(), e = other.mTable.end(); i != e; ++i) {
+            MapIter j = mTable.find(i->first);
+            if (other.isChild(i)) {
+                if (j == mTable.end()) { // insert other node's child
+                    ChildNodeType& child = stealChild(i, Tile(other.mBackground, /*on=*/false));
+                    child.resetBackground(other.mBackground, mBackground);
+                    mTable[i->first] = NodeStruct(child);
+                } else if (isTile(j)) {
+                    if (isTileOff(j)) { // replace inactive tile with other node's child
+                        ChildNodeType& child = stealChild(i, Tile(other.mBackground, /*on=*/false));
+                        child.resetBackground(other.mBackground, mBackground);
+                        setChild(j, child);
+                    }
+                } else { // merge both child nodes
+                    getChild(j).merge<MERGE_ACTIVE_STATES>(getChild(i),
+                        other.mBackground, mBackground);
+                }
+            } else if (other.isTileOn(i)) {
+                if (j == mTable.end()) { // insert other node's active tile
+                    mTable[i->first] = i->second;
+                } else if (!isTileOn(j)) {
+                    // Replace anything except an active tile with the other node's active tile.
+                    setTile(j, Tile(other.getTile(i).value, true));
+                }
             }
-        } else { // other is a tile
-            if (j == mTable.end()) { // insert other tile
-                mTable[i->first] = i->second;
-            } else continue; // ignore other tile
         }
+        break;
+
+    case MERGE_NODES:
+        for (MapIter i = other.mTable.begin(), e = other.mTable.end(); i != e; ++i) {
+            MapIter j = mTable.find(i->first);
+            if (other.isChild(i)) {
+                if (j == mTable.end()) { // insert other node's child
+                    ChildNodeType& child = stealChild(i, Tile(other.mBackground, /*on=*/false));
+                    child.resetBackground(other.mBackground, mBackground);
+                    mTable[i->first] = NodeStruct(child);
+                } else if (isTile(j)) { // replace tile with other node's child
+                    ChildNodeType& child = stealChild(i, Tile(other.mBackground, /*on=*/false));
+                    child.resetBackground(other.mBackground, mBackground);
+                    setChild(j, child);
+                } else { // merge both child nodes
+                    getChild(j).merge<MERGE_NODES>(getChild(i), other.mBackground, mBackground);
+                }
+            }
+        }
+        break;
+
+    case MERGE_ACTIVE_STATES_AND_NODES:
+        for (MapIter i = other.mTable.begin(), e = other.mTable.end(); i != e; ++i) {
+            MapIter j = mTable.find(i->first);
+            if (other.isChild(i)) {
+                if (j == mTable.end()) {
+                    // Steal and insert the other node's child.
+                    ChildNodeType& child = stealChild(i, Tile(other.mBackground, /*on=*/false));
+                    child.resetBackground(other.mBackground, mBackground);
+                    mTable[i->first] = NodeStruct(child);
+                } else if (isTile(j)) {
+                    // Replace this node's tile with the other node's child.
+                    ChildNodeType& child = stealChild(i, Tile(other.mBackground, /*on=*/false));
+                    child.resetBackground(other.mBackground, mBackground);
+                    const Tile tile = getTile(j);
+                    setChild(j, child);
+                    if (tile.active) {
+                        // Merge the other node's child with this node's active tile.
+                        child.merge<MERGE_ACTIVE_STATES_AND_NODES>(tile.value, tile.active);
+                    }
+                } else /*if (isChild(j))*/ {
+                    // Merge the other node's child into this node's child.
+                    getChild(j).merge<MERGE_ACTIVE_STATES_AND_NODES>(getChild(i),
+                        other.mBackground, mBackground);
+                }
+            } else if (other.isTileOn(i)) {
+                if (j == mTable.end()) {
+                    // Insert a copy of the other node's active tile.
+                    mTable[i->first] = i->second;
+                } else if (isTileOff(j)) {
+                    // Replace this node's inactive tile with a copy of the other's active tile.
+                    setTile(j, Tile(other.getTile(i).value, true));
+                } else if (isChild(j)) {
+                    // Merge the other node's active tile into this node's child.
+                    const Tile& tile = getTile(i);
+                    getChild(j).merge<MERGE_ACTIVE_STATES_AND_NODES>(tile.value, tile.active);
+                }
+            } // else if (other.isTileOff(i)) {} // ignore the other node's inactive tiles
+        }
+        break;
     }
+
     // Empty the other tree so as not to leave it in a partially cannibalized state.
     other.clear();
+
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
 
 

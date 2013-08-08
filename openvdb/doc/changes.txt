@@ -3,28 +3,69 @@
 @page changes Release Notes
 
 
-@htmlonly <a name="v1_2_1_changes"></a>@endhtmlonly
+@htmlonly <a name="v2_0_0_changes"></a>@endhtmlonly
 @par
-<B>Version 1.2.1</B> - <I>In development</I>
-- Added a LevelSetRayIntersector for efficient hierarchical intersection
-  of rays with level sets.
-- Added a Ray class and a Digital Differential Analyzer specialized for VDB.
-- Added an option in the "From Particles" SOP to generate an alpha
-  mask that is very useful for constraining subsequent level set filtering
-  such that surface details are preserved.
-- Improved the computational performance of masked filtering in
-  @vdblink::tools::LevelSetFilter tools::LevelSetFilter@endlink
-  by 20% for the most common cases.
+<B>Version 2.0.0</B> - <I>In development</I>
+- Added a @vdblink::tools::LevelSetRayIntersector
+  LevelSetRayIntersector@endlink tool for efficient, hierarchical
+  intersection of rays with level sets.
+- Added a @vdblink::math::Ray Ray@endlink class and a hierarchical
+  @vdblink::math::DDA Digital Differential Analyzer@endlink for fast
+  ray traversal.
+- Increased the speed of masked level set filtering by 20% for
+  the most common cases.
 - Added @vdblink::math::BoxStencil math::BoxStencil@endlink, with support
-  for trilinear interpolation. 
-- Fixed meshing issues relating to masking and automatic partitioning.
-- Fixed a bug in the "Level Set Smooth", "Level Set Renormalize" and 
-  "Level Set Offset" SOPs that caused the Group name to be ignored. 
+  for trilinear interpolation and gradient computation.
+- Added @vdblink::math::MinIndex math::MinIndex@endlink and 
+  @vdblink::math::MaxIndex math::MaxIndex@endlink, which find the minimum
+  and maximum component of a vector without any branching.
 - Fixed a bug in the default @vdblink::math::ScaleMap ScaleMap@endlink
   constructor that left some data used in the inverse uninitialized.
-- Fixed build issues under OSX and Windows [Contributed by Edward Lam].
-- Fixed bugs in Stats::print and Histogram::print that could lead to
-  incorrect behavior if called before any elements were added.
+- Added MapBase::applyJT() to apply the Jacobian Transpose to an input vector.
+  The Jacobian Transpose will take a range-space vector to a domain-space
+  vector (e.g. world to index).
+- Reimplemented @vdblink::math::RandomInt math::RandomInt@endlink using
+  Boost.Random instead of @c rand() (which is not thread-safe), and deprecated
+  @vdblink::math::randUniform math::randUniform@endlink and added
+  @vdblink::math::Random01 math::Random01@endlink to replace it. 
+- Fixed bugs in @vdblink::math::Stats::print() math::Stats::print@endlink
+  and @vdblink::math::Histogram::print() math::Histogram::print@endlink
+  that could lead to incorrect behavior if those functions were called before
+  any elements were added.
+- Fixed meshing issues relating to masking and automatic partitioning.
+- @vdblink::Grid::merge() Grid::merge@endlink and
+  @vdblink::tree::Tree::merge() Tree::merge@endlink now accept an optional
+  @vdblink::MergePolicy MergePolicy@endlink argument that specifies one of
+  three new merging schemes.  (The old merging scheme, which is no longer
+  available, used logic for each tree level that was inconsistent with
+  the other levels and that could result in active tiles being replaced
+  with nodes having only inactive values.)
+- Replaced @vdblink::tree::Tree Tree@endlink methods @c setValueOnMin,
+  @c setValueOnMax and @c setValueOnSum with
+  @vdblink::tools::setValueOnMin() tools::setValueOnMin@endlink,
+  @vdblink::tools::setValueOnMax() tools::setValueOnMax@endlink and
+  @vdblink::tools::setValueOnSum() tools::setValueOnSum@endlink
+  (and a new @vdblink::tools::setValueOnMult() tools::setValueOnMult@endlink)
+  and added @vdblink::tree::Tree::modifyValue() Tree::modifyValue@endlink
+  and @vdblink::tree::Tree::modifyValueAndActiveState()
+  Tree::modifyValueAndActiveState@endlink, which modify voxel values
+  in-place via user-supplied functors.  Similarly, replaced
+  @c ValueAccessor::setValueOnSum() with
+  @vdblink::tree::ValueAccessor::modifyValue()
+  ValueAccessor::modifyValue@endlink
+  and @vdblink::tree::ValueAccessor::modifyValueAndActiveState()
+  ValueAccessor::modifyValueAndActiveState@endlink.
+- Removed @c LeafNode::addValue and @c LeafNode::scaleValue.
+- Added an option to the From Particles SOP to generate an alpha mask,
+  which can be used to constrain level set filtering so as to preserve
+  surface details.
+- Implemented a closest point on line segment algorithm,
+  math::closestPointOnSegmentToPoint().
+- The mesh to volume converter now handles point-degenerate polygons.
+- Fixed a bug in the Level Set Smooth, Level Set Renormalize and 
+  Level Set Offset SOPs that caused the group name to be ignored. 
+- Fixed OS X and Windows build issues.
+  <I>[Contributed by SESI]</I>
 
 
 @htmlonly <a name="v1_2_0_changes"></a>@endhtmlonly
@@ -58,8 +99,7 @@
 - Added a @vdblink::tree::ValueAccessor3::probeNode() probeNode@endlink method
   to the value accessor and to tree nodes that returns a pointer to the node
   that contains a given voxel.
-- Deprecated @vdblink::tree::LeafNode::addValue() LeafNode::addValue@endlink
-  and @vdblink::tree::LeafNode::scaleValue() LeafNode::scaleValue@endlink.
+- Deprecated @c LeafNode::addValue and @c LeafNode::scaleValue.
 - Doubled the speed of the mesh to volume converter (which also improves
   the performance of the fracture and level set rebuild tools) and
   improved its inside/outside voxel classification near edges and corners.

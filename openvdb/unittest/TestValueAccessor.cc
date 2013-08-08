@@ -158,6 +158,19 @@ CPPUNIT_TEST_SUITE_REGISTRATION(TestValueAccessor);
 ////////////////////////////////////////
 
 
+namespace {
+
+struct Plus
+{
+    float addend;
+    Plus(float f): addend(f) {}
+    inline void operator()(float& f) const { f += addend; }
+    inline void operator()(float& f, bool& b) const { f += addend; b = false; }
+};
+
+}
+
+
 template<typename AccessorT>
 void
 TestValueAccessor::accessorTest()
@@ -225,7 +238,8 @@ TestValueAccessor::accessorTest()
         CPPUNIT_ASSERT(!acc.isCached(c1)); // uncached background value
         CPPUNIT_ASSERT(!acc.isValueOn(c1)); // inactive background value
         ASSERT_DOUBLES_EXACTLY_EQUAL(value, acc.getValue(c0));
-        CPPUNIT_ASSERT((acc.numCacheLevels()>0) == acc.isCached(c0)); // active, leaf-level voxel value
+        CPPUNIT_ASSERT(
+            (acc.numCacheLevels()>0) == acc.isCached(c0)); // active, leaf-level voxel value
         CPPUNIT_ASSERT(acc.isValueOn(c0));
 
         acc.setValue(c1, value);
@@ -259,13 +273,16 @@ TestValueAccessor::accessorTest()
         CPPUNIT_ASSERT( acc.isValueOn(c0));
         CPPUNIT_ASSERT( acc.isValueOn(c1));
 
-        acc.setValueOnSum(c1, value);
+        acc.modifyValueAndActiveState(c1, Plus(-value)); // subtract value & mark inactive
+        CPPUNIT_ASSERT(!acc.isValueOn(c1));
+
+        acc.modifyValue(c1, Plus(-value)); // subtract value again & mark active
 
         CPPUNIT_ASSERT(acc.isValueOn(c1));
         ASSERT_DOUBLES_EXACTLY_EQUAL(value, tree.getValue(c0));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(2*value, tree.getValue(c1));
+        ASSERT_DOUBLES_EXACTLY_EQUAL(-value, tree.getValue(c1));
         CPPUNIT_ASSERT((acc.numCacheLevels()>0) == acc.isCached(c1));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(2*value, acc.getValue(c1));
+        ASSERT_DOUBLES_EXACTLY_EQUAL(-value, acc.getValue(c1));
         CPPUNIT_ASSERT(!acc.isCached(c0));
         ASSERT_DOUBLES_EXACTLY_EQUAL(value, acc.getValue(c0));
         CPPUNIT_ASSERT((acc.numCacheLevels()>0) == acc.isCached(c0));

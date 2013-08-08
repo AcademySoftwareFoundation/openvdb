@@ -31,6 +31,7 @@
 #include <set>
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/openvdb.h>
+#include <openvdb/Types.h>
 #include <openvdb/tools/Filter.h>
 #include <openvdb/util/logging.h>
 #include "util.h" // for unittest_util::makeSphere()
@@ -391,7 +392,7 @@ TestLeafBool::testMerge()
     val = active = false;
     CPPUNIT_ASSERT(!leaf2.isConstant(val, active));
 
-    leaf.merge(leaf2);
+    leaf.merge<openvdb::MERGE_ACTIVE_STATES>(leaf2);
     CPPUNIT_ASSERT(leaf.isValueMaskOn());
     CPPUNIT_ASSERT(!leaf.isValueMaskOff());
     val = active = false;

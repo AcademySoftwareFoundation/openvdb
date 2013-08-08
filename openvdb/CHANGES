@@ -1,24 +1,52 @@
 OpenVDB Version History
 =======================
 
-Version 1.2.1 - In development
-    - Added a LevelSetRayIntersector for efficient hierarchical intersection
-      of rays with level sets.
-    - Added a Ray class and a Digital Differential Analyzer specialized for VDB.
-    - Added an option in the "From Particles" SOP to generate an alpha
-      mask that is very useful for constraining subsequent level set filtering
-      such that surface details are preserved.
-    - Improved the computational performance of masked Level Set filtering
-      by 20% for the most common cases.
-    - Added BoxStencil with support for trilinear interpolation.
+Version 2.0.0 - In development
+    - Added a LevelSetRayIntersector tool for efficient, hierarchical
+      intersection of rays with level sets.
+    - Added a Ray class and a hierarchical Digital Differential Analyzer
+      for fast ray traversal.
+    - Increased the speed of masked level set filtering by 20% for
+      the most common cases.
+    - Added math::BoxStencil, with support for trilinear interpolation 
+      and gradient computation.
+    - Added math::MinIndex and math::MaxIndex, which find the minimum
+      and maximum component of a vector without any branching.
+    - Fixed a bug in the default ScaleMap constructor that left some data
+      used in the inverse uninitialized.
+    - Added MapBase::applyJT() to apply the Jacobian Transpose to an input
+      vector. The Jacobian Transpose will take a range-space vector to a
+      domain-space vector (e.g. world to index).
+    - Reimplemented math::RandomInt using Boost.Random instead of rand()
+      (which is not thread-safe), and deprecated math::randUniform()
+      and added math::Random01 to replace it. 
+    - Fixed bugs in math::Stats::print() and math::Histogram::print() that
+      could lead to incorrect behavior if those functions were called before
+      any elements were added.
     - Fixed meshing issues relating to masking and automatic partitioning.
-    - Fixed a bug in the "Level Set Smooth", "Level Set Renormalize" and 
-      "Level Set Offset" SOPs that caused the Group name to be ignored.   
-    - Fixed a bug in the default constructor for ScaleMaps that would
-      leave some data used in the inverse unitialized.
-    - Fixed build issues under OSX and Windows [Contributed by Edward Lam].
-    - Fixed bugs in Stats::print and Histogram::print that could lead to
-      incorrect behavior if called before any elements were added.
+    - Grid::merge() and Tree::merge() now accept an optional MergePolicy
+      argument that specifies one of three new merging schemes.  (The old
+      merging scheme, which is no longer available, used logic for each tree
+      level that was inconsistent with the other levels and that could result
+      in active tiles being replaced with nodes having only inactive values.)
+    - Replaced Tree methods setValueOnMin(), setValueOnMax() and
+      setValueOnSum() with tools::setValueOnMin(), tools::setValueOnMax() and
+      tools::setValueOnSum() (and a new tools::setValueOnMult()) and added
+      Tree::modifyValue() and Tree::modifyValueAndActiveState(), which modify
+      voxel values in place via user-supplied functors.  Similarly, replaced
+      ValueAccessor::setValueOnSum() with ValueAccessor::modifyValue()
+      and ValueAccessor::modifyValueAndActiveState().
+    - Removed @c LeafNode::addValue and @c LeafNode::scaleValue.
+    - Added an option to the From Particles SOP to generate an alpha mask,
+      which can be used to constrain level set filtering so as to preserve
+      surface details.
+    - Implemented a closest point on line segment algorithm,
+      math::closestPointOnSegmentToPoint().
+    - The mesh to volume converter now handles point-degenerate polygons.
+    - Fixed a bug in the Level Set Smooth, Level Set Renormalize and 
+      Level Set Offset SOPs that caused the group name to be ignored.   
+    - Fixed OS X and Windows build issues.
+      [Contributed by SESI]
 
 Version 1.2.0 - June 28, 2013
     - Level set filters now accept an optional alpha mask grid.

@@ -30,6 +30,8 @@
 //
 /// @file ValueTransformer.h
 ///
+/// @author Peter Cucka
+///
 /// tools::foreach() and tools::transformValues() transform the values in a grid
 /// by iterating over the grid with a user-supplied iterator and applying a
 /// user-supplied functor at each step of the iteration.  With tools::foreach(),
@@ -45,10 +47,16 @@
 /// an additional step is performed: when any two threads finish processing,
 /// @c op.join(otherOp) is called on one thread's functor to allow it to coalesce
 /// its intermediate result with the other thread's.
+///
+/// Finally, tools::setValueOnMin(), tools::setValueOnMax(), tools::setValueOnSum()
+/// and tools::setValueOnMult() are wrappers around Tree::modifyValue() (or
+/// ValueAccessor::modifyValue()) for some commmon in-place operations.
+/// These are typically significantly faster than calling getValue() followed by setValue().
 
 #ifndef OPENVDB_TOOLS_VALUETRANSFORMER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_VALUETRANSFORMER_HAS_BEEN_INCLUDED
 
+#include <algorithm> // for std::min(), std::max()
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 #include <openvdb/Types.h>
@@ -124,6 +132,7 @@ inline void foreach(const IterT& iter, const XformOp& op,
 /// @param threaded  if true, transform multiple values of the input grid in parallel
 /// @param shareOp   if true and @a threaded is true, all threads use the same functor;
 ///                  otherwise, each thread gets its own copy of the @e original functor
+/// @param merge     how to merge intermediate results from multiple threads (see Types.h)
 ///
 /// @par Example:
 /// Populate a scalar floating-point grid with the lengths of the vectors from all
@@ -153,12 +162,14 @@ inline void foreach(const IterT& iter, const XformOp& op,
 /// with a tree::IteratorRange that wraps a grid or tree iterator.
 template<typename InIterT, typename OutGridT, typename XformOp>
 inline void transformValues(const InIterT& inIter, OutGridT& outGrid,
-    XformOp& op, bool threaded = true, bool shareOp = true);
+    XformOp& op, bool threaded = true, bool shareOp = true,
+    MergePolicy merge = MERGE_ACTIVE_STATES);
 
 #ifndef _MSC_VER
 template<typename InIterT, typename OutGridT, typename XformOp>
 inline void transformValues(const InIterT& inIter, OutGridT& outGrid,
-    const XformOp& op, bool threaded = true, bool shareOp = true);
+    const XformOp& op, bool threaded = true, bool shareOp = true,
+    MergePolicy merge = MERGE_ACTIVE_STATES);
 #endif
 
 
@@ -208,6 +219,107 @@ inline void transformValues(const InIterT& inIter, OutGridT& outGrid,
 /// with a tree::IteratorRange that wraps a grid or tree iterator.
 template<typename IterT, typename XformOp>
 inline void accumulate(const IterT& iter, XformOp& op, bool threaded = true);
+
+
+/// @brief Set the value of the voxel at the given coordinates in @a tree to
+/// the minimum of its current value and @a value, and mark the voxel as active.
+/// @details This is typically significantly faster than calling getValue()
+/// followed by setValueOn().
+/// @note @a TreeT can be either a Tree or a ValueAccessor.
+template<typename TreeT>
+inline void setValueOnMin(TreeT& tree, const Coord& xyz, const typename TreeT::ValueType& value);
+
+/// @brief Set the value of the voxel at the given coordinates in @a tree to
+/// the maximum of its current value and @a value, and mark the voxel as active.
+/// @details This is typically significantly faster than calling getValue()
+/// followed by setValueOn().
+/// @note @a TreeT can be either a Tree or a ValueAccessor.
+template<typename TreeT>
+inline void setValueOnMax(TreeT& tree, const Coord& xyz, const typename TreeT::ValueType& value);
+
+/// @brief Set the value of the voxel at the given coordinates in @a tree to
+/// the sum of its current value and @a value, and mark the voxel as active.
+/// @details This is typically significantly faster than calling getValue()
+/// followed by setValueOn().
+/// @note @a TreeT can be either a Tree or a ValueAccessor.
+template<typename TreeT>
+inline void setValueOnSum(TreeT& tree, const Coord& xyz, const typename TreeT::ValueType& value);
+
+/// @brief Set the value of the voxel at the given coordinates in @a tree to
+/// the product of its current value and @a value, and mark the voxel as active.
+/// @details This is typically significantly faster than calling getValue()
+/// followed by setValueOn().
+/// @note @a TreeT can be either a Tree or a ValueAccessor.
+template<typename TreeT>
+inline void setValueOnMult(TreeT& tree, const Coord& xyz, const typename TreeT::ValueType& value);
+
+
+////////////////////////////////////////
+
+
+namespace valxform {
+
+template<typename ValueType>
+struct MinOp {
+    const ValueType val;
+    MinOp(const ValueType& v): val(v) {}
+    inline void operator()(ValueType& v) const { v = std::min<ValueType>(v, val); }
+};
+
+template<typename ValueType>
+struct MaxOp {
+    const ValueType val;
+    MaxOp(const ValueType& v): val(v) {}
+    inline void operator()(ValueType& v) const { v = std::max<ValueType>(v, val); }
+};
+
+template<typename ValueType>
+struct SumOp {
+    const ValueType val;
+    SumOp(const ValueType& v): val(v) {}
+    inline void operator()(ValueType& v) const { v += val; }
+};
+
+template<typename ValueType>
+struct MultOp {
+    const ValueType val;
+    MultOp(const ValueType& v): val(v) {}
+    inline void operator()(ValueType& v) const { v *= val; }
+};
+
+}
+
+
+template<typename TreeT>
+inline void
+setValueOnMin(TreeT& tree, const Coord& xyz, const typename TreeT::ValueType& value)
+{
+    tree.modifyValue(xyz, valxform::MinOp<typename TreeT::ValueType>(value));
+}
+
+
+template<typename TreeT>
+inline void
+setValueOnMax(TreeT& tree, const Coord& xyz, const typename TreeT::ValueType& value)
+{
+    tree.modifyValue(xyz, valxform::MaxOp<typename TreeT::ValueType>(value));
+}
+
+
+template<typename TreeT>
+inline void
+setValueOnSum(TreeT& tree, const Coord& xyz, const typename TreeT::ValueType& value)
+{
+    tree.modifyValue(xyz, valxform::SumOp<typename TreeT::ValueType>(value));
+}
+
+
+template<typename TreeT>
+inline void
+setValueOnMult(TreeT& tree, const Coord& xyz, const typename TreeT::ValueType& value)
+{
+    tree.modifyValue(xyz, valxform::MultOp<typename TreeT::ValueType>(value));
+}
 
 
 ////////////////////////////////////////
@@ -312,12 +424,13 @@ public:
     typedef typename tree::IteratorRange<InIterT> IterRange;
     typedef typename OutTreeT::ValueType OutValueT;
 
-    SharedOpTransformer(const InIterT& inIter, OutTreeT& outTree, OpT& op):
+    SharedOpTransformer(const InIterT& inIter, OutTreeT& outTree, OpT& op, MergePolicy merge):
         mIsRoot(true),
         mInputIter(inIter),
         mInputTree(inIter.getTree()),
         mOutputTree(&outTree),
-        mOp(op)
+        mOp(op),
+        mMergePolicy(merge)
     {
         if (static_cast<const void*>(mInputTree) == static_cast<void*>(mOutputTree)) {
             OPENVDB_LOG_INFO("use tools::foreach(), not transformValues(),"
@@ -331,7 +444,8 @@ public:
         mInputIter(other.mInputIter),
         mInputTree(other.mInputTree),
         mOutputTree(new OutTreeT(zeroVal<OutValueT>())),
-        mOp(other.mOp)
+        mOp(other.mOp),
+        mMergePolicy(other.mMergePolicy)
         {}
 
     ~SharedOpTransformer()
@@ -372,7 +486,7 @@ public:
     void join(const SharedOpTransformer& other)
     {
         if (mOutputTree && other.mOutputTree) {
-            mOutputTree->merge(*other.mOutputTree);
+            mOutputTree->merge(*other.mOutputTree, mMergePolicy);
         }
     }
 
@@ -382,6 +496,7 @@ private:
     const InTreeT* mInputTree;
     OutTreeT* mOutputTree;
     OpT& mOp;
+    MergePolicy mMergePolicy;
 }; // class SharedOpTransformer
 
 
@@ -393,13 +508,15 @@ public:
     typedef typename tree::IteratorRange<InIterT> IterRange;
     typedef typename OutTreeT::ValueType OutValueT;
 
-    CopyableOpTransformer(const InIterT& inIter, OutTreeT& outTree, const OpT& op):
+    CopyableOpTransformer(const InIterT& inIter, OutTreeT& outTree,
+        const OpT& op, MergePolicy merge):
         mIsRoot(true),
         mInputIter(inIter),
         mInputTree(inIter.getTree()),
         mOutputTree(&outTree),
         mOp(op),
-        mOrigOp(&op)
+        mOrigOp(&op),
+        mMergePolicy(merge)
     {
         if (static_cast<const void*>(mInputTree) == static_cast<void*>(mOutputTree)) {
             OPENVDB_LOG_INFO("use tools::foreach(), not transformValues(),"
@@ -415,7 +532,8 @@ public:
         mInputTree(other.mInputTree),
         mOutputTree(new OutTreeT(zeroVal<OutValueT>())),
         mOp(*other.mOrigOp),
-        mOrigOp(other.mOrigOp)
+        mOrigOp(other.mOrigOp),
+        mMergePolicy(other.mMergePolicy)
         {}
 
     ~CopyableOpTransformer()
@@ -456,7 +574,7 @@ public:
     void join(const CopyableOpTransformer& other)
     {
         if (mOutputTree && other.mOutputTree) {
-            mOutputTree->merge(*other.mOutputTree);
+            mOutputTree->merge(*other.mOutputTree, mMergePolicy);
         }
     }
 
@@ -467,6 +585,7 @@ private:
     OutTreeT* mOutputTree;
     OpT mOp; // copy of original functor
     OpT const * const mOrigOp; // pointer to original functor
+    MergePolicy mMergePolicy;
 }; // class CopyableOpTransformer
 
 } // namespace valxform
@@ -478,17 +597,17 @@ private:
 template<typename InIterT, typename OutGridT, typename XformOp>
 inline void
 transformValues(const InIterT& inIter, OutGridT& outGrid, XformOp& op,
-    bool threaded, bool shared)
+    bool threaded, bool shared, MergePolicy merge)
 {
     typedef TreeAdapter<OutGridT> Adapter;
     typedef typename Adapter::TreeType OutTreeT;
     if (shared) {
         typedef typename valxform::SharedOpTransformer<InIterT, OutTreeT, XformOp> Processor;
-        Processor proc(inIter, Adapter::tree(outGrid), op);
+        Processor proc(inIter, Adapter::tree(outGrid), op, merge);
         proc.process(threaded);
     } else {
         typedef typename valxform::CopyableOpTransformer<InIterT, OutTreeT, XformOp> Processor;
-        Processor proc(inIter, Adapter::tree(outGrid), op);
+        Processor proc(inIter, Adapter::tree(outGrid), op, merge);
         proc.process(threaded);
     }
 }
@@ -497,13 +616,13 @@ transformValues(const InIterT& inIter, OutGridT& outGrid, XformOp& op,
 template<typename InIterT, typename OutGridT, typename XformOp>
 inline void
 transformValues(const InIterT& inIter, OutGridT& outGrid, const XformOp& op,
-    bool threaded, bool /*share*/)
+    bool threaded, bool /*share*/, MergePolicy merge)
 {
     typedef TreeAdapter<OutGridT> Adapter;
     typedef typename Adapter::TreeType OutTreeT;
     // Const ops are shared across threads, not copied.
     typedef typename valxform::SharedOpTransformer<InIterT, OutTreeT, const XformOp> Processor;
-    Processor proc(inIter, Adapter::tree(outGrid), op);
+    Processor proc(inIter, Adapter::tree(outGrid), op, merge);
     proc.process(threaded);
 }
 #endif

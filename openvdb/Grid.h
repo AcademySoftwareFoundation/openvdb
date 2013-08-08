@@ -618,10 +618,12 @@ public:
     /// Reduce the memory footprint of this grid by increasing its sparseness.
     virtual void pruneGrid(float tolerance = 0.0);
 
-    /// @brief Transfer active voxels from another grid to this grid
-    /// wherever those voxels coincide with inactive voxels in this grid.
-    /// @note This operation always empties the other tree.
-    void merge(Grid& other) { tree().merge(other.tree()); }
+    /// @brief Efficiently merge another grid into this grid using one of several schemes.
+    /// @details This operation is primarily intended to combine grids that are mostly
+    /// non-overlapping (for example, intermediate grids from computations that are
+    /// parallelized across disjoint regions of space).
+    /// @warning This operation always empties the other grid.
+    void merge(Grid& other, MergePolicy policy = MERGE_ACTIVE_STATES);
 
     /// @brief Union this grid's set of active values with the active values
     /// of the other grid, whose value type may be different.
@@ -1106,6 +1108,14 @@ inline void
 Grid<TreeT>::pruneGrid(float tolerance)
 {
     this->prune(ValueType(zeroVal<ValueType>() + tolerance));
+}
+
+
+template<typename TreeT>
+inline void
+Grid<TreeT>::merge(Grid& other, MergePolicy policy)
+{
+    tree().merge(other.tree(), policy);
 }
 
 

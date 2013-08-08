@@ -434,92 +434,67 @@ public:
     /// Return the level (i.e., 0) at which leaf node values reside.
     static Index getValueLevel(const Coord&) { return LEVEL; }
 
-    /// Set the active state at the given coordinates, but don't change its value.
+    /// Set the active state of the voxel at the given coordinates but don't change its value.
     void setActiveState(const Coord& xyz, bool on);
 
-    /// Mark the voxel at the given coordinates as inactive, but don't change its value.
+    /// Mark the voxel at the given coordinates as inactive but don't change its value.
     void setValueOff(const Coord& xyz) { mValueMask.setOff(LeafNode::coord2offset(xyz)); }
-    /// Mark the voxel at the given offset as inactive, but don't change its value.
+    /// Mark the voxel at the given offset as inactive but don't change its value.
     void setValueOff(Index offset) { assert(offset < SIZE); mValueMask.setOff(offset); }
 
-    /// Change the value of the voxel at the given coordinates and mark the voxel as inactive.
+    /// Set the value of the voxel at the given coordinates and mark the voxel as inactive.
     void setValueOff(const Coord& xyz, const ValueType& val);
-    /// Change the value of the voxel at the given offset and mark the voxel as inactive.
+    /// Set the value of the voxel at the given offset and mark the voxel as inactive.
     void setValueOff(Index offset, const ValueType& val);
 
-    /// Mark the voxel at the given coordinates as active, but don't change its value.
+    /// Mark the voxel at the given coordinates as active but don't change its value.
     void setValueOn(const Coord& xyz) { mValueMask.setOn(LeafNode::coord2offset(xyz)); }
-    /// Mark the voxel at the given offset as active, but don't change its value.
+    /// Mark the voxel at the given offset as active but don't change its value.
     void setValueOn(Index offset) { assert(offset < SIZE); mValueMask.setOn(offset); }
     /// Set the value of the voxel at the given coordinates and mark the voxel as active.
     void setValueOn(const Coord& xyz, const ValueType& val) {
         this->setValueOn(LeafNode::coord2offset(xyz), val);
     }
-    /// Identical to setValueOn
+    /// Set the value of the voxel at the given coordinates and mark the voxel as active.
     void setValue(const Coord& xyz, const ValueType& val) { this->setValueOn(xyz, val); };
-    /// Change the value of the voxel at the given offset and mark the voxel as active.
+    /// Set the value of the voxel at the given offset and mark the voxel as active.
     void setValueOn(Index offset, const ValueType& val) {
         mBuffer[offset] = val;
         mValueMask.setOn(offset);
     }
 
-    /// @brief Set the value of the voxel at the given coordinates to the minimum of
-    /// its current value and the given value, and mark the voxel as active.
-    void setValueOnMin(const Coord& xyz, const ValueType& val) {
-        this->setValueOnMin(LeafNode::coord2offset(xyz), val);
-    }
-    /// @brief Set the value of the voxel at the given offset to the minimum of
-    /// its current value and the given value, and mark the voxel as active.
-    void setValueOnMin(Index offset, const ValueType& val) {
-        mBuffer[offset] = std::min(val, mBuffer[offset]);
+    /// @brief Apply a functor to the value of the voxel at the given coordinates
+    /// and mark the voxel as active.
+    template<typename ModifyOp>
+    void modifyValue(const Coord& xyz, const ModifyOp& op)
+    {
+        const Index offset = this->coord2offset(xyz);
+        op(mBuffer[offset]);
         mValueMask.setOn(offset);
     }
 
-    /// @brief Set the value of the voxel at the given coordinates to the maximum of
-    /// its current value and the given value, and mark the voxel as active.
-    void setValueOnMax(const Coord& xyz, const ValueType& val) {
-        this->setValueOnMax(LeafNode::coord2offset(xyz), val);
-    }
-    /// @brief Set the value of the voxel at the given offset to the maximum of
-    /// its current value and the given value, and mark the voxel as active.
-    void setValueOnMax(Index offset, const ValueType& val) {
-        mBuffer[offset] = std::max(val, mBuffer[offset]);
-        mValueMask.setOn(offset);
+    /// Apply a functor to the voxel at the given coordinates.
+    template<typename ModifyOp>
+    void modifyValueAndActiveState(const Coord& xyz, const ModifyOp& op)
+    {
+        const Index offset = this->coord2offset(xyz);
+        bool state = mValueMask.isOn(offset);
+        op(mBuffer[offset], state);
+        mValueMask.set(offset, state);
     }
 
-    /// @brief Set the value of the voxel at the given coordinates to the sum of
-    /// its current value and the given value, and mark the voxel as active.
-    void setValueOnSum(const Coord& xyz, const ValueType& val) {
-        this->setValueOnSum(LeafNode::coord2offset(xyz), val);
-    }
-    /// @brief Set the value of the voxel at the given offset to the sum of
-    /// its current value and the given value, and mark the voxel as active.
-    void setValueOnSum(Index offset, const ValueType& val) {
-        mBuffer[offset] += val;
-        mValueMask.setOn(offset);
-    }
-
-    /// @brief Change the value of the voxel at the given coordinates without altering
-    /// the voxel's active state.
+    /// Set the value of the voxel at the given coordinates but don't change its active state.
     void setValueOnly(const Coord& xyz, const ValueType& val) {
         this->setValueOnly(LeafNode::coord2offset(xyz), val);
     }
-    /// @brief Change the value of the voxel at the given offset without altering
-    /// the voxel's active state.
-    /// @details This method is very fast since it effectively
-    /// ignores the active state of the voxel.
+    /// Set the value of the voxel at the given offset but don't change its active state.
     void setValueOnly(Index offset, const ValueType& val) {
         assert(offset<SIZE); mBuffer[offset] = val;
     }
 
-    /// Add the given value to all active voxels, leaving inactive voxels unchanged.
-    OPENVDB_DEPRECATED void addValue(const ValueType& val);
-    /// Multiply all active voxels by the given value, leaving inactive voxels unchanged.
-    OPENVDB_DEPRECATED void scaleValue(const ValueType& scale);
-
-    /// Mark all voxels as active, but don't change their values.
+    /// Mark all voxels as active but don't change their values.
     void setValuesOn() { mValueMask.setOn(); }
-    /// Mark all voxels as inactive, but don't change their values.
+    /// Mark all voxels as inactive but don't change their values.
     void setValuesOff() { mValueMask.setOff(); }
 
     /// Return @c true if the voxel at the given coordinates is active.
@@ -530,14 +505,12 @@ public:
     /// Return @c false since leaf nodes never contain tiles.
     static bool hasActiveTiles() { return false; }
 
-    /// @brief Set all voxels within an axis-aligned box to a constant value.
-    /// (The bbox coordinates are inclusive.)
+    /// Set all voxels within an axis-aligned box to the specified value and active state.
     void fill(const CoordBBox& bbox, const ValueType&, bool active = true);
 
-    /// @brief Sets all values to the specified value. Their state is unchanged.
+    /// Set all voxels to the specified value but don't change their active states.
     void fill(const ValueType& value);
-
-    /// @brief Sets all values to the specified value and state
+    /// Set all voxels to the specified value and active state.
     void fill(const ValueType& value, bool active);
 
     /// @brief Copy into a dense grid the values of the voxels that lie within
@@ -575,7 +548,7 @@ public:
                        const ValueType& background, const ValueType& tolerance);
 
     /// @brief Return the value of the voxel at the given coordinates.
-    /// @note Used internally by ValueAccessor (note last argument is a dummy).
+    /// @note Used internally by ValueAccessor.
     template<typename AccessorT>
     const ValueType& getValueAndCache(const Coord& xyz, AccessorT&) const
     {
@@ -583,12 +556,12 @@ public:
     }
 
     /// @brief Return @c true if the voxel at the given coordinates is active.
-    /// @note Used internally by ValueAccessor (note last argument is a dummy).
+    /// @note Used internally by ValueAccessor.
     template<typename AccessorT>
     bool isValueOnAndCache(const Coord& xyz, AccessorT&) const { return this->isValueOn(xyz); }
 
     /// @brief Change the value of the voxel at the given coordinates and mark it as active.
-    /// @note Used internally by ValueAccessor (note last argument is a dummy).
+    /// @note Used internally by ValueAccessor.
     template<typename AccessorT>
     void setValueAndCache(const Coord& xyz, const ValueType& val, AccessorT&)
     {
@@ -597,25 +570,32 @@ public:
 
     /// @brief Change the value of the voxel at the given coordinates
     /// but preserve its state.
-    /// @note Used internally by ValueAccessor (last argument is a dummy).
+    /// @note Used internally by ValueAccessor.
     template<typename AccessorT>
     void setValueOnlyAndCache(const Coord& xyz, const ValueType& val, AccessorT&)
     {
         this->setValueOnly(xyz, val);
     }
 
-    /// Set the value of the voxel at the given coordinates to the sum of
-    /// its current value and the given value, and mark the voxel as
-    /// active.
-    /// @note Used internally by ValueAccessor (note last argument is a dummy).
-    template<typename AccessorT>
-    void setValueOnSumAndCache(const Coord& xyz, const ValueType& val, AccessorT&)
+    /// @brief Apply a functor to the value of the voxel at the given coordinates
+    /// and mark the voxel as active.
+    /// @note Used internally by ValueAccessor.
+    template<typename ModifyOp, typename AccessorT>
+    void modifyValueAndCache(const Coord& xyz, const ModifyOp& op, AccessorT&)
     {
-        this->setValueOnSum(xyz, val);
+        this->modifyValue(xyz, op);
+    }
+
+    /// Apply a functor to the voxel at the given coordinates.
+    /// @note Used internally by ValueAccessor.
+    template<typename ModifyOp, typename AccessorT>
+    void modifyValueAndActiveStateAndCache(const Coord& xyz, const ModifyOp& op, AccessorT&)
+    {
+        this->modifyValueAndActiveState(xyz, op);
     }
 
     /// @brief Change the value of the voxel at the given coordinates and mark it as inactive.
-    /// @note Used internally by ValueAccessor (note last argument is a dummy).
+    /// @note Used internally by ValueAccessor.
     template<typename AccessorT>
     void setValueOffAndCache(const Coord& xyz, const ValueType& value, AccessorT&)
     {
@@ -624,7 +604,7 @@ public:
 
     /// @brief Set the active state of the voxel at the given coordinates
     /// without changing its value.
-    /// @note Used internally by ValueAccessor (note last argument is a dummy).
+    /// @note Used internally by ValueAccessor.
     template<typename AccessorT>
     void setActiveStateAndCache(const Coord& xyz, bool on, AccessorT&)
     {
@@ -633,7 +613,7 @@ public:
 
     /// @brief Return @c true if the voxel at the given coordinates is active
     /// and return the voxel value in @a val.
-    /// @note Used internally by ValueAccessor (note last argument is a dummy).
+    /// @note Used internally by ValueAccessor.
     template<typename AccessorT>
     bool probeValueAndCache(const Coord& xyz, ValueType& val, AccessorT&) const
     {
@@ -642,7 +622,7 @@ public:
 
     /// @brief Return the value of the voxel at the given coordinates and return
     /// its active state and level (i.e., 0) in @a state and @a level.
-    /// @note Used internally by ValueAccessor (note last argument is a dummy).
+    /// @note Used internally by ValueAccessor.
     template<typename AccessorT>
     const ValueType& getValue(const Coord& xyz, bool& state, int& level, AccessorT&) const
     {
@@ -668,33 +648,28 @@ public:
     /// and inactive occurrences of @a -oldBackground with @a -newBackground.
     void resetBackground(const ValueType& oldBackground, const ValueType& newBackground);
 
-    /// @brief Overwrites the inactive voxels with a new value whos
-    /// magnitude is equal to the specified background value and sign
-    /// is consistant with the lexicographically closest active voxel.
-    /// The net effect is a propagation of signs from the active
-    /// voxels to the inactive voxels.
-    ///
-    /// @note This method is primarily useful for propagating the sign
-    /// from the (active) voxels in a narrow-band level set to the
-    /// inactive values outside the narrow band.
+    /// @brief Overwrite each inactive value in this node and in any child nodes with
+    /// a new value whose magnitude is equal to the specified background value and whose
+    /// sign is consistent with that of the lexicographically closest active value.
+    /// @details This is primarily useful for propagating the sign from the (active) voxels
+    /// in a narrow-band level set to the inactive voxels outside the narrow band.
     void signedFloodFill(const ValueType& background);
 
-    /// @brief Sets the inactive voxels to either the outside or inside
-    /// value, depending on the sign of the closest corresponding
-    /// active voxels. More specefically, an inactive voxel is set to
-    /// the outside value if the closest active voxel in the
-    /// lexicographic direction is positive, else it is set to the
-    /// inside value.
+    /// @brief Overwrite each inactive value in this node and in any child nodes with
+    /// either @a outside or @a inside, depending on the sign of the lexicographically
+    /// closest active value.
+    /// @details Specifically, an inactive value is set to @a outside if the closest active
+    /// value in the lexicographic direction is positive, otherwise it is set to @a inside.
     void signedFloodFill(const ValueType& outside, const ValueType& inside);
 
     void negate();
 
-    void merge(const LeafNode&);
-    void merge(const LeafNode& other, const ValueType& /*bg*/, const ValueType& /*otherBG*/)
-    {
-        LeafNode::merge(other);
-    }
     void voxelizeActiveTiles() {};
+
+    template<MergePolicy Policy> void merge(const LeafNode&);
+    template<MergePolicy Policy> void merge(const ValueType& tileValue, bool tileActive);
+    template<MergePolicy Policy>
+    void merge(const LeafNode& other, const ValueType& /*bg*/, const ValueType& /*otherBG*/);
 
     /// @brief Union this node's set of active values with the active values
     /// of the other node, whose @c ValueType may be different. So a
@@ -1060,26 +1035,6 @@ LeafNode<T, Log2Dim>::setActiveState(const Coord& xyz, bool on)
 }
 
 
-template<typename T, Index Log2Dim>
-inline void
-LeafNode<T, Log2Dim>::addValue(const ValueType& val)
-{
-    for (typename NodeMaskType::OnIterator iter = mValueMask.beginOn(); iter; ++iter) {
-        mBuffer[iter.pos()] += val;
-    }
-}
-
-
-template<typename T, Index Log2Dim>
-inline void
-LeafNode<T, Log2Dim>::scaleValue(const ValueType& scale)
-{
-    for (typename NodeMaskType::OnIterator iter = mValueMask.beginOn(); iter; ++iter) {
-        mBuffer[iter.pos()] *= scale;
-    }
-}
-
-
 ////////////////////////////////////////
 
 
@@ -1127,10 +1082,10 @@ LeafNode<T, Log2Dim>::copyToDense(const CoordBBox& bbox, DenseT& dense) const
     T* t0 = dense.data() + bbox.min()[2]-min[2];//target array
     const T* s0 = &mBuffer[bbox.min()[2]&DIM-1u];//source array
     for (Int32 x = bbox.min()[0], ex=bbox.max()[0]+1; x<ex; ++x) {
-        T*       t1 = t0 + xStride*(x-min[0]);
+        T* t1 = t0 + xStride*(x-min[0]);
         const T* s1 = s0 + ((x&DIM-1u)<<2*Log2Dim);
         for (Int32 y = bbox.min()[1], ey=bbox.max()[1]+1; y<ey; ++y) {
-            T*       t2 = t1 + yStride*(y-min[1]);
+            T* t2 = t1 + yStride*(y-min[1]);
             const T* s2 = s1 + ((y&DIM-1u)<<Log2Dim);
             for (Int32 z = bbox.min()[2], ez=bbox.max()[2]+1; z<ez ; ++z) *t2++ = *s2++;
         }
@@ -1147,13 +1102,13 @@ LeafNode<T, Log2Dim>::copyFromDense(const CoordBBox& bbox, const DenseT& dense,
     const Coord& min = dense.bbox().min();
 
     const ValueType* s0 = dense.data() + bbox.min()[2]-min[2];//source
-    const Int32      n0 = bbox.min()[2]&DIM-1u;
+    const Int32 n0 = bbox.min()[2]&DIM-1u;
     for (Int32 x = bbox.min()[0], ex=bbox.max()[0]+1; x<ex; ++x) {
         const ValueType* s1 = s0 + xStride*(x-min[0]);
-        const Int32      n1 = n0 + ((x&DIM-1u)<<2*LOG2DIM);
+        const Int32 n1 = n0 + ((x&DIM-1u)<<2*LOG2DIM);
         for (Int32 y = bbox.min()[1], ey=bbox.max()[1]+1; y<ey; ++y) {
             const ValueType* s2 = s1 + yStride*(y-min[1]);
-            Int32            n2 = n1 + ((y&DIM-1u)<<LOG2DIM) ;
+            Int32 n2 = n1 + ((y&DIM-1u)<<LOG2DIM) ;
             for (Int32 z = bbox.min()[2], ez=bbox.max()[2]+1; z<ez ; ++z, ++n2, ++s2) {
                 if (math::isApproxEqual(background, *s2, tolerance)) {
                     mValueMask.setOff(n2);
@@ -1362,16 +1317,47 @@ LeafNode<T, Log2Dim>::resetBackground(const ValueType& oldBackground,
 
 
 template<typename T, Index Log2Dim>
+template<MergePolicy Policy>
 inline void
 LeafNode<T, Log2Dim>::merge(const LeafNode& other)
 {
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+    if (Policy == MERGE_NODES) return;
     typename NodeMaskType::OnIterator iter = other.mValueMask.beginOn();
     for (; iter; ++iter) {
         const Index n = iter.pos();
-        if (mValueMask.isOn(n)) continue;
-        mBuffer[n] = other.mBuffer[n];
+        if (mValueMask.isOff(n)) {
+            mBuffer[n] = other.mBuffer[n];
+            mValueMask.setOn(n);
+        }
+    }
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+}
+
+template<typename T, Index Log2Dim>
+template<MergePolicy Policy>
+inline void
+LeafNode<T, Log2Dim>::merge(const LeafNode& other,
+    const ValueType& /*bg*/, const ValueType& /*otherBG*/)
+{
+    this->template merge<Policy>(other);
+}
+
+template<typename T, Index Log2Dim>
+template<MergePolicy Policy>
+inline void
+LeafNode<T, Log2Dim>::merge(const ValueType& tileValue, bool tileActive)
+{
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+    if (Policy != MERGE_ACTIVE_STATES_AND_NODES) return;
+    if (!tileActive) return;
+    // Replace all inactive values with the active tile value.
+    for (typename NodeMaskType::OffIterator iter = mValueMask.beginOff(); iter; ++iter) {
+        const Index n = iter.pos();
+        mBuffer[n] = tileValue;
         mValueMask.setOn(n);
     }
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
 
 

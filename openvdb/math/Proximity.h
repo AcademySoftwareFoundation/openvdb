@@ -45,7 +45,7 @@ namespace math {
 ///         point @c p, returns the point on @c abc closest to @c p and the 
 ///         corresponding barycentric coordinates.
 ///
-/// @note   Algorithm from "Real-Time Collision Detection" pg 136 to 142 by Christer Ericson.
+/// @note   Algorithms from "Real-Time Collision Detection" pg 136 to 142 by Christer Ericson.
 ///         The closest point is obtained by first determining which of the triangles
 ///         Voronoi feature regions @c p is in and then computing the orthogonal projection
 ///         of @c p onto the corresponding feature.
@@ -56,8 +56,21 @@ namespace math {
 /// @param p    Point to compute the closest point on @c abc for. 
 /// @param uvw  Barycentric coordinates, computed and returned.
 OPENVDB_API Vec3d
-closestPointOnTriangleToPoint(const Vec3d& a, const Vec3d& b, const Vec3d& c,
-    const Vec3d& p, Vec3d& uvw);
+closestPointOnTriangleToPoint(
+    const Vec3d& a, const Vec3d& b, const Vec3d& c, const Vec3d& p, Vec3d& uvw);
+
+
+/// @brief  Closest Point on Line Segment to Point. Given segment @c ab and
+///         point @c p, returns the point on @c ab closest to @c p and @c t the 
+///         parametric distance to @c b.
+///
+/// @param a    The segments's first vertex point.
+/// @param b    The segments's second vertex point.
+/// @param p    Point to compute the closest point on @c ab for.
+/// @param t    Parametric distance to @c b.
+OPENVDB_API Vec3d
+closestPointOnSegmentToPoint(
+    const Vec3d& a, const Vec3d& b, const Vec3d& p, double& t);
 
 
 ////////////////////////////////////////

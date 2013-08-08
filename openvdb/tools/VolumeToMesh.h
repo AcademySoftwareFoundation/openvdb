@@ -1080,7 +1080,7 @@ Merge<DistTreeT>::operator()(const tbb::blocked_range<size_t>& range) const
 
 
 template <typename IntTreeT>
-class RegionCount 
+class RegionCount
 {
 public:
     typedef typename IntTreeT::template ValueConverter<bool>::Type BoolTreeT;
@@ -2311,7 +2311,7 @@ BoundaryMaskGen<SrcTreeT>::operator()(const tbb::blocked_range<size_t>& range)
     typename SrcTreeT::LeafNodeType::ValueOnCIter iter;
 
     for (size_t n = range.begin(); n != range.end(); ++n) {
- 
+
         const typename SrcTreeT::LeafNodeType&
             leaf = mLeafManager.leaf(n);
 
@@ -2444,7 +2444,7 @@ AuxiliaryData<SrcTreeT, LeafManagerT, AuxDataT>::operator()(const tbb::blocked_r
     if (!mExtraCheck) {
         for (size_t n = range.begin(); n != range.end(); ++n) {
 
-            
+
             for (iter = mLeafManager.leaf(n).cbeginValueOn(); iter; ++iter) {
 
                 ijk = iter.getCoord();
@@ -3466,7 +3466,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
             meshGen.setRefData(refData);
             meshGen.runParallel();
         } else {
-            
+
             internal::MeshGen<DistTreeT, internal::AdaptiveMeshOp>
                 meshGen(edgeLeafs, *auxTree, mPolygons);
             meshGen.setRefData(refData);
@@ -3478,14 +3478,17 @@ VolumeToMesh::operator()(const GridT& distGrid)
     // automatic mesh partitioning is enabled.
     if (mPartitions > 1 && !noAdaptivity) {
 
-        bool usedPointMask[mPointListSize];
-        for (size_t n = 0; n < mPointListSize; ++n) {
-            usedPointMask[n] = false;
+        boost::scoped_array<bool> usedPointMask;
+        if (mPointListSize > 0) {
+            usedPointMask.reset(new bool[mPointListSize]);
+            for (size_t n = 0; n < mPointListSize; ++n) {
+                usedPointMask[n] = false;
+            }
         }
 
         for (size_t n = 0; n < mPolygonPoolListSize; ++n) {
             const PolygonPool& polygons = mPolygons[n];
-            
+
             for (size_t i = 0; i < polygons.numQuads(); ++i) {
                 const Vec4I& quad = polygons.quad(i);
                 usedPointMask[quad[0]] = true;

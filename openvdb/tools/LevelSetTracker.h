@@ -366,6 +366,7 @@ normalize()
 
     for (int n=0, e=mTracker.getNormCount(); n < e; ++n) {
 
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
         switch(TemporalScheme) {//switch is resolved at compile-time
         case math::TVD_RK1:
             //std::cerr << "1";
@@ -415,6 +416,7 @@ normalize()
         default:
             OPENVDB_THROW(ValueError, "Temporal integration scheme not supported!");
         }
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
     mTracker.mLeafs->removeAuxBuffers();
 }

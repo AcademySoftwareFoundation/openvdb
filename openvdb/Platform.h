@@ -81,12 +81,15 @@
 /// In the above, <tt>NodeType::LEVEL == 0</tt> is a compile-time constant expression,
 /// so for some template instantiations, the line below it is unreachable.
 #if defined(__INTEL_COMPILER)
-    // Disable ICC remark #111 ("statement is unreachable") and
-    // remark #185 ("dynamic initialization in unreachable code").
+    // Disable ICC remarks 111 ("statement is unreachable"), 128 ("loop is not reachable"),
+    // 185 ("dynamic initialization in unreachable code"), and 280 ("selector expression
+    // is constant").
     #define OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN \
         _Pragma("warning (push)") \
         _Pragma("warning (disable:111)") \
-        _Pragma("warning (disable:185)")
+        _Pragma("warning (disable:128)") \
+        _Pragma("warning (disable:185)") \
+        _Pragma("warning (disable:280)")
     #define OPENVDB_NO_UNREACHABLE_CODE_WARNING_END \
         _Pragma("warning (pop)")
 #else

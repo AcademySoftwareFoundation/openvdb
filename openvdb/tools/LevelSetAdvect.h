@@ -98,6 +98,10 @@ private:
 
 /// @brief Analytical, divergence-free and periodic vecloity field
 /// @note Primarily intended for debugging!
+/// @warning This analytical velocity only produce meaningfull values
+/// in the unitbox in world space. In other words make sure any level
+/// set surface in fully enclodes in the axis aligned bounding box
+/// spanning 0->1 in world units.
 template <typename ScalarT = float>
 class EnrightField
 {

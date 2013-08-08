@@ -233,46 +233,64 @@ void TestRay::testDDA()
     using namespace openvdb;
     typedef math::Ray<double>  RayType;
     
-    {// test simple voxel traversal
-        typedef math::DDA<RayType> DDAType;     
-        const RayType::Vec3T dir(1, 0, 0);
-        const RayType::Vec3T eye(0, 0, 0);
-        
-        RayType ray(eye, dir);
-        DDAType dda(ray);
-        
-        for (int i=0; i<10; ++i) {
-            CPPUNIT_ASSERT(dda.voxel()==Coord(i, 0, 0));
-            ASSERT_DOUBLES_APPROX_EQUAL(1.0+i,dda.step());
+    {// test voxel traversal along both directions of each axis
+        typedef math::DDA<RayType> DDAType;
+        const RayType::Vec3T eye( 0, 0, 0);
+        for (int s = -1; s<=1; s+=2) {
+            for (int a = 0; a<3; ++a) {
+                const int d[3]={s*(a==0), s*(a==1), s*(a==2)};
+                const RayType::Vec3T dir(d[0], d[1], d[2]);
+                RayType ray(eye, dir);
+                DDAType dda(ray);
+                CPPUNIT_ASSERT(dda.voxel()==Coord(0,0,0));
+                //std::cerr << "\nray: "<<ray<<std::endl; 
+                for (int i=0; i<10; ++i) {
+                    //std::cerr << "i="<<i<<" voxel="<<dda.voxel()<<" time="<<dda.time()<<std::endl;
+                    CPPUNIT_ASSERT(dda.voxel()==Coord(i*d[0], i*d[1], i*d[2]));
+                    ASSERT_DOUBLES_APPROX_EQUAL(1.0+i,dda.step());
+                }
+            }
         }
     }
-    {// test simple LeafNode traversal
-        typedef math::DDA<RayType,3> DDAType;     
-        const RayType::Vec3T dir(1, 0, 0);
+    {// test Node traversal along both directions of each axis
+        typedef math::DDA<RayType,3> DDAType;
         const RayType::Vec3T eye(0, 0, 0);
-        
-        RayType ray(eye, dir);
-        DDAType dda(ray);
-        CPPUNIT_ASSERT(dda.voxel()==Coord(0,0,0));
-        
-        for (int i=0; i<10; ++i) {
-            CPPUNIT_ASSERT(dda.voxel()==Coord(8*i, 0, 0));
-            ASSERT_DOUBLES_APPROX_EQUAL(8.0+8*i,dda.step());
+
+        for (int s = -1; s<=1; s+=2) {
+            for (int a = 0; a<3; ++a) {
+                const int d[3]={s*(a==0), s*(a==1), s*(a==2)};
+                const RayType::Vec3T dir(d[0], d[1], d[2]);
+                RayType ray(eye, dir);
+                DDAType dda(ray);
+                CPPUNIT_ASSERT(dda.voxel()==Coord(0,0,0));
+                //std::cerr << "\nray: "<<ray<<std::endl; 
+                for (int i=0; i<10; ++i) {
+                    //std::cerr << "i="<<i<<" voxel="<<dda.voxel()<<" time="<<dda.time()<<std::endl;
+                    CPPUNIT_ASSERT(dda.voxel()==Coord(8*i*d[0],8*i*d[1],8*i*d[2]));
+                    ASSERT_DOUBLES_APPROX_EQUAL(8.0+8*i,dda.step());
+                }
+            }
         }
     }
 
-    {// test simple LeafNode traversal
-        typedef math::DDA<RayType,3> DDAType;     
-        const RayType::Vec3T dir(0, 2, 0);
+    {// test accelerated Node traversal along both directions of each axis
+        typedef math::DDA<RayType,3> DDAType;
         const RayType::Vec3T eye(0, 0, 0);
-        
-        RayType ray(eye, dir);
-        DDAType dda(ray);
-        CPPUNIT_ASSERT(dda.voxel()==Coord(0,0,0));
-        
-        for (int i=0; i<10; ++i) {
-            CPPUNIT_ASSERT(dda.voxel()==Coord(0, 8*i, 0));
-            ASSERT_DOUBLES_APPROX_EQUAL(4.0+4*i,dda.step());
+
+        for (int s = -1; s<=1; s+=2) {
+            for (int a = 0; a<3; ++a) {
+                const int d[3]={s*(a==0), s*(a==1), s*(a==2)};
+                const RayType::Vec3T dir(2*d[0], 2*d[1], 2*d[2]);
+                RayType ray(eye, dir);
+                DDAType dda(ray);
+                CPPUNIT_ASSERT(dda.voxel()==Coord(0,0,0));
+                //std::cerr << "\nray: "<<ray<<std::endl; 
+                for (int i=0; i<10; ++i) {
+                    //std::cerr << "i="<<i<<" voxel="<<dda.voxel()<<" time="<<dda.time()<<std::endl;
+                    CPPUNIT_ASSERT(dda.voxel()==Coord(8*i*d[0],8*i*d[1],8*i*d[2]));
+                    ASSERT_DOUBLES_APPROX_EQUAL(4.0+4*i,dda.step());
+                }
+            }
         }
     }
     

@@ -291,8 +291,8 @@ public:
         /// @note These methods don't perform meaningful operations.
         bool operator< (const EdgeData&) const { return false; };
         bool operator> (const EdgeData&) const { return false; };
-        template<class T> EdgeData operator+(const T&) const { return *this; };
-        template<class T> EdgeData operator-(const T&) const { return *this; };
+        template<class T> EdgeData operator+(const T&) const { return *this; }
+        template<class T> EdgeData operator-(const T&) const { return *this; }
         EdgeData operator-() const { return *this; }
         //@}
 

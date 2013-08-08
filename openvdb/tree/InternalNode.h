@@ -272,20 +272,26 @@ public:
     /// Otherwise, return the result of calling getLastValue() on the child.
     const ValueType& getLastValue() const;
 
-    /// Set the active state at the given coordinates, but don't change its value.
+    /// Set the active state at the given coordinates but don't change its value.
     void setActiveState(const Coord& xyz, bool on);
-
-    /// Mark the voxel at the given coordinates as inactive, but don't change its value.
+    /// Set the value of the voxel at the given coordinates but don't change its active state.
+    void setValueOnly(const Coord& xyz, const ValueType& value);
+    /// Mark the voxel at the given coordinates as active but don't change its value.
+    void setValueOn(const Coord& xyz);
+    /// Change the value of the voxel at the given coordinates and mark the voxel as active.
+    void setValueOn(const Coord& xyz, const ValueType& value);
+    /// Mark the voxel at the given coordinates as inactive but don't change its value.
     void setValueOff(const Coord& xyz);
-    /// Change the value of the voxel at the given coordinates and mark the voxel as inactive.
+    /// Set the value of the voxel at the given coordinates and mark the voxel as inactive.
     void setValueOff(const Coord& xyz, const ValueType& value);
 
-    void setValueOn(const Coord& xyz);
-    void setValueOn(const Coord& xyz, const ValueType& value);
-    void setValueOnly(const Coord& xyz, const ValueType& value);
-    void setValueOnMin(const Coord& xyz, const ValueType& value);
-    void setValueOnMax(const Coord& xyz, const ValueType& value);
-    void setValueOnSum(const Coord& xyz, const ValueType& value);
+    /// @brief Apply a functor to the value of the voxel at the given coordinates
+    /// and mark the voxel as active.
+    template<typename ModifyOp>
+    void modifyValue(const Coord& xyz, const ModifyOp& op);
+    /// Apply a functor to the voxel at the given coordinates.
+    template<typename ModifyOp>
+    void modifyValueAndActiveState(const Coord& xyz, const ModifyOp& op);
 
     /// @brief Set all voxels within an axis-aligned box to a constant value.
     /// (The min and max coordinates are inclusive.)
@@ -293,11 +299,9 @@ public:
 
     /// @brief Copy into a dense grid the values of the voxels that lie within
     /// a given bounding box.
-    ///
     /// @param bbox   inclusive bounding box of the voxels to be copied into the dense grid
     /// @param dense  dense grid with a stride in @e z of one (see tools::Dense
     ///               in tools/Dense.h for the required API)
-    ///
     /// @note @a bbox is assumed to be identical to or contained in the coordinate domains
     /// of both the dense grid and this node, i.e., no bounds checking is performed.
     template<typename DenseT>
@@ -331,13 +335,20 @@ public:
     template<typename AccessorT>
     void setValueOnlyAndCache(const Coord& xyz, const ValueType& value, AccessorT&);
 
-    /// Set the value of the voxel at the given coordinates to the sum of its current
-    /// value and the given value, and mark the voxel as active.
+    /// @brief Apply a functor to the value of the voxel at the given coordinates
+    /// and mark the voxel as active.
     /// If necessary, update the accessor with pointers to the nodes along the path
     /// from the root node to the node containing the voxel.
     /// @note Used internally by ValueAccessor.
-    template<typename AccessorT>
-    void setValueOnSumAndCache(const Coord& xyz, const ValueType& value, AccessorT&);
+    template<typename ModifyOp, typename AccessorT>
+    void modifyValueAndCache(const Coord& xyz, const ModifyOp& op, AccessorT&);
+
+    /// Apply a functor to the voxel at the given coordinates.
+    /// If necessary, update the accessor with pointers to the nodes along the path
+    /// from the root node to the node containing the voxel.
+    /// @note Used internally by ValueAccessor.
+    template<typename ModifyOp, typename AccessorT>
+    void modifyValueAndActiveStateAndCache(const Coord& xyz, const ModifyOp& op, AccessorT&);
 
     /// Change the value of the voxel at the given coordinates and mark it as inactive.
     /// If necessary, update the accessor with pointers to the nodes along the path
@@ -353,9 +364,10 @@ public:
     template<typename AccessorT>
     void setActiveStateAndCache(const Coord& xyz, bool on, AccessorT&);
 
-    /// Return @c true if the voxel at the given coordinates is active, change the voxel's
-    /// value, and, if necessary, update the accessor with pointers to the nodes along
+    /// Return, in @a value, the value of the voxel at the given coordinates and,
+    /// if necessary, update the accessor with pointers to the nodes along
     /// the path from the root node to the node containing the voxel.
+    /// @return @c true if the voxel at the given coordinates is active
     /// @note Used internally by ValueAccessor.
     template<typename AccessorT>
     bool probeValueAndCache(const Coord& xyz, ValueType& value, AccessorT&) const;
@@ -372,6 +384,7 @@ public:
     /// Mark all values (both tiles and voxels) as active.
     void setValuesOn();
 
+
     //
     // I/O
     //
@@ -380,38 +393,39 @@ public:
     void writeBuffers(std::ostream&, bool toHalf = false) const;
     void readBuffers(std::istream&, bool fromHalf = false);
 
-    /// @brief Overwrites the inactive values with a new value whos
-    /// magnitude is equal to the specified background value and sign
-    /// is consistant with the lexicographically closest active value.
-    /// The net effect is a propagation of signs from the active to the
-    /// inactive values. Note this flood-filling is also performed on
-    /// any child nodes.
-    ///
-    /// @note This method is primarily useful for propagating the sign
-    /// from the (active) voxels in a narrow-band level set to the
-    /// inactive values outside the narrow band.
+
+    //
+    // Aux methods
+    //
+    /// @brief Overwrite each inactive value in this node and in any child nodes with
+    /// a new value whose magnitude is equal to the specified background value and whose
+    /// sign is consistent with that of the lexicographically closest active value.
+    /// @details This is primarily useful for propagating the sign from the (active) voxels
+    /// in a narrow-band level set to the inactive voxels outside the narrow band.
     void signedFloodFill(const ValueType& background);
 
-    /// @brief Sets the inactive values to either the outside or inside
-    /// value, depending on the sign of the closest corresponding
-    /// active value. More specefically, an inactive value is set to
-    /// the outside value if the closest active value in the
-    /// lexicographic direction is positive, else it is set to the
-    /// inside value. Note this operation is also performed on any child nodes.
+    /// @brief Overwrite each inactive value in this node and in any child nodes with
+    /// either @a outside or @a inside, depending on the sign of the lexicographically
+    /// closest active value.
+    /// @details Specifically, an inactive value is set to @a outside if the closest active
+    /// value in the lexicographic direction is positive, otherwise it is set to @a inside.
     void signedFloodFill(const ValueType& outside, const ValueType& inside);
 
     /// Change the sign of all the values represented in this node and
     /// its child nodes.
     void negate();
 
-    /// Replace active tiles with dense voxels, i.e., with active leaf nodes.
+    /// Densify active tiles, i.e., replace them with leaf-level active voxels.
     void voxelizeActiveTiles();
 
-    /// @brief Simple merge: Nodes and values of this node are always unchanged!
-    ///
-    /// @note Nodes and values of the other node are simply merged into this
-    /// node and the other tree is cannibalized in the process!
+    /// @brief Efficiently merge another tree into this tree using one of several schemes.
+    /// @warning This operation cannibalizes the other tree.
+    template<MergePolicy Policy>
     void merge(InternalNode& other, const ValueType& background, const ValueType& otherBackground);
+
+    /// @brief Merge, using one of several schemes, this node (and its descendants)
+    /// with a tile of the same dimensions and the given value and active state.
+    template<MergePolicy Policy> void merge(const ValueType& tileValue, bool tileActive);
 
     /// @brief Union this branch's set of active values with the other branch's
     /// active values.  The value type of the other branch can be different.
@@ -522,7 +536,7 @@ public:
     NodeType* probeNodeAndCache(const Coord& xyz, AccessorT&);
     template<typename NodeType, typename AccessorT>
     const NodeType* probeConstNodeAndCache(const Coord& xyz, AccessorT&) const;
-    
+
     /// @brief Return a pointer to the leaf node that contains voxel (x, y, z).
     /// If no such node exists, return NULL.
     LeafNodeType* probeLeaf(const Coord& xyz)
@@ -961,7 +975,7 @@ InternalNode<ChildT, Log2Dim>::probeConstNode(const Coord& xyz) const
             : child->template probeConstNode<NodeT>(xyz);
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
- 
+
 template<typename ChildT, Index Log2Dim>
 template<typename NodeT, typename AccessorT>
 inline const NodeT*
@@ -1154,7 +1168,7 @@ InternalNode<ChildT, Log2Dim>::touchLeafAndCache(const Coord& xyz, AccessorT& ac
     acc.insert(xyz, mNodes[n].getChild());
     return mNodes[n].getChild()->touchLeafAndCache(xyz, acc);
 }
- 
+
 
 ////////////////////////////////////////
 
@@ -1548,91 +1562,123 @@ InternalNode<ChildT, Log2Dim>::setValuesOn()
 
 
 template<typename ChildT, Index Log2Dim>
+template<typename ModifyOp>
 inline void
-InternalNode<ChildT, Log2Dim>::setValueOnMin(const Coord& xyz, const ValueType& value)
+InternalNode<ChildT, Log2Dim>::modifyValue(const Coord& xyz, const ModifyOp& op)
 {
     const Index n = InternalNode::coord2offset(xyz);
     bool hasChild = this->isChildMaskOn(n);
     if (!hasChild) {
+        // Need to create a child if the tile is inactive,
+        // in order to activate voxel (x, y, z).
         const bool active = this->isValueMaskOn(n);
-        if (!active || (mNodes[n].getValue() > value)) {
-            // If the voxel belongs to a tile that is either inactive or that
-            // has a constant value that is greater than the one provided,
-            // a child subtree must be constructed.
-            mChildMask.setOn(n); // we're adding a child node so set the mask on
-            mValueMask.setOff(n); // value mask is always off if child mask is on
+        bool createChild = !active;
+        if (!createChild) {
+            // Need to create a child if applying the functor
+            // to the tile value produces a different value.
+            const ValueType& tileVal = mNodes[n].getValue();
+            ValueType modifiedVal = tileVal;
+            op(modifiedVal);
+            createChild = !math::isExactlyEqual(tileVal, modifiedVal);
+        }
+        if (createChild) {
+            mChildMask.setOn(n); // we're adding a child node, so set the mask on
+            mValueMask.setOff(n); // value mask is always off wherever child mask is on
             hasChild = true;
             mNodes[n].setChild(new ChildNodeType(xyz, mNodes[n].getValue(), active));
         }
     }
-    if (hasChild) mNodes[n].getChild()->setValueOnMin(xyz, value);
+    if (hasChild) mNodes[n].getChild()->modifyValue(xyz, op);
 }
 
-
 template<typename ChildT, Index Log2Dim>
+template<typename ModifyOp, typename AccessorT>
 inline void
-InternalNode<ChildT, Log2Dim>::setValueOnMax(const Coord& xyz, const ValueType& value)
+InternalNode<ChildT, Log2Dim>::modifyValueAndCache(const Coord& xyz, const ModifyOp& op,
+    AccessorT& acc)
 {
     const Index n = InternalNode::coord2offset(xyz);
     bool hasChild = this->isChildMaskOn(n);
     if (!hasChild) {
+        // Need to create a child if the tile is inactive,
+        // in order to activate voxel (x, y, z).
         const bool active = this->isValueMaskOn(n);
-        if (!active || (value > mNodes[n].getValue())) {
-            // If the voxel belongs to a tile that is either inactive or that
-            // has a constant value that is less than the one provided,
-            // a child subtree must be constructed.
-            mChildMask.setOn(n); // we're adding a child node so set the mask on
-            mValueMask.setOff(n); // value mask is always off if child mask is on
-            hasChild = true;
-            mNodes[n].setChild(new ChildNodeType(xyz, mNodes[n].getValue(), active));
+        bool createChild = !active;
+        if (!createChild) {
+            // Need to create a child if applying the functor
+            // to the tile value produces a different value.
+            const ValueType& tileVal = mNodes[n].getValue();
+            ValueType modifiedVal = tileVal;
+            op(modifiedVal);
+            createChild = !math::isExactlyEqual(tileVal, modifiedVal);
         }
-    }
-    if (hasChild) mNodes[n].getChild()->setValueOnMax(xyz, value);
-}
-
-
-template<typename ChildT, Index Log2Dim>
-inline void
-InternalNode<ChildT, Log2Dim>::setValueOnSum(const Coord& xyz, const ValueType& addend)
-{
-    const Index n = InternalNode::coord2offset(xyz);
-    bool hasChild = this->isChildMaskOn(n);
-    if (!hasChild) {
-        const bool active = this->isValueMaskOn(n);
-        if (!active || !math::isExactlyEqual(addend, zeroVal<ValueType>())) {
-            // If the voxel belongs to a tile that is inactive or if
-            // the addend is nonzero, a child subtree must be constructed.
-            mChildMask.setOn(n);//  we're adding a child node so set the mask on
-            mValueMask.setOff(n);// value mask is always off if child mask is on
-            hasChild = true;
-            mNodes[n].setChild(new ChildNodeType(xyz, mNodes[n].getValue(), active));
-        }
-    }
-    if (hasChild) mNodes[n].getChild()->setValueOnSum(xyz, addend);
-}
-
-template<typename ChildT, Index Log2Dim>
-template<typename AccessorT>
-inline void
-InternalNode<ChildT, Log2Dim>::setValueOnSumAndCache(const Coord& xyz,
-    const ValueType& addend, AccessorT& acc)
-{
-    const Index n = this->coord2offset(xyz);
-    bool hasChild = this->isChildMaskOn(n);
-    if (!hasChild) {
-        const bool active = this->isValueMaskOn(n);
-        if (!active || !math::isExactlyEqual(addend, zeroVal<ValueType>())) {
-            // If the voxel belongs to a tile that is inactive or if
-            // the addend is nonzero, a child subtree must be constructed.
-            mChildMask.setOn(n); // we're adding a child node so set the mask on
-            mValueMask.setOff(n); // value mask is always off if child mask is on
+        if (createChild) {
+            mChildMask.setOn(n); // we're adding a child node, so set the mask on
+            mValueMask.setOff(n); // value mask is always off wherever child mask is on
             hasChild = true;
             mNodes[n].setChild(new ChildNodeType(xyz, mNodes[n].getValue(), active));
         }
     }
     if (hasChild) {
-        acc.insert(xyz, mNodes[n].getChild());
-        mNodes[n].getChild()->setValueOnSumAndCache(xyz, addend, acc);
+        ChildNodeType* child = mNodes[n].getChild();
+        acc.insert(xyz, child);
+        child->modifyValueAndCache(xyz, op, acc);
+    }
+}
+
+
+template<typename ChildT, Index Log2Dim>
+template<typename ModifyOp>
+inline void
+InternalNode<ChildT, Log2Dim>::modifyValueAndActiveState(const Coord& xyz, const ModifyOp& op)
+{
+    const Index n = InternalNode::coord2offset(xyz);
+    bool hasChild = this->isChildMaskOn(n);
+    if (!hasChild) {
+        const bool tileState = this->isValueMaskOn(n);
+        const ValueType& tileVal = mNodes[n].getValue();
+        bool modifiedState = !tileState;
+        ValueType modifiedVal = tileVal;
+        op(modifiedVal, modifiedState);
+        // Need to create a child if applying the functor to the tile
+        // produces a different value or active state.
+        if (modifiedState != tileState || !math::isExactlyEqual(modifiedVal, tileVal)) {
+            mChildMask.setOn(n); // we're adding a child node, so set the mask on
+            mValueMask.setOff(n); // value mask is always off wherever child mask is on
+            hasChild = true;
+            mNodes[n].setChild(new ChildNodeType(xyz, tileVal, tileState));
+        }
+    }
+    if (hasChild) mNodes[n].getChild()->modifyValueAndActiveState(xyz, op);
+}
+
+template<typename ChildT, Index Log2Dim>
+template<typename ModifyOp, typename AccessorT>
+inline void
+InternalNode<ChildT, Log2Dim>::modifyValueAndActiveStateAndCache(
+    const Coord& xyz, const ModifyOp& op, AccessorT& acc)
+{
+    const Index n = InternalNode::coord2offset(xyz);
+    bool hasChild = this->isChildMaskOn(n);
+    if (!hasChild) {
+        const bool tileState = this->isValueMaskOn(n);
+        const ValueType& tileVal = mNodes[n].getValue();
+        bool modifiedState = !tileState;
+        ValueType modifiedVal = tileVal;
+        op(modifiedVal, modifiedState);
+        // Need to create a child if applying the functor to the tile
+        // produces a different value or active state.
+        if (modifiedState != tileState || !math::isExactlyEqual(modifiedVal, tileVal)) {
+            mChildMask.setOn(n); // we're adding a child node, so set the mask on
+            mValueMask.setOff(n); // value mask is always off wherever child mask is on
+            hasChild = true;
+            mNodes[n].setChild(new ChildNodeType(xyz, tileVal, tileState));
+        }
+    }
+    if (hasChild) {
+        ChildNodeType* child = mNodes[n].getChild();
+        acc.insert(xyz, child);
+        child->modifyValueAndActiveStateAndCache(xyz, op, acc);
     }
 }
 
@@ -1915,36 +1961,149 @@ InternalNode<ChildT, Log2Dim>::voxelizeActiveTiles()
 }
 
 
+////////////////////////////////////////
+
+
 template<typename ChildT, Index Log2Dim>
+template<MergePolicy Policy>
 inline void
 InternalNode<ChildT, Log2Dim>::merge(InternalNode& other,
     const ValueType& background, const ValueType& otherBackground)
 {
-    for (ChildOnIter iter = other.beginChildOn(); iter; ++iter) {
-        const Index n = iter.pos();
-        if (mChildMask.isOff(n)) { // transfer node
-            ChildNodeType* child = other.mNodes[n].getChild();
-            other.mChildMask.setOff(n);
-            // Note other's new tile value is undefined which is okay since
-            // other is assumed to be cannibalized in the process of merging!
-            child->resetBackground(otherBackground, background);
-            mChildMask.setOn(n);
-            mValueMask.setOff(n);
-            mNodes[n].setChild(child);
-        } else {
-            mNodes[n].getChild()->merge(*iter, background, otherBackground);
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+
+    switch (Policy) {
+
+    case MERGE_ACTIVE_STATES:
+    default:
+    {
+        for (ChildOnIter iter = other.beginChildOn(); iter; ++iter) {
+            const Index n = iter.pos();
+            if (mChildMask.isOn(n)) {
+                // Merge this node's child with the other node's child.
+                mNodes[n].getChild()->template merge<MERGE_ACTIVE_STATES>(*iter,
+                    background, otherBackground);
+            } else if (mValueMask.isOff(n)) {
+                // Replace this node's inactive tile with the other node's child
+                // and replace the other node's child with a tile of undefined value
+                // (which is okay since the other tree is assumed to be cannibalized
+                // in the process of merging).
+                ChildNodeType* child = other.mNodes[n].getChild();
+                other.mChildMask.setOff(n);
+                child->resetBackground(otherBackground, background);
+                mChildMask.setOn(n);
+                mValueMask.setOff(n);
+                mNodes[n].setChild(child);
+            }
         }
+
+        // Copy active tile values.
+        for (ValueOnCIter iter = other.cbeginValueOn(); iter; ++iter) {
+            const Index n = iter.pos();
+            if (mValueMask.isOff(n)) {
+                // Replace this node's child or inactive tile with the other node's active tile.
+                this->makeChildNodeEmpty(n, iter.getValue());
+                mValueMask.setOn(n);
+            }
+        }
+        break;
     }
 
-    // Copy active tile values.
-    for (ValueOnCIter iter = other.cbeginValueOn(); iter; ++iter) {
+    case MERGE_NODES:
+    {
+        for (ChildOnIter iter = other.beginChildOn(); iter; ++iter) {
+            const Index n = iter.pos();
+            if (mChildMask.isOn(n)) {
+                // Merge this node's child with the other node's child.
+                mNodes[n].getChild()->template merge<Policy>(*iter, background, otherBackground);
+            } else {
+                // Replace this node's tile (regardless of its active state) with
+                // the other node's child and replace the other node's child with
+                // a tile of undefined value (which is okay since the other tree
+                // is assumed to be cannibalized in the process of merging).
+                ChildNodeType* child = other.mNodes[n].getChild();
+                other.mChildMask.setOff(n);
+                child->resetBackground(otherBackground, background);
+                this->setChildNode(n, child);
+            }
+        }
+        break;
+    }
+
+    case MERGE_ACTIVE_STATES_AND_NODES:
+    {
+        // Transfer children from the other tree to this tree.
+        for (ChildOnIter iter = other.beginChildOn(); iter; ++iter) {
+            const Index n = iter.pos();
+            if (mChildMask.isOn(n)) {
+                // Merge this node's child with the other node's child.
+                mNodes[n].getChild()->template merge<Policy>(*iter, background, otherBackground);
+            } else {
+                // Replace this node's tile with the other node's child, leaving the other
+                // node with an inactive tile of undefined value (which is okay since
+                // the other tree is assumed to be cannibalized in the process of merging).
+                ChildNodeType* child = other.mNodes[n].getChild();
+                other.mChildMask.setOff(n);
+                child->resetBackground(otherBackground, background);
+                if (mValueMask.isOn(n)) {
+                    // Merge the child with this node's active tile.
+                    child->merge<Policy>(mNodes[n].getValue(), /*on=*/true);
+                    mValueMask.setOff(n);
+                }
+                mChildMask.setOn(n);
+                mNodes[n].setChild(child);
+            }
+        }
+
+        // Merge active tiles into this tree.
+        for (ValueOnCIter iter = other.cbeginValueOn(); iter; ++iter) {
+            const Index n = iter.pos();
+            if (mChildMask.isOn(n)) {
+                // Merge the other node's active tile into this node's child.
+                mNodes[n].getChild()->template merge<Policy>(iter.getValue(), /*on=*/true);
+            } else if (mValueMask.isOff(n)) {
+                // Replace this node's inactive tile with the other node's active tile.
+                mNodes[n].setValue(iter.getValue());
+                mValueMask.setOn(n);
+            }
+        }
+        break;
+    }
+
+    }
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+}
+
+
+template<typename ChildT, Index Log2Dim>
+template<MergePolicy Policy>
+inline void
+InternalNode<ChildT, Log2Dim>::merge(const ValueType& tileValue, bool tileActive)
+{
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+
+    if (Policy != MERGE_ACTIVE_STATES_AND_NODES) return;
+
+    // For MERGE_ACTIVE_STATES_AND_NODES, inactive tiles in the other tree are ignored.
+    if (!tileActive) return;
+
+    // Iterate over this node's children and inactive tiles.
+    for (ValueOffIter iter = beginValueOff(); iter; ++iter) {
         const Index n = iter.pos();
-        if (mChildMask.isOff(n) && mValueMask.isOff(n)) {
-            mNodes[n].setValue(iter.getValue());
+        if (mChildMask.isOn(n)) {
+            // Merge the other node's active tile into this node's child.
+            mNodes[n].getChild()->template merge<Policy>(tileValue, /*on=*/true);
+        } else {
+            // Replace this node's inactive tile with the other node's active tile.
+            iter.setValue(tileValue);
             mValueMask.setOn(n);
         }
     }
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
+
+
+////////////////////////////////////////
 
 
 template<typename ChildT, Index Log2Dim>

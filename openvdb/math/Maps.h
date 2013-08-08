@@ -184,9 +184,9 @@ public:
     virtual Vec3d applyInverseMap(const Vec3d& in) const = 0;
 
     virtual Vec3d applyIJT(const Vec3d& in) const = 0;
-    virtual Vec3d applyIJT(const Vec3d& in, const Vec3d& pos) const = 0;
+    virtual Vec3d applyIJT(const Vec3d& in, const Vec3d& domainPos) const = 0;
     virtual Mat3d applyIJC(const Mat3d& m) const = 0;
-    virtual Mat3d applyIJC(const Mat3d& m, const Vec3d& v, const Vec3d& pos) const = 0;
+    virtual Mat3d applyIJC(const Mat3d& m, const Vec3d& v, const Vec3d& domainPos) const = 0;
 
 
     virtual double determinant() const = 0;
@@ -219,6 +219,20 @@ public:
     virtual MapBase::Ptr postShear(double shear, Axis axis0, Axis axis1) const = 0;
     //@}
 
+    //@{
+    /// @brief new methods to apply the Jacobian and the Jacobian Transpose
+    /// to an input vector.  The Jacobian Transpose will take a range-space 
+    /// vector to a domain-space vector (e.g. world to index)
+    /// These methods are not compatible with the version of OpenVDB in 
+    /// Houdini 12.5 and prior.
+    virtual Vec3d applyJacobian(const Vec3d& in) const = 0;
+    virtual Vec3d applyJacobian(const Vec3d& in, const Vec3d& domainPos) const = 0;
+    
+    virtual Vec3d applyJT(const Vec3d& in) const = 0;
+    virtual Vec3d applyJT(const Vec3d& in, const Vec3d& domainPos) const = 0;
+    //@}
+    
+    
 protected:
     MapBase() {}
 
@@ -399,6 +413,14 @@ public:
         return Vec3d( m[ 0] * in[0] + m[ 4] * in[1] + m[ 8] * in[2],
                       m[ 1] * in[0] + m[ 5] * in[1] + m[ 9] * in[2],
                       m[ 2] * in[0] + m[ 6] * in[1] + m[10] * in[2] );
+    }
+    
+    /// Return the Jacobian Transpose of the map applied to @a in.
+    /// This tranforms range-space gradients to domain-space gradients
+    Vec3d applyJT(const Vec3d& in, const Vec3d&) const { return applyJT(in); }
+    /// Return the Jacobian Transpose of the map applied to @a in.
+    Vec3d applyJT(const Vec3d& in) const {
+        return mMatrix * in;
     }
 
     /// Return the transpose of the inverse Jacobian of the map applied to @a in.
@@ -706,6 +728,13 @@ public:
     Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const { return applyJacobian(in); }
     /// Return the Jacobian of the map applied to @a in.
     Vec3d applyJacobian(const Vec3d& in) const { return applyMap(in); }
+    
+    /// Return the Jacobian Transpose of the map applied to @a in.
+    /// This tranforms range-space gradients to domain-space gradients
+    Vec3d applyJT(const Vec3d& in, const Vec3d&) const { return applyJT(in); }
+    /// Return the Jacobian Transpose of the map applied to @a in.
+    Vec3d applyJT(const Vec3d& in) const { return applyMap(in); }
+
 
 
     /// @brief Return the transpose of the inverse Jacobian of the map applied to @a in.
@@ -958,7 +987,13 @@ public:
     Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const { return applyJacobian(in); }
     /// Return the Jacobian of the map applied to @a in.
     Vec3d applyJacobian(const Vec3d& in) const { return in; }
-
+    
+    /// Return the Jacobian Transpose of the map applied to @a in.
+    /// This tranforms range-space gradients to domain-space gradients
+    Vec3d applyJT(const Vec3d& in, const Vec3d&) const { return applyJT(in); }
+    /// Return the Jacobian Transpose of the map applied to @a in.
+    Vec3d applyJT(const Vec3d& in) const { return in; }
+    
     /// @brief Return the transpose of the inverse Jacobian (Identity for TranslationMap)
     /// of the map applied to @c in, ignores second argument
     Vec3d applyIJT(const Vec3d& in, const Vec3d& ) const { return applyIJT(in);}
@@ -1184,6 +1219,12 @@ public:
     Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const { return applyJacobian(in); }
     /// Return the Jacobian of the map applied to @a in.
     Vec3d applyJacobian(const Vec3d& in) const { return in * mScaleValues; }
+
+    /// Return the Jacobian Transpose of the map applied to @a in.
+    /// This tranforms range-space gradients to domain-space gradients
+    Vec3d applyJT(const Vec3d& in, const Vec3d&) const { return applyJT(in); }
+    /// Return the Jacobian Transpose of the map applied to @a in.
+    Vec3d applyJT(const Vec3d& in) const { return applyJacobian(in); }
 
     /// @brief Return the transpose of the inverse Jacobian of the map applied to @a in
     /// @details Ignores second argument
@@ -1614,6 +1655,16 @@ public:
     Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const { return applyJacobian(in); }
     /// Return the Jacobian of the map applied to @a in.
     Vec3d applyJacobian(const Vec3d& in) const { return applyMap(in); }
+    
+    /// Return the Jacobian Transpose of the map applied to @a in.
+    /// This tranforms range-space gradients to domain-space gradients
+    Vec3d applyJT(const Vec3d& in, const Vec3d&) const { return applyJT(in); }
+    /// Return the Jacobian Transpose of the map applied to @a in.
+    Vec3d applyJT(const Vec3d& in) const { 
+        // The transpose of the unitary map is its inverse
+        return applyInverseMap(in); 
+    }
+
 
     /// @brief Return the transpose of the inverse Jacobian of the map applied to @a in
     /// @details Ignores second argument
@@ -1960,6 +2011,36 @@ public:
                         mDepthOnLz * in.z());
 
         return mSecondMap.applyJacobian(tmp);
+    }
+
+
+    /// Return the Jacobian Transpose of the map applied to vector @c in at @c indexloc.
+    /// This tranforms range-space gradients to domain-space gradients.
+    ///
+    Vec3d applyJT(const Vec3d& in, const Vec3d& isloc) const { 
+        const Vec3d tmp = mSecondMap.applyJT(in);
+        // Move the center of the x-face of the bbox
+        // to the origin in index space.
+        Vec3d centered(isloc);
+        centered = centered - mBBox.min();
+        centered.x() -= mXo;
+        centered.y() -= mYo;
+
+        // scale the z-direction on depth / K count
+        const double zprime = centered.z()*mDepthOnLz;
+
+        const double scale = (mGamma * zprime + 1.) / mLx;
+        const double scale2 = mGamma * mDepthOnLz / mLx;
+
+        return Vec3d(scale * tmp.x(),
+                     scale * tmp.y(),
+                     scale2 * centered.x()* tmp.x() + 
+                     scale2 * centered.y()* tmp.y() +
+                     mDepthOnLz * tmp.z());
+    }
+    /// Return the Jacobian Transpose of the second map applied to @c in.
+    Vec3d applyJT(const Vec3d& in) const { 
+        return mSecondMap.applyJT(in);
     }
 
     /// Return the transpose of the inverse Jacobian of the linear second map applied to @c in

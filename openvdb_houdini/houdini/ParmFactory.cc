@@ -374,7 +374,7 @@ ParmFactory::setSpareData(const std::map<std::string, std::string>& items)
 {
     typedef std::map<std::string, std::string> StringMap;
     if (!items.empty()) {
-        PRM_SpareData* data = new PRM_SpareData(NULL);
+        PRM_SpareData* data = new PRM_SpareData;
         for (StringMap::const_iterator i = items.begin(), e = items.end(); i != e; ++i) {
             data->addTokenValue(i->first.c_str(), i->second.c_str());
         }

@@ -42,7 +42,7 @@
 #include <boost/algorithm/string/trim.hpp>
 
 #ifdef DWA_OPENVDB
-#include <simd/Simd.h> 
+#include <simd/Simd.h>
 #endif
 
 namespace openvdb {
@@ -255,7 +255,7 @@ biasedGradientSchemeToMenuName(BiasedGradientScheme bgs)
 
 ////////////////////////////////////////
 
-    
+
 /// @brief Temporal integrations schemes
 // Add new items to the *end* of this list, and update NUM_TEMPORAL_SCHEMES.
 enum TemporalIntegrationScheme {
@@ -296,7 +296,7 @@ stringToTemporalIntegrationScheme(const std::string& s)
     } else if (str == temporalIntegrationSchemeToString(TVD_RK3)) {
         ret = TVD_RK3;
     }
-    
+
     return ret;
 }
 
@@ -369,13 +369,13 @@ inline Real GudonovsNormSqrd(bool isOutside,
         dPLen2 += Max(Pow2(Min(dP_zm, zero)), Pow2(Max(dP_zp,zero))); // (dP/dz)2
     }
     return dPLen2; // |\nabla\phi|^2
-};
+}
 
 
 template <typename Real>
 inline Real GudonovsNormSqrd(bool isOutside, const Vec3<Real>& gradient_m, const Vec3<Real>& gradient_p)
 {
-    return GudonovsNormSqrd<Real>(isOutside, 
+    return GudonovsNormSqrd<Real>(isOutside,
                                   gradient_m[0], gradient_p[0],
                                   gradient_m[1], gradient_p[1],
                                   gradient_m[2], gradient_p[2]);
@@ -447,7 +447,7 @@ struct D1
 
     template<typename Accessor>
     static typename Accessor::ValueType inZ(const Accessor& grid, const Coord& ijk);
-    
+
     // stencil access version
     template<typename Stencil>
     static typename Stencil::ValueType inX(const Stencil& S);
@@ -486,14 +486,14 @@ struct D1<CD_2NDT>
     {
         return difference(grid.getValue(ijk.offsetBy(0, 0, 1)), grid.getValue(ijk.offsetBy( 0, 0, -1)));
     }
-    
+
     // stencil access version
     template<typename Stencil>
     static typename Stencil::ValueType inX(const Stencil& S)
     {
         return difference( S.template getValue< 1, 0, 0>(),  S.template getValue<-1, 0, 0>());
     }
-    
+
     template<typename Stencil>
     static typename Stencil::ValueType inY(const Stencil& S)
     {
@@ -517,7 +517,7 @@ struct D1<CD_2ND>
         return (xp1 - xm1)*ValueType(0.5);
     }
 
-    
+
     // random access
     template<typename Accessor>
     static typename Accessor::ValueType inX(const Accessor& grid, const Coord& ijk)
@@ -537,7 +537,7 @@ struct D1<CD_2ND>
         return difference(grid.getValue(ijk.offsetBy(0, 0, 1)), grid.getValue(ijk.offsetBy( 0, 0, -1)));
     }
 
- 
+
     // stencil access version
     template<typename Stencil>
     static typename Stencil::ValueType inX(const Stencil& S)
@@ -545,7 +545,7 @@ struct D1<CD_2ND>
         typedef typename Stencil::ValueType ValueType;
         return difference(S.template getValue< 1, 0, 0>(), S.template getValue<-1, 0, 0>());
     }
-    template<typename Stencil> 
+    template<typename Stencil>
     static typename Stencil::ValueType inY(const Stencil& S)
     {
         typedef typename Stencil::ValueType ValueType;
@@ -564,14 +564,14 @@ struct D1<CD_2ND>
 template<>
 struct D1<CD_4TH>
 {
-    
+
     // the difference opperator
     template <typename ValueType>
-    static ValueType difference( const ValueType& xp2, const ValueType& xp1, 
+    static ValueType difference( const ValueType& xp2, const ValueType& xp1,
                                  const ValueType& xm1, const ValueType& xm2 ) {
         return ValueType(2./3.)*(xp1 - xm1) + ValueType(1./12.)*(xm2 - xp2) ;
     }
-    
+
 
     // random access version
     template<typename Accessor>
@@ -579,52 +579,52 @@ struct D1<CD_4TH>
     {
         return difference( grid.getValue(ijk.offsetBy( 2,0,0)), grid.getValue(ijk.offsetBy( 1,0,0)),
                            grid.getValue(ijk.offsetBy(-1,0,0)), grid.getValue(ijk.offsetBy(-2,0,0)) );
-                          
+
     }
 
     template<typename Accessor>
     static typename Accessor::ValueType inY(const Accessor& grid, const Coord& ijk)
     {
-        
+
         return difference( grid.getValue(ijk.offsetBy( 0, 2, 0)), grid.getValue(ijk.offsetBy( 0, 1, 0)),
                            grid.getValue(ijk.offsetBy( 0,-1, 0)), grid.getValue(ijk.offsetBy( 0,-2, 0)) );
-        
+
     }
 
     template<typename Accessor>
     static typename Accessor::ValueType inZ(const Accessor& grid, const Coord& ijk)
     {
-   
+
         return difference( grid.getValue(ijk.offsetBy( 0, 0, 2)), grid.getValue(ijk.offsetBy( 0, 0, 1)),
                            grid.getValue(ijk.offsetBy( 0, 0,-1)), grid.getValue(ijk.offsetBy( 0, 0,-2)) );
     }
 
-    
+
     // stencil access version
     template<typename Stencil>
     static typename Stencil::ValueType inX(const Stencil& S)
     {
-        return difference( S.template getValue< 2, 0, 0>(), 
+        return difference( S.template getValue< 2, 0, 0>(),
                            S.template getValue< 1, 0, 0>(),
-                           S.template getValue<-1, 0, 0>(), 
+                           S.template getValue<-1, 0, 0>(),
                            S.template getValue<-2, 0, 0>() );
     }
 
     template<typename Stencil>
     static typename Stencil::ValueType inY(const Stencil& S)
     {
-        return difference( S.template getValue< 0, 2, 0>(), 
+        return difference( S.template getValue< 0, 2, 0>(),
                            S.template getValue< 0, 1, 0>(),
-                           S.template getValue< 0,-1, 0>(), 
+                           S.template getValue< 0,-1, 0>(),
                            S.template getValue< 0,-2, 0>() );
     }
 
     template<typename Stencil>
     static typename Stencil::ValueType inZ(const Stencil& S)
     {
-        return difference( S.template getValue< 0, 0, 2>(), 
+        return difference( S.template getValue< 0, 0, 2>(),
                            S.template getValue< 0, 0, 1>(),
-                           S.template getValue< 0, 0,-1>(), 
+                           S.template getValue< 0, 0,-1>(),
                            S.template getValue< 0, 0,-2>() );
     }
 };
@@ -632,16 +632,16 @@ struct D1<CD_4TH>
 template<>
 struct D1<CD_6TH>
 {
-    
+
     // the difference opperator
     template <typename ValueType>
-    static ValueType difference( const ValueType& xp3, const ValueType& xp2, const ValueType& xp1, 
+    static ValueType difference( const ValueType& xp3, const ValueType& xp2, const ValueType& xp1,
                                  const ValueType& xm1, const ValueType& xm2, const ValueType& xm3 ) {
         return ValueType(3./4.)*(xp1 - xm1) - ValueType(0.15)*(xp2 - xm2) + ValueType(1./60.)*(xp3-xm3);
     }
-    
 
-    // random access version 
+
+    // random access version
     template<typename Accessor>
     static typename Accessor::ValueType inX(const Accessor& grid, const Coord& ijk)
     {
@@ -657,7 +657,7 @@ struct D1<CD_6TH>
                            grid.getValue(ijk.offsetBy( 0, 1,0)),  grid.getValue(ijk.offsetBy( 0,-1,0)),
                            grid.getValue(ijk.offsetBy( 0,-2,0)),  grid.getValue(ijk.offsetBy( 0,-3,0)));
     }
-    
+
     template<typename Accessor>
     static typename Accessor::ValueType inZ(const Accessor& grid, const Coord& ijk)
     {
@@ -665,40 +665,40 @@ struct D1<CD_6TH>
                            grid.getValue(ijk.offsetBy( 0, 0, 1)),  grid.getValue(ijk.offsetBy( 0, 0,-1)),
                            grid.getValue(ijk.offsetBy( 0, 0,-2)),  grid.getValue(ijk.offsetBy( 0, 0,-3)));
     }
-    
+
     // stencil access version
     template<typename Stencil>
     static typename Stencil::ValueType inX(const Stencil& S)
-    {          
-        return  difference(S.template getValue< 3, 0, 0>(), 
+    {
+        return  difference(S.template getValue< 3, 0, 0>(),
                            S.template getValue< 2, 0, 0>(),
-                           S.template getValue< 1, 0, 0>(), 
+                           S.template getValue< 1, 0, 0>(),
                            S.template getValue<-1, 0, 0>(),
-                           S.template getValue<-2, 0, 0>(), 
+                           S.template getValue<-2, 0, 0>(),
                            S.template getValue<-3, 0, 0>());
     }
 
     template<typename Stencil>
     static typename Stencil::ValueType inY(const Stencil& S)
     {
-                  
-        return  difference( S.template getValue< 0, 3, 0>(), 
+
+        return  difference( S.template getValue< 0, 3, 0>(),
                             S.template getValue< 0, 2, 0>(),
-                            S.template getValue< 0, 1, 0>(), 
+                            S.template getValue< 0, 1, 0>(),
                             S.template getValue< 0,-1, 0>(),
-                            S.template getValue< 0,-2, 0>(), 
+                            S.template getValue< 0,-2, 0>(),
                             S.template getValue< 0,-3, 0>());
     }
 
     template<typename Stencil>
     static typename Stencil::ValueType inZ(const Stencil& S)
     {
-                     
-        return  difference( S.template getValue< 0, 0, 3>(), 
+
+        return  difference( S.template getValue< 0, 0, 3>(),
                             S.template getValue< 0, 0, 2>(),
-                            S.template getValue< 0, 0, 1>(), 
+                            S.template getValue< 0, 0, 1>(),
                             S.template getValue< 0, 0,-1>(),
-                            S.template getValue< 0, 0,-2>(), 
+                            S.template getValue< 0, 0,-2>(),
                             S.template getValue< 0, 0,-3>());
     }
 };
@@ -707,15 +707,15 @@ struct D1<CD_6TH>
 template<>
 struct D1<FD_1ST>
 {
-    
+
     // the difference opperator
     template <typename ValueType>
     static ValueType difference(const ValueType& xp1, const ValueType& xp0) {
         return xp1 - xp0;
     }
-    
 
-    // random access version 
+
+    // random access version
     template<typename Accessor>
     static typename Accessor::ValueType inX(const Accessor& grid, const Coord& ijk)
     {
@@ -733,7 +733,7 @@ struct D1<FD_1ST>
     {
         return difference(grid.getValue(ijk.offsetBy(0, 0, 1)), grid.getValue(ijk));
     }
-    
+
     // stencil access version
     template<typename Stencil>
     static typename Stencil::ValueType inX(const Stencil& S)
@@ -758,13 +758,13 @@ struct D1<FD_1ST>
 template<>
 struct D1<FD_2ND>
 {
-    
+
     // the difference opperator
     template <typename ValueType>
     static ValueType difference(const ValueType& xp2, const ValueType& xp1, const ValueType& xp0) {
         return ValueType(2)*xp1 -(ValueType(0.5)*xp2 + ValueType(3./2.)*xp0);
     }
-    
+
 
     // random access version
     template<typename Accessor>
@@ -784,21 +784,21 @@ struct D1<FD_2ND>
     {
         return difference(grid.getValue(ijk.offsetBy(0,0,2)), grid.getValue(ijk.offsetBy(0,0,1)), grid.getValue(ijk));
     }
-    
+
 
     // stencil access version
     template<typename Stencil>
     static typename Stencil::ValueType inX(const Stencil& S)
     {
-        return difference( S.template getValue< 2, 0, 0>(), 
-                           S.template getValue< 1, 0, 0>(), 
+        return difference( S.template getValue< 2, 0, 0>(),
+                           S.template getValue< 1, 0, 0>(),
                            S.template getValue< 0, 0, 0>() );
     }
 
     template<typename Stencil>
     static typename Stencil::ValueType inY(const Stencil& S)
     {
-        return difference( S.template getValue< 0, 2, 0>(), 
+        return difference( S.template getValue< 0, 2, 0>(),
                            S.template getValue< 0, 1, 0>(),
                            S.template getValue< 0, 0, 0>() );
     }
@@ -806,8 +806,8 @@ struct D1<FD_2ND>
     template<typename Stencil>
     static typename Stencil::ValueType inZ(const Stencil& S)
     {
-        return difference( S.template getValue< 0, 0, 2>(), 
-                           S.template getValue< 0, 0, 1>(), 
+        return difference( S.template getValue< 0, 0, 2>(),
+                           S.template getValue< 0, 0, 1>(),
                            S.template getValue< 0, 0, 0>() );
     }
 
@@ -817,68 +817,68 @@ struct D1<FD_2ND>
 template<>
 struct D1<FD_3RD>
 {
-    
+
     // the difference opperator
     template <typename ValueType>
     static ValueType difference(const ValueType& xp3, const ValueType& xp2, const ValueType& xp1, const ValueType& xp0) {
         return ValueType(1./3.)*xp3 - ValueType(1.5)*xp2 + ValueType(3.)*xp1 - ValueType(11./6.)*xp0;
     }
-    
+
 
     // random access version
     template<typename Accessor>
     static typename Accessor::ValueType inX(const Accessor& grid, const Coord& ijk)
     {
-        return difference( grid.getValue(ijk.offsetBy(3,0,0)), 
+        return difference( grid.getValue(ijk.offsetBy(3,0,0)),
                            grid.getValue(ijk.offsetBy(2,0,0)),
-                           grid.getValue(ijk.offsetBy(1,0,0)), 
+                           grid.getValue(ijk.offsetBy(1,0,0)),
                            grid.getValue(ijk) );
     }
 
     template<typename Accessor>
     static typename Accessor::ValueType inY(const Accessor& grid, const Coord& ijk)
     {
-        return difference( grid.getValue(ijk.offsetBy(0,3,0)), 
+        return difference( grid.getValue(ijk.offsetBy(0,3,0)),
                            grid.getValue(ijk.offsetBy(0,2,0)),
-                           grid.getValue(ijk.offsetBy(0,1,0)), 
+                           grid.getValue(ijk.offsetBy(0,1,0)),
                            grid.getValue(ijk) );
     }
 
     template<typename Accessor>
     static typename Accessor::ValueType inZ(const Accessor& grid, const Coord& ijk)
     {
-        return difference( grid.getValue(ijk.offsetBy(0,0,3)), 
+        return difference( grid.getValue(ijk.offsetBy(0,0,3)),
                            grid.getValue(ijk.offsetBy(0,0,2)),
-                           grid.getValue(ijk.offsetBy(0,0,1)), 
+                           grid.getValue(ijk.offsetBy(0,0,1)),
                            grid.getValue(ijk) );
     }
 
-    
+
     // stencil access version
     template<typename Stencil>
     static typename Stencil::ValueType inX(const Stencil& S)
     {
-        return difference(S.template getValue< 3, 0, 0>(), 
+        return difference(S.template getValue< 3, 0, 0>(),
                           S.template getValue< 2, 0, 0>(),
-                          S.template getValue< 1, 0, 0>(), 
+                          S.template getValue< 1, 0, 0>(),
                           S.template getValue< 0, 0, 0>() );
     }
 
     template<typename Stencil>
     static typename Stencil::ValueType inY(const Stencil& S)
     {
-        return difference(S.template getValue< 0, 3, 0>(), 
+        return difference(S.template getValue< 0, 3, 0>(),
                           S.template getValue< 0, 2, 0>(),
-                          S.template getValue< 0, 1, 0>(), 
+                          S.template getValue< 0, 1, 0>(),
                           S.template getValue< 0, 0, 0>() );
     }
 
     template<typename Stencil>
     static typename Stencil::ValueType inZ(const Stencil& S)
     {
-        return difference( S.template getValue< 0, 0, 3>(), 
+        return difference( S.template getValue< 0, 0, 3>(),
                            S.template getValue< 0, 0, 2>(),
-                           S.template getValue< 0, 0, 1>(), 
+                           S.template getValue< 0, 0, 1>(),
                            S.template getValue< 0, 0, 0>() );
     }
 };
@@ -887,13 +887,13 @@ struct D1<FD_3RD>
 template<>
 struct D1<BD_1ST>
 {
-   
+
     // the difference opperator
     template <typename ValueType>
     static ValueType difference(const ValueType& xm1, const ValueType& xm0) {
         return -D1<FD_1ST>::difference(xm1, xm0);
     }
-    
+
 
     // random access version
     template<typename Accessor>
@@ -914,7 +914,7 @@ struct D1<BD_1ST>
         return difference(grid.getValue(ijk.offsetBy(0, 0,-1)), grid.getValue(ijk));
     }
 
-    
+
     // stencil access version
     template<typename Stencil>
     static typename Stencil::ValueType inX(const Stencil& S)
@@ -939,45 +939,45 @@ struct D1<BD_1ST>
 template<>
 struct D1<BD_2ND>
 {
-    
+
     // the difference opperator
     template <typename ValueType>
     static ValueType difference(const ValueType& xm2, const ValueType& xm1, const ValueType& xm0) {
         return -D1<FD_2ND>::difference(xm2, xm1, xm0);
     }
-    
+
 
     // random access version
     template<typename Accessor>
     static typename Accessor::ValueType inX(const Accessor& grid, const Coord& ijk)
     {
-        return difference( grid.getValue(ijk.offsetBy(-2,0,0)), 
-                           grid.getValue(ijk.offsetBy(-1,0,0)), 
+        return difference( grid.getValue(ijk.offsetBy(-2,0,0)),
+                           grid.getValue(ijk.offsetBy(-1,0,0)),
                            grid.getValue(ijk) );
     }
 
     template<typename Accessor>
     static typename Accessor::ValueType inY(const Accessor& grid, const Coord& ijk)
     {
-        return difference( grid.getValue(ijk.offsetBy(0,-2,0)), 
-                           grid.getValue(ijk.offsetBy(0,-1,0)), 
+        return difference( grid.getValue(ijk.offsetBy(0,-2,0)),
+                           grid.getValue(ijk.offsetBy(0,-1,0)),
                            grid.getValue(ijk) );
     }
 
     template<typename Accessor>
     static typename Accessor::ValueType inZ(const Accessor& grid, const Coord& ijk)
     {
-        return difference( grid.getValue(ijk.offsetBy(0,0,-2)), 
-                           grid.getValue(ijk.offsetBy(0,0,-1)), 
+        return difference( grid.getValue(ijk.offsetBy(0,0,-2)),
+                           grid.getValue(ijk.offsetBy(0,0,-1)),
                            grid.getValue(ijk) );
     }
-    
+
     // stencil access version
     template<typename Stencil>
     static typename Stencil::ValueType inX(const Stencil& S)
     {
         return difference( S.template getValue<-2, 0, 0>(),
-                           S.template getValue<-1, 0, 0>(), 
+                           S.template getValue<-1, 0, 0>(),
                            S.template getValue< 0, 0, 0>() );
     }
 
@@ -985,7 +985,7 @@ struct D1<BD_2ND>
     static typename Stencil::ValueType inY(const Stencil& S)
     {
         return difference( S.template getValue< 0,-2, 0>(),
-                           S.template getValue< 0,-1, 0>(), 
+                           S.template getValue< 0,-1, 0>(),
                            S.template getValue< 0, 0, 0>() );
     }
 
@@ -993,7 +993,7 @@ struct D1<BD_2ND>
     static typename Stencil::ValueType inZ(const Stencil& S)
     {
         return difference( S.template getValue< 0, 0,-2>(),
-                           S.template getValue< 0, 0,-1>(), 
+                           S.template getValue< 0, 0,-1>(),
                            S.template getValue< 0, 0, 0>() );
     }
 };
@@ -1002,13 +1002,13 @@ struct D1<BD_2ND>
 template<>
 struct D1<BD_3RD>
 {
-     
+
     // the difference opperator
     template <typename ValueType>
-    static ValueType difference(const ValueType& xm3, const ValueType& xm2, const ValueType& xm1, const ValueType& xm0){ 
+    static ValueType difference(const ValueType& xm3, const ValueType& xm2, const ValueType& xm1, const ValueType& xm0){
         return -D1<FD_3RD>::difference(xm3, xm2, xm1, xm0);
     }
-    
+
     // random access version
     template<typename Accessor>
     static typename Accessor::ValueType inX(const Accessor& grid, const Coord& ijk)
@@ -1036,7 +1036,7 @@ struct D1<BD_3RD>
                            grid.getValue(ijk.offsetBy( 0, 0,-1)),
                            grid.getValue(ijk) );
     }
-    
+
     // stencil access version
     template<typename Stencil>
     static typename Stencil::ValueType inX(const Stencil& S)
@@ -1072,7 +1072,7 @@ struct D1<FD_WENO5>
 {
     // the difference opperator
     template <typename ValueType>
-    static ValueType difference(const ValueType& xp3, const ValueType& xp2, 
+    static ValueType difference(const ValueType& xp3, const ValueType& xp2,
                                 const ValueType& xp1, const ValueType& xp0,
                                 const ValueType& xm1, const ValueType& xm2) {
         return WENO5<ValueType>(xp3, xp2, xp1, xp0, xm1)
@@ -1130,23 +1130,23 @@ struct D1<FD_WENO5>
     template<typename Stencil>
     static typename Stencil::ValueType inX(const Stencil& S)
     {
-        
-        return difference( S.template getValue< 3, 0, 0>(), 
-                           S.template getValue< 2, 0, 0>(), 
-                           S.template getValue< 1, 0, 0>(), 
-                           S.template getValue< 0, 0, 0>(), 
+
+        return difference( S.template getValue< 3, 0, 0>(),
+                           S.template getValue< 2, 0, 0>(),
+                           S.template getValue< 1, 0, 0>(),
+                           S.template getValue< 0, 0, 0>(),
                            S.template getValue<-1, 0, 0>(),
                            S.template getValue<-2, 0, 0>() );
-       
+
     }
 
     template<typename Stencil>
     static typename Stencil::ValueType inY(const Stencil& S)
     {
-        return difference( S.template getValue< 0, 3, 0>(), 
-                           S.template getValue< 0, 2, 0>(), 
-                           S.template getValue< 0, 1, 0>(), 
-                           S.template getValue< 0, 0, 0>(), 
+        return difference( S.template getValue< 0, 3, 0>(),
+                           S.template getValue< 0, 2, 0>(),
+                           S.template getValue< 0, 1, 0>(),
+                           S.template getValue< 0, 0, 0>(),
                            S.template getValue< 0,-1, 0>(),
                            S.template getValue< 0,-2, 0>() );
     }
@@ -1154,11 +1154,11 @@ struct D1<FD_WENO5>
     template<typename Stencil>
     static typename Stencil::ValueType inZ(const Stencil& S)
     {
-        
-        return difference( S.template getValue< 0, 0, 3>(), 
-                           S.template getValue< 0, 0, 2>(), 
-                           S.template getValue< 0, 0, 1>(), 
-                           S.template getValue< 0, 0, 0>(), 
+
+        return difference( S.template getValue< 0, 0, 3>(),
+                           S.template getValue< 0, 0, 2>(),
+                           S.template getValue< 0, 0, 1>(),
+                           S.template getValue< 0, 0, 0>(),
                            S.template getValue< 0, 0,-1>(),
                            S.template getValue< 0, 0,-2>() );
     }
@@ -1167,10 +1167,10 @@ struct D1<FD_WENO5>
 template<>
 struct D1<FD_HJWENO5>
 {
-    
+
     // the difference opperator
     template <typename ValueType>
-    static ValueType difference(const ValueType& xp3, const ValueType& xp2, 
+    static ValueType difference(const ValueType& xp3, const ValueType& xp2,
                                 const ValueType& xp1, const ValueType& xp0,
                                 const ValueType& xm1, const ValueType& xm2) {
         return WENO5<ValueType>(xp3 - xp2, xp2 - xp1, xp1 - xp0, xp0-xm1, xm1-xm2);
@@ -1227,23 +1227,23 @@ struct D1<FD_HJWENO5>
     template<typename Stencil>
     static typename Stencil::ValueType inX(const Stencil& S)
     {
-        
-        return difference( S.template getValue< 3, 0, 0>(), 
-                           S.template getValue< 2, 0, 0>(), 
-                           S.template getValue< 1, 0, 0>(), 
-                           S.template getValue< 0, 0, 0>(), 
+
+        return difference( S.template getValue< 3, 0, 0>(),
+                           S.template getValue< 2, 0, 0>(),
+                           S.template getValue< 1, 0, 0>(),
+                           S.template getValue< 0, 0, 0>(),
                            S.template getValue<-1, 0, 0>(),
                            S.template getValue<-2, 0, 0>() );
-       
+
     }
 
     template<typename Stencil>
     static typename Stencil::ValueType inY(const Stencil& S)
     {
-        return difference( S.template getValue< 0, 3, 0>(), 
-                           S.template getValue< 0, 2, 0>(), 
-                           S.template getValue< 0, 1, 0>(), 
-                           S.template getValue< 0, 0, 0>(), 
+        return difference( S.template getValue< 0, 3, 0>(),
+                           S.template getValue< 0, 2, 0>(),
+                           S.template getValue< 0, 1, 0>(),
+                           S.template getValue< 0, 0, 0>(),
                            S.template getValue< 0,-1, 0>(),
                            S.template getValue< 0,-2, 0>() );
     }
@@ -1251,28 +1251,28 @@ struct D1<FD_HJWENO5>
     template<typename Stencil>
     static typename Stencil::ValueType inZ(const Stencil& S)
     {
-        
-        return difference( S.template getValue< 0, 0, 3>(), 
-                           S.template getValue< 0, 0, 2>(), 
-                           S.template getValue< 0, 0, 1>(), 
-                           S.template getValue< 0, 0, 0>(), 
+
+        return difference( S.template getValue< 0, 0, 3>(),
+                           S.template getValue< 0, 0, 2>(),
+                           S.template getValue< 0, 0, 1>(),
+                           S.template getValue< 0, 0, 0>(),
                            S.template getValue< 0, 0,-1>(),
                            S.template getValue< 0, 0,-2>() );
     }
-    
+
 };
 
 template<>
 struct D1<BD_WENO5>
 {
-    
+
     template<typename ValueType>
     static ValueType difference(const ValueType& xm3, const ValueType& xm2, const ValueType& xm1,
                                 const ValueType& xm0, const ValueType& xp1, const ValueType& xp2) {
         return -D1<FD_WENO5>::difference(xm3, xm2, xm1, xm0, xp1, xp2);
     }
-    
-    
+
+
     // random access version
     template<typename Accessor>
     static typename Accessor::ValueType inX(const Accessor& grid, const Coord& ijk)
@@ -1491,7 +1491,7 @@ struct D1Vec
         return D1<DiffScheme>::inZ(grid, ijk)[n];
     }
 
-    
+
     // stencil access version
     template<typename Stencil>
     static typename Stencil::ValueType::value_type inX(const Stencil& S, int n)
@@ -1521,43 +1521,43 @@ struct D1Vec<CD_2NDT>
     template<typename Accessor>
     static typename Accessor::ValueType::value_type inX(const Accessor& grid, const Coord& ijk, int n)
     {
-        return D1<CD_2NDT>::difference( grid.getValue(ijk.offsetBy( 1, 0, 0))[n], 
+        return D1<CD_2NDT>::difference( grid.getValue(ijk.offsetBy( 1, 0, 0))[n],
                                         grid.getValue(ijk.offsetBy(-1, 0, 0))[n] );
     }
 
     template<typename Accessor>
     static typename Accessor::ValueType::value_type inY(const Accessor& grid, const Coord& ijk, int n)
     {
-        return D1<CD_2NDT>::difference( grid.getValue(ijk.offsetBy(0, 1, 0))[n], 
+        return D1<CD_2NDT>::difference( grid.getValue(ijk.offsetBy(0, 1, 0))[n],
                                         grid.getValue(ijk.offsetBy(0,-1, 0))[n] );
     }
 
     template<typename Accessor>
     static typename Accessor::ValueType::value_type inZ(const Accessor& grid, const Coord& ijk, int n)
     {
-        return D1<CD_2NDT>::difference( grid.getValue(ijk.offsetBy(0, 0, 1))[n], 
+        return D1<CD_2NDT>::difference( grid.getValue(ijk.offsetBy(0, 0, 1))[n],
                                         grid.getValue(ijk.offsetBy(0, 0,-1))[n] );
     }
-    
+
     // stencil access version
     template<typename Stencil>
     static typename Stencil::ValueType::value_type inX(const Stencil& S, int n)
     {
-        return D1<CD_2NDT>::difference( S.template getValue< 1, 0, 0>()[n], 
+        return D1<CD_2NDT>::difference( S.template getValue< 1, 0, 0>()[n],
                                         S.template getValue<-1, 0, 0>()[n] );
     }
 
     template<typename Stencil>
     static typename Stencil::ValueType::value_type inY(const Stencil& S, int n)
     {
-        return D1<CD_2NDT>::difference( S.template getValue< 0, 1, 0>()[n], 
+        return D1<CD_2NDT>::difference( S.template getValue< 0, 1, 0>()[n],
                                         S.template getValue< 0,-1, 0>()[n] );
     }
 
     template<typename Stencil>
     static typename Stencil::ValueType::value_type inZ(const Stencil& S, int n)
     {
-        return D1<CD_2NDT>::difference( S.template getValue< 0, 0, 1>()[n], 
+        return D1<CD_2NDT>::difference( S.template getValue< 0, 0, 1>()[n],
                                         S.template getValue< 0, 0,-1>()[n] );
     }
 };
@@ -1572,7 +1572,7 @@ struct D1Vec<CD_2ND>
     {
         return D1<CD_2ND>::difference( grid.getValue(ijk.offsetBy( 1, 0, 0))[n] ,
                                        grid.getValue(ijk.offsetBy(-1, 0, 0))[n] );
-    } 
+    }
 
     template<typename Accessor>
     static typename Accessor::ValueType::value_type inY(const Accessor& grid, const Coord& ijk, int n)
@@ -1588,7 +1588,7 @@ struct D1Vec<CD_2ND>
                                        grid.getValue(ijk.offsetBy(0, 0,-1))[n] );
     }
 
-    
+
     // stencil access version
     template<typename Stencil>
     static typename Stencil::ValueType::value_type inX(const Stencil& S, int n)
@@ -1616,15 +1616,15 @@ struct D1Vec<CD_2ND>
 template<>
 struct D1Vec<CD_4TH> {
     // typedef typename Accessor::ValueType::value_type  value_type;
-    
-    
+
+
     // random access version
     template<typename Accessor>
     static typename Accessor::ValueType::value_type inX(const Accessor& grid, const Coord& ijk, int n) {
         return  D1<CD_4TH>::difference(grid.getValue(ijk.offsetBy(2, 0, 0))[n], grid.getValue(ijk.offsetBy( 1, 0, 0))[n],
                                        grid.getValue(ijk.offsetBy(-1,0, 0))[n], grid.getValue(ijk.offsetBy(-2, 0, 0))[n]);
     }
-    
+
     template<typename Accessor>
     static typename Accessor::ValueType::value_type inY(const Accessor& grid, const Coord& ijk, int n) {
         return  D1<CD_4TH>::difference(grid.getValue(ijk.offsetBy( 0, 2, 0))[n], grid.getValue(ijk.offsetBy( 0, 1, 0))[n],
@@ -1636,23 +1636,23 @@ struct D1Vec<CD_4TH> {
         return  D1<CD_4TH>::difference(grid.getValue(ijk.offsetBy(0,0, 2))[n], grid.getValue(ijk.offsetBy( 0, 0, 1))[n],
                                        grid.getValue(ijk.offsetBy(0,0,-1))[n], grid.getValue(ijk.offsetBy( 0, 0,-2))[n]);
     }
-    
+
     // stencil access version
     template<typename Stencil>
     static typename Stencil::ValueType::value_type inX(const Stencil& S, int n) {
-        return  D1<CD_4TH>::difference(S.template getValue< 2, 0, 0>()[n],  S.template getValue< 1, 0, 0>()[n], 
+        return  D1<CD_4TH>::difference(S.template getValue< 2, 0, 0>()[n],  S.template getValue< 1, 0, 0>()[n],
                                        S.template getValue<-1, 0, 0>()[n],  S.template getValue<-2, 0, 0>()[n] );
     }
-    
+
     template<typename Stencil>
     static typename Stencil::ValueType::value_type inY(const Stencil& S, int n) {
-        return D1<CD_4TH>::difference(S.template getValue< 0, 2, 0>()[n],  S.template getValue< 0, 1, 0>()[n], 
+        return D1<CD_4TH>::difference(S.template getValue< 0, 2, 0>()[n],  S.template getValue< 0, 1, 0>()[n],
                                       S.template getValue< 0,-1, 0>()[n],  S.template getValue< 0,-2, 0>()[n]);
     }
 
     template<typename Stencil>
     static typename Stencil::ValueType::value_type inZ(const Stencil& S, int n) {
-        return D1<CD_4TH>::difference(S.template getValue< 0, 0, 2>()[n],  S.template getValue< 0, 0, 1>()[n], 
+        return D1<CD_4TH>::difference(S.template getValue< 0, 0, 2>()[n],  S.template getValue< 0, 0, 1>()[n],
                                       S.template getValue< 0, 0,-1>()[n],  S.template getValue< 0, 0,-2>()[n]);
     }
 };
@@ -1666,52 +1666,52 @@ struct D1Vec<CD_6TH>
     template<typename Accessor>
     static typename Accessor::ValueType::value_type inX(const Accessor& grid, const Coord& ijk, int n)
     {
-        return D1<CD_6TH>::difference( grid.getValue(ijk.offsetBy( 3, 0, 0))[n],  grid.getValue(ijk.offsetBy( 2, 0, 0))[n], 
-                                       grid.getValue(ijk.offsetBy( 1, 0, 0))[n],  grid.getValue(ijk.offsetBy(-1, 0, 0))[n], 
+        return D1<CD_6TH>::difference( grid.getValue(ijk.offsetBy( 3, 0, 0))[n],  grid.getValue(ijk.offsetBy( 2, 0, 0))[n],
+                                       grid.getValue(ijk.offsetBy( 1, 0, 0))[n],  grid.getValue(ijk.offsetBy(-1, 0, 0))[n],
                                        grid.getValue(ijk.offsetBy(-2, 0, 0))[n],  grid.getValue(ijk.offsetBy(-3, 0, 0))[n] );
     }
 
     template<typename Accessor>
     static typename Accessor::ValueType::value_type inY(const Accessor& grid, const Coord& ijk, int n)
     {
-        
-        return D1<CD_6TH>::difference( grid.getValue(ijk.offsetBy( 0, 3, 0))[n],  grid.getValue(ijk.offsetBy( 0, 2, 0))[n], 
-                                       grid.getValue(ijk.offsetBy( 0, 1, 0))[n],  grid.getValue(ijk.offsetBy( 0,-1, 0))[n], 
+
+        return D1<CD_6TH>::difference( grid.getValue(ijk.offsetBy( 0, 3, 0))[n],  grid.getValue(ijk.offsetBy( 0, 2, 0))[n],
+                                       grid.getValue(ijk.offsetBy( 0, 1, 0))[n],  grid.getValue(ijk.offsetBy( 0,-1, 0))[n],
                                        grid.getValue(ijk.offsetBy( 0,-2, 0))[n],  grid.getValue(ijk.offsetBy( 0,-3, 0))[n] );
     }
 
     template<typename Accessor>
     static typename Accessor::ValueType::value_type inZ(const Accessor& grid, const Coord& ijk, int n)
     {
-        
-        return D1<CD_6TH>::difference( grid.getValue(ijk.offsetBy( 0, 0, 3))[n],  grid.getValue(ijk.offsetBy( 0, 0, 2))[n], 
-                                       grid.getValue(ijk.offsetBy( 0, 0, 1))[n],  grid.getValue(ijk.offsetBy( 0, 0,-1))[n], 
+
+        return D1<CD_6TH>::difference( grid.getValue(ijk.offsetBy( 0, 0, 3))[n],  grid.getValue(ijk.offsetBy( 0, 0, 2))[n],
+                                       grid.getValue(ijk.offsetBy( 0, 0, 1))[n],  grid.getValue(ijk.offsetBy( 0, 0,-1))[n],
                                        grid.getValue(ijk.offsetBy( 0, 0,-2))[n],  grid.getValue(ijk.offsetBy( 0, 0,-3))[n] );
     }
 
-    
+
     // stencil access version
     template<typename Stencil>
     static typename Stencil::ValueType::value_type inX(const Stencil& S, int n)
     {
-        return D1<CD_6TH>::difference( S.template getValue< 3, 0, 0>()[n], S.template getValue< 2, 0, 0>()[n],  
-                                       S.template getValue< 1, 0, 0>()[n], S.template getValue<-1, 0, 0>()[n], 
+        return D1<CD_6TH>::difference( S.template getValue< 3, 0, 0>()[n], S.template getValue< 2, 0, 0>()[n],
+                                       S.template getValue< 1, 0, 0>()[n], S.template getValue<-1, 0, 0>()[n],
                                        S.template getValue<-2, 0, 0>()[n], S.template getValue<-3, 0, 0>()[n] );
     }
 
     template<typename Stencil>
     static typename Stencil::ValueType::value_type inY(const Stencil& S, int n)
-    {        
-        return D1<CD_6TH>::difference( S.template getValue< 0, 3, 0>()[n], S.template getValue< 0, 2, 0>()[n],  
-                                       S.template getValue< 0, 1, 0>()[n], S.template getValue< 0,-1, 0>()[n], 
+    {
+        return D1<CD_6TH>::difference( S.template getValue< 0, 3, 0>()[n], S.template getValue< 0, 2, 0>()[n],
+                                       S.template getValue< 0, 1, 0>()[n], S.template getValue< 0,-1, 0>()[n],
                                        S.template getValue< 0,-2, 0>()[n], S.template getValue< 0,-3, 0>()[n] );
     }
-    
+
     template<typename Stencil>
     static typename Stencil::ValueType::value_type inZ(const Stencil& S, int n)
-    {                
-        return D1<CD_6TH>::difference( S.template getValue< 0, 0, 3>()[n], S.template getValue< 0, 0, 2>()[n],  
-                                       S.template getValue< 0, 0, 1>()[n], S.template getValue< 0, 0,-1>()[n], 
+    {
+        return D1<CD_6TH>::difference( S.template getValue< 0, 0, 3>()[n], S.template getValue< 0, 0, 2>()[n],
+                                       S.template getValue< 0, 0, 1>()[n], S.template getValue< 0, 0,-1>()[n],
                                        S.template getValue< 0, 0,-2>()[n], S.template getValue< 0, 0,-3>()[n] );
     }
 };
@@ -1737,7 +1737,7 @@ struct D2
     template<typename Accessor>
     static typename Accessor::ValueType inYandZ(const Accessor& grid, const Coord& ijk);
 
-    
+
     // stencil access version
     template<typename Stencil>
     static typename Stencil::ValueType inX(const Stencil& S);
@@ -1760,15 +1760,15 @@ struct D2
 template<>
 struct D2<CD_SECOND>
 {
-      
+
     // the difference opperator
     template <typename ValueType>
     static ValueType difference(const ValueType& xp1, const ValueType& xp0, const ValueType& xm1) {
         return xp1 + xm1 - ValueType(2)*xp0;
     }
-  
+
     template <typename ValueType>
-    static ValueType crossdifference(const ValueType& xpyp, const ValueType& xpym, 
+    static ValueType crossdifference(const ValueType& xpyp, const ValueType& xpym,
                                      const ValueType& xmyp, const ValueType& xmym) {
         return ValueType(0.25)*(xpyp + xmym - xpym - xmyp);
     }
@@ -1777,22 +1777,22 @@ struct D2<CD_SECOND>
     template<typename Accessor>
     static typename Accessor::ValueType inX(const Accessor& grid, const Coord& ijk)
     {
-        return difference( grid.getValue(ijk.offsetBy( 1,0,0)), grid.getValue(ijk), 
+        return difference( grid.getValue(ijk.offsetBy( 1,0,0)), grid.getValue(ijk),
                            grid.getValue(ijk.offsetBy(-1,0,0)) );
     }
 
     template<typename Accessor>
     static typename Accessor::ValueType inY(const Accessor& grid, const Coord& ijk)
     {
-        
-        return difference( grid.getValue(ijk.offsetBy(0, 1,0)), grid.getValue(ijk), 
+
+        return difference( grid.getValue(ijk.offsetBy(0, 1,0)), grid.getValue(ijk),
                            grid.getValue(ijk.offsetBy(0,-1,0)) );
     }
 
     template<typename Accessor>
     static typename Accessor::ValueType inZ(const Accessor& grid, const Coord& ijk)
     {
-        return difference( grid.getValue(ijk.offsetBy( 0,0, 1)), grid.getValue(ijk), 
+        return difference( grid.getValue(ijk.offsetBy( 0,0, 1)), grid.getValue(ijk),
                            grid.getValue(ijk.offsetBy( 0,0,-1)) );
     }
 
@@ -1802,7 +1802,7 @@ struct D2<CD_SECOND>
     {
         return crossdifference(grid.getValue(ijk.offsetBy(1, 1,0)), grid.getValue(ijk.offsetBy( 1,-1,0)),
                                grid.getValue(ijk.offsetBy(-1,1,0)), grid.getValue(ijk.offsetBy(-1,-1,0)));
-        
+
     }
 
     template<typename Accessor>
@@ -1819,12 +1819,12 @@ struct D2<CD_SECOND>
                                grid.getValue(ijk.offsetBy(0,-1,1)), grid.getValue(ijk.offsetBy(0,-1,-1)) );
     }
 
-    
+
     // stencil access version
     template<typename Stencil>
     static typename Stencil::ValueType inX(const Stencil& S)
     {
-        return difference( S.template getValue< 1, 0, 0>(), S.template getValue< 0, 0, 0>(), 
+        return difference( S.template getValue< 1, 0, 0>(), S.template getValue< 0, 0, 0>(),
                            S.template getValue<-1, 0, 0>() );
     }
 
@@ -1869,14 +1869,14 @@ struct D2<CD_SECOND>
 template<>
 struct D2<CD_FOURTH>
 {
-    
+
     // the difference opperator
     template <typename ValueType>
     static ValueType difference(const ValueType& xp2, const ValueType& xp1, const ValueType& xp0,
                                 const ValueType& xm1, const ValueType& xm2) {
         return ValueType(-1./12.)*(xp2 + xm2) + ValueType(4./3.)*(xp1 + xm1) -ValueType(2.5)*xp0;
     }
-    
+
     template <typename ValueType>
     static ValueType crossdifference(const ValueType& xp2yp2, const ValueType& xp2yp1,
                                      const ValueType& xp2ym1, const ValueType& xp2ym2,
@@ -1886,40 +1886,40 @@ struct D2<CD_FOURTH>
                                      const ValueType& xm2ym1, const ValueType& xm2ym2,
                                      const ValueType& xm1yp2, const ValueType& xm1yp1,
                                      const ValueType& xm1ym1, const ValueType& xm1ym2 ) {
-        ValueType tmp1 = 
+        ValueType tmp1 =
             ValueType(2./3.0)*(xp1yp1 - xm1yp1 - xp1ym1 + xm1ym1)-
             ValueType(1./12.)*(xp2yp1 - xm2yp1 - xp2ym1 + xm2ym1);
         ValueType tmp2 =
             ValueType(2./3.0)*(xp1yp2 - xm1yp2 - xp1ym2 + xm1ym2)-
-            ValueType(1./12.)*(xp2yp2 - xm2yp2 - xp2ym2 + xm2ym2); 
-    
+            ValueType(1./12.)*(xp2yp2 - xm2yp2 - xp2ym2 + xm2ym2);
+
         return ValueType(2./3.)*tmp1 - ValueType(1./12.)*tmp2;
     }
-    
 
-  
+
+
     // random access version
     template<typename Accessor>
     static typename Accessor::ValueType inX(const Accessor& grid, const Coord& ijk)
     {
-        return difference(grid.getValue(ijk.offsetBy(2,0,0)),  grid.getValue(ijk.offsetBy( 1,0,0)), 
-                          grid.getValue(ijk), 
+        return difference(grid.getValue(ijk.offsetBy(2,0,0)),  grid.getValue(ijk.offsetBy( 1,0,0)),
+                          grid.getValue(ijk),
                           grid.getValue(ijk.offsetBy(-1,0,0)), grid.getValue(ijk.offsetBy(-2, 0, 0)));
     }
 
     template<typename Accessor>
     static typename Accessor::ValueType inY(const Accessor& grid, const Coord& ijk)
     {
-        return difference(grid.getValue(ijk.offsetBy(0, 2,0)), grid.getValue(ijk.offsetBy(0, 1,0)), 
-                          grid.getValue(ijk), 
+        return difference(grid.getValue(ijk.offsetBy(0, 2,0)), grid.getValue(ijk.offsetBy(0, 1,0)),
+                          grid.getValue(ijk),
                           grid.getValue(ijk.offsetBy(0,-1,0)), grid.getValue(ijk.offsetBy(0,-2, 0)));
     }
 
     template<typename Accessor>
     static typename Accessor::ValueType inZ(const Accessor& grid, const Coord& ijk)
     {
-         return difference(grid.getValue(ijk.offsetBy(0,0, 2)), grid.getValue(ijk.offsetBy(0, 0,1)), 
-                           grid.getValue(ijk), 
+         return difference(grid.getValue(ijk.offsetBy(0,0, 2)), grid.getValue(ijk.offsetBy(0, 0,1)),
+                           grid.getValue(ijk),
                            grid.getValue(ijk.offsetBy(0,0,-1)), grid.getValue(ijk.offsetBy(0,0,-2)));
     }
 
@@ -1928,10 +1928,10 @@ struct D2<CD_FOURTH>
     static typename Accessor::ValueType inXandY(const Accessor& grid, const Coord& ijk)
     {
         typedef typename Accessor::ValueType  ValueType;
-        typename Accessor::ValueType tmp1 = 
+        typename Accessor::ValueType tmp1 =
             D1<CD_4TH>::inX(grid, ijk.offsetBy(0, 1, 0)) -
             D1<CD_4TH>::inX(grid, ijk.offsetBy(0,-1, 0));
-        typename Accessor::ValueType tmp2 = 
+        typename Accessor::ValueType tmp2 =
             D1<CD_4TH>::inX(grid, ijk.offsetBy(0, 2, 0)) -
             D1<CD_4TH>::inX(grid, ijk.offsetBy(0,-2, 0));
         return ValueType(2./3.)*tmp1 - ValueType(1./12.)*tmp2;
@@ -1941,10 +1941,10 @@ struct D2<CD_FOURTH>
     static typename Accessor::ValueType inXandZ(const Accessor& grid, const Coord& ijk)
     {
         typedef typename Accessor::ValueType  ValueType;
-        typename Accessor::ValueType tmp1 = 
+        typename Accessor::ValueType tmp1 =
             D1<CD_4TH>::inX(grid, ijk.offsetBy(0, 0, 1)) -
             D1<CD_4TH>::inX(grid, ijk.offsetBy(0, 0,-1));
-        typename Accessor::ValueType tmp2 = 
+        typename Accessor::ValueType tmp2 =
             D1<CD_4TH>::inX(grid, ijk.offsetBy(0, 0, 2)) -
             D1<CD_4TH>::inX(grid, ijk.offsetBy(0, 0,-2));
         return ValueType(2./3.)*tmp1 - ValueType(1./12.)*tmp2;
@@ -1954,38 +1954,38 @@ struct D2<CD_FOURTH>
     static typename Accessor::ValueType inYandZ(const Accessor& grid, const Coord& ijk)
     {
         typedef typename Accessor::ValueType  ValueType;
-        typename Accessor::ValueType tmp1 = 
+        typename Accessor::ValueType tmp1 =
             D1<CD_4TH>::inY(grid, ijk.offsetBy(0, 0, 1)) -
             D1<CD_4TH>::inY(grid, ijk.offsetBy(0, 0,-1));
-        typename Accessor::ValueType tmp2 = 
+        typename Accessor::ValueType tmp2 =
             D1<CD_4TH>::inY(grid, ijk.offsetBy(0, 0, 2)) -
             D1<CD_4TH>::inY(grid, ijk.offsetBy(0, 0,-2));
         return ValueType(2./3.)*tmp1 - ValueType(1./12.)*tmp2;
     }
-    
 
-    // stencil access version 
+
+    // stencil access version
     template<typename Stencil>
     static typename Stencil::ValueType inX(const Stencil& S)
     {
-        return  difference(S.template getValue< 2, 0, 0>(), S.template getValue< 1, 0, 0>(), 
-                           S.template getValue< 0, 0, 0>(), 
+        return  difference(S.template getValue< 2, 0, 0>(), S.template getValue< 1, 0, 0>(),
+                           S.template getValue< 0, 0, 0>(),
                            S.template getValue<-1, 0, 0>(), S.template getValue<-2, 0, 0>() );
     }
 
     template<typename Stencil>
     static typename Stencil::ValueType inY(const Stencil& S)
     {
-        return  difference(S.template getValue< 0, 2, 0>(), S.template getValue< 0, 1, 0>(), 
-                           S.template getValue< 0, 0, 0>(), 
+        return  difference(S.template getValue< 0, 2, 0>(), S.template getValue< 0, 1, 0>(),
+                           S.template getValue< 0, 0, 0>(),
                            S.template getValue< 0,-1, 0>(), S.template getValue< 0,-2, 0>() );
     }
 
     template<typename Stencil>
     static typename Stencil::ValueType inZ(const Stencil& S)
     {
-        return  difference(S.template getValue< 0, 0, 2>(), S.template getValue< 0, 0, 1>(), 
-                           S.template getValue< 0, 0, 0>(), 
+        return  difference(S.template getValue< 0, 0, 2>(), S.template getValue< 0, 0, 1>(),
+                           S.template getValue< 0, 0, 0>(),
                            S.template getValue< 0, 0,-1>(), S.template getValue< 0, 0,-2>() );
     }
 
@@ -2001,7 +2001,7 @@ struct D2<CD_FOURTH>
                                  S.template getValue<-2,-1, 0>(), S.template getValue<-2,-2, 0>(),
                                  S.template getValue<-1, 2, 0>(), S.template getValue<-1, 1, 0>(),
                                  S.template getValue<-1,-1, 0>(), S.template getValue<-1,-2, 0>() );
-     } 
+     }
 
     template<typename Stencil>
     static typename Stencil::ValueType inXandZ(const Stencil& S)
@@ -2015,7 +2015,7 @@ struct D2<CD_FOURTH>
                                 S.template getValue<-1, 0, 2>(), S.template getValue<-1, 0, 1>(),
                                 S.template getValue<-1, 0,-1>(), S.template getValue<-1, 0,-2>() );
     }
- 
+
     template<typename Stencil>
     static typename Stencil::ValueType inYandZ(const Stencil& S)
     {
@@ -2028,7 +2028,7 @@ struct D2<CD_FOURTH>
                                 S.template getValue< 0,-1, 2>(), S.template getValue< 0,-1, 1>(),
                                 S.template getValue< 0,-1,-1>(), S.template getValue< 0,-1,-2>() );
     }
-    
+
 
 
 };
@@ -2036,19 +2036,19 @@ struct D2<CD_FOURTH>
 template<>
 struct D2<CD_SIXTH>
 {
-     
+
     // the difference opperator
     template <typename ValueType>
-    static ValueType difference(const ValueType& xp3, const ValueType& xp2, const ValueType& xp1, 
+    static ValueType difference(const ValueType& xp3, const ValueType& xp2, const ValueType& xp1,
                                 const ValueType& xp0,
                                 const ValueType& xm1, const ValueType& xm2, const ValueType& xm3) {
-        return  ValueType(1./90.)*(xp3 + xm3) - ValueType(3./20.)*(xp2 + xm2)  
+        return  ValueType(1./90.)*(xp3 + xm3) - ValueType(3./20.)*(xp2 + xm2)
               + ValueType(1.5)*(xp1 + xm1) - ValueType(49./18.)*xp0;
     }
-       
+
     template <typename ValueType>
     static ValueType crossdifference( const ValueType& xp1yp1,const ValueType& xm1yp1,
-                                      const ValueType& xp1ym1,const ValueType& xm1ym1, 
+                                      const ValueType& xp1ym1,const ValueType& xm1ym1,
                                       const ValueType& xp2yp1,const ValueType& xm2yp1,
                                       const ValueType& xp2ym1,const ValueType& xm2ym1,
                                       const ValueType& xp3yp1,const ValueType& xm3yp1,
@@ -2064,26 +2064,26 @@ struct D2<CD_SIXTH>
                                       const ValueType& xp2yp3,const ValueType& xm2yp3,
                                       const ValueType& xp2ym3,const ValueType& xm2ym3,
                                       const ValueType& xp3yp3,const ValueType& xm3yp3,
-                                      const ValueType& xp3ym3,const ValueType& xm3ym3 ) 
+                                      const ValueType& xp3ym3,const ValueType& xm3ym3 )
     {
         ValueType tmp1 =
             ValueType(0.7500)*(xp1yp1 - xm1yp1 - xp1ym1 + xm1ym1) -
             ValueType(0.1500)*(xp2yp1 - xm2yp1 - xp2ym1 + xm2ym1) +
             ValueType(1./60.)*(xp3yp1 - xm3yp1 - xp3ym1 + xm3ym1);
-        
+
         ValueType tmp2 =
             ValueType(0.7500)*(xp1yp2 - xm1yp2 - xp1ym2 + xm1ym2) -
             ValueType(0.1500)*(xp2yp2 - xm2yp2 - xp2ym2 + xm2ym2) +
             ValueType(1./60.)*(xp3yp2 - xm3yp2 - xp3ym2 + xm3ym2);
-        
+
         ValueType tmp3 =
             ValueType(0.7500)*(xp1yp3 - xm1yp3 - xp1ym3 + xm1ym3) -
             ValueType(0.1500)*(xp2yp3 - xm2yp3 - xp2ym3 + xm2ym3) +
             ValueType(1./60.)*(xp3yp3 - xm3yp3 - xp3ym3 + xm3ym3);
-        
+
         return ValueType(0.75)*tmp1 - ValueType(0.15)*tmp2 + ValueType(1./60)*tmp3;
     }
-        
+
     // random access version
 
     template<typename Accessor>
@@ -2093,29 +2093,29 @@ struct D2<CD_SIXTH>
                           grid.getValue(ijk.offsetBy( 1, 0, 0)), grid.getValue(ijk),
                           grid.getValue(ijk.offsetBy(-1, 0, 0)), grid.getValue(ijk.offsetBy(-2, 0, 0)),
                           grid.getValue(ijk.offsetBy(-3, 0, 0)) );
-            
+
     }
 
     template<typename Accessor>
     static typename Accessor::ValueType inY(const Accessor& grid, const Coord& ijk)
     {
-        
+
         return difference(grid.getValue(ijk.offsetBy( 0, 3, 0)), grid.getValue(ijk.offsetBy( 0, 2, 0)),
                           grid.getValue(ijk.offsetBy( 0, 1, 0)), grid.getValue(ijk),
                           grid.getValue(ijk.offsetBy( 0,-1, 0)), grid.getValue(ijk.offsetBy( 0,-2, 0)),
                           grid.getValue(ijk.offsetBy( 0,-3, 0)) );
-     
+
     }
 
     template<typename Accessor>
     static typename Accessor::ValueType inZ(const Accessor& grid, const Coord& ijk)
     {
-           
+
         return difference(grid.getValue(ijk.offsetBy( 0, 0, 3)), grid.getValue(ijk.offsetBy( 0, 0, 2)),
                           grid.getValue(ijk.offsetBy( 0, 0, 1)), grid.getValue(ijk),
                           grid.getValue(ijk.offsetBy( 0, 0,-1)), grid.getValue(ijk.offsetBy( 0, 0,-2)),
                           grid.getValue(ijk.offsetBy( 0, 0,-3)) );
-     
+
     }
 
     template<typename Accessor>
@@ -2124,25 +2124,25 @@ struct D2<CD_SIXTH>
         typename Accessor::ValueType tmp1 =
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 1, 0)) -
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0,-1, 0));
-        typename Accessor::ValueType tmp2 = 
+        typename Accessor::ValueType tmp2 =
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 2, 0)) -
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0,-2, 0));
-        typename Accessor::ValueType tmp3 = 
+        typename Accessor::ValueType tmp3 =
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 3, 0)) -
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0,-3, 0));
         return 0.75*tmp1 - 0.15*tmp2 + 1./60*tmp3;
     }
-    
+
     template<typename Accessor>
     static typename Accessor::ValueType inXandZ(const Accessor& grid, const Coord& ijk)
     {
-        typename Accessor::ValueType tmp1 = 
+        typename Accessor::ValueType tmp1 =
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 0, 1)) -
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 0,-1));
-        typename Accessor::ValueType tmp2 = 
+        typename Accessor::ValueType tmp2 =
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 0, 2)) -
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 0,-2));
-        typename Accessor::ValueType tmp3 = 
+        typename Accessor::ValueType tmp3 =
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 0, 3)) -
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 0,-3));
         return 0.75*tmp1 - 0.15*tmp2 + 1./60*tmp3;
@@ -2151,13 +2151,13 @@ struct D2<CD_SIXTH>
     template<typename Accessor>
     static typename Accessor::ValueType inYandZ(const Accessor& grid, const Coord& ijk)
     {
-        typename Accessor::ValueType tmp1 = 
+        typename Accessor::ValueType tmp1 =
             D1<CD_6TH>::inY(grid, ijk.offsetBy(0, 0, 1)) -
             D1<CD_6TH>::inY(grid, ijk.offsetBy(0, 0,-1));
-        typename Accessor::ValueType tmp2 = 
+        typename Accessor::ValueType tmp2 =
             D1<CD_6TH>::inY(grid, ijk.offsetBy(0, 0, 2)) -
             D1<CD_6TH>::inY(grid, ijk.offsetBy(0, 0,-2));
-        typename Accessor::ValueType tmp3 = 
+        typename Accessor::ValueType tmp3 =
             D1<CD_6TH>::inY(grid, ijk.offsetBy(0, 0, 3)) -
             D1<CD_6TH>::inY(grid, ijk.offsetBy(0, 0,-3));
         return 0.75*tmp1 - 0.15*tmp2 + 1./60*tmp3;
@@ -2181,7 +2181,7 @@ struct D2<CD_SIXTH>
                            S.template getValue< 0, 1, 0>(),  S.template getValue< 0, 0, 0>(),
                            S.template getValue< 0,-1, 0>(),  S.template getValue< 0,-2, 0>(),
                            S.template getValue< 0,-3, 0>() );
-        
+
     }
 
     template<typename Stencil>
@@ -2197,7 +2197,7 @@ struct D2<CD_SIXTH>
     static typename Stencil::ValueType inXandY(const Stencil& S)
     {
         return crossdifference( S.template getValue< 1, 1, 0>(), S.template getValue<-1, 1, 0>(),
-                                S.template getValue< 1,-1, 0>(), S.template getValue<-1,-1, 0>(), 
+                                S.template getValue< 1,-1, 0>(), S.template getValue<-1,-1, 0>(),
                                 S.template getValue< 2, 1, 0>(), S.template getValue<-2, 1, 0>(),
                                 S.template getValue< 2,-1, 0>(), S.template getValue<-2,-1, 0>(),
                                 S.template getValue< 3, 1, 0>(), S.template getValue<-3, 1, 0>(),
@@ -2221,7 +2221,7 @@ struct D2<CD_SIXTH>
     static typename Stencil::ValueType inXandZ(const Stencil& S)
     {
         return crossdifference( S.template getValue< 1, 0, 1>(), S.template getValue<-1, 0, 1>(),
-                                S.template getValue< 1, 0,-1>(), S.template getValue<-1, 0,-1>(), 
+                                S.template getValue< 1, 0,-1>(), S.template getValue<-1, 0,-1>(),
                                 S.template getValue< 2, 0, 1>(), S.template getValue<-2, 0, 1>(),
                                 S.template getValue< 2, 0,-1>(), S.template getValue<-2, 0,-1>(),
                                 S.template getValue< 3, 0, 1>(), S.template getValue<-3, 0, 1>(),
@@ -2238,14 +2238,14 @@ struct D2<CD_SIXTH>
                                 S.template getValue< 2, 0,-3>(), S.template getValue<-2, 0,-3>(),
                                 S.template getValue< 3, 0, 3>(), S.template getValue<-3, 0, 3>(),
                                 S.template getValue< 3, 0,-3>(), S.template getValue<-3, 0,-3>() );
-               
+
     }
-    
+
     template<typename Stencil>
     static typename Stencil::ValueType inYandZ(const Stencil& S)
     {
         return crossdifference( S.template getValue< 0, 1, 1>(), S.template getValue< 0,-1, 1>(),
-                                S.template getValue< 0, 1,-1>(), S.template getValue< 0,-1,-1>(), 
+                                S.template getValue< 0, 1,-1>(), S.template getValue< 0,-1,-1>(),
                                 S.template getValue< 0, 2, 1>(), S.template getValue< 0,-2, 1>(),
                                 S.template getValue< 0, 2,-1>(), S.template getValue< 0,-2,-1>(),
                                 S.template getValue< 0, 3, 1>(), S.template getValue< 0,-3, 1>(),
@@ -2266,8 +2266,6 @@ struct D2<CD_SIXTH>
 
 };
 
-
-    
 } // end math namespace
 } // namespace OPENVDB_VERSION_NAME
 } // end openvdb namespace

@@ -262,20 +262,15 @@ public:
         const Vec3T &pos = ray(time), &inv = ray.invDir();
         mVoxel = Coord::floor(pos) & (~(DIM-1));
         for (size_t axis = 0; axis < 3; ++axis) {
-            if (inv[axis] > 0) {
-                mStep[axis] = DIM;
-                mNext[axis] = time + (mVoxel[axis] + DIM - pos[axis]) * inv[axis];
-            } else {
-                mStep[axis] = -DIM;
-                mNext[axis] = time + (mVoxel[axis] - pos[axis]) * inv[axis];
-            }
+            mStep[axis]  = inv[axis] > 0 ? DIM : -DIM;
+            mNext[axis]  = time + (mVoxel[axis] + mStep[axis] - pos[axis]) * inv[axis];
             mDelta[axis] = mStep[axis] * inv[axis];
         }
     }
 
     /// Increment the voxel index to next intersected voxel or node and return the
     /// corresponding intersection point paramerterized in time along the initializing ray.
-    RealT step()
+    RealType step()
     {
         const size_t stepAxis = math::MinIndex(mNext);
         mTime = mNext[stepAxis];

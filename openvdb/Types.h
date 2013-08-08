@@ -160,6 +160,26 @@ enum VecType {
 enum { NUM_VEC_TYPES = VEC_CONTRAVARIANT_ABSOLUTE + 1 };
 
 
+/// Specify how grids should be merged during certain (typically multithreaded) operations.
+/// <dl>
+/// <dt><b>MERGE_ACTIVE_STATES</b>
+/// <dd>The output grid is active wherever any of the input grids is active.
+///
+/// <dt><b>MERGE_NODES</b>
+/// <dd>The output grid's tree has a node wherever any of the input grids' trees
+///     has a node, regardless of any active states.
+///
+/// <dt><b>MERGE_ACTIVE_STATES_AND_NODES</b>
+/// <dd>The output grid is active wherever any of the input grids is active,
+///     and its tree has a node wherever any of the input grids' trees has a node.
+/// </dl>
+enum MergePolicy {
+    MERGE_ACTIVE_STATES = 0,
+    MERGE_NODES,
+    MERGE_ACTIVE_STATES_AND_NODES
+};
+
+
 ////////////////////////////////////////
 
 

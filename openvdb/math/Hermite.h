@@ -164,8 +164,8 @@ public:
     /// @note These methods don't perform meaningful operations on Hermite data.
     bool operator< (const Hermite&) const { return false; };
     bool operator> (const Hermite&) const { return false; };
-    template<class T> Hermite operator+(const T&) const { return *this; };
-    template<class T> Hermite operator-(const T&) const { return *this; };
+    template<class T> Hermite operator+(const T&) const { return *this; }
+    template<class T> Hermite operator-(const T&) const { return *this; }
     //@}
 
 private:
