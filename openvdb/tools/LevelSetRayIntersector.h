@@ -55,10 +55,11 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
     
-/// Helper class that implements hierarchical Digital Differential Analysers   
-template <typename GridT, int NodeLevel> struct HDDA;
+/// Helper class that implements hierarchical Digital Differential Analysers
+/// specialized for ray intersections with level lets    
+template <typename GridT, int NodeLevel> struct LevelSetHDDA;
 
-/// @brief This a level-set-ray intersector base on iterative linear
+/// @brief Intersects a level set with a ray using iterative linear
 /// interpolation along the direction of the ray. Thus it is
 /// approximate in the sense that it only detects an intersection when
 /// the voxelized ray encounters a zero-crossing. The number of linear
@@ -93,11 +94,10 @@ public:
         mTime = mT[0] = mT[1] = ray.t0();
         const Vec3T pos = ray.start();
         const Coord ijk = Coord::floor(pos);
-        ValueT V;
+        ValueT V = 0;
         if (mStencil.accessor().probeValue(ijk, V)) {//inside narrow band?
             mStencil.moveTo(ijk,  V);
-            const Vec3T uvw = pos - Vec3T(ijk[0], ijk[1], ijk[2]);
-            V = mStencil.interpolation(uvw);
+            V = mStencil.interpolation(pos);
         }
         mV[0] = mV[1] = V;
     }
@@ -110,32 +110,25 @@ public:
         ValueT V;
         if (mStencil.accessor().probeValue(ijk, V) &&//inside narrow band?
             math::Abs(V)<mThreshold) {// close to zero-crossing?
-            const Vec3T xyz(ijk[0], ijk[1], ijk[2]);
             mT[1] = time;
-            mStencil.moveTo(ijk,  V);//update 7 remaining stencil points
-            Vec3T uvw = ray(mT[1]) - xyz;//normalized voxel coordinates
-            mV[1] = mStencil.interpolation(uvw);
+            mV[1] = this->interpValue(ray(time));
             if (math::ZeroCrossing(mV[0], mV[1])) {
-                mTime = this->linearInterp();
+                this->updateTime();
                 OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-                if (Iterations > 0) {//resolved at compile-time
-                    for (int n=0; n<Iterations; ++n) {//resolved at compile-time
-                        uvw = ray(mTime) - xyz;//normalized
-                        V = mStencil.interpolation(uvw);
-                        if (math::ZeroCrossing(mV[0], V)) {
-                            mV[1] = V;
-                            mT[1] = mTime;
-                        } else {
-                            mV[0] = V;
-                            mT[0] = mTime;
-                        }
-                        mTime = this->linearInterp();
+                for (int n=0; Iterations>0 && n<Iterations; ++n) {//resolved at compile-time
+                    V = this->interpValue(ray(mTime));
+                    if (math::ZeroCrossing(mV[0], V)) {
+                        mV[1] = V;
+                        mT[1] = mTime;
+                    } else {
+                        mV[0] = V;
+                        mT[0] = mTime;
                     }
+                    this->updateTime();
                 }
                 OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
                 return true;
             }
-            
             mT[0] = mT[1];
             mV[0] = mV[1];
         } 
@@ -143,7 +136,7 @@ public:
     }
    
     /// @brief Return a const reference to a ValueAccessor
-    const AccessorT& accessor() const { return mStencil.accessor(); }
+    StencilT& stencil()  { return mStencil; }
 
     /// @brief Return the time of intersection.
     /// @warning Only trust the return value AFTER an intersection was detected.
@@ -151,10 +144,16 @@ public:
 
 private:
 
-    inline RealT linearInterp()
+    inline void updateTime()
     {
         assert(math::isApproxLarger(mT[1], mT[0], 1e-6));
-        return mT[0]+(mT[1]-mT[0])*mV[0]/(mV[0]-mV[1]);
+        mTime = mT[0]+(mT[1]-mT[0])*mV[0]/(mV[0]-mV[1]);
+    }
+    
+    inline RealT interpValue(const Vec3R& pos)
+    {
+        mStencil.moveTo(pos);
+        return mStencil.interpolation(pos);
     }
     
     StencilT mStencil;
@@ -162,7 +161,7 @@ private:
     ValueT   mV[2];
     RealT    mT[2];
     ValueT   mThreshold;
-};    
+};// LinearIntersector
     
 
 //===============================================================   
@@ -205,32 +204,72 @@ public:
     }
     /// @brief Return @c true if the index space ray intersects the level set.
     /// @param iRay Ray represented in index space.
-    /// @param ijk  If an intersection was found it is assigned the
+    /// @param tester The tester for the actual ray-level-set intersection
+    /// @note The index space Ray is passed by value since it's internally
+    /// clipped against the index-space bounding-box of the grid.
+    template <typename TesterT>
+    bool intersectsIS(RayType iRay, TesterT& tester) const
+    {
+        if (!iRay.clip(mBBox)) return false;//missed bbox
+        tester.init(iRay);
+        return LevelSetHDDA<TreeT, NodeLevel>::test(iRay, tester);
+    }
+    /// @brief Return @c true if the index space ray intersects the level set.
+    /// @param iRay Ray represented in index space.
+    /// @param xyz  If an intersection was found it is assigned the
     ///             intersection point in index space. Otherwise it is unchanged.
     /// @param tester The tester for the actual ray-level-set intersection
     /// @note The index space Ray is passed by value since it's internally
     /// clipped against the index-space bounding-box of the grid.
     template <typename TesterT>
-    bool intersectsIS(RayType iRay, TesterT& tester, Vec3Type& ijk) const
+    bool intersectsIS(RayType iRay, TesterT& tester, Vec3Type& xyz) const
     {
         if (!iRay.clip(mBBox)) return false;//missed bbox
         tester.init(iRay);
-        if (!HDDA<TreeT, NodeLevel>::test(iRay, tester)) return false;//missed level set
-        ijk = iRay(tester.time());
+        if (!LevelSetHDDA<TreeT, NodeLevel>::test(iRay, tester)) return false;//missed level set
+        xyz = iRay(tester.time());
         return true;
     }
     /// @brief Return @c true if the world space ray intersects the level set.
     /// @param wRay   Ray represented in world space.
     /// @param tester The tester for the actual ray-level-set intersection
-    /// @param xyz    If an intersection was found it is assigned the
-    ///               intersection point in world space. Else it is unchanged.
     template <typename TesterT>
-    bool intersectsWS(const RayType& wRay, TesterT& tester, Vec3Type& xyz) const
+    bool intersectsWS(const RayType& wRay, TesterT& tester) const
     {
         RayType iRay = wRay.applyInverseMap(*(mGrid->transform().baseMap()));
-        Vec3Type ijk;
-        if (!this->intersectsIS(iRay, tester, ijk)) return false;
-        xyz = mGrid->indexToWorld(ijk);
+        return this->intersectsIS(iRay, tester);
+    }
+    /// @brief Return @c true if the world space ray intersects the level set.
+    /// @param wRay   Ray represented in world space.
+    /// @param tester The tester for the actual ray-level-set intersection
+    /// @param world  If an intersection was found it is assigned the
+    ///               intersection point in world space. Else it is unchanged.
+    template <typename TesterT>
+    bool intersectsWS(const RayType& wRay, TesterT& tester, Vec3Type& world) const
+    {
+        RayType iRay = wRay.applyInverseMap(*(mGrid->transform().baseMap()));
+        Vec3Type xyz;
+        if (!this->intersectsIS(iRay, tester, xyz)) return false;//missed level set
+        world = mGrid->indexToWorld(xyz);
+        return true;
+    }
+
+    /// @brief Return @c true if the world space ray intersects the level set.
+    /// @param wRay   Ray represented in world space.
+    /// @param tester The tester for the actual ray-level-set intersection
+    /// @param world  If an intersection was found it is assigned the
+    ///               intersection point in world space. Else it is unchanged.
+    /// @param normal If an intersection was found it is assigned the
+    ///               normal of the level set surface in world space. Else it is unchanged.
+    template <typename TesterT>
+    bool intersectsWS(const RayType& wRay, TesterT& tester, Vec3Type& world, Vec3Type& normal) const
+    {
+        RayType iRay = wRay.applyInverseMap(*(mGrid->transform().baseMap()));
+        Vec3Type xyz;
+        if (!this->intersectsIS(iRay, tester, xyz)) return false;
+        tester.stencil().moveTo(xyz);
+        normal = tester.stencil().gradient(xyz);
+        world  = mGrid->indexToWorld(xyz);
         return true;
     }
 
@@ -244,9 +283,10 @@ private:
     
 };// LevelSetRayIntersector
 
-/// Helper class that implements Hierarchical Digital Differential Analyzers.    
+/// Helper class that implements Hierarchical Digital Differential Analyzers
+/// that is specialized for ray intersections with level sets.
 template <typename TreeT, int NodeLevel>
-struct HDDA
+struct LevelSetHDDA
 {
     typedef typename TreeT::RootNodeType::NodeChainType ChainT;
     typedef typename boost::mpl::at<ChainT, boost::mpl::int_<NodeLevel> >::type NodeT;
@@ -257,10 +297,10 @@ struct HDDA
         math::DDA<RayT, NodeT::TOTAL> dda(ray);
         do {
             if (const NodeT* node =
-                tester.accessor().template probeConstNode<NodeT>(dda.voxel())) {
+                tester.stencil().accessor().template probeConstNode<NodeT>(dda.voxel())) {
                 RayT subRay = ray;
                 subRay.clip(node->getNodeBoundingBox());
-                if (HDDA<TreeT, NodeLevel-1>::test(subRay, tester)) return true;
+                if (LevelSetHDDA<TreeT, NodeLevel-1>::test(subRay, tester)) return true;
             }
             dda.step();
         } while (ray.test(dda.time()));
@@ -269,9 +309,9 @@ struct HDDA
 };
 
 /// @brief Specialization of Hierarchical Digital Differential Analyzer
-/// class that intersects against the voxels.    
+/// class that intersects against the voxels of a level set.    
 template <typename TreeT>
-struct HDDA<TreeT, -1>     
+struct LevelSetHDDA<TreeT, -1>     
 {
     template <typename RayT, typename TesterT>
     static bool test(const RayT& ray, TesterT& tester)

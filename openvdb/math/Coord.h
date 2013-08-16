@@ -43,7 +43,7 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace math {
 
-/// @brief Signed (x, y, z) integer coordinates
+/// @brief Signed (x, y, z) 32-bit integer coordinates
 class Coord
 {
 public:
@@ -70,7 +70,10 @@ public:
     explicit Coord(const Int32* v)
         { mVec[0] = v[0]; mVec[1] = v[1]; mVec[2] = v[2]; }
 
+    /// @brief Return the smallest possible coordinate
     static const Coord& min() { static const Coord sMin(Limits::min()); return sMin; }
+
+    /// @brief Return the largest possible coordinate
     static const Coord& max() { static const Coord sMax(Limits::max()); return sMax; }
 
     /// @brief Return @a xyz rounded to the closest integer coordinates

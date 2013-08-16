@@ -1936,6 +1936,33 @@ public:
     }
     const LeafNodeT* probeLeaf(const Coord& xyz) const { return this->probeConstLeaf(xyz); }
 
+    /// @brief @return a const pointer to the node of the specified type that contains
+    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    template <typename NodeT>
+    const NodeT* probeConstNode(const Coord& xyz) const
+    {
+        assert(BaseT::mTree);
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+        if ((boost::is_same<NodeT, NodeT0>::value)) {
+            if (this->isHashed0(xyz)) {
+                assert(mNode0);
+                return reinterpret_cast<const NodeT*>(mNode0);
+            } else if (this->isHashed1(xyz)) {
+                assert(mNode1);
+                return mNode1->template probeConstNodeAndCache<NodeT>(xyz, this->self());
+            }
+            return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
+        } else if ((boost::is_same<NodeT, NodeT1>::value)) {
+            if (this->isHashed1(xyz)) {
+                assert(mNode1);
+                return reinterpret_cast<const NodeT*>(mNode1);
+            }
+            return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
+        }
+        return NULL;
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+    }
+
     /// Remove all the cached nodes and invalidate the corresponding hash-keys.
     virtual void clear()
     {

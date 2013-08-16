@@ -120,7 +120,7 @@ namespace tools {
 
 // This is a simple type that combines a distance value and a particle
 // attribute. It's required for attribute transfer which is performed
-// in the Raster class below.
+// in the ParticlesToLevelSet::Raster memberclass defined below.
 namespace local {template <typename VisibleT, typename BlindT> class BlindData;}
     
 template<typename SdfGridT,
@@ -152,7 +152,7 @@ public:
     /// onto the exisinting level set surface. However, if attribute tranfer
     /// is enabled, i.e. AttributeT != void, attributes are only
     /// generated for voxels that overlap with particles, not the existing
-    /// voxels in the input grid.
+    /// voxels in the input grid (for which no attributes exist!).
     ///
     /// @details The width in voxel units of the generated narrow band level set is
     /// given by 2*background/dx, where background is the background value
@@ -716,7 +716,7 @@ class BlindData
     typedef BlindT   BlindType;
     explicit BlindData() {}
     explicit BlindData(VisibleT v) : mVisible(v) {}
-    explicit BlindData(VisibleT v, BlindT b) : mVisible(v), mBlind(b) {}
+    BlindData(VisibleT v, BlindT b) : mVisible(v), mBlind(b) {}
     BlindData& operator=(const BlindData& rhs)
     {
         mVisible = rhs.mVisible;

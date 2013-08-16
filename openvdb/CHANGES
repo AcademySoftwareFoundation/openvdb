@@ -10,19 +10,34 @@ Version 2.0.0 - In development
       the most common cases.
     - Added math::BoxStencil, with support for trilinear interpolation 
       and gradient computation.
-    - Added math::MinIndex and math::MaxIndex, which find the minimum
-      and maximum component of a vector without any branching.
+    - Added math::MinIndex() and math::MaxIndex(), which find the minimum
+      and maximum components of a vector without any branching.
+    - The default math::BBox constructor now generates an invalid bounding
+      box rather than an empty bounding box positioned at the origin.
+      The new behavior is consistent with math::CoordBBox.
+      [Thanks to Rick Hankins for suggesting this fix.]
+    - Added math::BBox::minExtent(), which returns a bounding box's
+      shortest axis.
     - Fixed a bug in the default ScaleMap constructor that left some data
       used in the inverse uninitialized.
-    - Added MapBase::applyJT() to apply the Jacobian Transpose to an input
-      vector. The Jacobian Transpose will take a range-space vector to a
-      domain-space vector (e.g. world to index).
+    - Added MapBase::applyJT(), which applies the Jacobian transpose to
+      a vector.  The Jacobian transpose takes a range-space vector to a
+      domain-space vector (e.g., world to index).
+      Note: Houdini 12.5 uses an earlier version of OpenVDB, and maps
+      created with that version lack a virtual table entry for this method,
+      so do not call this method from Houdini 12.5.
+    - Added MapBase::inverseMap(), which returns as a MapBase::Ptr
+      the inverse of the map in question.  The Nonlinear Frustum map 
+      will throw as it does not currently have a defined inverse map.
+      Note: Houdini 12.5 uses an earlier version of OpenVDB, and maps
+      created with that version lack a virtual table entry for this method,
+      so do not call this method from Houdini 12.5.
     - Reimplemented math::RandomInt using Boost.Random instead of rand()
       (which is not thread-safe), and deprecated math::randUniform()
       and added math::Random01 to replace it. 
-    - Fixed bugs in math::Stats::print() and math::Histogram::print() that
-      could lead to incorrect behavior if those functions were called before
-      any elements were added.
+    - Fixed bugs in math::Stats and math::Histogram that could produce
+      NaNs or other incorrect behavior if certain methods were called
+      on populations of size zero.
     - Fixed meshing issues relating to masking and automatic partitioning.
     - Grid::merge() and Tree::merge() now accept an optional MergePolicy
       argument that specifies one of three new merging schemes.  (The old
@@ -36,7 +51,7 @@ Version 2.0.0 - In development
       voxel values in place via user-supplied functors.  Similarly, replaced
       ValueAccessor::setValueOnSum() with ValueAccessor::modifyValue()
       and ValueAccessor::modifyValueAndActiveState().
-    - Removed @c LeafNode::addValue and @c LeafNode::scaleValue.
+    - Removed LeafNode::addValue() and LeafNode::scaleValue().
     - Added an option to the From Particles SOP to generate an alpha mask,
       which can be used to constrain level set filtering so as to preserve
       surface details.
@@ -45,7 +60,7 @@ Version 2.0.0 - In development
     - The mesh to volume converter now handles point-degenerate polygons.
     - Fixed a bug in the Level Set Smooth, Level Set Renormalize and 
       Level Set Offset SOPs that caused the group name to be ignored.   
-    - Fixed OS X and Windows build issues.
+    - Fixed various OS X and Windows build issues.
       [Contributed by SESI]
 
 Version 1.2.0 - June 28, 2013

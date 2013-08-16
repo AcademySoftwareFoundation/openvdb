@@ -630,7 +630,7 @@ SignChange(const Type& a, const Type& b)
 
 
 /// @brief Return @c true if the interval [@a a, @a b] includes zero,
-/// i.e., if either @a a or @a b is zero of if they have different signs.
+/// i.e., if either @a a or @a b is zero or if they have different signs.
 template <typename Type>
 inline bool
 ZeroCrossing(const Type& a, const Type& b)

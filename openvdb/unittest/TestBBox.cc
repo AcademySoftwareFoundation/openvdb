@@ -43,10 +43,12 @@ public:
     CPPUNIT_TEST_SUITE(TestBBox);
     CPPUNIT_TEST(testBBox);
     CPPUNIT_TEST(testCenter);
+    CPPUNIT_TEST(testExtent);
     CPPUNIT_TEST_SUITE_END();
 
     void testBBox();
     void testCenter();
+    void testExtent();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestBBox);
@@ -58,13 +60,24 @@ TestBBox::testBBox()
     typedef openvdb::Vec3R                     Vec3R;
     typedef openvdb::math::BBox<Vec3R>         BBoxType;
 
-    BBoxType B(Vec3R(1,1,1),Vec3R(2,2,2));
-
-    CPPUNIT_ASSERT(B.isSorted());
-    CPPUNIT_ASSERT(B.isInside(Vec3R(1.5,2,2)));
-    CPPUNIT_ASSERT(!B.isInside(Vec3R(2,3,2)));
-    B.expand(Vec3R(3,3,3));
-    CPPUNIT_ASSERT(B.isInside(Vec3R(3,3,3)));
+    {
+        BBoxType B(Vec3R(1,1,1),Vec3R(2,2,2));
+        
+        CPPUNIT_ASSERT(B.isSorted());
+        CPPUNIT_ASSERT(B.isInside(Vec3R(1.5,2,2)));
+        CPPUNIT_ASSERT(!B.isInside(Vec3R(2,3,2)));
+        B.expand(Vec3R(3,3,3));
+        CPPUNIT_ASSERT(B.isInside(Vec3R(3,3,3)));
+    }
+   
+    {
+        BBoxType B;
+        CPPUNIT_ASSERT(B.empty());
+        const Vec3R expected(1);
+        B.expand(expected);
+        CPPUNIT_ASSERT_EQUAL(expected, B.min());
+        CPPUNIT_ASSERT_EQUAL(expected, B.max());
+    }
 }
 
 
@@ -83,6 +96,29 @@ TestBBox::testCenter()
 
     openvdb::CoordBBox cbox(openvdb::Coord(1), openvdb::Coord(2));
     CPPUNIT_ASSERT_EQUAL(expected, cbox.getCenter());
+}
+
+void
+TestBBox::testExtent()
+{
+    typedef openvdb::Vec3R                     Vec3R;
+    typedef openvdb::math::BBox<Vec3R>         BBoxType;
+
+    {
+        BBoxType B(Vec3R(-20,0,1),Vec3R(2,2,2));
+        CPPUNIT_ASSERT_EQUAL(size_t(2), B.minExtent());
+        CPPUNIT_ASSERT_EQUAL(size_t(0), B.maxExtent());
+    }
+    {
+        BBoxType B(Vec3R(1,0,1),Vec3R(2,21,20));
+        CPPUNIT_ASSERT_EQUAL(size_t(0), B.minExtent());
+        CPPUNIT_ASSERT_EQUAL(size_t(1), B.maxExtent());
+    }
+    {
+        BBoxType B(Vec3R(1,0,1),Vec3R(3,1.5,20));
+        CPPUNIT_ASSERT_EQUAL(size_t(1), B.minExtent());
+        CPPUNIT_ASSERT_EQUAL(size_t(2), B.maxExtent());
+    }
 }
 
 // Copyright (c) 2012-2013 DreamWorks Animation LLC

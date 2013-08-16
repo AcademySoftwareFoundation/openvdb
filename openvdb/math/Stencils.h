@@ -61,23 +61,28 @@ public:
     typedef typename BufferType::iterator    IterType;
     typedef typename GridType::ConstAccessor AccessorType;
 
-    /// @brief Initialize the stencil buffer with the values of voxel (x, y, z)
+    /// @brief Initialize the stencil buffer with the values of voxel (i, j, k)
     /// and its neighbors.
+    /// @param ijk Index coordinates of stencil center
     inline void moveTo(const Coord& ijk)
     {
         mCenter = ijk;
         mStencil[0] = mCache.getValue(ijk);
         static_cast<StencilType&>(*this).init(mCenter);
     }
-    /// @brief Initialize the stencil buffer with the values of voxel (x, y, z)
+    
+    /// @brief Initialize the stencil buffer with the values of voxel (i, j, k)
     /// and its neighbors. The method also takes a value of the center
     /// element of the stencil, assuming it is already known.
+    /// @param ijk Index coordinates of stnecil center
+    /// @param centerValue Value of the center element of the stencil
     inline void moveTo(const Coord& ijk, const ValueType& centerValue)
     {
         mCenter = ijk;
         mStencil[0] = centerValue;
         static_cast<StencilType&>(*this).init(mCenter);
     }
+    
     /// @brief Initialize the stencil buffer with the values of voxel
     /// (x, y, z) and its neighbors.
     ///
@@ -89,6 +94,18 @@ public:
         mCenter = iter.getCoord();
         mStencil[0] = *iter;
         static_cast<StencilType&>(*this).init(mCenter);
+    }
+
+    /// @brief Initialize the stencil buffer with the values of voxel (x, y, z)
+    /// and its neighbors.
+    /// @param xyz Floating point voxel coordinates of stencil center
+    /// @details This method will check to see if it is necessary to
+    /// update the stencil based on the cached index coordinates of
+    /// the center point.
+    inline void moveTo(const Vec3R& xyz)
+    {
+        Coord ijk = openvdb::Coord::floor(xyz);
+        if (ijk != mCenter) this->moveTo(ijk);
     }
 
     /// @brief Return the value from the stencil buffer with linear
@@ -171,19 +188,25 @@ public:
                (less  ^  (this->getValue< 0, 0, 1>() < isoValue))  ;
     }
 
+    /// @brief Return a const reference to the grid from which this
+    /// stencil was constructed.
+    inline const GridType& grid() const { return *mGrid; }
+
+    /// @brief Return a const reference to the ValueAccessor
+    /// associated with this Stencil.
     inline const AccessorType& accessor() const { return mCache; }
 
 protected:
     // Constructor is protected to prevent direct instantiation.
     BaseStencil(const GridType& grid, int size):
-        mCache(grid.getConstAccessor()),
-        mStencil(size)
+        mGrid(&grid), mCache(grid.getConstAccessor()), mStencil(size)
     {
     }
 
-    AccessorType mCache;
-    BufferType   mStencil;
-    Coord        mCenter;
+    const GridType* mGrid;
+    AccessorType    mCache;
+    BufferType      mStencil;
+    Coord           mCenter;
 
 }; // class BaseStencil
 
@@ -289,25 +312,74 @@ public:
     }
 
     /// @brief Return the trilinear interpolation at the normalized position.
-    /// @param uvw Normalized position within the current voxel.
-    inline ValueType interpolation(const Vec3Type& uvw) const
+    /// @param xyz Floating point coordinate position.
+    /// @warning It is assumed that the stencil has already been moved
+    /// to the relevant voxel position, e.g. using moveTo(xyz).
+    /// @note Trilinear interpolation kernal reads as:
+    ///       v000 (1-u)(1-v)(1-w) + v001 (1-u)(1-v)w + v010 (1-u)v(1-w) + v011 (1-u)vw
+    ///     + v100 u(1-v)(1-w)     + v101 u(1-v)w     + v110 uv(1-w)     + v111 uvw
+    inline ValueType interpolation(const Vec3Type& xyz) const
     {
-        //     v000 (1-u)(1-v)(1-w) + v001 (1-u)(1-v)w + v010 (1-u)v(1-w) + v011 (1-u)vw
-        //   + v100 u(1-v)(1-w)     + v101 u(1-v)w     + v110 uv(1-w)     + v111 uvw
-
+        const Real u = xyz[0] - BaseType::mCenter[0]; assert(u>=0 && u<=1);
+        const Real v = xyz[1] - BaseType::mCenter[1]; assert(v>=0 && v<=1);
+        const Real w = xyz[2] - BaseType::mCenter[2]; assert(w>=0 && w<=1);
+        
         ValueType V = BaseType::template getValue<0,0,0>();
-        ValueType A = V + (BaseType::template getValue<0,0,1>() - V) * uvw[2];
+        ValueType A = V + (BaseType::template getValue<0,0,1>() - V) * w;
         V = BaseType::template getValue< 0, 1, 0>();
-        ValueType B = V + (BaseType::template getValue<0,1,1>() - V) * uvw[2];
-        ValueType C = A + (B - A) * uvw[1];
+        ValueType B = V + (BaseType::template getValue<0,1,1>() - V) * w;
+        ValueType C = A + (B - A) * v;
 
         V = BaseType::template getValue<1,0,0>();
-        A = V + (BaseType::template getValue<1,0,1>() - V) * uvw[2];
+        A = V + (BaseType::template getValue<1,0,1>() - V) * w;
         V = BaseType::template getValue<1,1,0>();
-        B = V + (BaseType::template getValue<1,1,1>() - V) * uvw[2];
-        ValueType D = A + (B - A) * uvw[1];
+        B = V + (BaseType::template getValue<1,1,1>() - V) * w;
+        ValueType D = A + (B - A) * v;
         
-        return C + (D - C) * uvw[0];
+        return C + (D - C) * u;
+    }
+
+    /// @brief Return the gradient in world space of the trilinear interpolation kernel.
+    /// @param xyz Floating point coordinate position.
+    /// @warning It is assumed that the stencil has already been moved
+    /// to the relevant voxel position, e.g. using moveTo(xyz).
+    /// @note Computed as partial derivatives of the trilinear interpolation kernel:
+    ///       v000 (1-u)(1-v)(1-w) + v001 (1-u)(1-v)w + v010 (1-u)v(1-w) + v011 (1-u)vw
+    ///     + v100 u(1-v)(1-w)     + v101 u(1-v)w     + v110 uv(1-w)     + v111 uvw
+    inline Vec3Type gradient(const Vec3Type& xyz) const
+    {
+        const Real u = xyz[0] - BaseType::mCenter[0]; assert(u>=0 && u<=1);
+        const Real v = xyz[1] - BaseType::mCenter[1]; assert(v>=0 && v<=1);
+        const Real w = xyz[2] - BaseType::mCenter[2]; assert(w>=0 && w<=1);
+        
+        ValueType D[4]={BaseType::template getValue<0,0,1>()-BaseType::template getValue<0,0,0>(),
+                        BaseType::template getValue<0,1,1>()-BaseType::template getValue<0,1,0>(),
+                        BaseType::template getValue<1,0,1>()-BaseType::template getValue<1,0,0>(),
+                        BaseType::template getValue<1,1,1>()-BaseType::template getValue<1,1,0>()};
+
+        // Z component
+        ValueType A = D[0] + (D[1]- D[0]) * v;
+        ValueType B = D[2] + (D[3]- D[2]) * v;
+        Vec3Type grad(zeroVal<ValueType>(), zeroVal<ValueType>(), A + (B - A) * u);
+
+        D[0] = BaseType::template getValue<0,0,0>() + D[0] * w;
+        D[1] = BaseType::template getValue<0,1,0>() + D[1] * w;
+        D[2] = BaseType::template getValue<1,0,0>() + D[2] * w;
+        D[3] = BaseType::template getValue<1,1,0>() + D[3] * w;
+
+        // X component
+        A = D[0] + (D[1] - D[0]) * v;
+        B = D[2] + (D[3] - D[2]) * v;
+
+        grad[0] = B - A;
+
+        // Y component
+        A = D[1] - D[0];
+        B = D[3] - D[2];
+
+        grad[1] = A + (B - A) * u;
+
+        return BaseType::mGrid->transform().baseMap()->applyIJT(grad, xyz);
     }
 
 private:
@@ -315,10 +387,9 @@ private:
     {
         BaseType::template setValue< 0, 0, 1>(mCache.getValue(ijk.offsetBy( 0, 0, 1)));
         BaseType::template setValue< 0, 1, 1>(mCache.getValue(ijk.offsetBy( 0, 1, 1)));
-
         BaseType::template setValue< 0, 1, 0>(mCache.getValue(ijk.offsetBy( 0, 1, 0)));
         BaseType::template setValue< 1, 0, 0>(mCache.getValue(ijk.offsetBy( 1, 0, 0)));
-
+        BaseType::template setValue< 1, 0, 1>(mCache.getValue(ijk.offsetBy( 1, 0, 1)));
         BaseType::template setValue< 1, 1, 1>(mCache.getValue(ijk.offsetBy( 1, 1, 1)));
         BaseType::template setValue< 1, 1, 0>(mCache.getValue(ijk.offsetBy( 1, 1, 0)));
     }

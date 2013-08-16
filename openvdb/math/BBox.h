@@ -43,53 +43,93 @@ namespace OPENVDB_VERSION_NAME {
 namespace math {
 
 /// @brief Axis-aligned bounding box
-template<class _VectorType>
+template<typename Vec3T>
 class BBox
 {
 public:
-    typedef _VectorType VectorType;
-    typedef _VectorType ValueType;
-    typedef typename _VectorType::ValueType ElementType;
+    typedef Vec3T Vec3Type;
+    typedef Vec3T ValueType;
+    typedef Vec3T VectorType;
+    typedef typename Vec3Type::ValueType ElementType;
 
+    /// @brief Default constructor creates an invalid BBox
     BBox();
-    BBox(const VectorType& xyzMin, const VectorType& xyzMax);
-    BBox(const VectorType& xyzMin, const VectorType& xyzMax, bool sorted);
+
+    /// @brief Constructor based on a minimum and maximum point.
+    BBox(const Vec3T& xyzMin, const Vec3T& xyzMax);
+
+    /// @brief Constructor based on a minimum and maximum point.
+    /// If sorted is false the points will be sorted by x,y,z component.
+    BBox(const Vec3T& xyzMin, const Vec3T& xyzMax, bool sorted);
+    
     /// @brief Contruct a cubical BBox from a minimum coordinate and a
     /// single edge length.
     /// @note inclusive for integral <tt>ElementType</tt>s
-    BBox(const VectorType& xyzMin, const ElementType& length);
+    BBox(const Vec3T& xyzMin, const ElementType& length);
+
+    /// @brief Constructor based on a raw array of six points. If
+    /// sorted is false the points will be sorted by x,y,z component.
     explicit BBox(const ElementType* xyz, bool sorted = true);
+
+    /// @brief Copy constructor
     BBox(const BBox& other);
 
+    /// @brief Sort the min/max by x,y,z component.
     void sort();
 
-    const VectorType& min() const { return mMin; }
-    const VectorType& max() const { return mMax; }
+    /// @brief Return a const reference to the minimum point of the BBox
+    const Vec3T& min() const { return mMin; }
 
-    VectorType& min() { return mMin; }
-    VectorType& max() { return mMax; }
+    /// @brief Return a const reference to the maximum point of the BBox
+    const Vec3T& max() const { return mMax; }
 
+    /// @brief Return a non-const reference to the minimum point of the BBox
+    Vec3T& min() { return mMin; }
+
+    /// @brief Return a non-const reference to the maximum point of the BBox
+    Vec3T& max() { return mMax; }
+
+    /// @brief Return true if the two BBox'es are identical
     bool operator==(const BBox& rhs) const;
+
+    /// @brief Return true if the two BBox'es are not identical
     bool operator!=(const BBox& rhs) const { return !(*this == rhs); }
 
+    /// @brief Return true if the BBox is empty, i.e. has no
+    /// (positive) volume.
     bool empty() const;
-    bool hasVolume() const { return !empty(); }
-    operator bool() const { return !empty(); }
 
+    /// @brief Return true if the BBox has a (positive) volume.
+    bool hasVolume() const { return !this->empty(); }
+
+    /// @brief Return true if the BBox is valid, i.e. as a (positive) volume.
+    operator bool() const { return !this->empty(); }
+
+    /// @brief Return true if the all components of mMin <= mMax,
+    /// i.e. the volume is not negative.
+    /// @note For floating point values a tolerance is used for this test.
     bool isSorted() const;
 
+    /// @brief Return the center point of the BBox
     Vec3d getCenter() const;
 
+    /// @brief Returns the extents of the BBox, i.e. the length per axis
+    /// for floating points values or number of grids per axis points
+    /// integral values. 
     /// @note inclusive for integral <tt>ElementType</tt>s
-    VectorType extents() const;
+    Vec3T extents() const;
 
-    ElementType volume() const { VectorType e = extents(); return e[0] * e[1] * e[2]; }
+    /// @brief Return the volume spanned by this BBox.
+    ElementType volume() const { Vec3T e = this->extents(); return e[0] * e[1] * e[2]; }
 
     /// Return the index (0, 1 or 2) of the longest axis.
-    size_t maxExtent() const;
+    size_t maxExtent() const { return MaxIndex(mMax - mMin); }
+
+    /// Return the index (0, 1 or 2) of the shortest axis.
+    size_t minExtent() const { return MinIndex(mMax - mMin); }
 
     /// Return @c true if point (x, y, z) is inside this bounding box.
-    bool isInside(const VectorType& xyz) const;
+    bool isInside(const Vec3T& xyz) const;
 
     /// Return @c true if the given bounding box is inside this bounding box.
     bool isInside(const BBox&) const;
@@ -99,56 +139,60 @@ public:
 
     /// Pad this bounding box.
     void expand(ElementType padding);
+    
     /// Expand this bounding box to enclose point (x, y, z).
-    void expand(const VectorType& xyz);
+    void expand(const Vec3T& xyz);
+    
     /// Union this bounding box with the given bounding box.
     void expand(const BBox&);
     // @brief Union this bbox with the cubical bbox defined from xyzMin and
     // length
     /// @note inclusive for integral <tt>ElementType</tt>s
-    void expand(const VectorType& xyzMin, const ElementType& length);
+    void expand(const Vec3T& xyzMin, const ElementType& length);
+
     /// Translate this bounding box by \f$(t_x, t_y, t_z)\f$.
-    void translate(const VectorType& t);
+    void translate(const Vec3T& t);
 
     /// Unserialize this bounding box from the given stream.
     void read(std::istream& is) { mMin.read(is); mMax.read(is); }
+
     /// Serialize this bounding box to the given stream.
     void write(std::ostream& os) const { mMin.write(os); mMax.write(os); }
 
 private:
-    VectorType mMin, mMax;
+    Vec3T mMin, mMax;
 }; // class BBox
 
 
 ////////////////////////////////////////
 
 
-template<class VectorType>
+template<typename Vec3T>
 inline
-BBox<VectorType>::BBox():
-    mMin(ElementType(0), ElementType(0), ElementType(0)),
-    mMax(ElementType(0), ElementType(0), ElementType(0))
+BBox<Vec3T>::BBox():
+    mMin( std::numeric_limits<ElementType>::max()),
+    mMax(-std::numeric_limits<ElementType>::max())
 {
 }
 
-template<class VectorType>
+template<typename Vec3T>
 inline
-BBox<VectorType>::BBox(const VectorType& xyzMin, const VectorType& xyzMax):
+BBox<Vec3T>::BBox(const Vec3T& xyzMin, const Vec3T& xyzMax):
     mMin(xyzMin), mMax(xyzMax)
 {
 }
 
-template<class VectorType>
+template<typename Vec3T>
 inline
-BBox<VectorType>::BBox(const VectorType& xyzMin, const VectorType& xyzMax, bool sorted):
+BBox<Vec3T>::BBox(const Vec3T& xyzMin, const Vec3T& xyzMax, bool sorted):
     mMin(xyzMin), mMax(xyzMax)
 {
     if (!sorted) this->sort();
 }
 
-template<class VectorType>
+template<typename Vec3T>
 inline
-BBox<VectorType>::BBox(const VectorType& xyzMin, const ElementType& length):
+BBox<Vec3T>::BBox(const Vec3T& xyzMin, const ElementType& length):
     mMin(xyzMin), mMax(xyzMin)
 {
     // min and max are inclusive for integral ElementType
@@ -158,9 +202,9 @@ BBox<VectorType>::BBox(const VectorType& xyzMin, const ElementType& length):
     mMax[2] += size;
 }
 
-template<class VectorType>
+template<typename Vec3T>
 inline
-BBox<VectorType>::BBox(const ElementType* xyz, bool sorted):
+BBox<Vec3T>::BBox(const ElementType* xyz, bool sorted):
     mMin(xyz[0], xyz[1], xyz[2]),
     mMax(xyz[3], xyz[4], xyz[5])
 {
@@ -168,9 +212,9 @@ BBox<VectorType>::BBox(const ElementType* xyz, bool sorted):
 }
 
 
-template<class VectorType>
+template<typename Vec3T>
 inline
-BBox<VectorType>::BBox(const BBox& other):
+BBox<Vec3T>::BBox(const BBox& other):
     mMin(other.mMin), mMax(other.mMax)
 {
 }
@@ -179,9 +223,9 @@ BBox<VectorType>::BBox(const BBox& other):
 ////////////////////////////////////////
 
 
-template<class VectorType>
+template<typename Vec3T>
 inline bool
-BBox<VectorType>::empty() const
+BBox<Vec3T>::empty() const
 {
     if (boost::is_integral<ElementType>::value) {
         // min and max are inclusive for integral ElementType
@@ -191,9 +235,9 @@ BBox<VectorType>::empty() const
 }
 
 
-template<class VectorType>
+template<typename Vec3T>
 inline bool
-BBox<VectorType>::operator==(const BBox& rhs) const
+BBox<Vec3T>::operator==(const BBox& rhs) const
 {
     if (boost::is_integral<ElementType>::value) {
         return mMin == rhs.min() && mMax == rhs.max();
@@ -203,11 +247,11 @@ BBox<VectorType>::operator==(const BBox& rhs) const
 }
 
 
-template<class VectorType>
+template<typename Vec3T>
 inline void
-BBox<VectorType>::sort()
+BBox<Vec3T>::sort()
 {
-    VectorType tMin(mMin), tMax(mMax);
+    Vec3T tMin(mMin), tMax(mMax);
     for (size_t i = 0; i < 3; ++i) {
         mMin[i] = std::min(tMin[i], tMax[i]);
         mMax[i] = std::max(tMin[i], tMax[i]);
@@ -215,9 +259,9 @@ BBox<VectorType>::sort()
 }
 
 
-template<class VectorType>
+template<typename Vec3T>
 inline bool
-BBox<VectorType>::isSorted() const
+BBox<Vec3T>::isSorted() const
 {
     if (boost::is_integral<ElementType>::value) {
         return (mMin[0] <= mMax[0] && mMin[1] <= mMax[1] && mMin[2] <= mMax[2]);
@@ -228,43 +272,31 @@ BBox<VectorType>::isSorted() const
 }
 
 
-template<class VectorType>
+template<typename Vec3T>
 inline Vec3d
-BBox<VectorType>::getCenter() const
+BBox<Vec3T>::getCenter() const
 {
     return (Vec3d(mMin.asPointer()) + Vec3d(mMax.asPointer())) * 0.5;
 }
 
 
-template<class VectorType>
-inline VectorType
-BBox<VectorType>::extents() const
+template<typename Vec3T>
+inline Vec3T
+BBox<Vec3T>::extents() const
 {
     if (boost::is_integral<ElementType>::value) {
-        return (mMax - mMin) + VectorType(1, 1, 1);
+        return (mMax - mMin) + Vec3T(1, 1, 1);
     } else {
         return (mMax - mMin);
     }
 }
 
-
-template<class VectorType>
-inline size_t
-BBox<VectorType>::maxExtent() const
-{
-    VectorType e = extents();
-    if (e[0] > e[1] && e[0] > e[2]) return 0;
-    else if (e[1] > e[2]) return 1;
-    return 2;
-}
-
-
 ////////////////////////////////////////
 
 
-template<class VectorType>
+template<typename Vec3T>
 inline bool
-BBox<VectorType>::isInside(const VectorType& xyz) const
+BBox<Vec3T>::isInside(const Vec3T& xyz) const
 {
     if (boost::is_integral<ElementType>::value) {
         return xyz[0] >= mMin[0] && xyz[0] <= mMax[0] &&
@@ -279,9 +311,9 @@ BBox<VectorType>::isInside(const VectorType& xyz) const
 }
 
 
-template<class VectorType>
+template<typename Vec3T>
 inline bool
-BBox<VectorType>::isInside(const BBox& b) const
+BBox<Vec3T>::isInside(const BBox& b) const
 {
     if (boost::is_integral<ElementType>::value) {
         return b.min()[0] >= mMin[0]  && b.max()[0] <= mMax[0] &&
@@ -296,9 +328,9 @@ BBox<VectorType>::isInside(const BBox& b) const
 }
 
 
-template<class VectorType>
+template<typename Vec3T>
 inline bool
-BBox<VectorType>::hasOverlap(const BBox& b) const
+BBox<Vec3T>::hasOverlap(const BBox& b) const
 {
     if (boost::is_integral<ElementType>::value) {
         return mMax[0] >= b.min()[0] && mMin[0] <= b.max()[0] &&
@@ -316,9 +348,9 @@ BBox<VectorType>::hasOverlap(const BBox& b) const
 ////////////////////////////////////////
 
 
-template<class VectorType>
+template<typename Vec3T>
 inline void
-BBox<VectorType>::expand(ElementType dx)
+BBox<Vec3T>::expand(ElementType dx)
 {
     dx = std::abs(dx);
     for (size_t i = 0; i < 3; ++i) {
@@ -328,9 +360,9 @@ BBox<VectorType>::expand(ElementType dx)
 }
 
 
-template<class VectorType>
+template<typename Vec3T>
 inline void
-BBox<VectorType>::expand(const VectorType& xyz)
+BBox<Vec3T>::expand(const Vec3T& xyz)
 {
     for (size_t i = 0; i < 3; ++i) {
         mMin[i] = std::min(mMin[i], xyz[i]);
@@ -339,9 +371,9 @@ BBox<VectorType>::expand(const VectorType& xyz)
 }
 
 
-template<class VectorType>
+template<typename Vec3T>
 inline void
-BBox<VectorType>::expand(const BBox& b)
+BBox<Vec3T>::expand(const BBox& b)
 {
     for (size_t i = 0; i < 3; ++i) {
         mMin[i] = std::min(mMin[i], b.min()[i]);
@@ -349,9 +381,9 @@ BBox<VectorType>::expand(const BBox& b)
     }
 }
 
-template<class VectorType>
+template<typename Vec3T>
 inline void
-BBox<VectorType>::expand(const VectorType& xyzMin, const ElementType& length)
+BBox<Vec3T>::expand(const Vec3T& xyzMin, const ElementType& length)
 {
     const ElementType size = boost::is_integral<ElementType>::value ? length-1 : length;
     for (size_t i = 0; i < 3; ++i) {
@@ -361,9 +393,9 @@ BBox<VectorType>::expand(const VectorType& xyzMin, const ElementType& length)
 }
 
 
-template<class VectorType>
+template<typename Vec3T>
 inline void
-BBox<VectorType>::translate(const VectorType& dx)
+BBox<Vec3T>::translate(const Vec3T& dx)
 {
     mMin += dx;
     mMax += dx;
@@ -373,9 +405,9 @@ BBox<VectorType>::translate(const VectorType& dx)
 ////////////////////////////////////////
 
 
-template<class VectorType>
+template<typename Vec3T>
 inline std::ostream&
-operator<<(std::ostream& os, const BBox<VectorType>& b)
+operator<<(std::ostream& os, const BBox<Vec3T>& b)
 {
     os << b.min() << " -> " << b.max();
     return os;

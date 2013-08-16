@@ -88,13 +88,15 @@ public:
     /// Add the samples from the other Stats instance.
     void add(const Stats& other)
     {
-        mMin  = std::min<double>(mMin, other.mMin);
-        mMax  = std::max<double>(mMax, other.mMax);
-        const double denom = 1.0/double(mSize + other.mSize);
-        const double delta = other.mAvg - mAvg;
-        mAvg += denom*delta*other.mSize;
-        mAux += other.mAux + denom*delta*delta*mSize*other.mSize;
-        mSize += other.mSize;
+        if (other.mSize > 0) {
+            mMin  = std::min<double>(mMin, other.mMin);
+            mMax  = std::max<double>(mMax, other.mMax);
+            const double denom = 1.0/double(mSize + other.mSize);
+            const double delta = other.mAvg - mAvg;
+            mAvg += denom*delta*other.mSize;
+            mAux += other.mAux + denom*delta*delta*mSize*other.mSize;
+            mSize += other.mSize;
+        }
     }
 
     /// Return the size of the population, i.e., the total number of samples.

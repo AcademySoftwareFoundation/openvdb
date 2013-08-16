@@ -16,22 +16,38 @@
   the most common cases.
 - Added @vdblink::math::BoxStencil math::BoxStencil@endlink, with support
   for trilinear interpolation and gradient computation.
-- Added @vdblink::math::MinIndex math::MinIndex@endlink and 
-  @vdblink::math::MaxIndex math::MaxIndex@endlink, which find the minimum
-  and maximum component of a vector without any branching.
+- Added @vdblink::math::MinIndex() math::MinIndex@endlink and 
+  @vdblink::math::MaxIndex() math::MaxIndex@endlink, which find the minimum
+  and maximum components of a vector without any branching.
+- The default @vdblink::math::BBox BBox@endlink constructor now
+  generates an invalid bounding box rather than an empty bounding box
+  positioned at the origin.  The new behavior is consistent with
+  @vdblink::math::CoordBBox CoordBBox@endlink.
+  <I>[Thanks to Rick Hankins for suggesting this fix.]</I>
+- Added @vdblink::math::BBox::minExtent() BBox::minExtent@endlink,
+  which returns a bounding box&rsquo;s shortest axis.
 - Fixed a bug in the default @vdblink::math::ScaleMap ScaleMap@endlink
   constructor that left some data used in the inverse uninitialized.
-- Added MapBase::applyJT() to apply the Jacobian Transpose to an input vector.
-  The Jacobian Transpose will take a range-space vector to a domain-space
-  vector (e.g. world to index).
+- Added @vdblink::math::MapBase::applyJT MapBase::applyJT@endlink, which
+  applies the Jacobian transpose to a vector.  The Jacobian transpose takes
+  a range-space vector to a domain-space vector (e.g., world to index).
+  <br>Note: Houdini 12.5 uses an earlier version of OpenVDB, and maps
+  created with that version lack a virtual table entry for this method,
+  so do not call this method from Houdini 12.5.
+- Added MapBase::inverseMap(), which returns as a MapBase::Ptr
+  the inverse of the map in question.  The Nonlinear Frustum map 
+  will throw as it does not currently have a defined inverse map.
+  Note: Houdini 12.5 uses an earlier version of OpenVDB, and maps
+  created with that version lack a virtual table entry for this method,
+  so do not call this method from Houdini 12.5.
 - Reimplemented @vdblink::math::RandomInt math::RandomInt@endlink using
   Boost.Random instead of @c rand() (which is not thread-safe), and deprecated
   @vdblink::math::randUniform math::randUniform@endlink and added
   @vdblink::math::Random01 math::Random01@endlink to replace it. 
-- Fixed bugs in @vdblink::math::Stats::print() math::Stats::print@endlink
-  and @vdblink::math::Histogram::print() math::Histogram::print@endlink
-  that could lead to incorrect behavior if those functions were called before
-  any elements were added.
+- Fixed bugs in @vdblink::math::Stats math::Stats@endlink and
+  @vdblink::math::Histogram math::Histogram@endlink that could produce
+  <TT>NaN</TT>s or other incorrect behavior if certain methods were called
+  on populations of size zero.
 - Fixed meshing issues relating to masking and automatic partitioning.
 - @vdblink::Grid::merge() Grid::merge@endlink and
   @vdblink::tree::Tree::merge() Tree::merge@endlink now accept an optional
@@ -60,11 +76,12 @@
   which can be used to constrain level set filtering so as to preserve
   surface details.
 - Implemented a closest point on line segment algorithm,
-  math::closestPointOnSegmentToPoint().
+  @vdblink::math::closestPointOnSegmentToPoint()
+  math::closestPointOnSegmentToPoint@endlink.
 - The mesh to volume converter now handles point-degenerate polygons.
 - Fixed a bug in the Level Set Smooth, Level Set Renormalize and 
   Level Set Offset SOPs that caused the group name to be ignored. 
-- Fixed OS X and Windows build issues.
+- Fixed various OS X and Windows build issues.
   <I>[Contributed by SESI]</I>
 
 

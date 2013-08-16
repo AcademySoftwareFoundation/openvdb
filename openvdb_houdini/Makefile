@@ -311,13 +311,13 @@ ifeq (no,$(strip $(shared)))
 $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
 	@echo "Building $(HOUDINI_INSTALL_DIR)/$(@:.o=.so) because of $(call list_deps)"
 	$(HB)/hcustom $(HCUSTOM_FLAGS) $(INCLDIRS) \
-	$(LIBS) -L. -lopenvdb_houdini -L$(OPENVDB_LIB_DIR) -lopenvdb $< $(QUIET)
+	$(LIBS) -L. -lopenvdb_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) $< $(QUIET)
 else
 # Link SOPs against shared OpenVDB libraries.
 $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
 	@echo "Building $(HOUDINI_INSTALL_DIR)/$(@:.o=.so) because of $(call list_deps)"
 	$(HB)/hcustom $(HCUSTOM_FLAGS) $(INCLDIRS) \
-	-L. -lopenvdb_houdini -L$(OPENVDB_LIB_DIR) -lopenvdb $< $(QUIET)
+	-L. -lopenvdb_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) $< $(QUIET)
 endif
 
 $(HOUDINI_SOP_SO_NAMES): $(HOUDINI_INSTALL_DIR)/%.so: houdini/%.o
