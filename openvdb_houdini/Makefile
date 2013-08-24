@@ -104,6 +104,20 @@ SHELL = /bin/bash
 # Turn off implicit rules for speed
 .SUFFIXES:
 
+# Determine the platform.
+ifeq ("$(OS)","Windows_NT")
+    WINDOWS_NT := 1
+else
+    UNAME_S := $(shell uname -s)
+    ifeq ("$(UNAME_S)","Linux")
+        LINUX := 1
+    else
+        ifeq ("$(UNAME_S)","Darwin")
+            MBSD := 1
+        endif
+    endif
+endif
+
 HOUDINI_INCL_DIR := $(HT)/include
 HCUSTOM_FLAGS := -i $(HOUDINI_INSTALL_DIR)
 
@@ -123,6 +137,11 @@ endif
 INCLDIRS := -I . -I .. -I $(BOOST_INCL_DIR) -I $(HALF_INCL_DIR) -I $(TBB_INCL_DIR)
 
 CXXFLAGS += -pthread $(OPTIMIZE) $(INCLDIRS)
+ifdef MBSD
+	# Darwin ld treats undefined symbols as errors by default;
+	# change to runtime resolution, like Linux.
+    CXXFLAGS += -undefined dynamic_lookup
+endif
 
 ifneq ($(strip $(wildcard $(HOUDINI_INCL_DIR))),)
     HOUDINI_CXXFLAGS := $(shell hcustom -c)
@@ -132,13 +151,17 @@ endif
 LIBS := \
     -ldl -lm -lz \
     -L$(HALF_LIB_DIR) $(HALF_LIB) \
-    -L$(TBB_LIB_DIR) $(TBB_LIB) -lrt \
+    -L$(TBB_LIB_DIR) $(TBB_LIB) \
 #
 LIBS_RPATH := \
     -ldl -lm -lz \
     -Wl,-rpath,$(HALF_LIB_DIR) -L$(HALF_LIB_DIR) $(HALF_LIB) \
-    -Wl,-rpath,$(TBB_LIB_DIR) -L$(TBB_LIB_DIR) $(TBB_LIB) -lrt \
+    -Wl,-rpath,$(TBB_LIB_DIR) -L$(TBB_LIB_DIR) $(TBB_LIB) \
 #
+ifdef LINUX
+    LIBS += -lrt
+    LIBS_RPATH += -lrt
+endif
 
 LIBHOUDINI_INCLUDE_NAMES := \
     houdini/AttributeTransferUtil.h \

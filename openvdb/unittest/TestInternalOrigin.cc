@@ -72,17 +72,17 @@ TestInternalOrigin::test()
     typedef Node1::ChildNodeType     Node2;
     typedef Node2::LeafNodeType      Node3;
     for (Node0::ChildOnCIter iter0=tree.getRootNode().cbeginChildOn(); iter0; ++iter0) {//internal 1
-        openvdb::Coord C0=iter0->getOrigin();
+        openvdb::Coord C0=iter0->origin();
         iter0.getCoord(G);
         CPPUNIT_ASSERT_EQUAL(C0,G);
         for (Node1::ChildOnCIter iter1=iter0->cbeginChildOn(); iter1; ++iter1) {//internal 2
-            openvdb::Coord C1=iter1->getOrigin();
+            openvdb::Coord C1=iter1->origin();
             iter1.getCoord(G);
             CPPUNIT_ASSERT_EQUAL(C1,G);
             CPPUNIT_ASSERT(C0 <= C1);
             CPPUNIT_ASSERT(C1 <= C0 + openvdb::Coord(Node1::DIM,Node1::DIM,Node1::DIM));
             for (Node2::ChildOnCIter iter2=iter1->cbeginChildOn(); iter2; ++iter2) {//leafs
-                openvdb::Coord C2=iter2->getOrigin();
+                openvdb::Coord C2=iter2->origin();
                 iter2.getCoord(G);
                 CPPUNIT_ASSERT_EQUAL(C2,G);
                 CPPUNIT_ASSERT(C1 <= C2);

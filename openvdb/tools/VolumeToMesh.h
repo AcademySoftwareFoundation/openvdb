@@ -949,7 +949,7 @@ Merge<DistTreeT>::operator()(const tbb::blocked_range<size_t>& range) const
         DistValueT adaptivity = mAdaptivity;
         IntLeafT& auxLeaf = *mAuxLeafs[n];
 
-        const Coord& origin = auxLeaf.getOrigin();
+        const Coord& origin = auxLeaf.origin();
         end[0] = origin[0] + LeafDim;
         end[1] = origin[1] + LeafDim;
         end[2] = origin[2] + LeafDim;
@@ -1154,7 +1154,7 @@ RegionCount<IntTreeT>::operator()(const tbb::blocked_range<size_t>& range) const
         IntLeafT& auxLeaf = *mAuxLeafs[n];
 
         if (mPointMask) {
-            const BoolLeafT * ptnMaskLeaf = mPointMask->probeConstLeaf(auxLeaf.getOrigin());
+            const BoolLeafT * ptnMaskLeaf = mPointMask->probeConstLeaf(auxLeaf.origin());
 
             if (ptnMaskLeaf) { // remove unused regions
 
@@ -1363,9 +1363,9 @@ PointGen<DistTreeT>::operator()(const tbb::blocked_range<size_t>& range) const
         BoolLeafT* smoothMaskLeaf = NULL;
         Vec3sLeafT* ptnLeaf = NULL;
         if (hasRefData) {
-            maskLeaf = refMaskAcc->probeLeaf(auxLeaf.getOrigin());
-            smoothMaskLeaf = refSmoothMaskAcc->probeLeaf(auxLeaf.getOrigin());
-            ptnLeaf = refPtnAcc->probeLeaf(auxLeaf.getOrigin());
+            maskLeaf = refMaskAcc->probeLeaf(auxLeaf.origin());
+            smoothMaskLeaf = refSmoothMaskAcc->probeLeaf(auxLeaf.origin());
+            ptnLeaf = refPtnAcc->probeLeaf(auxLeaf.origin());
         }
 
         for (auxIter = auxLeaf.beginValueOn(); auxIter; ++auxIter) {
@@ -1844,7 +1844,7 @@ MeshGen<DistTreeT, MeshingOp>::operator()(
 
     for (size_t n = range.begin(); n != range.end(); ++n) {
 
-        const Coord origin = mEdgeLeafs[n]->getOrigin();
+        const Coord origin = mEdgeLeafs[n]->origin();
 
         // Get an upper bound on the number of primitives.
         edgeCount = 0;
@@ -2041,7 +2041,7 @@ PartGen<SrcTreeT>::operator()(const tbb::blocked_range<size_t>& range)
 
     for (size_t n = range.begin(); n != range.end(); ++n) {
         if (n < mStart || n >= mEnd) continue;
-        BoolLeafT* leaf = acc.touchLeaf(mLeafManager.leaf(n).getOrigin());
+        BoolLeafT* leaf = acc.touchLeaf(mLeafManager.leaf(n).origin());
         leaf->topologyUnion(mLeafManager.leaf(n));
     }
 }
@@ -2137,7 +2137,7 @@ MaskGen<SrcTreeT>::operator()(const tbb::blocked_range<size_t>& range)
     typename SrcTreeT::LeafNodeType::ValueOnCIter iter;
     for (size_t n = range.begin(); n != range.end(); ++n) {
 
-        ijk = mLeafManager.leaf(n).getOrigin();
+        ijk = mLeafManager.leaf(n).origin();
         BoolLeafT* leaf = new BoolLeafT(ijk, false);
         bool addLeaf = false;
 
@@ -2315,7 +2315,7 @@ BoundaryMaskGen<SrcTreeT>::operator()(const tbb::blocked_range<size_t>& range)
         const typename SrcTreeT::LeafNodeType&
             leaf = mLeafManager.leaf(n);
 
-        ijk = leaf.getOrigin();
+        ijk = leaf.origin();
 
         if (!mLeafBBox.isInside(ijk) || !neighboringLeaf(ijk, auxAcc)) continue;
 
@@ -3415,7 +3415,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
         if (refData.isValid()) { // match leaf topology
             tree::ValueAccessor<BoolTreeT> acc(*refData.mSmoothingMaskTree);
             for (size_t n = 0, N = auxLeafs.size(); n < N; ++n) {
-                acc.touchLeaf(auxLeafs[n]->getOrigin());
+                acc.touchLeaf(auxLeafs[n]->origin());
             }
         }
 

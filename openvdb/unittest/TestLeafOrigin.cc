@@ -82,7 +82,7 @@ TestLeafOrigin::test()
 
     for (FloatTree::LeafCIter leafIter = tree.cbeginLeaf(); leafIter; ++leafIter) {
         const Int32 mask = ~((1 << leafIter->log2dim()) - 1);
-        const Coord leafOrigin = leafIter->getOrigin();
+        const Coord leafOrigin = leafIter->origin();
         for (FloatTree::LeafNodeType::ValueOnCIter valIter = leafIter->cbeginValueOn();
             valIter; ++valIter)
         {
@@ -112,9 +112,9 @@ TestLeafOrigin::test2Values()
     grid->setTransform(math::Transform::createLinearTransform(0.1));
 
     FloatTree::LeafCIter iter = tree.cbeginLeaf();
-    CPPUNIT_ASSERT_EQUAL(Coord(0, 0, 0), iter->getOrigin());
+    CPPUNIT_ASSERT_EQUAL(Coord(0, 0, 0), iter->origin());
     ++iter;
-    CPPUNIT_ASSERT_EQUAL(Coord(96, 0, 0), iter->getOrigin());
+    CPPUNIT_ASSERT_EQUAL(Coord(96, 0, 0), iter->origin());
 }
 
 void

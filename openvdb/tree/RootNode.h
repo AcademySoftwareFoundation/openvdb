@@ -2178,7 +2178,7 @@ inline void
 RootNode<ChildT>::addTile(Index level, const Coord& xyz,
                           const ValueType& value, bool state)
 {
-    if (LEVEL >= level && level > 0) {
+    if (LEVEL >= level) {
         MapIter iter = this->findCoord(xyz);
         if (iter == mTable.end()) {//background
             if (LEVEL > level) {
@@ -2213,7 +2213,7 @@ inline void
 RootNode<ChildT>::addTileAndCache(Index level, const Coord& xyz, const ValueType& value,
                                   bool state, AccessorT& acc)
 {
-    if (LEVEL >= level && level > 0) {
+    if (LEVEL >= level) {
         MapIter iter = this->findCoord(xyz);
         if (iter == mTable.end()) {//background
             if (LEVEL > level) {
@@ -2502,7 +2502,7 @@ RootNode<ChildT>::merge(RootNode& other)
                         setChild(j, child);
                     }
                 } else { // merge both child nodes
-                    getChild(j).merge<MERGE_ACTIVE_STATES>(getChild(i),
+                    getChild(j).template merge<MERGE_ACTIVE_STATES>(getChild(i),
                         other.mBackground, mBackground);
                 }
             } else if (other.isTileOn(i)) {
@@ -2529,7 +2529,8 @@ RootNode<ChildT>::merge(RootNode& other)
                     child.resetBackground(other.mBackground, mBackground);
                     setChild(j, child);
                 } else { // merge both child nodes
-                    getChild(j).merge<MERGE_NODES>(getChild(i), other.mBackground, mBackground);
+                    getChild(j).template merge<MERGE_NODES>(
+                        getChild(i), other.mBackground, mBackground);
                 }
             }
         }
@@ -2552,11 +2553,12 @@ RootNode<ChildT>::merge(RootNode& other)
                     setChild(j, child);
                     if (tile.active) {
                         // Merge the other node's child with this node's active tile.
-                        child.merge<MERGE_ACTIVE_STATES_AND_NODES>(tile.value, tile.active);
+                        child.template merge<MERGE_ACTIVE_STATES_AND_NODES>(
+                            tile.value, tile.active);
                     }
                 } else /*if (isChild(j))*/ {
                     // Merge the other node's child into this node's child.
-                    getChild(j).merge<MERGE_ACTIVE_STATES_AND_NODES>(getChild(i),
+                    getChild(j).template merge<MERGE_ACTIVE_STATES_AND_NODES>(getChild(i),
                         other.mBackground, mBackground);
                 }
             } else if (other.isTileOn(i)) {
@@ -2569,7 +2571,8 @@ RootNode<ChildT>::merge(RootNode& other)
                 } else if (isChild(j)) {
                     // Merge the other node's active tile into this node's child.
                     const Tile& tile = getTile(i);
-                    getChild(j).merge<MERGE_ACTIVE_STATES_AND_NODES>(tile.value, tile.active);
+                    getChild(j).template merge<MERGE_ACTIVE_STATES_AND_NODES>(
+                        tile.value, tile.active);
                 }
             } // else if (other.isTileOff(i)) {} // ignore the other node's inactive tiles
         }
@@ -2719,7 +2722,7 @@ RootNode<ChildT>::combine2(const RootNode& other0, const RootNode& other1,
             if (!isChild(thisIter)) {
                 // Add a new child with the same coordinates, etc. as the other node's child.
                 setChild(thisIter,
-                    *(new ChildT(otherChild.getOrigin(), getTile(thisIter).value)));
+                    *(new ChildT(otherChild.origin(), getTile(thisIter).value)));
             }
             ChildT& child = getChild(thisIter);
 

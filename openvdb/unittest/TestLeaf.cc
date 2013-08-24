@@ -233,35 +233,35 @@ TestLeaf::testGetOrigin()
 {
     {
         LeafType leaf(openvdb::Coord(1, 0, 0), 1);
-        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(0, 0, 0), leaf.getOrigin());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(0, 0, 0), leaf.origin());
     }
     {
         LeafType leaf(openvdb::Coord(0, 0, 0), 1);
-        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(0, 0, 0), leaf.getOrigin());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(0, 0, 0), leaf.origin());
     }
     {
         LeafType leaf(openvdb::Coord(8, 0, 0), 1);
-        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(8, 0, 0), leaf.getOrigin());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(8, 0, 0), leaf.origin());
     }
     {
         LeafType leaf(openvdb::Coord(8, 1, 0), 1);
-        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(8, 0, 0), leaf.getOrigin());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(8, 0, 0), leaf.origin());
     }
     {
         LeafType leaf(openvdb::Coord(1024, 1, 3), 1);
-        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(128*8, 0, 0), leaf.getOrigin());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(128*8, 0, 0), leaf.origin());
     }
     {
         LeafType leaf(openvdb::Coord(1023, 1, 3), 1);
-        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(127*8, 0, 0), leaf.getOrigin());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(127*8, 0, 0), leaf.origin());
     }
     {
         LeafType leaf(openvdb::Coord(512, 512, 512), 1);
-        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(512, 512, 512), leaf.getOrigin());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(512, 512, 512), leaf.origin());
     }
     {
         LeafType leaf(openvdb::Coord(2, 52, 515), 1);
-        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(0, 48, 512), leaf.getOrigin());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(0, 48, 512), leaf.origin());
     }
 }
 
@@ -272,7 +272,7 @@ TestLeaf::testIteratorGetCoord()
 
     LeafType leaf(openvdb::Coord(8, 8, 0), 2);
 
-    CPPUNIT_ASSERT_EQUAL(Coord(8, 8, 0), leaf.getOrigin());
+    CPPUNIT_ASSERT_EQUAL(Coord(8, 8, 0), leaf.origin());
 
     leaf.setValueOn(Coord(1, 2, 3), -3);
     leaf.setValueOn(Coord(5, 2, 3),  4);
@@ -293,7 +293,7 @@ TestLeaf::testNegativeIndexing()
 
     LeafType leaf(openvdb::Coord(-9, -2, -8), 1);
 
-    CPPUNIT_ASSERT_EQUAL(Coord(-16, -8, -8), leaf.getOrigin());
+    CPPUNIT_ASSERT_EQUAL(Coord(-16, -8, -8), leaf.origin());
 
     leaf.setValueOn(Coord(1, 2, 3), -3);
     leaf.setValueOn(Coord(5, 2, 3),  4);

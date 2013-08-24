@@ -53,7 +53,7 @@
 /// class ParticleList {
 ///   ...
 /// public:
-///   
+///
 ///   // Return the total number of particles in list.
 ///   // Always required!
 ///   size_t         size()          const;
@@ -122,7 +122,7 @@ namespace tools {
 // attribute. It's required for attribute transfer which is performed
 // in the ParticlesToLevelSet::Raster memberclass defined below.
 namespace local {template <typename VisibleT, typename BlindT> class BlindData;}
-    
+
 template<typename SdfGridT,
          typename AttributeT = void,
          typename InterrupterT = util::NullInterrupter>
@@ -132,23 +132,23 @@ public:
 
     typedef typename boost::is_void<AttributeT>::type DisableT;
     typedef InterrupterT                          InterrupterType;
-    
+
     typedef SdfGridT                              SdfGridType;
     typedef typename SdfGridT::ValueType          SdfType;
 
-    typedef typename boost::mpl::if_<DisableT, size_t, AttributeT>::type  AttType; 
+    typedef typename boost::mpl::if_<DisableT, size_t, AttributeT>::type  AttType;
     typedef typename SdfGridT::template ValueConverter<AttType>::Type AttGridType;
 
     BOOST_STATIC_ASSERT(boost::is_floating_point<SdfType>::value);
-    
+
     /// @brief Constructor using an exiting signed distance,
-    /// i.e. narrow band level set, grid. 
+    /// i.e. narrow band level set, grid.
     ///
     /// @param grid      Level set grid in which particles are rasterized
     /// @param interrupt Callback to interrupt a long-running process
     ///
     /// @note The input grid is assumed to be a valid level set and if
-    /// it already contains voxels (with SDF values) partices are unioned 
+    /// it already contains voxels (with SDF values) partices are unioned
     /// onto the exisinting level set surface. However, if attribute tranfer
     /// is enabled, i.e. AttributeT != void, attributes are only
     /// generated for voxels that overlap with particles, not the existing
@@ -186,7 +186,7 @@ public:
     /// @brief Return the size of a voxel in world units
     Real getVoxelSize() const { return mDx; }
 
-    /// @brief Return the half-width of the narrow band in voxel units 
+    /// @brief Return the half-width of the narrow band in voxel units
     Real getHalfWidth() const { return mHalfWidth; }
 
     /// @brief Return the smallest radius allowed in voxel units
@@ -247,13 +247,13 @@ public:
     void rasterizeTrails(const ParticleListT& pa, Real delta=1.0);
 
 private:
-   
+
     typedef local::BlindData<SdfType, AttType>    BlindType;
     typedef typename SdfGridT::template ValueConverter<BlindType>::Type BlindGridType;
-    
+
     /// Class with multi-threaded implementation of particle rasterization
     template<typename ParticleListT, typename GridT> struct Raster;
-    
+
     SdfGridType*   mSdfGrid;
     typename AttGridType::Ptr   mAttGrid;
     BlindGridType* mBlindGrid;
@@ -262,11 +262,11 @@ private:
     Real           mRmin, mRmax;//ignore particles outside this range of radii in voxel
     size_t         mMinCount, mMaxCount;//counters for ignored particles!
     int            mGrainSize;
-   
+
 };//end of ParticlesToLevelSet class
-      
+
 template<typename SdfGridT, typename AttributeT, typename InterrupterT>
-inline ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::    
+inline ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::
 ParticlesToLevelSet(SdfGridT& grid, InterrupterT* interrupter) :
     mSdfGrid(&grid),
     mBlindGrid(NULL),
@@ -288,7 +288,7 @@ ParticlesToLevelSet(SdfGridT& grid, InterrupterT* interrupter) :
                       "ParticlesToLevelSet only supports level sets!"
                       "\nUse Grid::setGridClass(openvdb::GRID_LEVEL_SET)");
     }
-    
+
     if (!DisableT::value) {
         mBlindGrid = new BlindGridType(BlindType(grid.background()));
         mBlindGrid->setTransform(mSdfGrid->transform().copy());
@@ -296,7 +296,7 @@ ParticlesToLevelSet(SdfGridT& grid, InterrupterT* interrupter) :
 }
 
 template<typename SdfGridT, typename AttributeT, typename InterrupterT>
-template <typename ParticleListT>  
+template <typename ParticleListT>
 inline void ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::
 rasterizeSpheres(const ParticleListT& pa)
 {
@@ -310,7 +310,7 @@ rasterizeSpheres(const ParticleListT& pa)
 }
 
 template<typename SdfGridT, typename AttributeT, typename InterrupterT>
-template <typename ParticleListT>  
+template <typename ParticleListT>
 inline void ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::
 rasterizeSpheres(const ParticleListT& pa, Real radius)
 {
@@ -324,8 +324,8 @@ rasterizeSpheres(const ParticleListT& pa, Real radius)
 }
 
 template<typename SdfGridT, typename AttributeT, typename InterrupterT>
-template <typename ParticleListT>  
-inline void ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::  
+template <typename ParticleListT>
+inline void ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::
 rasterizeTrails(const ParticleListT& pa, Real delta)
 {
     if (DisableT::value) {
@@ -336,13 +336,13 @@ rasterizeTrails(const ParticleListT& pa, Real delta)
         r.rasterizeTrails(delta);
     }
 }
-  
+
 template<typename SdfGridT, typename AttributeT, typename InterrupterT>
-inline void ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::   
-finalize()
+inline void
+ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::finalize()
 {
     if (mBlindGrid==NULL) return;
-    
+
     typedef typename SdfGridType::TreeType   SdfTreeT;
     typedef typename AttGridType::TreeType   AttTreeT;
     typedef typename BlindGridType::TreeType BlindTreeT;
@@ -350,13 +350,15 @@ finalize()
     const BlindTreeT& tree = mBlindGrid->tree();
 
     // New level set tree
-    typename SdfTreeT::Ptr sdfTree(new SdfTreeT(tree, tree.background().visible(), openvdb::TopologyCopy()));
+    typename SdfTreeT::Ptr sdfTree(new SdfTreeT(
+        tree, tree.background().visible(), openvdb::TopologyCopy()));
 
     // Note this overwrites any existing attribute grids!
-    typename AttTreeT::Ptr attTree(new AttTreeT(tree, tree.background().blind(), openvdb::TopologyCopy()));
+    typename AttTreeT::Ptr attTree(new AttTreeT(
+        tree, tree.background().blind(), openvdb::TopologyCopy()));
     mAttGrid = typename AttGridType::Ptr(new AttGridType(attTree));
     mAttGrid->setTransform(mBlindGrid->transform().copy());
-    
+
     // Extract the level set and IDs from mBlindDataGrid. We will
     // explore the fact that by design active values always live
     // at the leaf node level, i.e. no active tiles exist in level sets
@@ -366,7 +368,7 @@ finalize()
     typedef typename AttTreeT::LeafNodeType   AttLeafT;
     for (LeafIterT n = tree.cbeginLeaf(); n; ++n) {
         const LeafT& leaf = *n;
-        const openvdb::Coord xyz = leaf.getOrigin();
+        const openvdb::Coord xyz = leaf.origin();
         // Get leafnodes that were allocated during topology contruction!
         SdfLeafT* sdfLeaf = sdfTree->probeLeaf(xyz);
         AttLeafT* attLeaf = attTree->probeLeaf(xyz);
@@ -385,8 +387,8 @@ finalize()
     } else {
         tools::csgUnion(mSdfGrid->tree(), *sdfTree, /*prune=*/true);
     }
-}  
-  
+}
+
 ///////////////////////////////////////////////////////////
 
 template<typename SdfGridT, typename AttributeT, typename InterrupterT>
@@ -396,10 +398,10 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
     typedef typename boost::is_void<AttributeT>::type DisableT;
     typedef ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT> ParticlesToLevelSetT;
     typedef typename ParticlesToLevelSetT::SdfType   SdfT;//type of signed distance values
-    typedef typename ParticlesToLevelSetT::AttType   AttT;//type of particle attribute 
+    typedef typename ParticlesToLevelSetT::AttType   AttT;//type of particle attribute
     typedef typename GridT::ValueType                ValueT;
     typedef typename GridT::Accessor                 AccessorT;
-        
+
     /// @brief Main constructor
     Raster(ParticlesToLevelSetT& parent, GridT* grid, const ParticleListT& particles)
         : mParent(parent),
@@ -411,7 +413,7 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
           mOwnsGrid(false)
     {
     }
-    
+
     /// @brief Copy constructor called by tbb threads
     Raster(Raster& other, tbb::split)
         : mParent(other.mParent),
@@ -425,7 +427,7 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
     {
         mGrid->newTree();
     }
-    
+
     virtual ~Raster() { if (mOwnsGrid) delete mGrid; }
 
     /// @brief Rasterize a sphere per particle derived from their
@@ -433,7 +435,9 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
     void rasterizeSpheres()
     {
         mMinCount = mMaxCount = 0;
-        if (mParent.mInterrupter) mParent.mInterrupter->start("Rasterizing particles to level set using spheres");
+        if (mParent.mInterrupter) {
+            mParent.mInterrupter->start("Rasterizing particles to level set using spheres");
+        }
         mTask = boost::bind(&Raster::rasterSpheres, _1, _2);
         this->cook();
         if (mParent.mInterrupter) mParent.mInterrupter->end();
@@ -449,7 +453,10 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
             mParent.mMinCount = mMinCount;
             mParent.mMaxCount = mMaxCount;
         } else {
-            if (mParent.mInterrupter) mParent.mInterrupter->start("Rasterizing particles to level set using const spheres");
+            if (mParent.mInterrupter) {
+                mParent.mInterrupter->start(
+                    "Rasterizing particles to level set using const spheres");
+            }
             mTask = boost::bind(&Raster::rasterFixedSpheres, _1, _2, SdfT(radius));
             this->cook();
             if (mParent.mInterrupter) mParent.mInterrupter->end();
@@ -472,7 +479,9 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
     void rasterizeTrails(Real delta=1.0)
     {
         mMinCount = mMaxCount = 0;
-        if (mParent.mInterrupter) mParent.mInterrupter->start("Rasterizing particles to level set using trails");
+        if (mParent.mInterrupter) {
+            mParent.mInterrupter->start("Rasterizing particles to level set using trails");
+        }
         mTask = boost::bind(&Raster::rasterTrails, _1, _2, SdfT(delta));
         this->cook();
         if (mParent.mInterrupter) mParent.mInterrupter->end();
@@ -486,7 +495,7 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
         mParent.mMinCount = mMinCount;
         mParent.mMaxCount = mMaxCount;
     }
-    
+
     /// @brief Reguired by tbb::parallel_reduce
     void join(Raster& other)
     {
@@ -497,7 +506,7 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
 private:
     /// Disallow assignment since some of the members are references
     Raster& operator=(const Raster& other) { return *this; }
-    
+
     /// @return true if the particle is too small or too large
     bool ignoreParticle(SdfT R)
     {
@@ -564,9 +573,9 @@ private:
                 for ( c.y() = a.y(); c.y() <= b.y(); ++c.y() ) {
                     SdfT x2y2 = x2 + math::Pow2( c.y() - P[1] );
                     for ( c.z() = a.z(); c.z() <= b.z(); ++c.z() ) {
-                        SdfT x2y2z2 = x2y2 + math::Pow2( c.z() - P[2] );//square distance from c to P
+                        SdfT x2y2z2 = x2y2 + math::Pow2(c.z()- P[2]);//square distance from c to P
                         if ( x2y2z2 >= max2 || (!acc.probeValue(c,v) && v<ValueT(0)) )
-                            continue;//outside narrow band of the particle or inside existing level set
+                            continue;//outside narrow band of particle or inside existing level set
                         if ( x2y2z2 <= min2 ) {//inside narrow band of the particle.
                             acc.setValueOff(c, inside);
                             continue;
@@ -615,12 +624,13 @@ private:
     void cook()
     {
         if (mParent.mGrainSize>0) {
-            tbb::parallel_reduce(tbb::blocked_range<size_t>(0,mParticles.size(),mParent.mGrainSize), *this);
+            tbb::parallel_reduce(
+                tbb::blocked_range<size_t>(0,mParticles.size(),mParent.mGrainSize), *this);
         } else {
             (*this)(tbb::blocked_range<size_t>(0, mParticles.size()));
         }
     }
-    
+
     /// @brief Rasterize sphere at position P and radius R into a
     /// narrow-band level set with half-width, mHalfWidth.
     /// @return false if it was interrupted
@@ -700,7 +710,7 @@ private:
     const bool            mOwnsGrid;
 };//end of Raster struct
 
-    
+
 ///////////////////// YOU CAN SAFELY IGNORE THIS SECTION /////////////////////
 
 namespace local {
@@ -752,7 +762,7 @@ inline BlindData<VisibleT, BlindT> Abs(const BlindData<VisibleT, BlindT>& x)
 }// local namespace
 
 //////////////////////////////////////////////////////////////////////////////
-    
+
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

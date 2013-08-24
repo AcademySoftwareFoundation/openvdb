@@ -705,7 +705,7 @@ public:
                     leafIt; ++leafIt)
                 {
                     const typename BoolTreeT::LeafNodeType* leaf =
-                        interiorAcc.probeConstLeaf(leafIt->getOrigin());
+                        interiorAcc.probeConstLeaf(leafIt->origin());
                     if (leaf) leafIt->topologyDifference(*leaf, false);
                 }
                 surfaceMask->pruneInactive();

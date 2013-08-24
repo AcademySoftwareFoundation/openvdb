@@ -251,8 +251,10 @@ new_VDBGeometryIO(void *)
 void
 newGeometryIO(void *data)
 {
-    // Initialize the vdb library
-    UTvdbInitialize();
+    // Initialize the version of the OpenVDB library that this library is built against
+    // (i.e., not the HDK native OpenVDB library).
+    openvdb::initialize();
+    // Register a .vdb file translator.
     new_VDBGeometryIO(data);
 }
 #endif

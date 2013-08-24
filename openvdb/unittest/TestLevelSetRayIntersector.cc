@@ -193,7 +193,7 @@ struct SurfaceShader
 {
     SurfaceShader() {}
     template <typename RayType>
-    Film::RGB operator()(const openvdb::Vec3R& xyz,
+    Film::RGB operator()(const openvdb::Vec3R&,
                          const openvdb::Vec3R& normal,
                          const RayType& ray) const
     {

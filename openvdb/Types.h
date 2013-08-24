@@ -51,7 +51,6 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 
 // One-dimensional scalar types
-typedef uint32_t            Uint;
 typedef uint32_t            Index32;
 typedef uint64_t            Index64;
 typedef Index32             Index;
@@ -63,34 +62,35 @@ typedef unsigned char       Byte;
 typedef double              Real;
 
 // Two-dimensional vector types
-typedef math::Vec2i         Vec2i;
-typedef math::Vec2s         Vec2s;
-typedef math::Vec2d         Vec2d;
 typedef math::Vec2<Real>    Vec2R;
-typedef math::Vec2<Index>   Vec2I;
+typedef math::Vec2<Index32> Vec2I;
+typedef math::Vec2<float>   Vec2f;
 typedef math::Vec2<half>    Vec2H;
+using math::Vec2i;
+using math::Vec2s;
+using math::Vec2d;
 
 // Three-dimensional vector types
 typedef math::Vec3<Real>    Vec3R;
 typedef math::Vec3<Index32> Vec3I;
-typedef math::Vec3<Int32>   Vec3i;
 typedef math::Vec3<float>   Vec3f;
-typedef math::Vec3s         Vec3s;
-typedef math::Vec3<double>  Vec3d;
 typedef math::Vec3<half>    Vec3H;
+using math::Vec3i;
+using math::Vec3s;
+using math::Vec3d;
 
-typedef math::Coord         Coord;
-typedef math::CoordBBox     CoordBBox;
+using math::Coord;
+using math::CoordBBox;
 typedef math::BBox<Vec3d>   BBoxd;
 
 // Four-dimensional vector types
 typedef math::Vec4<Real>    Vec4R;
 typedef math::Vec4<Index32> Vec4I;
-typedef math::Vec4<Int32>   Vec4i;
 typedef math::Vec4<float>   Vec4f;
-typedef math::Vec4s         Vec4s;
-typedef math::Vec4<double>  Vec4d;
 typedef math::Vec4<half>    Vec4H;
+using math::Vec4i;
+using math::Vec4s;
+using math::Vec4d;
 
 // Three-dimensional matrix types
 typedef math::Mat3<Real>    Mat3R;

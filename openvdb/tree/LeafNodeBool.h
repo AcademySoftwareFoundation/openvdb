@@ -178,11 +178,13 @@ public:
     CoordBBox getNodeBoundingBox() const { return CoordBBox::createCube(mOrigin, DIM); }
 
     /// Set the grid index coordinates of this node's local origin.
-    void setOrigin(const Coord& origin)  { mOrigin = origin; }
+    void setOrigin(const Coord& origin) { mOrigin = origin; }
+    /// @brief Return the grid index coordinates of this node's local origin.
+    /// @deprecated Use origin() instead.
+    OPENVDB_DEPRECATED const Coord& getOrigin() const { return mOrigin; }
     //@{
-    /// Get the grid index coordinates of this node's local origin.
+    /// Return the grid index coordinates of this node's local origin.
     const Coord& origin() const { return mOrigin; }
-    const Coord& getOrigin() const { return mOrigin; }
     void getOrigin(Coord& origin) const { origin = mOrigin; }
     void getOrigin(Int32& x, Int32& y, Int32& z) const { mOrigin.asXYZ(x, y, z); }
     //@}
@@ -247,6 +249,13 @@ public:
 
     /// Set the active state of the voxel at the given coordinates but don't change its value.
     void setActiveState(const Coord& xyz, bool on);
+    /// Set the active state of the voxel at the given offset but don't change its value.
+    void setActiveState(Index offset, bool on) { assert(offset<SIZE); mValueMask.set(offset, on); }
+
+    /// Set the value of the voxel at the given coordinates but don't change its active state.
+    void setValueOnly(const Coord& xyz, bool val);
+    /// Set the value of the voxel at the given offset but don't change its active state.
+    void setValueOnly(Index offset, bool val) { assert(offset<SIZE); mBuffer.setValue(offset,val); }
 
     /// Mark the voxel at the given coordinates as inactive but don't change its value.
     void setValueOff(const Coord& xyz) { mValueMask.setOff(this->coord2offset(xyz)); }
@@ -269,11 +278,6 @@ public:
     void setValue(const Coord& xyz, bool val) { this->setValueOn(xyz, val); };
     /// Set the value of the voxel at the given offset and mark the voxel as active.
     void setValueOn(Index offset, bool val);
-
-    /// Set the value of the voxel at the given coordinates but don't change its active state.
-    void setValueOnly(const Coord& xyz, bool val);
-    /// Set the value of the voxel at the given offset but don't change its active state.
-    void setValueOnly(Index offset, bool val) { assert(offset<SIZE); mBuffer.setValue(offset,val); }
 
     /// @brief Apply a functor to the value of the voxel at the given coordinates
     /// and mark the voxel as active.
@@ -517,13 +521,15 @@ public:
     NodeT* probeNode(const Coord&) { return NULL; }
     template<typename NodeT>
     const NodeT* probeConstNode(const Coord&) const { return NULL; }
-    void addTile(Index, const Coord&, bool, bool) {}
-    template<typename AccessorT>
-    void addTileAndCache(Index, const Coord&, const ValueType&, bool, AccessorT&) {}
     //@}
 
+    void addTile(Index level, const Coord&, bool val, bool active);
+    void addTile(Index offset, bool val, bool active);
+    template<typename AccessorT>
+    void addTileAndCache(Index level, const Coord&, bool val, bool active, AccessorT&);
+
     //@{
-    /// @brief return a pointer to itself
+    /// @brief Return a pointer to this node.
     LeafNode* touchLeaf(const Coord&) { return this; }
     template<typename AccessorT>
     LeafNode* touchLeafAndCache(const Coord&, AccessorT&) { return this; }
@@ -540,7 +546,7 @@ public:
     }
     //@}
     //@{
-    /// @brief return a const pointer to itself
+    /// @brief Return a @const pointer to this node.
     const LeafNode* probeLeaf(const Coord&) const { return this; }
     template<typename AccessorT>
     const LeafNode* probeLeafAndCache(const Coord&, AccessorT&) const { return this; }
@@ -779,7 +785,7 @@ inline
 LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other, TopologyCopy):
     mValueMask(other.getValueMask()),
     mBuffer(other.getValueMask()), // value = active state
-    mOrigin(other.getOrigin())
+    mOrigin(other.origin())
 {
 }
 
@@ -791,7 +797,7 @@ LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other,
                                   bool offValue, bool onValue, TopologyCopy):
     mValueMask(other.getValueMask()),
     mBuffer(other.getValueMask()),
-    mOrigin(other.getOrigin())
+    mOrigin(other.origin())
 {
     if (offValue) { if (!onValue) mBuffer.mData.toggle(); else mBuffer.mData.setOn(); }
 }
@@ -804,7 +810,7 @@ LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other,
                                   bool background, TopologyCopy):
     mValueMask(other.getValueMask()),
     mBuffer(background),
-    mOrigin(other.getOrigin())
+    mOrigin(other.origin())
 {
 }
 
@@ -903,7 +909,7 @@ template<Index Log2Dim>
 inline Coord
 LeafNode<bool, Log2Dim>::offset2globalCoord(Index n) const
 {
-    return (this->offset2coord(n) + this->getOrigin());
+    return (this->offset2coord(n) + this->origin());
 }
 
 
@@ -1014,6 +1020,36 @@ LeafNode<bool, Log2Dim>::isConstant(bool& constValue, bool& state, bool toleranc
     state = mValueMask.isOn();
     constValue = mBuffer.mData.isOn();
     return true;
+}
+
+
+////////////////////////////////////////
+
+
+template<Index Log2Dim>
+inline void
+LeafNode<bool, Log2Dim>::addTile(Index level, const Coord& xyz, bool val, bool active)
+{
+    assert(level == 0);
+    this->addTile(this->coord2offset(xyz), val, active);
+}
+
+template<Index Log2Dim>
+inline void
+LeafNode<bool, Log2Dim>::addTile(Index offset, bool val, bool active)
+{
+    assert(offset < SIZE);
+    setValueOnly(offset, val);
+    setActiveState(offset, active);
+}
+
+template<Index Log2Dim>
+template<typename AccessorT>
+inline void
+LeafNode<bool, Log2Dim>::addTileAndCache(Index level, const Coord& xyz,
+    bool val, bool active, AccessorT&)
+{
+    this->addTile(level, xyz, val, active);
 }
 
 

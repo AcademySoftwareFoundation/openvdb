@@ -421,7 +421,7 @@ public:
     ///     template <typename LeafNodeType>
     ///     void operator()(LeafNodeType &lhsLeaf, size_t) const
     ///     {
-    ///         const LeafNodeType * rhsLeaf = mRhsTreeAcc.probeConstLeaf(lhsLeaf.getOrigin());
+    ///         const LeafNodeType * rhsLeaf = mRhsTreeAcc.probeConstLeaf(lhsLeaf.origin());
     ///         if (rhsLeaf) {
     ///             typename LeafNodeType::ValueOnIter iter = lhsLeaf.beginValueOn();
     ///             for (; iter; ++iter) {

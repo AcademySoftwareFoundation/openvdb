@@ -598,16 +598,11 @@ inline Vec3<T> maxComponent(const Vec3<T> &v1, const Vec3<T> &v2)
             std::max(v1.z(), v2.z()));
 }
 
-typedef Vec3<int>          Vec3i;
-typedef Vec3<unsigned int> Vec3ui;
-typedef Vec3<float>        Vec3s;
-typedef Vec3<double>       Vec3d;
 
-#if DWREAL_IS_DOUBLE == 1
-typedef Vec3d    Vec3f;
-#else
-typedef Vec3s    Vec3f;
-#endif  // DWREAL_IS_DOUBLE
+typedef Vec3<int32_t>   Vec3i;
+typedef Vec3<uint32_t>  Vec3ui;
+typedef Vec3<float>     Vec3s;
+typedef Vec3<double>    Vec3d;
 
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME

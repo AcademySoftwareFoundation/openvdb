@@ -161,8 +161,8 @@ public:
 
 	    /// Nodes are rendered as cell-centered (0.5 voxel dilated)
 	    /// AABBox in world space
-	    bbox_pos[0] = leaf->getOrigin() - half;
-	    bbox_pos[1] = leaf->getOrigin().offsetBy(leaf->dim() - 1) + half;
+	    bbox_pos[0] = leaf->origin() - half;
+	    bbox_pos[1] = leaf->origin().offsetBy(leaf->dim() - 1) + half;
 
 	    Vec3s corners[NPTS];
 	    Coord lut[NPTS] = {

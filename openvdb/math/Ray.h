@@ -98,7 +98,7 @@ public:
     {
         assert(map.isLinear());
         const Vec3T eye = map.applyMap(mEye);
-        const Vec3T dir = map.applyMap(mDir) - map.applyMap(Vec3T(0,0,0));
+        const Vec3T dir = map.applyJT(mDir);
         const RealT tmp = Sqrt(mDir.lengthSqr()/dir.lengthSqr());
         return Ray(eye, dir, mT0*tmp, mT1*tmp);
     }
@@ -111,7 +111,7 @@ public:
     {
         assert(map.isLinear());
         const Vec3T eye = map.applyInverseMap(mEye);
-        const Vec3T dir = map.applyInverseMap(mDir) - map.applyInverseMap(Vec3T(0,0,0));
+        const Vec3T dir = map.applyIJT(mDir);
         const RealT tmp = Sqrt(mDir.lengthSqr()/dir.lengthSqr());
         return Ray(eye, dir, mT0*tmp, mT1*tmp);
     }

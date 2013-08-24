@@ -61,8 +61,6 @@ public:
         { mVec[0] = mVec[1] = mVec[2] = xyz; }
     Coord(Int32 x, Int32 y, Int32 z)
         { mVec[0] = x; mVec[1] = y; mVec[2] = z; }
-    Coord(Index32 x, Index32 y, Index32 z)
-        { mVec[0] = Int32(x); mVec[1] = Int32(y); mVec[2] = Int32(z); }
     explicit Coord(const Vec3i& v)
         { mVec[0] = v[0]; mVec[1] = v[1]; mVec[2] = v[2]; }
     explicit Coord(const Vec3I& v)
@@ -79,72 +77,40 @@ public:
     /// @brief Return @a xyz rounded to the closest integer coordinates
     /// (cell centered conversion).
     template<typename T> static Coord round(const Vec3<T>& xyz)
-    {
-        return Coord(static_cast<int>(Round(xyz[0])),
-                     static_cast<int>(Round(xyz[1])),
-                     static_cast<int>(Round(xyz[2])));
-    }
+        { return Coord(Int32(Round(xyz[0])), Int32(Round(xyz[1])), Int32(Round(xyz[2]))); }
     /// @brief Return the largest integer coordinates that are not greater
     /// than @a xyz (node centered conversion).
     template<typename T> static Coord floor(const Vec3<T>& xyz)
-    {
-        return Coord(static_cast<int>(Floor(xyz[0])),
-                     static_cast<int>(Floor(xyz[1])),
-                     static_cast<int>(Floor(xyz[2])));
-    }
+        { return Coord(Int32(Floor(xyz[0])), Int32(Floor(xyz[1])), Int32(Floor(xyz[2]))); }
 
     /// @brief Return the largest integer coordinates that are not greater
     /// than @a xyz+1 (node centered conversion).
     template<typename T> static Coord ceil(const Vec3<T>& xyz)
-    {
-        return Coord(static_cast<int>(Ceil(xyz[0])),
-                     static_cast<int>(Ceil(xyz[1])),
-                     static_cast<int>(Ceil(xyz[2])));
-    }
+        { return Coord(Int32(Ceil(xyz[0])), Int32(Ceil(xyz[1])), Int32(Ceil(xyz[2]))); }
 
     Coord& reset(Int32 x, Int32 y, Int32 z)
-    {
-        mVec[0] = x; mVec[1] = y; mVec[2] = z;
-        this->dirty();
-        return *this;
-    }
-    Coord& reset(Index32 x, Index32 y, Index32 z)
-    {
-        return this->reset(Int32(x), Int32(y), Int32(z));
-    }
+        { mVec[0] = x; mVec[1] = y; mVec[2] = z; this->dirty(); return *this; }
     Coord& reset(Int32 xyz) { return this->reset(xyz, xyz, xyz); }
+
     Coord& setX(Int32 x) { mVec[0] = x; dirty(); return *this; }
     Coord& setY(Int32 y) { mVec[1] = y; dirty(); return *this; }
     Coord& setZ(Int32 z) { mVec[2] = z; dirty(); return *this; }
+
     Coord& offset(Int32 dx, Int32 dy, Int32 dz)
-    {
-        mVec[0]+=dx; mVec[1]+=dy; mVec[2]+=dz;
-        this->dirty();
-        return *this;
-    }
+        { mVec[0]+=dx; mVec[1]+=dy; mVec[2]+=dz; this->dirty(); return *this; }
     Coord& offset(Int32 n) { return this->offset(n, n, n); }
     Coord offsetBy(Int32 dx, Int32 dy, Int32 dz) const
-    {
-        return Coord(mVec[0] + dx, mVec[1] + dy, mVec[2] + dz);
-    }
+        { return Coord(mVec[0] + dx, mVec[1] + dy, mVec[2] + dz); }
     Coord offsetBy(Int32 n) const { return offsetBy(n, n, n); }
 
     Coord& operator+=(const Coord& rhs)
-    {
-        mVec[0] += rhs[0]; mVec[1] += rhs[1]; mVec[2] += rhs[2]; return *this;
-    }
+        { mVec[0] += rhs[0]; mVec[1] += rhs[1]; mVec[2] += rhs[2]; return *this; }
     Coord& operator-=(const Coord& rhs)
-    {
-        mVec[0] -= rhs[0]; mVec[1] -= rhs[1]; mVec[2] -= rhs[2]; return *this;
-    }
+        { mVec[0] -= rhs[0]; mVec[1] -= rhs[1]; mVec[2] -= rhs[2]; return *this; }
     Coord operator+(const Coord& rhs) const
-    {
-        return Coord(mVec[0] + rhs[0], mVec[1] + rhs[1], mVec[2] + rhs[2]);
-    }
+        { return Coord(mVec[0] + rhs[0], mVec[1] + rhs[1], mVec[2] + rhs[2]); }
     Coord operator-(const Coord& rhs) const
-    {
-        return Coord(mVec[0] - rhs[0], mVec[1] - rhs[1], mVec[2] - rhs[2]);
-    }
+        { return Coord(mVec[0] - rhs[0], mVec[1] - rhs[1], mVec[2] - rhs[2]); }
     Coord operator-() const { return Coord(-mVec[0], -mVec[1], -mVec[2]); }
 
     Coord  operator>> (size_t n) const { return Coord(mVec[0]>>n, mVec[1]>>n, mVec[2]>>n); }
@@ -170,16 +136,11 @@ public:
     Vec3d asVec3d() const { return Vec3d(double(mVec[0]), double(mVec[1]), double(mVec[2])); }
     Vec3s asVec3s() const { return Vec3s(float(mVec[0]), float(mVec[1]), float(mVec[2])); }
     Vec3i asVec3i() const { return Vec3i(mVec); }
-    Vec3I asVec3I() const
-    {
-        return Vec3I(Index32(mVec[0]), Index32(mVec[1]), Index32(mVec[2]));
-    }
+    Vec3I asVec3I() const { return Vec3I(Index32(mVec[0]), Index32(mVec[1]), Index32(mVec[2])); }
     void asXYZ(Int32& x, Int32& y, Int32& z) const { x = mVec[0]; y = mVec[1]; z = mVec[2]; }
 
     bool operator==(const Coord& rhs) const
-    {
-        return (mVec[0] == rhs.mVec[0] && mVec[1] == rhs.mVec[1] && mVec[2] == rhs.mVec[2]);
-    }
+        { return (mVec[0] == rhs.mVec[0] && mVec[1] == rhs.mVec[1] && mVec[2] == rhs.mVec[2]); }
     bool operator!=(const Coord& rhs) const { return !(*this == rhs); }
 
     /// Lexicographic less than
@@ -239,17 +200,15 @@ public:
             return (a[0] < b[0] || a[1] < b[1] || a[2] < b[2]);
     }
 
-    /// @brief Return the index [0,1,2] with the smallest value
+    /// @brief Return the index (0, 1 or 2) with the smallest value.
     size_t minIndex() const { return MinIndex(mVec); }
 
-    /// @brief Return the index [0,1,2] with the largest value
+    /// @brief Return the index (0, 1 or 2) with the largest value.
     size_t maxIndex() const { return MaxIndex(mVec); }
-    
+
     void read(std::istream& is) { is.read(reinterpret_cast<char*>(mVec), sizeof(mVec)); }
     void write(std::ostream& os) const
-    {
-        os.write(reinterpret_cast<const char*>(mVec), sizeof(mVec));
-    }
+        { os.write(reinterpret_cast<const char*>(mVec), sizeof(mVec)); }
 
 private:
     //no-op for now
@@ -272,7 +231,7 @@ class CoordBBox
 public:
     typedef uint64_t         Index64;
     typedef Coord::ValueType ValueType;
-    
+
     /// @brief The default constructor produces an empty bounding box.
     CoordBBox(): mMin(Coord::max()), mMax(Coord::min()) {}
     /// @brief Construct a bounding box with the given @a min and @a max bounds.
@@ -340,7 +299,7 @@ public:
 
     /// @brief Return the index (0, 1 or 2) of the shortest axis.
     size_t minExtent() const { return this->dim().minIndex(); }
-   
+
     /// @brief Return the index (0, 1 or 2) of the longest axis.
     size_t maxExtent() const { return this->dim().maxIndex(); }
 
@@ -402,7 +361,6 @@ public:
     void write(std::ostream& os) const { mMin.write(os); mMax.write(os); }
 
 private:
-    
     Coord mMin, mMax;
 }; // class CoordBBox
 

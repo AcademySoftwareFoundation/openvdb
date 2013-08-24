@@ -30,13 +30,28 @@
 ///
 /// @file LevelSetRayIntersector.h
 ///
-/// @brief Intersects a ray with a narrow-band level set.
-///
 /// @author Ken Museth
 ///
-/// @todo Add analytical intersection test, i.e. solve cubic equation.
+/// @brief Accelerated intersection of a ray with a narrow-band level set.
 ///
-/// @note See the TestLevelSetRayIntersector unit-test for applications.
+/// @details This file defines three classes that together perform accelerated
+/// intersection of a ray with a narrow-band level set.  The main class is
+/// LevelSetRayIntersector, which is templated on the LinearIntersector class
+/// and calls instances of the LevelSetHDDA class.  The reason to split ray intersection
+/// into three classes is twofold.  First, to facilitate efficient multithreading
+/// LevelSetRayIntersector is designed with thread-safe methods, whereas LinearIntersector
+/// is not.  In other words, a single LevelSetRayIntersector may be shared by
+/// multiple threads, whereas each thread must have its own instance of LinearIntersector.
+/// Second, LevelSetHDDA, which implements a hierarchical Differential Digital Analyzer,
+/// relies on partial template specialization, so it has to be a standalone class
+/// (as opposed to a member class of LevelSetRayIntersector).
+///
+/// @see unittest/TestLevelSetRayIntersector.cc for examples of intended usage.
+///
+/// @todo Add TrilinearIntersector, as an alternative to LinearIntersector,
+/// that performs analytical 3D trilinear intersection tests, i.e., solves
+/// cubic equations. This is slower than but more accurate than the 1D
+/// linear interpolation in LinearIntersector.
 
 #ifndef OPENVDB_TOOLS_LEVELSETRAYINTERSECTOR_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_LEVELSETRAYINTERSECTOR_HAS_BEEN_INCLUDED
@@ -54,26 +69,25 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
-    
-/// Helper class that implements hierarchical Digital Differential Analysers
-/// specialized for ray intersections with level lets    
+
+// Helper class that implements hierarchical Digital Differential Analyzers
+// specialized for ray intersections with level lets
 template <typename GridT, int NodeLevel> struct LevelSetHDDA;
 
-/// @brief Intersects a level set with a ray using iterative linear
-/// interpolation along the direction of the ray. Thus it is
-/// approximate in the sense that it only detects an intersection when
-/// the voxelized ray encounters a zero-crossing. The number of linear
-/// iterations can be defined with a template parameter, but the
-/// default value has proven fairly accurate and fast.
+/// @brief A LinearIntersector intersects a level set with a ray using
+/// iterative linear interpolation along the direction of the ray.
+/// @details It is approximate in the sense that it only detects an intersection
+/// when the voxelized ray encounters a zero crossing. The number of linear
+/// iterations can be defined with a template parameter, but the default value
+/// has proven fairly accurate and fast.
 ///
-/// @warning Since this class internally stores a ValueAccessor for
-/// improved random access it is NOT thread-safe so make sure to
-/// declare an instance per thread. This of course also means the
-/// overhead of allocating an instance should (if possible) be
-/// amortized by as many ray-intersections as possible.
+/// @warning Since this class internally stores a ValueAccessor it is NOT thread-safe,
+/// so make sure to give each thread its own instance.  This of course also means that
+/// the cost of allocating an instance should (if possible) be amortized over
+/// as many ray intersections as possible.
 ///
-/// @note More iterations are not guaranteed to give better results.    
-template<typename GridT, int Iterations = 0, typename RealT = double>    
+/// @note More iterations are not guaranteed to give better results.
+template<typename GridT, int Iterations = 0, typename RealT = double>
 class LinearIntersector
 {
 public:
@@ -113,28 +127,24 @@ public:
             mT[1] = time;
             mV[1] = this->interpValue(ray(time));
             if (math::ZeroCrossing(mV[0], mV[1])) {
-                this->updateTime();
+                mTime = this->interpTime();
                 OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
                 for (int n=0; Iterations>0 && n<Iterations; ++n) {//resolved at compile-time
                     V = this->interpValue(ray(mTime));
-                    if (math::ZeroCrossing(mV[0], V)) {
-                        mV[1] = V;
-                        mT[1] = mTime;
-                    } else {
-                        mV[0] = V;
-                        mT[0] = mTime;
-                    }
-                    this->updateTime();
+                    const int m = math::ZeroCrossing(mV[0], V) ? 1 : 0;
+                    mV[m] = V;
+                    mT[m] = mTime;
+                    mTime = this->interpTime();
                 }
                 OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
                 return true;
             }
             mT[0] = mT[1];
             mV[0] = mV[1];
-        } 
+        }
         return false;
     }
-   
+
     /// @brief Return a const reference to a ValueAccessor
     StencilT& stencil()  { return mStencil; }
 
@@ -144,49 +154,49 @@ public:
 
 private:
 
-    inline void updateTime()
+    inline RealT interpTime()
     {
         assert(math::isApproxLarger(mT[1], mT[0], 1e-6));
-        mTime = mT[0]+(mT[1]-mT[0])*mV[0]/(mV[0]-mV[1]);
+        return mT[0]+(mT[1]-mT[0])*mV[0]/(mV[0]-mV[1]);
     }
-    
+
     inline RealT interpValue(const Vec3R& pos)
     {
         mStencil.moveTo(pos);
         return mStencil.interpolation(pos);
     }
-    
+
     StencilT mStencil;
     RealT    mTime;
     ValueT   mV[2];
     RealT    mT[2];
     ValueT   mThreshold;
 };// LinearIntersector
-    
 
-//===============================================================   
+
+////////////////////////////////////////
+
 
 /// @brief Intersect a ray with a narrow-band level set.
-///
-/// @note Performs hierarchical tree node and voxel traversal
+/// @details Performs hierarchical tree node and voxel traversal
 template<typename GridT,
          int NodeLevel = GridT::TreeType::RootNodeType::ChildNodeType::LEVEL,
          typename RayT = math::Ray<double> >
 class LevelSetRayIntersector
 {
 public:
-    typedef GridT                         GridType; 
+    typedef GridT                         GridType;
     typedef RayT                          RayType;
     typedef typename RayT::Vec3T          Vec3Type;
     typedef typename GridT::ValueType     ValueT;
     typedef typename GridT::TreeType      TreeT;
-    
+
     BOOST_STATIC_ASSERT( NodeLevel >= -1 && NodeLevel < int(TreeT::DEPTH)-1);
     BOOST_STATIC_ASSERT(boost::is_floating_point<ValueT>::value);
 
     /// @brief Constructor
     ///
-    /// @param grid Level set grid to intersect rays against
+    /// @param grid level set grid to intersect rays against
     LevelSetRayIntersector(const GridT& grid): mGrid(&grid), mVoxelSize(grid.voxelSize()[0])
     {
         if (!grid.hasUniformVoxels() ) {
@@ -197,16 +207,16 @@ public:
             OPENVDB_THROW(RuntimeError,
                           "LevelSetRayIntersector only supports level sets!"
                           "\nUse Grid::setGridClass(openvdb::GRID_LEVEL_SET)");
-        }   
+        }
         if (!grid.tree().evalLeafBoundingBox(mBBox)) {
             OPENVDB_THROW(RuntimeError, "LevelSetRayIntersector does not supports empty grids");
         }
     }
-    /// @brief Return @c true if the index space ray intersects the level set.
-    /// @param iRay Ray represented in index space.
-    /// @param tester The tester for the actual ray-level-set intersection
-    /// @note The index space Ray is passed by value since it's internally
-    /// clipped against the index-space bounding-box of the grid.
+    /// @brief Return @c true if the index-space ray intersects the level set
+    /// @param iRay ray represented in index space
+    /// @param tester the tester for the actual ray/level-set intersection
+    /// @note The index space Ray is passed by value since it is internally
+    /// clipped against the index-space bounding box of the grid.
     template <typename TesterT>
     bool intersectsIS(RayType iRay, TesterT& tester) const
     {
@@ -214,13 +224,13 @@ public:
         tester.init(iRay);
         return LevelSetHDDA<TreeT, NodeLevel>::test(iRay, tester);
     }
-    /// @brief Return @c true if the index space ray intersects the level set.
-    /// @param iRay Ray represented in index space.
-    /// @param xyz  If an intersection was found it is assigned the
-    ///             intersection point in index space. Otherwise it is unchanged.
-    /// @param tester The tester for the actual ray-level-set intersection
-    /// @note The index space Ray is passed by value since it's internally
-    /// clipped against the index-space bounding-box of the grid.
+    /// @brief Return @c true if the index-space ray intersects the level set.
+    /// @param iRay ray represented in index space.
+    /// @param xyz  if an intersection was found it is assigned the
+    ///             intersection point in index space, otherwise it is unchanged.
+    /// @param tester the tester for the actual ray/level-set intersection
+    /// @note The index space Ray is passed by value since it is internally
+    /// clipped against the index-space bounding box of the grid.
     template <typename TesterT>
     bool intersectsIS(RayType iRay, TesterT& tester, Vec3Type& xyz) const
     {
@@ -230,20 +240,20 @@ public:
         xyz = iRay(tester.time());
         return true;
     }
-    /// @brief Return @c true if the world space ray intersects the level set.
-    /// @param wRay   Ray represented in world space.
-    /// @param tester The tester for the actual ray-level-set intersection
+    /// @brief Return @c true if the world-space ray intersects the level set.
+    /// @param wRay   ray represented in world space.
+    /// @param tester the tester for the actual ray/level-set intersection
     template <typename TesterT>
     bool intersectsWS(const RayType& wRay, TesterT& tester) const
     {
         RayType iRay = wRay.applyInverseMap(*(mGrid->transform().baseMap()));
         return this->intersectsIS(iRay, tester);
     }
-    /// @brief Return @c true if the world space ray intersects the level set.
-    /// @param wRay   Ray represented in world space.
-    /// @param tester The tester for the actual ray-level-set intersection
-    /// @param world  If an intersection was found it is assigned the
-    ///               intersection point in world space. Else it is unchanged.
+    /// @brief Return @c true if the world-space ray intersects the level set.
+    /// @param wRay   ray represented in world space.
+    /// @param tester the tester for the actual ray/level-set intersection
+    /// @param world  if an intersection was found it is assigned the
+    ///               intersection point in world space, otherwise it is unchanged
     template <typename TesterT>
     bool intersectsWS(const RayType& wRay, TesterT& tester, Vec3Type& world) const
     {
@@ -254,13 +264,13 @@ public:
         return true;
     }
 
-    /// @brief Return @c true if the world space ray intersects the level set.
-    /// @param wRay   Ray represented in world space.
-    /// @param tester The tester for the actual ray-level-set intersection
-    /// @param world  If an intersection was found it is assigned the
-    ///               intersection point in world space. Else it is unchanged.
-    /// @param normal If an intersection was found it is assigned the
-    ///               normal of the level set surface in world space. Else it is unchanged.
+    /// @brief Return @c true if the world-space ray intersects the level set.
+    /// @param wRay   ray represented in world space.
+    /// @param tester the tester for the actual ray/level-set intersection
+    /// @param world  if an intersection was found it is assigned the
+    ///               intersection point in world space, otherwise it is unchanged.
+    /// @param normal if an intersection was found it is assigned the normal
+    ///               of the level set surface in world space, otherwise it is unchanged.
     template <typename TesterT>
     bool intersectsWS(const RayType& wRay, TesterT& tester, Vec3Type& world, Vec3Type& normal) const
     {
@@ -280,17 +290,20 @@ private:
     const GridT*    mGrid;
     const ValueT    mVoxelSize;
     math::CoordBBox mBBox;
-    
 };// LevelSetRayIntersector
 
-/// Helper class that implements Hierarchical Digital Differential Analyzers
-/// that is specialized for ray intersections with level sets.
-template <typename TreeT, int NodeLevel>
+
+////////////////////////////////////////
+
+
+/// @brief Helper class that implements Hierarchical Digital Differential Analyzers
+/// and is specialized for ray intersections with level sets
+template<typename TreeT, int NodeLevel>
 struct LevelSetHDDA
 {
     typedef typename TreeT::RootNodeType::NodeChainType ChainT;
     typedef typename boost::mpl::at<ChainT, boost::mpl::int_<NodeLevel> >::type NodeT;
-    
+
     template <typename RayT, typename TesterT>
     static bool test(const RayT& ray, TesterT& tester)
     {
@@ -309,9 +322,9 @@ struct LevelSetHDDA
 };
 
 /// @brief Specialization of Hierarchical Digital Differential Analyzer
-/// class that intersects against the voxels of a level set.    
-template <typename TreeT>
-struct LevelSetHDDA<TreeT, -1>     
+/// class that intersects a ray against the voxels of a level set
+template<typename TreeT>
+struct LevelSetHDDA<TreeT, -1>
 {
     template <typename RayT, typename TesterT>
     static bool test(const RayT& ray, TesterT& tester)
@@ -324,7 +337,7 @@ struct LevelSetHDDA<TreeT, -1>
         return false;
     }
 };
-    
+
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

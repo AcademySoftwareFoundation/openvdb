@@ -91,13 +91,13 @@ TestQuat::testAxisAngle()
     Quat<float> q1(1  , 2  , 3  , 4  );
     Quat<float> q2(1.2, 2.3, 3.4, 4.5);
 
-    Vec3f v(1, 2, 3);
+    Vec3s v(1, 2, 3);
     v.normalize();
     float a = M_PI/4;
 
     Quat<float> q(v,a);
     float b = q.angle();
-    Vec3f vv = q.axis();
+    Vec3s vv = q.axis();
 
     CPPUNIT_ASSERT( isApproxEqual(a, b, TOL) );
     CPPUNIT_ASSERT( v.eq(vv, TOL) );
@@ -224,27 +224,27 @@ TestQuat::testInvert()
 void
 TestQuat::testEulerAngles()
 {
-    
+
     {
         double TOL = 1e-7;
 
         Mat4d rx, ry, rz;
         const double angle1 = 20. * M_PI / 180.;
-        const double angle2 = 64. * M_PI / 180.; 
-        const double angle3 = 125. *M_PI / 180.; 
+        const double angle2 = 64. * M_PI / 180.;
+        const double angle3 = 125. *M_PI / 180.;
         rx.setToRotation(Vec3d(1,0,0), angle1);
         ry.setToRotation(Vec3d(0,1,0), angle2);
         rz.setToRotation(Vec3d(0,0,1), angle3);
-        
+
         Mat4d r = rx * ry * rz;
-        
+
         const Quat<double> rot(r.getMat3());
         Vec3d result = rot.eulerAngles(ZYX_ROTATION);
-       
+
         rx.setToRotation(Vec3d(1,0,0), result[0]);
         ry.setToRotation(Vec3d(0,1,0), result[1]);
         rz.setToRotation(Vec3d(0,0,1), result[2]);
-        
+
         Mat4d rtest = rx * ry * rz;
 
         CPPUNIT_ASSERT(r.eq(rtest, TOL));
@@ -255,21 +255,21 @@ TestQuat::testEulerAngles()
 
         Mat4d rx, ry, rz;
         const double angle1 = 20. * M_PI / 180.;
-        const double angle2 = 64. * M_PI / 180.; 
-        const double angle3 = 125. *M_PI / 180.; 
+        const double angle2 = 64. * M_PI / 180.;
+        const double angle3 = 125. *M_PI / 180.;
         rx.setToRotation(Vec3d(1,0,0), angle1);
         ry.setToRotation(Vec3d(0,1,0), angle2);
         rz.setToRotation(Vec3d(0,0,1), angle3);
-        
+
         Mat4d r = rz * ry * rx;
-        
+
         const Quat<double> rot(r.getMat3());
         Vec3d result = rot.eulerAngles(XYZ_ROTATION);
-       
+
         rx.setToRotation(Vec3d(1,0,0), result[0]);
         ry.setToRotation(Vec3d(0,1,0), result[1]);
         rz.setToRotation(Vec3d(0,0,1), result[2]);
-        
+
         Mat4d rtest = rz * ry * rx;
 
         CPPUNIT_ASSERT(r.eq(rtest, TOL));
@@ -280,32 +280,32 @@ TestQuat::testEulerAngles()
 
         Mat4d rx, ry, rz;
         const double angle1 = 20. * M_PI / 180.;
-        const double angle2 = 64. * M_PI / 180.; 
-        const double angle3 = 125. *M_PI / 180.; 
+        const double angle2 = 64. * M_PI / 180.;
+        const double angle3 = 125. *M_PI / 180.;
         rx.setToRotation(Vec3d(1,0,0), angle1);
         ry.setToRotation(Vec3d(0,1,0), angle2);
         rz.setToRotation(Vec3d(0,0,1), angle3);
-        
+
         Mat4d r = rz * rx * ry;
-        
+
         const Quat<double> rot(r.getMat3());
         Vec3d result = rot.eulerAngles(YXZ_ROTATION);
-       
+
         rx.setToRotation(Vec3d(1,0,0), result[0]);
         ry.setToRotation(Vec3d(0,1,0), result[1]);
         rz.setToRotation(Vec3d(0,0,1), result[2]);
-        
+
         Mat4d rtest = rz * rx * ry;
 
         CPPUNIT_ASSERT(r.eq(rtest, TOL));
     }
-    
+
     {
         const Quat<float> rot(X_AXIS, 1.0);
-        Vec3f result = rot.eulerAngles(XZY_ROTATION);
-        CPPUNIT_ASSERT_EQUAL(result, Vec3f(1,0,0));
+        Vec3s result = rot.eulerAngles(XZY_ROTATION);
+        CPPUNIT_ASSERT_EQUAL(result, Vec3s(1,0,0));
     }
-    
+
 }
 
 // Copyright (c) 2012-2013 DreamWorks Animation LLC

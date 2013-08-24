@@ -21,17 +21,14 @@ Version 2.0.0 - In development
     - Fixed a bug in the default ScaleMap constructor that left some data
       used in the inverse uninitialized.
     - Added MapBase::applyJT(), which applies the Jacobian transpose to
-      a vector.  The Jacobian transpose takes a range-space vector to a
-      domain-space vector (e.g., world to index).
+      a vector (the Jacobian transpose takes a range-space vector to a
+      domain-space vector, e.g., world to index), and added
+      MapBase::inverseMap(), which returns a new map representing
+      the inverse of the original map (except for NonlinearFrustumMap,
+      which does not currently have a defined inverse map).
       Note: Houdini 12.5 uses an earlier version of OpenVDB, and maps
-      created with that version lack a virtual table entry for this method,
-      so do not call this method from Houdini 12.5.
-    - Added MapBase::inverseMap(), which returns as a MapBase::Ptr
-      the inverse of the map in question.  The Nonlinear Frustum map 
-      will throw as it does not currently have a defined inverse map.
-      Note: Houdini 12.5 uses an earlier version of OpenVDB, and maps
-      created with that version lack a virtual table entry for this method,
-      so do not call this method from Houdini 12.5.
+      created with that version lack virtual table entries for these
+      new methods, so do not call these methods from Houdini 12.5.
     - Reimplemented math::RandomInt using Boost.Random instead of rand()
       (which is not thread-safe), and deprecated math::randUniform()
       and added math::Random01 to replace it. 
@@ -52,6 +49,7 @@ Version 2.0.0 - In development
       ValueAccessor::setValueOnSum() with ValueAccessor::modifyValue()
       and ValueAccessor::modifyValueAndActiveState().
     - Removed LeafNode::addValue() and LeafNode::scaleValue().
+    - Added convenience classes Tree3 and Tree5 for custom tree configurations.
     - Added an option to the From Particles SOP to generate an alpha mask,
       which can be used to constrain level set filtering so as to preserve
       surface details.
@@ -61,7 +59,7 @@ Version 2.0.0 - In development
     - Fixed a bug in the Level Set Smooth, Level Set Renormalize and 
       Level Set Offset SOPs that caused the group name to be ignored.   
     - Fixed various OS X and Windows build issues.
-      [Contributed by SESI]
+      [Contributions from SESI and DD]
 
 Version 1.2.0 - June 28, 2013
     - Level set filters now accept an optional alpha mask grid.

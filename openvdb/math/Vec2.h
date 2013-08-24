@@ -496,16 +496,10 @@ inline Vec2<T> maxComponent(const Vec2<T> &v1, const Vec2<T> &v2)
 }
 
 
-typedef Vec2<float>        Vec2s;
-typedef Vec2<int>          Vec2i;
-typedef Vec2<unsigned int> Vec2ui;
-typedef Vec2<double>       Vec2d;
-
-#if DWREAL_IS_DOUBLE == 1
-typedef Vec2d Vec2f;
-#else
-typedef Vec2s Vec2f;
-#endif // DWREAL_IS_DOUBLE
+typedef Vec2<int32_t>   Vec2i;
+typedef Vec2<uint32_t>  Vec2ui;
+typedef Vec2<float>     Vec2s;
+typedef Vec2<double>    Vec2d;
 
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME

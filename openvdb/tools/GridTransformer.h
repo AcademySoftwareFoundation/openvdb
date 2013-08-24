@@ -742,7 +742,7 @@ public:
         for ( ; r; ++r) {
             if (interrupt()) break;
             LeafIterT i = r.iterator();
-            CoordBBox bbox(i->getOrigin(), i->getOrigin() + Coord(i->dim()));
+            CoordBBox bbox(i->origin(), i->origin() + Coord(i->dim()));
             if (!mBBox.empty()) {
                 // Intersect the leaf node's bounding box with mBBox.
                 bbox = CoordBBox(

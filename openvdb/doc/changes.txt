@@ -29,17 +29,15 @@
 - Fixed a bug in the default @vdblink::math::ScaleMap ScaleMap@endlink
   constructor that left some data used in the inverse uninitialized.
 - Added @vdblink::math::MapBase::applyJT MapBase::applyJT@endlink, which
-  applies the Jacobian transpose to a vector.  The Jacobian transpose takes
-  a range-space vector to a domain-space vector (e.g., world to index).
+  applies the Jacobian transpose to a vector (the Jacobian transpose takes
+  a range-space vector to a domain-space vector, e.g., world to index),
+  and added @vdblink::math::MapBase::inverseMap() MapBase::inverseMap@endlink,
+  which returns a new map representing the inverse of the original map
+  (except for @vdblink::math::NonlinearFrustumMap NonlinearFrustumMap@endlink,
+  which does not currently have a defined inverse map).
   <br>Note: Houdini 12.5 uses an earlier version of OpenVDB, and maps
-  created with that version lack a virtual table entry for this method,
-  so do not call this method from Houdini 12.5.
-- Added MapBase::inverseMap(), which returns as a MapBase::Ptr
-  the inverse of the map in question.  The Nonlinear Frustum map 
-  will throw as it does not currently have a defined inverse map.
-  Note: Houdini 12.5 uses an earlier version of OpenVDB, and maps
-  created with that version lack a virtual table entry for this method,
-  so do not call this method from Houdini 12.5.
+  created with that version lack virtual table entries for these
+  new methods, so do not call these methods from Houdini&nbsp;12.5.
 - Reimplemented @vdblink::math::RandomInt math::RandomInt@endlink using
   Boost.Random instead of @c rand() (which is not thread-safe), and deprecated
   @vdblink::math::randUniform math::randUniform@endlink and added
@@ -72,6 +70,8 @@
   and @vdblink::tree::ValueAccessor::modifyValueAndActiveState()
   ValueAccessor::modifyValueAndActiveState@endlink.
 - Removed @c LeafNode::addValue and @c LeafNode::scaleValue.
+- Added convenience classes @vdblink::tree::Tree3 tree::Tree3@endlink and
+@vdblink::tree::Tree5 tree::Tree3@endlink for custom tree configurations.
 - Added an option to the From Particles SOP to generate an alpha mask,
   which can be used to constrain level set filtering so as to preserve
   surface details.
@@ -82,7 +82,7 @@
 - Fixed a bug in the Level Set Smooth, Level Set Renormalize and 
   Level Set Offset SOPs that caused the group name to be ignored. 
 - Fixed various OS X and Windows build issues.
-  <I>[Contributed by SESI]</I>
+  <I>[Contributions from SESI and DD]</I>
 
 
 @htmlonly <a name="v1_2_0_changes"></a>@endhtmlonly

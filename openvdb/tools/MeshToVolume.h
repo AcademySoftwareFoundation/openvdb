@@ -665,7 +665,7 @@ MeshVoxelizer<FloatTreeT, InterruptT>::join(MeshVoxelizer<FloatTreeT, InterruptT
     typename FloatTreeT::LeafIter leafIt = rhs.mSqrDistTree.beginLeaf();
     for ( ; leafIt; ++leafIt) {
 
-        ijk = leafIt->getOrigin();
+        ijk = leafIt->origin();
         FloatLeafT* lhsDistLeafPt = mSqrDistAccessor.probeLeaf(ijk);
 
         if (!lhsDistLeafPt) {
@@ -1041,7 +1041,7 @@ SignMask<FloatTreeT, InterruptT>::operator()(const tbb::blocked_range<size_t> &r
 
         const FloatLeafT& distLeaf = mDistLeafs.leaf(n);
 
-        minCoord = distLeaf.getOrigin();
+        minCoord = distLeaf.origin();
         maxCoord[0] = minCoord[0] + extent;
         maxCoord[1] = minCoord[1] + extent;
         maxCoord[2] = minCoord[2] + extent;
@@ -1197,7 +1197,7 @@ PropagateSign<FloatTreeT, InterruptT>::operator()(const tbb::blocked_range<size_
     for (size_t n = range.begin(); n < range.end(); ++n) {
         BoolLeafT& oldMaskLeaf = mOldSignMaskLeafs.leaf(n);
 
-        minCoord = oldMaskLeaf.getOrigin();
+        minCoord = oldMaskLeaf.origin();
         maxCoord[0] = minCoord[0] + extent;
         maxCoord[1] = minCoord[1] + extent;
         maxCoord[2] = minCoord[2] + extent;
@@ -1539,7 +1539,7 @@ IntersectingVoxelCleaner<FloatTreeT>::operator()(
 
         BoolLeafT& maskLeaf = mLeafs.leaf(n);
 
-        ijk = maskLeaf.getOrigin();
+        ijk = maskLeaf.origin();
 
         DistLeafT * distLeaf = distAcc.probeLeaf(ijk);
         if (distLeaf) {
@@ -1682,7 +1682,7 @@ ShellVoxelCleaner<FloatTreeT>::operator()(
 
         DistLeafT& distLeaf = mLeafs.leaf(n);
 
-        ijk = distLeaf.getOrigin();
+        ijk = distLeaf.origin();
 
         const BoolLeafT* maskLeaf = maskAcc.probeConstLeaf(ijk);
         IntLeafT& indexLeaf = *indexAcc.probeLeaf(ijk);
@@ -1877,7 +1877,7 @@ ExpandNB<FloatTreeT>::operator()(const tbb::blocked_range<size_t>& range)
 
         if (maskLeaf.isEmpty()) continue;
 
-        ijk = maskLeaf.getOrigin();
+        ijk = maskLeaf.origin();
 
         FloatLeafT* distLeafPt = distAcc.probeLeaf(ijk);
         if (!distLeafPt) {
@@ -2276,7 +2276,7 @@ struct LeafTopologyDiffOp
     template <typename LeafNodeType>
     void operator()(LeafNodeType &leaf, size_t) const
     {
-        const LeafNodeT* rhsLeaf = mTree.probeConstLeaf(leaf.getOrigin());
+        const LeafNodeT* rhsLeaf = mTree.probeConstLeaf(leaf.origin());
         if (rhsLeaf) leaf.topologyDifference(*rhsLeaf, false);
     }
 
@@ -2873,7 +2873,7 @@ MeshToVoxelEdgeData::GenEdgeData::join(GenEdgeData& rhs)
 
     TreeType::LeafIter leafIt = rhs.mTree.beginLeaf();
     for ( ; leafIt; ++leafIt) {
-        ijk = leafIt->getOrigin();
+        ijk = leafIt->origin();
 
         TreeType::LeafNodeType* lhsLeafPt = mTree.probeLeaf(ijk);
 

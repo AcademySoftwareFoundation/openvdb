@@ -43,6 +43,7 @@
 #include <limits>    // for std::numeric_limits<Type>::max()
 #include <string>
 #include <boost/numeric/conversion/conversion_traits.hpp>
+#include <boost/math/special_functions/cbrt.hpp>
 #include <boost/random/mersenne_twister.hpp> // for boost::random::mt19937
 #include <boost/random/uniform_01.hpp>
 #include <boost/random/uniform_int.hpp>
@@ -649,9 +650,9 @@ inline long double Sqrt(long double x) { return sqrtl(x); }
 
 //@{
 /// Return the cube root of a floating-point value.
-inline float Cbrt(float x) { return cbrtf(x); }
-inline double Cbrt(double x) { return cbrtf(x); }
-inline long double Cbrt(long double x) { return cbrtl(x); }
+inline float Cbrt(float x) { return boost::math::cbrt(x); }
+inline double Cbrt(double x) { return boost::math::cbrt(x); }
+inline long double Cbrt(long double x) { return boost::math::cbrt(x); }
 //@}
 
 
@@ -784,8 +785,8 @@ struct promote {
 /// @note This methods assumes operator[] exists and avoids branching.
 /// @details If two components of the input vector are equal and smaller then the
 /// third component, the largest index of the two is always returned.
-/// If all three vector components are equal the largest index, i.e. 2, is 
-/// returned. In other words the return value corresponds to the largest index 
+/// If all three vector components are equal the largest index, i.e. 2, is
+/// returned. In other words the return value corresponds to the largest index
 /// of the of the smallest vector components.
 template<typename Vec3T>
 size_t
@@ -802,8 +803,8 @@ MinIndex(const Vec3T& v)
 /// @note This methods assumes operator[] exists and avoids branching.
 /// @details If two components of the input vector are equal and larger then the
 /// third component, the largest index of the two is always returned.
-/// If all three vector components are equal the largest index, i.e. 2, is 
-/// returned. In other words the return value corresponds to the largest index 
+/// If all three vector components are equal the largest index, i.e. 2, is
+/// returned. In other words the return value corresponds to the largest index
 /// of the of the largest vector components.
 template<typename Vec3T>
 size_t

@@ -800,17 +800,17 @@ TestTree::testIterators()
                 internal_iter2.test(); ++internal_iter2)
             {
                 internal_iter2.getCoord(xyz2);
-                xyz2 = xyz2 - internal_iter2.parent().getOrigin();
+                xyz2 = xyz2 - internal_iter2.parent().origin();
                 for (InternalNodeType1::ChildOnIter internal_iter1 =
                     internal_iter2->beginChildOn(); internal_iter1.test(); ++internal_iter1)
                 {
                     internal_iter1.getCoord(xyz1);
-                    xyz1 = xyz1 - internal_iter1.parent().getOrigin();
+                    xyz1 = xyz1 - internal_iter1.parent().origin();
                     for (LeafNodeType::ValueOnIter block_iter =
                         internal_iter1->beginValueOn(); block_iter.test(); ++block_iter)
                     {
                         block_iter.getCoord(xyz0);
-                        xyz0 = xyz0 - block_iter.parent().getOrigin();
+                        xyz0 = xyz0 - block_iter.parent().origin();
                         v_sum += *block_iter;
                         xyzSum = xyzSum + xyz0 + xyz1 + xyz2 + xyz3;
                     }

@@ -460,8 +460,7 @@ public:
     /// @brief Add a tile containing voxel (x, y, z) at the specified tree level,
     /// creating a new branch if necessary.  Delete any existing lower-level nodes
     /// that contain (x, y, z).
-    /// @note @c Level must be greater than zero (i.e., the level of leaf nodes)
-    /// and less than this tree's depth.
+    /// @note @a level must be less than this tree's depth.
     void addTile(Index level, const Coord& xyz, const ValueType& value, bool active);
 
     /// @brief Return a pointer to the node of type @c NodeT that contains voxel (x, y, z)
@@ -1038,13 +1037,34 @@ protected:
 }; // end of Tree class
 
 
-/// Tree4<T, N1, N2, N3>::Type is the type of a four-level tree
+/// @brief Tree3<T, N1, N2>::Type is the type of a three-level tree
+/// (Root, Internal, Leaf) with value type T and
+/// internal and leaf node log dimensions N1 and N2, respectively.
+/// @note This is NOT the standard tree configuration (Tree4 is).
+template<typename T, Index N1, Index N2>
+struct Tree3 {
+    typedef Tree<RootNode<InternalNode<LeafNode<T, N2>, N1> > > Type;
+};
+
+
+/// @brief Tree4<T, N1, N2, N3>::Type is the type of a four-level tree
 /// (Root, Internal, Internal, Leaf) with value type T and
 /// internal and leaf node log dimensions N1, N2 and N3, respectively.
-/// This is the standard tree configuration.
+/// @note This is the standard tree configuration.
 template<typename T, Index N1, Index N2, Index N3>
 struct Tree4 {
     typedef Tree<RootNode<InternalNode<InternalNode<LeafNode<T, N3>, N2>, N1> > > Type;
+};
+
+
+/// @brief Tree5<T, N1, N2, N3, N4>::Type is the type of a five-level tree
+/// (Root, Internal, Internal, Internal, Leaf) with value type T and
+/// internal and leaf node log dimensions N1, N2, N3 and N4, respectively.
+/// @note This is NOT the standard tree configuration (Tree4 is).
+template<typename T, Index N1, Index N2, Index N3, Index N4>
+struct Tree5 {
+    typedef Tree<RootNode<InternalNode<InternalNode<InternalNode<LeafNode<T, N4>, N3>, N2>, N1> > >
+        Type;
 };
 
 
@@ -1884,7 +1904,7 @@ Tree<RootNodeType>::evalLeafBoundingBox(CoordBBox& bbox) const
         bIter->getOrigin(ijk);
         bbox.expand(ijk);
     }
-    bbox.max() += Coord(LeafNodeType::dim()-1);
+    bbox.max() += Coord(Int32(LeafNodeType::dim()-1));
     return true; // not empty
 }
 

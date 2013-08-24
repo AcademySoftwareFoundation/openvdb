@@ -198,7 +198,7 @@ protected:
     void setWriteGridStatsMetadata(std::ostream&);
 
     /// Read in and return the number of grids on the input stream.
-    static int readGridCount(std::istream&);
+    static int32_t readGridCount(std::istream&);
 
     /// Populate the given grid from the input stream.
     static void readGrid(GridBase::Ptr, const GridDescriptor&, std::istream&);

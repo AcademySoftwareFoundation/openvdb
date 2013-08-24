@@ -75,7 +75,7 @@ public:
 
     inline void operator()(const typename TreeType1::LeafIter& lIter) const
     {
-        const Coord xyz = lIter->getOrigin();
+        const Coord xyz = lIter->origin();
         const typename TreeType2::LeafNodeType* leaf = mOtherTree->probeConstLeaf(xyz);
         if (leaf) {//leaf node
             lIter->topologyIntersection(*leaf, zeroVal<typename TreeType1::ValueType>());
@@ -99,7 +99,7 @@ public:
 
     inline void operator()(const typename TreeType1::LeafIter& lIter) const
     {
-        const Coord xyz = lIter->getOrigin();
+        const Coord xyz = lIter->origin();
         const typename TreeType2::LeafNodeType* leaf = mOtherTree->probeConstLeaf(xyz);
         if (leaf) {//leaf node
             lIter->topologyDifference(*leaf, zeroVal<typename TreeType1::ValueType>());

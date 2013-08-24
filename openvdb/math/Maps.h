@@ -240,15 +240,12 @@ public:
     virtual Vec3d applyJT(const Vec3d& in, const Vec3d& domainPos) const = 0;
     //@}
 
-    //@{
-    /// @brief Returns a MapBasePtr to the derived map. If the map is a Frustum
-    /// this will throw as we have not implimented an explicit map type to serve 
-    /// as the inverse of a Frustum. 
+    /// @brief Return a new map representing the inverse of this map.
+    /// @throw NotImplementedError if the map is a NonlinearFrustumMap.
     /// @warning Houdini 12.5 uses an earlier version of OpenVDB, and maps created
     /// with that version lack a virtual table entry for this method.  Do not call
     /// this method from Houdini 12.5.
     virtual MapBase::Ptr inverseMap() const = 0;
-    //@}
 
 protected:
     MapBase() {}
@@ -439,7 +436,10 @@ public:
     Vec3d applyJT(const Vec3d& in, const Vec3d&) const { return applyJT(in); }
     /// Return the Jacobian Transpose of the map applied to @a in.
     Vec3d applyJT(const Vec3d& in) const {
-        return mMatrix * in;
+        const double* m = mMatrix.asPointer();
+        return Vec3d( m[ 0] * in[0] + m[ 1] * in[1] + m[ 2] * in[2],
+                      m[ 4] * in[0] + m[ 5] * in[1] + m[ 6] * in[2],
+                      m[ 8] * in[0] + m[ 9] * in[1] + m[10] * in[2] );
     }
 
     /// Return the transpose of the inverse Jacobian of the map applied to @a in.
@@ -913,8 +913,8 @@ public:
     static MapBase::Ptr create() { return MapBase::Ptr(new UniformScaleMap()); }
     /// Return a MapBase::Ptr to a deep copy of this map
     MapBase::Ptr copy() const { return MapBase::Ptr(new UniformScaleMap(*this)); }
-    
-    MapBase::Ptr inverseMap() const { 
+
+    MapBase::Ptr inverseMap() const {
         const Vec3d& invScale = getInvScale();
         return MapBase::Ptr(new UniformScaleMap( invScale[0])); }
 
@@ -1199,7 +1199,11 @@ public:
     /// Return a MapBase::Ptr to a deep copy of this map
     MapBase::Ptr copy() const { return MapBase::Ptr(new ScaleTranslateMap(*this)); }
 
-    MapBase::Ptr inverseMap() const { return MapBase::Ptr(new ScaleTranslateMap(mScaleValuesInverse, -mScaleValuesInverse * mTranslation)); }
+    MapBase::Ptr inverseMap() const
+    {
+        return MapBase::Ptr(new ScaleTranslateMap(
+            mScaleValuesInverse, -mScaleValuesInverse * mTranslation));
+    }
 
     static bool isRegistered() { return MapRegistry::isRegistered(ScaleTranslateMap::mapType()); }
 
@@ -1451,10 +1455,12 @@ public:
     /// Return a MapBase::Ptr to a deep copy of this map
     MapBase::Ptr copy() const { return MapBase::Ptr(new UniformScaleTranslateMap(*this)); }
 
-    MapBase::Ptr inverseMap() const { 
+    MapBase::Ptr inverseMap() const
+    {
         const Vec3d& scaleInv = getInvScale();
         const Vec3d& trans = getTranslation();
-        return MapBase::Ptr(new UniformScaleTranslateMap(scaleInv[0], -scaleInv[0] * trans)); }
+        return MapBase::Ptr(new UniformScaleTranslateMap(scaleInv[0], -scaleInv[0] * trans));
+    }
 
     static bool isRegistered()
     {
@@ -1574,76 +1580,76 @@ ScaleTranslateMap::postScale(const Vec3d& v) const
 /// i.e. rotation  and or reflection.
 class OPENVDB_API UnitaryMap: public MapBase
 {
- public:
+public:
     typedef boost::shared_ptr<UnitaryMap>       Ptr;
     typedef boost::shared_ptr<const UnitaryMap> ConstPtr;
 
     /// default constructor makes an Idenity.
     UnitaryMap(): mAffineMap(Mat4d::identity())
-        {
-        }
+    {
+    }
 
     UnitaryMap(const Vec3d& axis, double radians)
-        {
-            Mat3d matrix;
-            matrix.setToRotation(axis, radians);
-            mAffineMap = AffineMap(matrix);
-        }
+    {
+        Mat3d matrix;
+        matrix.setToRotation(axis, radians);
+        mAffineMap = AffineMap(matrix);
+    }
 
     UnitaryMap(Axis axis, double radians)
-        {
-            Mat4d matrix;
-            matrix.setToRotation(axis, radians);
-            mAffineMap = AffineMap(matrix);
-        }
+    {
+        Mat4d matrix;
+        matrix.setToRotation(axis, radians);
+        mAffineMap = AffineMap(matrix);
+    }
 
     UnitaryMap(const Mat3d& m)
-        {
-            // test that the mat3 is a rotation || reflection
-            if (!isUnitary(m)) {
-                OPENVDB_THROW(ArithmeticError, "Matrix initializing unitary map was not unitary");
-            }
-
-            Mat4d matrix(Mat4d::identity());
-            matrix.setMat3(m);
-            mAffineMap = AffineMap(matrix);
+    {
+        // test that the mat3 is a rotation || reflection
+        if (!isUnitary(m)) {
+            OPENVDB_THROW(ArithmeticError, "Matrix initializing unitary map was not unitary");
         }
+
+        Mat4d matrix(Mat4d::identity());
+        matrix.setMat3(m);
+        mAffineMap = AffineMap(matrix);
+    }
 
     UnitaryMap(const Mat4d& m)
-        {
-            if (!isInvertible(m)) {
-                OPENVDB_THROW(ArithmeticError,
-                              "4x4 Matrix initializing unitary map was not unitary: not invertible");
-            }
-
-            if (!isAffine(m)) {
-                OPENVDB_THROW(ArithmeticError,
-                              "4x4 Matrix initializing unitary map was not unitary: not affine");
-            }
-
-            if (hasTranslation(m)) {
-                OPENVDB_THROW(ArithmeticError,
-                              "4x4 Matrix initializing unitary map was not unitary: had translation");
-            }
-
-            if (!isUnitary(m.getMat3())) {
-                OPENVDB_THROW(ArithmeticError,
-                              "4x4 Matrix initializing unitary map was not unitary");
-            }
-
-            mAffineMap = AffineMap(m);
+    {
+        if (!isInvertible(m)) {
+            OPENVDB_THROW(ArithmeticError,
+                "4x4 Matrix initializing unitary map was not unitary: not invertible");
         }
+
+        if (!isAffine(m)) {
+            OPENVDB_THROW(ArithmeticError,
+                "4x4 Matrix initializing unitary map was not unitary: not affine");
+        }
+
+        if (hasTranslation(m)) {
+            OPENVDB_THROW(ArithmeticError,
+                "4x4 Matrix initializing unitary map was not unitary: had translation");
+        }
+
+        if (!isUnitary(m.getMat3())) {
+            OPENVDB_THROW(ArithmeticError,
+                "4x4 Matrix initializing unitary map was not unitary");
+        }
+
+        mAffineMap = AffineMap(m);
+    }
 
     UnitaryMap(const UnitaryMap& other):
         MapBase(other),
         mAffineMap(other.mAffineMap)
-            {
-            }
+    {
+    }
 
     UnitaryMap(const UnitaryMap& first, const UnitaryMap& second):
         mAffineMap(*(first.getAffineMap()), *(second.getAffineMap()))
-        {
-        }
+    {
+    }
 
     ~UnitaryMap() {}
     /// Return a MapBase::Ptr to a new UnitaryMap
@@ -1651,8 +1657,11 @@ class OPENVDB_API UnitaryMap: public MapBase
     /// Returns a MapBase::Ptr to a deep copy of *this
     MapBase::Ptr copy() const { return MapBase::Ptr(new UnitaryMap(*this)); }
 
-    MapBase::Ptr inverseMap() const { return MapBase::Ptr(new UnitaryMap(mAffineMap.getMat4().inverse())); }
-  
+    MapBase::Ptr inverseMap() const
+    {
+        return MapBase::Ptr(new UnitaryMap(mAffineMap.getMat4().inverse()));
+    }
+
     static bool isRegistered() { return MapRegistry::isRegistered(UnitaryMap::mapType()); }
 
     static void registerMap()
@@ -1707,7 +1716,7 @@ class OPENVDB_API UnitaryMap: public MapBase
     Vec3d applyIJT(const Vec3d& in, const Vec3d& ) const { return applyIJT(in);}
     /// Return the transpose of the inverse Jacobian of the map applied to @c in
     Vec3d applyIJT(const Vec3d& in) const { return mAffineMap.applyIJT(in); }
-       /// Return the Jacobian Curvature: zero for a linear map
+    /// Return the Jacobian Curvature: zero for a linear map
     Mat3d applyIJC(const Mat3d& in) const { return mAffineMap.applyIJC(in); }
     Mat3d applyIJC(const Mat3d& in, const Vec3d&, const Vec3d& ) const { return applyIJC(in); }
     /// Return the determinant of the Jacobian, ignores argument
@@ -1948,8 +1957,14 @@ public:
     /// Return a MapBase::Ptr to a deep copy of this map
     MapBase::Ptr copy() const { return MapBase::Ptr(new NonlinearFrustumMap(*this)); }
 
-    MapBase::Ptr inverseMap() const { OPENVDB_THROW(ArithmeticError, "OpenVDB does not have an inverse Maps"
-                                                    " defined for the NonlinearFrustum");  }
+    /// @brief Not implemented, since there is currently no map type that can
+    /// represent the inverse of a frustum
+    /// @throw NotImplementedError
+    MapBase::Ptr inverseMap() const
+    {
+        OPENVDB_THROW(NotImplementedError,
+            "inverseMap() is not implemented for NonlinearFrustumMap");
+    }
     static bool isRegistered() { return MapRegistry::isRegistered(NonlinearFrustumMap::mapType()); }
 
     static void registerMap()

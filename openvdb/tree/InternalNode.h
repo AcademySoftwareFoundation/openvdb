@@ -220,7 +220,13 @@ public:
     static void offset2coord(Index n, Coord& xyz);
     Coord offset2globalCoord(Index n) const;
 
-    Coord getOrigin() const { return mOrigin; }
+    /// Return the grid index coordinates of this node's local origin.
+    const Coord& origin() const { return mOrigin; }
+    /// @brief Return the grid index coordinates of this node's local origin.
+    /// @deprecated Use origin() instead.
+    OPENVDB_DEPRECATED Coord getOrigin() const { return mOrigin; }
+    /// Set the grid index coordinates of this node's local origin.
+    void setOrigin(const Coord& origin) { mOrigin = origin; }
 
     Index32 leafCount() const;
     Index32 nonLeafCount() const;
@@ -272,13 +278,13 @@ public:
     /// Otherwise, return the result of calling getLastValue() on the child.
     const ValueType& getLastValue() const;
 
-    /// Set the active state at the given coordinates but don't change its value.
+    /// Set the active state of the voxel at the given coordinates but don't change its value.
     void setActiveState(const Coord& xyz, bool on);
     /// Set the value of the voxel at the given coordinates but don't change its active state.
     void setValueOnly(const Coord& xyz, const ValueType& value);
     /// Mark the voxel at the given coordinates as active but don't change its value.
     void setValueOn(const Coord& xyz);
-    /// Change the value of the voxel at the given coordinates and mark the voxel as active.
+    /// Set the value of the voxel at the given coordinates and mark the voxel as active.
     void setValueOn(const Coord& xyz, const ValueType& value);
     /// Mark the voxel at the given coordinates as inactive but don't change its value.
     void setValueOff(const Coord& xyz);
@@ -292,20 +298,6 @@ public:
     /// Apply a functor to the voxel at the given coordinates.
     template<typename ModifyOp>
     void modifyValueAndActiveState(const Coord& xyz, const ModifyOp& op);
-
-    /// @brief Set all voxels within an axis-aligned box to a constant value.
-    /// (The min and max coordinates are inclusive.)
-    void fill(const CoordBBox& bbox, const ValueType&, bool active = true);
-
-    /// @brief Copy into a dense grid the values of the voxels that lie within
-    /// a given bounding box.
-    /// @param bbox   inclusive bounding box of the voxels to be copied into the dense grid
-    /// @param dense  dense grid with a stride in @e z of one (see tools::Dense
-    ///               in tools/Dense.h for the required API)
-    /// @note @a bbox is assumed to be identical to or contained in the coordinate domains
-    /// of both the dense grid and this node, i.e., no bounds checking is performed.
-    template<typename DenseT>
-    void copyToDense(const CoordBBox& bbox, DenseT& dense) const;
 
     /// Return the value of the voxel at the given coordinates and, if necessary, update
     /// the accessor with pointers to the nodes along the path from the root node to
@@ -397,6 +389,10 @@ public:
     //
     // Aux methods
     //
+    /// @brief Set all voxels within an axis-aligned box to a constant value.
+    /// (The min and max coordinates are inclusive.)
+    void fill(const CoordBBox& bbox, const ValueType&, bool active = true);
+
     /// @brief Overwrite each inactive value in this node and in any child nodes with
     /// a new value whose magnitude is equal to the specified background value and whose
     /// sign is consistent with that of the lexicographically closest active value.
@@ -417,6 +413,16 @@ public:
 
     /// Densify active tiles, i.e., replace them with leaf-level active voxels.
     void voxelizeActiveTiles();
+
+    /// @brief Copy into a dense grid the values of the voxels that lie within
+    /// a given bounding box.
+    /// @param bbox   inclusive bounding box of the voxels to be copied into the dense grid
+    /// @param dense  dense grid with a stride in @e z of one (see tools::Dense
+    ///               in tools/Dense.h for the required API)
+    /// @note @a bbox is assumed to be identical to or contained in the coordinate domains
+    /// of both the dense grid and this node, i.e., no bounds checking is performed.
+    template<typename DenseT>
+    void copyToDense(const CoordBBox& bbox, DenseT& dense) const;
 
     /// @brief Efficiently merge another tree into this tree using one of several schemes.
     /// @warning This operation cannibalizes the other tree.
@@ -450,11 +456,9 @@ public:
     template<typename CombineOp>
     void combine2(const InternalNode& other0, const InternalNode& other1, CombineOp&);
     template<typename CombineOp>
-    void combine2(const ValueType& value, const InternalNode& other,
-                  bool valueIsActive, CombineOp&);
+    void combine2(const ValueType& value, const InternalNode& other, bool valIsActive, CombineOp&);
     template<typename CombineOp>
-    void combine2(const InternalNode& other, const ValueType& value,
-                  bool valueIsActive, CombineOp&);
+    void combine2(const InternalNode& other, const ValueType& val, bool valIsActive, CombineOp&);
 
     /// @brief Calls the templated functor BBoxOp with bounding box
     /// information for all active tiles and leaf nodes in this node.
@@ -500,7 +504,7 @@ public:
     /// in the process.  If the leaf node already exists, replace it.
     void addLeaf(LeafNodeType* leaf);
 
-    /// @brief Same as addLeaf except, if necessary, it update the accessor with pointers
+    /// @brief Same as addLeaf() except, if necessary, update the accessor with pointers
     /// to the nodes along the path from the root node to the node containing the coordinate.
     template<typename AccessorT>
     void addLeafAndCache(LeafNodeType* leaf, AccessorT&);
@@ -520,59 +524,48 @@ public:
     /// possibly creating a parent branch or deleting a child branch in the process.
     void addTile(Index level, const Coord& xyz, const ValueType& value, bool state);
 
+    /// @brief Delete any existing child branch at the specified offset and add a tile.
+    void addTile(Index offset, const ValueType& value, bool state);
+
     /// @brief Same as addTile() except, if necessary, update the accessor with pointers
     /// to the nodes along the path from the root node to the node containing (x, y, z).
     template<typename AccessorT>
-    void addTileAndCache(Index level, const Coord& xyz, const ValueType& value,
-                         bool state, AccessorT&);
+    void addTileAndCache(Index level, const Coord& xyz, const ValueType&, bool state, AccessorT&);
 
+    //@{
     /// @brief Return a pointer to the node that contains voxel (x, y, z).
     /// If no such node exists, return NULL.
-    template <typename NodeType>
-    NodeType* probeNode(const Coord& xyz);
-    template <typename NodeType>
-    const NodeType* probeConstNode(const Coord& xyz) const;
+    template<typename NodeType> NodeType* probeNode(const Coord& xyz);
+    template<typename NodeType> const NodeType* probeConstNode(const Coord& xyz) const;
+    //@}
+
+    //@{
+    /// @brief Same as probeNode() except, if necessary, update the accessor with pointers
+    /// to the nodes along the path from the root node to the node containing (x, y, z).
     template<typename NodeType, typename AccessorT>
     NodeType* probeNodeAndCache(const Coord& xyz, AccessorT&);
     template<typename NodeType, typename AccessorT>
     const NodeType* probeConstNodeAndCache(const Coord& xyz, AccessorT&) const;
+    //@}
 
+    //@{
     /// @brief Return a pointer to the leaf node that contains voxel (x, y, z).
     /// If no such node exists, return NULL.
-    LeafNodeType* probeLeaf(const Coord& xyz)
-    {
-        return this->template probeNode<LeafNodeType>(xyz);
-    }
+    LeafNodeType* probeLeaf(const Coord& xyz);
+    const LeafNodeType* probeConstLeaf(const Coord& xyz) const;
+    const LeafNodeType* probeLeaf(const Coord& xyz) const;
+    //@}
 
-    /// @brief Return a const pointer to the leaf node that contains voxel (x, y, z).
-    /// If no such node exists, return NULL.
-    const LeafNodeType* probeConstLeaf(const Coord& xyz) const
-    {
-        return this->template probeConstNode<LeafNodeType>(xyz);
-    }
-    const LeafNodeType* probeLeaf(const Coord& xyz) const { return this->probeConstLeaf(xyz); }
-
-    /// @brief Same as probeLeaf except, if necessary, it update the accessor with pointers
-    /// to the nodes along the path from the root node to the node containing the coordinate.
+    //@{
+    /// @brief Same as probeLeaf() except, if necessary, update the accessor with pointers
+    /// to the nodes along the path from the root node to the node containing (x, y, z).
     template<typename AccessorT>
-    LeafNodeType* probeLeafAndCache(const Coord& xyz, AccessorT& acc)
-    {
-        return this->template probeNodeAndCache<LeafNodeType>(xyz, acc);
-    }
-
-    /// @brief Same as probeLeaf except, if necessary, it update the accessor with pointers
-    /// to the nodes along the path from the root node to the node containing the coordinate.
+    LeafNodeType* probeLeafAndCache(const Coord& xyz, AccessorT& acc);
     template<typename AccessorT>
-    const LeafNodeType* probeConstLeafAndCache(const Coord& xyz, AccessorT& acc) const
-    {
-        return this->template probeConstNodeAndCache<LeafNodeType>(xyz, acc);
-    }
-    /// @brief Same as probeConstLeafAndCache
+    const LeafNodeType* probeConstLeafAndCache(const Coord& xyz, AccessorT& acc) const;
     template<typename AccessorT>
-    const LeafNodeType* probeLeafAndCache(const Coord& xyz, AccessorT& acc) const
-    {
-        return this->probeConstLeafAndCache(xyz, acc);
-    }
+    const LeafNodeType* probeLeafAndCache(const Coord& xyz, AccessorT& acc) const;
+    //@}
 
     /// @brief Return the leaf node that contains voxel (x, y, z).
     /// If no such node exists, create one, but preserve the values and
@@ -582,7 +575,7 @@ public:
     /// over which to safely perform multithreaded processing.
     LeafNodeType* touchLeaf(const Coord& xyz);
 
-    /// @brief Same as touchLeaf except, if necessary, it update the accessor with pointers
+    /// @brief Same as touchLeaf() except, if necessary, update the accessor with pointers
     /// to the nodes along the path from the root node to the node containing the coordinate.
     template<typename AccessorT>
     LeafNodeType* touchLeafAndCache(const Coord& xyz, AccessorT&);
@@ -900,6 +893,7 @@ InternalNode<ChildT, Log2Dim>::pruneInactive()
 
 ////////////////////////////////////////
 
+
 template<typename ChildT, Index Log2Dim>
 template<typename NodeT>
 inline NodeT*
@@ -922,7 +916,9 @@ InternalNode<ChildT, Log2Dim>::stealNode(const Coord& xyz, const ValueType& valu
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
 
+
 ////////////////////////////////////////
+
 
 template<typename ChildT, Index Log2Dim>
 template<typename NodeT>
@@ -940,6 +936,7 @@ InternalNode<ChildT, Log2Dim>::probeNode(const Coord& xyz)
            : child->template probeNode<NodeT>(xyz);
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
+
 
 template<typename ChildT, Index Log2Dim>
 template<typename NodeT, typename AccessorT>
@@ -959,6 +956,7 @@ InternalNode<ChildT, Log2Dim>::probeNodeAndCache(const Coord& xyz, AccessorT& ac
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
 
+
 template<typename ChildT, Index Log2Dim>
 template<typename NodeT>
 inline const NodeT*
@@ -975,6 +973,7 @@ InternalNode<ChildT, Log2Dim>::probeConstNode(const Coord& xyz) const
             : child->template probeConstNode<NodeT>(xyz);
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
+
 
 template<typename ChildT, Index Log2Dim>
 template<typename NodeT, typename AccessorT>
@@ -994,7 +993,55 @@ InternalNode<ChildT, Log2Dim>::probeConstNodeAndCache(const Coord& xyz, Accessor
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
 
+
 ////////////////////////////////////////
+
+
+template<typename ChildT, Index Log2Dim>
+inline typename ChildT::LeafNodeType*
+InternalNode<ChildT, Log2Dim>::probeLeaf(const Coord& xyz)
+{
+    return this->template probeNode<LeafNodeType>(xyz);
+}
+
+
+template<typename ChildT, Index Log2Dim>
+template<typename AccessorT>
+inline typename ChildT::LeafNodeType*
+InternalNode<ChildT, Log2Dim>::probeLeafAndCache(const Coord& xyz, AccessorT& acc)
+{
+    return this->template probeNodeAndCache<LeafNodeType>(xyz, acc);
+}
+
+
+template<typename ChildT, Index Log2Dim>
+template<typename AccessorT>
+inline const typename ChildT::LeafNodeType*
+InternalNode<ChildT, Log2Dim>::probeLeafAndCache(const Coord& xyz, AccessorT& acc) const
+{
+    return this->probeConstLeafAndCache(xyz, acc);
+}
+
+
+template<typename ChildT, Index Log2Dim>
+inline const typename ChildT::LeafNodeType*
+InternalNode<ChildT, Log2Dim>::probeConstLeaf(const Coord& xyz) const
+{
+    return this->template probeConstNode<LeafNodeType>(xyz);
+}
+
+
+template<typename ChildT, Index Log2Dim>
+template<typename AccessorT>
+inline const typename ChildT::LeafNodeType*
+InternalNode<ChildT, Log2Dim>::probeConstLeafAndCache(const Coord& xyz, AccessorT& acc) const
+{
+    return this->template probeConstNodeAndCache<LeafNodeType>(xyz, acc);
+}
+
+
+////////////////////////////////////////
+
 
 template<typename ChildT, Index Log2Dim>
 inline void
@@ -1064,10 +1111,19 @@ InternalNode<ChildT, Log2Dim>::addLeafAndCache(LeafNodeType* leaf, AccessorT& ac
 
 template<typename ChildT, Index Log2Dim>
 inline void
+InternalNode<ChildT, Log2Dim>::addTile(Index n, const ValueType& value, bool state)
+{
+    assert(n < NUM_VALUES);
+    this->makeChildNodeEmpty(n, value);
+    mValueMask.set(n, state);
+}
+
+
+template<typename ChildT, Index Log2Dim>
+inline void
 InternalNode<ChildT, Log2Dim>::addTile(Index level, const Coord& xyz,
                                        const ValueType& value, bool state)
 {
-    assert(level > 0);
     if (LEVEL >= level) {
         const Index n = this->coord2offset(xyz);
         if (mChildMask.isOff(n)) {// tile case
@@ -1102,7 +1158,6 @@ inline void
 InternalNode<ChildT, Log2Dim>::addTileAndCache(Index level, const Coord& xyz,
     const ValueType& value, bool state, AccessorT& acc)
 {
-    assert(level > 0);
     if (LEVEL >= level) {
         const Index n = this->coord2offset(xyz);
         if (mChildMask.isOff(n)) {// tile case
@@ -2047,7 +2102,7 @@ InternalNode<ChildT, Log2Dim>::merge(InternalNode& other,
                 child->resetBackground(otherBackground, background);
                 if (mValueMask.isOn(n)) {
                     // Merge the child with this node's active tile.
-                    child->merge<Policy>(mNodes[n].getValue(), /*on=*/true);
+                    child->template merge<Policy>(mNodes[n].getValue(), /*on=*/true);
                     mValueMask.setOff(n);
                 }
                 mChildMask.setOn(n);
@@ -2257,8 +2312,7 @@ InternalNode<ChildT, Log2Dim>::combine2(const InternalNode& other0, const Intern
                 // as the other node's child.
                 mChildMask.setOn(i);
                 mValueMask.setOff(i);
-                mNodes[i].setChild(new ChildNodeType(otherChild->getOrigin(),
-                                                     mNodes[i].getValue()));
+                mNodes[i].setChild(new ChildNodeType(otherChild->origin(), mNodes[i].getValue()));
             }
 
             if (other0.isChildMaskOff(i)) {
@@ -2343,8 +2397,7 @@ InternalNode<ChildT, Log2Dim>::combine2(const InternalNode& other, const ValueTy
                 // as the other node's child.
                 mChildMask.setOn(i);
                 mValueMask.setOff(i);
-                mNodes[i].setChild(new ChildNodeType(otherChild->getOrigin(),
-                                                     mNodes[i].getValue()));
+                mNodes[i].setChild(new ChildNodeType(otherChild->origin(), mNodes[i].getValue()));
             }
             // Combine the other node's child with a constant value
             // and write the result into child i.
@@ -2591,7 +2644,7 @@ InternalNode<ChildT, Log2Dim>::offset2globalCoord(Index n) const
     Coord local;
     this->offset2coord(n, local);
     local <<= ChildT::TOTAL;
-    return local + this->getOrigin();
+    return local + this->origin();
 }
 
 

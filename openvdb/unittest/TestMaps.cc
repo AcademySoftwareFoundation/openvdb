@@ -179,6 +179,13 @@ TestMaps::testTranslation()
     CPPUNIT_ASSERT_DOUBLES_EQUAL(result(1), 0, TOL);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(result(2), 0, TOL);
 
+    /// Jacobian Transpose
+    result = translate_by_two->applyJT(translate_by_two->applyIJT(unit));
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(result(0), unit(0), TOL);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(result(1), unit(1), TOL);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(result(2), unit(2), TOL);
+
+
     MapBase::Ptr inverse = translation->inverseMap();
     CPPUNIT_ASSERT(inverse->type() == TranslationMap::mapType());
     // apply the map forward and the inverse map back
@@ -268,6 +275,13 @@ TestMaps::testRotation()
     CPPUNIT_ASSERT_DOUBLES_EQUAL(sqrt(2.)/2, result(1), TOL);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(sqrt(2.)/2, result(2), TOL);
 
+    /// Jacobian Transpose
+    result = rotation_two->applyJT(rotation_two->applyIJT(unit));
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(result(0), unit(0), TOL);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(result(1), unit(1), TOL);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(result(2), unit(2), TOL);
+
+
     // Test inverse map
     MapBase::Ptr inverse = rotation->inverseMap();
     CPPUNIT_ASSERT(inverse->type() == UnitaryMap::mapType());
@@ -321,6 +335,14 @@ TestMaps::testScaleTranslate()
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0, result(0), TOL);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1, result(1), TOL);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0, result(2), TOL);
+
+
+    /// Jacobian Transpose
+    result = scaleAndTranslate->applyJT(scaleAndTranslate->applyIJT(unit));
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(result(0), unit(0), TOL);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(result(1), unit(1), TOL);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(result(2), unit(2), TOL);
+
 
     // Test inverse map
     MapBase::Ptr inverse = scaleAndTranslate->inverseMap();
@@ -376,6 +398,14 @@ TestMaps::testUniformScaleTranslate()
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0, result(0), TOL);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1, result(1), TOL);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0, result(2), TOL);
+
+
+    /// Jacobian Transpose
+    result = scaleAndTranslate->applyJT(scaleAndTranslate->applyIJT(unit));
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(result(0), unit(0), TOL);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(result(1), unit(1), TOL);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(result(2), unit(2), TOL);
+
 
 
     // Test inverse map

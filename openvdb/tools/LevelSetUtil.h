@@ -194,7 +194,7 @@ public:
     template <typename LeafNodeType>
     void operator()(LeafNodeType &leaf, size_t/*leafIndex*/) const
     {
-        const Coord origin = leaf.getOrigin();
+        const Coord origin = leaf.origin();
         const typename TreeType::LeafNodeType* refLeafPt = mTree.probeConstLeaf(origin);
 
         if (refLeafPt != NULL) {

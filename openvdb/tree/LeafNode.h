@@ -227,12 +227,16 @@ public:
     CoordBBox getNodeBoundingBox() const { return CoordBBox::createCube(mOrigin, DIM); }
 
     /// Set the grid index coordinates of this node's local origin.
-    void setOrigin(const Coord& origin)  { mOrigin = origin; }
-    /// Get the grid index coordinates of this node's local origin.
+    void setOrigin(const Coord& origin) { mOrigin = origin; }
+    /// @brief Return the grid index coordinates of this node's local origin.
+    /// @deprecated Use origin() instead.
+    OPENVDB_DEPRECATED const Coord& getOrigin() const { return mOrigin; }
+    //@{
+    /// Return the grid index coordinates of this node's local origin.
     const Coord& origin() const { return mOrigin; }
-    const Coord& getOrigin() const { return mOrigin; }
     void getOrigin(Coord& origin) const { origin = mOrigin; }
     void getOrigin(Int32& x, Int32& y, Int32& z) const { mOrigin.asXYZ(x, y, z); }
+    //@}
 
     /// Return the linear table offset of the given coordinates.
     static Index coord2offset(const Coord& xyz);
@@ -436,6 +440,13 @@ public:
 
     /// Set the active state of the voxel at the given coordinates but don't change its value.
     void setActiveState(const Coord& xyz, bool on);
+    /// Set the active state of the voxel at the given offset but don't change its value.
+    void setActiveState(Index offset, bool on) { assert(offset<SIZE); mValueMask.set(offset, on); }
+
+    /// Set the value of the voxel at the given coordinates but don't change its active state.
+    void setValueOnly(const Coord& xyz, const ValueType& val);
+    /// Set the value of the voxel at the given offset but don't change its active state.
+    void setValueOnly(Index offset, const ValueType& val);
 
     /// Mark the voxel at the given coordinates as inactive but don't change its value.
     void setValueOff(const Coord& xyz) { mValueMask.setOff(LeafNode::coord2offset(xyz)); }
@@ -481,15 +492,6 @@ public:
         bool state = mValueMask.isOn(offset);
         op(mBuffer[offset], state);
         mValueMask.set(offset, state);
-    }
-
-    /// Set the value of the voxel at the given coordinates but don't change its active state.
-    void setValueOnly(const Coord& xyz, const ValueType& val) {
-        this->setValueOnly(LeafNode::coord2offset(xyz), val);
-    }
-    /// Set the value of the voxel at the given offset but don't change its active state.
-    void setValueOnly(Index offset, const ValueType& val) {
-        assert(offset<SIZE); mBuffer[offset] = val;
     }
 
     /// Mark all voxels as active but don't change their values.
@@ -753,10 +755,13 @@ public:
     NodeT* probeNode(const Coord&) { return NULL; }
     template<typename NodeT>
     const NodeT* probeConstNode(const Coord&) const { return NULL; }
-    void addTile(Index, const Coord&, const ValueType&, bool) {}
-    template<typename AccessorT>
-    void addTileAndCache(Index, const Coord&, const ValueType&, bool, AccessorT&) {}
     //@}
+
+    void addTile(Index level, const Coord&, const ValueType&, bool);
+    void addTile(Index offset, const ValueType&, bool);
+    template<typename AccessorT>
+    void addTileAndCache(Index, const Coord&, const ValueType&, bool, AccessorT&);
+
     //@{
     /// @brief Return a pointer to this node.
     LeafNode* touchLeaf(const Coord&) { return this; }
@@ -970,7 +975,7 @@ LeafNode<T, Log2Dim>::offset2globalCoord(Index n) const
 {
     Coord local;
     this->offset2coord(n, local);
-    return Coord(local + this->getOrigin());
+    return Coord(local + this->origin());
 }
 
 
@@ -1032,6 +1037,21 @@ inline void
 LeafNode<T, Log2Dim>::setActiveState(const Coord& xyz, bool on)
 {
     mValueMask.set(this->coord2offset(xyz), on);
+}
+
+
+template<typename T, Index Log2Dim>
+inline void
+LeafNode<T, Log2Dim>::setValueOnly(const Coord& xyz, const ValueType& val)
+{
+    this->setValueOnly(LeafNode::coord2offset(xyz), val);
+}
+
+template<typename T, Index Log2Dim>
+inline void
+LeafNode<T, Log2Dim>::setValueOnly(Index offset, const ValueType& val)
+{
+    assert(offset<SIZE); mBuffer[offset] = val;
 }
 
 
@@ -1254,6 +1274,40 @@ LeafNode<T, Log2Dim>::isConstant(ValueType& constValue,
     if (allEqual) constValue = value; ///< @todo return average/median value?
     return allEqual;
 }
+
+
+////////////////////////////////////////
+
+
+template<typename T, Index Log2Dim>
+inline void
+LeafNode<T, Log2Dim>::addTile(Index level, const Coord& xyz, const ValueType& val, bool active)
+{
+    assert(level == 0);
+    this->addTile(this->coord2offset(xyz), val, active);
+}
+
+template<typename T, Index Log2Dim>
+inline void
+LeafNode<T, Log2Dim>::addTile(Index offset, const ValueType& val, bool active)
+{
+    assert(offset < SIZE);
+    setValueOnly(offset, val);
+    setActiveState(offset, active);
+}
+
+template<typename T, Index Log2Dim>
+template<typename AccessorT>
+inline void
+LeafNode<T, Log2Dim>::addTileAndCache(Index level, const Coord& xyz,
+    const ValueType& val, bool active, AccessorT&)
+{
+    this->addTile(level, xyz, val, active);
+}
+
+
+////////////////////////////////////////
+
 
 template<typename T, Index Log2Dim>
 inline void
