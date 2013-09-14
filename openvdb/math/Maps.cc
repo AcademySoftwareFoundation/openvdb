@@ -228,7 +228,7 @@ simplify(AffineMap::Ptr affine)
 Mat4d
 approxInverse(const Mat4d& mat4d)
 {
-    if (std::abs(mat4d.det()) >= 3 * tolerance<double>::value()) {
+    if (std::abs(mat4d.det()) >= 3 * math::Tolerance<double>::value()) {
         try {
             Mat4d result = mat4d.inverse();
             return result;
@@ -274,7 +274,7 @@ approxInverse(const Mat4d& mat4d)
 
         Mat3d d = Mat3d::identity();
         for (int i = 0; i < 3; ++i ) {
-            if (std::abs(eigenValues[i]) < 10.*tolerance<double>::value() ) {
+            if (std::abs(eigenValues[i]) < 10.0 * math::Tolerance<double>::value()) {
                 d[i][i] = 0.f;
             } else {
                 d[i][i] = 1.f/eigenValues[i];
@@ -282,7 +282,7 @@ approxInverse(const Mat4d& mat4d)
         }
         // assemble the pseudo inverse
 
-        Mat3d pseudoInv = eigenVectors * d *  eigenVectors.transpose();
+        Mat3d pseudoInv = eigenVectors * d * eigenVectors.transpose();
         Vec3d invTrans = -trans * pseudoInv;
 
         Mat4d result = Mat4d::identity();

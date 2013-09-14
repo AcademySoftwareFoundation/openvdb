@@ -7,11 +7,21 @@
 @par
 <B>Version 2.0.0</B> - <I>In development</I>
 - Added a @vdblink::tools::LevelSetRayIntersector
-  LevelSetRayIntersector@endlink tool for efficient, hierarchical
+  level set ray intersector@endlink tool for efficient, hierarchical
   intersection of rays with level sets.
 - Added a @vdblink::math::Ray Ray@endlink class and a hierarchical
   @vdblink::math::DDA Digital Differential Analyzer@endlink for fast
   ray traversal.
+- Added a fully multi-threaded @vdblink::tools::LevelSetRayTracer 
+  level set ray tracer@endlink and
+  @vdblink::tools::PerspectiveCamera camera@endlink
+  @vdblink::tools::OrthographicCamera classes@endlink
+  that mimic Houdini&rsquo;s cameras.
+- Added a simple, command-line renderer (currently for level sets only.)
+- Implemented a new meshing scheme that produces topologically robust
+  two-manifold meshes and is twice as fast as the previous scheme.
+- Added a tool (and a Houdini SOP) that fills a volume with
+  adaptively-sized overlapping or non-overlapping spheres.
 - Increased the speed of masked level set filtering by 20% for
   the most common cases.
 - Added @vdblink::math::BoxStencil math::BoxStencil@endlink, with support
@@ -19,13 +29,13 @@
 - Added @vdblink::math::MinIndex() math::MinIndex@endlink and 
   @vdblink::math::MaxIndex() math::MaxIndex@endlink, which find the minimum
   and maximum components of a vector without any branching.
+- Added @vdblink::math::BBox::minExtent() BBox::minExtent@endlink,
+  which returns a bounding box&rsquo;s shortest axis.
 - The default @vdblink::math::BBox BBox@endlink constructor now
   generates an invalid bounding box rather than an empty bounding box
   positioned at the origin.  The new behavior is consistent with
   @vdblink::math::CoordBBox CoordBBox@endlink.
   <I>[Thanks to Rick Hankins for suggesting this fix.]</I>
-- Added @vdblink::math::BBox::minExtent() BBox::minExtent@endlink,
-  which returns a bounding box&rsquo;s shortest axis.
 - Fixed a bug in the default @vdblink::math::ScaleMap ScaleMap@endlink
   constructor that left some data used in the inverse uninitialized.
 - Added @vdblink::math::MapBase::applyJT MapBase::applyJT@endlink, which
@@ -46,6 +56,13 @@
   @vdblink::math::Histogram math::Histogram@endlink that could produce
   <TT>NaN</TT>s or other incorrect behavior if certain methods were called
   on populations of size zero.
+- Renamed <TT>struct tolerance</TT> to
+  @vdblink::math::Tolerance math::Tolerance@endlink
+  and @c negative to @vdblink::math::negative() math::negative@endlink
+  and removed @c math::toleranceValue().
+- Implemented a closest point on line segment algorithm,
+  @vdblink::math::closestPointOnSegmentToPoint()
+  math::closestPointOnSegmentToPoint@endlink.
 - Fixed meshing issues relating to masking and automatic partitioning.
 - @vdblink::Grid::merge() Grid::merge@endlink and
   @vdblink::tree::Tree::merge() Tree::merge@endlink now accept an optional
@@ -54,6 +71,13 @@
   available, used logic for each tree level that was inconsistent with
   the other levels and that could result in active tiles being replaced
   with nodes having only inactive values.)
+- Renamed @c LeafNode::coord2offset(), @c LeafNode::offset2coord() and
+  @c LeafNode::offset2globalCoord() to
+  @vdblink::tree::LeafNode::coordToOffset() coordToOffset@endlink,
+  @vdblink::tree::LeafNode::offsetToLocalCoord() offsetToLocalCoord@endlink,
+  and @vdblink::tree::LeafNode::offsetToGlobalCoord()
+  offsetToGlobalCoord@endlink, respectively, and likewise for
+  @vdblink::tree::InternalNode::offsetToGlobalCoord() InternalNode@endlink.
 - Replaced @vdblink::tree::Tree Tree@endlink methods @c setValueOnMin,
   @c setValueOnMax and @c setValueOnSum with
   @vdblink::tools::setValueOnMin() tools::setValueOnMin@endlink,
@@ -68,16 +92,15 @@
   @vdblink::tree::ValueAccessor::modifyValue()
   ValueAccessor::modifyValue@endlink
   and @vdblink::tree::ValueAccessor::modifyValueAndActiveState()
-  ValueAccessor::modifyValueAndActiveState@endlink.
+  ValueAccessor::modifyValueAndActiveState@endlink, and added a
+  @vdblink::tree::TreeValueIteratorBase::modifyValue() modifyValue@endlink
+  method to all value iterators.
 - Removed @c LeafNode::addValue and @c LeafNode::scaleValue.
 - Added convenience classes @vdblink::tree::Tree3 tree::Tree3@endlink and
-@vdblink::tree::Tree5 tree::Tree3@endlink for custom tree configurations.
+  @vdblink::tree::Tree5 tree::Tree5@endlink for custom tree configurations.
 - Added an option to the From Particles SOP to generate an alpha mask,
   which can be used to constrain level set filtering so as to preserve
   surface details.
-- Implemented a closest point on line segment algorithm,
-  @vdblink::math::closestPointOnSegmentToPoint()
-  math::closestPointOnSegmentToPoint@endlink.
 - The mesh to volume converter now handles point-degenerate polygons.
 - Fixed a bug in the Level Set Smooth, Level Set Renormalize and 
   Level Set Offset SOPs that caused the group name to be ignored. 

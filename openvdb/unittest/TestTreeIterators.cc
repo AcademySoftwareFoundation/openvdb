@@ -51,6 +51,7 @@ public:
     CPPUNIT_TEST(testValueAllIterator);
     CPPUNIT_TEST(testValueOnIterator);
     CPPUNIT_TEST(testValueOffIterator);
+    CPPUNIT_TEST(testModifyValue);
     CPPUNIT_TEST(testDepthBounds);
     CPPUNIT_TEST_SUITE_END();
 
@@ -60,6 +61,7 @@ public:
     void testValueAllIterator();
     void testValueOnIterator();
     void testValueOffIterator();
+    void testModifyValue();
     void testDepthBounds();
 };
 
@@ -427,6 +429,87 @@ TestTreeIterators::testValueOffIterator()
         }
         for (iter = tree.beginValueOff(); iter; ++iter, --numOff);
         CPPUNIT_ASSERT_EQUAL(size_t(0), numOff);
+    }
+}
+
+
+void
+TestTreeIterators::testModifyValue()
+{
+    using openvdb::Coord;
+
+    const openvdb::Index DIM0 = 3, DIM1 = 2, DIM2 = 3;
+    {
+        typedef openvdb::tree::Tree4<int32_t, DIM2, DIM1, DIM0>::Type IntTree323f;
+
+        IntTree323f tree(/*background=*/256);
+        tree.addTile(/*level=*/3, Coord(-1),                 /*value=*/ 4, /*active=*/true);
+        tree.addTile(/*level=*/2, Coord(1 << (DIM0 + DIM1)), /*value=*/-3, /*active=*/true);
+        tree.addTile(/*level=*/1, Coord(1 << DIM0),          /*value=*/ 2, /*active=*/true);
+        tree.addTile(/*level=*/0, Coord(0),                  /*value=*/-1, /*active=*/true);
+
+        struct Local { static inline void negate(int32_t& n) { n = -n; } };
+
+        for (IntTree323f::ValueAllIter iter = tree.beginValueAll(); iter; ++iter) {
+            iter.modifyValue(Local::negate);
+        }
+
+        for (IntTree323f::ValueAllCIter iter = tree.cbeginValueAll(); iter; ++iter) {
+            const int32_t val = *iter;
+            if (val < 0) CPPUNIT_ASSERT((-val) % 2 == 0); // negative values are even
+            else CPPUNIT_ASSERT(val % 2 == 1); // positive values are odd
+        }
+
+        // Because modifying values through a const iterator is not allowed,
+        // uncommenting the following line should result in a static assertion failure:
+        //tree.cbeginValueOn().modifyValue(Local::negate);
+    }
+    {
+        typedef openvdb::tree::Tree4<bool, DIM2, DIM1, DIM0>::Type BoolTree323f;
+
+        BoolTree323f tree;
+        tree.addTile(/*level=*/3, Coord(-1),                 /*value=*/false, /*active=*/true);
+        tree.addTile(/*level=*/2, Coord(1 << (DIM0 + DIM1)), /*value=*/ true, /*active=*/true);
+        tree.addTile(/*level=*/1, Coord(1 << DIM0),          /*value=*/false, /*active=*/true);
+        tree.addTile(/*level=*/0, Coord(0),                  /*value=*/ true, /*active=*/true);
+
+        struct Local { static inline void negate(bool& b) { b = !b; } };
+
+        for (BoolTree323f::ValueAllIter iter = tree.beginValueAll(); iter; ++iter) {
+            iter.modifyValue(Local::negate);
+        }
+
+        CPPUNIT_ASSERT(!tree.getValue(Coord(0)));
+        CPPUNIT_ASSERT( tree.getValue(Coord(1 << DIM0)));
+        CPPUNIT_ASSERT(!tree.getValue(Coord(1 << (DIM0 + DIM1))));
+        CPPUNIT_ASSERT( tree.getValue(Coord(-1)));
+
+        // Because modifying values through a const iterator is not allowed,
+        // uncommenting the following line should result in a static assertion failure:
+        //tree.cbeginValueOn().modifyValue(Local::negate);
+    }
+    {
+        typedef openvdb::tree::Tree4<std::string, DIM2, DIM1, DIM0>::Type StringTree323f;
+
+        StringTree323f tree(/*background=*/"");
+        tree.addTile(/*level=*/3, Coord(-1),                 /*value=*/"abc", /*active=*/true);
+        tree.addTile(/*level=*/2, Coord(1 << (DIM0 + DIM1)), /*value=*/"abc", /*active=*/true);
+        tree.addTile(/*level=*/1, Coord(1 << DIM0),          /*value=*/"abc", /*active=*/true);
+        tree.addTile(/*level=*/0, Coord(0),                  /*value=*/"abc", /*active=*/true);
+
+        struct Local { static inline void op(std::string& s) { s.append("def"); } };
+
+        for (StringTree323f::ValueOnIter iter = tree.beginValueOn(); iter; ++iter) {
+            iter.modifyValue(Local::op);
+        }
+
+        const std::string expectedVal("abcdef");
+        for (StringTree323f::ValueOnCIter iter = tree.cbeginValueOn(); iter; ++iter) {
+            CPPUNIT_ASSERT_EQUAL(expectedVal, *iter);
+        }
+        for (StringTree323f::ValueOffCIter iter = tree.cbeginValueOff(); iter; ++iter) {
+            CPPUNIT_ASSERT((*iter).empty());
+        }
     }
 }
 

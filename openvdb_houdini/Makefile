@@ -210,6 +210,7 @@ HOUDINI_SOP_SRC_NAMES := \
     houdini/SOP_OpenVDB_Sample_Points.cc \
     houdini/SOP_OpenVDB_Scatter.cc \
     houdini/SOP_OpenVDB_To_Polygons.cc \
+    houdini/SOP_OpenVDB_To_Spheres.cc \
     houdini/SOP_OpenVDB_Transform.cc \
     houdini/SOP_OpenVDB_Vector_Merge.cc \
     houdini/SOP_OpenVDB_Vector_Split.cc \
@@ -246,7 +247,7 @@ LIB_MINOR_VERSION=$(shell grep 'OPENVDB_LIBRARY_MINOR_VERSION = ' \
 LIB_PATCH_VERSION=$(shell grep 'OPENVDB_LIBRARY_PATCH_VERSION = ' \
     $(OPENVDB_INCL_DIR)/openvdb/version.h | sed 's/[^0-9]*//g')
 
-LIB_VERSION=$(LIB_MINOR_VERSION).$(LIB_PATCH_VERSION)
+LIB_VERSION=$(LIB_MAJOR_VERSION).$(LIB_MINOR_VERSION).$(LIB_PATCH_VERSION)
 
 LIBHOUDINI_NAME=libopenvdb_houdini
 LIBHOUDINI_STATIC := $(LIBHOUDINI_NAME).a

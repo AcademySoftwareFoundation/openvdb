@@ -73,10 +73,12 @@ TestMath::testAll()
 
     }
     {// isApproxZero
-        CPPUNIT_ASSERT( math::isApproxZero( 0.0f) );
-        CPPUNIT_ASSERT( math::isApproxZero( 0.0000009f) );
-        CPPUNIT_ASSERT( math::isApproxZero(-0.0000009f) );
-        CPPUNIT_ASSERT( math::isApproxZero( 0.01, 0.1) );
+        CPPUNIT_ASSERT( math::isApproxZero( 0.0f));
+        CPPUNIT_ASSERT(!math::isApproxZero( 9.0e-6f));
+        CPPUNIT_ASSERT(!math::isApproxZero(-9.0e-6f));
+        CPPUNIT_ASSERT( math::isApproxZero( 9.0e-9f));
+        CPPUNIT_ASSERT( math::isApproxZero(-9.0e-9f));
+        CPPUNIT_ASSERT( math::isApproxZero( 0.01, 0.1));
     }
     {// Cbrt
         const double a = math::Cbrt(3.0);

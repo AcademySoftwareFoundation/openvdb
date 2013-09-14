@@ -913,7 +913,7 @@ typename MatType::ValueType lOneNorm(const MatType& matrix)
 }
 
 
-///@brief  Decompose an invertible 3x3 matrix into Unitary following
+/// @brief Decompose an invertible 3x3 matrix into Unitary following
 /// a symmetric matrix (postitive semi-defininte Hermitian):
 /// i.e.  M = U * S
 /// if the Unitary.det() = 1 it is a rotation, otherwise
@@ -921,15 +921,14 @@ typename MatType::ValueType lOneNorm(const MatType& matrix)
 /// See "Computing the polar decomposition with applications"
 /// Higham, N.J. - SIAM J. Sc. Stat Comput 7(4):1160-1174
 template<typename MatType>
-bool polarDecomposition(const MatType& input, MatType& unitary, MatType& positive_hermitian, unsigned int MAX_ITERATIONS=100)
+bool polarDecomposition(const MatType& input, MatType& unitary,
+    MatType& positive_hermitian, unsigned int MAX_ITERATIONS=100)
 {
-    /// tolerance
-    /// this should really be a trait of MatType::ValueType
     unitary = input;
     MatType new_unitary(input);
     MatType unitary_inv;
 
-    if (fabs(unitary.det()) < tolerance<typename MatType::ValueType>::value()) return false;
+    if (fabs(unitary.det()) < math::Tolerance<typename MatType::ValueType>::value()) return false;
 
     unsigned int iteration(0);
 
@@ -958,7 +957,7 @@ bool polarDecomposition(const MatType& input, MatType& unitary, MatType& positiv
         /// this generally converges in less than ten iterations
         if (iteration > MAX_ITERATIONS) return false;
         iteration++;
-    } while (l1_error > tolerance<typename MatType::ValueType>::value());
+    } while (l1_error > math::Tolerance<typename MatType::ValueType>::value());
 
     positive_hermitian = unitary.transpose() * input;
     return true;

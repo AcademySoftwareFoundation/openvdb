@@ -186,11 +186,6 @@ newSopOperator(OP_OperatorTable* table)
             "all attributes (primitive, vertex and point) from the reference surface. "
             "Will override computed vertex normals for primitives in the surface group."));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "smoothseams", "Smooth Seams")
-        .setDefault(PRMoneDefaults)
-        .setHelpText("Smooth seam line edges during mesh extraction, "
-            "removes staircase artifacts for fractured pieces."));
-
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "sharpenfeatures", "Sharpen Features")
         .setHelpText("Sharpen edges and corners."));
 
@@ -240,6 +235,7 @@ newSopOperator(OP_OperatorTable* table)
     // Obsolete parameters
     hutil::ParmList obsoleteParms;
     obsoleteParms.add(hutil::ParmFactory(PRM_SEPARATOR,"sep1", ""));
+    obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "smoothseams", "Smooth Seams"));
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Convert",
@@ -633,7 +629,6 @@ SOP_OpenVDB_Convert::updateParmsFlags()
     changed |= enableParm("interiorgroup", toPoly && refexists);
     changed |= enableParm("seamlinegroup", toPoly && refexists);
     changed |= enableParm("transferattributes", toPoly && refexists);
-    changed |= enableParm("smoothseams", toPoly && refexists);
     changed |= enableParm("sharpenfeatures", toPoly && refexists);
 
     setVisibleState("adaptivity", toPoly);
@@ -644,7 +639,6 @@ SOP_OpenVDB_Convert::updateParmsFlags()
     setVisibleState("interiorgroup", toPoly);
     setVisibleState("seamlinegroup", toPoly);
     setVisibleState("transferattributes", toPoly);
-    setVisibleState("smoothseams", toPoly);
     setVisibleState("sharpenfeatures", toPoly);
 
     setVisibleState("flood", toOpenVDB);
@@ -677,7 +671,6 @@ SOP_OpenVDB_Convert::referenceMeshing(
     typedef typename GridType::ValueType ValueType;
 
     const bool transferAttributes = evalInt("transferattributes", 0, time);
-    const bool smoothseams = evalInt("smoothseams", 0, time);
     const bool sharpenFeatures = evalInt("sharpenfeatures", 0, time);
 
     // Get the first grid's transform and background value.
@@ -697,20 +690,6 @@ SOP_OpenVDB_Convert::referenceMeshing(
     typedef typename openvdb::tools::MeshToVolume<GridType>::IntGridT IntGridT;
     typename IntGridT::Ptr indexGrid;
     openvdb::tools::MeshToVoxelEdgeData edgeData;
-
-    // Check for reference VDB
-    {
-        const GA_PrimitiveGroup *refGroup =
-            matchGroup(const_cast<GU_Detail&>(*refGeo), "");
-        hvdb::VdbPrimCIterator refIt(refGeo, refGroup);
-
-        if (refIt) {
-            const openvdb::GridClass refClass = refIt->getGrid().getGridClass();
-            if (refClass == openvdb::GRID_LEVEL_SET) {
-                refGrid = openvdb::gridConstPtrCast<GridType>(refIt->getGridPtr());
-            }
-        }
-    }
 
     boost::shared_ptr<GU_Detail> geoPtr;
     if (!refGrid) {
@@ -754,7 +733,7 @@ SOP_OpenVDB_Convert::referenceMeshing(
     if (boss.wasInterrupted()) return;
 
     const double iadaptivity = double(evalFloat("internaladaptivity", 0, time));
-    mesher.setRefGrid(refGrid, iadaptivity, smoothseams);
+    mesher.setRefGrid(refGrid, iadaptivity);
 
 
     std::vector<std::string> badTransformList, badBackgroundList, badTypeList;

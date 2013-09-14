@@ -195,11 +195,6 @@ newSopOperator(OP_OperatorTable* table)
             "reference surface. Will override computed vertex normals for primitives "
             " in the surface group."));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "smoothseams", "Smooth Seams")
-        .setDefault(PRMoneDefaults)
-        .setHelpText("Smooth seam line edges during mesh extraction, "
-            "removes staircase artifacts"));
-
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "sharpenfeatures", "Sharpen Features")
         .setDefault(PRMoneDefaults)
         .setHelpText("Sharpen edges and corners."));
@@ -264,9 +259,11 @@ newSopOperator(OP_OperatorTable* table)
 
 
     //////////
-
+    hutil::ParmList obsoleteParms;
+    obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "smoothseams", "Smooth Seams"));
 
     hvdb::OpenVDBOpFactory("OpenVDB To Polygons", SOP_OpenVDB_To_Polygons::factory, parms, *table)
+        .setObsoleteParms(obsoleteParms)
         .addInput("OpenVDB grids to surface")
         .addOptionalInput("Optional reference surface. Can be used "
             "to transfer attributes, sharpen features and to "
@@ -302,7 +299,6 @@ SOP_OpenVDB_To_Polygons::disableParms()
     changed += enableParm("interiorgroup", refexists);
     changed += enableParm("seamlinegroup", refexists);
     changed += enableParm("transferattributes", refexists);
-    changed += enableParm("smoothseams", refexists);
     changed += enableParm("sharpenfeatures", refexists);
     changed += enableParm("edgetolerance", refexists);
 
@@ -803,7 +799,6 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
     const bool computeNormals = evalInt("computenormals", 0, time);
     const bool transferAttributes = evalInt("transferattributes", 0, time);
     const bool keepVdbName = evalInt("keepvdbname", 0, time);
-    const bool smoothseams = evalInt("smoothseams", 0, time);
     const bool sharpenFeatures = evalInt("sharpenfeatures", 0, time);
     const float edgetolerance = double(evalFloat("edgetolerance", 0, time));
 
@@ -908,7 +903,7 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
     if (boss.wasInterrupted()) return;
 
     const double iadaptivity = double(evalFloat("internaladaptivity", 0, time));
-    mesher.setRefGrid(refGrid, iadaptivity, smoothseams);
+    mesher.setRefGrid(refGrid, iadaptivity);
 
 
     std::list<openvdb::GridBase::Ptr>::iterator it = grids.begin();
@@ -969,7 +964,7 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
     // Sharpen Features
     if (!boss.wasInterrupted() && sharpenFeatures) { 
         UTparallelFor(GA_SplittableRange(gdp->getPointRange()),
-            hvdb::SharpenFeaturesOp(*gdp, *refGeo, edgeData, *transform, surfaceGroup, maskTree.get()));
+            hvdb::SharpenFeaturesOp(*gdp, *refGeo, edgeData, *transform, surfaceGroup));
     }
 
     // Compute vertex normals

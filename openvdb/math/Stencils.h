@@ -199,7 +199,8 @@ public:
 protected:
     // Constructor is protected to prevent direct instantiation.
     BaseStencil(const GridType& grid, int size):
-        mGrid(&grid), mCache(grid.getConstAccessor()), mStencil(size)
+        mGrid(&grid), mCache(grid.getConstAccessor()),
+        mStencil(size), mCenter(Coord::max())
     {
     }
 

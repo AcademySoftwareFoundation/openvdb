@@ -1977,7 +1977,7 @@ ExpandNB<FloatTreeT>::evalVoxelDist(
 
     Index pos;
     for (Int32 n = 0; n < 18; ++n) {
-        pos = FloatLeafT::coord2offset(ijk + util::COORD_OFFSETS[n]);
+        pos = FloatLeafT::coordToOffset(ijk + util::COORD_OFFSETS[n]);
         if (!maskLeaf.isValueOn(pos) && distLeaf.probeValue(pos, tmpDist)) {
             prims.push_back(indexLeaf.getValue(pos));
             tmpDist = std::abs(tmpDist);
@@ -2599,8 +2599,8 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
 
     if (wasInterrupted(99)) return;
 
-    mDistGrid->tree().pruneLevelSet();
-    mDistGrid->tree().signedFloodFill();
+    mDistGrid->tree().pruneLevelSet();    
+    mDistGrid->tree().signedFloodFill(exBandWidth, -inBandWidth);
 }
 
 

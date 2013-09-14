@@ -702,7 +702,7 @@ namespace {
 
         double Sjj_minus_Sii = D[j] - D[i];
 
-        if (fabs(Sjj_minus_Sii) * (10*tolerance<T>::value()) > fabs(Sij)) {
+        if (fabs(Sjj_minus_Sii) * (10*math::Tolerance<T>::value()) > fabs(Sij)) {
             tan_of_theta = Sij / Sjj_minus_Sii;
         } else {
             /// pivot on Sij
@@ -781,7 +781,7 @@ bool diagonalizeSymmetricMatrix(const Mat3<T>& input, Mat3<T>& Q, Vec3<T>& D,
                 er += fabs(S(i,j));
             }
         }
-        if (std::abs(er) < tolerance<T>::value()) {
+        if (std::abs(er) < math::Tolerance<T>::value()) {
             return true;
         }
         iterations++;
@@ -793,7 +793,7 @@ bool diagonalizeSymmetricMatrix(const Mat3<T>& input, Mat3<T>& Q, Vec3<T>& D,
         for (int i = 0; i < n; ++i) {
             for (int j = i+1; j < n; ++j){
 
-                if ( fabs(D[i]) * (10*tolerance<T>::value()) > fabs(S(i,j))) {
+                if ( fabs(D[i]) * (10*math::Tolerance<T>::value()) > fabs(S(i,j))) {
                     /// value too small to pivot on
                     S(i,j) = 0;
                 }

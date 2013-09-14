@@ -113,7 +113,7 @@ protected:
     struct ChildOn {}; struct ChildOff {}; struct ChildAll {};
 
     // The following class templates implement the iterator interfaces specified in Iterator.h
-    // by providing getItem() and setItem() methods for active values and/or inactive values.
+    // by providing getItem(), setItem() and/or modifyItem() methods.
 
     template<typename NodeT, typename ChildT, typename MaskIterT, typename TagT>
     struct ChildIter: public SparseIteratorBase<
@@ -127,6 +127,8 @@ protected:
 
         // Note: setItem() can't be called on const iterators.
         void setItem(Index pos, const ChildT& c) const { this->parent().setChildNode(pos, &c); }
+
+        // Note: modifyItem() isn't implemented, since it's not useful for child node pointers.
     };// ChildIter
 
     template<typename NodeT, typename ValueT, typename MaskIterT, typename TagT>
@@ -141,6 +143,13 @@ protected:
 
         // Note: setItem() can't be called on const iterators.
         void setItem(Index pos, const ValueT& v) const { this->parent().mNodes[pos].setValue(v); }
+
+        // Note: modifyItem() can't be called on const iterators.
+        template<typename ModifyOp>
+        void modifyItem(Index pos, const ModifyOp& op) const
+        {
+            op(this->parent().mNodes[pos].getValue());
+        }
     };// ValueIter
 
     template<typename NodeT, typename ChildT, typename ValueT, typename TagT>
@@ -216,9 +225,13 @@ public:
     static void getNodeLog2Dims(std::vector<Index>& dims);
     static Index getChildDim() { return ChildNodeType::DIM; }
 
-    static Index coord2offset(const Coord& xyz);
-    static void offset2coord(Index n, Coord& xyz);
-    Coord offset2globalCoord(Index n) const;
+    /// Return the linear table offset of the given global or local coordinates.
+    static Index coordToOffset(const Coord& xyz);
+    /// @brief Return the local coordinates for a linear table offset,
+    /// where offset 0 has coordinates (0, 0, 0).
+    static void offsetToLocalCoord(Index n, Coord& xyz);
+    /// Return the global coordinates for a linear table offset.
+    Coord offsetToGlobalCoord(Index n) const;
 
     /// Return the grid index coordinates of this node's local origin.
     const Coord& origin() const { return mOrigin; }
@@ -902,7 +915,7 @@ InternalNode<ChildT, Log2Dim>::stealNode(const Coord& xyz, const ValueType& valu
     if ((NodeT::LEVEL == ChildT::LEVEL && !(boost::is_same<NodeT, ChildT>::value)) ||
          NodeT::LEVEL >  ChildT::LEVEL) return NULL;
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     if (mChildMask.isOff(n)) return NULL;
     ChildT* child = mNodes[n].getChild();
     if (boost::is_same<NodeT, ChildT>::value) {
@@ -928,7 +941,7 @@ InternalNode<ChildT, Log2Dim>::probeNode(const Coord& xyz)
     if ((NodeT::LEVEL == ChildT::LEVEL && !(boost::is_same<NodeT, ChildT>::value)) ||
          NodeT::LEVEL >  ChildT::LEVEL) return NULL;
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     if (mChildMask.isOff(n)) return NULL;
     ChildT* child = mNodes[n].getChild();
     return (boost::is_same<NodeT, ChildT>::value)
@@ -946,7 +959,7 @@ InternalNode<ChildT, Log2Dim>::probeNodeAndCache(const Coord& xyz, AccessorT& ac
     if ((NodeT::LEVEL == ChildT::LEVEL && !(boost::is_same<NodeT, ChildT>::value)) ||
          NodeT::LEVEL >  ChildT::LEVEL) return NULL;
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     if (mChildMask.isOff(n)) return NULL;
     ChildT* child = mNodes[n].getChild();
     acc.insert(xyz, child);
@@ -965,7 +978,7 @@ InternalNode<ChildT, Log2Dim>::probeConstNode(const Coord& xyz) const
     if ((NodeT::LEVEL == ChildT::LEVEL && !(boost::is_same<NodeT, ChildT>::value)) ||
          NodeT::LEVEL >  ChildT::LEVEL) return NULL;
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     if (mChildMask.isOff(n)) return NULL;
     const ChildT* child = mNodes[n].getChild();
     return (boost::is_same<NodeT, ChildT>::value)
@@ -983,7 +996,7 @@ InternalNode<ChildT, Log2Dim>::probeConstNodeAndCache(const Coord& xyz, Accessor
     if ((NodeT::LEVEL == ChildT::LEVEL && !(boost::is_same<NodeT, ChildT>::value)) ||
          NodeT::LEVEL >  ChildT::LEVEL) return NULL;
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     if (mChildMask.isOff(n)) return NULL;
     const ChildT* child = mNodes[n].getChild();
     acc.insert(xyz, child);
@@ -1049,7 +1062,7 @@ InternalNode<ChildT, Log2Dim>::addLeaf(LeafNodeType* leaf)
 {
     assert(leaf != NULL);
     const Coord& xyz = leaf->origin();
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     ChildT* child = NULL;
     if (mChildMask.isOff(n)) {
         if (ChildT::LEVEL>0) {
@@ -1080,7 +1093,7 @@ InternalNode<ChildT, Log2Dim>::addLeafAndCache(LeafNodeType* leaf, AccessorT& ac
 {
     assert(leaf != NULL);
     const Coord& xyz = leaf->origin();
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     ChildT* child = NULL;
     if (mChildMask.isOff(n)) {
         if (ChildT::LEVEL>0) {
@@ -1125,7 +1138,7 @@ InternalNode<ChildT, Log2Dim>::addTile(Index level, const Coord& xyz,
                                        const ValueType& value, bool state)
 {
     if (LEVEL >= level) {
-        const Index n = this->coord2offset(xyz);
+        const Index n = this->coordToOffset(xyz);
         if (mChildMask.isOff(n)) {// tile case
             if (LEVEL > level) {
                 ChildT* child = new ChildT(xyz, mNodes[n].getValue(), mValueMask.isOn(n));
@@ -1159,7 +1172,7 @@ InternalNode<ChildT, Log2Dim>::addTileAndCache(Index level, const Coord& xyz,
     const ValueType& value, bool state, AccessorT& acc)
 {
     if (LEVEL >= level) {
-        const Index n = this->coord2offset(xyz);
+        const Index n = this->coordToOffset(xyz);
         if (mChildMask.isOff(n)) {// tile case
             if (LEVEL > level) {
                 ChildT* child = new ChildT(xyz, mNodes[n].getValue(), mValueMask.isOn(n));
@@ -1195,7 +1208,7 @@ template<typename ChildT, Index Log2Dim>
 inline typename ChildT::LeafNodeType*
 InternalNode<ChildT, Log2Dim>::touchLeaf(const Coord& xyz)
 {
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     ChildT* child = NULL;
     if (mChildMask.isOff(n)) {
         child = new ChildT(xyz, mNodes[n].getValue(), mValueMask.isOn(n));
@@ -1214,7 +1227,7 @@ template<typename AccessorT>
 inline typename ChildT::LeafNodeType*
 InternalNode<ChildT, Log2Dim>::touchLeafAndCache(const Coord& xyz, AccessorT& acc)
 {
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     if (mChildMask.isOff(n)) {
         mNodes[n].setChild(new ChildNodeType(xyz, mNodes[n].getValue(), mValueMask.isOn(n)));
         mChildMask.setOn(n);
@@ -1294,7 +1307,7 @@ template<typename ChildT, Index Log2Dim>
 inline bool
 InternalNode<ChildT, Log2Dim>::isValueOn(const Coord& xyz) const
 {
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     if (this->isChildMaskOff(n)) return this->isValueMaskOn(n);
     return mNodes[n].getChild()->isValueOn(xyz);
 }
@@ -1304,7 +1317,7 @@ template<typename AccessorT>
 inline bool
 InternalNode<ChildT, Log2Dim>::isValueOnAndCache(const Coord& xyz, AccessorT& acc) const
 {
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     if (this->isChildMaskOff(n)) return this->isValueMaskOn(n);
     acc.insert(xyz, mNodes[n].getChild());
     return mNodes[n].getChild()->isValueOnAndCache(xyz, acc);
@@ -1315,7 +1328,7 @@ template<typename ChildT, Index Log2Dim>
 inline const typename ChildT::ValueType&
 InternalNode<ChildT, Log2Dim>::getValue(const Coord& xyz) const
 {
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     return this->isChildMaskOff(n) ? mNodes[n].getValue()
         :  mNodes[n].getChild()->getValue(xyz);
 }
@@ -1325,7 +1338,7 @@ template<typename AccessorT>
 inline const typename ChildT::ValueType&
 InternalNode<ChildT, Log2Dim>::getValueAndCache(const Coord& xyz, AccessorT& acc) const
 {
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     if (this->isChildMaskOn(n)) {
         acc.insert(xyz, mNodes[n].getChild());
         return mNodes[n].getChild()->getValueAndCache(xyz, acc);
@@ -1338,7 +1351,7 @@ template<typename ChildT, Index Log2Dim>
 inline Index
 InternalNode<ChildT, Log2Dim>::getValueLevel(const Coord& xyz) const
 {
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     return this->isChildMaskOff(n) ? LEVEL : mNodes[n].getChild()->getValueLevel(xyz);
 }
 
@@ -1347,7 +1360,7 @@ template<typename AccessorT>
 inline Index
 InternalNode<ChildT, Log2Dim>::getValueLevelAndCache(const Coord& xyz, AccessorT& acc) const
 {
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     if (this->isChildMaskOn(n)) {
         acc.insert(xyz, mNodes[n].getChild());
         return mNodes[n].getChild()->getValueLevelAndCache(xyz, acc);
@@ -1360,7 +1373,7 @@ template<typename ChildT, Index Log2Dim>
 inline bool
 InternalNode<ChildT, Log2Dim>::probeValue(const Coord& xyz, ValueType& value) const
 {
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     if (this->isChildMaskOff(n)) {
         value = mNodes[n].getValue();
         return this->isValueMaskOn(n);
@@ -1374,7 +1387,7 @@ inline bool
 InternalNode<ChildT, Log2Dim>::probeValueAndCache(const Coord& xyz,
     ValueType& value, AccessorT& acc) const
 {
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     if (this->isChildMaskOn(n)) {
         acc.insert(xyz, mNodes[n].getChild());
         return mNodes[n].getChild()->probeValueAndCache(xyz, value, acc);
@@ -1388,7 +1401,7 @@ template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::setValueOff(const Coord& xyz)
 {
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     bool hasChild = this->isChildMaskOn(n);
     if (!hasChild && this->isValueMaskOn(n)) {
         // If the voxel belongs to a constant tile that is active,
@@ -1406,7 +1419,7 @@ template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::setValueOn(const Coord& xyz)
 {
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     bool hasChild = this->isChildMaskOn(n);
     if (!hasChild && !this->isValueMaskOn(n)) {
         // If the voxel belongs to a constant tile that is inactive,
@@ -1424,7 +1437,7 @@ template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::setValueOff(const Coord& xyz, const ValueType& value)
 {
-    const Index n = InternalNode::coord2offset(xyz);
+    const Index n = InternalNode::coordToOffset(xyz);
     bool hasChild = this->isChildMaskOn(n);
     if (!hasChild) {
         const bool active = this->isValueMaskOn(n);
@@ -1447,7 +1460,7 @@ inline void
 InternalNode<ChildT, Log2Dim>::setValueOffAndCache(const Coord& xyz,
     const ValueType& value, AccessorT& acc)
 {
-    const Index n = InternalNode::coord2offset(xyz);
+    const Index n = InternalNode::coordToOffset(xyz);
     bool hasChild = this->isChildMaskOn(n);
     if (!hasChild) {
         const bool active = this->isValueMaskOn(n);
@@ -1473,7 +1486,7 @@ template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::setValueOn(const Coord& xyz, const ValueType& value)
 {
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     bool hasChild = this->isChildMaskOn(n);
     if (!hasChild) {
         const bool active = this->isValueMaskOn(n); // tile's active state
@@ -1496,7 +1509,7 @@ inline void
 InternalNode<ChildT, Log2Dim>::setValueAndCache(const Coord& xyz,
     const ValueType& value, AccessorT& acc)
 {
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     bool hasChild = this->isChildMaskOn(n);
     if (!hasChild) {
         const bool active = this->isValueMaskOn(n);
@@ -1521,7 +1534,7 @@ template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::setValueOnly(const Coord& xyz, const ValueType& value)
 {
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     bool hasChild = this->isChildMaskOn(n);
     if (!hasChild && !math::isExactlyEqual(mNodes[n].getValue(), value)) {
         // If the voxel has a tile value that is different from the one provided,
@@ -1541,7 +1554,7 @@ inline void
 InternalNode<ChildT, Log2Dim>::setValueOnlyAndCache(const Coord& xyz,
                                                     const ValueType& value, AccessorT& acc)
 {
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     bool hasChild = this->isChildMaskOn(n);
     if (!hasChild && !math::isExactlyEqual(mNodes[n].getValue(), value)) {
         // If the voxel has a tile value that is different from the one provided,
@@ -1563,7 +1576,7 @@ template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::setActiveState(const Coord& xyz, bool on)
 {
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     bool hasChild = this->isChildMaskOn(n);
     if (!hasChild) {
         if (on != this->isValueMaskOn(n)) {
@@ -1584,7 +1597,7 @@ template<typename AccessorT>
 inline void
 InternalNode<ChildT, Log2Dim>::setActiveStateAndCache(const Coord& xyz, bool on, AccessorT& acc)
 {
-    const Index n = this->coord2offset(xyz);
+    const Index n = this->coordToOffset(xyz);
     bool hasChild = this->isChildMaskOn(n);
     if (!hasChild) {
         if (on != this->isValueMaskOn(n)) {
@@ -1621,7 +1634,7 @@ template<typename ModifyOp>
 inline void
 InternalNode<ChildT, Log2Dim>::modifyValue(const Coord& xyz, const ModifyOp& op)
 {
-    const Index n = InternalNode::coord2offset(xyz);
+    const Index n = InternalNode::coordToOffset(xyz);
     bool hasChild = this->isChildMaskOn(n);
     if (!hasChild) {
         // Need to create a child if the tile is inactive,
@@ -1652,7 +1665,7 @@ inline void
 InternalNode<ChildT, Log2Dim>::modifyValueAndCache(const Coord& xyz, const ModifyOp& op,
     AccessorT& acc)
 {
-    const Index n = InternalNode::coord2offset(xyz);
+    const Index n = InternalNode::coordToOffset(xyz);
     bool hasChild = this->isChildMaskOn(n);
     if (!hasChild) {
         // Need to create a child if the tile is inactive,
@@ -1687,7 +1700,7 @@ template<typename ModifyOp>
 inline void
 InternalNode<ChildT, Log2Dim>::modifyValueAndActiveState(const Coord& xyz, const ModifyOp& op)
 {
-    const Index n = InternalNode::coord2offset(xyz);
+    const Index n = InternalNode::coordToOffset(xyz);
     bool hasChild = this->isChildMaskOn(n);
     if (!hasChild) {
         const bool tileState = this->isValueMaskOn(n);
@@ -1713,7 +1726,7 @@ inline void
 InternalNode<ChildT, Log2Dim>::modifyValueAndActiveStateAndCache(
     const Coord& xyz, const ModifyOp& op, AccessorT& acc)
 {
-    const Index n = InternalNode::coord2offset(xyz);
+    const Index n = InternalNode::coordToOffset(xyz);
     bool hasChild = this->isChildMaskOn(n);
     if (!hasChild) {
         const bool tileState = this->isValueMaskOn(n);
@@ -1754,8 +1767,8 @@ InternalNode<ChildT, Log2Dim>::fill(const CoordBBox& bbox, const ValueType& valu
                 xyz.setZ(z);
 
                 // Get the bounds of the tile that contains voxel (x, y, z).
-                const Index n = this->coord2offset(xyz);
-                tileMin = this->offset2globalCoord(n);
+                const Index n = this->coordToOffset(xyz);
+                tileMin = this->offsetToGlobalCoord(n);
                 tileMax = tileMin.offsetBy(ChildT::DIM - 1);
 
                 if (xyz != tileMin || Coord::lessThan(bbox.max(), tileMax)) {
@@ -1806,9 +1819,9 @@ InternalNode<ChildT, Log2Dim>::copyToDense(const CoordBBox& bbox, DenseT& dense)
     for (Coord xyz = bbox.min(), max; xyz[0] <= bbox.max()[0]; xyz[0] = max[0] + 1) {
         for (xyz[1] = bbox.min()[1]; xyz[1] <= bbox.max()[1]; xyz[1] = max[1] + 1) {
             for (xyz[2] = bbox.min()[2]; xyz[2] <= bbox.max()[2]; xyz[2] = max[2] + 1) {
-                const Index n = this->coord2offset(xyz);
+                const Index n = this->coordToOffset(xyz);
                 // Get max coordinates of the child node that contains voxel xyz.
-                max = this->offset2globalCoord(n).offsetBy(ChildT::DIM-1);
+                max = this->offsetToGlobalCoord(n).offsetBy(ChildT::DIM-1);
 
                 // Get the bbox of the interection of bbox and the child node
                 CoordBBox sub(xyz, Coord::minComponent(bbox.max(), max));
@@ -1871,7 +1884,7 @@ InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
         for (Index i = 0; i < NUM_VALUES; ++i) {
             if (this->isChildMaskOn(i)) {
                 ChildNodeType* child =
-                    new ChildNodeType(offset2globalCoord(i), zeroVal<ValueType>());
+                    new ChildNodeType(offsetToGlobalCoord(i), zeroVal<ValueType>());
                 mNodes[i].setChild(child);
                 child->readTopology(is);
             } else {
@@ -1940,7 +1953,7 @@ template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::signedFloodFill(const ValueType& background)
 {
-    this->signedFloodFill(background, negative(background));
+    this->signedFloodFill(background, math::negative(background));
 }
 
 
@@ -1994,7 +2007,7 @@ InternalNode<ChildT, Log2Dim>::negate()
         if (this->isChildMaskOn(i)) {
             mNodes[i].getChild()->negate();
         } else {
-            mNodes[i].setValue(negative(mNodes[i].getValue()));
+            mNodes[i].setValue(math::negative(mNodes[i].getValue()));
         }
     }
 
@@ -2617,7 +2630,7 @@ InternalNode<ChildT, Log2Dim>::getNodeLog2Dims(std::vector<Index>& dims)
 
 template<typename ChildT, Index Log2Dim>
 inline void
-InternalNode<ChildT, Log2Dim>::offset2coord(Index n, Coord &xyz)
+InternalNode<ChildT, Log2Dim>::offsetToLocalCoord(Index n, Coord &xyz)
 {
     assert(n<(1<<3*Log2Dim));
     xyz.setX(n >> 2*Log2Dim);
@@ -2629,7 +2642,7 @@ InternalNode<ChildT, Log2Dim>::offset2coord(Index n, Coord &xyz)
 
 template<typename ChildT, Index Log2Dim>
 inline Index
-InternalNode<ChildT, Log2Dim>::coord2offset(const Coord& xyz)
+InternalNode<ChildT, Log2Dim>::coordToOffset(const Coord& xyz)
 {
     return (((xyz[0]&DIM-1u)>>ChildNodeType::TOTAL)<<2*Log2Dim)
         +  (((xyz[1]&DIM-1u)>>ChildNodeType::TOTAL)<<  Log2Dim)
@@ -2639,10 +2652,10 @@ InternalNode<ChildT, Log2Dim>::coord2offset(const Coord& xyz)
 
 template<typename ChildT, Index Log2Dim>
 inline Coord
-InternalNode<ChildT, Log2Dim>::offset2globalCoord(Index n) const
+InternalNode<ChildT, Log2Dim>::offsetToGlobalCoord(Index n) const
 {
     Coord local;
-    this->offset2coord(n, local);
+    this->offsetToLocalCoord(n, local);
     local <<= ChildT::TOTAL;
     return local + this->origin();
 }
@@ -2663,8 +2676,8 @@ InternalNode<ChildT, Log2Dim>::resetBackground(const ValueType& oldBackground,
        } else if (this->isValueMaskOff(i)) {
            if (math::isApproxEqual(mNodes[i].getValue(), oldBackground)) {
                mNodes[i].setValue(newBackground);
-           } else if (math::isApproxEqual(mNodes[i].getValue(), negative(oldBackground))) {
-               mNodes[i].setValue(negative(newBackground));
+           } else if (math::isApproxEqual(mNodes[i].getValue(), math::negative(oldBackground))) {
+               mNodes[i].setValue(math::negative(newBackground));
            }
        }
     }

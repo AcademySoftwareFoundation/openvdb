@@ -255,9 +255,9 @@ public:
 
     CsgVisitorBase(const TreeT& aTree, const TreeT& bTree):
         mAOutside(aTree.background()),
-        mAInside(negative(mAOutside)),
+        mAInside(math::negative(mAOutside)),
         mBOutside(bTree.background()),
-        mBInside(negative(mBOutside))
+        mBInside(math::negative(mBOutside))
     {
         const ValueT zero = zeroVal<ValueT>();
         if (!(mAOutside > zero)) {
@@ -492,7 +492,7 @@ struct CsgDiffVisitor: public CsgVisitorBase<TreeType>
         ValueT aValue, bValue;
         aIter.probeValue(aValue);
         bIter.probeValue(bValue);
-        bValue = negative(bValue);
+        bValue = math::negative(bValue);
         if (aValue < bValue) { // a = max(a, -b)
             aIter.setValue(bValue);
             aIter.setValueOn(bIter.isValueOn());

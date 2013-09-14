@@ -67,35 +67,38 @@ TestVolumeToMesh::testAuxData()
     tree->setValue(openvdb::Coord(0,1,0),  1);
     tree->setValue(openvdb::Coord(0,0,1),  1);
 
+    typedef openvdb::tree::LeafManager<const openvdb::FloatTree> LeafManager;
+    
+    LeafManager leafs(*tree);
+    
+    CPPUNIT_ASSERT(openvdb::tools::internal::needsActiveVoxePadding(leafs, 0.0, 1.0));
 
-
-    openvdb::tree::LeafManager<const openvdb::FloatTree> leafs(*tree);
-
-    openvdb::tools::internal::AuxiliaryData<openvdb::FloatTree> init(*tree, leafs, 0.0);
-
-    init.run();
-
-    CPPUNIT_ASSERT(init.auxTree()->activeVoxelCount() == 7);
-    CPPUNIT_ASSERT(init.edgeTree()->activeVoxelCount() == 1);
-
-    int flags = int(init.edgeTree()->getValue(openvdb::Coord(0,0,0)));
+    openvdb::tools::internal::SignData<openvdb::FloatTree, LeafManager> op(*tree, leafs, 0.0);
+    op.run();
+    
+    CPPUNIT_ASSERT(op.signTree()->activeVoxelCount() == 1);
+    CPPUNIT_ASSERT(op.signTree()->activeVoxelCount() == op.idxTree()->activeVoxelCount());
+      
+        
+    int flags = int(op.signTree()->getValue(openvdb::Coord(0,0,0)));
 
     CPPUNIT_ASSERT(bool(flags & openvdb::tools::internal::INSIDE));
+    CPPUNIT_ASSERT(bool(flags & openvdb::tools::internal::EDGES));
     CPPUNIT_ASSERT(bool(flags & openvdb::tools::internal::XEDGE));
     CPPUNIT_ASSERT(bool(flags & openvdb::tools::internal::YEDGE));
     CPPUNIT_ASSERT(bool(flags & openvdb::tools::internal::ZEDGE));
 
 
     tree->setValueOff(openvdb::Coord(0,0,1), -1);
+    op.run();
 
-    init.run();
+    CPPUNIT_ASSERT(op.signTree()->activeVoxelCount() == 1);
+    CPPUNIT_ASSERT(op.signTree()->activeVoxelCount() == op.idxTree()->activeVoxelCount());
 
-    CPPUNIT_ASSERT(init.auxTree()->activeVoxelCount() == 7);
-    CPPUNIT_ASSERT(init.edgeTree()->activeVoxelCount() == 1);
-
-    flags = int(init.edgeTree()->getValue(openvdb::Coord(0,0,0)));
+    flags = int(op.signTree()->getValue(openvdb::Coord(0,0,0)));
 
     CPPUNIT_ASSERT(bool(flags & openvdb::tools::internal::INSIDE));
+    CPPUNIT_ASSERT(bool(flags & openvdb::tools::internal::EDGES));
     CPPUNIT_ASSERT(bool(flags & openvdb::tools::internal::XEDGE));
     CPPUNIT_ASSERT(bool(flags & openvdb::tools::internal::YEDGE));
     CPPUNIT_ASSERT(!bool(flags & openvdb::tools::internal::ZEDGE));

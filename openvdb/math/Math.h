@@ -79,7 +79,7 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 
 /// @brief Return the value of type T that corresponds to zero.
-/// @note A @c zeroVal<T>() specialization must be defined for each @c ValueType T
+/// @note A zeroVal<T>() specialization must be defined for each @c ValueType T
 /// that cannot be constructed using the form @c T(0).  For example, @c std::string(0)
 /// treats 0 as @c NULL and throws a @c std::logic_error.
 template<typename T> inline T zeroVal() { return T(0); }
@@ -87,17 +87,6 @@ template<typename T> inline T zeroVal() { return T(0); }
 template<> inline std::string zeroVal<std::string>() { return ""; }
 /// Return the @c bool value that corresponds to zero.
 template<> inline bool zeroVal<bool>() { return false; }
-
-
-//@{
-/// Floating-point comparison tolerance
-template<typename T> inline T toleranceValue() { return T(1e-8); }
-template<> inline float toleranceValue<float>() { return float(1e-6); }
-template<typename T> struct tolerance { static T value() { return 0; } };
-template<> struct tolerance<float>    { static float value() { return 1e-8f; } };
-template<> struct tolerance<double>   { static double value() { return 1e-15; } };
-//@}
-
 
 /// @todo These won't be needed if we eliminate StringGrids.
 //@{
@@ -110,18 +99,25 @@ inline std::string operator+(const std::string& s, double) { return s; }
 //@}
 
 
-//@{
+namespace math {
+
 /// @brief Return the unary negation of the given value.
 /// @note A negative<T>() specialization must be defined for each ValueType T
 /// for which unary negation is not defined.
 template<typename T> inline T negative(const T& val) { return T(-val); }
+/// Return the negation of the given boolean.
 template<> inline bool negative(const bool& val) { return !val; }
-//@}
 /// Return the "negation" of the given string.
 template<> inline std::string negative(const std::string& val) { return val; }
 
 
-namespace math {
+//@{
+/// Tolerance for floating-point comparison
+template<typename T> struct Tolerance { static T value() { return zeroVal<T>(); } };
+template<> struct Tolerance<float>    { static float value() { return 1e-8f; } };
+template<> struct Tolerance<double>   { static double value() { return 1e-15; } };
+//@}
+
 
 // ==========> Random Values <==================
 
@@ -291,7 +287,7 @@ template<typename Type>
 inline bool
 isApproxZero(const Type& x)
 {
-    const Type tolerance = Type(zeroVal<Type>() + toleranceValue<Type>());
+    const Type tolerance = Type(zeroVal<Type>() + Tolerance<Type>::value());
     return x < tolerance && x > -tolerance;
 }
 
@@ -304,36 +300,32 @@ isApproxZero(const Type& x, const Type& tolerance)
 }
 
 
+/// Return @c true if @a x is less than zero.
 template<typename Type>
 inline bool
 isNegative(const Type& x) { return x < zeroVal<Type>(); }
 
-/// Dummy implementation for bool type
-template<>
-inline bool isNegative<bool>(const bool&) { return false; }
+/// Return @c false, since @c bool values are never less than zero.
+template<> inline bool isNegative<bool>(const bool&) { return false; }
 
 
+/// @brief Return @c true if @a a is equal to @a b to within
+/// the default floating-point comparison tolerance.
 template<typename Type>
 inline bool
 isApproxEqual(const Type& a, const Type& b)
 {
-    const Type tolerance = Type(zeroVal<Type>() + toleranceValue<Type>());
+    const Type tolerance = Type(zeroVal<Type>() + Tolerance<Type>::value());
     return !(Abs(a - b) > tolerance);
 }
 
+
+/// Return @c true if @a a is equal to @a b to within the given tolerance.
 template<typename Type>
 inline bool
 isApproxEqual(const Type& a, const Type& b, const Type& tolerance)
 {
     return !(Abs(a - b) > tolerance);
-}
-
-/// @brief Return true if a is approximatly larger then b, i.e. b - a < tolerance
-template<typename Type>
-inline bool
-isApproxLarger(const Type& a, const Type& b, const Type& tolerance)
-{
-    return (b - a < tolerance);
 }
 
 #define OPENVDB_EXACT_IS_APPROX_EQUAL(T) \
@@ -345,6 +337,17 @@ OPENVDB_EXACT_IS_APPROX_EQUAL(bool)
 OPENVDB_EXACT_IS_APPROX_EQUAL(std::string)
 
 
+/// @brief Return @c true if @a a is larger than @a b to within
+/// the given tolerance, i.e., if @a b - @a a < @a tolerance.
+template<typename Type>
+inline bool
+isApproxLarger(const Type& a, const Type& b, const Type& tolerance)
+{
+    return (b - a < tolerance);
+}
+
+
+/// @brief Return @c true if @a a is exactly equal to @a b.
 template<typename T0, typename T1>
 inline bool
 isExactlyEqual(const T0& a, const T1& b)

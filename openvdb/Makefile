@@ -35,6 +35,7 @@
 #   pdfdoc              PDF documentation (doc/latex/refman.pdf;
 #                       requires LaTeX and ghostscript)
 #   vdb_print           command-line tool to inspect OpenVDB files
+#   vdb_render          command-line tool to ray-trace OpenVDB files
 #   vdb_view            command-line tool to view OpenVDB files
 #   vdb_test            unit tests for the OpenVDB library
 #
@@ -70,6 +71,12 @@ INSTALL_DIR := /tmp/OpenVDB
 
 # The parent directory of the boost/ header directory
 BOOST_INCL_DIR := $(HT)/include
+
+# The parent directory of the OpenEXR/ header directory
+EXR_INCL_DIR := $(HOUDINI_DIR)/toolkit/include
+# The directory containing libIlmImf, libIlmThread, etc.
+EXR_LIB_DIR := $(HOUDINI_DIR)/dsolib
+EXR_LIB := -lIlmImf -lIlmThread -lIex -lImath
 
 # The parent directory of the OpenEXR/ header directory (which contains half.h)
 HALF_INCL_DIR := $(HT)/include
@@ -217,7 +224,6 @@ INCLUDE_NAMES := \
     tools/LevelSetAdvect.h \
     tools/LevelSetFilter.h \
     tools/LevelSetFracture.h \
-    tools/LevelSetRayIntersector.h \
     tools/LevelSetRebuild.h \
     tools/LevelSetSphere.h \
     tools/LevelSetTracker.h \
@@ -227,9 +233,12 @@ INCLUDE_NAMES := \
     tools/ParticlesToLevelSet.h \
     tools/PointAdvect.h \
     tools/PointScatter.h \
+    tools/RayIntersector.h \
+    tools/RayTracer.h \
     tools/Statistics.h \
     tools/ValueTransformer.h \
     tools/VolumeToMesh.h \
+    tools/VolumeToSpheres.h \
     tree/InternalNode.h \
     tree/Iterator.h \
     tree/LeafManager.h \
@@ -374,6 +383,7 @@ CMD_INCLUDE_NAMES := \
 
 CMD_SRC_NAMES := \
     cmd/openvdb_print/main.cc \
+    cmd/openvdb_render/main.cc \
     cmd/openvdb_view/main.cc \
 #
 
@@ -442,6 +452,7 @@ ALL_TARGETS := \
     $(LIBOPENVDB) \
     vdb_test \
     vdb_print \
+    vdb_render \
     vdb_view \
     $(DEPEND) \
     $(LIBOPENVDB_NAME).so \
@@ -455,7 +466,7 @@ ALL_TARGETS := \
 	@echo "Building $@ because of $(call list_deps)"
 	$(CXX) -c $(CXXFLAGS) -fPIC -o $@ $<
 
-all: lib vdb_print vdb_test depend
+all: lib vdb_print vdb_render vdb_test depend
 
 $(OBJ_NAMES): %.o: %.cc
 	@echo "Building $@ because of $(call list_deps)"
@@ -511,6 +522,13 @@ vdb_print: $(LIBOPENVDB) cmd/openvdb_print/main.cc
 	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
 	    $(LIBOPENVDB_RPATH) -L$(PWD) $(LIBOPENVDB)
 
+vdb_render: $(LIBOPENVDB) cmd/openvdb_render/main.cc
+	@echo "Building $@ because of $(call list_deps)"
+	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_render/main.cc -I . -I $(EXR_INCL_DIR) \
+	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
+	    -Wl,-rpath,$(EXR_LIB_DIR) -L $(EXR_LIB_DIR) $(EXR_LIB) \
+	    $(LIBOPENVDB_RPATH) -L$(PWD) $(LIBOPENVDB)
+
 ifneq (3,$(words $(strip $(GLFW_LIB_DIR) $(GLFW_INCL_DIR) $(GLFW_LIB))))
 vdb_view:
 	@echo "$@"': GLFW is unavailable'
@@ -555,7 +573,7 @@ test:
 	@echo "$@"': $$(CPPUNIT_INCL_DIR) is undefined'
 endif
 
-install: lib vdb_print vdb_view doc
+install: lib vdb_print vdb_render vdb_view doc
 	mkdir -p $(INSTALL_DIR)/include/openvdb
 	@echo "Created $(INSTALL_DIR)/include/openvdb"
 	pushd $(INSTALL_DIR)/include/openvdb > /dev/null; \
@@ -577,6 +595,8 @@ install: lib vdb_print vdb_view doc
 	@echo "Created $(INSTALL_DIR)/bin/"
 	cp -f vdb_print $(INSTALL_DIR)/bin
 	@echo "Copied vdb_print to $(INSTALL_DIR)/bin/"
+	cp -f vdb_render $(INSTALL_DIR)/bin
+	@echo "Copied vdb_render to $(INSTALL_DIR)/bin/"
 	if [ -f vdb_view ]; \
 	then \
 	    cp -f vdb_view $(INSTALL_DIR)/bin; \

@@ -238,12 +238,13 @@ public:
     void getOrigin(Int32& x, Int32& y, Int32& z) const { mOrigin.asXYZ(x, y, z); }
     //@}
 
-    /// Return the linear table offset of the given coordinates.
-    static Index coord2offset(const Coord& xyz);
-    /// Get the local coordinates for a linear table offset.
-    static void offset2coord(Index n, Coord &xyz);
-    /// Get the global coordinates for a linear table offset.
-    Coord offset2globalCoord(Index n) const;
+    /// Return the linear table offset of the given global or local coordinates.
+    static Index coordToOffset(const Coord& xyz);
+    /// @brief Return the local coordinates for a linear table offset,
+    /// where offset 0 has coordinates (0, 0, 0).
+    static void offsetToLocalCoord(Index n, Coord& xyz);
+    /// Return the global coordinates for a linear table offset.
+    Coord offsetToGlobalCoord(Index n) const;
 
     /// Return a string representation of this node.
     std::string str() const;
@@ -291,6 +292,13 @@ protected:
         {
             this->parent().setValueOnly(this->pos(), value);
         }
+
+        // Note: modifyItem() can't be called on const iterators.
+        template<typename ModifyOp>
+        void modifyItem(Index n, const ModifyOp& op) const { this->parent().modifyValue(n, op); }
+        // Note: modifyValue() can't be called on const iterators.
+        template<typename ModifyOp>
+        void modifyValue(const ModifyOp& op) const { this->parent().modifyValue(this->pos(), op); }
     };
 
     /// Leaf nodes have no children, so their child iterators have no get/set accessors.
@@ -449,7 +457,7 @@ public:
     void setValueOnly(Index offset, const ValueType& val);
 
     /// Mark the voxel at the given coordinates as inactive but don't change its value.
-    void setValueOff(const Coord& xyz) { mValueMask.setOff(LeafNode::coord2offset(xyz)); }
+    void setValueOff(const Coord& xyz) { mValueMask.setOff(LeafNode::coordToOffset(xyz)); }
     /// Mark the voxel at the given offset as inactive but don't change its value.
     void setValueOff(Index offset) { assert(offset < SIZE); mValueMask.setOff(offset); }
 
@@ -459,12 +467,12 @@ public:
     void setValueOff(Index offset, const ValueType& val);
 
     /// Mark the voxel at the given coordinates as active but don't change its value.
-    void setValueOn(const Coord& xyz) { mValueMask.setOn(LeafNode::coord2offset(xyz)); }
+    void setValueOn(const Coord& xyz) { mValueMask.setOn(LeafNode::coordToOffset(xyz)); }
     /// Mark the voxel at the given offset as active but don't change its value.
     void setValueOn(Index offset) { assert(offset < SIZE); mValueMask.setOn(offset); }
     /// Set the value of the voxel at the given coordinates and mark the voxel as active.
     void setValueOn(const Coord& xyz, const ValueType& val) {
-        this->setValueOn(LeafNode::coord2offset(xyz), val);
+        this->setValueOn(LeafNode::coordToOffset(xyz), val);
     }
     /// Set the value of the voxel at the given coordinates and mark the voxel as active.
     void setValue(const Coord& xyz, const ValueType& val) { this->setValueOn(xyz, val); };
@@ -474,21 +482,27 @@ public:
         mValueMask.setOn(offset);
     }
 
+    /// @brief Apply a functor to the value of the voxel at the given offset
+    /// and mark the voxel as active.
+    template<typename ModifyOp>
+    void modifyValue(Index offset, const ModifyOp& op)
+    {
+        op(mBuffer[offset]);
+        mValueMask.setOn(offset);
+    }
     /// @brief Apply a functor to the value of the voxel at the given coordinates
     /// and mark the voxel as active.
     template<typename ModifyOp>
     void modifyValue(const Coord& xyz, const ModifyOp& op)
     {
-        const Index offset = this->coord2offset(xyz);
-        op(mBuffer[offset]);
-        mValueMask.setOn(offset);
+        this->modifyValue(this->coordToOffset(xyz), op);
     }
 
     /// Apply a functor to the voxel at the given coordinates.
     template<typename ModifyOp>
     void modifyValueAndActiveState(const Coord& xyz, const ModifyOp& op)
     {
-        const Index offset = this->coord2offset(xyz);
+        const Index offset = this->coordToOffset(xyz);
         bool state = mValueMask.isOn(offset);
         op(mBuffer[offset], state);
         mValueMask.set(offset, state);
@@ -500,7 +514,7 @@ public:
     void setValuesOff() { mValueMask.setOff(); }
 
     /// Return @c true if the voxel at the given coordinates is active.
-    bool isValueOn(const Coord& xyz) const { return this->isValueOn(LeafNode::coord2offset(xyz)); }
+    bool isValueOn(const Coord& xyz) const {return this->isValueOn(LeafNode::coordToOffset(xyz));}
     /// Return @c true if the voxel at the given offset is active.
     bool isValueOn(Index offset) const { return mValueMask.isOn(offset); }
 
@@ -628,7 +642,7 @@ public:
     template<typename AccessorT>
     const ValueType& getValue(const Coord& xyz, bool& state, int& level, AccessorT&) const
     {
-        const Index offset = this->coord2offset(xyz);
+        const Index offset = this->coordToOffset(xyz);
         state = mValueMask.isOn(offset);
         level = LEVEL;
         return mBuffer[offset];
@@ -948,7 +962,7 @@ LeafNode<T, Log2Dim>::str() const
 
 template<typename T, Index Log2Dim>
 inline Index
-LeafNode<T, Log2Dim>::coord2offset(const Coord& xyz)
+LeafNode<T, Log2Dim>::coordToOffset(const Coord& xyz)
 {
     assert ((xyz[0]&DIM-1u)<DIM && (xyz[1]&DIM-1u)<DIM && (xyz[2]&DIM-1u)<DIM);
     return ((xyz[0]&DIM-1u)<<2*Log2Dim)
@@ -959,7 +973,7 @@ LeafNode<T, Log2Dim>::coord2offset(const Coord& xyz)
 
 template<typename T, Index Log2Dim>
 inline void
-LeafNode<T, Log2Dim>::offset2coord(Index n, Coord &xyz)
+LeafNode<T, Log2Dim>::offsetToLocalCoord(Index n, Coord &xyz)
 {
     assert(n<(1<< 3*Log2Dim));
     xyz.setX(n >> 2*Log2Dim);
@@ -971,10 +985,10 @@ LeafNode<T, Log2Dim>::offset2coord(Index n, Coord &xyz)
 
 template<typename T, Index Log2Dim>
 inline Coord
-LeafNode<T, Log2Dim>::offset2globalCoord(Index n) const
+LeafNode<T, Log2Dim>::offsetToGlobalCoord(Index n) const
 {
     Coord local;
-    this->offset2coord(n, local);
+    this->offsetToLocalCoord(n, local);
     return Coord(local + this->origin());
 }
 
@@ -986,7 +1000,7 @@ template<typename ValueT, Index Log2Dim>
 inline const ValueT&
 LeafNode<ValueT, Log2Dim>::getValue(const Coord& xyz) const
 {
-    return this->getValue(LeafNode::coord2offset(xyz));
+    return this->getValue(LeafNode::coordToOffset(xyz));
 }
 
 template<typename ValueT, Index Log2Dim>
@@ -1002,7 +1016,7 @@ template<typename T, Index Log2Dim>
 inline bool
 LeafNode<T, Log2Dim>::probeValue(const Coord& xyz, ValueType& val) const
 {
-    return this->probeValue(LeafNode::coord2offset(xyz), val);
+    return this->probeValue(LeafNode::coordToOffset(xyz), val);
 }
 
 template<typename T, Index Log2Dim>
@@ -1019,7 +1033,7 @@ template<typename T, Index Log2Dim>
 inline void
 LeafNode<T, Log2Dim>::setValueOff(const Coord& xyz, const ValueType& val)
 {
-    this->setValueOff(LeafNode::coord2offset(xyz), val);
+    this->setValueOff(LeafNode::coordToOffset(xyz), val);
 }
 
 template<typename T, Index Log2Dim>
@@ -1036,7 +1050,7 @@ template<typename T, Index Log2Dim>
 inline void
 LeafNode<T, Log2Dim>::setActiveState(const Coord& xyz, bool on)
 {
-    mValueMask.set(this->coord2offset(xyz), on);
+    mValueMask.set(this->coordToOffset(xyz), on);
 }
 
 
@@ -1044,7 +1058,7 @@ template<typename T, Index Log2Dim>
 inline void
 LeafNode<T, Log2Dim>::setValueOnly(const Coord& xyz, const ValueType& val)
 {
-    this->setValueOnly(LeafNode::coord2offset(xyz), val);
+    this->setValueOnly(LeafNode::coordToOffset(xyz), val);
 }
 
 template<typename T, Index Log2Dim>
@@ -1284,7 +1298,7 @@ inline void
 LeafNode<T, Log2Dim>::addTile(Index level, const Coord& xyz, const ValueType& val, bool active)
 {
     assert(level == 0);
-    this->addTile(this->coord2offset(xyz), val, active);
+    this->addTile(this->coordToOffset(xyz), val, active);
 }
 
 template<typename T, Index Log2Dim>
@@ -1313,7 +1327,7 @@ template<typename T, Index Log2Dim>
 inline void
 LeafNode<T, Log2Dim>::signedFloodFill(const ValueType& background)
 {
-    this->signedFloodFill(background, negative(background));
+    this->signedFloodFill(background, math::negative(background));
 }
 
 template<typename T, Index Log2Dim>
@@ -1363,8 +1377,8 @@ LeafNode<T, Log2Dim>::resetBackground(const ValueType& oldBackground,
         ValueType &inactiveValue = mBuffer[iter.pos()];
         if (math::isApproxEqual(inactiveValue, oldBackground)) {
             inactiveValue = newBackground;
-        } else if (math::isApproxEqual(inactiveValue, negative(oldBackground))) {
-            inactiveValue = negative(newBackground);
+        } else if (math::isApproxEqual(inactiveValue, math::negative(oldBackground))) {
+            inactiveValue = math::negative(newBackground);
         }
     }
 }

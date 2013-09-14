@@ -32,6 +32,7 @@
 #define OPENVDB_UNITTEST_UTIL_HAS_BEEN_INCLUDED
 
 #include <openvdb/openvdb.h>
+#include <boost/date_time/posix_time/posix_time.hpp>// for ScopedTimer
 
 namespace unittest_util {
 
@@ -116,6 +117,25 @@ makeSphere(const openvdb::Coord& dim, const openvdb::Vec3f& center, float radius
     makeSphere<GridType>(dim, center, radius, grid, mode);
 }
 
+class CpuTimer
+{
+public:
+    CpuTimer() {}
+    void start(const std::string& msg = std::string("Task"))
+    {
+        std::cerr << msg << " ... ";
+        mT0 =boost::posix_time::microsec_clock::local_time();
+    }
+    void stop() const
+    {
+        boost::posix_time::ptime t1 = boost::posix_time::microsec_clock::local_time();
+        boost::posix_time::time_duration msdiff = t1 - mT0;
+        std::cerr << "completed in " << msdiff.total_milliseconds() << " ms\n";
+    }
+private:
+    boost::posix_time::ptime mT0;
+};// CpuTimer
+    
 // @todo makePlane
 
 } // namespace unittest_util

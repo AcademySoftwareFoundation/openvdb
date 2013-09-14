@@ -295,7 +295,7 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     }
     ValueT inactiveVal1 = background;
     ValueT inactiveVal0 =
-        ((metadata == NO_MASK_OR_INACTIVE_VALS) ? background : negative(background));
+        ((metadata == NO_MASK_OR_INACTIVE_VALS) ? background : math::negative(background));
 
     if (metadata != NO_MASK_OR_INACTIVE_VALS &&
         metadata != NO_MASK_AND_MINUS_BG &&
@@ -438,7 +438,7 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
 
         if (numUniqueInactiveVals == 1) {
             if (!Local::eq(inactiveVal[0], background)) {
-                if (Local::eq(inactiveVal[0], negative(background))) {
+                if (Local::eq(inactiveVal[0], math::negative(background))) {
                     metadata = NO_MASK_AND_MINUS_BG;
                 } else {
                     metadata = NO_MASK_AND_ONE_INACTIVE_VAL;
@@ -452,7 +452,7 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
                 metadata = MASK_AND_TWO_INACTIVE_VALS;
 
             } else if (Local::eq(inactiveVal[1], background)) {
-                if (Local::eq(inactiveVal[0], negative(background))) {
+                if (Local::eq(inactiveVal[0], math::negative(background))) {
                     // If the second inactive value is equal to the background and
                     // the first is equal to -background, neither value needs to be saved,
                     // but save a mask that selects between -background and +background.
@@ -464,7 +464,7 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
                     metadata = MASK_AND_ONE_INACTIVE_VAL;
                 }
             } else if (Local::eq(inactiveVal[0], background)) {
-                if (Local::eq(inactiveVal[1], negative(background))) {
+                if (Local::eq(inactiveVal[1], math::negative(background))) {
                     // If the first inactive value is equal to the background and
                     // the second is equal to -background, neither value needs to be saved,
                     // but save a mask that selects between -background and +background.

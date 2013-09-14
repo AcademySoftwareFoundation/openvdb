@@ -296,6 +296,13 @@ private:
         ValueT* operator->() const { return &(this->getValue()); }
 
         void setValue(const ValueT& v) const { assert(isTile(mIter)); getTile(mIter).value = v; }
+
+        template<typename ModifyOp>
+        void modifyValue(const ModifyOp& op) const
+        {
+            assert(isTile(mIter));
+            op(getTile(mIter).value);
+        }
     }; // ValueIter
 
     template<typename RootNodeT, typename MapIterT, typename ChildNodeT, typename ValueT>
@@ -956,8 +963,8 @@ RootNode<ChildT>::setBackground(const ValueType& background)
             if (tile.active) continue;//only change inactive tiles
             if (math::isApproxEqual(tile.value, mBackground)) {
                 tile.value = background;
-            } else if (math::isApproxEqual(tile.value, negative(mBackground))) {
-                tile.value = negative(background);
+            } else if (math::isApproxEqual(tile.value, math::negative(mBackground))) {
+                tile.value = math::negative(background);
             }
         }
     }
@@ -2416,7 +2423,7 @@ template<typename ChildT>
 inline void
 RootNode<ChildT>::signedFloodFill()
 {
-    this->signedFloodFill(mBackground, negative(mBackground));
+    this->signedFloodFill(mBackground, math::negative(mBackground));
 }
 
 

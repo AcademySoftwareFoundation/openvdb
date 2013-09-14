@@ -401,6 +401,14 @@ public:
         if (lvl == Level) mIter.setValueOff(); else mNext.setValueOff(lvl);
     }
 
+    /// @brief Apply a functor to the item to which this iterator is pointing.
+    /// @note Not valid when @c IterT is a const iterator type
+    template<typename ModifyOp>
+    void modifyValue(Index lvl, const ModifyOp& op) const
+    {
+        if (lvl == Level) mIter.modifyValue(op); else mNext.modifyValue(lvl, op);
+    }
+
 private:
     typedef typename boost::mpl::pop_front<NodeVecT>::type RestT; // NodeVecT minus its first item
     typedef IterListItem<IterListItem, RestT, VecSize - 1, Level + 1> NextItem;
@@ -518,6 +526,12 @@ public:
         if (lvl == 0) mIter.setValueOff(); else mNext.setValueOff(lvl);
     }
 
+    template<typename ModifyOp>
+    void modifyValue(Index lvl, const ModifyOp& op) const
+    {
+        if (lvl == 0) mIter.modifyValue(op); else mNext.modifyValue(lvl, op);
+    }
+
 private:
     typedef typename boost::mpl::pop_front<NodeVecT>::type RestT; // NodeVecT minus its first item
     typedef IterListItem<IterListItem, RestT, VecSize - 1, /*Level=*/1> NextItem;
@@ -622,6 +636,12 @@ public:
     void setValueOn(Index lvl, bool on = true) const { if (lvl == Level) mIter.setValueOn(on); }
     void setValueOff(Index lvl) const { if (lvl == Level) mIter.setValueOff(); }
 
+    template<typename ModifyOp>
+    void modifyValue(Index lvl, const ModifyOp& op) const
+    {
+        if (lvl == Level) mIter.modifyValue(op);
+    }
+
 private:
     IterT mIter;
     PrevItemT* mPrev;
@@ -723,6 +743,14 @@ public:
     void setActiveState(bool on) const { mValueIterList.setValueOn(mLevel, on); }
     /// Mark the tile or voxel value to which this iterator is currently pointing as inactive.
     void setValueOff() const { mValueIterList.setValueOff(mLevel); }
+
+    /// @brief Apply a functor to the item to which this iterator is pointing.
+    /// (Not valid for const iterators.)
+    /// @param op  a functor of the form <tt>void op(ValueType&) const</tt> that modifies
+    ///            its argument in place
+    /// @see Tree::modifyValue()
+    template<typename ModifyOp>
+    void modifyValue(const ModifyOp& op) const { mValueIterList.modifyValue(mLevel, op); }
 
     /// Return a pointer to the tree over which this iterator is iterating.
     TreeT* getTree() const { return mTree; }

@@ -90,13 +90,13 @@ TestLeafBool::testGetValue()
     {
         LeafType leaf(openvdb::Coord(0, 0, 0), /*background=*/false);
         for (openvdb::Index n = 0; n < leaf.numValues(); ++n) {
-            CPPUNIT_ASSERT_EQUAL(false, leaf.getValue(leaf.offset2coord(n)));
+            CPPUNIT_ASSERT_EQUAL(false, leaf.getValue(leaf.offsetToLocalCoord(n)));
         }
     }
     {
         LeafType leaf(openvdb::Coord(0, 0, 0), /*background=*/true);
         for (openvdb::Index n = 0; n < leaf.numValues(); ++n) {
-            CPPUNIT_ASSERT_EQUAL(true, leaf.getValue(leaf.offset2coord(n)));
+            CPPUNIT_ASSERT_EQUAL(true, leaf.getValue(leaf.offsetToLocalCoord(n)));
         }
     }
 }
@@ -356,7 +356,7 @@ TestLeafBool::testTopologyCopy()
     FloatLeafType fleaf(Coord(10, 20, 30), /*background=*/-1.0);
     std::set<Coord> coords;
     for (openvdb::Index n = 0; n < fleaf.numValues(); n += 10) {
-        Coord xyz = fleaf.offset2globalCoord(n);
+        Coord xyz = fleaf.offsetToGlobalCoord(n);
         fleaf.setValueOn(xyz, n);
         coords.insert(xyz);
     }

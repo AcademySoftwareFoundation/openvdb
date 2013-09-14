@@ -48,7 +48,7 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace math {
 
-template<typename RealT>
+template<typename RealT = double>
 class Ray
 {
 public:
@@ -57,71 +57,89 @@ public:
     typedef Vec3Type   Vec3T;
 
     Ray(const Vec3Type& eye, const Vec3Type& direction,
-        RealT t0 = 0, RealT t1 = std::numeric_limits<RealT>::max())
+        RealT t0 = 1e-3, RealT t1 = std::numeric_limits<RealT>::max())
         : mEye(eye), mDir(direction), mInvDir(1/mDir), mT0(t0), mT1(t1)
     {
     }
 
-    void setEye(const Vec3Type& eye) { mEye = eye; }
+    inline void setEye(const Vec3Type& eye) { mEye = eye; }
 
-    void setDir(const Vec3Type& direction) { mDir = direction; mInvDir = 1/mDir; }
+    inline void setDir(const Vec3Type& dir)
+      {
+          mDir = dir;
+          mInvDir = 1/mDir;
+      }
 
-    void setTime(RealT t0, RealT t1) { mT0 = t0; mT1 = t1; }
+    inline void setTime(RealT t0, RealT t1) { mT0 = t0; mT1 = t1; }
+
+    inline void scaleTime(RealT scale) {  assert(scale>0); mT0 *= scale; mT1 *= scale; }
     
-    void reset(const Vec3Type& eye, const Vec3Type& direction,
-               RealT t0 = 0, RealT t1 = std::numeric_limits<RealT>::max())
+    inline void reset(const Vec3Type& eye, const Vec3Type& direction,
+                      RealT t0 = 0, RealT t1 = std::numeric_limits<RealT>::max())
     {
         this->setEye(eye);
         this->setDir(direction);
         this->setTime(t0, t1);
     }
 
-    const Vec3T& eye() const {return mEye;}
-    const Vec3T& dir() const {return mDir;}
-    const Vec3T& invDir() const {return mInvDir;}
-    RealT t0() const {return mT0;}
-    RealT t1() const {return mT1;}
+    inline const Vec3T& eye() const {return mEye;}
+    inline const Vec3T& dir() const {return mDir;}
+    inline const Vec3T& invDir() const {return mInvDir;}
+    inline RealT t0() const {return mT0;}
+    inline RealT t1() const {return mT1;}
 
     /// @brief Return the position along the ray at the specified time.
-    Vec3R operator()(RealT time) const { return mEye + mDir * time; }
+    inline Vec3R operator()(RealT time) const { return mEye + mDir * time; }
     /// @brief Return the starting point of the ray.
-    Vec3R start() const { return (*this)(mT0); }
+    inline Vec3R start() const { return (*this)(mT0); }
     /// @brief Return the endpoint of the ray.
-    Vec3R end() const { return (*this)(mT1); }
+    inline Vec3R end() const { return (*this)(mT1); }
+    /// @brief Return the midpoint of the ray.
+    inline Vec3R mid() const { return (*this)(0.5*(mT0+mT1)); }
     /// @brief Return @c true if @a time is within t0 and t1, both inclusive.
-    bool test(RealT time) const { return (time>=mT0 && time<=mT1); }
+    inline bool test(RealT time) const { return (time>=mT0 && time<=mT1); }
     /// @brief Return a new Ray that is transformed with the specified map.
     /// @param map  the map from which to construct the new Ray.
-    /// @note This assumes a linear map.
+    /// @warning Assumes a linear map and a normalize direction.
+    /// @details The requirement that the direction is normalized
+    /// follows from the transformation of t0 and t1 - and that fact that
+    /// we want applyMap and applyInverseMap to be inverse operations.
     template<typename MapType>
-    Ray applyMap(const MapType& map) const
+    inline Ray applyMap(const MapType& map) const
     {
         assert(map.isLinear());
+        assert(math::isApproxEqual(mDir.length(), RealT(1)));
         const Vec3T eye = map.applyMap(mEye);
-        const Vec3T dir = map.applyJT(mDir);
-        const RealT tmp = Sqrt(mDir.lengthSqr()/dir.lengthSqr());
-        return Ray(eye, dir, mT0*tmp, mT1*tmp);
+        const Vec3T dir = map.applyJacobian(mDir);
+        const RealT length = dir.length();
+        return Ray(eye, dir/length, length*mT0, length*mT1);
     }
 
     /// @brief Return a new Ray that is transformed with the inverse of the specified map.
     /// @param map  the map from which to construct the new Ray by inverse mapping.
-    /// @note This assumes a linear map.
+    /// @warning Assumes a linear map and a normalize direction.
+    /// @details The requirement that the direction is normalized
+    /// follows from the transformation of t0 and t1 - and that fact that
+    /// we want applyMap and applyInverseMap to be inverse operations.
     template<typename MapType>
-    Ray applyInverseMap(const MapType& map) const
+    inline Ray applyInverseMap(const MapType& map) const
     {
         assert(map.isLinear());
+        assert(math::isApproxEqual(mDir.length(), RealT(1)));
         const Vec3T eye = map.applyInverseMap(mEye);
-        const Vec3T dir = map.applyIJT(mDir);
-        const RealT tmp = Sqrt(mDir.lengthSqr()/dir.lengthSqr());
-        return Ray(eye, dir, mT0*tmp, mT1*tmp);
+        const Vec3T dir = map.applyInverseJacobian(mDir);
+        const RealT length = dir.length();
+        return Ray(eye, dir/length, length*mT0, length*mT1);
     }
-
+    
     /// @brief Return true if this ray intersects the specified sphere.
     /// @param center The center of the sphere in the same space as this ray.
     /// @param radius The radius of the sphere in the same units as this ray.
     /// @param t0     The first intersection point if an intersection exists.
     /// @param t1     The second intersection point if an intersection exists.
-    bool intersects(const Vec3T& center, RealT radius, RealT& t0, RealT& t1) const
+    /// @note If the return value is true, i.e. a hit, and t0 =
+    /// this->t0() or t1 == this->t1() only one true intersection exist.
+    inline bool intersects(const Vec3T& center, RealT radius, RealT& t0, RealT& t1) const
     {
         const Vec3T origin = mEye - center;
         const RealT A = mDir.lengthSqr();
@@ -145,17 +163,17 @@ public:
     /// @brief Return true if this ray intersects the specified sphere.
     /// @param center The center of the sphere in the same space as this ray.
     /// @param radius The radius of the sphere in the same units as this ray.
-    bool intersects(const Vec3T& center, RealT radius) const
+    inline bool intersects(const Vec3T& center, RealT radius) const
     {
         RealT t0, t1;
-        return this->intersects(center, radius, t0, t1);
+        return this->intersects(center, radius, t0, t1)>0;
     }
 
     /// @brief Return true if this ray intersects the specified sphere. 
     /// @note For intersection this ray is clipped to the two intersection points.
     /// @param center The center of the sphere in the same space as this ray.
     /// @param radius The radius of the sphere in the same units as this ray.
-    bool clip(const Vec3T& center, RealT radius)
+    inline bool clip(const Vec3T& center, RealT radius)
     {
         RealT t0, t1;
         const bool hit = this->intersects(center, radius, t0, t1);
@@ -174,8 +192,8 @@ public:
     /// @param t1   If an intersection is detected this is assigned
     ///             the time for the second intersection point.
     template<typename BBoxT>
-    bool intersects(const BBoxT& bbox, RealT& t0, RealT& t1) const
-    {
+    inline bool intersects(const BBoxT& bbox, RealT& t0, RealT& t1) const
+      {
         t0 = mT0;
         t1 = mT1;
         for (size_t i = 0; i < 3; ++i) {
@@ -192,7 +210,7 @@ public:
     /// @brief Return true if this ray intersects the specified bounding box.
     /// @param bbox Axis-aligned bounding box in the same space as this ray.
     template<typename BBoxT>
-    bool intersects(const BBoxT& bbox) const
+    inline bool intersects(const BBoxT& bbox) const
     {
         RealT t0, t1;
         return this->intersects(bbox, t0, t1);
@@ -202,7 +220,7 @@ public:
     /// @note For intersection this ray is clipped to the two intersection points.
     /// @param bbox Axis-aligned bounding box in the same space as this ray.
     template<typename BBoxT>
-    bool clip(const BBoxT& bbox)
+    inline bool clip(const BBoxT& bbox)
     {
         RealT t0, t1;
         const bool hit = this->intersects(bbox, t0, t1);
@@ -213,19 +231,41 @@ public:
         return hit;
     }
 
+    /// @brief Return true if the Ray intersects the plane specified
+    /// by a normal and distance from the origin.
+    /// @param normal   Normal of the plane.
+    /// @param distance Distance of the plane to the origin.
+    /// @param t        Time of intersection, if one exists.
+    inline bool intersects(const Vec3T& normal, RealT distance, RealT& t) const
+      {
+          const RealT cosAngle = mDir.dot(normal);
+          if (math::isApproxZero(cosAngle)) return false;//parallel
+          t = (distance-mEye.dot(normal))/cosAngle;
+          return this->test(t);
+      }
+
+    /// @brief Return true if the Ray intersects the plane specified
+    /// by a normal and point.
+    /// @param normal   Normal of the plane.
+    /// @param point    Point in the plane.
+    /// @param t        Time of intersection, if one exists.
+    inline bool intersects(const Vec3T& normal, const Vec3T& point, RealT& t) const
+      {
+          return this->intersects(normal, point.dot(normal), t);
+      }
+
 private:
     Vec3T mEye, mDir, mInvDir;
     RealT mT0, mT1;
-}; // end of Ray class
-
+}; // end of Ray class  
 
 /// @brief Output streaming of the Ray class.
 /// @note Primarily intended for debugging.
 template<typename RealT>
 inline std::ostream& operator<<(std::ostream& os, const Ray<RealT>& r)
 {
-    os << "eye=" << r.eye() << " dir=" << r.dir()
-       << " t0=" << r.t0()  << " t0="  << r.t1();
+    os << "eye=" << r.eye() << " dir=" << r.dir() << " 1/dir="<<r.invDir()
+       << " t0=" << r.t0()  << " t1="  << r.t1();
     return os;
 }
 
@@ -239,7 +279,7 @@ inline std::ostream& operator<<(std::ostream& os, const Ray<RealT>& r)
 /// corresponds to a voxel and Log2Dim a tree node of size 2^Log2Dim.     
 ///
 /// @note The Ray template class is expected to have the following
-/// four methods: test(time), t0(), invDir(), and  operator()(time).
+/// methods: test(time), t0(), t1(), invDir(), and  operator()(time).
 /// See the example Ray class above for their definition.
 template<typename RayT, Index Log2Dim = 0>
 class DDA
@@ -250,48 +290,78 @@ public:
     typedef typename RayT::Vec3Type Vec3Type;
     typedef Vec3Type                Vec3T;
 
-    DDA(const RayT& ray) { this->init(ray, ray.t0()); }
+    DDA(const RayT& ray) { this->init(ray, ray.t0(), ray.t1()); }
 
-    DDA(const RayT& ray, RealT time) { this->init(ray, time); }
+    DDA(const RayT& ray, RealT startTime) { this->init(ray, startTime, ray.t1()); }
 
-    void init(const RayT& ray, RealT time)
+    DDA(const RayT& ray, RealT startTime, RealT maxTime) { this->init(ray, startTime, maxTime); }
+    
+    inline void init(const RayT& ray, RealT startTime, RealT maxTime)
     {
+        assert(startTime <= maxTime);
         static const int DIM = 1 << Log2Dim;
-        mTime = time;
-        assert(ray.test(time));
-        const Vec3T &pos = ray(time), &inv = ray.invDir();
+        mT0 = startTime;
+        mT1 = maxTime;
+        const Vec3T &pos = ray(mT0), &dir = ray.dir(), &inv = ray.invDir();
         mVoxel = Coord::floor(pos) & (~(DIM-1));
         for (size_t axis = 0; axis < 3; ++axis) {
-            mStep[axis]  = inv[axis] > 0 ? DIM : -DIM;
-            mNext[axis]  = time + (mVoxel[axis] + mStep[axis] - pos[axis]) * inv[axis];
-            mDelta[axis] = mStep[axis] * inv[axis];
+            if (math::isZero(dir[axis])) {//handles dir = +/- 0
+                mStep[axis]  = 0;//dummy value
+                mNext[axis]  = std::numeric_limits<RealT>::max();//i.e. disabled!
+                mDelta[axis] = std::numeric_limits<RealT>::max();//dummy value
+            } else if (inv[axis] > 0) {
+                mStep[axis]  = DIM;
+                mNext[axis]  = mT0 + (mVoxel[axis] + DIM - pos[axis]) * inv[axis];
+                mDelta[axis] = mStep[axis] * inv[axis];
+            } else {
+                mStep[axis]  = -DIM;
+                mNext[axis]  = mT0 + (mVoxel[axis] - pos[axis]) * inv[axis];
+                mDelta[axis] = mStep[axis] * inv[axis];
+            }
         }
     }
 
-    /// Increment the voxel index to next intersected voxel or node and return the
-    /// corresponding intersection point paramerterized in time along the initializing ray.
-    RealType step()
+    /// @brief Increment the voxel index to next intersected voxel or node
+    /// and returns true if the step in time does not exceed maxTime.
+    inline bool step()
     {
         const size_t stepAxis = math::MinIndex(mNext);
-        mTime = mNext[stepAxis];
+        mT0 = mNext[stepAxis];
         mNext[stepAxis]  += mDelta[stepAxis];
         mVoxel[stepAxis] += mStep[stepAxis];
-        return mTime;
+        return mT0 <= mT1;
     }
 
     /// @brief Return the index coordinates of the next node or voxel
     /// intersected by the ray. If Log2Dim = 0 the return value is the
     /// actual signed coordinate of the voxel, else it is the origin
-    /// of the corresponding VDB tree node.
+    /// of the corresponding VDB tree node or tile.
     /// @note Incurs no computational overhead.
-    const Coord& voxel() const { return mVoxel; }
+    inline const Coord& voxel() const { return mVoxel; }
 
-    /// @brief Return the time parameterization along the initial Ray.
+    /// @brief Return the time (parameterized along the Ray) of the
+    /// first hit of a tree node of size 2^Log2Dim.
+    /// @details This value is initialized to startTime or ray.t0()
+    /// depending on the constructor used.
     /// @note Incurs no computational overhead.
-    RealType time() const { return mTime; }
+    inline RealType time() const { return mT0; }
+
+    /// @brief Return the time (parameterized along the Ray) of the
+    /// second (i.e. next) hit of a tree node of size 2^Log2Dim.
+    /// @note Incurs a (small) computational overhead.
+    inline RealType next() const { return math::Min(mT1, mNext[0], mNext[1], mNext[2]); }
+
+    /// @brief Print information about this DDA for debugging.
+    /// @param os    a stream to which to write textual information.
+    void print(std::ostream& os = std::cout) const
+      {
+          os << "Dim=" << (1<<Log2Dim) << " time=" << mT0 << " next()="
+             << this->next() << " voxel=" << mVoxel << " next=" << mNext
+             << " delta=" << mDelta << " step=" << mStep << std::endl;
+      }
 
 private:
-    RealT mTime;
+    RealT mT0, mT1;
     Coord mVoxel, mStep;
     Vec3T mDelta, mNext;
 }; // class DDA

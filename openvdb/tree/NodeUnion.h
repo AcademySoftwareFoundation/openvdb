@@ -33,13 +33,12 @@
 /// @author Peter Cucka
 ///
 /// NodeUnion is a templated helper class that controls access to either
-/// the child node pointer or the fill value for a particular element
-/// of a root or internal node.  For space efficiency, the child pointer
-/// and the fill value are unioned, since the two are never in use
-/// simultaneously.  Template specializations of NodeUnion allow for
-/// fill values of either POD (int, float, pointer, etc.) or class
-/// (std::string, math::Vec, etc.) types.  (The latter cannot be
-/// stored directly in a union.)
+/// the child node pointer or the value for a particular element of a root
+/// or internal node.  For space efficiency, the child pointer and the value
+/// are unioned, since the two are never in use simultaneously.
+/// Template specializations of NodeUnion allow for values of either POD
+/// (int, float, pointer, etc.) or class (std::string, math::Vec, etc.) types.
+/// (The latter cannot be stored directly in a union.)
 
 #ifndef OPENVDB_TREE_NODEUNION_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_NODEUNION_HAS_BEEN_INCLUDED
@@ -52,11 +51,11 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tree {
 
-// Internal implementation of a union of a child node pointer and a fill value
+// Internal implementation of a union of a child node pointer and a value
 template<bool ValueIsClass, class ValueT, class ChildT> class NodeUnionImpl;
 
 
-// Partial specialization for fill values of non-class types
+// Partial specialization for values of non-class types
 // (int, float, pointer, etc.) that stores elements by value
 template<typename ValueT, typename ChildT>
 class NodeUnionImpl</*ValueIsClass=*/false, ValueT, ChildT>
@@ -69,12 +68,13 @@ public:
 
     ChildT* getChild() const { return mUnion.child; }
     const ValueT& getValue() const { return mUnion.value; }
+    ValueT& getValue() { return mUnion.value; }
     void setChild(ChildT* child) { mUnion.child = child; }
     void setValue(const ValueT& val) { mUnion.value = val; }
 };
 
 
-// Partial specialization for fill values of class types (std::string,
+// Partial specialization for values of class types (std::string,
 // math::Vec, etc.) that stores elements by pointer
 template<typename ValueT, typename ChildT>
 class NodeUnionImpl</*ValueIsClass=*/true, ValueT, ChildT>
@@ -97,7 +97,7 @@ public:
     }
     ~NodeUnionImpl() { setChild(NULL); }
 
-    ChildT* getChild() const ///< @todo throw if !mHasChild?
+    ChildT* getChild() const
         { return mHasChild ? mUnion.child : NULL; }
     void setChild(ChildT* child)
     {
@@ -107,11 +107,11 @@ public:
     }
 
     const ValueT& getValue() const { return *mUnion.value; }
-        ///< @todo throw if mHasChild?
+    ValueT& getValue() { return *mUnion.value; }
     void setValue(const ValueT& val)
     {
         /// @todo To minimize storage across nodes, intern and reuse
-        /// common fill values, using, e.g., boost::flyweight.
+        /// common values, using, e.g., boost::flyweight.
         if (!mHasChild) delete mUnion.value;
         mUnion.value = new ValueT(val);
         mHasChild = false;

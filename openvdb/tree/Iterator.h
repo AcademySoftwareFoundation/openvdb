@@ -36,6 +36,8 @@
 #define OPENVDB_TREE_ITERATOR_HAS_BEEN_INCLUDED
 
 #include <sstream>
+#include <boost/static_assert.hpp>
+#include <boost/type_traits/is_const.hpp>
 #include <boost/type_traits/remove_const.hpp>
 #include <openvdb/util/NodeMasks.h>
 #include <openvdb/Exceptions.h>
@@ -118,7 +120,7 @@ public:
     void setValueOff() const { parent().mValueMask.setOff(this->pos()); }
 
     /// Return the coordinates of the item to which this iterator is pointing.
-    Coord getCoord() const { return parent().offset2globalCoord(this->pos()); }
+    Coord getCoord() const { return parent().offsetToGlobalCoord(this->pos()); }
     /// Return in @a xyz the coordinates of the item to which this iterator is pointing.
     void getCoord(Coord& xyz) const { xyz = this->getCoord(); }
 
@@ -176,7 +178,19 @@ struct SparseIteratorBase: public IteratorBase<MaskIterT, NodeT>
     /// (Not valid for const iterators.)
     void setValue(const ItemT& value) const
     {
+        BOOST_STATIC_ASSERT(!boost::is_const<NodeT>::value);
         static_cast<const IterT*>(this)->setItem(this->pos(), value); // static polymorphism
+    }
+    /// @brief Apply a functor to the item to which this iterator is pointing.
+    /// (Not valid for const iterators.)
+    /// @param op  a functor of the form <tt>void op(ValueType&) const</tt> that modifies
+    ///            its argument in place
+    /// @see Tree::modifyValue()
+    template<typename ModifyOp>
+    void modifyValue(const ModifyOp& op) const
+    {
+        BOOST_STATIC_ASSERT(!boost::is_const<NodeT>::value);
+        static_cast<const IterT*>(this)->modifyItem(this->pos(), op); // static polymorphism
     }
 }; // class SparseIteratorBase
 
