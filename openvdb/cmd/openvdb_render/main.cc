@@ -49,6 +49,7 @@
 #include <OpenEXR/ImfHeader.h>
 #include <OpenEXR/ImfOutputFile.h>
 #include <OpenEXR/ImfPixelType.h>
+#include <tbb/task_scheduler_init.h>
 #include <tbb/tick_count.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/RayIntersector.h>
@@ -73,7 +74,7 @@ struct RenderOpts
     size_t samples;
     size_t width, height;
     std::string compression;
-    bool threaded;
+    int threads;
     bool verbose;
 
     RenderOpts():
@@ -90,7 +91,7 @@ struct RenderOpts
         width(2048),
         height(1024),
         compression("zip"),
-        threaded(true),
+        threads(0),
         verbose(false)
     {}
 
@@ -118,7 +119,7 @@ struct RenderOpts
         os << "-aperture " << aperture
             << " -camera " << camera
             << " -compression " << compression
-            << " -cpus " << (threaded ? 0 : 1)
+            << " -cpus " << threads
             << " -far " << zfar
             << " -focal " << focal
             << " -frame " << frame
@@ -152,12 +153,14 @@ usage(int exitStatus = EXIT_FAILURE)
 "                      (default: " << opts.camera << ")\n" <<
 "    -compression S    EXR compression scheme; either \"none\" (uncompressed),\n" <<
 "                      \"rle\" or \"zip\" (default: " << opts.compression << ")\n" <<
-"    -cpus N           specify N = 1 to disable threading, otherwise (for now)\n" <<
-"                      all available CPUs are used (default: N = 0)\n" <<
+"    -cpus N           number of rendering threads, or 1 to disable threading,\n" <<
+"                      or 0 to use all available CPUs (default: " << opts.threads << ")\n" <<
 "    -far F            camera far plane depth (default: " << opts.zfar << ")\n" <<
 "    -focal F          camera focal length (default: " << opts.focal << ")\n" <<
 "    -fov F            camera field of view (default: " << fov << ")\n" <<
 "    -frame F          camera world-space frame width (default: " << opts.frame << ")\n" <<
+"    -name S           name of the grid to be rendered (default: render\n" <<
+"                      the first floating-point grid found in in.vdb)\n" <<
 "    -near F           camera near plane depth (default: " << opts.znear << ")\n" <<
 "    -res WxH          image width and height (default: "
     << opts.width << "x" << opts.height << ")\n" <<
@@ -165,17 +168,16 @@ usage(int exitStatus = EXIT_FAILURE)
 "    -rotate X,Y,Z     camera rotation in degrees\n" <<
 "    -shader S         shader name; either \"diffuse\", \"matte\" or \"normal\"\n" <<
 "                      (default: " << opts.shader << ")\n" <<
-"    -samples N        number of samples (rays) per pixel\n" <<
-"                      (default: " << opts.samples << ")\n" <<
+"    -samples N        number of samples (rays) per pixel (default: " << opts.samples << ")\n" <<
 "    -t X,Y,Z                            \n" <<
 "    -translate X,Y,Z  camera translation\n" <<
 "\n" <<
-"    -v                verbose (print diagnostics)\n" <<
+"    -v                verbose (print timing and diagnostics)\n" <<
 "    -h, -help         print this usage message and exit\n" <<
 "\n" <<
 "Example:\n" <<
-"    " << gProgName << " bunny.vdb bunny.exr -shader normal -res 1920x1080\n" <<
-"        -focal 40 -rotate 0,45,0 -translate 50,12.5,50 -compression rle\n" <<
+"    " << gProgName << " crawler.vdb crawler.exr -shader diffuse -res 1920x1080 \\\n" <<
+"        -focal 50 -rotate -30,0,0 -translate 0,210.5,400 -compression rle -v\n" <<
 "\n" <<
 "This is not (and is not intended to be) a production-quality renderer,\n" <<
 "and it is currently limited to rendering level set volumes.\n";
@@ -196,9 +198,10 @@ saveEXR(const std::string& fname, const openvdb::tools::Film& film, const Render
         std::cout << gProgName << ": writing " << filename << "..." << std::flush;
     }
 
-    tbb::tick_count start = tbb::tick_count::now();
+    const tbb::tick_count start = tbb::tick_count::now();
 
-    if (opts.threaded) Imf::setGlobalThreadCount(8);
+    int threads = (opts.threads == 0 ? 8 : opts.threads);
+    Imf::setGlobalThreadCount(threads);
 
     Imf::Header header(film.width(), film.height());
     if (opts.compression == "none") {
@@ -274,10 +277,16 @@ render(const GridType& grid, const std::string& imgFilename, const RenderOpts& o
             "expected diffuse, matte or normal shader, got \"" << opts.shader << "\"");
     }
 
-    //tools::LevelSetRayIntersector<GridType> lsri(grid);
-    //tools::LevelSetRayTracer<FloatGrid> tracer(lsri, *shader, *camera, opts.samples);
-    tools::LevelSetRayTracer<FloatGrid> tracer(grid, *shader, *camera, opts.samples);
-    tracer.trace(opts.threaded);
+    if (opts.verbose) {
+        std::cout << gProgName << ": ray-tracing..." << std::flush;
+    }
+    const tbb::tick_count start = tbb::tick_count::now();
+
+    tools::rayTrace(grid, *shader, *camera, opts.samples, 0, (opts.threads != 1));
+
+    if (opts.verbose) {
+        std::cout << (tbb::tick_count::now() - start).seconds() << " sec" << std::endl;
+    }
 
     if (boost::iends_with(imgFilename, ".ppm")) {
         // Save as PPM (fast, but large file size).
@@ -317,13 +326,23 @@ strToVec3R(const std::string& s)
 }
 
 
-struct ArgCounter
+struct OptParse
 {
     int argc;
-    ArgCounter(int argc_): argc(argc_) {}
-    bool last(int i) const
+    char** argv;
+
+    OptParse(int argc_, char* argv_[]): argc(argc_), argv(argv_) {}
+
+    bool check(int idx, const std::string& name, int numArgs = 1) const
     {
-        if (i + 1 >= argc) usage();
+        if (argv[idx] == name) {
+            if (idx + numArgs >= argc) {
+                std::cerr << gProgName << ": option " << name << " requires "
+                    << numArgs << " argument" << (numArgs == 1 ? "" : "s") << "\n";
+                usage();
+            }
+            return true;
+        }
         return false;
     }
 };
@@ -336,8 +355,10 @@ main(int argc, char *argv[])
 {
     int retcode = EXIT_SUCCESS;
 
+    OPENVDB_START_THREADSAFE_STATIC_WRITE
     gProgName = argv[0];
     if (const char* ptr = ::strrchr(gProgName, '/')) gProgName = ptr + 1;
+    OPENVDB_FINISH_THREADSAFE_STATIC_WRITE
 
 #ifdef DWA_OPENVDB
     logging_base::configure(argc, argv);
@@ -345,64 +366,70 @@ main(int argc, char *argv[])
 
     if (argc == 1) usage();
 
-    std::string vdbFilename, imgFilename;
+    std::string vdbFilename, imgFilename, gridName;
     RenderOpts opts;
 
     bool hasFocal = false, hasFov = false;
     float fov = 0.0;
 
-    ArgCounter counter(argc);
+    OptParse parser(argc, argv);
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg[0] == '-') {
-            if (arg == "-aperture" && !counter.last(i)) {
+            if (parser.check(i, "-aperture")) {
                 ++i;
                 opts.aperture = atof(argv[i]);
-            } else if (arg == "-camera" && !counter.last(i)) {
+            } else if (parser.check(i, "-camera")) {
                 ++i;
                 opts.camera = argv[i];
-            } else if (arg == "-compression" && !counter.last(i)) {
+            } else if (parser.check(i, "-compression")) {
                 ++i;
                 opts.compression = argv[i];
-            } else if (arg == "-cpus" && !counter.last(i)) {
+            } else if (parser.check(i, "-cpus")) {
                 ++i;
-                opts.threaded = (atoi(argv[i]) != 1);
-            } else if (arg == "-far" && !counter.last(i)) {
+                opts.threads = std::max(0, atoi(argv[i]));
+            } else if (parser.check(i, "-far")) {
                 ++i;
                 opts.zfar = atof(argv[i]);
-            } else if (arg == "-focal" && !counter.last(i)) {
+            } else if (parser.check(i, "-focal")) {
                 ++i;
                 opts.focal = atof(argv[i]);
                 hasFocal = true;
-            } else if (arg == "-fov" && !counter.last(i)) {
+            } else if (parser.check(i, "-fov")) {
                 ++i;
                 fov = atof(argv[i]);
                 hasFov = true;
-            } else if (arg == "-frame" && !counter.last(i)) {
+            } else if (parser.check(i, "-frame")) {
                 ++i;
                 opts.frame = atof(argv[i]);
-            } else if (arg == "-near" && !counter.last(i)) {
+            } else if (parser.check(i, "-name")) {
+                ++i;
+                gridName = argv[i];
+            } else if (parser.check(i, "-near")) {
                 ++i;
                 opts.znear = atof(argv[i]);
-            } else if ((arg == "-r" || arg == "-rotate") && !counter.last(i)) {
+            } else if (parser.check(i, "-r") || parser.check(i, "-rotate")) {
                 ++i;
                 opts.rotation = strToVec3R(argv[i]);
-            } else if (arg == "-res" && !counter.last(i)) {
+            } else if (parser.check(i, "-res")) {
                 ++i;
                 strToSize(argv[i], opts.width, opts.height);
-            } else if (arg == "-shader" && !counter.last(i)) {
+            } else if (parser.check(i, "-shader")) {
                 ++i;
                 opts.shader = argv[i];
-            } else if (arg == "-samples" && !counter.last(i)) {
+            } else if (parser.check(i, "-samples")) {
                 ++i;
                 opts.samples = size_t(std::max(0, atoi(argv[i])));
-            } else if ((arg == "-t" || arg == "-translate") && !counter.last(i)) {
+            } else if (parser.check(i, "-t") || parser.check(i, "-translate")) {
                 ++i;
                 opts.translation = strToVec3R(argv[i]);
             } else if (arg == "-v") {
                 opts.verbose = true;
             } else if (arg == "-h" || arg == "-help" || arg == "--help") {
                 usage(EXIT_SUCCESS);
+            } else {
+                std::cerr << gProgName << ": \"" << arg << "\" is not a valid option\n";
+                usage();
             }
         } else if (vdbFilename.empty()) {
             vdbFilename = arg;
@@ -434,14 +461,54 @@ main(int argc, char *argv[])
     if (opts.verbose) std::cout << opts << std::endl;
 
     try {
+        tbb::task_scheduler_init schedulerInit(
+            (opts.threads == 0) ? tbb::task_scheduler_init::automatic : opts.threads);
+
         openvdb::initialize();
 
-        openvdb::io::File file(vdbFilename);
-        if (opts.verbose) std::cout << "reading " << vdbFilename << "...\n";
-        file.open();
-        if (openvdb::FloatGrid::Ptr grid =
-            openvdb::gridPtrCast<openvdb::FloatGrid>(file.getGrids()->at(0)))
+        const tbb::tick_count start = tbb::tick_count::now();
+        if (opts.verbose) {
+            std::cout << gProgName << ": reading ";
+            if (!gridName.empty()) std::cout << gridName << " from ";
+            std::cout << vdbFilename << "..." << std::flush;
+        }
+
+        openvdb::FloatGrid::Ptr grid;
         {
+            openvdb::io::File file(vdbFilename);
+
+            file.open();
+            if (!gridName.empty()) {
+                grid = openvdb::gridPtrCast<openvdb::FloatGrid>(file.readGrid(gridName));
+                if (!grid) {
+                    OPENVDB_THROW(openvdb::ValueError,
+                        gridName + " is not a scalar, floating-point grid");
+                }
+            } else {
+                // If no grid was specified by name, retrieve the first float grid from the file.
+                openvdb::GridPtrVecPtr grids = file.readAllGridMetadata();
+                for (size_t i = 0; i < grids->size(); ++i) {
+                    grid = openvdb::gridPtrCast<openvdb::FloatGrid>(grids->at(i));
+                    if (grid) {
+                        gridName = grid->getName();
+                        file.close();
+                        file.open();
+                        grid = openvdb::gridPtrCast<openvdb::FloatGrid>(file.readGrid(gridName));
+                        break;
+                    }
+                }
+                if (!grid) {
+                    OPENVDB_THROW(openvdb::ValueError,
+                        "no scalar, floating-point grids in file " + vdbFilename);
+                }
+            }
+        }
+
+        if (opts.verbose) {
+            std::cout << (tbb::tick_count::now() - start).seconds() << " sec" << std::endl;
+        }
+
+        if (grid) {
             render<openvdb::FloatGrid>(*grid, imgFilename, opts);
         }
     } catch (std::exception& e) {

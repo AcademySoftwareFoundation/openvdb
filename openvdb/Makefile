@@ -73,15 +73,15 @@ INSTALL_DIR := /tmp/OpenVDB
 BOOST_INCL_DIR := $(HT)/include
 
 # The parent directory of the OpenEXR/ header directory
-EXR_INCL_DIR := $(HOUDINI_DIR)/toolkit/include
+EXR_INCL_DIR := $(HT)/include
 # The directory containing libIlmImf, libIlmThread, etc.
-EXR_LIB_DIR := $(HOUDINI_DIR)/dsolib
+EXR_LIB_DIR := $(HDSO)
 EXR_LIB := -lIlmImf -lIlmThread -lIex -lImath
 
 # The parent directory of the OpenEXR/ header directory (which contains half.h)
-HALF_INCL_DIR := $(HT)/include
+HALF_INCL_DIR := $(EXR_INCL_DIR)
 # The directory containing libHalf
-HALF_LIB_DIR := $(HDSO)
+HALF_LIB_DIR := $(EXR_LIB_DIR)
 HALF_LIB := -lHalf
 
 # The parent directory of the tbb/ header directory
@@ -526,7 +526,7 @@ vdb_render: $(LIBOPENVDB) cmd/openvdb_render/main.cc
 	@echo "Building $@ because of $(call list_deps)"
 	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_render/main.cc -I . -I $(EXR_INCL_DIR) \
 	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
-	    -Wl,-rpath,$(EXR_LIB_DIR) -L $(EXR_LIB_DIR) $(EXR_LIB) \
+	    -Wl,-rpath,$(EXR_LIB_DIR) -L$(EXR_LIB_DIR) $(EXR_LIB) \
 	    $(LIBOPENVDB_RPATH) -L$(PWD) $(LIBOPENVDB)
 
 ifneq (3,$(words $(strip $(GLFW_LIB_DIR) $(GLFW_INCL_DIR) $(GLFW_LIB))))
