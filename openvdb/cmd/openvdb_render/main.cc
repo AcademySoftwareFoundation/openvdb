@@ -148,20 +148,20 @@ usage(int exitStatus = EXIT_FAILURE)
 "Usage: " << gProgName << " in.vdb out.{exr,ppm} [options]\n" <<
 "Which: ray-traces OpenVDB volumes\n" <<
 "Options:\n" <<
-"    -aperture F       camera aperture (default: " << opts.aperture << ")\n" <<
+"    -aperture F       aperture of perspective camera (default: " << opts.aperture << ")\n" <<
 "    -camera S         camera type; either \"persp[ective]\" or \"ortho[graphic]\"\n" <<
 "                      (default: " << opts.camera << ")\n" <<
 "    -compression S    EXR compression scheme; either \"none\" (uncompressed),\n" <<
 "                      \"rle\" or \"zip\" (default: " << opts.compression << ")\n" <<
 "    -cpus N           number of rendering threads, or 1 to disable threading,\n" <<
 "                      or 0 to use all available CPUs (default: " << opts.threads << ")\n" <<
-"    -far F            camera far plane depth (default: " << opts.zfar << ")\n" <<
-"    -focal F          camera focal length (default: " << opts.focal << ")\n" <<
-"    -fov F            camera field of view (default: " << fov << ")\n" <<
-"    -frame F          camera world-space frame width (default: " << opts.frame << ")\n" <<
+"    -far F            far plane depth of camera (default: " << opts.zfar << ")\n" <<
+"    -focal F          focal length of perspective camera (default: " << opts.focal << ")\n" <<
+"    -fov F            field of view of perspective camera (default: " << fov << ")\n" <<
+"    -frame F          frame width in world-sace of orthographic camera (default: " << opts.frame << ")\n" <<
 "    -name S           name of the grid to be rendered (default: render\n" <<
 "                      the first floating-point grid found in in.vdb)\n" <<
-"    -near F           camera near plane depth (default: " << opts.znear << ")\n" <<
+"    -near F           near plane depth of camera (default: " << opts.znear << ")\n" <<
 "    -res WxH          image width and height (default: "
     << opts.width << "x" << opts.height << ")\n" <<
 "    -r X,Y,Z                                    \n" <<
@@ -195,7 +195,7 @@ saveEXR(const std::string& fname, const openvdb::tools::Film& film, const Render
     if (!boost::iends_with(filename, ".exr")) filename += ".exr";
 
     if (opts.verbose) {
-        std::cout << gProgName << ": writing " << filename << "..." << std::flush;
+        std::cout << gProgName << ": writing \"" << filename << "\"..." << std::flush;
     }
 
     const tbb::tick_count start = tbb::tick_count::now();
@@ -235,7 +235,8 @@ saveEXR(const std::string& fname, const openvdb::tools::Film& film, const Render
     imgFile.writePixels(film.height());
 
     if (opts.verbose) {
-        std::cout << (tbb::tick_count::now() - start).seconds() << " sec" << std::endl;
+        std::cout << "completed in " << (tbb::tick_count::now() - start).seconds()
+                  << " sec" << std::endl;
     }
 }
 
@@ -285,7 +286,8 @@ render(const GridType& grid, const std::string& imgFilename, const RenderOpts& o
     tools::rayTrace(grid, *shader, *camera, opts.samples, 0, (opts.threads != 1));
 
     if (opts.verbose) {
-        std::cout << (tbb::tick_count::now() - start).seconds() << " sec" << std::endl;
+        std::cout << "completed in " << (tbb::tick_count::now() - start).seconds()
+                  << " sec" << std::endl;
     }
 
     if (boost::iends_with(imgFilename, ".ppm")) {
@@ -468,9 +470,9 @@ main(int argc, char *argv[])
 
         const tbb::tick_count start = tbb::tick_count::now();
         if (opts.verbose) {
-            std::cout << gProgName << ": reading ";
-            if (!gridName.empty()) std::cout << gridName << " from ";
-            std::cout << vdbFilename << "..." << std::flush;
+            std::cout << gProgName << ": reading \"";
+            if (!gridName.empty()) std::cout << gridName << "\" from \"";
+            std::cout << vdbFilename << "\"..." << std::flush;
         }
 
         openvdb::FloatGrid::Ptr grid;
@@ -505,7 +507,8 @@ main(int argc, char *argv[])
         }
 
         if (opts.verbose) {
-            std::cout << (tbb::tick_count::now() - start).seconds() << " sec" << std::endl;
+            std::cout << "completed in " << (tbb::tick_count::now() - start).seconds()
+                      << " sec" << std::endl;
         }
 
         if (grid) {

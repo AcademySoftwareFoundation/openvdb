@@ -204,6 +204,7 @@ HOUDINI_SOP_SRC_NAMES := \
     houdini/SOP_OpenVDB_Noise.cc \
     houdini/SOP_OpenVDB_Platonic.cc \
     houdini/SOP_OpenVDB_Prune.cc \
+    houdini/SOP_OpenVDB_Ray.cc \
     houdini/SOP_OpenVDB_Read.cc \
     houdini/SOP_OpenVDB_Rebuild_Level_Set.cc \
     houdini/SOP_OpenVDB_Resample.cc \

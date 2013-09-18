@@ -13,6 +13,10 @@ Version 2.0.0 - In development
       two-manifold meshes and is twice as fast as the previous scheme.
     - Added a tool (and a Houdini SOP) that fills a volume with
       adaptively-sized overlapping or non-overlapping spheres.
+    - Added a Houdini Ray SOP that can be used to perform geometry projections
+      using level set ray intersections or closest point queries.
+    - Added a tool that performs accelerated closest surface point queries on
+      narrow band level sets.
     - Increased the speed of masked level set filtering by 20% for
       the most common cases.
     - Added math::BoxStencil, with support for trilinear interpolation 
