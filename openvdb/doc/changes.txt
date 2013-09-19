@@ -25,7 +25,8 @@
 - Added a Houdini Ray SOP that can be used to perform geometry projections
   using level set ray intersections or closest point queries.
 - Added a tool that performs accelerated closest surface point queries on
-  narrow band level sets.
+  narrow band level sets. Supports queries that originate at arbitrary
+  worldspace locations.
 - Increased the speed of masked level set filtering by 20% for
   the most common cases.
 - Added @vdblink::math::BoxStencil math::BoxStencil@endlink, with support

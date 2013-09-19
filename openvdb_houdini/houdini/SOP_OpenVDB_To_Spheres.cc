@@ -101,7 +101,7 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "minradius", "Min Radius")
         .setDefault(PRMoneDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 0.0001, PRM_RANGE_UI, 2.0)
+        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 2.0)
         .setHelpText("Determines the smallest sphere size, voxel units."));
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "spheres", "Spheres")

@@ -165,7 +165,105 @@ private:
 };
 
 
+////////////////////////////////////////
+
+
+/// @brief  TBB body object for threaded sharp feature construction.
+template <typename IndexTreeType, typename BoolTreeType>
+class GenAdaptivityMaskOp
+{
+public:
+    typedef openvdb::tree::LeafManager<BoolTreeType> BoolLeafManager;
+
+    GenAdaptivityMaskOp(const GU_Detail& refGeo,
+        const IndexTreeType& indexTree, BoolLeafManager& leafs, float edgetolerance = 0.0);
+
+    void run(bool threaded = true);
+
+    void operator()(const tbb::blocked_range<size_t> &range) const;
+
+private:
+    const GU_Detail& mRefGeo;
+    const IndexTreeType& mIndexTree;
+    BoolLeafManager& mLeafs;
+    float mEdgeTolerance;
+};
+
+
+template <typename IndexTreeType, typename BoolTreeType>
+GenAdaptivityMaskOp<IndexTreeType, BoolTreeType>::GenAdaptivityMaskOp(const GU_Detail& refGeo,
+    const IndexTreeType& indexTree, BoolLeafManager& leafs, float edgetolerance)
+    : mRefGeo(refGeo)
+    , mIndexTree(indexTree)
+    , mLeafs(leafs)
+    , mEdgeTolerance(edgetolerance)
+{
+    mEdgeTolerance = std::max(0.0f, mEdgeTolerance);
+    mEdgeTolerance = std::min(1.0f, mEdgeTolerance);
+}
+
+
+template <typename IndexTreeType, typename BoolTreeType>
+void
+GenAdaptivityMaskOp<IndexTreeType, BoolTreeType>::run(bool threaded)
+{
+    if (threaded) {
+        tbb::parallel_for(mLeafs.getRange(), *this);
+    } else {
+        (*this)(mLeafs.getRange());
+    }
+}
+
+
+template <typename IndexTreeType, typename BoolTreeType>
+void
+GenAdaptivityMaskOp<IndexTreeType, BoolTreeType>::operator()(const tbb::blocked_range<size_t> &range) const
+{
+    typedef typename openvdb::tree::ValueAccessor<const IndexTreeType> IndexAccessorType;
+    IndexAccessorType idxAcc(mIndexTree);
+
+    UT_Vector3 tmpN, normal;
+    GA_Offset primOffset;
+    int tmpIdx;
+
+    openvdb::Coord ijk, nijk;
+    typename BoolTreeType::LeafNodeType::ValueOnIter iter;
+
+    for (size_t n = range.begin(); n < range.end(); ++n) {
+        iter = mLeafs.leaf(n).beginValueOn();
+        for (; iter; ++iter) {
+            ijk = iter.getCoord();
+            
+            bool edgeVoxel = false;
+
+            int idx = idxAcc.getValue(ijk);
+
+            primOffset = mRefGeo.primitiveOffset(idx);
+            normal = mRefGeo.getGEOPrimitive(primOffset)->computeNormal();
+
+            for (size_t i = 0; i < 18; ++i) {
+                nijk = ijk + openvdb::util::COORD_OFFSETS[i];
+                if (idxAcc.probeValue(nijk, tmpIdx) && tmpIdx != idx) {
+                    primOffset = mRefGeo.primitiveOffset(tmpIdx);
+                    tmpN = mRefGeo.getGEOPrimitive(primOffset)->computeNormal();
+
+                    if (normal.dot(tmpN) < mEdgeTolerance) {
+                        edgeVoxel = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!edgeVoxel) iter.setValueOff();
+        }
+    }
+}
+
+
+
 } // namespace openvdb_houdini
+
+
 
 
 ////////////////////////////////////////

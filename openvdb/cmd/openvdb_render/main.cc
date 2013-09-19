@@ -158,7 +158,7 @@ usage(int exitStatus = EXIT_FAILURE)
 "    -far F            far plane depth of camera (default: " << opts.zfar << ")\n" <<
 "    -focal F          focal length of perspective camera (default: " << opts.focal << ")\n" <<
 "    -fov F            field of view of perspective camera (default: " << fov << ")\n" <<
-"    -frame F          frame width in world-sace of orthographic camera (default: " << opts.frame << ")\n" <<
+"    -frame F          frame width in world units of orthographic camera (default: " << opts.frame << ")\n" <<
 "    -name S           name of the grid to be rendered (default: render\n" <<
 "                      the first floating-point grid found in in.vdb)\n" <<
 "    -near F           near plane depth of camera (default: " << opts.znear << ")\n" <<

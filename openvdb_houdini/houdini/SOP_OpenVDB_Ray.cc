@@ -41,7 +41,6 @@
 #include <openvdb/tools/VolumeToSpheres.h>
 #include <openvdb/tools/RayIntersector.h>
 
-
 #include <UT/UT_Interrupt.h>
 #include <GA/GA_PageIterator.h>
 #include <GU/GU_Detail.h>
@@ -103,6 +102,14 @@ newSopOperator(OP_OperatorTable* table)
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
 
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "isovalue", "Isovalue")
+        .setDefault(PRMzeroDefaults)
+        .setRange(PRM_RANGE_UI, -1.0, PRM_RANGE_UI, 1.0)
+        .setHelpText("The crossing point of the VDB values that is considered "
+            "the surface. The zero default value works for signed distance "
+            "fields while fog volumes require a larger positive value, 0.5 is "
+            "a good initial guess."));
+
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "dotrans", "Transform")
         .setDefault(PRMoneDefaults)
         .setHelpText("Move the intersected geometry."));
@@ -121,6 +128,10 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "reverserays", "Reverse Rays")
         .setHelpText("Make rays fire in the direction opposite to the normals."));
 
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "bias", "Bias")
+        .setDefault(PRMzeroDefaults)
+        .setRange(PRM_RANGE_UI, 0, PRM_RANGE_UI, 1)
+        .setHelpText("Offsets the starting position of the rays."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "creategroup", "Create Ray Hit Group")
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
@@ -160,10 +171,13 @@ SOP_OpenVDB_Ray::disableParms()
     unsigned changed = 0;
 
     bool rayintersection = evalInt("method", 0, 0) == 0;
-    
+
+    changed += enableParm("isovalue", !rayintersection);
+
     changed += enableParm("lookfar", rayintersection);
     changed += enableParm("reverserays", rayintersection);
     changed += enableParm("creategroup", rayintersection);
+    changed += enableParm("bias", rayintersection);
 
     changed += enableParm("scale", bool(evalInt("dotrans", 0, 0)));
 
@@ -189,7 +203,8 @@ public:
         std::vector<char>& intersections,
         bool keepMaxDist = false,
         bool reverseRays = false,
-        double scale = 1.0)
+        double scale = 1.0,
+        double bias = 0.0)
     : mGdp(gdp)
     , mPointNormals(pointNormals)
     , mIntersector(grid)
@@ -199,6 +214,7 @@ public:
     , mKeepMaxDist(keepMaxDist)
     , mReverseRays(reverseRays)
     , mScale(scale)
+    , mBias(bias)
     {
     }
 
@@ -208,6 +224,9 @@ public:
         GA_Index pointIndex;
         typedef openvdb::math::Ray<double> RayT;
         openvdb::Vec3d eye, dir, intersection;
+
+        const bool doScaling = !openvdb::math::isApproxEqual(mScale, 1.0);
+        const bool offsetRay = !openvdb::math::isApproxEqual(mBias, 0.0);
 
         GA_ROPageHandleV3 points(mGdp.getP());
 
@@ -235,8 +254,9 @@ public:
 
                 if (mReverseRays) dir = -dir;
 
+                RayT ray((offsetRay ? (eye + dir * mBias) : eye), dir);
 
-                if (!mIntersector.intersectsWS(RayT(eye, dir), intersection)) {
+                if (!mIntersector.intersectsWS(ray, intersection)) {
 
                     if (!mIntersections[pointIndex]) mPositions(pointIndex) = pos;
                     continue;
@@ -252,9 +272,7 @@ public:
                     UT_Vector3& position = mPositions(pointIndex);
 
 
-                    if (!openvdb::math::isApproxEqual(mScale, 1.0)) {
-                        intersection = eye + dir * mScale * double(distance);
-                    }
+                    if (doScaling) intersection = eye + dir * mScale * double(distance);
 
                     position.x() = float(intersection[0]);
                     position.y() = float(intersection[1]);
@@ -275,7 +293,7 @@ private:
     UT_FloatArray& mDistances;
     std::vector<char>& mIntersections;
     const bool mKeepMaxDist, mReverseRays;
-    const double mScale;
+    const double mScale, mBias;
 };
 
 
@@ -301,11 +319,11 @@ closestPoints(const GridT& grid, float isovalue, const GU_Detail& gdp,
 
     const bool transformPoints = (positions != NULL);
 
+    openvdb::tools::ClosestSurfacePoint<GridT> closestPoint;
+    closestPoint.initialize(grid, isovalue, &boss);
 
-    openvdb::tools::ClosestSurfacePoint<GridT> cspa;
-    cspa.initialize(grid, isovalue, &boss);
-    cspa.search(tmpPoints, tmpDistances, transformPoints);
-
+    if (transformPoints) closestPoint.searchAndReplace(tmpPoints, tmpDistances);
+    else closestPoint.search(tmpPoints, tmpDistances);
 
     for (size_t n = 0, N = tmpDistances.size(); n < N; ++n) {
 
@@ -406,12 +424,13 @@ SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
         }
 
         // Eval attributes
-        bool keepMaxDist = bool(evalInt("lookfar", 0, time));
-        bool reverseRays = bool(evalInt("reverserays", 0, time));
-        bool rayIntersection = evalInt("method", 0, time) == 0;
-        double scale = double(evalFloat("scale", 0, time));
-
-
+        const bool keepMaxDist = bool(evalInt("lookfar", 0, time));
+        const bool reverseRays = bool(evalInt("reverserays", 0, time));
+        const bool rayIntersection = evalInt("method", 0, time) == 0;
+        const double scale = double(evalFloat("scale", 0, time));
+        const double bias = double(evalFloat("bias", 0, time));
+        const float isovalue = evalFloat("isovalue", 0, time);
+        
         UT_Vector3Array pointNormals;
 
         GA_ROAttributeRef attributeRef = gdp->findPointAttribute("N");
@@ -449,10 +468,10 @@ SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
  
                 if (rayIntersection) {
                     IntersectPoints<openvdb::FloatGrid> op(*gdp, pointNormals, *gridPtr, positions, distances,
-                        intersections, keepMaxDist, reverseRays, scale);
+                        intersections, keepMaxDist, reverseRays, scale, bias);
                     UTparallelFor(GA_SplittableRange(gdp->getPointRange()), op);
                 } else {
-                    closestPoints(*gridPtr, 0.0, *gdp, distances, &positions, boss);
+                    closestPoints(*gridPtr, isovalue, *gdp, distances, &positions, boss);
                 }
 
             } else {

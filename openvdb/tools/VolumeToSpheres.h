@@ -118,7 +118,9 @@ fillWithSpheres(
 ////////////////////////////////////////
 
 
-/// @brief Accelerated closest surface point queries for narrow band level sets.
+/// @brief  Accelerated closest surface point queries for narrow band level sets.
+///         Supports queries that originate at arbitrary worldspace locations, is
+///         not confined to the narrow band region of the input volume geometry.
 template<typename GridT>
 class ClosestSurfacePoint
 {
@@ -126,12 +128,45 @@ public:
 
     ClosestSurfacePoint();
 
-    void initialize(const GridT& grid, float isovalue = 0.0);
 
+    /// @brief  Extracts the surface points and constructs a spatial acceleration structure.
+    ///
+    /// @param grid             a scalar gird, level set or fog volume.
+    ///
+    /// @param isovalue         the crossing point of the volume values that is considered
+    ///                         the surface. The zero default value works for signed distance
+    ///                         fields while fog volumes require a larger positive value,
+    ///                         0.5 is a good initial guess.
+    ///
+    /// @param interrupter      a pointer adhering to the util::NullInterrupter interface.
+    ///
     template<typename InterrupterT>
     void initialize(const GridT& grid, float isovalue = 0.0, InterrupterT* interrupter = NULL);
 
-    void search(std::vector<Vec3R>& points, std::vector<float>& distances, bool transformPoints = false);
+
+    /// @brief  @c initialize method variant that automatically infers
+    ///         the util::NullInterrupter.
+    void initialize(const GridT& grid, float isovalue = 0.0);
+
+
+
+    /// @brief Computes distance to closest surface.
+    ///
+    /// @param points       search locations in world space.
+    ///
+    /// @param distances    list of closest surface point distances, populated by this method.
+    ///
+    void search(const std::vector<Vec3R>& points, std::vector<float>& distances);
+
+
+    /// @brief Performs closest point searches.
+    ///
+    /// @param points       search locations in world space to be replaced by their closest
+    ///                     surface point.
+    ///
+    /// @param distances    list of closest surface point distances, populated by this method.
+    ///
+    void searchAndReplace(std::vector<Vec3R>& points, std::vector<float>& distances);
 
 private:
     typedef typename GridT::TreeType TreeT;
@@ -147,6 +182,8 @@ private:
     size_t mPointListSize, mMaxNodeLeafs;
     float mMaxRadiusSqr;
     typename IntTreeT::Ptr mIdxTreePt;
+
+    void search(std::vector<Vec3R>&, std::vector<float>&, bool transformPoints);
 };
 
 
@@ -722,7 +759,7 @@ fillWithSpheres(
 
     csp.initialize(grid, isovalue, interrupter);
 
-    csp.search(instancePoints, instanceRadius, false);
+    csp.search(instancePoints, instanceRadius);
 
 
     if (interrupter && interrupter->wasInterrupted()) return;
@@ -937,6 +974,22 @@ ClosestSurfacePoint<GridT>::search(std::vector<Vec3R>& points,
         mMaxNodeLeafs, transformPoints);
 
     cpd.run();
+}
+
+
+template<typename GridT>
+void
+ClosestSurfacePoint<GridT>::search(const std::vector<Vec3R>& points, std::vector<float>& distances)
+{
+    search(const_cast<std::vector<Vec3R>& >(points), distances, false);
+}
+
+
+template<typename GridT>
+void
+ClosestSurfacePoint<GridT>::searchAndReplace(std::vector<Vec3R>& points, std::vector<float>& distances)
+{
+    search(points, distances, true);
 }
 
 
