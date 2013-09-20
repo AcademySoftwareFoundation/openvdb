@@ -815,7 +815,7 @@ public:
     /// and are equal to within the given tolerance, and return the value in @a constValue
     /// and the active state in @a state.
     bool isConstant(ValueType& constValue, bool& state,
-        const ValueType& tolerance = zeroVal<ValueType>()) const;
+                    const ValueType& tolerance = zeroVal<ValueType>()) const;
     /// Return @c true if all of this node's values are inactive.
     bool isInactive() const { return mValueMask.isOff(); }
 
@@ -877,11 +877,6 @@ protected:
     template<typename NodeT, typename VisitorOp,
              typename ChildAllIterT, typename OtherChildAllIterT>
     static inline void doVisit2(NodeT& self, OtherChildAllIterT&, VisitorOp&, bool otherIsLHS);
-
-private:
-
-    // Disallow copying.
-    LeafNode& operator=(const LeafNode&);
 
 }; // end of LeafNode class
 
@@ -945,7 +940,6 @@ inline
 LeafNode<T, Log2Dim>::~LeafNode()
 {
 }
-
 
 template<typename T, Index Log2Dim>
 inline std::string
@@ -1273,11 +1267,11 @@ LeafNode<T, Log2Dim>::hasSameTopology(const LeafNode<OtherType, OtherLog2Dim>* o
 template<typename T, Index Log2Dim>
 inline bool
 LeafNode<T, Log2Dim>::isConstant(ValueType& constValue,
-    bool& state, const ValueType& tolerance) const
+                                 bool& state, const ValueType& tolerance) const
 {
-    if (!mValueMask.isOn() && !mValueMask.isOff()) return false;
-
     state = mValueMask.isOn();
+    
+    if (!(state || mValueMask.isOff())) return false;
 
     bool allEqual = true;
     const T value = mBuffer[0];

@@ -44,6 +44,7 @@ Version 2.0.0 - In development
     - Reimplemented math::RandomInt using Boost.Random instead of rand()
       (which is not thread-safe), and deprecated math::randUniform()
       and added math::Random01 to replace it. 
+    - Fixed bugs in tools::CopyFromDense.
     - Fixed bugs in math::Stats and math::Histogram that could produce
       NaNs or other incorrect behavior if certain methods were called
       on populations of size zero.

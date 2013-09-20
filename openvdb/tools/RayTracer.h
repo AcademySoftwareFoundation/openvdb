@@ -342,7 +342,7 @@ class PerspectiveCamera : public BaseCamera
         Vec3R dir = BaseCamera::rasterToScreen(i + iOffset, j + jOffset, -1.0);
         dir = BaseCamera::mScreenToWorld.applyJacobian(dir);
         dir.normalize();
-        ray.scaleTime(1.0/dir.dot(ray.dir()));
+        ray.scaleTimes(1.0/dir.dot(ray.dir()));
         ray.setDir(dir);
         return ray;
     }

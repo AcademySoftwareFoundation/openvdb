@@ -399,7 +399,12 @@ public:
     /// @brief Change inactive tiles or voxels with a value equal to +/- the
     /// old background to the specified value (with the same sign). Active values
     /// are unchanged.
-    void setBackground(const ValueType& value);
+    /// @param value The new background value
+    /// @param updateChildNodes If true (which is the default) the
+    /// background values of the child nodes is also updated. Else
+    /// only the background value stored in the RootNode itself is changed.
+    void setBackground(const ValueType& value, bool updateChildNodes = true);
+
     /// Return this node's background value.
     const ValueType& background() const { return mBackground; }
 
@@ -948,23 +953,25 @@ RootNode<ChildT>::operator=(const RootNode& other)
 
 template<typename ChildT>
 inline void
-RootNode<ChildT>::setBackground(const ValueType& background)
+RootNode<ChildT>::setBackground(const ValueType& background, bool updateChildNodes)
 {
     if (math::isExactlyEqual(background, mBackground)) return;
 
-    // Traverse the tree, replacing occurrences of mBackground with background
-    // and -mBackground with -background.
-    for (MapIter iter=mTable.begin(); iter!=mTable.end(); ++iter) {
-        ChildT *child = iter->second.child;
-        if (child) {
-            child->resetBackground(/*old=*/mBackground, /*new=*/background);
-        } else {
-            Tile& tile = getTile(iter);
-            if (tile.active) continue;//only change inactive tiles
-            if (math::isApproxEqual(tile.value, mBackground)) {
-                tile.value = background;
-            } else if (math::isApproxEqual(tile.value, math::negative(mBackground))) {
-                tile.value = math::negative(background);
+    if (updateChildNodes) {
+        // Traverse the tree, replacing occurrences of mBackground with background
+        // and -mBackground with -background.
+        for (MapIter iter=mTable.begin(); iter!=mTable.end(); ++iter) {
+            ChildT *child = iter->second.child;
+            if (child) {
+                child->resetBackground(/*old=*/mBackground, /*new=*/background);
+            } else {
+                Tile& tile = getTile(iter);
+                if (tile.active) continue;//only change inactive tiles
+                if (math::isApproxEqual(tile.value, mBackground)) {
+                    tile.value = background;
+                } else if (math::isApproxEqual(tile.value, math::negative(mBackground))) {
+                    tile.value = math::negative(background);
+                }
             }
         }
     }

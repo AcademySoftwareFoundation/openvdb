@@ -56,8 +56,10 @@ public:
     typedef Vec3<Real> Vec3Type;
     typedef Vec3Type   Vec3T;
 
-    Ray(const Vec3Type& eye, const Vec3Type& direction,
-        RealT t0 = 1e-3, RealT t1 = std::numeric_limits<RealT>::max())
+    Ray(const Vec3Type& eye = Vec3Type(0,0,0),
+        const Vec3Type& direction = Vec3Type(1,0,0),
+        RealT t0 = 1e-3,
+        RealT t1 = std::numeric_limits<RealT>::max())
         : mEye(eye), mDir(direction), mInvDir(1/mDir), mT0(t0), mT1(t1)
     {
     }
@@ -70,34 +72,47 @@ public:
           mInvDir = 1/mDir;
       }
 
-    inline void setTime(RealT t0, RealT t1) { mT0 = t0; mT1 = t1; }
+    inline void setMinTime(RealT t0) { assert(t0>0); mT0 = t0; }
 
-    inline void scaleTime(RealT scale) {  assert(scale>0); mT0 *= scale; mT1 *= scale; }
+    inline void setMaxTime(RealT t1) { assert(t1>0); mT1 = t1; }
+
+    inline void setTimes(RealT t0, RealT t1) { assert(t0>0 && t1>0);mT0 = t0; mT1 = t1; }
+
+    inline void scaleTimes(RealT scale) {  assert(scale>0); mT0 *= scale; mT1 *= scale; }
     
     inline void reset(const Vec3Type& eye, const Vec3Type& direction,
                       RealT t0 = 0, RealT t1 = std::numeric_limits<RealT>::max())
     {
         this->setEye(eye);
         this->setDir(direction);
-        this->setTime(t0, t1);
+        this->setTimes(t0, t1);
     }
 
     inline const Vec3T& eye() const {return mEye;}
+
     inline const Vec3T& dir() const {return mDir;}
+
     inline const Vec3T& invDir() const {return mInvDir;}
+
     inline RealT t0() const {return mT0;}
+
     inline RealT t1() const {return mT1;}
 
     /// @brief Return the position along the ray at the specified time.
     inline Vec3R operator()(RealT time) const { return mEye + mDir * time; }
+
     /// @brief Return the starting point of the ray.
     inline Vec3R start() const { return (*this)(mT0); }
+
     /// @brief Return the endpoint of the ray.
     inline Vec3R end() const { return (*this)(mT1); }
+
     /// @brief Return the midpoint of the ray.
     inline Vec3R mid() const { return (*this)(0.5*(mT0+mT1)); }
+
     /// @brief Return @c true if @a time is within t0 and t1, both inclusive.
     inline bool test(RealT time) const { return (time>=mT0 && time<=mT1); }
+
     /// @brief Return a new Ray that is transformed with the specified map.
     /// @param map  the map from which to construct the new Ray.
     /// @warning Assumes a linear map and a normalize direction.
@@ -240,7 +255,7 @@ public:
       {
           const RealT cosAngle = mDir.dot(normal);
           if (math::isApproxZero(cosAngle)) return false;//parallel
-          t = (distance-mEye.dot(normal))/cosAngle;
+          t = (distance - mEye.dot(normal))/cosAngle;
           return this->test(t);
       }
 
@@ -365,6 +380,16 @@ private:
     Coord mVoxel, mStep;
     Vec3T mDelta, mNext;
 }; // class DDA
+
+/// @brief Output streaming of the Ray class.
+/// @note Primarily intended for debugging.
+template<typename RayT, Index Log2Dim>
+inline std::ostream& operator<<(std::ostream& os, const DDA<RayT, Log2Dim>& dda)
+{
+    os << "Dim="     << (1<<Log2Dim) << " time="  << dda.time()
+       << " next()=" << dda.next()   << " voxel=" << dda.voxel();
+    return os;
+}
 
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME

@@ -57,6 +57,7 @@
   Boost.Random instead of @c rand() (which is not thread-safe), and deprecated
   @vdblink::math::randUniform math::randUniform@endlink and added
   @vdblink::math::Random01 math::Random01@endlink to replace it. 
+- Fixed bugs in @vdblink::tools::CopyFromDense tools::CopyFromDense@endlink.
 - Fixed bugs in @vdblink::math::Stats math::Stats@endlink and
   @vdblink::math::Histogram math::Histogram@endlink that could produce
   <TT>NaN</TT>s or other incorrect behavior if certain methods were called

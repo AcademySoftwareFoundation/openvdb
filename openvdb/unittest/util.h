@@ -32,7 +32,8 @@
 #define OPENVDB_UNITTEST_UTIL_HAS_BEEN_INCLUDED
 
 #include <openvdb/openvdb.h>
-#include <boost/date_time/posix_time/posix_time.hpp>// for ScopedTimer
+#include <tbb/tick_count.h>
+#include <sstream>
 
 namespace unittest_util {
 
@@ -117,26 +118,34 @@ makeSphere(const openvdb::Coord& dim, const openvdb::Vec3f& center, float radius
     makeSphere<GridType>(dim, center, radius, grid, mode);
 }
 
+// @todo makePlane
+
+
+////////////////////////////////////////
+
+
 class CpuTimer
 {
 public:
     CpuTimer() {}
+
     void start(const std::string& msg = std::string("Task"))
     {
         std::cerr << msg << " ... ";
-        mT0 =boost::posix_time::microsec_clock::local_time();
+        mT0 = tbb::tick_count::now();
     }
+
     void stop() const
     {
-        boost::posix_time::ptime t1 = boost::posix_time::microsec_clock::local_time();
-        boost::posix_time::time_duration msdiff = t1 - mT0;
-        std::cerr << "completed in " << msdiff.total_milliseconds() << " ms\n";
+        tbb::tick_count t1 = tbb::tick_count::now();
+        std::ostringstream ostr;
+        ostr << "completed in " << std::setprecision(3) << (t1 - mT0).seconds() << " sec\n";
+        std::cerr << ostr.str();
     }
+
 private:
-    boost::posix_time::ptime mT0;
+    tbb::tick_count mT0;
 };// CpuTimer
-    
-// @todo makePlane
 
 } // namespace unittest_util
 

@@ -756,9 +756,6 @@ private:
     friend class IteratorBase<MaskDenseIter, LeafNode>;
     //@}
 
-    // Disallow copying.
-    LeafNode& operator=(const LeafNode&);
-
 }; // class LeafNode<bool>
 
 
@@ -1023,7 +1020,9 @@ template<Index Log2Dim>
 inline bool
 LeafNode<bool, Log2Dim>::isConstant(bool& constValue, bool& state, bool tolerance) const
 {
-    if (!(mValueMask.isOn() || mValueMask.isOff())) return false;
+    state = mValueMask.isOn();
+    
+    if (!(state || mValueMask.isOff())) return false;
 
     // Note: if tolerance is true (i.e., 1), then all boolean values compare equal.
     if (!tolerance && !(mBuffer.mData.isOn() || mBuffer.mData.isOff())) return false;

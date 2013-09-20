@@ -42,17 +42,13 @@
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/tools/RayIntersector.h>
 #include <openvdb/tools/RayTracer.h>// for Film
-#include "util.h"//for CpuTimer
-
+#ifdef STATS_TEST
 //only needed for statistics
 #include <openvdb/math/Stats.h>
-
-
+#include "util.h"//for CpuTimer
 #include <iostream>
-#include <fstream>
-#include <string>
-#include <sstream>
-#include <assert.h>
+#endif
+
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
@@ -66,15 +62,17 @@ class TestLevelSetRayIntersector : public CppUnit::TestCase
 public:
     CPPUNIT_TEST_SUITE(TestLevelSetRayIntersector);
     CPPUNIT_TEST(tests);
-    
+
 #ifdef STATS_TEST
     CPPUNIT_TEST(stats);
 #endif
-    
+
     CPPUNIT_TEST_SUITE_END();
 
     void tests();
+#ifdef STATS_TEST
     void stats();
+#endif
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestLevelSetRayIntersector);
@@ -85,7 +83,7 @@ TestLevelSetRayIntersector::tests()
     using namespace openvdb;
     typedef math::Ray<double>  RayT;
     typedef RayT::Vec3Type     Vec3T;
-    
+
     {// voxel intersection against a level set sphere
         const float r = 5.0f;
         const Vec3f c(20.0f, 0.0f, 0.0f);
@@ -110,7 +108,7 @@ TestLevelSetRayIntersector::tests()
         //std::cerr << "Intersection at  xyz = " << xyz << std::endl;
         CPPUNIT_ASSERT(ray(t0) == xyz);
     }
-    
+
     {// voxel intersection against a level set sphere
         const float r = 5.0f;
         const Vec3f c(20.0f, 0.0f, 0.0f);
@@ -135,7 +133,7 @@ TestLevelSetRayIntersector::tests()
         //std::cerr << "Intersection at  xyz = " << xyz << std::endl;
         CPPUNIT_ASSERT(ray(t0) == xyz);
     }
-    
+
     {// voxel intersection against a level set sphere
         const float r = 5.0f;
         const Vec3f c(0.0f, 20.0f, 0.0f);
@@ -161,7 +159,7 @@ TestLevelSetRayIntersector::tests()
         ASSERT_DOUBLES_APPROX_EQUAL(15.0, ray(t0)[1]);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, ray(t0)[2]);
     }
-    
+
     {// voxel intersection against a level set sphere
         const float r = 5.0f;
         const Vec3f c(0.0f, 20.0f, 0.0f);
@@ -187,14 +185,14 @@ TestLevelSetRayIntersector::tests()
         ASSERT_DOUBLES_APPROX_EQUAL(15.0, ray(t0)[1]);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, ray(t0)[2]);
     }
-    
+
     {// voxel intersection against a level set sphere
         const float r = 5.0f;
         const Vec3f c(0.0f, 0.0f, 20.0f);
         const float s = 1.0f, w = 3.0f;
 
         FloatGrid::Ptr ls = tools::createLevelSetSphere<FloatGrid>(r, c, s, w);
-        
+
         typedef tools::LinearSearchImpl<FloatGrid> SearchImplT;
         tools::LevelSetRayIntersector<FloatGrid, SearchImplT, -1> lsri(*ls);
 
@@ -221,7 +219,7 @@ TestLevelSetRayIntersector::tests()
         const float s = 1.0f, w = 3.0f;
 
         FloatGrid::Ptr ls = tools::createLevelSetSphere<FloatGrid>(r, c, s, w);
-        
+
         typedef tools::LinearSearchImpl<FloatGrid> SearchImplT;
         tools::LevelSetRayIntersector<FloatGrid, SearchImplT, -1> lsri(*ls);
 
@@ -270,7 +268,7 @@ TestLevelSetRayIntersector::tests()
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, ray(t0)[1]);
         ASSERT_DOUBLES_APPROX_EQUAL(25.0, ray(t1)[2]);
     }
-    
+
     {// voxel intersection against a level set sphere
         const float r = 5.0f;
         const Vec3f c(10.0f, 10.0f, 10.0f);
@@ -299,7 +297,7 @@ TestLevelSetRayIntersector::tests()
         //std::cerr << "|delta|/dx=" << (delta.length()/ls->voxelSize()[0]) << std::endl;
         ASSERT_DOUBLES_APPROX_EQUAL(0, delta.length());
     }
-    
+
     {// test intersections against a high-resolution level set sphere @1000^3
         const float r = 5.0f;
         const Vec3f c(10.0f, 10.0f, 20.0f);
@@ -329,6 +327,7 @@ TestLevelSetRayIntersector::tests()
     }
 }
 
+#ifdef STATS_TEST
 void
 TestLevelSetRayIntersector::stats()
 {
@@ -357,7 +356,7 @@ TestLevelSetRayIntersector::stats()
         tools::Film film(width, width);
         math::Stats stats;
         math::Histogram hist(0.0, 0.1, 20);
-        
+
         timer.start("\nSerial ray-intersections of sphere");
         for (size_t i=0; i<width; ++i) {
             for (size_t j=0; j<width; ++j) {
@@ -383,6 +382,7 @@ TestLevelSetRayIntersector::stats()
         hist.print("First hit");
     }
 }
+#endif // STATS_TEST
 
 #undef STATS_TEST
 

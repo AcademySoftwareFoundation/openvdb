@@ -96,6 +96,14 @@ void TestRay::testRay()
     typedef math::Ray<RealT>   RayT;
     typedef RayT::Vec3T        Vec3T;
     typedef math::BBox<Vec3T>  BBoxT;
+
+    {//default constructor
+        RayT ray;
+        CPPUNIT_ASSERT(ray.eye() == Vec3T(0,0,0));
+        CPPUNIT_ASSERT(ray.dir() == Vec3T(1,0,0));
+        ASSERT_DOUBLES_APPROX_EQUAL( 0.001, ray.t0());
+        ASSERT_DOUBLES_APPROX_EQUAL( std::numeric_limits<RealT>::max(), ray.t1());
+    }
     
     {// simple construction
         
@@ -324,6 +332,21 @@ void TestRay::testDDA()
     using namespace openvdb;
     typedef math::Ray<double>  RayType;
 
+    {
+        typedef math::DDA<RayType,3+4+5> DDAType;
+        const RayType::Vec3T dir( 1.0, 0.0, 0.0);
+        const RayType::Vec3T eye(-1.0, 0.0, 0.0);
+        const RayType ray(eye, dir);
+        //std::cerr << ray << std::endl;
+        DDAType dda(ray);
+        ASSERT_DOUBLES_APPROX_EQUAL(0.001, dda.time());
+        ASSERT_DOUBLES_APPROX_EQUAL(1.0, dda.next());
+        //dda.print();
+        dda.step();
+        ASSERT_DOUBLES_APPROX_EQUAL(1.0, dda.time());
+        ASSERT_DOUBLES_APPROX_EQUAL(4096+1.0, dda.next());
+        //dda.print();
+    }
     
     {// Check for the notorious +-0 issue!
         typedef math::DDA<RayType,3> DDAType;

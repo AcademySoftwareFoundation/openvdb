@@ -805,7 +805,7 @@ public:
 
     typedef typename TreeT::template ValueConverter<Int16>::Type Int16TreeT;
     typedef tree::ValueAccessor<Int16TreeT> Int16AccessorT;
-        
+
     //////////
 
 
@@ -886,7 +886,7 @@ SignData<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size_t>& rang
     unsigned char signs, face;
     Coord ijk, coord;
 
-    std::auto_ptr<Int16LeafT> signLeafPt(new Int16LeafT(ijk, 0)); 
+    std::auto_ptr<Int16LeafT> signLeafPt(new Int16LeafT(ijk, 0));
 
     for (size_t n = range.begin(); n != range.end(); ++n) {
 
@@ -900,7 +900,7 @@ SignData<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size_t>& rang
         const typename TreeT::LeafNodeType *leafPt = mDistAcc.probeConstLeaf(coord);
 
         coord.offset(TreeT::LeafNodeType::DIM - 1);
-        
+
         for (iter = mLeafs.leaf(n).cbeginValueOn(); iter; ++iter) {
 
             ijk = iter.getCoord();
@@ -924,7 +924,7 @@ SignData<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size_t>& rang
                 flags |= Int16(signs);
 
                 signLeafPt->setValue(ijk, flags);
-                collectedData = true; 
+                collectedData = true;
             }
         }
 
@@ -979,7 +979,7 @@ public:
     template <typename LeafNodeType>
     void operator()(LeafNodeType &leaf, size_t leafIndex) const
     {
-        
+
         size_t regions = 0;
 
         IntLeafT tmpLeaf(*mIdxAcc.probeConstLeaf(leaf.origin()));
@@ -1239,7 +1239,7 @@ GenPoints<TreeT, LeafManagerT>::operator()(
     for (size_t n = range.begin(); n != range.end(); ++n) {
 
         coord = mSignLeafs.leaf(n).origin();
-        
+
         const typename TreeT::LeafNodeType *leafPt = mDistAcc.probeConstLeaf(coord);
         typename IntTreeT::LeafNodeType *idxLeafPt = idxAcc.probeLeaf(coord);
 
@@ -1305,7 +1305,7 @@ GenPoints<TreeT, LeafManagerT>::operator()(
                 offset = iter.pos();
 
                 signs = (SIGNS & mSignLeafs.leaf(n).getValue(offset));
-                
+
                 if (ijk[0] < coord[0] && ijk[1] < coord[1] && ijk[2] < coord[2]) {
                     collectCornerValues(*leafPt, offset, values);
                 } else {
@@ -1338,8 +1338,6 @@ GenPoints<TreeT, LeafManagerT>::operator()(
 
             ++ptnIdx;
         }
-
-
     }
 }
 
@@ -1510,7 +1508,7 @@ MergeVoxelRegions<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size
             adaptivity = mInternalAdaptivity;
         }
 
-        IntLeafT& idxLeaf = *idxAcc.probeLeaf(origin); 
+        IntLeafT& idxLeaf = *idxAcc.probeLeaf(origin);
 
         end[0] = origin[0] + LeafDim;
         end[1] = origin[1] + LeafDim;
@@ -1535,7 +1533,7 @@ MergeVoxelRegions<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size
 
 
         LeafT adaptivityLeaf(origin, adaptivity);
-        
+
         if (mAdaptivityGrid) {
             for (Index offset = 0; offset < LeafT::NUM_VALUES; ++offset) {
                 ijk = adaptivityLeaf.offsetToGlobalCoord(offset);
@@ -1607,14 +1605,14 @@ MergeVoxelRegions<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size
         int regionId = 1, next_dim = dim << 1;
 
         // Process the first adaptivity level.
-         for (ijk[0] = 0; ijk[0] < LeafDim; ijk[0] += dim) {
+        for (ijk[0] = 0; ijk[0] < LeafDim; ijk[0] += dim) {
             coord[0] = ijk[0] - (ijk[0] % next_dim);
             for (ijk[1] = 0; ijk[1] < LeafDim; ijk[1] += dim) {
                 coord[1] = ijk[1] - (ijk[1] % next_dim);
                 for (ijk[2] = 0; ijk[2] < LeafDim; ijk[2] += dim) {
                     coord[2] = ijk[2] - (ijk[2] % next_dim);
                     adaptivity = adaptivityLeaf.getValue(ijk);
-                    if(mask.isValueOn(ijk) || !isMergable(gradientBuffer, ijk, dim, adaptivity)) {
+                    if (mask.isValueOn(ijk) || !isMergable(gradientBuffer, ijk, dim, adaptivity)) {
                         mask.setActiveState(coord, true);
                         continue;
                     }
@@ -1625,7 +1623,7 @@ MergeVoxelRegions<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size
 
 
         // Process remaining adaptivity levels
-       for (dim = 4; dim < LeafDim; dim = dim << 1) {
+        for (dim = 4; dim < LeafDim; dim = dim << 1) {
             next_dim = dim << 1;
             coord[0] = ijk[0] - (ijk[0] % next_dim);
             for (ijk[0] = origin[0]; ijk[0] < end[0]; ijk[0] += dim) {
@@ -1635,7 +1633,8 @@ MergeVoxelRegions<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size
                     for (ijk[2] = origin[2]; ijk[2] < end[2]; ijk[2] += dim) {
                         adaptivity = adaptivityLeaf.getValue(ijk);
                         if (mask.isValueOn(ijk) || isNonManifold(mDistAcc, ijk, mIsovalue, dim) ||
-                            !isMergable(gradientBuffer, ijk, dim, adaptivity)) {
+                            !isMergable(gradientBuffer, ijk, dim, adaptivity))
+                        {
                             mask.setActiveState(coord, true);
                             continue;
                         }
@@ -1647,7 +1646,8 @@ MergeVoxelRegions<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size
 
         adaptivity = adaptivityLeaf.getValue(origin);
         if (!(mask.isValueOn(origin) || isNonManifold(mDistAcc, origin, mIsovalue, LeafDim))
-            && isMergable(gradientBuffer, origin, LeafDim, adaptivity)) {
+            && isMergable(gradientBuffer, origin, LeafDim, adaptivity))
+        {
             mergeVoxels(idxLeaf, origin, LeafDim, regionId++);
         }
     }
@@ -1868,7 +1868,7 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord
     char tag[2];
     tag[0] = (flags & SEAM) ? POLYFLAG_FRACTURE_SEAM : 0;
     tag[1] = tag[0] | char(POLYFLAG_EXTERIOR);
-   
+
     const bool isInside = flags & INSIDE;
     const int v0 = idxAcc.getValue(ijk);
     Coord coord;
@@ -2080,7 +2080,7 @@ struct PartOp
     }
 
 private:
-   size_t mStart, mEnd;
+    size_t mStart, mEnd;
 };
 
 
@@ -2271,7 +2271,7 @@ public:
     {
         const typename TreeT::LeafNodeType *maskLeaf =
             mAcc.probeConstLeaf(leaf.origin());
-     
+
         if (!maskLeaf) return;
 
         typename LeafNodeType::ValueOnIter it = leaf.beginValueOn();
@@ -2633,8 +2633,10 @@ public:
     void join(GenBoundaryMask& rhs) { mTree.merge(rhs.mTree); }
 
 private:
-    bool neighboringLeaf(const Coord&,
-        const tree::ValueAccessor<const IntTreeT>&) const;
+    // This typedef is needed for Windows
+    typedef tree::ValueAccessor<const IntTreeT> IntTreeAccessorT;
+
+    bool neighboringLeaf(const Coord&, const IntTreeAccessorT&) const;
 
     const LeafManagerT& mLeafManager;
     const BoolTreeT& mMaskTree;
@@ -2682,8 +2684,7 @@ GenBoundaryMask<SrcTreeT>::run(bool threaded)
 
 template<typename SrcTreeT>
 bool
-GenBoundaryMask<SrcTreeT>::neighboringLeaf(const Coord& ijk,
-    const tree::ValueAccessor<const IntTreeT>& acc) const
+GenBoundaryMask<SrcTreeT>::neighboringLeaf(const Coord& ijk, const IntTreeAccessorT& acc) const
 {
     if (acc.probeConstLeaf(ijk)) return true;
 
@@ -2699,7 +2700,7 @@ GenBoundaryMask<SrcTreeT>::neighboringLeaf(const Coord& ijk,
     if (acc.probeConstLeaf(Coord(ijk[0], ijk[1], ijk[2] - dim))) return true;
 
 
-    // edge adjacent neghbours
+    // edge adjacent neighbors
 
     if (acc.probeConstLeaf(Coord(ijk[0] + dim, ijk[1], ijk[2] - dim))) return true;
     if (acc.probeConstLeaf(Coord(ijk[0] - dim, ijk[1], ijk[2] - dim))) return true;
@@ -2714,7 +2715,7 @@ GenBoundaryMask<SrcTreeT>::neighboringLeaf(const Coord& ijk,
     if (acc.probeConstLeaf(Coord(ijk[0], ijk[1] + dim, ijk[2] + dim))) return true;
     if (acc.probeConstLeaf(Coord(ijk[0], ijk[1] + dim, ijk[2] - dim))) return true;
 
-    // corner adjacent neghbours
+    // corner adjacent neighbors
 
     if (acc.probeConstLeaf(Coord(ijk[0] - dim, ijk[1] - dim, ijk[2] - dim))) return true;
     if (acc.probeConstLeaf(Coord(ijk[0] - dim, ijk[1] - dim, ijk[2] + dim))) return true;
@@ -3082,7 +3083,7 @@ private:
 template <typename LeafManagerT>
 inline bool
 needsActiveVoxePadding(const LeafManagerT& leafs, double iso, double voxelSize)
-{ 
+{
     double interiorWidth = 0.0, exteriorWidth = 0.0;
     {
         typename LeafManagerT::TreeType::LeafNodeType::ValueOffCIter it;
@@ -3249,7 +3250,8 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
 
     if (mAdaptivityMaskTree && mAdaptivityMaskTree->type() == BoolTreeT::treeType()) {
-        const BoolTreeT *adaptivityMaskPt = static_cast<const BoolTreeT*>(mAdaptivityMaskTree.get());
+        const BoolTreeT *adaptivityMaskPt =
+            static_cast<const BoolTreeT*>(mAdaptivityMaskTree.get());
         seamMask.topologyUnion(*adaptivityMaskPt);
     }
 
@@ -3274,7 +3276,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
             maskEdges = true;
 
             if (surfaceMask) {
-                
+
                 { // Mask
                     internal::GenTopologyMask<DistTreeT> masking(
                         *surfaceMask, distLeafs, transform, mInvertSurfaceMask);
@@ -3300,7 +3302,8 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
                 BoolLeafManagerT leafs(valueMask);
 
-                internal::SignData<DistTreeT, BoolLeafManagerT> signDataOp(distTree, leafs, isovalue);
+                internal::SignData<DistTreeT, BoolLeafManagerT>
+                    signDataOp(distTree, leafs, isovalue);
                 signDataOp.run();
 
                 signTreePt = signDataOp.signTree();
@@ -3313,7 +3316,8 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
                 BoolLeafManagerT bleafs(boundary.tree());
 
-                internal::SignData<DistTreeT, BoolLeafManagerT> signDataOp(distTree, bleafs, isovalue);
+                internal::SignData<DistTreeT, BoolLeafManagerT>
+                    signDataOp(distTree, bleafs, isovalue);
                 signDataOp.run();
 
                 signTreePt->merge(*signDataOp.signTree());
@@ -3322,7 +3326,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
         } else {
             // Collect voxel-sign configurations
-            
+
             if (padActiveVoxels) {
 
                 BoolTreeT regionMask(false);
@@ -3331,15 +3335,17 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
                 BoolLeafManagerT leafs(regionMask);
 
-                internal::SignData<DistTreeT, BoolLeafManagerT> signDataOp(distTree, leafs, isovalue);
+                internal::SignData<DistTreeT, BoolLeafManagerT>
+                    signDataOp(distTree, leafs, isovalue);
                 signDataOp.run();
-                
+
                 signTreePt = signDataOp.signTree();
                 idxTreePt = signDataOp.idxTree();
 
             } else {
 
-                internal::SignData<DistTreeT, DistLeafManagerT> signDataOp(distTree, distLeafs, isovalue);
+                internal::SignData<DistTreeT, DistLeafManagerT>
+                    signDataOp(distTree, distLeafs, isovalue);
                 signDataOp.run();
 
                 signTreePt = signDataOp.signTree();
@@ -3351,7 +3357,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
     // Collect auxiliary data from active tiles
     internal::tileData(distTree, *signTreePt, *idxTreePt, isovalue);
-  
+
 
     // Optionally collect auxiliary data from a reference level set.
 
@@ -3367,7 +3373,8 @@ VolumeToMesh::operator()(const GridT& distGrid)
             const DistTreeT *refDistTreePt = &refGrid->tree();
 
             DistLeafManagerT refDistLeafs(*refDistTreePt);
-            internal::SignData<DistTreeT, DistLeafManagerT> signDataOp(*refDistTreePt, refDistLeafs, isovalue);
+            internal::SignData<DistTreeT, DistLeafManagerT>
+                signDataOp(*refDistTreePt, refDistLeafs, isovalue);
             signDataOp.run();
             mRefSignTree = signDataOp.signTree();
         }
@@ -3395,7 +3402,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
     if (refSignTreePt) {
         internal::GenSeamMask<Int16TreeT, Int16LeafManagerT> seamOp(signLeafs, *refSignTreePt);
         seamOp.run();
-        
+
         tools::dilateVoxels(seamOp.mask(), 3);
         signLeafs.foreach(internal::TagSeamEdges<BoolTreeT>(seamOp.mask()));
 
@@ -3410,8 +3417,8 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
     if (adaptive) {
 
-        internal::MergeVoxelRegions<DistTreeT, Int16LeafManagerT>
-            merge(signLeafs, *signTreePt, distTree, *idxTreePt, isovalue, DistValueT(mPrimAdaptivity));
+        internal::MergeVoxelRegions<DistTreeT, Int16LeafManagerT> merge(
+            signLeafs, *signTreePt, distTree, *idxTreePt, isovalue, DistValueT(mPrimAdaptivity));
 
         if (adaptivityField) {
             merge.setSpatialAdaptivity(transform, *adaptivityField);

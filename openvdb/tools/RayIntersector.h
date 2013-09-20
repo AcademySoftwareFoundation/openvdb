@@ -277,7 +277,7 @@ public:
     /// @warning Only trust the return value AFTER an intersection was detected.
     //inline RealT time() const { return mTime; }
 
-    inline void setRange(RealT t0, RealT t1) { mRay.setTime(t0, t1); }
+    inline void setRange(RealT t0, RealT t1) { mRay.setTimes(t0, t1); }
 
     /// @brief Return a const reference to the ray.
     inline const RayT& ray() const { return mRay; }

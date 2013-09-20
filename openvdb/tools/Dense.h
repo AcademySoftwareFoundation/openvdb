@@ -38,8 +38,10 @@
 
 #include <openvdb/Types.h>
 #include <openvdb/Grid.h>
+#include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/Exceptions.h>
 #include <tbb/parallel_for.h>
+#include <boost/scoped_ptr.hpp>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -102,13 +104,11 @@ public:
     ///
     /// @param bbox  the bounding box of the (signed) coordinate range of this grid
     /// @throw ValueError if the bounding box is empty.
+    /// @note The min and max coordinates in the bbox are inclusive.
     Dense(const CoordBBox& bbox)
-        : mBBox(bbox), mArray(new ValueT[bbox.volume()]), mData(mArray.get()),
-          mY(bbox.dim()[2]), mX(mY*bbox.dim()[1])
+        : mBBox(bbox), mY(bbox.dim()[2]), mX(mY*bbox.dim()[1])
     {
-        if (bbox.empty()) {
-            OPENVDB_THROW(ValueError, "can't construct a dense grid with an empty bounding box");
-        }
+        this->initArray();
     }
 
     /// @brief Construct a dense grid with a given range of coordinates and initial value
@@ -116,13 +116,11 @@ public:
     /// @param bbox  the bounding box of the (signed) coordinate range of this grid
     /// @param value the initial value of the grid.
     /// @throw ValueError if the bounding box is empty.
+    /// @note The min and max coordinates in the bbox are inclusive.
     Dense(const CoordBBox& bbox, const ValueT& value)
-        : mBBox(bbox), mArray(new ValueT[bbox.volume()]), mData(mArray.get()),
-          mY(bbox.dim()[2]), mX(mY*bbox.dim()[1])
+        : mBBox(bbox), mY(bbox.dim()[2]), mX(mY*bbox.dim()[1])
     {
-        if (bbox.empty()) {
-            OPENVDB_THROW(ValueError, "can't construct a dense grid with an empty bounding box");
-        }
+        this->initArray();
         this->fill(value);
     }
 
@@ -134,6 +132,7 @@ public:
     ///
     /// @note The data array is assumed to have a stride of one in the @e z direction.
     /// @throw ValueError if the bounding box is empty.
+    /// @note The min and max coordinates in the bbox are inclusive.
     Dense(const CoordBBox& bbox, ValueT* data)
         : mBBox(bbox), mData(data), mY(mBBox.dim()[2]), mX(mY*mBBox.dim()[1])
     {
@@ -147,13 +146,11 @@ public:
     /// @param dim  the desired dimensions of the grid
     /// @param min  the signed coordinates of the first voxel in the dense grid
     /// @throw ValueError if any of the dimensions are zero.
+    /// @note The min is inclusive, but the max coordinate will be min+dim-1.
     Dense(const Coord& dim, const Coord& min = Coord(0))
-        : mBBox(min, min+dim.offsetBy(-1)), mArray(new ValueT[mBBox.volume()]),
-          mData(mArray.get()), mY(mBBox.dim()[2]), mX(mY*mBBox.dim()[1])
+        : mBBox(min, min+dim.offsetBy(-1)), mY(mBBox.dim()[2]), mX(mY*mBBox.dim()[1])
     {
-        if (mBBox.empty()) {
-            OPENVDB_THROW(ValueError, "can't construct a dense grid of size zero");
-        }
+        this->initArray();
     }
 
     /// @brief Return a raw pointer to this grid's value array.
@@ -254,6 +251,16 @@ public:
     Index64 memUsage() const{ return sizeof(*this) + mBBox.volume() * sizeof(ValueType); }
     
 private:
+
+    inline void initArray()
+    {
+        if (mBBox.empty()) {
+            OPENVDB_THROW(ValueError, "can't construct a dense grid with an empty bounding box");
+        }
+        mArray.reset(new ValueT[mBBox.volume()]);
+        mData = mArray.get();
+    }
+    
     const CoordBBox mBBox;//signed coordinates of the domain represented by the grid
     boost::shared_array<ValueT> mArray;
     ValueT*         mData;//raw c-style pointer to values
@@ -276,26 +283,26 @@ public:
     typedef typename TreeT::ValueType    ValueT;
 
     CopyToDense(const TreeT& tree, Dense<ValueT> &dense)
-        : mRoot(tree.root()), mDense(dense) {}
+        : mRoot(&(tree.root())), mDense(&dense) {}
 
     void copy(bool serial = false) const
     {
         if (serial) {
-            mRoot.copyToDense(mDense.bbox(), mDense);
+            mRoot->copyToDense(mDense->bbox(), *mDense);
         } else {
-            tbb::parallel_for(mDense.bbox(), *this);
+            tbb::parallel_for(mDense->bbox(), *this);
         }
     }
 
     /// @brief Public method called by tbb::parallel_for
     void operator()(const CoordBBox& bbox) const
     {
-        mRoot.copyToDense(bbox, mDense);
+        mRoot->copyToDense(bbox, *mDense);
     }
 
 private:
-    const typename TreeT::RootNodeType &mRoot;
-    Dense<ValueT>                      &mDense;
+    const typename TreeT::RootNodeType* mRoot;
+    Dense<ValueT>*                      mDense;
 };// CopyToDense
 
 
@@ -330,69 +337,97 @@ class CopyFromDense
 public:
     typedef typename TreeT::ValueType    ValueT;
     typedef typename TreeT::LeafNodeType LeafT;
+    typedef tree::ValueAccessor<TreeT>   AccessorT;
 
     CopyFromDense(const Dense<ValueT>& dense, TreeT& tree, const ValueT& tolerance)
-        : mDense(dense), mTree(tree), mBlocks(NULL), mTolerance(tolerance)
+        : mDense(&dense),
+          mTree(&tree),
+          mBlocks(NULL),
+          mTolerance(tolerance),
+          mAccessor(tree.empty() ? NULL : new AccessorT(tree))
     {
     }
-
+    CopyFromDense(const CopyFromDense& other)
+        : mDense(other.mDense),
+          mTree(other.mTree),
+          mBlocks(other.mBlocks),
+          mTolerance(other.mTolerance),
+          mAccessor(other.mAccessor.get() == NULL ? NULL : new AccessorT(*mTree))
+    {
+    }
     /// @brief Copy values from the dense grid to the sparse tree.
     void copy(bool serial = false)
     {
-        std::vector<Block> blocks;
-        mBlocks = &blocks;
-        const CoordBBox& bbox = mDense.bbox();
+        mBlocks = new std::vector<Block>();
+        const CoordBBox& bbox = mDense->bbox();
         // Pre-process: Construct a list of blocks alligned with (potential) leaf nodes
         for (CoordBBox sub=bbox; sub.min()[0] <= bbox.max()[0]; sub.min()[0] = sub.max()[0] + 1) {
             for (sub.min()[1] = bbox.min()[1]; sub.min()[1] <= bbox.max()[1];
-                sub.min()[1] = sub.max()[1] + 1)
+                 sub.min()[1] = sub.max()[1] + 1)
             {
                 for (sub.min()[2] = bbox.min()[2]; sub.min()[2] <= bbox.max()[2];
-                    sub.min()[2] = sub.max()[2] + 1)
+                     sub.min()[2] = sub.max()[2] + 1)
                 {
                     sub.max() = Coord::minComponent(bbox.max(),
                         (sub.min()&(~(LeafT::DIM-1u))).offsetBy(LeafT::DIM-1u));
-                    blocks.push_back(Block(sub));
+                    mBlocks->push_back(Block(sub));
                 }
             }
         }
+        
         // Multi-threaded process: Convert dense grid into leaf nodes and tiles
         if (serial) {
-            (*this)(tbb::blocked_range<size_t>(0, blocks.size()));
+            (*this)(tbb::blocked_range<size_t>(0, mBlocks->size()));
         } else {
-            tbb::parallel_for(tbb::blocked_range<size_t>(0, blocks.size()), *this);
+            tbb::parallel_for(tbb::blocked_range<size_t>(0, mBlocks->size()), *this);
         }
+        
         // Post-process: Insert leaf nodes and tiles into the tree, and prune the tiles only!
-        tree::ValueAccessor<TreeT> acc(mTree);
-        for (size_t m=0, size = blocks.size(); m<size; ++m) {
-            Block& block = blocks[m];
+        tree::ValueAccessor<TreeT> acc(*mTree);
+        for (size_t m=0, size = mBlocks->size(); m<size; ++m) {
+            Block& block = (*mBlocks)[m];
             if (block.leaf) {
                 acc.addLeaf(block.leaf);
             } else if (block.tile.second) {//only background tiles are inactive
                 acc.addTile(1, block.bbox.min(), block.tile.first, true);//leaf tile
             }
         }
-        mTree.root().pruneTiles(mTolerance);
+        delete mBlocks;
+        mBlocks = NULL;
+        
+        mTree->root().pruneTiles(mTolerance);
     }
 
     /// @brief Public method called by tbb::parallel_for
+    /// @warning Never call this method directly!
     void operator()(const tbb::blocked_range<size_t> &r) const
     {
-        LeafT* leaf = NULL;
+        assert(mBlocks);
+        LeafT* leaf = new LeafT();
 
         for (size_t m=r.begin(), n=0, end = r.end(); m != end; ++m, ++n) {
-
-            if (leaf == NULL) leaf = new LeafT();
-
+            
             Block& block = (*mBlocks)[m];
             const CoordBBox &bbox = block.bbox;
+            
+            if (mAccessor.get() == NULL) {//i.e. empty target tree
+                leaf->fill(mTree->background(), false);
+            } else {//account for exiting leafs in the target tree
+                if (const LeafT* target = mAccessor->probeConstLeaf(bbox.min())) {
+                    (*leaf) = (*target);
+                } else {
+                    ValueT value = zeroVal<ValueT>();
+                    bool state = mAccessor->probeValue(bbox.min(), value);
+                    leaf->fill(value, state);
+                }
+            }
 
-            leaf->copyFromDense(bbox, mDense, mTree.background(), mTolerance);
+            leaf->copyFromDense(bbox, *mDense, mTree->background(), mTolerance);
 
             if (!leaf->isConstant(block.tile.first, block.tile.second, mTolerance)) {
                 leaf->setOrigin(bbox.min());
                 block.leaf = leaf;
-                leaf = NULL;
+                leaf = new LeafT();
             }
         }// loop over blocks
 
@@ -406,11 +441,12 @@ private:
         std::pair<ValueT, bool> tile;
         Block(const CoordBBox& b) : bbox(b), leaf(NULL) {}
     };
-
-    const Dense<ValueT>& mDense;
-    TreeT&               mTree;
-    std::vector<Block>*  mBlocks;
-    ValueT               mTolerance;
+    
+    const Dense<ValueT>*         mDense;
+    TreeT*                       mTree;
+    std::vector<Block>*          mBlocks;
+    ValueT                       mTolerance;
+    boost::scoped_ptr<AccessorT> mAccessor;
 };// CopyFromDense
 
 
