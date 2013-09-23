@@ -346,6 +346,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestValueAccessor.cc \
     unittest/TestVec2Metadata.cc \
     unittest/TestVec3Metadata.cc \
+    unittest/TestVolumeRayIntersector.cc \
     unittest/TestVolumeToMesh.cc \
 #
 

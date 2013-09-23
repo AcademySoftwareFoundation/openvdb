@@ -60,25 +60,14 @@ closestPointOnTriangleToPoint(
         uvw[0] = 1.0 - t;
         uvw[2] = t;
 
-        if (uvw != uvw) {
-            std::cout << "AC uvw = " << uvw << std::endl;
-        }
-
         return cp;
 
     } else if (isApproxEqual(a, c) || isApproxEqual(b, c)) {
 
-
         double t = 0.0;
         Vec3d cp = closestPointOnSegmentToPoint(a, b, p, t);
-        
         uvw[0] = 1.0 - t;
         uvw[1] = t;
-
-        if (uvw != uvw) {
-            std::cout << "AB uvw = " << uvw << std::endl;
-        }
-
         return cp;
     }
 
@@ -100,21 +89,6 @@ closestPointOnTriangleToPoint(
     if (vc <= 0.0 && d1 >= 0.0 && d3 <= 0.0) {
         uvw[1] = d1 / (d1 - d3);
         uvw[0] = 1.0 - uvw[1];
-
-    if (uvw != uvw) {
-        std::cout << "BAD uvw = " << uvw << std::endl;
-        std::cout << "    a = " << a << std::endl;
-        std::cout << "    b = " << b << std::endl;
-        std::cout << "    c = " << c << std::endl;
-        std::cout << "    d1 = " << d1 << std::endl;
-        std::cout << "    d3 = " << d3 << std::endl;
-        
-        std::cout << "    ab = " << isApproxEqual(a, b) << std::endl;
-        std::cout << "    ac = " << isApproxEqual(a, c) << std::endl;
-        std::cout << "    bc = " << isApproxEqual(b, c) << std::endl;
-    }
-
-
         return a + uvw[1] * ab; // barycentric coordinates (1-v,v,0) 
     }
 
@@ -147,8 +121,6 @@ closestPointOnTriangleToPoint(
     uvw[2] = vc * denom;
     uvw[1] = vb * denom;
     uvw[0] = 1.0 - uvw[1] - uvw[2];
-
-
 
     return a + ab*uvw[1] + ac*uvw[2]; // = u*a + v*b + w*c , u= va*denom = 1.0-v-w 
 }

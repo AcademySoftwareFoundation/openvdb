@@ -318,6 +318,7 @@ private:
     const std::vector<Vec4R>& mLeafBoundingSpheres;
 };
 
+inline
 NodeBS::NodeBS(std::vector<Vec4R>& nodeBoundingSpheres,
     const std::vector<IndexRange>& leafRanges,
     const std::vector<Vec4R>& leafBoundingSpheres)
@@ -327,7 +328,7 @@ NodeBS::NodeBS(std::vector<Vec4R>& nodeBoundingSpheres,
 {
 }
 
-void
+inline void
 NodeBS::run(bool threaded)
 {
     if (threaded) {
@@ -337,7 +338,7 @@ NodeBS::run(bool threaded)
     }
 }
 
-void
+inline void
 NodeBS::operator()(const tbb::blocked_range<size_t>& range) const
 {
     Vec3s avg, pos;
@@ -614,6 +615,7 @@ private:
     int mIndex;
 };
 
+inline
 UpdatePoints::UpdatePoints(
     const Vec4s& sphere,
     const std::vector<Vec3R>& points,
@@ -630,7 +632,7 @@ UpdatePoints::UpdatePoints(
 {
 }
 
-
+inline
 UpdatePoints::UpdatePoints(UpdatePoints& rhs, tbb::split)
     : mSphere(rhs.mSphere)
     , mPoints(rhs.mPoints)
@@ -642,8 +644,7 @@ UpdatePoints::UpdatePoints(UpdatePoints& rhs, tbb::split)
 {
 }
 
-
-void
+inline void
 UpdatePoints::run(bool threaded)
 {
     if (threaded) {
@@ -653,8 +654,7 @@ UpdatePoints::run(bool threaded)
     }
 }
 
-
-void
+inline void
 UpdatePoints::operator()(const tbb::blocked_range<size_t>& range)
 {
     Vec3s pos;

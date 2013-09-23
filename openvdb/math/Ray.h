@@ -110,6 +110,9 @@ public:
     /// @brief Return the midpoint of the ray.
     inline Vec3R mid() const { return (*this)(0.5*(mT0+mT1)); }
 
+     /// @brief Return @c true if t0 is strictly less then t1.
+    inline bool test() const { return (mT0 < mT1); }
+    
     /// @brief Return @c true if @a time is within t0 and t1, both inclusive.
     inline bool test(RealT time) const { return (time>=mT0 && time<=mT1); }
 

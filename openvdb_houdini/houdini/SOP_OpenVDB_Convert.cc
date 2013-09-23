@@ -210,7 +210,7 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "automaticpartitions", "Automatic Partitions")
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 20)
-        .setHelpText("Subdivide volume and mesh into disjoint parts. (In development)")
+        .setHelpText("Subdivide volume and mesh into disjoint parts.")
         .setDefault(PRMoneDefaults)
         .setCallbackFunc(&checkActivePartCB));
 
@@ -241,7 +241,7 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_FLT_J, "edgetolerance", "Edge Tolerance")
         .setDefault(0.5)
         .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_RESTRICTED, 1.0)
-        .setHelpText("Controls the edge adaptivity mask. (This is a temporary/experimental setting)"));
+        .setHelpText("Controls the edge adaptivity mask."));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "surfacegroup", "Surface Group")
         .setDefault("surface_polygons")
