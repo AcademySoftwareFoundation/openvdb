@@ -280,17 +280,15 @@ LIBS := \
     -L $(ZLIB_LIB_DIR) $(ZLIB_LIB) \
 #
 LIBS_RPATH := \
-    -Wl,-rpath,. $(LDDIROPT)$(HALF_LIB_DIR) $(HALF_LIB) \
-    -Wl,-rpath,. $(LDDIROPT)$(TBB_LIB_DIR) $(TBB_LIB) \
-    -Wl,-rpath,. $(LDDIROPT)$(ZLIB_LIB_DIR) $(ZLIB_LIB) \
+    -Wl,-rpath,'$$ORIGIN/.' $(LDDIROPT)$(HALF_LIB_DIR) $(HALF_LIB) \
+    -Wl,-rpath,'$$ORIGIN/.' $(LDDIROPT)$(TBB_LIB_DIR) $(TBB_LIB) \
+    -Wl,-rpath,'$$ORIGIN/.' $(LDDIROPT)$(ZLIB_LIB_DIR) $(ZLIB_LIB) \
 #
-ifneq (,$(strip $(CONCURRENT_MALLOC_LIB)))
-ifneq (,$(strip $(CONCURRENT_MALLOC_LIB_DIR)))
-LIBS += \
-    -L $(CONCURRENT_MALLOC_LIB_DIR) $(CONCURRENT_MALLOC_LIB)
-LIBS_RPATH += \
-    -Wl,-rpath,. $(LDDIROPT)$(CONCURRENT_MALLOC_LIB_DIR) $(CONCURRENT_MALLOC_LIB)
-endif
+ifeq (2,$(words $(strip $(CONCURRENT_MALLOC_LIB_DIR) $(CONCURRENT_MALLOC_LIB))))
+ALLOC_LIBS_RPATH := \
+    -Wl,-rpath,'$$ORIGIN/.' $(LDDIROPT)$(CONCURRENT_MALLOC_LIB_DIR) $(CONCURRENT_MALLOC_LIB)
+else
+ALLOC_LIBS_RPATH :=
 endif
 
 INCLUDE_NAMES := \
@@ -677,7 +675,8 @@ endif
 # BEGIN vdb_print rules
 vdb_print$(EXE_SUFFIX): $(LIBOPENVDB) $(CMD_OBJ_NAMES)
 	$(call BuildExecutable, $(CMD_OBJ_NAMES) \
-                                $(LIBS_RPATH) $(LIBOPENVDB_RPATH))
+                                $(LIBS_RPATH) $(LIBOPENVDB_RPATH) \
+				$(ALLOC_LIBS_RPATH))
 
 ifneq (,$(strip $(EXE_SUFFIX)))
 vdb_print: vdb_print$(EXE_SUFFIX)
@@ -687,7 +686,8 @@ endif
 # BEGIN vdb_render rules
 vdb_render$(EXE_SUFFIX): $(LIBOPENVDB) $(RENDER_OBJ_NAMES)
 	$(call BuildExecutable, $(RENDER_OBJ_NAMES) \
-                                $(LIBS_RPATH) $(LIBOPENVDB_RPATH))
+                                $(LIBS_RPATH) $(LIBOPENVDB_RPATH) \
+				$(ALLOC_LIBS_RPATH))
 
 ifneq (,$(strip $(EXE_SUFFIX)))
 vdb_render: vdb_render$(EXE_SUFFIX)
@@ -724,7 +724,8 @@ vdb_view$(EXE_SUFFIX): $(LIBOPENVDB) $(LIBVIEWER_OBJ_NAMES) $(VIEW_OBJ_NAMES)
 	$(call BuildExecutable, $(VIEW_OBJ_NAMES) $(LIBVIEWER_OBJ_NAMES) \
 		$(GLFW_RPATH) \
 		$(LIBVIEWER_FLAGS) $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
-		$(LIBOPENVDB_RPATH))
+		$(LIBOPENVDB_RPATH) \
+		$(ALLOC_LIBS_RPATH))
 endif
 # END vdb_view RULES
 
@@ -735,8 +736,10 @@ $(UNITTEST_OBJ_NAMES): %.o: %.cc
 	$(call CompileCXX,-I $(CPPUNIT_INCL_DIR))
 
 vdb_test$(EXE_SUFFIX): $(LIBOPENVDB) $(UNITTEST_OBJ_NAMES)
-	$(call BuildExecutable, $(UNITTEST_OBJ_NAMES) $(CPPUNIT_RPATH) \
-				$(LIBS_RPATH) $(LIBOPENVDB_RPATH))
+	$(call BuildExecutable, $(UNITTEST_OBJ_NAMES) \
+		$(CPPUNIT_RPATH) \
+		$(LIBS_RPATH) $(LIBOPENVDB_RPATH) \
+		$(ALLOC_LIBS_RPATH))
 
 ifneq (,$(strip $(EXE_SUFFIX)))
 vdb_test: vdb_test$(EXE_SUFFIX)
