@@ -501,7 +501,7 @@ CMD_SRC_NAMES := \
     cmd/openvdb_print/main.cc \
 #
 RENDER_SRC_NAMES := \
-    cmd/openvdb_print/main.cc \
+    cmd/openvdb_render/main.cc \
 #
 VIEW_SRC_NAMES := \
     cmd/openvdb_view/main.cc \
