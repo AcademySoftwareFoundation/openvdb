@@ -730,7 +730,7 @@ endif
 # END vdb_view RULES
 
 # BEGIN vdb_test RULES
-ifneq (3,$(words $(strip $(CPPUNIT_LIB_DIR) $(CPPUNIT_INCL_DIR) $(CPPUNIT_LIB))))
+ifeq (3,$(words $(strip $(CPPUNIT_LIB_DIR) $(CPPUNIT_INCL_DIR) $(CPPUNIT_LIB))))
 
 $(UNITTEST_OBJ_NAMES): %.o: %.cc
 	$(call CompileCXX,-I $(CPPUNIT_INCL_DIR))
