@@ -253,7 +253,10 @@ public:
 
     /// @brief Expand the specified bounding box so that it includes the active tiles
     /// of this internal node as well as all the active values in its child nodes.
-    void evalActiveVoxelBoundingBox(CoordBBox& bbox) const;
+    /// If visitVoxels is false LeafNodes will be approximated as dense, i.e. with all 
+    /// voxels active. Else the individual active voxels are visited to produce a tight bbox.
+    void evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels = true) const;
+    OPENVDB_DEPRECATED void evalActiveVoxelBoundingBox(CoordBBox& bbox) const;
 
     /// @brief Return the bounding box of this node, i.e., the full index space
     /// spanned by the node regardless of its content.
@@ -839,21 +842,27 @@ InternalNode<ChildT, Log2Dim>::memUsage() const
     return sum;
 }
 
-
+// Deprecated
 template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::evalActiveVoxelBoundingBox(CoordBBox& bbox) const
 {
     if (bbox.isInside(this->getNodeBoundingBox())) return;
 
-    ValueType dummy;
-    for (ChildAllCIter iter = this->cbeginChildAll(); iter; ++iter) {
-        if (const ChildT* child = iter.probeChild(dummy)) {
-            child->evalActiveVoxelBoundingBox(bbox);
-        } else if (iter.isValueOn()) {
-            bbox.expand(iter.getCoord(), ChildT::DIM);
-        }
-    }
+    for (ValueOnCIter i = this->cbeginValueOn(); i; ++i) bbox.expand(i.getCoord(), ChildT::DIM);
+
+    for (ChildOnCIter i = this->cbeginChildOn(); i; ++i) i->evalActiveVoxelBoundingBox(bbox);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline void
+InternalNode<ChildT, Log2Dim>::evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels) const
+{
+    if (bbox.isInside(this->getNodeBoundingBox())) return;
+    
+    for (ValueOnCIter i = this->cbeginValueOn(); i; ++i) bbox.expand(i.getCoord(), ChildT::DIM);
+
+    for (ChildOnCIter i = this->cbeginChildOn(); i; ++i) i->evalActiveBoundingBox(bbox, visitVoxels);
 }
 
 

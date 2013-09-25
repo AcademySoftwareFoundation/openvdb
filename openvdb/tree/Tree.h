@@ -72,12 +72,12 @@ public:
 
     /// Return the name of this tree's type.
     virtual const Name& type() const = 0;
+    
     /// Return the name of the type of a voxel's value (e.g., "float" or "vec3d").
     virtual Name valueType() const = 0;
 
     /// Return a pointer to a deep copy of this tree
     virtual TreeBase::Ptr copy() const = 0;
-
 
     //
     // Tree methods
@@ -86,10 +86,15 @@ public:
     /// @note Query the metadata object for the value's type.
     virtual Metadata::Ptr getBackgroundValue() const { return Metadata::Ptr(); }
 
-    /// @brief Return in @a bbox the axis-aligned bounding box of all leaf nodes.
+    /// @brief Return in @a bbox the axis-aligned bounding box of all
+    /// leaf nodes and active tiles.
+    /// @details This is faster then calling evalActiveVoxelBoundingBox, 
+    /// which visits the individual active voxels, and hence
+    /// evalLeafBoundingBox produces a less tight, i.e. approximate, bbox.
     /// @return @c false if the bounding box is empty (in which case
     /// the bbox is set to its default value).
     virtual bool evalLeafBoundingBox(CoordBBox& bbox) const = 0;
+    
     /// @brief Return in @a dim the dimensions of the axis-aligned bounding box
     /// of all leaf nodes.
     /// @return @c false if the bounding box is empty.
@@ -97,10 +102,13 @@ public:
 
     /// @brief Return in @a bbox the axis-aligned bounding box of all
     /// active voxels and tiles.
-    /// This is a tighter bounding box than the leaf node bounding box.
+    /// @details This method produces a more accurate, i.e. tighter,
+    /// bounding box than evalLeafBoundingBox which is approximate but
+    /// faster.
     /// @return @c false if the bounding box is empty (in which case
     /// the bbox is set to its default value).
     virtual bool evalActiveVoxelBoundingBox(CoordBBox& bbox) const = 0;
+    
     /// @brief Return in @a dim the dimensions of the axis-aligned bounding box of all
     /// active voxels.  This is a tighter bounding box than the leaf node bounding box.
     /// @return @c false if the bounding box is empty.
@@ -1891,31 +1899,25 @@ template<typename RootNodeType>
 inline bool
 Tree<RootNodeType>::evalLeafBoundingBox(CoordBBox& bbox) const
 {
-    if (this->empty()) {
-        bbox = CoordBBox(); // return default bbox
-        return false;// empty
-    }
+    bbox.reset(); // default invalid bbox
+    
+    if (this->empty()) return false;  // empty
 
-    bbox.min() =  Coord::max();
-    bbox.max() = -Coord::max();
+    mRoot.evalActiveBoundingBox(bbox, false);
 
-    Coord ijk;
-    for (LeafCIter bIter(*this); bIter; ++bIter) {
-        bIter->getOrigin(ijk);
-        bbox.expand(ijk);
-    }
-    bbox.max() += Coord(Int32(LeafNodeType::dim()-1));
-    return true; // not empty
+    return true;// not empty
 }
 
 template<typename RootNodeType>
 inline bool
 Tree<RootNodeType>::evalActiveVoxelBoundingBox(CoordBBox& bbox) const
 {
-    bbox = CoordBBox(); // default invalid bbox
+    
+    bbox.reset(); // default invalid bbox
+    
     if (this->empty()) return false;  // empty
 
-    mRoot.evalActiveVoxelBoundingBox(bbox);
+    mRoot.evalActiveBoundingBox(bbox, true);
 
     return true;// not empty
 }

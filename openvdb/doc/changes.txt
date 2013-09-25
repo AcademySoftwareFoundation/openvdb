@@ -9,6 +9,9 @@
 - Added a @vdblink::tools::LevelSetRayIntersector
   level set ray intersector@endlink tool for efficient, hierarchical
   intersection of rays with level sets.
+- Added a @vdblink::tools::VolumeRayIntersector
+  volume ray intersector@endlink tool for efficient, hierarchical
+  intersection of rays with generic (e.g. density) volumes.
 - Added a @vdblink::math::Ray Ray@endlink class and a hierarchical
   @vdblink::math::DDA Digital Differential Analyzer@endlink for fast
   ray traversal.
@@ -20,6 +23,10 @@
 - Added a simple, command-line renderer (currently for level sets only.)
 - Implemented a new meshing scheme that produces topologically robust
   two-manifold meshes and is twice as fast as the previous scheme.
+- Improved performance of @vdblink::tree::Tree::evalLeafBoundingBox
+  Tree::evalLeafBoundingBox@endlink by 30x and
+  @vdblink::tree::Tree::evalActiveVoxelBoundingBox 
+  Tree::evalActiveVoxelBoundingBox@endlink by 2x.
 - Added a tool (and a Houdini SOP) that fills a volume with
   adaptively-sized overlapping or non-overlapping spheres.
 - Added a Houdini Ray SOP that can be used to perform geometry projections
@@ -41,6 +48,8 @@
   positioned at the origin.  The new behavior is consistent with
   @vdblink::math::CoordBBox CoordBBox@endlink.
   <I>[Thanks to Rick Hankins for suggesting this fix.]</I>
+- Added @vdblink::math::CoordBBox::reset() CoordBBox::reset()@endlink
+  to reset the bbox its initial value, i.e. an invalid bounding box.
 - Fixed a bug in the default @vdblink::math::ScaleMap ScaleMap@endlink
   constructor that left some data used in the inverse uninitialized.
 - Added @vdblink::math::MapBase::applyJT MapBase::applyJT@endlink, which

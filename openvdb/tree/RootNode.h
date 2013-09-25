@@ -390,8 +390,12 @@ public:
     Index64 memUsage() const;
 
     /// @brief Expand the specified bbox so it includes the active tiles of
-    /// this root node as well as all the active values in its child nodes.
-    void evalActiveVoxelBoundingBox(CoordBBox& bbox) const;
+    /// this root node as well as all the active values in its child
+    /// nodes. If visitVoxels is false LeafNodes will be approximated
+    /// as dense, i.e. with all voxels active. Else the individual
+    /// active voxels are visited to produce a tight bbox.
+    void evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels = true) const;
+    OPENVDB_DEPRECATED void evalActiveVoxelBoundingBox(CoordBBox& bbox) const;
 
     /// Return the bounding box of this RootNode, i.e., an infinite bounding box.
     static CoordBBox getNodeBoundingBox() { return CoordBBox::inf(); }
@@ -1210,6 +1214,18 @@ RootNode<ChildT>::evalActiveVoxelBoundingBox(CoordBBox& bbox) const
     }
 }
 
+template<typename ChildT>
+inline void
+RootNode<ChildT>::evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels) const
+{
+    for (MapCIter iter=mTable.begin(); iter!=mTable.end(); ++iter) {
+        if (const ChildT *child = iter->second.child) {
+            child->evalActiveBoundingBox(bbox, visitVoxels);
+        } else if (isTileOn(iter)) {
+            bbox.expand(iter->first, ChildT::DIM);
+        }
+    }
+}
 
 template<typename ChildT>
 inline void

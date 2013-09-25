@@ -237,6 +237,24 @@ TestCoord::testCoordBBox()
         }
     }
 
+    {//reset
+        openvdb::CoordBBox b;
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord::max(), b.min());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord::min(), b.max());
+        CPPUNIT_ASSERT(b.empty());
+
+        const openvdb::Coord min(-1,-2,30), max(20,30,55);
+        b.reset(min, max);
+        CPPUNIT_ASSERT_EQUAL(min, b.min());
+        CPPUNIT_ASSERT_EQUAL(max, b.max());
+        CPPUNIT_ASSERT(!b.empty());
+
+        b.reset();
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord::max(), b.min());
+        CPPUNIT_ASSERT_EQUAL(openvdb::Coord::min(), b.max());
+        CPPUNIT_ASSERT(b.empty());
+    }
+
 }
 
 // Copyright (c) 2012-2013 DreamWorks Animation LLC

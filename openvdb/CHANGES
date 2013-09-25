@@ -4,6 +4,8 @@ OpenVDB Version History
 Version 2.0.0 - In development
     - Added a level set ray intersector tool for efficient, hierarchical
       intersection of rays with level sets.
+    - Added a volume ray intersector tool for efficient, hierarchical
+      intersection of rays with generic (e.g. density) volumes.
     - Added a Ray class and a hierarchical Digital Differential Analyzer
       for fast ray traversal.
     - Added a fully multithreaded level set ray tracer and camera classes 
@@ -11,6 +13,8 @@ Version 2.0.0 - In development
     - Added a simple, command-line renderer (currently for level sets only.)
     - Implemented a new meshing scheme that produces topologically robust
       two-manifold meshes and is twice as fast as the previous scheme.
+    - Improved performance of Tree::evalLeafBoundingBox by 30x and
+      Tree::evalActiveVoxelBoundingBox by 2x.
     - Added a tool (and a Houdini SOP) that fills a volume with
       adaptively-sized overlapping or non-overlapping spheres.
     - Added a Houdini Ray SOP that can be used to perform geometry projections
@@ -30,6 +34,8 @@ Version 2.0.0 - In development
       box rather than an empty bounding box positioned at the origin.
       The new behavior is consistent with math::CoordBBox.
       [Thanks to Rick Hankins for suggesting this fix.]
+    - Added CoordBBox::reset() to reset the bbox its initial value, i.e. 
+      an invalid bounding box.
     - Fixed a bug in the default ScaleMap constructor that left some data
       used in the inverse uninitialized.
     - Added MapBase::applyJT(), which applies the Jacobian transpose to
