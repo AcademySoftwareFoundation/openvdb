@@ -129,23 +129,30 @@ TestPrePostAPI::testMat4Rotate()
     rx.setToRotation(Vec3d(1,0,0), angle1);
     ry.setToRotation(Vec3d(0,1,0), angle2);
     rz.setToRotation(Vec3d(0,0,1), angle3);
-
-    const Mat4d preResult = rz*ry*rx;
-    const Mat4d postResult = rx*ry*rz;
     
-    Mat4d mpre = Mat4d::identity();
+    Mat4d shear = Mat4d::identity();
+    shear.setToShear(X_AXIS, Z_AXIS, 2.0);
+    shear.preShear(Y_AXIS, X_AXIS, 3.0);
+    shear.preTranslate(Vec3d(2,4,1));
+    
+    const Mat4d preResult = rz*ry*rx*shear;
+    Mat4d mpre = shear;
     mpre.preRotate(X_AXIS, angle1);
     mpre.preRotate(Y_AXIS, angle2);
     mpre.preRotate(Z_AXIS, angle3);
 
     CPPUNIT_ASSERT( mpre.eq(preResult, TOL) );
-
-    Mat4d mpost = Mat4d::identity();
+    
+    const Mat4d postResult = shear*rx*ry*rz;
+    Mat4d mpost = shear;
     mpost.postRotate(X_AXIS, angle1);
     mpost.postRotate(Y_AXIS, angle2);
     mpost.postRotate(Z_AXIS, angle3);
 
     CPPUNIT_ASSERT( mpost.eq(postResult, TOL) );
+    
+    CPPUNIT_ASSERT( !mpost.eq(mpre, TOL));
+
 }
 
 
