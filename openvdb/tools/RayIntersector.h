@@ -33,33 +33,28 @@
 /// @author Ken Museth
 ///
 /// @brief Accelerated intersection of a ray with a narrow-band level
-/// set or a generic (e.g. FOG) volume.
+/// set or a generic (e.g. density) volume. This will of course be
+/// useful for respectively surface and volume rendering.
 ///
-/// @details This file defines three classes that together perform accelerated
-/// intersection of a ray with a narrow-band level set.  The main class is
-/// LevelSetRayIntersector, which is templated on the LinearSearchImpl class
-/// and calls instances of the LevelSetHDDA class.  The reason to split ray intersection
-/// into three classes is twofold. First LevelSetRayIntersector defined the public 
-/// API for client code and LinearSearchImpl defines the algorithm used for the 
-/// ray-level-set intersection. In other words this design will allow
+/// @details This file defines two main classes,
+/// LevelSetRayIntersector and VolumeRayIntersector, as well as the
+/// three support classes LevelSetHDDA, VolumeHDDA and LinearSearchImpl.
+/// The LevelSetRayIntersector is templated on the LinearSearchImpl class
+/// and calls instances of the LevelSetHDDA class. The reason to split
+/// level set ray intersection into three classes is twofold. First
+/// LevelSetRayIntersector defines the public API for client code and
+/// LinearSearchImpl defines the actual algorithm used for the 
+/// ray level-set intersection. In other words this design will allow
 /// for the public API to be fixed while the intersection algorithm
-/// can change without resolving to (slow) virtual methods. Second, LevelSetHDDA, 
-/// which implements a hierarchical Differential Digital Analyzer,
-/// relies on partial template specialization, so it has to be a standalone class
-/// (as opposed to a member class of LevelSetRayIntersector).
-///
-/// @warning Make sure to assign a local copy of the
-/// LevelSetRayIntersector to each computational thread. This is
-/// important becauce it contains an instance of the LinearSearchImpl
-/// which in turn is not thread-safe (due to a ValueAccessor among
-/// other things). However copying is very efficient. 
-///
-/// @see tools/RayTracer.h for examples of intended usage.
-///
-/// @todo Add TrilinearSearchImpl, as an alternative to LinearSearchImpl,
-/// that performs analytical 3D trilinear intersection tests, i.e., solves
-/// cubic equations. This is slower but also more accurate than the 1D
-/// linear interpolation in LinearSearchImpl.
+/// can change without resolving to (slow) virtual methods. Second,
+/// LevelSetHDDA, which implements a hierarchical Differential Digital
+/// Analyzer, relies on partial template specialization, so it has to
+/// be a standalone class (as opposed to a member class of
+/// LevelSetRayIntersector). The VolumeRayIntersector is conceptually
+/// much simpler then the LevelSetRayIntersector, and hence it only
+/// depends on VolumeHDDA that implements the hierarchical
+/// Differential Digital Analyzer.
+
 
 #ifndef OPENVDB_TOOLS_RAYINTERSECTOR_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_RAYINTERSECTOR_HAS_BEEN_INCLUDED
@@ -98,12 +93,21 @@ class LinearSearchImpl;
 
 /// @brief This class provides the public API for intersecting a ray
 /// with a narrow-band level set.
+///
 /// @details It wraps an SearchImplT with a simple public API and
 /// performs the actual hierarchical tree node and voxel traversal.
+///
 /// @warning Use the (default) copy-constructor to make sure each
 /// computational thread has their own instance of this class. This is
 /// important since the SearchImplT contains a ValueAccessor that is
-/// not thread-safe. However copying is very efficient.     
+/// not thread-safe. However copying is very efficient. 
+///
+/// @see tools/RayTracer.h for examples of intended usage.
+///
+/// @todo Add TrilinearSearchImpl, as an alternative to LinearSearchImpl,
+/// that performs analytical 3D trilinear intersection tests, i.e., solves
+/// cubic equations. This is slower but also more accurate than the 1D
+/// linear interpolation in LinearSearchImpl.
 template<typename GridT,
          typename SearchImplT = LinearSearchImpl<GridT>,
          int NodeLevel = GridT::TreeType::RootNodeType::ChildNodeType::LEVEL,
@@ -200,30 +204,30 @@ private:
 
 
 /// @brief This class provides the public API for intersecting a ray
-/// with a generic volume.
-/// @details Internally it performs the actual hierarchical tree node
-/// and voxel traversal.
+/// with a generic (e.g. density) volume.
+/// @details Internally it performs the actual hierarchical tree node traversal.
 /// @warning Use the (default) copy-constructor to make sure each
 /// computational thread has their own instance of this class. This is
-/// important since it cintains a ValueAccessor that is
+/// important since it contains a ValueAccessor that is
 /// not thread-safe and a CoordBBox of the active voxels that should
 /// not be re-computed for each thread. However copying is very efficient.
 /// @par Example:
 /// @code
 /// // Create an instance for the master thread
-/// VolumeIntersector inter(grid);
+/// VolumeRayIntersector inter(grid);
 /// // For each additional thread use the copy contructor. This
 /// // amortizes the overhead of computing the bbox of the active voxels!
-/// VolumeIntersector inter2(inter);
+/// VolumeRayIntersector inter2(inter);
 /// // Before each ray-traversal set the index ray.      
 /// iter.setIndexRay(ray);
 /// // or world ray
-///  iter.setWorldRay(ray);    
-/// // Not you can begin the ray-marching using iterative call to
-/// double t0=0, t1=0;    
-/// if ( inter.march(t0, t1) > 0) {
-///   //perform line-integration between t0 and t1 along the INDEX ray.
-/// }
+/// iter.setWorldRay(ray);    
+/// // Now you can begin the ray-marching using consecutive calls to VolumeRayIntersector::march
+/// double t0=0, t1=0;// note the entry and exit times are with respect to the INDEX ray    
+/// while ( int n = inter.march(t0, t1) ) {// perform line-integration between t0 and t1
+///   if (n == 1) {//hit a tile so the value between t0 and t1 is constant
+///   } else {//n == 2 so we hit a leaf node and the value between t0 and t1 is unknown
+/// }}
 /// @endcode
 template<typename GridT,
          int NodeLevel = GridT::TreeType::RootNodeType::ChildNodeType::LEVEL,
@@ -238,23 +242,27 @@ public:
     BOOST_STATIC_ASSERT( NodeLevel >= 0 && NodeLevel < int(TreeT::DEPTH)-1);
 
     /// @brief Constructor
-    /// @param grid level set grid to intersect rays against
+    /// @param grid Generic grid to intersect rays against.
+    /// @warning In the near future we will add support for grids with frustrum transforms. 
     VolumeRayIntersector(const GridT& grid): mGrid(&grid), mAccessor(grid.tree())
     {
         if (!grid.hasUniformVoxels() ) {
             OPENVDB_THROW(RuntimeError,
                           "VolumeRayIntersector only supports uniform voxels!");
         }
-        if (!grid.tree().evalActiveVoxelBoundingBox(mBBox)) {
-            OPENVDB_THROW(RuntimeError, "VolumeRayIntersector does not supports empty grids");
+        if ( grid.empty() ) {
+            OPENVDB_THROW(RuntimeError, "LinearSearchImpl does not supports empty grids");
         }
+        grid.tree().root().evalActiveBoundingBox(mBBox, /*visit individual voxels*/false); 
+       
         mBBox.max().offset(1);//padding so the bbox of a node becomes (origin,origin + node_dim)
     }
     
-    /// @brief Return @c false the ray misses the bbox of the grid.
+    /// @brief Return @c false if the index ray misses the bbox of the grid.
     /// @param iRay Ray represented in index space.
-    /// @warning Call this method before the ray traversal starts and
-    /// us the return value to decide if further marching is required.
+    /// @warning Call this method (or setWorldRay) before the ray
+    /// traversal starts and use the return value to decide if further
+    /// marching is required. 
     inline bool setIndexRay(const RayT& iRay)
     {
         mRay = iRay;
@@ -263,11 +271,20 @@ public:
         return hit;
     }
 
-    /// @brief Return a ray in index space given a ray in world space.
+    /// @brief Return @c false if the world ray misses the bbox of the grid.
+    /// @param wRay Ray represented in world space.
+    /// @warning Call this method (or setIndexRay) before the ray
+    /// traversal starts and use the return value to decide if further
+    /// marching is required. 
+    /// @details Since hit times are computed with repect to the ray
+    /// represented in index space of the current grid, it is
+    /// recommended that either the client code uses getIndexPos to
+    /// compute index position from hit times or alternatively keeps
+    /// an instance of the index ray and instead uses setIndexRay to
+    /// initialize the ray. 
     inline bool setWorldRay(const RayT& wRay)
     {
-        const RayT iRay = wRay.applyInverseMap(*(mGrid->transform().baseMap()));
-        return this->setIndexRay(iRay);
+        return this->setIndexRay(wRay.worldToIndex(*mGrid));
     }
 
     /// @brief Return 0 if not hit was detected. A return value of 1
@@ -277,6 +294,8 @@ public:
     /// INDEX ray!
     /// @param t0 If the return value > 0 this is the time of the first hit.
     /// @param t1 If the return value > 0 this is the time of the second hit.
+    /// @warning t0 and t1 are computed with repect to the ray represented in
+    /// index space of the current grid, not world space!
     inline int march(Real& t0, Real& t1)
     {
         const int n = mRay.test() ? VolumeHDDA<TreeT, NodeLevel>::test(*this) : 0;
@@ -287,6 +306,14 @@ public:
         mRay.setTimes(mRay.t1(), mTmax);
         return n;
     }
+
+    /// @brief Return the floating-point index position along the
+    /// current index ray at the specified time.
+    inline Vec3R getIndexPos(Real time) const { return mRay(time); }
+
+    /// @brief Return the floating-point world position along the
+    /// current index ray at the specified time.
+    inline Vec3R getWorldPos(Real time) const { return mGrid->indexToWorld(mRay(time)); }
     
 private:
     
@@ -325,7 +352,7 @@ private:
 ///
 /// @note Since this class is used internally in
 /// LevelSetRayIntersector (define above) and LevelSetHDDA (defined below) 
-/// client code will never interact directly with its API. This also
+/// client code should never interact directly with its API. This also
 /// explains why we are not concerned with the fact that several of
 /// its methods are unsafe to call unless zero-crossings were
 /// already detected. 
@@ -353,9 +380,10 @@ public:
     LinearSearchImpl(const GridT& grid)
         : mStencil(grid), mThreshold(2*grid.voxelSize()[0])
       {
-          if (!grid.tree().evalActiveVoxelBoundingBox(mBBox)) {
+          if ( grid.empty() ) {
               OPENVDB_THROW(RuntimeError, "LinearSearchImpl does not supports empty grids");
           }
+          grid.tree().root().evalActiveBoundingBox(mBBox, /*visit individual voxels*/false);
       }
 
     /// @brief Return @c false the ray misses the bbox of the grid.
@@ -372,7 +400,7 @@ public:
     /// @warning Call this method before the ray traversal starts.
     inline bool setWorldRay(const RayT& wRay)
     {
-        mRay = wRay.applyInverseMap(*(mStencil.grid().transform().baseMap()));
+        mRay = wRay.worldToIndex(mStencil.grid());
         return mRay.clip(mBBox);//did it hit the bbox
     }
     

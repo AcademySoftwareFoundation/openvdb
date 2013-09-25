@@ -149,6 +149,22 @@ public:
         const RealT length = dir.length();
         return Ray(eye, dir/length, length*mT0, length*mT1);
     }
+
+    /// @brief Return a new ray in world space, assuming the existing
+    /// ray is represented in the index space of the specified grid.
+    template<typename GridType>
+    inline Ray indexToWorld(const GridType& grid) const
+    {
+        return this->applyMap(*(grid.transform().baseMap()));
+    }
+
+    /// @brief Return a new ray in the index space of the specified
+    /// grid, assuming the existing ray is represented in world space. 
+    template<typename GridType>
+    inline Ray worldToIndex(const GridType& grid) const
+    {
+        return this->applyInverseMap(*(grid.transform().baseMap()));
+    }
     
     /// @brief Return true if this ray intersects the specified sphere.
     /// @param center The center of the sphere in the same space as this ray.

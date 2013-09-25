@@ -168,10 +168,12 @@ public:
 
     /// Return the memory in bytes occupied by this node.
     Index64 memUsage() const;
-
-    /// Expand the specified bbox so it includes the active voxels of
-    /// this leaf node.
-    void evalActiveVoxelBoundingBox(CoordBBox& bbox) const;
+    
+    /// Expand the given bounding box so that it includes this leaf node's active voxels.
+    /// If visitVoxels is false this LeafNode will be approximated as dense, i.e. with all 
+    /// voxels active. Else the individual active voxels are visited to produce a tight bbox.
+    void evalActiveBoundingBox(CoordBBox&, bool visitVoxels = true) const;
+    OPENVDB_DEPRECATED void evalActiveVoxelBoundingBox(CoordBBox& bbox) const;
 
     /// @brief Return the bounding box of this node, i.e., the full index space
     /// spanned by this leaf node.
@@ -862,6 +864,22 @@ LeafNode<bool, Log2Dim>::evalActiveVoxelBoundingBox(CoordBBox& bbox) const
         bbox.expand(this_bbox);
     } else {
         for (ValueOnCIter iter=this->cbeginValueOn(); iter; ++iter) bbox.expand(iter.getCoord());
+    }
+}
+
+template<Index Log2Dim>
+inline void
+LeafNode<bool, Log2Dim>::evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels) const
+{
+    CoordBBox this_bbox = this->getNodeBoundingBox();
+    if (bbox.isInside(this_bbox)) return;//this LeafNode is already enclosed in the bbox
+    if (ValueOnCIter iter = this->cbeginValueOn()) {//any active values?
+        if (visitVoxels) {//use voxel granularity?
+            this_bbox.reset();
+            for(; iter; ++iter) this_bbox.expand(this->offsetToLocalCoord(iter.pos()));
+            this_bbox.translate(this->origin());
+        }
+        bbox.expand(this_bbox);
     }
 }
 

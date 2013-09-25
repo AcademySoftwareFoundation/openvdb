@@ -260,6 +260,7 @@ public:
     Coord& min() { return mMin; }
     Coord& max() { return mMax; }
 
+    void reset() { mMin = Coord::max(); mMax = Coord::min(); }
     void reset(const Coord& min, const Coord& max) { mMin = min; mMax = max; }
     void resetToCube(const Coord& min, ValueType dim) { mMin = min; mMax = min.offsetBy(dim - 1); }
 

@@ -778,7 +778,9 @@ fillWithSpheres(
     Vec3s pos;
     Vec4s sphere;
     minRadius *= transform.voxelSize()[0];
-    for (int s = 0; s < maxSphereCount; ++s) {
+    for (size_t s = 0, S = std::min(size_t(maxSphereCount), instancePoints.size()); s < S; ++s) {
+
+        if (interrupter && interrupter->wasInterrupted()) return;
 
         if (s != 0 && maxRadius < minRadius) break;
 

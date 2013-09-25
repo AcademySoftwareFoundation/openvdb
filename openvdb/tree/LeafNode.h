@@ -220,7 +220,10 @@ public:
     Index64 memUsage() const;
 
     /// Expand the given bounding box so that it includes this leaf node's active voxels.
-    void evalActiveVoxelBoundingBox(CoordBBox&) const;
+    /// If visitVoxels is false this LeafNode will be approximated as dense, i.e. with all 
+    /// voxels active. Else the individual active voxels are visited to produce a tight bbox.
+    void evalActiveBoundingBox(CoordBBox&, bool visitVoxels = true) const;
+    OPENVDB_DEPRECATED void evalActiveVoxelBoundingBox(CoordBBox&) const;
 
     /// @brief Return the bounding box of this node, i.e., the full index space
     /// spanned by this leaf node.
@@ -242,7 +245,8 @@ public:
     static Index coordToOffset(const Coord& xyz);
     /// @brief Return the local coordinates for a linear table offset,
     /// where offset 0 has coordinates (0, 0, 0).
-    static void offsetToLocalCoord(Index n, Coord& xyz);
+    static Coord offsetToLocalCoord(Index n);
+    OPENVDB_DEPRECATED static void offsetToLocalCoord(Index n, Coord& xyz);
     /// Return the global coordinates for a linear table offset.
     Coord offsetToGlobalCoord(Index n) const;
 
@@ -964,7 +968,20 @@ LeafNode<T, Log2Dim>::coordToOffset(const Coord& xyz)
         +   (xyz[2]&DIM-1u);
 }
 
+template<typename T, Index Log2Dim>
+inline Coord
+LeafNode<T, Log2Dim>::offsetToLocalCoord(Index n)
+{
+    assert(n<(1<< 3*Log2Dim));
+    Coord xyz;
+    xyz.setX(n >> 2*Log2Dim);
+    n &= ((1<<2*Log2Dim)-1);
+    xyz.setY(n >> Log2Dim);
+    xyz.setZ(n & ((1<<Log2Dim)-1));
+    return xyz;
+}
 
+//deprecated
 template<typename T, Index Log2Dim>
 inline void
 LeafNode<T, Log2Dim>::offsetToLocalCoord(Index n, Coord &xyz)
@@ -981,9 +998,7 @@ template<typename T, Index Log2Dim>
 inline Coord
 LeafNode<T, Log2Dim>::offsetToGlobalCoord(Index n) const
 {
-    Coord local;
-    this->offsetToLocalCoord(n, local);
-    return Coord(local + this->origin());
+    return (this->offsetToLocalCoord(n) + this->origin());
 }
 
 
@@ -1243,13 +1258,29 @@ template<typename T, Index Log2Dim>
 inline void
 LeafNode<T, Log2Dim>::evalActiveVoxelBoundingBox(CoordBBox& bbox) const
 {
-    const CoordBBox this_bbox = this->getNodeBoundingBox();
-    if (bbox.isInside(this_bbox)) {
-        // nothing to do
-    } else if (this->isDense()) {
+    CoordBBox this_bbox = this->getNodeBoundingBox();
+    if (bbox.isInside(this_bbox)) return;//this LeafNode is already enclosed in the bbox
+    if (ValueOnCIter iter = this->cbeginValueOn()) {//any active values?
+        this_bbox.reset();
+        for(; iter; ++iter) this_bbox.expand(this->offsetToLocalCoord(iter.pos()));
+        this_bbox.translate(this->origin());
         bbox.expand(this_bbox);
-    } else {
-        for (ValueOnCIter iter=this->cbeginValueOn(); iter; ++iter) bbox.expand(iter.getCoord());
+    }
+}
+
+template<typename T, Index Log2Dim>
+inline void
+LeafNode<T, Log2Dim>::evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels) const
+{
+    CoordBBox this_bbox = this->getNodeBoundingBox();
+    if (bbox.isInside(this_bbox)) return;//this LeafNode is already enclosed in the bbox
+    if (ValueOnCIter iter = this->cbeginValueOn()) {//any active values?
+        if (visitVoxels) {//use voxel granularity?
+            this_bbox.reset();
+            for(; iter; ++iter) this_bbox.expand(this->offsetToLocalCoord(iter.pos()));
+            this_bbox.translate(this->origin());
+        }
+        bbox.expand(this_bbox);
     }
 }
 

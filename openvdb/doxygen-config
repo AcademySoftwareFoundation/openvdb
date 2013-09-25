@@ -23,10 +23,10 @@ PROJECT_NAME           = OpenVDB
 # This could be handy for archiving the generated documentation or 
 # if some version control system is used.
 
-PROJECT_NUMBER         = 2.0.0b2
+PROJECT_NUMBER         = 2.0.0b3
 
-ALIASES += vdbnamespace="openvdb::v2_0_0b2"
-PREDEFINED = OPENVDB_VERSION_NAME=v2_0_0b2
+ALIASES += vdbnamespace="openvdb::v2_0_0b3"
+PREDEFINED = OPENVDB_VERSION_NAME=v2_0_0b3
 
 PREDEFINED += __declspec(x):= __attribute__(x):=
 #EXPAND_AS_DEFINED = \
