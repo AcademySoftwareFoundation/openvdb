@@ -69,8 +69,10 @@ struct RenderOpts
     std::string shader;
     std::string camera;
     float aperture, focal, frame, znear, zfar;
-    openvdb::Vec3R rotation;
-    openvdb::Vec3R translation;
+    openvdb::Vec3R rotate;
+    openvdb::Vec3R translate;
+    openvdb::Vec3R target;
+    bool lookat;
     size_t samples;
     size_t width, height;
     std::string compression;
@@ -85,11 +87,13 @@ struct RenderOpts
         frame(1.0),
         znear(1.0e-3),
         zfar(std::numeric_limits<double>::max()),
-        rotation(0.0),
-        translation(0.0),
+        rotate(0.0),
+        translate(0.0),
+        target(0.0),
+        lookat(false),
         samples(1),
-        width(2048),
-        height(1024),
+        width(1920),
+        height(1080),
         compression("zip"),
         threads(0),
         verbose(false)
@@ -117,18 +121,23 @@ struct RenderOpts
     std::ostream& put(std::ostream& os) const
     {
         os << "-aperture " << aperture
-            << " -camera " << camera
-            << " -compression " << compression
-            << " -cpus " << threads
-            << " -far " << zfar
-            << " -focal " << focal
-            << " -frame " << frame
-            << " -near " << znear
-            << " -rotate " << rotation[0] << "," << rotation[1] << "," << rotation[2]
-            << " -res " << width << "x" << height
-            << " -shader " << shader
-            << " -samples " << samples
-            << " -translate " << translation[0] << "," << translation[1] << "," << translation[2];
+           << " -camera " << camera
+           << " -compression " << compression
+           << " -cpus " << threads
+           << " -far " << zfar
+           << " -focal " << focal
+           << " -frame " << frame;
+        if (lookat) {
+            os << " -lookat " << target[0] << "," << target[1] << "," << target[2];
+        }
+        os << " -near " << znear
+           << " -res " << width << "x" << height;
+        if (!lookat) {
+            os << " -rotate " << rotate[0] << "," << rotate[1] << "," << rotate[2];
+        }
+        os << " -shader " << shader
+           << " -samples " << samples
+           << " -translate " << translate[0] << "," << translate[1] << "," << translate[2];
         if (verbose) os << " -v";
         return os;
     }
@@ -144,24 +153,27 @@ usage(int exitStatus = EXIT_FAILURE)
     const float fov = openvdb::tools::PerspectiveCamera::focalLengthToFieldOfView(
         opts.focal, opts.aperture);
 
-    std::cerr <<
+    std::ostringstream ostr;
+    ostr << std::setprecision(3) <<
 "Usage: " << gProgName << " in.vdb out.{exr,ppm} [options]\n" <<
 "Which: ray-traces OpenVDB volumes\n" <<
 "Options:\n" <<
-"    -aperture F       aperture of perspective camera (default: " << opts.aperture << ")\n" <<
+"    -aperture F       perspective camera aperture (default: " << opts.aperture << ")\n" <<
 "    -camera S         camera type; either \"persp[ective]\" or \"ortho[graphic]\"\n" <<
 "                      (default: " << opts.camera << ")\n" <<
 "    -compression S    EXR compression scheme; either \"none\" (uncompressed),\n" <<
 "                      \"rle\" or \"zip\" (default: " << opts.compression << ")\n" <<
 "    -cpus N           number of rendering threads, or 1 to disable threading,\n" <<
 "                      or 0 to use all available CPUs (default: " << opts.threads << ")\n" <<
-"    -far F            far plane depth of camera (default: " << opts.zfar << ")\n" <<
-"    -focal F          focal length of perspective camera (default: " << opts.focal << ")\n" <<
-"    -fov F            field of view of perspective camera (default: " << fov << ")\n" <<
-"    -frame F          frame width in world units of orthographic camera (default: " << opts.frame << ")\n" <<
+"    -far F            camera far plane depth (default: " << opts.zfar << ")\n" <<
+"    -focal F          perspective camera focal length (default: " << opts.focal << ")\n" <<
+"    -fov F            perspective camera field of view (default: " << fov << ")\n" <<
+"    -frame F          ortho camera frame width in world units (default: "
+    << opts.frame << ")\n" <<
+"    -lookat X,Y,Z     rotate the camera to point to (X, Y, Z)\n" <<
 "    -name S           name of the grid to be rendered (default: render\n" <<
 "                      the first floating-point grid found in in.vdb)\n" <<
-"    -near F           near plane depth of camera (default: " << opts.znear << ")\n" <<
+"    -near F           camera near plane depth (default: " << opts.znear << ")\n" <<
 "    -res WxH          image width and height (default: "
     << opts.width << "x" << opts.height << ")\n" <<
 "    -r X,Y,Z                                    \n" <<
@@ -177,11 +189,12 @@ usage(int exitStatus = EXIT_FAILURE)
 "\n" <<
 "Example:\n" <<
 "    " << gProgName << " crawler.vdb crawler.exr -shader diffuse -res 1920x1080 \\\n" <<
-"        -focal 50 -rotate -30,0,0 -translate 0,210.5,400 -compression rle -v\n" <<
+"        -focal 50 -translate 0,210.5,400 -compression rle -v\n" <<
 "\n" <<
 "This is not (and is not intended to be) a production-quality renderer,\n" <<
 "and it is currently limited to rendering level set volumes.\n";
 
+    std::cerr << ostr.str();
     exit(exitStatus);
 }
 
@@ -195,7 +208,7 @@ saveEXR(const std::string& fname, const openvdb::tools::Film& film, const Render
     if (!boost::iends_with(filename, ".exr")) filename += ".exr";
 
     if (opts.verbose) {
-        std::cout << gProgName << ": writing \"" << filename << "\"..." << std::flush;
+        std::cout << gProgName << ": writing " << filename << "..." << std::endl;
     }
 
     const tbb::tick_count start = tbb::tick_count::now();
@@ -235,8 +248,10 @@ saveEXR(const std::string& fname, const openvdb::tools::Film& film, const Render
     imgFile.writePixels(film.height());
 
     if (opts.verbose) {
-        std::cout << "completed in " << (tbb::tick_count::now() - start).seconds()
-                  << " sec" << std::endl;
+        std::ostringstream ostr;
+        ostr << gProgName << ": ...completed in " << std::setprecision(3)
+            << (tbb::tick_count::now() - start).seconds() << " sec";
+        std::cout << ostr.str() << std::endl;
     }
 }
 
@@ -256,15 +271,16 @@ render(const GridType& grid, const std::string& imgFilename, const RenderOpts& o
 
     boost::scoped_ptr<tools::BaseCamera> camera;
     if (boost::starts_with(opts.camera, "persp")) {
-        camera.reset(new tools::PerspectiveCamera(film, opts.rotation, opts.translation,
+        camera.reset(new tools::PerspectiveCamera(film, opts.rotate, opts.translate,
             opts.focal, opts.aperture, opts.znear, opts.zfar));
     } else if (boost::starts_with(opts.camera, "ortho")) {
-        camera.reset(new tools::OrthographicCamera(film, opts.rotation, opts.translation,
+        camera.reset(new tools::OrthographicCamera(film, opts.rotate, opts.translate,
             opts.frame, opts.znear, opts.zfar));
     } else {
         OPENVDB_THROW(ValueError,
             "expected perspective or orthographic camera, got \"" << opts.camera << "\"");
     }
+    if (opts.lookat) camera->lookAt(opts.target);
 
     boost::scoped_ptr<tools::BaseShader> shader;
     if (opts.shader == "diffuse") {
@@ -279,15 +295,17 @@ render(const GridType& grid, const std::string& imgFilename, const RenderOpts& o
     }
 
     if (opts.verbose) {
-        std::cout << gProgName << ": ray-tracing..." << std::flush;
+        std::cout << gProgName << ": ray-tracing..." << std::endl;
     }
     const tbb::tick_count start = tbb::tick_count::now();
 
     tools::rayTrace(grid, *shader, *camera, opts.samples, 0, (opts.threads != 1));
 
     if (opts.verbose) {
-        std::cout << "completed in " << (tbb::tick_count::now() - start).seconds()
-                  << " sec" << std::endl;
+        std::ostringstream ostr;
+        ostr << gProgName << ": ...completed in " << std::setprecision(3)
+            << (tbb::tick_count::now() - start).seconds() << " sec";
+        std::cout << ostr.str() << std::endl;
     }
 
     if (boost::iends_with(imgFilename, ".ppm")) {
@@ -371,7 +389,7 @@ main(int argc, char *argv[])
     std::string vdbFilename, imgFilename, gridName;
     RenderOpts opts;
 
-    bool hasFocal = false, hasFov = false;
+    bool hasFocal = false, hasFov = false, hasRotate = false, hasLookAt = false;
     float fov = 0.0;
 
     OptParse parser(argc, argv);
@@ -404,6 +422,11 @@ main(int argc, char *argv[])
             } else if (parser.check(i, "-frame")) {
                 ++i;
                 opts.frame = atof(argv[i]);
+            } else if (parser.check(i, "-lookat")) {
+                ++i;
+                opts.lookat = true;
+                opts.target = strToVec3R(argv[i]);
+                hasLookAt = true;
             } else if (parser.check(i, "-name")) {
                 ++i;
                 gridName = argv[i];
@@ -412,7 +435,8 @@ main(int argc, char *argv[])
                 opts.znear = atof(argv[i]);
             } else if (parser.check(i, "-r") || parser.check(i, "-rotate")) {
                 ++i;
-                opts.rotation = strToVec3R(argv[i]);
+                opts.rotate = strToVec3R(argv[i]);
+                hasRotate = true;
             } else if (parser.check(i, "-res")) {
                 ++i;
                 strToSize(argv[i], opts.width, opts.height);
@@ -424,7 +448,7 @@ main(int argc, char *argv[])
                 opts.samples = size_t(std::max(0, atoi(argv[i])));
             } else if (parser.check(i, "-t") || parser.check(i, "-translate")) {
                 ++i;
-                opts.translation = strToVec3R(argv[i]);
+                opts.translate = strToVec3R(argv[i]);
             } else if (arg == "-v") {
                 opts.verbose = true;
             } else if (arg == "-h" || arg == "-help" || arg == "--help") {
@@ -452,6 +476,10 @@ main(int argc, char *argv[])
         opts.focal =
             openvdb::tools::PerspectiveCamera::fieldOfViewToFocalLength(fov, opts.aperture);
     }
+    if (hasLookAt && hasRotate) {
+        OPENVDB_LOG_FATAL("specify -lookat or -r[otate], but not both");
+        usage();
+    }
     {
         const std::string err = opts.validate();
         if (!err.empty()) {
@@ -459,8 +487,6 @@ main(int argc, char *argv[])
             usage();
         }
     }
-
-    if (opts.verbose) std::cout << opts << std::endl;
 
     try {
         tbb::task_scheduler_init schedulerInit(
@@ -470,9 +496,9 @@ main(int argc, char *argv[])
 
         const tbb::tick_count start = tbb::tick_count::now();
         if (opts.verbose) {
-            std::cout << gProgName << ": reading \"";
-            if (!gridName.empty()) std::cout << gridName << "\" from \"";
-            std::cout << vdbFilename << "\"..." << std::flush;
+            std::cout << gProgName << ": reading ";
+            if (!gridName.empty()) std::cout << gridName << " from ";
+            std::cout << vdbFilename << "..." << std::endl;
         }
 
         openvdb::FloatGrid::Ptr grid;
@@ -507,11 +533,23 @@ main(int argc, char *argv[])
         }
 
         if (opts.verbose) {
-            std::cout << "completed in " << (tbb::tick_count::now() - start).seconds()
-                      << " sec" << std::endl;
+            std::ostringstream ostr;
+            ostr << gProgName << ": ...completed in " << std::setprecision(3)
+                << (tbb::tick_count::now() - start).seconds() << " sec";
+            std::cout << ostr.str() << std::endl;
         }
 
         if (grid) {
+            if (!hasLookAt && !hasRotate) {
+                // If the user specified neither the camera rotation nor a target
+                // to look at, orient the camera to point to the center of the grid.
+                opts.target = grid->evalActiveVoxelBoundingBox().getCenter();
+                opts.target = grid->constTransform().indexToWorld(opts.target);
+                opts.lookat = true;
+            }
+
+            if (opts.verbose) std::cout << opts << std::endl;
+
             render<openvdb::FloatGrid>(*grid, imgFilename, opts);
         }
     } catch (std::exception& e) {

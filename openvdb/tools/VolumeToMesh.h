@@ -244,10 +244,6 @@ public:
     /// @param activePart Specific partition to mesh, 0 to @c partitions - 1.
     void partition(unsigned partitions = 1, unsigned activePart = 0);
 
-
-    boost::scoped_array<bool> markedPoints;
-    boost::scoped_array<unsigned> cases;
-
 private:
 
     PointList mPoints;
@@ -1063,109 +1059,142 @@ collectCornerValues(const AccessorT& acc, const Coord& ijk, std::vector<double>&
 }
 
 
-inline void
-computePoints(const std::vector<double>& values, unsigned char signs,
-    std::vector<Vec3d>& points, double iso)
+inline Vec3d
+computePoint(const std::vector<double>& values, unsigned char signs,
+    unsigned char edgeGroup, double iso)
 {
-    Vec3d avg;
+    Vec3d avg(0.0, 0.0, 0.0);
+    int samples = 0;
+
+    if (sEdgeGroupTable[signs][1] == edgeGroup) { // Edged: 0 - 1
+        avg[0] += evalRoot(values[0], values[1], iso);
+        ++samples;
+    }
+
+    if (sEdgeGroupTable[signs][2] == edgeGroup) { // Edged: 1 - 2
+        avg[0] += 1.0;
+        avg[2] += evalRoot(values[1], values[2], iso);
+        ++samples;
+    }
+
+    if (sEdgeGroupTable[signs][3] == edgeGroup) { // Edged: 3 - 2
+        avg[0] += evalRoot(values[3], values[2], iso);
+        avg[2] += 1.0;
+        ++samples;
+    }
+
+    if (sEdgeGroupTable[signs][4] == edgeGroup) { // Edged: 0 - 3
+        avg[2] += evalRoot(values[0], values[3], iso);
+        ++samples;
+    }
+
+    if (sEdgeGroupTable[signs][5] == edgeGroup) { // Edged: 4 - 5
+        avg[0] += evalRoot(values[4], values[5], iso);
+        avg[1] += 1.0;
+        ++samples;
+    }
+
+    if (sEdgeGroupTable[signs][6] == edgeGroup) { // Edged: 5 - 6
+        avg[0] += 1.0;
+        avg[1] += 1.0;
+        avg[2] += evalRoot(values[5], values[6], iso);
+        ++samples;
+    }
+
+    if (sEdgeGroupTable[signs][7] == edgeGroup) { // Edged: 7 - 6
+        avg[0] += evalRoot(values[7], values[6], iso);
+        avg[1] += 1.0;
+        avg[2] += 1.0;
+        ++samples;
+    }
+
+    if (sEdgeGroupTable[signs][8] == edgeGroup) { // Edged: 4 - 7
+        avg[1] += 1.0;
+        avg[2] += evalRoot(values[4], values[7], iso);
+        ++samples;
+    }
+
+    if (sEdgeGroupTable[signs][9] == edgeGroup) { // Edged: 0 - 4
+        avg[1] += evalRoot(values[0], values[4], iso);
+        ++samples;
+    }
+
+    if (sEdgeGroupTable[signs][10] == edgeGroup) { // Edged: 1 - 5
+        avg[0] += 1.0;
+        avg[1] += evalRoot(values[1], values[5], iso);
+        ++samples;
+    }
+
+    if (sEdgeGroupTable[signs][11] == edgeGroup) { // Edged: 2 - 6
+        avg[0] += 1.0;
+        avg[1] += evalRoot(values[2], values[6], iso);
+        avg[2] += 1.0;
+        ++samples;
+    }
+
+    if (sEdgeGroupTable[signs][12] == edgeGroup) { // Edged: 3 - 7
+        avg[1] += evalRoot(values[3], values[7], iso);
+        avg[2] += 1.0;
+        ++samples;
+    }
+
+    if (samples > 1) {
+        double w = 1.0 / double(samples);
+        avg[0] *= w;
+        avg[1] *= w;
+        avg[2] *= w;
+    }
+
+    return avg;
+}
+
+
+inline void
+computeCellPoints(std::vector<Vec3d>& points,
+    const std::vector<double>& values, unsigned char signs, double iso)
+{
     for (size_t n = 1, N = sEdgeGroupTable[signs][0] + 1; n < N; ++n) {
-
-        int samples = 0;
-        avg[0] = 0.0;
-        avg[1] = 0.0;
-        avg[2] = 0.0;
-
-        if (sEdgeGroupTable[signs][1] == n) { // Edged: 0 - 1
-            avg[0] += evalRoot(values[0], values[1], iso);
-            ++samples;
-        }
-
-        if (sEdgeGroupTable[signs][2] == n) { // Edged: 1 - 2
-            avg[0] += 1.0;
-            avg[2] += evalRoot(values[1], values[2], iso);
-            ++samples;
-        }
-
-        if (sEdgeGroupTable[signs][3] == n) { // Edged: 3 - 2
-            avg[0] += evalRoot(values[3], values[2], iso);
-            avg[2] += 1.0;
-            ++samples;
-        }
-
-        if (sEdgeGroupTable[signs][4] == n) { // Edged: 0 - 3
-            avg[2] += evalRoot(values[0], values[3], iso);
-            ++samples;
-        }
-
-        if (sEdgeGroupTable[signs][5] == n) { // Edged: 4 - 5
-            avg[0] += evalRoot(values[4], values[5], iso);
-            avg[1] += 1.0;
-            ++samples;
-        }
-
-        if (sEdgeGroupTable[signs][6] == n) { // Edged: 5 - 6
-            avg[0] += 1.0;
-            avg[1] += 1.0;
-            avg[2] += evalRoot(values[5], values[6], iso);
-            ++samples;
-        }
-
-        if (sEdgeGroupTable[signs][7] == n) { // Edged: 7 - 6
-            avg[0] += evalRoot(values[7], values[6], iso);
-            avg[1] += 1.0;
-            avg[2] += 1.0;
-            ++samples;
-        }
-
-        if (sEdgeGroupTable[signs][8] == n) { // Edged: 4 - 7
-            avg[1] += 1.0;
-            avg[2] += evalRoot(values[4], values[7], iso);
-            ++samples;
-        }
-
-        if (sEdgeGroupTable[signs][9] == n) { // Edged: 0 - 4
-            avg[1] += evalRoot(values[0], values[4], iso);
-            ++samples;
-        }
-
-        if (sEdgeGroupTable[signs][10] == n) { // Edged: 1 - 5
-            avg[0] += 1.0;
-            avg[1] += evalRoot(values[1], values[5], iso);
-            ++samples;
-        }
-
-        if (sEdgeGroupTable[signs][11] == n) { // Edged: 2 - 6
-            avg[0] += 1.0;
-            avg[1] += evalRoot(values[2], values[6], iso);
-            avg[2] += 1.0;
-            ++samples;
-        }
-
-        if (sEdgeGroupTable[signs][12] == n) { // Edged: 3 - 7
-            avg[1] += evalRoot(values[3], values[7], iso);
-            avg[2] += 1.0;
-            ++samples;
-        }
-
-        if (samples > 1) {
-            double w = 1.0 / double(samples);
-            avg[0] *= w;
-            avg[1] *= w;
-            avg[2] *= w;
-        }
-
-        points.push_back(avg);
+        points.push_back(computePoint(values, signs, n, iso));
     }
 }
+
+
+inline void
+computeCellPoints(std::vector<Vec3d>& points,
+    const std::vector<double>& lhsValues, const std::vector<double>& rhsValues,
+    unsigned char lhsSigns, unsigned char rhsSigns, double iso)
+{
+    for (size_t n = 1, N = sEdgeGroupTable[lhsSigns][0] + 1; n < N; ++n) {
+
+        int id = -1;
+        for (size_t i = 1; i <= 12; ++i) {
+            if (sEdgeGroupTable[lhsSigns][i] == n && sEdgeGroupTable[rhsSigns][i] != 0) {
+                id = sEdgeGroupTable[rhsSigns][i];
+                break;
+            }
+        }
+
+        if (id != -1) {
+            unsigned char e(id);
+            points.push_back(computePoint(rhsValues, rhsSigns, e, iso));
+        } else {
+            points.push_back(computePoint(lhsValues, lhsSigns, n, iso));
+        }
+    }
+}
+
+
 
 template <typename TreeT, typename LeafManagerT>
 class GenPoints
 {
 public:
     typedef tree::ValueAccessor<const TreeT> AccessorT;
-
     typedef typename TreeT::template ValueConverter<int>::Type IntTreeT;
     typedef tree::ValueAccessor<IntTreeT> IntAccessorT;
+
+    typedef typename TreeT::template ValueConverter<Int16>::Type Int16TreeT;
+    typedef tree::ValueAccessor<const Int16TreeT> Int16AccessorT;
 
 
     //////////
@@ -1174,6 +1203,8 @@ public:
     GenPoints(const LeafManagerT& signLeafs, const TreeT& distTree,
         IntTreeT& idxTree, PointList& points, std::vector<size_t>& indices,
         const math::Transform& xform, double iso);
+
+    void setRefData(const Int16TreeT* refSignTree = NULL, const TreeT* refDistTree = NULL);
 
     void run(bool threaded = true);
 
@@ -1194,6 +1225,9 @@ private:
     std::vector<size_t>& mIndices;
     const math::Transform& mTransform;
     const double mIsovalue;
+
+    const Int16TreeT *mRefSignTree;
+    const TreeT* mRefDistTree;
 };
 
 
@@ -1209,6 +1243,8 @@ GenPoints<TreeT, LeafManagerT>::GenPoints(const LeafManagerT& signLeafs,
     , mIndices(indices)
     , mTransform(xform)
     , mIsovalue(iso)
+    , mRefSignTree(NULL)
+    , mRefDistTree(NULL)
 {
 }
 
@@ -1224,21 +1260,44 @@ GenPoints<TreeT, LeafManagerT>::run(bool threaded)
 
 template <typename TreeT, typename LeafManagerT>
 void
+GenPoints<TreeT, LeafManagerT>::setRefData(const Int16TreeT *refSignTree, const TreeT *refDistTree)
+{
+    mRefSignTree = refSignTree;
+    mRefDistTree = refDistTree;
+}
+
+
+template <typename TreeT, typename LeafManagerT>
+void
 GenPoints<TreeT, LeafManagerT>::operator()(
     const tbb::blocked_range<size_t>& range) const
 {
     typename IntTreeT::LeafNodeType::ValueOnIter iter;
     IntAccessorT idxAcc(mIdxTree);
 
-    unsigned char signs;
+    unsigned char signs, refSigns;
     Index offset;
     Coord ijk, coord;
     std::vector<Vec3d> points(4);
-    std::vector<double> values(8);
+    std::vector<double> values(8), refValues(8);
+
+    // reference data
+    boost::scoped_ptr<Int16AccessorT> refSignAcc;
+    if (mRefSignTree) refSignAcc.reset(new Int16AccessorT(*mRefSignTree));
+
+    boost::scoped_ptr<AccessorT> refDistAcc;
+    if (mRefDistTree) refDistAcc.reset(new AccessorT(*mRefDistTree));
 
     for (size_t n = range.begin(); n != range.end(); ++n) {
 
         coord = mSignLeafs.leaf(n).origin();
+
+        const typename TreeT::LeafNodeType *refDistLeafPt = NULL;
+        if (refDistAcc) refDistLeafPt = refDistAcc->probeConstLeaf(coord);
+
+        const typename Int16TreeT::LeafNodeType *refSignLeafPt = NULL;
+        if (refSignAcc) refSignLeafPt = refSignAcc->probeConstLeaf(coord);
+
 
         const typename TreeT::LeafNodeType *leafPt = mDistAcc.probeConstLeaf(coord);
         typename IntTreeT::LeafNodeType *idxLeafPt = idxAcc.probeLeaf(coord);
@@ -1256,8 +1315,17 @@ GenPoints<TreeT, LeafManagerT>::operator()(
             offset = iter.pos();
             ijk = iter.getCoord();
 
-            points.clear();
-            signs = (SIGNS & mSignLeafs.leaf(n).getValue(offset));
+
+            const Int16& flags = mSignLeafs.leaf(n).getValue(offset);
+            
+            signs    = SIGNS & flags;
+            refSigns = 0;
+
+            if ((flags & SEAM) && refDistLeafPt && refSignLeafPt) {
+                if (mRefSignTree->isValueOn(ijk)) {
+                    refSigns = (SIGNS & refSignLeafPt->getValue(offset));
+                }
+            }
 
             if (ijk[0] < coord[0] && ijk[1] < coord[1] && ijk[2] < coord[2]) {
                 collectCornerValues(*leafPt, offset, values);
@@ -1265,7 +1333,23 @@ GenPoints<TreeT, LeafManagerT>::operator()(
                 collectCornerValues(mDistAcc, ijk, values);
             }
 
-            computePoints(values, signs, points, mIsovalue);
+
+            points.clear();
+
+
+            if (refSigns == 0) {
+                computeCellPoints(points, values, signs, mIsovalue);
+            } else {
+
+                if (ijk[0] < coord[0] && ijk[1] < coord[1] && ijk[2] < coord[2]) {
+                    collectCornerValues(*refDistLeafPt, offset, refValues);
+                } else {
+                    collectCornerValues(*refDistAcc, ijk, refValues);
+                }
+
+                computeCellPoints(points, values, refValues, signs, refSigns, mIsovalue);
+            }
+
 
             for (size_t i = 0, I = points.size(); i < I; ++i) {
 
@@ -1282,7 +1366,6 @@ GenPoints<TreeT, LeafManagerT>::operator()(
 
                 ++ptnIdx;
             }
-
         }
 
 
@@ -1313,7 +1396,7 @@ GenPoints<TreeT, LeafManagerT>::operator()(
                 }
 
                 points.clear();
-                computePoints(values, signs, points, mIsovalue);
+                computeCellPoints(points, values, signs, mIsovalue);
 
                 avg[0] += double(ijk[0]) + points[0][0];
                 avg[1] += double(ijk[1]) + points[0][1];
@@ -2847,8 +2930,6 @@ GenTileMask<TreeT>::operator()(const tbb::blocked_range<size_t>& range)
         bbox.max() = bbox.min();
         bbox.max().offset(tile[3]);
 
-
-
         const bool thisInside = (distAcc.getValue(bbox.min()) < mIsovalue);
         const int thisDepth = distAcc.getValueDepth(bbox.min());
 
@@ -3362,6 +3443,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
     // Optionally collect auxiliary data from a reference level set.
 
     const Int16TreeT *refSignTreePt = NULL;
+    const DistTreeT *refDistTreePt = NULL;
 
     if (mRefGrid && mRefGrid->type() == GridT::gridType()) {
 
@@ -3370,7 +3452,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
         if (!mRefSignTree) { 
 
             const GridT* refGrid = static_cast<const GridT*>(mRefGrid.get());
-            const DistTreeT *refDistTreePt = &refGrid->tree();
+            refDistTreePt = &refGrid->tree();
 
             DistLeafManagerT refDistLeafs(*refDistTreePt);
             internal::SignData<DistTreeT, DistLeafManagerT>
@@ -3382,15 +3464,16 @@ VolumeToMesh::operator()(const GridT& distGrid)
         // Get cached auxiliary data
         if (mRefSignTree) {
             refSignTreePt = static_cast<Int16TreeT*>(mRefSignTree.get());
+
+            const GridT* refGrid = static_cast<const GridT*>(mRefGrid.get());
+            refDistTreePt = &refGrid->tree();
+
         }
 
 
     }
 
-
-
     // Process auxiliary data
-
     Int16LeafManagerT signLeafs(*signTreePt);
 
     if (maskEdges) {
@@ -3408,9 +3491,6 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
         seamMask.merge(seamOp.mask());
     }
-
-
-    
 
     std::vector<size_t> regions(signLeafs.leafCount(), 0);
     if (regions.empty()) return;
@@ -3457,6 +3537,9 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
     internal::GenPoints<DistTreeT, Int16LeafManagerT>
         pointOp(signLeafs, distTree, *idxTreePt, mPoints, regions, transform, mIsovalue);
+
+
+    pointOp.setRefData(refSignTreePt, refDistTreePt);
 
     pointOp.run();
 

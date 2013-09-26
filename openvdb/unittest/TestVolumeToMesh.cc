@@ -28,15 +28,13 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-#include <vector>
 #include <cppunit/extensions/HelperMacros.h>
 
-#include <openvdb/openvdb.h>
-#include <openvdb/Exceptions.h>
 #include <openvdb/tools/VolumeToMesh.h>
+#include <openvdb/Exceptions.h>
 #include <openvdb/tree/LeafManager.h>
-#include <openvdb/util/Util.h>
 
+#include <vector>
 
 class TestVolumeToMesh: public CppUnit::TestCase
 {
@@ -59,7 +57,8 @@ CPPUNIT_TEST_SUITE_REGISTRATION(TestVolumeToMesh);
 void
 TestVolumeToMesh::testAuxData()
 {
-    openvdb::FloatTree::Ptr tree(new openvdb::FloatTree(0));
+    typedef openvdb::tree::Tree4<float, 5, 4, 3>::Type Tree543f;
+    Tree543f::Ptr tree(new Tree543f(0));
 
     // create one voxel with 3 upwind edges (that have a sign change)
     tree->setValue(openvdb::Coord(0,0,0), -1);
@@ -67,13 +66,13 @@ TestVolumeToMesh::testAuxData()
     tree->setValue(openvdb::Coord(0,1,0),  1);
     tree->setValue(openvdb::Coord(0,0,1),  1);
 
-    typedef openvdb::tree::LeafManager<const openvdb::FloatTree> LeafManager;
+    typedef openvdb::tree::LeafManager<const Tree543f> LeafManager;
     
     LeafManager leafs(*tree);
     
     CPPUNIT_ASSERT(openvdb::tools::internal::needsActiveVoxePadding(leafs, 0.0, 1.0));
 
-    openvdb::tools::internal::SignData<openvdb::FloatTree, LeafManager> op(*tree, leafs, 0.0);
+    openvdb::tools::internal::SignData<Tree543f, LeafManager> op(*tree, leafs, 0.0);
     op.run();
     
     CPPUNIT_ASSERT(op.signTree()->activeVoxelCount() == 1);
@@ -110,7 +109,11 @@ TestVolumeToMesh::testConversion()
 {
     using namespace openvdb;
 
-    FloatGrid::Ptr grid = createGrid<FloatGrid>(/*background=*/1);
+    typedef tree::Tree4<float, 5, 4, 3>::Type Tree543f;
+    typedef Grid<Tree543f> GridType;
+
+    GridType::Ptr grid = createGrid<GridType>(/*background=*/1);
+    
     grid->fill(CoordBBox(Coord(0), Coord(7)), 0.0);
     grid->fill(CoordBBox(Coord(1), Coord(6)), -1.0);
 

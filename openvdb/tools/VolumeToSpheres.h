@@ -156,7 +156,7 @@ public:
     ///
     /// @param distances    list of closest surface point distances, populated by this method.
     ///
-    void search(const std::vector<Vec3R>& points, std::vector<float>& distances);
+    bool search(const std::vector<Vec3R>& points, std::vector<float>& distances);
 
 
     /// @brief Performs closest point searches.
@@ -166,7 +166,7 @@ public:
     ///
     /// @param distances    list of closest surface point distances, populated by this method.
     ///
-    void searchAndReplace(std::vector<Vec3R>& points, std::vector<float>& distances);
+    bool searchAndReplace(std::vector<Vec3R>& points, std::vector<float>& distances);
 
 private:
     typedef typename GridT::TreeType TreeT;
@@ -183,7 +183,7 @@ private:
     float mMaxRadiusSqr;
     typename IntTreeT::Ptr mIdxTreePt;
 
-    void search(std::vector<Vec3R>&, std::vector<float>&, bool transformPoints);
+    bool search(std::vector<Vec3R>&, std::vector<float>&, bool transformPoints);
 };
 
 
@@ -717,7 +717,7 @@ fillWithSpheres(
     typedef tree::LeafManager<const TreeT> LeafManagerT;
     typedef tree::LeafManager<IntTreeT>    IntLeafManagerT;
     typedef tree::LeafManager<Int16TreeT>  Int16LeafManagerT;
-    
+
 
     typedef boost::mt11213b RandGen;
     RandGen mtRand(/*seed=*/0);
@@ -756,13 +756,11 @@ fillWithSpheres(
     std::vector<float> instanceRadius;
 
     ClosestSurfacePoint<GridT> csp;
-
     csp.initialize(grid, isovalue, interrupter);
 
-    csp.search(instancePoints, instanceRadius);
-
-
     if (interrupter && interrupter->wasInterrupted()) return;
+
+    if (!csp.search(instancePoints, instanceRadius)) return;
 
     std::vector<unsigned char> instanceMask(instancePoints.size(), 0);
     float maxRadius = 0.0;
@@ -774,7 +772,7 @@ fillWithSpheres(
             maxRadiusIdx = n;
         }
     }
-    
+
     Vec3s pos;
     Vec4s sphere;
     minRadius *= transform.voxelSize()[0];
@@ -789,7 +787,7 @@ fillWithSpheres(
         sphere[2] = float(instancePoints[maxRadiusIdx].z());
         sphere[3] = maxRadius;
 
-        spheres.push_back(sphere);        
+        spheres.push_back(sphere);
         instanceMask[maxRadiusIdx] = 1;
  
         internal::UpdatePoints op(sphere, instancePoints, instanceRadius, instanceMask, overlapping);
@@ -962,11 +960,11 @@ ClosestSurfacePoint<GridT>::initialize(
 
 
 template<typename GridT>
-void
+bool
 ClosestSurfacePoint<GridT>::search(std::vector<Vec3R>& points,
     std::vector<float>& distances, bool transformPoints)
 {
-    if (!mIsInitialized) return;
+    if (!mIsInitialized) return false;
 
     distances.clear();
     distances.resize(points.size(), mMaxRadiusSqr);
@@ -976,22 +974,24 @@ ClosestSurfacePoint<GridT>::search(std::vector<Vec3R>& points,
         mMaxNodeLeafs, transformPoints);
 
     cpd.run();
+
+    return true;
 }
 
 
 template<typename GridT>
-void
+bool
 ClosestSurfacePoint<GridT>::search(const std::vector<Vec3R>& points, std::vector<float>& distances)
 {
-    search(const_cast<std::vector<Vec3R>& >(points), distances, false);
+    return search(const_cast<std::vector<Vec3R>& >(points), distances, false);
 }
 
 
 template<typename GridT>
-void
+bool
 ClosestSurfacePoint<GridT>::searchAndReplace(std::vector<Vec3R>& points, std::vector<float>& distances)
 {
-    search(points, distances, true);
+    return search(points, distances, true);
 }
 
 
