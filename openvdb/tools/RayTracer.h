@@ -32,16 +32,14 @@
 ///
 /// @author Ken Museth
 ///
-/// @brief Defines a multi-threaded and yet simple LevelSetRayTracer,
-/// a PerspectiveCamera and an OrthographicCamera (both designed to
-/// mimic a Houdini camera), a Film class and some rather naive
-/// shaders (just for test-rendering).
+/// @brief Defines a simple, multithreaded level-set ray tracer,
+/// perspective and orthographic cameras (both designed to mimic a Houdini camera),
+/// a Film class and some rather naive shaders
 ///
-/// @note These classes are only included as examples of ray tracing
-/// of level sets represented in OpenVDB volumes and obviously not for
-/// production quality rendering.
+/// @note These classes are included mainly to illustrate how to ray-trace
+/// OpenVDB volumes.  They are not intended for production-quality rendering.
 ///
-/// @todo Add a volume renderer 
+/// @todo Add a volume renderer
 
 #ifndef OPENVDB_TOOLS_RAYTRACER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_RAYTRACER_HAS_BEEN_INCLUDED
@@ -53,14 +51,13 @@
 #include <boost/scoped_ptr.hpp>
 #include <vector>
 
-// Required by Film::saveEXR
-/*
+#ifdef OPENVDB_TOOLS_RAYTRACER_USE_EXR
 #include <OpenEXR/ImfPixelType.h>
 #include <OpenEXR/ImfChannelList.h>
 #include <OpenEXR/ImfOutputFile.h>
 #include <OpenEXR/ImfHeader.h>
 #include <OpenEXR/ImfFrameBuffer.h>
-*/
+#endif
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -70,10 +67,8 @@ namespace tools {
 // Forward declarations
 class BaseCamera;
 class BaseShader;
-    
-//////////////////////////////////////// RAYTRACER ////////////////////////////////////////
 
-/// @brief Ray-trace a volume.    
+/// @brief Ray-trace a volume.
 template<typename GridT>
 inline void rayTrace(const GridT&,
                      const BaseShader&,
@@ -92,8 +87,11 @@ inline void rayTrace(const GridT&,
                      unsigned int seed = 0,
                      bool threaded = true);
 
-/// @brief A (very) simple multi-threaded ray tracer specefically for narrow level sets.
-/// @warning Primarily included as a reference implementation.
+
+//////////////////////////////////////// RAYTRACER ////////////////////////////////////////
+
+/// @brief A (very) simple multithreaded ray tracer specifically for narrow-band level sets.
+/// @details Included primarily as a reference implementation.
 template<typename GridT, typename IntersectorT = tools::LevelSetRayIntersector<GridT> >
 class LevelSetRayTracer
 {
@@ -101,7 +99,7 @@ public:
     typedef GridT                           GridType;
     typedef typename IntersectorT::Vec3Type Vec3Type;
     typedef typename IntersectorT::RayType  RayType;
-    
+
     LevelSetRayTracer(const GridT& grid,
                       const BaseShader& shader,
                       BaseCamera& camera,
@@ -121,9 +119,8 @@ public:
     void setPixelSamples(size_t pixelSamples, unsigned int seed = 0);
     void trace(bool threaded = true);
     void operator()(const tbb::blocked_range<size_t>& range) const;
-     
-  private:
-    
+
+private:
     const bool                          mIsMaster;
     double*                             mRand;
     IntersectorT                        mInter;
@@ -131,47 +128,52 @@ public:
     BaseCamera*                         mCamera;
     size_t                              mSubPixels;
 };// LevelSetRayTracer
-    
+
+
 //////////////////////////////////////// FILM ////////////////////////////////////////
 
-/// @brief A simple film class used for concurrent updating of pixel
-/// values, background initialization and PPM/EXR file output.
+/// @brief A simple class that allows for concurrent writes to pixels in an image,
+/// background initialization of the image, and PPM or EXR file output.
 class Film
 {
 public:
-
     /// @brief Floating-point RGBA components in the range [0, 1].
-    /// This is our prefered representation for color processing.
+    /// @details This is our preferred representation for color processing.
     struct RGBA
     {
         typedef float ValueT;
+
         RGBA() : r(0), g(0), b(0), a(1) {}
         explicit RGBA(ValueT intensity) : r(intensity), g(intensity), b(intensity), a(1) {}
-        explicit RGBA(ValueT _r, ValueT _g, ValueT _b, ValueT _a=1.0f) : r(_r), g(_g), b(_b), a(_a) {}
-        inline RGBA  operator* (ValueT scale)  const { return RGBA(r*scale, g*scale, b*scale);}
-        inline RGBA  operator+ (const RGBA& rhs) const { return RGBA(r+rhs.r, g+rhs.g, b+rhs.b);}
-        inline RGBA  operator* (const RGBA& rhs) const { return RGBA(r*rhs.r, g*rhs.g, b*rhs.b);}
-        inline RGBA& operator+=(const RGBA& rhs) { r+=rhs.r; g+=rhs.g; b+=rhs.b, a+=rhs.a; return *this;}
-        inline void over(const RGBA& rhs)
+        RGBA(ValueT _r, ValueT _g, ValueT _b, ValueT _a=1.0f) : r(_r), g(_g), b(_b), a(_a) {}
+
+        RGBA  operator* (ValueT scale)  const { return RGBA(r*scale, g*scale, b*scale);}
+        RGBA  operator+ (const RGBA& rhs) const { return RGBA(r+rhs.r, g+rhs.g, b+rhs.b);}
+        RGBA  operator* (const RGBA& rhs) const { return RGBA(r*rhs.r, g*rhs.g, b*rhs.b);}
+        RGBA& operator+=(const RGBA& rhs) { r+=rhs.r; g+=rhs.g; b+=rhs.b, a+=rhs.a; return *this;}
+
+        void over(const RGBA& rhs)
         {
             const float s = rhs.a*(1.0f-a);
             r = a*r+s*rhs.r;
             g = a*g+s*rhs.g;
             b = a*b+s*rhs.b;
             a = a + s;
-        }   
+        }
+
         ValueT r, g, b, a;
     };
-    
+
+
     Film(size_t width, size_t height)
         : mWidth(width), mHeight(height), mSize(width*height), mPixels(new RGBA[mSize])
-      {
-      }
+    {
+    }
     Film(size_t width, size_t height, const RGBA& bg)
         : mWidth(width), mHeight(height), mSize(width*height), mPixels(new RGBA[mSize])
-      {
-          this->fill(bg);
-      }
+    {
+        this->fill(bg);
+    }
     ~Film() { delete mPixels; }
 
     const RGBA& pixel(size_t w, size_t h) const
@@ -190,14 +192,14 @@ public:
 
     void fill(const RGBA& rgb=RGBA(0)) { for (size_t i=0; i<mSize; ++i) mPixels[i] = rgb; }
     void checkerboard(const RGBA& c1=RGBA(0.3f), const RGBA& c2=RGBA(0.6f), size_t size=32)
-      {
-          RGBA *p = mPixels;
-          for (size_t j = 0; j < mHeight; ++j) {
-              for (size_t i = 0; i < mWidth; ++i, ++p) {
-                  *p = ((i & size) ^ (j & size)) ? c1 : c2;
-              }
-          }
-      }
+    {
+        RGBA *p = mPixels;
+        for (size_t j = 0; j < mHeight; ++j) {
+            for (size_t i = 0; i < mWidth; ++i, ++p) {
+                *p = ((i & size) ^ (j & size)) ? c1 : c2;
+            }
+        }
+    }
 
     void savePPM(const std::string& fileName)
     {
@@ -209,19 +211,20 @@ public:
             *q++ = static_cast<unsigned char>(255.0f*(*p  ).r);
             *q++ = static_cast<unsigned char>(255.0f*(*p  ).g);
             *q++ = static_cast<unsigned char>(255.0f*(*p++).b);
-        }    
-        
+        }
+
         std::ofstream os(name.c_str(), std::ios_base::binary);
         if (!os.is_open()) {
             std::cerr << "Error opening PPM file \"" << name << "\"" << std::endl;
             return;
         }
-        
+
         os << "P6\n" << mWidth << " " << mHeight << "\n255\n";
         os.write((const char *)&(*tmp), 3*mSize*sizeof(unsigned char));
         delete [] tmp;
     }
-    /*
+
+#ifdef OPENVDB_TOOLS_RAYTRACER_USE_EXR
     void saveEXR(const std::string& fileName, size_t compression = 2, size_t threads = 8)
     {
         std::string name(fileName + ".exr");
@@ -235,7 +238,7 @@ public:
         header.channels().insert("G", Imf::Channel(Imf::FLOAT));
         header.channels().insert("B", Imf::Channel(Imf::FLOAT));
         header.channels().insert("A", Imf::Channel(Imf::FLOAT));
-        
+
         Imf::FrameBuffer framebuffer;
         framebuffer.insert("R", Imf::Slice( Imf::FLOAT, (char *) &(mPixels[0].r),
                                             sizeof (RGBA), sizeof (RGBA) * mWidth));
@@ -245,12 +248,13 @@ public:
                                             sizeof (RGBA), sizeof (RGBA) * mWidth));
         framebuffer.insert("A", Imf::Slice( Imf::FLOAT, (char *) &(mPixels[0].a),
                                             sizeof (RGBA), sizeof (RGBA) * mWidth));
-        
+
         Imf::OutputFile file(name.c_str(), header);
         file.setFrameBuffer(framebuffer);
         file.writePixels(mHeight);
     }
-    */
+#endif
+
     size_t width()       const { return mWidth; }
     size_t height()      const { return mHeight; }
     size_t numPixels()   const { return mSize; }
@@ -260,18 +264,23 @@ private:
     size_t mWidth, mHeight, mSize;
     RGBA*  mPixels;
 };// Film
-    
+
+
 //////////////////////////////////////// CAMERAS ////////////////////////////////////////
 
-// Abstract base class for the perspective and orthographic cameras
+/// Abstract base class for the perspective and orthographic cameras
 class BaseCamera
 {
-  public:
+public:
     BaseCamera(Film& film, const Vec3R& rotation, const Vec3R& translation,
                double frameWidth, double nearPlane, double farPlane)
-        :  mFilm(&film), mScaleWidth(frameWidth),
-           mScaleHeight(frameWidth*film.height()/double(film.width())),
-           mRay(Vec3R(0.0), Vec3R(1.0), nearPlane, farPlane)
+        : mFilm(&film)
+        , mScaleWidth(frameWidth)
+        , mScaleHeight(frameWidth*film.height()/double(film.width()))
+        , mRay(Vec3R(0.0)
+        , Vec3R(1.0)
+        , nearPlane
+        , farPlane)
     {
         assert(nearPlane > 0 && farPlane > nearPlane);
         mScreenToWorld.accumPostRotation(math::X_AXIS, rotation[0] * M_PI / 180.0);
@@ -281,46 +290,64 @@ class BaseCamera
         mRay.setEye(mScreenToWorld.applyMap(Vec3R(0.0)));
         mRay.setDir(mScreenToWorld.applyJacobian(Vec3R(0.0, 0.0, -1.0)));
     }
+
     virtual ~BaseCamera() {}
-    inline Film::RGBA& pixel(size_t i, size_t j) { return mFilm->pixel(i, j); }
-    inline size_t width()  const { return mFilm->width(); }
-    inline size_t height() const { return mFilm->height(); }
-    inline Vec3R rasterToScreen(double i, double j, double z) const
+
+    Film::RGBA& pixel(size_t i, size_t j) { return mFilm->pixel(i, j); }
+
+    size_t width()  const { return mFilm->width(); }
+    size_t height() const { return mFilm->height(); }
+
+    /// Rotate the camera so that it points to (x, y, z).
+    void lookAt(const Vec3R& xyz)
+    {
+        const Vec3R translation = mScreenToWorld.applyMap(Vec3R(0.0));
+        Mat4d xform = math::aim<Mat4d>(
+            /*direction=*/translation - xyz, /*vertical=*/Vec3R(0.0, 1.0, 0.0));
+        xform.postTranslate(translation);
+        mScreenToWorld = math::AffineMap(xform);
+        mRay.setEye(mScreenToWorld.applyMap(Vec3R(0.0)));
+        mRay.setDir(mScreenToWorld.applyJacobian(Vec3R(0.0, 0.0, -1.0)));
+    }
+
+    Vec3R rasterToScreen(double i, double j, double z) const
     {
         return Vec3R( (2 * i / mFilm->width() - 1)  * mScaleWidth,
                       (1 - 2 * j / mFilm->height()) * mScaleHeight, z );
     }
-    virtual math::Ray<double> getRay(size_t i, size_t j,
-                                     double iOffset=0.5, double jOffset=0.5) const = 0;
+
+    /// @brief Return a Ray in world space given the pixel indices and
+    /// optional offsets in the range [0, 1]. An offset of 0.5 corresponds
+    /// to the center of the pixel.
+    virtual math::Ray<double> getRay(
+        size_t i, size_t j, double iOffset = 0.5, double jOffset = 0.5) const = 0;
+
 protected:
-    Film*  mFilm;
+    Film* mFilm;
     double mScaleWidth, mScaleHeight;
     math::Ray<double> mRay;
-    math::AffineMap   mScreenToWorld;
+    math::AffineMap mScreenToWorld;
 };// BaseCamera
 
-class PerspectiveCamera : public BaseCamera
+
+class PerspectiveCamera: public BaseCamera
 {
   public:
     /// @brief Constructor
-    /// @param film The film (i.e. image) defining the pixel resolution.
-    /// @param rotation Rotation in degrees placing the camera in
-    /// world space. Note they are applies in lexicographic order.
-    /// @param translation Translation in world units placing the
-    /// camera in world space. Note translation is applied after rotation. 
-    /// @param focalLength  Focal length of the camera in mm.
-    /// The default value of 50mm corrseponds to that of Houdini's camera.
-    /// @param aperture The width in mm of the visible field, i.e. frame.  
-    /// The default value of 41.2136 mm corrseponds to that of
-    /// Houdini's camera.
-    /// @param nearPlane Defines the near clipping plane as an offset
-    /// in world units of the screen plane.
-    /// @param farPlane  Defines the far clipping plane as an offset
-    /// in world units of the screen plane.
+    /// @param film         film (i.e. image) defining the pixel resolution
+    /// @param rotation     rotation in degrees of the camera in world space
+    ///                     (applied in x, y, z order)
+    /// @param translation  translation of the camera in world-space units,
+    ///                     applied after rotation
+    /// @param focalLength  focal length of the camera in mm
+    ///                     (the default of 50mm corresponds to Houdini's default camera)
+    /// @param aperture     width in mm of the frame, i.e., the visible field
+    ///                     (the default 41.2136 mm corresponds to Houdini's default camera)
+    /// @param nearPlane    depth of the near clipping plane in world-space units
+    /// @param farPlane     depth of the far clipping plane in world-space units
     ///
-    /// @note If no rotaion and translation is provided the camera is
-    /// placed in world space at (0,0,0) and points in the direction
-    /// of the negative z-axis.
+    /// @details If no rotation or translation is provided, the camera is placed
+    /// at (0,0,0) in world space and points in the direction of the negative z axis.
     PerspectiveCamera(Film& film,
                       const Vec3R& rotation    = Vec3R(0.0),
                       const Vec3R& translation = Vec3R(0.0),
@@ -331,12 +358,14 @@ class PerspectiveCamera : public BaseCamera
         : BaseCamera(film, rotation, translation, 0.5*aperture/focalLength, nearPlane, farPlane)
     {
     }
+
     virtual ~PerspectiveCamera() {}
+
     /// @brief Return a Ray in world space given the pixel indices and
-    /// optional offsets in the range [0,1]. An offset of 0.5 corresponds 
+    /// optional offsets in the range [0,1]. An offset of 0.5 corresponds
     /// to the center of the pixel.
-    math::Ray<double> getRay(size_t i, size_t j,
-                             double iOffset=0.5, double jOffset=0.5) const
+    virtual math::Ray<double> getRay(
+        size_t i, size_t j, double iOffset = 0.5, double jOffset = 0.5) const
     {
         math::Ray<double> ray(mRay);
         Vec3R dir = BaseCamera::rasterToScreen(i + iOffset, j + jOffset, -1.0);
@@ -346,38 +375,37 @@ class PerspectiveCamera : public BaseCamera
         ray.setDir(dir);
         return ray;
     }
-    /// @brief Return horizontal field of view in degrees given a
-    /// focal lenth in mm and assuming the specified aperture in mm.
-    inline static double focalLengthToFieldOfView(double length, double aperture)
+
+    /// @brief Return the horizontal field of view in degrees given a
+    /// focal lenth in mm and the specified aperture in mm.
+    static double focalLengthToFieldOfView(double length, double aperture)
     {
         return 360.0 / M_PI * atan(aperture/(2.0*length));
     }
-    /// @brief Return Focal length in mm given a horizontal field of
-    /// view in degrees and assuming the specified aperture in mm.
-    inline static double fieldOfViewToFocalLength(double fov, double aperture)
+    /// @brief Return the focal length in mm given a horizontal field of
+    /// view in degrees and the specified aperture in mm.
+    static double fieldOfViewToFocalLength(double fov, double aperture)
     {
         return aperture/(2.0*(tan(fov * M_PI / 360.0)));
     }
 };// PerspectiveCamera
 
-class OrthographicCamera : public BaseCamera
+
+class OrthographicCamera: public BaseCamera
 {
-  public:
+public:
     /// @brief Constructor
-    /// @param film The film (i.e. image) defining the pixel resolution.
-    /// @param rotation Rotation in degrees placing the camera in
-    /// world space. Note they are applies in lexicographic order.
-    /// @param translation Translation in world units placing the
-    /// camera in world space. Note translation is applied after rotation. 
-    /// @param frameWidth The width in of the frame in world units.
-    /// @param nearPlane Defines the near clipping plane as an offset
-    /// in world units of the screen plane.
-    /// @param farPlane  Defines the far clipping plane as an offset
-    /// in world units of the screen plane.
+    /// @param film         film (i.e. image) defining the pixel resolution
+    /// @param rotation     rotation in degrees of the camera in world space
+    ///                     (applied in x, y, z order)
+    /// @param translation  translation of the camera in world-space units,
+    ///                     applied after rotation
+    /// @param frameWidth   width in of the frame in world-space units
+    /// @param nearPlane    depth of the near clipping plane in world-space units
+    /// @param farPlane     depth of the far clipping plane in world-space units
     ///
-    /// @note If no rotaion and translation is provided the camera is
-    /// placed in world space at (0,0,0) and points in the direction
-    /// of the negative z-axis.
+    /// @details If no rotation or translation is provided, the camera is placed
+    /// at (0,0,0) in world space and points in the direction of the negative z axis.
     OrthographicCamera(Film& film,
                        const Vec3R& rotation    = Vec3R(0.0),
                        const Vec3R& translation = Vec3R(0.0),
@@ -388,11 +416,9 @@ class OrthographicCamera : public BaseCamera
     {
     }
     virtual ~OrthographicCamera() {}
-    /// @brief Return a Ray in world space given the pixel indices and
-    /// optional offsets in the range [0,1]. An offset of 0.5 corresponds 
-    /// to the center of the pixel.
-    math::Ray<double> getRay(size_t i, size_t j,
-                             double iOffset=0.5, double jOffset=0.5) const
+
+    virtual math::Ray<double> getRay(
+        size_t i, size_t j, double iOffset = 0.5, double jOffset = 0.5) const
     {
         math::Ray<double> ray(mRay);
         Vec3R eye = BaseCamera::rasterToScreen(i + iOffset, j + jOffset, 0.0);
@@ -400,13 +426,15 @@ class OrthographicCamera : public BaseCamera
         return ray;
     }
 };// OrthographicCamera
-    
+
+
 //////////////////////////////////////// SHADERS ////////////////////////////////////////
+
 
 /// Abstract base class for the shaders
 class BaseShader
 {
-public :
+public:
     typedef math::Ray<Real> RayT;
     BaseShader() {}
     virtual ~BaseShader() {}
@@ -414,66 +442,72 @@ public :
     virtual BaseShader* copy() const = 0;
 };
 
-/// Produces a simple matte
-class MatteShader : public BaseShader
+
+/// Shader that produces a simple matte
+class MatteShader: public BaseShader
 {
-  public:
-    MatteShader(const Film::RGBA& c = Film::RGBA(1.0f)) : mRGBA(c) {}
+public:
+    MatteShader(const Film::RGBA& c = Film::RGBA(1.0f)): mRGBA(c) {}
     virtual ~MatteShader() {}
-    inline Film::RGBA operator()(const Vec3R&, const Vec3R&,
-                                 const BaseShader::RayT&) const { return mRGBA; }
-    BaseShader* copy() const { return new MatteShader(*this); }
-  private:
+    virtual Film::RGBA operator()(const Vec3R&, const Vec3R&, const BaseShader::RayT&) const
+    {
+        return mRGBA;
+    }
+    virtual BaseShader* copy() const { return new MatteShader(*this); }
+
+private:
     const Film::RGBA mRGBA;
 };
 
-/// Color shading that treats the normal (x, y, z) values as (r, g, b) color components.
-class NormalShader : public BaseShader
+
+/// Color shader that treats the surface normal (x, y, z) as an RGB color
+class NormalShader: public BaseShader
 {
 public:
     NormalShader(const Film::RGBA& c = Film::RGBA(1.0f)) : mRGBA(c*0.5f) {}
     virtual ~NormalShader() {}
-    inline Film::RGBA operator()(const Vec3R&, const Vec3R& normal,
-                                 const BaseShader::RayT&) const
+    virtual Film::RGBA operator()(const Vec3R&, const Vec3R& normal, const BaseShader::RayT&) const
     {
         return mRGBA*Film::RGBA(normal[0]+1.0f, normal[1]+1.0f, normal[2]+1.0f);
     }
-    BaseShader* copy() const { return new NormalShader(*this); }
-  private:
+    virtual BaseShader* copy() const { return new NormalShader(*this); }
+
+private:
     const Film::RGBA mRGBA;
 };
 
-// This is a simple diffuse lambertian surface shader. Diffuse simply
-// means the color is constant (e.g. white) and Lambertian implies
-// that the (radiant) intensity is directly proportional to the cosine
-// of the angle between the surface normal and the direction of the
-// light source.
-class DiffuseShader : public BaseShader
+
+/// @brief Simple diffuse Lambertian surface shader
+/// @details Diffuse simply means the color is constant (e.g., white), and
+/// Lambertian implies that the (radiant) intensity is directly proportional
+/// to the cosine of the angle between the surface normal and the direction
+/// of the light source.
+class DiffuseShader: public BaseShader
 {
-  public:
-    DiffuseShader(const Film::RGBA& d = Film::RGBA(1.0f)) : mRGBA(d) {}
-    inline Film::RGBA operator()(const Vec3R&, const Vec3R& normal,
-                                 const BaseShader::RayT& ray) const
-      {
-          // We assume a single directional light source at the camera so
-          // cosine of the angle between the surface normal and the
-          // direction of the light source becomes the dot product of the
-          // surface normal and inverse direction of the ray! We will also 
-          // ignore negative dot products cooresponding to strict one-sided shading!
-          //return mRGBA * math::Max(0.0, normal.dot(-ray.dir()));
-          
-          // We take the abs of the dot product corresponding to
-          // having light sources at +/- ray.dir(), i.e. two-sided shading!
-          return mRGBA * math::Abs(normal.dot(ray.dir()));
-      }
-    BaseShader* copy() const { return new DiffuseShader(*this); }
-  private:
+public:
+    DiffuseShader(const Film::RGBA& d = Film::RGBA(1.0f)): mRGBA(d) {}
+    virtual Film::RGBA operator()(const Vec3R&, const Vec3R& normal,
+        const BaseShader::RayT& ray) const
+    {
+        // We assume a single directional light source at the camera,
+        // so the cosine of the angle between the surface normal and the
+        // direction of the light source becomes the dot product of the
+        // surface normal and inverse direction of the ray.  We also ignore
+        // negative dot products, corresponding to strict one-sided shading.
+        //return mRGBA * math::Max(0.0, normal.dot(-ray.dir()));
+
+        // We take the abs of the dot product corresponding to having
+        // light sources at +/- ray.dir(), i.e., two-sided shading.
+        return mRGBA * math::Abs(normal.dot(ray.dir()));
+    }
+    virtual BaseShader* copy() const { return new DiffuseShader(*this); }
+
+private:
     const Film::RGBA mRGBA;
 };
 
 
 //////////////////////////////////////// RAYTRACER ////////////////////////////////////////
-
 
 template<typename GridT>
 inline void rayTrace(const GridT& grid,
@@ -483,7 +517,8 @@ inline void rayTrace(const GridT& grid,
                      unsigned int seed,
                      bool threaded)
 {
-    LevelSetRayTracer<GridT, tools::LevelSetRayIntersector<GridT> > tracer(grid, shader, camera, pixelSamples, seed);
+    LevelSetRayTracer<GridT, tools::LevelSetRayIntersector<GridT> >
+        tracer(grid, shader, camera, pixelSamples, seed);
     tracer.trace(threaded);
 }
 
@@ -570,7 +605,7 @@ setIntersector(const IntersectorT& inter)
 {
     assert(mIsMaster);
     mInter = inter;
-}    
+}
 
 template<typename GridT, typename IntersectorT>
 inline void LevelSetRayTracer<GridT, IntersectorT>::
@@ -603,12 +638,12 @@ setPixelSamples(size_t pixelSamples, unsigned int seed)
     } else {
         mRand = NULL;
     }
-}    
+}
 
 template<typename GridT, typename IntersectorT>
 inline void LevelSetRayTracer<GridT, IntersectorT>::
 trace(bool threaded)
-{   
+{
     tbb::blocked_range<size_t> range(0, mCamera->height());
     threaded ? tbb::parallel_for(range, *this) : (*this)(range);
 }
