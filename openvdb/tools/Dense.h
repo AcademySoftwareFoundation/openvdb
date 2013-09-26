@@ -179,7 +179,7 @@ public:
     size_t yStride() const { return mY; }
 
     /// @brief Return the number of voxels contained in this grid.
-    size_t valueCount() const { return mBBox.volume(); }
+    Index64 valueCount() const { return mBBox.volume(); }
 
     /// @brief Set the value of the voxel at the given array offset.
     void setValue(size_t offset, const ValueT& value) { mData[offset] = value; }
