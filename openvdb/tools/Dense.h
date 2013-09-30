@@ -88,7 +88,7 @@ copyFromDense(
 /// @details Use the Dense class to efficiently produce a dense in-memory
 /// representation of an OpenVDB grid.  However, be aware that a dense grid
 /// could have a memory footprint that is orders of magnitude larger than
-/// the corresponding sparse grid from which it originates.
+/// the sparse grid from which it originates.
 ///
 /// @note This class can be used as a simple wrapper for existing dense grid
 /// classes if they provide access to the raw data array.
@@ -99,12 +99,12 @@ class Dense
 {
 public:
     typedef ValueT ValueType;
-    
+
     /// @brief Construct a dense grid with a given range of coordinates.
     ///
     /// @param bbox  the bounding box of the (signed) coordinate range of this grid
     /// @throw ValueError if the bounding box is empty.
-    /// @note The min and max coordinates in the bbox are inclusive.
+    /// @note The min and max coordinates of the bounding box are inclusive.
     Dense(const CoordBBox& bbox)
         : mBBox(bbox), mY(bbox.dim()[2]), mX(mY*bbox.dim()[1])
     {
@@ -116,7 +116,7 @@ public:
     /// @param bbox  the bounding box of the (signed) coordinate range of this grid
     /// @param value the initial value of the grid.
     /// @throw ValueError if the bounding box is empty.
-    /// @note The min and max coordinates in the bbox are inclusive.
+    /// @note The min and max coordinates of the bounding box are inclusive.
     Dense(const CoordBBox& bbox, const ValueT& value)
         : mBBox(bbox), mY(bbox.dim()[2]), mX(mY*bbox.dim()[1])
     {
@@ -132,7 +132,7 @@ public:
     ///
     /// @note The data array is assumed to have a stride of one in the @e z direction.
     /// @throw ValueError if the bounding box is empty.
-    /// @note The min and max coordinates in the bbox are inclusive.
+    /// @note The min and max coordinates of the bounding box are inclusive.
     Dense(const CoordBBox& bbox, ValueT* data)
         : mBBox(bbox), mData(data), mY(mBBox.dim()[2]), mX(mY*mBBox.dim()[1])
     {
@@ -146,7 +146,8 @@ public:
     /// @param dim  the desired dimensions of the grid
     /// @param min  the signed coordinates of the first voxel in the dense grid
     /// @throw ValueError if any of the dimensions are zero.
-    /// @note The min is inclusive, but the max coordinate will be min+dim-1.
+    /// @note The @a min coordinate is inclusive, and the max coordinate will be
+    /// @a min + @a dim - 1.
     Dense(const Coord& dim, const Coord& min = Coord(0))
         : mBBox(min, min+dim.offsetBy(-1)), mY(mBBox.dim()[2]), mX(mY*mBBox.dim()[1])
     {
@@ -154,32 +155,27 @@ public:
     }
 
     /// @brief Return a raw pointer to this grid's value array.
-    ///
     /// @note This method is required by CopyToDense.
     ValueT* data() { return mData; }
 
     /// @brief Return a raw pointer to this grid's value array.
-    ///
     /// @note This method is required by CopyFromDense.
     const ValueT* data() const { return mData; }
 
     /// @brief Return the bounding box of the signed index domain of this grid.
-    ///
     /// @note This method is required by both CopyToDense and CopyFromDense.
     const CoordBBox& bbox() const { return mBBox; }
 
     /// @brief Return the stride of the array in the x direction ( = dimY*dimZ).
-    ///
     /// @note This method is required by both CopyToDense and CopyFromDense.
     size_t xStride() const { return mX; }
 
     /// @brief Return the stride of the array in the y direction ( = dimZ).
-    ///
     /// @note This method is required by both CopyToDense and CopyFromDense.
     size_t yStride() const { return mY; }
 
     /// @brief Return the number of voxels contained in this grid.
-    size_t valueCount() const { return mBBox.volume(); }
+    Index64 valueCount() const { return mBBox.volume(); }
 
     /// @brief Set the value of the voxel at the given array offset.
     void setValue(size_t offset, const ValueT& value) { mData[offset] = value; }
@@ -193,28 +189,28 @@ public:
     {
         mData[this->coordToOffset(i,j,k)] = value;
     }
-    
+
     /// @brief Return the value of the voxel at unsigned index coordinates (i, j, k).
     /// @note This is somewhat slower than using an array offset.
     const ValueT& getValue(size_t i, size_t j, size_t k) const
     {
         return mData[this->coordToOffset(i,j,k)];
     }
-    
+
     /// @brief Set the value of the voxel at the given signed coordinates.
     /// @note This is slower than using either an array offset or unsigned index coordinates.
     void setValue(const Coord& xyz, const ValueT& value)
     {
         mData[this->coordToOffset(xyz)] = value;
     }
-    
+
     /// @brief Return the value of the voxel at the given signed coordinates.
     /// @note This is slower than using either an array offset or unsigned index coordinates.
     const ValueT& getValue(const Coord& xyz) const
     {
         return mData[this->coordToOffset(xyz)];
     }
-    
+
     /// @brief Fill this grid with a constant value.
     void fill(const ValueT& value)
     {
@@ -222,7 +218,7 @@ public:
         ValueT* a = mData;
         while(size--) *a++ = value;
     }
-    
+
     /// @brief Return the linear offset into this grid's value array given by
     /// unsigned coordinates (i, j, k), i.e., coordinates relative to
     /// the origin of this grid's bounding box.
@@ -233,7 +229,7 @@ public:
     {
         return k + j*mY + i*mX;
     }
-    
+
     /// @brief Return the linear offset into this grid's value array given by
     /// the specified signed coordinates, i.e., coordinates in the space of
     /// this grid's bounding box.
@@ -249,10 +245,9 @@ public:
     }
 
     Index64 memUsage() const{ return sizeof(*this) + mBBox.volume() * sizeof(ValueType); }
-    
-private:
 
-    inline void initArray()
+private:
+    void initArray()
     {
         if (mBBox.empty()) {
             OPENVDB_THROW(ValueError, "can't construct a dense grid with an empty bounding box");
@@ -260,11 +255,11 @@ private:
         mArray.reset(new ValueT[mBBox.volume()]);
         mData = mArray.get();
     }
-    
+
     const CoordBBox mBBox;//signed coordinates of the domain represented by the grid
     boost::shared_array<ValueT> mArray;
-    ValueT*         mData;//raw c-style pointer to values
-    const size_t    mY, mX;//strides in x and y (by design it's 1 in z)
+    ValueT* mData;//raw c-style pointer to values
+    const size_t mY, mX;//strides in x and y (by design it's 1 in z)
 };// end of Dense
 
 
@@ -273,9 +268,10 @@ private:
 
 /// @brief Copy an OpenVDB tree into an existing dense grid.
 ///
-/// @note Only the voxels enclosed by the existing dense grid are copied
-/// from the OpenVDB tree, meaning all exiting values in the dense
-/// grid are overwritten regardless of the tolopogy of the VDB tree.
+/// @note Only voxels that intersect the dense grid's bounding box are copied
+/// from the OpenVDB tree.  But both active and inactive voxels are copied,
+/// so all existing values in the dense grid are overwritten, regardless of
+/// the OpenVDB tree's tolopogy.
 template<typename TreeT>
 class CopyToDense
 {
@@ -355,6 +351,7 @@ public:
           mAccessor(other.mAccessor.get() == NULL ? NULL : new AccessorT(*mTree))
     {
     }
+
     /// @brief Copy values from the dense grid to the sparse tree.
     void copy(bool serial = false)
     {
@@ -374,14 +371,14 @@ public:
                 }
             }
         }
-        
+
         // Multi-threaded process: Convert dense grid into leaf nodes and tiles
         if (serial) {
             (*this)(tbb::blocked_range<size_t>(0, mBlocks->size()));
         } else {
             tbb::parallel_for(tbb::blocked_range<size_t>(0, mBlocks->size()), *this);
         }
-        
+
         // Post-process: Insert leaf nodes and tiles into the tree, and prune the tiles only!
         tree::ValueAccessor<TreeT> acc(*mTree);
         for (size_t m=0, size = mBlocks->size(); m<size; ++m) {
@@ -394,7 +391,7 @@ public:
         }
         delete mBlocks;
         mBlocks = NULL;
-        
+
         mTree->root().pruneTiles(mTolerance);
     }
 
@@ -406,10 +403,10 @@ public:
         LeafT* leaf = new LeafT();
 
         for (size_t m=r.begin(), n=0, end = r.end(); m != end; ++m, ++n) {
-            
+
             Block& block = (*mBlocks)[m];
             const CoordBBox &bbox = block.bbox;
-            
+
             if (mAccessor.get() == NULL) {//i.e. empty target tree
                 leaf->fill(mTree->background(), false);
             } else {//account for exiting leafs in the target tree
@@ -441,7 +438,7 @@ private:
         std::pair<ValueT, bool> tile;
         Block(const CoordBBox& b) : bbox(b), leaf(NULL) {}
     };
-    
+
     const Dense<ValueT>*         mDense;
     TreeT*                       mTree;
     std::vector<Block>*          mBlocks;
