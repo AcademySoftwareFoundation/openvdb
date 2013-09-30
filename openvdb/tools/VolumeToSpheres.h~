@@ -115,7 +115,7 @@ fillWithSpheres(
     int instanceCount = 10000)
 {
     fillWithSpheres<GridT, util::NullInterrupter>(grid, spheres,
-        maxSphereCount, overlapping, minRadius, maxRadius, isovalue, instanceCount);
+        maxSphereCount, overlapping, minRadius, isovalue, instanceCount);
 }
 
 
