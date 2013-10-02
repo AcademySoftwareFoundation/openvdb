@@ -69,7 +69,6 @@
 #include <vector>
 
 
-
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 
@@ -222,6 +221,10 @@ newSopOperator(OP_OperatorTable* table)
             "the seam lines. This group can be used to drive secondary elements such "
             "as debris and dust."));
  
+    parms.add(hutil::ParmFactory(PRM_STRING, "seampoints", "Seam Points")
+        .setDefault("seam_points")
+        .setHelpText("Specifies a group of the fracture seam points. This can be "
+            "used to drive local pre-fracture dynamics e.g. local surface buckling."));
 
     //////////
 
@@ -298,6 +301,7 @@ SOP_OpenVDB_To_Polygons::disableParms()
     changed += enableParm("surfacegroup", refexists);
     changed += enableParm("interiorgroup", refexists);
     changed += enableParm("seamlinegroup", refexists);
+    changed += enableParm("seampoints", refexists);
     changed += enableParm("transferattributes", refexists);
     changed += enableParm("sharpenfeatures", refexists);
     changed += enableParm("edgetolerance", refexists);
@@ -333,13 +337,14 @@ copyMesh(
     const char* gridName = NULL,
     GA_PrimitiveGroup* surfaceGroup = NULL,
     GA_PrimitiveGroup* interiorGroup = NULL,
-    GA_PrimitiveGroup* seamGroup = NULL)
+    GA_PrimitiveGroup* seamGroup = NULL,
+    GA_PointGroup* seamPointGroup = NULL)
 {
     const openvdb::tools::PointList& points = mesher.pointList();
     openvdb::tools::PolygonPoolList& polygonPoolList = mesher.polygonPoolList();
 
     const char exteriorFlag = char(openvdb::tools::POLYFLAG_EXTERIOR);
-    const char seamLineFlag = char(openvdb::tools::POLYFLAG_FRACTURE_SEAM);
+    const char seamLineFlag = char(openvdb::tools::POLYFLAG_NONPLANAR);//char(openvdb::tools::POLYFLAG_FRACTURE_SEAM);
 
     const GA_Index firstPrim = detail.primitives().entries();
 
@@ -349,6 +354,10 @@ copyMesh(
     for (size_t n = 0, N = mesher.pointListSize(); n < N; ++n) {
         GA_Offset ptoff = detail.appendPointOffset();
         detail.setPos3(ptoff, points[n].x(), points[n].y(), points[n].z());
+
+        if (seamPointGroup && mesher.pointFlags()[n]) {
+            seamPointGroup->addOffset(ptoff);
+        }
     }
 
     if (boss.wasInterrupted()) return;    
@@ -407,6 +416,18 @@ copyMesh(
     UT_ASSERT_COMPILETIME(sizeof(openvdb::tools::PointList::element_type) == sizeof(UT_Vector3));
     GA_RWHandleV3 pthandle(detail.getP());
     pthandle.setBlock(startpt, npoints, (UT_Vector3 *)points.get());
+
+    // group fracture seam points
+    if (seamPointGroup) {
+        GA_Offset ptoff = startpt;
+        for (GA_Size i = 0; i < npoints; ++i) {
+
+            if (mesher.pointFlags()[i]) {
+                seamPointGroup->addOffset(ptoff);
+            }
+            ++ptoff;
+        }
+    }
 
     // index 0 --> interior, not on seam
     // index 1 --> interior, on seam
@@ -809,11 +830,11 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
     const double iadaptivity = double(evalFloat("internaladaptivity", 0, time));
     mesher.setRefGrid(refGrid, iadaptivity);
 
-
     std::list<openvdb::GridBase::Ptr>::iterator it = grids.begin();
     std::vector<std::string> badTransformList, badBackgroundList, badTypeList;
 
     GA_PrimitiveGroup *surfaceGroup = NULL, *interiorGroup = NULL, *seamGroup = NULL;
+    GA_PointGroup* seamPointGroup = NULL;
 
     {
         UT_String newGropStr;
@@ -834,7 +855,14 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
             seamGroup = gdp->findPrimitiveGroup(newGropStr);
             if (!seamGroup) seamGroup = gdp->newPrimitiveGroup(newGropStr);
         }
+
+        evalString(newGropStr, "seampoints", 0, time);
+        if(newGropStr.length() > 0) {
+            seamPointGroup = gdp->findPointGroup(newGropStr);
+            if (!seamPointGroup) seamPointGroup = gdp->newPointGroup(newGropStr);
+        }
     }
+
 
     for (it = grids.begin(); it != grids.end(); ++it) {
 
@@ -860,7 +888,7 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
         mesher(*grid);
 
         copyMesh(*gdp, mesher, boss, keepVdbName ? grid->getName().c_str() : NULL,
-            surfaceGroup, interiorGroup, seamGroup);
+            surfaceGroup, interiorGroup, seamGroup, seamPointGroup);
     }
 
     grids.clear();
@@ -868,14 +896,14 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
     // Sharpen Features
     if (!boss.wasInterrupted() && sharpenFeatures) { 
         UTparallelFor(GA_SplittableRange(gdp->getPointRange()),
-            hvdb::SharpenFeaturesOp(*gdp, *refGeo, edgeData, *transform, surfaceGroup));
+            hvdb::SharpenFeaturesOp(*gdp, *refGeo, edgeData, *transform, surfaceGroup, maskTree.get()));
     }
 
     // Compute vertex normals
     if (!boss.wasInterrupted() && computeNormals) {
 
         UTparallelFor(GA_SplittableRange(gdp->getPrimitiveRange()),
-            hvdb::VertexNormalOp(*gdp, interiorGroup));
+            hvdb::VertexNormalOp(*gdp, interiorGroup, (transferAttributes ? -1.0 : 0.7) ));
 
         if (!interiorGroup) {
             addWarning(SOP_MESSAGE, "More accurate vertex normals can be generated "
@@ -887,7 +915,6 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
     if (!boss.wasInterrupted() && transferAttributes && refGeo && indexGrid) {
         hvdb::transferPrimitiveAttributes(*refGeo, *gdp, *indexGrid, boss, surfaceGroup);
     }
-
 
     if (!badTransformList.empty()) {
         std::string s = "The following grids were skipped: '" +

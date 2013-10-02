@@ -42,7 +42,7 @@
 /// vdb::vX_Y_Z::Vec3i, vdb::vX_Y_Z::io::File, vdb::vX_Y_Z::tree::Tree, etc.,
 /// where X, Y and Z are OPENVDB_LIBRARY_MAJOR_VERSION, OPENVDB_LIBRARY_MINOR_VERSION
 /// and OPENVDB_LIBRARY_PATCH_VERSION, respectively (defined below).
-#define OPENVDB_VERSION_NAME v2_0_0b3
+#define OPENVDB_VERSION_NAME v2_0_0
 
 /// If OPENVDB_REQUIRE_VERSION_NAME is undefined, symbols from the version
 /// namespace are promoted to the top-level namespace (e.g., vdb::v1_0_0::io::File

@@ -31,6 +31,7 @@
 #ifndef OPENVDB_TOOLS_VOLUME_TO_MESH_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_VOLUME_TO_MESH_HAS_BEEN_INCLUDED
 
+
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/util/Util.h> // for COORD_OFFSETS
 #include <openvdb/math/Operators.h> // for ISGradient
@@ -54,6 +55,7 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
+
 
 ////////////////////////////////////////
 
@@ -99,69 +101,53 @@ volumeToMesh(
 
 
 /// @brief Polygon flags, used for reference based meshing.
-enum { POLYFLAG_EXTERIOR = 0x1, POLYFLAG_FRACTURE_SEAM = 0x2 };
+enum { POLYFLAG_EXTERIOR = 0x1, POLYFLAG_FRACTURE_SEAM = 0x2,  POLYFLAG_NONPLANAR = 0x4};
 
 
 /// @brief Collection of quads and triangles
 class PolygonPool
 {
 public:
-    PolygonPool()
-    : mNumQuads(0)
-    , mNumTriangles(0)
-    , mQuads(NULL)
-    , mTriangles(NULL)
-    , mQuadFlags(NULL)
-    , mTriangleFlags(NULL)
-    {
-    }
 
-    void resetQuads(size_t size)
-    {
-        mNumQuads = size;
-        mQuads.reset(new openvdb::Vec4I[mNumQuads]);
-        mQuadFlags.reset(new char[mNumQuads]);
-    }
+    inline PolygonPool();
+    inline PolygonPool(const size_t numQuads, const size_t numTriangles);
 
-    void clearQuads()
-    {
-        mNumQuads = 0;
-        mQuads.reset(NULL);
-        mQuadFlags.reset(NULL);
-    }
 
-    void resetTriangles(size_t size)
-    {
-        mNumTriangles = size;
-        mTriangles.reset(new openvdb::Vec3I[mNumTriangles]);
-        mTriangleFlags.reset(new char[mNumTriangles]);
-    }
+    inline void copy(const PolygonPool& rhs);
 
-    void clearTriangles()
-    {
-        mNumTriangles = 0;
-        mTriangles.reset(NULL);
-        mTriangleFlags.reset(NULL);
-    }
+    inline void resetQuads(size_t size);
+    inline void clearQuads();
 
-    const size_t& numQuads() const { return mNumQuads; }
-    const size_t& numTriangles() const { return mNumTriangles; }
+    inline void resetTriangles(size_t size);
+    inline void clearTriangles();
+
 
     // polygon accessor methods
-    openvdb::Vec4I& quad(size_t n) { return mQuads[n]; }
-    const openvdb::Vec4I& quad(size_t n) const { return mQuads[n]; }
 
-    openvdb::Vec3I& triangle(size_t n) { return mTriangles[n]; }
-    const openvdb::Vec3I& triangle(size_t n) const { return mTriangles[n]; }
+    const size_t& numQuads() const                      { return mNumQuads; }
+
+    openvdb::Vec4I& quad(size_t n)                      { return mQuads[n]; }
+    const openvdb::Vec4I& quad(size_t n) const          { return mQuads[n]; }
+
+
+    const size_t& numTriangles() const                  { return mNumTriangles; }
+
+    openvdb::Vec3I& triangle(size_t n)                  { return mTriangles[n]; }
+    const openvdb::Vec3I& triangle(size_t n) const      { return mTriangles[n]; }
+
 
     // polygon flags accessor methods
-    char& quadFlags(size_t n) { return mQuadFlags[n]; }
-    const char& quadFlags(size_t n) const { return mQuadFlags[n]; }
 
-    char& triangleFlags(size_t n) { return mTriangleFlags[n]; }
-    const char& triangleFlags(size_t n) const { return mTriangleFlags[n]; }
+    char& quadFlags(size_t n)                           { return mQuadFlags[n]; }
+    const char& quadFlags(size_t n) const               { return mQuadFlags[n]; }
+
+    char& triangleFlags(size_t n)                       { return mTriangleFlags[n]; }
+    const char& triangleFlags(size_t n) const           { return mTriangleFlags[n]; }
 
 private:
+    // disallow copy by assignment
+    void operator=(const PolygonPool&) {}
+
     size_t mNumQuads, mNumTriangles;
     boost::scoped_array<openvdb::Vec4I> mQuads;
     boost::scoped_array<openvdb::Vec3I> mTriangles;
@@ -183,21 +169,37 @@ typedef boost::scoped_array<PolygonPool> PolygonPoolList;
 class VolumeToMesh
 {
 public:
+
     /// @param isovalue         Determines which isosurface to mesh.
     /// @param adaptivity       Adaptivity threshold [0 to 1]
     VolumeToMesh(double isovalue = 0, double adaptivity = 0);
 
-    PointList& pointList();
-    const size_t& pointListSize() const;
 
+    //////////
+    
+    // Mesh data accessors
+
+    const size_t& pointListSize() const;
+    PointList& pointList();
+
+    const size_t& polygonPoolListSize() const;
     PolygonPoolList& polygonPoolList();
     const PolygonPoolList& polygonPoolList() const;
-    const size_t& polygonPoolListSize() const;
 
-    /// @brief main call
+    std::vector<unsigned char>& pointFlags();
+    const std::vector<unsigned char>& pointFlags() const;
+
+
+    //////////
+
+
+    /// @brief Main call
     /// @note Call with scalar typed grid.
     template<typename GridT>
     void operator()(const GridT&);
+
+
+    //////////
 
 
     /// @brief  When surfacing fractured SDF fragments, the original unfractured
@@ -249,16 +251,20 @@ private:
     PointList mPoints;
     PolygonPoolList mPolygons;
 
-    size_t mPointListSize, mPolygonPoolListSize;
+    size_t mPointListSize, mSeamPointListSize, mPolygonPoolListSize;
     double mIsovalue, mPrimAdaptivity, mSecAdaptivity;
 
     GridBase::ConstPtr mRefGrid, mSurfaceMaskGrid, mAdaptivityGrid;
     TreeBase::ConstPtr mAdaptivityMaskTree;
 
-    TreeBase::Ptr mRefSignTree; //, mRefTopologyMaskTree, mSeamPointTree;
+    TreeBase::Ptr mRefSignTree, mRefIdxTree; 
 
-    bool mSmoothSeams, mInvertSurfaceMask;
+    bool mInvertSurfaceMask;
     unsigned mPartitions, mActivePart;
+
+    boost::scoped_array<uint32_t> mQuantizedSeamPoints;
+
+    std::vector<unsigned char> mPointFlags;
 };
 
 
@@ -366,13 +372,13 @@ inline Vec3d findFeaturePoint(
 
 
 // Internal utility methods
-
-
 namespace internal {
+
 
 /// @brief  Bit-flags used to classify cells.
 enum { SIGNS = 0xFF, EDGES = 0xE00, INSIDE = 0x100,
        XEDGE = 0x200, YEDGE = 0x400, ZEDGE = 0x800, SEAM = 0x1000};
+
 
 /// @brief Used to quickly determine if a given cell is adaptable.
 const bool sAdaptable[256] = {
@@ -385,6 +391,7 @@ const bool sAdaptable[256] = {
     1,0,0,0,1,0,1,0,1,1,0,0,1,1,1,1,1,1,0,0,1,0,0,0,1,1,0,0,1,1,0,1,
     1,0,1,0,1,0,1,0,1,0,0,0,1,0,1,1,1,1,1,1,1,0,1,1,1,1,0,1,1,1,1,1};
 
+
 /// @brief  Contains the ambiguous face index for certain cell configuration.
 const unsigned char sAmbiguousFace[256] = {
     0,0,0,0,0,5,0,0,0,0,5,0,0,0,0,0,0,0,1,0,0,5,1,0,4,0,0,0,4,0,0,0,
@@ -395,6 +402,7 @@ const unsigned char sAmbiguousFace[256] = {
     6,0,6,0,0,0,0,0,6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
     0,4,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
 
 /// @brief  Lookup table for different cell sign configurations. The first entry specifies
 ///         the total number of points that need to be generated inside a cell and the
@@ -488,6 +496,80 @@ const unsigned char sEdgeGroupTable[256][13] = {
     {0,0,0,0,0,0,0,0,0,0,0,0,0}};
 
 
+////////////////////////////////////////
+
+inline bool
+isPlanarQuad(
+    const Vec3d& p0, const Vec3d& p1,
+    const Vec3d& p2, const Vec3d& p3,
+    double epsilon = 0.001)
+{
+    // compute representative plane
+    Vec3d normal = (p2-p0).cross(p1-p3);
+    normal.normalize();
+    const Vec3d centroid = (p0 + p1 + p2 + p3);
+    const double d = centroid.dot(normal) * 0.25;
+    
+    
+    // test vertice distance to plane
+    double absDist = std::abs(p0.dot(normal) - d);
+    if (absDist > epsilon) return false;
+    
+    absDist = std::abs(p1.dot(normal) - d);
+    if (absDist > epsilon) return false;
+
+    absDist = std::abs(p2.dot(normal) - d);
+    if (absDist > epsilon) return false;
+
+    absDist = std::abs(p3.dot(normal) - d);
+    if (absDist > epsilon) return false;
+
+    return true;
+}
+
+
+////////////////////////////////////////
+
+
+/// @{
+/// @brief  Utility methods for point quantization.
+
+enum { MASK_FIRST_10_BITS = 0x000003FF, MASK_DIRTY_BIT = 0x80000000, MASK_INVALID_BIT = 0x40000000 };
+
+inline uint32_t
+packPoint(const Vec3d& v)
+{
+    uint32_t data = 0;
+
+    // values are expected to be in the [0.0 to 1.0] range.
+    assert(!(v.x() > 1.0) && !(v.y() > 1.0) && !(v.z() > 1.0));
+    assert(!(v.x() < 0.0) && !(v.y() < 0.0) && !(v.z() < 0.0));
+
+    data |= (uint32_t(v.x() * 1023.0) & MASK_FIRST_10_BITS) << 20;
+    data |= (uint32_t(v.y() * 1023.0) & MASK_FIRST_10_BITS) << 10;
+    data |= (uint32_t(v.z() * 1023.0) & MASK_FIRST_10_BITS);
+
+    return data;
+}
+
+inline Vec3d
+unpackPoint(uint32_t data)
+{
+    Vec3d v;
+    v.z() = double(data & MASK_FIRST_10_BITS) * 0.0009775171;
+    data = data >> 10;
+    v.y() = double(data & MASK_FIRST_10_BITS) * 0.0009775171;
+    data = data >> 10;
+    v.x() = double(data & MASK_FIRST_10_BITS) * 0.0009775171;
+
+    return v;
+}
+
+/// @}
+
+////////////////////////////////////////
+
+
 /// @brief  General method that computes the cell-sign configuration at the given
 ///         @c ijk coordinate.
 template<typename AccessorT>
@@ -551,6 +633,8 @@ evalCellSigns(const LeafT& leaf, const Index offset, typename LeafT::ValueType i
 }
 
 
+/// @brief  Used to correct topological ambiguities related to two adjacent cells
+///         that share an ambiguous face.
 template<class AccessorT>
 inline void
 correctCellSigns(unsigned char& signs, unsigned char face,
@@ -838,6 +922,7 @@ private:
 
 };
 
+
 template<typename TreeT, typename LeafManagerT>
 SignData<TreeT, LeafManagerT>::SignData(const TreeT& distTree,
     const LeafManagerT& leafs, ValueT iso)
@@ -852,6 +937,7 @@ SignData<TreeT, LeafManagerT>::SignData(const TreeT& distTree,
 {
 }
 
+
 template<typename TreeT, typename LeafManagerT>
 SignData<TreeT, LeafManagerT>::SignData(SignData& rhs, tbb::split)
     : mDistTree(rhs.mDistTree)
@@ -864,6 +950,7 @@ SignData<TreeT, LeafManagerT>::SignData(SignData& rhs, tbb::split)
     , mIdxAcc(*mIdxTree)
 {
 }
+
 
 template<typename TreeT, typename LeafManagerT>
 void
@@ -924,7 +1011,6 @@ SignData<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size_t>& rang
             }
         }
 
-
         if (collectedData) {
             mIdxAcc.touchLeaf(coord)->topologyUnion(*signLeafPt);
             mSignAcc.addLeaf(signLeafPt.release());
@@ -936,6 +1022,7 @@ SignData<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size_t>& rang
 ////////////////////////////////////////
 
 
+/// @brief Counts the total number of points per leaf, accounts for cells with multiple points. 
 class CountPoints
 {
 public:
@@ -959,6 +1046,42 @@ private:
 };
 
 
+/// @brief Computes the point list indices for the index tree.
+template<typename Int16TreeT>
+class MapPoints
+{
+public:
+    typedef tree::ValueAccessor<const Int16TreeT> Int16AccessorT;
+
+    MapPoints(std::vector<size_t>& pointList, const Int16TreeT& signTree)
+        : mPointList(pointList)
+        , mSignAcc(signTree)
+    {
+    }
+
+    template <typename LeafNodeType>
+    void operator()(LeafNodeType &leaf, size_t leafIndex) const
+    {
+        size_t ptnIdx = mPointList[leafIndex];
+        typename LeafNodeType::ValueOnIter iter = leaf.beginValueOn();
+
+        const typename Int16TreeT::LeafNodeType *signLeafPt =
+            mSignAcc.probeConstLeaf(leaf.origin());
+
+        for (; iter; ++iter) {
+            iter.setValue(ptnIdx);
+            unsigned signs = SIGNS & signLeafPt->getValue(iter.pos());
+            ptnIdx += size_t(sEdgeGroupTable[signs][0]);
+        }
+    }
+
+private:
+    std::vector<size_t>& mPointList;
+    Int16AccessorT mSignAcc;
+};
+
+
+/// @brief Counts the total number of points per collapsed region 
 template<typename IntTreeT>
 class CountRegions
 {
@@ -1012,9 +1135,12 @@ private:
 
 ////////////////////////////////////////
 
+
+// @brief linear interpolation.
 inline double evalRoot(double v0, double v1, double iso) { return (iso - v0) / (v1 - v0); }
 
 
+/// @brief Extracts the eight corner values for leaf inclusive cells. 
 template<typename LeafT>
 inline void
 collectCornerValues(const LeafT& leaf, const Index offset, std::vector<double>& values)
@@ -1029,6 +1155,8 @@ collectCornerValues(const LeafT& leaf, const Index offset, std::vector<double>& 
     values[6] = double(leaf.getValue(offset + (LeafT::DIM * LeafT::DIM) + LeafT::DIM + 1)); // i+1, j+1, k+1
 }
 
+
+/// @brief Extracts the eight corner values for a cell starting at the given @ijk coordinate. 
 template<typename AccessorT>
 inline void
 collectCornerValues(const AccessorT& acc, const Coord& ijk, std::vector<double>& values)
@@ -1059,6 +1187,7 @@ collectCornerValues(const AccessorT& acc, const Coord& ijk, std::vector<double>&
 }
 
 
+/// @brief Computes the average cell point for a given edge group.
 inline Vec3d
 computePoint(const std::vector<double>& values, unsigned char signs,
     unsigned char edgeGroup, double iso)
@@ -1149,6 +1278,270 @@ computePoint(const std::vector<double>& values, unsigned char signs,
 }
 
 
+/// @brief  Computes the average cell point for a given edge group, ignoring edge
+///         samples present in the @c signsMask configuration. 
+inline int
+computeMaskedPoint(Vec3d& avg, const std::vector<double>& values, unsigned char signs,
+    unsigned char signsMask, unsigned char edgeGroup, double iso)
+{
+    avg = Vec3d(0.0, 0.0, 0.0);
+    int samples = 0;
+
+    if (sEdgeGroupTable[signs][1] == edgeGroup
+        && sEdgeGroupTable[signsMask][1] == 0) { // Edged: 0 - 1
+        avg[0] += evalRoot(values[0], values[1], iso);
+        ++samples;
+    }
+
+    if (sEdgeGroupTable[signs][2] == edgeGroup
+        && sEdgeGroupTable[signsMask][2] == 0) { // Edged: 1 - 2
+        avg[0] += 1.0;
+        avg[2] += evalRoot(values[1], values[2], iso);
+        ++samples;
+    }
+
+    if (sEdgeGroupTable[signs][3] == edgeGroup
+        && sEdgeGroupTable[signsMask][3] == 0) { // Edged: 3 - 2
+        avg[0] += evalRoot(values[3], values[2], iso);
+        avg[2] += 1.0;
+        ++samples;
+    }
+
+    if (sEdgeGroupTable[signs][4] == edgeGroup
+        && sEdgeGroupTable[signsMask][4] == 0) { // Edged: 0 - 3
+        avg[2] += evalRoot(values[0], values[3], iso);
+        ++samples;
+    }
+
+    if (sEdgeGroupTable[signs][5] == edgeGroup
+        && sEdgeGroupTable[signsMask][5] == 0) { // Edged: 4 - 5
+        avg[0] += evalRoot(values[4], values[5], iso);
+        avg[1] += 1.0;
+        ++samples;
+    }
+
+    if (sEdgeGroupTable[signs][6] == edgeGroup
+        && sEdgeGroupTable[signsMask][6] == 0) { // Edged: 5 - 6
+        avg[0] += 1.0;
+        avg[1] += 1.0;
+        avg[2] += evalRoot(values[5], values[6], iso);
+        ++samples;
+    }
+
+    if (sEdgeGroupTable[signs][7] == edgeGroup
+        && sEdgeGroupTable[signsMask][7] == 0) { // Edged: 7 - 6
+        avg[0] += evalRoot(values[7], values[6], iso);
+        avg[1] += 1.0;
+        avg[2] += 1.0;
+        ++samples;
+    }
+
+    if (sEdgeGroupTable[signs][8] == edgeGroup
+        && sEdgeGroupTable[signsMask][8] == 0) { // Edged: 4 - 7
+        avg[1] += 1.0;
+        avg[2] += evalRoot(values[4], values[7], iso);
+        ++samples;
+    }
+
+    if (sEdgeGroupTable[signs][9] == edgeGroup
+        && sEdgeGroupTable[signsMask][9] == 0) { // Edged: 0 - 4
+        avg[1] += evalRoot(values[0], values[4], iso);
+        ++samples;
+    }
+
+    if (sEdgeGroupTable[signs][10] == edgeGroup
+        && sEdgeGroupTable[signsMask][10] == 0) { // Edged: 1 - 5
+        avg[0] += 1.0;
+        avg[1] += evalRoot(values[1], values[5], iso);
+        ++samples;
+    }
+
+    if (sEdgeGroupTable[signs][11] == edgeGroup
+        && sEdgeGroupTable[signsMask][11] == 0) { // Edged: 2 - 6
+        avg[0] += 1.0;
+        avg[1] += evalRoot(values[2], values[6], iso);
+        avg[2] += 1.0;
+        ++samples;
+    }
+
+    if (sEdgeGroupTable[signs][12] == edgeGroup
+        && sEdgeGroupTable[signsMask][12] == 0) { // Edged: 3 - 7
+        avg[1] += evalRoot(values[3], values[7], iso);
+        avg[2] += 1.0;
+        ++samples;
+    }
+
+    if (samples > 1) {
+        double w = 1.0 / double(samples);
+        avg[0] *= w;
+        avg[1] *= w;
+        avg[2] *= w;
+    }
+
+    return samples;
+}
+
+
+/// @brief  Computes the average cell point for a given edge group, by computing
+///         convex weights based on the distance from the sample point @c p.
+inline Vec3d
+computeWeightedPoint(const Vec3d& p, const std::vector<double>& values,
+    unsigned char signs, unsigned char edgeGroup, double iso)
+{
+    std::vector<Vec3d> samples;
+    samples.reserve(8);
+
+    std::vector<double> weights;
+    weights.reserve(8);
+
+    Vec3d avg(0.0, 0.0, 0.0);
+
+    if (sEdgeGroupTable[signs][1] == edgeGroup) { // Edged: 0 - 1
+        avg[0] = evalRoot(values[0], values[1], iso);
+        avg[1] = 0.0;
+        avg[2] = 0.0;
+
+        samples.push_back(avg);
+        weights.push_back((avg-p).lengthSqr());
+    }
+
+    if (sEdgeGroupTable[signs][2] == edgeGroup) { // Edged: 1 - 2
+        avg[0] = 1.0;
+        avg[1] = 0.0;
+        avg[2] = evalRoot(values[1], values[2], iso);
+
+        samples.push_back(avg);
+        weights.push_back((avg-p).lengthSqr());
+    }
+
+    if (sEdgeGroupTable[signs][3] == edgeGroup) { // Edged: 3 - 2
+        avg[0] = evalRoot(values[3], values[2], iso);
+        avg[1] = 0.0;
+        avg[2] = 1.0;
+
+        samples.push_back(avg);
+        weights.push_back((avg-p).lengthSqr());
+    }
+
+    if (sEdgeGroupTable[signs][4] == edgeGroup) { // Edged: 0 - 3
+        avg[0] = 0.0;
+        avg[1] = 0.0;
+        avg[2] = evalRoot(values[0], values[3], iso);
+
+        samples.push_back(avg);
+        weights.push_back((avg-p).lengthSqr());
+    }
+
+    if (sEdgeGroupTable[signs][5] == edgeGroup) { // Edged: 4 - 5
+        avg[0] = evalRoot(values[4], values[5], iso);
+        avg[1] = 1.0;
+        avg[2] = 0.0;
+
+        samples.push_back(avg);
+        weights.push_back((avg-p).lengthSqr());
+    }
+
+    if (sEdgeGroupTable[signs][6] == edgeGroup) { // Edged: 5 - 6
+        avg[0] = 1.0;
+        avg[1] = 1.0;
+        avg[2] = evalRoot(values[5], values[6], iso);
+
+        samples.push_back(avg);
+        weights.push_back((avg-p).lengthSqr());
+    }
+
+    if (sEdgeGroupTable[signs][7] == edgeGroup) { // Edged: 7 - 6
+        avg[0] = evalRoot(values[7], values[6], iso);
+        avg[1] = 1.0;
+        avg[2] = 1.0;
+
+        samples.push_back(avg);
+        weights.push_back((avg-p).lengthSqr());
+    }
+
+    if (sEdgeGroupTable[signs][8] == edgeGroup) { // Edged: 4 - 7
+        avg[0] = 0.0;
+        avg[1] = 1.0;
+        avg[2] = evalRoot(values[4], values[7], iso);
+
+        samples.push_back(avg);
+        weights.push_back((avg-p).lengthSqr());
+    }
+
+    if (sEdgeGroupTable[signs][9] == edgeGroup) { // Edged: 0 - 4
+        avg[0] = 0.0;
+        avg[1] = evalRoot(values[0], values[4], iso);
+        avg[2] = 0.0;
+
+        samples.push_back(avg);
+        weights.push_back((avg-p).lengthSqr());
+    }
+
+    if (sEdgeGroupTable[signs][10] == edgeGroup) { // Edged: 1 - 5
+        avg[0] = 1.0;
+        avg[1] = evalRoot(values[1], values[5], iso);
+        avg[2] = 0.0;
+
+        samples.push_back(avg);
+        weights.push_back((avg-p).lengthSqr());
+    }
+
+    if (sEdgeGroupTable[signs][11] == edgeGroup) { // Edged: 2 - 6
+        avg[0] = 1.0;
+        avg[1] = evalRoot(values[2], values[6], iso);
+        avg[2] = 1.0;
+
+        samples.push_back(avg);
+        weights.push_back((avg-p).lengthSqr());
+    }
+
+    if (sEdgeGroupTable[signs][12] == edgeGroup) { // Edged: 3 - 7
+        avg[0] = 0.0;
+        avg[1] = evalRoot(values[3], values[7], iso);
+        avg[2] = 1.0;
+
+        samples.push_back(avg);
+        weights.push_back((avg-p).lengthSqr());
+    }
+
+
+    double minWeight = std::numeric_limits<double>::max();
+    double maxWeight = -std::numeric_limits<double>::max();
+
+    for (size_t i = 0, I = weights.size(); i < I; ++i) {
+        minWeight = std::min(minWeight, weights[i]);
+        maxWeight = std::max(maxWeight, weights[i]);
+    }
+
+    const double offset = maxWeight + minWeight * 0.1;
+    for (size_t i = 0, I = weights.size(); i < I; ++i) {
+        weights[i] = offset - weights[i];
+    }
+
+
+    double weightSum = 0.0;
+    for (size_t i = 0, I = weights.size(); i < I; ++i) {
+        weightSum += weights[i];
+    }
+
+    avg[0] = 0.0;
+    avg[1] = 0.0;
+    avg[2] = 0.0;
+
+    if (samples.size() > 1) {
+        for (size_t i = 0, I = samples.size(); i < I; ++i) {            
+            avg += samples[i] * (weights[i] / weightSum);
+        }
+    } else {
+        avg = samples.front();
+    }
+
+    return avg;
+}
+
+
+/// @brief  Computes the average cell points defined by the sign configuration
+///         @c signs and the given corner values @c values. 
 inline void
 computeCellPoints(std::vector<Vec3d>& points,
     const std::vector<double>& values, unsigned char signs, double iso)
@@ -1159,30 +1552,57 @@ computeCellPoints(std::vector<Vec3d>& points,
 }
 
 
-inline void
-computeCellPoints(std::vector<Vec3d>& points,
+/// @brief  Given a sign configuration @c lhsSigns and an edge group @c groupId,
+///         finds the corresponding edge group in a different sign configuration
+///         @c rhsSigns. Returns -1 if no match is found.
+inline int
+matchEdgeGroup(unsigned char groupId, unsigned char lhsSigns, unsigned char rhsSigns)
+{
+    int id = -1;
+    for (size_t i = 1; i <= 12; ++i) {
+        if (sEdgeGroupTable[lhsSigns][i] == groupId && sEdgeGroupTable[rhsSigns][i] != 0) {
+            id = sEdgeGroupTable[rhsSigns][i];
+            break;
+        }
+    }
+    return id;
+}
+
+
+/// @brief  Computes the average cell points defined by the sign configuration
+///         @c signs and the given corner values @c values. Combines data from
+///         two different level sets to eliminate seam lines when meshing
+///         fractured segments.  
+inline void 
+computeCellPoints(std::vector<Vec3d>& points, std::vector<bool>& weightedPointMask,
     const std::vector<double>& lhsValues, const std::vector<double>& rhsValues,
-    unsigned char lhsSigns, unsigned char rhsSigns, double iso)
+    unsigned char lhsSigns, unsigned char rhsSigns,
+    double iso, size_t pointIdx, const boost::scoped_array<uint32_t>& seamPoints)
 {
     for (size_t n = 1, N = sEdgeGroupTable[lhsSigns][0] + 1; n < N; ++n) {
 
-        int id = -1;
-        for (size_t i = 1; i <= 12; ++i) {
-            if (sEdgeGroupTable[lhsSigns][i] == n && sEdgeGroupTable[rhsSigns][i] != 0) {
-                id = sEdgeGroupTable[rhsSigns][i];
-                break;
-            }
-        }
+        int id = matchEdgeGroup(n, lhsSigns, rhsSigns);
 
         if (id != -1) {
-            unsigned char e(id);
-            points.push_back(computePoint(rhsValues, rhsSigns, e, iso));
+
+            const unsigned char e(id);
+            uint32_t& quantizedPoint = seamPoints[pointIdx + (id - 1)];
+
+            if ((quantizedPoint & MASK_DIRTY_BIT) && !(quantizedPoint & MASK_INVALID_BIT)) {
+                Vec3d p = unpackPoint(quantizedPoint);
+                points.push_back(computeWeightedPoint(p, rhsValues, rhsSigns, e, iso));
+                weightedPointMask.push_back(true);
+            } else {
+                points.push_back(computePoint(rhsValues, rhsSigns, e, iso));
+                weightedPointMask.push_back(false);
+            }
+
         } else {
             points.push_back(computePoint(lhsValues, lhsSigns, n, iso));
+            weightedPointMask.push_back(false);
         }
     }
 }
-
 
 
 template <typename TreeT, typename LeafManagerT>
@@ -1190,12 +1610,15 @@ class GenPoints
 {
 public:
     typedef tree::ValueAccessor<const TreeT> AccessorT;
+
     typedef typename TreeT::template ValueConverter<int>::Type IntTreeT;
     typedef tree::ValueAccessor<IntTreeT> IntAccessorT;
+    typedef tree::ValueAccessor<const IntTreeT> IntCAccessorT;
 
     typedef typename TreeT::template ValueConverter<Int16>::Type Int16TreeT;
-    typedef tree::ValueAccessor<const Int16TreeT> Int16AccessorT;
+    typedef tree::ValueAccessor<const Int16TreeT> Int16CAccessorT;
 
+    typedef boost::scoped_array<uint32_t> QuantizedPointList;
 
     //////////
 
@@ -1204,9 +1627,11 @@ public:
         IntTreeT& idxTree, PointList& points, std::vector<size_t>& indices,
         const math::Transform& xform, double iso);
 
-    void setRefData(const Int16TreeT* refSignTree = NULL, const TreeT* refDistTree = NULL);
-
     void run(bool threaded = true);
+
+    void setRefData(const Int16TreeT* refSignTree = NULL, const TreeT* refDistTree = NULL,
+        IntTreeT* refIdxTree = NULL, const QuantizedPointList* seamPoints = NULL,
+        std::vector<unsigned char>* mSeamPointMaskPt = NULL);
 
     //////////
 
@@ -1216,9 +1641,7 @@ public:
 private:
     const LeafManagerT& mSignLeafs;
 
-    const TreeT& mDistTree;
     AccessorT mDistAcc;
-
     IntTreeT& mIdxTree;
 
     PointList& mPoints;
@@ -1226,8 +1649,12 @@ private:
     const math::Transform& mTransform;
     const double mIsovalue;
 
-    const Int16TreeT *mRefSignTree;
-    const TreeT* mRefDistTree;
+    // reference data
+    const Int16TreeT *mRefSignTreePt;
+    const TreeT* mRefDistTreePt;
+    const IntTreeT* mRefIdxTreePt;
+    const QuantizedPointList* mSeamPointsPt;
+    std::vector<unsigned char>* mSeamPointMaskPt;
 };
 
 
@@ -1236,15 +1663,17 @@ GenPoints<TreeT, LeafManagerT>::GenPoints(const LeafManagerT& signLeafs,
     const TreeT& distTree, IntTreeT& idxTree, PointList& points,
     std::vector<size_t>& indices, const math::Transform& xform, double iso)
     : mSignLeafs(signLeafs)
-    , mDistTree(distTree)
-    , mDistAcc(mDistTree)
+    , mDistAcc(distTree)
     , mIdxTree(idxTree)
     , mPoints(points)
     , mIndices(indices)
     , mTransform(xform)
     , mIsovalue(iso)
-    , mRefSignTree(NULL)
-    , mRefDistTree(NULL)
+    , mRefSignTreePt(NULL)
+    , mRefDistTreePt(NULL)
+    , mRefIdxTreePt(NULL)
+    , mSeamPointsPt(NULL)
+    , mSeamPointMaskPt(NULL)
 {
 }
 
@@ -1260,10 +1689,14 @@ GenPoints<TreeT, LeafManagerT>::run(bool threaded)
 
 template <typename TreeT, typename LeafManagerT>
 void
-GenPoints<TreeT, LeafManagerT>::setRefData(const Int16TreeT *refSignTree, const TreeT *refDistTree)
+GenPoints<TreeT, LeafManagerT>::setRefData(const Int16TreeT *refSignTree, const TreeT *refDistTree,
+    IntTreeT* refIdxTree, const QuantizedPointList* seamPoints, std::vector<unsigned char>* seamPointMask)
 {
-    mRefSignTree = refSignTree;
-    mRefDistTree = refDistTree;
+    mRefSignTreePt = refSignTree;
+    mRefDistTreePt = refDistTree;
+    mRefIdxTreePt = refIdxTree;
+    mSeamPointsPt = seamPoints;
+    mSeamPointMaskPt = seamPointMask;
 }
 
 
@@ -1273,36 +1706,47 @@ GenPoints<TreeT, LeafManagerT>::operator()(
     const tbb::blocked_range<size_t>& range) const
 {
     typename IntTreeT::LeafNodeType::ValueOnIter iter;
-    IntAccessorT idxAcc(mIdxTree);
-
     unsigned char signs, refSigns;
     Index offset;
     Coord ijk, coord;
     std::vector<Vec3d> points(4);
+    std::vector<bool> weightedPointMask(4);
     std::vector<double> values(8), refValues(8);
+    
 
-    // reference data
-    boost::scoped_ptr<Int16AccessorT> refSignAcc;
-    if (mRefSignTree) refSignAcc.reset(new Int16AccessorT(*mRefSignTree));
+    IntAccessorT idxAcc(mIdxTree);
+
+    // reference data accessors
+    boost::scoped_ptr<Int16CAccessorT> refSignAcc;
+    if (mRefSignTreePt) refSignAcc.reset(new Int16CAccessorT(*mRefSignTreePt));
+
+    boost::scoped_ptr<IntCAccessorT> refIdxAcc;
+    if (mRefIdxTreePt) refIdxAcc.reset(new IntCAccessorT(*mRefIdxTreePt));
 
     boost::scoped_ptr<AccessorT> refDistAcc;
-    if (mRefDistTree) refDistAcc.reset(new AccessorT(*mRefDistTree));
+    if (mRefDistTreePt) refDistAcc.reset(new AccessorT(*mRefDistTreePt));
+
 
     for (size_t n = range.begin(); n != range.end(); ++n) {
 
         coord = mSignLeafs.leaf(n).origin();
 
-        const typename TreeT::LeafNodeType *refDistLeafPt = NULL;
-        if (refDistAcc) refDistLeafPt = refDistAcc->probeConstLeaf(coord);
-
-        const typename Int16TreeT::LeafNodeType *refSignLeafPt = NULL;
-        if (refSignAcc) refSignLeafPt = refSignAcc->probeConstLeaf(coord);
-
-
         const typename TreeT::LeafNodeType *leafPt = mDistAcc.probeConstLeaf(coord);
         typename IntTreeT::LeafNodeType *idxLeafPt = idxAcc.probeLeaf(coord);
 
-        // generate points
+
+        // reference data leafs
+        const typename Int16TreeT::LeafNodeType *refSignLeafPt = NULL;
+        if (refSignAcc) refSignLeafPt = refSignAcc->probeConstLeaf(coord);
+
+        const typename IntTreeT::LeafNodeType *refIdxLeafPt = NULL;
+        if (refIdxAcc) refIdxLeafPt = refIdxAcc->probeConstLeaf(coord);
+
+        const typename TreeT::LeafNodeType *refDistLeafPt = NULL;
+        if (refDistAcc) refDistLeafPt = refDistAcc->probeConstLeaf(coord);
+
+
+        // generate cell points
         size_t ptnIdx = mIndices[n];
         coord.offset(TreeT::LeafNodeType::DIM - 1);
 
@@ -1315,39 +1759,35 @@ GenPoints<TreeT, LeafManagerT>::operator()(
             offset = iter.pos();
             ijk = iter.getCoord();
 
+            const bool inclusiveCell = ijk[0] < coord[0] && ijk[1] < coord[1] && ijk[2] < coord[2];
 
             const Int16& flags = mSignLeafs.leaf(n).getValue(offset);
-            
             signs    = SIGNS & flags;
             refSigns = 0;
 
-            if ((flags & SEAM) && refDistLeafPt && refSignLeafPt) {
-                if (mRefSignTree->isValueOn(ijk)) {
+            if ((flags & SEAM) && refSignLeafPt && refIdxLeafPt) {
+                if (refSignLeafPt->isValueOn(offset)) {
                     refSigns = (SIGNS & refSignLeafPt->getValue(offset));
                 }
             }
 
-            if (ijk[0] < coord[0] && ijk[1] < coord[1] && ijk[2] < coord[2]) {
-                collectCornerValues(*leafPt, offset, values);
-            } else {
-                collectCornerValues(mDistAcc, ijk, values);
-            }
+
+            if (inclusiveCell) collectCornerValues(*leafPt, offset, values);
+            else collectCornerValues(mDistAcc, ijk, values);
 
 
             points.clear();
-
+            weightedPointMask.clear();
 
             if (refSigns == 0) {
                 computeCellPoints(points, values, signs, mIsovalue);
             } else {
 
-                if (ijk[0] < coord[0] && ijk[1] < coord[1] && ijk[2] < coord[2]) {
-                    collectCornerValues(*refDistLeafPt, offset, refValues);
-                } else {
-                    collectCornerValues(*refDistAcc, ijk, refValues);
-                }
+                if (inclusiveCell) collectCornerValues(*refDistLeafPt, offset, refValues);
+                else collectCornerValues(*refDistAcc, ijk, refValues);
 
-                computeCellPoints(points, values, refValues, signs, refSigns, mIsovalue);
+                computeCellPoints(points, weightedPointMask, values, refValues, signs, refSigns,
+                    mIsovalue, refIdxLeafPt->getValue(offset), *mSeamPointsPt);
             }
 
 
@@ -1364,11 +1804,15 @@ GenPoints<TreeT, LeafManagerT>::operator()(
                 mPoints[ptnIdx][1] = float(points[i][1]);
                 mPoints[ptnIdx][2] = float(points[i][2]);
 
+                if (mSeamPointMaskPt && !weightedPointMask.empty() && weightedPointMask[i]) {
+                    (*mSeamPointMaskPt)[ptnIdx] = 1;
+                }
+
                 ++ptnIdx;
             }
         }
 
-
+        // generate collapsed region points
         int onVoxelCount = int(idxLeafPt->onVoxelCount());
         while (onVoxelCount > 0) {
 
@@ -1420,6 +1864,119 @@ GenPoints<TreeT, LeafManagerT>::operator()(
             mPoints[ptnIdx][2] = float(avg[2]);
 
             ++ptnIdx;
+        }
+    }
+}
+
+
+////////////////////////////////////////
+
+
+template<typename TreeT>
+class SeamWeights
+{
+public:
+    typedef tree::ValueAccessor<const TreeT> AccessorT;
+
+    typedef typename TreeT::template ValueConverter<int>::Type IntTreeT;
+    typedef tree::ValueAccessor<const IntTreeT> IntAccessorT;
+
+    typedef typename TreeT::template ValueConverter<Int16>::Type Int16TreeT;
+    typedef tree::ValueAccessor<const Int16TreeT> Int16AccessorT;
+
+    typedef boost::scoped_array<uint32_t> QuantizedPointList;
+
+    //////////
+
+    SeamWeights(const TreeT& distTree, const Int16TreeT& refSignTree,
+        IntTreeT& refIdxTree, QuantizedPointList& points, double iso);
+
+    template <typename LeafNodeType>
+    void operator()(LeafNodeType &signLeaf, size_t leafIndex) const;
+
+private:
+    AccessorT mDistAcc;
+    Int16AccessorT mRefSignAcc;
+    IntAccessorT mRefIdxAcc;
+
+    QuantizedPointList& mPoints;
+    const double mIsovalue;
+};
+
+
+template<typename TreeT>
+SeamWeights<TreeT>::SeamWeights(const TreeT& distTree, const Int16TreeT& refSignTree,
+    IntTreeT& refIdxTree, QuantizedPointList& points, double iso)
+    : mDistAcc(distTree)
+    , mRefSignAcc(refSignTree)
+    , mRefIdxAcc(refIdxTree)
+    , mPoints(points)
+    , mIsovalue(iso)
+{ 
+}
+
+
+template<typename TreeT>
+template <typename LeafNodeType>
+void
+SeamWeights<TreeT>::operator()(LeafNodeType &signLeaf, size_t /*leafIndex*/) const
+{
+    Coord coord = signLeaf.origin();
+    const typename Int16TreeT::LeafNodeType *refSignLeafPt = mRefSignAcc.probeConstLeaf(coord);
+
+    if (!refSignLeafPt) return;
+
+    const typename TreeT::LeafNodeType *distLeafPt = mDistAcc.probeConstLeaf(coord);
+    const typename IntTreeT::LeafNodeType *refIdxLeafPt = mRefIdxAcc.probeConstLeaf(coord);
+
+    std::vector<double> values(8);
+    unsigned char lhsSigns, rhsSigns;
+    Vec3d point;
+    Index offset;
+
+    Coord ijk;
+    coord.offset(TreeT::LeafNodeType::DIM - 1);
+
+    typename LeafNodeType::ValueOnCIter iter = signLeaf.cbeginValueOn();
+    for (; iter; ++iter) {
+
+        offset = iter.pos();
+        ijk = iter.getCoord();
+
+        const bool inclusiveCell = ijk[0] < coord[0] && ijk[1] < coord[1] && ijk[2] < coord[2];
+
+        if ((iter.getValue() & SEAM) && refSignLeafPt->isValueOn(offset)) {
+
+            lhsSigns = SIGNS & iter.getValue();
+            rhsSigns = SIGNS & refSignLeafPt->getValue(offset);
+
+
+            if (inclusiveCell) {
+                collectCornerValues(*distLeafPt, offset, values);
+            } else {
+                collectCornerValues(mDistAcc, ijk, values);
+            }
+
+
+            for (size_t n = 1, N = sEdgeGroupTable[lhsSigns][0] + 1; n < N; ++n) {
+
+                int id = matchEdgeGroup(n, lhsSigns, rhsSigns);
+
+                if (id != -1) {
+
+                    uint32_t& data = mPoints[refIdxLeafPt->getValue(offset) + (id - 1)];
+
+                    if (!(data & MASK_DIRTY_BIT)) {
+                        
+                        int smaples = computeMaskedPoint(point, values, lhsSigns, rhsSigns, n, mIsovalue);
+
+                        if (smaples > 0) data = packPoint(point);
+                        else data = MASK_INVALID_BIT;
+
+                        data |= MASK_DIRTY_BIT;
+                    }
+                }
+            }
         }
     }
 }
@@ -1540,6 +2097,7 @@ MergeVoxelRegions<TreeT, LeafManagerT>::setRefData(const Int16TreeT* signTree, V
     mRefSignTree = signTree;
     mInternalAdaptivity = adaptivity;
 }
+
 
 template <typename TreeT, typename LeafManagerT>
 void
@@ -2056,7 +2614,6 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord
 }
 
 
-
 template<typename LeafManagerT, typename PrimBuilder>
 void
 GenPolygons<LeafManagerT, PrimBuilder>::operator()(
@@ -2339,7 +2896,9 @@ GenSeamMask<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size_t>& r
     }
 }
 
+
 ////////////////////////////////////////
+
 
 template<typename TreeT>
 class TagSeamEdges
@@ -2559,7 +3118,6 @@ private:
 };
 
 
-
 ////////////////////////////////////////
 
 
@@ -2602,6 +3160,7 @@ private:
     BoolTreeT mTree;
 };
 
+
 template<typename SrcTreeT>
 GenTopologyMask<SrcTreeT>::GenTopologyMask(const BoolGridT& mask, const LeafManagerT& srcLeafs,
     const math::Transform& srcXForm, bool invertMask)
@@ -2612,6 +3171,7 @@ GenTopologyMask<SrcTreeT>::GenTopologyMask(const BoolGridT& mask, const LeafMana
     , mTree(false)
 {
 }
+
 
 template<typename SrcTreeT>
 GenTopologyMask<SrcTreeT>::GenTopologyMask(GenTopologyMask& rhs, tbb::split)
@@ -2774,7 +3334,6 @@ GenBoundaryMask<SrcTreeT>::neighboringLeaf(const Coord& ijk, const IntTreeAccess
     const int dim = IntTreeT::LeafNodeType::DIM;
 
     // face adjacent neghbours
-
     if (acc.probeConstLeaf(Coord(ijk[0] + dim, ijk[1], ijk[2]))) return true;
     if (acc.probeConstLeaf(Coord(ijk[0] - dim, ijk[1], ijk[2]))) return true;
     if (acc.probeConstLeaf(Coord(ijk[0], ijk[1] + dim, ijk[2]))) return true;
@@ -2782,9 +3341,7 @@ GenBoundaryMask<SrcTreeT>::neighboringLeaf(const Coord& ijk, const IntTreeAccess
     if (acc.probeConstLeaf(Coord(ijk[0], ijk[1], ijk[2] + dim))) return true;
     if (acc.probeConstLeaf(Coord(ijk[0], ijk[1], ijk[2] - dim))) return true;
 
-
     // edge adjacent neighbors
-
     if (acc.probeConstLeaf(Coord(ijk[0] + dim, ijk[1], ijk[2] - dim))) return true;
     if (acc.probeConstLeaf(Coord(ijk[0] - dim, ijk[1], ijk[2] - dim))) return true;
     if (acc.probeConstLeaf(Coord(ijk[0] + dim, ijk[1], ijk[2] + dim))) return true;
@@ -2799,7 +3356,6 @@ GenBoundaryMask<SrcTreeT>::neighboringLeaf(const Coord& ijk, const IntTreeAccess
     if (acc.probeConstLeaf(Coord(ijk[0], ijk[1] + dim, ijk[2] - dim))) return true;
 
     // corner adjacent neighbors
-
     if (acc.probeConstLeaf(Coord(ijk[0] - dim, ijk[1] - dim, ijk[2] - dim))) return true;
     if (acc.probeConstLeaf(Coord(ijk[0] - dim, ijk[1] - dim, ijk[2] + dim))) return true;
     if (acc.probeConstLeaf(Coord(ijk[0] + dim, ijk[1] - dim, ijk[2] + dim))) return true;
@@ -2933,7 +3489,7 @@ GenTileMask<TreeT>::operator()(const tbb::blocked_range<size_t>& range)
         const bool thisInside = (distAcc.getValue(bbox.min()) < mIsovalue);
         const int thisDepth = distAcc.getValueDepth(bbox.min());
 
-        // Eval x-edges
+        // eval x-edges
 
         ijk = bbox.max();
         nijk = ijk;
@@ -2967,7 +3523,7 @@ GenTileMask<TreeT>::operator()(const tbb::blocked_range<size_t>& range)
         }
 
 
-        // Eval y-edges
+        // eval y-edges
 
         ijk = bbox.max();
         nijk = ijk;
@@ -3000,7 +3556,7 @@ GenTileMask<TreeT>::operator()(const tbb::blocked_range<size_t>& range)
         }
 
 
-        // Eval z-edges
+        // eval z-edges
 
         ijk = bbox.max();
         nijk = ijk;
@@ -3160,6 +3716,7 @@ private:
     std::vector<Vec3s>& mPointsOut;
 };
 
+
 // Checks if the isovalue is in proximity to the active voxel boundary.
 template <typename LeafManagerT>
 inline bool
@@ -3193,14 +3750,99 @@ needsActiveVoxePadding(const LeafManagerT& leafs, double iso, double voxelSize)
     return !(minDist > (2.0 * voxelSize));
 }
 
-} // namespace internal
+
+} // end namespace internal
+
+
+////////////////////////////////////////
+
+
+inline
+PolygonPool::PolygonPool()
+    : mNumQuads(0)
+    , mNumTriangles(0)
+    , mQuads(NULL)
+    , mTriangles(NULL)
+    , mQuadFlags(NULL)
+    , mTriangleFlags(NULL)
+{
+}
+
+
+inline
+PolygonPool::PolygonPool(const size_t numQuads, const size_t numTriangles)
+    : mNumQuads(numQuads)
+    , mNumTriangles(numTriangles)
+    , mQuads(new openvdb::Vec4I[mNumQuads])
+    , mTriangles(new openvdb::Vec3I[mNumTriangles])
+    , mQuadFlags(new char[mNumQuads])
+    , mTriangleFlags(new char[mNumTriangles])
+{
+}
+
+
+inline void
+PolygonPool::copy(const PolygonPool& rhs)
+{
+    resetQuads(rhs.numQuads());
+    resetTriangles(rhs.numTriangles());
+
+    for (size_t i = 0; i < mNumQuads; ++i) {
+        mQuads[i] = rhs.mQuads[i];
+        mQuadFlags[i] = rhs.mQuadFlags[i];
+    }
+
+    for (size_t i = 0; i < mNumTriangles; ++i) {
+        mTriangles[i] = rhs.mTriangles[i];
+        mTriangleFlags[i] = rhs.mTriangleFlags[i];
+    }
+}
+
+
+inline void
+PolygonPool::resetQuads(size_t size)
+{
+    mNumQuads = size;
+    mQuads.reset(new openvdb::Vec4I[mNumQuads]);
+    mQuadFlags.reset(new char[mNumQuads]);
+}
+
+
+inline void
+PolygonPool::clearQuads()
+{
+    mNumQuads = 0;
+    mQuads.reset(NULL);
+    mQuadFlags.reset(NULL);
+}
+
+
+inline void
+PolygonPool::resetTriangles(size_t size)
+{
+    mNumTriangles = size;
+    mTriangles.reset(new openvdb::Vec3I[mNumTriangles]);
+    mTriangleFlags.reset(new char[mNumTriangles]);
+}
+
+
+inline void
+PolygonPool::clearTriangles()
+{
+    mNumTriangles = 0;
+    mTriangles.reset(NULL);
+    mTriangleFlags.reset(NULL);
+}
 
 
 ////////////////////////////////////////
 
 
 inline VolumeToMesh::VolumeToMesh(double isovalue, double adaptivity)
-    : mPointListSize(0)
+    : mPoints(NULL)
+    , mPolygons()
+    , mPointListSize(0)
+    , mSeamPointListSize(0)
     , mPolygonPoolListSize(0)
     , mIsovalue(isovalue)
     , mPrimAdaptivity(adaptivity)
@@ -3210,18 +3852,22 @@ inline VolumeToMesh::VolumeToMesh(double isovalue, double adaptivity)
     , mAdaptivityGrid(GridBase::ConstPtr())
     , mAdaptivityMaskTree(TreeBase::ConstPtr())
     , mRefSignTree(TreeBase::Ptr())
-    , mSmoothSeams(false)
+    , mRefIdxTree(TreeBase::Ptr())
     , mInvertSurfaceMask(false)
     , mPartitions(1)
     , mActivePart(0)
+    , mQuantizedSeamPoints(NULL)
+    , mPointFlags(0)
 {
 }
+
 
 inline PointList&
 VolumeToMesh::pointList()
 {
     return mPoints;
 }
+
 
 inline const size_t&
 VolumeToMesh::pointListSize() const
@@ -3256,9 +3902,14 @@ VolumeToMesh::setRefGrid(const GridBase::ConstPtr& grid, double secAdaptivity)
 {
     mRefGrid = grid;
     mSecAdaptivity = secAdaptivity;
+
     // Clear out old auxiliary data
     mRefSignTree = TreeBase::Ptr();
+    mRefIdxTree = TreeBase::Ptr();
+    mSeamPointListSize = 0;
+    mQuantizedSeamPoints.reset(NULL);
 }
+
 
 inline void
 VolumeToMesh::setSurfaceMask(const GridBase::ConstPtr& mask, bool invertMask)
@@ -3267,11 +3918,13 @@ VolumeToMesh::setSurfaceMask(const GridBase::ConstPtr& mask, bool invertMask)
     mInvertSurfaceMask = invertMask;
 }
 
+
 inline void
 VolumeToMesh::setSpatialAdaptivity(const GridBase::ConstPtr& grid)
 {
     mAdaptivityGrid = grid;
 }
+
 
 inline void
 VolumeToMesh::setAdaptivityMask(const TreeBase::ConstPtr& tree)
@@ -3279,12 +3932,28 @@ VolumeToMesh::setAdaptivityMask(const TreeBase::ConstPtr& tree)
    mAdaptivityMaskTree = tree;
 }
 
+
 inline void
 VolumeToMesh::partition(unsigned partitions, unsigned activePart)
 {
     mPartitions = std::max(partitions, unsigned(1));
     mActivePart = std::min(activePart, mPartitions-1);
 }
+
+
+inline std::vector<unsigned char>&
+VolumeToMesh::pointFlags()
+{
+    return mPointFlags;
+}
+
+
+inline const std::vector<unsigned char>&
+VolumeToMesh::pointFlags() const
+{
+    return mPointFlags;
+}
+
 
 template<typename GridT>
 inline void
@@ -3329,14 +3998,11 @@ VolumeToMesh::operator()(const GridT& distGrid)
         adaptivityField = static_cast<const FloatGridT*>(mAdaptivityGrid.get());
     }
 
-
     if (mAdaptivityMaskTree && mAdaptivityMaskTree->type() == BoolTreeT::treeType()) {
         const BoolTreeT *adaptivityMaskPt =
             static_cast<const BoolTreeT*>(mAdaptivityMaskTree.get());
         seamMask.topologyUnion(*adaptivityMaskPt);
     }
-
-
 
     // Collect auxiliary data
     {
@@ -3406,8 +4072,8 @@ VolumeToMesh::operator()(const GridT& distGrid)
             }
 
         } else {
-            // Collect voxel-sign configurations
 
+            // Collect voxel-sign configurations
             if (padActiveVoxels) {
 
                 BoolTreeT regionMask(false);
@@ -3436,42 +4102,42 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
     }
 
+
     // Collect auxiliary data from active tiles
     internal::tileData(distTree, *signTreePt, *idxTreePt, isovalue);
 
 
     // Optionally collect auxiliary data from a reference level set.
 
-    const Int16TreeT *refSignTreePt = NULL;
+    Int16TreeT *refSignTreePt = NULL;
+    IntTreeT *refIdxTreePt = NULL;
     const DistTreeT *refDistTreePt = NULL;
 
     if (mRefGrid && mRefGrid->type() == GridT::gridType()) {
 
+        const GridT* refGrid = static_cast<const GridT*>(mRefGrid.get());
+        refDistTreePt = &refGrid->tree();
 
         // Collect and cache auxiliary data from the reference grid. 
-        if (!mRefSignTree) { 
-
-            const GridT* refGrid = static_cast<const GridT*>(mRefGrid.get());
-            refDistTreePt = &refGrid->tree();
+        if (!mRefSignTree && !mRefIdxTree) { 
 
             DistLeafManagerT refDistLeafs(*refDistTreePt);
             internal::SignData<DistTreeT, DistLeafManagerT>
                 signDataOp(*refDistTreePt, refDistLeafs, isovalue);
+
             signDataOp.run();
+
             mRefSignTree = signDataOp.signTree();
+            mRefIdxTree = signDataOp.idxTree();
         }
 
         // Get cached auxiliary data
-        if (mRefSignTree) {
+        if (mRefSignTree && mRefIdxTree) {
             refSignTreePt = static_cast<Int16TreeT*>(mRefSignTree.get());
-
-            const GridT* refGrid = static_cast<const GridT*>(mRefGrid.get());
-            refDistTreePt = &refGrid->tree();
-
+            refIdxTreePt = static_cast<IntTreeT*>(mRefIdxTree.get());
         }
-
-
     }
+
 
     // Process auxiliary data
     Int16LeafManagerT signLeafs(*signTreePt);
@@ -3480,6 +4146,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
         signLeafs.foreach(internal::MaskEdges<BoolTreeT>(valueMask));
         valueMask.clear();
     }
+
 
     // Generate the seamline mask
     if (refSignTreePt) {
@@ -3491,6 +4158,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
         seamMask.merge(seamOp.mask());
     }
+
 
     std::vector<size_t> regions(signLeafs.leafCount(), 0);
     if (regions.empty()) return;
@@ -3534,27 +4202,70 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
     // Generate the unique point list
     mPoints.reset(new openvdb::Vec3s[mPointListSize]);
+    mPointFlags.clear();
+
+    // Generate seam line sample points
+    if (refSignTreePt && refIdxTreePt) {
+
+        if (mSeamPointListSize == 0) {
+    
+            std::vector<size_t> pointMap;
+
+            {
+                Int16LeafManagerT refSignLeafs(*refSignTreePt);
+                pointMap.resize(refSignLeafs.leafCount(), 0);
+
+                refSignLeafs.foreach(internal::CountPoints(pointMap));
+
+                size_t tmp = 0;
+                for (size_t n = 0, N = pointMap.size(); n < N; ++n) {
+                    tmp = pointMap[n];
+                    pointMap[n] = mSeamPointListSize;
+                    mSeamPointListSize += tmp;
+                }
+            }
+
+            if (!pointMap.empty() && mSeamPointListSize != 0) {
+
+                mQuantizedSeamPoints.reset(new uint32_t[mSeamPointListSize]);
+                memset(mQuantizedSeamPoints.get(), 0, sizeof(uint32_t) * mSeamPointListSize);
+
+                typedef tree::LeafManager<IntTreeT> IntLeafManagerT;
+
+                IntLeafManagerT refIdxLeafs(*refIdxTreePt);
+                refIdxLeafs.foreach(internal::MapPoints<Int16TreeT>(pointMap, *refSignTreePt));
+            }
+        }
+
+        if (mSeamPointListSize != 0) {
+            signLeafs.foreach(internal::SeamWeights<DistTreeT>(
+                distTree, *refSignTreePt, *refIdxTreePt, mQuantizedSeamPoints, mIsovalue));
+        }
+    }
+
 
     internal::GenPoints<DistTreeT, Int16LeafManagerT>
         pointOp(signLeafs, distTree, *idxTreePt, mPoints, regions, transform, mIsovalue);
 
 
-    pointOp.setRefData(refSignTreePt, refDistTreePt);
+    if (mSeamPointListSize != 0) {
+        mPointFlags.resize(mPointListSize);
+        pointOp.setRefData(refSignTreePt, refDistTreePt, refIdxTreePt,
+            &mQuantizedSeamPoints, &mPointFlags);
+    }
 
     pointOp.run();
-
-
 
 
     mPolygonPoolListSize = signLeafs.leafCount();
     mPolygons.reset(new PolygonPool[mPolygonPoolListSize]);
 
     if (adaptive) {
+
         internal::GenPolygons<Int16LeafManagerT, internal::AdaptivePrimBuilder>
             mesher(signLeafs, *signTreePt, *idxTreePt, mPolygons);
 
         mesher.setRefSignTree(refSignTreePt);
-
         mesher.run();
 
     } else {
@@ -3563,9 +4274,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
             mesher(signLeafs, *signTreePt, *idxTreePt, mPolygons);
 
         mesher.setRefSignTree(refSignTreePt);
-
         mesher.run();
-
     }
 
     // Clean up unused points, only necessary if masking and/or
@@ -3599,6 +4308,161 @@ VolumeToMesh::operator()(const GridT& distGrid)
             // update primitives
             internal::RemapIndices remap(mPolygons, mPolygonPoolListSize, indexMap);
             remap.run();
+        }
+    }
+
+
+    // Subdivide nonplanar quads near the seamline edges
+    // todo: thread and clean up
+    if (refSignTreePt || refIdxTreePt || refDistTreePt) {
+
+        std::vector<Vec3s> newPoints;
+
+        for (size_t n = 0; n <  mPolygonPoolListSize; ++n) {
+
+            PolygonPool& polygons = mPolygons[n];
+
+            std::vector<size_t> nonPlanarQuads;
+            nonPlanarQuads.reserve(polygons.numQuads());
+
+            for (size_t i = 0; i < polygons.numQuads(); ++i) {
+
+                char& flags = polygons.quadFlags(i);
+
+                if ((flags & POLYFLAG_FRACTURE_SEAM) && !(flags & POLYFLAG_EXTERIOR)) {
+
+                    openvdb::Vec4I& quad = polygons.quad(i);
+
+                    const bool edgePoly = mPointFlags[quad[0]] || mPointFlags[quad[1]]
+                        || mPointFlags[quad[2]] || mPointFlags[quad[3]];
+
+                    if (!edgePoly) continue;
+
+                    const Vec3s& p0 = mPoints[quad[0]];
+                    const Vec3s& p1 = mPoints[quad[1]];
+                    const Vec3s& p2 = mPoints[quad[2]];
+                    const Vec3s& p3 = mPoints[quad[3]];
+
+                    if (!internal::isPlanarQuad(p0, p1, p2, p3, 1e-6f)) {
+                        nonPlanarQuads.push_back(i);
+                    }
+                }
+            }
+
+
+            if (!nonPlanarQuads.empty()) {
+ 
+                PolygonPool tmpPolygons;
+
+                tmpPolygons.resetQuads(polygons.numQuads() - nonPlanarQuads.size());
+                tmpPolygons.resetTriangles(4 * nonPlanarQuads.size());
+
+                size_t triangleIdx = 0;
+                for (size_t i = 0; i < nonPlanarQuads.size(); ++i) {
+
+                    size_t& quadIdx = nonPlanarQuads[i];
+
+                    openvdb::Vec4I& quad = polygons.quad(quadIdx);
+                    char& quadFlags = polygons.quadFlags(quadIdx);
+                    quadFlags |= POLYFLAG_NONPLANAR;
+
+                    Vec3s centroid = (mPoints[quad[0]] + mPoints[quad[1]] + 
+                        mPoints[quad[2]] + mPoints[quad[3]]) * 0.25;
+
+                    size_t pointIdx = newPoints.size() + mPointListSize;
+
+                    newPoints.push_back(centroid);
+
+                    
+                    {
+                        Vec3I& triangle = tmpPolygons.triangle(triangleIdx);
+                
+                        triangle[0] = quad[0];
+                        triangle[1] = pointIdx;
+                        triangle[2] = quad[3];
+
+                        tmpPolygons.triangleFlags(triangleIdx) = quadFlags;
+                    }
+
+                    ++triangleIdx;
+
+                    {
+                        Vec3I& triangle = tmpPolygons.triangle(triangleIdx);
+                
+                        triangle[0] = quad[0];
+                        triangle[1] = quad[1];
+                        triangle[2] = pointIdx;
+
+                        tmpPolygons.triangleFlags(triangleIdx) = quadFlags;
+                    }
+
+                    ++triangleIdx;
+
+                    {
+                        Vec3I& triangle = tmpPolygons.triangle(triangleIdx);
+                
+                        triangle[0] = quad[1];
+                        triangle[1] = quad[2];
+                        triangle[2] = pointIdx;
+
+                        tmpPolygons.triangleFlags(triangleIdx) = quadFlags;
+                    }
+
+
+                    ++triangleIdx;
+
+                    {
+                        Vec3I& triangle = tmpPolygons.triangle(triangleIdx);
+                
+                        triangle[0] = quad[2];
+                        triangle[1] = quad[3];
+                        triangle[2] = pointIdx;
+
+                        tmpPolygons.triangleFlags(triangleIdx) = quadFlags;
+                    }
+
+                    ++triangleIdx;
+
+                    quad[0] = util::INVALID_IDX;
+                }
+
+
+                size_t quadIdx = 0;
+                for (size_t i = 0; i < polygons.numQuads(); ++i) {
+                    openvdb::Vec4I& quad = polygons.quad(i);
+
+                    if (quad[0] != util::INVALID_IDX) {
+                        tmpPolygons.quad(quadIdx) = quad;
+                        tmpPolygons.quadFlags(quadIdx) = polygons.quadFlags(i);
+                        ++quadIdx;
+                    }
+                }
+
+                
+                polygons.copy(tmpPolygons);
+            }
+            
+        }
+
+
+        if (!newPoints.empty()) {
+
+            size_t newPointCount = newPoints.size() + mPointListSize;
+
+            std::auto_ptr<openvdb::Vec3s> newPointList(new openvdb::Vec3s[newPointCount]);
+
+           
+            for (size_t i = 0; i < mPointListSize; ++i) {
+                newPointList.get()[i] = mPoints[i];
+            }
+
+            for (size_t i = mPointListSize; i < newPointCount; ++i) {
+                newPointList.get()[i] = newPoints[i - mPointListSize];
+            }
+
+            mPointListSize = newPointCount;
+            mPoints.reset(newPointList.release());
+
         }
     }
 }
@@ -3673,6 +4537,10 @@ volumeToMesh(
     std::vector<Vec3I> triangles(0);
     volumeToMesh(grid,points, triangles, quads, isovalue, 0.0);
 }
+
+
+////////////////////////////////////////
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

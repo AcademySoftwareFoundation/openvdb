@@ -160,6 +160,8 @@ public:
     Index64 offVoxelCount() const { return mValueMask.countOff(); }
     Index64 onLeafVoxelCount() const { return onVoxelCount(); }
     Index64 offLeafVoxelCount() const { return offVoxelCount(); }
+    static Index64 onTileCount()  { return 0; }
+    static Index64 offTileCount() { return 0; }
 
     /// Return @c true if this node has no active voxels.
     bool isEmpty() const { return mValueMask.isOff(); }
@@ -468,8 +470,8 @@ public:
 
     /// @brief Difference this node's set of active values with the active values
     /// of the other node, whose @c ValueType may be different. So a
-    /// resulting voxel will be active only if both of the original
-    /// voxel is active in this LeafNode and inactive in the other LeafNode.
+    /// resulting voxel will be active only if the original voxel is
+    /// active in this LeafNode and inactive in the other LeafNode.
     ///
     /// @details The last dummy argument is required to match the signature
     /// for InternalNode::topologyDifference.

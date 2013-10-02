@@ -1,31 +1,36 @@
 OpenVDB Version History
 =======================
 
-Version 2.0.0 - In development
-    - Added a level set ray intersector tool for efficient, hierarchical
-      intersection of rays with level sets.
-    - Added a volume ray intersector tool for efficient, hierarchical
-      intersection of rays with generic (e.g. density) volumes.
+Version 2.0.0 - October 31, 2013
+    - Added ray intersector tools for efficient, hierarchical intersection
+      of rays with level-set and generic volumes.
     - Added a Ray class and a hierarchical Digital Differential Analyzer
       for fast ray traversal.
     - Added a fully multithreaded level set ray tracer and camera classes 
       that mimic Houdini's cameras.
-    - Added a simple, command-line renderer (currently for level sets only.)
+    - Added a simple, command-line renderer (currently for level sets only).
     - Implemented a new meshing scheme that produces topologically robust
       two-manifold meshes and is twice as fast as the previous scheme.
-    - Improved performance of Tree::evalLeafBoundingBox by 30x and
-      Tree::evalActiveVoxelBoundingBox by 2x.
+    - Improved the performance of Tree::evalActiveVoxelBoundingBox() and
+      Tree::activeVoxelCount(), and significantly improved the performance
+      of Tree::evalLeafBoundingBox() (by about 30x).
     - Added a tool (and a Houdini SOP) that fills a volume with
       adaptively-sized overlapping or non-overlapping spheres.
-    - Added a Houdini Ray SOP that can be used to perform geometry projections
-      using level set ray intersections or closest point queries.
-    - Added a tool that performs accelerated closest surface point queries on
-      narrow band level sets. Supports queries that originate at arbitrary
-      worldspace locations.
+    - Added a Ray SOP that can be used to perform geometry projections
+      using level-set ray intersections or closest-point queries.
+    - Added a tool that performs accelerated closest surface point queries
+      from arbitrary points in world space to narrow-band level sets.
     - Increased the speed of masked level set filtering by 20% for
       the most common cases.
     - Added math::BoxStencil, with support for trilinear interpolation 
       and gradient computation.
+    - Added Tree::topologyIntersection(), which intersects a tree's active
+      values with those of another tree, and Tree::topologyDifference(),
+      which performs topological subtraction of one tree's active values
+      from another's.  In both cases, the ValueTypes of the two trees
+      need not be the same.
+    - Added Tree::activeTileCount(), which returns the number of active tiles
+      in a tree.
     - Added math::MinIndex() and math::MaxIndex(), which find the minimum
       and maximum components of a vector without any branching.
     - Added math::BBox::minExtent(), which returns a bounding box's
@@ -34,8 +39,8 @@ Version 2.0.0 - In development
       box rather than an empty bounding box positioned at the origin.
       The new behavior is consistent with math::CoordBBox.
       [Thanks to Rick Hankins for suggesting this fix.]
-    - Added CoordBBox::reset() to reset the bbox its initial value, i.e. 
-      an invalid bounding box.
+    - Added CoordBBox::reset(), which resets a bounding box to its initial,
+      invalid state.
     - Fixed a bug in the default ScaleMap constructor that left some data
       used in the inverse uninitialized.
     - Added MapBase::applyJT(), which applies the Jacobian transpose to
