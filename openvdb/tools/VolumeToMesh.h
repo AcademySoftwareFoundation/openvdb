@@ -101,7 +101,7 @@ volumeToMesh(
 
 
 /// @brief Polygon flags, used for reference based meshing.
-enum { POLYFLAG_EXTERIOR = 0x1, POLYFLAG_FRACTURE_SEAM = 0x2,  POLYFLAG_NONPLANAR = 0x4};
+enum { POLYFLAG_EXTERIOR = 0x1, POLYFLAG_FRACTURE_SEAM = 0x2,  POLYFLAG_SUBDIVIDED = 0x4};
 
 
 /// @brief Collection of quads and triangles
@@ -1797,6 +1797,7 @@ GenPoints<TreeT, LeafManagerT>::operator()(
                 points[i][0] += double(ijk[0]);
                 points[i][1] += double(ijk[1]);
                 points[i][2] += double(ijk[2]);
+
 
                 points[i] = mTransform.indexToWorld(points[i]);
 
@@ -4355,7 +4356,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
                 PolygonPool tmpPolygons;
 
                 tmpPolygons.resetQuads(polygons.numQuads() - nonPlanarQuads.size());
-                tmpPolygons.resetTriangles(4 * nonPlanarQuads.size());
+                tmpPolygons.resetTriangles(polygons.numTriangles() + 4 * nonPlanarQuads.size());
 
                 size_t triangleIdx = 0;
                 for (size_t i = 0; i < nonPlanarQuads.size(); ++i) {
@@ -4364,7 +4365,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
                     openvdb::Vec4I& quad = polygons.quad(quadIdx);
                     char& quadFlags = polygons.quadFlags(quadIdx);
-                    quadFlags |= POLYFLAG_NONPLANAR;
+                    quadFlags |= POLYFLAG_SUBDIVIDED;
 
                     Vec3s centroid = (mPoints[quad[0]] + mPoints[quad[1]] + 
                         mPoints[quad[2]] + mPoints[quad[3]]) * 0.25;
@@ -4424,6 +4425,13 @@ VolumeToMesh::operator()(const GridT& distGrid)
                     ++triangleIdx;
 
                     quad[0] = util::INVALID_IDX;
+                }
+
+            
+                for (size_t i = 0; i < polygons.numTriangles(); ++i) {
+                    tmpPolygons.triangle(triangleIdx) = polygons.triangle(i);
+                    tmpPolygons.triangleFlags(triangleIdx) = polygons.triangleFlags(i);
+                    ++triangleIdx;
                 }
 
 

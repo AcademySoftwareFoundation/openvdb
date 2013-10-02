@@ -344,7 +344,7 @@ copyMesh(
     openvdb::tools::PolygonPoolList& polygonPoolList = mesher.polygonPoolList();
 
     const char exteriorFlag = char(openvdb::tools::POLYFLAG_EXTERIOR);
-    const char seamLineFlag = char(openvdb::tools::POLYFLAG_NONPLANAR);//char(openvdb::tools::POLYFLAG_FRACTURE_SEAM);
+    const char seamLineFlag = char(openvdb::tools::POLYFLAG_FRACTURE_SEAM);
 
     const GA_Index firstPrim = detail.primitives().entries();
 
