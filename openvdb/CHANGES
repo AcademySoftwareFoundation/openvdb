@@ -11,6 +11,12 @@ Version 2.0.0 - October 31, 2013
     - Added a simple, command-line renderer (currently for level sets only).
     - Implemented a new meshing scheme that produces topologically robust
       two-manifold meshes and is twice as fast as the previous scheme.
+    - Implemented a new topologically robust (producing two-manifold meshes)
+      level set based seamless fracture scheme that eliminates visible scarring
+      seen in the earlier scheme. Near the fracture seams some internal non
+      planar quads are subdivided to eliminate artifacts. Additionally tags
+      fracture seam points, this information can be used to drive local
+      pre-fracture dynamics e.g. local surface buckling.
     - Improved the performance of Tree::evalActiveVoxelBoundingBox() and
       Tree::activeVoxelCount(), and significantly improved the performance
       of Tree::evalLeafBoundingBox() (by about 30x).
