@@ -277,18 +277,13 @@ public:
         : mFilm(&film)
         , mScaleWidth(frameWidth)
         , mScaleHeight(frameWidth*film.height()/double(film.width()))
-        , mRay(Vec3R(0.0)
-        , Vec3R(1.0)
-        , nearPlane
-        , farPlane)
     {
         assert(nearPlane > 0 && farPlane > nearPlane);
         mScreenToWorld.accumPostRotation(math::X_AXIS, rotation[0] * M_PI / 180.0);
         mScreenToWorld.accumPostRotation(math::Y_AXIS, rotation[1] * M_PI / 180.0);
         mScreenToWorld.accumPostRotation(math::Z_AXIS, rotation[2] * M_PI / 180.0);
         mScreenToWorld.accumPostTranslation(translation);
-        mRay.setEye(mScreenToWorld.applyMap(Vec3R(0.0)));
-        mRay.setDir(mScreenToWorld.applyJacobian(Vec3R(0.0, 0.0, -1.0)));
+        this->initRay(nearPlane, farPlane);
     }
 
     virtual ~BaseCamera() {}
@@ -298,16 +293,20 @@ public:
     size_t width()  const { return mFilm->width(); }
     size_t height() const { return mFilm->height(); }
 
-    /// Rotate the camera so that it points to (x, y, z).
-    void lookAt(const Vec3R& xyz)
+    /// Rotate the camera so its negative z-axis points at xyz and its
+    /// y axis is in the plane of the xyz and up vectors. In other
+    /// words the camera will look at xyz and use up as the
+    /// horizontal direction.
+    void lookAt(const Vec3R& xyz, const Vec3R& up = Vec3R(0.0, 1.0, 0.0))
     {
-        const Vec3R translation = mScreenToWorld.applyMap(Vec3R(0.0));
-        Mat4d xform = math::aim<Mat4d>(
-            /*direction=*/translation - xyz, /*vertical=*/Vec3R(0.0, 1.0, 0.0));
-        xform.postTranslate(translation);
-        mScreenToWorld = math::AffineMap(xform);
-        mRay.setEye(mScreenToWorld.applyMap(Vec3R(0.0)));
-        mRay.setDir(mScreenToWorld.applyJacobian(Vec3R(0.0, 0.0, -1.0)));
+        const Vec3R orig = mScreenToWorld.applyMap(Vec3R(0.0));
+        const Vec3R dir  = orig - xyz;
+        try {
+            Mat4d xform = math::aim<Mat4d>(dir, up);
+            xform.postTranslate(orig);
+            mScreenToWorld = math::AffineMap(xform);
+            this->initRay(mRay.t0(), mRay.t1());
+        } catch (...) {}
     }
 
     Vec3R rasterToScreen(double i, double j, double z) const
@@ -323,6 +322,14 @@ public:
         size_t i, size_t j, double iOffset = 0.5, double jOffset = 0.5) const = 0;
 
 protected:
+
+    void initRay(double near, double far)
+    {
+        mRay.setTimes(near, far);
+        mRay.setEye(mScreenToWorld.applyMap(Vec3R(0.0)));
+        mRay.setDir(mScreenToWorld.applyJacobian(Vec3R(0.0, 0.0, -1.0))); 
+    }
+    
     Film* mFilm;
     double mScaleWidth, mScaleHeight;
     math::Ray<double> mRay;

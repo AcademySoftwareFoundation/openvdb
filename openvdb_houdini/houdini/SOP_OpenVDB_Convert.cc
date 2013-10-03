@@ -264,6 +264,11 @@ newSopOperator(OP_OperatorTable* table)
             "the seam lines. This group can be used to drive secondary elements such "
             "as debris and dust."));
 
+    parms.add(hutil::ParmFactory(PRM_STRING, "seampoints", "Seam Points")
+        .setDefault("seam_points")
+        .setHelpText("When converting to polygons with a second input, this "
+            "specifies a group of the fracture seam points. This can be "
+            "used to drive local pre-fracture dynamics e.g. local surface buckling."));
 
     //////////
 
@@ -507,7 +512,8 @@ copyMesh(
     bool toPolySoup,
     GA_PrimitiveGroup* surfaceGroup = NULL,
     GA_PrimitiveGroup* interiorGroup = NULL,
-    GA_PrimitiveGroup* seamGroup = NULL)
+    GA_PrimitiveGroup* seamGroup = NULL,
+    GA_PointGroup* seamPointGroup = NULL)
 {
     const openvdb::tools::PointList& points = mesher.pointList();
     openvdb::tools::PolygonPoolList& polygonPoolList = mesher.polygonPoolList();
@@ -521,6 +527,10 @@ copyMesh(
     for (size_t n = 0, N = mesher.pointListSize(); n < N; ++n) {
         GA_Offset ptoff = detail.appendPointOffset();
         detail.setPos3(ptoff, points[n].x(), points[n].y(), points[n].z());
+
+        if (seamPointGroup && mesher.pointFlags()[n]) {
+            seamPointGroup->addOffset(ptoff);
+        }
     }
 
     GU_ConvertMarker marker(detail);
@@ -583,6 +593,18 @@ copyMesh(
     UT_ASSERT_COMPILETIME(sizeof(openvdb::tools::PointList::element_type) == sizeof(UT_Vector3));
     GA_RWHandleV3 pthandle(detail.getP());
     pthandle.setBlock(startpt, npoints, (UT_Vector3 *)points.get());
+
+    // group fracture seam points
+    if (seamPointGroup) {
+        GA_Offset ptoff = startpt;
+        for (GA_Size i = 0; i < npoints; ++i) {
+
+            if (mesher.pointFlags()[i]) {
+                seamPointGroup->addOffset(ptoff);
+            }
+            ++ptoff;
+        }
+    }
 
     // index 0 --> interior, not on seam
     // index 1 --> interior, on seam
@@ -718,6 +740,7 @@ SOP_OpenVDB_Convert::updateParmsFlags()
     changed |= enableParm("surfacegroup", toPoly && refexists);
     changed |= enableParm("interiorgroup", toPoly && refexists);
     changed |= enableParm("seamlinegroup", toPoly && refexists);
+    changed += enableParm("seampoints", toPoly && refexists);
     changed |= enableParm("transferattributes", toPoly && refexists);
     changed |= enableParm("sharpenfeatures", toPoly && refexists);
     changed |= enableParm("edgetolerance", toPoly && refexists);
@@ -757,6 +780,7 @@ SOP_OpenVDB_Convert::updateParmsFlags()
     setVisibleState("surfacegroup", toPoly);
     setVisibleState("interiorgroup", toPoly);
     setVisibleState("seamlinegroup", toPoly);
+    setVisibleState("seampoints", toPoly);
 
     setVisibleState("surfacemask", toPoly);
     setVisibleState("surfacemaskname", toPoly);
@@ -886,6 +910,7 @@ SOP_OpenVDB_Convert::referenceMeshing(
     std::vector<std::string> badTransformList, badBackgroundList, badTypeList;
 
     GA_PrimitiveGroup *surfaceGroup = NULL, *interiorGroup = NULL, *seamGroup = NULL;
+    GA_PointGroup* seamPointGroup = NULL;
 
     {
         UT_String newGropStr;
@@ -905,6 +930,12 @@ SOP_OpenVDB_Convert::referenceMeshing(
         if(newGropStr.length() > 0) {
             seamGroup = gdp->findPrimitiveGroup(newGropStr);
             if (!seamGroup) seamGroup = gdp->newPrimitiveGroup(newGropStr);
+        }
+
+        evalString(newGropStr, "seampoints", 0, time);
+        if(newGropStr.length() > 0) {
+            seamPointGroup = gdp->findPointGroup(newGropStr);
+            if (!seamPointGroup) seamPointGroup = gdp->newPointGroup(newGropStr);
         }
     }
 
@@ -949,20 +980,20 @@ SOP_OpenVDB_Convert::referenceMeshing(
         bool toPolySoup = false;
 #endif
         copyMesh(*gdp, fragment_vdbs[i], delgroup, mesher, toPolySoup,
-            surfaceGroup, interiorGroup, seamGroup);
+            surfaceGroup, interiorGroup, seamGroup, seamPointGroup);
     }
 
     // Sharpen Features
     if (!boss.wasInterrupted() && sharpenFeatures) { 
         UTparallelFor(GA_SplittableRange(gdp->getPointRange()),
-            hvdb::SharpenFeaturesOp(*gdp, *refGeo, edgeData, *transform, surfaceGroup));
+            hvdb::SharpenFeaturesOp(*gdp, *refGeo, edgeData, *transform, surfaceGroup, maskTree.get()));
     }
 
     // Compute vertex normals
     if (!boss.wasInterrupted() && computeNormals) {
 
         UTparallelFor(GA_SplittableRange(gdp->getPrimitiveRange()),
-            hvdb::VertexNormalOp(*gdp, interiorGroup));
+            hvdb::VertexNormalOp(*gdp, interiorGroup, (transferAttributes ? -1.0 : 0.7) ));
 
         if (!interiorGroup) {
             addWarning(SOP_MESSAGE, "More accurate vertex normals can be generated "

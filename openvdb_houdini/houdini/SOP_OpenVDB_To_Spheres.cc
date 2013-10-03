@@ -50,6 +50,8 @@
 
 #include <string>
 #include <vector>
+#include <limits> // std::numeric_limits
+
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -103,6 +105,12 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 2.0)
         .setHelpText("Determines the smallest sphere size, voxel units."));
+
+
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "maxradius", "Max Radius")
+        .setDefault(std::numeric_limits<float>::max())
+        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 100.0)
+        .setHelpText("Determines the largest sphere size, voxel units."));
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "spheres", "Spheres")
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 100)
@@ -182,6 +190,7 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
         // Eval attributes
         const float isovalue = evalFloat("isovalue", 0, time);
         const float minradius = evalFloat("minradius", 0, time);
+        const float maxradius = evalFloat("maxradius", 0, time);
         const int sphereCount = evalInt("spheres", 0, time);
         const bool overlapping = evalInt("overlapping", 0, time);
         const int scatter = evalInt("scatter", 0, time);
@@ -213,7 +222,7 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
                     openvdb::gridConstPtrCast<openvdb::FloatGrid>(vdbIt->getGridPtr());
 
                 openvdb::tools::fillWithSpheres(*gridPtr, spheres, sphereCount, overlapping,
-                    minradius, isovalue, scatter, &boss);
+                    minradius, maxradius, isovalue, scatter, &boss);
 
 
             } else if (vdbIt->getGrid().type() == openvdb::DoubleGrid::gridType()) {
@@ -222,7 +231,7 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
                     openvdb::gridConstPtrCast<openvdb::DoubleGrid>(vdbIt->getGridPtr());
 
                 openvdb::tools::fillWithSpheres(*gridPtr, spheres, sphereCount, overlapping,
-                    minradius, isovalue, scatter, &boss);
+                    minradius, maxradius, isovalue, scatter, &boss);
 
             } else {
                 skippedGrids.push_back(vdbIt.getPrimitiveNameOrIndex().toStdString());

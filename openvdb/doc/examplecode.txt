@@ -513,8 +513,6 @@ for (TreeType::NodeIter iter = grid->tree().beginNode(); iter; ++iter) {
     }
 }
 @endcode
-Calling @vdblink::Grid::tree() tree()@endlink instead would return a @c const
-reference to the existing tree, with no guarantee of exclusive ownership.
 
 
 @subsection sLeafIterator Leaf Node Iterator

@@ -248,17 +248,16 @@ For more on these classes, see the
 
 @section secToolUtils Utilities and Tools
 
-OpenVDB provides utility functions and classes for the manipulation
-of grids and the data they hold.  Tools such as those found in
-Gradient.h and Laplacian.h compute vector quantities from scalar
-data, while those in Curl.h, Divergence.h, Magnitude.h and Normalize.h
-perform simple operations on vector data.  Other tools perform filtering
-(Filter.h) and interpolation (LinearInterp.h, QuadraticInterp.h) as well as
-sampling (GridTransformer.h), compositing (Composite.h), and other
-transformations (ValueTransformer.h). OpenVDB also supports advanced finite 
-difference computations though various local support stencils defined in
-Stencils.h as well as fast hierachical constructive-solid-geometry operations
-on narrow-band level sets.
+OpenVDB provides utility functions and classes for the manipulation of grids
+and the data they hold.
+Tools such as those found in GridOperators.h compute vector quantities from
+scalar data or vice-versa.
+Other tools perform filtering (Filter.h and LevelSetFilter.h) and
+interpolation (Interpolation.h) as well as sampling (GridTransformer.h),
+compositing and constructive solid geometry (Composite.h), and other
+transformations (ValueTransformer.h).
+OpenVDB also supports advanced finite difference computations through
+a variety of local support stencils (Stencils.h).
 
 
 @section secIterator Iterators

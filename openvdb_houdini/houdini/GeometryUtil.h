@@ -125,12 +125,13 @@ private:
 class OPENVDB_HOUDINI_API VertexNormalOp
 {
 public:
-    VertexNormalOp(GU_Detail&, const GA_PrimitiveGroup *interiorPrims = NULL);
+    VertexNormalOp(GU_Detail&, const GA_PrimitiveGroup *interiorPrims = NULL, float angle = 0.7);
     void operator()(const GA_SplittableRange&) const;
 private:
     const GU_Detail& mDetail;
     const GA_PrimitiveGroup *mInteriorPrims;
     GA_RWHandleV3 mNormalHandle;
+    const float mAngle;
 
     bool isInteriorPrim(GA_Offset primOffset) const
     {

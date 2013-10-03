@@ -126,7 +126,7 @@ protected:
         ChildT& getItem(Index pos) const { return *(this->parent().getChildNode(pos)); }
 
         // Note: setItem() can't be called on const iterators.
-        void setItem(Index pos, const ChildT& c) const { this->parent().setChildNode(pos, &c); }
+        void setItem(Index pos, const ChildT& c) const { this->parent().resetChildNode(pos, &c); }
 
         // Note: modifyItem() isn't implemented, since it's not useful for child node pointers.
     };// ChildIter
@@ -173,7 +173,7 @@ protected:
         // Note: setItem() can't be called on const iterators.
         void setItem(Index pos, ChildT* child) const
         {
-            this->parent().setChildNode(pos, child);
+            this->parent().resetChildNode(pos, child);
         }
 
         // Note: unsetItem() can't be called on const iterators.
@@ -247,6 +247,7 @@ public:
     Index64 offVoxelCount() const;
     Index64 onLeafVoxelCount() const;
     Index64 offLeafVoxelCount() const;
+    Index64 onTileCount() const;
 
     /// Return the total amount of memory in bytes occupied by this node and its children.
     Index64 memUsage() const;
@@ -463,6 +464,38 @@ public:
     /// are marked as active in this branch but left with their original values.
     template<typename OtherChildNodeType>
     void topologyUnion(const InternalNode<OtherChildNodeType, Log2Dim>& other);
+   
+    /// @brief Intersects this tree's set of active values with the active values
+    /// of the other tree, whose @c ValueType may be different.
+    /// @details The resulting state of a value is active only if the corresponding 
+    /// value was already active AND if it is active in the other tree. Also, a
+    /// resulting value maps to a voxel if the corresponding value
+    /// already mapped to an active voxel in either of the two grids
+    /// and it maps to an active tile or voxel in the other grid.
+    ///
+    /// @note This operation can delete branches in this grid if they
+    /// overlap with inactive tiles in the other grid. Likewise active
+    /// voxels can be turned into unactive voxels resulting in leaf
+    /// nodes with no active values. Thus, it is recommended to
+    /// subsequently call prune.
+    template<typename OtherChildNodeType>
+    void topologyIntersection(const InternalNode<OtherChildNodeType, Log2Dim>& other,
+                              const ValueType& background);
+
+    /// @brief Difference this node's set of active values with the active values
+    /// of the other node, whose @c ValueType may be different. So a
+    /// resulting voxel will be active only if the original voxel is
+    /// active in this node and inactive in the other node.
+    ///
+    /// @details The last dummy argument is required to match the signature
+    /// for InternalNode::topologyDifference.
+    ///
+    /// @note This operation modifies only active states, not
+    /// values. Also note that this operation can result in all voxels
+    /// being inactive so consider subsequnetly calling prune.
+    template<typename OtherChildNodeType>
+    void topologyDifference(const InternalNode<OtherChildNodeType, Log2Dim>& other,
+                            const ValueType& background);
 
     template<typename CombineOp>
     void combine(InternalNode& other, CombineOp&);
@@ -635,7 +668,8 @@ protected:
     //@}
 
     void makeChildNodeEmpty(Index n, const ValueType& value);
-    void setChildNode(Index i, ChildNodeType* child);
+    void setChildNode(  Index i, ChildNodeType* child);//assumes a tile
+    void resetChildNode(Index i, ChildNodeType* child);//checks for an existing child 
     ChildNodeType* unsetChildNode(Index i, const ValueType& value);
 
     template<typename NodeT, typename VisitorOp, typename ChildAllIterT>
@@ -778,15 +812,11 @@ template<typename ChildT, Index Log2Dim>
 inline Index64
 InternalNode<ChildT, Log2Dim>::onVoxelCount() const
 {
-    Index64 sum = 0;
-    for (Index i = 0; i < NUM_VALUES; ++i) {
-        if (isChildMaskOff(i)) {
-            if (isValueMaskOn(i)) sum += ChildT::NUM_VOXELS;
-        } else {
-            sum += mNodes[i].getChild()->onVoxelCount();
-        }
+    Index64 sum = ChildT::NUM_VOXELS * mValueMask.countOn();
+    for (ChildOnCIter iter = this->cbeginChildOn(); iter; ++iter) {
+        sum += iter->onVoxelCount();
     }
-    return sum;
+    return sum;   
 }
 
 
@@ -794,13 +824,9 @@ template<typename ChildT, Index Log2Dim>
 inline Index64
 InternalNode<ChildT, Log2Dim>::offVoxelCount() const
 {
-    Index64 sum = 0;
-    for (Index i = 0; i < NUM_VALUES; ++i) {
-        if (isChildMaskOff(i)) {
-            if (isValueMaskOff(i)) sum += ChildT::NUM_VOXELS;
-        } else {
-            sum += mNodes[i].getChild()->offVoxelCount();
-        }
+    Index64 sum = ChildT::NUM_VOXELS * (NUM_VALUES-mValueMask.countOn()-mChildMask.countOn());
+    for (ChildOnCIter iter = this->cbeginChildOn(); iter; ++iter) {
+        sum += iter->offVoxelCount();
     }
     return sum;
 }
@@ -829,6 +855,16 @@ InternalNode<ChildT, Log2Dim>::offLeafVoxelCount() const
     return sum;
 }
 
+template<typename ChildT, Index Log2Dim>
+inline Index64
+InternalNode<ChildT, Log2Dim>::onTileCount() const
+{
+    Index64 sum = mValueMask.countOn();
+    for (ChildOnCIter iter = this->cbeginChildOn(); LEVEL>1 && iter; ++iter) {
+        sum += iter->onTileCount();
+    }
+    return sum;
+}
 
 template<typename ChildT, Index Log2Dim>
 inline Index64
@@ -1079,9 +1115,7 @@ InternalNode<ChildT, Log2Dim>::addLeaf(LeafNodeType* leaf)
         } else {
             child = reinterpret_cast<ChildT*>(leaf);
         }
-        mNodes[n].setChild(child);
-        mChildMask.setOn(n);
-        mValueMask.setOff(n);
+        this->setChildNode(n, child);
     } else {
         if (ChildT::LEVEL>0) {
             child = mNodes[n].getChild();
@@ -1111,9 +1145,7 @@ InternalNode<ChildT, Log2Dim>::addLeafAndCache(LeafNodeType* leaf, AccessorT& ac
         } else {
             child = reinterpret_cast<ChildT*>(leaf);
         }
-        mNodes[n].setChild(child);
-        mChildMask.setOn(n);
-        mValueMask.setOff(n);
+        this->setChildNode(n, child);
     } else {
         if (ChildT::LEVEL>0) {
             child = mNodes[n].getChild();
@@ -1151,9 +1183,7 @@ InternalNode<ChildT, Log2Dim>::addTile(Index level, const Coord& xyz,
         if (mChildMask.isOff(n)) {// tile case
             if (LEVEL > level) {
                 ChildT* child = new ChildT(xyz, mNodes[n].getValue(), mValueMask.isOn(n));
-                mNodes[n].setChild(child);
-                mChildMask.setOn(n);
-                mValueMask.setOff(n);
+                this->setChildNode(n, child);
                 child->addTile(level, xyz, value, state);
             } else {
                 mValueMask.set(n, state);
@@ -1185,9 +1215,7 @@ InternalNode<ChildT, Log2Dim>::addTileAndCache(Index level, const Coord& xyz,
         if (mChildMask.isOff(n)) {// tile case
             if (LEVEL > level) {
                 ChildT* child = new ChildT(xyz, mNodes[n].getValue(), mValueMask.isOn(n));
-                mNodes[n].setChild(child);
-                mChildMask.setOn(n);
-                mValueMask.setOff(n);
+                this->setChildNode(n, child);
                 acc.insert(xyz, child);
                 child->addTileAndCache(level, xyz, value, state, acc);
             } else {
@@ -1221,9 +1249,7 @@ InternalNode<ChildT, Log2Dim>::touchLeaf(const Coord& xyz)
     ChildT* child = NULL;
     if (mChildMask.isOff(n)) {
         child = new ChildT(xyz, mNodes[n].getValue(), mValueMask.isOn(n));
-        mNodes[n].setChild(child);
-        mChildMask.setOn(n);
-        mValueMask.setOff(n);
+        this->setChildNode(n, child);
     } else {
         child = mNodes[n].getChild();
     }
@@ -1238,9 +1264,7 @@ InternalNode<ChildT, Log2Dim>::touchLeafAndCache(const Coord& xyz, AccessorT& ac
 {
     const Index n = this->coordToOffset(xyz);
     if (mChildMask.isOff(n)) {
-        mNodes[n].setChild(new ChildNodeType(xyz, mNodes[n].getValue(), mValueMask.isOn(n)));
-        mChildMask.setOn(n);
-        mValueMask.setOff(n);
+        this->setChildNode(n, new ChildNodeType(xyz, mNodes[n].getValue(), mValueMask.isOn(n)));
     }
     acc.insert(xyz, mNodes[n].getChild());
     return mNodes[n].getChild()->touchLeafAndCache(xyz, acc);
@@ -1415,10 +1439,8 @@ InternalNode<ChildT, Log2Dim>::setValueOff(const Coord& xyz)
     if (!hasChild && this->isValueMaskOn(n)) {
         // If the voxel belongs to a constant tile that is active,
         // a child subtree must be constructed.
-        mChildMask.setOn(n); // we're adding a child node so set the mask on
-        mValueMask.setOff(n); // value mask is always off if child mask is on
         hasChild = true;
-        mNodes[n].setChild(new ChildNodeType(xyz, mNodes[n].getValue(), /*active=*/true));
+        this->setChildNode(n, new ChildNodeType(xyz, mNodes[n].getValue(), /*active=*/true));
     }
     if (hasChild) mNodes[n].getChild()->setValueOff(xyz);
 }
@@ -1433,10 +1455,8 @@ InternalNode<ChildT, Log2Dim>::setValueOn(const Coord& xyz)
     if (!hasChild && !this->isValueMaskOn(n)) {
         // If the voxel belongs to a constant tile that is inactive,
         // a child subtree must be constructed.
-        mChildMask.setOn(n); // we're adding a child node so set the mask on
-        mValueMask.setOff(n); // value mask is always off if child mask is on
         hasChild = true;
-        mNodes[n].setChild(new ChildNodeType(xyz, mNodes[n].getValue(), /*active=*/false));
+        this->setChildNode(n, new ChildNodeType(xyz, mNodes[n].getValue(), /*active=*/false));
     }
     if (hasChild) mNodes[n].getChild()->setValueOn(xyz);
 }
@@ -1454,10 +1474,8 @@ InternalNode<ChildT, Log2Dim>::setValueOff(const Coord& xyz, const ValueType& va
             // If the voxel belongs to a tile that is either active or that
             // has a constant value that is different from the one provided,
             // a child subtree must be constructed.
-            mChildMask.setOn(n); // we're adding a child node so set the mask on
-            mValueMask.setOff(n); // value mask is always off if child mask is on
             hasChild = true;
-            mNodes[n].setChild(new ChildNodeType(xyz, mNodes[n].getValue(), active));
+            this->setChildNode(n, new ChildNodeType(xyz, mNodes[n].getValue(), active));
         }
     }
     if (hasChild) mNodes[n].getChild()->setValueOff(xyz, value);
@@ -1477,10 +1495,8 @@ InternalNode<ChildT, Log2Dim>::setValueOffAndCache(const Coord& xyz,
             // If the voxel belongs to a tile that is either active or that
             // has a constant value that is different from the one provided,
             // a child subtree must be constructed.
-            mChildMask.setOn(n); // we're adding a child node so set the mask on
-            mValueMask.setOff(n); // value mask is always off if child mask is on
             hasChild = true;
-            mNodes[n].setChild(new ChildNodeType(xyz, mNodes[n].getValue(), active));
+            this->setChildNode(n, new ChildNodeType(xyz, mNodes[n].getValue(), active));
         }
     }
     if (hasChild) {
@@ -1503,10 +1519,8 @@ InternalNode<ChildT, Log2Dim>::setValueOn(const Coord& xyz, const ValueType& val
             // If the voxel belongs to a tile that is either inactive or that
             // has a constant value that is different from the one provided,
             // a child subtree must be constructed.
-            mChildMask.setOn(n); // we're adding a child node so set the mask on
-            mValueMask.setOff(n); // value mask is always off if child mask is on
             hasChild = true;
-            mNodes[n].setChild(new ChildNodeType(xyz, mNodes[n].getValue(), active));
+            this->setChildNode(n, new ChildNodeType(xyz, mNodes[n].getValue(), active));
         }
     }
     if (hasChild) mNodes[n].getChild()->setValueOn(xyz, value);
@@ -1526,10 +1540,8 @@ InternalNode<ChildT, Log2Dim>::setValueAndCache(const Coord& xyz,
             // If the voxel belongs to a tile that is either inactive or that
             // has a constant value that is different from the one provided,
             // a child subtree must be constructed.
-            mChildMask.setOn(n); // we're adding a child node so set the mask on
-            mValueMask.setOff(n); // value mask is always off if child mask is on
             hasChild = true;
-            mNodes[n].setChild(new ChildNodeType(xyz, mNodes[n].getValue(), active));
+            this->setChildNode(n, new ChildNodeType(xyz, mNodes[n].getValue(), active));
         }
     }
     if (hasChild) {
@@ -1549,10 +1561,8 @@ InternalNode<ChildT, Log2Dim>::setValueOnly(const Coord& xyz, const ValueType& v
         // If the voxel has a tile value that is different from the one provided,
         // a child subtree must be constructed.
         const bool active = this->isValueMaskOn(n);
-        mChildMask.setOn(n); // we're adding a child node so set the mask on
-        mValueMask.setOff(n); // value mask is always off if child mask is on
         hasChild = true;
-        mNodes[n].setChild(new ChildNodeType(xyz, mNodes[n].getValue(), active));
+        this->setChildNode(n, new ChildNodeType(xyz, mNodes[n].getValue(), active));
     }
     if (hasChild) mNodes[n].getChild()->setValueOnly(xyz, value);
 }
@@ -1569,10 +1579,8 @@ InternalNode<ChildT, Log2Dim>::setValueOnlyAndCache(const Coord& xyz,
         // If the voxel has a tile value that is different from the one provided,
         // a child subtree must be constructed.
         const bool active = this->isValueMaskOn(n);
-        mChildMask.setOn(n); // we're adding a child node so set the mask on
-        mValueMask.setOff(n); // value mask is always off if child mask is on
         hasChild = true;
-        mNodes[n].setChild(new ChildNodeType(xyz, mNodes[n].getValue(), active));
+        this->setChildNode(n, new ChildNodeType(xyz, mNodes[n].getValue(), active));
     }
     if (hasChild) {
         acc.insert(xyz, mNodes[n].getChild());
@@ -1591,11 +1599,9 @@ InternalNode<ChildT, Log2Dim>::setActiveState(const Coord& xyz, bool on)
         if (on != this->isValueMaskOn(n)) {
             // If the voxel belongs to a tile with the wrong active state,
             // then a child subtree must be constructed.
-            mChildMask.setOn(n); // we're adding a child node so set the mask on
-            mValueMask.setOff(n); // value mask is always off if child mask is on
-            mNodes[n].setChild(new ChildNodeType(xyz, mNodes[n].getValue(), !on));
-                // 'on' is the voxel's new state, therefore '!on' is the tile's current state
+            // 'on' is the voxel's new state, therefore '!on' is the tile's current state
             hasChild = true;
+            this->setChildNode(n, new ChildNodeType(xyz, mNodes[n].getValue(), !on));
         }
     }
     if (hasChild) mNodes[n].getChild()->setActiveState(xyz, on);
@@ -1612,11 +1618,9 @@ InternalNode<ChildT, Log2Dim>::setActiveStateAndCache(const Coord& xyz, bool on,
         if (on != this->isValueMaskOn(n)) {
             // If the voxel belongs to a tile with the wrong active state,
             // then a child subtree must be constructed.
-            mChildMask.setOn(n); // we're adding a child node so set the mask on
-            mValueMask.setOff(n); // value mask is always off if child mask is on
-            mNodes[n].setChild(new ChildNodeType(xyz, mNodes[n].getValue(), !on));
-                // 'on' is the voxel's new state, therefore '!on' is the tile's current state
+            // 'on' is the voxel's new state, therefore '!on' is the tile's current state
             hasChild = true;
+            this->setChildNode(n, new ChildNodeType(xyz, mNodes[n].getValue(), !on));
         }
     }
     if (hasChild) {
@@ -1659,10 +1663,8 @@ InternalNode<ChildT, Log2Dim>::modifyValue(const Coord& xyz, const ModifyOp& op)
             createChild = !math::isExactlyEqual(tileVal, modifiedVal);
         }
         if (createChild) {
-            mChildMask.setOn(n); // we're adding a child node, so set the mask on
-            mValueMask.setOff(n); // value mask is always off wherever child mask is on
             hasChild = true;
-            mNodes[n].setChild(new ChildNodeType(xyz, mNodes[n].getValue(), active));
+            this->setChildNode(n, new ChildNodeType(xyz, mNodes[n].getValue(), active));
         }
     }
     if (hasChild) mNodes[n].getChild()->modifyValue(xyz, op);
@@ -1690,10 +1692,8 @@ InternalNode<ChildT, Log2Dim>::modifyValueAndCache(const Coord& xyz, const Modif
             createChild = !math::isExactlyEqual(tileVal, modifiedVal);
         }
         if (createChild) {
-            mChildMask.setOn(n); // we're adding a child node, so set the mask on
-            mValueMask.setOff(n); // value mask is always off wherever child mask is on
             hasChild = true;
-            mNodes[n].setChild(new ChildNodeType(xyz, mNodes[n].getValue(), active));
+            this->setChildNode(n, new ChildNodeType(xyz, mNodes[n].getValue(), active));
         }
     }
     if (hasChild) {
@@ -1720,10 +1720,8 @@ InternalNode<ChildT, Log2Dim>::modifyValueAndActiveState(const Coord& xyz, const
         // Need to create a child if applying the functor to the tile
         // produces a different value or active state.
         if (modifiedState != tileState || !math::isExactlyEqual(modifiedVal, tileVal)) {
-            mChildMask.setOn(n); // we're adding a child node, so set the mask on
-            mValueMask.setOff(n); // value mask is always off wherever child mask is on
             hasChild = true;
-            mNodes[n].setChild(new ChildNodeType(xyz, tileVal, tileState));
+            this->setChildNode(n, new ChildNodeType(xyz, tileVal, tileState));
         }
     }
     if (hasChild) mNodes[n].getChild()->modifyValueAndActiveState(xyz, op);
@@ -1746,10 +1744,8 @@ InternalNode<ChildT, Log2Dim>::modifyValueAndActiveStateAndCache(
         // Need to create a child if applying the functor to the tile
         // produces a different value or active state.
         if (modifiedState != tileState || !math::isExactlyEqual(modifiedVal, tileVal)) {
-            mChildMask.setOn(n); // we're adding a child node, so set the mask on
-            mValueMask.setOff(n); // value mask is always off wherever child mask is on
             hasChild = true;
-            mNodes[n].setChild(new ChildNodeType(xyz, tileVal, tileState));
+            this->setChildNode(n, new ChildNodeType(xyz, tileVal, tileState));
         }
     }
     if (hasChild) {
@@ -1789,9 +1785,7 @@ InternalNode<ChildT, Log2Dim>::fill(const CoordBBox& bbox, const ValueType& valu
                         // Replace the tile with a newly-created child that is initialized
                         // with the tile's value and active state.
                         child = new ChildT(xyz, mNodes[n].getValue(), this->isValueMaskOn(n));
-                        mChildMask.setOn(n);
-                        mValueMask.setOff(n);
-                        mNodes[n].setChild(child);
+                        this->setChildNode(n, child);
                     } else {
                         child = mNodes[n].getChild();
                     }
@@ -2028,11 +2022,7 @@ inline void
 InternalNode<ChildT, Log2Dim>::voxelizeActiveTiles()
 {
     for (ValueOnIter iter = this->beginValueOn(); iter; ++iter) {
-        const Index n = iter.pos();
-        ChildNodeType* child = new ChildNodeType(iter.getCoord(), iter.getValue(), true);
-        mValueMask.setOff(n);
-        mChildMask.setOn(n);
-        mNodes[n].setChild(child);
+        this->setChildNode(iter.pos(), new ChildNodeType(iter.getCoord(), iter.getValue(), true));
     }
     for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) iter->voxelizeActiveTiles();
 }
@@ -2068,9 +2058,7 @@ InternalNode<ChildT, Log2Dim>::merge(InternalNode& other,
                 ChildNodeType* child = other.mNodes[n].getChild();
                 other.mChildMask.setOff(n);
                 child->resetBackground(otherBackground, background);
-                mChildMask.setOn(n);
-                mValueMask.setOff(n);
-                mNodes[n].setChild(child);
+                this->setChildNode(n, child);
             }
         }
 
@@ -2165,7 +2153,7 @@ InternalNode<ChildT, Log2Dim>::merge(const ValueType& tileValue, bool tileActive
     if (!tileActive) return;
 
     // Iterate over this node's children and inactive tiles.
-    for (ValueOffIter iter = beginValueOff(); iter; ++iter) {
+    for (ValueOffIter iter = this->beginValueOff(); iter; ++iter) {
         const Index n = iter.pos();
         if (mChildMask.isOn(n)) {
             // Merge the other node's active tile into this node's child.
@@ -2191,6 +2179,7 @@ InternalNode<ChildT, Log2Dim>::topologyUnion(const InternalNode<OtherChildT, Log
     typedef typename InternalNode<OtherChildT, Log2Dim>::ChildOnCIter OtherChildIter;
     typedef typename InternalNode<OtherChildT, Log2Dim>::ValueOnCIter OtherValueIter;
 
+    // Loop over other node's child nodes
     for (OtherChildIter iter = other.cbeginChildOn(); iter; ++iter) {
         const Index i = iter.pos();
         if (mChildMask.isOn(i)) {//this has a child node
@@ -2205,6 +2194,7 @@ InternalNode<ChildT, Log2Dim>::topologyUnion(const InternalNode<OtherChildT, Log
             mNodes[i].setChild(child);
         }
     }
+    // Loop over other node's active tiles
     for (OtherValueIter iter = other.cbeginValueOn(); iter; ++iter) {
         const Index i = iter.pos();
         if (mChildMask.isOn(i)) {
@@ -2215,6 +2205,72 @@ InternalNode<ChildT, Log2Dim>::topologyUnion(const InternalNode<OtherChildT, Log
     }
 }
 
+template<typename ChildT, Index Log2Dim>
+template<typename OtherChildT>
+inline void
+InternalNode<ChildT, Log2Dim>::topologyIntersection(const InternalNode<OtherChildT, Log2Dim>& other,
+                                                    const ValueType& background)
+{
+    // Loop over this node's child nodes
+    for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
+        const Index i = iter.pos();
+        if (other.mChildMask.isOn(i)) {//other also has a child node
+            iter->topologyIntersection(*(other.mNodes[i].getChild()),  background);
+        } else if (other.mValueMask.isOff(i)) {//other is an inactive tile
+            delete mNodes[i].getChild();//convert child to an inactive tile
+            mNodes[i].setValue(background);
+            mChildMask.setOff(i);
+            mValueMask.setOff(i);
+        }
+    }
+    
+    // Loop over this node's active tiles
+    for (ValueOnCIter iter = this->cbeginValueOn(); iter; ++iter) {
+        const Index i = iter.pos();
+        if (other.mChildMask.isOn(i)) {//other has a child node
+            ChildNodeType* child = new ChildNodeType(*(other.mNodes[i].getChild()),
+                                                     *iter, TopologyCopy());
+            this->setChildNode(i, child);//replace the active tile with a child branch
+        } else if (other.mValueMask.isOff(i)) {//other is an inactive tile
+            mValueMask.setOff(i);//convert active tile to an inactive tile
+        }
+    }
+}
+
+template<typename ChildT, Index Log2Dim>
+template<typename OtherChildT>
+inline void
+InternalNode<ChildT, Log2Dim>::topologyDifference(const InternalNode<OtherChildT, Log2Dim>& other,
+                                                  const ValueType& background)
+{
+    typedef typename InternalNode<OtherChildT, Log2Dim>::ChildOnCIter OtherChildIter;
+    typedef typename InternalNode<OtherChildT, Log2Dim>::ValueOnCIter OtherValueIter;
+     
+    // Loop over other node's child nodes
+    for (OtherChildIter iter = other.cbeginChildOn(); iter; ++iter) {
+        const Index i = iter.pos();
+        if (mChildMask.isOn(i)) {//this has a child node
+            mNodes[i].getChild()->topologyDifference(*iter, background);
+        } else if (mValueMask.isOn(i)) {// this is an active tile
+            ChildNodeType* child = new ChildNodeType(iter.getCoord(), mNodes[i].getValue(), true);
+            child->topologyDifference(*iter, background);
+            this->setChildNode(i, child);//we're replacing the active tile with a child branch
+        }
+    }
+    
+    // Loop over other node's active tiles
+    for (OtherValueIter iter = other.cbeginValueOn(); iter; ++iter) {
+        const Index i = iter.pos();
+        if (mChildMask.isOn(i)) {//this has a child node
+            delete mNodes[i].getChild();//convert child to an inactive tile
+            mNodes[i].setValue(background);
+            mChildMask.setOff(i);
+            mValueMask.setOff(i);
+        } else if (mValueMask.isOn(i)) {//this is an active tile
+            mValueMask.setOff(i);//convert active tile to an inactive tile
+        }
+    }
+}
 
 ////////////////////////////////////////
 
@@ -2259,9 +2315,7 @@ InternalNode<ChildT, Log2Dim>::combine(InternalNode& other, CombineOp& op)
                 // Steal the other node's child.
                 other.mChildMask.setOff(i);
                 other.mNodes[i].setValue(zero);
-                mChildMask.setOn(i);
-                mValueMask.setOff(i);
-                mNodes[i].setChild(child);
+                this->setChildNode(i, child);
             }
 
         } else /*if (isChildMaskOn(i) && other.isChildMaskOn(i))*/ {
@@ -2330,11 +2384,8 @@ InternalNode<ChildT, Log2Dim>::combine2(const InternalNode& other0, const Intern
                 ? other0.mNodes[i].getChild() : other1.mNodes[i].getChild();
             assert(otherChild);
             if (this->isChildMaskOff(i)) {
-                // Add a new child with the same coordinates, etc.
-                // as the other node's child.
-                mChildMask.setOn(i);
-                mValueMask.setOff(i);
-                mNodes[i].setChild(new ChildNodeType(otherChild->origin(), mNodes[i].getValue()));
+                // Add a new child with the same coordinates, etc. as the other node's child.
+                this->setChildNode(i, new ChildNodeType(otherChild->origin(), mNodes[i].getValue()));
             }
 
             if (other0.isChildMaskOff(i)) {
@@ -2382,9 +2433,7 @@ InternalNode<ChildT, Log2Dim>::combine2(const ValueType& value, const InternalNo
                 // Add a new child with the same coordinates, etc.
                 // as the other node's child.
                 /// @todo Could the other node's ChildNodeType be different from this node's?
-                mChildMask.setOn(i);
-                mValueMask.setOff(i);
-                mNodes[i].setChild(new ChildNodeType(*otherChild));
+                this->setChildNode(i, new ChildNodeType(*otherChild));
             }
             // Combine the other node's child with a constant value
             // and write the result into child i.
@@ -2415,11 +2464,8 @@ InternalNode<ChildT, Log2Dim>::combine2(const InternalNode& other, const ValueTy
             ChildNodeType* otherChild = other.mNodes[i].getChild();
             assert(otherChild);
             if (this->isChildMaskOff(i)) {
-                // Add a new child with the same coordinates, etc.
-                // as the other node's child.
-                mChildMask.setOn(i);
-                mValueMask.setOff(i);
-                mNodes[i].setChild(new ChildNodeType(otherChild->origin(), mNodes[i].getValue()));
+                // Add a new child with the same coordinates, etc. as the other node's child.
+                this->setChildNode(i, new ChildNodeType(otherChild->origin(), mNodes[i].getValue()));
             }
             // Combine the other node's child with a constant value
             // and write the result into child i.
@@ -2710,7 +2756,7 @@ InternalNode<ChildT, Log2Dim>::hasSameTopology(
 
 template<typename ChildT, Index Log2Dim>
 inline void
-InternalNode<ChildT, Log2Dim>::setChildNode(Index i, ChildNodeType* child)
+InternalNode<ChildT, Log2Dim>::resetChildNode(Index i, ChildNodeType* child)
 {
     assert(child);
     if (this->isChildMaskOn(i)) {
@@ -2719,6 +2765,17 @@ InternalNode<ChildT, Log2Dim>::setChildNode(Index i, ChildNodeType* child)
         mChildMask.setOn(i);
         mValueMask.setOff(i);
     }
+    mNodes[i].setChild(child);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline void
+InternalNode<ChildT, Log2Dim>::setChildNode(Index i, ChildNodeType* child)
+{
+    assert(child);
+    assert(mChildMask.isOff(i));
+    mChildMask.setOn(i);
+    mValueMask.setOff(i);
     mNodes[i].setChild(child);
 }
 

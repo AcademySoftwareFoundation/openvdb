@@ -46,7 +46,7 @@
 #include <tbb/parallel_reduce.h>
 
 #include <vector>
-
+#include <limits> // std::numeric_limits
 
 //////////
 
@@ -73,6 +73,8 @@ namespace tools {
 ///
 /// @param minRadius        determines the smallest sphere size in voxel units.
 ///
+/// @param maxRadius        determines the largest sphere size in voxel units.
+///
 /// @param isovalue         the crossing point of the volume values that is considered
 ///                         the surface. The zero default value works for signed distance
 ///                         fields while fog volumes require a larger positive value,
@@ -92,6 +94,7 @@ fillWithSpheres(
     int maxSphereCount,
     bool overlapping = false,
     float minRadius = 1.0,
+    float maxRadius = std::numeric_limits<float>::max(),
     float isovalue = 0.0,
     int instanceCount = 10000,
     InterrupterT* interrupter = NULL);
@@ -107,11 +110,12 @@ fillWithSpheres(
     int maxSphereCount,
     bool overlapping = false,
     float minRadius = 1.0,
+    float maxRadius = std::numeric_limits<float>::max(),
     float isovalue = 0.0,
     int instanceCount = 10000)
 {
     fillWithSpheres<GridT, util::NullInterrupter>(grid, spheres,
-        maxSphereCount, overlapping, minRadius, isovalue, instanceCount);
+        maxSphereCount, overlapping, minRadius, maxRadius, isovalue, instanceCount);
 }
 
 
@@ -698,6 +702,7 @@ fillWithSpheres(
     int maxSphereCount,
     bool overlapping,
     float minRadius,
+    float maxRadius,
     float isovalue,
     int instanceCount,
     InterrupterT* interrupter)
@@ -763,38 +768,42 @@ fillWithSpheres(
     if (!csp.search(instancePoints, instanceRadius)) return;
 
     std::vector<unsigned char> instanceMask(instancePoints.size(), 0);
-    float maxRadius = 0.0;
-    int maxRadiusIdx = 0;
+    float largestRadius = 0.0;
+    int largestRadiusIdx = 0;
 
     for (size_t n = 0, N = instancePoints.size(); n < N; ++n) {
-        if (instanceRadius[n] > maxRadius) {
-            maxRadius = instanceRadius[n];
-            maxRadiusIdx = n;
+        if (instanceRadius[n] > largestRadius) {
+            largestRadius = instanceRadius[n];
+            largestRadiusIdx = n;
         }
     }
 
     Vec3s pos;
     Vec4s sphere;
     minRadius *= transform.voxelSize()[0];
+    maxRadius *= transform.voxelSize()[0];
+
     for (size_t s = 0, S = std::min(size_t(maxSphereCount), instancePoints.size()); s < S; ++s) {
 
         if (interrupter && interrupter->wasInterrupted()) return;
 
-        if (s != 0 && maxRadius < minRadius) break;
+        largestRadius = std::min(maxRadius, largestRadius);
 
-        sphere[0] = float(instancePoints[maxRadiusIdx].x());
-        sphere[1] = float(instancePoints[maxRadiusIdx].y());
-        sphere[2] = float(instancePoints[maxRadiusIdx].z());
-        sphere[3] = maxRadius;
+        if (s != 0 && largestRadius < minRadius) break;
+
+        sphere[0] = float(instancePoints[largestRadiusIdx].x());
+        sphere[1] = float(instancePoints[largestRadiusIdx].y());
+        sphere[2] = float(instancePoints[largestRadiusIdx].z());
+        sphere[3] = largestRadius;
 
         spheres.push_back(sphere);
-        instanceMask[maxRadiusIdx] = 1;
+        instanceMask[largestRadiusIdx] = 1;
  
         internal::UpdatePoints op(sphere, instancePoints, instanceRadius, instanceMask, overlapping);
         op.run();
         
-        maxRadius = op.radius();
-        maxRadiusIdx = op.index();
+        largestRadius = op.radius();
+        largestRadiusIdx = op.index();
     }
 }
 

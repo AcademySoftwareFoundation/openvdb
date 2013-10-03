@@ -329,6 +329,10 @@ public:
     /// Return the number of inactive voxels within the bounding box of all active voxels.
     virtual Index64 inactiveVoxelCount() const;
 
+    /// Return the total number of active tiles.
+    /// @note This method is not virtual so as to not change the ABI.
+    Index64 activeTileCount() const { return mRoot.onTileCount(); }
+    
     /// Return the minimum and maximum active values in this tree.
     void evalMinMax(ValueType &min, ValueType &max) const;
 
@@ -579,6 +583,35 @@ public:
     /// are marked as active in this tree but left with their original values.
     template<typename OtherRootNodeType>
     void topologyUnion(const Tree<OtherRootNodeType>& other);
+   
+    /// @brief Intersects this tree's set of active values with the active values
+    /// of the other tree, whose @c ValueType may be different.
+    /// @details The resulting state of a value is active only if the corresponding 
+    /// value was already active AND if it is active in the other tree. Also, a
+    /// resulting value maps to a voxel if the corresponding value
+    /// already mapped to an active voxel in either of the two grids
+    /// and it maps to an active tile or voxel in the other grid.
+    ///
+    /// @note This operation can delete branches in this grid if they
+    /// overlap with inactive tiles in the other grid. Likewise active
+    /// voxels can be turned into unactive voxels resulting in leaf
+    /// nodes with no active values. Thus, it is recommended to
+    /// subsequently call prune. 
+    template<typename OtherRootNodeType>
+    void topologyIntersection(const Tree<OtherRootNodeType>& other);
+
+    /// @brief Difference this tree's set of active values with the active values
+    /// of the other tree, whose @c ValueType may be different. So a
+    /// resulting voxel will be active only if the original voxel is
+    /// active in this tree and inactive in the other tree.
+    ///
+    /// @note This operation can delete branches in this grid if they
+    /// overlap with active tiles in the other grid. Likewise active
+    /// voxels can be turned into inactive voxels resulting in leaf
+    /// nodes with no active values. Thus, it is recommended to
+    /// subsequently call prune.
+    template<typename OtherRootNodeType>
+    void topologyDifference(const Tree<OtherRootNodeType>& other);
 
     /*! For a given function @c f, use sparse traversal to compute <tt>f(this, other)</tt>
      *  over all corresponding pairs of values (tile or voxel) of this tree and the other tree
@@ -1638,6 +1671,23 @@ Tree<RootNodeType>::topologyUnion(const Tree<OtherRootNodeType>& other)
     mRoot.topologyUnion(other.getRootNode());
 }
 
+template<typename RootNodeType>
+template<typename OtherRootNodeType>
+inline void
+Tree<RootNodeType>::topologyIntersection(const Tree<OtherRootNodeType>& other)
+{
+    this->clearAllAccessors();
+    mRoot.topologyIntersection(other.getRootNode());
+}
+
+template<typename RootNodeType>
+template<typename OtherRootNodeType>
+inline void
+Tree<RootNodeType>::topologyDifference(const Tree<OtherRootNodeType>& other)
+{
+    this->clearAllAccessors();
+    mRoot.topologyDifference(other.getRootNode());
+}
 
 ////////////////////////////////////////
 
