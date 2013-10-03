@@ -331,7 +331,7 @@ private:
 
     bool isValueOn(const Coord& ijk) { return mAccessor.isValueOn(ijk); }
 
-    template<typename, int> friend class VolumeHDDA;
+    template<typename, int> friend struct VolumeHDDA;
 
     typedef typename GridT::ConstAccessor AccessorT;
     
@@ -490,7 +490,7 @@ private:
         return mStencil.interpolation(pos);
     }
 
-    template<typename, int> friend class LevelSetHDDA;
+    template<typename, int> friend struct LevelSetHDDA;
     
     RayT            mRay;
     StencilT        mStencil;
