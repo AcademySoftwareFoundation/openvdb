@@ -118,10 +118,27 @@ BOOST_VERSION	?= 1_51
 BOOST_INCL_DIR	:= $(LOCAL_INCLUDE)/boost-$(BOOST_VERSION)
 
 # The parent directory of the OpenEXR/ header directory
-EXR_INCL_DIR := $(HOUDINI_DIR)/toolkit/include
+EXR_INCL_DIR := $(LOCAL_INCLUDE)
 # The directory containing libIlmImf, libIlmThread, etc.
-EXR_LIB_DIR := $(HOUDINI_DIR)/dsolib
+EXR_LIB_DIR := $(LOCAL_LIB)
 EXR_LIB := -lIlmImf -lIlmThread -lIex -lImath
+ifdef WINDOWS_NT
+  ifneq (full,$(strip $(debug)))
+    ifeq (no,$(strip $(shared)))
+      EXR_LIB := IlmImf.lib IlmThread.lib Iex.lib Imath.lib
+    else
+      EXR_LIB := IlmImf.lib IlmThread.lib Iex.lib Imath.lib
+    endif
+  else
+    ifeq (no,$(strip $(shared)))
+      EXR_LIB := IlmImf_d.lib IlmThread_d.lib Iex_d.lib Imath_d.lib
+    else
+      EXR_LIB := IlmImf_d.lib IlmThread_d.lib Iex_d.lib Imath_d.lib
+    endif
+  endif
+else
+  EXR_LIB := -lIlmImf -lIlmThread -lIex -lImath
+endif
 
 # The parent directory of the OpenEXR/ header directory (which contains half.h)
 HALF_INCL_DIR := $(LOCAL_INCLUDE)
@@ -281,11 +298,13 @@ LIBS := \
     -L $(HALF_LIB_DIR) $(HALF_LIB) \
     -L $(TBB_LIB_DIR) $(TBB_LIB) \
     -L $(ZLIB_LIB_DIR) $(ZLIB_LIB) \
+    -L $(EXR_LIB_DIR) $(EXR_LIB) \
 #
 LIBS_RPATH := \
     -Wl,-rpath,'$$ORIGIN/.' $(LDDIROPT)$(HALF_LIB_DIR) $(HALF_LIB) \
     -Wl,-rpath,'$$ORIGIN/.' $(LDDIROPT)$(TBB_LIB_DIR) $(TBB_LIB) \
     -Wl,-rpath,'$$ORIGIN/.' $(LDDIROPT)$(ZLIB_LIB_DIR) $(ZLIB_LIB) \
+    -Wl,-rpath,'$$ORIGIN/.' $(LDDIROPT)$(EXR_LIB_DIR) $(EXR_LIB) \
 #
 ifeq (2,$(words $(strip $(CONCURRENT_MALLOC_LIB_DIR) $(CONCURRENT_MALLOC_LIB))))
 ALLOC_LIBS_RPATH := \
