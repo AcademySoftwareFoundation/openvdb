@@ -303,7 +303,7 @@ public:
             t0 = mRay.t0();
             t1 = mRay.t1();
         }
-        mRay.setTimes(mRay.t1(), mTmax);
+        mRay.setTimes(mRay.t1() + 1e-9, mTmax);
         return n;
     }
 

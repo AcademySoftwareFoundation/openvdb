@@ -56,16 +56,16 @@ class TestVolumeRayIntersector : public CppUnit::TestCase
 {
 public:
     CPPUNIT_TEST_SUITE(TestVolumeRayIntersector);
-    CPPUNIT_TEST(testLeafTraversal);
+    CPPUNIT_TEST(testAll);
     CPPUNIT_TEST_SUITE_END();
 
-    void testLeafTraversal();
+    void testAll();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestVolumeRayIntersector);
 
 void
-TestVolumeRayIntersector::testLeafTraversal()
+TestVolumeRayIntersector::testAll()
 {
     using namespace openvdb;
     typedef math::Ray<double>  RayT;
@@ -160,6 +160,30 @@ TestVolumeRayIntersector::testLeafTraversal()
         CPPUNIT_ASSERT_EQUAL(1, inter.march(t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL(33.0, t0);
         ASSERT_DOUBLES_APPROX_EQUAL(41.0, t1);
+        CPPUNIT_ASSERT_EQUAL(0, inter.march(t0, t1));
+    }
+    
+    {// Test submitted by "Jan" @ GitHub
+        FloatGrid grid(0.0f);
+        grid.tree().setValue(Coord(0*8,0,0), 1.0f);
+        grid.tree().setValue(Coord(1*8,0,0), 1.0f);
+        grid.tree().setValue(Coord(3*8,0,0), 1.0f);
+        tools::VolumeRayIntersector<FloatGrid> inter(grid);
+        
+        const Vec3T dir(-1.0, 0.0, 0.0);
+        const Vec3T eye(50.0, 0.0, 0.0);
+        const RayT ray(eye, dir);
+        CPPUNIT_ASSERT(inter.setIndexRay(ray));
+        double t0=0, t1=0;
+        CPPUNIT_ASSERT_EQUAL(2, inter.march(t0, t1));
+        ASSERT_DOUBLES_APPROX_EQUAL(18.0, t0);
+        ASSERT_DOUBLES_APPROX_EQUAL(26.0, t1);
+        CPPUNIT_ASSERT_EQUAL(2, inter.march(t0, t1));
+        ASSERT_DOUBLES_APPROX_EQUAL(34.0, t0);
+        ASSERT_DOUBLES_APPROX_EQUAL(42.0, t1);
+        CPPUNIT_ASSERT_EQUAL(2, inter.march(t0, t1));
+        ASSERT_DOUBLES_APPROX_EQUAL(42.0, t0);
+        ASSERT_DOUBLES_APPROX_EQUAL(50.0, t1);
         CPPUNIT_ASSERT_EQUAL(0, inter.march(t0, t1));
     }
 }
