@@ -624,6 +624,9 @@ ALL_TARGETS := \
     vdb_view$(EXE_SUFFIX) \
     vdb_view$(EXE_SUFFIX).manifest \
     vdb_view.{pdb,ilk} \
+    vdb_render$(EXE_SUFFIX) \
+    vdb_render$(EXE_SUFFIX).manifest \
+    vdb_render.{pdb,ilk} \
     $(DEPEND) \
 #
 
@@ -653,12 +656,6 @@ else
 $(LIBOPENVDB_SHARED): $(OBJ_NAMES)
 	$(call BuildSharedLibrary,$(LIBS_RPATH))
 endif # versioned libs
-
-ifdef WINDOWS_NT
-$(LIBOPENVDB_IMPORT): lib
-else
-LIBOPENVDB_IMPORT :=
-endif
 
 else
 
