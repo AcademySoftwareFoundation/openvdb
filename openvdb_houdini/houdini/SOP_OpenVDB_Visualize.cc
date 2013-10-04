@@ -85,7 +85,7 @@ public:
 
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
-    virtual unsigned disableParms();
+    virtual bool updateParmsFlags();
     virtual void resolveObsoleteParms(PRM_ParmList*);
     static  UT_Vector3 mColors[];
 };
@@ -270,22 +270,22 @@ SOP_OpenVDB_Visualize::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
 }
 
 
-// Disable UI Parms.
-unsigned
-SOP_OpenVDB_Visualize::disableParms()
+// Update UI parm display 
+bool
+SOP_OpenVDB_Visualize::updateParmsFlags()
 {
-    unsigned changed = 0;
+    bool changed = false;
 
 #if HAVE_SURFACING_PARM
     const bool extractMesh = evalInt("meshing", 0, 0) > 0;
     //changed += enableParm("computeNormals", extractMesh);
-    changed += enableParm("adaptivity", extractMesh);
-    changed += enableParm("surfaceColor", extractMesh);
-    changed += enableParm("isoValue", extractMesh);
+    changed |= enableParm("adaptivity", extractMesh);
+    changed |= enableParm("surfaceColor", extractMesh);
+    changed |= enableParm("isoValue", extractMesh);
 #endif
 
     const bool drawVoxels = evalInt("voxels",  0, 0) > 0;
-    changed += enableParm("ignorestaggered", drawVoxels);
+    changed |= enableParm("ignorestaggered", drawVoxels);
 
     return changed;
 }
@@ -853,7 +853,11 @@ SOP_OpenVDB_Visualize::cookMySop(OP_Context& context)
         // mesh using OpenVDB mesher
         if (meshing == 1) {
             GU_ConvertParms parms;
+#if (UT_VERSION_INT < 0x0d0000b1) // before 13.0.177
             parms.toType = GEO_PrimTypeCompat::GEOPRIMPOLY;
+#else
+            parms.setToType(GEO_PrimTypeCompat::GEOPRIMPOLY);
+#endif
             parms.myOffset = iso;
             parms.preserveGroups = false;
             parms.primGroup = const_cast<GA_PrimitiveGroup*>(group);

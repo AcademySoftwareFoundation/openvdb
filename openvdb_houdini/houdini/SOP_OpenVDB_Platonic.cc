@@ -53,7 +53,7 @@ public:
 
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
-    virtual unsigned disableParms();
+    virtual bool updateParmsFlags();
 };
 
 
@@ -130,10 +130,10 @@ SOP_OpenVDB_Platonic::SOP_OpenVDB_Platonic(OP_Network* net,
 }
 
 
-unsigned
-SOP_OpenVDB_Platonic::disableParms()
+bool
+SOP_OpenVDB_Platonic::updateParmsFlags()
 {
-    unsigned changed = 0;
+    bool changed = false;
 
     bool sdfGrid = false;
     {
@@ -142,7 +142,7 @@ SOP_OpenVDB_Platonic::disableParms()
         sdfGrid = (gridClassStr.toStdString() == "sdf");
     }
 
-    changed += enableParm("halfWidth", sdfGrid);
+    changed |= enableParm("halfWidth", sdfGrid);
 
     return changed;
 }
