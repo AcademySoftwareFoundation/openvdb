@@ -145,7 +145,8 @@ endif
 	MAKEDEP_SYSINCLUDES += -S "$(HFS)/custom/include"
 	MAKEDEP_SYSINCLUDES += -S "$(HFS)/toolkit/include"
     endif
-    MAKEDEPEND		:= ./clmakedep.py $(MAKEDEP_SYSINCLUDES)
+    SELF_DIR		:= $(dir $(lastword $(MAKEFILE_LIST)))
+    MAKEDEPEND		:= $(SELF_DIR)/clmakedep.py $(MAKEDEP_SYSINCLUDES)
 
     define BuildSharedLibrary
 	@echo "Building $@ because of $(call list_deps)"; \
