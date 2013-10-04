@@ -374,7 +374,7 @@ ParmFactory::setSpareData(const std::map<std::string, std::string>& items)
 {
     typedef std::map<std::string, std::string> StringMap;
     if (!items.empty()) {
-        PRM_SpareData* data = new PRM_SpareData;
+        PRM_SpareData* data = new PRM_SpareData();
         for (StringMap::const_iterator i = items.begin(), e = items.end(); i != e; ++i) {
             data->addTokenValue(i->first.c_str(), i->second.c_str());
         }
@@ -398,6 +398,12 @@ ParmFactory::setVectorSize(int n)                   { mImpl->vectorSize = n; ret
 PRM_Template
 ParmFactory::get() const
 {
+#ifdef SESI_OPENVDB
+    // Help is maintained separately within Houdini
+    const char *helpText = NULL;
+#else
+    const char *helpText = mImpl->helpText;
+#endif
     if (mImpl->multiType != PRM_MULTITYPE_NONE) {
         return PRM_Template(
             mImpl->multiType,
@@ -407,7 +413,7 @@ ParmFactory::get() const
             const_cast<PRM_Default*>(mImpl->defaults),
             const_cast<PRM_Range*>(mImpl->range),
             const_cast<PRM_SpareData*>(mImpl->spareData),
-            mImpl->helpText,
+            helpText,
             const_cast<PRM_ConditionalBase*>(mImpl->conditional));
     } else {
         return PRM_Template(
@@ -421,7 +427,7 @@ ParmFactory::get() const
             mImpl->callbackFunc,
             const_cast<PRM_SpareData*>(mImpl->spareData),
             mImpl->parmGroup,
-            mImpl->helpText,
+            helpText,
             const_cast<PRM_ConditionalBase*>(mImpl->conditional));
     }
 }

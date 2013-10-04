@@ -58,7 +58,7 @@ public:
 
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
-    virtual unsigned disableParms();
+    virtual bool updateParmsFlags();
 };
 
 
@@ -124,13 +124,13 @@ SOP_OpenVDB_Rebuild_Level_Set::SOP_OpenVDB_Rebuild_Level_Set(OP_Network* net,
 
 
 // Enable/disable or show/hide parameters in the UI.
-unsigned
-SOP_OpenVDB_Rebuild_Level_Set::disableParms()
+bool
+SOP_OpenVDB_Rebuild_Level_Set::updateParmsFlags()
 {
-    unsigned changed = 0;
+    bool changed = false;
 
     // Not sure if this is a desired feature.
-    setVisibleState("fillinterior", false);
+    changed |= setVisibleState("fillinterior", false);
 
     return changed;
 }

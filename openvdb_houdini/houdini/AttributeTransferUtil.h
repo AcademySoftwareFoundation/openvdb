@@ -1126,7 +1126,7 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
     openvdb::Coord ijk, coord;
     std::vector<GA_Index> primitives(8), similar_primitives(8);
     int count;
- 
+
     UT_Vector3 targetN, sourceN;
 
     for (GA_PageIterator pageIt = range.beginPages(); !pageIt.atEnd(); ++pageIt) {

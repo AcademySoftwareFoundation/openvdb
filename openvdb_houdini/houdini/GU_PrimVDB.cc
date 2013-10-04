@@ -78,12 +78,14 @@
 #include <UT/UT_ParallelUtil.h>
 #include <UT/UT_ScopedPtr.h>
 #include <UT/UT_StopWatch.h>
+#include <UT/UT_Version.h>
 
 #include <SYS/SYS_Types.h>
 
 #include <openvdb/tools/VolumeToMesh.h>
 
 #include <boost/function.hpp>
+#include <boost/scope_exit.hpp>
 #include <boost/type_traits/is_arithmetic.hpp>
 #include <boost/utility/enable_if.hpp>
 #include <algorithm>
@@ -320,8 +322,12 @@ GU_PrimVDB::buildFromGridAdapter(GU_Detail& gdp, void* gridPtr,
     return vdb;
 }
 
-GU_PrimVDB::~GU_PrimVDB()
+int64
+GU_PrimVDB::getMemoryUsage() const
 {
+    int64 mem = sizeof(*this);
+    mem += GEO_PrimVDB::getBaseMemoryUsage();
+    return mem;
 }
 
 namespace // anonymous
@@ -449,7 +455,7 @@ public:
 	using namespace openvdb;
 
 	FloatGrid &		grid = *myGrid.get();
-	float			background = grid.background();
+	const float		background = grid.background();
 	const UT_VoxelArrayF &	vox = *myVox;
 	uint8			bcnt = 0;
 
@@ -516,7 +522,7 @@ GU_PrimVDB::buildFromPrimVolume(
 	GU_Detail &geo,
 	const GEO_PrimVolume &vol,
 	const char *name,
-	const bool flood,
+	const bool flood_sdf,
 	const bool prune,
 	const float tolerance)
 {
@@ -555,7 +561,8 @@ GU_PrimVDB::buildFromPrimVolume(
         grid->pruneGrid(tolerance);
     }
     
-    if (flood && vol.isSDF()) {
+    if (flood_sdf && vol.isSDF()) {
+        // only call signed flood fill on SDFs
         grid->signedFloodFill();
     }
 
@@ -568,6 +575,57 @@ GU_PrimVDB::buildFromPrimVolume(
     prim_vdb->setVisualization(
 		vol.getVisualization(), vol.getVisIso(), vol.getVisDensity());
     return prim_vdb;
+}
+
+// Copy the exclusive bbox [start,end) from myVox into acc
+static void
+guCopyVoxelBBox(
+	const UT_VoxelArrayReadHandleF &vox,
+	openvdb::FloatGrid::Accessor &acc,
+	openvdb::Coord start, openvdb::Coord end)
+{
+    openvdb::Coord c;
+    for (c[0] = start[0] ; c[0] < end[0]; c[0]++) {
+	for (c[1] = start[1] ; c[1] < end[1]; c[1]++) {
+	    for (c[2] = start[2] ; c[2] < end[2]; c[2]++) {
+		float value = vox->getValue(c[0], c[1], c[2]);
+		acc.setValueOnly(c, value);
+	    }
+	}
+    }
+}
+
+void
+GU_PrimVDB::expandBorderFromPrimVolume(const GEO_PrimVolume &vol, int pad)
+{
+    using namespace openvdb;
+
+    UT_AutoInterrupt		    progress("Add inactive VDB border");
+    const UT_VoxelArrayReadHandleF  vox(vol.getVoxelHandle());
+    const Coord			    res(vox->getXRes(),
+					vox->getYRes(),
+					vox->getZRes());
+    GridBase &			    base = getGrid();
+    FloatGrid &			    grid = UTvdbGridCast<FloatGrid>(base);
+    FloatGrid::Accessor		    acc = grid.getAccessor();
+
+    // For simplicity, we overdraw the edges and corners
+    for (int axis = 0; axis < 3; axis++) {
+
+	if (progress.wasInterrupted())
+	    return;
+
+	openvdb::Coord beg(-pad, -pad, -pad);
+	openvdb::Coord end = res.offsetBy(+pad);
+
+	beg[axis] = -pad;
+	end[axis] = 0;
+	guCopyVoxelBBox(vox, acc, beg, end);
+
+	beg[axis] = res[axis];
+	end[axis] = res[axis] + pad;
+	guCopyVoxelBBox(vox, acc, beg, end);
+    }
 }
 
 // The following code is for HDK only
@@ -895,6 +953,60 @@ GU_PrimVDB::convertToPoly(
     return dst_geo.getGEOPrimitive(marker.primitiveBegin());
 }
 
+/*static*/ void
+GU_PrimVDB::convertPrimVolumeToPolySoup(
+	GU_Detail &dst_geo,
+	const GEO_PrimVolume &src_vol)
+{
+    using namespace openvdb;
+    UT_AutoInterrupt progress("Convert to Polygons");
+
+    GU_PrimVDB &vdb = *buildFromPrimVolume(
+			    dst_geo, src_vol, NULL,
+			    /*flood*/false, /*prune*/true, /*tol*/0);
+    // NOTE: This syntax is for Boost 1.46 used by H12.1. It is different in
+    // Boost 1.51 used by H12.5.
+    BOOST_SCOPE_EXIT( (&vdb) (&dst_geo) )
+    {
+	dst_geo.destroyPrimitive(vdb, /*and_points*/true);
+    } BOOST_SCOPE_EXIT_END
+
+    if (progress.wasInterrupted())
+	return;
+
+    try
+    {
+	BoolGrid::Ptr mask;
+	if (src_vol.getBorder() != GEO_VOLUMEBORDER_CONSTANT)
+	{
+	    Coord res;
+	    src_vol.getRes(res[0], res[1], res[2]);
+	    CoordBBox bbox(Coord(0, 0, 0), res.offsetBy(-1)); // inclusive
+	    if (bbox.hasVolume())
+	    {
+		vdb.expandBorderFromPrimVolume(src_vol, 4);
+		if (progress.wasInterrupted())
+		    return;
+		mask = BoolGrid::create(/*background*/false);
+		mask->setTransform(vdb.getGrid().transform().copy());
+		mask->fill(bbox, /*foreground*/true);
+	    }
+	}
+
+	tools::VolumeToMesh mesher(src_vol.getVisIso());
+	mesher.setSurfaceMask(mask);
+	GEOvdbProcessTypedGridScalar(vdb, mesher);
+	if (progress.wasInterrupted())
+	    return;
+	guCopyMesh(dst_geo, mesher, /*polysoup*/true, /*verbose*/false);
+	if (progress.wasInterrupted())
+	    return;
+    }
+    catch (std::exception& /*e*/)
+    {
+    }
+}
+
 namespace // anonymous
 {
 
@@ -1149,7 +1261,7 @@ GU_PrimVDB::convertVolumesToVDBs(
 	GU_Detail &dst_geo,
 	const GU_Detail &src_geo,
 	GU_ConvertParms &parms,
-	bool flood,
+	bool flood_sdf,
 	bool prune,
 	fpreal tolerance,
 	bool keep_original)
@@ -1170,8 +1282,8 @@ GU_PrimVDB::convertVolumesToVDBs(
 	GU_ConvertMarker marker(dst_geo);
 
 	GU_PrimVDB *new_prim;
-	new_prim = GU_PrimVDB::buildFromPrimVolume(dst_geo, *vol, NULL, flood,
-						   prune, tolerance);
+	new_prim = GU_PrimVDB::buildFromPrimVolume(
+			dst_geo, *vol, NULL, flood_sdf, prune, tolerance);
 	if (!new_prim || progress.wasInterrupted())
 	    break;
 
@@ -1232,12 +1344,12 @@ GU_PrimVDB::castToGeo(void) const
 }
 
 GU_RayIntersect *
-GU_PrimVDB::createRayCache(int &persistent)
+GU_PrimVDB::createRayCache(int &callermustdelete)
 {
     GU_Detail		*gdp	= (GU_Detail *)getParent();
     GU_RayIntersect	*intersect;
 
-    persistent = 0;
+    callermustdelete = 0;
     if (gdp->cacheable())
 	buildRayCache();
 
@@ -1245,7 +1357,7 @@ GU_PrimVDB::createRayCache(int &persistent)
     if (!intersect)
     {
 	intersect = new GU_RayIntersect(gdp, this);
-	persistent = 1;
+	callermustdelete = 1;
     }
 
     return intersect;

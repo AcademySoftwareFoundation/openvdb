@@ -103,7 +103,7 @@ public:
 
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
-    virtual unsigned disableParms();
+    virtual bool updateParmsFlags();
     virtual void resolveObsoleteParms(PRM_ParmList*);
 
 private:
@@ -323,14 +323,14 @@ SOP_OpenVDB_Combine::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
 ////////////////////////////////////////
 
 // Enable or disable parameters in the UI.
-unsigned
-SOP_OpenVDB_Combine::disableParms()
+bool
+SOP_OpenVDB_Combine::updateParmsFlags()
 {
-    unsigned changed = 0;
+    bool changed = false;
 
-    changed += enableParm("resampleinterp", evalInt("resample", 0, 0) != 0);
-    changed += enableParm("tolerance", evalInt("prune", 0, 0) != 0);
-    changed += enableParm("pairs", evalInt("flatten", 0, 0) == 0);
+    changed |= enableParm("resampleinterp", evalInt("resample", 0, 0) != 0);
+    changed |= enableParm("tolerance", evalInt("prune", 0, 0) != 0);
+    changed |= enableParm("pairs", evalInt("flatten", 0, 0) == 0);
 
     return changed;
 }

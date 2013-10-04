@@ -53,7 +53,7 @@ public:
 
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
-    virtual unsigned disableParms();
+    virtual bool updateParmsFlags();
 };
 
 
@@ -131,15 +131,15 @@ SOP_OpenVDB_Prune::SOP_OpenVDB_Prune(OP_Network* net,
 
 
 // Enable/disable or show/hide parameters in the UI.
-unsigned
-SOP_OpenVDB_Prune::disableParms()
+bool
+SOP_OpenVDB_Prune::updateParmsFlags()
 {
-    unsigned changed = 0;
+    bool changed = false;
 
     UT_String modeStr;
     evalString(modeStr, "mode", 0, 0);
 
-    changed += enableParm("tolerance", modeStr == "value");
+    changed |= enableParm("tolerance", modeStr == "value");
 
     return changed;
 }

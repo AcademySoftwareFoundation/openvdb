@@ -52,6 +52,7 @@
 #include "GEO_PrimVDB.h"
 
 #include <SYS/SYS_AtomicPtr.h>
+#include <SYS/SYS_Math.h>
 
 #include <UT/UT_Debug.h>
 #include <UT/UT_Defines.h>
@@ -60,27 +61,31 @@
 #include <UT/UT_JSONParser.h>
 #include <UT/UT_JSONValue.h>
 #include <UT/UT_JSONWriter.h>
-#include <UT/UT_Math.h>
+#include <UT/UT_Matrix.h>
+#include <UT/UT_MatrixSolver.h>
 #include <UT/UT_ScopedPtr.h>
 #include <UT/UT_SparseArray.h>
 #include <UT/UT_StackTrace.h>
 #include <UT/UT_SysClone.h>
 #include "UT_VDBUtils.h"
+#include <UT/UT_Vector.h>
 #include <UT/UT_Version.h>
 #include <UT/UT_XformOrder.h>
 
 #include <GA/GA_AttributeRefMap.h>
 #include <GA/GA_AttributeRefMapDestHandle.h>
 #include <GA/GA_Defragment.h>
-#include <GA/GA_WorkVertexBuffer.h>
-#include <GA/GA_WeightedSum.h>
+#include <GA/GA_ElementWrangler.h>
 #if (UT_VERSION_INT >= 0x0c010048) // 12.1.72 or later
 #include <GA/GA_IntrinsicMacros.h>
 #endif
 #include <GA/GA_MergeMap.h>
-#include <GA/GA_ElementWrangler.h>
 #include <GA/GA_PrimitiveJSON.h>
+#include <GA/GA_RangeMemberQuery.h>
 #include <GA/GA_SaveMap.h>
+#include <GA/GA_WeightedSum.h>
+#include <GA/GA_WorkVertexBuffer.h>
+
 #include <GEO/GEO_Detail.h>
 #include <GEO/GEO_PrimType.h>
 #include <GEO/GEO_PrimVolume.h>
@@ -130,7 +135,6 @@ GEO_PrimVDB::GEO_PrimVDB(GEO_Detail *d, GA_Offset offset)
     , myMetadataUniqueId(GEO_PrimVDB::nextUniqueId())
     , myTransformUniqueId(GEO_PrimVDB::nextUniqueId())
 {
-    // Nothing, but cannot be inlined.
     myVertex = allocateVertex();
 #if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
     myStashedState = false;
@@ -179,6 +183,14 @@ GEO_PrimVDB::clearForDeletion()
     GEO_Primitive::clearForDeletion();
 }
 
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
+void
+GEO_PrimVDB::stashed(bool beingstashed, GA_Offset offset)
+{
+    // NB: Base class must be unstashed before we can call allocateVertex().
+    GEO_Primitive::stashed(beingstashed, offset);
+    myVertex = beingstashed ? GA_INVALID_OFFSET : allocateVertex();
+#else
 void
 GEO_PrimVDB::stashed(int onoff, GA_Offset offset)
 {
@@ -195,6 +207,7 @@ GEO_PrimVDB::stashed(int onoff, GA_Offset offset)
     // NB: Base class must be unstashed before we can call allocateVertex().
     GEO_Primitive::stashed(onoff, offset);
     myVertex = onoff ? GA_INVALID_OFFSET : allocateVertex();
+#endif
     // Set our internal state to default
     myVis = GEO_VolumeOptions(GEO_VOLUMEVIS_SMOKE, /*iso*/0.0, /*density*/1.0);
 }
@@ -434,6 +447,77 @@ GEO_PrimVDB::getSpaceTransform() const
     return result;
 }
 
+bool
+GEO_PrimVDB::conditionMatrix(UT_Matrix4D &mat4)
+{
+    // This tolerance is just one factor larger than what
+    // AffineMap::updateAcceleration() uses to ensure that we never trigger the
+    // exception.
+    const double tol = 4.0 * openvdb::math::Tolerance<double>::value();
+    const double min_diag = SYScbrt(tol);
+    if (!SYSequalZero(mat4.determinant3(), tol))
+	return false;
+
+    UT_MatrixSolverD solver;
+    UT_Matrix3D mat3(mat4);
+    const int N = 3;
+    UT_MatrixD m(1,N, 1,N), v(1,N, 1,N), diag(1,N, 1,N), tmp(1,N, 1,N);
+    UT_VectorD w(1,N);
+
+    m.setSubmatrix3(1, 1, mat3);
+    if (!solver.SVDDecomp(m, w, v))
+    {
+	// Give up and return a scale matrix as small as possible
+	mat4.identity();
+	mat4.scale(min_diag, min_diag, min_diag);
+    }
+    else
+    {
+	v.transpose(tmp);
+	v = tmp;
+	diag.makeIdentity();
+	for (int i = 1; i <= N; i++)
+	    diag(i,i) = SYSmax(min_diag, w(i));
+	m.postMult(diag, tmp);
+	tmp.postMult(v, m);
+	m.getSubmatrix3(mat3, 1, 1);
+	mat4 = mat3;
+    }
+    return true;
+}
+
+// All AffineMap creation must to through this to avoid crashes when passing
+// singular matrices into OpenVDB
+template<typename T>
+static boost::shared_ptr<T>
+geoCreateAffineMap(const UT_Matrix4D& mat4)
+{
+    using namespace openvdb::math;
+
+    boost::shared_ptr<T> transform;
+    UT_Matrix4D new_mat4(mat4);
+    (void) GEO_PrimVDB::conditionMatrix(new_mat4);
+    try
+    {
+	transform.reset(new AffineMap(UTvdbConvert(new_mat4)));
+    }
+    catch (openvdb::ArithmeticError &)
+    {
+	UT_ASSERT(!"Failed to create affine map");
+	transform.reset(new AffineMap());
+    }
+    return transform;
+}
+
+// All calls to createLinearTransform with a matrix4 must to through this to
+// avoid crashes when passing singular matrices into OpenVDB
+static openvdb::math::Transform::Ptr
+geoCreateLinearTransform(const UT_Matrix4D& mat4)
+{
+    using namespace openvdb::math;
+    return Transform::Ptr(new Transform(geoCreateAffineMap<MapBase>(mat4)));
+}
+
 void 		 
 GEO_PrimVDB::setSpaceTransform(
 	const GEO_PrimVolumeXform &space,
@@ -496,7 +580,7 @@ GEO_PrimVDB::setSpaceTransform(
 	bbox.translate(Vec3d(-0.5));
 
 	// Build a NonlinearFrustumMap from this
-	MapBase::Ptr affine_map(new AffineMap(UTvdbConvert(transform)));
+	MapBase::Ptr affine_map(geoCreateAffineMap<MapBase>(transform));
 	xform.reset(new Transform(MapBase::Ptr(
 	    new NonlinearFrustumMap(bbox, taper, /*depth*/1.0, affine_map))));
     }
@@ -524,8 +608,8 @@ GEO_PrimVDB::setSpaceTransform(
 	matx *= mult;
 	matx.translate(space.myCenter(0), space.myCenter(1), space.myCenter(2));
 
-	// Create a linear transform usint the matrix
-	xform = Transform::createLinearTransform(UTvdbConvert(matx));
+	// Create a linear transform using the matrix
+	xform = geoCreateLinearTransform(matx);
     }
 
     myGridAccessor.setTransform(*xform, *this);
@@ -829,10 +913,11 @@ GEO_PrimVDB::enlargeBoundingSphere(UT_BoundingSphere &sphere,
 }
 
 int64
-GEO_PrimVDB::getMemoryUsage() const
+GEO_PrimVDB::getBaseMemoryUsage() const
 {
-    exint mem = sizeof(*this);
-    if (hasGrid()) mem += getGrid().memUsage();
+    exint mem = 0;
+    if (hasGrid())
+        mem += getGrid().memUsage();
     return mem;
 }
 
@@ -1394,7 +1479,7 @@ GEO_PrimVDB::transform(const UT_Matrix4 &mat)
 	final.setTranslates(UTvdbConvert(translation));
 
 	// Make an affine matrix out of it
-	AffineMap::Ptr map(new AffineMap(UTvdbConvert(final)));
+	AffineMap::Ptr map(geoCreateAffineMap<AffineMap>(final));
 
 	// Set the affine matrix from our base_map into this map
 	MapBase::Ptr result = simplify(map);
@@ -1418,6 +1503,7 @@ GEO_PrimVDB::transform(const UT_Matrix4 &mat)
     }
     catch (std::exception& /*e*/)
     {
+	UT_ASSERT(!"Failed to apply transform");
     }
 }
 
@@ -1460,8 +1546,7 @@ void
 GEO_PrimVDB::setTransform4(const UT_DMatrix4 &xform4)
 {
     using namespace openvdb::math;
-    myGridAccessor.setTransform(
-	    *Transform::createLinearTransform(UTvdbConvert(xform4)), *this);
+    myGridAccessor.setTransform(*geoCreateLinearTransform(xform4), *this);
 }
 
 void
@@ -1488,6 +1573,29 @@ GEO_PrimVDB::getVoxelDiameter() const
     p2 -= p1;
 
     return p2.length();
+}
+
+UT_Vector3
+GEO_PrimVDB::getVoxelSize() const
+{
+    UT_Vector3		p1, p2;
+    UT_Vector3		vsize;
+
+    indexToPos(0, 0, 0, p1);
+
+    indexToPos(1, 0, 0, p2);
+    p2 -= p1;
+    vsize.x() = p2.length();
+
+    indexToPos(0, 1, 0, p2);
+    p2 -= p1;
+    vsize.y() = p2.length();
+
+    indexToPos(0, 0, 1, p2);
+    p2 -= p1;
+    vsize.z() = p2.length();
+
+    return vsize;
 }
 
 
@@ -2025,11 +2133,78 @@ GEO_PrimVDB::activateByVDB(const GEO_PrimVDB *input_vdb,
 UT_Matrix4D
 GEO_PrimVDB::getTransform4() const
 {
-    GEO_PrimVolumeXform space = getSpaceTransform();
-    UT_Matrix4D 	xform;
-    xform = UT_Matrix3D(space.myXform);
-    xform.translate(space.myCenter.x(), space.myCenter.y(), space.myCenter.z());
-    return xform;
+    using namespace openvdb;
+    using namespace openvdb::math;
+
+    UT_Matrix4D mat4;
+    const Transform &gxform = getGrid().transform();
+    NonlinearFrustumMap::ConstPtr fmap = gxform.map<NonlinearFrustumMap>();
+    if (fmap)
+    {
+	const openvdb::BBoxd &bbox = fmap->getBBox();
+	const openvdb::Vec3d center = bbox.getCenter();
+	const openvdb::Vec3d size = bbox.extents();
+
+	// TODO: Use fmap->linearMap() once that actually works
+	mat4.identity();
+	mat4.translate(-center.x(), -center.y(), -bbox.min().z());
+	// NOTE: We scale both XY axes by size.x() because the secondMap()
+	//       has the aspect ratio baked in
+	mat4.scale(1.0/size.x(), 1.0/size.x(), 1.0/size.z());
+	mat4 *= UTvdbConvert(fmap->secondMap().getMat4());
+    }
+    else
+    {
+	mat4 = UTvdbConvert(gxform.baseMap()->getAffineMap()->getMat4());
+    }
+    return mat4;
+}
+
+void
+GEO_PrimVDB::getLocalTransform(UT_Matrix3D &result) const
+{
+    result = getTransform4();
+}
+
+void
+GEO_PrimVDB::setLocalTransform(const UT_Matrix3D &new_mat3)
+{
+    using namespace openvdb;
+    using namespace openvdb::math;
+
+    Transform::Ptr xform;
+    UT_Matrix4D new_mat4;
+    new_mat4 = new_mat3;
+    new_mat4.setTranslates(getDetail().getPos3(vertexPoint(0)));
+
+    const Transform & gxform = getGrid().transform();
+    NonlinearFrustumMap::ConstPtr fmap = gxform.map<NonlinearFrustumMap>();
+    if (fmap)
+    {
+	fmap = geoStandardFrustumMapPtr(*this);
+	const openvdb::BBoxd &bbox = fmap->getBBox();
+	const openvdb::Vec3d center = bbox.getCenter();
+	const openvdb::Vec3d size = bbox.extents();
+
+	// TODO: Use fmap->linearMap() once that actually works
+	UT_Matrix4D second;
+	second.identity();
+	second.translate(-0.5, -0.5, 0.0); // adjust for frustum map center
+	// NOTE: We scale both XY axes by size.x() because the secondMap()
+	//       has the aspect ratio baked in
+	second.scale(size.x(), size.x(), size.z());
+	second.translate(center.x(), center.y(), bbox.min().z());
+	second *= new_mat4;
+	xform.reset(new Transform(MapBase::Ptr(
+	    new NonlinearFrustumMap(fmap->getBBox(), fmap->getTaper(),
+				    /*depth*/1.0,
+				    geoCreateAffineMap<MapBase>(second)))));
+    }
+    else
+    {
+	xform = geoCreateLinearTransform(new_mat4);
+    }
+    myGridAccessor.setTransform(*xform, *this);
 }
 
 int
@@ -2050,19 +2225,19 @@ GEO_PrimVDB::detachPoints(GA_PointGroup &grp)
 }
 
 GA_Primitive::GA_DereferenceStatus
-GEO_PrimVDB::dereferencePoint(GA_Offset, bool)
+GEO_PrimVDB::dereferencePoint(GA_Offset point, bool)
 {
-    if (isDegenerate())
-	return GA_DEREFERENCE_DEGENERATE;
-    return GA_DEREFERENCE_FAIL;
+    return vertexPoint(0) == point
+		? GA_DEREFERENCE_DESTROY
+		: GA_DEREFERENCE_OK;
 }
 
 GA_Primitive::GA_DereferenceStatus
-GEO_PrimVDB::dereferencePoints(const GA_RangeMemberQuery &, bool)
+GEO_PrimVDB::dereferencePoints(const GA_RangeMemberQuery &point_query, bool)
 {
-    if (isDegenerate())
-	return GA_DEREFERENCE_DEGENERATE;
-    return GA_DEREFERENCE_FAIL;
+    return point_query.contains(vertexPoint(0))
+		? GA_DEREFERENCE_DESTROY
+		: GA_DEREFERENCE_OK;
 }
 
 ///
@@ -2559,28 +2734,36 @@ GEO_PrimVDB::isDegenerate() const
 // Methods to handle vertex attributes for the attribute dictionary
 //
 void
+#if (UT_VERSION_INT >= 0x0d000000)
+GEO_PrimVDB::copyPrimitive(const GEO_Primitive *psrc)
+#else
 GEO_PrimVDB::copyPrimitive(const GEO_Primitive *psrc, GEO_Point **ptredirect)
+#endif
 {
     if (psrc == this) return;
 
-    const GEO_PrimVDB	 *src = (const GEO_PrimVDB *)psrc;
-    const GA_IndexMap	 &src_points = src->getParent()->getPointMap();
-    GEO_Point		 *ppt;
+    const GEO_PrimVDB *src = (const GEO_PrimVDB *)psrc;
+    const GA_IndexMap &src_points = src->getParent()->getPointMap();
 
     copyGridFrom(*src); // makes a shallow copy
 
     // TODO: Well and good to reuse the attribute handle for all our
-    //       points/vertices, but we should do so across primitives
-    //       as well.
-    GA_VertexWrangler		 vertex_wrangler(*getParent(),
-						 *src->getParent());
+    //       vertices, but we should do so across primitives as well.
+    GA_VertexWrangler vertex_wrangler(*getParent(), *src->getParent());
 
-    GA_Offset	v = myVertex;
-    ppt = ptredirect[src_points.indexFromOffset(src->vertexPoint(0))];
+    GA_Offset v = myVertex;
+    GA_Index ptind = src_points.indexFromOffset(src->vertexPoint(0));
+#if (UT_VERSION_INT >= 0x0d000000)
+    GA_Offset ptoff = getParent()->pointOffset(ptind);
+    wireVertex(v, ptoff);
+#else
+    GEO_Point *ppt = ptredirect[ptind];
     wireVertex(v, ppt ? ppt->getMapOffset() : GA_INVALID_OFFSET);
+#endif
     vertex_wrangler.copyAttributeValues(v, src->fastVertexOffset(0));
 }
 
+#if (UT_VERSION_INT < 0x0d000000) // Deleted in 13.0
 #if (UT_VERSION_INT >= 0x0c050132) // 12.5.306 or later
 void
 GEO_PrimVDB::copyOffsetPrimitive(const GEO_Primitive *psrc, GA_Index basept)
@@ -2610,6 +2793,7 @@ GEO_PrimVDB::copyOffsetPrimitive(const GEO_Primitive *psrc, int basept)
     wireVertex(v, ppt);
     vertex_wrangler.copyAttributeValues(v, src->fastVertexOffset(0));
 }
+#endif
 
 static inline
 openvdb::math::Vec3d
@@ -2624,7 +2808,14 @@ GEO_PrimVDB::GridAccessor::updateGridTranslates(const GEO_PrimVDB &prim) const
 {
     using namespace	openvdb::math;
     const GA_Detail &	geo = prim.getDetail();
-    Vec3d		newpos = UTvdbConvert(geo.getPos3(prim.vertexPoint(0)));
+    GA_Offset		vtxoff = prim.vertexPoint(0);
+
+    // It is possible our vertex offset is invalid, such as us
+    // being a stashed primitive.
+    if (!GAisValid(vtxoff))
+	return;
+
+    Vec3d		newpos = UTvdbConvert(geo.getPos3(vtxoff));
     Vec3d		oldpos = vdbTranslation(myGrid->transform());
     MapBase::ConstPtr	map = myGrid->transform().baseMap();
 
