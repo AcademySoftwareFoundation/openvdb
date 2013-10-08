@@ -298,19 +298,27 @@ LIBS := \
     -L $(HALF_LIB_DIR) $(HALF_LIB) \
     -L $(TBB_LIB_DIR) $(TBB_LIB) \
     -L $(ZLIB_LIB_DIR) $(ZLIB_LIB) \
-    -L $(EXR_LIB_DIR) $(EXR_LIB) \
 #
 LIBS_RPATH := \
     -Wl,-rpath,'$$ORIGIN/.' $(LDDIROPT)$(HALF_LIB_DIR) $(HALF_LIB) \
     -Wl,-rpath,'$$ORIGIN/.' $(LDDIROPT)$(TBB_LIB_DIR) $(TBB_LIB) \
     -Wl,-rpath,'$$ORIGIN/.' $(LDDIROPT)$(ZLIB_LIB_DIR) $(ZLIB_LIB) \
-    -Wl,-rpath,'$$ORIGIN/.' $(LDDIROPT)$(EXR_LIB_DIR) $(EXR_LIB) \
 #
-ifeq (2,$(words $(strip $(CONCURRENT_MALLOC_LIB_DIR) $(CONCURRENT_MALLOC_LIB))))
+ifeq (0,$(words $(strip $(EXR_LIB_DIR) $(EXR_LIB))))
+EXR_LIBS :=
+EXR_LIBS_RPATH :=
+else
+EXR_LIBS = -L $(EXR_LIB_DIR) $(EXR_LIB)
+EXR_LIBS_RPATH := \
+    -Wl,-rpath,'$$ORIGIN/.' $(LDDIROPT)$(EXR_LIB_DIR) $(EXR_LIB)
+endif
+ifeq (0,$(words $(strip $(CONCURRENT_MALLOC_LIB_DIR) $(CONCURRENT_MALLOC_LIB))))
+ALLOC_LIBS :=
+ALLOC_LIBS_RPATH :=
+else
+ALLOC_LIBS = -L $(CONCURRENT_MALLOC_LIB_DIR) $(CONCURRENT_MALLOC_LIB)
 ALLOC_LIBS_RPATH := \
     -Wl,-rpath,'$$ORIGIN/.' $(LDDIROPT)$(CONCURRENT_MALLOC_LIB_DIR) $(CONCURRENT_MALLOC_LIB)
-else
-ALLOC_LIBS_RPATH :=
 endif
 
 INCLUDE_NAMES := \
@@ -602,6 +610,8 @@ ifdef WINDOWS_NT
     LIBS_RPATH := $(subst -L ,$(LDDIROPT),$(LIBS))
     LIBOPENVDB_RPATH := $(LIBOPENVDB_IMPORT)
     CPPUNIT_RPATH := $(LDDIROPT)$(CPPUNIT_LIB_DIR) $(CPPUNIT_LIB)
+    EXR_LIBS_RPATH := $(subst -L ,$(LDDIROPT),$(EXR_LIBS))
+    ALLOC_LIBS_RPATH := $(subst -L ,$(LDDIROPT),$(ALLOC_LIBS))
 endif
 
 DEPEND := dependencies
@@ -705,7 +715,9 @@ endif
 # BEGIN vdb_render rules
 vdb_render$(EXE_SUFFIX): $(LIBOPENVDB) $(RENDER_OBJ_NAMES)
 	$(call BuildExecutable, $(RENDER_OBJ_NAMES) \
-                                $(LIBS_RPATH) $(LIBOPENVDB_RPATH) \
+                                $(LIBS_RPATH) \
+                                $(EXR_LIBS_RPATH) \
+				$(LIBOPENVDB_RPATH) \
 				$(ALLOC_LIBS_RPATH))
 
 ifneq (,$(strip $(EXE_SUFFIX)))
