@@ -89,7 +89,7 @@ public:
     CPPUNIT_TEST(testProcessBBox);
     CPPUNIT_TEST(testStealNode);
     CPPUNIT_TEST_SUITE_END();
-
+    
     void testBackground();
     void testHalf();
     void testValues();
@@ -1374,6 +1374,7 @@ TestTree::testTopologyUnion()
             ASSERT_DOUBLES_EXACTLY_EQUAL(tree0.getValue(p), *iter);
         }
     }
+    
 }// testTopologyUnion
 
 void
@@ -1447,16 +1448,14 @@ TestTree::testTopologyIntersection()
         tree1.setValue(openvdb::Coord( 500, 301, 200), 4.0f);
         tree1.setValue(openvdb::Coord( 400,  30,  20), 5.0f);
         tree1.setValue(openvdb::Coord( dim,  11,  11), 6.0f);
-        CPPUNIT_ASSERT_EQUAL(openvdb::Index64(3), tree1.activeVoxelCount());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index32(3), tree1.leafCount() );
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index64(3), tree1.activeVoxelCount());
         
         tree1.topologyIntersection(tree0);
 
-        CPPUNIT_ASSERT_EQUAL( openvdb::Index32(1), tree1.leafCount() );
-        CPPUNIT_ASSERT_EQUAL( openvdb::Index64(1), tree1.activeVoxelCount() );
-        CPPUNIT_ASSERT(!tree1.empty());
-        tree1.pruneInactive();
-        CPPUNIT_ASSERT(!tree1.empty());
+        CPPUNIT_ASSERT_EQUAL( openvdb::Index32(0), tree1.leafCount() );
+        CPPUNIT_ASSERT_EQUAL( openvdb::Index64(0), tree1.activeVoxelCount() );
+        CPPUNIT_ASSERT(tree1.empty());
     }
     {//active tile
         const ValueType background=0.0f;
@@ -1585,6 +1584,34 @@ TestTree::testTopologyIntersection()
             ASSERT_DOUBLES_EXACTLY_EQUAL(*iter, tree0_copy.getValue(p));
         }
     }
+
+    {// Test based on boolean grids
+        openvdb::CoordBBox big(  openvdb::Coord(-9), openvdb::Coord(10));
+        openvdb::CoordBBox small(openvdb::Coord( 1), openvdb::Coord(10));
+       
+        openvdb::BoolGrid::Ptr gridBig = openvdb::BoolGrid::create(false);
+        gridBig->fill(big, true/*value*/, true /*make active*/);
+        CPPUNIT_ASSERT_EQUAL(8, int(gridBig->tree().activeTileCount()));
+        CPPUNIT_ASSERT_EQUAL((20 * 20 * 20), int(gridBig->activeVoxelCount()));
+
+        openvdb::BoolGrid::Ptr gridSmall = openvdb::BoolGrid::create(false);
+        gridSmall->fill(small, true/*value*/, true /*make active*/);
+        CPPUNIT_ASSERT_EQUAL(0, int(gridSmall->tree().activeTileCount()));
+        CPPUNIT_ASSERT_EQUAL((10 * 10 * 10), int(gridSmall->activeVoxelCount()));
+       
+        // change the topology of gridBig by intersecting with gridSmall
+        gridBig->topologyIntersection(*gridSmall);
+
+        // Should be unchanged
+        CPPUNIT_ASSERT_EQUAL(0, int(gridSmall->tree().activeTileCount()));
+        CPPUNIT_ASSERT_EQUAL((10 * 10 * 10), int(gridSmall->activeVoxelCount()));
+       
+        // In this case the interesection should be exactly "small"
+        CPPUNIT_ASSERT_EQUAL(0, int(gridBig->tree().activeTileCount()));
+        CPPUNIT_ASSERT_EQUAL((10 * 10 * 10), int(gridBig->activeVoxelCount()));
+
+    }
+
 }// testTopologyIntersection
 
 void
