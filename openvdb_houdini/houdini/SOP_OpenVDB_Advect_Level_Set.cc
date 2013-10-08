@@ -147,7 +147,7 @@ public:
 
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
-    virtual unsigned disableParms();
+    virtual bool updateParmsFlags();
 
     OP_ERROR evalAdvectionParms(OP_Context&, AdvectionParms&);
 
@@ -290,12 +290,10 @@ SOP_OpenVDB_Advect_Level_Set::SOP_OpenVDB_Advect_Level_Set(OP_Network* net,
 
 // Enable/disable or show/hide parameters in the UI.
 
-unsigned
-SOP_OpenVDB_Advect_Level_Set::disableParms()
+bool
+SOP_OpenVDB_Advect_Level_Set::updateParmsFlags()
 {
-    unsigned changed = 0;
-
-    return changed;
+    return false;
 }
 
 

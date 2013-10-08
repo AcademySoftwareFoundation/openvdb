@@ -58,7 +58,7 @@ public:
 
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
-    virtual unsigned disableParms();
+    virtual bool updateParmsFlags();
     virtual void resolveObsoleteParms(PRM_ParmList*);
 };
 
@@ -173,19 +173,19 @@ SOP_OpenVDB_Scatter::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
 }
 
 
-unsigned
-SOP_OpenVDB_Scatter::disableParms()
+bool
+SOP_OpenVDB_Scatter::updateParmsFlags()
 {
-    unsigned changed = 0;
+    bool changed = false;
     const int pmode = evalInt("pointmode", /*idx=*/0, /*time=*/0);
 
-    this->setVisibleState("count",    (0 == pmode));
-    this->setVisibleState("density",  (1 == pmode));
-    this->setVisibleState("multiply", (1 == pmode));
-    this->setVisibleState("ppv",      (2 == pmode));
+    changed |= setVisibleState("count",    (0 == pmode));
+    changed |= setVisibleState("density",  (1 == pmode));
+    changed |= setVisibleState("multiply", (1 == pmode));
+    changed |= setVisibleState("ppv",      (2 == pmode));
 
     const int dogroup = evalInt("dogroup", 0, 0);
-    changed += enableParm("sgroup", 1 == dogroup);
+    changed |= enableParm("sgroup", 1 == dogroup);
 
     return changed;
 }

@@ -106,11 +106,7 @@ GEO_VDBTranslator::formatName() const
 int
 GEO_VDBTranslator::checkExtension(const char *name) 
 {
-    UT_String		sname(name);
-
-    if (sname.fileExtension() && !strcmp(sname.fileExtension(), ".vdb"))
-	return true;
-    return false;
+    return UT_String(name).matchFileExtension(".vdb");
 }
 
 int

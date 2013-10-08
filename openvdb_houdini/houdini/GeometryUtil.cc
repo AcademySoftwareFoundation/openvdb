@@ -271,8 +271,13 @@ validateGeometry(const GU_Detail& geometry, std::string& warning, Interrupter* b
 
     if (needconvert) {
         GU_ConvertParms parms;
+#if (UT_VERSION_INT < 0x0d0000b1) // before 13.0.177
         parms.fromType = GEO_PrimTypeCompat::GEOPRIMALL;
         parms.toType = GEO_PrimTypeCompat::GEOPRIMPOLY;
+#else
+        parms.setFromType(GEO_PrimTypeCompat::GEOPRIMALL);
+        parms.setToType(GEO_PrimTypeCompat::GEOPRIMPOLY);
+#endif
         geoPtr->convert(parms);
     }
 

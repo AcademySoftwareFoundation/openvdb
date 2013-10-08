@@ -68,7 +68,7 @@ protected:
     struct RebuildOp;
 
     virtual OP_ERROR cookMySop(OP_Context&);
-    virtual unsigned disableParms();
+    virtual bool updateParmsFlags();
 };
 
 
@@ -202,22 +202,22 @@ newSopOperator(OP_OperatorTable* table)
 
 
 // Disable UI Parms.
-unsigned
-SOP_OpenVDB_Resample::disableParms()
+bool
+SOP_OpenVDB_Resample::updateParmsFlags()
 {
-    unsigned changed = 0;
+    bool changed = false;
 
     const int mode = evalInt("mode", 0, 0);
-    changed += enableParm("translate", mode == MODE_PARMS);
-    changed += enableParm("rotate", mode == MODE_PARMS);
-    changed += enableParm("scale", mode == MODE_PARMS);
-    changed += enableParm("pivot", mode == MODE_PARMS);
-    changed += enableParm("xOrd", mode == MODE_PARMS);
-    changed += enableParm("rOrd", mode == MODE_PARMS);
-    changed += enableParm("reference_grid", mode == MODE_REF_GRID);
-    changed += enableParm("voxel_size", mode == MODE_VOXEL_SIZE);
+    changed |= enableParm("translate", mode == MODE_PARMS);
+    changed |= enableParm("rotate", mode == MODE_PARMS);
+    changed |= enableParm("scale", mode == MODE_PARMS);
+    changed |= enableParm("pivot", mode == MODE_PARMS);
+    changed |= enableParm("xOrd", mode == MODE_PARMS);
+    changed |= enableParm("rOrd", mode == MODE_PARMS);
+    changed |= enableParm("reference_grid", mode == MODE_REF_GRID);
+    changed |= enableParm("voxel_size", mode == MODE_VOXEL_SIZE);
 
-    changed += enableParm("tolerance", evalInt("prune", 0, 0));
+    changed |= enableParm("tolerance", evalInt("prune", 0, 0));
 
     return changed;
 }

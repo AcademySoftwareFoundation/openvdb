@@ -36,15 +36,18 @@
 
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
+#include <openvdb_houdini/GeometryUtil.h>
 #include <openvdb_houdini/Utils.h>
 
 #include <openvdb/tools/VolumeToSpheres.h>
 
-#include <UT/UT_Interrupt.h>
-#include <GA/GA_PageIterator.h>
+#include <GU/GU_ConvertParms.h>
 #include <GU/GU_Detail.h>
-#include <PRM/PRM_Parm.h>
 #include <GU/GU_PrimSphere.h>
+#include <PRM/PRM_Parm.h>
+#include <GA/GA_PageIterator.h>
+#include <UT/UT_Interrupt.h>
+#include <UT/UT_Version.h>
 
 #include <boost/algorithm/string/join.hpp>
 
@@ -74,7 +77,7 @@ public:
 
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
-    virtual unsigned disableParms();
+    virtual bool updateParmsFlags();
 };
 
 
@@ -101,36 +104,57 @@ newSopOperator(OP_OperatorTable* table)
             "fields while fog volumes require a larger positive value, 0.5 is "
             "a good initial guess."));
 
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "minradius", "Min Radius")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "minradius", "Min Radius in Voxels")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 2.0)
         .setHelpText("Determines the smallest sphere size, voxel units."));
 
-
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "maxradius", "Max Radius")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "maxradius", "Max Radius in Voxels")
         .setDefault(std::numeric_limits<float>::max())
         .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 100.0)
         .setHelpText("Determines the largest sphere size, voxel units."));
 
-    parms.add(hutil::ParmFactory(PRM_INT_J, "spheres", "Spheres")
+    parms.add(hutil::ParmFactory(PRM_INT_J, "spheres", "Max Spheres")
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 100)
         .setHelpText("No more than this number of spheres are generated")
         .setDefault(50));
 
-    
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "overlapping", "Overlapping")
-        .setHelpText("Toggle to allow spheres to overlap/intersect."));
-    
-    parms.add(hutil::ParmFactory(PRM_INT_J, "scatter", "Scatter")
+    parms.add(hutil::ParmFactory(PRM_INT_J, "scatter", "Scatter Points")
         .setRange(PRM_RANGE_RESTRICTED, 1000, PRM_RANGE_UI, 50000)
         .setHelpText("How many interior points to consider for the sphere placement, "
             "increasing this count increases the chances of finding optimal sphere sizes.")
         .setDefault(10000));
 
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "overlapping", "Overlapping")
+#ifndef SESI_OPENVDB
+	.setDefault(PRMzeroDefaults)
+#else
+	.setDefault(PRMoneDefaults)
+#endif
+        .setHelpText("Toggle to allow spheres to overlap/intersect."));
+
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "preserve",
+	      "Preserve Attributes and Groups")
+#ifndef SESI_OPENVDB
+	.setDefault(PRMzeroDefaults)
+#else
+	.setDefault(PRMoneDefaults)
+#endif
+        .setHelpText("Enable to copy attributes and groups from the input"));
+
+    // The "doid" parameter name comes from the standard in POPs
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "doid", "Add ID Attribute")
+#ifndef SESI_OPENVDB
+	.setDefault(PRMoneDefaults)
+#else
+	.setDefault(PRMzeroDefaults)
+#endif
+        .setHelpText("Enable to add an id point attribute that corresponds to different VDBs."));
+
     //////////
 
     hvdb::OpenVDBOpFactory("OpenVDB To Spheres", SOP_OpenVDB_To_Spheres::factory, parms, *table)
-        .addInput("level set or fog volume grids");
+        .addInput("VDBs to convert");
 }
 
 
@@ -149,10 +173,10 @@ SOP_OpenVDB_To_Spheres::SOP_OpenVDB_To_Spheres(OP_Network* net,
 }
 
 
-unsigned
-SOP_OpenVDB_To_Spheres::disableParms()
+bool
+SOP_OpenVDB_To_Spheres::updateParmsFlags()
 {
-    unsigned changed = 0;
+    bool changed = false;
     return changed;
 }
 
@@ -194,21 +218,31 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
         const int sphereCount = evalInt("spheres", 0, time);
         const bool overlapping = evalInt("overlapping", 0, time);
         const int scatter = evalInt("scatter", 0, time);
-        
+        const bool preserve = evalInt("preserve", 0, time);
 
-
-        GA_RWAttributeRef aRef = gdp->findPointAttribute("id");
-        if (!aRef.isValid()) aRef = gdp->addIntTuple(GA_ATTRIB_POINT, "id", 1, GA_Defaults(0));
-        
-        GA_RWHandleI idAttr = aRef.getAttribute();
-        
-        if(!idAttr.isValid()) {
-            addWarning(SOP_MESSAGE, "Failed to create the point ID attribute.");
-            return error();
-        }
+	const bool addID = evalInt("doid", 0, time);
+	GA_RWHandleI idAttr;
+	if (addID)
+	{
+	    GA_RWAttributeRef aRef = gdp->findPointAttribute("id");
+	    if (!aRef.isValid()) aRef = gdp->addIntTuple(GA_ATTRIB_POINT, "id", 1, GA_Defaults(0));
+	    
+	    idAttr = aRef.getAttribute();
+	    if(!idAttr.isValid()) {
+		addWarning(SOP_MESSAGE, "Failed to create the point ID attribute.");
+		return error();
+	    }
+	}
         
         int idNumber = 1;
-        
+
+	GU_ConvertParms parms;
+#if UT_VERSION_INT < 0x0d0000b1 // 13.0.177 or earlier
+	parms.preserveGroups = true;
+#else
+	parms.setKeepGroups(true);
+#endif
+
         std::vector<std::string> skippedGrids;
         
         for (; vdbIt; ++vdbIt) {
@@ -238,6 +272,7 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
                 continue;
             }
 
+	    GU_ConvertMarker marker(*gdp);
 
             // copy spheres to Houdini
             for (size_t n = 0, N = spheres.size(); n < N; ++n) {
@@ -248,12 +283,12 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
 
                 gdp->setPos3(ptoff, sphere.x(), sphere.y(), sphere.z());
                 
-                idAttr.set(ptoff, idNumber);
+		if (addID)
+		    idAttr.set(ptoff, idNumber);
                                
                 UT_Matrix4 mat = UT_Matrix4::getIdentityMatrix();
                 mat.scale(sphere[3],sphere[3],sphere[3]);                
                                
-
                 #if (UT_VERSION_INT >= 0x0c050000)  // 12.5.0 or later
                 GU_PrimSphereParms parms(gdp, ptoff);
                 parms.xform = mat;
@@ -263,8 +298,13 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
                 parms.xform = mat;
                 GU_PrimSphere::build(parms);
                 #endif
-                
             }
+
+	    if (preserve) {
+		GUconvertCopySingleVertexPrimAttribsAndGroups(
+			parms, *vdbGeo, vdbIt.getOffset(),
+			*gdp, marker.getPrimitives(), marker.getPoints());
+	    }
 
             ++idNumber;
             

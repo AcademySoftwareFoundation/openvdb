@@ -72,7 +72,7 @@ public:
 
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
-    virtual unsigned disableParms();
+    virtual bool updateParmsFlags();
 };
 
 
@@ -165,24 +165,24 @@ SOP_OpenVDB_Ray::SOP_OpenVDB_Ray(OP_Network* net,
 }
 
 
-unsigned
-SOP_OpenVDB_Ray::disableParms()
+bool
+SOP_OpenVDB_Ray::updateParmsFlags()
 {
-    unsigned changed = 0;
+    bool changed = false;
 
     bool rayintersection = evalInt("method", 0, 0) == 0;
 
-    changed += enableParm("isovalue", !rayintersection);
+    changed |= enableParm("isovalue", !rayintersection);
 
-    changed += enableParm("lookfar", rayintersection);
-    changed += enableParm("reverserays", rayintersection);
-    changed += enableParm("creategroup", rayintersection);
-    changed += enableParm("bias", rayintersection);
+    changed |= enableParm("lookfar", rayintersection);
+    changed |= enableParm("reverserays", rayintersection);
+    changed |= enableParm("creategroup", rayintersection);
+    changed |= enableParm("bias", rayintersection);
 
-    changed += enableParm("scale", bool(evalInt("dotrans", 0, 0)));
+    changed |= enableParm("scale", bool(evalInt("dotrans", 0, 0)));
 
     bool creategroup = evalInt("creategroup", 0, 0);
-    changed += enableParm("hitgrp", creategroup && rayintersection);
+    changed |= enableParm("hitgrp", creategroup && rayintersection);
 
     return changed;
 }

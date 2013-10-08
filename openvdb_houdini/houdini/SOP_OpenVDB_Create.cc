@@ -148,7 +148,7 @@ public:
 
 protected:
     virtual OP_ERROR cookMySop(OP_Context &context);
-    virtual unsigned disableParms();
+    virtual bool updateParmsFlags();
 
 private:
     inline cvdb::Vec3i voxelToIndex(const cvdb::Vec3R& V) const
@@ -465,10 +465,10 @@ SOP_OpenVDB_Create::SOP_OpenVDB_Create(OP_Network *net,
 ////////////////////////////////////////
 
 
-unsigned
-SOP_OpenVDB_Create::disableParms()
+bool
+SOP_OpenVDB_Create::updateParmsFlags()
 {
-    unsigned changed = 0;
+    bool changed = false;
     UT_String tmpStr;
 
     bool frustum = evalInt("transform", 0, 0) == 1;
@@ -493,33 +493,33 @@ SOP_OpenVDB_Create::disableParms()
         }
 
         /// Disbale unused bg value options
-        changed += enableParmInst("bgFloat#", &i, !isLevelSet && (eType == TYPE_FLOAT || eType == TYPE_DOUBLE));
-        changed += enableParmInst("width#",   &i, isLevelSet);
-        changed += enableParmInst("bgInt#",   &i, eType == TYPE_INT || eType == TYPE_BOOL);
-        changed += enableParmInst("bgVec3f#", &i, eType == TYPE_VEC3S || eType == TYPE_VEC3D);
-        changed += enableParmInst("bgVec3i#", &i, eType == TYPE_VEC3I);
-        changed += enableParmInst("vecType#", &i, eType >= TYPE_VEC3S);
+        changed |= enableParmInst("bgFloat#", &i, !isLevelSet && (eType == TYPE_FLOAT || eType == TYPE_DOUBLE));
+        changed |= enableParmInst("width#",   &i, isLevelSet);
+        changed |= enableParmInst("bgInt#",   &i, eType == TYPE_INT || eType == TYPE_BOOL);
+        changed |= enableParmInst("bgVec3f#", &i, eType == TYPE_VEC3S || eType == TYPE_VEC3D);
+        changed |= enableParmInst("bgVec3i#", &i, eType == TYPE_VEC3I);
+        changed |= enableParmInst("vecType#", &i, eType >= TYPE_VEC3S);
 
         // Hide unused bg value options.
-        setVisibleStateInst("bgFloat#", &i, !isLevelSet && (eType == TYPE_FLOAT || eType == TYPE_DOUBLE));
-        setVisibleStateInst("width#",   &i, isLevelSet);
-        setVisibleStateInst("bgInt#",   &i, eType == TYPE_INT);
-        setVisibleStateInst("bgBool#",  &i, eType == TYPE_BOOL);
-        setVisibleStateInst("bgVec3f#", &i, eType == TYPE_VEC3S || eType == TYPE_VEC3D);
-        setVisibleStateInst("bgVec3i#", &i, eType == TYPE_VEC3I);
-        setVisibleStateInst("vecType#", &i, eType >= TYPE_VEC3S);
+        changed |= setVisibleStateInst("bgFloat#", &i, !isLevelSet && (eType == TYPE_FLOAT || eType == TYPE_DOUBLE));
+        changed |= setVisibleStateInst("width#",   &i, isLevelSet);
+        changed |= setVisibleStateInst("bgInt#",   &i, eType == TYPE_INT);
+        changed |= setVisibleStateInst("bgBool#",  &i, eType == TYPE_BOOL);
+        changed |= setVisibleStateInst("bgVec3f#", &i, eType == TYPE_VEC3S || eType == TYPE_VEC3D);
+        changed |= setVisibleStateInst("bgVec3i#", &i, eType == TYPE_VEC3I);
+        changed |= setVisibleStateInst("vecType#", &i, eType >= TYPE_VEC3S);
 
         // Enable different data types
-        changed += enableParmInst("elementType#", &i, gridClass == openvdb::GRID_UNKNOWN);
-        setVisibleStateInst("elementType#", &i, gridClass == openvdb::GRID_UNKNOWN);
+        changed |= enableParmInst("elementType#", &i, gridClass == openvdb::GRID_UNKNOWN);
+        changed |= setVisibleStateInst("elementType#", &i, gridClass == openvdb::GRID_UNKNOWN);
     }
 
     // linear transform
-    changed += enableParm("voxelSize", !frustum);
-    changed += enableParm("rotation", !frustum);
+    changed |= enableParm("voxelSize", !frustum);
+    changed |= enableParm("rotation", !frustum);
 
-    setVisibleState("voxelSize", !frustum);
-    setVisibleState("rotation", !frustum);
+    changed |= setVisibleState("voxelSize", !frustum);
+    changed |= setVisibleState("rotation", !frustum);
 
     // frustum transform
     UT_String cameraPath;
@@ -529,23 +529,23 @@ SOP_OpenVDB_Create::disableParms()
     bool enableFrustumSettings = cameraPath.isstring() &&
         findOBJNode(cameraPath) != NULL;
 
-    changed += enableParm("camera", frustum);
-    changed += enableParm("voxelCount", frustum & enableFrustumSettings);
-    changed += enableParm("voxelDepthSize", frustum & enableFrustumSettings);
-    changed += enableParm("offset", frustum & enableFrustumSettings);
-    changed += enableParm("nearPlane", frustum & enableFrustumSettings);
-    changed += enableParm("farPlane", frustum & enableFrustumSettings);
-    changed += enableParm("cameraOffset", frustum & enableFrustumSettings);
-    changed += enableParm("previewFrustum", frustum & enableFrustumSettings);
+    changed |= enableParm("camera", frustum);
+    changed |= enableParm("voxelCount", frustum & enableFrustumSettings);
+    changed |= enableParm("voxelDepthSize", frustum & enableFrustumSettings);
+    changed |= enableParm("offset", frustum & enableFrustumSettings);
+    changed |= enableParm("nearPlane", frustum & enableFrustumSettings);
+    changed |= enableParm("farPlane", frustum & enableFrustumSettings);
+    changed |= enableParm("cameraOffset", frustum & enableFrustumSettings);
+    changed |= enableParm("previewFrustum", frustum & enableFrustumSettings);
 
-    setVisibleState("camera", frustum);
-    setVisibleState("voxelCount", frustum);
-    setVisibleState("voxelDepthSize", frustum);
-    setVisibleState("offset", frustum);
-    setVisibleState("nearPlane", frustum);
-    setVisibleState("farPlane", frustum);
-    setVisibleState("cameraOffset", frustum);
-    setVisibleState("previewFrustum", frustum);
+    changed |= setVisibleState("camera", frustum);
+    changed |= setVisibleState("voxelCount", frustum);
+    changed |= setVisibleState("voxelDepthSize", frustum);
+    changed |= setVisibleState("offset", frustum);
+    changed |= setVisibleState("nearPlane", frustum);
+    changed |= setVisibleState("farPlane", frustum);
+    changed |= setVisibleState("cameraOffset", frustum);
+    changed |= setVisibleState("previewFrustum", frustum);
 
     return changed;
 }

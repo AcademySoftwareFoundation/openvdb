@@ -52,7 +52,7 @@ public:
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
 protected:
-    virtual unsigned disableParms();
+    virtual bool updateParmsFlags();
     virtual OP_ERROR cookMySop(OP_Context&);
 };
 
@@ -132,17 +132,17 @@ newSopOperator(OP_OperatorTable* table)
 }
 
 
-unsigned
-SOP_OpenVDB_Metadata::disableParms()
+bool
+SOP_OpenVDB_Metadata::updateParmsFlags()
 {
-    unsigned changed = 0;
+    bool changed = false;
     const fpreal time = 0; // No point using CHgetTime as that is unstable.
 
-    changed += enableParm("class",   evalInt("setclass", 0, time));
-    changed += enableParm("creator", evalInt("setcreator", 0, time));
-    changed += enableParm("float16", evalInt("setfloat16", 0, time));
-    changed += enableParm("world",   evalInt("setworld", 0, time));
-    changed += enableParm("vectype", evalInt("setvectype", 0, time));
+    changed |= enableParm("class",   evalInt("setclass", 0, time));
+    changed |= enableParm("creator", evalInt("setcreator", 0, time));
+    changed |= enableParm("float16", evalInt("setfloat16", 0, time));
+    changed |= enableParm("world",   evalInt("setworld", 0, time));
+    changed |= enableParm("vectype", evalInt("setvectype", 0, time));
 
     return changed;
 }
