@@ -103,6 +103,7 @@ ifdef WINDOWS_NT
     DEFINES		+= -DNOMINMAX \
 			   -D_USE_MATH_DEFINES \
 			   -D_HAS_ITERATOR_DEBUGGING=0 \
+			   -DWIN32_LEAN_AND_MEAN \
 			    $(NULL)
     DEBUG_FLAGS		+= -Od -Z7
 ifeq (full,$(strip $(debug)))
