@@ -2709,26 +2709,20 @@ RootNode<ChildT>::topologyIntersection(const RootNode<OtherChildType>& other)
 
     enforceSameConfiguration(other);
 
-    for (OtherCIterT i = other.mTable.begin(), e = other.mTable.end(); i != e; ++i) {
-        MapIter j = mTable.find(i->first);
-        if (other.isChild(i)) {
-            if (j == mTable.end() || this->isTileOff(j)) {
-                //do nothing
-            } else if (this->isChild(j)) { // intersect with child branch
-                this->getChild(j).topologyIntersection(other.getChild(i), mBackground);
-            } else if (this->isTileOn(j)) {
-                // this is an active tile so replace it with a child branch with identical topology
-                ChildT* child = new ChildT(
-                    other.getChild(i), this->getTile(j).value, TopologyCopy());
-                this->setChild(j, *child);
+    for (MapIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
+        OtherCIterT j = other.mTable.find(i->first);
+        if (this->isChild(i)) {
+            if (j == other.mTable.end() || other.isTileOff(j)) {
+                mTable.erase(i->first);//delete child branch
+            } else if (other.isChild(j)) { // intersect with child branch
+                this->getChild(i).topologyIntersection(other.getChild(j), mBackground);
             }
-        } else if (other.isTileOff(i)) { // other is an inactive tile
-            if (j == mTable.end() || this->isTileOff(j)) {
-                // do nothing
-            } else if (this->isChild(j)) {
-                mTable.erase(j->first);//delete child
-            } else if (this->isTileOn(j)) {
-                this->setTile(j, Tile(this->getTile(j).value, false));
+        } else if (this->isTileOn(i)) {
+            if (j == other.mTable.end() || other.isTileOff(j)) {
+                this->setTile(i, Tile(this->getTile(i).value, false));//turn inactive
+            } else if (other.isChild(j)) { //replace with a child branch with identical topology
+                ChildT* child = new ChildT(other.getChild(j), this->getTile(i).value, TopologyCopy());
+                this->setChild(i, *child);
             }
         }
     }
