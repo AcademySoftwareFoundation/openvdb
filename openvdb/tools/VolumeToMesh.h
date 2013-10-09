@@ -4365,7 +4365,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
                     openvdb::Vec4I& quad = polygons.quad(quadIdx);
                     char& quadFlags = polygons.quadFlags(quadIdx);
-                    quadFlags |= POLYFLAG_SUBDIVIDED;
+                    //quadFlags |= POLYFLAG_SUBDIVIDED;
 
                     Vec3s centroid = (mPoints[quad[0]] + mPoints[quad[1]] + 
                         mPoints[quad[2]] + mPoints[quad[3]]) * 0.25;
@@ -4383,6 +4383,10 @@ VolumeToMesh::operator()(const GridT& distGrid)
                         triangle[2] = quad[3];
 
                         tmpPolygons.triangleFlags(triangleIdx) = quadFlags;
+
+                        if (mPointFlags[triangle[0]] || mPointFlags[triangle[2]]) {
+                            tmpPolygons.triangleFlags(triangleIdx) |= POLYFLAG_SUBDIVIDED;
+                        }
                     }
 
                     ++triangleIdx;
@@ -4395,6 +4399,10 @@ VolumeToMesh::operator()(const GridT& distGrid)
                         triangle[2] = pointIdx;
 
                         tmpPolygons.triangleFlags(triangleIdx) = quadFlags;
+
+                        if (mPointFlags[triangle[0]] || mPointFlags[triangle[1]]) {
+                            tmpPolygons.triangleFlags(triangleIdx) |= POLYFLAG_SUBDIVIDED;
+                        }
                     }
 
                     ++triangleIdx;
@@ -4407,6 +4415,10 @@ VolumeToMesh::operator()(const GridT& distGrid)
                         triangle[2] = pointIdx;
 
                         tmpPolygons.triangleFlags(triangleIdx) = quadFlags;
+
+                        if (mPointFlags[triangle[0]] || mPointFlags[triangle[1]]) {
+                            tmpPolygons.triangleFlags(triangleIdx) |= POLYFLAG_SUBDIVIDED;
+                        }
                     }
 
 
@@ -4420,6 +4432,10 @@ VolumeToMesh::operator()(const GridT& distGrid)
                         triangle[2] = pointIdx;
 
                         tmpPolygons.triangleFlags(triangleIdx) = quadFlags;
+
+                        if (mPointFlags[triangle[0]] || mPointFlags[triangle[1]]) {
+                            tmpPolygons.triangleFlags(triangleIdx) |= POLYFLAG_SUBDIVIDED;
+                        }
                     }
 
                     ++triangleIdx;
@@ -4458,7 +4474,6 @@ VolumeToMesh::operator()(const GridT& distGrid)
             size_t newPointCount = newPoints.size() + mPointListSize;
 
             std::auto_ptr<openvdb::Vec3s> newPointList(new openvdb::Vec3s[newPointCount]);
-
            
             for (size_t i = 0; i < mPointListSize; ++i) {
                 newPointList.get()[i] = mPoints[i];
@@ -4470,7 +4485,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
             mPointListSize = newPointCount;
             mPoints.reset(newPointList.release());
-
+            mPointFlags.resize(mPointListSize, 0);
         }
     }
 }
