@@ -248,6 +248,9 @@ ifdef MBSD
     else ifeq ($(DARWIN_OS_MAJOR_VER),12)
         # Mountain Lion
         MACOSX_SDK := MacOSX10.8
+    else ifeq ($(DARWIN_OS_MAJOR_VER),13)
+	# Mavericks
+	MACOSX_SDK := MacOSX10.9
     else
         $(error Unknown MacOSX Darwin major version $(DARWIN_OS_MAJOR_VER))
     endif
