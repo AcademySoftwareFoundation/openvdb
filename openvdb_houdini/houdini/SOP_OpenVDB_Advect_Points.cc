@@ -574,7 +574,7 @@ public:
 
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
-    virtual unsigned disableParms();
+    virtual bool updateParmsFlags();
 
     bool evalAdvectionParms(OP_Context&, AdvectionParms&);
 };
@@ -702,26 +702,26 @@ SOP_OpenVDBAdvectPoints::SOP_OpenVDBAdvectPoints(OP_Network* net,
 
 // Enable/disable or show/hide parameters in the UI.
 
-unsigned
-SOP_OpenVDBAdvectPoints::disableParms()
+bool
+SOP_OpenVDBAdvectPoints::updateParmsFlags()
 {
-    unsigned changed = 0;
+    bool changed = false;
 
     UT_String str;
     evalString(str, "propagation", 0, 0);
     const PropagationType propagation = stringToPropagationType(str.toStdString());
 
-    changed += enableParm("cptIterations", propagation != PROPAGATION_TYPE_ADVECTION);
-    changed += enableParm("integration", propagation != PROPAGATION_TYPE_PROJECTION);
-    changed += enableParm("timeStep", propagation != PROPAGATION_TYPE_PROJECTION);
-    changed += enableParm("steps", propagation != PROPAGATION_TYPE_PROJECTION);
-    changed += enableParm("outputStreamlines", propagation != PROPAGATION_TYPE_PROJECTION);
+    changed |= enableParm("cptIterations", propagation != PROPAGATION_TYPE_ADVECTION);
+    changed |= enableParm("integration", propagation != PROPAGATION_TYPE_PROJECTION);
+    changed |= enableParm("timeStep", propagation != PROPAGATION_TYPE_PROJECTION);
+    changed |= enableParm("steps", propagation != PROPAGATION_TYPE_PROJECTION);
+    changed |= enableParm("outputStreamlines", propagation != PROPAGATION_TYPE_PROJECTION);
 
-    setVisibleState("cptIterations", getEnableState("cptIterations"));
-    setVisibleState("integration", getEnableState("integration"));
-    setVisibleState("timeStep", getEnableState("timeStep"));
-    setVisibleState("steps", getEnableState("steps"));
-    setVisibleState("outputStreamlines", getEnableState("outputStreamlines"));
+    changed |= setVisibleState("cptIterations", getEnableState("cptIterations"));
+    changed |= setVisibleState("integration", getEnableState("integration"));
+    changed |= setVisibleState("timeStep", getEnableState("timeStep"));
+    changed |= setVisibleState("steps", getEnableState("steps"));
+    changed |= setVisibleState("outputStreamlines", getEnableState("outputStreamlines"));
 
     return changed;
 }

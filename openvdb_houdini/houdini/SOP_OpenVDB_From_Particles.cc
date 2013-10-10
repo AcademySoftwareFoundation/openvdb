@@ -234,7 +234,7 @@ public:
 
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
-    virtual unsigned disableParms();
+    virtual bool updateParmsFlags();
 
 private:
     void convert(openvdb::FloatGrid::Ptr, ParticleList&, const Settings&);
@@ -544,39 +544,42 @@ SOP_OpenVDB_From_Particles::convertUnits()
 
 
 // Enable or disable parameters in the UI.
-unsigned
-SOP_OpenVDB_From_Particles::disableParms()
+bool
+SOP_OpenVDB_From_Particles::updateParmsFlags()
 {
-    unsigned changed = 0;
+    bool changed = false;
     int refexists = (this->nInputs() == 2);
 
-    changed += enableParm("group", refexists);
-    changed += enableParm("writeintoref", refexists);
+    changed |= enableParm("group", refexists);
+    changed |= enableParm("writeintoref", refexists);
 
-    changed += enableParm("voxelSize", !refexists);
+    changed |= enableParm("voxelSize", !refexists);
 
     const bool wsUnits = bool(evalInt("worldSpaceUnits", 0, 0));
 
-    setVisibleState("bandWidth", !wsUnits);
-    setVisibleState("bandWidthWS", wsUnits);
+    changed |= setVisibleState("bandWidth", !wsUnits);
+    changed |= setVisibleState("bandWidthWS", wsUnits);
 
 
     // Particle conversion
     const bool useTrails =  evalInt("footprint", 0, 0) == 1;
-    changed += enableParm("dX", useTrails);
-    changed += enableParm("dV", useTrails);
+    changed |= enableParm("dX", useTrails);
+    changed |= enableParm("dV", useTrails);
 
-    setVisibleState("dX", useTrails);
-    setVisibleState("dV", useTrails);
+    changed |= setVisibleState("dX", useTrails);
+    changed |= setVisibleState("dV", useTrails);
 
-    setVisibleState("maskWidth", evalInt("maskVolume", 0, 0) == 1);
+    changed |= setVisibleState("maskWidth", evalInt("maskVolume", 0, 0) == 1);
 
     // Output
-    changed += enableParm("gridName", evalInt("levelSet", 0, 0));
-    changed += enableParm("fogVolumeGridName", evalInt("fogVolume", 0, 0));
+    changed |= enableParm("gridName", evalInt("levelSet", 0, 0));
+    changed |= enableParm("fogVolumeGridName", evalInt("fogVolume", 0, 0));
+
+    bool build_mask = (evalInt("maskVolume", 0, 0) != 0);
+    changed |= enableParm("maskVolumeGridName", build_mask);
+    changed |= enableParm("maskWidth", build_mask);
 
     // enable / diable vector type menu
-
     UT_String attrName;
     GA_ROAttributeRef attrRef;
     const GU_Detail* ptGeo = this->getInputLastGeo(0, CHgetEvalTime());
@@ -604,8 +607,8 @@ SOP_OpenVDB_From_Particles::disableParms()
                     }
                 }
             }
-            changed += enableParmInst("vecType#", &i, isVector);
-            setVisibleStateInst("vecType#", &i, isVector);
+            changed |= enableParmInst("vecType#", &i, isVector);
+            changed |= setVisibleStateInst("vecType#", &i, isVector);
         }
     }
     return changed;
@@ -631,10 +634,10 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
         mTime = context.getTime();
         mVoxelSize = evalFloat("voxelSize", 0, mTime);
 
-        const bool outputLevelSetGrid  = bool(evalInt("levelSet",  0, mTime));
-        const bool outputFogVolumeGrid = bool(evalInt("fogVolume", 0, mTime));
-        const bool outputMaskVolumeGrid = bool(evalInt("maskVolume", 0, mTime));
-        const bool outputAttributeGrid = bool(evalInt("attrList",  0, mTime) > 0);
+        const bool outputLevelSetGrid  = bool(evalInt("levelSet",     0, mTime));
+        const bool outputFogVolumeGrid = bool(evalInt("fogVolume",    0, mTime));
+        const bool outputMaskVolumeGrid = bool(evalInt("maskVolume",  0, mTime));
+        const bool outputAttributeGrid = bool(evalInt("attrList",     0, mTime) > 0);
 
         if (!outputFogVolumeGrid && !outputLevelSetGrid && !outputAttributeGrid) {
              addWarning(SOP_MESSAGE, "No output selected");

@@ -71,7 +71,7 @@ public:
 
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
-    virtual unsigned disableParms();
+    virtual bool updateParmsFlags();
 };
 
 
@@ -199,16 +199,16 @@ struct ToolOp
 
 
 // Enable or disable parameters in the UI.
-unsigned
-SOP_OpenVDB_Analysis::disableParms()
+bool
+SOP_OpenVDB_Analysis::updateParmsFlags()
 {
-    unsigned changed = 0;
+    bool changed = false;
 
     bool useCustomName = evalInt("outputName", 0, 0) == 2;
 
-    changed += enableParm("customName", useCustomName);
+    changed |= enableParm("customName", useCustomName);
 #ifndef SESI_OPENVDB
-    setVisibleState("customName", useCustomName);
+    changed |= setVisibleState("customName", useCustomName);
 #endif
 
     return changed;

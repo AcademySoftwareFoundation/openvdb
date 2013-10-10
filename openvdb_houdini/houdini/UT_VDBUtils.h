@@ -82,6 +82,7 @@ enum UT_VDBType
 #endif
 
 
+/// Calls openvdb::initialize()
 inline void UTvdbInitialize() { openvdb::initialize(); }
 
 /// Find the UT_VDBType from a grid

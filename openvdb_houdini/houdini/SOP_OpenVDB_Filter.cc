@@ -90,7 +90,7 @@ protected:
     OP_ERROR evalFilterParms(OP_Context&, GU_Detail&, FilterParmVec&);
 
     virtual OP_ERROR cookMySop(OP_Context&);
-    virtual unsigned disableParms();
+    virtual bool updateParmsFlags();
 
 private:
     struct FilterOp;
@@ -249,10 +249,10 @@ SOP_OpenVDB_Filter::registerSop(OP_OperatorTable* table)
 
 
 // Disable UI Parms.
-unsigned
-SOP_OpenVDB_Filter::disableParms()
+bool
+SOP_OpenVDB_Filter::updateParmsFlags()
 {
-    unsigned changed = 0;
+    bool changed = false;
 
     // currently no support for masks
     //setVisibleState("maskGroup1", getEnableState("maskGroup1"));
@@ -266,14 +266,14 @@ SOP_OpenVDB_Filter::disableParms()
 #ifndef SESI_OPENVDB
     // Disable and hide unused parameters.
     bool enable = (op == OP_MEAN || op == OP_GAUSS || op == OP_MEDIAN);
-    changed += enableParm("iterations", enable);
-    changed += enableParm("radius", enable);
-    setVisibleState("iterations", enable);
-    setVisibleState("radius", enable);
+    changed |= enableParm("iterations", enable);
+    changed |= enableParm("radius", enable);
+    changed |= setVisibleState("iterations", enable);
+    changed |= setVisibleState("radius", enable);
 
     enable = (op == OP_OFFSET);
-    changed += enableParm("offset", enable);
-    setVisibleState("offset", enable);
+    changed |= enableParm("offset", enable);
+    changed |= setVisibleState("offset", enable);
 #endif
 
     return changed;

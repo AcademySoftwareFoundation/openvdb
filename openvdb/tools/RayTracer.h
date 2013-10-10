@@ -323,9 +323,9 @@ public:
 
 protected:
 
-    void initRay(double near, double far)
+    void initRay(double znear, double zfar)
     {
-        mRay.setTimes(near, far);
+        mRay.setTimes(znear, zfar);
         mRay.setEye(mScreenToWorld.applyMap(Vec3R(0.0)));
         mRay.setDir(mScreenToWorld.applyJacobian(Vec3R(0.0, 0.0, -1.0))); 
     }
