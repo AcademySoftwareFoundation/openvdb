@@ -104,6 +104,7 @@ ifdef WINDOWS_NT
 			   -D_USE_MATH_DEFINES \
 			   -D_HAS_ITERATOR_DEBUGGING=0 \
 			   -DWIN32_LEAN_AND_MEAN \
+			   -D_WIN32_WINNT=0x0501 \
 			    $(NULL)
     DEBUG_FLAGS		+= -Od -Z7
 ifeq (full,$(strip $(debug)))
