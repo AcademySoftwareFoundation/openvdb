@@ -116,7 +116,11 @@ newSopOperator(OP_OperatorTable* table)
 
     // Use X name
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "usexname",  "Use Basename of X VDB")
+#ifndef SESI_OPENVDB
         .setDefault(PRMzeroDefaults));
+#else
+        .setDefault(PRMoneDefaults));
+#endif
 
     // Output vector grid name
     parms.add(hutil::ParmFactory(PRM_STRING, "merge_name",  "Merged VDB Name")
@@ -154,8 +158,10 @@ newSopOperator(OP_OperatorTable* table)
             "inactive voxels as active background voxels wherever\n"
             "corresponding input voxels have different active states."));
 
+#ifndef SESI_OPENVDB
     // Verbosity toggle
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "verbose", "Verbose"));
+#endif
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Vector Merge",
@@ -359,10 +365,13 @@ SOP_OpenVDB_Vector_Merge::cookMySop(OP_Context& context)
 
         duplicateSource(0, context);
 
-        const bool
-            copyInactiveValues = evalInt("copyinactive", 0, time),
-            removeSourceGrids = evalInt("remove_sources", 0, time),
-            verbose = evalInt("verbose", 0, time);
+        const bool copyInactiveValues = evalInt("copyinactive", 0, time);
+        const bool removeSourceGrids = evalInt("remove_sources", 0, time);
+#ifndef SESI_OPENVDB
+        const bool verbose = evalInt("verbose", 0, time);
+#else
+        const bool verbose = false;
+#endif
 
         // Get the name (or naming pattern) for merged grids.
         UT_String mergeName;

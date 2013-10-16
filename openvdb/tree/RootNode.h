@@ -1905,6 +1905,8 @@ template<typename DenseT>
 inline void
 RootNode<ChildT>::copyToDense(const CoordBBox& bbox, DenseT& dense) const
 {
+    typedef typename DenseT::ValueType DenseValueType;
+
     const size_t xStride = dense.xStride(), yStride = dense.yStride();// zStride=1
     const Coord& min = dense.bbox().min();
     CoordBBox nodeBBox;
@@ -1924,12 +1926,14 @@ RootNode<ChildT>::copyToDense(const CoordBBox& bbox, DenseT& dense) const
                 } else {//is background or a tile value
                     const ValueType value = iter==mTable.end() ? mBackground : getTile(iter).value;
                     sub.translate(-min);
-                    ValueType* a0 = dense.data() + sub.min()[2];
+                    DenseValueType* a0 = dense.data() + sub.min()[2];
                     for (Int32 x=sub.min()[0], ex=sub.max()[0]+1; x<ex; ++x) {
-                        ValueType* a1 = a0 + x*xStride;
+                        DenseValueType* a1 = a0 + x*xStride;
                         for (Int32 y=sub.min()[1], ey=sub.max()[1]+1; y<ey; ++y) {
-                            ValueType* a2 = a1 + y*yStride;
-                            for (Int32 z=sub.min()[2], ez=sub.max()[2]+1; z<ez; ++z) *a2++ = value;
+                            DenseValueType* a2 = a1 + y*yStride;
+                            for (Int32 z=sub.min()[2], ez=sub.max()[2]+1; z<ez; ++z) {
+                                *a2++ = DenseValueType(value);
+                            }
                         }
                     }
                 }
@@ -2709,11 +2713,12 @@ RootNode<ChildT>::topologyIntersection(const RootNode<OtherChildType>& other)
 
     enforceSameConfiguration(other);
 
+    std::set<Coord> tmp;//keys to erase
     for (MapIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
         OtherCIterT j = other.mTable.find(i->first);
         if (this->isChild(i)) {
             if (j == other.mTable.end() || other.isTileOff(j)) {
-                mTable.erase(i->first);//delete child branch
+                tmp.insert(i->first);//delete child branch
             } else if (other.isChild(j)) { // intersect with child branch
                 this->getChild(i).topologyIntersection(other.getChild(j), mBackground);
             }
@@ -2726,6 +2731,7 @@ RootNode<ChildT>::topologyIntersection(const RootNode<OtherChildType>& other)
             }
         }
     }
+    for (std::set<Coord>::iterator i = tmp.begin(), e = tmp.end(); i != e; ++i) mTable.erase(*i);
 }
 
 template<typename ChildT>
@@ -2737,7 +2743,7 @@ RootNode<ChildT>::topologyDifference(const RootNode<OtherChildType>& other)
     typedef typename OtherRootT::MapCIter OtherCIterT;
 
     enforceSameConfiguration(other);
-
+    
     for (OtherCIterT i = other.mTable.begin(), e = other.mTable.end(); i != e; ++i) {
         MapIter j = mTable.find(i->first);
         if (other.isChild(i)) {

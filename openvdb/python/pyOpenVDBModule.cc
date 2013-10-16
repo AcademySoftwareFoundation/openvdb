@@ -1,0 +1,615 @@
+///////////////////////////////////////////////////////////////////////////
+//
+// Copyright (c) 2012-2013 DreamWorks Animation LLC
+//
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
+//
+// Redistributions of source code must retain the above copyright
+// and license notice and the following restrictions and disclaimer.
+//
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
+// from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
+// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
+//
+///////////////////////////////////////////////////////////////////////////
+
+#include <cstring> // for strncmp(), strrchr(), etc.
+#include <limits>
+#include <boost/python.hpp>
+#include <boost/python/stl_iterator.hpp>
+#include <boost/python/exception_translator.hpp>
+#include "openvdb/openvdb.h"
+#include "pyutil.h"
+
+namespace py = boost::python;
+
+
+// Forward declarations
+void exportTransform();
+void exportMetadata();
+void exportGrid();
+namespace pyGrid {
+py::object getGridFromGridBase(openvdb::GridBase::Ptr);
+openvdb::GridBase::Ptr getGridBaseFromGrid(py::object);
+}
+
+
+namespace _openvdbmodule {
+
+/// Helper class to convert between a Python numeric sequence
+/// (tuple, list, etc.) and an openvdb::Coord
+struct CoordConverter
+{
+    /// @return a Python tuple object equivalent to the given Coord.
+    static PyObject* convert(const openvdb::Coord& xyz)
+    {
+        py::object obj = py::make_tuple(xyz[0], xyz[1], xyz[2]);
+        Py_INCREF(obj.ptr());
+            ///< @todo is this the right way to ensure that the object
+            ///< doesn't get freed on exit?
+        return obj.ptr();
+    }
+
+    /// @return NULL if the given Python object is not convertible to a Coord.
+    static void* convertible(PyObject* obj)
+    {
+        if (!PySequence_Check(obj)) return NULL; // not a Python sequence
+
+        Py_ssize_t len = PySequence_Length(obj);
+        if (len != 3 && len != 1) return NULL; // not the right length
+
+        return obj;
+    }
+
+    /// Convert from a Python object to a Coord.
+    static void construct(PyObject* obj,
+        py::converter::rvalue_from_python_stage1_data* data)
+    {
+        // Construct a Coord in the provided memory location.
+        typedef py::converter::rvalue_from_python_storage<openvdb::Coord>
+            StorageT;
+        void* storage = reinterpret_cast<StorageT*>(data)->storage.bytes;
+        new (storage) openvdb::Coord; // placement new
+        data->convertible = storage;
+
+        openvdb::Coord* xyz = static_cast<openvdb::Coord*>(storage);
+
+        // Populate the Coord.
+        switch (PySequence_Length(obj)) {
+        case 1:
+            xyz->reset(pyutil::getSequenceItem<openvdb::Int32>(obj, 0));
+            break;
+        case 3:
+            xyz->reset(
+                pyutil::getSequenceItem<openvdb::Int32>(obj, 0),
+                pyutil::getSequenceItem<openvdb::Int32>(obj, 1),
+                pyutil::getSequenceItem<openvdb::Int32>(obj, 2));
+            break;
+        default:
+            PyErr_Format(PyExc_ValueError,
+                "expected a sequence of three integers");
+            py::throw_error_already_set();
+            break;
+        }
+    }
+
+    /// Register both the Coord-to-tuple and the sequence-to-Coord converters.
+    static void registerConverter()
+    {
+        py::to_python_converter<openvdb::Coord, CoordConverter>();
+        py::converter::registry::push_back(
+            &CoordConverter::convertible,
+            &CoordConverter::construct,
+            py::type_id<openvdb::Coord>());
+    }
+}; // struct CoordConverter
+
+/// @todo CoordBBoxConverter?
+
+
+////////////////////////////////////////
+
+
+/// Helper class to convert between a Python numeric sequence
+/// (tuple, list, etc.) and an openvdb::Vec
+template<typename VecT>
+struct VecConverter
+{
+    static PyObject* convert(const VecT& v)
+    {
+        py::object obj;
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+        switch (VecT::size) { // compile-time constant
+            case 2: obj = py::make_tuple(v[0], v[1]); break;
+            case 3: obj = py::make_tuple(v[0], v[1], v[2]); break;
+            case 4: obj = py::make_tuple(v[0], v[1], v[2], v[3]); break;
+            default:
+            {
+                py::list lst;
+                for (int n = 0; n < VecT::size; ++n) lst.append(v[n]);
+                obj = lst;
+            }
+        }
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        Py_INCREF(obj.ptr());
+        return obj.ptr();
+    }
+
+    static void* convertible(PyObject* obj)
+    {
+        if (!PySequence_Check(obj)) return NULL; // not a Python sequence
+
+        Py_ssize_t len = PySequence_Length(obj);
+        if (len != VecT::size) return NULL;
+
+        // Check that all elements of the Python sequence are convertible
+        // to the Vec's value type.
+        py::object seq = pyutil::pyBorrow(obj);
+        for (size_t i = 0; i < VecT::size; ++i) {
+            if (!py::extract<typename VecT::value_type>(seq[i]).check()) {
+                return NULL;
+            }
+        }
+        return obj;
+    }
+
+    static void construct(PyObject* obj,
+        py::converter::rvalue_from_python_stage1_data* data)
+    {
+        // Construct a Vec in the provided memory location.
+        typedef py::converter::rvalue_from_python_storage<VecT> StorageT;
+        void* storage = reinterpret_cast<StorageT*>(data)->storage.bytes;
+        new (storage) VecT; // placement new
+        data->convertible = storage;
+        VecT* v = static_cast<VecT*>(storage);
+
+        // Populate the vector.
+        for (int n = 0; n < VecT::size; ++n) {
+            (*v)[n] = pyutil::getSequenceItem<typename VecT::value_type>(obj, n);
+        }
+    }
+
+    static void registerConverter()
+    {
+        py::to_python_converter<VecT, VecConverter<VecT> >();
+        py::converter::registry::push_back(
+            &VecConverter<VecT>::convertible,
+            &VecConverter<VecT>::construct,
+            py::type_id<VecT>());
+    }
+}; // struct VecConverter
+
+
+////////////////////////////////////////
+
+
+/// Helper class to convert between a Python dict and an openvdb::MetaMap
+/// @todo Consider implementing a separate, templated converter for
+/// the various Metadata types.
+struct MetaMapConverter
+{
+    static PyObject* convert(const openvdb::MetaMap& metaMap)
+    {
+        using namespace openvdb;
+
+        py::dict ret;
+        for (MetaMap::ConstMetaIterator it = metaMap.beginMeta();
+            it != metaMap.endMeta(); ++it)
+        {
+            if (Metadata::Ptr meta = it->second) {
+                py::object obj(meta);
+                const std::string typeName = meta->typeName();
+                if (typeName == StringMetadata::staticTypeName()) {
+                    obj = py::str(
+                        static_cast<StringMetadata&>(*meta).value());
+                } else if (typeName == DoubleMetadata::staticTypeName()) {
+                    obj = py::object(
+                        static_cast<DoubleMetadata&>(*meta).value());
+                } else if (typeName == FloatMetadata::staticTypeName()) {
+                    obj = py::object(
+                        static_cast<FloatMetadata&>(*meta).value());
+                } else if (typeName == Int32Metadata::staticTypeName()) {
+                    obj = py::object(
+                        static_cast<Int32Metadata&>(*meta).value());
+                } else if (typeName == Int64Metadata::staticTypeName()) {
+                    obj = py::object(
+                        static_cast<Int64Metadata&>(*meta).value());
+                } else if (typeName == Vec2DMetadata::staticTypeName()) {
+                    const Vec2d v = static_cast<Vec2DMetadata&>(*meta).value();
+                    obj = py::make_tuple(v[0], v[1]);
+                } else if (typeName == Vec2IMetadata::staticTypeName()) {
+                    const Vec2i v = static_cast<Vec2IMetadata&>(*meta).value();
+                    obj = py::make_tuple(v[0], v[1]);
+                } else if (typeName == Vec2SMetadata::staticTypeName()) {
+                    const Vec2s v = static_cast<Vec2SMetadata&>(*meta).value();
+                    obj = py::make_tuple(v[0], v[1]);
+                } else if (typeName == Vec3DMetadata::staticTypeName()) {
+                    const Vec3d v = static_cast<Vec3DMetadata&>(*meta).value();
+                    obj = py::make_tuple(v[0], v[1], v[2]);
+                } else if (typeName == Vec3IMetadata::staticTypeName()) {
+                    const Vec3i v = static_cast<Vec3IMetadata&>(*meta).value();
+                    obj = py::make_tuple(v[0], v[1], v[2]);
+                } else if (typeName == Vec3SMetadata::staticTypeName()) {
+                    const Vec3s v = static_cast<Vec3SMetadata&>(*meta).value();
+                    obj = py::make_tuple(v[0], v[1], v[2]);
+                }
+                ret[it->first] = obj;
+            }
+        }
+        Py_INCREF(ret.ptr());
+        return ret.ptr();
+    }
+
+    static void* convertible(PyObject* obj)
+    {
+        return (PyMapping_Check(obj) ? obj : NULL);
+    }
+
+    static void construct(PyObject* obj,
+        py::converter::rvalue_from_python_stage1_data* data)
+    {
+        using namespace openvdb;
+
+        // Construct a MetaMap in the provided memory location.
+        typedef py::converter::rvalue_from_python_storage<MetaMap> StorageT;
+        void* storage = reinterpret_cast<StorageT*>(data)->storage.bytes;
+        new (storage) MetaMap; // placement new
+        data->convertible = storage;
+        MetaMap* metaMap = static_cast<MetaMap*>(storage);
+
+        // Populate the map.
+        py::dict pyDict(pyutil::pyBorrow(obj));
+        py::list keys = pyDict.keys();
+        for (size_t i = 0, N = py::len(keys); i < N; ++i) {
+            std::string name;
+            py::object key = keys[i];
+            if (py::extract<std::string>(key).check()) {
+                name = py::extract<std::string>(key);
+            } else {
+                const std::string
+                    keyAsStr = py::extract<std::string>(key.attr("__str__")()),
+                    keyType = py::extract<std::string>(
+                        key.attr("__class__").attr("__name__"));
+                PyErr_Format(PyExc_TypeError,
+                    "expected string as metadata name, got object"
+                    " \"%s\" of type %s", keyAsStr.c_str(), keyType.c_str());
+                py::throw_error_already_set();
+            }
+
+            // Note: the order of the following tests is significant, as it
+            // avoids unnecessary type promotion (e.g., of ints to floats).
+            py::object val = pyDict[keys[i]];
+            Metadata::Ptr value;
+            if (py::extract<std::string>(val).check()) {
+                value.reset(
+                    new StringMetadata(py::extract<std::string>(val)));
+            } else if (PyInt_Check(val.ptr())
+                && PyInt_AsLong(val.ptr()) <= std::numeric_limits<Int32>::max()
+                && PyInt_AsLong(val.ptr()) >= std::numeric_limits<Int32>::min())
+            {
+                value.reset(new Int32Metadata(py::extract<Int32>(val)));
+            } else if (PyInt_Check(val.ptr()) || PyLong_Check(val.ptr())) {
+                value.reset(new Int64Metadata(py::extract<Int64>(val)));
+            //} else if (py::extract<float>(val).check()) {
+            //    value.reset(new FloatMetadata(py::extract<float>(val)));
+            } else if (py::extract<double>(val).check()) {
+                value.reset(new DoubleMetadata(py::extract<double>(val)));
+            } else if (py::extract<Vec2i>(val).check()) {
+                value.reset(new Vec2IMetadata(py::extract<Vec2i>(val)));
+            } else if (py::extract<Vec2d>(val).check()) {
+                value.reset(new Vec2DMetadata(py::extract<Vec2d>(val)));
+            } else if (py::extract<Vec2s>(val).check()) {
+                value.reset(new Vec2SMetadata(py::extract<Vec2s>(val)));
+            } else if (py::extract<Vec3i>(val).check()) {
+                value.reset(new Vec3IMetadata(py::extract<Vec3i>(val)));
+            } else if (py::extract<Vec3d>(val).check()) {
+                value.reset(new Vec3DMetadata(py::extract<Vec3d>(val)));
+            } else if (py::extract<Vec3s>(val).check()) {
+                value.reset(new Vec3SMetadata(py::extract<Vec3s>(val)));
+            } else if (py::extract<Metadata::Ptr>(val).check()) {
+                value = py::extract<Metadata::Ptr>(val);
+            } else {
+                const std::string
+                    valAsStr = py::extract<std::string>(val.attr("__str__")()),
+                    valType = py::extract<std::string>(
+                        val.attr("__class__").attr("__name__"));
+                PyErr_Format(PyExc_TypeError,
+                    "metadata value \"%s\" of type %s is not allowed",
+                    valAsStr.c_str(), valType.c_str());
+                py::throw_error_already_set();
+            }
+            if (value) metaMap->insertMeta(name, *value);
+        }
+    }
+
+    static void registerConverter()
+    {
+        py::to_python_converter<openvdb::MetaMap, MetaMapConverter>();
+        py::converter::registry::push_back(
+            &MetaMapConverter::convertible,
+            &MetaMapConverter::construct,
+            py::type_id<openvdb::MetaMap>());
+    }
+}; // struct MetaMapConverter
+
+
+////////////////////////////////////////
+
+
+template<typename T> void translateException(const T&) {}
+
+/// @brief Define a function that translates an OpenVDB exception into
+/// the equivalent Python exception.
+/// @details openvdb::Exception::what() typically returns a string of the form
+/// "<exception>: <description>".  To avoid duplication of the exception name in Python
+/// stack traces, the function strips off the "<exception>: " prefix.  To do that,
+/// it needs the class name in the form of a string, hence the preprocessor macro.
+#define PYOPENVDB_CATCH(_openvdbname, _pyname)                      \
+    template<>                                                      \
+    void translateException<_openvdbname>(const _openvdbname& e)    \
+    {                                                               \
+        const char* name = #_openvdbname;                           \
+        if (const char* c = std::strrchr(name, ':')) name = c + 1;  \
+        const int namelen = std::strlen(name);                      \
+        const char* msg = e.what();                                 \
+        if (0 == std::strncmp(msg, name, namelen)) msg += namelen;  \
+        if (0 == std::strncmp(msg, ": ", 2)) msg += 2;              \
+        PyErr_SetString(_pyname, msg);                              \
+    }
+
+
+/// Define an overloaded function that translate all OpenVDB exceptions into
+/// their Python equivalents.
+/// @todo IllegalValueException and LookupError are redundant and should someday be removed.
+PYOPENVDB_CATCH(openvdb::ArithmeticError,       PyExc_ArithmeticError)
+PYOPENVDB_CATCH(openvdb::IllegalValueException, PyExc_ValueError)
+PYOPENVDB_CATCH(openvdb::IndexError,            PyExc_IndexError)
+PYOPENVDB_CATCH(openvdb::IoError,               PyExc_IOError)
+PYOPENVDB_CATCH(openvdb::KeyError,              PyExc_KeyError)
+PYOPENVDB_CATCH(openvdb::LookupError,           PyExc_LookupError)
+PYOPENVDB_CATCH(openvdb::NotImplementedError,   PyExc_NotImplementedError)
+PYOPENVDB_CATCH(openvdb::ReferenceError,        PyExc_ReferenceError)
+PYOPENVDB_CATCH(openvdb::RuntimeError,          PyExc_RuntimeError)
+PYOPENVDB_CATCH(openvdb::TypeError,             PyExc_TypeError)
+PYOPENVDB_CATCH(openvdb::ValueError,            PyExc_ValueError)
+
+#undef PYOPENVDB_CATCH
+
+
+////////////////////////////////////////
+
+
+py::object
+readFromFile(const std::string& filename, const std::string& gridName)
+{
+    openvdb::io::File vdbFile(filename);
+    vdbFile.open();
+
+    if (!vdbFile.hasGrid(gridName)) {
+        PyErr_Format(PyExc_KeyError,
+            "file %s has no grid named \"%s\"",
+            filename.c_str(), gridName.c_str());
+        py::throw_error_already_set();
+    }
+
+    return pyGrid::getGridFromGridBase(vdbFile.readGrid(gridName));
+}
+
+
+py::tuple
+readAllFromFile(const std::string& filename)
+{
+    openvdb::io::File vdbFile(filename);
+    vdbFile.open();
+
+    openvdb::GridPtrVecPtr grids = vdbFile.getGrids();
+    openvdb::MetaMap::Ptr metadata = vdbFile.getMetadata();
+    vdbFile.close();
+
+    py::list gridList;
+    for (openvdb::GridPtrVec::const_iterator it = grids->begin(); it != grids->end(); ++it) {
+        gridList.append(pyGrid::getGridFromGridBase(*it));
+    }
+
+    return py::make_tuple(gridList, py::dict(*metadata));
+}
+
+
+py::dict
+readFileMetadata(const std::string& filename)
+{
+    using namespace openvdb;
+
+    io::File vdbFile(filename);
+    vdbFile.open();
+
+    MetaMap::Ptr metadata = vdbFile.getMetadata();
+    vdbFile.close();
+
+    return py::dict(*metadata);
+}
+
+
+py::object
+readGridMetadataFromFile(const std::string& filename, const std::string& gridName)
+{
+    openvdb::io::File vdbFile(filename);
+    vdbFile.open();
+
+    if (!vdbFile.hasGrid(gridName)) {
+        PyErr_Format(PyExc_KeyError,
+            "file %s has no grid named \"%s\"",
+            filename.c_str(), gridName.c_str());
+        py::throw_error_already_set();
+    }
+
+    return pyGrid::getGridFromGridBase(vdbFile.readGridMetadata(gridName));
+}
+
+
+py::list
+readAllGridMetadataFromFile(const std::string& filename)
+{
+    openvdb::io::File vdbFile(filename);
+    vdbFile.open();
+    openvdb::GridPtrVecPtr grids = vdbFile.readAllGridMetadata();
+    vdbFile.close();
+
+    py::list gridList;
+    for (openvdb::GridPtrVec::const_iterator it = grids->begin(); it != grids->end(); ++it) {
+        gridList.append(pyGrid::getGridFromGridBase(*it));
+    }
+    return gridList;
+}
+
+
+void
+writeToFile(const std::string& filename, py::object gridSeq, py::object dictObj)
+{
+    using namespace openvdb;
+
+    GridPtrVec gridVec;
+    for (py::stl_input_iterator<py::object> it(gridSeq), end; it != end; ++it) {
+        if (GridBase::Ptr base = pyGrid::getGridBaseFromGrid(*it)) {
+            gridVec.push_back(base);
+        }
+    }
+
+    io::File vdbFile(filename);
+    if (dictObj.is_none()) {
+        vdbFile.write(gridVec);
+    } else {
+        openvdb::MetaMap metadata = py::extract<MetaMap>(dictObj);
+        vdbFile.write(gridVec, metadata);
+    }
+    vdbFile.close();
+}
+
+} // namespace _openvdbmodule
+
+
+////////////////////////////////////////
+
+
+// This is order sensitive.  Related to the inheritance chain.
+// Otherwise you can get runtime errors.  For example TreeBase
+// must be listed before Tree and Tree inherits from TreeBase.
+#ifdef DWA_OPENVDB
+BOOST_PYTHON_MODULE(_openvdb)
+#else
+BOOST_PYTHON_MODULE(pyopenvdb)
+#endif
+{
+    // Don't auto-generate ugly, C++-style function signatures.
+    py::docstring_options docOptions;
+    docOptions.disable_signatures();
+    docOptions.enable_user_defined();
+
+    using namespace openvdb::OPENVDB_VERSION_NAME;
+
+    // Initialize OpenVDB.
+    initialize();
+
+    _openvdbmodule::CoordConverter::registerConverter();
+
+    _openvdbmodule::VecConverter<Vec2i>::registerConverter();
+    _openvdbmodule::VecConverter<Vec2I>::registerConverter();
+    _openvdbmodule::VecConverter<Vec2s>::registerConverter();
+    _openvdbmodule::VecConverter<Vec2d>::registerConverter();
+
+    _openvdbmodule::VecConverter<Vec3i>::registerConverter();
+    _openvdbmodule::VecConverter<Vec3I>::registerConverter();
+    _openvdbmodule::VecConverter<Vec3s>::registerConverter();
+    _openvdbmodule::VecConverter<Vec3d>::registerConverter();
+
+    _openvdbmodule::VecConverter<Vec4i>::registerConverter();
+    _openvdbmodule::VecConverter<Vec4I>::registerConverter();
+    _openvdbmodule::VecConverter<Vec4s>::registerConverter();
+    _openvdbmodule::VecConverter<Vec4d>::registerConverter();
+
+    _openvdbmodule::MetaMapConverter::registerConverter();
+
+#define PYOPENVDB_TRANSLATE_EXCEPTION(_classname) \
+    py::register_exception_translator<_classname>(&_openvdbmodule::translateException<_classname>)
+
+    PYOPENVDB_TRANSLATE_EXCEPTION(ArithmeticError);
+    PYOPENVDB_TRANSLATE_EXCEPTION(IllegalValueException);
+    PYOPENVDB_TRANSLATE_EXCEPTION(IndexError);
+    PYOPENVDB_TRANSLATE_EXCEPTION(IoError);
+    PYOPENVDB_TRANSLATE_EXCEPTION(KeyError);
+    PYOPENVDB_TRANSLATE_EXCEPTION(LookupError);
+    PYOPENVDB_TRANSLATE_EXCEPTION(NotImplementedError);
+    PYOPENVDB_TRANSLATE_EXCEPTION(ReferenceError);
+    PYOPENVDB_TRANSLATE_EXCEPTION(RuntimeError);
+    PYOPENVDB_TRANSLATE_EXCEPTION(TypeError);
+    PYOPENVDB_TRANSLATE_EXCEPTION(ValueError);
+
+#undef PYOPENVDB_TRANSLATE_EXCEPTION
+
+
+    // Export the python bindings.
+    exportTransform();
+    exportMetadata();
+    exportGrid();
+
+
+    py::def("read",
+        &_openvdbmodule::readFromFile,
+        (py::arg("filename"), py::arg("gridname")),
+        "read(filename, gridname) -> Grid\n\n"
+        "Read a single grid from a .vdb file.");
+
+    py::def("readAll",
+        &_openvdbmodule::readAllFromFile,
+        py::arg("filename"),
+        "readAll(filename) -> list, dict\n\n"
+        "Read a .vdb file and return a list of grids and\n"
+        "a dict of file-level metadata.");
+
+    py::def("readMetadata",
+        &_openvdbmodule::readFileMetadata,
+        py::arg("filename"),
+        "readMetadata(filename) -> dict\n\n"
+        "Read file-level metadata from a .vdb file.");
+
+    py::def("readGridMetadata",
+        &_openvdbmodule::readGridMetadataFromFile,
+        (py::arg("filename"), py::arg("gridname")),
+        "readGridMetadata(filename, gridname) -> Grid\n\n"
+        "Read a single grid's metadata and transform (but not its tree)\n"
+        "from a .vdb file.");
+
+    py::def("readAllGridMetadata",
+        &_openvdbmodule::readAllGridMetadataFromFile,
+        py::arg("filename"),
+        "readAllGridMetadata(filename) -> list\n\n"
+        "Read a .vdb file and return a list of grids populated with\n"
+        "their metadata and transforms, but not their trees.");
+
+    py::def("write",
+        &_openvdbmodule::writeToFile,
+        (py::arg("filename"), py::arg("grids"), py::arg("metadata") = py::object()),
+        "write(filename, grids, metadata=None)\n\n"
+        "Write a sequence of grids and, optionally, a dict of\n"
+        "(name, value) metadata pairs to a .vdb file.");
+
+} // BOOST_PYTHON_MODULE(_openvdb)
+
+// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

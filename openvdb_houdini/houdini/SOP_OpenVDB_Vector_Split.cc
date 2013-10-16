@@ -87,8 +87,10 @@ newSopOperator(OP_OperatorTable* table)
             "If enabled, split the values of both active and inactive voxels.\n"
             "If disabled, split the values of active voxels only."));
 
+#ifndef SESI_OPENVDB
     // Verbosity toggle
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "verbose", "Verbose"));
+#endif
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Vector Split",
@@ -120,14 +122,13 @@ namespace {
 class VectorGridSplitter
 {
 private:
-    GU_Detail& mGdp;
     const GEO_PrimVDB& mInVdb;
     hvdb::GridPtr mXGrid, mYGrid, mZGrid;
     bool mCopyInactiveValues;
 
 public:
-    VectorGridSplitter(GU_Detail& _gdp, const GEO_PrimVDB& _vdb, bool _inactive):
-        mGdp(_gdp), mInVdb(_vdb), mCopyInactiveValues(_inactive) {}
+    VectorGridSplitter(const GEO_PrimVDB& _vdb, bool _inactive):
+        mInVdb(_vdb), mCopyInactiveValues(_inactive) {}
 
     const hvdb::GridPtr& getXGrid() { return mXGrid; }
     const hvdb::GridPtr& getYGrid() { return mYGrid; }
@@ -230,7 +231,11 @@ SOP_OpenVDB_Vector_Split::cookMySop(OP_Context& context)
 
         const bool copyInactiveValues = evalInt("copyinactive", 0, time);
         const bool removeSourceGrids = evalInt("remove_sources", 0, time);
+#ifndef SESI_OPENVDB
         const bool verbose = evalInt("verbose", 0, time);
+#else
+        const bool verbose = false;
+#endif
 
         UT_AutoInterrupt progress("Splitting VDB grids");
 
@@ -253,7 +258,7 @@ SOP_OpenVDB_Vector_Split::cookMySop(OP_Context& context)
 
             const std::string gridName = vdb->getGridName();
 
-            VectorGridSplitter op(*gdp, *vdb, copyInactiveValues);
+            VectorGridSplitter op(*vdb, copyInactiveValues);
             bool ok = GEOvdbProcessTypedGridVec3(*vdb, op);
 
             if (!ok) {

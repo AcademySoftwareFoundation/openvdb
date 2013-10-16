@@ -110,10 +110,22 @@ typedef math::Quat<Real>    QuatR;
 ////////////////////////////////////////
 
 
-template<typename T> struct VecTraits { static const bool IsVec = false; };
-template<typename T> struct VecTraits<math::Vec2<T> > { static const bool IsVec = true; };
-template<typename T> struct VecTraits<math::Vec3<T> > { static const bool IsVec = true; };
-template<typename T> struct VecTraits<math::Vec4<T> > { static const bool IsVec = true; };
+template<typename T> struct VecTraits {
+    static const bool IsVec = false;
+    static const int Size = 1;
+};
+template<typename T> struct VecTraits<math::Vec2<T> > {
+    static const bool IsVec = true;
+    static const int Size = 2;
+};
+template<typename T> struct VecTraits<math::Vec3<T> > {
+    static const bool IsVec = true;
+    static const int Size = 3;
+};
+template<typename T> struct VecTraits<math::Vec4<T> > {
+    static const bool IsVec = true;
+    static const int Size = 4;
+};
 
 
 ////////////////////////////////////////

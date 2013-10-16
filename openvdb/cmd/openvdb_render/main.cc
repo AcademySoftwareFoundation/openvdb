@@ -56,6 +56,7 @@
 #include <openvdb/tools/RayTracer.h>
 #ifdef DWA_OPENVDB
 #include <logging_base/logging.h>
+#include <usagetrack.h>
 #endif
 
 
@@ -376,16 +377,17 @@ struct OptParse
 int
 main(int argc, char *argv[])
 {
-    int retcode = EXIT_SUCCESS;
+#ifdef DWA_OPENVDB
+    USAGETRACK_report_basic_tool_usage(argc, argv, /*duration=*/0);
+    logging_base::configure(argc, argv);
+#endif
 
     OPENVDB_START_THREADSAFE_STATIC_WRITE
     gProgName = argv[0];
     if (const char* ptr = ::strrchr(gProgName, '/')) gProgName = ptr + 1;
     OPENVDB_FINISH_THREADSAFE_STATIC_WRITE
 
-#ifdef DWA_OPENVDB
-    logging_base::configure(argc, argv);
-#endif
+    int retcode = EXIT_SUCCESS;
 
     if (argc == 1) usage();
 

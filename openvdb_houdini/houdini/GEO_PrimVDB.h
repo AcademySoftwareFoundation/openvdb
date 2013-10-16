@@ -122,15 +122,23 @@ class OPENVDB_HOUDINI_API GEO_PrimVDB : public GEO_Primitive
 public:
     typedef uint64	UniqueId;
 
+protected:
+    /// NOTE: The constructor should only be called from subclass
+    ///       constructors.
     GEO_PrimVDB(GEO_Detail *d, GA_Offset offset = GA_INVALID_OFFSET);
 
+    /// NOTE: The constructor should only be called from subclass
+    ///       constructors.
     GEO_PrimVDB(const GA_MergeMap &map, GA_Detail &detail,
                 GA_Offset offset, const GEO_PrimVDB &src_prim);
 
+    /// NOTE: The destructor should only be called from subclass
+    ///       destructors.
+    virtual ~GEO_PrimVDB();
+
+public:
     static GA_PrimitiveFamilyMask 	buildFamilyMask()
 					    { return GA_FAMILY_NONE; }
-
-    virtual ~GEO_PrimVDB();
 
     /// @{
     /// Required interface methods
@@ -138,13 +146,14 @@ public:
     virtual int         getBBox(UT_BoundingBox *bbox) const;
     virtual void        reverse();
     virtual UT_Vector3  computeNormal() const;
+#if (UT_VERSION_INT >= 0x0d000000)
+    virtual void        copyPrimitive(const GEO_Primitive *src);
+#else
     virtual void        copyPrimitive(const GEO_Primitive *src,
                                       GEO_Point **ptredirect);
+#endif
     virtual void        copyUnwiredForMerge(const GA_Primitive *src,
                                             const GA_MergeMap &map);
-
-    /// Report approximate memory usage.
-    virtual int64	getMemoryUsage() const;
 
     // Query the number of vertices in the array. This number may be smaller
     // than the actual size of the array.
@@ -209,11 +218,14 @@ public:
     // ignored.
     virtual void 	transform(const UT_Matrix4 &mat);
 
+    /// Accessors for the 4x4 matrix representing the affine transform that
+    /// converts from index space voxel coordinates to world space. For frustum
+    /// maps, this will be transform as if the taper value is set to 1.
+    /// @{
     void 		setTransform4(const UT_DMatrix4 &xform4);
     void 		setTransform4(const UT_Matrix4 &xform4);
-
-    /// The 4x4 matrix representing the getSpaceTransform's affine transform.
     UT_Matrix4D 	getTransform4() const;
+    /// @}
 
     // Take the whole set of points into consideration when applying the
     // point removal operation to this primitive. The method returns 0 if
@@ -246,7 +258,7 @@ public:
     virtual int         evaluatePointV4(UT_Vector4 &pos, float u, float v = 0,
                                         unsigned du=0, unsigned dv=0) const
                         {
-                           return GEO_Primitive::evaluatePoint(pos, u, v,
+                           return GEO_Primitive::evaluatePointV4(pos, u, v,
                                        du, dv);
                         }
     /// @}
@@ -255,13 +267,18 @@ public:
     /// @{
 
     /// Get a GEO_PrimVolumeXform which represent's the grid's full transform.
-    /// Given a voxel space index, it will compute its world space position.
+    /// The returned space's fromVoxelSpace() method will convert index space
+    /// voxel coordinates to world space positions (and the vice versa for
+    /// toVoxelSpace()).
     GEO_PrimVolumeXform getIndexSpaceTransform() const;
 
     /// Gives the equivalent to GEO_PrimVolume's getSpaceTransform() by using
-    /// the active voxel bounding box to determine the bounds of
-    /// the transform. The resulting world space sample points will be offset
-    /// by half a voxel so that they maych GEO_PrimVolume.
+    /// the active voxel bounding box to determine the bounds of the transform.
+    /// The resulting world space sample points will be offset by half a voxel
+    /// so that they match GEO_PrimVolume.
+    /// The returned space's fromVoxelSpace() method will convert 0-1
+    /// coordinates over the active voxel bounding box to world space (and vice
+    /// versa for toVoxelSpace()).
     GEO_PrimVolumeXform getSpaceTransform() const;
 
     /// Sets the transform from a GEO_PrimVolume's getSpaceTransform() by using
@@ -283,6 +300,9 @@ public:
     /// Computes the voxel diameter by taking a step in x, y, and z
     /// converting to world space and taking the length of that vector.
     fpreal		 getVoxelDiameter() const;
+
+    /// Returns the length of the voxel when you take an x, y, and z step
+    UT_Vector3		 getVoxelSize() const;
 
     /// VDBs may either be unbounded, or created with a specific frustum
     /// range.  The latter is important for tapered VDBs that otherwise
@@ -326,15 +346,19 @@ public:
     virtual GEO_Primitive       *copy(int preserve_shared_pts = 0) const;
 
     // Have we been deactivated and stashed?
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
+    virtual void        stashed(bool beingstashed, GA_Offset offset=GA_INVALID_OFFSET);
+#else
     virtual void        stashed(int onoff, GA_Offset offset=GA_INVALID_OFFSET);
+#endif
 
     // We need to invalidate the vertex offsets
     virtual void        clearForDeletion();
 
-#if (UT_VERSION_INT >= 0x0c050132) // 12.5.306 or later
-    virtual void        copyOffsetPrimitive(const GEO_Primitive *src, GA_Index base);
-#else
+#if (UT_VERSION_INT < 0x0c050132) // Before 12.5.306
     virtual void        copyOffsetPrimitive(const GEO_Primitive *src, int base);
+#elif (UT_VERSION_INT < 0x0d000000) // Before 13.0, when the function was deleted
+    virtual void        copyOffsetPrimitive(const GEO_Primitive *src, GA_Index base);
 #endif
     /// @}
 
@@ -365,6 +389,19 @@ public:
     /// enlarges the sphere based on the vertex.
     virtual bool	 enlargeBoundingSphere(UT_BoundingSphere &b,
 					const GA_Attribute *P) const;
+
+    /// Accessor for the local 3x3 affine transform matrix for the primitive.
+    /// For frustum maps, this will be transform as if the taper value is set
+    /// to 1.
+    /// @{
+    virtual void	getLocalTransform(UT_Matrix3D &result) const;
+    virtual void	setLocalTransform(const UT_Matrix3D &new_mat3);
+    /// @}
+
+    /// @internal Hack to condition 4x4 matrices that we avoid creating what
+    /// OpenVDB erroneously thinks are singular matrices. Returns true if mat4
+    /// was modified.
+    static bool		conditionMatrix(UT_Matrix4D &mat4);
 
     /// Visualization accessors
     /// @{
@@ -533,6 +570,10 @@ protected:
     /// @warning vertexPoint() doesn't check the bounds.  Use with caution.
     GA_Offset           vertexPoint(GA_Size i) const
                             { return getDetail().vertexPoint(myVertex); }
+
+    /// Report approximate memory usage, excluding sizeof(*this),
+    /// because the subclass doesn't have access to myGridAccessor.
+    int64		getBaseMemoryUsage() const;
 
     /// @brief Return an ID number that is guaranteed to be unique across
     /// all VDB primitives.

@@ -214,7 +214,7 @@ public:
 
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
-    virtual unsigned disableParms();
+    virtual bool updateParmsFlags();
     virtual void resolveObsoleteParms(PRM_ParmList*);
 
     int constructGenericAtttributeLists(
@@ -253,15 +253,6 @@ private:
 
 namespace
 {
-
-std::string
-int2str(const int nr)
-{
-    std::stringstream ss;
-    ss << nr;
-    return ss.str();
-}
-
 
 // Callback to convert from voxel to world space units
 int
@@ -534,44 +525,44 @@ SOP_OpenVDB_From_Polygons::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
 
 
 // Enable or disable parameters in the UI.
-unsigned
-SOP_OpenVDB_From_Polygons::disableParms()
+bool
+SOP_OpenVDB_From_Polygons::updateParmsFlags()
 {
-    unsigned changed = 0;
+    bool changed = false;
     const fpreal time = 0; // No point using CHgetTime as that is unstable.
 
     int refexists = (nInputs() == 2);
 
     // Transform
-    changed += enableParm("group", refexists);
-    changed += enableParm("voxelSize", !refexists);
+    changed |= enableParm("group", refexists);
+    changed |= enableParm("voxelSize", !refexists);
 
     // Conversion
     const bool wsUnits = bool(evalInt("worldSpaceUnits", 0, time));
     const bool fillInterior = bool(evalInt("fillInterior", 0, time));
     const bool unsignedDist = bool(evalInt("unsignedDist", 0, time));
 
-    changed += enableParm("interiorBandWidth",
+    changed |= enableParm("interiorBandWidth",
         !wsUnits && !fillInterior && !unsignedDist);
 
-    changed += enableParm("interiorBandWidthWS",
+    changed |= enableParm("interiorBandWidthWS",
         wsUnits && !fillInterior && !unsignedDist);
 
-    changed += enableParm("exteriorBandWidth", !wsUnits);
-    changed += enableParm("exteriorBandWidthWS", wsUnits);
+    changed |= enableParm("exteriorBandWidth", !wsUnits);
+    changed |= enableParm("exteriorBandWidthWS", wsUnits);
 
-    setVisibleState("interiorBandWidth", !wsUnits);
-    setVisibleState("exteriorBandWidth", !wsUnits);
-    setVisibleState("interiorBandWidthWS", wsUnits);
-    setVisibleState("exteriorBandWidthWS", wsUnits);
+    changed |= setVisibleState("interiorBandWidth", !wsUnits);
+    changed |= setVisibleState("exteriorBandWidth", !wsUnits);
+    changed |= setVisibleState("interiorBandWidthWS", wsUnits);
+    changed |= setVisibleState("exteriorBandWidthWS", wsUnits);
 
-    changed += enableParm("fillInterior", !unsignedDist);
+    changed |= enableParm("fillInterior", !unsignedDist);
 
     // Output
-    changed += enableParm("distanceFieldGridName", bool(evalInt("distanceField", 0, time)));
-    changed += enableParm("fogVolumeGridName",
+    changed |= enableParm("distanceFieldGridName", bool(evalInt("distanceField", 0, time)));
+    changed |= enableParm("fogVolumeGridName",
         bool(evalInt("fogVolume", 0, time)) && !unsignedDist);
-    changed += enableParm("fogVolume", !unsignedDist);
+    changed |= enableParm("fogVolume", !unsignedDist);
 
     // enable / diable vector type menu
     UT_String attrStr, attrName;
@@ -611,8 +602,8 @@ SOP_OpenVDB_From_Polygons::disableParms()
                 }
             }
 
-            changed += enableParmInst("vecType#", &i, isVector);
-            setVisibleStateInst("vecType#", &i, isVector);
+            changed |= enableParmInst("vecType#", &i, isVector);
+            changed |= setVisibleStateInst("vecType#", &i, isVector);
         }
     }
     return changed;

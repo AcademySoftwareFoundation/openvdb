@@ -104,13 +104,9 @@ GEO_VDBTranslator::formatName() const
 }
 
 int
-GEO_VDBTranslator::checkExtension(const char *name) 
+GEO_VDBTranslator::checkExtension(const char *name)
 {
-    UT_String		sname(name);
-
-    if (sname.fileExtension() && !strcmp(sname.fileExtension(), ".vdb"))
-	return true;
-    return false;
+    return UT_String(name).matchFileExtension(".vdb");
 }
 
 int
@@ -147,7 +143,7 @@ GEO_VDBTranslator::fileLoad(GEO_Detail *geogdp, UT_IStream &is, int ate_magic)
 	    nameIter != file.endName(); ++nameIter)
 	{
             const std::string& gridName = nameIter.gridName();
-	    if (GridPtr grid = file.readGrid(gridName)) 
+	    if (GridPtr grid = file.readGrid(gridName))
 	    {
 		// Copy file-level metadata into the grid, then create (if
 		// necessary)
@@ -198,7 +194,7 @@ GEO_VDBTranslator::fileSaveToFile(const GEO_Detail *geogdp, ostream &os, const c
 	// Populate an output GridMap with VDB grid primitives found in the
 	// geometry.
 	openvdb::GridPtrVec outGrids;
-	for (VdbPrimIterator it(gdp); it; ++it) 
+	for (VdbPrimIterator it(gdp); it; ++it)
 	{
 	    const GU_PrimVDB* vdb = *it;
 

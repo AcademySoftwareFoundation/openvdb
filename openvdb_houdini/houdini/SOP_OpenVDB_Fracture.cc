@@ -47,11 +47,13 @@
 #include <GA/GA_ElementGroupTable.h>
 #include <GA/GA_PageHandle.h>
 #include <GA/GA_PageIterator.h>
+#include <GA/GA_AttributeInstanceMatrix.h>
 #include <GEO/GEO_PrimClassifier.h>
 #include <GEO/GEO_PointClassifier.h>
 #include <GU/GU_ConvertParms.h>
 #include <UT/UT_Quaternion.h>
 #include <UT/UT_ScopedPtr.h>
+#include <UT/UT_Version.h>
 
 #include <boost/algorithm/string/join.hpp>
 #include <boost/random.hpp>
@@ -85,7 +87,7 @@ public:
 
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
-    virtual unsigned disableParms();
+    virtual bool updateParmsFlags();
 
     template <class GridType>
     void process(
@@ -126,7 +128,11 @@ newSopOperator(OP_OperatorTable* table)
             "generated fragments."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "centercutter", "Center Cutter Geometry")
+#ifndef SESI_OPENVDB
         .setDefault(PRMoneDefaults)
+#else
+        .setDefault(PRMzeroDefaults)
+#endif
         .setHelpText("Pre-center cutter geometry about the origin before instancing."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "randomizerotation", "Randomize Cutter Rotation")
@@ -194,20 +200,20 @@ SOP_OpenVDB_Fracture::SOP_OpenVDB_Fracture(OP_Network* net,
 
 
 // Enable or disable parameters in the UI.
-unsigned
-SOP_OpenVDB_Fracture::disableParms()
+bool
+SOP_OpenVDB_Fracture::updateParmsFlags()
 {
-    unsigned changed = 0;
+    bool changed = false;
 
     const bool instancePointsExist = (nInputs() == 3);
     const bool multipleCutters = bool(evalInt("separatecutters", 0, 0));
     const bool randomizeRotation = bool(evalInt("randomizerotation", 0, 0));
 
-    changed += enableParm("separatecutters", !instancePointsExist);
-    changed += enableParm("centercutter", instancePointsExist);
-    changed += enableParm("randomizerotation", instancePointsExist);
-    changed += enableParm("seed", randomizeRotation);
-    changed += enableParm("cutteroverlap", instancePointsExist || multipleCutters);
+    changed |= enableParm("separatecutters", !instancePointsExist);
+    changed |= enableParm("centercutter", instancePointsExist);
+    changed |= enableParm("randomizerotation", instancePointsExist);
+    changed |= enableParm("seed", randomizeRotation);
+    changed |= enableParm("cutteroverlap", instancePointsExist || multipleCutters);
 
     return changed;
 }
@@ -381,6 +387,70 @@ SOP_OpenVDB_Fracture::process(
     std::vector<openvdb::Vec3s> instancePoints;
     std::vector<openvdb::math::Quats> instanceRotations;
 
+#if (UT_VERSION_INT >= 0x0d000035) // 13.0.53 or later
+    if (pointGeo != NULL) {
+        instancePoints.resize(pointGeo->getNumPoints());
+
+        GA_Range range(pointGeo->getPointRange());
+        GA_AttributeInstanceMatrix instanceMatrix;
+        instanceMatrix.initialize(pointGeo->pointAttribs(), "N", "v");
+        // Ignore any scaling until levelset fracture supports it.
+        instanceMatrix.resetScales();
+
+        // If we're randomizing or there are *any* valid transformation
+        // attributes, we need to create an instance matrix.
+        if (randomizeRotation || instanceMatrix.hasAnyAttribs()) {
+            instanceRotations.resize(instancePoints.size());
+            typedef boost::mt19937 RandGen;
+            RandGen rng(RandGen::result_type(evalInt("seed", 0, time)));
+            boost::uniform_01<RandGen, float> uniform01(rng);
+            const float two_pi = 2.0 * boost::math::constants::pi<float>();
+            UT_DMatrix4 xform;
+            UT_Vector3 trans;
+            UT_DMatrix3 rotmat;
+            UT_QuaternionD quat;
+
+            for (GA_Iterator it(range); !it.atEnd(); it.advance()) {
+                UT_Vector3 pos = pointGeo->getPos3(*it);
+
+                if (randomizeRotation) {
+                    // Generate uniform random rotations by picking random
+                    // points in the unit cube and forming the unit quaternion.
+
+                    const float u  = uniform01();
+                    const float c1 = std::sqrt(1-u);
+                    const float c2 = std::sqrt(u);
+                    const float s1 = two_pi * uniform01();
+                    const float s2 = two_pi * uniform01();
+
+                    UT_Quaternion  orient(c1 * std::sin(s1), c1 * std::cos(s1),
+                                          c2 * std::sin(s2), c2 * std::cos(s2));
+                    instanceMatrix.getMatrix(xform, pos, orient, *it);
+                }
+                else {
+                    instanceMatrix.getMatrix(xform, pos, *it);
+                }
+                GA_Index i = pointGeo->pointIndex(*it);
+                xform.getTranslates(trans);
+                xform.extractRotate(rotmat);
+                quat.updateFromRotationMatrix(rotmat);
+                instancePoints[i] =
+                    openvdb::Vec3s(trans.x(), trans.y(), trans.z());
+                instanceRotations[i].init(quat.x(), quat.y(), quat.z(),
+                                          quat.w());
+            }
+        }
+        else
+        {
+            // No randomization or valid instance attributes, just use P.
+            for (GA_Iterator it(range); !it.atEnd(); it.advance()) {
+                UT_Vector3 pos = pointGeo->getPos3(*it);
+                instancePoints[pointGeo->pointIndex(*it)] =
+                    openvdb::Vec3s(pos.x(), pos.y(), pos.z());
+            }
+        }
+    }
+#else // before 13.0.53
     if (pointGeo != NULL) {
         instancePoints.resize(pointGeo->getNumPoints());
 
@@ -481,7 +551,7 @@ SOP_OpenVDB_Fracture::process(
             }
         }
     }
-
+#endif
     if (boss.wasInterrupted()) return;
 
     std::list<typename GridType::Ptr> residuals;

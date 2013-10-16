@@ -34,42 +34,29 @@
 #include <vector>
 #include <openvdb/openvdb.h>
 #ifdef DWA_OPENVDB
-#include <arg.h>
-#include <logging/logging.h>
-#include <except/catchall.h>
-#include <pdi.h>
-#endif
-#ifdef _WIN32
-#include <openvdb/port/getopt.c>
-#else
-#include <unistd.h> // for getopt(), optarg
+#include <logging_base/logging.h>
+#include <usagetrack.h>
 #endif
 
 
 namespace {
 
-const char* INDENT = "   ";
-
 typedef std::vector<std::string> StringVec;
 
-StringVec sFilenames;
+const char* INDENT = "   ";
+const char* gProgName = "";
 
 
 void
-usage(const char* progName)
+usage(int exitStatus = EXIT_FAILURE)
 {
     std::cerr <<
-"Usage: " << progName << " in.vdb [in.vdb ...] [options]\n" <<
+"Usage: " << gProgName << " in.vdb [in.vdb ...] [options]\n" <<
 "Which: prints information about OpenVDB grids\n" <<
 "Options:\n" <<
-#ifdef DWA_OPENVDB
 "    -l, -stats     long printout, including grid statistics\n" <<
 "    -m, -metadata  print per-file and per-grid metadata\n";
-#else
-"    -l  long printout, including grid statistics\n" <<
-"    -m  print per-file and per-grid metadata\n";
-#endif
-    exit(EXIT_FAILURE);
+    exit(exitStatus);
 }
 
 
@@ -294,51 +281,43 @@ printShortListing(const StringVec& filenames, bool metadata)
 int
 main(int argc, char *argv[])
 {
-    int retcode = EXIT_SUCCESS;
-
 #ifdef DWA_OPENVDB
-    logging::configure(argc, argv);
-
-    const char* progName = PDI_get_program_name();
-#else
-    const char* progName = argv[0];
-    if (const char* ptr = ::strrchr(progName, '/')) progName = ptr + 1;
+    USAGETRACK_report_basic_tool_usage(argc, argv, /*duration=*/0);
+    logging_base::configure(argc, argv);
 #endif
 
-    if (argc == 1) usage(progName);
+    OPENVDB_START_THREADSAFE_STATIC_WRITE
+    gProgName = argv[0];
+    if (const char* ptr = ::strrchr(gProgName, '/')) gProgName = ptr + 1;
+    OPENVDB_FINISH_THREADSAFE_STATIC_WRITE
 
-    struct Local {
-        static void handleFilenames(int argc, const char* argv[]) {
-            for (int i = 0; i < argc; ++i) {
-                if (argv[i] && argv[i][0]) sFilenames.push_back(argv[i]);
+    int exitStatus = EXIT_SUCCESS;
+
+    if (argc == 1) usage();
+
+    bool stats = false, metadata = false;
+    StringVec filenames;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg[0] == '-') {
+            if (arg == "-m" || arg == "-metadata") {
+                metadata = true;
+            } else if (arg == "-l" || arg == "-stats") {
+                stats = true;
+            } else if (arg == "-h" || arg == "-help" || arg == "--help") {
+                usage(EXIT_SUCCESS);
+            } else {
+                std::cerr << gProgName << ": \"" << arg << "\" is not a valid option\n";
+                usage();
             }
-        }
-    };
-
-    int stats = 0, metadata = 0;
-#ifdef DWA_OPENVDB
-    if (ARG_get(argc, argv,
-        "", ARG_GET_SUBR(&Local::handleFilenames), "VDB files",
-        "-m", ARG_GET_FLAG(&metadata), "print metadata",
-        "-metadata", ARG_GET_FLAG(&metadata), "print metadata",
-        "-l", ARG_GET_FLAG(&stats), "print grid statistics",
-        "-stats", ARG_GET_FLAG(&stats), "print grid statistics",
-        ARG_NULL) < 0)
-    {
-        usage(progName);
-    }
-#else
-    int c = -1;
-    while ((c = getopt(argc, argv, "lm")) != -1) {
-        switch (c) {
-            case 'l': stats = 1; break;
-            case 'm': metadata = 1; break;
-            default: usage(progName); break;
+        } else if (!arg.empty()) {
+            filenames.push_back(arg);
         }
     }
-    Local::handleFilenames(
-        argc - ::optind, const_cast<const char**>(argv) + ::optind);
-#endif
+    if (filenames.empty()) {
+        std::cerr << gProgName << ": expected one or more OpenVDB files\n";
+        usage();
+    }
 
     try {
         openvdb::initialize();
@@ -357,25 +336,21 @@ main(int argc, char *argv[])
         openvdb::Grid<openvdb::tree::Tree4<openvdb::Vec3d, 4, 3, 3>::Type>::registerGrid();
 
         if (stats) {
-            printLongListing(sFilenames);
+            printLongListing(filenames);
         } else {
-            printShortListing(sFilenames, metadata);
+            printShortListing(filenames, metadata);
         }
     }
-#ifdef DWA_OPENVDB
-    CATCH_ALL(retcode);
-#else
     catch (const std::exception& e) {
         OPENVDB_LOG_FATAL(e.what());
-        retcode = EXIT_FAILURE;
+        exitStatus = EXIT_FAILURE;
     }
     catch (...) {
         OPENVDB_LOG_FATAL("Exception caught (unexpected type)");
         std::unexpected();
     }
-#endif
 
-    return retcode;
+    return exitStatus;
 }
 
 // Copyright (c) 2012-2013 DreamWorks Animation LLC

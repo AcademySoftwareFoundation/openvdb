@@ -234,7 +234,7 @@ public:
 
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
-    virtual unsigned disableParms();
+    virtual bool updateParmsFlags();
 
 private:
     void convert(openvdb::FloatGrid::Ptr, ParticleList&, const Settings&);
@@ -332,7 +332,7 @@ newSopOperator(OP_OperatorTable* table)
               .setHelpText("Output the mask volume grid.\nGenerate an alpha mask "
                "that is very useful for subsequent constrained level set smoothing "
                "of the level set surface from the particles. This alpha mask is defined "
-               "as the FOG volume derived from the CSG difference between a level set "
+               "as the fog volume derived from the CSG difference between a level set "
                "surface with a maximum radius of the particles and a level set surface "
                "with a minimum radius of the particles. This mask will guarentee that "
                "subsequent level set smoothing is constrained between the min/max surfaces, "
@@ -544,39 +544,42 @@ SOP_OpenVDB_From_Particles::convertUnits()
 
 
 // Enable or disable parameters in the UI.
-unsigned
-SOP_OpenVDB_From_Particles::disableParms()
+bool
+SOP_OpenVDB_From_Particles::updateParmsFlags()
 {
-    unsigned changed = 0;
+    bool changed = false;
     int refexists = (this->nInputs() == 2);
 
-    changed += enableParm("group", refexists);
-    changed += enableParm("writeintoref", refexists);
+    changed |= enableParm("group", refexists);
+    changed |= enableParm("writeintoref", refexists);
 
-    changed += enableParm("voxelSize", !refexists);
+    changed |= enableParm("voxelSize", !refexists);
 
     const bool wsUnits = bool(evalInt("worldSpaceUnits", 0, 0));
 
-    setVisibleState("bandWidth", !wsUnits);
-    setVisibleState("bandWidthWS", wsUnits);
+    changed |= setVisibleState("bandWidth", !wsUnits);
+    changed |= setVisibleState("bandWidthWS", wsUnits);
 
 
     // Particle conversion
     const bool useTrails =  evalInt("footprint", 0, 0) == 1;
-    changed += enableParm("dX", useTrails);
-    changed += enableParm("dV", useTrails);
+    changed |= enableParm("dX", useTrails);
+    changed |= enableParm("dV", useTrails);
 
-    setVisibleState("dX", useTrails);
-    setVisibleState("dV", useTrails);
+    changed |= setVisibleState("dX", useTrails);
+    changed |= setVisibleState("dV", useTrails);
 
-    setVisibleState("maskWidth", evalInt("maskVolume", 0, 0) == 1);
+    changed |= setVisibleState("maskWidth", evalInt("maskVolume", 0, 0) == 1);
 
     // Output
-    changed += enableParm("gridName", evalInt("levelSet", 0, 0));
-    changed += enableParm("fogVolumeGridName", evalInt("fogVolume", 0, 0));
+    changed |= enableParm("gridName", evalInt("levelSet", 0, 0));
+    changed |= enableParm("fogVolumeGridName", evalInt("fogVolume", 0, 0));
 
-    // enable / diable vector type menu
+    bool build_mask = (evalInt("maskVolume", 0, 0) != 0);
+    changed |= enableParm("maskVolumeGridName", build_mask);
+    changed |= enableParm("maskWidth", build_mask);
 
+    // enable / disable vector type menu
     UT_String attrName;
     GA_ROAttributeRef attrRef;
     const GU_Detail* ptGeo = this->getInputLastGeo(0, CHgetEvalTime());
@@ -604,8 +607,8 @@ SOP_OpenVDB_From_Particles::disableParms()
                     }
                 }
             }
-            changed += enableParmInst("vecType#", &i, isVector);
-            setVisibleStateInst("vecType#", &i, isVector);
+            changed |= enableParmInst("vecType#", &i, isVector);
+            changed |= setVisibleStateInst("vecType#", &i, isVector);
         }
     }
     return changed;
@@ -631,10 +634,10 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
         mTime = context.getTime();
         mVoxelSize = evalFloat("voxelSize", 0, mTime);
 
-        const bool outputLevelSetGrid  = bool(evalInt("levelSet",  0, mTime));
-        const bool outputFogVolumeGrid = bool(evalInt("fogVolume", 0, mTime));
+        const bool outputLevelSetGrid   = bool(evalInt("levelSet",   0, mTime));
+        const bool outputFogVolumeGrid  = bool(evalInt("fogVolume",  0, mTime));
         const bool outputMaskVolumeGrid = bool(evalInt("maskVolume", 0, mTime));
-        const bool outputAttributeGrid = bool(evalInt("attrList",  0, mTime) > 0);
+        const bool outputAttributeGrid  = bool(evalInt("attrList",   0, mTime) > 0);
 
         if (!outputFogVolumeGrid && !outputLevelSetGrid && !outputAttributeGrid) {
              addWarning(SOP_MESSAGE, "No output selected");
@@ -655,7 +658,6 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
             openvdb::math::Transform::createLinearTransform(mVoxelSize);
 
         openvdb::FloatGrid::Ptr outputGrid, minGrid, maxGrid;
-        
 
         // Optionally copy reference grid and/or transform.
         if (refexists) {
@@ -675,21 +677,22 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
 
                 if (bool(evalInt("writeintoref", 0, mTime))) {
                     if (refPrim->getGrid().getGridClass() == openvdb::GRID_LEVEL_SET) {
-                        outputGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(refPrim->getGrid().deepCopyGrid());
+                        outputGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(
+                            refPrim->getGrid().deepCopyGrid());
                         if (outputMaskVolumeGrid) {
-                            minGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(refPrim->getGrid().deepCopyGrid());
-                            maxGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(refPrim->getGrid().deepCopyGrid());
+                            minGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(
+                                refPrim->getGrid().deepCopyGrid());
+                            maxGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(
+                                refPrim->getGrid().deepCopyGrid());
                         }
                         if (!outputGrid) {
-                            addWarning(SOP_MESSAGE,
-                                "Cannot write into the selected reference grid because it is not a float grid.");
+                            addWarning(SOP_MESSAGE, "Cannot write into the selected"
+                                " reference grid because it is not a float grid.");
                         }
-
                     } else {
                         addWarning(SOP_MESSAGE, "Can only write directly into a level set grid.");
                     }
                 }
-
             } else {
                 addError(SOP_MESSAGE, "Second input has no VDB primitives.");
                 return error();
@@ -728,7 +731,7 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
                     maxGrid->setTransform(transform->copy());
                     paList.radiusMult() *= (1.0f + maskWidth);
                     convert(maxGrid, paList, settings);
-                
+
                     // Min grid
                     if ( maskWidth < 1.0f) {
                         if (!minGrid) minGrid = openvdb::FloatGrid::create(background);
@@ -736,16 +739,16 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
                         minGrid->setTransform(transform->copy());
                         paList.radiusMult() *= (1.0f  - maskWidth)/(1.0f + maskWidth);
                         convert(minGrid, paList, settings);
-                        
+
                         // CSG difference
                         openvdb::tools::csgDifference(*maxGrid, *minGrid);
                     }
                 }
-                    
-                // Convert to FOG volume    
+
+                // Convert to fog volume
                 openvdb::tools::sdfToFogVolume(*maxGrid);
 
-                // Add FOG volume to gdp
+                // Add fog volume to gdp
                 UT_String gridNameStr = "";
                 evalString(gridNameStr, "maskVolumeGridName", 0, mTime);
                 outputGrid->setName(gridNameStr.toStdString());
@@ -829,7 +832,7 @@ SOP_OpenVDB_From_Particles::convertWithAttributes(openvdb::FloatGrid::Ptr output
 
     raster.setRmin(evalFloat("Rmin", 0,  mTime));
     raster.setRmax(1e15f);
-    
+
     if (settings.mRasterizeTrails && paList.hasVelocity()) {
         raster.rasterizeTrails(paList, settings.mDx);
     } else if (paList.hasRadius()){

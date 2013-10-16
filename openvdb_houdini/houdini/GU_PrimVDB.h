@@ -73,26 +73,32 @@ using ::GU_PrimVDB;
 
 class GA_Attribute;
 class GEO_PrimVolume;
+class UT_MemoryCounter;
 
 
 class OPENVDB_HOUDINI_API GU_PrimVDB : public GEO_PrimVDB, public GU_Primitive
 {
+protected:
+    /// NOTE: Primitives should not be deleted directly.  They are managed
+    ///       by the GA_PrimitiveList and the stash.
+    virtual ~GU_PrimVDB() {}
+
 public:
-    // This constructor creates a new GU_PrimVDB but does
-    // not append it to the detail
+    /// NOTE: This constructor should only be called via GU_PrimitiveFactory.
     GU_PrimVDB(GU_Detail *gdp, GA_Offset offset=GA_INVALID_OFFSET)
-	: GEO_PrimVDB(gdp, offset)
-	, GU_Primitive()
-    { }
+        : GEO_PrimVDB(gdp, offset)
+        , GU_Primitive()
+    {}
 
-
+    /// NOTE: This constructor should only be called via GU_PrimitiveFactory.
     GU_PrimVDB(const GA_MergeMap &map, GA_Detail &detail,
                GA_Offset offset, const GU_PrimVDB &src_prim)
-	: GEO_PrimVDB(map, detail, offset, src_prim)
-	, GU_Primitive()
-    { }
+        : GEO_PrimVDB(map, detail, offset, src_prim)
+        , GU_Primitive()
+    {}
 
-    virtual ~GU_PrimVDB();
+    /// Report approximate memory usage.
+    virtual int64 getMemoryUsage() const;
 
 #ifndef SESI_OPENVDB
     /// Allows you to find out what this primitive type was named.
@@ -103,11 +109,11 @@ public:
     static void		registerMyself(GA_PrimitiveFactory *factory);
 #endif
 
-    virtual const GA_PrimitiveDefinition	&getTypeDef() const
-						{
-						    UT_ASSERT(theDefinition);
-						    return *theDefinition;
-						}
+    virtual const GA_PrimitiveDefinition &getTypeDef() const
+    {
+        UT_ASSERT(theDefinition);
+        return *theDefinition;
+    }
 
     // Conversion Methods
 
@@ -122,7 +128,7 @@ public:
 					GU_Detail &dst_geo,
 					const GU_Detail &src_geo,
 					GU_ConvertParms &parms,
-					bool flood,
+					bool flood_sdf,
 					bool prune,
 					fpreal tolerance,
 					bool keep_original);
@@ -154,7 +160,7 @@ public:
     /// @param grid  a grid to be associated with the new primitive
     /// @param src   if non-null, copy attributes and groups from this primitive
     /// @param name  if non-null, set the new primitive's @c name attribute to
-    ///              this string; otherwise, if @a src is non-null, use its name
+    ///     this string; otherwise, if @a src is non-null, use its name
     static GU_PrimVDB* buildFromGrid(GU_Detail& gdp, openvdb::GridBase::Ptr grid,
 	const GEO_PrimVDB* src = NULL, const char* name = NULL)
     {
@@ -166,9 +172,16 @@ public:
 			    GU_Detail &geo,
 			    const GEO_PrimVolume &vol,
 			    const char *name,
-			    const bool flood = false,
+			    const bool flood_sdf = false,
 			    const bool prune = false,
 			    const float tolerance = 0.0);
+
+    /// A fast method for converting a primitive volume to a polysoup via VDB
+    /// into the given gdp. It will _not_ copy attributes because this is a
+    /// special case used for display purposes only.
+    static void		convertPrimVolumeToPolySoup(
+			    GU_Detail &dst_geo,
+			    const GEO_PrimVolume &src_vol);
 
     virtual void	normal(NormalComp &output) const;
 
@@ -179,9 +192,12 @@ public:
 				float *u = 0, float *v = 0,
 				int ignoretrim = 1) const;
 
-    // Persistent is true if the returned cache is not to be deleted by
+    // callermustdelete is true if the returned cache is to be deleted by
     // the caller.
-    virtual GU_RayIntersect	*createRayCache(int &persistent);
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
+    SYS_DEPRECATED_HDK(13.0)
+#endif
+    virtual GU_RayIntersect	*createRayCache(int &callermustdelete);
 
 
     /// @brief Transfer any metadata associated with this primitive's
@@ -214,6 +230,15 @@ public:
     }
 
 private: // METHODS
+
+    /// Add a border of the given radius by evaluating from the given volume.
+    /// It assumes that the VDB is a float grid and that the voxel array has
+    /// the same index space, so this can really only be safely called after
+    /// buildFromPrimVolume(). This is used to ensure that non-constant borders
+    /// can be converted at the expense of some extra memory.
+    void		expandBorderFromPrimVolume(
+			    const GEO_PrimVolume &vol,
+			    int border_radius);
 
     GEO_Primitive *	convertToNewPrim(
 			    GEO_Detail &dst_geo,
@@ -248,13 +273,19 @@ private: // DATA
 
     static GA_PrimitiveDefinition	*theDefinition;
     friend class			 GU_PrimitiveFactory;
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
+    SYS_DEPRECATED_PUSH_DISABLE()
+#endif
 };
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
+    SYS_DEPRECATED_POP_DISABLE()
+#endif
 
 
 #ifndef SESI_OPENVDB
 namespace openvdb_houdini {
 using ::GU_PrimVDB;
-}
+} // namespace openvdb_houdini
 #endif
 
 #endif // __HDK_GU_PrimVDB__

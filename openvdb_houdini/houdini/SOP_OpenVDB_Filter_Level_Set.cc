@@ -327,7 +327,7 @@ public:
 
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
-    virtual unsigned disableParms();
+    virtual bool updateParmsFlags();
 
 private:
     typedef hvdb::Interrupter BossT;
@@ -526,11 +526,11 @@ SOP_OpenVDB_Filter_Level_Set::SOP_OpenVDB_Filter_Level_Set(
 ////////////////////////////////////////
 
 // Disable UI Parms.
-unsigned
-SOP_OpenVDB_Filter_Level_Set::disableParms()
+bool
+SOP_OpenVDB_Filter_Level_Set::updateParmsFlags()
 {
-    unsigned changed = 0;
-    
+    bool changed = false;
+
     bool stencil = false, reshape = mOpType == OP_TYPE_RESHAPE;
 
     if (mOpType != OP_TYPE_RENORM) {
@@ -544,17 +544,17 @@ SOP_OpenVDB_Filter_Level_Set::disableParms()
                   operation == FILTER_TYPE_MEDIAN_VALUE;
 
         bool hasMask = (this->nInputs() == 2);
-        changed += enableParm("mask", hasMask);
-        changed += enableParm("maskname", hasMask &&  bool(evalInt("mask", 0, 0)));
+        changed |= enableParm("mask", hasMask);
+        changed |= enableParm("maskname", hasMask &&  bool(evalInt("mask", 0, 0)));
     }
 
-    changed += enableParm("iterations", !reshape);
-    changed += enableParm("stencilWidth", stencil);
-    changed += enableParm("voxelOffset", reshape);
+    changed |= enableParm("iterations", !reshape);
+    changed |= enableParm("stencilWidth", stencil);
+    changed |= enableParm("voxelOffset", reshape);
 
-    setVisibleState("stencilWidth", getEnableState("stencilWidth"));
-    setVisibleState("iterations", getEnableState("iterations"));
-    setVisibleState("voxelOffset", getEnableState("voxelOffset"));
+    changed |= setVisibleState("stencilWidth", getEnableState("stencilWidth"));
+    changed |= setVisibleState("iterations", getEnableState("iterations"));
+    changed |= setVisibleState("voxelOffset", getEnableState("voxelOffset"));
 
     return changed;
 }
@@ -679,7 +679,7 @@ SOP_OpenVDB_Filter_Level_Set::evalFilterParms(OP_Context& context,
 
     evalString(str, "group", 0, now);
     parms.mGroup = str.toStdString();
-    
+
     if (OP_TYPE_SMOOTH == mOpType || OP_TYPE_RESHAPE == mOpType) {
         if (evalInt("mask", 0, now)) {
             parms.mMaskInputNode = getInput(1, /*mark_used*/true);
@@ -716,7 +716,7 @@ SOP_OpenVDB_Filter_Level_Set::applyFilters(
 
     const ValueT voxelSize = ValueT(grid->voxelSize()[0]);
     FilterT filter(*grid, &boss);
-    
+
     if (grid->background() < ValueT(openvdb::LEVEL_SET_HALF_WIDTH * voxelSize)) {
         std::string msg = "VDB primitive '"
             + std::string(vdbPrim->getGridName())
@@ -725,7 +725,7 @@ SOP_OpenVDB_Filter_Level_Set::applyFilters(
     }
 
     for (size_t n = 0, N = filterParms.size(); n < N; ++n) {
-        
+
         const GA_PrimitiveGroup *group = matchGroup(*gdp, filterParms[n].mGroup);
 
         // Skip this node if it doesn't operate on this primitive
