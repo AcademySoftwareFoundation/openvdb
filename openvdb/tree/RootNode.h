@@ -2709,23 +2709,25 @@ RootNode<ChildT>::topologyIntersection(const RootNode<OtherChildType>& other)
 
     enforceSameConfiguration(other);
 
+    std::set<Coord> tmp;//keys to erase
     for (MapIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
-        OtherCIterT j = other.mTable.find(i->first);
-        if (this->isChild(i)) {
-            if (j == other.mTable.end() || other.isTileOff(j)) {
-                mTable.erase(i->first);//delete child branch
-            } else if (other.isChild(j)) { // intersect with child branch
-                this->getChild(i).topologyIntersection(other.getChild(j), mBackground);
-            }
-        } else if (this->isTileOn(i)) {
-            if (j == other.mTable.end() || other.isTileOff(j)) {
-                this->setTile(i, Tile(this->getTile(i).value, false));//turn inactive
-            } else if (other.isChild(j)) { //replace with a child branch with identical topology
-                ChildT* child = new ChildT(other.getChild(j), this->getTile(i).value, TopologyCopy());
-                this->setChild(i, *child);
-            }
-        }
+	OtherCIterT j = other.mTable.find(i->first);
+	if (this->isChild(i)) {
+	    if (j == other.mTable.end() || other.isTileOff(j)) {
+		tmp.insert(i->first);//delete child branch
+	    } else if (other.isChild(j)) { // intersect with child branch
+		this->getChild(i).topologyIntersection(other.getChild(j), mBackground);
+	    }
+	} else if (this->isTileOn(i)) {
+	    if (j == other.mTable.end() || other.isTileOff(j)) {
+		this->setTile(i, Tile(this->getTile(i).value, false));//turn inactive
+	    } else if (other.isChild(j)) { //replace with a child branch with identical topology
+		ChildT* child = new ChildT(other.getChild(j), this->getTile(i).value, TopologyCopy());
+		this->setChild(i, *child);
+	    }
+	}
     }
+    for (std::set<Coord>::iterator i = tmp.begin(), e = tmp.end(); i != e; ++i) mTable.erase(*i);
 }
 
 template<typename ChildT>
