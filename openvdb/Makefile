@@ -34,6 +34,10 @@
 #   doc                 HTML documentation (doc/html/index.html)
 #   pdfdoc              PDF documentation (doc/latex/refman.pdf;
 #                       requires LaTeX and ghostscript)
+#   python              OpenVDB Python module
+#   pytest              unit tests for the Python module
+#   pydoc               HTML documentation for the Python module
+#                       (doc/html/python/index.html)
 #   vdb_print           command-line tool to inspect OpenVDB files
 #   vdb_render          command-line tool to ray-trace OpenVDB files
 #   vdb_view            command-line tool to view OpenVDB files
@@ -90,6 +94,14 @@ endif
 # variables below point by default to the HDK library and header directories:
 # $(HDSO) and $(HT)/include, respectively.  (Source the houdini_setup script
 # to set those two environment variables.)
+#
+# To build the OpenVDB Python module, you will need local distributions of
+# Python, Boost.Python, and optionally NumPy.  As of Houdini 12.5, the HDK
+# includes versions 2.5 and 2.6 of Python as well as the Boost.Python headers.
+# Unfortunately, it does not include the libboost_python library, nor does it
+# include NumPy, so both Boost.Python and NumPy have to be built separately.
+# Point the variables $(BOOST_PYTHON_LIB_DIR), $(BOOST_PYTHON_LIB) and
+# $(NUMPY_INCL_DIR) below to your local distributions of those libraries.
 #
 
 # The directory into which to install libraries, executables and header files
@@ -209,8 +221,13 @@ endif
 # such as jemalloc (included in the Houdini HDK) or TBB malloc
 # (leave blank if unavailable)
 ifdef WINDOWS_NT
-CONCURRENT_MALLOC_LIB :=
-CONCURRENT_MALLOC_LIB_DIR :=
+CONCURRENT_MALLOC_LIB := tbbmalloc_proxy.lib
+ifdef AMD64
+CONCURRENT_MALLOC_LIB += /INCLUDE:__TBB_malloc_proxy
+else
+CONCURRENT_MALLOC_LIB += /INCLUDE:___TBB_malloc_proxy
+endif
+CONCURRENT_MALLOC_LIB_DIR := $(LOCAL_LIB)
 else ifdef MBSD
 CONCURRENT_MALLOC_LIB :=
 CONCURRENT_MALLOC_LIB_DIR :=
@@ -242,6 +259,47 @@ GLFW_INCL_DIR :=
 # The directory containing libglfw
 GLFW_LIB_DIR :=
 GLFW_LIB :=
+
+# The version of Python for which to build the OpenVDB module
+# (leave blank if Python is unavailable)
+PYTHON_VERSION := 2.7
+PYTHON_VERSION_NO_DOT := 27
+# The directory containing Python.h
+PYTHON_INCL_DIR := $(HFS)/python/include/python$(PYTHON_VERSION)
+# The directory containing pyconfig.h
+PYCONFIG_INCL_DIR := $(PYTHON_INCL_DIR)
+# The directory containing libpython
+ifdef WINDOWS_NT
+PYTHON_LIB_DIR := $(HFS)/python$(PYTHON_VERSION_NO_DOT)/libs
+PYTHON_LIB := python$(PYTHON_VERSION_NO_DOT).lib
+else ifdef LINUX
+PYTHON_LIB_DIR := $(HFS)/python/lib
+PYTHON_LIB := -lpython$(PYTHON_VERSION)
+else ifdef MBSD
+PYTHON_LIB_DIR := $(HFS)/Frameworks/Python.framework/Versions/$(PYTHON_VERSION)/lib
+PYTHON_LIB := -lpython$(PYTHON_VERSION)
+endif
+# The directory containing libboost_python
+BOOST_PYTHON_LIB_DIR :=
+BOOST_PYTHON_LIB :=
+# The directory containing arrayobject.h
+# (leave blank if NumPy is unavailable)
+NUMPY_INCL_DIR :=
+# The Epydoc executable
+# (leave blank if Epydoc is unavailable)
+EPYDOC :=
+# Set PYTHON_WRAP_ALL_GRID_TYPES to "yes" to specify that the Python module
+# should expose (almost) all of the grid types defined in openvdb.h
+# Otherwise, only FloatGrid, BoolGrid and Vec3SGrid will be exposed
+# (see exportGrid() in python/pyGrid.cc).
+# Compiling the Python module with PYTHON_WRAP_ALL_GRID_TYPES set to "yes"
+# can be very memory-intensive.
+PYTHON_WRAP_ALL_GRID_TYPES := no
+#
+PYTHON_LIBS_RPATH := \
+    -Wl,-rpath,$(PYTHON_LIB_DIR) -L$(PYTHON_LIB_DIR) $(PYTHON_LIB) \
+    -Wl,-rpath,$(BOOST_PYTHON_LIB_DIR) -L$(BOOST_PYTHON_LIB_DIR) $(BOOST_PYTHON_LIB) \
+#
 
 # The Doxygen executable
 # (leave blank if Doxygen is unavailable)
@@ -286,8 +344,21 @@ endif
 
 ifeq (yes,$(strip $(verbose)))
     QUIET :=
+    QUIET_TEST := -v
 else
     QUIET := > /dev/null
+    QUIET_TEST := $(QUIET)
+endif
+
+has_glfw := no
+ifeq (3,$(words $(strip $(GLFW_LIB_DIR) $(GLFW_INCL_DIR) $(GLFW_LIB))))
+    has_glfw := yes
+endif
+
+has_python := no
+ifeq (7,$(words $(strip $(PYTHON_VERSION) $(PYTHON_LIB_DIR) $(PYTHON_INCL_DIR) \
+    $(PYCONFIG_INCL_DIR) $(PYTHON_LIB) $(BOOST_PYTHON_LIB_DIR) $(BOOST_PYTHON_LIB))))
+    has_python := yes
 endif
 
 INCLDIRS := -I . -I .. -I $(BOOST_INCL_DIR) -I $(HALF_INCL_DIR) -I $(TBB_INCL_DIR) -I $(ZLIB_INCL_DIR)
@@ -535,6 +606,31 @@ VIEW_SRC_NAMES := \
     cmd/openvdb_view/main.cc \
 #
 
+
+PYTHON_INCLUDE_NAMES := \
+    python/pyopenvdb.h \
+    python/pyutil.h \
+    python/pyAccessor.h \
+#
+# Used for "install" target only
+PYTHON_PUBLIC_INCLUDE_NAMES := \
+    python/pyopenvdb.h \
+#
+PYTHON_SRC_NAMES := \
+    python/pyGrid.cc \
+    python/pyMetadata.cc \
+    python/pyTransform.cc \
+    python/pyOpenVDBModule.cc \
+#
+PYCXXFLAGS := -I python -I $(PYTHON_INCL_DIR) -I $(PYCONFIG_INCL_DIR)
+ifneq ($(strip $(NUMPY_INCL_DIR)),)
+PYCXXFLAGS += -I $(NUMPY_INCL_DIR) -DPY_OPENVDB_USE_NUMPY
+endif
+ifneq (no,$(strip $(PYTHON_WRAP_ALL_GRID_TYPES)))
+PYCXXFLAGS += -DPY_OPENVDB_WRAP_ALL_GRID_TYPES
+endif
+
+
 HEADER_SUBDIRS := $(dir $(INCLUDE_NAMES))
 
 ifdef WINDOWS_NT
@@ -549,6 +645,7 @@ ALL_INCLUDE_FILES := \
     $(CMD_INCLUDE_NAMES) \
     $(LIBVIEWER_INCLUDE_NAMES) \
     $(GETOPT_INCLUDE) \
+    $(PYTHON_INCLUDE_NAMES) \
 #
 SRC_FILES := \
     $(SRC_NAMES) \
@@ -557,6 +654,7 @@ SRC_FILES := \
     $(RENDER_SRC_NAMES) \
     $(VIEW_SRC_NAMES) \
     $(LIBVIEWER_SRC_NAMES) \
+    $(PYTHON_SRC_NAMES) \
 #
 ALL_SRC_FILES := $(SRC_FILES)
 
@@ -566,6 +664,7 @@ RENDER_OBJ_NAMES := $(RENDER_SRC_NAMES:.cc=.o)
 VIEW_OBJ_NAMES := $(VIEW_SRC_NAMES:.cc=.o)
 UNITTEST_OBJ_NAMES := $(UNITTEST_SRC_NAMES:.cc=.o)
 LIBVIEWER_OBJ_NAMES := $(LIBVIEWER_SRC_NAMES:.cc=.o)
+PYTHON_OBJ_NAMES := $(PYTHON_SRC_NAMES:.cc=.o)
 
 LIB_MAJOR_VERSION=$(shell grep 'OPENVDB_LIBRARY_MAJOR_VERSION = ' \
     version.h | sed 's/[^0-9]*//g')
@@ -575,12 +674,28 @@ LIB_PATCH_VERSION=$(shell grep 'OPENVDB_LIBRARY_PATCH_VERSION = ' \
     version.h | sed 's/[^0-9]*//g')
 
 LIB_VERSION=$(LIB_MAJOR_VERSION).$(LIB_MINOR_VERSION).$(LIB_PATCH_VERSION)
+SO_VERSION=$(LIB_MAJOR_VERSION).$(LIB_MINOR_VERSION)
 
 LIBOPENVDB_NAME=openvdb_sesi
 LIBOPENVDB_STATIC := $(STATICLIB_PREFIX)$(LIBOPENVDB_NAME)$(STATICLIB_SUFFIX)
 LIBOPENVDB_SHARED := $(SHAREDLIB_PREFIX)$(LIBOPENVDB_NAME)$(SHAREDLIB_SUFFIX)
 LIBOPENVDB_SHARED_VERSIONED := $(LIBOPENVDB_SHARED).$(LIB_VERSION)
+LIBOPENVDB_SONAME := $(LIBOPENVDB_SHARED).$(SO_VERSION)
 LIBOPENVDB_IMPORT := $(IMPORTLIB_PREFIX)$(LIBOPENVDB_NAME)$(IMPORTLIB_SUFFIX)
+ifdef LINUX
+LIBOPENVDB_SONAME_FLAGS := -Wl,-soname,$(LIBOPENVDB_SONAME)
+else
+LIBOPENVDB_SONAME_FLAGS :=
+endif
+
+PYTHON_MODULE_NAME=pyopenvdb
+PYTHON_MODULE := $(SHAREDLIB_PREFIX)$(PYTHON_MODULE_NAME)$(SHAREDLIB_SUFFIX)
+PYTHON_SONAME := $(PYTHON_MODULE).$(SO_VERSION)
+ifdef LINUX
+PYTHON_SONAME_FLAGS := -Wl,-soname,$(PYTHON_SONAME)
+else
+PYTHON_SONAME_FLAGS :=
+endif
 
 ifeq (no,$(strip $(shared)))
     LIBOPENVDB := $(LIBOPENVDB_STATIC)
@@ -592,16 +707,7 @@ else
   else
     LIBOPENVDB := $(LIBOPENVDB_SHARED)
   endif
-
-    # For debugging, pass "rpath=yes" to encode the path to libopenvdb.so
-    # into commands and SOPs.  With "rpath=no" (the default setting),
-    # the directory containing libopenvdb.so will need to be added
-    # to LD_LIBRARY_PATH.
-    ifeq (yes,$(strip $(rpath)))
-        LIBOPENVDB_RPATH := -Wl,-rpath,$(PWD) $(LDDIROPT)$(PWD) $(LIBOPENVDB)
-    else
-        LIBOPENVDB_RPATH := $(LDDIROPT)$(PWD) $(LIBOPENVDB)
-    endif # rpath
+    LIBOPENVDB_RPATH := -Wl,-rpath,$(INSTALL_DIR)/lib
 endif # shared
 
 CPPUNIT_RPATH := -Wl,-rpath,$(CPPUNIT_LIB_DIR) $(LDDIROPT)$(CPPUNIT_LIB_DIR) $(CPPUNIT_LIB)
@@ -612,6 +718,9 @@ ifdef WINDOWS_NT
     CPPUNIT_RPATH := $(LDDIROPT)$(CPPUNIT_LIB_DIR) $(CPPUNIT_LIB)
     EXR_LIBS_RPATH := $(subst -L ,$(LDDIROPT),$(EXR_LIBS))
     ALLOC_LIBS_RPATH := $(subst -L ,$(LDDIROPT),$(ALLOC_LIBS))
+    PYTHON_LIBS_RPATH := \
+	$(LDDIROPT)$(PYTHON_LIB_DIR) $(PYTHON_LIB) \
+	$(LDDIROPT)$(BOOST_PYTHON_LIB_DIR) $(BOOST_PYTHON_LIB)
 endif
 
 DEPEND := dependencies
@@ -620,7 +729,7 @@ DEPEND := dependencies
 # but limit the list to at most three entries.
 list_deps = $(if $(wordlist 4,5,$(?F)),$(firstword $(?F)) and others,$(wordlist 1,3,$(?F)))
 
-ALL_TARGETS := \
+ALL_PRODUCTS := \
     $(LIBOPENVDB_STATIC) \
     $(LIBOPENVDB_SHARED) \
     $(LIBOPENVDB_SHARED_VERSIONED) \
@@ -638,16 +747,18 @@ ALL_TARGETS := \
     vdb_render$(EXE_SUFFIX).manifest \
     vdb_render.{pdb,ilk} \
     $(DEPEND) \
+    $(PYTHON_MODULE) \
 #
 
 .SUFFIXES: .o .cc
 
-.PHONY: all clean depend install install_headers lib test sesi_archive 
+.PHONY: all clean depend doc install lib pdfdoc pydoc pytest python test \
+        sesi_archive install_headers
 
 .cc.o:
 	$(call CompileCXX,)
 
-all: lib vdb_print vdb_render vdb_test
+all: lib python vdb_print vdb_render vdb_test
 
 $(OBJ_NAMES): %.o: %.cc
 	$(call CompileCXX,-DOPENVDB_PRIVATE)
@@ -659,9 +770,11 @@ lib: $(LIBOPENVDB_SHARED)
 
 ifeq (yes,$(strip $(VERSIONED_LIBS)))
 $(LIBOPENVDB_SHARED_VERSIONED): $(OBJ_NAMES)
-	$(call BuildSharedLibrary,$(LIBS_RPATH))
-$(LIBOPENVDB_SHARED): $(LIBOPENVDB_SHARED_VERSIONED)
+	$(call BuildSharedLibrary,$(LIBS_RPATH) $(LIBOPENVDB_SONAME_FLAGS))
+$(LIBOPENVDB_SONAME): $(LIBOPENVDB_SHARED_VERSIONED)
 	$(LN) $< $@
+$(LIBOPENVDB_SHARED): $(LIBOPENVDB_SHARED_VERSIONED) $(LIBOPENVDB_SONAME)
+	$(LN) $(LIBOPENVDB_SHARED_VERSIONED) $@
 else
 $(LIBOPENVDB_SHARED): $(OBJ_NAMES)
 	$(call BuildSharedLibrary,$(LIBS_RPATH))
@@ -726,7 +839,7 @@ endif
 # END vdb_render rules
 
 # BEGIN vdb_view rules
-ifneq (3,$(words $(strip $(GLFW_LIB_DIR) $(GLFW_INCL_DIR) $(GLFW_LIB))))
+ifneq (yes,$(has_glfw))
 vdb_view:
 	@echo "$@"': GLFW is unavailable'
 else
@@ -740,13 +853,6 @@ $(LIBVIEWER_OBJ_NAMES): $(LIBVIEWER_INCLUDE_NAMES)
 $(LIBVIEWER_OBJ_NAMES): %.o: %.cc
 	$(call CompileCXX,-I $(GLFW_INCL_DIR) -DGL_GLEXT_PROTOTYPES=1)
 
-$(LIBVIEWER_STATIC): $(LIBVIEWER_OBJ_NAMES) $(LIBOPENVDB)
-	@echo "Building $@ because of $(call list_deps)"
-	$(AR) cr $@ $^
-
-$(LIBVIEWER_SHARED): $(LIBVIEWER_OBJ_NAMES) $(LIBOPENVDB)
-	$(call BuildSharedLibrary,$(LIBS_RPATH))
-
 ifneq (,$(strip $(EXE_SUFFIX)))
 vdb_view: vdb_view$(EXE_SUFFIX)
 endif
@@ -759,6 +865,41 @@ vdb_view$(EXE_SUFFIX): $(LIBOPENVDB) $(LIBVIEWER_OBJ_NAMES) $(VIEW_OBJ_NAMES)
 		$(ALLOC_LIBS_RPATH))
 endif
 # END vdb_view RULES
+
+# Build the Python module
+$(PYTHON_OBJ_NAMES): $(PYTHON_INCLUDE_NAMES)
+$(PYTHON_OBJ_NAMES): %.o: %.cc
+	$(call CompileCXX, -I . $(PYCXXFLAGS))
+$(PYTHON_MODULE): $(LIBOPENVDB) $(PYTHON_OBJ_NAMES)
+	$(call BuildSharedLibrary, $(PYTHON_SONAME_FLAGS) $(PYTHON_OBJ_NAMES) \
+		$(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) $(PYTHON_LIBS_RPATH))
+
+ifeq (yes,$(has_python))
+ifneq ($(strip $(EPYDOC)),)
+pydoc: $(PYTHON_MODULE) $(LIBOPENVDB_SONAME)
+	@echo "Generating Python module documentation because of $(call list_deps)"
+	pydocdir=doc/html/python; \
+	/bin/mkdir -p $${pydocdir}; \
+	echo "Created $${pydocdir}"; \
+	export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(PWD); \
+	export PYTHONPATH=${PYTHONPATH}:$(PWD); \
+	    $(EPYDOC) --html -o $${pydocdir} $(PYTHON_MODULE_NAME) $(QUIET)
+else
+pydoc:
+	@echo "$@"': $$EPYDOC is undefined'
+endif
+
+pytest: $(PYTHON_MODULE) $(LIBOPENVDB_SONAME)
+	@echo "Testing Python module $(PYTHON_MODULE)"
+	export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(PWD); \
+	export PYTHONPATH=${PYTHONPATH}:$(PWD); \
+	    python$(PYTHON_VERSION) ./python/test/TestOpenVDB.py $(QUIET_TEST)
+
+python: $(PYTHON_MODULE)
+else
+python pytest pydoc:
+	@echo "$@"': Python is unavailable'
+endif
 
 # BEGIN vdb_test RULES
 ifeq (3,$(words $(strip $(CPPUNIT_LIB_DIR) $(CPPUNIT_INCL_DIR) $(CPPUNIT_LIB))))
@@ -787,8 +928,8 @@ else
 endif
 
 test: vdb_test
-	$(APP_EXPORTS); ./vdb_test
-
+	@echo "Testing $(LIBOPENVDB_NAME)"
+	$(APP_EXPORTS); ./vdb_test $(QUIET_TEST)
 else
 vdb_test:
 	@echo "$@"': $$(CPPUNIT_INCL_DIR) is undefined'
@@ -807,7 +948,7 @@ install_headers: $(INCLUDE_NAMES)
 	@#
 	@echo "Copied header files to $(INSTALL_DIR)/include"
 
-install: install_headers lib vdb_print$(EXE_SUFFIX) vdb_render$(EXE_SUFFIX) vdb_view doc
+install: install_headers lib python vdb_print vdb_render vdb_view doc pydoc
 	mkdir -p $(INSTALL_DIR)/lib
 	@echo "Created $(INSTALL_DIR)/lib/"
 	cp -f $(LIBOPENVDB) $(LIBOPENVDB_IMPORT) $(INSTALL_DIR)/lib
@@ -816,6 +957,23 @@ install: install_headers lib vdb_print$(EXE_SUFFIX) vdb_render$(EXE_SUFFIX) vdb_
 		    $(LN) $(LIBOPENVDB_SHARED_VERSIONED) $(LIBOPENVDB_SHARED); fi; \
 	    popd > /dev/null
 	@echo "Copied libopenvdb to $(INSTALL_DIR)/lib/"
+	@#
+	if [ -f $(PYTHON_MODULE) ]; \
+	then \
+	    installdir=$(INSTALL_DIR)/python/include/python$(PYTHON_VERSION); \
+	    mkdir -p $${installdir}; \
+	    echo "Created $${installdir}"; \
+	    /bin/cp -f $(PYTHON_PUBLIC_INCLUDE_NAMES) $${installdir}/; \
+	    echo "Copied Python header files to $${installdir}"; \
+	    installdir=$(INSTALL_DIR)/python/lib/python$(PYTHON_VERSION); \
+	    mkdir -p $${installdir}; \
+	    echo "Created $${installdir}"; \
+	    /bin/cp -f $(PYTHON_MODULE) $${installdir}/; \
+	    pushd $${installdir} > /dev/null; \
+	    $(LN) $(PYTHON_MODULE) $(PYTHON_SONAME); \
+	    popd > /dev/null; \
+	    echo "Copied Python module to $${installdir}"; \
+	fi
 	@#
 	mkdir -p $(INSTALL_DIR)/bin
 	@echo "Created $(INSTALL_DIR)/bin/"
@@ -897,12 +1055,15 @@ $(DEPEND): $(ALL_INCLUDE_FILES) $(ALL_SRC_FILES)
 depend: $(DEPEND)
 
 clean_obj:
-	$(RM) $(OBJ_NAMES) $(UNITTEST_OBJ_NAMES) $(CMD_OBJ_NAMES) \
-              $(LIBVIEWER_OBJ_NAMES) \
-	      $(VIEW_OBJ_NAMES)
+	$(RM) $(OBJ_NAMES)
+	$(RM) $(PYTHON_OBJ_NAMES)
+	$(RM) $(UNITTEST_OBJ_NAMES)
+	$(RM) $(CMD_OBJ_NAMES)
+	$(RM) $(LIBVIEWER_OBJ_NAMES)
+	$(RM) $(VIEW_OBJ_NAMES) 
 
 clean: clean_obj
-	$(RM) $(ALL_TARGETS) $(DEPFILES)
+	$(RM) $(ALL_PRODUCTS) $(DEPFILES)
 	$(RM) $(LIBOPENVDB_STATIC)
 	$(RM) $(LIBOPENVDB_SHARED_VERSIONED)
 	$(RM) $(LIBOPENVDB_SHARED)

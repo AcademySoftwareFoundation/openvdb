@@ -57,11 +57,11 @@ template<typename ValueT> class Dense;
 /// @param sparse  an OpenVDB grid or tree from which to copy values
 /// @param dense   the dense grid into which to copy values
 /// @param serial  if false, process voxels in parallel
-template<typename GridOrTreeT>
+template<typename DenseT, typename GridOrTreeT>
 void
 copyToDense(
     const GridOrTreeT& sparse,
-    Dense<typename GridOrTreeT::ValueType>& dense,
+    DenseT& dense,
     bool serial = false);
 
 
@@ -71,10 +71,10 @@ copyToDense(
 /// @param tolerance  values in the dense grid that are within this tolerance of the sparse
 ///     grid's background value become inactive background voxels or tiles in the sparse grid
 /// @param serial     if false, process voxels in parallel
-template<typename GridOrTreeT>
+template<typename DenseT, typename GridOrTreeT>
 void
 copyFromDense(
-    const Dense<typename GridOrTreeT::ValueType>& dense,
+    const DenseT& dense,
     GridOrTreeT& sparse,
     const typename GridOrTreeT::ValueType& tolerance,
     bool serial = false);
@@ -272,13 +272,15 @@ private:
 /// from the OpenVDB tree.  But both active and inactive voxels are copied,
 /// so all existing values in the dense grid are overwritten, regardless of
 /// the OpenVDB tree's tolopogy.
-template<typename TreeT>
+template<typename _TreeT, typename _DenseT = Dense<typename _TreeT::ValueType> >
 class CopyToDense
 {
 public:
+    typedef _DenseT                      DenseT;
+    typedef _TreeT                       TreeT;
     typedef typename TreeT::ValueType    ValueT;
 
-    CopyToDense(const TreeT& tree, Dense<ValueT> &dense)
+    CopyToDense(const TreeT& tree, DenseT& dense)
         : mRoot(&(tree.root())), mDense(&dense) {}
 
     void copy(bool serial = false) const
@@ -298,19 +300,19 @@ public:
 
 private:
     const typename TreeT::RootNodeType* mRoot;
-    Dense<ValueT>*                      mDense;
+    DenseT* mDense;
 };// CopyToDense
 
 
 // Convenient wrapper function for the CopyToDense class
-template<typename GridOrTreeT>
+template<typename DenseT, typename GridOrTreeT>
 void
-copyToDense(const GridOrTreeT& sparse, Dense<typename GridOrTreeT::ValueType>& dense, bool serial)
+copyToDense(const GridOrTreeT& sparse, DenseT& dense, bool serial)
 {
     typedef TreeAdapter<GridOrTreeT> Adapter;
     typedef typename Adapter::TreeType TreeT;
 
-    CopyToDense<TreeT> op(Adapter::constTree(sparse), dense);
+    CopyToDense<TreeT, DenseT> op(Adapter::constTree(sparse), dense);
     op.copy(serial);
 }
 
@@ -327,15 +329,17 @@ copyToDense(const GridOrTreeT& sparse, Dense<typename GridOrTreeT::ValueType>& d
 /// @note Since this class allocates leaf nodes concurrently it is recommended
 /// to use a scalable implementation of @c new like the one provided by TBB,
 /// rather than the mutex-protected standard library @c new.
-template<typename TreeT>
+template<typename _TreeT, typename _DenseT = Dense<typename _TreeT::ValueType> >
 class CopyFromDense
 {
 public:
+    typedef _DenseT                      DenseT;
+    typedef _TreeT                       TreeT;
     typedef typename TreeT::ValueType    ValueT;
     typedef typename TreeT::LeafNodeType LeafT;
     typedef tree::ValueAccessor<TreeT>   AccessorT;
 
-    CopyFromDense(const Dense<ValueT>& dense, TreeT& tree, const ValueT& tolerance)
+    CopyFromDense(const DenseT& dense, TreeT& tree, const ValueT& tolerance)
         : mDense(&dense),
           mTree(&tree),
           mBlocks(NULL),
@@ -409,7 +413,7 @@ public:
 
             if (mAccessor.get() == NULL) {//i.e. empty target tree
                 leaf->fill(mTree->background(), false);
-            } else {//account for exiting leafs in the target tree
+            } else {//account for existing leaf nodes in the target tree
                 if (const LeafT* target = mAccessor->probeConstLeaf(bbox.min())) {
                     (*leaf) = (*target);
                 } else {
@@ -439,7 +443,7 @@ private:
         Block(const CoordBBox& b) : bbox(b), leaf(NULL) {}
     };
 
-    const Dense<ValueT>*         mDense;
+    const DenseT*                mDense;
     TreeT*                       mTree;
     std::vector<Block>*          mBlocks;
     ValueT                       mTolerance;
@@ -448,15 +452,15 @@ private:
 
 
 // Convenient wrapper function for the CopyFromDense class
-template<typename GridOrTreeT>
+template<typename DenseT, typename GridOrTreeT>
 void
-copyFromDense(const Dense<typename GridOrTreeT::ValueType>& dense, GridOrTreeT& sparse,
+copyFromDense(const DenseT& dense, GridOrTreeT& sparse,
     const typename GridOrTreeT::ValueType& tolerance, bool serial)
 {
     typedef TreeAdapter<GridOrTreeT> Adapter;
     typedef typename Adapter::TreeType TreeT;
 
-    CopyFromDense<TreeT> op(dense, Adapter::tree(sparse), tolerance);
+    CopyFromDense<TreeT, DenseT> op(dense, Adapter::tree(sparse), tolerance);
     op.copy(serial);
 }
 

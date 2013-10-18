@@ -94,8 +94,8 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setHelpText("Specify a subset of the input VDB grids to surface.")
         .setChoiceList(&hutil::PrimGroupMenu));
-        
-        
+
+
     parms.add(hutil::ParmFactory(PRM_FLT_J, "isovalue", "Isovalue")
         .setDefault(PRMzeroDefaults)
         .setRange(PRM_RANGE_UI, -1.0, PRM_RANGE_UI, 1.0)
@@ -127,27 +127,26 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "overlapping", "Overlapping")
 #ifndef SESI_OPENVDB
-	.setDefault(PRMzeroDefaults)
+        .setDefault(PRMzeroDefaults)
 #else
-	.setDefault(PRMoneDefaults)
+        .setDefault(PRMoneDefaults)
 #endif
         .setHelpText("Toggle to allow spheres to overlap/intersect."));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "preserve",
-	      "Preserve Attributes and Groups")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "preserve", "Preserve Attributes and Groups")
 #ifndef SESI_OPENVDB
-	.setDefault(PRMzeroDefaults)
+        .setDefault(PRMzeroDefaults)
 #else
-	.setDefault(PRMoneDefaults)
+        .setDefault(PRMoneDefaults)
 #endif
         .setHelpText("Enable to copy attributes and groups from the input"));
 
     // The "doid" parameter name comes from the standard in POPs
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "doid", "Add ID Attribute")
 #ifndef SESI_OPENVDB
-	.setDefault(PRMoneDefaults)
+        .setDefault(PRMoneDefaults)
 #else
-	.setDefault(PRMzeroDefaults)
+        .setDefault(PRMzeroDefaults)
 #endif
         .setHelpText("Enable to add an id point attribute that corresponds to different VDBs."));
 
@@ -188,7 +187,6 @@ OP_ERROR
 SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
 {
     try {
-    
         hutil::ScopedInputLock lock(*this, context);
         const fpreal time = context.getTime();
 
@@ -220,39 +218,38 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
         const int scatter = evalInt("scatter", 0, time);
         const bool preserve = evalInt("preserve", 0, time);
 
-	const bool addID = evalInt("doid", 0, time);
-	GA_RWHandleI idAttr;
-	if (addID)
-	{
-	    GA_RWAttributeRef aRef = gdp->findPointAttribute("id");
-	    if (!aRef.isValid()) aRef = gdp->addIntTuple(GA_ATTRIB_POINT, "id", 1, GA_Defaults(0));
-	    
-	    idAttr = aRef.getAttribute();
-	    if(!idAttr.isValid()) {
-		addWarning(SOP_MESSAGE, "Failed to create the point ID attribute.");
-		return error();
-	    }
-	}
-        
+        const bool addID = evalInt("doid", 0, time);
+        GA_RWHandleI idAttr;
+        if (addID) {
+            GA_RWAttributeRef aRef = gdp->findPointAttribute("id");
+            if (!aRef.isValid()) aRef = gdp->addIntTuple(GA_ATTRIB_POINT, "id", 1, GA_Defaults(0));
+
+            idAttr = aRef.getAttribute();
+            if(!idAttr.isValid()) {
+                addWarning(SOP_MESSAGE, "Failed to create the point ID attribute.");
+                return error();
+            }
+        }
+
         int idNumber = 1;
 
-	GU_ConvertParms parms;
+        GU_ConvertParms parms;
 #if UT_VERSION_INT < 0x0d0000b1 // 13.0.177 or earlier
-	parms.preserveGroups = true;
+        parms.preserveGroups = true;
 #else
-	parms.setKeepGroups(true);
+        parms.setKeepGroups(true);
 #endif
 
         std::vector<std::string> skippedGrids;
-        
+
         for (; vdbIt; ++vdbIt) {
             if (boss.wasInterrupted()) break;
 
             std::vector<openvdb::Vec4s> spheres;
 
             if (vdbIt->getGrid().type() == openvdb::FloatGrid::gridType()) {
-            
-                openvdb::FloatGrid::ConstPtr gridPtr = 
+
+                openvdb::FloatGrid::ConstPtr gridPtr =
                     openvdb::gridConstPtrCast<openvdb::FloatGrid>(vdbIt->getGridPtr());
 
                 openvdb::tools::fillWithSpheres(*gridPtr, spheres, sphereCount, overlapping,
@@ -261,7 +258,7 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
 
             } else if (vdbIt->getGrid().type() == openvdb::DoubleGrid::gridType()) {
 
-                openvdb::DoubleGrid::ConstPtr gridPtr = 
+                openvdb::DoubleGrid::ConstPtr gridPtr =
                     openvdb::gridConstPtrCast<openvdb::DoubleGrid>(vdbIt->getGridPtr());
 
                 openvdb::tools::fillWithSpheres(*gridPtr, spheres, sphereCount, overlapping,
@@ -272,23 +269,23 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
                 continue;
             }
 
-	    GU_ConvertMarker marker(*gdp);
+            GU_ConvertMarker marker(*gdp);
 
             // copy spheres to Houdini
             for (size_t n = 0, N = spheres.size(); n < N; ++n) {
-            
+
                 const openvdb::Vec4s& sphere = spheres[n];
-                
+
                 GA_Offset ptoff = gdp->appendPointOffset();
 
                 gdp->setPos3(ptoff, sphere.x(), sphere.y(), sphere.z());
-                
-		if (addID)
-		    idAttr.set(ptoff, idNumber);
-                               
+
+                if (addID) {
+                    idAttr.set(ptoff, idNumber);
+                }
                 UT_Matrix4 mat = UT_Matrix4::getIdentityMatrix();
-                mat.scale(sphere[3],sphere[3],sphere[3]);                
-                               
+                mat.scale(sphere[3],sphere[3],sphere[3]);
+
                 #if (UT_VERSION_INT >= 0x0c050000)  // 12.5.0 or later
                 GU_PrimSphereParms parms(gdp, ptoff);
                 parms.xform = mat;
@@ -300,23 +297,19 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
                 #endif
             }
 
-	    if (preserve) {
-		GUconvertCopySingleVertexPrimAttribsAndGroups(
-			parms, *vdbGeo, vdbIt.getOffset(),
-			*gdp, marker.getPrimitives(), marker.getPoints());
-	    }
-
+            if (preserve) {
+                GUconvertCopySingleVertexPrimAttribsAndGroups(
+                    parms, *vdbGeo, vdbIt.getOffset(),
+                    *gdp, marker.getPrimitives(), marker.getPoints());
+            }
             ++idNumber;
-            
         }
-        
-        
+
         if (!skippedGrids.empty()) {
             std::string s = "Only scalar (float/double) grids are supported, the following "
                 "were skipped: '" + boost::algorithm::join(skippedGrids, ", ") + "'.";
             addWarning(SOP_MESSAGE, s.c_str());
         }
-
 
         if (boss.wasInterrupted()) {
             addWarning(SOP_MESSAGE, "Process was interrupted");
@@ -333,4 +326,3 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
 // Copyright (c) 2012-2013 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-

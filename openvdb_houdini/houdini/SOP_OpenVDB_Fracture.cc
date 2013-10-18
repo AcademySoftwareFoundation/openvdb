@@ -397,8 +397,8 @@ SOP_OpenVDB_Fracture::process(
         // Ignore any scaling until levelset fracture supports it.
         instanceMatrix.resetScales();
 
-	// If we're randomizing or there are *any* valid transformation
-	// attributes, we need to create an instance matrix.
+        // If we're randomizing or there are *any* valid transformation
+        // attributes, we need to create an instance matrix.
         if (randomizeRotation || instanceMatrix.hasAnyAttribs()) {
             instanceRotations.resize(instancePoints.size());
             typedef boost::mt19937 RandGen;
@@ -442,7 +442,7 @@ SOP_OpenVDB_Fracture::process(
         }
         else
         {
-	    // No randomization or valid instance attributes, just use P.
+            // No randomization or valid instance attributes, just use P.
             for (GA_Iterator it(range); !it.atEnd(); it.advance()) {
                 UT_Vector3 pos = pointGeo->getPos3(*it);
                 instancePoints[pointGeo->pointIndex(*it)] =
@@ -450,7 +450,7 @@ SOP_OpenVDB_Fracture::process(
             }
         }
     }
-#else
+#else // before 13.0.53
     if (pointGeo != NULL) {
         instancePoints.resize(pointGeo->getNumPoints());
 

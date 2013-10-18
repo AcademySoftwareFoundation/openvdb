@@ -170,9 +170,9 @@ public:
 
     /// Return the memory in bytes occupied by this node.
     Index64 memUsage() const;
-    
+
     /// Expand the given bounding box so that it includes this leaf node's active voxels.
-    /// If visitVoxels is false this LeafNode will be approximated as dense, i.e. with all 
+    /// If visitVoxels is false this LeafNode will be approximated as dense, i.e. with all
     /// voxels active. Else the individual active voxels are visited to produce a tight bbox.
     void evalActiveBoundingBox(CoordBBox&, bool visitVoxels = true) const;
     OPENVDB_DEPRECATED void evalActiveVoxelBoundingBox(CoordBBox& bbox) const;
@@ -1041,7 +1041,7 @@ inline bool
 LeafNode<bool, Log2Dim>::isConstant(bool& constValue, bool& state, bool tolerance) const
 {
     state = mValueMask.isOn();
-    
+
     if (!(state || mValueMask.isOff())) return false;
 
     // Note: if tolerance is true (i.e., 1), then all boolean values compare equal.
@@ -1317,18 +1317,20 @@ template<typename DenseT>
 inline void
 LeafNode<bool, Log2Dim>::copyToDense(const CoordBBox& bbox, DenseT& dense) const
 {
+    typedef typename DenseT::ValueType DenseValueType;
+
     const size_t xStride = dense.xStride(), yStride = dense.yStride();// zStride=1
     const Coord& min = dense.bbox().min();
-    bool*       t0 = dense.data() + bbox.min()[2]-min[2];//target array
+    DenseValueType* t0 = dense.data() + bbox.min()[2]-min[2];//target array
     const Int32 n0 = bbox.min()[2]&DIM-1u;
     for (Int32 x = bbox.min()[0], ex=bbox.max()[0]+1; x<ex; ++x) {
-        bool*       t1 = t0 + xStride*(x-min[0]);
+        DenseValueType* t1 = t0 + xStride*(x-min[0]);
         const Int32 n1 = n0 + ((x&DIM-1u)<<2*LOG2DIM);
         for (Int32 y = bbox.min()[1], ey=bbox.max()[1]+1; y<ey; ++y) {
-            bool* t2 = t1 + yStride*(y-min[1]);
+            DenseValueType* t2 = t1 + yStride*(y-min[1]);
             Int32 n2 = n1 + ((y&DIM-1u)<<LOG2DIM) ;
             for (Int32 z = bbox.min()[2], ez=bbox.max()[2]+1; z<ez ; ++z) {
-                *t2++ = mBuffer.mData.isOn(n2++);
+                *t2++ = DenseValueType(mBuffer.mData.isOn(n2++));
             }
         }
     }
@@ -1341,24 +1343,26 @@ inline void
 LeafNode<bool, Log2Dim>::copyFromDense(const CoordBBox& bbox, const DenseT& dense,
                                        bool background, bool tolerance)
 {
+    typedef typename DenseT::ValueType DenseValueType;
+
     const size_t xStride = dense.xStride(), yStride = dense.yStride();// zStride=1
     const Coord& min = dense.bbox().min();
-    const bool* s0 = dense.data() + bbox.min()[2]-min[2];//source
+    const DenseValueType* s0 = dense.data() + bbox.min()[2]-min[2];//source
     const Int32 n0 = bbox.min()[2]&DIM-1u;
     for (Int32 x = bbox.min()[0], ex=bbox.max()[0]+1; x<ex; ++x) {
-        const bool* s1 = s0 + xStride*(x-min[0]);
+        const DenseValueType* s1 = s0 + xStride*(x-min[0]);
         const Int32 n1 = n0 + ((x&DIM-1u)<<2*LOG2DIM);
         for (Int32 y = bbox.min()[1], ey=bbox.max()[1]+1; y<ey; ++y) {
-            const bool* s2 = s1 + yStride*(y-min[1]);
+            const DenseValueType* s2 = s1 + yStride*(y-min[1]);
             Int32 n2 = n1 + ((y&DIM-1u)<<LOG2DIM);
             for (Int32 z = bbox.min()[2], ez=bbox.max()[2]+1; z<ez ; ++z, ++n2, ++s2) {
                 // Note: if tolerance is true (i.e., 1), then all boolean values compare equal.
-                if (tolerance || background == *s2) {
+                if (tolerance || background == bool(*s2)) {
                     mValueMask.setOff(n2);
                     mBuffer.mData.set(n2, background);
                 } else {
                     mValueMask.setOn(n2);
-                    mBuffer.mData.set(n2, *s2);
+                    mBuffer.mData.set(n2, bool(*s2));
                 }
             }
         }

@@ -322,14 +322,13 @@ public:
         size_t i, size_t j, double iOffset = 0.5, double jOffset = 0.5) const = 0;
 
 protected:
-
     void initRay(double znear, double zfar)
     {
         mRay.setTimes(znear, zfar);
         mRay.setEye(mScreenToWorld.applyMap(Vec3R(0.0)));
-        mRay.setDir(mScreenToWorld.applyJacobian(Vec3R(0.0, 0.0, -1.0))); 
+        mRay.setDir(mScreenToWorld.applyJacobian(Vec3R(0.0, 0.0, -1.0)));
     }
-    
+
     Film* mFilm;
     double mScaleWidth, mScaleHeight;
     math::Ray<double> mRay;

@@ -231,7 +231,7 @@ public:
 
 private: // METHODS
 
-    /// Add an border of the given radius by evaluating from the given volume.
+    /// Add a border of the given radius by evaluating from the given volume.
     /// It assumes that the VDB is a float grid and that the voxel array has
     /// the same index space, so this can really only be safely called after
     /// buildFromPrimVolume(). This is used to ensure that non-constant borders

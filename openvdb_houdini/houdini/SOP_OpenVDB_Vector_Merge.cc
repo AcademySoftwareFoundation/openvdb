@@ -368,9 +368,9 @@ SOP_OpenVDB_Vector_Merge::cookMySop(OP_Context& context)
         const bool copyInactiveValues = evalInt("copyinactive", 0, time);
         const bool removeSourceGrids = evalInt("remove_sources", 0, time);
 #ifndef SESI_OPENVDB
-	const bool verbose = evalInt("verbose", 0, time);
+        const bool verbose = evalInt("verbose", 0, time);
 #else
-	const bool verbose = false;
+        const bool verbose = false;
 #endif
 
         // Get the name (or naming pattern) for merged grids.

@@ -115,6 +115,7 @@ private:
 
 ////////////////////////////////////////
 
+
 namespace {
 
 // Callback to check partition limit
@@ -143,7 +144,6 @@ SOP_OpenVDB_Convert::checkActivePart(float time)
 
 
 ////////////////////////////////////////
-
 
 
 // Build UI and register this operator.
@@ -300,7 +300,8 @@ newSopOperator(OP_OperatorTable* table)
         .setHelpText("Enable / disable the the adaptivity field."));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "adaptivityfieldname", "Adaptivity Field")
-        .setHelpText("A single scalar grid used as an spatial multiplier for the adaptivity threshold.")
+        .setHelpText("A single scalar grid used as a spatial multiplier"
+            " for the adaptivity threshold.")
         .setSpareData(&SOP_Node::theThirdInput)
         .setChoiceList(&hutil::PrimGroupMenu));
 
@@ -671,18 +672,18 @@ copyMesh(
         }
     }
 
-    bool shared_vertices = true; 
+    bool shared_vertices = true;
     if (toPolySoup) {
-	// NOTE: Since we could be using the same points for multiple
-	//       polysoups, and the shared vertices option assumes that
-	//       the points are only used by this polysoup, we have to
-	//       use the unique vertices option.
-	int num_prims = 0;
-	for (int flags = 0; flags < 4; ++flags) {
-	    if (!nquads[flags] && !ntris[flags]) continue;
-	    num_prims++;
-	}
-	shared_vertices = (num_prims <= 1);
+        // NOTE: Since we could be using the same points for multiple
+        //       polysoups, and the shared vertices option assumes that
+        //       the points are only used by this polysoup, we have to
+        //       use the unique vertices option.
+        int num_prims = 0;
+        for (int flags = 0; flags < 4; ++flags) {
+            if (!nquads[flags] && !ntris[flags]) continue;
+            num_prims++;
+        }
+        shared_vertices = (num_prims <= 1);
     }
 
     for (int flags = 0; flags < 4; ++flags) {
@@ -899,9 +900,9 @@ SOP_OpenVDB_Convert::referenceMeshing(
 
     if (sharpenFeatures) {
 
-	const double edgetolerance = double(evalFloat("edgetolerance", 0, time));
+        const double edgetolerance = double(evalFloat("edgetolerance", 0, time));
 
-        maskTree = typename BoolTreeType::Ptr(new BoolTreeType(false));    
+        maskTree = typename BoolTreeType::Ptr(new BoolTreeType(false));
         maskTree->topologyUnion(indexGrid->tree());
         openvdb::tree::LeafManager<BoolTreeType> maskLeafs(*maskTree);
 
@@ -1000,9 +1001,10 @@ SOP_OpenVDB_Convert::referenceMeshing(
     }
 
     // Sharpen Features
-    if (!boss.wasInterrupted() && sharpenFeatures) { 
+    if (!boss.wasInterrupted() && sharpenFeatures) {
         UTparallelFor(GA_SplittableRange(gdp->getPointRange()),
-            hvdb::SharpenFeaturesOp(*gdp, *refGeo, edgeData, *transform, surfaceGroup, maskTree.get()));
+            hvdb::SharpenFeaturesOp(*gdp, *refGeo, edgeData, *transform,
+                surfaceGroup, maskTree.get()));
     }
 
     // Compute vertex normals
@@ -1045,6 +1047,7 @@ SOP_OpenVDB_Convert::referenceMeshing(
     }
 }
 
+
 void
 SOP_OpenVDB_Convert::convertToPoly(
     fpreal time,
@@ -1069,7 +1072,7 @@ SOP_OpenVDB_Convert::convertToPoly(
 
     openvdb::tools::VolumeToMesh mesher(iso, adaptivity);
 
-    // Slicing options    
+    // Slicing options
     mesher.partition(evalInt("automaticpartitions", 0, time), evalInt("activepart", 0, time) - 1);
 
     // Check mask input
@@ -1172,8 +1175,6 @@ SOP_OpenVDB_Convert::convertToPoly(
         // Mesh using a reference surface
         if (!grids.empty() && !boss.wasInterrupted()) {
 
-            
-
             if (grids.front()->isType<openvdb::FloatGrid>()) {
                 referenceMeshing<openvdb::FloatGrid>(
                     grids, vdbs, delGroup, mesher, refGeo, computeNormals, boss, time);
@@ -1212,9 +1213,9 @@ SOP_OpenVDB_Convert::convertToPoly(
 
         }
 
-	// Delete old VDB primitives
-	if (error() < UT_ERROR_ABORT)
-	    gdp->destroyPrimitives(gdp->getPrimitiveRange(delGroup), /*and_points*/true);
+        // Delete old VDB primitives
+        if (error() < UT_ERROR_ABORT)
+            gdp->destroyPrimitives(gdp->getPrimitiveRange(delGroup), /*and_points*/true);
 
         if (!boss.wasInterrupted() && computeNormals) {
             UTparallelFor(GA_SplittableRange(gdp->getPrimitiveRange()),

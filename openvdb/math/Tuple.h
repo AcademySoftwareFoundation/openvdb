@@ -51,7 +51,8 @@ class Tuple {
 public:
     typedef T value_type;
     typedef T ValueType;
-    enum SIZE_ { size = SIZE };
+
+    static const int size = SIZE;
 
     /// Default ctor.  Does nothing.  Required because declaring a copy (or
     /// other) constructor means the default constructor gets left out.

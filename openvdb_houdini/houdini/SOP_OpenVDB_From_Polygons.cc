@@ -254,16 +254,6 @@ private:
 namespace
 {
 
-#if 0
-std::string
-int2str(const int nr)
-{
-    std::stringstream ss;
-    ss << nr;
-    return ss.str();
-}
-#endif
-
 // Callback to convert from voxel to world space units
 int
 convertUnitsCB(void* data, int /*idx*/, float /*time*/, const PRM_Template*)
@@ -571,7 +561,7 @@ SOP_OpenVDB_From_Polygons::updateParmsFlags()
     // Output
     changed |= enableParm("distanceFieldGridName", bool(evalInt("distanceField", 0, time)));
     changed |= enableParm("fogVolumeGridName",
-	bool(evalInt("fogVolume", 0, time)) && !unsignedDist);
+        bool(evalInt("fogVolume", 0, time)) && !unsignedDist);
     changed |= enableParm("fogVolume", !unsignedDist);
 
     // enable / diable vector type menu
