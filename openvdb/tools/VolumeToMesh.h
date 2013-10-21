@@ -2449,7 +2449,7 @@ private:
 template<typename SignAccT, typename IdxAccT, typename PrimBuilder>
 inline void
 constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord& ijk,
-    const SignAccT& signAcc, const IdxAccT& idxAcc, PrimBuilder& mesher, size_t pointListSize)
+    const SignAccT& signAcc, const IdxAccT& idxAcc, PrimBuilder& mesher, Index32 pointListSize)
 {
     char tag[2];
     tag[0] = (flags & SEAM) ? POLYFLAG_FRACTURE_SEAM : 0;
@@ -2460,7 +2460,7 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord
     Coord coord;
     openvdb::Vec4I quad;
     unsigned char cell;
-    int tmpIdx = 0;
+    Index32 tmpIdx = 0;
 
     if (flags & XEDGE) {
 
@@ -2470,7 +2470,7 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord
 
         cell = SIGNS & signAcc.getValue(coord);
         if (sEdgeGroupTable[cell][0] > 1) {
-            tmpIdx = quad[1] + (sEdgeGroupTable[cell][5] - 1);
+            tmpIdx = quad[1] + Index32(sEdgeGroupTable[cell][5] - 1);
             if (tmpIdx < pointListSize) quad[1] = tmpIdx;
         }
 
@@ -2479,7 +2479,7 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord
 
         cell = SIGNS & signAcc.getValue(coord);
         if (sEdgeGroupTable[cell][0] > 1) {
-            tmpIdx = quad[2] + (sEdgeGroupTable[cell][7] - 1);
+            tmpIdx = quad[2] + Index32(sEdgeGroupTable[cell][7] - 1);
             if (tmpIdx < pointListSize) quad[2] = tmpIdx;
         }
 
@@ -2488,7 +2488,7 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord
 
         cell = SIGNS & signAcc.getValue(coord);
         if (sEdgeGroupTable[cell][0] > 1) {
-            tmpIdx = quad[3] + (sEdgeGroupTable[cell][3] - 1);
+            tmpIdx = quad[3] + Index32(sEdgeGroupTable[cell][3] - 1);
             if (tmpIdx < pointListSize) quad[3] = tmpIdx;
         }
 
@@ -2504,7 +2504,7 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord
 
         cell = SIGNS & signAcc.getValue(coord);
         if (sEdgeGroupTable[cell][0] > 1) {
-            tmpIdx = quad[1] + (sEdgeGroupTable[cell][12] - 1);
+            tmpIdx = quad[1] + Index32(sEdgeGroupTable[cell][12] - 1);
             if (tmpIdx < pointListSize) quad[1] = tmpIdx;
         }
 
@@ -2513,7 +2513,7 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord
 
         cell = SIGNS & signAcc.getValue(coord);
         if (sEdgeGroupTable[cell][0] > 1) {
-            tmpIdx = quad[2] + (sEdgeGroupTable[cell][11] - 1);
+            tmpIdx = quad[2] + Index32(sEdgeGroupTable[cell][11] - 1);
             if (tmpIdx < pointListSize) quad[2] = tmpIdx;
         }
 
@@ -2522,7 +2522,7 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord
 
         cell = SIGNS & signAcc.getValue(coord);
         if (sEdgeGroupTable[cell][0] > 1) {
-            tmpIdx = quad[3] + (sEdgeGroupTable[cell][10] - 1);
+            tmpIdx = quad[3] + Index32(sEdgeGroupTable[cell][10] - 1);
             if (tmpIdx < pointListSize) quad[3] = tmpIdx;
         }
 
@@ -2538,7 +2538,7 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord
 
         cell = SIGNS & signAcc.getValue(coord);
         if (sEdgeGroupTable[cell][0] > 1) {
-            tmpIdx = quad[1] + (sEdgeGroupTable[cell][8] - 1);
+            tmpIdx = quad[1] + Index32(sEdgeGroupTable[cell][8] - 1);
             if (tmpIdx < pointListSize) quad[1] = tmpIdx;
         }
 
@@ -2547,7 +2547,7 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord
 
         cell = SIGNS & signAcc.getValue(coord);
         if (sEdgeGroupTable[cell][0] > 1) {
-            tmpIdx = quad[2] + (sEdgeGroupTable[cell][6] - 1);
+            tmpIdx = quad[2] + Index32(sEdgeGroupTable[cell][6] - 1);
             if (tmpIdx < pointListSize) quad[2] = tmpIdx;
         }
 
@@ -2556,7 +2556,7 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord
 
         cell = SIGNS & signAcc.getValue(coord);
         if (sEdgeGroupTable[cell][0] > 1) {
-            tmpIdx = quad[3] + (sEdgeGroupTable[cell][2] - 1);
+            tmpIdx = quad[3] + Index32(sEdgeGroupTable[cell][2] - 1);
             if (tmpIdx < pointListSize) quad[3] = tmpIdx;
         }
 
@@ -2582,7 +2582,7 @@ public:
 
 
     GenPolygons(const LeafManagerT& signLeafs, const Int16TreeT& signTree,
-        const IntTreeT& idxTree, PolygonPoolList& polygons, size_t pointListSize);
+        const IntTreeT& idxTree, PolygonPoolList& polygons, Index32 pointListSize);
 
     void run(bool threaded = true);
 
@@ -2599,7 +2599,7 @@ private:
     const Int16TreeT& mSignTree;
     const IntTreeT& mIdxTree;
     const PolygonPoolList& mPolygonPoolList;
-    const size_t mPointListSize;
+    const Index32 mPointListSize;
 
     const Int16TreeT *mRefSignTree;
  };
@@ -2608,7 +2608,7 @@ private:
 template<typename LeafManagerT, typename PrimBuilder>
 GenPolygons<LeafManagerT, PrimBuilder>::GenPolygons(const LeafManagerT& signLeafs,
     const Int16TreeT& signTree, const IntTreeT& idxTree, PolygonPoolList& polygons,
-    size_t pointListSize)
+    Index32 pointListSize)
     : mSignLeafs(signLeafs)
     , mSignTree(signTree)
     , mIdxTree(idxTree)
@@ -4275,7 +4275,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
     if (adaptive) {
 
         internal::GenPolygons<Int16LeafManagerT, internal::AdaptivePrimBuilder>
-            mesher(signLeafs, *signTreePt, *idxTreePt, mPolygons, mPointListSize);
+            mesher(signLeafs, *signTreePt, *idxTreePt, mPolygons, Index32(mPointListSize));
 
         mesher.setRefSignTree(refSignTreePt);
         mesher.run();
@@ -4283,7 +4283,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
     } else {
 
         internal::GenPolygons<Int16LeafManagerT, internal::UniformPrimBuilder>
-            mesher(signLeafs, *signTreePt, *idxTreePt, mPolygons, mPointListSize);
+            mesher(signLeafs, *signTreePt, *idxTreePt, mPolygons, Index32(mPointListSize));
 
         mesher.setRefSignTree(refSignTreePt);
         mesher.run();
