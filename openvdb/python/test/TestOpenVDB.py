@@ -108,6 +108,11 @@ class TestOpenVDB(unittest.TestCase):
         worldp = map(lambda x: int(round(x * 1000000)), worldp)
         self.assertEqual(worldp, [-110000, -110000, 2500000])
 
+        grid = openvdb.FloatGrid()
+        self.assertEqual(grid.transform, openvdb.createLinearTransform())
+        grid.transform = openvdb.createLinearTransform(2.0)
+        self.assertEqual(grid.transform, openvdb.createLinearTransform(2.0))
+
 
     def testGridCopy(self):
         grid = openvdb.FloatGrid()
@@ -158,15 +163,15 @@ class TestOpenVDB(unittest.TestCase):
     def testGridMetadata(self):
         grid = openvdb.BoolGrid()
 
-        self.assertEqual(grid.getMetadata(), {})
+        self.assertEqual(grid.metadata, {})
 
         meta = { 'name': 'test', 'saveFloatAsHalf': True, 'xyz': (-1, 0, 1) }
-        grid.setMetadata(meta)
-        self.assertEqual(grid.getMetadata(), meta)
+        grid.metadata = meta
+        self.assertEqual(grid.metadata, meta)
 
         meta['xyz'] = (-100, 100, 0)
         grid.updateMetadata(meta)
-        self.assertEqual(grid.getMetadata(), meta)
+        self.assertEqual(grid.metadata, meta)
 
         self.assertEqual(set(grid.iterkeys()), set(meta.iterkeys()))
 
@@ -280,22 +285,22 @@ class TestOpenVDB(unittest.TestCase):
             self.assertRaises(AttributeError, lambda: setattr(value, 'count', 1))
 
 
-    def testGridApply(self):
+    def testMap(self):
         grid = openvdb.BoolGrid()
         grid.fill((-4, -4, -4), (5, 5, 5), grid.zeroValue) # make active
-        grid.applyOn(lambda x: not x) # replace active False values with True
+        grid.mapOn(lambda x: not x) # replace active False values with True
         n = sum(item.value for item in grid.iterOnValues())
         self.assertEqual(n, 10 * 10 * 10)
 
         grid = openvdb.FloatGrid()
         grid.fill((-4, -4, -4), (5, 5, 5), grid.oneValue)
-        grid.applyOn(lambda x: x * 2)
+        grid.mapOn(lambda x: x * 2)
         n = sum(item.value for item in grid.iterOnValues())
         self.assertEqual(n, 10 * 10 * 10 * 2)
 
         grid = openvdb.Vec3SGrid()
         grid.fill((-4, -4, -4), (5, 5, 5), grid.zeroValue)
-        grid.applyOn(lambda x: (0, 1, 0))
+        grid.mapOn(lambda x: (0, 1, 0))
         n = sum(item.value[1] for item in grid.iterOnValues())
         self.assertEqual(n, 10 * 10 * 10)
 
@@ -416,7 +421,7 @@ class TestOpenVDB(unittest.TestCase):
             grid = factory()
             # Add some metadata to the grid.
             meta = { 'name': 'test', 'saveFloatAsHalf': True, 'xyz': (-1, 0, 1) }
-            grid.setMetadata(meta)
+            grid.metadata = meta
             # Add some voxel data to the grid.
             active = True
             for width in range(63, 0, -10):
@@ -429,7 +434,7 @@ class TestOpenVDB(unittest.TestCase):
             restoredGrid = pickle.loads(s)
 
             # Verify that the original and unpickled grids' metadata are equal.
-            self.assertEqual(restoredGrid.getMetadata(), meta)
+            self.assertEqual(restoredGrid.metadata, meta)
 
             # Verify that the original and unpickled grids have the same active values.
             for restored, original in zip(restoredGrid.iterOnValues(), grid.iterOnValues()):

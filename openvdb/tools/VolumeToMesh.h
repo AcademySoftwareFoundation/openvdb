@@ -1750,6 +1750,8 @@ GenPoints<TreeT, LeafManagerT>::operator()(
         size_t ptnIdx = mIndices[n];
         coord.offset(TreeT::LeafNodeType::DIM - 1);
 
+        
+
         for (iter = idxLeafPt->beginValueOn(); iter; ++iter) {
 
             if(iter.getValue() != 0) continue;
@@ -2444,6 +2446,125 @@ private:
 };
 
 
+template<typename SignAccT, typename IdxAccT, typename PrimBuilder>
+inline void
+constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord& ijk,
+    const SignAccT& signAcc, const IdxAccT& idxAcc, PrimBuilder& mesher, size_t pointListSize)
+{
+    char tag[2];
+    tag[0] = (flags & SEAM) ? POLYFLAG_FRACTURE_SEAM : 0;
+    tag[1] = tag[0] | char(POLYFLAG_EXTERIOR);
+
+    const bool isInside = flags & INSIDE;
+    const int v0 = idxAcc.getValue(ijk);
+    Coord coord;
+    openvdb::Vec4I quad;
+    unsigned char cell;
+    int tmpIdx = 0;
+
+    if (flags & XEDGE) {
+
+        quad[0] = v0 + offsets[0];
+        coord[0] = ijk[0]; coord[1] = ijk[1]-1; coord[2] = ijk[2]; // i, j-1, k
+        quad[1] = idxAcc.getValue(coord);
+
+        cell = SIGNS & signAcc.getValue(coord);
+        if (sEdgeGroupTable[cell][0] > 1) {
+            tmpIdx = quad[1] + (sEdgeGroupTable[cell][5] - 1);
+            if (tmpIdx < pointListSize) quad[1] = tmpIdx;
+        }
+
+        coord[2] -= 1; // i, j-1, k-1
+        quad[2] = idxAcc.getValue(coord);
+
+        cell = SIGNS & signAcc.getValue(coord);
+        if (sEdgeGroupTable[cell][0] > 1) {
+            tmpIdx = quad[2] + (sEdgeGroupTable[cell][7] - 1);
+            if (tmpIdx < pointListSize) quad[2] = tmpIdx;
+        }
+
+        coord[1] = ijk[1]; // i, j, k-1
+        quad[3] = idxAcc.getValue(coord);
+
+        cell = SIGNS & signAcc.getValue(coord);
+        if (sEdgeGroupTable[cell][0] > 1) {
+            tmpIdx = quad[3] + (sEdgeGroupTable[cell][3] - 1);
+            if (tmpIdx < pointListSize) quad[3] = tmpIdx;
+        }
+
+        mesher.addPrim(quad, isInside, tag[bool(refFlags & XEDGE)]);
+    }
+
+
+    if (flags & YEDGE) {
+
+        quad[0] = v0 + offsets[1];
+        coord[0] = ijk[0]; coord[1] = ijk[1]; coord[2] = ijk[2]-1; // i, j, k-1
+        quad[1] = idxAcc.getValue(coord);
+
+        cell = SIGNS & signAcc.getValue(coord);
+        if (sEdgeGroupTable[cell][0] > 1) {
+            tmpIdx = quad[1] + (sEdgeGroupTable[cell][12] - 1);
+            if (tmpIdx < pointListSize) quad[1] = tmpIdx;
+        }
+
+        coord[0] -= 1; // i-1, j, k-1
+        quad[2] = idxAcc.getValue(coord);
+
+        cell = SIGNS & signAcc.getValue(coord);
+        if (sEdgeGroupTable[cell][0] > 1) {
+            tmpIdx = quad[2] + (sEdgeGroupTable[cell][11] - 1);
+            if (tmpIdx < pointListSize) quad[2] = tmpIdx;
+        }
+
+        coord[2] = ijk[2]; // i-1, j, k
+        quad[3] = idxAcc.getValue(coord);
+
+        cell = SIGNS & signAcc.getValue(coord);
+        if (sEdgeGroupTable[cell][0] > 1) {
+            tmpIdx = quad[3] + (sEdgeGroupTable[cell][10] - 1);
+            if (tmpIdx < pointListSize) quad[3] = tmpIdx;
+        }
+
+        mesher.addPrim(quad, isInside, tag[bool(refFlags & YEDGE)]);
+    }
+
+
+    if (flags & ZEDGE) {
+
+        quad[0] = v0 + offsets[2];
+        coord[0] = ijk[0]; coord[1] = ijk[1]-1; coord[2] = ijk[2]; // i, j-1, k
+        quad[1] = idxAcc.getValue(coord);
+
+        cell = SIGNS & signAcc.getValue(coord);
+        if (sEdgeGroupTable[cell][0] > 1) {
+            tmpIdx = quad[1] + (sEdgeGroupTable[cell][8] - 1);
+            if (tmpIdx < pointListSize) quad[1] = tmpIdx;
+        }
+
+        coord[0] -= 1; // i-1, j-1, k
+        quad[2] = idxAcc.getValue(coord);
+
+        cell = SIGNS & signAcc.getValue(coord);
+        if (sEdgeGroupTable[cell][0] > 1) {
+            tmpIdx = quad[2] + (sEdgeGroupTable[cell][6] - 1);
+            if (tmpIdx < pointListSize) quad[2] = tmpIdx;
+        }
+
+        coord[1] = ijk[1]; // i-1, j, k
+        quad[3] = idxAcc.getValue(coord);
+
+        cell = SIGNS & signAcc.getValue(coord);
+        if (sEdgeGroupTable[cell][0] > 1) {
+            tmpIdx = quad[3] + (sEdgeGroupTable[cell][2] - 1);
+            if (tmpIdx < pointListSize) quad[3] = tmpIdx;
+        }
+
+        mesher.addPrim(quad, !isInside, tag[bool(refFlags & ZEDGE)]);
+    }
+}
+
+
 ////////////////////////////////////////
 
 
@@ -2461,7 +2582,7 @@ public:
 
 
     GenPolygons(const LeafManagerT& signLeafs, const Int16TreeT& signTree,
-        const IntTreeT& idxTree, PolygonPoolList& polygons);
+        const IntTreeT& idxTree, PolygonPoolList& polygons, size_t pointListSize);
 
     void run(bool threaded = true);
 
@@ -2478,6 +2599,7 @@ private:
     const Int16TreeT& mSignTree;
     const IntTreeT& mIdxTree;
     const PolygonPoolList& mPolygonPoolList;
+    const size_t mPointListSize;
 
     const Int16TreeT *mRefSignTree;
  };
@@ -2485,11 +2607,13 @@ private:
 
 template<typename LeafManagerT, typename PrimBuilder>
 GenPolygons<LeafManagerT, PrimBuilder>::GenPolygons(const LeafManagerT& signLeafs,
-    const Int16TreeT& signTree, const IntTreeT& idxTree, PolygonPoolList& polygons)
+    const Int16TreeT& signTree, const IntTreeT& idxTree, PolygonPoolList& polygons,
+    size_t pointListSize)
     : mSignLeafs(signLeafs)
     , mSignTree(signTree)
     , mIdxTree(idxTree)
     , mPolygonPoolList(polygons)
+    , mPointListSize(pointListSize)
     , mRefSignTree(NULL)
 {
 }
@@ -2501,119 +2625,6 @@ GenPolygons<LeafManagerT, PrimBuilder>::run(bool threaded)
     if (threaded) tbb::parallel_for(mSignLeafs.getRange(), *this);
     else (*this)(mSignLeafs.getRange());
 }
-
-template<typename SignAccT, typename IdxAccT, typename PrimBuilder>
-inline void
-constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord& ijk,
-    const SignAccT& signAcc, const IdxAccT& idxAcc, PrimBuilder& mesher)
-{
-    char tag[2];
-    tag[0] = (flags & SEAM) ? POLYFLAG_FRACTURE_SEAM : 0;
-    tag[1] = tag[0] | char(POLYFLAG_EXTERIOR);
-
-    const bool isInside = flags & INSIDE;
-    const int v0 = idxAcc.getValue(ijk);
-    Coord coord;
-    openvdb::Vec4I quad;
-    unsigned char cell;
-
-    if (flags & XEDGE) {
-
-
-        quad[0] = v0 + offsets[0];
-
-        coord[0] = ijk[0]; coord[1] = ijk[1]-1; coord[2] = ijk[2]; // i, j-1, k
-        quad[1] = idxAcc.getValue(coord);
-
-        cell = SIGNS & signAcc.getValue(coord);
-        if (sEdgeGroupTable[cell][0] > 1) {
-            quad[1] += (sEdgeGroupTable[cell][5] - 1);
-        }
-
-        coord[2] -= 1; // i, j-1, k-1
-        quad[2] = idxAcc.getValue(coord);
-
-        cell = SIGNS & signAcc.getValue(coord);
-        if (sEdgeGroupTable[cell][0] > 1) {
-            quad[2] += (sEdgeGroupTable[cell][7] - 1);
-        }
-
-
-        coord[1] = ijk[1]; // i, j, k-1
-        quad[3] = idxAcc.getValue(coord);
-
-        cell = SIGNS & signAcc.getValue(coord);
-        if (sEdgeGroupTable[cell][0] > 1) {
-            quad[3] += (sEdgeGroupTable[cell][3] - 1);
-        }
-
-        mesher.addPrim(quad, isInside, tag[bool(refFlags & XEDGE)]);
-
-    }
-
-
-    if (flags & YEDGE) {
-
-        quad[0] = v0 + offsets[1];
-        coord[0] = ijk[0]; coord[1] = ijk[1]; coord[2] = ijk[2]-1; // i, j, k-1
-        quad[1] = idxAcc.getValue(coord);
-
-        cell = SIGNS & signAcc.getValue(coord);
-        if (sEdgeGroupTable[cell][0] > 1) {
-            quad[1] += (sEdgeGroupTable[cell][12] - 1);
-        }
-
-        coord[0] -= 1; // i-1, j, k-1
-        quad[2] = idxAcc.getValue(coord);
-
-        cell = SIGNS & signAcc.getValue(coord);
-        if (sEdgeGroupTable[cell][0] > 1) {
-            quad[2] += (sEdgeGroupTable[cell][11] - 1);
-        }
-
-        coord[2] = ijk[2]; // i-1, j, k
-        quad[3] = idxAcc.getValue(coord);
-
-        cell = SIGNS & signAcc.getValue(coord);
-        if (sEdgeGroupTable[cell][0] > 1) {
-            quad[3] += (sEdgeGroupTable[cell][10] - 1);
-        }
-
-        mesher.addPrim(quad, isInside, tag[bool(refFlags & YEDGE)]);
-    }
-
-    if (flags & ZEDGE) {
-
-        quad[0] = v0 + offsets[2];
-        coord[0] = ijk[0]; coord[1] = ijk[1]-1; coord[2] = ijk[2]; // i, j-1, k
-        quad[1] = idxAcc.getValue(coord);
-
-        cell = SIGNS & signAcc.getValue(coord);
-        if (sEdgeGroupTable[cell][0] > 1) {
-            quad[1] += (sEdgeGroupTable[cell][8] - 1);
-        }
-
-        coord[0] -= 1; // i-1, j-1, k
-        quad[2] = idxAcc.getValue(coord);
-
-
-        cell = SIGNS & signAcc.getValue(coord);
-        if (sEdgeGroupTable[cell][0] > 1) {
-            quad[2] += (sEdgeGroupTable[cell][6] - 1);
-        }
-
-        coord[1] = ijk[1]; // i-1, j, k
-        quad[3] = idxAcc.getValue(coord);
-
-        cell = SIGNS & signAcc.getValue(coord);
-        if (sEdgeGroupTable[cell][0] > 1) {
-            quad[3] += (sEdgeGroupTable[cell][2] - 1);
-        }
-
-        mesher.addPrim(quad, !isInside, tag[bool(refFlags & ZEDGE)]);
-    }
-}
-
 
 template<typename LeafManagerT, typename PrimBuilder>
 void
@@ -2689,9 +2700,9 @@ GenPolygons<LeafManagerT, PrimBuilder>::operator()(
             }
 
             if (ijk[0] > origin[0] && ijk[1] > origin[1] && ijk[2] > origin[2]) {
-                constructPolygons(flags, refFlags, offsets, ijk, *signleafPt, *idxLeafPt, mesher);
+                constructPolygons(flags, refFlags, offsets, ijk, *signleafPt, *idxLeafPt, mesher, mPointListSize);
             } else {
-                constructPolygons(flags, refFlags, offsets, ijk, signAcc, idxAcc, mesher);
+                constructPolygons(flags, refFlags, offsets, ijk, signAcc, idxAcc, mesher, mPointListSize);
             }
         }
 
@@ -4264,7 +4275,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
     if (adaptive) {
 
         internal::GenPolygons<Int16LeafManagerT, internal::AdaptivePrimBuilder>
-            mesher(signLeafs, *signTreePt, *idxTreePt, mPolygons);
+            mesher(signLeafs, *signTreePt, *idxTreePt, mPolygons, mPointListSize);
 
         mesher.setRefSignTree(refSignTreePt);
         mesher.run();
@@ -4272,11 +4283,12 @@ VolumeToMesh::operator()(const GridT& distGrid)
     } else {
 
         internal::GenPolygons<Int16LeafManagerT, internal::UniformPrimBuilder>
-            mesher(signLeafs, *signTreePt, *idxTreePt, mPolygons);
+            mesher(signLeafs, *signTreePt, *idxTreePt, mPolygons, mPointListSize);
 
         mesher.setRefSignTree(refSignTreePt);
         mesher.run();
     }
+
 
     // Clean up unused points, only necessary if masking and/or
     // automatic mesh partitioning is enabled.
@@ -4316,7 +4328,6 @@ VolumeToMesh::operator()(const GridT& distGrid)
     // Subdivide nonplanar quads near the seamline edges
     // todo: thread and clean up
     if (refSignTreePt || refIdxTreePt || refDistTreePt) {
-
         std::vector<Vec3s> newPoints;
 
         for (size_t n = 0; n <  mPolygonPoolListSize; ++n) {

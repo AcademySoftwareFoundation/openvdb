@@ -106,8 +106,8 @@ getGridFromPyObject(const boost::python::object& gridObj)
 #endif
 #undef CONVERT_GRID_TO_BASE
 
-    const std::string objType = py::extract<std::string>(gridObj.attr("type")());
-    OPENVDB_THROW(TypeError, objType + " is not a supported OpenVDB grid type");
+    OPENVDB_THROW(TypeError,
+        pyutil::className(gridObj) + " is not a supported OpenVDB grid type");
 }
 
 
@@ -254,18 +254,115 @@ notEmpty(const GridType& grid)
 
 template<typename GridType>
 inline typename GridType::ValueType
-getBackground(const GridType& grid)
+getGridBackground(const GridType& grid)
 {
     return grid.background();
 }
 
 
+template<typename GridType>
+inline void
+setGridBackground(GridType& grid, py::object obj)
+{
+    grid.setBackground(extractValueArg<GridType>(obj, "setBackground"));
+}
+
+
+inline void
+setGridName(GridBase::Ptr grid, py::object strObj)
+{
+    if (grid) {
+        if (!strObj) { // if name is None
+            grid->removeMeta(GridBase::META_GRID_NAME);
+        } else {
+            const std::string name = pyutil::extractArg<std::string>(
+                strObj, "setName", /*className=*/NULL, /*argIdx=*/1, "str");
+            grid->setName(name);
+        }
+    }
+}
+
+
+inline void
+setGridCreator(GridBase::Ptr grid, py::object strObj)
+{
+    if (grid) {
+        if (!strObj) { // if name is None
+            grid->removeMeta(GridBase::META_GRID_CREATOR);
+        } else {
+            const std::string name = pyutil::extractArg<std::string>(
+                strObj, "setCreator", /*className=*/NULL, /*argIdx=*/1, "str");
+            grid->setCreator(name);
+        }
+    }
+}
+
+
 inline std::string
-gridInfo(GridBase::Ptr grid, int verbosity)
+getGridClass(GridBase::ConstPtr grid)
+{
+    return GridBase::gridClassToString(grid->getGridClass());
+}
+
+
+inline void
+setGridClass(GridBase::Ptr grid, py::object strObj)
+{
+    if (!strObj) {
+        grid->clearGridClass();
+    } else {
+        const std::string name = pyutil::extractArg<std::string>(
+            strObj, "setGridClass", /*className=*/NULL, /*argIdx=*/1, "str");
+        grid->setGridClass(GridBase::stringToGridClass(name));
+    }
+}
+
+
+inline std::string
+getVecType(GridBase::ConstPtr grid)
+{
+    return GridBase::vecTypeToString(grid->getVectorType());
+}
+
+
+inline void
+setVecType(GridBase::Ptr grid, py::object strObj)
+{
+    if (!strObj) {
+        grid->clearVectorType();
+    } else {
+        const std::string name = pyutil::extractArg<std::string>(
+            strObj, "setVectorType", /*className=*/NULL, /*argIdx=*/1, "str");
+        grid->setVectorType(GridBase::stringToVecType(name));
+    }
+}
+
+
+inline std::string
+gridInfo(GridBase::ConstPtr grid, int verbosity)
 {
     std::ostringstream ostr;
     grid->print(ostr, std::max<int>(1, verbosity));
     return ostr.str();
+}
+
+
+////////////////////////////////////////
+
+
+inline void
+setGridTransform(GridBase::Ptr grid, py::object xformObj)
+{
+    if (grid) {
+        if (math::Transform::Ptr xform = pyutil::extractArg<math::Transform::Ptr>(
+            xformObj, "setTransform", /*className=*/NULL, /*argIdx=*/1, "Transform"))
+        {
+            grid->setTransform(xform);
+        } else {
+            PyErr_SetString(PyExc_ValueError, "null transform");
+            py::throw_error_already_set();
+        }
+    }
 }
 
 
@@ -491,9 +588,12 @@ getMetadataKeys(GridBase::ConstPtr grid)
 
 
 inline py::object
-getMetadata(GridBase::ConstPtr grid, const std::string& name)
+getMetadata(GridBase::ConstPtr grid, py::object nameObj)
 {
     if (!grid) return py::object();
+
+    const std::string name = pyutil::extractArg<std::string>(
+        nameObj, "__getitem__", NULL, /*argIdx=*/1, "str");
 
     Metadata::ConstPtr metadata = (*grid)[name];
     if (!metadata) {
@@ -512,9 +612,12 @@ getMetadata(GridBase::ConstPtr grid, const std::string& name)
 
 
 inline void
-setMetadata(GridBase::Ptr grid, const std::string& name, py::object valueObj)
+setMetadata(GridBase::Ptr grid, py::object nameObj, py::object valueObj)
 {
     if (!grid) return;
+
+    const std::string name = pyutil::extractArg<std::string>(
+        nameObj, "__setitem__", NULL, /*argIdx=*/1, "str");
 
     // Insert the Python object into a Python dict, then use the dict-to-MetaMap
     // converter (see pyOpenVDBModule.cc) to convert the dict to a MetaMap
@@ -892,7 +995,7 @@ copyToArray(GridType& grid, py::object arrayObj, py::object coordObj)
 
 template<typename GridType, typename IterType>
 inline void
-apply(const char* methodName, GridType& grid, py::object funcObj)
+applyMap(const char* methodName, GridType& grid, py::object funcObj)
 {
     typedef typename GridType::ValueType ValueT;
 
@@ -903,14 +1006,12 @@ apply(const char* methodName, GridType& grid, py::object funcObj)
         // Verify that the result is of type GridType::ValueType.
         py::extract<ValueT> val(result);
         if (!val.check()) {
-            const std::string resultType =
-                py::extract<std::string>(result.attr("__class__").attr("__name__"));
             PyErr_Format(PyExc_TypeError,
                 "expected callable argument to %s.%s() to return %s, found %s",
                 pyutil::GridTraits<GridType>::name(),
                 methodName,
                 openvdb::typeNameAsString<ValueT>(),
-                resultType.c_str());
+                pyutil::className(result).c_str());
             py::throw_error_already_set();
         }
 
@@ -921,25 +1022,25 @@ apply(const char* methodName, GridType& grid, py::object funcObj)
 
 template<typename GridType>
 inline void
-applyOn(GridType& grid, py::object funcObj)
+mapOn(GridType& grid, py::object funcObj)
 {
-    apply<GridType, typename GridType::ValueOnIter>("applyOn", grid, funcObj);
+    applyMap<GridType, typename GridType::ValueOnIter>("mapOn", grid, funcObj);
 }
 
 
 template<typename GridType>
 inline void
-applyOff(GridType& grid, py::object funcObj)
+mapOff(GridType& grid, py::object funcObj)
 {
-    apply<GridType, typename GridType::ValueOffIter>("applyOff", grid, funcObj);
+    applyMap<GridType, typename GridType::ValueOffIter>("mapOff", grid, funcObj);
 }
 
 
 template<typename GridType>
 inline void
-applyAll(GridType& grid, py::object funcObj)
+mapAll(GridType& grid, py::object funcObj)
 {
-    apply<GridType, typename GridType::ValueAllIter>("applyAll", grid, funcObj);
+    applyMap<GridType, typename GridType::ValueAllIter>("mapAll", grid, funcObj);
 }
 
 
@@ -959,13 +1060,11 @@ struct TreeCombineOp
 
         py::extract<ValueT> val(resultObj);
         if (!val.check()) {
-            const std::string resultType =
-                py::extract<std::string>(resultObj.attr("__class__").attr("__name__"));
             PyErr_Format(PyExc_TypeError,
                 "expected callable argument to %s.combine() to return %s, found %s",
                 pyutil::GridTraits<GridType>::name(),
                 openvdb::typeNameAsString<ValueT>(),
-                resultType.c_str());
+                pyutil::className(resultObj).c_str());
             py::throw_error_already_set();
         }
 
@@ -1446,7 +1545,7 @@ struct PickleSuite: py::pickle_suite
 
         if (badState) {
             PyErr_SetObject(PyExc_ValueError,
-                ("expected (dict, str) tuple in call to __setstate__; got %s"
+                ("expected (dict, str) tuple in call to __setstate__; found %s"
                      % stateObj.attr("__repr__")()).ptr());
             py::throw_error_already_set();
         }
@@ -1488,7 +1587,7 @@ exportGrid()
     typedef typename GridType::ValueOffIter  ValueOffIterT;
     typedef typename GridType::ValueAllIter  ValueAllIterT;
 
-    math::Transform::ConstPtr (GridType::*getTransform)() const = &GridType::constTransformPtr;
+    math::Transform::Ptr (GridType::*getTransform)() = &GridType::transformPtr;
 
     const std::string pyGridTypeName = Traits::name();
     const std::string defaultCtorDescr = "Initialize with a background value of "
@@ -1533,30 +1632,40 @@ exportGrid()
                 /// @todo docstring = to "name of this grid's type"
 
             .add_property("background",
-                &pyGrid::getBackground<GridType>, &GridType::setBackground,
+                &pyGrid::getGridBackground<GridType>, &pyGrid::setGridBackground<GridType>,
                 "value of this grid's background voxels")
-            .add_property("name", &GridType::getName, &GridType::setName,
+            .add_property("name", &GridType::getName, &pyGrid::setGridName,
                 "this grid's name")
+            .add_property("creator", &GridType::getCreator, &pyGrid::setGridCreator,
+                "description of this grid's creator")
 
-            .add_property("transform", getTransform, &GridType::setTransform,
+            .add_property("transform", getTransform, &pyGrid::setGridTransform,
                 "transform associated with this grid")
 
+            .add_property("gridClass", &pyGrid::getGridClass, &pyGrid::setGridClass,
+                "the class of volumetric data (level set, fog volume, etc.)\nstored in this grid")
+
+            .add_property("vectorType", &pyGrid::getVecType, &pyGrid::setVecType,
+                "how transforms are applied to values stored in this grid")
+
             .def("getAccessor", &pyGrid::getAccessor<GridType>,
+                ("getAccessor() -> " + pyGridTypeName + "Accessor\n\n"
                 "Return an accessor that provides random read and write access\n"
-                "to this grid's voxels.")
+                "to this grid's voxels.").c_str())
             .def("getConstAccessor", &pyGrid::getConstAccessor<GridType>,
+                ("getConstAccessor() -> " + pyGridTypeName + "Accessor\n\n"
                 "Return an accessor that provides random read-only access\n"
-                "to this grid's voxels.")
+                "to this grid's voxels.").c_str())
 
             //
             // Metadata
             //
-            .def("getMetadata", &pyGrid::getAllMetadata,
-                "getMetadata() -> dict\n\n"
-                "Return a copy of this grid's metadata.")
-            .def("setMetadata", &pyGrid::replaceAllMetadata,
-                "setMetadata(dict)\n\n"
-                "Replace this grid's metadata.")
+            .add_property("metadata", &pyGrid::getAllMetadata, &pyGrid::replaceAllMetadata,
+                "dict of this grid's metadata\n\n"
+                "Setting this attribute replaces all of this grid's metadata,\n"
+                "but mutating it in place has no effect on the grid, since\n"
+                "the value of this attribute is a only a copy of the metadata.\n"
+                "Use either indexing or updateMetadata() to mutate metadata in place.")
             .def("updateMetadata", &pyGrid::updateMetadata,
                 "updateMetadata(dict)\n\n"
                 "Add metadata to this grid, replacing any existing items\n"
@@ -1587,11 +1696,11 @@ exportGrid()
                 "__contains__(name) -> bool\n\n"
                 "Return True if this grid contains metadata with the given name.")
             .def("__iter__", &pyGrid::getMetadataKeys,
-                "__iter__() -> list\n\n"
-                "Return this grid's metadata keys.")
+                "__iter__() -> iterator\n\n"
+                "Return an iterator over this grid's metadata keys.")
             .def("iterkeys", &pyGrid::getMetadataKeys,
-                "iterkeys() -> list\n\n"
-                "Return this grid's metadata keys.")
+                "iterkeys() -> iterator\n\n"
+                "Return an iterator over this grid's metadata keys.")
 
             .add_property("saveFloatAsHalf",
                 &GridType::saveFloatAsHalf, &GridType::setSaveFloatAsHalf,
@@ -1720,26 +1829,26 @@ exportGrid()
                 "corresponding voxels in the other grid that are active.\n\n"
                 "Note: this operation always empties the other grid.").c_str())
 
-            .def("applyOn", &pyGrid::applyOn<GridType>,
+            .def("mapOn", &pyGrid::mapOn<GridType>,
                 py::arg("function"),
-                "applyOn(function)\n\n"
+                "mapOn(function)\n\n"
                 "Iterate over all the active (\"on\") values (tile and voxel)\n"
                 "of this grid and replace each value with function(value).\n\n"
-                "Example: grid.applyOn(lambda x: x * 2 if x < 0.5 else x)")
+                "Example: grid.mapOn(lambda x: x * 2 if x < 0.5 else x)")
 
-            .def("applyOff", &pyGrid::applyOff<GridType>,
+            .def("mapOff", &pyGrid::mapOff<GridType>,
                 py::arg("function"),
-                "applyOff(function)\n\n"
+                "mapOff(function)\n\n"
                 "Iterate over all the inactive (\"off\") values (tile and voxel)\n"
                 "of this grid and replace each value with function(value).\n\n"
-                "Example: grid.applyOff(lambda x: x * 2 if x < 0.5 else x)")
+                "Example: grid.mapOff(lambda x: x * 2 if x < 0.5 else x)")
 
-            .def("applyAll", &pyGrid::applyAll<GridType>,
+            .def("mapAll", &pyGrid::mapAll<GridType>,
                 py::arg("function"),
-                "applyAll(function)\n\n"
+                "mapAll(function)\n\n"
                 "Iterate over all values (tile and voxel) of this grid\n"
                 "and replace each value with function(value).\n\n"
-                "Example: grid.applyAll(lambda x: x * 2 if x < 0.5 else x)")
+                "Example: grid.mapAll(lambda x: x * 2 if x < 0.5 else x)")
 
             .def("combine", &pyGrid::combine<GridType>,
                 (py::arg("grid"), py::arg("function")),

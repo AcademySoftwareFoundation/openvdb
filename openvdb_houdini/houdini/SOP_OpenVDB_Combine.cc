@@ -372,13 +372,13 @@ SOP_OpenVDB_Combine::cookMySop(OP_Context& context)
         // Iterate over A and, optionally, B grids.
         hvdb::VdbPrimIterator aIt(aGdp, GA_Range::safedeletions(), aGroup);
         hvdb::VdbPrimCIterator bIt(bGdp, bGroup);
-        for ( ; (!needA || aIt) && (!needB || bIt);
-            (needA ? ++aIt : aIt), ((needB && pairs) ? ++bIt : bIt))
+        for ( ; (!needA || aIt) && (!needB || bIt); ++aIt, ((needB && pairs) ? ++bIt : bIt))
         {
             if (progress.wasInterrupted()) {
                 throw std::runtime_error("was interrupted");
             }
 
+            // Note: even if needA is false, we still need to delete A grids.
             GU_PrimVDB* aVdb = aIt ? *aIt : NULL;
 
             const GU_PrimVDB* bVdb = bIt ? *bIt : NULL;
@@ -433,11 +433,12 @@ SOP_OpenVDB_Combine::cookMySop(OP_Context& context)
         // In flatten mode there should be a single A grid.
         if (flatten) ++aIt;
 
-        if ((needA && aIt) || (needB && bIt)) {
+        const bool unusedA = (needA && aIt), unusedB = (needB && bIt);
+        if (unusedA || unusedB) {
             std::ostringstream ostr;
             ostr << "some grids were not processed because there were more "
-                << (aIt ? "A" : "B") << " grids than "
-                << (aIt ? "B" : "A") << " grids";
+                << (unusedA ? "A" : "B") << " grids than "
+                << (unusedA ? "B" : "A") << " grids";
             addWarning(SOP_MESSAGE, ostr.str().c_str());
         }
 

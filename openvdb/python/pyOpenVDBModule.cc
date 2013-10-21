@@ -34,6 +34,7 @@
 #include <boost/python/stl_iterator.hpp>
 #include <boost/python/exception_translator.hpp>
 #include "openvdb/openvdb.h"
+#include "pyopenvdb.h"
 #include "pyutil.h"
 
 namespace py = boost::python;
@@ -50,6 +51,9 @@ openvdb::GridBase::Ptr getGridBaseFromGrid(py::object);
 
 
 namespace _openvdbmodule {
+
+using namespace openvdb;
+
 
 /// Helper class to convert between a Python numeric sequence
 /// (tuple, list, etc.) and an openvdb::Coord
@@ -203,10 +207,8 @@ struct VecConverter
 /// the various Metadata types.
 struct MetaMapConverter
 {
-    static PyObject* convert(const openvdb::MetaMap& metaMap)
+    static PyObject* convert(const MetaMap& metaMap)
     {
-        using namespace openvdb;
-
         py::dict ret;
         for (MetaMap::ConstMetaIterator it = metaMap.beginMeta();
             it != metaMap.endMeta(); ++it)
@@ -215,20 +217,17 @@ struct MetaMapConverter
                 py::object obj(meta);
                 const std::string typeName = meta->typeName();
                 if (typeName == StringMetadata::staticTypeName()) {
-                    obj = py::str(
-                        static_cast<StringMetadata&>(*meta).value());
+                    obj = py::str(static_cast<StringMetadata&>(*meta).value());
                 } else if (typeName == DoubleMetadata::staticTypeName()) {
-                    obj = py::object(
-                        static_cast<DoubleMetadata&>(*meta).value());
+                    obj = py::object(static_cast<DoubleMetadata&>(*meta).value());
                 } else if (typeName == FloatMetadata::staticTypeName()) {
-                    obj = py::object(
-                        static_cast<FloatMetadata&>(*meta).value());
+                    obj = py::object(static_cast<FloatMetadata&>(*meta).value());
                 } else if (typeName == Int32Metadata::staticTypeName()) {
-                    obj = py::object(
-                        static_cast<Int32Metadata&>(*meta).value());
+                    obj = py::object(static_cast<Int32Metadata&>(*meta).value());
                 } else if (typeName == Int64Metadata::staticTypeName()) {
-                    obj = py::object(
-                        static_cast<Int64Metadata&>(*meta).value());
+                    obj = py::object(static_cast<Int64Metadata&>(*meta).value());
+                } else if (typeName == BoolMetadata::staticTypeName()) {
+                    obj = py::object(static_cast<BoolMetadata&>(*meta).value());
                 } else if (typeName == Vec2DMetadata::staticTypeName()) {
                     const Vec2d v = static_cast<Vec2DMetadata&>(*meta).value();
                     obj = py::make_tuple(v[0], v[1]);
@@ -263,8 +262,6 @@ struct MetaMapConverter
     static void construct(PyObject* obj,
         py::converter::rvalue_from_python_stage1_data* data)
     {
-        using namespace openvdb;
-
         // Construct a MetaMap in the provided memory location.
         typedef py::converter::rvalue_from_python_storage<MetaMap> StorageT;
         void* storage = reinterpret_cast<StorageT*>(data)->storage.bytes;
@@ -283,10 +280,9 @@ struct MetaMapConverter
             } else {
                 const std::string
                     keyAsStr = py::extract<std::string>(key.attr("__str__")()),
-                    keyType = py::extract<std::string>(
-                        key.attr("__class__").attr("__name__"));
+                    keyType = pyutil::className(key);
                 PyErr_Format(PyExc_TypeError,
-                    "expected string as metadata name, got object"
+                    "expected string as metadata name, found object"
                     " \"%s\" of type %s", keyAsStr.c_str(), keyType.c_str());
                 py::throw_error_already_set();
             }
@@ -326,8 +322,7 @@ struct MetaMapConverter
             } else {
                 const std::string
                     valAsStr = py::extract<std::string>(val.attr("__str__")()),
-                    valType = py::extract<std::string>(
-                        val.attr("__class__").attr("__name__"));
+                    valType = pyutil::className(val);
                 PyErr_Format(PyExc_TypeError,
                     "metadata value \"%s\" of type %s is not allowed",
                     valAsStr.c_str(), valType.c_str());
@@ -339,11 +334,11 @@ struct MetaMapConverter
 
     static void registerConverter()
     {
-        py::to_python_converter<openvdb::MetaMap, MetaMapConverter>();
+        py::to_python_converter<MetaMap, MetaMapConverter>();
         py::converter::registry::push_back(
             &MetaMapConverter::convertible,
             &MetaMapConverter::construct,
-            py::type_id<openvdb::MetaMap>());
+            py::type_id<MetaMap>());
     }
 }; // struct MetaMapConverter
 
@@ -397,7 +392,7 @@ PYOPENVDB_CATCH(openvdb::ValueError,            PyExc_ValueError)
 py::object
 readFromFile(const std::string& filename, const std::string& gridName)
 {
-    openvdb::io::File vdbFile(filename);
+    io::File vdbFile(filename);
     vdbFile.open();
 
     if (!vdbFile.hasGrid(gridName)) {
@@ -414,15 +409,15 @@ readFromFile(const std::string& filename, const std::string& gridName)
 py::tuple
 readAllFromFile(const std::string& filename)
 {
-    openvdb::io::File vdbFile(filename);
+    io::File vdbFile(filename);
     vdbFile.open();
 
-    openvdb::GridPtrVecPtr grids = vdbFile.getGrids();
-    openvdb::MetaMap::Ptr metadata = vdbFile.getMetadata();
+    GridPtrVecPtr grids = vdbFile.getGrids();
+    MetaMap::Ptr metadata = vdbFile.getMetadata();
     vdbFile.close();
 
     py::list gridList;
-    for (openvdb::GridPtrVec::const_iterator it = grids->begin(); it != grids->end(); ++it) {
+    for (GridPtrVec::const_iterator it = grids->begin(); it != grids->end(); ++it) {
         gridList.append(pyGrid::getGridFromGridBase(*it));
     }
 
@@ -433,8 +428,6 @@ readAllFromFile(const std::string& filename)
 py::dict
 readFileMetadata(const std::string& filename)
 {
-    using namespace openvdb;
-
     io::File vdbFile(filename);
     vdbFile.open();
 
@@ -448,7 +441,7 @@ readFileMetadata(const std::string& filename)
 py::object
 readGridMetadataFromFile(const std::string& filename, const std::string& gridName)
 {
-    openvdb::io::File vdbFile(filename);
+    io::File vdbFile(filename);
     vdbFile.open();
 
     if (!vdbFile.hasGrid(gridName)) {
@@ -465,13 +458,13 @@ readGridMetadataFromFile(const std::string& filename, const std::string& gridNam
 py::list
 readAllGridMetadataFromFile(const std::string& filename)
 {
-    openvdb::io::File vdbFile(filename);
+    io::File vdbFile(filename);
     vdbFile.open();
-    openvdb::GridPtrVecPtr grids = vdbFile.readAllGridMetadata();
+    GridPtrVecPtr grids = vdbFile.readAllGridMetadata();
     vdbFile.close();
 
     py::list gridList;
-    for (openvdb::GridPtrVec::const_iterator it = grids->begin(); it != grids->end(); ++it) {
+    for (GridPtrVec::const_iterator it = grids->begin(); it != grids->end(); ++it) {
         gridList.append(pyGrid::getGridFromGridBase(*it));
     }
     return gridList;
@@ -479,14 +472,17 @@ readAllGridMetadataFromFile(const std::string& filename)
 
 
 void
-writeToFile(const std::string& filename, py::object gridSeq, py::object dictObj)
+writeToFile(const std::string& filename, py::object gridOrSeqObj, py::object dictObj)
 {
-    using namespace openvdb;
-
     GridPtrVec gridVec;
-    for (py::stl_input_iterator<py::object> it(gridSeq), end; it != end; ++it) {
-        if (GridBase::Ptr base = pyGrid::getGridBaseFromGrid(*it)) {
-            gridVec.push_back(base);
+    try {
+        GridBase::Ptr base = pyopenvdb::getGridFromPyObject(gridOrSeqObj);
+        gridVec.push_back(base);
+    } catch (openvdb::TypeError&) {
+        for (py::stl_input_iterator<py::object> it(gridOrSeqObj), end; it != end; ++it) {
+            if (GridBase::Ptr base = pyGrid::getGridBaseFromGrid(*it)) {
+                gridVec.push_back(base);
+            }
         }
     }
 
@@ -494,11 +490,80 @@ writeToFile(const std::string& filename, py::object gridSeq, py::object dictObj)
     if (dictObj.is_none()) {
         vdbFile.write(gridVec);
     } else {
-        openvdb::MetaMap metadata = py::extract<MetaMap>(dictObj);
+        MetaMap metadata = py::extract<MetaMap>(dictObj);
         vdbFile.write(gridVec, metadata);
     }
     vdbFile.close();
 }
+
+
+////////////////////////////////////////
+
+
+// Descriptor for the openvdb::GridClass enum (for use with pyutil::StringEnum)
+struct GridClassDescr
+{
+    static const char* name() { return "GridClass"; }
+    static const char* doc()
+    {
+        return "Classes of volumetric data (level set, fog volume, etc.)";
+    }
+    static pyutil::CStringPair item(int i)
+    {
+        static const int sCount = 4;
+        static const char* const sStrings[sCount][2] = {
+            { "UNKNOWN",    strdup(GridBase::gridClassToString(GRID_UNKNOWN).c_str()) },
+            { "LEVEL_SET",  strdup(GridBase::gridClassToString(GRID_LEVEL_SET).c_str()) },
+            { "FOG_VOLUME", strdup(GridBase::gridClassToString(GRID_FOG_VOLUME).c_str()) },
+            { "STAGGERED",  strdup(GridBase::gridClassToString(GRID_STAGGERED).c_str()) }
+        };
+        if (i >= 0 && i < sCount) return pyutil::CStringPair(&sStrings[i][0], &sStrings[i][1]);
+        return pyutil::CStringPair(NULL, NULL);
+    }
+};
+
+
+// Descriptor for the openvdb::VecType enum (for use with pyutil::StringEnum)
+struct VecTypeDescr
+{
+    static const char* name() { return "VectorType"; }
+    static const char* doc()
+    {
+        return
+            "The type of a vector determines how transforms are applied to it.\n"
+            "- INVARIANT:\n"
+            "    does not transform (e.g., tuple, uvw, color)\n"
+            "- COVARIANT:\n"
+            "    apply inverse-transpose transformation with w = 0\n"
+            "    and ignore translation (e.g., gradient/normal)\n"
+            "- COVARIANT_NORMALIZE:\n"
+            "    apply inverse-transpose transformation with w = 0\n"
+            "    and ignore translation, vectors are renormalized\n"
+            "    (e.g., unit normal)\n"
+            "- CONTRAVARIANT_RELATIVE:\n"
+            "    apply \"regular\" transformation with w = 0 and ignore\n"
+            "    translation (e.g., displacement, velocity, acceleration)\n"
+            "- CONTRAVARIANT_ABSOLUTE:\n"
+            "    apply \"regular\" transformation with w = 1 so that\n"
+            "    vector translates (e.g., position)";
+    }
+    static pyutil::CStringPair item(int i)
+    {
+        static const int sCount = 5;
+        static const char* const sStrings[sCount][2] = {
+            { "INVARIANT", strdup(GridBase::vecTypeToString(openvdb::VEC_INVARIANT).c_str()) },
+            { "COVARIANT", strdup(GridBase::vecTypeToString(openvdb::VEC_COVARIANT).c_str()) },
+            { "COVARIANT_NORMALIZE",
+                strdup(GridBase::vecTypeToString(openvdb::VEC_COVARIANT_NORMALIZE).c_str()) },
+            { "CONTRAVARIANT_RELATIVE",
+                strdup(GridBase::vecTypeToString(openvdb::VEC_CONTRAVARIANT_RELATIVE).c_str()) },
+            { "CONTRAVARIANT_ABSOLUTE",
+                strdup(GridBase::vecTypeToString(openvdb::VEC_CONTRAVARIANT_ABSOLUTE).c_str()) }
+        };
+        if (i >= 0 && i < sCount) return std::make_pair(&sStrings[i][0], &sStrings[i][1]);
+        return pyutil::CStringPair(NULL, NULL);
+    }
+};
 
 } // namespace _openvdbmodule
 
@@ -506,14 +571,13 @@ writeToFile(const std::string& filename, py::object gridSeq, py::object dictObj)
 ////////////////////////////////////////
 
 
-// This is order sensitive.  Related to the inheritance chain.
-// Otherwise you can get runtime errors.  For example TreeBase
-// must be listed before Tree and Tree inherits from TreeBase.
 #ifdef DWA_OPENVDB
-BOOST_PYTHON_MODULE(_openvdb)
+#define PY_OPENVDB_MODULE_NAME  _openvdb
 #else
-BOOST_PYTHON_MODULE(pyopenvdb)
+#define PY_OPENVDB_MODULE_NAME  pyopenvdb
 #endif
+
+BOOST_PYTHON_MODULE(PY_OPENVDB_MODULE_NAME)
 {
     // Don't auto-generate ugly, C++-style function signatures.
     py::docstring_options docOptions;
@@ -605,10 +669,18 @@ BOOST_PYTHON_MODULE(pyopenvdb)
         &_openvdbmodule::writeToFile,
         (py::arg("filename"), py::arg("grids"), py::arg("metadata") = py::object()),
         "write(filename, grids, metadata=None)\n\n"
-        "Write a sequence of grids and, optionally, a dict of\n"
-        "(name, value) metadata pairs to a .vdb file.");
+        "Write a grid or a sequence of grids and, optionally, a dict\n"
+        "of (name, value) metadata pairs to a .vdb file.");
 
-} // BOOST_PYTHON_MODULE(_openvdb)
+    // Add some useful module-level constants.
+    py::scope().attr("COORD_MIN") = openvdb::Coord::min();
+    py::scope().attr("COORD_MAX") = openvdb::Coord::max();
+    py::scope().attr("LEVEL_SET_HALF_WIDTH") = openvdb::LEVEL_SET_HALF_WIDTH;
+
+    pyutil::StringEnum<_openvdbmodule::GridClassDescr>::wrap();
+    pyutil::StringEnum<_openvdbmodule::VecTypeDescr>::wrap();
+
+} // BOOST_PYTHON_MODULE
 
 // Copyright (c) 2012-2013 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

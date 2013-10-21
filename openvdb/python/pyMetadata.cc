@@ -29,7 +29,7 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include <boost/python.hpp>
-#include <openvdb/openvdb.h>
+#include "openvdb/openvdb.h"
 
 namespace py = boost::python;
 using namespace openvdb::OPENVDB_VERSION_NAME;
@@ -64,11 +64,21 @@ void (MetadataWrap::*copy1)(const Metadata&) = &MetadataWrap::copy;
 
 void exportMetadata()
 {
-    py::class_<MetadataWrap, boost::noncopyable>("Metadata", py::init<>())
-        .def("type", py::pure_virtual(&Metadata::typeName))
-        .def("copy", py::pure_virtual(copy0))
-        .def("copy", py::pure_virtual(copy1))
-        .def("size", py::pure_virtual(&Metadata::size))
+    py::class_<MetadataWrap, boost::noncopyable> clss(
+        /*classname=*/"Metadata",
+        /*docstring=*/
+            "Class that holds the value of a single item of metadata of a type\n"
+            "for which no Python equivalent exists (typically a custom type)",
+        /*ctor=*/py::no_init // can only be instantiated from C++, not from Python
+    );
+    clss.def("copy", py::pure_virtual(copy0),
+            "copy() -> Metadata\n\nReturn a copy of this value.")
+        .def("copy", py::pure_virtual(copy1),
+            "copy() -> Metadata\n\nReturn a copy of this value.")
+        .def("type", py::pure_virtual(&Metadata::typeName),
+            "type() -> str\n\nReturn the name of this value's type.")
+        .def("size", py::pure_virtual(&Metadata::size),
+            "size() -> int\n\nReturn the size of this value in bytes.")
         .def("__nonzero__", py::pure_virtual(&Metadata::asBool))
         .def("__str__", py::pure_virtual(&Metadata::str))
         ;

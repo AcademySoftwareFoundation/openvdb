@@ -33,6 +33,8 @@
 
 #include "openvdb/openvdb.h"
 #include <boost/python.hpp>
+#include <tbb/mutex.h>
+#include <map> // for std::pair
 #include <string>
 #include <sstream>
 
@@ -119,6 +121,98 @@ GRID_TRAITS(openvdb::Vec3DGrid, "Vec3DGrid");
 ////////////////////////////////////////
 
 
+// Note that the elements are pointers to C strings (char**), because
+// boost::python::class_::def_readonly() requires a pointer to a static member.
+typedef std::pair<const char* const*, const char* const*> CStringPair;
+
+
+/// @brief Enum-like mapping from string keys to string values, with characteristics
+/// of both (Python) classes and class instances (as well as NamedTuples)
+/// @details
+/// - (@e key, @e value) pairs can be accessed as class attributes (\"<tt>MyClass.MY_KEY</tt>\")
+/// - (@e key, @e value) pairs can be accessed via dict lookup on instances
+///   (\"<tt>MyClass()['MY_KEY']</tt>\")
+/// - (@e key, @e value) pairs can't be modified or reassigned
+/// - instances are iterable (\"<tt>for key in MyClass(): ...</tt>\")
+///
+/// A @c Descr class must implement the following interface:
+/// @code
+/// struct MyDescr
+/// {
+///     // Return the Python name for the enum class.
+///     static const char* name();
+///     // Return the docstring for the enum class.
+///     static const char* doc();
+///     // Return the ith (key, value) pair, in the form of
+///     // a pair of *pointers* to C strings
+///     static CStringPair item(int i);
+/// };
+/// @endcode
+template<typename Descr>
+struct StringEnum
+{
+    /// Return the (key, value) map as a Python dict.
+    static boost::python::dict items()
+    {
+        static tbb::mutex sMutex;
+        static boost::python::dict itemDict;
+        if (!itemDict) {
+            // The first time this function is called, populate
+            // the static dict with (key, value) pairs.
+            tbb::mutex::scoped_lock lock(sMutex);
+            if (!itemDict) {
+                for (int i = 0; ; ++i) {
+                    const CStringPair item = Descr::item(i);
+                    OPENVDB_START_THREADSAFE_STATIC_WRITE
+                    if (item.first) {
+                        itemDict[boost::python::str(*item.first)] =
+                            boost::python::str(*item.second);
+                    }
+                    OPENVDB_FINISH_THREADSAFE_STATIC_WRITE
+                    else break;
+                }
+            }
+        }
+        return itemDict;
+    }
+
+    /// Return the keys as a Python list of strings.
+    static boost::python::object keys() { return items().attr("keys")(); }
+    /// Return the number of keys as a Python int.
+    boost::python::object numItems() const
+    {
+        return boost::python::object(boost::python::len(items()));
+    }
+    /// Return the value (as a Python string) for the given key.
+    boost::python::object getItem(boost::python::object keyObj) const { return items()[keyObj]; }
+    /// Return a Python iterator over the keys.
+    boost::python::object iter() const { return items().attr("__iter__")(); }
+
+    /// Register this enum.
+    static void wrap()
+    {
+        boost::python::class_<StringEnum> cls(
+            /*classname=*/Descr::name(),
+            /*docstring=*/Descr::doc());
+        cls.def("keys", &StringEnum::keys, "keys() -> list")
+            .staticmethod("keys")
+            .def("__len__", &StringEnum::numItems, "__len__() -> int")
+            .def("__iter__", &StringEnum::iter, "__iter__() -> iterator")
+            .def("__getitem__", &StringEnum::getItem, "__getitem__(str) -> str")
+            /*end*/;
+        // Add a read-only, class-level attribute for each (key, value) pair.
+        for (int i = 0; ; ++i) {
+            const CStringPair item = Descr::item(i);
+            if (item.first) cls.def_readonly(*item.first, item.second);
+            else break;
+        }
+    }
+};
+
+
+////////////////////////////////////////
+
+
 /// @brief From the given Python object, extract a value of type @c T.
 ///
 /// If the object cannot be converted to type @c T, raise a @c TypeError with a more
@@ -169,6 +263,16 @@ inline std::string
 str(const T& val)
 {
     return boost::python::extract<std::string>(boost::python::str(val));
+}
+
+
+/// Return the name of the given Python object's class.
+inline std::string
+className(boost::python::object obj)
+{
+    std::string s = boost::python::extract<std::string>(
+        obj.attr("__class__").attr("__name__"));
+    return s;
 }
 
 } // namespace pyutil
