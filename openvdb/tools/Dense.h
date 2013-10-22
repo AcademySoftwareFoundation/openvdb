@@ -426,7 +426,7 @@ public:
             leaf->copyFromDense(bbox, *mDense, mTree->background(), mTolerance);
 
             if (!leaf->isConstant(block.tile.first, block.tile.second, mTolerance)) {
-                leaf->setOrigin(bbox.min());
+                leaf->setOrigin(bbox.min() & (~(LeafT::DIM - 1)));
                 block.leaf = leaf;
                 leaf = new LeafT();
             }

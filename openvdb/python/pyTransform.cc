@@ -198,7 +198,7 @@ struct PickleSuite: py::pickle_suite
 
         if (badState) {
             PyErr_SetObject(PyExc_ValueError,
-                ("expected (dict, int, int, int, str) tuple in call to __setstate__; got %s"
+                ("expected (dict, int, int, int, str) tuple in call to __setstate__; found %s"
                      % stateObj.attr("__repr__")()).ptr());
             py::throw_error_already_set();
         }
