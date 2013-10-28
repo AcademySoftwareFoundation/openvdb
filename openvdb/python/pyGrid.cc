@@ -45,7 +45,7 @@
 #include "openvdb/tools/LevelSetSphere.h"
 #include "openvdb/tools/Dense.h"
 #include "pyutil.h"
-#include "pyAccessor.h" // for exportAccessor<GridType>()
+#include "pyAccessor.h" // for pyAccessor::AccessorWrap
 #include "pyopenvdb.h"
 #include <sstream>
 
@@ -1251,6 +1251,8 @@ public:
 
     IterValueProxy copy() const { return *this; }
 
+    typename GridT::ConstPtr parent() const { return mGrid; }
+
     ValueT getValue() const { return *mIter; }
     bool getActive() const { return mIter.isValueOn(); }
     Index getDepth() const { return mIter.getDepth(); }
@@ -1303,6 +1305,7 @@ public:
         }
         PyErr_SetObject(PyExc_KeyError, ("%s" % keyObj.attr("__repr__")()).ptr());
         py::throw_error_already_set();
+        return py::object();
     }
 
     /// @brief Set the value for the given key.
@@ -1388,6 +1391,8 @@ public:
 
     IterWrap(typename GridT::ConstPtr grid, const IterT& iter): mGrid(grid), mIter(iter) {}
 
+    typename GridT::ConstPtr parent() const { return mGrid; }
+
     /// Return an IterValueProxy for the current iterator position.
     IterValueProxyT next()
     {
@@ -1408,25 +1413,32 @@ public:
     {
         const std::string
             gridClassName = pyutil::GridTraits<typename boost::remove_const<GridT>::type>::name(),
-            iterClassName = gridClassName + Traits::name(),
-            valueClassName = gridClassName + "Value";
+            iterClassName = /*gridClassName +*/ Traits::name(),
+            valueClassName = /*gridClassName +*/ "Value";
 
         py::class_<IterWrap>(
             iterClassName.c_str(),
             /*docstring=*/Traits::descr().c_str(),
             /*ctor=*/py::no_init) // can only be instantiated from C++, not from Python
 
+            .add_property("parent", &IterWrap::parent,
+                ("the " + gridClassName + " over which to iterate").c_str())
+
             .def("next", &IterWrap::next, ("next() -> " + valueClassName).c_str())
             .def("__iter__", &returnSelf);
 
         py::class_<IterValueProxyT>(
             valueClassName.c_str(),
+            /*docstring=*/("Proxy for a tile or voxel value in a " + gridClassName).c_str(),
             /*ctor=*/py::no_init) // can only be instantiated from C++, not from Python
 
             .def("copy", &IterValueProxyT::copy,
                 ("copy() -> " + valueClassName + "\n\n"
                 "Return a shallow copy of this value, i.e., one that shares\n"
                 "its data with the original.").c_str())
+
+            .add_property("parent", &IterValueProxyT::parent,
+                ("the " + gridClassName + " to which this value belongs").c_str())
 
             .def("__str__", &IterValueProxyT::info)
             .def("__repr__", &IterValueProxyT::info)
@@ -1593,17 +1605,17 @@ exportGrid()
     const std::string defaultCtorDescr = "Initialize with a background value of "
         + pyutil::str(pyGrid::getZeroValue<GridType>()) + ".";
 
-    pyAccessor::exportAccessor<GridType>();
-    pyAccessor::exportAccessor<const GridType>();
-
     // Define the Grid wrapper class and make it the current scope.
     {
-        py::scope gridClassScope = py::class_<GridType, /*HeldType=*/GridPtr>(
+        py::class_<GridType, /*HeldType=*/GridPtr> clss(
             /*classname=*/pyGridTypeName.c_str(),
             /*docstring=*/(Traits::descr()).c_str(),
             /*ctor=*/py::init<>(defaultCtorDescr.c_str())
-        )
-            .def(py::init<const ValueT&>(py::args("background"),
+        );
+
+        py::scope gridClassScope = clss;
+
+        clss.def(py::init<const ValueT&>(py::args("background"),
                 "Initialize with the given background value."))
 
             .def("copy", &pyGrid::copyGrid<GridType>,
@@ -1893,6 +1905,11 @@ exportGrid()
         /// py::implicitly_convertible<GridType&, GridBase&>();
         /// @endcode
 
+        // Wrap const and non-const value accessors and expose them
+        // as nested classes of the Grid class.
+        pyAccessor::AccessorWrap<const GridType>::wrap();
+        pyAccessor::AccessorWrap<GridType>::wrap();
+
         // Wrap tree value iterators and expose them as nested classes of the Grid class.
         IterWrap<const GridType, ValueOnCIterT>::wrap();
         IterWrap<const GridType, ValueOffCIterT>::wrap();
@@ -1900,6 +1917,7 @@ exportGrid()
         IterWrap<GridType, ValueOnIterT>::wrap();
         IterWrap<GridType, ValueOffIterT>::wrap();
         IterWrap<GridType, ValueAllIterT>::wrap();
+
     } // gridClassScope
 
     // Add the Python type object for this grid type to the module-level list.

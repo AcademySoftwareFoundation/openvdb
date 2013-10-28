@@ -360,12 +360,20 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
             if (progress.wasInterrupted()) throw std::runtime_error("Was Interrupted");
 
             GU_PrimVDB* vdb = *it;
-            const hvdb::Grid& grid = vdb->getGrid();
 
             const UT_VDBType valueType = vdb->getStorageType();
 
-            const bool isLevelSet = ((grid.getGridClass() == openvdb::GRID_LEVEL_SET)
+            const bool isLevelSet = ((vdb->getGrid().getGridClass() == openvdb::GRID_LEVEL_SET)
                 && (valueType == UT_VDB_FLOAT || valueType == UT_VDB_DOUBLE));
+
+            if (isLevelSet && !rebuild) {
+                // If the input grid is a level set but level set rebuild is disabled,
+                // set the grid's class to "unknown", to prevent the resample tool
+                // from triggering a rebuild.
+                vdb->getGrid().setGridClass(openvdb::GRID_UNKNOWN);
+            }
+
+            const hvdb::Grid& grid = vdb->getGrid();
 
             // Override the sampling order for boolean grids.
             int curOrder = samplingOrder;

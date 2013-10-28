@@ -402,7 +402,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestVolumeToMesh.cc \
 #
 
-DOC_FILES := doc/doc.txt doc/faq.txt doc/changes.txt doc/codingstyle.txt doc/examplecode.txt doc/api_0_98_0.txt doc/math.txt
+DOC_FILES := doc/doc.txt doc/faq.txt doc/changes.txt doc/codingstyle.txt doc/examplecode.txt doc/api_0_98_0.txt doc/math.txt doc/python.txt
 DOC_INDEX := doc/html/index.html
 DOC_PDF := doc/latex/refman.pdf
 

@@ -164,7 +164,7 @@ struct VecConverter
         // Check that all elements of the Python sequence are convertible
         // to the Vec's value type.
         py::object seq = pyutil::pyBorrow(obj);
-        for (size_t i = 0; i < VecT::size; ++i) {
+        for (int i = 0; i < VecT::size; ++i) {
             if (!py::extract<typename VecT::value_type>(seq[i]).check()) {
                 return NULL;
             }

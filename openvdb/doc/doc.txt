@@ -29,6 +29,9 @@ See the @subpage faq "FAQ" for frequently asked questions about @b OpenVDB.
 
 See the @subpage codeExamples "Cookbook" to get started using @b OpenVDB.
 
+See @subpage python "Using OpenVDB in Python" to get started with the @b OpenVDB
+Python module.
+
 See the @subpage changes "Release Notes" for what's new in this version
 of @b OpenVDB.
 
@@ -95,7 +98,7 @@ transforms as well as some of the tools that act on the sparse data.
 In OpenVDB the @c Tree data structure exists to answer the question
 <I>What value is stored at location @ijk in three-dimensional index
 space?</I>  Here <I>i</I>, <I>j</I> and <I>k</I> are arbitrary signed 32-bit
-integers and the data type of the associated value (<TT>float</TT>,
+integers, and the data type of the associated value (<TT>float</TT>,
 <TT>bool</TT>, vector, etc.) is the same for all @ijk.  While the @c Tree
 serves the same purpose as a large three-dimensional array, it is a
 specially designed data structure that, given sparse unique values,
@@ -143,7 +146,7 @@ block of voxels of size @f$32\times16\times8 = 4096@f$ on a side.  Unlike
 the <TT>InternalNode</TT>s and <TT>LeafNode</TT>s, the @c RootNode ("level
 3" for the default configuration) is not explicitly restricted in the number 
 of children it may have, so the overall index space is limited only by the 
-range of the integer indices (by default 32-bit index precision). 
+range of the integer indices, which are 32-bit by default. 
 
 
 @section secSparsity Sparse Values and Voxels
@@ -171,7 +174,7 @@ voxels subsumed by a given node.  (For example, a tile Value belonging to an
 of the same size, @f$8\times8\times8@f$, as a @c LeafNode.)  The tile value
 is returned when a request is made for the data associated with any @ijk
 location within the uniform tile.  The background value is a unique value 
-(stored at the root-level) that is returned when accessing any @ijk location 
+(stored at the root level) that is returned when accessing any @ijk location 
 that does not resolve to either a tile or a @c LeafNode. 
 
  

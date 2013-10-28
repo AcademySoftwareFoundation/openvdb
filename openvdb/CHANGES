@@ -2,6 +2,8 @@ OpenVDB Version History
 =======================
 
 Version 2.0.0 - October 31, 2013
+    - Added a Python module with functions for basic manipulation of grids
+      (but no tools, yet).
     - Added ray intersector tools for efficient, hierarchical intersection
       of rays with level-set and generic volumes.
     - Added a Ray class and a hierarchical Digital Differential Analyzer
@@ -61,7 +63,9 @@ Version 2.0.0 - October 31, 2013
     - Reimplemented math::RandomInt using Boost.Random instead of rand()
       (which is not thread-safe), and deprecated math::randUniform()
       and added math::Random01 to replace it. 
-    - Fixed bugs in tools::CopyFromDense.
+    - Modified tools::copyFromDense() and tools::copyToDense() to allow
+      for implicit type conversion (e.g., between a Dense<Int32> and a
+      FloatTree) and fixed several bugs in tools::CopyFromDense.
     - Fixed bugs in math::Stats and math::Histogram that could produce
       NaNs or other incorrect behavior if certain methods were called
       on populations of size zero.

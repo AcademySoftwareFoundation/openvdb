@@ -237,15 +237,16 @@ saveEXR(const std::string& fname, const openvdb::tools::Film& film, const Render
     header.channels().insert("A", Imf::Channel(Imf::FLOAT));
 
     const size_t pixelBytes = sizeof(RGBA), rowBytes = pixelBytes * film.width();
+    RGBA& pixel0 = const_cast<RGBA*>(film.pixels())[0];
     Imf::FrameBuffer framebuffer;
-    framebuffer.insert("R", Imf::Slice(Imf::FLOAT,
-        (char*)(&(film.pixels()[0].r)), pixelBytes, rowBytes));
-    framebuffer.insert("G", Imf::Slice(Imf::FLOAT,
-        (char*)(&(film.pixels()[0].g)), pixelBytes, rowBytes));
-    framebuffer.insert("B", Imf::Slice(Imf::FLOAT,
-        (char*)(&(film.pixels()[0].b)), pixelBytes, rowBytes));
-    framebuffer.insert("A", Imf::Slice(Imf::FLOAT,
-        (char*)(&(film.pixels()[0].a)), pixelBytes, rowBytes));
+    framebuffer.insert("R",
+        Imf::Slice(Imf::FLOAT, reinterpret_cast<char*>(&pixel0.r), pixelBytes, rowBytes));
+    framebuffer.insert("G",
+        Imf::Slice(Imf::FLOAT, reinterpret_cast<char*>(&pixel0.g), pixelBytes, rowBytes));
+    framebuffer.insert("B",
+        Imf::Slice(Imf::FLOAT, reinterpret_cast<char*>(&pixel0.b), pixelBytes, rowBytes));
+    framebuffer.insert("A",
+        Imf::Slice(Imf::FLOAT, reinterpret_cast<char*>(&pixel0.a), pixelBytes, rowBytes));
 
     Imf::OutputFile imgFile(filename.c_str(), header);
     imgFile.setFrameBuffer(framebuffer);

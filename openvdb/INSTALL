@@ -24,7 +24,7 @@ Other compilers or versions might work but have not been tested.
 
 Optional:
 
-- Doxygen (www.stack.nl/~dimitri/doxygen/), version 1.4.7 or later
+- Doxygen 1.8 (www.stack.nl/~dimitri/doxygen/)
 
 - CppUnit (www.freedesktop.org/wiki/Software/cppunit), version 1.10 or later
   (Linux: yum install cppunit-devel)
@@ -35,7 +35,7 @@ Optional:
 - pdfLaTeX (www.pdftex.org), version 1.21 or later, for documentation
   in PDF format
 
-- GLFW (www.glfw.org), version 2.7.5 or later, for the OpenVDB viewer
+- GLFW 2.7 (www.glfw.org), for the OpenVDB viewer
 
 - OpenGL 3.2 or later, for the OpenVDB viewer
 

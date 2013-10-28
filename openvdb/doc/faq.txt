@@ -99,7 +99,7 @@ N-trees have fixed branching factors of respectively two and N in each
 coordinate direction, OpenVDB's branching factors typically vary between
 tree levels and are only limited to be powers of two.  To understand why
 and also learn about other unique features of OpenVDB, refer to the
-upcoming paper in <i>ACM&nbsp;Transactions on Graphics</i>.
+paper in <i>ACM&nbsp;Transactions on Graphics</i>.
 
 @section sLevelSet Is OpenVDB primarily for level set applications?
 No! Don't let the fact that OpenVDB can represent and operate so well on
@@ -118,7 +118,7 @@ use it to mean a grid that can store data sampled at adaptive voxel sizes
 typically derived from a so-called "refinement oracle", whereas others mean
 multiple grids with different fixed voxel sizes all sampling the same data.
 An example of the former is an octree and of the latter is a mipmap. Since
-OpenVDB stores both data values and child nodes at each level of the tree it
+OpenVDB stores both data values and child nodes at each level of the tree, it
 is adaptive only in the first sense, not the second. The level of adaptivity
 or refinement between the tree levels is defined by the branching factors of
 the nodes, which are fixed at compile time.
@@ -142,7 +142,7 @@ inherently not thread-safe.  However, a single grid may have multiple
 value accessors, so each thread can safely be assigned its own value accessor.
 Uncached&mdash;and therefore slower, but thread-safe&mdash;random access is possible
 through a grid's tree, for example with a call like
-<tt>grid.tree()->getValue(ijk)</tt>.
+<tt>grid.tree().getValue(ijk)</tt>.
 
 @section sValue How and where does OpenVDB store values?
 OpenVDB stores voxel data in a tree with a fixed maximum height (chosen
@@ -225,7 +225,7 @@ almost always superior.
 
 @section sFuture What future improvements to OpenVDB are planned?
 We are continuing to expand the OpenVDB toolset and improve its performance.
-In the near future we hope to add Python bindings, real-time volume rendering,
+In the near future we hope to add real-time volume visualization,
 a particle acceleration data structure, and possibly support for out-of-core
 rendering and volume processing. We would very much like to hear your
 suggestions and preferences.

@@ -6,6 +6,8 @@
 @htmlonly <a name="v2_0_0_changes"></a>@endhtmlonly
 @par
 <B>Version 2.0.0</B> - <I>October 31, 2013</I>
+- Added a @ref python "Python module" with functions for basic manipulation
+  of grids (but no tools, yet).
 - Added ray intersector tools for efficient, hierarchical intersection
   of rays with @vdblink::tools::LevelSetRayIntersector level-set@endlink
   and @vdblink::tools::VolumeRayIntersector generic@endlink volumes.
@@ -80,7 +82,12 @@
   Boost.Random instead of @c rand() (which is not thread-safe), and deprecated
   @vdblink::math::randUniform math::randUniform@endlink and added
   @vdblink::math::Random01 math::Random01@endlink to replace it. 
-- Fixed bugs in @vdblink::tools::CopyFromDense tools::CopyFromDense@endlink.
+- Modified @vdblink::tools::copyFromDense() tools::copyFromDense@endlink
+  and @vdblink::tools::copyToDense() tools::copyToDense@endlink to allow
+  for implicit type conversion (e.g., between a
+  @vdblink::tools::Dense Dense&lt;Int32&gt;@endlink and a
+  @vdblink::FloatTree FloatTree@endlink) and fixed several bugs
+  in @vdblink::tools::CopyFromDense tools::CopyFromDense@endlink.
 - Fixed bugs in @vdblink::math::Stats math::Stats@endlink and
   @vdblink::math::Histogram math::Histogram@endlink that could produce
   <TT>NaN</TT>s or other incorrect behavior if certain methods were called

@@ -460,6 +460,7 @@ INPUT                  = . \
                          io \
                          math \
                          metadata \
+                         python/pyopenvdb.h \
                          tools \
                          tree \
                          util \
@@ -469,7 +470,8 @@ INPUT                  = . \
                          doc/changes.txt \
                          doc/codingstyle.txt \
                          doc/api_0_98_0.txt \
-                         doc/examplecode.txt
+                         doc/examplecode.txt \
+                         doc/python.txt
 
 # If the value of the INPUT tag contains directories, you can use the 
 # FILE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp 
