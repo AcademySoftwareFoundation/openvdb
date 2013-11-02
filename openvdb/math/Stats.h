@@ -100,19 +100,34 @@ public:
     }
 
     /// Return the size of the population, i.e., the total number of samples.
-    uint64_t size() const { return mSize; }
+    inline uint64_t size() const { return mSize; }
+
     /// Return the minimum value.
-    double min() const { return mMin; }
+    inline double min() const { return mMin; }
+
     /// Return the maximum value.
-    double max() const { return mMax; }
-    /// Return the mean value.
-    double mean() const { return mAvg; }
+    inline double max() const { return mMax; }
+
+    //@{
+    /// Return the  arithmetic mean, i.e. average, value.
+    inline double avg()  const { return mAvg; }
+    inline double mean() const { return mAvg; }
+    //@}
+
+    //@{
     /// @brief Return the population variance.
-    /// @note The unbiased sample variance = population variance * num/(num-1)
-    double variance() const { return mSize<2 ? 0.0 : mAux/double(mSize); }
+    /// @note The unbiased sample variance = population variance *
+    //num/(num-1)
+    inline double var()      const { return mSize<2 ? 0.0 : mAux/double(mSize); }
+    inline double variance() const { return this->var(); }
+    //@}
+
+    //@{
     /// @brief Return the standard deviation (=Sqrt(variance)) as
     /// defined from the (biased) population variance.
-    double stdDev() const { return sqrt(this->variance()); }
+    inline double std()    const { return sqrt(this->var()); }
+    inline double stdDev() const { return this->std(); }
+    //@}
 
     /// @brief Print statistics to the specified output stream.
     void print(const std::string &name= "", std::ostream &strm=std::cout, int precision=3) const
@@ -174,7 +189,7 @@ public:
     /// @brief Add @a n samples with constant value @a val, provided that the
     /// @a val falls within this histogram's value range.
     /// @return @c true if the sample value falls within this histogram's value range.
-    bool add(double val, uint64_t n = 1)
+    inline bool add(double val, uint64_t n = 1)
     {
         if (val<mMin || val>mMax) return false;
         mBins[size_t(mDelta*(val-mMin))] += n;
@@ -194,19 +209,19 @@ public:
     }
 
     /// Return the number of bins in this histogram.
-    size_t numBins() const { return mBins.size(); }
+    inline size_t numBins() const { return mBins.size(); }
     /// Return the lower bound of this histogram's value range.
-    double min() const { return mMin; }
+    inline double min() const { return mMin; }
     /// Return the upper bound of this histogram's value range.
-    double max() const { return mMax; }
+    inline double max() const { return mMax; }
     /// Return the minimum value in the <i>n</i>th bin.
-    double min(int n) const { return mMin+n/mDelta; }
+    inline double min(int n) const { return mMin+n/mDelta; }
     /// Return the maximum value in the <i>n</i>th bin.
-    double max(int n) const { return mMin+(n+1)/mDelta; }
+    inline double max(int n) const { return mMin+(n+1)/mDelta; }
     /// Return the number of samples in the <i>n</i>th bin.
-    uint64_t count(int n) const { return mBins[n]; }
+    inline uint64_t count(int n) const { return mBins[n]; }
     /// Return the population size, i.e., the total number of samples.
-    uint64_t size() const { return mSize; }
+    inline uint64_t size() const { return mSize; }
 
     /// Print the histogram to the specified output stream.
     void print(const std::string& name = "", std::ostream& strm = std::cout) const

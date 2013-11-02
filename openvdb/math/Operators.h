@@ -597,9 +597,9 @@ struct ISMeanCurvature
     }
 };
 
+////////////////////////////////////////////////////////
 
 // --- Operators defined in the Range of a given map
-
 
 //@{
 /// @brief Center difference gradient operators, defined with respect to
@@ -631,7 +631,7 @@ struct Gradient
     }
 };
 
-
+// Partial template specialization of Gradient
 // translation, any order
 template<DScheme DiffScheme>
 struct Gradient<TranslationMap, DiffScheme>
@@ -653,8 +653,8 @@ struct Gradient<TranslationMap, DiffScheme>
     }
 };
 
-
-// uniform scale, 2nd order
+/// Full template specialization of Gradient
+/// uniform scale, 2nd order
 template<>
 struct Gradient<UniformScaleMap, CD_2ND>
 {
@@ -685,8 +685,8 @@ struct Gradient<UniformScaleMap, CD_2ND>
     }
 };
 
-
-// uniform scale translate, 2nd order
+/// Full template specialization of Gradient
+/// uniform scale translate, 2nd order
 template<>
 struct Gradient<UniformScaleTranslateMap, CD_2ND>
 {
@@ -717,8 +717,8 @@ struct Gradient<UniformScaleTranslateMap, CD_2ND>
     }
 };
 
-
-// scale, 2nd order
+/// Full template specialization of Gradient
+/// scale, 2nd order
 template<>
 struct Gradient<ScaleMap, CD_2ND>
 {
@@ -751,8 +751,8 @@ struct Gradient<ScaleMap, CD_2ND>
     }
 };
 
-
-// scale translate, 2nd order
+/// Full template specialization of Gradient
+/// scale translate, 2nd order
 template<>
 struct Gradient<ScaleTranslateMap, CD_2ND>
 {
@@ -820,6 +820,9 @@ struct GradientBiased
 //@}
 
 
+////////////////////////////////////////////////////////
+
+// Computes |Grad[Phi]| using upwinding
 template<typename MapType, BiasedGradientScheme GradScheme>
 struct GradientNormSqrd
 {
@@ -845,7 +848,7 @@ struct GradientNormSqrd
     static typename StencilT::ValueType
     result(const MapType& map, const StencilT& stencil)
     {
-        typedef typename StencilT::ValueType      ValueType;
+        typedef typename StencilT::ValueType     ValueType;
         typedef math::Vec3<ValueType>            Vec3Type;
 
         Vec3Type up   = Gradient<MapType, FD>::result(map, stencil);
@@ -854,7 +857,7 @@ struct GradientNormSqrd
     }
 };
 
-
+/// Partial template specialization of GradientNormSqrd
 template<BiasedGradientScheme GradScheme>
 struct GradientNormSqrd<UniformScaleMap, GradScheme>
 {
@@ -881,6 +884,7 @@ struct GradientNormSqrd<UniformScaleMap, GradScheme>
     }
 };
 
+/// Partial template specialization of GradientNormSqrd
 template<BiasedGradientScheme GradScheme>
 struct GradientNormSqrd<UniformScaleTranslateMap, GradScheme>
 {
@@ -949,8 +953,8 @@ struct Divergence
     }
 };
 
-
-// translation, any scheme
+/// Partial template specialization of Divergence
+/// translation, any scheme
 template<DScheme DiffScheme>
 struct Divergence<TranslationMap, DiffScheme>
 {
@@ -979,8 +983,8 @@ struct Divergence<TranslationMap, DiffScheme>
     }
 };
 
-
-// uniform scale, any scheme
+/// Partial template specialization of Divergence
+/// uniform scale, any scheme
 template<DScheme DiffScheme>
 struct Divergence<UniformScaleMap, DiffScheme>
 {
@@ -1013,8 +1017,8 @@ struct Divergence<UniformScaleMap, DiffScheme>
     }
 };
 
-
-// uniform scale and translation, any scheme
+/// Partial template specialization of Divergence
+/// uniform scale and translation, any scheme
 template<DScheme DiffScheme>
 struct Divergence<UniformScaleTranslateMap, DiffScheme>
 {
@@ -1047,8 +1051,8 @@ struct Divergence<UniformScaleTranslateMap, DiffScheme>
     }
 };
 
-
-// uniform scale 2nd order
+/// Full template specialization of Divergence
+/// uniform scale 2nd order
 template<>
 struct Divergence<UniformScaleMap, CD_2ND>
 {
@@ -1079,8 +1083,8 @@ struct Divergence<UniformScaleMap, CD_2ND>
     }
 };
 
-
-// uniform scale translate 2nd order
+/// Full template specialization of Divergence
+/// uniform scale translate 2nd order
 template<>
 struct Divergence<UniformScaleTranslateMap, CD_2ND>
 {
@@ -1113,8 +1117,8 @@ struct Divergence<UniformScaleTranslateMap, CD_2ND>
     }
 };
 
-
-// scale, any scheme
+/// Partial template specialization of Divergence
+/// scale, any scheme
 template<DScheme DiffScheme>
 struct Divergence<ScaleMap, DiffScheme>
 {
@@ -1148,8 +1152,8 @@ struct Divergence<ScaleMap, DiffScheme>
     }
 };
 
-
-// scale translate, any scheme
+/// Partial template specialization of Divergence
+/// scale translate, any scheme
 template<DScheme DiffScheme>
 struct Divergence<ScaleTranslateMap, DiffScheme>
 {
@@ -1183,8 +1187,8 @@ struct Divergence<ScaleTranslateMap, DiffScheme>
     }
 };
 
-
-// scale 2nd order
+/// Full template specialization Divergence
+/// scale 2nd order
 template<>
 struct Divergence<ScaleMap, CD_2ND>
 {
@@ -1217,8 +1221,8 @@ struct Divergence<ScaleMap, CD_2ND>
     }
 };
 
-
-// scale and translate, 2nd order
+/// Full template specialization of Divergence
+/// scale and translate, 2nd order
 template<>
 struct Divergence<ScaleTranslateMap, CD_2ND>
 {
@@ -1298,7 +1302,7 @@ struct Curl
     }
 };
 
-
+/// Partial template specialization of Curl
 template<DScheme DiffScheme>
 struct Curl<UniformScaleMap, DiffScheme>
 {
@@ -1321,7 +1325,7 @@ struct Curl<UniformScaleMap, DiffScheme>
      }
 };
 
-
+/// Partial template specialization of Curl
 template<DScheme DiffScheme>
 struct Curl<UniformScaleTranslateMap, DiffScheme>
 {
@@ -1346,6 +1350,7 @@ struct Curl<UniformScaleTranslateMap, DiffScheme>
     }
 };
 
+/// Full template specialization of Curl
 template<>
 struct Curl<UniformScaleMap, CD_2ND>
 {
@@ -1370,6 +1375,7 @@ struct Curl<UniformScaleMap, CD_2ND>
     }
 };
 
+/// Full template specialization of Curl
 template<>
 struct Curl<UniformScaleTranslateMap, CD_2ND>
 {

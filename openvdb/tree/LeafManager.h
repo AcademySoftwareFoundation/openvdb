@@ -403,8 +403,10 @@ public:
     /// @brief   Threaded method that applies a user-supplied functor
     ///          to each leaf node in the LeafManager
     ///
-    /// @param op       user-supplied functor, see examples for interface details.
-    /// @param threaded optional toggle to disable threading, on by default.
+    /// @param op        user-supplied functor, see examples for interface details.
+    /// @param threaded  optional toggle to disable threading, on by default.
+    /// @param grainSize optional parameter to specify the grainsize
+    ///                  for threading, one by default.
     ///
     /// @warning The functor object is deep-copied to create TBB tasks.
     ///
@@ -458,10 +460,10 @@ public:
     /// };
     /// @endcode
     template<typename LeafOp>
-    void foreach(const LeafOp& op, bool threaded = true)
+    void foreach(const LeafOp& op, bool threaded = true, size_t grainSize=1)
     {
-        LeafTransformer<LeafOp> transform(*this, op);
-        transform.run(threaded);
+        LeafTransformer<LeafOp> transform(op);
+        transform.run(this->leafRange(grainSize), threaded);
     }
 
     ////////////////////////////////////////////////////////////////////////////////////
@@ -558,23 +560,15 @@ private:
     template<typename LeafOp>
     struct LeafTransformer
     {
-        LeafTransformer(LeafManager& leafs, const LeafOp& leafOp)
-            : mLeafManager(&leafs), mLeafOp(leafOp) {}
-        void run(bool threaded = true)
+        LeafTransformer(const LeafOp& leafOp) : mLeafOp(leafOp) {}
+        void run(const LeafRange& range, bool threaded = true)
         {
-            if (threaded) {
-                tbb::parallel_for(mLeafManager->getRange(), *this);
-            } else {
-                (*this)(mLeafManager->getRange());
-            }
+            threaded ? tbb::parallel_for(range, *this) : (*this)(range);
         }
-        void operator()(const tbb::blocked_range<size_t>& range) const
+        void operator()(const LeafRange& range) const
         {
-            for (size_t n = range.begin(); n < range.end(); ++n) {
-                mLeafOp(mLeafManager->leaf(n), n);
-            }
+            for (typename LeafRange::Iterator it = range.begin(); it; ++it) mLeafOp(*it, it.pos());
         }
-        LeafManager* mLeafManager;
         const LeafOp mLeafOp;
     };
 

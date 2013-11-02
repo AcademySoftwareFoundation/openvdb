@@ -225,9 +225,12 @@ almost always superior.
 
 @section sFuture What future improvements to OpenVDB are planned?
 We are continuing to expand the OpenVDB toolset and improve its performance.
-In the near future we hope to add real-time volume visualization,
-a particle acceleration data structure, and possibly support for out-of-core
-rendering and volume processing. We would very much like to hear your
+In the near future we plan to add OpenVDB Maya plugins, Python bindings to
+more library tools, support for accelerated particle storage and lookup, level
+set morphing and measures (e.g. area and volume), more rendering options, a fluid
+pressure solver, improved methods for particle skinning, asynchronous I/O,
+optimization by means of SIMD instructions, out-of-core support, advection of
+densities (vs. level sets) and much more. We would very much like to hear your
 suggestions and preferences.
 
 @section sContribute How can I contribute to OpenVDB?

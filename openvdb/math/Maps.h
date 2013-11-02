@@ -939,9 +939,11 @@ public:
     /// Return a MapBase::Ptr to a deep copy of this map
     MapBase::Ptr copy() const { return MapBase::Ptr(new UniformScaleMap(*this)); }
 
-    MapBase::Ptr inverseMap() const {
+    MapBase::Ptr inverseMap() const
+    {
         const Vec3d& invScale = getInvScale();
-        return MapBase::Ptr(new UniformScaleMap( invScale[0])); }
+        return MapBase::Ptr(new UniformScaleMap( invScale[0]));
+    }
 
     static bool isRegistered() { return MapRegistry::isRegistered(UniformScaleMap::mapType()); }
     static void registerMap()
@@ -1274,9 +1276,9 @@ public:
     Vec3d applyInverseMap(const Vec3d& in) const
     {
         return Vec3d(
-            (in.x() - mTranslation.x() ) / mScaleValues.x(),
-            (in.y() - mTranslation.y() ) / mScaleValues.y(),
-            (in.z() - mTranslation.z() ) / mScaleValues.z());
+            (in.x() - mTranslation.x() ) * mScaleValuesInverse.x(),
+            (in.y() - mTranslation.y() ) * mScaleValuesInverse.y(),
+            (in.z() - mTranslation.z() ) * mScaleValuesInverse.z());
     }
 
     /// Return the Jacobian of the map applied to @a in.
@@ -1287,7 +1289,7 @@ public:
     /// Return the Inverse Jacobian of the map applied to @a in. (i.e. inverse map with out translation)
     Vec3d applyInverseJacobian(const Vec3d& in, const Vec3d&) const { return applyInverseJacobian(in); }
     /// Return the Inverse Jacobian of the map applied to @a in. (i.e. inverse map with out translation)
-    Vec3d applyInverseJacobian(const Vec3d& in) const { return in / mScaleValues; }
+    Vec3d applyInverseJacobian(const Vec3d& in) const { return in * mScaleValuesInverse; }
 
     /// Return the Jacobian Transpose of the map applied to @a in.
     /// This tranforms range-space gradients to domain-space gradients
@@ -1302,9 +1304,9 @@ public:
     Vec3d applyIJT(const Vec3d& in) const
     {
         return Vec3d(
-            in.x() / mScaleValues.x(),
-            in.y() / mScaleValues.y(),
-            in.z() / mScaleValues.z());
+            in.x() * mScaleValuesInverse.x(),
+            in.y() * mScaleValuesInverse.y(),
+            in.z() * mScaleValuesInverse.z());
     }
     /// Return the Jacobian Curvature: zero for a linear map
     Mat3d applyIJC(const Mat3d& in) const

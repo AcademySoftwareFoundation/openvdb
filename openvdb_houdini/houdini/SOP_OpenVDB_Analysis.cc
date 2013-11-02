@@ -174,7 +174,7 @@ SOP_OpenVDB_Analysis::SOP_OpenVDB_Analysis(OP_Network* net,
 
 namespace {
 
-template<template<typename GridT, typename InterruptT> class ToolT>
+template<template<typename GridT, typename MaskType, typename InterruptT> class ToolT>
 struct ToolOp
 {
     ToolOp(bool t, hvdb::Interrupter& boss): mThreaded(t), mBoss(boss) {}
@@ -182,7 +182,7 @@ struct ToolOp
     template<typename GridType>
     void operator()(const GridType& inGrid)
     {
-        ToolT<GridType, hvdb::Interrupter> tool(inGrid, &mBoss);
+        ToolT<GridType, cvdb::BoolGrid, hvdb::Interrupter> tool(inGrid, &mBoss);
         mOutGrid = tool.process(mThreaded);
         //mOutGrid->setTransform(inGrid.transform().copy());
     }

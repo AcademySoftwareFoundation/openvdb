@@ -52,6 +52,7 @@ public:
     CPPUNIT_TEST(testWSMeanCurvature);                    // MeanCurvature in World Space
     CPPUNIT_TEST(testWSMeanCurvatureStencil);
     CPPUNIT_TEST(testMeanCurvatureTool);                  // MeanCurvature tool
+    CPPUNIT_TEST(testMeanCurvatureMaskedTool);                  // MeanCurvature tool
     CPPUNIT_TEST(testOldStyleStencils);                   // old stencil impl - deprecate
 
     CPPUNIT_TEST_SUITE_END();
@@ -61,6 +62,7 @@ public:
     void testWSMeanCurvature();
     void testWSMeanCurvatureStencil();
     void testMeanCurvatureTool();
+    void testMeanCurvatureMaskedTool();
     void testOldStyleStencils();
 };
 
@@ -534,6 +536,42 @@ TestMeanCurvature::testMeanCurvatureTool()
 
     xyz.reset(35,10,40);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/20.0, accessor.getValue(xyz), 0.001);
+}
+
+
+void
+TestMeanCurvature::testMeanCurvatureMaskedTool()
+{
+    using namespace openvdb;
+
+    FloatGrid::Ptr grid = createGrid<FloatGrid>(/*background=*/5.0);
+    FloatTree& tree = grid->tree();
+
+    const openvdb::Coord dim(64,64,64);
+    const openvdb::Vec3f center(35.0f, 30.0f, 40.0f);//i.e. (35,30,40) in index space
+    const float radius=0.0f;
+    unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
+
+    CPPUNIT_ASSERT(!tree.empty());
+
+    
+    const openvdb::CoordBBox maskbbox(openvdb::Coord(35, 30, 30), openvdb::Coord(41, 41, 41));
+    BoolGrid::Ptr maskGrid = BoolGrid::create(false);
+    maskGrid->fill(maskbbox, true/*value*/, true/*activate*/);
+    
+
+    FloatGrid::Ptr curv = tools::meanCurvature(*grid, *maskGrid);
+    FloatGrid::ConstAccessor accessor = curv->getConstAccessor();
+
+    // test inside
+    Coord xyz(35,30,30);
+    CPPUNIT_ASSERT(maskbbox.isInside(xyz));
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/10.0, accessor.getValue(xyz), 0.001);
+
+    // test outside
+    xyz.reset(35,10,40);
+    CPPUNIT_ASSERT(!maskbbox.isInside(xyz));
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, accessor.getValue(xyz), 0.001);
 }
 
 

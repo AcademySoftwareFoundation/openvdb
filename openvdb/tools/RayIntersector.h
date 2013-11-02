@@ -117,6 +117,7 @@ class LevelSetRayIntersector
 public:
     typedef GridT                         GridType;
     typedef RayT                          RayType;
+    typedef typename RayT::RealType       RealType;
     typedef typename RayT::Vec3T          Vec3Type;
     typedef typename GridT::ValueType     ValueT;
     typedef typename GridT::TreeType      TreeT;
@@ -237,6 +238,7 @@ class VolumeRayIntersector
 public:
     typedef GridT                         GridType;
     typedef RayT                          RayType;
+    typedef typename RayT::RealType       RealType;
     typedef typename GridT::TreeType      TreeT;
 
     BOOST_STATIC_ASSERT( NodeLevel >= 0 && NodeLevel < int(TreeT::DEPTH)-1);
@@ -303,7 +305,7 @@ public:
             t0 = mRay.t0();
             t1 = mRay.t1();
         }
-        mRay.setTimes(mRay.t1() + 1e-9, mTmax);
+        mRay.setTimes(mRay.t1() + math::Delta<RealType>::value(), mTmax);
         return n;
     }
 

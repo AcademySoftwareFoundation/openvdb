@@ -242,7 +242,7 @@ private:
     /// The version of the library that was used to create the file that was read
     VersionId mLibraryVersion;
     /// 16-byte (128-bit) UUID
-    mutable boost::uuids::uuid mUuid;// needs to mutable since writeHeader is const!
+    mutable boost::uuids::uuid mUuid;// needs to be mutable since writeHeader is const!
     /// Flag indicating whether the input stream contains grid offsets
     /// and therefore supports partial reading
     bool mInputHasGridOffsets;

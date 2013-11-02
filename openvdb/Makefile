@@ -276,6 +276,8 @@ INCLUDE_NAMES := \
     tools/LevelSetAdvect.h \
     tools/LevelSetFilter.h \
     tools/LevelSetFracture.h \
+    tools/LevelSetMeasure.h \
+    tools/LevelSetMorph.h \
     tools/LevelSetRebuild.h \
     tools/LevelSetSphere.h \
     tools/LevelSetTracker.h \

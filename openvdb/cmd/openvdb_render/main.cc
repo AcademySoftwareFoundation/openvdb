@@ -104,7 +104,7 @@ struct RenderOpts
 
     std::string validate() const
     {
-        if (shader != "diffuse" && shader != "matte" && shader != "normal") {
+        if (shader != "diffuse" && shader != "matte" && shader != "normal" && shader != "position") {
             return "expected diffuse, matte or normal shader, got \"" + shader + "\"";
         }
         if (!boost::starts_with(camera, "ortho") && !boost::starts_with(camera, "persp")) {
@@ -180,7 +180,7 @@ usage(int exitStatus = EXIT_FAILURE)
 "    -r X,Y,Z                                    \n" <<
 "    -rotate X,Y,Z     camera rotation in degrees\n" <<
 "                      (default: look at the center of the grid)\n" <<
-"    -shader S         shader name; either \"diffuse\", \"matte\" or \"normal\"\n" <<
+"    -shader S         shader name; either \"diffuse\", \"matte\", \"normal\" or \"position\"\n" <<
 "                      (default: " << opts.shader << ")\n" <<
 "    -samples N        number of samples (rays) per pixel (default: " << opts.samples << ")\n" <<
 "    -t X,Y,Z                            \n" <<
@@ -294,6 +294,10 @@ render(const GridType& grid, const std::string& imgFilename, const RenderOpts& o
         shader.reset(new tools::MatteShader);
     } else if (opts.shader == "normal") {
         shader.reset(new tools::NormalShader);
+    } else if (opts.shader == "position") {
+        const CoordBBox b = grid.evalActiveVoxelBoundingBox();
+        math::BBox<openvdb::Vec3R> bbox(b.min().asVec3d(), b.max().asVec3d());
+        shader.reset(new tools::PositionShader(bbox.applyMap(*(grid.transform().baseMap()))));
     } else {
         OPENVDB_THROW(ValueError,
             "expected diffuse, matte or normal shader, got \"" << opts.shader << "\"");

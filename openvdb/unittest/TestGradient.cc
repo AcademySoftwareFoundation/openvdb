@@ -52,6 +52,7 @@ public:
     CPPUNIT_TEST(testWSGradientNormSqr);             // Gradient Norm Sqr (world space only)
     CPPUNIT_TEST(testWSGradientNormSqrStencil);      // Gradient Norm Sqr (world space only)
     CPPUNIT_TEST(testGradientTool);                  // Gradient tool
+    CPPUNIT_TEST(testGradientMaskedTool);            // Gradient tool
     CPPUNIT_TEST(testIntersectsIsoValue);          // zero-crossing
     CPPUNIT_TEST(testOldStyleStencils);              // old stencil impl - deprecate
 
@@ -64,6 +65,7 @@ public:
     void testWSGradientNormSqr();
     void testWSGradientNormSqrStencil();
     void testGradientTool();
+    void testGradientMaskedTool();
     void testIntersectsIsoValue();
     void testOldStyleStencils();
 };
@@ -566,6 +568,43 @@ TestGradient::testGradientTool()
     CPPUNIT_ASSERT_EQUAL(int(tree.activeVoxelCount()), int(grad->activeVoxelCount()));
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, grad->getConstAccessor().getValue(xyz).length(),
         /*tolerance=*/0.01);
+}
+
+
+void
+TestGradient::testGradientMaskedTool()
+{
+    using namespace openvdb;
+
+    typedef FloatGrid::ConstAccessor  AccessorType;
+    FloatGrid::Ptr grid = createGrid<FloatGrid>(/*background=*/5.0);
+    FloatTree& tree = grid->tree();
+
+    const openvdb::Coord dim(64, 64, 64);
+    const openvdb::Vec3f center(35.0f, 30.0f, 40.0f);
+    const float radius = 10.0f;
+    unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
+
+    CPPUNIT_ASSERT(!tree.empty());
+    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
+  
+    const openvdb::CoordBBox maskbbox(openvdb::Coord(35, 30, 30), openvdb::Coord(41, 41, 41));
+    BoolGrid::Ptr maskGrid = BoolGrid::create(false);
+    maskGrid->fill(maskbbox, true/*value*/, true/*activate*/);
+
+    Vec3SGrid::Ptr grad = tools::gradient(*grid, *maskGrid);
+    {// outside the masked region
+        const Coord xyz(10, 20, 30); 
+        CPPUNIT_ASSERT(!maskbbox.isInside(xyz));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, grad->getConstAccessor().getValue(xyz).length(),
+                                     /*tolerance=*/0.01);
+    } 
+    {// inside the masked region
+        const Coord xyz(38, 35, 33);
+        CPPUNIT_ASSERT(maskbbox.isInside(xyz));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, grad->getConstAccessor().getValue(xyz).length(),
+                                     /*tolerance=*/0.01);
+    }
 }
 
 
