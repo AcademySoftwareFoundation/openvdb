@@ -884,7 +884,7 @@ TestTools::testLevelSetMeasure()
     //std::cerr << "\nArea of sphere = " << area << "  " << a << std::endl;
     //std::cerr << "Volume of sphere = " << volume << "  " << v << std::endl;
     //std::cerr << "Avg mean curvature of sphere = " << curv << "  " << c << std::endl;
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(area, a, 0.001);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(area, a, 0.01);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, 0.001);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(curv, c, 0.05);
     

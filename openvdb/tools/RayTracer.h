@@ -121,6 +121,7 @@ public:
 
     /// @brief Destructor
     ~LevelSetRayTracer();
+    
     /// @brief Set the level set grid to be ray-traced
     void setGrid(const GridT& grid);
 
@@ -139,6 +140,7 @@ public:
 
     /// @brief Set the camera derived from the abstract BaseCamera class.
     void setCamera(BaseCamera& camera);
+    
     /// @brief Set the number of pixel samples and the seed for
     /// jittered sub-rays. A value larger then one implies
     /// anti-aliasing by jittered super-sampling.
@@ -480,8 +482,14 @@ public:
     /// @brief Defines the interface of the virtual function that returns a RGB color.
     /// @param xyz World position of the intersection point.
     /// @param nml Normal in world space at the intersection point.
-    /// @param dir Direction of the ray that intersects.
+    /// @param dir Direction of the ray in world space.
     virtual Film::RGBA operator()(const Vec3R& xyz, const Vec3R& nml, const Vec3R& dir) const = 0;
+
+    /// @brief Deprecated, use the method above instead.
+    OPENVDB_DEPRECATED Film::RGBA operator()(const Vec3R& xyz, const Vec3R& nml, const RayT& ray) const
+      {
+          return (*this)(xyz, nml, ray.dir());
+      }
     virtual BaseShader* copy() const = 0;
 };
 
@@ -526,7 +534,7 @@ class PositionShader: public BaseShader
 {
 public:
     PositionShader(const math::BBox<Vec3R>& bbox, const Film::RGBA& c = Film::RGBA(1.0f))
-        : mMin(bbox.min()), mInvDim(1.0/bbox.extents()), mRGBA(c*0.5f) {}
+        : mMin(bbox.min()), mInvDim(1.0/bbox.extents()), mRGBA(c) {}
     virtual ~PositionShader() {}
     virtual Film::RGBA operator()(const Vec3R& xyz, const Vec3R&, const Vec3R&) const
     {
