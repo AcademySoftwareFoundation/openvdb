@@ -42,10 +42,10 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
-    
+
 /// @brief Smeared-out and continuous Dirac Delta function.
-template<typename RealT>    
-class DiracDelta    
+template<typename RealT>
+class DiracDelta
 {
 public:
     DiracDelta(RealT eps) : mC(0.5/eps), mD(2*boost::math::constants::pi<RealT>()*mC), mE(eps) {}
@@ -67,7 +67,7 @@ public:
     typedef typename TreeType::ValueType         ValueType;
     typedef typename tree::LeafManager<const TreeType> ManagerType;
     typedef typename ManagerType::LeafRange      RangeType;
-    
+
     BOOST_STATIC_ASSERT(boost::is_floating_point<ValueType>::value);
 
     /// @brief Main constructor from a grid
@@ -77,7 +77,7 @@ public:
     LevelSetMeasure(const GridType& grid, InterruptT* interrupt = NULL);
 
     LevelSetMeasure(ManagerType& leafs, Real Dx, InterruptT* interrupt);
-    
+
     /// @brief Shallow copy constructor called by tbb::parallel_reduce() threads.
     /// @param other The other LevelSetMeasure from which to copy.
     /// @param dummy Dummy argument required by tbb.
@@ -89,13 +89,13 @@ public:
 
     /// @brief Re-initialize using the specified LeafManager and voxelSize.
     void reinit(ManagerType& leafs, Real dx);
-    
+
     /// @brief Destructor
     ~LevelSetMeasure() {}
 
      /// @return the grain-size used for multi-threading
     int  getGrainSize() const { return mGrainSize; }
-    
+
     /// @brief Set the grain-size used for multi-threading.
     /// @note A grainsize of 0 or less disables multi-threading!
     void setGrainSize(int grainsize) { mGrainSize = grainsize; }
@@ -133,7 +133,7 @@ private:
     typedef typename LeafT::ValueOnCIter        VoxelCIterT;
     typedef typename ManagerType::BufferType    BufferT;
     typedef typename RangeType::Iterator        LeafIterT;
-    
+
     AccT         mAcc;
     ManagerType* mLeafs;
     InterruptT*  mInterrupter;
@@ -143,10 +143,10 @@ private:
 
     // @brief Return false if the process was interrupted
     bool checkInterrupter();
-        
+
     // Private cook method calling tbb::parallel_reduce
     void cook();
-   
+
     // Private methods called by tbb::parallel_reduce threads
     void measure2( const RangeType& );
 
@@ -157,7 +157,8 @@ private:
 
 
 template<typename GridT, typename InterruptT>
-LevelSetMeasure<GridT, InterruptT>::LevelSetMeasure(const GridT& grid, InterruptT* interrupt)
+inline
+LevelSetMeasure<GridT, InterruptT>::LevelSetMeasure(const GridType& grid, InterruptT* interrupt)
     : mAcc(grid.tree())
     , mLeafs(NULL)
     , mInterrupter(interrupt)
@@ -168,20 +169,22 @@ LevelSetMeasure<GridT, InterruptT>::LevelSetMeasure(const GridT& grid, Interrupt
     , mTask(0)
     , mGrainSize(1)
 {
-    if ( !grid.hasUniformVoxels() ) {
+    if (!grid.hasUniformVoxels()) {
          OPENVDB_THROW(RuntimeError,
              "The transform must have uniform scale for the LevelSetMeasure to function");
     }
-    if ( grid.getGridClass() != GRID_LEVEL_SET) {
+    if (grid.getGridClass() != GRID_LEVEL_SET) {
         OPENVDB_THROW(RuntimeError,
-                      "LevelSetMeasure only supports level sets!\n"
-                      "However, only level sets are guaranteed to work!\n"
-                      "Hint: Grid::setGridClass(openvdb::GRID_LEVEL_SET)");
+            "LevelSetMeasure only supports level sets;"
+            " try setting the grid class to \"level set\"");
     }
 }
 
+
 template<typename GridT, typename InterruptT>
-LevelSetMeasure<GridT, InterruptT>::LevelSetMeasure(ManagerType& leafs, Real dx, InterruptT* interrupt)
+inline
+LevelSetMeasure<GridT, InterruptT>::LevelSetMeasure(
+    ManagerType& leafs, Real dx, InterruptT* interrupt)
     : mAcc(leafs.tree())
     , mLeafs(&leafs)
     , mInterrupter(interrupt)
@@ -193,9 +196,10 @@ LevelSetMeasure<GridT, InterruptT>::LevelSetMeasure(ManagerType& leafs, Real dx,
     , mGrainSize(1)
 {
 }
-  
+
 
 template<typename GridT, typename InterruptT>
+inline
 LevelSetMeasure<GridT, InterruptT>::LevelSetMeasure(const LevelSetMeasure& other, tbb::split)
     : mAcc(other.mAcc)
     , mLeafs(other.mLeafs)
@@ -209,31 +213,35 @@ LevelSetMeasure<GridT, InterruptT>::LevelSetMeasure(const LevelSetMeasure& other
 {
 }
 
+
 template<typename GridT, typename InterruptT>
-void LevelSetMeasure<GridT, InterruptT>::reinit(const GridT& grid)
+inline void
+LevelSetMeasure<GridT, InterruptT>::reinit(const GridType& grid)
 {
-    if ( !grid.hasUniformVoxels() ) {
+    if (!grid.hasUniformVoxels()) {
          OPENVDB_THROW(RuntimeError,
              "The transform must have uniform scale for the LevelSetMeasure to function");
     }
-    if ( grid.getGridClass() != GRID_LEVEL_SET) {
+    if (grid.getGridClass() != GRID_LEVEL_SET) {
         OPENVDB_THROW(RuntimeError,
-                      "LevelSetMeasure only supports level sets!\n"
-                      "However, only level sets are guaranteed to work!\n"
-                      "Hint: Grid::setGridClass(openvdb::GRID_LEVEL_SET)");
+            "LevelSetMeasure only supports level sets;"
+            " try setting the grid class to \"level set\"");
     }
     mLeafs = NULL;
     mAcc = grid.getConstAccessor();
     mDx = grid.voxelSize()[0];
 }
 
+
 template<typename GridT, typename InterruptT>
-void LevelSetMeasure<GridT, InterruptT>::reinit(ManagerType& leafs, Real dx)
+inline void
+LevelSetMeasure<GridT, InterruptT>::reinit(ManagerType& leafs, Real dx)
 {
     mLeafs = &leafs;
     mAcc = AccT(leafs.tree());
     mDx = dx;
-}  
+}
+
 
 template<typename GridT, typename InterruptT>
 inline void
@@ -244,7 +252,9 @@ LevelSetMeasure<GridT, InterruptT>::join(const LevelSetMeasure& other)
     mCurv += other.mCurv;
 }
 
+
 ////////////////////////////////////////
+
 
 template<typename GridT, typename InterruptT>
 inline void
@@ -259,6 +269,7 @@ LevelSetMeasure<GridT, InterruptT>::measure(Real& area, Real& volume, bool useWo
     area   = dx * dx * mArea;
     volume = dx * dx * dx * mVol / 3.0;
 }
+
 
 template<typename GridT, typename InterruptT>
 inline void
@@ -276,7 +287,9 @@ LevelSetMeasure<GridT, InterruptT>::measure(Real& area, Real& volume, Real& avgM
     avgMeanCurvature = mCurv / area * dx;
 }
 
+
 ///////////////////////// PRIVATE METHODS //////////////////////
+
 
 template<typename GridT, typename InterruptT>
 inline bool
@@ -289,13 +302,14 @@ LevelSetMeasure<GridT, InterruptT>::checkInterrupter()
     return true;
 }
 
+
 template<typename GridT, typename InterruptT>
 inline void
 LevelSetMeasure<GridT, InterruptT>::cook()
 {
     const bool newLeafs = mLeafs == NULL;
     if (newLeafs) mLeafs = new ManagerType(mAcc.tree());
-    
+
     if (mGrainSize>0) {
         tbb::parallel_reduce(mLeafs->leafRange(mGrainSize), *this);
     } else {
@@ -307,7 +321,8 @@ LevelSetMeasure<GridT, InterruptT>::cook()
         mLeafs = NULL;
     }
 }
- 
+
+
 template<typename GridT, typename InterruptT>
 inline void
 LevelSetMeasure<GridT, InterruptT>::measure2(const RangeType& range)
@@ -319,7 +334,7 @@ LevelSetMeasure<GridT, InterruptT>::measure2(const RangeType& range)
     const DiracDelta<Real> DD(1.5);
     for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
         for (VoxelCIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter) {
-            const ValueType dd = DD(invDx * (*voxelIter));
+            const Real dd = DD(invDx * (*voxelIter));
             if (!math::isZero(dd)) {
                 const Coord ijk =  voxelIter.getCoord();
                 const Vec3T G = Grad::result(mAcc, ijk)*invDx;
@@ -329,25 +344,26 @@ LevelSetMeasure<GridT, InterruptT>::measure2(const RangeType& range)
         }
     }
 }
- 
+
+
 template<typename GridT, typename InterruptT>
 inline void
 LevelSetMeasure<GridT, InterruptT>::measure3(const RangeType& range)
 {
     typedef math::Vec3<ValueType> Vec3T;
     typedef math::ISGradient<math::CD_2ND> Grad;
-    typedef math::ISMeanCurvature<math::CD_SECOND, math::CD_2ND> Curv; 
+    typedef math::ISMeanCurvature<math::CD_SECOND, math::CD_2ND> Curv;
     this->checkInterrupter();
     const Real invDx = 1.0/mDx;
     const DiracDelta<Real> DD(1.5);
     ValueType alpha, beta;
     for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
         for (VoxelCIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter) {
-            const ValueType dd = DD(invDx * (*voxelIter));
+            const Real dd = DD(invDx * (*voxelIter));
             if (!math::isZero(dd)) {
-                const Coord ijk =  voxelIter.getCoord();
+                const Coord ijk = voxelIter.getCoord();
                 const Vec3T G = Grad::result(mAcc, ijk)*invDx;
-                const ValueType dA = dd * G.dot(G);
+                const Real dA = dd * G.dot(G);
                 mArea += dA;
                 mVol  += dd * G.dot(ijk.asVec3d());
                 Curv::result(mAcc, ijk, alpha, beta);
@@ -355,8 +371,8 @@ LevelSetMeasure<GridT, InterruptT>::measure3(const RangeType& range)
             }
         }
     }
-}    
-     
+}
+
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

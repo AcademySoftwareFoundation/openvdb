@@ -839,11 +839,12 @@ TestTools::testLevelSetMeasure()
     /// Test area and volume of sphere in world units
     m.measure(a, v);
     area = 4*Pi*r*r;
-    //std::cerr << "\nArea of sphere = " << area << "  " << a << std::endl;
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(area, a, 0.001);
     volume = 4.0/3.0*Pi*r*r*r;
+    //std::cerr << "\nArea of sphere = " << area << "  " << a << std::endl;
     //std::cerr << "\nVolume of sphere1 = " << volume << "  " << v << std::endl;
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, 0.001);
+    // Test accuracy of computed measures to within 1% of the exact measure. 
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, 0.01*area);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, 0.01*volume);
 
     // Test all measures of sphere1 in world units
     m.measure(a, v, c);
@@ -853,9 +854,10 @@ TestTools::testLevelSetMeasure()
     //std::cerr << "\nArea of sphere1 = " << area << "  " << a << std::endl;
     //std::cerr << "Volume of sphere1 = " << volume << "  " << v << std::endl;
     //std::cerr << "Avg mean curvature of sphere1 = " << curv << "  " << c << std::endl;
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(area, a, 0.001);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, 0.001);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(curv, c, 0.05);
+    // Test accuracy of computed measures to within 1% of the exact measure. 
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, 0.01*area);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, 0.01*volume);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(curv,   c, 0.01*curv);
 
      // Test all measures of sphere1 in index units
     m.measure(a, v, c, false);
@@ -866,9 +868,10 @@ TestTools::testLevelSetMeasure()
     //std::cerr << "\nArea of sphere = " << area << "  " << a << std::endl;
     //std::cerr << "Volume of sphere = " << volume << "  " << v << std::endl;
     //std::cerr << "Avg mean curvature of sphere = " << curv << "  " << c << std::endl;
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(area, a, 2);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, 100);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(curv, c, 0.001);
+    // Test accuracy of computed measures to within 1% of the exact measure. 
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, 0.01*area);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, 0.01*volume);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(curv,   c, 0.01*curv);
 
     // Second sphere
     C = openvdb::Vec3f(5.4f, 6.4f, 8.4f);
@@ -884,9 +887,10 @@ TestTools::testLevelSetMeasure()
     //std::cerr << "\nArea of sphere = " << area << "  " << a << std::endl;
     //std::cerr << "Volume of sphere = " << volume << "  " << v << std::endl;
     //std::cerr << "Avg mean curvature of sphere = " << curv << "  " << c << std::endl;
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(area, a, 0.01);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, 0.001);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(curv, c, 0.05);
+    // Test accuracy of computed measures to within 1% of the exact measure. 
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, 0.01*area);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, 0.01*volume);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(curv,   c, 0.01*curv);
     
      // Test all measures of sphere in index units
     m.measure(a, v, c, false);
@@ -897,9 +901,10 @@ TestTools::testLevelSetMeasure()
     //std::cerr << "\nArea of sphere = " << area << "  " << a << std::endl;
     //std::cerr << "Volume of sphere = " << volume << "  " << v << std::endl;
     //std::cerr << "Avg mean curvature of sphere = " << curv << "  " << c << std::endl;
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, 150);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, 150);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(curv, c, 0.001);
+    // Test accuracy of computed measures to within 1% of the exact measure. 
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, 0.01*area);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, 0.01*volume);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(curv,   c, 0.01*curv);
 
     // Read level set from file
     /*

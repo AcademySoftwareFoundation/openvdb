@@ -15,7 +15,10 @@ Version 2.1.0 - In development
     - Added math::BBox::applyMap and math::BBox::applyInverseMap which 
       allows for transformation of axis-aligned bounding boxes.
     - Changed the API of the BaseShader and added a position shader to the 
-      level set ray-tracer for the simple purpose of debugging. 
+      level set ray-tracer for the simple purpose of debugging.
+    - Improved tools::levelSetRebuild accuracy.
+    - Fixed a bug in the VolumeToMesh converter that generated invalid polygons
+      when the zero-crossing laid in between the active and inactive regions.
 
 Version 2.0.0 - October 31, 2013
     - Added a Python module with functions for basic manipulation of grids

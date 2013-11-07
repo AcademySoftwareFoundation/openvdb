@@ -104,8 +104,8 @@ struct RenderOpts
 
     std::string validate() const
     {
-        if (shader != "diffuse" && shader != "matte" && shader != "normal" && shader != "position") {
-            return "expected diffuse, matte or normal shader, got \"" + shader + "\"";
+        if (shader != "diffuse" && shader != "matte" && shader != "normal" && shader != "position"){
+            return "expected diffuse, matte, normal or position shader, got \"" + shader + "\"";
         }
         if (!boost::starts_with(camera, "ortho") && !boost::starts_with(camera, "persp")) {
             return "expected perspective or orthographic camera, got \"" + camera + "\"";
@@ -180,8 +180,8 @@ usage(int exitStatus = EXIT_FAILURE)
 "    -r X,Y,Z                                    \n" <<
 "    -rotate X,Y,Z     camera rotation in degrees\n" <<
 "                      (default: look at the center of the grid)\n" <<
-"    -shader S         shader name; either \"diffuse\", \"matte\", \"normal\" or \"position\"\n" <<
-"                      (default: " << opts.shader << ")\n" <<
+"    -shader S         shader name; either \"diffuse\", \"matte\", \"normal\"\n" <<
+"                      or \"position\" (default: " << opts.shader << ")\n" <<
 "    -samples N        number of samples (rays) per pixel (default: " << opts.samples << ")\n" <<
 "    -t X,Y,Z                            \n" <<
 "    -translate X,Y,Z  camera translation\n" <<
@@ -300,7 +300,7 @@ render(const GridType& grid, const std::string& imgFilename, const RenderOpts& o
         shader.reset(new tools::PositionShader(bbox.applyMap(*(grid.transform().baseMap()))));
     } else {
         OPENVDB_THROW(ValueError,
-            "expected diffuse, matte or normal shader, got \"" << opts.shader << "\"");
+            "expected diffuse, matte, normal or position shader, got \"" << opts.shader << "\"");
     }
 
     if (opts.verbose) {

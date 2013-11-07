@@ -22,7 +22,10 @@
 - Changed the API of the @vdblink::tools::BaseShader tools::BaseShader@endlink 
   and added @vdblink::tools::PositionShader tools::PositionShader@endlink to 
   the level set ray-tracer for the simple purpose of debugging.
-
+- Improved tools::levelSetRebuild accuracy.
+- Fixed a bug in the VolumeToMesh converter that generated invalid polygons
+  when the zero-crossing laid in between the active and inactive regions.
+      
 @htmlonly <a name="v2_0_0_changes"></a>@endhtmlonly
 @par
 <B>Version 2.0.0</B> - <I>October 31, 2013</I>
