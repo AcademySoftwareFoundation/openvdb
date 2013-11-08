@@ -16,6 +16,8 @@
   (used in VDB) and the XYZ memory layout employed by Houdini and Maya.
 - Added masking options to grid operators that compute cpt, curl, divergence,  
   gradient, laplacian, meanCurvature, magnitude, and normalize.
+- Added masking options to the Analysis Houdini SOP.
+- Added more narrow band controls to the 'Rebuild Level Set' Houdini SOP
 - Added @vdblink::math::BBox::applyMap BBox::applyMap@endlink and 
   @vdblink::math::BBox::applyInverseMap BBox::applyInverseMap@endlink which 
   allows for transformation of axis-aligned bounding boxes.

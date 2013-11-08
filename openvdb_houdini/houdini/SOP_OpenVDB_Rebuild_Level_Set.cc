@@ -32,13 +32,18 @@
 ///
 /// @author FX R&D OpenVDB team
 ///
-/// @brief Level set rebuild and resample.
+/// @brief Rebuild level sets or fog volumes.
 
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/tools/LevelSetRebuild.h>
+
 #include <UT/UT_Interrupt.h>
+#include <CH/CH_Manager.h>
+#include <PRM/PRM_Parm.h>
+#include <PRM/PRM_SharedFunc.h>
+
 #include <boost/algorithm/string/join.hpp>
 
 namespace hvdb = openvdb_houdini;
@@ -59,6 +64,7 @@ public:
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
     virtual bool updateParmsFlags();
+    virtual void resolveObsoleteParms(PRM_ParmList*);
 };
 
 
@@ -70,6 +76,9 @@ void
 newSopOperator(OP_OperatorTable* table)
 {
     if (table == NULL) return;
+
+    //////////
+    // Conversion settings
 
     hutil::ParmList parms;
 
@@ -83,21 +92,40 @@ newSopOperator(OP_OperatorTable* table)
         .setRange(PRM_RANGE_UI, -1, PRM_RANGE_UI, 1)
         .setHelpText("The isovalue that defines the implicit surface"));
 
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "halfbandwidth", "Half-Band Width")
+
+    // Narrow-band width {
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "exteriorBandWidth", "Exterior Band Voxels")
         .setDefault(PRMthreeDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
-        .setHelpText(
-            "Half the width of the narrow band, in voxel units\n"
-            "(3 is optimal for level set operations)"));
+        .setHelpText("Specify the width of the exterior (d >= 0) portion of the narrow band. "
+            "(3 voxel units is optimal for level set operations.)"));
+
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "interiorBandWidth", "Interior Band Voxels")
+        .setDefault(PRMthreeDefaults)
+        .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
+        .setHelpText("Specify the width of the interior (d < 0) portion of the narrow band. "
+            "(3 voxel units is optimal for level set operations.)"));
+    // }
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "fillinterior", "Fill Interior")
-        .setHelpText(
-            "Densify the interior of a level set by computing\n"
-            "signed distances for all interior voxels."));
+        .setHelpText("Extract signed distances for all interior voxels, this "
+            "operation is going to densify the interior of the model. "
+            "Requires a closed watertight model."));
 
+    //////////
+    // Obsolete parameters
+
+    hutil::ParmList obsoleteParms;
+    obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "halfbandwidth", "Half-Band Width")
+        .setDefault(PRMthreeDefaults));
+
+
+    //////////
     // Register this operator.
+
     hvdb::OpenVDBOpFactory("OpenVDB Rebuild Level Set",
         SOP_OpenVDB_Rebuild_Level_Set::factory, parms, *table)
+        .setObsoleteParms(obsoleteParms)
         .addInput("VDB grids to process");
 }
 
@@ -123,14 +151,36 @@ SOP_OpenVDB_Rebuild_Level_Set::SOP_OpenVDB_Rebuild_Level_Set(OP_Network* net,
 ////////////////////////////////////////
 
 
+void
+SOP_OpenVDB_Rebuild_Level_Set::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
+{
+    if (!obsoleteParms) return;
+    const fpreal time = CHgetEvalTime();
+
+    PRM_Parm* parm = obsoleteParms->getParmPtr("halfbandwidth");
+
+    if (parm && !parm->isFactoryDefault()) {
+        const fpreal voxelWidth = obsoleteParms->evalFloat("halfbandwidth", 0, time);
+        setFloat("exteriorBandWidth", 0, time, voxelWidth);
+        setFloat("interiorBandWidth", 0, time, voxelWidth);
+    }
+
+    // Delegate to the base class.
+    hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
+}
+
+
+////////////////////////////////////////
+
+
 // Enable/disable or show/hide parameters in the UI.
 bool
 SOP_OpenVDB_Rebuild_Level_Set::updateParmsFlags()
 {
     bool changed = false;
 
-    // Not sure if this is a desired feature.
-    changed |= setVisibleState("fillinterior", false);
+    const bool fillinterior = bool(evalInt("fillinterior", 0, 0));
+    changed |= enableParm("interiorBandWidth", !fillinterior);
 
     return changed;
 }
@@ -156,10 +206,9 @@ SOP_OpenVDB_Rebuild_Level_Set::cookMySop(OP_Context& context)
         const GA_PrimitiveGroup* group = this->matchGroup(*gdp, groupStr.toStdString());
 
         // Get other UI parameters.
-        const float exBandWidth = evalFloat("halfbandwidth", 0, time);
-
-        float inBandWidth = bool(evalInt("fillinterior", 0, time)) ?
-            std::numeric_limits<float>::max() : exBandWidth;
+        const float exBandWidth = evalFloat("exteriorBandWidth", 0, time);
+        const float inBandWidth = bool(evalInt("fillinterior", 0, time)) ?
+            std::numeric_limits<float>::max() : evalFloat("interiorBandWidth", 0, time);
 
         const float iso = evalFloat("isovalue", 0, time);
 

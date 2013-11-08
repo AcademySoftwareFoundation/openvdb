@@ -733,7 +733,7 @@ operator()(const tbb::blocked_range<size_t>& range) const
             RayType ray = mCamera->getRay(i, j);//primary ray
             Film::RGBA c = mInter.intersectsWS(ray, xyz, nml) ? shader(xyz, nml, ray.dir()) : bg;
             for (size_t k=0; k<mSubPixels; ++k, n +=2 ) {
-                ray = mCamera->getRay(i, j, mRand[n & 15], mRand[n+1 & 15]);
+                ray = mCamera->getRay(i, j, mRand[n & 15], mRand[(n+1) & 15]);
                 c += mInter.intersectsWS(ray, xyz, nml) ? shader(xyz, nml, ray.dir()) : bg;
             }//loop over sub-pixels
             bg = c*frac;

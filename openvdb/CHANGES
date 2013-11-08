@@ -12,6 +12,8 @@ Version 2.1.0 - In development
       and the XYZ memory layout employed by Houdini and Maya. 
     - Added masking options to grid operators that compute cpt, curl, 
       divergence, gradient, laplacian, meanCurvature, magnitude, and normalize.
+    - Added masking options to the Analysis Houdini SOP.
+    - Added more narrow band controls to the 'Rebuild Level Set' Houdini SOP
     - Added math::BBox::applyMap and math::BBox::applyInverseMap which 
       allows for transformation of axis-aligned bounding boxes.
     - Changed the API of the BaseShader and added a position shader to the 
