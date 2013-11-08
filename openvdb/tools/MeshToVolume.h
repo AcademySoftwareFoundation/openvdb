@@ -188,7 +188,7 @@ meshToUnsignedDistanceField(
 
 
 /// Conversion flags, used to control the MeshToVolume output
-enum { GENERATE_PRIM_INDEX_GRID = 0x1 };
+enum { GENERATE_PRIM_INDEX_GRID = 0x1, OUTPUT_RAW_DATA = 0x2};
 
 
 // MeshToVolume
@@ -2296,6 +2296,7 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
 {
     mDistGrid->setTransform(mTransform);
     mIndexGrid->setTransform(mTransform);
+    const bool rawData = OUTPUT_RAW_DATA & mConversionFlags;
 
     // The progress estimates given to the interrupter are based on the
     // observed average time for each stage and therefore not alway
@@ -2316,6 +2317,7 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
         mIndexGrid->tree().merge(voxelizer.primIndexTree());
         mIntersectingVoxelsGrid->tree().merge(voxelizer.intersectionTree());
     }
+
 
     if (!unsignedDistField) {
         // Determine the inside/outside state for the narrow band of voxels.
@@ -2373,14 +2375,16 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
 
             // Remove mesh intersecting voxels that where set by rasterizing
             // self-intersecting portions of the mesh.
-            internal::IntersectingVoxelCleaner<FloatTreeT> cleaner(mDistGrid->tree(),
-                mIndexGrid->tree(), mIntersectingVoxelsGrid->tree(), leafs);
-            cleaner.run();
+            if (!rawData) {
+                internal::IntersectingVoxelCleaner<FloatTreeT> cleaner(mDistGrid->tree(),
+                    mIndexGrid->tree(), mIntersectingVoxelsGrid->tree(), leafs);
+                cleaner.run();
+            }
         }
 
-        {
-            // Remove shell voxels that where set by rasterizing
-            // self-intersecting portions of the mesh.
+        // Remove shell voxels that where set by rasterizing
+        // self-intersecting portions of the mesh.
+        if (!rawData) {
 
             tree::LeafManager<FloatTreeT> leafs(mDistGrid->tree());
 
@@ -2465,9 +2469,9 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
 
     if (wasInterrupted(80)) return;
 
-    // Smooth out bumps caused by self-intersecting and overlapping portions
-    // of the mesh and renormalize the level set.
-    if (!unsignedDistField) {
+    // Renormalize distances to smooth out bumps caused by self-intersecting
+    // and overlapping portions of the mesh and renormalize the level set.
+    if (!unsignedDistField && !rawData) {
 
         mDistGrid->tree().pruneLevelSet();
         tree::LeafManager<FloatTreeT> leafs(mDistGrid->tree(), 1);

@@ -104,8 +104,8 @@ struct RenderOpts
 
     std::string validate() const
     {
-        if (shader != "diffuse" && shader != "matte" && shader != "normal") {
-            return "expected diffuse, matte or normal shader, got \"" + shader + "\"";
+        if (shader != "diffuse" && shader != "matte" && shader != "normal" && shader != "position"){
+            return "expected diffuse, matte, normal or position shader, got \"" + shader + "\"";
         }
         if (!boost::starts_with(camera, "ortho") && !boost::starts_with(camera, "persp")) {
             return "expected perspective or orthographic camera, got \"" + camera + "\"";
@@ -180,8 +180,8 @@ usage(int exitStatus = EXIT_FAILURE)
 "    -r X,Y,Z                                    \n" <<
 "    -rotate X,Y,Z     camera rotation in degrees\n" <<
 "                      (default: look at the center of the grid)\n" <<
-"    -shader S         shader name; either \"diffuse\", \"matte\" or \"normal\"\n" <<
-"                      (default: " << opts.shader << ")\n" <<
+"    -shader S         shader name; either \"diffuse\", \"matte\", \"normal\"\n" <<
+"                      or \"position\" (default: " << opts.shader << ")\n" <<
 "    -samples N        number of samples (rays) per pixel (default: " << opts.samples << ")\n" <<
 "    -t X,Y,Z                            \n" <<
 "    -translate X,Y,Z  camera translation\n" <<
@@ -237,15 +237,16 @@ saveEXR(const std::string& fname, const openvdb::tools::Film& film, const Render
     header.channels().insert("A", Imf::Channel(Imf::FLOAT));
 
     const size_t pixelBytes = sizeof(RGBA), rowBytes = pixelBytes * film.width();
+    RGBA& pixel0 = const_cast<RGBA*>(film.pixels())[0];
     Imf::FrameBuffer framebuffer;
-    framebuffer.insert("R", Imf::Slice(Imf::FLOAT,
-        (char*)(&(film.pixels()[0].r)), pixelBytes, rowBytes));
-    framebuffer.insert("G", Imf::Slice(Imf::FLOAT,
-        (char*)(&(film.pixels()[0].g)), pixelBytes, rowBytes));
-    framebuffer.insert("B", Imf::Slice(Imf::FLOAT,
-        (char*)(&(film.pixels()[0].b)), pixelBytes, rowBytes));
-    framebuffer.insert("A", Imf::Slice(Imf::FLOAT,
-        (char*)(&(film.pixels()[0].a)), pixelBytes, rowBytes));
+    framebuffer.insert("R",
+        Imf::Slice(Imf::FLOAT, reinterpret_cast<char*>(&pixel0.r), pixelBytes, rowBytes));
+    framebuffer.insert("G",
+        Imf::Slice(Imf::FLOAT, reinterpret_cast<char*>(&pixel0.g), pixelBytes, rowBytes));
+    framebuffer.insert("B",
+        Imf::Slice(Imf::FLOAT, reinterpret_cast<char*>(&pixel0.b), pixelBytes, rowBytes));
+    framebuffer.insert("A",
+        Imf::Slice(Imf::FLOAT, reinterpret_cast<char*>(&pixel0.a), pixelBytes, rowBytes));
 
     Imf::OutputFile imgFile(filename.c_str(), header);
     imgFile.setFrameBuffer(framebuffer);
@@ -293,9 +294,13 @@ render(const GridType& grid, const std::string& imgFilename, const RenderOpts& o
         shader.reset(new tools::MatteShader);
     } else if (opts.shader == "normal") {
         shader.reset(new tools::NormalShader);
+    } else if (opts.shader == "position") {
+        const CoordBBox b = grid.evalActiveVoxelBoundingBox();
+        math::BBox<openvdb::Vec3R> bbox(b.min().asVec3d(), b.max().asVec3d());
+        shader.reset(new tools::PositionShader(bbox.applyMap(*(grid.transform().baseMap()))));
     } else {
         OPENVDB_THROW(ValueError,
-            "expected diffuse, matte or normal shader, got \"" << opts.shader << "\"");
+            "expected diffuse, matte, normal or position shader, got \"" << opts.shader << "\"");
     }
 
     if (opts.verbose) {

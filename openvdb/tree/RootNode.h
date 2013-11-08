@@ -1907,7 +1907,7 @@ RootNode<ChildT>::copyToDense(const CoordBBox& bbox, DenseT& dense) const
 {
     typedef typename DenseT::ValueType DenseValueType;
 
-    const size_t xStride = dense.xStride(), yStride = dense.yStride();// zStride=1
+    const size_t xStride = dense.xStride(), yStride = dense.yStride(), zStride = dense.zStride();
     const Coord& min = dense.bbox().min();
     CoordBBox nodeBBox;
     for (Coord xyz = bbox.min(); xyz[0] <= bbox.max()[0]; xyz[0] = nodeBBox.max()[0] + 1) {
@@ -1926,13 +1926,13 @@ RootNode<ChildT>::copyToDense(const CoordBBox& bbox, DenseT& dense) const
                 } else {//is background or a tile value
                     const ValueType value = iter==mTable.end() ? mBackground : getTile(iter).value;
                     sub.translate(-min);
-                    DenseValueType* a0 = dense.data() + sub.min()[2];
+                    DenseValueType* a0 = dense.data() + zStride*sub.min()[2];
                     for (Int32 x=sub.min()[0], ex=sub.max()[0]+1; x<ex; ++x) {
                         DenseValueType* a1 = a0 + x*xStride;
                         for (Int32 y=sub.min()[1], ey=sub.max()[1]+1; y<ey; ++y) {
                             DenseValueType* a2 = a1 + y*yStride;
-                            for (Int32 z=sub.min()[2], ez=sub.max()[2]+1; z<ez; ++z) {
-                                *a2++ = DenseValueType(value);
+                            for (Int32 z=sub.min()[2], ez=sub.max()[2]+1; z<ez; ++z, a2 += zStride) {
+                                *a2 =  DenseValueType(value);
                             }
                         }
                     }

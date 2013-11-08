@@ -3,9 +3,36 @@
 @page changes Release Notes
 
 
+@htmlonly <a name="v2_1_0_changes"></a>@endhtmlonly
+@par
+<B>Version 2.1.0</B> - <I>In development</I>
+- Added @vdblink::tools::LevelSetMorphing LevelSetMorphing@endlink, i.e. 
+  shape morphology (more improvements coming soon!).
+- Added @vdblink::tools::LevelSetMeasure LevelSetMeasure@endlink that 
+  performs multi-threaded computation of surface area, volume and average 
+  mean-curvature for narrow band level sets (in both world and voxel units).
+- Reimplemented the @vdblink::tools::Dense Dense@endlink volume class and 
+  its convertes to and from VDB so they support both the ZYX memory layout 
+  (used in VDB) and the XYZ memory layout employed by Houdini and Maya.
+- Added masking options to grid operators that compute cpt, curl, divergence,  
+  gradient, laplacian, meanCurvature, magnitude, and normalize.
+- Added masking options to the Analysis Houdini SOP.
+- Added more narrow band controls to the 'Rebuild Level Set' Houdini SOP
+- Added @vdblink::math::BBox::applyMap BBox::applyMap@endlink and 
+  @vdblink::math::BBox::applyInverseMap BBox::applyInverseMap@endlink which 
+  allows for transformation of axis-aligned bounding boxes.
+- Changed the API of the @vdblink::tools::BaseShader tools::BaseShader@endlink 
+  and added @vdblink::tools::PositionShader tools::PositionShader@endlink to 
+  the level set ray-tracer for the simple purpose of debugging.
+- Improved tools::levelSetRebuild accuracy.
+- Fixed a bug in the VolumeToMesh converter that generated invalid polygons
+  when the zero-crossing laid in between the active and inactive regions.
+      
 @htmlonly <a name="v2_0_0_changes"></a>@endhtmlonly
 @par
 <B>Version 2.0.0</B> - <I>October 31, 2013</I>
+- Added a @ref python "Python module" with functions for basic manipulation
+  of grids (but no tools, yet).
 - Added ray intersector tools for efficient, hierarchical intersection
   of rays with @vdblink::tools::LevelSetRayIntersector level-set@endlink
   and @vdblink::tools::VolumeRayIntersector generic@endlink volumes.
@@ -80,7 +107,12 @@
   Boost.Random instead of @c rand() (which is not thread-safe), and deprecated
   @vdblink::math::randUniform math::randUniform@endlink and added
   @vdblink::math::Random01 math::Random01@endlink to replace it. 
-- Fixed bugs in @vdblink::tools::CopyFromDense tools::CopyFromDense@endlink.
+- Modified @vdblink::tools::copyFromDense() tools::copyFromDense@endlink
+  and @vdblink::tools::copyToDense() tools::copyToDense@endlink to allow
+  for implicit type conversion (e.g., between a
+  @vdblink::tools::Dense Dense&lt;Int32&gt;@endlink and a
+  @vdblink::FloatTree FloatTree@endlink) and fixed several bugs
+  in @vdblink::tools::CopyFromDense tools::CopyFromDense@endlink.
 - Fixed bugs in @vdblink::math::Stats math::Stats@endlink and
   @vdblink::math::Histogram math::Histogram@endlink that could produce
   <TT>NaN</TT>s or other incorrect behavior if certain methods were called
@@ -107,6 +139,7 @@
   and @vdblink::tree::LeafNode::offsetToGlobalCoord()
   offsetToGlobalCoord@endlink, respectively, and likewise for
   @vdblink::tree::InternalNode::offsetToGlobalCoord() InternalNode@endlink.
+  <I>[Thanks to Rick Hankins for suggesting this change.]</I>
 - Replaced @vdblink::tree::Tree Tree@endlink methods @c setValueOnMin,
   @c setValueOnMax and @c setValueOnSum with
   @vdblink::tools::setValueOnMin() tools::setValueOnMin@endlink,

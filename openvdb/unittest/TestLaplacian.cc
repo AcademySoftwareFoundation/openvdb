@@ -51,6 +51,7 @@ public:
     CPPUNIT_TEST(testWSLaplacianFrustum);             // Laplacian in World Space
     CPPUNIT_TEST(testWSLaplacianStencil);
     CPPUNIT_TEST(testLaplacianTool);                  // Laplacian tool
+    CPPUNIT_TEST(testLaplacianMaskedTool);                  // Laplacian tool
     CPPUNIT_TEST(testOldStyleStencils);               // old stencil impl
     CPPUNIT_TEST_SUITE_END();
 
@@ -60,6 +61,7 @@ public:
     void testWSLaplacianFrustum();
     void testWSLaplacianStencil();
     void testLaplacianTool();
+    void testLaplacianMaskedTool();
     void testOldStyleStencils();
 };
 
@@ -433,6 +435,54 @@ TestLaplacian::testLaplacianTool()
 
     CPPUNIT_ASSERT_DOUBLES_EQUAL(
         2.0/20.0, lap->getConstAccessor().getValue(xyz),0.01);// 2/distance from center
+}
+
+void
+TestLaplacian::testLaplacianMaskedTool()
+{
+    using namespace openvdb;
+
+    typedef FloatGrid::ConstAccessor  AccessorType;
+    FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
+    FloatTree& tree = grid->tree();
+    CPPUNIT_ASSERT(tree.empty());
+
+    const Coord dim(64, 64, 64);
+    const openvdb::Vec3f center(35.0f, 30.0f, 40.0f);
+    const float radius=0.0f;
+    unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
+
+    CPPUNIT_ASSERT(!tree.empty());
+    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
+    
+    const openvdb::CoordBBox maskbbox(openvdb::Coord(35, 30, 30), openvdb::Coord(41, 41, 41));
+    BoolGrid::Ptr maskGrid = BoolGrid::create(false);
+    maskGrid->fill(maskbbox, true/*value*/, true/*activate*/);
+    
+
+    FloatGrid::Ptr lap = tools::laplacian(*grid, *maskGrid);
+    
+    {// outside the masked region
+        Coord xyz(34,30,30);
+        
+        CPPUNIT_ASSERT(!maskbbox.isInside(xyz));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(
+                                     0, lap->getConstAccessor().getValue(xyz), 0.01);// 2/distance from center
+        
+        xyz.reset(35,10,40);
+        
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(
+                                     0, lap->getConstAccessor().getValue(xyz),0.01);// 2/distance from center
+    }
+
+    {// inside the masked region
+        Coord xyz(35,30,30);
+        
+        CPPUNIT_ASSERT(maskbbox.isInside(xyz));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(
+                                     2.0/10.0, lap->getConstAccessor().getValue(xyz), 0.01);// 2/distance from center
+        
+    }
 }
 
 // Copyright (c) 2012-2013 DreamWorks Animation LLC

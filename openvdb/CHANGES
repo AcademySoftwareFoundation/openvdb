@@ -1,7 +1,30 @@
 OpenVDB Version History
 =======================
 
+Version 2.1.0 - In development
+    - Added level set morphing, i.e. shape morphology (more improvements 
+      coming soon!)
+    - Added LevelSetMeasure that performs multi-threaded computation 
+      of surface area, volume and average mean-curvature for narrow band 
+      level sets (in both world and voxel units).
+    - Reimplemented the Dense volume class and its convertes to and 
+      from VDB so they support both the ZYX memory layout (used in VDB) 
+      and the XYZ memory layout employed by Houdini and Maya. 
+    - Added masking options to grid operators that compute cpt, curl, 
+      divergence, gradient, laplacian, meanCurvature, magnitude, and normalize.
+    - Added masking options to the Analysis Houdini SOP.
+    - Added more narrow band controls to the 'Rebuild Level Set' Houdini SOP
+    - Added math::BBox::applyMap and math::BBox::applyInverseMap which 
+      allows for transformation of axis-aligned bounding boxes.
+    - Changed the API of the BaseShader and added a position shader to the 
+      level set ray-tracer for the simple purpose of debugging.
+    - Improved tools::levelSetRebuild accuracy.
+    - Fixed a bug in the VolumeToMesh converter that generated invalid polygons
+      when the zero-crossing laid in between the active and inactive regions.
+
 Version 2.0.0 - October 31, 2013
+    - Added a Python module with functions for basic manipulation of grids
+      (but no tools, yet).
     - Added ray intersector tools for efficient, hierarchical intersection
       of rays with level-set and generic volumes.
     - Added a Ray class and a hierarchical Digital Differential Analyzer
@@ -61,7 +84,9 @@ Version 2.0.0 - October 31, 2013
     - Reimplemented math::RandomInt using Boost.Random instead of rand()
       (which is not thread-safe), and deprecated math::randUniform()
       and added math::Random01 to replace it. 
-    - Fixed bugs in tools::CopyFromDense.
+    - Modified tools::copyFromDense() and tools::copyToDense() to allow
+      for implicit type conversion (e.g., between a Dense<Int32> and a
+      FloatTree) and fixed several bugs in tools::CopyFromDense.
     - Fixed bugs in math::Stats and math::Histogram that could produce
       NaNs or other incorrect behavior if certain methods were called
       on populations of size zero.
@@ -78,6 +103,7 @@ Version 2.0.0 - October 31, 2013
     - Renamed LeafNode::coord2offset(), LeafNode::offset2coord() and
       LeafNode::offset2globalCoord() to coordToOffset(), offsetToLocalCoord()
       and offsetToGlobalCoord(), respectively, and likewise for InternalNode.
+      [Thanks to Rick Hankins for suggesting this change.]
     - Replaced Tree methods setValueOnMin(), setValueOnMax() and
       setValueOnSum() with tools::setValueOnMin(), tools::setValueOnMax() and
       tools::setValueOnSum() (and a new tools::setValueOnMult()) and added

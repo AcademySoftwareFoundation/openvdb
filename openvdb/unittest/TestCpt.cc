@@ -49,12 +49,14 @@ public:
     CPPUNIT_TEST(testCpt);                      // Cpt in World Space
     CPPUNIT_TEST(testCptStencil);
     CPPUNIT_TEST(testCptTool);                  // Cpt tool
+    CPPUNIT_TEST(testCptMaskedTool);
     CPPUNIT_TEST(testOldStyleStencils);         // old stencil impl
     CPPUNIT_TEST_SUITE_END();
 
     void testCpt();
     void testCptStencil();
     void testCptTool();
+    void testCptMaskedTool();
     void testOldStyleStencils();
 };
 
@@ -476,6 +478,48 @@ TestCpt::testCptTool()
     ASSERT_DOUBLES_EXACTLY_EQUAL(center[0],P[0]);
     ASSERT_DOUBLES_EXACTLY_EQUAL(center[1],P[1]);
     ASSERT_DOUBLES_EXACTLY_EQUAL(center[2],P[2]);
+}
+
+void
+TestCpt::testCptMaskedTool()
+{
+    using namespace openvdb;
+
+    FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
+    const FloatTree& tree = grid->tree();
+    CPPUNIT_ASSERT(tree.empty());
+
+    const openvdb::Coord dim(64,64,64);
+    const openvdb::Vec3f center(35.0f, 30.0f, 40.0f);
+    const float radius=0;//point at {35,30,40}
+    unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
+    CPPUNIT_ASSERT(!tree.empty());
+    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
+
+    const openvdb::CoordBBox maskbbox(openvdb::Coord(35, 30, 30), openvdb::Coord(41, 41, 41));
+    BoolGrid::Ptr maskGrid = BoolGrid::create(false);
+    maskGrid->fill(maskbbox, true/*value*/, true/*activate*/);
+
+    // run the tool
+    typedef openvdb::tools::Cpt<FloatGrid> FloatCpt;
+    FloatCpt cpt(*grid, *maskGrid);
+    FloatCpt::OutGridType::Ptr cptGrid =
+        cpt.process(true/*threaded*/, false/*use world transform*/);
+
+    FloatCpt::OutGridType::ConstAccessor cptAccessor = cptGrid->getConstAccessor();
+
+    // inside the masked region
+    Coord xyz(35,30,30);
+    CPPUNIT_ASSERT(tree.isValueOn(xyz));
+
+    Vec3f P = cptAccessor.getValue(xyz);
+    ASSERT_DOUBLES_EXACTLY_EQUAL(center[0], P[0]);
+    ASSERT_DOUBLES_EXACTLY_EQUAL(center[1], P[1]);
+    ASSERT_DOUBLES_EXACTLY_EQUAL(center[2], P[2]);
+
+    // outside the masked region
+    xyz.reset(42,42,42);
+    CPPUNIT_ASSERT(!cptAccessor.isValueOn(xyz));
 }
 
 void

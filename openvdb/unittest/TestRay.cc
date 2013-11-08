@@ -101,7 +101,7 @@ void TestRay::testRay()
         RayT ray;
         CPPUNIT_ASSERT(ray.eye() == Vec3T(0,0,0));
         CPPUNIT_ASSERT(ray.dir() == Vec3T(1,0,0));
-        ASSERT_DOUBLES_APPROX_EQUAL( 0.001, ray.t0());
+        ASSERT_DOUBLES_APPROX_EQUAL( math::Delta<RealT>::value(), ray.t0());
         ASSERT_DOUBLES_APPROX_EQUAL( std::numeric_limits<RealT>::max(), ray.t1());
     }
     
@@ -339,7 +339,7 @@ void TestRay::testDDA()
         const RayType ray(eye, dir);
         //std::cerr << ray << std::endl;
         DDAType dda(ray);
-        ASSERT_DOUBLES_APPROX_EQUAL(0.001, dda.time());
+        ASSERT_DOUBLES_APPROX_EQUAL(math::Delta<double>::value(), dda.time());
         ASSERT_DOUBLES_APPROX_EQUAL(1.0, dda.next());
         //dda.print();
         dda.step();

@@ -53,6 +53,7 @@ public:
     CPPUNIT_TEST(testWSCurl);                    // Gradient in World Space
     CPPUNIT_TEST(testWSCurlStencil);
     CPPUNIT_TEST(testCurlTool);                  // Gradient tool
+    CPPUNIT_TEST(testCurlMaskedTool);            // Gradient tool
 
     CPPUNIT_TEST_SUITE_END();
 
@@ -61,6 +62,7 @@ public:
     void testWSCurl();
     void testWSCurlStencil();
     void testCurlTool();
+    void testCurlMaskedTool();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestCurl);
@@ -108,6 +110,72 @@ TestCurl::testCurlTool()
                 ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[0]);
                 ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[1]);
                 ASSERT_DOUBLES_EXACTLY_EQUAL(-2,v[2]);
+            }
+        }
+    }
+}
+
+
+void
+TestCurl::testCurlMaskedTool()
+{
+    using namespace openvdb;
+
+    typedef VectorGrid::ConstAccessor Accessor;
+
+    VectorGrid::Ptr inGrid = VectorGrid::create();
+    const VectorTree& inTree = inGrid->tree();
+    CPPUNIT_ASSERT(inTree.empty());
+
+    VectorGrid::Accessor inAccessor = inGrid->getAccessor();
+    int dim = GRID_DIM;
+    for (int x = -dim; x<dim; ++x) {
+        for (int y = -dim; y<dim; ++y) {
+            for (int z = -dim; z<dim; ++z) {
+                inAccessor.setValue(Coord(x,y,z),VectorTree::ValueType(y,-x,0));
+            }
+        }
+    }
+    CPPUNIT_ASSERT(!inTree.empty());
+    CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
+    
+    openvdb::CoordBBox maskBBox(openvdb::Coord(0), openvdb::Coord(dim));
+    BoolGrid::Ptr maskGrid = BoolGrid::create(false);
+    maskGrid->fill(maskBBox, true /*value*/, true /*activate*/);
+
+    openvdb::CoordBBox testBBox(openvdb::Coord(-dim+1), openvdb::Coord(dim));
+    BoolGrid::Ptr testGrid = BoolGrid::create(false);
+    testGrid->fill(testBBox, true, true);
+    
+    testGrid->topologyIntersection(*maskGrid);
+    
+
+    VectorGrid::Ptr curl_grid = tools::curl(*inGrid, *maskGrid);
+    CPPUNIT_ASSERT_EQUAL(math::Pow3(dim), int(curl_grid->activeVoxelCount()));
+
+    VectorGrid::ConstAccessor curlAccessor = curl_grid->getConstAccessor();
+    --dim;//ignore boundary curl vectors
+    for (int x = -dim; x<dim; ++x) {
+        for (int y = -dim; y<dim; ++y) {
+            for (int z = -dim; z<dim; ++z) {
+                Coord xyz(x,y,z);
+                VectorTree::ValueType v = inAccessor.getValue(xyz);
+             
+                ASSERT_DOUBLES_EXACTLY_EQUAL( y,v[0]);
+                ASSERT_DOUBLES_EXACTLY_EQUAL(-x,v[1]);
+                ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[2]);
+             
+                v = curlAccessor.getValue(xyz);
+                if (maskBBox.isInside(xyz)) {
+                    ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[0]);
+                    ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[1]);
+                    ASSERT_DOUBLES_EXACTLY_EQUAL(-2,v[2]);
+                } else { 
+                    // get the background value outside masked region
+                    ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[0]);
+                    ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[1]);
+                    ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[2]);
+                }
             }
         }
     }

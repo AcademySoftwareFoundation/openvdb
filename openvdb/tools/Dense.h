@@ -48,10 +48,6 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
-// Forward declaration (see definition below)
-template<typename ValueT> class Dense;
-
-
 /// @brief Populate a dense grid with the values of voxels from a sparse grid,
 /// where the sparse grid intersects the dense grid.
 /// @param sparse  an OpenVDB grid or tree from which to copy values
@@ -82,7 +78,85 @@ copyFromDense(
 
 ////////////////////////////////////////
 
+/// We currently support the following two 3D memory layouts for dense
+/// volumes: XYZ, i.e. x is the fastest moving index, and ZYX, i.e. z
+/// is the fastest moving index. The ZYX memory layout leads to nested
+/// for-loops of the order x, y, z, which we find to be the most
+/// intuitive. Hence, ZYX is the layout used throughout VDB. However,
+/// other data structures, e.g. Houdini and Maya, employ the XYZ
+/// layout. Clearly a dense volume with the ZYX layout converts more
+/// efficiently to a VDB, but we support both for convenience.     
+enum MemoryLayout { LayoutXYZ, LayoutZYX };     
+    
+/// @brief Base class for Dense which is defined below.
+/// @note The constructor of this class is protected to prevent direct
+/// instantiation.     
+template<typename ValueT, MemoryLayout Layout> class DenseBase;
 
+/// @brief Partial template specialization of DenseBase.
+/// @note ZYX is the memory-layout in VDB. It leads to nested
+/// for-loops of the order x, y, z which we find to be the most intuitive.
+template<typename ValueT>
+class DenseBase<ValueT, LayoutZYX>
+{
+public:
+    /// @brief Return the linear offset into this grid's value array given by
+    /// unsigned coordinates (i, j, k), i.e., coordinates relative to
+    /// the origin of this grid's bounding box.
+    inline size_t coordToOffset(size_t i, size_t j, size_t k) const { return i*mX + j*mY + k; }
+    
+    /// @brief Return the stride of the array in the x direction ( = dimY*dimZ).
+    /// @note This method is required by both CopyToDense and CopyFromDense.
+    inline size_t xStride() const { return mX; }
+
+    /// @brief Return the stride of the array in the y direction ( = dimZ).
+    /// @note This method is required by both CopyToDense and CopyFromDense.
+    inline size_t yStride() const { return mY; }
+
+    /// @brief Return the stride of the array in the z direction ( = 1).
+    /// @note This method is required by both CopyToDense and CopyFromDense.
+    static size_t zStride() { return 1; }
+    
+protected:
+    /// Protected constructor so as to prevent direct instantiation
+    DenseBase(const CoordBBox& bbox) : mBBox(bbox), mY(bbox.dim()[2]), mX(mY*bbox.dim()[1]) {}
+
+    const CoordBBox mBBox;//signed coordinates of the domain represented by the grid
+    const size_t mY, mX;//strides in the y and x direction
+};// end of DenseBase<ValueT, LayoutZYX>
+
+/// @brief Partial template specialization of DenseBase.
+/// @note This is the memory-layout emplayed in Houdini and Maya. It leads
+/// to nested for-loops of the order z, y, x.    
+template<typename ValueT>
+class DenseBase<ValueT, LayoutXYZ>
+{
+public:
+    /// @brief Return the linear offset into this grid's value array given by
+    /// unsigned coordinates (i, j, k), i.e., coordinates relative to
+    /// the origin of this grid's bounding box.
+    inline size_t coordToOffset(size_t i, size_t j, size_t k) const { return i + j*mY + k*mZ; }
+    
+    /// @brief Return the stride of the array in the x direction ( = 1).
+    /// @note This method is required by both CopyToDense and CopyFromDense.
+    static size_t xStride() { return 1; }
+
+    /// @brief Return the stride of the array in the y direction ( = dimX).
+    /// @note This method is required by both CopyToDense and CopyFromDense.
+    inline size_t yStride() const { return mY; }
+
+    /// @brief Return the stride of the array in the y direction ( = dimX*dimY).
+    /// @note This method is required by both CopyToDense and CopyFromDense.
+    inline size_t zStride() const { return mZ; }
+    
+protected:
+    /// Protected constructor so as to prevent direct instantiation
+    DenseBase(const CoordBBox& bbox) : mBBox(bbox), mY(bbox.dim()[0]), mZ(mY*bbox.dim()[1]) {}
+
+    const CoordBBox mBBox;//signed coordinates of the domain represented by the grid
+    const size_t mY, mZ;//strides in the y and z direction
+};// end of DenseBase<ValueT, LayoutXYZ>
+    
 /// @brief Dense is a simple dense grid API used by the CopyToDense and
 /// CopyFromDense classes defined below.
 /// @details Use the Dense class to efficiently produce a dense in-memory
@@ -92,24 +166,22 @@ copyFromDense(
 ///
 /// @note This class can be used as a simple wrapper for existing dense grid
 /// classes if they provide access to the raw data array.
-/// @note This implementation assumes a data layout where @e z is the
-/// fastest-changing index (because that is the layout used by OpenVDB grids).
-template<typename ValueT>
-class Dense
+/// @note This implementation allows for the 3D memory layout to be
+/// defined by the MemoryLayout template parameter (see above for definition).
+/// The default memory layout is ZYX since that's the layout used by OpenVDB grids.
+template<typename ValueT, MemoryLayout Layout = LayoutZYX>
+class Dense : public DenseBase<ValueT, Layout>
 {
 public:
     typedef ValueT ValueType;
+    typedef DenseBase<ValueT, Layout> BaseT;
 
     /// @brief Construct a dense grid with a given range of coordinates.
     ///
     /// @param bbox  the bounding box of the (signed) coordinate range of this grid
     /// @throw ValueError if the bounding box is empty.
     /// @note The min and max coordinates of the bounding box are inclusive.
-    Dense(const CoordBBox& bbox)
-        : mBBox(bbox), mY(bbox.dim()[2]), mX(mY*bbox.dim()[1])
-    {
-        this->initArray();
-    }
+    Dense(const CoordBBox& bbox) : BaseT(bbox) { this->init(); }    
 
     /// @brief Construct a dense grid with a given range of coordinates and initial value
     ///
@@ -117,10 +189,9 @@ public:
     /// @param value the initial value of the grid.
     /// @throw ValueError if the bounding box is empty.
     /// @note The min and max coordinates of the bounding box are inclusive.
-    Dense(const CoordBBox& bbox, const ValueT& value)
-        : mBBox(bbox), mY(bbox.dim()[2]), mX(mY*bbox.dim()[1])
+    Dense(const CoordBBox& bbox, const ValueT& value) : BaseT(bbox)
     {
-        this->initArray();
+        this->init();
         this->fill(value);
     }
 
@@ -133,13 +204,12 @@ public:
     /// @note The data array is assumed to have a stride of one in the @e z direction.
     /// @throw ValueError if the bounding box is empty.
     /// @note The min and max coordinates of the bounding box are inclusive.
-    Dense(const CoordBBox& bbox, ValueT* data)
-        : mBBox(bbox), mData(data), mY(mBBox.dim()[2]), mX(mY*mBBox.dim()[1])
+    Dense(const CoordBBox& bbox, ValueT* data) : BaseT(bbox), mData(data)
     {
-        if (mBBox.empty()) {
+        if (BaseT::mBBox.empty()) {
             OPENVDB_THROW(ValueError, "can't construct a dense grid with an empty bounding box");
         }
-    }
+    }    
 
     /// @brief Construct a dense grid with a given origin and dimensions.
     ///
@@ -149,85 +219,69 @@ public:
     /// @note The @a min coordinate is inclusive, and the max coordinate will be
     /// @a min + @a dim - 1.
     Dense(const Coord& dim, const Coord& min = Coord(0))
-        : mBBox(min, min+dim.offsetBy(-1)), mY(mBBox.dim()[2]), mX(mY*mBBox.dim()[1])
+        : BaseT(CoordBBox(min, min+dim.offsetBy(-1)))
     {
-        this->initArray();
+        this->init();
     }
+
+    /// @brief Return the memory layout for this grid (see above for definitions).
+    static MemoryLayout memoryLayout() { return Layout; }
 
     /// @brief Return a raw pointer to this grid's value array.
     /// @note This method is required by CopyToDense.
-    ValueT* data() { return mData; }
+    inline ValueT* data() { return mData; }
 
     /// @brief Return a raw pointer to this grid's value array.
     /// @note This method is required by CopyFromDense.
-    const ValueT* data() const { return mData; }
+    inline const ValueT* data() const { return mData; }
 
     /// @brief Return the bounding box of the signed index domain of this grid.
     /// @note This method is required by both CopyToDense and CopyFromDense.
-    const CoordBBox& bbox() const { return mBBox; }
-
-    /// @brief Return the stride of the array in the x direction ( = dimY*dimZ).
-    /// @note This method is required by both CopyToDense and CopyFromDense.
-    size_t xStride() const { return mX; }
-
-    /// @brief Return the stride of the array in the y direction ( = dimZ).
-    /// @note This method is required by both CopyToDense and CopyFromDense.
-    size_t yStride() const { return mY; }
+    inline const CoordBBox& bbox() const { return BaseT::mBBox; }
 
     /// @brief Return the number of voxels contained in this grid.
-    Index64 valueCount() const { return mBBox.volume(); }
+    inline Index64 valueCount() const { return BaseT::mBBox.volume(); }
 
     /// @brief Set the value of the voxel at the given array offset.
-    void setValue(size_t offset, const ValueT& value) { mData[offset] = value; }
+    inline void setValue(size_t offset, const ValueT& value) { mData[offset] = value; }
 
     /// @brief Return the value of the voxel at the given array offset.
     const ValueT& getValue(size_t offset) const { return mData[offset]; }
 
     /// @brief Set the value of the voxel at unsigned index coordinates (i, j, k).
     /// @note This is somewhat slower than using an array offset.
-    void setValue(size_t i, size_t j, size_t k, const ValueT& value)
+    inline void setValue(size_t i, size_t j, size_t k, const ValueT& value)
     {
-        mData[this->coordToOffset(i,j,k)] = value;
+        mData[BaseT::coordToOffset(i,j,k)] = value;
     }
 
     /// @brief Return the value of the voxel at unsigned index coordinates (i, j, k).
     /// @note This is somewhat slower than using an array offset.
-    const ValueT& getValue(size_t i, size_t j, size_t k) const
+    inline const ValueT& getValue(size_t i, size_t j, size_t k) const
     {
-        return mData[this->coordToOffset(i,j,k)];
+        return mData[BaseT::coordToOffset(i,j,k)];
     }
 
     /// @brief Set the value of the voxel at the given signed coordinates.
     /// @note This is slower than using either an array offset or unsigned index coordinates.
-    void setValue(const Coord& xyz, const ValueT& value)
+    inline void setValue(const Coord& xyz, const ValueT& value)
     {
         mData[this->coordToOffset(xyz)] = value;
     }
 
     /// @brief Return the value of the voxel at the given signed coordinates.
     /// @note This is slower than using either an array offset or unsigned index coordinates.
-    const ValueT& getValue(const Coord& xyz) const
+    inline const ValueT& getValue(const Coord& xyz) const
     {
         return mData[this->coordToOffset(xyz)];
     }
 
     /// @brief Fill this grid with a constant value.
-    void fill(const ValueT& value)
+    inline void fill(const ValueT& value)
     {
         size_t size = this->valueCount();
         ValueT* a = mData;
         while(size--) *a++ = value;
-    }
-
-    /// @brief Return the linear offset into this grid's value array given by
-    /// unsigned coordinates (i, j, k), i.e., coordinates relative to
-    /// the origin of this grid's bounding box.
-    ///
-    /// @note This method reflects the fact that we assume the same layout
-    /// of values as an OpenVDB grid, i.e., the fastest coordinate is @e k.
-    inline size_t coordToOffset(size_t i, size_t j, size_t k) const
-    {
-        return k + j*mY + i*mX;
     }
 
     /// @brief Return the linear offset into this grid's value array given by
@@ -238,30 +292,33 @@ public:
     /// layout of values as an OpenVDB grid, i.e., the fastest coordinate is @e z.
     inline size_t coordToOffset(Coord xyz) const
     {
-        assert(mBBox.isInside(xyz));
-        return this->coordToOffset(size_t(xyz[0]-mBBox.min()[0]),
-                                   size_t(xyz[1]-mBBox.min()[1]),
-                                   size_t(xyz[2]-mBBox.min()[2]));
+        assert(BaseT::mBBox.isInside(xyz));
+        return BaseT::coordToOffset(size_t(xyz[0]-BaseT::mBBox.min()[0]),
+                                    size_t(xyz[1]-BaseT::mBBox.min()[1]),
+                                    size_t(xyz[2]-BaseT::mBBox.min()[2]));
     }
 
-    Index64 memUsage() const{ return sizeof(*this) + mBBox.volume() * sizeof(ValueType); }
+    /// @brief Return the memory footprint of this Dense grid in bytes.
+    inline Index64 memUsage() const
+    {
+        return sizeof(*this) + BaseT::mBBox.volume() * sizeof(ValueType);
+    }
 
 private:
-    void initArray()
+
+    /// @brief Private method to initialize the dense value array.
+    void init()
     {
-        if (mBBox.empty()) {
+        if (BaseT::mBBox.empty()) {
             OPENVDB_THROW(ValueError, "can't construct a dense grid with an empty bounding box");
         }
-        mArray.reset(new ValueT[mBBox.volume()]);
+        mArray.reset(new ValueT[BaseT::mBBox.volume()]);
         mData = mArray.get();
     }
-
-    const CoordBBox mBBox;//signed coordinates of the domain represented by the grid
+    
     boost::shared_array<ValueT> mArray;
     ValueT* mData;//raw c-style pointer to values
-    const size_t mY, mX;//strides in x and y (by design it's 1 in z)
-};// end of Dense
-
+};// end of Dense    
 
 ////////////////////////////////////////
 

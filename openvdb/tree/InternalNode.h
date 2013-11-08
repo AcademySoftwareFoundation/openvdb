@@ -254,7 +254,7 @@ public:
 
     /// @brief Expand the specified bounding box so that it includes the active tiles
     /// of this internal node as well as all the active values in its child nodes.
-    /// If visitVoxels is false LeafNodes will be approximated as dense, i.e. with all 
+    /// If visitVoxels is false LeafNodes will be approximated as dense, i.e. with all
     /// voxels active. Else the individual active voxels are visited to produce a tight bbox.
     void evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels = true) const;
     OPENVDB_DEPRECATED void evalActiveVoxelBoundingBox(CoordBBox& bbox) const;
@@ -464,10 +464,10 @@ public:
     /// are marked as active in this branch but left with their original values.
     template<typename OtherChildNodeType>
     void topologyUnion(const InternalNode<OtherChildNodeType, Log2Dim>& other);
-   
+
     /// @brief Intersects this tree's set of active values with the active values
     /// of the other tree, whose @c ValueType may be different.
-    /// @details The resulting state of a value is active only if the corresponding 
+    /// @details The resulting state of a value is active only if the corresponding
     /// value was already active AND if it is active in the other tree. Also, a
     /// resulting value maps to a voxel if the corresponding value
     /// already mapped to an active voxel in either of the two grids
@@ -669,7 +669,7 @@ protected:
 
     void makeChildNodeEmpty(Index n, const ValueType& value);
     void setChildNode(  Index i, ChildNodeType* child);//assumes a tile
-    void resetChildNode(Index i, ChildNodeType* child);//checks for an existing child 
+    void resetChildNode(Index i, ChildNodeType* child);//checks for an existing child
     ChildNodeType* unsetChildNode(Index i, const ValueType& value);
 
     template<typename NodeT, typename VisitorOp, typename ChildAllIterT>
@@ -816,7 +816,7 @@ InternalNode<ChildT, Log2Dim>::onVoxelCount() const
     for (ChildOnCIter iter = this->cbeginChildOn(); iter; ++iter) {
         sum += iter->onVoxelCount();
     }
-    return sum;   
+    return sum;
 }
 
 
@@ -895,7 +895,7 @@ inline void
 InternalNode<ChildT, Log2Dim>::evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels) const
 {
     if (bbox.isInside(this->getNodeBoundingBox())) return;
-    
+
     for (ValueOnCIter i = this->cbeginValueOn(); i; ++i) bbox.expand(i.getCoord(), ChildT::DIM);
 
     for (ChildOnCIter i = this->cbeginChildOn(); i; ++i) i->evalActiveBoundingBox(bbox, visitVoxels);
@@ -1819,7 +1819,7 @@ InternalNode<ChildT, Log2Dim>::copyToDense(const CoordBBox& bbox, DenseT& dense)
 {
     typedef typename DenseT::ValueType DenseValueType;
 
-    const size_t xStride = dense.xStride(), yStride = dense.yStride();// zStride=1
+    const size_t xStride = dense.xStride(), yStride = dense.yStride(), zStride = dense.zStride();
     const Coord& min = dense.bbox().min();
     for (Coord xyz = bbox.min(), max; xyz[0] <= bbox.max()[0]; xyz[0] = max[0] + 1) {
         for (xyz[1] = bbox.min()[1]; xyz[1] <= bbox.max()[1]; xyz[1] = max[1] + 1) {
@@ -1836,13 +1836,13 @@ InternalNode<ChildT, Log2Dim>::copyToDense(const CoordBBox& bbox, DenseT& dense)
                 } else {//a tile value
                     const ValueType value = mNodes[n].getValue();
                     sub.translate(-min);
-                    DenseValueType* a0 = dense.data() + sub.min()[2];
+                    DenseValueType* a0 = dense.data() + zStride*sub.min()[2];
                     for (Int32 x=sub.min()[0], ex=sub.max()[0]+1; x<ex; ++x) {
                         DenseValueType* a1 = a0 + x*xStride;
                         for (Int32 y=sub.min()[1], ey=sub.max()[1]+1; y<ey; ++y) {
                             DenseValueType* a2 = a1 + y*yStride;
-                            for (Int32 z=sub.min()[2], ez=sub.max()[2]+1; z<ez; ++z) {
-                                *a2++ = DenseValueType(value);
+                            for (Int32 z=sub.min()[2], ez=sub.max()[2]+1; z<ez; ++z, a2 += zStride) {
+                                *a2 = DenseValueType(value);
                             }
                         }
                     }
@@ -2227,7 +2227,7 @@ InternalNode<ChildT, Log2Dim>::topologyIntersection(const InternalNode<OtherChil
             mValueMask.setOff(i);
         }
     }
-    
+
     // Loop over this node's active tiles
     for (ValueOnCIter iter = this->cbeginValueOn(); iter; ++iter) {
         const Index i = iter.pos();
@@ -2249,7 +2249,7 @@ InternalNode<ChildT, Log2Dim>::topologyDifference(const InternalNode<OtherChildT
 {
     typedef typename InternalNode<OtherChildT, Log2Dim>::ChildOnCIter OtherChildIter;
     typedef typename InternalNode<OtherChildT, Log2Dim>::ValueOnCIter OtherValueIter;
-     
+
     // Loop over other node's child nodes
     for (OtherChildIter iter = other.cbeginChildOn(); iter; ++iter) {
         const Index i = iter.pos();
@@ -2261,7 +2261,7 @@ InternalNode<ChildT, Log2Dim>::topologyDifference(const InternalNode<OtherChildT
             this->setChildNode(i, child);//we're replacing the active tile with a child branch
         }
     }
-    
+
     // Loop over other node's active tiles
     for (OtherValueIter iter = other.cbeginValueOn(); iter; ++iter) {
         const Index i = iter.pos();
@@ -2703,9 +2703,9 @@ template<typename ChildT, Index Log2Dim>
 inline Index
 InternalNode<ChildT, Log2Dim>::coordToOffset(const Coord& xyz)
 {
-    return (((xyz[0]&DIM-1u)>>ChildNodeType::TOTAL)<<2*Log2Dim)
-        +  (((xyz[1]&DIM-1u)>>ChildNodeType::TOTAL)<<  Log2Dim)
-        +   ((xyz[2]&DIM-1u)>>ChildNodeType::TOTAL);
+    return (((xyz[0] & (DIM-1u)) >> ChildNodeType::TOTAL) << 2*Log2Dim)
+        +  (((xyz[1] & (DIM-1u)) >> ChildNodeType::TOTAL) <<   Log2Dim)
+        +   ((xyz[2] & (DIM-1u)) >> ChildNodeType::TOTAL);
 }
 
 

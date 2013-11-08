@@ -77,7 +77,7 @@ CountOn(Index32 v)
 {
     v = v - ((v >> 1) & 0x55555555U);
     v = (v & 0x33333333U) + ((v >> 2) & 0x33333333U);
-    return ((v + (v >> 4) & 0xF0F0F0FU) * 0x1010101U) >> 24;
+    return (((v + (v >> 4)) & 0xF0F0F0FU) * 0x1010101U) >> 24;
 }
 
 /// Return the number of off bits in the given 32-bit value.
@@ -89,7 +89,7 @@ CountOn(Index64 v)
 {
     v = v - ((v >> 1) & UINT64_C(0x5555555555555555));
     v = (v & UINT64_C(0x3333333333333333)) + ((v >> 2) & UINT64_C(0x3333333333333333));
-    return ((v + (v >> 4) & UINT64_C(0xF0F0F0F0F0F0F0F)) * UINT64_C(0x101010101010101)) >> 56;
+    return (((v + (v >> 4)) & UINT64_C(0xF0F0F0F0F0F0F0F)) * UINT64_C(0x101010101010101)) >> 56;
 }
 
 /// Return the number of off bits in the given 64-bit value.

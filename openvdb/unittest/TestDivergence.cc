@@ -53,6 +53,7 @@ public:
     CPPUNIT_TEST(testWSDivergence);                    // Divergence in World Space
     CPPUNIT_TEST(testWSDivergenceStencil);
     CPPUNIT_TEST(testDivergenceTool);                  // Divergence tool
+    CPPUNIT_TEST(testDivergenceMaskedTool);            // Divergence tool
     CPPUNIT_TEST(testStaggeredDivergence);
     CPPUNIT_TEST_SUITE_END();
 
@@ -61,6 +62,7 @@ public:
     void testWSDivergence();
     void testWSDivergenceStencil();
     void testDivergenceTool();
+    void testDivergenceMaskedTool();
     void testStaggeredDivergence();
 };
 
@@ -106,6 +108,62 @@ TestDivergence::testDivergenceTool()
 
                 const float d = accessor.getValue(xyz);
                 ASSERT_DOUBLES_EXACTLY_EQUAL(2, d);
+            }
+        }
+    }
+}
+
+
+
+void
+TestDivergence::testDivergenceMaskedTool()
+{
+    using namespace openvdb;
+
+    typedef VectorGrid::ConstAccessor Accessor;
+
+    VectorGrid::Ptr inGrid = VectorGrid::create();
+    VectorTree& inTree = inGrid->tree();
+    CPPUNIT_ASSERT(inTree.empty());
+
+    int dim = GRID_DIM;
+    for (int x = -dim; x<dim; ++x) {
+        for (int y = -dim; y<dim; ++y) {
+            for (int z = -dim; z<dim; ++z) {
+                inTree.setValue(Coord(x,y,z),VectorTree::ValueType(x,y,0));
+            }
+        }
+    }
+
+    CPPUNIT_ASSERT(!inTree.empty());
+    CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
+
+    /// maked region
+    openvdb::CoordBBox maskBBox(openvdb::Coord(0), openvdb::Coord(dim));
+    BoolGrid::Ptr maskGrid = BoolGrid::create(false);
+    maskGrid->fill(maskBBox, true /*value*/, true /*activate*/);
+
+    FloatGrid::Ptr divGrid = tools::divergence(*inGrid, *maskGrid);
+    CPPUNIT_ASSERT_EQUAL(math::Pow3(dim), int(divGrid->activeVoxelCount()));
+
+    FloatGrid::ConstAccessor accessor = divGrid->getConstAccessor();
+    --dim;//ignore boundary divergence
+    for (int x = -dim; x<dim; ++x) {
+        for (int y = -dim; y<dim; ++y) {
+            for (int z = -dim; z<dim; ++z) {
+                Coord xyz(x,y,z);
+               
+                VectorTree::ValueType v = inTree.getValue(xyz);
+                ASSERT_DOUBLES_EXACTLY_EQUAL(x, v[0]);
+                ASSERT_DOUBLES_EXACTLY_EQUAL(y, v[1]);
+                ASSERT_DOUBLES_EXACTLY_EQUAL(0, v[2]);
+                
+                const float d = accessor.getValue(xyz);
+                if (maskBBox.isInside(xyz)) {
+                    ASSERT_DOUBLES_EXACTLY_EQUAL(2, d);
+                } else {
+                    ASSERT_DOUBLES_EXACTLY_EQUAL(0, d);
+                }
             }
         }
     }

@@ -164,7 +164,7 @@ struct VecConverter
         // Check that all elements of the Python sequence are convertible
         // to the Vec's value type.
         py::object seq = pyutil::pyBorrow(obj);
-        for (size_t i = 0; i < VecT::size; ++i) {
+        for (int i = 0; i < VecT::size; ++i) {
             if (!py::extract<typename VecT::value_type>(seq[i]).check()) {
                 return NULL;
             }
@@ -518,7 +518,7 @@ struct GridClassDescr
             { "STAGGERED",  strdup(GridBase::gridClassToString(GRID_STAGGERED).c_str()) }
         };
         if (i >= 0 && i < sCount) return pyutil::CStringPair(&sStrings[i][0], &sStrings[i][1]);
-        return pyutil::CStringPair(NULL, NULL);
+        return pyutil::CStringPair(static_cast<char**>(NULL), static_cast<char**>(NULL));
     }
 };
 
@@ -561,7 +561,7 @@ struct VecTypeDescr
                 strdup(GridBase::vecTypeToString(openvdb::VEC_CONTRAVARIANT_ABSOLUTE).c_str()) }
         };
         if (i >= 0 && i < sCount) return std::make_pair(&sStrings[i][0], &sStrings[i][1]);
-        return pyutil::CStringPair(NULL, NULL);
+        return pyutil::CStringPair(static_cast<char**>(NULL), static_cast<char**>(NULL));
     }
 };
 

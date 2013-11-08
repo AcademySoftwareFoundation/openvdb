@@ -569,6 +569,9 @@ SOP_OpenVDB_To_Polygons::cookMySop(OP_Context& context)
 
         // Setup level set mesher
         openvdb::tools::VolumeToMesh mesher(iso, adaptivity);
+        
+        // Slicing options
+        mesher.partition(evalInt("automaticpartitions", 0, time), evalInt("activepart", 0, time) - 1);
 
         // Check mask input
         const GU_Detail* maskGeo = inputGeo(2);

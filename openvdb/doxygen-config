@@ -23,10 +23,10 @@ PROJECT_NAME           = OpenVDB
 # This could be handy for archiving the generated documentation or 
 # if some version control system is used.
 
-PROJECT_NUMBER         = 2.0.0
+PROJECT_NUMBER         = 2.1.0
 
-ALIASES += vdbnamespace="openvdb::v2_0_0"
-PREDEFINED = OPENVDB_VERSION_NAME=v2_0_0
+ALIASES += vdbnamespace="openvdb::v2_1_0"
+PREDEFINED = OPENVDB_VERSION_NAME=v2_1_0
 
 PREDEFINED += __declspec(x):= __attribute__(x):=
 #EXPAND_AS_DEFINED = \
@@ -460,6 +460,7 @@ INPUT                  = . \
                          io \
                          math \
                          metadata \
+                         python/pyopenvdb.h \
                          tools \
                          tree \
                          util \
@@ -469,7 +470,8 @@ INPUT                  = . \
                          doc/changes.txt \
                          doc/codingstyle.txt \
                          doc/api_0_98_0.txt \
-                         doc/examplecode.txt
+                         doc/examplecode.txt \
+                         doc/python.txt
 
 # If the value of the INPUT tag contains directories, you can use the 
 # FILE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp 

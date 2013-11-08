@@ -45,41 +45,90 @@ class TestDense: public CppUnit::TestCase
 {
 public:
     CPPUNIT_TEST_SUITE(TestDense);
-    CPPUNIT_TEST(testDense);
-    CPPUNIT_TEST(testCopy);
-    CPPUNIT_TEST(testCopyBool);
-    CPPUNIT_TEST(testCopyFromDenseWithOffset);
-    CPPUNIT_TEST(testDense2Sparse);
-    CPPUNIT_TEST(testDense2Sparse2);
-    CPPUNIT_TEST(testInvalidBBox);
-    CPPUNIT_TEST(testDense2Sparse2Dense);
+
+    CPPUNIT_TEST(testDenseZYX);
+    CPPUNIT_TEST(testDenseXYZ);
+    
+    CPPUNIT_TEST(testCopyZYX);
+    CPPUNIT_TEST(testCopyXYZ);
+
+    CPPUNIT_TEST(testCopyBoolZYX);
+    CPPUNIT_TEST(testCopyBoolXYZ);
+
+    CPPUNIT_TEST(testCopyFromDenseWithOffsetZYX);
+    CPPUNIT_TEST(testCopyFromDenseWithOffsetXYZ);
+    
+    CPPUNIT_TEST(testDense2SparseZYX);
+    CPPUNIT_TEST(testDense2SparseXYZ);
+    
+    CPPUNIT_TEST(testDense2Sparse2ZYX);
+    CPPUNIT_TEST(testDense2Sparse2XYZ);
+    
+    CPPUNIT_TEST(testInvalidBBoxZYX);
+    CPPUNIT_TEST(testInvalidBBoxXYZ);
+    
+    CPPUNIT_TEST(testDense2Sparse2DenseZYX);
+    CPPUNIT_TEST(testDense2Sparse2DenseXYZ);
     CPPUNIT_TEST_SUITE_END();
 
-    void testDense();
+    void testDenseZYX();
+    void testDenseXYZ();
+    
+    template <openvdb::tools::MemoryLayout Layout>
     void testCopy();
+    void testCopyZYX() { this->testCopy<openvdb::tools::LayoutZYX>(); }
+    void testCopyXYZ() { this->testCopy<openvdb::tools::LayoutXYZ>(); }
+
+    template <openvdb::tools::MemoryLayout Layout>
     void testCopyBool();
-    void testDense2Sparse();
-    void testDense2Sparse2();
-    void testInvalidBBox();
-    void testDense2Sparse2Dense();
+    void testCopyBoolZYX() { this->testCopyBool<openvdb::tools::LayoutZYX>(); }
+    void testCopyBoolXYZ() { this->testCopyBool<openvdb::tools::LayoutXYZ>(); }
+
+    template <openvdb::tools::MemoryLayout Layout>
     void testCopyFromDenseWithOffset();
+    void testCopyFromDenseWithOffsetZYX() {
+        this->testCopyFromDenseWithOffset<openvdb::tools::LayoutZYX>();
+    }
+    void testCopyFromDenseWithOffsetXYZ() {
+        this->testCopyFromDenseWithOffset<openvdb::tools::LayoutXYZ>();
+    }
+
+    template <openvdb::tools::MemoryLayout Layout>
+    void testDense2Sparse();
+    void testDense2SparseZYX() { this->testDense2Sparse<openvdb::tools::LayoutZYX>(); }
+    void testDense2SparseXYZ() { this->testDense2Sparse<openvdb::tools::LayoutXYZ>(); }
+
+    template <openvdb::tools::MemoryLayout Layout>
+    void testDense2Sparse2();
+    void testDense2Sparse2ZYX() { this->testDense2Sparse2<openvdb::tools::LayoutZYX>(); }
+    void testDense2Sparse2XYZ() { this->testDense2Sparse2<openvdb::tools::LayoutXYZ>(); }
+
+    template <openvdb::tools::MemoryLayout Layout>
+    void testInvalidBBox();
+    void testInvalidBBoxZYX() { this->testInvalidBBox<openvdb::tools::LayoutZYX>(); }
+    void testInvalidBBoxXYZ() { this->testInvalidBBox<openvdb::tools::LayoutXYZ>(); }
+
+    template <openvdb::tools::MemoryLayout Layout>
+    void testDense2Sparse2Dense();
+    void testDense2Sparse2DenseZYX() { this->testDense2Sparse2Dense<openvdb::tools::LayoutZYX>(); }
+    void testDense2Sparse2DenseXYZ() { this->testDense2Sparse2Dense<openvdb::tools::LayoutXYZ>(); }
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestDense);
 
 
 void
-TestDense::testDense()
+TestDense::testDenseZYX()
 {
     const openvdb::CoordBBox bbox(openvdb::Coord(-40,-5, 6),
                                   openvdb::Coord(-11, 7,22));
-    openvdb::tools::Dense<float> dense(bbox);
+    openvdb::tools::Dense<float> dense(bbox);//LayoutZYX is the default
 
     // Check Dense::valueCount
     const int size = dense.valueCount();
     CPPUNIT_ASSERT_EQUAL(30*13*17, size);
 
-    // Cehck Dense::fill(float) and Dense::getValue(size_t)
+    // Check Dense::fill(float) and Dense::getValue(size_t)
     const float v = 0.234f;
     dense.fill(v);
     for (int i=0; i<size; ++i) {
@@ -127,16 +176,80 @@ TestDense::testDense()
 
 }
 
+void
+TestDense::testDenseXYZ()
+{
+    const openvdb::CoordBBox bbox(openvdb::Coord(-40,-5, 6),
+                                  openvdb::Coord(-11, 7,22));
+    openvdb::tools::Dense<float, openvdb::tools::LayoutXYZ> dense(bbox);
+
+    // Check Dense::valueCount
+    const int size = dense.valueCount();
+    CPPUNIT_ASSERT_EQUAL(30*13*17, size);
+
+    // Check Dense::fill(float) and Dense::getValue(size_t)
+    const float v = 0.234f;
+    dense.fill(v);
+    for (int i=0; i<size; ++i) {
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(v, dense.getValue(i),/*tolerance=*/0.0001);
+    }
+
+    // Check Dense::data() and Dense::getValue(Coord, float)
+    float* a = dense.data();
+    int s = size;
+    while(s--) CPPUNIT_ASSERT_DOUBLES_EQUAL(v, *a++, /*tolerance=*/0.0001);
+
+    for (openvdb::Coord P(bbox.min()); P[2] <= bbox.max()[2]; ++P[2]) {
+        for (P[1] = bbox.min()[1]; P[1] <= bbox.max()[1]; ++P[1]) {
+            for (P[0] = bbox.min()[0]; P[0] <= bbox.max()[0]; ++P[0]) {
+                CPPUNIT_ASSERT_DOUBLES_EQUAL(v, dense.getValue(P), /*tolerance=*/0.0001);
+            }
+        }
+    }
+
+    // Check Dense::setValue(Coord, float)
+    const openvdb::Coord C(-30, 3,12);
+    const float v1 = 3.45f;
+    dense.setValue(C, v1);
+    for (openvdb::Coord P(bbox.min()); P[2] <= bbox.max()[2]; ++P[2]) {
+        for (P[1] = bbox.min()[1]; P[1] <= bbox.max()[1]; ++P[1]) {
+            for (P[0] = bbox.min()[0]; P[0] <= bbox.max()[0]; ++P[0]) {
+                CPPUNIT_ASSERT_DOUBLES_EQUAL(P==C ? v1 : v, dense.getValue(P),
+                    /*tolerance=*/0.0001);
+            }
+        }
+    }
+
+    // Check Dense::setValue(size_t, size_t, size_t, float)
+    dense.setValue(C, v);
+    const openvdb::Coord L(1,2,3), C1 = bbox.min() + L;
+    dense.setValue(L[0], L[1], L[2], v1);
+    for (openvdb::Coord P(bbox.min()); P[2] <= bbox.max()[2]; ++P[2]) {
+        for (P[1] = bbox.min()[1]; P[1] <= bbox.max()[1]; ++P[1]) {
+            for (P[0] = bbox.min()[0]; P[0] <= bbox.max()[0]; ++P[0]) {
+                CPPUNIT_ASSERT_DOUBLES_EQUAL(P==C1 ? v1 : v, dense.getValue(P),
+                    /*tolerance=*/0.0001);
+            }
+        }
+    }
+
+}
+
 
 // The check is so slow that we're going to multi-thread it :)
-template <typename TreeT>
+template <typename TreeT,
+          typename DenseT = openvdb::tools::Dense<typename TreeT::ValueType,
+                                                  openvdb::tools::LayoutZYX> >
 class CheckDense
 {
 public:
-    typedef typename TreeT::ValueType     ValueT;
-    typedef openvdb::tools::Dense<ValueT> DenseT;
+    typedef typename TreeT::ValueType ValueT;
 
-    CheckDense() : mTree(NULL), mDense(NULL) {}
+    CheckDense() : mTree(NULL), mDense(NULL)
+    {
+        CPPUNIT_ASSERT(DenseT::memoryLayout() == openvdb::tools::LayoutZYX ||
+                       DenseT::memoryLayout() == openvdb::tools::LayoutXYZ );
+    }
 
     void check(const TreeT& tree, const DenseT& dense)
     {
@@ -147,11 +260,23 @@ public:
     void operator()(const openvdb::CoordBBox& bbox) const
     {
         openvdb::tree::ValueAccessor<const TreeT> acc(*mTree);
-        for (openvdb::Coord P(bbox.min()); P[0] <= bbox.max()[0]; ++P[0]) {
-            for (P[1] = bbox.min()[1]; P[1] <= bbox.max()[1]; ++P[1]) {
-                for (P[2] = bbox.min()[2]; P[2] <= bbox.max()[2]; ++P[2]) {
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(acc.getValue(P), mDense->getValue(P),
-                        /*tolerance=*/0.0001);
+
+        if (DenseT::memoryLayout() == openvdb::tools::LayoutZYX) {//resolved at compiletime
+            for (openvdb::Coord P(bbox.min()); P[0] <= bbox.max()[0]; ++P[0]) {
+                for (P[1] = bbox.min()[1]; P[1] <= bbox.max()[1]; ++P[1]) {
+                    for (P[2] = bbox.min()[2]; P[2] <= bbox.max()[2]; ++P[2]) {
+                        CPPUNIT_ASSERT_DOUBLES_EQUAL(acc.getValue(P), mDense->getValue(P),
+                                                     /*tolerance=*/0.0001);
+                    }
+                }
+            }
+        } else {
+             for (openvdb::Coord P(bbox.min()); P[2] <= bbox.max()[2]; ++P[2]) {
+                for (P[1] = bbox.min()[1]; P[1] <= bbox.max()[1]; ++P[1]) {
+                    for (P[0] = bbox.min()[0]; P[0] <= bbox.max()[0]; ++P[0]) {
+                        CPPUNIT_ASSERT_DOUBLES_EQUAL(acc.getValue(P), mDense->getValue(P),
+                                                     /*tolerance=*/0.0001);
+                    }
                 }
             }
         }
@@ -161,27 +286,34 @@ private:
     const DenseT* mDense;
 };// CheckDense
 
-
+template <openvdb::tools::MemoryLayout Layout>
 void
 TestDense::testCopy()
 {
-    CheckDense<openvdb::FloatTree> checkDense;
+    using namespace openvdb;
+    
+    //std::cerr << "\nTesting testCopy with "
+    //          << (Layout == tools::LayoutXYZ ? "XYZ" : "ZYX") << " memory layout"
+    //          << std::endl;
+    
+    typedef tools::Dense<float, Layout> DenseT;
+    CheckDense<FloatTree, DenseT> checkDense;
     const float radius = 10.0f, tolerance = 0.00001f;
-    const openvdb::Vec3f center(0.0f);
+    const Vec3f center(0.0f);
     // decrease the voxelSize to test larger grids
 #ifdef BENCHMARK_TEST
     const float voxelSize = 0.05f, width = 5.0f;
 #else
-    const float voxelSize = 0.2f, width = 5.0f;
+    const float voxelSize = 0.5f, width = 5.0f;
 #endif
 
     // Create a VDB containing a level set of a sphere
-    openvdb::FloatGrid::Ptr grid =
-        openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(radius, center, voxelSize, width);
-    openvdb::FloatTree& tree0 = grid->tree();
+    FloatGrid::Ptr grid =
+        tools::createLevelSetSphere<FloatGrid>(radius, center, voxelSize, width);
+    FloatTree& tree0 = grid->tree();
 
     // Create an empty dense grid
-    openvdb::tools::Dense<float> dense(grid->evalActiveVoxelBoundingBox());
+    DenseT dense(grid->evalActiveVoxelBoundingBox());
 #ifdef BENCHMARK_TEST
     std::cerr << "\nBBox = " << grid->evalActiveVoxelBoundingBox() << std::endl;
 #endif
@@ -189,7 +321,7 @@ TestDense::testCopy()
     {//check Dense::fill
         dense.fill(voxelSize);
 #ifndef BENCHMARK_TEST
-        checkDense.check(openvdb::FloatTree(voxelSize), dense);
+        checkDense.check(FloatTree(voxelSize), dense);
 #endif
     }
 
@@ -198,7 +330,7 @@ TestDense::testCopy()
         unittest_util::CpuTimer ts;
         ts.start("CopyToDense");
 #endif
-        openvdb::tools::copyToDense(*grid, dense);
+        tools::copyToDense(*grid, dense);
 #ifdef BENCHMARK_TEST
         ts.stop();
 #else
@@ -211,8 +343,8 @@ TestDense::testCopy()
         unittest_util::CpuTimer ts;
         ts.start("CopyFromDense");
 #endif
-        openvdb::FloatTree tree1(tree0.background());
-        openvdb::tools::copyFromDense(dense, tree1, tolerance);
+        FloatTree tree1(tree0.background());
+        tools::copyFromDense(dense, tree1, tolerance);
 #ifdef BENCHMARK_TEST
         ts.stop();
 #else
@@ -221,11 +353,15 @@ TestDense::testCopy()
     }
 }
 
-
+template <openvdb::tools::MemoryLayout Layout>
 void
 TestDense::testCopyBool()
 {
     using namespace openvdb;
+    
+    //std::cerr << "\nTesting testCopyBool with "
+    //          << (Layout == tools::LayoutXYZ ? "XYZ" : "ZYX") << " memory layout"
+    //          << std::endl;
 
     const Coord bmin(-1), bmax(8);
     const CoordBBox bbox(bmin, bmax);
@@ -233,7 +369,8 @@ TestDense::testCopyBool()
     BoolGrid::Ptr grid = createGrid<BoolGrid>(false);
     BoolGrid::ConstAccessor acc = grid->getConstAccessor();
 
-    tools::Dense<bool> dense(bbox);
+    typedef openvdb::tools::Dense<bool, Layout> DenseT;
+    DenseT dense(bbox);
     dense.fill(false);
 
     // Start with sparse and dense grids both filled with false.
@@ -251,7 +388,7 @@ TestDense::testCopyBool()
     // Fill the dense grid with true.
     dense.fill(true);
     // Copy the contents of the dense grid to the sparse grid.
-    openvdb::tools::copyFromDense(dense, *grid, /*tolerance=*/false);
+    tools::copyFromDense(dense, *grid, /*tolerance=*/false);
 
     // Verify that both sparse and dense grids are now filled with true.
     for (x = bmin.x(); x <= bmax.x(); ++x) {
@@ -266,7 +403,7 @@ TestDense::testCopyBool()
     // Fill the dense grid with false.
     dense.fill(false);
     // Copy the contents (= true) of the sparse grid to the dense grid.
-    openvdb::tools::copyToDense(*grid, dense);
+    tools::copyToDense(*grid, dense);
 
     // Verify that the dense grid is now filled with true.
     for (x = bmin.x(); x <= bmax.x(); ++x) {
@@ -280,10 +417,17 @@ TestDense::testCopyBool()
 
 
 // Test copying from a dense grid to a sparse grid with various bounding boxes.
+template <openvdb::tools::MemoryLayout Layout>
 void
 TestDense::testCopyFromDenseWithOffset()
 {
     using namespace openvdb;
+    
+    //std::cerr << "\nTesting testCopyFromDenseWithOffset with "
+    //          << (Layout == tools::LayoutXYZ ? "XYZ" : "ZYX") << " memory layout"
+    //          << std::endl;
+   
+    typedef openvdb::tools::Dense<float, Layout> DenseT;
 
     const int DIM = 20, COUNT = DIM * DIM * DIM;
     const float FOREGROUND = 99.0f, BACKGROUND = 5000.0f;
@@ -294,7 +438,7 @@ TestDense::testCopyFromDenseWithOffset()
         const int offset = OFFSET[offsetIdx];
         const CoordBBox bbox = CoordBBox::createCube(Coord(offset), DIM);
 
-        tools::Dense<float> dense(bbox, FOREGROUND);
+        DenseT dense(bbox, FOREGROUND);
         CPPUNIT_ASSERT_EQUAL(bbox, dense.bbox());
 
         FloatGrid grid(BACKGROUND);
@@ -318,11 +462,18 @@ TestDense::testCopyFromDenseWithOffset()
     }
 }
 
-
+template <openvdb::tools::MemoryLayout Layout>
 void
 TestDense::testDense2Sparse()
 {
     // The following test revealed a bug in v2.0.0b2
+    using namespace openvdb;
+    
+    //std::cerr << "\nTesting testDense2Sparse with "
+    //          << (Layout == tools::LayoutXYZ ? "XYZ" : "ZYX") << " memory layout"
+    //          << std::endl;
+   
+    typedef tools::Dense<float, Layout> DenseT;
 
     // Test Domain Resolution
     size_t sizeX = 8;
@@ -330,8 +481,8 @@ TestDense::testDense2Sparse()
     size_t sizeZ = 9;
 
     // Define a dense grid
-    openvdb::tools::Dense<float> dense(openvdb::Coord(sizeX, sizeY, sizeZ));
-    const openvdb::CoordBBox bboxD = dense.bbox();
+    DenseT dense(Coord(sizeX, sizeY, sizeZ));
+    const CoordBBox bboxD = dense.bbox();
     // std::cerr <<  "\nDense bbox" << bboxD << std::endl;
 
     // Verify that the CoordBBox is truely used as [inclusive, inclusive]
@@ -341,12 +492,12 @@ TestDense::testDense2Sparse()
     dense.fill(1.0f);
 
     // Create two empty float grids
-    openvdb::FloatGrid::Ptr gridS = openvdb::FloatGrid::create(0.0f /*background*/);
-    openvdb::FloatGrid::Ptr gridP = openvdb::FloatGrid::create(0.0f /*background*/);
+    FloatGrid::Ptr gridS = FloatGrid::create(0.0f /*background*/);
+    FloatGrid::Ptr gridP = FloatGrid::create(0.0f /*background*/);
 
     // Convert in serial and parallel modes
-    openvdb::tools::copyFromDense(dense, *gridS, /*tolerance*/0.0f, /*serial = */ true);
-    openvdb::tools::copyFromDense(dense, *gridP, /*tolerance*/0.0f, /*serial = */ false);
+    tools::copyFromDense(dense, *gridS, /*tolerance*/0.0f, /*serial = */ true);
+    tools::copyFromDense(dense, *gridP, /*tolerance*/0.0f, /*serial = */ false);
 
     float minS, maxS;
     float minP, maxP;
@@ -358,13 +509,13 @@ TestDense::testDense2Sparse()
 
     CPPUNIT_ASSERT_DOUBLES_EQUAL(minS, minP, tolerance);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(maxS, maxP, tolerance);
-    CPPUNIT_ASSERT_EQUAL(gridP->activeVoxelCount(), openvdb::Index64(sizeX * sizeY * sizeZ));
+    CPPUNIT_ASSERT_EQUAL(gridP->activeVoxelCount(), Index64(sizeX * sizeY * sizeZ));
 
-    const openvdb::FloatTree& treeS = gridS->tree();
-    const openvdb::FloatTree& treeP = gridP->tree();
+    const FloatTree& treeS = gridS->tree();
+    const FloatTree& treeP = gridP->tree();
 
     // Values in Test Domain are correct
-    for (openvdb::Coord ijk(bboxD.min()); ijk[0] <= bboxD.max()[0]; ++ijk[0]) {
+    for (Coord ijk(bboxD.min()); ijk[0] <= bboxD.max()[0]; ++ijk[0]) {
         for (ijk[1] = bboxD.min()[1]; ijk[1] <= bboxD.max()[1]; ++ijk[1]) {
             for (ijk[2] = bboxD.min()[2]; ijk[2] <= bboxD.max()[2]; ++ijk[2]) {
 
@@ -380,14 +531,14 @@ TestDense::testDense2Sparse()
         }
     }
 
-    openvdb::CoordBBox bboxP = gridP->evalActiveVoxelBoundingBox();
-    const openvdb::Index64 voxelCountP = gridP->activeVoxelCount();
+    CoordBBox bboxP = gridP->evalActiveVoxelBoundingBox();
+    const Index64 voxelCountP = gridP->activeVoxelCount();
     //std::cerr <<  "\nParallel: bbox=" << bboxP << " voxels=" << voxelCountP << std::endl;
     CPPUNIT_ASSERT( bboxP == bboxD );
     CPPUNIT_ASSERT_EQUAL( dense.valueCount(), voxelCountP);
 
-    openvdb::CoordBBox bboxS = gridS->evalActiveVoxelBoundingBox();
-    const openvdb::Index64 voxelCountS = gridS->activeVoxelCount();
+    CoordBBox bboxS = gridS->evalActiveVoxelBoundingBox();
+    const Index64 voxelCountS = gridS->activeVoxelCount();
     //std::cerr <<  "\nSerial: bbox=" << bboxS << " voxels=" << voxelCountS << std::endl;
     CPPUNIT_ASSERT( bboxS == bboxD );
     CPPUNIT_ASSERT_EQUAL( dense.valueCount(), voxelCountS);
@@ -399,7 +550,7 @@ TestDense::testDense2Sparse()
     CPPUNIT_ASSERT( bboxP.isInside(bboxS) );
 
     /// Check that the two grids agree
-    for (openvdb::Coord ijk(bboxS.min()); ijk[0] <= bboxS.max()[0]; ++ijk[0]) {
+    for (Coord ijk(bboxS.min()); ijk[0] <= bboxS.max()[0]; ++ijk[0]) {
         for (ijk[1] = bboxS.min()[1]; ijk[1] <= bboxS.max()[1]; ++ijk[1]) {
             for (ijk[2] = bboxS.min()[2]; ijk[2] <= bboxS.max()[2]; ++ijk[2]) {
 
@@ -426,21 +577,30 @@ TestDense::testDense2Sparse()
 
 }
 
+template <openvdb::tools::MemoryLayout Layout>
 void
 TestDense::testDense2Sparse2()
 {
     // The following tests copying a dense grid into a VDB tree with
     // existing values outside the bbox of the dense grid.
 
+    using namespace openvdb;
+    
+    //std::cerr << "\nTesting testDense2Sparse2 with "
+    //          << (Layout == tools::LayoutXYZ ? "XYZ" : "ZYX") << " memory layout"
+    //          << std::endl;
+   
+    typedef tools::Dense<float, Layout> DenseT;
+
     // Test Domain Resolution
     size_t sizeX = 8;
     size_t sizeY = 8;
     size_t sizeZ = 9;
-    const openvdb::Coord magicVoxel(sizeX, sizeY, sizeZ);
+    const Coord magicVoxel(sizeX, sizeY, sizeZ);
 
     // Define a dense grid
-    openvdb::tools::Dense<float> dense(openvdb::Coord(sizeX, sizeY, sizeZ));
-    const openvdb::CoordBBox bboxD = dense.bbox();
+    DenseT dense(Coord(sizeX, sizeY, sizeZ));
+    const CoordBBox bboxD = dense.bbox();
     //std::cerr <<  "\nDense bbox" << bboxD << std::endl;
 
     // Verify that the CoordBBox is truely used as [inclusive, inclusive]
@@ -450,14 +610,14 @@ TestDense::testDense2Sparse2()
     dense.fill(1.0f);
 
     // Create two empty float grids
-    openvdb::FloatGrid::Ptr gridS = openvdb::FloatGrid::create(0.0f /*background*/);
-    openvdb::FloatGrid::Ptr gridP = openvdb::FloatGrid::create(0.0f /*background*/);
+    FloatGrid::Ptr gridS = FloatGrid::create(0.0f /*background*/);
+    FloatGrid::Ptr gridP = FloatGrid::create(0.0f /*background*/);
     gridS->tree().setValue(magicVoxel, 5.0f);
     gridP->tree().setValue(magicVoxel, 5.0f);
 
     // Convert in serial and parallel modes
-    openvdb::tools::copyFromDense(dense, *gridS, /*tolerance*/0.0f, /*serial = */ true);
-    openvdb::tools::copyFromDense(dense, *gridP, /*tolerance*/0.0f, /*serial = */ false);
+    tools::copyFromDense(dense, *gridS, /*tolerance*/0.0f, /*serial = */ true);
+    tools::copyFromDense(dense, *gridP, /*tolerance*/0.0f, /*serial = */ false);
 
     float minS, maxS;
     float minP, maxP;
@@ -471,13 +631,13 @@ TestDense::testDense2Sparse2()
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0f, minS, tolerance);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0f, maxP, tolerance);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(5.0f, maxS, tolerance);
-    CPPUNIT_ASSERT_EQUAL(gridP->activeVoxelCount(), openvdb::Index64(1 + sizeX * sizeY * sizeZ));
+    CPPUNIT_ASSERT_EQUAL(gridP->activeVoxelCount(), Index64(1 + sizeX * sizeY * sizeZ));
 
-    const openvdb::FloatTree& treeS = gridS->tree();
-    const openvdb::FloatTree& treeP = gridP->tree();
+    const FloatTree& treeS = gridS->tree();
+    const FloatTree& treeP = gridP->tree();
 
     // Values in Test Domain are correct
-    for (openvdb::Coord ijk(bboxD.min()); ijk[0] <= bboxD.max()[0]; ++ijk[0]) {
+    for (Coord ijk(bboxD.min()); ijk[0] <= bboxD.max()[0]; ++ijk[0]) {
         for (ijk[1] = bboxD.min()[1]; ijk[1] <= bboxD.max()[1]; ++ijk[1]) {
             for (ijk[2] = bboxD.min()[2]; ijk[2] <= bboxD.max()[2]; ++ijk[2]) {
 
@@ -493,18 +653,18 @@ TestDense::testDense2Sparse2()
         }
     }
 
-    openvdb::CoordBBox bboxP = gridP->evalActiveVoxelBoundingBox();
-    const openvdb::Index64 voxelCountP = gridP->activeVoxelCount();
+    CoordBBox bboxP = gridP->evalActiveVoxelBoundingBox();
+    const Index64 voxelCountP = gridP->activeVoxelCount();
     //std::cerr <<  "\nParallel: bbox=" << bboxP << " voxels=" << voxelCountP << std::endl;
     CPPUNIT_ASSERT( bboxP != bboxD );
-    CPPUNIT_ASSERT( bboxP == openvdb::CoordBBox(openvdb::Coord(0,0,0), magicVoxel) );
+    CPPUNIT_ASSERT( bboxP == CoordBBox(Coord(0,0,0), magicVoxel) );
     CPPUNIT_ASSERT_EQUAL( dense.valueCount()+1, voxelCountP);
 
-    openvdb::CoordBBox bboxS = gridS->evalActiveVoxelBoundingBox();
-    const openvdb::Index64 voxelCountS = gridS->activeVoxelCount();
+    CoordBBox bboxS = gridS->evalActiveVoxelBoundingBox();
+    const Index64 voxelCountS = gridS->activeVoxelCount();
     //std::cerr <<  "\nSerial: bbox=" << bboxS << " voxels=" << voxelCountS << std::endl;
     CPPUNIT_ASSERT( bboxS != bboxD );
-    CPPUNIT_ASSERT( bboxS == openvdb::CoordBBox(openvdb::Coord(0,0,0), magicVoxel) );
+    CPPUNIT_ASSERT( bboxS == CoordBBox(Coord(0,0,0), magicVoxel) );
     CPPUNIT_ASSERT_EQUAL( dense.valueCount()+1, voxelCountS);
 
     // Topology
@@ -514,7 +674,7 @@ TestDense::testDense2Sparse2()
     CPPUNIT_ASSERT( bboxP.isInside(bboxS) );
 
     /// Check that the two grids agree
-    for (openvdb::Coord ijk(bboxS.min()); ijk[0] <= bboxS.max()[0]; ++ijk[0]) {
+    for (Coord ijk(bboxS.min()); ijk[0] <= bboxS.max()[0]; ++ijk[0]) {
         for (ijk[1] = bboxS.min()[1]; ijk[1] <= bboxS.max()[1]; ++ijk[1]) {
             for (ijk[2] = bboxS.min()[2]; ijk[2] <= bboxS.max()[2]; ++ijk[2]) {
 
@@ -541,27 +701,42 @@ TestDense::testDense2Sparse2()
 
 }
 
-
+template <openvdb::tools::MemoryLayout Layout>
 void
 TestDense::testInvalidBBox()
 {
-    const openvdb::CoordBBox badBBox(openvdb::Coord(1, 1, 1), openvdb::Coord(-1, 2, 2));
+    using namespace openvdb;
+    
+    //std::cerr << "\nTesting testInvalidBBox with "
+    //          << (Layout == tools::LayoutXYZ ? "XYZ" : "ZYX") << " memory layout"
+    //          << std::endl;
+   
+    typedef tools::Dense<float, Layout> DenseT;
+    const CoordBBox badBBox(Coord(1, 1, 1), Coord(-1, 2, 2));
 
     CPPUNIT_ASSERT(badBBox.empty());
-    CPPUNIT_ASSERT_THROW(openvdb::tools::Dense<float> dense(badBBox), openvdb::ValueError);
+    CPPUNIT_ASSERT_THROW(DenseT dense(badBBox), ValueError);
 }
 
-
+template <openvdb::tools::MemoryLayout Layout>
 void
 TestDense::testDense2Sparse2Dense()
 {
-    const openvdb::CoordBBox bboxBig(openvdb::Coord(-12, 7, -32), openvdb::Coord(12, 14, -15));
-    const openvdb::CoordBBox bboxSmall(openvdb::Coord(-10, 8, -31), openvdb::Coord(10, 12, -20));
+    using namespace openvdb;
+
+    //std::cerr << "\nTesting testDense2Sparse2Dense with "
+    //          << (Layout == tools::LayoutXYZ ? "XYZ" : "ZYX") << " memory layout"
+    //          << std::endl;
+   
+    typedef tools::Dense<float, Layout> DenseT;
+    
+    const CoordBBox bboxBig(Coord(-12, 7, -32), Coord(12, 14, -15));
+    const CoordBBox bboxSmall(Coord(-10, 8, -31), Coord(10, 12, -20));
 
 
     // A larger bbox
-    openvdb::CoordBBox bboxBigger = bboxBig;
-    bboxBigger.expand(openvdb::Coord(10));
+    CoordBBox bboxBigger = bboxBig;
+    bboxBigger.expand(Coord(10));
 
 
     // Small is in big
@@ -571,7 +746,7 @@ TestDense::testDense2Sparse2Dense()
     CPPUNIT_ASSERT(bboxBigger.isInside(bboxBig));
 
     // Construct a small dense grid
-    openvdb::tools::Dense<float> denseSmall(bboxSmall, 0.f);
+    DenseT denseSmall(bboxSmall, 0.f);
     {
         // insert non-const values
         const int n = denseSmall.valueCount();
@@ -579,7 +754,7 @@ TestDense::testDense2Sparse2Dense()
         for (int i = 0; i < n; ++i) { d[i] = i; }
     }
     // Construct large dense grid
-    openvdb::tools::Dense<float> denseBig(bboxBig, 0.f);
+    DenseT denseBig(bboxBig, 0.f);
     {
         // insert non-const values
         const int n = denseBig.valueCount();
@@ -588,16 +763,16 @@ TestDense::testDense2Sparse2Dense()
     }
 
     // Make a sparse grid to copy this data into
-    openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create(3.3f /*background*/);
-    openvdb::tools::copyFromDense(denseBig, *grid, /*tolerance*/0.0f, /*serial = */ true);
-    openvdb::tools::copyFromDense(denseSmall, *grid, /*tolerance*/0.0f, /*serial = */ false);
+    FloatGrid::Ptr grid = FloatGrid::create(3.3f /*background*/);
+    tools::copyFromDense(denseBig, *grid, /*tolerance*/0.0f, /*serial = */ true);
+    tools::copyFromDense(denseSmall, *grid, /*tolerance*/0.0f, /*serial = */ false);
 
-    const openvdb::FloatTree& tree = grid->tree();
+    const FloatTree& tree = grid->tree();
     //
     CPPUNIT_ASSERT_EQUAL(bboxBig.volume(), grid->activeVoxelCount());
 
     // iterate over the Bigger
-    for (openvdb::Coord ijk(bboxBigger.min()); ijk[0] <= bboxBigger.max()[0]; ++ijk[0]) {
+    for (Coord ijk(bboxBigger.min()); ijk[0] <= bboxBigger.max()[0]; ++ijk[0]) {
         for (ijk[1] = bboxBigger.min()[1]; ijk[1] <= bboxBigger.max()[1]; ++ijk[1]) {
             for (ijk[2] = bboxBigger.min()[2]; ijk[2] <= bboxBigger.max()[2]; ++ijk[2]) {
 
@@ -618,11 +793,11 @@ TestDense::testDense2Sparse2Dense()
 
     // Convert to Dense in small bbox
     {
-        openvdb::tools::Dense<float> denseSmall2(bboxSmall);
-        openvdb::tools::copyToDense(*grid, denseSmall2, true /* serial */);
+        DenseT denseSmall2(bboxSmall);
+        tools::copyToDense(*grid, denseSmall2, true /* serial */);
 
         // iterate over the Bigger
-        for (openvdb::Coord ijk(bboxSmall.min()); ijk[0] <= bboxSmall.max()[0]; ++ijk[0]) {
+        for (Coord ijk(bboxSmall.min()); ijk[0] <= bboxSmall.max()[0]; ++ijk[0]) {
             for (ijk[1] = bboxSmall.min()[1]; ijk[1] <= bboxSmall.max()[1]; ++ijk[1]) {
                 for (ijk[2] = bboxSmall.min()[2]; ijk[2] <= bboxSmall.max()[2]; ++ijk[2]) {
 
@@ -635,11 +810,11 @@ TestDense::testDense2Sparse2Dense()
     }
     // Convert to Dense in large bbox
     {
-        openvdb::tools::Dense<float> denseBig2(bboxBig);
+        DenseT denseBig2(bboxBig);
 
-        openvdb::tools::copyToDense(*grid, denseBig2, false /* serial */);
+        tools::copyToDense(*grid, denseBig2, false /* serial */);
          // iterate over the Bigger
-        for (openvdb::Coord ijk(bboxBig.min()); ijk[0] <= bboxBig.max()[0]; ++ijk[0]) {
+        for (Coord ijk(bboxBig.min()); ijk[0] <= bboxBig.max()[0]; ++ijk[0]) {
             for (ijk[1] = bboxBig.min()[1]; ijk[1] <= bboxBig.max()[1]; ++ijk[1]) {
                 for (ijk[2] = bboxBig.min()[2]; ijk[2] <= bboxBig.max()[2]; ++ijk[2]) {
 

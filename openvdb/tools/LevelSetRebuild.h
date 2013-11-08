@@ -268,8 +268,9 @@ doLevelSetRebuild(const GridType& grid, typename GridType::ValueType iso,
         primCpy.runParallel();
     }
 
-    MeshToVolume<GridType, InterruptT> vol(transform, 0, interrupter);
+    MeshToVolume<GridType, InterruptT> vol(transform, OUTPUT_RAW_DATA, interrupter);
     vol.convertToLevelSet(points, primitives, exBandWidth, inBandWidth);
+
     return vol.distGridPtr();
 }
 

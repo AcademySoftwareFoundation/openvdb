@@ -153,6 +153,14 @@ public:
     /// Translate this bounding box by \f$(t_x, t_y, t_z)\f$.
     void translate(const Vec3T& t);
 
+    /// Apply a map to this bounding box
+    template<typename MapType>
+    BBox applyMap(const MapType& map) const;
+
+     /// Apply the inverse of a map to this bounding box
+    template<typename MapType>
+    BBox applyInverseMap(const MapType& map) const;
+
     /// Unserialize this bounding box from the given stream.
     void read(std::istream& is) { mMin.read(is); mMax.read(is); }
 
@@ -401,6 +409,41 @@ BBox<Vec3T>::translate(const Vec3T& dx)
     mMax += dx;
 }
 
+template<typename Vec3T>
+template<typename MapType>  
+inline BBox<Vec3T>
+BBox<Vec3T>::applyMap(const MapType& map) const
+{
+    typedef Vec3<double> Vec3R;
+    BBox<Vec3T> bbox;
+    bbox.expand(map.applyMap(Vec3R(mMin[0], mMin[1], mMin[2])));
+    bbox.expand(map.applyMap(Vec3R(mMin[0], mMin[1], mMax[2])));
+    bbox.expand(map.applyMap(Vec3R(mMin[0], mMax[1], mMin[2])));
+    bbox.expand(map.applyMap(Vec3R(mMax[0], mMin[1], mMin[2])));
+    bbox.expand(map.applyMap(Vec3R(mMax[0], mMax[1], mMin[2])));
+    bbox.expand(map.applyMap(Vec3R(mMax[0], mMin[1], mMax[2])));
+    bbox.expand(map.applyMap(Vec3R(mMin[0], mMax[1], mMax[2])));
+    bbox.expand(map.applyMap(Vec3R(mMax[0], mMax[1], mMax[2])));
+    return bbox;
+}
+
+template<typename Vec3T>
+template<typename MapType>  
+inline BBox<Vec3T>
+BBox<Vec3T>::applyInverseMap(const MapType& map) const
+{
+    typedef Vec3<double> Vec3R;
+    BBox<Vec3T> bbox;
+    bbox.expand(map.applyInverseMap(Vec3R(mMin[0], mMin[1], mMin[2])));
+    bbox.expand(map.applyInverseMap(Vec3R(mMin[0], mMin[1], mMax[2])));
+    bbox.expand(map.applyInverseMap(Vec3R(mMin[0], mMax[1], mMin[2])));
+    bbox.expand(map.applyInverseMap(Vec3R(mMax[0], mMin[1], mMin[2])));
+    bbox.expand(map.applyInverseMap(Vec3R(mMax[0], mMax[1], mMin[2])));
+    bbox.expand(map.applyInverseMap(Vec3R(mMax[0], mMin[1], mMax[2])));
+    bbox.expand(map.applyInverseMap(Vec3R(mMin[0], mMax[1], mMax[2])));
+    bbox.expand(map.applyInverseMap(Vec3R(mMax[0], mMax[1], mMax[2])));
+    return bbox;
+}  
 
 ////////////////////////////////////////
 

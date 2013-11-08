@@ -32,8 +32,6 @@
 #define OPENVDB_PYACCESSOR_HAS_BEEN_INCLUDED
 
 #include <boost/python.hpp>
-#include <boost/type_traits/remove_const.hpp>
-#include <tbb/atomic.h>
 #include "openvdb/openvdb.h"
 #include "pyutil.h"
 
@@ -41,23 +39,6 @@ namespace pyAccessor {
 
 namespace py = boost::python;
 using namespace openvdb::OPENVDB_VERSION_NAME;
-
-
-template<typename GridT>
-inline const char*
-accessorTypeName(const std::string& baseName)
-{
-    // Because the accessor type name is used in arg extractor functions (below),
-    // and because those functions might be called in an inner loop, the name
-    // should be a static value, not one that needs to be computed at runtime.
-    static tbb::atomic<const char*> sTypeName;
-    if (sTypeName == NULL) {
-        char* s = strdup((pyutil::GridTraits<GridT>::name() + baseName).c_str());
-        sTypeName.compare_and_swap(s, NULL);
-        if (sTypeName != s) free(s);
-    }
-    return sTypeName;
-}
 
 
 //@{
@@ -71,10 +52,15 @@ struct AccessorTraits
     typedef typename NonConstGridT::Accessor    AccessorT;
     typedef typename AccessorT::ValueType       ValueT;
 
-    static const char* typeName() { return accessorTypeName<NonConstGridT>("Accessor"); }
+    static const bool IsConst = false;
+
+    static const char* typeName() { return "Accessor"; }
 
     static void setActiveState(AccessorT& acc, const Coord& ijk, bool on) {
         acc.setActiveState(ijk, on);
+    }
+    static void setValueOnly(AccessorT& acc, const Coord& ijk, const ValueT& val) {
+        acc.setValueOnly(ijk, val);
     }
     static void setValueOn(AccessorT& acc, const Coord& ijk) { acc.setValueOn(ijk); }
     static void setValueOn(AccessorT& acc, const Coord& ijk, const ValueT& val) {
@@ -96,9 +82,12 @@ struct AccessorTraits<const _GridT>
     typedef typename NonConstGridT::ConstAccessor   AccessorT;
     typedef typename AccessorT::ValueType           ValueT;
 
-    static const char* typeName() { return accessorTypeName<NonConstGridT>("ConstAccessor"); }
+    static const bool IsConst = true;
+
+    static const char* typeName() { return "ConstAccessor"; }
 
     static void setActiveState(AccessorT&, const Coord&, bool) { notWritable(); }
+    static void setValueOnly(AccessorT&, const Coord&, const ValueT&) { notWritable(); }
     static void setValueOn(AccessorT&, const Coord&) { notWritable(); }
     static void setValueOn(AccessorT&, const Coord&, const ValueT&) { notWritable(); }
     static void setValueOff(AccessorT&, const Coord&) { notWritable(); }
@@ -151,7 +140,7 @@ extractValueArg(
 /// @internal This class could have just been made to inherit from ValueAccessor,
 /// but the method wrappers allow for more Pythonic error messages.  For example,
 /// if we constructed the Python getValue() method directly from the corresponding
-/// ValueAccessor method, as follows:
+/// ValueAccessor method, as follows,
 ///
 ///    .def("getValue", &Accessor::getValue, ...)
 ///
@@ -178,6 +167,8 @@ public:
     AccessorWrap copy() const { return *this; }
 
     void clear() { mAccessor.clear(); }
+
+    GridPtrType parent() const { return mGrid; }
 
     ValueType getValue(py::object coordObj)
     {
@@ -217,6 +208,13 @@ public:
         Traits::setActiveState(mAccessor, ijk, on);
     }
 
+    void setValueOnly(py::object coordObj, py::object valObj)
+    {
+        Coord ijk = extractCoordArg<GridType>(coordObj, "setValueOnly", 1);
+        ValueType val = extractValueArg<GridType>(valObj, "setValueOnly", 2);
+        Traits::setValueOnly(mAccessor, ijk, val);
+    }
+
     void setValueOn(py::object coordObj, py::object valObj)
     {
         Coord ijk = extractCoordArg<GridType>(coordObj, "setValueOn", 1);
@@ -245,103 +243,96 @@ public:
         return mAccessor.isCached(ijk);
     }
 
+    /// @brief Define a Python wrapper class for this C++ class.
+    static void wrap()
+    {
+        const std::string
+            pyGridTypeName = pyutil::GridTraits<GridType>::name(),
+            pyValueTypeName = openvdb::typeNameAsString<typename GridType::ValueType>(),
+            pyAccessorTypeName = Traits::typeName();
+
+        py::class_<AccessorWrap> clss(
+            pyAccessorTypeName.c_str(),
+            (std::string(Traits::IsConst ? "Read-only" : "Read/write")
+                + " access by (i, j, k) index coordinates to the voxels\nof a "
+                + pyGridTypeName).c_str(),
+            py::no_init);
+
+        clss.def("copy", &AccessorWrap::copy,
+                ("copy() -> " + pyAccessorTypeName + "\n\n"
+                 "Return a copy of this accessor.").c_str())
+
+            .def("clear", &AccessorWrap::clear,
+                "clear()\n\n"
+                "Clear this accessor of all cached data.")
+
+            .add_property("parent", &AccessorWrap::parent,
+                ("this accessor's parent " + pyGridTypeName).c_str())
+
+            //
+            // Voxel access
+            //
+            .def("getValue", &AccessorWrap::getValue,
+                py::arg("ijk"),
+                ("getValue(ijk) -> " + pyValueTypeName + "\n\n"
+                 "Return the value of the voxel at coordinates (i, j, k).").c_str())
+
+            .def("getValueDepth", &AccessorWrap::getValueDepth,
+                py::arg("ijk"),
+                "getValueDepth(ijk) -> int\n\n"
+                "Return the tree depth (0 = root) at which the value of voxel\n"
+                "(i, j, k) resides.  If (i, j, k) isn't explicitly represented in\n"
+                "the tree (i.e., it is implicitly a background voxel), return -1.")
+
+            .def("isVoxel", &AccessorWrap::isVoxel,
+                py::arg("ijk"),
+                "isVoxel(ijk) -> bool\n\n"
+                "Return True if voxel (i, j, k) resides at the leaf level of the tree.")
+
+            .def("probeValue", &AccessorWrap::probeValue,
+                py::arg("ijk"),
+                "probeValue(ijk) -> value, bool\n\n"
+                "Return the value of the voxel at coordinates (i, j, k)\n"
+                "together with the voxel's active state.")
+
+            .def("isValueOn", &AccessorWrap::isValueOn,
+                py::arg("ijk"),
+                "isValueOn(ijk) -> bool\n\n"
+                "Return the active state of the voxel at coordinates (i, j, k).")
+            .def("setActiveState", &AccessorWrap::setActiveState,
+                (py::arg("ijk"), py::arg("on")),
+                "setActiveState(ijk, on)\n\n"
+                "Mark voxel (i, j, k) as either active or inactive (True or False),\n"
+                "but don't change its value.")
+
+            .def("setValueOnly", &AccessorWrap::setValueOnly,
+                (py::arg("ijk"), py::arg("value")),
+                "setValueOnly(ijk, value)\n\n"
+                "Set the value of voxel (i, j, k), but don't change its active state.")
+
+            .def("setValueOn", &AccessorWrap::setValueOn,
+                (py::arg("ijk"), py::arg("value") = py::object()),
+                "setValueOn(ijk, value=None)\n\n"
+                "Mark voxel (i, j, k) as active and, if the given value\n"
+                "is not None, set the voxel's value.\n")
+            .def("setValueOff", &AccessorWrap::setValueOff,
+                (py::arg("ijk"), py::arg("value") = py::object()),
+                "setValueOff(ijk, value=None)\n\n"
+                "Mark voxel (i, j, k) as inactive and, if the given value\n"
+                "is not None, set the voxel's value.")
+
+            .def("isCached", &AccessorWrap::isCached,
+                py::arg("ijk"),
+                "isCached(ijk) -> bool\n\n"
+                "Return True if this accessor has cached the path to voxel (i, j, k).")
+
+            ; // py::class_<ValueAccessor>
+    }
+
 private:
     const GridPtrType mGrid;
     Accessor mAccessor;
 }; // class AccessorWrap
-
-
-////////////////////////////////////////
-
-
-/// Create a Python wrapper for a particular grid type's ValueAccessor.
-template<typename GridType>
-void
-exportAccessor()
-{
-    typedef AccessorTraits<GridType>            Traits;
-    typedef typename Traits::NonConstGridT      NonConstGridType;
-    typedef typename Traits::AccessorT          Accessor;
-    typedef pyAccessor::AccessorWrap<GridType>  AccWrap;
-
-    const std::string
-        pyGridTypeName = pyutil::GridTraits<NonConstGridType>::name(),
-        pyValueTypeName = openvdb::typeNameAsString<typename NonConstGridType::ValueType>(),
-        pyAccessorTypeName = Traits::typeName();
-
-    py::class_<AccWrap>(
-        pyAccessorTypeName.c_str(),
-        ("Access by (i, j, k) index coordinates to the voxels of an OpenVDB "
-             + pyGridTypeName).c_str(),
-        py::no_init)
-
-        .def("copy", &AccWrap::copy,
-            ("copy() -> " + pyAccessorTypeName + "\n\n"
-            "Return a copy of this accessor.").c_str())
-
-        .def("clear", &AccWrap::clear,
-            "clear()\n\n"
-            "Clear this accessor of all cached data.")
-
-        //
-        // Voxel access
-        //
-        .def("getValue", &AccWrap::getValue,
-            py::arg("ijk"),
-            ("getValue(ijk) -> " + pyValueTypeName + "\n\n"
-            "Return the value of the voxel at coordinates (i, j, k).").c_str())
-
-        .def("getValueDepth", &AccWrap::getValueDepth,
-            py::arg("ijk"),
-            "getValueDepth(ijk) -> int\n\n"
-            "Return the tree depth (0 = root) at which the value of voxel\n"
-            "(i, j, k) resides.  If (i, j, k) isn't explicitly represented in\n"
-            "the tree (i.e., it is implicitly a background voxel), return -1.")
-
-        .def("isVoxel", &AccWrap::isVoxel,
-            py::arg("ijk"),
-            "isVoxel(ijk) -> bool\n\n"
-            "Return True if voxel (i, j, k) resides at the leaf level of the tree.")
-
-        .def("probeValue", &AccWrap::probeValue,
-            py::arg("ijk"),
-            "probeValue(ijk) -> value, bool\n\n"
-            "Return the value of the voxel at coordinates (i, j, k)\n"
-            "together with the voxel's active state.")
-
-        .def("isValueOn", &AccWrap::isValueOn,
-            py::arg("ijk"),
-            "isValueOn(ijk) -> bool\n\n"
-            "Return the active state of the voxel at coordinates (i, j, k).")
-        .def("setActiveState", &AccWrap::setActiveState,
-            (py::arg("ijk"), py::arg("on")),
-            "setActiveState(ijk, on)\n\n"
-            "Mark voxel (i, j, k) as either active or inactive (True or False),\n"
-            "but don't change its value.")
-
-        /// @todo Do we want to expose setValue()?
-        //.def("setValue", &AccWrap::setValueOn,
-        //    (py::arg("ijk"), py::arg("value")),
-        //    "setValue(ijk, value)\n\n"
-        //    "Set the value of voxel (i, j, k) and mark the voxel as active.")
-        .def("setValueOn", &AccWrap::setValueOn,
-            (py::arg("ijk"), py::arg("value") = py::object()),
-            "setValueOn(ijk, value=None)\n\n"
-            "Mark voxel (i, j, k) as active and, if the given value\n"
-            "is not None, set the voxel's value.\n")
-        .def("setValueOff", &AccWrap::setValueOff,
-            (py::arg("ijk"), py::arg("value") = py::object()),
-            "setValueOff(ijk, value=None)\n\n"
-            "Mark voxel (i, j, k) as inactive and, if the given value\n"
-            "is not None, set the voxel's value.")
-
-        .def("isCached", &AccWrap::isCached,
-            py::arg("ijk"),
-            "isCached(ijk) -> bool\n\n"
-            "Return True if this accessor has cached the path to voxel (i, j, k).")
-
-        ; // py::class_<ValueAccessor>
-}
 
 } // namespace pyAccessor
 

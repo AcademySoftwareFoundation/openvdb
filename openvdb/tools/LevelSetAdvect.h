@@ -470,7 +470,8 @@ advect(ScalarType time0, ScalarType time1)
         const ScalarType dt = this->sampleField(time0, time1);
         if ( math::isZero(dt) ) break;//V is essentially zero so terminate
 
-        switch(TemporalScheme) {//switch is resolved at compile-time
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN //switch is resolved at compile-time
+        switch(TemporalScheme) {
         case math::TVD_RK1:
             // Perform one explicit Euler step: t1 = t0 + dt
             // Phi_t1(1) = Phi_t0(0) - dt * VdotG_t0(0)
@@ -512,7 +513,9 @@ advect(ScalarType time0, ScalarType time1)
             break;
         default:
             OPENVDB_THROW(ValueError, "Temporal integration scheme not supported!");
-        }
+        }//end of compile-time resolved switch
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+            
         time0 += isForward ? dt : -dt;
         ++countCFL;
         mParent.mTracker.leafs().removeAuxBuffers();

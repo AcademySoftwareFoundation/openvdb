@@ -144,6 +144,13 @@ public:
     char& triangleFlags(size_t n)                       { return mTriangleFlags[n]; }
     const char& triangleFlags(size_t n) const           { return mTriangleFlags[n]; }
 
+
+    // reduce the polygon containers, n has to
+    // be smaller than the current container size.
+
+    inline bool trimQuads(const size_t n, bool reallocate = false);
+    inline bool trimTrinagles(const size_t n, bool reallocate = false);
+
 private:
     // disallow copy by assignment
     void operator=(const PolygonPool&) {}
@@ -932,7 +939,7 @@ SignData<TreeT, LeafManagerT>::SignData(const TreeT& distTree,
     , mIsovalue(iso)
     , mSignTree(new Int16TreeT(0))
     , mSignAcc(*mSignTree)
-    , mIdxTree(new IntTreeT(0))
+    , mIdxTree(new IntTreeT(int(util::INVALID_IDX)))
     , mIdxAcc(*mIdxTree)
 {
 }
@@ -946,7 +953,7 @@ SignData<TreeT, LeafManagerT>::SignData(SignData& rhs, tbb::split)
     , mIsovalue(rhs.mIsovalue)
     , mSignTree(new Int16TreeT(0))
     , mSignAcc(*mSignTree)
-    , mIdxTree(new IntTreeT(0))
+    , mIdxTree(new IntTreeT(int(util::INVALID_IDX)))
     , mIdxAcc(*mIdxTree)
 {
 }
@@ -965,6 +972,7 @@ void
 SignData<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size_t>& range)
 {
     typedef typename Int16TreeT::LeafNodeType Int16LeafT;
+    typedef typename IntTreeT::LeafNodeType IntLeafT;
     typename LeafManagerT::TreeType::LeafNodeType::ValueOnCIter iter;
     unsigned char signs, face;
     Coord ijk, coord;
@@ -1012,7 +1020,14 @@ SignData<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size_t>& rang
         }
 
         if (collectedData) {
-            mIdxAcc.touchLeaf(coord)->topologyUnion(*signLeafPt);
+
+            IntLeafT* idxLeaf = mIdxAcc.touchLeaf(coord);
+            idxLeaf->topologyUnion(*signLeafPt);
+            typename IntLeafT::ValueOnIter it = idxLeaf->beginValueOn();
+            for (; it; ++it) {
+                it.setValue(0);
+            }
+
             mSignAcc.addLeaf(signLeafPt.release());
         }
     }
@@ -2328,7 +2343,10 @@ struct UniformPrimBuilder
         ++mIdx;
     }
 
-    void done() {}
+    void done()
+    {
+        mPolygonPool->trimQuads(mIdx);
+    }
 
 private:
     size_t mIdx;
@@ -2339,15 +2357,13 @@ private:
 // Constructs qudas and triangles
 struct AdaptivePrimBuilder
 {
-    AdaptivePrimBuilder()
-        : mQuadIdx(0), mTriangleIdx(0), mPolygonPool(NULL), mTmpPolygonPool() {}
+    AdaptivePrimBuilder() : mQuadIdx(0), mTriangleIdx(0), mPolygonPool(NULL) {}
 
     void init(const size_t upperBound, PolygonPool& polygonPool)
     {
         mPolygonPool = &polygonPool;
-
-        mTmpPolygonPool.resetQuads(upperBound);
-        mTmpPolygonPool.resetTriangles(upperBound);
+        mPolygonPool->resetQuads(upperBound);
+        mPolygonPool->resetTriangles(upperBound);
 
         mQuadIdx = 0;
         mTriangleIdx = 0;
@@ -2357,35 +2373,35 @@ struct AdaptivePrimBuilder
     {
         if (verts[0] != verts[1] && verts[0] != verts[2] && verts[0] != verts[3]
             && verts[1] != verts[2] && verts[1] != verts[3] && verts[2] != verts[3]) {
-            mTmpPolygonPool.quadFlags(mQuadIdx) = flags;
+            mPolygonPool->quadFlags(mQuadIdx) = flags;
             addQuad(verts, reverse);
         } else if (
             verts[0] == verts[3] &&
             verts[1] != verts[2] &&
             verts[1] != verts[0] &&
             verts[2] != verts[0]) {
-            mTmpPolygonPool.triangleFlags(mTriangleIdx) = flags;
+            mPolygonPool->triangleFlags(mTriangleIdx) = flags;
             addTriangle(verts[0], verts[1], verts[2], reverse);
         } else if (
             verts[1] == verts[2] &&
             verts[0] != verts[3] &&
             verts[0] != verts[1] &&
             verts[3] != verts[1]) {
-            mTmpPolygonPool.triangleFlags(mTriangleIdx) = flags;
+            mPolygonPool->triangleFlags(mTriangleIdx) = flags;
             addTriangle(verts[0], verts[1], verts[3], reverse);
         } else if (
             verts[0] == verts[1] &&
             verts[2] != verts[3] &&
             verts[2] != verts[0] &&
             verts[3] != verts[0]) {
-            mTmpPolygonPool.triangleFlags(mTriangleIdx) = flags;
+            mPolygonPool->triangleFlags(mTriangleIdx) = flags;
             addTriangle(verts[0], verts[2], verts[3], reverse);
         } else if (
             verts[2] == verts[3] &&
             verts[0] != verts[1] &&
             verts[0] != verts[2] &&
             verts[1] != verts[2]) {
-            mTmpPolygonPool.triangleFlags(mTriangleIdx) = flags;
+            mPolygonPool->triangleFlags(mTriangleIdx) = flags;
             addTriangle(verts[0], verts[1], verts[2], reverse);
         }
     }
@@ -2393,19 +2409,8 @@ struct AdaptivePrimBuilder
 
     void done()
     {
-        mPolygonPool->resetQuads(mQuadIdx);
-        for (size_t  i = 0; i < mQuadIdx; ++i) {
-            mPolygonPool->quad(i) = mTmpPolygonPool.quad(i);
-            mPolygonPool->quadFlags(i) = mTmpPolygonPool.quadFlags(i);
-        }
-        mTmpPolygonPool.clearQuads();
-
-        mPolygonPool->resetTriangles(mTriangleIdx);
-        for (size_t  i = 0; i < mTriangleIdx; ++i) {
-            mPolygonPool->triangle(i) = mTmpPolygonPool.triangle(i);
-            mPolygonPool->triangleFlags(i) = mTmpPolygonPool.triangleFlags(i);
-        }
-        mTmpPolygonPool.clearTriangles();
+        mPolygonPool->trimQuads(mQuadIdx, /*reallocate=*/true);
+        mPolygonPool->trimTrinagles(mTriangleIdx, /*reallocate=*/true);
     }
 
 private:
@@ -2413,9 +2418,9 @@ private:
     void addQuad(const Vec4I& verts, bool reverse)
     {
         if (!reverse) {
-            mTmpPolygonPool.quad(mQuadIdx) = verts;
+            mPolygonPool->quad(mQuadIdx) = verts;
         } else {
-            Vec4I& quad = mTmpPolygonPool.quad(mQuadIdx);
+            Vec4I& quad = mPolygonPool->quad(mQuadIdx);
             quad[0] = verts[3];
             quad[1] = verts[2];
             quad[2] = verts[1];
@@ -2426,7 +2431,7 @@ private:
 
     void addTriangle(unsigned v0, unsigned v1, unsigned v2, bool reverse)
     {
-        Vec3I& prim = mTmpPolygonPool.triangle(mTriangleIdx);
+        Vec3I& prim = mPolygonPool->triangle(mTriangleIdx);
 
         prim[1] = v1;
 
@@ -2442,7 +2447,6 @@ private:
 
     size_t mQuadIdx, mTriangleIdx;
     PolygonPool *mPolygonPool;
-    PolygonPool mTmpPolygonPool;
 };
 
 
@@ -2451,12 +2455,15 @@ inline void
 constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord& ijk,
     const SignAccT& signAcc, const IdxAccT& idxAcc, PrimBuilder& mesher, Index32 pointListSize)
 {
+    const Index32 v0 = idxAcc.getValue(ijk);    
+    if (v0 == util::INVALID_IDX) return;
+
     char tag[2];
     tag[0] = (flags & SEAM) ? POLYFLAG_FRACTURE_SEAM : 0;
     tag[1] = tag[0] | char(POLYFLAG_EXTERIOR);
 
     const bool isInside = flags & INSIDE;
-    const int v0 = idxAcc.getValue(ijk);
+
     Coord coord;
     openvdb::Vec4I quad;
     unsigned char cell;
@@ -2465,102 +2472,128 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord
     if (flags & XEDGE) {
 
         quad[0] = v0 + offsets[0];
-        coord[0] = ijk[0]; coord[1] = ijk[1]-1; coord[2] = ijk[2]; // i, j-1, k
-        quad[1] = idxAcc.getValue(coord);
 
+        // i, j-1, k
+        coord[0] = ijk[0];
+        coord[1] = ijk[1] - 1;
+        coord[2] = ijk[2];
+
+        quad[1] = idxAcc.getValue(coord);
         cell = SIGNS & signAcc.getValue(coord);
         if (sEdgeGroupTable[cell][0] > 1) {
             tmpIdx = quad[1] + Index32(sEdgeGroupTable[cell][5] - 1);
             if (tmpIdx < pointListSize) quad[1] = tmpIdx;
         }
 
-        coord[2] -= 1; // i, j-1, k-1
-        quad[2] = idxAcc.getValue(coord);
+        // i, j-1, k-1
+        coord[2] -= 1; 
 
+        quad[2] = idxAcc.getValue(coord);
         cell = SIGNS & signAcc.getValue(coord);
         if (sEdgeGroupTable[cell][0] > 1) {
             tmpIdx = quad[2] + Index32(sEdgeGroupTable[cell][7] - 1);
             if (tmpIdx < pointListSize) quad[2] = tmpIdx;
         }
 
-        coord[1] = ijk[1]; // i, j, k-1
-        quad[3] = idxAcc.getValue(coord);
+        // i, j, k-1
+        coord[1] = ijk[1];
 
+        quad[3] = idxAcc.getValue(coord);
         cell = SIGNS & signAcc.getValue(coord);
         if (sEdgeGroupTable[cell][0] > 1) {
             tmpIdx = quad[3] + Index32(sEdgeGroupTable[cell][3] - 1);
             if (tmpIdx < pointListSize) quad[3] = tmpIdx;
         }
 
-        mesher.addPrim(quad, isInside, tag[bool(refFlags & XEDGE)]);
+        if (quad[1] != util::INVALID_IDX &&
+            quad[2] != util::INVALID_IDX && quad[3] != util::INVALID_IDX) {
+            mesher.addPrim(quad, isInside, tag[bool(refFlags & XEDGE)]);
+        }
     }
 
 
     if (flags & YEDGE) {
 
         quad[0] = v0 + offsets[1];
-        coord[0] = ijk[0]; coord[1] = ijk[1]; coord[2] = ijk[2]-1; // i, j, k-1
-        quad[1] = idxAcc.getValue(coord);
 
+        // i, j, k-1
+        coord[0] = ijk[0];
+        coord[1] = ijk[1];
+        coord[2] = ijk[2] - 1;
+
+        quad[1] = idxAcc.getValue(coord);
         cell = SIGNS & signAcc.getValue(coord);
         if (sEdgeGroupTable[cell][0] > 1) {
             tmpIdx = quad[1] + Index32(sEdgeGroupTable[cell][12] - 1);
             if (tmpIdx < pointListSize) quad[1] = tmpIdx;
         }
 
-        coord[0] -= 1; // i-1, j, k-1
-        quad[2] = idxAcc.getValue(coord);
+        // i-1, j, k-1
+        coord[0] -= 1;
 
+        quad[2] = idxAcc.getValue(coord);
         cell = SIGNS & signAcc.getValue(coord);
         if (sEdgeGroupTable[cell][0] > 1) {
             tmpIdx = quad[2] + Index32(sEdgeGroupTable[cell][11] - 1);
             if (tmpIdx < pointListSize) quad[2] = tmpIdx;
         }
 
-        coord[2] = ijk[2]; // i-1, j, k
-        quad[3] = idxAcc.getValue(coord);
+        // i-1, j, k
+        coord[2] = ijk[2]; 
 
+        quad[3] = idxAcc.getValue(coord);
         cell = SIGNS & signAcc.getValue(coord);
         if (sEdgeGroupTable[cell][0] > 1) {
             tmpIdx = quad[3] + Index32(sEdgeGroupTable[cell][10] - 1);
             if (tmpIdx < pointListSize) quad[3] = tmpIdx;
         }
 
-        mesher.addPrim(quad, isInside, tag[bool(refFlags & YEDGE)]);
+        if (quad[1] != util::INVALID_IDX &&
+            quad[2] != util::INVALID_IDX && quad[3] != util::INVALID_IDX) {
+            mesher.addPrim(quad, isInside, tag[bool(refFlags & YEDGE)]);
+        }
     }
-
 
     if (flags & ZEDGE) {
 
         quad[0] = v0 + offsets[2];
-        coord[0] = ijk[0]; coord[1] = ijk[1]-1; coord[2] = ijk[2]; // i, j-1, k
-        quad[1] = idxAcc.getValue(coord);
 
+        // i, j-1, k
+        coord[0] = ijk[0];
+        coord[1] = ijk[1] - 1;
+        coord[2] = ijk[2];
+
+        quad[1] = idxAcc.getValue(coord);
         cell = SIGNS & signAcc.getValue(coord);
         if (sEdgeGroupTable[cell][0] > 1) {
             tmpIdx = quad[1] + Index32(sEdgeGroupTable[cell][8] - 1);
             if (tmpIdx < pointListSize) quad[1] = tmpIdx;
         }
 
-        coord[0] -= 1; // i-1, j-1, k
-        quad[2] = idxAcc.getValue(coord);
+        // i-1, j-1, k
+        coord[0] -= 1;
 
+        quad[2] = idxAcc.getValue(coord);
         cell = SIGNS & signAcc.getValue(coord);
         if (sEdgeGroupTable[cell][0] > 1) {
             tmpIdx = quad[2] + Index32(sEdgeGroupTable[cell][6] - 1);
             if (tmpIdx < pointListSize) quad[2] = tmpIdx;
         }
 
-        coord[1] = ijk[1]; // i-1, j, k
-        quad[3] = idxAcc.getValue(coord);
+        // i-1, j, k
+        coord[1] = ijk[1];
 
+        quad[3] = idxAcc.getValue(coord);
         cell = SIGNS & signAcc.getValue(coord);
         if (sEdgeGroupTable[cell][0] > 1) {
             tmpIdx = quad[3] + Index32(sEdgeGroupTable[cell][2] - 1);
             if (tmpIdx < pointListSize) quad[3] = tmpIdx;
         }
 
-        mesher.addPrim(quad, !isInside, tag[bool(refFlags & ZEDGE)]);
+        if (quad[1] != util::INVALID_IDX &&
+            quad[2] != util::INVALID_IDX && quad[3] != util::INVALID_IDX) {
+            mesher.addPrim(quad, !isInside, tag[bool(refFlags & ZEDGE)]);
+        }
     }
 }
 
@@ -3847,6 +3880,64 @@ PolygonPool::clearTriangles()
 }
 
 
+inline bool
+PolygonPool::trimQuads(const size_t n, bool reallocate)
+{
+    if (!(n < mNumQuads)) return false;
+
+    if (reallocate) {
+
+        if (n == 0) {
+            mQuads.reset(NULL);
+        } else {
+
+            boost::scoped_array<openvdb::Vec4I> quads(new openvdb::Vec4I[n]);
+            boost::scoped_array<char> flags(new char[n]);
+
+            for (size_t i = 0; i < n; ++i) {
+                quads[i] = mQuads[i];
+                flags[i] = mQuadFlags[i];
+            }
+
+            mQuads.swap(quads);
+            mQuadFlags.swap(flags);
+        }
+    }
+
+    mNumQuads = n;
+    return true;
+}
+
+
+inline bool
+PolygonPool::trimTrinagles(const size_t n, bool reallocate)
+{
+    if (!(n < mNumTriangles)) return false;
+
+    if (reallocate) {
+
+        if (n == 0) {
+            mTriangles.reset(NULL);
+        } else {
+
+            boost::scoped_array<openvdb::Vec3I> triangles(new openvdb::Vec3I[n]);
+            boost::scoped_array<char> flags(new char[n]);
+
+            for (size_t i = 0; i < n; ++i) {
+                triangles[i] = mTriangles[i];
+                flags[i] = mTriangleFlags[i];
+            }
+
+            mTriangles.swap(triangles);
+            mTriangleFlags.swap(flags);
+        }
+    }
+
+    mNumTriangles = n;
+    return true;
+}
+
+
 ////////////////////////////////////////
 
 
@@ -4016,18 +4107,31 @@ VolumeToMesh::operator()(const GridT& distGrid)
         seamMask.topologyUnion(*adaptivityMaskPt);
     }
 
+
     // Collect auxiliary data
     {
         DistLeafManagerT distLeafs(distTree);
 
         // Check if the isovalue is in proximity to the active voxel boundary.
         bool padActiveVoxels = false;
+        int padVoxels = 3;
 
         if (distGrid.getGridClass() != GRID_LEVEL_SET) {
             padActiveVoxels = true;
         } else {
             padActiveVoxels = internal::needsActiveVoxePadding(distLeafs,
                 mIsovalue, transform.voxelSize()[0]);
+        }
+
+        // always pad the active region for small volumes (the performance hit is neglectable).
+        if (!padActiveVoxels) {
+            Coord dim;
+            distTree.evalActiveVoxelDim(dim);
+            int maxDim = std::max(std::max(dim[0], dim[1]), dim[2]);
+            if (maxDim < 1000) {
+                padActiveVoxels = true;
+                padVoxels = 1;
+            }
         }
 
         if (surfaceMask || mPartitions > 1) {
@@ -4057,8 +4161,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
             }
 
             {
-                if (padActiveVoxels) tools::dilateVoxels(valueMask, 3);
-
+                if (padActiveVoxels) tools::dilateVoxels(valueMask, padVoxels);
                 BoolLeafManagerT leafs(valueMask);
 
                 internal::SignData<DistTreeT, BoolLeafManagerT>
@@ -4090,7 +4193,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
                 BoolTreeT regionMask(false);
                 regionMask.topologyUnion(distTree);
-                tools::dilateVoxels(regionMask, 3);
+                tools::dilateVoxels(regionMask, padVoxels);
 
                 BoolLeafManagerT leafs(regionMask);
 
@@ -4100,7 +4203,6 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
                 signTreePt = signDataOp.signTree();
                 idxTreePt = signDataOp.idxTree();
-
             } else {
 
                 internal::SignData<DistTreeT, DistLeafManagerT>
@@ -4118,9 +4220,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
     // Collect auxiliary data from active tiles
     internal::tileData(distTree, *signTreePt, *idxTreePt, isovalue);
 
-
     // Optionally collect auxiliary data from a reference level set.
-
     Int16TreeT *refSignTreePt = NULL;
     IntTreeT *refIdxTreePt = NULL;
     const DistTreeT *refDistTreePt = NULL;
@@ -4272,6 +4372,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
     mPolygonPoolListSize = signLeafs.leafCount();
     mPolygons.reset(new PolygonPool[mPolygonPoolListSize]);
 
+
     if (adaptive) {
 
         internal::GenPolygons<Int16LeafManagerT, internal::AdaptivePrimBuilder>
@@ -4288,7 +4389,6 @@ VolumeToMesh::operator()(const GridT& distGrid)
         mesher.setRefSignTree(refSignTreePt);
         mesher.run();
     }
-
 
     // Clean up unused points, only necessary if masking and/or
     // automatic mesh partitioning is enabled.

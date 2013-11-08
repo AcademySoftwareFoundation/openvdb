@@ -41,7 +41,8 @@
 #include "Vec3.h"
 #include "Transform.h"
 #include <iostream> // for std::ostream
-
+#include <boost/type_traits/is_floating_point.hpp>
+#include <limits>// for std::numeric_limits<Type>::max()
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -52,13 +53,14 @@ template<typename RealT = double>
 class Ray
 {
 public:
+    BOOST_STATIC_ASSERT(boost::is_floating_point<RealT>::value);
     typedef RealT      RealType;
     typedef Vec3<Real> Vec3Type;
     typedef Vec3Type   Vec3T;
 
     Ray(const Vec3Type& eye = Vec3Type(0,0,0),
         const Vec3Type& direction = Vec3Type(1,0,0),
-        RealT t0 = 1e-3,
+        RealT t0 = math::Delta<RealT>::value(),
         RealT t1 = std::numeric_limits<RealT>::max())
         : mEye(eye), mDir(direction), mInvDir(1/mDir), mT0(t0), mT1(t1)
     {
@@ -291,8 +293,8 @@ public:
 private:
     Vec3T mEye, mDir, mInvDir;
     RealT mT0, mT1;
-}; // end of Ray class  
-
+}; // end of Ray class
+    
 /// @brief Output streaming of the Ray class.
 /// @note Primarily intended for debugging.
 template<typename RealT>

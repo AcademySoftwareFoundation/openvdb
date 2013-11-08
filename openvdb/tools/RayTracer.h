@@ -45,6 +45,7 @@
 #define OPENVDB_TOOLS_RAYTRACER_HAS_BEEN_INCLUDED
 
 #include <openvdb/Types.h>
+#include <openvdb/math/BBox.h>
 #include <openvdb/math/Ray.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/tools/RayIntersector.h>
@@ -100,24 +101,58 @@ public:
     typedef typename IntersectorT::Vec3Type Vec3Type;
     typedef typename IntersectorT::RayType  RayType;
 
+    /// @brief Constructor based on an instance of the grid to be rendered.
     LevelSetRayTracer(const GridT& grid,
                       const BaseShader& shader,
                       BaseCamera& camera,
                       size_t pixelSamples = 1,
                       unsigned int seed = 0);
+
+    /// @brief Constructor based on an instance of the intersector
+    /// performing the ray-intersections.
     LevelSetRayTracer(const IntersectorT& inter,
                       const BaseShader& shader,
                       BaseCamera& camera,
                       size_t pixelSamples = 1,
                       unsigned int seed = 0);
+
+    /// @brief Copy constructor
     LevelSetRayTracer(const LevelSetRayTracer& other);
+
+    /// @brief Destructor
     ~LevelSetRayTracer();
+    
+    /// @brief Set the level set grid to be ray-traced
     void setGrid(const GridT& grid);
+
+    /// @brief Set the intersector that performs the actual
+    /// intersection of the rays against the narrow-band level set.
     void setIntersector(const IntersectorT& inter);
+
+    /// @brief Set the shader derived from the abstract BaseShader class.
+    ///
+    /// @note The shader is not assumed to be thread-safe so each
+    /// thread will get it's only deep copy. For instance it could
+    /// contains a ValueAccessor into another grid with auxiliary
+    /// shading information. Thus, make sure it is relatively 
+    /// light-weight and efficient to copy (which is the case for ValueAccesors).
     void setShader(const BaseShader& shader);
+
+    /// @brief Set the camera derived from the abstract BaseCamera class.
     void setCamera(BaseCamera& camera);
+    
+    /// @brief Set the number of pixel samples and the seed for
+    /// jittered sub-rays. A value larger then one implies
+    /// anti-aliasing by jittered super-sampling.
+    /// @throw ValueError if pixelSamples is equal to zero.
     void setPixelSamples(size_t pixelSamples, unsigned int seed = 0);
-    void trace(bool threaded = true);
+
+    /// @brief Perform the actual (potentially multithreaded) ray-tracing.
+    void render(bool threaded = true);
+    OPENVDB_DEPRECATED void trace(bool threaded = true) { this->render(threaded); }
+
+    /// @brief Public method required by tbb::parallel_for.
+    /// @warning Never call it directly.
     void operator()(const tbb::blocked_range<size_t>& range) const;
 
 private:
@@ -322,9 +357,9 @@ public:
         size_t i, size_t j, double iOffset = 0.5, double jOffset = 0.5) const = 0;
 
 protected:
-    void initRay(double znear, double zfar)
+    void initRay(double t0, double t1)
     {
-        mRay.setTimes(znear, zfar);
+        mRay.setTimes(t0, t1);
         mRay.setEye(mScreenToWorld.applyMap(Vec3R(0.0)));
         mRay.setDir(mScreenToWorld.applyJacobian(Vec3R(0.0, 0.0, -1.0)));
     }
@@ -444,7 +479,17 @@ public:
     typedef math::Ray<Real> RayT;
     BaseShader() {}
     virtual ~BaseShader() {}
-    virtual Film::RGBA operator()(const Vec3R&, const Vec3R&, const RayT&) const = 0;
+    /// @brief Defines the interface of the virtual function that returns a RGB color.
+    /// @param xyz World position of the intersection point.
+    /// @param nml Normal in world space at the intersection point.
+    /// @param dir Direction of the ray in world space.
+    virtual Film::RGBA operator()(const Vec3R& xyz, const Vec3R& nml, const Vec3R& dir) const = 0;
+
+    /// @brief Deprecated, use the method above instead.
+    OPENVDB_DEPRECATED Film::RGBA operator()(const Vec3R& xyz, const Vec3R& nml, const RayT& ray) const
+      {
+          return (*this)(xyz, nml, ray.dir());
+      }
     virtual BaseShader* copy() const = 0;
 };
 
@@ -455,7 +500,7 @@ class MatteShader: public BaseShader
 public:
     MatteShader(const Film::RGBA& c = Film::RGBA(1.0f)): mRGBA(c) {}
     virtual ~MatteShader() {}
-    virtual Film::RGBA operator()(const Vec3R&, const Vec3R&, const BaseShader::RayT&) const
+    virtual Film::RGBA operator()(const Vec3R&, const Vec3R&, const Vec3R&) const
     {
         return mRGBA;
     }
@@ -472,7 +517,7 @@ class NormalShader: public BaseShader
 public:
     NormalShader(const Film::RGBA& c = Film::RGBA(1.0f)) : mRGBA(c*0.5f) {}
     virtual ~NormalShader() {}
-    virtual Film::RGBA operator()(const Vec3R&, const Vec3R& normal, const BaseShader::RayT&) const
+    virtual Film::RGBA operator()(const Vec3R&, const Vec3R& normal, const Vec3R&) const
     {
         return mRGBA*Film::RGBA(normal[0]+1.0f, normal[1]+1.0f, normal[2]+1.0f);
     }
@@ -482,6 +527,26 @@ private:
     const Film::RGBA mRGBA;
 };
 
+  
+/// Color shader that treats position (x, y, z) as an RGB color in a
+/// cube defined from an axis-aligned bounding box in world space.
+class PositionShader: public BaseShader
+{
+public:
+    PositionShader(const math::BBox<Vec3R>& bbox, const Film::RGBA& c = Film::RGBA(1.0f))
+        : mMin(bbox.min()), mInvDim(1.0/bbox.extents()), mRGBA(c) {}
+    virtual ~PositionShader() {}
+    virtual Film::RGBA operator()(const Vec3R& xyz, const Vec3R&, const Vec3R&) const
+    {
+        const Vec3R rgb = (xyz - mMin)*mInvDim;
+        return mRGBA*Film::RGBA(rgb[0], rgb[1], rgb[2]);
+    }
+    virtual BaseShader* copy() const { return new PositionShader(*this); }
+
+    private:
+    const Vec3R mMin, mInvDim;
+    const Film::RGBA mRGBA;
+};
 
 /// @brief Simple diffuse Lambertian surface shader
 /// @details Diffuse simply means the color is constant (e.g., white), and
@@ -492,19 +557,18 @@ class DiffuseShader: public BaseShader
 {
 public:
     DiffuseShader(const Film::RGBA& d = Film::RGBA(1.0f)): mRGBA(d) {}
-    virtual Film::RGBA operator()(const Vec3R&, const Vec3R& normal,
-        const BaseShader::RayT& ray) const
+    virtual Film::RGBA operator()(const Vec3R&, const Vec3R& normal, const Vec3R& rayDir) const
     {
         // We assume a single directional light source at the camera,
         // so the cosine of the angle between the surface normal and the
         // direction of the light source becomes the dot product of the
         // surface normal and inverse direction of the ray.  We also ignore
         // negative dot products, corresponding to strict one-sided shading.
-        //return mRGBA * math::Max(0.0, normal.dot(-ray.dir()));
+        //return mRGBA * math::Max(0.0, normal.dot(-rayDir));
 
         // We take the abs of the dot product corresponding to having
-        // light sources at +/- ray.dir(), i.e., two-sided shading.
-        return mRGBA * math::Abs(normal.dot(ray.dir()));
+        // light sources at +/- rayDir, i.e., two-sided shading.
+        return mRGBA * math::Abs(normal.dot(rayDir));
     }
     virtual BaseShader* copy() const { return new DiffuseShader(*this); }
 
@@ -525,7 +589,7 @@ inline void rayTrace(const GridT& grid,
 {
     LevelSetRayTracer<GridT, tools::LevelSetRayIntersector<GridT> >
         tracer(grid, shader, camera, pixelSamples, seed);
-    tracer.trace(threaded);
+    tracer.render(threaded);
 }
 
 
@@ -539,7 +603,7 @@ inline void rayTrace(const GridT&,
                      bool threaded)
 {
     LevelSetRayTracer<GridT, IntersectorT> tracer(inter, shader, camera, pixelSamples, seed);
-    tracer.trace(threaded);
+    tracer.render(threaded);
 }
 
 
@@ -634,7 +698,9 @@ inline void LevelSetRayTracer<GridT, IntersectorT>::
 setPixelSamples(size_t pixelSamples, unsigned int seed)
 {
     assert(mIsMaster);
-    assert(pixelSamples>0);
+    if (pixelSamples == 0) {
+        OPENVDB_THROW(ValueError, "pixelSamples must be larger then zero!");
+    }
     mSubPixels = pixelSamples - 1;
     delete [] mRand;
     if (mSubPixels > 0) {
@@ -648,7 +714,7 @@ setPixelSamples(size_t pixelSamples, unsigned int seed)
 
 template<typename GridT, typename IntersectorT>
 inline void LevelSetRayTracer<GridT, IntersectorT>::
-trace(bool threaded)
+render(bool threaded)
 {
     tbb::blocked_range<size_t> range(0, mCamera->height());
     threaded ? tbb::parallel_for(range, *this) : (*this)(range);
@@ -658,16 +724,17 @@ template<typename GridT, typename IntersectorT>
 inline void LevelSetRayTracer<GridT, IntersectorT>::
 operator()(const tbb::blocked_range<size_t>& range) const
 {
+    const BaseShader& shader = *mShader;
     Vec3Type xyz, nml;
     const float frac = 1.0f / (1.0f + mSubPixels);
     for (size_t j=range.begin(), n=0, je = range.end(); j<je; ++j) {
         for (size_t i=0, ie = mCamera->width(); i<ie; ++i) {
             Film::RGBA& bg = mCamera->pixel(i,j);
             RayType ray = mCamera->getRay(i, j);//primary ray
-            Film::RGBA c = mInter.intersectsWS(ray, xyz, nml) ? (*mShader)(xyz, nml, ray) : bg;
+            Film::RGBA c = mInter.intersectsWS(ray, xyz, nml) ? shader(xyz, nml, ray.dir()) : bg;
             for (size_t k=0; k<mSubPixels; ++k, n +=2 ) {
-                ray = mCamera->getRay(i, j, mRand[n & 15], mRand[n+1 & 15]);
-                c += mInter.intersectsWS(ray, xyz, nml) ? (*mShader)(xyz, nml, ray) : bg;
+                ray = mCamera->getRay(i, j, mRand[n & 15], mRand[(n+1) & 15]);
+                c += mInter.intersectsWS(ray, xyz, nml) ? shader(xyz, nml, ray.dir()) : bg;
             }//loop over sub-pixels
             bg = c*frac;
         }//loop over image height
