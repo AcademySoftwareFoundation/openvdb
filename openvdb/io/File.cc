@@ -57,6 +57,41 @@ File::~File()
 }
 
 
+File::File(const File& other)
+    : Archive(other)
+    , mFilename(other.mFilename)
+    , mMeta(other.mMeta)
+    , mIsOpen(false) // don't want two file objects reading from the same stream
+    , mGridDescriptors(other.mGridDescriptors)
+    , mNamedGrids(other.mNamedGrids)
+    , mGrids(other.mGrids)
+{
+}
+
+
+File&
+File::operator=(const File& other)
+{
+    if (&other != this) {
+        Archive::operator=(other);
+        mFilename = other.mFilename;
+        mMeta = other.mMeta;
+        mIsOpen = false; // don't want two file objects reading from the same stream
+        mGridDescriptors = other.mGridDescriptors;
+        mNamedGrids = other.mNamedGrids;
+        mGrids = other.mGrids;
+    }
+    return *this;
+}
+
+
+boost::shared_ptr<Archive>
+File::copy() const
+{
+    return boost::shared_ptr<Archive>(new File(*this));
+}
+
+
 ////////////////////////////////////////
 
 

@@ -28,10 +28,13 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+#include <boost/bind.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <cppunit/extensions/HelperMacros.h>
+#include <tbb/tbb_thread.h> // for tbb::this_tbb_thread::sleep()
 #include <openvdb/Exceptions.h>
 #include <openvdb/io/File.h>
+#include <openvdb/io/Queue.h>
 #include <openvdb/io/Stream.h>
 #include <openvdb/Metadata.h>
 #include <openvdb/math/Transform.h>
@@ -39,6 +42,9 @@
 #include <openvdb/version.h>
 #include <openvdb/openvdb.h>
 #include "util.h" // for unittest_util::makeSphere()
+#include <map>
+#include <set>
+#include <vector>
 #include <sys/types.h> // for stat()
 #include <sys/stat.h>
 #ifndef _WIN32
@@ -75,6 +81,7 @@ public:
     CPPUNIT_TEST(testNameIterator);
     CPPUNIT_TEST(testReadOldFileFormat);
     CPPUNIT_TEST(testCompression);
+    CPPUNIT_TEST(testAsync);
     CPPUNIT_TEST_SUITE_END();
 
     void testHeader();
@@ -99,6 +106,7 @@ public:
     void testNameIterator();
     void testReadOldFileFormat();
     void testCompression();
+    void testAsync();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestFile);
@@ -502,10 +510,11 @@ TestFile::testWriteInstancedGrids()
     GridBase::Ptr
         grid1 = createGrid(tree1),
         grid2 = createGrid(tree1), // instance of grid1
-        grid3 = createGrid(tree2);
+        grid3 = createGrid(tree2),
+        grid4 = createGrid(tree2); // instance of grid3
     grid1->setName("density");
     grid2->setName("density_copy");
-    grid3->setName("temperature");
+    // Leave grid3 and grid4 unnamed.
 
     // Create transforms.
     math::Transform::Ptr trans1 = math::Transform::createLinearTransform(0.1);
@@ -513,6 +522,7 @@ TestFile::testWriteInstancedGrids()
     grid1->setTransform(trans1);
     grid2->setTransform(trans2);
     grid3->setTransform(trans2);
+    grid4->setTransform(trans1);
 
     // Set some values.
     tree1->setValue(Coord(0, 0, 0), 5);
@@ -528,6 +538,7 @@ TestFile::testWriteInstancedGrids()
     grids->push_back(grid1);
     grids->push_back(grid2);
     grids->push_back(grid3);
+    grids->push_back(grid4);
 
     // Write the grids to a file and then close the file.
     const char* filename = "something.vdb2";
@@ -552,7 +563,7 @@ TestFile::testWriteInstancedGrids()
 
     // Verify the grids.
     CPPUNIT_ASSERT(grids.get() != NULL);
-    CPPUNIT_ASSERT_EQUAL(3, int(grids->size()));
+    CPPUNIT_ASSERT_EQUAL(4, int(grids->size()));
 
     GridBase::Ptr grid = findGridByName(*grids, "density");
     CPPUNIT_ASSERT(grid.get() != NULL);
@@ -567,10 +578,20 @@ TestFile::testWriteInstancedGrids()
     CPPUNIT_ASSERT_EQUAL(density, gridPtrCast<Int32Grid>(grid)->treePtr());
 
     grid.reset();
-    grid = findGridByName(*grids, "temperature");
+    grid = findGridByName(*grids, "");
     CPPUNIT_ASSERT(grid.get() != NULL);
     FloatTree::Ptr temperature = gridPtrCast<FloatGrid>(grid)->treePtr();
     CPPUNIT_ASSERT(temperature.get() != NULL);
+
+    grid.reset();
+    for (GridPtrVec::reverse_iterator it = grids->rbegin(); !grid && it != grids->rend(); ++it) {
+        // Search for the second unnamed grid starting from the end of the list.
+        if ((*it)->getName() == "") grid = *it;
+    }
+    CPPUNIT_ASSERT(grid.get() != NULL);
+    CPPUNIT_ASSERT(gridPtrCast<FloatGrid>(grid)->treePtr().get() != NULL);
+    // Verify that the second unnamed grid is an instance of the first.
+    CPPUNIT_ASSERT_EQUAL(temperature, gridPtrCast<FloatGrid>(grid)->treePtr());
 
     CPPUNIT_ASSERT_DOUBLES_EQUAL(5, density->getValue(Coord(0, 0, 0)), /*tolerance=*/0);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(6, density->getValue(Coord(100, 0, 0)), /*tolerance=*/0);
@@ -582,12 +603,31 @@ TestFile::testWriteInstancedGrids()
     file.setInstancingEnabled(false);
     file.open();
     grids = file.getGrids();
-    CPPUNIT_ASSERT_EQUAL(3, int(grids->size()));
+    CPPUNIT_ASSERT_EQUAL(4, int(grids->size()));
+
+    grid = findGridByName(*grids, "density");
+    CPPUNIT_ASSERT(grid.get() != NULL);
+    density = gridPtrCast<Int32Grid>(grid)->treePtr();
+    CPPUNIT_ASSERT(density.get() != NULL);
     grid = findGridByName(*grids, "density_copy");
     CPPUNIT_ASSERT(grid.get() != NULL);
     CPPUNIT_ASSERT(gridPtrCast<Int32Grid>(grid)->treePtr().get() != NULL);
     // Verify that "density_copy" is *not* an instance of "density".
     CPPUNIT_ASSERT(gridPtrCast<Int32Grid>(grid)->treePtr() != density);
+
+    // Verify that the two unnamed grids are not instances of each other.
+    grid = findGridByName(*grids, "");
+    CPPUNIT_ASSERT(grid.get() != NULL);
+    temperature = gridPtrCast<FloatGrid>(grid)->treePtr();
+    CPPUNIT_ASSERT(temperature.get() != NULL);
+    grid.reset();
+    for (GridPtrVec::reverse_iterator it = grids->rbegin(); !grid && it != grids->rend(); ++it) {
+        // Search for the second unnamed grid starting from the end of the list.
+        if ((*it)->getName() == "") grid = *it;
+    }
+    CPPUNIT_ASSERT(grid.get() != NULL);
+    CPPUNIT_ASSERT(gridPtrCast<FloatGrid>(grid)->treePtr().get() != NULL);
+    CPPUNIT_ASSERT(gridPtrCast<FloatGrid>(grid)->treePtr() != temperature);
 
     // Rewrite with instancing disabled, then reread with instancing enabled.
     file.close();
@@ -599,12 +639,31 @@ TestFile::testWriteInstancedGrids()
     file.setInstancingEnabled(true);
     file.open();
     grids = file.getGrids();
-    CPPUNIT_ASSERT_EQUAL(3, int(grids->size()));
+    CPPUNIT_ASSERT_EQUAL(4, int(grids->size()));
+
+    // Verify that "density_copy" is not an instance of "density".
+    grid = findGridByName(*grids, "density");
+    CPPUNIT_ASSERT(grid.get() != NULL);
+    density = gridPtrCast<Int32Grid>(grid)->treePtr();
+    CPPUNIT_ASSERT(density.get() != NULL);
     grid = findGridByName(*grids, "density_copy");
     CPPUNIT_ASSERT(grid.get() != NULL);
     CPPUNIT_ASSERT(gridPtrCast<Int32Grid>(grid)->treePtr().get() != NULL);
-    // Verify that "density_copy" is *not* an instance of "density".
     CPPUNIT_ASSERT(gridPtrCast<Int32Grid>(grid)->treePtr() != density);
+
+    // Verify that the two unnamed grids are not instances of each other.
+    grid = findGridByName(*grids, "");
+    CPPUNIT_ASSERT(grid.get() != NULL);
+    temperature = gridPtrCast<FloatGrid>(grid)->treePtr();
+    CPPUNIT_ASSERT(temperature.get() != NULL);
+    grid.reset();
+    for (GridPtrVec::reverse_iterator it = grids->rbegin(); !grid && it != grids->rend(); ++it) {
+        // Search for the second unnamed grid starting from the end of the list.
+        if ((*it)->getName() == "") grid = *it;
+    }
+    CPPUNIT_ASSERT(grid.get() != NULL);
+    CPPUNIT_ASSERT(gridPtrCast<FloatGrid>(grid)->treePtr().get() != NULL);
+    CPPUNIT_ASSERT(gridPtrCast<FloatGrid>(grid)->treePtr() != temperature);
 }
 
 
@@ -1352,7 +1411,7 @@ TestFile::testReadGridMetadata()
         } else {
             // Stream the grids to a file (i.e., without file offsets).
             std::ofstream ostrm(filename, std::ios_base::binary);
-            io::Stream().write(ostrm, srcGrids);
+            io::Stream(ostrm).write(srcGrids);
         }
 
         // Read just the grid-level metadata from the file.
@@ -1798,8 +1857,8 @@ TestFile::testNameIterator()
 
     vdbfile.open();
 
-    // Names should appear in alphabetical order.
-    Name names[6] = { "", "[1]", "density", "level_set", "level_set[1]", "temperature" };
+    // Names should appear in lexicographic order.
+    Name names[6] = { "[1]", "[2]", "density", "level_set", "level_set[1]", "temperature" };
     int count = 0;
     for (io::File::NameIterator iter = vdbfile.beginName(); iter != vdbfile.endName(); ++iter) {
         CPPUNIT_ASSERT_EQUAL(names[count], *iter);
@@ -1936,6 +1995,194 @@ TestFile::testCompression()
                 }
             }
         }
+    }
+}
+
+
+////////////////////////////////////////
+
+
+namespace {
+
+using namespace openvdb;
+
+struct TestAsyncHelper
+{
+    std::set<io::Queue::Id> ids;
+    std::map<io::Queue::Id, std::string> filenames;
+    size_t refFileSize;
+    bool verbose;
+
+    TestAsyncHelper(size_t _refFileSize): refFileSize(_refFileSize), verbose(false) {}
+
+    ~TestAsyncHelper()
+    {
+        // Remove output files.
+        for (std::map<io::Queue::Id, std::string>::iterator it = filenames.begin();
+            it != filenames.end(); ++it)
+        {
+            ::remove(it->second.c_str());
+        }
+        filenames.clear();
+        ids.clear();
+    }
+
+    io::Queue::Notifier notifier()
+    {
+        return boost::bind(&TestAsyncHelper::validate, this, _1, _2);
+    }
+
+    void insert(io::Queue::Id id, const std::string& filename)
+    {
+        ids.insert(id);
+        filenames[id] = filename;
+        if (verbose) std::cerr << "queued " << filename << " as task " << id << "\n";
+    }
+
+    void validate(io::Queue::Id id, io::Queue::Status status)
+    {
+        if (verbose) {
+            std::ostringstream ostr;
+            ostr << "task " << id;
+            switch (status) {
+                case io::Queue::UNKNOWN:   ostr << " is unknown"; break;
+                case io::Queue::PENDING:   ostr << " is pending"; break;
+                case io::Queue::SUCCEEDED: ostr << " succeeded"; break;
+                case io::Queue::FAILED:    ostr << " failed"; break;
+            }
+            std::cerr << ostr.str() << "\n";
+        }
+
+        if (status == io::Queue::SUCCEEDED) {
+            // If the task completed successfully, verify that the output file's
+            // size matches the reference file's size.
+            struct stat buf;
+            buf.st_size = 0;
+            CPPUNIT_ASSERT_EQUAL(0, ::stat(filenames[id].c_str(), &buf));
+            CPPUNIT_ASSERT_EQUAL(Index64(refFileSize), Index64(buf.st_size));
+        }
+
+        if (status == io::Queue::SUCCEEDED || status == io::Queue::FAILED) {
+            ids.erase(id);
+        }
+    }
+}; // struct TestAsyncHelper
+
+} // unnamed namespace
+
+
+void
+TestFile::testAsync()
+{
+    using namespace openvdb;
+
+    typedef openvdb::Int32Grid IntGrid;
+
+    // Register types.
+    openvdb::initialize();
+
+    // Create a grid.
+    FloatGrid::Ptr lsGrid = createLevelSet<FloatGrid>();
+    unittest_util::makeSphere(/*dim=*/Coord(100), /*ctr=*/Vec3f(50, 50, 50), /*r=*/20.0,
+        *lsGrid, unittest_util::SPHERE_SPARSE_NARROW_BAND);
+
+    MetaMap fileMetadata;
+    fileMetadata.insertMeta("author", StringMetadata("Einstein"));
+    fileMetadata.insertMeta("year", Int32Metadata(2013));
+
+    GridPtrVec grids;
+    grids.push_back(lsGrid);
+    grids.push_back(lsGrid->deepCopy());
+    grids.push_back(lsGrid->deepCopy());
+
+    size_t refFileSize = 0;
+    {
+        // Write a reference file without using asynchronous I/O.
+        const char* filename = "/tmp/testAsyncref.vdb";
+        boost::shared_ptr<const char> scopedFile(filename, ::remove);
+        io::File f(filename);
+        f.write(grids, fileMetadata);
+
+        // Record the size of the reference file.
+        struct stat buf;
+        buf.st_size = 0;
+        CPPUNIT_ASSERT_EQUAL(0, ::stat(filename, &buf));
+        refFileSize = buf.st_size;
+    }
+
+    {
+        // Output multiple files using asynchronous I/O.
+        // Use polling to get the status of the I/O tasks.
+
+        TestAsyncHelper helper(refFileSize);
+
+        io::Queue queue;
+        for (int i = 1; i < 10; ++i) {
+            std::ostringstream ostr;
+            ostr << "/tmp/testAsync." << i << ".vdb";
+            const std::string filename = ostr.str();
+            io::Queue::Id id = queue.write(grids, io::File(filename), fileMetadata);
+            helper.insert(id, filename);
+        }
+
+        tbb::tick_count start = tbb::tick_count::now();
+        while (!helper.ids.empty()) {
+            if ((tbb::tick_count::now() - start).seconds() > 60) break; // time out after 1 minute
+
+            // Wait one second for tasks to complete.
+            tbb::this_tbb_thread::sleep(tbb::tick_count::interval_t(1.0/*sec*/));
+
+            // Poll each task in the pending map.
+            std::set<io::Queue::Id> ids = helper.ids; // iterate over a copy
+            for (std::set<io::Queue::Id>::iterator it = ids.begin(); it != ids.end(); ++it) {
+                const io::Queue::Id id = *it;
+                const io::Queue::Status status = queue.status(id);
+                helper.validate(id, status);
+            }
+        }
+        CPPUNIT_ASSERT(helper.ids.empty());
+        CPPUNIT_ASSERT(queue.empty());
+    }
+    {
+        // Output multiple files using asynchronous I/O.
+        // Use notifications to get the status of the I/O tasks.
+
+        TestAsyncHelper helper(refFileSize);
+
+        io::Queue queue(/*capacity=*/2);
+        queue.addNotifier(helper.notifier());
+
+        for (int i = 1; i < 10; ++i) {
+            std::ostringstream ostr;
+            ostr << "/tmp/testAsync" << i << ".vdb";
+            const std::string filename = ostr.str();
+            io::Queue::Id id = queue.write(grids, io::File(filename), fileMetadata);
+            helper.insert(id, filename);
+        }
+        while (!queue.empty()) {
+            tbb::this_tbb_thread::sleep(tbb::tick_count::interval_t(1.0/*sec*/));
+        }
+    }
+    {
+        // Test queue timeout.
+
+        io::Queue queue(/*capacity=*/1);
+        queue.setTimeout(0/*sec*/);
+
+        boost::shared_ptr<const char>
+            scopedFile1("/tmp/testAsyncIOa.vdb", ::remove),
+            scopedFile2("/tmp/testAsyncIOb.vdb", ::remove);
+        std::ofstream
+            file1(scopedFile1.get()),
+            file2(scopedFile2.get());
+
+        queue.write(grids, io::Stream(file1));
+
+        // With the queue length restricted to 1 and the timeout to 0 seconds,
+        // the next write() call should time out immediately with an exception.
+        // (It is possible, though highly unlikely, for the previous task to complete
+        // in time for this write() to actually succeed.)
+        CPPUNIT_ASSERT_THROW(queue.write(grids, io::Stream(file2)), openvdb::RuntimeError);
     }
 }
 

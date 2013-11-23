@@ -448,7 +448,8 @@ TestTools::testFilter()
         openvdb::FloatTree& tree = grid->tree();
         openvdb::tools::Filter<openvdb::FloatGrid> filter(*grid);
         const float offset = 2.34f;
-        filter.offset(offset, true/*=serial*/);
+        filter.setGrainSize(0);//i.e. disable threading
+        filter.offset(offset);
         for (int x=0; x<dim[0]; ++x) {
             xyz[0]=x;
             for (int y=0; y<dim[1]; ++y) {
@@ -461,6 +462,7 @@ TestTools::testFilter()
                 }
             }
         }
+        filter.setGrainSize(1);//i.e. enable threading
         filter.offset(-offset);//default is multi-threaded
         for (int x=0; x<dim[0]; ++x) {
             xyz[0]=x;
@@ -482,7 +484,7 @@ TestTools::testFilter()
         const int width = 2;
         openvdb::math::DenseStencil<openvdb::FloatGrid> stencil(*referenceGrid, width);
         openvdb::tools::Filter<openvdb::FloatGrid> filter(*filteredGrid);
-        filter.median(width, /*interations=*/1, false/*=serial*/);
+        filter.median(width, /*interations=*/1);
         std::vector<float> tmp;
         for (int x=0; x<dim[0]; ++x) {
             xyz[0]=x;
@@ -518,7 +520,7 @@ TestTools::testFilter()
         const int width = 2;
         openvdb::math::DenseStencil<openvdb::FloatGrid> stencil(*referenceGrid, width);
         openvdb::tools::Filter<openvdb::FloatGrid> filter(*filteredGrid);
-        filter.mean(width,  /*interations=*/1, false/*=serial*/);
+        filter.mean(width,  /*interations=*/1);
         for (int x=0; x<dim[0]; ++x) {
             xyz[0]=x;
             for (int y=0; y<dim[1]; ++y) {
@@ -824,12 +826,12 @@ void
 TestTools::testLevelSetMeasure()
 {
     typedef openvdb::FloatGrid GridT;
-    const int dim = 128;
+    const int dim = 256;
     openvdb::Real a, v, c, area, volume, curv;
 
     // First sphere
-    openvdb::Vec3f C(0.35f, 0.35f, 0.35f);//, C2(5.4f, 6.4f, 8.4f);
-    float r = 0.15f, voxelSize = 1.0f/(dim-1);//, r2 = 0.57f, 
+    openvdb::Vec3f C(0.35f, 0.35f, 0.35f);
+    openvdb::Real r = 0.15, voxelSize = 1.0/(dim-1); 
     const openvdb::Real Pi = boost::math::constants::pi<openvdb::Real>();
     GridT::Ptr sphere = openvdb::tools::createLevelSetSphere<GridT>(r, C, voxelSize);
     
@@ -841,25 +843,25 @@ TestTools::testLevelSetMeasure()
     area = 4*Pi*r*r;
     volume = 4.0/3.0*Pi*r*r*r;
     //std::cerr << "\nArea of sphere = " << area << "  " << a << std::endl;
-    //std::cerr << "\nVolume of sphere1 = " << volume << "  " << v << std::endl;
+    //std::cerr << "\nVolume of sphere = " << volume << "  " << v << std::endl;
     // Test accuracy of computed measures to within 1% of the exact measure. 
     CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, 0.01*area);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, 0.01*volume);
 
-    // Test all measures of sphere1 in world units
+    // Test all measures of sphere in world units
     m.measure(a, v, c);
     area = 4*Pi*r*r;
     volume = 4.0/3.0*Pi*r*r*r;
     curv = 1.0/r;
-    //std::cerr << "\nArea of sphere1 = " << area << "  " << a << std::endl;
-    //std::cerr << "Volume of sphere1 = " << volume << "  " << v << std::endl;
-    //std::cerr << "Avg mean curvature of sphere1 = " << curv << "  " << c << std::endl;
+    //std::cerr << "\nArea of sphere = " << area << "  " << a << std::endl;
+    //std::cerr << "Volume of sphere = " << volume << "  " << v << std::endl;
+    //std::cerr << "Avg mean curvature of sphere = " << curv << "  " << c << std::endl;
     // Test accuracy of computed measures to within 1% of the exact measure. 
     CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, 0.01*area);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, 0.01*volume);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(curv,   c, 0.01*curv);
 
-     // Test all measures of sphere1 in index units
+     // Test all measures of sphere in index units
     m.measure(a, v, c, false);
     r /= voxelSize;
     area = 4*Pi*r*r;
@@ -891,6 +893,8 @@ TestTools::testLevelSetMeasure()
     CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, 0.01*area);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, 0.01*volume);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(curv,   c, 0.01*curv);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,  openvdb::tools::levelSetArea(*sphere),  0.01*area);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume,openvdb::tools::levelSetVolume(*sphere),0.01*volume);
     
      // Test all measures of sphere in index units
     m.measure(a, v, c, false);
@@ -905,6 +909,8 @@ TestTools::testLevelSetMeasure()
     CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, 0.01*area);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, 0.01*volume);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(curv,   c, 0.01*curv);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,  openvdb::tools::levelSetArea(*sphere,false),  0.01*area);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume,openvdb::tools::levelSetVolume(*sphere,false),0.01*volume);
 
     // Read level set from file
     /*
@@ -915,12 +921,37 @@ TestTools::testLevelSetMeasure()
     GridT::Ptr model = openvdb::gridPtrCast<GridT>(sourceFile.getGrids()->at(0));
     m.reinit(*model);
 
-    timer.start("\nMeasure area and volume");
+    m.setGrainSize(32);
+    timer.start("\nMeasure 32 area and volume");
     m.measure(a, v, false);
     timer.stop();
     std::cerr << "Model: area = " << a << ", volume = " << v << std::endl;
 
-    timer.start("\nMeasure area, volume and curvature");
+    timer.start("\nMeasure 32 area, volume and curvature");
+    m.measure(a, v, c, false);
+    timer.stop();
+    std::cerr << "Model: area = " << a << ", volume = " << v
+              << ", average curvature = " << c << std::endl;
+
+    m.setGrainSize(64);
+    timer.start("\nParallel 64 Measure area and volume");
+    m.measure(a, v, false);
+    timer.stop();
+    std::cerr << "Model: area = " << a << ", volume = " << v << std::endl;
+
+    timer.start("\nParallel 64 Measure area, volume and curvature");
+    m.measure(a, v, c, false);
+    timer.stop();
+    std::cerr << "Model: area = " << a << ", volume = " << v
+              << ", average curvature = " << c << std::endl;
+    
+    m.setGrainSize(0);
+    timer.start("\nSerial Measure area and volume");
+    m.measure(a, v, false);
+    timer.stop();
+    std::cerr << "Model: area = " << a << ", volume = " << v << std::endl;
+
+    timer.start("\nSerial Measure area, volume and curvature");
     m.measure(a, v, c, false);
     timer.stop();
     std::cerr << "Model: area = " << a << ", volume = " << v

@@ -744,92 +744,15 @@ SOP_OpenVDB_Create::buildTransform(OP_Context& context, openvdb::math::Transform
 
         // Register
         this->addExtraInput(cam, OP_INTEREST_DATA);
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
-        cam->addInterestOnCameraParms(this);
-#else
-        cam->addInterestsOnIFDParms(this);
-#endif
 
-        // Eval camera parms
-        float camAspect = cam->ASPECT(time);
-        float camFocal = cam->FOCAL(time);
-        float camAperture = cam->APERTURE(time);
-        float camXRes = cam->RESX(time);
-        float camYRes = cam->RESY(time);
+        const float offset = evalFloat("cameraOffset", 0, time);
+        const float nearPlane = evalFloat("nearPlane", 0, time);
+        const float farPlane = evalFloat("farPlane", 0, time);
+        const float voxelDepthSize = evalFloat("voxelDepthSize", 0, time);
+        const int voxelCount = evalInt("voxelCount", 0, time);
 
-        // Eval UI parms
-        float nearPlaneDist = evalFloat("nearPlane", 0, time);
-        float farPlaneDist = evalFloat("farPlane", 0, time);
-        float offset = evalFloat("cameraOffset", 0, time);
-
-        nearPlaneDist += offset;
-        farPlaneDist += offset;
-        float depth = farPlaneDist - nearPlaneDist;
-
-        float zoom = camAperture / camFocal;
-        float aspectRatio = camYRes / (camXRes * camAspect);
-
-        openvdb::Vec2d nearPlaneSize;
-        nearPlaneSize.x() = nearPlaneDist * zoom;
-        nearPlaneSize.y() = nearPlaneSize.x() * aspectRatio;
-
-        openvdb::Vec2d farPlaneSize;
-        farPlaneSize.x() = farPlaneDist * zoom;
-        farPlaneSize.y() = farPlaneSize.x() * aspectRatio;
-
-
-        // Create the linear map
-        openvdb::math::Mat4d xform(openvdb::math::Mat4d::identity());
-        xform.setToTranslation(openvdb::Vec3d(0, 0, -(nearPlaneDist - offset)));
-
-        /// this will be used to scale the frust to the correct size, and orient the
-        /// into the frustum as the negative z-direction
-        xform.preScale(openvdb::Vec3d(nearPlaneSize.x(), nearPlaneSize.x(), -nearPlaneSize.x()));
-
-        openvdb::math::Mat4d camxform(openvdb::math::Mat4d::identity());
-        {
-            UT_Matrix4 M;
-            OBJ_Node *meobj = getCreator()->castToOBJNode();
-            if (meobj) {
-                if (!cam->getRelativeTransform(*meobj, M, context))
-                    addTransformError(*cam, "relative");
-            } else {
-                if (!((OP_Node *)cam)->getWorldTransform(M, context))
-                    addTransformError(*cam, "world");
-            }
-
-            for (unsigned i = 0; i < 4; ++i) {
-                for (unsigned j = 0; j < 4; ++j) {
-                    camxform(i,j) = M(i,j);
-                }
-            }
-        }
-
-        openvdb::math::MapBase::Ptr linearMap(openvdb::math::simplify(
-            openvdb::math::AffineMap(xform * camxform).getAffineMap()));
-
-
-        // Create the non linear map
-
-        float voxelDepthSize = evalFloat("voxelDepthSize", 0, time);
-        int voxelCountX = evalInt("voxelCount", 0, time);
-
-        int voxelCountY = int(std::ceil(float(voxelCountX) * aspectRatio));
-        int voxelCountZ = int(std::ceil(depth / voxelDepthSize));
-
-        // the frustum will be the image of the coordinate in this bounding box
-        openvdb::BBoxd bbox(openvdb::Vec3d(0, 0, 0),
-                                openvdb::Vec3d(voxelCountX, voxelCountY, voxelCountZ));
-        // define the taper
-        float taper = nearPlaneSize.x() / farPlaneSize.x();
-
-        // note that the depth is scaled on the nearPlaneSize.
-        // the linearMap will uniformly scale the frustum to the correct size
-        // and rotate to align with the camera
-        transform = openvdb::math::Transform::Ptr(new openvdb::math::Transform(
-            openvdb::math::MapBase::Ptr(new openvdb::math::NonlinearFrustumMap(
-                              bbox, taper, depth/nearPlaneSize.x(), linearMap))));
-
+        transform = hvdb::frustumTransformFromCamera(*this, context, *cam,
+            offset, nearPlane, farPlane, voxelDepthSize, voxelCount);
 
         if (bool(evalInt("previewFrustum", 0, time))) {
             UT_Vector3 boxColor(0.6, 0.6, 0.6);

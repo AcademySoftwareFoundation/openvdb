@@ -372,11 +372,11 @@ grids->push_back(...);
 
 // Stream the grids to a string.
 std::ostringstream ostr(std::ios_base::binary);
-openvdb::io::Stream().write(ostr, *grids);
+openvdb::io::Stream(ostr).write(*grids);
 
 // Stream the grids to a file.
 std::ofstream ofile("mygrids.vdb", std::ios_base::binary);
-openvdb::io::Stream().write(ofile, *grids);
+openvdb::io::Stream(ofile).write(*grids);
 
 // Stream in grids from a string.
 // Note that io::Stream::getGrids() returns a shared pointer

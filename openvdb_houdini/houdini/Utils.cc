@@ -33,8 +33,11 @@
 /// @brief Utility classes and functions for OpenVDB plugins
 
 #include "Utils.h"
+
 #include <houdini_utils/ParmFactory.h>
-#include <GU/GU_PrimPoly.h>
+#include "GEO_PrimVDB.h"
+#include <GU/GU_Detail.h>
+#include <UT/UT_String.h>
 #include <UT/UT_Version.h>
 
 namespace openvdb_houdini {
@@ -200,7 +203,7 @@ evalGridBBox(GridCRef grid, UT_Vector3 corners[8], bool expandHalfVoxel)
     bbox[6] = voxelBBox.max();
     bbox[7].init(voxelBBox.max()[0], voxelBBox.max()[1], voxelBBox.min()[2]);
 
-    const openvdb::math::Transform &xform = grid.transform();
+    const openvdb::math::Transform& xform = grid.transform();
     bbox[0] = xform.indexToWorld(bbox[0]);
     bbox[1] = xform.indexToWorld(bbox[1]);
     bbox[2] = xform.indexToWorld(bbox[2]);

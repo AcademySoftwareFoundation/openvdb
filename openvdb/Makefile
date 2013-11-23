@@ -146,7 +146,7 @@ EPYDOC := epydoc
 # Set PYTHON_WRAP_ALL_GRID_TYPES to "yes" to specify that the Python module
 # should expose (almost) all of the grid types defined in openvdb.h
 # Otherwise, only FloatGrid, BoolGrid and Vec3SGrid will be exposed
-# (see exportGrid() in python/pyGrid.cc).
+# (see, e.g., exportIntGrid() in python/pyIntGrid.cc).
 # Compiling the Python module with PYTHON_WRAP_ALL_GRID_TYPES set to "yes"
 # can be very memory-intensive.
 PYTHON_WRAP_ALL_GRID_TYPES := no
@@ -161,8 +161,6 @@ DOXYGEN := doxygen
 #
 
 SHELL = /bin/bash
-
-PWD ?= $(abspath .)
 
 # Turn off implicit rules for speed.
 .SUFFIXES:
@@ -237,6 +235,7 @@ INCLUDE_NAMES := \
     io/Compression.h \
     io/File.h \
     io/GridDescriptor.h \
+    io/Queue.h \
     io/Stream.h \
     math/BBox.h \
     math/Coord.h \
@@ -321,6 +320,7 @@ SRC_NAMES := \
     io/Compression.cc \
     io/File.cc \
     io/GridDescriptor.cc \
+    io/Queue.cc \
     io/Stream.cc \
     math/Hermite.cc \
     math/Maps.cc \
@@ -447,16 +447,19 @@ PYTHON_INCLUDE_NAMES := \
     python/pyopenvdb.h \
     python/pyutil.h \
     python/pyAccessor.h \
+    python/pyGrid.h \
 #
 # Used for "install" target only
 PYTHON_PUBLIC_INCLUDE_NAMES := \
     python/pyopenvdb.h \
 #
 PYTHON_SRC_NAMES := \
-    python/pyGrid.cc \
+    python/pyFloatGrid.cc \
+    python/pyIntGrid.cc \
     python/pyMetadata.cc \
-    python/pyTransform.cc \
     python/pyOpenVDBModule.cc \
+    python/pyTransform.cc \
+    python/pyVec3Grid.cc \
 #
 PYCXXFLAGS := -fPIC -I python -I $(PYTHON_INCL_DIR) -I $(PYCONFIG_INCL_DIR)
 ifneq ($(strip $(NUMPY_INCL_DIR)),)
@@ -616,14 +619,14 @@ vdb_print: $(LIBOPENVDB) cmd/openvdb_print/main.cc
 	@echo "Building $@ because of $(call list_deps)"
 	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_print/main.cc -I . \
 	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
-	    $(LIBOPENVDB_RPATH) -L$(PWD) $(LIBOPENVDB)
+	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB)
 
 vdb_render: $(LIBOPENVDB) cmd/openvdb_render/main.cc
 	@echo "Building $@ because of $(call list_deps)"
 	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_render/main.cc -I . -I $(EXR_INCL_DIR) \
 	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
 	    -Wl,-rpath,$(EXR_LIB_DIR) -L$(EXR_LIB_DIR) $(EXR_LIB) \
-	    $(LIBOPENVDB_RPATH) -L$(PWD) $(LIBOPENVDB)
+	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB)
 
 ifneq (yes,$(has_glfw))
 vdb_view:
@@ -645,7 +648,7 @@ vdb_view: $(LIBOPENVDB) $(LIBVIEWER_OBJ_NAMES) cmd/openvdb_view/main.cc
 	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_view/main.cc $(LIBVIEWER_OBJ_NAMES) \
 		-I . -Wl,-rpath,$(GLFW_LIB_DIR) -L$(GLFW_LIB_DIR) $(GLFW_LIB) \
 		$(LIBVIEWER_FLAGS) $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
-	    $(LIBOPENVDB_RPATH) -L$(PWD) $(LIBOPENVDB)
+	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB)
 endif
 
 
@@ -660,7 +663,7 @@ $(PYTHON_MODULE): $(LIBOPENVDB) $(PYTHON_OBJ_NAMES)
 	    -o $@ $(PYTHON_OBJ_NAMES) $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
 	    -Wl,-rpath,$(PYTHON_LIB_DIR) -L$(PYTHON_LIB_DIR) $(PYTHON_LIB) \
 	    -Wl,-rpath,$(BOOST_PYTHON_LIB_DIR) -L$(BOOST_PYTHON_LIB_DIR) $(BOOST_PYTHON_LIB) \
-	    $(LIBOPENVDB_RPATH) -L$(PWD) $(LIBOPENVDB)
+	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB)
 
 ifeq (yes,$(has_python))
 ifneq ($(strip $(EPYDOC)),)
@@ -669,8 +672,8 @@ pydoc: $(PYTHON_MODULE) $(LIBOPENVDB_SONAME)
 	pydocdir=doc/html/python; \
 	mkdir -p $${pydocdir}; \
 	echo "Created $${pydocdir}"; \
-	export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(PWD); \
-	export PYTHONPATH=${PYTHONPATH}:$(PWD); \
+	export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(CURDIR); \
+	export PYTHONPATH=${PYTHONPATH}:$(CURDIR); \
 	    $(EPYDOC) --html -o $${pydocdir} $(PYTHON_MODULE_NAME) $(QUIET)
 else
 pydoc:
@@ -679,8 +682,8 @@ endif
 
 pytest: $(PYTHON_MODULE) $(LIBOPENVDB_SONAME)
 	@echo "Testing Python module $(PYTHON_MODULE)"
-	export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(PWD); \
-	export PYTHONPATH=${PYTHONPATH}:$(PWD); \
+	export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(CURDIR); \
+	export PYTHONPATH=${PYTHONPATH}:$(CURDIR); \
 	    python$(PYTHON_VERSION) ./python/test/TestOpenVDB.py $(QUIET_TEST)
 
 python: $(PYTHON_MODULE)
@@ -700,11 +703,11 @@ vdb_test: $(LIBOPENVDB) $(UNITTEST_OBJ_NAMES)
 	$(CXX) $(CXXFLAGS) -o $@ $(UNITTEST_OBJ_NAMES) \
 	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
 	    -Wl,-rpath,$(CPPUNIT_LIB_DIR) -L$(CPPUNIT_LIB_DIR) $(CPPUNIT_LIB) \
-	    $(LIBOPENVDB_RPATH) -L$(PWD) $(LIBOPENVDB)
+	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB)
 
 test: vdb_test
 	@echo "Testing $(LIBOPENVDB_NAME)"
-	export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(PWD); ./vdb_test $(QUIET_TEST)
+	export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(CURDIR); ./vdb_test $(QUIET_TEST)
 else
 vdb_test:
 	@echo "$@"': $$(CPPUNIT_INCL_DIR) is undefined'

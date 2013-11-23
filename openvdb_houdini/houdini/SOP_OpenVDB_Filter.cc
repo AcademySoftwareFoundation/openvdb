@@ -293,8 +293,9 @@ struct SOP_OpenVDB_Filter::FilterOp
     void operator()(GridT& grid)
     {
         typedef typename GridT::ValueType ValueT;
+        typedef openvdb::FloatGrid MaskT;
 
-        openvdb::tools::Filter<GridT, hvdb::Interrupter> filter(grid, interrupt);
+        openvdb::tools::Filter<GridT, MaskT, hvdb::Interrupter> filter(grid, interrupt);
 
         for (size_t i = 0, N = opSequence.size(); i < N; ++i) {
             if (interrupt && interrupt->wasInterrupted()) return;
@@ -303,7 +304,7 @@ struct SOP_OpenVDB_Filter::FilterOp
             switch (parms.op) {
 #ifndef SESI_OPENVDB
             case OP_OFFSET:
-                filter.offset(parms.offset);
+                filter.offset(static_cast<ValueT>(parms.offset));
                 break;
 #endif
             case OP_MEAN:

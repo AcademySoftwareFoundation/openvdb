@@ -200,7 +200,7 @@ TestStream::testWrite()
     MetaMap::Ptr meta;
     GridPtrVecPtr grids = createTestGrids(meta);
     std::ostringstream ostr(std::ios_base::binary);
-    io::Stream().write(ostr, *grids, *meta);
+    io::Stream(ostr).write(*grids, *meta);
     //std::ofstream file("debug.vdb2", std::ios_base::binary);
     //file << ostr.str();
 
@@ -251,7 +251,7 @@ TestStream::testFileReadFromStream()
     {
         std::ofstream os(filename, std::ios_base::binary);
         grids = createTestGrids(meta);
-        io::Stream().write(os, *grids, *meta);
+        io::Stream(os).write(*grids, *meta);
     }
 
     // Read the grids back in.

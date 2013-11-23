@@ -35,13 +35,9 @@
 #ifndef OPENVDB_HOUDINI_UTILS_HAS_BEEN_INCLUDED
 #define OPENVDB_HOUDINI_UTILS_HAS_BEEN_INCLUDED
 
-#include "GEO_PrimVDB.h"
-#include <GEO/GEO_PrimVolume.h>
 #include "GU_PrimVDB.h"
-#include <UT/UT_String.h>
 #include <UT/UT_Interrupt.h>
 #include <openvdb/openvdb.h>
-#include <GU/GU_Detail.h>
 #include <boost/function.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/type_traits/is_const.hpp>
@@ -54,6 +50,9 @@
 #endif
 #endif
 
+class GEO_PrimVDB;
+class GU_Detail;
+class UT_String;
 
 namespace openvdb_houdini {
 

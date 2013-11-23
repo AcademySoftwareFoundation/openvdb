@@ -49,8 +49,16 @@ class OPENVDB_API Stream: public Archive
 public:
     /// Read grids from an input stream.
     explicit Stream(std::istream&);
+
+    /// Construct an archive for stream output.
     Stream();
-    ~Stream();
+    /// Construct an archive for output to the given stream.
+    explicit Stream(std::ostream&);
+
+    virtual ~Stream();
+
+    /// @brief Return a copy of this archive.
+    virtual boost::shared_ptr<Archive> copy() const;
 
     /// Return the file-level metadata in a newly created MetaMap.
     MetaMap::Ptr getMetadata() const;
@@ -58,9 +66,20 @@ public:
     /// Return pointers to the grids that were read from the input stream.
     GridPtrVecPtr getGrids() { return mGrids; }
 
-    /// Write the grids in the given container to an output stream.
+    /// @brief Write the grids in the given container to this archive's output stream.
+    /// @throw ValueError if this archive was constructed without specifying an output stream.
+    virtual void write(const GridCPtrVec&, const MetaMap& = MetaMap()) const;
+
+    /// @brief Write the grids in the given container to this archive's output stream.
+    /// @throw ValueError if this archive was constructed without specifying an output stream.
     template<typename GridPtrContainerT>
-    void write(std::ostream&, const GridPtrContainerT&, const MetaMap& = MetaMap()) const;
+    void write(const GridPtrContainerT&, const MetaMap& = MetaMap()) const;
+
+    /// @brief Write the grids in the given container to an output stream.
+    /// @deprecated Use Stream(os).write(grids) instead.
+    template<typename GridPtrContainerT>
+    OPENVDB_DEPRECATED void write(std::ostream&,
+        const GridPtrContainerT&, const MetaMap& = MetaMap()) const;
 
 private:
     /// Create a new grid of the type specified by the given descriptor,
@@ -70,17 +89,37 @@ private:
 
     void writeGrids(std::ostream&, const GridCPtrVec&, const MetaMap&) const;
 
-    // Disallow copying of instances of this class.
-    Stream(const Stream&);
-    Stream& operator=(const Stream&);
-
 
     MetaMap::Ptr mMeta;
     GridPtrVecPtr mGrids;
+    std::ostream* mOutputStream;
 };
 
 
 ////////////////////////////////////////
+
+
+inline void
+Stream::write(const GridCPtrVec& grids, const MetaMap& metadata) const
+{
+    if (mOutputStream == NULL) {
+        OPENVDB_THROW(ValueError, "no output stream was specified");
+    }
+    this->writeGrids(*mOutputStream, grids, metadata);
+}
+
+
+template<typename GridPtrContainerT>
+inline void
+Stream::write(const GridPtrContainerT& container, const MetaMap& metadata) const
+{
+    if (mOutputStream == NULL) {
+        OPENVDB_THROW(ValueError, "no output stream was specified");
+    }
+    GridCPtrVec grids;
+    std::copy(container.begin(), container.end(), std::back_inserter(grids));
+    this->writeGrids(*mOutputStream, grids, metadata);
+}
 
 
 template<typename GridPtrContainerT>

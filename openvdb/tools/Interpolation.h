@@ -361,7 +361,49 @@ public:
 private:
     const AccessorType*    mAccessor;//not thread-safe!
     const math::Transform* mTransform;
-};
+};//Specialization of GridSampler
+
+
+////////////////////////////////////////
+
+
+/// @brief This is a simple convenience class that allows for sampling
+/// from a source grid into the index space of a target grid. At
+/// construction the source and target grids are checked for alignment
+/// which potentially renders interpolation unnecessary. Else
+/// interpolation is performed according to the templated Sampler type.     
+///
+/// @warning For performance reasons the check for alignment of the
+/// two grids is only performed at construction time! Also note that
+/// unless the grids are aligned, virtual methods are used to resolve
+/// the coordinate transformations, which is clearly not optimal. So
+/// consider resolving the Map types of the two grids for better
+/// performance.     
+template<typename SourceGridT,
+         typename TargetGridT,
+         typename SamplerT = tools::BoxSampler>
+class DualGridSampler
+{
+public:
+    typedef typename SourceGridT::ValueType ValueType;
+    DualGridSampler(const SourceGridT& source, const TargetGridT& target)
+        : mTarget(&target), mSource(&source), mAccessor(source.tree()),
+          mAligned(target.transform() == source.transform())
+    {
+    }
+    /// @brief Return the value of the source grid at the index
+    /// coordinates, ijk, relative to the target grid.  
+    inline ValueType operator()(const Coord& ijk) const
+    {
+        return mAligned ? mAccessor.getValue(ijk) : SamplerT::sample(mAccessor,
+               mSource->worldToIndex(mTarget->indexToWorld(ijk)));
+    }
+private:
+    const TargetGridT*                  mTarget;
+    const SourceGridT*                  mSource;
+    typename SourceGridT::ConstAccessor mAccessor;
+    const bool                          mAligned;
+};// DualGridSampler  
 
 
 ////////////////////////////////////////

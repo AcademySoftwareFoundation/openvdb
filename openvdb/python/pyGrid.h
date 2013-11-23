@@ -28,7 +28,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 //
-/// @file pyGrid.cc
+/// @file pyGrid.h
 /// @author Peter Cucka
 /// @brief Boost.Python wrapper for openvdb::Grid
 
@@ -55,7 +55,7 @@ using namespace openvdb::OPENVDB_VERSION_NAME;
 
 namespace pyopenvdb {
 
-py::object
+inline py::object
 getPyObjectFromGrid(const GridBase::Ptr& grid)
 {
     if (!grid) return py::object();
@@ -81,7 +81,7 @@ getPyObjectFromGrid(const GridBase::Ptr& grid)
 }
 
 
-openvdb::GridBase::Ptr
+inline openvdb::GridBase::Ptr
 getGridFromPyObject(const boost::python::object& gridObj)
 {
     if (!gridObj) return GridBase::Ptr();
@@ -111,7 +111,7 @@ getGridFromPyObject(const boost::python::object& gridObj)
 }
 
 
-openvdb::GridBase::Ptr
+inline openvdb::GridBase::Ptr
 getGridFromPyObject(PyObject* gridObj)
 {
     return getGridFromPyObject(pyutil::pyBorrow(gridObj));
@@ -125,7 +125,7 @@ getGridFromPyObject(PyObject* gridObj)
 
 namespace pyGrid {
 
-py::object
+inline py::object
 getGridFromGridBase(GridBase::Ptr grid)
 {
     py::object obj;
@@ -145,7 +145,7 @@ getGridFromGridBase(GridBase::Ptr grid)
 /// pure virtual functions like GridBase::baseTree()), but there are
 /// a few cases where, internally, we need to extract a GridBase::Ptr
 /// from a py::object.  Hence this converter.
-GridBase::Ptr
+inline GridBase::Ptr
 getGridBaseFromGrid(py::object gridObj)
 {
     GridBase::Ptr grid;
@@ -403,7 +403,7 @@ struct AccessorHelper<const GridType>
 
 /// Return a non-const accessor (wrapped in a pyAccessor::AccessorWrap) for the given grid.
 template<typename GridType>
-typename AccessorHelper<GridType>::Wrapper
+inline typename AccessorHelper<GridType>::Wrapper
 getAccessor(typename GridType::Ptr grid)
 {
     return AccessorHelper<GridType>::wrap(grid);
@@ -413,7 +413,7 @@ getAccessor(typename GridType::Ptr grid)
 /// @internal Note that the grid pointer is non-const, even though the grid is
 /// treated as const.  This is because we don't expose a const grid type in Python.
 template<typename GridType>
-typename AccessorHelper<const GridType>::Wrapper
+inline typename AccessorHelper<const GridType>::Wrapper
 getConstAccessor(typename GridType::Ptr grid)
 {
     return AccessorHelper<const GridType>::wrap(grid);
@@ -1508,9 +1508,9 @@ struct PickleSuite: py::pickle_suite
             // Serialize the Grid to a string.
             std::ostringstream ostr(std::ios_base::binary);
             {
-                openvdb::io::Stream strm;
+                openvdb::io::Stream strm(ostr);
                 strm.setGridStatsMetadataEnabled(false);
-                strm.write(ostr, openvdb::GridPtrVec(1, grid));
+                strm.write(openvdb::GridPtrVec(1, grid));
             }
             // Construct a state tuple comprising the Python object's __dict__
             // and the serialized Grid.
@@ -1585,7 +1585,7 @@ struct PickleSuite: py::pickle_suite
 
 /// Create a Python wrapper for a particular template instantiation of Grid.
 template<typename GridType>
-void
+inline void
 exportGrid()
 {
     typedef typename GridType::ValueType ValueT;
@@ -1926,38 +1926,6 @@ exportGrid()
 }
 
 } // namespace pyGrid
-
-
-/// Create a Python wrapper for each supported Grid type.
-void
-exportGrid()
-{
-    // Add a module-level list that gives the types of all supported Grid classes.
-    py::scope().attr("GridTypes") = py::list();
-
-    // Specify that py::numeric::array should refer to the Python type numpy.ndarray
-    // (rather than the older Numeric.array).
-    py::numeric::array::set_module_and_type("numpy", "ndarray");
-
-    pyGrid::exportGrid<FloatGrid>();
-    pyGrid::exportGrid<Vec3SGrid>();
-    pyGrid::exportGrid<BoolGrid>();
-#ifdef PY_OPENVDB_WRAP_ALL_GRID_TYPES
-    pyGrid::exportGrid<DoubleGrid>();
-    pyGrid::exportGrid<Int32Grid>();
-    pyGrid::exportGrid<Int64Grid>();
-    pyGrid::exportGrid<Vec3IGrid>();
-    pyGrid::exportGrid<Vec3DGrid>();
-#endif
-
-    py::def("createLevelSetSphere",
-        &pyGrid::createLevelSetSphere<FloatGrid>,
-        (py::arg("radius"), py::arg("center")=openvdb::Coord(), py::arg("voxelSize")=1.0,
-             py::arg("halfWidth")=openvdb::LEVEL_SET_HALF_WIDTH),
-        "createLevelSetSphere(radius, center, voxelSize, halfWidth) -> FloatGrid\n\n"
-        "Return a grid containing a narrow-band level set representation\n"
-        "of a sphere.");
-}
 
 #endif // OPENVDB_PYGRID_HAS_BEEN_INCLUDED
 

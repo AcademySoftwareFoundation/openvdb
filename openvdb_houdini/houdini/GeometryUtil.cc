@@ -33,7 +33,9 @@
 /// @brief Utility methods and tools for geometry processing
 
 #include "GeometryUtil.h"
+#include "Utils.h"
 #include <houdini_utils/ParmFactory.h> // for createBox()
+#include <openvdb/tools/VolumeToMesh.h>
 
 #include <UT/UT_ScopedPtr.h>
 #include <UT/UT_String.h>
@@ -42,7 +44,9 @@
 #include <GU/GU_ConvertParms.h>
 #include <GA/GA_ElementWrangler.h>
 #include <GA/GA_PageIterator.h>
+#include <GA/GA_SplittableRange.h>
 #include <GA/GA_Types.h>
+#include <OBJ/OBJ_Camera.h>
 
 
 namespace openvdb_houdini {
@@ -51,7 +55,8 @@ namespace openvdb_houdini {
 void
 drawFrustum(
     GU_Detail& geo, const openvdb::math::Transform& transform,
-    const UT_Vector3* boxColor, const UT_Vector3* tickColor, bool shaded)
+    const UT_Vector3* boxColor, const UT_Vector3* tickColor,
+    bool shaded, bool drawTicks)
 {
     if (transform.mapType() != openvdb::math::NonlinearFrustumMap::mapType()) {
         return;
@@ -110,95 +115,187 @@ drawFrustum(
     houdini_utils::createBox(geo, corners, boxColor, shaded, alpha);
 
     // Add voxel ticks
-    GA_RWHandleV3 cd;
-    int count = 0;
-    double length = 4, maxLength = (bbox.max()[1] - bbox.min()[1]);
-    size_t total_count = 0;
-
-    if (tickColor) {
-        cd.bind(geo.addDiffuseAttribute(GA_ATTRIB_POINT).getAttribute());
-    }
-
-    for (double z = bbox.min()[2] + 1, Z = bbox.max()[2]; z < Z; ++z) {
-
-        GA_Offset v0 = geo.appendPointOffset();
-        GA_Offset v1 = geo.appendPointOffset();
+    if (drawTicks) {
+        GA_RWHandleV3 cd;
+        int count = 0;
+        double length = 4, maxLength = (bbox.max()[1] - bbox.min()[1]);
+        size_t total_count = 0;
 
         if (tickColor) {
-            cd.set(v0, *tickColor);
-            cd.set(v1, *tickColor);
+            cd.bind(geo.addDiffuseAttribute(GA_ATTRIB_POINT).getAttribute());
         }
 
-        length = 4;
-        ++count;
-        if (count == 5) {
-            length = 8;
-            count = 0;
+        for (double z = bbox.min()[2] + 1, Z = bbox.max()[2]; z < Z; ++z) {
+
+            GA_Offset v0 = geo.appendPointOffset();
+            GA_Offset v1 = geo.appendPointOffset();
+
+            if (tickColor) {
+                cd.set(v0, *tickColor);
+                cd.set(v1, *tickColor);
+            }
+
+            length = 4;
+            ++count;
+            if (count == 5) {
+                length = 8;
+                count = 0;
+            }
+
+            length = std::min(length, maxLength);
+
+            wp[0] = bbox.max()[0];
+            wp[1] = bbox.max()[1]-length;
+            wp[2] = z;
+            wp = frustum.applyMap(wp);
+            geo.setPos3(v0, wp[0], wp[1], wp[2]);
+
+            wp[0] = bbox.max()[0];
+            wp[1] = bbox.max()[1];
+            wp[2] = z;
+            wp = frustum.applyMap(wp);
+            geo.setPos3(v1, wp[0], wp[1], wp[2]);
+
+
+            GEO_PrimPoly& prim = *GU_PrimPoly::build(&geo, 0, GU_POLY_OPEN, 0);
+            prim.appendVertex(v0);
+            prim.appendVertex(v1);
+
+            if (++total_count > 999) break;
         }
 
-        length = std::min(length, maxLength);
+        count = 0;
+        total_count = 0;
+        maxLength = (bbox.max()[2] - bbox.min()[2]);
+        for (double x = bbox.min()[0] + 1, X = bbox.max()[0]; x < X; ++x) {
 
-        wp[0] = bbox.max()[0];
-        wp[1] = bbox.max()[1]-length;
-        wp[2] = z;
-        wp = frustum.applyMap(wp);
-        geo.setPos3(v0, wp[0], wp[1], wp[2]);
+            GA_Offset v0 = geo.appendPointOffset();
+            GA_Offset v1 = geo.appendPointOffset();
 
-        wp[0] = bbox.max()[0];
-        wp[1] = bbox.max()[1];
-        wp[2] = z;
-        wp = frustum.applyMap(wp);
-        geo.setPos3(v1, wp[0], wp[1], wp[2]);
+            if (tickColor) {
+                cd.set(v0, *tickColor);
+                cd.set(v1, *tickColor);
+            }
+
+            length = 1;
+            ++count;
+            if (count == 5) {
+                length = 2;
+                count = 0;
+            }
+
+            length = std::min(length, maxLength);
+
+            wp[0] = x;
+            wp[1] = bbox.max()[1];
+            wp[2] = bbox.max()[2]-length;
+            wp = frustum.applyMap(wp);
+            geo.setPos3(v0, wp[0], wp[1], wp[2]);
+
+            wp[0] = x;
+            wp[1] = bbox.max()[1];
+            wp[2] = bbox.max()[2];
+            wp = frustum.applyMap(wp);
+            geo.setPos3(v1, wp[0], wp[1], wp[2]);
 
 
-        GEO_PrimPoly& prim = *GU_PrimPoly::build(&geo, 0, GU_POLY_OPEN, 0);
-        prim.appendVertex(v0);
-        prim.appendVertex(v1);
+            GEO_PrimPoly& prim = *GU_PrimPoly::build(&geo, 0, GU_POLY_OPEN, 0);
+            prim.appendVertex(v0);
+            prim.appendVertex(v1);
 
-        if (++total_count > 999) break;
+            if (++total_count > 999) break;
+        }
+    }
+}
+
+
+////////////////////////////////////////
+
+
+openvdb::math::Transform::Ptr
+frustumTransformFromCamera(
+    OP_Node& node, OP_Context& context, OBJ_Camera& cam,
+    float offset, float nearPlaneDist, float farPlaneDist,
+    float voxelDepthSize, int voxelCountX)
+{
+#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
+    cam.addInterestOnCameraParms(&node);
+#else
+    cam.addInterestsOnIFDParms(&node);
+#endif
+
+    const fpreal time = context.getTime();
+
+    // Eval camera parms
+    const float camAspect = cam.ASPECT(time);
+    const float camFocal = cam.FOCAL(time);
+    const float camAperture = cam.APERTURE(time);
+    const float camXRes = cam.RESX(time);
+    const float camYRes = cam.RESY(time);
+
+    nearPlaneDist += offset;
+    farPlaneDist += offset;
+
+    const float depth = farPlaneDist - nearPlaneDist;
+    const float zoom = camAperture / camFocal;
+    const float aspectRatio = camYRes / (camXRes * camAspect);
+
+    openvdb::Vec2d nearPlaneSize;
+    nearPlaneSize.x() = nearPlaneDist * zoom;
+    nearPlaneSize.y() = nearPlaneSize.x() * aspectRatio;
+
+    openvdb::Vec2d farPlaneSize;
+    farPlaneSize.x() = farPlaneDist * zoom;
+    farPlaneSize.y() = farPlaneSize.x() * aspectRatio;
+
+
+    // Create the linear map
+    openvdb::math::Mat4d xform(openvdb::math::Mat4d::identity());
+    xform.setToTranslation(openvdb::Vec3d(0, 0, -(nearPlaneDist - offset)));
+
+    /// this will be used to scale the frust to the correct size, and orient the
+    /// into the frustum as the negative z-direction
+    xform.preScale(openvdb::Vec3d(nearPlaneSize.x(), nearPlaneSize.x(), -nearPlaneSize.x()));
+
+    openvdb::math::Mat4d camxform(openvdb::math::Mat4d::identity());
+    {
+        UT_Matrix4 M;
+        OBJ_Node *meobj = node.getCreator()->castToOBJNode();
+        if (meobj) {
+            if (!cam.getRelativeTransform(*meobj, M, context))
+                node.addTransformError(cam, "relative");
+        } else {
+            if (!((OP_Node *)&cam)->getWorldTransform(M, context))
+                node.addTransformError(cam, "world");
+        }
+
+        for (unsigned i = 0; i < 4; ++i) {
+            for (unsigned j = 0; j < 4; ++j) {
+                camxform(i,j) = M(i,j);
+            }
+        }
     }
 
-    count = 0;
-    total_count = 0;
-    maxLength = (bbox.max()[2] - bbox.min()[2]);
-    for (double x = bbox.min()[0] + 1, X = bbox.max()[0]; x < X; ++x) {
-
-        GA_Offset v0 = geo.appendPointOffset();
-        GA_Offset v1 = geo.appendPointOffset();
-
-        if (tickColor) {
-            cd.set(v0, *tickColor);
-            cd.set(v1, *tickColor);
-        }
-
-        length = 1;
-        ++count;
-        if (count == 5) {
-            length = 2;
-            count = 0;
-        }
-
-        length = std::min(length, maxLength);
-
-        wp[0] = x;
-        wp[1] = bbox.max()[1];
-        wp[2] = bbox.max()[2]-length;
-        wp = frustum.applyMap(wp);
-        geo.setPos3(v0, wp[0], wp[1], wp[2]);
-
-        wp[0] = x;
-        wp[1] = bbox.max()[1];
-        wp[2] = bbox.max()[2];
-        wp = frustum.applyMap(wp);
-        geo.setPos3(v1, wp[0], wp[1], wp[2]);
+    openvdb::math::MapBase::Ptr linearMap(openvdb::math::simplify(
+        openvdb::math::AffineMap(xform * camxform).getAffineMap()));
 
 
-        GEO_PrimPoly& prim = *GU_PrimPoly::build(&geo, 0, GU_POLY_OPEN, 0);
-        prim.appendVertex(v0);
-        prim.appendVertex(v1);
+    // Create the non linear map
+    const int voxelCountY = int(std::ceil(float(voxelCountX) * aspectRatio));
+    const int voxelCountZ = int(std::ceil(depth / voxelDepthSize));
 
-        if (++total_count > 999) break;
-    }
+    // the frustum will be the image of the coordinate in this bounding box
+    openvdb::BBoxd bbox(openvdb::Vec3d(0, 0, 0),
+        openvdb::Vec3d(voxelCountX, voxelCountY, voxelCountZ));
+    // define the taper
+    const float taper = nearPlaneSize.x() / farPlaneSize.x();
+
+    // note that the depth is scaled on the nearPlaneSize.
+    // the linearMap will uniformly scale the frustum to the correct size
+    // and rotate to align with the camera
+    return openvdb::math::Transform::Ptr(new openvdb::math::Transform(
+        openvdb::math::MapBase::Ptr(new openvdb::math::NonlinearFrustumMap(
+            bbox, taper, depth/nearPlaneSize.x(), linearMap))));
 }
 
 
@@ -501,7 +598,7 @@ void
 SharpenFeaturesOp::operator()(const GA_SplittableRange& range) const
 {
     openvdb::tools::MeshToVoxelEdgeData::Accessor acc = mEdgeData.getAccessor();
-    
+
     typedef openvdb::tree::ValueAccessor<const openvdb::BoolTree> BoolAccessor;
     boost::scoped_ptr<BoolAccessor> maskAcc;
 
@@ -516,14 +613,14 @@ SharpenFeaturesOp::operator()(const GA_SplittableRange& range) const
 
     openvdb::Vec3d pos, normal;
     openvdb::Coord ijk;
-    
+
     std::vector<openvdb::Vec3d> points(12), normals(12);
     std::vector<openvdb::Index32> primitives(12);
- 
+
     for (GA_PageIterator pageIt = range.beginPages(); !pageIt.atEnd(); ++pageIt) {
         for (GA_Iterator blockIt(pageIt.begin()); blockIt.blockAdvance(start, end); ) {
             for (ptnOffset = start; ptnOffset < end; ++ptnOffset) {
-                
+
                 // Check if this point is referenced by a surface primitive.
                 if (mSurfacePrims && !pointInPrimGroup(ptnOffset, mMeshGeo, *mSurfacePrims)) continue;
 
@@ -537,14 +634,14 @@ SharpenFeaturesOp::operator()(const GA_SplittableRange& range) const
                 ijk[0] = int(std::floor(pos[0]));
                 ijk[1] = int(std::floor(pos[1]));
                 ijk[2] = int(std::floor(pos[2]));
-                
-                
+
+
                 if (maskAcc && !maskAcc->isValueOn(ijk)) continue;
 
                 points.clear();
                 normals.clear();
                 primitives.clear();
-                
+
                 // get voxel-edge intersections
                 mEdgeData.getEdgeData(acc, ijk, points, primitives);
 

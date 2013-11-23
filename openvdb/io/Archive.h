@@ -37,6 +37,7 @@
 #include <string>
 #include <boost/uuid/uuid.hpp>
 #include <boost/cstdint.hpp>
+#include <boost/shared_ptr.hpp>
 #include <openvdb/Grid.h>
 #include <openvdb/metadata/MetaMap.h>
 #include <openvdb/version.h> // for VersionId
@@ -117,6 +118,9 @@ public:
     Archive();
     virtual ~Archive();
 
+    /// @brief Return a copy of this archive.
+    virtual boost::shared_ptr<Archive> copy() const;
+
     /// @brief Return the UUID that was most recently written (or read,
     /// if no UUID has been written yet).
     std::string getUniqueTag() const;
@@ -162,6 +166,9 @@ public:
     /// @brief Specify whether grid statistics (active voxel count and
     /// bounding box, etc.) should be computed and written as grid metadata.
     void setGridStatsMetadataEnabled(bool b) { mEnableGridStats = b; }
+
+    /// @brief Write the grids in the given container to this archive's output stream.
+    virtual void write(const GridCPtrVec&, const MetaMap& = MetaMap()) const {}
 
 protected:
     /// @brief Return @c true if the input stream contains grid offsets

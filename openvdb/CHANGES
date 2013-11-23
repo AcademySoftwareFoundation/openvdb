@@ -6,10 +6,18 @@ Version 2.1.0 - In development
       coming soon!)
     - Added LevelSetMeasure that performs multi-threaded computation 
       of surface area, volume and average mean-curvature for narrow band 
-      level sets (in both world and voxel units).
+      level sets (in both world and voxel units). This is now exposed as 
+      intrinsic attributes on the Houdini VDB primitive, which is enabled
+      by the native Measure SOP.
     - Reimplemented the Dense volume class and its convertes to and 
       from VDB so they support both the ZYX memory layout (used in VDB) 
-      and the XYZ memory layout employed by Houdini and Maya. 
+      and the XYZ memory layout employed by Houdini and Maya.
+    - Several improvments to masking in LevelSetFilter and the corresponding 
+      SOP. The user can now specify a range for the mask which allows for any 
+      scalar function to act as a smooth alpha mask. Also an option is added
+      to invert the alpha mask. Finally the new implementation is faster.
+    - Added masking options to the (non-level-set) Filter methods.  
+    - Improved performance of masking in LevelSetFilter (and Filter).   
     - Added masking options to grid operators that compute cpt, curl, 
       divergence, gradient, laplacian, meanCurvature, magnitude, and normalize.
     - Added masking options to the Analysis Houdini SOP.
@@ -21,6 +29,20 @@ Version 2.1.0 - In development
     - Improved tools::levelSetRebuild accuracy.
     - Fixed a bug in the VolumeToMesh converter that generated invalid polygons
       when the zero-crossing laid in between the active and inactive regions.
+    - Added an io::Queue class that manages a concurrent queue for
+      asynchronous serialization of grids to files or streams.
+    - Fixed a bug in tools::PointScatter (and the corresponding SOP) that 
+      caused to last voxel to never contain points.
+    - Fixed a bug in io::Archive whereby writing unnamed, instanced grids
+      (i.e., grids sharing a tree) to a file rendered the file unreadable.
+
+    API changes:
+    - The Filter tool is now templated on a mask grid and threading is 
+      controlled using a grain size, which is consistent most other level 
+      set tools.
+    - The LevelSetFilter tool is now templated on a mask grid for greater
+      flexibility.
+    - All shaders now take a ray direction vs a ray.
 
 Version 2.0.0 - October 31, 2013
     - Added a Python module with functions for basic manipulation of grids

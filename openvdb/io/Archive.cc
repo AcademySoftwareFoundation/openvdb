@@ -155,6 +155,13 @@ Archive::~Archive()
 }
 
 
+boost::shared_ptr<Archive>
+Archive::copy() const
+{
+    return boost::shared_ptr<Archive>(new Archive(*this));
+}
+
+
 ////////////////////////////////////////
 
 
@@ -605,9 +612,12 @@ Archive::write(std::ostream& os, const GridCPtrVec& grids, bool seekable,
     for (GridCPtrVecCIter i = grids.begin(), e = grids.end(); i != e; ++i) {
         if (const GridBase::ConstPtr& grid = *i) {
 
-            // Ensure that the grid's descriptor has a unique grid name.
+            // Ensure that the grid's descriptor has a unique grid name, by appending
+            // a number to it if a grid with the same name was already written.
+            // Always add a number if the grid name is empty, so that the grid can be
+            // properly identified as an instance parent, if necessary.
             std::string name = grid->getName();
-            for (int n = 1; uniqueNames.find(name) != uniqueNames.end(); ++n) {
+            for (int n = 1; name.empty() || uniqueNames.find(name) != uniqueNames.end(); ++n) {
                 name = GridDescriptor::addSuffix(grid->getName(), n);
             }
             uniqueNames.insert(name);

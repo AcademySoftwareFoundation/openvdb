@@ -57,8 +57,24 @@ public:
     typedef NameMap::const_iterator NameMapCIter;
 
     explicit File(const std::string& filename);
-    ~File();
+    virtual ~File();
 
+    /// @brief Copy constructor
+    /// @details The copy will be closed and will not reference the same
+    /// file descriptor as the original.
+    File(const File& other);
+    /// @brief Assignment
+    /// @details After assignment, this File will be closed and will not
+    /// reference the same file descriptor as the source File.
+    File& operator=(const File& other);
+
+    /// @brief Return a copy of this archive.
+    /// @details The copy will be closed and will not reference the same
+    /// file descriptor as the original.
+    virtual boost::shared_ptr<Archive> copy() const;
+
+    /// @brief Return the name of the file with which this archive is associated.
+    /// @details The file does not necessarily exist on disk yet.
     const std::string& filename() const { return mFilename; }
 
     /// Open the file, read the file header and the file-level metadata, and
@@ -67,7 +83,7 @@ public:
     /// @return @c true if the file's UUID has changed since it was last read.
     bool open();
 
-    /// Return @c true if the file has been opened for reading, false otherwise.
+    /// Return @c true if the file has been opened for reading.
     bool isOpen() const { return mIsOpen; }
 
     /// Close the file once we are done reading from it.
@@ -106,6 +122,10 @@ public:
 
     /// @todo GridPtrVec readAllGridsPartial(const Name&)
     /// @todo GridPtrVec readAllGrids(const Name&)
+
+    /// @brief Write the grids in the given container to the file whose name
+    /// was given in the constructor.
+    virtual void write(const GridCPtrVec&, const MetaMap& = MetaMap()) const;
 
     /// @brief Write the grids in the given container to the file whose name
     /// was given in the constructor.
@@ -165,10 +185,6 @@ private:
 
     void writeGrids(const GridCPtrVec&, const MetaMap&) const;
 
-    // Disallow copying of instances of this class.
-    File(const File& other);
-    File& operator=(const File& other);
-
     friend class ::TestFile;
     friend class ::TestStream;
 
@@ -193,19 +209,19 @@ private:
 ////////////////////////////////////////
 
 
+inline void
+File::write(const GridCPtrVec& grids, const MetaMap& metadata) const
+{
+    this->writeGrids(grids, metadata);
+}
+
+
 template<typename GridPtrContainerT>
 inline void
 File::write(const GridPtrContainerT& container, const MetaMap& metadata) const
 {
     GridCPtrVec grids;
     std::copy(container.begin(), container.end(), std::back_inserter(grids));
-    this->writeGrids(grids, metadata);
-}
-
-template<>
-inline void
-File::write<GridCPtrVec>(const GridCPtrVec& grids, const MetaMap& metadata) const
-{
     this->writeGrids(grids, metadata);
 }
 
