@@ -616,15 +616,15 @@ openvdb::FloatGrid::Ptr
     targetGrid = ...;
 
 // Get the source and target grids' index space to world space transforms.
-const openvdb::Transform
+const openvdb::math::Transform
     &sourceXform = sourceGrid->transform(),
     &targetXform = targetGrid->transform();
 // Compute a source grid to target grid transform.
 // (For this example, we assume that both grids' transforms are linear,
 // so that they can be represented as 4 x 4 matrices.)
 openvdb::Mat4R xform =
-    sourceXform.getBaseMap()->getAffineMap()->getMat4() *
-    targetXform.getBaseMap()->getAffineMap()->getMat4().inverse();
+    sourceXform.baseMap()->getAffineMap()->getMat4() *
+    targetXform.baseMap()->getAffineMap()->getMat4().inverse();
 
 // Create the transformer.
 openvdb::tools::GridTransformer transformer(xform);

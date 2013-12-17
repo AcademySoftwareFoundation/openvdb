@@ -43,7 +43,6 @@
 #include <tbb/parallel_for.h>
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
-#include <boost/scoped_ptr.hpp>
 #include <boost/type_traits/is_floating_point.hpp>
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h>
@@ -59,9 +58,7 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
-/// @brief Filtering (e.g. diffusion) of VDB volumes. An optional
-/// scalar field can be used to produce a (smooth) alpha mask
-/// for the filtering.    
+/// @brief Volume filtering (e.g., diffusion) with optional alpha masking
 ///
 /// @note Only the values in the grid are changed, not its topology!
 template<typename GridT,
@@ -126,9 +123,8 @@ public:
     /// @brief Define the range for the (optional) scalar mask.
     /// @param min Minimum value of the range.
     /// @param max Maximum value of the range.
-    /// @details Mask values outside the range maps to alpha values of
-    /// respectfully zero and one, and values inside the range maps
-    /// smoothly to 0->1 (unless of course the mask is inverted).
+    /// @details Mask values outside the range are clamped to zero or one, and
+    /// values inside the range map smoothly to 0->1 (unless the mask is inverted).
     /// @throw ValueError if @a min is not smaller then @a max.
     void setMaskRange(AlphaType min, AlphaType max)
     {
@@ -198,8 +194,8 @@ private:
                   AlphaType min, AlphaType max, bool invert)
             : mSampler(mask, grid), mMin(min), mInvNorm(1/(max-min)), mInvert(invert)
         {
-            assert(min < max);   
-        } 
+            assert(min < max);
+        }
         inline bool operator()(const Coord& xyz, AlphaType& a, AlphaType& b) const
         {
             a = mSampler(xyz);
@@ -213,7 +209,7 @@ private:
         const AlphaType mMin, mInvNorm;
         const bool      mInvert;
     };
-    
+
     template <size_t Axis>
     struct Avg {
         Avg(const GridT* grid, Int32 w) :
@@ -256,7 +252,7 @@ inline void
 Filter<GridT, MaskT, InterruptT>::mean(int width, int iterations, const MaskType* mask)
 {
     mMask = mask;
-    
+
     if (mInterrupter) mInterrupter->start("Applying mean filter");
 
     const int w = std::max(1, width);
@@ -282,7 +278,7 @@ inline void
 Filter<GridT, MaskT, InterruptT>::gaussian(int width, int iterations, const MaskType* mask)
 {
     mMask = mask;
-    
+
     if (mInterrupter) mInterrupter->start("Applying gaussian filter");
 
     const int w = std::max(1, width);
@@ -311,7 +307,7 @@ inline void
 Filter<GridT, MaskT, InterruptT>::median(int width, int iterations, const MaskType* mask)
 {
     mMask = mask;
-    
+
     if (mInterrupter) mInterrupter->start("Applying median filter");
 
     LeafManagerType leafs(mGrid->tree(), 1, mGrainSize==0);
@@ -327,7 +323,7 @@ inline void
 Filter<GridT, MaskT, InterruptT>::offset(ValueType value, const MaskType* mask)
 {
     mMask = mask;
-    
+
     if (mInterrupter) mInterrupter->start("Applying offset");
 
     LeafManagerType leafs(mGrid->tree(), 0, mGrainSize==0);
@@ -370,7 +366,9 @@ Filter<GridT, MaskT, InterruptT>::doBox(const RangeType& range, Int32 w)
             BufferT& buffer = leafIter.buffer(1);
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 const Coord xyz = iter.getCoord();
-                if (alpha(xyz, a, b)) buffer.setValue(iter.pos(), b*(*iter)+ a*avg(xyz));
+                if (alpha(xyz, a, b)) {
+                    buffer.setValue(iter.pos(), ValueType(b*(*iter) + a*avg(xyz)));
+                }
             }
         }
     } else {
@@ -382,7 +380,7 @@ Filter<GridT, MaskT, InterruptT>::doBox(const RangeType& range, Int32 w)
         }
     }
 }
-   
+
 /// Performs simple but slow median-value diffusion
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
@@ -398,7 +396,7 @@ Filter<GridT, MaskT, InterruptT>::doMedian(const RangeType& range, int width)
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 if (alpha(iter.getCoord(), a, b)) {
                     stencil.moveTo(iter);
-                    buffer.setValue(iter.pos(), b*(*iter) + a*stencil.median());
+                    buffer.setValue(iter.pos(), ValueType(b*(*iter) + a*stencil.median()));
                 }
             }
         }
@@ -424,7 +422,7 @@ Filter<GridT, MaskT, InterruptT>::doOffset(const RangeType& range, ValueType off
         AlphaMask alpha(*mGrid, *mMask, mMinMask, mMaxMask, mInvertMask);
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
             for (VoxelIterT iter = leafIter->beginValueOn(); iter; ++iter) {
-                if (alpha(iter.getCoord(), a, b)) iter.setValue(*iter + a*offset);
+                if (alpha(iter.getCoord(), a, b)) iter.setValue(ValueType(*iter + a*offset));
             }
         }
     } else {

@@ -38,6 +38,7 @@
 #include <openvdb/tools/Composite.h>
 #include <openvdb/tools/GridTransformer.h> // for resampleToMatch()
 #include <openvdb/tools/LevelSetRebuild.h> // for levelSetRebuild()
+#include <openvdb/tools/Morphology.h> // for deactivate()
 #include <openvdb/util/NullInterrupter.h>
 #include <PRM/PRM_Parm.h>
 #include <UT/UT_Interrupt.h>
@@ -126,7 +127,7 @@ private:
 };
 
 
-//#define TIMES " \xd7 "
+//#define TIMES " \xd7 " // ISO-8859 multiplication symbol
 #define TIMES " * "
 const char* const SOP_OpenVDB_Combine::sOpMenuItems[] = {
     "copya",                "Copy A",
@@ -237,19 +238,34 @@ newSopOperator(OP_OperatorTable* table)
                 "resampling one grid to match the other's transform."));
     }
 
-    // Prune toggle
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "prune", "Prune Tolerance")
-        .setDefault(PRMoneDefaults)
-        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
+    // Deactivate background value toggle
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "deactivate", "Deactivate Background Voxels")
+        .setDefault(PRMzeroDefaults)
+        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
+
+    // Deactivation tolerance slider
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "bgtolerance", "Deactivate Tolerance")
+        .setDefault(PRMzeroDefaults)
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1)
         .setHelpText(
-            "Collapse regions of constant value in output grids.\n"
+            "Deactivate active output voxels whose values\n"
+            "equal the output grid's background value.\n"
             "Voxel values are considered equal if they differ\n"
-            "by less than the specified threshold."));
+            "by less than the specified tolerance."));
+
+    // Prune toggle
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "prune", "Prune")
+        .setDefault(PRMoneDefaults)
+        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
 
     // Pruning tolerance slider
     parms.add(hutil::ParmFactory(PRM_FLT_J, "tolerance", "Prune Tolerance")
         .setDefault(PRMzeroDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1));
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1)
+        .setHelpText(
+            "Collapse regions of constant value in output grids.\n"
+            "Voxel values are considered equal if they differ\n"
+            "by less than the specified tolerance."));
 
     // Flood fill toggle
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "flood", "Signed-Flood-Fill Output")
@@ -329,6 +345,7 @@ SOP_OpenVDB_Combine::updateParmsFlags()
     bool changed = false;
 
     changed |= enableParm("resampleinterp", evalInt("resample", 0, 0) != 0);
+    changed |= enableParm("bgtolerance", evalInt("deactivate", 0, 0) != 0);
     changed |= enableParm("tolerance", evalInt("prune", 0, 0) != 0);
     changed |= enableParm("pairs", evalInt("flatten", 0, 0) == 0);
 
@@ -643,13 +660,15 @@ struct SOP_OpenVDB_Combine::CombineOp
             needB = self->needBGrid(op),
             needBoth = needA && needB,
             prune = self->evalInt("prune", 0, self->getTime()),
-            flood = self->evalInt("flood", 0, self->getTime());
+            flood = self->evalInt("flood", 0, self->getTime()),
+            deactivate = self->evalInt("deactivate", 0, self->getTime());
         const int
             samplingOrder = self->evalInt("resampleinterp", 0, self->getTime());
         const float
             aMult = self->evalFloat("mult_a", 0, self->getTime()),
             bMult = self->evalFloat("mult_b", 0, self->getTime()),
-            tolerance = self->evalFloat("tolerance", 0, self->getTime());
+            tolerance = self->evalFloat("tolerance", 0, self->getTime()),
+            deactivationTolerance = self->evalFloat("bgtolerance", 0, self->getTime());
 
         const GridT *aGrid = NULL, *bGrid = NULL;
         if (aBaseGrid) aGrid = UTvdbGridCast<GridT>(aBaseGrid);
@@ -833,6 +852,14 @@ struct SOP_OpenVDB_Combine::CombineOp
                 MulAdd<GridT>(bMult).process(*bGrid, tempGrid);
                 openvdb::tools::compReplace(*resultGrid, *tempGrid);
                 break;
+        }
+
+        if (deactivate) {
+            // Mark active output tiles and voxels as inactive if their
+            // values match the output grid's background value.
+            // Do this first to facilitate pruning.
+            openvdb::tools::deactivate(*resultGrid, resultGrid->background(),
+                ValueT(ZERO + deactivationTolerance));
         }
 
         // Note: flood fill and pruning currently work only for scalar grids.

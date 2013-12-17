@@ -456,15 +456,19 @@ newSopOperator(OP_OperatorTable* table)
                 .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
         }
 
-        // Invert mask.
+        //Invert mask.
         parms.add(hutil::ParmFactory(PRM_TOGGLE, "invert", "Invert Alpha Mask")
             .setHelpText("Inverts the optional mask so alpha values 0->1 maps to 1->0"));
 
+        // Min mask range
         parms.add(hutil::ParmFactory(PRM_FLT_J, "minMask", "Min Mask Cutoff")
+            .setHelpText("Value below which the mask values map to zero")      
             .setDefault(PRMzeroDefaults)
             .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
 
+        // Max mask range
         parms.add(hutil::ParmFactory(PRM_FLT_J, "maxMask", "Max Mask Cutoff")
+            .setHelpText("Value above which the mask values map to one")      
             .setDefault(PRMoneDefaults)
             .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
         

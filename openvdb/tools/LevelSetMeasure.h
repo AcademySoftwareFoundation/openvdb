@@ -35,7 +35,8 @@
 #ifndef OPENVDB_TOOLS_LEVELSETMEASURE_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_LEVELSETMEASURE_HAS_BEEN_INCLUDED
 
-#include <tbb/parallel_reduce.h>
+#include <tbb/parallel_for.h>
+#include <tbb/parallel_sort.h>
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
 #include <boost/type_traits/is_floating_point.hpp>
@@ -123,6 +124,11 @@ private:
 
 /// @brief Multi-threaded computation of surface area, volume and
 /// average mean-curvature for narrow band level sets.
+///
+/// @details To reduce the risk of round-off errors (primarily due to
+/// catastrophic cancellation) and guarantee determinism during
+/// multi-threading this class is implemented using parallel_for, and
+/// delayed reduction of a sorted list.    
 template<typename GridT,
          typename InterruptT = util::NullInterrupter>
 class LevelSetMeasure
@@ -142,12 +148,6 @@ public:
     LevelSetMeasure(const GridType& grid, InterruptT* interrupt = NULL);
 
     LevelSetMeasure(ManagerType& leafs, Real Dx, InterruptT* interrupt);
-
-    /// @brief Shallow copy constructor called by tbb::parallel_reduce() threads.
-    /// @param other The other LevelSetMeasure from which to copy.
-    /// @param dummy Dummy argument required by tbb.
-    /// @warning Never call this method directly.
-    LevelSetMeasure(const LevelSetMeasure& other, tbb::split dummy);
 
     /// @brief Re-initialize using the specified grid.
     void reinit(const GridType& grid);
@@ -182,15 +182,11 @@ public:
     /// @brief Used internally by tbb::parallel_reduce().
     /// @param range The range over which to perform multi-threading.
     /// @warning Never call this method directly!
-    void operator()(const RangeType& range)
+    void operator()(const RangeType& range) const
     {
         if (mTask) mTask(const_cast<LevelSetMeasure*>(this), range);
         else OPENVDB_THROW(ValueError, "task is undefined");
     }
-
-    /// @brief Used internally by tbb::parallel_reduce().
-    /// @warning Never call this method directly!
-    void join(const LevelSetMeasure& other);
 
 private:
     typedef typename GridT::ConstAccessor       AccT;
@@ -202,22 +198,28 @@ private:
     AccT         mAcc;
     ManagerType* mLeafs;
     InterruptT*  mInterrupter;
-    double       mDx, mArea, mCurv, mVol;
-    //long double  mVol;
+    double       mDx;
+    double*      mArray;
     typename boost::function<void (LevelSetMeasure*, const RangeType&)> mTask;
     int          mGrainSize;
 
     // @brief Return false if the process was interrupted
     bool checkInterrupter();
 
-    // Private cook method calling tbb::parallel_reduce
-    void cook(Real dx);
-
     // Private methods called by tbb::parallel_reduce threads
     void measure2( const RangeType& );
 
     // Private methods called by tbb::parallel_reduce threads
     void measure3( const RangeType& );
+
+    inline double reduce(double* first, double scale)
+    {
+        double* last = first + mLeafs->leafCount();
+        tbb::parallel_sort(first, last);//reduces catastrophic cancellation
+        Real sum = 0.0;
+        while(first != last) sum += *first++;
+        return scale * sum;
+    }
 
 }; // end of LevelSetMeasure class
 
@@ -229,6 +231,7 @@ LevelSetMeasure<GridT, InterruptT>::LevelSetMeasure(const GridType& grid, Interr
     , mLeafs(NULL)
     , mInterrupter(interrupt)
     , mDx(grid.voxelSize()[0])
+    , mArray(NULL)
     , mTask(0)
     , mGrainSize(1)
 {
@@ -252,27 +255,11 @@ LevelSetMeasure<GridT, InterruptT>::LevelSetMeasure(
     , mLeafs(&leafs)
     , mInterrupter(interrupt)
     , mDx(dx)
+    , mArray(NULL)
     , mTask(0)
     , mGrainSize(1)
 {
 }
-
-
-template<typename GridT, typename InterruptT>
-inline
-LevelSetMeasure<GridT, InterruptT>::LevelSetMeasure(const LevelSetMeasure& other, tbb::split)
-    : mAcc(other.mAcc)
-    , mLeafs(other.mLeafs)
-    , mInterrupter(other.mInterrupter)
-    , mDx(other.mDx)
-    , mArea(0)
-    , mCurv(0)
-    , mVol(0) 
-    , mTask(other.mTask)
-    , mGrainSize(other.mGrainSize)
-{
-}
-
 
 template<typename GridT, typename InterruptT>
 inline void
@@ -302,17 +289,6 @@ LevelSetMeasure<GridT, InterruptT>::reinit(ManagerType& leafs, Real dx)
     mDx = dx;
 }
 
-
-template<typename GridT, typename InterruptT>
-inline void
-LevelSetMeasure<GridT, InterruptT>::join(const LevelSetMeasure& other)
-{
-    mArea += other.mArea;
-    mVol  += other.mVol;
-    mCurv += other.mCurv;
-}
-
-
 ////////////////////////////////////////
 
 
@@ -322,10 +298,33 @@ LevelSetMeasure<GridT, InterruptT>::measure(Real& area, Real& volume, bool useWo
 {
     if (mInterrupter) mInterrupter->start("Measuring level set");
     mTask = boost::bind(&LevelSetMeasure::measure2, _1, _2);
-    this->cook(useWorldUnits ? mDx : 1.0);
+
+    const bool newLeafs = mLeafs == NULL;
+    if (newLeafs) mLeafs = new ManagerType(mAcc.tree());
+    const size_t leafCount = mLeafs->leafCount();
+    if (leafCount == 0) {
+        area = volume = 0;
+        return;
+    }
+    mArray = new double[2*leafCount];
+
+    if (mGrainSize>0) {
+        tbb::parallel_for(mLeafs->leafRange(mGrainSize), *this);
+    } else {
+        (*this)(mLeafs->leafRange());
+    }
+
+    const double dx = useWorldUnits ? mDx : 1.0;
+    area = this->reduce(mArray, math::Pow2(dx));
+    volume = this->reduce(mArray + leafCount, math::Pow3(dx) / 3.0);
+
+    if (newLeafs) {
+        delete mLeafs;
+        mLeafs = NULL;
+    }
+    delete [] mArray;
+
     if (mInterrupter) mInterrupter->end();
-    area = mArea;
-    volume = mVol;
 }
 
 
@@ -336,11 +335,34 @@ LevelSetMeasure<GridT, InterruptT>::measure(Real& area, Real& volume, Real& avgM
 {
     if (mInterrupter) mInterrupter->start("Measuring level set");
     mTask = boost::bind(&LevelSetMeasure::measure3, _1, _2);
-    this->cook(useWorldUnits ? mDx : 1.0);
+
+    const bool newLeafs = mLeafs == NULL;
+    if (newLeafs) mLeafs = new ManagerType(mAcc.tree());
+    const size_t leafCount = mLeafs->leafCount();
+    if (leafCount == 0) {
+        area = volume = avgMeanCurvature = 0;
+        return;
+    }
+    mArray = new double[3*leafCount];
+
+    if (mGrainSize>0) {
+        tbb::parallel_for(mLeafs->leafRange(mGrainSize), *this);
+    } else {
+        (*this)(mLeafs->leafRange());
+    }
+
+    const double dx = useWorldUnits ? mDx : 1.0;
+    area = this->reduce(mArray, math::Pow2(dx));
+    volume = this->reduce(mArray + leafCount, math::Pow3(dx) / 3.0);
+    avgMeanCurvature = this->reduce(mArray + 2*leafCount, dx/area);
+
+    if (newLeafs) {
+        delete mLeafs;
+        mLeafs = NULL;
+    }
+    delete [] mArray;
+
     if (mInterrupter) mInterrupter->end();
-    area = mArea;
-    volume = mVol;
-    avgMeanCurvature = mCurv;
 }
 
 
@@ -358,33 +380,6 @@ LevelSetMeasure<GridT, InterruptT>::checkInterrupter()
     return true;
 }
 
-
-template<typename GridT, typename InterruptT>
-inline void
-LevelSetMeasure<GridT, InterruptT>::cook(Real dx)
-{
-    mArea = mVol = mCurv = 0.0;
-    
-    const bool newLeafs = mLeafs == NULL;
-    if (newLeafs) mLeafs = new ManagerType(mAcc.tree());
-
-    if (mGrainSize>0) {
-        tbb::parallel_reduce(mLeafs->leafRange(mGrainSize), *this);
-    } else {
-        (*this)(mLeafs->leafRange());
-    }
-
-    if (newLeafs) {
-        delete mLeafs;
-        mLeafs = NULL;
-    }
-    
-    mArea *= math::Pow2(dx);
-    mVol  *= math::Pow3(dx) / 3.0;
-    mCurv *= dx / mArea;
-}
-
-
 template<typename GridT, typename InterruptT>
 inline void
 LevelSetMeasure<GridT, InterruptT>::measure2(const RangeType& range)
@@ -394,8 +389,9 @@ LevelSetMeasure<GridT, InterruptT>::measure2(const RangeType& range)
     this->checkInterrupter();
     const Real invDx = 1.0/mDx;
     const DiracDelta<Real> DD(1.5);
-    Real sumA = 0, sumV=0;//reduce risk of catastrophic cancellation
+    const size_t leafCount = mLeafs->leafCount();
     for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
+        Real sumA = 0, sumV = 0;//reduce risk of catastrophic cancellation
         for (VoxelCIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter) {
             const Real dd = DD(invDx * (*voxelIter));
             if (dd > 0.0) {
@@ -405,9 +401,11 @@ LevelSetMeasure<GridT, InterruptT>::measure2(const RangeType& range)
                 sumV += dd * (g[0]*p[0]+g[1]*p[1]+g[2]*p[2]);
             }
         }
+        double* v = mArray + leafIter.pos();
+        *v = sumA;
+        v += leafCount;
+        *v = sumV;
     }
-    mArea += sumA;
-    mVol  += sumV;
 }
 
 
@@ -422,8 +420,9 @@ LevelSetMeasure<GridT, InterruptT>::measure3(const RangeType& range)
     const Real invDx = 1.0/mDx;
     const DiracDelta<Real> DD(1.5);
     ValueType alpha, beta;
-    Real sumA = 0, sumV = 0, sumC = 0;//reduce risk of catastrophic cancellation
+    const size_t leafCount = mLeafs->leafCount();
     for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
+        Real sumA = 0, sumV = 0, sumC = 0;//reduce risk of catastrophic cancellation
         for (VoxelCIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter) {
             const Real dd = DD(invDx * (*voxelIter));
             if (dd > 0.0) {
@@ -431,15 +430,18 @@ LevelSetMeasure<GridT, InterruptT>::measure3(const RangeType& range)
                 const Vec3T g = invDx*Grad::result(mAcc, p);//voxel units
                 const Real dA = dd * g.dot(g);
                 sumA += dA;
-                sumV +=  dd * (g[0]*p[0]+g[1]*p[1]+g[2]*p[2]);
+                sumV += dd * (g[0]*p[0]+g[1]*p[1]+g[2]*p[2]);
                 Curv::result(mAcc, p, alpha, beta);
                 sumC += dA * alpha/(2*math::Pow2(beta))*invDx;
             }
         }
+        double* v = mArray + leafIter.pos();
+        *v = sumA;
+        v += leafCount;
+        *v = sumV;
+        v += leafCount;
+        *v = sumC;
     }
-    mArea += sumA;
-    mVol  += sumV;
-    mCurv += sumC;
 }
 
 ////////////////////////////////////////

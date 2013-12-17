@@ -82,6 +82,7 @@ public:
     CPPUNIT_TEST_SUITE(TestTools);
     CPPUNIT_TEST(testDilateVoxels);
     CPPUNIT_TEST(testErodeVoxels);
+    CPPUNIT_TEST(testActivate);
     CPPUNIT_TEST(testFilter);
     CPPUNIT_TEST(testFloatApply);
     CPPUNIT_TEST(testLevelSetSphere);
@@ -103,6 +104,7 @@ public:
 
     void testDilateVoxels();
     void testErodeVoxels();
+    void testActivate();
     void testFilter();
     void testFloatApply();
     void testLevelSetSphere();
@@ -427,6 +429,42 @@ TestTools::testErodeVoxels()
         CPPUNIT_ASSERT(grid.tree().activeVoxelCount() < count);
     }
 }
+
+
+void
+TestTools::testActivate()
+{
+    using namespace openvdb;
+
+    const Vec3s background(0.0, -1.0, 1.0), foreground(42.0);
+
+    Vec3STree tree(background);
+
+    const CoordBBox bbox1(Coord(-200), Coord(-181)), bbox2(Coord(51), Coord(373));
+
+    // Set some non-background active voxels.
+    tree.fill(bbox1, Vec3s(0.0), /*active=*/true);
+
+    // Mark some background voxels as active.
+    tree.fill(bbox2, background, /*active=*/true);
+    CPPUNIT_ASSERT_EQUAL(bbox2.volume() + bbox1.volume(), tree.activeVoxelCount());
+
+    // Deactivate all voxels with the background value.
+    tools::deactivate(tree, background, /*tolerance=*/Vec3s(1.0e-6));
+    // Verify that there are no longer any active voxels with the background value.
+    CPPUNIT_ASSERT_EQUAL(bbox1.volume(), tree.activeVoxelCount());
+
+    // Set some voxels to the foreground value but leave them inactive.
+    tree.fill(bbox2, foreground, /*active=*/false);
+    // Verify that there are no active voxels with the background value.
+    CPPUNIT_ASSERT_EQUAL(bbox1.volume(), tree.activeVoxelCount());
+
+    // Activate all voxels with the foreground value.
+    tools::activate(tree, foreground);
+    // Verify that the expected number of voxels are active.
+    CPPUNIT_ASSERT_EQUAL(bbox1.volume() + bbox2.volume(), tree.activeVoxelCount());
+}
+
 
 void
 TestTools::testFilter()
@@ -825,6 +863,7 @@ TestTools::testLevelSetMorph()
 void
 TestTools::testLevelSetMeasure()
 {
+    const double percentage = 0.1/100.0;//i.e. 0.1%
     typedef openvdb::FloatGrid GridT;
     const int dim = 256;
     openvdb::Real a, v, c, area, volume, curv;
@@ -844,9 +883,9 @@ TestTools::testLevelSetMeasure()
     volume = 4.0/3.0*Pi*r*r*r;
     //std::cerr << "\nArea of sphere = " << area << "  " << a << std::endl;
     //std::cerr << "\nVolume of sphere = " << volume << "  " << v << std::endl;
-    // Test accuracy of computed measures to within 1% of the exact measure. 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, 0.01*area);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, 0.01*volume);
+    // Test accuracy of computed measures to within 0.1% of the exact measure. 
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, percentage*area);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, percentage*volume);
 
     // Test all measures of sphere in world units
     m.measure(a, v, c);
@@ -856,10 +895,10 @@ TestTools::testLevelSetMeasure()
     //std::cerr << "\nArea of sphere = " << area << "  " << a << std::endl;
     //std::cerr << "Volume of sphere = " << volume << "  " << v << std::endl;
     //std::cerr << "Avg mean curvature of sphere = " << curv << "  " << c << std::endl;
-    // Test accuracy of computed measures to within 1% of the exact measure. 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, 0.01*area);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, 0.01*volume);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(curv,   c, 0.01*curv);
+    // Test accuracy of computed measures to within 0.1% of the exact measure. 
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, percentage*area);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, percentage*volume);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(curv,   c, percentage*curv);
 
      // Test all measures of sphere in index units
     m.measure(a, v, c, false);
@@ -870,10 +909,10 @@ TestTools::testLevelSetMeasure()
     //std::cerr << "\nArea of sphere = " << area << "  " << a << std::endl;
     //std::cerr << "Volume of sphere = " << volume << "  " << v << std::endl;
     //std::cerr << "Avg mean curvature of sphere = " << curv << "  " << c << std::endl;
-    // Test accuracy of computed measures to within 1% of the exact measure. 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, 0.01*area);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, 0.01*volume);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(curv,   c, 0.01*curv);
+    // Test accuracy of computed measures to within 0.1% of the exact measure. 
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, percentage*area);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, percentage*volume);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(curv,   c, percentage*curv);
 
     // Second sphere
     C = openvdb::Vec3f(5.4f, 6.4f, 8.4f);
@@ -889,12 +928,12 @@ TestTools::testLevelSetMeasure()
     //std::cerr << "\nArea of sphere = " << area << "  " << a << std::endl;
     //std::cerr << "Volume of sphere = " << volume << "  " << v << std::endl;
     //std::cerr << "Avg mean curvature of sphere = " << curv << "  " << c << std::endl;
-    // Test accuracy of computed measures to within 1% of the exact measure. 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, 0.01*area);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, 0.01*volume);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(curv,   c, 0.01*curv);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,  openvdb::tools::levelSetArea(*sphere),  0.01*area);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume,openvdb::tools::levelSetVolume(*sphere),0.01*volume);
+    // Test accuracy of computed measures to within 0.1% of the exact measure. 
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, percentage*area);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, percentage*volume);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(curv,   c, percentage*curv);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,  openvdb::tools::levelSetArea(*sphere),  percentage*area);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume,openvdb::tools::levelSetVolume(*sphere),percentage*volume);
     
      // Test all measures of sphere in index units
     m.measure(a, v, c, false);
@@ -905,12 +944,14 @@ TestTools::testLevelSetMeasure()
     //std::cerr << "\nArea of sphere = " << area << "  " << a << std::endl;
     //std::cerr << "Volume of sphere = " << volume << "  " << v << std::endl;
     //std::cerr << "Avg mean curvature of sphere = " << curv << "  " << c << std::endl;
-    // Test accuracy of computed measures to within 1% of the exact measure. 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, 0.01*area);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, 0.01*volume);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(curv,   c, 0.01*curv);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,  openvdb::tools::levelSetArea(*sphere,false),  0.01*area);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume,openvdb::tools::levelSetVolume(*sphere,false),0.01*volume);
+    // Test accuracy of computed measures to within 0.1% of the exact measure. 
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, percentage*area);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, percentage*volume);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(curv,   c, percentage*curv);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,  openvdb::tools::levelSetArea(*sphere,false),
+                                 percentage*area);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume,openvdb::tools::levelSetVolume(*sphere,false),
+                                 percentage*volume);
 
     // Read level set from file
     /*
@@ -921,37 +962,25 @@ TestTools::testLevelSetMeasure()
     GridT::Ptr model = openvdb::gridPtrCast<GridT>(sourceFile.getGrids()->at(0));
     m.reinit(*model);
 
-    m.setGrainSize(32);
-    timer.start("\nMeasure 32 area and volume");
+    //m.setGrainSize(1);
+    timer.start("\nParallel measure of area and volume");
     m.measure(a, v, false);
     timer.stop();
     std::cerr << "Model: area = " << a << ", volume = " << v << std::endl;
 
-    timer.start("\nMeasure 32 area, volume and curvature");
-    m.measure(a, v, c, false);
-    timer.stop();
-    std::cerr << "Model: area = " << a << ", volume = " << v
-              << ", average curvature = " << c << std::endl;
-
-    m.setGrainSize(64);
-    timer.start("\nParallel 64 Measure area and volume");
-    m.measure(a, v, false);
-    timer.stop();
-    std::cerr << "Model: area = " << a << ", volume = " << v << std::endl;
-
-    timer.start("\nParallel 64 Measure area, volume and curvature");
+    timer.start("\nParallel measure of area, volume and curvature");
     m.measure(a, v, c, false);
     timer.stop();
     std::cerr << "Model: area = " << a << ", volume = " << v
               << ", average curvature = " << c << std::endl;
     
     m.setGrainSize(0);
-    timer.start("\nSerial Measure area and volume");
+    timer.start("\nSerial measure of area and volume");
     m.measure(a, v, false);
     timer.stop();
     std::cerr << "Model: area = " << a << ", volume = " << v << std::endl;
 
-    timer.start("\nSerial Measure area, volume and curvature");
+    timer.start("\nSerial measure of area, volume and curvature");
     m.measure(a, v, c, false);
     timer.stop();
     std::cerr << "Model: area = " << a << ", volume = " << v

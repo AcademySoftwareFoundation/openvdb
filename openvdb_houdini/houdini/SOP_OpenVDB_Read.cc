@@ -314,9 +314,6 @@ SOP_OpenVDB_Read::cookMySop(OP_Context& context)
                         }
                     }
                 }
-                // Transfer the grid name from the input grid map to the grid's metadata.
-                grid->removeMeta("name");
-                grid->insertMeta("name", openvdb::StringMetadata(gridName));
 
                 // Add a new VDB primitive for this grid.
                 // Note: this clears the grid's metadata.
