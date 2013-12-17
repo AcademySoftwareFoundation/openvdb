@@ -84,7 +84,7 @@ namespace tools {
 // When the samplers are applied to grids holding vector or other non-scalar data,
 // the data is assumed to be collocated.  For example, using the BoxSampler on a grid
 // with ValueType Vec3f assumes that all three elements in a vector can be assigned
-// the same physical location.
+// the same physical location. Consider using the GridSampler below instead.
 
 struct PointSampler
 {
@@ -203,7 +203,7 @@ struct StaggeredQuadraticSampler
 
 
 /// @brief Class that provides the interface for continuous sampling
-/// of values in a tree. Consider using the GridSampler below instead.
+/// of values in a tree.
 ///
 /// @details Since trees support only discrete voxel sampling, TreeSampler
 /// must be used to sample arbitrary continuous points in (world or
@@ -212,9 +212,9 @@ struct StaggeredQuadraticSampler
 /// @warning This implementation of the GridSampler stores a pointer
 /// to a Tree for value access. While this is thread-safe it is
 /// uncached and hence slow compared to using a
-/// ValueAccessor. Consequently is it normally advisable to use the
+/// ValueAccessor. Consequently it is normally advisable to use the
 /// template specialization below that employs a
-/// ValueAccessor. However case must be taken when dealing with
+/// ValueAccessor. However, care must be taken when dealing with
 /// multi-threading (see warning below).
 template<typename GridOrTreeType, typename SamplerType>
 class GridSampler
@@ -310,7 +310,8 @@ public:
 
     /// @param acc  a ValueAccessor to be sampled
     /// @param transform is used when sampling world space locations.
-    GridSampler(const AccessorType& acc, const math::Transform& transform)
+    GridSampler(const AccessorType& acc,
+                const math::Transform& transform)
         : mAccessor(&acc), mTransform(&transform) {}
 
      const math::Transform& transform() const { return *mTransform; }
@@ -371,40 +372,102 @@ private:
 /// from a source grid into the index space of a target grid. At
 /// construction the source and target grids are checked for alignment
 /// which potentially renders interpolation unnecessary. Else
-/// interpolation is performed according to the templated Sampler type.     
+/// interpolation is performed according to the templated Sampler
+/// type.
 ///
 /// @warning For performance reasons the check for alignment of the
-/// two grids is only performed at construction time! Also note that
-/// unless the grids are aligned, virtual methods are used to resolve
-/// the coordinate transformations, which is clearly not optimal. So
-/// consider resolving the Map types of the two grids for better
-/// performance.     
-template<typename SourceGridT,
-         typename TargetGridT,
-         typename SamplerT = tools::BoxSampler>
+/// two grids is only performed at construction time!
+template<typename GridOrTreeT,
+         typename SamplerT>
 class DualGridSampler
 {
 public:
-    typedef typename SourceGridT::ValueType ValueType;
-    DualGridSampler(const SourceGridT& source, const TargetGridT& target)
-        : mTarget(&target), mSource(&source), mAccessor(source.tree()),
-          mAligned(target.transform() == source.transform())
+    typedef typename GridOrTreeT::ValueType               ValueType;
+    typedef typename TreeAdapter<GridOrTreeT>::GridType   GridType;
+    typedef typename TreeAdapter<GridOrTreeT>::TreeType   TreeType;
+    typedef typename TreeAdapter<GridType>::AccessorType  AccessorType;
+
+    /// @brief Grid and transform constructor.
+    /// @param sourceGrid Source grid.
+    /// @param targetXform Transform of the target grid.
+    DualGridSampler(const GridType& sourceGrid,
+                    const math::Transform& targetXform)
+        : mSourceTree(&(sourceGrid.tree()))
+        , mSourceXform(&(sourceGrid.transform()))
+        , mTargetXform(&targetXform)
+        , mAligned(targetXform == *mSourceXform)
+    {
+    }
+    /// @brief Tree and transform constructor.
+    /// @param sourceTree Source tree.
+    /// @param sourceXform Transform of the source grid.
+    /// @param targetXform Transform of the target grid.
+    DualGridSampler(const TreeType& sourceTree,
+                    const math::Transform& sourceXform,
+                    const math::Transform& targetXform)
+        : mSourceTree(&sourceTree)
+        , mSourceXform(&sourceXform)
+        , mTargetXform(&targetXform)
+        , mAligned(targetXform == sourceXform)
+    {
+    }
+    /// @brief Return the value of the source grid at the index
+    /// coordinates, ijk, relative to the target grid (or its tranform).  
+    inline ValueType operator()(const Coord& ijk) const
+    {
+        if (mAligned) return mSourceTree->getValue(ijk);
+        const Vec3R world = mTargetXform->indexToWorld(ijk);
+        return SamplerT::sample(*mSourceTree, mSourceXform->worldToIndex(world));
+    }
+    /// @brief Return true if the two grids are aligned.
+    inline bool isAligned() const { return mAligned; }
+private:
+    const TreeType*        mSourceTree;
+    const math::Transform* mSourceXform;
+    const math::Transform* mTargetXform;
+    const bool             mAligned;
+};// DualGridSampler  
+
+/// @brief Specialization of DualGridSampler for construction from a ValueAccessor type.
+template<typename TreeT,
+         typename SamplerT>
+class DualGridSampler<tree::ValueAccessor<TreeT>, SamplerT>
+{
+    public:
+    typedef typename TreeT::ValueType ValueType;
+    typedef TreeT                     TreeType;
+    typedef Grid<TreeType>            GridType;
+    typedef typename tree::ValueAccessor<TreeT> AccessorType;
+
+    /// @brief ValueAccessor and transform constructor.
+    /// @param sourceAccessor ValueAccessor into the source grid.
+    /// @param sourceXform Transform for the source grid.
+    /// @param targetXform Transform for the target grid.
+    DualGridSampler(const AccessorType& sourceAccessor,
+                    const math::Transform& sourceXform,
+                    const math::Transform& targetXform)
+        : mSourceAcc(&sourceAccessor)
+        , mSourceXform(&sourceXform)
+        , mTargetXform(&targetXform)
+        , mAligned(targetXform == sourceXform)
     {
     }
     /// @brief Return the value of the source grid at the index
     /// coordinates, ijk, relative to the target grid.  
     inline ValueType operator()(const Coord& ijk) const
     {
-        return mAligned ? mAccessor.getValue(ijk) : SamplerT::sample(mAccessor,
-               mSource->worldToIndex(mTarget->indexToWorld(ijk)));
+        if (mAligned) return mSourceAcc->getValue(ijk);
+        const Vec3R world = mTargetXform->indexToWorld(ijk);
+        return SamplerT::sample(*mSourceAcc, mSourceXform->worldToIndex(world));
     }
+    /// @brief Return true if the two grids are aligned.
+    inline bool isAligned() const { return mAligned; }
 private:
-    const TargetGridT*                  mTarget;
-    const SourceGridT*                  mSource;
-    typename SourceGridT::ConstAccessor mAccessor;
-    const bool                          mAligned;
-};// DualGridSampler  
-
+    const AccessorType*    mSourceAcc;
+    const math::Transform* mSourceXform;
+    const math::Transform* mTargetXform;
+    const bool             mAligned;
+};//Specialization of DualGridSampler
 
 ////////////////////////////////////////
 

@@ -74,8 +74,8 @@ public:
     static MObject aTemperatureName;
     static MObject aPressure;
     static MObject aPressureName;
-    static MObject aFule;
-    static MObject aFuleName;
+    static MObject aFuel;
+    static MObject aFuelName;
     static MObject aFalloff;
     static MObject aFalloffName;
     static MObject aVelocity;
@@ -98,8 +98,8 @@ MObject OpenVDBFromMayaFluidNode::aTemperature;
 MObject OpenVDBFromMayaFluidNode::aTemperatureName;
 MObject OpenVDBFromMayaFluidNode::aPressure;
 MObject OpenVDBFromMayaFluidNode::aPressureName;
-MObject OpenVDBFromMayaFluidNode::aFule;
-MObject OpenVDBFromMayaFluidNode::aFuleName;
+MObject OpenVDBFromMayaFluidNode::aFuel;
+MObject OpenVDBFromMayaFluidNode::aFuelName;
 MObject OpenVDBFromMayaFluidNode::aFalloff;
 MObject OpenVDBFromMayaFluidNode::aFalloffName;
 MObject OpenVDBFromMayaFluidNode::aVelocity;
@@ -179,16 +179,16 @@ MStatus OpenVDBFromMayaFluidNode::initialize()
     if (stat != MS::kSuccess) return stat;
 
 
-    aFule = nAttr.create("Fule", "f", MFnNumericData::kBoolean);
+    aFuel = nAttr.create("Fuel", "f", MFnNumericData::kBoolean);
     nAttr.setDefault(false);
     nAttr.setConnectable(false);
-    stat = addAttribute(aFule);
+    stat = addAttribute(aFuel);
     if (stat != MS::kSuccess) return stat;
 
-    aFuleName = tAttr.create("FuleName", "fname", MFnData::kString, strData.create("fule"), &stat);
+    aFuelName = tAttr.create("FuelName", "fname", MFnData::kString, strData.create("fuel"), &stat);
     if (stat != MS::kSuccess) return stat;
     tAttr.setConnectable(false);
-    stat = addAttribute(aFuleName);
+    stat = addAttribute(aFuelName);
     if (stat != MS::kSuccess) return stat;
 
 
@@ -285,10 +285,10 @@ MStatus OpenVDBFromMayaFluidNode::initialize()
     stat = attributeAffects(aPressureName, aVdbOutput);
     if (stat != MS::kSuccess) return stat;
 
-    stat = attributeAffects(aFule, aVdbOutput);
+    stat = attributeAffects(aFuel, aVdbOutput);
     if (stat != MS::kSuccess) return stat;
 
-    stat = attributeAffects(aFuleName, aVdbOutput);
+    stat = attributeAffects(aFuelName, aVdbOutput);
     if (stat != MS::kSuccess) return stat;
 
     stat = attributeAffects(aFalloff, aVdbOutput);
@@ -452,8 +452,8 @@ MStatus OpenVDBFromMayaFluidNode::compute(const MPlug& plug, MDataBlock& data)
             internal::copyGrid(*vdb, name, *xform, fluid.pressure(), bbox, 0.0f, 1e-7f);
         }
 
-        if (data.inputValue(aFule, &status).asBool()) {
-            const std::string name = data.inputValue(aFuleName, &status).asString().asChar();
+        if (data.inputValue(aFuel, &status).asBool()) {
+            const std::string name = data.inputValue(aFuelName, &status).asString().asChar();
             internal::copyGrid(*vdb, name, *xform, fluid.fuel(), bbox, 0.0f, 1e-7f);
         }
 

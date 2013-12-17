@@ -202,7 +202,8 @@ private:
     {
         AlphaMask(const GridType& grid, const MaskType& mask,
                   AlphaType min, AlphaType max, bool invert)
-            : mSampler(mask, grid), mMin(min), mInvNorm(1/(max-min)), mInvert(invert)
+            : mAcc(mask.tree()), mSampler(mAcc, mask.transform(), grid.transform()),
+              mMin(min), mInvNorm(1/(max-min)), mInvert(invert)
         {
             assert(min < max);   
         } 
@@ -215,7 +216,9 @@ private:
             if (mInvert) std::swap(a,b);
             return a>0;
         }
-        tools::DualGridSampler<MaskType, GridType, tools::BoxSampler> mSampler;
+        typedef typename MaskType::ConstAccessor AccType;
+        AccType mAcc;
+        tools::DualGridSampler<AccType, tools::BoxSampler> mSampler;
         const AlphaType mMin, mInvNorm;
         const bool      mInvert;
     };

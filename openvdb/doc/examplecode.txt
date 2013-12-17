@@ -21,6 +21,10 @@ illustrate how to use OpenVDB and how to perform common tasks.
   - @ref sNodeIterator
   - @ref sLeafIterator
   - @ref sValueIterator
+- @ref sInterpolation
+  - @ref sSamplers
+  - @ref sGridSampler
+  - @ref sDualGridSampler
 - @ref sXformTools
   - @ref sResamplingTools
   - @ref sValueXformTools
@@ -594,6 +598,165 @@ for (GridType::ValueOffIter iter = grid->beginValueOff(); iter.test(); ++iter) {
 grid->setBackground(grid->background().unit());
 @endcode
 See the @ref treeValueIterRef "Overview" for more on value iterators.
+
+
+
+@section sInterpolation Interpolation of grid values
+
+Applications such as rendering require evaluation of grids at arbitrary,
+fractional coordinates in either index or world space.
+This is achieved, of course, by interpolating between known grid values
+at neighboring whole-voxel locations, that is, at integer coordinates
+in index space.
+The following sections introduce OpenVDB&rsquo;s various interpolation schemes
+as well as the @ref sGridSampler and @ref sDualGridSampler classes for
+efficient, continuous sampling of grids.
+In most cases, GridSampler is the preferred interface for interpolation,
+but note that when a fixed transform is to be applied to all values in a grid
+(that is, the grid is to be resampled), it is both easier and more efficient to
+use the multithreaded @vdblink::tools::GridTransformer GridTransformer@endlink
+class, introduced in @ref sXformTools.   
+
+
+@subsection sSamplers Index-space samplers
+OpenVDB offers low-level zero-, first- and second-order interpolators
+@vdblink::tools::PointSampler PointSampler@endlink,
+@vdblink::tools::BoxSampler BoxSampler@endlink and
+@vdblink::tools::QuadraticSampler QuadraticSampler@endlink, in addition to the
+variants @vdblink::tools::StaggeredPointSampler StaggeredPointSampler@endlink,
+@vdblink::tools::StaggeredBoxSampler StaggeredBoxSampler@endlink and
+@vdblink::tools::StaggeredQuadraticSampler StaggeredQuadraticSampler@endlink
+for @ref sStaggered "staggered" velocity grids.
+
+@code
+#include <openvdb/openvdb.h>
+#include <openvdb/tools/Interpolation.h>
+
+const GridType grid = ...;
+
+// Choose fractional coordinates in index space.
+const openvdb::Vec3R ijk(10.5, -100.2, 50.3);
+
+// Compute the value of the grid at ijk via nearest-neighbor (zero-order)
+// interpolation.
+GridType::ValueType v0 = openvdb::tools::PointSampler::sample(grid.tree(), ijk);
+
+// Compute the value via trilinear (first-order) interpolation.
+GridType::ValueType v1 = openvdb::tools::BoxSampler::sample(grid.tree(), ijk);
+
+// Compute the value via triquadratic (second-order) interpolation.
+GridType::ValueType v2 = openvdb::tools::QuadraticSampler::sample(grid.tree(), ijk);
+@endcode 
+
+These examples invoke the @vdblink::tree::Tree::getValue() getValue@endlink
+method on the grid&rsquo;s tree to fetch sample values in the neighborhood
+of @ijk.
+Accessing values via the tree is thread-safe due to the lack of caching,
+but for that reason it is also suboptimal.
+For better performance, use @ref subsecValueAccessor "value accessors"
+(but be careful to use one accessor per computational thread):
+@code
+GridType::ConstAccessor accessor = grid.getConstAccessor();
+
+GridType::ValueType v0 = openvdb::tools::PointSampler::sample(accessor, ijk);
+GridType::ValueType v1 = openvdb::tools::BoxSampler::sample(accessor, ijk);
+GridType::ValueType v2 = openvdb::tools::QuadraticSampler::sample(accessor, ijk);
+@endcode 
+
+Another issue with these low-level interpolators is that they operate only
+in index space.
+To interpolate in world space, use the higher-level classes discussed below.
+
+
+@subsection sGridSampler GridSampler
+
+The @vdblink::tools::GridSampler GridSampler@endlink class allows for
+continuous sampling in both world space and index space and can be used
+with grids, trees or value accessors.
+
+@code
+#include <openvdb/openvdb.h>
+#include <openvdb/tools/Interpolation.h>
+
+const GridType grid = ...;
+
+// Instantiate the GridSampler template on the grid type and on a box sampler
+// for thread-safe but uncached trilinear interpolation.
+openvdb::tools::GridSampler<GridType, openvdb::tools::BoxSampler> sampler(grid);
+
+// Compute the value of the grid at fractional coordinates in index space.
+GridType::ValueType indexValue = sampler.isSample(openvdb::Vec3R(10.5, -100.2, 50.3));
+
+// Compute the value of the grid at a location in world space.
+GridType::ValueType worldValue = sampler.wsSample(openvdb::Vec3R(0.25, 1.4, -1.1));
+
+// Request a value accessor for accelerated access.
+// (Because value accessors employ a cache, it is important to declare
+// one accessor per thread.)
+GridType::ConstAccessor accessor = grid.getConstAccessor();
+
+// Instantiate the GridSampler template on the accessor type and on
+// a box sampler for accelerated trilinear interpolation.
+openvdb::tools::GridSampler<GridType::ConstAccessor, openvdb::tools::BoxSampler>
+    fastSampler(accessor, grid.transform());
+
+// Compute the value of the grid at fractional coordinates in index space.
+indexValue = fastSampler.isSample(openvdb::Vec3R(10.5, -100.2, 50.3));
+
+// Compute the value of the grid at a location in world space.
+worldValue = fastSampler.wsSample(openvdb::Vec3R(0.25, 1.4, -1.1));
+@endcode 
+Note that when constructing a GridSampler with either a tree or a
+value accessor, you must also supply an index-to-world transform.
+When constructing a GridSampler with a grid, the grid's transform is used
+automatically.
+
+
+@subsection sDualGridSampler DualGridSampler
+
+It might sometimes be necessary to interpolate values from a source grid
+into the index space of a target grid.
+If this transformation is to be applied to all of the values in the source grid,
+then it is best to use the tools in GridTransformer.h.
+For other cases, consider using the
+@vdblink::tools::DualGridSampler DualGridSampler@endlink class.
+Like the GridSampler class, this class can be used with grids, trees or value
+accessors.
+In addition, DualGridSampler checks if the source and target grids are aligned
+(that is, they have the same transform), in which case it avoids unnecessary
+interpolation.
+
+@code
+#include <openvdb/openvdb.h>
+#include <openvdb/tools/Interpolation.h>
+
+const GridType sourceGrid = ...;
+
+// Instantiate the DualGridSampler template on the grid type and on
+// a box sampler for thread-safe but uncached trilinear interpolation.
+openvdb::tools::DualGridSampler<GridType, openvdb::tools::BoxSampler>
+    sampler(sourceGrid, targetGrid.constTransform());
+
+// Compute the value of the source grid at a location in the
+// target grid's index space.
+GridType::ValueType value = sampler(openvdb::Coord(-23, -50, 202));
+
+// Request a value accessor for accelerated access to the source grid.
+// (Because value accessors employ a cache, it is important to declare
+// one accessor per thread.)
+GridType::ConstAccessor accessor = sourceGrid.getConstAccessor();
+
+// Instantiate the DualGridSampler template on the accessor type and on
+// a box sampler for accelerated trilinear interpolation.
+openvdb::tools::DualGridSampler<GridType::ConstAccessor, openvdb::tools::BoxSampler>
+    fastSampler(accessor, sourceGrid.constTransform(), targetGrid.constTransform());
+
+// Compute the value of the source grid at a location in the
+// target grid's index space.
+value = fastSampler(openvdb::Coord(-23, -50, 202));
+@endcode 
+Note that interpolation is done by invoking a DualGridSampler as a functor,
+in contrast to the more general-purpose GridSampler.
 
 
 

@@ -1,6 +1,14 @@
 OpenVDB Version History
 =======================
 
+Version 2.2.0 - In development
+    - Modified tools::DualGridSampler so it is more consistent with 
+      tools::GridSampler.
+
+ API changes:
+    - tools::DualGridSampler is not longer templated to the target grid type,
+      and the ValueAccessor is now passed as an argument.
+
 Version 2.1.0 - December 12, 2013
     - Added a small number of Maya nodes, primarily for conversion of geometry
       to and from OpenVDB volumes and for visualization of volumes.
