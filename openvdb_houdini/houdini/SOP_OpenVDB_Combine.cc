@@ -409,9 +409,15 @@ SOP_OpenVDB_Combine::cookMySop(OP_Context& context)
             UT_String aGridName = aIt.getPrimitiveName(/*default=*/"A");
             UT_String bGridName = bIt.getPrimitiveName(/*default=*/"B");
 
+            // Name the output grid after the A grid, except (see below) if the A grid is unused.
+            UT_String outGridName = aIt.getPrimitiveName();
+
             hvdb::GridPtr outGrid;
 
             while (true) {
+                // If the A grid is unused, name the output grid after the most recent B grid.
+                if (!needA) outGridName = bIt.getPrimitiveName();
+
                 outGrid = combineGrids(op, aGrid, bGrid, aGridName, bGridName, resample);
 
                 // When not flattening, quit after one pass.
@@ -432,9 +438,7 @@ SOP_OpenVDB_Combine::cookMySop(OP_Context& context)
             if (outGrid) {
                 // Add a new VDB primitive for the output grid to the output gdp.
                 GU_PrimVDB::buildFromGrid(*gdp, outGrid,
-                    /*copyAttrsFrom=*/needA ? aVdb : bVdb,
-                    /*copyGridNameFrom=*/needA ? aGridName.toStdString().c_str()
-                        : bGridName.toStdString().c_str());
+                    /*copyAttrsFrom=*/needA ? aVdb : bVdb, outGridName);
 
                 // Remove the A grid from the output gdp.
                 if (aVdb) gdp->destroyPrimitive(*aVdb, /*andPoints=*/true);
@@ -923,7 +927,8 @@ SOP_OpenVDB_Combine::combineGrids(Operation op,
     compOp.bGridName = bGridName;
     compOp.interrupt = hvdb::Interrupter();
 
-    int success = UTvdbProcessTypedGrid(UTvdbGetGridType(needA ? *aGrid : *bGrid), aGrid, compOp);
+    int success = UTvdbProcessTypedGridTopology(
+        UTvdbGetGridType(needA ? *aGrid : *bGrid), aGrid, compOp);
     if (!success || !compOp.outGrid) {
         std::ostringstream ostr;
         ostr << "grids " << aGridName << " and " << bGridName

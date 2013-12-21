@@ -2,11 +2,16 @@ OpenVDB Version History
 =======================
 
 Version 2.2.0 - In development
+    - Added documentation (in the Cookbook) on interpolation, e.g. BoxSamper, 
+      GridSampler and DualGridSampler.
     - Modified tools::DualGridSampler so it is more consistent with 
       tools::GridSampler.
+    - Added support to the Combine, Resample, Scatter, Prune and Visualize SOPs
+      for grids with values of type bool.
+    - Fixed build issue reported for clang 3.2.
 
- API changes:
-    - tools::DualGridSampler is not longer templated to the target grid type,
+    API changes:
+    - tools::DualGridSampler is no longer templated on the target grid type,
       and the ValueAccessor is now passed as an argument.
 
 Version 2.1.0 - December 12, 2013

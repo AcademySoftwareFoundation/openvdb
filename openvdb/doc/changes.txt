@@ -6,14 +6,19 @@
 @htmlonly <a name="v2_2_0_changes"></a>@endhtmlonly
 @par
 <B>Version 2.2.0</B> - <I>In development</I>
+- Added documentation (in the Cookbook) on interpolation, e.g. BoxSamper, 
+  GridSampler and DualGridSampler.
 - Modified @vdblink::tools::DualGridSampler DualGridSampler@endlink so 
-it is more consistent with @vdblink::tools::GridSampler GridSampler@endlink.
+  it is more consistent with @vdblink::tools::GridSampler GridSampler@endlink.
+- Added support to the Combine, Resample, Scatter, Prune and Visualize SOPs
+  for grids with values of type bool.
+- Fixed build issue reported for clang 3.2.
 
 @par
 API changes:
 - @vdblink::tools::DualGridSampler DualGridSampler@endlink is no longer 
-templated to the target grid type, and the ValueAccessor is now passed 
-as an argument.
+  templated on the target grid type, and the ValueAccessor is now passed 
+  as an argument.
 
 @htmlonly <a name="v2_1_0_changes"></a>@endhtmlonly
 @par

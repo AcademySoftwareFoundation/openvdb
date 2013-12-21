@@ -352,7 +352,7 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
                     if (interior && isSignedDistance) {
                         processLSInterior(gridType, grid, scatter);
                     } else {
-                        UTvdbProcessTypedGrid(gridType, grid, scatter);
+                        UTvdbProcessTypedGridTopology(gridType, grid, scatter);
                     }
 
                     if (verbose) scatter.print(gridName);
@@ -371,7 +371,7 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
                 if (interior && isSignedDistance) {
                     processLSInterior(gridType, grid, scatter);
                 } else {
-                    UTvdbProcessTypedGrid(gridType, grid, scatter);
+                    UTvdbProcessTypedGridTopology(gridType, grid, scatter);
                 }
 
                 if (verbose) scatter.print(gridName);
