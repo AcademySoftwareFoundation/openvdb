@@ -840,7 +840,7 @@ SOP_OpenVDB_Visualize::cookMySop(OP_Context& context)
 #if HAVE_SURFACING_PARM
         if (meshing != 0) {
 
-            fpreal32 values[3] = {
+            fpreal values[3] = {
                 evalFloat("surfaceColor", 0, time),
                 evalFloat("surfaceColor", 1, time),
                 evalFloat("surfaceColor", 2, time)};
