@@ -291,7 +291,7 @@ EPYDOC :=
 # Set PYTHON_WRAP_ALL_GRID_TYPES to "yes" to specify that the Python module
 # should expose (almost) all of the grid types defined in openvdb.h
 # Otherwise, only FloatGrid, BoolGrid and Vec3SGrid will be exposed
-# (see exportGrid() in python/pyGrid.cc).
+# (see, e.g., exportIntGrid() in python/pyIntGrid.cc).
 # Compiling the Python module with PYTHON_WRAP_ALL_GRID_TYPES set to "yes"
 # can be very memory-intensive.
 PYTHON_WRAP_ALL_GRID_TYPES := no
@@ -311,8 +311,6 @@ DOXYGEN :=
 #
 
 SHELL = /bin/bash
-
-PWD ?= $(abspath .)
 
 # Turn off implicit rules for speed.
 .SUFFIXES:
@@ -399,6 +397,7 @@ INCLUDE_NAMES := \
     io/Compression.h \
     io/File.h \
     io/GridDescriptor.h \
+    io/Queue.h \
     io/Stream.h \
     math/BBox.h \
     math/Coord.h \
@@ -483,6 +482,7 @@ SRC_NAMES := \
     io/Compression.cc \
     io/File.cc \
     io/GridDescriptor.cc \
+    io/Queue.cc \
     io/Stream.cc \
     math/Hermite.cc \
     math/Maps.cc \
@@ -613,16 +613,19 @@ PYTHON_INCLUDE_NAMES := \
     python/pyopenvdb.h \
     python/pyutil.h \
     python/pyAccessor.h \
+    python/pyGrid.h \
 #
 # Used for "install" target only
 PYTHON_PUBLIC_INCLUDE_NAMES := \
     python/pyopenvdb.h \
 #
 PYTHON_SRC_NAMES := \
-    python/pyGrid.cc \
+    python/pyFloatGrid.cc \
+    python/pyIntGrid.cc \
     python/pyMetadata.cc \
-    python/pyTransform.cc \
     python/pyOpenVDBModule.cc \
+    python/pyTransform.cc \
+    python/pyVec3Grid.cc \
 #
 PYCXXFLAGS := -I python -I $(PYTHON_INCL_DIR) -I $(PYCONFIG_INCL_DIR)
 ifneq ($(strip $(NUMPY_INCL_DIR)),)
@@ -668,11 +671,11 @@ UNITTEST_OBJ_NAMES := $(UNITTEST_SRC_NAMES:.cc=.o)
 LIBVIEWER_OBJ_NAMES := $(LIBVIEWER_SRC_NAMES:.cc=.o)
 PYTHON_OBJ_NAMES := $(PYTHON_SRC_NAMES:.cc=.o)
 
-LIB_MAJOR_VERSION=$(shell grep 'OPENVDB_LIBRARY_MAJOR_VERSION = ' \
+LIB_MAJOR_VERSION=$(shell grep 'define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER ' \
     version.h | sed 's/[^0-9]*//g')
-LIB_MINOR_VERSION=$(shell grep 'OPENVDB_LIBRARY_MINOR_VERSION = ' \
+LIB_MINOR_VERSION=$(shell grep 'define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER ' \
     version.h | sed 's/[^0-9]*//g')
-LIB_PATCH_VERSION=$(shell grep 'OPENVDB_LIBRARY_PATCH_VERSION = ' \
+LIB_PATCH_VERSION=$(shell grep 'define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER ' \
     version.h | sed 's/[^0-9]*//g')
 
 LIB_VERSION=$(LIB_MAJOR_VERSION).$(LIB_MINOR_VERSION).$(LIB_PATCH_VERSION)
@@ -883,8 +886,8 @@ pydoc: $(PYTHON_MODULE) $(LIBOPENVDB_SONAME)
 	pydocdir=doc/html/python; \
 	/bin/mkdir -p $${pydocdir}; \
 	echo "Created $${pydocdir}"; \
-	export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(PWD); \
-	export PYTHONPATH=${PYTHONPATH}:$(PWD); \
+	export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(CURDIR); \
+	export PYTHONPATH=${PYTHONPATH}:$(CURDIR); \
 	    $(EPYDOC) --html -o $${pydocdir} $(PYTHON_MODULE_NAME) $(QUIET)
 else
 pydoc:
@@ -893,8 +896,8 @@ endif
 
 pytest: $(PYTHON_MODULE) $(LIBOPENVDB_SONAME)
 	@echo "Testing Python module $(PYTHON_MODULE)"
-	export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(PWD); \
-	export PYTHONPATH=${PYTHONPATH}:$(PWD); \
+	export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(CURDIR); \
+	export PYTHONPATH=${PYTHONPATH}:$(CURDIR); \
 	    python$(PYTHON_VERSION) ./python/test/TestOpenVDB.py $(QUIET_TEST)
 
 python: $(PYTHON_MODULE)
@@ -920,12 +923,12 @@ vdb_test: vdb_test$(EXE_SUFFIX)
 endif
 
 ifdef MBSD
-  APP_EXPORTS := export DYLD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(LOCAL_LIB):$(PWD)
+  APP_EXPORTS := export DYLD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(LOCAL_LIB):$(CURDIR)
 else
   ifdef WINDOWS_NT
     APP_EXPORTS := true
   else
-    APP_EXPORTS := export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(PWD)
+    APP_EXPORTS := export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(CURDIR)
   endif
 endif
 

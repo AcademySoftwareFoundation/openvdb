@@ -49,16 +49,9 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
-/// Below are two simple wrapper classes for advection velocity fields.
-/// DiscreteField wraps a velocity grid, and EnrightField is mostly
-/// intended for debugging (it's an analytical, divergence-free and
-/// periodic field).  Both classes implement the interface required by
-/// the LevelSetMorphing class defined below, and any class with the
-/// same API should work with LevelSetMorphing.
 
-
-/// @brief  Hyperbolic advection of narrow-band level sets in an
-/// external velocity field
+/// @brief Shape morphology of level sets. Morphing from a source
+/// narrow-band level sets to a target narrow-band level set.
 ///
 /// @details
 /// The @c InterruptType template argument below refers to any class
@@ -76,7 +69,6 @@ namespace tools {
 /// @note If no template argument is provided for this InterruptType,
 /// the util::NullInterrupter is used, which implies that all interrupter
 /// calls are no-ops (i.e., they incur no computational overhead).
-
 template<typename GridT,
          typename InterruptT = util::NullInterrupter>
 class LevelSetMorphing
@@ -239,12 +231,12 @@ LevelSetMorphing<GridT, InterruptT>::advect(ScalarType time0, ScalarType time1)
     switch (mSpatialScheme) {
     case math::FIRST_BIAS:
         return this->advect1<math::FIRST_BIAS  >(time0, time1);
-    case math::SECOND_BIAS:
-        return this->advect1<math::SECOND_BIAS >(time0, time1);
-    case math::THIRD_BIAS:
-        return this->advect1<math::THIRD_BIAS  >(time0, time1);
-    case math::WENO5_BIAS:
-        return this->advect1<math::WENO5_BIAS  >(time0, time1);
+        //case math::SECOND_BIAS:
+        //return this->advect1<math::SECOND_BIAS >(time0, time1);
+        //case math::THIRD_BIAS:
+        //return this->advect1<math::THIRD_BIAS  >(time0, time1);
+        //case math::WENO5_BIAS:
+        //return this->advect1<math::WENO5_BIAS  >(time0, time1);
     case math::HJWENO5_BIAS:
         return this->advect1<math::HJWENO5_BIAS>(time0, time1);
     default:

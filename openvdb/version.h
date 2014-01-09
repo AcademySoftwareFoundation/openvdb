@@ -42,7 +42,18 @@
 /// vdb::vX_Y_Z::Vec3i, vdb::vX_Y_Z::io::File, vdb::vX_Y_Z::tree::Tree, etc.,
 /// where X, Y and Z are OPENVDB_LIBRARY_MAJOR_VERSION, OPENVDB_LIBRARY_MINOR_VERSION
 /// and OPENVDB_LIBRARY_PATCH_VERSION, respectively (defined below).
-#define OPENVDB_VERSION_NAME v2_1_0_sesi
+#define OPENVDB_VERSION_NAME v2_2_0_sesi
+
+// Library major, minor and patch version numbers
+#define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 2
+#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 2
+#define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 0
+
+/// Library version number as a packed integer ("%02x%02x%04x", major, minor, patch)
+#define OPENVDB_LIBRARY_VERSION_NUMBER \
+    ((OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER << 24) | \
+    ((OPENVDB_LIBRARY_MINOR_VERSION_NUMBER & 0xFF) << 16) | \
+    (OPENVDB_LIBRARY_PATCH_VERSION_NUMBER & 0xFFFF))
 
 /// If OPENVDB_REQUIRE_VERSION_NAME is undefined, symbols from the version
 /// namespace are promoted to the top-level namespace (e.g., vdb::v1_0_0::io::File
@@ -67,10 +78,13 @@ namespace OPENVDB_VERSION_NAME {
 /// @details This can be used to quickly test whether we have a valid file or not.
 const int32_t OPENVDB_MAGIC = 0x56444220;
 
+// Library major, minor and patch version numbers
 const uint32_t
-    OPENVDB_LIBRARY_MAJOR_VERSION = 2,
-    OPENVDB_LIBRARY_MINOR_VERSION = 1,
-    OPENVDB_LIBRARY_PATCH_VERSION = 0;
+    OPENVDB_LIBRARY_MAJOR_VERSION = OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER,
+    OPENVDB_LIBRARY_MINOR_VERSION = OPENVDB_LIBRARY_MINOR_VERSION_NUMBER,
+    OPENVDB_LIBRARY_PATCH_VERSION = OPENVDB_LIBRARY_PATCH_VERSION_NUMBER;
+/// Library version number as a packed integer ("%02x%02x%04x", major, minor, patch)
+const uint32_t OPENVDB_LIBRARY_VERSION = OPENVDB_LIBRARY_VERSION_NUMBER;
 
 /// @brief The current version number of the VDB file format
 /// @details  This can be used to enable various backwards compatability switches

@@ -35,6 +35,7 @@
 #include <boost/python/exception_translator.hpp>
 #include "openvdb/openvdb.h"
 #include "pyopenvdb.h"
+#include "pyGrid.h"
 #include "pyutil.h"
 
 namespace py = boost::python;
@@ -43,11 +44,9 @@ namespace py = boost::python;
 // Forward declarations
 void exportTransform();
 void exportMetadata();
-void exportGrid();
-namespace pyGrid {
-py::object getGridFromGridBase(openvdb::GridBase::Ptr);
-openvdb::GridBase::Ptr getGridBaseFromGrid(py::object);
-}
+void exportFloatGrid();
+void exportIntGrid();
+void exportVec3Grid();
 
 
 namespace _openvdbmodule {
@@ -629,7 +628,9 @@ BOOST_PYTHON_MODULE(PY_OPENVDB_MODULE_NAME)
     // Export the python bindings.
     exportTransform();
     exportMetadata();
-    exportGrid();
+    exportFloatGrid();
+    exportIntGrid();
+    exportVec3Grid();
 
 
     py::def("read",

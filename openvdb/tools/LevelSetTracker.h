@@ -52,6 +52,8 @@
 #include <openvdb/math/Transform.h>
 #include <openvdb/Grid.h>
 #include <openvdb/util/NullInterrupter.h>
+#include <openvdb/tree/ValueAccessor.h>
+#include <openvdb/tree/LeafManager.h>
 #include "Morphology.h"//for tools::dilateVoxels
 
 namespace openvdb {

@@ -207,7 +207,7 @@ SOP_OpenVDB_Prune::cookMySop(OP_Context& context)
             }
 
             GU_PrimVDB* vdbPrim = *it;
-            GEOvdbProcessTypedGrid(*vdbPrim, pruneOp);
+            GEOvdbProcessTypedGridTopology(*vdbPrim, pruneOp);
         }
     } catch (std::exception& e) {
         addError(SOP_MESSAGE, e.what());

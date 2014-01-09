@@ -36,6 +36,7 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <UT/UT_Interrupt.h>
+#include <boost/scoped_ptr.hpp>
 
 namespace hutil = houdini_utils;
 namespace hvdb = openvdb_houdini;
@@ -44,13 +45,30 @@ namespace hvdb = openvdb_houdini;
 class SOP_OpenVDB_Fill: public hvdb::SOP_NodeVDB
 {
 public:
+    enum Mode { MODE_INDEX = 0, MODE_WORLD, MODE_GEOM };
+
     SOP_OpenVDB_Fill(OP_Network*, const char* name, OP_Operator*);
     virtual ~SOP_OpenVDB_Fill();
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
+    virtual int isRefInput(unsigned input) const { return (input == 1); }
+
 protected:
+    virtual bool updateParmsFlags();
     virtual OP_ERROR cookMySop(OP_Context&);
+
+    Mode getMode(fpreal time) const
+    {
+        UT_String modeStr;
+        evalString(modeStr, "mode", 0, time);
+        if (modeStr == "index") return MODE_INDEX;
+        if (modeStr == "world") return MODE_WORLD;
+        if (modeStr == "geom") return MODE_GEOM;
+
+        std::string err = "unrecognized mode \"" + modeStr.toStdString() + "\"";
+        throw std::runtime_error(err);
+    }
 };
 
 
@@ -64,15 +82,80 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setHelpText("Specify a subset of the input VDB grids to be processed.")
         .setChoiceList(&hutil::PrimGroupMenu));
+
+    {
+        const char* items[] = {
+            "index",  "Min and Max in Index Space",
+            "world",  "Min and Max in World Space",
+            "geom",   "Reference Geometry",
+            NULL
+        };
+        parms.add(hutil::ParmFactory(PRM_STRING, "mode", "Bounds")
+            .setDefault("index")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setHelpText(
+                "Index Space:\n"
+                "    Interpret the given min and max coordinates in index-space units.\n"
+                "World Space:\n"
+                "    Interpret the given min and max coordinates in world-space units.\n"
+                "Reference Geometry:\n"
+                "    Use the world-space bounds of the reference input geometry.\n"));
+    }
+
     parms.add(hutil::ParmFactory(PRM_INT_XYZ, "min", "Min coord").setVectorSize(3));
     parms.add(hutil::ParmFactory(PRM_INT_XYZ, "max", "Max coord").setVectorSize(3));
+
+    parms.add(hutil::ParmFactory(PRM_XYZ, "worldmin", "Min coord").setVectorSize(3));
+    parms.add(hutil::ParmFactory(PRM_XYZ, "worldmax", "Max coord").setVectorSize(3));
+
     parms.add(hutil::ParmFactory(PRM_FLT_J, "value", "Value")
         .setTypeExtended(PRM_TYPE_JOIN_PAIR));
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "active", "Active")
         .setDefault(PRMoneDefaults));
 
     hvdb::OpenVDBOpFactory("OpenVDB Fill", SOP_OpenVDB_Fill::factory, parms, *table)
-        .addInput("Input with VDB grids to operate on");
+        .addInput("Input with VDB grids to operate on")
+        .addOptionalInput("Optional bounding geometry");
+}
+
+
+bool
+SOP_OpenVDB_Fill::updateParmsFlags()
+{
+    bool changed = false;
+    const fpreal time = 0;
+
+    //int refExists = (nInputs() == 2);
+
+    Mode mode;
+    try { mode = getMode(time); } catch (std::runtime_error&) { mode = MODE_INDEX; }
+
+    switch (mode) {
+        case MODE_INDEX:
+            changed |= enableParm("min", true);
+            changed |= enableParm("max", true);
+            changed |= setVisibleState("min", true);
+            changed |= setVisibleState("max", true);
+            changed |= setVisibleState("worldmin", false);
+            changed |= setVisibleState("worldmax", false);
+            break;
+        case MODE_WORLD:
+            changed |= enableParm("worldmin", true);
+            changed |= enableParm("worldmax", true);
+            changed |= setVisibleState("min", false);
+            changed |= setVisibleState("max", false);
+            changed |= setVisibleState("worldmin", true);
+            changed |= setVisibleState("worldmax", true);
+            break;
+        case MODE_GEOM:
+            changed |= enableParm("min", false);
+            changed |= enableParm("max", false);
+            changed |= enableParm("worldmin", false);
+            changed |= enableParm("worldmax", false);
+            break;
+    }
+
+    return changed;
 }
 
 
@@ -100,17 +183,29 @@ namespace {
 
 struct FillOp
 {
-    const openvdb::CoordBBox bbox;
+    const openvdb::CoordBBox indexBBox;
+    const openvdb::BBoxd worldBBox;
     const float value;
     const bool active;
 
     FillOp(const openvdb::CoordBBox& b, float val, bool on):
-        bbox(b), value(val), active(on)
+        indexBBox(b), value(val), active(on)
+    {}
+
+    FillOp(const openvdb::BBoxd& b, float val, bool on):
+        worldBBox(b), value(val), active(on)
     {}
 
     template<typename GridT>
     void operator()(GridT& grid) const
     {
+        openvdb::CoordBBox bbox = indexBBox;
+        if (worldBBox) {
+            openvdb::math::Vec3d imin, imax;
+            openvdb::math::calculateBounds(grid.constTransform(),
+               worldBBox.min(), worldBBox.max(), imin, imax);
+            bbox.reset(openvdb::Coord::floor(imin), openvdb::Coord::ceil(imax));
+        }
         typedef typename GridT::ValueType ValueT;
         grid.fill(bbox, ValueT(openvdb::zeroVal<ValueT>() + value), active);
     }
@@ -133,14 +228,57 @@ SOP_OpenVDB_Fill::cookMySop(OP_Context& context)
         evalString(groupStr, "group", 0, t);
         const GA_PrimitiveGroup* group = matchGroup(*gdp, groupStr.toStdString());
 
-        const openvdb::CoordBBox bbox(
-            openvdb::Coord(evalInt("min", 0, t), evalInt("min", 1, t), evalInt("min", 2, t)),
-            openvdb::Coord(evalInt("max", 0, t), evalInt("max", 1, t), evalInt("max", 2, t)));
-
         const float value = evalFloat("value", 0, t);
         const bool active = evalInt("active", 0, t);
 
-        const FillOp fillOp(bbox, value, active);
+        boost::scoped_ptr<const FillOp> fillOp;
+        switch (getMode(t)) {
+            case MODE_INDEX:
+            {
+                const openvdb::CoordBBox bbox(
+                    openvdb::Coord(
+                        evalInt("min", 0, t), evalInt("min", 1, t), evalInt("min", 2, t)),
+                    openvdb::Coord(
+                        evalInt("max", 0, t), evalInt("max", 1, t), evalInt("max", 2, t)));
+                fillOp.reset(new FillOp(bbox, value, active));
+                break;
+            }
+            case MODE_WORLD:
+            {
+                const openvdb::BBoxd bbox(
+                    openvdb::BBoxd::ValueType(
+                        evalFloat("worldmin", 0, t),
+                        evalFloat("worldmin", 1, t),
+                        evalFloat("worldmin", 2, t)),
+                    openvdb::BBoxd::ValueType(
+                        evalFloat("worldmax", 0, t),
+                        evalFloat("worldmax", 1, t),
+                        evalFloat("worldmax", 2, t)));
+                fillOp.reset(new FillOp(bbox, value, active));
+                break;
+            }
+            case MODE_GEOM:
+            {
+                openvdb::BBoxd bbox;
+                if (const GU_Detail* refGeo = inputGeo(1)) {
+                    UT_BoundingBox b;
+                    refGeo->computeQuickBounds(b);
+                    if (!b.isValid()) {
+                        throw std::runtime_error("no reference geometry found");
+                    }
+                    bbox.min()[0] = b.xmin();
+                    bbox.min()[1] = b.ymin();
+                    bbox.min()[2] = b.zmin();
+                    bbox.max()[0] = b.xmax();
+                    bbox.max()[1] = b.ymax();
+                    bbox.max()[2] = b.zmax();
+                } else {
+                    throw std::runtime_error("reference input is unconnected");
+                }
+                fillOp.reset(new FillOp(bbox, value, active));
+                break;
+            }
+        }
 
         UT_AutoInterrupt progress("Filling VDB grids");
 
@@ -150,7 +288,7 @@ SOP_OpenVDB_Fill::cookMySop(OP_Context& context)
             }
 
             GU_PrimVDB* vdbPrim = *it;
-            GEOvdbProcessTypedGrid(*vdbPrim, fillOp);
+            GEOvdbProcessTypedGridTopology(*vdbPrim, *fillOp);
         }
     } catch (std::exception& e) {
         addError(SOP_MESSAGE, e.what());

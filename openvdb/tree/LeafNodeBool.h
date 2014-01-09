@@ -641,11 +641,11 @@ protected:
     };
 
 public:
-    typedef ValueIter<MaskOnIter, LeafNode, bool>                 ValueOnIter;
+    typedef ValueIter<MaskOnIter, LeafNode, const bool>           ValueOnIter;
     typedef ValueIter<MaskOnIter, const LeafNode, const bool>     ValueOnCIter;
-    typedef ValueIter<MaskOffIter, LeafNode, bool>                ValueOffIter;
+    typedef ValueIter<MaskOffIter, LeafNode, const bool>          ValueOffIter;
     typedef ValueIter<MaskOffIter, const LeafNode, const bool>    ValueOffCIter;
-    typedef ValueIter<MaskDenseIter, LeafNode, bool>              ValueAllIter;
+    typedef ValueIter<MaskDenseIter, LeafNode, const bool>        ValueAllIter;
     typedef ValueIter<MaskDenseIter, const LeafNode, const bool>  ValueAllCIter;
     typedef ChildIter<MaskOnIter, LeafNode>                       ChildOnIter;
     typedef ChildIter<MaskOnIter, const LeafNode>                 ChildOnCIter;
@@ -1497,9 +1497,9 @@ LeafNode<bool, Log2Dim>::visitActiveBBox(BBoxOp& op) const
     if (op.template descent<LEVEL>()) {
         for (ValueOnCIter i=this->cbeginValueOn(); i; ++i) {
 #ifdef _MSC_VER
-            op.operator()<LEVEL>(CoordBBox(i.getCoord(),1));
+            op.operator()<LEVEL>(CoordBBox::createCube(i.getCoord(), 1));
 #else
-            op.template operator()<LEVEL>(CoordBBox(i.getCoord(),1));
+            op.template operator()<LEVEL>(CoordBBox::createCube(i.getCoord(), 1));
 #endif
         }
     } else {

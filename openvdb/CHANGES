@@ -1,26 +1,75 @@
 OpenVDB Version History
 =======================
 
-Version 2.1.0 - In development
-    - Added level set morphing, i.e. shape morphology (more improvements 
-      coming soon!)
-    - Added LevelSetMeasure that performs multi-threaded computation 
-      of surface area, volume and average mean-curvature for narrow band 
-      level sets (in both world and voxel units).
-    - Reimplemented the Dense volume class and its convertes to and 
-      from VDB so they support both the ZYX memory layout (used in VDB) 
-      and the XYZ memory layout employed by Houdini and Maya. 
-    - Added masking options to grid operators that compute cpt, curl, 
-      divergence, gradient, laplacian, meanCurvature, magnitude, and normalize.
-    - Added masking options to the Analysis Houdini SOP.
-    - Added more narrow band controls to the 'Rebuild Level Set' Houdini SOP
-    - Added math::BBox::applyMap and math::BBox::applyInverseMap which 
-      allows for transformation of axis-aligned bounding boxes.
-    - Changed the API of the BaseShader and added a position shader to the 
-      level set ray-tracer for the simple purpose of debugging.
-    - Improved tools::levelSetRebuild accuracy.
-    - Fixed a bug in the VolumeToMesh converter that generated invalid polygons
-      when the zero-crossing laid in between the active and inactive regions.
+Version 2.2.0 - In development
+    - Added a section to the Cookbook on interpolation using BoxSampler, 
+      GridSampler, DualGridSampler, et al.
+    - Modified tools::DualGridSampler so it is more consistent with 
+      tools::GridSampler.
+    - Added selection of iso-value to the LevelSetRayIntersector and 
+      openvdb_render.
+    - Added a Grid::topologyDifference() method.
+    - Added topology union, intersection and difference operations to
+      the Combine SOP.  These operations combine the active voxel topologies
+      of grids that may have different value types.
+    - Added support to the Combine, Resample, Scatter, Prune and Visualize SOPs
+      for grids with values of type bool.
+    - The Fill SOP now allows the fill region bounds to be specified either in
+      index space (as before), in world space, or using the bounds of geometry
+      connected to an optional new reference input.
+    - Fixed build issue reported for Clang 3.2.
+
+    API changes:
+    - tools::DualGridSampler is no longer templated on the target grid type,
+      and the ValueAccessor is now passed as an argument.
+
+Version 2.1.0 - December 12, 2013
+    - Added a small number of Maya nodes, primarily for conversion of geometry
+      to and from OpenVDB volumes and for visualization of volumes.
+    - Added an initial implementation of level set morphing (with improvements
+      to follow soon).
+    - Added tools::LevelSetMeasure, which efficiently computes the surface area,
+      volume and average mean-curvature of narrow-band level sets, in both
+      world and voxel units.  Those quantities are now exposed as intrinsic
+      attributes on the Houdini VDB primitive and can be queried using the
+      native Measure SOP.
+    - tools::Dense now supports the XYZ memory layout used by Houdini and Maya
+      in addition to the ZYX layout used in OpenVDB trees. 
+    - Improved the performance of masking in the level set filter tool and
+      added inversion and scaling of the mask input, so that any scalar-valued
+      volume can be used as a mask, not just volumes with a [0, 1] range.
+    - Added optional masking to the non-level-set filters, to the grid
+      operators (CPT, curl, divergence, gradient, Laplacian, mean curvature,
+      magnitude, and normalize) and to the Analysis and Filter SOPs.
+    - Added more narrow band controls to the Rebuild Level Set SOP.
+    - Improved the accuracy of the level set rebuild tool.
+    - Added tools::activate() and tools::deactivate(), which set the active
+      states of tiles and voxels whose values are equal to or approximately
+      equal to a given value, and added a Deactivate Background Voxels toggle
+      to the Combine SOP.
+    - Added math::BBox::applyMap() and math::BBox::applyInverseMap(), which 
+      allow for transformation of axis-aligned bounding boxes.
+    - Added a position shader to the level set ray-tracer (primarily for
+      debugging purposes).
+    - Added an io::Queue class that manages a concurrent queue for
+      asynchronous serialization of grids to files or streams.
+    - Fixed a bug in io::Archive whereby writing unnamed, instanced grids
+      (i.e., grids sharing a tree) to a file rendered the file unreadable.
+    - Fixed a bug in the volume to mesh converter that caused it to generate
+      invalid polygons when the zero crossing lay between active and inactive
+      regions.
+    - Fixed a bug in the point scatter tool (and the Scatter SOP) whereby 
+      the last voxel always remained empty.
+    - Fixed a bug in the Read SOP that caused grids with the same name
+      to be renamed with a numeric suffix (e.g., "grid[1]", "grid[2]", etc.).
+    - Fixed some unit test failures on 64-bit Itanium machines.
+
+    API changes:
+    - The Filter tool is now templated on a mask grid, and threading is 
+      controlled using a grain size, for consistency with most of the
+      other level set tools.
+    - The level set filter tool is now templated on a mask grid.
+    - All shaders now take a ray direction instead of a ray.
 
 Version 2.0.0 - October 31, 2013
     - Added a Python module with functions for basic manipulation of grids

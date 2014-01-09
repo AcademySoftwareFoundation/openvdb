@@ -888,7 +888,7 @@ SOP_OpenVDB_Visualize::cookMySop(OP_Context& context)
                     VDBTopologyVisualizer draw(*gdp, nodeOptions, tileOptions,
                         voxelOptions, ignorestaggered, &boss);
 
-                    GEOvdbProcessTypedGrid(*vdb, draw);
+                    GEOvdbProcessTypedGridTopology(*vdb, draw);
                 }
 
                 if (showFrustum) {

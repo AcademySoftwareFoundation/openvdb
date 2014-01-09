@@ -292,6 +292,9 @@ struct FilterParms {
         , mIterations(0)
         , mStencilWidth(0)
         , mVoxelOffset(0.0)
+        , mMinMask(0)
+        , mMaxMask(1)
+        , mInvertMask(false)
         , mAccuracy(ACCURACY_UPWIND_FIRST)
         , mMaskInputNode(NULL)
     {
@@ -301,7 +304,8 @@ struct FilterParms {
     bool mSecondInputConnected;
     FilterType mFilterType;
     int mIterations, mStencilWidth;
-    float mVoxelOffset;
+    float mVoxelOffset, mMinMask, mMaxMask;
+    bool  mInvertMask;
     Accuracy mAccuracy;
     OP_Node* mMaskInputNode;
 };
@@ -347,27 +351,27 @@ private:
 
     template<typename FilterT>
     void offset(const FilterParms&, FilterT&, const float offset, bool verbose,
-        const typename FilterT::GridType* mask = NULL);
+        const typename FilterT::MaskType* mask = NULL);
 
     template<typename FilterT>
     void mean(const FilterParms&, FilterT&, BossT&, bool verbose,
-        const typename FilterT::GridType* mask = NULL);
+        const typename FilterT::MaskType* mask = NULL);
 
     template<typename FilterT>
     void gaussian(const FilterParms&, FilterT&, BossT&, bool verbose,
-        const typename FilterT::GridType* mask = NULL);
+        const typename FilterT::MaskType* mask = NULL);
 
     template<typename FilterT>
     void median(const FilterParms&, FilterT&, BossT&, bool verbose,
-        const typename FilterT::GridType* mask = NULL);
+        const typename FilterT::MaskType* mask = NULL);
 
     template<typename FilterT>
     void meanCurvature(const FilterParms&, FilterT&, BossT&, bool verbose,
-        const typename FilterT::GridType* mask = NULL);
+        const typename FilterT::MaskType* mask = NULL);
 
     template<typename FilterT>
     void laplacian(const FilterParms&, FilterT&, BossT&, bool verbose,
-        const typename FilterT::GridType* mask = NULL);
+        const typename FilterT::MaskType* mask = NULL);
 
     template<typename FilterT>
     void renormalize(const FilterParms&, FilterT&, BossT&, bool verbose = false);
@@ -452,6 +456,22 @@ newSopOperator(OP_OperatorTable* table)
                 .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
         }
 
+        //Invert mask.
+        parms.add(hutil::ParmFactory(PRM_TOGGLE, "invert", "Invert Alpha Mask")
+            .setHelpText("Inverts the optional mask so alpha values 0->1 maps to 1->0"));
+
+        // Min mask range
+        parms.add(hutil::ParmFactory(PRM_FLT_J, "minMask", "Min Mask Cutoff")
+            .setHelpText("Value below which the mask values map to zero")      
+            .setDefault(PRMzeroDefaults)
+            .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
+
+        // Max mask range
+        parms.add(hutil::ParmFactory(PRM_FLT_J, "maxMask", "Max Mask Cutoff")
+            .setHelpText("Value above which the mask values map to one")      
+            .setDefault(PRMoneDefaults)
+            .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
+        
 #ifndef SESI_OPENVDB
         // Verbosity toggle.
         parms.add(hutil::ParmFactory(PRM_TOGGLE, "verbose", "Verbose")
@@ -545,7 +565,11 @@ SOP_OpenVDB_Filter_Level_Set::updateParmsFlags()
 
         bool hasMask = (this->nInputs() == 2);
         changed |= enableParm("mask", hasMask);
-        changed |= enableParm("maskname", hasMask &&  bool(evalInt("mask", 0, 0)));
+        bool useMask = bool(evalInt("mask", 0, 0)) && hasMask;
+        changed |= enableParm("invert", useMask);
+        changed |= enableParm("minMask", useMask);
+        changed |= enableParm("maxMask", useMask);
+        changed |= enableParm("maskname", useMask);
     }
 
     changed |= enableParm("iterations", !reshape);
@@ -660,10 +684,12 @@ SOP_OpenVDB_Filter_Level_Set::evalFilterParms(OP_Context& context,
     hutil::OP_EvalScope eval_scope(*this, context);
     fpreal now = context.getTime();
 
-    parms.mIterations = evalInt("iterations", 0, now);
+    parms.mIterations   = evalInt("iterations", 0, now);
     parms.mStencilWidth = evalInt("stencilWidth", 0, now);
-    parms.mVoxelOffset = evalFloat("voxelOffset", 0, now);
-
+    parms.mVoxelOffset  = evalFloat("voxelOffset", 0, now);
+    parms.mMinMask      = evalFloat("minMask", 0, now);
+    parms.mMaxMask      = evalFloat("maxMask", 0, now);
+    parms.mInvertMask   = evalInt("invert", 0, now);
 
     UT_String str;
 
@@ -712,7 +738,8 @@ SOP_OpenVDB_Filter_Level_Set::applyFilters(
     if (!grid) return false;
 
     typedef typename GridT::ValueType ValueT;
-    typedef openvdb::tools::LevelSetFilter<GridT, BossT> FilterT;
+    typedef openvdb::FloatGrid MaskT;
+    typedef openvdb::tools::LevelSetFilter<GridT, MaskT, BossT> FilterT;
 
     const ValueT voxelSize = ValueT(grid->voxelSize()[0]);
     FilterT filter(*grid, &boss);
@@ -730,7 +757,7 @@ SOP_OpenVDB_Filter_Level_Set::applyFilters(
 
         // Skip this node if it doesn't operate on this primitive
         if (group && !group->containsOffset(vdbPrim->getMapOffset())) continue;
-
+        
         filterGrid(context, filter, filterParms[n], voxelSize, boss, verbose);
 
         if (boss.wasInterrupted()) break;
@@ -751,7 +778,8 @@ SOP_OpenVDB_Filter_Level_Set::filterGrid(OP_Context& context, FilterT& filter,
 {
     // Alpha-masking
     typedef typename FilterT::GridType GridT;
-    typename GridT::ConstPtr maskGrid;
+    typedef typename FilterT::MaskType MaskT;
+    typename MaskT::ConstPtr maskGrid;
     
     if (parms.mMaskInputNode) {
 
@@ -776,7 +804,7 @@ SOP_OpenVDB_Filter_Level_Set::filterGrid(OP_Context& context, FilterT& filter,
                 hvdb::VdbPrimCIterator maskIt(maskGeo, maskGroup);
                 if (maskIt) {
                     if (maskIt->getStorageType() == UT_VDB_FLOAT) {
-                        maskGrid = openvdb::gridConstPtrCast<GridT>(maskIt->getGridPtr());
+                        maskGrid = openvdb::gridConstPtrCast<MaskT>(maskIt->getGridPtr());
                     } else {
                         addWarning(SOP_MESSAGE, "The mask grid has to be a FloatGrid.");
                     }
@@ -785,6 +813,8 @@ SOP_OpenVDB_Filter_Level_Set::filterGrid(OP_Context& context, FilterT& filter,
                 }
             }
         }
+        filter.setMaskRange(parms.mMinMask, parms.mMaxMask);
+        filter.invertMask(parms.mInvertMask);
     }
 
       
@@ -842,7 +872,7 @@ SOP_OpenVDB_Filter_Level_Set::filterGrid(OP_Context& context, FilterT& filter,
 template<typename FilterT>
 inline void
 SOP_OpenVDB_Filter_Level_Set::offset(const FilterParms& parms, FilterT& filter,
-    const float offset, bool verbose, const typename FilterT::GridType* mask)
+    const float offset, bool verbose, const typename FilterT::MaskType* mask)
 {
 
     if (verbose) {
@@ -856,7 +886,7 @@ SOP_OpenVDB_Filter_Level_Set::offset(const FilterParms& parms, FilterT& filter,
 template<typename FilterT>
 void
 SOP_OpenVDB_Filter_Level_Set::mean(const FilterParms& parms, FilterT& filter,
-    BossT& boss, bool verbose, const typename FilterT::GridType* mask)
+    BossT& boss, bool verbose, const typename FilterT::MaskType* mask)
 {
     for (int n = 0, N = parms.mIterations; n < N && !boss.wasInterrupted(); ++n) {
 
@@ -871,7 +901,7 @@ SOP_OpenVDB_Filter_Level_Set::mean(const FilterParms& parms, FilterT& filter,
 template<typename FilterT>
 void
 SOP_OpenVDB_Filter_Level_Set::gaussian(const FilterParms& parms, FilterT& filter,
-    BossT& boss, bool verbose, const typename FilterT::GridType* mask)
+    BossT& boss, bool verbose, const typename FilterT::MaskType* mask)
 {
     for (int n = 0, N = parms.mIterations; n < N && !boss.wasInterrupted(); ++n) {
 
@@ -886,7 +916,7 @@ SOP_OpenVDB_Filter_Level_Set::gaussian(const FilterParms& parms, FilterT& filter
 template<typename FilterT>
 void
 SOP_OpenVDB_Filter_Level_Set::median(const FilterParms& parms, FilterT& filter,
-    BossT& boss, bool verbose, const typename FilterT::GridType* mask)
+    BossT& boss, bool verbose, const typename FilterT::MaskType* mask)
 {
     for (int n = 0, N = parms.mIterations; n < N && !boss.wasInterrupted(); ++n) {
 
@@ -901,7 +931,7 @@ SOP_OpenVDB_Filter_Level_Set::median(const FilterParms& parms, FilterT& filter,
 template<typename FilterT>
 void
 SOP_OpenVDB_Filter_Level_Set::meanCurvature(const FilterParms& parms, FilterT& filter,
-    BossT& boss, bool verbose, const typename FilterT::GridType* mask)
+    BossT& boss, bool verbose, const typename FilterT::MaskType* mask)
 {
     for (int n = 0, N = parms.mIterations; n < N && !boss.wasInterrupted(); ++n) {
 
@@ -914,7 +944,7 @@ SOP_OpenVDB_Filter_Level_Set::meanCurvature(const FilterParms& parms, FilterT& f
 template<typename FilterT>
 void
 SOP_OpenVDB_Filter_Level_Set::laplacian(const FilterParms& parms, FilterT& filter,
-    BossT& boss, bool verbose, const typename FilterT::GridType* mask)
+    BossT& boss, bool verbose, const typename FilterT::MaskType* mask)
 {
     for (int n = 0, N = parms.mIterations; n < N && !boss.wasInterrupted(); ++n) {
 

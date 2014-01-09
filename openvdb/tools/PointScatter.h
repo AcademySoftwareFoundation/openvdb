@@ -117,7 +117,7 @@ public:
     void operator()(const GridT& grid)
     {
         mVoxelCount = grid.activeVoxelCount();
-        if (mVoxelCount == 0) return;//throw std::runtime_error("No voxels in which to scatter points!");
+        if (mVoxelCount == 0) return;
         const openvdb::Index64 voxelId = mVoxelCount - 1;
         const openvdb::Vec3d dim = grid.voxelSize();
         if (mPointsPerVolume>0) {
@@ -128,31 +128,29 @@ public:
             mPointsPerVolume = mPointCount/float(dim[0]*dim[1]*dim[2] * mVoxelCount);
         } else {
             return;
-            //throw std::runtime_error("Invalid point count and point density");
         }
         openvdb::CoordBBox bbox;
         /// build sorted multi-map of random voxel-ids to contain a point
         std::multiset<openvdb::Index64> mVoxelSet;
+        const double maxId = static_cast<double>(voxelId);
         for (int i=0, chunks=100000; i<mPointCount; i += chunks) {
             if (util::wasInterrupted(mInterrupter)) return;
-            //    throw std::runtime_error("processing was interrupted");
-            //}
             /// @todo Multi-thread the generation of mVoxelSet
             for (int j=i, end=std::min(i+chunks, mPointCount); j<end; ++j) {
-                mVoxelSet.insert(openvdb::Index64(voxelId*getRand()));
+                mVoxelSet.insert(openvdb::Index64(math::Round(maxId*getRand())));
             }
         }
         std::multiset<openvdb::Index64>::iterator voxelIter =
             mVoxelSet.begin(), voxelEnd = mVoxelSet.end();
         typename GridT::ValueOnCIter valueIter = grid.cbeginValueOn();
-        mPointCount = 0;
+        mPointCount = 0;//addPoint increments this counter
         size_t interruptCount = 0;
-        for (openvdb::Index64 i=valueIter.getVoxelCount(); voxelIter != voxelEnd; ++voxelIter) {
+        for (openvdb::Index64 n=valueIter.getVoxelCount(); voxelIter != voxelEnd; ++voxelIter) {
             //only check interrupter for every 32'th particle
             if (!(interruptCount++ & (1<<5)-1) && util::wasInterrupted(mInterrupter)) return;
-            while ( i <= *voxelIter ) {
+            while ( n <= *voxelIter ) {
                 ++valueIter;
-                i += valueIter.getVoxelCount();
+                n += valueIter.getVoxelCount();
             }
             if (valueIter.isVoxelValue()) {// a majorty is expected to be voxels
                 const openvdb::Coord min = valueIter.getCoord();

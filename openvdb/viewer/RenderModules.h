@@ -363,7 +363,7 @@ public:
         std::vector<GLfloat>& points,
         std::vector<GLuint>& indices,
         LeafManagerType& leafs,
-        std::vector<unsigned>& indexMap,
+        std::vector<size_t>& indexMap,
         const openvdb::math::Transform& transform,
         openvdb::Index64 voxelsPerLeaf = TreeType::LeafNodeType::NUM_VOXELS)
         : mPoints(points)
@@ -381,17 +381,17 @@ public:
     }
 
 
-    inline void operator()(const tbb::blocked_range<openvdb::Index64>& range) const
+    inline void operator()(const typename LeafManagerType::RangeType& range) const
     {
         using openvdb::Index64;
 
         typedef typename TreeType::LeafNodeType::ValueOnCIter ValueOnCIter;
 
         openvdb::Vec3d pos;
-        unsigned index = 0;
+        size_t index = 0;
         Index64 activeVoxels = 0;
 
-        for (Index64 n = range.begin(); n < range.end(); ++n) {
+        for (size_t n = range.begin(); n < range.end(); ++n) {
 
             index = mIndexMap[n];
             ValueOnCIter it = mLeafs.leaf(n).cbeginValueOn();
@@ -414,20 +414,20 @@ public:
             } else {
 
                 std::vector<openvdb::Coord> coords;
-                coords.reserve(activeVoxels);
+                coords.reserve(static_cast<size_t>(activeVoxels));
                 for ( ; it; ++it) { coords.push_back(it.getCoord()); }
 
                 pos = mTransform.indexToWorld(coords[0]);
                 insertPoint(pos, index);
                 ++index;
 
-                pos = mTransform.indexToWorld(coords[activeVoxels-1]);
+                pos = mTransform.indexToWorld(coords[static_cast<size_t>(activeVoxels-1)]);
                 insertPoint(pos, index);
                 ++index;
 
-                int r = int(std::floor(mVoxelsPerLeaf / activeVoxels));
-                for (int i = 1, I = mVoxelsPerLeaf - 2; i < I; ++i) {
-                    pos = mTransform.indexToWorld(coords[i * r]);
+                Index64 r = Index64(std::floor(double(mVoxelsPerLeaf) / activeVoxels));
+                for (Index64 i = 1, I = mVoxelsPerLeaf - 2; i < I; ++i) {
+                    pos = mTransform.indexToWorld(coords[static_cast<size_t>(i * r)]);
                     insertPoint(pos, index);
                     ++index;
                 }
@@ -436,10 +436,10 @@ public:
     }
 
 private:
-    void insertPoint(const openvdb::Vec3d& pos, unsigned index) const
+    void insertPoint(const openvdb::Vec3d& pos, size_t index) const
     {
         mIndices[index] = index;
-        const unsigned element = index * 3;
+        const size_t element = index * 3;
         mPoints[element    ] = pos[0];
         mPoints[element + 1] = pos[1];
         mPoints[element + 2] = pos[2];
@@ -448,7 +448,7 @@ private:
     std::vector<GLfloat>& mPoints;
     std::vector<GLuint>& mIndices;
     LeafManagerType& mLeafs;
-    std::vector<unsigned>& mIndexMap;
+    std::vector<size_t>& mIndexMap;
     const openvdb::math::Transform& mTransform;
     const openvdb::Index64 mVoxelsPerLeaf;
 }; // PointGenerator
@@ -507,22 +507,18 @@ public:
 
     void runParallel()
     {
-        tbb::parallel_for(
-            tbb::blocked_range<openvdb::Index64>(0, (mPoints.size() / 3)), *this);
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, (mPoints.size() / 3)), *this);
     }
 
-    inline void operator()(const tbb::blocked_range<openvdb::Index64>& range) const
+    inline void operator()(const tbb::blocked_range<size_t>& range) const
     {
-        using openvdb::Index64;
-
         openvdb::Coord ijk;
         openvdb::Vec3d pos, tmpNormal, normal(0.0, -1.0, 0.0);
         openvdb::Vec3s color(0.9, 0.3, 0.3);
         float w = 0.0;
 
-        Index64 e1, e2, e3, voxelNum = 0;
-        for (Index64 n = range.begin(); n < range.end(); ++n) {
-
+        size_t e1, e2, e3, voxelNum = 0;
+        for (size_t n = range.begin(); n < range.end(); ++n) {
             e1 = 3 * n;
             e2 = e1 + 1;
             e3 = e2 + 1;
@@ -669,8 +665,8 @@ public:
                 openvdb::tools::erodeVoxels(*interiorMask, 2);
 
                 openvdb::tree::LeafManager<BoolTreeT> maskleafs(*interiorMask);
-                std::vector<unsigned> indexMap(maskleafs.leafCount());
-                unsigned voxelCount = 0;
+                std::vector<size_t> indexMap(maskleafs.leafCount());
+                size_t voxelCount = 0;
                 for (Index64 l = 0, L = maskleafs.leafCount(); l < L; ++l) {
                     indexMap[l] = voxelCount;
                     voxelCount += std::min(maskleafs.leaf(l).onVoxelCount(), voxelsPerLeaf);
@@ -711,8 +707,8 @@ public:
                 surfaceMask->pruneInactive();
 
                 openvdb::tree::LeafManager<BoolTreeT> maskleafs(*surfaceMask);
-                std::vector<unsigned> indexMap(maskleafs.leafCount());
-                unsigned voxelCount = 0;
+                std::vector<size_t> indexMap(maskleafs.leafCount());
+                size_t voxelCount = 0;
                 for (Index64 l = 0, L = maskleafs.leafCount(); l < L; ++l) {
                     indexMap[l] = voxelCount;
                     voxelCount += std::min(maskleafs.leaf(l).onVoxelCount(), voxelsPerLeaf);
@@ -746,8 +742,8 @@ public:
             voxelsPerLeaf = std::max<Index64>(1, (maxVoxelPoints / tree.leafCount()));
         }
 
-        std::vector<unsigned> indexMap(leafs.leafCount());
-        unsigned voxelCount = 0;
+        std::vector<size_t> indexMap(leafs.leafCount());
+        size_t voxelCount = 0;
         for (Index64 l = 0, L = leafs.leafCount(); l < L; ++l) {
             indexMap[l] = voxelCount;
             voxelCount += std::min(leafs.leaf(l).onVoxelCount(), voxelsPerLeaf);

@@ -412,13 +412,13 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
 
                     if (samplingOrder == 0) {
                         hvdb::GridResampleToMatchOp<openvdb::tools::PointSampler> op(outGrid);
-                        GEOvdbProcessTypedGrid(*vdb, op);
+                        GEOvdbProcessTypedGridTopology(*vdb, op);
                     } else if (samplingOrder == 1) {
                         hvdb::GridResampleToMatchOp<openvdb::tools::BoxSampler> op(outGrid);
-                        GEOvdbProcessTypedGrid(*vdb, op);
+                        GEOvdbProcessTypedGridTopology(*vdb, op);
                     } else if (samplingOrder == 2) {
                         hvdb::GridResampleToMatchOp<openvdb::tools::QuadraticSampler> op(outGrid);
-                        GEOvdbProcessTypedGrid(*vdb, op);
+                        GEOvdbProcessTypedGridTopology(*vdb, op);
                     }
                 }
 
@@ -452,13 +452,13 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
 
                     if (samplingOrder == 0) {
                         hvdb::GridTransformOp<openvdb::tools::PointSampler> op(outGrid, xform);
-                        GEOvdbProcessTypedGrid(*vdb, op);
+                        GEOvdbProcessTypedGridTopology(*vdb, op);
                     } else if (samplingOrder == 1) {
                         hvdb::GridTransformOp<openvdb::tools::BoxSampler> op(outGrid, xform);
-                        GEOvdbProcessTypedGrid(*vdb, op);
+                        GEOvdbProcessTypedGridTopology(*vdb, op);
                     } else if (samplingOrder == 2) {
                         hvdb::GridTransformOp<openvdb::tools::QuadraticSampler> op(outGrid, xform);
-                        GEOvdbProcessTypedGrid(*vdb, op);
+                        GEOvdbProcessTypedGridTopology(*vdb, op);
                     }
                 }
             }

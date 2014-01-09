@@ -70,6 +70,7 @@ struct RenderOpts
     std::string shader;
     std::string camera;
     float aperture, focal, frame, znear, zfar;
+    double isovalue;
     openvdb::Vec3R rotate;
     openvdb::Vec3R translate;
     openvdb::Vec3R target;
@@ -89,6 +90,7 @@ struct RenderOpts
         frame(1.0),
         znear(1.0e-3),
         zfar(std::numeric_limits<double>::max()),
+        isovalue(0.0),
         rotate(0.0),
         translate(0.0),
         target(0.0),
@@ -129,7 +131,8 @@ struct RenderOpts
            << " -cpus " << threads
            << " -far " << zfar
            << " -focal " << focal
-           << " -frame " << frame;
+           << " -frame " << frame
+           << " -isovalue " << isovalue;
         if (lookat) os << " -lookat " << target[0] << "," << target[1] << "," << target[2];
         os << " -near " << znear
            << " -res " << width << "x" << height;
@@ -169,14 +172,16 @@ usage(int exitStatus = EXIT_FAILURE)
 "    -focal F          perspective camera focal length in mm (default: " << opts.focal << ")\n" <<
 "    -fov F            perspective camera field of view in degrees\n" <<
 "                      (default: " << fov << ")\n" <<
-"    -frame F          ortho camera frame width in world units (default: "
-    << opts.frame << ")\n" <<
+"    -frame F          ortho camera frame width in world units (default: " <<
+    opts.frame << ")\n" <<
+"    -isovalue F       isovalue in world units for level set ray intersection\n" <<
+"                      (default: " << opts.isovalue << ")\n" <<
 "    -lookat X,Y,Z     rotate the camera to point to (X, Y, Z)\n" <<
 "    -name S           name of the grid to be rendered (default: render\n" <<
 "                      the first floating-point grid found in in.vdb)\n" <<
 "    -near F           camera near plane depth (default: " << opts.znear << ")\n" <<
-"    -res WxH          image dimensions in pixels (default: "
-    << opts.width << "x" << opts.height << ")\n" <<
+"    -res WxH          image dimensions in pixels (default: " <<
+    opts.width << "x" << opts.height << ")\n" <<
 "    -r X,Y,Z                                    \n" <<
 "    -rotate X,Y,Z     camera rotation in degrees\n" <<
 "                      (default: look at the center of the grid)\n" <<
@@ -308,7 +313,8 @@ render(const GridType& grid, const std::string& imgFilename, const RenderOpts& o
     }
     const tbb::tick_count start = tbb::tick_count::now();
 
-    tools::rayTrace(grid, *shader, *camera, opts.samples, 0, (opts.threads != 1));
+    tools::LevelSetRayIntersector<GridType> intersector(grid, opts.isovalue);
+    tools::rayTrace(grid, intersector, *shader, *camera, opts.samples, 0, (opts.threads != 1));
 
     if (opts.verbose) {
         std::ostringstream ostr;
@@ -418,6 +424,9 @@ main(int argc, char *argv[])
             } else if (parser.check(i, "-cpus")) {
                 ++i;
                 opts.threads = std::max(0, atoi(argv[i]));
+            } else if (parser.check(i, "-isovalue")) {
+                ++i;
+                opts.isovalue = atof(argv[i]);
             } else if (parser.check(i, "-far")) {
                 ++i;
                 opts.zfar = atof(argv[i]);

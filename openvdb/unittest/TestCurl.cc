@@ -34,7 +34,7 @@
 #include <openvdb/tools/GridOperators.h>
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
-    CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/1e-6);
 
 namespace {
 const int GRID_DIM = 10;

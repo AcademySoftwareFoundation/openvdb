@@ -42,7 +42,7 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace io {
 
-Stream::Stream(std::istream& is)
+Stream::Stream(std::istream& is): mOutputStream(NULL)
 {
     if (!is) return;
 
@@ -81,13 +81,25 @@ Stream::Stream(std::istream& is)
 }
 
 
-Stream::Stream()
+Stream::Stream(): mOutputStream(NULL)
+{
+}
+
+
+Stream::Stream(std::ostream& os): mOutputStream(&os)
 {
 }
 
 
 Stream::~Stream()
 {
+}
+
+
+boost::shared_ptr<Archive>
+Stream::copy() const
+{
+    return boost::shared_ptr<Archive>(new Stream(*this));
 }
 
 
