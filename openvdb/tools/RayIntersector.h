@@ -126,8 +126,10 @@ public:
     BOOST_STATIC_ASSERT(boost::is_floating_point<ValueT>::value);
 
     /// @brief Constructor
-    /// @param grid level set grid to intersect rays against
-    LevelSetRayIntersector(const GridT& grid): mTester(grid)
+    /// @param grid level set grid to intersect rays against.
+    /// @param isoValue optional iso-value for the ray-intersection.
+    LevelSetRayIntersector(const GridT& grid, const ValueT& isoValue = zeroVal<ValueT>())
+        : mTester(grid, isoValue)
     {
         if (!grid.hasUniformVoxels() ) {
             OPENVDB_THROW(RuntimeError,
@@ -349,20 +351,24 @@ private:
 //////////////////////////////////////// LinearSearchImpl ////////////////////////////////////////
 
     
-/// @brief Implements linear iterative search for a zero-crossing of
+/// @brief Implements linear iterative search for an iso-value of
 /// the level set along along the direction of the ray.
 ///
 /// @note Since this class is used internally in
 /// LevelSetRayIntersector (define above) and LevelSetHDDA (defined below) 
 /// client code should never interact directly with its API. This also
 /// explains why we are not concerned with the fact that several of
-/// its methods are unsafe to call unless zero-crossings were
-/// already detected. 
+/// its methods are unsafe to call unless roots were already detected. 
 ///    
 /// @details It is approximate due to the limited number of iterations
 /// which can can be defined with a template parameter. However the default value
 /// has proven surprisingly accurate and fast. In fact more iterations
 /// are not guaranteed to give significantly better results.
+///
+/// @warning Since the root-searching algorithm is approximate
+/// (first-order) it is possible to miss intersections if the
+/// iso-value is too close to the inside or outside of the narrow
+/// band (typically a distance less then a voxel unit).
 ///
 /// @warning Since this class internally stores a ValueAccessor it is NOT thread-safe,
 /// so make sure to give each thread its own instance.  This of course also means that
@@ -379,14 +385,26 @@ public:
     typedef typename StencilT::Vec3Type   Vec3T;
 
     /// @brief Constructor from a grid.
-    LinearSearchImpl(const GridT& grid)
-        : mStencil(grid), mThreshold(2*grid.voxelSize()[0])
+    /// @throw RunTimeError if the grid is empty.
+    /// @throw ValueError if the isoValue is not inside the narrow-band.
+    LinearSearchImpl(const GridT& grid, const ValueT& isoValue = zeroVal<ValueT>())
+        : mStencil(grid),
+          mIsoValue(isoValue),
+          mMinValue(isoValue-2*grid.voxelSize()[0]),
+          mMaxValue(isoValue+2*grid.voxelSize()[0])
       {
           if ( grid.empty() ) {
               OPENVDB_THROW(RuntimeError, "LinearSearchImpl does not supports empty grids");
           }
+          if (mIsoValue<= -grid.background() ||
+              mIsoValue>=  grid.background() ){
+              OPENVDB_THROW(ValueError, "The iso-value must be inside the narrow-band!");
+          }
           grid.tree().root().evalActiveBoundingBox(mBBox, /*visit individual voxels*/false);
       }
+
+    /// @brief Return the iso-value used for ray-intersections
+    const ValueT& getIsoValue() const { return mIsoValue; }
 
     /// @brief Return @c false the ray misses the bbox of the grid.
     /// @param iRay Ray represented in index space.
@@ -456,8 +474,8 @@ private:
     inline bool operator()(const Coord& ijk, RealT time)
     {
         ValueT V;
-        if (mStencil.accessor().probeValue(ijk, V) &&//inside narrow band?
-            math::Abs(V)<mThreshold) {// close to zero-crossing?
+        if (mStencil.accessor().probeValue(ijk, V) &&//within narrow band
+            V>mMinValue && V<mMaxValue) {// and close to iso-value?
             mT[1] = time;
             mV[1] = this->interpValue(time);
             if (math::ZeroCrossing(mV[0], mV[1])) {
@@ -489,7 +507,7 @@ private:
     {
         const Vec3R pos = mRay(time);
         mStencil.moveTo(pos);
-        return mStencil.interpolation(pos);
+        return mStencil.interpolation(pos) - mIsoValue;
     }
 
     template<typename, int> friend struct LevelSetHDDA;
@@ -499,7 +517,7 @@ private:
     RealT           mTime;
     ValueT          mV[2];
     RealT           mT[2];
-    ValueT          mThreshold;
+    const ValueT    mIsoValue, mMinValue, mMaxValue;
     math::CoordBBox mBBox;
 };// LinearSearchImpl
 

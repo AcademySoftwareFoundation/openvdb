@@ -2,13 +2,22 @@ OpenVDB Version History
 =======================
 
 Version 2.2.0 - In development
-    - Added documentation (in the Cookbook) on interpolation, e.g. BoxSamper, 
-      GridSampler and DualGridSampler.
+    - Added a section to the Cookbook on interpolation using BoxSampler, 
+      GridSampler, DualGridSampler, et al.
     - Modified tools::DualGridSampler so it is more consistent with 
       tools::GridSampler.
+    - Added selection of iso-value to the LevelSetRayIntersector and 
+      openvdb_render.
+    - Added a Grid::topologyDifference() method.
+    - Added topology union, intersection and difference operations to
+      the Combine SOP.  These operations combine the active voxel topologies
+      of grids that may have different value types.
     - Added support to the Combine, Resample, Scatter, Prune and Visualize SOPs
       for grids with values of type bool.
-    - Fixed build issue reported for clang 3.2.
+    - The Fill SOP now allows the fill region bounds to be specified either in
+      index space (as before), in world space, or using the bounds of geometry
+      connected to an optional new reference input.
+    - Fixed build issue reported for Clang 3.2.
 
     API changes:
     - tools::DualGridSampler is no longer templated on the target grid type,

@@ -39,6 +39,7 @@
 #include <openvdb/tree/TreeIterator.h>
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/tree/LeafManager.h>
+#include "ValueTransformer.h" // for foreach()
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

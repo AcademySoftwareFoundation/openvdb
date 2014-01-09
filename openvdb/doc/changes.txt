@@ -6,13 +6,26 @@
 @htmlonly <a name="v2_2_0_changes"></a>@endhtmlonly
 @par
 <B>Version 2.2.0</B> - <I>In development</I>
-- Added documentation (in the Cookbook) on interpolation, e.g. BoxSamper, 
-  GridSampler and DualGridSampler.
+- Added a @ref sInterpolation "section" to the Cookbook on interpolation
+  using @vdblink::tools::BoxSampler BoxSampler@endlink,
+  @vdblink::tools::GridSampler GridSampler@endlink,
+  @vdblink::tools::DualGridSampler DualGridSampler@endlink, et al.
 - Modified @vdblink::tools::DualGridSampler DualGridSampler@endlink so 
   it is more consistent with @vdblink::tools::GridSampler GridSampler@endlink.
+- Added selection of iso-value to the 
+  @vdblink::tools::LevelSetRayIntersector LevelSetRayIntersector@endlink 
+  and openvdb_render.
+- Added a
+  @vdblink::Grid::topologyDifference() Grid::topologyDifference@endlink method.
+- Added topology union, intersection and difference operations to
+  the Combine SOP.  These operations combine the active voxel topologies
+  of grids that may have different value types.
 - Added support to the Combine, Resample, Scatter, Prune and Visualize SOPs
   for grids with values of type bool.
-- Fixed build issue reported for clang 3.2.
+- The Fill SOP now allows the fill region bounds to be specified either in
+  index space (as before), in world space, or using the bounds of geometry
+  connected to an optional new reference input.
+- Fixed build issue reported for Clang 3.2.
 
 @par
 API changes:

@@ -632,35 +632,42 @@ public:
     /// value maps to a voxel if the corresponding value already mapped to a voxel
     /// OR if it is a voxel in the other grid. Thus, a resulting value can only
     /// map to a tile if the corresponding value already mapped to a tile
-    /// AND if it is a tile value in other grid.
+    /// AND if it is a tile value in the other grid.
     ///
     /// @note This operation modifies only active states, not values.
     /// Specifically, active tiles and voxels in this grid are not changed, and
     /// tiles or voxels that were inactive in this grid but active in the other grid
     /// are marked as active in this grid but left with their original values.
     template<typename OtherTreeType>
-    void topologyUnion(const Grid<OtherTreeType>& other) { tree().topologyUnion(other.tree()); }
+    void topologyUnion(const Grid<OtherTreeType>& other);
 
-    /// @brief Intersects this tree's set of active values with the active values
-    /// of the other tree, whose @c ValueType may be different.
-    /// @details The resulting state of a value is active only if the corresponding 
+    /// @brief Intersect this grid's set of active values with the active values
+    /// of the other grid, whose value type may be different.
+    /// @details The resulting state of a value is active only if the corresponding
     /// value was already active AND if it is active in the other tree. Also, a
     /// resulting value maps to a voxel if the corresponding value
     /// already mapped to an active voxel in either of the two grids
     /// and it maps to an active tile or voxel in the other grid.
     ///
-    /// @note This operation can delete branches in this grid if they
-    /// overlap with inactive tiles in the other grid. Likewise active
-    /// voxels can be turned into unactive voxels resulting in leaf
-    /// nodes with no active values. Thus, it is recommended to
-    /// subsequently call prune. 
+    /// @note This operation can delete branches of this grid that overlap with
+    /// inactive tiles in the other grid.  Also, because it can deactivate voxels,
+    /// it can create leaf nodes with no active values.  Thus, it is recommended
+    /// to prune this grid after calling this method.
     template<typename OtherTreeType>
-    void topologyIntersection(const Grid<OtherTreeType>& other)
-    {
-        tree().topologyIntersection(other.tree());
-    }
+    void topologyIntersection(const Grid<OtherTreeType>& other);
 
-    /// @todo topologyDifference
+    /// @brief Difference this grid's set of active values with the active values
+    /// of the other grid, whose value type may be different.
+    /// @details After this method is called, voxels in this grid will be active
+    /// only if they were active to begin with and if the corresponding voxels
+    /// in the other grid were inactive.
+    ///
+    /// @note This operation can delete branches of this grid that overlap with
+    /// active tiles in the other grid.  Also, because it can deactivate voxels,
+    /// it can create leaf nodes with no active values.  Thus, it is recommended
+    /// to prune this grid after calling this method.
+    template<typename OtherTreeType>
+    void topologyDifference(const Grid<OtherTreeType>& other);
 
     //
     // Statistics
@@ -1106,6 +1113,9 @@ Grid<TreeT>::newTree()
 }
 
 
+////////////////////////////////////////
+
+
 template<typename TreeT>
 inline void
 Grid<TreeT>::fill(const CoordBBox& bbox, const ValueType& value, bool active)
@@ -1136,6 +1146,36 @@ Grid<TreeT>::merge(Grid& other, MergePolicy policy)
 {
     tree().merge(other.tree(), policy);
 }
+
+
+template<typename TreeT>
+template<typename OtherTreeType>
+inline void
+Grid<TreeT>::topologyUnion(const Grid<OtherTreeType>& other)
+{
+    tree().topologyUnion(other.tree());
+}
+
+
+template<typename TreeT>
+template<typename OtherTreeType>
+inline void
+Grid<TreeT>::topologyIntersection(const Grid<OtherTreeType>& other)
+{
+    tree().topologyIntersection(other.tree());
+}
+
+
+template<typename TreeT>
+template<typename OtherTreeType>
+inline void
+Grid<TreeT>::topologyDifference(const Grid<OtherTreeType>& other)
+{
+    tree().topologyDifference(other.tree());
+}
+
+
+////////////////////////////////////////
 
 
 template<typename TreeT>
