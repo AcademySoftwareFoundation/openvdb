@@ -55,6 +55,11 @@
     #define OPENVDB_CHECK_GCC(MAJOR, MINOR) 0
 #endif
 
+/// Macro for determining if there are sufficient C++0x/C++11 features
+#if (_MSC_VER >= 1700 || __cplusplus > 199711L)
+    #define OPENVDB_HAS_CXX11 1
+#endif
+
 /// For compilers that need templated function specializations to have
 /// storage qualifiers, we need to declare the specializations as static inline.
 /// Otherwise, we'll get linker errors about multiply defined symbols.
