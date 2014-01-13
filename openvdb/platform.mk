@@ -183,7 +183,7 @@ else
 			   -Wnon-virtual-dtor \
 			   -Woverloaded-virtual \
 			   $(NULL)
-    CXXFLAGS		+= $(DEFINES) -pthread -fPIC \
+    CXXFLAGS		+= $(DEFINES) -std=c++0x -pthread -fPIC \
 			   -fvisibility=hidden -fvisibility-inlines-hidden \
 			   $(CXX_WARNFLAGS) \
 			   $(NULL)
@@ -289,6 +289,6 @@ platform:
 	@echo MSVCDir=$(MSVCDir)
 	@echo MBSD=$(MBSD)
 	@echo AMD64=$(AMD64)
-	@echo CC=$(CC)
 	@echo CXX=$(CXX)
+	@echo CXXFLAGS=$(CXXFLAGS)
 endif
