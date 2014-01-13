@@ -32,6 +32,7 @@
 #define OPENVDB_TOOLS_VOLUME_TO_MESH_HAS_BEEN_INCLUDED
 
 
+#include <openvdb/Platform.h> // for OPENVDB_HAS_CXX11
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/util/Util.h> // for COORD_OFFSETS
 #include <openvdb/math/Operators.h> // for ISGradient
@@ -45,7 +46,7 @@
 #include <tbb/parallel_reduce.h>
 
 #include <vector>
-#include <memory> // for auto_pointer
+#include <memory> // for auto_ptr/unique_ptr
 
 
 //////////
@@ -381,6 +382,15 @@ inline Vec3d findFeaturePoint(
 // Internal utility methods
 namespace internal {
 
+template <typename T>
+struct UniquePtr
+{
+#ifdef OPENVDB_HAS_CXX11
+    typedef std::unique_ptr<T>  type;
+#else
+    typedef std::auto_ptr<T>    type;
+#endif
+};
 
 /// @brief  Bit-flags used to classify cells.
 enum { SIGNS = 0xFF, EDGES = 0xE00, INSIDE = 0x100,
@@ -977,7 +987,7 @@ SignData<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size_t>& rang
     unsigned char signs, face;
     Coord ijk, coord;
 
-    std::auto_ptr<Int16LeafT> signLeafPt(new Int16LeafT(ijk, 0));
+    typename internal::UniquePtr<Int16LeafT>::type signLeafPt(new Int16LeafT(ijk, 0));
 
     for (size_t n = range.begin(); n != range.end(); ++n) {
 
@@ -3123,7 +3133,7 @@ public:
     //////////
 
     MovePoints(
-        std::auto_ptr<openvdb::Vec3s>& newPointList,
+        internal::UniquePtr<openvdb::Vec3s>::type& newPointList,
         const PointList& oldPointList,
         const std::vector<unsigned>& indexMap,
         const std::vector<unsigned char>& usedPointMask)
@@ -3156,7 +3166,7 @@ public:
     }
 
 private:
-    std::auto_ptr<openvdb::Vec3s>& mNewPointList;
+    internal::UniquePtr<openvdb::Vec3s>::type& mNewPointList;
     const PointList& mOldPointList;
     const std::vector<unsigned>& mIndexMap;
     const std::vector<unsigned char>& mUsedPointMask;
@@ -4410,7 +4420,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
         if (usedPointCount < mPointListSize) {
 
             // move points
-            std::auto_ptr<openvdb::Vec3s> newPointList(new openvdb::Vec3s[usedPointCount]);
+            internal::UniquePtr<openvdb::Vec3s>::type newPointList(new openvdb::Vec3s[usedPointCount]);
 
             internal::MovePoints movePoints(newPointList, mPoints, indexMap, usedPointMask);
             movePoints.run();
@@ -4584,7 +4594,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
             size_t newPointCount = newPoints.size() + mPointListSize;
 
-            std::auto_ptr<openvdb::Vec3s> newPointList(new openvdb::Vec3s[newPointCount]);
+            internal::UniquePtr<openvdb::Vec3s>::type newPointList(new openvdb::Vec3s[newPointCount]);
            
             for (size_t i = 0; i < mPointListSize; ++i) {
                 newPointList.get()[i] = mPoints[i];

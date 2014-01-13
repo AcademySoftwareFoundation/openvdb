@@ -252,15 +252,11 @@ calculateBounds<math::NonlinearFrustumMap>(const math::NonlinearFrustumMap& frus
         pre_image = frustum.applyInverseMap(extreme2);
         out_max.x() = std::max(x_min, std::min(x_max, pre_image.x()));
         
-        const Vec3d tmpPlus = extreme2;
-
         extreme.x() = xm;
         extreme.y() = centerLS.y();
         extreme.z() = zm;
         // location in world space of the tangent point
         extreme2 = secondMap.applyMap(extreme);
-
-        const Vec3d tmpMinus = extreme2;
 
         // convert back to voxel space
         pre_image = frustum.applyInverseMap(extreme2);
@@ -285,14 +281,10 @@ calculateBounds<math::NonlinearFrustumMap>(const math::NonlinearFrustumMap& frus
         pre_image = frustum.applyInverseMap(extreme2);
         out_max.y() = std::max(y_min, std::min(y_max, pre_image.y()));
 
-        const Vec3d tmpPlus = extreme2;
-
         extreme.x() = centerLS.x();
         extreme.y() = xm;
         extreme.z() = zm;
         extreme2 = secondMap.applyMap(extreme);
-
-        const Vec3d tmpMinus = extreme2;
 
         // convert back to voxel space
         pre_image = frustum.applyInverseMap(extreme2);

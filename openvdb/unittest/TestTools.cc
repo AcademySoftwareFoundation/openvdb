@@ -1311,9 +1311,9 @@ TestTools::testPointAdvect()
 
 struct PointList
 {
-    struct Point { float x,y,z; };
+    struct Point { double x,y,z; };
     std::vector<Point> list;
-    void add(const openvdb::Vec3R &p) { Point q={p[0],p[1],p[2]}; list.push_back(q); }
+    void add(const openvdb::math::Vec3d &p) { Point q={p[0],p[1],p[2]}; list.push_back(q); }
 };
 
 
