@@ -706,13 +706,12 @@ ifeq (no,$(strip $(shared)))
     LIBOPENVDB := $(LIBOPENVDB_STATIC)
     LIBOPENVDB_IMPORT := $(LIBOPENVDB_STATIC)
 else
-
   ifeq (yes,$(strip $(VERSIONED_LIBS)))
     LIBOPENVDB := $(LIBOPENVDB_SHARED_VERSIONED)
   else
     LIBOPENVDB := $(LIBOPENVDB_SHARED)
   endif
-    LIBOPENVDB_RPATH := -Wl,-rpath,$(INSTALL_DIR)/lib
+  LIBOPENVDB_RPATH := -Wl,-rpath,$(INSTALL_DIR)/lib $(LIBOPENVDB)
 endif # shared
 
 CPPUNIT_RPATH := -Wl,-rpath,$(CPPUNIT_LIB_DIR) $(LDDIROPT)$(CPPUNIT_LIB_DIR) $(CPPUNIT_LIB)
