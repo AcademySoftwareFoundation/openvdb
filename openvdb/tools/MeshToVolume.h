@@ -856,7 +856,7 @@ int
 ContourTracer<FloatTreeT, InterruptT>::sparseScan(int slice) const
 {
     bool lastVoxelWasOut = true;
-    int last_k;
+    int last_k = mBBox.min()[2];
 
     Coord ijk(slice, mBBox.min()[1], mBBox.min()[2]);
     Coord step(mStepSize[mDistAccessor.getValueDepth(ijk) + 1]);

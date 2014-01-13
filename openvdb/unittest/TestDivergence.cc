@@ -463,7 +463,7 @@ TestDivergence::testWSDivergence()
             for (int y = -dim; y<dim; ++y) {
                 for (int z = -dim; z<dim; ++z) {
                     openvdb::Coord xyz(x,y,z);
-                    openvdb::VectorTree::ValueType v = inTree.getValue(xyz);
+                    //openvdb::VectorTree::ValueType v = inTree.getValue(xyz);
                     //std::cout << "vec(" << xyz << ")=" << v << std::endl;
 
                     float d;
@@ -542,7 +542,8 @@ TestDivergence::testWSDivergence()
             for (int y = -dim; y<dim; ++y) {
                 for (int z = -dim; z<dim; ++z) {
                     openvdb::Coord xyz(x,y,z);
-                    openvdb::VectorTree::ValueType v = inTree.getValue(xyz);
+                    //openvdb::VectorTree::ValueType v = inTree.getValue(xyz);
+                    //std::cout << "vec(" << xyz << ")=" << v << std::endl;
 
                     float d;
                     d = math::Divergence<math::AffineMap, math::CD_2ND>::result(
@@ -606,7 +607,7 @@ TestDivergence::testWSDivergenceStencil()
             for (int y = -dim; y<dim; ++y) {
                 for (int z = -dim; z<dim; ++z) {
                     openvdb::Coord xyz(x,y,z);
-                    openvdb::VectorTree::ValueType v = inTree.getValue(xyz);
+                    //openvdb::VectorTree::ValueType v = inTree.getValue(xyz);
                     //std::cout << "vec(" << xyz << ")=" << v << std::endl;
                     float d;
 
