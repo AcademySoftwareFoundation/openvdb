@@ -56,7 +56,7 @@
 #endif
 
 /// Macro for determining if there are sufficient C++0x/C++11 features
-#if (_MSC_VER >= 1700 || __cplusplus > 199711L)
+#if _MSC_VER >= 1700 || __cplusplus > 199711L || __GXX_EXPERIMENTAL_CXX0X__
     #define OPENVDB_HAS_CXX11 1
 #endif
 
