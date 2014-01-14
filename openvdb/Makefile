@@ -221,7 +221,11 @@ endif
 # such as jemalloc (included in the Houdini HDK) or TBB malloc
 # (leave blank if unavailable)
 ifdef WINDOWS_NT
-CONCURRENT_MALLOC_LIB := tbbmalloc_proxy.lib
+  ifneq (full,$(strip $(debug)))
+    CONCURRENT_MALLOC_LIB := tbbmalloc_proxy.lib
+  else
+    CONCURRENT_MALLOC_LIB := tbbmalloc_proxy_debug.lib
+  endif
 ifdef AMD64
 CONCURRENT_MALLOC_LIB += /INCLUDE:__TBB_malloc_proxy
 else
