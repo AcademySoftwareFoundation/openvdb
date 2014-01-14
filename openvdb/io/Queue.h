@@ -242,7 +242,7 @@ private:
 
     Id writeGridVec(const GridCPtrVec&, const Archive&, const MetaMap&);
 
-    class Impl;
+    struct Impl;
     boost::shared_ptr<Impl> mImpl;
 }; // class Queue
 
