@@ -56,8 +56,17 @@
 #endif
 
 /// Macro for determining if there are sufficient C++0x/C++11 features
-#if (_MSC_VER >= 1700 || __cplusplus > 199711L)
-    #define OPENVDB_HAS_CXX11 1
+#if _MSC_VER >= 1700 || __cplusplus > 199711L || __GXX_EXPERIMENTAL_CXX0X__
+    #if __clang__
+	#ifndef _LIBCPP_VERSION
+	    #include <ciso646>
+	#endif
+	#ifdef _LIBCPP_VERSION
+	    #define OPENVDB_HAS_CXX11 1
+	#endif
+    #else
+	#define OPENVDB_HAS_CXX11 1
+    #endif
 #endif
 
 /// For compilers that need templated function specializations to have
