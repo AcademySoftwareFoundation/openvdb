@@ -640,7 +640,11 @@ copyMesh(
     };
     UT_IntArray verts[4];
     for (int flags = 0; flags < 4; ++flags) {
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
+        verts[flags].setCapacity(nverts[flags]);
+#else
         verts[flags].resize(nverts[flags]);
+#endif
         verts[flags].entries(nverts[flags]);
     }
 

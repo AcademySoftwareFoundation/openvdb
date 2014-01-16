@@ -71,7 +71,7 @@ struct FractalBoltzmanGenerator
             point = (point * curfreq);
 
             // convert to float for UT_PNoise
-            float location[3] = {point[0], point[1], point[2]};
+            float location[3] = { float(point[0]), float(point[1]), float(point[2]) };
 
             // generate noise in the [-1,1] range
             signal = 2.0f*UT_PNoise::noise3D(location) - 1.0f;

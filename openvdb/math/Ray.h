@@ -78,12 +78,20 @@ public:
 
     inline void setMaxTime(RealT t1) { assert(t1>0); mT1 = t1; }
 
-    inline void setTimes(RealT t0, RealT t1) { assert(t0>0 && t1>0);mT0 = t0; mT1 = t1; }
+    inline void setTimes(RealT t0 = math::Delta<RealT>::value(),
+                         RealT t1 = std::numeric_limits<RealT>::max())
+    {
+        assert(t0>0 && t1>0);
+        mT0 = t0;
+        mT1 = t1;
+    }
 
     inline void scaleTimes(RealT scale) {  assert(scale>0); mT0 *= scale; mT1 *= scale; }
     
-    inline void reset(const Vec3Type& eye, const Vec3Type& direction,
-                      RealT t0 = 0, RealT t1 = std::numeric_limits<RealT>::max())
+    inline void reset(const Vec3Type& eye,
+                      const Vec3Type& direction,
+                      RealT t0 = math::Delta<RealT>::value(),
+                      RealT t1 = std::numeric_limits<RealT>::max())
     {
         this->setEye(eye);
         this->setDir(direction);

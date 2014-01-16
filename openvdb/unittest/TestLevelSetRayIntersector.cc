@@ -98,14 +98,17 @@ TestLevelSetRayIntersector::tests()
         const RayT ray(eye, dir);
         //std::cerr << ray << std::endl;
         Vec3T xyz(0);
-        CPPUNIT_ASSERT(lsri.intersectsWS(ray, xyz));
+        Real time = 0;
+        CPPUNIT_ASSERT(lsri.intersectsWS(ray, xyz, time));
         ASSERT_DOUBLES_APPROX_EQUAL(15.0, xyz[0]);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[1]);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[2]);
+        ASSERT_DOUBLES_APPROX_EQUAL(13.0, time); 
         double t0=0, t1=0;
         CPPUNIT_ASSERT(ray.intersects(c, r, t0, t1));
+        ASSERT_DOUBLES_APPROX_EQUAL(t0, time);
         //std::cerr << "\nray("<<t0<<")="<<ray(t0)<<std::endl;
-        //std::cerr << "Intersection at  xyz = " << xyz << std::endl;
+        //std::cerr << "Intersection at  xyz = " << xyz << " time = " << time << std::endl;
         CPPUNIT_ASSERT(ray(t0) == xyz);
     }
 
@@ -123,12 +126,15 @@ TestLevelSetRayIntersector::tests()
         const RayT ray(eye, dir);
         //std::cerr << ray << std::endl;
         Vec3T xyz(0);
-        CPPUNIT_ASSERT(lsri.intersectsWS(ray, xyz));
+        Real time = 0;
+        CPPUNIT_ASSERT(lsri.intersectsWS(ray, xyz, time));
         ASSERT_DOUBLES_APPROX_EQUAL(15.0, xyz[0]);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[1]);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[2]);
+        ASSERT_DOUBLES_APPROX_EQUAL(13.0, time); 
         double t0=0, t1=0;
         CPPUNIT_ASSERT(ray.intersects(c, r, t0, t1));
+        ASSERT_DOUBLES_APPROX_EQUAL(t0, time);
         //std::cerr << "\nray("<<t0<<")="<<ray(t0)<<std::endl;
         //std::cerr << "Intersection at  xyz = " << xyz << std::endl;
         CPPUNIT_ASSERT(ray(t0) == xyz);
@@ -147,12 +153,15 @@ TestLevelSetRayIntersector::tests()
         const Vec3T eye(0.0,-2.0, 0.0);
         RayT ray(eye, dir);
         Vec3T xyz(0);
-        CPPUNIT_ASSERT(lsri.intersectsWS(ray, xyz));
+        Real time = 0;
+        CPPUNIT_ASSERT(lsri.intersectsWS(ray, xyz, time));
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[0]);
         ASSERT_DOUBLES_APPROX_EQUAL(15.0, xyz[1]);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[2]);
+        ASSERT_DOUBLES_APPROX_EQUAL(17.0, time); 
         double t0=0, t1=0;
         CPPUNIT_ASSERT(ray.intersects(c, r, t0, t1));
+        ASSERT_DOUBLES_APPROX_EQUAL(t0, time);
         //std::cerr << "\nray("<<t0<<")="<<ray(t0)<<std::endl;
         //std::cerr << "Intersection at  xyz = " << xyz << std::endl;
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, ray(t0)[0]);
@@ -173,12 +182,15 @@ TestLevelSetRayIntersector::tests()
         const Vec3T eye( 0.0,-2.0, 0.0);
         RayT ray(eye, dir);
         Vec3T xyz(0);
-        CPPUNIT_ASSERT(lsri.intersectsWS(ray, xyz));
+        Real time = 0;
+        CPPUNIT_ASSERT(lsri.intersectsWS(ray, xyz, time));
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[0]);
         ASSERT_DOUBLES_APPROX_EQUAL(15.0, xyz[1]);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[2]);
+        ASSERT_DOUBLES_APPROX_EQUAL(17.0, time); 
         double t0=0, t1=0;
         CPPUNIT_ASSERT(ray.intersects(c, r, t0, t1));
+        ASSERT_DOUBLES_APPROX_EQUAL(t0, time);
         //std::cerr << "\nray("<<t0<<")="<<ray(t0)<<std::endl;
         //std::cerr << "Intersection at  xyz = " << xyz << std::endl;
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, ray(t0)[0]);
@@ -200,12 +212,15 @@ TestLevelSetRayIntersector::tests()
         const Vec3T eye(0.0, 0.0, 4.0);
         RayT ray(eye, dir);
         Vec3T xyz(0);
-        CPPUNIT_ASSERT(lsri.intersectsWS(ray, xyz));
+        Real time = 0;
+        CPPUNIT_ASSERT(lsri.intersectsWS(ray, xyz, time));
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[0]);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[1]);
         ASSERT_DOUBLES_APPROX_EQUAL(15.0, xyz[2]);
+        ASSERT_DOUBLES_APPROX_EQUAL(11.0, time); 
         double t0=0, t1=0;
         CPPUNIT_ASSERT(ray.intersects(c, r, t0, t1));
+        ASSERT_DOUBLES_APPROX_EQUAL(t0, time);
         //std::cerr << "\nray("<<t0<<")="<<ray(t0)<<std::endl;
         //std::cerr << "Intersection at  xyz = " << xyz << std::endl;
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, ray(t0)[0]);
@@ -227,12 +242,15 @@ TestLevelSetRayIntersector::tests()
         const Vec3T eye( 0.0, 0.0, 4.0);
         RayT ray(eye, dir);
         Vec3T xyz(0);
-        CPPUNIT_ASSERT(lsri.intersectsWS(ray, xyz));
+        Real time = 0;
+        CPPUNIT_ASSERT(lsri.intersectsWS(ray, xyz, time));
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[0]);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[1]);
         ASSERT_DOUBLES_APPROX_EQUAL(15.0, xyz[2]);
+        ASSERT_DOUBLES_APPROX_EQUAL(11.0, time); 
         double t0=0, t1=0;
         CPPUNIT_ASSERT(ray.intersects(c, r, t0, t1));
+        ASSERT_DOUBLES_APPROX_EQUAL(t0, time);
         //std::cerr << "t0 = " << t0 << " t1 = " << t1 << std::endl;
         //std::cerr << "\nray("<<t0<<")="<<ray(t0)<<std::endl;
         //std::cerr << "Intersection at  xyz = " << xyz << std::endl;
@@ -255,15 +273,18 @@ TestLevelSetRayIntersector::tests()
         const Vec3T eye( 0.0, 0.0, 4.0);
         RayT ray(eye, dir, 16.0);
         Vec3T xyz(0);
-        CPPUNIT_ASSERT(lsri.intersectsWS(ray, xyz));
+        Real time = 0;
+        CPPUNIT_ASSERT(lsri.intersectsWS(ray, xyz, time));
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[0]);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[1]);
         ASSERT_DOUBLES_APPROX_EQUAL(25.0, xyz[2]);
+        ASSERT_DOUBLES_APPROX_EQUAL(21.0, time); 
         double t0=0, t1=0;
         CPPUNIT_ASSERT(ray.intersects(c, r, t0, t1));
         //std::cerr << "t0 = " << t0 << " t1 = " << t1 << std::endl;
         //std::cerr << "\nray("<<t0<<")="<<ray(t0)<<std::endl;
         //std::cerr << "Intersection at  xyz = " << xyz << std::endl;
+        ASSERT_DOUBLES_APPROX_EQUAL(t1, time);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, ray(t0)[0]);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, ray(t0)[1]);
         ASSERT_DOUBLES_APPROX_EQUAL(25.0, ray(t1)[2]);
@@ -283,11 +304,13 @@ TestLevelSetRayIntersector::tests()
         RayT ray(eye, dir);
         //std::cerr << "ray: " << ray << std::endl;
         Vec3T xyz(0);
-        CPPUNIT_ASSERT(lsri.intersectsWS(ray, xyz));
+        Real time = 0;
+        CPPUNIT_ASSERT(lsri.intersectsWS(ray, xyz, time));
         //std::cerr << "\nIntersection at  xyz = " << xyz << std::endl;
         //analytical intersection test
         double t0=0, t1=0;
         CPPUNIT_ASSERT(ray.intersects(c, r, t0, t1));
+        ASSERT_DOUBLES_APPROX_EQUAL(t0, time);
         ASSERT_DOUBLES_APPROX_EQUAL((ray(t0)-c).length()-r, 0);
         ASSERT_DOUBLES_APPROX_EQUAL((ray(t1)-c).length()-r, 0);
         //std::cerr << "\nray("<<t0<<")="<<ray(t0)<<std::endl;
@@ -298,7 +321,7 @@ TestLevelSetRayIntersector::tests()
         ASSERT_DOUBLES_APPROX_EQUAL(0, delta.length());
     }
 
-    {// test intersections against a high-resolution level set sphere @1000^3
+    {// test intersections against a high-resolution level set sphere @1024^3
         const float r = 5.0f;
         const Vec3f c(10.0f, 10.0f, 20.0f);
         const float s = 0.01f, w = 2.0f;
@@ -309,6 +332,7 @@ TestLevelSetRayIntersector::tests()
         tools::LevelSetRayIntersector<FloatGrid, SearchImplT> lsri(*ls);
 
         Vec3T xyz(0);
+        Real time = 0;
         const size_t width = 1024;
         const double dx = 20.0/width;
         const Vec3T dir(0.0, 0.0, 1.0);
@@ -317,8 +341,9 @@ TestLevelSetRayIntersector::tests()
             for (size_t j=0; j<width; ++j) {
                 const Vec3T eye(dx*i, dx*j, 0.0);
                 const RayT ray(eye, dir);
-                if (lsri.intersectsWS(ray, xyz)){
+                if (lsri.intersectsWS(ray, xyz, time)){
                     CPPUNIT_ASSERT(ray.intersects(c, r, t0, t1));
+                    CPPUNIT_ASSERT_DOUBLES_EQUAL(0, 100*(t0-time)/t0, /*tolerance=*/0.1);//percent
                     double delta = (ray(t0)-xyz).length()/s;//in voxel units
                     CPPUNIT_ASSERT(delta < 0.06);
                 }
@@ -338,7 +363,7 @@ TestLevelSetRayIntersector::stats()
 
     {// generate an image, benchmarks and statistics
 
-        // Generate a high-resolution level set sphere @1000^3
+        // Generate a high-resolution level set sphere @1024^3
         const float r = 5.0f;
         const Vec3f c(10.0f, 10.0f, 20.0f);
         const float s = 0.01f, w = 2.0f;

@@ -517,7 +517,7 @@ MeshVoxelizer<FloatTreeT, InterruptT>::MeshVoxelizer(
     , mPolygonList(polygonList)
     , mSqrDistTree(std::numeric_limits<FloatValueT>::max())
     , mSqrDistAccessor(mSqrDistTree)
-    , mPrimIndexTree(Int32(util::INVALID_IDX)) 
+    , mPrimIndexTree(Int32(util::INVALID_IDX))
     , mPrimIndexAccessor(mPrimIndexTree)
     , mIntersectionTree(false)
     , mIntersectionAccessor(mIntersectionTree)
@@ -856,7 +856,7 @@ int
 ContourTracer<FloatTreeT, InterruptT>::sparseScan(int slice) const
 {
     bool lastVoxelWasOut = true;
-    int last_k;
+    int last_k = mBBox.min()[2];
 
     Coord ijk(slice, mBBox.min()[1], mBBox.min()[2]);
     Coord step(mStepSize[mDistAccessor.getValueDepth(ijk) + 1]);
@@ -1828,7 +1828,7 @@ ExpandNB<FloatTreeT>::operator()(const tbb::blocked_range<size_t>& range)
             distLeafPt = new FloatLeafT(ijk, distAcc.getValue(ijk));
             newDistAcc.addLeaf(distLeafPt);
         }
-     
+
         IntLeafT* indexLeafPt = indexAcc.probeLeaf(ijk);
         if (!indexLeafPt) indexLeafPt =  newIndexAcc.touchLeaf(ijk);
 
@@ -2511,7 +2511,7 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
 
     if (wasInterrupted(99)) return;
 
-    mDistGrid->tree().pruneLevelSet();    
+    mDistGrid->tree().pruneLevelSet();
     mDistGrid->tree().signedFloodFill(exBandWidth, -inBandWidth);
 }
 

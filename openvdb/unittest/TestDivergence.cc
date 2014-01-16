@@ -152,12 +152,12 @@ TestDivergence::testDivergenceMaskedTool()
         for (int y = -dim; y<dim; ++y) {
             for (int z = -dim; z<dim; ++z) {
                 Coord xyz(x,y,z);
-               
+
                 VectorTree::ValueType v = inTree.getValue(xyz);
                 ASSERT_DOUBLES_EXACTLY_EQUAL(x, v[0]);
                 ASSERT_DOUBLES_EXACTLY_EQUAL(y, v[1]);
                 ASSERT_DOUBLES_EXACTLY_EQUAL(0, v[2]);
-                
+
                 const float d = accessor.getValue(xyz);
                 if (maskBBox.isInside(xyz)) {
                     ASSERT_DOUBLES_EXACTLY_EQUAL(2, d);
@@ -463,7 +463,7 @@ TestDivergence::testWSDivergence()
             for (int y = -dim; y<dim; ++y) {
                 for (int z = -dim; z<dim; ++z) {
                     openvdb::Coord xyz(x,y,z);
-                    openvdb::VectorTree::ValueType v = inTree.getValue(xyz);
+                    //openvdb::VectorTree::ValueType v = inTree.getValue(xyz);
                     //std::cout << "vec(" << xyz << ")=" << v << std::endl;
 
                     float d;
@@ -542,7 +542,8 @@ TestDivergence::testWSDivergence()
             for (int y = -dim; y<dim; ++y) {
                 for (int z = -dim; z<dim; ++z) {
                     openvdb::Coord xyz(x,y,z);
-                    openvdb::VectorTree::ValueType v = inTree.getValue(xyz);
+                    //openvdb::VectorTree::ValueType v = inTree.getValue(xyz);
+                    //std::cout << "vec(" << xyz << ")=" << v << std::endl;
 
                     float d;
                     d = math::Divergence<math::AffineMap, math::CD_2ND>::result(
@@ -606,7 +607,7 @@ TestDivergence::testWSDivergenceStencil()
             for (int y = -dim; y<dim; ++y) {
                 for (int z = -dim; z<dim; ++z) {
                     openvdb::Coord xyz(x,y,z);
-                    openvdb::VectorTree::ValueType v = inTree.getValue(xyz);
+                    //openvdb::VectorTree::ValueType v = inTree.getValue(xyz);
                     //std::cout << "vec(" << xyz << ")=" << v << std::endl;
                     float d;
 

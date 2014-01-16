@@ -740,7 +740,17 @@ DWAOpPolicy::getHelpURL(const OpFactory& factory)
 ////////////////////////////////////////
 
 
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
+
+const PRM_ChoiceList PrimGroupMenu = SOP_Node::primGroupMenu;
+
+#else // earlier than 13.0.0
+
 namespace {
+
+// Extended group name drop-down menu incorporating @c "@<attr>=<value>" syntax
+// (this functionality was added to SOP_Node::primGroupMenu some time ago,
+// possibly as early as Houdini 12.5)
 
 inline int
 lookupGroupInput(const PRM_SpareData *spare)
@@ -896,13 +906,13 @@ sopBuildGridMenu(void *data, PRM_Name *menuEntries, int themenusize,
 } // unnamed namespace
 
 
-/// @brief Extended group name drop-down menu incorporating @c "@<attr>=<value>" syntax
-/// @todo Remove this once it becomes a native menu type (expected in Houdini 12.5).
 #ifdef _MSC_VER
 OPENVDB_HOUDINI_API const PRM_ChoiceList PrimGroupMenu(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
 #else
 const PRM_ChoiceList PrimGroupMenu(PRM_CHOICELIST_TOGGLE, sopBuildGridMenu);
 #endif
+
+#endif // earlier than 13.0.0
 
 
 ////////////////////////////////////////

@@ -86,7 +86,6 @@ template<typename GridType, typename MaskT, typename InterruptT> inline
 typename ScalarToVectorConverter<GridType>::Type::Ptr
 cpt(const GridType& grid, const MaskT& mask, bool threaded, InterruptT* interrupt);
 
-
 template<typename GridType> inline
 typename ScalarToVectorConverter<GridType>::Type::Ptr
 cpt(const GridType& grid, bool threaded = true)
@@ -436,6 +435,7 @@ public:
     {
         Functor functor(mInputGrid, mMask, threaded, useWorldTransform, mInterrupt);
         processTypedMap(mInputGrid.transform(), functor);
+        if (functor.mOutputGrid) functor.mOutputGrid->setVectorType(VEC_CONTRAVARIANT_ABSOLUTE);
         return functor.mOutputGrid;
     }
 
@@ -498,7 +498,7 @@ private:
 ////////////////////////////////////////
 
 
-/// @brief Compute the curl of a scalar grid.
+/// @brief Compute the curl of a vector grid.
 template<
     typename GridT,
     typename MaskGridType = typename gridop::ToBoolGrid<GridT>::Type,
@@ -523,6 +523,7 @@ public:
     {
         Functor functor(mInputGrid, mMask, threaded, mInterrupt);
         processTypedMap(mInputGrid.transform(), functor);
+        if (functor.mOutputGrid) functor.mOutputGrid->setVectorType(VEC_COVARIANT);
         return functor.mOutputGrid;
     }
 
@@ -558,7 +559,7 @@ private:
 ////////////////////////////////////////
 
 
-/// @brief Compute the divergence of a scalar grid.
+/// @brief Compute the divergence of a vector grid.
 template<
     typename InGridT,
     typename MaskGridType = typename gridop::ToBoolGrid<InGridT>::Type,
@@ -650,6 +651,7 @@ public:
     {
         Functor functor(mInputGrid, mMask, threaded, mInterrupt);
         processTypedMap(mInputGrid.transform(), functor);
+        if (functor.mOutputGrid) functor.mOutputGrid->setVectorType(VEC_COVARIANT);
         return functor.mOutputGrid;
     }
 
@@ -685,7 +687,6 @@ protected:
 ////////////////////////////////////////
 
 
-/// @brief Compute the Laplacian of a scalar grid.
 template<
     typename GridT,
     typename MaskGridType = typename gridop::ToBoolGrid<GridT>::Type,
@@ -710,6 +711,7 @@ public:
     {
         Functor functor(mInputGrid, mMask, threaded, mInterrupt);
         processTypedMap(mInputGrid.transform(), functor);
+        if (functor.mOutputGrid) functor.mOutputGrid->setVectorType(VEC_COVARIANT);
         return functor.mOutputGrid;
     }
 
@@ -768,6 +770,7 @@ public:
     {
         Functor functor(mInputGrid, mMask, threaded, mInterrupt);
         processTypedMap(mInputGrid.transform(), functor);
+        if (functor.mOutputGrid) functor.mOutputGrid->setVectorType(VEC_COVARIANT);
         return functor.mOutputGrid;
     }
 
@@ -890,6 +893,14 @@ public:
     {
         Functor functor(mInputGrid, mMask, threaded, mInterrupt);
         processTypedMap(mInputGrid.transform(), functor);
+        if (typename GridT::Ptr outGrid = functor.mOutputGrid) {
+            const VecType vecType = mInputGrid.getVectorType();
+            if (vecType == VEC_COVARIANT) {
+                outGrid->setVectorType(VEC_COVARIANT_NORMALIZE);
+            } else {
+                outGrid->setVectorType(vecType);
+            }
+        }
         return functor.mOutputGrid;
     }
 

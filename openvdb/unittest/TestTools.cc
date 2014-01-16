@@ -350,10 +350,10 @@ TestTools::testErodeVoxels()
     }
     {
         struct Info {
-            void test(TreeType::Ptr tree) {
-                CPPUNIT_ASSERT_EQUAL(activeVoxelCount, int(tree->activeVoxelCount()));
-                CPPUNIT_ASSERT_EQUAL(leafCount,        int(tree->leafCount()));
-                CPPUNIT_ASSERT_EQUAL(nonLeafCount,     int(tree->nonLeafCount()));
+            void test(TreeType::Ptr aTree) {
+                CPPUNIT_ASSERT_EQUAL(activeVoxelCount, int(aTree->activeVoxelCount()));
+                CPPUNIT_ASSERT_EQUAL(leafCount,        int(aTree->leafCount()));
+                CPPUNIT_ASSERT_EQUAL(nonLeafCount,     int(aTree->nonLeafCount()));
             }
             int activeVoxelCount, leafCount, nonLeafCount;
         };
@@ -641,7 +641,7 @@ TestTools::testLevelSetAdvect()
 
     typedef openvdb::FloatGrid GridT;
     typedef openvdb::Vec3fGrid VectT;
-   
+
     */
     /*
     {//test tracker
@@ -742,7 +742,7 @@ TestTools::testLevelSetMorph()
         const int dim = 64;
         const openvdb::Vec3f C1(0.35f, 0.35f, 0.35f), C2(0.4f, 0.4f, 0.4f);
         const float radius = 0.15f, voxelSize = 1.0f/(dim-1);
-        
+
         GridT::Ptr source = openvdb::tools::createLevelSetSphere<GridT>(radius, C1, voxelSize);
         GridT::Ptr target = openvdb::tools::createLevelSetSphere<GridT>(radius, C2, voxelSize);
 
@@ -854,7 +854,7 @@ TestTools::testLevelSetMorph()
             fw(name, t + dt, cflCount);
         }
         }
-    
+
     */
 }//testLevelSetMorph
 
@@ -870,20 +870,20 @@ TestTools::testLevelSetMeasure()
 
     // First sphere
     openvdb::Vec3f C(0.35f, 0.35f, 0.35f);
-    openvdb::Real r = 0.15, voxelSize = 1.0/(dim-1); 
+    openvdb::Real r = 0.15, voxelSize = 1.0/(dim-1);
     const openvdb::Real Pi = boost::math::constants::pi<openvdb::Real>();
     GridT::Ptr sphere = openvdb::tools::createLevelSetSphere<GridT>(r, C, voxelSize);
-    
+
     typedef openvdb::tools::LevelSetMeasure<GridT>  MeasureT;
     MeasureT m(*sphere);
-    
+
     /// Test area and volume of sphere in world units
     m.measure(a, v);
     area = 4*Pi*r*r;
     volume = 4.0/3.0*Pi*r*r*r;
     //std::cerr << "\nArea of sphere = " << area << "  " << a << std::endl;
     //std::cerr << "\nVolume of sphere = " << volume << "  " << v << std::endl;
-    // Test accuracy of computed measures to within 0.1% of the exact measure. 
+    // Test accuracy of computed measures to within 0.1% of the exact measure.
     CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, percentage*area);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, percentage*volume);
 
@@ -895,7 +895,7 @@ TestTools::testLevelSetMeasure()
     //std::cerr << "\nArea of sphere = " << area << "  " << a << std::endl;
     //std::cerr << "Volume of sphere = " << volume << "  " << v << std::endl;
     //std::cerr << "Avg mean curvature of sphere = " << curv << "  " << c << std::endl;
-    // Test accuracy of computed measures to within 0.1% of the exact measure. 
+    // Test accuracy of computed measures to within 0.1% of the exact measure.
     CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, percentage*area);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, percentage*volume);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(curv,   c, percentage*curv);
@@ -909,7 +909,7 @@ TestTools::testLevelSetMeasure()
     //std::cerr << "\nArea of sphere = " << area << "  " << a << std::endl;
     //std::cerr << "Volume of sphere = " << volume << "  " << v << std::endl;
     //std::cerr << "Avg mean curvature of sphere = " << curv << "  " << c << std::endl;
-    // Test accuracy of computed measures to within 0.1% of the exact measure. 
+    // Test accuracy of computed measures to within 0.1% of the exact measure.
     CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, percentage*area);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, percentage*volume);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(curv,   c, percentage*curv);
@@ -919,7 +919,7 @@ TestTools::testLevelSetMeasure()
     r = 0.57f;
     sphere = openvdb::tools::createLevelSetSphere<GridT>(r, C, voxelSize);
     m.reinit(*sphere);
-    
+
      // Test all measures of sphere in world units
     m.measure(a, v, c);
     area = 4*Pi*r*r;
@@ -928,13 +928,13 @@ TestTools::testLevelSetMeasure()
     //std::cerr << "\nArea of sphere = " << area << "  " << a << std::endl;
     //std::cerr << "Volume of sphere = " << volume << "  " << v << std::endl;
     //std::cerr << "Avg mean curvature of sphere = " << curv << "  " << c << std::endl;
-    // Test accuracy of computed measures to within 0.1% of the exact measure. 
+    // Test accuracy of computed measures to within 0.1% of the exact measure.
     CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, percentage*area);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, percentage*volume);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(curv,   c, percentage*curv);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(area,  openvdb::tools::levelSetArea(*sphere),  percentage*area);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(volume,openvdb::tools::levelSetVolume(*sphere),percentage*volume);
-    
+
      // Test all measures of sphere in index units
     m.measure(a, v, c, false);
     r /= voxelSize;
@@ -944,7 +944,7 @@ TestTools::testLevelSetMeasure()
     //std::cerr << "\nArea of sphere = " << area << "  " << a << std::endl;
     //std::cerr << "Volume of sphere = " << volume << "  " << v << std::endl;
     //std::cerr << "Avg mean curvature of sphere = " << curv << "  " << c << std::endl;
-    // Test accuracy of computed measures to within 0.1% of the exact measure. 
+    // Test accuracy of computed measures to within 0.1% of the exact measure.
     CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   a, percentage*area);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, v, percentage*volume);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(curv,   c, percentage*curv);
@@ -973,7 +973,7 @@ TestTools::testLevelSetMeasure()
     timer.stop();
     std::cerr << "Model: area = " << a << ", volume = " << v
               << ", average curvature = " << c << std::endl;
-    
+
     m.setGrainSize(0);
     timer.start("\nSerial measure of area and volume");
     m.measure(a, v, false);
@@ -1047,10 +1047,10 @@ TestTools::testMaskedMagnitude()
     const openvdb::CoordBBox maskbbox(openvdb::Coord(35, 30, 30), openvdb::Coord(41, 41, 41));
     openvdb::BoolGrid::Ptr maskGrid = openvdb::BoolGrid::create(false);
     maskGrid->fill(maskbbox, true/*value*/, true/*activate*/);
-    
+
     // compute the magnitude in masked region
     openvdb::FloatGrid::Ptr mag = openvdb::tools::magnitude(*gradGrid, *maskGrid);
-   
+
     openvdb::FloatGrid::ConstAccessor accessor = mag->getConstAccessor();
 
     // test in the masked region
@@ -1311,9 +1311,9 @@ TestTools::testPointAdvect()
 
 struct PointList
 {
-    struct Point { float x,y,z; };
+    struct Point { double x,y,z; };
     std::vector<Point> list;
-    void add(const openvdb::Vec3R &p) { Point q={p[0],p[1],p[2]}; list.push_back(q); }
+    void add(const openvdb::Vec3d &p) { Point q={p[0],p[1],p[2]}; list.push_back(q); }
 };
 
 
@@ -1410,9 +1410,9 @@ namespace {
 
 template<typename IterT>
 struct MatMul {
-    openvdb::math::Mat3s M;
-    MatMul(const openvdb::math::Mat3s& M): M(M) {}
-    openvdb::Vec3s xform(const openvdb::Vec3s& v) const { return M.transform(v); }
+    openvdb::math::Mat3s mat;
+    MatMul(const openvdb::math::Mat3s& _mat): mat(_mat) {}
+    openvdb::Vec3s xform(const openvdb::Vec3s& v) const { return mat.transform(v); }
     void operator()(const IterT& it) const { it.setValue(xform(*it)); }
 };
 
