@@ -79,7 +79,16 @@ public:
 
 protected:
     struct FilterParms {
-        FilterParms(Operation _op): op(_op), iterations(1), radius(1), offset(0.0) {}
+        FilterParms(Operation _op)
+	    : op(_op)
+	    , iterations(1)
+	    , radius(1)
+#ifndef SESI_OPENVDB
+	    , offset(0.0)
+#endif
+	{
+	}
+
         Operation op;
         int iterations;
         int radius;
@@ -274,7 +283,7 @@ SOP_OpenVDB_Filter::registerSop(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "verbose", "Verbose")
               .setHelpText("Prints the sequence of operations to the terminal."));
 #endif
-    
+
     // Obsolete parameters
     hutil::ParmList obsoleteParms;
     obsoleteParms.add(hutil::ParmFactory(PRM_SEPARATOR,"sep1", ""));
@@ -283,7 +292,7 @@ SOP_OpenVDB_Filter::registerSop(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("OpenVDB Filter", SOP_OpenVDB_Filter::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("VDBs to Smooth")
-        .addOptionalInput("Optional VDB Mask (for alpha masking)");
+        .addOptionalInput("Optional VDB Alpha Mask");
 }
 
 
@@ -306,7 +315,7 @@ SOP_OpenVDB_Filter::updateParmsFlags()
     changed |= enableParm("minMask", useMask);
     changed |= enableParm("maxMask", useMask);
     changed |= enableParm("maskname", useMask);
-        
+
 #ifndef SESI_OPENVDB
     // Disable and hide unused parameters.
     bool enable = (op == OP_MEAN || op == OP_GAUSS || op == OP_MEDIAN);
@@ -347,7 +356,7 @@ struct SOP_OpenVDB_Filter::FilterOp
             const FilterParms& parms = opSequence[i];
             filter.setMaskRange(parms.minMask, parms.maxMask);
             filter.invertMask(parms.invertMask);
-            
+
             switch (parms.op) {
 #ifndef SESI_OPENVDB
             case OP_OFFSET:

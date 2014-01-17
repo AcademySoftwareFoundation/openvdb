@@ -251,21 +251,20 @@ geoStandardFrustumMapPtr(const GEO_PrimVDB &vdb)
 				    /*depth*/1.0, secondMap.copy()));
 }
 
-// Return a GEO_PrimVolumeXform which maps [-0.5,+0.5] Houdini voxel space
-// coordinates over the VDB's active voxel bbox into world space.
+// The returned space's fromVoxelSpace() method will convert 0-1
+// coordinates over the bbox extents to world space (and vice versa for
+// toVoxelSpace()).
 GEO_PrimVolumeXform
-GEO_PrimVDB::getSpaceTransform() const
+GEO_PrimVDB::getSpaceTransform(const UT_BoundingBoxD &bbox) const
 {
     using namespace openvdb;
     using namespace openvdb::math;
-    using openvdb::CoordBBox;
     using openvdb::Vec3d;
     using openvdb::Mat4d;
 
     MapBase::ConstPtr	base_map = getGrid().transform().baseMap();
-    const CoordBBox	coord_bbox = getGrid().evalActiveVoxelBoundingBox();
-    BBoxd		active_bbox(coord_bbox.getStart().asVec3d(),
-				    coord_bbox.getEnd().asVec3d());
+    BBoxd		active_bbox(UTvdbConvert(bbox.minvec()),
+				    UTvdbConvert(bbox.maxvec()));
     UT_Matrix4D		transform(1.0); // identity
     fpreal		new_taper(1.0); // no taper default
 
@@ -446,6 +445,15 @@ GEO_PrimVDB::getSpaceTransform() const
     result.myTaperY = new_taper;
 
     return result;
+}
+
+// Return a GEO_PrimVolumeXform which maps [-0.5,+0.5] Houdini voxel space
+// coordinates over the VDB's active voxel bbox into world space.
+GEO_PrimVolumeXform
+GEO_PrimVDB::getSpaceTransform() const
+{
+    const openvdb::CoordBBox bbox = getGrid().evalActiveVoxelBoundingBox();
+    return getSpaceTransform(UTvdbConvert(bbox));
 }
 
 bool
@@ -848,7 +856,7 @@ geo_calcArea(const GridType &grid, fpreal &area)
         }
     }
 }
-    
+
 fpreal
 GEO_PrimVDB::calcArea() const
 {
@@ -2818,14 +2826,14 @@ GEO_PrimVDB::GridAccessor::updateGridTranslates(const GEO_PrimVDB &prim) const
 {
     using namespace	openvdb::math;
     const GA_Detail &	geo = prim.getDetail();
-    GA_Offset		vtxoff = prim.vertexPoint(0);
 
     // It is possible our vertex offset is invalid, such as us
     // being a stashed primitive.
-    if (!GAisValid(vtxoff))
+    if (!GAisValid(prim.getVertexOffset(0)))
 	return;
 
-    Vec3d		newpos = UTvdbConvert(geo.getPos3(vtxoff));
+    GA_Offset		ptoff = prim.vertexPoint(0);
+    Vec3d		newpos = UTvdbConvert(geo.getPos3(ptoff));
     Vec3d		oldpos = vdbTranslation(myGrid->transform());
     MapBase::ConstPtr	map = myGrid->transform().baseMap();
 

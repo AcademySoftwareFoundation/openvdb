@@ -321,7 +321,6 @@ SOP_OpenVDB_Sample_Points::sample(OP_Context& context)
         matchGroup(const_cast<GU_Detail&>(*bGdp), groupStr.toStdString());
 
     // scratch variables used in the loop
-    GEO_AttributeHandle attribHandle;
     GA_Defaults defaultFloat(0.0), defaultInt(0);
 
     int numScalarGrids  = 0;

@@ -103,16 +103,23 @@ filterTypeToString(FilterType filter)
     switch (filter) {
         case FILTER_TYPE_NONE: ret           = "none";           break;
         case FILTER_TYPE_RENORMALIZE: ret    = "renormalize";    break;
-        case FILTER_TYPE_MEAN_VALUE: ret     = "mean value";     break;
         case FILTER_TYPE_GAUSSIAN: ret       = "gaussian";       break;
-        case FILTER_TYPE_MEDIAN_VALUE: ret   = "median value";   break;
-        case FILTER_TYPE_MEAN_CURVATURE: ret = "mean curvature"; break;
-        case FILTER_TYPE_LAPLACIAN_FLOW: ret = "laplacian flow"; break;
         case FILTER_TYPE_DILATE: ret         = "dilate";         break;
         case FILTER_TYPE_ERODE: ret          = "erode";          break;
         case FILTER_TYPE_OPEN: ret           = "open";           break;
         case FILTER_TYPE_CLOSE: ret          = "close";          break;
         case FILTER_TYPE_TRACK: ret          = "track";          break;
+#ifndef SESI_OPENVDB
+        case FILTER_TYPE_MEAN_VALUE: ret     = "mean value";     break;
+        case FILTER_TYPE_MEDIAN_VALUE: ret   = "median value";   break;
+        case FILTER_TYPE_MEAN_CURVATURE: ret = "mean curvature"; break;
+        case FILTER_TYPE_LAPLACIAN_FLOW: ret = "laplacian flow"; break;
+#else
+        case FILTER_TYPE_MEAN_VALUE: ret     = "meanvalue";      break;
+        case FILTER_TYPE_MEDIAN_VALUE: ret   = "medianvalue";    break;
+        case FILTER_TYPE_MEAN_CURVATURE: ret = "meancurvature";  break;
+        case FILTER_TYPE_LAPLACIAN_FLOW: ret = "laplacianflow";  break;
+#endif
     }
     return ret;
 }
@@ -496,16 +503,16 @@ newSopOperator(OP_OperatorTable* table)
             hvdb::OpenVDBOpFactory("OpenVDB Offset Level Set",
                 SOP_OpenVDB_Filter_Level_Set::factoryReshape, parms, *table)
                 .setObsoleteParms(obsoleteParms)
-                .addInput("Input with VDB grids to process")
-                .addOptionalInput("Optional VDB Mask (for alpha masking)");
+                .addInput("Input with VDBs to process")
+                .addOptionalInput("Optional VDB Alpha Mask");
 
         } else if (OP_TYPE_SMOOTH == op) {
 
             hvdb::OpenVDBOpFactory("OpenVDB Smooth Level Set",
                 SOP_OpenVDB_Filter_Level_Set::factorySmooth, parms, *table)
                 .setObsoleteParms(obsoleteParms)
-                .addInput("Input with VDB grids to process")
-                .addOptionalInput("Optional VDB Mask (for alpha masking)");
+                .addInput("Input with VDBs to process")
+                .addOptionalInput("Optional VDB Alpha Mask");
         }
     }
  }
@@ -619,7 +626,11 @@ SOP_OpenVDB_Filter_Level_Set::cookMySop(OP_Context& context)
         BossT boss("Processing level sets");
 
         const fpreal time = context.getTime();
+#ifndef SESI_OPENVDB
         const bool verbose = bool(evalInt("verbose", 0, time));
+#else
+	const bool verbose = false;
+#endif
 
         if (verbose) std::cout << "--- " << this->getName() << " ---\n";
 
@@ -757,7 +768,7 @@ SOP_OpenVDB_Filter_Level_Set::applyFilters(
 
         // Skip this node if it doesn't operate on this primitive
         if (group && !group->containsOffset(vdbPrim->getMapOffset())) continue;
-        
+
         filterGrid(context, filter, filterParms[n], voxelSize, boss, verbose);
 
         if (boss.wasInterrupted()) break;

@@ -75,6 +75,7 @@ using ::GEO_PrimVDB;
 
 #include <SYS/SYS_AtomicInt.h> // for SYS_AtomicCounter
 
+#include <UT/UT_BoundingBox.h>
 #include "UT_VDBUtils.h"
 #include <UT/UT_Version.h>
 
@@ -272,14 +273,20 @@ public:
     /// toVoxelSpace()).
     GEO_PrimVolumeXform getIndexSpaceTransform() const;
 
-    /// Gives the equivalent to GEO_PrimVolume's getSpaceTransform() by using
-    /// the active voxel bounding box to determine the bounds of the transform.
-    /// The resulting world space sample points will be offset by half a voxel
-    /// so that they match GEO_PrimVolume.
+    /// Equivalent to getSpaceTransform(getGrid().evalActiveVoxelBoundingBox()).
     /// The returned space's fromVoxelSpace() method will convert 0-1
     /// coordinates over the active voxel bounding box to world space (and vice
     /// versa for toVoxelSpace()).
     GEO_PrimVolumeXform getSpaceTransform() const;
+
+    /// Gives the equivalent to GEO_PrimVolume's getSpaceTransform() by using
+    /// the given bounding box to determine the bounds of the transform.
+    /// The resulting world space sample points will be offset by half a voxel
+    /// so that they match GEO_PrimVolume.
+    /// The returned space's fromVoxelSpace() method will convert 0-1
+    /// coordinates over the bbox extents to world space (and vice versa for
+    /// toVoxelSpace()).
+    GEO_PrimVolumeXform getSpaceTransform(const UT_BoundingBoxD &bbox) const;
 
     /// Sets the transform from a GEO_PrimVolume's getSpaceTransform() by using
     /// the index space [(0,0,0), resolution] bbox. If force_taper is true,

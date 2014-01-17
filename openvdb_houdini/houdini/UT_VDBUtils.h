@@ -68,12 +68,12 @@ enum UT_VDBType
 #include <openvdb/openvdb.h>
 
 #include <UT/UT_Assert.h>
+#include <UT/UT_BoundingBox.h>
 #include <UT/UT_Matrix4.h>
 #include <UT/UT_Matrix3.h>
 #include <UT/UT_Matrix2.h>
 #include <SYS/SYS_Math.h>
 
-#include <boost/type_traits.hpp>
 #include <boost/typeof/typeof.hpp>
 
 
@@ -580,6 +580,13 @@ UTvdbConvert(const UT_Vector2T<S> &src)
 }
 // @}
 
+/// Bounding box conversion from openvdb to UT
+inline UT_BoundingBoxD
+UTvdbConvert(const openvdb::CoordBBox &bbox)
+{
+    return UT_BoundingBoxD(UTvdbConvert(bbox.getStart().asVec3d()),
+			   UTvdbConvert(bbox.getEnd().asVec3d()));
+}
 
 template <typename T>
 inline openvdb::math::Vec4<T>	SYSabs(const openvdb::math::Vec4<T> &v1)
