@@ -673,10 +673,10 @@ newSopOperator(OP_OperatorTable* table)
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Advect Points",
         SOP_OpenVDBAdvectPoints::factory, parms, *table)
+        .setObsoleteParms(obsoleteParms)
         .addInput("Points to Advect")
         .addOptionalInput("Velocity VDB")
-        .addOptionalInput("Closest Point VDB")
-        .setObsoleteParms(obsoleteParms);
+        .addOptionalInput("Closest Point VDB");
 }
 
 

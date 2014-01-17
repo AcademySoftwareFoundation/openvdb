@@ -37,8 +37,8 @@
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
-#include <openvdb/tools/GridOperators.h>
 
+#include <openvdb/tools/GridOperators.h>
 #include <openvdb/tools/LevelSetUtil.h>
 #include <openvdb/tools/GridTransformer.h>
 
@@ -130,7 +130,7 @@ newSopOperator(OP_OperatorTable* table)
     }
 
     parms.add(hutil::ParmFactory(PRM_STRING, "maskname", "Mask VDB")
-        .setHelpText("A VDB used to define the iteration space")
+        .setHelpText("VDB (from the second input) used to define the iteration space")
                   .setSpareData(&SOP_Node::theSecondInput)
                   .setChoiceList(&hutil::PrimGroupMenu));
 

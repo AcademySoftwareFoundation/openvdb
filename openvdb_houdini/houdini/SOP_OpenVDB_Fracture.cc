@@ -260,8 +260,8 @@ SOP_OpenVDB_Fracture::cookMySop(OP_Context& context)
             group = matchGroup(*gdp, str.toStdString());
         }
 
-        UT_PtrArray<const GA_ElementGroup*>::const_iterator groupIt;
-        UT_PtrArray<const GA_ElementGroup*> primitiveGroups;
+        UT_ValArray<const GA_ElementGroup*>::const_iterator groupIt;
+        UT_ValArray<const GA_ElementGroup*> primitiveGroups;
         gdp->primitiveGroups().getList(primitiveGroups);
 
         std::list<openvdb::GridBase::Ptr> grids;

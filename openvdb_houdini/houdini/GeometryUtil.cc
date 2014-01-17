@@ -374,6 +374,9 @@ validateGeometry(const GU_Detail& geometry, std::string& warning, Interrupter* b
 #else
         parms.setFromType(GEO_PrimTypeCompat::GEOPRIMALL);
         parms.setToType(GEO_PrimTypeCompat::GEOPRIMPOLY);
+	// We don't want interior tetrahedron faces as they will just
+	// distract us and fill up the vdb.
+	parms.setSharedFaces(false);
 #endif
         geoPtr->convert(parms);
     }

@@ -147,7 +147,7 @@ const char* const SOP_OpenVDB_Combine::sOpMenuItems[] = {
     "sdfunion",             "SDF Union",
     "sdfintersect",         "SDF Intersection",
     "sdfdifference",        "SDF Difference",
-    "replacewithactive",    "Replace A With Active B",
+    "replacewithactive",    "Replace A with Active B",
     "topounion",            "Activity Union",
     "topointersect",        "Activity Intersection",
     "topodifference",       "Activity Difference",

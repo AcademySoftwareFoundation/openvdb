@@ -397,8 +397,8 @@ newSopOperator(OP_OperatorTable* table)
     }
 
     // Add multi parm
-    parms.add(hutil::ParmFactory(PRM_MULTITYPE_LIST, "attrList", "Mesh Attributes")
-        .setHelpText("Transfer mesh attributes (point/vertex/primitive) to "
+    parms.add(hutil::ParmFactory(PRM_MULTITYPE_LIST, "attrList", "Surface Attributes")
+        .setHelpText("Transfer surface attributes (point/vertex/primitive) to "
             "all active voxels in the distance field / level set.")
         .setMultiparms(attrParms)
         .setDefault(PRMzeroDefaults));
