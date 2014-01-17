@@ -35,7 +35,7 @@
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
-#include <openvdb/tools/ValueTransformer.h> // for tools::foreach()
+#include <openvdb/tools/VectorTransformer.h> // for transformVectors()
 #include <UT/UT_Interrupt.h>
 #include <boost/math/constants/constants.hpp>
 
@@ -129,84 +129,17 @@ SOP_OpenVDB_Transform::SOP_OpenVDB_Transform(OP_Network* net,
 
 namespace {
 
-using openvdb::Mat4d;
-
-// Functors for use with openvdb::tools::foreach() to transform vector voxel values
-
-struct HomogeneousMatMul {
-    const Mat4d mat;
-    HomogeneousMatMul(const Mat4d& _mat): mat(_mat) {}
-    template<typename TreeIterT> void operator()(const TreeIterT& it) const
-    {
-        openvdb::Vec3d v(*it);
-        it.setValue(mat.transformH(v));
-    }
-};
-
-struct MatMul {
-    const Mat4d mat;
-    MatMul(const Mat4d& _mat): mat(_mat) {}
-    template<typename TreeIterT>
-    void operator()(const TreeIterT& it) const
-    {
-        openvdb::Vec3d v(*it);
-        it.setValue(mat.transform3x3(v));
-    }
-};
-
-struct MatMulNormalize {
-    const Mat4d mat;
-    MatMulNormalize(const Mat4d& _mat): mat(_mat) {}
-    template<typename TreeIterT>
-    void operator()(const TreeIterT& it) const
-    {
-        openvdb::Vec3d v(*it);
-        v = mat.transform3x3(v);
-        v.normalize();
-        it.setValue(v);
-    }
-};
-
-
 // Functor for use with GEOvdbProcessTypedGridVec3() to apply a transform
 // to the voxel values of vector-valued grids
-struct XformOp
+struct VecXformOp
 {
     openvdb::Mat4d mat;
-
-    XformOp(const openvdb::Mat4d& _mat): mat(_mat) {}
-
+    VecXformOp(const openvdb::Mat4d& _mat): mat(_mat) {}
     template<typename GridT> void operator()(GridT& grid) const
     {
-        const openvdb::VecType vecType = grid.getVectorType();
-        switch (vecType) {
-            case openvdb::VEC_COVARIANT:
-            case openvdb::VEC_COVARIANT_NORMALIZE:
-            {
-                openvdb::Mat4d invmat = mat.inverse();
-                invmat = invmat.transpose();
-
-                if (vecType == openvdb::VEC_COVARIANT_NORMALIZE) {
-                    openvdb::tools::foreach(grid.beginValueAll(), MatMulNormalize(invmat));
-                } else {
-                    openvdb::tools::foreach(grid.beginValueAll(), MatMul(invmat));
-                }
-                break;
-            }
-
-            case openvdb::VEC_CONTRAVARIANT_RELATIVE:
-                openvdb::tools::foreach(grid.beginValueAll(), MatMul(mat));
-                break;
-
-            case openvdb::VEC_CONTRAVARIANT_ABSOLUTE:
-                openvdb::tools::foreach(grid.beginValueAll(), HomogeneousMatMul(mat));
-                break;
-
-            case openvdb::VEC_INVARIANT:
-                break;
-        }
+        openvdb::tools::transformVectors(grid, mat);
     }
-}; // struct XformOp
+};
 
 } // unnamed namespace
 
@@ -256,7 +189,7 @@ SOP_OpenVDB_Transform::cookMySop(OP_Context& context)
 
         if (flagInverse) mat = mat.inverse();
 
-        const XformOp xformOp(mat);
+        const VecXformOp xformOp(mat);
 
         // Construct an affine map.
         AffineMap map(mat);

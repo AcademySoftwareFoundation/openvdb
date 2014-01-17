@@ -780,6 +780,35 @@ struct SOP_OpenVDB_Combine::CombineOp
         }
     }
 
+    void checkVectorTypes(const hvdb::Grid* aGrid, const hvdb::Grid* bGrid)
+    {
+        if (!aGrid || !bGrid || !self->needAGrid(op) || !self->needBGrid(op)) return;
+
+        switch (op) {
+            case OP_TOPO_UNION:
+            case OP_TOPO_INTERSECTION:
+            case OP_TOPO_DIFFERENCE:
+                // No need to warn about different vector types for topology-only operations.
+                break;
+
+            default:
+            {
+                const openvdb::VecType
+                    aVecType = aGrid->getVectorType(),
+                    bVecType = bGrid->getVectorType();
+                if (aVecType != bVecType) {
+                    std::ostringstream ostr;
+                    ostr << aGridName << " and " << bGridName
+                        << " have different vector types\n"
+                        << "                 (" << hvdb::Grid::vecTypeToString(aVecType)
+                        << " vs. " << hvdb::Grid::vecTypeToString(bVecType) << ")";
+                    self->addWarning(SOP_MESSAGE, ostr.str().c_str());
+                }
+                break;
+            }
+        }
+    }
+
     // Combine two grids of the same type.
     template<typename GridT>
     void combineSameType()
@@ -798,6 +827,11 @@ struct SOP_OpenVDB_Combine::CombineOp
         if (bBaseGrid) bGrid = UTvdbGridCast<GridT>(bBaseGrid).get();
         if (needA && !aGrid) throw std::runtime_error("missing A grid");
         if (needB && !bGrid) throw std::runtime_error("missing B grid");
+
+        // Warn if combining vector grids with different vector types.
+        if (needA && needB && openvdb::VecTraits<ValueT>::IsVec) {
+            this->checkVectorTypes(aGrid, bGrid);
+        }
 
         // If necessary, resample one grid so that its index space
         // registers with the other grid's.
@@ -932,6 +966,13 @@ struct SOP_OpenVDB_Combine::CombineOp
         if (bBaseGrid) bGrid = UTvdbGridCast<BGridT>(bBaseGrid).get();
         if (needA && !aGrid) throw std::runtime_error("missing A grid");
         if (needB && !bGrid) throw std::runtime_error("missing B grid");
+
+        // Warn if combining vector grids with different vector types.
+        if (needA && needB && openvdb::VecTraits<typename AGridT::ValueType>::IsVec
+            && openvdb::VecTraits<typename BGridT::ValueType>::IsVec)
+        {
+            this->checkVectorTypes(aGrid, bGrid);
+        }
 
         // If necessary, resample one grid so that its index space
         // registers with the other grid's.

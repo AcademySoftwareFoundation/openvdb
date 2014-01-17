@@ -290,6 +290,7 @@ INCLUDE_NAMES := \
     tools/RayTracer.h \
     tools/Statistics.h \
     tools/ValueTransformer.h \
+    tools/VectorTransformer.h \
     tools/VolumeToMesh.h \
     tools/VolumeToSpheres.h \
     tree/InternalNode.h \
