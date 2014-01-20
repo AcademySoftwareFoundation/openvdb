@@ -46,6 +46,7 @@
 #include <openvdb/tools/LevelSetUtil.h>
 #include <openvdb/tools/ParticlesToLevelSet.h>
 #include <CH/CH_Manager.h>
+#include <GA/GA_Types.h> // for GA_ATTRIB_POINT
 
 
 namespace hvdb = openvdb_houdini;
@@ -65,7 +66,7 @@ public:
                  openvdb::Real radiusMult = 1,
                  openvdb::Real velocityMult = 1) :
         mGdp(gdp),
-        mScaleHandle(gdp, GA_ATTRIB_POINT,"pscale"),
+        mScaleHandle(gdp, GA_ATTRIB_POINT, "pscale"),
         mVelHandle(gdp, GA_ATTRIB_POINT, "v"),
         mHasRadius(mScaleHandle.isValid()),
         mHasVelocity(mVelHandle.isValid()),

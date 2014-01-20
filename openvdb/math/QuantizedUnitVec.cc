@@ -41,7 +41,7 @@ namespace math {
 
 ////////////////////////////////////////
 
-    
+
 bool QuantizedUnitVec::sInitialized = false;
 float QuantizedUnitVec::sNormalizationWeights[MASK_SLOTS + 1];
 
@@ -55,7 +55,7 @@ tbb::mutex sInitMutex;
 void
 QuantizedUnitVec::init()
 {
-    tbb::mutex::scoped_lock(sInitMutex);
+    tbb::mutex::scoped_lock lock(sInitMutex);
 
     if (!sInitialized) {
 
@@ -91,7 +91,6 @@ QuantizedUnitVec::init()
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
-
 
 // Copyright (c) 2012-2013 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

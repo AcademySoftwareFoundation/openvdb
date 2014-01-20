@@ -35,6 +35,7 @@
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
+#include <openvdb/tools/VectorTransformer.h> // for transformVectors()
 #include <UT/UT_Interrupt.h>
 #include <boost/math/constants/constants.hpp>
 
@@ -97,6 +98,13 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "invert", "Invert Transformation")
         .setDefault(PRMzeroDefaults));
 
+    // Toggle, apply transform to vector values
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "xformvectors", "Transform Vectors")
+        .setDefault(PRMzeroDefaults)
+        .setHelpText(
+            "Apply the transform to the voxel values of vector-valued grids,\n"
+            "in accordance with those grids' Vector Type attributes.\n"));
+
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Transform", SOP_OpenVDB_Transform::factory, parms, *table)
@@ -117,6 +125,23 @@ SOP_OpenVDB_Transform::SOP_OpenVDB_Transform(OP_Network* net,
     hvdb::SOP_NodeVDB(net, name, op)
 {
 }
+
+
+namespace {
+
+// Functor for use with GEOvdbProcessTypedGridVec3() to apply a transform
+// to the voxel values of vector-valued grids
+struct VecXformOp
+{
+    openvdb::Mat4d mat;
+    VecXformOp(const openvdb::Mat4d& _mat): mat(_mat) {}
+    template<typename GridT> void operator()(GridT& grid) const
+    {
+        openvdb::tools::transformVectors(grid, mat);
+    }
+};
+
+} // unnamed namespace
 
 
 OP_ERROR
@@ -141,6 +166,8 @@ SOP_OpenVDB_Transform::cookMySop(OP_Context& context)
 
         int flagInverse = evalInt("invert", 0, time);
 
+        const bool xformVec = evalInt("xformvectors", 0, time);
+
         // Get the group of grids to be transformed.
         UT_String groupStr;
         evalString(groupStr, "group", 0, time);
@@ -162,6 +189,8 @@ SOP_OpenVDB_Transform::cookMySop(OP_Context& context)
 
         if (flagInverse) mat = mat.inverse();
 
+        const VecXformOp xformOp(mat);
+
         // Construct an affine map.
         AffineMap map(mat);
 
@@ -171,7 +200,8 @@ SOP_OpenVDB_Transform::cookMySop(OP_Context& context)
 
             GU_PrimVDB* vdb = *it;
 
-            // No need to make the grid unique, since we're not modifying its voxel data.
+            // No need to make the grid unique at this point, since we might not need
+            // to modify its voxel data.
             hvdb::Grid& grid = vdb->getGrid();
 
             // Merge the transform's current affine representation with the new affine map.
@@ -186,6 +216,12 @@ SOP_OpenVDB_Transform::cookMySop(OP_Context& context)
             hvdb::GridPtr copyOfGrid = grid.copyGrid();
             copyOfGrid->setTransform(grid.constTransform().copy());
             vdb->setGrid(*copyOfGrid);
+
+            if (xformVec && vdb->getConstGrid().getVectorType() != openvdb::VEC_INVARIANT) {
+                // If (and only if) the grid is vector-valued, deep copy it,
+                // then apply the transform to each voxel's value.
+                GEOvdbProcessTypedGridVec3(*vdb, xformOp, /*makeUnique=*/true);
+            }
         }
     } catch (std::exception& e) {
         addError(SOP_MESSAGE, e.what());

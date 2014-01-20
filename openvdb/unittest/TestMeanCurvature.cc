@@ -78,26 +78,17 @@ TestMeanCurvature::testISMeanCurvature()
 
     FloatGrid::Ptr grid = createGrid<FloatGrid>(/*background=*/5.0);
     FloatTree& tree = grid->tree();
-
-    const openvdb::Coord dim(64,64,64);
-    const openvdb::Vec3f center(35.0f ,30.0f, 40.0f);
-    const float radius=0.0f;
-    unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
-
-    CPPUNIT_ASSERT(!tree.empty());
+    AccessorType inAccessor = grid->getConstAccessor();
+    AccessorType::ValueType alpha, beta, meancurv, normGrad;
     Coord xyz(35,30,30);
 
-    AccessorType inAccessor = grid->getConstAccessor();
-    AccessorType::ValueType alpha, beta;
-    math::ISMeanCurvature<math::CD_SECOND, math::CD_2ND>::result(inAccessor, xyz, alpha, beta);
+    // First test an empty grid
+    CPPUNIT_ASSERT(tree.empty());
+    typedef math::ISMeanCurvature<math::CD_SECOND, math::CD_2ND> SecondOrder;
+    CPPUNIT_ASSERT(!SecondOrder::result(inAccessor, xyz, alpha, beta));
 
-    AccessorType::ValueType meancurv = alpha/(2*math::Pow3(beta) );
-    AccessorType::ValueType normGrad = alpha/(2*math::Pow2(beta) );
-
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/10.0, meancurv, 0.001);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/10.0, normGrad, 0.001);
-
-    math::ISMeanCurvature<math::CD_FOURTH, math::CD_4TH>::result(inAccessor, xyz, alpha, beta);
+    typedef math::ISMeanCurvature<math::CD_FOURTH, math::CD_4TH> FourthOrder;
+    CPPUNIT_ASSERT(!FourthOrder::result(inAccessor, xyz, alpha, beta));
 
     meancurv = alpha/(2*math::Pow3(beta) );
     normGrad = alpha/(2*math::Pow2(beta) );
@@ -105,8 +96,40 @@ TestMeanCurvature::testISMeanCurvature()
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/10.0, meancurv, 0.001);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/10.0, normGrad, 0.001);
 
+    typedef math::ISMeanCurvature<math::CD_SIXTH, math::CD_6TH> SixthOrder;
+    CPPUNIT_ASSERT(!SixthOrder::result(inAccessor, xyz, alpha, beta));
 
-    math::ISMeanCurvature<math::CD_SIXTH, math::CD_6TH>::result(inAccessor, xyz, alpha, beta);
+    meancurv = alpha/(2*math::Pow3(beta) );
+    normGrad = alpha/(2*math::Pow2(beta) );
+
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/10.0, meancurv, 0.001);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/10.0, normGrad, 0.001);
+    
+    // Next test a level set sphere
+    const openvdb::Coord dim(64,64,64);
+    const openvdb::Vec3f center(35.0f ,30.0f, 40.0f);
+    const float radius=0.0f;
+    unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
+
+    CPPUNIT_ASSERT(!tree.empty());
+    
+    SecondOrder::result(inAccessor, xyz, alpha, beta);
+
+    meancurv = alpha/(2*math::Pow3(beta) );
+    normGrad = alpha/(2*math::Pow2(beta) );
+
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/10.0, meancurv, 0.001);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/10.0, normGrad, 0.001);
+
+    FourthOrder::result(inAccessor, xyz, alpha, beta);
+
+    meancurv = alpha/(2*math::Pow3(beta) );
+    normGrad = alpha/(2*math::Pow2(beta) );
+
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/10.0, meancurv, 0.001);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/10.0, normGrad, 0.001);
+
+    SixthOrder::result(inAccessor, xyz, alpha, beta);
 
     meancurv = alpha/(2*math::Pow3(beta) );
     normGrad = alpha/(2*math::Pow2(beta) );
@@ -116,7 +139,7 @@ TestMeanCurvature::testISMeanCurvature()
 
     xyz.reset(35,10,40);
 
-    math::ISMeanCurvature<math::CD_SECOND, math::CD_2ND>::result(inAccessor, xyz, alpha, beta);
+    SecondOrder::result(inAccessor, xyz, alpha, beta);
 
     meancurv = alpha/(2*math::Pow3(beta) );
     normGrad = alpha/(2*math::Pow2(beta) );
@@ -135,23 +158,39 @@ TestMeanCurvature::testISMeanCurvatureStencil()
 
     FloatGrid::Ptr grid = createGrid<FloatGrid>(/*background=*/5.0);
     FloatTree& tree = grid->tree();
-
-    const openvdb::Coord dim(64,64,64);
-    const openvdb::Vec3f center(35.0f ,30.0f, 40.0f);
-    const float radius=0.0f;
-    unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
-
-    CPPUNIT_ASSERT(!tree.empty());
-    Coord xyz(35,30,30);
     math::SecondOrderDenseStencil<FloatGrid> dense_2nd(*grid);
     math::FourthOrderDenseStencil<FloatGrid> dense_4th(*grid);
     math::SixthOrderDenseStencil<FloatGrid> dense_6th(*grid);
+    AccessorType::ValueType alpha, beta;
+    Coord xyz(35,30,30);
     dense_2nd.moveTo(xyz);
     dense_4th.moveTo(xyz);
     dense_6th.moveTo(xyz);
 
-    AccessorType::ValueType alpha, beta;
-    math::ISMeanCurvature<math::CD_SECOND, math::CD_2ND>::result(dense_2nd, alpha, beta);
+    // First test on an empty grid
+    CPPUNIT_ASSERT(tree.empty());
+    
+    typedef math::ISMeanCurvature<math::CD_SECOND, math::CD_2ND> SecondOrder;
+    CPPUNIT_ASSERT(!SecondOrder::result(dense_2nd, alpha, beta));
+
+    typedef math::ISMeanCurvature<math::CD_FOURTH, math::CD_4TH> FourthOrder;
+    CPPUNIT_ASSERT(!FourthOrder::result(dense_4th, alpha, beta));
+
+    typedef math::ISMeanCurvature<math::CD_SIXTH, math::CD_6TH> SixthOrder;
+    CPPUNIT_ASSERT(!SixthOrder::result(dense_6th, alpha, beta));
+
+    // Next test on a level set sphere
+    const openvdb::Coord dim(64,64,64);
+    const openvdb::Vec3f center(35.0f ,30.0f, 40.0f);
+    const float radius=0.0f;
+    unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
+    dense_2nd.moveTo(xyz);
+    dense_4th.moveTo(xyz);
+    dense_6th.moveTo(xyz);
+
+    CPPUNIT_ASSERT(!tree.empty());
+    
+    CPPUNIT_ASSERT(SecondOrder::result(dense_2nd, alpha, beta));
 
     AccessorType::ValueType meancurv = alpha/(2*math::Pow3(beta) );
     AccessorType::ValueType normGrad = alpha/(2*math::Pow2(beta) );
@@ -159,7 +198,7 @@ TestMeanCurvature::testISMeanCurvatureStencil()
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/10.0, meancurv, 0.001);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/10.0, normGrad, 0.001);
 
-    math::ISMeanCurvature<math::CD_FOURTH, math::CD_4TH>::result(dense_4th, alpha, beta);
+    CPPUNIT_ASSERT(FourthOrder::result(dense_4th, alpha, beta));
 
     meancurv = alpha/(2*math::Pow3(beta) );
     normGrad = alpha/(2*math::Pow2(beta) );
@@ -167,8 +206,7 @@ TestMeanCurvature::testISMeanCurvatureStencil()
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/10.0, meancurv, 0.001);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/10.0, normGrad, 0.001);
 
-
-    math::ISMeanCurvature<math::CD_SIXTH, math::CD_6TH>::result(dense_6th, alpha, beta);
+    CPPUNIT_ASSERT(SixthOrder::result(dense_6th, alpha, beta));
 
     meancurv = alpha/(2*math::Pow3(beta) );
     normGrad = alpha/(2*math::Pow2(beta) );
@@ -178,7 +216,7 @@ TestMeanCurvature::testISMeanCurvatureStencil()
 
     xyz.reset(35,10,40);
     dense_2nd.moveTo(xyz);
-    math::ISMeanCurvature<math::CD_SECOND, math::CD_2ND>::result(dense_2nd, alpha, beta);
+    CPPUNIT_ASSERT(SecondOrder::result(dense_2nd, alpha, beta));
 
     meancurv = alpha/(2*math::Pow3(beta) );
     normGrad = alpha/(2*math::Pow2(beta) );
@@ -197,6 +235,50 @@ TestMeanCurvature::testWSMeanCurvature()
     using math::UniformScaleMap;
 
     typedef FloatGrid::ConstAccessor  AccessorType;
+
+    {// Empty grid test
+        FloatGrid::Ptr grid = createGrid<FloatGrid>(/*background=*/5.0);
+        FloatTree& tree = grid->tree();
+        AccessorType inAccessor = grid->getConstAccessor();
+        Coord xyz(35,30,30);
+        CPPUNIT_ASSERT(tree.empty());
+
+        AccessorType::ValueType meancurv;
+        AccessorType::ValueType normGrad;
+
+        AffineMap affine;
+        meancurv = math::MeanCurvature<AffineMap, math::CD_SECOND, math::CD_2ND>::result(
+            affine, inAccessor, xyz);
+        normGrad = math::MeanCurvature<AffineMap, math::CD_SECOND, math::CD_2ND>::normGrad(
+            affine, inAccessor, xyz);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, meancurv, 0.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, normGrad, 0.0);
+        
+        meancurv = math::MeanCurvature<AffineMap, math::CD_FOURTH, math::CD_4TH>::result(
+            affine, inAccessor, xyz);
+        normGrad = math::MeanCurvature<AffineMap, math::CD_FOURTH, math::CD_4TH>::normGrad(
+            affine, inAccessor, xyz);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, meancurv, 0.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, normGrad, 0.0);
+
+        UniformScaleMap uniform;
+        meancurv = math::MeanCurvature<UniformScaleMap, math::CD_SIXTH, math::CD_6TH>::result(
+            uniform, inAccessor, xyz);
+        normGrad = math::MeanCurvature<UniformScaleMap, math::CD_SIXTH, math::CD_6TH>::normGrad(
+            uniform, inAccessor, xyz);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, meancurv, 0.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, normGrad, 0.0);
+
+        xyz.reset(35,10,40);
+
+        TranslationMap trans;
+        meancurv = math::MeanCurvature<TranslationMap, math::CD_SIXTH, math::CD_6TH>::result(
+            trans, inAccessor, xyz);
+        normGrad = math::MeanCurvature<TranslationMap, math::CD_SIXTH, math::CD_6TH>::normGrad(
+            trans, inAccessor, xyz);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, meancurv, 0.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, normGrad, 0.0);
+    }
 
     { // unit size voxel test
         FloatGrid::Ptr grid = createGrid<FloatGrid>(/*background=*/5.0);
@@ -353,6 +435,57 @@ TestMeanCurvature::testWSMeanCurvatureStencil()
     using math::UniformScaleMap;
 
     typedef FloatGrid::ConstAccessor AccessorType;
+
+    {// empty grid test
+        FloatGrid::Ptr grid = createGrid<FloatGrid>(/*background=*/5.0);
+        FloatTree& tree = grid->tree();
+        CPPUNIT_ASSERT(tree.empty());
+        Coord xyz(35,30,30);
+
+        math::SecondOrderDenseStencil<FloatGrid> dense_2nd(*grid);
+        math::FourthOrderDenseStencil<FloatGrid> dense_4th(*grid);
+        math::SixthOrderDenseStencil<FloatGrid> dense_6th(*grid);
+        dense_2nd.moveTo(xyz);
+        dense_4th.moveTo(xyz);
+        dense_6th.moveTo(xyz);
+
+        AccessorType::ValueType meancurv;
+        AccessorType::ValueType normGrad;
+
+        AffineMap affine;
+        meancurv = math::MeanCurvature<AffineMap, math::CD_SECOND, math::CD_2ND>::result(
+            affine, dense_2nd);
+        normGrad = math::MeanCurvature<AffineMap, math::CD_SECOND, math::CD_2ND>::normGrad(
+            affine, dense_2nd);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, meancurv, 0.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, normGrad, 0.00);
+        
+        meancurv = math::MeanCurvature<AffineMap, math::CD_FOURTH, math::CD_4TH>::result(
+            affine, dense_4th);
+        normGrad = math::MeanCurvature<AffineMap, math::CD_FOURTH, math::CD_4TH>::normGrad(
+            affine, dense_4th);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, meancurv, 0.00);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, normGrad, 0.00);
+
+        UniformScaleMap uniform;
+        meancurv = math::MeanCurvature<UniformScaleMap, math::CD_SIXTH, math::CD_6TH>::result(
+            uniform, dense_6th);
+        normGrad = math::MeanCurvature<UniformScaleMap, math::CD_SIXTH, math::CD_6TH>::normGrad(
+            uniform, dense_6th);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, meancurv, 0.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, normGrad, 0.0);
+
+        xyz.reset(35,10,40);
+        dense_6th.moveTo(xyz);
+
+        TranslationMap trans;
+        meancurv = math::MeanCurvature<TranslationMap, math::CD_SIXTH, math::CD_6TH>::result(
+            trans, dense_6th);
+        normGrad = math::MeanCurvature<TranslationMap, math::CD_SIXTH, math::CD_6TH>::normGrad(
+            trans, dense_6th);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, meancurv, 0.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, normGrad, 0.0);
+    }
 
     { // unit-sized voxels
 
@@ -585,7 +718,15 @@ TestMeanCurvature::testOldStyleStencils()
         FloatGrid::Ptr grid = FloatGrid::create(/*backgroundValue=*/5.0);
         grid->setTransform(math::Transform::createLinearTransform(/*voxel size=*/0.5));
         CPPUNIT_ASSERT(grid->empty());
+        math::CurvatureStencil<FloatGrid> cs(*grid);
+        Coord xyz(20,16,20);//i.e. 8 voxel or 4 world units away from the center
+        cs.moveTo(xyz);
 
+        // First test on an empty grid
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, cs.meanCurvature(), 0.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, cs.meanCurvatureNormGrad(), 0.0);
+        
+        // Next test on a level set sphere
         const openvdb::Coord dim(32,32,32);
         const openvdb::Vec3f center(6.0f, 8.0f, 10.0f);//i.e. (12,16,20) in index space
         const float radius=10.0f;
@@ -594,10 +735,8 @@ TestMeanCurvature::testOldStyleStencils()
 
         CPPUNIT_ASSERT(!grid->empty());
         CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(grid->activeVoxelCount()));
-        math::CurvatureStencil<FloatGrid> cs(*grid);
-
-        Coord xyz(20,16,20);//i.e. 8 voxel or 4 world units away from the center
         cs.moveTo(xyz);
+        
         CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/4.0, cs.meanCurvature(), 0.01);// 1/distance from center
         CPPUNIT_ASSERT_DOUBLES_EQUAL(
             1.0/4.0, cs.meanCurvatureNormGrad(), 0.01);// 1/distance from center

@@ -6,18 +6,38 @@ Version 2.2.0 - In development
       GridSampler, DualGridSampler, et al.
     - Modified tools::DualGridSampler so it is more consistent with 
       tools::GridSampler.
-    - Added selection of iso-value to the LevelSetRayIntersector and 
-      openvdb_render.
+    - Added an option to the LevelSetRayIntersector and to vdb_render
+      to specify the isovalue of the level set.
+    - Added methods to the LevelSetRayIntersector to return the time of
+      intersection along a world or index ray.
+    - tools::cpt(), tools::curl(), tools::laplacian(), tools::meanCurvature()
+      and tools::normalize() now output grids with appropriate vector types
+      (covariant, contravariant, etc.).
+    - Added tools::transformVectors(), which applies an affine transformation
+      to the voxel values of a vector-valued grid, in accordance with the
+      grid's Vector Type metadata setting.
+    - Fixed a bug in the mean curvature computation that could produce NaNs
+      in regions with constant values.
     - Added a Grid::topologyDifference() method.
     - Added topology union, intersection and difference operations to
       the Combine SOP.  These operations combine the active voxel topologies
       of grids that may have different value types.
-    - Added support to the Combine, Resample, Scatter, Prune and Visualize SOPs
-      for grids with values of type bool.
+    - Added support for boolean grids to the Combine, Resample, Scatter, Prune
+      and Visualize SOPs.
     - The Fill SOP now allows the fill region bounds to be specified either in
       index space (as before), in world space, or using the bounds of geometry
       connected to an optional new reference input.
-    - Fixed build issue reported for Clang 3.2.
+    - Added a toggle to the Offset Level Set SOP to specify the offset in
+      either world or voxel units.
+    - Added a toggle to the Transform and Resample SOPs to apply the
+      transform to the voxel values of vector-valued grids, in accordance with
+      those grids' Vector Type metadata settings.
+    - Added a Vector Type menu to the Vector Merge SOP.
+    - Removed masking options from the Renormalize SOP (since masking is
+      not supported yet).
+    - Fixed a build issue reported for Clang 3.2.
+    - Made various changes for compatibility with C++11 compilers.
+      [Contributed by SESI]
 
     API changes:
     - tools::DualGridSampler is no longer templated on the target grid type,

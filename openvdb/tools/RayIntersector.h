@@ -142,11 +142,22 @@ public:
         }
     }
     
-    /// @brief Return @c true if the index-space ray intersects the level set
-    /// @param iRay ray represented in index space
+    /// @brief Return @c true if the index-space ray intersects the level set.
+    /// @param iRay ray represented in index space.
     bool intersectsIS(const RayType& iRay) const
     {
         if (!mTester.setIndexRay(iRay)) return false;//missed bbox
+        return LevelSetHDDA<TreeT, NodeLevel>::test(mTester);
+    }
+
+    /// @brief Return @c true if the index-space ray intersects the level set
+    /// @param iRay  ray represented in index space.
+    /// @param iTime if an intersection was found it is assigned the time of the
+    ///              intersection along the index ray.
+    bool intersectsIS(const RayType& iRay, Real &iTime) const
+    {
+        if (!mTester.setIndexRay(iRay)) return false;//missed bbox
+        iTime = mTester.getIndexTime();
         return LevelSetHDDA<TreeT, NodeLevel>::test(mTester);
     }
     
@@ -161,12 +172,38 @@ public:
         mTester.getIndexPos(xyz);
         return true;
     }
+
+    /// @brief Return @c true if the index-space ray intersects the level set.
+    /// @param iRay  ray represented in index space.
+    /// @param xyz   if an intersection was found it is assigned the
+    ///              intersection point in index space, otherwise it is unchanged.
+    /// @param iTime if an intersection was found it is assigned the time of the
+    ///              intersection along the index ray.
+    bool intersectsIS(const RayType& iRay, Vec3Type& xyz, Real &iTime) const
+    {
+        if (!mTester.setIndexRay(iRay)) return false;//missed bbox
+        if (!LevelSetHDDA<TreeT, NodeLevel>::test(mTester)) return false;//missed level set
+        mTester.getIndexPos(xyz);
+        iTime = mTester.getIndexTime();
+        return true;
+    }
     
     /// @brief Return @c true if the world-space ray intersects the level set.
     /// @param wRay   ray represented in world space.
     bool intersectsWS(const RayType& wRay) const
     {
         if (!mTester.setWorldRay(wRay)) return false;//missed bbox
+        return LevelSetHDDA<TreeT, NodeLevel>::test(mTester);
+    }
+
+    /// @brief Return @c true if the world-space ray intersects the level set.
+    /// @param wRay   ray represented in world space.
+    /// @param wTime  if an intersection was found it is assigned the time of the
+    ///               intersection along the world ray.
+    bool intersectsWS(const RayType& wRay, Real &wTime) const
+    {
+        if (!mTester.setWorldRay(wRay)) return false;//missed bbox
+        wTime = mTester.getWorldTime();
         return LevelSetHDDA<TreeT, NodeLevel>::test(mTester);
     }
     
@@ -181,6 +218,21 @@ public:
         mTester.getWorldPos(world);
         return true;
     }
+    
+    /// @brief Return @c true if the world-space ray intersects the level set.
+    /// @param wRay   ray represented in world space.
+    /// @param world  if an intersection was found it is assigned the
+    ///               intersection point in world space, otherwise it is unchanged.
+    /// @param wTime  if an intersection was found it is assigned the time of the
+    ///               intersection along the world ray.
+    bool intersectsWS(const RayType& wRay, Vec3Type& world, Real &wTime) const
+    {
+        if (!mTester.setWorldRay(wRay)) return false;//missed bbox
+        if (!LevelSetHDDA<TreeT, NodeLevel>::test(mTester)) return false;//missed level set
+        mTester.getWorldPos(world);
+        wTime = mTester.getWorldTime();
+        return true;
+    }
    
     /// @brief Return @c true if the world-space ray intersects the level set.
     /// @param wRay   ray represented in world space.
@@ -193,6 +245,23 @@ public:
         if (!mTester.setWorldRay(wRay)) return false;//missed bbox
         if (!LevelSetHDDA<TreeT, NodeLevel>::test(mTester)) return false;//missed level set
         mTester.getWorldPosAndNml(world, normal);
+        return true;
+    }
+
+    /// @brief Return @c true if the world-space ray intersects the level set.
+    /// @param wRay   ray represented in world space.
+    /// @param world  if an intersection was found it is assigned the
+    ///               intersection point in world space, otherwise it is unchanged.
+    /// @param normal if an intersection was found it is assigned the normal
+    ///               of the level set surface in world space, otherwise it is unchanged.
+    /// @param wTime  if an intersection was found it is assigned the time of the
+    ///               intersection along the world ray.
+    bool intersectsWS(const RayType& wRay, Vec3Type& world, Vec3Type& normal, Real &wTime) const
+    {
+        if (!mTester.setWorldRay(wRay)) return false;//missed bbox
+        if (!LevelSetHDDA<TreeT, NodeLevel>::test(mTester)) return false;//missed level set
+        mTester.getWorldPosAndNml(world, normal);
+        wTime = mTester.getWorldTime();
         return true;
     }
     
@@ -291,7 +360,7 @@ public:
         return this->setIndexRay(wRay.worldToIndex(*mGrid));
     }
 
-    /// @brief Return 0 if not hit was detected. A return value of 1
+    /// @brief Return 0 if no hit was detected. A return value of 1
     /// means it hit an active tile, and a return value of 2 means it
     /// hit a LeafNode. Only when a hit is detected are t0 and t1
     /// updated with the corresponding entry and exit times along the
@@ -318,6 +387,11 @@ public:
     /// @brief Return the floating-point world position along the
     /// current index ray at the specified time.
     inline Vec3R getWorldPos(Real time) const { return mGrid->indexToWorld(mRay(time)); }
+
+    inline Real getWorldTime(Real time) const
+    {
+        return time*mGrid->transform().baseMap()->applyJacobian(mRay.dir()).length();
+    }
     
 private:
     
@@ -444,6 +518,15 @@ public:
         xyz = mStencil.grid().indexToWorld(xyz);
     }
 
+    /// @brief Return the time of intersection along the index ray.
+    inline RealT getIndexTime() const { return mTime; }
+
+    /// @brief Return the time of intersection along the world ray.
+    inline RealT getWorldTime() const
+    {
+        return mTime*mStencil.grid().transform().baseMap()->applyJacobian(mRay.dir()).length();
+    }
+
 private:
 
     /// @brief Initiate the local voxel intersection test.
@@ -514,7 +597,7 @@ private:
     
     RayT            mRay;
     StencilT        mStencil;
-    RealT           mTime;
+    RealT           mTime;//time of intersection
     ValueT          mV[2];
     RealT           mT[2];
     const ValueT    mIsoValue, mMinValue, mMaxValue;

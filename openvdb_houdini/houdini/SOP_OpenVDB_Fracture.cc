@@ -53,6 +53,7 @@
 #include <GU/GU_ConvertParms.h>
 #include <UT/UT_Quaternion.h>
 #include <UT/UT_ScopedPtr.h>
+#include <UT/UT_ValArray.h>
 #include <UT/UT_Version.h>
 
 #include <boost/algorithm/string/join.hpp>
@@ -260,9 +261,16 @@ SOP_OpenVDB_Fracture::cookMySop(OP_Context& context)
             group = matchGroup(*gdp, str.toStdString());
         }
 
+        //@{
+        /// @todo Is this needed?
         UT_ValArray<const GA_ElementGroup*>::const_iterator groupIt;
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
         UT_ValArray<const GA_ElementGroup*> primitiveGroups;
+#else
+        UT_PtrArray<const GA_ElementGroup*> primitiveGroups;
+#endif
         gdp->primitiveGroups().getList(primitiveGroups);
+        //@}
 
         std::list<openvdb::GridBase::Ptr> grids;
         std::vector<GU_PrimVDB*> origvdbs;

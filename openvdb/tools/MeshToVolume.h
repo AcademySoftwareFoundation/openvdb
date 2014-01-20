@@ -517,7 +517,7 @@ MeshVoxelizer<FloatTreeT, InterruptT>::MeshVoxelizer(
     , mPolygonList(polygonList)
     , mSqrDistTree(std::numeric_limits<FloatValueT>::max())
     , mSqrDistAccessor(mSqrDistTree)
-    , mPrimIndexTree(Int32(util::INVALID_IDX)) 
+    , mPrimIndexTree(Int32(util::INVALID_IDX))
     , mPrimIndexAccessor(mPrimIndexTree)
     , mIntersectionTree(false)
     , mIntersectionAccessor(mIntersectionTree)
@@ -1828,7 +1828,7 @@ ExpandNB<FloatTreeT>::operator()(const tbb::blocked_range<size_t>& range)
             distLeafPt = new FloatLeafT(ijk, distAcc.getValue(ijk));
             newDistAcc.addLeaf(distLeafPt);
         }
-     
+
         IntLeafT* indexLeafPt = indexAcc.probeLeaf(ijk);
         if (!indexLeafPt) indexLeafPt =  newIndexAcc.touchLeaf(ijk);
 
@@ -2511,7 +2511,7 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
 
     if (wasInterrupted(99)) return;
 
-    mDistGrid->tree().pruneLevelSet();    
+    mDistGrid->tree().pruneLevelSet();
     mDistGrid->tree().signedFloodFill(exBandWidth, -inBandWidth);
 }
 
