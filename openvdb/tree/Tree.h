@@ -72,7 +72,7 @@ public:
 
     /// Return the name of this tree's type.
     virtual const Name& type() const = 0;
-    
+
     /// Return the name of the type of a voxel's value (e.g., "float" or "vec3d").
     virtual Name valueType() const = 0;
 
@@ -88,13 +88,13 @@ public:
 
     /// @brief Return in @a bbox the axis-aligned bounding box of all
     /// leaf nodes and active tiles.
-    /// @details This is faster then calling evalActiveVoxelBoundingBox, 
+    /// @details This is faster then calling evalActiveVoxelBoundingBox,
     /// which visits the individual active voxels, and hence
     /// evalLeafBoundingBox produces a less tight, i.e. approximate, bbox.
     /// @return @c false if the bounding box is empty (in which case
     /// the bbox is set to its default value).
     virtual bool evalLeafBoundingBox(CoordBBox& bbox) const = 0;
-    
+
     /// @brief Return in @a dim the dimensions of the axis-aligned bounding box
     /// of all leaf nodes.
     /// @return @c false if the bounding box is empty.
@@ -108,7 +108,7 @@ public:
     /// @return @c false if the bounding box is empty (in which case
     /// the bbox is set to its default value).
     virtual bool evalActiveVoxelBoundingBox(CoordBBox& bbox) const = 0;
-    
+
     /// @brief Return in @a dim the dimensions of the axis-aligned bounding box of all
     /// active voxels.  This is a tighter bounding box than the leaf node bounding box.
     /// @return @c false if the bounding box is empty.
@@ -332,7 +332,7 @@ public:
     /// Return the total number of active tiles.
     /// @note This method is not virtual so as to not change the ABI.
     Index64 activeTileCount() const { return mRoot.onTileCount(); }
-    
+
     /// Return the minimum and maximum active values in this tree.
     void evalMinMax(ValueType &min, ValueType &max) const;
 
@@ -583,10 +583,10 @@ public:
     /// are marked as active in this tree but left with their original values.
     template<typename OtherRootNodeType>
     void topologyUnion(const Tree<OtherRootNodeType>& other);
-   
+
     /// @brief Intersects this tree's set of active values with the active values
     /// of the other tree, whose @c ValueType may be different.
-    /// @details The resulting state of a value is active only if the corresponding 
+    /// @details The resulting state of a value is active only if the corresponding
     /// value was already active AND if it is active in the other tree. Also, a
     /// resulting value maps to a voxel if the corresponding value
     /// already mapped to an active voxel in either of the two grids
@@ -596,7 +596,7 @@ public:
     /// overlap with inactive tiles in the other grid. Likewise active
     /// voxels can be turned into unactive voxels resulting in leaf
     /// nodes with no active values. Thus, it is recommended to
-    /// subsequently call prune. 
+    /// subsequently call prune.
     template<typename OtherRootNodeType>
     void topologyIntersection(const Tree<OtherRootNodeType>& other);
 
@@ -1697,7 +1697,7 @@ Tree<RootNodeType>::topologyDifference(const Tree<OtherRootNodeType>& other)
 template<typename ValueT, typename CombineOp>
 struct CombineOpAdapter
 {
-    CombineOpAdapter(CombineOp& op): op(op) {}
+    CombineOpAdapter(CombineOp& _op): op(_op) {}
 
     void operator()(CombineArgs<ValueT>& args) const {
         op(args.a(), args.b(), args.result());
@@ -1950,7 +1950,7 @@ inline bool
 Tree<RootNodeType>::evalLeafBoundingBox(CoordBBox& bbox) const
 {
     bbox.reset(); // default invalid bbox
-    
+
     if (this->empty()) return false;  // empty
 
     mRoot.evalActiveBoundingBox(bbox, false);
@@ -1962,9 +1962,8 @@ template<typename RootNodeType>
 inline bool
 Tree<RootNodeType>::evalActiveVoxelBoundingBox(CoordBBox& bbox) const
 {
-    
     bbox.reset(); // default invalid bbox
-    
+
     if (this->empty()) return false;  // empty
 
     mRoot.evalActiveBoundingBox(bbox, true);
@@ -2029,7 +2028,7 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
     struct OnExit {
         std::ostream& os;
         std::streamsize savedPrecision;
-        OnExit(std::ostream& os): os(os), savedPrecision(os.precision()) {}
+        OnExit(std::ostream& _os): os(_os), savedPrecision(os.precision()) {}
         ~OnExit() { os.precision(savedPrecision); }
     };
     OnExit restorePrecision(os);

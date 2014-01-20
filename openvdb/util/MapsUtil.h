@@ -202,7 +202,7 @@ calculateBounds<math::NonlinearFrustumMap>(const math::NonlinearFrustumMap& frus
         calculateBounds<math::NonlinearFrustumMap>(frustum, bounding_box, out);
         return;
     }
-    
+
     // for convenience
     Vec3d& out_min = out.min();
     Vec3d& out_max = out.max();
@@ -251,7 +251,7 @@ calculateBounds<math::NonlinearFrustumMap>(const math::NonlinearFrustumMap& frus
         // convert back to voxel space
         pre_image = frustum.applyInverseMap(extreme2);
         out_max.x() = std::max(x_min, std::min(x_max, pre_image.x()));
-        
+
         extreme.x() = xm;
         extreme.y() = centerLS.y();
         extreme.z() = zm;

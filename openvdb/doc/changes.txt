@@ -12,20 +12,45 @@
   @vdblink::tools::DualGridSampler DualGridSampler@endlink, et al.
 - Modified @vdblink::tools::DualGridSampler DualGridSampler@endlink so 
   it is more consistent with @vdblink::tools::GridSampler GridSampler@endlink.
-- Added selection of iso-value to the 
+- Added an option to the
   @vdblink::tools::LevelSetRayIntersector LevelSetRayIntersector@endlink 
-  and openvdb_render.
+  and to @c vdb_render to specify the isovalue of the level set.
+- Added methods to the 
+  @vdblink::tools::LevelSetRayIntersector LevelSetRayIntersector@endlink 
+  to return the time of intersection along a world or index ray.
+- The @vdblink::tools::cpt() cpt@endlink, @vdblink::tools::curl() curl@endlink,
+  @vdblink::tools::laplacian() laplacian@endlink,
+  @vdblink::tools::meanCurvature() meanCurvature@endlink
+  and @vdblink::tools::normalize() normalize@endlink tools now output grids
+  with appropriate @vdblink::VecType vector types@endlink
+  (covariant, contravariant, etc.).
+- Added @vdblink::tools::transformVectors() tools::transformVectors@endlink,
+  which applies an affine transformation to the voxel values of a
+  vector-valued grid, in accordance with the grid&rsquo;s
+  @vdblink::VecType vector type@endlink.
+- Fixed a bug in the mean curvature computation that could produce NaNs
+  in regions with constant values.
 - Added a
   @vdblink::Grid::topologyDifference() Grid::topologyDifference@endlink method.
 - Added topology union, intersection and difference operations to
   the Combine SOP.  These operations combine the active voxel topologies
   of grids that may have different value types.
-- Added support to the Combine, Resample, Scatter, Prune and Visualize SOPs
-  for grids with values of type bool.
+- Added support for boolean grids to the Combine, Resample, Scatter, Prune
+  and Visualize SOPs.
 - The Fill SOP now allows the fill region bounds to be specified either in
   index space (as before), in world space, or using the bounds of geometry
   connected to an optional new reference input.
-- Fixed build issue reported for Clang 3.2.
+- Added a toggle to the Offset Level Set SOP to specify the offset in
+  either world or voxel units.
+- Added a toggle to the Transform and Resample SOPs to apply the transform
+  to the voxel values of vector-valued grids, in accordance with those
+  grids&rsquo; @vdblink::VecType vector types@endlink.
+- Added a Vector Type menu to the Vector Merge SOP.
+- Removed masking options from the Renormalize SOP (since masking is
+  not supported yet).
+- Fixed a build issue reported for Clang 3.2.
+- Made various changes for compatibility with C++11 compilers.
+  <I>[Contributed by SESI]</I>
 
 @par
 API changes:

@@ -56,17 +56,28 @@
 #endif
 
 /// Macro for determining if there are sufficient C++0x/C++11 features
-#if _MSC_VER >= 1700 || __cplusplus > 199711L || __GXX_EXPERIMENTAL_CXX0X__
-    #if __clang__
-	#ifndef _LIBCPP_VERSION
-	    #include <ciso646>
-	#endif
-	#ifdef _LIBCPP_VERSION
-	    #define OPENVDB_HAS_CXX11 1
-	#endif
-    #else
-	#define OPENVDB_HAS_CXX11 1
+#ifdef __INTEL_COMPILER
+    #ifdef __INTEL_CXX11_MODE__
+        #define OPENVDB_HAS_CXX11 1
     #endif
+#elif defined(__clang__)
+    #ifndef _LIBCPP_VERSION
+	#include <ciso646>
+    #endif
+    #ifdef _LIBCPP_VERSION
+        #define OPENVDB_HAS_CXX11 1
+    #endif
+#elif defined(__GXX_EXPERIMENTAL_CXX0X__) || (__cplusplus > 199711L)
+    #define OPENVDB_HAS_CXX11 1
+#elif defined(_MSC_VER)
+    #if (_MSC_VER >= 1700)
+        #define OPENVDB_HAS_CXX11 1
+    #endif
+#endif
+#if defined(__GNUC__) && !OPENVDB_CHECK_GCC(4, 4)
+    // ICC uses GCC's standard library headers, so even if the ICC version
+    // is recent enough for C++11, the GCC version might not be.
+    #undef OPENVDB_HAS_CXX11
 #endif
 
 /// For compilers that need templated function specializations to have

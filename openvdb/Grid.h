@@ -417,7 +417,7 @@ typedef boost::shared_ptr<GridCPtrSet>  GridCPtrSetPtr;
 /// @brief Predicate functor that returns @c true for grids that have a specified name
 struct OPENVDB_API GridNamePred
 {
-    GridNamePred(const Name& name): name(name) {}
+    GridNamePred(const Name& _name): name(_name) {}
     bool operator()(const GridBase::ConstPtr& g) const { return g && g->getName() == name; }
     Name name;
 };

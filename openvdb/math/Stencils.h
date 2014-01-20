@@ -1478,8 +1478,7 @@ public:
     inline ValueType meanCurvature()
     {
         Real alpha, beta;
-        this->meanCurvature(alpha, beta);
-        return ValueType(alpha*mInv2Dx/math::Pow3(beta));
+        return this->meanCurvature(alpha, beta) ? ValueType(alpha*mInv2Dx/math::Pow3(beta)) : 0;
     }
 
     /// Return the mean curvature multiplied by the norm of the
@@ -1491,8 +1490,7 @@ public:
     inline ValueType meanCurvatureNormGrad()
     {
         Real alpha, beta;
-        this->meanCurvature(alpha, beta);
-        return ValueType(alpha*mInvDx2/(2*math::Pow2(beta)));
+        return this->meanCurvature(alpha, beta) ? ValueType(alpha*mInvDx2/(2*math::Pow2(beta))) : 0;
     }
 
     /// Return the Laplacian computed at the previously buffered
@@ -1549,7 +1547,7 @@ private:
         mStencil[18] = mCache.getValue(ijk.offsetBy( 0,  1,  1));
     }
 
-    inline void meanCurvature(Real& alpha, Real& beta) const
+    inline bool meanCurvature(Real& alpha, Real& beta) const
     {
         // For performance all finite differences are unscaled wrt dx
         const Real
@@ -1557,6 +1555,12 @@ private:
             Dx  = Half * (mStencil[2] - mStencil[1]), Dx2 = Dx * Dx, // * 1/dx
             Dy  = Half * (mStencil[4] - mStencil[3]), Dy2 = Dy * Dy, // * 1/dx
             Dz  = Half * (mStencil[6] - mStencil[5]), Dz2 = Dz * Dz, // * 1/dx
+            normGrad = Dx2 + Dy2 + Dz2;
+        if (normGrad <= math::Tolerance<Real>::value()) {
+             alpha = beta = 0;
+             return false;
+        }
+        const Real
             Dxx = mStencil[2] - 2 * mStencil[0] + mStencil[1], // * 1/dx2
             Dyy = mStencil[4] - 2 * mStencil[0] + mStencil[3], // * 1/dx2
             Dzz = mStencil[6] - 2 * mStencil[0] + mStencil[5], // * 1/dx2
@@ -1564,7 +1568,8 @@ private:
             Dxz = Quarter * (mStencil[14] - mStencil[12] + mStencil[11] - mStencil[13]), // * 1/dx2
             Dyz = Quarter * (mStencil[18] - mStencil[16] + mStencil[15] - mStencil[17]); // * 1/dx2
         alpha = (Dx2*(Dyy+Dzz)+Dy2*(Dxx+Dzz)+Dz2*(Dxx+Dyy)-2*(Dx*(Dy*Dxy+Dz*Dxz)+Dy*Dz*Dyz));
-        beta  = std::sqrt(Dx2 + Dy2 + Dz2); // * 1/dx
+        beta  = std::sqrt(normGrad); // * 1/dx
+        return true;
     }
 
     template<typename, typename> friend class BaseStencil; // allow base class to call init()

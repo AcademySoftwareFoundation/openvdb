@@ -306,7 +306,7 @@ protected:
 template<typename ValueType, typename CombineOp>
 struct SwappedCombineOp
 {
-    SwappedCombineOp(CombineOp& op): op(op) {}
+    SwappedCombineOp(CombineOp& _op): op(_op) {}
 
     void operator()(CombineArgs<ValueType>& args)
     {

@@ -270,7 +270,7 @@ SOP_OpenVDB_Visualize::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
 }
 
 
-// Update UI parm display 
+// Update UI parm display
 bool
 SOP_OpenVDB_Visualize::updateParmsFlags()
 {

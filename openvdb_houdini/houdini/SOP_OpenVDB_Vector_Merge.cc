@@ -70,6 +70,7 @@ public:
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
 protected:
+    virtual bool updateParmsFlags();
     virtual OP_ERROR cookMySop(OP_Context&);
 
     static void addWarningMessage(SOP_OpenVDB_Vector_Merge* self, const char* msg)
@@ -130,17 +131,28 @@ newSopOperator(OP_OperatorTable* table)
             "Include '#' in the name to number the output grids\n"
             "in the order that they are processed."));
 
+    {
+        // Output grid's vector type (invariant, covariant, etc.)
+        std::vector<std::string> items;
+        for (int i = 0; i < openvdb::NUM_VEC_TYPES ; ++i) {
+            items.push_back(openvdb::GridBase::vecTypeToString(openvdb::VecType(i)));
+            items.push_back(openvdb::GridBase::vecTypeExamples(openvdb::VecType(i)));
+        }
+        parms.add(hutil::ParmFactory(PRM_ORD, "vectype", "Vector Type")
+            .setDefault(PRMzeroDefaults)
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+    }
+
 #if HAVE_MERGE_GROUP
+    // Toggle to enable/disable grouping
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "enable_grouping", "")
+        .setDefault(PRMoneDefaults)
+        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
+        .setHelpText("If disabled, don't group merged vector grids."));
+
     // Output vector grid group name
     parms.add(hutil::ParmFactory(PRM_STRING, "group",  "Merge Group")
-        .setTypeExtended(PRM_TYPE_JOIN_PAIR)
         .setHelpText("Specify a name for the output group of merged vector grids."));
-
-    // Toggle to enable/disable grouping
-    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_Type(PRM_Type::PRM_INTERFACE_LABEL_NONE),
-            "enable_grouping", "")
-        .setDefault(PRMoneDefaults)
-        .setHelpText("If disabled, don't group merged vector grids."));
 #endif
 
     // Toggle to keep/remove source grids
@@ -167,6 +179,19 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("OpenVDB Vector Merge",
         SOP_OpenVDB_Vector_Merge::factory, parms, *table)
         .addInput("Scalar VDBs to merge into vector");
+}
+
+
+bool
+SOP_OpenVDB_Vector_Merge::updateParmsFlags()
+{
+    bool changed = false;
+
+#if HAVE_MERGE_GROUP
+    changed |= enableParm("group", evalInt("enable_grouping", 0, 0) != 0);
+#endif
+
+    return changed;
 }
 
 
@@ -373,6 +398,14 @@ SOP_OpenVDB_Vector_Merge::cookMySop(OP_Context& context)
         const bool verbose = false;
 #endif
 
+        openvdb::VecType vecType = openvdb::VEC_INVARIANT;
+        {
+            const int vtype = evalInt("vectype", 0, time);
+            if (vtype >= 0 && vtype < openvdb::NUM_VEC_TYPES) {
+                vecType = static_cast<openvdb::VecType>(vtype);
+            }
+        }
+
         // Get the name (or naming pattern) for merged grids.
         UT_String mergeName;
         evalString(mergeName, "merge_name", 0, time);
@@ -450,7 +483,8 @@ SOP_OpenVDB_Vector_Merge::cookMySop(OP_Context& context)
             UTvdbProcessTypedGridScalar(UTvdbGetGridType(*nonNullGrid), *nonNullGrid, op);
 
             if (hvdb::GridPtr outGrid = op.getGrid()) {
-                outGrid->insertMeta("name", openvdb::StringMetadata(outGridName));
+                outGrid->setName(outGridName);
+                outGrid->setVectorType(vecType);
 
                 if (verbose) {
                     std::ostringstream ostr;
