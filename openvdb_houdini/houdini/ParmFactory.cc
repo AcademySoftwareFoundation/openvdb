@@ -38,9 +38,13 @@
 #include <GU/GU_Detail.h>
 #include <GU/GU_PrimPoly.h>
 #include <GU/GU_Selection.h>
+#include <GA/GA_AIFSharedStringTuple.h>
+#include <GA/GA_Attribute.h>
+#include <GA/GA_AttributeRef.h>
 #include <OP/OP_OperatorTable.h>
 #include <PRM/PRM_Parm.h>
 #include <PRM/PRM_SharedFunc.h>
+#include <UT/UT_IntArray.h>
 #include <UT/UT_Version.h>
 #include <UT/UT_WorkArgs.h>
 #include <cstring> // for ::strdup()
@@ -807,10 +811,13 @@ sopBuildGridMenu(void *data, PRM_Name *menuEntries, int themenusize,
     if (gdp) {
         ithead = gdp->primitiveGroups().beginTraverse();
 
-        GEO_AttributeHandle name_gah;
-        name_gah = gdp->getPrimAttribute("name");
-        if (name_gah.isAttributeValid()) {
-            name_gah.getDefinedStrings(allnames);
+        GA_ROAttributeRef atr = gdp->findPrimitiveAttribute("name");
+        if (atr.isValid()) {
+	    const GA_AIFSharedStringTuple *stuple = atr->getAIFSharedStringTuple();
+	    if (stuple) {
+		UT_IntArray handles;
+		stuple->extractStrings(atr.get(), allnames, handles);
+	    }
         }
     }
 

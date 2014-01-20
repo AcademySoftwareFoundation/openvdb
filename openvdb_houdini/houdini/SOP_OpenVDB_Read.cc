@@ -317,7 +317,6 @@ SOP_OpenVDB_Read::cookMySop(OP_Context& context)
 
                 // Add a new VDB primitive for this grid.
                 // Note: this clears the grid's metadata.
-
                 GEO_PrimVDB* vdb = hvdb::createVdbPrimitive(*gdp, grid);
 
                 // Add the primitive to the group.

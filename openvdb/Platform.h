@@ -60,6 +60,13 @@
     #ifdef __INTEL_CXX11_MODE__
         #define OPENVDB_HAS_CXX11 1
     #endif
+#elif defined(__clang__)
+    #ifndef _LIBCPP_VERSION
+	#include <ciso646>
+    #endif
+    #ifdef _LIBCPP_VERSION
+	#define OPENVDB_HAS_CXX11 1
+    #endif
 #elif defined(__GXX_EXPERIMENTAL_CXX0X__) || (__cplusplus > 199711L)
     #define OPENVDB_HAS_CXX11 1
 #elif defined(_MSC_VER)

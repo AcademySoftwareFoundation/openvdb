@@ -435,7 +435,11 @@ SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
 
         GA_ROAttributeRef attributeRef = gdp->findPointAttribute("N");
         if (attributeRef.isValid()) {
+#if (UT_VERSION_INT >= 0x0d0000c0)  // 13.0.192 or later
+            gdp->getAttributeAsArray(attributeRef.getAttribute(), gdp->getPointRange(), pointNormals);
+#else
             gdp->getPointAttributeAsArray(attributeRef.getAttribute(), gdp->getPointRange(), pointNormals);
+#endif
         } else {
             gdp->normal(pointNormals, /*use_internaln=*/false);
         }
@@ -496,7 +500,11 @@ SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
             GA_RWAttributeRef aRef = gdp->findPointAttribute("dist");
             if (!aRef.isValid()) aRef = gdp->addIntTuple(GA_ATTRIB_POINT, "dist", 1, GA_Defaults(0));
 
+#if (UT_VERSION_INT >= 0x0d0000c0)  // 13.0.192 or later
+            gdp->setAttributeFromArray(aRef.getAttribute(),  gdp->getPointRange(), distances);
+#else
             gdp->setPointAttributeFromArray(aRef.getAttribute(),  gdp->getPointRange(), distances);
+#endif
         }
 
         if (rayIntersection && bool(evalInt("creategroup", 0, time))) { // group intersecting points

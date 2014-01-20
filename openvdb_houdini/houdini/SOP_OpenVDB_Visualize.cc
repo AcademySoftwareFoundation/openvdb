@@ -227,7 +227,7 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("OpenVDB Visualize", SOP_OpenVDB_Visualize::factory, parms, *table)
         .addAlias("OpenVDB Visualizer")
         .setObsoleteParms(obsoleteParms)
-        .addInput("Input with VDB grids to visualize");
+        .addInput("Input with VDBs to visualize");
 }
 
 
