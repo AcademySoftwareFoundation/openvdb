@@ -18,13 +18,15 @@
 - Added methods to the 
   @vdblink::tools::LevelSetRayIntersector LevelSetRayIntersector@endlink 
   to return the time of intersection along a world or index ray.
+- Added bounding box support to the
+  @vdblink::tools::VolumeRayIntersector VolumeRayIntersector@endlink.
 - The @vdblink::tools::cpt() cpt@endlink, @vdblink::tools::curl() curl@endlink,
   @vdblink::tools::laplacian() laplacian@endlink,
   @vdblink::tools::meanCurvature() meanCurvature@endlink
   and @vdblink::tools::normalize() normalize@endlink tools now output grids
   with appropriate @vdblink::VecType vector types@endlink
   (covariant, contravariant, etc.).
-- Added @vdblink::tools::transformVectors() tools::transformVectors@endlink,
+- Added a @vdblink::tools::transformVectors() transformVectors@endlink tool,
   which applies an affine transformation to the voxel values of a
   vector-valued grid, in accordance with the grid&rsquo;s
   @vdblink::VecType vector type@endlink.
@@ -32,6 +34,25 @@
   in regions with constant values.
 - Added a
   @vdblink::Grid::topologyDifference() Grid::topologyDifference@endlink method.
+- Added @vdblink::math::Vec3::exp() exp@endlink and
+  @vdblink::math::Vec3::sum() sum@endlink methods to
+  @vdblink::math::Vec2 Vec2@endlink, @vdblink::math::Vec3 Vec3@endlink
+  and @vdblink::math::Vec4 Vec4@endlink.
+- Fixed a bug in the mesh to volume converter that caused incorrect sign
+  classifications for the level set rebuild tool.
+- Fixed a build issue reported for Clang 3.2.
+- Made various changes for compatibility with Houdini&nbsp;13 and with
+  C++11 compilers.
+  <I>[Contributed by SESI]</I>
+
+@par
+API changes:
+- @vdblink::tools::DualGridSampler DualGridSampler@endlink is no longer 
+  templated on the target grid type, and the value accessor is now passed 
+  as an argument.
+
+@par
+Houdini:
 - Added topology union, intersection and difference operations to
   the Combine SOP.  These operations combine the active voxel topologies
   of grids that may have different value types.
@@ -48,15 +69,6 @@
 - Added a Vector Type menu to the Vector Merge SOP.
 - Removed masking options from the Renormalize SOP (since masking is
   not supported yet).
-- Fixed a build issue reported for Clang 3.2.
-- Made various changes for compatibility with C++11 compilers.
-  <I>[Contributed by SESI]</I>
-
-@par
-API changes:
-- @vdblink::tools::DualGridSampler DualGridSampler@endlink is no longer 
-  templated on the target grid type, and the ValueAccessor is now passed 
-  as an argument.
 
 @htmlonly <a name="v2_1_0_changes"></a>@endhtmlonly
 @par

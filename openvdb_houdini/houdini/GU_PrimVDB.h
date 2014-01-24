@@ -136,12 +136,21 @@ public:
     /// Convert all GEO_PrimVDB primitives in geometry to parms.toType,
     /// preserving prim/vertex/point attributes (and prim/point groups if
     /// requested).
+    /// @{
     static void			convertVDBs(
 					GU_Detail &dst_geo,
 					const GU_Detail &src_geo,
 					GU_ConvertParms &parms,
 					fpreal adaptivity,
 					bool keep_original);
+    static void			convertVDBs(
+					GU_Detail &dst_geo,
+					const GU_Detail &src_geo,
+					GU_ConvertParms &parms,
+					fpreal adaptivity,
+					bool keep_original,
+					bool split_disjoint_volumes);
+    /// @}
 
     virtual void		*castTo (void) const;
     virtual const GEO_Primitive	*castToGeo(void) const;
@@ -244,10 +253,12 @@ private: // METHODS
 			    GEO_Detail &dst_geo,
 			    GU_ConvertParms &parms,
 			    fpreal adaptivity,
+			    bool split_disjoint_volumes,
 			    bool &success) const;
     GEO_Primitive *	convertToPrimVolume(
 			    GEO_Detail &dst_geo,
-			    GU_ConvertParms &parms) const;
+			    GU_ConvertParms &parms,
+			    bool split_disjoint_volumes) const;
     GEO_Primitive *	convertToPoly(
 			    GEO_Detail &dst_geo,
 			    GU_ConvertParms &parms,

@@ -222,8 +222,9 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
         GA_RWHandleI idAttr;
         if (addID) {
             GA_RWAttributeRef aRef = gdp->findPointAttribute("id");
-            if (!aRef.isValid()) aRef = gdp->addIntTuple(GA_ATTRIB_POINT, "id", 1, GA_Defaults(0));
-
+            if (!aRef.isValid()) {
+                aRef = gdp->addIntTuple(GA_ATTRIB_POINT, "id", 1, GA_Defaults(0));
+            }
             idAttr = aRef.getAttribute();
             if(!idAttr.isValid()) {
                 addWarning(SOP_MESSAGE, "Failed to create the point ID attribute.");
@@ -269,7 +270,11 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
                 continue;
             }
 
+#if (UT_VERSION_INT >= 0x0d050013) // 13.5.19 or later
+            GA_Detail::OffsetMarker marker(*gdp);
+#else
             GU_ConvertMarker marker(*gdp);
+#endif
 
             // copy spheres to Houdini
             for (size_t n = 0, N = spheres.size(); n < N; ++n) {
@@ -300,7 +305,11 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
             if (preserve) {
                 GUconvertCopySingleVertexPrimAttribsAndGroups(
                     parms, *vdbGeo, vdbIt.getOffset(),
+#if (UT_VERSION_INT >= 0x0d050013) // 13.5.19 or later
+                    *gdp, marker.primitiveRange(), marker.pointRange());
+#else
                     *gdp, marker.getPrimitives(), marker.getPoints());
+#endif
             }
             ++idNumber;
         }
@@ -321,7 +330,6 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
     }
     return error();
 }
-
 
 // Copyright (c) 2012-2013 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

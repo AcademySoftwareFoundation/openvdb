@@ -55,12 +55,21 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/math/special_functions/round.hpp>
 
+#include <list>
+
 #if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
 #define HAVE_POLYSOUP 1
 #include <GU/GU_PrimPolySoup.h>
 #else
 #define HAVE_POLYSOUP 0
 #endif
+
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
+#define HAVE_SPLITTING 1
+#else
+#define HAVE_SPLITTING 0
+#endif
+
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -190,6 +199,18 @@ newSopOperator(OP_OperatorTable* table)
 
     //////////
 
+    // Parms for converting to volumes
+
+#if HAVE_SPLITTING
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "splitdisjointvolumes", "Split Disjoint Volumes")
+        .setHelpText("When converting to volumes, create multiple "
+            "volume primitives per VDB for unconnected regions where "
+            "possible. This allows very large and sparse VDBs to be converted "
+            "with less memory usage."));
+#endif
+
+    //////////
+
     // Parms for converting to polygons
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "isoValue", "Isovalue")
@@ -200,7 +221,7 @@ newSopOperator(OP_OperatorTable* table)
             "a good initial guess."));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "adaptivity", "Adaptivity")
-        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_RESTRICTED, 1.0)
+        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_RESTRICTED, 2.0)
         .setHelpText("When converting to polygons the adaptivity threshold determines "
             "how closely the isosurface is matched by the resulting mesh. Higher "
             "thresholds will allow more variation in polygon size, using fewer "
@@ -300,8 +321,8 @@ newSopOperator(OP_OperatorTable* table)
         .setHelpText("Enable / disable the the adaptivity field."));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "adaptivityfieldname", "Adaptivity Field")
-        .setHelpText("A single scalar grid used as a spatial multiplier"
-            " for the adaptivity threshold.")
+        .setHelpText(
+            "A single scalar grid used as a spatial multiplier for the adaptivity threshold.")
         .setSpareData(&SOP_Node::theThirdInput)
         .setChoiceList(&hutil::PrimGroupMenu));
 
@@ -372,24 +393,26 @@ namespace {
 /// @return @c true if all grids were successfully converted, @c false if one
 /// or more grids were skipped due to unrecognized grid types.
 void
-convertFromVDB(
+convertToVolumes(
     GU_Detail& dst,
     GA_PrimitiveGroup* group,
-    const GA_PrimCompat::TypeMask &toType,
-    fpreal adaptivity = 0,
-    fpreal iso = 0)
+    bool split_disjoint = false)
 {
     GU_ConvertParms parms;
+
 #if UT_VERSION_INT < 0x0d0000b1 // 13.0.177 or earlier
-    parms.toType = toType;
+    parms.toType = GEO_PrimTypeCompat::GEOPRIMVOLUME;
 #else
-    parms.setToType(toType);
+    parms.setToType(GEO_PrimTypeCompat::GEOPRIMVOLUME);
 #endif
     parms.primGroup = group;
     parms.preserveGroups = true;
-    parms.myOffset = iso;
-    GU_PrimVDB::convertVDBs(
-        dst, dst, parms, adaptivity, /*keep_original*/false);
+#if HAVE_SPLITTING
+    GU_PrimVDB::convertVDBs(dst, dst, parms,
+        /*adaptivity=*/0, /*keep_original*/false , split_disjoint);
+#else
+    GU_PrimVDB::convertVDBs(dst, dst, parms, /*adaptivity=*/0, /*keep_original*/false);
+#endif
 }
 
 
@@ -697,7 +720,11 @@ copyMesh(
         if (nquads[flags]) sizelist.append(4, nquads[flags]);
         if (ntris[flags])  sizelist.append(3, ntris[flags]);
 
+#if (UT_VERSION_INT >= 0x0d050013) // 13.5.19 or later
+        GA_Detail::OffsetMarker marker(detail);
+#else
         GU_ConvertMarker marker(detail);
+#endif
 
         if (toPolySoup) {
             GU_PrimPolySoup::build(
@@ -706,8 +733,13 @@ copyMesh(
             GU_PrimPoly::buildBlock(&detail, startpt, npoints, sizelist, verts[flags].array());
         }
 
-        GA_Range range = marker.getPrimitives();
-        GA_Range pntRange = marker.getPoints();
+#if (UT_VERSION_INT >= 0x0d050013) // 13.5.19 or later
+        GA_Range range(marker.primitiveRange());
+        GA_Range pntRange(marker.pointRange());
+#else
+        GA_Range range(marker.getPrimitives());
+        GA_Range pntRange(marker.getPoints());
+#endif
         GU_ConvertParms parms;
         parms.preserveGroups = true;
         GUconvertCopySingleVertexPrimAttribsAndGroups(parms,
@@ -736,6 +768,9 @@ SOP_OpenVDB_Convert::updateParmsFlags()
     const fpreal time = CHgetEvalTime();
 
     ConvertTo target = static_cast<ConvertTo>(evalInt("conversion", 0, time));
+#if HAVE_SPLITTING
+    bool toVolume = (target == HVOLUME);
+#endif
     bool toOpenVDB = (target == OPENVDB);
     bool toPoly = (target == POLYGONS);
     bool toPolySoup = false;
@@ -785,6 +820,9 @@ SOP_OpenVDB_Convert::updateParmsFlags()
     const bool partition = evalInt("automaticpartitions", 0, 0) > 1;
     changed |= enableParm("activepart", partition);
 
+#if HAVE_SPLITTING
+    changed |= setVisibleState("splitdisjointvolumes", toVolume);
+#endif
 
     changed |= setVisibleState("adaptivity", toPoly);
     changed |= setVisibleState("isoValue", toPoly || toOpenVDB);
@@ -1051,7 +1089,6 @@ SOP_OpenVDB_Convert::referenceMeshing(
     }
 }
 
-
 void
 SOP_OpenVDB_Convert::convertToPoly(
     fpreal time,
@@ -1244,6 +1281,12 @@ SOP_OpenVDB_Convert::cookMySop(OP_Context& context)
 
         const fpreal t = context.getTime();
 
+#if HAVE_SPLITTING
+        const bool splitDisjointVols = (evalInt("splitdisjointvolumes", 0, t) != 0);
+#else
+        const bool splitDisjointVols = false;
+#endif
+
         UT_String group_str;
         evalString(group_str, "group", 0, t);
         GA_PrimitiveGroup* group = parsePrimitiveGroupsCopy(group_str, gdp);
@@ -1253,7 +1296,7 @@ SOP_OpenVDB_Convert::cookMySop(OP_Context& context)
         switch (evalInt("conversion",  0, t))
         {
             case HVOLUME: {
-                convertFromVDB(*gdp, group, GEO_PrimTypeCompat::GEOPRIMVOLUME);
+                convertToVolumes(*gdp, group, splitDisjointVols);
                 break;
             }
             case OPENVDB: {

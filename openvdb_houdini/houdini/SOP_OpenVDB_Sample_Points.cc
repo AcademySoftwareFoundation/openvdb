@@ -117,7 +117,11 @@ struct NearestNeighborSampler<true> {
 };
 
 
-template<typename GridType, typename GA_RWPageHandleType, bool staggered = false, bool NearestNeighbor = false>
+template<
+    typename GridType,
+    typename GA_RWPageHandleType,
+    bool staggered = false,
+    bool NearestNeighbor = false>
 class PointSampler
 {
 public:
@@ -196,7 +200,8 @@ public:
                     point = mGrid.worldToIndex(cvdb::Vec3R(pos[0], pos[1], pos[2]));
 
                     if (NearestNeighbor) {
-                        NearestNeighborSampler<staggered>::template sample<Accessor>(accessor, point, value);
+                        NearestNeighborSampler<staggered>::template sample<Accessor>(
+                            accessor, point, value);
                     } else {
                         BoxSampler<staggered>::template sample<Accessor>(accessor, point, value);
                     }
@@ -321,7 +326,6 @@ SOP_OpenVDB_Sample_Points::sample(OP_Context& context)
         matchGroup(const_cast<GU_Detail&>(*bGdp), groupStr.toStdString());
 
     // scratch variables used in the loop
-    GEO_AttributeHandle attribHandle;
     GA_Defaults defaultFloat(0.0), defaultInt(0);
 
     int numScalarGrids  = 0;

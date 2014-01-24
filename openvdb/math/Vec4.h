@@ -236,6 +236,24 @@ public:
             + this->mm[2]*this->mm[2] + this->mm[3]*this->mm[3]);
     }
 
+    /// Return a reference to itsef after the exponent has been
+    /// applied to all the vector components.
+    inline const Vec4<T>& exp()
+    {
+        this->mm[0] = std::exp(this->mm[0]);
+        this->mm[1] = std::exp(this->mm[1]);
+        this->mm[2] = std::exp(this->mm[2]);
+        this->mm[3] = std::exp(this->mm[3]);
+        return *this;
+    }
+
+    /// Return the sum of all the vector components.
+    inline T sum() const
+    {
+        return this->mm[0] + this->mm[1] + this->mm[2] + this->mm[3];
+    }
+        
+
     /// this = normalized this
     bool normalize(T eps=1.0e-8)
     {
@@ -517,6 +535,10 @@ inline Vec4<T> maxComponent(const Vec4<T> &v1, const Vec4<T> &v2)
             std::max(v1.w(), v2.w()));
 }
 
+/// @brief Return a vector with the exponent applied to each of
+/// the components of the input vector. 
+template <typename T>
+inline Vec4<T> Exp(Vec4<T> v) { return v.exp(); }
 
 typedef Vec4<int32_t>   Vec4i;
 typedef Vec4<uint32_t>  Vec4ui;

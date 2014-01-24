@@ -2375,17 +2375,14 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
 
             // Remove mesh intersecting voxels that where set by rasterizing
             // self-intersecting portions of the mesh.
-            if (!rawData) {
-                internal::IntersectingVoxelCleaner<FloatTreeT> cleaner(mDistGrid->tree(),
-                    mIndexGrid->tree(), mIntersectingVoxelsGrid->tree(), leafs);
-                cleaner.run();
-            }
+            internal::IntersectingVoxelCleaner<FloatTreeT> cleaner(mDistGrid->tree(),
+                mIndexGrid->tree(), mIntersectingVoxelsGrid->tree(), leafs);
+            cleaner.run();
         }
 
         // Remove shell voxels that where set by rasterizing
         // self-intersecting portions of the mesh.
-        if (!rawData) {
-
+        {
             tree::LeafManager<FloatTreeT> leafs(mDistGrid->tree());
 
             internal::ShellVoxelCleaner<FloatTreeT> cleaner(mDistGrid->tree(),

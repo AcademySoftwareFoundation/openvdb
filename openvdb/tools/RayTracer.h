@@ -36,8 +36,9 @@
 /// perspective and orthographic cameras (both designed to mimic a Houdini camera),
 /// a Film class and some rather naive shaders
 ///
-/// @note These classes are included mainly to illustrate how to ray-trace
-/// OpenVDB volumes.  They are not intended for production-quality rendering.
+/// @note These classes are included mainly as reference implementations for
+/// ray-tracing of OpenVDB volumes. In other words they are not intended for 
+/// production-quality rendering.
 ///
 /// @todo Add a volume renderer
 

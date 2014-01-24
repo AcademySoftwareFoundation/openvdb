@@ -623,7 +623,12 @@ Min(const Type& a, const Type& b, const Type& c, const Type& d,
 
 
 ////////////////////////////////////////
+// ============> Exp <==================
 
+template<typename Type>
+inline Type Exp(const Type& x) { return std::exp(x); }
+    
+////////////////////////////////////////
 
 /// Return the sign of the given value as an integer (either -1, 0 or 1).
 template <typename Type>

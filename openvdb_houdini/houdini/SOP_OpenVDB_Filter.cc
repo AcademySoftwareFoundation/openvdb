@@ -79,7 +79,15 @@ public:
 
 protected:
     struct FilterParms {
-        FilterParms(Operation _op): op(_op), iterations(1), radius(1), offset(0.0) {}
+        FilterParms(Operation _op)
+            : op(_op)
+            , iterations(1)
+            , radius(1)
+#ifndef SESI_OPENVDB
+            , offset(0.0)
+#endif
+        {
+        }
         Operation op;
         int iterations;
         int radius;
@@ -256,16 +264,16 @@ SOP_OpenVDB_Filter::registerSop(OP_OperatorTable* table)
      //Invert mask.
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "invert", "Invert Alpha Mask")
               .setHelpText("Inverts the optional mask so alpha values 0->1 maps to 1->0"));
-    
+
     // Min mask range
     parms.add(hutil::ParmFactory(PRM_FLT_J, "minMask", "Min Mask Cutoff")
-              .setHelpText("Value below which the mask values map to zero")      
+              .setHelpText("Value below which the mask values map to zero")
               .setDefault(PRMzeroDefaults)
               .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
-    
+
     // Max mask range
     parms.add(hutil::ParmFactory(PRM_FLT_J, "maxMask", "Max Mask Cutoff")
-              .setHelpText("Value above which the mask values map to one")      
+              .setHelpText("Value above which the mask values map to one")
               .setDefault(PRMoneDefaults)
               .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
 
@@ -274,7 +282,7 @@ SOP_OpenVDB_Filter::registerSop(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "verbose", "Verbose")
               .setHelpText("Prints the sequence of operations to the terminal."));
 #endif
-    
+
     // Obsolete parameters
     hutil::ParmList obsoleteParms;
     obsoleteParms.add(hutil::ParmFactory(PRM_SEPARATOR,"sep1", ""));
@@ -283,7 +291,7 @@ SOP_OpenVDB_Filter::registerSop(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("OpenVDB Filter", SOP_OpenVDB_Filter::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
         .addInput("VDBs to Smooth")
-        .addOptionalInput("Optional VDB Mask (for alpha masking)");
+        .addOptionalInput("Optional VDB Alpha Mask");
 }
 
 
@@ -306,7 +314,7 @@ SOP_OpenVDB_Filter::updateParmsFlags()
     changed |= enableParm("minMask", useMask);
     changed |= enableParm("maxMask", useMask);
     changed |= enableParm("maskname", useMask);
-        
+
 #ifndef SESI_OPENVDB
     // Disable and hide unused parameters.
     bool enable = (op == OP_MEAN || op == OP_GAUSS || op == OP_MEDIAN);
@@ -347,7 +355,7 @@ struct SOP_OpenVDB_Filter::FilterOp
             const FilterParms& parms = opSequence[i];
             filter.setMaskRange(parms.minMask, parms.maxMask);
             filter.invertMask(parms.invertMask);
-            
+
             switch (parms.op) {
 #ifndef SESI_OPENVDB
             case OP_OFFSET:
@@ -361,8 +369,8 @@ struct SOP_OpenVDB_Filter::FilterOp
             case OP_MEAN:
 #ifndef SESI_OPENVDB
                 if (parms.verbose) {
-                    std::cout << "Applying " << parms.iterations << " iterations of mean value filtering "
-                              << "with a radius of " << parms.radius << std::endl;
+                    std::cout << "Applying " << parms.iterations << " iterations of mean value"
+                        " filtering with a radius of " << parms.radius << std::endl;
                 }
 #endif
                 filter.mean(parms.radius, parms.iterations, parms.mask);
@@ -371,8 +379,8 @@ struct SOP_OpenVDB_Filter::FilterOp
             case OP_GAUSS:
 #ifndef SESI_OPENVDB
                 if (parms.verbose) {
-                    std::cout << "Applying " << parms.iterations << " iterations of gaussian filtering "
-                              << "with a radius of " << parms.radius << std::endl;
+                    std::cout << "Applying " << parms.iterations << " iterations of gaussian"
+                        " filtering with a radius of " << parms.radius << std::endl;
                 }
 #endif
                 filter.gaussian(parms.radius, parms.iterations, parms.mask);
@@ -381,8 +389,8 @@ struct SOP_OpenVDB_Filter::FilterOp
             case OP_MEDIAN:
 #ifndef SESI_OPENVDB
                 if (parms.verbose) {
-                    std::cout << "Applying " << parms.iterations << " iterations of median value filtering "
-                              << "with a radius of " << parms.radius << std::endl;
+                    std::cout << "Applying " << parms.iterations << " iterations of median value"
+                        " filtering with a radius of " << parms.radius << std::endl;
                 }
 #endif
                 filter.median(parms.radius, parms.iterations, parms.mask);
@@ -424,7 +432,7 @@ SOP_OpenVDB_Filter::evalFilterParms(OP_Context& context, GU_Detail& geo, FilterP
         std::string maskName = str.toStdString();
         GU_DetailHandle maskHandle;
         maskHandle = static_cast<SOP_Node*>(maskInputNode)->getCookedGeoHandle(context);
-        
+
         GU_DetailHandleAutoReadLock maskScope(maskHandle);
         const GU_Detail *maskGeo = maskScope.getGdp();
 
@@ -438,7 +446,8 @@ SOP_OpenVDB_Filter::evalFilterParms(OP_Context& context, GU_Detail& geo, FilterP
                 hvdb::VdbPrimCIterator maskIt(maskGeo, maskGroup);
                 if (maskIt) {
                     if (maskIt->getStorageType() == UT_VDB_FLOAT) {
-                        maskGrid = openvdb::gridConstPtrCast<openvdb::FloatGrid>(maskIt->getGridPtr());
+                        maskGrid = openvdb::gridConstPtrCast<openvdb::FloatGrid>(
+                            maskIt->getGridPtr());
                     } else {
                         addWarning(SOP_MESSAGE, "The mask grid has to be a FloatGrid.");
                     }

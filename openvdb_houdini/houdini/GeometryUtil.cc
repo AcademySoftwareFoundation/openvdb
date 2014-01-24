@@ -374,6 +374,9 @@ validateGeometry(const GU_Detail& geometry, std::string& warning, Interrupter* b
 #else
         parms.setFromType(GEO_PrimTypeCompat::GEOPRIMALL);
         parms.setToType(GEO_PrimTypeCompat::GEOPRIMPOLY);
+        // We don't want interior tetrahedron faces as they will just
+        // distract us and fill up the vdb.
+        parms.setSharedFaces(false);
 #endif
         geoPtr->convert(parms);
     }
@@ -517,7 +520,8 @@ PrimCpyOp::operator()(const GA_SplittableRange &r) const
 ////////////////////////////////////////
 
 
-VertexNormalOp::VertexNormalOp(GU_Detail& detail, const GA_PrimitiveGroup *interiorPrims, float angle)
+VertexNormalOp::VertexNormalOp(GU_Detail& detail,
+    const GA_PrimitiveGroup *interiorPrims, float angle)
     : mDetail(detail)
     , mInteriorPrims(interiorPrims)
     , mAngle(angle)

@@ -101,18 +101,25 @@ filterTypeToString(FilterType filter)
 {
     std::string ret;
     switch (filter) {
-        case FILTER_TYPE_NONE: ret           = "none";           break;
-        case FILTER_TYPE_RENORMALIZE: ret    = "renormalize";    break;
-        case FILTER_TYPE_MEAN_VALUE: ret     = "mean value";     break;
-        case FILTER_TYPE_GAUSSIAN: ret       = "gaussian";       break;
-        case FILTER_TYPE_MEDIAN_VALUE: ret   = "median value";   break;
+        case FILTER_TYPE_NONE:           ret = "none";           break;
+        case FILTER_TYPE_RENORMALIZE:    ret = "renormalize";    break;
+        case FILTER_TYPE_GAUSSIAN:       ret = "gaussian";       break;
+        case FILTER_TYPE_DILATE:         ret = "dilate";         break;
+        case FILTER_TYPE_ERODE:          ret = "erode";          break;
+        case FILTER_TYPE_OPEN:           ret = "open";           break;
+        case FILTER_TYPE_CLOSE:          ret = "close";          break;
+        case FILTER_TYPE_TRACK:          ret = "track";          break;
+#ifndef SESI_OPENVDB
+        case FILTER_TYPE_MEAN_VALUE:     ret = "mean value";     break;
+        case FILTER_TYPE_MEDIAN_VALUE:   ret = "median value";   break;
         case FILTER_TYPE_MEAN_CURVATURE: ret = "mean curvature"; break;
         case FILTER_TYPE_LAPLACIAN_FLOW: ret = "laplacian flow"; break;
-        case FILTER_TYPE_DILATE: ret         = "dilate";         break;
-        case FILTER_TYPE_ERODE: ret          = "erode";          break;
-        case FILTER_TYPE_OPEN: ret           = "open";           break;
-        case FILTER_TYPE_CLOSE: ret          = "close";          break;
-        case FILTER_TYPE_TRACK: ret          = "track";          break;
+#else
+        case FILTER_TYPE_MEAN_VALUE:     ret = "meanvalue";      break;
+        case FILTER_TYPE_MEDIAN_VALUE:   ret = "medianvalue";    break;
+        case FILTER_TYPE_MEAN_CURVATURE: ret = "meancurvature";  break;
+        case FILTER_TYPE_LAPLACIAN_FLOW: ret = "laplacianflow";  break;
+#endif
     }
     return ret;
 }
@@ -423,14 +430,14 @@ newSopOperator(OP_OperatorTable* table)
         if (OP_TYPE_RENORM != op) { // Filter menu
 
             parms.add(hutil::ParmFactory(PRM_TOGGLE, "mask", "")
-                  .setDefault(PRMoneDefaults)
-                  .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-                  .setHelpText("Enable / disable the mask."));
+                .setDefault(PRMoneDefaults)
+                .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
+                .setHelpText("Enable / disable the mask."));
 
             parms.add(hutil::ParmFactory(PRM_STRING, "maskname", "Alpha Mask")
-                  .setHelpText("Optional VDB used for alpha masking. Assumes values 0->1.")
-                  .setSpareData(&SOP_Node::theSecondInput)
-                  .setChoiceList(&hutil::PrimGroupMenu));
+                .setHelpText("Optional VDB used for alpha masking. Assumes values 0->1.")
+                .setSpareData(&SOP_Node::theSecondInput)
+                .setChoiceList(&hutil::PrimGroupMenu));
 
             std::vector<std::string> items;
 
@@ -452,17 +459,18 @@ newSopOperator(OP_OperatorTable* table)
             .setDefault(PRMfourDefaults)
             .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10));
 
-        if (OP_TYPE_RESHAPE == op) { 
+        if (OP_TYPE_RESHAPE == op) {
             // Toggle between world- and index-space units for offset
-            parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldSpaceUnits", "Specify Offset in World (vs Voxel) Units")
-                      .setCallbackFunc(&convertUnitsCB));
-        
+            parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldSpaceUnits",
+                    "Specify Offset in World (vs Voxel) Units")
+                .setCallbackFunc(&convertUnitsCB));
+
             // Offset
             parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelOffset", "Offset")
-                      .setDefault(PRMoneDefaults)
-                      .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 10.0));
+                .setDefault(PRMoneDefaults)
+                .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 10.0));
         }
-                
+
         { // Renormalization accuracy
 
             std::vector<std::string> items;
@@ -485,21 +493,21 @@ newSopOperator(OP_OperatorTable* table)
         if (OP_TYPE_RENORM != op) {
             //Invert mask.
             parms.add(hutil::ParmFactory(PRM_TOGGLE, "invert", "Invert Alpha Mask")
-                      .setHelpText("Inverts the optional mask so alpha values 0->1 maps to 1->0"));
+                .setHelpText("Inverts the optional mask so alpha values 0->1 maps to 1->0"));
 
             // Min mask range
             parms.add(hutil::ParmFactory(PRM_FLT_J, "minMask", "Min Mask Cutoff")
-                      .setHelpText("Value below which the mask values map to zero")      
-                      .setDefault(PRMzeroDefaults)
-                      .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
+                .setHelpText("Value below which the mask values map to zero")
+                .setDefault(PRMzeroDefaults)
+                .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
 
             // Max mask range
             parms.add(hutil::ParmFactory(PRM_FLT_J, "maxMask", "Max Mask Cutoff")
-                      .setHelpText("Value above which the mask values map to one")      
-                      .setDefault(PRMoneDefaults)
-                      .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
+                .setHelpText("Value above which the mask values map to one")
+                .setDefault(PRMoneDefaults)
+                .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
         }
-            
+
 #ifndef SESI_OPENVDB
         // Verbosity toggle.
         parms.add(hutil::ParmFactory(PRM_TOGGLE, "verbose", "Verbose")
@@ -524,16 +532,16 @@ newSopOperator(OP_OperatorTable* table)
             hvdb::OpenVDBOpFactory("OpenVDB Offset Level Set",
                 SOP_OpenVDB_Filter_Level_Set::factoryReshape, parms, *table)
                 .setObsoleteParms(obsoleteParms)
-                .addInput("Input with VDB grids to process")
-                .addOptionalInput("Optional VDB Mask (for alpha masking)");
+                .addInput("Input with VDBs to process")
+                .addOptionalInput("Optional VDB Alpha Mask");
 
         } else if (OP_TYPE_SMOOTH == op) {
 
             hvdb::OpenVDBOpFactory("OpenVDB Smooth Level Set",
                 SOP_OpenVDB_Filter_Level_Set::factorySmooth, parms, *table)
                 .setObsoleteParms(obsoleteParms)
-                .addInput("Input with VDB grids to process")
-                .addOptionalInput("Optional VDB Mask (for alpha masking)");
+                .addInput("Input with VDBs to process")
+                .addOptionalInput("Optional VDB Alpha Mask");
         }
     }
  }
@@ -656,7 +664,11 @@ SOP_OpenVDB_Filter_Level_Set::cookMySop(OP_Context& context)
         BossT boss("Processing level sets");
 
         const fpreal time = context.getTime();
+#ifndef SESI_OPENVDB
         const bool verbose = bool(evalInt("verbose", 0, time));
+#else
+        const bool verbose = false;
+#endif
 
         if (verbose) std::cout << "--- " << this->getName() << " ---\n";
 
@@ -737,7 +749,7 @@ SOP_OpenVDB_Filter_Level_Set::evalFilterParms(OP_Context& context,
     } else {
         parms.mFilterType = FILTER_TYPE_RENORMALIZE;
     }
-    
+
     evalString(str, "accuracy", 0, now);
     parms.mAccuracy = stringToAccuracy(str.toStdString());
 
@@ -795,7 +807,7 @@ SOP_OpenVDB_Filter_Level_Set::applyFilters(
 
         // Skip this node if it doesn't operate on this primitive
         if (group && !group->containsOffset(vdbPrim->getMapOffset())) continue;
-        
+
         filterGrid(context, filter, filterParms[n], boss, verbose);
 
         if (boss.wasInterrupted()) break;
@@ -818,17 +830,17 @@ SOP_OpenVDB_Filter_Level_Set::filterGrid(OP_Context& context, FilterT& filter,
     typedef typename FilterT::GridType GridT;
     typedef typename FilterT::MaskType MaskT;
     typename MaskT::ConstPtr maskGrid;
-    
+
     if (parms.mMaskInputNode) {
 
         // record second input
         if (getInput(1) != parms.mMaskInputNode) {
             addExtraInput(parms.mMaskInputNode, OP_INTEREST_DATA);
         }
-    
+
         GU_DetailHandle maskHandle;
         maskHandle = static_cast<SOP_Node*>(parms.mMaskInputNode)->getCookedGeoHandle(context);
-        
+
         GU_DetailHandleAutoReadLock maskScope(maskHandle);
         const GU_Detail *maskGeo = maskScope.getGdp();
 
@@ -855,7 +867,7 @@ SOP_OpenVDB_Filter_Level_Set::filterGrid(OP_Context& context, FilterT& filter,
         filter.invertMask(parms.mInvertMask);
     }
 
-      
+
 
     typedef typename FilterT::ValueType ValueT;
     const ValueT ds = (parms.mWorldUnits ? 1 : mVoxelSize) * ValueT(parms.mVoxelOffset);

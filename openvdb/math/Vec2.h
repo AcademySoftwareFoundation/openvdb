@@ -197,6 +197,21 @@ public:
     /// does not involve square root
     T lengthSqr() const { return (this->mm[0]*this->mm[0] + this->mm[1]*this->mm[1]); }
 
+    /// Return a reference to itsef after the exponent has been
+    /// applied to all the vector components.
+    inline const Vec2<T>& exp()
+    {
+        this->mm[0] = std::exp(this->mm[0]);
+        this->mm[1] = std::exp(this->mm[1]);
+        return *this;
+    }
+
+    /// Return the sum of all the vector components.
+    inline T sum() const
+    {
+        return this->mm[0] + this->mm[1];
+    }
+    
     /// this = normalized this
     bool normalize(T eps=1.0e-8)
     {
@@ -495,6 +510,10 @@ inline Vec2<T> maxComponent(const Vec2<T> &v1, const Vec2<T> &v2)
             std::max(v1.y(), v2.y()));
 }
 
+/// @brief Return a vector with the exponent applied to each of
+/// the components of the input vector. 
+template <typename T>
+inline Vec2<T> Exp(Vec2<T> v) { return v.exp(); }    
 
 typedef Vec2<int32_t>   Vec2i;
 typedef Vec2<uint32_t>  Vec2ui;
