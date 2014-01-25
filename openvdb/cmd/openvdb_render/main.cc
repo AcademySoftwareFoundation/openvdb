@@ -32,9 +32,8 @@
 ///
 /// @brief Simple ray tracer for OpenVDB volumes
 ///
-/// @note This is intended mainly as an example of how to ray-trace OpenVDB volumes.
-/// It is not a production-quality renderer, and it is currently limited to
-/// rendering level set volumes.
+/// @note This is intended mainly as an example of how to ray-trace
+/// OpenVDB volumes.  It is not a production-quality renderer.
 
 #include <iostream>
 #include <limits>
@@ -71,12 +70,18 @@ struct RenderOpts
     std::string camera;
     float aperture, focal, frame, znear, zfar;
     double isovalue;
-    openvdb::Vec3R rotate;
-    openvdb::Vec3R translate;
-    openvdb::Vec3R target;
-    openvdb::Vec3R up;
+    openvdb::Vec3d rotate;
+    openvdb::Vec3d translate;
+    openvdb::Vec3d target;
+    openvdb::Vec3d up;
     bool lookat;
     size_t samples;
+    openvdb::Vec3d absorb;
+    openvdb::Vec3d color;
+    openvdb::Vec3d light;
+    openvdb::Vec3d scatter;
+    double cutoff, gain;
+    openvdb::Vec2d step;
     size_t width, height;
     std::string compression;
     int threads;
@@ -97,6 +102,13 @@ struct RenderOpts
         up(0.0, 1.0, 0.0),
         lookat(false),
         samples(1),
+        absorb(0.1),
+        color(0.7),
+        light(0.3, 0.3, 0.0),
+        scatter(1.5),
+        cutoff(0.005),
+        gain(1.0),
+        step(1.0, 3.0),
         width(1920),
         height(1080),
         compression("zip"),
@@ -125,20 +137,28 @@ struct RenderOpts
 
     std::ostream& put(std::ostream& os) const
     {
-        os << "-aperture " << aperture
+        os << " -absorb " << absorb[0] << "," << absorb[1] << "," << absorb[2]
+           << " -aperture " << aperture
            << " -camera " << camera
+           << " -color " << color[0] << "," << color[1] << "," << color[2]
            << " -compression " << compression
            << " -cpus " << threads
+           << " -cutoff " << cutoff
            << " -far " << zfar
            << " -focal " << focal
            << " -frame " << frame
-           << " -isovalue " << isovalue;
+           << " -gain " << gain
+           << " -isovalue " << isovalue
+           << " -light " << light[0] << "," << light[1] << "," << light[2];
         if (lookat) os << " -lookat " << target[0] << "," << target[1] << "," << target[2];
         os << " -near " << znear
            << " -res " << width << "x" << height;
         if (!lookat) os << " -rotate " << rotate[0] << "," << rotate[1] << "," << rotate[2];
         os << " -shader " << shader
            << " -samples " << samples
+           << " -scatter " << scatter[0] << "," << scatter[1] << "," << scatter[2]
+           << " -shadowstep " << step[1]
+           << " -step " << step[0]
            << " -translate " << translate[0] << "," << translate[1] << "," << translate[2];
         if (lookat) os << " -up " << up[0] << "," << up[1] << "," << up[2];
         if (verbose) os << " -v";
@@ -174,8 +194,6 @@ usage(int exitStatus = EXIT_FAILURE)
 "                      (default: " << fov << ")\n" <<
 "    -frame F          ortho camera frame width in world units (default: " <<
     opts.frame << ")\n" <<
-"    -isovalue F       isovalue in world units for level set ray intersection\n" <<
-"                      (default: " << opts.isovalue << ")\n" <<
 "    -lookat X,Y,Z     rotate the camera to point to (X, Y, Z)\n" <<
 "    -name S           name of the grid to be rendered (default: render\n" <<
 "                      the first floating-point grid found in in.vdb)\n" <<
@@ -185,9 +203,6 @@ usage(int exitStatus = EXIT_FAILURE)
 "    -r X,Y,Z                                    \n" <<
 "    -rotate X,Y,Z     camera rotation in degrees\n" <<
 "                      (default: look at the center of the grid)\n" <<
-"    -shader S         shader name; either \"diffuse\", \"matte\", \"normal\"\n" <<
-"                      or \"position\" (default: " << opts.shader << ")\n" <<
-"    -samples N        number of samples (rays) per pixel (default: " << opts.samples << ")\n" <<
 "    -t X,Y,Z                            \n" <<
 "    -translate X,Y,Z  camera translation\n" <<
 "    -up X,Y,Z         vector that should point up after rotation with -lookat\n" <<
@@ -196,12 +211,33 @@ usage(int exitStatus = EXIT_FAILURE)
 "    -v                verbose (print timing and diagnostics)\n" <<
 "    -h, -help         print this usage message and exit\n" <<
 "\n" <<
-"Example:\n" <<
+"Level set options:\n" <<
+"    -isovalue F       isovalue in world units for level set ray intersection\n" <<
+"                      (default: " << opts.isovalue << ")\n" <<
+"    -samples N        number of samples (rays) per pixel (default: " << opts.samples << ")\n" <<
+"    -shader S         shader name; either \"diffuse\", \"matte\", \"normal\"\n" <<
+"                      or \"position\" (default: " << opts.shader << ")\n" <<
+"\n" <<
+"Dense volume options:\n" <<
+"    -absorb R,G,B     absorption coefficients (default: " << opts.absorb << ")\n" <<
+"    -color R,G,B      light source color (default: " << opts.color << ")\n" <<
+"    -cutoff F         density and transmittance cutoff value (default: " << opts.cutoff << ")\n" <<
+"    -gain F           amount of scatter along the shadow ray (default: " << opts.gain << ")\n" <<
+"    -light X,Y,Z      light source direction (default: " << opts.light << ")\n" <<
+"    -scatter R,G,B    scattering coefficients (default: " << opts.scatter << ")\n" <<
+"    -shadowstep F     step size in voxels for integration along the shadow ray\n" <<
+"                      (default: " << opts.step[1] << ")\n" <<
+"    -step F           step size in voxels for integration along the primary ray\n" <<
+"                      (default: " << opts.step[0] << ")\n" <<
+"\n" <<
+"Examples:\n" <<
 "    " << gProgName << " crawler.vdb crawler.exr -shader diffuse -res 1920x1080 \\\n" <<
 "        -focal 35 -samples 4 -translate 0,210.5,400 -compression rle -v\n" <<
 "\n" <<
-"This is not (and is not intended to be) a production-quality renderer,\n" <<
-"and it is currently limited to rendering level set volumes.\n";
+"    " << gProgName << " bunny_cloud.vdb bunny_cloud.exr -res 1920x1080 \\\n" <<
+"        -focal 50 -translate 0,0,110 -absorb 0.1,0.5,0.1 -gain 2 -v\n" <<
+"\n" <<
+"This is not (and is not intended to be) a production-quality renderer.\n";
 
     std::cerr << ostr.str();
     exit(exitStatus);
@@ -272,10 +308,7 @@ render(const GridType& grid, const std::string& imgFilename, const RenderOpts& o
 {
     using namespace openvdb;
 
-    const GridClass cls = grid.getGridClass();
-    if (cls != GRID_LEVEL_SET) {
-        OPENVDB_THROW(ValueError, "expected level set, got " << GridBase::gridClassToString(cls));
-    }
+    const bool isLevelSet = (grid.getGridClass() == GRID_LEVEL_SET);
 
     tools::Film film(opts.width, opts.height);
 
@@ -292,29 +325,45 @@ render(const GridType& grid, const std::string& imgFilename, const RenderOpts& o
     }
     if (opts.lookat) camera->lookAt(opts.target, opts.up);
 
-    boost::scoped_ptr<tools::BaseShader> shader;
-    if (opts.shader == "diffuse") {
-        shader.reset(new tools::DiffuseShader);
-    } else if (opts.shader == "matte") {
+    boost::scoped_ptr<tools::BaseShader> shader(new tools::DiffuseShader);
+    if (opts.shader == "matte") {
         shader.reset(new tools::MatteShader);
     } else if (opts.shader == "normal") {
         shader.reset(new tools::NormalShader);
     } else if (opts.shader == "position") {
         const CoordBBox b = grid.evalActiveVoxelBoundingBox();
-        math::BBox<openvdb::Vec3R> bbox(b.min().asVec3d(), b.max().asVec3d());
+        math::BBox<openvdb::Vec3d> bbox(b.min().asVec3d(), b.max().asVec3d());
         shader.reset(new tools::PositionShader(bbox.applyMap(*(grid.transform().baseMap()))));
-    } else {
-        OPENVDB_THROW(ValueError,
-            "expected diffuse, matte, normal or position shader, got \"" << opts.shader << "\"");
     }
 
     if (opts.verbose) {
-        std::cout << gProgName << ": ray-tracing..." << std::endl;
+        std::cout << gProgName << ": ray-tracing";
+        const std::string gridName = grid.getName();
+        if (!gridName.empty()) std::cout << " " << gridName;
+        std::cout << "..." << std::endl;
     }
     const tbb::tick_count start = tbb::tick_count::now();
 
-    tools::LevelSetRayIntersector<GridType> intersector(grid, opts.isovalue);
-    tools::rayTrace(grid, intersector, *shader, *camera, opts.samples, 0, (opts.threads != 1));
+    if (isLevelSet) {
+        tools::LevelSetRayIntersector<GridType> intersector(grid, opts.isovalue);
+        tools::rayTrace(grid, intersector, *shader, *camera, opts.samples,
+            /*seed=*/0, (opts.threads != 1));
+    } else {
+        typedef tools::VolumeRayIntersector<GridType> IntersectorType;
+        IntersectorType intersector(grid);
+
+        tools::VolumeRender<IntersectorType> renderer(intersector, *camera);
+        renderer.setLightDir(opts.light[0], opts.light[1], opts.light[2]);
+        renderer.setLightColor(opts.color[0], opts.color[1], opts.color[2]);
+        renderer.setPrimaryStep(opts.step[0]);
+        renderer.setShadowStep(opts.step[1]);
+        renderer.setScattering(opts.scatter[0], opts.scatter[1], opts.scatter[2]);
+        renderer.setAbsorption(opts.absorb[0], opts.absorb[1], opts.absorb[2]);
+        renderer.setLightGain(opts.gain);
+        renderer.setCutOff(opts.cutoff);
+
+        renderer.render(opts.threads != 1);
+    }
 
     if (opts.verbose) {
         std::ostringstream ostr;
@@ -348,14 +397,29 @@ strToSize(const std::string& s, size_t& x, size_t& y)
 }
 
 
-openvdb::Vec3R
-strToVec3R(const std::string& s)
+std::vector<double>
+strToVec(const std::string& s)
 {
-    openvdb::Vec3R result;
+    std::vector<double> result;
     std::vector<std::string> elems;
     boost::split(elems, s, boost::algorithm::is_any_of(","));
     for (size_t i = 0, N = elems.size(); i < N; ++i) {
-        result[i] = atof(elems[i].c_str());
+        result.push_back(atof(elems[i].c_str()));
+    }
+    return result;
+}
+
+
+openvdb::Vec3d
+strToVec3d(const std::string& s)
+{
+    openvdb::Vec3d result(0.0, 0.0, 0.0);
+    std::vector<double> elems = strToVec(s);
+    if (!elems.empty()) {
+        result = openvdb::Vec3d(elems[0]);
+        for (size_t i = 1, N = std::min<size_t>(3, elems.size()); i < N; ++i) {
+            result[i] = elems[i];
+        }
     }
     return result;
 }
@@ -412,18 +476,27 @@ main(int argc, char *argv[])
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg[0] == '-') {
-            if (parser.check(i, "-aperture")) {
+            if (parser.check(i, "-absorb")) {
+                ++i;
+                opts.absorb = strToVec3d(argv[i]);
+            } else if (parser.check(i, "-aperture")) {
                 ++i;
                 opts.aperture = atof(argv[i]);
             } else if (parser.check(i, "-camera")) {
                 ++i;
                 opts.camera = argv[i];
+            } else if (parser.check(i, "-color")) {
+                ++i;
+                opts.color = strToVec3d(argv[i]);
             } else if (parser.check(i, "-compression")) {
                 ++i;
                 opts.compression = argv[i];
             } else if (parser.check(i, "-cpus")) {
                 ++i;
                 opts.threads = std::max(0, atoi(argv[i]));
+            } else if (parser.check(i, "-cutoff")) {
+                ++i;
+                opts.cutoff = atof(argv[i]);
             } else if (parser.check(i, "-isovalue")) {
                 ++i;
                 opts.isovalue = atof(argv[i]);
@@ -441,10 +514,16 @@ main(int argc, char *argv[])
             } else if (parser.check(i, "-frame")) {
                 ++i;
                 opts.frame = atof(argv[i]);
+            } else if (parser.check(i, "-gain")) {
+                ++i;
+                opts.gain = atof(argv[i]);
+            } else if (parser.check(i, "-light")) {
+                ++i;
+                opts.light = strToVec3d(argv[i]);
             } else if (parser.check(i, "-lookat")) {
                 ++i;
                 opts.lookat = true;
-                opts.target = strToVec3R(argv[i]);
+                opts.target = strToVec3d(argv[i]);
                 hasLookAt = true;
             } else if (parser.check(i, "-name")) {
                 ++i;
@@ -454,23 +533,32 @@ main(int argc, char *argv[])
                 opts.znear = atof(argv[i]);
             } else if (parser.check(i, "-r") || parser.check(i, "-rotate")) {
                 ++i;
-                opts.rotate = strToVec3R(argv[i]);
+                opts.rotate = strToVec3d(argv[i]);
                 hasRotate = true;
             } else if (parser.check(i, "-res")) {
                 ++i;
                 strToSize(argv[i], opts.width, opts.height);
+            } else if (parser.check(i, "-scatter")) {
+                ++i;
+                opts.scatter = strToVec3d(argv[i]);
             } else if (parser.check(i, "-shader")) {
                 ++i;
                 opts.shader = argv[i];
+            } else if (parser.check(i, "-shadowstep")) {
+                ++i;
+                opts.step[1] = atof(argv[i]);
             } else if (parser.check(i, "-samples")) {
                 ++i;
                 opts.samples = size_t(std::max(0, atoi(argv[i])));
+            } else if (parser.check(i, "-step")) {
+                ++i;
+                opts.step[0] = atof(argv[i]);
             } else if (parser.check(i, "-t") || parser.check(i, "-translate")) {
                 ++i;
-                opts.translate = strToVec3R(argv[i]);
+                opts.translate = strToVec3d(argv[i]);
             } else if (parser.check(i, "-up")) {
                 ++i;
-                opts.up = strToVec3R(argv[i]);
+                opts.up = strToVec3d(argv[i]);
             } else if (arg == "-v") {
                 opts.verbose = true;
             } else if (arg == "-h" || arg == "-help" || arg == "--help") {

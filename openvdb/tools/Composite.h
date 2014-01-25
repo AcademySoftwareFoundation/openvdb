@@ -83,6 +83,10 @@ inline void compSum(GridOrTreeT& a, GridOrTreeT& b);
 /// Store the result in the A grid and leave the B grid empty.
 template<typename GridOrTreeT> OPENVDB_STATIC_SPECIALIZATION
 inline void compMul(GridOrTreeT& a, GridOrTreeT& b);
+/// @brief Given grids A and B, compute a / b per voxel (using sparse traversal).
+/// Store the result in the A grid and leave the B grid empty.
+template<typename GridOrTreeT> OPENVDB_STATIC_SPECIALIZATION
+inline void compDiv(GridOrTreeT& a, GridOrTreeT& b);
 
 /// Copy the active voxels of B into A.
 template<typename GridOrTreeT> OPENVDB_STATIC_SPECIALIZATION
@@ -180,6 +184,21 @@ compMul(GridOrTreeT& aTree, GridOrTreeT& bTree)
     struct Local {
         static inline void op(CombineArgs<typename TreeT::ValueType>& args) {
             args.setResult(args.a() * args.b());
+        }
+    };
+    Adapter::tree(aTree).combineExtended(Adapter::tree(bTree), Local::op, /*prune=*/false);
+}
+
+
+template<typename GridOrTreeT>
+OPENVDB_STATIC_SPECIALIZATION inline void
+compDiv(GridOrTreeT& aTree, GridOrTreeT& bTree)
+{
+    typedef TreeAdapter<GridOrTreeT> Adapter;
+    typedef typename Adapter::TreeType TreeT;
+    struct Local {
+        static inline void op(CombineArgs<typename TreeT::ValueType>& args) {
+            args.setResult(args.a() / args.b());
         }
     };
     Adapter::tree(aTree).combineExtended(Adapter::tree(bTree), Local::op, /*prune=*/false);

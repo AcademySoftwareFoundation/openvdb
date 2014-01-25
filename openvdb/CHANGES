@@ -2,28 +2,32 @@ OpenVDB Version History
 =======================
 
 Version 2.2.0 - In development
-    - Added a section to the Cookbook on interpolation using BoxSampler, 
-      GridSampler, DualGridSampler, et al.
-    - Modified tools::DualGridSampler so it is more consistent with 
-      tools::GridSampler.
+    - Added a simple, multithreaded volume renderer, and added volume
+      rendering support to the vdb_render command-line renderer.
     - Added an option to the LevelSetRayIntersector and to vdb_render
       to specify the isovalue of the level set.
     - Added methods to the LevelSetRayIntersector to return the time of
       intersection along a world or index ray.
     - Added bounding box support to the VolumeRayIntersector.
+    - Added a section to the Cookbook on interpolation using BoxSampler, 
+      GridSampler, DualGridSampler, et al.
+    - Modified tools::DualGridSampler so it is more consistent with 
+      tools::GridSampler.
     - tools::cpt(), tools::curl(), tools::laplacian(), tools::meanCurvature()
       and tools::normalize() now output grids with appropriate vector types
       (covariant, contravariant, etc.).
     - Added tools::transformVectors(), which applies an affine transformation
       to the voxel values of a vector-valued grid, in accordance with the
       grid's Vector Type metadata setting.
+    - Added tools::compDiv(), which combines grids by dividing the values
+      of corresponding voxels.
     - Fixed a bug in the mean curvature computation that could produce NaNs
       in regions with constant values.
     - Added a Grid::topologyDifference() method.
     - Added exp() and sum() methods to math::Vec2, math::Vec3 and math::Vec4.
     - Fixed a bug in the mesh to volume converter that caused incorrect sign
       classifications for the level set rebuild tool.
-    - Fixed a build issue reported for Clang 3.2.
+    - Fixed a build issue reported by Clang 3.2 in tools/GridOperators.h.
     - Made various changes for compatibility with Houdini 13 and with
       C++11 compilers.
       [Contributed by SESI]
@@ -36,6 +40,7 @@ Version 2.2.0 - In development
     - Added topology union, intersection and difference operations to
       the Combine SOP.  These operations combine the active voxel topologies
       of grids that may have different value types.
+    - Added a Divide operation to the Combine SOP.
     - Added support for boolean grids to the Combine, Resample, Scatter, Prune
       and Visualize SOPs.
     - The Fill SOP now allows the fill region bounds to be specified either in

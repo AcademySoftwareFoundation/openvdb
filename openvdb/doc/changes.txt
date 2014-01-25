@@ -6,12 +6,10 @@
 @htmlonly <a name="v2_2_0_changes"></a>@endhtmlonly
 @par
 <B>Version 2.2.0</B> - <I>In development</I>
-- Added a @ref sInterpolation "section" to the Cookbook on interpolation
-  using @vdblink::tools::BoxSampler BoxSampler@endlink,
-  @vdblink::tools::GridSampler GridSampler@endlink,
-  @vdblink::tools::DualGridSampler DualGridSampler@endlink, et al.
-- Modified @vdblink::tools::DualGridSampler DualGridSampler@endlink so 
-  it is more consistent with @vdblink::tools::GridSampler GridSampler@endlink.
+- Added a simple, multithreaded
+  @vdblink::tools::VolumeRender volume renderer@endlink,
+  and added volume rendering support to the @c vdb_render
+  command-line renderer.
 - Added an option to the
   @vdblink::tools::LevelSetRayIntersector LevelSetRayIntersector@endlink 
   and to @c vdb_render to specify the isovalue of the level set.
@@ -20,6 +18,12 @@
   to return the time of intersection along a world or index ray.
 - Added bounding box support to the
   @vdblink::tools::VolumeRayIntersector VolumeRayIntersector@endlink.
+- Added a @ref sInterpolation "section" to the Cookbook on interpolation
+  using @vdblink::tools::BoxSampler BoxSampler@endlink,
+  @vdblink::tools::GridSampler GridSampler@endlink,
+  @vdblink::tools::DualGridSampler DualGridSampler@endlink, et al.
+- Modified @vdblink::tools::DualGridSampler DualGridSampler@endlink so 
+  it is more consistent with @vdblink::tools::GridSampler GridSampler@endlink.
 - The @vdblink::tools::cpt() cpt@endlink, @vdblink::tools::curl() curl@endlink,
   @vdblink::tools::laplacian() laplacian@endlink,
   @vdblink::tools::meanCurvature() meanCurvature@endlink
@@ -30,6 +34,8 @@
   which applies an affine transformation to the voxel values of a
   vector-valued grid, in accordance with the grid&rsquo;s
   @vdblink::VecType vector type@endlink.
+- Added a @vdblink::tools::compDiv() compDiv@endlink tool, which combines
+  grids by dividing the values of corresponding voxels.
 - Fixed a bug in the mean curvature computation that could produce NaNs
   in regions with constant values.
 - Added a
@@ -40,10 +46,10 @@
   and @vdblink::math::Vec4 Vec4@endlink.
 - Fixed a bug in the mesh to volume converter that caused incorrect sign
   classifications for the level set rebuild tool.
-- Fixed a build issue reported for Clang 3.2.
+- Fixed a build issue reported by Clang&nbsp;3.2 in tools/GridOperators.h.
 - Made various changes for compatibility with Houdini&nbsp;13 and with
   C++11 compilers.
-  <I>[Contributed by SESI]</I>
+  <I>[Contributed&nbsp;by&nbsp;SESI]</I>
 
 @par
 API changes:
@@ -56,6 +62,7 @@ Houdini:
 - Added topology union, intersection and difference operations to
   the Combine SOP.  These operations combine the active voxel topologies
   of grids that may have different value types.
+- Added a Divide operation to the Combine SOP.
 - Added support for boolean grids to the Combine, Resample, Scatter, Prune
   and Visualize SOPs.
 - The Fill SOP now allows the fill region bounds to be specified either in
