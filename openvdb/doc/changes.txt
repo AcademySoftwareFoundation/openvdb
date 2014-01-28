@@ -44,9 +44,13 @@
   @vdblink::math::Vec3::sum() sum@endlink methods to
   @vdblink::math::Vec2 Vec2@endlink, @vdblink::math::Vec3 Vec3@endlink
   and @vdblink::math::Vec4 Vec4@endlink.
+- Improved tools::fillWithSpheres() for small volumes that are just a few
+  voxels across.
 - Fixed a bug in the mesh to volume converter that caused incorrect sign
   classifications for the level set rebuild tool.
+- Fixed a bug in @vdblink::math::NonlinearFrustumMap::applyIJT NonlinearFrustumMap::applyIJT@endlink.
 - Fixed a build issue reported by Clang&nbsp;3.2 in tools/GridOperators.h.
+- Fixed bugs related to new GUI paramters introduced in the "Level Set Offset" SOP.
 - Made various changes for compatibility with Houdini&nbsp;13 and with
   C++11 compilers.
   <I>[Contributed&nbsp;by&nbsp;SESI]</I>

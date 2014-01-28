@@ -25,9 +25,13 @@ Version 2.2.0 - In development
       in regions with constant values.
     - Added a Grid::topologyDifference() method.
     - Added exp() and sum() methods to math::Vec2, math::Vec3 and math::Vec4.
+    - Improved tools::fillWithSpheres() for small volumes that are just a few
+      voxels across.
     - Fixed a bug in the mesh to volume converter that caused incorrect sign
       classifications for the level set rebuild tool.
     - Fixed a build issue reported by Clang 3.2 in tools/GridOperators.h.
+    - Fixed a bug with the gradient calculation involving frustum transforms.
+    - Fixed bugs related to new GUI paramters introduced in the "Level Set Offset" SOP. 
     - Made various changes for compatibility with Houdini 13 and with
       C++11 compilers.
       [Contributed by SESI]

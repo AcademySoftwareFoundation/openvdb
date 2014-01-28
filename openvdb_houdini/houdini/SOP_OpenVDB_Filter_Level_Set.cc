@@ -458,18 +458,16 @@ newSopOperator(OP_OperatorTable* table)
         parms.add(hutil::ParmFactory(PRM_INT_J, "iterations", "Iterations")
             .setDefault(PRMfourDefaults)
             .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10));
+        
+        // Toggle between world- and index-space units for offset
+        parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldSpaceUnits",
+                  "Specify Offset in World (vs Voxel) Units")
+                  .setCallbackFunc(&convertUnitsCB));
 
-        if (OP_TYPE_RESHAPE == op) {
-            // Toggle between world- and index-space units for offset
-            parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldSpaceUnits",
-                    "Specify Offset in World (vs Voxel) Units")
-                .setCallbackFunc(&convertUnitsCB));
-
-            // Offset
-            parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelOffset", "Offset")
-                .setDefault(PRMoneDefaults)
-                .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 10.0));
-        }
+        // Offset
+        parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelOffset", "Offset")
+                  .setDefault(PRMoneDefaults)
+                  .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 10.0));
 
         { // Renormalization accuracy
 
@@ -489,24 +487,22 @@ newSopOperator(OP_OperatorTable* table)
                 .setDefault(items[0])
                 .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
         }
-
-        if (OP_TYPE_RENORM != op) {
-            //Invert mask.
-            parms.add(hutil::ParmFactory(PRM_TOGGLE, "invert", "Invert Alpha Mask")
+        
+        //Invert mask.
+        parms.add(hutil::ParmFactory(PRM_TOGGLE, "invert", "Invert Alpha Mask")
                 .setHelpText("Inverts the optional mask so alpha values 0->1 maps to 1->0"));
 
-            // Min mask range
-            parms.add(hutil::ParmFactory(PRM_FLT_J, "minMask", "Min Mask Cutoff")
+        // Min mask range
+        parms.add(hutil::ParmFactory(PRM_FLT_J, "minMask", "Min Mask Cutoff")
                 .setHelpText("Value below which the mask values map to zero")
                 .setDefault(PRMzeroDefaults)
                 .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
 
-            // Max mask range
-            parms.add(hutil::ParmFactory(PRM_FLT_J, "maxMask", "Max Mask Cutoff")
+       // Max mask range
+       parms.add(hutil::ParmFactory(PRM_FLT_J, "maxMask", "Max Mask Cutoff")
                 .setHelpText("Value above which the mask values map to one")
                 .setDefault(PRMoneDefaults)
                 .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
-        }
 
 #ifndef SESI_OPENVDB
         // Verbosity toggle.
@@ -585,34 +581,37 @@ SOP_OpenVDB_Filter_Level_Set::SOP_OpenVDB_Filter_Level_Set(
 bool
 SOP_OpenVDB_Filter_Level_Set::updateParmsFlags()
 {
-    bool changed = false;
-
-    bool stencil = false, reshape = mOpType == OP_TYPE_RESHAPE;
+    bool changed = false, stencil = false;
+    const bool reshape = mOpType == OP_TYPE_RESHAPE;
 
     if (mOpType != OP_TYPE_RENORM) {
-
         UT_String str;
         evalString(str, "operation", 0, 0);
         FilterType operation = stringToFilterType(str.toStdString());
-
         stencil = operation == FILTER_TYPE_MEAN_VALUE ||
                   operation == FILTER_TYPE_GAUSSIAN   ||
                   operation == FILTER_TYPE_MEDIAN_VALUE;
-
-        bool hasMask = (this->nInputs() == 2);
+        const bool hasMask = (this->nInputs() == 2);
         changed |= enableParm("mask", hasMask);
-        bool useMask = bool(evalInt("mask", 0, 0)) && hasMask;
-        changed |= enableParm("invert", useMask);
-        changed |= enableParm("minMask", useMask);
-        changed |= enableParm("maxMask", useMask);
+        const bool useMask = hasMask && bool(evalInt("mask", 0, 0));
+        changed |= enableParm("invert",   useMask);
+        changed |= enableParm("minMask",  useMask);
+        changed |= enableParm("maxMask",  useMask);
         changed |= enableParm("maskname", useMask);
+    } else {
+        changed |= setVisibleState("invert", false);
+        changed |= setVisibleState("minMask",false);
+        changed |= setVisibleState("maxMask",false);
     }
 
-    changed |= enableParm("iterations", !reshape);
+    changed |= enableParm("iterations",  !reshape);
     changed |= enableParm("stencilWidth", stencil);
 
     changed |= setVisibleState("stencilWidth", getEnableState("stencilWidth"));
-    changed |= setVisibleState("iterations", getEnableState("iterations"));
+    changed |= setVisibleState("iterations",   getEnableState("iterations"));
+
+    changed |= setVisibleState("worldSpaceUnits", reshape);
+    changed |= setVisibleState("voxelOffset",     reshape);
 
     return changed;
 }

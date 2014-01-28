@@ -2209,7 +2209,7 @@ public:
 
         Vec3d result;
         for (int i = 0; i < 3; ++i) {
-            result(0) = d1_is(0) * gradE(0,i) + d1_is(1) * gradE(1,i) + d1_is(2) * gradE(2,i);
+            result(i) = d1_is(0) * gradE(0,i) + d1_is(1) * gradE(1,i) + d1_is(2) * gradE(2,i);
         }
 
         return result;
