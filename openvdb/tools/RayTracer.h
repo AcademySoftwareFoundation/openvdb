@@ -32,14 +32,15 @@
 ///
 /// @author Ken Museth
 ///
-/// @brief Defines a simple, multithreaded level-set ray tracer,
+/// @brief Defines two simple but multithreaded renders, a level-set
+/// ray tracer and a volume render. To support these renders we also define
 /// perspective and orthographic cameras (both designed to mimic a Houdini camera),
-/// a Film class and some rather naive shaders
+/// a Film class and some rather naive shaders.
 ///
-/// @note These classes are included mainly to illustrate how to ray-trace
-/// OpenVDB volumes.  They are not intended for production-quality rendering.
-///
-/// @todo Add a volume renderer
+/// @note These classes are included mainly as reference implementations for
+/// ray-tracing of OpenVDB volumes. In other words they are not intended for 
+/// production-quality rendering, but could be used for fast pre-visualiztion 
+/// or as a startingpoint for a more serious render.
 
 #ifndef OPENVDB_TOOLS_RAYTRACER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_RAYTRACER_HAS_BEEN_INCLUDED
@@ -49,6 +50,7 @@
 #include <openvdb/math/Ray.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/tools/RayIntersector.h>
+#include <openvdb/tools/Interpolation.h>
 #include <boost/scoped_ptr.hpp>
 #include <vector>
 
@@ -89,7 +91,7 @@ inline void rayTrace(const GridT&,
                      bool threaded = true);
 
 
-//////////////////////////////////////// RAYTRACER ////////////////////////////////////////
+///////////////////////////////LEVEL SET RAY TRACER ///////////////////////////////////////
 
 /// @brief A (very) simple multithreaded ray tracer specifically for narrow-band level sets.
 /// @details Included primarily as a reference implementation.
@@ -148,8 +150,7 @@ public:
     void setPixelSamples(size_t pixelSamples, unsigned int seed = 0);
 
     /// @brief Perform the actual (potentially multithreaded) ray-tracing.
-    void render(bool threaded = true);
-    OPENVDB_DEPRECATED void trace(bool threaded = true) { this->render(threaded); }
+    void render(bool threaded = true) const;
 
     /// @brief Public method required by tbb::parallel_for.
     /// @warning Never call it directly.
@@ -164,6 +165,74 @@ private:
     size_t                              mSubPixels;
 };// LevelSetRayTracer
 
+
+///////////////////////////////VOLUME RENDER ///////////////////////////////////////
+
+/// @brief A (very) simple multithreaded volume render specifically for scalar density.
+/// @details Included primarily as a reference implementation.
+/// @note It will only compile if the IntersectorT is templated on a Grid with a 
+/// floating-point voxel type.    
+template <typename IntersectorT, typename SamplerT = tools::BoxSampler>
+class VolumeRender
+{
+public:
+
+    typedef typename IntersectorT::GridType GridType;
+    typedef typename IntersectorT::RayType  RayType;
+    typedef typename GridType::ValueType    ValueType;
+    typedef tools::GridSampler<typename GridType::ConstAccessor, SamplerT> SamplerType;
+    BOOST_STATIC_ASSERT(boost::is_floating_point<ValueType>::value);
+    
+    VolumeRender(const IntersectorT& inter, BaseCamera& camera);
+
+    /// @brief Perform the actual (potentially multithreaded) volume rendering.
+    void render(bool threaded=true) const;
+
+    /// @brief Set the camera derived from the abstract BaseCamera class.
+    void setCamera(BaseCamera& camera) { mCamera = &camera; }
+
+    /// @brief Set the intersector that performs the actual
+    /// intersection of the rays against the volume.
+    void setIntersector(const IntersectorT& inter) { mIntersector = &inter; }
+    
+    /// @brief Set the vector components of a directional light source
+    /// @throw ArithmeticError if input is a null vector.
+    void setLightDir(Real x, Real y, Real z) { mLightDir = Vec3R(x,y,z).unit(); }
+
+    /// @brief Set the color of the direcitonal light source.
+    void setLightColor(Real r, Real g, Real b) { mLightColor = Vec3R(r,g,b); }
+
+    /// @brief Set the integration step-size in voxel units for the primay ray.
+    void setPrimaryStep(Real primaryStep) { mPrimaryStep = primaryStep; }
+
+    /// @brief Set the integration step-size in voxel units for the primay ray.
+    void setShadowStep(Real shadowStep) { mShadowStep  = shadowStep; }
+
+    /// @brief Set Scattering coefficients.
+    void setScattering(Real x, Real y, Real z) { mScattering = Vec3R(x,y,z); }
+
+    /// @brief Set absorption coefficients.
+    void setAbsorption(Real x, Real y, Real z) { mAbsorption = Vec3R(x,y,z); }
+
+    /// @brief Set parameter that imitates multi-scattering. A value
+    /// of zero implies no multi-scattering. 
+    void setLightGain(Real gain) { mLightGain = gain; }
+
+    /// @brief Set the cut-off value for density and transmittance.
+    void setCutOff(Real cutOff) { mCutOff = cutOff; }
+
+    /// @brief Public method required by tbb::parallel_for.
+    /// @warning Never call it directly.
+    void operator()(const tbb::blocked_range<size_t>& range) const;
+    
+private:
+    
+    BaseCamera* mCamera;
+    const IntersectorT* mIntersector;
+
+    Real  mPrimaryStep, mShadowStep, mCutOff, mLightGain;
+    Vec3R mLightDir, mLightColor, mAbsorption, mScattering;
+};//VolumeRender    
 
 //////////////////////////////////////// FILM ////////////////////////////////////////
 
@@ -484,12 +553,6 @@ public:
     /// @param nml Normal in world space at the intersection point.
     /// @param dir Direction of the ray in world space.
     virtual Film::RGBA operator()(const Vec3R& xyz, const Vec3R& nml, const Vec3R& dir) const = 0;
-
-    /// @brief Deprecated, use the method above instead.
-    OPENVDB_DEPRECATED Film::RGBA operator()(const Vec3R& xyz, const Vec3R& nml, const RayT& ray) const
-      {
-          return (*this)(xyz, nml, ray.dir());
-      }
     virtual BaseShader* copy() const = 0;
 };
 
@@ -714,7 +777,7 @@ setPixelSamples(size_t pixelSamples, unsigned int seed)
 
 template<typename GridT, typename IntersectorT>
 inline void LevelSetRayTracer<GridT, IntersectorT>::
-render(bool threaded)
+render(bool threaded) const
 {
     tbb::blocked_range<size_t> range(0, mCamera->height());
     threaded ? tbb::parallel_for(range, *this) : (*this)(range);
@@ -739,6 +802,86 @@ operator()(const tbb::blocked_range<size_t>& range) const
             bg = c*frac;
         }//loop over image height
     }//loop over image width
+}
+
+////////////////////////////////////////
+
+template<typename IntersectorT, typename SampleT>
+inline VolumeRender<IntersectorT, SampleT>::
+VolumeRender(const IntersectorT& inter, BaseCamera& camera)
+    : mCamera(&camera)
+    , mIntersector(&inter)
+    , mPrimaryStep(1.0)
+    , mShadowStep(3.0)
+    , mCutOff(0.005)
+    , mLightGain(1.0)
+    , mLightDir(Vec3R(0.3, 0.3, 0).unit())
+    , mLightColor(0.7, 0.7, 0.7)
+    , mAbsorption(0.1)
+    , mScattering(1.5)
+{
+}
+
+template<typename IntersectorT, typename SampleT>
+inline void VolumeRender<IntersectorT, SampleT>::
+render(bool threaded) const
+{
+    tbb::blocked_range<size_t> range(0, mCamera->height());
+    threaded ? tbb::parallel_for(range, *this) : (*this)(range);
+}
+
+template<typename IntersectorT, typename SampleT>
+inline void VolumeRender<IntersectorT, SampleT>::
+operator()(const tbb::blocked_range<size_t>& range) const
+{
+    IntersectorT primary(*mIntersector), shadow(*mIntersector);
+    SamplerType sampler(shadow.grid().getConstAccessor(), shadow.grid().transform());
+        
+    // Any variable prefixed with p (or s) means it's associate with a primay (or shadow) ray
+    const Vec3R lightDir = mLightDir, lightAmp = mLightColor;
+    const Vec3R pScat = mScattering, sigma = -(pScat+mAbsorption);//Absorption and scattering
+    const Real sGain = mLightGain;//in-scattering along shadow ray 
+    const Real pStep = mPrimaryStep;//Integration step along primary ray in voxel units
+    const Real sStep = mShadowStep;//Integration step along shadow ray in voxel units
+    const Real cutoff = mCutOff;//Cutoff for density and transmittance
+    
+    RayType sRay(Vec3R(0), lightDir);//Shadow ray
+    for (size_t j=range.begin(), je = range.end(); j<je; ++j) {
+        for (size_t i=0, ie = mCamera->width(); i<ie; ++i) {
+            Film::RGBA& bg = mCamera->pixel(i, j);
+            bg.a = bg.r = bg.g = bg.b = 0;
+            RayType pRay = mCamera->getRay(i, j);// Primary ray
+            if( !primary.setWorldRay(pRay)) continue;
+            Vec3R pTrans(1.0), pLumi(0.0);
+            for (Real pT0, pT1; primary.march(pT0, pT1); ) {
+                for (Real pT = pStep*ceil(pT0/pStep); pT <= pT1; pT +=pStep) {
+                    Vec3R pPos = primary.getWorldPos(pT);
+                    const Real density = sampler.wsSample(pPos);
+                    if (density < cutoff) continue;
+                    pTrans *= math::Exp(sigma * density * pStep);
+                    if (pTrans.lengthSqr()<cutoff) goto Pixel;//Terminate pRay
+                    Vec3R sTrans(1.0);
+                    sRay.setEye(pPos);
+                    if( !shadow.setWorldRay(sRay)) continue;
+                    for (Real sT0, sT1, gain=1.0; shadow.march(sT0, sT1);) {
+                        for (Real sT = sStep*ceil(sT0/sStep); sT<=sT1; sT+=sStep, gain+=sGain) {
+                            const Real d = sampler.wsSample(shadow.getWorldPos(sT));
+                            if (d < cutoff) continue;
+                            sTrans *= math::Exp(sigma * d * sStep/gain);
+                            if (sTrans.lengthSqr()<cutoff) goto Luminance;//Terminate sRay 
+                        }//Integration over shadow segment
+                    }// Shadow ray march
+                Luminance:
+                    pLumi += (pScat * density * sTrans * pStep * pTrans) * lightAmp;
+                }//Integration over primary segment
+            }// Primary ray march
+        Pixel:
+            bg.r = pLumi[0];
+            bg.g = pLumi[1];
+            bg.b = pLumi[2];
+            bg.a = 1.0f - pTrans.sum()/3.0f;
+        }//Horizontal pixel scan    
+    }//Vertical pixel scan
 }
 
 } // namespace tools

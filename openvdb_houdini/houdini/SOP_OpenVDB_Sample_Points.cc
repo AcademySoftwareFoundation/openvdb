@@ -117,7 +117,11 @@ struct NearestNeighborSampler<true> {
 };
 
 
-template<typename GridType, typename GA_RWPageHandleType, bool staggered = false, bool NearestNeighbor = false>
+template<
+    typename GridType,
+    typename GA_RWPageHandleType,
+    bool staggered = false,
+    bool NearestNeighbor = false>
 class PointSampler
 {
 public:
@@ -196,7 +200,8 @@ public:
                     point = mGrid.worldToIndex(cvdb::Vec3R(pos[0], pos[1], pos[2]));
 
                     if (NearestNeighbor) {
-                        NearestNeighborSampler<staggered>::template sample<Accessor>(accessor, point, value);
+                        NearestNeighborSampler<staggered>::template sample<Accessor>(
+                            accessor, point, value);
                     } else {
                         BoxSampler<staggered>::template sample<Accessor>(accessor, point, value);
                     }

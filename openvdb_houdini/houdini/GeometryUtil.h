@@ -51,8 +51,8 @@ class OP_Node;
 
 #ifdef SESI_OPENVDB
     #ifdef OPENVDB_HOUDINI_API
-	#undef OPENVDB_HOUDINI_API
-	#define OPENVDB_HOUDINI_API
+        #undef OPENVDB_HOUDINI_API
+        #define OPENVDB_HOUDINI_API
     #endif
 #endif
 

@@ -235,7 +235,7 @@ doLevelSetRebuild(const GridType& grid, typename GridType::ValueType iso,
         exBandWidth = float(exWidth),
         inBandWidth = float(inWidth);
 
-    tools::VolumeToMesh mesher(isovalue, 0.0005);
+    tools::VolumeToMesh mesher(isovalue);
     mesher(grid);
 
     math::Transform::Ptr transform = (xform != NULL) ? xform->copy() : grid.transform().copy();

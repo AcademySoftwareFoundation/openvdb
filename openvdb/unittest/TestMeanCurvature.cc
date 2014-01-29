@@ -90,20 +90,8 @@ TestMeanCurvature::testISMeanCurvature()
     typedef math::ISMeanCurvature<math::CD_FOURTH, math::CD_4TH> FourthOrder;
     CPPUNIT_ASSERT(!FourthOrder::result(inAccessor, xyz, alpha, beta));
 
-    meancurv = alpha/(2*math::Pow3(beta) );
-    normGrad = alpha/(2*math::Pow2(beta) );
-
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/10.0, meancurv, 0.001);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/10.0, normGrad, 0.001);
-
     typedef math::ISMeanCurvature<math::CD_SIXTH, math::CD_6TH> SixthOrder;
     CPPUNIT_ASSERT(!SixthOrder::result(inAccessor, xyz, alpha, beta));
-
-    meancurv = alpha/(2*math::Pow3(beta) );
-    normGrad = alpha/(2*math::Pow2(beta) );
-
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/10.0, meancurv, 0.001);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0/10.0, normGrad, 0.001);
     
     // Next test a level set sphere
     const openvdb::Coord dim(64,64,64);

@@ -77,16 +77,23 @@
 #include <UT/UT_Lock.h>
 #include <UT/UT_ParallelUtil.h>
 #include <UT/UT_ScopedPtr.h>
+#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
 #include <UT/UT_ScopeExit.h>
+#endif
 #include <UT/UT_StopWatch.h>
 #include <UT/UT_Version.h>
 
+#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
 #include <SYS/SYS_Inline.h>
+#endif
 #include <SYS/SYS_Types.h>
 
 #include <openvdb/tools/VolumeToMesh.h>
 
 #include <boost/function.hpp>
+#if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
+#include <boost/scope_exit.hpp>
+#endif
 #include <boost/type_traits/is_arithmetic.hpp>
 #include <boost/utility/enable_if.hpp>
 
@@ -703,22 +710,28 @@ GU_PrimVDB::convertToNewPrim(
 	bool split_disjoint_volumes,
 	bool &success) const
 {
-    GEO_Primitive *	prim = NULL; 
+    GEO_Primitive *	prim = NULL;
+
+#if UT_VERSION_INT < 0x0d0000b1 // 13.0.177 or earlier
+    const GA_PrimCompat::TypeMask parmType = parms.toType;
+#else
+    const GA_PrimCompat::TypeMask parmType = parms.toType();
+#endif
 
     success = false;
-    if (parms.toType() == GEO_PrimTypeCompat::GEOPRIMPOLY)
+    if (parmType == GEO_PrimTypeCompat::GEOPRIMPOLY)
     {
 	prim = convertToPoly(dst_geo, parms, adaptivity,
 			     /*polysoup*/false, success);
     }
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later 
-    else if (parms.toType() == GEO_PrimTypeCompat::GEOPRIMPOLYSOUP)
+#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
+    else if (parmType == GEO_PrimTypeCompat::GEOPRIMPOLYSOUP)
     {
 	prim = convertToPoly(dst_geo, parms, adaptivity,
 			     /*polysoup*/true, success);
     }
 #endif
-    else if (parms.toType() == GEO_PrimTypeCompat::GEOPRIMVOLUME)
+    else if (parmType == GEO_PrimTypeCompat::GEOPRIMVOLUME)
     {
 	prim = convertToPrimVolume(dst_geo, parms, split_disjoint_volumes);
 	if (prim)
@@ -981,11 +994,21 @@ GU_PrimVDB::convertPrimVolumeToPolySoup(
     GU_PrimVDB &vdb = *buildFromPrimVolume(
 			    dst_geo, src_vol, NULL,
 			    /*flood*/false, /*prune*/true, /*tol*/0);
+#if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
+    // NOTE: This syntax is for Boost 1.46 used by H12.1. It is different in
+    // Boost 1.51 used by H12.5.
+    BOOST_SCOPE_EXIT( (&vdb) (&dst_geo) )
+#else
     UT_SCOPE_EXIT(&vdb, &dst_geo)
+#endif
     {
 	dst_geo.destroyPrimitive(vdb, /*and_points*/true);
     }
+#if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
+    BOOST_SCOPE_EXIT_END
+#else
     UT_SCOPE_EXIT_END
+#endif
 
     if (progress.wasInterrupted())
 	return;
@@ -1448,7 +1471,11 @@ VoxelArrayVolume<TUPLE_SIZE>::copyToAlignedTile(
 	for (int tuple_i = 0; tuple_i < TUPLE_SIZE; tuple_i++) {
 
 	    VoxelTileF* tile = tiles[tuple_i];
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
 	    tile->makeRawUninitialized();
+#else
+	    tile->uncompress();
+#endif
 
 	    Coord ijk;
 	    for (ijk[0] = beg[0]; ijk[0] < end[0]; ijk[0] += LEAF_DIM) {
@@ -1508,7 +1535,11 @@ VoxelArrayVolume<TUPLE_SIZE>::copyToTile(
 	for (int tuple_i = 0; tuple_i < TUPLE_SIZE; tuple_i++) {
 
 	    VoxelTileF* tile = tiles[tuple_i];
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
 	    tile->makeRawUninitialized();
+#else
+	    tile->uncompress();
+#endif
 
 	    Coord ijk;
 	    for (ijk[0] = a_beg[0]; ijk[0] < end[0]; ijk[0] += DIM) {

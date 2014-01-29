@@ -101,22 +101,22 @@ filterTypeToString(FilterType filter)
 {
     std::string ret;
     switch (filter) {
-        case FILTER_TYPE_NONE: ret           = "none";           break;
-        case FILTER_TYPE_RENORMALIZE: ret    = "renormalize";    break;
-        case FILTER_TYPE_GAUSSIAN: ret       = "gaussian";       break;
-        case FILTER_TYPE_DILATE: ret         = "dilate";         break;
-        case FILTER_TYPE_ERODE: ret          = "erode";          break;
-        case FILTER_TYPE_OPEN: ret           = "open";           break;
-        case FILTER_TYPE_CLOSE: ret          = "close";          break;
-        case FILTER_TYPE_TRACK: ret          = "track";          break;
+        case FILTER_TYPE_NONE:           ret = "none";           break;
+        case FILTER_TYPE_RENORMALIZE:    ret = "renormalize";    break;
+        case FILTER_TYPE_GAUSSIAN:       ret = "gaussian";       break;
+        case FILTER_TYPE_DILATE:         ret = "dilate";         break;
+        case FILTER_TYPE_ERODE:          ret = "erode";          break;
+        case FILTER_TYPE_OPEN:           ret = "open";           break;
+        case FILTER_TYPE_CLOSE:          ret = "close";          break;
+        case FILTER_TYPE_TRACK:          ret = "track";          break;
 #ifndef SESI_OPENVDB
-        case FILTER_TYPE_MEAN_VALUE: ret     = "mean value";     break;
-        case FILTER_TYPE_MEDIAN_VALUE: ret   = "median value";   break;
+        case FILTER_TYPE_MEAN_VALUE:     ret = "mean value";     break;
+        case FILTER_TYPE_MEDIAN_VALUE:   ret = "median value";   break;
         case FILTER_TYPE_MEAN_CURVATURE: ret = "mean curvature"; break;
         case FILTER_TYPE_LAPLACIAN_FLOW: ret = "laplacian flow"; break;
 #else
-        case FILTER_TYPE_MEAN_VALUE: ret     = "meanvalue";      break;
-        case FILTER_TYPE_MEDIAN_VALUE: ret   = "medianvalue";    break;
+        case FILTER_TYPE_MEAN_VALUE:     ret = "meanvalue";      break;
+        case FILTER_TYPE_MEDIAN_VALUE:   ret = "medianvalue";    break;
         case FILTER_TYPE_MEAN_CURVATURE: ret = "meancurvature";  break;
         case FILTER_TYPE_LAPLACIAN_FLOW: ret = "laplacianflow";  break;
 #endif
@@ -430,14 +430,14 @@ newSopOperator(OP_OperatorTable* table)
         if (OP_TYPE_RENORM != op) { // Filter menu
 
             parms.add(hutil::ParmFactory(PRM_TOGGLE, "mask", "")
-                  .setDefault(PRMoneDefaults)
-                  .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-                  .setHelpText("Enable / disable the mask."));
+                .setDefault(PRMoneDefaults)
+                .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
+                .setHelpText("Enable / disable the mask."));
 
             parms.add(hutil::ParmFactory(PRM_STRING, "maskname", "Alpha Mask")
-                  .setHelpText("Optional VDB used for alpha masking. Assumes values 0->1.")
-                  .setSpareData(&SOP_Node::theSecondInput)
-                  .setChoiceList(&hutil::PrimGroupMenu));
+                .setHelpText("Optional VDB used for alpha masking. Assumes values 0->1.")
+                .setSpareData(&SOP_Node::theSecondInput)
+                .setChoiceList(&hutil::PrimGroupMenu));
 
             std::vector<std::string> items;
 
@@ -458,17 +458,16 @@ newSopOperator(OP_OperatorTable* table)
         parms.add(hutil::ParmFactory(PRM_INT_J, "iterations", "Iterations")
             .setDefault(PRMfourDefaults)
             .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10));
-
-        if (OP_TYPE_RESHAPE == op) { 
-            // Toggle between world- and index-space units for offset
-            parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldSpaceUnits", "Specify Offset in World (vs Voxel) Units")
-                      .setCallbackFunc(&convertUnitsCB));
         
-            // Offset
-            parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelOffset", "Offset")
-                      .setDefault(PRMoneDefaults)
-                      .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 10.0));
-        }
+        // Toggle between world- and index-space units for offset
+        parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldSpaceUnits",
+                  "Specify Offset in World (vs Voxel) Units")
+                  .setCallbackFunc(&convertUnitsCB));
+
+        // Offset
+        parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelOffset", "Offset")
+                  .setDefault(PRMoneDefaults)
+                  .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 10.0));
 
         { // Renormalization accuracy
 
@@ -488,24 +487,22 @@ newSopOperator(OP_OperatorTable* table)
                 .setDefault(items[0])
                 .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
         }
+        
+        //Invert mask.
+        parms.add(hutil::ParmFactory(PRM_TOGGLE, "invert", "Invert Alpha Mask")
+                .setHelpText("Inverts the optional mask so alpha values 0->1 maps to 1->0"));
 
-        if (OP_TYPE_RENORM != op) {
-            //Invert mask.
-            parms.add(hutil::ParmFactory(PRM_TOGGLE, "invert", "Invert Alpha Mask")
-                      .setHelpText("Inverts the optional mask so alpha values 0->1 maps to 1->0"));
+        // Min mask range
+        parms.add(hutil::ParmFactory(PRM_FLT_J, "minMask", "Min Mask Cutoff")
+                .setHelpText("Value below which the mask values map to zero")
+                .setDefault(PRMzeroDefaults)
+                .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
 
-            // Min mask range
-            parms.add(hutil::ParmFactory(PRM_FLT_J, "minMask", "Min Mask Cutoff")
-                      .setHelpText("Value below which the mask values map to zero")      
-                      .setDefault(PRMzeroDefaults)
-                      .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
-
-            // Max mask range
-            parms.add(hutil::ParmFactory(PRM_FLT_J, "maxMask", "Max Mask Cutoff")
-                      .setHelpText("Value above which the mask values map to one")      
-                      .setDefault(PRMoneDefaults)
-                      .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
-        }
+       // Max mask range
+       parms.add(hutil::ParmFactory(PRM_FLT_J, "maxMask", "Max Mask Cutoff")
+                .setHelpText("Value above which the mask values map to one")
+                .setDefault(PRMoneDefaults)
+                .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
 
 #ifndef SESI_OPENVDB
         // Verbosity toggle.
@@ -584,35 +581,38 @@ SOP_OpenVDB_Filter_Level_Set::SOP_OpenVDB_Filter_Level_Set(
 bool
 SOP_OpenVDB_Filter_Level_Set::updateParmsFlags()
 {
-    bool changed = false;
-
-    bool stencil = false, reshape = mOpType == OP_TYPE_RESHAPE;
+    bool changed = false, stencil = false;
+    const bool reshape = mOpType == OP_TYPE_RESHAPE;
 
     if (mOpType != OP_TYPE_RENORM) {
-
         UT_String str;
         evalString(str, "operation", 0, 0);
         FilterType operation = stringToFilterType(str.toStdString());
-
         stencil = operation == FILTER_TYPE_MEAN_VALUE ||
                   operation == FILTER_TYPE_GAUSSIAN   ||
                   operation == FILTER_TYPE_MEDIAN_VALUE;
-
-        bool hasMask = (this->nInputs() == 2);
+        const bool hasMask = (this->nInputs() == 2);
         changed |= enableParm("mask", hasMask);
-        bool useMask = bool(evalInt("mask", 0, 0)) && hasMask;
-        changed |= enableParm("invert", useMask);
-        changed |= enableParm("minMask", useMask);
-        changed |= enableParm("maxMask", useMask);
+        const bool useMask = hasMask && bool(evalInt("mask", 0, 0));
+        changed |= enableParm("invert",   useMask);
+        changed |= enableParm("minMask",  useMask);
+        changed |= enableParm("maxMask",  useMask);
         changed |= enableParm("maskname", useMask);
+    } else {
+        changed |= setVisibleState("invert", false);
+        changed |= setVisibleState("minMask",false);
+        changed |= setVisibleState("maxMask",false);
     }
 
-    changed |= enableParm("iterations", !reshape);
+    changed |= enableParm("iterations",  !reshape);
     changed |= enableParm("stencilWidth", stencil);
     changed |= enableParm("voxelOffset", reshape);
 
     changed |= setVisibleState("stencilWidth", getEnableState("stencilWidth"));
-    changed |= setVisibleState("iterations", getEnableState("iterations"));
+    changed |= setVisibleState("iterations",   getEnableState("iterations"));
+
+    changed |= setVisibleState("worldSpaceUnits", reshape);
+    changed |= setVisibleState("voxelOffset",     reshape);
 
     return changed;
 }
@@ -667,7 +667,7 @@ SOP_OpenVDB_Filter_Level_Set::cookMySop(OP_Context& context)
 #ifndef SESI_OPENVDB
         const bool verbose = bool(evalInt("verbose", 0, time));
 #else
-	const bool verbose = false;
+        const bool verbose = false;
 #endif
 
         if (verbose) std::cout << "--- " << this->getName() << " ---\n";
@@ -830,17 +830,17 @@ SOP_OpenVDB_Filter_Level_Set::filterGrid(OP_Context& context, FilterT& filter,
     typedef typename FilterT::GridType GridT;
     typedef typename FilterT::MaskType MaskT;
     typename MaskT::ConstPtr maskGrid;
-    
+
     if (parms.mMaskInputNode) {
 
         // record second input
         if (getInput(1) != parms.mMaskInputNode) {
             addExtraInput(parms.mMaskInputNode, OP_INTEREST_DATA);
         }
-    
+
         GU_DetailHandle maskHandle;
         maskHandle = static_cast<SOP_Node*>(parms.mMaskInputNode)->getCookedGeoHandle(context);
-        
+
         GU_DetailHandleAutoReadLock maskScope(maskHandle);
         const GU_Detail *maskGeo = maskScope.getGdp();
 
@@ -867,7 +867,7 @@ SOP_OpenVDB_Filter_Level_Set::filterGrid(OP_Context& context, FilterT& filter,
         filter.invertMask(parms.mInvertMask);
     }
 
-      
+
 
     typedef typename FilterT::ValueType ValueT;
     const ValueT ds = (parms.mWorldUnits ? 1 : mVoxelSize) * ValueT(parms.mVoxelOffset);

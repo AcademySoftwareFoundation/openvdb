@@ -49,6 +49,7 @@ public:
     CPPUNIT_TEST(testISGradientStencil);
     CPPUNIT_TEST(testWSGradient);                    // Gradient in World Space
     CPPUNIT_TEST(testWSGradientStencil);
+    CPPUNIT_TEST(testWSGradientStencilFrustum);
     CPPUNIT_TEST(testWSGradientNormSqr);             // Gradient Norm Sqr (world space only)
     CPPUNIT_TEST(testWSGradientNormSqrStencil);      // Gradient Norm Sqr (world space only)
     CPPUNIT_TEST(testGradientTool);                  // Gradient tool
@@ -61,6 +62,7 @@ public:
     void testISGradient();
     void testISGradientStencil();
     void testWSGradient();
+    void testWSGradientStencilFrustum();
     void testWSGradientStencil();
     void testWSGradientNormSqr();
     void testWSGradientNormSqrStencil();
@@ -313,6 +315,94 @@ TestGradient::testWSGradient()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
     }
 }
+
+void
+TestGradient::testWSGradientStencilFrustum()
+{
+    using namespace openvdb;
+    
+    // Construct a frustum that matches the one in TestMaps::testFrustum()
+    
+    openvdb::BBoxd bbox(Vec3d(0), Vec3d(100));
+    math::NonlinearFrustumMap frustum(bbox, 1./6., 5);
+    /// frustum will have depth, far plane - near plane = 5
+    /// the frustum has width 1 in the front and 6 in the back
+
+    Vec3d trans(2,2,2);
+    math::NonlinearFrustumMap::Ptr map =
+        boost::static_pointer_cast<math::NonlinearFrustumMap, math::MapBase>(
+            frustum.preScale(Vec3d(10,10,10))->postTranslate(trans));
+
+    
+    // Create a grid with this frustum
+    
+    FloatGrid::Ptr grid = FloatGrid::create(/*background=*/0.f);
+    math::Transform::Ptr transform = math::Transform::Ptr( new math::Transform(map));
+    grid->setTransform(transform);
+
+    FloatGrid::Accessor acc = grid->getAccessor();
+    // Totally fill the interior of the frustum with word space distances
+    // from its center.
+
+    
+    math::Vec3d isCenter(.5 * 101, .5 * 101, .5 * 101);
+    math::Vec3d wsCenter = map->applyMap(isCenter);
+    
+    math::Coord ijk;
+
+    // convert to IntType
+    Vec3i min(bbox.min());
+    Vec3i max = Vec3i(bbox.max()) + Vec3i(1, 1, 1);
+
+    for (ijk[0] = min.x(); ijk[0] < max.x(); ++ijk[0]) {
+        for (ijk[1] = min.y(); ijk[1] < max.y(); ++ijk[1]) {
+            for (ijk[2] = min.z(); ijk[2] < max.z(); ++ijk[2]) {
+                const math::Vec3d wsLocation = transform->indexToWorld(ijk);
+                const float dis = (wsLocation - wsCenter).length();
+                
+                acc.setValue(ijk, dis);
+            }
+        }
+    }
+    
+
+    {
+    // test at location 10, 10, 10 in index space
+    math::Coord xyz(10, 10, 10);
+    
+    math::Vec3s result = 
+          math::Gradient<math::NonlinearFrustumMap, math::CD_2ND>::result(*map, acc, xyz);
+
+    // The Gradient should be unit lenght for this case
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+
+    math::Vec3d wsVec = transform->indexToWorld(xyz);
+    math::Vec3d direction = (wsVec - wsCenter);
+    direction.normalize();
+     
+    // test the actual direction of the gradient
+    CPPUNIT_ASSERT(direction.eq(result, 0.01 /*tolerance*/));
+    }              
+
+    {
+    // test at location 30, 30, 60 in index space
+    math::Coord xyz(30, 30, 60);
+    
+    math::Vec3s result = 
+          math::Gradient<math::NonlinearFrustumMap, math::CD_2ND>::result(*map, acc, xyz);
+
+    // The Gradient should be unit lenght for this case
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+
+    math::Vec3d wsVec = transform->indexToWorld(xyz);
+    math::Vec3d direction = (wsVec - wsCenter);
+    direction.normalize();
+     
+    // test the actual direction of the gradient
+    CPPUNIT_ASSERT(direction.eq(result, 0.01 /*tolerance*/));
+    }              
+}
+    
 
 
 void

@@ -59,6 +59,7 @@ public:
     CPPUNIT_TEST(testCompMin);
     CPPUNIT_TEST(testCompSum);
     CPPUNIT_TEST(testCompProd);
+    CPPUNIT_TEST(testCompDiv);
     CPPUNIT_TEST(testCompReplace);
     CPPUNIT_TEST(testBoolTree);
 #ifdef DWA_OPENVDB
@@ -72,6 +73,7 @@ public:
     void testCompMin();
     void testCompSum();
     void testCompProd();
+    void testCompDiv();
     void testCompReplace();
     void testBoolTree();
     void testCsg();
@@ -144,12 +146,14 @@ template<typename TreeT> void compMax(TreeT& a, TreeT& b) { openvdb::tools::comp
 template<typename TreeT> void compMin(TreeT& a, TreeT& b) { openvdb::tools::compMin(a, b); }
 template<typename TreeT> void compSum(TreeT& a, TreeT& b) { openvdb::tools::compSum(a, b); }
 template<typename TreeT> void compMul(TreeT& a, TreeT& b) { openvdb::tools::compMul(a, b); }\
+template<typename TreeT> void compDiv(TreeT& a, TreeT& b) { openvdb::tools::compDiv(a, b); }\
 
 float orderf(float a, float b) { return a + 100 * b; }
 float maxf(float a, float b) { return std::max(a, b); }
 float minf(float a, float b) { return std::min(a, b); }
 float sumf(float a, float b) { return a + b; }
 float mulf(float a, float b) { return a * b; }
+float divf(float a, float b) { return a / b; }
 
 openvdb::Vec3f orderv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) { return a + 100 * b; }
 openvdb::Vec3f maxv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) {
@@ -162,6 +166,7 @@ openvdb::Vec3f minv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) {
 }
 openvdb::Vec3f sumv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) { return a + b; }
 openvdb::Vec3f mulv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) { return a * b; }
+openvdb::Vec3f divv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) { return a / b; }
 
 } // namespace Local
 } // unnamed namespace
@@ -207,6 +212,14 @@ TestTreeCombine::testCompProd()
 {
     testComp<openvdb::FloatTree>(Local::compMul<openvdb::FloatTree>, Local::mulf);
     testComp<openvdb::VectorTree>(Local::compMul<openvdb::VectorTree>, Local::mulv);
+}
+
+
+void
+TestTreeCombine::testCompDiv()
+{
+    testComp<openvdb::FloatTree>(Local::compDiv<openvdb::FloatTree>, Local::divf);
+    testComp<openvdb::VectorTree>(Local::compDiv<openvdb::VectorTree>, Local::divv);
 }
 
 

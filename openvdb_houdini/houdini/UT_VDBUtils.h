@@ -585,8 +585,9 @@ inline UT_BoundingBoxD
 UTvdbConvert(const openvdb::CoordBBox &bbox)
 {
     return UT_BoundingBoxD(UTvdbConvert(bbox.getStart().asVec3d()),
-			   UTvdbConvert(bbox.getEnd().asVec3d()));
+	UTvdbConvert(bbox.getEnd().asVec3d()));
 }
+
 
 template <typename T>
 inline openvdb::math::Vec4<T>	SYSabs(const openvdb::math::Vec4<T> &v1)

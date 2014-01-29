@@ -80,15 +80,14 @@ public:
 protected:
     struct FilterParms {
         FilterParms(Operation _op)
-	    : op(_op)
-	    , iterations(1)
-	    , radius(1)
+            : op(_op)
+            , iterations(1)
+            , radius(1)
 #ifndef SESI_OPENVDB
-	    , offset(0.0)
+            , offset(0.0)
 #endif
-	{
-	}
-
+        {
+        }
         Operation op;
         int iterations;
         int radius;
@@ -265,16 +264,16 @@ SOP_OpenVDB_Filter::registerSop(OP_OperatorTable* table)
      //Invert mask.
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "invert", "Invert Alpha Mask")
               .setHelpText("Inverts the optional mask so alpha values 0->1 maps to 1->0"));
-    
+
     // Min mask range
     parms.add(hutil::ParmFactory(PRM_FLT_J, "minMask", "Min Mask Cutoff")
-              .setHelpText("Value below which the mask values map to zero")      
+              .setHelpText("Value below which the mask values map to zero")
               .setDefault(PRMzeroDefaults)
               .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
-    
+
     // Max mask range
     parms.add(hutil::ParmFactory(PRM_FLT_J, "maxMask", "Max Mask Cutoff")
-              .setHelpText("Value above which the mask values map to one")      
+              .setHelpText("Value above which the mask values map to one")
               .setDefault(PRMoneDefaults)
               .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0));
 
@@ -370,8 +369,8 @@ struct SOP_OpenVDB_Filter::FilterOp
             case OP_MEAN:
 #ifndef SESI_OPENVDB
                 if (parms.verbose) {
-                    std::cout << "Applying " << parms.iterations << " iterations of mean value filtering "
-                              << "with a radius of " << parms.radius << std::endl;
+                    std::cout << "Applying " << parms.iterations << " iterations of mean value"
+                        " filtering with a radius of " << parms.radius << std::endl;
                 }
 #endif
                 filter.mean(parms.radius, parms.iterations, parms.mask);
@@ -380,8 +379,8 @@ struct SOP_OpenVDB_Filter::FilterOp
             case OP_GAUSS:
 #ifndef SESI_OPENVDB
                 if (parms.verbose) {
-                    std::cout << "Applying " << parms.iterations << " iterations of gaussian filtering "
-                              << "with a radius of " << parms.radius << std::endl;
+                    std::cout << "Applying " << parms.iterations << " iterations of gaussian"
+                        " filtering with a radius of " << parms.radius << std::endl;
                 }
 #endif
                 filter.gaussian(parms.radius, parms.iterations, parms.mask);
@@ -390,8 +389,8 @@ struct SOP_OpenVDB_Filter::FilterOp
             case OP_MEDIAN:
 #ifndef SESI_OPENVDB
                 if (parms.verbose) {
-                    std::cout << "Applying " << parms.iterations << " iterations of median value filtering "
-                              << "with a radius of " << parms.radius << std::endl;
+                    std::cout << "Applying " << parms.iterations << " iterations of median value"
+                        " filtering with a radius of " << parms.radius << std::endl;
                 }
 #endif
                 filter.median(parms.radius, parms.iterations, parms.mask);
@@ -433,7 +432,7 @@ SOP_OpenVDB_Filter::evalFilterParms(OP_Context& context, GU_Detail& geo, FilterP
         std::string maskName = str.toStdString();
         GU_DetailHandle maskHandle;
         maskHandle = static_cast<SOP_Node*>(maskInputNode)->getCookedGeoHandle(context);
-        
+
         GU_DetailHandleAutoReadLock maskScope(maskHandle);
         const GU_Detail *maskGeo = maskScope.getGdp();
 
@@ -447,7 +446,8 @@ SOP_OpenVDB_Filter::evalFilterParms(OP_Context& context, GU_Detail& geo, FilterP
                 hvdb::VdbPrimCIterator maskIt(maskGeo, maskGroup);
                 if (maskIt) {
                     if (maskIt->getStorageType() == UT_VDB_FLOAT) {
-                        maskGrid = openvdb::gridConstPtrCast<openvdb::FloatGrid>(maskIt->getGridPtr());
+                        maskGrid = openvdb::gridConstPtrCast<openvdb::FloatGrid>(
+                            maskIt->getGridPtr());
                     } else {
                         addWarning(SOP_MESSAGE, "The mask grid has to be a FloatGrid.");
                     }

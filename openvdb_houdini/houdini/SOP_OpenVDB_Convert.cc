@@ -55,6 +55,8 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/math/special_functions/round.hpp>
 
+#include <list>
+
 #if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
 #define HAVE_POLYSOUP 1
 #include <GU/GU_PrimPolySoup.h>
@@ -62,7 +64,11 @@
 #define HAVE_POLYSOUP 0
 #endif
 
-#include <list>
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
+#define HAVE_SPLITTING 1
+#else
+#define HAVE_SPLITTING 0
+#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -195,12 +201,13 @@ newSopOperator(OP_OperatorTable* table)
 
     // Parms for converting to volumes
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE,
-		"splitdisjointvolumes", "Split Disjoint Volumes")
-        .setHelpText("When converting to volumes, create multiple  "
+#if HAVE_SPLITTING
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "splitdisjointvolumes", "Split Disjoint Volumes")
+        .setHelpText("When converting to volumes, create multiple "
             "volume primitives per VDB for unconnected regions where "
-	    "possible. This allows very large and sparse VDBs to be converted "
-	    "with less memory usage."));
+            "possible. This allows very large and sparse VDBs to be converted "
+            "with less memory usage."));
+#endif
 
     //////////
 
@@ -314,7 +321,8 @@ newSopOperator(OP_OperatorTable* table)
         .setHelpText("Enable / disable the the adaptivity field."));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "adaptivityfieldname", "Adaptivity Field")
-        .setHelpText("A single scalar grid used as an spatial multiplier for the adaptivity threshold.")
+        .setHelpText(
+            "A single scalar grid used as a spatial multiplier for the adaptivity threshold.")
         .setSpareData(&SOP_Node::theThirdInput)
         .setChoiceList(&hutil::PrimGroupMenu));
 
@@ -399,8 +407,12 @@ convertToVolumes(
 #endif
     parms.primGroup = group;
     parms.preserveGroups = true;
-    GU_PrimVDB::convertVDBs(
-        dst, dst, parms, 0, /*keep_original*/false, split_disjoint);
+#if HAVE_SPLITTING
+    GU_PrimVDB::convertVDBs(dst, dst, parms,
+        /*adaptivity=*/0, /*keep_original*/false , split_disjoint);
+#else
+    GU_PrimVDB::convertVDBs(dst, dst, parms, /*adaptivity=*/0, /*keep_original*/false);
+#endif
 }
 
 
@@ -756,7 +768,9 @@ SOP_OpenVDB_Convert::updateParmsFlags()
     const fpreal time = CHgetEvalTime();
 
     ConvertTo target = static_cast<ConvertTo>(evalInt("conversion", 0, time));
+#if HAVE_SPLITTING
     bool toVolume = (target == HVOLUME);
+#endif
     bool toOpenVDB = (target == OPENVDB);
     bool toPoly = (target == POLYGONS);
     bool toPolySoup = false;
@@ -806,7 +820,9 @@ SOP_OpenVDB_Convert::updateParmsFlags()
     const bool partition = evalInt("automaticpartitions", 0, 0) > 1;
     changed |= enableParm("activepart", partition);
 
+#if HAVE_SPLITTING
     changed |= setVisibleState("splitdisjointvolumes", toVolume);
+#endif
 
     changed |= setVisibleState("adaptivity", toPoly);
     changed |= setVisibleState("isoValue", toPoly || toOpenVDB);
@@ -1266,6 +1282,12 @@ SOP_OpenVDB_Convert::cookMySop(OP_Context& context)
 
         const fpreal t = context.getTime();
 
+#if HAVE_SPLITTING
+        const bool splitDisjointVols = (evalInt("splitdisjointvolumes", 0, t) != 0);
+#else
+        const bool splitDisjointVols = false;
+#endif
+
         UT_String group_str;
         evalString(group_str, "group", 0, t);
         GA_PrimitiveGroup* group = parsePrimitiveGroupsCopy(group_str, gdp);
@@ -1275,8 +1297,7 @@ SOP_OpenVDB_Convert::cookMySop(OP_Context& context)
         switch (evalInt("conversion",  0, t))
         {
             case HVOLUME: {
-                convertToVolumes(*gdp, group,
-			         (evalInt("splitdisjointvolumes", 0, t) != 0));
+                convertToVolumes(*gdp, group, splitDisjointVols);
                 break;
             }
             case OPENVDB: {

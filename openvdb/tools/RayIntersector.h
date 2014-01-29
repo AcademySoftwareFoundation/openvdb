@@ -314,9 +314,10 @@ public:
 
     BOOST_STATIC_ASSERT( NodeLevel >= 0 && NodeLevel < int(TreeT::DEPTH)-1);
 
-    /// @brief Constructor
-    /// @param grid Generic grid to intersect rays against.
-    /// @warning In the near future we will add support for grids with frustrum transforms. 
+    /// @brief Grid constructor
+    /// @param grid Generic grid to intersect rays against. 
+    /// @throw RuntimeError if the voxels of the grid are not uniform
+    /// or the grid is empty.
     VolumeRayIntersector(const GridT& grid): mGrid(&grid), mAccessor(grid.tree())
     {
         if (!grid.hasUniformVoxels() ) {
@@ -329,6 +330,25 @@ public:
         grid.tree().root().evalActiveBoundingBox(mBBox, /*visit individual voxels*/false); 
        
         mBBox.max().offset(1);//padding so the bbox of a node becomes (origin,origin + node_dim)
+    }
+
+    /// @brief Grid and BBox constructor
+    /// @param grid Generic grid to intersect rays against.
+    /// @param bbox The axis-aligned bounding-box in the index space of the grid. 
+    /// @warning It is assumed that bbox = (min, min + dim) where min denotes 
+    /// to the smallest grid coordinates and dim are the integer length of the bbox. 
+    /// @throw RuntimeError if the voxels of the grid are not uniform
+    /// or the grid is empty.
+    VolumeRayIntersector(const GridT& grid, const math::CoordBBox& bbox)
+        : mGrid(&grid), mAccessor(grid.tree()), mBBox(bbox)
+    {
+        if (!grid.hasUniformVoxels() ) {
+            OPENVDB_THROW(RuntimeError,
+                          "VolumeRayIntersector only supports uniform voxels!");
+        }
+        if ( grid.empty() ) {
+            OPENVDB_THROW(RuntimeError, "LinearSearchImpl does not supports empty grids");
+        }
     }
     
     /// @brief Return @c false if the index ray misses the bbox of the grid.
@@ -392,6 +412,12 @@ public:
     {
         return time*mGrid->transform().baseMap()->applyJacobian(mRay.dir()).length();
     }
+
+    /// @brief Return a const reference to the grid.
+    const GridT& grid() const { return *mGrid; }
+
+    /// @brief Return a const reference to the BBOX of the grid
+    const math::CoordBBox& bbox() const { return mBBox; }
     
 private:
     

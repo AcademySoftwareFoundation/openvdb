@@ -375,7 +375,7 @@ public:
 
                 pointIndex = mGdp.pointIndex(pointOffset);
 
-                const UT_Vector3& point = points.value(pointOffset);                
+                const UT_Vector3& point = points.value(pointOffset);
                 UT_Vector3& pos = mPositions(pointIndex);
 
                 dir = pos - point;
@@ -430,15 +430,17 @@ SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
         const double scale = double(evalFloat("scale", 0, time));
         const double bias = double(evalFloat("bias", 0, time));
         const float isovalue = evalFloat("isovalue", 0, time);
-        
+
         UT_Vector3Array pointNormals;
 
         GA_ROAttributeRef attributeRef = gdp->findPointAttribute("N");
         if (attributeRef.isValid()) {
 #if (UT_VERSION_INT >= 0x0d0000c0)  // 13.0.192 or later
-            gdp->getAttributeAsArray(attributeRef.getAttribute(), gdp->getPointRange(), pointNormals);
+            gdp->getAttributeAsArray(
+                attributeRef.getAttribute(), gdp->getPointRange(), pointNormals);
 #else
-            gdp->getPointAttributeAsArray(attributeRef.getAttribute(), gdp->getPointRange(), pointNormals);
+            gdp->getPointAttributeAsArray(
+                attributeRef.getAttribute(), gdp->getPointRange(), pointNormals);
 #endif
         } else {
             gdp->normal(pointNormals, /*use_internaln=*/false);
@@ -455,7 +457,7 @@ SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
         UT_FloatArray distances;
         distances.appendMultiple((keepMaxDist && rayIntersection) ? -limit : limit, numPoints);
 
-        
+
 
         std::vector<std::string> skippedGrids;
 
@@ -467,11 +469,12 @@ SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
             if (vdbIt->getGrid().getGridClass() == openvdb::GRID_LEVEL_SET &&
                 vdbIt->getGrid().type() == openvdb::FloatGrid::gridType()) {
 
-                openvdb::FloatGrid::ConstPtr gridPtr = 
+                openvdb::FloatGrid::ConstPtr gridPtr =
                     openvdb::gridConstPtrCast<openvdb::FloatGrid>(vdbIt->getGridPtr());
- 
+
                 if (rayIntersection) {
-                    IntersectPoints<openvdb::FloatGrid> op(*gdp, pointNormals, *gridPtr, positions, distances,
+                    IntersectPoints<openvdb::FloatGrid> op(
+                        *gdp, pointNormals, *gridPtr, positions, distances,
                         intersections, keepMaxDist, reverseRays, scale, bias);
                     UTparallelFor(GA_SplittableRange(gdp->getPointRange()), op);
                 } else {
@@ -481,7 +484,7 @@ SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
             } else {
                 skippedGrids.push_back(vdbIt.getPrimitiveNameOrIndex().toStdString());
                 continue;
-            } 
+            }
         }
 
 
@@ -496,14 +499,15 @@ SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
         }
 
         if (bool(evalInt("putdist", 0, time))) { // add distance attribute
- 
-            GA_RWAttributeRef aRef = gdp->findPointAttribute("dist");
-            if (!aRef.isValid()) aRef = gdp->addIntTuple(GA_ATTRIB_POINT, "dist", 1, GA_Defaults(0));
 
+            GA_RWAttributeRef aRef = gdp->findPointAttribute("dist");
+            if (!aRef.isValid()) {
+                aRef = gdp->addIntTuple(GA_ATTRIB_POINT, "dist", 1, GA_Defaults(0));
+            }
 #if (UT_VERSION_INT >= 0x0d0000c0)  // 13.0.192 or later
-            gdp->setAttributeFromArray(aRef.getAttribute(),  gdp->getPointRange(), distances);
+            gdp->setAttributeFromArray(aRef.getAttribute(), gdp->getPointRange(), distances);
 #else
-            gdp->setPointAttributeFromArray(aRef.getAttribute(),  gdp->getPointRange(), distances);
+            gdp->setPointAttributeFromArray(aRef.getAttribute(), gdp->getPointRange(), distances);
 #endif
         }
 
@@ -540,8 +544,6 @@ SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
     return error();
 }
 
-
 // Copyright (c) 2012-2013 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-

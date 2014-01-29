@@ -131,8 +131,8 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "maskname", "Mask VDB")
         .setHelpText("VDB (from the second input) used to define the iteration space")
-                  .setSpareData(&SOP_Node::theSecondInput)
-                  .setChoiceList(&hutil::PrimGroupMenu));
+        .setSpareData(&SOP_Node::theSecondInput)
+        .setChoiceList(&hutil::PrimGroupMenu));
 
     { // Output name
         const char* items[] = {
