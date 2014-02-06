@@ -141,6 +141,9 @@ public:
                           "\nUse Grid::setGridClass(openvdb::GRID_LEVEL_SET)");
         }
     }
+
+    /// @brief Return the iso-value used for ray-intersections
+    const ValueT& getIsoValue() const { return mTester.getIsoValue(); }
     
     /// @brief Return @c true if the index-space ray intersects the level set.
     /// @param iRay ray represented in index space.

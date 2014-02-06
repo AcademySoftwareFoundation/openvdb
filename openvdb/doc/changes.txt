@@ -15,7 +15,8 @@
   and to @c vdb_render to specify the isovalue of the level set.
 - Added methods to the 
   @vdblink::tools::LevelSetRayIntersector LevelSetRayIntersector@endlink 
-  to return the time of intersection along a world or index ray.
+  to return the time of intersection along a world or index ray and to
+  return the level set isovalue.
 - Added bounding box support to the
   @vdblink::tools::VolumeRayIntersector VolumeRayIntersector@endlink.
 - Added a @ref sInterpolation "section" to the Cookbook on interpolation
@@ -44,13 +45,20 @@
   @vdblink::math::Vec3::sum() sum@endlink methods to
   @vdblink::math::Vec2 Vec2@endlink, @vdblink::math::Vec3 Vec3@endlink
   and @vdblink::math::Vec4 Vec4@endlink.
-- Improved tools::fillWithSpheres() for small volumes that are just a few
-  voxels across.
+- Improved the @vdblink::tools::fillWithSpheres() fillWithSpheres@endlink
+  tool for small volumes that are just a few voxels across.
+- Improved the accuracy of the mesh to volume converter.
 - Fixed a bug in the mesh to volume converter that caused incorrect sign
-  classifications for the level set rebuild tool.
-- Fixed a bug in @vdblink::math::NonlinearFrustumMap::applyIJT NonlinearFrustumMap::applyIJT@endlink.
+  classifications for narrow-band level sets.
+- Fixed a bug in @vdblink::math::NonlinearFrustumMap::applyIJT()
+  NonlinearFrustumMap::applyIJT@endlink that resulted in incorrect values
+  when computing the gradient of a grid with a frustum transform.
+- Fixed a file I/O bug whereby some <TT>.vdb</TT> files could not be read
+  correctly if they contained grids with more than two distinct inactive
+  values.
 - Fixed a build issue reported by Clang&nbsp;3.2 in tools/GridOperators.h.
-- Fixed bugs related to new GUI paramters introduced in the "Level Set Offset" SOP.
+- Improved convergence in @vdblink::tools::VolumeRender VolumeRender@endlink. 
+  <I>[Contributed by Jerry Tessendorf]</I>
 - Made various changes for compatibility with Houdini&nbsp;13 and with
   C++11 compilers.
   <I>[Contributed&nbsp;by&nbsp;SESI]</I>
@@ -60,6 +68,9 @@ API changes:
 - @vdblink::tools::DualGridSampler DualGridSampler@endlink is no longer 
   templated on the target grid type, and the value accessor is now passed 
   as an argument.
+- The <TT>.vdb</TT> file format has changed slightly.  Tools built with older
+  versions of OpenVDB should be recompiled to ensure that they can read files
+  in the new format. 
 
 @par
 Houdini:
@@ -69,9 +80,10 @@ Houdini:
 - Added a Divide operation to the Combine SOP.
 - Added support for boolean grids to the Combine, Resample, Scatter, Prune
   and Visualize SOPs.
-- The Fill SOP now allows the fill region bounds to be specified either in
-  index space (as before), in world space, or using the bounds of geometry
-  connected to an optional new reference input.
+- The Fill SOP now accepts a vector as the fill value, and it allows
+  the fill region bounds to be specified either in index space (as before),
+  in world space, or using the bounds of geometry connected to an optional
+  new reference input.
 - Added a toggle to the Offset Level Set SOP to specify the offset in
   either world or voxel units.
 - Added a toggle to the Transform and Resample SOPs to apply the transform

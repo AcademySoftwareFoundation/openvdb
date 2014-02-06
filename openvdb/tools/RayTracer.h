@@ -838,8 +838,8 @@ operator()(const tbb::blocked_range<size_t>& range) const
     SamplerType sampler(shadow.grid().getConstAccessor(), shadow.grid().transform());
         
     // Any variable prefixed with p (or s) means it's associate with a primay (or shadow) ray
-    const Vec3R lightDir = mLightDir, lightAmp = mLightColor;
-    const Vec3R pScat = mScattering, sigma = -(pScat+mAbsorption);//Absorption and scattering
+    const Vec3R lightDir = mLightDir, sigma = -mScattering-mAbsorption;
+    const Vec3R lightAmp = mLightColor*mScattering/(mScattering+mAbsorption);
     const Real sGain = mLightGain;//in-scattering along shadow ray 
     const Real pStep = mPrimaryStep;//Integration step along primary ray in voxel units
     const Real sStep = mShadowStep;//Integration step along shadow ray in voxel units
@@ -858,8 +858,7 @@ operator()(const tbb::blocked_range<size_t>& range) const
                     Vec3R pPos = primary.getWorldPos(pT);
                     const Real density = sampler.wsSample(pPos);
                     if (density < cutoff) continue;
-                    pTrans *= math::Exp(sigma * density * pStep);
-                    if (pTrans.lengthSqr()<cutoff) goto Pixel;//Terminate pRay
+                    const Vec3R DT = math::Exp(sigma * density * pStep);
                     Vec3R sTrans(1.0);
                     sRay.setEye(pPos);
                     if( !shadow.setWorldRay(sRay)) continue;
@@ -872,7 +871,9 @@ operator()(const tbb::blocked_range<size_t>& range) const
                         }//Integration over shadow segment
                     }// Shadow ray march
                 Luminance:
-                    pLumi += (pScat * density * sTrans * pStep * pTrans) * lightAmp;
+                    pLumi += lightAmp * sTrans * pTrans * (Vec3R(1.0)-DT);
+                    pTrans *= DT;
+                    if (pTrans.lengthSqr()<cutoff) goto Pixel;  // Terminate Ray
                 }//Integration over primary segment
             }// Primary ray march
         Pixel:

@@ -290,9 +290,6 @@ struct ISGradientNormSqrd<HJWENO5_BIAS>
     static typename Accessor::ValueType
     result(const Accessor& grid, const Coord& ijk)
     {
-        typedef typename Accessor::ValueType     ValueType;
-        typedef math::Vec3<ValueType>            Vec3Type;
-
         // SSE optimized
         const simd::Float4
             v1(grid.getValue(ijk.offsetBy(-2, 0, 0)) - grid.getValue(ijk.offsetBy(-3, 0, 0)),
@@ -324,9 +321,6 @@ struct ISGradientNormSqrd<HJWENO5_BIAS>
     static typename StencilT::ValueType
     result(const StencilT& s)
     {
-        typedef typename StencilT::ValueType      ValueType;
-        typedef math::Vec3<ValueType>            Vec3Type;
-
         // SSE optimized
         const simd::Float4
             v1(s.template getValue<-2, 0, 0>() - s.template getValue<-3, 0, 0>(),
@@ -940,7 +934,6 @@ struct Divergence
     template<typename Accessor> static typename Accessor::ValueType::value_type
     result(const MapType& map, const Accessor& grid, const Coord& ijk)
     {
-        typedef typename Accessor::ValueType             Vec3Type;
         typedef typename Accessor::ValueType::value_type ValueType;
 
         ValueType div(0);
@@ -957,7 +950,6 @@ struct Divergence
     template<typename StencilT> static typename StencilT::ValueType::value_type
     result(const MapType& map, const StencilT& stencil)
     {
-        typedef typename StencilT::ValueType             Vec3Type;
         typedef typename StencilT::ValueType::value_type ValueType;
 
         ValueType div(0);
@@ -980,7 +972,6 @@ struct Divergence<TranslationMap, DiffScheme>
     template<typename Accessor> static typename Accessor::ValueType::value_type
     result(const TranslationMap&, const Accessor& grid, const Coord& ijk)
     {
-        typedef typename Accessor::ValueType             Vec3Type;
         typedef typename Accessor::ValueType::value_type ValueType;
 
         ValueType div(0);
@@ -992,7 +983,6 @@ struct Divergence<TranslationMap, DiffScheme>
     template<typename StencilT> static typename StencilT::ValueType::value_type
     result(const TranslationMap&, const StencilT& stencil)
     {
-        typedef typename StencilT::ValueType             Vec3Type;
         typedef typename StencilT::ValueType::value_type ValueType;
 
         ValueType div(0);
@@ -1010,7 +1000,6 @@ struct Divergence<UniformScaleMap, DiffScheme>
     template<typename Accessor> static typename Accessor::ValueType::value_type
     result(const UniformScaleMap& map, const Accessor& grid, const Coord& ijk)
     {
-        typedef typename Accessor::ValueType             Vec3Type;
         typedef typename Accessor::ValueType::value_type ValueType;
 
         ValueType div(0);
@@ -1024,7 +1013,6 @@ struct Divergence<UniformScaleMap, DiffScheme>
     template<typename StencilT> static typename StencilT::ValueType::value_type
     result(const UniformScaleMap& map, const StencilT& stencil)
     {
-        typedef typename StencilT::ValueType             Vec3Type;
         typedef typename StencilT::ValueType::value_type ValueType;
 
         ValueType div(0);
@@ -1044,7 +1032,6 @@ struct Divergence<UniformScaleTranslateMap, DiffScheme>
     template<typename Accessor> static typename Accessor::ValueType::value_type
     result(const UniformScaleTranslateMap& map, const Accessor& grid, const Coord& ijk)
     {
-        typedef typename Accessor::ValueType             Vec3Type;
         typedef typename Accessor::ValueType::value_type ValueType;
 
         ValueType div(0);
@@ -1058,7 +1045,6 @@ struct Divergence<UniformScaleTranslateMap, DiffScheme>
     template<typename StencilT> static typename StencilT::ValueType::value_type
     result(const UniformScaleTranslateMap& map, const StencilT& stencil)
     {
-        typedef typename StencilT::ValueType             Vec3Type;
         typedef typename StencilT::ValueType::value_type ValueType;
 
         ValueType div(0);
@@ -1078,7 +1064,6 @@ struct Divergence<UniformScaleMap, CD_2ND>
     template<typename Accessor> static typename Accessor::ValueType::value_type
     result(const UniformScaleMap& map, const Accessor& grid, const Coord& ijk)
     {
-        typedef typename Accessor::ValueType             Vec3Type;
         typedef typename Accessor::ValueType::value_type ValueType;
 
         ValueType div(0);
@@ -1091,7 +1076,6 @@ struct Divergence<UniformScaleMap, CD_2ND>
     template<typename StencilT> static typename StencilT::ValueType::value_type
     result(const UniformScaleMap& map, const StencilT& stencil)
     {
-        typedef typename StencilT::ValueType             Vec3Type;
         typedef typename StencilT::ValueType::value_type ValueType;
 
         ValueType div(0);
@@ -1110,7 +1094,6 @@ struct Divergence<UniformScaleTranslateMap, CD_2ND>
     template<typename Accessor> static typename Accessor::ValueType::value_type
     result(const UniformScaleTranslateMap& map, const Accessor& grid, const Coord& ijk)
     {
-        typedef typename Accessor::ValueType             Vec3Type;
         typedef typename Accessor::ValueType::value_type ValueType;
 
         ValueType div(0);
@@ -1124,7 +1107,6 @@ struct Divergence<UniformScaleTranslateMap, CD_2ND>
     template<typename StencilT> static typename StencilT::ValueType::value_type
     result(const UniformScaleTranslateMap& map, const StencilT& stencil)
     {
-        typedef typename StencilT::ValueType             Vec3Type;
         typedef typename StencilT::ValueType::value_type ValueType;
 
         ValueType div(0);
@@ -1144,7 +1126,6 @@ struct Divergence<ScaleMap, DiffScheme>
     template<typename Accessor> static typename Accessor::ValueType::value_type
     result(const ScaleMap& map, const Accessor& grid, const Coord& ijk)
     {
-        typedef typename Accessor::ValueType             Vec3Type;
         typedef typename Accessor::ValueType::value_type ValueType;
 
         ValueType div = ValueType(
@@ -1158,7 +1139,6 @@ struct Divergence<ScaleMap, DiffScheme>
     template<typename StencilT> static typename StencilT::ValueType::value_type
     result(const ScaleMap& map, const StencilT& stencil)
     {
-        typedef typename StencilT::ValueType             Vec3Type;
         typedef typename StencilT::ValueType::value_type ValueType;
 
         ValueType div(0);
@@ -1179,7 +1159,6 @@ struct Divergence<ScaleTranslateMap, DiffScheme>
     template<typename Accessor> static typename Accessor::ValueType::value_type
     result(const ScaleTranslateMap& map, const Accessor& grid, const Coord& ijk)
     {
-        typedef typename Accessor::ValueType             Vec3Type;
         typedef typename Accessor::ValueType::value_type ValueType;
 
         ValueType div = ValueType(
@@ -1193,7 +1172,6 @@ struct Divergence<ScaleTranslateMap, DiffScheme>
     template<typename StencilT> static typename StencilT::ValueType::value_type
     result(const ScaleTranslateMap& map, const StencilT& stencil)
     {
-        typedef typename StencilT::ValueType             Vec3Type;
         typedef typename StencilT::ValueType::value_type ValueType;
 
         ValueType div(0);
@@ -1214,7 +1192,6 @@ struct Divergence<ScaleMap, CD_2ND>
     template<typename Accessor> static typename Accessor::ValueType::value_type
     result(const ScaleMap& map, const Accessor& grid, const Coord& ijk)
     {
-        typedef typename Accessor::ValueType             Vec3Type;
         typedef typename Accessor::ValueType::value_type ValueType;
 
         ValueType div = ValueType(
@@ -1228,7 +1205,6 @@ struct Divergence<ScaleMap, CD_2ND>
     template<typename StencilT> static typename StencilT::ValueType::value_type
     result(const ScaleMap& map, const StencilT& stencil)
     {
-        typedef typename StencilT::ValueType             Vec3Type;
         typedef typename StencilT::ValueType::value_type ValueType;
 
         ValueType div = ValueType(
@@ -1248,7 +1224,6 @@ struct Divergence<ScaleTranslateMap, CD_2ND>
     template<typename Accessor> static typename Accessor::ValueType::value_type
     result(const ScaleTranslateMap& map, const Accessor& grid, const Coord& ijk)
     {
-        typedef typename Accessor::ValueType             Vec3Type;
         typedef typename Accessor::ValueType::value_type ValueType;
 
         ValueType div = ValueType(
@@ -1262,7 +1237,6 @@ struct Divergence<ScaleTranslateMap, CD_2ND>
     template<typename StencilT> static typename StencilT::ValueType::value_type
     result(const ScaleTranslateMap& map, const StencilT& stencil)
     {
-        typedef typename StencilT::ValueType             Vec3Type;
         typedef typename StencilT::ValueType::value_type ValueType;
 
         ValueType div = ValueType(
@@ -1764,7 +1738,6 @@ struct MeanCurvature
                         double& alpha, double& beta)
     {
         typedef typename Accessor::ValueType ValueType;
-        typedef Vec3<ValueType>              Vec3Type;
 
          // compute the gradient in index and world space
          Vec3d d1_is(D1<DiffScheme1>::inX(grid, ijk),
@@ -1844,7 +1817,6 @@ struct MeanCurvature
                         double& alpha, double& beta)
     {
         typedef typename StencilT::ValueType  ValueType;
-        typedef Vec3<ValueType>              Vec3Type;
 
          // compute the gradient in index and world space
          Vec3d d1_is(D1<DiffScheme1>::inX(stencil),

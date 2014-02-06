@@ -35,11 +35,7 @@
 #define OPENVDB_MATH_MAT_HAS_BEEN_INCLUDED
 
 #include <math.h>
-#include <cstdlib>
-#include <cstdio>
-#include <assert.h>
 #include <iostream>
-#include <sstream>
 #include <boost/format.hpp>
 #include <openvdb/Exceptions.h>
 #include "Math.h"
@@ -149,13 +145,12 @@ protected:
 template<typename T> class Quat;
 template<typename T> class Vec3;
 
-/// Returns rotation matrix specified by the quaternion
-/// The quaternion is normalized and used to construct the matrix
-/// Note that the matrix is transposed to match post-multiplication
-/// symantics.
+/// @brief Return the rotation matrix specified by the given quaternion.
+/// @details The quaternion is normalized and used to construct the matrix.
+/// Note that the matrix is transposed to match post-multiplication semantics.
 template<class MatType>
-MatType rotation(const Quat<typename MatType::value_type> &q,
-                 typename MatType::value_type eps = 1.0e-8)
+MatType
+rotation(const Quat<typename MatType::value_type> &q, typename MatType::value_type eps = 1.0e-8)
 {
     typedef typename MatType::value_type T;
 
@@ -190,11 +185,12 @@ MatType rotation(const Quat<typename MatType::value_type> &q,
 
 
 
-/// @brief Set the matrix to a rotation about the given axis.
+/// @brief Return a matrix for rotation by @a angle radians about the given @a axis.
 /// @param axis   The axis (one of X, Y, Z) to rotate about.
 /// @param angle  The rotation angle, in radians.
 template<class MatType>
-MatType rotation(Axis axis, typename MatType::value_type angle)
+MatType
+rotation(Axis axis, typename MatType::value_type angle)
 {
     typedef typename MatType::value_type T;
     T c = static_cast<T>(cos(angle));
@@ -228,12 +224,11 @@ MatType rotation(Axis axis, typename MatType::value_type angle)
 }
 
 
-/// @return matrix to the rotation specified by axis and angle
-/// @note The axis must be unit vector
+/// @brief Return a matrix for rotation by @a angle radians about the given @a axis.
+/// @note The axis must be a unit vector.
 template<class MatType>
-MatType rotation(
-    const Vec3<typename MatType::value_type> &_axis,
-    typename MatType::value_type angle)
+MatType
+rotation(const Vec3<typename MatType::value_type> &_axis, typename MatType::value_type angle)
 {
     typedef typename MatType::value_type T;
     T txy, txz, tyz, sx, sy, sz;
@@ -276,9 +271,9 @@ MatType rotation(
 }
 
 
-/// Return the euler angles composing this rotation matrix. Optional
-/// axes arguments describe in what order elementary rotations are
-/// applied. Note that in our convention, XYZ means Rz * Ry * Rx.
+/// @brief Return the Euler angles composing the given rotation matrix.
+/// @details Optional axes arguments describe in what order elementary rotations
+/// are applied. Note that in our convention, XYZ means Rz * Ry * Rx.
 /// Because we are using rows rather than columns to represent the
 /// local axes of a coordinate frame, the interpretation from a local
 /// reference point of view is to first rotate about the x axis, then
@@ -286,14 +281,14 @@ MatType rotation(
 /// From a fixed reference point of view, the interpretation is to
 /// rotate about the stationary world z, y, and x axes respectively.
 ///
-/// Irrespective of the euler angle convention, in the case of distinct
+/// Irrespective of the Euler angle convention, in the case of distinct
 /// axes, eulerAngles() returns the x, y, and z angles in the corresponding
 /// x, y, z components of the returned Vec3. For the XZX convention, the
 /// left X value is returned in Vec3.x, and the right X value in Vec3.y.
 /// For the ZXZ convention the left Z value is returned in Vec3.z and
 /// the right Z value in Vec3.y
 ///
-/// Examples of reconstructing r from its euler angle decomposition
+/// Examples of reconstructing r from its Euler angle decomposition
 ///
 /// v = eulerAngles(r, ZYX_ROTATION);
 /// rx.setToRotation(Vec3d(1,0,0), v[0]);
@@ -313,8 +308,9 @@ MatType rotation(
 /// rz.setToRotation  (Vec3d(0,0,1), v[2]);
 /// r = rx2 * rz * rx1;
 ///
-template <class MatType>
-Vec3<typename MatType::value_type> eulerAngles(
+template<class MatType>
+Vec3<typename MatType::value_type>
+eulerAngles(
     const MatType& mat,
     RotationOrder rotationOrder,
     typename MatType::value_type eps=1.0e-8)
@@ -478,10 +474,11 @@ Vec3<typename MatType::value_type> eulerAngles(
 }
 
 
-/// @brief Set the matrix to a rotation that maps v1 onto v2 about the cross
-/// product of v1 and v2.
+/// @brief Return a rotation matrix that maps @a v1 onto @a v2
+/// about the cross product of @a v1 and @a v2.
 template<class MatType>
-MatType rotation(
+MatType
+rotation(
     const Vec3<typename MatType::value_type>& _v1,
     const Vec3<typename MatType::value_type>& _v2,
     typename MatType::value_type eps=1.0e-8)
@@ -590,25 +587,25 @@ MatType rotation(
 }
 
 
-/// @return the matrix to a matrix that scales by v
+/// Return a matrix that scales by @a s.
 template<class MatType>
-MatType scale(const Vec3<typename MatType::value_type> &scaling)
+MatType
+scale(const Vec3<typename MatType::value_type>& s)
 {
     // Gets identity, then sets top 3 diagonal
     // Inefficient by 3 sets.
 
     MatType result;
     result.setIdentity();
-    result[0][0] = scaling[0];
-    result[1][1] = scaling[1];
-    result[2][2] = scaling[2];
+    result[0][0] = s[0];
+    result[1][1] = s[1];
+    result[2][2] = s[2];
 
     return result;
 }
 
 
-/// @return a Vec3 representing the lengths of the passed matrix's upper
-/// 3x3's rows.
+/// Return a Vec3 representing the lengths of the passed matrix's upper 3x3's rows.
 template<class MatType>
 Vec3<typename MatType::value_type>
 getScale(const MatType &mat)
@@ -621,8 +618,8 @@ getScale(const MatType &mat)
 }
 
 
-/// @return a copy of included matrix with its upper 3x3 rows normalized.
-/// This can be geometrically interpretted as a matrix with no scaling
+/// @brief Return a copy of the given matrix with its upper 3x3 rows normalized.
+/// @details This can be geometrically interpreted as a matrix with no scaling
 /// along its major axes.
 template<class MatType>
 MatType
@@ -633,9 +630,9 @@ unit(const MatType &mat, typename MatType::value_type eps = 1.0e-8)
 }
 
 
-/// @return a copy of included matrix with its upper 3x3 rows normalized,
-/// and writes the length of each of these rows.
-/// This can be geometrically interpretted as a matrix with no scaling
+/// @brief Return a copy of the given matrix with its upper 3x3 rows normalized,
+/// and return the length of each of these rows in @a scaling.
+/// @details This can be geometrically interpretted as a matrix with no scaling
 /// along its major axes, and the scaling in the input vector
 template<class MatType>
 MatType
@@ -660,7 +657,7 @@ unit(
 }
 
 
-/// @brief Set the matrix to a shear along axis0 by a fraction of axis1.
+/// @brief Set the matrix to a shear along @a axis0 by a fraction of @a axis1.
 /// @param axis0 The fixed axis of the shear.
 /// @param axis1 The shear axis.
 /// @param shear The shear factor.
@@ -683,7 +680,7 @@ shear(Axis axis0, Axis axis1, typename MatType::value_type shear)
 }
 
 
-/// @return a matrix as the cross product of the given vector
+/// Return a matrix as the cross product of the given vector.
 template<class MatType>
 MatType
 skew(const Vec3<typename MatType::value_type> &skew)
@@ -700,8 +697,8 @@ skew(const Vec3<typename MatType::value_type> &skew)
 }
 
 
-/// Build an orientation matrix such that z points along direction,
-/// and y is along direction/vertical plane.
+/// @brief Return an orientation matrix such that z points along @a direction,
+/// and y is along the @a direction / @a vertical plane.
 template<class MatType>
 MatType
 aim(const Vec3<typename MatType::value_type>& direction,
@@ -723,8 +720,8 @@ aim(const Vec3<typename MatType::value_type>& direction,
 }
 
 
-/// Write 0's along Mat4's last row and column, and a 1 on its diagonal
-/// Useful initialization when we're initializing juse the 3x3 block
+/// @brief Write 0s along Mat4's last row and column, and a 1 on its diagonal.
+/// @details Useful initialization when we're initializing just the 3x3 block.
 template<class MatType>
 static MatType&
 padMat4(MatType& dest)
@@ -737,9 +734,8 @@ padMat4(MatType& dest)
 }
 
 
-/// Solve for A=B*B, given A
-///
-/// Denman-Beavers square root iteration
+/// @brief Solve for A=B*B, given A.
+/// @details Denman-Beavers square root iteration
 template <typename MatType>
 inline void
 sqrtSolve(const MatType &aA, MatType &aB, double aTol=0.01)
@@ -830,38 +826,54 @@ powSolve(const MatType &aA, MatType &aB, double aPower, double aTol=0.01)
     }
 }
 
-template <typename MatType>
-inline bool isIdentity(const MatType& m) {
-    typedef typename MatType::ValueType  value_type;
+
+/// @brief Determine if a matrix is an identity matrix.
+template<typename MatType>
+inline bool
+isIdentity(const MatType& m)
+{
     return m.eq(MatType::identity());
 }
 
 
-template <typename MatType>
-inline bool isInvertible(const MatType& m) {
+/// @brief Determine if a matrix is invertible.
+template<typename MatType>
+inline bool
+isInvertible(const MatType& m)
+{
     typedef typename MatType::ValueType  value_type;
     return !isApproxEqual(m.det(), (value_type)0);
 }
-/// Determine if a matrix is symmetric.
-/// This implicitly uses "isApproxEqual" to determine the equality
-template <typename MatType>
-inline bool isSymmetric(const MatType& m) {
+
+
+/// @brief Determine if a matrix is symmetric.
+/// @details This implicitly uses math::isApproxEqual() to determine equality.
+template<typename MatType>
+inline bool
+isSymmetric(const MatType& m)
+{
     return m.eq(m.transpose());
 }
 
-/// Determine is a matrix is Unitary (i.e. rotation or reflection)
-template <typename MatType>
-inline bool isUnitary(const MatType& m) {
-    typedef typename MatType::ValueType  value_type;
+
+/// Determine if a matrix is unitary (i.e., rotation or reflection).
+template<typename MatType>
+inline bool
+isUnitary(const MatType& m)
+{
+    typedef typename MatType::ValueType value_type;
     if (!isApproxEqual(std::abs(m.det()), value_type(1.0))) return false;
     // check that the matrix transpose is the inverse
     MatType temp = m * m.transpose();
     return temp.eq(MatType::identity());
 }
 
-/// Determine if a matrix is diagonal
-template <typename MatType>
-inline bool isDiagonal(const MatType& mat) {
+
+/// Determine if a matrix is diagonal.
+template<typename MatType>
+inline bool
+isDiagonal(const MatType& mat)
+{
     int n = MatType::size;
     typename MatType::ValueType temp(0);
     for (int i = 0; i < n; ++i) {
@@ -874,9 +886,11 @@ inline bool isDiagonal(const MatType& mat) {
     return isApproxEqual(temp, typename MatType::ValueType(0.0));
 }
 
-/// takes a n by n matrix and returns the L_Infinty norm
+
+/// Return the @f$L_\infty@f$ norm of an N x N matrix.
 template<typename MatType>
-typename MatType::ValueType lInfinityNorm(const MatType& matrix)
+typename MatType::ValueType
+lInfinityNorm(const MatType& matrix)
 {
     int n = MatType::size;
     typename MatType::ValueType norm = 0;
@@ -893,9 +907,11 @@ typename MatType::ValueType lInfinityNorm(const MatType& matrix)
     return norm;
 }
 
-/// takes an n by n matrix and returns the L_1 norm
+
+/// Return the @f$L_1@f$ norm of an N x N matrix.
 template<typename MatType>
-typename MatType::ValueType lOneNorm(const MatType& matrix)
+typename MatType::ValueType
+lOneNorm(const MatType& matrix)
 {
     int n = MatType::size;
     typename MatType::ValueType norm = 0;
@@ -913,15 +929,16 @@ typename MatType::ValueType lOneNorm(const MatType& matrix)
 }
 
 
-/// @brief Decompose an invertible 3x3 matrix into Unitary following
-/// a symmetric matrix (postitive semi-defininte Hermitian):
-/// i.e.  M = U * S
-/// if the Unitary.det() = 1 it is a rotation, otherwise
-/// Unitary.det() = -1, meaning there is some part reflection.
+/// @brief Decompose an invertible 3x3 matrix into a unitary matrix
+/// followed by a symmetric matrix (positive semi-definite Hermitian),
+/// i.e., M = U * S.
+/// @details If det(U) = 1 it is a rotation, otherwise det(U) = -1,
+/// meaning there is some part reflection.
 /// See "Computing the polar decomposition with applications"
 /// Higham, N.J. - SIAM J. Sc. Stat Comput 7(4):1160-1174
 template<typename MatType>
-bool polarDecomposition(const MatType& input, MatType& unitary,
+bool
+polarDecomposition(const MatType& input, MatType& unitary,
     MatType& positive_hermitian, unsigned int MAX_ITERATIONS=100)
 {
     unitary = input;

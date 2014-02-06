@@ -35,7 +35,9 @@
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
+#include <PRM/PRM_Parm.h>
 #include <UT/UT_Interrupt.h>
+#include <boost/utility/enable_if.hpp>
 #include <boost/scoped_ptr.hpp>
 
 namespace hutil = houdini_utils;
@@ -56,6 +58,7 @@ public:
 
 protected:
     virtual bool updateParmsFlags();
+    virtual void resolveObsoleteParms(PRM_ParmList*);
     virtual OP_ERROR cookMySop(OP_Context&);
 
     Mode getMode(fpreal time) const
@@ -108,14 +111,45 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_XYZ, "worldmin", "Min coord").setVectorSize(3));
     parms.add(hutil::ParmFactory(PRM_XYZ, "worldmax", "Max coord").setVectorSize(3));
 
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "value", "Value")
-        .setTypeExtended(PRM_TYPE_JOIN_PAIR));
+    parms.add(hutil::ParmFactory(PRM_XYZ, "val", "Value").setVectorSize(3)
+        .setTypeExtended(PRM_TYPE_JOIN_PAIR)
+        .setHelpText(
+            "The value with which to fill voxels\n"
+            "(y and z are ignored when filling scalar grids)"));
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "active", "Active")
-        .setDefault(PRMoneDefaults));
+        .setDefault(PRMoneDefaults)
+        .setHelpText(
+            "If enabled, activate voxels in the fill region, otherwise deactivate them."));
+
+
+    hutil::ParmList obsoleteParms;
+    obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "value", "Value"));
+
 
     hvdb::OpenVDBOpFactory("OpenVDB Fill", SOP_OpenVDB_Fill::factory, parms, *table)
+        .setObsoleteParms(obsoleteParms)
         .addInput("Input with VDB grids to operate on")
         .addOptionalInput("Optional bounding geometry");
+}
+
+
+void
+SOP_OpenVDB_Fill::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
+{
+    if (!obsoleteParms) return;
+
+    PRM_Parm* parm = obsoleteParms->getParmPtr("value");
+    if (parm && !parm->isFactoryDefault()) {
+        // Transfer the scalar value of the obsolete parameter "value"
+        // to the new, vector-valued parameter "val".
+        const fpreal val = obsoleteParms->evalFloat("value", 0, /*time=*/0.0);
+        setFloat("val", 0, 0.0, val);
+        setFloat("val", 1, 0.0, val);
+        setFloat("val", 2, 0.0, val);
+    }
+
+    // Delegate to the base class.
+    hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
 }
 
 
@@ -181,18 +215,64 @@ SOP_OpenVDB_Fill::~SOP_OpenVDB_Fill()
 
 namespace {
 
+// Convert a Vec3 value to a vector of another value type or to a scalar value
+
+inline const openvdb::Vec3R& convertValue(const openvdb::Vec3R& val) { return val; }
+
+// Overload for scalar types (discards all but the first vector component)
+template<typename ValueType>
+inline typename boost::disable_if_c<openvdb::VecTraits<ValueType>::IsVec, ValueType>::type
+convertValue(const openvdb::Vec3R& val)
+{
+    return ValueType(val[0]);
+}
+
+// Overload for Vec2 types (not currently used)
+template<typename ValueType>
+inline typename boost::enable_if_c<
+    openvdb::VecTraits<ValueType>::IsVec && openvdb::VecTraits<ValueType>::Size == 2,
+    ValueType>::type
+convertValue(const openvdb::Vec3R& val)
+{
+    return ValueType(val[0], val[1]);
+}
+
+// Overload for Vec3 types
+template<typename ValueType>
+inline typename boost::enable_if_c<
+    openvdb::VecTraits<ValueType>::IsVec && openvdb::VecTraits<ValueType>::Size == 3,
+    ValueType>::type
+convertValue(const openvdb::Vec3R& val)
+{
+    return ValueType(val[0], val[1], val[2]);
+}
+
+// Overload for Vec4 types (not currently used)
+template<typename ValueType>
+inline typename boost::enable_if_c<
+    openvdb::VecTraits<ValueType>::IsVec && openvdb::VecTraits<ValueType>::Size == 4,
+    ValueType>::type
+convertValue(const openvdb::Vec3R& val)
+{
+    return ValueType(val[0], val[1], val[2], 1.0);
+}
+
+
+////////////////////////////////////////
+
+
 struct FillOp
 {
     const openvdb::CoordBBox indexBBox;
     const openvdb::BBoxd worldBBox;
-    const float value;
+    const openvdb::Vec3R value;
     const bool active;
 
-    FillOp(const openvdb::CoordBBox& b, float val, bool on):
+    FillOp(const openvdb::CoordBBox& b, const openvdb::Vec3R& val, bool on):
         indexBBox(b), value(val), active(on)
     {}
 
-    FillOp(const openvdb::BBoxd& b, float val, bool on):
+    FillOp(const openvdb::BBoxd& b, const openvdb::Vec3R& val, bool on):
         worldBBox(b), value(val), active(on)
     {}
 
@@ -207,7 +287,7 @@ struct FillOp
             bbox.reset(openvdb::Coord::floor(imin), openvdb::Coord::ceil(imax));
         }
         typedef typename GridT::ValueType ValueT;
-        grid.fill(bbox, ValueT(openvdb::zeroVal<ValueT>() + value), active);
+        grid.fill(bbox, convertValue<ValueT>(value), active);
     }
 };
 
@@ -228,7 +308,7 @@ SOP_OpenVDB_Fill::cookMySop(OP_Context& context)
         evalString(groupStr, "group", 0, t);
         const GA_PrimitiveGroup* group = matchGroup(*gdp, groupStr.toStdString());
 
-        const float value = evalFloat("value", 0, t);
+        const openvdb::Vec3R value = SOP_NodeVDB::evalVec3R("val", t);
         const bool active = evalInt("active", 0, t);
 
         boost::scoped_ptr<const FillOp> fillOp;
