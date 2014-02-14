@@ -41,6 +41,7 @@
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/Exceptions.h>
 #include <tbb/parallel_for.h>
+#include <boost/scoped_array.hpp> 
 #include <boost/scoped_ptr.hpp>
 
 namespace openvdb {
@@ -316,7 +317,7 @@ private:
         mData = mArray.get();
     }
     
-    boost::shared_array<ValueT> mArray;
+    boost::scoped_array<ValueT> mArray;
     ValueT* mData;//raw c-style pointer to values
 };// end of Dense    
 

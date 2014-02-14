@@ -83,10 +83,61 @@ TestVolumeRayIntersector::testAll()
         tools::VolumeRayIntersector<FloatGrid> inter(grid);
         CPPUNIT_ASSERT(inter.setIndexRay(ray));
         double t0=0, t1=0;
-        CPPUNIT_ASSERT_EQUAL(2, inter.march(t0, t1));
+        CPPUNIT_ASSERT(inter.march(t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL( 1.0, t0);
         ASSERT_DOUBLES_APPROX_EQUAL( 9.0, t1);
-        CPPUNIT_ASSERT_EQUAL(0, inter.march(t0, t1));
+        CPPUNIT_ASSERT(!inter.march(t0, t1));
+    }
+    {//same as above but with dilation
+        FloatGrid grid(0.0f);
+        
+        grid.tree().setValue(Coord(0,0,0), 1.0f);
+        grid.tree().setValue(Coord(7,7,7), 1.0f);
+        
+        const Vec3T dir( 1.0, 0.0, 0.0);
+        const Vec3T eye(-1.0, 0.0, 0.0);
+        const RayT ray(eye, dir);//ray in index space
+        tools::VolumeRayIntersector<FloatGrid> inter(grid, 1);
+        CPPUNIT_ASSERT(inter.setIndexRay(ray));
+        double t0=0, t1=0;
+        CPPUNIT_ASSERT(inter.march(t0, t1));
+        ASSERT_DOUBLES_APPROX_EQUAL( 0.0, t0);
+        ASSERT_DOUBLES_APPROX_EQUAL(17.0, t1);
+        CPPUNIT_ASSERT(!inter.march(t0, t1));
+    }
+    {//one single leaf node
+        FloatGrid grid(0.0f);
+
+        grid.tree().setValue(Coord(1,1,1), 1.0f);
+        grid.tree().setValue(Coord(7,3,3), 1.0f);
+
+        const Vec3T dir( 1.0, 0.0, 0.0);
+        const Vec3T eye(-1.0, 0.0, 0.0);
+        const RayT ray(eye, dir);//ray in index space
+        tools::VolumeRayIntersector<FloatGrid> inter(grid);
+        CPPUNIT_ASSERT(inter.setIndexRay(ray));
+        double t0=0, t1=0;
+        CPPUNIT_ASSERT(inter.march(t0, t1));
+        ASSERT_DOUBLES_APPROX_EQUAL( 1.0, t0);
+        ASSERT_DOUBLES_APPROX_EQUAL( 9.0, t1);
+        CPPUNIT_ASSERT(!inter.march(t0, t1));
+    }
+     {//same as above but with dilation
+        FloatGrid grid(0.0f);
+        
+        grid.tree().setValue(Coord(1,1,1), 1.0f);
+        grid.tree().setValue(Coord(7,3,3), 1.0f);
+        
+        const Vec3T dir( 1.0, 0.0, 0.0);
+        const Vec3T eye(-1.0, 0.0, 0.0);
+        const RayT ray(eye, dir);//ray in index space
+        tools::VolumeRayIntersector<FloatGrid> inter(grid, 1);
+        CPPUNIT_ASSERT(inter.setIndexRay(ray));
+        double t0=0, t1=0;
+        CPPUNIT_ASSERT(inter.march(t0, t1));
+        ASSERT_DOUBLES_APPROX_EQUAL( 1.0, t0);
+        ASSERT_DOUBLES_APPROX_EQUAL(17.0, t1);
+        CPPUNIT_ASSERT(!inter.march(t0, t1));
     }
     {//two adjacent leaf nodes
         FloatGrid grid(0.0f);
@@ -101,13 +152,10 @@ TestVolumeRayIntersector::testAll()
         tools::VolumeRayIntersector<FloatGrid> inter(grid);
         CPPUNIT_ASSERT(inter.setIndexRay(ray));
         double t0=0, t1=0;
-        CPPUNIT_ASSERT_EQUAL(2, inter.march(t0, t1));
+        CPPUNIT_ASSERT(inter.march(t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL( 1.0, t0);
-        ASSERT_DOUBLES_APPROX_EQUAL( 9.0, t1);
-        CPPUNIT_ASSERT_EQUAL(2, inter.march(t0, t1));
-        ASSERT_DOUBLES_APPROX_EQUAL( 9.0, t0);
         ASSERT_DOUBLES_APPROX_EQUAL(17.0, t1);
-        CPPUNIT_ASSERT_EQUAL(0, inter.march(t0, t1));
+        CPPUNIT_ASSERT(!inter.march(t0, t1));
     }
     {//two adjacent leafs followed by a gab and leaf
         FloatGrid grid(0.0f);
@@ -123,16 +171,13 @@ TestVolumeRayIntersector::testAll()
         tools::VolumeRayIntersector<FloatGrid> inter(grid);
         CPPUNIT_ASSERT(inter.setIndexRay(ray));
         double t0=0, t1=0;
-        CPPUNIT_ASSERT_EQUAL(2, inter.march(t0, t1));
+        CPPUNIT_ASSERT(inter.march(t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL( 1.0, t0);
-        ASSERT_DOUBLES_APPROX_EQUAL( 9.0, t1);
-        CPPUNIT_ASSERT_EQUAL(2, inter.march(t0, t1));
-        ASSERT_DOUBLES_APPROX_EQUAL( 9.0, t0);
         ASSERT_DOUBLES_APPROX_EQUAL(17.0, t1);
-        CPPUNIT_ASSERT_EQUAL(2, inter.march(t0, t1));
+        CPPUNIT_ASSERT(inter.march(t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL(25.0, t0);
         ASSERT_DOUBLES_APPROX_EQUAL(33.0, t1);
-        CPPUNIT_ASSERT_EQUAL(0, inter.march(t0, t1));
+        CPPUNIT_ASSERT(!inter.march(t0, t1));
     }
     {//two adjacent leafs followed by a gab, a leaf and an active tile
         FloatGrid grid(0.0f);
@@ -148,19 +193,13 @@ TestVolumeRayIntersector::testAll()
         tools::VolumeRayIntersector<FloatGrid> inter(grid);
         CPPUNIT_ASSERT(inter.setIndexRay(ray));
         double t0=0, t1=0;
-        CPPUNIT_ASSERT_EQUAL(2, inter.march(t0, t1));
+        CPPUNIT_ASSERT(inter.march(t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL( 1.0, t0);
-        ASSERT_DOUBLES_APPROX_EQUAL( 9.0, t1);
-        CPPUNIT_ASSERT_EQUAL(2, inter.march(t0, t1));
-        ASSERT_DOUBLES_APPROX_EQUAL( 9.0, t0);
         ASSERT_DOUBLES_APPROX_EQUAL(17.0, t1);
-        CPPUNIT_ASSERT_EQUAL(2, inter.march(t0, t1));
+        CPPUNIT_ASSERT(inter.march(t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL(25.0, t0);
-        ASSERT_DOUBLES_APPROX_EQUAL(33.0, t1);
-        CPPUNIT_ASSERT_EQUAL(1, inter.march(t0, t1));
-        ASSERT_DOUBLES_APPROX_EQUAL(33.0, t0);
         ASSERT_DOUBLES_APPROX_EQUAL(41.0, t1);
-        CPPUNIT_ASSERT_EQUAL(0, inter.march(t0, t1));
+        CPPUNIT_ASSERT(!inter.march(t0, t1));
     }
     
     {// Test submitted by "Jan" @ GitHub
@@ -175,16 +214,13 @@ TestVolumeRayIntersector::testAll()
         const RayT ray(eye, dir);
         CPPUNIT_ASSERT(inter.setIndexRay(ray));
         double t0=0, t1=0;
-        CPPUNIT_ASSERT_EQUAL(2, inter.march(t0, t1));
+        CPPUNIT_ASSERT(inter.march(t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL(18.0, t0);
         ASSERT_DOUBLES_APPROX_EQUAL(26.0, t1);
-        CPPUNIT_ASSERT_EQUAL(2, inter.march(t0, t1));
+        CPPUNIT_ASSERT(inter.march(t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL(34.0, t0);
-        ASSERT_DOUBLES_APPROX_EQUAL(42.0, t1);
-        CPPUNIT_ASSERT_EQUAL(2, inter.march(t0, t1));
-        ASSERT_DOUBLES_APPROX_EQUAL(42.0, t0);
         ASSERT_DOUBLES_APPROX_EQUAL(50.0, t1);
-        CPPUNIT_ASSERT_EQUAL(0, inter.march(t0, t1));
+        CPPUNIT_ASSERT(!inter.march(t0, t1));
     }
 }
 

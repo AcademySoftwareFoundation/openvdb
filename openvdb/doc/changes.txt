@@ -17,8 +17,9 @@
   @vdblink::tools::LevelSetRayIntersector LevelSetRayIntersector@endlink 
   to return the time of intersection along a world or index ray and to
   return the level set isovalue.
-- Added bounding box support to the
-  @vdblink::tools::VolumeRayIntersector VolumeRayIntersector@endlink.
+- Improved the performance of the
+  @vdblink::tools::VolumeRayIntersector VolumeRayIntersector@endlink
+  and added support for voxel dilation to account for interpolation kernels.
 - Added a @ref sInterpolation "section" to the Cookbook on interpolation
   using @vdblink::tools::BoxSampler BoxSampler@endlink,
   @vdblink::tools::GridSampler GridSampler@endlink,
@@ -57,14 +58,23 @@
   correctly if they contained grids with more than two distinct inactive
   values.
 - Fixed a build issue reported by Clang&nbsp;3.2 in tools/GridOperators.h.
-- Improved convergence in @vdblink::tools::VolumeRender VolumeRender@endlink. 
-  <I>[Contributed by Jerry Tessendorf]</I>
+- Fixed a memory leak in @vdblink::tools::Film Film@endlink.
+- Added library and file format version number constants to the Python module.
+- Improved convergence in the
+  @vdblink::tools::VolumeRender volume renderer@endlink. 
+  <I>[Contributed by Jerry Tessendorf and Mark Matthews]</I>
 - Made various changes for compatibility with Houdini&nbsp;13 and with
   C++11 compilers.
   <I>[Contributed&nbsp;by&nbsp;SESI]</I>
 
 @par
 API changes:
+- @vdblink::tools::VolumeRayIntersector::march()
+  VolumeRayIntersector::march@endlink no longer returns an @c int
+  to distinguish tile vs. voxel hits.  Instead, it now returns @c false
+  if no intersection is detected and @c true otherwise.  Also, @e t0 and
+  @e t1 might now correspond to the first and last hits of multiple adjacent
+  leaf nodes and/or active tiles. 
 - @vdblink::tools::DualGridSampler DualGridSampler@endlink is no longer 
   templated on the target grid type, and the value accessor is now passed 
   as an argument.
@@ -92,6 +102,9 @@ Houdini:
 - Added a Vector Type menu to the Vector Merge SOP.
 - Removed masking options from the Renormalize SOP (since masking is
   not supported yet).
+- Reimplemented the Vector Merge SOP for better performance and
+  interruptibility and to fix a bug in the handling of tile values.
+
 
 @htmlonly <a name="v2_1_0_changes"></a>@endhtmlonly
 @par

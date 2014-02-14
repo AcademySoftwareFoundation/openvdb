@@ -390,6 +390,9 @@ public:
     /// @note Incurs no computational overhead.
     inline RealType time() const { return mT0; }
 
+    /// @brief Return the maximum time (parameterized along the Ray).
+    inline RealType maxTime() const { return mT1; }
+
     /// @brief Return the time (parameterized along the Ray) of the
     /// second (i.e. next) hit of a tree node of size 2^Log2Dim.
     /// @note Incurs a (small) computational overhead.

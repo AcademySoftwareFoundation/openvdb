@@ -107,7 +107,7 @@ struct RenderOpts
         light(0.3, 0.3, 0.0),
         scatter(1.5),
         cutoff(0.005),
-        gain(1.0),
+        gain(0.2),
         step(1.0, 3.0),
         width(1920),
         height(1080),
@@ -235,7 +235,7 @@ usage(int exitStatus = EXIT_FAILURE)
 "        -focal 35 -samples 4 -translate 0,210.5,400 -compression rle -v\n" <<
 "\n" <<
 "    " << gProgName << " bunny_cloud.vdb bunny_cloud.exr -res 1920x1080 \\\n" <<
-"        -focal 50 -translate 0,0,110 -absorb 0.1,0.5,0.1 -gain 2 -v\n" <<
+"        -translate 0,0,110 -absorb 0.1,0.25,0.1 -gain 0.2 -v\n" <<
 "\n" <<
 "This is not (and is not intended to be) a production-quality renderer.\n";
 
@@ -361,7 +361,7 @@ render(const GridType& grid, const std::string& imgFilename, const RenderOpts& o
         renderer.setAbsorption(opts.absorb[0], opts.absorb[1], opts.absorb[2]);
         renderer.setLightGain(opts.gain);
         renderer.setCutOff(opts.cutoff);
-
+        
         renderer.render(opts.threads != 1);
     }
 

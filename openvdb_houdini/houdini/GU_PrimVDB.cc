@@ -1471,7 +1471,7 @@ VoxelArrayVolume<TUPLE_SIZE>::copyToAlignedTile(
 	for (int tuple_i = 0; tuple_i < TUPLE_SIZE; tuple_i++) {
 
 	    VoxelTileF* tile = tiles[tuple_i];
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
+#if (UT_VERSION_INT >= 0x0d0000ed) // 13.0.237 or later
 	    tile->makeRawUninitialized();
 #else
 	    tile->uncompress();
@@ -1535,7 +1535,7 @@ VoxelArrayVolume<TUPLE_SIZE>::copyToTile(
 	for (int tuple_i = 0; tuple_i < TUPLE_SIZE; tuple_i++) {
 
 	    VoxelTileF* tile = tiles[tuple_i];
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
+#if (UT_VERSION_INT >= 0x0d0000ed) // 13.0.237 or later
 	    tile->makeRawUninitialized();
 #else
 	    tile->uncompress();

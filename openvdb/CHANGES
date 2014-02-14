@@ -9,7 +9,8 @@ Version 2.2.0 - In development
     - Added methods to the LevelSetRayIntersector to return the time of
       intersection along a world or index ray and to return the level set
       isovalue.
-    - Added bounding box support to the VolumeRayIntersector.
+    - Improved the performance of the VolumeRayIntersector and added
+      support for voxel dilation to account for interpolation kernels.
     - Added a section to the Cookbook on interpolation using BoxSampler, 
       GridSampler, DualGridSampler, et al.
     - Modified tools::DualGridSampler so it is more consistent with 
@@ -36,12 +37,21 @@ Version 2.2.0 - In development
     - Fixed a file I/O bug whereby some .vdb files could not be read correctly
       if they contained grids with more than two distinct inactive values.
     - Fixed a build issue reported by Clang 3.2 in tools/GridOperators.h.
-    - Improved convergence in VolumeRender [Contributed by Jerry Tessendorf].
+    - Fixed a memory leak in tools::Film.
+    - Added library and file format version number constants to the
+      Python module.
+    - Improved convergence in the volume renderer.
+      [Contributed by Jerry Tessendorf and Mark Matthews]
     - Made various changes for compatibility with Houdini 13 and with
       C++11 compilers.
       [Contributed by SESI]
 
     API changes:
+    - tools::VolumeRayIntersector::march() no longer returns an int
+      to distinguish tile vs. voxel hits.  Instead, it now returns false
+      if no intersection is detected and true otherwise.  Also, t0 and t1
+      might now correspond to the first and last hits of multiple adjacent
+      leaf nodes and/or active tiles. 
     - tools::DualGridSampler is no longer templated on the target grid type,
       and the value accessor is now passed as an argument.
     - The .vdb file format has changed slightly.  Tools built with older
@@ -67,6 +77,8 @@ Version 2.2.0 - In development
     - Added a Vector Type menu to the Vector Merge SOP.
     - Removed masking options from the Renormalize SOP (since masking is
       not supported yet).
+    - Reimplemented the Vector Merge SOP for better performance and
+      interruptibility and to fix a bug in the handling of tile values.
 
 Version 2.1.0 - December 12, 2013
     - Added a small number of Maya nodes, primarily for conversion of geometry
