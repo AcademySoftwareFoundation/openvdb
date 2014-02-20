@@ -1,7 +1,7 @@
 OpenVDB Version History
 =======================
 
-Version 2.2.0 - In development
+Version 2.2.0 - February 20, 2014
     - Added a simple, multithreaded volume renderer, and added volume
       rendering support to the vdb_render command-line renderer.
     - Added an option to the LevelSetRayIntersector and to vdb_render
@@ -13,14 +13,15 @@ Version 2.2.0 - In development
       support for voxel dilation to account for interpolation kernels.
     - Added a section to the Cookbook on interpolation using BoxSampler, 
       GridSampler, DualGridSampler, et al.
+    - Added a section to the Overview on grids and grid metadata.
     - Modified tools::DualGridSampler so it is more consistent with 
       tools::GridSampler.
     - tools::cpt(), tools::curl(), tools::laplacian(), tools::meanCurvature()
       and tools::normalize() now output grids with appropriate vector types
       (covariant, contravariant, etc.).
     - Added tools::transformVectors(), which applies an affine transformation
-      to the voxel values of a vector-valued grid, in accordance with the
-      grid's Vector Type metadata setting.
+      to the voxel values of a vector-valued grid in accordance with the
+      grid's Vector Type and World Space/Local Space metadata setting.
     - Added tools::compDiv(), which combines grids by dividing the values
       of corresponding voxels.
     - Fixed a bug in the mean curvature computation that could produce NaNs
@@ -36,6 +37,9 @@ Version 2.2.0 - In development
       values when computing the gradient of a grid with a frustum transform.
     - Fixed a file I/O bug whereby some .vdb files could not be read correctly
       if they contained grids with more than two distinct inactive values.
+    - Fixed an off-by-one bug in the numbering of unnamed grids in .vdb files.
+      The first unnamed grid in a file is now retrieved using the name "[0]",
+      instead of "[1]".
     - Fixed a build issue reported by Clang 3.2 in tools/GridOperators.h.
     - Fixed a memory leak in tools::Film.
     - Added library and file format version number constants to the
@@ -73,7 +77,7 @@ Version 2.2.0 - In development
       either world or voxel units.
     - Added a toggle to the Transform and Resample SOPs to apply the
       transform to the voxel values of vector-valued grids, in accordance with
-      those grids' Vector Type metadata settings.
+      those grids' Vector Type and World Space/Local Space metadata settings.
     - Added a Vector Type menu to the Vector Merge SOP.
     - Removed masking options from the Renormalize SOP (since masking is
       not supported yet).

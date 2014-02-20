@@ -617,7 +617,8 @@ Archive::write(std::ostream& os, const GridCPtrVec& grids, bool seekable,
             // Always add a number if the grid name is empty, so that the grid can be
             // properly identified as an instance parent, if necessary.
             std::string name = grid->getName();
-            for (int n = 1; name.empty() || uniqueNames.find(name) != uniqueNames.end(); ++n) {
+            if (name.empty()) name = GridDescriptor::addSuffix(name, 0);
+            for (int n = 1; uniqueNames.find(name) != uniqueNames.end(); ++n) {
                 name = GridDescriptor::addSuffix(grid->getName(), n);
             }
             uniqueNames.insert(name);

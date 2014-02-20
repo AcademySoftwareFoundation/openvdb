@@ -5,7 +5,7 @@
 
 @htmlonly <a name="v2_2_0_changes"></a>@endhtmlonly
 @par
-<B>Version 2.2.0</B> - <I>In development</I>
+<B>Version 2.2.0</B> - <I>February 20, 2014</I>
 - Added a simple, multithreaded
   @vdblink::tools::VolumeRender volume renderer@endlink,
   and added volume rendering support to the @c vdb_render
@@ -24,6 +24,7 @@
   using @vdblink::tools::BoxSampler BoxSampler@endlink,
   @vdblink::tools::GridSampler GridSampler@endlink,
   @vdblink::tools::DualGridSampler DualGridSampler@endlink, et al.
+- Added a @ref secGrid "section" to the Overview on grids and grid metadata.
 - Modified @vdblink::tools::DualGridSampler DualGridSampler@endlink so 
   it is more consistent with @vdblink::tools::GridSampler GridSampler@endlink.
 - The @vdblink::tools::cpt() cpt@endlink, @vdblink::tools::curl() curl@endlink,
@@ -34,8 +35,9 @@
   (covariant, contravariant, etc.).
 - Added a @vdblink::tools::transformVectors() transformVectors@endlink tool,
   which applies an affine transformation to the voxel values of a
-  vector-valued grid, in accordance with the grid&rsquo;s
-  @vdblink::VecType vector type@endlink.
+  vector-valued grid in accordance with the grid&rsquo;s
+  @vdblink::VecType vector type@endlink and
+  @vdblink::Grid::isInWorldSpace() world space/local space@endlink setting.
 - Added a @vdblink::tools::compDiv() compDiv@endlink tool, which combines
   grids by dividing the values of corresponding voxels.
 - Fixed a bug in the mean curvature computation that could produce NaNs
@@ -57,6 +59,9 @@
 - Fixed a file I/O bug whereby some <TT>.vdb</TT> files could not be read
   correctly if they contained grids with more than two distinct inactive
   values.
+- Fixed an off-by-one bug in the numbering of unnamed grids in <TT>.vdb</TT>
+  files.  The first unnamed grid in a file is now retrieved using the name
+  &ldquo;<TT>[0]</TT>&rdquo;, instead of &ldquo;<TT>[1]</TT>&rdquo;.
 - Fixed a build issue reported by Clang&nbsp;3.2 in tools/GridOperators.h.
 - Fixed a memory leak in @vdblink::tools::Film Film@endlink.
 - Added library and file format version number constants to the Python module.
@@ -98,7 +103,8 @@ Houdini:
   either world or voxel units.
 - Added a toggle to the Transform and Resample SOPs to apply the transform
   to the voxel values of vector-valued grids, in accordance with those
-  grids&rsquo; @vdblink::VecType vector types@endlink.
+  grids&rsquo; @vdblink::VecType vector types@endlink and
+  @vdblink::Grid::isInWorldSpace() world space/local space@endlink settings.
 - Added a Vector Type menu to the Vector Merge SOP.
 - Removed masking options from the Renormalize SOP (since masking is
   not supported yet).

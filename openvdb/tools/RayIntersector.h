@@ -90,7 +90,7 @@ template<typename GridT, int Iterations = 0, typename RealT = double>
 class LinearSearchImpl;
 
 
-//////////////////////////////////////// LevelSetRayIntersector ////////////////////////////////////////
+/////////////////////////////////////// LevelSetRayIntersector //////////////////////////////////////
 
 
 /// @brief This class provides the public API for intersecting a ray
@@ -277,7 +277,7 @@ private:
 };// LevelSetRayIntersector
 
 
-//////////////////////////////////////// VolumeRayIntersector ////////////////////////////////////////
+/////////////////////////////////////// VolumeRayIntersector ////////////////////////////////////////
 
 
 /// @brief This class provides the public API for intersecting a ray
@@ -379,8 +379,8 @@ public:
     /// mutex-lock impairs multi-threading).
     VolumeRayIntersector(const VolumeRayIntersector& other)
         : mIsMaster(false)
-        , mTree(other.mTree)//shalow copy
-        , mGrid(other.mGrid)//shalow copy
+        , mTree(other.mTree)//shallow copy
+        , mGrid(other.mGrid)//shallow copy
         , mAccessor(*mTree)//deep copy
         , mRay(other.mRay)//deep copy
         , mTmax(other.mTmax)//deep copy
@@ -508,7 +508,7 @@ private:
 };// VolumeRayIntersector
 
 
-//////////////////////////////////////// LinearSearchImpl ////////////////////////////////////////
+///////////////////////////////////////// LinearSearchImpl //////////////////////////////////////////
 
 
 /// @brief Implements linear iterative search for an iso-value of
@@ -690,7 +690,7 @@ private:
     math::CoordBBox mBBox;
 };// LinearSearchImpl
 
-//////////////////////////////////////// LevelSetHDDA ////////////////////////////////////////
+/////////////////////////////////////////// LevelSetHDDA ////////////////////////////////////////////
 
 
 /// @brief Helper class that implements Hierarchical Digital Differential Analyzers
@@ -731,7 +731,7 @@ struct LevelSetHDDA<TreeT, -1>
 };
 
 
-//////////////////////////////////////// VolumeHDDA ////////////////////////////////////////
+//////////////////////////////////////////// VolumeHDDA /////////////////////////////////////////////
 
 /// Helper class that implements Hierarchical Digital Differential Analyzers
 /// for ray intersections against a generic volume.
@@ -752,7 +752,7 @@ struct VolumeHDDA
             } else if (tester.isValueOn(dda.voxel())) {//hit an active tile
                 if (t0<0) t0 = dda.time();//this is the first hit so set t0
             } else if (t0>0) {//hit an inactive tile after hitting active values
-                t1 = dda.time();//set end of active interval
+                t1 = dda.time();//set end of active ray segment
                 return true;//terminate
             }
         } while (dda.step());
@@ -777,7 +777,7 @@ struct VolumeHDDA<TreeT, 0>
                 tester.isValueOn(dda.voxel())) {//hit a leaf or an active tile
                 if (t0<0) t0 = dda.time();//this is the first hit
             } else if (t0>0) {//hit an inactive tile after hitting active values
-                t1 = dda.time();//set end of active interval
+                t1 = dda.time();//set end of active ray segment
                 return true;//terminate
             }
         } while (dda.step());

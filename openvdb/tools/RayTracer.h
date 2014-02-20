@@ -908,7 +908,8 @@ operator()(const tbb::blocked_range<size_t>& range) const
             RayType pRay = mCamera->getRay(i, j);// Primary ray
             if( !mPrimary->setWorldRay(pRay)) continue;
             Vec3R pTrans(1.0), pLumi(0.0);
-            for (Real pT0, pT1; mPrimary->march(pT0, pT1); ) {
+            Real pT0, pT1;
+            while (mPrimary->march(pT0, pT1)) {
                 for (Real pT = pStep*ceil(pT0/pStep); pT <= pT1; pT += pStep) {
                     Vec3R pPos = mPrimary->getWorldPos(pT);
                     const Real density = sampler.wsSample(pPos);
@@ -917,7 +918,8 @@ operator()(const tbb::blocked_range<size_t>& range) const
                     Vec3R sTrans(1.0);
                     sRay.setEye(pPos);
                     if( !mShadow->setWorldRay(sRay)) continue;
-                    for (Real sT0, sT1; mShadow->march(sT0, sT1);) {
+                    Real sT0, sT1;
+                    while (mShadow->march(sT0, sT1)) {
                         for (Real sT = sStep*ceil(sT0/sStep); sT <= sT1; sT+= sStep) {
                             const Real d = sampler.wsSample(mShadow->getWorldPos(sT));
                             if (d < cutoff) continue;

@@ -1696,6 +1696,9 @@ TestTools::testVectorTransformer()
         acc.setValue(Coord(3), refVec3); \
     }
 
+        // Verify that grid values are in world space by default.
+        CPPUNIT_ASSERT(grid.isInWorldSpace());
+
         resetGrid();
         grid.setVectorType(VEC_INVARIANT);
         tools::transformVectors(grid, xform);
@@ -1736,6 +1739,16 @@ TestTools::testVectorTransformer()
         CPPUNIT_ASSERT(acc.getValue(Coord(1)).eq(xform.transformH(refVec1)));
         CPPUNIT_ASSERT(acc.getValue(Coord(2)).eq(xform.transformH(refVec2)));
         CPPUNIT_ASSERT(acc.getValue(Coord(3)).eq(xform.transformH(refVec3)));
+
+        // Verify that transformVectors() has no effect on local-space grids.
+        resetGrid();
+        grid.setVectorType(VEC_CONTRAVARIANT_RELATIVE);
+        grid.setIsInWorldSpace(false);
+        tools::transformVectors(grid, xform);
+        CPPUNIT_ASSERT(acc.getValue(Coord(0)).eq(refVec0));
+        CPPUNIT_ASSERT(acc.getValue(Coord(1)).eq(refVec1));
+        CPPUNIT_ASSERT(acc.getValue(Coord(2)).eq(refVec2));
+        CPPUNIT_ASSERT(acc.getValue(Coord(3)).eq(refVec3));
 
 #undef resetGrid
     }

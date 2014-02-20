@@ -1858,7 +1858,7 @@ TestFile::testNameIterator()
     vdbfile.open();
 
     // Names should appear in lexicographic order.
-    Name names[6] = { "[1]", "[2]", "density", "level_set", "level_set[1]", "temperature" };
+    Name names[6] = { "[0]", "[1]", "density", "level_set", "level_set[1]", "temperature" };
     int count = 0;
     for (io::File::NameIterator iter = vdbfile.beginName(); iter != vdbfile.endName(); ++iter) {
         CPPUNIT_ASSERT_EQUAL(names[count], *iter);

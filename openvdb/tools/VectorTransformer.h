@@ -108,6 +108,8 @@ template<typename GridType> inline
 typename boost::enable_if_c<VecTraits<typename GridType::ValueType>::IsVec, void>::type
 doTransformVectors(GridType& grid, const Mat4d& mat)
 {
+    if (!grid.isInWorldSpace()) return;
+
     const VecType vecType = grid.getVectorType();
     switch (vecType) {
         case VEC_COVARIANT:
