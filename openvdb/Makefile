@@ -56,6 +56,7 @@
 #   debug=yes           build with debugging symbols and without optimization
 #   verbose=yes         run commands (e.g., doxygen) in verbose mode
 
+#
 # libConfig allows us to specify a single variable for whether we build
 # debug/release and shared/static
 ifdef libConfig
