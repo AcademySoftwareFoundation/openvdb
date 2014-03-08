@@ -1116,7 +1116,7 @@ public:
 
 private:
     // disallow copy by assignment
-    void operator=(const PropagateSign<FloatTreeT, InterruptT>&) {}
+    void operator=(const PropagateSign<FloatTreeT, InterruptT>&);
     bool wasInterrupted() const { return mInterrupter && mInterrupter->wasInterrupted(); }
 
     BoolLeafManager& mOldSignMaskLeafs;
@@ -2462,7 +2462,7 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
     if (wasInterrupted(40)) return;
 
     if (!unsignedDistField) { // Propagate sign information to inactive values.
-        mDistGrid->tree().getRootNode().setBackground(exBandWidth, /*updateChildNodes=*/false);
+        mDistGrid->tree().root().setBackground(exBandWidth, /*updateChildNodes=*/false);
         mDistGrid->tree().signedFloodFill(exBandWidth, -inBandWidth);
     }
 

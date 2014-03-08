@@ -51,6 +51,7 @@ public:
     CPPUNIT_TEST(testIsType);
     CPPUNIT_TEST(testTransform);
     CPPUNIT_TEST(testCopyGrid);
+    CPPUNIT_TEST(testValueConversion);
     CPPUNIT_TEST_SUITE_END();
 
     void testGridRegistry();
@@ -59,6 +60,7 @@ public:
     void testIsType();
     void testTransform();
     void testCopyGrid();
+    void testValueConversion();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestGrid);
@@ -268,6 +270,65 @@ TestGrid::testCopyGrid()
     // query changed value and make sure it's different between trees
     ASSERT_DOUBLES_EXACTLY_EQUAL(fillValue1, tree1.getValue(changeCoord));
     ASSERT_DOUBLES_EXACTLY_EQUAL(1.0f, tree2.getValue(changeCoord));
+}
+
+
+void
+TestGrid::testValueConversion()
+{
+    using namespace openvdb;
+
+    const Coord c0(-10, 40, 845), c1(1, -50, -8), c2(1, 2, 3);
+    const float fval0 = 3.25f, fval1 = 1.0f, fbkgd = 5.0f;
+
+    // Create a FloatGrid.
+    FloatGrid fgrid(fbkgd);
+    FloatTree& ftree = fgrid.tree();
+    ftree.setValue(c0, fval0);
+    ftree.setValue(c1, fval1);
+
+    // Copy the FloatGrid to a DoubleGrid.
+    DoubleGrid dgrid(fgrid);
+    DoubleTree& dtree = dgrid.tree();
+    // Compare topology.
+    CPPUNIT_ASSERT(dtree.hasSameTopology(ftree));
+    CPPUNIT_ASSERT(ftree.hasSameTopology(dtree));
+    // Compare values.
+    ASSERT_DOUBLES_EXACTLY_EQUAL(double(fbkgd), dtree.getValue(c2));
+    ASSERT_DOUBLES_EXACTLY_EQUAL(double(fval0), dtree.getValue(c0));
+    ASSERT_DOUBLES_EXACTLY_EQUAL(double(fval1), dtree.getValue(c1));
+
+    // Copy the FloatGrid to a BoolGrid.
+    BoolGrid bgrid(fgrid);
+    BoolTree& btree = bgrid.tree();
+    // Compare topology.
+    CPPUNIT_ASSERT(btree.hasSameTopology(ftree));
+    CPPUNIT_ASSERT(ftree.hasSameTopology(btree));
+    // Compare values.
+    CPPUNIT_ASSERT_EQUAL(bool(fbkgd), btree.getValue(c2));
+    CPPUNIT_ASSERT_EQUAL(bool(fval0), btree.getValue(c0));
+    CPPUNIT_ASSERT_EQUAL(bool(fval1), btree.getValue(c1));
+
+    // Copy the FloatGrid to a Vec3SGrid.
+    Vec3SGrid vgrid(fgrid);
+    Vec3STree& vtree = vgrid.tree();
+    // Compare topology.
+    CPPUNIT_ASSERT(vtree.hasSameTopology(ftree));
+    CPPUNIT_ASSERT(ftree.hasSameTopology(vtree));
+    // Compare values.
+    CPPUNIT_ASSERT_EQUAL(Vec3s(fbkgd), vtree.getValue(c2));
+    CPPUNIT_ASSERT_EQUAL(Vec3s(fval0), vtree.getValue(c0));
+    CPPUNIT_ASSERT_EQUAL(Vec3s(fval1), vtree.getValue(c1));
+
+    // Verify that a Vec3SGrid can't be copied to an Int32Grid
+    // (because an Int32 can't be constructed from a Vec3S).
+    CPPUNIT_ASSERT_THROW(Int32Grid igrid2(vgrid), openvdb::TypeError);
+
+    // Verify that a grid can't be converted to another type with a different
+    // tree configuration.
+    typedef tree::Tree3<double, 2, 3>::Type DTree23;
+    typedef Grid<DTree23> DGrid23;
+    CPPUNIT_ASSERT_THROW(DGrid23 d23grid(fgrid), openvdb::TypeError);
 }
 
 // Copyright (c) 2012-2013 DreamWorks Animation LLC

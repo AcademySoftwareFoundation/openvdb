@@ -3,6 +3,60 @@
 @page changes Release Notes
 
 
+@htmlonly <a name="v2_3_0_changes"></a>@endhtmlonly
+@par
+<B>Version 2.3.0</B> - <I>In development</I>
+- Added @vdblink::tools::extractSparseTree() extractSparseTree@endlink,
+  which selectively extracts and transforms data from a dense grid to
+  produce a sparse tree, and @vdblink::tools::extractSparseTreeWithMask()
+  extractSparseTreeWithMask@endlink, which copies data from the index-space
+  intersection of a sparse tree and a dense input grid.
+- Added copy constructors to the
+  @vdblink::Grid::Grid(const Grid<OtherTreeType>&) Grid@endlink,
+  @vdblink::tree::Tree::Tree(const Tree<OtherRootType>&) Tree@endlink,
+  @vdblink::tree::RootNode::RootNode(const RootNode<OtherChildType>&)
+  RootNode@endlink,
+  @vdblink::tree::InternalNode::InternalNode(const InternalNode<OtherChildNodeType, Log2Dim>&)
+  InternalNode@endlink and
+  @vdblink::tree::LeafNode::LeafNode(const LeafNode<OtherValueType, Log2Dim>&) LeafNode@endlink
+  classes, and an assignment operator overload to
+  @vdblink::tree::RootNode::operator=(const RootNode<OtherChildType>&)
+  RootNode@endlink, that allow the source and destination to have different
+  value types.
+- Modified @vdblink::tree::Tree::combine2() Tree::combine2@endlink to permit
+  combination of trees with different value types.
+- Added @vdblink::CanConvertType CanConvertType@endlink and
+  @vdblink::tree::RootNode::SameConfiguration
+  RootNode::SameConfiguration@endlink metafunctions, which perform compile-time
+  tests for value type and tree type compatibility, and a
+  @vdblink::tree::RootNode::hasCompatibleValueType()
+  RootNode::hasCompatibleValueType@endlink method, which does runtime checking.
+
+@par
+API changes:
+- Collected the digital differential analyzer code from math/Ray.h
+  and tools/RayIntersector.h into a new header file, math/DDA.h.
+- Rewrote @vdblink::math::VolumeHDDA VolumeHDDA@endlink and made several
+  changes to its API.  (@vdblink::math::VolumeHDDA VolumeHDDA@endlink
+  is used internally by @vdblink::tools::VolumeRayIntersector 
+  VolumeRayIntersector@endlink, whose API is unchanged.)
+- @vdblink::tree::Tree::combine2() Tree::combine2@endlink,
+  @vdblink::tree::RootNode::combine2() RootNode::combine2@endlink,
+  @vdblink::tree::InternalNode::combine2() InternalNode::combine2@endlink,
+  @vdblink::tree::LeafNode::combine2() LeafNode::combine2@endlink
+  and @vdblink::CombineArgs CombineArgs@endlink all now require an additional
+  template argument, which determines the type of the other tree.
+- Assignment operators for
+  @vdblink::tree::LeafManager::LeafRange::Iterator::operator=()
+  LeafManager::LeafRange::Iterator@endlink,
+  @vdblink::util::BaseMaskIterator::operator=() BaseMaskIterator@endlink,
+  @vdblink::util::NodeMask::operator=() NodeMask@endlink and
+  @vdblink::util::RootNodeMask::operator=() RootNodeMask@endlink
+  now return references to the respective objects.
+- Removed a number of methods that were deprecated in version&nbsp;2.0.0
+  or earlier.
+
+
 @htmlonly <a name="v2_2_0_changes"></a>@endhtmlonly
 @par
 <B>Version 2.2.0</B> - <I>February 20, 2014</I>
@@ -250,7 +304,7 @@ API changes:
   new methods, so do not call these methods from Houdini&nbsp;12.5.
 - Reimplemented @vdblink::math::RandomInt math::RandomInt@endlink using
   Boost.Random instead of @c rand() (which is not thread-safe), and deprecated
-  @vdblink::math::randUniform math::randUniform@endlink and added
+  @c math::randUniform() and added
   @vdblink::math::Random01 math::Random01@endlink to replace it. 
 - Modified @vdblink::tools::copyFromDense() tools::copyFromDense@endlink
   and @vdblink::tools::copyToDense() tools::copyToDense@endlink to allow

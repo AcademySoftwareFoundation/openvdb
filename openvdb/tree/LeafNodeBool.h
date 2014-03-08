@@ -73,6 +73,14 @@ public:
     template<typename ValueType>
     struct ValueConverter { typedef LeafNode<ValueType, Log2Dim> Type; };
 
+    /// @brief SameConfiguration<OtherNodeType>::value is @c true if and only if
+    /// OtherNodeType is the type of a LeafNode with the same dimensions as this node.
+    template<typename OtherNodeType>
+    struct SameConfiguration {
+        static const bool value = SameLeafConfig<LOG2DIM, OtherNodeType>::value;
+    };
+
+
     class Buffer
     {
     public:
@@ -122,18 +130,22 @@ public:
     /// Deep copy constructor
     LeafNode(const LeafNode&);
 
+    /// Value conversion copy constructor
+    template<typename OtherValueType>
+    explicit LeafNode(const LeafNode<OtherValueType, Log2Dim>& other);
+
     /// Topology copy constructor
     template<typename ValueType>
     LeafNode(const LeafNode<ValueType, Log2Dim>& other, TopologyCopy);
 
-    /// Topology copy constructor
+    //@{
+    /// @brief Topology copy constructor
     /// @note This variant exists mainly to enable template instantiation.
     template<typename ValueType>
-    LeafNode(const LeafNode<ValueType, Log2Dim>& other,
-             bool offValue, bool onValue, TopologyCopy);
+    LeafNode(const LeafNode<ValueType, Log2Dim>& other, bool offValue, bool onValue, TopologyCopy);
     template<typename ValueType>
-    LeafNode(const LeafNode<ValueType, Log2Dim>& other,
-             bool background, TopologyCopy);
+    LeafNode(const LeafNode<ValueType, Log2Dim>& other, bool background, TopologyCopy);
+    //@}
 
     /// Destructor
     ~LeafNode();
@@ -175,7 +187,6 @@ public:
     /// If visitVoxels is false this LeafNode will be approximated as dense, i.e. with all
     /// voxels active. Else the individual active voxels are visited to produce a tight bbox.
     void evalActiveBoundingBox(CoordBBox&, bool visitVoxels = true) const;
-    OPENVDB_DEPRECATED void evalActiveVoxelBoundingBox(CoordBBox& bbox) const;
 
     /// @brief Return the bounding box of this node, i.e., the full index space
     /// spanned by this leaf node.
@@ -183,9 +194,6 @@ public:
 
     /// Set the grid index coordinates of this node's local origin.
     void setOrigin(const Coord& origin) { mOrigin = origin; }
-    /// @brief Return the grid index coordinates of this node's local origin.
-    /// @deprecated Use origin() instead.
-    OPENVDB_DEPRECATED const Coord& getOrigin() const { return mOrigin; }
     //@{
     /// Return the grid index coordinates of this node's local origin.
     const Coord& origin() const { return mOrigin; }
@@ -476,9 +484,9 @@ public:
     /// @details The last dummy argument is required to match the signature
     /// for InternalNode::topologyDifference.
     ///
-    /// @note This operation modifies only active states, not
-    /// values. Also note that this operation can result in all voxels
-    /// being inactive so consider subsequnetly calling prune.
+    /// @note This operation modifies only active states, not values.
+    /// Also, because it can deactivate all of this node's voxels,
+    /// consider subsequently calling prune.
     template<typename OtherType>
     void topologyDifference(const LeafNode<OtherType, Log2Dim>& other, const bool&);
 
@@ -487,12 +495,12 @@ public:
     template<typename CombineOp>
     void combine(bool, bool valueIsActive, CombineOp& op);
 
-    template<typename CombineOp>
-    void combine2(const LeafNode& other, bool, bool valueIsActive, CombineOp&);
-    template<typename CombineOp>
-    void combine2(bool, const LeafNode& other, bool valueIsActive, CombineOp&);
-    template<typename CombineOp>
-    void combine2(const LeafNode& b0, const LeafNode& b1, CombineOp&);
+    template<typename CombineOp, typename OtherType /*= bool*/>
+    void combine2(const LeafNode& other, const OtherType&, bool valueIsActive, CombineOp&);
+    template<typename CombineOp, typename OtherNodeT /*= LeafNode*/>
+    void combine2(bool, const OtherNodeT& other, bool valueIsActive, CombineOp&);
+    template<typename CombineOp, typename OtherNodeT /*= LeafNode*/>
+    void combine2(const LeafNode& b0, const OtherNodeT& b1, CombineOp&);
 
     /// @brief Calls the templated functor BBoxOp with bounding box information.
     /// An additional level argument is provided to the callback.
@@ -792,6 +800,47 @@ LeafNode<bool, Log2Dim>::LeafNode(const Coord& xyz, bool value, bool active):
 
 
 template<Index Log2Dim>
+inline
+LeafNode<bool, Log2Dim>::LeafNode(const LeafNode &other):
+    mValueMask(other.mValueMask),
+    mBuffer(other.mBuffer),
+    mOrigin(other.mOrigin)
+{
+}
+
+
+// Copy-construct from a leaf node with the same configuration but a different ValueType.
+template<Index Log2Dim>
+template<typename ValueT>
+inline
+LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other):
+    mValueMask(other.getValueMask()),
+    mOrigin(other.origin())
+{
+    struct Local {
+        /// @todo Consider using a value conversion functor passed as an argument instead.
+        static inline bool convertValue(const ValueT& val) { return bool(val); }
+    };
+
+    for (Index i = 0; i < SIZE; ++i) {
+         mBuffer.setValue(i, Local::convertValue(other.mBuffer[i]));
+    }
+}
+
+
+template<Index Log2Dim>
+template<typename ValueT>
+inline
+LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other,
+                                  bool background, TopologyCopy):
+    mValueMask(other.getValueMask()),
+    mBuffer(background),
+    mOrigin(other.origin())
+{
+}
+
+
+template<Index Log2Dim>
 template<typename ValueT>
 inline
 LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other, TopologyCopy):
@@ -816,28 +865,6 @@ LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other,
 
 
 template<Index Log2Dim>
-template<typename ValueT>
-inline
-LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other,
-                                  bool background, TopologyCopy):
-    mValueMask(other.getValueMask()),
-    mBuffer(background),
-    mOrigin(other.origin())
-{
-}
-
-
-template<Index Log2Dim>
-inline
-LeafNode<bool, Log2Dim>::LeafNode(const LeafNode &other):
-    mValueMask(other.mValueMask),
-    mBuffer(other.mBuffer),
-    mOrigin(other.mOrigin)
-{
-}
-
-
-template<Index Log2Dim>
 inline
 LeafNode<bool, Log2Dim>::~LeafNode()
 {
@@ -854,20 +881,6 @@ LeafNode<bool, Log2Dim>::memUsage() const
     return sizeof(mOrigin) + mValueMask.memUsage() + mBuffer.memUsage();
 }
 
-
-template<Index Log2Dim>
-inline void
-LeafNode<bool, Log2Dim>::evalActiveVoxelBoundingBox(CoordBBox& bbox) const
-{
-    const CoordBBox this_bbox = this->getNodeBoundingBox();
-    if (bbox.isInside(this_bbox)) {
-        // nothing to do
-    } else if (this->isDense()) {
-        bbox.expand(this_bbox);
-    } else {
-        for (ValueOnCIter iter=this->cbeginValueOn(); iter; ++iter) bbox.expand(iter.getCoord());
-    }
-}
 
 template<Index Log2Dim>
 inline void
@@ -1428,12 +1441,12 @@ LeafNode<bool, Log2Dim>::combine(bool value, bool valueIsActive, CombineOp& op)
 
 
 template<Index Log2Dim>
-template<typename CombineOp>
+template<typename CombineOp, typename OtherType>
 inline void
-LeafNode<bool, Log2Dim>::combine2(const LeafNode& other, bool value,
+LeafNode<bool, Log2Dim>::combine2(const LeafNode& other, const OtherType& value,
     bool valueIsActive, CombineOp& op)
 {
-    CombineArgs<bool> args;
+    CombineArgs<bool, OtherType> args;
     args.setBRef(value).setBIsActive(valueIsActive);
     for (Index i = 0; i < SIZE; ++i) {
         bool result = false, aVal = other.mBuffer.mData.isOn(i);
@@ -1447,12 +1460,12 @@ LeafNode<bool, Log2Dim>::combine2(const LeafNode& other, bool value,
 
 
 template<Index Log2Dim>
-template<typename CombineOp>
+template<typename CombineOp, typename OtherNodeT>
 inline void
-LeafNode<bool, Log2Dim>::combine2(bool value, const LeafNode& other,
+LeafNode<bool, Log2Dim>::combine2(bool value, const OtherNodeT& other,
     bool valueIsActive, CombineOp& op)
 {
-    CombineArgs<bool> args;
+    CombineArgs<bool, typename OtherNodeT::ValueType> args;
     args.setARef(value).setAIsActive(valueIsActive);
     for (Index i = 0; i < SIZE; ++i) {
         bool result = false, bVal = other.mBuffer.mData.isOn(i);
@@ -1466,11 +1479,11 @@ LeafNode<bool, Log2Dim>::combine2(bool value, const LeafNode& other,
 
 
 template<Index Log2Dim>
-template<typename CombineOp>
+template<typename CombineOp, typename OtherNodeT>
 inline void
-LeafNode<bool, Log2Dim>::combine2(const LeafNode& b0, const LeafNode& b1, CombineOp& op)
+LeafNode<bool, Log2Dim>::combine2(const LeafNode& b0, const OtherNodeT& b1, CombineOp& op)
 {
-    CombineArgs<bool> args;
+    CombineArgs<bool, typename OtherNodeT::ValueType> args;
     for (Index i = 0; i < SIZE; ++i) {
         // Default behavior: output voxel is active if either input voxel is active.
         mValueMask.set(i, b0.mValueMask.isOn(i) || b1.mValueMask.isOn(i));

@@ -32,6 +32,7 @@
 #include <openvdb/Exceptions.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/math/Ray.h>
+#include <openvdb/math/DDA.h>
 #include <openvdb/math/BBox.h>
 #include <openvdb/Types.h>
 #include <openvdb/math/Transform.h>

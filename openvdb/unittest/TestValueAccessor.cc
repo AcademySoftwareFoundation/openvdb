@@ -477,14 +477,14 @@ TestValueAccessor::testAccessorRegistration()
     // the cache is populated.
     acc.setValue(c0, value);
     CPPUNIT_ASSERT_EQUAL(Index(1), tree->leafCount());
-    CPPUNIT_ASSERT_EQUAL(tree->getRootNode().getLevel(), tree->nonLeafCount());
+    CPPUNIT_ASSERT_EQUAL(tree->root().getLevel(), tree->nonLeafCount());
     CPPUNIT_ASSERT(acc.getNode<openvdb::FloatTree::LeafNodeType>() != NULL);
 
     // Reset the voxel to the background value and verify that no nodes
     // have been deleted and that the cache is still populated.
     tree->setValueOff(c0, background);
     CPPUNIT_ASSERT_EQUAL(Index(1), tree->leafCount());
-    CPPUNIT_ASSERT_EQUAL(tree->getRootNode().getLevel(), tree->nonLeafCount());
+    CPPUNIT_ASSERT_EQUAL(tree->root().getLevel(), tree->nonLeafCount());
     CPPUNIT_ASSERT(acc.getNode<openvdb::FloatTree::LeafNodeType>() != NULL);
 
     // Prune the tree and verify that only the root node remains and that
@@ -497,7 +497,7 @@ TestValueAccessor::testAccessorRegistration()
     // Set the leaf voxel again and verify that the cache is repopulated.
     acc.setValue(c0, value);
     CPPUNIT_ASSERT_EQUAL(Index(1), tree->leafCount());
-    CPPUNIT_ASSERT_EQUAL(tree->getRootNode().getLevel(), tree->nonLeafCount());
+    CPPUNIT_ASSERT_EQUAL(tree->root().getLevel(), tree->nonLeafCount());
     CPPUNIT_ASSERT(acc.getNode<openvdb::FloatTree::LeafNodeType>() != NULL);
 
     // Delete the tree and verify that the cache has been cleared.

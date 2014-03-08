@@ -365,6 +365,7 @@ TestTreeCombine::testComp(const TreeComp& comp, const ValueComp& op)
 void
 TestTreeCombine::testCombine2()
 {
+    using openvdb::Coord;
     using openvdb::Vec3d;
 
     struct Local {
@@ -372,48 +373,112 @@ TestTreeCombine::testCombine2()
             { result = 0.5 * (a + b); }
         static void vec3dAverage(const Vec3d& a, const Vec3d& b, Vec3d& result)
             { result = 0.5 * (a + b); }
+        static void vec3dFloatMultiply(const Vec3d& a, const float& b, Vec3d& result)
+            { result = a * b; }
+        static void vec3dBoolMultiply(const Vec3d& a, const bool& b, Vec3d& result)
+            { result = a * b; }
     };
 
+    const Coord c0(0, 0, 0), c1(0, 0, 1), c2(0, 1, 0), c3(1, 0, 0), c4(1000, 1, 2);
+
     openvdb::FloatTree aFloatTree(/*bg=*/1.0), bFloatTree(5.0), outFloatTree(1.0);
-    aFloatTree.setValue(openvdb::Coord(0, 0, 0), 3.0);
-    aFloatTree.setValue(openvdb::Coord(0, 0, 1), 3.0);
-    bFloatTree.setValue(openvdb::Coord(0, 0, 0), -1.0);
-    bFloatTree.setValue(openvdb::Coord(0, 1, 0), 4.0);
+    aFloatTree.setValue(c0, 3.0);
+    aFloatTree.setValue(c1, 3.0);
+    bFloatTree.setValue(c0, -1.0);
+    bFloatTree.setValue(c2, 4.0);
     outFloatTree.combine2(aFloatTree, bFloatTree, Local::floatAverage);
 
     const float tolerance = 0.0;
     // Average of set value 3 and set value -1
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, outFloatTree.getValue(openvdb::Coord(0, 0, 0)), tolerance);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, outFloatTree.getValue(c0), tolerance);
     // Average of set value 3 and bg value 5
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, outFloatTree.getValue(openvdb::Coord(0, 0, 1)), tolerance);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, outFloatTree.getValue(c1), tolerance);
     // Average of bg value 1 and set value 4
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.5, outFloatTree.getValue(openvdb::Coord(0, 1, 0)), tolerance);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.5, outFloatTree.getValue(c2), tolerance);
     // Average of bg value 1 and bg value 5
-    CPPUNIT_ASSERT(outFloatTree.isValueOff(openvdb::Coord(1, 0, 0)));
-    CPPUNIT_ASSERT(outFloatTree.isValueOff(openvdb::Coord(0, 1, 2)));
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, outFloatTree.getValue(openvdb::Coord(1, 0, 0)), tolerance);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, outFloatTree.getValue(openvdb::Coord(1000, 1, 2)), tolerance);
+    CPPUNIT_ASSERT(outFloatTree.isValueOff(c3));
+    CPPUNIT_ASSERT(outFloatTree.isValueOff(c4));
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, outFloatTree.getValue(c3), tolerance);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, outFloatTree.getValue(c4), tolerance);
 
     // As above, but combining vector grids:
-    const Vec3d one(1, 1, 1), two(2, 2, 2), three(3, 3, 3), four(4, 4, 4), five(5, 5, 5);
+    const Vec3d zero(0), one(1), two(2), three(3), four(4), five(5);
     openvdb::Vec3DTree aVecTree(/*bg=*/one), bVecTree(five), outVecTree(one);
-    aVecTree.setValue(openvdb::Coord(0, 0, 0), three);
-    aVecTree.setValue(openvdb::Coord(0, 0, 1), three);
-    bVecTree.setValue(openvdb::Coord(0, 0, 0), -1.0 * one);
-    bVecTree.setValue(openvdb::Coord(0, 1, 0), four);
+    aVecTree.setValue(c0, three);
+    aVecTree.setValue(c1, three);
+    bVecTree.setValue(c0, -1.0 * one);
+    bVecTree.setValue(c2, four);
     outVecTree.combine2(aVecTree, bVecTree, Local::vec3dAverage);
 
     // Average of set value 3 and set value -1
-    CPPUNIT_ASSERT(outVecTree.getValue(openvdb::Coord(0, 0, 0)) == one);
+    CPPUNIT_ASSERT_EQUAL(one, outVecTree.getValue(c0));
     // Average of set value 3 and bg value 5
-    CPPUNIT_ASSERT(outVecTree.getValue(openvdb::Coord(0, 0, 1)) == four);
+    CPPUNIT_ASSERT_EQUAL(four, outVecTree.getValue(c1));
     // Average of bg value 1 and set value 4
-    CPPUNIT_ASSERT(outVecTree.getValue(openvdb::Coord(0, 1, 0)) == (2.5 * one));
+    CPPUNIT_ASSERT_EQUAL(2.5 * one, outVecTree.getValue(c2));
     // Average of bg value 1 and bg value 5
-    CPPUNIT_ASSERT(outVecTree.isValueOff(openvdb::Coord(1, 0, 0)));
-    CPPUNIT_ASSERT(outVecTree.isValueOff(openvdb::Coord(0, 1, 2)));
-    CPPUNIT_ASSERT(outVecTree.getValue(openvdb::Coord(1, 0, 0)) == three);
-    CPPUNIT_ASSERT(outVecTree.getValue(openvdb::Coord(1000, 1, 2)) == three);
+    CPPUNIT_ASSERT(outVecTree.isValueOff(c3));
+    CPPUNIT_ASSERT(outVecTree.isValueOff(c4));
+    CPPUNIT_ASSERT_EQUAL(three, outVecTree.getValue(c3));
+    CPPUNIT_ASSERT_EQUAL(three, outVecTree.getValue(c4));
+
+    // Multiply the vector tree by the scalar tree.
+    {
+        openvdb::Vec3DTree vecTree(one);
+        vecTree.combine2(outVecTree, outFloatTree, Local::vec3dFloatMultiply);
+
+        // Product of set value (1, 1, 1) and set value 1
+        CPPUNIT_ASSERT(vecTree.isValueOn(c0));
+        CPPUNIT_ASSERT_EQUAL(one, vecTree.getValue(c0));
+        // Product of set value (4, 4, 4) and set value 4
+        CPPUNIT_ASSERT(vecTree.isValueOn(c1));
+        CPPUNIT_ASSERT_EQUAL(4 * 4 * one, vecTree.getValue(c1));
+        // Product of set value (2.5, 2.5, 2.5) and set value 2.5
+        CPPUNIT_ASSERT(vecTree.isValueOn(c2));
+        CPPUNIT_ASSERT_EQUAL(2.5 * 2.5 * one, vecTree.getValue(c2));
+        // Product of bg value (3, 3, 3) and bg value 3
+        CPPUNIT_ASSERT(vecTree.isValueOff(c3));
+        CPPUNIT_ASSERT(vecTree.isValueOff(c4));
+        CPPUNIT_ASSERT_EQUAL(3 * 3 * one, vecTree.getValue(c3));
+        CPPUNIT_ASSERT_EQUAL(3 * 3 * one, vecTree.getValue(c4));
+    }
+
+    // Multiply the vector tree by a boolean tree.
+    {
+        openvdb::BoolTree boolTree(0);
+        boolTree.setValue(c0, true);
+        boolTree.setValue(c1, false);
+        boolTree.setValue(c2, true);
+
+        openvdb::Vec3DTree vecTree(one);
+        vecTree.combine2(outVecTree, boolTree, Local::vec3dBoolMultiply);
+
+        // Product of set value (1, 1, 1) and set value 1
+        CPPUNIT_ASSERT(vecTree.isValueOn(c0));
+        CPPUNIT_ASSERT_EQUAL(one, vecTree.getValue(c0));
+        // Product of set value (4, 4, 4) and set value 0
+        CPPUNIT_ASSERT(vecTree.isValueOn(c1));
+        CPPUNIT_ASSERT_EQUAL(zero, vecTree.getValue(c1));
+        // Product of set value (2.5, 2.5, 2.5) and set value 1
+        CPPUNIT_ASSERT(vecTree.isValueOn(c2));
+        CPPUNIT_ASSERT_EQUAL(2.5 * one, vecTree.getValue(c2));
+        // Product of bg value (3, 3, 3) and bg value 0
+        CPPUNIT_ASSERT(vecTree.isValueOff(c3));
+        CPPUNIT_ASSERT(vecTree.isValueOff(c4));
+        CPPUNIT_ASSERT_EQUAL(zero, vecTree.getValue(c3));
+        CPPUNIT_ASSERT_EQUAL(zero, vecTree.getValue(c4));
+    }
+
+    // Verify that a vector tree can't be combined into a scalar tree
+    // (although the reverse is allowed).
+    {
+        struct Local2 {
+            static void f(const float& a, const Vec3d&, float& result) { result = a; }
+        };
+        openvdb::FloatTree floatTree(5.0), outTree;
+        openvdb::Vec3DTree vecTree(one);
+        CPPUNIT_ASSERT_THROW(outTree.combine2(floatTree, vecTree, Local2::f), openvdb::TypeError);
+    }
 }
 
 

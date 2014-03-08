@@ -32,7 +32,7 @@
 ///
 /// @author Ken Museth
 ///
-/// @brief A Ray class and a Digital Differential Analyzer specialized for VDB.
+/// @brief A Ray class.
 
 #ifndef OPENVDB_MATH_RAY_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_RAY_HAS_BEEN_INCLUDED
@@ -313,115 +313,6 @@ inline std::ostream& operator<<(std::ostream& os, const Ray<RealT>& r)
     return os;
 }
 
-
-////////////////////////////////////////
-
-
-/// @brief A Digital Differential Analyzer specialized for OpenVDB grids
-/// @note Conceptually similar to Bresenham's line algorithm applied
-/// to a 3D Ray intersecting OpenVDB nodes or voxels. Log2Dim = 0
-/// corresponds to a voxel and Log2Dim a tree node of size 2^Log2Dim.     
-///
-/// @note The Ray template class is expected to have the following
-/// methods: test(time), t0(), t1(), invDir(), and  operator()(time).
-/// See the example Ray class above for their definition.
-template<typename RayT, Index Log2Dim = 0>
-class DDA
-{
-public:
-    typedef typename RayT::RealType RealType;
-    typedef RealType                RealT;
-    typedef typename RayT::Vec3Type Vec3Type;
-    typedef Vec3Type                Vec3T;
-
-    DDA(const RayT& ray) { this->init(ray, ray.t0(), ray.t1()); }
-
-    DDA(const RayT& ray, RealT startTime) { this->init(ray, startTime, ray.t1()); }
-
-    DDA(const RayT& ray, RealT startTime, RealT maxTime) { this->init(ray, startTime, maxTime); }
-    
-    inline void init(const RayT& ray, RealT startTime, RealT maxTime)
-    {
-        assert(startTime <= maxTime);
-        static const int DIM = 1 << Log2Dim;
-        mT0 = startTime;
-        mT1 = maxTime;
-        const Vec3T &pos = ray(mT0), &dir = ray.dir(), &inv = ray.invDir();
-        mVoxel = Coord::floor(pos) & (~(DIM-1));
-        for (size_t axis = 0; axis < 3; ++axis) {
-            if (math::isZero(dir[axis])) {//handles dir = +/- 0
-                mStep[axis]  = 0;//dummy value
-                mNext[axis]  = std::numeric_limits<RealT>::max();//i.e. disabled!
-                mDelta[axis] = std::numeric_limits<RealT>::max();//dummy value
-            } else if (inv[axis] > 0) {
-                mStep[axis]  = DIM;
-                mNext[axis]  = mT0 + (mVoxel[axis] + DIM - pos[axis]) * inv[axis];
-                mDelta[axis] = mStep[axis] * inv[axis];
-            } else {
-                mStep[axis]  = -DIM;
-                mNext[axis]  = mT0 + (mVoxel[axis] - pos[axis]) * inv[axis];
-                mDelta[axis] = mStep[axis] * inv[axis];
-            }
-        }
-    }
-
-    /// @brief Increment the voxel index to next intersected voxel or node
-    /// and returns true if the step in time does not exceed maxTime.
-    inline bool step()
-    {
-        const size_t stepAxis = math::MinIndex(mNext);
-        mT0 = mNext[stepAxis];
-        mNext[stepAxis]  += mDelta[stepAxis];
-        mVoxel[stepAxis] += mStep[stepAxis];
-        return mT0 <= mT1;
-    }
-
-    /// @brief Return the index coordinates of the next node or voxel
-    /// intersected by the ray. If Log2Dim = 0 the return value is the
-    /// actual signed coordinate of the voxel, else it is the origin
-    /// of the corresponding VDB tree node or tile.
-    /// @note Incurs no computational overhead.
-    inline const Coord& voxel() const { return mVoxel; }
-
-    /// @brief Return the time (parameterized along the Ray) of the
-    /// first hit of a tree node of size 2^Log2Dim.
-    /// @details This value is initialized to startTime or ray.t0()
-    /// depending on the constructor used.
-    /// @note Incurs no computational overhead.
-    inline RealType time() const { return mT0; }
-
-    /// @brief Return the maximum time (parameterized along the Ray).
-    inline RealType maxTime() const { return mT1; }
-
-    /// @brief Return the time (parameterized along the Ray) of the
-    /// second (i.e. next) hit of a tree node of size 2^Log2Dim.
-    /// @note Incurs a (small) computational overhead.
-    inline RealType next() const { return math::Min(mT1, mNext[0], mNext[1], mNext[2]); }
-
-    /// @brief Print information about this DDA for debugging.
-    /// @param os    a stream to which to write textual information.
-    void print(std::ostream& os = std::cout) const
-      {
-          os << "Dim=" << (1<<Log2Dim) << " time=" << mT0 << " next()="
-             << this->next() << " voxel=" << mVoxel << " next=" << mNext
-             << " delta=" << mDelta << " step=" << mStep << std::endl;
-      }
-
-private:
-    RealT mT0, mT1;
-    Coord mVoxel, mStep;
-    Vec3T mDelta, mNext;
-}; // class DDA
-
-/// @brief Output streaming of the Ray class.
-/// @note Primarily intended for debugging.
-template<typename RayT, Index Log2Dim>
-inline std::ostream& operator<<(std::ostream& os, const DDA<RayT, Log2Dim>& dda)
-{
-    os << "Dim="     << (1<<Log2Dim) << " time="  << dda.time()
-       << " next()=" << dda.next()   << " voxel=" << dda.voxel();
-    return os;
-}
 
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME

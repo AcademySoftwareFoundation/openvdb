@@ -894,7 +894,7 @@ operator()(const tbb::blocked_range<size_t>& range) const
         
     // Any variable prefixed with p (or s) means it's associate with a primay (or shadow) ray
     const Vec3R extinction = -mScattering-mAbsorption, One(1.0);
-    const Vec3R lightAmp = mLightColor*mScattering/(mScattering+mAbsorption);
+    const Vec3R albedo = mLightColor*mScattering/(mScattering+mAbsorption);//single scattering
     const Real sGain = mLightGain;//in-scattering along shadow ray 
     const Real pStep = mPrimaryStep;//Integration step along primary ray in voxel units
     const Real sStep = mShadowStep;//Integration step along shadow ray in voxel units
@@ -928,7 +928,7 @@ operator()(const tbb::blocked_range<size_t>& range) const
                         }//Integration over shadow segment
                     }// Shadow ray march
                 Luminance:
-                    pLumi += lightAmp * sTrans * pTrans * (One-dT);
+                    pLumi += albedo * sTrans * pTrans * (One-dT);
                     pTrans *= dT;
                     if (pTrans.lengthSqr()<cutoff) goto Pixel;  // Terminate Ray
                 }//Integration over primary segment

@@ -235,7 +235,7 @@ usage(int exitStatus = EXIT_FAILURE)
 "        -focal 35 -samples 4 -translate 0,210.5,400 -compression rle -v\n" <<
 "\n" <<
 "    " << gProgName << " bunny_cloud.vdb bunny_cloud.exr -res 1920x1080 \\\n" <<
-"        -translate 0,0,110 -absorb 0.1,0.25,0.1 -gain 0.2 -v\n" <<
+"        -translate 0,0,110 -absorb 0.4,0.2,0.1 -gain 0.2 -v\n" <<
 "\n" <<
 "This is not (and is not intended to be) a production-quality renderer.\n";
 

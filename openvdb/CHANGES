@@ -1,6 +1,36 @@
 OpenVDB Version History
 =======================
 
+Version 2.3.0 - In development
+    - Added tools::extractSparseTree(), which selectively extracts and
+      transforms data from a dense grid to produce a sparse tree,
+      and tools::extractSparseTreeWithMask(), which copies data from
+      the index-space intersection of a sparse tree and a dense input grid.
+    - Added copy constructors to the Grid, Tree, RootNode, InternalNode
+      and LeafNode classes, and an assignment operator overload to RootNode,
+      that allow the source and destination to have different value types.
+    - Modified Tree::combine2() to permit combination of trees with different
+      value types.
+    - Added CanConvertType and RootNode::SameConfiguration metafunctions,
+      which perform compile-time tests for value type and tree type
+      compatibility, and a RootNode::hasCompatibleValueType() method,
+      which does runtime checking.
+
+    API changes:
+    - Collected the digital differential analyzer code from math/Ray.h
+      and tools/RayIntersector.h into a new header file, math/DDA.h.
+    - Rewrote VolumeHDDA and made several changes to its API.  (VolumeHDDA
+      is used internally by VolumeRayIntersector, whose API is unchanged.)
+    - Tree::combine2(), RootNode::combine2(), InternalNode::combine2(),
+      LeafNode::combine2() and CombineArgs all now require an additional
+      template argument, which determines the type of the other tree.
+    - Assignment operators for LeafManager::LeafRange::Iterator,
+      BaseMaskIterator, NodeMask and RootNodeMask now return references
+      to the respective objects.
+    - Removed a number of methods that were deprecated in version 2.0.0
+      or earlier.
+
+
 Version 2.2.0 - February 20, 2014
     - Added a simple, multithreaded volume renderer, and added volume
       rendering support to the vdb_render command-line renderer.

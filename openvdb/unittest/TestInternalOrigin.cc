@@ -71,7 +71,7 @@ TestInternalOrigin::test()
     typedef Node0::ChildNodeType     Node1;
     typedef Node1::ChildNodeType     Node2;
     typedef Node2::LeafNodeType      Node3;
-    for (Node0::ChildOnCIter iter0=tree.getRootNode().cbeginChildOn(); iter0; ++iter0) {//internal 1
+    for (Node0::ChildOnCIter iter0=tree.root().cbeginChildOn(); iter0; ++iter0) {//internal 1
         openvdb::Coord C0=iter0->origin();
         iter0.getCoord(G);
         CPPUNIT_ASSERT_EQUAL(C0,G);

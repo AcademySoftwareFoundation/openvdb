@@ -129,6 +129,10 @@ public:
             {
                 assert(this->isValid());
             }
+            Iterator& operator=(const Iterator& other)
+            {
+                mRange = other.mRange; mPos = other.mPos; return *this;
+            }
             /// Advance to the next leaf node.
             Iterator& operator++() { ++mPos; return *this; }
             /// Return a reference to the leaf node to which this iterator is pointing.
@@ -150,8 +154,6 @@ public:
             operator bool() const { return this->test(); }
             /// Return @c true if this iterator is exhausted.
             bool empty() const { return !this->test(); }
-            //bool operator<( const Iterator& other ) const { return mPos < other.mPos; }
-            void operator=( const Iterator& other) { mRange = other.mRange; mPos = other.mPos; }
             bool operator!=(const Iterator& other) const
             {
                 return (mPos != other.mPos) || (&mRange != &other.mRange);
@@ -283,8 +285,6 @@ public:
         this->removeAuxBuffers();
         this->initLeafArray();
     }
-    /// @deprecated Use rebuildLeafArray() instead.
-    OPENVDB_DEPRECATED void rebuildLeafs() { this->rebuildLeafArray(); }
 
     /// Return the total number of allocated auxiliary buffers.
     size_t auxBufferCount() const { return mAuxBufferCount; }

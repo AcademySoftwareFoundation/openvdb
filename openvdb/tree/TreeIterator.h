@@ -783,8 +783,8 @@ TreeValueIteratorBase<TreeT, ValueIterT>::TreeValueIteratorBase(TreeT& tree):
     mMaxLevel(int(ROOT_LEVEL)),
     mTree(&tree)
 {
-    mChildIterList.setIter(IterTraits<NodeT, ChildOnIterT>::begin(tree.getRootNode()));
-    mValueIterList.setIter(IterTraits<NodeT, ValueIterT>::begin(tree.getRootNode()));
+    mChildIterList.setIter(IterTraits<NodeT, ChildOnIterT>::begin(tree.root()));
+    mValueIterList.setIter(IterTraits<NodeT, ValueIterT>::begin(tree.root()));
     this->advance(/*dontIncrement=*/true);
 }
 
@@ -1067,7 +1067,7 @@ NodeIteratorBase<TreeT, RootChildOnIterT>::NodeIteratorBase(TreeT& tree):
     mDone(false),
     mTree(&tree)
 {
-    mIterList.setIter(RootIterTraits::begin(tree.getRootNode()));
+    mIterList.setIter(RootIterTraits::begin(tree.root()));
 }
 
 
@@ -1227,7 +1227,7 @@ public:
     LeafIteratorBase(TreeT& tree): mIterList(NULL), mTree(&tree)
     {
         // Initialize the iterator list with a root node iterator.
-        mIterList.setIter(RootIterTraits::begin(tree.getRootNode()));
+        mIterList.setIter(RootIterTraits::begin(tree.root()));
         // Descend along the first branch, initializing the node iterator at each level.
         Index lvl = ROOT_LEVEL;
         for ( ; lvl > 0 && mIterList.down(lvl); --lvl) {}

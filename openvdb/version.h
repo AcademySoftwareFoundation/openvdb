@@ -42,11 +42,11 @@
 /// vdb::vX_Y_Z::Vec3i, vdb::vX_Y_Z::io::File, vdb::vX_Y_Z::tree::Tree, etc.,
 /// where X, Y and Z are OPENVDB_LIBRARY_MAJOR_VERSION, OPENVDB_LIBRARY_MINOR_VERSION
 /// and OPENVDB_LIBRARY_PATCH_VERSION, respectively (defined below).
-#define OPENVDB_VERSION_NAME v2_2_0
+#define OPENVDB_VERSION_NAME v2_3_0
 
 // Library major, minor and patch version numbers
 #define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 2
-#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 2
+#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 3
 #define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 0
 
 /// Library version number as a packed integer ("%02x%02x%04x", major, minor, patch)
