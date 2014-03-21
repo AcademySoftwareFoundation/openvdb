@@ -15,6 +15,18 @@ Version 2.3.0 - In development
       which perform compile-time tests for value type and tree type
       compatibility, and a RootNode::hasCompatibleValueType() method,
       which does runtime checking.
+    - Added optional support for logging using log4cplus.  See logging.h
+      and the INSTALL file for details.
+    - Added VolumeRayIntersector::hits that produces all the hit-segments 
+      along a ray. This is generally more efficient then repeated calls to
+      VolumeRayIntersector::march.
+    - Added member class Ray::TimeSpan and method Ray:valid(eps), and 
+      deprecated method Ray::test(). 
+    - Added tools::compsite(), which composites data from a sparse tree
+      into a dense array, using a sparse alpha mask. Over, Add, Sub, Min, 
+      Max, Mult, and Set are supported operations.
+    - Added tools::transformDense(), that applies a point-wise functor at
+      locations in the intersection of a dense grid with a given bounding box.
 
     API changes:
     - Collected the digital differential analyzer code from math/Ray.h

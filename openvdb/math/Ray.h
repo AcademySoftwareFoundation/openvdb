@@ -57,12 +57,31 @@ public:
     typedef RealT      RealType;
     typedef Vec3<Real> Vec3Type;
     typedef Vec3Type   Vec3T;
+    struct TimeSpan {
+        RealT t0, t1;
+        /// @brief Default constructor
+        TimeSpan() {}
+        /// @brief Constructor
+        TimeSpan(RealT _t0, RealT _t1) : t0(_t0), t1(_t1) {}
+        /// @brief Set both times
+        inline void set(RealT _t0, RealT _t1) { t0=_t0; t1=_t1; }
+        /// @brief Get both times
+        inline void get(RealT& _t0, RealT& _t1) const { _t0=t0; _t1=t1; }
+        /// @brief Return @c true if t1 is larger then t0 by at least eps.
+        inline bool valid(RealT eps=math::Delta<RealT>::value()) const { return (t1-t0)>eps; }
+        /// @brief Return the midpoint of the ray.
+        inline RealT mid() const { return 0.5*(t0 + t1); }
+        /// @brief Multiplies both times
+        inline void scale(RealT s) {assert(s>0); t0*=s; t1*=s; }
+        /// @brief Return @c true if time is inclusive
+        inline bool test(RealT t) const { return (t>=t0 && t<=t1); }
+    };
 
     Ray(const Vec3Type& eye = Vec3Type(0,0,0),
         const Vec3Type& direction = Vec3Type(1,0,0),
         RealT t0 = math::Delta<RealT>::value(),
         RealT t1 = std::numeric_limits<RealT>::max())
-        : mEye(eye), mDir(direction), mInvDir(1/mDir), mT0(t0), mT1(t1)
+        : mEye(eye), mDir(direction), mInvDir(1/mDir), mTimeSpan(t0, t1)
     {
     }
 
@@ -74,19 +93,18 @@ public:
           mInvDir = 1/mDir;
       }
 
-    inline void setMinTime(RealT t0) { assert(t0>0); mT0 = t0; }
+    inline void setMinTime(RealT t0) { assert(t0>0); mTimeSpan.t0 = t0; }
 
-    inline void setMaxTime(RealT t1) { assert(t1>0); mT1 = t1; }
+    inline void setMaxTime(RealT t1) { assert(t1>0); mTimeSpan.t1 = t1; }
 
     inline void setTimes(RealT t0 = math::Delta<RealT>::value(),
                          RealT t1 = std::numeric_limits<RealT>::max())
     {
         assert(t0>0 && t1>0);
-        mT0 = t0;
-        mT1 = t1;
+        mTimeSpan.set(t0, t1);
     }
 
-    inline void scaleTimes(RealT scale) {  assert(scale>0); mT0 *= scale; mT1 *= scale; }
+    inline void scaleTimes(RealT scale) { mTimeSpan.scale(scale); }
     
     inline void reset(const Vec3Type& eye,
                       const Vec3Type& direction,
@@ -104,27 +122,33 @@ public:
 
     inline const Vec3T& invDir() const {return mInvDir;}
 
-    inline RealT t0() const {return mT0;}
+    inline RealT t0() const {return mTimeSpan.t0;}
 
-    inline RealT t1() const {return mT1;}
+    inline RealT t1() const {return mTimeSpan.t1;}
 
     /// @brief Return the position along the ray at the specified time.
     inline Vec3R operator()(RealT time) const { return mEye + mDir * time; }
 
     /// @brief Return the starting point of the ray.
-    inline Vec3R start() const { return (*this)(mT0); }
+    inline Vec3R start() const { return (*this)(mTimeSpan.t0); }
 
     /// @brief Return the endpoint of the ray.
-    inline Vec3R end() const { return (*this)(mT1); }
+    inline Vec3R end() const { return (*this)(mTimeSpan.t1); }
 
     /// @brief Return the midpoint of the ray.
-    inline Vec3R mid() const { return (*this)(0.5*(mT0+mT1)); }
+    inline Vec3R mid() const { return (*this)(mTimeSpan.mid()); }
 
-     /// @brief Return @c true if t0 is strictly less then t1.
-    inline bool test() const { return (mT0 < mT1); }
+    /// @brief Return @c true if t0 is strictly less then t1.
+    OPENVDB_DEPRECATED inline bool test() const { return mTimeSpan.valid(RealT(0)); }
+
+    /// @brief Return @c true if t1 is larger then t0 by at least eps.
+    inline bool valid(RealT eps=math::Delta<float>::value()) const
+      {
+          return mTimeSpan.valid(eps);
+      }
     
     /// @brief Return @c true if @a time is within t0 and t1, both inclusive.
-    inline bool test(RealT time) const { return (time>=mT0 && time<=mT1); }
+    inline bool test(RealT time) const { return mTimeSpan.test(time); }
 
     /// @brief Return a new Ray that is transformed with the specified map.
     /// @param map  the map from which to construct the new Ray.
@@ -140,7 +164,7 @@ public:
         const Vec3T eye = map.applyMap(mEye);
         const Vec3T dir = map.applyJacobian(mDir);
         const RealT length = dir.length();
-        return Ray(eye, dir/length, length*mT0, length*mT1);
+        return Ray(eye, dir/length, length*mTimeSpan.t0, length*mTimeSpan.t1);
     }
 
     /// @brief Return a new Ray that is transformed with the inverse of the specified map.
@@ -157,7 +181,7 @@ public:
         const Vec3T eye = map.applyInverseMap(mEye);
         const Vec3T dir = map.applyInverseJacobian(mDir);
         const RealT length = dir.length();
-        return Ray(eye, dir/length, length*mT0, length*mT1);
+        return Ray(eye, dir/length, length*mTimeSpan.t0, length*mTimeSpan.t1);
     }
 
     /// @brief Return a new ray in world space, assuming the existing
@@ -199,8 +223,8 @@ public:
         t1 = C / Q;
         
         if (t0 > t1) std::swap(t0, t1);
-        if (t0 < mT0) t0 = mT0;
-        if (t1 > mT1) t1 = mT1;
+        if (t0 < mTimeSpan.t0) t0 = mTimeSpan.t0;
+        if (t1 > mTimeSpan.t1) t1 = mTimeSpan.t1;
         return t0 <= t1;
     }
     
@@ -221,10 +245,7 @@ public:
     {
         RealT t0, t1;
         const bool hit = this->intersects(center, radius, t0, t1);
-        if (hit) {
-            mT0 = t0;
-            mT1 = t1;
-        }
+        if (hit) mTimeSpan.set(t0, t1);
         return hit;
     }
 
@@ -237,9 +258,8 @@ public:
     ///             the time for the second intersection point.
     template<typename BBoxT>
     inline bool intersects(const BBoxT& bbox, RealT& t0, RealT& t1) const
-      {
-        t0 = mT0;
-        t1 = mT1;
+    {
+        mTimeSpan.get(t0, t1);
         for (size_t i = 0; i < 3; ++i) {
             RealT a = (bbox.min()[i] - mEye[i]) * mInvDir[i];
             RealT b = (bbox.max()[i] - mEye[i]) * mInvDir[i];
@@ -268,10 +288,7 @@ public:
     {
         RealT t0, t1;
         const bool hit = this->intersects(bbox, t0, t1);
-        if (hit) {
-            mT0 = t0;
-            mT1 = t1;
-        }
+        if (hit) mTimeSpan.set(t0, t1);
         return hit;
     }
 
@@ -300,7 +317,7 @@ public:
 
 private:
     Vec3T mEye, mDir, mInvDir;
-    RealT mT0, mT1;
+    TimeSpan mTimeSpan;
 }; // end of Ray class
     
 /// @brief Output streaming of the Ray class.

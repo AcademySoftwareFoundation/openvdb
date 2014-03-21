@@ -29,13 +29,15 @@
 ///////////////////////////////////////////////////////////////////////////
 //
 
-#ifndef DENSESPARSETOOLS_HAS_BEEN_INCLUDED
-#define DENSESPARSETOOLS_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_TOOLS_DENSESPARSETOOLS_HAS_BEEN_INCLUDED
+#define OPENVDB_TOOLS_DENSESPARSETOOLS_HAS_BEEN_INCLUDED
 
 #include <tbb/parallel_reduce.h>
 #include <tbb/blocked_range3d.h>
+#include <tbb/blocked_range2d.h>
 #include <tbb/blocked_range.h>
 #include <openvdb/tools/Dense.h>
+#include <openvdb/tree/LeafManager.h>
 #include <openvdb/openvdb.h>
 
 
@@ -143,6 +145,50 @@ extractSparseTreeWithMask(const DenseType& dense,
                           const MaskTreeType& mask, 
                           const typename DenseType::ValueType& background,
                           bool threaded = true);
+
+
+
+/// Apply a point-wise functor to the intersection of a dense grid and a given bounding box
+/// @param dense A dense grid to be transformed
+/// @param bbox  Index space bounding box, define region where the transformation is applied
+/// @param op    A functor that acts on the dense grid value type
+/// @param parallel Used to select multithreaded or single threaded  
+/// Minimally, the @c op class has to support a @c operator() method,
+/// @code
+/// // Square values in a grid
+/// struct Op
+/// {
+///     ValueT operator()(const ValueT& in) const 
+///     { 
+///       // do work
+///       ValueT result = in * in;
+///
+///       return result; 
+///     } 
+/// };
+/// @endcode
+/// NB: only Dense grids with memory layout zxy are supported
+template <typename ValueT, typename OpType>
+void transformDense(Dense<ValueT, openvdb::tools::LayoutZYX>& dense, 
+                    const openvdb::CoordBBox& bbox, const OpType& op, bool parallel=true);
+
+/// We currrently support the following operations when compositing sparse
+/// data into a dense grid. 
+enum COMPOSITE_OPTYPE {OVER, ADD, SUB, MIN, MAX, MULT, SET};
+
+/// @brief Composite data from a sparse tree into a dense array of the same value type.
+/// @param dense    Dense grid to be altered by the operation
+/// @param source   Sparse data to composite into @c dense
+/// @param alpha    Sparse Alpha mask used in compositing operations.
+/// @param beta     Constant multiplier on src
+/// @param strength Constant multiplier on alpha
+/// @param threaded Enable threading for this operation.   
+template <COMPOSITE_OPTYPE, typename TreeT>    
+void composite(Dense<typename TreeT::ValueType, LayoutZYX>& dense, 
+               const TreeT& source, const TreeT& alpha, 
+               const typename TreeT::ValueType beta, 
+               const typename TreeT::ValueType strength, 
+               bool threaded = true);
 
 
 
@@ -640,12 +686,589 @@ extractSparseTreeWithMask(const DenseType& dense,
 } 
 
 
+/// @brief Class that applies a functor to the index space intersection
+/// of a prescribed bounding box and the dense grid.
+/// NB: This class only supports DenseGrids with ZYX memory layout.
+template <typename _ValueT, typename OpType>
+class DenseTransformer
+{
+public:
+
+    typedef _ValueT                                 ValueT;
+    typedef Dense<ValueT, openvdb::tools::LayoutZYX>       DenseT;
+    typedef openvdb::math::Coord::ValueType         IntType;
+    typedef tbb::blocked_range2d<IntType, IntType>  RangeType;
+
+
+private:
+
+    DenseT&                  mDense;
+    const OpType&            mOp;
+    openvdb::math::CoordBBox mBBox;
+
+public:
+    DenseTransformer(DenseT& dense, 
+                     const openvdb::math::CoordBBox& bbox,
+                     const OpType& functor):
+        mDense(dense), mOp(functor), mBBox(dense.bbox()) 
+    {
+        // The interation space is the intersection of the 
+        // input bbox and the index-space covered by the dense grid
+        mBBox.intersect(bbox);
+    }
+    
+    DenseTransformer(const DenseTransformer& other) :
+        mDense(other.mDense), mOp(other.mOp), mBBox(other.mBBox) {}
+
+    void apply(bool threaded = true) {
+
+        // Early out if the interation space is empty
+
+        if (mBBox.empty()) return;
+
+        
+        const openvdb::math::Coord start = mBBox.getStart();
+        const openvdb::math::Coord end   = mBBox.getEnd();
+         
+        // The interation range only the slower two directions.
+        const RangeType range(start.x(), end.x(), 1,
+                              start.y(), end.y(), 1);
+        
+        if (threaded) {
+            tbb::parallel_for(range, *this);
+        } else {
+            (*this)(range);
+        }
+    }
+
+    void operator()(const RangeType& range) const {
+
+        // The stride in the z-direction.  
+        // Note: the bbox is [inclusive, inclusive]
+       
+        const size_t zlength = size_t(mBBox.max().z() - mBBox.min().z() + 1);
+        
+        const IntType imin = range.rows().begin();
+        const IntType imax = range.rows().end();
+        const IntType jmin = range.cols().begin();
+        const IntType jmax = range.cols().end();
+
+        
+        openvdb::math::Coord xyz(imin, jmin, mBBox.min().z());
+        for (xyz[0] = imin; xyz[0] != imax; ++xyz[0]) {
+            for (xyz[1] = jmin; xyz[1] != jmax; ++xyz[1]) {
+                
+                mOp.transform(mDense, xyz, zlength);
+            }
+        }
+    }
+        
+};
+
+/// @brief a wrapper struct used to avoid unnecessary computation of 
+/// memory access from @c Coord when all offsets are guaranteed to be
+/// within the dense grid.
+template <typename ValueT, typename PointWiseOp>
+struct ContiguousOp
+{
+    ContiguousOp(const PointWiseOp& op) : mOp(op){};
+
+    typedef Dense<ValueT, openvdb::tools::LayoutZYX>  DenseT;
+    inline void transform(DenseT& dense, openvdb::math::Coord& ijk, size_t size) const
+    {
+        ValueT* dp = const_cast<ValueT*>(&dense.getValue(ijk));
+        
+        for (size_t offset = 0; offset < size; ++offset) {
+            dp[offset] = mOp(dp[offset]);
+        }
+    }
+    
+    const PointWiseOp mOp;
+};
+               
+
+/// Apply a point-wise functor to the intersection of a dense grid and a given bounding box
+template <typename ValueT, typename PointwiseOpT>
+void transformDense(Dense<ValueT, openvdb::tools::LayoutZYX>& dense, 
+                    const openvdb::CoordBBox& bbox, 
+                    const PointwiseOpT& functor, bool parallel)
+{  
+    typedef ContiguousOp<ValueT, PointwiseOpT>  OpT;
+    
+    // Convert the Op so it operates on an contiguous line in memory
+    
+    OpT op(functor);
+    
+    // Apply to the index space intersection in the dense grid
+    DenseTransformer<ValueT, OpT> transformer(dense, bbox, op);
+    transformer.apply(parallel);
+}
+
+
+
+template <typename CompositeMethod, typename _TreeT>
+class SparseToDenseCompositor 
+{
+
+public:
+    typedef _TreeT                                               TreeT;
+    typedef typename TreeT::ValueType                            ValueT;
+    typedef typename TreeT::LeafNodeType                         LeafT;
+    typedef typename TreeT::template ValueConverter<bool>::Type  BoolTreeT;
+    typedef typename BoolTreeT::LeafNodeType                     BoolLeafT;
+    typedef Dense<ValueT, openvdb::tools::LayoutZYX>             DenseT;
+    typedef openvdb::math::Coord::ValueType                      Index;
+    typedef tbb::blocked_range3d<Index, Index, Index>            Range3d;
+
+    SparseToDenseCompositor(DenseT& dense, const TreeT& source, const TreeT& alpha, 
+                            const ValueT beta, const ValueT strength) :
+        mDense(dense), mSource(source), mAlpha(alpha), mBeta(beta), mStrength(strength)
+    {}
+    
+    SparseToDenseCompositor(const SparseToDenseCompositor& other):
+        mDense(other.mDense), mSource(other.mSource), mAlpha(other.mAlpha),
+        mBeta(other.mBeta), mStrength(other.mStrength) {};
+   
+
+
+    void sparseComposite(bool threaded) {
+
+        const ValueT beta = mBeta;
+        const ValueT strenght = mStrength;
+        
+        // construct a tree that defines the iteration space
+        
+        BoolTreeT boolTree(mSource, false /*background*/, openvdb::TopologyCopy()); 
+        boolTree.topologyUnion(mAlpha);
+
+        // Coposite regions that are represented by leafnodes in either mAlpha or mSource
+        // Parallelize over bool-leafs
+        
+        openvdb::tree::LeafManager<const BoolTreeT> boolLeafs(boolTree);
+        boolLeafs.foreach(*this, threaded);
+
+        // Composite tregions that are represnted by tiles
+        // Parallelize within each tile.
+        
+        typename BoolTreeT::ValueOnCIter citer = boolTree.cbeginValueOn();
+        citer.setMaxDepth(BoolTree::ValueOnCIter::LEAF_DEPTH - 1);
+
+        if (!citer) return;
+        
+        typename tree::ValueAccessor<const TreeT>   alphaAccessor(mAlpha);
+        typename tree::ValueAccessor<const TreeT>   sourceAccessor(mSource);
+        
+        for (; citer; ++citer) {
+            
+            const openvdb::math::Coord org = citer.getCoord();
+            
+            // Early out if both alpha and source are zero in this tile.
+            
+            const ValueT alphaValue = alphaAccessor.getValue(org);
+            const ValueT sourceValue = sourceAccessor.getValue(org);
+            
+            if (openvdb::math::isZero(alphaValue) && 
+                openvdb::math::isZero(sourceValue) ) continue;
+
+            // Compute overlap of tile with the dense grid
+
+            openvdb::math::CoordBBox localBBox = citer.getBoundingBox();
+            localBBox.intersect(mDense.bbox());
+            
+            // Early out if there is no intersection
+
+            if (localBBox.empty()) continue;
+            
+            // Composite the tile-uniform values into the dense grid.
+            compositeFromTile(mDense, localBBox, sourceValue, 
+                              alphaValue, beta, strenght, threaded);
+        }
+    }
+
+    // Composites leaf values where the alpha values are active.
+    // Used in sparseComposite
+    void inline operator()(const BoolLeafT& boolLeaf, size_t /*i*/) const
+    {
+        
+        typedef UniformLeaf   ULeaf;
+        openvdb::math::CoordBBox localBBox = boolLeaf.getNodeBoundingBox();
+        localBBox.intersect(mDense.bbox());
+
+        // Early out for non-overlapping leafs
+        
+        if (localBBox.empty()) return;
+
+        const openvdb::math::Coord org = boolLeaf.origin();
+        const LeafT* alphaLeaf = mAlpha.probeLeaf(org);
+        const LeafT* sourceLeaf   = mSource.probeLeaf(org);
+
+        if (!sourceLeaf) {
+            
+            // Create a source leaf proxy with the correct value
+            ULeaf uniformSource(mSource.getValue(org));
+            
+            if (!alphaLeaf) {
+                
+                // Create an alpha leaf proxy with the correct value
+                ULeaf uniformAlpha(mAlpha.getValue(org));
+                
+                compositeFromLeaf(mDense, localBBox, uniformSource, uniformAlpha, 
+                                  mBeta, mStrength);
+            } else {
+                
+                compositeFromLeaf(mDense, localBBox, uniformSource, *alphaLeaf, 
+                                  mBeta, mStrength);
+            } 
+        } else {
+            if (!alphaLeaf) {
+                
+                // Create an alpha leaf proxy with the correct value
+                ULeaf uniformAlpha(mAlpha.getValue(org));
+                
+                compositeFromLeaf(mDense, localBBox, *sourceLeaf, uniformAlpha, 
+                                  mBeta, mStrength);
+            } else {
+                
+                compositeFromLeaf(mDense, localBBox, *sourceLeaf, *alphaLeaf, 
+                                  mBeta, mStrength);
+            } 
+        }
+    }
+    // i.e.  it assumes that all valueOff Alpha voxels have value 0.
+    
+    template <typename LeafT1, typename LeafT2>
+    inline static void compositeFromLeaf(DenseT& dense, const openvdb::math::CoordBBox& bbox, 
+                                         const LeafT1& source, const LeafT2& alpha,
+                                         const ValueT beta, const ValueT strength) 
+    {
+        typedef openvdb::math::Coord::ValueType  IntType;
+        
+        const ValueT sbeta = strength * beta;
+        openvdb::math::Coord ijk = bbox.min();
+
+
+        if (alpha.isDense() /*all active values*/) {
+        
+            // Optial path for dense alphaLeaf
+            const IntType size = bbox.max().z() + 1 - bbox.min().z();
+            
+            for (ijk[0] = bbox.min().x(); ijk[0] < bbox.max().x() + 1; ++ijk[0]) {
+                for (ijk[1] = bbox.min().y(); ijk[1] < bbox.max().y() + 1; ++ijk[1]) {
+                    
+                    ValueT* d = const_cast<ValueT*>(&dense.getValue(ijk));
+                    const ValueT* a = &alpha.getValue(ijk);
+                    const ValueT* s = &source.getValue(ijk);
+                    
+                    for (IntType idx = 0; idx < size; ++idx) {
+                        d[idx] = CompositeMethod::apply(d[idx], a[idx], s[idx],
+                                                        strength, beta, sbeta);
+                    }
+                }
+            }
+        }  else {
+
+            // AlphaLeaf has non-active cells.
+
+            for (ijk[0] = bbox.min().x(); ijk[0] < bbox.max().x() + 1; ++ijk[0]) {
+                for (ijk[1] = bbox.min().y(); ijk[1] < bbox.max().y() + 1; ++ijk[1]) {
+                    for (ijk[2] = bbox.min().z(); ijk[2] < bbox.max().z() + 1; ++ijk[2]) {
+                
+                        if (alpha.isValueOn(ijk)) {
+                            
+                            dense.setValue(ijk,  
+                             CompositeMethod::apply(dense.getValue(ijk), 
+                                                    alpha.getValue(ijk), source.getValue(ijk),
+                                                    strength, beta, sbeta)
+                                           );
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    inline static void compositeFromTile(DenseT& dense, openvdb::math::CoordBBox& bbox, 
+                                         const ValueT& sourceValue, const ValueT& alphaValue, 
+                                         const ValueT& beta, const ValueT& strength,
+                                         bool threaded)
+    {
+        
+        typedef UniformTransformer TileTransformer;
+        TileTransformer functor(sourceValue, alphaValue, beta, strength);
+       
+        // Transform the data inside the bbox according to the TileTranformer.
+
+        transformDense(dense, bbox, functor, threaded);
+
+    }
+
+
+    void denseComposite(bool threaded)
+    {
+        /// Construct a range that corresponds to the 
+        /// bounding box of the dense volume
+        const openvdb::math::CoordBBox& bbox = mDense.bbox();
+        
+        Range3d  range(bbox.min().x(), bbox.max().x(), LeafT::DIM, 
+                       bbox.min().y(), bbox.max().y(), LeafT::DIM,
+                       bbox.min().z(), bbox.max().z(), LeafT::DIM);
+        
+        // Interate over the range, compositing into  
+        // the dense grid using value accessors for 
+        // sparse the grids.
+        if (threaded) {
+            tbb::parallel_for(range, *this);
+        } else {
+            (*this)(range);
+        }
+
+    }
+
+    // Composites a dense region using value accessors
+    // into a dense grid
+    void inline operator()(const Range3d& range) const 
+    {
+        // Use value accessors to alpha and source
+        
+        typename tree::ValueAccessor<const TreeT>   alphaAccessor(mAlpha);
+        typename tree::ValueAccessor<const TreeT>   sourceAccessor(mSource);
+        
+        const ValueT strength = mStrength;
+        const ValueT beta     = mBeta;
+        const ValueT sbeta    = strength * beta;
+
+        // Unpack the range3d item.
+        const Index imin = range.pages().begin();
+        const Index imax = range.pages().end();
+            
+        const Index jmin = range.rows().begin();
+        const Index jmax = range.rows().end();
+            
+        const Index kmin = range.cols().begin();
+        const Index kmax = range.cols().end();
+
+        openvdb::Coord ijk;
+        for (ijk[0] = imin; ijk[0] < imax; ++ijk[0]) {
+            for (ijk[1] = jmin; ijk[1] < jmax; ++ijk[1]) {
+                for (ijk[2] = kmin; ijk[2] < kmax; ++ijk[2]) {
+                    const ValueT d_old = mDense.getValue(ijk);
+                    const ValueT& alpha = alphaAccessor.getValue(ijk);
+                    const ValueT& src   = sourceAccessor.getValue(ijk);
+                    
+                    mDense.setValue(ijk, CompositeMethod::apply(d_old, alpha, src,
+                                                                strength, beta, sbeta));
+                }
+            }
+        }
+        
+    }
+
+
+private:
+
+    // Internal class that wraps the templated composite method
+    // for use when both alpha and source are uniform over 
+    // a prescribed bbox (e.g. a tile).    
+    class UniformTransformer
+    {
+    public:
+        UniformTransformer(const ValueT& source, const ValueT& alpha, const ValueT& _beta,
+                           const ValueT& _strength) :
+            mSource(source), mAlpha(alpha), mBeta(_beta),
+            mStrength(_strength), mSBeta(_strength * _beta)
+        {}
+    
+        ValueT operator()(const ValueT& input) const 
+        {  
+            return CompositeMethod::apply(input, mAlpha, mSource, 
+                                          mStrength, mBeta, mSBeta);
+        }
+    
+    private:
+        const ValueT mSource;   const ValueT mAlpha; const ValueT mBeta;
+        const ValueT mStrength; const ValueT mSBeta;
+    };
+
+    
+    // Simple Class structure that mimics a leaf 
+    // with uniform values. Holds LeafT::DIM copies
+    // of a value in an array.  
+    struct Line {  ValueT mValues[LeafT::DIM]; };
+    class UniformLeaf : private Line
+    {
+    public:
+        typedef typename LeafT::ValueType ValueT;
+        
+        typedef Line   BaseT;
+        UniformLeaf(const ValueT& value) : BaseT(init(value)){};
+        
+        static const BaseT init(const ValueT& value) {
+            BaseT tmp;
+            for (openvdb::Index i = 0; i < LeafT::DIM; ++i) {
+                tmp.mValues[i] = value;
+            }
+            return tmp;
+        }
+        
+        bool isDense() const { return true; }
+        bool isValueOn(openvdb::math::Coord&) const { return true; }
+        
+        inline const ValueT& getValue(const openvdb::math::Coord& ) const
+        {return  BaseT::mValues[0];}
+    };
+
+
+
+private:
+
+    DenseT&       mDense;
+    const TreeT&  mSource;
+    const TreeT&  mAlpha;
+    ValueT        mBeta;
+    ValueT        mStrength;
+
+};            
+
+
+namespace
+{
+    //@{
+    /// @brief Point wise methods used to apply various compositing 
+    /// operations.
+    template <typename ValueT>
+    struct OpOver
+    {
+        static inline ValueT apply(const ValueT u, const ValueT alpha, 
+                                   const ValueT v,
+                                   const ValueT strength,
+                                   const ValueT beta,
+                                   const ValueT /*sbeta*/)
+        { return (u + strength * alpha * (beta * v - u)); }  
+    };
+    
+    
+    template <typename ValueT>
+    struct OpAdd
+    {
+        static inline ValueT apply(const ValueT u, const ValueT alpha, 
+                                   const ValueT v,
+                                   const ValueT /*strength*/,
+                                   const ValueT /*beta*/,
+                                   const ValueT sbeta)
+        { return (u + sbeta * alpha * v); }
+    };
+
+    template <typename ValueT>
+    struct OpSub
+    {
+        static inline ValueT apply(const ValueT u, const ValueT alpha, 
+                                   const ValueT v,
+                                   const ValueT /*strength*/,
+                                   const ValueT /*beta*/,
+                                   const ValueT sbeta)
+        { return (u - sbeta * alpha * v); }
+    };
+
+    template <typename ValueT>
+    struct OpMin
+    {
+        static inline ValueT apply(const ValueT u, const ValueT alpha, 
+                                   const ValueT v,
+                                   const ValueT s /*trength*/,
+                                   const ValueT beta,
+                                   const ValueT /*sbeta*/)
+        { return ( ( 1 - s * alpha) * u + s * alpha * std::min(u, beta * v) ); }
+    };
+
+
+    template <typename ValueT>
+    struct OpMax
+    {
+        static inline ValueT apply(const ValueT u, const ValueT alpha, 
+                                   const ValueT v,
+                                   const ValueT s/*trength*/,
+                                   const ValueT beta,
+                                   const ValueT /*sbeta*/)
+        { return ( ( 1 - s * alpha ) * u + s * alpha * std::min(u, beta * v) ); }
+    };
+
+    template <typename ValueT>
+    struct OpMult
+    {
+        static inline ValueT apply(const ValueT u, const ValueT alpha, 
+                                   const ValueT v,
+                                   const ValueT s/*trength*/,
+                                   const ValueT /*beta*/,
+                                   const ValueT sbeta)
+        { return ( ( 1 + alpha * (sbeta * v - s)) * u ); } 
+    };
+    //@}
+    
+    //@{
+    /// Translator that converts an emum to compositing functor types
+    template <COMPOSITE_OPTYPE OP, typename ValueT>
+    struct CompositeFunctorTranslator{};
+    
+    template <typename ValueT>
+    struct CompositeFunctorTranslator<OVER, ValueT>{ typedef OpOver<ValueT>   OpT; };
+
+    template <typename ValueT>
+    struct CompositeFunctorTranslator<ADD, ValueT>{ typedef OpAdd<ValueT>   OpT; };
+
+    template <typename ValueT>
+    struct CompositeFunctorTranslator<SUB, ValueT>{ typedef OpSub<ValueT>   OpT; };
+
+    template <typename ValueT>
+    struct CompositeFunctorTranslator<MIN, ValueT>{ typedef OpMin<ValueT>   OpT; };
+
+    template <typename ValueT>
+    struct CompositeFunctorTranslator<MAX, ValueT>{ typedef OpMax<ValueT>   OpT; };
+
+    template <typename ValueT>
+    struct CompositeFunctorTranslator<MULT, ValueT>{ typedef OpMult<ValueT>   OpT; };
+    //@}
+
+} // end of anonymous namespace
+
+
+
+
+template <COMPOSITE_OPTYPE OpT, typename TreeT>
+void composite(Dense<typename TreeT::ValueType, LayoutZYX>& dense, 
+          const TreeT& source, const TreeT& alpha, 
+          const typename TreeT::ValueType beta, 
+          const typename TreeT::ValueType strength, 
+          bool threaded)
+{
+    typedef typename TreeT::ValueType  ValueT;
+    typedef CompositeFunctorTranslator<OpT, ValueT> Translator;
+    typedef typename Translator::OpT  Method;
+
+    if (openvdb::math::isZero(strength)) return;
+ 
+    SparseToDenseCompositor<Method, TreeT> tool(dense, source, alpha, beta, strength);
+    
+    if (openvdb::math::isZero(alpha.background()) && 
+        openvdb::math::isZero(source.background())) {
+        
+        // Use the sparsity of (alpha U source) as the interation space
+        
+        tool.sparseComposite(threaded);
+    } else {
+        
+        // Use the bounding box of dense as the interation space
+        
+        tool.denseComposite(threaded);
+    }
+    
+}
+
     
 // close namespaces
 }
 }
 }
-#endif //DENSESPARSETOOLS_HAS_BEEN_INCLUDED
+#endif //OPENVDB_TOOLS_DENSESPARSETOOLS_HAS_BEEN_INCLUDED
 
 
 // Copyright (c) 2012-2013 DreamWorks Animation LLC

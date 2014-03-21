@@ -209,30 +209,70 @@ template <typename TreeT, typename RayT, int ChildNodeLevel>
 class VolumeHDDA
 {
 public:
+    
     typedef typename TreeT::RootNodeType::NodeChainType ChainT;
     typedef typename boost::mpl::at<ChainT, boost::mpl::int_<ChildNodeLevel> >::type NodeT;
     typedef typename tree::ValueAccessor<const TreeT> AccessorT;
+    typedef typename RayT::TimeSpan TimeSpanT;
 
     VolumeHDDA() {}
+
+    TimeSpanT march(RayT& ray, AccessorT &acc)
+    {
+        TimeSpanT t(-1, -1);
+        if (ray.valid()) this->march(ray, acc, t);
+        return t;
+    }
     
-    bool march(RayT& ray, AccessorT &acc, Real& t0, Real& t1)
+    void hits(RayT& ray, AccessorT &acc, std::vector<TimeSpanT>& times)
+    {
+        TimeSpanT t(-1,-1);
+        times.clear();
+        this->hits(ray, acc, times, t);
+        if (t.valid()) times.push_back(t);
+    }
+    
+private:
+    
+    friend class VolumeHDDA<TreeT, RayT, ChildNodeLevel+1>;
+
+    bool march(RayT& ray, AccessorT &acc, TimeSpanT& t)
     {
         mDDA.init(ray);
         do {
             if (acc.template probeConstNode<NodeT>(mDDA.voxel()) != NULL) {//child node
                 ray.setTimes(mDDA.time(), mDDA.next());
-                if (mHDDA.march(ray, acc, t0, t1)) return true;//terminate
+                if (mHDDA.march(ray, acc, t)) return true;//terminate
             } else if (acc.isValueOn(mDDA.voxel())) {//hit an active tile
-                if (t0<0) t0 = mDDA.time();//this is the first hit so set t0
-            } else if (t0>0) {//hit an inactive tile after hitting active values
-                t1 = mDDA.time();//set end of active ray segment
-                return true;//terminate
+                if (t.t0<0) t.t0 = mDDA.time();//this is the first hit so set t0
+            } else if (t.t0>0) {//hit an inactive tile after hitting active values
+                t.t1 = mDDA.time();//set end of active ray segment
+                if (t.valid()) return true;//terminate
+                t.set(-1, -1);//reset to an empty and invalid time-span
             }
         } while (mDDA.step());
-        if (t0>0) t1 = mDDA.maxTime();
+        if (t.t0>0) t.t1 = mDDA.maxTime();
         return false;
     }
-private:
+    
+    void hits(RayT& ray, AccessorT &acc, std::vector<TimeSpanT>& times, TimeSpanT& t)
+    {
+        mDDA.init(ray);
+        do {
+            if (acc.template probeConstNode<NodeT>(mDDA.voxel()) != NULL) {//child node
+                ray.setTimes(mDDA.time(), mDDA.next());
+                mHDDA.hits(ray, acc, times, t);
+            } else if (acc.isValueOn(mDDA.voxel())) {//hit an active tile
+                if (t.t0<0) t.t0 = mDDA.time();//this is the first hit so set t0
+            } else if (t.t0>0) {//hit an inactive tile after hitting active values
+                t.t1 = mDDA.time();//set end of active ray segment
+                if (t.valid()) times.push_back(t);
+                t.set(-1,-1);//reset to an empty and invalid time-span
+            }
+        } while (mDDA.step());
+        if (t.t0>0) t.t1 = mDDA.maxTime();
+    }
+    
     math::DDA<RayT, NodeT::TOTAL> mDDA;
     VolumeHDDA<TreeT, RayT, ChildNodeLevel-1> mHDDA;
 };
@@ -243,27 +283,64 @@ template <typename TreeT, typename RayT>
 class VolumeHDDA<TreeT, RayT, 0>
 {
 public:
+    
     typedef typename TreeT::LeafNodeType LeafT;
     typedef typename tree::ValueAccessor<const TreeT> AccessorT;
+    typedef typename RayT::TimeSpan TimeSpanT;
 
     VolumeHDDA() {}
+
+    TimeSpanT march(RayT& ray, AccessorT &acc)
+    {
+        TimeSpanT t(-1, -1);
+        if (ray.valid()) this->march(ray, acc, t);
+        return t;
+    }
     
-    bool march(RayT& ray, AccessorT &acc, Real& t0, Real& t1)
+    void hits(RayT& ray, AccessorT &acc, std::vector<TimeSpanT>& times)
+    {
+        TimeSpanT t(-1,-1);
+        times.clear();
+        this->hits(ray, acc, times, t);
+        if (t.valid()) times.push_back(t);
+    }
+    
+private:
+    
+    friend class VolumeHDDA<TreeT, RayT, 1>;
+
+    bool march(RayT& ray, AccessorT &acc, TimeSpanT& t)
     {
         mDDA.init(ray);
         do {
             if (acc.template probeConstNode<LeafT>(mDDA.voxel()) ||
                 acc.isValueOn(mDDA.voxel())) {//hit a leaf or an active tile
-                if (t0<0) t0 = mDDA.time();//this is the first hit
-            } else if (t0>0) {//hit an inactive tile after hitting active values
-                t1 = mDDA.time();//set end of active ray segment
-                return true;//terminate
+                if (t.t0<0) t.t0 = mDDA.time();//this is the first hit
+            } else if (t.t0>0) {//hit an inactive tile after hitting active values
+                t.t1 = mDDA.time();//set end of active ray segment
+                if (t.valid()) return true;//terminate
+                t.set(-1, -1);//reset to an empty and invalid time-span
             }
         } while (mDDA.step());
-        if (t0>0) t1 = mDDA.maxTime();
+        if (t.t0>0) t.t1 = mDDA.maxTime();
         return false;
     }
-private:
+    
+    void hits(RayT& ray, AccessorT &acc, std::vector<TimeSpanT>& times, TimeSpanT& t)
+    {
+        mDDA.init(ray);
+        do {
+            if (acc.template probeConstNode<LeafT>(mDDA.voxel()) ||
+                acc.isValueOn(mDDA.voxel())) {//hit a leaf or an active tile
+                if (t.t0<0) t.t0 = mDDA.time();//this is the first hit
+            } else if (t.t0>0) {//hit an inactive tile after hitting active values
+                t.t1 = mDDA.time();//set end of active ray segment
+                if (t.valid()) times.push_back(t);
+                t.set(-1, -1);//reset to an empty and invalid time-span
+            }
+        } while (mDDA.step());
+        if (t.t0>0) t.t1 = mDDA.maxTime();
+    }
     math::DDA<RayT, LeafT::TOTAL> mDDA;
 };    
 

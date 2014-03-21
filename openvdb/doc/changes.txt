@@ -31,6 +31,23 @@
   tests for value type and tree type compatibility, and a
   @vdblink::tree::RootNode::hasCompatibleValueType()
   RootNode::hasCompatibleValueType@endlink method, which does runtime checking.
+- Added optional support for logging using
+  <A HREF="http://log4cplus.sourceforge.net/">log4cplus</A>.
+  See logging.h and the @c INSTALL file for details.
+- Added  @vdblink::tools::VolumeRayIntersector::hits
+  VolumeRayIntersector::hits@endlink that produces all the hit-segments 
+  along a ray. This is generally more efficient then repeated calls to
+  @vdblink::tools::VolumeRayIntersector::march VolumeRayIntersector::march@endlink.
+- Added member class @vdblink::math::Ray::TimeSpan Ray::TimeSpan@endlink
+  and method @vdblink::math::Ray::valid Ray::valid@endlink, and deprecated method 
+  @vdblink::math::Ray::test Ray::test@endlink.
+- Added @vdblink::tools::composite() composite@endlink, which 
+  composites data from a sparse tree into a dense array, using a 
+  sparse alpha mask. Over, Add, Sub, Min, Max, Mult, and Set are 
+  supported operations.
+- Added @vdblink::tools::transformDense() transformDense@endlink, that 
+  applies a point-wise functor at locations in the intersection 
+  of a dense grid with a given bounding box.
 
 @par
 API changes:

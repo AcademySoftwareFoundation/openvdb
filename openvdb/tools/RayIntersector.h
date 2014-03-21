@@ -421,6 +421,13 @@ public:
         return this->setIndexRay(wRay.worldToIndex(*mGrid));
     }
 
+    inline typename RayT::TimeSpan march()
+    {
+        const typename RayT::TimeSpan t = mHDDA.march(mRay, mAccessor);
+        if (t.t1>0) mRay.setTimes(t.t1 + math::Delta<RealType>::value(), mTmax);
+        return t;
+    }
+    
     /// @brief Return @c true if the ray intersects active values,
     /// i.e. either active voxels or tiles. Only when a hit is
     /// detected are t0 and t1 updated with the corresponding entry
@@ -434,10 +441,14 @@ public:
     /// index space of the current grid, not world space!
     inline bool march(Real& t0, Real& t1)
     {
-        t0 = t1 = -1;
-        if (mRay.test()) mHDDA.march(mRay, mAccessor, t0, t1);
-        if (t0>0) mRay.setTimes(t1 + math::Delta<RealType>::value(), mTmax);
-        return t0>0;
+        const typename RayT::TimeSpan t = this->march();
+        t.get(t0, t1);
+        return t.valid();
+    }
+
+    inline void hits(std::vector<typename RayT::TimeSpan>& list)
+    {
+        mHDDA.hits(mRay, mAccessor, list);
     }
 
     /// @brief Return the floating-point index position along the

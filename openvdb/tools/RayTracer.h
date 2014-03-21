@@ -889,9 +889,9 @@ render(bool threaded) const
 template<typename IntersectorT, typename SampleT>
 inline void VolumeRender<IntersectorT, SampleT>::
 operator()(const tbb::blocked_range<size_t>& range) const
-{
+{ 
     SamplerType sampler(mAccessor, mShadow->grid().transform());//light-weight wrapper
-        
+    
     // Any variable prefixed with p (or s) means it's associate with a primay (or shadow) ray
     const Vec3R extinction = -mScattering-mAbsorption, One(1.0);
     const Vec3R albedo = mLightColor*mScattering/(mScattering+mAbsorption);//single scattering
@@ -899,6 +899,16 @@ operator()(const tbb::blocked_range<size_t>& range) const
     const Real pStep = mPrimaryStep;//Integration step along primary ray in voxel units
     const Real sStep = mShadowStep;//Integration step along shadow ray in voxel units
     const Real cutoff = mCutOff;//Cutoff for density and transmittance
+
+    // For the sake of completeness we show how to use two different
+    // methods (hits/march) in VolumeRayIntersector that produce
+    // segments along the ray that intersects active values. Comment out
+    // the line below to use VolumeRayIntersector::march instead of
+    // VolumeRayIntersector::hits.
+#define USE_HITS
+#ifdef USE_HITS
+    std::vector<typename RayType::TimeSpan> pTS, sTS;
+#endif
     
     RayType sRay(Vec3R(0), mLightDir);//Shadow ray
     for (size_t j=range.begin(), je = range.end(); j<je; ++j) {
@@ -908,9 +918,16 @@ operator()(const tbb::blocked_range<size_t>& range) const
             RayType pRay = mCamera->getRay(i, j);// Primary ray
             if( !mPrimary->setWorldRay(pRay)) continue;
             Vec3R pTrans(1.0), pLumi(0.0);
+#ifndef USE_HITS
             Real pT0, pT1;
             while (mPrimary->march(pT0, pT1)) {
                 for (Real pT = pStep*ceil(pT0/pStep); pT <= pT1; pT += pStep) {
+#else
+            mPrimary->hits(pTS);
+            for (size_t k=0; k<pTS.size(); ++k) {
+                Real pT = pStep*ceil(pTS[k].t0/pStep), pT1=pTS[k].t1;
+                for (; pT <= pT1; pT += pStep) {
+#endif
                     Vec3R pPos = mPrimary->getWorldPos(pT);
                     const Real density = sampler.wsSample(pPos);
                     if (density < cutoff) continue;
@@ -918,9 +935,16 @@ operator()(const tbb::blocked_range<size_t>& range) const
                     Vec3R sTrans(1.0);
                     sRay.setEye(pPos);
                     if( !mShadow->setWorldRay(sRay)) continue;
+#ifndef USE_HITS
                     Real sT0, sT1;
                     while (mShadow->march(sT0, sT1)) {
                         for (Real sT = sStep*ceil(sT0/sStep); sT <= sT1; sT+= sStep) {
+#else
+                    mShadow->hits(sTS);
+                    for (size_t l=0; l<sTS.size(); ++l) {
+                        Real sT = sStep*ceil(sTS[l].t0/sStep), sT1=sTS[l].t1;
+                        for (; sT <= sT1; sT+= sStep) {
+#endif
                             const Real d = sampler.wsSample(mShadow->getWorldPos(sT));
                             if (d < cutoff) continue;
                             sTrans *= math::Exp(extinction * d * sStep/(1.0+sT*sGain));
@@ -938,8 +962,8 @@ operator()(const tbb::blocked_range<size_t>& range) const
             bg.g = pLumi[1];
             bg.b = pLumi[2];
             bg.a = 1.0f - pTrans.sum()/3.0f;
-        }//Horizontal pixel scan    
-    }//Vertical pixel scan
+     }//Horizontal pixel scan    
+   }//Vertical pixel scan
 }
 
 } // namespace tools

@@ -32,6 +32,8 @@ Optional:
 - Ghostscript (www.ghostscript.com), version 8.70 or later, for documentation
   in PDF format
 
+- log4cplus (log4cplus.sourceforge.net), version 1.0 or later
+
 - pdfLaTeX (www.pdftex.org), version 1.21 or later, for documentation
   in PDF format
 
@@ -95,6 +97,12 @@ Installation
                         GLFW is needed only for the command-line viewer tool)
     GLFW_LIB_DIR        the directory containing libglfw
     GLFW_LIB            linker flags for the GLFW library (e.g., -lglfw)
+
+    LOG4CPLUS_INCL_DIR  the parent directory of the log4cplus/ header directory
+                        (leave blank if log4cplus is not available)
+    LOG4CPLUS_LIB_DIR   directory containing liblog4cplus.so or liblog4cplus.a
+    LOG4CPLUS_LIB       linker flags for the log4cplus library
+                        (e.g., -llog4cplus)
 
     PYTHON_VERSION      the version of Python for which to build the OpenVDB
                         module (e.g., 2.6)

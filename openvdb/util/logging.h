@@ -33,32 +33,46 @@
 
 #ifndef OPENVDB_USE_LOG4CPLUS
 
-/// Macros to log messages of various severity levels
-/// The message is of the form 'someVar << "some text" << ...'.
+/// Log an info message of the form '<TT>someVar << "some text" << ...</TT>'.
 #define OPENVDB_LOG_INFO(message)
-#define OPENVDB_LOG_WARN(message)          do { std::cerr << message << std::endl; } while (0);
-#define OPENVDB_LOG_ERROR(message)         do { std::cerr << message << std::endl; } while (0);
-#define OPENVDB_LOG_FATAL(message)         do { std::cerr << message << std::endl; } while (0);
+/// Log a warning message of the form '<TT>someVar << "some text" << ...</TT>'.
+#define OPENVDB_LOG_WARN(message)           do { std::cerr << message << std::endl; } while (0);
+/// Log an error message of the form '<TT>someVar << "some text" << ...</TT>'.
+#define OPENVDB_LOG_ERROR(message)          do { std::cerr << message << std::endl; } while (0);
+/// Log a fatal error message of the form '<TT>someVar << "some text" << ...</TT>'.
+#define OPENVDB_LOG_FATAL(message)          do { std::cerr << message << std::endl; } while (0);
+/// In debug builds only, log a debugging message of the form '<TT>someVar << "text" << ...</TT>'.
 #define OPENVDB_LOG_DEBUG(message)
+/// @brief Log a debugging message in both debug and optimized builds.
+/// @warning Don't use this in performance-critical code.
 #define OPENVDB_LOG_DEBUG_RUNTIME(message)
 
 #else // ifdef OPENVDB_USE_LOG4CPLUS
 
-#include <logging_base/logging.h>
+#include <log4cplus/logger.h>
+#include <log4cplus/loglevel.h>
+#include <sstream>
 
-#define OPENVDB_LOG_INFO(message)          LOG_INFO(message)
-#define OPENVDB_LOG_WARN(message)          LOG_WARN(message)
-#define OPENVDB_LOG_ERROR(message)         LOG_ERROR(message)
-#define OPENVDB_LOG_FATAL(message)         LOG_FATAL(message)
+#define OPENVDB_LOG(level, message) \
+    do { \
+        log4cplus::Logger _log = log4cplus::Logger::getInstance(LOG4CPLUS_TEXT("main")); \
+        if (_log.isEnabledFor(log4cplus::level##_LOG_LEVEL)) { \
+            std::ostringstream _buf; \
+            _buf << message; \
+            _log.forcedLog(log4cplus::level##_LOG_LEVEL, _buf.str(), __FILE__, __LINE__); \
+        } \
+    } while (0);
+
+#define OPENVDB_LOG_INFO(message)           OPENVDB_LOG(INFO, message)
+#define OPENVDB_LOG_WARN(message)           OPENVDB_LOG(WARN, message)
+#define OPENVDB_LOG_ERROR(message)          OPENVDB_LOG(ERROR, message)
+#define OPENVDB_LOG_FATAL(message)          OPENVDB_LOG(FATAL, message)
 #ifdef DEBUG
-/// Log debugging messages in debug builds only.
-#define OPENVDB_LOG_DEBUG(message)         LOG_DEBUG(message)
+#define OPENVDB_LOG_DEBUG(message)          OPENVDB_LOG(DEBUG, message)
 #else
 #define OPENVDB_LOG_DEBUG(message)
 #endif
-/// Log debugging messages even in non-debug builds.
-/// Don't use this in performance-critical code.
-#define OPENVDB_LOG_DEBUG_RUNTIME(message) LOG_DEBUG_RUNTIME(message)
+#define OPENVDB_LOG_DEBUG_RUNTIME(message)  OPENVDB_LOG(DEBUG, message)
 
 #endif // OPENVDB_USE_LOG4CPLUS
 

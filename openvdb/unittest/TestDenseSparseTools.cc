@@ -48,13 +48,16 @@ public:
     CPPUNIT_TEST(testExtractSparseBoolTree);
     CPPUNIT_TEST(testExtractSparseAltDenseLayout);
     CPPUNIT_TEST(testExtractSparseMaskedTree);
+    CPPUNIT_TEST(testDenseTransform);
+    CPPUNIT_TEST(testOver);
     CPPUNIT_TEST_SUITE_END();
     
     void testExtractSparseFloatTree();
     void testExtractSparseBoolTree();
     void testExtractSparseAltDenseLayout();
     void testExtractSparseMaskedTree();
-
+    void testDenseTransform();
+    void testOver();
 
 private:
     openvdb::tools::Dense<float>* mDense;
@@ -141,6 +144,12 @@ namespace {
     };
     
 
+    // Square each value
+    struct SqrOp
+    {
+        float operator()(const float& in) const
+        { return in * in; }
+    };
 }
 
 void
@@ -283,6 +292,135 @@ TestDenseSparseTools::testExtractSparseMaskedTree()
 
     CPPUNIT_ASSERT_DOUBLES_EQUAL(testvalue, result->getValue(mijk), 1.e-6);
 
+}
+
+void
+TestDenseSparseTools::testDenseTransform()
+{
+
+    namespace vdbmath = openvdb::math;
+
+    vdbmath::CoordBBox domain(vdbmath::Coord(-4, -6, 10),
+                              vdbmath::Coord( 1, 2, 15));
+
+    // Create dense grid, filled with value
+    const float value(2.f); const float valueSqr(value*value);
+    
+    openvdb::tools::Dense<float> dense(domain, 0.f);
+    dense.fill(value);
+    
+    SqrOp op;
+
+    vdbmath::CoordBBox smallBBox(vdbmath::Coord(-5, -5, 11),
+                                 vdbmath::Coord( 0,  1, 13) );
+    
+    // Apply the transformation
+    openvdb::tools::transformDense<float, SqrOp>(dense, smallBBox, op, true);
+    
+    vdbmath::Coord ijk;
+    // Test results.
+    for (ijk[0] = domain.min().x(); ijk[0] < domain.max().x() + 1; ++ijk[0]) {
+        for (ijk[1] = domain.min().y(); ijk[1] < domain.max().y() + 1; ++ijk[1]) {
+            for (ijk[2] = domain.min().z(); ijk[2] < domain.max().z() + 1; ++ijk[2]) {
+                
+                if (smallBBox.isInside(ijk)) {
+                    // the functor was applied here
+                    // the value should be base * base
+                    CPPUNIT_ASSERT_DOUBLES_EQUAL(dense.getValue(ijk), 
+                                                 valueSqr, 1.e-6);
+                } else {
+                    // the original value 
+                    CPPUNIT_ASSERT_DOUBLES_EQUAL(dense.getValue(ijk), 
+                                                 value, 1.e-6);
+                }
+            }
+        }
+    }
+   
+}
+
+void
+TestDenseSparseTools::testOver()
+{
+    
+    
+    namespace vdbmath = openvdb::math;
+    
+    const vdbmath::CoordBBox domain(vdbmath::Coord(-10, 0, 5),
+                              vdbmath::Coord( 10, 5, 10));
+    const openvdb::Coord ijk = domain.min() + openvdb::Coord(1, 1, 1);
+    // Create dense grid, filled with value
+    const float value(2.f);
+    const float strength(1.f);
+    const float beta(1.f);
+
+    openvdb::FloatTree src(0.f);
+    src.setValue(ijk, 1.f);
+    openvdb::FloatTree alpha(0.f);
+    alpha.setValue(ijk, 1.f);
+
+    
+    const float expected  = openvdb::tools::OpOver<float>::apply(value, 
+                                                                 alpha.getValue(ijk), 
+                                                                 src.getValue(ijk), strength,
+                                                                 beta, 1.f);
+        
+    { // testing composite function 
+        openvdb::tools::Dense<float> dense(domain, 0.f);
+        dense.fill(value);
+        
+    
+        openvdb::tools::composite<openvdb::tools::OVER>(dense, src, alpha, 
+                                                        beta,  strength, 
+                                                        true /*threaded*/);
+        
+        // Check for over value
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(dense.getValue(ijk), 
+                                     expected, 1.e-6);
+        // Check for original value
+        
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(dense.getValue(openvdb::Coord(1,1,1) + ijk), 
+                                     value, 1.e-6);
+    }
+
+    { // testing sparse explict sparse composite
+        openvdb::tools::Dense<float> dense(domain, 0.f);
+        dense.fill(value);
+        
+        typedef openvdb::tools::CompositeFunctorTranslator<openvdb::tools::OVER, float> CompositeTool;
+        typedef CompositeTool::OpT Method;
+        openvdb::tools::SparseToDenseCompositor<Method, openvdb::FloatTree>
+            sparseToDense(dense, src, alpha, beta, strength);
+        
+        sparseToDense.sparseComposite(true);
+        // Check for over value
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(dense.getValue(ijk), 
+                                     expected, 1.e-6);
+        // Check for original value
+        
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(dense.getValue(openvdb::Coord(1,1,1) + ijk), 
+                                     value, 1.e-6);
+    } 
+
+     { // testing sparse explict dense composite
+        openvdb::tools::Dense<float> dense(domain, 0.f);
+        dense.fill(value);
+        
+        typedef openvdb::tools::CompositeFunctorTranslator<openvdb::tools::OVER, float> CompositeTool;
+        typedef CompositeTool::OpT Method;
+        openvdb::tools::SparseToDenseCompositor<Method, openvdb::FloatTree>
+            sparseToDense(dense, src, alpha, beta, strength);
+
+        sparseToDense.denseComposite(true);
+        // Check for over value
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(dense.getValue(ijk), 
+                                     expected, 1.e-6);
+        // Check for original value
+        
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(dense.getValue(openvdb::Coord(1,1,1) + ijk), 
+                                     value, 1.e-6);
+    } 
+    
 }
 
 
