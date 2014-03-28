@@ -17,16 +17,16 @@ Version 2.3.0 - In development
       which does runtime checking.
     - Added optional support for logging using log4cplus.  See logging.h
       and the INSTALL file for details.
-    - Added VolumeRayIntersector::hits that produces all the hit-segments 
-      along a ray. This is generally more efficient then repeated calls to
-      VolumeRayIntersector::march.
-    - Added member class Ray::TimeSpan and method Ray:valid(eps), and 
+    - Added VolumeRayIntersector::hits(), which returns all the hit segments 
+      along a ray.  This is generally more efficient than repeated calls
+      to VolumeRayIntersector::march().
+    - Added member class Ray::TimeSpan and method Ray::valid(), and 
       deprecated method Ray::test(). 
-    - Added tools::compsite(), which composites data from a sparse tree
-      into a dense array, using a sparse alpha mask. Over, Add, Sub, Min, 
-      Max, Mult, and Set are supported operations.
-    - Added tools::transformDense(), that applies a point-wise functor at
-      locations in the intersection of a dense grid with a given bounding box.
+    - Added tools::compositeToDense(), which composites data from a
+      sparse tree into a dense array, using a sparse alpha mask.
+      Over, Add, Sub, Min, Max, Mult, and Set are supported operations.
+    - Added tools::transformDense(), which applies a functor to the value
+      of each voxel of a dense grid within a given bounding box.
 
     API changes:
     - Collected the digital differential analyzer code from math/Ray.h
@@ -42,6 +42,10 @@ Version 2.3.0 - In development
     - Removed a number of methods that were deprecated in version 2.0.0
       or earlier.
 
+    Houdini:
+    - Added a Clip SOP, which does volumetric clipping. 
+    - Added an Occlusion Mask SOP, which generates a mask of the voxels
+      inside a camera frustum that are occluded by objects in an input grid.
 
 Version 2.2.0 - February 20, 2014
     - Added a simple, multithreaded volume renderer, and added volume

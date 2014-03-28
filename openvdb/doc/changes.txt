@@ -34,20 +34,21 @@
 - Added optional support for logging using
   <A HREF="http://log4cplus.sourceforge.net/">log4cplus</A>.
   See logging.h and the @c INSTALL file for details.
-- Added  @vdblink::tools::VolumeRayIntersector::hits
-  VolumeRayIntersector::hits@endlink that produces all the hit-segments 
-  along a ray. This is generally more efficient then repeated calls to
-  @vdblink::tools::VolumeRayIntersector::march VolumeRayIntersector::march@endlink.
+- Added  @vdblink::tools::VolumeRayIntersector::hits()
+  VolumeRayIntersector::hits@endlink, which returns all the hit segments 
+  along a ray.  This is generally more efficient than repeated calls to
+  @vdblink::tools::VolumeRayIntersector::march()
+  VolumeRayIntersector::march@endlink.
 - Added member class @vdblink::math::Ray::TimeSpan Ray::TimeSpan@endlink
-  and method @vdblink::math::Ray::valid Ray::valid@endlink, and deprecated method 
-  @vdblink::math::Ray::test Ray::test@endlink.
-- Added @vdblink::tools::composite() composite@endlink, which 
-  composites data from a sparse tree into a dense array, using a 
-  sparse alpha mask. Over, Add, Sub, Min, Max, Mult, and Set are 
+  and method @vdblink::math::Ray::valid() Ray::valid@endlink, and deprecated
+  method @vdblink::math::Ray::test() Ray::test@endlink.
+- Added a @vdblink::tools::compositeToDense() compositeToDense@endlink tool,
+  which composites data from a sparse tree into a dense array, using a 
+  sparse alpha mask.  Over, Add, Sub, Min, Max, Mult, and Set are 
   supported operations.
-- Added @vdblink::tools::transformDense() transformDense@endlink, that 
-  applies a point-wise functor at locations in the intersection 
-  of a dense grid with a given bounding box.
+- Added a @vdblink::tools::transformDense() transformDense@endlink tool,
+  which applies a functor to the value of each voxel of a dense grid
+  within a given bounding box.
 
 @par
 API changes:
@@ -72,6 +73,12 @@ API changes:
   now return references to the respective objects.
 - Removed a number of methods that were deprecated in version&nbsp;2.0.0
   or earlier.
+
+@par
+Houdini:
+- Added a Clip SOP, which does volumetric clipping. 
+- Added an Occlusion Mask SOP, which generates a mask of the voxels
+  inside a camera frustum that are occluded by objects in an input grid.
 
 
 @htmlonly <a name="v2_2_0_changes"></a>@endhtmlonly

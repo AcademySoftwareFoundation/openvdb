@@ -198,6 +198,7 @@ MAYA_SRC_NAMES := \
 #
 MAYA_INCLUDE_NAMES := \
     maya/OpenVDBData.h \
+    maya/OpenVDBUtil.h \
 #
 
 MAYA_SCRIPTS := \
@@ -242,6 +243,14 @@ ALL_TARGETS := \
 	$(CXX) -c $(CXXFLAGS) -fPIC -o $@ $<
 
 all: $(ALL_TARGETS)
+
+# Create an openvdb_maya/ symlink to the maya/ subdirectory,
+# to mirror the DWA directory structure.
+openvdb_maya:
+	ln -f -s maya openvdb_maya
+openvdb_maya/OpenVDBData.h openvdb_maya/OpenVDBUtil.h: openvdb_maya
+
+$(MAYA_OBJ_NAMES): openvdb_maya/OpenVDBData.h openvdb_maya/OpenVDBUtil.h
 
 $(MAYA_SO_NAME): $(MAYA_OBJ_NAMES)
 	@echo "Building $@ because of $(call list_deps)"

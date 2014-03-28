@@ -30,7 +30,7 @@
 
 /// @author FX R&D OpenVDB team
 
-#include "OpenVDBData.h"
+#include <openvdb_maya/OpenVDBData.h>
 #include "OpenVDBPlugin.h"
 
 #include <openvdb/Platform.h>

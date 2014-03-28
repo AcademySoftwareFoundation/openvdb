@@ -92,11 +92,6 @@ std::string getGridNames(const OpenVDBData& vdb)
 }
 
 
-////////////////////////////////////////
-
-
-namespace {
-
 bool containsGrid(const std::vector<std::string>& selectionList,
     const std::string& gridName, size_t gridIndex)
 {
@@ -127,8 +122,6 @@ bool containsGrid(const std::vector<std::string>& selectionList,
 
     return selectionList.empty();
 }
-
-}; // unnamed namespace
 
 
 bool
