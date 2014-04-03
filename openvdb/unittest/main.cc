@@ -31,7 +31,7 @@
 #ifdef DWA_OPENVDB
 
 #include <pdevunit/pdevunit.h>
-#include <logging/logging.h>
+#include <logging_base/logging.h>
 
 #else
 
@@ -45,6 +45,11 @@
 #include <cppunit/TextTestProgressListener.h>
 #include <cppunit/extensions/TestFactoryRegistry.h>
 #include <cppunit/ui/text/TestRunner.h>
+#ifdef OPENVDB_USE_LOG4CPLUS
+#include <log4cplus/logger.h>
+#include <log4cplus/loggingmacros.h>
+#include <log4cplus/configurator.h>
+#endif
 #ifdef _WIN32
 #include <openvdb/port/getopt.c>
 #else
@@ -94,6 +99,13 @@ run(int argc, char* argv[])
 "    -t test  specific suite or test to run, e.g., \"-t TestGrid\"\n" <<
 "             or \"-t TestGrid::testGetGrid\" (default: run all tests)\n" <<
 "    -v       verbose output\n";
+#ifdef OPENVDB_USE_LOG4CPLUS
+                std::cerr << "\n" <<
+"    -error   log fatal and non-fatal errors (default: log only fatal errors)\n" <<
+"    -warn    log warnings and errors\n" <<
+"    -info    log info messages, warnings and errors\n" <<
+"    -debug   log debugging messages, info messages, warnings and errors\n";
+#endif
                 return EXIT_FAILURE;
             }
         }
@@ -138,6 +150,7 @@ int
 main(int argc, char *argv[])
 {
 #ifdef DWA_OPENVDB
+
     // Disable logging by default ("-quiet") unless overridden
     // with "-debug" or "-info".
     bool quiet = false;
@@ -156,9 +169,32 @@ main(int argc, char *argv[])
     logging_base::configure(config);
 
     return pdevunit::run(numArgs, &args[0]);
-#else
+
+#else // ifndef DWA_OPENVDB
+
+#ifndef OPENVDB_USE_LOG4CPLUS
     return run(argc, argv);
-#endif
+#else
+    log4cplus::BasicConfigurator::doConfigure();
+
+    std::vector<char*> args;
+    args.push_back(argv[0]);
+
+    log4cplus::Logger log = log4cplus::Logger::getInstance(LOG4CPLUS_TEXT("main"));
+    log.setLogLevel(log4cplus::FATAL_LOG_LEVEL);
+    for (int i = 1; i < argc; ++i) {
+        char* arg = argv[i];
+        if (std::string("-info") == arg)       log.setLogLevel(log4cplus::INFO_LOG_LEVEL);
+        else if (std::string("-warn") == arg)  log.setLogLevel(log4cplus::WARN_LOG_LEVEL);
+        else if (std::string("-error") == arg) log.setLogLevel(log4cplus::ERROR_LOG_LEVEL);
+        else if (std::string("-debug") == arg) log.setLogLevel(log4cplus::DEBUG_LOG_LEVEL);
+        else args.push_back(arg);
+    }
+
+    return run(int(args.size()), &args[0]);
+#endif // OPENVDB_USE_LOG4CPLUS
+
+#endif // DWA_OPENVDB
 }
 
 // Copyright (c) 2012-2013 DreamWorks Animation LLC

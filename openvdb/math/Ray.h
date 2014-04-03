@@ -32,7 +32,7 @@
 ///
 /// @author Ken Museth
 ///
-/// @brief A Ray class and a Digital Differential Analyzer specialized for VDB.
+/// @brief A Ray class.
 
 #ifndef OPENVDB_MATH_RAY_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_RAY_HAS_BEEN_INCLUDED
@@ -57,12 +57,31 @@ public:
     typedef RealT      RealType;
     typedef Vec3<Real> Vec3Type;
     typedef Vec3Type   Vec3T;
+    struct TimeSpan {
+        RealT t0, t1;
+        /// @brief Default constructor
+        TimeSpan() {}
+        /// @brief Constructor
+        TimeSpan(RealT _t0, RealT _t1) : t0(_t0), t1(_t1) {}
+        /// @brief Set both times
+        inline void set(RealT _t0, RealT _t1) { t0=_t0; t1=_t1; }
+        /// @brief Get both times
+        inline void get(RealT& _t0, RealT& _t1) const { _t0=t0; _t1=t1; }
+        /// @brief Return @c true if t1 is larger then t0 by at least eps.
+        inline bool valid(RealT eps=math::Delta<RealT>::value()) const { return (t1-t0)>eps; }
+        /// @brief Return the midpoint of the ray.
+        inline RealT mid() const { return 0.5*(t0 + t1); }
+        /// @brief Multiplies both times
+        inline void scale(RealT s) {assert(s>0); t0*=s; t1*=s; }
+        /// @brief Return @c true if time is inclusive
+        inline bool test(RealT t) const { return (t>=t0 && t<=t1); }
+    };
 
     Ray(const Vec3Type& eye = Vec3Type(0,0,0),
         const Vec3Type& direction = Vec3Type(1,0,0),
         RealT t0 = math::Delta<RealT>::value(),
         RealT t1 = std::numeric_limits<RealT>::max())
-        : mEye(eye), mDir(direction), mInvDir(1/mDir), mT0(t0), mT1(t1)
+        : mEye(eye), mDir(direction), mInvDir(1/mDir), mTimeSpan(t0, t1)
     {
     }
 
@@ -74,19 +93,18 @@ public:
           mInvDir = 1/mDir;
       }
 
-    inline void setMinTime(RealT t0) { assert(t0>0); mT0 = t0; }
+    inline void setMinTime(RealT t0) { assert(t0>0); mTimeSpan.t0 = t0; }
 
-    inline void setMaxTime(RealT t1) { assert(t1>0); mT1 = t1; }
+    inline void setMaxTime(RealT t1) { assert(t1>0); mTimeSpan.t1 = t1; }
 
     inline void setTimes(RealT t0 = math::Delta<RealT>::value(),
                          RealT t1 = std::numeric_limits<RealT>::max())
     {
         assert(t0>0 && t1>0);
-        mT0 = t0;
-        mT1 = t1;
+        mTimeSpan.set(t0, t1);
     }
 
-    inline void scaleTimes(RealT scale) {  assert(scale>0); mT0 *= scale; mT1 *= scale; }
+    inline void scaleTimes(RealT scale) { mTimeSpan.scale(scale); }
     
     inline void reset(const Vec3Type& eye,
                       const Vec3Type& direction,
@@ -104,27 +122,33 @@ public:
 
     inline const Vec3T& invDir() const {return mInvDir;}
 
-    inline RealT t0() const {return mT0;}
+    inline RealT t0() const {return mTimeSpan.t0;}
 
-    inline RealT t1() const {return mT1;}
+    inline RealT t1() const {return mTimeSpan.t1;}
 
     /// @brief Return the position along the ray at the specified time.
     inline Vec3R operator()(RealT time) const { return mEye + mDir * time; }
 
     /// @brief Return the starting point of the ray.
-    inline Vec3R start() const { return (*this)(mT0); }
+    inline Vec3R start() const { return (*this)(mTimeSpan.t0); }
 
     /// @brief Return the endpoint of the ray.
-    inline Vec3R end() const { return (*this)(mT1); }
+    inline Vec3R end() const { return (*this)(mTimeSpan.t1); }
 
     /// @brief Return the midpoint of the ray.
-    inline Vec3R mid() const { return (*this)(0.5*(mT0+mT1)); }
+    inline Vec3R mid() const { return (*this)(mTimeSpan.mid()); }
 
-     /// @brief Return @c true if t0 is strictly less then t1.
-    inline bool test() const { return (mT0 < mT1); }
+    /// @brief Return @c true if t0 is strictly less then t1.
+    OPENVDB_DEPRECATED inline bool test() const { return mTimeSpan.valid(RealT(0)); }
+
+    /// @brief Return @c true if t1 is larger then t0 by at least eps.
+    inline bool valid(RealT eps=math::Delta<float>::value()) const
+      {
+          return mTimeSpan.valid(eps);
+      }
     
     /// @brief Return @c true if @a time is within t0 and t1, both inclusive.
-    inline bool test(RealT time) const { return (time>=mT0 && time<=mT1); }
+    inline bool test(RealT time) const { return mTimeSpan.test(time); }
 
     /// @brief Return a new Ray that is transformed with the specified map.
     /// @param map  the map from which to construct the new Ray.
@@ -140,7 +164,7 @@ public:
         const Vec3T eye = map.applyMap(mEye);
         const Vec3T dir = map.applyJacobian(mDir);
         const RealT length = dir.length();
-        return Ray(eye, dir/length, length*mT0, length*mT1);
+        return Ray(eye, dir/length, length*mTimeSpan.t0, length*mTimeSpan.t1);
     }
 
     /// @brief Return a new Ray that is transformed with the inverse of the specified map.
@@ -157,7 +181,7 @@ public:
         const Vec3T eye = map.applyInverseMap(mEye);
         const Vec3T dir = map.applyInverseJacobian(mDir);
         const RealT length = dir.length();
-        return Ray(eye, dir/length, length*mT0, length*mT1);
+        return Ray(eye, dir/length, length*mTimeSpan.t0, length*mTimeSpan.t1);
     }
 
     /// @brief Return a new ray in world space, assuming the existing
@@ -199,8 +223,8 @@ public:
         t1 = C / Q;
         
         if (t0 > t1) std::swap(t0, t1);
-        if (t0 < mT0) t0 = mT0;
-        if (t1 > mT1) t1 = mT1;
+        if (t0 < mTimeSpan.t0) t0 = mTimeSpan.t0;
+        if (t1 > mTimeSpan.t1) t1 = mTimeSpan.t1;
         return t0 <= t1;
     }
     
@@ -221,10 +245,7 @@ public:
     {
         RealT t0, t1;
         const bool hit = this->intersects(center, radius, t0, t1);
-        if (hit) {
-            mT0 = t0;
-            mT1 = t1;
-        }
+        if (hit) mTimeSpan.set(t0, t1);
         return hit;
     }
 
@@ -237,9 +258,8 @@ public:
     ///             the time for the second intersection point.
     template<typename BBoxT>
     inline bool intersects(const BBoxT& bbox, RealT& t0, RealT& t1) const
-      {
-        t0 = mT0;
-        t1 = mT1;
+    {
+        mTimeSpan.get(t0, t1);
         for (size_t i = 0; i < 3; ++i) {
             RealT a = (bbox.min()[i] - mEye[i]) * mInvDir[i];
             RealT b = (bbox.max()[i] - mEye[i]) * mInvDir[i];
@@ -268,10 +288,7 @@ public:
     {
         RealT t0, t1;
         const bool hit = this->intersects(bbox, t0, t1);
-        if (hit) {
-            mT0 = t0;
-            mT1 = t1;
-        }
+        if (hit) mTimeSpan.set(t0, t1);
         return hit;
     }
 
@@ -300,7 +317,7 @@ public:
 
 private:
     Vec3T mEye, mDir, mInvDir;
-    RealT mT0, mT1;
+    TimeSpan mTimeSpan;
 }; // end of Ray class
     
 /// @brief Output streaming of the Ray class.
@@ -313,112 +330,6 @@ inline std::ostream& operator<<(std::ostream& os, const Ray<RealT>& r)
     return os;
 }
 
-
-////////////////////////////////////////
-
-
-/// @brief A Digital Differential Analyzer specialized for OpenVDB grids
-/// @note Conceptually similar to Bresenham's line algorithm applied
-/// to a 3D Ray intersecting OpenVDB nodes or voxels. Log2Dim = 0
-/// corresponds to a voxel and Log2Dim a tree node of size 2^Log2Dim.     
-///
-/// @note The Ray template class is expected to have the following
-/// methods: test(time), t0(), t1(), invDir(), and  operator()(time).
-/// See the example Ray class above for their definition.
-template<typename RayT, Index Log2Dim = 0>
-class DDA
-{
-public:
-    typedef typename RayT::RealType RealType;
-    typedef RealType                RealT;
-    typedef typename RayT::Vec3Type Vec3Type;
-    typedef Vec3Type                Vec3T;
-
-    DDA(const RayT& ray) { this->init(ray, ray.t0(), ray.t1()); }
-
-    DDA(const RayT& ray, RealT startTime) { this->init(ray, startTime, ray.t1()); }
-
-    DDA(const RayT& ray, RealT startTime, RealT maxTime) { this->init(ray, startTime, maxTime); }
-    
-    inline void init(const RayT& ray, RealT startTime, RealT maxTime)
-    {
-        assert(startTime <= maxTime);
-        static const int DIM = 1 << Log2Dim;
-        mT0 = startTime;
-        mT1 = maxTime;
-        const Vec3T &pos = ray(mT0), &dir = ray.dir(), &inv = ray.invDir();
-        mVoxel = Coord::floor(pos) & (~(DIM-1));
-        for (size_t axis = 0; axis < 3; ++axis) {
-            if (math::isZero(dir[axis])) {//handles dir = +/- 0
-                mStep[axis]  = 0;//dummy value
-                mNext[axis]  = std::numeric_limits<RealT>::max();//i.e. disabled!
-                mDelta[axis] = std::numeric_limits<RealT>::max();//dummy value
-            } else if (inv[axis] > 0) {
-                mStep[axis]  = DIM;
-                mNext[axis]  = mT0 + (mVoxel[axis] + DIM - pos[axis]) * inv[axis];
-                mDelta[axis] = mStep[axis] * inv[axis];
-            } else {
-                mStep[axis]  = -DIM;
-                mNext[axis]  = mT0 + (mVoxel[axis] - pos[axis]) * inv[axis];
-                mDelta[axis] = mStep[axis] * inv[axis];
-            }
-        }
-    }
-
-    /// @brief Increment the voxel index to next intersected voxel or node
-    /// and returns true if the step in time does not exceed maxTime.
-    inline bool step()
-    {
-        const size_t stepAxis = math::MinIndex(mNext);
-        mT0 = mNext[stepAxis];
-        mNext[stepAxis]  += mDelta[stepAxis];
-        mVoxel[stepAxis] += mStep[stepAxis];
-        return mT0 <= mT1;
-    }
-
-    /// @brief Return the index coordinates of the next node or voxel
-    /// intersected by the ray. If Log2Dim = 0 the return value is the
-    /// actual signed coordinate of the voxel, else it is the origin
-    /// of the corresponding VDB tree node or tile.
-    /// @note Incurs no computational overhead.
-    inline const Coord& voxel() const { return mVoxel; }
-
-    /// @brief Return the time (parameterized along the Ray) of the
-    /// first hit of a tree node of size 2^Log2Dim.
-    /// @details This value is initialized to startTime or ray.t0()
-    /// depending on the constructor used.
-    /// @note Incurs no computational overhead.
-    inline RealType time() const { return mT0; }
-
-    /// @brief Return the time (parameterized along the Ray) of the
-    /// second (i.e. next) hit of a tree node of size 2^Log2Dim.
-    /// @note Incurs a (small) computational overhead.
-    inline RealType next() const { return math::Min(mT1, mNext[0], mNext[1], mNext[2]); }
-
-    /// @brief Print information about this DDA for debugging.
-    /// @param os    a stream to which to write textual information.
-    void print(std::ostream& os = std::cout) const
-      {
-          os << "Dim=" << (1<<Log2Dim) << " time=" << mT0 << " next()="
-             << this->next() << " voxel=" << mVoxel << " next=" << mNext
-             << " delta=" << mDelta << " step=" << mStep << std::endl;
-      }
-
-private:
-    RealT mT0, mT1;
-    Coord mVoxel, mStep;
-    Vec3T mDelta, mNext;
-}; // class DDA
-
-/// @brief Output streaming of the Ray class.
-/// @note Primarily intended for debugging.
-template<typename RayT, Index Log2Dim>
-inline std::ostream& operator<<(std::ostream& os, const DDA<RayT, Log2Dim>& dda)
-{
-    os << "Dim="     << (1<<Log2Dim) << " time="  << dda.time()
-       << " next()=" << dda.next()   << " voxel=" << dda.voxel();
-    return os;
-}
 
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME

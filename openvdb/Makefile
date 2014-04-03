@@ -258,6 +258,13 @@ else
   CPPUNIT_LIB := -lcppunit
 endif
 
+# The parent directory of the log4cplus/ header directory
+# (leave blank if log4cplus is unavailable)
+LOG4CPLUS_INCL_DIR :=
+# The directory containing liblog4cplus
+LOG4CPLUS_LIB_DIR :=
+LOG4CPLUS_LIB :=
+
 # The directory containing glfw.h
 # (leave blank if GLFW is unavailable)
 GLFW_INCL_DIR :=
@@ -358,6 +365,11 @@ ifeq (3,$(words $(strip $(GLFW_LIB_DIR) $(GLFW_INCL_DIR) $(GLFW_LIB))))
     has_glfw := yes
 endif
 
+has_log4cplus := no
+ifeq (3,$(words $(strip $(LOG4CPLUS_LIB_DIR) $(LOG4CPLUS_INCL_DIR) $(LOG4CPLUS_LIB))))
+    has_log4cplus := yes
+endif
+
 has_python := no
 ifeq (7,$(words $(strip $(PYTHON_VERSION) $(PYTHON_LIB_DIR) $(PYTHON_INCL_DIR) \
     $(PYCONFIG_INCL_DIR) $(PYTHON_LIB) $(BOOST_PYTHON_LIB_DIR) $(BOOST_PYTHON_LIB))))
@@ -365,8 +377,14 @@ ifeq (7,$(words $(strip $(PYTHON_VERSION) $(PYTHON_LIB_DIR) $(PYTHON_INCL_DIR) \
 endif
 
 INCLDIRS := -I . -I .. -I $(BOOST_INCL_DIR) -I $(HALF_INCL_DIR) -I $(TBB_INCL_DIR) -I $(ZLIB_INCL_DIR)
+ifeq (yes,$(has_log4cplus))
+    INCLDIRS += -I $(LOG4CPLUS_INCL_DIR)
+endif
 
 CXXFLAGS += $(OPTIMIZE) $(INCLDIRS)
+ifeq (yes,$(has_log4cplus))
+    CXXFLAGS += -DOPENVDB_USE_LOG4CPLUS
+endif
 
 LIBS := \
     -L $(HALF_LIB_DIR) $(HALF_LIB) \
@@ -385,6 +403,14 @@ else
 EXR_LIBS = -L $(EXR_LIB_DIR) $(EXR_LIB)
 EXR_LIBS_RPATH := \
     -Wl,-rpath,'$$ORIGIN/.' $(LDDIROPT)$(EXR_LIB_DIR) $(EXR_LIB)
+endif
+ifeq (yes,$(has_log4cplus))
+LOG4CPLUS_LIBS := -L $(LOG4CPLUS_LIB_DIR) $(LOG4CPLUS_LIB)
+LOG4CPLUS_LIBS_RPATH := \
+    -Wl,-rpath,'$$ORIGIN/.' $(LDDIROPT)$(LOG4CPLUS_LIB_DIR) $(LOG4CPLUS_LIB)
+else
+LOG4CPLUS_LIBS :=
+LOG4CPLUS_LIBS_RPATH :=
 endif
 ifeq (0,$(words $(strip $(CONCURRENT_MALLOC_LIB_DIR) $(CONCURRENT_MALLOC_LIB))))
 ALLOC_LIBS :=
@@ -406,6 +432,7 @@ INCLUDE_NAMES := \
     io/Stream.h \
     math/BBox.h \
     math/Coord.h \
+    math/DDA.h \
     math/FiniteDifference.h \
     math/Hermite.h \
     math/LegacyFrustum.h \
@@ -435,6 +462,7 @@ INCLUDE_NAMES := \
     PlatformConfig.h \
     tools/Composite.h \
     tools/Dense.h \
+    tools/DenseSparseTools.h \
     tools/Filter.h \
     tools/GridOperators.h \
     tools/GridTransformer.h \
@@ -514,6 +542,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestCpt.cc \
     unittest/TestCurl.cc \
     unittest/TestDense.cc \
+    unittest/TestDenseSparseTools.cc \
     unittest/TestDivergence.cc \
     unittest/TestDoubleMetadata.cc \
     unittest/TestExceptions.cc \

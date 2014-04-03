@@ -198,7 +198,6 @@ public:
 	    lines[4].init( 0.0, 0.0,-0.5);
 	    lines[5].init( 0.0, 0.0, 0.5);
 
-	    const openvdb::math::Transform &xform = grid.transform();
 	    for (int i = 0; i < NPTS; i++)
 		lines[i] = xform.indexToWorld(lines[i]);
 

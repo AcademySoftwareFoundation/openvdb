@@ -674,6 +674,11 @@ BOOST_PYTHON_MODULE(PY_OPENVDB_MODULE_NAME)
         "of (name, value) metadata pairs to a .vdb file.");
 
     // Add some useful module-level constants.
+    py::scope().attr("LIBRARY_VERSION") = py::make_tuple(
+        openvdb::OPENVDB_LIBRARY_MAJOR_VERSION,
+        openvdb::OPENVDB_LIBRARY_MINOR_VERSION,
+        openvdb::OPENVDB_LIBRARY_PATCH_VERSION);
+    py::scope().attr("FILE_FORMAT_VERSION") = openvdb::OPENVDB_FILE_VERSION;
     py::scope().attr("COORD_MIN") = openvdb::Coord::min();
     py::scope().attr("COORD_MAX") = openvdb::Coord::max();
     py::scope().attr("LEVEL_SET_HALF_WIDTH") = openvdb::LEVEL_SET_HALF_WIDTH;

@@ -509,6 +509,13 @@ public:
     explicit Grid(TreePtrType);
     /// Deep copy another grid's metadata, transform and tree.
     Grid(const Grid&);
+    /// @brief Deep copy the metadata, transform and tree of another grid whose tree
+    /// configuration is the same as this grid's but whose value type is different.
+    /// Cast the other grid's values to this grid's value type.
+    /// @throw TypeError if the other grid's tree configuration doesn't match this grid's
+    /// or if this grid's ValueType is not constructible from the other grid's ValueType.
+    template<typename OtherTreeType>
+    explicit Grid(const Grid<OtherTreeType>&);
     /// Deep copy another grid's metadata, but share its tree and transform.
     Grid(const Grid&, ShallowCopy);
     /// @brief Deep copy another grid's metadata and transform, but construct a new tree
@@ -1001,6 +1008,15 @@ template<typename TreeT>
 inline Grid<TreeT>::Grid(const Grid& other):
     GridBase(other),
     mTree(boost::static_pointer_cast<TreeType>(other.mTree->copy()))
+{
+}
+
+
+template<typename TreeT>
+template<typename OtherTreeType>
+inline Grid<TreeT>::Grid(const Grid<OtherTreeType>& other):
+    GridBase(other),
+    mTree(new TreeType(other.constTree()))
 {
 }
 

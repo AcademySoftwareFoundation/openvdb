@@ -278,6 +278,7 @@ HOUDINI_SOP_SRC_NAMES := \
     houdini/SOP_OpenVDB_Advect_Level_Set.cc \
     houdini/SOP_OpenVDB_Advect_Points.cc \
     houdini/SOP_OpenVDB_Analysis.cc \
+    houdini/SOP_OpenVDB_Clip.cc \
     houdini/SOP_OpenVDB_Combine.cc \
     houdini/SOP_OpenVDB_Convert.cc \
     houdini/SOP_OpenVDB_Create.cc \
@@ -289,6 +290,7 @@ HOUDINI_SOP_SRC_NAMES := \
     houdini/SOP_OpenVDB_From_Polygons.cc \
     houdini/SOP_OpenVDB_Metadata.cc \
     houdini/SOP_OpenVDB_Noise.cc \
+    houdini/SOP_OpenVDB_Occlusion_Mask.cc \
     houdini/SOP_OpenVDB_Platonic.cc \
     houdini/SOP_OpenVDB_Prune.cc \
     houdini/SOP_OpenVDB_Ray.cc \

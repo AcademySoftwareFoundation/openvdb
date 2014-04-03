@@ -1858,7 +1858,7 @@ TestFile::testNameIterator()
     vdbfile.open();
 
     // Names should appear in lexicographic order.
-    Name names[6] = { "[1]", "[2]", "density", "level_set", "level_set[1]", "temperature" };
+    Name names[6] = { "[0]", "[1]", "density", "level_set", "level_set[1]", "temperature" };
     int count = 0;
     for (io::File::NameIterator iter = vdbfile.beginName(); iter != vdbfile.endName(); ++iter) {
         CPPUNIT_ASSERT_EQUAL(names[count], *iter);
@@ -1897,6 +1897,9 @@ TestFile::testCompression()
     IntGrid::Ptr intGrid = IntGrid::create(/*background=*/0);
     intGrid->fill(CoordBBox(Coord(0), Coord(49)), /*value=*/999, /*active=*/true);
     intGrid->fill(CoordBBox(Coord(6), Coord(43)), /*value=*/0, /*active=*/false);
+    intGrid->fill(CoordBBox(Coord(21), Coord(22)), /*value=*/1, /*active=*/false);
+    intGrid->fill(CoordBBox(Coord(23), Coord(24)), /*value=*/2, /*active=*/false);
+    CPPUNIT_ASSERT_EQUAL(8, int(IntGrid::TreeType::LeafNodeType::DIM));
 
     FloatGrid::Ptr lsGrid = createLevelSet<FloatGrid>();
     unittest_util::makeSphere(/*dim=*/Coord(100), /*ctr=*/Vec3f(50, 50, 50), /*r=*/20.0,
@@ -1973,6 +1976,17 @@ TestFile::testCompression()
                 CPPUNIT_ASSERT_EQUAL(
                     intGrid->tree().getValue(Coord(0)),
                     grid->tree().getValue(Coord(0)));
+                // Verify that leaf nodes with more than two distinct inactive values
+                // are handled correctly (FX-7085).
+                CPPUNIT_ASSERT_EQUAL(
+                    intGrid->tree().getValue(Coord(6)),
+                    grid->tree().getValue(Coord(6)));
+                CPPUNIT_ASSERT_EQUAL(
+                    intGrid->tree().getValue(Coord(21)),
+                    grid->tree().getValue(Coord(21)));
+                CPPUNIT_ASSERT_EQUAL(
+                    intGrid->tree().getValue(Coord(23)),
+                    grid->tree().getValue(Coord(23)));
 
                 // Verify that the only active value in this grid is 999.
                 Int32 minVal = -1, maxVal = -1;

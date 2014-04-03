@@ -53,6 +53,7 @@ Contributors, please familiarize yourselves with our
   - @ref subsecVoxSpace
   - @ref subsecWorSpace
   - @ref subsecTrans
+- @ref secGrid
 - @ref secToolUtils
 - @ref secIterator
   - @ref subsecTreeIter
@@ -233,10 +234,9 @@ addition, methods such as @vdblink::math::Transform::worldToIndexCellCentered()
 worldToIndexCellCentered()@endlink actually return lattice points. 
 
 @subsection subsecTrans Transforms and Maps
-A @c Grid contains smart pointers to both a @c Tree object and a
-@vdblink::math::Transform Transform @endlink object.  The transform
-provides a context for interpreting the information held in the tree
-by associating a location in world space with each entry in the tree.
+A @vdblink::math::Transform Transform @endlink provides a context for
+interpreting the information held in a tree by associating a location
+in world space with each entry in the tree.
 The actual implementation of the @c Transform is managed by a 
 @vdblink::math::MapBase Map@endlink object, which is an
 encapsulation of a continuous, mostly invertible function of three
@@ -247,6 +247,106 @@ methods to relate locations in its domain to its range and vice versa.
 A @c Map is also required to provide information about its local derivatives.
 For more on these classes, see the
 @subpage transformsAndMaps "Transforms and Maps" page.
+
+
+@section secGrid The Grid
+
+For many applications, it might not be necessary ever to operate directly on
+trees, though there are often significant performance improvements to be
+gained by exploiting the tree structure.
+The @vdblink::Grid Grid@endlink, however, is the preferred interface through
+which to manage voxel data, in part because a grid associates with a tree
+additional and often necessary information that is not accessible through
+the tree itself.
+
+A @vdblink::Grid Grid@endlink contains smart pointers to a
+@vdblink::tree::Tree Tree@endlink object and a
+@vdblink::math::Transform Transform@endlink object, either or both of which
+might be shared with other grids.
+As mentioned above, the transform provides for the interpretation of voxel
+locations.  Other grid metadata, notably the <B>grid class</B>, the
+<B>vector type</B> and the world&nbsp;space/local space toggle, affect
+the interpretation of voxel values.
+
+OpenVDB is particularly well-suited (though by no means exclusively so)
+to the representation of <B>narrow-band level sets</B> and
+<B>fog volumes</B>.
+A narrow-band level set is represented by three distinct regions of voxels:
+an @b outside (or background) region of inactive voxels having a constant,
+positive distance from the level set surface; an @b inside region of inactive
+voxels having a constant, negative distance; and a thin band of active voxels
+(normally three voxels wide on either side of the surface) whose values are
+signed distances.
+Similarly, a fog volume is represented by an outside region of inactive
+voxels with value zero, an inside region of active voxels with value one,
+and a thin band of active voxels, with values typically varying linearly
+between zero and one, that separates the inside from the outside.
+Identifying a grid as a level set or a fog volume, by setting its
+@vdblink::GridClass grid class@endlink with
+@vdblink::Grid::setGridClass() setGridClass@endlink, allows tools to invoke
+alternative implementations that are better-suited or better-optimized
+for those classes.
+For example, resampling (in particular, scaling) a level set should normally
+not be done without updating its signed distance values.
+The @vdblink::tools::resampleToMatch() resampleToMatch@endlink tool
+automatically recomputes signed distances for grids that are identified
+as level sets.
+(The lower-level @vdblink::tools::GridResampler GridResampler@endlink does not,
+but it is optimized for level set grids in that it transforms only voxels
+in the narrow band and relies on
+@vdblink::Grid::signedFloodFill() signed flood fill@endlink to reconstruct
+the inside and outside regions.)
+Other tools whose behavior is affected by the grid class include the
+@vdblink::tools::divergence() divergence@endlink operator (which has an
+alternative implementation for @ref sStaggered "staggered velocity" grids),
+the @vdblink::tools::volumeToMesh() volume to mesh@endlink converter, and
+the @vdblink::tools::fillWithSpheres() sphere packing@endlink tool.
+In addition, a number of level-set-specific tools, such as the
+@vdblink::tools::LevelSetTracker level set tracker@endlink, throw
+exceptions when invoked on grids that are not identified as level sets.
+It is important, therefore, to set a grid&rsquo;s class appropriately.
+
+When a vector-valued grid is transformed or resampled, it is often necessary
+for the transform to be applied not just to voxel locations but also to
+voxel values.
+By default, grids are identified as &ldquo;world-space&rdquo;, meaning that
+if the grid is vector-valued, its voxel values should be transformed.
+Alternatively, voxel values of grids identified as
+&ldquo;local-space&rdquo;, via
+@vdblink::Grid::setIsInWorldSpace() setIsInWorldSpace@endlink, do not
+undergo transformation.
+A world-space grid&rsquo;s @vdblink::VecType vector type@endlink, specified
+with @vdblink::Grid::setVectorType() setVectorType@endlink, may be invariant,
+covariant or contravariant, which determines how transforms are applied
+to the grid&rsquo;s voxel values (for details see, for example,
+<A HREF="http://en.wikipedia.org/wiki/Covariance_and_contravariance_of_vectors">
+<I>Covariance and contravariance of vectors</I></A>&nbsp;[Wikipedia]).
+The @vdblink::tools::transformVectors() transformVectors@endlink tool can be
+used to apply a transform to a grid&rsquo;s voxel values, and it handles all
+of the supported vector types.
+
+A grid can optionally be assigned @vdblink::Grid::setName() name@endlink and
+@vdblink::Grid::setCreator() creator@endlink strings.
+These are purely informational, though it might be desirable to name grids
+so as to easily select which ones to read from files that contain multiple
+grids.
+In the absence of grid names, or at least of unique names, OpenVDB&rsquo;s
+file I/O routines recognize an ordinal suffix:
+&ldquo;<TT>[0]</TT>&rdquo; refers to the first unnamed grid,
+&ldquo;<TT>[1]</TT>&rdquo; refers to the second, and so on, and
+&ldquo;<TT>density[0]</TT>&rdquo; and &ldquo;<TT>density[1]</TT>&rdquo;
+refer to the first and second grids named &ldquo;density&rdquo;.
+Also of interest for file I/O is a grid&rsquo;s
+&ldquo;@vdblink::Grid::setSaveFloatAsHalf() save float as half@endlink&rdquo;
+setting, which allows it to be written more compactly using 16-bit
+floating point values rather than full-precision values.
+Finally, during file output certain statistics are computed and stored
+as per-grid metadata.
+These include the grid&rsquo;s index-space active voxel bounding box,
+its active voxel count and its memory usage in bytes.
+This information can also be
+@vdblink::io::File::readAllGridMetadata() retrieved@endlink
+efficiently from a file.
 
 
 @section secToolUtils Utilities and Tools
@@ -334,16 +434,14 @@ class for the complete list.
 
 @anchor treeLeafIterRef
 @par Tree::LeafIter
-Narrow-band level sets are represented by three distinct regions of voxels:
-a thin band of active voxels whose values are signed distances; an
-@b outside (or background) region of inactive voxels having a constant,
-positive distance; and an @b inside region of inactive voxels having a
-constant, negative distance.  By convention in OpenVDB, narrow-band voxels
-are stored only at the leaf level of a tree, so to facilitate the
+By convention in OpenVDB, voxels in the narrow band of a narrow-band
+level set are stored only at the leaf level of a tree, so to facilitate the
 implementation of level set algorithms that operate on narrow-band voxels,
 OpenVDB provides an iterator that visits each @c LeafNode in a tree exactly
-once.  See the @vdblink::tree::LeafIteratorBase LeafIteratorBase @endlink
-class for details.
+once.
+See the @vdblink::tree::LeafIteratorBase LeafIteratorBase@endlink class
+for details, and also the related
+@vdblink::tree::LeafManager LeafManager@endlink acceleration structure.
 
 @anchor treeNodeIterRef
 @par Tree::NodeIter

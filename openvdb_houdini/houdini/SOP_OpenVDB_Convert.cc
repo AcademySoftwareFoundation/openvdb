@@ -64,7 +64,7 @@
 #define HAVE_POLYSOUP 0
 #endif
 
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
+#if (UT_VERSION_INT >= 0x0d0000ed) // 13.0.237 or later
 #define HAVE_SPLITTING 1
 #else
 #define HAVE_SPLITTING 0

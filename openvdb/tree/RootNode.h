@@ -58,7 +58,12 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tree {
 
-template<typename HeadType, int HeadLevel> struct NodeChain; // forward declaration
+// Forward declarations
+template<typename HeadType, int HeadLevel> struct NodeChain;
+template<typename, typename> struct SameRootConfig;
+template<typename, typename, bool> struct RootNodeCopyHelper;
+template<typename, typename, typename, bool> struct RootNodeCombineHelper;
+
 
 template<typename ChildType>
 class RootNode
@@ -81,6 +86,14 @@ public:
         typedef RootNode<typename ChildType::template ValueConverter<OtherValueType>::Type> Type;
     };
 
+    /// @brief SameConfiguration<OtherNodeType>::value is @c true if and only if
+    /// OtherNodeType is the type of a RootNode whose ChildNodeType has the same
+    /// configuration as this node's ChildNodeType.
+    template<typename OtherNodeType>
+    struct SameConfiguration {
+        static const bool value = SameRootConfig<ChildNodeType, OtherNodeType>::value;
+    };
+
 
     /// Construct a new tree with a background value of 0.
     RootNode();
@@ -90,6 +103,15 @@ public:
 
     RootNode(const RootNode& other) { *this = other; }
 
+    /// @brief Construct a new tree that reproduces the topology and active states
+    /// of a tree of a different ValueType but the same configuration (levels,
+    /// node dimensions and branching factors).  Cast the other tree's values to
+    /// this tree's ValueType.
+    /// @throw TypeError if the other tree's configuration doesn't match this tree's
+    /// or if this tree's ValueType is not constructible from the other tree's ValueType.
+    template<typename OtherChildType>
+    explicit RootNode(const RootNode<OtherChildType>& other) { *this = other; }
+
     /// @brief Construct a new tree that reproduces the topology and active states of
     /// another tree (which may have a different ValueType), but not the other tree's values.
     /// @details All tiles and voxels that are active in the other tree are set to
@@ -97,10 +119,10 @@ public:
     /// @param other       the root node of a tree having (possibly) a different ValueType
     /// @param background  the value to which inactive tiles and voxels are initialized
     /// @param foreground  the value to which active tiles and voxels are initialized
+    /// @throw TypeError if the other tree's configuration doesn't match this tree's.
     template<typename OtherChildType>
     RootNode(const RootNode<OtherChildType>& other,
-        const ValueType& background, const ValueType& foreground,
-             TopologyCopy);
+        const ValueType& background, const ValueType& foreground, TopologyCopy);
 
     /// @brief Construct a new tree that reproduces the topology and active states of
     /// another tree (which may have a different ValueType), but not the other tree's values.
@@ -111,10 +133,21 @@ public:
     /// @note This copy constructor is generally faster than the one that takes both
     /// a foreground and a background value.  Its main application is in multithreaded
     /// operations where the topology of the output tree exactly matches the input tree.
+    /// @throw TypeError if the other tree's configuration doesn't match this tree's.
     template<typename OtherChildType>
     RootNode(const RootNode<OtherChildType>& other, const ValueType& background, TopologyCopy);
 
+    /// @brief Copy a root node of the same type as this node.
     RootNode& operator=(const RootNode& other);
+    /// @brief Copy a root node of the same tree configuration as this node
+    /// but a different ValueType.
+    /// @throw TypeError if the other tree's configuration doesn't match this tree's.
+    /// @note This node's ValueType must be constructible from the other node's ValueType.
+    /// For example, a root node with values of type float can be assigned to a root node
+    /// with values of type Vec3s, because a Vec3s can be constructed from a float.
+    /// But a Vec3s root node cannot be assigned to a float root node.
+    template<typename OtherChildType>
+    RootNode& operator=(const RootNode<OtherChildType>& other);
 
     ~RootNode() { this->clearTable(); }
 
@@ -395,7 +428,6 @@ public:
     /// as dense, i.e. with all voxels active. Else the individual
     /// active voxels are visited to produce a tight bbox.
     void evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels = true) const;
-    OPENVDB_DEPRECATED void evalActiveVoxelBoundingBox(CoordBBox& bbox) const;
 
     /// Return the bounding box of this RootNode, i.e., an infinite bounding box.
     static CoordBBox getNodeBoundingBox() { return CoordBBox::inf(); }
@@ -461,6 +493,11 @@ public:
     /// Return @c false if the other node's dimensions don't match this node's.
     template<typename OtherChildType>
     static bool hasSameConfiguration(const RootNode<OtherChildType>& other);
+
+    /// Return @c true if values of the other node's ValueType can be converted
+    /// to values of this node's ValueType.
+    template<typename OtherChildType>
+    static bool hasCompatibleValueType(const RootNode<OtherChildType>& other);
 
     Index32 leafCount() const;
     Index32 nonLeafCount() const;
@@ -755,7 +792,7 @@ public:
 
     /// @brief Intersects this tree's set of active values with the active values
     /// of the other tree, whose @c ValueType may be different.
-    /// @details The resulting state of a value is active only if the corresponding 
+    /// @details The resulting state of a value is active only if the corresponding
     /// value was already active AND if it is active in the other tree. Also, a
     /// resulting value maps to a voxel if the corresponding value
     /// already mapped to an active voxel in either of the two grids
@@ -785,8 +822,8 @@ public:
     template<typename CombineOp>
     void combine(RootNode& other, CombineOp&, bool prune = false);
 
-    template<typename CombineOp>
-    void combine2(const RootNode& other0, const RootNode& other1,
+    template<typename CombineOp, typename OtherRootNode /*= RootNode*/>
+    void combine2(const RootNode& other0, const OtherRootNode& other1,
                   CombineOp& op, bool prune = false);
 
     /// @brief Call the templated functor BBoxOp with bounding box
@@ -808,6 +845,9 @@ private:
     /// During topology-only construction, access is needed
     /// to protected/private members of other template instances.
     template<typename> friend class RootNode;
+
+    template<typename, typename, bool> friend struct RootNodeCopyHelper;
+    template<typename, typename, typename, bool> friend struct RootNodeCombineHelper;
 
     /// Currently no-op, but can be used to define empty and delete keys for mTable
     void initTable() {}
@@ -848,9 +888,23 @@ private:
     /// @return an iterator pointing to the matching mTable entry.
     MapIter findOrAddCoord(const Coord& xyz);
 
-    /// @throw TypeError if the other node's dimensions don't match this node's.
+    /// @brief Verify that the tree rooted at @a other has the same configuration
+    /// (levels, branching factors and node dimensions) as this tree, but allow
+    /// their ValueTypes to differ.
+    /// @throw TypeError if the other tree's configuration doesn't match this tree's.
     template<typename OtherChildType>
     static void enforceSameConfiguration(const RootNode<OtherChildType>& other);
+
+    /// @brief Verify that @a other has values of a type that can be converted
+    /// to this node's ValueType.
+    /// @details For example, values of type float are compatible with values of type Vec3s,
+    /// because a Vec3s can be constructed from a float.  But the reverse is not true.
+    /// @throw TypeError if the other node's ValueType is not convertible into this node's.
+    template<typename OtherChildType>
+    static void enforceCompatibleValueTypes(const RootNode<OtherChildType>& other);
+
+    template<typename CombineOp, typename OtherRootNode /*= RootNode*/>
+    void doCombine2(const RootNode&, const OtherRootNode&, CombineOp&, bool prune);
 
     template<typename RootNodeT, typename VisitorOp, typename ChildAllIterT>
     static inline void doVisit(RootNodeT&, VisitorOp&);
@@ -904,6 +958,24 @@ struct NodeChain<HeadT, /*HeadLevel=*/1> {
 ////////////////////////////////////////
 
 
+//@{
+/// Helper metafunction used to implement RootNode::SameConfiguration
+/// (which, as an inner class, can't be independently specialized)
+template<typename ChildT1, typename NodeT2>
+struct SameRootConfig {
+    static const bool value = false;
+};
+
+template<typename ChildT1, typename ChildT2>
+struct SameRootConfig<ChildT1, RootNode<ChildT2> > {
+    static const bool value = ChildT1::template SameConfiguration<ChildT2>::value;
+};
+//@}
+
+
+////////////////////////////////////////
+
+
 template<typename ChildT>
 inline
 RootNode<ChildT>::RootNode(): mBackground(zeroVal<ValueType>())
@@ -914,7 +986,7 @@ RootNode<ChildT>::RootNode(): mBackground(zeroVal<ValueType>())
 
 template<typename ChildT>
 inline
-RootNode<ChildT>::RootNode(const ValueType& background) : mBackground(background)
+RootNode<ChildT>::RootNode(const ValueType& background): mBackground(background)
 {
     this->initTable();
 }
@@ -929,7 +1001,6 @@ RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
 {
     typedef RootNode<OtherChildType> OtherRootT;
 
-    /// @todo Can this be avoided with partial specialization?
     enforceSameConfiguration(other);
 
     const Tile bgTile(backgd, /*active=*/false), fgTile(foregd, true);
@@ -952,7 +1023,6 @@ RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
 {
     typedef RootNode<OtherChildType> OtherRootT;
 
-    /// @todo Can this be avoided with partial specialization?
     enforceSameConfiguration(other);
 
     const Tile bgTile(backgd, /*active=*/false), fgTile(backgd, true);
@@ -965,19 +1035,99 @@ RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
 }
 
 
+////////////////////////////////////////
+
+
+// This helper class is a friend of RootNode and is needed so that assignment
+// with value conversion can be specialized for compatible and incompatible
+// pairs of RootNode types.
+template<typename RootT, typename OtherRootT, bool Compatible = false>
+struct RootNodeCopyHelper
+{
+    static inline void copyWithValueConversion(RootT& self, const OtherRootT& other)
+    {
+        // If the two root nodes have different configurations or incompatible ValueTypes,
+        // throw an exception.
+        self.enforceSameConfiguration(other);
+        self.enforceCompatibleValueTypes(other);
+        // One of the above two tests should throw, so we should never get here:
+        std::ostringstream ostr;
+        ostr << "cannot convert a " << typeid(OtherRootT).name()
+            << " to a " << typeid(RootT).name();
+        OPENVDB_THROW(TypeError, ostr.str());
+    }
+};
+
+// Specialization for root nodes of compatible types
+template<typename RootT, typename OtherRootT>
+struct RootNodeCopyHelper<RootT, OtherRootT, /*Compatible=*/true>
+{
+    static inline void copyWithValueConversion(RootT& self, const OtherRootT& other)
+    {
+        typedef typename RootT::ValueType          ValueT;
+        typedef typename RootT::ChildNodeType      ChildT;
+        typedef typename RootT::NodeStruct         NodeStruct;
+        typedef typename RootT::Tile               Tile;
+        typedef typename OtherRootT::ValueType     OtherValueT;
+        typedef typename OtherRootT::ChildNodeType OtherChildT;
+        typedef typename OtherRootT::MapCIter      OtherMapCIter;
+        typedef typename OtherRootT::Tile          OtherTile;
+
+        struct Local {
+            /// @todo Consider using a value conversion functor passed as an argument instead.
+            static inline ValueT convertValue(const OtherValueT& val) { return ValueT(val); }
+        };
+
+        self.mBackground = Local::convertValue(other.mBackground);
+
+        self.clearTable();
+        self.initTable();
+
+        for (OtherMapCIter i = other.mTable.begin(), e = other.mTable.end(); i != e; ++i) {
+            if (other.isTile(i)) {
+                // Copy the other node's tile, but convert its value to this node's ValueType.
+                const OtherTile& otherTile = other.getTile(i);
+                self.mTable[i->first] = NodeStruct(
+                    Tile(Local::convertValue(otherTile.value), otherTile.active));
+            } else {
+                // Copy the other node's child, but convert its values to this node's ValueType.
+                self.mTable[i->first] = NodeStruct(*(new ChildT(other.getChild(i))));
+            }
+        }
+    }
+};
+
+
+// Overload for root nodes of the same type as this node
 template<typename ChildT>
 inline RootNode<ChildT>&
 RootNode<ChildT>::operator=(const RootNode& other)
 {
-    mBackground = other.mBackground;
+    if (&other != this) {
+        mBackground = other.mBackground;
 
-    this->clearTable();
-    this->initTable();
+        this->clearTable();
+        this->initTable();
 
-    for (MapCIter i = other.mTable.begin(), e = other.mTable.end(); i != e; ++i) {
-        mTable[i->first] =
-            isTile(i) ? NodeStruct(getTile(i)) : NodeStruct(*(new ChildT(getChild(i))));
+        for (MapCIter i = other.mTable.begin(), e = other.mTable.end(); i != e; ++i) {
+            mTable[i->first] =
+                isTile(i) ? NodeStruct(getTile(i)) : NodeStruct(*(new ChildT(getChild(i))));
+        }
     }
+    return *this;
+}
+
+// Overload for root nodes of different types
+template<typename ChildT>
+template<typename OtherChildType>
+inline RootNode<ChildT>&
+RootNode<ChildT>::operator=(const RootNode<OtherChildType>& other)
+{
+    typedef RootNode<OtherChildType>       OtherRootT;
+    typedef typename OtherRootT::ValueType OtherValueT;
+    static const bool compatible = (SameConfiguration<OtherRootT>::value
+        && CanConvertType</*from=*/OtherValueT, /*to=*/ValueType>::value);
+    RootNodeCopyHelper<RootNode, OtherRootT, compatible>::copyWithValueConversion(*this, other);
     return *this;
 }
 
@@ -1215,6 +1365,31 @@ RootNode<ChildT>::enforceSameConfiguration(const RootNode<OtherChildType>&)
 }
 
 
+template<typename ChildT>
+template<typename OtherChildType>
+inline bool
+RootNode<ChildT>::hasCompatibleValueType(const RootNode<OtherChildType>&)
+{
+    typedef typename OtherChildType::ValueType OtherValueType;
+    return CanConvertType</*from=*/OtherValueType, /*to=*/ValueType>::value;
+}
+
+
+template<typename ChildT>
+template<typename OtherChildType>
+inline void
+RootNode<ChildT>::enforceCompatibleValueTypes(const RootNode<OtherChildType>&)
+{
+    typedef typename OtherChildType::ValueType OtherValueType;
+    if (!CanConvertType</*from=*/OtherValueType, /*to=*/ValueType>::value) {
+        std::ostringstream ostr;
+        ostr << "values of type " << typeNameAsString<OtherValueType>()
+            << " cannot be converted to type " << typeNameAsString<ValueType>();
+        OPENVDB_THROW(TypeError, ostr.str());
+    }
+}
+
+
 ////////////////////////////////////////
 
 
@@ -1231,18 +1406,17 @@ RootNode<ChildT>::memUsage() const
     return sum;
 }
 
+
 template<typename ChildT>
 inline void
-RootNode<ChildT>::evalActiveVoxelBoundingBox(CoordBBox& bbox) const
+RootNode<ChildT>::clearTable()
 {
-    for (MapCIter iter=mTable.begin(); iter!=mTable.end(); ++iter) {
-        if (const ChildT *child = iter->second.child) {
-            child->evalActiveVoxelBoundingBox(bbox);
-        } else if (isTileOn(iter)) {
-            bbox.expand(iter->first, ChildT::DIM);
-        }
+    for (MapIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
+        delete i->second.child;
     }
+    mTable.clear();
 }
+
 
 template<typename ChildT>
 inline void
@@ -1255,16 +1429,6 @@ RootNode<ChildT>::evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels) const
             bbox.expand(iter->first, ChildT::DIM);
         }
     }
-}
-
-template<typename ChildT>
-inline void
-RootNode<ChildT>::clearTable()
-{
-    for (MapIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
-        delete i->second.child;
-    }
-    mTable.clear();
 }
 
 
@@ -2726,7 +2890,8 @@ RootNode<ChildT>::topologyIntersection(const RootNode<OtherChildType>& other)
             if (j == other.mTable.end() || other.isTileOff(j)) {
                 this->setTile(i, Tile(this->getTile(i).value, false));//turn inactive
             } else if (other.isChild(j)) { //replace with a child branch with identical topology
-                ChildT* child = new ChildT(other.getChild(j), this->getTile(i).value, TopologyCopy());
+                ChildT* child =
+                    new ChildT(other.getChild(j), this->getTile(i).value, TopologyCopy());
                 this->setChild(i, *child);
             }
         }
@@ -2743,7 +2908,7 @@ RootNode<ChildT>::topologyDifference(const RootNode<OtherChildType>& other)
     typedef typename OtherRootT::MapCIter OtherCIterT;
 
     enforceSameConfiguration(other);
-    
+
     for (OtherCIterT i = other.mTable.begin(), e = other.mTable.end(); i != e; ++i) {
         MapIter j = mTable.find(i->first);
         if (other.isChild(i)) {
@@ -2830,28 +2995,80 @@ RootNode<ChildT>::combine(RootNode& other, CombineOp& op, bool prune)
 ////////////////////////////////////////
 
 
+// This helper class is a friend of RootNode and is needed so that combine2
+// can be specialized for compatible and incompatible pairs of RootNode types.
+template<typename CombineOp, typename RootT, typename OtherRootT, bool Compatible = false>
+struct RootNodeCombineHelper
+{
+    static inline void combine2(RootT& self, const RootT&, const OtherRootT& other1,
+        CombineOp&, bool)
+    {
+        // If the two root nodes have different configurations or incompatible ValueTypes,
+        // throw an exception.
+        self.enforceSameConfiguration(other1);
+        self.enforceCompatibleValueTypes(other1);
+        // One of the above two tests should throw, so we should never get here:
+        std::ostringstream ostr;
+        ostr << "cannot combine a " << typeid(OtherRootT).name()
+            << " into a " << typeid(RootT).name();
+        OPENVDB_THROW(TypeError, ostr.str());
+    }
+};
+
+// Specialization for root nodes of compatible types
+template<typename CombineOp, typename RootT, typename OtherRootT>
+struct RootNodeCombineHelper<CombineOp, RootT, OtherRootT, /*Compatible=*/true>
+{
+    static inline void combine2(RootT& self, const RootT& other0, const OtherRootT& other1,
+        CombineOp& op, bool prune)
+    {
+        self.doCombine2(other0, other1, op, prune);
+    }
+};
+
+
 template<typename ChildT>
-template<typename CombineOp>
+template<typename CombineOp, typename OtherRootNode>
 inline void
-RootNode<ChildT>::combine2(const RootNode& other0, const RootNode& other1,
+RootNode<ChildT>::combine2(const RootNode& other0, const OtherRootNode& other1,
     CombineOp& op, bool prune)
 {
-    CombineArgs<ValueType> args;
+    typedef typename OtherRootNode::ValueType OtherValueType;
+    static const bool compatible = (SameConfiguration<OtherRootNode>::value
+        && CanConvertType</*from=*/OtherValueType, /*to=*/ValueType>::value);
+    RootNodeCombineHelper<CombineOp, RootNode, OtherRootNode, compatible>::combine2(
+        *this, other0, other1, op, prune);
+}
+
+
+template<typename ChildT>
+template<typename CombineOp, typename OtherRootNode>
+inline void
+RootNode<ChildT>::doCombine2(const RootNode& other0, const OtherRootNode& other1,
+    CombineOp& op, bool prune)
+{
+    enforceSameConfiguration(other1);
+
+    typedef typename OtherRootNode::ValueType  OtherValueT;
+    typedef typename OtherRootNode::Tile       OtherTileT;
+    typedef typename OtherRootNode::NodeStruct OtherNodeStructT;
+    typedef typename OtherRootNode::MapCIter   OtherMapCIterT;
+
+    CombineArgs<ValueType, OtherValueT> args;
 
     CoordSet keys;
     other0.insertKeys(keys);
     other1.insertKeys(keys);
 
-    const NodeStruct
-        bg0(Tile(other0.mBackground, /*active=*/false)),
-        bg1(Tile(other1.mBackground, /*active=*/false));
+    const NodeStruct bg0(Tile(other0.mBackground, /*active=*/false));
+    const OtherNodeStructT bg1(OtherTileT(other1.mBackground, /*active=*/false));
 
     for (CoordSetCIter i = keys.begin(), e = keys.end(); i != e; ++i) {
         MapIter thisIter = this->findOrAddCoord(*i);
-        MapCIter iter0 = other0.findKey(*i), iter1 = other1.findKey(*i);
-        const NodeStruct
-            &ns0 = (iter0 != other0.mTable.end()) ? iter0->second : bg0,
-            &ns1 = (iter1 != other1.mTable.end()) ? iter1->second : bg1;
+        MapCIter iter0 = other0.findKey(*i);
+        OtherMapCIterT iter1 = other1.findKey(*i);
+        const NodeStruct& ns0 = (iter0 != other0.mTable.end()) ? iter0->second : bg0;
+        const OtherNodeStructT& ns1 = (iter1 != other1.mTable.end()) ? iter1->second : bg1;
         if (ns0.isTile() && ns1.isTile()) {
             // Both input nodes have constant values (tiles).
             // Combine the two values and add a new tile to this node with the result.
@@ -2861,11 +3078,11 @@ RootNode<ChildT>::combine2(const RootNode& other0, const RootNode& other1,
                 .setBIsActive(ns1.isTileOn()));
             setTile(thisIter, Tile(args.result(), args.resultIsActive()));
         } else {
-            ChildT& otherChild = ns0.isChild() ? *ns0.child : *ns1.child;
             if (!isChild(thisIter)) {
                 // Add a new child with the same coordinates, etc. as the other node's child.
-                setChild(thisIter,
-                    *(new ChildT(otherChild.origin(), getTile(thisIter).value)));
+                const Coord& childOrigin =
+                    ns0.isChild() ? ns0.child->origin() : ns1.child->origin();
+                setChild(thisIter, *(new ChildT(childOrigin, getTile(thisIter).value)));
             }
             ChildT& child = getChild(thisIter);
 
@@ -2982,8 +3199,6 @@ template<
 inline void
 RootNode<ChildT>::doVisit2(RootNodeT& self, OtherRootNodeT& other, VisitorOp& op)
 {
-    /// @todo Allow the two nodes to have different ValueTypes, but not
-    /// different fan-out factors or different index space bounds.
     enforceSameConfiguration(other);
 
     typename RootNodeT::ValueType val;

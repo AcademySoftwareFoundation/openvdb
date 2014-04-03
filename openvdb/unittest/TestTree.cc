@@ -89,7 +89,7 @@ public:
     CPPUNIT_TEST(testProcessBBox);
     CPPUNIT_TEST(testStealNode);
     CPPUNIT_TEST_SUITE_END();
-    
+
     void testBackground();
     void testHalf();
     void testValues();
@@ -1183,7 +1183,7 @@ TestTree::testTopologyUnion()
         tree0.setValue(openvdb::Coord( 500, 300, 200), 1.0f);
         tree1.setValue(openvdb::Coord(   8,  11,  11), 2.0f);
         openvdb::FloatTree tree2(tree1);
-        
+
         tree1.topologyUnion(tree0);
 
         for (openvdb::FloatTree::ValueOnCIter iter = tree0.cbeginValueOn(); iter; ++iter) {
@@ -1239,7 +1239,7 @@ TestTree::testTopologyUnion()
         CPPUNIT_ASSERT(!tree2.empty());
         CPPUNIT_ASSERT(!tree3.empty());
         openvdb::FloatTree tree1_copy(tree1);
-        
+
         //tree1.topologyUnion(tree2);//should make tree1 = tree0
         tree1.topologyUnion(tree3);//should make tree1 = tree0
 
@@ -1344,25 +1344,25 @@ TestTree::testTopologyUnion()
         openvdb::FloatGrid grid0(background);
         openvdb::FloatGrid grid1(background);
         unittest_util::makeSphere<openvdb::FloatGrid>(dim, C0, R0, grid0,
-                                                      1.0f, unittest_util::SPHERE_SPARSE_NARROW_BAND);
+            1.0f, unittest_util::SPHERE_SPARSE_NARROW_BAND);
         unittest_util::makeSphere<openvdb::FloatGrid>(dim, C1, R1, grid1,
-                                                      1.0f, unittest_util::SPHERE_SPARSE_NARROW_BAND);
+            1.0f, unittest_util::SPHERE_SPARSE_NARROW_BAND);
         openvdb::FloatTree& tree0 = grid0.tree();
         openvdb::FloatTree& tree1 = grid1.tree();
         openvdb::FloatTree tree0_copy(tree0);
-        
+
         tree0.topologyUnion(tree1);
-        
+
         const openvdb::Index64 n0 = tree0_copy.activeVoxelCount();
         const openvdb::Index64 n  = tree0.activeVoxelCount();
         const openvdb::Index64 n1 = tree1.activeVoxelCount();
-        
+
         //fprintf(stderr,"Union of spheres: n=%i, n0=%i n1=%i n0+n1=%i\n",n,n0,n1, n0+n1);
-        
+
         CPPUNIT_ASSERT( n > n0 );
         CPPUNIT_ASSERT( n > n1 );
         CPPUNIT_ASSERT( n < n0 + n1 );
-        
+
         for (openvdb::FloatTree::ValueOnCIter iter = tree1.cbeginValueOn(); iter; ++iter) {
             const openvdb::Coord p = iter.getCoord();
             CPPUNIT_ASSERT(tree0.isValueOn(p));
@@ -1374,7 +1374,7 @@ TestTree::testTopologyUnion()
             ASSERT_DOUBLES_EXACTLY_EQUAL(tree0.getValue(p), *iter);
         }
     }
-    
+
 }// testTopologyUnion
 
 void
@@ -1387,7 +1387,7 @@ TestTree::testTopologyIntersection()
         tree1.setValue(openvdb::Coord(   8,  11,  11), 2.0f);
         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(1), tree0.activeVoxelCount());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(1), tree1.activeVoxelCount());
-        
+
         tree1.topologyIntersection(tree0);
 
         CPPUNIT_ASSERT_EQUAL(tree1.activeVoxelCount(), openvdb::Index64(0));
@@ -1399,12 +1399,12 @@ TestTree::testTopologyIntersection()
         const ValueType background=0.0f;
         openvdb::FloatTree tree0(background), tree1(background);
         tree0.setValue(openvdb::Coord( 500, 300, 200), 1.0f);
-        
+
         tree1.setValue(openvdb::Coord(   8,  11,  11), 2.0f);
         tree1.setValue(openvdb::Coord( 500, 300, 200), 1.0f);
         CPPUNIT_ASSERT_EQUAL( openvdb::Index64(1), tree0.activeVoxelCount() );
         CPPUNIT_ASSERT_EQUAL( openvdb::Index64(2), tree1.activeVoxelCount() );
-        
+
         tree1.topologyIntersection(tree0);
 
         CPPUNIT_ASSERT_EQUAL( openvdb::Index64(1), tree1.activeVoxelCount() );
@@ -1420,13 +1420,13 @@ TestTree::testTopologyIntersection()
         tree0.setValue(openvdb::Coord(   8,  11,  11), 3.0f);
         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(3), tree0.activeVoxelCount());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index32(3), tree0.leafCount() );
-        
+
         tree1.setValue(openvdb::Coord( 500, 301, 200), 4.0f);
         tree1.setValue(openvdb::Coord( 400,  30,  20), 5.0f);
         tree1.setValue(openvdb::Coord(   8,  11,  11), 6.0f);
         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(3), tree1.activeVoxelCount());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index32(3), tree1.leafCount() );
-        
+
         tree1.topologyIntersection(tree0);
 
         CPPUNIT_ASSERT_EQUAL( openvdb::Index32(3), tree1.leafCount() );
@@ -1444,13 +1444,13 @@ TestTree::testTopologyIntersection()
         tree0.fill(openvdb::CoordBBox(openvdb::Coord(0),openvdb::Coord(dim-1)),2.0f, false);
         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(0), tree0.activeVoxelCount());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), tree0.leafCount() );
-        
+
         tree1.setValue(openvdb::Coord( 500, 301, 200), 4.0f);
         tree1.setValue(openvdb::Coord( 400,  30,  20), 5.0f);
         tree1.setValue(openvdb::Coord( dim,  11,  11), 6.0f);
         CPPUNIT_ASSERT_EQUAL(openvdb::Index32(3), tree1.leafCount() );
         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(3), tree1.activeVoxelCount());
-        
+
         tree1.topologyIntersection(tree0);
 
         CPPUNIT_ASSERT_EQUAL( openvdb::Index32(0), tree1.leafCount() );
@@ -1464,13 +1464,13 @@ TestTree::testTopologyIntersection()
         tree1.fill(openvdb::CoordBBox(openvdb::Coord(0),openvdb::Coord(dim-1)),2.0f, true);
         CPPUNIT_ASSERT_EQUAL(dim*dim*dim, tree1.activeVoxelCount());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), tree1.leafCount() );
-        
+
         tree0.setValue(openvdb::Coord( 500, 301, 200), 4.0f);
         tree0.setValue(openvdb::Coord( 400,  30,  20), 5.0f);
         tree0.setValue(openvdb::Coord( dim,  11,  11), 6.0f);
         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(3), tree0.activeVoxelCount());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index32(3), tree0.leafCount() );
-        
+
         tree1.topologyIntersection(tree0);
 
         CPPUNIT_ASSERT_EQUAL( openvdb::Index32(2), tree1.leafCount() );
@@ -1488,12 +1488,12 @@ TestTree::testTopologyIntersection()
         tree0.setValue(openvdb::Coord(-5, 10,-20),0.1f);
         tree0.setValue(openvdb::Coord( 5,-10,-20),0.2f);
         tree0.setValue(openvdb::Coord(-5,-10,-20),0.3f);
-        
+
         tree1.setValue(openvdb::Coord( 5, 10, 20),0.0f);
         tree1.setValue(openvdb::Coord(-5, 10,-20),0.1f);
         tree1.setValue(openvdb::Coord( 5,-10,-20),0.2f);
         tree1.setValue(openvdb::Coord(-5,-10,-20),0.3f);
-        
+
         tree2.setValue(openvdb::Coord( 5, 10, 20),0.4f);
         tree2.setValue(openvdb::Coord(-5, 10,-20),0.5f);
         tree2.setValue(openvdb::Coord( 5,-10,-20),0.6f);
@@ -1504,7 +1504,7 @@ TestTree::testTopologyIntersection()
         tree2.setValue(openvdb::Coord(-5000,-2000, 3000),4.5678f);
 
         openvdb::FloatTree tree1_copy(tree1);
-        
+
         // tree3 has the same topology as tree2 but a different value type
         const openvdb::Vec3f background2(1.0f,3.4f,6.0f), vec_val(3.1f,5.3f,-9.5f);
         openvdb::Vec3fTree tree3(background2);
@@ -1516,8 +1516,8 @@ TestTree::testTopologyIntersection()
         CPPUNIT_ASSERT_EQUAL(openvdb::Index32(4), tree1.leafCount());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index32(7), tree2.leafCount());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index32(7), tree3.leafCount());
-        
-       
+
+
         //tree1.topologyInterection(tree2);//should make tree1 = tree0
         tree1.topologyIntersection(tree3);//should make tree1 = tree0
 
@@ -1529,7 +1529,7 @@ TestTree::testTopologyIntersection()
         CPPUNIT_ASSERT(tree0.inactiveVoxelCount()==tree1.inactiveVoxelCount());
         CPPUNIT_ASSERT(tree1.hasSameTopology(tree0));
         CPPUNIT_ASSERT(tree0.hasSameTopology(tree1));
-        
+
         for (openvdb::FloatTree::ValueOnCIter iter = tree0.cbeginValueOn(); iter; ++iter) {
             const openvdb::Coord p = iter.getCoord();
             CPPUNIT_ASSERT(tree1.isValueOn(p));
@@ -1551,7 +1551,7 @@ TestTree::testTopologyIntersection()
             ASSERT_DOUBLES_EXACTLY_EQUAL(*iter,tree0.getValue(p));
         }
     }
-   
+
     {// test overlapping spheres
         const float background=5.0f, R0=10.0f, R1=5.6f;
         const openvdb::Vec3f C0(35.0f, 30.0f, 40.0f), C1(22.3f, 30.5f, 31.0f);
@@ -1559,13 +1559,13 @@ TestTree::testTopologyIntersection()
         openvdb::FloatGrid grid0(background);
         openvdb::FloatGrid grid1(background);
         unittest_util::makeSphere<openvdb::FloatGrid>(dim, C0, R0, grid0,
-                                                      1.0f, unittest_util::SPHERE_SPARSE_NARROW_BAND);
+            1.0f, unittest_util::SPHERE_SPARSE_NARROW_BAND);
         unittest_util::makeSphere<openvdb::FloatGrid>(dim, C1, R1, grid1,
-                                                      1.0f, unittest_util::SPHERE_SPARSE_NARROW_BAND);
+            1.0f, unittest_util::SPHERE_SPARSE_NARROW_BAND);
         openvdb::FloatTree& tree0 = grid0.tree();
         openvdb::FloatTree& tree1 = grid1.tree();
         openvdb::FloatTree tree0_copy(tree0);
-        
+
         tree0.topologyIntersection(tree1);
 
         const openvdb::Index64 n0 = tree0_copy.activeVoxelCount();
@@ -1573,10 +1573,10 @@ TestTree::testTopologyIntersection()
         const openvdb::Index64 n1 = tree1.activeVoxelCount();
 
         //fprintf(stderr,"Intersection of spheres: n=%i, n0=%i n1=%i n0+n1=%i\n",n,n0,n1, n0+n1);
-        
+
         CPPUNIT_ASSERT( n < n0 );
         CPPUNIT_ASSERT( n < n1 );
-        
+
         for (openvdb::FloatTree::ValueOnCIter iter = tree0.cbeginValueOn(); iter; ++iter) {
             const openvdb::Coord p = iter.getCoord();
             CPPUNIT_ASSERT(tree1.isValueOn(p));
@@ -1588,7 +1588,7 @@ TestTree::testTopologyIntersection()
     {// Test based on boolean grids
         openvdb::CoordBBox big(  openvdb::Coord(-9), openvdb::Coord(10));
         openvdb::CoordBBox small(openvdb::Coord( 1), openvdb::Coord(10));
-       
+
         openvdb::BoolGrid::Ptr gridBig = openvdb::BoolGrid::create(false);
         gridBig->fill(big, true/*value*/, true /*make active*/);
         CPPUNIT_ASSERT_EQUAL(8, int(gridBig->tree().activeTileCount()));
@@ -1598,14 +1598,14 @@ TestTree::testTopologyIntersection()
         gridSmall->fill(small, true/*value*/, true /*make active*/);
         CPPUNIT_ASSERT_EQUAL(0, int(gridSmall->tree().activeTileCount()));
         CPPUNIT_ASSERT_EQUAL((10 * 10 * 10), int(gridSmall->activeVoxelCount()));
-       
+
         // change the topology of gridBig by intersecting with gridSmall
         gridBig->topologyIntersection(*gridSmall);
 
         // Should be unchanged
         CPPUNIT_ASSERT_EQUAL(0, int(gridSmall->tree().activeTileCount()));
         CPPUNIT_ASSERT_EQUAL((10 * 10 * 10), int(gridSmall->activeVoxelCount()));
-       
+
         // In this case the interesection should be exactly "small"
         CPPUNIT_ASSERT_EQUAL(0, int(gridBig->tree().activeTileCount()));
         CPPUNIT_ASSERT_EQUAL((10 * 10 * 10), int(gridBig->activeVoxelCount()));
@@ -1624,7 +1624,7 @@ TestTree::testTopologyDifference()
         tree1.setValue(openvdb::Coord(   8,  11,  11), 2.0f);
         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(1), tree0.activeVoxelCount());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(1), tree1.activeVoxelCount());
-        
+
         tree1.topologyDifference(tree0);
 
         CPPUNIT_ASSERT_EQUAL(tree1.activeVoxelCount(), openvdb::Index64(1));
@@ -1636,12 +1636,12 @@ TestTree::testTopologyDifference()
         const ValueType background=0.0f;
         openvdb::FloatTree tree0(background), tree1(background);
         tree0.setValue(openvdb::Coord( 500, 300, 200), 1.0f);
-        
+
         tree1.setValue(openvdb::Coord(   8,  11,  11), 2.0f);
         tree1.setValue(openvdb::Coord( 500, 300, 200), 1.0f);
         CPPUNIT_ASSERT_EQUAL( openvdb::Index64(1), tree0.activeVoxelCount() );
         CPPUNIT_ASSERT_EQUAL( openvdb::Index64(2), tree1.activeVoxelCount() );
-        
+
         CPPUNIT_ASSERT( tree0.isValueOn(openvdb::Coord( 500, 300, 200)));
         CPPUNIT_ASSERT( tree1.isValueOn(openvdb::Coord( 500, 300, 200)));
         CPPUNIT_ASSERT( tree1.isValueOn(openvdb::Coord(   8,  11,  11)));
@@ -1652,7 +1652,7 @@ TestTree::testTopologyDifference()
         CPPUNIT_ASSERT( tree0.isValueOn(openvdb::Coord( 500, 300, 200)));
         CPPUNIT_ASSERT(!tree1.isValueOn(openvdb::Coord( 500, 300, 200)));
         CPPUNIT_ASSERT( tree1.isValueOn(openvdb::Coord(   8,  11,  11)));
-        
+
         CPPUNIT_ASSERT(!tree1.empty());
         tree1.pruneInactive();
         CPPUNIT_ASSERT(!tree1.empty());
@@ -1665,13 +1665,13 @@ TestTree::testTopologyDifference()
         tree0.setValue(openvdb::Coord(   8,  11,  11), 3.0f);
         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(3), tree0.activeVoxelCount());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index32(3), tree0.leafCount() );
-        
+
         tree1.setValue(openvdb::Coord( 500, 301, 200), 4.0f);
         tree1.setValue(openvdb::Coord( 400,  30,  20), 5.0f);
         tree1.setValue(openvdb::Coord(   8,  11,  11), 6.0f);
         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(3), tree1.activeVoxelCount());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index32(3), tree1.leafCount() );
-        
+
         tree1.topologyDifference(tree0);
 
         CPPUNIT_ASSERT_EQUAL( openvdb::Index32(3), tree1.leafCount() );
@@ -1691,14 +1691,14 @@ TestTree::testTopologyDifference()
         CPPUNIT_ASSERT(!tree0.hasActiveTiles());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(0), tree0.root().onTileCount());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), tree0.leafCount() );
-        
+
         tree1.setValue(openvdb::Coord( 500, 301, 200), 4.0f);
         tree1.setValue(openvdb::Coord( 400,  30,  20), 5.0f);
         tree1.setValue(openvdb::Coord( dim,  11,  11), 6.0f);
         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(3), tree1.activeVoxelCount());
         CPPUNIT_ASSERT(!tree1.hasActiveTiles());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index32(3), tree1.leafCount() );
-        
+
         tree1.topologyDifference(tree0);
 
         CPPUNIT_ASSERT_EQUAL( openvdb::Index32(3), tree1.leafCount() );
@@ -1718,7 +1718,7 @@ TestTree::testTopologyDifference()
         CPPUNIT_ASSERT(tree1.hasActiveTiles());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(1), tree1.root().onTileCount());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), tree0.leafCount() );
-        
+
         tree0.setValue(openvdb::Coord( 500, 301, 200), 4.0f);
         tree0.setValue(openvdb::Coord( 400,  30,  20), 5.0f);
         tree0.setValue(openvdb::Coord( int(dim),  11,  11), 6.0f);
@@ -1727,9 +1727,9 @@ TestTree::testTopologyDifference()
         CPPUNIT_ASSERT_EQUAL(openvdb::Index32(3), tree0.leafCount() );
         CPPUNIT_ASSERT( tree0.isValueOn(openvdb::Coord( int(dim),  11,  11)));
         CPPUNIT_ASSERT(!tree1.isValueOn(openvdb::Coord( int(dim),  11,  11)));
-        
+
         tree1.topologyDifference(tree0);
-        
+
         CPPUNIT_ASSERT(tree1.root().onTileCount() > 1);
         CPPUNIT_ASSERT_EQUAL( dim*dim*dim - 2, tree1.activeVoxelCount() );
         CPPUNIT_ASSERT(!tree1.empty());
@@ -1746,14 +1746,14 @@ TestTree::testTopologyDifference()
         CPPUNIT_ASSERT(tree1.hasActiveTiles());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(1), tree1.root().onTileCount());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), tree0.leafCount() );
-        
+
         tree0.setValue(openvdb::Coord( 500, 301, 200), 4.0f);
         tree0.setValue(openvdb::Coord( 400,  30,  20), 5.0f);
         tree0.setValue(openvdb::Coord( dim,  11,  11), 6.0f);
         CPPUNIT_ASSERT(!tree0.hasActiveTiles());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(3), tree0.activeVoxelCount());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index32(3), tree0.leafCount() );
-        
+
         tree0.topologyDifference(tree1);
 
         CPPUNIT_ASSERT_EQUAL( openvdb::Index32(1), tree0.leafCount() );
@@ -1773,12 +1773,12 @@ TestTree::testTopologyDifference()
         tree0.setValue(openvdb::Coord(-5, 10,-20),0.1f);
         tree0.setValue(openvdb::Coord( 5,-10,-20),0.2f);
         tree0.setValue(openvdb::Coord(-5,-10,-20),0.3f);
-        
+
         tree1.setValue(openvdb::Coord( 5, 10, 20),0.0f);
         tree1.setValue(openvdb::Coord(-5, 10,-20),0.1f);
         tree1.setValue(openvdb::Coord( 5,-10,-20),0.2f);
         tree1.setValue(openvdb::Coord(-5,-10,-20),0.3f);
-        
+
         tree2.setValue(openvdb::Coord( 5, 10, 20),0.4f);
         tree2.setValue(openvdb::Coord(-5, 10,-20),0.5f);
         tree2.setValue(openvdb::Coord( 5,-10,-20),0.6f);
@@ -1789,7 +1789,7 @@ TestTree::testTopologyDifference()
         tree2.setValue(openvdb::Coord(-5000,-2000, 3000),4.5678f);
 
         openvdb::FloatTree tree1_copy(tree1);
-        
+
         // tree3 has the same topology as tree2 but a different value type
         const openvdb::Vec3f background2(1.0f,3.4f,6.0f), vec_val(3.1f,5.3f,-9.5f);
         openvdb::Vec3fTree tree3(background2);
@@ -1801,8 +1801,8 @@ TestTree::testTopologyDifference()
         CPPUNIT_ASSERT_EQUAL(openvdb::Index32(4), tree1.leafCount());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index32(7), tree2.leafCount());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index32(7), tree3.leafCount());
-        
-       
+
+
         //tree1.topologyInterection(tree2);//should make tree1 = tree0
         tree1.topologyIntersection(tree3);//should make tree1 = tree0
 
@@ -1814,7 +1814,7 @@ TestTree::testTopologyDifference()
         CPPUNIT_ASSERT(tree0.inactiveVoxelCount()==tree1.inactiveVoxelCount());
         CPPUNIT_ASSERT(tree1.hasSameTopology(tree0));
         CPPUNIT_ASSERT(tree0.hasSameTopology(tree1));
-        
+
         for (openvdb::FloatTree::ValueOnCIter iter = tree0.cbeginValueOn(); iter; ++iter) {
             const openvdb::Coord p = iter.getCoord();
             CPPUNIT_ASSERT(tree1.isValueOn(p));
@@ -1843,20 +1843,20 @@ TestTree::testTopologyDifference()
         openvdb::FloatGrid grid0(background);
         openvdb::FloatGrid grid1(background);
         unittest_util::makeSphere<openvdb::FloatGrid>(dim, C0, R0, grid0,
-                                                      1.0f, unittest_util::SPHERE_SPARSE_NARROW_BAND);
+            1.0f, unittest_util::SPHERE_SPARSE_NARROW_BAND);
         unittest_util::makeSphere<openvdb::FloatGrid>(dim, C1, R1, grid1,
-                                                      1.0f, unittest_util::SPHERE_SPARSE_NARROW_BAND);
+            1.0f, unittest_util::SPHERE_SPARSE_NARROW_BAND);
         openvdb::FloatTree& tree0 = grid0.tree();
         openvdb::FloatTree& tree1 = grid1.tree();
         openvdb::FloatTree tree0_copy(tree0);
-        
+
         tree0.topologyDifference(tree1);
 
         const openvdb::Index64 n0 = tree0_copy.activeVoxelCount();
         const openvdb::Index64 n  = tree0.activeVoxelCount();
-        
+
         CPPUNIT_ASSERT( n < n0 );
-        
+
         for (openvdb::FloatTree::ValueOnCIter iter = tree0.cbeginValueOn(); iter; ++iter) {
             const openvdb::Coord p = iter.getCoord();
             CPPUNIT_ASSERT(tree1.isValueOff(p));
@@ -1878,7 +1878,7 @@ TestTree::testSignedFloodFill()
     const float outside = 2.0f, inside = -outside, radius = 20.0f;
     openvdb::Grid<TreeT>::Ptr grid = openvdb::Grid<TreeT>::create(outside);
     TreeT& tree = grid->tree();
-    const RootT& root = tree.getRootNode();
+    const RootT& root = tree.root();
     const openvdb::Coord dim(3*16, 3*16, 3*16);
     const openvdb::Coord C(16+8,16+8,16+8);
 

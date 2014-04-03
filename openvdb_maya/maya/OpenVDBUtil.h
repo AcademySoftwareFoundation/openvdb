@@ -100,6 +100,8 @@ void getGrids(std::vector<openvdb::GridBase::ConstPtr>& grids,
 
 std::string getGridNames(const OpenVDBData& vdb);
 
+bool containsGrid(const std::vector<std::string>& selectionList,
+    const std::string& gridName, size_t gridIndex);
 
 /// @brief  Constructs a list of selected grids @c grids from
 ///         the @c inputVdb and passes through unselected grids

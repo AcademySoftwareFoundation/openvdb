@@ -86,7 +86,8 @@ enum {
     /*2*/ NO_MASK_AND_ONE_INACTIVE_VAL, // all inactive vals have the same non-background val
     /*3*/ MASK_AND_NO_INACTIVE_VALS,    // mask selects between -background and +background
     /*4*/ MASK_AND_ONE_INACTIVE_VAL,    // mask selects between backgd and one other inactive val
-    /*5*/ MASK_AND_TWO_INACTIVE_VALS    // mask selects between two non-background inactive vals
+    /*5*/ MASK_AND_TWO_INACTIVE_VALS,   // mask selects between two non-background inactive vals
+    /*6*/ NO_MASK_AND_ALL_VALS          // > 2 inactive vals, so no mask compression at all
 };
 
 
@@ -282,7 +283,7 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
         zipped = compression & COMPRESS_ZIP,
         maskCompressed = compression & COMPRESS_ACTIVE_MASK;
 
-    int8_t metadata = NO_MASK_OR_INACTIVE_VALS;
+    int8_t metadata = NO_MASK_AND_ALL_VALS;
     if (getFormatVersion(is) >= OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
         // Read the flag that specifies what, if any, additional metadata
         // (selection mask and/or inactive value(s)) is saved.
@@ -297,9 +298,9 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     ValueT inactiveVal0 =
         ((metadata == NO_MASK_OR_INACTIVE_VALS) ? background : math::negative(background));
 
-    if (metadata != NO_MASK_OR_INACTIVE_VALS &&
-        metadata != NO_MASK_AND_MINUS_BG &&
-        metadata != MASK_AND_NO_INACTIVE_VALS)
+    if (metadata == NO_MASK_AND_ONE_INACTIVE_VAL ||
+        metadata == MASK_AND_ONE_INACTIVE_VAL ||
+        metadata == MASK_AND_TWO_INACTIVE_VALS)
     {
         // Read one of at most two distinct inactive values.
         is.read(reinterpret_cast<char*>(&inactiveVal0), sizeof(ValueT));
@@ -310,9 +311,9 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     }
 
     MaskT selectionMask;
-    if (metadata != NO_MASK_OR_INACTIVE_VALS &&
-        metadata != NO_MASK_AND_MINUS_BG &&
-        metadata != NO_MASK_AND_ONE_INACTIVE_VAL)
+    if (metadata == MASK_AND_NO_INACTIVE_VALS ||
+        metadata == MASK_AND_ONE_INACTIVE_VAL ||
+        metadata == MASK_AND_TWO_INACTIVE_VALS)
     {
         // For use in mask compression (only), read the bitmask that selects
         // between two distinct inactive values.
@@ -323,7 +324,9 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     boost::scoped_array<ValueT> scopedTempBuf;
 
     Index tempCount = destCount;
-    if (maskCompressed && getFormatVersion(is) >= OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
+    if (maskCompressed && metadata != NO_MASK_AND_ALL_VALS
+        && getFormatVersion(is) >= OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION)
+    {
         tempCount = valueMask.countOn();
         if (tempCount != destCount) {
             // If this node has inactive voxels, allocate a temporary buffer
@@ -395,7 +398,7 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
     ValueT* tempBuf = srcBuf;
     boost::scoped_array<ValueT> scopedTempBuf;
 
-    int8_t metadata = NO_MASK_OR_INACTIVE_VALS;
+    int8_t metadata = NO_MASK_AND_ALL_VALS;
 
     if (!maskCompress) {
         os.write(reinterpret_cast<const char*>(&metadata), /*bytes=*/1);
@@ -478,13 +481,15 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
                     metadata = MASK_AND_ONE_INACTIVE_VAL;
                 }
             }
+        } else if (numUniqueInactiveVals > 2) {
+            metadata = NO_MASK_AND_ALL_VALS;
         }
 
         os.write(reinterpret_cast<const char*>(&metadata), /*bytes=*/1);
 
-        if (metadata != NO_MASK_OR_INACTIVE_VALS &&
-            metadata != NO_MASK_AND_MINUS_BG &&
-            metadata != MASK_AND_NO_INACTIVE_VALS)
+        if (metadata == NO_MASK_AND_ONE_INACTIVE_VAL ||
+            metadata == MASK_AND_ONE_INACTIVE_VAL ||
+            metadata == MASK_AND_TWO_INACTIVE_VALS)
         {
             if (!toHalf) {
                 // Write one of at most two distinct inactive values.
@@ -505,7 +510,7 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
             }
         }
 
-        if (metadata == NO_MASK_OR_INACTIVE_VALS && numUniqueInactiveVals > 2) {
+        if (metadata == NO_MASK_AND_ALL_VALS) {
             // If there are more than two unique inactive values, the entire input buffer
             // needs to be saved (both active and inactive values).
             /// @todo Save the selection mask as long as most of the inactive values

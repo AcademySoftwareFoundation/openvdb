@@ -31,8 +31,8 @@
 /// @author FX R&D OpenVDB team
 
 #include "OpenVDBPlugin.h"
-#include "OpenVDBData.h"
-#include "OpenVDBUtil.h"
+#include <openvdb_maya/OpenVDBData.h>
+#include <openvdb_maya/OpenVDBUtil.h>
 
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnStringData.h>

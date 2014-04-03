@@ -217,7 +217,9 @@ SOP_OpenVDB_Transform::cookMySop(OP_Context& context)
             copyOfGrid->setTransform(grid.constTransform().copy());
             vdb->setGrid(*copyOfGrid);
 
-            if (xformVec && vdb->getConstGrid().getVectorType() != openvdb::VEC_INVARIANT) {
+            if (xformVec && vdb->getConstGrid().isInWorldSpace()
+                && vdb->getConstGrid().getVectorType() != openvdb::VEC_INVARIANT)
+            {
                 // If (and only if) the grid is vector-valued, deep copy it,
                 // then apply the transform to each voxel's value.
                 GEOvdbProcessTypedGridVec3(*vdb, xformOp, /*makeUnique=*/true);

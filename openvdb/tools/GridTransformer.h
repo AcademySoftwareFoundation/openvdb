@@ -29,6 +29,7 @@
 ///////////////////////////////////////////////////////////////////////////
 //
 /// @file GridTransformer.h
+/// @author Peter Cucka
 
 #ifndef OPENVDB_TOOLS_GRIDTRANSFORMER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_GRIDTRANSFORMER_HAS_BEEN_INCLUDED
@@ -884,7 +885,6 @@ GridResampler::transformBBox(
     const Sampler& sampler)
 {
     typedef typename OutTreeT::ValueType ValueT;
-    typedef math::Vec4<Real> Vec4R;
 
     // Transform the corners of the input tree's bounding box
     // and compute the enclosing bounding box in the output tree.

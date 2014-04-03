@@ -391,17 +391,17 @@ validateGeometry(const GU_Detail& geometry, std::string& warning, Interrupter* b
         // Final pass to delete anything illegal.
         // There could be little fligs left over that
         // we don't want confusing the mesher.
-        GEO_Primitive           *prim;
+        GEO_Primitive           *delprim;
         GA_PrimitiveGroup       *delgrp = 0;
 
-        GA_FOR_ALL_PRIMITIVES(geoPtr.get(), prim) {
+        GA_FOR_ALL_PRIMITIVES(geoPtr.get(), delprim) {
 
             if (boss && boss->wasInterrupted()) return geoPtr;
 
             bool kill = false;
-            if (prim->getPrimitiveId() & GEO_PrimTypeCompat::GEOPRIMPOLY) {
+            if (delprim->getPrimitiveId() & GEO_PrimTypeCompat::GEOPRIMPOLY) {
 
-                GEO_PrimPoly *poly = static_cast<GEO_PrimPoly*>(prim);
+                GEO_PrimPoly *poly = static_cast<GEO_PrimPoly*>(delprim);
 
                 if (poly->getVertexCount() > 4) kill = true;
                 if (poly->getVertexCount() < 3) kill = true;
@@ -414,7 +414,7 @@ validateGeometry(const GU_Detail& geometry, std::string& warning, Interrupter* b
                 if (!delgrp) {
                     delgrp = geoPtr->newPrimitiveGroup("__delete_group__", 1);
                 }
-                delgrp->add(prim);
+                delgrp->add(delprim);
             }
         }
 
@@ -499,9 +499,9 @@ PrimCpyOp::operator()(const GA_SplittableRange &r) const
 
                 if (primRef->getTypeId() == GEO_PRIMPOLY && (3 == vtxn || 4 == vtxn)) {
 
-                    GA_Primitive::const_iterator it;
-                    for (vtx = 0, primRef->beginVertex(it); !it.atEnd(); ++it, ++vtx) {
-                        prim[vtx] = mGdp->pointIndex(it.getPointOffset());
+                    GA_Primitive::const_iterator vit;
+                    for (vtx = 0, primRef->beginVertex(vit); !vit.atEnd(); ++vit, ++vtx) {
+                        prim[vtx] = mGdp->pointIndex(vit.getPointOffset());
                     }
 
                     if (vtxn != 4) prim[3] = openvdb::util::INVALID_IDX;

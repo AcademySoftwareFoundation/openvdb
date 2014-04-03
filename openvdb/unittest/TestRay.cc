@@ -32,6 +32,7 @@
 #include <openvdb/Exceptions.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/math/Ray.h>
+#include <openvdb/math/DDA.h>
 #include <openvdb/math/BBox.h>
 #include <openvdb/Types.h>
 #include <openvdb/math/Transform.h>
@@ -49,11 +50,13 @@ public:
     CPPUNIT_TEST_SUITE(TestRay);
     CPPUNIT_TEST(testInfinity);
     CPPUNIT_TEST(testRay);
+    CPPUNIT_TEST(testTimeSpan);
     CPPUNIT_TEST(testDDA);
     CPPUNIT_TEST_SUITE_END();
 
     void testInfinity();
     void testRay();
+    void testTimeSpan();
     void testDDA();
 };
 
@@ -325,6 +328,24 @@ void TestRay::testRay()
         CPPUNIT_ASSERT(!ray.intersects(Vec3T( 1.0, 0.0, 0.0), 0.4, t));
     }
    
+}
+
+void TestRay::testTimeSpan()
+{
+    using namespace openvdb;
+    typedef double             RealT;
+    typedef math::Ray<RealT>::TimeSpan   TimeSpanT;
+    TimeSpanT t(2.0, 5.0);
+    ASSERT_DOUBLES_EXACTLY_EQUAL(2.0, t.t0);
+    ASSERT_DOUBLES_EXACTLY_EQUAL(5.0, t.t1);
+    ASSERT_DOUBLES_APPROX_EQUAL(3.5, t.mid());
+    CPPUNIT_ASSERT(t.valid());
+    t.set(-1, -1);
+    CPPUNIT_ASSERT(!t.valid());
+    t.scale(5);
+    ASSERT_DOUBLES_EXACTLY_EQUAL(-5.0, t.t0);
+    ASSERT_DOUBLES_EXACTLY_EQUAL(-5.0, t.t1);
+    ASSERT_DOUBLES_APPROX_EQUAL(-5.0, t.mid());
 }
 
 void TestRay::testDDA()

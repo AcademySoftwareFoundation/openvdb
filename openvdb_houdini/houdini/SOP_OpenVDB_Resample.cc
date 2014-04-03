@@ -490,7 +490,9 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
                     }
                 }
 
-                if (xformVec && outGrid->getVectorType() != openvdb::VEC_INVARIANT) {
+                if (xformVec && outGrid->isInWorldSpace()
+                    && outGrid->getVectorType() != openvdb::VEC_INVARIANT)
+                {
                     // If (and only if) the grid is vector-valued, apply the transform
                     // to each voxel's value.
                     VecXformOp op(xform.getTransform());

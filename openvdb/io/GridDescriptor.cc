@@ -211,8 +211,9 @@ GridDescriptor::stringAsUniqueName(const std::string& s)
         std::string::size_type pos = ret.find("[");
         // Replace "[N]" with SEP "N".
         if (pos != std::string::npos) {
-            if (ret.substr(pos) == "[0]") {
-                // "name[0]" is equivalent to "name".
+            if (pos != 0 && ret.substr(pos) == "[0]") {
+                // "name[0]" is equivalent to "name", except in the case of
+                // the empty name "[0]".
                 ret.erase(pos);
             } else {
                 ret.resize(ret.size() - 1); // drop trailing ']'
