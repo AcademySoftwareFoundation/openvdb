@@ -247,12 +247,12 @@ inline int64_t Abs(int64_t i)
 #ifdef _MSC_VER
     return (i < int64_t(0) ? -i : i);
 #else
-    return abs(i);
+    return labs(i);
 #endif
 }
 inline float Abs(float x) { return fabs(x); }
 inline double Abs(double x) { return fabs(x); }
-inline long double Abs(long double x) { return fabs(x); }
+inline long double Abs(long double x) { return fabsl(x); }
 inline uint32_t Abs(uint32_t i) { return i; }
 inline uint64_t Abs(uint64_t i) { return i; }
 // On OSX size_t and uint64_t are different types
