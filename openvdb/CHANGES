@@ -22,11 +22,13 @@ Version 2.3.0 - In development
       to VolumeRayIntersector::march().
     - Added member class Ray::TimeSpan and method Ray::valid(), and 
       deprecated method Ray::test(). 
+    - Fixed a bug in VolumeHDDA occurring when ray.t0=0 [Contributed by Mike Farnsworth]
     - Added tools::compositeToDense(), which composites data from a
       sparse tree into a dense array, using a sparse alpha mask.
       Over, Add, Sub, Min, Max, Mult, and Set are supported operations.
     - Added tools::transformDense(), which applies a functor to the value
       of each voxel of a dense grid within a given bounding box.
+    - Improved performance of node iterators.
 
     API changes:
     - Collected the digital differential analyzer code from math/Ray.h

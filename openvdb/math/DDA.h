@@ -245,13 +245,13 @@ private:
                 if (mHDDA.march(ray, acc, t)) return true;//terminate
             } else if (acc.isValueOn(mDDA.voxel())) {//hit an active tile
                 if (t.t0<0) t.t0 = mDDA.time();//this is the first hit so set t0
-            } else if (t.t0>0) {//hit an inactive tile after hitting active values
+            } else if (t.t0>=0) {//hit an inactive tile after hitting active values
                 t.t1 = mDDA.time();//set end of active ray segment
                 if (t.valid()) return true;//terminate
                 t.set(-1, -1);//reset to an empty and invalid time-span
             }
         } while (mDDA.step());
-        if (t.t0>0) t.t1 = mDDA.maxTime();
+        if (t.t0>=0) t.t1 = mDDA.maxTime();
         return false;
     }
     
@@ -264,13 +264,13 @@ private:
                 mHDDA.hits(ray, acc, times, t);
             } else if (acc.isValueOn(mDDA.voxel())) {//hit an active tile
                 if (t.t0<0) t.t0 = mDDA.time();//this is the first hit so set t0
-            } else if (t.t0>0) {//hit an inactive tile after hitting active values
+            } else if (t.t0>=0) {//hit an inactive tile after hitting active values
                 t.t1 = mDDA.time();//set end of active ray segment
                 if (t.valid()) times.push_back(t);
                 t.set(-1,-1);//reset to an empty and invalid time-span
             }
         } while (mDDA.step());
-        if (t.t0>0) t.t1 = mDDA.maxTime();
+        if (t.t0>=0) t.t1 = mDDA.maxTime();
     }
     
     math::DDA<RayT, NodeT::TOTAL> mDDA;
@@ -316,13 +316,13 @@ private:
             if (acc.template probeConstNode<LeafT>(mDDA.voxel()) ||
                 acc.isValueOn(mDDA.voxel())) {//hit a leaf or an active tile
                 if (t.t0<0) t.t0 = mDDA.time();//this is the first hit
-            } else if (t.t0>0) {//hit an inactive tile after hitting active values
+            } else if (t.t0>=0) {//hit an inactive tile after hitting active values
                 t.t1 = mDDA.time();//set end of active ray segment
                 if (t.valid()) return true;//terminate
                 t.set(-1, -1);//reset to an empty and invalid time-span
             }
         } while (mDDA.step());
-        if (t.t0>0) t.t1 = mDDA.maxTime();
+        if (t.t0>=0) t.t1 = mDDA.maxTime();
         return false;
     }
     
@@ -333,13 +333,13 @@ private:
             if (acc.template probeConstNode<LeafT>(mDDA.voxel()) ||
                 acc.isValueOn(mDDA.voxel())) {//hit a leaf or an active tile
                 if (t.t0<0) t.t0 = mDDA.time();//this is the first hit
-            } else if (t.t0>0) {//hit an inactive tile after hitting active values
+            } else if (t.t0>=0) {//hit an inactive tile after hitting active values
                 t.t1 = mDDA.time();//set end of active ray segment
                 if (t.valid()) times.push_back(t);
                 t.set(-1, -1);//reset to an empty and invalid time-span
             }
         } while (mDDA.step());
-        if (t.t0>0) t.t1 = mDDA.maxTime();
+        if (t.t0>=0) t.t1 = mDDA.maxTime();
     }
     math::DDA<RayT, LeafT::TOTAL> mDDA;
 };    

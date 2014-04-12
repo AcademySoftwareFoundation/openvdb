@@ -42,6 +42,8 @@
 - Added member class @vdblink::math::Ray::TimeSpan Ray::TimeSpan@endlink
   and method @vdblink::math::Ray::valid() Ray::valid@endlink, and deprecated
   method @vdblink::math::Ray::test() Ray::test@endlink.
+- Fixed a bug in @vdblink::math::VolumeHDDA VolumeHDDA@endlink occurring when 
+  ray.t0=0 [Contributed by Mike Farnsworth]
 - Added a @vdblink::tools::compositeToDense() compositeToDense@endlink tool,
   which composites data from a sparse tree into a dense array, using a 
   sparse alpha mask.  Over, Add, Sub, Min, Max, Mult, and Set are 
@@ -49,6 +51,7 @@
 - Added a @vdblink::tools::transformDense() transformDense@endlink tool,
   which applies a functor to the value of each voxel of a dense grid
   within a given bounding box.
+- Improved performance of node iterators.
 
 @par
 API changes:

@@ -74,16 +74,7 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
-    /*
-// Helper class that implements hierarchical Digital Differential Analyzers
-// specialized for ray intersections with level sets
-template <typename GridT, int NodeLevel> struct LevelSetHDDA;
-
-
-/// Helper class that implements hierarchical Digital Differential Analysers
-/// specialized for ray intersections with density (vs level set surfaces)
-template <typename GridT, int NodeLevel> struct VolumeHDDA;
-    */
+   
 // Helper class that implements the actual search of the zero-crossing
 // of the level set along the direction of a ray. This particular
 // implementation uses iterative linear search.
@@ -464,8 +455,12 @@ public:
         return time*mGrid->transform().baseMap()->applyJacobian(mRay.dir()).length();
     }
 
-    /// @brief Return a const reference to the grid.
+    /// @brief Return a const reference to the input grid.
     const GridT& grid() const { return *mGrid; }
+
+    /// @brief Return a const reference to the (potentially dilated)
+    /// bool tree used to accelerate the ray marching.
+    const TreeT& tree() const { return *mTree; }
 
     /// @brief Return a const reference to the BBOX of the grid
     const math::CoordBBox& bbox() const { return mBBox; }
