@@ -59,12 +59,13 @@
 #ifndef OPENVDB_TOOLS_RAYINTERSECTOR_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_RAYINTERSECTOR_HAS_BEEN_INCLUDED
 
-#include <openvdb/math/Ray.h>
 #include <openvdb/math/DDA.h>
+#include <openvdb/math/Math.h>
+#include <openvdb/math/Ray.h>
 #include <openvdb/math/Stencils.h>
 #include <openvdb/Grid.h>
 #include <openvdb/Types.h>
-#include <openvdb/math/Math.h>
+#include <openvdb/openvdb.h>
 #include "Morphology.h"
 #include <boost/utility.hpp>
 #include <boost/type_traits/is_floating_point.hpp>
