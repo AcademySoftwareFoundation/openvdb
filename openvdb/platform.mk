@@ -279,6 +279,20 @@ ifdef MBSD
 
 endif
 
+# Compiler specific flags for gcc/clang
+ifndef WINDOWS
+
+    GCC_VERSION   := $(shell ${CC} -dumpversion)
+    GCC_MAJOR_VER := $(shell echo "$(GCC_VERSION)" | cut -d "." -f 1)
+    GCC_MINOR_VER := $(shell echo "$(GCC_VERSION)" | cut -d "." -f 2)
+
+    ifeq ($(GCC_MAJOR_VER), 4)
+      ifeq ($(GCC_MINOR_VER), 8)
+        CXXFLAGS += -Wno-unused-local-typedefs
+      endif
+    endif
+
+endif
 
 ifdef PLATFORM_ENABLED
 # Rule for testing platform detection
