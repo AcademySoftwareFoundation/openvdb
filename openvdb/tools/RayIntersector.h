@@ -59,12 +59,12 @@
 #ifndef OPENVDB_TOOLS_RAYINTERSECTOR_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_RAYINTERSECTOR_HAS_BEEN_INCLUDED
 
-#include <openvdb/math/Ray.h>
 #include <openvdb/math/DDA.h>
+#include <openvdb/math/Math.h>
+#include <openvdb/math/Ray.h>
 #include <openvdb/math/Stencils.h>
 #include <openvdb/Grid.h>
 #include <openvdb/Types.h>
-#include <openvdb/math/Math.h>
 #include "Morphology.h"
 #include <boost/utility.hpp>
 #include <boost/type_traits/is_floating_point.hpp>
@@ -350,7 +350,7 @@ public:
     /// or the grid is empty.
     VolumeRayIntersector(const GridT& grid, const math::CoordBBox& bbox)
         : mIsMaster(true)
-        , mTree(new BoolTree(grid.tree(), false, TopologyCopy()))
+        , mTree(new TreeT(grid.tree(), false, TopologyCopy()))
         , mGrid(&grid)
         , mAccessor(*mTree)
         , mBBox(bbox)
