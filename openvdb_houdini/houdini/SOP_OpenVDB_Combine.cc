@@ -277,9 +277,10 @@ newSopOperator(OP_OperatorTable* table)
             "by less than the specified tolerance."));
 
     // Flood fill toggle
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "flood", "Signed-Flood-Fill Output")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "flood", "Signed-Flood-Fill Output SDFs")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("Reclassify inactive output voxels as either inside or outside."));
+        .setHelpText(
+            "Reclassify inactive voxels of level set grids as either inside or outside."));
 
     // Obsolete parameters
     hutil::ParmList obsoleteParms;
@@ -1043,8 +1044,9 @@ struct SOP_OpenVDB_Combine::CombineOp
                 ValueT(ZERO + deactivationTolerance));
         }
 
-        // Note: flood fill and pruning currently work only for scalar grids.
-        if (flood) resultGrid->signedFloodFill();
+        if (flood && resultGrid->getGridClass() == openvdb::GRID_LEVEL_SET) {
+            resultGrid->signedFloodFill();
+        }
         if (prune) {
             const float tolerance = self->evalFloat("tolerance", 0, self->getTime());
             resultGrid->tree().prune(ValueT(ZERO + tolerance));

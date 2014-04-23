@@ -59,12 +59,12 @@
 #ifndef OPENVDB_TOOLS_RAYINTERSECTOR_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_RAYINTERSECTOR_HAS_BEEN_INCLUDED
 
-#include <openvdb/math/Ray.h>
 #include <openvdb/math/DDA.h>
+#include <openvdb/math/Math.h>
+#include <openvdb/math/Ray.h>
 #include <openvdb/math/Stencils.h>
 #include <openvdb/Grid.h>
 #include <openvdb/Types.h>
-#include <openvdb/math/Math.h>
 #include "Morphology.h"
 #include <boost/utility.hpp>
 #include <boost/type_traits/is_floating_point.hpp>
@@ -74,7 +74,7 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
-   
+
 // Helper class that implements the actual search of the zero-crossing
 // of the level set along the direction of a ray. This particular
 // implementation uses iterative linear search.
@@ -82,7 +82,7 @@ template<typename GridT, int Iterations = 0, typename RealT = double>
 class LinearSearchImpl;
 
 
-/////////////////////////////////////// LevelSetRayIntersector //////////////////////////////////////
+///////////////////////////////////// LevelSetRayIntersector /////////////////////////////////////
 
 
 /// @brief This class provides the public API for intersecting a ray
@@ -269,7 +269,7 @@ private:
 };// LevelSetRayIntersector
 
 
-/////////////////////////////////////// VolumeRayIntersector ////////////////////////////////////////
+////////////////////////////////////// VolumeRayIntersector //////////////////////////////////////
 
 
 /// @brief This class provides the public API for intersecting a ray
@@ -350,7 +350,7 @@ public:
     /// or the grid is empty.
     VolumeRayIntersector(const GridT& grid, const math::CoordBBox& bbox)
         : mIsMaster(true)
-        , mTree(new BoolTree(grid.tree(), false, TopologyCopy()))
+        , mTree(new TreeT(grid.tree(), false, TopologyCopy()))
         , mGrid(&grid)
         , mAccessor(*mTree)
         , mBBox(bbox)
@@ -418,7 +418,7 @@ public:
         if (t.t1>0) mRay.setTimes(t.t1 + math::Delta<RealType>::value(), mTmax);
         return t;
     }
-    
+
     /// @brief Return @c true if the ray intersects active values,
     /// i.e. either active voxels or tiles. Only when a hit is
     /// detected are t0 and t1 updated with the corresponding entry
@@ -480,7 +480,7 @@ public:
             }
         }
     }
-    
+
 private:
 
     typedef typename tree::ValueAccessor<const TreeT> AccessorT;
@@ -497,7 +497,7 @@ private:
 };// VolumeRayIntersector
 
 
-///////////////////////////////////////// LinearSearchImpl //////////////////////////////////////////
+//////////////////////////////////////// LinearSearchImpl ////////////////////////////////////////
 
 
 /// @brief Implements linear iterative search for an iso-value of

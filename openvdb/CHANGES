@@ -1,7 +1,7 @@
 OpenVDB Version History
 =======================
 
-Version 2.3.0 - In development
+Version 2.3.0 - April 23, 2014
     - Added tools::extractSparseTree(), which selectively extracts and
       transforms data from a dense grid to produce a sparse tree,
       and tools::extractSparseTreeWithMask(), which copies data from
@@ -22,13 +22,15 @@ Version 2.3.0 - In development
       to VolumeRayIntersector::march().
     - Added member class Ray::TimeSpan and method Ray::valid(), and 
       deprecated method Ray::test(). 
-    - Fixed a bug in VolumeHDDA occurring when ray.t0=0 [Contributed by Mike Farnsworth]
+    - Fixed a bug in VolumeHDDA that could cause rendering artifacts
+      when a ray's start time was zero.
+      [Contributed by Mike Farnsworth]
     - Added tools::compositeToDense(), which composites data from a
       sparse tree into a dense array, using a sparse alpha mask.
       Over, Add, Sub, Min, Max, Mult, and Set are supported operations.
     - Added tools::transformDense(), which applies a functor to the value
       of each voxel of a dense grid within a given bounding box.
-    - Improved performance of node iterators.
+    - Improved the performance of node iterators.
 
     API changes:
     - Collected the digital differential analyzer code from math/Ray.h
@@ -48,6 +50,9 @@ Version 2.3.0 - In development
     - Added a Clip SOP, which does volumetric clipping. 
     - Added an Occlusion Mask SOP, which generates a mask of the voxels
       inside a camera frustum that are occluded by objects in an input grid.
+    - The Combine SOP now applies the optional signed flood fill only to
+      level set grids, since that operation isn't meaningful for other grids.
+    - The Filter SOP now processes all grid types, not just scalar grids.
 
 Version 2.2.0 - February 20, 2014
     - Added a simple, multithreaded volume renderer, and added volume

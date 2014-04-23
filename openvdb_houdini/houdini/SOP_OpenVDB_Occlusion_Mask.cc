@@ -111,7 +111,6 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(PRMzeroDefaults));
 
     hvdb::OpenVDBOpFactory("OpenVDB Occlusion Mask", SOP_OpenVDB_Occlusion_Mask::factory, parms, *table)
-        .addAlias("OpenVDB Camera Shadow")
         .addInput("VDBs");
 }
 

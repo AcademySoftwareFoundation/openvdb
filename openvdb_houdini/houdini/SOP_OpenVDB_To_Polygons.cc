@@ -695,20 +695,7 @@ SOP_OpenVDB_To_Polygons::cookMySop(OP_Context& context)
             for (; vdbIt; ++vdbIt) {
 
                 if (boss.wasInterrupted()) break;
-                
-                
-                if (!GEOvdbProcessTypedGridScalar(*vdbIt.getPrimitive(), mesher)) {
-                
-                if (vdbIt->getGrid().type() == openvdb::BoolGrid::gridType()) {
-                    openvdb::BoolGrid::ConstPtr gridPtr =
-                        openvdb::gridConstPtrCast<openvdb::BoolGrid>(vdbIt->getGridPtr());
-
-                    mesher(*gridPtr);
-                }
-            }
-                
-                
-                //GEOvdbProcessTypedGridScalar(*vdbIt.getPrimitive(), mesher);
+                GEOvdbProcessTypedGridScalar(*vdbIt.getPrimitive(), mesher);
                 copyMesh(*gdp, mesher, boss,
                     keepVdbName ? vdbIt.getPrimitive()->getGridName() : NULL);
             }
