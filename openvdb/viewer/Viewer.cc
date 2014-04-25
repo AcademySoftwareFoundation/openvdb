@@ -242,6 +242,7 @@ ViewerImpl::init(const std::string& progName, bool verbose)
         glfwWindowHint(GLFW_DEPTH_BITS, 24);
         glfwWindowHint(GLFW_STENCIL_BITS, 0);
         if (window = glfwCreateWindow(100, 100, "", NULL, NULL)) {
+            glfwMakeContextCurrent(window);
             int major, minor, rev;
             glfwGetVersion(&major, &minor, &rev);
             std::cout << "GLFW: " << major << "." << minor << "." << rev << "\n"
