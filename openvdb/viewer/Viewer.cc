@@ -499,7 +499,10 @@ ViewerImpl::viewGrids(const openvdb::GridCPtrVec& gridList, int width, int heigh
     glfwSwapInterval(1);
 
     do {
-        if (needsDisplay()) render(width, height);
+        if (needsDisplay()) {
+            glfwGetWindowSize(window.get(), &width, &height);
+            render(width, height);
+        }
 
         // eval fps
         ++frame;
