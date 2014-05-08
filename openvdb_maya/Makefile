@@ -262,10 +262,10 @@ $(MAYA_SO_NAME): $(MAYA_OBJ_NAMES)
 	end
 
 install: $(MAYA_SO_NAME)
-	mkdir -p $(MAYA_INSTALL_DIR)/plugins
-	@echo "Created $(MAYA_INSTALL_DIR)/plugins"
-	cp -f $(MAYA_SO_NAME) $(MAYA_INSTALL_DIR)/plugins/
-	@echo "Copied $(MAYA_SO_NAME) to $(MAYA_INSTALL_DIR)/plugins/"
+	mkdir -p $(MAYA_INSTALL_DIR)/plug-ins
+	@echo "Created $(MAYA_INSTALL_DIR)/plug-ins"
+	cp -f $(MAYA_SO_NAME) $(MAYA_INSTALL_DIR)/plug-ins/
+	@echo "Copied $(MAYA_SO_NAME) to $(MAYA_INSTALL_DIR)/plug-ins/"
 	mkdir -p $(MAYA_INSTALL_DIR)/scripts
 	@echo "Created $(MAYA_INSTALL_DIR)/scripts"
 	cp -f $(MAYA_SCRIPTS) $(MAYA_INSTALL_DIR)/scripts/
