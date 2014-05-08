@@ -222,7 +222,11 @@ MAYA_SRC_FILES := \
 ALL_SRC_FILES := $(MAYA_SRC_FILES)
 
 MAYA_OBJ_NAMES := $(MAYA_SRC_NAMES:.cc=.o)
-MAYA_SO_NAME := OpenVDB.so
+ifdef MBSD
+	MAYA_SO_NAME := OpenVDB.bundle
+else
+	MAYA_SO_NAME := OpenVDB.so
+endif
 
 DEPEND := maya_deps
 
