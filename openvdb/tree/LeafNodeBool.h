@@ -186,7 +186,7 @@ public:
     /// Expand the given bounding box so that it includes this leaf node's active voxels.
     /// If visitVoxels is false this LeafNode will be approximated as dense, i.e. with all
     /// voxels active. Else the individual active voxels are visited to produce a tight bbox.
-    void evalActiveBoundingBox(CoordBBox&, bool visitVoxels = true) const;
+    void evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels = true) const;
 
     /// @brief Return the bounding box of this node, i.e., the full index space
     /// spanned by this leaf node.

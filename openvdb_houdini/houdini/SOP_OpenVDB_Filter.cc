@@ -524,11 +524,12 @@ SOP_OpenVDB_Filter::cookMySop(OP_Context& context)
             }
 #endif
 
-            int success = GEOvdbProcessTypedGridScalar(*vdbPrim, filterOp);
+            int success = GEOvdbProcessTypedGridTopology(*vdbPrim, filterOp);
 
             if (!success) {
                 std::stringstream ss;
-                ss << "VDB primitive " << name << " was skipped because it is not a scalar grid";
+                ss << "VDB grid " << name << " of type "
+                    << vdbPrim->getConstGrid().valueType() << " was skipped";
                 addWarning(SOP_MESSAGE, ss.str().c_str());
                 continue;
             }

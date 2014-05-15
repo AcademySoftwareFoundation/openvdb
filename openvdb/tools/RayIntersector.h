@@ -74,16 +74,7 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
-    /*
-// Helper class that implements hierarchical Digital Differential Analyzers
-// specialized for ray intersections with level sets
-template <typename GridT, int NodeLevel> struct LevelSetHDDA;
 
-
-/// Helper class that implements hierarchical Digital Differential Analysers
-/// specialized for ray intersections with density (vs level set surfaces)
-template <typename GridT, int NodeLevel> struct VolumeHDDA;
-    */
 // Helper class that implements the actual search of the zero-crossing
 // of the level set along the direction of a ray. This particular
 // implementation uses iterative linear search.
@@ -91,7 +82,7 @@ template<typename GridT, int Iterations = 0, typename RealT = double>
 class LinearSearchImpl;
 
 
-/////////////////////////////////////// LevelSetRayIntersector //////////////////////////////////////
+///////////////////////////////////// LevelSetRayIntersector /////////////////////////////////////
 
 
 /// @brief This class provides the public API for intersecting a ray
@@ -278,7 +269,7 @@ private:
 };// LevelSetRayIntersector
 
 
-/////////////////////////////////////// VolumeRayIntersector ////////////////////////////////////////
+////////////////////////////////////// VolumeRayIntersector //////////////////////////////////////
 
 
 /// @brief This class provides the public API for intersecting a ray
@@ -427,7 +418,7 @@ public:
         if (t.t1>0) mRay.setTimes(t.t1 + math::Delta<RealType>::value(), mTmax);
         return t;
     }
-    
+
     /// @brief Return @c true if the ray intersects active values,
     /// i.e. either active voxels or tiles. Only when a hit is
     /// detected are t0 and t1 updated with the corresponding entry
@@ -464,8 +455,12 @@ public:
         return time*mGrid->transform().baseMap()->applyJacobian(mRay.dir()).length();
     }
 
-    /// @brief Return a const reference to the grid.
+    /// @brief Return a const reference to the input grid.
     const GridT& grid() const { return *mGrid; }
+
+    /// @brief Return a const reference to the (potentially dilated)
+    /// bool tree used to accelerate the ray marching.
+    const TreeT& tree() const { return *mTree; }
 
     /// @brief Return a const reference to the BBOX of the grid
     const math::CoordBBox& bbox() const { return mBBox; }
@@ -485,7 +480,7 @@ public:
             }
         }
     }
-    
+
 private:
 
     typedef typename tree::ValueAccessor<const TreeT> AccessorT;
@@ -502,7 +497,7 @@ private:
 };// VolumeRayIntersector
 
 
-///////////////////////////////////////// LinearSearchImpl //////////////////////////////////////////
+//////////////////////////////////////// LinearSearchImpl ////////////////////////////////////////
 
 
 /// @brief Implements linear iterative search for an iso-value of

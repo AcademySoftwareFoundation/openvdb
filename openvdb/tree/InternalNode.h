@@ -138,7 +138,11 @@ protected:
         ChildIter(const MaskIterT& iter, NodeT* parent): SparseIteratorBase<
             MaskIterT, ChildIter<NodeT, ChildT, MaskIterT, TagT>, NodeT, ChildT>(iter, parent) {}
 
-        ChildT& getItem(Index pos) const { return *(this->parent().getChildNode(pos)); }
+        ChildT& getItem(Index pos) const
+        {
+            assert(this->parent().isChildMaskOn(pos));
+            return *(this->parent().getChildNode(pos));
+        }
 
         // Note: setItem() can't be called on const iterators.
         void setItem(Index pos, const ChildT& c) const { this->parent().resetChildNode(pos, &c); }
@@ -180,9 +184,13 @@ protected:
 
         bool getItem(Index pos, ChildT*& child, NonConstValueT& value) const
         {
-            child = this->parent().getChildNode(pos);
-            if (!child) value = this->parent().mNodes[pos].getValue();
-            return (child != NULL);
+            if (this->parent().isChildMaskOn(pos)) {
+                child = this->parent().getChildNode(pos);
+                return true;
+            }
+            child = NULL;
+            value = this->parent().mNodes[pos].getValue();
+            return false;
         }
 
         // Note: setItem() can't be called on const iterators.
@@ -694,8 +702,13 @@ protected:
         typename ChildAllIterT, typename OtherChildAllIterT>
     static inline void doVisit2(NodeT&, OtherChildAllIterT&, VisitorOp&, bool otherIsLHS);
 
+    ///@{
+    /// @brief Returns a pointer to the child node at the linear offset n. 
+    /// @warning This protected method assumes that a child node exists at
+    /// the specified linear offset!
     ChildNodeType* getChildNode(Index n);
     const ChildNodeType* getChildNode(Index n) const;
+    ///@}
 
 
     UnionType mNodes[NUM_VALUES];
@@ -2857,7 +2870,8 @@ template<typename ChildT, Index Log2Dim>
 inline ChildT*
 InternalNode<ChildT, Log2Dim>::getChildNode(Index n)
 {
-    return (this->isChildMaskOn(n) ? mNodes[n].getChild() : NULL);
+    assert(this->isChildMaskOn(n));
+    return mNodes[n].getChild();
 }
 
 
@@ -2865,7 +2879,8 @@ template<typename ChildT, Index Log2Dim>
 inline const ChildT*
 InternalNode<ChildT, Log2Dim>::getChildNode(Index n) const
 {
-    return (this->isChildMaskOn(n) ? mNodes[n].getChild() : NULL);
+    assert(this->isChildMaskOn(n));
+    return mNodes[n].getChild();
 }
 
 } // namespace tree

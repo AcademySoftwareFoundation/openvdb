@@ -71,7 +71,7 @@
 ///   void getPosRadVel(size_t n, Vec3R& xyz, Real& rad, Vec3R& vel) const;
 ///
 ///   // Get the attribute of the n'th particle. AttributeType is user-defined!
-///   // Only required is attribute transfer is enabled in ParticledToLevelSet.
+///   // Only required if attribute transfer is enabled in ParticledToLevelSet.
 ///   void getAtt(AttributeType& att) const;
 /// };
 /// @endcode
