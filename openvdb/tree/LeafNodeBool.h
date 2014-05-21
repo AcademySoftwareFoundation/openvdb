@@ -95,7 +95,12 @@ public:
         const bool& getValue(Index i) const
         {
             assert(i < SIZE);
-            return mData.isOn(i) ? LeafNode::sOn : LeafNode::sOff;
+	    // For Visual C++ to avoid returning a temporary here, we
+	    // *CANNOT* use the ternary operator here.
+            if (mData.isOn(i))
+		return LeafNode::sOn;
+	    else
+		return LeafNode::sOff;
         }
         const bool& operator[](Index i) const { return this->getValue(i); }
 
