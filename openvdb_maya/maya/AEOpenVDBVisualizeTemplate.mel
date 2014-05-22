@@ -45,6 +45,13 @@ global proc replaceOpenVDBVisualizeGridSelection(string $attr)
 {
     //connectControl vdbGridNameMenu $attr;
     
+    $node = plugNode($attr);
+    // fix changeCommand
+    optionMenu -e -changeCommand ("updateOpenVDBVisualizeGridSelection( \""+$attr+"\" )") vdbGridNameMenu;
+
+    // save current item
+    string $citem = getAttr ($node+".VdbSelectedGridNames");
+
     // Clear old items
     {
         string $items[] = `optionMenu -q -ill vdbGridNameMenu`;
@@ -62,6 +69,12 @@ global proc replaceOpenVDBVisualizeGridSelection(string $attr)
 
         string $name;
         for ($name in $gridNames) menuItem -l $name -parent vdbGridNameMenu;
+    }
+
+    // restore current item
+    if(`size($citem)` > 0)
+    {
+        optionMenu -e -value $citem vdbGridNameMenu;
     }
 
     /// @todo re-select previous item if it exists, don't update VdbSelectedGridNames if the same item is selectd.
