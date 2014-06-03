@@ -86,6 +86,7 @@ public:
     SOP_NodeVDB(OP_Network*, const char*, OP_Operator*);
     virtual ~SOP_NodeVDB() {}
 
+    virtual void fillInfoTreeNodeSpecific(UT_InfoTree&, fpreal time);
     virtual void getNodeSpecificInfoText(OP_Context&, OP_NodeInfoParms&);
 
 protected:

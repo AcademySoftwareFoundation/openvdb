@@ -179,8 +179,8 @@ stringToIntegrationType(const std::string& s)
 struct AdvectionParms
 {
     AdvectionParms(GU_Detail *outputGeo)
-        : mPointGeo(NULL)
-        , mOutputGeo(outputGeo)
+        : mOutputGeo(outputGeo)
+        , mPointGeo(NULL)
         , mPointGroup(NULL)
         , mVelPrim(NULL)
         , mCptPrim(NULL)

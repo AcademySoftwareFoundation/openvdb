@@ -408,7 +408,7 @@ struct SOP_OpenVDB_Filter::FilterOp
 
 
 OP_ERROR
-SOP_OpenVDB_Filter::evalFilterParms(OP_Context& context, GU_Detail& geo, FilterParmVec& parmVec)
+SOP_OpenVDB_Filter::evalFilterParms(OP_Context& context, GU_Detail&, FilterParmVec& parmVec)
 {
     hutil::OP_EvalScope evalScope(*this, context);
     const fpreal now = context.getTime();

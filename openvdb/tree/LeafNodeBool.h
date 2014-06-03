@@ -37,6 +37,7 @@
 #include <boost/static_assert.hpp>
 #include <openvdb/Types.h>
 #include <openvdb/io/Compression.h> // for io::readData(), etc.
+#include <openvdb/math/Math.h> // for math::isZero()
 #include <openvdb/util/NodeMasks.h>
 #include "LeafNode.h"
 #include "Iterator.h"
@@ -95,7 +96,9 @@ public:
         const bool& getValue(Index i) const
         {
             assert(i < SIZE);
-            return mData.isOn(i) ? LeafNode::sOn : LeafNode::sOff;
+            // We can't use the ternary operator here, otherwise Visual C++ returns
+            // a reference to a temporary.
+            if (mData.isOn(i)) return LeafNode::sOn; else return LeafNode::sOff;
         }
         const bool& operator[](Index i) const { return this->getValue(i); }
 
@@ -523,7 +526,6 @@ public:
     //@{
     /// This function exists only to enable template instantiation.
     void signedFloodFill(bool) {}
-    /// This function exists only to enable template instantiation.
     void signedFloodFill(bool, bool) {}
     template<typename PruneOp> void pruneOp(PruneOp&) {}
     void prune(const ValueType& /*tolerance*/ = zeroVal<ValueType>()) {}
@@ -537,6 +539,7 @@ public:
     NodeT* probeNode(const Coord&) { return NULL; }
     template<typename NodeT>
     const NodeT* probeConstNode(const Coord&) const { return NULL; }
+    template<typename ArrayT> void getNodes(ArrayT&) const {}
     //@}
 
     void addTile(Index level, const Coord&, bool val, bool active);
@@ -1073,9 +1076,8 @@ LeafNode<bool, Log2Dim>::isConstant(bool& constValue, bool& state, bool toleranc
 
 template<Index Log2Dim>
 inline void
-LeafNode<bool, Log2Dim>::addTile(Index level, const Coord& xyz, bool val, bool active)
+LeafNode<bool, Log2Dim>::addTile(Index /*level*/, const Coord& xyz, bool val, bool active)
 {
-    assert(level == 0);
     this->addTile(this->coordToOffset(xyz), val, active);
 }
 
@@ -1371,6 +1373,9 @@ LeafNode<bool, Log2Dim>::copyFromDense(const CoordBBox& bbox, const DenseT& dens
                                        bool background, bool tolerance)
 {
     typedef typename DenseT::ValueType DenseValueType;
+    struct Local {
+        inline static bool toBool(const DenseValueType& v) { return !math::isZero(v); }
+    };
 
     const size_t xStride = dense.xStride(), yStride = dense.yStride(), zStride = dense.zStride();
     const Coord& min = dense.bbox().min();
@@ -1384,12 +1389,12 @@ LeafNode<bool, Log2Dim>::copyFromDense(const CoordBBox& bbox, const DenseT& dens
             Int32 n2 = n1 + ((y & (DIM-1u)) << LOG2DIM);
             for (Int32 z = bbox.min()[2], ez = bbox.max()[2]+1; z < ez; ++z, ++n2, s2 += zStride) {
                 // Note: if tolerance is true (i.e., 1), then all boolean values compare equal.
-                if (tolerance || background == bool(*s2)) {
+                if (tolerance || (background == Local::toBool(*s2))) {
                     mValueMask.setOff(n2);
                     mBuffer.mData.set(n2, background);
                 } else {
                     mValueMask.setOn(n2);
-                    mBuffer.mData.set(n2, bool(*s2));
+                    mBuffer.mData.set(n2, Local::toBool(*s2));
                 }
             }
         }

@@ -336,7 +336,11 @@ void
 copyMesh(
     GU_Detail& detail,
     openvdb::tools::VolumeToMesh& mesher,
+#if (UT_VERSION_INT < 0x0c0500F5) // earlier than 12.5.245
     hvdb::Interrupter& boss,
+#else
+    hvdb::Interrupter&,
+#endif
     const char* gridName = NULL,
     GA_PrimitiveGroup* surfaceGroup = NULL,
     GA_PrimitiveGroup* interiorGroup = NULL,

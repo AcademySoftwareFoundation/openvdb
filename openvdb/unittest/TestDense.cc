@@ -37,7 +37,7 @@
 #include <openvdb/Exceptions.h>
 #include <sstream>
 #ifdef BENCHMARK_TEST
-#include "util.h" // for CpuTimer
+#include <openvdb/util/CpuTimer.h>
 #endif
 
 
@@ -327,7 +327,7 @@ TestDense::testCopy()
 
     {// parallel convert to dense
 #ifdef BENCHMARK_TEST
-        unittest_util::CpuTimer ts;
+        util::CpuTimer ts;
         ts.start("CopyToDense");
 #endif
         tools::copyToDense(*grid, dense);
@@ -340,7 +340,7 @@ TestDense::testCopy()
 
     {// Parallel create from dense
 #ifdef BENCHMARK_TEST
-        unittest_util::CpuTimer ts;
+        util::CpuTimer ts;
         ts.start("CopyFromDense");
 #endif
         FloatTree tree1(tree0.background());

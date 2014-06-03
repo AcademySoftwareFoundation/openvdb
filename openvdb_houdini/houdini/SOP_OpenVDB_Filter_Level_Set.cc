@@ -458,7 +458,7 @@ newSopOperator(OP_OperatorTable* table)
         parms.add(hutil::ParmFactory(PRM_INT_J, "iterations", "Iterations")
             .setDefault(PRMfourDefaults)
             .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10));
-        
+
         // Toggle between world- and index-space units for offset
         parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldSpaceUnits",
                   "Specify Offset in World (vs Voxel) Units")
@@ -487,7 +487,7 @@ newSopOperator(OP_OperatorTable* table)
                 .setDefault(items[0])
                 .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
         }
-        
+
         //Invert mask.
         parms.add(hutil::ParmFactory(PRM_TOGGLE, "invert", "Invert Alpha Mask")
                 .setHelpText("Inverts the optional mask so alpha values 0->1 maps to 1->0"));
@@ -779,7 +779,7 @@ SOP_OpenVDB_Filter_Level_Set::applyFilters(
     std::vector<FilterParms>& filterParms,
     BossT& boss,
     OP_Context& context,
-    GU_Detail& geo,
+    GU_Detail&,
     bool verbose)
 {
     typename GridT::Ptr grid = openvdb::deepCopyTypedGrid<GridT>(vdbPrim->getGrid());
@@ -920,7 +920,7 @@ SOP_OpenVDB_Filter_Level_Set::filterGrid(OP_Context& context, FilterT& filter,
 
 template<typename FilterT>
 inline void
-SOP_OpenVDB_Filter_Level_Set::offset(const FilterParms& parms, FilterT& filter,
+SOP_OpenVDB_Filter_Level_Set::offset(const FilterParms&, FilterT& filter,
     const float offset, bool verbose, const typename FilterT::MaskType* mask)
 {
 

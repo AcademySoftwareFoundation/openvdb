@@ -110,13 +110,13 @@ GEO_VDBTranslator::checkExtension(const char *name)
 }
 
 int
-GEO_VDBTranslator::checkMagicNumber(unsigned magic)
+GEO_VDBTranslator::checkMagicNumber(unsigned /*magic*/)
 {
     return 0;
 }
 
 GA_Detail::IOStatus
-GEO_VDBTranslator::fileLoad(GEO_Detail *geogdp, UT_IStream &is, int ate_magic)
+GEO_VDBTranslator::fileLoad(GEO_Detail *geogdp, UT_IStream &is, int /*ate_magic*/)
 {
     UT_WorkBuffer			buf;
     GU_Detail				*gdp = (GU_Detail *) geogdp;
@@ -178,7 +178,7 @@ GEO_VDBTranslator::fileLoad(GEO_Detail *geogdp, UT_IStream &is, int ate_magic)
 }
 
 GA_Detail::IOStatus
-GEO_VDBTranslator::fileSaveToFile(const GEO_Detail *geogdp, ostream &os, const char *fname)
+GEO_VDBTranslator::fileSaveToFile(const GEO_Detail *geogdp, ostream &, const char *fname)
 {
     GU_Detail		*gdp = static_cast<GU_Detail*>(const_cast<GEO_Detail*>(geogdp));
     if (!fname)

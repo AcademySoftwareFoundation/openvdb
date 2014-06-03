@@ -228,7 +228,7 @@ evalAttrDefault(const GA_Defaults& defaults, int idx)
 }
 
 template <> inline float
-evalAttrDefault<float>(const GA_Defaults& defaults, int idx)
+evalAttrDefault<float>(const GA_Defaults& defaults, int /*idx*/)
 {
     fpreal32 value;
     defaults.get(0, value);

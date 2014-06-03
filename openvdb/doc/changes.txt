@@ -3,6 +3,60 @@
 @page changes Release Notes
 
 
+@htmlonly <a name="v3_0_0_changes"></a>@endhtmlonly
+@par
+<B>Version 3.0.0</B> - <I>In development</I>
+- Improved the performance of point scattering (by orders of magnitude) and
+  added a @vdblink::tools::DenseUniformPointScatter
+  DenseUniformPointScatter@endlink class.
+- Reduced the construction time for
+  @vdblink::tree::LeafManager LeafManager@endlink instances.
+- Added @vdblink::tree::Tree::getNodes() Tree::getNodes@endlink, which allows
+  for fast construction of linear arrays of tree nodes for use in multithreaded
+  code such as the @vdblink::tree::LeafManager LeafManager@endlink.
+- Added @vdblink::math::Extrema math::Extrema@endlink and
+  @vdblink::tools::extrema tools::extrema@endlink to efficiently 
+  compute min/max.
+- Added @vdblink::getLibraryVersionString()
+  getLibraryVersionString@endlink and
+  @link OPENVDB_LIBRARY_VERSION_STRING OPENVDB_LIBRARY_VERSION_STRING@endlink.
+- Modified the mesh to volume converter to always set the grid background value
+  to the exterior narrow-band width and added finite value checks to narrow
+  band parameters.
+- Fixed a memory leak in @vdblink::io::Queue io::Queue@endlink when the queue
+  was full and a write task could not be added within the timeout interval.
+- Fixed a bug in @vdblink::tree::LeafNode::Buffer::getValue()
+  LeafNode::Buffer::getValue@endlink whereby Visual C++ would return
+  a reference to a temporary.
+  <I>[Contributed by SESI]</I>
+- Added @vdblink::util::CpuTimer util::CpuTimer@endlink and removed 
+  @c unittest_util::CpuTimer (with a minimal API) from @c unittest/util.h.
+- Eliminated the use of @c getopt for command-line argument parsing
+  in @c vdb_test.
+- Fixed the @c vdb_print, @c vdb_render and @c vdb_view tools so that they
+  properly initialize <A HREF="http://log4cplus.sourceforge.net/">log4cplus</A>
+  if it is enabled.
+- Fixed a bug in the QuantizedUnitVec::pack method that caused quantization
+  artifacts.
+
+@par
+API changes:
+- The point counts in
+  @vdblink::tools::UniformPointScatter UniformPointScatter@endlink 
+  and @vdblink::tools::NonUniformPointScatter NonUniformPointScatter@endlink
+  are now specified (and returned) as @c Index64.
+
+@par
+Houdini:
+- Added a Voxel Scale mode to the Resample SOP.
+- Improved the performance of the Scatter SOP by more than an order of
+  magnitude.
+- Added the OpenVDB library version number to the Extended Operator
+  Information for all SOPs.
+- Like the native Houdini file SOP, the Read SOP now allows missing frames
+  to be reported either as errors or as warnings.
+
+
 @htmlonly <a name="v2_3_0_changes"></a>@endhtmlonly
 @par
 <B>Version 2.3.0</B> - <I>April 23, 2014</I>

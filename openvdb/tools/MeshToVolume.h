@@ -42,6 +42,9 @@
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
+
+#include <boost/math/special_functions/fpclassify.hpp> // for isfinite()
+
 #include <deque>
 #include <limits>
 
@@ -2351,6 +2354,11 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
     mIndexGrid->setTransform(mTransform);
     const bool rawData = OUTPUT_RAW_DATA & mConversionFlags;
 
+    if (!boost::math::isfinite(exBandWidth) || !boost::math::isfinite(inBandWidth)) {
+        OPENVDB_THROW(ValueError, "Illegal narrow band width.");
+    }
+
+
     // The progress estimates given to the interrupter are based on the
     // observed average time for each stage and therefore not alway
     // accurate. The goal is to give some progression feedback to the user.
@@ -2449,7 +2457,10 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
         inBandWidth = FloatValueT(0.0);
     }
 
-    if (mDistGrid->activeVoxelCount() == 0) return;
+    if (mDistGrid->activeVoxelCount() == 0) {
+        mDistGrid->tree().setBackground(exBandWidth);
+        return;
+    }
 
     mIntersectingVoxelsGrid->clear();
     const FloatValueT voxelSize(mTransform->voxelSize()[0]);

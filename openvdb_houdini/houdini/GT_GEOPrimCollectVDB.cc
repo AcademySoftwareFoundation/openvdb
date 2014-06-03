@@ -142,7 +142,7 @@ public:
 
     template <typename GridT>
     void
-    processGrid(const GridT &grid, int dummy)
+    processGrid(const GridT &grid, int /*dummy*/)
     {
 	using namespace openvdb;
         typedef typename GridT::TreeType TreeT;
@@ -275,9 +275,9 @@ GT_GEOPrimCollectVDB::beginCollecting(
 
 GT_PrimitiveHandle
 GT_GEOPrimCollectVDB::collect(
-	const GT_GEODetailListHandle &geometry,
+	const GT_GEODetailListHandle &/*geometry*/,
 	const GEO_Primitive *const* prim_list,
-	int nsegments,
+	int /*nsegments*/,
 	GT_GEOPrimCollectData *data) const
 {
     data->asPointer<GT_GEOPrimCollectOffsets>()->append(prim_list[0]);

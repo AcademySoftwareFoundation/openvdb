@@ -294,7 +294,10 @@ public:
     /// Return the number of leaf nodes.
     size_t leafCount() const { return mLeafCount; }
 
-    /// Return the tree associated with this manager.
+    /// Return a const reference to tree associated with this manager.
+    const TreeType& tree() const { return *mTree; }
+
+    /// Return a reference to the tree associated with this manager.
     TreeType& tree() { return *mTree; }
 
     /// Return @c true if the tree associated with this manager is immutable.
@@ -478,7 +481,18 @@ public:
 
 
 
-private:
+  private:
+
+    // This a simple wrapper for a c-style array so it mimics the api
+    // of a std container, e.g. std::vector or std::deque, and can be
+    // passed to Tree::getNodes().
+    struct MyArray {
+        typedef LeafType* value_type;//required by Tree::getNodes
+        value_type* ptr;
+        MyArray(value_type* array) : ptr(array) {}
+        void push_back(value_type leaf) { *ptr++ = leaf; }//required by Tree::getNodes
+    };
+   
     void initLeafArray()
     {
         const size_t leafCount = mTree->leafCount();
@@ -487,8 +501,8 @@ private:
             mLeafs = (leafCount == 0) ? NULL : new LeafType*[leafCount];
             mLeafCount = leafCount;
         }
-        LeafIterType iter = mTree->beginLeaf();
-        for (size_t n = 0; n != leafCount; ++n, ++iter) mLeafs[n] = iter.getLeaf();
+        MyArray a(mLeafs);
+        mTree->getNodes(a);
     }
 
     void initAuxBuffers(bool serial)

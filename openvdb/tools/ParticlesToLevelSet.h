@@ -659,7 +659,7 @@ private:
         size_t count = 0;
         for ( Coord c = a; c.x() <= b.x(); ++c.x() ) {
             //only check interrupter every 32'th scan in x
-            if (!(count++ & (1<<5)-1) && util::wasInterrupted(mParent.mInterrupter)) {
+            if (!(count++ & ((1<<5)-1)) && util::wasInterrupted(mParent.mInterrupter)) {
                 tbb::task::self().cancel_group_execution();
                 return false;
             }

@@ -30,8 +30,8 @@
 //
 /// @file Statistics.h
 ///
-/// @brief Functions to efficiently compute histograms and statistics
-/// (mean, variance, etc.) of grid values
+/// @brief Functions to efficiently compute histograms, extremas
+/// (min/max) and statistics (mean, variance, etc.) of grid values
 
 #ifndef OPENVDB_TOOLS_STATISTICS_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_STATISTICS_HAS_BEEN_INCLUDED
@@ -61,7 +61,16 @@ inline math::Histogram
 histogram(const IterT& iter, double minVal, double maxVal,
           size_t numBins = 10, bool threaded = true);
 
-
+/// @brief Iterate over a scalar grid and compute extrema (min/max) of the
+/// values of the voxels that are visited, or iterate over a vector-valued grid
+/// and compute extrema of the magnitudes of the vectors.
+/// @param iter      an iterator over the values of a grid or its tree
+///                  (@c Grid::ValueOnCIter, @c Tree::ValueOffIter, etc.)
+/// @param threaded  if true, iterate over the grid in parallel
+template<typename IterT>
+inline math::Extrema
+extrema(const IterT& iter, bool threaded = true);
+    
 /// @brief Iterate over a scalar grid and compute statistics (mean, variance, etc.)
 /// of the values of the voxels that are visited, or iterate over a vector-valued grid
 /// and compute statistics of the magnitudes of the vectors.
@@ -72,7 +81,39 @@ template<typename IterT>
 inline math::Stats
 statistics(const IterT& iter, bool threaded = true);
 
-
+/// @brief Iterate over a grid and compute extremas (min/max) of
+/// the values produced by applying the given functor at each voxel that is visited.
+/// @param iter      an iterator over the values of a grid or its tree
+///                  (@c Grid::ValueOnCIter, @c Tree::ValueOffIter, etc.)
+/// @param op        a functor of the form <tt>void op(const IterT&, math::Stats&)</tt>,
+///                  where @c IterT is the type of @a iter, that inserts zero or more
+///                  floating-point values into the provided @c math::Stats object
+/// @param threaded  if true, iterate over the grid in parallel
+/// @note When @a threaded is true, each thread gets its own copy of the functor.
+///
+/// @par Example:
+/// Compute statistics of just the active and positive-valued voxels of a scalar,
+/// floating-point grid.
+/// @code
+/// struct Local {
+///     static inline
+///     void addIfPositive(const FloatGrid::ValueOnCIter& iter, math::Extrema& ex)
+///     {
+///         const float f = *iter;
+///         if (f > 0.0) {
+///             if (iter.isVoxelValue()) ex.add(f);
+///             else ex.add(f, iter.getVoxelCount());
+///         }
+///     }
+/// };
+/// FloatGrid grid = ...;
+/// math::Extrema stats =
+///     tools::extrema(grid.cbeginValueOn(), Local::addIfPositive, /*threaded=*/true);
+/// @endcode
+template<typename IterT, typename ValueOp>
+inline math::Extrema
+extrema(const IterT& iter, const ValueOp& op, bool threaded);
+    
 /// @brief Iterate over a grid and compute statistics (mean, variance, etc.) of
 /// the values produced by applying the given functor at each voxel that is visited.
 /// @param iter      an iterator over the values of a grid or its tree
@@ -173,6 +214,10 @@ template<typename OperatorT, typename IterT>
 inline math::Stats
 opStatistics(const IterT& iter, const OperatorT& op = OperatorT(), bool threaded = true);
 
+/// @brief Same as opStatistics except it returns a math::Extrema vs a math::Stats   
+template<typename OperatorT, typename IterT>
+inline math::Extrema
+opExtrema(const IterT& iter, const OperatorT& op = OperatorT(), bool threaded = true);
 
 ////////////////////////////////////////
 
@@ -223,10 +268,9 @@ struct GetVal
     }
 };
 
-
 // Helper class to accumulate scalar voxel values or vector voxel magnitudes
 // into a math::Stats object
-template<typename IterT, typename ValueOp>
+template<typename IterT, typename ValueOp, typename StatsT>
 struct StatsOp
 {
     StatsOp(const ValueOp& op): getValue(op) {}
@@ -237,10 +281,10 @@ struct StatsOp
     // Accumulate another functor's Stats object into this functor's.
     inline void join(StatsOp& other) { stats.add(other.stats); }
 
-    math::Stats stats;
+    StatsT stats;
     ValueOp getValue;
 };
-
+    
 
 // Helper class to accumulate scalar voxel values or vector voxel magnitudes
 // into a math::Histogram object
@@ -265,7 +309,7 @@ struct HistOp
 // Helper class to apply an operator such as math::Gradient or math::Laplacian
 // to voxels and accumulate the scalar results or the magnitudes of vector results
 // into a math::Stats object
-template<typename IterT, typename OpT>
+template<typename IterT, typename OpT, typename StatsT>
 struct MathOp
 {
     typedef typename IterT::TreeT                     TreeT;
@@ -275,7 +319,7 @@ struct MathOp
     // Each thread gets its own accessor and its own copy of the operator.
     ConstAccessor mAcc;
     OpT mOp;
-    math::Stats mStats;
+    StatsT mStats;
 
     template<typename TreeT>
     static inline TreeT* THROW_IF_NULL(TreeT* ptr) {
@@ -330,7 +374,14 @@ histogram(const IterT& iter, double vmin, double vmax, size_t numBins, bool thre
     return op.hist;
 }
 
-
+template<typename IterT>
+inline math::Extrema
+extrema(const IterT& iter, bool threaded)
+{
+    stats_internal::GetVal<IterT, math::Extrema> valOp;
+    return extrema(iter, valOp, threaded);
+}
+    
 template<typename IterT>
 inline math::Stats
 statistics(const IterT& iter, bool threaded)
@@ -339,25 +390,42 @@ statistics(const IterT& iter, bool threaded)
     return statistics(iter, valOp, threaded);
 }
 
+template<typename IterT, typename ValueOp>
+inline math::Extrema
+extrema(const IterT& iter, const ValueOp& valOp, bool threaded)
+{
+    stats_internal::StatsOp<IterT, const ValueOp, math::Extrema> op(valOp);
+    tools::accumulate(iter, op, threaded);
+    return op.stats;
+}    
 
 template<typename IterT, typename ValueOp>
 inline math::Stats
 statistics(const IterT& iter, const ValueOp& valOp, bool threaded)
 {
-    stats_internal::StatsOp<IterT, const ValueOp> op(valOp);
+    stats_internal::StatsOp<IterT, const ValueOp, math::Stats> op(valOp);
     tools::accumulate(iter, op, threaded);
     return op.stats;
 }
 
 
 template<typename OperatorT, typename IterT>
-inline math::Stats
-opStatistics(const IterT& iter, const OperatorT& op, bool threaded)
+inline math::Extrema
+opExtrema(const IterT& iter, const OperatorT& op, bool threaded)
 {
-    stats_internal::MathOp<IterT, OperatorT> func(iter, op);
+    stats_internal::MathOp<IterT, OperatorT, math::Extrema> func(iter, op);
     tools::accumulate(iter, func, threaded);
     return func.mStats;
 }
+
+template<typename OperatorT, typename IterT>
+inline math::Stats
+opStatistics(const IterT& iter, const OperatorT& op, bool threaded)
+{
+    stats_internal::MathOp<IterT, OperatorT, math::Stats> func(iter, op);
+    tools::accumulate(iter, func, threaded);
+    return func.mStats;
+}    
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

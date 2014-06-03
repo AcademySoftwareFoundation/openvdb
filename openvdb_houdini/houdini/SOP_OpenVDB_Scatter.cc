@@ -273,7 +273,7 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
 
         const int seed = evalInt("seed", /*idx=*/0, time);
         const bool verbose   = evalInt("verbose", /*idx=*/0, time) != 0;
-        const int pointCount = evalInt("count", 0, time);
+        const openvdb::Index64 pointCount = evalInt("count", 0, time);
         const float density  = evalFloat("density", 0, time);
         const int ptsPerVox  = evalInt("ppv", 0, time);
         const bool interior  = evalInt("interior", /*idx=*/0, time) != 0;
@@ -360,13 +360,8 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
 
             } else if (pmode == 2) { // points per voxel
 
-                const openvdb::Vec3d voxelSize = grid.voxelSize();
-
-                // scatter tool needs points per unit volume
-                const float ppvol = float(ptsPerVox) / (voxelSize[0] * voxelSize[1] * voxelSize[2]);
-
-                openvdb::tools::UniformPointScatter<PointAccessor, RandGen, hvdb::Interrupter>
-                    scatter(points, ppvol, mtRand, &boss);
+                openvdb::tools::DenseUniformPointScatter<PointAccessor, RandGen, hvdb::Interrupter>
+                    scatter(points, ptsPerVox, mtRand, &boss);
 
                 if (interior && isSignedDistance) {
                     processLSInterior(gridType, grid, scatter);
@@ -378,7 +373,7 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
             }
 
         } // for each grid
-        
+
         if (!emptyGrids.empty()) {
             std::string s = "The following grids were empty: "
                 + boost::algorithm::join(emptyGrids, ", ");

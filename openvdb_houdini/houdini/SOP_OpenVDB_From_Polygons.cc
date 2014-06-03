@@ -85,7 +85,7 @@ evalAttrType(const UT_String& attrStr, UT_String& attrName, int& attrClass)
 }
 
 inline int
-lookupAttrInput(const PRM_SpareData *spare)
+lookupAttrInput(const PRM_SpareData* spare)
 {
     const char  *istring;
     if (!spare) return 0;
@@ -94,8 +94,8 @@ lookupAttrInput(const PRM_SpareData *spare)
 }
 
 inline void
-sopBuildAttrMenu(void *data, PRM_Name *menuEntries, int themenusize,
-    const PRM_SpareData *spare, const PRM_Parm *parm)
+sopBuildAttrMenu(void* data, PRM_Name* menuEntries, int themenusize,
+    const PRM_SpareData* spare, const PRM_Parm*)
 {
     if (data == NULL || menuEntries == NULL || spare == NULL) return;
 

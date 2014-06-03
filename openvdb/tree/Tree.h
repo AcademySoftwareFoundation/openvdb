@@ -522,6 +522,33 @@ public:
     //@}
 
 
+    //@{
+    /// @brief Adds all nodes of a certain type to a container with the following API:
+    /// @code
+    /// struct ArrayT {
+    ///    typedef value_type;// defines the type of nodes to be added to the array
+    ///    void push_back(value_type nodePtr);// method that add nodes to the array
+    /// };
+    /// @endcode
+    /// @details An example of a wrapper around a c-style array is:
+    /// @code
+    /// struct MyArray {
+    ///    typedef LeafType* value_type;
+    ///    value_type* ptr;
+    ///    MyArray(value_type* array) : ptr(array) {}
+    ///    void push_back(value_type leaf) { *ptr++ = leaf; }
+    ///};
+    /// @endcode
+    /// @details An example that constructs a list of pointer to all leaf nodes is:
+    /// @code
+    /// std::vector<const LeafNodeType*> array;//most std contains have the required API
+    /// array.reserve(tree.leafCount());//this is a fast preallocation.
+    /// tree.getNodes(array);
+    /// @endcode
+    template<typename ArrayT> void getNodes(ArrayT& array) { mRoot.getNodes(array); }
+    template<typename ArrayT> void getNodes(ArrayT& array) const { mRoot.getNodes(array); }
+    //@}
+    
     //
     // Aux methods
     //

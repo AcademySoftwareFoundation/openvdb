@@ -39,6 +39,11 @@
 #include <set>
 #include <sstream>
 #include <boost/type_traits/remove_const.hpp>
+#include <boost/type_traits/remove_pointer.hpp>
+#include <boost/type_traits/is_pointer.hpp>
+#include <boost/type_traits/is_const.hpp>
+#include <boost/mpl/contains.hpp>
+#include <boost/mpl/if.hpp>
 #include <boost/mpl/vector.hpp>//for boost::mpl::vector
 #include <boost/mpl/at.hpp>
 #include <boost/mpl/push_back.hpp>
@@ -745,10 +750,39 @@ public:
     const LeafNodeType* probeLeafAndCache(const Coord& xyz, AccessorT& acc) const;
     //@}
 
-
+    
     //
     // Aux methods
     //
+
+    //@{
+    /// @brief Adds all nodes of a certain type to a container with the following API:
+    /// @code
+    /// struct ArrayT {
+    ///    typedef value_type;// defines the type of nodes to be added to the array
+    ///    void push_back(value_type nodePtr);// method that add nodes to the array
+    /// };
+    /// @endcode
+    /// @details An example of a wrapper around a c-style array is:
+    /// @code
+    /// struct MyArray {
+    ///    typedef LeafType* value_type;
+    ///    value_type* ptr;
+    ///    MyArray(value_type* array) : ptr(array) {}
+    ///    void push_back(value_type leaf) { *ptr++ = leaf; }
+    ///};
+    /// @endcode
+    /// @details An example that constructs a list of pointer to all leaf nodes is:
+    /// @code
+    /// std::vector<const LeafNodeType*> array;//most std contains have the required API
+    /// array.reserve(tree.leafCount());//this is a fast preallocation.
+    /// tree.getNodes(array);
+    /// @endcode
+    template<typename ArrayT> void getNodes(ArrayT& array);
+    template<typename ArrayT> void getNodes(ArrayT& array) const;
+    //@}
+
+    
     /// @brief Set the values of all inactive voxels and tiles of a narrow-band
     /// level set from the signs of the active voxels, setting outside values to
     /// +background and inside values to -background.
@@ -2653,6 +2687,60 @@ RootNode<ChildT>::probeConstNodeAndCache(const Coord& xyz, AccessorT& acc) const
 
 ////////////////////////////////////////
 
+template<typename ChildT>
+template<typename ArrayT>
+inline void
+RootNode<ChildT>::getNodes(ArrayT& array)
+{
+    typedef typename ArrayT::value_type NodePtr;
+    BOOST_STATIC_ASSERT(boost::is_pointer<NodePtr>::value);
+    typedef typename boost::remove_pointer<NodePtr>::type NodeType;
+    typedef typename boost::remove_const<NodeType>::type NonConstNodeType;
+    typedef typename boost::mpl::contains<NodeChainType, NonConstNodeType>::type result;
+    BOOST_STATIC_ASSERT(result::value);
+    typedef typename boost::mpl::if_<boost::is_const<NodeType>,
+                                     const ChildT, ChildT>::type ArrayChildT;
+    
+    for (MapIter iter=mTable.begin(); iter!=mTable.end(); ++iter) {
+        if (ChildT* child = iter->second.child) {
+            OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+            if (boost::is_same<NodePtr, ArrayChildT*>::value) {
+                array.push_back(reinterpret_cast<NodePtr>(iter->second.child));
+            } else {
+                child->getNodes(array);//descent
+            }
+            OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        }
+    }
+}
+
+template<typename ChildT>
+template<typename ArrayT>
+inline void
+RootNode<ChildT>::getNodes(ArrayT& array) const
+{
+    typedef typename ArrayT::value_type NodePtr;
+    BOOST_STATIC_ASSERT(boost::is_pointer<NodePtr>::value);
+    typedef typename boost::remove_pointer<NodePtr>::type NodeType;
+    BOOST_STATIC_ASSERT(boost::is_const<NodeType>::value);
+    typedef typename boost::remove_const<NodeType>::type NonConstNodeType;
+    typedef typename boost::mpl::contains<NodeChainType, NonConstNodeType>::type result;
+    BOOST_STATIC_ASSERT(result::value);
+    
+    for (MapCIter iter=mTable.begin(); iter!=mTable.end(); ++iter) {
+        if (const ChildNodeType *child = iter->second.child) {
+            OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+            if (boost::is_same<NodePtr, const ChildT*>::value) {
+                array.push_back(reinterpret_cast<NodePtr>(iter->second.child));
+            } else {
+                child->getNodes(array);//descent
+            }
+            OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        }
+    }
+}
+
+////////////////////////////////////////
 
 template<typename ChildT>
 inline void

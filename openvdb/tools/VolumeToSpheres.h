@@ -320,10 +320,9 @@ public:
         const std::vector<IndexRange>& leafRanges,
         const std::vector<Vec4R>& leafBoundingSpheres);
 
-    void run(bool threaded = true);
+    inline void run(bool threaded = true);
 
-
-    void operator()(const tbb::blocked_range<size_t>&) const;
+    inline void operator()(const tbb::blocked_range<size_t>&) const;
 
 private:
     std::vector<Vec4R>& mNodeBoundingSpheres;
@@ -595,11 +594,11 @@ public:
     float radius() const { return mRadius; }
     int index() const { return mIndex; };
 
-    void run(bool threaded = true);
+    inline void run(bool threaded = true);
 
 
     UpdatePoints(UpdatePoints&, tbb::split);
-    void operator()(const tbb::blocked_range<size_t>& range);
+    inline void operator()(const tbb::blocked_range<size_t>& range);
     void join(const UpdatePoints& rhs)
     {
         if (rhs.mRadius > mRadius) {
@@ -754,7 +753,7 @@ fillWithSpheres(
         internal::PointAccessor ptnAcc(instancePoints);
 
         UniformPointScatter<internal::PointAccessor, RandGen, InterrupterT>
-            scatter(ptnAcc, (addNBPoints ? (instances / 2) : instances), mtRand, interrupter);
+            scatter(ptnAcc, Index64(addNBPoints ? (instances / 2) : instances), mtRand, interrupter);
 
         scatter(*interiorMaskPtr);
     }
@@ -767,7 +766,7 @@ fillWithSpheres(
     csp.initialize(grid, isovalue, interrupter);
 
     // add extra instance points in the interior narrow band.
-    if (instancePoints.size() < instances) {
+    if (instancePoints.size() < size_t(instances)) {
         const Int16TreeT& signTree = csp.signTree();
         typename Int16TreeT::LeafNodeType::ValueOnCIter it;
         typename Int16TreeT::LeafCIter leafIt = signTree.cbeginLeaf();
@@ -779,9 +778,9 @@ fillWithSpheres(
                     instancePoints.push_back(transform.indexToWorld(it.getCoord()));
                 }
 
-                if (instancePoints.size() == instances) break;
+                if (instancePoints.size() == size_t(instances)) break;
             }
-            if (instancePoints.size() == instances) break;
+            if (instancePoints.size() == size_t(instances)) break;
         }
     }
 
