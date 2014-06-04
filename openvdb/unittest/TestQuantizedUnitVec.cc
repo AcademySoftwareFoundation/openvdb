@@ -120,7 +120,7 @@ TestQuantizedUnitVec::testQuantization()
     //
     // Check conversion error
     //
-    const double tol = 0.015; // component error tolerance
+    const double tol = 0.05; // component error tolerance
 
     const int numNormals = 40000;
 

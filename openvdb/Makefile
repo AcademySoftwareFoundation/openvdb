@@ -500,6 +500,7 @@ INCLUDE_NAMES := \
     tree/Util.h \
     tree/ValueAccessor.h \
     Types.h \
+    util/CpuTimer.h \
     util/Formats.h \
     util/logging.h \
     util/MapsUtil.h \

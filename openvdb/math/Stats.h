@@ -48,6 +48,86 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace math {
 
+/// @brief This class computes the minimum and maximum values of a population
+/// of floating-point values.    
+class Extrema
+{
+public:
+
+    /// @brief Constructor
+    /// @warning The min/max values are initiated to extreme values
+    Extrema()
+        : mSize(0)
+        , mMin(std::numeric_limits<double>::max())
+        , mMax(-mMin)
+    {
+    }
+    
+    /// Add a single sample.
+    void add(double val)
+    {
+        ++mSize;
+        mMin = std::min<double>(val, mMin);
+        mMax = std::max<double>(val, mMax);
+    }
+
+    /// Add @a n samples with constant value @a val.
+    void add(double val, uint64_t n)
+    {
+        mSize += n;
+        mMin  = std::min<double>(val, mMin);
+        mMax  = std::max<double>(val, mMax);
+    }
+
+    /// Return the size of the population, i.e., the total number of samples.
+    inline uint64_t size() const { return mSize; }
+    
+    /// Return the minimum value.
+    inline double min() const { return mMin; }
+
+    /// Return the maximum value.
+    inline double max() const { return mMax; }
+
+    /// Add the samples from the other Stats instance.
+    void add(const Extrema& other)
+    {
+        if (other.mSize > 0) this->join(other);
+    }
+
+    /// @brief Print extrema to the specified output stream.
+    void print(const std::string &name= "", std::ostream &strm=std::cout, int precision=3) const
+    {
+        // Write to a temporary string stream so as not to affect the state
+        // (precision, field width, etc.) of the output stream.
+        std::ostringstream os;
+        os << std::setprecision(precision) << std::setiosflags(std::ios::fixed);
+        os << "Extrema ";
+        if (!name.empty()) os << "for \"" << name << "\" ";
+        if (mSize>0) {
+            os << "with " << mSize << " samples:\n"
+               << "  Min=" << mMin
+               << ", Max=" << mMax << std::endl;
+        } else {
+            os << ": no samples were added." << std::endl;
+        }
+        strm << os.str();
+    }
+
+protected:
+    
+    inline void join(const Extrema& other)
+    {
+        assert(other.mSize > 0);
+        mSize += other.mSize;
+        mMin   = std::min<double>(mMin, other.mMin);
+        mMax   = std::max<double>(mMax, other.mMax);
+    }
+    
+    uint64_t mSize;
+    double mMin, mMax;
+};//end Extrema
+    
+    
 /// @brief This class computes statistics (minimum value, maximum
 /// value, mean, variance and standard deviation) of a population
 /// of floating-point values.
@@ -56,18 +136,20 @@ namespace math {
 ///          standard deviation = sqrt(variance)
 ///
 /// @note This class employs incremental computation and double precision.
-class Stats
+class Stats : public Extrema
 {
 public:
-    Stats(): mSize(0), mAvg(0.0), mAux(0.0),
-        mMin(std::numeric_limits<double>::max()), mMax(-mMin) {}
+    Stats()
+        : Extrema()
+        , mAvg(0.0)
+        , mAux(0.0)
+    {
+    }
 
     /// Add a single sample.
     void add(double val)
     {
-        mSize++;
-        mMin = std::min<double>(val, mMin);
-        mMax = std::max<double>(val, mMax);
+        Extrema::add(val);
         const double delta = val - mAvg;
         mAvg += delta/double(mSize);
         mAux += delta*(val - mAvg);
@@ -76,37 +158,24 @@ public:
     /// Add @a n samples with constant value @a val.
     void add(double val, uint64_t n)
     {
-        mMin  = std::min<double>(val, mMin);
-        mMax  = std::max<double>(val, mMax);
         const double denom = 1.0/double(mSize + n);
         const double delta = val - mAvg;
         mAvg += denom*delta*n;
         mAux += denom*delta*delta*mSize*n;
-        mSize += n;
+        Extrema::add(val, n);
     }
 
     /// Add the samples from the other Stats instance.
     void add(const Stats& other)
     {
         if (other.mSize > 0) {
-            mMin  = std::min<double>(mMin, other.mMin);
-            mMax  = std::max<double>(mMax, other.mMax);
             const double denom = 1.0/double(mSize + other.mSize);
             const double delta = other.mAvg - mAvg;
             mAvg += denom*delta*other.mSize;
             mAux += other.mAux + denom*delta*delta*mSize*other.mSize;
-            mSize += other.mSize;
+            Extrema::join(other);
         }
     }
-
-    /// Return the size of the population, i.e., the total number of samples.
-    inline uint64_t size() const { return mSize; }
-
-    /// Return the minimum value.
-    inline double min() const { return mMin; }
-
-    /// Return the maximum value.
-    inline double max() const { return mMax; }
 
     //@{
     /// Return the  arithmetic mean, i.e. average, value.
@@ -151,9 +220,11 @@ public:
         strm << os.str();
     }
 
-private:
-    uint64_t mSize;
-    double mAvg, mAux, mMin, mMax;
+protected:
+    using Extrema::mSize;
+    using Extrema::mMin;
+    using Extrema::mMax;
+    double mAvg, mAux;
 }; // end Stats
 
 

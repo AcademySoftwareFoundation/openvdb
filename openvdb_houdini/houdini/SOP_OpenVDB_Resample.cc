@@ -56,7 +56,7 @@ namespace hutil = houdini_utils;
 class SOP_OpenVDB_Resample: public hvdb::SOP_NodeVDB
 {
 public:
-    enum { MODE_PARMS = 0, MODE_REF_GRID = 1, MODE_VOXEL_SIZE = 2 };
+    enum { MODE_PARMS = 0, MODE_REF_GRID, MODE_VOXEL_SIZE, MODE_VOXEL_SCALE };
 
     SOP_OpenVDB_Resample(OP_Network*, const char* name, OP_Operator*);
     virtual ~SOP_OpenVDB_Resample() {};
@@ -114,9 +114,10 @@ newSopOperator(OP_OperatorTable* table)
 
     {   // Transform source
         const char* items[] = {
-            "explicit",      "Explicitly",
-            "refvdb",        "To Match Reference VDB",
-            "voxelsizeonly", "Using Voxel Size Only",
+            "explicit",       "Explicitly",
+            "refvdb",         "To Match Reference VDB",
+            "voxelsizeonly",  "Using Voxel Size Only",
+            "voxelscaleonly", "Using Voxel Scale Only",
             NULL
         };
 
@@ -162,7 +163,18 @@ newSopOperator(OP_OperatorTable* table)
     // Voxel size
     parms.add(hutil::ParmFactory(PRM_FLT_J, "voxel_size", "Voxel Size")
         .setDefault(PRMoneDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 0.000001f, PRM_RANGE_UI, 1));
+        .setRange(PRM_RANGE_RESTRICTED, 0.000001f, PRM_RANGE_UI, 1)
+        .setHelpText(
+            "Specify the desired absolute voxel size for all output grids.\n"
+            "Larger voxels correspond to lower resolution.\n"));
+
+    // Voxel scale
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelscale", "Voxel Scale")
+        .setDefault(PRMoneDefaults)
+        .setRange(PRM_RANGE_RESTRICTED, 0.000001f, PRM_RANGE_UI, 1)
+        .setHelpText(
+            "Specify the amount by which to scale the voxel size for each output grid.\n"
+            "Larger voxels correspond to lower resolution.\n"));
 
     // Toggle to apply transform to vector values
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "xformvectors", "Transform Vectors")
@@ -226,6 +238,10 @@ SOP_OpenVDB_Resample::updateParmsFlags()
     changed |= enableParm("xformvectors", mode == MODE_PARMS);
     changed |= enableParm("reference_grid", mode == MODE_REF_GRID);
     changed |= enableParm("voxel_size", mode == MODE_VOXEL_SIZE);
+    changed |= enableParm("voxelscale", mode == MODE_VOXEL_SCALE);
+    // Show either the voxel size or the voxel scale parm, but not both.
+    changed |= setVisibleState("voxel_size", mode != MODE_VOXEL_SCALE);
+    changed |= setVisibleState("voxelscale", mode == MODE_VOXEL_SCALE);
 
     changed |= enableParm("tolerance", evalInt("prune", 0, 0));
 
@@ -326,9 +342,10 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
         evalString(rotOrder, "rOrd", 0, time);
 
         const int mode = evalInt("mode", 0, time);
-        if (mode < MODE_PARMS || mode > MODE_VOXEL_SIZE) {
+        if (mode < MODE_PARMS || mode > MODE_VOXEL_SCALE) {
             std::stringstream ss;
-            ss << "expected mode 0, 1 or 2, got "<< mode;
+            ss << "expected mode between " << MODE_PARMS << " and " << MODE_VOXEL_SCALE
+                << ", got "<< mode;
             throw std::runtime_error(ss.str().c_str());
         }
 
@@ -337,7 +354,9 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
             rotate = (M_PI / 180.0) * SOP_NodeVDB::evalVec3R("rotate", time),
             scale = SOP_NodeVDB::evalVec3R("scale", time),
             pivot = SOP_NodeVDB::evalVec3R("pivot", time);
-        const float voxelSize = evalFloat("voxel_size", 0, time);
+        const float
+            voxelSize = evalFloat("voxel_size", 0, time),
+            voxelScale = evalFloat("voxelscale", 0, time);
 
         const bool
             prune = evalInt("prune", 0, time),
@@ -357,6 +376,9 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
             hvdb::GridPtr grid = openvdb::FloatGrid::create();
             grid->setTransform(openvdb::math::Transform::createLinearTransform(voxelSize));
             refGrid = grid;
+        } else if (mode == MODE_VOXEL_SCALE) {
+            // Create a dummy reference grid with a default (linear) transform.
+            refGrid = openvdb::FloatGrid::create();
         } else if (mode == MODE_REF_GRID) {
             // Get the (optional) reference grid.
             UT_String refGroupStr;
@@ -424,11 +446,17 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
                 // If a reference grid was provided, then after resampling, the
                 // output grid's transform will be the same as the reference grid's.
 
+                openvdb::math::Transform::Ptr refXform = refGrid->transform().copy();
+                if (mode == MODE_VOXEL_SCALE) {
+                    openvdb::Vec3d scaledVoxelSize = grid.voxelSize() * voxelScale;
+                    refXform->preScale(scaledVoxelSize);
+                }
+
                 if (isLevelSet && rebuild) {
                     // Use the level set rebuild tool to both resample and rebuild.
                     RebuildOp op;
                     op.self = this;
-                    op.xform = refGrid->transform();
+                    op.xform = *refXform;
                     UTvdbProcessTypedGridReal(valueType, grid, op);
                     outGrid = op.outGrid;
 
@@ -436,15 +464,15 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
                     // Use the resample tool to sample the input grid into the output grid.
 
                     // Set the correct transform on the output grid.
-                    outGrid->setTransform(refGrid->transform().copy());
+                    outGrid->setTransform(refXform);
 
-                    if (samplingOrder == 0) {
+                    if (curOrder == 0) {
                         hvdb::GridResampleToMatchOp<openvdb::tools::PointSampler> op(outGrid);
                         GEOvdbProcessTypedGridTopology(*vdb, op);
-                    } else if (samplingOrder == 1) {
+                    } else if (curOrder == 1) {
                         hvdb::GridResampleToMatchOp<openvdb::tools::BoxSampler> op(outGrid);
                         GEOvdbProcessTypedGridTopology(*vdb, op);
-                    } else if (samplingOrder == 2) {
+                    } else if (curOrder == 2) {
                         hvdb::GridResampleToMatchOp<openvdb::tools::QuadraticSampler> op(outGrid);
                         GEOvdbProcessTypedGridTopology(*vdb, op);
                     }
@@ -478,13 +506,13 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
                     hvdb::Interrupter interrupter;
                     xform.setInterrupter(interrupter);
 
-                    if (samplingOrder == 0) {
+                    if (curOrder == 0) {
                         hvdb::GridTransformOp<openvdb::tools::PointSampler> op(outGrid, xform);
                         GEOvdbProcessTypedGridTopology(*vdb, op);
-                    } else if (samplingOrder == 1) {
+                    } else if (curOrder == 1) {
                         hvdb::GridTransformOp<openvdb::tools::BoxSampler> op(outGrid, xform);
                         GEOvdbProcessTypedGridTopology(*vdb, op);
-                    } else if (samplingOrder == 2) {
+                    } else if (curOrder == 2) {
                         hvdb::GridTransformOp<openvdb::tools::QuadraticSampler> op(outGrid, xform);
                         GEOvdbProcessTypedGridTopology(*vdb, op);
                     }

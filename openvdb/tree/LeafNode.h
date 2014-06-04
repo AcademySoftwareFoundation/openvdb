@@ -785,6 +785,7 @@ public:
     NodeT* probeNode(const Coord&) { return NULL; }
     template<typename NodeT>
     const NodeT* probeConstNode(const Coord&) const { return NULL; }
+    template<typename ArrayT> void getNodes(ArrayT&) const {}
     //@}
 
     void addTile(Index level, const Coord&, const ValueType&, bool);
@@ -1354,9 +1355,8 @@ LeafNode<T, Log2Dim>::isConstant(ValueType& constValue,
 
 template<typename T, Index Log2Dim>
 inline void
-LeafNode<T, Log2Dim>::addTile(Index level, const Coord& xyz, const ValueType& val, bool active)
+LeafNode<T, Log2Dim>::addTile(Index /*level*/, const Coord& xyz, const ValueType& val, bool active)
 {
-    assert(level == 0);
     this->addTile(this->coordToOffset(xyz), val, active);
 }
 

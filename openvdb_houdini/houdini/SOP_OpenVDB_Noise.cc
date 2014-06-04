@@ -55,8 +55,8 @@ struct FractalBoltzmanGenerator
 {
     FractalBoltzmanGenerator(float freq, float amp, int octaves, float gain,
         float lacunarity, float roughness, int mode):
-        mFreq(freq), mAmp(amp), mGain(gain), mLacunarity(lacunarity),
-        mRoughness(roughness), mOctaves(octaves), mNoiseMode(mode)
+        mOctaves(octaves), mNoiseMode(mode), mFreq(freq), mAmp(amp), mGain(gain),
+        mLacunarity(lacunarity), mRoughness(roughness)
     {};
 
     // produce the noise as float

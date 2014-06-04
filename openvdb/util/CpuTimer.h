@@ -28,69 +28,71 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-#include "QuantizedUnitVec.h"
-#include <openvdb/Types.h>
-#include <tbb/atomic.h>
-#include <tbb/mutex.h>
+#ifndef OPENVDB_UTIL_CPUTIMER_HAS_BEEN_INCLUDED
+#define OPENVDB_UTIL_CPUTIMER_HAS_BEEN_INCLUDED
+
+#include <string>
+#include <tbb/tick_count.h>
+#include <sstream>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
-namespace math {
+namespace util {
 
-
-////////////////////////////////////////
-
-
-bool QuantizedUnitVec::sInitialized = false;
-float QuantizedUnitVec::sNormalizationWeights[MASK_SLOTS + 1];
-
-// Declare this at file scope to ensure thread-safe initialization.
-tbb::mutex sInitMutex;
-
-
-////////////////////////////////////////
-
-
-void
-QuantizedUnitVec::init()
+/// @brief Simple timer for basic profiling.   
+/// @code
+///    Cputimer timer;
+///    timer.start("My algorithm");
+///    // code to be timed goes here
+///    timer.stop();
+/// @endcode
+class CpuTimer
 {
-    tbb::mutex::scoped_lock lock(sInitMutex);
+public:
+    
+    /// @brief Initiate timer
+    CpuTimer() : mT0(tbb::tick_count::now()) {}
 
-    if (!sInitialized) {
+    /// @brief Restart timer
+    /// @note Should normally be followed by a call to time()
+    inline void start() { mT0 = tbb::tick_count::now(); }
 
-        OPENVDB_START_THREADSAFE_STATIC_WRITE
-
-        sInitialized = true;
-
-        uint16_t xbits, ybits;
-        double x, y, z, w;
-
-        for (uint16_t b = 0; b < 8192; ++b) {
-
-            xbits = (b & MASK_XSLOT) >> 7;
-            ybits = b & MASK_YSLOT;
-
-            if ((xbits + ybits) > 126) {
-                xbits = 127 - xbits;
-                ybits = 127 - ybits;
-            }
-
-            x = double(xbits);
-            y = double(ybits);
-            z = double(126 - xbits - ybits);
-            w = 1.0 / std::sqrt(x*x + y*y + z*z);
-
-            sNormalizationWeights[b] = float(w);
-        }
-
-        OPENVDB_FINISH_THREADSAFE_STATIC_WRITE
+    /// @brief Print message and re-start timer.
+    /// @note Should normally be followed by a call to stop()
+    inline void start(const std::string& msg)
+    {
+        std::cerr << msg << " ... ";
+        this->start();
     }
-}
 
-} // namespace math
+    /// Return Time diference in milliseconds since construction or start was called.
+    inline double delta() const
+    {
+        tbb::tick_count::interval_t dt = tbb::tick_count::now() - mT0;
+        return 1000.0*dt.seconds();
+    }
+
+    /// @brief Prints time in milliseconds since construction or start was called.
+    inline void stop() const
+    {
+        const double t = this->delta();
+        std::ostringstream ostr;
+        ostr << "completed in " << std::setprecision(3) << t << " ms\n";
+        std::cerr << ostr.str();
+    }
+
+private:
+    
+    tbb::tick_count mT0;
+};// CpuTimer
+
+} // namespace util
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
+
+    
+#endif // OPENVDB_UTIL_CPUTIMER_HAS_BEEN_INCLUDED
 
 // Copyright (c) 2012-2013 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

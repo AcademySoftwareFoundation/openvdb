@@ -42,6 +42,7 @@
 #endif
 #include "openvdb/openvdb.h"
 #include "openvdb/io/Stream.h"
+#include "openvdb/math/Math.h" // for math::isExactlyEqual()
 #include "openvdb/tools/LevelSetSphere.h"
 #include "openvdb/tools/Dense.h"
 #include "pyutil.h"
@@ -1221,12 +1222,12 @@ template<typename GridT, typename IterT>
 struct IterItemSetter<const GridT, IterT>
 {
     typedef typename GridT::ValueType ValueT;
-    static void setValue(const IterT& iter, const ValueT& val)
+    static void setValue(const IterT&, const ValueT&)
     {
         PyErr_SetString(PyExc_AttributeError, "can't set attribute 'value'");
         py::throw_error_already_set();
     }
-    static void setActive(const IterT& iter, bool on)
+    static void setActive(const IterT&, bool /*on*/)
     {
         PyErr_SetString(PyExc_AttributeError, "can't set attribute 'active'");
         py::throw_error_already_set();
@@ -1335,7 +1336,7 @@ public:
     {
         return (other.getActive() == this->getActive()
             && other.getDepth() == this->getDepth()
-            && other.getValue() == this->getValue()
+            && math::isExactlyEqual(other.getValue(), this->getValue())
             && other.getBBoxMin() == this->getBBoxMin()
             && other.getBBoxMax() == this->getBBoxMax()
             && other.getVoxelCount() == this->getVoxelCount());

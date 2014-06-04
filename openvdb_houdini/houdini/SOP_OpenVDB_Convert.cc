@@ -396,7 +396,12 @@ void
 convertToVolumes(
     GU_Detail& dst,
     GA_PrimitiveGroup* group,
-    bool split_disjoint = false)
+#if HAVE_SPLITTING
+    bool split_disjoint = false
+#else
+    bool = false
+#endif
+)
 {
     GU_ConvertParms parms;
 
@@ -443,7 +448,7 @@ convertVDBClass(
     GU_Detail& dst,
     GA_PrimitiveGroup* group,
     openvdb::GridClass new_class,
-    float isovalue)
+    float /*isovalue*/)
 {
     using namespace openvdb;
 

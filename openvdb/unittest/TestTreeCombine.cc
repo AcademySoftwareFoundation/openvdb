@@ -32,12 +32,13 @@
 #include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Composite.h>
+#include <openvdb/util/CpuTimer.h>
 #include "util.h" // for unittest_util::makeSphere()
 
 #define TEST_CSG_VERBOSE 0
 
 #if TEST_CSG_VERBOSE
-#include <tbb/tick_count.h> // Timer
+#include <openvdb/util/CpuTimer.h>
 #endif
 
 namespace {
@@ -88,15 +89,6 @@ private:
     template<typename TreeT, typename VisitorT>
     typename TreeT::Ptr
     visitCsg(const TreeT& a, const TreeT& b, const TreeT& ref, const VisitorT&);
-
-#if TEST_CSG_VERBOSE
-    struct Timer {
-        tbb::tick_count t;
-        Timer(): t(tbb::tick_count::now()) {}
-        void start() { t = tbb::tick_count::now(); }
-        double stop() { return (tbb::tick_count::now() - t).seconds(); };
-    };
-#endif
 };
 
 
@@ -699,7 +691,7 @@ TestTreeCombine::testCsg()
     TreePtr smallTree1, smallTree2, largeTree1, largeTree2, refTree, outTree;
 
 #if TEST_CSG_VERBOSE
-    Timer timer;
+    openvdb::util::CpuTimer timer;
     timer.start();
 #endif
 
@@ -757,14 +749,13 @@ TestTreeCombine::visitCsg(const TreeT& aInputTree, const TreeT& bInputTree,
     typedef typename TreeT::Ptr TreePtr;
 
 #if TEST_CSG_VERBOSE
-    Timer timer;
-
+    openvdb::util::CpuTimer timer;
     timer.start();
 #endif
     TreePtr aTree(new TreeT(aInputTree));
     TreeT bTree(bInputTree);
 #if TEST_CSG_VERBOSE
-    std::cerr << "deep copy: " << timer.stop() << " sec\n";
+    std::cerr << "deep copy: " << timer.delta() << " ms\n";
 #endif
 
 #if (TEST_CSG_VERBOSE > 1)
@@ -783,7 +774,7 @@ TestTreeCombine::visitCsg(const TreeT& aInputTree, const TreeT& bInputTree,
 #endif
     visitor(*aTree, bTree);
 #if TEST_CSG_VERBOSE
-    std::cerr << "combine: " << timer.stop() << " sec\n";
+    std::cerr << "combine: " << timer.delta() << " ms\n";
 #endif
 #if (TEST_CSG_VERBOSE > 1)
     std::cerr << "\nActual:\n";

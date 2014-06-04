@@ -35,7 +35,7 @@
 
 #else
 
-#include <cstdlib> // for exit()
+#include <cstdlib> // for EXIT_SUCCESS
 #include <cstring> // for strrchr()
 #include <iostream>
 #include <cppunit/BriefTestProgressListener.h>
@@ -50,11 +50,27 @@
 #include <log4cplus/loggingmacros.h>
 #include <log4cplus/configurator.h>
 #endif
-#ifdef _WIN32
-#include <openvdb/port/getopt.c>
-#else
-#include <unistd.h> // for getopt(), optarg
+
+
+void
+usage(const char* progName)
+{
+    std::cerr <<
+        "Usage: " << progName << " [options]\n" <<
+        "Which: runs OpenVDB library unit tests\n" <<
+        "Options:\n" <<
+        "    -l       list all available tests\n" <<
+        "    -t test  specific suite or test to run, e.g., \"-t TestGrid\"\n" <<
+        "             or \"-t TestGrid::testGetGrid\" (default: run all tests)\n" <<
+        "    -v       verbose output\n";
+#ifdef OPENVDB_USE_LOG4CPLUS
+    std::cerr << "\n" <<
+        "    -error   log fatal and non-fatal errors (default: log only fatal errors)\n" <<
+        "    -warn    log warnings and errors\n" <<
+        "    -info    log info messages, warnings and errors\n" <<
+        "    -debug   log debugging messages, info messages, warnings and errors\n";
 #endif
+}
 
 
 static void
@@ -75,39 +91,33 @@ dump(CppUnit::Test* test)
 int
 run(int argc, char* argv[])
 {
-    int verbose = 0;
+    const char* progName = argv[0];
+    if (const char* ptr = ::strrchr(progName, '/')) progName = ptr + 1;
+
+    bool verbose = false;
     std::string tests;
-    int c = -1;
-    while ((c = getopt(argc, argv, "lt:v")) != -1) {
-        switch (c) {
-            case 'l':
-            {
-                dump(CppUnit::TestFactoryRegistry::getRegistry().makeTest());
-                return EXIT_SUCCESS;
-            }
-            case 'v': verbose = 1; break;
-            case 't': if (optarg) tests = optarg; break;
-            default:
-            {
-                const char* prog = argv[0];
-                if (const char* ptr = ::strrchr(prog, '/')) prog = ptr + 1;
-                std::cerr <<
-"Usage: " << prog << " [options]\n" <<
-"Which: runs OpenVDB library unit tests\n" <<
-"Options:\n" <<
-"    -l       list all available tests\n" <<
-"    -t test  specific suite or test to run, e.g., \"-t TestGrid\"\n" <<
-"             or \"-t TestGrid::testGetGrid\" (default: run all tests)\n" <<
-"    -v       verbose output\n";
-#ifdef OPENVDB_USE_LOG4CPLUS
-                std::cerr << "\n" <<
-"    -error   log fatal and non-fatal errors (default: log only fatal errors)\n" <<
-"    -warn    log warnings and errors\n" <<
-"    -info    log info messages, warnings and errors\n" <<
-"    -debug   log debugging messages, info messages, warnings and errors\n";
-#endif
+    for (int i = 1; i < argc; ++i) {
+        const std::string arg = argv[i];
+        if (arg == "-l") {
+            dump(CppUnit::TestFactoryRegistry::getRegistry().makeTest());
+            return EXIT_SUCCESS;
+        } else if (arg == "-v") {
+            verbose = true;
+        } else if (arg == "-t") {
+            if (i + 1 < argc) {
+                ++i;
+                tests = argv[i];
+            } else {
+                usage(progName);
                 return EXIT_FAILURE;
             }
+        } else if (arg == "-h" || arg == "-help" || arg == "--help") {
+            usage(progName);
+            return EXIT_SUCCESS;
+        } else {
+            std::cerr << progName << ": unrecognized option '" << arg << "'\n";
+            usage(progName);
+            return EXIT_FAILURE;
         }
     }
 
@@ -160,15 +170,15 @@ main(int argc, char *argv[])
         logging_base::Config config(numArgs, &args[0]);
         quiet = (!config.useInfo() && !config.useDebug());
     }
-    char* quietArg = "-quiet";
-    std::vector<char*> args(argv, argv + argc);
-    if (quiet) args.insert(++args.begin(), quietArg);
+    const std::string quietArg("-quiet");
+    std::vector<const char*> args(argv, argv + argc);
+    if (quiet) args.insert(++args.begin(), quietArg.c_str());
     int numArgs = int(args.size());
 
     logging_base::Config config(numArgs, &args[0]);
     logging_base::configure(config);
 
-    return pdevunit::run(numArgs, &args[0]);
+    return pdevunit::run(numArgs, const_cast<char**>(&args[0]));
 
 #else // ifndef DWA_OPENVDB
 

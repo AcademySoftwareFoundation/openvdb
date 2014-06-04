@@ -180,6 +180,22 @@ newSopOperator(OP_OperatorTable* table)
             CH_PYTHON_EXPRESSION)
         .setHelpText("Specify a name for this group of grids."));
 
+    // Missing Frame menu
+    {
+        const char* items[] = {
+            "error",    "Report Error",
+            "empty",    "No Geometry",
+            NULL
+        };
+
+        parms.add(hutil::ParmFactory(PRM_ORD, "missingframe", "Missing Frame")
+            .setDefault(PRMzeroDefaults)
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setHelpText(
+                "If the specified file does not exist on disk, either report an error\n"
+                "(Report Error) or warn and continue (No Geometry)."));
+    }
+
     // Reload button
     parms.add(hutil::ParmFactory(PRM_CALLBACK, "reload",  "Reload File")
         .setCallbackFunc(&reloadCB)
@@ -238,7 +254,9 @@ SOP_OpenVDB_Read::cookMySop(OP_Context& context)
 
         const fpreal t = context.getTime();
 
-        const bool readMetadataOnly = evalInt("metadata_only", 0, t);
+        const bool
+            readMetadataOnly = evalInt("metadata_only", 0, t),
+            missingFrameIsError = (0 == evalInt("missingframe", 0, t));
 
         // Get the file name string from the UI.
         std::string filename;
@@ -269,13 +287,29 @@ SOP_OpenVDB_Read::cookMySop(OP_Context& context)
 
         UT_AutoInterrupt progress(("Reading " + filename).c_str());
 
-        // Create and open a VDB file, but don't read any grids yet.
         openvdb::io::File file(filename);
-        file.open();
+        openvdb::MetaMap::Ptr fileMetadata;
+        try {
+            // Open the VDB file, but don't read any grids yet.
+            file.open();
 
-        // Read the file-level metadata.
-        openvdb::MetaMap::Ptr fileMetadata = file.getMetadata();
-        if (!fileMetadata) fileMetadata.reset(new openvdb::MetaMap);
+            // Read the file-level metadata.
+            fileMetadata = file.getMetadata();
+            if (!fileMetadata) fileMetadata.reset(new openvdb::MetaMap);
+
+        } catch (std::exception& e) { ///< @todo consider catching only openvdb::IoError
+            std::string mesg;
+            if (const char* s = e.what()) mesg = s;
+            // Strip off the exception name from an openvdb::IoError.
+            if (mesg.substr(0, 9) == "IoError: ") mesg = mesg.substr(9);
+
+            if (missingFrameIsError) {
+                addError(SOP_MESSAGE, mesg.c_str());
+            } else {
+                addWarning(SOP_MESSAGE, mesg.c_str());
+            }
+            return error();
+        }
 
         // Create a group for the grid primitives.
         GA_PrimitiveGroup* group = NULL;

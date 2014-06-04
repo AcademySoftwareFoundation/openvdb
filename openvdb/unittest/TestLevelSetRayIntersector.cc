@@ -45,7 +45,7 @@
 #ifdef STATS_TEST
 //only needed for statistics
 #include <openvdb/math/Stats.h>
-#include "util.h"//for CpuTimer
+#include <openvdb/util/CpuTimer.h>
 #include <iostream>
 #endif
 
@@ -359,7 +359,7 @@ TestLevelSetRayIntersector::stats()
     using namespace openvdb;
     typedef math::Ray<double>  RayT;
     typedef RayT::Vec3Type     Vec3T;
-    unittest_util::CpuTimer timer;
+    util::CpuTimer timer;
 
     {// generate an image, benchmarks and statistics
 

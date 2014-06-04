@@ -39,15 +39,21 @@
 /// The version namespace name for this library version
 ///
 /// Fully-namespace-qualified symbols are named as follows:
-/// vdb::vX_Y_Z::Vec3i, vdb::vX_Y_Z::io::File, vdb::vX_Y_Z::tree::Tree, etc.,
+/// openvdb::vX_Y_Z::Vec3i, openvdb::vX_Y_Z::io::File, openvdb::vX_Y_Z::tree::Tree, etc.,
 /// where X, Y and Z are OPENVDB_LIBRARY_MAJOR_VERSION, OPENVDB_LIBRARY_MINOR_VERSION
 /// and OPENVDB_LIBRARY_PATCH_VERSION, respectively (defined below).
-#define OPENVDB_VERSION_NAME v2_3_0_sesi
+#define OPENVDB_VERSION_NAME v3_0_0_sesi
 
 // Library major, minor and patch version numbers
-#define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 2
-#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 3
+#define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 3
+#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 0
 #define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 0
+
+/// @brief Library version number string of the form "<major>.<minor>.<patch>"
+/// @details This is a macro rather than a static constant because we typically
+/// want the compile-time version number, not the runtime version number
+/// (although the two are usually the same).
+#define OPENVDB_LIBRARY_VERSION_STRING "3.0.0"
 
 /// Library version number as a packed integer ("%02x%02x%04x", major, minor, patch)
 #define OPENVDB_LIBRARY_VERSION_NUMBER \
@@ -56,8 +62,8 @@
     (OPENVDB_LIBRARY_PATCH_VERSION_NUMBER & 0xFFFF))
 
 /// If OPENVDB_REQUIRE_VERSION_NAME is undefined, symbols from the version
-/// namespace are promoted to the top-level namespace (e.g., vdb::v1_0_0::io::File
-/// can be referred to simply as vdb::io::File).  Otherwise, symbols must be fully
+/// namespace are promoted to the top-level namespace (e.g., openvdb::v1_0_0::io::File
+/// can be referred to simply as openvdb::io::File).  Otherwise, symbols must be fully
 /// namespace-qualified.
 #ifdef OPENVDB_REQUIRE_VERSION_NAME
 #define OPENVDB_USE_VERSION_NAMESPACE
@@ -105,6 +111,10 @@ enum {
     OPENVDB_FILE_VERSION_FLOAT_FRUSTUM_BBOX = 221,
     OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION = 222
 };
+
+
+/// Return a library version number string of the form "<major>.<minor>.<patch>".
+inline const char* getLibraryVersionString() { return OPENVDB_LIBRARY_VERSION_STRING; }
 
 
 struct VersionId { uint32_t first, second; VersionId(): first(0), second(0) {} };
