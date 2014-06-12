@@ -216,9 +216,13 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_FLT_J, "isoValue", "Isovalue")
         .setRange(PRM_RANGE_UI, -1.0, PRM_RANGE_UI, 1.0)
         .setHelpText("The crossing point of the VDB values that is considered "
-            "the surface. The zero default value works for signed distance "
-            "fields while fog volumes require a larger positive value, 0.5 is "
-            "a good initial guess."));
+            "the surface when converting to polygons."));
+
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "fogisovalue", "Fog Isovalue")
+        .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0)
+        .setDefault(PRMpointFiveDefaults)
+        .setHelpText("The crossing point of the VDB values that is considered "
+            "the surface when converting to level sets from fog volumes."));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "adaptivity", "Adaptivity")
         .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_RESTRICTED, 2.0)
@@ -448,7 +452,7 @@ convertVDBClass(
     GU_Detail& dst,
     GA_PrimitiveGroup* group,
     openvdb::GridClass new_class,
-    float /*isovalue*/)
+    float isovalue)
 {
     using namespace openvdb;
 
@@ -464,7 +468,7 @@ convertVDBClass(
                 // *** FIXME:TODO: Hack until we have a good method ***
                 // Convert to polygons
                 FloatGrid &grid = UTvdbGridCast<FloatGrid>(it->getGrid());
-                tools::VolumeToMesh mesher(0.5);
+                tools::VolumeToMesh mesher(isovalue);
                 mesher(grid);
                 // Convert to SDF
                 math::Transform::Ptr transform = grid.transformPtr();
@@ -512,7 +516,8 @@ convertVDBClass(
                 }
 
                 tools::MeshToVolume<FloatGrid> vol(transform);
-                vol.convertToLevelSet(points, primitives, 1.0, 1.0);
+                vol.convertToLevelSet(points, primitives,
+			LEVEL_SET_HALF_WIDTH, LEVEL_SET_HALF_WIDTH);
 
                 // Set grid and visualization
                 it->setGrid(*vol.distGridPtr());
@@ -554,6 +559,10 @@ copyMesh(
 
     const char exteriorFlag = char(openvdb::tools::POLYFLAG_EXTERIOR);
     const char seamLineFlag = char(openvdb::tools::POLYFLAG_FRACTURE_SEAM);
+
+    // Disable adding to seamPointGroup if we don't have pointFlags()
+    if (mesher.pointFlags().size() != mesher.pointListSize())
+	seamPointGroup = NULL;
 
 #if (UT_VERSION_INT < 0x0c0500F5) // earlier than 12.5.245
     const GA_Offset lastIdx(detail.getPointMap().lastOffset()+1);
@@ -788,6 +797,7 @@ SOP_OpenVDB_Convert::updateParmsFlags()
 
     changed |= enableParm("adaptivity", toPoly);
     changed |= enableParm("isoValue", toPoly || (toOpenVDB && toSDF));
+    changed |= enableParm("fogisovalue", toOpenVDB && toSDF);
 
     if (toOpenVDB) {
         changed |= enableParm("tolerance", evalInt("prune",  0, time));
@@ -830,7 +840,8 @@ SOP_OpenVDB_Convert::updateParmsFlags()
 #endif
 
     changed |= setVisibleState("adaptivity", toPoly);
-    changed |= setVisibleState("isoValue", toPoly || toOpenVDB);
+    changed |= setVisibleState("isoValue", toPoly);
+    changed |= setVisibleState("fogisovalue", toOpenVDB);
     changed |= setVisibleState("computenormals", toPoly);
     changed |= setVisibleState("automaticpartitions", toPoly);
     changed |= setVisibleState("activepart", toPoly);
@@ -1286,12 +1297,6 @@ SOP_OpenVDB_Convert::cookMySop(OP_Context& context)
 
         const fpreal t = context.getTime();
 
-#if HAVE_SPLITTING
-        const bool splitDisjointVols = (evalInt("splitdisjointvolumes", 0, t) != 0);
-#else
-        const bool splitDisjointVols = false;
-#endif
-
         UT_String group_str;
         evalString(group_str, "group", 0, t);
         GA_PrimitiveGroup* group = parsePrimitiveGroupsCopy(group_str, gdp);
@@ -1301,6 +1306,11 @@ SOP_OpenVDB_Convert::cookMySop(OP_Context& context)
         switch (evalInt("conversion",  0, t))
         {
             case HVOLUME: {
+#if HAVE_SPLITTING
+		const bool splitDisjointVols = (evalInt("splitdisjointvolumes", 0, t) != 0);
+#else
+		const bool splitDisjointVols = false;
+#endif
                 convertToVolumes(*gdp, group, splitDisjointVols);
                 break;
             }
@@ -1313,11 +1323,11 @@ SOP_OpenVDB_Convert::cookMySop(OP_Context& context)
                 switch (evalInt("vdbclass", 0, t)) {
                     case CLASS_SDF:
                         convertVDBClass(*gdp, group, openvdb::GRID_LEVEL_SET,
-                            evalFloat("isoValue", 0, t));
+                            evalFloat("fogisovalue", 0, t));
                         break;
                     case CLASS_FOG_VOLUME:
                         convertVDBClass(*gdp, group, openvdb::GRID_FOG_VOLUME,
-                            evalFloat("isoValue", 0, t));
+			    /*unused*/0);
                         break;
                     default:
                         // ignore

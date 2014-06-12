@@ -357,12 +357,14 @@ class AdvectionOp
 public:
 
     AdvectionOp(const GridType& velocityGrid, GU_Detail& geo,
-        hvdb::Interrupter& boss, float timeStep, int steps)
+        hvdb::Interrupter& boss, float timeStep, GA_ROHandleF traillen,
+	int steps)
         : mVelocityGrid(velocityGrid)
         , mCptGrid(NULL)
         , mGeo(geo)
         , mBoss(boss)
         , mTimeStep(timeStep)
+	, mTrailLen(traillen)
         , mSteps(steps)
         , mCptIterations(0)
     {
@@ -409,8 +411,12 @@ public:
                     w[1] = ElementType(p[1]);
                     w[2] = ElementType(p[2]);
 
+		    float timestep = mTimeStep;
+		    if (mTrailLen.isValid())
+			timestep *= mTrailLen.get(i);
+
                     for (int n = 0; n < mSteps; ++n) {
-                        integrator.template rungeKutta<IntegrationOrder, VectorType>(mTimeStep, w);
+                        integrator.template rungeKutta<IntegrationOrder, VectorType>(timestep, w);
 
                         if (Constrained) projector->projectToConstraintSurface(w);
                     }
@@ -430,6 +436,7 @@ private:
     GU_Detail& mGeo;
     hvdb::Interrupter& mBoss;
     float mTimeStep;
+    GA_ROHandleF mTrailLen;
     const int mSteps, mCptIterations;
 };
 
@@ -449,8 +456,12 @@ public:
         if (mBoss.wasInterrupted()) return;
 
         if (!mParms.mStreamlines) { // Advect points
+
+	    GA_ROHandleF traillen_h(mParms.mOutputGeo, GA_ATTRIB_POINT, "traillen");
+
             AdvectionOp<GridType, IntegrationOrder, StaggeredVelocity>
-                op(velocityGrid, *mParms.mOutputGeo, mBoss, mParms.mTimeStep, mParms.mSteps);
+                op(velocityGrid, *mParms.mOutputGeo, mBoss, mParms.mTimeStep, 
+		   traillen_h, mParms.mSteps);
 
             UTparallelFor(
                 GA_SplittableRange(mParms.mOutputGeo->getPointRange(mParms.mPointGroup)), op);
@@ -468,8 +479,10 @@ public:
 
                 if (mBoss.wasInterrupted()) return;
 
+		GA_ROHandleF traillen_h(&geo, GA_ATTRIB_POINT, "traillen");
+
                 AdvectionOp<GridType, IntegrationOrder, StaggeredVelocity>
-                    op(velocityGrid, geo, mBoss, mParms.mTimeStep, 1);
+                    op(velocityGrid, geo, mBoss, mParms.mTimeStep, traillen_h, 1);
 
                 UTparallelFor(GA_SplittableRange(geo.getPointRange()), op);
 
