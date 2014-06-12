@@ -192,7 +192,7 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
 
         gdp->clearAndDestroy();
 
-        hvdb::Interrupter boss("OpenVDB To Spheres");
+        hvdb::Interrupter boss("OpenVDB to Spheres");
 
         const GU_Detail* vdbGeo = inputGeo(0);
         if(vdbGeo == NULL) return error();
