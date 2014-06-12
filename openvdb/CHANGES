@@ -1,6 +1,46 @@
 OpenVDB Version History
 =======================
 
+Version 3.0.0 - In development
+    - Improved the performance of point scattering (by orders of magnitude)
+      and added a DenseUniformScatter class.
+    - Reduced the construction time for LeafManager instances.
+    - Added Tree::getNodes(), which allows for fast construction of
+      linear arrays of tree nodes for use in multithreaded code
+      such as the LeafManager.
+    - Added math::Extrema and tools::extrema to efficiently compute min/max.
+    - Added openvdb::getLibraryVersionString() and
+      OPENVDB_LIBRARY_VERSION_STRING.
+    - Modified the mesh to volume converter to always set the grid background
+      value to the exterior narrow-band width and added finite value checks to
+      narrow band parameters.
+    - Fixed a memory leak in io::Queue when the queue was full and
+      a write task could not be added within the timeout interval.
+    - Fixed a bug in LeafNode::Buffer::getValue() whereby Visual C++
+      would return a reference to a temporary.
+      [Contributed by SESI]
+    - Added util/CpuTimer.h and removed CpuTimer (with a minimal API) from
+      unittest/util.h.
+    - Eliminated the use of getopt() for command-line argument parsing
+      in vdb_test.
+    - Fixed the vdb_print, vdb_render and vdb_view tools so that they
+      properly initialize log4cplus if it is enabled.
+    - Fixed a bug in the QuantizedUnitVec::pack method that caused
+      quantization artifacts.
+
+    API changes:
+    - The point counts in the UniformPointScatter and NonUniformPointScatter
+      tools are now specified (and returned) as Index64.  
+      
+    Houdini:
+    - Added a Voxel Scale mode to the Resample SOP.
+    - Improved the performance of the Scatter SOP by more than an order
+      of magnitude.
+    - Added the OpenVDB library version number to the Extended Operator
+      Information for all SOPs.
+    - Like the native Houdini file SOP, the Read SOP now allows missing frames
+      to be reported either as errors or as warnings.
+
 Version 2.3.0 - April 23, 2014
     - Added tools::extractSparseTree(), which selectively extracts and
       transforms data from a dense grid to produce a sparse tree,

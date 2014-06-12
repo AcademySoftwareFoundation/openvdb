@@ -189,9 +189,9 @@ template<template<typename GridT, typename MaskType, typename InterruptT> class 
 struct ToolOp
 {
     ToolOp(bool t, hvdb::Interrupter& boss, const cvdb::BoolGrid *mask = NULL)
-        : mThreaded(t)
+        : mMaskGrid(mask)
+        , mThreaded(t)
         , mBoss(boss)
-        , mMaskGrid(mask)
     {
     }
 

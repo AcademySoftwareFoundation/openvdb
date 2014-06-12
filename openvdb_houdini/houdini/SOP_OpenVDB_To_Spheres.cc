@@ -292,13 +292,13 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
                 mat.scale(sphere[3],sphere[3],sphere[3]);
 
                 #if (UT_VERSION_INT >= 0x0c050000)  // 12.5.0 or later
-                GU_PrimSphereParms parms(gdp, ptoff);
-                parms.xform = mat;
-                GU_PrimSphere::build(parms);
+                GU_PrimSphereParms sphereParms(gdp, ptoff);
+                sphereParms.xform = mat;
+                GU_PrimSphere::build(sphereParms);
                 #else
-                GU_PrimSphereParms parms(gdp, gdp->getGEOPoint(ptoff));
-                parms.xform = mat;
-                GU_PrimSphere::build(parms);
+                GU_PrimSphereParms sphereParms(gdp, gdp->getGEOPoint(ptoff));
+                sphereParms.xform = mat;
+                GU_PrimSphere::build(sphereParms);
                 #endif
             }
 

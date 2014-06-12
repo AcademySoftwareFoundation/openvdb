@@ -47,6 +47,7 @@
 #include <openvdb/tools/ValueTransformer.h>
 #include <openvdb/tools/VectorTransformer.h>
 #include <openvdb/util/Util.h>
+#include <openvdb/util/CpuTimer.h>
 #include <openvdb/math/Stats.h>
 #include "util.h" // for unittest_util::makeSphere()
 
@@ -773,7 +774,7 @@ TestTools::testLevelSetMorph()
         const std::string name("SphereToSphere");
         //FrameWriter<GridT> fw(dim, source);
         //fw(name, 0.0f, 0);
-        //unittest_util::CpuTimer timer;
+        //util::CpuTimer timer;
         const float tMax =  0.05f/voxelSize;
         //std::cerr << "\nt-max = " << tMax << std::endl;
         //timer.start("\nMorphing");
@@ -809,7 +810,7 @@ TestTools::testLevelSetMorph()
     /*
     // Uncomment sections below to run this (very time-consuming) test
     {//test morphing between the bunny and the buddha models loaded from files
-        unittest_util::CpuTimer timer;
+        util::CpuTimer timer;
         openvdb::initialize();//required whenever I/O of OpenVDB files is performed!
         openvdb::io::File sourceFile("/usr/pic1/Data/OpenVDB/LevelSetModels/bunny.vdb");
         sourceFile.open();
@@ -842,7 +843,7 @@ TestTools::testLevelSetMorph()
     /*
     // Uncomment sections below to run this (very time-consuming) test
     {//test morphing between the dragon and the teapot models loaded from files
-        unittest_util::CpuTimer timer;
+        util::CpuTimer timer;
         openvdb::initialize();//required whenever I/O of OpenVDB files is performed!
         openvdb::io::File sourceFile("/usr/pic1/Data/OpenVDB/LevelSetModels/dragon.vdb");
         sourceFile.open();
@@ -972,7 +973,7 @@ TestTools::testLevelSetMeasure()
 
     // Read level set from file
     /*
-    unittest_util::CpuTimer timer;
+    util::CpuTimer timer;
     openvdb::initialize();//required whenever I/O of OpenVDB files is performed!
     openvdb::io::File sourceFile("/usr/pic1/Data/OpenVDB/LevelSetModels/venusstatue.vdb");
     sourceFile.open();
@@ -1332,6 +1333,7 @@ namespace {
     {
         struct Point { double x,y,z; };
         std::vector<Point> list;
+        openvdb::Index64 size() const { return list.size(); }
         void add(const openvdb::Vec3d &p) { Point q={p[0],p[1],p[2]}; list.push_back(q); }
     };
 }
@@ -1351,29 +1353,37 @@ TestTools::testPointScatter()
     unittest_util::makeSphere<GridType>(dim, center, radius, *grid,
                                         unittest_util::SPHERE_DENSE_NARROW_BAND);
 
-    {
-        const int pointCount = 1000;
+    {// test fixed point count scattering
+        const openvdb::Index64 pointCount = 1000;
         PointList points;
         openvdb::tools::UniformPointScatter<PointList, RandGen> scatter(points, pointCount, mtRand);
         scatter.operator()<GridType>(*grid);
         CPPUNIT_ASSERT_EQUAL( pointCount, scatter.getPointCount() );
-        CPPUNIT_ASSERT_EQUAL( pointCount, int(points.list.size()) );
+        CPPUNIT_ASSERT_EQUAL( pointCount, points.size() );
     }
-    {
+    {// test uniform density scattering
         const float density = 1.0f;//per volume = per voxel since voxel size = 1
         PointList points;
         openvdb::tools::UniformPointScatter<PointList, RandGen> scatter(points, density, mtRand);
         scatter.operator()<GridType>(*grid);
-        CPPUNIT_ASSERT_EQUAL( int(scatter.getVoxelCount()), scatter.getPointCount() );
-        CPPUNIT_ASSERT_EQUAL( int(scatter.getVoxelCount()), int(points.list.size()) );
+        CPPUNIT_ASSERT_EQUAL( scatter.getVoxelCount(), scatter.getPointCount() );
+        CPPUNIT_ASSERT_EQUAL( scatter.getVoxelCount(), points.size() );
     }
-    {
+    {// test non-uniform density scattering
         const float density = 1.0f;//per volume = per voxel since voxel size = 1
         PointList points;
         openvdb::tools::NonUniformPointScatter<PointList, RandGen> scatter(points, density, mtRand);
         scatter.operator()<GridType>(*grid);
-        CPPUNIT_ASSERT( int(scatter.getVoxelCount()) < scatter.getPointCount() );
-        CPPUNIT_ASSERT_EQUAL( scatter.getPointCount(), int(points.list.size()) );
+        CPPUNIT_ASSERT( scatter.getVoxelCount() < scatter.getPointCount() );
+        CPPUNIT_ASSERT_EQUAL( scatter.getPointCount(), points.size() );
+    }
+     {// test dense uniform scattering
+        const size_t pointsPerVoxel = 8;
+        PointList points;
+        openvdb::tools::DenseUniformPointScatter<PointList, RandGen> scatter(points, pointsPerVoxel, mtRand);
+        scatter.operator()<GridType>(*grid);
+        CPPUNIT_ASSERT_EQUAL( scatter.getVoxelCount()*pointsPerVoxel, scatter.getPointCount() );
+        CPPUNIT_ASSERT_EQUAL( scatter.getPointCount(), points.size() );
     }
 }
 

@@ -324,7 +324,13 @@ Queue::writeGridVec(const GridCPtrVec& grids, const Archive& archive, const Meta
     // From the "GUI Thread" chapter in the TBB Design Patterns guide
     OutputTask* task =
         new(tbb::task::allocate_root()) OutputTask(mImpl->mNextId++, grids, archive, metadata);
-    mImpl->enqueue(*task);
+    try {
+        mImpl->enqueue(*task);
+    } catch (openvdb::RuntimeError&) {
+        // Destroy the task if it could not be enqueued, then rethrow the exception.
+        tbb::task::destroy(*task);
+        throw;
+    }
     return task->id();
 }
 

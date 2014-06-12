@@ -97,8 +97,8 @@ QuantizedUnitVec::pack(const Vec3<T>& vec)
     // The z component is discarded and x & y are quantized in
     // the 0 to 126 range.
     T w = T(126.0) / (x + y + z);
-    uint16_t xbits = uint16_t((x * w) + T(0.5));
-    uint16_t ybits = uint16_t((y * w) + T(0.5));
+    uint16_t xbits = uint16_t((x * w));
+    uint16_t ybits = uint16_t((y * w));
 
     // The remaining 13 bits in our 16 bit word are dividied into a 
     // 6-bit x-slot and a 7-bit y-slot. Both the xbits and the ybits

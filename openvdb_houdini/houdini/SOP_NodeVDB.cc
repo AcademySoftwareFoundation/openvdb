@@ -41,6 +41,7 @@
 #include <OP/OP_NodeInfoParms.h>
 #include <PRM/PRM_Parm.h>
 #include <PRM/PRM_Type.h>
+#include <UT/UT_InfoTree.h>
 #include <sstream>
 
 
@@ -89,6 +90,20 @@ SOP_NodeVDB::matchGroup(GU_Detail& aGdp, const std::string& pattern)
 
 
 ////////////////////////////////////////
+
+
+void
+SOP_NodeVDB::fillInfoTreeNodeSpecific(UT_InfoTree& tree, fpreal time)
+{
+    SOP_Node::fillInfoTreeNodeSpecific(tree, time);
+
+    // Add the OpenVDB library version number to this node's
+    // extended operator information.
+    if (UT_InfoTree* child = tree.addChildBranch("OpenVDB")) {
+        child->addColumnHeading("version");
+        child->addProperties(openvdb::getLibraryVersionString());
+    }
+}
 
 
 void
@@ -196,7 +211,7 @@ createEmptyGridGlyph(GU_Detail& gdp, GridCRef grid)
 
 
 OP_ERROR
-SOP_NodeVDB::cookMyGuide1(OP_Context& context)
+SOP_NodeVDB::cookMyGuide1(OP_Context&)
 {
     myGuide1->clearAndDestroy();
     UT_Vector3 color(0.1, 0.1, 1.0);

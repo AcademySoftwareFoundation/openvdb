@@ -37,6 +37,10 @@
 
 #include <boost/shared_array.hpp>
 #include <boost/static_assert.hpp>
+#include <boost/mpl/if.hpp>
+#include <boost/type_traits/is_const.hpp>
+#include <boost/type_traits/is_pointer.hpp>
+#include <boost/type_traits/remove_pointer.hpp>
 #include <openvdb/Platform.h>
 #include <openvdb/util/NodeMasks.h>
 #include <openvdb/io/Compression.h> // for io::readData(), etc.
@@ -647,6 +651,33 @@ public:
     /// to the nodes along the path from the root node to the node containing the coordinate.
     template<typename AccessorT>
     LeafNodeType* touchLeafAndCache(const Coord& xyz, AccessorT&);
+
+    //@{
+    /// @brief Adds all nodes of a certain type to a container with the following API:
+    /// @code
+    /// struct ArrayT {
+    ///    typedef value_type;// defines the type of nodes to be added to the array
+    ///    void push_back(value_type nodePtr);// method that add nodes to the array
+    /// };
+    /// @endcode
+    /// @details An example of a wrapper around a c-style array is:
+    /// @code
+    /// struct MyArray {
+    ///    typedef LeafType* value_type;
+    ///    value_type* ptr;
+    ///    MyArray(value_type* array) : ptr(array) {}
+    ///    void push_back(value_type leaf) { *ptr++ = leaf; }
+    ///};
+    /// @endcode
+    /// @details An example that constructs a list of pointer to all leaf nodes is:
+    /// @code
+    /// std::vector<const LeafNodeType*> array;//most std contains have the required API
+    /// array.reserve(tree.leafCount());//this is a fast preallocation.
+    /// tree.getNodes(array);
+    /// @endcode
+    template<typename ArrayT> void getNodes(ArrayT& array);
+    template<typename ArrayT> void getNodes(ArrayT& array) const;
+    //@}
 
     /// @brief Change inactive tiles or voxels with value oldBackground to newBackground
     /// or -oldBackground to -newBackground. Active values are unchanged.
@@ -2779,6 +2810,46 @@ InternalNode<ChildT, Log2Dim>::offsetToGlobalCoord(Index n) const
     return local + this->origin();
 }
 
+////////////////////////////////////////
+
+template<typename ChildT, Index Log2Dim>
+template<typename ArrayT>
+inline void
+InternalNode<ChildT, Log2Dim>::getNodes(ArrayT& array)
+{
+    typedef typename ArrayT::value_type T;
+    BOOST_STATIC_ASSERT(boost::is_pointer<T>::value);
+    typedef typename boost::mpl::if_<boost::is_const<typename boost::remove_pointer<T>::type>,
+                                     const ChildT, ChildT>::type ArrayChildT;
+    for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+        if (boost::is_same<T, ArrayChildT*>::value) {
+            array.push_back(reinterpret_cast<T>(mNodes[iter.pos()].getChild()));
+        } else {
+            iter->getNodes(array);//descent
+        }
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+    }
+}
+
+template<typename ChildT, Index Log2Dim>
+template<typename ArrayT>
+inline void
+InternalNode<ChildT, Log2Dim>::getNodes(ArrayT& array) const
+{
+    typedef typename ArrayT::value_type T;
+    BOOST_STATIC_ASSERT(boost::is_pointer<T>::value);
+    BOOST_STATIC_ASSERT(boost::is_const<typename boost::remove_pointer<T>::type>::value);
+    for (ChildOnCIter iter = this->cbeginChildOn(); iter; ++iter) {
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+        if (boost::is_same<T, const ChildT*>::value) {
+            array.push_back(reinterpret_cast<T>(mNodes[iter.pos()].getChild()));
+        } else {
+            iter->getNodes(array);//descent
+        }
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+    }
+}
 
 ////////////////////////////////////////
 
