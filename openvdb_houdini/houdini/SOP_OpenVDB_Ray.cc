@@ -42,6 +42,7 @@
 #include <openvdb/tools/RayIntersector.h>
 
 #include <UT/UT_Interrupt.h>
+#include <UT/UT_Version.h>
 #include <GA/GA_PageIterator.h>
 #include <GU/GU_Detail.h>
 #include <PRM/PRM_Parm.h>
