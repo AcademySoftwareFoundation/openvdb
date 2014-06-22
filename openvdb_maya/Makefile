@@ -107,6 +107,7 @@ else
 endif
 
 MAYA_INCL_DIR := $(MAYA_LOCATION)/include
+MAYA_LIB_DIR := $(MAYA_LOCATION)/lib # note: on OS X, this is Maya.app/Contents/MacOS
 
 ifeq (yes,$(strip $(debug)))
     OPTIMIZE := -g
@@ -163,7 +164,7 @@ endif
 ifdef MBSD
 	# Darwin ld treats undefined symbols as errors by default;
 	# change to runtime resolution, like Linux.
-    CXXFLAGS += -undefined dynamic_lookup
+    CXXFLAGS += -undefined dynamic_lookup -DOSMAC_
 endif
 
 MAYA_LIBS := \
@@ -176,7 +177,7 @@ LIBS := \
     -Wl,-rpath,$(OPENVDB_LIB_DIR) -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) \
     -Wl,-rpath,$(HALF_LIB_DIR) -L$(HALF_LIB_DIR) $(HALF_LIB) \
     -Wl,-rpath,$(TBB_LIB_DIR) -L$(TBB_LIB_DIR) $(TBB_LIB) \
-    -Wl,-rpath,$(MAYA_LOCATION)/lib -L$(MAYA_LOCATION)/lib $(MAYA_LIBS) \
+    -Wl,-rpath,$(MAYA_LIB_DIR) -L$(MAYA_LIB_DIR) $(MAYA_LIBS) \
     -ldl -lm -lz \
 #
 ifdef LINUX
@@ -221,7 +222,11 @@ MAYA_SRC_FILES := \
 ALL_SRC_FILES := $(MAYA_SRC_FILES)
 
 MAYA_OBJ_NAMES := $(MAYA_SRC_NAMES:.cc=.o)
-MAYA_SO_NAME := OpenVDB.so
+ifdef MBSD
+	MAYA_SO_NAME := OpenVDB.bundle
+else
+	MAYA_SO_NAME := OpenVDB.so
+endif
 
 DEPEND := maya_deps
 
@@ -254,13 +259,17 @@ $(MAYA_OBJ_NAMES): openvdb_maya/OpenVDBData.h openvdb_maya/OpenVDBUtil.h
 
 $(MAYA_SO_NAME): $(MAYA_OBJ_NAMES)
 	@echo "Building $@ because of $(call list_deps)"
-	$(CXX) $(CXXFLAGS) -fPIC -Wl,-Bsymbolic -shared -o $@ $^ $(LIBS)
+	ifdef MBSD
+		$(CXX) $(CXXFLAGS) -fPIC -Wl -shared -o $@ $^ $(LIBS)
+	else
+		$(CXX) $(CXXFLAGS) -fPIC -Wl,-Bsymbolic -shared -o $@ $^ $(LIBS)
+	end
 
 install: $(MAYA_SO_NAME)
-	mkdir -p $(MAYA_INSTALL_DIR)/plugins
-	@echo "Created $(MAYA_INSTALL_DIR)/plugins"
-	cp -f $(MAYA_SO_NAME) $(MAYA_INSTALL_DIR)/plugins/
-	@echo "Copied $(MAYA_SO_NAME) to $(MAYA_INSTALL_DIR)/plugins/"
+	mkdir -p $(MAYA_INSTALL_DIR)/plug-ins
+	@echo "Created $(MAYA_INSTALL_DIR)/plug-ins"
+	cp -f $(MAYA_SO_NAME) $(MAYA_INSTALL_DIR)/plug-ins/
+	@echo "Copied $(MAYA_SO_NAME) to $(MAYA_INSTALL_DIR)/plug-ins/"
 	mkdir -p $(MAYA_INSTALL_DIR)/scripts
 	@echo "Created $(MAYA_INSTALL_DIR)/scripts"
 	cp -f $(MAYA_SCRIPTS) $(MAYA_INSTALL_DIR)/scripts/
