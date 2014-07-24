@@ -49,6 +49,8 @@ readString(std::istream& is)
     uint32_t size;
     is.read(reinterpret_cast<char*>(&size), sizeof(uint32_t));
     std::string buffer(size, ' ');
+    if (size == 0)	return "";
+
     is.read(&buffer[0], size);
     return buffer;
 }
