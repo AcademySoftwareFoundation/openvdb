@@ -70,6 +70,7 @@ typedef Grid<BoolTree>      BoolGrid;
 typedef Grid<FloatTree>     FloatGrid;
 typedef Grid<DoubleTree>    DoubleGrid;
 typedef Grid<Int32Tree>     Int32Grid;
+typedef Grid<UInt32Tree>    UInt32Grid;
 typedef Grid<Int64Tree>     Int64Grid;
 typedef Grid<HermiteTree>   HermiteGrid;
 typedef Grid<Vec3ITree>     Vec3IGrid;
