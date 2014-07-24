@@ -55,6 +55,7 @@ initialize()
     DoubleMetadata::registerType();
     FloatMetadata::registerType();
     Int32Metadata::registerType();
+    UInt32Metadata::registerType();
     Int64Metadata::registerType();
     StringMetadata::registerType();
     Vec2IMetadata::registerType();
@@ -83,6 +84,7 @@ initialize()
     FloatGrid::registerGrid();
     DoubleGrid::registerGrid();
     Int32Grid::registerGrid();
+    UInt32Grid::registerGrid();
     Int64Grid::registerGrid();
     HermiteGrid::registerGrid();
     StringGrid::registerGrid();
