@@ -2325,7 +2325,14 @@ MeshToVolume<FloatGridT, InterruptT>::convertToLevelSet(
     exBandWidth = std::max(internal::Tolerance<FloatValueT>::minNarrowBandWidth(), exBandWidth);
     inBandWidth = std::max(internal::Tolerance<FloatValueT>::minNarrowBandWidth(), inBandWidth);
     const FloatValueT vs = mTransform->voxelSize()[0];
-    doConvert(pointList, polygonList, vs * exBandWidth, vs * inBandWidth);
+
+    // Convert from index space units to world-space units. To fill the
+    // interior, inBandWidth is passed FLOAT_MAX. Don't multiply with vs if so.
+    exBandWidth *= vs;
+    if (inBandWidth < std::numeric_limits<FloatValueT>::max())
+	inBandWidth *= vs;
+
+    doConvert(pointList, polygonList, exBandWidth, inBandWidth);
     mDistGrid->setGridClass(GRID_LEVEL_SET);
 }
 
@@ -2354,7 +2361,9 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
     mIndexGrid->setTransform(mTransform);
     const bool rawData = OUTPUT_RAW_DATA & mConversionFlags;
 
-    if (!boost::math::isfinite(exBandWidth) || !boost::math::isfinite(inBandWidth)) {
+    // Note that inBandWidth is allowed to be infinite when filling the
+    // interior.
+    if (!boost::math::isfinite(exBandWidth) || boost::math::isnan(inBandWidth)) {
         OPENVDB_THROW(ValueError, "Illegal narrow band width.");
     }
 
