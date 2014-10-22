@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -69,7 +69,6 @@ TestCpt::testCpt()
     using namespace openvdb;
 
     typedef FloatGrid::ConstAccessor AccessorType;
-
 
     { // unit voxel size tests
 
@@ -227,8 +226,6 @@ void
 TestCpt::testCptStencil()
 {
     using namespace openvdb;
-
-    typedef FloatGrid::ConstAccessor AccessorType;
 
     { // UNIT VOXEL TEST
 
@@ -563,7 +560,6 @@ TestCpt::testOldStyleStencils()
     }
 }
 
-
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

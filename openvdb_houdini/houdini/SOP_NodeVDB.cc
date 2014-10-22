@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -32,6 +32,7 @@
 /// @author FX R&D OpenVDB team
 
 #include "SOP_NodeVDB.h"
+#include <houdini_utils/geometry.h>
 
 #include "Utils.h"
 #include "GEO_PrimVDB.h"
@@ -189,7 +190,7 @@ createEmptyGridGlyph(GU_Detail& gdp, GridCRef grid)
 
     boost::shared_ptr<GU_Detail> tmpGDP(new GU_Detail);
 
-    UT_Vector3 color(0.1, 1.0, 0.1);
+    UT_Vector3 color(0.1f, 1.0f, 0.1f);
     tmpGDP->addFloatTuple(GA_ATTRIB_POINT, "Cd", 3, GA_Defaults(color.data(), 3));
 
     GU_PrimPoly *poly;
@@ -198,10 +199,10 @@ createEmptyGridGlyph(GU_Detail& gdp, GridCRef grid)
         poly = GU_PrimPoly::build(&*tmpGDP, 2, GU_POLY_OPEN);
 
         tmpGDP->setPos3(poly->getPointOffset(i % 2),
-            UT_Vector3(lines[i][0], lines[i][1], lines[i][2]));
+            UT_Vector3(float(lines[i][0]), float(lines[i][1]), float(lines[i][2])));
 
         tmpGDP->setPos3(poly->getPointOffset(i % 2 + 1),
-            UT_Vector3(lines[i + 1][0], lines[i + 1][1], lines[i + 1][2]));
+            UT_Vector3(float(lines[i + 1][0]), float(lines[i + 1][1]), float(lines[i + 1][2])));
     }
 
     gdp.merge(*tmpGDP);
@@ -214,7 +215,7 @@ OP_ERROR
 SOP_NodeVDB::cookMyGuide1(OP_Context&)
 {
     myGuide1->clearAndDestroy();
-    UT_Vector3 color(0.1, 0.1, 1.0);
+    UT_Vector3 color(0.1f, 0.1f, 1.0f);
     UT_Vector3 corners[8];
 
     // For each VDB primitive (with a non-null grid pointer) in the group...
@@ -236,9 +237,9 @@ SOP_NodeVDB::cookMyGuide1(OP_Context&)
 openvdb::Vec3f
 SOP_NodeVDB::evalVec3f(const char *name, fpreal time) const
 {
-    return openvdb::Vec3f(evalFloat(name, 0, time),
-                          evalFloat(name, 1, time),
-                          evalFloat(name, 2, time));
+    return openvdb::Vec3f(float(evalFloat(name, 0, time)),
+                          float(evalFloat(name, 1, time)),
+                          float(evalFloat(name, 2, time)));
 }
 
 openvdb::Vec3R
@@ -354,6 +355,6 @@ OpenVDBOpFactory::OpenVDBOpFactory(
 
 } // namespace openvdb_houdini
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

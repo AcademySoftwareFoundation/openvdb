@@ -120,6 +120,7 @@ endif
 			   -I "$(TOOL_INCLUDEPATH)" \
 			   -I "$(TOOL_SDKINCLUDEPATH)" \
 			   $(NULL)
+    CXXISYSTEM		:= -I
     CXXOUTPUT		:= -Fo
     LINK		:= $(TOOL_BINPATH)/link -nologo
     LDFLAGS		+= -VERSION:$(LIB_MAJOR_VERSION).$(LIB_MINOR_VERSION) \
@@ -187,6 +188,7 @@ else
 			   -fvisibility=hidden -fvisibility-inlines-hidden \
 			   $(CXX_WARNFLAGS) \
 			   $(NULL)
+    CXXISYSTEM		:= -isystem
     CXXOUTPUT		:= -o
 ifdef MBSD
     LINK		= $(CXX) $(CXXFLAGS) -dynamiclib
@@ -252,6 +254,9 @@ ifdef MBSD
     else ifeq ($(DARWIN_OS_MAJOR_VER),13)
 	# Mavericks
 	MACOSX_SDK := MacOSX10.9
+    else ifeq ($(DARWIN_OS_MAJOR_VER),14)
+	# Yosemite
+	MACOSX_SDK := MacOSX10.10
     else
         $(error Unknown MacOSX Darwin major version $(DARWIN_OS_MAJOR_VER))
     endif

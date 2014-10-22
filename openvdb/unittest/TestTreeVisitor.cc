@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -146,13 +146,13 @@ public:
     openvdb::Index leafCount() const
     {
         NodeMap::const_iterator it = mNodes.find(0);
-        return (it != mNodes.end()) ? it->second.size() : 0;
+        return openvdb::Index((it != mNodes.end()) ? it->second.size() : 0);
     }
     openvdb::Index nonLeafCount() const
     {
         openvdb::Index count = 1; // root node
         for (NodeMap::const_iterator i = mNodes.begin(), e = mNodes.end(); i != e; ++i) {
-            if (i->first != 0) count += i->second.size();
+            if (i->first != 0) count = openvdb::Index(count + i->second.size());
         }
         return count;
     }
@@ -284,7 +284,7 @@ private:
     {
         const NodeMap& theMap = (useA ? mANodeCount : mBNodeCount);
         NodeMap::const_iterator it = theMap.find(0);
-        if (it != theMap.end()) return it->second.size();
+        if (it != theMap.end()) return openvdb::Index(it->second.size());
         return 0;
     }
     openvdb::Index nonLeafCount(bool useA) const
@@ -292,7 +292,7 @@ private:
         openvdb::Index count = 0;
         const NodeMap& theMap = (useA ? mANodeCount : mBNodeCount);
         for (NodeMap::const_iterator i = theMap.begin(), e = theMap.end(); i != e; ++i) {
-            if (i->first != 0) count += i->second.size();
+            if (i->first != 0) count = openvdb::Index(count + i->second.size());
         }
         return count;
     }
@@ -310,7 +310,6 @@ TestTreeVisitor::testVisit2Trees()
     typedef openvdb::FloatTree TreeT;
     typedef openvdb::VectorTree Tree2T;
     typedef TreeT::ValueType ValueT;
-    typedef Tree2T::ValueType Value2T;
 
     // Create a test tree.
     TreeT tree = createTestTree<TreeT>();
@@ -371,6 +370,6 @@ TestTreeVisitor::testVisit2Trees()
     CPPUNIT_ASSERT_EQUAL(tree.nonLeafCount(), visitor.bNonLeafCount());
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

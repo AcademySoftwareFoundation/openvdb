@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -178,6 +178,7 @@ private:
     typedef typename LeafT::ValueOnCIter                     VoxelCIterT;
     typedef typename tree::LeafManager<TreeType>::BufferType BufferT;
     typedef typename RangeType::Iterator                     LeafIterT;
+    typedef tools::AlphaMask<GridT, MaskT>                   AlphaMaskT;
 
     // Only two private member data
     typename boost::function<void (LevelSetFilter*, const RangeType&)> mTask;
@@ -197,40 +198,17 @@ private:
         if (swap) BaseType::leafs().swapLeafBuffer(1, n==0);
     }
 
-    // Private class to derive the normalized alpha mask
-    struct AlphaMask
-    {
-        AlphaMask(const GridType& grid, const MaskType& mask,
-                  AlphaType min, AlphaType max, bool invert)
-            : mAcc(mask.tree()), mSampler(mAcc, mask.transform(), grid.transform()),
-              mMin(min), mInvNorm(1/(max-min)), mInvert(invert)
-        {
-            assert(min < max);   
-        } 
-        inline bool operator()(const Coord& xyz, AlphaType& a, AlphaType& b) const
-        {
-            a = mSampler(xyz);
-            const AlphaType t = (a-mMin)*mInvNorm;
-            a = t > 0 ? t < 1 ? (3-2*t)*t*t : 1 : 0;//smooth mapping to 0->1
-            b = 1 - a;
-            if (mInvert) std::swap(a,b);
-            return a>0;
-        }
-        typedef typename MaskType::ConstAccessor AccType;
-        AccType mAcc;
-        tools::DualGridSampler<AccType, tools::BoxSampler> mSampler;
-        const AlphaType mMin, mInvNorm;
-        const bool      mInvert;
-    };
-
     // Private driver method for mean and gaussian filtering
     void box(int width);
 
     template <size_t Axis>
     struct Avg {
         Avg(const GridT& grid, Int32 w) :
-            acc(grid.tree()), width(w), frac(1/ValueType(2*w+1)) {}
-        ValueType operator()(Coord xyz) {
+            acc(grid.tree()), width(w), frac(1/ValueType(2*w+1))
+        {
+        }
+        ValueType operator()(Coord xyz)
+        {
             ValueType sum = zeroVal<ValueType>();
             Int32& i = xyz[Axis], j = i + width;
             for (i -= width; i <= j; ++i) sum += acc.getValue(xyz);
@@ -240,7 +218,7 @@ private:
         const Int32 width;
         const ValueType frac;
     };
-   
+
     // Private methods called by tbb::parallel_for threads
     template <typename AvgT>
     void doBox( const RangeType& r, Int32 w);
@@ -262,7 +240,7 @@ inline void
 LevelSetFilter<GridT, MaskT, InterruptT>::median(int width, const MaskType* mask)
 {
     mMask = mask;
-    
+
     BaseType::startInterrupter("Median-value flow of level set");
 
     BaseType::leafs().rebuildAuxBuffers(1, BaseType::getGrainSize()==0);
@@ -280,7 +258,7 @@ inline void
 LevelSetFilter<GridT, MaskT, InterruptT>::mean(int width, const MaskType* mask)
 {
     mMask = mask;
-    
+
     BaseType::startInterrupter("Mean-value flow of level set");
 
     this->box(width);
@@ -293,7 +271,7 @@ inline void
 LevelSetFilter<GridT, MaskT, InterruptT>::gaussian(int width, const MaskType* mask)
 {
     mMask = mask;
-    
+
     BaseType::startInterrupter("Gaussian flow of level set");
 
     for (int n=0; n<4; ++n) this->box(width);
@@ -321,12 +299,12 @@ LevelSetFilter<GridT, MaskT, InterruptT>::box(int width)
     BaseType::track();
 }
 
-template<typename GridT, typename MaskT, typename InterruptT>    
+template<typename GridT, typename MaskT, typename InterruptT>
 inline void
 LevelSetFilter<GridT, MaskT, InterruptT>::meanCurvature(const MaskType* mask)
 {
     mMask = mask;
-    
+
     BaseType::startInterrupter("Mean-curvature flow of level set");
 
     BaseType::leafs().rebuildAuxBuffers(1, BaseType::getGrainSize()==0);
@@ -344,7 +322,7 @@ inline void
 LevelSetFilter<GridT, MaskT, InterruptT>::laplacian(const MaskType* mask)
 {
     mMask = mask;
-    
+
     BaseType::startInterrupter("Laplacian flow of level set");
 
     BaseType::leafs().rebuildAuxBuffers(1, BaseType::getGrainSize()==0);
@@ -357,12 +335,12 @@ LevelSetFilter<GridT, MaskT, InterruptT>::laplacian(const MaskType* mask)
     BaseType::endInterrupter();
 }
 
-template<typename GridT, typename MaskT, typename InterruptT>    
+template<typename GridT, typename MaskT, typename InterruptT>
 inline void
 LevelSetFilter<GridT, MaskT, InterruptT>::offset(ValueType value, const MaskType* mask)
 {
     mMask = mask;
-    
+
     BaseType::startInterrupter("Offsetting level set");
 
     BaseType::leafs().removeAuxBuffers();// no auxiliary buffers required
@@ -395,8 +373,8 @@ LevelSetFilter<GridT, MaskT, InterruptT>::doMeanCurvature(const RangeType& range
     const ValueType dx = BaseType::voxelSize(), dt = math::Pow2(dx) / ValueType(3.0);
     math::CurvatureStencil<GridType> stencil(BaseType::grid(), dx);
     if (mMask) {
-        AlphaType a, b;
-        AlphaMask alpha(BaseType::grid(), *mMask, mMinMask, mMaxMask, mInvertMask);
+        typename AlphaMaskT::FloatType a, b;
+        AlphaMaskT alpha(BaseType::grid(), *mMask, mMinMask, mMaxMask, mInvertMask);
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
             BufferT& buffer = leafIter.buffer(1);
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
@@ -425,7 +403,7 @@ LevelSetFilter<GridT, MaskT, InterruptT>::doMeanCurvature(const RangeType& range
 /// expensive! In other words if you're performing renormalization
 /// anyway (e.g. rebuilding the narrow-band) you should consider
 /// performing laplacian diffusion over mean curvature flow!
-template<typename GridT, typename MaskT, typename InterruptT>    
+template<typename GridT, typename MaskT, typename InterruptT>
 inline void
 LevelSetFilter<GridT, MaskT, InterruptT>::doLaplacian(const RangeType& range)
 {
@@ -434,8 +412,8 @@ LevelSetFilter<GridT, MaskT, InterruptT>::doLaplacian(const RangeType& range)
     const ValueType dx = BaseType::voxelSize(), dt = math::Pow2(dx) / ValueType(6.0);
     math::GradStencil<GridType> stencil(BaseType::grid(), dx);
     if (mMask) {
-        AlphaType a, b;
-        AlphaMask alpha(BaseType::grid(), *mMask, mMinMask, mMaxMask, mInvertMask);
+        typename AlphaMaskT::FloatType a, b;
+        AlphaMaskT alpha(BaseType::grid(), *mMask, mMinMask, mMaxMask, mInvertMask);
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
             BufferT& buffer = leafIter.buffer(1);
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
@@ -464,8 +442,8 @@ LevelSetFilter<GridT, MaskT, InterruptT>::doOffset(const RangeType& range, Value
 {
     BaseType::checkInterrupter();
     if (mMask) {
-        AlphaType a, b;
-        AlphaMask alpha(BaseType::grid(), *mMask, mMinMask, mMaxMask, mInvertMask);
+        typename AlphaMaskT::FloatType a, b;
+        AlphaMaskT alpha(BaseType::grid(), *mMask, mMinMask, mMaxMask, mInvertMask);
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
             for (VoxelIterT iter = leafIter->beginValueOn(); iter; ++iter) {
                 if (alpha(iter.getCoord(), a, b)) iter.setValue(*iter + a*offset);
@@ -488,8 +466,8 @@ LevelSetFilter<GridT, MaskT, InterruptT>::doMedian(const RangeType& range, int w
     BaseType::checkInterrupter();
     typename math::DenseStencil<GridType> stencil(BaseType::grid(), width);//creates local cache!
     if (mMask) {
-        AlphaType a, b;
-        AlphaMask alpha(BaseType::grid(), *mMask, mMinMask, mMaxMask, mInvertMask);
+        typename AlphaMaskT::FloatType a, b;
+        AlphaMaskT alpha(BaseType::grid(), *mMask, mMinMask, mMaxMask, mInvertMask);
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
             BufferT& buffer = leafIter.buffer(1);
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
@@ -519,8 +497,8 @@ LevelSetFilter<GridT, MaskT, InterruptT>::doBox(const RangeType& range, Int32 w)
     BaseType::checkInterrupter();
     AvgT avg(BaseType::grid(), w);
     if (mMask) {
-        AlphaType a, b;
-        AlphaMask alpha(BaseType::grid(), *mMask, mMinMask, mMaxMask, mInvertMask);
+        typename AlphaMaskT::FloatType a, b;
+        AlphaMaskT alpha(BaseType::grid(), *mMask, mMinMask, mMaxMask, mInvertMask);
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
             BufferT& buffer = leafIter.buffer(1);
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
@@ -537,13 +515,13 @@ LevelSetFilter<GridT, MaskT, InterruptT>::doBox(const RangeType& range, Int32 w)
         }
     }
 }
-  
+
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
 #endif // OPENVDB_TOOLS_LEVELSETFILTER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

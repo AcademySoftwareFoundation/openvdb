@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -70,7 +70,7 @@ public:
         mStencil[0] = mCache.getValue(ijk);
         static_cast<StencilType&>(*this).init(mCenter);
     }
-    
+
     /// @brief Initialize the stencil buffer with the values of voxel (i, j, k)
     /// and its neighbors. The method also takes a value of the center
     /// element of the stencil, assuming it is already known.
@@ -82,7 +82,7 @@ public:
         mStencil[0] = centerValue;
         static_cast<StencilType&>(*this).init(mCenter);
     }
-    
+
     /// @brief Initialize the stencil buffer with the values of voxel
     /// (x, y, z) and its neighbors.
     ///
@@ -109,7 +109,7 @@ public:
     }
 
     /// @brief Return the value from the stencil buffer with linear
-    /// offset pos. 
+    /// offset pos.
     ///
     /// @note The default (@a pos = 0) corresponds to the first element
     /// which is typically the center point of the stencil.
@@ -151,7 +151,7 @@ public:
     inline ValueType mean() const
     {
         ValueType sum = 0.0;
-        for (int n=0, s=mStencil.size(); n<s; ++n) sum += mStencil[n];
+        for (int n = 0, s = int(mStencil.size()); n < s; ++n) sum += mStencil[n];
         return sum / mStencil.size();
     }
 
@@ -324,20 +324,20 @@ public:
         const Real u = xyz[0] - BaseType::mCenter[0]; assert(u>=0 && u<=1);
         const Real v = xyz[1] - BaseType::mCenter[1]; assert(v>=0 && v<=1);
         const Real w = xyz[2] - BaseType::mCenter[2]; assert(w>=0 && w<=1);
-        
+
         ValueType V = BaseType::template getValue<0,0,0>();
-        ValueType A = V + (BaseType::template getValue<0,0,1>() - V) * w;
+        ValueType A = static_cast<ValueType>(V + (BaseType::template getValue<0,0,1>() - V) * w);
         V = BaseType::template getValue< 0, 1, 0>();
-        ValueType B = V + (BaseType::template getValue<0,1,1>() - V) * w;
-        ValueType C = A + (B - A) * v;
+        ValueType B = static_cast<ValueType>(V + (BaseType::template getValue<0,1,1>() - V) * w);
+        ValueType C = static_cast<ValueType>(A + (B - A) * v);
 
         V = BaseType::template getValue<1,0,0>();
-        A = V + (BaseType::template getValue<1,0,1>() - V) * w;
+        A = static_cast<ValueType>(V + (BaseType::template getValue<1,0,1>() - V) * w);
         V = BaseType::template getValue<1,1,0>();
-        B = V + (BaseType::template getValue<1,1,1>() - V) * w;
-        ValueType D = A + (B - A) * v;
-        
-        return C + (D - C) * u;
+        B = static_cast<ValueType>(V + (BaseType::template getValue<1,1,1>() - V) * w);
+        ValueType D = static_cast<ValueType>(A + (B - A) * v);
+
+        return static_cast<ValueType>(C + (D - C) * u);
     }
 
     /// @brief Return the gradient in world space of the trilinear interpolation kernel.
@@ -352,25 +352,26 @@ public:
         const Real u = xyz[0] - BaseType::mCenter[0]; assert(u>=0 && u<=1);
         const Real v = xyz[1] - BaseType::mCenter[1]; assert(v>=0 && v<=1);
         const Real w = xyz[2] - BaseType::mCenter[2]; assert(w>=0 && w<=1);
-        
+
         ValueType D[4]={BaseType::template getValue<0,0,1>()-BaseType::template getValue<0,0,0>(),
                         BaseType::template getValue<0,1,1>()-BaseType::template getValue<0,1,0>(),
                         BaseType::template getValue<1,0,1>()-BaseType::template getValue<1,0,0>(),
                         BaseType::template getValue<1,1,1>()-BaseType::template getValue<1,1,0>()};
 
         // Z component
-        ValueType A = D[0] + (D[1]- D[0]) * v;
-        ValueType B = D[2] + (D[3]- D[2]) * v;
-        Vec3Type grad(zeroVal<ValueType>(), zeroVal<ValueType>(), A + (B - A) * u);
+        ValueType A = static_cast<ValueType>(D[0] + (D[1]- D[0]) * v);
+        ValueType B = static_cast<ValueType>(D[2] + (D[3]- D[2]) * v);
+        Vec3Type grad(
+            zeroVal<ValueType>(), zeroVal<ValueType>(), static_cast<ValueType>(A + (B - A) * u));
 
-        D[0] = BaseType::template getValue<0,0,0>() + D[0] * w;
-        D[1] = BaseType::template getValue<0,1,0>() + D[1] * w;
-        D[2] = BaseType::template getValue<1,0,0>() + D[2] * w;
-        D[3] = BaseType::template getValue<1,1,0>() + D[3] * w;
+        D[0] = static_cast<ValueType>(BaseType::template getValue<0,0,0>() + D[0] * w);
+        D[1] = static_cast<ValueType>(BaseType::template getValue<0,1,0>() + D[1] * w);
+        D[2] = static_cast<ValueType>(BaseType::template getValue<1,0,0>() + D[2] * w);
+        D[3] = static_cast<ValueType>(BaseType::template getValue<1,1,0>() + D[3] * w);
 
         // X component
-        A = D[0] + (D[1] - D[0]) * v;
-        B = D[2] + (D[3] - D[2]) * v;
+        A = static_cast<ValueType>(D[0] + (D[1] - D[0]) * v);
+        B = static_cast<ValueType>(D[2] + (D[3] - D[2]) * v);
 
         grad[0] = B - A;
 
@@ -378,7 +379,7 @@ public:
         A = D[1] - D[0];
         B = D[3] - D[2];
 
-        grad[1] = A + (B - A) * u;
+        grad[1] = static_cast<ValueType>(A + (B - A) * u);
 
         return BaseType::mGrid->transform().baseMap()->applyIJT(grad, xyz);
     }
@@ -398,7 +399,7 @@ private:
     template<typename, typename> friend class BaseStencil; // allow base class to call init()
     using BaseType::mCache;
     using BaseType::mStencil;
-};    
+};
 
 
 ////////////////////////////////////////
@@ -1274,7 +1275,7 @@ public:
     }
 
 private:
-    
+
     inline void init(const Coord& ijk)
     {
         mStencil[1] = mCache.getValue(ijk.offsetBy(-1,  0,  0));
@@ -1286,7 +1287,7 @@ private:
         mStencil[5] = mCache.getValue(ijk.offsetBy( 0,  0, -1));
         mStencil[6] = mCache.getValue(ijk.offsetBy( 0,  0,  1));
     }
-    
+
     template<typename, typename> friend class BaseStencil; // allow base class to call init()
     using BaseType::mCache;
     using BaseType::mStencil;
@@ -1358,7 +1359,8 @@ public:
             dP_yp = math::WENO5(v[12]-v[11],v[11]-v[10],v[10]-v[ 0],v[ 0]-v[ 9],v[ 9]-v[ 8],mDx2),
             dP_zm = math::WENO5(v[14]-v[13],v[15]-v[14],v[ 0]-v[15],v[16]-v[ 0],v[17]-v[16],mDx2),
             dP_zp = math::WENO5(v[18]-v[17],v[17]-v[16],v[16]-v[ 0],v[ 0]-v[15],v[15]-v[14],mDx2);
-        return mInvDx2*math::GudonovsNormSqrd(v[0]>0,dP_xm,dP_xp,dP_ym,dP_yp,dP_zm,dP_zp);
+        return static_cast<ValueType>(
+            mInvDx2*math::GudonovsNormSqrd(v[0]>0,dP_xm,dP_xp,dP_ym,dP_yp,dP_zm,dP_zp));
 #endif
     }
 
@@ -1643,6 +1645,6 @@ private:
 
 #endif // OPENVDB_MATH_STENCILS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

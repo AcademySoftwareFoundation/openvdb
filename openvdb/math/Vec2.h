@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -211,7 +211,7 @@ public:
     {
         return this->mm[0] + this->mm[1];
     }
-    
+
     /// this = normalized this
     bool normalize(T eps=1.0e-8)
     {
@@ -511,9 +511,9 @@ inline Vec2<T> maxComponent(const Vec2<T> &v1, const Vec2<T> &v2)
 }
 
 /// @brief Return a vector with the exponent applied to each of
-/// the components of the input vector. 
+/// the components of the input vector.
 template <typename T>
-inline Vec2<T> Exp(Vec2<T> v) { return v.exp(); }    
+inline Vec2<T> Exp(Vec2<T> v) { return v.exp(); }
 
 typedef Vec2<int32_t>   Vec2i;
 typedef Vec2<uint32_t>  Vec2ui;
@@ -526,6 +526,6 @@ typedef Vec2<double>    Vec2d;
 
 #endif // OPENVDB_MATH_VEC2_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

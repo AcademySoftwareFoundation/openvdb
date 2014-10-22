@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -197,6 +197,20 @@ public:
     /// (converted to this grid's value type).
     virtual void pruneGrid(float tolerance = 0.0) = 0;
 
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    /// @brief Clip this grid to the given world-space bounding box.
+    /// @details Voxels that lie outside the bounding box are set to the background.
+    /// @warning Clipping a level set will likely produce a grid that is
+    /// no longer a valid level set.
+    void clipGrid(const BBoxd&);
+
+    /// @brief Clip this grid to the given index-space bounding box.
+    /// @details Voxels that lie outside the bounding box are set to the background.
+    /// @warning Clipping a level set will likely produce a grid that is
+    /// no longer a valid level set.
+    virtual void clip(const CoordBBox&) = 0;
+#endif
+
 
     //
     // Metadata
@@ -357,6 +371,16 @@ public:
 
     /// Read all data buffers for this grid.
     virtual void readBuffers(std::istream&) = 0;
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    /// Read all of this grid's data buffers that intersect the given index-space bounding box.
+    virtual void readBuffers(std::istream&, const CoordBBox&) = 0;
+    /// @brief Read all of this grid's data buffers that are not yet resident in memory
+    /// (because delayed loading is in effect).
+    /// @details If this grid was read from a memory-mapped file, this operation
+    /// disconnects the grid from the file.
+    /// @sa io::File::open, io::MappedFile
+    virtual void readNonresidentBuffers() const = 0;
+#endif
     /// Write out all data buffers for this grid.
     virtual void writeBuffers(std::ostream&) const = 0;
 
@@ -625,6 +649,14 @@ public:
     /// Reduce the memory footprint of this grid by increasing its sparseness.
     virtual void pruneGrid(float tolerance = 0.0);
 
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    /// @brief Clip this grid to the given index-space bounding box.
+    /// @details Voxels that lie outside the bounding box are set to the background.
+    /// @warning Clipping a level set will likely produce a grid that is
+    /// no longer a valid level set.
+    virtual void clip(const CoordBBox&);
+#endif
+
     /// @brief Efficiently merge another grid into this grid using one of several schemes.
     /// @details This operation is primarily intended to combine grids that are mostly
     /// non-overlapping (for example, intermediate grids from computations that are
@@ -736,6 +768,16 @@ public:
 
     /// Read all data buffers for this grid.
     virtual void readBuffers(std::istream&);
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    /// Read all of this grid's data buffers that intersect the given index-space bounding box.
+    virtual void readBuffers(std::istream&, const CoordBBox&);
+    /// @brief Read all of this grid's data buffers that are not yet resident in memory
+    /// (because delayed loading is in effect).
+    /// @details If this grid was read from a memory-mapped file, this operation
+    /// disconnects the grid from the file.
+    /// @sa io::File::open, io::MappedFile
+    virtual void readNonresidentBuffers() const;
+#endif
     /// Write out all data buffers for this grid.
     virtual void writeBuffers(std::ostream&) const;
 
@@ -1156,6 +1198,16 @@ Grid<TreeT>::pruneGrid(float tolerance)
 }
 
 
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+template<typename TreeT>
+inline void
+Grid<TreeT>::clip(const CoordBBox& bbox)
+{
+    tree().clip(bbox);
+}
+#endif
+
+
 template<typename TreeT>
 inline void
 Grid<TreeT>::merge(Grid& other, MergePolicy policy)
@@ -1252,6 +1304,26 @@ Grid<TreeT>::readBuffers(std::istream& is)
 }
 
 
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+
+template<typename TreeT>
+inline void
+Grid<TreeT>::readBuffers(std::istream& is, const CoordBBox& bbox)
+{
+    tree().readBuffers(is, bbox, saveFloatAsHalf());
+}
+
+
+template<typename TreeT>
+inline void
+Grid<TreeT>::readNonresidentBuffers() const
+{
+    tree().readNonresidentBuffers();
+}
+
+#endif // !OPENVDB_2_ABI_COMPATIBLE
+
+
 template<typename TreeT>
 inline void
 Grid<TreeT>::writeBuffers(std::ostream& os) const
@@ -1333,6 +1405,6 @@ createLevelSet(Real voxelSize, Real halfWidth)
 
 #endif // OPENVDB_GRID_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

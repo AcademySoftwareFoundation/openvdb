@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -63,9 +63,9 @@ struct FractalBoltzmanGenerator
     float noise(cvdb::Vec3R point, float freqMult = 1.0f) const
     {
         float signal;
-        float result   = 0.0f;
-        float curamp  = mAmp;
-        float curfreq  = mFreq * freqMult;
+        float result = 0.0f;
+        float curamp = mAmp;
+        float curfreq = mFreq * freqMult;
 
         for (int n = 0; n <= mOctaves; n++) {
             point = (point * curfreq);
@@ -77,7 +77,7 @@ struct FractalBoltzmanGenerator
             signal = 2.0f*UT_PNoise::noise3D(location) - 1.0f;
 
             if (mNoiseMode > 0) {
-                signal = pow(fabs(signal), mGain);
+                signal = cvdb::math::Pow(cvdb::math::Abs(signal), mGain);
             }
 
             result  += (signal * curamp);
@@ -363,7 +363,7 @@ SOP_OpenVDB_Noise::applyNoise(
                 if (result < settings.mThreshold) {
                     continue; //next voxel
                 }
-                alpha = (result >= settings.mThreshold + settings.mFallOff ?
+                alpha = static_cast<float>(result >= settings.mThreshold + settings.mFallOff ?
                     1.0f : (result - settings.mThreshold) / settings.mFallOff);
 
                 worldPt = xform.indexToWorld(CPT::result(map, stencil) + settings.mNOffset);
@@ -387,7 +387,7 @@ SOP_OpenVDB_Noise::applyNoise(
                 if (result > settings.mThreshold) {
                     continue; //next voxel
                 }
-                alpha = (result <= settings.mThreshold - settings.mFallOff ?
+                alpha = static_cast<float>(result <= settings.mThreshold - settings.mFallOff ?
                     1.0f : (settings.mThreshold - result) / settings.mFallOff);
 
                 worldPt = xform.indexToWorld(CPT::result(map, stencil) + settings.mNOffset);
@@ -414,10 +414,10 @@ SOP_OpenVDB_Noise::applyNoise(
                 // normal alignment
                 Vec3Type grid_grad = Gradient::result(map, stencil);
                 Vec3Type mask_grad = Gradient::result(map, maskStencil);
-                const float c = fabs(grid_grad.dot(mask_grad));
+                const double c = cvdb::math::Abs(grid_grad.dot(mask_grad));
 
-                if (result > settings.mThreshold && c > 0.9f) continue;//next voxel
-                alpha = (result <= settings.mThreshold - settings.mFallOff ?
+                if (result > settings.mThreshold && c > 0.9) continue;//next voxel
+                alpha = static_cast<float>(result <= settings.mThreshold - settings.mFallOff ?
                     1.0f : (settings.mThreshold - result) / settings.mFallOff);
 
                 worldPt = xform.indexToWorld(CPT::result(map, stencil) + settings.mNOffset);
@@ -440,7 +440,7 @@ SOP_OpenVDB_Noise::applyNoise(
 
                 worldPt = xform.indexToWorld(CPT::result(map, stencil) + settings.mNOffset);
                 // Use result of sample as frequency multiplier.
-                noise = fbGenerator.noise(worldPt, result);
+                noise = fbGenerator.noise(worldPt, static_cast<float>(result));
                 v.setValue(*v + alpha * (noise - settings.mOffset));
             }
         }
@@ -467,18 +467,18 @@ SOP_OpenVDB_Noise::cookMySop(OP_Context &context)
         duplicateSource(0, context);
 
         // Evaluate the FractalBoltzman noise parameters from UI
-        FractalBoltzmanGenerator fbGenerator(evalFloat("freq", 0, time),
-                                             evalFloat("amp", 0, time),
+        FractalBoltzmanGenerator fbGenerator(static_cast<float>(evalFloat("freq", 0, time)),
+                                             static_cast<float>(evalFloat("amp", 0, time)),
                                              evalInt("oct", 0, time),
-                                             evalFloat("gain", 0, time),
-                                             evalFloat("lac", 0, time),
-                                             evalFloat("rough", 0, time),
+                                             static_cast<float>(evalFloat("gain", 0, time)),
+                                             static_cast<float>(evalFloat("lac", 0, time)),
+                                             static_cast<float>(evalFloat("rough", 0, time)),
                                              evalInt("mode", 0, time));
 
         NoiseSettings settings;
 
         // evaluate parameter for blending noise
-        settings.mOffset = evalFloat("soff", 0, time);
+        settings.mOffset = static_cast<float>(evalFloat("soff", 0, time));
         settings.mNOffset = cvdb::Vec3R(evalFloat("noff", 0, time),
                                         evalFloat("noff", 1, time),
                                         evalFloat("noff", 2, time));
@@ -499,8 +499,8 @@ SOP_OpenVDB_Noise::cookMySop(OP_Context &context)
 
             if (gridIter) {
                 settings.mMaskMode = evalInt("mask", 0, time);
-                settings.mThreshold = evalFloat("thres", 0, time);
-                settings.mFallOff = evalFloat("fall", 0, time);
+                settings.mThreshold = static_cast<float>(evalFloat("thres", 0, time));
+                settings.mFallOff = static_cast<float>(evalFloat("fall", 0, time));
 
                 maskGrid = &((*gridIter)->getGrid());
                 ++gridIter;
@@ -552,6 +552,6 @@ SOP_OpenVDB_Noise::cookMySop(OP_Context &context)
     return error();
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

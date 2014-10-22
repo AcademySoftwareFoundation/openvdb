@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -421,7 +421,7 @@ TestValueAccessor::testMultithreadedAccessor()
             for (int i = -MAX_COORD; i < MAX_COORD; ++i) {
                 float f = acc.getValue(openvdb::Coord(i));
                 ASSERT_DOUBLES_EXACTLY_EQUAL(float(i), f);
-                acc.setValue(openvdb::Coord(i), i);
+                acc.setValue(openvdb::Coord(i), float(i));
                 ASSERT_DOUBLES_EXACTLY_EQUAL(float(i), acc.getValue(openvdb::Coord(i)));
             }
             return NULL;
@@ -451,7 +451,7 @@ TestValueAccessor::testMultithreadedAccessor()
     AccessorT acc(tree);
     // Populate the tree.
     for (int i = -MAX_COORD; i < MAX_COORD; ++i) {
-        acc.setValue(openvdb::Coord(i), i);
+        acc.setValue(openvdb::Coord(i), float(i));
     }
 
     // Run multiple read and write tasks in parallel.
@@ -544,6 +544,6 @@ TestValueAccessor::testGetNode()
     }
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

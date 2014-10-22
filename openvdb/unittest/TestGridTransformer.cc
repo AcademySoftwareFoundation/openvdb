@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -236,7 +236,7 @@ TestGridTransformer::testResampleToMatch()
         // The output grid's transform should not have changed.
         CPPUNIT_ASSERT(outGrid.transform() == inGrid.transform());
     }
-    
+
     {//test nontrivial transform
         // Create an output grid with a different transform.
         math::Transform::Ptr xform = math::Transform::createLinearTransform();
@@ -244,13 +244,13 @@ TestGridTransformer::testResampleToMatch()
         FloatGrid outGrid;
         outGrid.setTransform(xform);
         CPPUNIT_ASSERT(outGrid.transform() != inGrid.transform());
-        
+
         // Resample the input grid into the output grid using point sampling.
         tools::resampleToMatch<tools::PointSampler>(inGrid, outGrid);
-        
+
         // The output grid's transform should not have changed.
         CPPUNIT_ASSERT_EQUAL(*xform, outGrid.transform());
-        
+
         // The output grid should have half the resolution of the input grid in x and y
         // and the same resolution in z.
         CPPUNIT_ASSERT_EQUAL(250, int(outGrid.activeVoxelCount()));
@@ -260,6 +260,6 @@ TestGridTransformer::testResampleToMatch()
     }
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

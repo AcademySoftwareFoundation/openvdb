@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -55,21 +55,28 @@
  *----------------------------------------------------------------------------
  */
 
-#include <stdio.h>
-#include <iostream>
-#include <UT/UT_Assert.h>
+#include "GU_PrimVDB.h"
+#include "Utils.h"
+
 #ifndef SESI_OPENVDB
 #include <UT/UT_DSOVersion.h>
 #endif
 #include <UT/UT_IOTable.h>
 #include <UT/UT_IStream.h>
+#include <UT/UT_Version.h>
+
 #include <GU/GU_Detail.h>
-#include "GU_PrimVDB.h"
-#include <GEO/GEO_IOTranslator.h>
 #include <SOP/SOP_Node.h>
-#include "Utils.h"
+#include <GEO/GEO_IOTranslator.h>
+
+#include <openvdb/io/Stream.h>
+#include <openvdb/io/File.h>
+
+#include <stdio.h>
+#include <iostream>
 
 using namespace openvdb_houdini;
+using std::cerr;
 
 namespace {
 
@@ -84,11 +91,22 @@ public:
     virtual const char *formatName() const;
 
     virtual int		checkExtension(const char *name);
+    virtual void	getFileExtensions(UT_StringArray &extensions) const;
 
     virtual int		checkMagicNumber(unsigned magic);
 
+#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
+    virtual GA_Detail::IOStatus fileLoad(GEO_Detail *gdp, UT_IStream &is, bool ate_magic);
+#else
     virtual GA_Detail::IOStatus fileLoad(GEO_Detail *gdp, UT_IStream &is, int ate_magic);
-    virtual GA_Detail::IOStatus fileSaveToFile(const GEO_Detail *gdp, ostream &os, const char *fname);
+#endif
+    virtual GA_Detail::IOStatus fileSave(const GEO_Detail *gdp, std::ostream &os);
+#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
+    virtual GA_Detail::IOStatus fileSaveToFile(const GEO_Detail *gdp, const char *fname);
+#else
+    virtual GA_Detail::IOStatus fileSaveToFile(const GEO_Detail *gdp, std::ostream &os,
+					       const char *fname);
+#endif
 };
 
 GEO_IOTranslator *
@@ -109,122 +127,173 @@ GEO_VDBTranslator::checkExtension(const char *name)
     return UT_String(name).matchFileExtension(".vdb");
 }
 
+void
+GEO_VDBTranslator::getFileExtensions(UT_StringArray &extensions) const
+{
+    extensions.clear();
+    extensions.append(".vdb");
+}
+
 int
 GEO_VDBTranslator::checkMagicNumber(unsigned /*magic*/)
 {
     return 0;
 }
 
+#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
+GA_Detail::IOStatus
+GEO_VDBTranslator::fileLoad(GEO_Detail *geogdp, UT_IStream &is, bool /*ate_magic*/)
+#else
 GA_Detail::IOStatus
 GEO_VDBTranslator::fileLoad(GEO_Detail *geogdp, UT_IStream &is, int /*ate_magic*/)
+#endif
 {
-    UT_WorkBuffer			buf;
-    GU_Detail				*gdp = (GU_Detail *) geogdp;
+    UT_WorkBuffer   buf;
+    GU_Detail       *gdp = static_cast<GU_Detail*>(geogdp);
 
-    if (!is.isRandomAccessFile(buf))
-    {
-	cerr << "Error: Attempt to load VDB from non-file source." << endl;
-	return false;
+    if (!is.isRandomAccessFile(buf)) {
+        cerr << "Error: Attempt to load VDB from non-file source.\n";
+        return false;
     }
 
-    try
-    {
-	// Create and open a VDB file, but don't read any grids yet.
-	openvdb::io::File file(buf.buffer());
+    try {
+        // Create and open a VDB file, but don't read any grids yet.
+        openvdb::io::File file(buf.buffer());
 
-	file.open();
+        file.open();
 
-	// Read the file-level metadata.
-	openvdb::MetaMap::Ptr fileMetadata = file.getMetadata();
-	if (!fileMetadata) fileMetadata.reset(new openvdb::MetaMap);
+        // Read the file-level metadata into global attributes.
+        openvdb::MetaMap::Ptr fileMetadata = file.getMetadata();
+#if !defined(SESI_OPENVDB) && (UT_VERSION_INT >= 0x0c050157)
+        if (!fileMetadata) fileMetadata.reset(new openvdb::MetaMap);
+#else
+        if (fileMetadata) {
+            GU_PrimVDB::createAttrsFromMetadata(
+                GA_ATTRIB_GLOBAL, GA_Offset(0), *fileMetadata, *geogdp);
+        }
+#endif
 
-	// Loop over all grids in the file.
-	for (openvdb::io::File::NameIterator nameIter = file.beginName();
-	    nameIter != file.endName(); ++nameIter)
-	{
+        // Loop over all grids in the file.
+        for (openvdb::io::File::NameIterator nameIter = file.beginName(); nameIter != file.endName(); ++nameIter) {
             const std::string& gridName = nameIter.gridName();
-	    if (GridPtr grid = file.readGrid(gridName))
-	    {
-		// Copy file-level metadata into the grid, then create (if
-		// necessary)
-		// and set a primitive attribute for each metadata item.
-		for (openvdb::MetaMap::ConstMetaIterator fileMetaIt = fileMetadata->beginMeta(),
-		    end = fileMetadata->endMeta(); fileMetaIt != end; ++fileMetaIt)
-		{
-		    // Resolve file- and grid-level metadata name conflicts
-		    // in favor of the grid-level metadata.
-		    if (openvdb::Metadata::Ptr meta = fileMetaIt->second) {
-			const std::string name = fileMetaIt->first;
-			if (!(*grid)[name]) {
-			    grid->insertMeta(name, *meta);
-			}
-		    }
-		}
 
-		// Add a new VDB primitive for this grid.
-		// Note: this clears the grid's metadata.
-		createVdbPrimitive(*gdp, grid);
-	    }
-	}
-	file.close();
+            if (GridPtr grid = file.readGrid(gridName)) {
+
+#if !defined(SESI_OPENVDB) && (UT_VERSION_INT >= 0x0c050157)
+                // Copy file-level metadata into the grid, then create (if
+                // necessary)
+                // and set a primitive attribute for each metadata item.
+                for (openvdb::MetaMap::ConstMetaIterator fileMetaIt = fileMetadata->beginMeta(),
+                    end = fileMetadata->endMeta(); fileMetaIt != end; ++fileMetaIt)
+                {
+                    // Resolve file- and grid-level metadata name conflicts
+                    // in favor of the grid-level metadata.
+                    if (openvdb::Metadata::Ptr meta = fileMetaIt->second) {
+                        const std::string name = fileMetaIt->first;
+                        if (!(*grid)[name]) {
+                            grid->insertMeta(name, *meta);
+                        }
+                    }
+                }
+#endif
+                // Add a new VDB primitive for this grid.
+                // Note: this clears the grid's metadata.
+                createVdbPrimitive(*gdp, grid);
+            }
+        }
+        file.close();
+
+    } catch (std::exception &e) {
+        cerr << "Load failure: " << e.what() << "\n";
+        return false;
     }
-    catch (std::exception &e)
-    {
-	cerr << "Load failure: " << e.what() << endl;
+
+    return true;
+}
+
+template <typename FileT, typename OutputT>
+bool
+fileSaveVDB(const GEO_Detail *geogdp, OutputT os)
+{
+    GU_Detail *gdp = static_cast<GU_Detail*>(const_cast<GEO_Detail*>(geogdp));
+    if (!gdp)
 	return false;
+
+    try {
+        // Populate an output GridMap with VDB grid primitives found in the
+        // geometry.
+        openvdb::GridPtrVec outGrids;
+        for (VdbPrimIterator it(gdp); it; ++it) {
+            const GU_PrimVDB* vdb = *it;
+
+            // Create a new grid that shares the primitive's tree and transform
+            // and then transfer primitive attributes to the new grid as metadata.
+            GridPtr grid = vdb->getGrid().copyGrid();
+            GU_PrimVDB::createMetadataFromGridAttrs(*grid, *vdb, *gdp);
+            grid->removeMeta("is_vdb");
+
+            // Retrieve the grid's name from the primitive attribute.
+            grid->setName(it.getPrimitiveName().toStdString());
+
+            outGrids.push_back(grid);
+        }
+
+        // Add file-level metadata.
+        openvdb::MetaMap fileMetadata;
+
+        std::string versionStr = "Houdini ";
+        versionStr += UTgetFullVersion();
+        versionStr += "/GEO_VDBTranslator";
+
+        fileMetadata.insertMeta("creator", openvdb::StringMetadata(versionStr));
+
+#if defined(SESI_OPENVDB) || (UT_VERSION_INT < 0x0c050157)
+        GU_PrimVDB::createMetadataFromAttrs(
+            fileMetadata, GA_ATTRIB_GLOBAL, GA_Offset(0), *gdp);
+#endif
+        // Create a VDB file object.
+        FileT file(os);
+
+        // Always enable active mask compression, since it is fast
+        // and compresses level sets and fog volumes well. Enable Blosc unless
+	// backwards compatibility is requested.
+        uint32_t compression = openvdb::io::COMPRESS_ACTIVE_MASK;
+        if (openvdb::io::Archive::hasBloscCompression()
+		&& !UT_EnvControl::getInt(ENV_HOUDINI13_VOLUME_COMPATIBILITY)) {
+            compression |= openvdb::io::COMPRESS_BLOSC_LZ4;
+        }
+        file.setCompression(compression);
+
+        file.write(outGrids, fileMetadata);
+
+    } catch (std::exception &e) {
+        cerr << "Save failure: " << e.what() << "\n";
+        return false;
     }
 
     return true;
 }
 
 GA_Detail::IOStatus
-GEO_VDBTranslator::fileSaveToFile(const GEO_Detail *geogdp, ostream &, const char *fname)
+GEO_VDBTranslator::fileSave(const GEO_Detail *geogdp, std::ostream &os)
 {
-    GU_Detail		*gdp = static_cast<GU_Detail*>(const_cast<GEO_Detail*>(geogdp));
-    if (!fname)
-    {
-	return false;
-    }
+    // Saving via io::Stream will NOT save grid offsets, disabling partial
+    // reading.
+    return fileSaveVDB<openvdb::io::Stream, std::ostream &>(geogdp, os);
+}
 
-    try
-    {
-	// Populate an output GridMap with VDB grid primitives found in the
-	// geometry.
-	openvdb::GridPtrVec outGrids;
-	for (VdbPrimIterator it(gdp); it; ++it)
-	{
-	    const GU_PrimVDB* vdb = *it;
-
-	    // Create a new grid that shares the primitive's tree and transform
-	    // and then transfer primitive attributes to the new grid as metadata.
-	    GridPtr grid = vdb->getGrid().copyGrid();
-	    GU_PrimVDB::createMetadataFromGridAttrs(*grid, *vdb, *gdp);
-	    grid->removeMeta("is_vdb");
-
-	    // Retrieve the grid's name from the primitive attribute.
-	    grid->setName(it.getPrimitiveName().toStdString());
-
-	    outGrids.push_back(grid);
-	}
-
-	// Add file-level metadata.
-	openvdb::MetaMap fileMetadata;
-	fileMetadata.insertMeta("creator",
-	    openvdb::StringMetadata("Houdini/GEO_VDBTranslator"));
-
-	// Create a VDB file object.
-	openvdb::io::File file(fname);
-	file.setCompressionEnabled(false); // too slow if compression is on
-	file.write(outGrids, fileMetadata);
-	file.close();
-    }
-    catch (std::exception &e)
-    {
-	cerr << "Save failure: " << e.what() << endl;
-	return false;
-    }
-
-    return true;
+#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
+GA_Detail::IOStatus
+GEO_VDBTranslator::fileSaveToFile(const GEO_Detail *geogdp, const char *fname)
+#else
+GA_Detail::IOStatus
+GEO_VDBTranslator::fileSaveToFile(const GEO_Detail *geogdp, std::ostream &,
+    const char *fname)
+#endif
+{
+    // Saving via io::File will save grid offsets that allow for partial
+    // reading.
+    return fileSaveVDB<openvdb::io::File, const char *>(geogdp, fname);
 }
 
 } // unnamed namespace
@@ -252,6 +321,6 @@ newGeometryIO(void *data)
 }
 #endif
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

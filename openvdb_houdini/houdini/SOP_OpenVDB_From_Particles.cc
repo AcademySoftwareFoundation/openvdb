@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -62,6 +62,9 @@ namespace {
 class ParticleList
 {
 public:
+    // required typedef for bucketing
+    typedef openvdb::Vec3R    value_type;
+
     ParticleList(const GU_Detail* gdp,
                  openvdb::Real radiusMult = 1,
                  openvdb::Real velocityMult = 1) :
@@ -120,7 +123,7 @@ public:
         vel[0] = mVelocityMult*v[0], vel[1] = mVelocityMult*v[1], vel[2] = mVelocityMult*v[2];
     }
     // Required for attribute transfer
-    void getAtt(int n, openvdb::Int32& att) const { att = n; }
+    void getAtt(size_t n, openvdb::Int32& att) const { att = openvdb::Int32(n); }
 
 protected:
 
@@ -515,8 +518,8 @@ SOP_OpenVDB_From_Particles::factory(OP_Network* net,
 SOP_OpenVDB_From_Particles::SOP_OpenVDB_From_Particles(OP_Network* net,
     const char* name, OP_Operator* op)
     : hvdb::SOP_NodeVDB(net, name, op)
-    , mVoxelSize(0.1)
-    , mTime(0.0)
+    , mVoxelSize(0.1f)
+    , mTime(0.0f)
     , mBoss("Converting particles to level set")
 {
 }
@@ -632,8 +635,8 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
         bool refexists = refGeo != NULL;
 
         // Set member data
-        mTime = context.getTime();
-        mVoxelSize = evalFloat("voxelSize", 0, mTime);
+        mTime = static_cast<float>(context.getTime());
+        mVoxelSize = static_cast<float>(evalFloat("voxelSize", 0, mTime));
 
         const bool outputLevelSetGrid   = bool(evalInt("levelSet",   0, mTime));
         const bool outputFogVolumeGrid  = bool(evalInt("fogVolume",  0, mTime));
@@ -650,7 +653,7 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
         // Get the conversion settings from the UI parameters.
         Settings settings;
         settings.mRasterizeTrails =  evalInt("footprint", 0, mTime) == 1;
-        settings.mDx = evalFloat("dX", 0,  mTime);
+        settings.mDx = static_cast<float>(evalFloat("dX", 0, mTime));
 
         const bool wsUnits = bool(evalInt("worldSpaceUnits", 0, mTime));
         float background = 0.0;
@@ -674,22 +677,25 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
 
             if (refPrim) {
                 transform = refPrim->getGrid().transform().copy();
-                mVoxelSize = transform->voxelSize()[0];
+                mVoxelSize = static_cast<float>(transform->voxelSize()[0]);
 
                 if (bool(evalInt("writeintoref", 0, mTime))) {
                     if (refPrim->getGrid().getGridClass() == openvdb::GRID_LEVEL_SET) {
                         outputGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(
                             refPrim->getGrid().deepCopyGrid());
+
+                        if (!outputGrid) {
+                            addWarning(SOP_MESSAGE, "Cannot write into the selected"
+                                       " reference grid because it is not a float grid.");
+                        }
+
                         if (outputMaskVolumeGrid) {
                             minGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(
                                 refPrim->getGrid().deepCopyGrid());
                             maxGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(
                                 refPrim->getGrid().deepCopyGrid());
                         }
-                        if (!outputGrid) {
-                            addWarning(SOP_MESSAGE, "Cannot write into the selected"
-                                " reference grid because it is not a float grid.");
-                        }
+
                     } else {
                         addWarning(SOP_MESSAGE, "Can only write directly into a level set grid.");
                     }
@@ -701,8 +707,8 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
         }
 
         // Set narrow band half-width
-        if (wsUnits) background = evalFloat("bandWidthWS", 0, mTime);
-        else background = mVoxelSize * evalFloat("bandWidth", 0, mTime);
+        if (wsUnits) background = static_cast<float>(evalFloat("bandWidthWS", 0, mTime));
+        else background = static_cast<float>(mVoxelSize * evalFloat("bandWidth", 0, mTime));
 
 
         // Perform the particle conversion.
@@ -724,7 +730,7 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
             }
 
             if (outputMaskVolumeGrid) {
-                const float maskWidth = evalFloat("maskWidth", 0,  mTime);
+                const float maskWidth = static_cast<float>(evalFloat("maskWidth", 0,  mTime));
                 // Max grid
                 if (!maxGrid) maxGrid = openvdb::FloatGrid::create(background);
                 if (maskWidth > 0.0f) {
@@ -1073,6 +1079,6 @@ SOP_OpenVDB_From_Particles::transferAttributes(
     }
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

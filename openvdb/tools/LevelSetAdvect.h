@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -39,9 +39,11 @@
 #ifndef OPENVDB_TOOLS_LEVEL_SET_ADVECT_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_LEVEL_SET_ADVECT_HAS_BEEN_INCLUDED
 
+#include <openvdb/Platform.h>
 #include "LevelSetTracker.h"
 #include "Interpolation.h" // for BoxSampler, etc.
 #include <openvdb/math/FiniteDifference.h>
+#include <boost/math/constants/constants.hpp>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -386,7 +388,8 @@ template <typename ScalarT>
 inline math::Vec3<ScalarT>
 EnrightField<ScalarT>::operator() (const Vec3d& xyz, ScalarType time) const
 {
-    static const ScalarT pi = ScalarT(3.1415926535897931), phase = pi / ScalarT(3.0);
+    const ScalarT pi = boost::math::constants::pi<ScalarT>();
+    const ScalarT phase = pi / ScalarT(3.0);
     const ScalarT Px =  pi * ScalarT(xyz[0]), Py = pi * ScalarT(xyz[1]), Pz = pi * ScalarT(xyz[2]);
     const ScalarT tr =  cos(ScalarT(time) * phase);
     const ScalarT a  =  sin(ScalarT(2.0)*Py);
@@ -411,7 +414,7 @@ LevelSetAdvect<MapT, SpatialScheme, TemporalScheme>::
 LevelSetAdvect(LevelSetAdvection& parent):
     mParent(parent),
     mVec(NULL),
-    mMinAbsV(1e-6),
+    mMinAbsV(ScalarType(1e-6)),
     mMap(parent.mTracker.grid().transform().template constMap<MapT>().get()),
     mTask(0),
     mIsMaster(true)
@@ -515,7 +518,7 @@ advect(ScalarType time0, ScalarType time1)
             OPENVDB_THROW(ValueError, "Temporal integration scheme not supported!");
         }//end of compile-time resolved switch
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
-            
+
         time0 += isForward ? dt : -dt;
         ++countCFL;
         mParent.mTracker.leafs().removeAuxBuffers();
@@ -545,9 +548,12 @@ sampleField(ScalarType time0, ScalarType time1)
     }
     this->cook(PARALLEL_REDUCE);
     if (math::isExactlyEqual(mMinAbsV, mMaxAbsV)) return ScalarType(0.0);//V is essentially zero
-    static const ScalarType CFL = (TemporalScheme == math::TVD_RK1 ? ScalarType(0.3) :
-                                   TemporalScheme == math::TVD_RK2 ? ScalarType(0.9) :
-                                   ScalarType(1.0))/math::Sqrt(ScalarType(3.0));
+#ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
+    static
+#endif
+    const ScalarType CFL = (TemporalScheme == math::TVD_RK1 ? ScalarType(0.3) :
+        TemporalScheme == math::TVD_RK2 ? ScalarType(0.9) :
+        ScalarType(1.0))/math::Sqrt(ScalarType(3.0));
     const ScalarType dt = math::Abs(time1 - time0), dx = mParent.mTracker.voxelSize();
     return math::Min(dt, ScalarType(CFL*dx/math::Sqrt(mMaxAbsV)));
 }
@@ -706,6 +712,6 @@ euler2(const RangeType& range, ScalarType dt, ScalarType alpha, Index phiBuffer,
 
 #endif // OPENVDB_TOOLS_LEVEL_SET_ADVECT_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

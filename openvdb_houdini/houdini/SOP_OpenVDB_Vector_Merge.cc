@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -54,7 +54,7 @@
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 
-// HAVE_MERGE_GROUP is disabled in H12.5
+// HAVE_MERGE_GROUP is disabled in Houdini
 #ifdef SESI_OPENVDB
 #define HAVE_MERGE_GROUP 0
 #else
@@ -697,6 +697,6 @@ SOP_OpenVDB_Vector_Merge::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

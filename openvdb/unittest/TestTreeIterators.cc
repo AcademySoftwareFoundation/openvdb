@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -32,6 +32,7 @@
 #include <openvdb/tree/Tree.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/Types.h>
+#include <openvdb/tools/LevelSetSphere.h> // for tools::createLevelSetSphere()
 
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
@@ -87,14 +88,14 @@ TestTreeIterators::testLeafIterator()
     tree.setValue(openvdb::Coord(0, 0, 24), 4.0);
     tree.setValue(openvdb::Coord(1, 0, 24), 4.5);
 
-    float val = 1.0;
+    float val = 1.f;
     for (TreeType::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
         const TreeType::LeafNodeType* leaf = iter.getLeaf();
         CPPUNIT_ASSERT(leaf != NULL);
         ASSERT_DOUBLES_EXACTLY_EQUAL(val,       leaf->getValue(openvdb::Coord(0, 0, 0)));
         ASSERT_DOUBLES_EXACTLY_EQUAL(val + 0.5, iter->getValue(openvdb::Coord(1, 0, 0)));
         ASSERT_DOUBLES_EXACTLY_EQUAL(fillValue, iter->getValue(openvdb::Coord(1, 1, 1)));
-        val = val + 1.0;
+        val = val + 1.f;
     }
 }
 
@@ -319,7 +320,7 @@ TestTreeIterators::testValueOnIterator()
         CPPUNIT_ASSERT(iter.test());
 
         // Read all active tile and voxel values through a non-const value iterator.
-        size_t numOn = 0;
+        int numOn = 0;
         for ( ; iter; ++iter) {
             CPPUNIT_ASSERT(iter.isVoxelValue());
             CPPUNIT_ASSERT(iter.isValueOn());
@@ -327,14 +328,14 @@ TestTreeIterators::testValueOnIterator()
             CPPUNIT_ASSERT_EQUAL(openvdb::Coord(STEP * numOn), iter.getCoord());
             ++numOn;
         }
-        CPPUNIT_ASSERT_EQUAL(NUM_STEPS, int(numOn));
+        CPPUNIT_ASSERT_EQUAL(NUM_STEPS, numOn);
     }
     {
         Tree323f::ValueOnCIter iter = tree.cbeginValueOn();
         CPPUNIT_ASSERT(iter.test());
 
         // Read all active tile and voxel values through a const value iterator.
-        size_t numOn = 0;
+        int numOn = 0;
         for ( ; iter.test(); iter.next()) {
             CPPUNIT_ASSERT(iter.isVoxelValue());
             CPPUNIT_ASSERT(iter.isValueOn());
@@ -342,7 +343,7 @@ TestTreeIterators::testValueOnIterator()
             CPPUNIT_ASSERT_EQUAL(openvdb::Coord(STEP * numOn), iter.getCoord());
             ++numOn;
         }
-        CPPUNIT_ASSERT_EQUAL(NUM_STEPS, int(numOn));
+        CPPUNIT_ASSERT_EQUAL(NUM_STEPS, numOn);
     }
     {
         Tree323f::ValueOnIter iter = tree.beginValueOn();
@@ -350,7 +351,7 @@ TestTreeIterators::testValueOnIterator()
 
         // Read all active tile and voxel values through a non-const value iterator
         // and overwrite the values.
-        size_t numOn = 0;
+        int numOn = 0;
         for ( ; iter; ++iter) {
             CPPUNIT_ASSERT(iter.isVoxelValue());
             CPPUNIT_ASSERT(iter.isValueOn());
@@ -360,7 +361,7 @@ TestTreeIterators::testValueOnIterator()
             CPPUNIT_ASSERT_EQUAL(openvdb::Coord(STEP * numOn), iter.getCoord());
             ++numOn;
         }
-        CPPUNIT_ASSERT_EQUAL(NUM_STEPS, int(numOn));
+        CPPUNIT_ASSERT_EQUAL(NUM_STEPS, numOn);
     }
 }
 
@@ -580,8 +581,25 @@ TestTreeIterators::testDepthBounds()
         }
         CPPUNIT_ASSERT_EQUAL(expectedNumOff - numDepth1 - numDepth3, numOff);
     }
+    {
+        // FX-7884 regression test
+        using namespace openvdb;
+
+        const float radius = 4.3f, voxelSize = 0.1f, width = 2.0f;
+        const Vec3f center(15.8f, 13.2f, 16.7f);
+        FloatGrid::Ptr sphereGrid = tools::createLevelSetSphere<FloatGrid>(
+            radius, center, voxelSize, width);
+        const FloatTree& sphereTree = sphereGrid->tree();
+
+        FloatGrid::ValueOffIter iter = sphereGrid->beginValueOff();
+        iter.setMaxDepth(2);
+        for ( ; iter; ++iter) {
+            const Coord ijk = iter.getCoord();
+            ASSERT_DOUBLES_EXACTLY_EQUAL(sphereTree.getValue(ijk), *iter);
+        }
+    }
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -55,7 +55,7 @@ public:
     static std::string testSuiteName()
     {
         std::string name = openvdb::typeNameAsString<typename GridType::ValueType>();
-        if (!name.empty()) name[0] = ::toupper(name[0]);
+        if (!name.empty()) name[0] = static_cast<char>(::toupper(name[0]));
         return "TestLinearInterp" + name;
     }
 
@@ -124,7 +124,7 @@ TestLinearInterp<GridType>::test()
 
     // transform used for worldspace interpolation)
     openvdb::tools::GridSampler<GridType, openvdb::tools::BoxSampler>
-        interpolator(grid); 
+        interpolator(grid);
     //openvdb::tools::LinearInterp<GridType> interpolator(*tree);
 
     typename GridType::ValueType val =
@@ -212,48 +212,48 @@ TestLinearInterp<openvdb::Vec3SGrid>::test()
     tree.setValue(openvdb::Coord(11,  9, 9), Vec3s(4.0, 4.0, 4.0));
 
     openvdb::tools::GridSampler<Vec3SGrid, openvdb::tools::BoxSampler>
-        interpolator(grid); 
-    
+        interpolator(grid);
+
     //openvdb::tools::LinearInterp<Vec3STree> interpolator(*tree);
 
     Vec3SGrid::ValueType val = interpolator.sampleVoxel(10.5, 10.5, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.375, 2.375, 2.375)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.375f)));
 
     val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(1.0, 1.0, 1.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(1.f)));
 
     val = interpolator.sampleVoxel(11.0, 10.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.0, 2.0, 2.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.f)));
 
     val = interpolator.sampleVoxel(11.0, 11.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.0, 2.0, 2.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.f)));
 
     val = interpolator.sampleVoxel(11.0, 11.0, 11.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(3.0, 3.0, 3.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(3.f)));
 
     val = interpolator.sampleVoxel(9.0, 11.0, 9.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(4.0, 4.0, 4.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(4.f)));
 
     val = interpolator.sampleVoxel(9.0, 10.0, 9.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(4.0, 4.0, 4.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(4.f)));
 
     val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(1.1, 1.1, 1.1)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(1.1f)));
 
     val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.792, 2.792, 2.792)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.792f)));
 
     val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.41, 2.41, 2.41)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.41f)));
 
     val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.41, 2.41, 2.41)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.41f)));
 
     val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.71, 2.71, 2.71)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.71f)));
 
     val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.01, 2.01, 2.01)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.01f)));
 }
 
 template<typename GridType>
@@ -348,7 +348,7 @@ TestLinearInterp<openvdb::Vec3SGrid>::testTree()
     using namespace openvdb;
 
     Vec3s fillValue = Vec3s(256.0f, 256.0f, 256.0f);
-    
+
     Vec3STree tree(fillValue);
 
     tree.setValue(openvdb::Coord(10, 10, 10), Vec3s(1.0, 1.0, 1.0));
@@ -383,48 +383,48 @@ TestLinearInterp<openvdb::Vec3SGrid>::testTree()
     tree.setValue(openvdb::Coord(11,  9, 9), Vec3s(4.0, 4.0, 4.0));
 
     openvdb::tools::GridSampler<Vec3STree, openvdb::tools::BoxSampler>
-        interpolator(tree, openvdb::math::Transform()); 
-    
+        interpolator(tree, openvdb::math::Transform());
+
     //openvdb::tools::LinearInterp<Vec3STree> interpolator(*tree);
 
     Vec3SGrid::ValueType val = interpolator.sampleVoxel(10.5, 10.5, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.375, 2.375, 2.375)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.375f)));
 
     val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(1.0, 1.0, 1.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(1.f)));
 
     val = interpolator.sampleVoxel(11.0, 10.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.0, 2.0, 2.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.f)));
 
     val = interpolator.sampleVoxel(11.0, 11.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.0, 2.0, 2.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.f)));
 
     val = interpolator.sampleVoxel(11.0, 11.0, 11.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(3.0, 3.0, 3.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(3.f)));
 
     val = interpolator.sampleVoxel(9.0, 11.0, 9.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(4.0, 4.0, 4.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(4.f)));
 
     val = interpolator.sampleVoxel(9.0, 10.0, 9.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(4.0, 4.0, 4.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(4.f)));
 
     val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(1.1, 1.1, 1.1)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(1.1f)));
 
     val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.792, 2.792, 2.792)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.792f)));
 
     val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.41, 2.41, 2.41)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.41f)));
 
     val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.41, 2.41, 2.41)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.41f)));
 
     val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.71, 2.71, 2.71)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.71f)));
 
     val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.01, 2.01, 2.01)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.01f)));
 }
 
 template<typename GridType>
@@ -562,43 +562,43 @@ TestLinearInterp<openvdb::Vec3SGrid>::testAccessor()
         interpolator(acc, grid.transform());
 
     Vec3SGrid::ValueType val = interpolator.sampleVoxel(10.5, 10.5, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.375, 2.375, 2.375)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.375f)));
 
     val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(1.0, 1.0, 1.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(1.0f)));
 
     val = interpolator.sampleVoxel(11.0, 10.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.0, 2.0, 2.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.0f)));
 
     val = interpolator.sampleVoxel(11.0, 11.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.0, 2.0, 2.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.0f)));
 
     val = interpolator.sampleVoxel(11.0, 11.0, 11.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(3.0, 3.0, 3.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(3.0f)));
 
     val = interpolator.sampleVoxel(9.0, 11.0, 9.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(4.0, 4.0, 4.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(4.0f)));
 
     val = interpolator.sampleVoxel(9.0, 10.0, 9.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(4.0, 4.0, 4.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(4.0f)));
 
     val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(1.1, 1.1, 1.1)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(1.1f)));
 
     val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.792, 2.792, 2.792)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.792f)));
 
     val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.41, 2.41, 2.41)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.41f)));
 
     val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.41, 2.41, 2.41)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.41f)));
 
     val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.71, 2.71, 2.71)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.71f)));
 
     val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.01, 2.01, 2.01)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.01f)));
 }
 
 template<typename GridType>
@@ -643,7 +643,7 @@ TestLinearInterp<GridType>::testConstantValues()
     tree.setValue(openvdb::Coord(10,  9, 9), 2.0);
     tree.setValue(openvdb::Coord(11,  9, 9), 2.0);
 
-    openvdb::tools::GridSampler<TreeType, openvdb::tools::BoxSampler>  interpolator(grid); 
+    openvdb::tools::GridSampler<TreeType, openvdb::tools::BoxSampler>  interpolator(grid);
     //openvdb::tools::LinearInterp<GridType> interpolator(*tree);
 
     typename GridType::ValueType val =
@@ -716,7 +716,7 @@ TestLinearInterp<openvdb::Vec3SGrid>::testConstantValues()
     tree.setValue(openvdb::Coord(10,  9, 9), Vec3s(2.0, 2.0, 2.0));
     tree.setValue(openvdb::Coord(11,  9, 9), Vec3s(2.0, 2.0, 2.0));
 
-    openvdb::tools::GridSampler<Vec3STree, openvdb::tools::BoxSampler>  interpolator(grid); 
+    openvdb::tools::GridSampler<Vec3STree, openvdb::tools::BoxSampler>  interpolator(grid);
     //openvdb::tools::LinearInterp<Vec3STree> interpolator(*tree);
 
     Vec3SGrid::ValueType val = interpolator.sampleVoxel(10.5, 10.5, 10.5);
@@ -749,14 +749,14 @@ template<typename GridType>
 void
 TestLinearInterp<GridType>::testFillValues()
 {
-    typedef typename GridType::TreeType TreeType;
+    //typedef typename GridType::TreeType TreeType;
     float fillValue = 256.0f;
 
     GridType grid(fillValue);
     //typename GridType::TreeType& tree = grid.tree();
 
     openvdb::tools::GridSampler<GridType, openvdb::tools::BoxSampler>
-        interpolator(grid); 
+        interpolator(grid);
     //openvdb::tools::LinearInterp<GridType> interpolator(*tree);
 
     typename GridType::ValueType val =
@@ -798,7 +798,7 @@ TestLinearInterp<openvdb::Vec3SGrid>::testFillValues()
     //Vec3STree& tree = grid.tree();
 
     openvdb::tools::GridSampler<Vec3SGrid, openvdb::tools::BoxSampler>
-        interpolator(grid); 
+        interpolator(grid);
     //openvdb::tools::LinearInterp<Vec3STree> interpolator(*tree);
 
     Vec3SGrid::ValueType val = interpolator.sampleVoxel(10.5, 10.5, 10.5);
@@ -869,7 +869,7 @@ TestLinearInterp<GridType>::testNegativeIndices()
     tree.setValue(openvdb::Coord(-11,  -9, -9), 4.0);
 
     //openvdb::tools::LinearInterp<GridType> interpolator(*tree);
-    openvdb::tools::GridSampler<TreeType, openvdb::tools::BoxSampler>  interpolator(grid); 
+    openvdb::tools::GridSampler<TreeType, openvdb::tools::BoxSampler>  interpolator(grid);
 
     typename GridType::ValueType val =
         interpolator.sampleVoxel(-10.5, -10.5, -10.5);
@@ -955,49 +955,49 @@ TestLinearInterp<openvdb::Vec3SGrid>::testNegativeIndices()
     tree.setValue(openvdb::Coord(-10,  -9, -9), Vec3s(4.0, 4.0, 4.0));
     tree.setValue(openvdb::Coord(-11,  -9, -9), Vec3s(4.0, 4.0, 4.0));
 
-    openvdb::tools::GridSampler<Vec3SGrid, openvdb::tools::BoxSampler>  interpolator(grid); 
+    openvdb::tools::GridSampler<Vec3SGrid, openvdb::tools::BoxSampler>  interpolator(grid);
     //openvdb::tools::LinearInterp<Vec3STree> interpolator(*tree);
 
     Vec3SGrid::ValueType val = interpolator.sampleVoxel(-10.5, -10.5, -10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.375, 2.375, 2.375)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.375f)));
 
     val = interpolator.sampleVoxel(-10.0, -10.0, -10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(1.0, 1.0, 1.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(1.0f)));
 
     val = interpolator.sampleVoxel(-11.0, -10.0, -10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.0, 2.0, 2.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.0f)));
 
     val = interpolator.sampleVoxel(-11.0, -11.0, -10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.0, 2.0, 2.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.0f)));
 
     val = interpolator.sampleVoxel(-11.0, -11.0, -11.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(3.0, 3.0, 3.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(3.0f)));
 
     val = interpolator.sampleVoxel(-9.0, -11.0, -9.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(4.0, 4.0, 4.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(4.0f)));
 
     val = interpolator.sampleVoxel(-9.0, -10.0, -9.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(4.0, 4.0, 4.0)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(4.0f)));
 
     val = interpolator.sampleVoxel(-10.1, -10.0, -10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(1.1, 1.1, 1.1)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(1.1f)));
 
     val = interpolator.sampleVoxel(-10.8, -10.8, -10.8);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.792, 2.792, 2.792)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.792f)));
 
     val = interpolator.sampleVoxel(-10.1, -10.8, -10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.41, 2.41, 2.41)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.41f)));
 
     val = interpolator.sampleVoxel(-10.8, -10.1, -10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.41, 2.41, 2.41)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.41f)));
 
     val = interpolator.sampleVoxel(-10.5, -10.1, -10.8);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.71, 2.71, 2.71)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.71f)));
 
     val = interpolator.sampleVoxel(-10.5, -10.8, -10.1);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.01, 2.01, 2.01)));
+    CPPUNIT_ASSERT(val.eq(Vec3s(2.01f)));
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

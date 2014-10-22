@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -124,11 +124,11 @@ TestTreeGetSetValues::testSetValues()
         const int expectedActiveCount = (!activeTile ? 8 : 32 * 32 * 32);
         CPPUNIT_ASSERT_EQUAL(expectedActiveCount, int(tree.activeVoxelCount()));
 
-        float val = 1.0;
+        float val = 1.f;
         for (Tree323f::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
             ASSERT_DOUBLES_EXACTLY_EQUAL(val, iter->getValue(openvdb::Coord(0, 0, 0)));
             ASSERT_DOUBLES_EXACTLY_EQUAL(val+0.5, iter->getValue(openvdb::Coord(1, 0, 0)));
-            val = val + 1.0;
+            val = val + 1.f;
         }
     }
 }
@@ -460,6 +460,6 @@ TestTreeGetSetValues::testHasActiveTiles()
     CPPUNIT_ASSERT(tree.hasActiveTiles());
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

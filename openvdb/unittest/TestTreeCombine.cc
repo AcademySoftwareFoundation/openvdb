@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -34,6 +34,8 @@
 #include <openvdb/tools/Composite.h>
 #include <openvdb/util/CpuTimer.h>
 #include "util.h" // for unittest_util::makeSphere()
+#include <limits> // for std::numeric_limits
+#include <boost/math/special_functions/fpclassify.hpp> // for boost::math::isnan() and isinf()
 
 #define TEST_CSG_VERBOSE 0
 
@@ -61,6 +63,7 @@ public:
     CPPUNIT_TEST(testCompSum);
     CPPUNIT_TEST(testCompProd);
     CPPUNIT_TEST(testCompDiv);
+    CPPUNIT_TEST(testCompDivByZero);
     CPPUNIT_TEST(testCompReplace);
     CPPUNIT_TEST(testBoolTree);
 #ifdef DWA_OPENVDB
@@ -75,6 +78,7 @@ public:
     void testCompSum();
     void testCompProd();
     void testCompDiv();
+    void testCompDivByZero();
     void testCompReplace();
     void testBoolTree();
     void testCsg();
@@ -212,6 +216,73 @@ TestTreeCombine::testCompDiv()
 {
     testComp<openvdb::FloatTree>(Local::compDiv<openvdb::FloatTree>, Local::divf);
     testComp<openvdb::VectorTree>(Local::compDiv<openvdb::VectorTree>, Local::divv);
+}
+
+
+void
+TestTreeCombine::testCompDivByZero()
+{
+    const openvdb::Coord c0(0), c1(1), c2(2), c3(3), c4(4);
+
+    // Verify that integer-valued grids behave well w.r.t. division by zero.
+    {
+        const openvdb::Int32 inf = std::numeric_limits<openvdb::Int32>::max();
+
+        openvdb::Int32Tree a(/*background=*/1), b(0);
+
+        a.setValueOn(c0);
+        a.setValueOn(c1);
+        a.setValueOn(c2, -1);
+        a.setValueOn(c3, -1);
+        a.setValueOn(c4, 0);
+        b.setValueOn(c1);
+        b.setValueOn(c3);
+
+        openvdb::tools::compDiv(a, b);
+
+        CPPUNIT_ASSERT_EQUAL( inf, a.getValue(c0)); //  1 / 0
+        CPPUNIT_ASSERT_EQUAL( inf, a.getValue(c1)); //  1 / 0
+        CPPUNIT_ASSERT_EQUAL(-inf, a.getValue(c2)); // -1 / 0
+        CPPUNIT_ASSERT_EQUAL(-inf, a.getValue(c3)); // -1 / 0
+        CPPUNIT_ASSERT_EQUAL(   0, a.getValue(c4)); //  0 / 0
+    }
+    {
+        const openvdb::Index32 zero(0), inf = std::numeric_limits<openvdb::Index32>::max();
+
+        openvdb::UInt32Tree a(/*background=*/1), b(0);
+
+        a.setValueOn(c0);
+        a.setValueOn(c1);
+        a.setValueOn(c2, zero);
+        b.setValueOn(c1);
+
+        openvdb::tools::compDiv(a, b);
+
+        CPPUNIT_ASSERT_EQUAL( inf, a.getValue(c0)); //  1 / 0
+        CPPUNIT_ASSERT_EQUAL( inf, a.getValue(c1)); //  1 / 0
+        CPPUNIT_ASSERT_EQUAL(zero, a.getValue(c2)); //  0 / 0
+    }
+
+    // Verify that non-integer-valued grids don't use integer division semantics.
+    {
+        openvdb::FloatTree a(/*background=*/1.0), b(0.0);
+
+        a.setValueOn(c0);
+        a.setValueOn(c1);
+        a.setValueOn(c2, -1.0);
+        a.setValueOn(c3, -1.0);
+        a.setValueOn(c4, 0.0);
+        b.setValueOn(c1);
+        b.setValueOn(c3);
+
+        openvdb::tools::compDiv(a, b);
+
+        CPPUNIT_ASSERT(boost::math::isinf(a.getValue(c0))); //  1 / 0
+        CPPUNIT_ASSERT(boost::math::isinf(a.getValue(c1))); //  1 / 0
+        CPPUNIT_ASSERT(boost::math::isinf(a.getValue(c2))); // -1 / 0
+        CPPUNIT_ASSERT(boost::math::isinf(a.getValue(c3))); // -1 / 0
+        CPPUNIT_ASSERT(boost::math::isnan(a.getValue(c4))); //  0 / 0
+    }
 }
 
 
@@ -362,7 +433,7 @@ TestTreeCombine::testCombine2()
 
     struct Local {
         static void floatAverage(const float& a, const float& b, float& result)
-            { result = 0.5 * (a + b); }
+            { result = 0.5f * (a + b); }
         static void vec3dAverage(const Vec3d& a, const Vec3d& b, Vec3d& result)
             { result = 0.5 * (a + b); }
         static void vec3dFloatMultiply(const Vec3d& a, const float& b, Vec3d& result)
@@ -706,7 +777,7 @@ TestTreeCombine::testCsg()
     CPPUNIT_ASSERT(largeTree2.get() != NULL);
 
 #if TEST_CSG_VERBOSE
-    std::cerr << "file read: " << timer.stop() << " sec\n";
+    std::cerr << "file read: " << timer.delta() << " sec\n";
 #endif
 
 #if TEST_CSG_VERBOSE
@@ -782,8 +853,8 @@ TestTreeCombine::visitCsg(const TreeT& aInputTree, const TreeT& bInputTree,
 #endif
 
     std::ostringstream aInfo, refInfo;
-    aTree->print(aInfo, /*verbose=*/3);
-    refTree.print(refInfo, /*verbose=*/3);
+    aTree->print(aInfo, /*verbose=*/2);
+    refTree.print(refInfo, /*verbose=*/2);
 
     CPPUNIT_ASSERT_EQUAL(refInfo.str(), aInfo.str());
 
@@ -792,6 +863,6 @@ TestTreeCombine::visitCsg(const TreeT& aInputTree, const TreeT& bInputTree,
     return aTree;
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

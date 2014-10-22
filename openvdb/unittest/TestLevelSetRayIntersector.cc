@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -103,7 +103,7 @@ TestLevelSetRayIntersector::tests()
         ASSERT_DOUBLES_APPROX_EQUAL(15.0, xyz[0]);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[1]);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[2]);
-        ASSERT_DOUBLES_APPROX_EQUAL(13.0, time); 
+        ASSERT_DOUBLES_APPROX_EQUAL(13.0, time);
         double t0=0, t1=0;
         CPPUNIT_ASSERT(ray.intersects(c, r, t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL(t0, time);
@@ -131,7 +131,7 @@ TestLevelSetRayIntersector::tests()
         ASSERT_DOUBLES_APPROX_EQUAL(15.0, xyz[0]);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[1]);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[2]);
-        ASSERT_DOUBLES_APPROX_EQUAL(13.0, time); 
+        ASSERT_DOUBLES_APPROX_EQUAL(13.0, time);
         double t0=0, t1=0;
         CPPUNIT_ASSERT(ray.intersects(c, r, t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL(t0, time);
@@ -158,7 +158,7 @@ TestLevelSetRayIntersector::tests()
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[0]);
         ASSERT_DOUBLES_APPROX_EQUAL(15.0, xyz[1]);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[2]);
-        ASSERT_DOUBLES_APPROX_EQUAL(17.0, time); 
+        ASSERT_DOUBLES_APPROX_EQUAL(17.0, time);
         double t0=0, t1=0;
         CPPUNIT_ASSERT(ray.intersects(c, r, t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL(t0, time);
@@ -187,7 +187,7 @@ TestLevelSetRayIntersector::tests()
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[0]);
         ASSERT_DOUBLES_APPROX_EQUAL(15.0, xyz[1]);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[2]);
-        ASSERT_DOUBLES_APPROX_EQUAL(17.0, time); 
+        ASSERT_DOUBLES_APPROX_EQUAL(17.0, time);
         double t0=0, t1=0;
         CPPUNIT_ASSERT(ray.intersects(c, r, t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL(t0, time);
@@ -217,7 +217,7 @@ TestLevelSetRayIntersector::tests()
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[0]);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[1]);
         ASSERT_DOUBLES_APPROX_EQUAL(15.0, xyz[2]);
-        ASSERT_DOUBLES_APPROX_EQUAL(11.0, time); 
+        ASSERT_DOUBLES_APPROX_EQUAL(11.0, time);
         double t0=0, t1=0;
         CPPUNIT_ASSERT(ray.intersects(c, r, t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL(t0, time);
@@ -247,7 +247,7 @@ TestLevelSetRayIntersector::tests()
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[0]);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[1]);
         ASSERT_DOUBLES_APPROX_EQUAL(15.0, xyz[2]);
-        ASSERT_DOUBLES_APPROX_EQUAL(11.0, time); 
+        ASSERT_DOUBLES_APPROX_EQUAL(11.0, time);
         double t0=0, t1=0;
         CPPUNIT_ASSERT(ray.intersects(c, r, t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL(t0, time);
@@ -278,7 +278,7 @@ TestLevelSetRayIntersector::tests()
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[0]);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[1]);
         ASSERT_DOUBLES_APPROX_EQUAL(25.0, xyz[2]);
-        ASSERT_DOUBLES_APPROX_EQUAL(21.0, time); 
+        ASSERT_DOUBLES_APPROX_EQUAL(21.0, time);
         double t0=0, t1=0;
         CPPUNIT_ASSERT(ray.intersects(c, r, t0, t1));
         //std::cerr << "t0 = " << t0 << " t1 = " << t1 << std::endl;
@@ -339,7 +339,7 @@ TestLevelSetRayIntersector::tests()
 
         for (size_t i=0; i<width; ++i) {
             for (size_t j=0; j<width; ++j) {
-                const Vec3T eye(dx*i, dx*j, 0.0);
+                const Vec3T eye(dx*double(i), dx*double(j), 0.0);
                 const RayT ray(eye, dir);
                 if (lsri.intersectsWS(ray, xyz, time)){
                     CPPUNIT_ASSERT(ray.intersects(c, r, t0, t1));
@@ -411,6 +411,6 @@ TestLevelSetRayIntersector::stats()
 
 #undef STATS_TEST
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

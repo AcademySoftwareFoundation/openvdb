@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -49,7 +49,7 @@ namespace OPENVDB_VERSION_NAME {
 namespace math {
 
 /// @brief This class computes the minimum and maximum values of a population
-/// of floating-point values.    
+/// of floating-point values.
 class Extrema
 {
 public:
@@ -62,7 +62,7 @@ public:
         , mMax(-mMin)
     {
     }
-    
+
     /// Add a single sample.
     void add(double val)
     {
@@ -81,7 +81,7 @@ public:
 
     /// Return the size of the population, i.e., the total number of samples.
     inline uint64_t size() const { return mSize; }
-    
+
     /// Return the minimum value.
     inline double min() const { return mMin; }
 
@@ -114,7 +114,7 @@ public:
     }
 
 protected:
-    
+
     inline void join(const Extrema& other)
     {
         assert(other.mSize > 0);
@@ -122,12 +122,12 @@ protected:
         mMin   = std::min<double>(mMin, other.mMin);
         mMax   = std::max<double>(mMax, other.mMax);
     }
-    
+
     uint64_t mSize;
     double mMin, mMax;
 };//end Extrema
-    
-    
+
+
 /// @brief This class computes statistics (minimum value, maximum
 /// value, mean, variance and standard deviation) of a population
 /// of floating-point values.
@@ -160,8 +160,8 @@ public:
     {
         const double denom = 1.0/double(mSize + n);
         const double delta = val - mAvg;
-        mAvg += denom*delta*n;
-        mAux += denom*delta*delta*mSize*n;
+        mAvg += denom * delta * double(n);
+        mAux += denom * delta * delta * double(mSize) * double(n);
         Extrema::add(val, n);
     }
 
@@ -171,8 +171,8 @@ public:
         if (other.mSize > 0) {
             const double denom = 1.0/double(mSize + other.mSize);
             const double delta = other.mAvg - mAvg;
-            mAvg += denom*delta*other.mSize;
-            mAux += other.mAux + denom*delta*delta*mSize*other.mSize;
+            mAvg += denom * delta * double(other.mSize);
+            mAux += other.mAux + denom * delta * delta * double(mSize) * double(other.mSize);
             Extrema::join(other);
         }
     }
@@ -308,9 +308,9 @@ public:
             os << "==============================================================\n";
             os << "||  #   |       Min      |       Max      | Frequency |  %  ||\n";
             os << "==============================================================\n";
-            for (size_t i=0, e=mBins.size(); i!=e; ++i) {
-                os << "|| " << std::setw(4) << i   << " | " << std::setw(14) << this->min(i) << " | "
-                   << std::setw(14) << this->max(i) << " | " << std::setw(9) << mBins[i]     << " | "
+            for (int i = 0, e = int(mBins.size()); i != e; ++i) {
+                os << "|| " << std::setw(4) << i << " | " << std::setw(14) << this->min(i) << " | "
+                   << std::setw(14) << this->max(i) << " | " << std::setw(9) << mBins[i] << " | "
                    << std::setw(3) << (100*mBins[i]/mSize) << " ||\n";
             }
             os << "==============================================================\n";
@@ -332,6 +332,6 @@ private:
 
 #endif // OPENVDB_MATH_STATS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

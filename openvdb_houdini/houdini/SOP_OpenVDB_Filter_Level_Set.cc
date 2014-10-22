@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -606,7 +606,6 @@ SOP_OpenVDB_Filter_Level_Set::updateParmsFlags()
 
     changed |= enableParm("iterations",  !reshape);
     changed |= enableParm("stencilWidth", stencil);
-    changed |= enableParm("voxelOffset", reshape);
 
     changed |= setVisibleState("stencilWidth", getEnableState("stencilWidth"));
     changed |= setVisibleState("iterations",   getEnableState("iterations"));
@@ -624,7 +623,7 @@ int
 SOP_OpenVDB_Filter_Level_Set::convertUnits()
 {
     const bool toWS = static_cast<bool>(evalInt("worldSpaceUnits", 0, 0));
-    const float offset = evalFloat("voxelOffset", 0, 0) * (toWS ? mVoxelSize : 1.0f/mVoxelSize);
+    const fpreal offset = evalFloat("voxelOffset", 0, 0) * (toWS ? mVoxelSize : 1.0f/mVoxelSize);
     setFloat("voxelOffset", 0, 0, offset);
     return 1;
 }
@@ -735,9 +734,9 @@ SOP_OpenVDB_Filter_Level_Set::evalFilterParms(OP_Context& context,
 
     parms.mIterations   = evalInt("iterations", 0, now);
     parms.mStencilWidth = evalInt("stencilWidth", 0, now);
-    parms.mVoxelOffset  = evalFloat("voxelOffset", 0, now);
-    parms.mMinMask      = evalFloat("minMask", 0, now);
-    parms.mMaxMask      = evalFloat("maxMask", 0, now);
+    parms.mVoxelOffset  = static_cast<float>(evalFloat("voxelOffset", 0, now));
+    parms.mMinMask      = static_cast<float>(evalFloat("minMask", 0, now));
+    parms.mMaxMask      = static_cast<float>(evalFloat("maxMask", 0, now));
     parms.mInvertMask   = evalInt("invert", 0, now);
     parms.mWorldUnits   = evalInt("worldSpaceUnits", 0, now);
 
@@ -791,7 +790,7 @@ SOP_OpenVDB_Filter_Level_Set::applyFilters(
     typedef openvdb::FloatGrid MaskT;
     typedef openvdb::tools::LevelSetFilter<GridT, MaskT, BossT> FilterT;
 
-    mVoxelSize = ValueT(grid->voxelSize()[0]);
+    mVoxelSize = static_cast<float>(grid->voxelSize()[0]);
     FilterT filter(*grid, &boss);
 
     if (grid->background() < ValueT(openvdb::LEVEL_SET_HALF_WIDTH * mVoxelSize)) {
@@ -870,7 +869,7 @@ SOP_OpenVDB_Filter_Level_Set::filterGrid(OP_Context& context, FilterT& filter,
 
 
     typedef typename FilterT::ValueType ValueT;
-    const ValueT ds = (parms.mWorldUnits ? 1 : mVoxelSize) * ValueT(parms.mVoxelOffset);
+    const float ds = (parms.mWorldUnits ? 1.f : mVoxelSize) * parms.mVoxelOffset;
 
     switch (parms.mFilterType) {
 
@@ -1044,6 +1043,6 @@ SOP_OpenVDB_Filter_Level_Set::track(const FilterParms& parms, FilterT& filter,
 ////////////////////////////////////////
 
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

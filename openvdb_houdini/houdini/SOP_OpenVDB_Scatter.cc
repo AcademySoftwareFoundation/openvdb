@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -132,10 +132,9 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(PRMzeroDefaults) /* off by default */);
 
     // Points per voxel
-    parms.add(hutil::ParmFactory(PRM_INT_J , "ppv", "Count")
-        .setDefault(8)
-        .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 32));
-
+    parms.add(hutil::ParmFactory(PRM_FLT_J , "ppv", "Count")
+         .setDefault(8)
+         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10));
 
     // Toggle to scatter inside level sets
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "interior", "Scatter points inside level set grids")
@@ -274,8 +273,8 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
         const int seed = evalInt("seed", /*idx=*/0, time);
         const bool verbose   = evalInt("verbose", /*idx=*/0, time) != 0;
         const openvdb::Index64 pointCount = evalInt("count", 0, time);
-        const float density  = evalFloat("density", 0, time);
-        const int ptsPerVox  = evalInt("ppv", 0, time);
+        const float density  = static_cast<float>(evalFloat("density", 0, time));
+        const float ptsPerVox = static_cast<float>(evalFloat("ppv", 0, time));
         const bool interior  = evalInt("interior", /*idx=*/0, time) != 0;
 
 
@@ -402,6 +401,6 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

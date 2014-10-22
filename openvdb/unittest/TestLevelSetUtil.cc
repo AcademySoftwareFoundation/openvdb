@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -59,7 +59,7 @@ TestLevelSetUtil::testMinMaxVoxel()
 {
 
     openvdb::FloatTree myTree(std::numeric_limits<float>::max());
-   
+
     openvdb::tree::ValueAccessor<openvdb::FloatTree> acc(myTree);
 
     for (int i = -9; i < 10; ++i) {
@@ -84,8 +84,8 @@ TestLevelSetUtil::testLevelSetToFogVolume()
 
     grid->fill(openvdb::CoordBBox(openvdb::Coord(-100), openvdb::Coord(100)), 9.0);
     grid->fill(openvdb::CoordBBox(openvdb::Coord(-50), openvdb::Coord(50)), -9.0);
-    
-    
+
+
     openvdb::tools::sdfToFogVolume(*grid);
 
     CPPUNIT_ASSERT(grid->background() < 1e-7);
@@ -97,6 +97,6 @@ TestLevelSetUtil::testLevelSetToFogVolume()
     }
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

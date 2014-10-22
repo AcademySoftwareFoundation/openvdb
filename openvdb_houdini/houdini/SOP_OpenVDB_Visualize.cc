@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -35,9 +35,11 @@
 /// @brief Visualize VDB grids and their tree topology
 
 #include <houdini_utils/ParmFactory.h>
+#include <houdini_utils/geometry.h>
 #include <openvdb_houdini/GeometryUtil.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
+#include <openvdb/tools/PointIndexGrid.h>
 
 #ifdef DWA_OPENVDB
 #include <openvdb_houdini/DW_VDBUtils.h>
@@ -59,6 +61,10 @@
 #include <boost/type_traits/is_floating_point.hpp>
 #include <boost/type_traits/is_arithmetic.hpp>
 
+namespace boost {
+template<> struct is_integral<openvdb::PointIndex32>: public boost::true_type {};
+template<> struct is_integral<openvdb::PointIndex64>: public boost::true_type {};
+}
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -93,12 +99,12 @@ protected:
 
 // Same color scheme as the VDB TOG paper.
 UT_Vector3 SOP_OpenVDB_Visualize::mColors[] = {
-    UT_Vector3(0.045, 0.045, 0.045),         /// 0. Root
-    UT_Vector3(0.0432, 0.33, 0.0411023),     /// 1. First internal node level
-    UT_Vector3(0.871, 0.394, 0.01916),       /// 2. Intermediate internal node levels
-    UT_Vector3(0.00608299, 0.279541, 0.625), /// 3. Leaf level
-    UT_Vector3(0.523, 0.0325175, 0.0325175), /// 4. Value >= ZeroVal (for voxels or tiles)
-    UT_Vector3(0.92, 0.92, 0.92)             /// 5. Value < ZeroVal (for voxels or tiles)
+    UT_Vector3(0.045f, 0.045f, 0.045f),         // 0. Root
+    UT_Vector3(0.0432f, 0.33f, 0.0411023f),     // 1. First internal node level
+    UT_Vector3(0.871f, 0.394f, 0.01916f),       // 2. Intermediate internal node levels
+    UT_Vector3(0.00608299f, 0.279541f, 0.625f), // 3. Leaf level
+    UT_Vector3(0.523f, 0.0325175f, 0.0325175f), // 4. Value >= ZeroVal (for voxels or tiles)
+    UT_Vector3(0.92f, 0.92f, 0.92f)             // 5. Value < ZeroVal (for voxels or tiles)
 };
 
 
@@ -297,6 +303,12 @@ void
 createBox(GU_Detail& geo, const openvdb::math::Transform& xform,
     const openvdb::CoordBBox& bbox, const UT_Vector3& color, bool solid = false)
 {
+    struct Local {
+        static inline UT_Vector3 Vec3dToUTV3(const openvdb::Vec3d& v) {
+            return UT_Vector3(float(v.x()), float(v.y()), float(v.z()));
+        }
+    };
+
     UT_Vector3 corners[8];
 
 #if 1
@@ -310,34 +322,34 @@ createBox(GU_Detail& geo, const openvdb::math::Transform& xform,
 #endif
 
     openvdb::Vec3d ptn = xform.indexToWorld(min);
-    corners[0] = UT_Vector3(ptn.x(), ptn.y(), ptn.z());
+    corners[0] = Local::Vec3dToUTV3(ptn);
 
     ptn = openvdb::Vec3d(min.x(), min.y(), max.z());
     ptn = xform.indexToWorld(ptn);
-    corners[1] = UT_Vector3(ptn.x(), ptn.y(), ptn.z());
+    corners[1] = Local::Vec3dToUTV3(ptn);
 
     ptn = openvdb::Vec3d(max.x(), min.y(), max.z());
     ptn = xform.indexToWorld(ptn);
-    corners[2] = UT_Vector3(ptn.x(), ptn.y(), ptn.z());
+    corners[2] = Local::Vec3dToUTV3(ptn);
 
     ptn = openvdb::Vec3d(max.x(), min.y(), min.z());
     ptn = xform.indexToWorld(ptn);
-    corners[3] = UT_Vector3(ptn.x(), ptn.y(), ptn.z());
+    corners[3] = Local::Vec3dToUTV3(ptn);
 
     ptn = openvdb::Vec3d(min.x(), max.y(), min.z());
     ptn = xform.indexToWorld(ptn);
-    corners[4] = UT_Vector3(ptn.x(), ptn.y(), ptn.z());
+    corners[4] = Local::Vec3dToUTV3(ptn);
 
     ptn = openvdb::Vec3d(min.x(), max.y(), max.z());
     ptn = xform.indexToWorld(ptn);
-    corners[5] = UT_Vector3(ptn.x(), ptn.y(), ptn.z());
+    corners[5] = Local::Vec3dToUTV3(ptn);
 
     ptn = xform.indexToWorld(max);
-    corners[6] = UT_Vector3(ptn.x(), ptn.y(), ptn.z());
+    corners[6] = Local::Vec3dToUTV3(ptn);
 
     ptn = openvdb::Vec3d(max.x(), max.y(), min.z());
     ptn = xform.indexToWorld(ptn);
-    corners[7] = UT_Vector3(ptn.x(), ptn.y(), ptn.z());
+    corners[7] = Local::Vec3dToUTV3(ptn);
 
     hutil::createBox(geo, corners, &color, solid);
 }
@@ -771,7 +783,8 @@ VDBGridSurfacer::operator()(const GridType& grid)
 
         if (mAdaptivityThreshold > 1e-6) {
             GU_PolyReduceParms parms;
-            parms.percentage = 100.0 * (1.0 - std::min(mAdaptivityThreshold, 0.99f));
+            parms.percentage =
+                static_cast<float>(100.0 * (1.0 - std::min(mAdaptivityThreshold, 0.99f)));
             parms.usepercent = 1;
             tmpGeo.polyReduce(parms);
         }
@@ -858,7 +871,7 @@ SOP_OpenVDB_Visualize::cookMySop(OP_Context& context)
 #else
             parms.setToType(GEO_PrimTypeCompat::GEOPRIMPOLY);
 #endif
-            parms.myOffset = iso;
+            parms.myOffset = static_cast<float>(iso);
             parms.preserveGroups = false;
             parms.primGroup = const_cast<GA_PrimitiveGroup*>(group);
             GU_PrimVDB::convertVDBs(*gdp, *refGdp, parms,
@@ -878,7 +891,8 @@ SOP_OpenVDB_Visualize::cookMySop(OP_Context& context)
 #if HAVE_SURFACING_PARM
                 // mesh using houdini surfacer
                 if (meshing == 2) {
-                    VDBGridSurfacer surfacer(*gdp, iso, adaptivity, false, &boss);
+                    VDBGridSurfacer surfacer(*gdp, static_cast<float>(iso),
+                        static_cast<float>(adaptivity), false, &boss);
                     GEOvdbProcessTypedGridScalar(*vdb, surfacer);
                 }
 #endif
@@ -888,12 +902,20 @@ SOP_OpenVDB_Visualize::cookMySop(OP_Context& context)
                     VDBTopologyVisualizer draw(*gdp, nodeOptions, tileOptions,
                         voxelOptions, ignorestaggered, &boss);
 
-                    GEOvdbProcessTypedGridTopology(*vdb, draw);
+                    if (!GEOvdbProcessTypedGridTopology(*vdb, draw)) {
+
+                        if (vdb->getGrid().type() == openvdb::tools::PointIndexGrid::gridType()) {
+                            openvdb::tools::PointIndexGrid::ConstPtr grid =
+                                 openvdb::gridConstPtrCast<openvdb::tools::PointIndexGrid>(
+                                     vdb->getGridPtr());
+                            draw(*grid);
+                        }
+                    }
                 }
 
                 if (showFrustum) {
-                    UT_Vector3 box_color(0.6, 0.6, 0.6);
-                    UT_Vector3 tick_color(0.0, 0.0, 0.0);
+                    UT_Vector3 box_color(0.6f, 0.6f, 0.6f);
+                    UT_Vector3 tick_color(0.0f, 0.0f, 0.0f);
                     hvdb::drawFrustum(*gdp, vdb->getGrid().transform(),
                         &box_color, &tick_color, /*shaded*/true);
                 }
@@ -931,6 +953,6 @@ SOP_OpenVDB_Visualize::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

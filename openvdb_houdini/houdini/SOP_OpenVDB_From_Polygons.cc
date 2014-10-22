@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -455,7 +455,7 @@ SOP_OpenVDB_From_Polygons::factory(OP_Network* net,
 SOP_OpenVDB_From_Polygons::SOP_OpenVDB_From_Polygons(OP_Network* net,
     const char* name, OP_Operator* op)
     : hvdb::SOP_NodeVDB(net, name, op)
-    , mVoxelSize(0.1)
+    , mVoxelSize(0.1f)
 {
 }
 
@@ -478,11 +478,11 @@ SOP_OpenVDB_From_Polygons::convertUnits()
         return 1;
     }
 
-    width = evalFloat("exteriorBandWidthWS", 0, 0);
+    width = static_cast<float>(evalFloat("exteriorBandWidthWS", 0, 0));
     int voxelWidth = std::max(static_cast<int>(width / mVoxelSize), 1);
     setInt("exteriorBandWidth", 0, 0, voxelWidth);
 
-    width = evalFloat("interiorBandWidthWS", 0, 0);
+    width = static_cast<float>(evalFloat("interiorBandWidthWS", 0, 0));
     voxelWidth = std::max(static_cast<int>(width / mVoxelSize), 1);
     setInt("interiorBandWidth", 0, 0, voxelWidth);
 
@@ -567,7 +567,7 @@ SOP_OpenVDB_From_Polygons::updateParmsFlags()
     // enable / diable vector type menu
     UT_String attrStr, attrName;
     GA_ROAttributeRef attrRef;
-    int attrClass;
+    int attrClass = POINT_ATTR;
     const GU_Detail* meshGdp = this->getInputLastGeo(0, time);
     if (meshGdp) {
         for (int i = 1, N = evalInt("attrList", 0, time); i <= N; ++i) {
@@ -628,7 +628,7 @@ SOP_OpenVDB_From_Polygons::cookMySop(OP_Context& context)
 
         const GU_Detail* inputGdp = inputGeo(0);
 
-        if (!inputGdp || !inputGdp->primitives().entries()) {
+        if (!inputGdp || !inputGdp->getNumPrimitives()) {
             addWarning(SOP_MESSAGE, "No mesh to convert");
             // We still create the grids as later workflow
             // may be able to handle an empty grid.
@@ -661,7 +661,7 @@ SOP_OpenVDB_From_Polygons::cookMySop(OP_Context& context)
         unsigned int conversionFlags = 0;
         if (outputAttributeGrid) conversionFlags |= openvdb::tools::GENERATE_PRIM_INDEX_GRID;
 
-        mVoxelSize = evalFloat("voxelSize", 0, time);
+        mVoxelSize = static_cast<float>(evalFloat("voxelSize", 0, time));
         openvdb::math::Transform::Ptr transform;
 
         float inBand = std::numeric_limits<float>::max(), exBand = 0.0;
@@ -683,7 +683,7 @@ SOP_OpenVDB_From_Polygons::cookMySop(OP_Context& context)
 
             if (gridIter) {
                 transform = (*gridIter)->getGrid().transform().copy();
-                mVoxelSize = transform->voxelSize()[0];
+                mVoxelSize = static_cast<float>(transform->voxelSize()[0]);
                 ++gridIter;
             } else {
                  addError(SOP_MESSAGE, "Could not find a reference grid");
@@ -705,13 +705,20 @@ SOP_OpenVDB_From_Polygons::cookMySop(OP_Context& context)
 
         // Set the narrow-band parameters
         {
-	    const bool wsUnits = static_cast<bool>(evalInt("worldSpaceUnits", 0, time));
+            const bool wsUnits = static_cast<bool>(evalInt("worldSpaceUnits", 0, time));
 
-	    if (wsUnits) exBand = evalFloat("exteriorBandWidthWS", 0, time) / mVoxelSize;
-	    else exBand = static_cast<float>(evalInt("exteriorBandWidth", 0, time));
-	    if (!bool(evalInt("fillInterior", 0, time))) {
-		if (wsUnits) inBand = evalFloat("interiorBandWidthWS", 0, time) / mVoxelSize;
-		else inBand = static_cast<float>(evalInt("interiorBandWidth", 0, time));
+            if (wsUnits) {
+                exBand = static_cast<float>(evalFloat("exteriorBandWidthWS", 0, time) / mVoxelSize);
+            } else {
+                exBand = static_cast<float>(evalInt("exteriorBandWidth", 0, time));
+            }
+            if (!bool(evalInt("fillInterior", 0, time))) {
+                if (wsUnits) {
+                    inBand = static_cast<float>(
+                        evalFloat("interiorBandWidthWS", 0, time) / mVoxelSize);
+                } else {
+                    inBand = static_cast<float>(evalInt("interiorBandWidth", 0, time));
+                }
             }
         }
 
@@ -790,7 +797,7 @@ SOP_OpenVDB_From_Polygons::cookMySop(OP_Context& context)
 
             int closestPrimIndexInstance =
                 constructGenericAtttributeLists(pointAttributes, vertexAttributes,
-                    primitiveAttributes, *inputGdp, *converter.indexGridPtr(), time);
+                    primitiveAttributes, *inputGdp, *converter.indexGridPtr(), float(time));
 
             transferAttributes(pointAttributes, vertexAttributes, primitiveAttributes,
                 *converter.indexGridPtr(), transform, *inputGdp);
@@ -835,7 +842,7 @@ SOP_OpenVDB_From_Polygons::constructGenericAtttributeLists(
     UT_String attrStr, attrName;
     GA_ROAttributeRef attrRef;
     GA_Range range;
-    int attrClass;
+    int attrClass = POINT_ATTR;
     int closestPrimIndexInstance = -1;
 
     // for each selected attribute
@@ -852,7 +859,7 @@ SOP_OpenVDB_From_Polygons::constructGenericAtttributeLists(
             continue;
         }
 
-        hvdb::AttributeDetailList *attributeList;
+        hvdb::AttributeDetailList* attributeList = NULL;
 
         if (attrClass == POINT_ATTR) {
             attrRef = meshGdp.findPointAttribute(attrName);
@@ -1066,6 +1073,6 @@ SOP_OpenVDB_From_Polygons::transferAttributes(
     }
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

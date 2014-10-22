@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -654,11 +654,12 @@ private:
 //#define DEBUG_TREE_VALUE_ITERATOR
 
 /// @brief Base class for tree-traversal iterators over tile and voxel values
-template<typename _TreeT, typename ValueIterT>
+template<typename _TreeT, typename _ValueIterT>
 class TreeValueIteratorBase
 {
 public:
     typedef _TreeT TreeT;
+    typedef _ValueIterT ValueIterT;
     typedef typename ValueIterT::NodeType NodeT;
     typedef typename ValueIterT::NonConstValueType ValueT;
     typedef typename NodeT::ChildOnCIter ChildOnIterT;
@@ -887,10 +888,14 @@ TreeValueIteratorBase<TreeT, ValueIterT>::advance(bool dontIncrement)
 #ifdef ENABLE_TREE_VALUE_DEPTH_BOUND_OPTIMIZATION
         if (int(mLevel) == mMinLevel) {
             // If the current node lies at the lowest allowed level, none of its
-            // children can be visited, so advance its child iterator to the end.
-            /// @todo Consider adding methods to iterators to advance to the end
-            /// in one step, instead of by repeated increments.
-            while (mChildIterList.test(mLevel)) mChildIterList.next(mLevel);
+            // children can be visited, so just advance its child iterator.
+            mChildIterList.next(mLevel);
+            if (mValueIterList.pos(mLevel) == mChildIterList.pos(mLevel)
+                && mChildIterList.test(mLevel))
+            {
+                /// @todo Once ValueOff iterators properly skip child pointers, remove this block.
+                mValueIterList.next(mLevel);
+            }
         } else
 #endif
         if (mChildIterList.down(mLevel)) {
@@ -1023,11 +1028,15 @@ public:
     /// this iterator is currently pointing.
     CoordBBox getBoundingBox() const { CoordBBox b; this->getBoundingBox(b); return b; }
 
+    //@{
     /// @brief Return the node to which the iterator is pointing.
     /// @note This iterator doesn't have the usual dereference operators (* and ->),
     /// because they would have to be overloaded by the returned node type.
     template<typename NodeT>
     void getNode(NodeT*& node) const { node = NULL; mIterList.getNode(mLevel, node); }
+    template<typename NodeT>
+    void getNode(const NodeT*& node) const { node = NULL; mIterList.getNode(mLevel, node); }
+    //@}
 
     TreeT* getTree() const { return mTree; }
 
@@ -1383,6 +1392,6 @@ private:
 
 #endif // OPENVDB_TREE_TREEITERATOR_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

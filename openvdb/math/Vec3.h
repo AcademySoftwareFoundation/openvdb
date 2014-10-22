@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -73,7 +73,8 @@ public:
         this->mm[2] = a[2];
     }
 
-    /// Conversion constructor
+    /// @brief Construct a Vec3 from a 3-Tuple with a possibly different value type.
+    /// @details Type conversion warnings are suppressed.
     template<typename Source>
     explicit Vec3(const Tuple<3, Source> &v)
     {
@@ -82,6 +83,8 @@ public:
         this->mm[2] = static_cast<T>(v[2]);
     }
 
+    /// @brief Construct a Vec3 from another Vec3 with a possibly different value type.
+    /// @details Type conversion warnings are suppressed.
     template<typename Other>
     Vec3(const Vec3<Other>& v)
     {
@@ -125,14 +128,15 @@ public:
         return *this;
     }
 
-    /// Assignment operator
+    /// @brief Assignment operator
+    /// @details Type conversion warnings are not suppressed.
     template<typename Source>
     const Vec3<T>& operator=(const Vec3<Source> &v)
     {
         // note: don't static_cast because that suppresses warnings
-        this->mm[0] = ValueType(v[0]);
-        this->mm[1] = ValueType(v[1]);
-        this->mm[2] = ValueType(v[2]);
+        this->mm[0] = v[0];
+        this->mm[1] = v[1];
+        this->mm[2] = v[2];
 
         return *this;
     }
@@ -248,9 +252,9 @@ public:
     template <typename S>
     const Vec3<T> &operator*=(S scalar)
     {
-        this->mm[0] *= scalar;
-        this->mm[1] *= scalar;
-        this->mm[2] *= scalar;
+        this->mm[0] = static_cast<T>(this->mm[0] * scalar);
+        this->mm[1] = static_cast<T>(this->mm[1] * scalar);
+        this->mm[2] = static_cast<T>(this->mm[2] * scalar);
         return *this;
     }
 
@@ -288,9 +292,9 @@ public:
     template <typename S>
     const Vec3<T> &operator+=(S scalar)
     {
-        this->mm[0] += scalar;
-        this->mm[1] += scalar;
-        this->mm[2] += scalar;
+        this->mm[0] = static_cast<T>(this->mm[0] + scalar);
+        this->mm[1] = static_cast<T>(this->mm[1] + scalar);
+        this->mm[2] = static_cast<T>(this->mm[2] + scalar);
         return *this;
     }
 
@@ -376,7 +380,7 @@ public:
 
     /// Returns the scalar component of v in the direction of onto, onto need
     /// not be unit. e.g   double c = Vec3d::component(v1,v2);
-    T component(const Vec3<T> &onto, T eps=1.0e-7) const
+    T component(const Vec3<T> &onto, T eps = static_cast<T>(1.0e-7)) const
     {
         T l = onto.length();
         if (isApproxEqual(l, T(0), eps)) return 0;
@@ -386,7 +390,7 @@ public:
 
     /// Return the projection of v onto the vector, onto need not be unit
     /// e.g.   Vec3d a = vprojection(n);
-    Vec3<T> projection(const Vec3<T> &onto, T eps=1.0e-7) const
+    Vec3<T> projection(const Vec3<T> &onto, T eps = static_cast<T>(1.0e-7)) const
     {
         T l = onto.lengthSqr();
         if (isApproxEqual(l, T(0), eps)) return Vec3::zero();
@@ -615,7 +619,7 @@ inline Vec3<T> maxComponent(const Vec3<T> &v1, const Vec3<T> &v2)
 }
 
 /// @brief Return a vector with the exponent applied to each of
-/// the components of the input vector. 
+/// the components of the input vector.
 template <typename T>
 inline Vec3<T> Exp(Vec3<T> v) { return v.exp(); }
 
@@ -630,6 +634,6 @@ typedef Vec3<double>    Vec3d;
 
 #endif // OPENVDB_MATH_VEC3_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

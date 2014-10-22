@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -66,7 +66,7 @@ public:
     static std::string testSuiteName()
     {
         std::string name = openvdb::typeNameAsString<ValueT>();
-        if (!name.empty()) name[0] = ::toupper(name[0]);
+        if (!name.empty()) name[0] = static_cast<char>(::toupper(name[0]));
         return "TestQuadraticInterp" + name;
     }
 
@@ -106,7 +106,7 @@ template<>
 inline openvdb::Vec3s
 TestQuadraticInterp<openvdb::Vec3SGrid>::constValue(double d)
 {
-    return openvdb::Vec3s(d, d, d);
+    return openvdb::Vec3s(float(d), float(d), float(d));
 }
 
 /// Specialization for Vec3s grids
@@ -115,7 +115,7 @@ inline bool
 TestQuadraticInterp<openvdb::Vec3SGrid>::relEq(
     const openvdb::Vec3s& v1, const openvdb::Vec3s& v2)
 {
-    return v1.eq(v2, TOLERANCE);
+    return v1.eq(v2, float(TOLERANCE));
 }
 
 
@@ -189,19 +189,19 @@ TestQuadraticInterp<GridType>::test()
     tree.setValue(openvdb::Coord(11,  9, 9), four);
 
     const TestVal testVals[] = {
-        { 10.5, 10.5, 10.5, constValue(1.703125) },
-        { 10.0, 10.0, 10.0, one },
-        { 11.0, 10.0, 10.0, two },
-        { 11.0, 11.0, 10.0, two },
-        { 11.0, 11.0, 11.0, three },
-        {  9.0, 11.0,  9.0, four },
-        {  9.0, 10.0,  9.0, four },
-        { 10.1, 10.0, 10.0, constValue(1.01) },
-        { 10.8, 10.8, 10.8, constValue(2.513344) },
-        { 10.1, 10.8, 10.5, constValue(1.8577) },
-        { 10.8, 10.1, 10.5, constValue(1.8577) },
-        { 10.5, 10.1, 10.8, constValue(2.2927) },
-        { 10.5, 10.8, 10.1, constValue(1.6977) },
+        { 10.5f, 10.5f, 10.5f, constValue(1.703125) },
+        { 10.0f, 10.0f, 10.0f, one },
+        { 11.0f, 10.0f, 10.0f, two },
+        { 11.0f, 11.0f, 10.0f, two },
+        { 11.0f, 11.0f, 11.0f, three },
+        {  9.0f, 11.0f,  9.0f, four },
+        {  9.0f, 10.0f,  9.0f, four },
+        { 10.1f, 10.0f, 10.0f, constValue(1.01) },
+        { 10.8f, 10.8f, 10.8f, constValue(2.513344) },
+        { 10.1f, 10.8f, 10.5f, constValue(1.8577) },
+        { 10.8f, 10.1f, 10.5f, constValue(1.8577) },
+        { 10.5f, 10.1f, 10.8f, constValue(2.2927) },
+        { 10.5f, 10.8f, 10.1f, constValue(1.6977) },
     };
     const size_t numVals = sizeof(testVals) / sizeof(TestVal);
 
@@ -216,7 +216,7 @@ TestQuadraticInterp<GridType>::testConstantValues()
     const ValueT
         two = constValue(2),
         fillValue = constValue(256);
-    
+
     GridPtr grid(new GridType(fillValue));
     typename GridType::TreeType& tree = grid->tree();
 
@@ -252,14 +252,14 @@ TestQuadraticInterp<GridType>::testConstantValues()
     tree.setValue(openvdb::Coord(11,  9, 9), two);
 
     const TestVal testVals[] = {
-        { 10.5, 10.5, 10.5, two },
-        { 10.0, 10.0, 10.0, two },
-        { 10.1, 10.0, 10.0, two },
-        { 10.8, 10.8, 10.8, two },
-        { 10.1, 10.8, 10.5, two },
-        { 10.8, 10.1, 10.5, two },
-        { 10.5, 10.1, 10.8, two },
-        { 10.5, 10.8, 10.1, two }
+        { 10.5f, 10.5f, 10.5f, two },
+        { 10.0f, 10.0f, 10.0f, two },
+        { 10.1f, 10.0f, 10.0f, two },
+        { 10.8f, 10.8f, 10.8f, two },
+        { 10.1f, 10.8f, 10.5f, two },
+        { 10.8f, 10.1f, 10.5f, two },
+        { 10.5f, 10.1f, 10.8f, two },
+        { 10.5f, 10.8f, 10.1f, two }
     };
     const size_t numVals = sizeof(testVals) / sizeof(TestVal);
 
@@ -276,14 +276,14 @@ TestQuadraticInterp<GridType>::testFillValues()
     GridPtr grid(new GridType(fillValue));
 
     const TestVal testVals[] = {
-        { 10.5, 10.5, 10.5, fillValue },
-        { 10.0, 10.0, 10.0, fillValue },
-        { 10.1, 10.0, 10.0, fillValue },
-        { 10.8, 10.8, 10.8, fillValue },
-        { 10.1, 10.8, 10.5, fillValue },
-        { 10.8, 10.1, 10.5, fillValue },
-        { 10.5, 10.1, 10.8, fillValue },
-        { 10.5, 10.8, 10.1, fillValue }
+        { 10.5f, 10.5f, 10.5f, fillValue },
+        { 10.0f, 10.0f, 10.0f, fillValue },
+        { 10.1f, 10.0f, 10.0f, fillValue },
+        { 10.8f, 10.8f, 10.8f, fillValue },
+        { 10.1f, 10.8f, 10.5f, fillValue },
+        { 10.8f, 10.1f, 10.5f, fillValue },
+        { 10.5f, 10.1f, 10.8f, fillValue },
+        { 10.5f, 10.8f, 10.1f, fillValue }
     };
     const size_t numVals = sizeof(testVals) / sizeof(TestVal);
 
@@ -337,25 +337,25 @@ TestQuadraticInterp<GridType>::testNegativeIndices()
     tree.setValue(openvdb::Coord(-11,  -9, -9), four);
 
     const TestVal testVals[] = {
-        { -10.5, -10.5, -10.5, constValue(-104.75586) },
-        { -10.0, -10.0, -10.0, one },
-        { -11.0, -10.0, -10.0, two },
-        { -11.0, -11.0, -10.0, two },
-        { -11.0, -11.0, -11.0, three },
-        {  -9.0, -11.0,  -9.0, four },
-        {  -9.0, -10.0,  -9.0, four },
-        { -10.1, -10.0, -10.0, constValue(-10.28504) },
-        { -10.8, -10.8, -10.8, constValue(-62.84878) },
-        { -10.1, -10.8, -10.5, constValue(-65.68951) },
-        { -10.8, -10.1, -10.5, constValue(-65.68951) },
-        { -10.5, -10.1, -10.8, constValue(-65.40736) },
-        { -10.5, -10.8, -10.1, constValue(-66.30510) },
+        { -10.5f, -10.5f, -10.5f, constValue(-104.75586) },
+        { -10.0f, -10.0f, -10.0f, one },
+        { -11.0f, -10.0f, -10.0f, two },
+        { -11.0f, -11.0f, -10.0f, two },
+        { -11.0f, -11.0f, -11.0f, three },
+        {  -9.0f, -11.0f,  -9.0f, four },
+        {  -9.0f, -10.0f,  -9.0f, four },
+        { -10.1f, -10.0f, -10.0f, constValue(-10.28504) },
+        { -10.8f, -10.8f, -10.8f, constValue(-62.84878) },
+        { -10.1f, -10.8f, -10.5f, constValue(-65.68951) },
+        { -10.8f, -10.1f, -10.5f, constValue(-65.68951) },
+        { -10.5f, -10.1f, -10.8f, constValue(-65.40736) },
+        { -10.5f, -10.8f, -10.1f, constValue(-66.30510) },
     };
     const size_t numVals = sizeof(testVals) / sizeof(TestVal);
 
     executeTest(grid, testVals, numVals);
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

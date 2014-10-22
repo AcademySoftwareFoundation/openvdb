@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -51,7 +51,7 @@ public:
     static std::string testSuiteName()
     {
         std::string name = openvdb::typeNameAsString<T>();
-        if (!name.empty()) name[0] = ::toupper(name[0]);
+        if (!name.empty()) name[0] = static_cast<char>(::toupper(name[0]));
         return "TestMetadataIO" + name;
     }
 
@@ -259,6 +259,6 @@ TestMetadataIO<openvdb::Vec2i>::testMultiple()
     CPPUNIT_ASSERT(tm2.value() == Vec2i(3, 4));
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

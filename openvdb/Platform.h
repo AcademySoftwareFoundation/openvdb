@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -62,7 +62,7 @@
     #endif
 #elif defined(__clang__)
     #ifndef _LIBCPP_VERSION
-	#include <ciso646>
+        #include <ciso646>
     #endif
     #ifdef _LIBCPP_VERSION
         #define OPENVDB_HAS_CXX11 1
@@ -197,6 +197,6 @@ using boost::uint64_t;
 
 #endif // OPENVDB_PLATFORM_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

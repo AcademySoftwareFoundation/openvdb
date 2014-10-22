@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -48,7 +48,7 @@ public:
     CPPUNIT_TEST(testMaps);
     CPPUNIT_TEST(testLinearTransform);
     CPPUNIT_TEST(testFrustumTransform);
-    
+
     CPPUNIT_TEST_SUITE_END();
 
     void testMat4();
@@ -119,22 +119,22 @@ void
 TestPrePostAPI::testMat4Rotate()
 {
     using namespace openvdb::math;
-        
+
     double TOL = 1e-7;
-    
+
     Mat4d rx, ry, rz;
     const double angle1 = 20. * M_PI / 180.;
-    const double angle2 = 64. * M_PI / 180.; 
-    const double angle3 = 125. *M_PI / 180.; 
+    const double angle2 = 64. * M_PI / 180.;
+    const double angle3 = 125. *M_PI / 180.;
     rx.setToRotation(Vec3d(1,0,0), angle1);
     ry.setToRotation(Vec3d(0,1,0), angle2);
     rz.setToRotation(Vec3d(0,0,1), angle3);
-    
+
     Mat4d shear = Mat4d::identity();
     shear.setToShear(X_AXIS, Z_AXIS, 2.0);
     shear.preShear(Y_AXIS, X_AXIS, 3.0);
     shear.preTranslate(Vec3d(2,4,1));
-    
+
     const Mat4d preResult = rz*ry*rx*shear;
     Mat4d mpre = shear;
     mpre.preRotate(X_AXIS, angle1);
@@ -142,7 +142,7 @@ TestPrePostAPI::testMat4Rotate()
     mpre.preRotate(Z_AXIS, angle3);
 
     CPPUNIT_ASSERT( mpre.eq(preResult, TOL) );
-    
+
     const Mat4d postResult = shear*rx*ry*rz;
     Mat4d mpost = shear;
     mpost.postRotate(X_AXIS, angle1);
@@ -150,7 +150,7 @@ TestPrePostAPI::testMat4Rotate()
     mpost.postRotate(Z_AXIS, angle3);
 
     CPPUNIT_ASSERT( mpost.eq(postResult, TOL) );
-    
+
     CPPUNIT_ASSERT( !mpost.eq(mpre, TOL));
 
 }
@@ -160,18 +160,18 @@ void
 TestPrePostAPI::testMat4Scale()
 {
     using namespace openvdb::math;
-        
+
     double TOL = 1e-7;
-    
+
     Mat4d mpre, mpost;
     double* pre  = mpre.asPointer();
-    double* post = mpost.asPointer(); 
+    double* post = mpost.asPointer();
     for (int i = 0; i < 16; ++i) {
         pre[i] = double(i);
         post[i] = double(i);
     }
 
-    Mat4d scale = Mat4d::identity(); 
+    Mat4d scale = Mat4d::identity();
     scale.setToScale(Vec3d(2, 3, 5.5));
     Mat4d preResult = scale * mpre;
     Mat4d postResult = mpost * scale;
@@ -188,18 +188,18 @@ void
 TestPrePostAPI::testMat4Shear()
 {
     using namespace openvdb::math;
-        
+
     double TOL = 1e-7;
-    
+
     Mat4d mpre, mpost;
     double* pre  = mpre.asPointer();
-    double* post = mpost.asPointer(); 
+    double* post = mpost.asPointer();
     for (int i = 0; i < 16; ++i) {
         pre[i] = double(i);
         post[i] = double(i);
     }
 
-    Mat4d shear = Mat4d::identity(); 
+    Mat4d shear = Mat4d::identity();
     shear.setToShear(X_AXIS, Z_AXIS, 13.);
     Mat4d preResult = shear * mpre;
     Mat4d postResult = mpost * shear;
@@ -216,16 +216,16 @@ void
 TestPrePostAPI::testMaps()
 {
     using namespace openvdb::math;
-        
+
     double TOL = 1e-7;
 
-    { // pre translate 
+    { // pre translate
         UniformScaleMap usm;
         UniformScaleTranslateMap ustm;
         ScaleMap sm;
         ScaleTranslateMap stm;
         AffineMap am;
-        
+
         const Vec3d trans(1,2,3);
         Mat4d correct = Mat4d::identity();
         correct.preTranslate(trans);
@@ -257,7 +257,7 @@ TestPrePostAPI::testMaps()
         ScaleMap sm;
         ScaleTranslateMap stm;
         AffineMap am;
-        
+
         const Vec3d trans(1,2,3);
         Mat4d correct = Mat4d::identity();
         correct.postTranslate(trans);
@@ -288,7 +288,7 @@ TestPrePostAPI::testMaps()
         ScaleMap sm;
         ScaleTranslateMap stm;
         AffineMap am;
-        
+
         const Vec3d scale(1,2,3);
         Mat4d correct = Mat4d::identity();
         correct.preScale(scale);
@@ -319,7 +319,7 @@ TestPrePostAPI::testMaps()
         ScaleMap sm;
         ScaleTranslateMap stm;
         AffineMap am;
-        
+
         const Vec3d scale(1,2,3);
         Mat4d correct = Mat4d::identity();
         correct.postScale(scale);
@@ -350,7 +350,7 @@ TestPrePostAPI::testMaps()
         ScaleMap sm;
         ScaleTranslateMap stm;
         AffineMap am;
-        
+
         Mat4d correct = Mat4d::identity();
         correct.preShear(X_AXIS, Z_AXIS, 13.);
         {
@@ -380,7 +380,7 @@ TestPrePostAPI::testMaps()
         ScaleMap sm;
         ScaleTranslateMap stm;
         AffineMap am;
-        
+
         Mat4d correct = Mat4d::identity();
         correct.postShear(X_AXIS, Z_AXIS, 13.);
         {
@@ -411,7 +411,7 @@ TestPrePostAPI::testMaps()
         ScaleMap sm;
         ScaleTranslateMap stm;
         AffineMap am;
-        
+
         Mat4d correct = Mat4d::identity();
         correct.preRotate(X_AXIS, angle1);
         {
@@ -442,7 +442,7 @@ TestPrePostAPI::testMaps()
         ScaleMap sm;
         ScaleTranslateMap stm;
         AffineMap am;
-        
+
         Mat4d correct = Mat4d::identity();
         correct.postRotate(X_AXIS, angle1);
         {
@@ -478,7 +478,7 @@ TestPrePostAPI::testLinearTransform()
     {
         Transform::Ptr t = Transform::createLinearTransform(1.f);
         Transform::Ptr tinv = Transform::createLinearTransform(1.f);
-        
+
         // create matrix with pre-API
         // Translate Shear Rotate Translate Scale matrix
         t->preScale(Vec3d(1, 2, 3));
@@ -486,27 +486,27 @@ TestPrePostAPI::testLinearTransform()
         t->preRotate(20);
         t->preShear(2, X_AXIS, Y_AXIS);
         t->preTranslate(Vec3d(2, 2, 2));
-        
+
         // create inverse using the post-API
         tinv->postScale(Vec3d(1.f, 1.f/2.f, 1.f/3.f));
         tinv->postTranslate(-Vec3d(2, 3, 4));
         tinv->postRotate(-20);
         tinv->postShear(-2, X_AXIS, Y_AXIS);
         tinv->postTranslate(-Vec3d(2, 2, 2));
-        
-        
+
+
         // test this by verifying that equvilent interal matrix
         // represenations are inverses
         Mat4d m = t->baseMap()->getAffineMap()->getMat4();
         Mat4d minv = tinv->baseMap()->getAffineMap()->getMat4();
-        
+
         Mat4d mtest = minv * m;
-        
+
         // verify that the results is an identity
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[0][0], 1, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[1][1], 1, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[2][2], 1, TOL);
-        
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[0][1], 0, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[0][2], 0, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[0][3], 0, TOL);
@@ -516,19 +516,19 @@ TestPrePostAPI::testLinearTransform()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[2][0], 0, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[2][1], 0, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[2][3], 0, TOL);
-        
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[3][0], 0, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[3][1], 0, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[3][2], 0, TOL);
-        
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[3][3], 1, TOL);
     }
 
-    { 
+    {
         Transform::Ptr t = Transform::createLinearTransform(1.f);
 
         Mat4d m = Mat4d::identity();
-        
+
         // create matrix with pre-API
         // Translate Shear Rotate Translate Scale matrix
         m.preScale(Vec3d(1, 2, 3));
@@ -536,31 +536,31 @@ TestPrePostAPI::testLinearTransform()
         m.preRotate(X_AXIS, 20);
         m.preShear(X_AXIS, Y_AXIS, 2);
         m.preTranslate(Vec3d(2, 2, 2));
-        
+
         t->preScale(Vec3d(1,2,3));
         t->preMult(m);
         t->postMult(m);
-    
+
         Mat4d minv = Mat4d::identity();
-        
+
         // create inverse using the post-API
         minv.postScale(Vec3d(1.f, 1.f/2.f, 1.f/3.f));
         minv.postTranslate(-Vec3d(2, 3, 4));
         minv.postRotate(X_AXIS,-20);
         minv.postShear(X_AXIS, Y_AXIS, -2);
         minv.postTranslate(-Vec3d(2, 2, 2));
-    
+
         t->preMult(minv);
         t->postMult(minv);
 
         Mat4d mtest = t->baseMap()->getAffineMap()->getMat4();
 
-      
+
         // verify that the results is the scale
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[0][0], 1, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[1][1], 2, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[2][2], 3, 1e-6);
-        
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[0][1], 0, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[0][2], 0, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[0][3], 0, TOL);
@@ -570,15 +570,15 @@ TestPrePostAPI::testLinearTransform()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[2][0], 0, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[2][1], 0, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[2][3], 0, TOL);
-        
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[3][0], 0, 1e-6);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[3][1], 0, 1e-6);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[3][2], 0, TOL);
-        
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[3][3], 1, TOL);
     }
-        
-        
+
+
 }
 
 
@@ -586,7 +586,7 @@ void
 TestPrePostAPI::testFrustumTransform()
 {
     using namespace openvdb::math;
-    
+
     typedef BBox<Vec3d> BBoxd;
 
     double TOL = 1e-7;
@@ -595,8 +595,8 @@ TestPrePostAPI::testFrustumTransform()
         BBoxd bbox(Vec3d(-5,-5,0), Vec3d(5,5,10));
         Transform::Ptr t = Transform::createFrustumTransform(bbox, /* taper*/ 1, /*depth*/10, /* voxel size */1.f);
         Transform::Ptr tinv = Transform::createFrustumTransform(bbox, /* taper*/ 1, /*depth*/10, /* voxel size */1.f);
-    
-        
+
+
         // create matrix with pre-API
         // Translate Shear Rotate Translate Scale matrix
         t->preScale(Vec3d(1, 2, 3));
@@ -604,30 +604,30 @@ TestPrePostAPI::testFrustumTransform()
         t->preRotate(20);
         t->preShear(2, X_AXIS, Y_AXIS);
         t->preTranslate(Vec3d(2, 2, 2));
-        
+
         // create inverse using the post-API
         tinv->postScale(Vec3d(1.f, 1.f/2.f, 1.f/3.f));
         tinv->postTranslate(-Vec3d(2, 3, 4));
         tinv->postRotate(-20);
         tinv->postShear(-2, X_AXIS, Y_AXIS);
         tinv->postTranslate(-Vec3d(2, 2, 2));
-        
-        
+
+
         // test this by verifying that equvilent interal matrix
         // represenations are inverses
         NonlinearFrustumMap::Ptr frustum = boost::static_pointer_cast<NonlinearFrustumMap, MapBase>( t->baseMap() );
-        NonlinearFrustumMap::Ptr frustuminv = boost::static_pointer_cast<NonlinearFrustumMap, MapBase>( tinv->baseMap() ); 
-            
+        NonlinearFrustumMap::Ptr frustuminv = boost::static_pointer_cast<NonlinearFrustumMap, MapBase>( tinv->baseMap() );
+
         Mat4d m = frustum->secondMap().getMat4();
         Mat4d minv = frustuminv->secondMap().getMat4();
-        
+
         Mat4d mtest = minv * m;
-        
+
         // verify that the results is an identity
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[0][0], 1, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[1][1], 1, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[2][2], 1, TOL);
-        
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[0][1], 0, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[0][2], 0, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[0][3], 0, TOL);
@@ -637,22 +637,22 @@ TestPrePostAPI::testFrustumTransform()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[2][0], 0, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[2][1], 0, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[2][3], 0, TOL);
-        
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[3][0], 0, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[3][1], 0, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[3][2], 0, TOL);
-        
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[3][3], 1, TOL);
     }
 
     {
-        
+
         BBoxd bbox(Vec3d(-5,-5,0), Vec3d(5,5,10));
         Transform::Ptr t = Transform::createFrustumTransform(bbox, /* taper*/ 1, /*depth*/10, /* voxel size */1.f);
 
 
         Mat4d m = Mat4d::identity();
-        
+
         // create matrix with pre-API
         // Translate Shear Rotate Translate Scale matrix
         m.preScale(Vec3d(1, 2, 3));
@@ -660,20 +660,20 @@ TestPrePostAPI::testFrustumTransform()
         m.preRotate(X_AXIS, 20);
         m.preShear(X_AXIS, Y_AXIS, 2);
         m.preTranslate(Vec3d(2, 2, 2));
-        
+
         t->preScale(Vec3d(1,2,3));
         t->preMult(m);
         t->postMult(m);
-    
+
         Mat4d minv = Mat4d::identity();
-        
+
         // create inverse using the post-API
         minv.postScale(Vec3d(1.f, 1.f/2.f, 1.f/3.f));
         minv.postTranslate(-Vec3d(2, 3, 4));
         minv.postRotate(X_AXIS,-20);
         minv.postShear(X_AXIS, Y_AXIS, -2);
         minv.postTranslate(-Vec3d(2, 2, 2));
-    
+
         t->preMult(minv);
         t->postMult(minv);
 
@@ -684,7 +684,7 @@ TestPrePostAPI::testFrustumTransform()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[0][0], 1, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[1][1], 2, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[2][2], 3, 1e-6);
-        
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[0][1], 0, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[0][2], 0, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[0][3], 0, TOL);
@@ -694,18 +694,18 @@ TestPrePostAPI::testFrustumTransform()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[2][0], 0, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[2][1], 0, TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[2][3], 0, TOL);
-        
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[3][0], 0, 1e-6);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[3][1], 0, 1e-6);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[3][2], 0, TOL);
-        
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL(mtest[3][3], 1, TOL);
     }
-        
-        
+
+
 }
 
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

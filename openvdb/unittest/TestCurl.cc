@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -73,8 +73,6 @@ TestCurl::testCurlTool()
 {
     using namespace openvdb;
 
-    typedef VectorGrid::ConstAccessor Accessor;
-
     VectorGrid::Ptr inGrid = VectorGrid::create();
     const VectorTree& inTree = inGrid->tree();
     CPPUNIT_ASSERT(inTree.empty());
@@ -84,7 +82,8 @@ TestCurl::testCurlTool()
     for (int x = -dim; x<dim; ++x) {
         for (int y = -dim; y<dim; ++y) {
             for (int z = -dim; z<dim; ++z) {
-                inAccessor.setValue(Coord(x,y,z),VectorTree::ValueType(y,-x,0));
+                inAccessor.setValue(Coord(x,y,z),
+                    VectorTree::ValueType(float(y), float(-x), 0.f));
             }
         }
     }
@@ -121,8 +120,6 @@ TestCurl::testCurlMaskedTool()
 {
     using namespace openvdb;
 
-    typedef VectorGrid::ConstAccessor Accessor;
-
     VectorGrid::Ptr inGrid = VectorGrid::create();
     const VectorTree& inTree = inGrid->tree();
     CPPUNIT_ASSERT(inTree.empty());
@@ -132,13 +129,14 @@ TestCurl::testCurlMaskedTool()
     for (int x = -dim; x<dim; ++x) {
         for (int y = -dim; y<dim; ++y) {
             for (int z = -dim; z<dim; ++z) {
-                inAccessor.setValue(Coord(x,y,z),VectorTree::ValueType(y,-x,0));
+                inAccessor.setValue(Coord(x,y,z),
+                    VectorTree::ValueType(float(y), float(-x), 0.f));
             }
         }
     }
     CPPUNIT_ASSERT(!inTree.empty());
     CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
-    
+
     openvdb::CoordBBox maskBBox(openvdb::Coord(0), openvdb::Coord(dim));
     BoolGrid::Ptr maskGrid = BoolGrid::create(false);
     maskGrid->fill(maskBBox, true /*value*/, true /*activate*/);
@@ -146,9 +144,9 @@ TestCurl::testCurlMaskedTool()
     openvdb::CoordBBox testBBox(openvdb::Coord(-dim+1), openvdb::Coord(dim));
     BoolGrid::Ptr testGrid = BoolGrid::create(false);
     testGrid->fill(testBBox, true, true);
-    
+
     testGrid->topologyIntersection(*maskGrid);
-    
+
 
     VectorGrid::Ptr curl_grid = tools::curl(*inGrid, *maskGrid);
     CPPUNIT_ASSERT_EQUAL(math::Pow3(dim), int(curl_grid->activeVoxelCount()));
@@ -160,17 +158,17 @@ TestCurl::testCurlMaskedTool()
             for (int z = -dim; z<dim; ++z) {
                 Coord xyz(x,y,z);
                 VectorTree::ValueType v = inAccessor.getValue(xyz);
-             
+
                 ASSERT_DOUBLES_EXACTLY_EQUAL( y,v[0]);
                 ASSERT_DOUBLES_EXACTLY_EQUAL(-x,v[1]);
                 ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[2]);
-             
+
                 v = curlAccessor.getValue(xyz);
                 if (maskBBox.isInside(xyz)) {
                     ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[0]);
                     ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[1]);
                     ASSERT_DOUBLES_EXACTLY_EQUAL(-2,v[2]);
-                } else { 
+                } else {
                     // get the background value outside masked region
                     ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[0]);
                     ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[1]);
@@ -187,8 +185,6 @@ TestCurl::testISCurl()
 {
     using namespace openvdb;
 
-    typedef VectorGrid::ConstAccessor Accessor;
-
     VectorGrid::Ptr inGrid = VectorGrid::create();
     const VectorTree& inTree = inGrid->tree();
     CPPUNIT_ASSERT(inTree.empty());
@@ -198,7 +194,8 @@ TestCurl::testISCurl()
     for (int x = -dim; x<dim; ++x) {
         for (int y = -dim; y<dim; ++y) {
             for (int z = -dim; z<dim; ++z) {
-                inAccessor.setValue(Coord(x,y,z),VectorTree::ValueType(y,-x,0));
+                inAccessor.setValue(Coord(x,y,z),
+                    VectorTree::ValueType(float(y), float(-x), 0.f));
             }
         }
     }
@@ -210,7 +207,7 @@ TestCurl::testISCurl()
 
     --dim;//ignore boundary curl vectors
     // test unit space operators
-    Accessor inConstAccessor = inGrid->getConstAccessor();
+    VectorGrid::ConstAccessor inConstAccessor = inGrid->getConstAccessor();
     for (int x = -dim; x<dim; ++x) {
         for (int y = -dim; y<dim; ++y) {
             for (int z = -dim; z<dim; ++z) {
@@ -303,8 +300,6 @@ TestCurl::testISCurlStencil()
 {
     using namespace openvdb;
 
-    typedef VectorGrid::ConstAccessor Accessor;
-
     VectorGrid::Ptr inGrid = VectorGrid::create();
     const VectorTree& inTree = inGrid->tree();
     CPPUNIT_ASSERT(inTree.empty());
@@ -314,7 +309,8 @@ TestCurl::testISCurlStencil()
     for (int x = -dim; x<dim; ++x) {
         for (int y = -dim; y<dim; ++y) {
             for (int z = -dim; z<dim; ++z) {
-                inAccessor.setValue(Coord(x,y,z),VectorTree::ValueType(y,-x,0));
+                inAccessor.setValue(Coord(x,y,z),
+                    VectorTree::ValueType(float(y), float(-x), 0.f));
             }
         }
     }
@@ -431,8 +427,6 @@ TestCurl::testWSCurl()
 {
     using namespace openvdb;
 
-    typedef VectorGrid::ConstAccessor Accessor;
-
     VectorGrid::Ptr inGrid = VectorGrid::create();
     const VectorTree& inTree = inGrid->tree();
     CPPUNIT_ASSERT(inTree.empty());
@@ -442,7 +436,8 @@ TestCurl::testWSCurl()
     for (int x = -dim; x<dim; ++x) {
         for (int y = -dim; y<dim; ++y) {
             for (int z = -dim; z<dim; ++z) {
-                inAccessor.setValue(Coord(x,y,z),VectorTree::ValueType(y,-x,0));
+                inAccessor.setValue(Coord(x,y,z),
+                    VectorTree::ValueType(float(y), float(-x), 0.f));
             }
         }
     }
@@ -486,17 +481,20 @@ TestCurl::testWSCurl()
                 ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[1]);
                 ASSERT_DOUBLES_EXACTLY_EQUAL(-2,v[2]);
 
-                v = math::Curl<math::UniformScaleMap, math::CD_2ND>::result(uniform_map, inAccessor, xyz);
+                v = math::Curl<math::UniformScaleMap, math::CD_2ND>::result(
+                    uniform_map, inAccessor, xyz);
                 ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[0]);
                 ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[1]);
                 ASSERT_DOUBLES_EXACTLY_EQUAL(-2,v[2]);
 
-                v = math::Curl<math::UniformScaleMap, math::FD_1ST>::result(uniform_map, inAccessor, xyz);
+                v = math::Curl<math::UniformScaleMap, math::FD_1ST>::result(
+                    uniform_map, inAccessor, xyz);
                 ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[0]);
                 ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[1]);
                 ASSERT_DOUBLES_EXACTLY_EQUAL(-2,v[2]);
 
-                v = math::Curl<math::UniformScaleMap, math::BD_1ST>::result(uniform_map, inAccessor, xyz);
+                v = math::Curl<math::UniformScaleMap, math::BD_1ST>::result(
+                    uniform_map, inAccessor, xyz);
                 ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[0]);
                 ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[1]);
                 ASSERT_DOUBLES_EXACTLY_EQUAL(-2,v[2]);
@@ -511,8 +509,6 @@ TestCurl::testWSCurlStencil()
 {
     using namespace openvdb;
 
-    typedef VectorGrid::ConstAccessor Accessor;
-
     VectorGrid::Ptr inGrid = VectorGrid::create();
     const VectorTree& inTree = inGrid->tree();
     CPPUNIT_ASSERT(inTree.empty());
@@ -522,7 +518,8 @@ TestCurl::testWSCurlStencil()
     for (int x = -dim; x<dim; ++x) {
         for (int y = -dim; y<dim; ++y) {
             for (int z = -dim; z<dim; ++z) {
-                inAccessor.setValue(Coord(x,y,z),VectorTree::ValueType(y,-x,0));
+                inAccessor.setValue(Coord(x,y,z),
+                    VectorTree::ValueType(float(y), float(-x), 0.f));
             }
         }
     }
@@ -590,6 +587,6 @@ TestCurl::testWSCurlStencil()
     }
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

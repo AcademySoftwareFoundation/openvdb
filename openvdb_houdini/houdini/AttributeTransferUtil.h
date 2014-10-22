@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -204,7 +204,7 @@ template <> inline openvdb::Vec3d
 combine(const openvdb::Vec3d& v0, const openvdb::Vec3d& v1,
     const openvdb::Vec3d& v2, const openvdb::Vec3d& w)
 {
-    openvdb::Vec3s vec;
+    openvdb::Vec3d vec;
 
     vec[0] = v0[0] * w[0] + v1[0] * w[1] + v2[0] * w[2];
     vec[1] = v0[1] * w[0] + v1[1] * w[1] + v2[1] * w[2];
@@ -548,7 +548,8 @@ MeshAttrTransfer::operator()(IterRange &range) const
     openvdb::Int32Tree::LeafNodeType::ValueOnCIter iter;
 
     openvdb::Coord ijk;
-    unsigned int vtx, vtxn;
+    unsigned int vtx;
+    GA_Size vtxn;
 
     const bool ptnAttrTransfer = mPointAttributes.size() > 0;
     const bool vtxAttrTransfer = mVertexAttributes.size() > 0;
@@ -1004,7 +1005,7 @@ findClosestPrimitiveToPoint(
     const GU_Detail& geo, std::vector<GA_Index>& primitives, const openvdb::Vec3d& p,
     GA_Offset& vert0, GA_Offset& vert1, GA_Offset& vert2, openvdb::Vec3d& uvw)
 {
-    GA_Offset primOffset;
+    GA_Offset primOffset = GA_INVALID_OFFSET;
     const GA_Primitive * primRef = NULL;
     double minDist = std::numeric_limits<double>::max();
 
@@ -1116,6 +1117,8 @@ template<class GridType>
 void
 TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& range) const
 {
+    typedef typename GridType::ValueType IndexT;
+
     GA_Offset start, end, source, target, v0, v1, v2;
     const GA_Primitive * primRef = NULL;
     GA_Primitive::const_iterator vtxIt;
@@ -1161,15 +1164,15 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
 
                     primitives.clear();
                     similar_primitives.clear();
-                    int primIndex;
+                    IndexT primIndex;
 
                     for (int d = 0; d < 8; ++d) {
-                        ijk[0] = coord[0] + ((d & 0x02) >> 1 ^ d & 0x01);
+                        ijk[0] = coord[0] + (((d & 0x02) >> 1) ^ (d & 0x01));
                         ijk[1] = coord[1] + ((d & 0x02) >> 1);
                         ijk[2] = coord[2] + ((d & 0x04) >> 2);
 
                         if (acc.probeValue(ijk, primIndex) &&
-                            primIndex != openvdb::util::INVALID_IDX) {
+                            openvdb::Index32(primIndex) != openvdb::util::INVALID_IDX) {
 
                             GA_Offset tmpOffset = mSourceGeo.primitiveOffset(primIndex);
                             sourceN = mSourceGeo.getGEOPrimitive(tmpOffset)->computeNormal();
@@ -1218,12 +1221,12 @@ TransferPrimitiveAttributesOp<GridType>::operator()(const GA_SplittableRange& ra
                         similar_primitives.clear();
 
                         for (int d = 0; d < 8; ++d) {
-                            ijk[0] = coord[0] + ((d & 0x02) >> 1 ^ d & 0x01);
+                            ijk[0] = coord[0] + (((d & 0x02) >> 1) ^ (d & 0x01));
                             ijk[1] = coord[1] + ((d & 0x02) >> 1);
                             ijk[2] = coord[2] + ((d & 0x04) >> 2);
 
                             if (acc.probeValue(ijk, primIndex) &&
-                                primIndex != openvdb::util::INVALID_IDX) {
+                                openvdb::Index32(primIndex) != openvdb::util::INVALID_IDX) {
 
                                 GA_Offset tmpOffset = mSourceGeo.primitiveOffset(primIndex);
                                 sourceN = mSourceGeo.getGEOPrimitive(tmpOffset)->computeNormal();
@@ -1293,6 +1296,8 @@ template<class GridType>
 void
 TransferPointAttributesOp<GridType>::operator()(const GA_SplittableRange& range) const
 {
+    typedef typename GridType::ValueType IndexT;
+
     GA_Offset start, end, vtxOffset, primOffset, target, v0, v1, v2;
 
     typename GridType::ConstAccessor acc = mIndexGrid.getConstAccessor();
@@ -1338,15 +1343,15 @@ TransferPointAttributesOp<GridType>::operator()(const GA_SplittableRange& range)
                 coord[2] = int(std::floor(indexPos[2]));
 
                 primitives.clear();
-                int primIndex;
+                IndexT primIndex;
 
                 for (int d = 0; d < 8; ++d) {
-                    ijk[0] = coord[0] + ((d & 0x02) >> 1 ^ d & 0x01);
+                    ijk[0] = coord[0] + (((d & 0x02) >> 1) ^ (d & 0x01));
                     ijk[1] = coord[1] + ((d & 0x02) >> 1);
                     ijk[2] = coord[2] + ((d & 0x04) >> 2);
 
                     if (acc.probeValue(ijk, primIndex) &&
-                        primIndex != openvdb::util::INVALID_IDX) {
+                        openvdb::Index32(primIndex) != openvdb::util::INVALID_IDX) {
                         primitives.push_back(primIndex);
                     }
                 }
@@ -1466,6 +1471,6 @@ transferPrimitiveAttributes(
 
 #endif // OPENVDB_HOUDINI_ATTRIBUTE_TRANSFER_UTIL_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

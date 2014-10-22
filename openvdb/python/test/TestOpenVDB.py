@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-# Copyright (c) 2012-2013 DreamWorks Animation LLC
+# Copyright (c) 2012-2014 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -672,6 +672,107 @@ class TestOpenVDB(unittest.TestCase):
                 self.assertEqual(np.amax(arr), BG)
 
 
+    def testMeshConversion(self):
+        import time
+
+        # Skip this test if NumPy is not available.
+        try:
+            import numpy as np
+        except ImportError:
+            return
+
+        # Test mesh to volume conversion.
+
+        # Generate the vertices of a cube.
+        cubeVertices = [(x, y, z) for x in (0, 100) for y in (0, 100) for z in (0, 100)]
+        cubePoints = np.array(cubeVertices, float)
+
+        # Generate the faces of a cube.
+        cubeQuads = np.array([
+            (0, 1, 3, 2), # left
+            (0, 2, 6, 4), # front
+            (4, 6, 7, 5), # right
+            (5, 7, 3, 1), # back
+            (2, 3, 7, 6), # top
+            (0, 4, 5, 1), # bottom
+        ], float)
+
+        voxelSize = 2.0
+        halfWidth = 3.0
+        xform = openvdb.createLinearTransform(voxelSize)
+
+        # Only scalar, floating-point grids support createLevelSetFromPolygons()
+        # (and the OpenVDB module might have been compiled without DoubleGrid support).
+        grids = []
+        for gridType in [n for n in openvdb.GridTypes
+            if n.__name__ in ('FloatGrid', 'DoubleGrid')]:
+
+            # Skip this test if the OpenVDB module was built without NumPy support.
+            try:
+                grid = gridType.createLevelSetFromPolygons(
+                    cubePoints, quads=cubeQuads, transform=xform, halfWidth=halfWidth)
+            except NotImplementedError:
+                return
+
+            #openvdb.write('/tmp/testMeshConversion.vdb', grid)
+
+            self.assertEqual(grid.transform, xform)
+            self.assertEqual(grid.background, halfWidth * voxelSize)
+
+            dim = grid.evalActiveVoxelDim()
+            self.assert_(50 < dim[0] < 58)
+            self.assert_(50 < dim[1] < 58)
+            self.assert_(50 < dim[2] < 58)
+
+            grids.append(grid)
+
+        # Boolean-valued grids can't be used to store level sets.
+        self.assertRaises(TypeError, lambda: openvdb.BoolGrid.createLevelSetFromPolygons(
+            cubePoints, quads=cubeQuads, transform=xform, halfWidth=halfWidth))
+        # Vector-valued grids can't be used to store level sets.
+        self.assertRaises(TypeError, lambda: openvdb.Vec3SGrid.createLevelSetFromPolygons(
+            cubePoints, quads=cubeQuads, transform=xform, halfWidth=halfWidth))
+        # The "points" argument to createLevelSetFromPolygons() must be a NumPy array.
+        self.assertRaises(TypeError, lambda: openvdb.FloatGrid.createLevelSetFromPolygons(
+            cubeVertices, quads=cubeQuads, transform=xform, halfWidth=halfWidth))
+        # The "points" argument to createLevelSetFromPolygons() must be a NumPy float or int array.
+        self.assertRaises(TypeError, lambda: openvdb.FloatGrid.createLevelSetFromPolygons(
+            np.array(cubeVertices, bool), quads=cubeQuads, transform=xform, halfWidth=halfWidth))
+        # The "triangles" argument to createLevelSetFromPolygons() must be an N x 3 NumPy array.
+        self.assertRaises(TypeError, lambda: openvdb.FloatGrid.createLevelSetFromPolygons(
+            cubePoints, triangles=cubeQuads, transform=xform, halfWidth=halfWidth))
+
+        # Test volume to mesh conversion.
+
+        # Vector-valued grids can't be meshed.
+        self.assertRaises(TypeError, lambda: openvdb.Vec3SGrid().convertToQuads())
+
+        for grid in grids:
+            points, quads = grid.convertToQuads()
+
+            # These checks are intended mainly to test the Python/C++ bindings,
+            # not the OpenVDB volume to mesh converter.
+            self.assert_(len(points) > 8)
+            self.assert_(len(quads) > 6)
+            pmin, pmax = points.min(0), points.max(0)
+            self.assert_(-2 < pmin[0] < 2)
+            self.assert_(-2 < pmin[1] < 2)
+            self.assert_(-2 < pmin[2] < 2)
+            self.assert_(98 < pmax[0] < 102)
+            self.assert_(98 < pmax[1] < 102)
+            self.assert_(98 < pmax[2] < 102)
+
+            points, triangles, quads = grid.convertToPolygons(adaptivity=1)
+
+            self.assert_(len(points) > 8)
+            pmin, pmax = points.min(0), points.max(0)
+            self.assert_(-2 < pmin[0] < 2)
+            self.assert_(-2 < pmin[1] < 2)
+            self.assert_(-2 < pmin[2] < 2)
+            self.assert_(98 < pmax[0] < 102)
+            self.assert_(98 < pmax[1] < 102)
+            self.assert_(98 < pmax[2] < 102)
+
 
 if __name__ == '__main__':
     print 'Testing', os.path.dirname(openvdb.__file__)
@@ -692,6 +793,6 @@ if __name__ == '__main__':
     unittest.main(argv=args)
 
 
-# Copyright (c) 2012-2013 DreamWorks Animation LLC
+# Copyright (c) 2012-2014 DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

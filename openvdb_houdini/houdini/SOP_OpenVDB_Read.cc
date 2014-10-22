@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -53,6 +53,10 @@ public:
 
     static void registerSop(OP_OperatorTable*);
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
+
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    virtual int isRefInput(unsigned input) const { return (input == 0); }
+#endif
 
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
@@ -152,6 +156,13 @@ newSopOperator(OP_OperatorTable* table)
             "If enabled, output empty grids populated with\n"
             "their metadata and transforms only.\n"));
 
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    // Clipping toggle
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "clip", "Clip to Reference Bounds")
+        .setDefault(PRMzeroDefaults)
+        .setHelpText("Clip grids to the bounding box of the reference geometry."));
+#endif
+
     // Filename
     parms.add(hutil::ParmFactory(PRM_FILE, "file_name", "File Name")
         .setDefault(0, "./filename.vdb")
@@ -201,8 +212,38 @@ newSopOperator(OP_OperatorTable* table)
         .setCallbackFunc(&reloadCB)
         .setHelpText("Reread the VDB file."));
 
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    parms.add(hutil::ParmFactory(PRM_SEPARATOR, "sep1", "Sep"));
+
+    // Delayed loading
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "delayload", "Delay Loading")
+        .setDefault(PRMoneDefaults)
+        .setHelpText(
+            "Don't allocate memory for or read voxel values until the values\n"
+            "are actually accessed.\n\n"
+            "Delayed loading can significantly lower memory usage, but\n"
+            "note that viewport visualization of a volume usually requires\n"
+            "the entire volume to be loaded into memory."));
+
+    // Localization file size slider
+    parms.add(hutil::ParmFactory(PRM_FLT_J | PRM_TYPE_JOIN_NEXT,
+        "copylimit", "Copy if smaller than")
+        .setDefault(0.5f)
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
+        .setHelpText(
+            "When delayed loading is enabled, a file must not be modified on disk before\n"
+            "it has been fully read.  For safety, files smaller than the given size (in GB)\n"
+            "will be copied to a private, temporary location (either $OPENVDB_TEMP_DIR,\n"
+            "$TMPDIR or a system default temp directory)."));
+
+    parms.add(hutil::ParmFactory(PRM_LABEL, "copylimitlabel", "GB"));
+#endif
+
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Read", SOP_OpenVDB_Read::factory, parms, *table)
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+        .addOptionalInput("Optional Bounding Geometry")
+#endif
         .addAlias("OpenVDB Reader");
 }
 
@@ -236,6 +277,12 @@ SOP_OpenVDB_Read::updateParmsFlags()
     float t = 0.0;
 
     changed |= enableParm("group", evalInt("enable_grouping", 0, t));
+
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    const bool delayedLoad = evalInt("delayload", 0, t);
+    changed |= enableParm("copylimit", delayedLoad);
+    changed |= enableParm("copylimitlabel", delayedLoad);
+#endif
 
     return changed;
 }
@@ -285,13 +332,40 @@ SOP_OpenVDB_Read::cookMySop(OP_Context& context)
             //}
         }
 
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+        const bool delayedLoad = evalInt("delayload", 0, t);
+        const openvdb::Index64 copyMaxBytes =
+            openvdb::Index64(1.0e9 * evalFloat("copylimit", 0, t));
+
+        openvdb::BBoxd clipBBox;
+        bool clip = evalInt("clip", 0, t);
+        if (clip) {
+            if (const GU_Detail* clipGeo = inputGeo(0)) {
+                UT_BoundingBox box;
+                clipGeo->computeQuickBounds(box);
+                clipBBox.min()[0] = box.xmin();
+                clipBBox.min()[1] = box.ymin();
+                clipBBox.min()[2] = box.zmin();
+                clipBBox.max()[0] = box.xmax();
+                clipBBox.max()[1] = box.ymax();
+                clipBBox.max()[2] = box.zmax();
+            }
+            clip = clipBBox.isSorted();
+        }
+#endif
+
         UT_AutoInterrupt progress(("Reading " + filename).c_str());
 
         openvdb::io::File file(filename);
         openvdb::MetaMap::Ptr fileMetadata;
         try {
             // Open the VDB file, but don't read any grids yet.
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+            file.setCopyMaxBytes(copyMaxBytes);
+            file.open(delayedLoad);
+#else
             file.open();
+#endif
 
             // Read the file-level metadata.
             fileMetadata = file.getMetadata();
@@ -330,6 +404,10 @@ SOP_OpenVDB_Read::cookMySop(OP_Context& context)
             hvdb::GridPtr grid;
             if (readMetadataOnly) {
                 grid = file.readGridMetadata(gridName);
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+            } else if (clip) {
+                grid = file.readGrid(gridName, clipBBox);
+#endif
             } else {
                 grid = file.readGrid(gridName);
             }
@@ -368,6 +446,6 @@ SOP_OpenVDB_Read::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

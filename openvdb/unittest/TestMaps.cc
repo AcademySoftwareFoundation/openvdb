@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -71,34 +71,34 @@ void
 TestMaps::testApproxInverse()
 {
     using namespace openvdb::math;
-        
+
     Mat4d singular = Mat4d::identity();
     singular[1][1] = 0.f;
     {
         Mat4d singularInv = approxInverse(singular);
-        
+
         CPPUNIT_ASSERT( singular == singularInv );
     }
-    { 
+    {
         Mat4d rot = Mat4d::identity();
         rot.setToRotation(X_AXIS, M_PI/4.);
-        
+
         Mat4d rotInv = rot.inverse();
         Mat4d mat = rotInv * singular * rot;
-        
+
         Mat4d singularInv = approxInverse(mat);
 
         // this matrix is equal to its own singular inverse
         CPPUNIT_ASSERT( mat == singularInv );
 
     }
-    { 
+    {
         Mat4d m = Mat4d::identity();
         m[0][1] = 1;
-        
+
         // should give true inverse, since this matrix has det=1
         Mat4d minv = approxInverse(m);
-        
+
         Mat4d prod = m * minv;
         CPPUNIT_ASSERT( prod.eq( Mat4d::identity() ) );
     }
@@ -108,13 +108,13 @@ TestMaps::testApproxInverse()
         m[1][1] = 0;
         // should give true inverse, since this matrix has det=1
         Mat4d minv = approxInverse(m);
-        
+
         Mat4d expected = Mat4d::zero();
         expected[3][3] = 1;
         CPPUNIT_ASSERT( minv.eq(expected ) );
     }
-    
-  
+
+
 }
 
 
@@ -124,7 +124,7 @@ TestMaps::testUniformScale()
     using namespace openvdb::math;
 
     AffineMap map;
-    
+
     CPPUNIT_ASSERT(map.hasUniformScale());
 
     // Apply uniform scale: should still have square voxels
@@ -198,7 +198,7 @@ TestMaps::testTranslation()
     CPPUNIT_ASSERT_DOUBLES_EQUAL(result(1), 0, TOL);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(result(2), 0, TOL);
 
-  
+
 }
 
 void
@@ -212,20 +212,20 @@ TestMaps::testScaleDefault()
     // should be the identity
     ScaleMap::Ptr  scale(new ScaleMap());
     Vec3d unit(1, 1, 1);
-    
+
     Vec3d result = scale->applyMap(unit);
-    
+
     CPPUNIT_ASSERT_DOUBLES_EQUAL(unit(0), result(0), TOL);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(unit(1), result(1), TOL);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(unit(2), result(2), TOL);
-    
+
     result = scale->applyInverseMap(unit);
 
     CPPUNIT_ASSERT_DOUBLES_EQUAL(unit(0), result(0), TOL);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(unit(1), result(1), TOL);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(unit(2), result(2), TOL);
 
-    
+
     MapBase::Ptr inverse = scale->inverseMap();
     CPPUNIT_ASSERT(inverse->type() == ScaleMap::mapType());
     // apply the map forward and the inverse map back
@@ -234,7 +234,7 @@ TestMaps::testScaleDefault()
     CPPUNIT_ASSERT_DOUBLES_EQUAL(result(1), unit(1), TOL);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(result(2), unit(2), TOL);
 
-    
+
 }
 
 void
@@ -683,27 +683,27 @@ TestMaps::testJacobians()
     const double TOL = 1e-7;
     {
         AffineMap affine;
-        
+
         const int n = 10;
         const double dtheta = M_PI / n;
-        
+
         const Vec3d test(1,2,3);
         const Vec3d origin(0,0,0);
-        
+
         for (int i = 0; i < n; ++i) {
             double theta = i * dtheta;
-            
+
             affine.accumPostRotation(X_AXIS, theta);
-            
+
             Vec3d result = affine.applyJacobian(test);
             Vec3d expected = affine.applyMap(test) - affine.applyMap(origin);
-            
+
             CPPUNIT_ASSERT_DOUBLES_EQUAL(result(0), expected(0), TOL);
             CPPUNIT_ASSERT_DOUBLES_EQUAL(result(1), expected(1), TOL);
             CPPUNIT_ASSERT_DOUBLES_EQUAL(result(2), expected(2), TOL);
-            
+
             Vec3d tmp = affine.applyInverseJacobian(result);
-            
+
             CPPUNIT_ASSERT_DOUBLES_EQUAL(tmp(0), test(0), TOL);
             CPPUNIT_ASSERT_DOUBLES_EQUAL(tmp(1), test(1), TOL);
             CPPUNIT_ASSERT_DOUBLES_EQUAL(tmp(2), test(2), TOL);
@@ -714,37 +714,37 @@ TestMaps::testJacobians()
         UniformScaleMap scale(3);
         const Vec3d test(1,2,3);
         const Vec3d origin(0,0,0);
-        
-        
+
+
         Vec3d result = scale.applyJacobian(test);
         Vec3d expected = scale.applyMap(test) - scale.applyMap(origin);
-        
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL(result(0), expected(0), TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(result(1), expected(1), TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(result(2), expected(2), TOL);
-        
+
         Vec3d tmp = scale.applyInverseJacobian(result);
-        
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL(tmp(0), test(0), TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(tmp(1), test(1), TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(tmp(2), test(2), TOL);
     }
-        
+
     {
         ScaleMap scale(Vec3d(1,2,3));
         const Vec3d test(1,2,3);
         const Vec3d origin(0,0,0);
-        
-        
+
+
         Vec3d result = scale.applyJacobian(test);
         Vec3d expected = scale.applyMap(test) - scale.applyMap(origin);
-        
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL(result(0), expected(0), TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(result(1), expected(1), TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(result(2), expected(2), TOL);
-        
+
         Vec3d tmp = scale.applyInverseJacobian(result);
-        
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL(tmp(0), test(0), TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(tmp(1), test(1), TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(tmp(2), test(2), TOL);
@@ -753,17 +753,17 @@ TestMaps::testJacobians()
         TranslationMap map(Vec3d(1,2,3));
         const Vec3d test(1,2,3);
         const Vec3d origin(0,0,0);
-        
-        
+
+
         Vec3d result = map.applyJacobian(test);
         Vec3d expected = map.applyMap(test) - map.applyMap(origin);
-        
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL(result(0), expected(0), TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(result(1), expected(1), TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(result(2), expected(2), TOL);
-        
+
         Vec3d tmp = map.applyInverseJacobian(result);
-        
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL(tmp(0), test(0), TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(tmp(1), test(1), TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(tmp(2), test(2), TOL);
@@ -772,41 +772,41 @@ TestMaps::testJacobians()
         ScaleTranslateMap map(Vec3d(1,2,3), Vec3d(3,5,4));
         const Vec3d test(1,2,3);
         const Vec3d origin(0,0,0);
-        
-        
+
+
         Vec3d result = map.applyJacobian(test);
         Vec3d expected = map.applyMap(test) - map.applyMap(origin);
-        
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL(result(0), expected(0), TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(result(1), expected(1), TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(result(2), expected(2), TOL);
-        
+
         Vec3d tmp = map.applyInverseJacobian(result);
-        
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL(tmp(0), test(0), TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(tmp(1), test(1), TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(tmp(2), test(2), TOL);
     }
     {
-        
+
         openvdb::BBoxd bbox(Vec3d(0), Vec3d(100));
         NonlinearFrustumMap frustum(bbox, 1./6., 5);
         /// frustum will have depth, far plane - near plane = 5
         /// the frustum has width 1 in the front and 6 in the back
-        
+
         Vec3d trans(2,2,2);
         NonlinearFrustumMap::Ptr map =
             boost::static_pointer_cast<NonlinearFrustumMap, MapBase>(
             frustum.preScale(Vec3d(10,10,10))->postTranslate(trans));
 
-        
+
         const Vec3d test(1,2,3);
         const Vec3d origin(0, 0, 0);
-        
+
         // these two drop down to just the linear part
         Vec3d lresult = map->applyJacobian(test);
         Vec3d ltmp = map->applyInverseJacobian(lresult);
-        
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL(ltmp(0), test(0), TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(ltmp(1), test(1), TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(ltmp(2), test(2), TOL);
@@ -815,20 +815,20 @@ TestMaps::testJacobians()
         // these two drop down to just the linear part
         Vec3d result = map->applyJacobian(test, isloc);
         Vec3d tmp = map->applyInverseJacobian(result, isloc);
-        
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL(tmp(0), test(0), TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(tmp(1), test(1), TOL);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(tmp(2), test(2), TOL);
 
 
-        
+
     }
-    
-     
+
+
 }
 
 
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

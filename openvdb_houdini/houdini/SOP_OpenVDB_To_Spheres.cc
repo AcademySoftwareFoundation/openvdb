@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -210,9 +210,10 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
         }
 
         // Eval attributes
-        const float isovalue = evalFloat("isovalue", 0, time);
-        const float minradius = evalFloat("minradius", 0, time);
-        const float maxradius = evalFloat("maxradius", 0, time);
+        const float
+            isovalue = static_cast<float>(evalFloat("isovalue", 0, time)),
+            minradius = static_cast<float>(evalFloat("minradius", 0, time)),
+            maxradius = static_cast<float>(evalFloat("maxradius", 0, time));
         const int sphereCount = evalInt("spheres", 0, time);
         const bool overlapping = evalInt("overlapping", 0, time);
         const int scatter = evalInt("scatter", 0, time);
@@ -311,7 +312,6 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
                     *gdp, marker.getPrimitives(), marker.getPoints());
 #endif
             }
-
             ++idNumber;
         }
 
@@ -332,6 +332,6 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

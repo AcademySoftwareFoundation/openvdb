@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -39,7 +39,7 @@ public:
     CPPUNIT_TEST(testMat4s);
     CPPUNIT_TEST(testMat4d);
     CPPUNIT_TEST_SUITE_END();
-    
+
     void testMat4s();
     void testMat4d();
 };
@@ -90,7 +90,7 @@ void
 TestMat4Metadata::testMat4d()
 {
     using namespace openvdb;
-    
+
     Metadata::Ptr m(new Mat4DMetadata(openvdb::math::Mat4d(1.0, 1.0, 1.0, 1.0,
                                                            1.0, 1.0, 1.0, 1.0,
                                                            1.0, 1.0, 1.0, 1.0,
@@ -126,6 +126,6 @@ TestMat4Metadata::testMat4d()
                                                       3.0, 3.0, 3.0, 3.0));
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

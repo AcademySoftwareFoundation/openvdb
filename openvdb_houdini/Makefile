@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2013 DreamWorks Animation LLC
+# Copyright (c) 2012-2014 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -41,6 +41,8 @@
 #   depend              recompute source file header dependencies
 #
 # Options:
+#   abi=2               build for compatibility with the OpenVDB 2.x Grid ABI
+#                       (some OpenVDB 3.x features will be disabled)
 #   shared=no           link executables against static OpenVDB libraries
 #                       (default: link against shared libraries)
 #   debug=yes           build with debugging symbols and without optimization
@@ -130,7 +132,14 @@ else
 endif
 
 # The parent directory of the boost/ header directory
-BOOST_INCL_DIR := $(HT)/include
+BOOST_INCL_DIR := $(LOCAL_INCLUDE)
+# The directory containing libboost_iostreams, libboost_system, etc.
+BOOST_LIB_DIR := $(LOCAL_LIB)
+ifdef WINDOWS_NT
+  BOOST_LIB :=
+else
+  BOOST_LIB := -lboost_iostreams -lboost_system
+endif
 
 # The parent directory of the OpenEXR/ header directory (which contains half.h)
 HALF_INCL_DIR := $(HT)/include
@@ -187,7 +196,23 @@ SHELL = /bin/bash
 .SUFFIXES:
 
 HOUDINI_INCL_DIR := $(HT)/include
-HCUSTOM_FLAGS :=
+# Flags to be passed to the hcustom build script
+HCUSTOM_FLAGS := -i $(HOUDINI_INSTALL_DIR)
+ifeq (yes,$(strip $(verbose)))
+    HCUSTOM_FLAGS += -e
+endif
+# Extra flags to be passed through hcustom to the compiler or linker
+HCUSTOM_EXTRA_FLAGS := -DIGNORE_HDK_DEPRECATIONS
+# The compiler to be used by hcustom
+ifeq ($(strip $(HOUDINI_CC)),)
+    # If HOUDINI_CC is not set, set it to CXX if CXX is set, otherwise set it to "g++".
+    # (This replicates the logic in hcustom.)
+    ifneq ($(strip $(CXX)),)
+        HOUDINI_CC = $(CXX)
+    else
+        HOUDINI_CC = g++
+    endif
+endif
 
 ifeq (full,$(strip $(debug)))
   OPTIMIZE := $(DEBUG_FLAGS)
@@ -225,12 +250,17 @@ else
     QUIET := > /dev/null
 endif
 
-INCLDIRS := -I . -I .. -I $(BOOST_INCL_DIR) -I $(HALF_INCL_DIR) -I $(TBB_INCL_DIR)
+INCLDIRS := -I . -I .. $(CXXISYSTEM) $(BOOST_INCL_DIR) $(CXXISYSTEM) $(HALF_INCL_DIR) $(CXXISYSTEM) $(TBB_INCL_DIR)
+HCUSTOM_INCLDIRS := $(subst isystem,I,$(INCLDIRS))
 
-CXXFLAGS += $(OPTIMIZE) $(INCLDIRS)
+CXXFLAGS += $(OPTIMIZE) $(INCLDIRS) -DIGNORE_HDK_DEPRECATIONS
+ifeq (2,$(strip $(abi)))
+    CXXFLAGS += -DOPENVDB_2_ABI_COMPATIBLE
+    HCUSTOM_EXTRA_FLAGS += -DOPENVDB_2_ABI_COMPATIBLE
+endif
 ifdef MBSD
-	# Darwin ld treats undefined symbols as errors by default;
-	# change to runtime resolution, like Linux.
+    # Darwin ld treats undefined symbols as errors by default;
+    # change to runtime resolution, like Linux.
     CXXFLAGS += -undefined dynamic_lookup
 endif
 
@@ -242,12 +272,14 @@ endif
 HCUSTOM_LIBS := \
     -L $(HALF_LIB_DIR) $(HALF_LIB) \
     -L $(TBB_LIB_DIR) $(TBB_LIB) \
+    -L $(BOOST_LIB_DIR) $(BOOST_LIB) \
     -L $(OPENVDB_LIB_DIR) $(OPENVDB_LIB) \
 #
 LIBS_RPATH := \
     -Wl,-rpath,$(HALF_LIB_DIR) $(LDDIROPT)$(HALF_LIB_DIR) $(HALF_LIB) \
     -Wl,-rpath,$(TBB_LIB_DIR) $(LDDIROPT)$(TBB_LIB_DIR) $(TBB_LIB) \
     -Wl,-rpath,$(OPENVDB_LIB_DIR) $(LDDIROPT)$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) \
+    -Wl,-rpath,$(BOOST_LIB_DIR) -L$(BOOST_LIB_DIR) $(BOOST_LIB) \
 #
 
 LIBHOUDINI_INCLUDE_NAMES := \
@@ -257,6 +289,7 @@ LIBHOUDINI_INCLUDE_NAMES := \
     houdini/GT_GEOPrimCollectVDB.h \
     houdini/GU_PrimVDB.h \
     houdini/OP_NodeChain.h \
+    houdini/geometry.h \
     houdini/ParmFactory.h \
     houdini/SOP_NodeVDB.h \
     houdini/UT_VDBTools.h \
@@ -267,8 +300,10 @@ LIBHOUDINI_SRC_NAMES := \
     houdini/GeometryUtil.cc \
     houdini/GEO_PrimVDB.cc \
     houdini/GEO_VDBTranslator.cc \
+    houdini/GR_PrimVDBPoints.cc \
     houdini/GT_GEOPrimCollectVDB.cc \
     houdini/GU_PrimVDB.cc \
+    houdini/geometry.cc \
     houdini/ParmFactory.cc \
     houdini/SOP_NodeVDB.cc \
     houdini/UT_VDBUtils.cc \
@@ -390,9 +425,9 @@ openvdb_houdini/AttributeTransferUtil.h openvdb_houdini/GeometryUtil.h openvdb_h
 # to mirror the DWA directory structure.
 houdini_utils:
 	$(LN) houdini houdini_utils
-houdini_utils/ParmFactory.h houdini_utils/OP_NodeChain.h: houdini_utils
+houdini_utils/geometry.h houdini_utils/ParmFactory.h houdini_utils/OP_NodeChain.h: houdini_utils
 
-$(LIBHOUDINI_OBJ_NAMES): houdini_utils/ParmFactory.h houdini_utils/OP_NodeChain.h openvdb_houdini/AttributeTransferUtil.h openvdb_houdini/GeometryUtil.h openvdb_houdini/GEO_PrimVDB.h openvdb_houdini/GT_GEOPrimCollectVDB.h openvdb_houdini/GU_PrimVDB.h openvdb_houdini/SOP_NodeVDB.h openvdb_houdini/UT_VDBTools.h openvdb_houdini/UT_VDBUtils.h openvdb_houdini/Utils.h
+$(LIBHOUDINI_OBJ_NAMES): houdini_utils/geometry.h houdini_utils/ParmFactory.h houdini_utils/OP_NodeChain.h openvdb_houdini/AttributeTransferUtil.h openvdb_houdini/GeometryUtil.h openvdb_houdini/GEO_PrimVDB.h openvdb_houdini/GT_GEOPrimCollectVDB.h openvdb_houdini/GU_PrimVDB.h openvdb_houdini/SOP_NodeVDB.h openvdb_houdini/UT_VDBTools.h openvdb_houdini/UT_VDBUtils.h openvdb_houdini/Utils.h
 
 $(LIBHOUDINI_OBJ_NAMES): %.o: %.cc
 	$(call CompileCXX,-DOPENVDB_HOUDINI_PRIVATE $(HOUDINI_CXXFLAGS))
@@ -432,14 +467,17 @@ ifeq (no,$(strip $(shared)))
 # Link SOPs against static OpenVDB libraries.
 $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
 	@echo "Building $(HOUDINI_INSTALL_DIR)/$(@:.o=$(SHAREDLIB_SUFFIX)) because of $(call list_deps)"
-	$(HCUSTOM) -i $(HOUDINI_INSTALL_DIR) $(INCLDIRS) \
-	    $(HCUSTOM_LIBS) $(HCUSTOM_LIBDEPS) $< $(QUIET)
+	@# TODO: This seems to be the only way to pass extra compiler flags to hcustom.
+	/bin/env HOUDINI_CC='$(HOUDINI_CC) $(HCUSTOM_EXTRA_FLAGS)' \
+	    $(HCUSTOM) $(HOUDINI_INCLDIRS) \
+		$(HCUSTOM_LIBS) $(HCUSTOM_LIBDEPS) $< $(QUIET)
 else
 # Link SOPs against shared OpenVDB libraries.
 $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
 	@echo "Building $(HOUDINI_INSTALL_DIR)/$(@:.o=$(SHAREDLIB_SUFFIX)) because of $(call list_deps)"
-	$(HCUSTOM) -i $(HOUDINI_INSTALL_DIR) $(INCLDIRS) \
-	    $(HCUSTOM_LIBDEPS) $< $(QUIET)
+	@# TODO: This seems to be the only way to pass extra compiler flags to hcustom.
+	/bin/env HOUDINI_CC='$(HOUDINI_CC) $(HCUSTOM_EXTRA_FLAGS)' \
+	    $(HCUSTOM) $(HOUDINI_INCLDIRS) $(HCUSTOM_LIBDEPS) $< $(QUIET)
 endif
 
 $(HOUDINI_SOP_SO_NAMES): $(HOUDINI_INSTALL_DIR)/%$(SHAREDLIB_SUFFIX): houdini/%.o
@@ -457,7 +495,8 @@ install: houdinilib houdinisops
 	@echo "Created $(INSTALL_DIR)/include/houdini_utils"
 	cp -f $(LIBHOUDINI_INCLUDE_NAMES) $(INSTALL_DIR)/include/openvdb_houdini/
 	@# Move headers from openvdb_houdini/ to houdini_utils/.
-	mv -f $(INSTALL_DIR)/include/openvdb_houdini/ParmFactory.h \
+	mv -f $(INSTALL_DIR)/include/openvdb_houdini/geometry.h \
+            $(INSTALL_DIR)/include/openvdb_houdini/ParmFactory.h \
 	    $(INSTALL_DIR)/include/openvdb_houdini/OP_NodeChain.h \
 	    $(INSTALL_DIR)/include/houdini_utils/
 	@echo "Copied header files to $(INSTALL_DIR)/include"
@@ -522,6 +561,6 @@ ifneq ($(DEPFILES),)
 -include $(DEPFILES)
 endif
 
-# Copyright (c) 2012-2013 DreamWorks Animation LLC
+# Copyright (c) 2012-2014 DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

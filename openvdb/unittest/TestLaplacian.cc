@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -73,14 +73,14 @@ TestLaplacian::testISLaplacian()
 {
     using namespace openvdb;
 
-    typedef FloatGrid::ConstAccessor  AccessorType;
     FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
     FloatTree& tree = grid->tree();
     CPPUNIT_ASSERT(tree.empty());
 
     const Coord dim(64,64,64);
     const Coord c(35,30,40);
-    const openvdb::Vec3f center(c[0],c[1],c[2]);
+    const openvdb::Vec3f
+        center(static_cast<float>(c[0]), static_cast<float>(c[1]), static_cast<float>(c[2]));
     const float radius=0.0f;//point at {35,30,40}
     unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
     CPPUNIT_ASSERT(!tree.empty());
@@ -89,7 +89,7 @@ TestLaplacian::testISLaplacian()
     Coord xyz(35,10,40);
 
     // Index Space Laplacian random access
-    AccessorType inAccessor = grid->getConstAccessor();
+    FloatGrid::ConstAccessor inAccessor = grid->getConstAccessor();
     FloatGrid::ValueType result;
     result = math::ISLaplacian<math::CD_SECOND>::result(inAccessor, xyz);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20.0, result, /*tolerance=*/0.01);
@@ -107,14 +107,14 @@ TestLaplacian::testISLaplacianStencil()
 {
     using namespace openvdb;
 
-    typedef FloatGrid::ConstAccessor  AccessorType;
     FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
     FloatTree& tree = grid->tree();
     CPPUNIT_ASSERT(tree.empty());
 
     const Coord dim(64,64,64);
     const Coord c(35,30,40);
-    const openvdb::Vec3f center(c[0],c[1],c[2]);
+    const openvdb::Vec3f
+        center(static_cast<float>(c[0]), static_cast<float>(c[1]), static_cast<float>(c[2]));
     const float radius=0;//point at {35,30,40}
     unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
     CPPUNIT_ASSERT(!tree.empty());
@@ -147,14 +147,14 @@ TestLaplacian::testWSLaplacian()
 {
     using namespace openvdb;
 
-    typedef FloatGrid::ConstAccessor  AccessorType;
     FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
     FloatTree& tree = grid->tree();
     CPPUNIT_ASSERT(tree.empty());
 
     const Coord dim(64,64,64);
     const Coord c(35,30,40);
-    const openvdb::Vec3f center(c[0],c[1],c[2]);
+    const openvdb::Vec3f
+        center(static_cast<float>(c[0]), static_cast<float>(c[1]), static_cast<float>(c[2]));
     const float radius=0.0f;//point at {35,30,40}
     unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
 
@@ -164,7 +164,7 @@ TestLaplacian::testWSLaplacian()
     Coord xyz(35,10,40);
 
     FloatGrid::ValueType result;
-    AccessorType inAccessor = grid->getConstAccessor();
+    FloatGrid::ConstAccessor inAccessor = grid->getConstAccessor();
 
     // try with a map
     math::UniformScaleMap map;
@@ -175,43 +175,53 @@ TestLaplacian::testWSLaplacian()
         boost::static_pointer_cast<math::AffineMap, math::MapBase>(rotated_map);
 
     // the laplacian is invariant to rotation
-    result = math::Laplacian<math::AffineMap, math::CD_SECOND>::result(*affine_map, inAccessor, xyz);
+    result = math::Laplacian<math::AffineMap, math::CD_SECOND>::result(
+        *affine_map, inAccessor, xyz);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
-    result = math::Laplacian<math::AffineMap, math::CD_FOURTH>::result(*affine_map, inAccessor, xyz);
+    result = math::Laplacian<math::AffineMap, math::CD_FOURTH>::result(
+        *affine_map, inAccessor, xyz);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
-    result = math::Laplacian<math::AffineMap, math::CD_SIXTH>::result(*affine_map, inAccessor, xyz);
+    result = math::Laplacian<math::AffineMap, math::CD_SIXTH>::result(
+        *affine_map, inAccessor, xyz);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
 
     // test uniform map
     math::UniformScaleMap uniform;
 
-    result = math::Laplacian<math::UniformScaleMap, math::CD_SECOND>::result(uniform, inAccessor, xyz);
+    result = math::Laplacian<math::UniformScaleMap, math::CD_SECOND>::result(
+        uniform, inAccessor, xyz);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
-    result = math::Laplacian<math::UniformScaleMap, math::CD_FOURTH>::result(uniform, inAccessor, xyz);
+    result = math::Laplacian<math::UniformScaleMap, math::CD_FOURTH>::result(
+        uniform, inAccessor, xyz);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
-    result = math::Laplacian<math::UniformScaleMap, math::CD_SIXTH>::result(uniform, inAccessor, xyz);
+    result = math::Laplacian<math::UniformScaleMap, math::CD_SIXTH>::result(
+        uniform, inAccessor, xyz);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
 
     // test the GenericMap Grid interface
     {
         math::GenericMap generic_map(*grid);
-        result = math::Laplacian<math::GenericMap, math::CD_SECOND>::result(generic_map, inAccessor, xyz);
+        result = math::Laplacian<math::GenericMap, math::CD_SECOND>::result(
+            generic_map, inAccessor, xyz);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
 
-        result = math::Laplacian<math::GenericMap, math::CD_FOURTH>::result(generic_map, inAccessor, xyz);
+        result = math::Laplacian<math::GenericMap, math::CD_FOURTH>::result(
+            generic_map, inAccessor, xyz);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
     }
     {
         // test the GenericMap Transform interface
         math::GenericMap generic_map(grid->transform());
-        result = math::Laplacian<math::GenericMap, math::CD_SECOND>::result(generic_map, inAccessor, xyz);
+        result = math::Laplacian<math::GenericMap, math::CD_SECOND>::result(
+            generic_map, inAccessor, xyz);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
 
     }
     {
         // test the GenericMap Map interface
         math::GenericMap generic_map(rotated_map);
-        result = math::Laplacian<math::GenericMap, math::CD_SECOND>::result(generic_map, inAccessor, xyz);
+        result = math::Laplacian<math::GenericMap, math::CD_SECOND>::result(
+            generic_map, inAccessor, xyz);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
     }
 
@@ -257,21 +267,20 @@ TestLaplacian::testWSLaplacianFrustum()
             for (Int32& k=ijk.z(); k < 20; ++k) {
                 // world space image of the ijk coord
                 const Vec3d ws = map->applyMap(ijk.asVec3d());
-                const float value = cos( ws.x() ) * sin( ws.y()) * cos(ws.z());
+                const float value = float(cos(ws.x() ) * sin( ws.y()) * cos(ws.z()));
                 tree.setValue(ijk, value);
             }
         }
     }
 
     const Coord testloc(16,16,16);
-    float test_result
-        = math::Laplacian<math::NonlinearFrustumMap, math::CD_SECOND>::result(*map, tree, testloc);
+    float test_result = math::Laplacian<math::NonlinearFrustumMap, math::CD_SECOND>::result(
+        *map, tree, testloc);
     float expected_result =  -3.f * tree.getValue(testloc);
 
     // The exact solution of Laplacian( cos(x)sin(y)cos(z) ) = -3 cos(x) sin(y) cos(z)
 
     CPPUNIT_ASSERT( math::isApproxEqual(test_result, expected_result, /*tolerance=*/0.02f) );
-
 }
 
 
@@ -280,14 +289,14 @@ TestLaplacian::testWSLaplacianStencil()
 {
     using namespace openvdb;
 
-    typedef FloatGrid::ConstAccessor  AccessorType;
     FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
     FloatTree& tree = grid->tree();
     CPPUNIT_ASSERT(tree.empty());
 
     const Coord dim(64,64,64);
     const Coord c(35,30,40);
-    const openvdb::Vec3f center(c[0],c[1],c[2]);
+    const openvdb::Vec3f
+        center(static_cast<float>(c[0]), static_cast<float>(c[1]), static_cast<float>(c[2]));
     const float radius=0.0f;//point at {35,30,40}
     unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
 
@@ -411,7 +420,6 @@ TestLaplacian::testLaplacianTool()
 {
     using namespace openvdb;
 
-    typedef FloatGrid::ConstAccessor  AccessorType;
     FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
     FloatTree& tree = grid->tree();
     CPPUNIT_ASSERT(tree.empty());
@@ -442,7 +450,6 @@ TestLaplacian::testLaplacianMaskedTool()
 {
     using namespace openvdb;
 
-    typedef FloatGrid::ConstAccessor  AccessorType;
     FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
     FloatTree& tree = grid->tree();
     CPPUNIT_ASSERT(tree.empty());
@@ -454,37 +461,37 @@ TestLaplacian::testLaplacianMaskedTool()
 
     CPPUNIT_ASSERT(!tree.empty());
     CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
-    
+
     const openvdb::CoordBBox maskbbox(openvdb::Coord(35, 30, 30), openvdb::Coord(41, 41, 41));
     BoolGrid::Ptr maskGrid = BoolGrid::create(false);
     maskGrid->fill(maskbbox, true/*value*/, true/*activate*/);
-    
+
 
     FloatGrid::Ptr lap = tools::laplacian(*grid, *maskGrid);
-    
+
     {// outside the masked region
         Coord xyz(34,30,30);
-        
+
         CPPUNIT_ASSERT(!maskbbox.isInside(xyz));
         CPPUNIT_ASSERT_DOUBLES_EQUAL(
-                                     0, lap->getConstAccessor().getValue(xyz), 0.01);// 2/distance from center
-        
+            0, lap->getConstAccessor().getValue(xyz), 0.01);// 2/distance from center
+
         xyz.reset(35,10,40);
-        
+
         CPPUNIT_ASSERT_DOUBLES_EQUAL(
-                                     0, lap->getConstAccessor().getValue(xyz),0.01);// 2/distance from center
+            0, lap->getConstAccessor().getValue(xyz),0.01);// 2/distance from center
     }
 
     {// inside the masked region
         Coord xyz(35,30,30);
-        
+
         CPPUNIT_ASSERT(maskbbox.isInside(xyz));
         CPPUNIT_ASSERT_DOUBLES_EQUAL(
-                                     2.0/10.0, lap->getConstAccessor().getValue(xyz), 0.01);// 2/distance from center
-        
+            2.0/10.0, lap->getConstAccessor().getValue(xyz), 0.01);// 2/distance from center
+
     }
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

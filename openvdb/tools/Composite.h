@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -125,6 +125,26 @@ max(const T& a, const T& b)
     return (aMag < bMag ? b : (bMag < aMag ? a : std::max(a, b)));
 }
 
+
+template<typename T> inline
+typename boost::disable_if<boost::is_integral<T>, T>::type // = T if T is not an integer type
+divide(const T& a, const T& b) { return a / b; }
+
+template<typename T> inline
+typename boost::enable_if<boost::is_integral<T>, T>::type // = T if T is an integer type
+divide(const T& a, const T& b)
+{
+    const T zero(0);
+    if (b != zero) return a / b;
+    if (a == zero) return 0;
+    return (a > 0 ? std::numeric_limits<T>::max() : -std::numeric_limits<T>::max());
+}
+
+// If b is true, return a / 1 = a.
+// If b is false and a is true, return 1 / 0 = inf = MAX_BOOL = 1 = a.
+// If b is false and a is false, return 0 / 0 = NaN = 0 = a.
+inline bool divide(bool a, bool /*b*/) { return a; }
+
 } // namespace composite
 
 
@@ -198,7 +218,7 @@ compDiv(GridOrTreeT& aTree, GridOrTreeT& bTree)
     typedef typename Adapter::TreeType TreeT;
     struct Local {
         static inline void op(CombineArgs<typename TreeT::ValueType>& args) {
-            args.setResult(args.a() / args.b());
+            args.setResult(composite::divide(args.a(), args.b()));
         }
     };
     Adapter::tree(aTree).combineExtended(Adapter::tree(bTree), Local::op, /*prune=*/false);
@@ -569,6 +589,6 @@ csgDifference(GridOrTreeT& a, GridOrTreeT& b, bool prune)
 
 #endif // OPENVDB_TOOLS_COMPOSITE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -42,7 +42,9 @@
 #include <openvdb/util/NullInterrupter.h>
 #include <PRM/PRM_Parm.h>
 #include <UT/UT_Interrupt.h>
+#include <boost/math/special_functions/fpclassify.hpp> // for isfinite()
 #include <sstream>
+
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -605,6 +607,10 @@ struct ApproxEq<openvdb::math::Vec4<T> >
     operator bool() const { return a.eq(b, /*abs=*/ValueT(1e-8f)); }
 };
 
+
+template<typename T> inline bool isFinite(const T& val) { return boost::math::isfinite(val); }
+inline bool isFinite(bool) { return true; }
+
 } // unnamed namespace
 
 
@@ -666,6 +672,15 @@ struct SOP_OpenVDB_Combine::CombineOp
             const ValueT halfWidth = ((ref.getGridClass() == openvdb::GRID_LEVEL_SET)
                 ? ValueT(ZERO + this->getScalarBackgroundValue(ref) * (1.0 / ref.voxelSize()[0]))
                 : ValueT(src.background() * (1.0 / src.voxelSize()[0])));
+
+            if (!isFinite(halfWidth)) {
+                std::stringstream msg;
+                msg << "Resample to match: Illegal narrow band width = " << halfWidth
+                    << ", caused by grid '" << src.getName() << "' with background "
+                    << this->getScalarBackgroundValue(ref);
+                throw std::invalid_argument(msg.str());
+            }
+
             try {
                 dest = openvdb::tools::doLevelSetRebuild(src, /*iso=*/ZERO,
                     /*exWidth=*/halfWidth, /*inWidth=*/halfWidth, &refXform, &interrupt);
@@ -822,8 +837,8 @@ struct SOP_OpenVDB_Combine::CombineOp
             needA = self->needAGrid(op),
             needB = self->needBGrid(op);
         const float
-            aMult = self->evalFloat("mult_a", 0, self->getTime()),
-            bMult = self->evalFloat("mult_b", 0, self->getTime());
+            aMult = float(self->evalFloat("mult_a", 0, self->getTime())),
+            bMult = float(self->evalFloat("mult_b", 0, self->getTime()));
 
         const GridT *aGrid = NULL, *bGrid = NULL;
         if (aBaseGrid) aGrid = UTvdbGridCast<GridT>(aBaseGrid).get();
@@ -987,7 +1002,7 @@ struct SOP_OpenVDB_Combine::CombineOp
         // registers with the other grid's.
         if (aGrid && bGrid) this->resampleGrids(aGrid, bGrid);
 
-        const float aMult = self->evalFloat("mult_a", 0, self->getTime());
+        const float aMult = float(self->evalFloat("mult_a", 0, self->getTime()));
 
         typename AGridT::Ptr resultGrid;
 
@@ -1035,7 +1050,7 @@ struct SOP_OpenVDB_Combine::CombineOp
 
         if (deactivate) {
             const float deactivationTolerance =
-                self->evalFloat("bgtolerance", 0, self->getTime());
+                float(self->evalFloat("bgtolerance", 0, self->getTime()));
 
             // Mark active output tiles and voxels as inactive if their
             // values match the output grid's background value.
@@ -1048,7 +1063,7 @@ struct SOP_OpenVDB_Combine::CombineOp
             resultGrid->signedFloodFill();
         }
         if (prune) {
-            const float tolerance = self->evalFloat("tolerance", 0, self->getTime());
+            const float tolerance = float(self->evalFloat("tolerance", 0, self->getTime()));
             resultGrid->tree().prune(ValueT(ZERO + tolerance));
         }
 
@@ -1158,6 +1173,6 @@ SOP_OpenVDB_Combine::combineGrids(Operation op,
     return compOp.outGrid;
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

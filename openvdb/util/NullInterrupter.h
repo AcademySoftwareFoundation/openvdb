@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -71,20 +71,20 @@ struct NullInterrupter
 /// out when client code only has a pointer (vs reference) to the interrupter.
 ///
 /// @note This is a free-standing function since C++ doesn't allow for
-/// partial template specialization (in client code of the interrupter).    
+/// partial template specialization (in client code of the interrupter).
 template <typename T>
 inline bool wasInterrupted(T* i, int percent = -1) { return i && i->wasInterrupted(percent); }
-    
+
 /// Specialization for NullInterrupter
-template<>    
+template<>
 inline bool wasInterrupted<util::NullInterrupter>(util::NullInterrupter*, int) { return false; }
-    
+
 } // namespace util
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
 #endif // OPENVDB_UTIL_NULL_INTERRUPTER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

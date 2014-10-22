@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -237,7 +237,7 @@ SOP_OpenVDB_Fracture::cookMySop(OP_Context& context)
         // Validate inputs
 
         const GU_Detail* cutterGeo = inputGeo(1);
-        if (!cutterGeo || !cutterGeo->primitives().entries()) {
+        if (!cutterGeo || !cutterGeo->getNumPrimitives()) {
             // All good, nothing to worry about with no cutting objects!
             return error();
         }
@@ -412,7 +412,7 @@ SOP_OpenVDB_Fracture::process(
             typedef boost::mt19937 RandGen;
             RandGen rng(RandGen::result_type(evalInt("seed", 0, time)));
             boost::uniform_01<RandGen, float> uniform01(rng);
-            const float two_pi = 2.0 * boost::math::constants::pi<float>();
+            const float two_pi = 2.0f * boost::math::constants::pi<float>();
             UT_DMatrix4 xform;
             UT_Vector3 trans;
             UT_DMatrix3 rotmat;
@@ -442,10 +442,12 @@ SOP_OpenVDB_Fracture::process(
                 xform.getTranslates(trans);
                 xform.extractRotate(rotmat);
                 quat.updateFromRotationMatrix(rotmat);
-                instancePoints[i] =
-                    openvdb::Vec3s(trans.x(), trans.y(), trans.z());
-                instanceRotations[i].init(quat.x(), quat.y(), quat.z(),
-                                          quat.w());
+                instancePoints[i] = openvdb::Vec3s(trans.x(), trans.y(), trans.z());
+                instanceRotations[i].init(
+                    static_cast<float>(quat.x()),
+                    static_cast<float>(quat.y()),
+                    static_cast<float>(quat.z()),
+                    static_cast<float>(quat.w()));
             }
         }
         else
@@ -640,15 +642,20 @@ SOP_OpenVDB_Fracture::process(
     }
 
     // Check for multiple cutter objects
+#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
+    GEO_PrimClassifier primClassifier;
+    if (separatecutters)
+        primClassifier.classifyBySharedPoints(*cutterGeo);
+#else
     GEO_PointClassifier pointClassifier;
     GEO_PrimClassifier primClassifier;
     if (separatecutters) {
         pointClassifier.classifyPoints(*cutterGeo);
         primClassifier.classifyBySharedPoints(*cutterGeo, pointClassifier);
     }
-
+#endif
     const int cutterObjects = separatecutters ? primClassifier.getNumClass() : 1;
-    const ValueType bandWidth = backgroundValue / transform->voxelSize()[0];
+    const ValueType bandWidth = ValueType(backgroundValue / transform->voxelSize()[0]);
 
     if (cutterObjects > 1) {
         GA_Offset start, end;
@@ -679,14 +686,15 @@ SOP_OpenVDB_Fracture::process(
                 primList.reserve(numPrims);
 
                 openvdb::Vec4I prim;
-                unsigned int vtx, vtxn;
+                typedef openvdb::Vec4I::ValueType Vec4IValueType;
+                unsigned int vtx;
+                GA_Size vtxn;
 
                 for (GA_PageIterator pageIt = range.beginPages(); !pageIt.atEnd(); ++pageIt) {
                     for (GA_Iterator blockIt(pageIt.begin()); blockIt.blockAdvance(start, end); ) {
                         for (GA_Offset i = start; i < end; ++i) {
                             if (primClassifier.getClass(cutterGeo->primitiveIndex(i)) == classId) {
-                                const GA_Primitive* primRef =
-                                    cutterGeo->getPrimitiveList().get(i);
+                                const GA_Primitive* primRef = cutterGeo->getPrimitiveList().get(i);
                                 vtxn = primRef->getVertexCount();
 
                                 if (primRef->getTypeId() == GEO_PRIMPOLY &&
@@ -696,7 +704,8 @@ SOP_OpenVDB_Fracture::process(
                                     for (vtx = 0, primRef->beginVertex(it);
                                         !it.atEnd(); ++it, ++vtx)
                                     {
-                                        prim[vtx] = cutterGeo->pointIndex(it.getPointOffset());
+                                        prim[vtx] = static_cast<Vec4IValueType>(
+                                            cutterGeo->pointIndex(it.getPointOffset()));
                                     }
 
                                     if (vtxn != 4) prim[3] = openvdb::util::INVALID_IDX;
@@ -768,7 +777,7 @@ SOP_OpenVDB_Fracture::process(
     totalpiececount.entries(gdp->getNumPrimitiveOffsets());
 
     boost::mt19937 rng(1);
-    boost::uniform_real<float> range(0.3, 0.8);
+    boost::uniform_real<float> range(0.3f, 0.8f);
     boost::variate_generator<boost::mt19937, boost::uniform_real<float> > randNr(rng, range);
 
     GU_ConvertParms parms;
@@ -942,6 +951,6 @@ SOP_OpenVDB_Fracture::process(
     }
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -128,7 +128,7 @@ TestMetaMap::testRemove()
 
     meta.removeMeta("meta3");
 
-    CPPUNIT_ASSERT(meta.empty());
+    CPPUNIT_ASSERT_EQUAL(0, int(meta.metaCount()));
 }
 
 void
@@ -182,7 +182,7 @@ TestMetaMap::testIO()
     MetaMap meta2;
     std::istringstream istr(ostr.str(), std::ios_base::binary);
     CPPUNIT_ASSERT_NO_THROW(meta2.readMeta(istr));
-    CPPUNIT_ASSERT(meta2.empty());
+    CPPUNIT_ASSERT_EQUAL(0, int(meta2.metaCount()));
 
     // Register just one of the three types, then reread and verify that
     // the value of the registered type can be retrieved.
@@ -293,7 +293,7 @@ TestMetaMap::testAssignment()
 
     // Create an empty map.
     MetaMap meta2;
-    CPPUNIT_ASSERT(meta2.empty());
+    CPPUNIT_ASSERT_EQUAL(0, int(meta2.metaCount()));
 
     // Copy the first map to the second.
     meta2 = meta;
@@ -312,6 +312,6 @@ TestMetaMap::testAssignment()
     CPPUNIT_ASSERT_EQUAL(std::string("testing"), meta2.metaValue<std::string>("meta1"));
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

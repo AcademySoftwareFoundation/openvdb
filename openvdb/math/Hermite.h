@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -355,19 +355,19 @@ Hermite::setIsInside(bool isInside)
 inline float
 Hermite::getOffsetX() const
 {
-    return float((mData >> 20) & MASK_ZSLOT) * 0.000977517;
+    return float(((mData >> 20) & MASK_ZSLOT) * 0.000977517);
 }
 
 inline float
 Hermite::getOffsetY() const
 {
-    return float((mData >> 10) & MASK_ZSLOT) * 0.000977517;
+    return float(((mData >> 10) & MASK_ZSLOT) * 0.000977517);
 }
 
 inline float
 Hermite::getOffsetZ() const
 {
-    return float(mData & MASK_ZSLOT) * 0.000977517;
+    return float((mData & MASK_ZSLOT) * 0.000977517);
 }
 
 
@@ -488,6 +488,6 @@ template<> inline math::Hermite zeroVal<math::Hermite>() { return math::Hermite(
 
 #endif // OPENVDB_MATH_HERMITE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

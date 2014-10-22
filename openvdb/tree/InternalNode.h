@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -101,7 +101,11 @@ public:
 
     explicit InternalNode(const ValueType& offValue);
 
-    InternalNode(const Coord&, const ValueType& value, bool active = false);
+    InternalNode(const Coord&, const ValueType& fillValue, bool active = false);
+
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    InternalNode(PartialCreate, const Coord&, const ValueType& fillValue, bool active = false);
+#endif
 
     /// Deep copy constructor
     InternalNode(const InternalNode&);
@@ -424,6 +428,7 @@ public:
     void readTopology(std::istream&, bool fromHalf = false);
     void writeBuffers(std::ostream&, bool toHalf = false) const;
     void readBuffers(std::istream&, bool fromHalf = false);
+    void readBuffers(std::istream&, const CoordBBox&, bool fromHalf = false);
 
 
     //
@@ -550,6 +555,9 @@ public:
     void visit2(IterT& otherIter, VisitorOp&, bool otherIsLHS = false);
     template<typename IterT, typename VisitorOp>
     void visit2(IterT& otherIter, VisitorOp&, bool otherIsLHS = false) const;
+
+    /// Set all voxels that lie outside the given axis-aligned box to the background.
+    void clip(const CoordBBox&, const ValueType& background);
 
     /// @brief Call the @c PruneOp functor for each child node and, if the functor
     /// returns @c true, prune the node and replace it with a tile.
@@ -734,7 +742,7 @@ protected:
     static inline void doVisit2(NodeT&, OtherChildAllIterT&, VisitorOp&, bool otherIsLHS);
 
     ///@{
-    /// @brief Returns a pointer to the child node at the linear offset n. 
+    /// @brief Returns a pointer to the child node at the linear offset n.
     /// @warning This protected method assumes that a child node exists at
     /// the specified linear offset!
     ChildNodeType* getChildNode(Index n);
@@ -788,6 +796,21 @@ InternalNode<ChildT, Log2Dim>::InternalNode(const Coord& origin, const ValueType
     if (active) mValueMask.setOn();
     for (Index i = 0; i < NUM_VALUES; ++i) mNodes[i].setValue(val);
 }
+
+
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+// For InternalNodes, the PartialCreate constructor is identical to its
+// non-PartialCreate counterpart.
+template<typename ChildT, Index Log2Dim>
+inline
+InternalNode<ChildT, Log2Dim>::InternalNode(PartialCreate,
+    const Coord& origin, const ValueType& val, bool active)
+    : mOrigin(origin[0] & ~(DIM-1), origin[1] & ~(DIM-1), origin[2] & ~(DIM-1))
+{
+    if (active) mValueMask.setOn();
+    for (Index i = 0; i < NUM_VALUES; ++i) mNodes[i].setValue(val);
+}
+#endif
 
 
 template<typename ChildT, Index Log2Dim>
@@ -1852,6 +1875,56 @@ InternalNode<ChildT, Log2Dim>::modifyValueAndActiveStateAndCache(
 
 template<typename ChildT, Index Log2Dim>
 inline void
+InternalNode<ChildT, Log2Dim>::clip(const CoordBBox& clipBBox, const ValueType& background)
+{
+    CoordBBox nodeBBox = this->getNodeBoundingBox();
+    if (!clipBBox.hasOverlap(nodeBBox)) {
+        // This node lies completely outside the clipping region.  Fill it with background tiles.
+        this->fill(nodeBBox, background, /*active=*/false);
+    } else if (clipBBox.isInside(nodeBBox)) {
+        // This node lies completely inside the clipping region.  Leave it intact.
+        return;
+    }
+
+    // This node isn't completely contained inside the clipping region.
+    // Clip tiles and children, and replace any that lie outside the region
+    // with background tiles.
+
+    for (Index pos = 0; pos < NUM_VALUES; ++pos) {
+        const Coord xyz = this->offsetToGlobalCoord(pos); // tile or child origin
+        CoordBBox tileBBox(xyz, xyz.offsetBy(ChildT::DIM - 1)); // tile or child bounds
+        if (!clipBBox.hasOverlap(tileBBox)) {
+            // This table entry lies completely outside the clipping region.
+            // Replace it with a background tile.
+            this->makeChildNodeEmpty(pos, background);
+            mValueMask.setOff(pos);
+        } else if (!clipBBox.isInside(tileBBox)) {
+            // This table entry does not lie completely inside the clipping region
+            // and must be clipped.
+            if (this->isChildMaskOn(pos)) {
+                mNodes[pos].getChild()->clip(clipBBox, background);
+            } else {
+                // Replace this tile with a background tile, then fill the clip region
+                // with the tile's original value.  (This might create a child branch.)
+                tileBBox.intersect(clipBBox);
+                const ValueType val = mNodes[pos].getValue();
+                const bool on = this->isValueMaskOn(pos);
+                mNodes[pos].setValue(background);
+                mValueMask.setOff(pos);
+                this->fill(tileBBox, val, on);
+            }
+        } else {
+            // This table entry lies completely inside the clipping region.  Leave it intact.
+        }
+    }
+}
+
+
+////////////////////////////////////////
+
+
+template<typename ChildT, Index Log2Dim>
+inline void
 InternalNode<ChildT, Log2Dim>::fill(const CoordBBox& bbox, const ValueType& value, bool active)
 {
     Coord xyz, tileMin, tileMax;
@@ -1975,6 +2048,11 @@ template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
 {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    const ValueType background = (!io::getGridBackgroundValuePtr(is) ? zeroVal<ValueType>()
+        : *static_cast<const ValueType*>(io::getGridBackgroundValuePtr(is)));
+#endif
+
     mChildMask.load(is);
     mValueMask.load(is);
 
@@ -1982,7 +2060,11 @@ InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
         for (Index i = 0; i < NUM_VALUES; ++i) {
             if (this->isChildMaskOn(i)) {
                 ChildNodeType* child =
+#ifdef OPENVDB_2_ABI_COMPATIBLE
                     new ChildNodeType(offsetToGlobalCoord(i), zeroVal<ValueType>());
+#else
+                    new ChildNodeType(PartialCreate(), offsetToGlobalCoord(i), background);
+#endif
                 mNodes[i].setChild(child);
                 child->readTopology(is);
             } else {
@@ -2016,7 +2098,11 @@ InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
         }
         // Read in all child nodes and insert them into the table at their proper locations.
         for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
+#ifdef OPENVDB_2_ABI_COMPATIBLE
             ChildNodeType* child = new ChildNodeType(iter.getCoord(), zeroVal<ValueType>());
+#else
+            ChildNodeType* child = new ChildNodeType(PartialCreate(), iter.getCoord(), background);
+#endif
             mNodes[iter.pos()].setChild(child);
             child->readTopology(is, fromHalf);
         }
@@ -2766,6 +2852,28 @@ InternalNode<ChildT, Log2Dim>::readBuffers(std::istream& is, bool fromHalf)
 }
 
 
+template<typename ChildT, Index Log2Dim>
+inline void
+InternalNode<ChildT, Log2Dim>::readBuffers(std::istream& is,
+    const CoordBBox& clipBBox, bool fromHalf)
+{
+    for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
+        // Stream in the branch rooted at this child.
+        // (We can't skip over children that lie outside the clipping region,
+        // because buffers are serialized in depth-first order and need to be
+        // unserialized in the same order.)
+        iter->readBuffers(is, clipBBox, fromHalf);
+    }
+
+    // Get this tree's background value.
+    ValueType background = zeroVal<ValueType>();
+    if (const void* bgPtr = io::getGridBackgroundValuePtr(is)) {
+        background = *static_cast<const ValueType*>(bgPtr);
+    }
+    this->clip(clipBBox, background);
+}
+
+
 ////////////////////////////////////////
 
 
@@ -2960,6 +3068,6 @@ InternalNode<ChildT, Log2Dim>::getChildNode(Index n) const
 
 #endif // OPENVDB_TREE_INTERNALNODE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

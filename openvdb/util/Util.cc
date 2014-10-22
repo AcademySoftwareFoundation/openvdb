@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -57,7 +57,7 @@ const Coord COORD_OFFSETS[26] =
     Coord( 0, -1,  1),
     Coord( 0, -1, -1),
     Coord( 0,  1,  1),
-    Coord( 0,  1, -1), 
+    Coord( 0,  1, -1),
     Coord(-1, -1, -1), /// Voxel-corner adjacent neghbours
     Coord(-1, -1,  1), /// 18 to 25
     Coord( 1, -1,  1),
@@ -72,6 +72,6 @@ const Coord COORD_OFFSETS[26] =
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

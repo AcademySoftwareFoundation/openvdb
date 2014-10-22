@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -150,7 +150,7 @@ SOP_OpenVDB_Prune::updateParmsFlags()
 
 namespace {
 struct PruneOp {
-    PruneOp(const std::string m, float tol= 0.0): mode(m), tolerance(tol) {}
+    PruneOp(const std::string m, fpreal tol = 0.0): mode(m), tolerance(tol) {}
 
     template<typename GridT>
     void operator()(GridT& grid) const
@@ -167,7 +167,7 @@ struct PruneOp {
     }
 
     std::string mode;
-    float tolerance;
+    fpreal tolerance;
 };
 }
 
@@ -193,7 +193,7 @@ SOP_OpenVDB_Prune::cookMySop(OP_Context& context)
         // Get other UI parameters.
         UT_String modeStr;
         evalString(modeStr, "mode", 0, time);
-        const float tolerance = evalFloat("tolerance", 0, time);
+        const fpreal tolerance = evalFloat("tolerance", 0, time);
 
         // Construct a functor to process grids of arbitrary type.
         const PruneOp pruneOp(modeStr.toStdString(), tolerance);
@@ -215,6 +215,6 @@ SOP_OpenVDB_Prune::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -49,7 +49,7 @@ readString(std::istream& is)
     uint32_t size;
     is.read(reinterpret_cast<char*>(&size), sizeof(uint32_t));
     std::string buffer(size, ' ');
-    is.read(&buffer[0], size);
+    if (size>0) is.read(&buffer[0], size);
     return buffer;
 }
 
@@ -67,6 +67,6 @@ writeString(std::ostream& os, const Name& name)
 
 #endif // OPENVDB_UTIL_NAME_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

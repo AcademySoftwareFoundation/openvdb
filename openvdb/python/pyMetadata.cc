@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -39,12 +39,14 @@ namespace {
 class MetadataWrap: public Metadata, public py::wrapper<Metadata>
 {
 public:
-    Name typeName() const { return this->get_override("typeName")(); }
-    Metadata::Ptr copy() const { return this->get_override("copy")(); }
+    Name typeName() const { return static_cast<const Name&>(this->get_override("typeName")()); }
+    Metadata::Ptr copy() const {
+        return static_cast<const Metadata::Ptr&>(this->get_override("copy")());
+    }
     void copy(const Metadata& other) { this->get_override("copy")(other); }
-    std::string str() const { return this->get_override("str")(); }
-    bool asBool() const { return this->get_override("asBool")(); }
-    Index32 size() const { return this->get_override("size")(); }
+    std::string str() const {return static_cast<const std::string&>(this->get_override("str")());}
+    bool asBool() const { return static_cast<const bool&>(this->get_override("asBool")()); }
+    Index32 size() const { return static_cast<const Index32&>(this->get_override("size")()); }
 
 protected:
     void readValue(std::istream& is, Index32 numBytes) {
@@ -85,6 +87,6 @@ void exportMetadata()
     py::register_ptr_to_python<Metadata::Ptr>();
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

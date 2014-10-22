@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -419,7 +419,7 @@ public:
         (mIntegrationOrder>0) ? mAdvIterations = advIterations : mAdvIterations = 1;
 
         if (mInterrupter) mInterrupter->start("Advecting points by OpenVDB velocity field: ");
-        const int N = mPoints->size();
+        const size_t N = mPoints->size();
 
         if (mThreaded) {
             tbb::parallel_for(tbb::blocked_range<size_t>(0, N), *this);
@@ -519,6 +519,6 @@ private:
 
 #endif // OPENVDB_TOOLS_POINT_ADVECT_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

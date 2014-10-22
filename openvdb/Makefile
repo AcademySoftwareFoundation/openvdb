@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2013 DreamWorks Animation LLC
+# Copyright (c) 2012-2014 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -51,6 +51,8 @@
 #   test                run tests
 #
 # Options:
+#   abi=2               build for compatibility with the OpenVDB 2.x Grid ABI
+#                       (some OpenVDB 3.x features will be disabled)
 #   shared=no           link executables against static OpenVDB libraries
 #                       (default: link against shared libraries)
 #   debug=yes           build with debugging symbols and without optimization
@@ -129,6 +131,13 @@ LOCAL_LIB	:= $(prefix)/lib
 BOOST_VERSION	?= 1_51
 # The parent directory of the boost/ header directory
 BOOST_INCL_DIR	:= $(LOCAL_INCLUDE)/boost-$(BOOST_VERSION)
+# The directory containing libboost_iostreams, libboost_system, etc.
+BOOST_LIB_DIR := $(LOCAL_LIB)
+ifdef WINDOWS_NT
+  BOOST_LIB :=
+else
+  BOOST_LIB := -lboost_iostreams -lboost_system
+endif
 
 # The parent directory of the OpenEXR/ header directory
 EXR_INCL_DIR := $(LOCAL_INCLUDE)
@@ -197,6 +206,29 @@ else
   TBB_LIB := -ltbb
 endif
 
+# The parent directory of the blosc.h header
+# (leave blank if Blosc is unavailable)
+BLOSC_INCL_DIR := $(LOCAL_INCLUDE)
+# The directory containing libblosc
+BLOSC_LIB_DIR := $(LOCAL_LIB)
+ifdef WINDOWS_NT
+  ifneq (full,$(strip $(debug)))
+    ifeq (no,$(strip $(shared)))
+      BLOSC_LIB := libblosc.lib
+    else
+      BLOSC_LIB := blosc.lib
+    endif
+  else
+    ifeq (no,$(strip $(shared)))
+      BLOSC_LIB := libblosc_d.lib
+    else
+      BLOSC_LIB := blosc_d.lib
+    endif
+  endif
+else
+  BLOSC_LIB := -lblosc
+endif
+
 # The parent directory of the zlib header directory (which contains zlib.h)
 ZLIB_INCL_DIR := $(LOCAL_INCLUDE)
 ZLIB_LIB_DIR := $(LOCAL_LIB)
@@ -240,7 +272,7 @@ else
 CONCURRENT_MALLOC_LIB := -ljemalloc
 #CONCURRENT_MALLOC_LIB := -ltbbmalloc_proxy -ltbbmalloc
 # The directory containing the malloc replacement library
-CONCURRENT_MALLOC_LIB_DIR := $(HDSO)
+CONCURRENT_MALLOC_LIB_DIR := $(LOCAL_LIB)
 endif
 
 # The parent directory of the cppunit/ header directory
@@ -360,6 +392,11 @@ else
     QUIET_TEST := $(QUIET)
 endif
 
+has_blosc := no
+ifeq (3,$(words $(strip $(BLOSC_LIB_DIR) $(BLOSC_INCL_DIR) $(BLOSC_LIB))))
+    has_blosc := yes
+endif
+
 has_glfw := no
 ifeq (3,$(words $(strip $(GLFW_LIB_DIR) $(GLFW_INCL_DIR) $(GLFW_LIB))))
     has_glfw := yes
@@ -376,33 +413,47 @@ ifeq (7,$(words $(strip $(PYTHON_VERSION) $(PYTHON_LIB_DIR) $(PYTHON_INCL_DIR) \
     has_python := yes
 endif
 
-INCLDIRS := -I . -I .. -I $(BOOST_INCL_DIR) -I $(HALF_INCL_DIR) -I $(TBB_INCL_DIR) -I $(ZLIB_INCL_DIR)
+INCLDIRS := -I . -I .. \
+    $(CXXISYSTEM) $(BOOST_INCL_DIR) \
+    $(CXXISYSTEM) $(HALF_INCL_DIR) \
+    $(CXXISYSTEM) $(TBB_INCL_DIR) \
+    $(CXXISYSTEM) $(ZLIB_INCL_DIR) \
+#
+ifeq (yes,$(has_blosc))
+    INCLDIRS += $(CXXISYSTEM) $(BLOSC_INCL_DIR)
+endif
 ifeq (yes,$(has_log4cplus))
-    INCLDIRS += -I $(LOG4CPLUS_INCL_DIR)
+    INCLDIRS += $(CXXISYSTEM) $(LOG4CPLUS_INCL_DIR)
 endif
 
 CXXFLAGS += $(OPTIMIZE) $(INCLDIRS)
+ifeq (yes,$(has_blosc))
+    CXXFLAGS += -DOPENVDB_USE_BLOSC_LZ4
+endif
 ifeq (yes,$(has_log4cplus))
     CXXFLAGS += -DOPENVDB_USE_LOG4CPLUS
+endif
+ifeq (2,$(strip $(abi)))
+	CXXFLAGS += -DOPENVDB_2_ABI_COMPATIBLE
 endif
 
 LIBS := \
     -L $(HALF_LIB_DIR) $(HALF_LIB) \
     -L $(TBB_LIB_DIR) $(TBB_LIB) \
     -L $(ZLIB_LIB_DIR) $(ZLIB_LIB) \
+    -L $(BOOST_LIB_DIR) $(BOOST_LIB) \
 #
 LIBS_RPATH := \
     -Wl,-rpath,'$$ORIGIN/.' $(LDDIROPT)$(HALF_LIB_DIR) $(HALF_LIB) \
     -Wl,-rpath,'$$ORIGIN/.' $(LDDIROPT)$(TBB_LIB_DIR) $(TBB_LIB) \
     -Wl,-rpath,'$$ORIGIN/.' $(LDDIROPT)$(ZLIB_LIB_DIR) $(ZLIB_LIB) \
+    -Wl,-rpath,'$$ORIGIN/.' $(LDDIROPT)$(BOOST_LIB_DIR) $(BOOST_LIB) \
 #
-ifeq (0,$(words $(strip $(EXR_LIB_DIR) $(EXR_LIB))))
-EXR_LIBS :=
-EXR_LIBS_RPATH :=
-else
-EXR_LIBS = -L $(EXR_LIB_DIR) $(EXR_LIB)
-EXR_LIBS_RPATH := \
-    -Wl,-rpath,'$$ORIGIN/.' $(LDDIROPT)$(EXR_LIB_DIR) $(EXR_LIB)
+ifeq (yes,$(has_blosc))
+LIBS += \
+    -L $(BLOSC_LIB_DIR) $(BLOSC_LIB)
+LIBS_RPATH += \
+    -Wl,-rpath,'$$ORIGIN/.' $(LDDIROPT)$(BLOSC_LIB_DIR) $(BLOSC_LIB)
 endif
 ifeq (yes,$(has_log4cplus))
 LOG4CPLUS_LIBS := -L $(LOG4CPLUS_LIB_DIR) $(LOG4CPLUS_LIB)
@@ -412,13 +463,15 @@ else
 LOG4CPLUS_LIBS :=
 LOG4CPLUS_LIBS_RPATH :=
 endif
-ifeq (0,$(words $(strip $(CONCURRENT_MALLOC_LIB_DIR) $(CONCURRENT_MALLOC_LIB))))
-ALLOC_LIBS :=
-ALLOC_LIBS_RPATH :=
-else
+ifneq (,$(strip $(CONCURRENT_MALLOC_LIB)))
+ifneq (,$(strip $(CONCURRENT_MALLOC_LIB_DIR)))
 ALLOC_LIBS = -L $(CONCURRENT_MALLOC_LIB_DIR) $(CONCURRENT_MALLOC_LIB)
 ALLOC_LIBS_RPATH := \
     -Wl,-rpath,'$$ORIGIN/.' $(LDDIROPT)$(CONCURRENT_MALLOC_LIB_DIR) $(CONCURRENT_MALLOC_LIB)
+else
+ALLOC_LIBS :=
+ALLOC_LIBS_RPATH :=
+endif
 endif
 
 INCLUDE_NAMES := \
@@ -428,8 +481,10 @@ INCLUDE_NAMES := \
     io/Compression.h \
     io/File.h \
     io/GridDescriptor.h \
+    io/io.h \
     io/Queue.h \
     io/Stream.h \
+    io/TempFile.h \
     math/BBox.h \
     math/Coord.h \
     math/DDA.h \
@@ -460,9 +515,11 @@ INCLUDE_NAMES := \
     openvdb.h \
     Platform.h \
     PlatformConfig.h \
+    tools/Clip.h \
     tools/Composite.h \
     tools/Dense.h \
     tools/DenseSparseTools.h \
+    tools/Diagnostics.h \
     tools/Filter.h \
     tools/GridOperators.h \
     tools/GridTransformer.h \
@@ -480,6 +537,8 @@ INCLUDE_NAMES := \
     tools/Morphology.h \
     tools/ParticlesToLevelSet.h \
     tools/PointAdvect.h \
+    tools/PointIndexGrid.h \
+    tools/PointPartitioner.h \
     tools/PointScatter.h \
     tools/RayIntersector.h \
     tools/RayTracer.h \
@@ -519,6 +578,7 @@ SRC_NAMES := \
     io/GridDescriptor.cc \
     io/Queue.cc \
     io/Stream.cc \
+    io/TempFile.cc \
     math/Hermite.cc \
     math/Maps.cc \
     math/Proximity.cc \
@@ -544,6 +604,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestCurl.cc \
     unittest/TestDense.cc \
     unittest/TestDenseSparseTools.cc \
+    unittest/TestDiagnostics.cc \
     unittest/TestDivergence.cc \
     unittest/TestDoubleMetadata.cc \
     unittest/TestExceptions.cc \
@@ -580,6 +641,8 @@ UNITTEST_SRC_NAMES := \
     unittest/TestNodeIterator.cc \
     unittest/TestNodeMask.cc \
     unittest/TestParticlesToLevelSet.cc \
+    unittest/TestPointIndexGrid.cc \
+    unittest/TestPointPartitioner.cc \
     unittest/TestPrePostAPI.cc \
     unittest/TestQuadraticInterp.cc \
     unittest/TestQuantizedUnitVec.cc \
@@ -663,9 +726,9 @@ PYTHON_SRC_NAMES := \
     python/pyTransform.cc \
     python/pyVec3Grid.cc \
 #
-PYCXXFLAGS := -I python -I $(PYTHON_INCL_DIR) -I $(PYCONFIG_INCL_DIR)
+PYCXXFLAGS := $(CXXISYSTEM) python $(CXXISYSTEM) $(PYTHON_INCL_DIR) $(CXXISYSTEM) $(PYCONFIG_INCL_DIR)
 ifneq ($(strip $(NUMPY_INCL_DIR)),)
-PYCXXFLAGS += -I $(NUMPY_INCL_DIR) -DPY_OPENVDB_USE_NUMPY
+PYCXXFLAGS += $(CXXISYSTEM) $(NUMPY_INCL_DIR) -DPY_OPENVDB_USE_NUMPY
 endif
 ifneq (no,$(strip $(PYTHON_WRAP_ALL_GRID_TYPES)))
 PYCXXFLAGS += -DPY_OPENVDB_WRAP_ALL_GRID_TYPES
@@ -866,6 +929,9 @@ endif
 # END vdb_print rules
 
 # BEGIN vdb_render rules
+$(RENDER_OBJ_NAMES): %.o: %.cc
+	$(call CompileCXX, $(CXXISYSTEM) $(EXR_INCL_DIR))
+
 vdb_render$(EXE_SUFFIX): $(LIBOPENVDB) $(RENDER_OBJ_NAMES)
 	$(call BuildExecutable, $(RENDER_OBJ_NAMES) \
                                 $(LIBS_RPATH) \
@@ -945,7 +1011,7 @@ endif
 ifeq (3,$(words $(strip $(CPPUNIT_LIB_DIR) $(CPPUNIT_INCL_DIR) $(CPPUNIT_LIB))))
 
 $(UNITTEST_OBJ_NAMES): %.o: %.cc
-	$(call CompileCXX,-I $(CPPUNIT_INCL_DIR))
+	$(call CompileCXX, $(CXXISYSTEM) $(CPPUNIT_INCL_DIR))
 
 vdb_test$(EXE_SUFFIX): $(LIBOPENVDB) $(UNITTEST_OBJ_NAMES)
 	$(call BuildExecutable, $(UNITTEST_OBJ_NAMES) \
@@ -1088,7 +1154,7 @@ $(DEPEND): $(ALL_INCLUDE_FILES) $(ALL_SRC_FILES)
 		for f in $(UNITTEST_SRC_NAMES); \
 			do $(CXX) $(CXXFLAGS) -O0 \
 				-MM $$f -MT `echo $$f | sed 's%\.[^.]*%.o%'` \
-				-I $(CPPUNIT_INCL_DIR) >> $(DEPEND); \
+				$(CXXISYSTEM) $(CPPUNIT_INCL_DIR) >> $(DEPEND); \
 		done; \
 	fi
 
@@ -1117,6 +1183,6 @@ ifneq ($(DEPFILES),)
 -include $(DEPFILES)
 endif
 
-# Copyright (c) 2012-2013 DreamWorks Animation LLC
+# Copyright (c) 2012-2014 DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

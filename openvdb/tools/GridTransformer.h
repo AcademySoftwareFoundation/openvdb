@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -145,14 +145,16 @@ protected:
 /// @brief For point sampling, tree traversal is less expensive than testing
 /// bounding box membership.
 template<typename TreeT>
-struct TileSampler<PointSampler, TreeT>: public PointSampler {
+class TileSampler<PointSampler, TreeT>: public PointSampler {
+public:
     TileSampler(const CoordBBox&, const typename TreeT::ValueType&, bool) {}
 };
 
 /// @brief For point sampling, tree traversal is less expensive than testing
 /// bounding box membership.
 template<typename TreeT>
-struct TileSampler<StaggeredPointSampler, TreeT>: public StaggeredPointSampler {
+class TileSampler<StaggeredPointSampler, TreeT>: public StaggeredPointSampler {
+public:
     TileSampler(const CoordBBox&, const typename TreeT::ValueType&, bool) {}
 };
 
@@ -981,6 +983,6 @@ GridResampler::transformBBox(
 
 #endif // OPENVDB_TOOLS_GRIDTRANSFORMER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

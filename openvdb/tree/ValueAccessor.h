@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -440,8 +440,9 @@ private:
 /// @details This specialization is provided mainly for benchmarking.
 /// Accessors with caching will almost always be faster.
 template<typename TreeType>
-struct ValueAccessor<TreeType, 0, tbb::null_mutex>: public ValueAccessor0<TreeType>
+class ValueAccessor<TreeType, 0, tbb::null_mutex>: public ValueAccessor0<TreeType>
 {
+public:
     ValueAccessor(TreeType& tree): ValueAccessor0<TreeType>(tree) {}
     ValueAccessor(const ValueAccessor& other): ValueAccessor0<TreeType>(other) {}
     virtual ~ValueAccessor() {}
@@ -450,8 +451,9 @@ struct ValueAccessor<TreeType, 0, tbb::null_mutex>: public ValueAccessor0<TreeTy
 
 /// Template specialization of the ValueAccessor with no mutex and one cache level
 template<typename TreeType>
-struct ValueAccessor<TreeType, 1, tbb::null_mutex>: public ValueAccessor1<TreeType>
+class ValueAccessor<TreeType, 1, tbb::null_mutex>: public ValueAccessor1<TreeType>
 {
+public:
     ValueAccessor(TreeType& tree): ValueAccessor1<TreeType>(tree) {}
     ValueAccessor(const ValueAccessor& other): ValueAccessor1<TreeType>(other) {}
     virtual ~ValueAccessor() {}
@@ -460,8 +462,9 @@ struct ValueAccessor<TreeType, 1, tbb::null_mutex>: public ValueAccessor1<TreeTy
 
 /// Template specialization of the ValueAccessor with no mutex and two cache levels
 template<typename TreeType>
-struct ValueAccessor<TreeType, 2, tbb::null_mutex>: public ValueAccessor2<TreeType>
+class ValueAccessor<TreeType, 2, tbb::null_mutex>: public ValueAccessor2<TreeType>
 {
+public:
     ValueAccessor(TreeType& tree): ValueAccessor2<TreeType>(tree) {}
     ValueAccessor(const ValueAccessor& other): ValueAccessor2<TreeType>(other) {}
     virtual ~ValueAccessor() {}
@@ -470,8 +473,9 @@ struct ValueAccessor<TreeType, 2, tbb::null_mutex>: public ValueAccessor2<TreeTy
 
 /// Template specialization of the ValueAccessor with no mutex and three cache levels
 template<typename TreeType>
-struct ValueAccessor<TreeType, 3, tbb::null_mutex>: public ValueAccessor3<TreeType>
+class ValueAccessor<TreeType, 3, tbb::null_mutex>: public ValueAccessor3<TreeType>
 {
+public:
     ValueAccessor(TreeType& tree): ValueAccessor3<TreeType>(tree) {}
     ValueAccessor(const ValueAccessor& other): ValueAccessor3<TreeType>(other) {}
     virtual ~ValueAccessor() {}
@@ -490,8 +494,9 @@ struct ValueAccessor<TreeType, 3, tbb::null_mutex>: public ValueAccessor3<TreeTy
 /// is recommended that, instead, each thread be assigned its own
 /// (non-mutex protected) accessor.
 template<typename TreeType>
-struct ValueAccessorRW: public ValueAccessor<TreeType, TreeType::DEPTH-1, tbb::spin_mutex>
+class ValueAccessorRW: public ValueAccessor<TreeType, TreeType::DEPTH-1, tbb::spin_mutex>
 {
+public:
     ValueAccessorRW(TreeType& tree)
         : ValueAccessor<TreeType, TreeType::DEPTH-1, tbb::spin_mutex>(tree)
     {
@@ -2606,6 +2611,6 @@ private:
 
 #endif // OPENVDB_TREE_VALUEACCESSOR_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -211,20 +211,13 @@ public:
             }
         }
     }
-    inline static
-    float translateValue(float vdb_value) {
-        return vdb_value;
+    template<typename T> inline static float translateValue(const T& vdb_value) {
+        return static_cast<float>(vdb_value);
     }
-    inline static
-    float translateValue(double& vdb_value, float& h_value) {
-        return (float) vdb_value;
-    }
-    inline static
-    UT_Vector3 translateValue(cvdb::Vec3f& vdb_value) {
+    inline static UT_Vector3 translateValue(cvdb::Vec3f& vdb_value) {
         return UT_Vector3(vdb_value[0], vdb_value[1], vdb_value[2]);
     }
-    inline static
-    UT_Vector3 translateValue(cvdb::Vec3d& vdb_value) {
+    inline static UT_Vector3 translateValue(cvdb::Vec3d& vdb_value) {
         return UT_Vector3((float)vdb_value[0], (float)vdb_value[1], (float)vdb_value[2]);
     }
 
@@ -309,7 +302,7 @@ SOP_OpenVDB_Sample_Points::sample(OP_Context& context)
     // extract UI data
     mVerbose = evalInt("verbose", 0, time);
     const bool threaded = true; /*evalInt("threaded", 0, time);*/
-    const int nPoints = aGdp->getNumPoints();
+    const GA_Size nPoints = aGdp->getNumPoints();
 
     // sanity checks
     if (nPoints == 0) {
@@ -527,6 +520,6 @@ SOP_OpenVDB_Sample_Points::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

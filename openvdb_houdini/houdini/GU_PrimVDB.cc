@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -65,9 +65,10 @@
 #include <GEO/GEO_Closure.h>
 #include <GEO/GEO_WorkVertexBuffer.h>
 
+#include <GA/GA_AIFTuple.h>
 #include <GA/GA_AttributeFilter.h>
 #include <GA/GA_ElementWrangler.h>
-#include <GA/GA_GBAttributeMath.h>
+#include <GA/GA_Handle.h>
 #include <GA/GA_PageHandle.h>
 #include <GA/GA_PageIterator.h>
 #include <GA/GA_SplittableRange.h>
@@ -80,8 +81,15 @@
 #if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
 #include <UT/UT_ScopeExit.h>
 #endif
+
+#if (UT_VERSION_INT < 0x0d000000) // earlier than 13.0.0
+typedef UT_Vector2T<int32> UT_Vector2i;
+typedef UT_Vector3T<int32> UT_Vector3i;
+#else
+#include <UT/UT_Singleton.h>
+#endif
+
 #include <UT/UT_StopWatch.h>
-#include <UT/UT_Version.h>
 
 #if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
 #include <SYS/SYS_Inline.h>
@@ -160,7 +168,11 @@ private:
 // wranglers are cached across all primitives with GU_ConvertParms itself.
 static void
 GUconvertCopySingleVertexPrimAttribsAndGroups(
+#ifdef SESI_OPENVDB
 	GU_ConvertParms &parms,
+#else
+	GU_ConvertParms &/*parms*/,
+#endif
 	const GA_Detail &src,
 	GA_Offset src_primoff,
 	GA_Detail &dst,
@@ -753,7 +765,11 @@ static void
 guCopyMesh(
 	GEO_Detail& detail,
 	openvdb::tools::VolumeToMesh& mesher,
+#if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
+	bool /*buildpolysoup*/,
+#else
 	bool buildpolysoup,
+#endif
 	bool verbose)
 {
     TIMING_DEF;
@@ -1083,7 +1099,7 @@ public:
     setVolumeOptions(
 	    bool is_sdf, const ValueT& background,
 	    GEO_VolumeVis vismode, fpreal iso, fpreal density,
-	    SCALAR_RET(ValueT) *dummy = 0)
+	    SCALAR_RET(ValueT)* /*dummy*/ = 0)
     {
 	if (is_sdf) {
 	    mVol[0]->setBorder(GEO_VOLUMEBORDER_SDF, background);
@@ -1098,7 +1114,7 @@ public:
     setVolumeOptions(
 	    bool is_sdf, const ValueT& background,
 	    GEO_VolumeVis vismode, fpreal iso, fpreal density,
-	    NON_SCALAR_RET(ValueT) *dummy = 0)
+	    NON_SCALAR_RET(ValueT)* /*dummy*/ = 0)
     {
 	if (is_sdf) {
 	    for (int i = 0; i < TUPLE_SIZE; i++) {
@@ -1156,14 +1172,14 @@ private: // methods
     template <class ValueT>
     static void
     makeConstant_(VoxelTileF* tiles[TUPLE_SIZE], const ValueT& v,
-		 SCALAR_RET(ValueT) *dummy = 0)
+		 SCALAR_RET(ValueT)* /*dummy*/ = 0)
     {
 	tiles[0]->makeConstant(fpreal32(v));
     }
     template <class ValueT>
     static void
     makeConstant_(VoxelTileF* tiles[TUPLE_SIZE], const ValueT& v,
-		 NON_SCALAR_RET(ValueT) *dummy = 0)
+		 NON_SCALAR_RET(ValueT)* /*dummy*/ = 0)
     {
 	for (int i = 0; i < TUPLE_SIZE; i++)
 	    tiles[i]->makeConstant(fpreal32(v[i]));
@@ -1188,8 +1204,8 @@ private: // methods
 	    VoxelTileF* tile,
 	    fpreal32* rawData,
 	    const ValueT& v,
-	    int i,
-	    SCALAR_RET(ValueT) *dummy = 0)
+	    int /*i*/,
+	    SCALAR_RET(ValueT)* /*dummy*/ = 0)
     {
 	rawData[tileCoordToOffset(tile, xyz)] = v;
     }
@@ -1201,7 +1217,7 @@ private: // methods
 	    fpreal32* rawData,
 	    const ValueT& v,
 	    int i,
-	    NON_SCALAR_RET(ValueT) *dummy = 0)
+	    NON_SCALAR_RET(ValueT)* /*dummy*/ = 0)
     {
 	rawData[tileCoordToOffset(tile, xyz)] = v[i];
     }
@@ -2029,8 +2045,7 @@ GU_PrimVDB::convertVDBs(
         if (progress.wasInterrupted())
 	    break;
 
-	GU_PrimVDB *vdb = dynamic_cast<GU_PrimVDB*>(
-				static_cast<GU_Primitive*>(prim->castTo()));
+	GU_PrimVDB *vdb = dynamic_cast<GU_PrimVDB*>(prim);
 	if (vdb == NULL)
 	    continue;
 
@@ -2059,6 +2074,7 @@ GU_PrimVDB::normal(NormalComp& /*output*/) const
     // No need here.
 }
 
+#if (UT_VERSION_INT < 0x0d050000) // Earlier than 13.5
 void *
 GU_PrimVDB::castTo() const
 {
@@ -2070,6 +2086,7 @@ GU_PrimVDB::castToGeo(void) const
 {
     return this;
 }
+#endif
 
 #if (UT_VERSION_INT < 0x0d050000) // Earlier than 13.5
 GU_RayIntersect *
@@ -2093,6 +2110,7 @@ GU_PrimVDB::createRayCache(int &callermustdelete)
 }
 #endif
 
+#if (UT_VERSION_INT < 0x0d050000) // Earlier than 13.5
 int
 GU_PrimVDB::intersectRay(const UT_Vector3 &org, const UT_Vector3 &dir,
 		float tmax, float , float *distance,
@@ -2113,6 +2131,7 @@ GU_PrimVDB::intersectRay(const UT_Vector3 &org, const UT_Vector3 &dir,
     }
     return result;
 }
+#endif
 
 
 ////////////////////////////////////////
@@ -2120,134 +2139,176 @@ GU_PrimVDB::intersectRay(const UT_Vector3 &org, const UT_Vector3 &dir,
 
 namespace {
 
-using namespace openvdb;
+template <typename T> struct IsScalarMeta
+{ BOOST_STATIC_CONSTANT(bool, value = true); };
 
-typedef boost::function<void (GEO_Detail&, const GEO_PrimVDB&,
-    const char* /*name*/, const openvdb::Metadata&)> AttrCreator;
-typedef std::map<std::string, AttrCreator> MetaToAttrMap;
+#define DECLARE_VECTOR(METADATA_T) \
+    template <> struct IsScalarMeta<METADATA_T> \
+    { BOOST_STATIC_CONSTANT(bool, value = false); }; \
+    /**/
+DECLARE_VECTOR(openvdb::Vec2IMetadata)
+DECLARE_VECTOR(openvdb::Vec2SMetadata)
+DECLARE_VECTOR(openvdb::Vec2DMetadata)
+DECLARE_VECTOR(openvdb::Vec3IMetadata)
+DECLARE_VECTOR(openvdb::Vec3SMetadata)
+DECLARE_VECTOR(openvdb::Vec3DMetadata)
+#undef DECLARE_VECTOR
 
-
-const MetaToAttrMap* sMetaToAttrMap = NULL;
-UT_Lock sLock;
-
-
-// For OpenVDB metadata of specific types, create primitive attributes
-// by calling GEO_Detail::addTuple() with appropriate arguments.
-template<typename MetadataT> void addPrimAttr(GEO_Detail&, const char* /*name*/) {}
-
-#define ADD_PRIM_ATTR(MetaT, StoreT, tupleSize) \
-    template<> void addPrimAttr<MetaT>(GEO_Detail& gdp, const char* name) { \
-        gdp.addTuple(StoreT, GA_ATTRIB_PRIMITIVE, name, tupleSize); \
-    }
-
-ADD_PRIM_ATTR(BoolMetadata,   GA_STORE_INT8,   1)
-ADD_PRIM_ATTR(FloatMetadata,  GA_STORE_REAL32, 1)
-ADD_PRIM_ATTR(DoubleMetadata, GA_STORE_REAL64, 1)
-ADD_PRIM_ATTR(Int32Metadata,  GA_STORE_INT32,  1)
-ADD_PRIM_ATTR(Int64Metadata,  GA_STORE_INT64,  1)
-ADD_PRIM_ATTR(StringMetadata, GA_STORE_STRING, 1)
-ADD_PRIM_ATTR(Vec2IMetadata,  GA_STORE_INT32,  2)
-ADD_PRIM_ATTR(Vec2SMetadata,  GA_STORE_REAL32, 2)
-ADD_PRIM_ATTR(Vec2DMetadata,  GA_STORE_REAL64, 2)
-ADD_PRIM_ATTR(Vec3IMetadata,  GA_STORE_INT32,  3)
-ADD_PRIM_ATTR(Vec3SMetadata,  GA_STORE_REAL32, 3)
-ADD_PRIM_ATTR(Vec3DMetadata,  GA_STORE_REAL64, 3)
-
-#undef ADD_PRIM_ATTR
-
-
-// For OpenVDB metadata of specific types, set the value of
-// a primitive attribute of a corresponding type.
-template<typename MetadataT> void setPrimAttr(GEO_AttributeHandle&, const MetadataT&) {}
-
-#define SET_PRIM_ATTR(MetaT) \
-    template<> void setPrimAttr<MetaT>(GEO_AttributeHandle& attr, const MetaT& meta)
-
-SET_PRIM_ATTR(BoolMetadata) { attr.setI(meta.value()); }
-SET_PRIM_ATTR(FloatMetadata) { attr.setF(meta.value()); }
-SET_PRIM_ATTR(DoubleMetadata) { attr.setF(meta.value()); }
-SET_PRIM_ATTR(Int32Metadata) { attr.setI(meta.value()); }
-SET_PRIM_ATTR(Int64Metadata) { attr.setI(meta.value()); } ///< @todo can we set a 64-bit value?
-SET_PRIM_ATTR(StringMetadata) { attr.setString(UT_String(meta.value())); }
-SET_PRIM_ATTR(Vec2IMetadata) {
-    const Vec2i& v = meta.value(); attr.setI(v[0], 0); attr.setI(v[1], 1);
-}
-SET_PRIM_ATTR(Vec2SMetadata) {
-    const Vec2s& v = meta.value(); attr.setF(v[0], 0); attr.setF(v[1], 1);
-}
-SET_PRIM_ATTR(Vec2DMetadata) {
-    const Vec2d& v = meta.value(); attr.setF(v[0], 0); attr.setF(v[1], 1);
-}
-SET_PRIM_ATTR(Vec3IMetadata) {
-    const Vec3i& v = meta.value(); attr.setI(v[0], 0); attr.setI(v[1], 1); attr.setI(v[2], 2);
-}
-SET_PRIM_ATTR(Vec3SMetadata) {
-    const Vec3s& v = meta.value(); attr.setF(v[0], 0); attr.setF(v[1], 1); attr.setF(v[2], 2);
-}
-SET_PRIM_ATTR(Vec3DMetadata) {
-    const Vec3d& v = meta.value(); attr.setF(v[0], 0); attr.setF(v[1], 1); attr.setF(v[2], 2);
-}
-
-#undef SET_PRIM_ATTR
-
-
-template<typename MetadataT>
-void
-addAndSetPrimAttr(GEO_Detail& gdp, const GEO_PrimVDB& prim,
-    const char* name, const Metadata& meta)
+template<typename T, typename MetadataT, int I, typename ENABLE = void>
+struct MetaTuple
 {
+    static T get(const MetadataT& meta) {
+        return meta.value()[I];
+    }
+};
+
+template<typename T, typename MetadataT, int I>
+struct MetaTuple<T, MetadataT, I, typename boost::enable_if< IsScalarMeta<MetadataT> >::type>
+{
+    static T get(const MetadataT& meta) {
+        UT_ASSERT(I == 0);
+        return meta.value();
+    }
+};
+
+template<int I>
+struct MetaTuple<const char*, openvdb::StringMetadata, I>
+{
+    static const char* get(const openvdb::StringMetadata& meta) {
+    UT_ASSERT(I == 0);
+        return meta.value().c_str();
+    }
+};
+
+template <typename MetadataT> struct MetaAttr;
+
+#define META_ATTR(METADATA_T, STORAGE, TUPLE_T, TUPLE_SIZE) \
+    template <> \
+    struct MetaAttr<METADATA_T> { \
+   typedef TUPLE_T TupleT; \
+   typedef GA_HandleT<TupleT>::RWType RWHandleT; \
+   static const int theTupleSize = TUPLE_SIZE; \
+   static const GA_Storage theStorage = STORAGE; \
+    }; \
+    /**/
+
+META_ATTR(openvdb::BoolMetadata,   GA_STORE_INT8,   int8,        1)
+META_ATTR(openvdb::FloatMetadata,  GA_STORE_REAL32, fpreal32,    1)
+META_ATTR(openvdb::DoubleMetadata, GA_STORE_REAL64, fpreal64,    1)
+META_ATTR(openvdb::Int32Metadata,  GA_STORE_INT32,  int32,       1)
+META_ATTR(openvdb::Int64Metadata,  GA_STORE_INT64,  int64,       1)
+//META_ATTR(openvdb::StringMetadata, GA_STORE_STRING, const char*, 1)
+META_ATTR(openvdb::Vec2IMetadata,  GA_STORE_INT32,  int32,       2)
+META_ATTR(openvdb::Vec2SMetadata,  GA_STORE_REAL32, fpreal32,    2)
+META_ATTR(openvdb::Vec2DMetadata,  GA_STORE_REAL64, fpreal64,    2)
+META_ATTR(openvdb::Vec3IMetadata,  GA_STORE_INT32,  int32,       3)
+META_ATTR(openvdb::Vec3SMetadata,  GA_STORE_REAL32, fpreal32,    3)
+META_ATTR(openvdb::Vec3DMetadata,  GA_STORE_REAL64, fpreal64,    3)
+
+#undef META_ATTR
+
+// Functor for setAttr()
+typedef boost::function<
+    void (GEO_Detail&, GA_AttributeOwner, GA_Offset, const char*, const openvdb::Metadata&)> AttrSettor;
+
+template <typename MetadataT>
+static void
+setAttr(GEO_Detail& geo, GA_AttributeOwner owner, GA_Offset elem,
+    const char* name, const openvdb::Metadata& meta_base)
+{
+    typedef MetaAttr<MetadataT>             MetaAttrT;
+    typedef typename MetaAttrT::RWHandleT   RWHandleT;
+    typedef typename MetaAttrT::TupleT      TupleT;
+
     /// @todo If there is an existing attribute with the given name but
     /// a different type, this will replace the old attribute with a new one.
     /// See GA_ReuseStrategy for alternative behaviors.
-    addPrimAttr<MetadataT>(gdp, name);
-    GEO_AttributeHandle attr = gdp.getPrimAttribute(name);
-    if (attr.isAttributeValid()) {
-        attr.setElement(&prim);
-        setPrimAttr<MetadataT>(attr, static_cast<const MetadataT&>(meta));
+    GA_RWAttributeRef attrRef = geo.addTuple(MetaAttrT::theStorage, owner, name, MetaAttrT::theTupleSize);
+    if (attrRef.isInvalid()) return;
+
+    RWHandleT handle(attrRef.getAttribute());
+
+    const MetadataT& meta = static_cast<const MetadataT&>(meta_base);
+    switch (MetaAttrT::theTupleSize) {
+    case 3: handle.set(elem, 2, MetaTuple<TupleT,MetadataT,2>::get(meta));
+    case 2: handle.set(elem, 1, MetaTuple<TupleT,MetadataT,1>::get(meta));
+    case 1: handle.set(elem, 0, MetaTuple<TupleT,MetadataT,0>::get(meta));
     }
+    UT_ASSERT(MetaAttrT::theTupleSize >= 1 && MetaAttrT::theTupleSize <= 3);
 }
 
-
-// Construct a mapping from OpenVDB metadata types to functions
-// that create primitive attributes of corresponding types.
-void
-initMetaToAttrMap()
+/// for Houdini 12.1
+template <typename MetadataT>
+static void
+setStrAttr(GEO_Detail& geo, GA_AttributeOwner owner, GA_Offset elem,
+    const char* name, const openvdb::Metadata& meta_base)
 {
-    using namespace openvdb;
+    GA_RWAttributeRef attrRef = geo.addStringTuple(owner, name, 1);
+    if (attrRef.isInvalid()) return;
 
-    if (sMetaToAttrMap != NULL) return;
+    GA_RWHandleS handle(attrRef.getAttribute());
 
-    UT_Lock::Scope lock(sLock);
-    if (sMetaToAttrMap != NULL) return;
-
-    MetaToAttrMap* newMap = new MetaToAttrMap;
-    (*newMap)[BoolMetadata::staticTypeName()] =   addAndSetPrimAttr<BoolMetadata>;
-    (*newMap)[FloatMetadata::staticTypeName()] =  addAndSetPrimAttr<FloatMetadata>;
-    (*newMap)[DoubleMetadata::staticTypeName()] = addAndSetPrimAttr<DoubleMetadata>;
-    (*newMap)[Int32Metadata::staticTypeName()] =  addAndSetPrimAttr<Int32Metadata>;
-    (*newMap)[Int64Metadata::staticTypeName()] =  addAndSetPrimAttr<Int64Metadata>;
-    (*newMap)[StringMetadata::staticTypeName()] = addAndSetPrimAttr<StringMetadata>;
-    (*newMap)[Vec2IMetadata::staticTypeName()] =  addAndSetPrimAttr<Vec2IMetadata>;
-    (*newMap)[Vec2SMetadata::staticTypeName()] =  addAndSetPrimAttr<Vec2SMetadata>;
-    (*newMap)[Vec2DMetadata::staticTypeName()] =  addAndSetPrimAttr<Vec2DMetadata>;
-    (*newMap)[Vec3IMetadata::staticTypeName()] =  addAndSetPrimAttr<Vec3IMetadata>;
-    (*newMap)[Vec3SMetadata::staticTypeName()] =  addAndSetPrimAttr<Vec3SMetadata>;
-    (*newMap)[Vec3DMetadata::staticTypeName()] =  addAndSetPrimAttr<Vec3DMetadata>;
-
-#if defined(__ICC)
-    // Disable ICC "assignment to static variable" warning, since
-    // the assignment to sMetaToAttrMap is mutex-protected.
-    __pragma(warning(disable:1711));
-#endif
-
-    sMetaToAttrMap = newMap;
-
-#if defined(__ICC)
-    __pragma(warning(default:1711));
-#endif
+    const MetadataT& meta = static_cast<const MetadataT&>(meta_base);
+    handle.set(elem, 0, MetaTuple<const char*, MetadataT, 0>::get(meta));
 }
+
+class MetaToAttrMap : public std::map<std::string, AttrSettor>
+{
+public:
+    MetaToAttrMap()
+    {
+        using namespace openvdb;
+        // Construct a mapping from OpenVDB metadata types to functions
+        // that create attributes of corresponding types.
+        (*this)[BoolMetadata::staticTypeName()]   = &setAttr<BoolMetadata>;
+        (*this)[FloatMetadata::staticTypeName()]  = &setAttr<FloatMetadata>;
+        (*this)[DoubleMetadata::staticTypeName()] = &setAttr<DoubleMetadata>;
+        (*this)[Int32Metadata::staticTypeName()]  = &setAttr<Int32Metadata>;
+        (*this)[Int64Metadata::staticTypeName()]  = &setAttr<Int64Metadata>;
+        (*this)[StringMetadata::staticTypeName()] = &setStrAttr<StringMetadata>;
+        (*this)[Vec2IMetadata::staticTypeName()]  = &setAttr<Vec2IMetadata>;
+        (*this)[Vec2SMetadata::staticTypeName()]  = &setAttr<Vec2SMetadata>;
+        (*this)[Vec2DMetadata::staticTypeName()]  = &setAttr<Vec2DMetadata>;
+        (*this)[Vec3IMetadata::staticTypeName()]  = &setAttr<Vec3IMetadata>;
+        (*this)[Vec3SMetadata::staticTypeName()]  = &setAttr<Vec3SMetadata>;
+        (*this)[Vec3DMetadata::staticTypeName()]  = &setAttr<Vec3DMetadata>;
+    }
+};
+
+
+#if (UT_VERSION_INT < 0x0d000000) // earlier than 13.0.0
+
+static UT_Lock sLock;
+
+template <typename T>
+struct PrimVDBSingletonWithLock {
+
+    PrimVDBSingletonWithLock() : mData(NULL) {}
+    ~PrimVDBSingletonWithLock() { if (mData) delete mData; }
+
+    T *operator->() {
+        if (mData != NULL) return mData;
+        UT_Lock::Scope lock(sLock);
+        if (mData == NULL) mData = new T();
+        return mData;
+    }
+
+private:
+    T* mData;
+};
+
+static PrimVDBSingletonWithLock<MetaToAttrMap> sMetaToAttrMap;
+
+#else
+
+static UT_SingletonWithLock<MetaToAttrMap> sMetaToAttrMap;
+
+#endif
 
 } // unnamed namespace
+
+
+////////////////////////////////////////
 
 
 void
@@ -2265,18 +2326,27 @@ GU_PrimVDB::createGridAttrsFromMetadataAdapter(
 	const void* gridPtr,
 	GEO_Detail& aGdp)
 {
-    // gridPtr is assumed to point to an openvdb::vX_Y_Z::GridBase, for some
+    createAttrsFromMetadataAdapter(
+        GA_ATTRIB_PRIMITIVE, prim.getMapOffset(), gridPtr, aGdp);
+}
+
+
+void
+GU_PrimVDB::createAttrsFromMetadataAdapter(
+    GA_AttributeOwner owner,
+    GA_Offset element,
+    const void* meta_map_ptr,
+    GEO_Detail& geo)
+{
+    // meta_map_ptr is assumed to point to an openvdb::vX_Y_Z::MetaMap, for some
     // version X.Y.Z of OpenVDB that may be newer than the one with which
-    // libHoudiniGEO.so was built.  This is safe provided that GridBase and
+    // libHoudiniGEO.so was built.  This is safe provided that MetaMap and
     // its member objects are ABI-compatible between the two OpenVDB versions.
-    const openvdb::GridBase& grid =
-	*static_cast<const openvdb::GridBase*>(gridPtr);
+    const openvdb::MetaMap& meta_map = *static_cast<const openvdb::MetaMap*>(meta_map_ptr);
 
-    initMetaToAttrMap();
+    for (openvdb::MetaMap::ConstMetaIterator metaIt = meta_map.beginMeta(),
+            metaEnd = meta_map.endMeta(); metaIt != metaEnd; ++metaIt) {
 
-    for (openvdb::MetaMap::ConstMetaIterator metaIt = grid.beginMeta(),
-        metaEnd = grid.endMeta(); metaIt != metaEnd; ++metaIt)
-    {
         if (openvdb::Metadata::Ptr meta = metaIt->second) {
             std::string name = metaIt->first;
 
@@ -2297,15 +2367,13 @@ GU_PrimVDB::createGridAttrsFromMetadataAdapter(
                 && meta->typeName() == openvdb::StringMetadata::staticTypeName()
                 && meta->str().empty())
             {
-                GEO_AttributeHandle attr = aGdp.getPrimAttribute(name.c_str());
-                if (!attr.isAttributeValid())
-                    continue;
+                if (geo.findAttribute(owner, name.c_str()).isInvalid()) continue;
             }
 
             MetaToAttrMap::const_iterator creatorIt =
                 sMetaToAttrMap->find(meta->typeName());
             if (creatorIt != sMetaToAttrMap->end()) {
-                creatorIt->second(aGdp, prim, name.c_str(), *meta);
+                creatorIt->second(geo, owner, element, name.c_str(), *meta);
             } else {
                 /// @todo Add warning:
                 // std::string("discarded metadata \"") + name
@@ -2322,20 +2390,36 @@ GU_PrimVDB::createMetadataFromGridAttrsAdapter(
 	const GEO_PrimVDB& prim,
 	const GEO_Detail& aGdp)
 {
+    createMetadataFromAttrsAdapter(
+        gridPtr, GA_ATTRIB_PRIMITIVE, prim.getMapOffset(), aGdp);
+}
+
+void
+GU_PrimVDB::createMetadataFromAttrsAdapter(
+    void* meta_map_ptr,
+    GA_AttributeOwner owner,
+    GA_Offset element,
+    const GEO_Detail& geo)
+{
     using namespace openvdb;
 
-    // gridPtr is assumed to point to an openvdb::vX_Y_Z::GridBase, for some
+    // meta_map_ptr is assumed to point to an openvdb::vX_Y_Z::MetaMap, for some
     // version X.Y.Z of OpenVDB that may be newer than the one with which
-    // libHoudiniGEO.so was built.  This is safe provided that GridBase and
+    // libHoudiniGEO.so was built.  This is safe provided that MetaMap and
     // its member objects are ABI-compatible between the two OpenVDB versions.
-    openvdb::GridBase& grid = *static_cast<openvdb::GridBase*>(gridPtr);
+    openvdb::MetaMap& meta_map = *static_cast<openvdb::MetaMap*>(meta_map_ptr);
 
-    const GA_AttributeSet& attrs = aGdp.getAttributes();
-    for (GA_AttributeDict::iterator it = attrs.begin(GA_ATTRIB_PRIMITIVE); !it.atEnd(); ++it) {
+    const GA_AttributeSet& attrs = geo.getAttributes();
+    for (GA_AttributeDict::iterator it = attrs.begin(owner, GA_SCOPE_PUBLIC); !it.atEnd(); ++it) {
+
         if (!it.name()) continue;
 
-        GEO_AttributeHandle attr = aGdp.getPrimAttribute(it.name());
-        if (!attr.isAttributeValid()) continue;
+        // For global attributes, only save them if they begin with vdb_
+        if (owner == GA_ATTRIB_GLOBAL) {
+            UT_String str = it.name();
+            str.toLower();
+            if (!str.startsWith("vdb_")) continue;
+        }
 
         std::string name = it.name();
         {
@@ -2345,34 +2429,56 @@ GU_PrimVDB::createMetadataFromGridAttrsAdapter(
             if (str.startsWith("vdb_")) name = name.substr(4);
         }
 
-        attr.setElement(&prim);
+        const GA_Attribute* attrib = it.attrib();
+        const GA_AIFTuple* tuple = attrib->getAIFTuple();
+        const int entries = attrib->getTupleSize();
 
-        const int entries = it.attrib()->getTupleSize();
-
-        switch (it.attrib()->getStorageClass()) { ///< @todo can we get the specific GA_Storage?
+        switch (attrib->getStorageClass()) {
 
         case GA_STORECLASS_INT:
             switch (entries) {
             case 1:
-                grid.removeMeta(name);
+                meta_map.removeMeta(name);
                 if (name.substr(0, 3) == "is_") {
                     // Scalar integer attributes whose names begin with "is_"
                     // are mapped to boolean metadata.
-                    grid.insertMeta(name, BoolMetadata(attr.getI()));
+                    if (tuple->getStorage(attrib) == GA_STORE_INT64) {
+                        GA_ROHandleT<int64> handle(attrib);
+                        meta_map.insertMeta(name, BoolMetadata(
+                        handle.get(element) != 0));
+                    } else {
+                        GA_ROHandleT<int32> handle(attrib);
+                        meta_map.insertMeta(name, BoolMetadata(
+                        handle.get(element) != 0));
+                    }
                 } else {
-                    grid.insertMeta(name, Int32Metadata(attr.getI()));
+                    if (tuple->getStorage(attrib) == GA_STORE_INT64) {
+                        GA_ROHandleT<int64> handle(attrib);
+                        meta_map.insertMeta(name, Int64Metadata(
+                        handle.get(element)));
+                    } else {
+                        GA_ROHandleT<int32> handle(attrib);
+                        meta_map.insertMeta(name, Int32Metadata(
+                        handle.get(element)));
+                    }
                 }
                 break;
             case 2:
-                grid.removeMeta(name);
-                grid.insertMeta(name,
-                    Vec2IMetadata(Vec2i(attr.getI(0), attr.getI(1))));
-                break;
+                {
+                    GA_ROHandleT<UT_Vector2i> handle(attrib);
+                    meta_map.removeMeta(name);
+                    meta_map.insertMeta(name, Vec2IMetadata(
+                    UTvdbConvert(handle.get(element))));
+                }
+            break;
             case 3:
-                grid.removeMeta(name);
-                grid.insertMeta(name,
-                    Vec3IMetadata(Vec3i(attr.getI(0), attr.getI(1), attr.getI(2))));
-                break;
+                {
+                    GA_ROHandleT<UT_Vector3i> handle(attrib);
+                    meta_map.removeMeta(name);
+                    meta_map.insertMeta(name, Vec3IMetadata(
+                    UTvdbConvert(handle.get(element))));
+                }
+            break;
             default:
                 {
                     /// @todo Add warning:
@@ -2387,18 +2493,40 @@ GU_PrimVDB::createMetadataFromGridAttrsAdapter(
         case GA_STORECLASS_FLOAT:
             switch (entries) {
             case 1:
-                grid.removeMeta(name);
-                grid.insertMeta(name, DoubleMetadata(attr.getF()));
+                meta_map.removeMeta(name);
+                if (tuple->getStorage(attrib) == GA_STORE_REAL64) {
+                    GA_ROHandleT<fpreal64> handle(attrib);
+                    meta_map.insertMeta(name, DoubleMetadata(
+                    handle.get(element)));
+                } else {
+                    GA_ROHandleT<fpreal32> handle(attrib);
+                    meta_map.insertMeta(name, FloatMetadata(
+                    handle.get(element)));
+                }
                 break;
             case 2:
-                grid.removeMeta(name);
-                grid.insertMeta(name,
-                    Vec2DMetadata(Vec2d(attr.getF(0), attr.getF(1))));
-                break;
+                meta_map.removeMeta(name);
+                if (tuple->getStorage(attrib) == GA_STORE_REAL64) {
+                    GA_ROHandleT<UT_Vector2D> handle(attrib);
+                    meta_map.insertMeta(name, Vec2DMetadata(
+                    UTvdbConvert(handle.get(element))));
+                } else {
+                    GA_ROHandleT<UT_Vector2F> handle(attrib);
+                    meta_map.insertMeta(name, Vec2SMetadata(
+                    UTvdbConvert(handle.get(element))));
+                }
+            break;
             case 3:
-                grid.removeMeta(name);
-                grid.insertMeta(name,
-                    Vec3DMetadata(Vec3d(attr.getF(0), attr.getF(1), attr.getF(2))));
+                meta_map.removeMeta(name);
+                if (tuple->getStorage(attrib) == GA_STORE_REAL64) {
+                    GA_ROHandleT<UT_Vector3D> handle(attrib);
+                    meta_map.insertMeta(name, Vec3DMetadata(
+                    UTvdbConvert(handle.get(element))));
+                } else {
+                    GA_ROHandleT<UT_Vector3F> handle(attrib);
+                    meta_map.insertMeta(name, Vec3SMetadata(
+                    UTvdbConvert(handle.get(element))));
+                }
                 break;
             default:
                 {
@@ -2413,10 +2541,12 @@ GU_PrimVDB::createMetadataFromGridAttrsAdapter(
 
         case GA_STORECLASS_STRING:
             if (entries == 1) {
-                UT_String s;
-                attr.getString(s);
-                grid.removeMeta(name);
-                grid.insertMeta(name, StringMetadata(s.toStdString()));
+                GA_ROHandleS handle(attrib);
+                meta_map.removeMeta(name);
+                const char* str = handle.get(element);
+		if (!str)
+		    str = "";
+                meta_map.insertMeta(name, StringMetadata(str));
             } else {
                 /// @todo Add warning:
                 //std::ostringstream ostr;
@@ -2449,6 +2579,6 @@ newGeometryPrim(GA_PrimitiveFactory *factory)
 
 #endif // UT_VERSION_INT < 0x0c050157 // earlier than 12.5.343
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

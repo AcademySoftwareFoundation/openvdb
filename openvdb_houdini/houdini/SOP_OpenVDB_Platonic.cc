@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -160,10 +160,10 @@ SOP_OpenVDB_Platonic::cookMySop(OP_Context& context)
         hvdb::Interrupter boss("OpenVDB Platonic");
 
         // Read GUI parameters and generate narrow-band level set of sphere
-        const float radius = evalFloat("scalarRadius", 0, time);
+        const float radius = static_cast<float>(evalFloat("scalarRadius", 0, time));
         const openvdb::Vec3f center = evalVec3f("center", time);
-        const float voxelSize = evalFloat("voxelSize", 0, time);
-        float halfWidth = evalFloat("halfWidth", 0, time);
+        const float voxelSize = static_cast<float>(evalFloat("voxelSize", 0, time));
+        float halfWidth = static_cast<float>(evalFloat("halfWidth", 0, time));
 
         {
             UT_String gridClassStr;
@@ -191,6 +191,6 @@ SOP_OpenVDB_Platonic::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

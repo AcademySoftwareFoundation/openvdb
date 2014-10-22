@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -29,6 +29,7 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include <cstdio> // for remove()
+#include <fstream>
 #include <sstream>
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/Exceptions.h>
@@ -166,8 +167,7 @@ TestTree::testWriteHalf()
 {
     typedef openvdb::Grid<TreeType> GridType;
     typedef typename TreeType::ValueType ValueT;
-    ValueT background = openvdb::zeroVal<ValueT>();
-    background += 5;
+    ValueT background(5);
     GridType grid(background);
 
     unittest_util::makeSphere<GridType>(openvdb::Coord(64, 64, 64),
@@ -1889,13 +1889,14 @@ TestTree::testSignedFloodFill()
 
     //make narrow band of sphere without setting sign for the background values!
     openvdb::Grid<TreeT>::Accessor acc = grid->getAccessor();
-    const openvdb::Vec3f center(C[0], C[1], C[2]);
+    const openvdb::Vec3f center(
+        static_cast<float>(C[0]), static_cast<float>(C[1]), static_cast<float>(C[2]));
     openvdb::Coord xyz;
     for (xyz[0]=0; xyz[0]<dim[0]; ++xyz[0]) {
         for (xyz[1]=0; xyz[1]<dim[1]; ++xyz[1]) {
             for (xyz[2]=0; xyz[2]<dim[2]; ++xyz[2]) {
                 const openvdb::Vec3R p =  grid->transform().indexToWorld(xyz);
-                const float dist = (p-center).length() - radius;
+                const float dist = float((p-center).length() - radius);
                 if (fabs(dist) > outside) continue;
                 acc.setValue(xyz, dist);
             }
@@ -1910,7 +1911,7 @@ TestTree::testSignedFloodFill()
         for (xyz[1]=0; xyz[1]<dim[1]; ++xyz[1]) {
             for (xyz[2]=0; xyz[2]<dim[2]; ++xyz[2]) {
                 const openvdb::Vec3R p =  grid->transform().indexToWorld(xyz);
-                const float dist = (p-center).length() - radius;
+                const float dist = float((p-center).length() - radius);
                 const float val  =  acc.getValue(xyz);
                 if (dist < inside) {
                     ASSERT_DOUBLES_EXACTLY_EQUAL( val, outside);
@@ -1932,7 +1933,7 @@ TestTree::testSignedFloodFill()
         for (xyz[1]=0; xyz[1]<dim[1]; ++xyz[1]) {
             for (xyz[2]=0; xyz[2]<dim[2]; ++xyz[2]) {
                 const openvdb::Vec3R p =  grid->transform().indexToWorld(xyz);
-                const float dist = (p-center).length() - radius;
+                const float dist = float((p-center).length() - radius);
                 const float val  =  acc.getValue(xyz);
                 if (dist < inside) {
                     ASSERT_DOUBLES_EXACTLY_EQUAL( val, inside);
@@ -1969,14 +1970,14 @@ TestTree::testPruneInactive()
     CPPUNIT_ASSERT(tree.empty());
 
     // Set some active values.
-    tree.setValue(Coord(-5, 10, 20), 0.1);
-    tree.setValue(Coord(-5,-10, 20), 0.4);
-    tree.setValue(Coord(-5, 10,-20), 0.5);
-    tree.setValue(Coord(-5,-10,-20), 0.7);
-    tree.setValue(Coord( 5, 10, 20), 0.0);
-    tree.setValue(Coord( 5,-10, 20), 0.2);
-    tree.setValue(Coord( 5,-10,-20), 0.6);
-    tree.setValue(Coord( 5, 10,-20), 0.3);
+    tree.setValue(Coord(-5, 10, 20), 0.1f);
+    tree.setValue(Coord(-5,-10, 20), 0.4f);
+    tree.setValue(Coord(-5, 10,-20), 0.5f);
+    tree.setValue(Coord(-5,-10,-20), 0.7f);
+    tree.setValue(Coord( 5, 10, 20), 0.0f);
+    tree.setValue(Coord( 5,-10, 20), 0.2f);
+    tree.setValue(Coord( 5,-10,-20), 0.6f);
+    tree.setValue(Coord( 5, 10,-20), 0.3f);
     // Verify that the tree has the expected numbers of active voxels and leaf nodes.
     CPPUNIT_ASSERT_EQUAL(Index64(8), tree.activeVoxelCount());
     CPPUNIT_ASSERT_EQUAL(Index32(8), tree.leafCount());
@@ -2324,7 +2325,7 @@ TestTree::testGetNodes()
     using openvdb::FloatTree;
 
     const Vec3f center(0.35f, 0.35f, 0.35f);
-    const float radius = 0.15;
+    const float radius = 0.15f;
     const int dim = 128, half_width = 5;
     const float voxel_size = 1.0f/dim;
 
@@ -2336,7 +2337,7 @@ TestTree::testGetNodes()
         Coord(dim), center, radius, *grid, unittest_util::SPHERE_SPARSE_NARROW_BAND);
     const size_t leafCount = tree.leafCount();
     const size_t voxelCount = tree.activeVoxelCount();
-    
+
     {//testing Tree::getNodes() with std::vector<T*>
         std::vector<openvdb::FloatTree::LeafNodeType*> array;
         CPPUNIT_ASSERT_EQUAL(size_t(0), array.size());
@@ -2435,7 +2436,7 @@ TestTree::testLeafManager()
     using openvdb::FloatTree;
 
     const Vec3f center(0.35f, 0.35f, 0.35f);
-    const float radius = 0.15;
+    const float radius = 0.15f;
     const int dim = 128, half_width = 5;
     const float voxel_size = 1.0f/dim;
 
@@ -2446,7 +2447,7 @@ TestTree::testLeafManager()
     unittest_util::makeSphere<FloatGrid>(
         Coord(dim), center, radius, *grid, unittest_util::SPHERE_SPARSE_NARROW_BAND);
     const size_t leafCount = tree.leafCount();
-    
+
     //grid->print(std::cout, 3);
     {// test with no aux buffers
         openvdb::tree::LeafManager<FloatTree> r(tree);
@@ -2642,6 +2643,6 @@ TestTree::testStealNode()
     }
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

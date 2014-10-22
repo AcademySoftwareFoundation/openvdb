@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -85,11 +85,15 @@ public:
     /// Creates a new Metadata from the metadata type registry.
     static Metadata::Ptr createMetadata(const Name &typeName);
 
-    /// @return true if the given type is known by the metadata type registry.
+    /// Return @c true if the given type is known by the metadata type registry.
     static bool isRegisteredType(const Name &typeName);
 
-    /// Clears out the metadata registry.
+    /// Clear out the metadata registry.
     static void clearRegistry();
+
+    /// Register the given metadata type along with a factory function.
+    static void registerType(const Name& typeName, Metadata::Ptr (*createMetadata)());
+    static void unregisterType(const Name& typeName);
 
 protected:
     /// Read the size of the attribute from a stream.
@@ -101,10 +105,6 @@ protected:
     virtual void readValue(std::istream&, Index32 numBytes) = 0;
     /// Write the attribute to a stream.
     virtual void writeValue(std::ostream&) const = 0;
-
-    /// Register the given metadata type along with a factory function.
-    static void registerType(const Name& typeName, Metadata::Ptr (*createMetadata)());
-    static void unregisterType(const Name& typeName);
 
 private:
     // Disallow copying of instances of this class.
@@ -409,6 +409,6 @@ typedef TypedMetadata<Mat4d>           Mat4DMetadata;
 
 #endif // OPENVDB_METADATA_METADATA_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
