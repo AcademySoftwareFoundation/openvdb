@@ -49,95 +49,97 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
-/// @brief Reduce the memory footprint of this @a by replacing with tiles
+/// @brief Reduce the memory footprint of a @a tree by replacing with tiles
 /// any nodes whose values are all the same (optionally to within a tolerance)
 /// and have the same active state.
 ///
-/// @param tree          Tree that will have its background value changed
-/// @param tol           Tolerance on values considere to be numerically equal.
-/// @param threaded      Enable or disable threading.  (Threading is enabled by default.)
-/// @param grainSize     Used to control the granularity of the multithreaded. (default is 1).
+/// @param tree       the tree to be pruned
+/// @param tolerance  tolerance within which values are considered to be equal
+/// @param threaded   enable or disable threading (threading is enabled by default)
+/// @param grainSize  used to control the threading granularity (default is 1)
 template<typename TreeT>
 inline void
 prune(TreeT& tree,
-      typename TreeT::ValueType tol = zeroVal<typename TreeT::ValueType>(),
+      typename TreeT::ValueType tolerance = zeroVal<typename TreeT::ValueType>(),
       bool threaded = true,
       size_t grainSize = 1);
 
-/// @brief Reduce the memory footprint of this @a by replacing with tiles
-/// any tiles whose values are all the same (optionally to within a tolerance)
+
+/// @brief Reduce the memory footprint of a @a tree by replacing with tiles
+/// any non-leaf nodes whose values are all the same (optionally to within a tolerance)
 /// and have the same active state.
 ///
-/// @param tree          Tree that will have its background value changed
-/// @param tol           Tolerance on values considere to be numerically equal.
-/// @param threaded      Enable or disable threading.  (Threading is enabled by default.)
-/// @param grainSize     Used to control the granularity of the multithreaded. (default is 1).
+/// @param tree       the tree to be pruned
+/// @param tolerance  tolerance within which values are considered to be equal
+/// @param threaded   enable or disable threading (threading is enabled by default)
+/// @param grainSize  used to control the threading granularity (default is 1)
 template<typename TreeT>
 inline void
 pruneTiles(TreeT& tree,
-           typename TreeT::ValueType tol = zeroVal<typename TreeT::ValueType>(),
+           typename TreeT::ValueType tolerance = zeroVal<typename TreeT::ValueType>(),
            bool threaded = true,
-           size_t grainSize = 1);    
+           size_t grainSize = 1);
 
 
-/// @brief Reduce the memory footprint of @a tree by replacing with
+/// @brief Reduce the memory footprint of a @a tree by replacing with
 /// background tiles any nodes whose values are all inactive.
 ///
-/// @param tree          Tree that will have its background value changed
-/// @param threaded      Enable or disable threading.  (Threading is enabled by default.)
-/// @param grainSize     Used to control the granularity of the multithreaded. (default is 1).    
+/// @param tree       the tree to be pruned
+/// @param threaded   enable or disable threading (threading is enabled by default)
+/// @param grainSize  used to control the threading granularity (default is 1)
 template<typename TreeT>
 inline void
-pruneInactive(TreeT& tree,
-              bool threaded = true,
-              size_t grainSize = 1);
+pruneInactive(TreeT& tree, bool threaded = true, size_t grainSize = 1);
 
 
-/// @brief Reduce the memory footprint of @a tree by replacing with
-/// @a value tiles any nodes whose values are all inactive.
+/// @brief Reduce the memory footprint of a @a tree by replacing any nodes
+/// whose values are all inactive with tiles of the given @a value.
 ///
-/// @param tree          Tree that will have its background value changed
-/// @param value         Value assigned to inactive tiles created during prune
-/// @param threaded      Enable or disable threading.  (Threading is enabled by default.)
-/// @param grainSize     Used to control the granularity of the multithreaded. (default is 1).    
+/// @param tree       the tree to be pruned
+/// @param value      value assigned to inactive tiles created during pruning
+/// @param threaded   enable or disable threading (threading is enabled by default)
+/// @param grainSize  used to control the threading granularity (default is 1)
 template<typename TreeT>
 inline void
-pruneInactive(TreeT& tree,
-              const typename TreeT::ValueType& value, 
-              bool threaded = true,
-              size_t grainSize = 1);    
+pruneInactiveWithValue(
+    TreeT& tree,
+    const typename TreeT::ValueType& value,
+    bool threaded = true,
+    size_t grainSize = 1);
 
-/// @brief Reduce the memory footprint of @a tree by replacing nodes
+
+/// @brief Reduce the memory footprint of a @a tree by replacing nodes
 /// whose values are all inactive with inactive tiles having a value equal to
 /// the first value encountered in the (inactive) child.
 /// @details This method is faster than tolerance-based prune and
 /// useful for narrow-band level set applications where inactive
 /// values are limited to either an inside or an outside value.
 ///
-/// @param tree          Tree that will have its background value changed
-/// @param threaded      Enable or disable threading.  (Threading is enabled by default.)
-/// @param grainSize     Used to control the granularity of the multithreaded. (default is 1).    
+/// @param tree       the tree to be pruned
+/// @param threaded   enable or disable threading (threading is enabled by default)
+/// @param grainSize  used to control the threading granularity (default is 1)
 ///
-/// @throw ValueError if the background of @a tree negative (as defined by math::isNegative).     
+/// @throw ValueError if the background of the @a tree is negative (as defined by math::isNegative)
 template<typename TreeT>
 inline void
 pruneLevelSet(TreeT& tree,
               bool threaded = true,
               size_t grainSize = 1);
 
-/// @brief Reduce the memory footprint of @a tree by replacing nodes
-/// whose values are all inactive with inactive tiles having a value equal to
-/// -| @a insideWidth | if it is negative and else | @a outsideWidth |.
-///    
+
+/// @brief Reduce the memory footprint of a @a tree by replacing nodes whose voxel values
+/// are all inactive with inactive tiles having the value -| @a insideWidth |
+/// if the voxel values are negative and | @a outsideWidth | otherwise.
+///
 /// @details This method is faster than tolerance-based prune and
 /// useful for narrow-band level set applications where inactive
 /// values are limited to either an inside or an outside value.
 ///
-/// @param tree          Tree that will have its background value changed
-/// @param outsideWidth  The width of the outside of the narrow band
-/// @param insideWidth   The width of the inside of the narrow band    
-/// @param threaded      Enable or disable threading.  (Threading is enabled by default.)
-/// @param grainSize     Used to control the granularity of the multithreaded. (default is 1).    
+/// @param tree          the tree to be pruned
+/// @param outsideWidth  the width of the outside of the narrow band
+/// @param insideWidth   the width of the inside of the narrow band
+/// @param threaded      enable or disable threading (threading is enabled by default)
+/// @param grainSize     used to control the threading granularity (default is 1)
 ///
 /// @throw ValueError if @a outsideWidth is negative or @a insideWidth is
 /// not negative (as defined by math::isNegative).
@@ -147,9 +149,11 @@ pruneLevelSet(TreeT& tree,
               const typename TreeT::ValueType& outsideWidth,
               const typename TreeT::ValueType& insideWidth,
               bool threaded = true,
-              size_t grainSize = 1);    
+              size_t grainSize = 1);
+
 
 ////////////////////////////////////////////////
+
 
 template<typename TreeT, Index TerminationLevel = 0>
 class InactivePruneOp
@@ -164,12 +168,12 @@ public:
     {
         tree.clearAllAccessors();//clear cache of nodes that could be pruned
     }
-    
+
     InactivePruneOp(TreeT& tree, const ValueT& v) : mValue(v)
     {
         tree.clearAllAccessors();//clear cache of nodes that could be pruned
     }
-    
+
     // Nothing to do at the leaf node level
     void operator()(LeafT& node) const {;}
     // Prune the child nodes of the internal nodes
@@ -191,9 +195,10 @@ public:
         root.eraseBackgroundTiles();
     }
 private:
-   
+
     const ValueT mValue;
 };// InactivePruneOp
+
 
 template<typename TreeT, Index TerminationLevel = 0>
 class TolerancePruneOp
@@ -203,12 +208,12 @@ public:
     typedef typename TreeT::RootNodeType RootT;
     typedef typename TreeT::LeafNodeType LeafT;
     BOOST_STATIC_ASSERT(RootT::LEVEL > TerminationLevel);
-    
+
     TolerancePruneOp(TreeT& tree, const ValueT& t) : mTolerance(t)
     {
         tree.clearAllAccessors();//clear cache of nodes that could be pruned
     }
-    
+
     // Nothing to do at the leaf node level
     void operator()(LeafT& node) const {;}
     // Prune the child nodes of the internal nodes
@@ -234,9 +239,10 @@ public:
         root.eraseBackgroundTiles();
     }
 private:
-   
+
     const ValueT mTolerance;
 };// TolerancePruneOp
+
 
 template<typename TreeT, Index TerminationLevel = 0>
 class LevelSetPruneOp
@@ -246,7 +252,7 @@ public:
     typedef typename TreeT::RootNodeType RootT;
     typedef typename TreeT::LeafNodeType LeafT;
     BOOST_STATIC_ASSERT(RootT::LEVEL > TerminationLevel);
-    
+
     LevelSetPruneOp(TreeT& tree)
         : mOutside(tree.background())
         , mInside(math::negative(mOutside))
@@ -291,61 +297,60 @@ public:
         }
         root.eraseBackgroundTiles();
     }
-private:
 
+private:
     template <typename IterT>
     inline ValueT getTileValue(const IterT& iter) const
     {
         return  math::isNegative(iter->getFirstValue()) ? mInside : mOutside;
     }
-   
+
     const ValueT mOutside, mInside;
 };// LevelSetPruneOp
 
+
 template<typename TreeT>
-void prune(TreeT& tree,
-           typename TreeT::ValueType tol,
-           bool threaded,
-           size_t grainSize)
+inline void
+prune(TreeT& tree, typename TreeT::ValueType tol, bool threaded, size_t grainSize)
 {
     tree::NodeManager<TreeT, TreeT::DEPTH-2> nodes(tree);
     TolerancePruneOp<TreeT> op(tree, tol);
     nodes.processBottomUp(op, threaded, grainSize);
 }
 
+
 template<typename TreeT>
-void pruneTiles(TreeT& tree,
-                typename TreeT::ValueType tol,
-                bool threaded,
-                size_t grainSize)
+inline void
+pruneTiles(TreeT& tree, typename TreeT::ValueType tol, bool threaded, size_t grainSize)
 {
     tree::NodeManager<TreeT, TreeT::DEPTH-3> nodes(tree);
     TolerancePruneOp<TreeT> op(tree, tol);
     nodes.processBottomUp(op, threaded, grainSize);
 }
 
+
 template<typename TreeT>
-void pruneInactive(TreeT& tree,
-                   bool threaded,
-                   size_t grainSize)
+inline void
+pruneInactive(TreeT& tree, bool threaded, size_t grainSize)
 {
     tree::NodeManager<TreeT, TreeT::DEPTH-2> nodes(tree);
     InactivePruneOp<TreeT> op(tree);
     nodes.processBottomUp(op, threaded, grainSize);
 }
 
+
 template<typename TreeT>
-void pruneInactive(TreeT& tree,
-                   const typename TreeT::ValueType& v,
-                   bool threaded,
-                   size_t grainSize)
+inline void
+pruneInactiveWithValue(TreeT& tree, const typename TreeT::ValueType& v,
+    bool threaded, size_t grainSize)
 {
     tree::NodeManager<TreeT, TreeT::DEPTH-2> nodes(tree);
     InactivePruneOp<TreeT> op(tree, v);
     nodes.processBottomUp(op, threaded, grainSize);
-}    
+}
 
-template <typename TreeT>
+
+template<typename TreeT>
 inline void
 pruneLevelSet(TreeT& tree,
               const typename TreeT::ValueType& outside,
@@ -358,7 +363,8 @@ pruneLevelSet(TreeT& tree,
     nodes.processBottomUp(op, threaded, grainSize);
 }
 
-template <typename TreeT>
+
+template<typename TreeT>
 inline void
 pruneLevelSet(TreeT& tree, bool threaded, size_t grainSize)
 {

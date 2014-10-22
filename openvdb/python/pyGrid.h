@@ -685,7 +685,8 @@ pruneInactive(GridType& grid, py::object valObj)
     if (valObj.is_none()) {
         tools::pruneInactive(grid.tree());
     } else {
-        tools::pruneInactive(grid.tree(), extractValueArg<GridType>(valObj, "pruneInactive"));
+        tools::pruneInactiveWithValue(
+            grid.tree(), extractValueArg<GridType>(valObj, "pruneInactive"));
     }
 }
 
