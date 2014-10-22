@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -79,7 +79,7 @@ TestRay::testInfinity()
     CPPUNIT_ASSERT_DOUBLES_EQUAL( zero , -one/infinity,0);
     CPPUNIT_ASSERT_DOUBLES_EQUAL( infinity  ,  one/zero,0);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(-infinity  , -one/zero,0);
-    
+
     std::cerr << "inf:        "   << infinity << "\n";
     std::cerr << "1 / inf:    "   << one / infinity << "\n";
     std::cerr << "1 / (-inf): "   << one / (-infinity) << "\n";
@@ -107,26 +107,26 @@ void TestRay::testRay()
         ASSERT_DOUBLES_APPROX_EQUAL( math::Delta<RealT>::value(), ray.t0());
         ASSERT_DOUBLES_APPROX_EQUAL( std::numeric_limits<RealT>::max(), ray.t1());
     }
-    
+
     {// simple construction
-        
+
         Vec3T eye(1.5,1.5,1.5), dir(1.5,1.5,1.5); dir.normalize();
         RealT t0=0.1, t1=12589.0;
-        
+
         RayT ray(eye, dir, t0, t1);
         CPPUNIT_ASSERT(ray.eye()==eye);
         CPPUNIT_ASSERT(ray.dir()==dir);
         ASSERT_DOUBLES_APPROX_EQUAL( t0, ray.t0());
         ASSERT_DOUBLES_APPROX_EQUAL( t1, ray.t1());
     }
-    
+
     {// test transformation
         math::Transform::Ptr xform = math::Transform::createLinearTransform();
-        
+
         xform->preRotate(M_PI, math::Y_AXIS );
         xform->postTranslate(math::Vec3d(1, 2, 3));
         xform->preScale(Vec3R(0.1, 0.2, 0.4));
-        
+
         Vec3T eye(9,1,1), dir(1,2,0);
         dir.normalize();
         RealT t0=0.1, t1=12589.0;
@@ -142,7 +142,7 @@ void TestRay::testRay()
         //std::cerr << "Ray1: " << ray1 << std::endl;
         RayT ray2 = ray1.applyInverseMap( *(xform->baseMap()) );
         //std::cerr << "Ray2: " << ray2 << std::endl;
-        
+
         ASSERT_DOUBLES_APPROX_EQUAL( eye[0], ray2.eye()[0]);
         ASSERT_DOUBLES_APPROX_EQUAL( eye[1], ray2.eye()[1]);
         ASSERT_DOUBLES_APPROX_EQUAL( eye[2], ray2.eye()[2]);
@@ -184,7 +184,7 @@ void TestRay::testRay()
         RayT ray1 = ray0.applyInverseMap( *(xform->baseMap()) );
         //std::cerr << "\nIndex Ray1: " << ray1 << std::endl;
         Vec3T xyz1[3] = {ray1.start(), ray1.mid(), ray1.end()};
-        
+
         for (int i=0; i<3; ++i) {
             Vec3T pos = xform->baseMap()->applyMap(xyz1[i]);
             //std::cerr << "world0 ="<<xyz0[i] << " transformed index="<< pos << std::endl;
@@ -194,7 +194,7 @@ void TestRay::testRay()
         // Transform the ray back to world pace
         RayT ray2 = ray1.applyMap( *(xform->baseMap()) );
         //std::cerr << "\nWorld Ray2: " << ray2 << std::endl;
-        
+
         ASSERT_DOUBLES_APPROX_EQUAL( eye[0], ray2.eye()[0]);
         ASSERT_DOUBLES_APPROX_EQUAL( eye[1], ray2.eye()[1]);
         ASSERT_DOUBLES_APPROX_EQUAL( eye[2], ray2.eye()[2]);
@@ -219,11 +219,11 @@ void TestRay::testRay()
     }
 
     {// test bbox intersection
-        
+
         const Vec3T eye( 2.0, 1.0, 1.0), dir(-1.0, 2.0, 3.0);
         RayT ray(eye, dir);
         RealT t0=0, t1=0;
-       
+
 
         // intersects the two faces of the box perpendicular to the y-axis!
         CPPUNIT_ASSERT(ray.intersects(CoordBBox(Coord(0, 2, 2), Coord(2, 4, 6)), t0, t1));
@@ -238,17 +238,17 @@ void TestRay::testRay()
         ASSERT_DOUBLES_APPROX_EQUAL( 0.5, t1);
         ASSERT_DOUBLES_APPROX_EQUAL( ray(0.5)[0], 1.5);//lower y component of intersection
         ASSERT_DOUBLES_APPROX_EQUAL( ray(0.5)[1], 2.0);//higher y component of intersection
-        
+
         // no intersections
         CPPUNIT_ASSERT(!ray.intersects(CoordBBox(Coord(4, 2, 2), Coord(6, 4, 6))));
     }
-    
+
     {// test sphere intersection
         const Vec3T dir(-1.0, 2.0, 3.0);
         const Vec3T eye( 2.0, 1.0, 1.0);
         RayT ray(eye, dir);
         RealT t0=0, t1=0;
-        
+
         // intersects twice - second intersection exits sphere in lower y-z-plane
         Vec3T center(2.0,3.0,4.0);
         RealT radius = 1.0f;
@@ -259,7 +259,7 @@ void TestRay::testRay()
         ASSERT_DOUBLES_APPROX_EQUAL(ray(t1)[2], center[2]);
         ASSERT_DOUBLES_APPROX_EQUAL((ray(t0)-center).length()-radius, 0);
         ASSERT_DOUBLES_APPROX_EQUAL((ray(t1)-center).length()-radius, 0);
-        
+
         // no intersection
         center = Vec3T(3.0,3.0,4.0);
         radius = 1.0f;
@@ -300,7 +300,7 @@ void TestRay::testRay()
         const Vec3T eye( 0.5, 4.7,-9.8);
         RealT t0=1.0, t1=12589.0;
         RayT ray(eye, dir, t0, t1);
-        
+
         Real t = 0.0;
         CPPUNIT_ASSERT(!ray.intersects(Vec3T( 1.0, 0.0, 0.0), 4.0, t));
         CPPUNIT_ASSERT(!ray.intersects(Vec3T(-1.0, 0.0, 0.0),-4.0, t));
@@ -317,7 +317,7 @@ void TestRay::testRay()
         const Vec3T eye( 4.7, 0.5,-9.8);
         RealT t0=1.0, t1=12589.0;
         RayT ray(eye, dir, t0, t1);
-        
+
         Real t = 0.0;
         CPPUNIT_ASSERT(!ray.intersects(Vec3T( 0.0,-1.0, 0.0), 4.0, t));
         CPPUNIT_ASSERT(!ray.intersects(Vec3T( 0.0, 1.0, 0.0),-4.0, t));
@@ -327,7 +327,7 @@ void TestRay::testRay()
         ASSERT_DOUBLES_APPROX_EQUAL(3.5, t);
         CPPUNIT_ASSERT(!ray.intersects(Vec3T( 1.0, 0.0, 0.0), 0.4, t));
     }
-   
+
 }
 
 void TestRay::testTimeSpan()
@@ -368,7 +368,7 @@ void TestRay::testDDA()
         ASSERT_DOUBLES_APPROX_EQUAL(4096+1.0, dda.next());
         //dda.print();
     }
-    
+
     {// Check for the notorious +-0 issue!
         typedef math::DDA<RayType,3> DDAType;
 
@@ -381,7 +381,7 @@ void TestRay::testDDA()
         //dda1.print();
         dda1.step();
         //dda1.print();
-        
+
         //std::cerr << "\nNegative zero ray" << std::endl;
         const RayType::Vec3T dir2(1.0,-0.0,-0.0);
         const RayType::Vec3T eye2(2.0, 0.0, 0.0);
@@ -391,7 +391,7 @@ void TestRay::testDDA()
         //dda2.print();
         dda2.step();
         //dda2.print();
-    
+
         //std::cerr << "\nNegative epsilon ray" << std::endl;
         const RayType::Vec3T dir3(1.0,-1e-9,-1e-9);
         const RayType::Vec3T eye3(2.0, 0.0, 0.0);
@@ -419,7 +419,7 @@ void TestRay::testDDA()
         ASSERT_DOUBLES_APPROX_EQUAL(dda2.next(), dda3.next());
         ASSERT_DOUBLES_APPROX_EQUAL(dda3.next(), dda4.next());
     }
-    
+
     {// test voxel traversal along both directions of each axis
         typedef math::DDA<RayType> DDAType;
         const RayType::Vec3T eye( 0, 0, 0);
@@ -450,7 +450,7 @@ void TestRay::testDDA()
                 const RayType::Vec3T dir(d[0], d[1], d[2]);
                 RayType ray(eye, dir);
                 DDAType dda(ray);
-                //std::cerr << "\nray: "<<ray<<std::endl; 
+                //std::cerr << "\nray: "<<ray<<std::endl;
                 for (int i=1; i<=10; ++i) {
                     //std::cerr << "i="<<i<<" voxel="<<dda.voxel()<<" time="<<dda.time()<<std::endl;
                     //CPPUNIT_ASSERT(dda.voxel()==Coord(8*i*d[0],8*i*d[1],8*i*d[2]));
@@ -474,7 +474,7 @@ void TestRay::testDDA()
                 //ASSERT_DOUBLES_APPROX_EQUAL(0.0, dda.time());
                 //CPPUNIT_ASSERT(dda.voxel()==Coord(0,0,0));
                 double next=0;
-                //std::cerr << "\nray: "<<ray<<std::endl; 
+                //std::cerr << "\nray: "<<ray<<std::endl;
                 for (int i=1; i<=10; ++i) {
                     //std::cerr << "i="<<i<<" voxel="<<dda.voxel()<<" time="<<dda.time()<<std::endl;
                     //CPPUNIT_ASSERT(dda.voxel()==Coord(8*i*d[0],8*i*d[1],8*i*d[2]));
@@ -486,9 +486,9 @@ void TestRay::testDDA()
             }
         }
     }
-    
+
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -65,7 +65,7 @@ void
 TestQuat::testConstructor()
 {
     {
-        Quat<float> qq(1.23, 2.34, 3.45, 4.56);
+        Quat<float> qq(1.23f, 2.34f, 3.45f, 4.56f);
         CPPUNIT_ASSERT( isExactlyEqual(qq.x(), 1.23f) );
         CPPUNIT_ASSERT( isExactlyEqual(qq.y(), 2.34f) );
         CPPUNIT_ASSERT( isExactlyEqual(qq.z(), 3.45f) );
@@ -73,7 +73,7 @@ TestQuat::testConstructor()
     }
 
     {
-        float a[] = {1.23, 2.34, 3.45, 4.56};
+        float a[] = { 1.23f, 2.34f, 3.45f, 4.56f };
         Quat<float> qq(a);
         CPPUNIT_ASSERT( isExactlyEqual(qq.x(), 1.23f) );
         CPPUNIT_ASSERT( isExactlyEqual(qq.y(), 2.34f) );
@@ -86,14 +86,14 @@ TestQuat::testConstructor()
 void
 TestQuat::testAxisAngle()
 {
-    float TOL = 1e-6;
+    float TOL = 1e-6f;
 
-    Quat<float> q1(1  , 2  , 3  , 4  );
-    Quat<float> q2(1.2, 2.3, 3.4, 4.5);
+    Quat<float> q1(1.0f, 2.0f, 3.0f, 4.0f);
+    Quat<float> q2(1.2f, 2.3f, 3.4f, 4.5f);
 
     Vec3s v(1, 2, 3);
     v.normalize();
-    float a = M_PI/4;
+    float a = float(M_PI / 4.f);
 
     Quat<float> q(v,a);
     float b = q.angle();
@@ -113,8 +113,8 @@ TestQuat::testAxisAngle()
 void
 TestQuat::testOpPlus()
 {
-    Quat<float> q1(1  , 2  , 3  , 4  );
-    Quat<float> q2(1.2, 2.3, 3.4, 4.5);
+    Quat<float> q1(1.0f, 2.0f, 3.0f, 4.0f);
+    Quat<float> q2(1.2f, 2.3f, 3.4f, 4.5f);
 
     Quat<float> q = q1 + q2;
 
@@ -143,8 +143,8 @@ TestQuat::testOpPlus()
 void
 TestQuat::testOpMinus()
 {
-    Quat<float> q1(1  , 2  , 3  , 4  );
-    Quat<float> q2(1.2, 2.3, 3.4, 4.5);
+    Quat<float> q1(1.0f, 2.0f, 3.0f, 4.0f);
+    Quat<float> q2(1.2f, 2.3f, 3.4f, 4.5f);
 
     Quat<float> q = q1 - q2;
 
@@ -173,8 +173,8 @@ TestQuat::testOpMinus()
 void
 TestQuat::testOpMultiply()
 {
-    Quat<float> q1(1  , 2  , 3  , 4  );
-    Quat<float> q2(1.2, 2.3, 3.4, 4.5);
+    Quat<float> q1(1.0f, 2.0f, 3.0f, 4.0f);
+    Quat<float> q2(1.2f, 2.3f, 3.4f, 4.5f);
 
     Quat<float> q = q1 * 1.5f;
 
@@ -201,10 +201,10 @@ TestQuat::testOpMultiply()
 void
 TestQuat::testInvert()
 {
-    float TOL = 1e-6;
+    float TOL = 1e-6f;
 
-    Quat<float> q1(1  , 2  , 3  , 4  );
-    Quat<float> q2(1.2, 2.3, 3.4, 4.5);
+    Quat<float> q1(1.0f, 2.0f, 3.0f, 4.0f);
+    Quat<float> q2(1.2f, 2.3f, 3.4f, 4.5f);
 
 
     q1 = q2;
@@ -308,6 +308,6 @@ TestQuat::testEulerAngles()
 
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

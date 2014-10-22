@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -46,7 +46,6 @@ public:
     CPPUNIT_TEST(testGetOrigin);
     CPPUNIT_TEST(testIteratorGetCoord);
     CPPUNIT_TEST(testNegativeIndexing);
-    CPPUNIT_TEST(testSignedFloodFill);
     CPPUNIT_TEST_SUITE_END();
 
     void testBuffer();
@@ -59,7 +58,6 @@ public:
     void testGetOrigin();
     void testIteratorGetCoord();
     void testNegativeIndexing();
-    void testSignedFloodFill();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestLeaf);
@@ -310,37 +308,6 @@ TestLeaf::testNegativeIndexing()
     CPPUNIT_ASSERT_EQUAL(Coord(-11, -6, -5), xyz);
 }
 
-void
-TestLeaf::testSignedFloodFill()
-{
-    using namespace openvdb;
-
-    const int fill0=5, fill1=-fill0;
-    int D=LeafType::dim(), C=D/2;
-    Coord origin(0,0,0), left(0,0,C-1), right(0,0,C);
-    LeafType leaf(origin,fill0);
-    for (int i=0; i<D; ++i) {
-        left[0]=right[0]=i;
-        for (int j=0; j<D; ++j) {
-            left[1]=right[1]=j;
-            leaf.setValueOn(left,fill0);
-            leaf.setValueOn(right,fill1);
-        }
-    }
-    const Coord first(0,0,0), last(D-1,D-1,D-1);
-    CPPUNIT_ASSERT(!leaf.isValueOn(first));
-    CPPUNIT_ASSERT(!leaf.isValueOn(last));
-    CPPUNIT_ASSERT_EQUAL(fill0, leaf.getValue(first));
-    CPPUNIT_ASSERT_EQUAL(fill0, leaf.getValue(last));
-
-    leaf.signedFloodFill(fill0);
-
-    CPPUNIT_ASSERT(!leaf.isValueOn(first));
-    CPPUNIT_ASSERT(!leaf.isValueOn(last));
-    CPPUNIT_ASSERT_EQUAL(fill0, leaf.getValue(first));
-    CPPUNIT_ASSERT_EQUAL(fill1, leaf.getValue(last));
-}
-
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

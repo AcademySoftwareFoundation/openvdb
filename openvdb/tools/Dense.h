@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -41,8 +41,9 @@
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/Exceptions.h>
 #include <tbb/parallel_for.h>
-#include <boost/scoped_array.hpp> 
+#include <boost/scoped_array.hpp>
 #include <boost/scoped_ptr.hpp>
+#include "Prune.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -86,12 +87,12 @@ copyFromDense(
 /// intuitive. Hence, ZYX is the layout used throughout VDB. However,
 /// other data structures, e.g. Houdini and Maya, employ the XYZ
 /// layout. Clearly a dense volume with the ZYX layout converts more
-/// efficiently to a VDB, but we support both for convenience.     
-enum MemoryLayout { LayoutXYZ, LayoutZYX };     
-    
+/// efficiently to a VDB, but we support both for convenience.
+enum MemoryLayout { LayoutXYZ, LayoutZYX };
+
 /// @brief Base class for Dense which is defined below.
 /// @note The constructor of this class is protected to prevent direct
-/// instantiation.     
+/// instantiation.
 template<typename ValueT, MemoryLayout Layout> class DenseBase;
 
 /// @brief Partial template specialization of DenseBase.
@@ -105,7 +106,7 @@ public:
     /// unsigned coordinates (i, j, k), i.e., coordinates relative to
     /// the origin of this grid's bounding box.
     inline size_t coordToOffset(size_t i, size_t j, size_t k) const { return i*mX + j*mY + k; }
-    
+
     /// @brief Return the stride of the array in the x direction ( = dimY*dimZ).
     /// @note This method is required by both CopyToDense and CopyFromDense.
     inline size_t xStride() const { return mX; }
@@ -117,7 +118,7 @@ public:
     /// @brief Return the stride of the array in the z direction ( = 1).
     /// @note This method is required by both CopyToDense and CopyFromDense.
     static size_t zStride() { return 1; }
-    
+
 protected:
     /// Protected constructor so as to prevent direct instantiation
     DenseBase(const CoordBBox& bbox) : mBBox(bbox), mY(bbox.dim()[2]), mX(mY*bbox.dim()[1]) {}
@@ -128,7 +129,7 @@ protected:
 
 /// @brief Partial template specialization of DenseBase.
 /// @note This is the memory-layout emplayed in Houdini and Maya. It leads
-/// to nested for-loops of the order z, y, x.    
+/// to nested for-loops of the order z, y, x.
 template<typename ValueT>
 class DenseBase<ValueT, LayoutXYZ>
 {
@@ -137,7 +138,7 @@ public:
     /// unsigned coordinates (i, j, k), i.e., coordinates relative to
     /// the origin of this grid's bounding box.
     inline size_t coordToOffset(size_t i, size_t j, size_t k) const { return i + j*mY + k*mZ; }
-    
+
     /// @brief Return the stride of the array in the x direction ( = 1).
     /// @note This method is required by both CopyToDense and CopyFromDense.
     static size_t xStride() { return 1; }
@@ -149,7 +150,7 @@ public:
     /// @brief Return the stride of the array in the y direction ( = dimX*dimY).
     /// @note This method is required by both CopyToDense and CopyFromDense.
     inline size_t zStride() const { return mZ; }
-    
+
 protected:
     /// Protected constructor so as to prevent direct instantiation
     DenseBase(const CoordBBox& bbox) : mBBox(bbox), mY(bbox.dim()[0]), mZ(mY*bbox.dim()[1]) {}
@@ -157,7 +158,7 @@ protected:
     const CoordBBox mBBox;//signed coordinates of the domain represented by the grid
     const size_t mY, mZ;//strides in the y and z direction
 };// end of DenseBase<ValueT, LayoutXYZ>
-    
+
 /// @brief Dense is a simple dense grid API used by the CopyToDense and
 /// CopyFromDense classes defined below.
 /// @details Use the Dense class to efficiently produce a dense in-memory
@@ -182,7 +183,7 @@ public:
     /// @param bbox  the bounding box of the (signed) coordinate range of this grid
     /// @throw ValueError if the bounding box is empty.
     /// @note The min and max coordinates of the bounding box are inclusive.
-    Dense(const CoordBBox& bbox) : BaseT(bbox) { this->init(); }    
+    Dense(const CoordBBox& bbox) : BaseT(bbox) { this->init(); }
 
     /// @brief Construct a dense grid with a given range of coordinates and initial value
     ///
@@ -210,7 +211,7 @@ public:
         if (BaseT::mBBox.empty()) {
             OPENVDB_THROW(ValueError, "can't construct a dense grid with an empty bounding box");
         }
-    }    
+    }
 
     /// @brief Construct a dense grid with a given origin and dimensions.
     ///
@@ -316,10 +317,10 @@ private:
         mArray.reset(new ValueT[BaseT::mBBox.volume()]);
         mData = mArray.get();
     }
-    
+
     boost::scoped_array<ValueT> mArray;
     ValueT* mData;//raw c-style pointer to values
-};// end of Dense    
+};// end of Dense
 
 ////////////////////////////////////////
 
@@ -454,7 +455,8 @@ public:
         delete mBlocks;
         mBlocks = NULL;
 
-        mTree->root().pruneTiles(mTolerance);
+        tools::pruneTiles(*mTree, mTolerance);
+        //mTree->root().pruneTiles(mTolerance);
     }
 
     /// @brief Public method called by tbb::parallel_for
@@ -528,6 +530,6 @@ copyFromDense(const DenseT& dense, GridOrTreeT& sparse,
 
 #endif // OPENVDB_TOOLS_DENSE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

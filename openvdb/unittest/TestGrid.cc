@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -52,6 +52,7 @@ public:
     CPPUNIT_TEST(testTransform);
     CPPUNIT_TEST(testCopyGrid);
     CPPUNIT_TEST(testValueConversion);
+    CPPUNIT_TEST(testClipping);
     CPPUNIT_TEST_SUITE_END();
 
     void testGridRegistry();
@@ -61,6 +62,7 @@ public:
     void testTransform();
     void testCopyGrid();
     void testValueConversion();
+    void testClipping();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestGrid);
@@ -100,6 +102,11 @@ public:
     virtual void readTopology(std::istream& is, bool = false) { is.seekg(0, std::ios::beg); }
     virtual void writeTopology(std::ostream& os, bool = false) const { os.seekp(0); }
 
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    virtual void readBuffers(std::istream& is,
+        const openvdb::CoordBBox&, bool /*saveFloatAsHalf*/=false) { is.seekg(0); }
+    virtual void readNonresidentBuffers() const {}
+#endif
     virtual void readBuffers(std::istream& is, bool /*saveFloatAsHalf*/=false) { is.seekg(0); }
     virtual void writeBuffers(std::ostream& os, bool /*saveFloatAsHalf*/=false) const
         { os.seekp(0, std::ios::beg); }
@@ -107,6 +114,10 @@ public:
     bool empty() const { return true; }
     void clear() {}
     void prune(const ValueType& = 0) {}
+    void clip(const openvdb::CoordBBox&) {}
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    virtual void clipUnallocatedNodes() {}
+#endif
 
     virtual void getIndexRange(openvdb::CoordBBox&) const {}
     virtual bool evalLeafBoundingBox(openvdb::CoordBBox& bbox) const
@@ -125,6 +136,9 @@ public:
     virtual openvdb::Index64 inactiveVoxelCount() const { return 0UL; }
     virtual openvdb::Index64 activeLeafVoxelCount() const { return 0UL; }
     virtual openvdb::Index64 inactiveLeafVoxelCount() const { return 0UL; }
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    virtual openvdb::Index64 activeTileCount() const { return 0UL; }
+#endif
 };
 
 const openvdb::Index ProxyTree::DEPTH = 0;
@@ -331,6 +345,89 @@ TestGrid::testValueConversion()
     CPPUNIT_ASSERT_THROW(DGrid23 d23grid(fgrid), openvdb::TypeError);
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+
+////////////////////////////////////////
+
+
+template<typename GridT>
+void
+validateClippedGrid(const GridT& clipped, const typename GridT::ValueType& fg)
+{
+    using namespace openvdb;
+
+    typedef typename GridT::ValueType ValueT;
+
+    const CoordBBox bbox = clipped.evalActiveVoxelBoundingBox();
+    CPPUNIT_ASSERT_EQUAL(4, bbox.min().x());
+    CPPUNIT_ASSERT_EQUAL(4, bbox.min().y());
+    CPPUNIT_ASSERT_EQUAL(-6, bbox.min().z());
+    CPPUNIT_ASSERT_EQUAL(4, bbox.max().x());
+    CPPUNIT_ASSERT_EQUAL(4, bbox.max().y());
+    CPPUNIT_ASSERT_EQUAL(6, bbox.max().z());
+    CPPUNIT_ASSERT_EQUAL(6 + 6 + 1, int(clipped.activeVoxelCount()));
+    CPPUNIT_ASSERT_EQUAL(2, int(clipped.constTree().leafCount()));
+
+    typename GridT::ConstAccessor acc = clipped.getConstAccessor();
+    const ValueT bg = clipped.background();
+    Coord xyz;
+    int &x = xyz[0], &y = xyz[1], &z = xyz[2];
+    for (x = -10; x <= 10; ++x) {
+        for (y = -10; y <= 10; ++y) {
+            for (z = -10; z <= 10; ++z) {
+                if (x == 4 && y == 4 && z >= -6 && z <= 6) {
+                    CPPUNIT_ASSERT_EQUAL(fg, acc.getValue(Coord(4, 4, z)));
+                } else {
+                    CPPUNIT_ASSERT_EQUAL(bg, acc.getValue(Coord(x, y, z)));
+                }
+            }
+        }
+    }
+}
+
+
+// See also TestTools::testClipping()
+void
+TestGrid::testClipping()
+{
+    using namespace openvdb;
+
+    const BBoxd clipBox(Vec3d(4.0, 4.0, -6.0), Vec3d(4.9, 4.9, 6.0));
+
+    {
+        const float fg = 5.f;
+        FloatGrid cube(0.f);
+        cube.fill(CoordBBox(Coord(-10), Coord(10)), /*value=*/fg, /*active=*/true);
+#ifdef OPENVDB_2_ABI_COMPATIBLE
+        cube.tree().clip(cube.constTransform().worldToIndexNodeCentered(clipBox));
+#else
+        cube.clipGrid(clipBox);
+#endif
+        validateClippedGrid(cube, fg);
+    }
+    {
+        const bool fg = true;
+        BoolGrid cube(false);
+        cube.fill(CoordBBox(Coord(-10), Coord(10)), /*value=*/fg, /*active=*/true);
+#ifdef OPENVDB_2_ABI_COMPATIBLE
+        cube.tree().clip(cube.constTransform().worldToIndexNodeCentered(clipBox));
+#else
+        cube.clipGrid(clipBox);
+#endif
+        validateClippedGrid(cube, fg);
+    }
+    {
+        const Vec3s fg(1.f, -2.f, 3.f);
+        Vec3SGrid cube(Vec3s(0.f));
+        cube.fill(CoordBBox(Coord(-10), Coord(10)), /*value=*/fg, /*active=*/true);
+#ifdef OPENVDB_2_ABI_COMPATIBLE
+        cube.tree().clip(cube.constTransform().worldToIndexNodeCentered(clipBox));
+#else
+        cube.clipGrid(clipBox);
+#endif
+        validateClippedGrid(cube, fg);
+    }
+}
+
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

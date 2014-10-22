@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -42,6 +42,7 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/tools/ValueTransformer.h> // for tools::foreach()
+#include <openvdb/tools/Prune.h>
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_String.h>
 #include <boost/bind.hpp>
@@ -519,7 +520,7 @@ public:
             mOutGrid.reset();
             return;
         }
-        vecGrid->prune();
+        openvdb::tools::prune(vecGrid->tree());
     }
 
 private:
@@ -697,6 +698,6 @@ SOP_OpenVDB_Vector_Merge::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

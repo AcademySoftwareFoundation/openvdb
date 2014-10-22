@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -102,9 +102,11 @@ struct OPENVDB_HOUDINI_API GEO_VolumeOptions
     }
     bool operator==(const GEO_VolumeOptions &v) const
     {
+	OPENVDB_NO_FP_EQUALITY_WARNING_BEGIN
 	return (myMode == v.myMode
 		&& myIso == v.myIso
 		&& myDensity == v.myDensity);
+	OPENVDB_NO_FP_EQUALITY_WARNING_END
     }
     bool operator!=(const GEO_VolumeOptions &v) const
     {
@@ -159,7 +161,7 @@ public:
     // Query the number of vertices in the array. This number may be smaller
     // than the actual size of the array.
     virtual GA_Size     getVertexCount() const;
-    virtual GA_Offset   getVertexOffset(GA_Size index) const
+    virtual GA_Offset   getVertexOffset(GA_Size /*index*/) const
                             { return myVertex; }
 
     /// Convert an index in the voxel array into the corresponding worldspace
@@ -445,7 +447,7 @@ public:
 			    const GA_LoadMap &map);
 
     /// Method to perform quick lookup of vertex without the virtual call
-    GA_Offset           fastVertexOffset(GA_Size index) const
+    GA_Offset           fastVertexOffset(GA_Size UT_IF_ASSERT_P(index)) const
                         {
                             UT_ASSERT_P(index < 1);
                             return myVertex;
@@ -575,7 +577,7 @@ protected:
     static bool		isIntrinsicMetadata(const char *name);
 
     /// @warning vertexPoint() doesn't check the bounds.  Use with caution.
-    GA_Offset           vertexPoint(GA_Size i) const
+    GA_Offset           vertexPoint(GA_Size) const
                             { return getDetail().vertexPoint(myVertex); }
 
     /// Report approximate memory usage, excluding sizeof(*this),
@@ -827,6 +829,6 @@ inline bool GEOvdbProcessTypedGridVec3(GEO_PrimVDB &vdb, OpT &op, bool makeUniqu
 
 #endif // UT_VERSION_INT < 0x0c050157 // earlier than 12.5.343
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

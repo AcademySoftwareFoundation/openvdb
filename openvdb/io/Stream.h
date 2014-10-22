@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -31,8 +31,9 @@
 #ifndef OPENVDB_IO_STREAM_HAS_BEEN_INCLUDED
 #define OPENVDB_IO_STREAM_HAS_BEEN_INCLUDED
 
-#include <iosfwd>
 #include "Archive.h"
+#include <boost/scoped_ptr.hpp>
+#include <iosfwd>
 
 
 namespace openvdb {
@@ -47,24 +48,31 @@ class GridDescriptor;
 class OPENVDB_API Stream: public Archive
 {
 public:
-    /// Read grids from an input stream.
-    explicit Stream(std::istream&);
+    /// @brief Read grids from an input stream.
+    /// @details If @a delayLoad is true, map the contents of the input stream
+    /// into memory and enable delayed loading of grids.
+    /// @note Define the environment variable @c OPENVDB_DISABLE_DELAYED_LOAD
+    /// to disable delayed loading unconditionally.
+    explicit Stream(std::istream&, bool delayLoad = true);
 
     /// Construct an archive for stream output.
     Stream();
     /// Construct an archive for output to the given stream.
     explicit Stream(std::ostream&);
 
+    Stream(const Stream&);
+    Stream& operator=(const Stream&);
+
     virtual ~Stream();
 
     /// @brief Return a copy of this archive.
-    virtual boost::shared_ptr<Archive> copy() const;
+    virtual Archive::Ptr copy() const;
 
     /// Return the file-level metadata in a newly created MetaMap.
     MetaMap::Ptr getMetadata() const;
 
     /// Return pointers to the grids that were read from the input stream.
-    GridPtrVecPtr getGrids() { return mGrids; }
+    GridPtrVecPtr getGrids();
 
     /// @brief Write the grids in the given container to this archive's output stream.
     /// @throw ValueError if this archive was constructed without specifying an output stream.
@@ -75,12 +83,6 @@ public:
     template<typename GridPtrContainerT>
     void write(const GridPtrContainerT&, const MetaMap& = MetaMap()) const;
 
-    /// @brief Write the grids in the given container to an output stream.
-    /// @deprecated Use Stream(os).write(grids) instead.
-    template<typename GridPtrContainerT>
-    OPENVDB_DEPRECATED void write(std::ostream&,
-        const GridPtrContainerT&, const MetaMap& = MetaMap()) const;
-
 private:
     /// Create a new grid of the type specified by the given descriptor,
     /// then populate the grid from the given input stream.
@@ -90,54 +92,21 @@ private:
     void writeGrids(std::ostream&, const GridCPtrVec&, const MetaMap&) const;
 
 
-    MetaMap::Ptr mMeta;
-    GridPtrVecPtr mGrids;
-    std::ostream* mOutputStream;
+    struct Impl;
+    boost::scoped_ptr<Impl> mImpl;
 };
 
 
 ////////////////////////////////////////
 
 
-inline void
-Stream::write(const GridCPtrVec& grids, const MetaMap& metadata) const
-{
-    if (mOutputStream == NULL) {
-        OPENVDB_THROW(ValueError, "no output stream was specified");
-    }
-    this->writeGrids(*mOutputStream, grids, metadata);
-}
-
-
 template<typename GridPtrContainerT>
 inline void
 Stream::write(const GridPtrContainerT& container, const MetaMap& metadata) const
 {
-    if (mOutputStream == NULL) {
-        OPENVDB_THROW(ValueError, "no output stream was specified");
-    }
     GridCPtrVec grids;
     std::copy(container.begin(), container.end(), std::back_inserter(grids));
-    this->writeGrids(*mOutputStream, grids, metadata);
-}
-
-
-template<typename GridPtrContainerT>
-inline void
-Stream::write(std::ostream& os, const GridPtrContainerT& container,
-    const MetaMap& metadata) const
-{
-    GridCPtrVec grids;
-    std::copy(container.begin(), container.end(), std::back_inserter(grids));
-    this->writeGrids(os, grids, metadata);
-}
-
-template<>
-inline void
-Stream::write<GridCPtrVec>(std::ostream& os, const GridCPtrVec& grids,
-    const MetaMap& metadata) const
-{
-    this->writeGrids(os, grids, metadata);
+    this->write(grids, metadata);
 }
 
 } // namespace io
@@ -146,6 +115,6 @@ Stream::write<GridCPtrVec>(std::ostream& os, const GridCPtrVec& grids,
 
 #endif // OPENVDB_IO_STREAM_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

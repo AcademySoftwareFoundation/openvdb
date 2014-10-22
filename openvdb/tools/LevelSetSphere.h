@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -45,7 +45,7 @@
 #include <openvdb/util/NullInterrupter.h>
 #include <boost/utility.hpp>
 #include <boost/type_traits/is_floating_point.hpp>
-
+#include "SignedFloodFill.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -177,13 +177,14 @@ private:
                         accessor.setValue(ijk, dx*v);// distance in world units
                     } else {// outside narrow band
                         m += math::Floor(d-w);// leapfrog
-                    }    
+                    }
                 }//end leapfrog over k
             }//end loop over j
         }//end loop over i
 
         // Define consistant signed distances outside the narrow-band
-        mGrid->signedFloodFill();
+        tools::signedFloodFill(mGrid->tree());
+        
         if (mInterrupt) mInterrupt->end();
     }
 
@@ -216,6 +217,6 @@ createLevelSetSphere(float radius, const openvdb::Vec3f& center, float voxelSize
 
 #endif // OPENVDB_TOOLS_LEVELSETSPHERE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

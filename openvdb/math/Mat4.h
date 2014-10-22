@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -93,25 +93,25 @@ public:
          Source i, Source j, Source k, Source l,
          Source m, Source n, Source o, Source p)
     {
-        MyBase::mm[ 0] = a;
-        MyBase::mm[ 1] = b;
-        MyBase::mm[ 2] = c;
-        MyBase::mm[ 3] = d;
+        MyBase::mm[ 0] = T(a);
+        MyBase::mm[ 1] = T(b);
+        MyBase::mm[ 2] = T(c);
+        MyBase::mm[ 3] = T(d);
 
-        MyBase::mm[ 4] = e;
-        MyBase::mm[ 5] = f;
-        MyBase::mm[ 6] = g;
-        MyBase::mm[ 7] = h;
+        MyBase::mm[ 4] = T(e);
+        MyBase::mm[ 5] = T(f);
+        MyBase::mm[ 6] = T(g);
+        MyBase::mm[ 7] = T(h);
 
-        MyBase::mm[ 8] = i;
-        MyBase::mm[ 9] = j;
-        MyBase::mm[10] = k;
-        MyBase::mm[11] = l;
+        MyBase::mm[ 8] = T(i);
+        MyBase::mm[ 9] = T(j);
+        MyBase::mm[10] = T(k);
+        MyBase::mm[11] = T(l);
 
-        MyBase::mm[12] = m;
-        MyBase::mm[13] = n;
-        MyBase::mm[14] = o;
-        MyBase::mm[15] = p;
+        MyBase::mm[12] = T(m);
+        MyBase::mm[13] = T(n);
+        MyBase::mm[14] = T(o);
+        MyBase::mm[15] = T(p);
     }
 
     /// Construct matrix given basis vectors (columns)
@@ -1040,7 +1040,8 @@ public:
         T0  w;
 
         // w = p * (*this).col(3);
-        w = p[0] * MyBase::mm[ 3] + p[1] * MyBase::mm[ 7] + p[2] * MyBase::mm[11] + MyBase::mm[15];
+        w = static_cast<T0>(p[0] * MyBase::mm[ 3] + p[1] * MyBase::mm[ 7]
+            + p[2] * MyBase::mm[11] + MyBase::mm[15]);
 
         if ( !isExactlyEqual(w , 0.0) ) {
             return Vec3<T0>(static_cast<T0>((p[0] * MyBase::mm[ 0] + p[1] * MyBase::mm[ 4] +
@@ -1362,6 +1363,6 @@ template<> inline math::Mat4d zeroVal<math::Mat4d>() { return math::Mat4d::ident
 
 #endif // OPENVDB_UTIL_MAT4_H_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

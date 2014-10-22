@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -192,7 +192,7 @@ TestCoord::testCoordBBox()
         Int32 maxInt32 = std::numeric_limits<Int32>::max();
         const openvdb::Coord min(Int32(0), Int32(0), Int32(0));
         const openvdb::Coord max(maxInt32-Int32(2), Int32(2), Int32(2));
-        
+
         const openvdb::CoordBBox b(min, max);
         uint64_t volume = UINT64_C(19327352814);
         CPPUNIT_ASSERT_EQUAL(volume, b.volume());
@@ -257,6 +257,6 @@ TestCoord::testCoordBBox()
 
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

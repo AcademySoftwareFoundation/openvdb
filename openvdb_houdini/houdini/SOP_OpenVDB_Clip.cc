@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -37,10 +37,8 @@
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
-
-#include <openvdb/tools/LevelSetUtil.h>
-#include <openvdb/tools/GridTransformer.h>
-#include <openvdb/tools/Morphology.h>
+#include <openvdb/tools/Clip.h> // for tools::clip()
+#include <openvdb/tools/LevelSetUtil.h> // for tools::sdfInteriorMask()
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -57,6 +55,7 @@ public:
     virtual int isRefInput(unsigned input) const { return (input == 1); }
 
 protected:
+    virtual bool updateParmsFlags();
     virtual OP_ERROR cookMySop(OP_Context&);
 };
 
@@ -72,17 +71,34 @@ newSopOperator(OP_OperatorTable* table)
 
     hutil::ParmList parms;
 
-    parms.add(hutil::ParmFactory(PRM_STRING, "group", "Grids")
-        .setHelpText("Specify a subset of the input VDB grids to be clip.")
+    parms.add(hutil::ParmFactory(PRM_STRING, "group", "Source Group")
+        .setHelpText("Specify a subset of the input VDB grids to be clipped.")
         .setChoiceList(&hutil::PrimGroupMenu));
 
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "usemask", "")
+        .setHelpText(
+            "If disabled, use the bounding box of the reference geometry\n"
+            "as the clipping region.")
+        .setDefault(PRMzeroDefaults)
+        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
+
     parms.add(hutil::ParmFactory(PRM_STRING, "mask", "Mask VDB")
+        .setHelpText("Specify a VDB grid whose active voxels are to be used as a clipping mask.")
         .setChoiceList(&hutil::PrimGroupMenu)
         .setSpareData(&SOP_Node::theSecondInput));
 
     hvdb::OpenVDBOpFactory("OpenVDB Clip", SOP_OpenVDB_Clip::factory, parms, *table)
         .addInput("VDBs")
         .addInput("Mask VDB or bounding geometry");
+}
+
+
+bool
+SOP_OpenVDB_Clip::updateParmsFlags()
+{
+    bool changed = false;
+    changed |= enableParm("mask", evalInt("usemask", 0, 0) != 0);
+    return changed;
 }
 
 
@@ -109,275 +125,70 @@ SOP_OpenVDB_Clip::SOP_OpenVDB_Clip(OP_Network* net,
 
 namespace {
 
-
-struct MaskOp
+struct LevelSetMaskOp
 {
     template<typename GridType>
     void operator()(const GridType& grid)
     {
-        if (openvdb::GRID_LEVEL_SET == grid.getGridClass()) {
-            mMaskGrid = openvdb::tools::sdfInteriorMask(grid);
-        } else {
-            mMaskGrid = openvdb::BoolGrid::create(false);
-            mMaskGrid->setTransform(grid.transform().copy());
-            mMaskGrid->tree().topologyUnion(grid.tree());
-        }
+        outputGrid = openvdb::tools::sdfInteriorMask(grid);
     }
 
-    openvdb::BoolGrid::Ptr mMaskGrid;
+    hvdb::GridPtr outputGrid;
 };
 
 
-template<typename TreeT>
-class MaskInteriorVoxels
+struct BBoxClipOp
 {
-public:
-    typedef typename TreeT::ValueType ValueT;
-    typedef typename TreeT::LeafNodeType LeafNodeT;
-
-    MaskInteriorVoxels(const TreeT& tree) : mAcc(tree) {}
-
-    template <typename LeafNodeType>
-    void operator()(LeafNodeType &leaf, size_t /*leafIndex*/) const
-    {
-        const LeafNodeT *refLeaf = mAcc.probeConstLeaf(leaf.origin());
-        if (refLeaf) {
-            typename LeafNodeType::ValueOffIter iter = leaf.beginValueOff();
-            for (; iter; ++iter) {
-                const openvdb::Index pos = iter.pos();
-                leaf.setActiveState(pos, refLeaf->getValue(pos) < ValueT(0));
-            }
-        }
-    }
-
-private:
-     openvdb::tree::ValueAccessor<const TreeT> mAcc;
-};
-
-
-template<typename TreeT>
-class CopyLeafs
-{
-public:
-    typedef typename TreeT::template ValueConverter<bool>::Type BoolTreeT;
-    typedef openvdb::tree::LeafManager<const BoolTreeT> BoolLeafManagerT;
-
-    //////////
-
-    CopyLeafs(const TreeT& tree, const BoolLeafManagerT& leafs);
-
-    void run(bool threaded = true);
-
-    typename TreeT::Ptr tree() const { return mNewTree; }
-
-    //////////
-
-    CopyLeafs(CopyLeafs&, tbb::split);
-    void operator()(const tbb::blocked_range<size_t>&);
-    void join(const CopyLeafs& rhs)
-    {
-        mNewTree->merge(*rhs.mNewTree);
-    }
-
-private:
-    const BoolTreeT* mClipMask;
-    const TreeT* mTree;
-    const BoolLeafManagerT* mLeafs;
-    typename TreeT::Ptr mNewTree;
-};
-
-template<typename TreeT>
-CopyLeafs<TreeT>::CopyLeafs(const TreeT& tree, const BoolLeafManagerT& leafs)
-    : mTree(&tree)
-    , mLeafs(&leafs)
-    , mNewTree(new TreeT(mTree->background()))
-{
-}
-
-template<typename TreeT>
-CopyLeafs<TreeT>::CopyLeafs(CopyLeafs& rhs, tbb::split)
-    : mTree(rhs.mTree)
-    , mLeafs(rhs.mLeafs)
-    , mNewTree(new TreeT(mTree->background()))
-{
-}
-
-template<typename TreeT>
-void
-CopyLeafs<TreeT>::run(bool threaded)
-{
-    if (threaded) tbb::parallel_reduce(mLeafs->getRange(), *this);
-    else (*this)(mLeafs->getRange());
-}
-
-template<typename TreeT>
-void
-CopyLeafs<TreeT>::operator()(const tbb::blocked_range<size_t>& range)
-{
-    typedef typename TreeT::LeafNodeType LeafT;
-    typedef typename openvdb::BoolTree::LeafNodeType BoolLeafT;
-    typename BoolLeafT::ValueOnCIter it;
-
-    openvdb::tree::ValueAccessor<TreeT> acc(*mNewTree);
-    openvdb::tree::ValueAccessor<const TreeT> refAcc(*mTree);
-
-    for (size_t n = range.begin(); n != range.end(); ++n) {
-
-        const BoolLeafT& maskLeaf = mLeafs->leaf(n);
-        const openvdb::Coord& ijk = maskLeaf.origin();
-        const LeafT* refLeaf = refAcc.probeConstLeaf(ijk);
-
-        LeafT* newLeaf = acc.touchLeaf(ijk);
-
-        if (refLeaf) {
-
-            for (it = maskLeaf.cbeginValueOn(); it; ++it) {
-                const openvdb::Index pos = it.pos();
-                newLeaf->setValueOnly(pos, refLeaf->getValue(pos));
-                newLeaf->setActiveState(pos, refLeaf->isValueOn(pos));
-            }
-
-        } else {
-
-            typename TreeT::ValueType value;
-            bool isActive = refAcc.probeValue(ijk, value);
-
-            for (it = maskLeaf.cbeginValueOn(); it; ++it) {
-                const openvdb::Index pos = it.pos();
-                newLeaf->setValueOnly(pos, value);
-                newLeaf->setActiveState(pos, isActive);
-            }
-        }
-    }
-}
-
-
-struct BoolSampler
-{
-    static const char* name() { return "bin"; }
-    static int radius() { return 2; }
-    static bool mipmap() { return false; }
-    static bool consistent() { return true; }
-
-    template<class TreeT>
-    static bool sample(const TreeT& inTree,
-        const openvdb::Vec3R& inCoord, typename TreeT::ValueType& result)
-    {
-        openvdb::Coord ijk;
-        ijk[0] = int(std::floor(inCoord[0]));
-        ijk[1] = int(std::floor(inCoord[1]));
-        ijk[2] = int(std::floor(inCoord[2]));
-        return inTree.probeValue(ijk, result);
-    }
-};
-
-
-struct ClipOp
-{
-    ClipOp() : mMaskGrid(NULL), mBBox(NULL) {}
-
-    ClipOp(const openvdb::BoolGrid& mask) : mMaskGrid(&mask), mBBox(NULL) {}
-    ClipOp(const openvdb::BBoxd& bbox) : mMaskGrid(NULL), mBBox(&bbox) {}
-
+    BBoxClipOp() {}
+    BBoxClipOp(const openvdb::BBoxd& bbox_): bbox(bbox_) {}
 
     template<typename GridType>
     void operator()(const GridType& grid)
     {
-        if (!mMaskGrid && !mBBox) return;
-
-        const openvdb::GridClass gridClass = grid.getGridClass();
-        typedef typename GridType::TreeType TreeType;
-        typedef openvdb::BoolTree BoolTree;
-        const TreeType& tree = grid.tree();
-
-
-        openvdb::BoolTree mask(false);
-        mask.topologyUnion(tree);
-
-        if (openvdb::GRID_LEVEL_SET == gridClass) {
-
-            openvdb::tree::LeafManager<openvdb::BoolTree> leafs(mask);
-            leafs.foreach(MaskInteriorVoxels<TreeType>(tree));
-
-            openvdb::tree::ValueAccessor<const TreeType> acc(tree);
-
-            typename BoolTree::ValueAllIter iter(mask);
-            iter.setMaxDepth(BoolTree::ValueAllIter::LEAF_DEPTH - 1);
-
-            for ( ; iter; ++iter) {
-                iter.setActiveState(acc.getValue(iter.getCoord()) < typename TreeType::ValueType(0));
-            }
-        }
-
-        if (!mBBox) {
-
-            openvdb::BoolGrid clipMask;
-            clipMask.setTransform(grid.transform().copy());
-            openvdb::tools::resampleToMatch<BoolSampler>(*mMaskGrid, clipMask);
-            clipMask.tree().prune();
-            mask.topologyIntersection(clipMask.tree());
-
-        } else {
-            openvdb::Vec3d minIS, maxIS;
-            openvdb::math::calculateBounds(grid.transform(), mBBox->min(), mBBox->max(), minIS, maxIS);
-
-            openvdb::CoordBBox region;
-            region.min()[0] = int(std::floor(minIS[0]));
-            region.min()[1] = int(std::floor(minIS[1]));
-            region.min()[2] = int(std::floor(minIS[2]));
-
-            region.max()[0] = int(std::floor(maxIS[0]));
-            region.max()[1] = int(std::floor(maxIS[1]));
-            region.max()[2] = int(std::floor(maxIS[2]));
-
-            openvdb::BoolTree clipMask(false);
-            clipMask.fill(region, true, true);
-
-            mask.topologyIntersection(clipMask);
-        }
-
-        typename GridType::Ptr newGrid;
-
-        { // Copy voxel data and state
-            openvdb::tree::LeafManager<const openvdb::BoolTree> leafs(mask);
-            CopyLeafs<TreeType> maskOp(tree, leafs);
-            maskOp.run();
-            newGrid = GridType::create(maskOp.tree());
-        }
-
-        { // Copy tile data and state
-            openvdb::tree::ValueAccessor<const TreeType> refAcc(tree);
-            openvdb::tree::ValueAccessor<const openvdb::BoolTree> maskAcc(mask);
-
-            typename TreeType::ValueAllIter it(newGrid->tree());
-            it.setMaxDepth(TreeType::ValueAllIter::LEAF_DEPTH - 1);
-            for ( ; it; ++it) {
-                openvdb::Coord ijk = it.getCoord();
-
-                if (maskAcc.isValueOn(ijk)) {
-                    typename TreeType::ValueType value;
-                    bool isActive = refAcc.probeValue(ijk, value);
-
-                    it.setValue(value);
-                    if (!isActive) it.setValueOff();
-                }
-            }
-        }
-
-
-        if (openvdb::GRID_LEVEL_SET != gridClass) {
-            newGrid->setGridClass(gridClass);
-        }
-
-        mGrid = newGrid;
-        mGrid->setTransform(grid.transform().copy());
+        outputGrid = openvdb::tools::clip(grid, bbox);
     }
 
-    const openvdb::BoolGrid *mMaskGrid;
-    const openvdb::BBoxd *mBBox;
-    hvdb::GridPtr mGrid;
+    openvdb::BBoxd bbox;
+    hvdb::GridPtr outputGrid;
 };
 
+
+template<typename GridType>
+struct MaskClipDispatchOp
+{
+    MaskClipDispatchOp(const GridType& grid_): grid(&grid_) {}
+
+    template<typename MaskGridType>
+    void operator()(const MaskGridType& mask)
+    {
+        outputGrid.reset();
+        if (grid) outputGrid = openvdb::tools::clip(*grid, mask);
+    }
+
+    const GridType* grid;
+    hvdb::GridPtr outputGrid;
+};
+
+
+struct MaskClipOp
+{
+    MaskClipOp(hvdb::GridCPtr mask_): mask(mask_) {}
+
+    template<typename GridType>
+    void operator()(const GridType& grid)
+    {
+        outputGrid.reset();
+        if (mask) {
+            // Dispatch on the mask grid type, now that the source grid type is resolved.
+            MaskClipDispatchOp<GridType> op(grid);
+            UTvdbProcessTypedGridTopology(UTvdbGetGridType(*mask), *mask, op);
+            outputGrid = op.outputGrid;
+        }
+    }
+
+    hvdb::GridCPtr mask;
+    hvdb::GridPtr outputGrid;
+};
 
 } // unnamed namespace
 
@@ -395,67 +206,81 @@ SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
         // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
         duplicateSource(0, context);
 
-
-        openvdb::BoolGrid::Ptr maskGrid;
         const GU_Detail* maskGeo = inputGeo(1);
-        bool gridNameEntered = false;
 
+        const bool useMask = evalInt("usemask", 0, time);
+
+        openvdb::BBoxd bbox;
+        hvdb::GridCPtr maskGrid;
         if (maskGeo) {
-            UT_String maskStr;
-            evalString(maskStr, "mask", 0, time);
+            if (useMask) {
+                UT_String maskStr;
+                evalString(maskStr, "mask", 0, time);
+                const GA_PrimitiveGroup* maskGroup = parsePrimitiveGroups(
+                    maskStr.buffer(), const_cast<GU_Detail*>(maskGeo));
+                hvdb::VdbPrimCIterator maskIt(maskGeo, maskGroup);
+                if (maskIt) {
+                    if (maskIt->getConstGrid().getGridClass() == openvdb::GRID_LEVEL_SET) {
+                        // If the mask grid is a level set, extract an interior mask from it.
+                        LevelSetMaskOp op;
+                        GEOvdbProcessTypedGridScalar(**maskIt, op);
+                        maskGrid = op.outputGrid;
+                    } else {
+                        maskGrid = maskIt->getConstGridPtr();
+                    }
+                }
+                if (!maskGrid) {
+                    addError(SOP_MESSAGE, "mask VDB not found");
+                    return error();
+                }
+            } else {
+                UT_BoundingBox box;
+                maskGeo->computeQuickBounds(box);
 
-            gridNameEntered = maskStr.length() > 0;
-
-            const GA_PrimitiveGroup * maskGroup =
-                parsePrimitiveGroups(maskStr.buffer(), const_cast<GU_Detail*>(maskGeo));
-
-            hvdb::VdbPrimCIterator maskIt(maskGeo, maskGroup);
-            if (maskIt) {
-                MaskOp op;
-                UTvdbProcessTypedGridScalar(maskIt->getStorageType(), maskIt->getGrid(), op);
-                maskGrid = op.mMaskGrid;
+                bbox.min()[0] = box.xmin();
+                bbox.min()[1] = box.ymin();
+                bbox.min()[2] = box.zmin();
+                bbox.max()[0] = box.xmax();
+                bbox.max()[1] = box.ymax();
+                bbox.max()[2] = box.zmax();
             }
         }
-
-        ClipOp clipOp;
-
-        if (maskGrid) {
-            clipOp = ClipOp(*maskGrid);
-
-        } else if (gridNameEntered) {
-            addError(SOP_MESSAGE, "Mask VDB not found.");
-            return error();
-
-        } else {
-
-            UT_BoundingBox box;
-            maskGeo->computeQuickBounds(box);
-
-            openvdb::BBoxd bbox;
-            bbox.min()[0] = box.xmin();
-            bbox.min()[1] = box.ymin();
-            bbox.min()[2] = box.zmin();
-            bbox.max()[0] = box.xmax();
-            bbox.max()[1] = box.ymax();
-            bbox.max()[2] = box.zmax();
-
-            clipOp = ClipOp(bbox);
-        }
-
 
         // Get the group of grids to surface.
         UT_String groupStr;
         evalString(groupStr, "group", 0, time);
         const GA_PrimitiveGroup* group = matchGroup(*gdp, groupStr.toStdString());
 
+        int numLevelSets = 0;
         for (hvdb::VdbPrimIterator it(gdp, group); it; ++it) {
+            if (it->getConstGrid().getGridClass() == openvdb::GRID_LEVEL_SET) {
+                ++numLevelSets;
+            }
 
-            //UTvdbProcessTypedGridScalar(it->getStorageType(), it->getGrid(), clipOp);
-            GEOvdbProcessTypedGridTopology(**it, clipOp);
+            hvdb::GridPtr outGrid;
+            if (maskGrid) {
+                MaskClipOp op(maskGrid);
+                GEOvdbProcessTypedGridTopology(**it, op);
+                outGrid = op.outputGrid;
+            } else {
+                BBoxClipOp op(bbox);
+                GEOvdbProcessTypedGridTopology(**it, op);
+                outGrid = op.outputGrid;
+            }
 
             // Replace the original VDB primitive with a new primitive that contains
             // the output grid and has the same attributes and group membership.
-            hvdb::replaceVdbPrimitive(*gdp, clipOp.mGrid, **it, true);
+            hvdb::replaceVdbPrimitive(*gdp, outGrid, **it, true);
+        }
+
+        if (numLevelSets > 0) {
+            if (numLevelSets == 1) {
+                addWarning(SOP_MESSAGE, "a level set grid was clipped;"
+                    " the resulting grid might not be a valid level set");
+            } else {
+                addWarning(SOP_MESSAGE, "some level sets were clipped;"
+                    " the resulting grids might not be valid level sets");
+            }
         }
 
     } catch (std::exception& e) {
@@ -465,6 +290,6 @@ SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

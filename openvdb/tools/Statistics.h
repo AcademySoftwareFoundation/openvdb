@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -70,7 +70,7 @@ histogram(const IterT& iter, double minVal, double maxVal,
 template<typename IterT>
 inline math::Extrema
 extrema(const IterT& iter, bool threaded = true);
-    
+
 /// @brief Iterate over a scalar grid and compute statistics (mean, variance, etc.)
 /// of the values of the voxels that are visited, or iterate over a vector-valued grid
 /// and compute statistics of the magnitudes of the vectors.
@@ -113,7 +113,7 @@ statistics(const IterT& iter, bool threaded = true);
 template<typename IterT, typename ValueOp>
 inline math::Extrema
 extrema(const IterT& iter, const ValueOp& op, bool threaded);
-    
+
 /// @brief Iterate over a grid and compute statistics (mean, variance, etc.) of
 /// the values produced by applying the given functor at each voxel that is visited.
 /// @param iter      an iterator over the values of a grid or its tree
@@ -214,7 +214,7 @@ template<typename OperatorT, typename IterT>
 inline math::Stats
 opStatistics(const IterT& iter, const OperatorT& op = OperatorT(), bool threaded = true);
 
-/// @brief Same as opStatistics except it returns a math::Extrema vs a math::Stats   
+/// @brief Same as opStatistics except it returns a math::Extrema vs a math::Stats
 template<typename OperatorT, typename IterT>
 inline math::Extrema
 opExtrema(const IterT& iter, const OperatorT& op = OperatorT(), bool threaded = true);
@@ -284,7 +284,7 @@ struct StatsOp
     StatsT stats;
     ValueOp getValue;
 };
-    
+
 
 // Helper class to accumulate scalar voxel values or vector voxel magnitudes
 // into a math::Histogram object
@@ -381,7 +381,7 @@ extrema(const IterT& iter, bool threaded)
     stats_internal::GetVal<IterT, math::Extrema> valOp;
     return extrema(iter, valOp, threaded);
 }
-    
+
 template<typename IterT>
 inline math::Stats
 statistics(const IterT& iter, bool threaded)
@@ -397,7 +397,7 @@ extrema(const IterT& iter, const ValueOp& valOp, bool threaded)
     stats_internal::StatsOp<IterT, const ValueOp, math::Extrema> op(valOp);
     tools::accumulate(iter, op, threaded);
     return op.stats;
-}    
+}
 
 template<typename IterT, typename ValueOp>
 inline math::Stats
@@ -425,7 +425,7 @@ opStatistics(const IterT& iter, const OperatorT& op, bool threaded)
     stats_internal::MathOp<IterT, OperatorT, math::Stats> func(iter, op);
     tools::accumulate(iter, func, threaded);
     return func.mStats;
-}    
+}
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
@@ -433,6 +433,6 @@ opStatistics(const IterT& iter, const OperatorT& op, bool threaded)
 
 #endif // OPENVDB_TOOLS_STATISTICS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -41,7 +41,6 @@
 #include <openvdb/util/NodeMasks.h>
 #include "LeafNode.h"
 #include "Iterator.h"
-#include "Util.h"
 
 
 namespace openvdb {
@@ -130,6 +129,11 @@ public:
     /// @param active  the active state to which to initialize all voxels
     explicit LeafNode(const Coord& xyz, bool value = false, bool active = false);
 
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    /// "Partial creation" constructor used during file input
+    LeafNode(PartialCreate, const Coord& xyz, bool value = false, bool active = false);
+#endif
+
     /// Deep copy constructor
     LeafNode(const LeafNode&);
 
@@ -182,6 +186,17 @@ public:
     bool isEmpty() const { return mValueMask.isOff(); }
     /// Return @c true if this node only contains active voxels.
     bool isDense() const { return mValueMask.isOn(); }
+
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    /// @brief Return @c true if memory for this node's buffer has been allocated.
+    /// @details Currently, boolean leaf nodes don't support partial creation,
+    /// so this always returns @c true.
+    bool isAllocated() const { return true; }
+    /// @brief Allocate memory for this node's buffer if it has not already been allocated.
+    /// @details Currently, boolean leaf nodes don't support partial creation,
+    /// so this has no effect.
+    bool allocate() { return true; }
+#endif
 
     /// Return the memory in bytes occupied by this node.
     Index64 memUsage() const;
@@ -243,6 +258,7 @@ public:
 
     /// Read in the topology and the origin.
     void readBuffers(std::istream&, bool fromHalf = false);
+    void readBuffers(std::istream& is, const CoordBBox&, bool fromHalf = false);
     /// Write out the topology and the origin.
     void writeBuffers(std::ostream&, bool toHalf = false) const;
 
@@ -319,6 +335,9 @@ public:
 
     /// Return @c false since leaf nodes never contain tiles.
     static bool hasActiveTiles() { return false; }
+
+    /// Set all voxels that lie outside the given axis-aligned box to the background.
+    void clip(const CoordBBox&, bool background);
 
     /// Set all voxels within an axis-aligned box to the specified value and active state.
     void fill(const CoordBBox& bbox, bool value, bool active = true);
@@ -525,11 +544,7 @@ public:
 
     //@{
     /// This function exists only to enable template instantiation.
-    void signedFloodFill(bool) {}
-    void signedFloodFill(bool, bool) {}
-    template<typename PruneOp> void pruneOp(PruneOp&) {}
     void prune(const ValueType& /*tolerance*/ = zeroVal<ValueType>()) {}
-    void pruneInactive(const ValueType&) {}
     void addLeaf(LeafNode*) {}
     template<typename AccessorT>
     void addLeafAndCache(LeafNode*, AccessorT&) {}
@@ -802,6 +817,21 @@ LeafNode<bool, Log2Dim>::LeafNode(const Coord& xyz, bool value, bool active):
 }
 
 
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+template<Index Log2Dim>
+inline
+LeafNode<bool, Log2Dim>::LeafNode(PartialCreate, const Coord& xyz, bool value, bool active):
+    mValueMask(active),
+    mBuffer(value),
+    mOrigin(xyz & (~(DIM - 1)))
+{
+    /// @todo For now, this is identical to the non-PartialCreate constructor.
+    /// Consider modifying the Buffer class to allow it to be constructed
+    /// without allocating a bitmask.
+}
+#endif
+
+
 template<Index Log2Dim>
 inline
 LeafNode<bool, Log2Dim>::LeafNode(const LeafNode &other):
@@ -975,6 +1005,24 @@ inline void
 LeafNode<bool, Log2Dim>::writeTopology(std::ostream& os, bool /*toHalf*/) const
 {
     mValueMask.save(os);
+}
+
+
+template<Index Log2Dim>
+inline void
+LeafNode<bool, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bool fromHalf)
+{
+    // Boolean LeafNodes don't currently implement lazy loading.
+    // Instead, load the full buffer, then clip it.
+
+    this->readBuffers(is, fromHalf);
+
+    // Get this tree's background value.
+    bool background = false;
+    if (const void* bgPtr = io::getGridBackgroundValuePtr(is)) {
+        background = *static_cast<const bool*>(bgPtr);
+    }
+    this->clip(clipBBox, background);
 }
 
 
@@ -1299,6 +1347,46 @@ LeafNode<bool, Log2Dim>::topologyDifference(const LeafNode<OtherType, Log2Dim>& 
                                             const bool&)
 {
     mValueMask &= !other.getValueMask();
+}
+
+
+////////////////////////////////////////
+
+
+template<Index Log2Dim>
+inline void
+LeafNode<bool, Log2Dim>::clip(const CoordBBox& clipBBox, bool background)
+{
+    CoordBBox nodeBBox = this->getNodeBoundingBox();
+    if (!clipBBox.hasOverlap(nodeBBox)) {
+        // This node lies completely outside the clipping region.  Fill it with background tiles.
+        this->fill(nodeBBox, background, /*active=*/false);
+    } else if (clipBBox.isInside(nodeBBox)) {
+        // This node lies completely inside the clipping region.  Leave it intact.
+        return;
+    }
+
+    // This node isn't completely contained inside the clipping region.
+    // Set any voxels that lie outside the region to the background value.
+
+    // Construct a boolean mask that is on inside the clipping region and off outside it.
+    NodeMaskType mask;
+    nodeBBox.intersect(clipBBox);
+    Coord xyz;
+    int &x = xyz.x(), &y = xyz.y(), &z = xyz.z();
+    for (x = nodeBBox.min().x(); x <= nodeBBox.max().x(); ++x) {
+        for (y = nodeBBox.min().y(); y <= nodeBBox.max().y(); ++y) {
+            for (z = nodeBBox.min().z(); z <= nodeBBox.max().z(); ++z) {
+                mask.setOn(static_cast<Index32>(this->coordToOffset(xyz)));
+            }
+        }
+    }
+
+    // Set voxels that lie in the inactive region of the mask (i.e., outside
+    // the clipping region) to the background value.
+    for (MaskOffIter maskIter = mask.beginOff(); maskIter; ++maskIter) {
+        this->setValueOff(maskIter.pos(), background);
+    }
 }
 
 
@@ -1655,6 +1743,6 @@ LeafNode<bool, Log2Dim>::doVisit2(NodeT& self, OtherChildAllIterT& otherIter,
 
 #endif // OPENVDB_TREE_LEAFNODEBOOL_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

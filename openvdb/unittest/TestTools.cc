@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -34,6 +34,8 @@
 #include <tbb/atomic.h>
 #include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
+#include <openvdb/tools/ChangeBackground.h>
+#include <openvdb/tools/Clip.h>
 #include <openvdb/tools/GridOperators.h>
 #include <openvdb/tools/Filter.h>
 #include <openvdb/tools/LevelSetUtil.h>
@@ -81,6 +83,7 @@ public:
     CPPUNIT_TEST(testAccumulate);
     CPPUNIT_TEST(testUtil);
     CPPUNIT_TEST(testVectorTransformer);
+    CPPUNIT_TEST(testClipping);
 
     CPPUNIT_TEST_SUITE_END();
 
@@ -104,6 +107,7 @@ public:
     void testAccumulate();
     void testUtil();
     void testVectorTransformer();
+    void testClipping();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestTools);
@@ -124,7 +128,7 @@ public:
     void operator()(const std::string& name, float time, size_t n)
     {
         std::ostringstream ostr;
-        ostr << "/usr/pic1/tmp/" << name << "_" << mVersion << "_" << mFrame << ".vdb";
+        ostr << "/tmp/" << name << "_" << mVersion << "_" << mFrame << ".vdb";
         openvdb::io::File file(ostr.str());
         openvdb::GridPtrVec grids;
         grids.push_back(mGrid);
@@ -154,7 +158,7 @@ TestTools::testDilateVoxels()
     typedef openvdb::tree::Tree4<float, 5, 4, 3>::Type Tree543f;
 
     Tree543f::Ptr tree(new Tree543f);
-    tree->setBackground(/*background=*/5.0);
+    openvdb::tools::changeBackground(*tree, /*background=*/5.0);
     CPPUNIT_ASSERT(tree->empty());
 
     const openvdb::Index leafDim = Tree543f::LeafNodeType::DIM;
@@ -262,7 +266,8 @@ TestTools::testDilateVoxels()
         //grid.print(std::cerr,5);
         openvdb::tools::dilateVoxels(grid.tree());
         CPPUNIT_ASSERT(grid.tree().activeVoxelCount() > count);
-        //std::cerr << "\nAfter: active voxel count = " << grid.tree().activeVoxelCount() << std::endl;
+        //std::cerr << "\nAfter: active voxel count = "
+        //    << grid.tree().activeVoxelCount() << std::endl;
     }
 //     {// Test a grid from a file that has proven to be challenging
 //         openvdb::initialize();
@@ -276,8 +281,157 @@ TestTools::testDilateVoxels()
 //         //grid->print(std::cerr,5);
 //         openvdb::tools::dilateVoxels(grid->tree());
 //         CPPUNIT_ASSERT(grid->tree().activeVoxelCount() > count);
-//         //std::cerr << "\nAfter: active voxel count = " << grid->tree().activeVoxelCount() << std::endl;
+//         //std::cerr << "\nAfter: active voxel count = "
+//         //    << grid->tree().activeVoxelCount() << std::endl;
 //     }
+
+    {// test dilateVoxels6
+        for (int x=0; x<8; ++x) {
+            for (int y=0; y<8; ++y) {
+                for (int z=0; z<8; ++z) {
+                    const openvdb::Coord ijk(x,y,z);
+                    Tree543f tree1(0.0f);
+                    CPPUNIT_ASSERT_EQUAL(Index64(0), tree1.activeVoxelCount());
+                    tree1.setValue(ijk, 1.0f);
+                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree1.activeVoxelCount());
+                    CPPUNIT_ASSERT(tree1.isValueOn(ijk));
+                    openvdb::tools::Morphology<Tree543f> m(tree1);
+                    m.dilateVoxels6();
+                    for (int i=-1; i<=1; ++i) {
+                        for (int j=-1; j<=1; ++j) {
+                            for (int k=-1; k<=1; ++k) {
+                                const openvdb::Coord xyz = ijk.offsetBy(i,j,k), d=ijk-xyz;
+                                const int n= openvdb::math::Abs(d[0])
+                                           + openvdb::math::Abs(d[1])
+                                           + openvdb::math::Abs(d[2]);
+                                if (n<=1) {
+                                    CPPUNIT_ASSERT( tree1.isValueOn(xyz));
+                                } else {
+                                    CPPUNIT_ASSERT(!tree1.isValueOn(xyz));
+                                }
+                            }
+                        }
+                    }
+                    CPPUNIT_ASSERT_EQUAL(Index64(1 + 6), tree1.activeVoxelCount());
+                }
+            }
+        }
+    }
+    {// test dilateVoxels18
+        for (int x=0; x<8; ++x) {
+            for (int y=0; y<8; ++y) {
+                for (int z=0; z<8; ++z) {
+                    const openvdb::Coord ijk(x,y,z);
+                    Tree543f tree1(0.0f);
+                    CPPUNIT_ASSERT_EQUAL(Index64(0), tree1.activeVoxelCount());
+                    tree1.setValue(ijk, 1.0f);
+                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree1.activeVoxelCount());
+                    CPPUNIT_ASSERT(tree1.isValueOn(ijk));
+                    openvdb::tools::Morphology<Tree543f> m(tree1);
+                    m.dilateVoxels18();
+                    for (int i=-1; i<=1; ++i) {
+                        for (int j=-1; j<=1; ++j) {
+                            for (int k=-1; k<=1; ++k) {
+                                const openvdb::Coord xyz = ijk.offsetBy(i,j,k), d=ijk-xyz;
+                                const int n= openvdb::math::Abs(d[0])
+                                           + openvdb::math::Abs(d[1])
+                                           + openvdb::math::Abs(d[2]);
+                                if (n<=2) {
+                                    CPPUNIT_ASSERT( tree1.isValueOn(xyz));
+                                } else {
+                                    CPPUNIT_ASSERT(!tree1.isValueOn(xyz));
+                                }
+                            }
+                        }
+                    }
+                    CPPUNIT_ASSERT_EQUAL(Index64(1 + 6 + 12), tree1.activeVoxelCount());
+                }
+            }
+        }
+    }
+    {// test dilateVoxels26
+        for (int x=0; x<8; ++x) {
+            for (int y=0; y<8; ++y) {
+                for (int z=0; z<8; ++z) {
+                    const openvdb::Coord ijk(x,y,z);
+                    Tree543f tree1(0.0f);
+                    CPPUNIT_ASSERT_EQUAL(Index64(0), tree1.activeVoxelCount());
+                    tree1.setValue(ijk, 1.0f);
+                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree1.activeVoxelCount());
+                    CPPUNIT_ASSERT(tree1.isValueOn(ijk));
+                    openvdb::tools::Morphology<Tree543f> m(tree1);
+                    m.dilateVoxels26();
+                    for (int i=-1; i<=1; ++i) {
+                        for (int j=-1; j<=1; ++j) {
+                            for (int k=-1; k<=1; ++k) {
+                                const openvdb::Coord xyz = ijk.offsetBy(i,j,k), d=ijk-xyz;
+                                const int n = openvdb::math::Abs(d[0])
+                                            + openvdb::math::Abs(d[1])
+                                            + openvdb::math::Abs(d[2]);
+                                if (n<=3) {
+                                    CPPUNIT_ASSERT( tree1.isValueOn(xyz));
+                                } else {
+                                    CPPUNIT_ASSERT(!tree1.isValueOn(xyz));
+                                }
+                            }
+                        }
+                    }
+                    CPPUNIT_ASSERT_EQUAL(Index64(1 + 6 + 12 + 8), tree1.activeVoxelCount());
+                }
+            }
+        }
+    }
+    /*
+    // Performance test
+    {// dialte a narrow band of a sphere
+        const float radius = 335.3f;
+        const openvdb::Vec3f center(15.8f, 13.2f, 16.7f);
+        const float voxelSize = 1.5f, width = 3.25f;
+        openvdb::FloatGrid::Ptr grid =
+            openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(
+                radius, center, voxelSize, width);
+        //grid->print(std::cerr, 3);
+        const openvdb::Index64 count = grid->tree().activeVoxelCount();
+        openvdb::util::CpuTimer t;
+        t.start("sphere dilateVoxels6");
+        openvdb::tools::dilateVoxels(grid->tree());
+        t.stop();
+        CPPUNIT_ASSERT(grid->tree().activeVoxelCount() > count);
+        // grid->print(std::cerr, 3);
+    }
+    {// dialte a narrow band of a sphere
+        const float radius = 335.3f;
+        const openvdb::Vec3f center(15.8f, 13.2f, 16.7f);
+        const float voxelSize = 1.5f, width = 3.25f;
+        openvdb::FloatGrid::Ptr grid =
+            openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(
+                radius, center, voxelSize, width);
+        //grid->print(std::cerr, 3);
+        const openvdb::Index64 count = grid->tree().activeVoxelCount();
+        openvdb::util::CpuTimer t;
+        t.start("sphere dilateVoxels18");
+        openvdb::tools::dilateVoxels(grid->tree(), 1, openvdb::tools::NN_FACE_EDGE);
+        t.stop();
+        CPPUNIT_ASSERT(grid->tree().activeVoxelCount() > count);
+        //grid->print(std::cerr, 3);
+    }
+    {// dialte a narrow band of a sphere
+        const float radius = 335.3f;
+        const openvdb::Vec3f center(15.8f, 13.2f, 16.7f);
+        const float voxelSize = 1.5f, width = 3.25f;
+        openvdb::FloatGrid::Ptr grid =
+            openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(
+                radius, center, voxelSize, width);
+        //grid->print(std::cerr, 3);
+        const openvdb::Index64 count = grid->tree().activeVoxelCount();
+        openvdb::util::CpuTimer t;
+        t.start("sphere dilateVoxels26");
+        openvdb::tools::dilateVoxels(grid->tree(), 1, openvdb::tools::NN_FACE_EDGE_VERTEX);
+        t.stop();
+        CPPUNIT_ASSERT(grid->tree().activeVoxelCount() > count);
+        //grid->print(std::cerr, 3);
+        }
+    */
 }
 
 void
@@ -291,7 +445,7 @@ TestTools::testErodeVoxels()
     typedef openvdb::tree::Tree4<float, 5, 4, 3>::Type TreeType;
 
     TreeType::Ptr tree(new TreeType);
-    tree->setBackground(/*background=*/5.0);
+    openvdb::tools::changeBackground(*tree, /*background=*/5.0);
     CPPUNIT_ASSERT(tree->empty());
 
     const int leafDim = TreeType::LeafNodeType::DIM;
@@ -446,6 +600,60 @@ TestTools::testErodeVoxels()
         openvdb::tools::erodeVoxels(grid.tree());
         CPPUNIT_ASSERT(grid.tree().activeVoxelCount() < count);
     }
+
+    {//erode6
+        for (int x=0; x<8; ++x) {
+            for (int y=0; y<8; ++y) {
+                for (int z=0; z<8; ++z) {
+                    tree->clear();
+                    const openvdb::Coord ijk(x,y,z);
+                    CPPUNIT_ASSERT_EQUAL(Index64(0), tree->activeVoxelCount());
+                    tree->setValue(ijk, 1.0f);
+                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeVoxelCount());
+                    CPPUNIT_ASSERT(tree->isValueOn(ijk));
+                    openvdb::tools::dilateVoxels(*tree, 1, openvdb::tools::NN_FACE);
+                    CPPUNIT_ASSERT_EQUAL(Index64(1 + 6), tree->activeVoxelCount());
+                    openvdb::tools::erodeVoxels( *tree, 1, openvdb::tools::NN_FACE);
+                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeVoxelCount());
+                    CPPUNIT_ASSERT(tree->isValueOn(ijk));
+                }
+            }
+        }
+    }
+    /* Not completed yet 
+    {//erode18
+        //for (int x=0; x<8; ++x) {
+        //for (int y=0; y<8; ++y) {
+        //for (int z=0; z<8; ++z) {
+        int x=3, y=3, z=3;
+                    const openvdb::Coord ijk(x,y,z);
+                    std::cerr << ijk;
+                    tree->clear();
+                    CPPUNIT_ASSERT_EQUAL(Index64(0), tree->activeVoxelCount());
+                    tree->setValue(ijk, 1.0f);
+                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeVoxelCount());
+                    CPPUNIT_ASSERT(tree->isValueOn(ijk));
+                    openvdb::tools::dilateVoxels(*tree, 1, openvdb::tools::NN_FACE_EDGE);
+                    std::cerr << " dilated to " << tree->activeVoxelCount();
+                    CPPUNIT_ASSERT_EQUAL(Index64(1 + 6 + 12), tree->activeVoxelCount());
+                    openvdb::tools::erodeVoxels( *tree, 1, openvdb::tools::NN_FACE_EDGE);
+                    std::cerr << ", eroded to " << tree->activeVoxelCount() << std::endl;
+                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeVoxelCount());
+                    CPPUNIT_ASSERT(tree->isValueOn(ijk));
+                    //      }
+                    //}
+                    //}
+    }
+    
+    {//erode26
+        tree->clear();
+        tree->setValue(openvdb::Coord(3,4,5), 1.0f);
+        openvdb::tools::dilateVoxels(*tree, 12, openvdb::tools::NN_FACE_EDGE_VERTEX);
+        openvdb::tools::erodeVoxels( *tree, 12, openvdb::tools::NN_FACE_EDGE_VERTEX);
+        CPPUNIT_ASSERT_EQUAL(1, int(tree->activeVoxelCount()));
+        CPPUNIT_ASSERT(tree->isValueOn(openvdb::Coord(3,4,5)));
+        }
+    */
 }
 
 
@@ -468,7 +676,7 @@ TestTools::testActivate()
     CPPUNIT_ASSERT_EQUAL(bbox2.volume() + bbox1.volume(), tree.activeVoxelCount());
 
     // Deactivate all voxels with the background value.
-    tools::deactivate(tree, background, /*tolerance=*/Vec3s(1.0e-6));
+    tools::deactivate(tree, background, /*tolerance=*/Vec3s(1.0e-6f));
     // Verify that there are no longer any active voxels with the background value.
     CPPUNIT_ASSERT_EQUAL(bbox1.volume(), tree.activeVoxelCount());
 
@@ -627,7 +835,7 @@ TestTools::testLevelSetSphere()
     for (int i=0; i<dim; ++i) {
         for (int j=0; j<dim; ++j) {
             for (int k=0; k<dim; ++k) {
-                const openvdb::Vec3f p(voxelSize*i,voxelSize*j,voxelSize*k);
+                const openvdb::Vec3f p(voxelSize*float(i), voxelSize*float(j), voxelSize*float(k));
                 const float dist = (p-center).length() - radius;
                 const float val1 = grid1->tree().getValue(openvdb::Coord(i,j,k));
                 const float val2 = grid2->tree().getValue(openvdb::Coord(i,j,k));
@@ -890,7 +1098,8 @@ TestTools::testLevelSetMeasure()
     openvdb::Vec3f C(0.35f, 0.35f, 0.35f);
     openvdb::Real r = 0.15, voxelSize = 1.0/(dim-1);
     const openvdb::Real Pi = boost::math::constants::pi<openvdb::Real>();
-    GridT::Ptr sphere = openvdb::tools::createLevelSetSphere<GridT>(r, C, voxelSize);
+    GridT::Ptr sphere = openvdb::tools::createLevelSetSphere<GridT>(
+        float(r), C, float(voxelSize));
 
     typedef openvdb::tools::LevelSetMeasure<GridT>  MeasureT;
     MeasureT m(*sphere);
@@ -935,7 +1144,7 @@ TestTools::testLevelSetMeasure()
     // Second sphere
     C = openvdb::Vec3f(5.4f, 6.4f, 8.4f);
     r = 0.57f;
-    sphere = openvdb::tools::createLevelSetSphere<GridT>(r, C, voxelSize);
+    sphere = openvdb::tools::createLevelSetSphere<GridT>(float(r), C, float(voxelSize));
     m.reinit(*sphere);
 
      // Test all measures of sphere in world units
@@ -1213,7 +1422,9 @@ TestTools::testPointAdvect()
 
         // create points
         std::vector<openvdb::Vec3f> pointList(numPoints);  /// larger than the tbb chunk size
-        for (size_t i = 0; i < numPoints; i++) pointList[i] = openvdb::Vec3f(i, i, i);
+        for (size_t i = 0; i < numPoints; i++) {
+            pointList[i] = openvdb::Vec3f(float(i), float(i), float(i));
+        }
 
         for (unsigned int order = 1; order < 5; ++order) {
             // check all four time integrations schemes
@@ -1223,11 +1434,13 @@ TestTools::testPointAdvect()
 
             // check locations
             for (size_t i = 0; i < numPoints; i++) {
-                openvdb::Vec3f expected(i + 1, i + 1 , i + 1);
+                openvdb::Vec3f expected(float(i + 1), float(i + 1), float(i + 1));
                 CPPUNIT_ASSERT_EQUAL(expected, pointList[i]);
             }
             // reset values
-            for (size_t i = 0; i < numPoints; i++) pointList[i] = openvdb::Vec3f(i, i, i);
+            for (size_t i = 0; i < numPoints; i++) {
+                pointList[i] = openvdb::Vec3f(float(i), float(i), float(i));
+            }
         }
 
     }
@@ -1328,12 +1541,12 @@ TestTools::testPointAdvect()
 
 
 namespace {
-    
+
     struct PointList
     {
         struct Point { double x,y,z; };
         std::vector<Point> list;
-        openvdb::Index64 size() const { return list.size(); }
+        openvdb::Index64 size() const { return openvdb::Index64(list.size()); }
         void add(const openvdb::Vec3d &p) { Point q={p[0],p[1],p[2]}; list.push_back(q); }
     };
 }
@@ -1380,7 +1593,8 @@ TestTools::testPointScatter()
      {// test dense uniform scattering
         const size_t pointsPerVoxel = 8;
         PointList points;
-        openvdb::tools::DenseUniformPointScatter<PointList, RandGen> scatter(points, pointsPerVoxel, mtRand);
+        openvdb::tools::DenseUniformPointScatter<PointList, RandGen>
+            scatter(points, pointsPerVoxel, mtRand);
         scatter.operator()<GridType>(*grid);
         CPPUNIT_ASSERT_EQUAL( scatter.getVoxelCount()*pointsPerVoxel, scatter.getPointCount() );
         CPPUNIT_ASSERT_EQUAL( scatter.getPointCount(), points.size() );
@@ -1397,7 +1611,7 @@ TestTools::testFloatApply()
     typedef openvdb::FloatTree::ValueOnIter ValueIter;
 
     struct Local {
-        static inline float op(float x) { return x * 2.0; }
+        static inline float op(float x) { return x * 2.f; }
         static inline void visit(const ValueIter& it) { it.setValue(op(*it)); }
     };
 
@@ -1412,7 +1626,7 @@ TestTools::testFloatApply()
             xyz.setY(y);
             for (int x = MIN; x < MAX; x += STEP) {
                 xyz.setX(x);
-                tree.setValue(xyz, x + y + z);
+                tree.setValue(xyz, float(x + y + z));
             }
         }
     }
@@ -1427,7 +1641,7 @@ TestTools::testFloatApply()
 
     for (openvdb::FloatTree::ValueOnCIter it = tree.cbeginValueOn(); it; ++it) {
         xyz = it.getCoord();
-        expected = Local::op(xyz[0] + xyz[1] + xyz[2]);
+        expected = Local::op(float(xyz[0] + xyz[1] + xyz[2]));
         CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, it.getValue(), /*tolerance=*/0.0);
     }
 }
@@ -1465,7 +1679,7 @@ TestTools::testVectorApply()
             xyz.setY(y);
             for (int x = MIN; x < MAX; x += STEP) {
                 xyz.setX(x);
-                tree.setValue(xyz, openvdb::Vec3s(x, y, z));
+                tree.setValue(xyz, openvdb::Vec3s(float(x), float(y), float(z)));
             }
         }
     }
@@ -1477,7 +1691,7 @@ TestTools::testVectorApply()
     openvdb::Vec3s expected;
     for (openvdb::VectorTree::ValueOnCIter it = tree.cbeginValueOn(); it; ++it) {
         xyz = it.getCoord();
-        expected = op.xform(openvdb::Vec3s(xyz[0], xyz[1], xyz[2]));
+        expected = op.xform(openvdb::Vec3s(float(xyz[0]), float(xyz[1]), float(xyz[2])));
         CPPUNIT_ASSERT_EQUAL(expected, it.getValue());
     }
 }
@@ -1596,7 +1810,7 @@ TestTools::testTransformValues()
             xyz.setY(y);
             for (int x = MIN; x < MAX; x += STEP) {
                 xyz.setX(x);
-                ftree.setValue(xyz, x + y + z);
+                ftree.setValue(xyz, float(x + y + z));
             }
         }
     }
@@ -1618,7 +1832,7 @@ TestTools::testTransformValues()
         Vec3s expected;
         for (Tree323v::ValueOnCIter it = vtree.cbeginValueOn(); it; ++it) {
             xyz = it.getCoord();
-            expected = op.toVec(xyz[0] + xyz[1] + xyz[2]);
+            expected = op.toVec(float(xyz[0] + xyz[1] + xyz[2]));
             CPPUNIT_ASSERT_EQUAL(expected, it.getValue());
         }
         // Check values inside the tiles.
@@ -1772,6 +1986,72 @@ TestTools::testVectorTransformer()
     }
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+
+////////////////////////////////////////
+
+
+// See also TestGrid::testClipping()
+void
+TestTools::testClipping()
+{
+    using namespace openvdb;
+
+    FloatGrid cube(0.f);
+    cube.fill(CoordBBox(Coord(-10), Coord(10)), /*value=*/5.f, /*active=*/true);
+
+    struct Local {
+        static void validate(const FloatGrid& clipped)
+        {
+            const CoordBBox bbox = clipped.evalActiveVoxelBoundingBox();
+            CPPUNIT_ASSERT_EQUAL(4, bbox.min().x());
+            CPPUNIT_ASSERT_EQUAL(4, bbox.min().y());
+            CPPUNIT_ASSERT_EQUAL(-6, bbox.min().z());
+            CPPUNIT_ASSERT_EQUAL(4, bbox.max().x());
+            CPPUNIT_ASSERT_EQUAL(4, bbox.max().y());
+            CPPUNIT_ASSERT_EQUAL(6, bbox.max().z());
+            CPPUNIT_ASSERT_EQUAL(6 + 6 + 1, int(clipped.activeVoxelCount()));
+            CPPUNIT_ASSERT_EQUAL(2, int(clipped.constTree().leafCount()));
+
+            FloatGrid::ConstAccessor acc = clipped.getConstAccessor();
+            const float bg = clipped.background();
+            Coord xyz;
+            int &x = xyz[0], &y = xyz[1], &z = xyz[2];
+            for (x = -10; x <= 10; ++x) {
+                for (y = -10; y <= 10; ++y) {
+                    for (z = -10; z <= 10; ++z) {
+                        if (x == 4 && y == 4 && z >= -6 && z <= 6) {
+                            CPPUNIT_ASSERT_EQUAL(5.f, acc.getValue(Coord(4, 4, z)));
+                        } else {
+                            CPPUNIT_ASSERT_EQUAL(bg, acc.getValue(Coord(x, y, z)));
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    {
+        // Test clipping against a bounding box.
+        BBoxd clipBox(Vec3d(4.0, 4.0, -6.0), Vec3d(4.9, 4.9, 6.0));
+        FloatGrid::Ptr clipped = tools::clip(cube, clipBox);
+        Local::validate(*clipped);
+    }
+    {
+        // Test clipping against a boolean mask grid.
+        BoolGrid mask(false);
+        mask.fill(CoordBBox(Coord(4, 4, -6), Coord(4, 4, 6)), true, true);
+        FloatGrid::Ptr clipped = tools::clip(cube, mask);
+        Local::validate(*clipped);
+    }
+    {
+        // Test clipping against a non-boolean mask grid.
+        Int32Grid mask(0);
+        mask.fill(CoordBBox(Coord(4, 4, -6), Coord(4, 4, 6)), -5, true);
+        FloatGrid::Ptr clipped = tools::clip(cube, mask);
+        Local::validate(*clipped);
+    }
+}
+
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

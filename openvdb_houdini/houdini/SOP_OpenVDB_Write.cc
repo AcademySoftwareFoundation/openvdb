@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -37,6 +37,7 @@
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb_houdini/GEO_PrimVDB.h>
 #include <openvdb_houdini/GU_PrimVDB.h>
+#include <PRM/PRM_Parm.h>
 #include <UT/UT_Interrupt.h>
 #include <set>
 
@@ -56,6 +57,8 @@ public:
     static int writeNowCallback(void* data, int index, float now, const PRM_Template*);
 
 protected:
+    virtual void resolveObsoleteParms(PRM_ParmList*);
+
     virtual OP_ERROR cookMySop(OP_Context&);
 
     void writeOnNextCook(bool write = true) { mWriteOnNextCook = write; }
@@ -78,7 +81,7 @@ newSopOperator(OP_OperatorTable* table)
 {
     if (table == NULL) return;
 
-    hutil::ParmList parms;
+    hutil::ParmList parms, obsoleteParms;
 
     // File name
     parms.add(hutil::ParmFactory(PRM_FILE, "file_name", "File Name")
@@ -91,11 +94,34 @@ newSopOperator(OP_OperatorTable* table)
         .setHelpText("Write only a subset of the input grids."));
 
     // Compression
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "compress_zip", "Zip Compression")
-        .setDefault(true)
-        .setHelpText(
+    {
+        const char* items[] = {
+            "none",     "None",
+            "zip",      "Zip",
+            "blosc",    "Blosc",
+            NULL
+        };
+
+#ifdef OPENVDB_USE_BLOSC
+        parms.add(hutil::ParmFactory(PRM_ORD, "compression", "Compression")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setDefault("blosc")
+            .setHelpText(
+                "Zip is slow but compresses very well.  Blosc is fast and compresses well,\n"
+                "but files written with Blosc cannot be read by older versions of Houdini.\n"));
+
+        obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "compress_zip", "Zip Compression"));
+#else
+        parms.add(hutil::ParmFactory(PRM_TOGGLE, "compress_zip", "Zip Compression")
+            .setDefault(true)
+            .setHelpText(
             "Apply Zip \"deflate\" compression to non-SDF and non-fog grids.\n"
             "(Zip compression can be slow for large volumes.)"));
+
+        obsoleteParms.add(hutil::ParmFactory(PRM_ORD, "compression", "Compression")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+#endif
+    }
 
     {   // Write mode (manual/auto)
 
@@ -145,7 +171,33 @@ newSopOperator(OP_OperatorTable* table)
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Write", SOP_OpenVDB_Write::factory, parms, *table)
         .addAlias("OpenVDB Writer")
+        .setObsoleteParms(obsoleteParms)
         .addInput("Input with VDB grids write out");
+}
+
+
+void
+SOP_OpenVDB_Write::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
+{
+    if (!obsoleteParms) return;
+
+#ifdef OPENVDB_USE_BLOSC
+    PRM_Parm* parm = obsoleteParms->getParmPtr("compress_zip");
+    if (parm && !parm->isFactoryDefault()) {
+        const bool zip = obsoleteParms->evalInt("compress_zip", 0, /*time=*/0.0);
+        const UT_String compression(zip ? "zip" : "none");
+        setString(compression, CH_STRING_LITERAL, "compression", 0, 0.0);
+    }
+#else
+    if (NULL != obsoleteParms->getParmPtr("compression")) {
+        UT_String compression;
+        obsoleteParms->evalString(compression, "compression", 0, /*time=*/0.0);
+        setInt("compress_zip", 0, 0.0, (compression == "zip" ? 1 : 0));
+    }
+#endif
+
+    // Delegate to the base class.
+    hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
 }
 
 
@@ -271,7 +323,12 @@ SOP_OpenVDB_Write::doCook(const fpreal time)
     }
 
     // Get compression options.
+#ifdef OPENVDB_USE_BLOSC
+    UT_String compression;
+    evalString(compression, "compression", 0, time);
+#else
     const bool zip = evalInt("compress_zip", 0, time);
+#endif
 
     UT_AutoInterrupt progress(("Writing " + filename).c_str());
 
@@ -332,13 +389,30 @@ SOP_OpenVDB_Write::doCook(const fpreal time)
 
     // Create a VDB file object.
     openvdb::io::File file(filename);
-    file.setCompressionEnabled(zip);
+
+#ifdef OPENVDB_USE_BLOSC
+    uint32_t compressionFlags = file.compression();
+    if (compression == "none") {
+        compressionFlags &= ~(openvdb::io::COMPRESS_ZIP | openvdb::io::COMPRESS_BLOSC);
+    } else if (compression == "blosc") {
+        compressionFlags &= ~openvdb::io::COMPRESS_ZIP;
+        compressionFlags |= openvdb::io::COMPRESS_BLOSC;
+    } else if (compression == "zip") {
+        compressionFlags |= openvdb::io::COMPRESS_ZIP;
+        compressionFlags &= ~openvdb::io::COMPRESS_BLOSC;
+    }
+#else
+    uint32_t compressionFlags = openvdb::io::COMPRESS_ACTIVE_MASK;
+    if (zip) compressionFlags |= openvdb::io::COMPRESS_ZIP;
+#endif
+    file.setCompression(compressionFlags);
+
     file.write(outGrids, outMeta);
     file.close();
 
     mWriteOnNextCook = false;
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

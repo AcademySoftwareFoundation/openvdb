@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -38,6 +38,7 @@
 
 #include <openvdb/Grid.h>
 #include <openvdb/tree/LeafManager.h>
+#include <openvdb/tools/Prune.h>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_reduce.h>
 #include <limits>
@@ -383,7 +384,7 @@ sdfInteriorMask(const GridType& grid, typename GridType::ValueType iso)
         iter.setActiveState(acc.getValue(iter.getCoord()) < iso);
     }
 
-    maskTree.pruneInactive();
+    tools::pruneInactive(maskTree);
 
     return maskGrid;
 }
@@ -394,6 +395,6 @@ sdfInteriorMask(const GridType& grid, typename GridType::ValueType iso)
 
 #endif // OPENVDB_TOOLS_LEVELSETUTIL_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

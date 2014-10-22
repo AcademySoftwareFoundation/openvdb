@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -49,6 +49,13 @@ inline double voxelVolume1(math::Transform& t, const Vec3d& p) { return t.voxelV
 inline Vec3d indexToWorld(math::Transform& t, const Vec3d& p) { return t.indexToWorld(p); }
 inline Vec3d worldToIndex(math::Transform& t, const Vec3d& p) { return t.worldToIndex(p); }
 
+inline Coord worldToIndexCellCentered(math::Transform& t, const Vec3d& p) {
+    return t.worldToIndexCellCentered(p);
+}
+inline Coord worldToIndexNodeCentered(math::Transform& t, const Vec3d& p) {
+    return t.worldToIndexNodeCentered(p);
+}
+
 
 inline std::string
 info(math::Transform& t)
@@ -74,12 +81,12 @@ createLinearFromMat(py::object obj)
     // Verify that obj is a four-element sequence.
     bool is4x4Seq = (PySequence_Check(obj.ptr()) && PySequence_Length(obj.ptr()) == 4);
     if (is4x4Seq) {
-        for (size_t row = 0; is4x4Seq && row < 4; ++row) {
+        for (int row = 0; is4x4Seq && row < 4; ++row) {
             // Verify that each element of obj is itself a four-element sequence.
             py::object rowObj = obj[row];
             if (PySequence_Check(rowObj.ptr()) && PySequence_Length(rowObj.ptr()) == 4) {
                 // Extract four numeric values from this row of the sequence.
-                for (size_t col = 0; is4x4Seq && col < 4; ++col) {
+                for (int col = 0; is4x4Seq && col < 4; ++col) {
                     if (py::extract<double>(rowObj[col]).check()) {
                         m[row][col] = py::extract<double>(rowObj[col]);
                     } else {
@@ -112,7 +119,7 @@ createFrustum(const Coord& xyzMin, const Coord& xyzMax,
 ////////////////////////////////////////
 
 
-struct PickleSuite: py::pickle_suite
+struct PickleSuite: public py::pickle_suite
 {
     enum { STATE_DICT = 0, STATE_MAJOR, STATE_MINOR, STATE_FORMAT, STATE_XFORM };
 
@@ -278,12 +285,12 @@ exportTransform()
         .def("worldToIndex", &pyTransform::worldToIndex, py::arg("xyz"),
             "worldToIndex((x, y, z)) -> (x', y', z')\n\n"
             "Apply the inverse of this transformation to the given coordinates.")
-        .def("worldToIndexCellCentered", &math::Transform::worldToIndexCellCentered,
+        .def("worldToIndexCellCentered", &pyTransform::worldToIndexCellCentered,
             py::arg("xyz"),
             "worldToIndexCellCentered((x, y, z)) -> (i, j, k)\n\n"
             "Apply the inverse of this transformation to the given coordinates\n"
             "and round the result to the nearest integer coordinates.")
-        .def("worldToIndexNodeCentered", &math::Transform::worldToIndexNodeCentered,
+        .def("worldToIndexNodeCentered", &pyTransform::worldToIndexNodeCentered,
             py::arg("xyz"),
             "worldToIndexNodeCentered((x, y, z)) -> (i, j, k)\n\n"
             "Apply the inverse of this transformation to the given coordinates\n"
@@ -316,6 +323,6 @@ exportTransform()
     py::register_ptr_to_python<math::Transform::Ptr>();
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

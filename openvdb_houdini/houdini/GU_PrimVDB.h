@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -152,8 +152,10 @@ public:
 					bool split_disjoint_volumes);
     /// @}
 
+#if (UT_VERSION_INT < 0x0d050000) // Earlier than 13.5
     virtual void		*castTo (void) const;
     virtual const GEO_Primitive	*castToGeo(void) const;
+#endif
 
     // NOTE:  For static member functions please call in the following
     //        manner.  <ptrvalue> = GU_PrimVDB::<functname>
@@ -194,20 +196,24 @@ public:
 
     virtual void	normal(NormalComp &output) const;
 
+#if (UT_VERSION_INT < 0x0d050000) // Earlier than 13.5
     virtual int		intersectRay(const UT_Vector3 &o, const UT_Vector3 &d,
 				float tmax = 1E17F, float tol = 1E-12F,
 				float *distance = 0, UT_Vector3 *pos = 0,
 				UT_Vector3 *nml = 0, int accurate = 0,
 				float *u = 0, float *v = 0,
 				int ignoretrim = 1) const;
+#endif
 
     // callermustdelete is true if the returned cache is to be deleted by
     // the caller.
+#if (UT_VERSION_INT < 0x0d050000) // Earlier than 13.5
+
 #if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
     SYS_DEPRECATED_HDK(13.0)
 #endif
     virtual GU_RayIntersect	*createRayCache(int &callermustdelete);
-
+#endif
 
     /// @brief Transfer any metadata associated with this primitive's
     /// VDB grid to primitive attributes.
@@ -219,11 +225,26 @@ public:
     /// @param grid  the grid whose metadata should be transferred
     /// @param gdp   the detail to which to transfer attributes
     static void createGridAttrsFromMetadata(
-	const GEO_PrimVDB& prim,
-	const openvdb::GridBase& grid,
-	GEO_Detail& gdp)
+        const GEO_PrimVDB& prim,
+        const openvdb::GridBase& grid,
+        GEO_Detail& gdp)
     {
-	GU_PrimVDB::createGridAttrsFromMetadataAdapter(prim, &grid, gdp);
+        GU_PrimVDB::createGridAttrsFromMetadataAdapter(prim, &grid, gdp);
+    }
+
+    /// @brief Transfer any metadata associated with the given MetaMap
+    /// to attributes on the given element specified by owner.
+    /// @param owner    the type of element
+    /// @param element  the offset of the element
+    /// @param meta_map the metadata that should be transferred
+    /// @param gdp      the detail to which to transfer attributes
+    static void createAttrsFromMetadata(
+        GA_AttributeOwner owner,
+        GA_Offset element,
+        const openvdb::MetaMap& meta_map,
+        GEO_Detail& gdp)
+    {
+        GU_PrimVDB::createAttrsFromMetadataAdapter(owner, element, &meta_map, gdp);
     }
 
     /// @brief Transfer a VDB primitive's attributes to a VDB grid as metadata.
@@ -231,11 +252,25 @@ public:
     /// @param prim  the primitive whose attributes should be transferred
     /// @param gdp   the detail from which to retrieve primitive attributes
     static void createMetadataFromGridAttrs(
-	openvdb::GridBase& grid,
-	const GEO_PrimVDB& prim,
-	const GEO_Detail& gdp)
+        openvdb::GridBase& grid,
+        const GEO_PrimVDB& prim,
+        const GEO_Detail& gdp)
     {
-	GU_PrimVDB::createMetadataFromGridAttrsAdapter(&grid, prim, gdp);
+        GU_PrimVDB::createMetadataFromGridAttrsAdapter(&grid, prim, gdp);
+    }
+
+    /// @brief Transfer attributes to VDB metadata.
+    /// @param meta_map  the output metadata
+    /// @param owner     the type of element
+    /// @param element   the offset of the element
+    /// @param geo       the detail from which to retrieve primitive attributes
+    static void createMetadataFromAttrs(
+        openvdb::MetaMap& meta_map,
+        GA_AttributeOwner owner,
+        GA_Offset element,
+        const GEO_Detail& geo)
+    {
+        GU_PrimVDB::createMetadataFromAttrsAdapter(&meta_map, owner, element, geo);
     }
 
 private: // METHODS
@@ -280,6 +315,18 @@ private: // METHODS
 			    const GEO_PrimVDB&,
 			    const GEO_Detail&);
 
+    static void createAttrsFromMetadataAdapter(
+        GA_AttributeOwner owner,
+        GA_Offset element,
+        const void* meta_map_ptr,
+        GEO_Detail& geo);
+
+    static void createMetadataFromAttrsAdapter(
+        void* meta_map_ptr,
+        GA_AttributeOwner owner,
+        GA_Offset element,
+        const GEO_Detail& geo);
+
 private: // DATA
 
     static GA_PrimitiveDefinition	*theDefinition;
@@ -303,6 +350,6 @@ using ::GU_PrimVDB;
 
 #endif // UT_VERSION_INT < 0x0c050157 // earlier than 12.5.343
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

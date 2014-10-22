@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -69,10 +69,10 @@ public:
         { mVec[0] = v[0]; mVec[1] = v[1]; mVec[2] = v[2]; }
 
     /// @brief Return the smallest possible coordinate
-    static const Coord& min() { static const Coord sMin(Limits::min()); return sMin; }
+    static Coord min() { return Coord(Limits::min()); }
 
     /// @brief Return the largest possible coordinate
-    static const Coord& max() { static const Coord sMax(Limits::max()); return sMax; }
+    static Coord max() { return Coord(Limits::max()); }
 
     /// @brief Return @a xyz rounded to the closest integer coordinates
     /// (cell centered conversion).
@@ -439,6 +439,6 @@ operator<<(std::ostream& os, const CoordBBox& b)
 
 #endif // OPENVDB_MATH_COORD_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

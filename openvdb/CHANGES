@@ -2,44 +2,194 @@ OpenVDB Version History
 =======================
 
 Version 3.0.0 - In development
+    - The io::File class now supports delayed loading of .vdb files,
+      meaning that memory is not allocated for voxel values until the values
+      are actually accessed.  (This feature is enabled by default.)
+      Until a grid has been fully loaded, its source .vdb file must not be
+      modified or deleted, so for safety, io::File::open() automatically makes
+      private copies of source files that are smaller than a user-specified
+      limit (see io::File::setCopyMaxBytes()).  The limit can be set to zero
+      to disable copying, but if it cannot be guaranteed that a file will not
+      be modified, then it is best not to enable delayed loading for that file.
+    - Added tools::PointPartitioner, a tool for fast spatial sorting
+      of points stored in an external array, and tools::PointIndexGrid,
+      an acceleration structure for fast range and nearest-neighbor searches.
+    - Added tree::NodeManager, which "linearizes" a tree to facilitate
+      efficient multithreading across all tree levels.
+    - Added tools::prune() (and other variants), which replaces and
+      outperforms Tree::prune().
+    - Added tools::signedFloodFill(), which replaces and outperforms
+      Tree::signedFloodFill().
+    - Added tools::changeBackground (and other variants), which replaces
+      and outperforms Tree::setBackground().
+    - Added a fast but approximate narrow-band level set dilation method,
+      a fast narrow-band level set erosion method,
+      and a masked normalization method to tools::LevelSetTracker.
+    - Added tools::Diagnose, which performs multithreaded diagnostics on grids
+      to identify issues like values that are NaNs or out-of-range.
+      It optionally generates a boolean grid of all values that fail
+      user-defined tests (a feature that will soon be exposed in Houdini).
+    - Added optional alpha masks to tools::LevelSetMorphing.
+    - Added tools::topologyToLevelSet(), which generates a level set
+      from the implicit boundary between active and inactive voxels
+      in an arbitrary input grid.
+      [DWA internal]
     - Improved the performance of point scattering (by orders of magnitude)
-      and added a DenseUniformScatter class.
-    - Reduced the construction time for LeafManager instances.
+      and added a DenseUniformPointScatter class as well as support for
+      fractional numbers of particles per voxel.
+    - Added edge-adjacent (6+12=18) and vertex-adjacent (6+12+8=26)
+      dilation algorithms to tools::Morphology::dilateVoxels().
+      Still defaults to a face-adjacent (6) dilation pattern.
+    - Improved the performance and memory footprint of the ParticlesToLevelSet
+      tool for large numbers (tens to hundreds of millions) of particles.
     - Added Tree::getNodes(), which allows for fast construction of
       linear arrays of tree nodes for use in multithreaded code
-      such as the LeafManager.
-    - Added math::Extrema and tools::extrema to efficiently compute min/max.
+      such as the LeafManager or NodeManager.
+    - Added math::Extrema and tools::extrema() to efficiently compute
+      minimum and maximum values in a grid.
+    - Added support for material color grids to all level set shaders,
+      and added an option to vdb_render that allows one to specify a
+      reference grid to be used for material color lookups.
     - Added openvdb::getLibraryVersionString() and
       OPENVDB_LIBRARY_VERSION_STRING.
     - Modified the mesh to volume converter to always set the grid background
-      value to the exterior narrow-band width and added finite value checks to
-      narrow band parameters.
+      value to the exterior narrow-band width, and added finite value checks
+      to narrow band parameters.
+    - tools::volumeToMesh() now compiles for all grid types but throws an
+      exception if the input grid does not have a scalar value type.
+    - Added an io::File::readGrid() overload and readBuffers() overloads
+      to the grid, tree and node classes that allow one to specify
+      a bounding box against which to clip a grid while reading it.
+      For large grids, clipping while reading can result in significantly
+      lower memory usage than clipping after reading.
+    - Added Grid::clipGrid(), which clips a grid against a world-space
+      bounding box, and Grid::clip() and Tree::clip(), which clip against
+      an index-space bounding box.
+    - Added tools::clip(), which clips a grid either against a bounding box
+      or against the active voxels of a mask grid.
+    - io::File::readGridPartial() allocates the nodes of a grid's tree
+      as before, but it now allocates leaf nodes without data buffers.
+      (This feature is mainly for internal use; partially-read grids should be
+      used with care if at all, and they should be treated as read-only.)
+    - Grid names retrieved using an io::File::NameIterator now always uniquely
+      identify grids; they no longer generate 'more than one grid named "x"'
+      warnings when there are multiple grids of the same name in a file
+      (for files written starting with this version of the OpenVDB library).
+    - Fixed a bug in Tree::ValueOffIter that could cause depth-bounded
+      iterators to return incorrect values.
+    - Fixed memory leaks in RootNode::topologyDifference() and
+      RootNode::topologyIntersection().
     - Fixed a memory leak in io::Queue when the queue was full and
       a write task could not be added within the timeout interval.
+    - Fixed a potential division by zero crash in tools::compDiv()
+      with integer-valued grids.
+    - Fixed kernel normalization in tools::Filter so that it is correct
+      for integer-valued grids.
     - Fixed a bug in LeafNode::Buffer::getValue() whereby Visual C++
       would return a reference to a temporary.
       [Contributed by SESI]
+    - Fixed a bug in tools::ParticlesToLevelSet related to attribute transfer
+      when leaf nodes are produced without active values.
     - Added util/CpuTimer.h and removed CpuTimer (with a minimal API) from
       unittest/util.h.
     - Eliminated the use of getopt() for command-line argument parsing
       in vdb_test.
     - Fixed the vdb_print, vdb_render and vdb_view tools so that they
       properly initialize log4cplus if it is enabled.
-    - Fixed a bug in the QuantizedUnitVec::pack method that caused
+    - Fixed a bug in the QuantizedUnitVec::pack() method that caused
       quantization artifacts.
+    - Added convenience class tools::AlphaMask to tools/Interpolation.h
+    - Added constructors and methods to both math::RandInt and math::Rand01
+      to set and reset the random seed value.
+    - Added convenience methods for transforming bounding boxes to
+      math::Transform.
+    - Made many small changes to address type conversion and other warnings
+      reported by newer compilers like GCC 4.8 and ICC 14.
+    - Replaced the HALF_INCL_DIR and HALF_LIB_DIR Makefile variables
+      with ILMBASE_INCL_DIR and ILMBASE_LIB_DIR and added ILMBASE_LIB,
+      to match OpenEXR's library organization.
+      [Contributed by Double Negative]
+    - Eliminated most local (function-scope) static variables, because
+      Visual C++ doesn't guarantee thread-safe initialization of local statics.
+      [Contributed by SESI]
+    - Fixed a bug in readString() related to empty strings.
+      [Contributed by Fabio Piparo]
 
     API changes:
+    - The addition of a GridBase::readBuffers() virtual function overload
+      and the GridBase::clip(), GridBase::readNonresidentBuffers() and
+      Tree::clipUnallocatedNodes() virtual functions changes the grid ABI
+      so that it is incompatible with earlier versions of the OpenVDB library
+      (such as the ones in Houdini 12.5 and 13).  Define the macro
+      OPENVDB_2_ABI_COMPATIBLE when compiling OpenVDB to disable these changes
+      and preserve ABI compatibility.
+    - All shaders now have a template argument to specify the type of
+      an optional material color grid, but the default type mimics
+      the old, uniform color behavior.
+    - Removed a deprecated io::Stream::write() overload.
     - The point counts in the UniformPointScatter and NonUniformPointScatter
-      tools are now specified (and returned) as Index64.  
-      
+      tools are now specified and returned as Index64.
+    - math::RandInt has an extra template argument to specify the integer
+      type.  The RandomInt typedef is unchanged.
+    - io::readData(), io::HalfReader::read() and io::HalfWriter::write() now
+      take a uint32_t argument indicating the type of compression instead of
+      a bool indicating whether compression is enabled.
+    - Removed io::Archive::isCompressionEnabled() and
+      io::Archive::setCompressionEnabled() and renamed
+      io::Archive::compressionFlags() and io::Archive::setCompressionFlags()
+      to io::Archive::compression() and io::Archive::setCompression().
+    - Internal and leaf node classes are now required to provide
+      "PartialCreate" constructors that optionally bypass the allocation
+      of voxel buffers.  Leaf node classes must now also provide allocate()
+      and isAllocated() methods to manage the allocation of their buffers.
+    - Removed pruneInactive() and pruneLevelSet() methods from the Tree
+      and various node classes.  These methods have been replaced by
+      the much faster pruning functions found in tools/Prune.h.
+    - Removed signedFloodFill() methods from the Grid, Tree and various
+      node classes.  These methods have been replaced by the much faster
+      functions found in tools/SignedFloodFill.h.
+    - Removed Grid::setBackground() and Tree::setBackground() (use the faster
+      changeBackground() tool instead), and removed the default argument
+      from RootNode::setBackground().
+
+    Python:
+    - Added grid methods convertToPolygons() and convertToQuads(),
+      which convert volumes to meshes, and createLevelSetFromPolygons(),
+      which converts meshes to volumes.  NumPy is required.
+
     Houdini:
+    - Added a new SOP (Trim Narrow Band) that can adjust (i.e. dilate or erode)
+      the width of a narrow band level set. This allows for a much faster workflows
+      where level sets are created (e.g. from points or polygons) with a very narrow
+      band and subsequently dilated with the new SOP.
+    - Fixed bugs in the Smooth Level Set and Reshape Level Set SOPs that ignored the
+      selected discretization scheme.
+    - Added alpha mask options to the Morph Level Set SOP.
+    - Added a From Points SOP to very quickly generate a level set
+      from a point cloud, ignoring any radius attribute.
+      [DWA internal]
     - Added a Voxel Scale mode to the Resample SOP.
+    - Improved the performance and memory footprint of the From Particles SOP
+      for large numbers (tens to hundreds of millions) of particles.
+    - The Scatter SOP now accepts fractional numbers of particles per voxel.
     - Improved the performance of the Scatter SOP by more than an order
       of magnitude.
+    - The Clip SOP now has a toggle to choose explicitly between a mask grid
+      or a bounding box as the clipping region.  As a consequence, the
+      mask grid can now be unnamed.
     - Added the OpenVDB library version number to the Extended Operator
       Information for all SOPs.
+    - SOPs are now linked with an rpath to the directory containing the
+      OpenVDB library.
     - Like the native Houdini file SOP, the Read SOP now allows missing frames
       to be reported either as errors or as warnings.
+    - The Read SOP now has an optional input for geometry, the bounding box
+      of which can be used to clip grids as they are read.  For large grids,
+      clipping while reading can result in significantly lower memory usage
+      than clipping after reading.
+
+    Maya:
+    - Added an adaptive polygonal surface extraction node.
 
 Version 2.3.0 - April 23, 2014
     - Added tools::extractSparseTree(), which selectively extracts and
@@ -57,11 +207,11 @@ Version 2.3.0 - April 23, 2014
       which does runtime checking.
     - Added optional support for logging using log4cplus.  See logging.h
       and the INSTALL file for details.
-    - Added VolumeRayIntersector::hits(), which returns all the hit segments 
+    - Added VolumeRayIntersector::hits(), which returns all the hit segments
       along a ray.  This is generally more efficient than repeated calls
       to VolumeRayIntersector::march().
-    - Added member class Ray::TimeSpan and method Ray::valid(), and 
-      deprecated method Ray::test(). 
+    - Added member class Ray::TimeSpan and method Ray::valid(), and
+      deprecated method Ray::test().
     - Fixed a bug in VolumeHDDA that could cause rendering artifacts
       when a ray's start time was zero.
       [Contributed by Mike Farnsworth]
@@ -87,7 +237,7 @@ Version 2.3.0 - April 23, 2014
       or earlier.
 
     Houdini:
-    - Added a Clip SOP, which does volumetric clipping. 
+    - Added a Clip SOP, which does volumetric clipping.
     - Added an Occlusion Mask SOP, which generates a mask of the voxels
       inside a camera frustum that are occluded by objects in an input grid.
     - The Combine SOP now applies the optional signed flood fill only to
@@ -104,10 +254,10 @@ Version 2.2.0 - February 20, 2014
       isovalue.
     - Improved the performance of the VolumeRayIntersector and added
       support for voxel dilation to account for interpolation kernels.
-    - Added a section to the Cookbook on interpolation using BoxSampler, 
+    - Added a section to the Cookbook on interpolation using BoxSampler,
       GridSampler, DualGridSampler, et al.
     - Added a section to the Overview on grids and grid metadata.
-    - Modified tools::DualGridSampler so it is more consistent with 
+    - Modified tools::DualGridSampler so it is more consistent with
       tools::GridSampler.
     - tools::cpt(), tools::curl(), tools::laplacian(), tools::meanCurvature()
       and tools::normalize() now output grids with appropriate vector types
@@ -148,12 +298,12 @@ Version 2.2.0 - February 20, 2014
       to distinguish tile vs. voxel hits.  Instead, it now returns false
       if no intersection is detected and true otherwise.  Also, t0 and t1
       might now correspond to the first and last hits of multiple adjacent
-      leaf nodes and/or active tiles. 
+      leaf nodes and/or active tiles.
     - tools::DualGridSampler is no longer templated on the target grid type,
       and the value accessor is now passed as an argument.
     - The .vdb file format has changed slightly.  Tools built with older
       versions of OpenVDB should be recompiled to ensure that they can read
-      files in the new format. 
+      files in the new format.
 
     Houdini:
     - Added topology union, intersection and difference operations to
@@ -188,7 +338,7 @@ Version 2.1.0 - December 12, 2013
       attributes on the Houdini VDB primitive and can be queried using the
       native Measure SOP.
     - tools::Dense now supports the XYZ memory layout used by Houdini and Maya
-      in addition to the ZYX layout used in OpenVDB trees. 
+      in addition to the ZYX layout used in OpenVDB trees.
     - Improved the performance of masking in the level set filter tool and
       added inversion and scaling of the mask input, so that any scalar-valued
       volume can be used as a mask, not just volumes with a [0, 1] range.
@@ -201,7 +351,7 @@ Version 2.1.0 - December 12, 2013
       states of tiles and voxels whose values are equal to or approximately
       equal to a given value, and added a Deactivate Background Voxels toggle
       to the Combine SOP.
-    - Added math::BBox::applyMap() and math::BBox::applyInverseMap(), which 
+    - Added math::BBox::applyMap() and math::BBox::applyInverseMap(), which
       allow for transformation of axis-aligned bounding boxes.
     - Added a position shader to the level set ray-tracer (primarily for
       debugging purposes).
@@ -212,14 +362,14 @@ Version 2.1.0 - December 12, 2013
     - Fixed a bug in the volume to mesh converter that caused it to generate
       invalid polygons when the zero crossing lay between active and inactive
       regions.
-    - Fixed a bug in the point scatter tool (and the Scatter SOP) whereby 
+    - Fixed a bug in the point scatter tool (and the Scatter SOP) whereby
       the last voxel always remained empty.
     - Fixed a bug in the Read SOP that caused grids with the same name
       to be renamed with a numeric suffix (e.g., "grid[1]", "grid[2]", etc.).
     - Fixed some unit test failures on 64-bit Itanium machines.
 
     API changes:
-    - The Filter tool is now templated on a mask grid, and threading is 
+    - The Filter tool is now templated on a mask grid, and threading is
       controlled using a grain size, for consistency with most of the
       other level set tools.
     - The level set filter tool is now templated on a mask grid.
@@ -232,7 +382,7 @@ Version 2.0.0 - October 31, 2013
       of rays with level-set and generic volumes.
     - Added a Ray class and a hierarchical Digital Differential Analyzer
       for fast ray traversal.
-    - Added a fully multithreaded level set ray tracer and camera classes 
+    - Added a fully multithreaded level set ray tracer and camera classes
       that mimic Houdini's cameras.
     - Added a simple, command-line renderer (currently for level sets only).
     - Implemented a new meshing scheme that produces topologically robust
@@ -254,7 +404,7 @@ Version 2.0.0 - October 31, 2013
       from arbitrary points in world space to narrow-band level sets.
     - Increased the speed of masked level set filtering by 20% for
       the most common cases.
-    - Added math::BoxStencil, with support for trilinear interpolation 
+    - Added math::BoxStencil, with support for trilinear interpolation
       and gradient computation.
     - Added Tree::topologyIntersection(), which intersects a tree's active
       values with those of another tree, and Tree::topologyDifference(),
@@ -286,7 +436,7 @@ Version 2.0.0 - October 31, 2013
       new methods, so do not call these methods from Houdini 12.5.
     - Reimplemented math::RandomInt using Boost.Random instead of rand()
       (which is not thread-safe), and deprecated math::randUniform()
-      and added math::Random01 to replace it. 
+      and added math::Random01 to replace it.
     - Modified tools::copyFromDense() and tools::copyToDense() to allow
       for implicit type conversion (e.g., between a Dense<Int32> and a
       FloatTree) and fixed several bugs in tools::CopyFromDense.
@@ -321,8 +471,8 @@ Version 2.0.0 - October 31, 2013
       which can be used to constrain level set filtering so as to preserve
       surface details.
     - The mesh to volume converter now handles point-degenerate polygons.
-    - Fixed a bug in the Level Set Smooth, Level Set Renormalize and 
-      Level Set Offset SOPs that caused the group name to be ignored.   
+    - Fixed a bug in the Level Set Smooth, Level Set Renormalize and
+      Level Set Offset SOPs that caused the group name to be ignored.
     - Fixed various OS X and Windows build issues.
       [Contributions from SESI and DD]
 
@@ -361,7 +511,7 @@ Version 1.2.0 - June 28, 2013
       from memory and then reloaded.
       [Contributed by Ollie Harding]
     - Fixed a bug in GU_PrimVDB::buildFromPrimVolume(), seen during the
-      conversion from Houdini volumes to OpenVDB grids, that could cause 
+      conversion from Houdini volumes to OpenVDB grids, that could cause
       signed flood fill to be applied to non-level set grids, resulting in
       active tiles with incorrect values.
     - Added a Prune SOP with several pruning schemes.
@@ -387,7 +537,7 @@ Version 1.1.1 - May 10 2013
     - Modified CoordBBox to adhere to TBB's splittable type requirements,
       so that, for example, a CoordBBox can be used as a blocked
       iteration range.
-    - Added Tree::addTile(), Tree::addLeaf() and Tree::stealNode(), for 
+    - Added Tree::addTile(), Tree::addLeaf() and Tree::stealNode(), for
       fine control over tree construction.
     - Addressed a numerical stability issue when performing Gaussian
       filtering of level set grids.
@@ -408,7 +558,7 @@ Version 1.1.1 - May 10 2013
     - Fixed a bug in the Advect Level Set SOP that caused a crash
       when the velocity input was connected but empty.
     - The Scatter and Sample Point SOPs now warn instead of erroring
-      when given empty grids. 
+      when given empty grids.
     - Fixed a crash in vdb_view when stepping through multiple grids
       after changing render modes.
     - vdb_view can now render fog volumes and vector fields, and it now
@@ -449,7 +599,7 @@ Version 1.1.0 - April 4 2013
       instead of 32-bit operations.
     - Implemented a new, more efficient closest point on triangle algorithm.
     - Implemented a new vertex normal scheme in the volume to mesh
-      converter, and resolved some overlapping polygon issues. 
+      converter, and resolved some overlapping polygon issues.
     - The volume to mesh converter now meshes not just active voxels
       but also active tiles.
     - Fixed a bug in the mesh to volume converter that caused unsigned
@@ -491,8 +641,8 @@ Version 1.0.0 - March 14 2013
 Version 0.104.0 - February 15 2013
     - Added a tool and a SOP to rebuild a level set from any scalar volume.
     - .vdb files are now saved using a mask-based compression scheme
-      that is an order of magnitude faster than Zip and produces comparable
-      file sizes for level set and fog volume grids.  (Zip compression
+      that is an order of magnitude faster than ZLIB and produces comparable
+      file sizes for level set and fog volume grids.  (ZLIB compression
       is still enabled by default for other classes of grids).
     - The Filter and LevelSetFilter tools now include a Gaussian filter,
       and mean (box) filtering is now 10-50x faster.
@@ -511,7 +661,7 @@ Version 0.104.0 - February 15 2013
       the functor should be shared across threads.
     - Added Mat4s and Mat4d metadata types.
     - Added explicit pre- and postmultiplication methods to the Transform,
-      Map and Mat4 classes and deprecated the old accumulation methods. 
+      Map and Mat4 classes and deprecated the old accumulation methods.
     - Modified NonlinearFrustumMap to be more compatible with Houdini's
       frustum transform.
     - Fixed a GridTransformer bug that caused it to translate the
@@ -520,7 +670,7 @@ Version 0.104.0 - February 15 2013
       intermittent crashes in tools::dilateVoxels().
     - The Hermite data type and Hermite grids are no longer supported.
     - Added tools/GridOperators.h, which includes new, cleaner implementations
-      of the Cpt, Curl, Divergence, Gradient, Laplacian, Magnitude, 
+      of the Cpt, Curl, Divergence, Gradient, Laplacian, Magnitude,
       MeanCurvature and Normalize tools.
     - Interrupt support has been improved in several tools, including
       tools::ParticlesToLevelSet.
@@ -756,7 +906,7 @@ Version 0.97.0 - October 18 2012
       excludes leaf nodes.
     - Exposed the value buffers inside leaf nodes with LeafNode::buffer().
       This allows for very fast access (const and non-const) to voxel
-      values using linear array offsets instead of (i,j,k) coordinates. 
+      values using linear array offsets instead of (i,j,k) coordinates.
     - In openvdb_houdini/UT_VDBTools.h, added operators for use with
       processTypedGrid() that resample grids in several different ways.
     - Added a policy mechanism to houdini_utils::OpFactory that allows for
@@ -845,7 +995,7 @@ Version 0.94.0 - August 30 2012
     - Added TreeValueIteratorBase::setActiveState() and deprecated setValueOn().
     - Removed tools/FastSweeping.h.  It will be replaced with a much more
       efficient implementation in the near future.
-    - ZIP compression of .vdb files is now optional, but enabled by default.
+    - ZLIB compression of .vdb files is now optional, but enabled by default.
       [Contributed by SESI]
     - Made various changes for Clang and Visual C++ compatibility.
       [Contributed by SESI]

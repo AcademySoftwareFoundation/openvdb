@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -49,7 +49,6 @@
 #include <openvdb/Types.h>
 #include "Iterator.h"
 #include "NodeUnion.h"
-#include "Util.h"
 
 
 namespace openvdb {
@@ -101,7 +100,11 @@ public:
 
     explicit InternalNode(const ValueType& offValue);
 
-    InternalNode(const Coord&, const ValueType& value, bool active = false);
+    InternalNode(const Coord&, const ValueType& fillValue, bool active = false);
+
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    InternalNode(PartialCreate, const Coord&, const ValueType& fillValue, bool active = false);
+#endif
 
     /// Deep copy constructor
     InternalNode(const InternalNode&);
@@ -237,12 +240,15 @@ public:
     ChildAllIter   beginChildAll() { return ChildAllIter(mChildMask.beginDense(), this); }
 
     ValueOnCIter  cbeginValueOn()  const { return ValueOnCIter(mValueMask.beginOn(), this); }
+    /// @warning This iterator will also visit child nodes so use isChildMaskOn to skip them! 
     ValueOffCIter cbeginValueOff() const { return ValueOffCIter(mValueMask.beginOff(), this); }
     ValueAllCIter cbeginValueAll() const { return ValueAllCIter(mChildMask.beginOff(), this); }
     ValueOnCIter   beginValueOn()  const { return cbeginValueOn(); }
+    /// @warning This iterator will also visit child nodes so use isChildMaskOn to skip them! 
     ValueOffCIter  beginValueOff() const { return cbeginValueOff(); }
     ValueAllCIter  beginValueAll() const { return cbeginValueAll(); }
     ValueOnIter    beginValueOn()  { return ValueOnIter(mValueMask.beginOn(), this); }
+    /// @warning This iterator will also visit child nodes so use isChildMaskOn to skip them! 
     ValueOffIter   beginValueOff() { return ValueOffIter(mValueMask.beginOff(), this); }
     ValueAllIter   beginValueAll() { return ValueAllIter(mChildMask.beginOff(), this); }
 
@@ -416,7 +422,6 @@ public:
     /// Mark all values (both tiles and voxels) as active.
     void setValuesOn();
 
-
     //
     // I/O
     //
@@ -424,6 +429,7 @@ public:
     void readTopology(std::istream&, bool fromHalf = false);
     void writeBuffers(std::ostream&, bool toHalf = false) const;
     void readBuffers(std::istream&, bool fromHalf = false);
+    void readBuffers(std::istream&, const CoordBBox&, bool fromHalf = false);
 
 
     //
@@ -432,20 +438,6 @@ public:
     /// @brief Set all voxels within an axis-aligned box to a constant value.
     /// (The min and max coordinates are inclusive.)
     void fill(const CoordBBox& bbox, const ValueType&, bool active = true);
-
-    /// @brief Overwrite each inactive value in this node and in any child nodes with
-    /// a new value whose magnitude is equal to the specified background value and whose
-    /// sign is consistent with that of the lexicographically closest active value.
-    /// @details This is primarily useful for propagating the sign from the (active) voxels
-    /// in a narrow-band level set to the inactive voxels outside the narrow band.
-    void signedFloodFill(const ValueType& background);
-
-    /// @brief Overwrite each inactive value in this node and in any child nodes with
-    /// either @a outside or @a inside, depending on the sign of the lexicographically
-    /// closest active value.
-    /// @details Specifically, an inactive value is set to @a outside if the closest active
-    /// value in the lexicographic direction is positive, otherwise it is set to @a inside.
-    void signedFloodFill(const ValueType& outside, const ValueType& inside);
 
     /// Change the sign of all the values represented in this node and
     /// its child nodes.
@@ -551,26 +543,13 @@ public:
     template<typename IterT, typename VisitorOp>
     void visit2(IterT& otherIter, VisitorOp&, bool otherIsLHS = false) const;
 
-    /// @brief Call the @c PruneOp functor for each child node and, if the functor
-    /// returns @c true, prune the node and replace it with a tile.
-    ///
-    /// This method is used to implement all of the various pruning algorithms
-    /// (prune(), pruneInactive(), etc.).  It should rarely be called directly.
-    /// @see openvdb/tree/Util.h for the definition of the @c PruneOp functor
-    template<typename PruneOp> void pruneOp(PruneOp&);
+    /// Set all voxels that lie outside the given axis-aligned box to the background.
+    void clip(const CoordBBox&, const ValueType& background);
 
     /// @brief Reduce the memory footprint of this tree by replacing with tiles
     /// any nodes whose values are all the same (optionally to within a tolerance)
     /// and have the same active state.
     void prune(const ValueType& tolerance = zeroVal<ValueType>());
-
-    /// @brief Reduce the memory footprint of this tree by replacing with
-    /// tiles of the given value any nodes whose values are all inactive.
-    void pruneInactive(const ValueType&);
-
-    /// @brief Reduce the memory footprint of this tree by replacing with
-    /// background tiles any nodes whose values are all inactive.
-    void pruneInactive();
 
     /// @brief Add the specified leaf to this node, possibly creating a child branch
     /// in the process.  If the leaf node already exists, replace it.
@@ -710,6 +689,16 @@ public:
     bool isChildMaskOn(Index n) const { return mChildMask.isOn(n); }
     bool isChildMaskOff(Index n) const { return mChildMask.isOff(n); }
     bool isChildMaskOff() const { return mChildMask.isOff(); }
+    const NodeMaskType& getValueMask() const { return mValueMask; }
+    const NodeMaskType& getChildMask() const { return mChildMask; }
+    NodeMaskType getValueOffMask() const
+    {
+        NodeMaskType mask = mValueMask;
+        mask |= mChildMask;
+        mask.toggle();
+        return mask;
+    }
+    const UnionType* getTable() const { return mNodes; }
 protected:
     //@{
     /// Use a mask accessor to ensure consistency between the child and value masks;
@@ -734,7 +723,7 @@ protected:
     static inline void doVisit2(NodeT&, OtherChildAllIterT&, VisitorOp&, bool otherIsLHS);
 
     ///@{
-    /// @brief Returns a pointer to the child node at the linear offset n. 
+    /// @brief Returns a pointer to the child node at the linear offset n.
     /// @warning This protected method assumes that a child node exists at
     /// the specified linear offset!
     ChildNodeType* getChildNode(Index n);
@@ -788,6 +777,21 @@ InternalNode<ChildT, Log2Dim>::InternalNode(const Coord& origin, const ValueType
     if (active) mValueMask.setOn();
     for (Index i = 0; i < NUM_VALUES; ++i) mNodes[i].setValue(val);
 }
+
+
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+// For InternalNodes, the PartialCreate constructor is identical to its
+// non-PartialCreate counterpart.
+template<typename ChildT, Index Log2Dim>
+inline
+InternalNode<ChildT, Log2Dim>::InternalNode(PartialCreate,
+    const Coord& origin, const ValueType& val, bool active)
+    : mOrigin(origin[0] & ~(DIM-1), origin[1] & ~(DIM-1), origin[2] & ~(DIM-1))
+{
+    if (active) mValueMask.setOn();
+    for (Index i = 0; i < NUM_VALUES; ++i) mNodes[i].setValue(val);
+}
+#endif
 
 
 template<typename ChildT, Index Log2Dim>
@@ -997,46 +1001,22 @@ InternalNode<ChildT, Log2Dim>::evalActiveBoundingBox(CoordBBox& bbox, bool visit
 
 
 template<typename ChildT, Index Log2Dim>
-template<typename PruneOp>
-inline void
-InternalNode<ChildT, Log2Dim>::pruneOp(PruneOp& op)
-{
-    for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
-        const Index i = iter.pos();
-        ChildT* child = mNodes[i].getChild();
-        if (!op(*child)) continue;
-        delete child;
-        mChildMask.setOff(i);
-        mValueMask.set(i, op.state);
-        mNodes[i].setValue(op.value);
-    }
-
-}
-
-
-template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::prune(const ValueType& tolerance)
 {
-    TolerancePrune<ValueType> op(tolerance);
-    this->pruneOp(op);
-}
-
-
-template<typename ChildT, Index Log2Dim>
-inline void
-InternalNode<ChildT, Log2Dim>::pruneInactive(const ValueType& bg)
-{
-    InactivePrune<ValueType> op(bg);
-    this->pruneOp(op);
-}
-
-
-template<typename ChildT, Index Log2Dim>
-inline void
-InternalNode<ChildT, Log2Dim>::pruneInactive()
-{
-    this->pruneInactive(this->getBackground());
+    bool state = false;
+    ValueType value = zeroVal<ValueType>();
+    for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
+        const Index i = iter.pos();
+        ChildT* child = mNodes[i].getChild();
+        child->prune(tolerance);
+        if (child->isConstant(value, state, tolerance)) {
+            delete child;
+            mChildMask.setOff(i);
+            mValueMask.set(i, state);
+            mNodes[i].setValue(value);
+        }
+     }
 }
 
 
@@ -1852,6 +1832,56 @@ InternalNode<ChildT, Log2Dim>::modifyValueAndActiveStateAndCache(
 
 template<typename ChildT, Index Log2Dim>
 inline void
+InternalNode<ChildT, Log2Dim>::clip(const CoordBBox& clipBBox, const ValueType& background)
+{
+    CoordBBox nodeBBox = this->getNodeBoundingBox();
+    if (!clipBBox.hasOverlap(nodeBBox)) {
+        // This node lies completely outside the clipping region.  Fill it with background tiles.
+        this->fill(nodeBBox, background, /*active=*/false);
+    } else if (clipBBox.isInside(nodeBBox)) {
+        // This node lies completely inside the clipping region.  Leave it intact.
+        return;
+    }
+
+    // This node isn't completely contained inside the clipping region.
+    // Clip tiles and children, and replace any that lie outside the region
+    // with background tiles.
+
+    for (Index pos = 0; pos < NUM_VALUES; ++pos) {
+        const Coord xyz = this->offsetToGlobalCoord(pos); // tile or child origin
+        CoordBBox tileBBox(xyz, xyz.offsetBy(ChildT::DIM - 1)); // tile or child bounds
+        if (!clipBBox.hasOverlap(tileBBox)) {
+            // This table entry lies completely outside the clipping region.
+            // Replace it with a background tile.
+            this->makeChildNodeEmpty(pos, background);
+            mValueMask.setOff(pos);
+        } else if (!clipBBox.isInside(tileBBox)) {
+            // This table entry does not lie completely inside the clipping region
+            // and must be clipped.
+            if (this->isChildMaskOn(pos)) {
+                mNodes[pos].getChild()->clip(clipBBox, background);
+            } else {
+                // Replace this tile with a background tile, then fill the clip region
+                // with the tile's original value.  (This might create a child branch.)
+                tileBBox.intersect(clipBBox);
+                const ValueType val = mNodes[pos].getValue();
+                const bool on = this->isValueMaskOn(pos);
+                mNodes[pos].setValue(background);
+                mValueMask.setOff(pos);
+                this->fill(tileBBox, val, on);
+            }
+        } else {
+            // This table entry lies completely inside the clipping region.  Leave it intact.
+        }
+    }
+}
+
+
+////////////////////////////////////////
+
+
+template<typename ChildT, Index Log2Dim>
+inline void
 InternalNode<ChildT, Log2Dim>::fill(const CoordBBox& bbox, const ValueType& value, bool active)
 {
     Coord xyz, tileMin, tileMax;
@@ -1975,6 +2005,11 @@ template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
 {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    const ValueType background = (!io::getGridBackgroundValuePtr(is) ? zeroVal<ValueType>()
+        : *static_cast<const ValueType*>(io::getGridBackgroundValuePtr(is)));
+#endif
+
     mChildMask.load(is);
     mValueMask.load(is);
 
@@ -1982,7 +2017,11 @@ InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
         for (Index i = 0; i < NUM_VALUES; ++i) {
             if (this->isChildMaskOn(i)) {
                 ChildNodeType* child =
+#ifdef OPENVDB_2_ABI_COMPATIBLE
                     new ChildNodeType(offsetToGlobalCoord(i), zeroVal<ValueType>());
+#else
+                    new ChildNodeType(PartialCreate(), offsetToGlobalCoord(i), background);
+#endif
                 mNodes[i].setChild(child);
                 child->readTopology(is);
             } else {
@@ -2016,7 +2055,11 @@ InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
         }
         // Read in all child nodes and insert them into the table at their proper locations.
         for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
+#ifdef OPENVDB_2_ABI_COMPATIBLE
             ChildNodeType* child = new ChildNodeType(iter.getCoord(), zeroVal<ValueType>());
+#else
+            ChildNodeType* child = new ChildNodeType(PartialCreate(), iter.getCoord(), background);
+#endif
             mNodes[iter.pos()].setChild(child);
             child->readTopology(is, fromHalf);
         }
@@ -2045,56 +2088,6 @@ InternalNode<ChildT, Log2Dim>::getLastValue() const
 
 
 ////////////////////////////////////////
-
-
-template<typename ChildT, Index Log2Dim>
-inline void
-InternalNode<ChildT, Log2Dim>::signedFloodFill(const ValueType& background)
-{
-    this->signedFloodFill(background, math::negative(background));
-}
-
-
-template<typename ChildT, Index Log2Dim>
-inline void
-InternalNode<ChildT, Log2Dim>::signedFloodFill(const ValueType& outsideValue,
-                                               const ValueType& insideValue)
-{
-    // First, flood fill all child nodes.
-    for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
-        iter->signedFloodFill(outsideValue, insideValue);
-    }
-    const Index first = mChildMask.findFirstOn();
-    if (first < NUM_VALUES) {
-        bool xInside = math::isNegative(mNodes[first].getChild()->getFirstValue()),
-            yInside = xInside, zInside = xInside;
-        for (Index x = 0; x != (1 << Log2Dim); ++x) {
-            const int x00 = x << (2 * Log2Dim); // offset for block(x, 0, 0)
-            if (isChildMaskOn(x00)) {
-                xInside = math::isNegative(mNodes[x00].getChild()->getLastValue());
-            }
-            yInside = xInside;
-            for (Index y = 0; y != (1 << Log2Dim); ++y) {
-                const Index xy0 = x00 + (y << Log2Dim); // offset for block(x, y, 0)
-                if (isChildMaskOn(xy0)) {
-                    yInside = math::isNegative(mNodes[xy0].getChild()->getLastValue());
-                }
-                zInside = yInside;
-                for (Index z = 0; z != (1 << Log2Dim); ++z) {
-                    const Index xyz = xy0 + z; // offset for block(x, y, z)
-                    if (isChildMaskOn(xyz)) {
-                        zInside = math::isNegative(mNodes[xyz].getChild()->getLastValue());
-                    } else {
-                        mNodes[xyz].setValue(zInside ? insideValue : outsideValue);
-                    }
-                }
-            }
-        }
-    } else {//no child nodes exist simply use the sign of the first tile value.
-        const ValueType v =  math::isNegative(mNodes[0].getValue()) ? insideValue : outsideValue;
-        for (Index i = 0; i < NUM_VALUES; ++i) mNodes[i].setValue(v);
-    }
-}
 
 
 template<typename ChildT, Index Log2Dim>
@@ -2766,6 +2759,28 @@ InternalNode<ChildT, Log2Dim>::readBuffers(std::istream& is, bool fromHalf)
 }
 
 
+template<typename ChildT, Index Log2Dim>
+inline void
+InternalNode<ChildT, Log2Dim>::readBuffers(std::istream& is,
+    const CoordBBox& clipBBox, bool fromHalf)
+{
+    for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
+        // Stream in the branch rooted at this child.
+        // (We can't skip over children that lie outside the clipping region,
+        // because buffers are serialized in depth-first order and need to be
+        // unserialized in the same order.)
+        iter->readBuffers(is, clipBBox, fromHalf);
+    }
+
+    // Get this tree's background value.
+    ValueType background = zeroVal<ValueType>();
+    if (const void* bgPtr = io::getGridBackgroundValuePtr(is)) {
+        background = *static_cast<const ValueType*>(bgPtr);
+    }
+    this->clip(clipBBox, background);
+}
+
+
 ////////////////////////////////////////
 
 
@@ -2873,7 +2888,6 @@ InternalNode<ChildT, Log2Dim>::resetBackground(const ValueType& oldBackground,
     }
 }
 
-
 template<typename ChildT, Index Log2Dim>
 template<typename OtherChildNodeType, Index OtherLog2Dim>
 inline bool
@@ -2960,6 +2974,6 @@ InternalNode<ChildT, Log2Dim>::getChildNode(Index n) const
 
 #endif // OPENVDB_TREE_INTERNALNODE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -32,8 +32,6 @@
 #define OPENVDB_VERSION_HAS_BEEN_INCLUDED
 
 #include "Platform.h"
-#include <iosfwd> // for std::istream
-#include <string>
 
 
 /// The version namespace name for this library version
@@ -95,7 +93,7 @@ const uint32_t OPENVDB_LIBRARY_VERSION = OPENVDB_LIBRARY_VERSION_NUMBER;
 /// @brief The current version number of the VDB file format
 /// @details  This can be used to enable various backwards compatability switches
 /// or to reject files that cannot be read.
-const uint32_t OPENVDB_FILE_VERSION = 222;
+const uint32_t OPENVDB_FILE_VERSION = 223;
 
 /// Notable file format version numbers
 enum {
@@ -109,7 +107,8 @@ enum {
     OPENVDB_FILE_VERSION_NEW_TRANSFORM = 219,
     OPENVDB_FILE_VERSION_SELECTIVE_COMPRESSION = 220,
     OPENVDB_FILE_VERSION_FLOAT_FRUSTUM_BBOX = 221,
-    OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION = 222
+    OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION = 222,
+    OPENVDB_FILE_VERSION_BLOSC_COMPRESSION = 223
 };
 
 
@@ -117,47 +116,17 @@ enum {
 inline const char* getLibraryVersionString() { return OPENVDB_LIBRARY_VERSION_STRING; }
 
 
-struct VersionId { uint32_t first, second; VersionId(): first(0), second(0) {} };
-
-namespace io {
-/// @brief Return the file format version number associated with the given input stream.
-OPENVDB_API uint32_t getFormatVersion(std::istream&);
-/// @brief Return the (major, minor) library version number associated with the given input stream.
-OPENVDB_API VersionId getLibraryVersion(std::istream&);
-/// @brief Return a string of the form "<major>.<minor>/<format>", giving the library
-/// and file format version numbers associated with the given input stream.
-OPENVDB_API std::string getVersion(std::istream&);
-// Associate the current file format and library version numbers with the given input stream.
-OPENVDB_API void setCurrentVersion(std::istream&);
-// Associate specific file format and library version numbers with the given stream.
-OPENVDB_API void setVersion(std::ios_base&, const VersionId& libraryVersion, uint32_t fileVersion);
-// Return a bitwise OR of compression option flags (COMPRESS_ZIP, COMPRESS_ACTIVE_MASK, etc.)
-// specifying whether and how input data is compressed or output data should be compressed.
-OPENVDB_API uint32_t getDataCompression(std::ios_base&);
-// Associate with the given stream a bitwise OR of compression option flags (COMPRESS_ZIP,
-// COMPRESS_ACTIVE_MASK, etc.) specifying whether and how input data is compressed
-// or output data should be compressed.
-OPENVDB_API void setDataCompression(std::ios_base&, uint32_t compressionFlags);
-// Return the class (GRID_LEVEL_SET, GRID_UNKNOWN, etc.) of the grid
-// currently being read from or written to the given stream.
-OPENVDB_API uint32_t getGridClass(std::ios_base&);
-// brief Associate with the given stream the class (GRID_LEVEL_SET, GRID_UNKNOWN, etc.)
-// of the grid currently being read or written.
-OPENVDB_API void setGridClass(std::ios_base&, uint32_t);
-// Return a pointer to the background value of the grid currently being
-// read from or written to the given stream.
-OPENVDB_API const void* getGridBackgroundValuePtr(std::ios_base&);
-// Specify (a pointer to) the background value of the grid currently being
-// read from or written to the given stream.
-// The pointer must remain valid until the entire grid has been read or written.
-OPENVDB_API void setGridBackgroundValuePtr(std::ios_base&, const void* background);
-} // namespace io
+struct VersionId {
+    uint32_t first, second;
+    VersionId(): first(0), second(0) {}
+    VersionId(uint32_t major, uint32_t minor): first(major), second(minor) {}
+};
 
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
 #endif // OPENVDB_VERSION_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

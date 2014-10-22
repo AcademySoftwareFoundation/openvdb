@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -44,6 +44,8 @@
 #include <string>
 #include <sstream>
 #include <assert.h>
+#include <vector>
+#include <deque>
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
@@ -70,7 +72,7 @@ TestVolumeRayIntersector::testAll()
     using namespace openvdb;
     typedef math::Ray<double>  RayT;
     typedef RayT::Vec3Type     Vec3T;
-    
+
     {//one single leaf node
         FloatGrid grid(0.0f);
 
@@ -90,10 +92,10 @@ TestVolumeRayIntersector::testAll()
     }
     {//same as above but with dilation
         FloatGrid grid(0.0f);
-        
+
         grid.tree().setValue(Coord(0,0,0), 1.0f);
         grid.tree().setValue(Coord(7,7,7), 1.0f);
-        
+
         const Vec3T dir( 1.0, 0.0, 0.0);
         const Vec3T eye(-1.0, 0.0, 0.0);
         const RayT ray(eye, dir);//ray in index space
@@ -124,10 +126,10 @@ TestVolumeRayIntersector::testAll()
     }
      {//same as above but with dilation
         FloatGrid grid(0.0f);
-        
+
         grid.tree().setValue(Coord(1,1,1), 1.0f);
         grid.tree().setValue(Coord(7,3,3), 1.0f);
-        
+
         const Vec3T dir( 1.0, 0.0, 0.0);
         const Vec3T eye(-1.0, 0.0, 0.0);
         const RayT ray(eye, dir);//ray in index space
@@ -159,7 +161,7 @@ TestVolumeRayIntersector::testAll()
     }
     {//two adjacent leafs followed by a gab and leaf
         FloatGrid grid(0.0f);
-        
+
         grid.tree().setValue(Coord(0*8,0,0), 1.0f);
         grid.tree().setValue(Coord(1*8,0,0), 1.0f);
         grid.tree().setValue(Coord(3*8,0,0), 1.0f);
@@ -181,7 +183,7 @@ TestVolumeRayIntersector::testAll()
     }
     {//two adjacent leafs followed by a gab, a leaf and an active tile
         FloatGrid grid(0.0f);
-        
+
         grid.tree().setValue(Coord(0*8,0,0), 1.0f);
         grid.tree().setValue(Coord(1*8,0,0), 1.0f);
         grid.tree().setValue(Coord(3*8,0,0), 1.0f);
@@ -201,10 +203,10 @@ TestVolumeRayIntersector::testAll()
         ASSERT_DOUBLES_APPROX_EQUAL(41.0, t1);
         CPPUNIT_ASSERT(!inter.march(t0, t1));
     }
-   
+
     {//two adjacent leafs followed by a gab, a leaf and an active tile
         FloatGrid grid(0.0f);
-        
+
         grid.tree().setValue(Coord(0*8,0,0), 1.0f);
         grid.tree().setValue(Coord(1*8,0,0), 1.0f);
         grid.tree().setValue(Coord(3*8,0,0), 1.0f);
@@ -224,14 +226,37 @@ TestVolumeRayIntersector::testAll()
         ASSERT_DOUBLES_APPROX_EQUAL(25.0, list[1].t0);
         ASSERT_DOUBLES_APPROX_EQUAL(41.0, list[1].t1);
     }
-    
+
+    {//same as above but now with std::deque instead of std::vector
+        FloatGrid grid(0.0f);
+
+        grid.tree().setValue(Coord(0*8,0,0), 1.0f);
+        grid.tree().setValue(Coord(1*8,0,0), 1.0f);
+        grid.tree().setValue(Coord(3*8,0,0), 1.0f);
+        grid.fill(CoordBBox(Coord(4*8,0,0), Coord(4*8+7,7,7)), 2.0f, true);
+
+        const Vec3T dir( 1.0, 0.0, 0.0);
+        const Vec3T eye(-1.0, 0.0, 0.0);
+        const RayT ray(eye, dir);//ray in index space
+        tools::VolumeRayIntersector<FloatGrid> inter(grid);
+        CPPUNIT_ASSERT(inter.setIndexRay(ray));
+        
+        std::deque<RayT::TimeSpan> list;
+        inter.hits(list);
+        CPPUNIT_ASSERT(list.size() == 2);
+        ASSERT_DOUBLES_APPROX_EQUAL( 1.0, list[0].t0);
+        ASSERT_DOUBLES_APPROX_EQUAL(17.0, list[0].t1);
+        ASSERT_DOUBLES_APPROX_EQUAL(25.0, list[1].t0);
+        ASSERT_DOUBLES_APPROX_EQUAL(41.0, list[1].t1);
+    }
+
     {// Test submitted by "Jan" @ GitHub
         FloatGrid grid(0.0f);
         grid.tree().setValue(Coord(0*8,0,0), 1.0f);
         grid.tree().setValue(Coord(1*8,0,0), 1.0f);
         grid.tree().setValue(Coord(3*8,0,0), 1.0f);
         tools::VolumeRayIntersector<FloatGrid> inter(grid);
-        
+
         const Vec3T dir(-1.0, 0.0, 0.0);
         const Vec3T eye(50.0, 0.0, 0.0);
         const RayT ray(eye, dir);
@@ -245,8 +270,67 @@ TestVolumeRayIntersector::testAll()
         ASSERT_DOUBLES_APPROX_EQUAL(50.0, t1);
         CPPUNIT_ASSERT(!inter.march(t0, t1));
     }
+
+    {// Test submitted by "Trevor" @ GitHub
+
+        FloatGrid::Ptr grid = createGrid<FloatGrid>(0.0f);
+        grid->tree().setValue(Coord(0,0,0), 1.0f);
+        tools::dilateVoxels(grid->tree());
+        tools::VolumeRayIntersector<FloatGrid> inter(*grid);
+
+        //std::cerr << "BBox = " << inter.bbox() << std::endl;
+
+        const Vec3T eye(-0.25, -0.25, 10.0);
+        const Vec3T dir( 0.00,  0.00, -1.0);
+        const RayT ray(eye, dir);
+        CPPUNIT_ASSERT(inter.setIndexRay(ray));// hits bbox
+
+        double t0=0, t1=0;
+        CPPUNIT_ASSERT(!inter.march(t0, t1));// misses leafs
+    }
+
+    {// Test submitted by "Trevor" @ GitHub
+
+        FloatGrid::Ptr grid = createGrid<FloatGrid>(0.0f);
+        grid->tree().setValue(Coord(0,0,0), 1.0f);
+        tools::dilateVoxels(grid->tree());
+        tools::VolumeRayIntersector<FloatGrid> inter(*grid);
+
+        //GridPtrVec grids;
+        //grids.push_back(grid);
+        //io::File vdbfile("/tmp/trevor_v1.vdb");
+        //vdbfile.write(grids);
+
+        //std::cerr << "BBox = " << inter.bbox() << std::endl;
+
+        const Vec3T eye(0.75, 0.75, 10.0);
+        const Vec3T dir( 0.00,  0.00, -1.0);
+        const RayT ray(eye, dir);
+        CPPUNIT_ASSERT(inter.setIndexRay(ray));// hits bbox
+
+        double t0=0, t1=0;
+        CPPUNIT_ASSERT(inter.march(t0, t1));// misses leafs
+        //std::cerr << "t0=" << t0 << " t1=" << t1 << std::endl;
+    }
+
+    {// Test derived from the test submitted by "Trevor" @ GitHub
+
+        FloatGrid grid(0.0f);
+        grid.fill(math::CoordBBox(Coord(-1,-1,-1),Coord(1,1,1)), 1.0f);
+        tools::VolumeRayIntersector<FloatGrid> inter(grid);
+        //std::cerr << "BBox = " << inter.bbox() << std::endl;
+
+        const Vec3T eye(-0.25, -0.25, 10.0);
+        const Vec3T dir( 0.00,  0.00, -1.0);
+        const RayT ray(eye, dir);
+        CPPUNIT_ASSERT(inter.setIndexRay(ray));// hits bbox
+
+        double t0=0, t1=0;
+        CPPUNIT_ASSERT(inter.march(t0, t1));// hits leafs
+        //std::cerr << "t0=" << t0 << " t1=" << t1 << std::endl;
+    }
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

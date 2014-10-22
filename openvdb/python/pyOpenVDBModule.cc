@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -33,6 +33,10 @@
 #include <boost/python.hpp>
 #include <boost/python/stl_iterator.hpp>
 #include <boost/python/exception_translator.hpp>
+#ifdef PY_OPENVDB_USE_NUMPY
+#define PY_ARRAY_UNIQUE_SYMBOL PY_OPENVDB_ARRAY_API
+#include <arrayobject.h> // for import_array()
+#endif
 #include "openvdb/openvdb.h"
 #include "pyopenvdb.h"
 #include "pyGrid.h"
@@ -359,7 +363,7 @@ template<typename T> void translateException(const T&) {}
     {                                                               \
         const char* name = #_openvdbname;                           \
         if (const char* c = std::strrchr(name, ':')) name = c + 1;  \
-        const int namelen = std::strlen(name);                      \
+        const int namelen = int(std::strlen(name));                 \
         const char* msg = e.what();                                 \
         if (0 == std::strncmp(msg, name, namelen)) msg += namelen;  \
         if (0 == std::strncmp(msg, ": ", 2)) msg += 2;              \
@@ -583,6 +587,11 @@ BOOST_PYTHON_MODULE(PY_OPENVDB_MODULE_NAME)
     docOptions.disable_signatures();
     docOptions.enable_user_defined();
 
+#ifdef PY_OPENVDB_USE_NUMPY
+    // Initialize NumPy.
+    import_array();
+#endif
+
     using namespace openvdb::OPENVDB_VERSION_NAME;
 
     // Initialize OpenVDB.
@@ -688,6 +697,6 @@ BOOST_PYTHON_MODULE(PY_OPENVDB_MODULE_NAME)
 
 } // BOOST_PYTHON_MODULE
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

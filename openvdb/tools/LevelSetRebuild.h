@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -144,7 +144,7 @@ public:
     inline void operator()(const tbb::blocked_range<size_t>& range) const
     {
         for (size_t n = range.begin(); n < range.end(); ++n) {
-            (*mPointsOut)[n] = mXform.worldToIndex(mPointsIn[n]);
+            (*mPointsOut)[n] = Vec3s(mXform.worldToIndex(mPointsIn[n]));
         }
     }
 
@@ -343,6 +343,6 @@ levelSetRebuild(const GridType& grid, float iso, float halfVal, const math::Tran
 
 #endif // OPENVDB_TOOLS_LEVELSETREBUILD_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

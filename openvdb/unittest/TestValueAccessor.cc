@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -32,6 +32,7 @@
 #include <tbb/task.h>
 #include <boost/type_traits/remove_const.hpp>
 #include <openvdb/openvdb.h>
+#include <openvdb/tools/Prune.h>
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
@@ -421,7 +422,7 @@ TestValueAccessor::testMultithreadedAccessor()
             for (int i = -MAX_COORD; i < MAX_COORD; ++i) {
                 float f = acc.getValue(openvdb::Coord(i));
                 ASSERT_DOUBLES_EXACTLY_EQUAL(float(i), f);
-                acc.setValue(openvdb::Coord(i), i);
+                acc.setValue(openvdb::Coord(i), float(i));
                 ASSERT_DOUBLES_EXACTLY_EQUAL(float(i), acc.getValue(openvdb::Coord(i)));
             }
             return NULL;
@@ -451,7 +452,7 @@ TestValueAccessor::testMultithreadedAccessor()
     AccessorT acc(tree);
     // Populate the tree.
     for (int i = -MAX_COORD; i < MAX_COORD; ++i) {
-        acc.setValue(openvdb::Coord(i), i);
+        acc.setValue(openvdb::Coord(i), float(i));
     }
 
     // Run multiple read and write tasks in parallel.
@@ -489,7 +490,8 @@ TestValueAccessor::testAccessorRegistration()
 
     // Prune the tree and verify that only the root node remains and that
     // the cache has been cleared.
-    tree->prune();
+    openvdb::tools::prune(*tree);
+    //tree->prune();
     CPPUNIT_ASSERT_EQUAL(Index(0), tree->leafCount());
     CPPUNIT_ASSERT_EQUAL(Index(1), tree->nonLeafCount()); // root node only
     CPPUNIT_ASSERT(acc.getNode<openvdb::FloatTree::LeafNodeType>() == NULL);
@@ -544,6 +546,6 @@ TestValueAccessor::testGetNode()
     }
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

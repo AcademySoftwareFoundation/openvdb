@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -344,8 +344,8 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
         const int mode = evalInt("mode", 0, time);
         if (mode < MODE_PARMS || mode > MODE_VOXEL_SCALE) {
             std::stringstream ss;
-            ss << "expected mode between " << MODE_PARMS << " and " << MODE_VOXEL_SCALE
-                << ", got "<< mode;
+            ss << "expected mode between " << int(MODE_PARMS)
+                << " and " << int(MODE_VOXEL_SCALE) << ", got "<< mode;
             throw std::runtime_error(ss.str().c_str());
         }
 
@@ -355,14 +355,14 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
             scale = SOP_NodeVDB::evalVec3R("scale", time),
             pivot = SOP_NodeVDB::evalVec3R("pivot", time);
         const float
-            voxelSize = evalFloat("voxel_size", 0, time),
-            voxelScale = evalFloat("voxelscale", 0, time);
+            voxelSize = static_cast<float>(evalFloat("voxel_size", 0, time)),
+            voxelScale = static_cast<float>(evalFloat("voxelscale", 0, time));
 
         const bool
             prune = evalInt("prune", 0, time),
             rebuild = evalInt("rebuild", 0, time),
             xformVec = evalInt("xformvectors", 0, time);
-        const float tolerance = evalFloat("tolerance", 0, time);
+        const float tolerance = static_cast<float>(evalFloat("tolerance", 0, time));
 
         // Get the group of grids to be resampled.
         UT_String groupStr;
@@ -540,6 +540,6 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

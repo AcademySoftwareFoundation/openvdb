@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -30,11 +30,14 @@
 
 #include "Compression.h"
 
+#include <openvdb/Exceptions.h>
+#include <openvdb/util/logging.h>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/shared_array.hpp>
 #include <zlib.h>
-#include <openvdb/Exceptions.h>
-#include <openvdb/util/logging.h>
+#ifdef OPENVDB_USE_BLOSC
+#include <blosc.h>
+#endif
 
 
 namespace openvdb {
@@ -48,11 +51,10 @@ compressionToString(uint32_t flags)
     if (flags == COMPRESS_NONE) return "none";
 
     std::vector<std::string> words;
-    if (flags & COMPRESS_ZIP) words.push_back("zipped");
-    if (flags & COMPRESS_ACTIVE_MASK) {
-        words.push_back("active values");
-    }
-    return boost::join(words, " ");
+    if (flags & COMPRESS_ZIP) words.push_back("zip");
+    if (flags & COMPRESS_BLOSC) words.push_back("blosc");
+    if (flags & COMPRESS_ACTIVE_MASK) words.push_back("active values");
+    return boost::join(words, " + ");
 }
 
 
@@ -134,10 +136,98 @@ unzipFromStream(std::istream& is, char* data, size_t numBytes)
     }
 }
 
+
+#ifndef OPENVDB_USE_BLOSC
+void
+bloscToStream(std::ostream&, const char*, size_t, size_t)
+{
+    OPENVDB_THROW(IoError, "Blosc encoding is not supported");
+}
+#else
+void
+bloscToStream(std::ostream& os, const char* data, size_t valSize, size_t numVals)
+{
+    const size_t inBytes = valSize * numVals;
+
+    int outBytes = int(inBytes) + BLOSC_MAX_OVERHEAD;
+    boost::shared_array<char> compressedData(new char[outBytes]);
+
+    outBytes = blosc_compress(
+        /*clevel=*/9, // 0 (no compression) to 9 (maximum compression)
+        /*doshuffle=*/true,
+        /*typesize=*/valSize, ///< @todo use size that gives best compression?
+        /*srcsize=*/inBytes,
+        /*src=*/data,
+        /*dest=*/compressedData.get(),
+        /*destsize=*/outBytes);
+
+    if (outBytes <= 0) {
+        std::ostringstream ostr;
+        ostr << "Blosc failed to compress " << inBytes << " byte" << (inBytes == 1 ? "" : "s");
+        if (outBytes < 0) ostr << " (internal error " << outBytes << ")";
+        OPENVDB_LOG_DEBUG(ostr.str());
+
+        // Write the size of the uncompressed data.
+        Int64 negBytes = -inBytes;
+        os.write(reinterpret_cast<char*>(&negBytes), 8);
+        // Write the uncompressed data.
+        os.write(reinterpret_cast<const char*>(data), inBytes);
+    } else {
+        // Write the size of the compressed data.
+        Int64 numBytes = outBytes;
+        os.write(reinterpret_cast<char*>(&numBytes), 8);
+        // Write the compressed data.
+        os.write(reinterpret_cast<char*>(compressedData.get()), outBytes);
+    }
+}
+#endif
+
+
+#ifndef OPENVDB_USE_BLOSC
+void
+bloscFromStream(std::istream&, char*, size_t)
+{
+    OPENVDB_THROW(IoError, "Blosc decoding is not supported");
+}
+#else
+void
+bloscFromStream(std::istream& is, char* data, size_t numBytes)
+{
+    // Read the size of the compressed data.
+    // A negative size indicates uncompressed data.
+    Int64 numCompressedBytes;
+    is.read(reinterpret_cast<char*>(&numCompressedBytes), 8);
+
+    if (numCompressedBytes <= 0) {
+        // Read the uncompressed data.
+        is.read(data, -numCompressedBytes);
+        if (size_t(-numCompressedBytes) != numBytes) {
+            OPENVDB_THROW(RuntimeError, "Expected to read a " << numBytes
+                << "-byte uncompressed chunk, got a " << -numCompressedBytes << "-byte chunk");
+        }
+    } else {
+        // Read the compressed data.
+        boost::shared_array<char> compressedData(new char[numCompressedBytes]);
+        is.read(reinterpret_cast<char*>(compressedData.get()), numCompressedBytes);
+        // Uncompress the data.
+        const int numUncompressedBytes = blosc_decompress(
+            /*src=*/compressedData.get(), /*dest=*/data, numBytes);
+        if (numUncompressedBytes < 1) {
+            OPENVDB_LOG_DEBUG("blosc_decompress() returned error code " << numUncompressedBytes);
+        }
+        if (numUncompressedBytes != Int64(numBytes)) {
+            OPENVDB_THROW(RuntimeError, "Expected to decompress " << numBytes
+                << " byte" << (numBytes == 1 ? "" : "s") << ", got "
+                << numUncompressedBytes << " byte" << (numUncompressedBytes == 1 ? "" : "s"));
+        }
+    }
+}
+#endif
+
 } // namespace io
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

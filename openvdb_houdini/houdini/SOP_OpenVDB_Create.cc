@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -197,8 +197,8 @@ SOP_OpenVDB_Create::updateNearFar(float time)
     OBJ_Camera* cam = camobj->castToOBJCamera();
     if (!cam) return 1;
 
-    float nearPlane = cam->getNEAR(time);
-    float farPlane = cam->getFAR(time);
+    fpreal nearPlane = cam->getNEAR(time);
+    fpreal farPlane = cam->getFAR(time);
 
     setFloat("nearPlane", 0, time, nearPlane);
     setFloat("farPlane", 0, time, farPlane);
@@ -219,9 +219,10 @@ updateNearPlaneCallback(void* data, int /*idx*/, float time, const PRM_Template*
 int
 SOP_OpenVDB_Create::updateNearPlane(float time)
 {
-    float nearPlane = evalFloat("nearPlane", 0, time),
-    farPlane = evalFloat("farPlane", 0, time),
-    voxelDepthSize = evalFloat("voxelDepthSize", 0, time);
+    fpreal
+        nearPlane = evalFloat("nearPlane", 0, time),
+        farPlane = evalFloat("farPlane", 0, time),
+        voxelDepthSize = evalFloat("voxelDepthSize", 0, time);
 
     if (!(voxelDepthSize > 0.0)) voxelDepthSize = 1e-6;
 
@@ -247,9 +248,10 @@ updateFarPlaneCallback(void* data, int /*idx*/, float time, const PRM_Template*)
 int
 SOP_OpenVDB_Create::updateFarPlane(float time)
 {
-    float nearPlane = evalFloat("nearPlane", 0, time),
-    farPlane = evalFloat("farPlane", 0, time),
-    voxelDepthSize = evalFloat("voxelDepthSize", 0, time);
+    fpreal
+        nearPlane = evalFloat("nearPlane", 0, time),
+        farPlane = evalFloat("farPlane", 0, time),
+        voxelDepthSize = evalFloat("voxelDepthSize", 0, time);
 
     if (!(voxelDepthSize > 0.0)) voxelDepthSize = 1e-6;
 
@@ -477,11 +479,11 @@ SOP_OpenVDB_Create::updateParmsFlags()
 
         evalStringInst("gridClass#", &i, tmpStr, 0, 0);
         openvdb::GridClass gridClass = openvdb::GridBase::stringToGridClass(tmpStr.toStdString());
-        
+
         evalStringInst("elementType#", &i, tmpStr, 0, 0);
         DataType eType = stringToDataType(tmpStr.toStdString());
         bool isLevelSet = false;
-        
+
         // Force a specific data type for some of the grid classes
         if (gridClass == openvdb::GRID_LEVEL_SET) {
             eType = TYPE_FLOAT;
@@ -493,7 +495,8 @@ SOP_OpenVDB_Create::updateParmsFlags()
         }
 
         /// Disbale unused bg value options
-        changed |= enableParmInst("bgFloat#", &i, !isLevelSet && (eType == TYPE_FLOAT || eType == TYPE_DOUBLE));
+        changed |= enableParmInst("bgFloat#", &i,
+            !isLevelSet && (eType == TYPE_FLOAT || eType == TYPE_DOUBLE));
         changed |= enableParmInst("width#",   &i, isLevelSet);
         changed |= enableParmInst("bgInt#",   &i, eType == TYPE_INT || eType == TYPE_BOOL);
         changed |= enableParmInst("bgVec3f#", &i, eType == TYPE_VEC3S || eType == TYPE_VEC3D);
@@ -501,7 +504,8 @@ SOP_OpenVDB_Create::updateParmsFlags()
         changed |= enableParmInst("vecType#", &i, eType >= TYPE_VEC3S);
 
         // Hide unused bg value options.
-        changed |= setVisibleStateInst("bgFloat#", &i, !isLevelSet && (eType == TYPE_FLOAT || eType == TYPE_DOUBLE));
+        changed |= setVisibleStateInst("bgFloat#", &i,
+            !isLevelSet && (eType == TYPE_FLOAT || eType == TYPE_DOUBLE));
         changed |= setVisibleStateInst("width#",   &i, isLevelSet);
         changed |= setVisibleStateInst("bgInt#",   &i, eType == TYPE_INT);
         changed |= setVisibleStateInst("bgBool#",  &i, eType == TYPE_BOOL);
@@ -589,11 +593,11 @@ SOP_OpenVDB_Create::cookMySop(OP_Context &context)
 {
     try {
         hutil::ScopedInputLock lock(*this, context);
-        
+
         gdp->clearAndDestroy();
         if (nInputs() == 1) duplicateSource(0, context);
 
-        float time = context.getTime();
+        fpreal time = context.getTime();
 
         // Create a group for the grid primitives.
         GA_PrimitiveGroup* group = NULL;
@@ -616,7 +620,8 @@ SOP_OpenVDB_Create::cookMySop(OP_Context &context)
             evalStringInst("gridName#", &i, gridNameStr, 0, time);
 
             evalStringInst("gridClass#", &i, tmpStr, 0, time);
-            openvdb::GridClass gridClass = openvdb::GridBase::stringToGridClass(tmpStr.toStdString());
+            openvdb::GridClass gridClass =
+                openvdb::GridBase::stringToGridClass(tmpStr.toStdString());
 
             evalStringInst("elementType#", &i, tmpStr, 0, time);
             DataType eType = stringToDataType(tmpStr.toStdString());
@@ -634,11 +639,11 @@ SOP_OpenVDB_Create::cookMySop(OP_Context &context)
                 {
                     float voxelSize = float(transform->voxelSize()[0]);
                     float background = 0.0;
-                    
-                    if (gridClass == openvdb::GRID_LEVEL_SET) { 
-                        background = evalFloatInst("width#", &i, 0, time) * voxelSize;
+
+                    if (gridClass == openvdb::GRID_LEVEL_SET) {
+                        background = float(evalFloatInst("width#", &i, 0, time) * voxelSize);
                     } else {
-                        background = evalFloatInst("bgFloat#", &i, 0, time);
+                        background = float(evalFloatInst("bgFloat#", &i, 0, time));
                     }
 
                     createNewGrid<cvdb::FloatGrid>(gridNameStr, background,
@@ -668,9 +673,9 @@ SOP_OpenVDB_Create::cookMySop(OP_Context &context)
                 }
                 case TYPE_VEC3S:
                 {
-                    cvdb::Vec3f background(evalFloatInst("bgVec3f#", &i, 0, time),
-                                           evalFloatInst("bgVec3f#", &i, 1, time),
-                                           evalFloatInst("bgVec3f#", &i, 2, time));
+                    cvdb::Vec3f background(float(evalFloatInst("bgVec3f#", &i, 0, time)),
+                                           float(evalFloatInst("bgVec3f#", &i, 1, time)),
+                                           float(evalFloatInst("bgVec3f#", &i, 2, time)));
 
                     int vecType = evalIntInst("vecType#", &i, 0, time);
 
@@ -717,7 +722,7 @@ SOP_OpenVDB_Create::cookMySop(OP_Context &context)
 OP_ERROR
 SOP_OpenVDB_Create::buildTransform(OP_Context& context, openvdb::math::Transform::Ptr& transform)
 {
-    float time = context.getTime();
+    fpreal time = context.getTime();
     bool frustum = evalInt("transform", 0, time) == 1;
 
     if (frustum) { // nonlinear frustum transform
@@ -745,18 +750,19 @@ SOP_OpenVDB_Create::buildTransform(OP_Context& context, openvdb::math::Transform
         // Register
         this->addExtraInput(cam, OP_INTEREST_DATA);
 
-        const float offset = evalFloat("cameraOffset", 0, time);
-        const float nearPlane = evalFloat("nearPlane", 0, time);
-        const float farPlane = evalFloat("farPlane", 0, time);
-        const float voxelDepthSize = evalFloat("voxelDepthSize", 0, time);
+        const float
+            offset = static_cast<float>(evalFloat("cameraOffset", 0, time)),
+            nearPlane = static_cast<float>(evalFloat("nearPlane", 0, time)),
+            farPlane = static_cast<float>(evalFloat("farPlane", 0, time)),
+            voxelDepthSize = static_cast<float>(evalFloat("voxelDepthSize", 0, time));
         const int voxelCount = evalInt("voxelCount", 0, time);
 
         transform = hvdb::frustumTransformFromCamera(*this, context, *cam,
             offset, nearPlane, farPlane, voxelDepthSize, voxelCount);
 
         if (bool(evalInt("previewFrustum", 0, time))) {
-            UT_Vector3 boxColor(0.6, 0.6, 0.6);
-            UT_Vector3 tickColor(0.0, 0.0, 0.0);
+            UT_Vector3 boxColor(0.6f, 0.6f, 0.6f);
+            UT_Vector3 tickColor(0.0f, 0.0f, 0.0f);
             hvdb::drawFrustum(*gdp, *transform,
                 &boxColor, &tickColor, /*shaded*/true);
         }
@@ -789,6 +795,6 @@ SOP_OpenVDB_Create::buildTransform(OP_Context& context, openvdb::math::Transform
     return error();
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -83,16 +83,28 @@ public:
     typedef typename TrackerT::ValueType       ScalarType;
 
     /// Main constructor
-    LevelSetMorphing(GridT& sourceGrid, const GridT& targetGrid, InterruptT* interrupt = NULL):
-        mTracker(sourceGrid, interrupt), mTarget(&targetGrid),
-        mSpatialScheme(math::HJWENO5_BIAS),
-        mTemporalScheme(math::TVD_RK2) {}
+    LevelSetMorphing(GridT& sourceGrid,
+                     const GridT& targetGrid,
+                     InterruptT* interrupt = NULL)
+        : mTracker(sourceGrid, interrupt)
+        , mTarget(&targetGrid)
+        , mMask(NULL)
+        , mSpatialScheme(math::HJWENO5_BIAS)
+        , mTemporalScheme(math::TVD_RK2)
+        , mMinMask(0)
+        , mDeltaMask(1)
+        , mInvertMask(false)
+    {
+    }
 
     virtual ~LevelSetMorphing() {};
 
     /// Redefine the target level set
     void setTarget(const GridT& targetGrid) { mTarget = &targetGrid; }
-    
+
+    /// Define the alpha mask
+    void setAlphaMask(const GridT& maskGrid) { mMask = &maskGrid; }
+
     /// Return the spatial finite-difference scheme
     math::BiasedGradientScheme getSpatialScheme() const { return mSpatialScheme; }
     /// Set the spatial finite-difference scheme
@@ -134,6 +146,35 @@ public:
     /// @note A grain size of 0 or less disables multithreading!
     void setGrainSize(int grainsize) { mTracker.setGrainSize(grainsize); }
 
+    /// @brief Return the minimum value of the mask to be used for the
+    /// derivation of a smooth alpha value.
+    ScalarType minMask() const { return mMinMask; }
+
+    /// @brief Return the maximum value of the mask to be used for the
+    /// derivation of a smooth alpha value.
+    ScalarType maxMask() const { return mDeltaMask + mMinMask; }
+
+    /// @brief Define the range for the (optional) scalar mask.
+    /// @param min Minimum value of the range.
+    /// @param max Maximum value of the range.
+    /// @details Mask values outside the range maps to alpha values of
+    /// respectfully zero and one, and values inside the range maps
+    /// smoothly to 0->1 (unless of course the mask is inverted).
+    /// @throw ValueError if @a min is not smaller then @a max.
+    void setMaskRange(ScalarType min, ScalarType max)
+    {
+        if (!(min < max)) OPENVDB_THROW(ValueError, "Invalid mask range (expects min < max)");
+        mMinMask   = min;
+        mDeltaMask = max-min;
+    }
+
+    /// @brief Return true if the mask is inverted, i.e. min->max in the
+    /// original mask maps to 1->0 in the inverted alpha mask.
+    bool isMaskInverted() const { return mInvertMask; }
+    /// @brief Invert the optional mask, i.e. min->max in the original
+    /// mask maps to 1->0 in the inverted alpha mask.
+    void invertMask(bool invert=true) { mInvertMask = invert; }
+
     /// @brief Advect the level set from its current time, @a time0, to its
     /// final time, @a time1. If @a time0 > @a time1, perform backward advection.
     ///
@@ -142,6 +183,28 @@ public:
 
 private:
 
+    template<math::BiasedGradientScheme SpatialScheme>
+    size_t advect1(ScalarType time0, ScalarType time1);
+
+    template<math::BiasedGradientScheme SpatialScheme,
+             math::TemporalIntegrationScheme TemporalScheme>
+    size_t advect2(ScalarType time0, ScalarType time1);
+
+    template<math::BiasedGradientScheme SpatialScheme,
+             math::TemporalIntegrationScheme TemporalScheme,
+             typename MapType>
+    size_t advect3(ScalarType time0, ScalarType time1);
+
+    TrackerT                        mTracker;
+    const GridT                    *mTarget, *mMask;
+    math::BiasedGradientScheme      mSpatialScheme;
+    math::TemporalIntegrationScheme mTemporalScheme;
+    ScalarType                      mMinMask, mDeltaMask;
+    bool                            mInvertMask;
+
+    // disallow copy by assignment
+    void operator=(const LevelSetMorphing& other) {}
+
     // This templated private class implements all the level set magic.
     template<typename MapT, math::BiasedGradientScheme SpatialScheme,
              math::TemporalIntegrationScheme TemporalScheme>
@@ -149,7 +212,7 @@ private:
     {
     public:
         /// Main constructor
-        LevelSetMorph(TrackerT& tracker, const GridT* target);
+        LevelSetMorph(LevelSetMorphing<GridT, InterruptT>& parent);
         /// Shallow copy constructor called by tbb::parallel_for() threads
         LevelSetMorph(const LevelSetMorph& other);
         /// Shallow copy constructor called by tbb::parallel_reduce() threads
@@ -175,11 +238,10 @@ private:
         void join(const LevelSetMorph& other) { mMaxAbsS = math::Max(mMaxAbsS, other.mMaxAbsS); }
     private:
         typedef typename boost::function<void (LevelSetMorph*, const LeafRange&)> FuncType;
-        TrackerT*    mTracker;
-        const GridT* mTarget;
-        ScalarType   mMinAbsS, mMaxAbsS;
-        const MapT*  mMap;
-        FuncType     mTask;
+        LevelSetMorphing* mParent;
+        ScalarType        mMinAbsS, mMaxAbsS;
+        const MapT*       mMap;
+        FuncType          mTask;
 
         /// Enum to define the type of multithreading
         enum ThreadingMode { PARALLEL_FOR, PARALLEL_REDUCE }; // for internal use
@@ -187,8 +249,7 @@ private:
         void cook(ThreadingMode mode, size_t swapBuffer = 0);
 
         /// Sample field and return the CFT time step
-        typename GridT::ValueType sampleSpeed(
-            ScalarType time0, ScalarType time1, Index speedBuffer);
+        typename GridT::ValueType sampleSpeed(ScalarType time0, ScalarType time1, Index speedBuffer);
         void sampleXformedSpeed(const LeafRange& r, Index speedBuffer);
         void sampleAlignedSpeed(const LeafRange& r, Index speedBuffer);
 
@@ -201,26 +262,6 @@ private:
                     Index phiBuffer, Index resultBuffer, Index speedBuffer);
 
     }; // end of private LevelSetMorph class
-
-    template<math::BiasedGradientScheme SpatialScheme>
-    size_t advect1(ScalarType time0, ScalarType time1);
-
-    template<math::BiasedGradientScheme SpatialScheme,
-             math::TemporalIntegrationScheme TemporalScheme>
-    size_t advect2(ScalarType time0, ScalarType time1);
-
-    template<math::BiasedGradientScheme SpatialScheme,
-             math::TemporalIntegrationScheme TemporalScheme,
-             typename MapType>
-    size_t advect3(ScalarType time0, ScalarType time1);
-
-    TrackerT                        mTracker;
-    const GridT*                    mTarget;
-    math::BiasedGradientScheme      mSpatialScheme;
-    math::TemporalIntegrationScheme mTemporalScheme;
-
-    // disallow copy by assignment
-    void operator=(const LevelSetMorphing& other) {}
 
 };//end of LevelSetMorphing
 
@@ -292,26 +333,24 @@ template<math::BiasedGradientScheme SpatialScheme,
 inline size_t
 LevelSetMorphing<GridT, InterruptT>::advect3(ScalarType time0, ScalarType time1)
 {
-    LevelSetMorph<MapT, SpatialScheme, TemporalScheme> tmp(mTracker, mTarget);
+    LevelSetMorph<MapT, SpatialScheme, TemporalScheme> tmp(*this);
     return tmp.advect(time0, time1);
 }
 
 
 ///////////////////////////////////////////////////////////////////////
 
-
 template<typename GridT, typename InterruptT>
 template <typename MapT, math::BiasedGradientScheme SpatialScheme,
           math::TemporalIntegrationScheme TemporalScheme>
 inline
 LevelSetMorphing<GridT, InterruptT>::
 LevelSetMorph<MapT, SpatialScheme, TemporalScheme>::
-LevelSetMorph(TrackerT& tracker, const GridT* target):
-    mTracker(&tracker),
-    mTarget(target),
-    mMinAbsS(1e-6),
-    mMap(tracker.grid().transform().template constMap<MapT>().get()),
-    mTask(0)
+LevelSetMorph(LevelSetMorphing<GridT, InterruptT>& parent)
+    : mParent(&parent)
+    , mMinAbsS(ScalarType(1e-6))
+    , mMap(parent.mTracker.grid().transform().template constMap<MapT>().get())
+    , mTask(0)
 {
 }
 
@@ -321,13 +360,12 @@ template <typename MapT, math::BiasedGradientScheme SpatialScheme,
 inline
 LevelSetMorphing<GridT, InterruptT>::
 LevelSetMorph<MapT, SpatialScheme, TemporalScheme>::
-LevelSetMorph(const LevelSetMorph& other):
-    mTracker(other.mTracker),
-    mTarget(other.mTarget),
-    mMinAbsS(other.mMinAbsS),
-    mMaxAbsS(other.mMaxAbsS),
-    mMap(other.mMap),
-    mTask(other.mTask)
+LevelSetMorph(const LevelSetMorph& other)
+    : mParent(other.mParent)
+    , mMinAbsS(other.mMinAbsS)
+    , mMaxAbsS(other.mMaxAbsS)
+    , mMap(other.mMap)
+    , mTask(other.mTask)
 {
 }
 
@@ -337,13 +375,12 @@ template <typename MapT, math::BiasedGradientScheme SpatialScheme,
 inline
 LevelSetMorphing<GridT, InterruptT>::
 LevelSetMorph<MapT, SpatialScheme, TemporalScheme>::
-LevelSetMorph(LevelSetMorph& other, tbb::split):
-    mTracker(other.mTracker),
-    mTarget(other.mTarget),
-    mMinAbsS(other.mMinAbsS),
-    mMaxAbsS(other.mMaxAbsS),
-    mMap(other.mMap),
-    mTask(other.mTask)
+LevelSetMorph(LevelSetMorph& other, tbb::split)
+    : mParent(other.mParent)
+    , mMinAbsS(other.mMinAbsS)
+    , mMaxAbsS(other.mMaxAbsS)
+    , mMap(other.mMap)
+    , mTask(other.mTask)
 {
 }
 
@@ -359,8 +396,8 @@ advect(ScalarType time0, ScalarType time1)
     // integration AS WELL AS an extra buffer with the speed function!
     static const Index auxBuffers = 1 + (TemporalScheme == math::TVD_RK3 ? 2 : 1);
     size_t countCFL = 0;
-    while (time0 < time1 && mTracker->checkInterrupter()) {
-        mTracker->leafs().rebuildAuxBuffers(auxBuffers);
+    while (time0 < time1 && mParent->mTracker.checkInterrupter()) {
+        mParent->mTracker.leafs().rebuildAuxBuffers(auxBuffers);
 
         const ScalarType dt = this->sampleSpeed(time0, time1, auxBuffers);
         if ( math::isZero(dt) ) break;//V is essentially zero so terminate
@@ -416,10 +453,10 @@ advect(ScalarType time0, ScalarType time1)
 
         time0 += dt;
         ++countCFL;
-        mTracker->leafs().removeAuxBuffers();
+        mParent->mTracker.leafs().removeAuxBuffers();
 
         // Track the narrow band
-        mTracker->track();
+        mParent->mTracker.track();
     }//end wile-loop over time
 
     return countCFL;//number of CLF propagation steps
@@ -434,10 +471,12 @@ LevelSetMorph<MapT, SpatialScheme, TemporalScheme>::
 sampleSpeed(ScalarType time0, ScalarType time1, Index speedBuffer)
 {
     mMaxAbsS = mMinAbsS;
-    const size_t leafCount = mTracker->leafs().leafCount();
+    const size_t leafCount = mParent->mTracker.leafs().leafCount();
     if (leafCount==0 || time0 >= time1) return ScalarType(0);
 
-    if (mTarget->transform() == mTracker->grid().transform()) {
+    const math::Transform& xform  = mParent->mTracker.grid().transform();
+    if (mParent->mTarget->transform() == xform &&
+        (mParent->mMask == NULL || mParent->mMask->transform() == xform)) {
         mTask = boost::bind(&LevelSetMorph::sampleAlignedSpeed, _1, _2, speedBuffer);
     } else {
         mTask = boost::bind(&LevelSetMorph::sampleXformedSpeed, _1, _2, speedBuffer);
@@ -447,7 +486,7 @@ sampleSpeed(ScalarType time0, ScalarType time1, Index speedBuffer)
     static const ScalarType CFL = (TemporalScheme == math::TVD_RK1 ? ScalarType(0.3) :
                                    TemporalScheme == math::TVD_RK2 ? ScalarType(0.9) :
                                    ScalarType(1.0))/math::Sqrt(ScalarType(3.0));
-    const ScalarType dt = math::Abs(time1 - time0), dx = mTracker->voxelSize();
+    const ScalarType dt = math::Abs(time1 - time0), dx = mParent->mTracker.voxelSize();
     return math::Min(dt, ScalarType(CFL*dx/mMaxAbsS));
 }
 
@@ -462,15 +501,32 @@ sampleXformedSpeed(const LeafRange& range, Index speedBuffer)
     typedef typename LeafType::ValueOnCIter VoxelIterT;
     typedef tools::GridSampler<typename GridT::ConstAccessor, tools::BoxSampler> SamplerT;
     const MapT& map = *mMap;
-    mTracker->checkInterrupter();
+    mParent->mTracker.checkInterrupter();
 
-    SamplerT sampler(mTarget->getAccessor(),  mTarget->transform());
-    for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
-        BufferType& speed = leafIter.buffer(speedBuffer);
-        for (VoxelIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter) {
-            ScalarType& s = const_cast<ScalarType&>(speed.getValue(voxelIter.pos()));
-            s -= sampler.wsSample(map.applyMap(voxelIter.getCoord().asVec3d()));
-            mMaxAbsS = math::Max(mMaxAbsS, math::Abs(s));
+    SamplerT target(mParent->mTarget->getAccessor(), mParent->mTarget->transform());
+    if (mParent->mMask == NULL) {
+        for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
+            BufferType& speed = leafIter.buffer(speedBuffer);
+            for (VoxelIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter) {
+                ScalarType& s = const_cast<ScalarType&>(speed.getValue(voxelIter.pos()));
+                s -= target.wsSample(map.applyMap(voxelIter.getCoord().asVec3d()));
+                mMaxAbsS = math::Max(mMaxAbsS, math::Abs(s));
+            }
+        }
+    } else {
+        const ScalarType min = mParent->mMinMask, invNorm = 1.0f/(mParent->mDeltaMask);
+        const bool invMask = mParent->isMaskInverted();
+        SamplerT mask(mParent->mMask->getAccessor(),  mParent->mMask->transform());
+        for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
+            BufferType& source = leafIter.buffer(speedBuffer);
+            for (VoxelIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter) {
+                const Vec3R xyz = map.applyMap(voxelIter.getCoord().asVec3d());//world space
+                const ScalarType a = math::SmoothUnitStep((mask.wsSample(xyz)-min)*invNorm);
+                ScalarType& s = const_cast<ScalarType&>(source.getValue(voxelIter.pos()));
+                s -= target.wsSample(xyz);
+                s *= invMask ? 1 - a : a;
+                mMaxAbsS = math::Max(mMaxAbsS, math::Abs(s));
+            }
         }
     }
 }
@@ -484,15 +540,33 @@ LevelSetMorph<MapT, SpatialScheme, TemporalScheme>::
 sampleAlignedSpeed(const LeafRange& range, Index speedBuffer)
 {
     typedef typename LeafType::ValueOnCIter VoxelIterT;
-    mTracker->checkInterrupter();
+    mParent->mTracker.checkInterrupter();
 
-    typename GridT::ConstAccessor target = mTarget->getAccessor();
-    for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
-        BufferType& speed = leafIter.buffer(speedBuffer);
-        for (VoxelIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter) {
-            ScalarType& s = const_cast<ScalarType&>(speed.getValue(voxelIter.pos()));
-            s -= target.getValue(voxelIter.getCoord());
-            mMaxAbsS = math::Max(mMaxAbsS, math::Abs(s));
+    typename GridT::ConstAccessor target = mParent->mTarget->getAccessor();
+
+    if (mParent->mMask == NULL) {
+        for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
+            BufferType& source = leafIter.buffer(speedBuffer);
+            for (VoxelIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter) {
+                ScalarType& s = const_cast<ScalarType&>(source.getValue(voxelIter.pos()));
+                s -= target.getValue(voxelIter.getCoord());
+                mMaxAbsS = math::Max(mMaxAbsS, math::Abs(s));
+            }
+        }
+    } else {
+        const ScalarType min = mParent->mMinMask, invNorm = 1.0f/(mParent->mDeltaMask);
+        const bool invMask = mParent->isMaskInverted();
+        typename GridT::ConstAccessor mask = mParent->mMask->getAccessor();
+        for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
+            BufferType& source = leafIter.buffer(speedBuffer);
+            for (VoxelIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter) {
+                const Coord ijk = voxelIter.getCoord();//index space
+                const ScalarType a = math::SmoothUnitStep((mask.getValue(ijk)-min)*invNorm);
+                ScalarType& s = const_cast<ScalarType&>(source.getValue(voxelIter.pos()));
+                s -= target.getValue(ijk);
+                s *= invMask ? 1 - a : a;
+                mMaxAbsS = math::Max(mMaxAbsS, math::Abs(s));
+            }
         }
     }
 }
@@ -505,12 +579,12 @@ LevelSetMorphing<GridT, InterruptT>::
 LevelSetMorph<MapT, SpatialScheme, TemporalScheme>::
 cook(ThreadingMode mode, size_t swapBuffer)
 {
-    mTracker->startInterrupter("Morphing level set");
+    mParent->mTracker.startInterrupter("Morphing level set");
 
-    const int grainSize   = mTracker->getGrainSize();
-    const LeafRange range = mTracker->leafs().leafRange(grainSize);
+    const int grainSize   = mParent->mTracker.getGrainSize();
+    const LeafRange range = mParent->mTracker.leafs().leafRange(grainSize);
 
-    if (mTracker->getGrainSize()==0) {
+    if (mParent->mTracker.getGrainSize()==0) {
         (*this)(range);
     } else if (mode == PARALLEL_FOR) {
         tbb::parallel_for(range, *this);
@@ -520,9 +594,9 @@ cook(ThreadingMode mode, size_t swapBuffer)
         throw std::runtime_error("Undefined threading mode");
     }
 
-    mTracker->leafs().swapLeafBuffer(swapBuffer, grainSize == 0);
+    mParent->mTracker.leafs().swapLeafBuffer(swapBuffer, grainSize == 0);
 
-    mTracker->endInterrupter();
+    mParent->mTracker.endInterrupter();
 }
 
 // Forward Euler advection steps:
@@ -536,22 +610,24 @@ LevelSetMorphing<GridT, InterruptT>::
 LevelSetMorph<MapT, SpatialScheme, TemporalScheme>::
 euler1(const LeafRange& range, ScalarType dt, Index resultBuffer, Index speedBuffer)
 {
-    typedef math::BIAS_SCHEME<SpatialScheme>                             Scheme;
-    typedef typename Scheme::template ISStencil<GridType>::StencilType   Stencil;
-    typedef typename LeafType::ValueOnCIter VoxelIterT;
+    typedef math::BIAS_SCHEME<SpatialScheme>                             SchemeT;
+    typedef typename SchemeT::template ISStencil<GridType>::StencilType  StencilT;
+    typedef typename LeafType::ValueOnCIter                              VoxelIterT;
+    typedef math::GradientNormSqrd<MapT, SpatialScheme>                  NumGrad;
 
-    mTracker->checkInterrupter();
+    mParent->mTracker.checkInterrupter();
     const MapT& map = *mMap;
-    Stencil stencil(mTracker->grid());
+    StencilT stencil(mParent->mTracker.grid());
 
     for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
         BufferType& speed  = leafIter.buffer(speedBuffer);
         BufferType& result = leafIter.buffer(resultBuffer);
         for (VoxelIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter) {
             const Index n = voxelIter.pos();
+            const ScalarType S = speed.getValue(n);
+            if (math::isApproxZero(S)) continue;
             stencil.moveTo(voxelIter);
-            const ScalarType G = math::GradientNormSqrd<MapT,SpatialScheme>::result(map, stencil);
-            result.setValue(n, *voxelIter - dt * speed.getValue(n) * G);
+            result.setValue(n, *voxelIter - dt * S * NumGrad::result(map, stencil));
         }
     }
 }
@@ -567,14 +643,15 @@ LevelSetMorph<MapT, SpatialScheme, TemporalScheme>::
 euler2(const LeafRange& range, ScalarType dt, ScalarType alpha,
        Index phiBuffer, Index resultBuffer, Index speedBuffer)
 {
-    typedef math::BIAS_SCHEME<SpatialScheme>                             Scheme;
-    typedef typename Scheme::template ISStencil<GridType>::StencilType   Stencil;
-    typedef typename LeafType::ValueOnCIter VoxelIterT;
+    typedef math::BIAS_SCHEME<SpatialScheme>                             SchemeT;
+    typedef typename SchemeT::template ISStencil<GridType>::StencilType  StencilT;
+    typedef typename LeafType::ValueOnCIter                              VoxelIterT;
+    typedef math::GradientNormSqrd<MapT, SpatialScheme>                  NumGrad;
 
-    mTracker->checkInterrupter();
+    mParent->mTracker.checkInterrupter();
     const MapT& map = *mMap;
     const ScalarType beta = ScalarType(1.0) - alpha;
-    Stencil stencil(mTracker->grid());
+    StencilT stencil(mParent->mTracker.grid());
 
     for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
         BufferType& speed  = leafIter.buffer(speedBuffer);
@@ -582,10 +659,11 @@ euler2(const LeafRange& range, ScalarType dt, ScalarType alpha,
         BufferType& phi    = leafIter.buffer(phiBuffer);
         for (VoxelIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter) {
             const Index n = voxelIter.pos();
+            const ScalarType S = speed.getValue(n);
+            if (math::isApproxZero(S)) continue;
             stencil.moveTo(voxelIter);
-            const ScalarType G = math::GradientNormSqrd<MapT,SpatialScheme>::result(map, stencil);
-            result.setValue(n,
-                alpha * phi.getValue(n) + beta * (*voxelIter - dt * speed.getValue(n) * G));
+            const ScalarType G = NumGrad::result(map, stencil);
+            result.setValue(n, alpha * phi.getValue(n) + beta * (*voxelIter - dt * S * G));
         }
     }
 }
@@ -596,6 +674,6 @@ euler2(const LeafRange& range, ScalarType dt, ScalarType alpha,
 
 #endif // OPENVDB_TOOLS_LEVEL_SET_MORPH_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

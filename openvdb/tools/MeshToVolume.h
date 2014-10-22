@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -38,6 +38,9 @@
 #include <openvdb/tools/Morphology.h> // for dilateVoxels()
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Util.h> // for nearestCoord()
+#include "ChangeBackground.h"
+#include "Prune.h"// for pruneInactive and pruneLevelSet
+#include "SignedFloodFill.h" // for signedFloodFill
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
@@ -47,6 +50,7 @@
 
 #include <deque>
 #include <limits>
+#include <sstream>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -375,7 +379,7 @@ public:
     inline void operator()(const tbb::blocked_range<size_t>& range) const
     {
         for (size_t n = range.begin(); n < range.end(); ++n) {
-            (*mPointsOut)[n] = mXform.worldToIndex(mPointsIn[n]);
+            (*mPointsOut)[n] = Vec3s(mXform.worldToIndex(mPointsIn[n]));
         }
     }
 
@@ -1461,7 +1465,7 @@ IntersectingVoxelCleaner<FloatTreeT>::run(bool threaded)
     if (threaded) tbb::parallel_for(mLeafs.getRange(), *this);
     else (*this)(mLeafs.getRange());
 
-    mIntersectionTree.pruneInactive();
+    tools::pruneInactive(mIntersectionTree, threaded);
 }
 
 
@@ -1535,7 +1539,7 @@ IntersectingVoxelCleaner<FloatTreeT>::operator()(
 
                 if (turnOff) {
                     maskLeaf.setValueOff(offset);
-                    distLeaf->setValueOn(offset, -0.86602540378443861);
+                    distLeaf->setValueOn(offset, FloatValueT(-0.86602540378443861));
                 }
             }
         }
@@ -1591,8 +1595,8 @@ ShellVoxelCleaner<FloatTreeT>::run(bool threaded)
     if (threaded) tbb::parallel_for(mLeafs.getRange(), *this);
     else (*this)(mLeafs.getRange());
 
-    mDistTree.pruneInactive();
-    mIndexTree.pruneInactive();
+    tools::pruneInactive(mDistTree,  threaded);
+    tools::pruneInactive(mIndexTree, threaded);
 }
 
 
@@ -1873,11 +1877,11 @@ ExpandNB<FloatTreeT>::operator()(const tbb::blocked_range<size_t>& range)
             ijk = iter.getCoord();
 
             if (bbox.isInside(ijk)) {
-                distance = evalVoxelDist(ijk, *distLeafPt, *indexLeafPt, maskLeaf,
-                    primitives, closestPrim);
+                distance = FloatValueT(evalVoxelDist(ijk, *distLeafPt, *indexLeafPt, maskLeaf,
+                    primitives, closestPrim));
             } else {
-                distance = evalVoxelDist(ijk, distAcc, indexAcc, maskAcc,
-                    primitives, closestPrim);
+                distance = FloatValueT(evalVoxelDist(ijk, distAcc, indexAcc, maskAcc,
+                    primitives, closestPrim));
             }
 
             pos = iter.pos();
@@ -2258,31 +2262,6 @@ private:
     AccessorT mAcc;
 };
 
-
-template<typename ValueType>
-struct SDFPrune
-{
-    SDFPrune(const ValueType& out, const ValueType& in)
-        : outside(out)
-        , inside(in)
-    {
-    }
-
-    template <typename ChildType>
-    bool operator()(ChildType& child)
-    {
-        child.pruneOp(*this);
-        if (!child.isInactive()) return false;
-        value = math::isNegative(child.getFirstValue()) ? inside : outside;
-        return true;
-    }
-
-    static const bool state = false;
-    const ValueType   outside, inside;
-    ValueType         value;
-};
-
-
 } // internal namespace
 
 
@@ -2324,8 +2303,16 @@ MeshToVolume<FloatGridT, InterruptT>::convertToLevelSet(
     // The narrow band width is exclusive, the shortest valid distance has to be > 1 voxel
     exBandWidth = std::max(internal::Tolerance<FloatValueT>::minNarrowBandWidth(), exBandWidth);
     inBandWidth = std::max(internal::Tolerance<FloatValueT>::minNarrowBandWidth(), inBandWidth);
-    const FloatValueT vs = mTransform->voxelSize()[0];
-    doConvert(pointList, polygonList, vs * exBandWidth, vs * inBandWidth);
+    const FloatValueT vs = FloatValueT(mTransform->voxelSize()[0]);
+
+    // Convert from index space units to world-space units. To fill the
+    // interior, inBandWidth is passed FLOAT_MAX. Don't multiply with vs if so.
+    exBandWidth *= vs;
+    if (inBandWidth < std::numeric_limits<FloatValueT>::max()) {
+        inBandWidth *= vs;
+    }
+
+    doConvert(pointList, polygonList, exBandWidth, inBandWidth);
     mDistGrid->setGridClass(GRID_LEVEL_SET);
 }
 
@@ -2338,7 +2325,7 @@ MeshToVolume<FloatGridT, InterruptT>::convertToUnsignedDistanceField(
 {
     // The narrow band width is exclusive, the shortest valid distance has to be > 1 voxel
     exBandWidth = std::max(internal::Tolerance<FloatValueT>::minNarrowBandWidth(), exBandWidth);
-    const FloatValueT vs = mTransform->voxelSize()[0];
+    const FloatValueT vs = FloatValueT(mTransform->voxelSize()[0]);
     doConvert(pointList, polygonList, vs * exBandWidth, 0.0, true);
     mDistGrid->setGridClass(GRID_UNKNOWN);
 }
@@ -2354,8 +2341,12 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
     mIndexGrid->setTransform(mTransform);
     const bool rawData = OUTPUT_RAW_DATA & mConversionFlags;
 
-    if (!boost::math::isfinite(exBandWidth) || !boost::math::isfinite(inBandWidth)) {
-        OPENVDB_THROW(ValueError, "Illegal narrow band width.");
+    // Note that inBandWidth is allowed to be infinite when filling the interior.
+    if (!boost::math::isfinite(exBandWidth) || boost::math::isnan(inBandWidth)) {
+        std::stringstream msg;
+        msg << "Illegal narrow band width: exterior = " << exBandWidth
+            << ", interior = " << inBandWidth;
+        OPENVDB_THROW(ValueError, msg.str());
     }
 
 
@@ -2458,12 +2449,12 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
     }
 
     if (mDistGrid->activeVoxelCount() == 0) {
-        mDistGrid->tree().setBackground(exBandWidth);
+        tools::changeBackground(mDistGrid->tree(), exBandWidth);
         return;
     }
 
     mIntersectingVoxelsGrid->clear();
-    const FloatValueT voxelSize(mTransform->voxelSize()[0]);
+    const FloatValueT voxelSize = FloatValueT(mTransform->voxelSize()[0]);
 
     { // Transform values (world space scaling etc.)
         tree::LeafManager<FloatTreeT> leafs(mDistGrid->tree());
@@ -2474,13 +2465,13 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
 
     if (!unsignedDistField) { // Propagate sign information to inactive values.
         mDistGrid->tree().root().setBackground(exBandWidth, /*updateChildNodes=*/false);
-        mDistGrid->tree().signedFloodFill(exBandWidth, -inBandWidth);
+        tools::signedFloodFill(mDistGrid->tree(), exBandWidth, -inBandWidth);
     }
 
     if (wasInterrupted(46)) return;
 
     // Narrow-band dilation
-    const FloatValueT minWidth = voxelSize * 2.0;
+    const FloatValueT minWidth = FloatValueT(voxelSize * 2.0);
     if (inBandWidth > minWidth || exBandWidth > minWidth) {
 
         // Create the initial voxel mask.
@@ -2499,7 +2490,7 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
             2.0 * std::ceil((std::max(inBandWidth, exBandWidth) - minWidth) / voxelSize);
         if (estimated < double(maxIterations)) {
             maxIterations = unsigned(estimated);
-            step = 42.0 / float(maxIterations);
+            step = 42.f / float(maxIterations);
         }
 
         unsigned count = 0;
@@ -2531,11 +2522,11 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
     // Renormalize distances to smooth out bumps caused by self-intersecting
     // and overlapping portions of the mesh and renormalize the level set.
     if (!unsignedDistField && !rawData) {
-
-        mDistGrid->tree().pruneLevelSet();
+        
+        tools::pruneLevelSet(mDistGrid->tree());
         tree::LeafManager<FloatTreeT> leafs(mDistGrid->tree(), 1);
 
-        const FloatValueT offset = 0.8 * voxelSize;
+        const FloatValueT offset = FloatValueT(0.8 * voxelSize);
         if (wasInterrupted(82)) return;
 
         internal::OffsetOp<FloatValueT> offsetOp(-offset);
@@ -2556,7 +2547,7 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
 
     if (wasInterrupted(98)) return;
 
-    const FloatValueT minTrimWidth = voxelSize * 4.0;
+    const FloatValueT minTrimWidth = FloatValueT(voxelSize * 4.0);
     if (inBandWidth < minTrimWidth || exBandWidth < minTrimWidth) {
 
         // If the narrow band was not expanded, we might need to trim off
@@ -2566,9 +2557,8 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
         tree::LeafManager<FloatTreeT> leafs(mDistGrid->tree());
         leafs.foreach(internal::TrimOp<FloatValueT>(
             exBandWidth, unsignedDistField ? exBandWidth : inBandWidth));
-
-        internal::SDFPrune<FloatValueT> sdfPrune(exBandWidth, -inBandWidth);
-        mDistGrid->tree().pruneOp(sdfPrune);
+        
+        tools::pruneLevelSet(mDistGrid->tree(), exBandWidth, -inBandWidth);
     }
 }
 
@@ -2641,7 +2631,7 @@ doMeshConversion(
     const std::vector<Vec4I>& /*quads*/,
     float /*exBandWidth*/,
     float /*inBandWidth*/,
-    bool unsignedDistanceField = false)
+    bool /*unsignedDistanceField*/ = false)
 {
     OPENVDB_THROW(TypeError,
         "mesh to volume conversion is supported only for scalar, floating-point grids");
@@ -2959,7 +2949,7 @@ MeshToVoxelEdgeData::GenEdgeData::evalPrimitive(const Coord& ijk, const Primitiv
 
     if (rayTriangleIntersection(org, Vec3d(1.0, 0.0, 0.0), prim.a, prim.c, prim.b, t)) {
         if (t < edgeData.mXDist) {
-            edgeData.mXDist = t;
+            edgeData.mXDist = float(t);
             edgeData.mXPrim = prim.index;
             intersecting = true;
         }
@@ -2967,7 +2957,7 @@ MeshToVoxelEdgeData::GenEdgeData::evalPrimitive(const Coord& ijk, const Primitiv
 
     if (rayTriangleIntersection(org, Vec3d(0.0, 1.0, 0.0), prim.a, prim.c, prim.b, t)) {
         if (t < edgeData.mYDist) {
-            edgeData.mYDist = t;
+            edgeData.mYDist = float(t);
             edgeData.mYPrim = prim.index;
             intersecting = true;
         }
@@ -2975,7 +2965,7 @@ MeshToVoxelEdgeData::GenEdgeData::evalPrimitive(const Coord& ijk, const Primitiv
 
     if (rayTriangleIntersection(org, Vec3d(0.0, 0.0, 1.0), prim.a, prim.c, prim.b, t)) {
         if (t < edgeData.mZDist) {
-            edgeData.mZDist = t;
+            edgeData.mZDist = float(t);
             edgeData.mZPrim = prim.index;
             intersecting = true;
         }
@@ -2990,7 +2980,7 @@ MeshToVoxelEdgeData::GenEdgeData::evalPrimitive(const Coord& ijk, const Primitiv
 
         if (rayTriangleIntersection(org, Vec3d(1.0, 0.0, 0.0), prim.a, prim.d, prim.c, t)) {
             if (t < edgeData.mXDist) {
-                edgeData.mXDist = t;
+                edgeData.mXDist = float(t);
                 edgeData.mXPrim = prim.index;
                 intersecting = true;
             }
@@ -2998,7 +2988,7 @@ MeshToVoxelEdgeData::GenEdgeData::evalPrimitive(const Coord& ijk, const Primitiv
 
         if (rayTriangleIntersection(org, Vec3d(0.0, 1.0, 0.0), prim.a, prim.d, prim.c, t)) {
             if (t < edgeData.mYDist) {
-                edgeData.mYDist = t;
+                edgeData.mYDist = float(t);
                 edgeData.mYPrim = prim.index;
                 intersecting = true;
             }
@@ -3006,7 +2996,7 @@ MeshToVoxelEdgeData::GenEdgeData::evalPrimitive(const Coord& ijk, const Primitiv
 
         if (rayTriangleIntersection(org, Vec3d(0.0, 0.0, 1.0), prim.a, prim.d, prim.c, t)) {
             if (t < edgeData.mZDist) {
-                edgeData.mZDist = t;
+                edgeData.mZDist = float(t);
                 edgeData.mZPrim = prim.index;
                 intersecting = true;
             }
@@ -3239,6 +3229,6 @@ MeshToVoxelEdgeData::getEdgeData(
 
 #endif // OPENVDB_TOOLS_MESH_TO_VOLUME_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

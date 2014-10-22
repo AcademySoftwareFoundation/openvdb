@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -110,7 +110,8 @@ newSopOperator(OP_OperatorTable* table)
         .setRange(PRM_RANGE_UI, -10, PRM_RANGE_UI, 10)
         .setDefault(PRMzeroDefaults));
 
-    hvdb::OpenVDBOpFactory("OpenVDB Occlusion Mask", SOP_OpenVDB_Occlusion_Mask::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("OpenVDB Occlusion Mask",
+        SOP_OpenVDB_Occlusion_Mask::factory, parms, *table)
         .addInput("VDBs");
 }
 
@@ -138,7 +139,7 @@ SOP_OpenVDB_Occlusion_Mask::cookMyGuide1(OP_Context&)
 {
     myGuide1->clearAndDestroy();
     if (mFrustum) {
-        UT_Vector3 color(0.9, 0.0, 0.0);
+        UT_Vector3 color(0.9f, 0.0f, 0.0f);
         hvdb::drawFrustum(*myGuide1, *mFrustum, &color, NULL, false, false);
     }
     return error();
@@ -300,7 +301,8 @@ struct ConstructShadow
 
 
             if (grid.transform().voxelSize()[0] < mFrustum.voxelSize()[0]) {
-                openvdb::tools::resampleToMatch<openvdb::tools::PointSampler>(topologyMask, frustumMask);
+                openvdb::tools::resampleToMatch<openvdb::tools::PointSampler>(
+                    topologyMask, frustumMask);
             } else {
                 openvdb::tools::resampleToMatch<BoolSampler>(topologyMask, frustumMask);
             }
@@ -391,18 +393,21 @@ SOP_OpenVDB_Occlusion_Mask::cookMySop(OP_Context& context)
             // Register
             this->addExtraInput(cam, OP_INTEREST_DATA);
 
-            const float nearPlane = cam->getNEAR(time);
-            const float farPlane = nearPlane +  evalFloat("depth", 0, time);
-            const float voxelDepthSize = evalFloat("voxelDepthSize", 0, time);
+            const float nearPlane = static_cast<float>(cam->getNEAR(time));
+            const float farPlane = static_cast<float>(nearPlane + evalFloat("depth", 0, time));
+            const float voxelDepthSize = static_cast<float>(evalFloat("voxelDepthSize", 0, time));
             const int voxelCount = evalInt("voxelCount", 0, time);
-
 
             mFrustum = hvdb::frustumTransformFromCamera(*this, context, *cam,
                 0, nearPlane, farPlane, voxelDepthSize, voxelCount);
+        } else {
+            addError(SOP_MESSAGE, "No camera referenced.");
+            return error();
         }
 
 
-        ConstructShadow shadowOp(*mFrustum, evalInt("erode", 0, time), evalInt("zoffset", 0, time));
+        ConstructShadow shadowOp(*mFrustum,
+            evalInt("erode", 0, time), evalInt("zoffset", 0, time));
 
 
         // Get the group of grids to surface.
@@ -429,6 +434,6 @@ SOP_OpenVDB_Occlusion_Mask::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

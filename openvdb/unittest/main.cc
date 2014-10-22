@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -38,6 +38,8 @@
 #include <cstdlib> // for EXIT_SUCCESS
 #include <cstring> // for strrchr()
 #include <iostream>
+#include <string>
+#include <vector>
 #include <cppunit/BriefTestProgressListener.h>
 #include <cppunit/CompilerOutputter.h>
 #include <cppunit/TestResult.h>
@@ -95,7 +97,7 @@ run(int argc, char* argv[])
     if (const char* ptr = ::strrchr(progName, '/')) progName = ptr + 1;
 
     bool verbose = false;
-    std::string tests;
+    std::vector<std::string> tests;
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
         if (arg == "-l") {
@@ -106,7 +108,7 @@ run(int argc, char* argv[])
         } else if (arg == "-t") {
             if (i + 1 < argc) {
                 ++i;
-                tests = argv[i];
+                tests.push_back(argv[i]);
             } else {
                 usage(progName);
                 return EXIT_FAILURE;
@@ -120,6 +122,7 @@ run(int argc, char* argv[])
             return EXIT_FAILURE;
         }
     }
+    if (tests.empty()) tests.push_back(""); // run all tests
 
     try {
         CppUnit::TestFactoryRegistry& registry =
@@ -141,7 +144,9 @@ run(int argc, char* argv[])
             controller.addListener(&progress);
         }
 
-        runner.run(controller, tests);
+        for (size_t i = 0; i < tests.size(); ++i) {
+            runner.run(controller, tests[i]);
+        }
 
         CppUnit::CompilerOutputter outputter(&result, std::cerr);
         outputter.write();
@@ -207,6 +212,6 @@ main(int argc, char *argv[])
 #endif // DWA_OPENVDB
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

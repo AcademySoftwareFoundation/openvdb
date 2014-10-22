@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -34,7 +34,7 @@
 
 #include "GeometryUtil.h"
 #include "Utils.h"
-#include <houdini_utils/ParmFactory.h> // for createBox()
+#include <houdini_utils/geometry.h> // for createBox()
 #include <openvdb/tools/VolumeToMesh.h>
 
 #include <UT/UT_ScopedPtr.h>
@@ -68,49 +68,57 @@ drawFrustum(
 
     UT_Vector3 corners[8];
 
+    struct Local{
+        static inline void floatVecFromDoubles(UT_Vector3& v, double x, double y, double z) {
+            v[0] = static_cast<float>(x);
+            v[1] = static_cast<float>(y);
+            v[2] = static_cast<float>(z);
+        }
+    };
+
     openvdb::Vec3d wp = frustum.applyMap(bbox.min());
-    corners[0] = UT_Vector3(wp[0], wp[1], wp[2]);
+    Local::floatVecFromDoubles(corners[0], wp[0], wp[1], wp[2]);
 
     wp[0] = bbox.min()[0];
     wp[1] = bbox.min()[1];
     wp[2] = bbox.max()[2];
     wp = frustum.applyMap(wp);
-    corners[1] = UT_Vector3(wp[0], wp[1], wp[2]);
+    Local::floatVecFromDoubles(corners[1], wp[0], wp[1], wp[2]);
 
     wp[0] = bbox.max()[0];
     wp[1] = bbox.min()[1];
     wp[2] = bbox.max()[2];
     wp = frustum.applyMap(wp);
-    corners[2] = UT_Vector3(wp[0], wp[1], wp[2]);
+    Local::floatVecFromDoubles(corners[2], wp[0], wp[1], wp[2]);
 
     wp[0] = bbox.max()[0];
     wp[1] = bbox.min()[1];
     wp[2] = bbox.min()[2];
     wp = frustum.applyMap(wp);
-    corners[3] = UT_Vector3(wp[0], wp[1], wp[2]);
+    Local::floatVecFromDoubles(corners[3], wp[0], wp[1], wp[2]);
 
     wp[0] = bbox.min()[0];
     wp[1] = bbox.max()[1];
     wp[2] = bbox.min()[2];
     wp = frustum.applyMap(wp);
-    corners[4] = UT_Vector3(wp[0], wp[1], wp[2]);
+    Local::floatVecFromDoubles(corners[4], wp[0], wp[1], wp[2]);
 
     wp[0] = bbox.min()[0];
     wp[1] = bbox.max()[1];
     wp[2] = bbox.max()[2];
     wp = frustum.applyMap(wp);
-    corners[5] = UT_Vector3(wp[0], wp[1], wp[2]);
+    Local::floatVecFromDoubles(corners[5], wp[0], wp[1], wp[2]);
 
     wp = frustum.applyMap(bbox.max());
-    corners[6] = UT_Vector3(wp[0], wp[1], wp[2]);
+    Local::floatVecFromDoubles(corners[6], wp[0], wp[1], wp[2]);
 
     wp[0] = bbox.max()[0];
     wp[1] = bbox.max()[1];
     wp[2] = bbox.min()[2];
     wp = frustum.applyMap(wp);
-    corners[7] = UT_Vector3(wp[0], wp[1], wp[2]);
+    Local::floatVecFromDoubles(corners[7], wp[0], wp[1], wp[2]);
 
-    float alpha = shaded ? 0.3 : 1.0;
+    float alpha = shaded ? 0.3f : 1.0f;
 
     houdini_utils::createBox(geo, corners, boxColor, shaded, alpha);
 
@@ -227,18 +235,18 @@ frustumTransformFromCamera(
     const fpreal time = context.getTime();
 
     // Eval camera parms
-    const float camAspect = cam.ASPECT(time);
-    const float camFocal = cam.FOCAL(time);
-    const float camAperture = cam.APERTURE(time);
-    const float camXRes = cam.RESX(time);
-    const float camYRes = cam.RESY(time);
+    const fpreal camAspect = cam.ASPECT(time);
+    const fpreal camFocal = cam.FOCAL(time);
+    const fpreal camAperture = cam.APERTURE(time);
+    const fpreal camXRes = cam.RESX(time);
+    const fpreal camYRes = cam.RESY(time);
 
     nearPlaneDist += offset;
     farPlaneDist += offset;
 
-    const float depth = farPlaneDist - nearPlaneDist;
-    const float zoom = camAperture / camFocal;
-    const float aspectRatio = camYRes / (camXRes * camAspect);
+    const fpreal depth = farPlaneDist - nearPlaneDist;
+    const fpreal zoom = camAperture / camFocal;
+    const fpreal aspectRatio = camYRes / (camXRes * camAspect);
 
     openvdb::Vec2d nearPlaneSize;
     nearPlaneSize.x() = nearPlaneDist * zoom;
@@ -288,7 +296,7 @@ frustumTransformFromCamera(
     openvdb::BBoxd bbox(openvdb::Vec3d(0, 0, 0),
         openvdb::Vec3d(voxelCountX, voxelCountY, voxelCountZ));
     // define the taper
-    const float taper = nearPlaneSize.x() / farPlaneSize.x();
+    const fpreal taper = nearPlaneSize.x() / farPlaneSize.x();
 
     // note that the depth is scaled on the nearPlaneSize.
     // the linearMap will uniformly scale the frustum to the correct size
@@ -485,7 +493,8 @@ PrimCpyOp::operator()(const GA_SplittableRange &r) const
 {
     openvdb::Vec4I prim;
     GA_Offset start, end;
-    unsigned int vtx, vtxn;
+    GA_Size vtxn;
+    int vtx;
 
     // Iterate over pages in the range
     for (GA_PageIterator pit = r.beginPages(); !pit.atEnd(); ++pit) {
@@ -501,7 +510,8 @@ PrimCpyOp::operator()(const GA_SplittableRange &r) const
 
                     GA_Primitive::const_iterator vit;
                     for (vtx = 0, primRef->beginVertex(vit); !vit.atEnd(); ++vit, ++vtx) {
-                        prim[vtx] = mGdp->pointIndex(vit.getPointOffset());
+                        prim[vtx] = static_cast<openvdb::Vec4I::ValueType>(
+                            mGdp->pointIndex(vit.getPointOffset()));
                     }
 
                     if (vtxn != 4) prim[3] = openvdb::util::INVALID_IDX;
@@ -626,7 +636,8 @@ SharpenFeaturesOp::operator()(const GA_SplittableRange& range) const
             for (ptnOffset = start; ptnOffset < end; ++ptnOffset) {
 
                 // Check if this point is referenced by a surface primitive.
-                if (mSurfacePrims && !pointInPrimGroup(ptnOffset, mMeshGeo, *mSurfacePrims)) continue;
+                if (mSurfacePrims && !pointInPrimGroup(ptnOffset, mMeshGeo, *mSurfacePrims))
+                    continue;
 
                 tmpP = mMeshGeo.getPos3(ptnOffset);
                 pos[0] = tmpP.x();
@@ -654,9 +665,9 @@ SharpenFeaturesOp::operator()(const GA_SplittableRange& range) const
                 // get normal list
                 for (size_t n = 0, N = points.size(); n < N; ++n) {
 
-                    avgP.x() += points[n].x();
-                    avgP.y() += points[n].y();
-                    avgP.z() += points[n].z();
+                    avgP.x() = static_cast<float>(avgP.x() + points[n].x());
+                    avgP.y() = static_cast<float>(avgP.y() + points[n].y());
+                    avgP.z() = static_cast<float>(avgP.z() + points[n].z());
 
                     primOffset = mRefGeo.primitiveOffset(primitives[n]);
 
@@ -683,9 +694,12 @@ SharpenFeaturesOp::operator()(const GA_SplittableRange& range) const
 
                     if (!cell.isInside(pos[0], pos[1], pos[2])) {
 
-                        UT_Vector3 org(pos[0], pos[1], pos[2]);
+                        UT_Vector3 org(
+                            static_cast<float>(pos[0]),
+                            static_cast<float>(pos[1]),
+                            static_cast<float>(pos[2]));
 
-                        avgP *= 1.0 / double(points.size());
+                        avgP *= 1.f / float(points.size());
                         UT_Vector3 dir = avgP - org;
                         dir.normalize();
 
@@ -702,9 +716,9 @@ SharpenFeaturesOp::operator()(const GA_SplittableRange& range) const
 
                     pos = mXForm.indexToWorld(pos);
 
-                    tmpP.x() = pos[0];
-                    tmpP.y() = pos[1];
-                    tmpP.z() = pos[2];
+                    tmpP.x() = static_cast<float>(pos[0]);
+                    tmpP.y() = static_cast<float>(pos[1]);
+                    tmpP.z() = static_cast<float>(pos[2]);
 
                     mMeshGeo.setPos3(ptnOffset, tmpP);
                 }
@@ -730,7 +744,7 @@ namespace GU_Convert_H12_5 {
 // wranglers are cached across all primitives with GU_ConvertParms itself.
 void
 GUconvertCopySingleVertexPrimAttribsAndGroups(
-    GU_ConvertParms &parms,
+    GU_ConvertParms &/*parms*/,
     const GA_Detail &src,
     GA_Offset src_primoff,
     GA_Detail &dst,
@@ -811,6 +825,6 @@ GUconvertCopySingleVertexPrimAttribsAndGroups(
 
 #endif // Prior to 12.5.245
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

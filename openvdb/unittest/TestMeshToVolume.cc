@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -236,9 +236,10 @@ TestMeshToVolume::testIntersectingVoxelCleaner()
         intersectionAcc.setValue(openvdb::Coord(i,0,0), 1);
     }
 
-    unsigned int numSDFVoxels = distTree.activeVoxelCount();
-    unsigned int numIVoxels = intersectionTree.activeVoxelCount();
-    unsigned int numCPVoxels = indexTree.activeVoxelCount();
+    openvdb::Index64
+        numSDFVoxels = distTree.activeVoxelCount(),
+        numIVoxels = intersectionTree.activeVoxelCount(),
+        numCPVoxels = indexTree.activeVoxelCount();
 
     {
         openvdb::tree::LeafManager<openvdb::BoolTree> leafs(intersectionTree);
@@ -249,9 +250,9 @@ TestMeshToVolume::testIntersectingVoxelCleaner()
         cleaner.run();
     }
 
-    CPPUNIT_ASSERT(numSDFVoxels == distTree.activeVoxelCount());
-    CPPUNIT_ASSERT(numIVoxels == intersectionTree.activeVoxelCount());
-    CPPUNIT_ASSERT(numCPVoxels == indexTree.activeVoxelCount());
+    CPPUNIT_ASSERT_EQUAL(numSDFVoxels, distTree.activeVoxelCount());
+    CPPUNIT_ASSERT_EQUAL(numIVoxels, intersectionTree.activeVoxelCount());
+    CPPUNIT_ASSERT_EQUAL(numCPVoxels, indexTree.activeVoxelCount());
 
 
     // Add a row of intersecting voxels that are not surrounded by any positive distance values.
@@ -274,9 +275,9 @@ TestMeshToVolume::testIntersectingVoxelCleaner()
         cleaner.run();
     }
 
-    CPPUNIT_ASSERT(numSDFVoxels == distTree.activeVoxelCount());
-    CPPUNIT_ASSERT(numIVoxels == intersectionTree.activeVoxelCount());
-    CPPUNIT_ASSERT(numCPVoxels == indexTree.activeVoxelCount());
+    CPPUNIT_ASSERT_EQUAL(numSDFVoxels, distTree.activeVoxelCount());
+    CPPUNIT_ASSERT_EQUAL(numIVoxels, intersectionTree.activeVoxelCount());
+    CPPUNIT_ASSERT_EQUAL(numCPVoxels, indexTree.activeVoxelCount());
 }
 
 
@@ -302,9 +303,10 @@ TestMeshToVolume::testShellVoxelCleaner()
         intersectionAcc.setValue(openvdb::Coord(i,0,0), 1);
     }
 
-    unsigned int numSDFVoxels = distTree.activeVoxelCount();
-    unsigned int numIVoxels = intersectionTree.activeVoxelCount();
-    unsigned int numCPVoxels = indexTree.activeVoxelCount();
+    openvdb::Index64
+        numSDFVoxels = distTree.activeVoxelCount(),
+        numIVoxels = intersectionTree.activeVoxelCount(),
+        numCPVoxels = indexTree.activeVoxelCount();
 
     {
         openvdb::tree::LeafManager<openvdb::FloatTree> leafs(distTree);
@@ -315,9 +317,9 @@ TestMeshToVolume::testShellVoxelCleaner()
         cleaner.run();
     }
 
-    CPPUNIT_ASSERT(numSDFVoxels == distTree.activeVoxelCount());
-    CPPUNIT_ASSERT(numIVoxels == intersectionTree.activeVoxelCount());
-    CPPUNIT_ASSERT(numCPVoxels == indexTree.activeVoxelCount());
+    CPPUNIT_ASSERT_EQUAL(numSDFVoxels, distTree.activeVoxelCount());
+    CPPUNIT_ASSERT_EQUAL(numIVoxels, intersectionTree.activeVoxelCount());
+    CPPUNIT_ASSERT_EQUAL(numCPVoxels, indexTree.activeVoxelCount());
 
     intersectionTree.clear();
 
@@ -330,9 +332,10 @@ TestMeshToVolume::testShellVoxelCleaner()
         cleaner.run();
     }
 
-    CPPUNIT_ASSERT(0 == distTree.activeVoxelCount());
-    CPPUNIT_ASSERT(0 == intersectionTree.activeVoxelCount());
-    CPPUNIT_ASSERT(0 == indexTree.activeVoxelCount());;
+    const openvdb::Index64 zero(0);
+    CPPUNIT_ASSERT_EQUAL(zero, distTree.activeVoxelCount());
+    CPPUNIT_ASSERT_EQUAL(zero, intersectionTree.activeVoxelCount());
+    CPPUNIT_ASSERT_EQUAL(zero, indexTree.activeVoxelCount());;
 }
 
 
@@ -373,6 +376,6 @@ TestMeshToVolume::testConversion()
     /// @todo validate output
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -184,48 +184,17 @@ private:
     typedef typename LeafT::ValueOnCIter                     VoxelCIterT;
     typedef typename tree::LeafManager<TreeType>::BufferType BufferT;
     typedef typename RangeType::Iterator                     LeafIterT;
+    typedef tools::AlphaMask<GridT, MaskT>                   AlphaMaskT;
 
     void cook(LeafManagerType& leafs);
 
-    // Private class to derive the normalized alpha mask
-    struct AlphaMask
-    {
-        AlphaMask(const GridType& grid, const MaskType& mask,
-                  AlphaType min, AlphaType max, bool invert)
-            : mAcc(mask.tree()), mSampler(mAcc, mask.transform(), grid.transform()),
-              mMin(min), mInvNorm(1/(max-min)), mInvert(invert)
-        {
-            assert(min < max);   
-        } 
-        inline bool operator()(const Coord& xyz, AlphaType& a, AlphaType& b) const
-        {
-            a = mSampler(xyz);
-            const AlphaType t = (a-mMin)*mInvNorm;
-            a = t > 0 ? t < 1 ? (3-2*t)*t*t : 1 : 0;//smooth mapping to 0->1
-            b = 1 - a;
-            if (mInvert) std::swap(a,b);
-            return a>0;
-        }
-        typedef typename MaskType::ConstAccessor AccType;
-        AccType mAcc;
-        tools::DualGridSampler<AccType, tools::BoxSampler> mSampler;
-        const AlphaType mMin, mInvNorm;
-        const bool      mInvert;
-    };
-
-    template <size_t Axis>
+    template<size_t Axis>
     struct Avg {
-        Avg(const GridT* grid, Int32 w) :
-            acc(grid->tree()), width(w), frac(1/ValueType(2*w+1)) {}
-        ValueType operator()(Coord xyz) {
-            ValueType sum = zeroVal<ValueType>();
-            Int32& i = xyz[Axis], j = i + width;
-            for (i -= width; i <= j; ++i) sum += acc.getValue(xyz);
-            return sum*frac;
-        }
+        Avg(const GridT* grid, Int32 w): acc(grid->tree()), width(w), frac(1.f/float(2*w+1)) {}
+        inline ValueType operator()(Coord xyz);
         typename GridT::ConstAccessor acc;
         const Int32 width;
-        const ValueType frac;
+        const float frac;
     };
 
     // Private filter methods called by tbb::parallel_for threads
@@ -248,7 +217,32 @@ private:
     bool             mInvertMask;
 }; // end of Filter class
 
+
 ////////////////////////////////////////
+
+
+namespace filter_internal {
+// Helper function for Filter::Avg::operator()
+template<typename T> static inline void accum(T& sum, T addend) { sum += addend; }
+// Overload for bool ValueType
+inline void accum(bool& sum, bool addend) { sum = sum || addend; }
+}
+
+
+template<typename GridT, typename MaskT, typename InterruptT>
+template<size_t Axis>
+inline typename GridT::ValueType
+Filter<GridT, MaskT, InterruptT>::Avg<Axis>::operator()(Coord xyz)
+{
+    ValueType sum = zeroVal<ValueType>();
+    Int32 &i = xyz[Axis], j = i + width;
+    for (i -= width; i <= j; ++i) filter_internal::accum(sum, acc.getValue(xyz));
+    return static_cast<ValueType>(sum * frac);
+}
+
+
+////////////////////////////////////////
+
 
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
@@ -275,6 +269,7 @@ Filter<GridT, MaskT, InterruptT>::mean(int width, int iterations, const MaskType
 
     if (mInterrupter) mInterrupter->end();
 }
+
 
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
@@ -321,6 +316,7 @@ Filter<GridT, MaskT, InterruptT>::median(int width, int iterations, const MaskTy
     if (mInterrupter) mInterrupter->end();
 }
 
+
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
 Filter<GridT, MaskT, InterruptT>::offset(ValueType value, const MaskType* mask)
@@ -336,6 +332,7 @@ Filter<GridT, MaskT, InterruptT>::offset(ValueType value, const MaskType* mask)
 
     if (mInterrupter) mInterrupter->end();
 }
+
 
 ////////////////////////////////////////
 
@@ -354,6 +351,7 @@ Filter<GridT, MaskT, InterruptT>::cook(LeafManagerType& leafs)
     leafs.swapLeafBuffer(1, mGrainSize==0);
 }
 
+
 /// One dimensional convolution of a separable box filter
 template<typename GridT, typename MaskT, typename InterruptT>
 template <typename AvgT>
@@ -363,8 +361,8 @@ Filter<GridT, MaskT, InterruptT>::doBox(const RangeType& range, Int32 w)
     this->wasInterrupted();
     AvgT avg(mGrid, w);
     if (mMask) {
-        AlphaType a, b;
-        AlphaMask alpha(*mGrid, *mMask, mMinMask, mMaxMask, mInvertMask);
+        typename AlphaMaskT::FloatType a, b;
+        AlphaMaskT alpha(*mGrid, *mMask, mMinMask, mMaxMask, mInvertMask);
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
             BufferT& buffer = leafIter.buffer(1);
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
@@ -384,6 +382,7 @@ Filter<GridT, MaskT, InterruptT>::doBox(const RangeType& range, Int32 w)
     }
 }
 
+
 /// Performs simple but slow median-value diffusion
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
@@ -392,8 +391,8 @@ Filter<GridT, MaskT, InterruptT>::doMedian(const RangeType& range, int width)
     this->wasInterrupted();
     typename math::DenseStencil<GridType> stencil(*mGrid, width);//creates local cache!
     if (mMask) {
-        AlphaType a, b;
-        AlphaMask alpha(*mGrid, *mMask, mMinMask, mMaxMask, mInvertMask);
+        typename AlphaMaskT::FloatType a, b;
+        AlphaMaskT alpha(*mGrid, *mMask, mMinMask, mMaxMask, mInvertMask);
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
             BufferT& buffer = leafIter.buffer(1);
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
@@ -414,6 +413,7 @@ Filter<GridT, MaskT, InterruptT>::doMedian(const RangeType& range, int width)
     }
 }
 
+
 /// Offsets the values by a constant
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
@@ -421,8 +421,8 @@ Filter<GridT, MaskT, InterruptT>::doOffset(const RangeType& range, ValueType off
 {
     this->wasInterrupted();
     if (mMask) {
-        AlphaType a, b;
-        AlphaMask alpha(*mGrid, *mMask, mMinMask, mMaxMask, mInvertMask);
+        typename AlphaMaskT::FloatType a, b;
+        AlphaMaskT alpha(*mGrid, *mMask, mMinMask, mMaxMask, mInvertMask);
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
             for (VoxelIterT iter = leafIter->beginValueOn(); iter; ++iter) {
                 if (alpha(iter.getCoord(), a, b)) iter.setValue(ValueType(*iter + a*offset));
@@ -436,6 +436,7 @@ Filter<GridT, MaskT, InterruptT>::doOffset(const RangeType& range, ValueType off
         }
     }
 }
+
 
 template<typename GridT, typename MaskT, typename InterruptT>
 inline bool
@@ -454,6 +455,6 @@ Filter<GridT, MaskT, InterruptT>::wasInterrupted()
 
 #endif // OPENVDB_TOOLS_FILTER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

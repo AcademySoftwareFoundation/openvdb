@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -29,8 +29,15 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include "openvdb.h"
+#include <openvdb/tools/PointIndexGrid.h>
 #include <tbb/mutex.h>
-
+#ifdef OPENVDB_USE_LOG4CPLUS
+#include <log4cplus/configurator.h>
+#include <log4cplus/logger.h>
+#endif
+#ifdef OPENVDB_USE_BLOSC
+#include <blosc.h>
+#endif
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -48,6 +55,18 @@ initialize()
 {
     Lock lock(sInitMutex);
     if (sIsInitialized) return;
+
+#ifdef OPENVDB_USE_LOG4CPLUS
+    {
+        // Configure log4cplus if it was not already configured (at least,
+        // if there are no appenders associated with the root logger).
+        log4cplus::Logger rootLogger = log4cplus::Logger::getRoot();
+        if (rootLogger.getAllAppenders().empty()) {
+            log4cplus::BasicConfigurator::doConfigure();
+            rootLogger.setLogLevel(log4cplus::WARN_LOG_LEVEL); // was DEBUG_LOG_LEVEL
+        }
+    }
+#endif
 
     // Register metadata.
     Metadata::clearRegistry();
@@ -90,6 +109,19 @@ initialize()
     Vec3SGrid::registerGrid();
     Vec3DGrid::registerGrid();
 
+    // Register types associated with point index grids.
+    Metadata::registerType(typeNameAsString<PointIndex32>(), Int32Metadata::createMetadata);
+    Metadata::registerType(typeNameAsString<PointIndex64>(), Int64Metadata::createMetadata);
+    tools::PointIndexGrid::registerGrid();
+
+#ifdef OPENVDB_USE_BLOSC
+    blosc_init();
+    if (blosc_set_compressor("lz4") < 0) {
+        OPENVDB_LOG_WARN("Blosc LZ4 compressor is unavailable");
+    }
+    /// @todo blosc_set_nthreads(int nthreads);
+#endif
+
 #ifdef __ICC
 // Disable ICC "assignment to statically allocated variable" warning.
 // This assignment is mutex-protected and therefore thread-safe.
@@ -124,11 +156,17 @@ __pragma(warning(default:1711))
     Metadata::clearRegistry();
     GridBase::clearRegistry();
     math::MapRegistry::clear();
+
+#ifdef OPENVDB_USE_BLOSC
+    // We don't want to destroy Blosc, because it might have been
+    // initialized by some other library.
+    //blosc_destroy();
+#endif
 }
 
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

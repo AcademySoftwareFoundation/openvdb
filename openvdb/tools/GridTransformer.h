@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -44,8 +44,11 @@
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h> // for isApproxEqual()
 #include <openvdb/util/NullInterrupter.h>
+#include "ChangeBackground.h"
 #include "Interpolation.h"
 #include "LevelSetRebuild.h" // for doLevelSetRebuild()
+#include "SignedFloodFill.h" // for signedFloodFill
+#include "Prune.h" // for pruneLevelSet
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -145,14 +148,16 @@ protected:
 /// @brief For point sampling, tree traversal is less expensive than testing
 /// bounding box membership.
 template<typename TreeT>
-struct TileSampler<PointSampler, TreeT>: public PointSampler {
+class TileSampler<PointSampler, TreeT>: public PointSampler {
+public:
     TileSampler(const CoordBBox&, const typename TreeT::ValueType&, bool) {}
 };
 
 /// @brief For point sampling, tree traversal is less expensive than testing
 /// bounding box membership.
 template<typename TreeT>
-struct TileSampler<StaggeredPointSampler, TreeT>: public StaggeredPointSampler {
+class TileSampler<StaggeredPointSampler, TreeT>: public StaggeredPointSampler {
+public:
     TileSampler(const CoordBBox&, const typename TreeT::ValueType&, bool) {}
 };
 
@@ -630,7 +635,7 @@ void
 GridResampler::transformGrid(const Transformer& xform,
     const GridT& inGrid, GridT& outGrid) const
 {
-    outGrid.setBackground(inGrid.background());
+    tools::changeBackground(outGrid.tree(), inGrid.background());
     applyTransform<Sampler>(xform, inGrid, outGrid);
 }
 
@@ -639,7 +644,7 @@ template<class Sampler, class GridT>
 void
 GridTransformer::transformGrid(const GridT& inGrid, GridT& outGrid) const
 {
-    outGrid.setBackground(inGrid.background());
+    tools::changeBackground(outGrid.tree(), inGrid.background());
 
     if (!Sampler::mipmap() || mMipLevels == Vec3i::zero()) {
         // Skip the mipmapping step.
@@ -864,8 +869,8 @@ GridResampler::applyTransform(const Transformer& xform,
 
     // If the grid is a level set, mark inactive voxels as inside or outside.
     if (gridClass == GRID_LEVEL_SET) {
-        outTree.pruneInactive();
-        outTree.signedFloodFill();
+        tools::pruneLevelSet(outTree);
+        tools::signedFloodFill(outTree);
     }
 }
 
@@ -981,6 +986,6 @@ GridResampler::transformBBox(
 
 #endif // OPENVDB_TOOLS_GRIDTRANSFORMER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

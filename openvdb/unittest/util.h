@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -32,6 +32,7 @@
 #define OPENVDB_UNITTEST_UTIL_HAS_BEEN_INCLUDED
 
 #include <openvdb/openvdb.h>
+#include <openvdb/tools/Prune.h>// for pruneLevelSet
 #include <sstream>
 
 namespace unittest_util {
@@ -65,7 +66,7 @@ makeSphere(const openvdb::Coord& dim, const openvdb::Vec3f& center, float radius
         for (xyz[1]=0; xyz[1]<dim[1]; ++xyz[1]) {
             for (xyz[2]=0; xyz[2]<dim[2]; ++xyz[2]) {
                 const openvdb::Vec3R p =  grid.transform().indexToWorld(xyz);
-                const float dist = (p-center).length() - radius;
+                const float dist = float((p-center).length() - radius);
                 ValueT val = ValueT(zero + dist);
                 switch (mode) {
                 case SPHERE_DENSE:
@@ -85,7 +86,8 @@ makeSphere(const openvdb::Coord& dim, const openvdb::Vec3f& center, float radius
             }
         }
     }
-    if (mode == SPHERE_SPARSE_NARROW_BAND) grid.tree().prune();
+    //if (mode == SPHERE_SPARSE_NARROW_BAND) grid.tree().prune();
+    if (mode == SPHERE_SPARSE_NARROW_BAND) openvdb::tools::pruneLevelSet(grid.tree());
 }
 
 // Template specialization for boolean trees (mostly a dummy implementation)
@@ -100,7 +102,7 @@ makeSphere<openvdb::BoolGrid>(const openvdb::Coord& dim, const openvdb::Vec3f& c
         for (xyz[1]=0; xyz[1]<dim[1]; ++xyz[1]) {
             for (xyz[2]=0; xyz[2]<dim[2]; ++xyz[2]) {
                 const openvdb::Vec3R p =  grid.transform().indexToWorld(xyz);
-                const float dist = (p-center).length() - radius;
+                const float dist = static_cast<float>((p-center).length() - radius);
                 if (dist <= 0) acc.setValue(xyz, true);
             }
         }
@@ -123,6 +125,6 @@ makeSphere(const openvdb::Coord& dim, const openvdb::Vec3f& center, float radius
 
 #endif // OPENVDB_UNITTEST_UTIL_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

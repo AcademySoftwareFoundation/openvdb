@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -35,6 +35,7 @@
 /// @brief SOP to prune tree branches from OpenVDB grids
 
 #include <houdini_utils/ParmFactory.h>
+#include <openvdb/tools/Prune.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <UT/UT_Interrupt.h>
@@ -150,7 +151,7 @@ SOP_OpenVDB_Prune::updateParmsFlags()
 
 namespace {
 struct PruneOp {
-    PruneOp(const std::string m, float tol= 0.0): mode(m), tolerance(tol) {}
+    PruneOp(const std::string m, fpreal tol = 0.0): mode(m), tolerance(tol) {}
 
     template<typename GridT>
     void operator()(GridT& grid) const
@@ -158,16 +159,16 @@ struct PruneOp {
         typedef typename GridT::ValueType ValueT;
 
         if (mode == "value") {
-            grid.tree().prune(ValueT(openvdb::zeroVal<ValueT>() + tolerance));
+            openvdb::tools::prune(grid.tree(), ValueT(openvdb::zeroVal<ValueT>() + tolerance));
         } else if (mode == "inactive") {
-            grid.tree().pruneInactive();
+            openvdb::tools::pruneInactive(grid.tree());
         } else if (mode == "levelset") {
-            grid.tree().pruneLevelSet();
+            openvdb::tools::pruneLevelSet(grid.tree());
         }
     }
 
     std::string mode;
-    float tolerance;
+    fpreal tolerance;
 };
 }
 
@@ -193,7 +194,7 @@ SOP_OpenVDB_Prune::cookMySop(OP_Context& context)
         // Get other UI parameters.
         UT_String modeStr;
         evalString(modeStr, "mode", 0, time);
-        const float tolerance = evalFloat("tolerance", 0, time);
+        const fpreal tolerance = evalFloat("tolerance", 0, time);
 
         // Construct a functor to process grids of arbitrary type.
         const PruneOp pruneOp(modeStr.toStdString(), tolerance);
@@ -215,6 +216,6 @@ SOP_OpenVDB_Prune::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

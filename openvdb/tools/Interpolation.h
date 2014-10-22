@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -71,6 +71,7 @@
 #include <boost/shared_ptr.hpp>
 #include <openvdb/version.h> // for OPENVDB_VERSION_NAME
 #include <openvdb/Platform.h> // for round()
+#include <openvdb/math/Math.h>// for SmoothUnitStep
 #include <openvdb/math/Transform.h> // for Transform
 #include <openvdb/Grid.h>
 #include <openvdb/tree/ValueAccessor.h>
@@ -412,7 +413,7 @@ public:
     {
     }
     /// @brief Return the value of the source grid at the index
-    /// coordinates, ijk, relative to the target grid (or its tranform).  
+    /// coordinates, ijk, relative to the target grid (or its tranform).
     inline ValueType operator()(const Coord& ijk) const
     {
         if (mAligned) return mSourceTree->getValue(ijk);
@@ -426,7 +427,7 @@ private:
     const math::Transform* mSourceXform;
     const math::Transform* mTargetXform;
     const bool             mAligned;
-};// DualGridSampler  
+};// DualGridSampler
 
 /// @brief Specialization of DualGridSampler for construction from a ValueAccessor type.
 template<typename TreeT,
@@ -453,7 +454,7 @@ class DualGridSampler<tree::ValueAccessor<TreeT>, SamplerT>
     {
     }
     /// @brief Return the value of the source grid at the index
-    /// coordinates, ijk, relative to the target grid.  
+    /// coordinates, ijk, relative to the target grid.
     inline ValueType operator()(const Coord& ijk) const
     {
         if (mAligned) return mSourceAcc->getValue(ijk);
@@ -471,6 +472,48 @@ private:
 
 ////////////////////////////////////////
 
+
+// Class to derive the normalized alpha mask
+template <typename GridT,
+          typename MaskT,
+          typename SamplerT = tools::BoxSampler,
+          typename FloatT = float>
+class AlphaMask
+{
+public:
+    BOOST_STATIC_ASSERT(boost::is_floating_point<FloatT>::value);
+    typedef GridT    GridType;
+    typedef MaskT    MaskType;
+    typedef SamplerT SamlerType;
+    typedef FloatT   FloatType;
+
+    AlphaMask(const GridT& grid, const MaskT& mask, FloatT min, FloatT max, bool invert)
+        : mAcc(mask.tree())
+        , mSampler(mAcc, mask.transform() , grid.transform())
+        , mMin(min)
+        , mInvNorm(1/(max-min))
+        , mInvert(invert)
+    {
+        assert(min < max);
+    }
+
+    inline bool operator()(const Coord& xyz, FloatT& a, FloatT& b) const
+    {
+        a = math::SmoothUnitStep( (mSampler(xyz) - mMin) * mInvNorm );//smooth mapping to 0->1
+        b = 1 - a;
+        if (mInvert) std::swap(a,b);
+        return a>0;
+    }
+
+protected:
+    typedef typename MaskType::ConstAccessor AccT;
+    AccT mAcc;
+    tools::DualGridSampler<AccT, SamplerT> mSampler;
+    const FloatT mMin, mInvNorm;
+    const bool mInvert;
+};// AlphaMask
+
+////////////////////////////////////////
 
 namespace local_util {
 
@@ -763,6 +806,6 @@ StaggeredQuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
 
 #endif // OPENVDB_TOOLS_INTERPOLATION_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

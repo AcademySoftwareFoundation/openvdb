@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -37,13 +37,9 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 
-MetaMap::MetaMap(const MetaMap &other)
+MetaMap::MetaMap(const MetaMap& other)
 {
-    // Insert all metadata into this map.
-    ConstMetaIterator iter = other.beginMeta();
-    for( ; iter != other.endMeta(); ++iter) {
-        this->insertMeta(iter->first, *(iter->second));
-    }
+    this->insertMeta(other);
 }
 
 
@@ -115,6 +111,7 @@ MetaMap::readMeta(std::istream &is)
     }
 }
 
+
 void
 MetaMap::writeMeta(std::ostream &os) const
 {
@@ -137,6 +134,7 @@ MetaMap::writeMeta(std::ostream &os) const
     }
 }
 
+
 void
 MetaMap::insertMeta(const Name &name, const Metadata &m)
 {
@@ -147,7 +145,7 @@ MetaMap::insertMeta(const Name &name, const Metadata &m)
     MetaIterator iter = mMeta.find(name);
 
     if(iter == mMeta.end()) {
-        // Create a copy of hte metadata and store it in the map
+        // Create a copy of the metadata and store it in the map
         Metadata::Ptr tmp = m.copy();
         mMeta[name] = tmp;
     } else {
@@ -164,6 +162,16 @@ MetaMap::insertMeta(const Name &name, const Metadata &m)
     }
 }
 
+
+void
+MetaMap::insertMeta(const MetaMap& other)
+{
+    for (ConstMetaIterator it = other.beginMeta(), end = other.endMeta(); it != end; ++it) {
+        if (it->second) this->insertMeta(it->first, *it->second);
+    }
+}
+
+
 void
 MetaMap::removeMeta(const Name &name)
 {
@@ -178,15 +186,19 @@ MetaMap::removeMeta(const Name &name)
 
 
 std::string
-MetaMap::str() const
+MetaMap::str(const std::string& indent) const
 {
-    std::ostringstream buffer;
-    buffer << "MetaMap:\n";
-    for(ConstMetaIterator iter = beginMeta(); iter != endMeta(); ++iter) {
-        buffer << "    " << iter->first << " = " << iter->second->str();
-        buffer << std::endl;
+    std::ostringstream ostr;
+    char sep[2] = { 0, 0 };
+    for (ConstMetaIterator iter = beginMeta(); iter != endMeta(); ++iter) {
+        ostr << sep << indent << iter->first;
+        if (iter->second) {
+            const std::string value = iter->second->str();
+            if (!value.empty()) ostr << ": " << value;
+        }
+        sep[0] = '\n';
     }
-    return buffer.str();
+    return ostr.str();
 }
 
 std::ostream&
@@ -199,6 +211,6 @@ operator<<(std::ostream& ostr, const MetaMap& metamap)
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

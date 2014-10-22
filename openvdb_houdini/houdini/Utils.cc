@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -214,7 +214,7 @@ evalGridBBox(GridCRef grid, UT_Vector3 corners[8], bool expandHalfVoxel)
     bbox[7] = xform.indexToWorld(bbox[7]);
 
     for (size_t i = 0; i < 8; ++i) {
-        corners[i].assign(bbox[i][0], bbox[i][1], bbox[i][2]);
+        corners[i].assign(float(bbox[i][0]), float(bbox[i][1]), float(bbox[i][2]));
     }
 
     return true;
@@ -246,9 +246,8 @@ makeCoordBBox(const UT_BoundingBox& b, const openvdb::math::Transform& t)
     return box;
 }
 
-
 } // namespace openvdb_houdini
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

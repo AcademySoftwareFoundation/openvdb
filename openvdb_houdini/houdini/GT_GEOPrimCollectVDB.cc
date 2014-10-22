@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -145,8 +145,7 @@ public:
     processGrid(const GridT &grid, int /*dummy*/)
     {
 	using namespace openvdb;
-        typedef typename GridT::TreeType TreeT;
-        typedef typename GridT::ConstPtr GridConstPtrT;
+	typedef typename GridT::TreeType TreeT;
 	typedef typename TreeT::LeafCIter LeafCIter;
 	typedef typename TreeT::LeafNodeType LeafNodeType;
 
@@ -314,6 +313,6 @@ GT_GEOPrimCollectVDB::endCollecting(
 			/*wrap*/false));
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

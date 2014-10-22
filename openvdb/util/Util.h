@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -34,6 +34,7 @@
 #include <openvdb/Types.h>
 #include <openvdb/tree/Tree.h>
 #include <openvdb/tools/ValueTransformer.h>
+#include <openvdb/tools/Prune.h>// for tree::pruneInactive
 
 
 namespace openvdb {
@@ -130,7 +131,7 @@ leafTopologyIntersection(const TreeType1& lhs, const TreeType2& rhs, bool thread
     tools::foreach(topologyTree->beginLeaf(),
         LeafTopologyIntOp<BoolTreeType, TreeType2>(rhs), threaded);
 
-    topologyTree->pruneInactive();
+    tools::pruneInactive(*topologyTree, threaded);
     return topologyTree;
 }
 
@@ -150,7 +151,7 @@ leafTopologyDifference(const TreeType1& lhs, const TreeType2& rhs, bool threaded
     tools::foreach(topologyTree->beginLeaf(),
         LeafTopologyDiffOp<BoolTreeType, TreeType2>(rhs), threaded);
 
-    topologyTree->pruneInactive();
+    tools::pruneInactive(*topologyTree, threaded);
     return topologyTree;
 }
 
@@ -160,6 +161,6 @@ leafTopologyDifference(const TreeType1& lhs, const TreeType2& rhs, bool threaded
 
 #endif // OPENVDB_UTIL_UTIL_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

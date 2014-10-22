@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -66,97 +66,97 @@ TestHermite::testAccessors()
     using namespace openvdb;
     using namespace openvdb::math;
     const double offsetTol = 0.001;
-    const double normalTol = 0.015;
-    
+    const float normalTol = 0.015f;
+
     //////////
-    
+
     // Check initial values.
-    
+
     Hermite hermite;
-    
+
     CPPUNIT_ASSERT(!hermite);
     CPPUNIT_ASSERT(!hermite.isInside());
-    
+
     CPPUNIT_ASSERT(!hermite.hasOffsetX());
     CPPUNIT_ASSERT(!hermite.hasOffsetY());
     CPPUNIT_ASSERT(!hermite.hasOffsetZ());
-    
-    
+
+
     //////////
-    
+
     // Check set & get
-    
+
     // x
     Vec3s n0(1.0, 0.0, 0.0);
-    hermite.setX(0.5f, n0);    
+    hermite.setX(0.5f, n0);
     CPPUNIT_ASSERT(hermite.hasOffsetX());
     CPPUNIT_ASSERT(!hermite.hasOffsetY());
     CPPUNIT_ASSERT(!hermite.hasOffsetZ());
-    
+
     float offset = hermite.getOffsetX();
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.5, offset, offsetTol);
-    
+
     Vec3s n1 = hermite.getNormalX();
     CPPUNIT_ASSERT(n0.eq(n1, normalTol));
-    
+
     // y
     n0 = Vec3s(0.0, 1.0, 0.0);
     hermite.setY(0.3f, n0);
     CPPUNIT_ASSERT(hermite.hasOffsetX());
     CPPUNIT_ASSERT(hermite.hasOffsetY());
     CPPUNIT_ASSERT(!hermite.hasOffsetZ());
-    
+
     offset = hermite.getOffsetY();
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.3, offset, offsetTol);
-    
+
     n1 = hermite.getNormalY();
     CPPUNIT_ASSERT(n0.eq(n1, normalTol));
-    
+
     // z
     n0 = Vec3s(0.0, 0.0, 1.0);
     hermite.setZ(0.75f, n0);
     CPPUNIT_ASSERT(hermite.hasOffsetX());
     CPPUNIT_ASSERT(hermite.hasOffsetY());
     CPPUNIT_ASSERT(hermite.hasOffsetZ());
-    
+
     offset = hermite.getOffsetZ();
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.75, offset, offsetTol);
-    
+
     n1 = hermite.getNormalZ();
     CPPUNIT_ASSERT(n0.eq(n1, normalTol));
-    
-    
+
+
     //////////
-    
+
     // Check inside/outside state
-    
+
     hermite.setIsInside(true);
     CPPUNIT_ASSERT(hermite.isInside());
-    
+
     hermite.clear();
-    
+
     CPPUNIT_ASSERT(!hermite);
     CPPUNIT_ASSERT(!hermite.isInside());
-    
+
     CPPUNIT_ASSERT(!hermite.hasOffsetX());
     CPPUNIT_ASSERT(!hermite.hasOffsetY());
     CPPUNIT_ASSERT(!hermite.hasOffsetZ());
-    
+
     n0 = Vec3s(0.0, 0.0, -1.0);
     hermite.setZ(0.15f, n0);
     CPPUNIT_ASSERT(!hermite.hasOffsetX());
     CPPUNIT_ASSERT(!hermite.hasOffsetY());
     CPPUNIT_ASSERT(hermite.hasOffsetZ());
-    
+
     offset = hermite.getOffsetZ();
     CPPUNIT_ASSERT_DOUBLES_EQUAL(0.15, offset, offsetTol);
-    
+
     n1 = hermite.getNormalZ();
     CPPUNIT_ASSERT(n0.eq(n1, normalTol));
-    
+
     hermite.setIsInside(true);
     CPPUNIT_ASSERT(hermite.isInside());
-    
+
     CPPUNIT_ASSERT(hermite);
 }
 
@@ -170,110 +170,110 @@ TestHermite::testComparisons()
     using namespace openvdb;
     using namespace openvdb::math;
     const double offsetTol = 0.001;
-    const double normalTol = 0.015;
+    const float normalTol = 0.015f;
 
-    
+
     //////////
-    
-    
-    Vec3s offsets(0.50, 0.82, 0.14);
-    Vec3s nX(1.0, 0.0, 0.0); 
+
+
+    Vec3s offsets(0.50f, 0.82f, 0.14f);
+    Vec3s nX(1.0, 0.0, 0.0);
     Vec3s nY(0.0, 1.0, 0.0);
     Vec3s nZ(0.0, 0.0, 1.0);
-        
+
     Hermite A, B;
-    
+
     A.setX(offsets[0], nX);
     A.setY(offsets[1], nY);
     A.setZ(offsets[2], nZ);
     A.setIsInside(true);
-        
+
     B = A;
-        
+
     CPPUNIT_ASSERT(B);
     CPPUNIT_ASSERT(B == A);
     CPPUNIT_ASSERT(!(B != A));
     CPPUNIT_ASSERT(B.isInside());
-    
+
     CPPUNIT_ASSERT_DOUBLES_EQUAL(offsets[0], B.getOffsetX(), offsetTol);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(offsets[1], B.getOffsetY(), offsetTol);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(offsets[2], B.getOffsetZ(), offsetTol);
-    
+
     CPPUNIT_ASSERT(B.getNormalX().eq(nX, normalTol));
     CPPUNIT_ASSERT(B.getNormalY().eq(nY, normalTol));
     CPPUNIT_ASSERT(B.getNormalZ().eq(nZ, normalTol));
-    
+
     CPPUNIT_ASSERT(!A.isLessX(B));
     CPPUNIT_ASSERT(!A.isLessY(B));
     CPPUNIT_ASSERT(!A.isLessZ(B));
-    
+
     CPPUNIT_ASSERT(!A.isGreaterX(B));
     CPPUNIT_ASSERT(!A.isGreaterY(B));
     CPPUNIT_ASSERT(!A.isGreaterZ(B));
-    
+
     B = -B;
-    
+
     CPPUNIT_ASSERT(B);
     CPPUNIT_ASSERT(B != A);
     CPPUNIT_ASSERT(!B.isInside());
-    
+
     CPPUNIT_ASSERT_DOUBLES_EQUAL(offsets[0], B.getOffsetX(), offsetTol);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(offsets[1], B.getOffsetY(), offsetTol);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(offsets[2], B.getOffsetZ(), offsetTol);
-    
+
     CPPUNIT_ASSERT(B.getNormalX().eq(-nX, normalTol));
     CPPUNIT_ASSERT(B.getNormalY().eq(-nY, normalTol));
     CPPUNIT_ASSERT(B.getNormalZ().eq(-nZ, normalTol));
-    
+
     CPPUNIT_ASSERT(A.isLessX(B));
     CPPUNIT_ASSERT(A.isLessY(B));
     CPPUNIT_ASSERT(A.isLessZ(B));
-    
+
     CPPUNIT_ASSERT(!A.isGreaterX(B));
     CPPUNIT_ASSERT(!A.isGreaterY(B));
     CPPUNIT_ASSERT(!A.isGreaterZ(B));
-    
-    
+
+
     //////////
-    
+
     // min / max
-    
+
     Hermite C = min(A, B);
-    
+
     CPPUNIT_ASSERT(C);
     CPPUNIT_ASSERT(C == A);
     CPPUNIT_ASSERT(C != B);
-    
+
     C = max(A, B);
-    
+
     CPPUNIT_ASSERT(C);
     CPPUNIT_ASSERT(C != A);
     CPPUNIT_ASSERT(C == B);
-    
-    
+
+
     A.clear();
     B.clear();
     C.clear();
-    
+
     A.setX(offsets[0], nX);
     A.setY(offsets[1], nY);
     A.setZ(offsets[2], nZ);
     A.setIsInside(true);
-    
+
     B.setX(offsets[2], nX);
     B.setY(offsets[0], nY);
     B.setZ(offsets[1], nZ);
     B.setIsInside(true);
 
     C = max(A, B);
-    
+
     CPPUNIT_ASSERT(C);
     CPPUNIT_ASSERT(C != A);
     CPPUNIT_ASSERT(C != B);
     CPPUNIT_ASSERT(C.isGreaterX(A));
     CPPUNIT_ASSERT(C.isGreaterY(A));
     CPPUNIT_ASSERT(C.isGreaterZ(B));
-    
+
     C = min(A, B);
     CPPUNIT_ASSERT(C);
     CPPUNIT_ASSERT(C != A);
@@ -281,41 +281,41 @@ TestHermite::testComparisons()
     CPPUNIT_ASSERT(C.isLessX(B));
     CPPUNIT_ASSERT(C.isLessY(B));
     CPPUNIT_ASSERT(C.isLessZ(A));
-    
-    
+
+
     A.clear();
     B.clear();
     C.clear();
-    
-    
+
+
     A.setY(offsets[1], nY);
     A.setZ(offsets[2], nZ);
-    
+
     B.setX(offsets[2], nX);
     B.setY(offsets[0], nY);
-    
+
     C = min(A, B);
-    
+
     CPPUNIT_ASSERT(C);
     CPPUNIT_ASSERT(C != A);
     CPPUNIT_ASSERT(C != B);
-    
+
     CPPUNIT_ASSERT(!C.hasOffsetX());
     CPPUNIT_ASSERT(C.hasOffsetY());
     CPPUNIT_ASSERT(!C.hasOffsetZ());
-    
+
     CPPUNIT_ASSERT(C.isLessY(A));
-    
+
     C = max(A, B);
-    
+
     CPPUNIT_ASSERT(C);
     CPPUNIT_ASSERT(C != A);
     CPPUNIT_ASSERT(C != B);
-    
+
     CPPUNIT_ASSERT(C.hasOffsetX());
     CPPUNIT_ASSERT(C.hasOffsetY());
     CPPUNIT_ASSERT(C.hasOffsetZ());
-    
+
     CPPUNIT_ASSERT(C.isGreaterX(A));
     CPPUNIT_ASSERT(C.isGreaterY(B));
     CPPUNIT_ASSERT(C.isGreaterZ(B));
@@ -330,12 +330,12 @@ TestHermite::testIO()
 {
     using namespace openvdb;
     using namespace openvdb::math;
-    
+
     std::stringstream
         ss(std::stringstream::in | std::stringstream::out | std::stringstream::binary);
 
     Hermite A, B;
-    
+
     A.setX(0.50f, Vec3s(1.0, 0.0, 0.0));
     A.setY(0.82f, Vec3s(0.0, 1.0, 0.0));
     A.setZ(0.14f, Vec3s(0.0, 0.0, 1.0));
@@ -343,17 +343,17 @@ TestHermite::testIO()
 
     CPPUNIT_ASSERT(A);
     CPPUNIT_ASSERT(!B);
-    
+
     A.write(ss);
 
     B.read(ss);
-    
+
     CPPUNIT_ASSERT(A);
     CPPUNIT_ASSERT(B);
-    
+
     CPPUNIT_ASSERT(A == B);
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -356,15 +356,14 @@ class AdvectionOp
 
 public:
 
-    AdvectionOp(const GridType& velocityGrid, GU_Detail& geo,
-        hvdb::Interrupter& boss, float timeStep, GA_ROHandleF traillen,
-	int steps)
+    AdvectionOp(const GridType& velocityGrid, GU_Detail& geo, hvdb::Interrupter& boss,
+        float timeStep, GA_ROHandleF traillen, int steps)
         : mVelocityGrid(velocityGrid)
         , mCptGrid(NULL)
         , mGeo(geo)
         , mBoss(boss)
         , mTimeStep(timeStep)
-	, mTrailLen(traillen)
+        , mTrailLen(traillen)
         , mSteps(steps)
         , mCptIterations(0)
     {
@@ -411,9 +410,10 @@ public:
                     w[1] = ElementType(p[1]);
                     w[2] = ElementType(p[2]);
 
-		    float timestep = mTimeStep;
-		    if (mTrailLen.isValid())
-			timestep *= mTrailLen.get(i);
+                    float timestep = mTimeStep;
+                    if (mTrailLen.isValid()) {
+                        timestep *= mTrailLen.get(i);
+                    }
 
                     for (int n = 0; n < mSteps; ++n) {
                         integrator.template rungeKutta<IntegrationOrder, VectorType>(timestep, w);
@@ -457,11 +457,11 @@ public:
 
         if (!mParms.mStreamlines) { // Advect points
 
-	    GA_ROHandleF traillen_h(mParms.mOutputGeo, GA_ATTRIB_POINT, "traillen");
+            GA_ROHandleF traillen_h(mParms.mOutputGeo, GA_ATTRIB_POINT, "traillen");
 
             AdvectionOp<GridType, IntegrationOrder, StaggeredVelocity>
-                op(velocityGrid, *mParms.mOutputGeo, mBoss, mParms.mTimeStep, 
-		   traillen_h, mParms.mSteps);
+                op(velocityGrid, *mParms.mOutputGeo, mBoss, mParms.mTimeStep,
+                    traillen_h, mParms.mSteps);
 
             UTparallelFor(
                 GA_SplittableRange(mParms.mOutputGeo->getPointRange(mParms.mPointGroup)), op);
@@ -479,7 +479,7 @@ public:
 
                 if (mBoss.wasInterrupted()) return;
 
-		GA_ROHandleF traillen_h(&geo, GA_ATTRIB_POINT, "traillen");
+                GA_ROHandleF traillen_h(&geo, GA_ATTRIB_POINT, "traillen");
 
                 AdvectionOp<GridType, IntegrationOrder, StaggeredVelocity>
                     op(velocityGrid, geo, mBoss, mParms.mTimeStep, traillen_h, 1);
@@ -844,7 +844,7 @@ SOP_OpenVDBAdvectPoints::evalAdvectionParms(OP_Context& context, AdvectionParms&
         parms.mStaggered =
             parms.mVelPrim->getGrid().getGridClass() == openvdb::GRID_STAGGERED;
 
-        parms.mTimeStep = evalFloat("timeStep", 0, now);
+        parms.mTimeStep = static_cast<float>(evalFloat("timeStep", 0, now));
         parms.mSteps    = evalInt("steps", 0, now);
         // The underlying code will accumulate, so to make it substeps
         // we need to divide out.
@@ -889,6 +889,6 @@ SOP_OpenVDBAdvectPoints::evalAdvectionParms(OP_Context& context, AdvectionParms&
     return true;
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

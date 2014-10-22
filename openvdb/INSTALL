@@ -15,6 +15,7 @@ Requirements
   (Linux: yum install zlib-devel)
 
 - OpenEXR (www.openexr.com), for the 16-bit float Half class in half.h
+  and for .exr file output in vdb_render
 
 - Intel Threading Building Blocks (threadingbuildingblocks.org),
   version 3.0 or later
@@ -28,6 +29,9 @@ Optional:
 
 - CppUnit (www.freedesktop.org/wiki/Software/cppunit), version 1.10 or later
   (Linux: yum install cppunit-devel)
+
+- Houdini HDK (ftp://ftp.sidefx.com/public/Houdini12.0), version 12.0.628
+  or later
 
 - Ghostscript (www.ghostscript.com), version 8.70 or later, for documentation
   in PDF format
@@ -61,20 +65,26 @@ Installation
 
     BOOST_INCL_DIR      the parent directory of the boost/ header directory
                         (e.g., /usr/include)
+    BOOST_LIB_DIR       the directory containing libboost_iostreams, etc.
+    BOOST_LIB           linker flags for libboost_iostreams and libboost_system
+
+    ILMBASE_INCL_DIR    the parent directory of the OpenEXR/ header directory
+                        (which contains half.h)
+    ILMBASE_LIB_DIR     the directory containing libHalf.so and/or libHalf.a
+    ILMBASE_LIB         linker flags for libIlmThread, libIex and libImath
+    HALF_LIB            linker flag(s) for the Half library (e.g., -lHalf)
 
     EXR_INCL_DIR        the parent directory of the OpenEXR/ header directory
-    EXR_LIB_DIR         the directory containing libIlmImf, etc.
-    EXR_LIB             linker flags for libIlmImf, libIlmThread, libIex
-                        and libImath
-
-    HALF_INCL_DIR       the parent directory of the OpenEXR/ header directory
-                        (which contains half.h)
-    HALF_LIB_DIR        the directory containing libHalf.so and/or libHalf.a
-    HALF_LIB            linker flag(s) for the Half library (e.g., -lHalf)
+    EXR_LIB_DIR         the directory containing libIlmImf
+    EXR_LIB             linker flags for libIlmImf
 
     TBB_INCL_DIR        the parent directory of the tbb/ header directory
     TBB_LIB_DIR         the directory containing libtbb
     TBB_LIB             linker flag(s) for the TBB library (e.g., -ltbb)
+
+    BLOSC_INCL_DIR      the parent directory of the blosc.h header
+    BLOSC_LIB_DIR       the directory containing libblosc
+    BLOSC_LIB           linker flags for libblosc
 
     CONCURRENT_MALLOC_LIB_DIR
                         a directory containing a scalable, concurrent malloc
@@ -144,6 +154,14 @@ Installation
     $HDSO, $HFS and $HT.  Source the houdini_setup script provided with
     your Houdini installation to set those environment variables.
 
+    Also note that certain new features in OpenVDB 3 (see the CHANGES file
+    for details) necessitated changes to the ABI of the Grid class,
+    rendering it incompatible with earlier versions of the library,
+    such as the ones in Houdini 12.5 and 13.  Passing grids between native
+    VDB nodes in a scene graph and nodes built against the new ABI
+    will lead to crashes, so if you must use OpenVDB 3 with those versions
+    of Houdini, set abi=2 to compile with the incompatible features disabled.
+
     To build the OpenVDB Python module, you will need local installations of
     Python, Boost.Python, and optionally NumPy.  As of Houdini 12.5, the HDK
     includes versions 2.5 and 2.6 of Python as well as Boost.Python headers.
@@ -159,8 +177,8 @@ Installation
     A default local build generates the following libraries and executables
     (but see the Makefile for additional targets and build options):
 
-    openvdb/libopenvdb.so.2.3.0         the OpenVDB library
-    openvdb/libopenvdb.so               symlink to libopenvdb.so.2.3.0
+    openvdb/libopenvdb.so.3.0.0         the OpenVDB library
+    openvdb/libopenvdb.so               symlink to libopenvdb.so.3.0.0
     openvdb/pyopenvdb.so                the OpenVDB Python module (if Python
                                         and Boost.Python are available)
     openvdb/vdb_print                   command-line tool that prints info
@@ -206,8 +224,8 @@ Installation
                 version.h
         lib/
             libopenvdb.so
-            libopenvdb.so.2.3
-            libopenvdb.so.2.3.0
+            libopenvdb.so.3.0
+            libopenvdb.so.3.0.0
 
         python/
             include/
@@ -216,7 +234,7 @@ Installation
             lib/
                 python$(PYTHON_VERSION)/
                     pyopenvdb.so
-                    pyopenvdb.so.2.3
+                    pyopenvdb.so.3.0
 
         share/
             doc/

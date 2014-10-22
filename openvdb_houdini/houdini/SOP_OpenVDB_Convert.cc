@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -41,6 +41,7 @@
 #include <openvdb/tools/LevelSetUtil.h>
 #include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/tools/VolumeToMesh.h>
+#include <openvdb/tools/Prune.h>
 #include <openvdb/tree/ValueAccessor.h>
 
 #include <CH/CH_Manager.h>
@@ -70,15 +71,20 @@
 #define HAVE_SPLITTING 0
 #endif
 
+#if defined(__GNUC__) && !defined(__INTEL_COMPILER)
+// GA_RWHandleV3 fails to initialize its member variables in some cases.
+#pragma GCC diagnostic ignored "-Wuninitialized"
+#endif
+
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 
 namespace {
 #if HAVE_POLYSOUP
-enum ConvertTo { HVOLUME, OPENVDB, POLYGONS, POLYSOUP, /*SIMDATA*/ };
+enum ConvertTo { HVOLUME, OPENVDB, POLYGONS, POLYSOUP /*, SIMDATA*/ };
 #else
-enum ConvertTo { HVOLUME, OPENVDB, POLYGONS, /*SIMDATA*/ };
+enum ConvertTo { HVOLUME, OPENVDB, POLYGONS /*, SIMDATA*/ };
 #endif
 enum ConvertClass { CLASS_NO_CHANGE, CLASS_SDF, CLASS_FOG_VOLUME };
 }
@@ -216,13 +222,13 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_FLT_J, "isoValue", "Isovalue")
         .setRange(PRM_RANGE_UI, -1.0, PRM_RANGE_UI, 1.0)
         .setHelpText("The crossing point of the VDB values that is considered "
-            "the surface when converting to polygons."));
+            "the surface when converting to polygons"));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "fogisovalue", "Fog Isovalue")
         .setRange(PRM_RANGE_UI, 0.0, PRM_RANGE_UI, 1.0)
         .setDefault(PRMpointFiveDefaults)
         .setHelpText("The crossing point of the VDB values that is considered "
-            "the surface when converting to level sets from fog volumes."));
+            "the surface when converting to level sets from fog volumes"));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "adaptivity", "Adaptivity")
         .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_RESTRICTED, 2.0)
@@ -232,17 +238,17 @@ newSopOperator(OP_OperatorTable* table)
             "polygons to express the surface."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "computenormals", "Compute Vertex Normals")
-        .setHelpText("Computes edge preserving vertex normals."));
+        .setHelpText("Compute edge-preserving vertex normals"));
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "automaticpartitions", "Automatic Partitions")
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 20)
-        .setHelpText("Subdivide volume and mesh into disjoint parts.")
+        .setHelpText("Subdivide volume and mesh into disjoint parts")
         .setDefault(PRMoneDefaults)
         .setCallbackFunc(&checkActivePartCB));
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "activepart", "Active Partition")
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 20)
-        .setHelpText("Specific partition to mesh.")
+        .setHelpText("Specific partition to mesh")
         .setDefault(PRMzeroDefaults)
         .setCallbackFunc(&checkActivePartCB));
 
@@ -267,7 +273,7 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_FLT_J, "edgetolerance", "Edge Tolerance")
         .setDefault(0.5)
         .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_RESTRICTED, 1.0)
-        .setHelpText("Controls the edge adaptivity mask."));
+        .setHelpText("Controls the edge adaptivity mask"));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "surfacegroup", "Surface Group")
         .setDefault("surface_polygons")
@@ -307,26 +313,26 @@ newSopOperator(OP_OperatorTable* table)
         .setHelpText("Enable / disable the surface mask."));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "surfacemaskname", "Surface Mask")
-        .setHelpText("A single level-set or sdf grid whose interior defines the region to mesh.")
+        .setHelpText("A single level-set or sdf grid whose interior defines the region to mesh")
         .setSpareData(&SOP_Node::theThirdInput)
         .setChoiceList(&hutil::PrimGroupMenu));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "surfacemaskoffset", "Mask Offset")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("Isovalue used to offset the interior region of the surface mask.")
+        .setHelpText("Isovalue used to offset the interior region of the surface mask")
         .setRange(PRM_RANGE_UI, -1.0, PRM_RANGE_UI, 1.0));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "invertmask", "Invert Surface Mask")
-        .setHelpText("Used to mesh the complement of the mask."));
+        .setHelpText("Used to mesh the complement of the mask"));
 
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "adaptivityfield", "")
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
-        .setHelpText("Enable / disable the the adaptivity field."));
+        .setHelpText("Enable / disable the the adaptivity field"));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "adaptivityfieldname", "Adaptivity Field")
         .setHelpText(
-            "A single scalar grid used as a spatial multiplier for the adaptivity threshold.")
+            "A single scalar grid used as a spatial multiplier for the adaptivity threshold")
         .setSpareData(&SOP_Node::theThirdInput)
         .setChoiceList(&hutil::PrimGroupMenu));
 
@@ -517,7 +523,7 @@ convertVDBClass(
 
                 tools::MeshToVolume<FloatGrid> vol(transform);
                 vol.convertToLevelSet(points, primitives,
-			LEVEL_SET_HALF_WIDTH, LEVEL_SET_HALF_WIDTH);
+                    LEVEL_SET_HALF_WIDTH, LEVEL_SET_HALF_WIDTH);
 
                 // Set grid and visualization
                 it->setGrid(*vol.distGridPtr());
@@ -546,9 +552,17 @@ void
 copyMesh(
     GU_Detail& detail,
     const GU_PrimVDB* srcvdb,
+#if (UT_VERSION_INT < 0x0c0500F5) // earlier than 12.5.245
+    GA_PrimitiveGroup* /*delgroup*/,
+#else
     GA_PrimitiveGroup* delgroup,
+#endif
     openvdb::tools::VolumeToMesh& mesher,
+#if (UT_VERSION_INT < 0x0c0500F5) // earlier than 12.5.245
+    bool /*toPolySoup*/,
+#else
     bool toPolySoup,
+#endif
     GA_PrimitiveGroup* surfaceGroup = NULL,
     GA_PrimitiveGroup* interiorGroup = NULL,
     GA_PrimitiveGroup* seamGroup = NULL,
@@ -561,17 +575,20 @@ copyMesh(
     const char seamLineFlag = char(openvdb::tools::POLYFLAG_FRACTURE_SEAM);
 
     // Disable adding to seamPointGroup if we don't have pointFlags()
-    if (mesher.pointFlags().size() != mesher.pointListSize())
-	seamPointGroup = NULL;
+    if (mesher.pointFlags().size() != mesher.pointListSize()) {
+        seamPointGroup = NULL;
+    }
 
 #if (UT_VERSION_INT < 0x0c0500F5) // earlier than 12.5.245
-    const GA_Offset lastIdx(detail.getPointMap().lastOffset()+1);
 
+    bool groupSeamPoints = seamPointGroup && !mesher.pointFlags().empty();
+
+    const GA_Offset lastIdx(detail.getNumPoints());
     for (size_t n = 0, N = mesher.pointListSize(); n < N; ++n) {
         GA_Offset ptoff = detail.appendPointOffset();
         detail.setPos3(ptoff, points[n].x(), points[n].y(), points[n].z());
 
-        if (seamPointGroup && mesher.pointFlags()[n]) {
+        if (groupSeamPoints && mesher.pointFlags()[n]) {
             seamPointGroup->addOffset(ptoff);
         }
     }
@@ -638,7 +655,7 @@ copyMesh(
     pthandle.setBlock(startpt, npoints, (UT_Vector3 *)points.get());
 
     // group fracture seam points
-    if (seamPointGroup) {
+    if (seamPointGroup && GA_Size(mesher.pointFlags().size()) == npoints) {
         GA_Offset ptoff = startpt;
         for (GA_Size i = 0; i < npoints; ++i) {
 
@@ -942,7 +959,8 @@ SOP_OpenVDB_Convert::referenceMeshing(
         if (gridClass == openvdb::GRID_LEVEL_SET) {
             converter.convertToLevelSet(pointList, primList);
         } else {
-            const ValueType bandWidth = backgroundValue / transform->voxelSize()[0];
+            const ValueType bandWidth = static_cast<ValueType>(
+                backgroundValue / transform->voxelSize()[0]);
             converter.convertToLevelSet(pointList, primList, bandWidth, bandWidth);
         }
 
@@ -958,7 +976,7 @@ SOP_OpenVDB_Convert::referenceMeshing(
 
     if (sharpenFeatures) {
 
-        const double edgetolerance = double(evalFloat("edgetolerance", 0, time));
+        const float edgetolerance = static_cast<float>(evalFloat("edgetolerance", 0, time));
 
         maskTree = typename BoolTreeType::Ptr(new BoolTreeType(false));
         maskTree->topologyUnion(indexGrid->tree());
@@ -968,7 +986,7 @@ SOP_OpenVDB_Convert::referenceMeshing(
             op(*refGeo, indexGrid->tree(), maskLeafs, edgetolerance);
         op.run();
 
-        maskTree->pruneInactive();
+        openvdb::tools::pruneInactive(*maskTree);
 
         openvdb::tools::dilateVoxels(*maskTree, 2);
 
@@ -1155,7 +1173,8 @@ SOP_OpenVDB_Convert::convertToPoly(
                             openvdb::gridConstPtrCast<openvdb::FloatGrid>(maskIt->getGridPtr());
 
                         mesher.setSurfaceMask(
-                            openvdb::tools::sdfInteriorMask(*grid, maskoffset), invertmask);
+                            openvdb::tools::sdfInteriorMask(*grid, static_cast<float>(maskoffset)),
+                            invertmask);
                     } else {
                         addWarning(SOP_MESSAGE, "Currently only supporting level set masks.");
                     }
@@ -1307,9 +1326,9 @@ SOP_OpenVDB_Convert::cookMySop(OP_Context& context)
         {
             case HVOLUME: {
 #if HAVE_SPLITTING
-		const bool splitDisjointVols = (evalInt("splitdisjointvolumes", 0, t) != 0);
+                const bool splitDisjointVols = (evalInt("splitdisjointvolumes", 0, t) != 0);
 #else
-		const bool splitDisjointVols = false;
+                const bool splitDisjointVols = false;
 #endif
                 convertToVolumes(*gdp, group, splitDisjointVols);
                 break;
@@ -1323,11 +1342,10 @@ SOP_OpenVDB_Convert::cookMySop(OP_Context& context)
                 switch (evalInt("vdbclass", 0, t)) {
                     case CLASS_SDF:
                         convertVDBClass(*gdp, group, openvdb::GRID_LEVEL_SET,
-                            evalFloat("fogisovalue", 0, t));
+                            static_cast<float>(evalFloat("fogisovalue", 0, t)));
                         break;
                     case CLASS_FOG_VOLUME:
-                        convertVDBClass(*gdp, group, openvdb::GRID_FOG_VOLUME,
-			    /*unused*/0);
+                        convertVDBClass(*gdp, group, openvdb::GRID_FOG_VOLUME, /*unused*/0);
                         break;
                     default:
                         // ignore
@@ -1365,6 +1383,6 @@ SOP_OpenVDB_Convert::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

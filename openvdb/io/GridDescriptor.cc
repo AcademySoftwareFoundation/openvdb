@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -30,10 +30,10 @@
 
 #include "GridDescriptor.h"
 
-#include <sstream>
+#include <openvdb/Exceptions.h>
 #include <boost/algorithm/string/predicate.hpp> // for boost::ends_with()
 #include <boost/algorithm/string/erase.hpp> // for boost::erase_last()
-#include <openvdb/Exceptions.h>
+#include <sstream>
 
 
 namespace openvdb {
@@ -211,14 +211,8 @@ GridDescriptor::stringAsUniqueName(const std::string& s)
         std::string::size_type pos = ret.find("[");
         // Replace "[N]" with SEP "N".
         if (pos != std::string::npos) {
-            if (pos != 0 && ret.substr(pos) == "[0]") {
-                // "name[0]" is equivalent to "name", except in the case of
-                // the empty name "[0]".
-                ret.erase(pos);
-            } else {
-                ret.resize(ret.size() - 1); // drop trailing ']'
-                ret.replace(ret.find("["), 1, SEP);
-            }
+            ret.resize(ret.size() - 1); // drop trailing ']'
+            ret.replace(ret.find("["), 1, SEP);
         }
     }
     return ret;
@@ -228,6 +222,6 @@ GridDescriptor::stringAsUniqueName(const std::string& s)
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -73,12 +73,12 @@ public:
     /// value type.
     template <int src_size, typename src_valtype>
     explicit Tuple(Tuple<src_size, src_valtype> const &src) {
-        static const int copyEnd = SIZE < src_size ? SIZE : src_size;
+        enum { COPY_END = (SIZE < src_size ? SIZE : src_size) };
 
-        for (int i = 0; i < copyEnd; ++i) {
+        for (int i = 0; i < COPY_END; ++i) {
             mm[i] = src[i];
         }
-        for (int i = copyEnd; i < SIZE; ++i) {
+        for (int i = COPY_END; i < SIZE; ++i) {
             mm[i] = 0;
         }
     }
@@ -157,7 +157,7 @@ template<int SIZE, typename T0, typename T1>
 bool
 operator<(const Tuple<SIZE, T0>& t0, const Tuple<SIZE, T1>& t1)
 {
-    for (size_t i = 0; i < SIZE-1; ++i) {
+    for (int i = 0; i < SIZE-1; ++i) {
         if (!isExactlyEqual(t0[i], t1[i])) return t0[i] < t1[i];
     }
     return t0[SIZE-1] < t1[SIZE-1];
@@ -169,7 +169,7 @@ template<int SIZE, typename T0, typename T1>
 bool
 operator>(const Tuple<SIZE, T0>& t0, const Tuple<SIZE, T1>& t1)
 {
-    for (size_t i = 0; i < SIZE-1; ++i) {
+    for (int i = 0; i < SIZE-1; ++i) {
         if (!isExactlyEqual(t0[i], t1[i])) return t0[i] > t1[i];
     }
     return t0[SIZE-1] > t1[SIZE-1];
@@ -179,35 +179,14 @@ operator>(const Tuple<SIZE, T0>& t0, const Tuple<SIZE, T1>& t1)
 ////////////////////////////////////////
 
 
-/// Helper class to compute the absolute value of a Tuple
-template<int SIZE, typename T, bool IsInteger>
-struct TupleAbs {
-    static inline Tuple<SIZE, T> absVal(const Tuple<SIZE, T>& t)
-    {
-        Tuple<SIZE, T> result;
-        for (size_t i = 0; i < SIZE; ++i) result[i] = ::fabs(t[i]);
-        return result;
-    }
-};
-
-// Partial specialization for integer types, using abs() instead of fabs()
-template<int SIZE, typename T>
-struct TupleAbs<SIZE, T, /*IsInteger=*/true> {
-    static inline Tuple<SIZE, T> absVal(const Tuple<SIZE, T>& t)
-    {
-        Tuple<SIZE, T> result;
-        for (size_t i = 0; i < SIZE; ++i) result[i] = ::abs(t[i]);
-        return result;
-    }
-};
-
-
 /// @return the absolute value of the given Tuple.
 template<int SIZE, typename T>
 Tuple<SIZE, T>
 Abs(const Tuple<SIZE, T>& t)
 {
-    return TupleAbs<SIZE, T, boost::is_integral<T>::value>::absVal(t);
+    Tuple<SIZE, T> result;
+    for (int i = 0; i < SIZE; ++i) result[i] = math::Abs(t[i]);
+    return result;
 }
 
 
@@ -228,6 +207,6 @@ std::ostream& operator<<(std::ostream& ostr, const Tuple<SIZE, T>& classname)
 
 #endif // OPENVDB_MATH_TUPLE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

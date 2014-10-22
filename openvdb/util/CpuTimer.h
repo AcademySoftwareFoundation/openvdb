@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -40,7 +40,7 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace util {
 
-/// @brief Simple timer for basic profiling.   
+/// @brief Simple timer for basic profiling.
 /// @code
 ///    Cputimer timer;
 ///    timer.start("My algorithm");
@@ -50,7 +50,7 @@ namespace util {
 class CpuTimer
 {
 public:
-    
+
     /// @brief Initiate timer
     CpuTimer() : mT0(tbb::tick_count::now()) {}
 
@@ -64,6 +64,14 @@ public:
     {
         std::cerr << msg << " ... ";
         this->start();
+    }
+
+    /// @brief Stops previous timer, print message and re-start timer.
+    /// @note Should normally be followed by a call to stop()
+    inline void restart(const std::string& msg)
+    {
+        this->stop();
+        this->start(msg);
     }
 
     /// Return Time diference in milliseconds since construction or start was called.
@@ -83,7 +91,7 @@ public:
     }
 
 private:
-    
+
     tbb::tick_count mT0;
 };// CpuTimer
 
@@ -91,9 +99,9 @@ private:
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-    
+
 #endif // OPENVDB_UTIL_CPUTIMER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

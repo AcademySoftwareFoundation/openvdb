@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -36,8 +36,6 @@
 #ifdef DWA_OPENVDB
 #include <logging_base/logging.h>
 #include <usagetrack.h>
-#elif defined(OPENVDB_USE_LOG4CPLUS)
-#include <log4cplus/configurator.h>
 #endif
 
 
@@ -70,11 +68,11 @@ sizeAsString(openvdb::Index64 n, const std::string& units)
     if (n < 1000) {
         ostr << n;
     } else if (n < 1000000) {
-        ostr << (n / 1.0e3) << "K";
+        ostr << (double(n) / 1.0e3) << "K";
     } else if (n < 1000000000) {
-        ostr << (n / 1.0e6) << "M";
+        ostr << (double(n) / 1.0e6) << "M";
     } else {
-        ostr << (n / 1.0e9) << "G";
+        ostr << (double(n) / 1.0e9) << "G";
     }
     ostr << units;
     return ostr.str();
@@ -87,11 +85,11 @@ bytesAsString(openvdb::Index64 n)
     std::ostringstream ostr;
     ostr << std::setprecision(3);
     if (n >> 30) {
-        ostr << (n / double(uint64_t(1) << 30)) << "GB";
+        ostr << (double(n) / double(uint64_t(1) << 30)) << "GB";
     } else if (n >> 20) {
-        ostr << (n / double(uint64_t(1) << 20)) << "MB";
+        ostr << (double(n) / double(uint64_t(1) << 20)) << "MB";
     } else if (n >> 10) {
-        ostr << (n / double(uint64_t(1) << 10)) << "KB";
+        ostr << (double(n) / double(uint64_t(1) << 10)) << "KB";
     } else {
         ostr << n << "B";
     }
@@ -104,27 +102,6 @@ coordAsString(const openvdb::Coord ijk, const std::string& sep)
 {
     std::ostringstream ostr;
     ostr << ijk[0] << sep << ijk[1] << sep << ijk[2];
-    return ostr.str();
-}
-
-
-/// Return a string representation of the given metadata key, value pairs
-std::string
-metadataAsString(
-    const openvdb::MetaMap::ConstMetaIterator& begin,
-    const openvdb::MetaMap::ConstMetaIterator& end,
-    const std::string& indent = "")
-{
-    std::ostringstream ostr;
-    char sep[2] = { 0, 0 };
-    for (openvdb::MetaMap::ConstMetaIterator it = begin; it != end; ++it) {
-        ostr << sep << indent << it->first;
-        if (it->second) {
-            const std::string value = it->second->str();
-            if (!value.empty()) ostr << ": " << value;
-        }
-        sep[0] = '\n';
-    }
     return ostr.str();
 }
 
@@ -176,7 +153,7 @@ printLongListing(const StringVec& filenames)
         // Print file-level metadata.
         std::cout << "VDB version: " << version << "\n";
         if (meta) {
-            std::string str = metadataAsString(meta->beginMeta(), meta->endMeta());
+            std::string str = meta->str();
             if (!str.empty()) std::cout << str << "\n";
         }
         std::cout << "\n";
@@ -187,7 +164,7 @@ printLongListing(const StringVec& filenames)
             if (openvdb::GridBase::ConstPtr grid = *it) {
                 if (!firstGrid) std::cout << "\n\n";
                 std::cout << "Name: " << grid->getName() << std::endl;
-                grid->print(std::cout, /*verboseLevel=*/3);
+                grid->print(std::cout, /*verboseLevel=*/11);
                 firstGrid = false;
             }
         }
@@ -228,7 +205,7 @@ printShortListing(const StringVec& filenames, bool metadata)
 
         if (metadata) {
             // Print file-level metadata.
-            std::string str = metadataAsString(meta->beginMeta(), meta->endMeta(), indent);
+            std::string str = meta->str(indent);
             if (!str.empty()) std::cout << str << "\n";
         }
 
@@ -246,8 +223,8 @@ printShortListing(const StringVec& filenames, bool metadata)
             std::string
                 boxStr = coordAsString(bbox.min()," ") + "  " + coordAsString(bbox.max()," "),
                 dimStr = coordAsString(bbox.extents(), "x");
-            boxStr += std::string(std::max<int>(1,
-                40 - boxStr.size() - dimStr.size()), ' ') + dimStr;
+            boxStr += std::string(
+                std::max(1, int(40 - boxStr.size() - dimStr.size())), ' ') + dimStr;
             std::cout << " " << std::left << std::setw(40) << boxStr;
 
             // Print the number of active voxels.
@@ -269,7 +246,7 @@ printShortListing(const StringVec& filenames, bool metadata)
                 // Print local and world transforms.
                 grid->transform().print(std::cout, indent2);
                 // Print custom metadata.
-                str = metadataAsString(grid->beginMeta(), grid->endMeta(), indent2);
+                str = grid->str(indent2);
                 if (!str.empty()) std::cout << str << "\n";
                 std::cout << std::flush;
             }
@@ -286,8 +263,6 @@ main(int argc, char *argv[])
 #ifdef DWA_OPENVDB
     USAGETRACK_report_basic_tool_usage(argc, argv, /*duration=*/0);
     logging_base::configure(argc, argv);
-#elif defined(OPENVDB_USE_LOG4CPLUS)
-    log4cplus::BasicConfigurator::doConfigure();
 #endif
 
     OPENVDB_START_THREADSAFE_STATIC_WRITE
@@ -357,6 +332,6 @@ main(int argc, char *argv[])
     return exitStatus;
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

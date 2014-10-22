@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -74,8 +74,6 @@ TestDivergence::testDivergenceTool()
 {
     using namespace openvdb;
 
-    typedef VectorGrid::ConstAccessor Accessor;
-
     VectorGrid::Ptr inGrid = VectorGrid::create();
     VectorTree& inTree = inGrid->tree();
     CPPUNIT_ASSERT(inTree.empty());
@@ -84,7 +82,8 @@ TestDivergence::testDivergenceTool()
     for (int x = -dim; x<dim; ++x) {
         for (int y = -dim; y<dim; ++y) {
             for (int z = -dim; z<dim; ++z) {
-                inTree.setValue(Coord(x,y,z),VectorTree::ValueType(x,y,0));
+                inTree.setValue(Coord(x,y,z),
+                    VectorTree::ValueType(float(x), float(y), 0.f));
             }
         }
     }
@@ -120,8 +119,6 @@ TestDivergence::testDivergenceMaskedTool()
 {
     using namespace openvdb;
 
-    typedef VectorGrid::ConstAccessor Accessor;
-
     VectorGrid::Ptr inGrid = VectorGrid::create();
     VectorTree& inTree = inGrid->tree();
     CPPUNIT_ASSERT(inTree.empty());
@@ -130,7 +127,8 @@ TestDivergence::testDivergenceMaskedTool()
     for (int x = -dim; x<dim; ++x) {
         for (int y = -dim; y<dim; ++y) {
             for (int z = -dim; z<dim; ++z) {
-                inTree.setValue(Coord(x,y,z),VectorTree::ValueType(x,y,0));
+                inTree.setValue(Coord(x,y,z),
+                    VectorTree::ValueType(float(x), float(y), 0.f));
             }
         }
     }
@@ -178,8 +176,6 @@ TestDivergence::testStaggeredDivergence()
 
     using namespace openvdb;
 
-    typedef VectorGrid::ConstAccessor Accessor;
-
     VectorGrid::Ptr inGrid = VectorGrid::create();
     inGrid->setGridClass( GRID_STAGGERED );
     VectorTree& inTree = inGrid->tree();
@@ -189,7 +185,8 @@ TestDivergence::testStaggeredDivergence()
     for (int x = -dim; x<dim; ++x) {
         for (int y = -dim; y<dim; ++y) {
             for (int z = -dim; z<dim; ++z) {
-                inTree.setValue(Coord(x,y,z),VectorTree::ValueType(x,y,z));
+                inTree.setValue(Coord(x,y,z),
+                    VectorTree::ValueType(float(x), float(y), float(z)));
             }
         }
     }
@@ -234,7 +231,8 @@ TestDivergence::testISDivergence()
     for (int x = -dim; x<dim; ++x) {
         for (int y = -dim; y<dim; ++y) {
             for (int z = -dim; z<dim; ++z) {
-                inTree.setValue(Coord(x,y,z),VectorTree::ValueType(x,y,0));
+                inTree.setValue(Coord(x,y,z),
+                    VectorTree::ValueType(float(x), float(y), 0.f));
             }
         }
     }
@@ -323,8 +321,6 @@ TestDivergence::testISDivergenceStencil()
 {
     using namespace openvdb;
 
-    typedef VectorGrid::ConstAccessor Accessor;
-
     VectorGrid::Ptr inGrid = VectorGrid::create();
     VectorTree& inTree = inGrid->tree();
     CPPUNIT_ASSERT(inTree.empty());
@@ -333,7 +329,8 @@ TestDivergence::testISDivergenceStencil()
     for (int x = -dim; x<dim; ++x) {
         for (int y = -dim; y<dim; ++y) {
             for (int z = -dim; z<dim; ++z) {
-                inTree.setValue(Coord(x,y,z),VectorTree::ValueType(x,y,0));
+                inTree.setValue(Coord(x,y,z),
+                    VectorTree::ValueType(float(x), float(y), 0.f));
             }
         }
     }
@@ -442,7 +439,7 @@ TestDivergence::testWSDivergence()
                 for (int z = -dim; z<dim; ++z) {
                     Vec3d location = inGrid->indexToWorld(Vec3d(x,y,z));
                     inTree.setValue(Coord(x,y,z),
-                        VectorTree::ValueType(location.x(), location.y(), 0));
+                        VectorTree::ValueType(float(location.x()), float(location.y()), 0.f));
                 }
             }
         }
@@ -524,7 +521,7 @@ TestDivergence::testWSDivergence()
                 for (int z = -dim; z<dim; ++z) {
                     Vec3d location = inGrid->indexToWorld(Vec3d(x,y,z));
                     inTree.setValue(Coord(x,y,z),
-                        VectorTree::ValueType(location.x(), location.y(), 0));
+                        VectorTree::ValueType(float(location.x()), float(location.y()), 0.f));
                 }
             }
         }
@@ -569,8 +566,6 @@ TestDivergence::testWSDivergenceStencil()
 {
     using namespace openvdb;
 
-    typedef VectorGrid::ConstAccessor Accessor;
-
     { // non-unit voxel size
         double voxel_size = 0.5;
         VectorGrid::Ptr inGrid = VectorGrid::create();
@@ -585,7 +580,7 @@ TestDivergence::testWSDivergenceStencil()
                 for (int z = -dim; z<dim; ++z) {
                     Vec3d location = inGrid->indexToWorld(Vec3d(x,y,z));
                     inTree.setValue(Coord(x,y,z),
-                        VectorTree::ValueType(location.x(), location.y(), 0));
+                        VectorTree::ValueType(float(location.x()), float(location.y()), 0.f));
                 }
             }
         }
@@ -671,7 +666,7 @@ TestDivergence::testWSDivergenceStencil()
                 for (int z = -dim; z<dim; ++z) {
                     Vec3d location = inGrid->indexToWorld(Vec3d(x,y,z));
                     inTree.setValue(Coord(x,y,z),
-                        VectorTree::ValueType(location.x(), location.y(), 0));
+                        VectorTree::ValueType(float(location.x()), float(location.y()), 0.f));
                 }
             }
         }
@@ -710,6 +705,6 @@ TestDivergence::testWSDivergenceStencil()
     }
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

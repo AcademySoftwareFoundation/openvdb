@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -37,9 +37,12 @@
 #include <openvdb/math/Operators.h> // for ISGradient
 #include <openvdb/tools/Morphology.h> // for dilateVoxels()
 #include <openvdb/tree/LeafManager.h>
+#include "Prune.h" // for pruneInactive
 
 #include <boost/scoped_array.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <boost/type_traits/is_scalar.hpp>
+#include <boost/utility/enable_if.hpp>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
@@ -69,8 +72,10 @@ namespace tools {
 /// @param points   output list of world space points
 /// @param quads    output quad index list
 /// @param isovalue determines which isosurface to mesh
+///
+/// @throw TypeError if @a grid does not have a scalar value type
 template<typename GridType>
-void
+inline void
 volumeToMesh(
     const GridType& grid,
     std::vector<Vec3s>& points,
@@ -86,8 +91,10 @@ volumeToMesh(
 /// @param quads        output quad index list
 /// @param isovalue     determines which isosurface to mesh
 /// @param adaptivity   surface adaptivity threshold [0 to 1]
+///
+/// @throw TypeError if @a grid does not have a scalar value type
 template<typename GridType>
-void
+inline void
 volumeToMesh(
     const GridType& grid,
     std::vector<Vec3s>& points,
@@ -551,7 +558,11 @@ isPlanarQuad(
 /// @{
 /// @brief  Utility methods for point quantization.
 
-enum { MASK_FIRST_10_BITS = 0x000003FF, MASK_DIRTY_BIT = 0x80000000, MASK_INVALID_BIT = 0x40000000 };
+enum {
+    MASK_FIRST_10_BITS = 0x000003FF,
+    MASK_DIRTY_BIT =     0x80000000,
+    MASK_INVALID_BIT =   0x40000000
+};
 
 inline uint32_t
 packPoint(const Vec3d& v)
@@ -610,7 +621,7 @@ evalCellSigns(const AccessorT& accessor, const Coord& ijk, typename AccessorT::V
     if (accessor.getValue(coord) < iso) signs |= 64u;
     coord[0] = ijk[0]; // i, j+1, k+1
     if (accessor.getValue(coord) < iso) signs |= 128u;
-    return signs;
+    return uint8_t(signs);
 }
 
 
@@ -659,22 +670,22 @@ correctCellSigns(unsigned char& signs, unsigned char face,
 {
     if (face == 1) {
         ijk[2] -= 1;
-        if (sAmbiguousFace[evalCellSigns(acc, ijk, iso)] == 3) signs = ~signs;
+        if (sAmbiguousFace[evalCellSigns(acc, ijk, iso)] == 3) signs = uint8_t(~signs);
     } else if (face == 3) {
         ijk[2] += 1;
-        if (sAmbiguousFace[evalCellSigns(acc, ijk, iso)] == 1) signs = ~signs;
+        if (sAmbiguousFace[evalCellSigns(acc, ijk, iso)] == 1) signs = uint8_t(~signs);
     } else if (face == 2) {
         ijk[0] += 1;
-        if (sAmbiguousFace[evalCellSigns(acc, ijk, iso)] == 4) signs = ~signs;
+        if (sAmbiguousFace[evalCellSigns(acc, ijk, iso)] == 4) signs = uint8_t(~signs);
     } else if (face == 4) {
         ijk[0] -= 1;
-        if (sAmbiguousFace[evalCellSigns(acc, ijk, iso)] == 2) signs = ~signs;
+        if (sAmbiguousFace[evalCellSigns(acc, ijk, iso)] == 2) signs = uint8_t(~signs);
     } else if (face == 5) {
         ijk[1] -= 1;
-        if (sAmbiguousFace[evalCellSigns(acc, ijk, iso)] == 6) signs = ~signs;
+        if (sAmbiguousFace[evalCellSigns(acc, ijk, iso)] == 6) signs = uint8_t(~signs);
     } else if (face == 6) {
         ijk[1] += 1;
-        if (sAmbiguousFace[evalCellSigns(acc, ijk, iso)] == 5) signs = ~signs;
+        if (sAmbiguousFace[evalCellSigns(acc, ijk, iso)] == 5) signs = uint8_t(~signs);
     }
 }
 
@@ -853,7 +864,7 @@ mergeVoxels(LeafType& leaf, const Coord& start, int dim, int regionId)
 // thinking that it is a constructor.
 template <class LeafType>
 inline bool
-isMergable(LeafType& leaf, const Coord& start, int dim,
+isMergeable(LeafType& leaf, const Coord& start, int dim,
     typename LeafType::ValueType::value_type adaptivity)
 {
     if (adaptivity < 1e-6) return false;
@@ -1022,7 +1033,7 @@ SignData<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size_t>& rang
                 face = internal::sAmbiguousFace[signs];
                 if (face != 0) correctCellSigns(signs, face, mDistAcc, ijk, mIsovalue);
 
-                flags |= Int16(signs);
+                flags = Int16(flags | Int16(signs));
 
                 signLeafPt->setValue(ijk, flags);
                 collectedData = true;
@@ -1094,7 +1105,7 @@ public:
             mSignAcc.probeConstLeaf(leaf.origin());
 
         for (; iter; ++iter) {
-            iter.setValue(ptnIdx);
+            iter.setValue(static_cast<typename LeafNodeType::ValueType>(ptnIdx));
             unsigned signs = SIGNS & signLeafPt->getValue(iter.pos());
             ptnIdx += size_t(sEdgeGroupTable[signs][0]);
         }
@@ -1572,7 +1583,7 @@ computeCellPoints(std::vector<Vec3d>& points,
     const std::vector<double>& values, unsigned char signs, double iso)
 {
     for (size_t n = 1, N = sEdgeGroupTable[signs][0] + 1; n < N; ++n) {
-        points.push_back(computePoint(values, signs, n, iso));
+        points.push_back(computePoint(values, signs, uint8_t(n), iso));
     }
 }
 
@@ -1606,11 +1617,11 @@ computeCellPoints(std::vector<Vec3d>& points, std::vector<bool>& weightedPointMa
 {
     for (size_t n = 1, N = sEdgeGroupTable[lhsSigns][0] + 1; n < N; ++n) {
 
-        int id = matchEdgeGroup(n, lhsSigns, rhsSigns);
+        int id = matchEdgeGroup(uint8_t(n), lhsSigns, rhsSigns);
 
         if (id != -1) {
 
-            const unsigned char e(id);
+            const unsigned char e = uint8_t(id);
             uint32_t& quantizedPoint = seamPoints[pointIdx + (id - 1)];
 
             if ((quantizedPoint & MASK_DIRTY_BIT) && !(quantizedPoint & MASK_INVALID_BIT)) {
@@ -1623,7 +1634,7 @@ computeCellPoints(std::vector<Vec3d>& points, std::vector<bool>& weightedPointMa
             }
 
         } else {
-            points.push_back(computePoint(lhsValues, lhsSigns, n, iso));
+            points.push_back(computePoint(lhsValues, lhsSigns, uint8_t(n), iso));
             weightedPointMask.push_back(false);
         }
     }
@@ -1714,8 +1725,12 @@ GenPoints<TreeT, LeafManagerT>::run(bool threaded)
 
 template <typename TreeT, typename LeafManagerT>
 void
-GenPoints<TreeT, LeafManagerT>::setRefData(const Int16TreeT *refSignTree, const TreeT *refDistTree,
-    IntTreeT* refIdxTree, const QuantizedPointList* seamPoints, std::vector<unsigned char>* seamPointMask)
+GenPoints<TreeT, LeafManagerT>::setRefData(
+    const Int16TreeT *refSignTree,
+    const TreeT *refDistTree,
+    IntTreeT* refIdxTree,
+    const QuantizedPointList* seamPoints,
+    std::vector<unsigned char>* seamPointMask)
 {
     mRefSignTreePt = refSignTree;
     mRefDistTreePt = refDistTree;
@@ -1727,8 +1742,7 @@ GenPoints<TreeT, LeafManagerT>::setRefData(const Int16TreeT *refSignTree, const 
 
 template <typename TreeT, typename LeafManagerT>
 void
-GenPoints<TreeT, LeafManagerT>::operator()(
-    const tbb::blocked_range<size_t>& range) const
+GenPoints<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size_t>& range) const
 {
     typename IntTreeT::LeafNodeType::ValueOnIter iter;
     unsigned char signs, refSigns;
@@ -1781,7 +1795,7 @@ GenPoints<TreeT, LeafManagerT>::operator()(
 
             if(iter.getValue() != 0) continue;
 
-            iter.setValue(ptnIdx);
+            iter.setValue(static_cast<typename IntTreeT::ValueType>(ptnIdx));
             iter.setValueOff();
             offset = iter.pos();
             ijk = iter.getCoord();
@@ -1789,12 +1803,12 @@ GenPoints<TreeT, LeafManagerT>::operator()(
             const bool inclusiveCell = ijk[0] < coord[0] && ijk[1] < coord[1] && ijk[2] < coord[2];
 
             const Int16& flags = mSignLeafs.leaf(n).getValue(offset);
-            signs    = SIGNS & flags;
+            signs    = uint8_t(SIGNS & flags);
             refSigns = 0;
 
             if ((flags & SEAM) && refSignLeafPt && refIdxLeafPt) {
                 if (refSignLeafPt->isValueOn(offset)) {
-                    refSigns = (SIGNS & refSignLeafPt->getValue(offset));
+                    refSigns = uint8_t(SIGNS & refSignLeafPt->getValue(offset));
                 }
             }
 
@@ -1852,14 +1866,14 @@ GenPoints<TreeT, LeafManagerT>::operator()(
             for (; iter; ++iter) {
                 if (iter.getValue() != regionId) continue;
 
-                iter.setValue(ptnIdx);
+                iter.setValue(static_cast<typename IntTreeT::ValueType>(ptnIdx));
                 iter.setValueOff();
                 --onVoxelCount;
 
                 ijk = iter.getCoord();
                 offset = iter.pos();
 
-                signs = (SIGNS & mSignLeafs.leaf(n).getValue(offset));
+                signs = uint8_t(SIGNS & mSignLeafs.leaf(n).getValue(offset));
 
                 if (ijk[0] < coord[0] && ijk[1] < coord[1] && ijk[2] < coord[2]) {
                     collectCornerValues(*leafPt, offset, values);
@@ -1975,8 +1989,8 @@ SeamWeights<TreeT>::operator()(LeafNodeType &signLeaf, size_t /*leafIndex*/) con
 
         if ((iter.getValue() & SEAM) && refSignLeafPt->isValueOn(offset)) {
 
-            lhsSigns = SIGNS & iter.getValue();
-            rhsSigns = SIGNS & refSignLeafPt->getValue(offset);
+            lhsSigns = uint8_t(SIGNS & iter.getValue());
+            rhsSigns = uint8_t(SIGNS & refSignLeafPt->getValue(offset));
 
 
             if (inclusiveCell) {
@@ -1988,7 +2002,7 @@ SeamWeights<TreeT>::operator()(LeafNodeType &signLeaf, size_t /*leafIndex*/) con
 
             for (size_t n = 1, N = sEdgeGroupTable[lhsSigns][0] + 1; n < N; ++n) {
 
-                int id = matchEdgeGroup(n, lhsSigns, rhsSigns);
+                int id = matchEdgeGroup(uint8_t(n), lhsSigns, rhsSigns);
 
                 if (id != -1) {
 
@@ -1996,7 +2010,8 @@ SeamWeights<TreeT>::operator()(LeafNodeType &signLeaf, size_t /*leafIndex*/) con
 
                     if (!(data & MASK_DIRTY_BIT)) {
 
-                        int smaples = computeMaskedPoint(point, values, lhsSigns, rhsSigns, n, mIsovalue);
+                        int smaples = computeMaskedPoint(
+                            point, values, lhsSigns, rhsSigns, uint8_t(n), mIsovalue);
 
                         if (smaples > 0) data = packPoint(point);
                         else data = MASK_INVALID_BIT;
@@ -2224,7 +2239,7 @@ MergeVoxelRegions<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size
 
 
             int flags = int(iter.getValue());
-            unsigned char signs = SIGNS & flags;
+            unsigned char signs = uint8_t(SIGNS & flags);
             if ((flags & SEAM) || !sAdaptable[signs] || sEdgeGroupTable[signs][0] > 1) {
                 mask.setActiveState(coord, true);
                 continue;
@@ -2232,7 +2247,7 @@ MergeVoxelRegions<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size
 
             for (int i = 0; i < 26; ++i) {
                 nijk = ijk + util::COORD_OFFSETS[i];
-                signs = SIGNS & mSignAcc.getValue(nijk);
+                signs = uint8_t(SIGNS & mSignAcc.getValue(nijk));
                 if (!sAdaptable[signs] || sEdgeGroupTable[signs][0] > 1) {
                     mask.setActiveState(coord, true);
                     break;
@@ -2281,7 +2296,9 @@ MergeVoxelRegions<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size
                 for (ijk[2] = 0; ijk[2] < LeafDim; ijk[2] += dim) {
                     coord[2] = ijk[2] - (ijk[2] % next_dim);
                     adaptivity = adaptivityLeaf.getValue(ijk);
-                    if (mask.isValueOn(ijk) || !isMergable(gradientBuffer, ijk, dim, adaptivity)) {
+                    if (mask.isValueOn(ijk)
+                        || !isMergeable(gradientBuffer, ijk, dim, adaptivity))
+                    {
                         mask.setActiveState(coord, true);
                         continue;
                     }
@@ -2302,7 +2319,7 @@ MergeVoxelRegions<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size
                     for (ijk[2] = origin[2]; ijk[2] < end[2]; ijk[2] += dim) {
                         adaptivity = adaptivityLeaf.getValue(ijk);
                         if (mask.isValueOn(ijk) || isNonManifold(mDistAcc, ijk, mIsovalue, dim) ||
-                            !isMergable(gradientBuffer, ijk, dim, adaptivity))
+                            !isMergeable(gradientBuffer, ijk, dim, adaptivity))
                         {
                             mask.setActiveState(coord, true);
                             continue;
@@ -2315,7 +2332,7 @@ MergeVoxelRegions<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size
 
         adaptivity = adaptivityLeaf.getValue(origin);
         if (!(mask.isValueOn(origin) || isNonManifold(mDistAcc, origin, mIsovalue, LeafDim))
-            && isMergable(gradientBuffer, origin, LeafDim, adaptivity))
+            && isMergeable(gradientBuffer, origin, LeafDim, adaptivity))
         {
             mergeVoxels(idxLeaf, origin, LeafDim, regionId++);
         }
@@ -2489,7 +2506,7 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord
         coord[2] = ijk[2];
 
         quad[1] = idxAcc.getValue(coord);
-        cell = SIGNS & signAcc.getValue(coord);
+        cell = uint8_t(SIGNS & signAcc.getValue(coord));
         if (sEdgeGroupTable[cell][0] > 1) {
             tmpIdx = quad[1] + Index32(sEdgeGroupTable[cell][5] - 1);
             if (tmpIdx < pointListSize) quad[1] = tmpIdx;
@@ -2499,7 +2516,7 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord
         coord[2] -= 1;
 
         quad[2] = idxAcc.getValue(coord);
-        cell = SIGNS & signAcc.getValue(coord);
+        cell = uint8_t(SIGNS & signAcc.getValue(coord));
         if (sEdgeGroupTable[cell][0] > 1) {
             tmpIdx = quad[2] + Index32(sEdgeGroupTable[cell][7] - 1);
             if (tmpIdx < pointListSize) quad[2] = tmpIdx;
@@ -2509,7 +2526,7 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord
         coord[1] = ijk[1];
 
         quad[3] = idxAcc.getValue(coord);
-        cell = SIGNS & signAcc.getValue(coord);
+        cell = uint8_t(SIGNS & signAcc.getValue(coord));
         if (sEdgeGroupTable[cell][0] > 1) {
             tmpIdx = quad[3] + Index32(sEdgeGroupTable[cell][3] - 1);
             if (tmpIdx < pointListSize) quad[3] = tmpIdx;
@@ -2532,7 +2549,7 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord
         coord[2] = ijk[2] - 1;
 
         quad[1] = idxAcc.getValue(coord);
-        cell = SIGNS & signAcc.getValue(coord);
+        cell = uint8_t(SIGNS & signAcc.getValue(coord));
         if (sEdgeGroupTable[cell][0] > 1) {
             tmpIdx = quad[1] + Index32(sEdgeGroupTable[cell][12] - 1);
             if (tmpIdx < pointListSize) quad[1] = tmpIdx;
@@ -2542,7 +2559,7 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord
         coord[0] -= 1;
 
         quad[2] = idxAcc.getValue(coord);
-        cell = SIGNS & signAcc.getValue(coord);
+        cell = uint8_t(SIGNS & signAcc.getValue(coord));
         if (sEdgeGroupTable[cell][0] > 1) {
             tmpIdx = quad[2] + Index32(sEdgeGroupTable[cell][11] - 1);
             if (tmpIdx < pointListSize) quad[2] = tmpIdx;
@@ -2552,7 +2569,7 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord
         coord[2] = ijk[2];
 
         quad[3] = idxAcc.getValue(coord);
-        cell = SIGNS & signAcc.getValue(coord);
+        cell = uint8_t(SIGNS & signAcc.getValue(coord));
         if (sEdgeGroupTable[cell][0] > 1) {
             tmpIdx = quad[3] + Index32(sEdgeGroupTable[cell][10] - 1);
             if (tmpIdx < pointListSize) quad[3] = tmpIdx;
@@ -2574,7 +2591,7 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord
         coord[2] = ijk[2];
 
         quad[1] = idxAcc.getValue(coord);
-        cell = SIGNS & signAcc.getValue(coord);
+        cell = uint8_t(SIGNS & signAcc.getValue(coord));
         if (sEdgeGroupTable[cell][0] > 1) {
             tmpIdx = quad[1] + Index32(sEdgeGroupTable[cell][8] - 1);
             if (tmpIdx < pointListSize) quad[1] = tmpIdx;
@@ -2584,7 +2601,7 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord
         coord[0] -= 1;
 
         quad[2] = idxAcc.getValue(coord);
-        cell = SIGNS & signAcc.getValue(coord);
+        cell = uint8_t(SIGNS & signAcc.getValue(coord));
         if (sEdgeGroupTable[cell][0] > 1) {
             tmpIdx = quad[2] + Index32(sEdgeGroupTable[cell][6] - 1);
             if (tmpIdx < pointListSize) quad[2] = tmpIdx;
@@ -2594,7 +2611,7 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord
         coord[1] = ijk[1];
 
         quad[3] = idxAcc.getValue(coord);
-        cell = SIGNS & signAcc.getValue(coord);
+        cell = uint8_t(SIGNS & signAcc.getValue(coord));
         if (sEdgeGroupTable[cell][0] > 1) {
             tmpIdx = quad[3] + Index32(sEdgeGroupTable[cell][2] - 1);
             if (tmpIdx < pointListSize) quad[3] = tmpIdx;
@@ -2734,7 +2751,7 @@ GenPolygons<LeafManagerT, PrimBuilder>::operator()(
             offsets[1] = 0;
             offsets[2] = 0;
 
-            const unsigned char cell = (SIGNS & flags);
+            const unsigned char cell = uint8_t(SIGNS & flags);
 
             if (sEdgeGroupTable[cell][0] > 1) {
                 offsets[0] = (sEdgeGroupTable[cell][1] - 1);
@@ -2743,9 +2760,11 @@ GenPolygons<LeafManagerT, PrimBuilder>::operator()(
             }
 
             if (ijk[0] > origin[0] && ijk[1] > origin[1] && ijk[2] > origin[2]) {
-                constructPolygons(flags, refFlags, offsets, ijk, *signleafPt, *idxLeafPt, mesher, mPointListSize);
+                constructPolygons(flags, refFlags, offsets, ijk,
+                    *signleafPt, *idxLeafPt, mesher, mPointListSize);
             } else {
-                constructPolygons(flags, refFlags, offsets, ijk, signAcc, idxAcc, mesher, mPointListSize);
+                constructPolygons(flags, refFlags, offsets, ijk,
+                    signAcc, idxAcc, mesher, mPointListSize);
             }
         }
 
@@ -2939,10 +2958,10 @@ GenSeamMask<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size_t>& r
 
             ijk = it.getCoord();
 
-            unsigned char rhsSigns = acc.getValue(ijk) & SIGNS;
+            unsigned char rhsSigns = uint8_t(acc.getValue(ijk) & SIGNS);
 
             if (sEdgeGroupTable[rhsSigns][0] > 0) {
-                unsigned char lhsSigns = it.getValue() & SIGNS;
+                unsigned char lhsSigns = uint8_t(it.getValue() & SIGNS);
                 if (rhsSigns != lhsSigns) {
                     maskAcc.setValueOn(ijk);
                 }
@@ -4160,7 +4179,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
                 if (mPartitions > 1) { // Partition
                     tree::LeafManager<BoolTreeT> leafs(valueMask);
                     leafs.foreach(internal::PartOp(leafs.leafCount() , mPartitions, mActivePart));
-                    valueMask.pruneInactive();
+                    tools::pruneInactive(valueMask);
                 }
 
             } else { // Partition
@@ -4228,7 +4247,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
 
     // Collect auxiliary data from active tiles
-    internal::tileData(distTree, *signTreePt, *idxTreePt, isovalue);
+    internal::tileData(distTree, *signTreePt, *idxTreePt, static_cast<double>(isovalue));
 
     // Optionally collect auxiliary data from a reference level set.
     Int16TreeT *refSignTreePt = NULL;
@@ -4414,7 +4433,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
         std::vector<unsigned> indexMap(mPointListSize);
         size_t usedPointCount = 0;
         for (size_t p = 0; p < mPointListSize; ++p) {
-            if (usedPointMask[p]) indexMap[p] = usedPointCount++;
+            if (usedPointMask[p]) indexMap[p] = static_cast<unsigned>(usedPointCount++);
         }
 
         if (usedPointCount < mPointListSize) {
@@ -4501,7 +4520,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
                         Vec3I& triangle = tmpPolygons.triangle(triangleIdx);
 
                         triangle[0] = quad[0];
-                        triangle[1] = pointIdx;
+                        triangle[1] = static_cast<unsigned>(pointIdx);
                         triangle[2] = quad[3];
 
                         tmpPolygons.triangleFlags(triangleIdx) = quadFlags;
@@ -4518,7 +4537,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
                         triangle[0] = quad[0];
                         triangle[1] = quad[1];
-                        triangle[2] = pointIdx;
+                        triangle[2] = static_cast<unsigned>(pointIdx);
 
                         tmpPolygons.triangleFlags(triangleIdx) = quadFlags;
 
@@ -4534,7 +4553,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
                         triangle[0] = quad[1];
                         triangle[1] = quad[2];
-                        triangle[2] = pointIdx;
+                        triangle[2] = static_cast<unsigned>(pointIdx);
 
                         tmpPolygons.triangleFlags(triangleIdx) = quadFlags;
 
@@ -4551,7 +4570,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
                         triangle[0] = quad[2];
                         triangle[1] = quad[3];
-                        triangle[2] = pointIdx;
+                        triangle[2] = static_cast<unsigned>(pointIdx);
 
                         tmpPolygons.triangleFlags(triangleIdx) = quadFlags;
 
@@ -4617,9 +4636,10 @@ VolumeToMesh::operator()(const GridT& distGrid)
 ////////////////////////////////////////
 
 
+/// @internal This overload is enabled only for grids with a scalar ValueType.
 template<typename GridType>
-inline void
-volumeToMesh(
+inline typename boost::enable_if<boost::is_scalar<typename GridType::ValueType>, void>::type
+doVolumeToMesh(
     const GridType& grid,
     std::vector<Vec3s>& points,
     std::vector<Vec3I>& triangles,
@@ -4671,17 +4691,45 @@ volumeToMesh(
     }
 }
 
+/// @internal This overload is enabled only for grids that do not have a scalar ValueType.
+template<typename GridType>
+inline typename boost::disable_if<boost::is_scalar<typename GridType::ValueType>, void>::type
+doVolumeToMesh(
+    const GridType&,
+    std::vector<Vec3s>&,
+    std::vector<Vec3I>&,
+    std::vector<Vec4I>&,
+    double,
+    double)
+{
+    OPENVDB_THROW(TypeError, "volume to mesh conversion is supported only for scalar grids");
+}
+
 
 template<typename GridType>
-void
+inline void
+volumeToMesh(
+    const GridType& grid,
+    std::vector<Vec3s>& points,
+    std::vector<Vec3I>& triangles,
+    std::vector<Vec4I>& quads,
+    double isovalue,
+    double adaptivity)
+{
+    doVolumeToMesh(grid, points, triangles, quads, isovalue, adaptivity);
+}
+
+
+template<typename GridType>
+inline void
 volumeToMesh(
     const GridType& grid,
     std::vector<Vec3s>& points,
     std::vector<Vec4I>& quads,
     double isovalue)
 {
-    std::vector<Vec3I> triangles(0);
-    volumeToMesh(grid,points, triangles, quads, isovalue, 0.0);
+    std::vector<Vec3I> triangles;
+    doVolumeToMesh(grid, points, triangles, quads, isovalue, 0.0);
 }
 
 
@@ -4694,6 +4742,6 @@ volumeToMesh(
 
 #endif // OPENVDB_TOOLS_VOLUME_TO_MESH_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

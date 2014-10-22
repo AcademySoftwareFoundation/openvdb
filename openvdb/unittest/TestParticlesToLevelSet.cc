@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -86,6 +86,9 @@ protected:
     openvdb::Real           mVelocityScale;
     std::vector<MyParticle> mParticleList;
 public:
+
+    typedef openvdb::Vec3R  value_type;
+
     MyParticleList(openvdb::Real rScale=1, openvdb::Real vScale=1)
         : mRadiusScale(rScale), mVelocityScale(vScale) {}
     void add(const openvdb::Vec3R &p, const openvdb::Real &r,
@@ -134,7 +137,7 @@ public:
     /// Required by ParticledToLevelSet::rasterizeSphere(*this,radius).
     void getPos(size_t n,  openvdb::Vec3R&pos) const { pos = mParticleList[n].p; }
 
-    
+
     void getPosRad(size_t n,  openvdb::Vec3R& pos, openvdb::Real& rad) const {
         pos = mParticleList[n].p;
         rad = mRadiusScale*mParticleList[n].r;
@@ -145,7 +148,7 @@ public:
         vel = mVelocityScale*mParticleList[n].v;
     }
     // The method below is only required for attribute transfer
-    void getAtt(size_t n, openvdb::Index32& att) const { att = n; }
+    void getAtt(size_t n, openvdb::Index32& att) const { att = openvdb::Index32(n); }
 };
 
 
@@ -172,7 +175,7 @@ TestParticlesToLevelSet::testMyParticleList()
     ASSERT_DOUBLES_EXACTLY_EQUAL(0 , pa.vel(1)[1]);
     ASSERT_DOUBLES_EXACTLY_EQUAL(0 , pa.vel(1)[2]);
     ASSERT_DOUBLES_EXACTLY_EQUAL(3 , pa.radius(1));
-    
+
     const float voxelSize = 0.5f, halfWidth = 4.0f;
     openvdb::FloatGrid::Ptr ls = openvdb::createLevelSet<openvdb::FloatGrid>(voxelSize, halfWidth);
     openvdb::CoordBBox bbox = pa.getBBox(*ls);
@@ -229,7 +232,7 @@ TestParticlesToLevelSet::testRasterizeSpheres()
     ASSERT_DOUBLES_EXACTLY_EQUAL( 0, ls->tree().getValue(openvdb::Coord(12,10,10)));
     ASSERT_DOUBLES_EXACTLY_EQUAL( 1, ls->tree().getValue(openvdb::Coord(13,10,10)));
     ASSERT_DOUBLES_EXACTLY_EQUAL( 2, ls->tree().getValue(openvdb::Coord(14,10,10)));
-    
+
     ASSERT_DOUBLES_EXACTLY_EQUAL( 2, ls->tree().getValue(openvdb::Coord(20,16,20)));
     ASSERT_DOUBLES_EXACTLY_EQUAL( 1, ls->tree().getValue(openvdb::Coord(20,17,20)));
     ASSERT_DOUBLES_EXACTLY_EQUAL( 0, ls->tree().getValue(openvdb::Coord(20,18,20)));
@@ -250,7 +253,7 @@ TestParticlesToLevelSet::testRasterizeSpheres()
                 for (ijk[2]=min[2]; ijk[2]<max[2]; ++ijk[2]) {
                     const openvdb::Vec3d xyz = ls->indexToWorld(ijk.asVec3d());
                     double dist = (xyz-pa.pos(0)).length()-pa.radius(0);
-                    for (int i=1, s=pa.size(); i<s; ++i) {
+                    for (int i = 1, s = int(pa.size()); i < s; ++i) {
                         dist=openvdb::math::Min(dist,(xyz-pa.pos(i)).length()-pa.radius(i));
                     }
                     const float val = ls->tree().getValue(ijk);
@@ -299,7 +302,7 @@ TestParticlesToLevelSet::testRasterizeSpheresAndId()
     typedef openvdb::tools::ParticlesToLevelSet<openvdb::FloatGrid, openvdb::Index32> RasterT;
     const float voxelSize = 1.0f, halfWidth = 2.0f;
     openvdb::FloatGrid::Ptr ls = openvdb::createLevelSet<openvdb::FloatGrid>(voxelSize, halfWidth);
-    
+
     RasterT raster(*ls);
     raster.setGrainSize(1);//a value of zero disables threading
     raster.rasterizeSpheres(pa);
@@ -353,7 +356,7 @@ TestParticlesToLevelSet::testRasterizeSpheresAndId()
                     const openvdb::Vec3d xyz = ls->indexToWorld(ijk.asVec3d());
                     double dist = (xyz-pa.pos(0)).length()-pa.radius(0);
                     openvdb::Index32 k =0;
-                    for (int i=1, s=pa.size(); i<s; ++i) {
+                    for (int i = 1, s = int(pa.size()); i < s; ++i) {
                         double d = (xyz-pa.pos(i)).length()-pa.radius(i);
                         if (d<dist) {
                             k = openvdb::Index32(i);
@@ -406,7 +409,7 @@ TestParticlesToLevelSet::testRasterizeTrails()
     pa.add(openvdb::Vec3R( 10, 10, 10), 3, openvdb::Vec3R( 0, 1, 0));
     pa.add(openvdb::Vec3R(  0,  0,  0), 6, openvdb::Vec3R( 0, 0,-5));
     pa.add(openvdb::Vec3R( 20,  0,  0), 2, openvdb::Vec3R( 0, 0, 0));
-    
+
     openvdb::tools::ParticlesToLevelSet<openvdb::FloatGrid> raster(*ls);
     raster.rasterizeTrails(pa, 0.75);//scale offset between two instances
 
@@ -436,7 +439,7 @@ TestParticlesToLevelSet::testRasterizeTrailsAndId()
     CPPUNIT_ASSERT(!ls->empty());
     CPPUNIT_ASSERT(!id->empty());
     CPPUNIT_ASSERT_EQUAL(ls->activeVoxelCount(),id->activeVoxelCount());
-    
+
     int min = std::numeric_limits<int>::max(), max = -min;
     for (RasterT::AttGridType::ValueOnCIter i=id->cbeginValueOn(); i; ++i) {
         min = openvdb::math::Min(min, int(*i));
@@ -449,6 +452,6 @@ TestParticlesToLevelSet::testRasterizeTrailsAndId()
     //this->writeGrid(ls, "testRasterizeTrails");
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

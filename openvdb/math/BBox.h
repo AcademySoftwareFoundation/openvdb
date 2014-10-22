@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -260,7 +260,7 @@ inline void
 BBox<Vec3T>::sort()
 {
     Vec3T tMin(mMin), tMax(mMax);
-    for (size_t i = 0; i < 3; ++i) {
+    for (int i = 0; i < 3; ++i) {
         mMin[i] = std::min(tMin[i], tMax[i]);
         mMax[i] = std::max(tMin[i], tMax[i]);
     }
@@ -361,7 +361,7 @@ inline void
 BBox<Vec3T>::expand(ElementType dx)
 {
     dx = std::abs(dx);
-    for (size_t i = 0; i < 3; ++i) {
+    for (int i = 0; i < 3; ++i) {
         mMin[i] -= dx;
         mMax[i] += dx;
     }
@@ -372,7 +372,7 @@ template<typename Vec3T>
 inline void
 BBox<Vec3T>::expand(const Vec3T& xyz)
 {
-    for (size_t i = 0; i < 3; ++i) {
+    for (int i = 0; i < 3; ++i) {
         mMin[i] = std::min(mMin[i], xyz[i]);
         mMax[i] = std::max(mMax[i], xyz[i]);
     }
@@ -383,7 +383,7 @@ template<typename Vec3T>
 inline void
 BBox<Vec3T>::expand(const BBox& b)
 {
-    for (size_t i = 0; i < 3; ++i) {
+    for (int i = 0; i < 3; ++i) {
         mMin[i] = std::min(mMin[i], b.min()[i]);
         mMax[i] = std::max(mMax[i], b.max()[i]);
     }
@@ -394,7 +394,7 @@ inline void
 BBox<Vec3T>::expand(const Vec3T& xyzMin, const ElementType& length)
 {
     const ElementType size = boost::is_integral<ElementType>::value ? length-1 : length;
-    for (size_t i = 0; i < 3; ++i) {
+    for (int i = 0; i < 3; ++i) {
         mMin[i] = std::min(mMin[i], xyzMin[i]);
         mMax[i] = std::max(mMax[i], xyzMin[i] + size);
     }
@@ -410,7 +410,7 @@ BBox<Vec3T>::translate(const Vec3T& dx)
 }
 
 template<typename Vec3T>
-template<typename MapType>  
+template<typename MapType>
 inline BBox<Vec3T>
 BBox<Vec3T>::applyMap(const MapType& map) const
 {
@@ -428,7 +428,7 @@ BBox<Vec3T>::applyMap(const MapType& map) const
 }
 
 template<typename Vec3T>
-template<typename MapType>  
+template<typename MapType>
 inline BBox<Vec3T>
 BBox<Vec3T>::applyInverseMap(const MapType& map) const
 {
@@ -443,7 +443,7 @@ BBox<Vec3T>::applyInverseMap(const MapType& map) const
     bbox.expand(map.applyInverseMap(Vec3R(mMin[0], mMax[1], mMax[2])));
     bbox.expand(map.applyInverseMap(Vec3R(mMax[0], mMax[1], mMax[2])));
     return bbox;
-}  
+}
 
 ////////////////////////////////////////
 
@@ -462,6 +462,6 @@ operator<<(std::ostream& os, const BBox<Vec3T>& b)
 
 #endif // OPENVDB_MATH_BBOX_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

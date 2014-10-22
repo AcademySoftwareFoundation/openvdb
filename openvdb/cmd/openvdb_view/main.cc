@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -36,8 +36,6 @@
 #ifdef DWA_OPENVDB
 #include <logging_base/logging.h>
 #include <usagetrack.h>
-#elif defined(OPENVDB_USE_LOG4CPLUS)
-#include <log4cplus/configurator.h>
 #endif
 
 
@@ -86,8 +84,6 @@ main(int argc, char *argv[])
 #ifdef DWA_OPENVDB
     USAGETRACK_report_basic_tool_usage(argc, argv, /*duration=*/0);
     logging_base::configure(argc, argv);
-#elif defined(OPENVDB_USE_LOG4CPLUS)
-    log4cplus::BasicConfigurator::doConfigure();
 #endif
 
     const char* progName = argv[0];
@@ -161,6 +157,6 @@ main(int argc, char *argv[])
     return status;
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

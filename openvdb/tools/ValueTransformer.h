@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -676,8 +676,8 @@ public:
     void join(OpAccumulator& other) { mOp->join(*other.mOp); }
 
 private:
-    bool mIsRoot;
-    IterT mIter;
+    const bool mIsRoot;
+    const IterT mIter;
     OpT* mOp; // pointer to original functor, which might get modified
     OpT const * const mOrigOp; // const copy of original functor
 }; // class OpAccumulator
@@ -702,6 +702,6 @@ accumulate(const IterT& iter, XformOp& op, bool threaded)
 
 #endif // OPENVDB_TOOLS_VALUETRANSFORMER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

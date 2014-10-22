@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -62,14 +62,14 @@ TestBBox::testBBox()
 
     {
         BBoxType B(Vec3R(1,1,1),Vec3R(2,2,2));
-        
+
         CPPUNIT_ASSERT(B.isSorted());
         CPPUNIT_ASSERT(B.isInside(Vec3R(1.5,2,2)));
         CPPUNIT_ASSERT(!B.isInside(Vec3R(2,3,2)));
         B.expand(Vec3R(3,3,3));
         CPPUNIT_ASSERT(B.isInside(Vec3R(3,3,3)));
     }
-   
+
     {
         BBoxType B;
         CPPUNIT_ASSERT(B.empty());
@@ -121,6 +121,6 @@ TestBBox::testExtent()
     }
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

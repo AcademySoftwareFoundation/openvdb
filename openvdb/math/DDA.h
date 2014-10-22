@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -51,7 +51,7 @@ namespace math {
 /// @brief A Digital Differential Analyzer specialized for OpenVDB grids
 /// @note Conceptually similar to Bresenham's line algorithm applied
 /// to a 3D Ray intersecting OpenVDB nodes or voxels. Log2Dim = 0
-/// corresponds to a voxel and Log2Dim a tree node of size 2^Log2Dim.     
+/// corresponds to a voxel and Log2Dim a tree node of size 2^Log2Dim.
 ///
 /// @note The Ray template class is expected to have the following
 /// methods: test(time), t0(), t1(), invDir(), and  operator()(time).
@@ -73,7 +73,7 @@ public:
     DDA(const RayT& ray, RealT startTime) { this->init(ray, startTime); }
 
     DDA(const RayT& ray, RealT startTime, RealT maxTime) { this->init(ray, startTime, maxTime); }
-    
+
     inline void init(const RayT& ray, RealT startTime, RealT maxTime)
     {
         assert(startTime <= maxTime);
@@ -82,7 +82,7 @@ public:
         mT1 = maxTime;
         const Vec3T &pos = ray(mT0), &dir = ray.dir(), &inv = ray.invDir();
         mVoxel = Coord::floor(pos) & (~(DIM-1));
-        for (size_t axis = 0; axis < 3; ++axis) {
+        for (int axis = 0; axis < 3; ++axis) {
             if (math::isZero(dir[axis])) {//handles dir = +/- 0
                 mStep[axis]  = 0;//dummy value
                 mNext[axis]  = std::numeric_limits<RealT>::max();//i.e. disabled!
@@ -107,7 +107,7 @@ public:
     /// and returns true if the step in time does not exceed maxTime.
     inline bool step()
     {
-        const size_t stepAxis = math::MinIndex(mNext);
+        const int stepAxis = static_cast<int>(math::MinIndex(mNext));
         mT0 = mNext[stepAxis];
         mNext[stepAxis]  += mDelta[stepAxis];
         mVoxel[stepAxis] += mStep[stepAxis];
@@ -205,11 +205,15 @@ struct LevelSetHDDA<TreeT, -1>
 
 /// @brief Helper class that implements Hierarchical Digital Differential Analyzers
 /// for ray intersections against a generic volume.
+///
+/// @details The template argument ChildNodeLevel specifies the entry
+/// upper node level used for the hierarchical ray-marching. The final
+/// lowest level is always the leaf node level, i.e. not the voxel level!
 template <typename TreeT, typename RayT, int ChildNodeLevel>
 class VolumeHDDA
 {
 public:
-    
+
     typedef typename TreeT::RootNodeType::NodeChainType ChainT;
     typedef typename boost::mpl::at<ChainT, boost::mpl::int_<ChildNodeLevel> >::type NodeT;
     typedef typename tree::ValueAccessor<const TreeT> AccessorT;
@@ -223,17 +227,22 @@ public:
         if (ray.valid()) this->march(ray, acc, t);
         return t;
     }
-    
-    void hits(RayT& ray, AccessorT &acc, std::vector<TimeSpanT>& times)
+
+    /// ListType is a list of RayType::TimeSpan and is required to
+    /// have the two methods: clear() and push_back(). Thus, it could
+    /// be std::vector<typename RayType::TimeSpan> or
+    /// std::deque<typename RayType::TimeSpan>.  
+    template <typename ListType>
+    void hits(RayT& ray, AccessorT &acc, ListType& times)
     {
         TimeSpanT t(-1,-1);
         times.clear();
         this->hits(ray, acc, times, t);
         if (t.valid()) times.push_back(t);
     }
-    
+
 private:
-    
+
     friend class VolumeHDDA<TreeT, RayT, ChildNodeLevel+1>;
 
     bool march(RayT& ray, AccessorT &acc, TimeSpanT& t)
@@ -255,7 +264,12 @@ private:
         return false;
     }
     
-    void hits(RayT& ray, AccessorT &acc, std::vector<TimeSpanT>& times, TimeSpanT& t)
+    /// ListType is a list of RayType::TimeSpan and is required to
+    /// have the two methods: clear() and push_back(). Thus, it could
+    /// be std::vector<typename RayType::TimeSpan> or
+    /// std::deque<typename RayType::TimeSpan>.
+    template <typename ListType>
+    void hits(RayT& ray, AccessorT &acc, ListType& times, TimeSpanT& t)
     {
         mDDA.init(ray);
         do {
@@ -272,7 +286,7 @@ private:
         } while (mDDA.step());
         if (t.t0>=0) t.t1 = mDDA.maxTime();
     }
-    
+
     math::DDA<RayT, NodeT::TOTAL> mDDA;
     VolumeHDDA<TreeT, RayT, ChildNodeLevel-1> mHDDA;
 };
@@ -283,7 +297,7 @@ template <typename TreeT, typename RayT>
 class VolumeHDDA<TreeT, RayT, 0>
 {
 public:
-    
+
     typedef typename TreeT::LeafNodeType LeafT;
     typedef typename tree::ValueAccessor<const TreeT> AccessorT;
     typedef typename RayT::TimeSpan TimeSpanT;
@@ -296,17 +310,18 @@ public:
         if (ray.valid()) this->march(ray, acc, t);
         return t;
     }
-    
-    void hits(RayT& ray, AccessorT &acc, std::vector<TimeSpanT>& times)
+
+    template <typename ListType>
+    void hits(RayT& ray, AccessorT &acc, ListType& times)
     {
         TimeSpanT t(-1,-1);
         times.clear();
         this->hits(ray, acc, times, t);
         if (t.valid()) times.push_back(t);
     }
-    
+
 private:
-    
+
     friend class VolumeHDDA<TreeT, RayT, 1>;
 
     bool march(RayT& ray, AccessorT &acc, TimeSpanT& t)
@@ -325,8 +340,9 @@ private:
         if (t.t0>=0) t.t1 = mDDA.maxTime();
         return false;
     }
-    
-    void hits(RayT& ray, AccessorT &acc, std::vector<TimeSpanT>& times, TimeSpanT& t)
+
+    template <typename ListType>
+    void hits(RayT& ray, AccessorT &acc, ListType& times, TimeSpanT& t)
     {
         mDDA.init(ray);
         do {
@@ -342,10 +358,14 @@ private:
         if (t.t0>=0) t.t1 = mDDA.maxTime();
     }
     math::DDA<RayT, LeafT::TOTAL> mDDA;
-};    
+};
 
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
 #endif // OPENVDB_MATH_DDA_HAS_BEEN_INCLUDED
+
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -38,6 +38,7 @@
 #include "Vec3.h"
 #include "BBox.h"
 #include "Coord.h"
+#include <openvdb/io/io.h> // for io::getFormatVersion()
 #include <openvdb/util/Name.h>
 #include <openvdb/Types.h>
 #include <boost/shared_ptr.hpp>
@@ -182,10 +183,10 @@ public:
 
     virtual Vec3d applyMap(const Vec3d& in) const = 0;
     virtual Vec3d applyInverseMap(const Vec3d& in) const = 0;
-    
+
     //@{
-    /// @brief Apply the Inverse Jacobian Transpose of this map to a vector.  
-    /// For a linear map this is equivalent to applying the transpose of 
+    /// @brief Apply the Inverse Jacobian Transpose of this map to a vector.
+    /// For a linear map this is equivalent to applying the transpose of
     /// inverse map excluding translation.
     virtual Vec3d applyIJT(const Vec3d& in) const = 0;
     virtual Vec3d applyIJT(const Vec3d& in, const Vec3d& domainPos) const = 0;
@@ -228,7 +229,7 @@ public:
     //@}
 
     //@{
-    /// @brief Apply the Jacobian of this map to a vector.  
+    /// @brief Apply the Jacobian of this map to a vector.
     /// For a linear map this is equivalent to applying the map excluding translation.
     /// @warning Houdini 12.5 uses an earlier version of OpenVDB, and maps created
     /// with that version lack a virtual table entry for this method.  Do not call
@@ -238,7 +239,7 @@ public:
     //@}
 
     //@{
-    /// @brief Apply the InverseJacobian of this map to a vector.  
+    /// @brief Apply the InverseJacobian of this map to a vector.
     /// For a linear map this is equivalent to applying the map inverse excluding translation.
     /// @warning Houdini 12.5 uses an earlier version of OpenVDB, and maps created
     /// with that version lack a virtual table entry for this method.  Do not call
@@ -249,7 +250,7 @@ public:
 
 
     //@{
-    /// @brief Apply the Jacobian transpose of this map to a vector.  
+    /// @brief Apply the Jacobian transpose of this map to a vector.
     /// For a linear map this is equivalent to applying the transpose of the map
     /// excluding translation.
     /// @warning Houdini 12.5 uses an earlier version of OpenVDB, and maps created
@@ -2110,11 +2111,11 @@ public:
         return mSecondMap.applyJacobian(tmp);
     }
 
-    
+
     /// Return the Inverse Jacobian of the map applied to @a in. (i.e. inverse map with out translation)
     Vec3d applyInverseJacobian(const Vec3d& in) const { return mSecondMap.applyInverseJacobian(in); }
-    /// Return the Inverse Jacobian defined at @c isloc of the map applied to @a in. 
-    Vec3d applyInverseJacobian(const Vec3d& in, const Vec3d& isloc) const { 
+    /// Return the Inverse Jacobian defined at @c isloc of the map applied to @a in.
+    Vec3d applyInverseJacobian(const Vec3d& in, const Vec3d& isloc) const {
 
         // Move the center of the x-face of the bbox
         // to the origin in index space.
@@ -2131,15 +2132,15 @@ public:
 
 
         Vec3d out = mSecondMap.applyInverseJacobian(in);
-        
+
         out.x() = (out.x() - scale2 * centered.x() * out.z() / mDepthOnLz) / scale;
         out.y() = (out.y() - scale2 * centered.y() * out.z() / mDepthOnLz) / scale;
         out.z() = out.z() / mDepthOnLz;
-     
+
         return out;
     }
-        
-        
+
+
 
     /// Return the Jacobian Transpose of the map applied to vector @c in at @c indexloc.
     /// This tranforms range-space gradients to domain-space gradients.
@@ -2679,6 +2680,6 @@ private:
 
 #endif // OPENVDB_MATH_MAPS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

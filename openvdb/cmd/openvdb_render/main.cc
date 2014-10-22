@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -56,8 +56,6 @@
 #ifdef DWA_OPENVDB
 #include <logging_base/logging.h>
 #include <usagetrack.h>
-#elif defined(OPENVDB_USE_LOG4CPLUS)
-#include <log4cplus/configurator.h>
 #endif
 
 
@@ -65,10 +63,14 @@ namespace {
 
 const char* gProgName = "";
 
+const double LIGHT_DEFAULTS[] = { 0.3, 0.3, 0.0, 0.7, 0.7, 0.7 };
+
 
 struct RenderOpts
 {
     std::string shader;
+    std::string color;
+    openvdb::Vec3SGrid::Ptr colorgrid;
     std::string camera;
     float aperture, focal, frame, znear, zfar;
     double isovalue;
@@ -79,8 +81,7 @@ struct RenderOpts
     bool lookat;
     size_t samples;
     openvdb::Vec3d absorb;
-    openvdb::Vec3d color;
-    openvdb::Vec3d light;
+    std::vector<double> light;
     openvdb::Vec3d scatter;
     double cutoff, gain;
     openvdb::Vec2d step;
@@ -92,11 +93,11 @@ struct RenderOpts
     RenderOpts():
         shader("diffuse"),
         camera("perspective"),
-        aperture(41.2136),
-        focal(50.0),
-        frame(1.0),
-        znear(1.0e-3),
-        zfar(std::numeric_limits<double>::max()),
+        aperture(41.2136f),
+        focal(50.0f),
+        frame(1.0f),
+        znear(1.0e-3f),
+        zfar(std::numeric_limits<float>::max()),
         isovalue(0.0),
         rotate(0.0),
         translate(0.0),
@@ -105,8 +106,7 @@ struct RenderOpts
         lookat(false),
         samples(1),
         absorb(0.1),
-        color(0.7),
-        light(0.3, 0.3, 0.0),
+        light(LIGHT_DEFAULTS, LIGHT_DEFAULTS + 6),
         scatter(1.5),
         cutoff(0.005),
         gain(0.2),
@@ -141,9 +141,9 @@ struct RenderOpts
     {
         os << " -absorb " << absorb[0] << "," << absorb[1] << "," << absorb[2]
            << " -aperture " << aperture
-           << " -camera " << camera
-           << " -color " << color[0] << "," << color[1] << "," << color[2]
-           << " -compression " << compression
+           << " -camera " << camera;
+        if (!color.empty()) os << " -color '" << color << "'";
+        os << " -compression " << compression
            << " -cpus " << threads
            << " -cutoff " << cutoff
            << " -far " << zfar
@@ -151,7 +151,8 @@ struct RenderOpts
            << " -frame " << frame
            << " -gain " << gain
            << " -isovalue " << isovalue
-           << " -light " << light[0] << "," << light[1] << "," << light[2];
+           << " -light " << light[0] << "," << light[1] << "," << light[2]
+               << "," << light[3] << "," << light[4] << "," << light[5];
         if (lookat) os << " -lookat " << target[0] << "," << target[1] << "," << target[2];
         os << " -near " << znear
            << " -res " << width << "x" << height;
@@ -175,7 +176,7 @@ void
 usage(int exitStatus = EXIT_FAILURE)
 {
     RenderOpts opts; // default options
-    const float fov = openvdb::tools::PerspectiveCamera::focalLengthToFieldOfView(
+    const double fov = openvdb::tools::PerspectiveCamera::focalLengthToFieldOfView(
         opts.focal, opts.aperture);
 
     std::ostringstream ostr;
@@ -197,14 +198,14 @@ usage(int exitStatus = EXIT_FAILURE)
 "    -frame F          ortho camera frame width in world units (default: " <<
     opts.frame << ")\n" <<
 "    -lookat X,Y,Z     rotate the camera to point to (X, Y, Z)\n" <<
-"    -name S           name of the grid to be rendered (default: render\n" <<
-"                      the first floating-point grid found in in.vdb)\n" <<
+"    -name S           name of the volume to be rendered (default: render\n" <<
+"                      the first floating-point volume found in in.vdb)\n" <<
 "    -near F           camera near plane depth (default: " << opts.znear << ")\n" <<
 "    -res WxH          image dimensions in pixels (default: " <<
     opts.width << "x" << opts.height << ")\n" <<
 "    -r X,Y,Z                                    \n" <<
 "    -rotate X,Y,Z     camera rotation in degrees\n" <<
-"                      (default: look at the center of the grid)\n" <<
+"                      (default: look at the center of the volume)\n" <<
 "    -t X,Y,Z                            \n" <<
 "    -translate X,Y,Z  camera translation\n" <<
 "    -up X,Y,Z         vector that should point up after rotation with -lookat\n" <<
@@ -214,6 +215,7 @@ usage(int exitStatus = EXIT_FAILURE)
 "    -h, -help         print this usage message and exit\n" <<
 "\n" <<
 "Level set options:\n" <<
+"    -color S          name of a vec3s volume to be used to set material colors\n" <<
 "    -isovalue F       isovalue in world units for level set ray intersection\n" <<
 "                      (default: " << opts.isovalue << ")\n" <<
 "    -samples N        number of samples (rays) per pixel (default: " << opts.samples << ")\n" <<
@@ -222,10 +224,12 @@ usage(int exitStatus = EXIT_FAILURE)
 "\n" <<
 "Dense volume options:\n" <<
 "    -absorb R,G,B     absorption coefficients (default: " << opts.absorb << ")\n" <<
-"    -color R,G,B      light source color (default: " << opts.color << ")\n" <<
 "    -cutoff F         density and transmittance cutoff value (default: " << opts.cutoff << ")\n" <<
 "    -gain F           amount of scatter along the shadow ray (default: " << opts.gain << ")\n" <<
-"    -light X,Y,Z      light source direction (default: " << opts.light << ")\n" <<
+"    -light X,Y,Z[,R,G,B]  light source direction and optional color\n" <<
+"                      (default: [" << opts.light[0] << ", " << opts.light[1]
+    << ", " << opts.light[2] << ", " << opts.light[3] << ", " << opts.light[4]
+    << ", " << opts.light[5] << "])\n" <<
 "    -scatter R,G,B    scattering coefficients (default: " << opts.scatter << ")\n" <<
 "    -shadowstep F     step size in voxels for integration along the shadow ray\n" <<
 "                      (default: " << opts.step[1] << ")\n" <<
@@ -239,7 +243,10 @@ usage(int exitStatus = EXIT_FAILURE)
 "    " << gProgName << " bunny_cloud.vdb bunny_cloud.exr -res 1920x1080 \\\n" <<
 "        -translate 0,0,110 -absorb 0.4,0.2,0.1 -gain 0.2 -v\n" <<
 "\n" <<
-"This is not (and is not intended to be) a production-quality renderer.\n";
+"Warning:\n" <<
+"     This is not (and is not intended to be) a production-quality renderer.\n" <<
+"     Use it for fast previewing or simply as a reference implementation\n" <<
+"     for integration into existing ray tracers.\n";
 
     std::cerr << ostr.str();
     exit(exitStatus);
@@ -263,7 +270,7 @@ saveEXR(const std::string& fname, const openvdb::tools::Film& film, const Render
     int threads = (opts.threads == 0 ? 8 : opts.threads);
     Imf::setGlobalThreadCount(threads);
 
-    Imf::Header header(film.width(), film.height());
+    Imf::Header header(int(film.width()), int(film.height()));
     if (opts.compression == "none") {
         header.compression() = Imf::NO_COMPRESSION;
     } else if (opts.compression == "rle") {
@@ -293,7 +300,7 @@ saveEXR(const std::string& fname, const openvdb::tools::Film& film, const Render
 
     Imf::OutputFile imgFile(filename.c_str(), header);
     imgFile.setFrameBuffer(framebuffer);
-    imgFile.writePixels(film.height());
+    imgFile.writePixels(int(film.height()));
 
     if (opts.verbose) {
         std::ostringstream ostr;
@@ -327,15 +334,35 @@ render(const GridType& grid, const std::string& imgFilename, const RenderOpts& o
     }
     if (opts.lookat) camera->lookAt(opts.target, opts.up);
 
-    boost::scoped_ptr<tools::BaseShader> shader(new tools::DiffuseShader);
+    // Define the shader for level set rendering.  The default shader is a diffuse shader.
+    boost::scoped_ptr<tools::BaseShader> shader;
     if (opts.shader == "matte") {
-        shader.reset(new tools::MatteShader);
+        if (opts.colorgrid) {
+            shader.reset(new tools::MatteShader<openvdb::Vec3SGrid>(*opts.colorgrid));
+        } else {
+            shader.reset(new tools::MatteShader<>());
+        }
     } else if (opts.shader == "normal") {
-        shader.reset(new tools::NormalShader);
+        if (opts.colorgrid) {
+            shader.reset(new tools::NormalShader<Vec3SGrid>(*opts.colorgrid));
+        } else {
+            shader.reset(new tools::NormalShader<>());
+        }
     } else if (opts.shader == "position") {
-        const CoordBBox b = grid.evalActiveVoxelBoundingBox();
-        math::BBox<openvdb::Vec3d> bbox(b.min().asVec3d(), b.max().asVec3d());
-        shader.reset(new tools::PositionShader(bbox.applyMap(*(grid.transform().baseMap()))));
+        const CoordBBox bbox = grid.evalActiveVoxelBoundingBox();
+        const math::BBox<Vec3d> bboxIndex(bbox.min().asVec3d(), bbox.max().asVec3d());
+        const math::BBox<Vec3R> bboxWorld = bboxIndex.applyMap(*(grid.transform().baseMap()));
+        if (opts.colorgrid) {
+            shader.reset(new tools::PositionShader<Vec3SGrid>(bboxWorld, *opts.colorgrid));
+        } else {
+            shader.reset(new tools::PositionShader<>(bboxWorld));
+        }
+    } else /* if (opts.shader == "diffuse") */ { // default
+        if (opts.colorgrid) {
+            shader.reset(new tools::DiffuseShader<Vec3SGrid>(*opts.colorgrid));
+        } else {
+            shader.reset(new tools::DiffuseShader<>());
+        }
     }
 
     if (opts.verbose) {
@@ -347,7 +374,8 @@ render(const GridType& grid, const std::string& imgFilename, const RenderOpts& o
     const tbb::tick_count start = tbb::tick_count::now();
 
     if (isLevelSet) {
-        tools::LevelSetRayIntersector<GridType> intersector(grid, opts.isovalue);
+        tools::LevelSetRayIntersector<GridType> intersector(
+            grid, static_cast<typename GridType::ValueType>(opts.isovalue));
         tools::rayTrace(grid, intersector, *shader, *camera, opts.samples,
             /*seed=*/0, (opts.threads != 1));
     } else {
@@ -356,7 +384,7 @@ render(const GridType& grid, const std::string& imgFilename, const RenderOpts& o
 
         tools::VolumeRender<IntersectorType> renderer(intersector, *camera);
         renderer.setLightDir(opts.light[0], opts.light[1], opts.light[2]);
-        renderer.setLightColor(opts.color[0], opts.color[1], opts.color[2]);
+        renderer.setLightColor(opts.light[3], opts.light[4], opts.light[5]);
         renderer.setPrimaryStep(opts.step[0]);
         renderer.setShadowStep(opts.step[1]);
         renderer.setScattering(opts.scatter[0], opts.scatter[1], opts.scatter[2]);
@@ -419,7 +447,7 @@ strToVec3d(const std::string& s)
     std::vector<double> elems = strToVec(s);
     if (!elems.empty()) {
         result = openvdb::Vec3d(elems[0]);
-        for (size_t i = 1, N = std::min<size_t>(3, elems.size()); i < N; ++i) {
+        for (int i = 1, N = std::min(3, int(elems.size())); i < N; ++i) {
             result[i] = elems[i];
         }
     }
@@ -457,8 +485,6 @@ main(int argc, char *argv[])
 #ifdef DWA_OPENVDB
     USAGETRACK_report_basic_tool_usage(argc, argv, /*duration=*/0);
     logging_base::configure(argc, argv);
-#elif defined(OPENVDB_USE_LOG4CPLUS)
-    log4cplus::BasicConfigurator::doConfigure();
 #endif
 
     OPENVDB_START_THREADSAFE_STATIC_WRITE
@@ -485,13 +511,13 @@ main(int argc, char *argv[])
                 opts.absorb = strToVec3d(argv[i]);
             } else if (parser.check(i, "-aperture")) {
                 ++i;
-                opts.aperture = atof(argv[i]);
+                opts.aperture = float(atof(argv[i]));
             } else if (parser.check(i, "-camera")) {
                 ++i;
                 opts.camera = argv[i];
             } else if (parser.check(i, "-color")) {
                 ++i;
-                opts.color = strToVec3d(argv[i]);
+                opts.color = argv[i];
             } else if (parser.check(i, "-compression")) {
                 ++i;
                 opts.compression = argv[i];
@@ -506,24 +532,24 @@ main(int argc, char *argv[])
                 opts.isovalue = atof(argv[i]);
             } else if (parser.check(i, "-far")) {
                 ++i;
-                opts.zfar = atof(argv[i]);
+                opts.zfar = float(atof(argv[i]));
             } else if (parser.check(i, "-focal")) {
                 ++i;
-                opts.focal = atof(argv[i]);
+                opts.focal = float(atof(argv[i]));
                 hasFocal = true;
             } else if (parser.check(i, "-fov")) {
                 ++i;
-                fov = atof(argv[i]);
+                fov = float(atof(argv[i]));
                 hasFov = true;
             } else if (parser.check(i, "-frame")) {
                 ++i;
-                opts.frame = atof(argv[i]);
+                opts.frame = float(atof(argv[i]));
             } else if (parser.check(i, "-gain")) {
                 ++i;
                 opts.gain = atof(argv[i]);
             } else if (parser.check(i, "-light")) {
                 ++i;
-                opts.light = strToVec3d(argv[i]);
+                opts.light = strToVec(argv[i]);
             } else if (parser.check(i, "-lookat")) {
                 ++i;
                 opts.lookat = true;
@@ -534,7 +560,7 @@ main(int argc, char *argv[])
                 gridName = argv[i];
             } else if (parser.check(i, "-near")) {
                 ++i;
-                opts.znear = atof(argv[i]);
+                opts.znear = float(atof(argv[i]));
             } else if (parser.check(i, "-r") || parser.check(i, "-rotate")) {
                 ++i;
                 opts.rotate = strToVec3d(argv[i]);
@@ -587,8 +613,8 @@ main(int argc, char *argv[])
             OPENVDB_LOG_FATAL("specify -focal or -fov, but not both");
             usage();
         }
-        opts.focal =
-            openvdb::tools::PerspectiveCamera::fieldOfViewToFocalLength(fov, opts.aperture);
+        opts.focal = float(
+            openvdb::tools::PerspectiveCamera::fieldOfViewToFocalLength(fov, opts.aperture));
     }
     if (hasLookAt && hasRotate) {
         OPENVDB_LOG_FATAL("specify -lookat or -r[otate], but not both");
@@ -624,15 +650,16 @@ main(int argc, char *argv[])
                 grid = openvdb::gridPtrCast<openvdb::FloatGrid>(file.readGrid(gridName));
                 if (!grid) {
                     OPENVDB_THROW(openvdb::ValueError,
-                        gridName + " is not a scalar, floating-point grid");
+                        gridName + " is not a scalar, floating-point volume");
                 }
             } else {
                 // If no grid was specified by name, retrieve the first float grid from the file.
+                openvdb::io::File::NameIterator it = file.beginName();
                 openvdb::GridPtrVecPtr grids = file.readAllGridMetadata();
-                for (size_t i = 0; i < grids->size(); ++i) {
+                for (size_t i = 0; i < grids->size(); ++i, ++it) {
                     grid = openvdb::gridPtrCast<openvdb::FloatGrid>(grids->at(i));
                     if (grid) {
-                        gridName = grid->getName();
+                        gridName = *it;
                         file.close();
                         file.open();
                         grid = openvdb::gridPtrCast<openvdb::FloatGrid>(file.readGrid(gridName));
@@ -641,7 +668,16 @@ main(int argc, char *argv[])
                 }
                 if (!grid) {
                     OPENVDB_THROW(openvdb::ValueError,
-                        "no scalar, floating-point grids in file " + vdbFilename);
+                        "no scalar, floating-point volumes in file " + vdbFilename);
+                }
+            }
+
+            if (!opts.color.empty()) {
+                opts.colorgrid =
+                    openvdb::gridPtrCast<openvdb::Vec3SGrid>(file.readGrid(opts.color));
+                if (!opts.colorgrid) {
+                    OPENVDB_THROW(openvdb::ValueError,
+                        opts.color + " is not a vec3s color volume");
                 }
             }
         }
@@ -677,6 +713,6 @@ main(int argc, char *argv[])
     return retcode;
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

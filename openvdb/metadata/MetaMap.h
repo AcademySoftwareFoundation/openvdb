@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -42,9 +42,7 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 
-/// @brief Provides functionality storing type agnostic metadata information.
-/// Grids and other structures can inherit from this to attain metadata
-/// functionality.
+/// Container that maps names (strings) to values of arbitrary types
 class OPENVDB_API MetaMap
 {
 public:
@@ -56,11 +54,8 @@ public:
     typedef MetadataMap::const_iterator ConstMetaIterator;
         ///< @todo this should really iterate over a map of Metadata::ConstPtrs
 
-    /// Constructor
     MetaMap() {}
     MetaMap(const MetaMap& other);
-
-    /// Destructor
     virtual ~MetaMap() {}
 
     /// Return a copy of this map whose fields are shared with this map.
@@ -68,50 +63,51 @@ public:
     /// Return a deep copy of this map that shares no data with this map.
     MetaMap::Ptr deepCopyMeta() const;
 
-    /// Assign to this map a deep copy of another map.
+    /// Assign a deep copy of another map to this map.
     MetaMap& operator=(const MetaMap&);
 
-    /// Read in all the Meta information the given stream.
+    /// Unserialize metadata from the given stream.
     void readMeta(std::istream&);
-
-    /// Write out all the Meta information to the given stream.
+    /// Serialize metadata to the given stream.
     void writeMeta(std::ostream&) const;
 
-    /// Insert a new metadata or overwrite existing. If Metadata with given name
-    /// doesn't exist, a new Metadata field is added. If it does exist and given
-    /// metadata is of the same type, then overwrite existing with new value. If
-    /// it does exist and not of the same type, then throw an exception.
-    ///
-    /// @param name the name of the metadata.
-    /// @param metadata the actual metadata to store.
-    void insertMeta(const Name& name, const Metadata& metadata);
+    /// @brief Insert a new metadata field or overwrite the value of an existing field.
+    /// @details If a field with the given name doesn't already exist, add a new field.
+    /// Otherwise, if the new value's type is the same as the existing field's value type,
+    /// overwrite the existing value with new value.
+    /// @throw TypeError if a field with the given name already exists, but its value type
+    /// is not the same as the new value's
+    /// @throw ValueError if the given field name is empty.
+    void insertMeta(const Name&, const Metadata& value);
+    /// @brief Deep copy all of the metadata fields from the given map into this map.
+    /// @throw TypeError if any field in the given map has the same name as
+    /// but a different value type than one of this map's fields.
+    void insertMeta(const MetaMap&);
 
-    /// Removes an existing metadata field from the grid. If the metadata with
-    /// the given name doesn't exist, do nothing.
-    ///
-    /// @param name the name of the metadata field to remove.
-    void removeMeta(const Name &name);
+    /// Remove the given metadata field if it exists.
+    void removeMeta(const Name&);
 
     //@{
-    /// @return a pointer to the metadata with the given name, NULL if no such
-    /// field exists.
+    /// @brief Return a pointer to the metadata with the given name.
+    /// If no such field exists, return a null pointer.
     Metadata::Ptr operator[](const Name&);
     Metadata::ConstPtr operator[](const Name&) const;
     //@}
 
     //@{
-    /// @return pointer to TypedMetadata, NULL if type and name mismatch.
-    template<typename T> typename T::Ptr getMetadata(const Name &name);
-    template<typename T> typename T::ConstPtr getMetadata(const Name &name) const;
+    /// @brief Return a pointer to a TypedMetadata object of type @c T and with the given name.
+    /// If no such field exists or if there is a type mismatch, return a null pointer.
+    template<typename T> typename T::Ptr getMetadata(const Name&);
+    template<typename T> typename T::ConstPtr getMetadata(const Name&) const;
     //@}
 
-    /// @return direct access to the underlying value stored by the given
-    /// metadata name. Here T is the type of the value stored. If there is a
-    /// mismatch, then throws an exception.
-    template<typename T> T& metaValue(const Name &name);
-    template<typename T> const T& metaValue(const Name &name) const;
+    /// @brief Return a reference to the value of type @c T stored in the given metadata field.
+    /// @throw LookupError if no field with the given name exists.
+    /// @throw TypeError if the given field is not of type @c T.
+    template<typename T> T& metaValue(const Name&);
+    template<typename T> const T& metaValue(const Name&) const;
 
-    /// Functions for iterating over the Metadata.
+    // Functions for iterating over the metadata
     MetaIterator beginMeta() { return mMeta.begin(); }
     MetaIterator endMeta() { return mMeta.end(); }
     ConstMetaIterator beginMeta() const { return mMeta.begin(); }
@@ -121,13 +117,11 @@ public:
 
     size_t metaCount() const { return mMeta.size(); }
 
-    bool empty() const { return mMeta.empty(); }
-
-    /// @return string representation of MetaMap
-    std::string str() const;
+    /// Return a string describing this metadata map.  Prefix each line with @a indent.
+    std::string str(const std::string& indent = "") const;
 
 private:
-    /// @return a pointer to TypedMetadata with the given template parameter.
+    /// @brief Return a pointer to TypedMetadata with the given template parameter.
     /// @throw LookupError if no field with the given name is found.
     /// @throw TypeError if the given field is not of type T.
     template<typename T>
@@ -247,6 +241,6 @@ MetaMap::metaValue(const Name &name) const
 
 #endif // OPENVDB_METADATA_METAMAP_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

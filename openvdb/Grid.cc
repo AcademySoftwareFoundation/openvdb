@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -461,7 +461,7 @@ GridBase::addStatsMetadata()
 MetaMap::Ptr
 GridBase::getStatsMetadata() const
 {
-    static const char* const sFields[] = {
+    const char* const fields[] = {
         META_FILE_BBOX_MIN,
         META_FILE_BBOX_MAX,
         META_FILE_MEM_BYTES,
@@ -471,17 +471,31 @@ GridBase::getStatsMetadata() const
 
     /// @todo Check that the fields are of the correct type?
     MetaMap::Ptr ret(new MetaMap);
-    for (int i = 0; sFields[i] != NULL; ++i) {
-        if (Metadata::ConstPtr m = (*this)[sFields[i]]) {
-            ret->insertMeta(sFields[i], *m);
+    for (int i = 0; fields[i] != NULL; ++i) {
+        if (Metadata::ConstPtr m = (*this)[fields[i]]) {
+            ret->insertMeta(fields[i], *m);
         }
     }
     return ret;
 }
 
+
+////////////////////////////////////////
+
+
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+void
+GridBase::clipGrid(const BBoxd& worldBBox)
+{
+    const CoordBBox indexBBox =
+        this->constTransform().worldToIndexNodeCentered(worldBBox);
+    this->clip(indexBBox);
+}
+#endif
+
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

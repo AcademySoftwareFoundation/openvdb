@@ -48,6 +48,7 @@ share a tree.
 - @ref sPyAccessors
 - @ref sPyIteration
 - @ref sPyNumPy
+- @ref sPyMeshConversion
 - @ref sPyCppAPI
 
 
@@ -518,6 +519,117 @@ array([ 3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
 @b copyToArray has no @c tolerance argument, because there is no distinction
 between active and inactive values in the destination array.
 
+
+
+@section sPyMeshConversion Mesh conversion
+
+Also available if the OpenVDB Python module is compiled with NumPy support
+(see @ref sPyNumPy "above") are grid methods to convert polygonal meshes to
+level sets (see @vdblink::tools::meshToLevelSet() tools::meshToLevelSet@endlink
+for some restrictions) and to convert isosurfaces of scalar-valued grids
+to meshes.
+@code{.py}
+>>> import pyopenvdb as vdb
+>>> import numpy
+
+>>> grid = vdb.read('bunny.vdb', 'ls_bunny')
+
+# Convert a volume to a quadrilateral mesh.
+>>> points, quads = grid.convertToQuads()
+
+# World-space vertices of the mesh:
+>>> points
+array([[-14.05082607,  -0.10118673,  -0.40250054],
+       [-14.05230808,  -0.05570767,  -0.45693323],
+       [-14.05613995,  -0.0734246 ,  -0.42150033],
+       ..., 
+       [  7.25201273,  13.25417805,   6.45283508],
+       [  7.25596714,  13.31225586,   6.40827513],
+       [  7.30518484,  13.21096039,   6.40724468]], dtype=float32)
+
+# Quadrilateral faces of the mesh, given by
+# 4-tuples of indices into the vertex list:
+>>> quads
+array([[      5,       2,       1,       4],
+       [     11,       7,       6,      10],
+       [     14,       9,       8,      13],
+       ..., 
+       [1327942, 1327766, 1339685, 1339733],
+       [1339728, 1327921, 1327942, 1339733],
+       [1339733, 1339685, 1339661, 1339728]], dtype=uint32)
+
+# Convert the mesh back to a (single-precision) volume.
+# Give the resulting grid the original grid's transform.
+>>> gridFromQuads = vdb.FloatGrid.createLevelSetFromPolygons(
+...     points, quads=quads, transform=grid.transform)
+
+
+# Alternatively, mesh a volume adaptively for a lower polygon count.
+# Adaptive meshing generates both triangular and quadrilateral faces.
+>>> points, triangles, quads = grid.convertToPolygons(adaptivity=0.5)
+
+# World-space vertices of the mesh:
+>>> points
+array([[-14.02906322,  -0.07213751,  -0.49265194],
+       [-14.11877823,  -0.11127799,  -0.17118289],
+       [-13.85006142,  -0.08145611,  -0.86669081],
+       ..., 
+       [  7.31098318,  12.97358608,   6.55133963],
+       [  7.20240211,  12.80632019,   6.80356836],
+       [  7.23679161,  13.28100395,   6.45595646]], dtype=float32)
+
+# Triangular faces of the mesh, given by
+# triples of indices into the vertex list:
+>>> triangles
+array([[    8,     7,     0],
+       [   14,     9,     8],
+       [   14,    11,     9],
+       ..., 
+       [22794, 22796, 22797],
+       [22784, 22783, 22810],
+       [22796, 22795, 22816]], dtype=uint32)
+
+# Quadrilateral faces of the mesh, given by
+# 4-tuples of indices into the vertex list:
+>>> quads
+array([[    4,     3,     6,     5],
+       [    8,     9,    10,     7],
+       [   11,    12,    10,     9],
+       ..., 
+       [23351, 23349, 23341, 23344],
+       [23344, 23117, 23169, 23351],
+       [23169, 23167, 23349, 23351]], dtype=uint32)
+
+# Convert the mesh to a double-precision volume.
+>>> doubleGridFromPolys = vdb.DoubleGrid.createLevelSetFromPolygons(
+...     points, triangles, quads, transform=grid.transform)
+@endcode
+
+The mesh representation is similar to that of the commonly-used
+<a href="http://en.wikipedia.org/wiki/Wavefront_.obj_file">
+Wavefront&nbsp;<tt>.obj</tt></a> file format,
+except that the vertex array is indexed starting from 0 rather than 1.
+To output mesh data to a file in <tt>.obj</tt> format, one might do
+the following:
+@code{.py}
+>>> def writeObjFile(filename, points, triangles=[], quads=[]):
+...     f = open(filename, 'w')
+...     # Output vertices.
+...     for xyz in points:
+...         f.write('v %g %g %g\n' % tuple(xyz))
+...     f.write('\n')
+...     # Output faces.
+...     for ijk in triangles:
+...         f.write('f %d %d %d\n' %
+...             (ijk[0]+1, ijk[1]+1, ijk[2]+1)) # offset vertex indices by one
+...     for ijkl in quads:
+...         f.write('f %d %d %d %d\n' %
+...             (ijkl[0]+1, ijkl[1]+1, ijkl[2]+1, ijkl[3]+1))
+...     f.close()
+...
+>>> mesh = grid.convertToPolygons(adaptivity=0.8)
+>>> writeObjFile('bunny.obj', *mesh)
+@endcode
 
 
 @section sPyCppAPI C++ glue routines

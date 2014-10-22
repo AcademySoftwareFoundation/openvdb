@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -78,15 +78,15 @@ public:
          Source d, Source e, Source f,
          Source g, Source h, Source i)
     {
-        MyBase::mm[0] = a;
-        MyBase::mm[1] = b;
-        MyBase::mm[2] = c;
-        MyBase::mm[3] = d;
-        MyBase::mm[4] = e;
-        MyBase::mm[5] = f;
-        MyBase::mm[6] = g;
-        MyBase::mm[7] = h;
-        MyBase::mm[8] = i;
+        MyBase::mm[0] = static_cast<ValueType>(a);
+        MyBase::mm[1] = static_cast<ValueType>(b);
+        MyBase::mm[2] = static_cast<ValueType>(c);
+        MyBase::mm[3] = static_cast<ValueType>(d);
+        MyBase::mm[4] = static_cast<ValueType>(e);
+        MyBase::mm[5] = static_cast<ValueType>(f);
+        MyBase::mm[6] = static_cast<ValueType>(g);
+        MyBase::mm[7] = static_cast<ValueType>(h);
+        MyBase::mm[8] = static_cast<ValueType>(i);
     } // constructor1Test
 
     /// Construct matrix given basis vectors (columns)
@@ -816,6 +816,6 @@ bool diagonalizeSymmetricMatrix(const Mat3<T>& input, Mat3<T>& Q, Vec3<T>& D,
 
 #endif // OPENVDB_MATH_MAT3_H_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -45,6 +45,8 @@
 #include <openvdb/math/Coord.h>
 #include <openvdb/math/Hermite.h>
 #include <boost/type_traits/is_convertible.hpp>
+#include <boost/type_traits/is_integral.hpp>
+#include <boost/static_assert.hpp>
 
 
 namespace openvdb {
@@ -111,21 +113,55 @@ typedef math::Quat<Real>    QuatR;
 ////////////////////////////////////////
 
 
+/// @brief  Integer wrapper, required to distinguish PointIndexGrid and
+///         PointDataGrid from Int32Grid and Int64Grid.
+/// @note   @c Kind is a dummy parameter used to create distinct types.
+template <typename IntType, Index Kind>
+struct PointIndex {
+    BOOST_STATIC_ASSERT(boost::is_integral<IntType>::value);
+
+    PointIndex(IntType i = IntType(0)) : mIndex(i) {}
+
+    operator IntType() const { return mIndex; }
+
+    /// @brief Needed to support the <tt>(zeroVal<PointIndex>() + val)</tt> idiom.
+    template<typename T>
+    PointIndex operator+(T x) { return PointIndex(mIndex + IntType(x)); }
+
+private:
+    IntType mIndex;
+};
+
+
+typedef PointIndex<Index32, 0> PointIndex32;
+typedef PointIndex<Index64, 0> PointIndex64;
+
+typedef PointIndex<Index32, 1> PointDataIndex32;
+typedef PointIndex<Index64, 1> PointDataIndex64;
+
+
+////////////////////////////////////////
+
+
 template<typename T> struct VecTraits {
     static const bool IsVec = false;
     static const int Size = 1;
+    typedef T ElementType;
 };
 template<typename T> struct VecTraits<math::Vec2<T> > {
     static const bool IsVec = true;
     static const int Size = 2;
+    typedef T ElementType;
 };
 template<typename T> struct VecTraits<math::Vec3<T> > {
     static const bool IsVec = true;
     static const int Size = 3;
+    typedef T ElementType;
 };
 template<typename T> struct VecTraits<math::Vec4<T> > {
     static const bool IsVec = true;
     static const int Size = 4;
+    typedef T ElementType;
 };
 
 
@@ -159,7 +195,8 @@ template<typename T0, typename T1>
 struct CanConvertType<T0, math::Vec3<T1> > { enum { value = CanConvertType<T0, T1>::value }; };
 template<typename T0, typename T1>
 struct CanConvertType<T0, math::Vec4<T1> > { enum { value = CanConvertType<T0, T1>::value }; };
-
+template<> struct CanConvertType<PointIndex32, PointDataIndex32> { enum {value = true}; };
+template<> struct CanConvertType<PointDataIndex32, PointIndex32> { enum {value = true}; };
 
 ////////////////////////////////////////
 
@@ -228,23 +265,27 @@ enum MergePolicy {
 ////////////////////////////////////////
 
 
-template<typename T> const char* typeNameAsString()           { return typeid(T).name(); }
-template<> inline const char* typeNameAsString<bool>()        { return "bool"; }
-template<> inline const char* typeNameAsString<float>()       { return "float"; }
-template<> inline const char* typeNameAsString<double>()      { return "double"; }
-template<> inline const char* typeNameAsString<int32_t>()     { return "int32"; }
-template<> inline const char* typeNameAsString<uint32_t>()    { return "uint32"; }
-template<> inline const char* typeNameAsString<int64_t>()     { return "int64"; }
-template<> inline const char* typeNameAsString<Hermite>()     { return "Hermite"; }
-template<> inline const char* typeNameAsString<Vec2i>()       { return "vec2i"; }
-template<> inline const char* typeNameAsString<Vec2s>()       { return "vec2s"; }
-template<> inline const char* typeNameAsString<Vec2d>()       { return "vec2d"; }
-template<> inline const char* typeNameAsString<Vec3i>()       { return "vec3i"; }
-template<> inline const char* typeNameAsString<Vec3f>()       { return "vec3s"; }
-template<> inline const char* typeNameAsString<Vec3d>()       { return "vec3d"; }
-template<> inline const char* typeNameAsString<std::string>() { return "string"; }
-template<> inline const char* typeNameAsString<Mat4s>()       { return "mat4s"; }
-template<> inline const char* typeNameAsString<Mat4d>()       { return "mat4d"; }
+template<typename T> const char* typeNameAsString()                 { return typeid(T).name(); }
+template<> inline const char* typeNameAsString<bool>()              { return "bool"; }
+template<> inline const char* typeNameAsString<float>()             { return "float"; }
+template<> inline const char* typeNameAsString<double>()            { return "double"; }
+template<> inline const char* typeNameAsString<int32_t>()           { return "int32"; }
+template<> inline const char* typeNameAsString<uint32_t>()          { return "uint32"; }
+template<> inline const char* typeNameAsString<int64_t>()           { return "int64"; }
+template<> inline const char* typeNameAsString<Hermite>()           { return "Hermite"; }
+template<> inline const char* typeNameAsString<Vec2i>()             { return "vec2i"; }
+template<> inline const char* typeNameAsString<Vec2s>()             { return "vec2s"; }
+template<> inline const char* typeNameAsString<Vec2d>()             { return "vec2d"; }
+template<> inline const char* typeNameAsString<Vec3i>()             { return "vec3i"; }
+template<> inline const char* typeNameAsString<Vec3f>()             { return "vec3s"; }
+template<> inline const char* typeNameAsString<Vec3d>()             { return "vec3d"; }
+template<> inline const char* typeNameAsString<std::string>()       { return "string"; }
+template<> inline const char* typeNameAsString<Mat4s>()             { return "mat4s"; }
+template<> inline const char* typeNameAsString<Mat4d>()             { return "mat4d"; }
+template<> inline const char* typeNameAsString<PointIndex32>()      { return "ptidx32"; }
+template<> inline const char* typeNameAsString<PointIndex64>()      { return "ptidx64"; }
+template<> inline const char* typeNameAsString<PointDataIndex32>()  { return "ptdataidx32"; }
+template<> inline const char* typeNameAsString<PointDataIndex64>()  { return "ptdataidx64"; }
 
 
 ////////////////////////////////////////
@@ -378,6 +419,8 @@ class ShallowCopy {};
 // Dummy class that distinguishes topology copy constructors from
 // deep copy constructors
 class TopologyCopy {};
+// Dummy class that distinguishes constructors during file input
+class PartialCreate {};
 
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
@@ -435,6 +478,6 @@ class TopologyCopy {};
 
 #endif // OPENVDB_TYPES_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

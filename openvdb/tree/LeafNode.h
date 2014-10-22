@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -38,12 +38,12 @@
 #include <boost/static_assert.hpp>
 #include <boost/bind.hpp>
 #include <tbb/blocked_range.h>
+#include <tbb/spin_mutex.h>
 #include <tbb/parallel_for.h>
 #include <openvdb/Types.h>
 #include <openvdb/util/NodeMasks.h>
 #include <openvdb/io/Compression.h> // for io::readData(), etc.
 #include "Iterator.h"
-#include "Util.h"
 
 
 class TestLeaf;
@@ -93,77 +93,245 @@ public:
         static const bool value = SameLeafConfig<LOG2DIM, OtherNodeType>::value;
     };
 
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    struct FileInfo
+    {
+        FileInfo(): bufpos(0) , maskpos(0) {}
+        std::streamoff bufpos;
+        std::streamoff maskpos;
+        io::MappedFile::Ptr mapping;
+        boost::shared_ptr<io::StreamMetadata> meta;
+    };
+#endif
 
-    /// @brief Stores the actual values in the LeafNode. Its dimension
-    /// it fixed to 2^(3*Log2Dim)
+    /// @brief Array of fixed size @f$2^{3 \times {\rm Log2Dim}}@f$ that stores
+    /// the voxel values of a LeafNode
     class Buffer
     {
     public:
-        /// @brief Empty default constructor
+#ifdef OPENVDB_2_ABI_COMPATIBLE
+        /// Default constructor
         Buffer(): mData(new ValueType[SIZE]) {}
-        /// @brief Constructs a buffer populated with the specified value
-        Buffer(const ValueType& val) :  mData(new ValueType[SIZE]) { this->fill(val); }
-        /// @brief Copy constructor
-        Buffer(const Buffer& other)   : mData(new ValueType[SIZE]) { *this = other; }
-        /// @brief Destructor
-        ~Buffer() { delete [] mData; }
-        /// @brief Populates the buffer with a constant value
+        /// Construct a buffer populated with the specified value.
+        explicit Buffer(const ValueType& val): mData(new ValueType[SIZE]) { this->fill(val); }
+        /// Copy constructor
+        Buffer(const Buffer& other): mData(new ValueType[SIZE]) { *this = other; }
+        /// Destructor
+        ~Buffer() { delete[] mData; }
+
+        /// Return @c true if this buffer's values have not yet been read from disk.
+        bool isOutOfCore() const { return false; }
+        /// Return @c true if memory for this buffer has not yet been allocated.
+        bool empty() const { return (mData == NULL); }
+        /// Allocate memory for this buffer if it has not already been allocated.
+        bool allocate() { if (mData == NULL) mData = new ValueType[SIZE]; return !this->empty(); }
+#else
+        /// Default constructor
+        Buffer(): mData(new ValueType[SIZE]), mOutOfCore(0) {}
+        /// Construct a buffer populated with the specified value.
+        explicit Buffer(const ValueType& val): mData(new ValueType[SIZE]), mOutOfCore(0)
+        {
+            this->fill(val);
+        }
+        /// Copy constructor
+        Buffer(const Buffer& other): mData(NULL), mOutOfCore(other.mOutOfCore)
+        {
+            if (other.isOutOfCore()) {
+                mFileInfo = new FileInfo(*other.mFileInfo);
+            } else {
+                this->allocate();
+                ValueType* target = mData;
+                const ValueType* source = other.mData;
+                Index n = SIZE;
+                while (n--) *target++ = *source++;
+            }
+        }
+        /// Construct a buffer but don't allocate memory for the full array of values.
+        Buffer(PartialCreate, const ValueType&): mData(NULL), mOutOfCore(0) {}
+        /// Destructor
+        ~Buffer()
+        {
+            if (this->isOutOfCore()) {
+                this->detachFromFile();
+            } else {
+                this->deallocate();
+            }
+        }
+
+        /// Return @c true if this buffer's values have not yet been read from disk.
+        bool isOutOfCore() const { return bool(mOutOfCore); }
+        /// Return @c true if memory for this buffer has not yet been allocated.
+        bool empty() const { return !mData || this->isOutOfCore(); }
+        /// Allocate memory for this buffer if it has not already been allocated.
+        bool allocate() { if (mData == NULL) mData = new ValueType[SIZE]; return !this->empty(); }
+#endif
+
+        /// Populate this buffer with a constant value.
         void fill(const ValueType& val)
         {
-            ValueType* target = mData;
-            Index n = SIZE;
-            while (n--) *target++ = val;
+            this->detachFromFile();
+            if (mData != NULL) {
+                ValueType* target = mData;
+                Index n = SIZE;
+                while (n--) *target++ = val;
+            }
         }
-        /// Return a const reference to the i'th element of the Buffer
-        const ValueType& getValue(Index i) const { assert(i < SIZE); return mData[i]; }
-        /// Return a const reference to the i'th element of the Buffer
-        const ValueType& operator[](Index i) const { return this->getValue(i); }
-        /// Set the i'th value of the Buffer to the specified value
-        void setValue(Index i, const ValueType& val) { assert(i < SIZE); mData[i] = val; }
-        /// Assigns the values in the other Buffer to this Buffer
+
+        /// Return a const reference to the i'th element of this buffer.
+        const ValueType& getValue(Index i) const { return this->at(i); }
+        /// Return a const reference to the i'th element of this buffer.
+        const ValueType& operator[](Index i) const { return this->at(i); }
+        /// Set the i'th value of this buffer to the specified value.
+        void setValue(Index i, const ValueType& val)
+        {
+            assert(i < SIZE);
+#ifdef OPENVDB_2_ABI_COMPATIBLE
+            mData[i] = val;
+#else
+            this->loadValues();
+            if (mData) mData[i] = val;
+#endif
+        }
+
+        /// Copy the other buffer's values into this buffer.
         Buffer& operator=(const Buffer& other)
         {
-            ValueType* target = mData;
-            const ValueType* source = other.mData;
-            Index n = SIZE;
-            while (n--) *target++ = *source++;
+            if (&other != this) {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+                if (this->isOutOfCore()) {
+                    this->detachFromFile();
+                } else {
+                    if (other.isOutOfCore()) this->deallocate();
+                }
+                if (other.isOutOfCore()) {
+                    mFileInfo = new FileInfo(*other.mFileInfo);
+                } else {
+#endif
+                    this->allocate();
+                    ValueType* target = mData;
+                    const ValueType* source = other.mData;
+                    Index n = SIZE;
+                    while (n--) *target++ = *source++;
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+                }
+#endif
+            }
             return *this;
         }
-        /// Return true if the values in the other buffer exactly
-        /// equates the values in this buffer
+
+        /// @brief Return @c true if the contents of the other buffer
+        /// exactly equal the contents of this buffer.
         bool operator==(const Buffer& other) const
         {
-            const ValueType* target = mData;
-            const ValueType* source = other.mData;
+            this->loadValues();
+            other.loadValues();
+            const ValueType *target = mData, *source = other.mData;
+            if (!target && !source) return true;
+            if (!target || !source) return false;
             Index n = SIZE;
             while (n && math::isExactlyEqual(*target++, *source++)) --n;
             return n == 0;
         }
-        /// Return true if any of the values in the other buffer do
-        /// not exactly equate the values in this buffer
+        /// @brief Return @c true if the contents of the other buffer
+        /// are not exactly equal to the contents of this buffer.
         bool operator!=(const Buffer& other) const { return !(other == *this); }
-        /// Replace the values in this Buffer with the values in the other Buffer
+
+        /// Exchange this buffer's values with the other buffer's values.
         void swap(Buffer& other)
         {
-            ValueType* tmp = mData;
-            mData = other.mData;
-            other.mData = tmp;
+            std::swap(mData, other.mData);
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+            std::swap(mOutOfCore, other.mOutOfCore);
+#endif
         }
-        /// Return the memory-footprint of this Buffer in units of bytes
-        static Index memUsage() { return sizeof(ValueType*) + SIZE * sizeof(ValueType); }
-        /// Return the number of values represented in this Buffer
+
+        /// Return the memory footprint of this buffer in bytes.
+        Index memUsage() const
+        {
+            size_t n = sizeof(*this);
+#ifdef OPENVDB_2_ABI_COMPATIBLE
+            if (mData) n += SIZE * sizeof(ValueType);
+#else
+            if (this->isOutOfCore()) n += sizeof(FileInfo);
+            else if (mData) n += SIZE * sizeof(ValueType);
+#endif
+            return static_cast<Index>(n);
+        }
+        /// Return the number of values contained in this buffer.
         static Index size() { return SIZE; }
 
     private:
-        /// This direct access method is private since it makes
-        /// assumptions about the implementations of the memory layout.
-        ValueType& operator[](Index i) { assert(i < SIZE); return mData[i]; }
+        /// If this buffer is empty, return zero, otherwise return the value at index @ i.
+        const ValueType& at(Index i) const
+        {
+            assert(i < SIZE);
+#ifdef OPENVDB_2_ABI_COMPATIBLE
+            return mData[i];
+#else
+            this->loadValues();
+            // We can't use the ternary operator here, otherwise Visual C++ returns
+            // a reference to a temporary.
+            if (mData) return mData[i]; else return sZero;
+#endif
+        }
+
+        /// @brief Return a non-const reference to the value at index @a i.
+        /// @details This method is private since it makes assumptions about the
+        /// buffer's memory layout.  Buffers associated with custom leaf node types
+        /// (e.g., a bool buffer implemented as a bitmask) might not be able to
+        /// return non-const references to their values.
+        ValueType& operator[](Index i) { return const_cast<ValueType&>(this->at(i)); }
+
+        bool deallocate()
+        {
+            if (mData != NULL && !this->isOutOfCore()) {
+                delete[] mData;
+                mData = NULL;
+                return true;
+            }
+            return false;
+        }
+
+#ifdef OPENVDB_2_ABI_COMPATIBLE
+        void setOutOfCore(bool) {}
+        void loadValues() const {}
+        void doLoad() const {}
+        bool detachFromFile() { return false; }
+#else
+        inline void setOutOfCore(bool b) { mOutOfCore = b; }
+        // To facilitate inlining in the common case in which the buffer is in-core,
+        // the loading logic is split into a separate function, doLoad().
+        inline void loadValues() const { if (this->isOutOfCore()) this->doLoad(); }
+        inline void doLoad() const;
+        inline bool detachFromFile()
+        {
+            if (this->isOutOfCore()) {
+                delete mFileInfo;
+                mFileInfo = NULL;
+                this->setOutOfCore(false);
+                return true;
+            }
+            return false;
+        }
+#endif
 
         friend class ::TestLeaf;
-        // Allow the parent LeafNode to access this Buffer's data pointer.
+        // Allow the parent LeafNode to access this buffer's data pointer.
         friend class LeafNode;
 
+#ifdef OPENVDB_2_ABI_COMPATIBLE
         ValueType* mData;
+#else
+        union {
+            ValueType* mData;
+            FileInfo* mFileInfo;
+        };
+        Index32 mOutOfCore; // currently interpreted as bool; extra bits reserved for future use
+        tbb::spin_mutex mMutex; // 1 byte
+        //int8_t mReserved[3]; // padding for alignment
+
+        static const ValueType sZero;
+#endif
     }; // class Buffer
 
 
@@ -177,6 +345,19 @@ public:
     explicit LeafNode(const Coord& coords,
                       const ValueType& value = zeroVal<ValueType>(),
                       bool active = false);
+
+
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    /// @brief "Partial creation" constructor used during file input
+    /// @param coords  the grid index coordinates of a voxel
+    /// @param value   a value with which to fill the buffer
+    /// @param active  the active state to which to initialize all voxels
+    /// @details This constructor does not allocate memory for voxel values.
+    LeafNode(PartialCreate,
+             const Coord& coords,
+             const ValueType& value = zeroVal<ValueType>(),
+             bool active = false);
+#endif
 
     /// Deep copy constructor
     LeafNode(const LeafNode&);
@@ -232,6 +413,13 @@ public:
     bool isEmpty() const { return mValueMask.isOff(); }
     /// Return @c true if this node contains only active voxels.
     bool isDense() const { return mValueMask.isOn(); }
+
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    /// Return @c true if memory for this node's buffer has been allocated.
+    bool isAllocated() const { return !mBuffer.isOutOfCore() && !mBuffer.empty(); }
+    /// Allocate memory for this node's buffer if it has not already been allocated.
+    bool allocate() { return mBuffer.allocate(); }
+#endif
 
     /// Return the memory in bytes occupied by this node.
     Index64 memUsage() const;
@@ -435,6 +623,11 @@ public:
     /// @param is        the stream from which to read
     /// @param fromHalf  if true, floating-point input values are assumed to be 16-bit
     void readBuffers(std::istream& is, bool fromHalf = false);
+    /// @brief Read buffers that intersect the given bounding box.
+    /// @param is        the stream from which to read
+    /// @param bbox      an index-space bounding box
+    /// @param fromHalf  if true, floating-point input values are assumed to be 16-bit
+    void readBuffers(std::istream& is, const CoordBBox& bbox, bool fromHalf = false);
     /// @brief Write buffers to a stream.
     /// @param os      the stream to which to write
     /// @param toHalf  if true, output floating-point values as 16-bit half floats
@@ -494,7 +687,7 @@ public:
     void setValue(const Coord& xyz, const ValueType& val) { this->setValueOn(xyz, val); };
     /// Set the value of the voxel at the given offset and mark the voxel as active.
     void setValueOn(Index offset, const ValueType& val) {
-        mBuffer[offset] = val;
+        mBuffer.setValue(offset, val);
         mValueMask.setOn(offset);
     }
 
@@ -503,7 +696,9 @@ public:
     template<typename ModifyOp>
     void modifyValue(Index offset, const ModifyOp& op)
     {
-        op(mBuffer[offset]);
+        ValueType val = mBuffer[offset];
+        op(val);
+        mBuffer.setValue(offset, val);
         mValueMask.setOn(offset);
     }
     /// @brief Apply a functor to the value of the voxel at the given coordinates
@@ -520,7 +715,9 @@ public:
     {
         const Index offset = this->coordToOffset(xyz);
         bool state = mValueMask.isOn(offset);
-        op(mBuffer[offset], state);
+        ValueType val = mBuffer[offset];
+        op(val, state);
+        mBuffer.setValue(offset, val);
         mValueMask.set(offset, state);
     }
 
@@ -536,6 +733,9 @@ public:
 
     /// Return @c false since leaf nodes never contain tiles.
     static bool hasActiveTiles() { return false; }
+
+    /// Set all voxels that lie outside the given axis-aligned box to the background.
+    void clip(const CoordBBox&, const ValueType& background);
 
     /// Set all voxels within an axis-aligned box to the specified value and active state.
     void fill(const CoordBBox& bbox, const ValueType&, bool active = true);
@@ -680,20 +880,6 @@ public:
     /// and inactive occurrences of @a -oldBackground with @a -newBackground.
     void resetBackground(const ValueType& oldBackground, const ValueType& newBackground);
 
-    /// @brief Overwrite each inactive value in this node and in any child nodes with
-    /// a new value whose magnitude is equal to the specified background value and whose
-    /// sign is consistent with that of the lexicographically closest active value.
-    /// @details This is primarily useful for propagating the sign from the (active) voxels
-    /// in a narrow-band level set to the inactive voxels outside the narrow band.
-    void signedFloodFill(const ValueType& background);
-
-    /// @brief Overwrite each inactive value in this node and in any child nodes with
-    /// either @a outside or @a inside, depending on the sign of the lexicographically
-    /// closest active value.
-    /// @details Specifically, an inactive value is set to @a outside if the closest active
-    /// value in the lexicographic direction is positive, otherwise it is set to @a inside.
-    void signedFloodFill(const ValueType& outside, const ValueType& inside);
-
     void negate();
 
     void voxelizeActiveTiles() {};
@@ -773,9 +959,7 @@ public:
 
     //@{
     /// This function exists only to enable template instantiation.
-    template<typename PruneOp> void pruneOp(PruneOp&) {}
     void prune(const ValueType& /*tolerance*/ = zeroVal<ValueType>()) {}
-    void pruneInactive(const ValueType&) {}
     void addLeaf(LeafNode*) {}
     template<typename AccessorT>
     void addLeafAndCache(LeafNode*, AccessorT&) {}
@@ -857,13 +1041,6 @@ protected:
     friend class IteratorBase<MaskOffIterator, LeafNode>;
     friend class IteratorBase<MaskDenseIterator, LeafNode>;
 
-    /// Buffer containing the actual data values
-    Buffer mBuffer;
-    /// Bitmask that determines which voxels are active
-    NodeMaskType mValueMask;
-    /// Global grid index coordinates (x,y,z) of the local origin of this node
-    Coord mOrigin;
-
     // Mask accessors
 public:
     bool isValueMaskOn(Index n) const { return mValueMask.isOn(n); }
@@ -895,7 +1072,20 @@ protected:
              typename ChildAllIterT, typename OtherChildAllIterT>
     static inline void doVisit2(NodeT& self, OtherChildAllIterT&, VisitorOp&, bool otherIsLHS);
 
+private:
+    /// Buffer containing the actual data values
+    Buffer mBuffer;
+    /// Bitmask that determines which voxels are active
+    NodeMaskType mValueMask;
+    /// Global grid index coordinates (x,y,z) of the local origin of this node
+    Coord mOrigin;
 }; // end of LeafNode class
+
+
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+template<typename T, Index Log2Dim>
+const T LeafNode<T, Log2Dim>::Buffer::sZero = zeroVal<T>();
+#endif
 
 
 ////////////////////////////////////////
@@ -932,6 +1122,18 @@ LeafNode<T, Log2Dim>::LeafNode(const Coord& xyz, const ValueType& val, bool acti
     mOrigin(xyz & (~(DIM - 1)))
 {
 }
+
+
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+template<typename T, Index Log2Dim>
+inline
+LeafNode<T, Log2Dim>::LeafNode(PartialCreate, const Coord& xyz, const ValueType& val, bool active):
+    mBuffer(PartialCreate(), val),
+    mValueMask(active),
+    mOrigin(xyz & (~(DIM - 1)))
+{
+}
+#endif
 
 
 template<typename T, Index Log2Dim>
@@ -1089,7 +1291,7 @@ inline void
 LeafNode<T, Log2Dim>::setValueOff(Index offset, const ValueType& val)
 {
     assert(offset < SIZE);
-    mBuffer[offset] = val;
+    mBuffer.setValue(offset, val);
     mValueMask.setOff(offset);
 }
 
@@ -1113,7 +1315,47 @@ template<typename T, Index Log2Dim>
 inline void
 LeafNode<T, Log2Dim>::setValueOnly(Index offset, const ValueType& val)
 {
-    assert(offset<SIZE); mBuffer[offset] = val;
+    assert(offset<SIZE); mBuffer.setValue(offset, val);
+}
+
+
+////////////////////////////////////////
+
+
+template<typename T, Index Log2Dim>
+inline void
+LeafNode<T, Log2Dim>::clip(const CoordBBox& clipBBox, const T& background)
+{
+    CoordBBox nodeBBox = this->getNodeBoundingBox();
+    if (!clipBBox.hasOverlap(nodeBBox)) {
+        // This node lies completely outside the clipping region.  Fill it with the background.
+        this->fill(background, /*active=*/false);
+    } else if (clipBBox.isInside(nodeBBox)) {
+        // This node lies completely inside the clipping region.  Leave it intact.
+        return;
+    }
+
+    // This node isn't completely contained inside the clipping region.
+    // Set any voxels that lie outside the region to the background value.
+
+    // Construct a boolean mask that is on inside the clipping region and off outside it.
+    NodeMaskType mask;
+    nodeBBox.intersect(clipBBox);
+    Coord xyz;
+    int &x = xyz.x(), &y = xyz.y(), &z = xyz.z();
+    for (x = nodeBBox.min().x(); x <= nodeBBox.max().x(); ++x) {
+        for (y = nodeBBox.min().y(); y <= nodeBBox.max().y(); ++y) {
+            for (z = nodeBBox.min().z(); z <= nodeBBox.max().z(); ++z) {
+                mask.setOn(static_cast<Index32>(this->coordToOffset(xyz)));
+            }
+        }
+    }
+
+    // Set voxels that lie in the inactive region of the mask (i.e., outside
+    // the clipping region) to the background value.
+    for (MaskOffIterator maskIter = mask.beginOff(); maskIter; ++maskIter) {
+        this->setValueOff(maskIter.pos(), background);
+    }
 }
 
 
@@ -1124,6 +1366,10 @@ template<typename T, Index Log2Dim>
 inline void
 LeafNode<T, Log2Dim>::fill(const CoordBBox& bbox, const ValueType& value, bool active)
 {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    if (!this->allocate()) return;
+#endif
+
     for (Int32 x = bbox.min().x(); x <= bbox.max().x(); ++x) {
         const Index offsetX = (x & (DIM-1u)) << 2*Log2Dim;
         for (Int32 y = bbox.min().y(); y <= bbox.max().y(); ++y) {
@@ -1161,6 +1407,10 @@ template<typename DenseT>
 inline void
 LeafNode<T, Log2Dim>::copyToDense(const CoordBBox& bbox, DenseT& dense) const
 {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    if (!this->isAllocated()) return;
+#endif
+
     typedef typename DenseT::ValueType DenseValueType;
 
     const size_t xStride = dense.xStride(), yStride = dense.yStride(), zStride = dense.zStride();
@@ -1187,6 +1437,10 @@ inline void
 LeafNode<T, Log2Dim>::copyFromDense(const CoordBBox& bbox, const DenseT& dense,
                                     const ValueType& background, const ValueType& tolerance)
 {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    if (!this->allocate()) return;
+#endif
+
     typedef typename DenseT::ValueType DenseValueType;
 
     const size_t xStride = dense.xStride(), yStride = dense.yStride(), zStride = dense.zStride();
@@ -1236,10 +1490,65 @@ LeafNode<T, Log2Dim>::writeTopology(std::ostream& os, bool /*toHalf*/) const
 ////////////////////////////////////////
 
 
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+template<typename T, Index Log2Dim>
+inline void
+LeafNode<T, Log2Dim>::Buffer::doLoad() const
+{
+    if (!this->isOutOfCore()) return;
+
+    Buffer* self = const_cast<Buffer*>(this);
+
+    // This lock will be contended at most once, after which this buffer
+    // will no longer be out-of-core.
+    tbb::spin_mutex::scoped_lock lock(self->mMutex);
+    if (!this->isOutOfCore()) return;
+
+    boost::scoped_ptr<FileInfo> info(self->mFileInfo);
+    assert(info.get() != NULL);
+    assert(info->mapping.get() != NULL);
+    assert(info->meta.get() != NULL);
+
+    /// @todo For now, we have to clear the mData pointer in order for allocate() to take effect.
+    self->mData = NULL;
+    self->allocate();
+
+    boost::shared_ptr<std::streambuf> buf = info->mapping->createBuffer();
+    std::istream is(buf.get());
+
+    io::setStreamMetadataPtr(is, info->meta, /*transfer=*/true);
+
+    NodeMaskType mask;
+    is.seekg(info->maskpos);
+    mask.load(is);
+
+    is.seekg(info->bufpos);
+    io::readCompressedValues(is, self->mData, SIZE, mask, io::getHalfFloat(is));
+
+    self->setOutOfCore(false);
+}
+#endif
+
+
+////////////////////////////////////////
+
+
 template<typename T, Index Log2Dim>
 inline void
 LeafNode<T,Log2Dim>::readBuffers(std::istream& is, bool fromHalf)
 {
+    this->readBuffers(is, CoordBBox::inf(), fromHalf);
+}
+
+
+template<typename T, Index Log2Dim>
+inline void
+LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bool fromHalf)
+{
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    std::streamoff maskpos = is.tellg();
+#endif
+
     // Read in the value mask.
     mValueMask.load(is);
 
@@ -1252,7 +1561,53 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, bool fromHalf)
         is.read(reinterpret_cast<char*>(&numBuffers), sizeof(int8_t));
     }
 
-    io::readCompressedValues(is, mBuffer.mData, SIZE, mValueMask, fromHalf);
+    CoordBBox nodeBBox = this->getNodeBoundingBox();
+    if (!clipBBox.hasOverlap(nodeBBox)) {
+        // This node lies completely outside the clipping region.
+        // Read and discard its voxel values.
+        Buffer temp;
+        io::readCompressedValues(is, temp.mData, SIZE, mValueMask, fromHalf);
+        mValueMask.setOff();
+        mBuffer.setOutOfCore(false);
+    } else {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+        // If this node lies completely inside the clipping region and it is being read
+        // from a memory-mapped file, delay loading of its buffer until the buffer
+        // is actually accessed.  (If this node requires clipping, its buffer
+        // must be accessed and therefore must be loaded.)
+        io::MappedFile::Ptr mappedFile = io::getMappedFilePtr(is);
+        const bool delayLoad = ((mappedFile.get() != NULL) && clipBBox.isInside(nodeBBox));
+
+        if (delayLoad) {
+            mBuffer.setOutOfCore(true);
+            mBuffer.mFileInfo = new FileInfo;
+            mBuffer.mFileInfo->bufpos = is.tellg();
+            mBuffer.mFileInfo->mapping = mappedFile;
+            // Save the offset to the value mask, because the in-memory copy
+            // might change before the value buffer gets read.
+            mBuffer.mFileInfo->maskpos = maskpos;
+
+            mBuffer.mFileInfo->meta = io::getStreamMetadataPtr(is);
+
+            // Read and discard voxel values.
+            Buffer temp;
+            io::readCompressedValues(is, temp.mData, SIZE, mValueMask, fromHalf);
+        } else {
+#endif
+            mBuffer.allocate();
+            io::readCompressedValues(is, mBuffer.mData, SIZE, mValueMask, fromHalf);
+            mBuffer.setOutOfCore(false);
+
+            // Get this tree's background value.
+            T background = zeroVal<T>();
+            if (const void* bgPtr = io::getGridBackgroundValuePtr(is)) {
+                background = *static_cast<const T*>(bgPtr);
+            }
+            this->clip(clipBBox, background);
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+        }
+#endif
+    }
 
     if (numBuffers > 1) {
         // Read in and discard auxiliary buffers that were created with earlier
@@ -1277,6 +1632,8 @@ LeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
     // Write out the value mask.
     mValueMask.save(os);
 
+    mBuffer.loadValues();
+
     io::writeCompressedValues(os, mBuffer.mData, SIZE,
         mValueMask, /*childMask=*/NodeMaskType(), toHalf);
 }
@@ -1299,7 +1656,9 @@ template<typename T, Index Log2Dim>
 inline Index64
 LeafNode<T, Log2Dim>::memUsage() const
 {
-    return mBuffer.memUsage() + sizeof(mOrigin) + mValueMask.memUsage();
+    // Use sizeof(*this) to capture alignment-related padding
+    // (but note that sizeof(*this) includes sizeof(mBuffer)).
+    return sizeof(*this) + mBuffer.memUsage() - sizeof(mBuffer);
 }
 
 
@@ -1384,52 +1743,13 @@ LeafNode<T, Log2Dim>::addTileAndCache(Index level, const Coord& xyz,
 
 template<typename T, Index Log2Dim>
 inline void
-LeafNode<T, Log2Dim>::signedFloodFill(const ValueType& background)
-{
-    this->signedFloodFill(background, math::negative(background));
-}
-
-template<typename T, Index Log2Dim>
-inline void
-LeafNode<T, Log2Dim>::signedFloodFill(const ValueType& outsideValue,
-                                      const ValueType& insideValue)
-{
-    const Index first = mValueMask.findFirstOn();
-    if (first < SIZE) {
-        bool xInside = math::isNegative(mBuffer[first]), yInside = xInside, zInside = xInside;
-        for (Index x = 0; x != (1 << Log2Dim); ++x) {
-            const Index x00 = x << (2 * Log2Dim);
-            if (mValueMask.isOn(x00)) {
-                xInside = math::isNegative(mBuffer[x00]); // element(x, 0, 0)
-            }
-            yInside = xInside;
-            for (Index y = 0; y != (1 << Log2Dim); ++y) {
-                const Index xy0 = x00 + (y << Log2Dim);
-                if (mValueMask.isOn(xy0)) {
-                    yInside = math::isNegative(mBuffer[xy0]); // element(x, y, 0)
-                }
-                zInside = yInside;
-                for (Index z = 0; z != (1 << Log2Dim); ++z) {
-                    const Index xyz = xy0 + z; // element(x, y, z)
-                    if (mValueMask.isOn(xyz)) {
-                        zInside = math::isNegative(mBuffer[xyz]);
-                    } else {
-                        mBuffer[xyz] = zInside ? insideValue : outsideValue;
-                    }
-                }
-            }
-        }
-    } else {// if no active voxels exist simply use the sign of the first value
-        mBuffer.fill(math::isNegative(mBuffer[0]) ? insideValue : outsideValue);
-    }
-}
-
-
-template<typename T, Index Log2Dim>
-inline void
 LeafNode<T, Log2Dim>::resetBackground(const ValueType& oldBackground,
                                       const ValueType& newBackground)
 {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    if (!this->allocate()) return;
+#endif
+
     typename NodeMaskType::OffIterator iter;
     // For all inactive values...
     for (iter = this->mValueMask.beginOff(); iter; ++iter) {
@@ -1448,6 +1768,10 @@ template<MergePolicy Policy>
 inline void
 LeafNode<T, Log2Dim>::merge(const LeafNode& other)
 {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    if (!this->allocate()) return;
+#endif
+
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
     if (Policy == MERGE_NODES) return;
     typename NodeMaskType::OnIterator iter = other.mValueMask.beginOn();
@@ -1475,6 +1799,10 @@ template<MergePolicy Policy>
 inline void
 LeafNode<T, Log2Dim>::merge(const ValueType& tileValue, bool tileActive)
 {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    if (!this->allocate()) return;
+#endif
+
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
     if (Policy != MERGE_ACTIVE_STATES_AND_NODES) return;
     if (!tileActive) return;
@@ -1518,6 +1846,9 @@ template<typename T, Index Log2Dim>
 inline void
 LeafNode<T, Log2Dim>::negate()
 {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    if (!this->allocate()) return;
+#endif
     for (Index i = 0; i < SIZE; ++i) {
         mBuffer[i] = -mBuffer[i];
     }
@@ -1532,6 +1863,9 @@ template<typename CombineOp>
 inline void
 LeafNode<T, Log2Dim>::combine(const LeafNode& other, CombineOp& op)
 {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    if (!this->allocate()) return;
+#endif
     CombineArgs<T> args;
     for (Index i = 0; i < SIZE; ++i) {
         op(args.setARef(mBuffer[i])
@@ -1549,6 +1883,9 @@ template<typename CombineOp>
 inline void
 LeafNode<T, Log2Dim>::combine(const ValueType& value, bool valueIsActive, CombineOp& op)
 {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    if (!this->allocate()) return;
+#endif
     CombineArgs<T> args;
     args.setBRef(value).setBIsActive(valueIsActive);
     for (Index i = 0; i < SIZE; ++i) {
@@ -1569,6 +1906,9 @@ inline void
 LeafNode<T, Log2Dim>::combine2(const LeafNode& other, const OtherType& value,
     bool valueIsActive, CombineOp& op)
 {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    if (!this->allocate()) return;
+#endif
     CombineArgs<T, OtherType> args;
     args.setBRef(value).setBIsActive(valueIsActive);
     for (Index i = 0; i < SIZE; ++i) {
@@ -1586,6 +1926,9 @@ inline void
 LeafNode<T, Log2Dim>::combine2(const ValueType& value, const OtherNodeT& other,
     bool valueIsActive, CombineOp& op)
 {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    if (!this->allocate()) return;
+#endif
     CombineArgs<T, typename OtherNodeT::ValueType> args;
     args.setARef(value).setAIsActive(valueIsActive);
     for (Index i = 0; i < SIZE; ++i) {
@@ -1602,6 +1945,9 @@ template<typename CombineOp, typename OtherNodeT>
 inline void
 LeafNode<T, Log2Dim>::combine2(const LeafNode& b0, const OtherNodeT& b1, CombineOp& op)
 {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    if (!this->allocate()) return;
+#endif
     CombineArgs<T, typename OtherNodeT::ValueType> args;
     for (Index i = 0; i < SIZE; ++i) {
         mValueMask.set(i, b0.mValueMask.isOn(i) || b1.mValueMask.isOn(i));
@@ -1787,6 +2133,6 @@ operator<<(std::ostream& os, const typename LeafNode<T, Log2Dim>::Buffer& buf)
 
 #endif // OPENVDB_TREE_LEAFNODE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -423,6 +423,9 @@ public:
     /// i.e. either active voxels or tiles. Only when a hit is
     /// detected are t0 and t1 updated with the corresponding entry
     /// and exit times along the INDEX ray!
+    /// @note Note that t0 and t1 are only resolved at the node level
+    /// (e.g. a LeafNode with active voxels) as oppose the individual
+    /// active voxels.
     /// @param t0 If the return value > 0 this is the time of the
     /// first hit of an active tile or leaf.
     /// @param t1 If the return value > t0 this is the time of the
@@ -437,7 +440,16 @@ public:
         return t.valid();
     }
 
-    inline void hits(std::vector<typename RayT::TimeSpan>& list)
+    /// @brief Generates a list of hits along the ray.
+    ///
+    /// @param list List of hits represented as time spans.
+    ///
+    /// @note ListType is a list of RayType::TimeSpan and is required to
+    /// have the two methods: clear() and push_back(). Thus, it could
+    /// be std::vector<typename RayType::TimeSpan> or
+    /// std::deque<typename RayType::TimeSpan>. 
+    template <typename ListType>
+    inline void hits(ListType& list)
     {
         mHDDA.hits(mRay, mAccessor, list);
     }
@@ -539,8 +551,8 @@ public:
     LinearSearchImpl(const GridT& grid, const ValueT& isoValue = zeroVal<ValueT>())
         : mStencil(grid),
           mIsoValue(isoValue),
-          mMinValue(isoValue-2*grid.voxelSize()[0]),
-          mMaxValue(isoValue+2*grid.voxelSize()[0])
+          mMinValue(isoValue - ValueT(2 * grid.voxelSize()[0])),
+          mMaxValue(isoValue + ValueT(2 * grid.voxelSize()[0]))
       {
           if ( grid.empty() ) {
               OPENVDB_THROW(RuntimeError, "LinearSearchImpl does not supports empty grids");
@@ -609,7 +621,7 @@ private:
     inline void init(RealT t0)
     {
         mT[0] = t0;
-        mV[0] = this->interpValue(t0);
+        mV[0] = static_cast<ValueT>(this->interpValue(t0));
     }
 
     inline void setRange(RealT t0, RealT t1) { mRay.setTimes(t0, t1); }
@@ -635,12 +647,12 @@ private:
         if (mStencil.accessor().probeValue(ijk, V) &&//within narrow band
             V>mMinValue && V<mMaxValue) {// and close to iso-value?
             mT[1] = time;
-            mV[1] = this->interpValue(time);
+            mV[1] = static_cast<ValueT>(this->interpValue(time));
             if (math::ZeroCrossing(mV[0], mV[1])) {
                 mTime = this->interpTime();
                 OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
                 for (int n=0; Iterations>0 && n<Iterations; ++n) {//resolved at compile-time
-                    V = this->interpValue(mTime);
+                    V = static_cast<ValueT>(this->interpValue(mTime));
                     const int m = math::ZeroCrossing(mV[0], V) ? 1 : 0;
                     mV[m] = V;
                     mT[m] = mTime;
@@ -685,6 +697,6 @@ private:
 
 #endif // OPENVDB_TOOLS_RAYINTERSECTOR_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

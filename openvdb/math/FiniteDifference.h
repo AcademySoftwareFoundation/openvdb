@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -329,22 +329,23 @@ temporalIntegrationSchemeToMenuName(TemporalIntegrationScheme tis)
 template<typename ValueType>
 inline ValueType
 WENO5(const ValueType& v1, const ValueType& v2, const ValueType& v3,
-    const ValueType& v4, const ValueType& v5, float scale2 = 0.01)
+    const ValueType& v4, const ValueType& v5, float scale2 = 0.01f)
 {
-    static const double C=13.0/12.0;
-    // Weno is formulated for non-dimensional equations, here the optional scale2
+    const double C = 13.0 / 12.0;
+    // WENO is formulated for non-dimensional equations, here the optional scale2
     // is a reference value (squared) for the function being interpolated.  For
     // example if 'v' is of order 1000, then scale2 = 10^6 is ok.  But in practice
     // leave scale2 = 1.
-    const double eps=1e-6*scale2;
+    const double eps = 1e-6 * scale2;
     // {\tilde \omega_k} = \gamma_k / ( \beta_k + \epsilon)^2 in Shu's ICASE report)
     const double A1=0.1/math::Pow2(C*math::Pow2(v1-2*v2+v3)+0.25*math::Pow2(v1-4*v2+3.0*v3)+eps),
                  A2=0.6/math::Pow2(C*math::Pow2(v2-2*v3+v4)+0.25*math::Pow2(v2-v4)+eps),
                  A3=0.3/math::Pow2(C*math::Pow2(v3-2*v4+v5)+0.25*math::Pow2(3.0*v3-4*v4+v5)+eps);
 
-    return ValueType(A1*(2.0*v1 - 7.0*v2 + 11.0*v3) +
-                     A2*(5.0*v3 -     v2 +  2.0*v4) +
-                     A3*(2.0*v3 + 5.0*v4 -      v5))/(6.0*(A1+A2+A3));
+    return static_cast<ValueType>(static_cast<ValueType>(
+        A1*(2.0*v1 - 7.0*v2 + 11.0*v3) +
+        A2*(5.0*v3 -     v2 +  2.0*v4) +
+        A3*(2.0*v3 + 5.0*v4 -      v5))/(6.0*(A1+A2+A3)));
 }
 
 
@@ -404,12 +405,12 @@ WENO5<simd::Float4>(const simd::Float4& v1, const simd::Float4& v2, const simd::
     using math::Pow2;
     typedef simd::Float4 F4;
     const F4
-        C(13.0 / 12.0),
-        eps(1e-6 * scale2),
+        C(13.f / 12.f),
+        eps(1.0e-6f * scale2),
         two(2.0), three(3.0), four(4.0), five(5.0), fourth(0.25),
-        A1 = F4(0.1) / Pow2(C*Pow2(v1-two*v2+v3) + fourth*Pow2(v1-four*v2+three*v3) + eps),
-        A2 = F4(0.6) / Pow2(C*Pow2(v2-two*v3+v4) + fourth*Pow2(v2-v4) + eps),
-        A3 = F4(0.3) / Pow2(C*Pow2(v3-two*v4+v5) + fourth*Pow2(three*v3-four*v4+v5) + eps);
+        A1 = F4(0.1f) / Pow2(C*Pow2(v1-two*v2+v3) + fourth*Pow2(v1-four*v2+three*v3) + eps),
+        A2 = F4(0.6f) / Pow2(C*Pow2(v2-two*v3+v4) + fourth*Pow2(v2-v4) + eps),
+        A3 = F4(0.3f) / Pow2(C*Pow2(v3-two*v4+v5) + fourth*Pow2(three*v3-four*v4+v5) + eps);
     return (A1 * (two * v1 - F4(7.0) * v2 + F4(11.0) * v3) +
             A2 * (five * v3 - v2 + two * v4) +
             A3 * (two * v3 + five * v4 - v5)) / (F4(6.0) * (A1 + A2 + A3));
@@ -1102,7 +1103,7 @@ struct D1<BD_3RD>
 template<>
 struct D1<FD_WENO5>
 {
-    // the difference opperator
+    // the difference operator
     template <typename ValueType>
     static ValueType difference(const ValueType& xp3, const ValueType& xp2,
                                 const ValueType& xp1, const ValueType& xp0,
@@ -1163,36 +1164,38 @@ struct D1<FD_WENO5>
     static typename Stencil::ValueType inX(const Stencil& S)
     {
 
-        return difference( S.template getValue< 3, 0, 0>(),
-                           S.template getValue< 2, 0, 0>(),
-                           S.template getValue< 1, 0, 0>(),
-                           S.template getValue< 0, 0, 0>(),
-                           S.template getValue<-1, 0, 0>(),
-                           S.template getValue<-2, 0, 0>() );
+        return static_cast<typename Stencil::ValueType>(difference(
+            S.template getValue< 3, 0, 0>(),
+            S.template getValue< 2, 0, 0>(),
+            S.template getValue< 1, 0, 0>(),
+            S.template getValue< 0, 0, 0>(),
+            S.template getValue<-1, 0, 0>(),
+            S.template getValue<-2, 0, 0>() ));
 
     }
 
     template<typename Stencil>
     static typename Stencil::ValueType inY(const Stencil& S)
     {
-        return difference( S.template getValue< 0, 3, 0>(),
-                           S.template getValue< 0, 2, 0>(),
-                           S.template getValue< 0, 1, 0>(),
-                           S.template getValue< 0, 0, 0>(),
-                           S.template getValue< 0,-1, 0>(),
-                           S.template getValue< 0,-2, 0>() );
+        return static_cast<typename Stencil::ValueType>(difference(
+            S.template getValue< 0, 3, 0>(),
+            S.template getValue< 0, 2, 0>(),
+            S.template getValue< 0, 1, 0>(),
+            S.template getValue< 0, 0, 0>(),
+            S.template getValue< 0,-1, 0>(),
+            S.template getValue< 0,-2, 0>() ));
     }
 
     template<typename Stencil>
     static typename Stencil::ValueType inZ(const Stencil& S)
     {
-
-        return difference( S.template getValue< 0, 0, 3>(),
-                           S.template getValue< 0, 0, 2>(),
-                           S.template getValue< 0, 0, 1>(),
-                           S.template getValue< 0, 0, 0>(),
-                           S.template getValue< 0, 0,-1>(),
-                           S.template getValue< 0, 0,-2>() );
+        return static_cast<typename Stencil::ValueType>(difference(
+            S.template getValue< 0, 0, 3>(),
+            S.template getValue< 0, 0, 2>(),
+            S.template getValue< 0, 0, 1>(),
+            S.template getValue< 0, 0, 0>(),
+            S.template getValue< 0, 0,-1>(),
+            S.template getValue< 0, 0,-2>() ));
     }
 };
 
@@ -2195,46 +2198,49 @@ struct D2<CD_SIXTH>
     template<typename Accessor>
     static typename Accessor::ValueType inXandY(const Accessor& grid, const Coord& ijk)
     {
-        typename Accessor::ValueType tmp1 =
+        typedef typename Accessor::ValueType ValueT;
+        ValueT tmp1 =
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 1, 0)) -
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0,-1, 0));
-        typename Accessor::ValueType tmp2 =
+        ValueT tmp2 =
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 2, 0)) -
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0,-2, 0));
-        typename Accessor::ValueType tmp3 =
+        ValueT tmp3 =
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 3, 0)) -
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0,-3, 0));
-        return 0.75*tmp1 - 0.15*tmp2 + 1./60*tmp3;
+        return ValueT(0.75*tmp1 - 0.15*tmp2 + 1./60*tmp3);
     }
 
     template<typename Accessor>
     static typename Accessor::ValueType inXandZ(const Accessor& grid, const Coord& ijk)
     {
-        typename Accessor::ValueType tmp1 =
+        typedef typename Accessor::ValueType ValueT;
+        ValueT tmp1 =
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 0, 1)) -
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 0,-1));
-        typename Accessor::ValueType tmp2 =
+        ValueT tmp2 =
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 0, 2)) -
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 0,-2));
-        typename Accessor::ValueType tmp3 =
+        ValueT tmp3 =
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 0, 3)) -
             D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 0,-3));
-        return 0.75*tmp1 - 0.15*tmp2 + 1./60*tmp3;
+        return ValueT(0.75*tmp1 - 0.15*tmp2 + 1./60*tmp3);
     }
 
     template<typename Accessor>
     static typename Accessor::ValueType inYandZ(const Accessor& grid, const Coord& ijk)
     {
-        typename Accessor::ValueType tmp1 =
+        typedef typename Accessor::ValueType ValueT;
+        ValueT tmp1 =
             D1<CD_6TH>::inY(grid, ijk.offsetBy(0, 0, 1)) -
             D1<CD_6TH>::inY(grid, ijk.offsetBy(0, 0,-1));
-        typename Accessor::ValueType tmp2 =
+        ValueT tmp2 =
             D1<CD_6TH>::inY(grid, ijk.offsetBy(0, 0, 2)) -
             D1<CD_6TH>::inY(grid, ijk.offsetBy(0, 0,-2));
-        typename Accessor::ValueType tmp3 =
+        ValueT tmp3 =
             D1<CD_6TH>::inY(grid, ijk.offsetBy(0, 0, 3)) -
             D1<CD_6TH>::inY(grid, ijk.offsetBy(0, 0,-3));
-        return 0.75*tmp1 - 0.15*tmp2 + 1./60*tmp3;
+        return ValueT(0.75*tmp1 - 0.15*tmp2 + 1./60*tmp3);
     }
 
 
@@ -2344,6 +2350,6 @@ struct D2<CD_SIXTH>
 
 #endif // OPENVDB_MATH_FINITEDIFFERENCE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

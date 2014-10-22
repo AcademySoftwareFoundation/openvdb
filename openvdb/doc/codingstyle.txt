@@ -205,7 +205,8 @@ but when specific bit sizes are required, use explicitly-sized types such as
 
 
 @subsection sMacros Macros
--# Avoid macros for constants. Use static constants instead.
+-# Avoid macros for constants. Use global static constants instead. (Local
+static constants are not guaranteed to be initialized in a thread-safe manner.)
 -# Avoid macro functions. Use @c inline and templates instead.
 
 

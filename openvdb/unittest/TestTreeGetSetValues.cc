@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -33,6 +33,7 @@
 #include <openvdb/Types.h>
 #include <openvdb/tree/Tree.h>
 #include <openvdb/tools/ValueTransformer.h> // for tools::setValueOnMin() et al.
+#include <openvdb/tools/Prune.h>
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
@@ -124,11 +125,11 @@ TestTreeGetSetValues::testSetValues()
         const int expectedActiveCount = (!activeTile ? 8 : 32 * 32 * 32);
         CPPUNIT_ASSERT_EQUAL(expectedActiveCount, int(tree.activeVoxelCount()));
 
-        float val = 1.0;
+        float val = 1.f;
         for (Tree323f::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
             ASSERT_DOUBLES_EXACTLY_EQUAL(val, iter->getValue(openvdb::Coord(0, 0, 0)));
             ASSERT_DOUBLES_EXACTLY_EQUAL(val+0.5, iter->getValue(openvdb::Coord(1, 0, 0)));
-            val = val + 1.0;
+            val = val + 1.f;
         }
     }
 }
@@ -369,7 +370,7 @@ TestTreeGetSetValues::testFill()
     // Partially fill a region with the background value.
     tree.fill(CoordBBox(Coord(27), Coord(254)), background, /*active=*/false);
     // Confirm that after pruning, the tree is empty.
-    tree.prune();
+    openvdb::tools::prune(tree);
     CPPUNIT_ASSERT(tree.empty());
     CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), tree.leafCount());
     CPPUNIT_ASSERT_EQUAL(openvdb::Index32(1), tree.nonLeafCount()); // root node
@@ -460,6 +461,6 @@ TestTreeGetSetValues::testHasActiveTiles()
     CPPUNIT_ASSERT(tree.hasActiveTiles());
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

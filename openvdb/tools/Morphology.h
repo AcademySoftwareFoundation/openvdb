@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -28,7 +28,20 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 //
-///////////////////////////////////////////////////////////////////////////
+/// @file   Morphology.h
+///
+/// @brief  Implementation of morphological dilation and erosion.
+///
+/// @note   By design the morphological operations only change the
+///         state of voxels, not their values. If one desires to
+///         change the values of voxels that change state an efficient
+///         technique is to construct a boolean mask by performing a
+///         topology difference between the original and final grids.
+///
+/// @todo   Extend erosion with 18 and 26 neighbors (coming soon!)
+///
+/// @author Ken Museth
+///
 
 #ifndef OPENVDB_TOOLS_MORPHOLOGY_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_MORPHOLOGY_HAS_BEEN_INCLUDED
@@ -39,6 +52,9 @@
 #include <openvdb/tree/TreeIterator.h>
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/tree/LeafManager.h>
+#include <boost/scoped_array.hpp>
+#include <boost/bind.hpp>
+#include "Prune.h"// for pruneLevelSet
 #include "ValueTransformer.h" // for foreach()
 
 namespace openvdb {
@@ -46,30 +62,75 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
-//@{
-/// Topologically dilate all leaf-level active voxels in the given tree,
-/// i.e., expand the set of active voxels by @a count voxels in the +x, -x,
-/// +y, -y, +z and -z directions, but don't change the values of any voxels,
-/// only their active states.
+/// @brief Voxel topology of nearest neighbors
+/// @details
+/// <dl>
+/// <dt><b>NN_FACE</b>
+/// <dd>face adjacency (6 nearest neighbors, defined as all neighbor
+/// voxels connected along one of the primary axes)
+///
+/// <dt><b>NN_FACE_EDGE</b>
+/// <dd>face and edge adjacency (18 nearest neighbors, defined as all
+/// neighbor voxels connected along either one or two of the primary axes)
+///
+/// <dt><b>NN_FACE_EDGE_VERTEX</b>
+/// <dd>face, edge and vertex adjacency (26 nearest neighbors, defined
+/// as all neighbor voxels connected along either one, two or all
+/// three of the primary axes)
+/// </dl>
+enum NearestNeighbors { NN_FACE = 6, NN_FACE_EDGE = 18, NN_FACE_EDGE_VERTEX = 26 };
+
+
+/// @brief Topologically dilate all leaf-level active voxels in a tree
+/// using one of three nearest neighbor connectivity patterns.
+///
+/// @param tree          tree to be dilated
+/// @param iterations    number of iterations to apply the dilation
+/// @param nn            connectivity pattern of the dilation: either
+///     face-adjacent (6 nearest neighbors), face- and edge-adjacent
+///     (18 nearest neighbors) or face-, edge- and vertex-adjacent (26
+///     nearest neighbors).
+///
+/// @note The values of any voxels are unchanged.
 /// @todo Currently operates only on leaf voxels; need to extend to tiles.
 template<typename TreeType> OPENVDB_STATIC_SPECIALIZATION
-inline void dilateVoxels(TreeType& tree, int count=1);
+inline void dilateVoxels(TreeType& tree,
+                         int iterations = 1,
+                         NearestNeighbors nn = NN_FACE);
 
-template<typename TreeType> OPENVDB_STATIC_SPECIALIZATION
-inline void dilateVoxels(tree::LeafManager<TreeType>& manager, int count = 1);
-//@}
-
-//@{
-/// Topologically erode all leaf-level active voxels in the given tree,
-/// i.e., shrink the set of active voxels by @a count voxels in the +x, -x,
-/// +y, -y, +z and -z directions, but don't change the values of any voxels,
-/// only their active states.
+/// @brief Topologically dilate all leaf-level active voxels in a tree
+/// using one of three nearest neighbor connectivity patterns.
+///
+/// @param manager       LeafManager containing the tree to be dilated.
+/// @param iterations    number of iterations to apply the dilation
+/// @param nn           connectivity pattern of the dilation: either
+///     face-adjacent (6 nearest neighbors), face- and edge-adjacent
+///     (18 nearest neighbors) or face-, edge- and vertex-adjacent (26
+///     nearest neighbors).
+///
+/// @note The values of any voxels are unchanged.
 /// @todo Currently operates only on leaf voxels; need to extend to tiles.
 template<typename TreeType> OPENVDB_STATIC_SPECIALIZATION
-inline void erodeVoxels(TreeType& tree, int count=1);
+inline void dilateVoxels(tree::LeafManager<TreeType>& manager,
+                         int iterations = 1,
+                         NearestNeighbors nn = NN_FACE);
+
+
+//@{
+/// @brief Topologically erode all leaf-level active voxels in the given tree.
+/// @details That is, shrink the set of active voxels by @a iterations voxels
+/// in the +x, -x, +y, -y, +z and -z directions, but don't change the values
+/// of any voxels, only their active states.
+/// @todo Currently operates only on leaf voxels; need to extend to tiles.
+template<typename TreeType> OPENVDB_STATIC_SPECIALIZATION
+inline void erodeVoxels(TreeType& tree,
+                        int iterations=1,
+                        NearestNeighbors nn = NN_FACE);
 
 template<typename TreeType> OPENVDB_STATIC_SPECIALIZATION
-inline void erodeVoxels(tree::LeafManager<TreeType>& manager, int count = 1);
+inline void erodeVoxels(tree::LeafManager<TreeType>& manager,
+                        int iterations = 1,
+                        NearestNeighbors nn = NN_FACE);
 //@}
 
 
@@ -118,12 +179,30 @@ public:
     Morphology(ManagerType* mgr):
         mOwnsManager(false), mManager(mgr), mAcc(mgr->tree()), mSteps(1) {}
     virtual ~Morphology() { if (mOwnsManager) delete mManager; }
-    void dilateVoxels();
-    void dilateVoxels(int count) { for (int i=0; i<count; ++i) this->dilateVoxels(); }
-    void erodeVoxels(int count = 1) { mSteps = count; this->doErosion(); }
 
-private:
-    void doErosion();
+    /// @brief Face-adjacent dilation pattern
+    void dilateVoxels6();
+    /// @brief Face- and edge-adjacent dilation pattern.
+    void dilateVoxels18();
+    /// @brief Face-, edge- and vertex-adjacent dilation pattern.
+    void dilateVoxels26();
+    void dilateVoxels(int iterations = 1, NearestNeighbors nn = NN_FACE);
+
+    /// @brief Face-adjacent erosion pattern.
+    void erodeVoxels6()  { mSteps = 1; this->doErosion(NN_FACE); }
+    /// @brief Face- and edge-adjacent erosion pattern.
+    void erodeVoxels18() { mSteps = 1; this->doErosion(NN_FACE_EDGE); }
+    /// @brief Face-, edge- and vertex-adjacent erosion pattern.
+    void erodeVoxels26() { mSteps = 1; this->doErosion(NN_FACE_EDGE_VERTEX); }
+    void erodeVoxels(int iterations = 1, NearestNeighbors nn = NN_FACE)
+    {
+        mSteps = iterations;
+        this->doErosion(nn);
+    }
+
+protected:
+
+    void doErosion(NearestNeighbors nn);
 
     typedef typename TreeType::LeafNodeType LeafType;
     typedef typename LeafType::NodeMaskType MaskType;
@@ -143,9 +222,9 @@ private:
         bool      init;//true if initialization is required
         bool      isOn;//true if an active tile
         Neighbor() : leaf(NULL), init(true) {}
-        inline void clear() { init = true; }
+        inline void clear() { leaf = NULL; init = true; }
         template<int DX, int DY, int DZ>
-        void scatter(AccessorType& acc, const Coord &xyz, int indx, Word oldWord)
+        void scatter(AccessorType& acc, const Coord &xyz, int indx, Word mask)
         {
             if (init) {
                 init = false;
@@ -153,9 +232,13 @@ private:
                 leaf = acc.probeLeaf(orig);
                 if (leaf==NULL && !acc.isValueOn(orig)) leaf = acc.touchLeaf(orig);
             }
-            static const int N = (LEAF_DIM -1 )*(DY + DX*LEAF_DIM);
-            if (leaf) leaf->getValueMask().template getWord<Word>(indx-N) |= oldWord;
+#ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
+            static
+#endif
+            const int N = (LEAF_DIM - 1)*(DY + DX*LEAF_DIM);
+            if (leaf) leaf->getValueMask().template getWord<Word>(indx-N) |= mask;
         }
+
         template<int DX, int DY, int DZ>
         Word gather(AccessorType& acc, const Coord &xyz, int indx)
         {
@@ -165,25 +248,89 @@ private:
                 leaf = acc.probeLeaf(orig);
                 isOn = leaf ? false : acc.isValueOn(orig);
             }
-            static const int N = (LEAF_DIM -1 )*(DY + DX*LEAF_DIM);
+#ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
+            static
+#endif
+            const int N = (LEAF_DIM -1 )*(DY + DX*LEAF_DIM);
             return leaf ? leaf->getValueMask().template getWord<Word>(indx-N)
                 : isOn ? ~Word(0) : Word(0);
         }
     };// Neighbor
 
+    struct LeafCache
+    {
+        LeafCache(size_t n, TreeType& tree) : size(n), leafs(new LeafType*[n]), acc(tree)
+        {
+            onTile.setValuesOn();
+            this->clear();
+        }
+        ~LeafCache() { delete [] leafs; }
+        LeafType*& operator[](int offset) { return leafs[offset]; }
+        inline void clear() { for (size_t i=0; i<size; ++i) leafs[i]=NULL; }
+        inline void setOrigin(const Coord& xyz) { origin = &xyz; }
+        inline void scatter(int n, int indx)
+        {
+            assert(leafs[n]);
+            leafs[n]->getValueMask().template getWord<Word>(indx) |= mask;
+        }
+        template<int DX, int DY, int DZ>
+        inline void scatter(int n, int indx)
+        {
+            if (!leafs[n]) {
+                const Coord xyz = origin->offsetBy(DX*LEAF_DIM, DY*LEAF_DIM, DZ*LEAF_DIM);
+                leafs[n] = acc.probeLeaf(xyz);
+                if (!leafs[n]) leafs[n] = acc.isValueOn(xyz) ? &onTile : acc.touchLeaf(xyz);
+            }
+            this->scatter(n, indx - (LEAF_DIM - 1)*(DY + DX*LEAF_DIM));
+        }
+        inline Word gather(int n, int indx)
+        {
+            assert(leafs[n]);
+            return leafs[n]->getValueMask().template getWord<Word>(indx);
+        }
+        template<int DX, int DY, int DZ>
+        inline Word gather(int n, int indx)
+        {
+            if (!leafs[n]) {
+                const Coord xyz = origin->offsetBy(DX*LEAF_DIM, DY*LEAF_DIM, DZ*LEAF_DIM);
+                leafs[n] = acc.probeLeaf(xyz);
+                if (!leafs[n]) leafs[n] = acc.isValueOn(xyz) ? &onTile : &offTile;
+            }
+            return this->gather(n, indx - (LEAF_DIM -1 )*(DY + DX*LEAF_DIM));
+        }
+        // Scatters in the xy face-directions relative to leaf i1
+        void scatterFacesXY(int x, int y, int i1, int n, int i2);
+
+        // Scatters in the xy edge-directions relative to leaf i1
+        void scatterEdgesXY(int x, int y, int i1, int n, int i2);
+
+        Word gatherFacesXY(int x, int y, int i1, int n, int i2);
+
+        Word gatherEdgesXY(int x, int y, int i1, int n, int i2);
+
+        const Coord* origin;
+        size_t size;
+        LeafType** leafs;
+        LeafType onTile, offTile;
+        AccessorType acc;
+        Word mask;
+    };// LeafCache
 
     struct ErodeVoxelsOp {
+        typedef tbb::blocked_range<size_t> RangeT;
         ErodeVoxelsOp(std::vector<MaskType>& masks, ManagerType& manager)
-            : mSavedMasks(masks) , mManager(manager) {}
-
-        void runParallel() { tbb::parallel_for(mManager.getRange(), *this); }
-        void operator()(const tbb::blocked_range<size_t>& range) const;
-
+            : mTask(0), mSavedMasks(masks) , mManager(manager) {}
+        void runParallel(NearestNeighbors nn);
+        void operator()(const RangeT& r) const {mTask(const_cast<ErodeVoxelsOp*>(this), r);}
+        void erode6( const RangeT&) const;
+        void erode18(const RangeT&) const;
+        void erode26(const RangeT&) const;
     private:
+        typedef typename boost::function<void (ErodeVoxelsOp*, const RangeT&)> FuncT;
+        FuncT                  mTask;
         std::vector<MaskType>& mSavedMasks;
-        ManagerType& mManager;
+        ManagerType&           mManager;
     };// ErodeVoxelsOp
-
 
     struct MaskManager {
         MaskManager(std::vector<MaskType>& masks, ManagerType& manager)
@@ -203,146 +350,409 @@ private:
                 }
             }
         }
-
     private:
         std::vector<MaskType>& mMasks;
         ManagerType& mManager;
         bool mSaveMasks;
     };// MaskManager
-};
 
+    struct UpdateMasks {
+        UpdateMasks(const std::vector<MaskType>& masks, ManagerType& manager)
+            : mMasks(masks), mManager(manager) {}
+        void update() { tbb::parallel_for(mManager.getRange(), *this); }
+        void operator()(const tbb::blocked_range<size_t>& r) const {
+            for (size_t i=r.begin(); i<r.end(); ++i) mManager.leaf(i).setValueMask(mMasks[i]);
+        }
+        const std::vector<MaskType>& mMasks;
+        ManagerType& mManager;
+    };
+    struct CopyMasks {
+        CopyMasks(std::vector<MaskType>& masks, const ManagerType& manager)
+            : mMasks(masks), mManager(manager) {}
+        void copy() { tbb::parallel_for(mManager.getRange(), *this); }
+        void operator()(const tbb::blocked_range<size_t>& r) const {
+            for (size_t i=r.begin(); i<r.end(); ++i) mMasks[i]=mManager.leaf(i).getValueMask();
+        }
+        std::vector<MaskType>& mMasks;
+        const ManagerType& mManager;
+    };
+    void copyMasks(std::vector<MaskType>& a, const ManagerType& b) {CopyMasks c(a, b); c.copy();}
+};// Morphology
 
 template<typename TreeType>
 void
-Morphology<TreeType>::dilateVoxels()
+Morphology<TreeType>::dilateVoxels(int iterations, NearestNeighbors nn)
+{
+    for (int i=0; i<iterations; ++i) {
+        switch (nn) {
+        case NN_FACE_EDGE: this->dilateVoxels18(); break;
+        case NN_FACE_EDGE_VERTEX: this->dilateVoxels26(); break;
+        default: this->dilateVoxels6();
+        }
+    }
+}
+
+template<typename TreeType>
+void
+Morphology<TreeType>::dilateVoxels6()
 {
     /// @todo Currently operates only on leaf voxels; need to extend to tiles.
-    const int leafCount = mManager->leafCount();
+    const int leafCount = static_cast<int>(mManager->leafCount());
 
     // Save the value masks of all leaf nodes.
     std::vector<MaskType> savedMasks(leafCount);
-    MaskManager masks(savedMasks, *mManager);
-    masks.save();
-
-    Neighbor NN[6];
-    Coord origin;
+    this->copyMasks(savedMasks, *mManager);
+    LeafCache cache(7, mManager->tree());
     for (int leafIdx = 0; leafIdx < leafCount; ++leafIdx) {
         const MaskType& oldMask = savedMasks[leafIdx];//original bit-mask of current leaf node
-        LeafType& leaf = mManager->leaf(leafIdx);//current leaf node
-        leaf.getOrigin(origin);// origin of the current leaf node.
+        cache[0] = &mManager->leaf(leafIdx);
+        cache.setOrigin(cache[0]->origin());
         for (int x = 0; x < LEAF_DIM; ++x ) {
             for (int y = 0, n = (x << LEAF_LOG2DIM); y < LEAF_DIM; ++y, ++n) {
                 // Extract the portion of the original mask that corresponds to a row in z.
-                const Word oldWord = oldMask.template getWord<Word>(n);
-                if (oldWord == 0) continue; // no active voxels
+                if (const Word w = oldMask.template getWord<Word>(n)) {
 
-                // dilate current leaf or neighbor in negative x-direction
-                if (x > 0) {
-                    leaf.getValueMask().template getWord<Word>(n-LEAF_DIM) |= oldWord;
-                } else {
-                    NN[0].template scatter<-1, 0, 0>(mAcc, origin, n, oldWord);
-                }
-                // dilate current leaf or neighbor in positive x-direction
-                if (x < LEAF_DIM - 1) {
-                    leaf.getValueMask().template getWord<Word>(n+LEAF_DIM) |= oldWord;
-                } else {
-                    NN[1].template scatter< 1, 0, 0>(mAcc, origin, n, oldWord);
-                }
-                // dilate current leaf or neighbor in negative y-direction
-                if (y > 0) {
-                    leaf.getValueMask().template getWord<Word>(n-1) |= oldWord;
-                } else {
-                    NN[2].template scatter< 0,-1, 0>(mAcc, origin, n, oldWord);
-                }
-                // dilate current leaf or neighbor in positive y-direction
-                if (y < LEAF_DIM - 1)  {
-                    leaf.getValueMask().template getWord<Word>(n+1) |= oldWord;
-                } else {
-                    NN[3].template scatter< 0, 1, 0>(mAcc, origin, n, oldWord);
-                }
-                // Dilate the current leaf node in the z direction by ORing its mask
-                // with itself shifted first left and then right by one bit.
-                leaf.getValueMask().template getWord<Word>(n) |= (oldWord >> 1) | (oldWord << 1);
-                // dilate neighbor in negative z-direction
-                if (Word w = oldWord<<(LEAF_DIM-1)) {
-                    NN[4].template scatter< 0, 0,-1>(mAcc, origin, n, w);
-                }
-                // dilate neighbot in positive z-direction
-                if (Word w = oldWord>>(LEAF_DIM-1)) {
-                    NN[5].template scatter< 0, 0, 1>(mAcc, origin, n, w);
+                    // Dilate the current leaf in the +z and -z direction
+                    cache.mask = Word(w | (w>>1) | (w<<1)); cache.scatter(0, n);
+
+                    // Dilate into neighbor leaf in the -z direction
+                    if ( (cache.mask = Word(w<<(LEAF_DIM-1))) ) {
+                        cache.template scatter< 0, 0,-1>(1, n);
+                    }
+                    // Dilate into neighbor leaf in the +z direction
+                    if ( (cache.mask = Word(w>>(LEAF_DIM-1))) ) {
+                        cache.template scatter< 0, 0, 1>(2, n);
+                    }
+                    // Dilate in the xy-face directions relative to the center leaf
+                    cache.mask = w; cache.scatterFacesXY(x, y, 0, n, 3);
                 }
             }// loop over y
         }//loop over x
-        for (int i=0; i<6; ++i) NN[i].clear();
+        cache.clear();
     }//loop over leafs
 
     mManager->rebuildLeafArray();
+}//dilateVoxels6
+
+template<typename TreeType>
+void
+Morphology<TreeType>::dilateVoxels18()
+{
+    /// @todo Currently operates only on leaf voxels; need to extend to tiles.
+    const int leafCount = static_cast<int>(mManager->leafCount());
+
+    // Save the value masks of all leaf nodes.
+    std::vector<MaskType> savedMasks(leafCount);
+    this->copyMasks(savedMasks, *mManager);
+    LeafCache cache(19, mManager->tree());
+    Coord orig_mz, orig_pz;//origins of neighbor leaf nodes in the -z and +z directions
+    for (int leafIdx = 0; leafIdx < leafCount; ++leafIdx) {
+        const MaskType& oldMask = savedMasks[leafIdx];//original bit-mask of current leaf node
+        cache[0] = &mManager->leaf(leafIdx);
+        orig_mz = cache[0]->origin().offsetBy(0, 0, -LEAF_DIM);
+        orig_pz = cache[0]->origin().offsetBy(0, 0,  LEAF_DIM);
+        for (int x = 0; x < LEAF_DIM; ++x ) {
+            for (int y = 0, n = (x << LEAF_LOG2DIM); y < LEAF_DIM; ++y, ++n) {
+                if (const Word w = oldMask.template getWord<Word>(n)) {
+                    {
+                        cache.mask = Word(w | (w>>1) | (w<<1));
+                        cache.setOrigin(cache[0]->origin());
+                        cache.scatter(0, n);
+                        cache.scatterFacesXY(x, y, 0, n, 3);
+                        cache.mask = w;
+                        cache.scatterEdgesXY(x, y, 0, n, 3);
+                    }
+                    if ( (cache.mask = Word(w<<(LEAF_DIM-1))) ) {
+                        cache.setOrigin(cache[0]->origin());
+                        cache.template scatter< 0, 0,-1>(1, n);
+                        cache.setOrigin(orig_mz);
+                        cache.scatterFacesXY(x, y, 1, n, 11);
+                    }
+                    if ( (cache.mask = Word(w>>(LEAF_DIM-1))) ) {
+                        cache.setOrigin(cache[0]->origin());
+                        cache.template scatter< 0, 0, 1>(2, n);
+                        cache.setOrigin(orig_pz);
+                        cache.scatterFacesXY(x, y, 2, n, 15);
+                    }
+                }
+            }// loop over y
+        }//loop over x
+        cache.clear();
+    }//loop over leafs
+
+    mManager->rebuildLeafArray();
+}// dilateVoxels18
+
+template<typename TreeType>
+void
+Morphology<TreeType>::dilateVoxels26()
+{
+    /// @todo Currently operates only on leaf voxels; need to extend to tiles.
+    const int leafCount = static_cast<int>(mManager->leafCount());
+
+    // Save the value masks of all leaf nodes.
+    std::vector<MaskType> savedMasks(leafCount);
+    this->copyMasks(savedMasks, *mManager);
+    LeafCache cache(27, mManager->tree());
+    Coord orig_mz, orig_pz;//origins of neighbor leaf nodes in the -z and +z directions
+    for (int leafIdx = 0; leafIdx < leafCount; ++leafIdx) {
+        const MaskType& oldMask = savedMasks[leafIdx];//original bit-mask of current leaf node
+        cache[0] = &mManager->leaf(leafIdx);
+        orig_mz = cache[0]->origin().offsetBy(0, 0, -LEAF_DIM);
+        orig_pz = cache[0]->origin().offsetBy(0, 0,  LEAF_DIM);
+        for (int x = 0; x < LEAF_DIM; ++x ) {
+            for (int y = 0, n = (x << LEAF_LOG2DIM); y < LEAF_DIM; ++y, ++n) {
+                if (const Word w = oldMask.template getWord<Word>(n)) {
+                    {
+                        cache.mask = Word(w | (w>>1) | (w<<1));
+                        cache.setOrigin(cache[0]->origin());
+                        cache.scatter(0, n);
+                        cache.scatterFacesXY(x, y, 0, n, 3);
+                        cache.scatterEdgesXY(x, y, 0, n, 3);
+                    }
+                    if ( (cache.mask = Word(w<<(LEAF_DIM-1))) ) {
+                        cache.setOrigin(cache[0]->origin());
+                        cache.template scatter< 0, 0,-1>(1, n);
+                        cache.setOrigin(orig_mz);
+                        cache.scatterFacesXY(x, y, 1, n, 11);
+                        cache.scatterEdgesXY(x, y, 1, n, 11);
+                    }
+                    if ( (cache.mask = Word(w>>(LEAF_DIM-1))) ) {
+                        cache.setOrigin(cache[0]->origin());
+                        cache.template scatter< 0, 0, 1>(2, n);
+                        cache.setOrigin(orig_pz);
+                        cache.scatterFacesXY(x, y, 2, n, 19);
+                        cache.scatterEdgesXY(x, y, 2, n, 19);
+                    }
+                }
+            }// loop over y
+        }//loop over x
+        cache.clear();
+    }//loop over leafs
+
+    mManager->rebuildLeafArray();
+}// dilateVoxels26
+
+template<typename TreeType>
+inline void Morphology<TreeType>::LeafCache::
+scatterFacesXY(int x, int y, int i1, int n, int i2)
+{
+    // dilate current leaf or neighbor in the -x direction
+    if (x > 0) {
+        this->scatter(i1, n-LEAF_DIM);
+    } else {
+        this->template scatter<-1, 0, 0>(i2, n);
+    }
+    // dilate current leaf or neighbor in the +x direction
+    if (x < LEAF_DIM-1) {
+        this->scatter(i1, n+LEAF_DIM);
+    } else {
+        this->template scatter< 1, 0, 0>(i2+1, n);
+    }
+    // dilate current leaf or neighbor in the -y direction
+    if (y > 0) {
+        this->scatter(i1, n-1);
+    } else {
+        this->template scatter< 0,-1, 0>(i2+2, n);
+    }
+    // dilate current leaf or neighbor in the +y direction
+    if (y < LEAF_DIM-1) {
+        this->scatter(i1, n+1);
+    } else {
+        this->template scatter< 0, 1, 0>(i2+3, n);
+    }
 }
 
+template<typename TreeType>
+void
+Morphology<TreeType>::LeafCache::
+scatterEdgesXY(int x, int y, int i1, int n, int i2)
+{
+    if (x > 0) {
+        if (y > 0) {
+            this->scatter(i1, n-LEAF_DIM-1);
+        } else {
+            this->template scatter< 0,-1, 0>(i2+2, n-LEAF_DIM);
+        }
+        if (y < LEAF_DIM-1) {
+            this->scatter(i1, n-LEAF_DIM+1);
+        } else {
+            this->template scatter< 0, 1, 0>(i2+3, n-LEAF_DIM);
+        }
+    } else {
+        if (y < LEAF_DIM-1) {
+            this->template scatter<-1, 0, 0>(i2  , n+1);
+        } else {
+            this->template scatter<-1, 1, 0>(i2+7, n  );
+        }
+        if (y > 0) {
+            this->template scatter<-1, 0, 0>(i2  , n-1);
+        } else {
+            this->template scatter<-1,-1, 0>(i2+4, n  );
+        }
+    }
+    if (x < LEAF_DIM-1) {
+        if (y > 0) {
+            this->scatter(i1, n+LEAF_DIM-1);
+        } else {
+            this->template scatter< 0,-1, 0>(i2+2, n+LEAF_DIM);
+        }
+        if (y < LEAF_DIM-1) {
+            this->scatter(i1, n+LEAF_DIM+1);
+        } else {
+            this->template scatter< 0, 1, 0>(i2+3, n+LEAF_DIM);
+        }
+    } else {
+        if (y > 0) {
+            this->template scatter< 1, 0, 0>(i2+1, n-1);
+        } else {
+            this->template scatter< 1,-1, 0>(i2+6, n  );
+        }
+        if (y < LEAF_DIM-1) {
+            this->template scatter< 1, 0, 0>(i2+1, n+1);
+        } else {
+            this->template scatter< 1, 1, 0>(i2+5, n  );
+        }
+    }
+}
+
+template<typename TreeType>
+inline void
+Morphology<TreeType>::ErodeVoxelsOp::
+runParallel(NearestNeighbors nn)
+{
+    switch (nn) {
+    case NN_FACE_EDGE:
+        mTask = boost::bind(&ErodeVoxelsOp::erode18, _1, _2);
+        break;
+    case NN_FACE_EDGE_VERTEX:
+        mTask = boost::bind(&ErodeVoxelsOp::erode26, _1, _2);
+        break;
+    default:
+        mTask = boost::bind(&ErodeVoxelsOp::erode6, _1, _2);
+    }
+    tbb::parallel_for(mManager.getRange(), *this);
+}
+
+template<typename TreeType>
+inline typename Morphology<TreeType>::Word
+Morphology<TreeType>::LeafCache::
+gatherFacesXY(int x, int y, int i1, int n, int i2)
+{
+    // erode current leaf or neighbor in negative x-direction
+    Word w = x>0 ? this->gather(i1,n-LEAF_DIM) : this->template gather<-1,0,0>(i2, n);
+
+    // erode current leaf or neighbor in positive x-direction
+    w = Word(w & (x<LEAF_DIM-1?this->gather(i1,n+LEAF_DIM):this->template gather<1,0,0>(i2+1,n)));
+
+    // erode current leaf or neighbor in negative y-direction
+    w = Word(w & (y>0 ? this->gather(i1, n-1) : this->template gather<0,-1,0>(i2+2, n)));
+
+    // erode current leaf or neighbor in positive y-direction
+    w = Word(w & (y<LEAF_DIM-1 ? this->gather(i1, n+1) : this->template gather<0,1,0>(i2+3, n)));
+
+    return w;
+}
+
+template<typename TreeType>
+inline
+typename Morphology<TreeType>::Word
+Morphology<TreeType>::LeafCache::
+gatherEdgesXY(int x, int y, int i1, int n, int i2)
+{
+    Word w = ~Word(0);
+
+    if (x > 0) {
+        w &= y > 0 ?          this->gather(i1, n-LEAF_DIM-1) :
+                              this->template gather< 0,-1, 0>(i2+2, n-LEAF_DIM);
+        w &= y < LEAF_DIM-1 ? this->gather(i1, n-LEAF_DIM+1) :
+                              this->template gather< 0, 1, 0>(i2+3, n-LEAF_DIM);
+    } else {
+        w &= y < LEAF_DIM-1 ? this->template gather<-1, 0, 0>(i2  , n+1):
+                              this->template gather<-1, 1, 0>(i2+7, n  );
+        w &= y > 0 ?          this->template gather<-1, 0, 0>(i2  , n-1):
+                              this->template gather<-1,-1, 0>(i2+4, n  );
+    }
+    if (x < LEAF_DIM-1) {
+        w &= y > 0 ?          this->gather(i1, n+LEAF_DIM-1) :
+                              this->template gather< 0,-1, 0>(i2+2, n+LEAF_DIM);
+        w &= y < LEAF_DIM-1 ? this->gather(i1, n+LEAF_DIM+1) :
+                              this->template gather< 0, 1, 0>(i2+3, n+LEAF_DIM);
+    } else {
+        w &= y > 0          ? this->template gather< 1, 0, 0>(i2+1, n-1):
+                              this->template gather< 1,-1, 0>(i2+6, n  );
+        w &= y < LEAF_DIM-1 ? this->template gather< 1, 0, 0>(i2+1, n+1):
+                              this->template gather< 1, 1, 0>(i2+5, n  );
+    }
+
+    return w;
+}
 
 template <typename TreeType>
 void
-Morphology<TreeType>::ErodeVoxelsOp::operator()(const tbb::blocked_range<size_t>& range) const
+Morphology<TreeType>::ErodeVoxelsOp::
+erode6(const RangeT& range) const
 {
-    AccessorType acc(mManager.tree());
-    Neighbor NN[6];
-    Coord origin;
+    LeafCache cache(7, mManager.tree());
     for (size_t leafIdx = range.begin(); leafIdx < range.end(); ++leafIdx) {
-        LeafType& leaf = mManager.leaf(leafIdx);//current leaf node
-        if (leaf.isEmpty()) continue;
+        cache[0] = &mManager.leaf(leafIdx);
+        if (cache[0]->isEmpty()) continue;
+        cache.setOrigin(cache[0]->origin());
         MaskType& newMask = mSavedMasks[leafIdx];//original bit-mask of current leaf node
-        leaf.getOrigin(origin);// origin of the current leaf node.
         for (int x = 0; x < LEAF_DIM; ++x ) {
             for (int y = 0, n = (x << LEAF_LOG2DIM); y < LEAF_DIM; ++y, ++n) {
                 // Extract the portion of the original mask that corresponds to a row in z.
-                Word& w = newMask.template getWord<Word>(n);
-                if (w == 0) continue; // no active voxels
+                if (Word& w = newMask.template getWord<Word>(n)) {
 
-                // Erode in two z directions (this is first since it uses the original w)
-                w &= (w<<1 | (NN[4].template gather<0,0,-1>(acc, origin, n)>>(LEAF_DIM-1))) &
-                     (w>>1 | (NN[5].template gather<0,0, 1>(acc, origin, n)<<(LEAF_DIM-1)));
+                    // erode in two z directions (this is first since it uses the original w)
+                    w = Word(w &
+                        (Word(w<<1 | (cache.template gather<0,0,-1>(1, n)>>(LEAF_DIM-1))) &
+                         Word(w>>1 | (cache.template gather<0,0, 1>(2, n)<<(LEAF_DIM-1)))));
 
-                // dilate current leaf or neighbor in negative x-direction
-                w &= (x == 0)          ? NN[0].template gather<-1, 0, 0>(acc, origin, n) :
-                     leaf.getValueMask().template getWord<Word>(n-LEAF_DIM);
-
-                // dilate current leaf or neighbor in positive x-direction
-                w &= (x == LEAF_DIM-1) ? NN[1].template gather< 1, 0, 0>(acc, origin, n) :
-                     leaf.getValueMask().template getWord<Word>(n+LEAF_DIM);
-
-                // dilate current leaf or neighbor in negative y-direction
-                w &= (y == 0)          ? NN[2].template gather< 0,-1, 0>(acc, origin, n) :
-                     leaf.getValueMask().template getWord<Word>(n-1);
-
-                // dilate current leaf or neighbor in positive y-direction
-                w &= (y == LEAF_DIM-1) ? NN[3].template gather< 0, 1, 0>(acc, origin, n) :
-                     leaf.getValueMask().template getWord<Word>(n+1);
+                    w = Word(w & cache.gatherFacesXY(x, y, 0, n, 3));
+                }
             }// loop over y
         }//loop over x
-        for (int i=0; i<6; ++i) NN[i].clear();
+        cache.clear();
     }//loop over leafs
+}
+
+template <typename TreeType>
+void
+Morphology<TreeType>::ErodeVoxelsOp::
+erode18(const RangeT&) const
+{
+    OPENVDB_THROW(RuntimeError, "tools::erode18 is not implemented yet!");
+}
+
+template <typename TreeType>
+void
+Morphology<TreeType>::ErodeVoxelsOp::
+erode26(const RangeT&) const
+{
+    OPENVDB_THROW(RuntimeError, "tools::erode26 is not implemented yet!");
 }
 
 
 template<typename TreeType>
 void
-Morphology<TreeType>::doErosion()
+Morphology<TreeType>::doErosion(NearestNeighbors nn)
 {
     /// @todo Currently operates only on leaf voxels; need to extend to tiles.
-    const int leafCount = mManager->leafCount();
+    const size_t leafCount = mManager->leafCount();
 
     // Save the value masks of all leaf nodes.
     std::vector<MaskType> savedMasks(leafCount);
-    MaskManager masks(savedMasks, *mManager);
-    masks.save();
-
+    this->copyMasks(savedMasks, *mManager);
+    UpdateMasks a(savedMasks, *mManager);
     ErodeVoxelsOp erode(savedMasks, *mManager);
+
     for (int i = 0; i < mSteps; ++i) {
-        erode.runParallel();
-        masks.update();
+        erode.runParallel(nn);
+        a.update();
     }
 
-    mManager->tree().pruneLevelSet();
+    tools::pruneLevelSet(mManager->tree());
 }
 
 
@@ -351,41 +761,41 @@ Morphology<TreeType>::doErosion()
 
 template<typename TreeType>
 OPENVDB_STATIC_SPECIALIZATION inline void
-dilateVoxels(tree::LeafManager<TreeType>& manager, int count)
+dilateVoxels(tree::LeafManager<TreeType>& manager, int iterations, NearestNeighbors nn)
 {
-    if (count > 0 ) { 
+    if (iterations > 0 ) {
         Morphology<TreeType> m(&manager);
-        m.dilateVoxels(count);
+        m.dilateVoxels(iterations, nn);
     }
 }
 
 template<typename TreeType>
 OPENVDB_STATIC_SPECIALIZATION inline void
-dilateVoxels(TreeType& tree, int count)
+dilateVoxels(TreeType& tree, int iterations, NearestNeighbors nn)
 {
-    if (count > 0 ) { 
+    if (iterations > 0 ) {
         Morphology<TreeType> m(tree);
-        m.dilateVoxels(count);
+        m.dilateVoxels(iterations, nn);
     }
 }
 
 template<typename TreeType>
 OPENVDB_STATIC_SPECIALIZATION inline void
-erodeVoxels(tree::LeafManager<TreeType>& manager, int count)
+erodeVoxels(tree::LeafManager<TreeType>& manager, int iterations, NearestNeighbors nn)
 {
-    if (count > 0 ) { 
+    if (iterations > 0 ) {
         Morphology<TreeType> m(&manager);
-        m.erodeVoxels(count);
+        m.erodeVoxels(iterations, nn);
     }
 }
 
 template<typename TreeType>
 OPENVDB_STATIC_SPECIALIZATION inline void
-erodeVoxels(TreeType& tree, int count)
+erodeVoxels(TreeType& tree, int iterations, NearestNeighbors nn)
 {
-    if (count > 0 ) { 
+    if (iterations > 0 ) {
         Morphology<TreeType> m(tree);
-        m.erodeVoxels(count);
+        m.erodeVoxels(iterations, nn);
     }
 }
 
@@ -499,6 +909,6 @@ deactivate(GridOrTree& gridOrTree, const typename GridOrTree::ValueType& value,
 
 #endif // OPENVDB_TOOLS_MORPHOLOGY_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

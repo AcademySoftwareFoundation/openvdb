@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -357,7 +357,7 @@ TestLeafBool::testTopologyCopy()
     std::set<Coord> coords;
     for (openvdb::Index n = 0; n < fleaf.numValues(); n += 10) {
         Coord xyz = fleaf.offsetToGlobalCoord(n);
-        fleaf.setValueOn(xyz, n);
+        fleaf.setValueOn(xyz, float(n));
         coords.insert(xyz);
     }
 
@@ -541,6 +541,6 @@ TestLeafBool::testBoolTree()
 //     CPPUNIT_ASSERT(tree->hasSameTopology(*copyOfTree));
 // }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

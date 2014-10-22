@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -44,6 +44,7 @@
 #include <openvdb/tools/VolumeToMesh.h>
 #include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/tools/LevelSetUtil.h>
+#include <openvdb/tools/Prune.h>
 #include <openvdb/math/Operators.h>
 #include <openvdb/math/Mat3.h>
 
@@ -68,6 +69,12 @@
 #include <string>
 #include <list>
 #include <vector>
+
+
+#if defined(__GNUC__) && !defined(__INTEL_COMPILER)
+// GA_RWHandleV3 fails to initialize its member variables in some cases.
+#pragma GCC diagnostic ignored "-Wuninitialized"
+#endif
 
 
 namespace hvdb = openvdb_houdini;
@@ -353,16 +360,18 @@ copyMesh(
     const char exteriorFlag = char(openvdb::tools::POLYFLAG_EXTERIOR);
     const char seamLineFlag = char(openvdb::tools::POLYFLAG_FRACTURE_SEAM);
 
-    const GA_Index firstPrim = detail.primitives().entries();
+    const GA_Index firstPrim = detail.getNumPrimitives();
 
 #if (UT_VERSION_INT < 0x0c0500F5) // earlier than 12.5.245
+
+    bool groupSeamPoints = seamPointGroup && !mesher.pointFlags().empty();
 
     const GA_Offset lastIdx(detail.getNumPoints());
     for (size_t n = 0, N = mesher.pointListSize(); n < N; ++n) {
         GA_Offset ptoff = detail.appendPointOffset();
         detail.setPos3(ptoff, points[n].x(), points[n].y(), points[n].z());
 
-        if (seamPointGroup && mesher.pointFlags()[n]) {
+        if (groupSeamPoints && mesher.pointFlags()[n]) {
             seamPointGroup->addOffset(ptoff);
         }
     }
@@ -425,7 +434,7 @@ copyMesh(
     pthandle.setBlock(startpt, npoints, (UT_Vector3 *)points.get());
 
     // group fracture seam points
-    if (seamPointGroup) {
+    if (seamPointGroup && GA_Size(mesher.pointFlags().size()) == npoints) {
         GA_Offset ptoff = startpt;
         for (GA_Size i = 0; i < npoints; ++i) {
 
@@ -522,7 +531,7 @@ copyMesh(
 
 
     // Keep VDB grid name
-    const GA_Index lastPrim = detail.primitives().entries();
+    const GA_Index lastPrim = detail.getNumPrimitives();
     if (gridName != NULL && firstPrim != lastPrim) {
 
         GA_RWAttributeRef aRef = detail.findPrimitiveAttribute("name");
@@ -575,7 +584,7 @@ SOP_OpenVDB_To_Polygons::cookMySop(OP_Context& context)
         const double iso = double(evalFloat("isovalue", 0, time));
         const bool computeNormals = evalInt("computenormals", 0, time);
         const bool keepVdbName = evalInt("keepvdbname", 0, time);
-        const float maskoffset = evalFloat("surfacemaskoffset", 0, time);
+        const float maskoffset = static_cast<float>(evalFloat("surfacemaskoffset", 0, time));
         const bool invertmask = evalInt("invertmask", 0, time);
 
         // Setup level set mesher
@@ -699,7 +708,19 @@ SOP_OpenVDB_To_Polygons::cookMySop(OP_Context& context)
             for (; vdbIt; ++vdbIt) {
 
                 if (boss.wasInterrupted()) break;
-                GEOvdbProcessTypedGridScalar(*vdbIt.getPrimitive(), mesher);
+                //GEOvdbProcessTypedGridScalar(*vdbIt.getPrimitive(), mesher);
+
+                if (!GEOvdbProcessTypedGridScalar(*vdbIt.getPrimitive(), mesher)) {
+
+                    if (vdbIt->getGrid().type() == openvdb::BoolGrid::gridType()) {
+
+                        openvdb::BoolGrid::ConstPtr gridPtr =
+                            openvdb::gridConstPtrCast<openvdb::BoolGrid>(vdbIt->getGridPtr());
+
+                        mesher(*gridPtr);
+                    }
+                }
+
                 copyMesh(*gdp, mesher, boss,
                     keepVdbName ? vdbIt.getPrimitive()->getGridName() : NULL);
             }
@@ -738,7 +759,7 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
     const bool transferAttributes = evalInt("transferattributes", 0, time);
     const bool keepVdbName = evalInt("keepvdbname", 0, time);
     const bool sharpenFeatures = evalInt("sharpenfeatures", 0, time);
-    const double edgetolerance = double(evalFloat("edgetolerance", 0, time));
+    const float edgetolerance = static_cast<float>(evalFloat("edgetolerance", 0, time));
 
     typedef typename GridType::TreeType TreeType;
     typedef typename GridType::ValueType ValueType;
@@ -806,7 +827,8 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
         if (gridClass == openvdb::GRID_LEVEL_SET) {
             converter.convertToLevelSet(pointList, primList);
         } else {
-            const ValueType bandWidth = backgroundValue / transform->voxelSize()[0];
+            const ValueType bandWidth =
+                static_cast<ValueType>(backgroundValue / transform->voxelSize()[0]);
             converter.convertToLevelSet(pointList, primList, bandWidth, bandWidth);
         }
 
@@ -832,7 +854,7 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
             op(*refGeo, indexGrid->tree(), maskLeafs, edgetolerance);
         op.run();
 
-        maskTree->pruneInactive();
+        openvdb::tools::pruneInactive(*maskTree);
 
         openvdb::tools::dilateVoxels(*maskTree, 2);
 
@@ -955,6 +977,6 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
     }
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

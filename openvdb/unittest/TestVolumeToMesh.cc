@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -67,18 +67,18 @@ TestVolumeToMesh::testAuxData()
     tree->setValue(openvdb::Coord(0,0,1),  1);
 
     typedef openvdb::tree::LeafManager<const Tree543f> LeafManager;
-    
+
     LeafManager leafs(*tree);
-    
+
     CPPUNIT_ASSERT(openvdb::tools::internal::needsActiveVoxePadding(leafs, 0.0, 1.0));
 
     openvdb::tools::internal::SignData<Tree543f, LeafManager> op(*tree, leafs, 0.0);
     op.run();
-    
+
     CPPUNIT_ASSERT(op.signTree()->activeVoxelCount() == 1);
     CPPUNIT_ASSERT(op.signTree()->activeVoxelCount() == op.idxTree()->activeVoxelCount());
-      
-        
+
+
     int flags = int(op.signTree()->getValue(openvdb::Coord(0,0,0)));
 
     CPPUNIT_ASSERT(bool(flags & openvdb::tools::internal::INSIDE));
@@ -113,7 +113,7 @@ TestVolumeToMesh::testConversion()
     typedef Grid<Tree543f> GridType;
 
     GridType::Ptr grid = createGrid<GridType>(/*background=*/1);
-    
+
     grid->fill(CoordBBox(Coord(0), Coord(7)), 0.0);
     grid->fill(CoordBBox(Coord(1), Coord(6)), -1.0);
 
@@ -136,6 +136,6 @@ TestVolumeToMesh::testConversion()
     /// @todo validate output
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

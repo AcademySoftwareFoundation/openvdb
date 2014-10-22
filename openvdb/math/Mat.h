@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -150,7 +150,8 @@ template<typename T> class Vec3;
 /// Note that the matrix is transposed to match post-multiplication semantics.
 template<class MatType>
 MatType
-rotation(const Quat<typename MatType::value_type> &q, typename MatType::value_type eps = 1.0e-8)
+rotation(const Quat<typename MatType::value_type> &q,
+    typename MatType::value_type eps = static_cast<typename MatType::value_type>(1.0e-8))
 {
     typedef typename MatType::value_type T;
 
@@ -158,7 +159,7 @@ rotation(const Quat<typename MatType::value_type> &q, typename MatType::value_ty
     T s(0);
 
     if (!isApproxEqual(qdot, T(0.0),eps)) {
-        s = 2.0 / qdot;
+        s = T(2.0 / qdot);
     }
 
     T x  = s*q.x();
@@ -313,7 +314,7 @@ Vec3<typename MatType::value_type>
 eulerAngles(
     const MatType& mat,
     RotationOrder rotationOrder,
-    typename MatType::value_type eps=1.0e-8)
+    typename MatType::value_type eps = static_cast<typename MatType::value_type>(1.0e-8))
 {
     typedef typename MatType::value_type ValueType;
     typedef Vec3<ValueType> V;
@@ -323,149 +324,149 @@ eulerAngles(
     {
     case XYZ_ROTATION:
         if (isApproxEqual(mat[2][0], ValueType(1.0), eps)) {
-            theta = M_PI_2;
-            phi = 0.5 * atan2(mat[1][2], mat[1][1]);
+            theta = ValueType(M_PI_2);
+            phi = ValueType(0.5 * atan2(mat[1][2], mat[1][1]));
             psi = phi;
         } else if (isApproxEqual(mat[2][0], ValueType(-1.0), eps)) {
-            theta = -M_PI_2;
-            phi = 0.5 * atan2(mat[1][2], mat[1][1]);
+            theta = ValueType(-M_PI_2);
+            phi = ValueType(0.5 * atan2(mat[1][2], mat[1][1]));
             psi = -phi;
         } else {
-            psi = atan2(-mat[1][0],mat[0][0]);
-            phi = atan2(-mat[2][1],mat[2][2]);
-            theta = atan2(mat[2][0],
+            psi = ValueType(atan2(-mat[1][0],mat[0][0]));
+            phi = ValueType(atan2(-mat[2][1],mat[2][2]));
+            theta = ValueType(atan2(mat[2][0],
                 sqrt( mat[2][1]*mat[2][1] +
-                    mat[2][2]*mat[2][2]));
+                    mat[2][2]*mat[2][2])));
         }
         return V(phi, theta, psi);
     case ZXY_ROTATION:
         if (isApproxEqual(mat[1][2], ValueType(1.0), eps)) {
-            theta = M_PI_2;
-            phi = 0.5 * atan2(mat[0][1], mat[0][0]);
+            theta = ValueType(M_PI_2);
+            phi = ValueType(0.5 * atan2(mat[0][1], mat[0][0]));
             psi = phi;
         } else if (isApproxEqual(mat[1][2], ValueType(-1.0), eps)) {
-            theta = -M_PI/2;
-            phi = 0.5 * atan2(mat[0][1],mat[2][1]);
+            theta = ValueType(-M_PI/2);
+            phi = ValueType(0.5 * atan2(mat[0][1],mat[2][1]));
             psi = -phi;
         } else {
-            psi = atan2(-mat[0][2], mat[2][2]);
-            phi = atan2(-mat[1][0], mat[1][1]);
-            theta = atan2(mat[1][2],
+            psi = ValueType(atan2(-mat[0][2], mat[2][2]));
+            phi = ValueType(atan2(-mat[1][0], mat[1][1]));
+            theta = ValueType(atan2(mat[1][2],
                         sqrt(mat[0][2] * mat[0][2] +
-                                mat[2][2] * mat[2][2]));
+                                mat[2][2] * mat[2][2])));
         }
         return V(theta, psi, phi);
 
     case YZX_ROTATION:
         if (isApproxEqual(mat[0][1], ValueType(1.0), eps)) {
-            theta = M_PI_2;
-            phi = 0.5 * atan2(mat[2][0], mat[2][2]);
+            theta = ValueType(M_PI_2);
+            phi = ValueType(0.5 * atan2(mat[2][0], mat[2][2]));
             psi = phi;
         } else if (isApproxEqual(mat[0][1], ValueType(-1.0), eps)) {
-            theta = -M_PI/2;
-            phi = 0.5 * atan2(mat[2][0], mat[1][0]);
+            theta = ValueType(-M_PI/2);
+            phi = ValueType(0.5 * atan2(mat[2][0], mat[1][0]));
             psi = -phi;
         } else {
-            psi = atan2(-mat[2][1], mat[1][1]);
-            phi = atan2(-mat[0][2], mat[0][0]);
-            theta = atan2(mat[0][1],
+            psi = ValueType(atan2(-mat[2][1], mat[1][1]));
+            phi = ValueType(atan2(-mat[0][2], mat[0][0]));
+            theta = ValueType(atan2(mat[0][1],
                 sqrt(mat[0][0] * mat[0][0] +
-                        mat[0][2] * mat[0][2]));
+                        mat[0][2] * mat[0][2])));
         }
         return V(psi, phi, theta);
 
     case XZX_ROTATION:
 
         if (isApproxEqual(mat[0][0], ValueType(1.0), eps)) {
-            theta = 0.0;
-            phi = 0.5 * atan2(mat[1][2], mat[1][1]);
+            theta = ValueType(0.0);
+            phi = ValueType(0.5 * atan2(mat[1][2], mat[1][1]));
             psi = phi;
         } else if (isApproxEqual(mat[0][0], ValueType(-1.0), eps)) {
-            theta = M_PI;
-            psi = 0.5 * atan2(mat[2][1], -mat[1][1]);
+            theta = ValueType(M_PI);
+            psi = ValueType(0.5 * atan2(mat[2][1], -mat[1][1]));
             phi = - psi;
         } else {
-            psi = atan2(mat[2][0], -mat[1][0]);
-            phi = atan2(mat[0][2], mat[0][1]);
-            theta = atan2(sqrt(mat[0][1] * mat[0][1] +
+            psi = ValueType(atan2(mat[2][0], -mat[1][0]));
+            phi = ValueType(atan2(mat[0][2], mat[0][1]));
+            theta = ValueType(atan2(sqrt(mat[0][1] * mat[0][1] +
                                 mat[0][2] * mat[0][2]),
-                            mat[0][0]);
+                            mat[0][0]));
         }
         return V(phi, psi, theta);
 
     case ZXZ_ROTATION:
 
         if (isApproxEqual(mat[2][2], ValueType(1.0), eps)) {
-            theta = 0.0;
-            phi = 0.5 * atan2(mat[0][1], mat[0][0]);
+            theta = ValueType(0.0);
+            phi = ValueType(0.5 * atan2(mat[0][1], mat[0][0]));
             psi = phi;
         } else if (isApproxEqual(mat[2][2], ValueType(-1.0), eps)) {
-            theta = M_PI;
-            phi = 0.5 * atan2(mat[0][1], mat[0][0]);
+            theta = ValueType(M_PI);
+            phi = ValueType(0.5 * atan2(mat[0][1], mat[0][0]));
             psi = -phi;
         } else {
-            psi = atan2(mat[0][2], mat[1][2]);
-            phi = atan2(mat[2][0], -mat[2][1]);
-            theta = atan2(sqrt(mat[0][2] * mat[0][2] +
+            psi = ValueType(atan2(mat[0][2], mat[1][2]));
+            phi = ValueType(atan2(mat[2][0], -mat[2][1]));
+            theta = ValueType(atan2(sqrt(mat[0][2] * mat[0][2] +
                                 mat[1][2] * mat[1][2]),
-                            mat[2][2]);
+                            mat[2][2]));
         }
         return V(theta, psi, phi);
 
     case YXZ_ROTATION:
 
         if (isApproxEqual(mat[2][1], ValueType(1.0), eps)) {
-            theta =  - M_PI_2;
-            phi = 0.5 * atan2(-mat[1][0], mat[0][0]);
+            theta = ValueType(-M_PI_2);
+            phi = ValueType(0.5 * atan2(-mat[1][0], mat[0][0]));
             psi = phi;
         } else if (isApproxEqual(mat[2][1], ValueType(-1.0), eps)) {
-            theta = M_PI_2;
-            phi = 0.5 * atan2(mat[1][0], mat[0][0]);
+            theta = ValueType(M_PI_2);
+            phi = ValueType(0.5 * atan2(mat[1][0], mat[0][0]));
             psi = -phi;
         } else {
-            psi = atan2(mat[0][1], mat[1][1]);
-            phi = atan2(mat[2][0], mat[2][2]);
-            theta = atan2(-mat[2][1],
+            psi = ValueType(atan2(mat[0][1], mat[1][1]));
+            phi = ValueType(atan2(mat[2][0], mat[2][2]));
+            theta = ValueType(atan2(-mat[2][1],
                 sqrt(mat[0][1] * mat[0][1] +
-                        mat[1][1] * mat[1][1]));
+                        mat[1][1] * mat[1][1])));
         }
         return V(theta, phi, psi);
 
     case ZYX_ROTATION:
 
         if (isApproxEqual(mat[0][2], ValueType(1.0), eps)) {
-            theta =  -M_PI_2;
-            phi = 0.5 * atan2(-mat[1][0], mat[1][1]);
+            theta = ValueType(-M_PI_2);
+            phi = ValueType(0.5 * atan2(-mat[1][0], mat[1][1]));
             psi = phi;
         } else if (isApproxEqual(mat[0][2], ValueType(-1.0), eps)) {
-            theta = M_PI_2;
-            phi = 0.5 * atan2(mat[2][1], mat[2][0]);
-            psi = - phi;
+            theta = ValueType(M_PI_2);
+            phi = ValueType(0.5 * atan2(mat[2][1], mat[2][0]));
+            psi = -phi;
         } else {
-            psi = atan2(mat[1][2], mat[2][2]);
-            phi = atan2(mat[0][1], mat[0][0]);
-            theta = atan2(-mat[0][2],
+            psi = ValueType(atan2(mat[1][2], mat[2][2]));
+            phi = ValueType(atan2(mat[0][1], mat[0][0]));
+            theta = ValueType(atan2(-mat[0][2],
                 sqrt(mat[0][1] * mat[0][1] +
-                        mat[0][0] * mat[0][0]));
+                        mat[0][0] * mat[0][0])));
         }
         return V(psi, theta, phi);
 
     case XZY_ROTATION:
 
         if (isApproxEqual(mat[1][0], ValueType(-1.0), eps)) {
-            theta = M_PI_2;
-            psi = 0.5 * atan2(mat[2][1], mat[2][2]);
-            phi = - psi;
+            theta = ValueType(M_PI_2);
+            psi = ValueType(0.5 * atan2(mat[2][1], mat[2][2]));
+            phi = -psi;
         } else if (isApproxEqual(mat[1][0], ValueType(1.0), eps)) {
-            theta = - M_PI_2;
-            psi = 0.5 * atan2(- mat[2][1], mat[2][2]);
+            theta = ValueType(-M_PI_2);
+            psi = ValueType(0.5 * atan2(- mat[2][1], mat[2][2]));
             phi = psi;
         } else {
-            psi = atan2(mat[2][0], mat[0][0]);
-            phi = atan2(mat[1][2], mat[1][1]);
-            theta = atan2(- mat[1][0],
+            psi = ValueType(atan2(mat[2][0], mat[0][0]));
+            phi = ValueType(atan2(mat[1][2], mat[1][1]));
+            theta = ValueType(atan2(- mat[1][0],
                             sqrt(mat[1][1] * mat[1][1] +
-                                    mat[1][2] * mat[1][2]));
+                                    mat[1][2] * mat[1][2])));
         }
         return V(phi, psi, theta);
     }
@@ -986,6 +987,6 @@ polarDecomposition(const MatType& input, MatType& unitary,
 
 #endif // OPENVDB_MATH_MAT_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -78,7 +78,13 @@ getNodeChain(OP_Context& context, NodeType* startNode, bool addInterest = true)
     struct Local {
         /// Return the nearest upstream node to the given node, traversing
         /// only input 0 connections and omitting bypassed nodes.
-        static inline OP_Node* nextInput(fpreal now, OP_Node* node)
+        static inline OP_Node* nextInput(
+#if (UT_VERSION_INT >= 0x0c0500aa) // 12.5.170
+            fpreal now,
+#else
+            fpreal /*now*/,
+#endif
+            OP_Node* node)
         {
             OP_Node* input = node->getInput(0, /*mark_used=*/true);
 #if (UT_VERSION_INT >= 0x0c0500aa) // 12.5.170
@@ -129,11 +135,11 @@ getNodeChain(OP_Context& context, NodeType* startNode, bool addInterest = true)
 /// (for the duration of the current scope) set the evaluation context
 /// and time for a node other than the one that is currently being cooked.
 /// @internal Entire class is defined in header, so do *NOT* use *_API
-class OP_EvalScope: public CH_AutoEvaluateTime
+class OP_EvalScope
 {
 public:
     OP_EvalScope(OP_Node& node, OP_Context& context):
-        CH_AutoEvaluateTime(
+        mAutoEvaluator(
             *OPgetDirector()->getCommandManager(),
             context.getThread(),
             context.getTime(),
@@ -147,6 +153,7 @@ public:
     ~OP_EvalScope() { mDirector->popCwd(mThread); }
 
 private:
+    CH_AutoEvaluateTime mAutoEvaluator;
     OP_Director* mDirector;
     int mThread;
 };
@@ -155,6 +162,6 @@ private:
 
 #endif // HOUDINI_UTILS_OP_NODECHAIN_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

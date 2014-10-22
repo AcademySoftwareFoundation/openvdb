@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -116,7 +116,7 @@ TestStats::testExtrema()
         CPPUNIT_ASSERT_EQUAL(uint64_t(n2), t.size());
         CPPUNIT_ASSERT_DOUBLES_EQUAL(val2, t.min(),      0.000001);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(val2, t.max(),      0.000001);
-        
+
         CPPUNIT_ASSERT_EQUAL(uint64_t(n1+n2), s.size());
         CPPUNIT_ASSERT_DOUBLES_EQUAL(val1,    s.min(),  0.000001);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(val2,    s.max(),  0.000001);
@@ -135,7 +135,7 @@ TestStats::testExtrema()
         CPPUNIT_ASSERT_EQUAL(s.size(), t.size());
         CPPUNIT_ASSERT_DOUBLES_EQUAL(s.min(), t.min(),  0.000001);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(s.max(), t.max(),  0.000001);
-    } 
+    }
 }
 
 void
@@ -297,7 +297,7 @@ TestStats::testStats()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(s.mean(),t.mean(), 0.000001);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(s.variance(), t.variance(), 0.000001);
     }
-   
+
     //std::cerr << "\nCompleted TestStats::testStats!\n" << std::endl;
 }
 
@@ -329,7 +329,7 @@ TestStats::testHistogram()
 }
 
 namespace {
-    
+
 struct GradOp
 {
     typedef openvdb::FloatGrid GridT;
@@ -658,7 +658,7 @@ TestStats::testGridHistogram()
             math::Histogram hist = tools::histogram(grid.cbeginValueOn(),
                 /*min=*/0.0, /*max=*/100.0);
 
-            for (size_t i = 0, N = hist.numBins(); i < N; ++i) {
+            for (int i = 0, N = int(hist.numBins()); i < N; ++i) {
                 uint64_t expected = ((hist.min(i) <= value && value <= hist.max(i)) ? 1 : 0);
                 CPPUNIT_ASSERT_EQUAL(expected, hist.count(i));
             }
@@ -676,7 +676,7 @@ TestStats::testGridHistogram()
                 /*min=*/0.0, /*max=*/10.0, /*numBins=*/9, threaded);
 
             CPPUNIT_ASSERT_EQUAL(Index64(2 * DIM * DIM * DIM), hist.size());
-            for (size_t i = 0, N = hist.numBins(); i < N; ++i) {
+            for (int i = 0, N = int(hist.numBins()); i < N; ++i) {
                 if (i == 0 || i == 2) {
                     CPPUNIT_ASSERT_EQUAL(uint64_t(DIM * DIM * DIM), hist.count(i));
                 } else {
@@ -702,7 +702,7 @@ TestStats::testGridHistogram()
                 /*min=*/0.0, /*max=*/10.0, /*numBins=*/9, threaded);
 
             CPPUNIT_ASSERT_EQUAL(Index64(2 * DIM * DIM * DIM), hist.size());
-            for (size_t i = 0, N = hist.numBins(); i < N; ++i) {
+            for (int i = 0, N = int(hist.numBins()); i < N; ++i) {
                 if (i == 2 || i == 4) {
                     CPPUNIT_ASSERT_EQUAL(uint64_t(DIM * DIM * DIM), hist.count(i));
                 } else {
@@ -713,6 +713,6 @@ TestStats::testGridHistogram()
     }
 }
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

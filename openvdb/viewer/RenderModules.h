@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -36,6 +36,7 @@
 #include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/tools/LevelSetUtil.h>
 #include <openvdb/tools/PointScatter.h>
+#include <openvdb/tools/Prune.h>
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/math/Operators.h>
 
@@ -704,7 +705,7 @@ public:
                         interiorAcc.probeConstLeaf(leafIt->origin());
                     if (leaf) leafIt->topologyDifference(*leaf, false);
                 }
-                surfaceMask->pruneInactive();
+                openvdb::tools::pruneInactive(*surfaceMask);
 
                 openvdb::tree::LeafManager<BoolTreeT> maskleafs(*surfaceMask);
                 std::vector<size_t> indexMap(maskleafs.leafCount());
@@ -1081,6 +1082,6 @@ processTypedVectorGrid(GridPtrType grid, OpType& op)
 
 #endif // OPENVDB_VIEWER_RENDERMODULES_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

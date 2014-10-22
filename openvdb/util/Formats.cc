@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -54,16 +54,16 @@ printBytes(std::ostream& os, uint64_t bytes,
     ostr << head;
     ostr << std::setprecision(precision) << std::setiosflags(std::ios::fixed);
     if (bytes >> 40) {
-        ostr << std::setw(width) << (bytes / double(one << 40)) << " TB";
+        ostr << std::setw(width) << (double(bytes) / double(one << 40)) << " TB";
         group = 4;
     } else if (bytes >> 30) {
-        ostr << std::setw(width) << (bytes / double(one << 30)) << " GB";
+        ostr << std::setw(width) << (double(bytes) / double(one << 30)) << " GB";
         group = 3;
     } else if (bytes >> 20) {
-        ostr << std::setw(width) << (bytes / double(one << 20)) << " MB";
+        ostr << std::setw(width) << (double(bytes) / double(one << 20)) << " MB";
         group = 2;
     } else if (bytes >> 10) {
-        ostr << std::setw(width) << (bytes / double(one << 10)) << " KB";
+        ostr << std::setw(width) << (double(bytes) / double(one << 10)) << " KB";
         group = 1;
     } else {
         ostr << std::setw(width) << bytes << " Bytes";
@@ -90,16 +90,16 @@ printNumber(std::ostream& os, uint64_t number,
     ostr << head;
     ostr << std::setprecision(precision) << std::setiosflags(std::ios::fixed);
     if (number / UINT64_C(1000000000000)) {
-        ostr << std::setw(width) << (number / 1000000000000.0) << " trillion";
+        ostr << std::setw(width) << (double(number) / 1000000000000.0) << " trillion";
         group = 4;
     } else if (number / UINT64_C(1000000000)) {
-        ostr << std::setw(width) << (number / 1000000000.0) << " billion";
+        ostr << std::setw(width) << (double(number) / 1000000000.0) << " billion";
         group = 3;
     } else if (number / UINT64_C(1000000)) {
-        ostr << std::setw(width) << (number / 1000000.0) << " million";
+        ostr << std::setw(width) << (double(number) / 1000000.0) << " million";
         group = 2;
     } else if (number / UINT64_C(1000)) {
-        ostr << std::setw(width) << (number / 1000.0) << " thousand";
+        ostr << std::setw(width) << (double(number) / 1000.0) << " thousand";
         group = 1;
     } else {
         ostr << std::setw(width) << number;
@@ -116,6 +116,6 @@ printNumber(std::ostream& os, uint64_t number,
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

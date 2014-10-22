@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -37,6 +37,7 @@
 #include <string>
 #include <boost/uuid/uuid.hpp>
 #include <boost/cstdint.hpp>
+#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <openvdb/Grid.h>
 #include <openvdb/metadata/MetaMap.h>
@@ -54,72 +55,20 @@ namespace io {
 class GridDescriptor;
 
 
-/// Return the file format version number associated with the given input stream.
-/// @sa File::setFormatVersion()
-OPENVDB_API uint32_t getFormatVersion(std::istream&);
-
-/// Return the library version number associated with the given input stream.
-/// @sa File::setLibraryVersion()
-OPENVDB_API VersionId getLibraryVersion(std::istream&);
-
-/// Return a string of the form "<major>.<minor>/<format>", giving the library
-/// and file format version numbers associated with the given input stream.
-OPENVDB_API std::string getVersion(std::istream&);
-
-/// Associate the current file format and library version numbers with the given input stream.
-OPENVDB_API void setCurrentVersion(std::istream&);
-
-/// @brief Associate specific file format and library version numbers with the given stream.
-/// @details This is typically called immediately after reading a header that contains
-/// the version numbers.  Data read subsequently can then be interpreted appropriately.
-OPENVDB_API void setVersion(std::ios_base&, const VersionId& libraryVersion, uint32_t fileVersion);
-
-/// Return @c true if grid statistics (active voxel count and bounding box, etc.)
-/// should be computed and stored as grid metadata on output to the given stream.
-OPENVDB_API bool getWriteGridStatsMetadata(std::ostream&);
-
-/// @brief Return a bitwise OR of compression option flags (COMPRESS_ZIP,
-/// COMPRESS_ACTIVE_MASK, etc.) specifying whether and how input data is compressed
-/// or output data should be compressed.
-OPENVDB_API uint32_t getDataCompression(std::ios_base&);
-
-/// @brief Associate with the given stream a bitwise OR of compression option flags
-/// (COMPRESS_ZIP, COMPRESS_ACTIVE_MASK, etc.) specifying whether and how input data
-/// is compressed or output data should be compressed.
-OPENVDB_API void setDataCompression(std::ios_base&, uint32_t compressionFlags);
-
-/// @brief Return the class (GRID_LEVEL_SET, GRID_UNKNOWN, etc.) of the grid
-/// currently being read from or written to the given stream.
-OPENVDB_API uint32_t getGridClass(std::ios_base&);
-
-/// @brief Associate with the given stream the class (GRID_LEVEL_SET, GRID_UNKNOWN, etc.)
-/// of the grid currently being read or written.
-OPENVDB_API void setGridClass(std::ios_base&, uint32_t);
-
-/// @brief Return a pointer to the background value of the grid
-/// currently being read from or written to the given stream.
-OPENVDB_API const void* getGridBackgroundValuePtr(std::ios_base&);
-
-/// @brief Specify (a pointer to) the background value of the grid
-/// currently being read from or written to the given stream.
-/// @note The pointer must remain valid until the entire grid has been read or written.
-OPENVDB_API void setGridBackgroundValuePtr(std::ios_base&, const void* background);
-
-
-////////////////////////////////////////
-
-
 /// Grid serializer/unserializer
 class OPENVDB_API Archive
 {
 public:
+    typedef boost::shared_ptr<Archive> Ptr;
+    typedef boost::shared_ptr<const Archive> ConstPtr;
+
     static const uint32_t DEFAULT_COMPRESSION_FLAGS;
 
     Archive();
     virtual ~Archive();
 
     /// @brief Return a copy of this archive.
-    virtual boost::shared_ptr<Archive> copy() const;
+    virtual Ptr copy() const;
 
     /// @brief Return the UUID that was most recently written (or read,
     /// if no UUID has been written yet).
@@ -144,21 +93,16 @@ public:
     /// @note Instancing is enabled by default.
     void setInstancingEnabled(bool b) { mEnableInstancing = b; }
 
-    /// Return @c true if the data stream is Zip-compressed.
-    bool isCompressionEnabled() const;
-    /// @brief Specify whether the data stream should be Zip-compressed.
-    /// @details Enabling Zip compression makes I/O slower, but saves space.
-    /// Disable it only if raw I/O speed is a concern.
-    void setCompressionEnabled(bool);
+    /// Return @c true if the OpenVDB library includes support for the Blosc compressor.
+    static bool hasBloscCompression();
 
     /// Return a bit mask specifying compression options for the data stream.
-    uint32_t compressionFlags() const { return mCompression; }
+    uint32_t compression() const { return mCompression; }
     /// @brief Specify whether and how the data stream should be compressed.
-    /// [Mainly for internal use]
     /// @param c bitwise OR (e.g., COMPRESS_ZIP | COMPRESS_ACTIVE_MASK) of
     ///     compression option flags (see Compression.h for the available flags)
     /// @note Not all combinations of compression options are supported.
-    void setCompressionFlags(uint32_t c) { mCompression = c; }
+    void setCompression(uint32_t c) { mCompression = c; }
 
     /// @brief Return @c true if grid statistics (active voxel count and
     /// bounding box, etc.) are computed and written as grid metadata.
@@ -169,6 +113,13 @@ public:
 
     /// @brief Write the grids in the given container to this archive's output stream.
     virtual void write(const GridCPtrVec&, const MetaMap& = MetaMap()) const {}
+
+    /// @brief Return @c true if delayed loading is enabled.
+    /// @details If enabled, delayed loading can be disabled for individual files,
+    /// but not vice-versa.
+    /// @note Define the environment variable @c OPENVDB_DISABLE_DELAYED_LOAD
+    /// to disable delayed loading unconditionally.
+    static bool isDelayedLoadingEnabled();
 
 protected:
     /// @brief Return @c true if the input stream contains grid offsets
@@ -200,15 +151,19 @@ protected:
     /// tag the given input stream with those flags.
     static void readGridCompression(std::istream&);
 
-    /// @brief Tag the given output stream with a flag indicating whether
-    /// to compute and write grid statistics metadata.
-    void setWriteGridStatsMetadata(std::ostream&);
-
     /// Read in and return the number of grids on the input stream.
     static int32_t readGridCount(std::istream&);
 
     /// Populate the given grid from the input stream.
     static void readGrid(GridBase::Ptr, const GridDescriptor&, std::istream&);
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    /// @brief Populate the given grid from the input stream, but only where it
+    /// intersects the given world-space bounding box.
+    static void readGrid(GridBase::Ptr, const GridDescriptor&, std::istream&, const BBoxd&);
+    /// @brief Populate the given grid from the input stream, but only where it
+    /// intersects the given index-space bounding box.
+    static void readGrid(GridBase::Ptr, const GridDescriptor&, std::istream&, const CoordBBox&);
+#endif
 
     typedef std::map<Name /*uniqueName*/, GridBase::Ptr> NamedGridMap;
 
@@ -268,6 +223,6 @@ private:
 
 #endif // OPENVDB_IO_ARCHIVE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

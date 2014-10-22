@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -68,12 +68,12 @@ QuantizedUnitVec::init()
 
         for (uint16_t b = 0; b < 8192; ++b) {
 
-            xbits = (b & MASK_XSLOT) >> 7;
+            xbits = uint16_t((b & MASK_XSLOT) >> 7);
             ybits = b & MASK_YSLOT;
 
             if ((xbits + ybits) > 126) {
-                xbits = 127 - xbits;
-                ybits = 127 - ybits;
+                xbits = uint16_t(127 - xbits);
+                ybits = uint16_t(127 - ybits);
             }
 
             x = double(xbits);
@@ -92,6 +92,6 @@ QuantizedUnitVec::init()
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -230,8 +230,7 @@ approxInverse(const Mat4d& mat4d)
 {
     if (std::abs(mat4d.det()) >= 3 * math::Tolerance<double>::value()) {
         try {
-            Mat4d result = mat4d.inverse();
-            return result;
+            return mat4d.inverse();
         } catch (ArithmeticError& ) {
             // Mat4 code couldn't invert.
         }
@@ -297,6 +296,6 @@ approxInverse(const Mat4d& mat4d)
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -59,9 +59,9 @@ void TestAll()
 {
     CPPUNIT_ASSERT(MaskType::memUsage() == MaskType::SIZE/8);
     const Index SIZE = MaskType::SIZE > 512 ? 512 : MaskType::SIZE;
-    
+
     {// default constructor
-        MaskType m;//all bits are off    
+        MaskType m;//all bits are off
         for (Index i=0; i<SIZE; ++i) CPPUNIT_ASSERT(m.isOff(i));
         for (Index i=0; i<SIZE; ++i) CPPUNIT_ASSERT(!m.isOn(i));
         CPPUNIT_ASSERT(m.isOff());
@@ -167,6 +167,6 @@ void TestAll()
 
 
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

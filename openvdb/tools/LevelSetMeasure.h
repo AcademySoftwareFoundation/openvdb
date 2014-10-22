@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -78,8 +78,8 @@ levelSetArea(const GridType& grid, bool useWorldSpace = true);
 /// @throw TypeError if @a grid is not scalar or not floating-point or not a level set.
 template<class GridType>
 inline Real
-levelSetVolume(const GridType& grid, bool useWorldSpace = true);    
-    
+levelSetVolume(const GridType& grid, bool useWorldSpace = true);
+
 /// @brief Compute the surface area and volume of a narrow-band level set.
 ///
 /// @param grid          a scalar, floating-point grid with one or more disjoint,
@@ -100,7 +100,7 @@ levelSetMeasure(const GridType& grid, Real& area, Real& volume, bool useWorldSpa
 ///                      closed isosurfaces at the given @a isovalue
 /// @param area          surface area of the level set
 /// @param volume        volume of the level set surface
-/// @param avgCurvature  average mean curvature of the level set surface       
+/// @param avgCurvature  average mean curvature of the level set surface
 /// @param useWorldSpace if true the area, volume and curvature are computed in
 ///                      world space units, else in voxel units.
 ///
@@ -108,7 +108,7 @@ levelSetMeasure(const GridType& grid, Real& area, Real& volume, bool useWorldSpa
 template<class GridType>
 inline void
 levelSetMeasure(const GridType& grid, Real& area, Real& volume, Real& avgCurvature,
-                bool useWorldSpace = true);      
+                bool useWorldSpace = true);
 
 /// @brief Smeared-out and continuous Dirac Delta function.
 template<typename RealT>
@@ -128,7 +128,7 @@ private:
 /// @details To reduce the risk of round-off errors (primarily due to
 /// catastrophic cancellation) and guarantee determinism during
 /// multi-threading this class is implemented using parallel_for, and
-/// delayed reduction of a sorted list.    
+/// delayed reduction of a sorted list.
 template<typename GridT,
          typename InterruptT = util::NullInterrupter>
 class LevelSetMeasure
@@ -445,7 +445,7 @@ LevelSetMeasure<GridT, InterruptT>::measure3(const RangeType& range)
 }
 
 ////////////////////////////////////////
-    
+
 template<class GridT>
 inline typename boost::enable_if<boost::is_floating_point<typename GridT::ValueType>, Real>::type
 doLevelSetArea(const GridT& grid, bool useWorldSpace)
@@ -472,7 +472,7 @@ levelSetArea(const GridT& grid, bool useWorldSpace)
 }
 
 ////////////////////////////////////////
-    
+
 template<class GridT>
 inline typename boost::enable_if<boost::is_floating_point<typename GridT::ValueType>, Real>::type
 doLevelSetVolume(const GridT& grid, bool useWorldSpace)
@@ -498,8 +498,8 @@ levelSetVolume(const GridT& grid, bool useWorldSpace)
     return doLevelSetVolume<GridT>(grid, useWorldSpace);
 }
 
-////////////////////////////////////////    
-    
+////////////////////////////////////////
+
 template<class GridT>
 inline typename boost::enable_if<boost::is_floating_point<typename GridT::ValueType> >::type
 doLevelSetMeasure(const GridT& grid, Real& area, Real& volume, bool useWorldSpace)
@@ -523,8 +523,8 @@ levelSetMeasure(const GridT& grid, Real& area, Real& volume, bool useWorldSpace)
     doLevelSetMeasure<GridT>(grid, area, volume, useWorldSpace);
 }
 
-////////////////////////////////////////    
-    
+////////////////////////////////////////
+
 template<class GridT>
 inline typename boost::enable_if<boost::is_floating_point<typename GridT::ValueType> >::type
 doLevelSetMeasure(const GridT& grid, Real& area, Real& volume, Real& avgCurvature,
@@ -548,13 +548,13 @@ levelSetMeasure(const GridT& grid, Real& area, Real& volume, Real& avgCurvature,
 {
     doLevelSetMeasure<GridT>(grid, area, volume, avgCurvature, useWorldSpace);
 }
-    
+
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
 #endif // OPENVDB_TOOLS_LEVELSETMEASURE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
