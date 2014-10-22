@@ -37,6 +37,7 @@
 #include <openvdb/math/Operators.h> // for ISGradient
 #include <openvdb/tools/Morphology.h> // for dilateVoxels()
 #include <openvdb/tree/LeafManager.h>
+#include "Prune.h" // for pruneInactive
 
 #include <boost/scoped_array.hpp>
 #include <boost/scoped_ptr.hpp>
@@ -4178,7 +4179,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
                 if (mPartitions > 1) { // Partition
                     tree::LeafManager<BoolTreeT> leafs(valueMask);
                     leafs.foreach(internal::PartOp(leafs.leafCount() , mPartitions, mActivePart));
-                    valueMask.pruneInactive();
+                    tools::pruneInactive(valueMask);
                 }
 
             } else { // Partition

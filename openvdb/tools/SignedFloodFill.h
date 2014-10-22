@@ -1,0 +1,277 @@
+///////////////////////////////////////////////////////////////////////////
+//
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
+//
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
+//
+// Redistributions of source code must retain the above copyright
+// and license notice and the following restrictions and disclaimer.
+//
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
+// from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
+// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
+//
+///////////////////////////////////////////////////////////////////////////
+//
+/// @file SignedFloodFill.h
+///
+/// @brief Propagates the sign of distance values from the active
+/// voxels in the narrow band to the inactive values outside the
+/// narrow band.
+///
+/// @author Ken Museth
+
+#ifndef OPENVDB_TOOLS_SIGNEDFLOODFILL_HAS_BEEN_INCLUDED
+#define OPENVDB_TOOLS_SIGNEDFLOODFILL_HAS_BEEN_INCLUDED
+
+#include <boost/utility/enable_if.hpp>
+#include <openvdb/math/Math.h> // for isNegative and negative
+#include <openvdb/Types.h> // for Index typedef
+#include <boost/static_assert.hpp>
+#include <boost/type_traits/is_floating_point.hpp>
+#include <openvdb/Types.h>
+#include <openvdb/tree/NodeManager.h>
+
+namespace openvdb {
+OPENVDB_USE_VERSION_NAMESPACE
+namespace OPENVDB_VERSION_NAME {
+namespace tools {
+
+/// @brief Set the values of all inactive voxels and tiles of a narrow-band
+/// level set from the signs of the active voxels, setting outside values to
+/// +background and inside values to -background.
+///    
+/// @warning This method should only be used on closed, symetric narrow-band level sets.    
+///
+/// @param tree          Tree that will be flood filled
+/// @param threaded      Enable or disable threading.  (Threading is enabled by default.)
+/// @param grainSize     Used to control the granularity of the multithreaded. (default is 1).   
+///
+/// @throw TypeError if the ValueType of @a tree is not floating point.
+template<typename TreeT>
+inline void
+signedFloodFill(TreeT& tree,
+                bool threaded = true,
+                size_t grainSize = 1);
+
+/// @brief Set the values of all inactive voxels and tiles of a narrow-band
+/// level set from the signs of the active voxels, setting exterior values to
+/// @a outsideWidth and interior values to @a insideWidth.  Set the background value
+/// of this tree to @a outsideWidth.
+///    
+/// @warning This method should only be used on closed, narrow-band level sets.    
+///
+/// @param tree          Tree that will be flood filled
+/// @param outsideWidth  The width of the outside of the narrow band
+/// @param insideWidth   The width of the inside of the narrow band    
+/// @param threaded      Enable or disable threading.  (Threading is enabled by default.)
+/// @param grainSize     Used to control the granularity of the multithreaded. (default is 1).   
+///
+/// @throw TypeError if the ValueType of @a tree is not floating point. 
+template<typename TreeT>
+inline void
+signedFloodFill(TreeT& tree,
+                const typename TreeT::ValueType& outsideWidth,
+                const typename TreeT::ValueType& insideWidth,
+                bool threaded = true,
+                size_t grainSize = 1);
+
+////////////////////////// Implementation of SignedFloodFill ////////////////////////////
+
+template<typename TreeT>
+class SignedFloodFillOp
+{
+public:
+    typedef typename TreeT::ValueType    ValueT;
+    typedef typename TreeT::RootNodeType RootT;
+    typedef typename TreeT::LeafNodeType LeafT;
+    BOOST_STATIC_ASSERT(boost::is_floating_point<ValueT>::value);
+    
+    SignedFloodFillOp(const TreeT& tree)
+        : mOutside(math::Abs(tree.background()))
+        , mInside(math::negative(mOutside))
+    {
+    }
+    SignedFloodFillOp(const TreeT& tree, const ValueT& background)
+        : mOutside(math::Abs(background))
+        , mInside(math::negative(mOutside))
+    {
+    }
+    SignedFloodFillOp(ValueT outsideValue, ValueT insideValue)
+        : mOutside(math::Abs(outsideValue))
+        , mInside(math::negative(math::Abs(insideValue)))
+    {
+    }
+    // Nothing to do at the leaf node level
+    void operator()(LeafT& leaf) const
+    {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+        if (!leaf.allocate()) return;//this assures that the buffer is allocated and in-memory
+#endif
+        const typename LeafT::NodeMaskType& valueMask = leaf.getValueMask();
+        // WARNING: "Never do what you're about to see at home, we're what you call experts!"
+        typename LeafT::ValueType* buffer = const_cast<typename LeafT::ValueType*>(&(leaf.getFirstValue()));
+        
+        const Index first = valueMask.findFirstOn();
+        if (first < LeafT::SIZE) {
+            bool xInside = buffer[first]<0, yInside = xInside, zInside = xInside;
+            for (Index x = 0; x != (1 << LeafT::LOG2DIM); ++x) {
+                const Index x00 = x << (2 * LeafT::LOG2DIM);
+                if (valueMask.isOn(x00)) xInside = buffer[x00] < 0; // element(x, 0, 0)
+                yInside = xInside;
+                for (Index y = 0; y != (1 << LeafT::LOG2DIM); ++y) {
+                    const Index xy0 = x00 + (y << LeafT::LOG2DIM);
+                    if (valueMask.isOn(xy0)) yInside = buffer[xy0] < 0; // element(x, y, 0)
+                    zInside = yInside;
+                    for (Index z = 0; z != (1 << LeafT::LOG2DIM); ++z) {
+                        const Index xyz = xy0 + z; // element(x, y, z)
+                        if (valueMask.isOn(xyz)) {
+                            zInside = buffer[xyz] < 0;
+                        } else {
+                            buffer[xyz] = zInside ? mInside : mOutside;
+                        }
+                    }
+                }
+            }
+        } else {// if no active voxels exist simply use the sign of the first value
+            leaf.fill(buffer[0] < 0 ? mInside : mOutside);
+        }
+    }
+    // Prune the child nodes of the internal nodes
+    template<typename NodeT>
+    void operator()(NodeT& node) const
+    {
+        // We assume the child nodes have already been flood filled!
+        const typename NodeT::NodeMaskType& childMask = node.getChildMask();
+        // WARNING: "Never do what you're about to see at home, we're what you call experts!"
+        typename NodeT::UnionType* table = const_cast<typename NodeT::UnionType*>(node.getTable()); 
+        
+        const Index first = childMask.findFirstOn();
+        if (first < NodeT::NUM_VALUES) {
+            bool xInside = table[first].getChild()->getFirstValue()<0;
+            bool yInside = xInside, zInside = xInside;
+            for (Index x = 0; x != (1 << NodeT::LOG2DIM); ++x) {
+                const int x00 = x << (2 * NodeT::LOG2DIM); // offset for block(x, 0, 0)
+                if (childMask.isOn(x00)) xInside = table[x00].getChild()->getLastValue()<0;
+                yInside = xInside;
+                for (Index y = 0; y != (1 << NodeT::LOG2DIM); ++y) {
+                    const Index xy0 = x00 + (y << NodeT::LOG2DIM); // offset for block(x, y, 0)
+                    if (childMask.isOn(xy0)) yInside = table[xy0].getChild()->getLastValue()<0;
+                    zInside = yInside;
+                    for (Index z = 0; z != (1 << NodeT::LOG2DIM); ++z) {
+                        const Index xyz = xy0 + z; // offset for block(x, y, z)
+                        if (childMask.isOn(xyz)) {
+                            zInside = table[xyz].getChild()->getLastValue()<0;
+                        } else {
+                            table[xyz].setValue(zInside ? mInside : mOutside);
+                        }
+                    }
+                }
+            }
+        } else {//no child nodes exist simply use the sign of the first tile value.
+            const ValueT v =  table[0].getValue()<0 ? mInside : mOutside;
+            for (Index i = 0; i < NodeT::NUM_VALUES; ++i) table[i].setValue(v);
+        }
+    }
+    // Prune the child nodes of the root node
+    void operator()(RootT& root) const
+    {
+        typedef typename RootT::ChildNodeType ChildT;
+        // Insert the child nodes into a map sorted according to their origin
+        std::map<Coord, ChildT*> nodeKeys;
+        typename RootT::ChildOnIter it = root.beginChildOn();
+        for (; it; ++it) nodeKeys.insert(std::pair<Coord, ChildT*>(it.getCoord(), &(*it)));
+        static const Index DIM = RootT::ChildNodeType::DIM;
+        
+        // We employ a simple z-scanline algorithm that inserts inactive tiles with 
+        // the inside value if they are sandwiched between inside child nodes only!
+        typename std::map<Coord, ChildT*>::const_iterator b = nodeKeys.begin(), e = nodeKeys.end();
+        if ( b == e ) return;
+        for (typename std::map<Coord, ChildT*>::const_iterator a = b++; b != e; ++a, ++b) {
+            Coord d = b->first - a->first; // delta of neighboring coordinates
+            if (d[0]!=0 || d[1]!=0 || d[2]==Int32(DIM)) continue;// not same z-scanline or neighbors
+            const ValueT fill[] = { a->second->getLastValue(), b->second->getFirstValue() };
+            if (!(fill[0] < 0) || !(fill[1] < 0)) continue; // scanline isn't inside
+            Coord c = a->first + Coord(0u, 0u, DIM);
+            for (; c[2] != b->first[2]; c[2] += DIM) root.addTile(c, mInside, false);
+        }
+        root.setBackground(mOutside, /*updateChildNodes=*/false);
+    }
+private:
+   
+    const ValueT mOutside, mInside;
+};// SignedFloodFillOp
+
+template <typename TreeT>
+inline
+typename boost::enable_if<typename boost::is_floating_point<typename TreeT::ValueType>::type>::type
+doSignedFloodFill(TreeT& tree,
+                  typename TreeT::ValueType outsideValue,
+                  typename TreeT::ValueType insideValue,
+                  bool threaded,
+                  size_t grainSize)
+{
+    tree::NodeManager<TreeT> nodes(tree);
+    SignedFloodFillOp<TreeT> op(outsideValue, insideValue);
+    nodes.processBottomUp(op, threaded, grainSize);
+}
+
+// Dummy (no-op) implementation for non-float types
+template <typename TreeT>
+inline
+typename boost::disable_if<typename boost::is_floating_point<typename TreeT::ValueType>::type>::type
+doSignedFloodFill(TreeT&,
+                  const typename TreeT::ValueType&,
+                  const typename TreeT::ValueType&,
+                  bool,
+                  size_t)
+{
+    OPENVDB_THROW(TypeError,
+        "signedFloodFill is supported only for scalar, floating-point grids");
+}
+
+// If the narrow-band is symmetric and unchanged
+template <typename TreeT>
+inline void
+signedFloodFill(TreeT& tree,
+                const typename TreeT::ValueType& outsideValue,
+                const typename TreeT::ValueType& insideValue,
+                bool threaded,
+                size_t grainSize)
+{
+    doSignedFloodFill(tree, outsideValue, insideValue, threaded, grainSize);
+}
+
+template <typename TreeT>
+inline void
+signedFloodFill(TreeT& tree,
+                bool threaded,
+                size_t grainSize)
+{
+    doSignedFloodFill(tree, tree.background(), tree.background(), threaded, grainSize);
+}
+
+} // namespace tools
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
+
+#endif // OPENVDB_TOOLS_RESETBACKGROUND_HAS_BEEN_INCLUDED
+
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

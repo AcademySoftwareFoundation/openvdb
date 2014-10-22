@@ -142,9 +142,9 @@ else
 endif
 
 # The parent directory of the OpenEXR/ header directory (which contains half.h)
-HALF_INCL_DIR := $(HT)/include
+ILMBASE_INCL_DIR := $(HT)/include
 # The directory containing libHalf
-HALF_LIB_DIR := $(HDSO)
+ILMBASE_LIB_DIR := $(HDSO)
 ifdef WINDOWS_NT
   ifneq (full,$(strip $(debug)))
     ifeq (no,$(strip $(shared)))
@@ -203,16 +203,7 @@ ifeq (yes,$(strip $(verbose)))
 endif
 # Extra flags to be passed through hcustom to the compiler or linker
 HCUSTOM_EXTRA_FLAGS := -DIGNORE_HDK_DEPRECATIONS
-# The compiler to be used by hcustom
-ifeq ($(strip $(HOUDINI_CC)),)
-    # If HOUDINI_CC is not set, set it to CXX if CXX is set, otherwise set it to "g++".
-    # (This replicates the logic in hcustom.)
-    ifneq ($(strip $(CXX)),)
-        HOUDINI_CC = $(CXX)
-    else
-        HOUDINI_CC = g++
-    endif
-endif
+HCUSTOM_EXTRA_LDFLAGS :=
 
 ifeq (full,$(strip $(debug)))
   OPTIMIZE := $(DEBUG_FLAGS)
@@ -250,7 +241,7 @@ else
     QUIET := > /dev/null
 endif
 
-INCLDIRS := -I . -I .. $(CXXISYSTEM) $(BOOST_INCL_DIR) $(CXXISYSTEM) $(HALF_INCL_DIR) $(CXXISYSTEM) $(TBB_INCL_DIR)
+INCLDIRS := -I . -I .. $(CXXISYSTEM) $(BOOST_INCL_DIR) $(CXXISYSTEM) $(ILMBASE_INCL_DIR) $(CXXISYSTEM) $(TBB_INCL_DIR)
 HCUSTOM_INCLDIRS := $(subst isystem,I,$(INCLDIRS))
 
 CXXFLAGS += $(OPTIMIZE) $(INCLDIRS) -DIGNORE_HDK_DEPRECATIONS
@@ -264,19 +255,19 @@ ifdef MBSD
     CXXFLAGS += -undefined dynamic_lookup
 endif
 
-ifneq ($(strip $(wildcard $(HOUDINI_INCL_DIR))),)
+ifneq (,$(strip $(wildcard $(HOUDINI_INCL_DIR))))
     HOUDINI_CXXFLAGS := $(shell hcustom -c)
     HOUDINI_LDFLAGS := $(shell hcustom -m)
 endif
 
 HCUSTOM_LIBS := \
-    -L $(HALF_LIB_DIR) $(HALF_LIB) \
+    -L $(ILMBASE_LIB_DIR) $(HALF_LIB) \
     -L $(TBB_LIB_DIR) $(TBB_LIB) \
     -L $(BOOST_LIB_DIR) $(BOOST_LIB) \
     -L $(OPENVDB_LIB_DIR) $(OPENVDB_LIB) \
 #
 LIBS_RPATH := \
-    -Wl,-rpath,$(HALF_LIB_DIR) $(LDDIROPT)$(HALF_LIB_DIR) $(HALF_LIB) \
+    -Wl,-rpath,$(ILMBASE_LIB_DIR) $(LDDIROPT)$(ILMBASE_LIB_DIR) $(HALF_LIB) \
     -Wl,-rpath,$(TBB_LIB_DIR) $(LDDIROPT)$(TBB_LIB_DIR) $(TBB_LIB) \
     -Wl,-rpath,$(OPENVDB_LIB_DIR) $(LDDIROPT)$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) \
     -Wl,-rpath,$(BOOST_LIB_DIR) -L$(BOOST_LIB_DIR) $(BOOST_LIB) \
@@ -344,8 +335,6 @@ HOUDINI_SOP_SRC_NAMES := \
 #
 HOUDINI_SOP_NAMES := $(basename $(notdir $(HOUDINI_SOP_SRC_NAMES)))
 
-#
-#
 # Replace filenames of the form "houdini/<name>.cc" with
 # "$(DWA_HOUDINI_SOP_SRC_DIR)/<name>/<name>.cc"
 DWA_HOUDINI_FILES += $(addprefix $(DWA_HOUDINI_SOP_SRC_DIR)/,\
@@ -387,10 +376,69 @@ else ifdef WINDOWS_NT
     LIBHOUDINI := $(LIBHOUDINI_SHARED)
 else
     LIBHOUDINI := $(LIBHOUDINI_SHARED_VERSIONED)
+
+    # For debugging, pass "rpath=yes" (the default setting) to encode
+    # the path to libopenvdb.so into SOPs.  With "rpath=no", the directory
+    # containing libopenvdb.so will need to be added to LD_LIBRARY_PATH.
+    ifeq (no,$(strip $(rpath)))
+        LIBOPENVDB_RPATH :=
+    else
+        LIBOPENVDB_RPATH := -Wl,-rpath,$(OPENVDB_LIB_DIR)
+    endif # rpath
+    HCUSTOM_EXTRA_LDFLAGS += $(LIBOPENVDB_RPATH)
 endif # shared
 
 ifdef WINDOWS_NT
     LIBS_RPATH := $(subst -L ,$(LDDIROPT),$(HCUSTOM_LIBS))
+endif
+
+
+# Environment variables to pass to hcustom
+HCUSTOM_EXPORT :=
+ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)$(HCUSTOM_EXTRA_LDFLAGS)))
+    # Prior to Houdini 13.0.548 and 14.0.105, the only way to pass extra compiler flags
+    # to hcustom was to append them to the compiler name and pass the result in the
+    # environment variable HOUDINI_CC.
+    ifeq (use_houdini_cc,$(shell test \
+        \( $(HOUDINI_MAJOR_RELEASE) -lt 13 \) \
+        -o \( \( $(HOUDINI_MAJOR_RELEASE) -eq 13 \) -a \( $(HOUDINI_BUILD_VERSION) -lt 548 \) \) \
+        -o \( \( $(HOUDINI_MAJOR_RELEASE) -eq 14 \) -a \( $(HOUDINI_MINOR_RELEASE) -eq 0 \) \
+            -a \( $(HOUDINI_BUILD_VERSION) -lt 105 \) \) \
+        && echo use_houdini_cc))
+        ifeq (,$(strip $(HOUDINI_CC)))
+            # If HOUDINI_CC is not set, set it to CXX if CXX is set, otherwise set it to
+            # something platform-appropriate.  (This replicates the logic in hcustom.)
+            ifneq (,$(strip $(CXX)))
+                HOUDINI_CC = $(CXX)
+            else
+                ifdef LINUX
+                    HOUDINI_CC = g++
+                else ifdef MBSD
+                    HOUDINI_CC = clang++
+                #else ifdef WINDOWS_NT  # TODO
+                #    HOUDINI_CC =
+                else
+                    HOUDINI_CC =
+                endif
+            endif
+        endif
+        ifeq (,$(strip $(HOUDINI_CC)))
+            $(error Cannot determine which C++ compiler to use with hcustom; please specify a compiler by setting $$(CXX))
+        endif
+        HCUSTOM_EXPORT := HOUDINI_CC='$(HOUDINI_CC) $(HCUSTOM_EXTRA_CFLAGS) $(HCUSTOM_EXTRA_LDFLAGS)'
+    else
+	# From Houdini 13.0.548 and 14.0.105 on, hcustom recognizes
+	# the environment variables HCUSTOM_CFLAGS and HCUSTOM_LDFLAGS.
+	ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)))
+	    HCUSTOM_EXPORT += HCUSTOM_CFLAGS=$(HCUSTOM_EXTRA_CFLAGS)
+	endif
+	ifneq (,$(strip $(HCUSTOM_EXTRA_LDFLAGS)))
+	    HCUSTOM_EXPORT += HCUSTOM_LDFLAGS=$(HCUSTOM_EXTRA_LDFLAGS)
+	endif
+    endif
+endif
+ifneq (,$(strip $(HCUSTOM_EXPORT)))
+    HCUSTOM_EXPORT := export $(HCUSTOM_EXPORT)
 endif
 
 DEPEND := houdini_deps
@@ -540,7 +588,7 @@ $(DEPEND): $(ALL_INCLUDE_FILES) $(ALL_SRC_FILES)
 	for f in $(HOUDINI_SRC_FILES); \
 		do $(CXX) $(CXXFLAGS) $(HOUDINI_CXXFLAGS) -O0 \
 			-MM $$f -MT `echo $$f | sed 's%\.[^.]*%.o%'` \
-			-I $(HOUDINI_INCL_DIR) >> $(DEPEND); \
+			$(CXXISYSTEM) $(HOUDINI_INCL_DIR) >> $(DEPEND); \
 	done
 
 depend: $(DEPEND)

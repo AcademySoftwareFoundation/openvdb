@@ -49,7 +49,6 @@
 #include <openvdb/Types.h>
 #include "Iterator.h"
 #include "NodeUnion.h"
-#include "Util.h"
 
 
 namespace openvdb {
@@ -241,12 +240,15 @@ public:
     ChildAllIter   beginChildAll() { return ChildAllIter(mChildMask.beginDense(), this); }
 
     ValueOnCIter  cbeginValueOn()  const { return ValueOnCIter(mValueMask.beginOn(), this); }
+    /// @warning This iterator will also visit child nodes so use isChildMaskOn to skip them! 
     ValueOffCIter cbeginValueOff() const { return ValueOffCIter(mValueMask.beginOff(), this); }
     ValueAllCIter cbeginValueAll() const { return ValueAllCIter(mChildMask.beginOff(), this); }
     ValueOnCIter   beginValueOn()  const { return cbeginValueOn(); }
+    /// @warning This iterator will also visit child nodes so use isChildMaskOn to skip them! 
     ValueOffCIter  beginValueOff() const { return cbeginValueOff(); }
     ValueAllCIter  beginValueAll() const { return cbeginValueAll(); }
     ValueOnIter    beginValueOn()  { return ValueOnIter(mValueMask.beginOn(), this); }
+    /// @warning This iterator will also visit child nodes so use isChildMaskOn to skip them! 
     ValueOffIter   beginValueOff() { return ValueOffIter(mValueMask.beginOff(), this); }
     ValueAllIter   beginValueAll() { return ValueAllIter(mChildMask.beginOff(), this); }
 
@@ -420,7 +422,6 @@ public:
     /// Mark all values (both tiles and voxels) as active.
     void setValuesOn();
 
-
     //
     // I/O
     //
@@ -437,20 +438,6 @@ public:
     /// @brief Set all voxels within an axis-aligned box to a constant value.
     /// (The min and max coordinates are inclusive.)
     void fill(const CoordBBox& bbox, const ValueType&, bool active = true);
-
-    /// @brief Overwrite each inactive value in this node and in any child nodes with
-    /// a new value whose magnitude is equal to the specified background value and whose
-    /// sign is consistent with that of the lexicographically closest active value.
-    /// @details This is primarily useful for propagating the sign from the (active) voxels
-    /// in a narrow-band level set to the inactive voxels outside the narrow band.
-    void signedFloodFill(const ValueType& background);
-
-    /// @brief Overwrite each inactive value in this node and in any child nodes with
-    /// either @a outside or @a inside, depending on the sign of the lexicographically
-    /// closest active value.
-    /// @details Specifically, an inactive value is set to @a outside if the closest active
-    /// value in the lexicographic direction is positive, otherwise it is set to @a inside.
-    void signedFloodFill(const ValueType& outside, const ValueType& inside);
 
     /// Change the sign of all the values represented in this node and
     /// its child nodes.
@@ -559,26 +546,10 @@ public:
     /// Set all voxels that lie outside the given axis-aligned box to the background.
     void clip(const CoordBBox&, const ValueType& background);
 
-    /// @brief Call the @c PruneOp functor for each child node and, if the functor
-    /// returns @c true, prune the node and replace it with a tile.
-    ///
-    /// This method is used to implement all of the various pruning algorithms
-    /// (prune(), pruneInactive(), etc.).  It should rarely be called directly.
-    /// @see openvdb/tree/Util.h for the definition of the @c PruneOp functor
-    template<typename PruneOp> void pruneOp(PruneOp&);
-
     /// @brief Reduce the memory footprint of this tree by replacing with tiles
     /// any nodes whose values are all the same (optionally to within a tolerance)
     /// and have the same active state.
     void prune(const ValueType& tolerance = zeroVal<ValueType>());
-
-    /// @brief Reduce the memory footprint of this tree by replacing with
-    /// tiles of the given value any nodes whose values are all inactive.
-    void pruneInactive(const ValueType&);
-
-    /// @brief Reduce the memory footprint of this tree by replacing with
-    /// background tiles any nodes whose values are all inactive.
-    void pruneInactive();
 
     /// @brief Add the specified leaf to this node, possibly creating a child branch
     /// in the process.  If the leaf node already exists, replace it.
@@ -718,6 +689,16 @@ public:
     bool isChildMaskOn(Index n) const { return mChildMask.isOn(n); }
     bool isChildMaskOff(Index n) const { return mChildMask.isOff(n); }
     bool isChildMaskOff() const { return mChildMask.isOff(); }
+    const NodeMaskType& getValueMask() const { return mValueMask; }
+    const NodeMaskType& getChildMask() const { return mChildMask; }
+    NodeMaskType getValueOffMask() const
+    {
+        NodeMaskType mask = mValueMask;
+        mask |= mChildMask;
+        mask.toggle();
+        return mask;
+    }
+    const UnionType* getTable() const { return mNodes; }
 protected:
     //@{
     /// Use a mask accessor to ensure consistency between the child and value masks;
@@ -1020,46 +1001,22 @@ InternalNode<ChildT, Log2Dim>::evalActiveBoundingBox(CoordBBox& bbox, bool visit
 
 
 template<typename ChildT, Index Log2Dim>
-template<typename PruneOp>
-inline void
-InternalNode<ChildT, Log2Dim>::pruneOp(PruneOp& op)
-{
-    for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
-        const Index i = iter.pos();
-        ChildT* child = mNodes[i].getChild();
-        if (!op(*child)) continue;
-        delete child;
-        mChildMask.setOff(i);
-        mValueMask.set(i, op.state);
-        mNodes[i].setValue(op.value);
-    }
-
-}
-
-
-template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::prune(const ValueType& tolerance)
 {
-    TolerancePrune<ValueType> op(tolerance);
-    this->pruneOp(op);
-}
-
-
-template<typename ChildT, Index Log2Dim>
-inline void
-InternalNode<ChildT, Log2Dim>::pruneInactive(const ValueType& bg)
-{
-    InactivePrune<ValueType> op(bg);
-    this->pruneOp(op);
-}
-
-
-template<typename ChildT, Index Log2Dim>
-inline void
-InternalNode<ChildT, Log2Dim>::pruneInactive()
-{
-    this->pruneInactive(this->getBackground());
+    bool state = false;
+    ValueType value = zeroVal<ValueType>();
+    for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
+        const Index i = iter.pos();
+        ChildT* child = mNodes[i].getChild();
+        child->prune(tolerance);
+        if (child->isConstant(value, state, tolerance)) {
+            delete child;
+            mChildMask.setOff(i);
+            mValueMask.set(i, state);
+            mNodes[i].setValue(value);
+        }
+     }
 }
 
 
@@ -2135,56 +2092,6 @@ InternalNode<ChildT, Log2Dim>::getLastValue() const
 
 template<typename ChildT, Index Log2Dim>
 inline void
-InternalNode<ChildT, Log2Dim>::signedFloodFill(const ValueType& background)
-{
-    this->signedFloodFill(background, math::negative(background));
-}
-
-
-template<typename ChildT, Index Log2Dim>
-inline void
-InternalNode<ChildT, Log2Dim>::signedFloodFill(const ValueType& outsideValue,
-                                               const ValueType& insideValue)
-{
-    // First, flood fill all child nodes.
-    for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
-        iter->signedFloodFill(outsideValue, insideValue);
-    }
-    const Index first = mChildMask.findFirstOn();
-    if (first < NUM_VALUES) {
-        bool xInside = math::isNegative(mNodes[first].getChild()->getFirstValue()),
-            yInside = xInside, zInside = xInside;
-        for (Index x = 0; x != (1 << Log2Dim); ++x) {
-            const int x00 = x << (2 * Log2Dim); // offset for block(x, 0, 0)
-            if (isChildMaskOn(x00)) {
-                xInside = math::isNegative(mNodes[x00].getChild()->getLastValue());
-            }
-            yInside = xInside;
-            for (Index y = 0; y != (1 << Log2Dim); ++y) {
-                const Index xy0 = x00 + (y << Log2Dim); // offset for block(x, y, 0)
-                if (isChildMaskOn(xy0)) {
-                    yInside = math::isNegative(mNodes[xy0].getChild()->getLastValue());
-                }
-                zInside = yInside;
-                for (Index z = 0; z != (1 << Log2Dim); ++z) {
-                    const Index xyz = xy0 + z; // offset for block(x, y, z)
-                    if (isChildMaskOn(xyz)) {
-                        zInside = math::isNegative(mNodes[xyz].getChild()->getLastValue());
-                    } else {
-                        mNodes[xyz].setValue(zInside ? insideValue : outsideValue);
-                    }
-                }
-            }
-        }
-    } else {//no child nodes exist simply use the sign of the first tile value.
-        const ValueType v =  math::isNegative(mNodes[0].getValue()) ? insideValue : outsideValue;
-        for (Index i = 0; i < NUM_VALUES; ++i) mNodes[i].setValue(v);
-    }
-}
-
-
-template<typename ChildT, Index Log2Dim>
-inline void
 InternalNode<ChildT, Log2Dim>::negate()
 {
     for (Index i = 0; i < NUM_VALUES; ++i) {
@@ -2980,7 +2887,6 @@ InternalNode<ChildT, Log2Dim>::resetBackground(const ValueType& oldBackground,
        }
     }
 }
-
 
 template<typename ChildT, Index Log2Dim>
 template<typename OtherChildNodeType, Index OtherLog2Dim>

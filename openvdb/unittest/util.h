@@ -32,6 +32,7 @@
 #define OPENVDB_UNITTEST_UTIL_HAS_BEEN_INCLUDED
 
 #include <openvdb/openvdb.h>
+#include <openvdb/tools/Prune.h>// for pruneLevelSet
 #include <sstream>
 
 namespace unittest_util {
@@ -85,7 +86,8 @@ makeSphere(const openvdb::Coord& dim, const openvdb::Vec3f& center, float radius
             }
         }
     }
-    if (mode == SPHERE_SPARSE_NARROW_BAND) grid.tree().prune();
+    //if (mode == SPHERE_SPARSE_NARROW_BAND) grid.tree().prune();
+    if (mode == SPHERE_SPARSE_NARROW_BAND) openvdb::tools::pruneLevelSet(grid.tree());
 }
 
 // Template specialization for boolean trees (mostly a dummy implementation)

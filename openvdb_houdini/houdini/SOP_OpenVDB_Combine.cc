@@ -39,6 +39,9 @@
 #include <openvdb/tools/GridTransformer.h> // for resampleToMatch()
 #include <openvdb/tools/LevelSetRebuild.h> // for levelSetRebuild()
 #include <openvdb/tools/Morphology.h> // for deactivate()
+#include <openvdb/tools/SignedFloodFill.h>
+#include <openvdb/tools/ChangeBackground.h>
+#include <openvdb/tools/Prune.h>
 #include <openvdb/util/NullInterrupter.h>
 #include <PRM/PRM_Parm.h>
 #include <UT/UT_Interrupt.h>
@@ -517,7 +520,7 @@ struct MulAdd
             if (!dest) dest = GridT::create(src); // same transform, new tree
             ValueT bg;
             (*this)(src.background(), ValueT(), bg);
-            dest->setBackground(bg);
+            openvdb::tools::changeBackground(dest->tree(), bg);
             dest->tree().combine2(src.tree(), src.tree(), *this, /*prune=*/false);
         }
     }
@@ -916,7 +919,7 @@ struct SOP_OpenVDB_Combine::CombineOp
                 ValueT bg;
                 comp(aGrid->background(), ZERO, bg);
                 resultGrid = aGrid->copy(/*tree=*/openvdb::CP_NEW);
-                resultGrid->setBackground(bg);
+                openvdb::tools::changeBackground(resultGrid->tree(), bg);
                 resultGrid->tree().combine2(aGrid->tree(), bGrid->tree(), comp, /*prune=*/false);
                 break;
             }
@@ -926,7 +929,7 @@ struct SOP_OpenVDB_Combine::CombineOp
                 ValueT bg;
                 comp(aGrid->background(), ZERO, bg);
                 resultGrid = aGrid->copy(/*tree=*/openvdb::CP_NEW);
-                resultGrid->setBackground(bg);
+                openvdb::tools::changeBackground(resultGrid->tree(), bg);
                 resultGrid->tree().combine2(aGrid->tree(), bGrid->tree(), comp, /*prune=*/false);
                 break;
             }
@@ -1060,11 +1063,11 @@ struct SOP_OpenVDB_Combine::CombineOp
         }
 
         if (flood && resultGrid->getGridClass() == openvdb::GRID_LEVEL_SET) {
-            resultGrid->signedFloodFill();
+            openvdb::tools::signedFloodFill(resultGrid->tree());
         }
         if (prune) {
             const float tolerance = float(self->evalFloat("tolerance", 0, self->getTime()));
-            resultGrid->tree().prune(ValueT(ZERO + tolerance));
+            openvdb::tools::prune(resultGrid->tree(), ValueT(ZERO + tolerance));
         }
 
         return resultGrid;

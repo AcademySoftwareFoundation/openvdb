@@ -34,6 +34,7 @@
 #include <openvdb/math/Math.h>
 #include <openvdb/tree/Tree.h>
 #include <openvdb/tools/GridTransformer.h>
+#include <openvdb/tools/Prune.h>
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
@@ -174,7 +175,7 @@ TestGridTransformer::transformGrid()
         // Transform the test grid.
         typename GridType::Ptr outGrid = GridType::create(background);
         transformer.transformGrid<Sampler>(*inGrid, *outGrid);
-        outGrid->tree().prune();
+        openvdb::tools::prune(outGrid->tree());
 
         // Verify that the bounding box of the transformed grid
         // matches the transformed bounding box of the original grid.

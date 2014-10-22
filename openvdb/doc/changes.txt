@@ -17,16 +17,23 @@
   The limit can be set to zero to disable copying, but if it cannot be
   guaranteed that a file will not be modified, then it is best not to enable
   delayed loading for that file.
-- <TT>.vdb</TT> files can now optionally be compressed with the Blosc&nbsp;LZ4
-  codec.  <A HREF="http://www.blosc.org/">Blosc</A> compresses almost as well
-  as ZLIB, but it is much faster.
 - Added @vdblink::tools::PointPartitioner PointPartitioner@endlink, a tool
   for fast spatial sorting of points stored in an external array, and
   @link PointIndexGrid.h PointIndexGrid@endlink, an acceleration structure
   for fast range and nearest-neighbor searches.
+- Added @link NodeManager.h tree::NodeManager@endlink,
+  which linearizes a tree to facilitate efficient multithreading
+  across all tree levels.
+- Added @vdblink::tools::prune() tools::prune@endlink (and other variants),
+  which replaces and outperforms @c Tree::prune.
+- Added @vdblink::tools::signedFloodFill() tools::signedFloodFill@endlink,
+  which replaces and outperforms @c Tree::signedFloodFill.
+- Added @vdblink::tools::changeBackground() tools::changeBackground@endlink
+  (and other variants), which replaces and outperforms @c Tree::setBackground().
 - Added a fast but approximate narrow-band level set
-  @vdblink::tools::LevelSetTracker::dilate() dilation@endlink method and
-  a @vdblink::tools::LevelSetTracker::normalize(const MaskType*)
+  @vdblink::tools::LevelSetTracker::dilate() dilation@endlink method, a fast
+   narrow-band level set @vdblink::tools::LevelSetTracker::erode() erosion@endlink
+  method, and a @vdblink::tools::LevelSetTracker::normalize(const MaskType*)
   masked normalization@endlink method to
   @vdblink::tools::LevelSetTracker LevelSetTracker@endlink.
 - Added @vdblink::tools::Diagnose Diagnose@endlink, which performs
@@ -53,7 +60,8 @@
   (6) dilation pattern.
 - Added @vdblink::tree::Tree::getNodes() Tree::getNodes@endlink, which allows
   for fast construction of linear arrays of tree nodes for use in multithreaded
-  code such as the @vdblink::tree::LeafManager LeafManager@endlink.
+  code such as the @vdblink::tree::LeafManager LeafManager@endlink or
+  @link NodeManager.h tree::NodeManager@endlink.
 - Added @vdblink::math::Extrema math::Extrema@endlink and
   @vdblink::tools::extrema() tools::extrema@endlink to efficiently
   compute minimum and maximum values in a grid.
@@ -92,9 +100,9 @@
 - Grid names retrieved using a
   @vdblink::io::File::NameIterator File::NameIterator@endlink now always
   uniquely identify grids; they no longer generate &lsquo;more than one grid
-  named&nbsp;&ldquo;<I>x</I>&rdquo;&rsquo; warnings when there are multiple grids
-  of the same name in a file (for files written starting with this version
-  of the OpenVDB library).
+  named&nbsp;&ldquo;<I>x</I>&rdquo;&rsquo; warnings when there are multiple
+  grids of the same name in a file (for files written starting with this
+  version of the OpenVDB library).
 - Fixed a bug in @vdblink::tree::Tree::ValueOffIter Tree::ValueOffIter@endlink
   that could cause
   @vdblink::tree::TreeValueIteratorBase::setMaxDepth() depth-bounded@endlink
@@ -113,6 +121,9 @@
   LeafNode::Buffer::getValue@endlink whereby Visual C++ would return
   a reference to a temporary.
   <I>[Contributed by SESI]</I>
+- Fixed a bug in @vdblink::tools::ParticlesToLevelSet
+  tools::ParticlesToLevelSet@endlink related to attribute transfer
+  when leaf nodes are produced without active values.
 - Added @vdblink::util::CpuTimer util::CpuTimer@endlink and removed
   @c unittest_util::CpuTimer (with a minimal API) from @c unittest/util.h.
 - Eliminated the use of @c getopt for command-line argument parsing
@@ -134,12 +145,16 @@
   to @vdblink::math::Transform math::Transform@endlink.
 - Made many small changes to address type conversion and other warnings
   reported by newer compilers like GCC&nbsp;4.8 and ICC&nbsp;14.
+- Replaced the @c HALF_INCL_DIR and @c HALF_LIB_DIR Makefile variables
+  with @c ILMBASE_INCL_DIR and @c ILMBASE_LIB_DIR and added @c ILMBASE_LIB,
+  to match <A HREF="https://github.com/openexr/openexr">OpenEXR</A>&rsquo;s
+  library organization.  <I>[Contributed by Double&nbsp;Negative]</I>
 - Eliminated most local (function-scope) static variables, because
   Visual&nbsp;C++ doesn&rsquo;t guarantee thread-safe initialization
-  of local statics.  <I>[Contributed by SESI]</I>
+  of local statics.  <I>[Contributed by&nbsp;SESI]</I>
 - Fixed a bug in @vdblink::readString() readString@endlink related
   to empty strings.
-  <I>[Contributed by Fabio Piparo]</I>
+  <I>[Contributed by Fabio&nbsp;Piparo]</I>
 
 @par
 API changes:
@@ -182,6 +197,18 @@ API changes:
   @vdblink::tree::LeafNode::allocate() allocate@endlink and
   @vdblink::tree::LeafNode::isAllocated() isAllocated@endlink methods
   to manage the allocation of their buffers.
+- Removed @c pruneInactive and @c pruneLevelSet methods from the
+  @vdblink::tree::Tree Tree@endlink and various node classes.
+  These methods have been replaced by the much faster pruning functions
+  found in tools/Prune.h.
+- Removed @c signedFloodFill methods from the @vdblink::Grid Grid@endlink,
+  @vdblink::tree::Tree Tree@endlink and various node classes.
+  These methods have been replaced by the much faster functions
+  found in tools/SignedFloodFill.h.
+- Removed @c Grid::setBackground() and @c Tree::setBackground() (use the
+  faster @vdblink::tools::changeBackground() changeBackground@endlink tool
+  instead), and removed the default argument from
+  @vdblink::tree::RootNode::setBackground() RootNode::setBackground@endlink.
 
 @par
 Python:
@@ -192,6 +219,12 @@ Python:
 
 @par
 Houdini:
+- Added a new SOP (Trim Narrow Band) that can adjust (i.e. dilate or erode)
+  the width of a narrow band level set. This allows for a much faster workflows
+  where level sets are created (e.g. from points or polygons) with a very narrow
+  band and subsequently dilated with the new SOP.
+- Fixed bugs in the Smooth Level Set and Reshape Level Set SOPs that ignored the
+  selected discretization scheme.
 - Added alpha mask options to the Morph Level Set SOP.
 - Added a From Points SOP to very quickly generate a level set
   from a point cloud, ignoring any radius attribute.
@@ -215,6 +248,10 @@ Houdini:
   of which can be used to clip grids as they are read.  For large grids,
   clipping while reading can result in significantly lower memory usage
   than clipping after reading.
+
+@par
+Maya:
+- Added an adaptive polygonal surface extraction node.
 
 
 @htmlonly <a name="v2_3_0_changes"></a>@endhtmlonly
@@ -738,8 +775,8 @@ API changes:
   simplified the @vdblink::tools::dilateVoxels dilation tool@endlink.
 - The @vdblink::tools::LevelSetAdvection LevelSetAdvection@endlink tool
   can now advect forward or backward in time.
-- @vdblink::tree::Tree::pruneLevelSet() Tree::pruneLevelSet@endlink now
-  replaces each pruned node with a tile having the inside or outside
+- Tree::pruneLevelSet() now replaces each pruned node with a tile having
+  the inside or outside
   background value, instead of arbitrarily selecting one of the node&rsquo;s
   tile or voxel values.
 - When a grid is saved to a file with
@@ -756,8 +793,8 @@ API changes:
   is disabled.
 - Added a @vdblink::Grid::signedFloodFill() Grid::signedFloodFill@endlink
   overload that allows one to specify inside and outside values.
-- Fixed a bug in @vdblink::Grid::setBackground() Grid::setBackground@endlink
-  so that now only the values of inactive voxels change.
+- Fixed a bug in Grid::setBackground() so that now only the values of
+  inactive voxels change.
 - Fixed @vdblink::Grid::topologyUnion() Grid::topologyUnion@endlink so that
   it actually unions tree topology, instead of just the active states
   of tiles and voxels.  The previous behavior broke multithreaded code
@@ -1013,9 +1050,7 @@ API changes:
 - Improved the performance of the
   @vdblink::tools::Filter::median() median filter@endlink
   and of level set @vdblink::tools::csgUnion() CSG@endlink operations.
-- Reintroduced
-  @vdblink::tree::Tree::pruneLevelSet() Tree::pruneLevelSet@endlink,
-  a specialized @vdblink::tree::Tree::pruneInactive() pruneInactive@endlink
+- Reintroduced Tree::pruneLevelSet(), a specialized Tree::pruneInactive()
   for level-set grids.
 - Added utilities to the @c houdini_utils library to facilitate the
   collection of a chain of adjacent nodes of a particular type
@@ -1153,12 +1188,10 @@ API changes:
   Tree::voxelizeActiveTiles@endlink method to densify active tiles.
   While convenient and fast, this can produce large dense grids, so use
   it with caution.
-- Repackaged @c Tree::pruneLevelSet() as a
-  @vdblink::tree::Tree::pruneOp() Tree::pruneOp()@endlink-compatible
-  functor.  @vdblink::tree::LevelSetPrune LevelSetPrune@endlink is a
-  specialized @vdblink::tree::Tree::pruneInactive() pruneInactive@endlink
+- Repackaged @c Tree::pruneLevelSet() as a Tree::pruneOp()-compatible
+  functor.  Tree::LevelSetPrune is a specialized Tree::pruneInactive
   for level-set grids and is used in interface tracking.
-- Added a @vdblink::GridBase::pruneGrid() GridBase::pruneGrid@endlink method.
+- Added a GridBase::pruneGrid() method.
 - Added a @vdblink::Grid::hasUniformVoxels() Grid:hasUniformVoxels@endlink
   method.
 - Renamed @c tools::dilate to
@@ -1229,8 +1262,7 @@ API changes:
   RootNode::setActiveState@endlink that caused a crash
   when marking a (virtual) background voxel as inactive.
 - Added a @c Tree::pruneLevelSet method that is similar to but faster than
-  @vdblink::tree::Tree::pruneInactive() pruneInactive@endlink
-  for level set grids.
+  Tree::pruneInactive() for level set grids.
 - Added fast leaf node voxel access
   @vdblink::tree::LeafNode::getValue(Index) const methods@endlink
   that index by linear offset (as returned by
@@ -1351,8 +1383,8 @@ API changes:
   @vdblink::tree::Tree::setValueOff(const Coord& xyz, const ValueType& value)
   Tree::setValueOff@endlink when the new value was equal to the
   background value.
-- Fixed bugs in @vdblink::tree::Tree::prune() Tree::prune@endlink
-  that could result in output tiles with incorrect active states.
+- Fixed bugs in Tree::prune() that could result in output tiles with
+  incorrect active states.
 - Added @c librt to the link dependencies to address build failures
   on Ubuntu systems.
 - Made various small changes to the Makefile and the source code

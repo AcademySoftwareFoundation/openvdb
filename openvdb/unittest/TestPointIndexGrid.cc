@@ -31,6 +31,7 @@
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/math/Math.h> // for math::Random01
 #include <openvdb/tools/PointIndexGrid.h>
+
 #include <vector>
 #include <algorithm>
 #include <cmath>
@@ -114,6 +115,20 @@ protected:
 }; // PointList
 
 
+template<typename T>
+bool hasDuplicates(const std::vector<T>& items)
+{
+    std::vector<T> vec(items);
+    std::sort(vec.begin(), vec.end());
+
+    size_t duplicates = 0;
+    for (size_t n = 1, N = vec.size(); n < N; ++n) {
+        if (vec[n] == vec[n-1]) ++duplicates;
+    }
+    return duplicates != 0;
+}
+
+
 } // namespace
 
 
@@ -145,15 +160,95 @@ TestPointIndexGrid::testPointIndexGrid()
     openvdb::CoordBBox bbox;
     pointGridPtr->tree().evalActiveVoxelBoundingBox(bbox);
 
-
-    // bbox search
+    // coord bbox search
 
     typedef PointIndexGrid::ConstAccessor ConstAccessor;
+    typedef openvdb::tools::PointIndexIterator<> PointIndexIterator;
+
     ConstAccessor acc = pointGridPtr->getConstAccessor();
-    openvdb::tools::PointIndexIterator<> it(bbox, acc);
+    PointIndexIterator it(bbox, acc);
 
     CPPUNIT_ASSERT(it.test());
     CPPUNIT_ASSERT_EQUAL(points.size(), it.size());
+
+    // fractional bbox search
+
+    openvdb::BBoxd region(bbox.min().asVec3d(), bbox.max().asVec3d());
+
+    // points are bucketed in a cell-centered fashion, we need to pad the
+    // coordinate range to get the same search region in the fractional bbox.
+    region.expand(voxelSize * 0.5);
+
+    it.searchAndUpdate(region, acc, pointList, *transform);
+
+    CPPUNIT_ASSERT(it.test());
+    CPPUNIT_ASSERT_EQUAL(points.size(), it.size());
+
+    {
+        std::vector<uint32_t> vec;
+        vec.reserve(it.size());
+        for (; it; ++it) {
+            vec.push_back(*it);
+        }
+
+        CPPUNIT_ASSERT_EQUAL(vec.size(), it.size());
+        CPPUNIT_ASSERT(!hasDuplicates(vec));
+    }
+
+    // radial search
+    openvdb::Vec3d center = region.getCenter();
+    double radius = region.extents().x() * 0.5;
+    it.searchAndUpdate(center, radius, acc, pointList, *transform);
+
+    CPPUNIT_ASSERT(it.test());
+    CPPUNIT_ASSERT_EQUAL(points.size(), it.size());
+
+    {
+        std::vector<uint32_t> vec;
+        vec.reserve(it.size());
+        for (; it; ++it) {
+            vec.push_back(*it);
+        }
+
+        CPPUNIT_ASSERT_EQUAL(vec.size(), it.size());
+        CPPUNIT_ASSERT(!hasDuplicates(vec));
+    }
+
+
+    center = region.min();
+    it.searchAndUpdate(center, radius, acc, pointList, *transform);
+
+    CPPUNIT_ASSERT(it.test());
+
+    {
+        std::vector<uint32_t> vec;
+        vec.reserve(it.size());
+        for (; it; ++it) {
+            vec.push_back(*it);
+        }
+
+        CPPUNIT_ASSERT_EQUAL(vec.size(), it.size());
+        CPPUNIT_ASSERT(!hasDuplicates(vec));
+
+        // check that no points where missed.
+
+        std::vector<unsigned char> indexMask(points.size(), 0);
+        for (size_t n = 0, N = vec.size(); n < N; ++n) {
+            indexMask[vec[n]] = 1;
+        }
+
+        const double r2 = radius * radius;
+        openvdb::Vec3R v;
+        for (size_t n = 0, N = indexMask.size(); n < N; ++n) {
+            v = center - transform->worldToIndex(points[n]);
+            if (indexMask[n] == 0) {
+                CPPUNIT_ASSERT(!(v.lengthSqr() < r2));
+            } else {
+                CPPUNIT_ASSERT(v.lengthSqr() < r2);
+            }
+        }
+    }
+
 
     // Check partitioning
 

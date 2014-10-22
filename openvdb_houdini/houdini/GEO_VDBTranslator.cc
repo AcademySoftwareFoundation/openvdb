@@ -216,8 +216,7 @@ bool
 fileSaveVDB(const GEO_Detail *geogdp, OutputT os)
 {
     GU_Detail *gdp = static_cast<GU_Detail*>(const_cast<GEO_Detail*>(geogdp));
-    if (!gdp)
-	return false;
+    if (!gdp) return false;
 
     try {
         // Populate an output GridMap with VDB grid primitives found in the
@@ -260,7 +259,7 @@ fileSaveVDB(const GEO_Detail *geogdp, OutputT os)
         uint32_t compression = openvdb::io::COMPRESS_ACTIVE_MASK;
         if (openvdb::io::Archive::hasBloscCompression()
 		&& !UT_EnvControl::getInt(ENV_HOUDINI13_VOLUME_COMPATIBILITY)) {
-            compression |= openvdb::io::COMPRESS_BLOSC_LZ4;
+            compression |= openvdb::io::COMPRESS_BLOSC;
         }
         file.setCompression(compression);
 

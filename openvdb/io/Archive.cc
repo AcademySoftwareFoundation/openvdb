@@ -47,9 +47,22 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
+#include <tbb/atomic.h>
+
+#ifdef _MSC_VER
+#include <boost/interprocess/detail/os_file_functions.hpp> // open_existing_file(), close_file()
+extern "C" __declspec(dllimport) bool __stdcall GetFileTime(
+    void* fh, void* ctime, void* atime, void* mtime);
+// boost::interprocess::detail was renamed to boost::interprocess::ipcdetail in Boost 1.48.
+// Ensure that both namespaces exist.
+namespace boost { namespace interprocess { namespace detail {} namespace ipcdetail {} } }
+#else
+#include <sys/types.h> // for struct stat
+#include <sys/stat.h> // for stat()
+#include <unistd.h> // for unlink()
+#endif
 #include <algorithm> // for std::find_if()
 #include <cerrno> // for errno
-#include <cstdio> // for remove()
 #include <cstdlib> // for getenv()
 #include <cstring> // for std::memcpy()
 #include <iostream>
@@ -87,8 +100,8 @@ sStreamState;
 const long StreamState::MAGIC_NUMBER =
     long((uint64_t(OPENVDB_MAGIC) << 32) | (uint64_t(OPENVDB_MAGIC)));
 
-#ifdef OPENVDB_USE_BLOSC_LZ4
-const uint32_t Archive::DEFAULT_COMPRESSION_FLAGS = (COMPRESS_BLOSC_LZ4 | COMPRESS_ACTIVE_MASK);
+#ifdef OPENVDB_USE_BLOSC
+const uint32_t Archive::DEFAULT_COMPRESSION_FLAGS = (COMPRESS_BLOSC | COMPRESS_ACTIVE_MASK);
 #else
 const uint32_t Archive::DEFAULT_COMPRESSION_FLAGS = (COMPRESS_ZIP | COMPRESS_ACTIVE_MASK);
 #endif
@@ -359,7 +372,16 @@ public:
         : mMap(filename.c_str(), boost::interprocess::read_only)
         , mRegion(mMap, boost::interprocess::read_only)
         , mAutoDelete(autoDelete)
-    {}
+    {
+        mLastWriteTime = this->getLastWriteTime();
+
+        if (mAutoDelete) {
+#ifndef _MSC_VER
+            // On Unix systems, unlink the file so that it gets deleted once it is closed.
+            ::unlink(mMap.get_name());
+#endif
+        }
+    }
 
     ~Impl()
     {
@@ -369,17 +391,47 @@ public:
         if (mNotifier) mNotifier(filename);
         if (mAutoDelete) {
             if (!boost::interprocess::file_mapping::remove(filename.c_str())) {
-                std::string mesg = getErrorString();
-                if (!mesg.empty()) mesg = " (" + mesg + ")";
-                OPENVDB_LOG_WARN("failed to remove temporary file " << filename << mesg);
+                if (errno != ENOENT) {
+                    // Warn if the file exists but couldn't be removed.
+                    std::string mesg = getErrorString();
+                    if (!mesg.empty()) mesg = " (" + mesg + ")";
+                    OPENVDB_LOG_WARN("failed to remove temporary file " << filename << mesg);
+                }
             }
         }
+    }
+
+    Index64 getLastWriteTime() const
+    {
+        Index64 result = 0;
+        const char* filename = mMap.get_name();
+
+#ifdef _MSC_VER
+        // boost::interprocess::detail was renamed to boost::interprocess::ipcdetail in Boost 1.48.
+        using namespace boost::interprocess::detail;
+        using namespace boost::interprocess::ipcdetail;
+
+        if (void* fh = open_existing_file(filename, boost::interprocess::read_only)) {
+            struct { unsigned long lo, hi; } mtime; // Windows FILETIME struct
+            if (GetFileTime(fh, NULL, NULL, &mtime)) {
+                result = (Index64(mtime.hi) << 32) | mtime.lo;
+            }
+            close_file(fh);
+        }
+#else
+        struct stat info;
+        if (0 == ::stat(filename, &info)) {
+            result = Index64(info.st_mtime);
+        }
+#endif
+        return result;
     }
 
     boost::interprocess::file_mapping mMap;
     boost::interprocess::mapped_region mRegion;
     bool mAutoDelete;
     Notifier mNotifier;
+    mutable tbb::atomic<Index64> mLastWriteTime;
 
 private:
     Impl(const Impl&); // not copyable
@@ -410,6 +462,16 @@ MappedFile::filename() const
 boost::shared_ptr<std::streambuf>
 MappedFile::createBuffer() const
 {
+    if (!mImpl->mAutoDelete && mImpl->mLastWriteTime > 0) {
+        // Warn if the file has been modified since it was opened
+        // (but don't bother checking if it is a private, temporary file).
+        if (mImpl->getLastWriteTime() > mImpl->mLastWriteTime) {
+            OPENVDB_LOG_WARN("file " << this->filename() << " might have changed on disk"
+                << " since it was opened");
+            mImpl->mLastWriteTime = 0; // suppress further warnings
+        }
+    }
+
     return boost::shared_ptr<std::streambuf>(
         new boost::iostreams::stream_buffer<boost::iostreams::array_source>(
             static_cast<const char*>(mImpl->mRegion.get_address()), mImpl->mRegion.get_size()));
@@ -619,7 +681,7 @@ Archive::setDataCompression(std::istream& is)
 bool
 Archive::hasBloscCompression()
 {
-#ifdef OPENVDB_USE_BLOSC_LZ4
+#ifdef OPENVDB_USE_BLOSC
     return true;
 #else
     return false;
@@ -834,7 +896,7 @@ Archive::readHeader(std::istream& is)
     // 5) Read the flag that indicates whether data is compressed.
     //    (From version 222 on, compression information is stored per grid.)
     mCompression = DEFAULT_COMPRESSION_FLAGS;
-    if (mFileVersion < OPENVDB_FILE_VERSION_BLOSC_LZ4_COMPRESSION) {
+    if (mFileVersion < OPENVDB_FILE_VERSION_BLOSC_COMPRESSION) {
         // Prior to the introduction of Blosc, ZLIB was the default compression scheme.
         mCompression = (COMPRESS_ZIP | COMPRESS_ACTIVE_MASK);
     }

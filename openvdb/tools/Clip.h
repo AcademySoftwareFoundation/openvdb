@@ -44,6 +44,7 @@
 #include <boost/utility/enable_if.hpp>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_reduce.h>
+#include "Prune.h"
 
 
 namespace openvdb {
@@ -397,7 +398,7 @@ clip(const GridType& grid, const Grid<MaskTreeType>& maskGrid)
         BoolMaskGridPtrT resampledMask = BoolMaskGridT::create(/*background=*/false);
         resampledMask->setTransform(grid.constTransform().copy());
         tools::resampleToMatch<clip_internal::BoolSampler>(*boolMaskGrid, *resampledMask);
-        resampledMask->prune();
+        tools::prune(resampledMask->tree());
         boolMaskGrid = resampledMask;
     }
 

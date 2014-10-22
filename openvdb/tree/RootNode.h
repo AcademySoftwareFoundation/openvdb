@@ -38,6 +38,7 @@
 #include <map>
 #include <set>
 #include <sstream>
+#include <deque>
 #include <boost/type_traits/remove_const.hpp>
 #include <boost/type_traits/remove_pointer.hpp>
 #include <boost/type_traits/is_pointer.hpp>
@@ -48,6 +49,7 @@
 #include <boost/mpl/at.hpp>
 #include <boost/mpl/push_back.hpp>
 #include <boost/mpl/size.hpp>
+#include <tbb/parallel_for.h>
 #include <openvdb/Exceptions.h>
 #include <openvdb/Types.h>
 #include <openvdb/io/Compression.h> // for truncateRealToHalf()
@@ -55,7 +57,6 @@
 #include <openvdb/math/BBox.h>
 #include <openvdb/util/NodeMasks.h> // for backward compatibility only (see readTopology())
 #include <openvdb/version.h>
-#include "Util.h"
 
 
 namespace openvdb {
@@ -440,12 +441,17 @@ public:
     /// @brief Change inactive tiles or voxels with a value equal to +/- the
     /// old background to the specified value (with the same sign). Active values
     /// are unchanged.
+    ///
     /// @param value The new background value
-    /// @param updateChildNodes If true (which is the default) the
-    /// background values of the child nodes is also updated. Else
-    /// only the background value stored in the RootNode itself is changed.
-    void setBackground(const ValueType& value, bool updateChildNodes = true);
-
+    /// @param updateChildNodes If true the background values of the
+    /// child nodes is also updated. Else only the background value
+    /// stored in the RootNode itself is changed.
+    ///
+    /// @note Instead of setting @a updateChildNodes to true, consider
+    /// using tools::changeBackground or
+    /// tools::changeLevelSetBackground which are multi-threaded!  
+    void setBackground(const ValueType& value, bool updateChildNodes);
+    
     /// Return this node's background value.
     const ValueType& background() const { return mBackground; }
 
@@ -649,31 +655,10 @@ public:
     /// Set all voxels that lie outside the given axis-aligned box to the background.
     void clip(const CoordBBox&);
 
-    /// Call the @c PruneOp functor for each child node and, if the functor
-    /// returns @c true, prune the node and replace it with a tile.
-    ///
-    /// This method is used to implement all of the various pruning algorithms
-    /// (prune(), pruneInactive(), etc.).  It should rarely be called directly.
-    /// @see openvdb/tree/Util.h for the definition of the @c PruneOp functor
-    template<typename PruneOp> void pruneOp(PruneOp&);
-
     /// @brief Reduce the memory footprint of this tree by replacing with tiles
     /// any nodes whose values are all the same (optionally to within a tolerance)
     /// and have the same active state.
     void prune(const ValueType& tolerance = zeroVal<ValueType>());
-
-    /// @brief Reduce the memory footprint of this tree by replacing with
-    /// tiles of the given value any nodes whose values are all inactive.
-    void pruneInactive(const ValueType&);
-
-    /// @brief Reduce the memory footprint of this tree by replacing with
-    /// background tiles any nodes whose values are all inactive.
-    void pruneInactive();
-
-    /// @brief Reduce the memory footprint of this tree by replacing with tiles
-    /// any non-leaf nodes whose values are all the same (optionally to within a tolerance)
-    /// and have the same active state.
-    void pruneTiles(const ValueType& tolerance);
 
     /// @brief Add the given leaf node to this tree, creating a new branch if necessary.
     /// If a leaf node with the same origin already exists, replace it.
@@ -695,6 +680,10 @@ public:
     template<typename NodeT>
     NodeT* stealNode(const Coord& xyz, const ValueType& value, bool state);
 
+    /// @brief Add a tile containing voxel (x, y, z) at the root level,
+    /// deleting the existing branch if necessary.
+    void addTile(const Coord& xyz, const ValueType& value, bool state);
+    
     /// @brief Add a tile containing voxel (x, y, z) at the specified tree level,
     /// creating a new branch if necessary.  Delete any existing lower-level nodes
     /// that contain (x, y, z).
@@ -785,21 +774,7 @@ public:
     template<typename ArrayT> void getNodes(ArrayT& array);
     template<typename ArrayT> void getNodes(ArrayT& array) const;
     //@}
-
-
-    /// @brief Set the values of all inactive voxels and tiles of a narrow-band
-    /// level set from the signs of the active voxels, setting outside values to
-    /// +background and inside values to -background.
-    /// @warning This method should only be used on closed, narrow-band level sets.
-    void signedFloodFill();
-
-    /// @brief Set the values of all inactive voxels and tiles of a narrow-band
-    /// level set from the signs of the active voxels, setting exterior values to
-    /// @a outside and interior values to @a inside.  Set the background value
-    /// of this tree to @a outside.
-    /// @warning This method should only be used on closed, narrow-band level sets.
-    void signedFloodFill(const ValueType& outside, const ValueType& inside);
-
+    
     /// Densify active tiles, i.e., replace them with leaf-level active voxels.
     void voxelizeActiveTiles();
 
@@ -1171,7 +1146,6 @@ RootNode<ChildT>::operator=(const RootNode<OtherChildType>& other)
 
 ////////////////////////////////////////
 
-
 template<typename ChildT>
 inline void
 RootNode<ChildT>::setBackground(const ValueType& background, bool updateChildNodes)
@@ -1198,7 +1172,6 @@ RootNode<ChildT>::setBackground(const ValueType& background, bool updateChildNod
     }
     mBackground = background;
 }
-
 
 template<typename ChildT>
 inline bool
@@ -2381,50 +2354,19 @@ RootNode<ChildT>::clip(const CoordBBox& clipBBox)
 
 
 template<typename ChildT>
-template<typename PruneOp>
-inline void
-RootNode<ChildT>::pruneOp(PruneOp& op)
-{
-    for (MapIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
-        if (this->isTile(i)|| !op(this->getChild(i))) continue;
-        this->setTile(i, Tile(op.value, op.state));
-    }
-    this->eraseBackgroundTiles();
-}
-
-
-template<typename ChildT>
 inline void
 RootNode<ChildT>::prune(const ValueType& tolerance)
 {
-    TolerancePrune<ValueType> op(tolerance);
-    this->pruneOp(op);
-}
-
-
-template<typename ChildT>
-inline void
-RootNode<ChildT>::pruneInactive(const ValueType& bg)
-{
-    InactivePrune<ValueType> op(bg);
-    this->pruneOp(op);
-}
-
-
-template<typename ChildT>
-inline void
-RootNode<ChildT>::pruneInactive()
-{
-    this->pruneInactive(mBackground);
-}
-
-
-template<typename ChildT>
-inline void
-RootNode<ChildT>::pruneTiles(const ValueType& tolerance)
-{
-    TolerancePrune<ValueType, /*Terminate at level=*/1> op(tolerance);
-    this->pruneOp(op);
+    bool state = false;
+    ValueType value = zeroVal<ValueType>();
+    for (MapIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
+        if (this->isTile(i)) continue;
+        this->getChild(i).prune(tolerance);
+        if (this->getChild(i).isConstant(value, state, tolerance)) {
+            this->setTile(i, Tile(value, state));
+        }
+    }
+    this->eraseBackgroundTiles();
 }
 
 
@@ -2520,6 +2462,17 @@ RootNode<ChildT>::addLeafAndCache(LeafNodeType* leaf, AccessorT& acc)
     child->addLeafAndCache(leaf, acc);
 }
 
+template<typename ChildT>
+inline void
+RootNode<ChildT>::addTile(const Coord& xyz, const ValueType& value, bool state)
+{
+    MapIter iter = this->findCoord(xyz);
+    if (iter == mTable.end()) {//background
+        mTable[this->coordToKey(xyz)] = NodeStruct(Tile(value, state));
+    } else {//child or tile
+        setTile(iter, Tile(value, state));//this also deletes the existing child node
+    }
+}
 
 template<typename ChildT>
 inline void
@@ -2808,50 +2761,6 @@ RootNode<ChildT>::getNodes(ArrayT& array) const
                 child->getNodes(array);//descent
             }
             OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
-        }
-    }
-}
-
-////////////////////////////////////////
-
-template<typename ChildT>
-inline void
-RootNode<ChildT>::signedFloodFill()
-{
-    this->signedFloodFill(mBackground, math::negative(mBackground));
-}
-
-
-template<typename ChildT>
-inline void
-RootNode<ChildT>::signedFloodFill(const ValueType& outside, const ValueType& inside)
-{
-    const ValueType zero = zeroVal<ValueType>();
-
-    mBackground = outside;
-
-    // First, flood fill all child nodes and put child-keys into a sorted set
-    CoordSet nodeKeys;
-    for (MapIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
-        if (this->isTile(i)) continue;
-        getChild(i).signedFloodFill(outside, inside);
-        nodeKeys.insert(i->first);//only add inactive tiles!
-    }
-
-    // We employ a simple z-scanline algorithm that inserts inactive
-    // tiles with the inside value if they are sandwiched
-    // between inside child nodes only!
-    const Tile insideTile(inside, /*on=*/false);
-    CoordSetCIter b = nodeKeys.begin(), e = nodeKeys.end();
-    if ( b == e ) return;
-    for (CoordSetCIter a = b++; b != e; ++a, ++b) {
-        Coord d = *b - *a; // delta of neighboring keys
-        if (d[0]!=0 || d[1]!=0 || d[2]==Int32(ChildT::DIM)) continue;//not z-scanline or neighbors
-        MapIter i = mTable.find(*a), j = mTable.find(*b);
-        const ValueType fill[] = { getChild(i).getLastValue(), getChild(j).getFirstValue() };
-        if (!(fill[0] < zero) || !(fill[1] < zero)) continue; // scanline isn't inside
-        for (Coord c = *a + Coord(0u,0u,ChildT::DIM); c[2] != (*b)[2]; c[2] += ChildT::DIM) {
-            mTable[c] = insideTile;
         }
     }
 }

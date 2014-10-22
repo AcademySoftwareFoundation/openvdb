@@ -1,0 +1,550 @@
+///////////////////////////////////////////////////////////////////////////
+//
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
+//
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
+//
+// Redistributions of source code must retain the above copyright
+// and license notice and the following restrictions and disclaimer.
+//
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
+// from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
+// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
+//
+///////////////////////////////////////////////////////////////////////////
+//
+/// @file NodeManager.h
+///
+/// @author Ken Museth
+///
+/// @brief NodeManager produces linear arrays of all tree nodes
+/// allowing for efficient multi-threading and bottom-up processing.
+///
+/// @todo Currently NodeManager only support a maximum DEPTH of
+/// 5.This will be generalized to any DEPTH soon.
+///
+
+#ifndef OPENVDB_TREE_NODEMANAGER_HAS_BEEN_INCLUDED
+#define OPENVDB_TREE_NODEMANAGER_HAS_BEEN_INCLUDED
+
+#include <tbb/parallel_for.h>
+#include <openvdb/Types.h>
+#include <deque>
+
+namespace openvdb {
+OPENVDB_USE_VERSION_NAMESPACE
+namespace OPENVDB_VERSION_NAME {
+namespace tree {
+
+/// @brief Produces linear arrays of all tree nodes
+/// allowing for efficient multi-threading and bottom-up processing.
+template<typename TreeT, Index LEVELS = TreeT::DEPTH-1>
+class NodeManager;
+
+////////////////////////////////////////
+
+template<typename NodeT>
+class NodeList
+{
+public:
+    typedef NodeT* value_type;
+    typedef std::deque<value_type> ListT;
+
+    NodeList() {}
+
+    void push_back(NodeT* node) { mList.push_back(node); }
+
+    NodeT& operator()(size_t idx) const { return *(mList[idx]); }
+
+    Index64 nodeCount() const { return mList.size(); }
+
+    void clear() { mList.clear(); }
+
+    class NodeRange
+    {
+    public:
+
+        NodeRange(size_t begin, size_t end, const NodeList& nodeList, size_t grainSize=1):
+            mEnd(end), mBegin(begin), mGrainSize(grainSize), mNodeList(nodeList) {}
+
+        NodeRange(NodeRange& r, tbb::split):
+            mEnd(r.mEnd), mBegin(doSplit(r)), mGrainSize(r.mGrainSize),
+            mNodeList(r.mNodeList) {}
+
+        size_t size() const { return mEnd - mBegin; }
+
+        size_t grainsize() const { return mGrainSize; }
+
+        const NodeList& nodeList() const { return mNodeList; }
+
+        bool empty() const {return !(mBegin < mEnd);}
+
+        bool is_divisible() const {return mGrainSize < this->size();}
+
+        class Iterator
+        {
+        public:
+            Iterator(const NodeRange& range, size_t pos): mRange(range), mPos(pos)
+            {
+                assert(this->isValid());
+            }
+            Iterator& operator=(const Iterator& other)
+            {
+                mRange = other.mRange; mPos = other.mPos; return *this;
+            }
+            /// Advance to the next node.
+            Iterator& operator++() { ++mPos; return *this; }
+            /// Return a reference to the node to which this iterator is pointing.
+            NodeT& operator*() const { return mRange.mNodeList(mPos); }
+            /// Return a pointer to the node to which this iterator is pointing.
+            NodeT* operator->() const { return &(this->operator*()); }
+            /// Return the index into the list of the current node.
+            size_t pos() const { return mPos; }
+            bool isValid() const { return mPos>=mRange.mBegin && mPos<=mRange.mEnd; }
+            /// Return @c true if this iterator is not yet exhausted.
+            bool test() const { return mPos < mRange.mEnd; }
+            /// Return @c true if this iterator is not yet exhausted.
+            operator bool() const { return this->test(); }
+            /// Return @c true if this iterator is exhausted.
+            bool empty() const { return !this->test(); }
+            bool operator!=(const Iterator& other) const
+            {
+                return (mPos != other.mPos) || (&mRange != &other.mRange);
+            }
+            bool operator==(const Iterator& other) const { return !(*this != other); }
+            const NodeRange& nodeRange() const { return mRange; }
+
+        private:
+            const NodeRange& mRange;
+            size_t mPos;
+        };// NodeList::NodeRange::Iterator
+
+        Iterator begin() const {return Iterator(*this, mBegin);}
+
+        Iterator end() const {return Iterator(*this, mEnd);}
+
+    private:
+        size_t mEnd, mBegin, mGrainSize;
+        const NodeList& mNodeList;
+
+        static size_t doSplit(NodeRange& r)
+        {
+            assert(r.is_divisible());
+            size_t middle = r.mBegin + (r.mEnd - r.mBegin) / 2u;
+            r.mEnd = middle;
+            return middle;
+        }
+    };// NodeList::NodeRange
+
+    /// Return a TBB-compatible NodeRange.
+    NodeRange nodeRange(size_t grainsize = 1) const
+    {
+        return NodeRange(0, this->nodeCount(), *this, grainsize);
+    }
+
+    template<typename NodeOp>
+    struct NodeTransformer
+    {
+        NodeTransformer(const NodeOp& nodeOp) : mNodeOp(nodeOp) {}
+        void run(const NodeRange& range, bool threaded = true)
+        {
+            threaded ? tbb::parallel_for(range, *this) : (*this)(range);
+        }
+        void operator()(const NodeRange& range) const
+        {
+            for (typename NodeRange::Iterator it = range.begin(); it; ++it) mNodeOp(*it);
+        }
+        const NodeOp mNodeOp;
+    };// NodeRange
+
+    template<typename NodeOp>
+    void foreach(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        NodeTransformer<NodeOp> transform(op);
+        transform.run(this->nodeRange(grainSize), threaded);
+    }
+
+protected:
+    ListT mList;
+};// NodeList
+
+////////////////////////////////////////////
+
+template<typename TreeT>
+class NodeManager0
+{
+public:
+    BOOST_STATIC_ASSERT(TreeT::DEPTH > 0);
+    NodeManager0(TreeT& tree) : mTree(&tree) { this->rebuild(); }
+
+    virtual ~NodeManager0() {}
+
+    void clear() {}
+
+    void rebuild() {}
+
+    const TreeT& tree() const { return *mTree; }
+
+    /// @brief Return the total number of cached nodes
+    Index64 nodeCount() const { return 0; }
+
+    Index64 nodeCount(Index) const { return 0; }
+
+    template<typename NodeOp>
+    void processBottomUp(const NodeOp& op, bool, size_t)
+    {
+        op(mTree->root());
+    }
+
+    template<typename NodeOp>
+    void processTopDown(const NodeOp& op, bool, size_t)
+    {
+        op(mTree->root());
+    }
+
+protected:
+
+    TreeT* mTree;
+};// NodeManager0
+
+////////////////////////////////////////////
+
+template<typename TreeT>
+class NodeManager1
+{
+public:
+    BOOST_STATIC_ASSERT(TreeT::DEPTH > 1);
+    NodeManager1(TreeT& tree) : mTree(&tree) { this->rebuild(); }
+
+    virtual ~NodeManager1() {}
+
+    void clear() { mList0.clear(); }
+
+    void rebuild()
+    {
+        mTree->root().getNodes(mList0);
+    }
+
+    const TreeT& tree() const { return *mTree; }
+
+    /// @brief Return the total number of cached nodes
+    Index64 nodeCount() const { return mList0.nodeCount(); }
+
+    /// @brief Return the number of cached nodes at level @a i, where
+    /// 0 corresponds to the lowest level.
+    Index64 nodeCount(Index i) const { return i==0 ? mList0.nodeCount() : 0; }
+
+    template<typename NodeOp>
+    void processBottomUp(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        mList0.foreach(op, threaded, grainSize);
+        op(mTree->root());
+    }
+
+    template<typename NodeOp>
+    void processTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(mTree->root());
+        mList0.foreach(op, threaded, grainSize);
+    }
+
+protected:
+    typedef typename TreeT::RootNodeType::ChildNodeType NodeT0;
+
+    typedef NodeList<NodeT0>                            ListT0;
+
+    TreeT* mTree;
+    ListT0 mList0;
+};// NodeManager1
+
+////////////////////////////////////////////
+
+template<typename TreeT>
+class NodeManager2
+{
+public:
+    BOOST_STATIC_ASSERT(TreeT::DEPTH > 2);
+    NodeManager2(TreeT& tree) : mTree(&tree) { this->rebuild(); }
+
+    virtual ~NodeManager2() {}
+
+    void clear() { mList0.clear(); mList1.clear(); }
+
+    void rebuild()
+    {
+        mTree->root().getNodes(mList1);
+        for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
+    }
+
+    const TreeT& tree() const { return *mTree; }
+
+    /// @brief Return the total number of cached nodes
+    Index64 nodeCount() const { return mList0.nodeCount() + mList1.nodeCount(); }
+
+    /// @brief Return the number of cached nodes at level @a i, where
+    /// 0 corresponds to the lowest level.
+    Index64 nodeCount(Index i) const
+    {
+        return i==0 ? mList0.nodeCount() : i==1 ? mList1.nodeCount() : 0;
+    }
+
+    template<typename NodeOp>
+    void processBottomUp(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        mList0.foreach(op, threaded, grainSize);
+        mList1.foreach(op, threaded, grainSize);
+        op(mTree->root());
+    }
+
+    template<typename NodeOp>
+    void processTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(mTree->root());
+        mList1.foreach(op, threaded, grainSize);
+        mList0.foreach(op, threaded, grainSize);
+    }
+
+protected:
+    typedef typename TreeT::RootNodeType::ChildNodeType NodeT1;//upper level
+    typedef typename NodeT1::ChildNodeType              NodeT0;//lower level
+
+    typedef NodeList<NodeT1>                            ListT1;//upper level
+    typedef NodeList<NodeT0>                            ListT0;//lower level
+
+    TreeT* mTree;
+    ListT1 mList1;
+    ListT0 mList0;
+};// NodeManager2
+
+////////////////////////////////////////////
+
+template<typename TreeT>
+class NodeManager3
+{
+public:
+    BOOST_STATIC_ASSERT(TreeT::DEPTH > 3);
+    NodeManager3(TreeT& tree) : mTree(&tree) { this->rebuild(); }
+
+    virtual ~NodeManager3() {}
+
+    void clear() { mList0.clear(); mList1.clear(); mList2.clear(); }
+
+    void rebuild()
+    {
+        mTree->root().getNodes(mList2);
+        for (size_t i=0, n=mList2.nodeCount(); i<n; ++i) mList2(i).getNodes(mList1);
+        for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
+    }
+
+    const TreeT& tree() const { return *mTree; }
+
+    /// @brief Return the total number of cached nodes
+    Index64 nodeCount() const { return mList0.nodeCount() + mList1.nodeCount() + mList2.nodeCount(); }
+
+    /// @brief Return the number of cached nodes at level @a i, where
+    /// 0 corresponds to the lowest level.
+    Index64 nodeCount(Index i) const
+    {
+        return i==0 ? mList0.nodeCount() : i==1 ? mList1.nodeCount() : i==2 ? mList2.nodeCount() : 0;
+    }
+
+    template<typename NodeOp>
+    void processBottomUp(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        mList0.foreach(op, threaded, grainSize);
+        mList1.foreach(op, threaded, grainSize);
+        mList2.foreach(op, threaded, grainSize);
+        op(mTree->root());
+    }
+
+    template<typename NodeOp>
+    void processTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(mTree->root());
+        mList2.foreach(op, threaded, grainSize);
+        mList1.foreach(op, threaded, grainSize);
+        mList0.foreach(op, threaded, grainSize);
+    }
+
+protected:
+    typedef typename TreeT::RootNodeType::ChildNodeType NodeT2;//upper level
+    typedef typename NodeT2::ChildNodeType              NodeT1;//mid level
+    typedef typename NodeT1::ChildNodeType              NodeT0;//lower level
+
+    typedef NodeList<NodeT2>                            ListT2;//upper level of internal nodes
+    typedef NodeList<NodeT1>                            ListT1;//lower level of internal nodes
+    typedef NodeList<NodeT0>                            ListT0;//lower level of internal nodes or leafs
+
+    TreeT* mTree;
+    ListT2 mList2;
+    ListT1 mList1;
+    ListT0 mList0;
+};// NodeManager3
+
+////////////////////////////////////////////
+
+template<typename TreeT>
+class NodeManager4
+{
+public:
+    BOOST_STATIC_ASSERT(TreeT::DEPTH > 4);
+    NodeManager4(TreeT& tree) : mTree(&tree) { this->rebuild(); }
+
+    virtual ~NodeManager4() {}
+
+    void clear() { mList0.clear(); mList1.clear(); mList2.clear(); mList3.clear; }
+
+    void rebuild()
+    {
+        mTree->root().getNodes(mList3);
+        for (size_t i=0, n=mList3.nodeCount(); i<n; ++i) mList3(i).getNodes(mList2);
+        for (size_t i=0, n=mList2.nodeCount(); i<n; ++i) mList2(i).getNodes(mList1);
+        for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
+    }
+
+    const TreeT& tree() const { return *mTree; }
+
+    /// @brief Return the total number of cached nodes
+    Index64 nodeCount() const
+    {
+        return mList0.nodeCount() + mList1.nodeCount()
+             + mList2.nodeCount() + mList3.nodeCount();
+    }
+
+    /// @brief Return the number of cached nodes at level @a i, where
+    /// 0 corresponds to the lowest level.
+    Index64 nodeCount(Index i) const
+    {
+        return i==0 ? mList0.nodeCount() : i==1 ? mList1.nodeCount() :
+               i==2 ? mList2.nodeCount() : i==3 ? mList3.nodeCount() : 0;
+    }
+
+    template<typename NodeOp>
+    void processBottomUp(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        mList0.foreach(op, threaded, grainSize);
+        mList1.foreach(op, threaded, grainSize);
+        mList2.foreach(op, threaded, grainSize);
+        mList3.foreach(op, threaded, grainSize);
+        op(mTree->root());
+    }
+
+    template<typename NodeOp>
+    void processTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(mTree->root());
+        mList3.foreach(op, threaded, grainSize);
+        mList2.foreach(op, threaded, grainSize);
+        mList1.foreach(op, threaded, grainSize);
+        mList0.foreach(op, threaded, grainSize);
+    }
+
+protected:
+    typedef typename TreeT::RootNodeType::ChildNodeType NodeT3;//upper level
+    typedef typename NodeT3::ChildNodeType              NodeT2;//upper mid level
+    typedef typename NodeT2::ChildNodeType              NodeT1;//lower mid level
+    typedef typename NodeT1::ChildNodeType              NodeT0;//lower level
+
+    typedef NodeList<NodeT3>                            ListT3;//upper level of internal nodes
+    typedef NodeList<NodeT2>                            ListT2;//upper mid level of internal nodes
+    typedef NodeList<NodeT1>                            ListT1;//lower mid level of internal nodes
+    typedef NodeList<NodeT0>                            ListT0;//lower level of internal nodes or leafs
+
+    TreeT* mTree;
+    ListT3 mList3;
+    ListT2 mList2;
+    ListT1 mList1;
+    ListT0 mList0;
+};// NodeManager4
+
+////////////////////////////////////////////
+
+/// Template specialization of the NodeManager with no caching of nodes
+template<typename TreeT>
+class NodeManager<TreeT, 0> : public NodeManager0<TreeT>
+{
+public:
+    typedef TreeT TreeType;
+    static const Index LEVELS = 0;
+    NodeManager(TreeT& tree): NodeManager0<TreeT>(tree) {}
+    virtual ~NodeManager() {}
+private:
+    NodeManager(const NodeManager&) {}//disallow copy-construction
+};
+
+/// Template specialization of the NodeManager with one level of nodes
+template<typename TreeT>
+class NodeManager<TreeT, 1> : public NodeManager1<TreeT>
+{
+public:
+    typedef TreeT TreeType;
+    static const Index LEVELS = 1;
+    NodeManager(TreeT& tree): NodeManager1<TreeT>(tree) {}
+    virtual ~NodeManager() {}
+private:
+    NodeManager(const NodeManager&) {}//disallow copy-construction
+};
+
+/// Template specialization of the NodeManager with two levels of nodes
+template<typename TreeT>
+class NodeManager<TreeT, 2> : public NodeManager2<TreeT>
+{
+public:
+    typedef TreeT TreeType;
+    static const Index LEVELS = 2;
+    NodeManager(TreeT& tree): NodeManager2<TreeT>(tree) {}
+    virtual ~NodeManager() {}
+private:
+    NodeManager(const NodeManager&) {}//disallow copy-construction
+};
+
+/// Template specialization of the NodeManager with three levels of nodes
+template<typename TreeT>
+class NodeManager<TreeT, 3> : public NodeManager3<TreeT>
+{
+public:
+    typedef TreeT TreeType;
+    static const Index LEVELS = 3;
+    NodeManager(TreeT& tree): NodeManager3<TreeT>(tree) {}
+    virtual ~NodeManager() {}
+private:
+    NodeManager(const NodeManager&) {}//disallow copy-construction
+};
+
+/// Template specialization of the NodeManager with four levels of nodes
+template<typename TreeT>
+class NodeManager<TreeT, 4> : public NodeManager4<TreeT>
+{
+public:
+    typedef TreeT TreeType;
+    static const Index LEVELS = 4;
+    NodeManager(TreeT& tree): NodeManager2<TreeT>(tree) {}
+    virtual ~NodeManager() {}
+private:
+    NodeManager(const NodeManager&) {}//disallow copy-construction
+};
+
+} // namespace tree
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
+
+#endif // OPENVDB_TREE_NODEMANAGER_HAS_BEEN_INCLUDED
+
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

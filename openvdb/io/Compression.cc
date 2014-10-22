@@ -35,7 +35,7 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/shared_array.hpp>
 #include <zlib.h>
-#ifdef OPENVDB_USE_BLOSC_LZ4
+#ifdef OPENVDB_USE_BLOSC
 #include <blosc.h>
 #endif
 
@@ -52,7 +52,7 @@ compressionToString(uint32_t flags)
 
     std::vector<std::string> words;
     if (flags & COMPRESS_ZIP) words.push_back("zip");
-    if (flags & COMPRESS_BLOSC_LZ4) words.push_back("blosc/lz4");
+    if (flags & COMPRESS_BLOSC) words.push_back("blosc");
     if (flags & COMPRESS_ACTIVE_MASK) words.push_back("active values");
     return boost::join(words, " + ");
 }
@@ -137,15 +137,15 @@ unzipFromStream(std::istream& is, char* data, size_t numBytes)
 }
 
 
-#ifndef OPENVDB_USE_BLOSC_LZ4
+#ifndef OPENVDB_USE_BLOSC
 void
-bloscLz4ToStream(std::ostream&, const char*, size_t, size_t)
+bloscToStream(std::ostream&, const char*, size_t, size_t)
 {
-    OPENVDB_THROW(IoError, "Blosc LZ4 encoding is not supported");
+    OPENVDB_THROW(IoError, "Blosc encoding is not supported");
 }
 #else
 void
-bloscLz4ToStream(std::ostream& os, const char* data, size_t valSize, size_t numVals)
+bloscToStream(std::ostream& os, const char* data, size_t valSize, size_t numVals)
 {
     const size_t inBytes = valSize * numVals;
 
@@ -183,15 +183,15 @@ bloscLz4ToStream(std::ostream& os, const char* data, size_t valSize, size_t numV
 #endif
 
 
-#ifndef OPENVDB_USE_BLOSC_LZ4
+#ifndef OPENVDB_USE_BLOSC
 void
-bloscLz4FromStream(std::istream&, char*, size_t)
+bloscFromStream(std::istream&, char*, size_t)
 {
-    OPENVDB_THROW(IoError, "Blosc LZ4 decoding is not supported");
+    OPENVDB_THROW(IoError, "Blosc decoding is not supported");
 }
 #else
 void
-bloscLz4FromStream(std::istream& is, char* data, size_t numBytes)
+bloscFromStream(std::istream& is, char* data, size_t numBytes)
 {
     // Read the size of the compressed data.
     // A negative size indicates uncompressed data.

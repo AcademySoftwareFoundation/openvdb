@@ -34,6 +34,7 @@
 #include <tbb/atomic.h>
 #include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
+#include <openvdb/tools/ChangeBackground.h>
 #include <openvdb/tools/Clip.h>
 #include <openvdb/tools/GridOperators.h>
 #include <openvdb/tools/Filter.h>
@@ -157,7 +158,7 @@ TestTools::testDilateVoxels()
     typedef openvdb::tree::Tree4<float, 5, 4, 3>::Type Tree543f;
 
     Tree543f::Ptr tree(new Tree543f);
-    tree->setBackground(/*background=*/5.0);
+    openvdb::tools::changeBackground(*tree, /*background=*/5.0);
     CPPUNIT_ASSERT(tree->empty());
 
     const openvdb::Index leafDim = Tree543f::LeafNodeType::DIM;
@@ -444,7 +445,7 @@ TestTools::testErodeVoxels()
     typedef openvdb::tree::Tree4<float, 5, 4, 3>::Type TreeType;
 
     TreeType::Ptr tree(new TreeType);
-    tree->setBackground(/*background=*/5.0);
+    openvdb::tools::changeBackground(*tree, /*background=*/5.0);
     CPPUNIT_ASSERT(tree->empty());
 
     const int leafDim = TreeType::LeafNodeType::DIM;
@@ -599,6 +600,60 @@ TestTools::testErodeVoxels()
         openvdb::tools::erodeVoxels(grid.tree());
         CPPUNIT_ASSERT(grid.tree().activeVoxelCount() < count);
     }
+
+    {//erode6
+        for (int x=0; x<8; ++x) {
+            for (int y=0; y<8; ++y) {
+                for (int z=0; z<8; ++z) {
+                    tree->clear();
+                    const openvdb::Coord ijk(x,y,z);
+                    CPPUNIT_ASSERT_EQUAL(Index64(0), tree->activeVoxelCount());
+                    tree->setValue(ijk, 1.0f);
+                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeVoxelCount());
+                    CPPUNIT_ASSERT(tree->isValueOn(ijk));
+                    openvdb::tools::dilateVoxels(*tree, 1, openvdb::tools::NN_FACE);
+                    CPPUNIT_ASSERT_EQUAL(Index64(1 + 6), tree->activeVoxelCount());
+                    openvdb::tools::erodeVoxels( *tree, 1, openvdb::tools::NN_FACE);
+                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeVoxelCount());
+                    CPPUNIT_ASSERT(tree->isValueOn(ijk));
+                }
+            }
+        }
+    }
+    /* Not completed yet 
+    {//erode18
+        //for (int x=0; x<8; ++x) {
+        //for (int y=0; y<8; ++y) {
+        //for (int z=0; z<8; ++z) {
+        int x=3, y=3, z=3;
+                    const openvdb::Coord ijk(x,y,z);
+                    std::cerr << ijk;
+                    tree->clear();
+                    CPPUNIT_ASSERT_EQUAL(Index64(0), tree->activeVoxelCount());
+                    tree->setValue(ijk, 1.0f);
+                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeVoxelCount());
+                    CPPUNIT_ASSERT(tree->isValueOn(ijk));
+                    openvdb::tools::dilateVoxels(*tree, 1, openvdb::tools::NN_FACE_EDGE);
+                    std::cerr << " dilated to " << tree->activeVoxelCount();
+                    CPPUNIT_ASSERT_EQUAL(Index64(1 + 6 + 12), tree->activeVoxelCount());
+                    openvdb::tools::erodeVoxels( *tree, 1, openvdb::tools::NN_FACE_EDGE);
+                    std::cerr << ", eroded to " << tree->activeVoxelCount() << std::endl;
+                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeVoxelCount());
+                    CPPUNIT_ASSERT(tree->isValueOn(ijk));
+                    //      }
+                    //}
+                    //}
+    }
+    
+    {//erode26
+        tree->clear();
+        tree->setValue(openvdb::Coord(3,4,5), 1.0f);
+        openvdb::tools::dilateVoxels(*tree, 12, openvdb::tools::NN_FACE_EDGE_VERTEX);
+        openvdb::tools::erodeVoxels( *tree, 12, openvdb::tools::NN_FACE_EDGE_VERTEX);
+        CPPUNIT_ASSERT_EQUAL(1, int(tree->activeVoxelCount()));
+        CPPUNIT_ASSERT(tree->isValueOn(openvdb::Coord(3,4,5)));
+        }
+    */
 }
 
 

@@ -67,18 +67,18 @@ namespace io {
 ///     On read, nodes might have been stored without inactive values.
 ///     Where necessary, reconstruct inactive values from available information.
 ///
-/// <dt><tt>COMPRESS_BLOSC_LZ4</tt>
+/// <dt><tt>COMPRESS_BLOSC</tt>
 /// <dd>When writing grids other than level sets or fog volumes, apply
-///     Blosc LZ4 compression to internal and leaf node value buffers.<br>
+///     Blosc compression to internal and leaf node value buffers.<br>
 ///     When reading grids other than level sets or fog volumes, indicate that
-///     the value buffers of internal and leaf nodes are Blosc LZ4-compressed.<br>
-///     Blosc LZ4 is much faster than ZLIB and produces comparable file sizes.
+///     the value buffers of internal and leaf nodes are Blosc-compressed.<br>
+///     Blosc is much faster than ZLIB and produces comparable file sizes.
 /// </dl>
 enum {
     COMPRESS_NONE           = 0,
     COMPRESS_ZIP            = 0x1,
     COMPRESS_ACTIVE_MASK    = 0x2,
-    COMPRESS_BLOSC_LZ4      = 0x4
+    COMPRESS_BLOSC          = 0x4
 };
 
 /// Return a string describing the given compression flags.
@@ -133,16 +133,16 @@ truncateRealToHalf(const T& val)
 
 OPENVDB_API void zipToStream(std::ostream&, const char* data, size_t numBytes);
 OPENVDB_API void unzipFromStream(std::istream&, char* data, size_t numBytes);
-OPENVDB_API void bloscLz4ToStream(std::ostream&, const char* data, size_t valSize, size_t numVals);
-OPENVDB_API void bloscLz4FromStream(std::istream&, char* data, size_t numBytes);
+OPENVDB_API void bloscToStream(std::ostream&, const char* data, size_t valSize, size_t numVals);
+OPENVDB_API void bloscFromStream(std::istream&, char* data, size_t numBytes);
 
 /// @brief Read data from a stream.
 /// @param is           the input stream
 /// @param data         the contiguous array of data to read in
 /// @param count        the number of elements to read in
 /// @param compression  whether and how the data is compressed (either COMPRESS_NONE,
-///                     COMPRESS_ZIP, COMPRESS_ACTIVE_MASK or COMPRESS_BLOSC_LZ4)
-/// @throw IoError if @a compression is COMPRESS_BLOSC_LZ4 but OpenVDB was compiled
+///                     COMPRESS_ZIP, COMPRESS_ACTIVE_MASK or COMPRESS_BLOSC)
+/// @throw IoError if @a compression is COMPRESS_BLOSC but OpenVDB was compiled
 /// without Blosc support.
 /// @details This default implementation is instantiated only for types
 /// whose size can be determined by the sizeof() operator.
@@ -150,11 +150,11 @@ template<typename T>
 inline void
 readData(std::istream& is, T* data, Index count, uint32_t compression)
 {
-    if (compression & COMPRESS_BLOSC_LZ4) {
-#ifdef OPENVDB_USE_BLOSC_LZ4
-        bloscLz4FromStream(is, reinterpret_cast<char*>(data), sizeof(T) * count);
+    if (compression & COMPRESS_BLOSC) {
+#ifdef OPENVDB_USE_BLOSC
+        bloscFromStream(is, reinterpret_cast<char*>(data), sizeof(T) * count);
 #else
-        OPENVDB_THROW(IoError, "Blosc LZ4 decoding is not supported");
+        OPENVDB_THROW(IoError, "Blosc decoding is not supported");
 #endif
     } else if (compression & COMPRESS_ZIP) {
         unzipFromStream(is, reinterpret_cast<char*>(data), sizeof(T) * count);
@@ -211,8 +211,8 @@ struct HalfReader</*IsReal=*/true, T> {
 /// @param data         the contiguous array of data to write
 /// @param count        the number of elements to write out
 /// @param compression  whether and how to compress the data (either COMPRESS_NONE,
-///                     COMPRESS_ZIP, COMPRESS_ACTIVE_MASK or COMPRESS_BLOSC_LZ4)
-/// @throw IoError if @a compression is COMPRESS_BLOSC_LZ4 but OpenVDB was compiled
+///                     COMPRESS_ZIP, COMPRESS_ACTIVE_MASK or COMPRESS_BLOSC)
+/// @throw IoError if @a compression is COMPRESS_BLOSC but OpenVDB was compiled
 /// without Blosc support.
 /// @details This default implementation is instantiated only for types
 /// whose size can be determined by the sizeof() operator.
@@ -220,11 +220,11 @@ template<typename T>
 inline void
 writeData(std::ostream &os, const T *data, Index count, uint32_t compression)
 {
-    if (compression & COMPRESS_BLOSC_LZ4) {
-#ifdef OPENVDB_USE_BLOSC_LZ4
-        bloscLz4ToStream(os, reinterpret_cast<const char*>(data), sizeof(T), count);
+    if (compression & COMPRESS_BLOSC) {
+#ifdef OPENVDB_USE_BLOSC
+        bloscToStream(os, reinterpret_cast<const char*>(data), sizeof(T), count);
 #else
-        OPENVDB_THROW(IoError, "Blosc LZ4 encoding is not supported");
+        OPENVDB_THROW(IoError, "Blosc encoding is not supported");
 #endif
     } else if (compression & COMPRESS_ZIP) {
         zipToStream(os, reinterpret_cast<const char*>(data), sizeof(T) * count);

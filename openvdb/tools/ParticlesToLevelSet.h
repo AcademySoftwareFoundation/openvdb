@@ -111,6 +111,8 @@
 #include <openvdb/util/NullInterrupter.h>
 #include "Composite.h" // for csgUnion()
 #include "PointPartitioner.h"
+#include "Prune.h"
+#include "SignedFloodFill.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -122,7 +124,7 @@ namespace p2ls_internal {
 // attribute. It's required for attribute transfer which is performed
 // in the ParticlesToLevelSet::Raster memberclass defined below.
 template<typename VisibleT, typename BlindT> class BlindData;
-}
+}// namespace p2ls_internal
 
 
 template<typename SdfGridT,
@@ -173,9 +175,10 @@ public:
     /// used and after the last call to any of the rasterizer methods.
     ///
     /// @note Avoid calling this method more then once and only after
-    /// all the particles have been rasterized. It has no effect if
-    /// attribute transfer is disabled, i.e. AttributeT = void.
-    void finalize();
+    /// all the particles have been rasterized. It has no effect or
+    /// overhead if attribute transfer is disabled, i.e. AttributeT =
+    /// void and prune is false.
+    void finalize(bool prune = false);
 
     /// @brief Return a shared pointer to the grid containing the
     /// (optional) attribute.
@@ -339,9 +342,14 @@ rasterizeTrails(const ParticleListT& pa, Real delta)
 
 template<typename SdfGridT, typename AttributeT, typename InterrupterT>
 inline void
-ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::finalize()
+ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::finalize(bool prune)
 {
-    if (mBlindGrid==NULL) return;
+    if (mBlindGrid==NULL) {
+        if (prune) tools::pruneLevelSet(mSdfGrid->tree());
+        return;
+    } else {
+        if (prune) tools::prune(mBlindGrid->tree());
+    }
 
     typedef typename SdfGridType::TreeType   SdfTreeT;
     typedef typename AttGridType::TreeType   AttTreeT;
@@ -361,7 +369,7 @@ ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::finalize()
 
     // Extract the level set and IDs from mBlindDataGrid. We will
     // explore the fact that by design active values always live
-    // at the leaf node level, i.e. no active tiles exist in level sets
+    // at the leaf node level, i.e. level sets have no active tiles!
     typedef typename BlindTreeT::LeafCIter    LeafIterT;
     typedef typename BlindTreeT::LeafNodeType LeafT;
     typedef typename SdfTreeT::LeafNodeType   SdfLeafT;
@@ -372,15 +380,25 @@ ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::finalize()
         // Get leafnodes that were allocated during topology contruction!
         SdfLeafT* sdfLeaf = sdfTree->probeLeaf(xyz);
         AttLeafT* attLeaf = attTree->probeLeaf(xyz);
-        for (typename LeafT::ValueOnCIter m=leaf.cbeginValueOn(); m; ++m) {
-            // Use linear offset (vs coordinate) access for better performance!
-            const openvdb::Index k = m.pos();
-            const BlindType& v = *m;
-            sdfLeaf->setValueOnly(k, v.visible());
-            attLeaf->setValueOnly(k, v.blind());
+        // Use linear offset (vs coordinate) access for better performance!
+        typename LeafT::ValueOnCIter m=leaf.cbeginValueOn();
+        if (!m) {//no active values in leaf node so copy everything
+            for (openvdb::Index k = 0; k!=LeafT::SIZE; ++k) {
+                const BlindType& v = leaf.getValue(k);
+                sdfLeaf->setValueOnly(k, v.visible());
+                attLeaf->setValueOnly(k, v.blind());
+            }
+        } else {//only copy active values (using flood fill for the inactive values)
+            for(; m; ++m) {
+                const openvdb::Index k = m.pos();
+                const BlindType& v = *m;
+                sdfLeaf->setValueOnly(k, v.visible());
+                attLeaf->setValueOnly(k, v.blind());
+            }
         }
     }
-    sdfTree->signedFloodFill();//required since we only transferred active voxels!
+    
+    tools::signedFloodFill(*sdfTree);//required since we only transferred active voxels!
 
     if (mSdfGrid->empty()) {
         mSdfGrid->setTree(sdfTree);
@@ -408,13 +426,13 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
 
     /// @brief Main constructor
     Raster(ParticlesToLevelSetT& parent, GridT* grid, const ParticleListT& particles)
-        : mParent(parent),
-          mParticles(particles),
-          mGrid(grid),
-          mMap(*(mGrid->transform().baseMap())),
-          mMinCount(0),
-          mMaxCount(0),
-          mIsCopy(false)
+        : mParent(parent)
+        , mParticles(particles)
+        , mGrid(grid)
+        , mMap(*(mGrid->transform().baseMap()))
+        , mMinCount(0)
+        , mMaxCount(0)
+        , mIsCopy(false)
     {
         mPointPartitioner = new PointPartitionerT();
         mPointPartitioner->construct(particles, mGrid->transform());
@@ -422,15 +440,15 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
 
     /// @brief Copy constructor called by tbb threads
     Raster(Raster& other, tbb::split)
-        : mParent(other.mParent),
-          mParticles(other.mParticles),
-          mGrid(new GridT(*other.mGrid, openvdb::ShallowCopy())),
-          mMap(other.mMap),
-          mMinCount(0),
-          mMaxCount(0),
-          mTask(other.mTask),
-          mIsCopy(true),
-          mPointPartitioner(other.mPointPartitioner)
+        : mParent(other.mParent)
+        , mParticles(other.mParticles)
+        , mGrid(new GridT(*other.mGrid, openvdb::ShallowCopy()))
+        , mMap(other.mMap)
+        , mMinCount(0)
+        , mMaxCount(0)
+        , mTask(other.mTask)
+        , mIsCopy(true)
+        , mPointPartitioner(other.mPointPartitioner)
     {
         mGrid->newTree();
     }
@@ -753,7 +771,7 @@ private:
     size_t                mMinCount, mMaxCount;//counters for ignored particles!
     FuncType              mTask;
     const bool            mIsCopy;
-    PointPartitionerT*     mPointPartitioner;
+    PointPartitionerT*    mPointPartitioner;
 };//end of Raster struct
 
 

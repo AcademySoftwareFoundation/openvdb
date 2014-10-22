@@ -45,7 +45,7 @@
 #include <openvdb/util/NullInterrupter.h>
 #include <boost/utility.hpp>
 #include <boost/type_traits/is_floating_point.hpp>
-
+#include "SignedFloodFill.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -183,7 +183,8 @@ private:
         }//end loop over i
 
         // Define consistant signed distances outside the narrow-band
-        mGrid->signedFloodFill();
+        tools::signedFloodFill(mGrid->tree());
+        
         if (mInterrupt) mInterrupt->end();
     }
 

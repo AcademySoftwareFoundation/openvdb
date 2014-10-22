@@ -32,7 +32,9 @@
 ///
 /// @brief  Multi-threaded space-partitioning scheme for points.
 ///
-/// @note   The actual points are never stored in the tool, only
+/// @note   This tool is deterministic; partitioning the same point
+///         sequence will produce the same result each time.
+///         The actual points are never stored in the tool, only
 ///         offsets into an external array.
 ///
 /// @author Mihai Alden
@@ -80,7 +82,9 @@ namespace tools {
 
 /// @brief  Partitions points into @c Log2Dim aligned buckets.
 ///
-/// @note   @c Log2Dim defines the bucket coordinate dimensions,
+/// @note   This tool is deterministic; partitioning the same point
+///         sequence will produce the same result each time.
+///         @c Log2Dim defines the bucket coordinate dimensions,
 ///         i.e. Log2Dim = 3 corresponds to a bucket that spans
 ///         a (2^3)^3 = 8^3 voxel region.
 template<typename PointIndexT = uint32_t, Index Log2Dim = 3>
@@ -290,56 +294,6 @@ struct IndexPair {
 };
 
 
-template<typename PointArray, typename Container, typename LeafNode>
-struct BucketWithOffsetsOp {
-
-    BucketWithOffsetsOp(const PointArray& points, std::vector<int16_t>& offsets,
-        Container& buckets, const math::Transform& m)
-        : mPoints(&points)
-        , mOffsets(&offsets)
-        , mBuckets(&buckets)
-        , mXForm(m)
-    {
-    }
-
-    void operator()(const tbb::blocked_range<size_t>& range) const {
-
-        typedef typename Container::IndexBucket IndexBucket;
-        typename PointArray::value_type point;
-        Coord ijk, lastCoord(std::numeric_limits<int>::max());
-
-        IndexBucket* bucket = NULL;
-
-        for (size_t n = range.begin(); n != range.end(); ++n) {
-
-            mPoints->getPos(n, point);
-            ijk = mXForm.worldToIndexCellCentered(point);
-
-            (*mOffsets)[n] = int16_t(LeafNode::coordToOffset(ijk));
-
-            ijk[0] >>= LeafNode::LOG2DIM;
-            ijk[1] >>= LeafNode::LOG2DIM;
-            ijk[2] >>= LeafNode::LOG2DIM;
-
-            if (ijk != lastCoord || bucket == NULL) {
-                lastCoord = ijk;
-                bucket = mBuckets->getIndexBucket(ijk);
-            }
-
-            bucket->push_back(unsigned(n));
-        }
-    }
-
-    //////////
-
-    PointArray           const * const mPoints;
-    std::vector<int16_t>       * const mOffsets;
-    Container                  * const mBuckets;
-
-    const math::Transform mXForm;
-};
-
-
 template<typename PointArray, typename IndexT, typename VoxelOffsetT>
 struct BucketAndVoxelOffsetOp
 {
@@ -363,7 +317,7 @@ struct BucketAndVoxelOffsetOp
 
 
     void operator()(const tbb::blocked_range<size_t>& range) const {
-        PointType point;
+        PointType pos;
         Coord ijk(0, 0, 0), loc(0, 0, 0);
 
         const int xMin = mBBox.min()[0], yMin = mBBox.min()[1], zMin = mBBox.min()[2];
@@ -376,17 +330,9 @@ struct BucketAndVoxelOffsetOp
         VoxelOffsetT voxelOffset = 0;
 
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
-            mPoints->getPos(n, point);
-
-            point = PointType(mXForm.worldToIndex(Vec3d(point)));
-
-            point[0] += 0.5f;
-            point[1] += 0.5f;
-            point[2] += 0.5f;
-
-            ijk[0] = Int32(std::floor(point[0]));
-            ijk[1] = Int32(std::floor(point[1]));
-            ijk[2] = Int32(std::floor(point[2]));
+            
+            mPoints->getPos(n, pos);
+            ijk = mXForm.worldToIndexCellCentered(pos);
 
             // coord to offset
             if (mVoxelOffsets) {
@@ -451,7 +397,7 @@ struct ComputeOffsetOp
 
 
     void operator()(const tbb::blocked_range<size_t>& range) const {
-        PointType point;
+        PointType pos;
         Coord ijk(0, 0, 0), loc(0, 0, 0);
 
         const int xMin = mBBox.min()[0], yMin = mBBox.min()[1], zMin = mBBox.min()[2];
@@ -464,17 +410,9 @@ struct ComputeOffsetOp
         VoxelOffsetT voxelOffset = 0;
 
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
-            mPoints->getPos(n, point);
 
-            point = PointType(mXForm.worldToIndex(Vec3d(point)));
-
-            point[0] += 0.5f;
-            point[1] += 0.5f;
-            point[2] += 0.5f;
-
-            ijk[0] = Int32(std::floor(point[0]));
-            ijk[1] = Int32(std::floor(point[1]));
-            ijk[2] = Int32(std::floor(point[2]));
+            mPoints->getPos(n, pos);
+            ijk = mXForm.worldToIndexCellCentered(pos);
 
             // coord to offset
             if (mVoxelOffsets) {
@@ -796,6 +734,28 @@ struct LeafNodeOriginOp
 
 ////////////////////////////////////////
 
+
+// Tests whether the given bbox volume can be computed without
+// overflowing the given IntType
+template<typename IntType>
+inline bool
+isVolumeCalculationOverflowSafe(const CoordBBox& bbox)
+{
+    const uint64_t xdim = uint64_t(bbox.max()[0] - bbox.min()[0]);
+    const uint64_t ydim = uint64_t(bbox.max()[1] - bbox.min()[1]);
+    const uint64_t zdim = uint64_t(bbox.max()[2] - bbox.min()[2]);
+
+    uint64_t product = xdim * ydim;
+    if (product > std::numeric_limits<IntType>::max()) return false;
+
+    product *= zdim;
+    if (product > std::numeric_limits<IntType>::max()) return false;
+    return true;
+}
+
+
+////////////////////////////////////////
+
 template<typename PointArray>
 inline CoordBBox
 computeLeafBounds(const PointArray& points, const math::Transform& m, unsigned log2dim)
@@ -1080,6 +1040,16 @@ PointPartitioner<PointIndexT, Log2Dim>::construct(const PointArray& points,
     const CoordBBox bbox =
         point_partitioner_internal::computeLeafBounds(points, xform, int(Log2Dim));
 
+    if(!point_partitioner_internal::isVolumeCalculationOverflowSafe<PointIndexT>(bbox)) {
+        // the bbox is computed in leafnode space (the lattice composing of only
+        // leafnode origins) and should rarely overflow a uint32 volume calc. in practice.
+        OPENVDB_THROW(ArithmeticError, "Detected overflow in bbox volume computation, "
+            "use uint64 for the PointIndexT type in the PointPartitioner.");
+
+        /// @todo This can be avoided using boost::int_t<N>::least to determine the
+        ///       bucket offset type instead of PointIndexT in the @c sortPartition
+        ///       and @c partition algorithms.
+    }
 
     if (bbox.volume() > Index64(point_partitioner_internal::LEAF_NODE_LIMIT)) {
         point_partitioner_internal::sortPartition<Log2Dim>(points, xform, bbox,

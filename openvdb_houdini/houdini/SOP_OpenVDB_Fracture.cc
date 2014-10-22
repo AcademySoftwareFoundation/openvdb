@@ -642,10 +642,11 @@ SOP_OpenVDB_Fracture::process(
     }
 
     // Check for multiple cutter objects
-#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
+#if (UT_VERSION_INT >= 0x0e000061) // 14.0.97 or later
     GEO_PrimClassifier primClassifier;
-    if (separatecutters)
+    if (separatecutters) {
         primClassifier.classifyBySharedPoints(*cutterGeo);
+    }
 #else
     GEO_PointClassifier pointClassifier;
     GEO_PrimClassifier primClassifier;
@@ -654,6 +655,7 @@ SOP_OpenVDB_Fracture::process(
         primClassifier.classifyBySharedPoints(*cutterGeo, pointClassifier);
     }
 #endif
+
     const int cutterObjects = separatecutters ? primClassifier.getNumClass() : 1;
     const ValueType bandWidth = ValueType(backgroundValue / transform->voxelSize()[0]);
 

@@ -102,6 +102,8 @@ typedef UT_Vector3T<int32> UT_Vector3i;
 #if (UT_VERSION_INT < 0x0c050000) // earlier than 12.5.0
 #include <boost/scope_exit.hpp>
 #endif
+
+#include <openvdb/tools/SignedFloodFill.h>
 #include <boost/type_traits/is_arithmetic.hpp>
 #include <boost/utility/enable_if.hpp>
 
@@ -587,7 +589,7 @@ GU_PrimVDB::buildFromPrimVolume(
     
     if (flood_sdf && vol.isSDF()) {
         // only call signed flood fill on SDFs
-        grid->signedFloodFill();
+        openvdb::tools::signedFloodFill(grid->tree());
     }
 
     GU_PrimVDB *prim_vdb = buildFromGrid(geo, grid, NULL, name);

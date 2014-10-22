@@ -42,6 +42,7 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/tools/ValueTransformer.h> // for tools::foreach()
+#include <openvdb/tools/Prune.h>
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_String.h>
 #include <boost/bind.hpp>
@@ -519,7 +520,7 @@ public:
             mOutGrid.reset();
             return;
         }
-        vecGrid->prune();
+        openvdb::tools::prune(vecGrid->tree());
     }
 
 private:

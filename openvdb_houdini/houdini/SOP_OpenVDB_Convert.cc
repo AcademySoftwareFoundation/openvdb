@@ -41,6 +41,7 @@
 #include <openvdb/tools/LevelSetUtil.h>
 #include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/tools/VolumeToMesh.h>
+#include <openvdb/tools/Prune.h>
 #include <openvdb/tree/ValueAccessor.h>
 
 #include <CH/CH_Manager.h>
@@ -985,7 +986,7 @@ SOP_OpenVDB_Convert::referenceMeshing(
             op(*refGeo, indexGrid->tree(), maskLeafs, edgetolerance);
         op.run();
 
-        maskTree->pruneInactive();
+        openvdb::tools::pruneInactive(*maskTree);
 
         openvdb::tools::dilateVoxels(*maskTree, 2);
 

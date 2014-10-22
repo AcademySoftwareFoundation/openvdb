@@ -96,16 +96,16 @@ newSopOperator(OP_OperatorTable* table)
     // Compression
     {
         const char* items[] = {
-            "none", "None",
-            "zip",  "Zip",
-            "lz4",  "Blosc LZ4",
+            "none",     "None",
+            "zip",      "Zip",
+            "blosc",    "Blosc",
             NULL
         };
 
-#ifdef OPENVDB_USE_BLOSC_LZ4
+#ifdef OPENVDB_USE_BLOSC
         parms.add(hutil::ParmFactory(PRM_ORD, "compression", "Compression")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setDefault("lz4")
+            .setDefault("blosc")
             .setHelpText(
                 "Zip is slow but compresses very well.  Blosc is fast and compresses well,\n"
                 "but files written with Blosc cannot be read by older versions of Houdini.\n"));
@@ -181,7 +181,7 @@ SOP_OpenVDB_Write::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
 {
     if (!obsoleteParms) return;
 
-#ifdef OPENVDB_USE_BLOSC_LZ4
+#ifdef OPENVDB_USE_BLOSC
     PRM_Parm* parm = obsoleteParms->getParmPtr("compress_zip");
     if (parm && !parm->isFactoryDefault()) {
         const bool zip = obsoleteParms->evalInt("compress_zip", 0, /*time=*/0.0);
@@ -323,7 +323,7 @@ SOP_OpenVDB_Write::doCook(const fpreal time)
     }
 
     // Get compression options.
-#ifdef OPENVDB_USE_BLOSC_LZ4
+#ifdef OPENVDB_USE_BLOSC
     UT_String compression;
     evalString(compression, "compression", 0, time);
 #else
@@ -390,16 +390,16 @@ SOP_OpenVDB_Write::doCook(const fpreal time)
     // Create a VDB file object.
     openvdb::io::File file(filename);
 
-#ifdef OPENVDB_USE_BLOSC_LZ4
+#ifdef OPENVDB_USE_BLOSC
     uint32_t compressionFlags = file.compression();
     if (compression == "none") {
-        compressionFlags &= ~(openvdb::io::COMPRESS_ZIP | openvdb::io::COMPRESS_BLOSC_LZ4);
-    } else if (compression == "lz4") {
+        compressionFlags &= ~(openvdb::io::COMPRESS_ZIP | openvdb::io::COMPRESS_BLOSC);
+    } else if (compression == "blosc") {
         compressionFlags &= ~openvdb::io::COMPRESS_ZIP;
-        compressionFlags |= openvdb::io::COMPRESS_BLOSC_LZ4;
+        compressionFlags |= openvdb::io::COMPRESS_BLOSC;
     } else if (compression == "zip") {
         compressionFlags |= openvdb::io::COMPRESS_ZIP;
-        compressionFlags &= ~openvdb::io::COMPRESS_BLOSC_LZ4;
+        compressionFlags &= ~openvdb::io::COMPRESS_BLOSC;
     }
 #else
     uint32_t compressionFlags = openvdb::io::COMPRESS_ACTIVE_MASK;

@@ -38,6 +38,9 @@
 #include <openvdb/tools/Morphology.h> // for dilateVoxels()
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Util.h> // for nearestCoord()
+#include "ChangeBackground.h"
+#include "Prune.h"// for pruneInactive and pruneLevelSet
+#include "SignedFloodFill.h" // for signedFloodFill
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
@@ -1462,7 +1465,7 @@ IntersectingVoxelCleaner<FloatTreeT>::run(bool threaded)
     if (threaded) tbb::parallel_for(mLeafs.getRange(), *this);
     else (*this)(mLeafs.getRange());
 
-    mIntersectionTree.pruneInactive();
+    tools::pruneInactive(mIntersectionTree, threaded);
 }
 
 
@@ -1592,8 +1595,8 @@ ShellVoxelCleaner<FloatTreeT>::run(bool threaded)
     if (threaded) tbb::parallel_for(mLeafs.getRange(), *this);
     else (*this)(mLeafs.getRange());
 
-    mDistTree.pruneInactive();
-    mIndexTree.pruneInactive();
+    tools::pruneInactive(mDistTree,  threaded);
+    tools::pruneInactive(mIndexTree, threaded);
 }
 
 
@@ -2259,31 +2262,6 @@ private:
     AccessorT mAcc;
 };
 
-
-template<typename ValueType>
-struct SDFPrune
-{
-    SDFPrune(const ValueType& out, const ValueType& in)
-        : outside(out)
-        , inside(in)
-    {
-    }
-
-    template <typename ChildType>
-    bool operator()(ChildType& child)
-    {
-        child.pruneOp(*this);
-        if (!child.isInactive()) return false;
-        value = math::isNegative(child.getFirstValue()) ? inside : outside;
-        return true;
-    }
-
-    static const bool state = false;
-    const ValueType   outside, inside;
-    ValueType         value;
-};
-
-
 } // internal namespace
 
 
@@ -2471,7 +2449,7 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
     }
 
     if (mDistGrid->activeVoxelCount() == 0) {
-        mDistGrid->tree().setBackground(exBandWidth);
+        tools::changeBackground(mDistGrid->tree(), exBandWidth);
         return;
     }
 
@@ -2487,7 +2465,7 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
 
     if (!unsignedDistField) { // Propagate sign information to inactive values.
         mDistGrid->tree().root().setBackground(exBandWidth, /*updateChildNodes=*/false);
-        mDistGrid->tree().signedFloodFill(exBandWidth, -inBandWidth);
+        tools::signedFloodFill(mDistGrid->tree(), exBandWidth, -inBandWidth);
     }
 
     if (wasInterrupted(46)) return;
@@ -2544,8 +2522,8 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
     // Renormalize distances to smooth out bumps caused by self-intersecting
     // and overlapping portions of the mesh and renormalize the level set.
     if (!unsignedDistField && !rawData) {
-
-        mDistGrid->tree().pruneLevelSet();
+        
+        tools::pruneLevelSet(mDistGrid->tree());
         tree::LeafManager<FloatTreeT> leafs(mDistGrid->tree(), 1);
 
         const FloatValueT offset = FloatValueT(0.8 * voxelSize);
@@ -2579,9 +2557,8 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
         tree::LeafManager<FloatTreeT> leafs(mDistGrid->tree());
         leafs.foreach(internal::TrimOp<FloatValueT>(
             exBandWidth, unsignedDistField ? exBandWidth : inBandWidth));
-
-        internal::SDFPrune<FloatValueT> sdfPrune(exBandWidth, -inBandWidth);
-        mDistGrid->tree().pruneOp(sdfPrune);
+        
+        tools::pruneLevelSet(mDistGrid->tree(), exBandWidth, -inBandWidth);
     }
 }
 

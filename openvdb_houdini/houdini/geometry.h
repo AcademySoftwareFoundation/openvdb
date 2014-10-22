@@ -91,6 +91,8 @@ struct PointList {
             }
 
             getOffset = &PointList::offsetFromGroupMap;
+        } else if (mIndexMap->isTrivialMap()) {
+            getOffset = &PointList::offsetFromIndexCast;
         } else {
             getOffset = &PointList::offsetFromGeoMap;
         }
@@ -168,11 +170,15 @@ private:
         return mOffsets[n];
     }
 
+    GA_Offset offsetFromIndexCast(const size_t n) const {
+        return GA_Offset(n);
+    }
+
     GA_ROHandleV3 mPositionHandle, mVelocityHandle;
     GA_ROHandleF mRadiusHandle;
     GA_IndexMap const * const mIndexMap;
-    std::vector<GA_Offset>      mOffsets;
-    size_t                      mSize;
+    std::vector<GA_Offset> mOffsets;
+    size_t mSize;
 }; // PointList
 
 

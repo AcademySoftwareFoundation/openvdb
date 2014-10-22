@@ -228,7 +228,12 @@ public:
         return t;
     }
 
-    void hits(RayT& ray, AccessorT &acc, std::vector<TimeSpanT>& times)
+    /// ListType is a list of RayType::TimeSpan and is required to
+    /// have the two methods: clear() and push_back(). Thus, it could
+    /// be std::vector<typename RayType::TimeSpan> or
+    /// std::deque<typename RayType::TimeSpan>.  
+    template <typename ListType>
+    void hits(RayT& ray, AccessorT &acc, ListType& times)
     {
         TimeSpanT t(-1,-1);
         times.clear();
@@ -258,8 +263,13 @@ private:
         if (t.t0>=0) t.t1 = mDDA.maxTime();
         return false;
     }
-
-    void hits(RayT& ray, AccessorT &acc, std::vector<TimeSpanT>& times, TimeSpanT& t)
+    
+    /// ListType is a list of RayType::TimeSpan and is required to
+    /// have the two methods: clear() and push_back(). Thus, it could
+    /// be std::vector<typename RayType::TimeSpan> or
+    /// std::deque<typename RayType::TimeSpan>.
+    template <typename ListType>
+    void hits(RayT& ray, AccessorT &acc, ListType& times, TimeSpanT& t)
     {
         mDDA.init(ray);
         do {
@@ -301,7 +311,8 @@ public:
         return t;
     }
 
-    void hits(RayT& ray, AccessorT &acc, std::vector<TimeSpanT>& times)
+    template <typename ListType>
+    void hits(RayT& ray, AccessorT &acc, ListType& times)
     {
         TimeSpanT t(-1,-1);
         times.clear();
@@ -330,7 +341,8 @@ private:
         return false;
     }
 
-    void hits(RayT& ray, AccessorT &acc, std::vector<TimeSpanT>& times, TimeSpanT& t)
+    template <typename ListType>
+    void hits(RayT& ray, AccessorT &acc, ListType& times, TimeSpanT& t)
     {
         mDDA.init(ray);
         do {

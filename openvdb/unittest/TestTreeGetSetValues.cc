@@ -33,6 +33,7 @@
 #include <openvdb/Types.h>
 #include <openvdb/tree/Tree.h>
 #include <openvdb/tools/ValueTransformer.h> // for tools::setValueOnMin() et al.
+#include <openvdb/tools/Prune.h>
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
@@ -369,7 +370,7 @@ TestTreeGetSetValues::testFill()
     // Partially fill a region with the background value.
     tree.fill(CoordBBox(Coord(27), Coord(254)), background, /*active=*/false);
     // Confirm that after pruning, the tree is empty.
-    tree.prune();
+    openvdb::tools::prune(tree);
     CPPUNIT_ASSERT(tree.empty());
     CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), tree.leafCount());
     CPPUNIT_ASSERT_EQUAL(openvdb::Index32(1), tree.nonLeafCount()); // root node

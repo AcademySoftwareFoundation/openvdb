@@ -55,6 +55,7 @@
 #include <boost/scoped_array.hpp>
 #include <fstream>
 #include <vector>
+#include <deque>
 
 #ifdef OPENVDB_TOOLS_RAYTRACER_USE_EXR
 #include <OpenEXR/ImfPixelType.h>
@@ -1028,6 +1029,7 @@ operator()(const tbb::blocked_range<size_t>& range) const
 #define USE_HITS
 #ifdef USE_HITS
     std::vector<typename RayType::TimeSpan> pTS, sTS;
+    //std::deque<typename RayType::TimeSpan> pTS, sTS;
 #endif
 
     RayType sRay(Vec3R(0), mLightDir);//Shadow ray

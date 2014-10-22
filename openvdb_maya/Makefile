@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2013 DreamWorks Animation LLC
+# Copyright (c) 2012-2014 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -34,6 +34,8 @@
 #   depend              recompute source file header dependencies
 #
 # Options:
+#   abi=2               build for compatibility with the OpenVDB 2.x Grid ABI
+#                       (some OpenVDB 3.x features will be disabled)
 #   bits=32|64          build for 32-bit or 64-bit environments (default: 64)
 #   debug=yes           build with debugging symbols and without optimization
 #   verbose=yes         run commands in verbose mode
@@ -69,11 +71,14 @@ OPENVDB_LIB := -lopenvdb
 
 # The parent directory of the boost/ header directory
 BOOST_INCL_DIR :=
+# The directory containing libboost_iostreams, libboost_system, etc.
+BOOST_LIB_DIR :=
+BOOST_LIB := -lboost_iostreams -lboost_system
 
 # The parent directory of the OpenEXR/ header directory (which contains half.h)
-HALF_INCL_DIR :=
+ILMBASE_INCL_DIR :=
 # The directory containing libHalf
-HALF_LIB_DIR :=
+ILMBASE_LIB_DIR :=
 HALF_LIB := -lHalf
 
 # The parent directory of the tbb/ header directory
@@ -124,12 +129,15 @@ INCLDIRS := \
     -I . \
     -I $(OPENVDB_INCL_DIR) \
     -I $(BOOST_INCL_DIR) \
-    -I $(HALF_INCL_DIR) \
+    -I $(ILMBASE_INCL_DIR) \
     -I $(TBB_INCL_DIR) \
     -I $(MAYA_INCL_DIR) \
 #
 
 CXXFLAGS += -pthread $(OPTIMIZE) $(INCLDIRS)
+ifeq (2,$(strip $(abi)))
+	CXXFLAGS += -DOPENVDB_2_ABI_COMPATIBLE
+endif
 # From $(MAYA_LOCATION)/devkit/plug-ins/buildconfig:
 CXXFLAGS += \
     -D_BOOL \
@@ -174,8 +182,9 @@ MAYA_LIBS := \
 
 LIBS := \
     -Wl,-rpath,$(OPENVDB_LIB_DIR) -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) \
-    -Wl,-rpath,$(HALF_LIB_DIR) -L$(HALF_LIB_DIR) $(HALF_LIB) \
+    -Wl,-rpath,$(ILMBASE_LIB_DIR) -L$(ILMBASE_LIB_DIR) $(HALF_LIB) \
     -Wl,-rpath,$(TBB_LIB_DIR) -L$(TBB_LIB_DIR) $(TBB_LIB) \
+    -Wl,-rpath,$(BOOST_LIB_DIR) -L$(BOOST_LIB_DIR) $(BOOST_LIB) \
     -Wl,-rpath,$(MAYA_LOCATION)/lib -L$(MAYA_LOCATION)/lib $(MAYA_LIBS) \
     -ldl -lm -lz \
 #
@@ -191,6 +200,7 @@ MAYA_SRC_NAMES := \
     maya/OpenVDBFromPolygonsNode.cc \
     maya/OpenVDBPlugin.cc \
     maya/OpenVDBReadNode.cc \
+    maya/OpenVDBToPolygonsNode.cc \
     maya/OpenVDBTransformNode.cc \
     maya/OpenVDBUtil.cc \
     maya/OpenVDBVisualizeNode.cc \
@@ -207,6 +217,7 @@ MAYA_SCRIPTS := \
     maya/AEOpenVDBFromMayaFluidTemplate.mel \
     maya/AEOpenVDBFromPolygonsTemplate.mel \
     maya/AEOpenVDBReadTemplate.mel \
+    maya/AEOpenVDBToPolygonsTemplate.mel \
     maya/AEOpenVDBTransformTemplate.mel \
     maya/AEOpenVDBVisualizeTemplate.mel \
     maya/AEOpenVDBWriteTemplate.mel \
@@ -282,10 +293,10 @@ depend: $(DEPEND)
 clean:
 	$(RM) $(ALL_TARGETS) $(DEPEND) $(MAYA_OBJ_NAMES)
 
-ifneq ($(strip $(wildcard $(DEPEND))),)
+ifneq (,$(strip $(wildcard $(DEPEND))))
     include $(DEPEND)
 endif
 
-# Copyright (c) 2012-2013 DreamWorks Animation LLC
+# Copyright (c) 2012-2014 DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

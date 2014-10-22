@@ -34,6 +34,7 @@
 #include <openvdb/Types.h>
 #include <openvdb/tree/Tree.h>
 #include <openvdb/tools/ValueTransformer.h>
+#include <openvdb/tools/Prune.h>// for tree::pruneInactive
 
 
 namespace openvdb {
@@ -130,7 +131,7 @@ leafTopologyIntersection(const TreeType1& lhs, const TreeType2& rhs, bool thread
     tools::foreach(topologyTree->beginLeaf(),
         LeafTopologyIntOp<BoolTreeType, TreeType2>(rhs), threaded);
 
-    topologyTree->pruneInactive();
+    tools::pruneInactive(*topologyTree, threaded);
     return topologyTree;
 }
 
@@ -150,7 +151,7 @@ leafTopologyDifference(const TreeType1& lhs, const TreeType2& rhs, bool threaded
     tools::foreach(topologyTree->beginLeaf(),
         LeafTopologyDiffOp<BoolTreeType, TreeType2>(rhs), threaded);
 
-    topologyTree->pruneInactive();
+    tools::pruneInactive(*topologyTree, threaded);
     return topologyTree;
 }
 

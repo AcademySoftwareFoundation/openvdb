@@ -44,7 +44,6 @@
 #include <openvdb/util/NodeMasks.h>
 #include <openvdb/io/Compression.h> // for io::readData(), etc.
 #include "Iterator.h"
-#include "Util.h"
 
 
 class TestLeaf;
@@ -881,20 +880,6 @@ public:
     /// and inactive occurrences of @a -oldBackground with @a -newBackground.
     void resetBackground(const ValueType& oldBackground, const ValueType& newBackground);
 
-    /// @brief Overwrite each inactive value in this node and in any child nodes with
-    /// a new value whose magnitude is equal to the specified background value and whose
-    /// sign is consistent with that of the lexicographically closest active value.
-    /// @details This is primarily useful for propagating the sign from the (active) voxels
-    /// in a narrow-band level set to the inactive voxels outside the narrow band.
-    void signedFloodFill(const ValueType& background);
-
-    /// @brief Overwrite each inactive value in this node and in any child nodes with
-    /// either @a outside or @a inside, depending on the sign of the lexicographically
-    /// closest active value.
-    /// @details Specifically, an inactive value is set to @a outside if the closest active
-    /// value in the lexicographic direction is positive, otherwise it is set to @a inside.
-    void signedFloodFill(const ValueType& outside, const ValueType& inside);
-
     void negate();
 
     void voxelizeActiveTiles() {};
@@ -974,9 +959,7 @@ public:
 
     //@{
     /// This function exists only to enable template instantiation.
-    template<typename PruneOp> void pruneOp(PruneOp&) {}
     void prune(const ValueType& /*tolerance*/ = zeroVal<ValueType>()) {}
-    void pruneInactive(const ValueType&) {}
     void addLeaf(LeafNode*) {}
     template<typename AccessorT>
     void addLeafAndCache(LeafNode*, AccessorT&) {}
@@ -1528,7 +1511,6 @@ LeafNode<T, Log2Dim>::Buffer::doLoad() const
 
     /// @todo For now, we have to clear the mData pointer in order for allocate() to take effect.
     self->mData = NULL;
-    self->setOutOfCore(false);
     self->allocate();
 
     boost::shared_ptr<std::streambuf> buf = info->mapping->createBuffer();
@@ -1542,6 +1524,8 @@ LeafNode<T, Log2Dim>::Buffer::doLoad() const
 
     is.seekg(info->bufpos);
     io::readCompressedValues(is, self->mData, SIZE, mask, io::getHalfFloat(is));
+
+    self->setOutOfCore(false);
 }
 #endif
 
@@ -1755,53 +1739,6 @@ LeafNode<T, Log2Dim>::addTileAndCache(Index level, const Coord& xyz,
 
 
 ////////////////////////////////////////
-
-
-template<typename T, Index Log2Dim>
-inline void
-LeafNode<T, Log2Dim>::signedFloodFill(const ValueType& background)
-{
-    this->signedFloodFill(background, math::negative(background));
-}
-
-template<typename T, Index Log2Dim>
-inline void
-LeafNode<T, Log2Dim>::signedFloodFill(const ValueType& outsideValue,
-                                      const ValueType& insideValue)
-{
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-    if (!this->allocate()) return;
-#endif
-
-    const Index first = mValueMask.findFirstOn();
-    if (first < SIZE) {
-        bool xInside = math::isNegative(mBuffer[first]), yInside = xInside, zInside = xInside;
-        for (Index x = 0; x != (1 << Log2Dim); ++x) {
-            const Index x00 = x << (2 * Log2Dim);
-            if (mValueMask.isOn(x00)) {
-                xInside = math::isNegative(mBuffer[x00]); // element(x, 0, 0)
-            }
-            yInside = xInside;
-            for (Index y = 0; y != (1 << Log2Dim); ++y) {
-                const Index xy0 = x00 + (y << Log2Dim);
-                if (mValueMask.isOn(xy0)) {
-                    yInside = math::isNegative(mBuffer[xy0]); // element(x, y, 0)
-                }
-                zInside = yInside;
-                for (Index z = 0; z != (1 << Log2Dim); ++z) {
-                    const Index xyz = xy0 + z; // element(x, y, z)
-                    if (mValueMask.isOn(xyz)) {
-                        zInside = math::isNegative(mBuffer[xyz]);
-                    } else {
-                        mBuffer[xyz] = zInside ? insideValue : outsideValue;
-                    }
-                }
-            }
-        }
-    } else {// if no active voxels exist simply use the sign of the first value
-        mBuffer.fill(math::isNegative(mBuffer[0]) ? insideValue : outsideValue);
-    }
-}
 
 
 template<typename T, Index Log2Dim>

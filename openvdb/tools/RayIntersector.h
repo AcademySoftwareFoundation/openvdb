@@ -440,7 +440,16 @@ public:
         return t.valid();
     }
 
-    inline void hits(std::vector<typename RayT::TimeSpan>& list)
+    /// @brief Generates a list of hits along the ray.
+    ///
+    /// @param list List of hits represented as time spans.
+    ///
+    /// @note ListType is a list of RayType::TimeSpan and is required to
+    /// have the two methods: clear() and push_back(). Thus, it could
+    /// be std::vector<typename RayType::TimeSpan> or
+    /// std::deque<typename RayType::TimeSpan>. 
+    template <typename ListType>
+    inline void hits(ListType& list)
     {
         mHDDA.hits(mRay, mAccessor, list);
     }

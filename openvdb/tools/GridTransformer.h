@@ -44,8 +44,11 @@
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h> // for isApproxEqual()
 #include <openvdb/util/NullInterrupter.h>
+#include "ChangeBackground.h"
 #include "Interpolation.h"
 #include "LevelSetRebuild.h" // for doLevelSetRebuild()
+#include "SignedFloodFill.h" // for signedFloodFill
+#include "Prune.h" // for pruneLevelSet
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -632,7 +635,7 @@ void
 GridResampler::transformGrid(const Transformer& xform,
     const GridT& inGrid, GridT& outGrid) const
 {
-    outGrid.setBackground(inGrid.background());
+    tools::changeBackground(outGrid.tree(), inGrid.background());
     applyTransform<Sampler>(xform, inGrid, outGrid);
 }
 
@@ -641,7 +644,7 @@ template<class Sampler, class GridT>
 void
 GridTransformer::transformGrid(const GridT& inGrid, GridT& outGrid) const
 {
-    outGrid.setBackground(inGrid.background());
+    tools::changeBackground(outGrid.tree(), inGrid.background());
 
     if (!Sampler::mipmap() || mMipLevels == Vec3i::zero()) {
         // Skip the mipmapping step.
@@ -866,8 +869,8 @@ GridResampler::applyTransform(const Transformer& xform,
 
     // If the grid is a level set, mark inactive voxels as inside or outside.
     if (gridClass == GRID_LEVEL_SET) {
-        outTree.pruneInactive();
-        outTree.signedFloodFill();
+        tools::pruneLevelSet(outTree);
+        tools::signedFloodFill(outTree);
     }
 }
 

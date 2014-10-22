@@ -33,9 +33,6 @@
 #include <boost/python.hpp>
 #include <boost/python/stl_iterator.hpp>
 #include <boost/python/exception_translator.hpp>
-#ifdef OPENVDB_USE_LOG4CPLUS
-#include <log4cplus/configurator.h>
-#endif
 #ifdef PY_OPENVDB_USE_NUMPY
 #define PY_ARRAY_UNIQUE_SYMBOL PY_OPENVDB_ARRAY_API
 #include <arrayobject.h> // for import_array()
@@ -589,10 +586,6 @@ BOOST_PYTHON_MODULE(PY_OPENVDB_MODULE_NAME)
     py::docstring_options docOptions;
     docOptions.disable_signatures();
     docOptions.enable_user_defined();
-
-#ifdef OPENVDB_USE_LOG4CPLUS
-    log4cplus::BasicConfigurator::doConfigure();
-#endif
 
 #ifdef PY_OPENVDB_USE_NUMPY
     // Initialize NumPy.

@@ -393,23 +393,23 @@ else
 endif
 
 has_blosc := no
-ifeq (3,$(words $(strip $(BLOSC_LIB_DIR) $(BLOSC_INCL_DIR) $(BLOSC_LIB))))
+ifneq (,$(and $(BLOSC_LIB_DIR),$(BLOSC_INCL_DIR),$(BLOSC_LIB)))
     has_blosc := yes
 endif
 
 has_glfw := no
-ifeq (3,$(words $(strip $(GLFW_LIB_DIR) $(GLFW_INCL_DIR) $(GLFW_LIB))))
+ifneq (,$(and $(GLFW_LIB_DIR),$(GLFW_INCL_DIR),$(GLFW_LIB)))
     has_glfw := yes
 endif
 
 has_log4cplus := no
-ifeq (3,$(words $(strip $(LOG4CPLUS_LIB_DIR) $(LOG4CPLUS_INCL_DIR) $(LOG4CPLUS_LIB))))
+ifneq (,$(and $(LOG4CPLUS_LIB_DIR),$(LOG4CPLUS_INCL_DIR),$(LOG4CPLUS_LIB)))
     has_log4cplus := yes
 endif
 
 has_python := no
-ifeq (7,$(words $(strip $(PYTHON_VERSION) $(PYTHON_LIB_DIR) $(PYTHON_INCL_DIR) \
-    $(PYCONFIG_INCL_DIR) $(PYTHON_LIB) $(BOOST_PYTHON_LIB_DIR) $(BOOST_PYTHON_LIB))))
+ifneq (,$(and $(PYTHON_VERSION),$(PYTHON_LIB_DIR),$(PYTHON_INCL_DIR), \
+    $(PYCONFIG_INCL_DIR),$(PYTHON_LIB),$(BOOST_PYTHON_LIB_DIR),$(BOOST_PYTHON_LIB)))
     has_python := yes
 endif
 
@@ -515,6 +515,7 @@ INCLUDE_NAMES := \
     openvdb.h \
     Platform.h \
     PlatformConfig.h \
+    tools/ChangeBackground.h \
     tools/Clip.h \
     tools/Composite.h \
     tools/Dense.h \
@@ -540,8 +541,10 @@ INCLUDE_NAMES := \
     tools/PointIndexGrid.h \
     tools/PointPartitioner.h \
     tools/PointScatter.h \
+    tools/Prune.h \
     tools/RayIntersector.h \
     tools/RayTracer.h \
+    tools/SignedFloodFill.h \
     tools/Statistics.h \
     tools/ValueTransformer.h \
     tools/VectorTransformer.h \
@@ -552,11 +555,11 @@ INCLUDE_NAMES := \
     tree/LeafManager.h \
     tree/LeafNode.h \
     tree/LeafNodeBool.h \
+    tree/NodeManager.h \
     tree/NodeUnion.h \
     tree/RootNode.h \
     tree/Tree.h \
     tree/TreeIterator.h \
-    tree/Util.h \
     tree/ValueAccessor.h \
     Types.h \
     util/CpuTimer.h \
@@ -906,7 +909,7 @@ $(DOC_PDF): doxygen-config $(INCLUDE_NAMES) $(SRC_NAMES) $(DOC_FILES)
 	    && cd ./doc/latex && make refman.pdf $(QUIET) \
 	    && echo 'Created doc/latex/refman.pdf'
 
-ifneq ($(strip $(DOXYGEN)),)
+ifneq (,$(strip $(DOXYGEN)))
 doc: $(DOC_INDEX)
 pdfdoc: $(DOC_PDF)
 else
@@ -981,7 +984,7 @@ $(PYTHON_MODULE): $(LIBOPENVDB) $(PYTHON_OBJ_NAMES)
 		$(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) $(PYTHON_LIBS_RPATH))
 
 ifeq (yes,$(has_python))
-ifneq ($(strip $(EPYDOC)),)
+ifneq (,$(strip $(EPYDOC)))
 pydoc: $(PYTHON_MODULE) $(LIBOPENVDB_SONAME)
 	@echo "Generating Python module documentation because of $(call list_deps)"
 	pydocdir=doc/html/python; \
@@ -1151,11 +1154,11 @@ $(DEPEND): $(ALL_INCLUDE_FILES) $(ALL_SRC_FILES)
 	done
 	if [ -d "$(CPPUNIT_INCL_DIR)" ]; \
 	then \
-		for f in $(UNITTEST_SRC_NAMES); \
-			do $(CXX) $(CXXFLAGS) -O0 \
-				-MM $$f -MT `echo $$f | sed 's%\.[^.]*%.o%'` \
-				$(CXXISYSTEM) $(CPPUNIT_INCL_DIR) >> $(DEPEND); \
-		done; \
+	    for f in $(UNITTEST_SRC_NAMES); \
+	        do $(CXX) $(CXXFLAGS) -O0 \
+	            -MM $$f -MT `echo $$f | sed 's%\.[^.]*%.o%'` \
+	            $(CXXISYSTEM) $(CPPUNIT_INCL_DIR) >> $(DEPEND); \
+	    done; \
 	fi
 
 depend: $(DEPEND)

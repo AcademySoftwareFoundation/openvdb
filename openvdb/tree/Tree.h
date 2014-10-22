@@ -52,7 +52,6 @@
 #include "LeafNode.h"
 #include "TreeIterator.h"
 #include "ValueAccessor.h"
-#include "Util.h"
 
 
 namespace openvdb {
@@ -305,12 +304,6 @@ public:
     RootNodeType& root() { return mRoot; }
     const RootNodeType& root() const { return mRoot; }
     //@}
-    //@{
-    /// @brief Return this tree's root node.
-    /// @deprecated Use root() instead.
-    OPENVDB_DEPRECATED RootNodeType& getRootNode() { return mRoot; }
-    OPENVDB_DEPRECATED const RootNodeType& getRootNode() const { return mRoot; }
-    //@}
 
 
     //
@@ -498,34 +491,15 @@ public:
     /// operation for optimal sparseness.
     void fill(const CoordBBox& bbox, const ValueType& value, bool active = true);
 
-    /// @brief Call the @c PruneOp functor for each non-root node in the tree.
-    /// If the functor returns @c true, prune the node and replace it with a tile.
-    ///
-    /// This method is used to implement all of the various pruning algorithms
-    /// (prune(), pruneInactive(), etc.).  It should rarely be called directly.
-    /// @see openvdb/tree/Util.h for the definition of the @c PruneOp functor
-    template<typename PruneOp> void pruneOp(PruneOp&);
-
     /// @brief Reduce the memory footprint of this tree by replacing with tiles
     /// any nodes whose values are all the same (optionally to within a tolerance)
     /// and have the same active state.
-    void prune(const ValueType& tolerance = zeroVal<ValueType>());
-
-    /// @brief Reduce the memory footprint of this tree by replacing with
-    /// tiles of the given value any nodes whose values are all inactive.
-    void pruneInactive(const ValueType&);
-
-    /// @brief Reduce the memory footprint of this tree by replacing with
-    /// background tiles any nodes whose values are all inactive.
-    void pruneInactive();
-
-    /// @brief Reduce the memory footprint of this tree by replacing nodes
-    /// whose values are all inactive with inactive tiles having a value equal to
-    /// the first value encountered in the (inactive) child.
-    /// @details This method is faster than tolerance-based prune and
-    /// useful for narrow-band level set applications where inactive
-    /// values are limited to either an inside or an outside value.
-    void pruneLevelSet();
+    /// @warning Will soon be deprecated!
+    void prune(const ValueType& tolerance = zeroVal<ValueType>())
+    {
+        this->clearAllAccessors();
+        mRoot.prune(tolerance);
+    }
 
     /// @brief Add the given leaf node to this tree, creating a new branch if necessary.
     /// If a leaf node with the same origin already exists, replace it.
@@ -623,27 +597,16 @@ public:
     /// @brief Return this tree's background value wrapped as metadata.
     /// @note Query the metadata object for the value's type.
     virtual Metadata::Ptr getBackgroundValue() const;
-
-    /// Return this tree's background value.
+    
+    /// @brief Return this tree's background value.
+    ///
+    /// @note Use tools::changeBackground to efficiently modify the
+    /// background values. Else use tree.root().setBackground, which
+    /// is serial and hence slower.
     const ValueType& background() const { return mRoot.background(); }
-    /// Replace this tree's background value.
-    void setBackground(const ValueType& background) { mRoot.setBackground(background); }
 
     /// Min and max are both inclusive.
     virtual void getIndexRange(CoordBBox& bbox) const { mRoot.getIndexRange(bbox); }
-
-    /// @brief Set the values of all inactive voxels and tiles of a narrow-band
-    /// level set from the signs of the active voxels, setting outside values to
-    /// +background and inside values to -background.
-    /// @warning This method should only be used on closed, narrow-band level sets.
-    void signedFloodFill() { mRoot.signedFloodFill(); }
-
-    /// @brief Set the values of all inactive voxels and tiles of a narrow-band
-    /// level set from the signs of the active voxels, setting exterior values to
-    /// @a outside and interior values to @a inside.  Set the background value
-    /// of this tree to @a outside.
-    /// @warning This method should only be used on closed, narrow-band level sets.
-    void signedFloodFill(const ValueType& outside, const ValueType& inside);
 
     /// Densify active tiles, i.e., replace them with leaf-level active voxels.
     void voxelizeActiveTiles();
@@ -685,7 +648,7 @@ public:
     /// overlap with inactive tiles in the other grid. Likewise active
     /// voxels can be turned into unactive voxels resulting in leaf
     /// nodes with no active values. Thus, it is recommended to
-    /// subsequently call pruneInactive.
+    /// subsequently call tools::pruneInactive.
     template<typename OtherRootNodeType>
     void topologyIntersection(const Tree<OtherRootNodeType>& other);
 
@@ -698,7 +661,7 @@ public:
     /// overlap with active tiles in the other grid. Likewise active
     /// voxels can be turned into inactive voxels resulting in leaf
     /// nodes with no active values. Thus, it is recommended to
-    /// subsequently call pruneInactive.
+    /// subsequently call tools::pruneInactive.
     template<typename OtherRootNodeType>
     void topologyDifference(const Tree<OtherRootNodeType>& other);
 
@@ -1628,51 +1591,6 @@ Tree<RootNodeType>::probeValue(const Coord& xyz, ValueType& value) const
 
 
 template<typename RootNodeType>
-template<typename PruneOp>
-inline void
-Tree<RootNodeType>::pruneOp(PruneOp& op)
-{
-    this->clearAllAccessors();
-    mRoot.pruneOp(op);
-}
-
-
-template<typename RootNodeType>
-inline void
-Tree<RootNodeType>::prune(const ValueType& tolerance)
-{
-    TolerancePrune<ValueType> op(tolerance);
-    this->pruneOp(op);
-}
-
-
-template<typename RootNodeType>
-inline void
-Tree<RootNodeType>::pruneInactive(const ValueType& bg)
-{
-    InactivePrune<ValueType> op(bg);
-    this->pruneOp(op);
-}
-
-
-template<typename RootNodeType>
-inline void
-Tree<RootNodeType>::pruneInactive()
-{
-    this->pruneInactive(this->background());
-}
-
-
-template<typename RootNodeType>
-inline void
-Tree<RootNodeType>::pruneLevelSet()
-{
-    LevelSetPrune<ValueType> op(this->background());
-    this->pruneOp(op);
-}
-
-
-template<typename RootNodeType>
 inline void
 Tree<RootNodeType>::addTile(Index level, const Coord& xyz,
                             const ValueType& value, bool active)
@@ -1777,14 +1695,6 @@ Tree<RootNodeType>::fill(const CoordBBox& bbox, const ValueType& value, bool act
 {
     this->clearAllAccessors();
     return mRoot.fill(bbox, value, active);
-}
-
-
-template<typename RootNodeType>
-inline void
-Tree<RootNodeType>::signedFloodFill(const ValueType& outside, const ValueType& inside)
-{
-    mRoot.signedFloodFill(outside, inside);
 }
 
 

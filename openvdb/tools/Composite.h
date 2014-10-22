@@ -43,6 +43,7 @@
 #include <openvdb/Grid.h>
 #include <openvdb/math/Math.h> // for isExactlyEqual()
 #include "ValueTransformer.h" // for transformValues()
+#include "Prune.h"// for prune
 #include <boost/utility/enable_if.hpp>
 
 
@@ -553,8 +554,7 @@ csgUnion(GridOrTreeT& a, GridOrTreeT& b, bool prune)
     TreeT &aTree = Adapter::tree(a), &bTree = Adapter::tree(b);
     CsgUnionVisitor<TreeT> visitor(aTree, bTree);
     aTree.visit2(bTree, visitor);
-    if (prune) aTree.pruneLevelSet();
-    //if (prune) aTree.prune();
+    if (prune) tools::pruneLevelSet(aTree);
 }
 
 template<typename GridOrTreeT>
@@ -566,8 +566,7 @@ csgIntersection(GridOrTreeT& a, GridOrTreeT& b, bool prune)
     TreeT &aTree = Adapter::tree(a), &bTree = Adapter::tree(b);
     CsgIntersectVisitor<TreeT> visitor(aTree, bTree);
     aTree.visit2(bTree, visitor);
-    if (prune) aTree.pruneLevelSet();
-    //if (prune) aTree.prune();
+    if (prune) tools::pruneLevelSet(aTree);
 }
 
 template<typename GridOrTreeT>
@@ -579,8 +578,7 @@ csgDifference(GridOrTreeT& a, GridOrTreeT& b, bool prune)
     TreeT &aTree = Adapter::tree(a), &bTree = Adapter::tree(b);
     CsgDiffVisitor<TreeT> visitor(aTree, bTree);
     aTree.visit2(bTree, visitor);
-    if (prune) aTree.pruneLevelSet();
-    //if (prune) aTree.prune();
+    if (prune) tools::pruneLevelSet(aTree);
 }
 
 } // namespace tools

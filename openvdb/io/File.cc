@@ -383,7 +383,7 @@ File::open(bool delayLoad, const MappedFile::Notifier& notifier)
     mImpl->mMeta->readMeta(inputStream());
 
     if (!inputHasGridOffsets()) {
-        OPENVDB_LOG_WARN("file " << filename() << " does not support partial reading");
+        OPENVDB_LOG_DEBUG_RUNTIME("file " << filename() << " does not support partial reading");
 
         mImpl->mGrids.reset(new GridPtrVec);
         mImpl->mNamedGrids.clear();

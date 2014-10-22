@@ -43,7 +43,9 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/Grid.h>
+#include <openvdb/util/CpuTimer.h>
 #include <openvdb/tools/LevelSetUtil.h>
+#include <openvdb/tools/LevelSetTracker.h>
 #include <openvdb/tools/ParticlesToLevelSet.h>
 #include <CH/CH_Manager.h>
 #include <GA/GA_Types.h> // for GA_ATTRIB_POINT
@@ -215,8 +217,70 @@ sopBuildAttrMenu(void* data, PRM_Name* menuEntries, int themenusize,
     menuEntries[menuIdx].setLabel(0);
 }
 
-const PRM_ChoiceList PrimAttrMenu(
-    PRM_ChoiceListType(PRM_CHOICELIST_EXCLUSIVE | PRM_CHOICELIST_REPLACE), sopBuildAttrMenu);
+const PRM_ChoiceList PrimAttrMenu(PRM_ChoiceListType(PRM_CHOICELIST_EXCLUSIVE |
+                                                     PRM_CHOICELIST_REPLACE), sopBuildAttrMenu);
+
+// Add new items to the *end* of this list, and update NUM_ACCURACY_TYPES.
+enum Accuracy {
+    ACCURACY_UPWIND_FIRST = 0,
+    ACCURACY_UPWIND_SECOND,
+    ACCURACY_UPWIND_THIRD,
+    ACCURACY_WENO,
+    ACCURACY_HJ_WENO
+};
+
+enum { NUM_ACCURACY_TYPES = ACCURACY_HJ_WENO + 1 };
+
+std::string
+accuracyToString(Accuracy ac)
+{
+    std::string ret;
+    switch (ac) {
+        case ACCURACY_UPWIND_FIRST: ret     = "upwind first";       break;
+        case ACCURACY_UPWIND_SECOND: ret    = "upwind second";      break;
+        case ACCURACY_UPWIND_THIRD: ret     = "upwind third";       break;
+        case ACCURACY_WENO: ret             = "weno";               break;
+        case ACCURACY_HJ_WENO: ret          = "hj weno";            break;
+    }
+    return ret;
+}
+
+std::string
+accuracyToMenuName(Accuracy ac)
+{
+    std::string ret;
+    switch (ac) {
+        case ACCURACY_UPWIND_FIRST: ret     = "First-order upwinding";      break;
+        case ACCURACY_UPWIND_SECOND: ret    = "Second-order upwinding";     break;
+        case ACCURACY_UPWIND_THIRD: ret     = "Third-order upwinding";      break;
+        case ACCURACY_WENO: ret             = "Fifth-order WENO";           break;
+        case ACCURACY_HJ_WENO: ret          = "Fifth-order HJ-WENO";        break;
+    }
+    return ret;
+}
+
+
+Accuracy
+stringToAccuracy(const std::string& s)
+{
+    Accuracy ret = ACCURACY_UPWIND_FIRST;
+
+    std::string str = s;
+    boost::trim(str);
+    boost::to_lower(str);
+
+    if (str == accuracyToString(ACCURACY_UPWIND_SECOND)) {
+        ret = ACCURACY_UPWIND_SECOND;
+    } else if (str == accuracyToString(ACCURACY_UPWIND_THIRD)) {
+        ret = ACCURACY_UPWIND_THIRD;
+    } else if (str == accuracyToString(ACCURACY_WENO)) {
+        ret = ACCURACY_WENO;
+    } else if (str == accuracyToString(ACCURACY_HJ_WENO)) {
+        ret = ACCURACY_HJ_WENO;
+    }
+
+    return ret;
+}
 
 } // unnamed namespace
 
@@ -241,6 +305,7 @@ protected:
     virtual bool updateParmsFlags();
 
 private:
+
     void convert(openvdb::FloatGrid::Ptr, ParticleList&, const Settings&);
     void convertWithAttributes(openvdb::FloatGrid::Ptr, ParticleList&,
         const Settings&, const GU_Detail&);
@@ -333,14 +398,14 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "maskVolumeGridName", "Mask VDB")
         .setDefault("mask")
-              .setHelpText("Output the mask volume grid.\nGenerate an alpha mask "
-               "that is very useful for subsequent constrained level set smoothing "
-               "of the level set surface from the particles. This alpha mask is defined "
-               "as the fog volume derived from the CSG difference between a level set "
-               "surface with a maximum radius of the particles and a level set surface "
-               "with a minimum radius of the particles. This mask will guarentee that "
-               "subsequent level set smoothing is constrained between the min/max surfaces, "
-               " thus avoiding that surface details are completely smoothed away!"));
+        .setHelpText("Output the mask volume grid.\nGenerate an alpha mask "
+              "that is very useful for subsequent constrained level set smoothing "
+              "of the level set surface from the particles. This alpha mask is defined "
+              "as the fog volume derived from the CSG difference between a level set "
+              "surface with a maximum radius of the particles and a level set surface "
+              "with a minimum radius of the particles. This mask will guarentee that "
+              "subsequent level set smoothing is constrained between the min/max surfaces, "
+              " thus avoiding that surface details are completely smoothed away!"));
 
     //////////
     // Conversion settings
@@ -363,14 +428,16 @@ newSopOperator(OP_OperatorTable* table)
 
     // Narrow-band {
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldSpaceUnits", "Use World Space for Band")
-        .setCallbackFunc(&convertUnitsCB));
+              .setCallbackFunc(&convertUnitsCB));
 
     // Voxel-space width
     parms.add(hutil::ParmFactory(PRM_FLT_J, "bandWidth", "Half-Band Voxels")
         .setDefault(PRMthreeDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
         .setHelpText("Half the width of the narrow band in voxel units. "
-            "(3 is optimal for level set operations.)"));
+                     "For level set operations use a value of 3, or for better "
+                     "performance a value of 1 followed by the application "
+                     "of the \"Trim Narrow Band\" SOP."));
 
     // World-space width
     parms.add(hutil::ParmFactory(PRM_FLT_J, "bandWidthWS", "Half-Band")
@@ -379,7 +446,7 @@ newSopOperator(OP_OperatorTable* table)
     // }
 
     // dR (radius scale)
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "dR", "Point Radius Scale")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "dR", "Particle Radius Scale")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 2.0)
         .setHelpText("Scaling multiplier for the radius. Use this parameter "
@@ -396,6 +463,14 @@ newSopOperator(OP_OperatorTable* table)
                      "voxels correspond to the Nyquist grid sampling frequency, "
                      "the smallest size the grid can safely represent. Thus, "
                      "values smaller than 1.5 will likely result in aliasing!"));
+
+     // Prune level set
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "prune", "Prune Level Set")
+        .setDefault(PRMzeroDefaults)
+        .setHelpText("Enable / disable the pruning of nodes, i.e. leafs filled with "
+                     "the inside values are compactly represented by a tile value. "
+                     "This option only has an effect if the particles are larger then "
+                     "the leaf nodes so it is normally recommended to leave it disabled."));
 
     // Width of the mask for constraining subsequent deformations
     parms.add(hutil::ParmFactory(PRM_FLT_J, "maskWidth", "Mask Width Scale")
@@ -433,8 +508,6 @@ newSopOperator(OP_OperatorTable* table)
         .setHelpText("Scale of distance between sphere instances. Use this parameter "
             "to control the aliasing and the number of instances."));
 
-
-
     //////////
     // Point attribute transfer
     parms.add(hutil::ParmFactory(PRM_HEADING, "transferHeading", "Attribute transfer"));
@@ -471,7 +544,6 @@ newSopOperator(OP_OperatorTable* table)
         .setHelpText("Transfer point attributes to each voxel in the level set's narrow band")
         .setMultiparms(attrParms)
         .setDefault(PRMzeroDefaults));
-
 
     //////////
     // Obsolete parameters
@@ -579,7 +651,7 @@ SOP_OpenVDB_From_Particles::updateParmsFlags()
     changed |= enableParm("gridName", evalInt("levelSet", 0, 0));
     changed |= enableParm("fogVolumeGridName", evalInt("fogVolume", 0, 0));
 
-    bool build_mask = (evalInt("maskVolume", 0, 0) != 0);
+    bool build_mask = evalInt("maskVolume", 0, 0) != 0;
     changed |= enableParm("maskVolumeGridName", build_mask);
     changed |= enableParm("maskWidth", build_mask);
 
@@ -724,9 +796,9 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
 
             if (outputAttributeGrid) {
                 // Converts and outputs point attribute grids
-                convertWithAttributes(outputGrid, paList, settings, *ptGeo);
+                this->convertWithAttributes(outputGrid, paList, settings, *ptGeo);
             } else {
-                convert(outputGrid, paList, settings);
+                this->convert(outputGrid, paList, settings);
             }
 
             if (outputMaskVolumeGrid) {
@@ -737,7 +809,7 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
                     maxGrid->setGridClass(openvdb::GRID_LEVEL_SET);
                     maxGrid->setTransform(transform->copy());
                     paList.radiusMult() *= (1.0f + maskWidth);
-                    convert(maxGrid, paList, settings);
+                    this->convert(maxGrid, paList, settings);
 
                     // Min grid
                     if ( maskWidth < 1.0f) {
@@ -745,7 +817,7 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
                         minGrid->setGridClass(openvdb::GRID_LEVEL_SET);
                         minGrid->setTransform(transform->copy());
                         paList.radiusMult() *= (1.0f  - maskWidth)/(1.0f + maskWidth);
-                        convert(minGrid, paList, settings);
+                        this->convert(minGrid, paList, settings);
 
                         // CSG difference
                         openvdb::tools::csgDifference(*maxGrid, *minGrid);
@@ -760,7 +832,7 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
                 evalString(gridNameStr, "maskVolumeGridName", 0, mTime);
                 outputGrid->setName(gridNameStr.toStdString());
                 hvdb::createVdbPrimitive(*gdp, maxGrid, gridNameStr.toStdString().c_str());
-            }
+            }// masked volume grid
 
             // Output level set grid
             if ( outputLevelSetGrid) {
@@ -797,7 +869,6 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
 
 ////////////////////////////////////////
 
-
 void
 SOP_OpenVDB_From_Particles::convert(openvdb::FloatGrid::Ptr outputGrid,
                                     ParticleList& paList,
@@ -817,7 +888,7 @@ SOP_OpenVDB_From_Particles::convert(openvdb::FloatGrid::Ptr outputGrid,
         raster.rasterizeSpheres(paList, paList.radiusMult());
     }
 
-    raster.finalize();
+    raster.finalize(evalInt("prune", 0, 0));
 
     if (raster.ignoredParticles()) {
         std::ostringstream ostr;
@@ -847,7 +918,8 @@ SOP_OpenVDB_From_Particles::convertWithAttributes(openvdb::FloatGrid::Ptr output
     } else {
         raster.rasterizeSpheres(paList, paList.radiusMult());
     }
-    raster.finalize();
+
+    raster.finalize(evalInt("prune", 0, 0));
 
     openvdb::Int32Grid::Ptr closestPtnIdxGrid = raster.attributeGrid();
 

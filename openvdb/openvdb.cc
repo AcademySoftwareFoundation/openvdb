@@ -35,7 +35,7 @@
 #include <log4cplus/configurator.h>
 #include <log4cplus/logger.h>
 #endif
-#ifdef OPENVDB_USE_BLOSC_LZ4
+#ifdef OPENVDB_USE_BLOSC
 #include <blosc.h>
 #endif
 
@@ -114,7 +114,7 @@ initialize()
     Metadata::registerType(typeNameAsString<PointIndex64>(), Int64Metadata::createMetadata);
     tools::PointIndexGrid::registerGrid();
 
-#ifdef OPENVDB_USE_BLOSC_LZ4
+#ifdef OPENVDB_USE_BLOSC
     blosc_init();
     if (blosc_set_compressor("lz4") < 0) {
         OPENVDB_LOG_WARN("Blosc LZ4 compressor is unavailable");
@@ -157,7 +157,7 @@ __pragma(warning(default:1711))
     GridBase::clearRegistry();
     math::MapRegistry::clear();
 
-#ifdef OPENVDB_USE_BLOSC_LZ4
+#ifdef OPENVDB_USE_BLOSC
     // We don't want to destroy Blosc, because it might have been
     // initialized by some other library.
     //blosc_destroy();

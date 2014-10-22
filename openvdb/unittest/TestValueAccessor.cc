@@ -32,6 +32,7 @@
 #include <tbb/task.h>
 #include <boost/type_traits/remove_const.hpp>
 #include <openvdb/openvdb.h>
+#include <openvdb/tools/Prune.h>
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
@@ -489,7 +490,8 @@ TestValueAccessor::testAccessorRegistration()
 
     // Prune the tree and verify that only the root node remains and that
     // the cache has been cleared.
-    tree->prune();
+    openvdb::tools::prune(*tree);
+    //tree->prune();
     CPPUNIT_ASSERT_EQUAL(Index(0), tree->leafCount());
     CPPUNIT_ASSERT_EQUAL(Index(1), tree->nonLeafCount()); // root node only
     CPPUNIT_ASSERT(acc.getNode<openvdb::FloatTree::LeafNodeType>() == NULL);

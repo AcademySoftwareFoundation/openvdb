@@ -27,6 +27,21 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
+//
+/// @file   Morphology.h
+///
+/// @brief  Implementation of morphological dilation and erosion.
+///
+/// @note   By design the morphological operations only change the
+///         state of voxels, not their values. If one desires to
+///         change the values of voxels that change state an efficient
+///         technique is to construct a boolean mask by performing a
+///         topology difference between the original and final grids.
+///
+/// @todo   Extend erosion with 18 and 26 neighbors (coming soon!)
+///
+/// @author Ken Museth
+///
 
 #ifndef OPENVDB_TOOLS_MORPHOLOGY_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_MORPHOLOGY_HAS_BEEN_INCLUDED
@@ -38,6 +53,8 @@
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/tree/LeafManager.h>
 #include <boost/scoped_array.hpp>
+#include <boost/bind.hpp>
+#include "Prune.h"// for pruneLevelSet
 #include "ValueTransformer.h" // for foreach()
 
 namespace openvdb {
@@ -106,10 +123,14 @@ inline void dilateVoxels(tree::LeafManager<TreeType>& manager,
 /// of any voxels, only their active states.
 /// @todo Currently operates only on leaf voxels; need to extend to tiles.
 template<typename TreeType> OPENVDB_STATIC_SPECIALIZATION
-inline void erodeVoxels(TreeType& tree, int iterations=1);
+inline void erodeVoxels(TreeType& tree,
+                        int iterations=1,
+                        NearestNeighbors nn = NN_FACE);
 
 template<typename TreeType> OPENVDB_STATIC_SPECIALIZATION
-inline void erodeVoxels(tree::LeafManager<TreeType>& manager, int iterations = 1);
+inline void erodeVoxels(tree::LeafManager<TreeType>& manager,
+                        int iterations = 1,
+                        NearestNeighbors nn = NN_FACE);
 //@}
 
 
@@ -158,6 +179,7 @@ public:
     Morphology(ManagerType* mgr):
         mOwnsManager(false), mManager(mgr), mAcc(mgr->tree()), mSteps(1) {}
     virtual ~Morphology() { if (mOwnsManager) delete mManager; }
+
     /// @brief Face-adjacent dilation pattern
     void dilateVoxels6();
     /// @brief Face- and edge-adjacent dilation pattern.
@@ -165,11 +187,22 @@ public:
     /// @brief Face-, edge- and vertex-adjacent dilation pattern.
     void dilateVoxels26();
     void dilateVoxels(int iterations = 1, NearestNeighbors nn = NN_FACE);
-    /// @brief Face-adjacent erosion pattern.
-    inline void erodeVoxels(int iterations = 1) { mSteps = iterations; this->doErosion(); }
 
-private:
-    void doErosion();
+    /// @brief Face-adjacent erosion pattern.
+    void erodeVoxels6()  { mSteps = 1; this->doErosion(NN_FACE); }
+    /// @brief Face- and edge-adjacent erosion pattern.
+    void erodeVoxels18() { mSteps = 1; this->doErosion(NN_FACE_EDGE); }
+    /// @brief Face-, edge- and vertex-adjacent erosion pattern.
+    void erodeVoxels26() { mSteps = 1; this->doErosion(NN_FACE_EDGE_VERTEX); }
+    void erodeVoxels(int iterations = 1, NearestNeighbors nn = NN_FACE)
+    {
+        mSteps = iterations;
+        this->doErosion(nn);
+    }
+
+protected:
+
+    void doErosion(NearestNeighbors nn);
 
     typedef typename TreeType::LeafNodeType LeafType;
     typedef typename LeafType::NodeMaskType MaskType;
@@ -190,9 +223,9 @@ private:
         bool      init;//true if initialization is required
         bool      isOn;//true if an active tile
         Neighbor() : leaf(NULL), init(true) {}
-        inline void clear() { init = true; }
+        inline void clear() { leaf = NULL; init = true; }
         template<int DX, int DY, int DZ>
-        void scatter(AccessorType& acc, const Coord &xyz, int indx, Word oldWord)
+        void scatter(AccessorType& acc, const Coord &xyz, int indx, Word mask)
         {
             if (init) {
                 init = false;
@@ -204,8 +237,9 @@ private:
             static
 #endif
             const int N = (LEAF_DIM - 1)*(DY + DX*LEAF_DIM);
-            if (leaf) leaf->getValueMask().template getWord<Word>(indx-N) |= oldWord;
+            if (leaf) leaf->getValueMask().template getWord<Word>(indx-N) |= mask;
         }
+
         template<int DX, int DY, int DZ>
         Word gather(AccessorType& acc, const Coord &xyz, int indx)
         {
@@ -224,19 +258,80 @@ private:
         }
     };// Neighbor
 
+    struct LeafCache
+    {
+        LeafCache(size_t n, TreeType& tree) : size(n), leafs(new LeafType*[n]), acc(tree)
+        {
+            onTile.setValuesOn();
+            this->clear();
+        }
+        ~LeafCache() { delete [] leafs; }
+        LeafType*& operator[](int offset) { return leafs[offset]; }
+        inline void clear() { for (size_t i=0; i<size; ++i) leafs[i]=NULL; }
+        inline void setOrigin(const Coord& xyz) { origin = &xyz; }
+        inline void scatter(int n, int indx)
+        {
+            assert(leafs[n]);
+            leafs[n]->getValueMask().template getWord<Word>(indx) |= mask;
+        }
+        template<int DX, int DY, int DZ>
+        inline void scatter(int n, int indx)
+        {
+            if (!leafs[n]) {
+                const Coord xyz = origin->offsetBy(DX*LEAF_DIM, DY*LEAF_DIM, DZ*LEAF_DIM);
+                leafs[n] = acc.probeLeaf(xyz);
+                if (!leafs[n]) leafs[n] = acc.isValueOn(xyz) ? &onTile : acc.touchLeaf(xyz);
+            }
+            this->scatter(n, indx - (LEAF_DIM - 1)*(DY + DX*LEAF_DIM));
+        }
+        inline Word gather(int n, int indx)
+        {
+            assert(leafs[n]);
+            return leafs[n]->getValueMask().template getWord<Word>(indx);
+        }
+        template<int DX, int DY, int DZ>
+        inline Word gather(int n, int indx)
+        {
+            if (!leafs[n]) {
+                const Coord xyz = origin->offsetBy(DX*LEAF_DIM, DY*LEAF_DIM, DZ*LEAF_DIM);
+                leafs[n] = acc.probeLeaf(xyz);
+                if (!leafs[n]) leafs[n] = acc.isValueOn(xyz) ? &onTile : &offTile;
+            }
+            return this->gather(n, indx - (LEAF_DIM -1 )*(DY + DX*LEAF_DIM));
+        }
+        // Scatters in the xy face-directions relative to leaf i1
+        void scatterFacesXY(int x, int y, int i1, int n, int i2);
+
+        // Scatters in the xy edge-directions relative to leaf i1
+        void scatterEdgesXY(int x, int y, int i1, int n, int i2);
+
+        Word gatherFacesXY(int x, int y, int i1, int n, int i2);
+
+        Word gatherEdgesXY(int x, int y, int i1, int n, int i2);
+
+        const Coord* origin;
+        size_t size;
+        LeafType** leafs;
+        LeafType onTile, offTile;
+        AccessorType acc;
+        Word mask;
+    };// LeafCache
 
     struct ErodeVoxelsOp {
+        typedef tbb::blocked_range<size_t> RangeT;
         ErodeVoxelsOp(std::vector<MaskType>& masks, ManagerType& manager)
-            : mSavedMasks(masks) , mManager(manager) {}
-
-        void runParallel() { tbb::parallel_for(mManager.getRange(), *this); }
-        void operator()(const tbb::blocked_range<size_t>& range) const;
-
+            : mTask(0), mSavedMasks(masks) , mManager(manager) {}
+        void runParallel(NearestNeighbors nn);
+        void operator()(const RangeT& r) const {mTask(const_cast<ErodeVoxelsOp*>(this), r);}
+        void erode6( const RangeT&) const;
+        void erode18(const RangeT&) const;
+        void erode26(const RangeT&) const;
     private:
+        typedef typename boost::function<void (ErodeVoxelsOp*, const RangeT&)> FuncT;
+        FuncT                  mTask;
         std::vector<MaskType>& mSavedMasks;
-        ManagerType& mManager;
+        ManagerType&           mManager;
     };// ErodeVoxelsOp
-
 
     struct MaskManager {
         MaskManager(std::vector<MaskType>& masks, ManagerType& manager)
@@ -256,13 +351,34 @@ private:
                 }
             }
         }
-
     private:
         std::vector<MaskType>& mMasks;
         ManagerType& mManager;
         bool mSaveMasks;
     };// MaskManager
-};
+
+    struct UpdateMasks {
+        UpdateMasks(const std::vector<MaskType>& masks, ManagerType& manager)
+            : mMasks(masks), mManager(manager) {}
+        void update() { tbb::parallel_for(mManager.getRange(), *this); }
+        void operator()(const tbb::blocked_range<size_t>& r) const {
+            for (size_t i=r.begin(); i<r.end(); ++i) mManager.leaf(i).setValueMask(mMasks[i]);
+        }
+        const std::vector<MaskType>& mMasks;
+        ManagerType& mManager;
+    };
+    struct CopyMasks {
+        CopyMasks(std::vector<MaskType>& masks, const ManagerType& manager)
+            : mMasks(masks), mManager(manager) {}
+        void copy() { tbb::parallel_for(mManager.getRange(), *this); }
+        void operator()(const tbb::blocked_range<size_t>& r) const {
+            for (size_t i=r.begin(); i<r.end(); ++i) mMasks[i]=mManager.leaf(i).getValueMask();
+        }
+        std::vector<MaskType>& mMasks;
+        const ManagerType& mManager;
+    };
+    void copyMasks(std::vector<MaskType>& a, const ManagerType& b) {CopyMasks c(a, b); c.copy();}
+};// Morphology
 
 template<typename TreeType>
 void
@@ -277,39 +393,6 @@ Morphology<TreeType>::dilateVoxels(int iterations, NearestNeighbors nn)
     }
 }
 
-// Classification of adjacency patterns
-// Face-adjacent cases: 0-5
-// Case 0:  (-1, 0, 0)
-// Case 1:  ( 1, 0, 0)
-// Case 2:  ( 0,-1, 0)
-// Case 3:  ( 0, 1, 0)
-// Case 4:  ( 0, 0,-1)
-// Case 5:  ( 0, 0, 1)
-//
-// Edge-adjacent cases: 6-17
-// Case 6:  (-1,-1, 0)
-// Case 7:  (-1, 1, 0)
-// Case 8:  (-1, 0,-1)
-// Case 9:  (-1, 0, 1)
-// Case 10: ( 1,-1, 0)
-// Case 11: ( 1, 1, 0)
-// Case 12: ( 1, 0,-1)
-// Case 13: ( 1, 0, 1)
-// Case 14: ( 0,-1,-1)
-// Case 15: ( 0,-1, 1)
-// Case 16: ( 0, 1,-1)
-// Case 17: ( 0, 1, 1)
-//
-// Vertex-adjacent cases: 18-25
-// Case 18: (-1,-1,-1)
-// Case 19: (-1,-1, 1)
-// Case 20: (-1, 1,-1)
-// Case 21: (-1, 1, 1)
-// Case 22: ( 1,-1,-1)
-// Case 23: ( 1,-1, 1)
-// Case 24: ( 1, 1,-1)
-// Case 25: ( 1, 1, 1)
-
 template<typename TreeType>
 void
 Morphology<TreeType>::dilateVoxels6()
@@ -319,59 +402,34 @@ Morphology<TreeType>::dilateVoxels6()
 
     // Save the value masks of all leaf nodes.
     std::vector<MaskType> savedMasks(leafCount);
-    MaskManager masks(savedMasks, *mManager);
-    masks.save();
-    Neighbor NN[6];
-    Coord origin;
+    this->copyMasks(savedMasks, *mManager);
+    LeafCache cache(7, mManager->tree());
     for (int leafIdx = 0; leafIdx < leafCount; ++leafIdx) {
         const MaskType& oldMask = savedMasks[leafIdx];//original bit-mask of current leaf node
-        LeafType& leaf = mManager->leaf(leafIdx);//current leaf node
-        leaf.getOrigin(origin);// origin of the current leaf node.
+        cache[0] = &mManager->leaf(leafIdx);
+        cache.setOrigin(cache[0]->origin());
         for (int x = 0; x < LEAF_DIM; ++x ) {
             for (int y = 0, n = (x << LEAF_LOG2DIM); y < LEAF_DIM; ++y, ++n) {
                 // Extract the portion of the original mask that corresponds to a row in z.
-                const Word oldWord = oldMask.template getWord<Word>(n);
-                if (oldWord == 0) continue; // no active voxels
+                if (const Word w = oldMask.template getWord<Word>(n)) {
 
-                const Word mask = Word(oldWord | (oldWord >> 1) | (oldWord << 1));
+                    // Dilate the current leaf in the +z and -z direction
+                    cache.mask = Word(w | (w>>1) | (w<<1)); cache.scatter(0, n);
 
-                // Dilate the current leaf node in the z direction by ORing its mask
-                // with itself shifted first left and then right by one bit.
-                leaf.getValueMask().template getWord<Word>(n) |= mask;
-
-                // -x, cases: 0
-                if (x > 0) {
-                    leaf.getValueMask().template getWord<Word>(n-LEAF_DIM) |= oldWord;//  #0: (-1,0,0)
-                } else {
-                    NN[0].template scatter<-1, 0, 0>(mAcc, origin, n, oldWord);//         #0: (-1,0,0)
+                    // Dilate into neighbor leaf in the -z direction
+                    if ( (cache.mask = Word(w<<(LEAF_DIM-1))) ) {
+                        cache.template scatter< 0, 0,-1>(1, n);
+                    }
+                    // Dilate into neighbor leaf in the +z direction
+                    if ( (cache.mask = Word(w>>(LEAF_DIM-1))) ) {
+                        cache.template scatter< 0, 0, 1>(2, n);
+                    }
+                    // Dilate in the xy-face directions relative to the center leaf
+                    cache.mask = w; cache.scatterFacesXY(x, y, 0, n, 3);
                 }
-                // +x, cases: 1
-                if (x < END) {
-                    leaf.getValueMask().template getWord<Word>(n+LEAF_DIM) |= oldWord;//  #1: (+1,0,0)
-                } else {
-                    NN[1].template scatter< 1, 0, 0>(mAcc, origin, n, oldWord);//         #1: (+1,0,0)
-                }
-                // -y, cases: 2
-                if (y > 0) {
-                    leaf.getValueMask().template getWord<Word>(n-1) |= oldWord;//         #2: (0,-1,0)
-                } else {
-                    NN[2].template scatter< 0,-1, 0>(mAcc, origin, n, oldWord);//         #2: (0,-1,0)
-                }
-                // +y, cases: 3
-                if (y < END)  {
-                    leaf.getValueMask().template getWord<Word>(n+1) |= oldWord;//         #3: (0,+1,0)
-                } else {
-                    NN[3].template scatter< 0, 1, 0>(mAcc, origin, n, oldWord);//         #3: (0,+1,0)
-                }
-                // -z, cases: 4
-                if (static_cast<Word>(oldWord<<END)) {
-                    NN[4].template scatter< 0, 0,-1>(mAcc, origin, n, 1<<END);//          #4: (0,0,-1)
-                }
-                // +z: cases: 5
-                if (oldWord>>END) NN[5].template scatter< 0, 0, 1>(mAcc, origin, n, 1);// #5: (0,0,+1)
             }// loop over y
         }//loop over x
-        for (int i=0; i<6; ++i) NN[i].clear();
+        cache.clear();
     }//loop over leafs
 
     mManager->rebuildLeafArray();
@@ -386,146 +444,41 @@ Morphology<TreeType>::dilateVoxels18()
 
     // Save the value masks of all leaf nodes.
     std::vector<MaskType> savedMasks(leafCount);
-    MaskManager masks(savedMasks, *mManager);
-    masks.save();
-    Neighbor NN[18];
-    Coord origin;
+    this->copyMasks(savedMasks, *mManager);
+    LeafCache cache(19, mManager->tree());
+    Coord orig_mz, orig_pz;//origins of neighbor leaf nodes in the -z and +z directions
     for (int leafIdx = 0; leafIdx < leafCount; ++leafIdx) {
         const MaskType& oldMask = savedMasks[leafIdx];//original bit-mask of current leaf node
-        LeafType& leaf = mManager->leaf(leafIdx);//current leaf node
-        leaf.getOrigin(origin);// origin of the current leaf node.
+        cache[0] = &mManager->leaf(leafIdx);
+        orig_mz = cache[0]->origin().offsetBy(0, 0, -LEAF_DIM);
+        orig_pz = cache[0]->origin().offsetBy(0, 0,  LEAF_DIM);
         for (int x = 0; x < LEAF_DIM; ++x ) {
             for (int y = 0, n = (x << LEAF_LOG2DIM); y < LEAF_DIM; ++y, ++n) {
-                // Extract the portion of the original mask that corresponds to a row in z.
-                const Word oldWord = oldMask.template getWord<Word>(n);
-                if (oldWord == 0) continue; // no active voxels
-                const Word mask = Word(oldWord | (oldWord >> 1) | (oldWord << 1));
-
-                // Dilate the current leaf node in the z direction by ORing its mask
-                // with itself shifted first left and then right by one bit.
-                leaf.getValueMask().template getWord<Word>(n) |= mask;
-
-                // -x, cases: 0, 6, 7
-                if (x > 0) {
-                    const Index m = n - LEAF_DIM;//-x
-                    leaf.getValueMask().template getWord<Word>(m) |= mask;//            #0: (-1,0,0)
-                    if (y > 0) {
-                        leaf.getValueMask().template getWord<Word>(m-1) |= oldWord;//   #6: (-1,-1,0)
-                    } else {//y=0
-                        NN[2].template scatter< 0,-1, 0>(mAcc, origin, m, oldWord);//   #6: (-1,-1,0)
+                if (const Word w = oldMask.template getWord<Word>(n)) {
+                    {
+                        cache.mask = Word(w | (w>>1) | (w<<1));
+                        cache.setOrigin(cache[0]->origin());
+                        cache.scatter(0, n);
+                        cache.scatterFacesXY(x, y, 0, n, 3);
+                        cache.mask = w;
+                        cache.scatterEdgesXY(x, y, 0, n, 3);
                     }
-                    if (y < END) {
-                        leaf.getValueMask().template getWord<Word>(m+1) |= oldWord;//   #7: (-1,+1,0)
-                    } else {//y=END
-                        NN[3].template scatter< 0, 1, 0>(mAcc, origin, m, oldWord);//   #7: (-1,+1,0)
+                    if ( (cache.mask = Word(w<<(LEAF_DIM-1))) ) {
+                        cache.setOrigin(cache[0]->origin());
+                        cache.template scatter< 0, 0,-1>(1, n);
+                        cache.setOrigin(orig_mz);
+                        cache.scatterFacesXY(x, y, 1, n, 11);
                     }
-                } else {//x=0
-                    NN[0].template scatter<-1, 0, 0>(mAcc, origin, n, mask);//          #0: (-1,0,0)
-                    if (y > 0) {
-                        NN[0].template scatter<-1, 0, 0>(mAcc, origin, n-1, oldWord);// #6: (-1,-1,0)
-                    } else {//y=0
-                        NN[6].template scatter<-1,-1, 0>(mAcc, origin, n, oldWord);//   #6: (-1,-1,0)
-                    }
-                    if (y < END) {
-                        NN[0].template scatter<-1, 0, 0>(mAcc, origin, n+1, oldWord);// #7: (-1,+1,0)
-                    } else {//y=END
-                        NN[7].template scatter<-1, 1, 0>(mAcc, origin, n, oldWord);//   #7: (-1,+1,0)
-                    }
-                }
-
-                // +x, cases: 1, 10, 11
-                if (x < END) {
-                    const Index m = n + LEAF_DIM;//+x
-                    leaf.getValueMask().template getWord<Word>(m) |= mask;//           #1 : (+1, 0, 0)
-                    if (y > 0) {
-                        leaf.getValueMask().template getWord<Word>(m-1) |= oldWord;//  #10: (+1,-1,0)
-                    } else {//y=0
-                        NN[2].template scatter<0,-1, 0>(mAcc, origin, m, oldWord);//   #10: (+1,-1,0)
-                    }
-                    if (y < END) {
-                        leaf.getValueMask().template getWord<Word>(m+1) |= oldWord;//  #11: (+1,+1,0)
-                    } else {//y=END
-                         NN[3].template scatter<0, 1, 0>(mAcc, origin, m, oldWord);//  #11: (+1,+1,0)
-                    }
-                } else {
-                    NN[1].template scatter< 1, 0, 0>(mAcc, origin, n, mask);//          #1 : (+1,0,0)
-                    if (y>0) {
-                        NN[ 1].template scatter<1, 0, 0>(mAcc, origin, n-1, oldWord);// #10: (+1,-1,0)
-                    } else {//y=0
-                        NN[10].template scatter<1,-1, 0>(mAcc, origin, n, oldWord);//   #10: (+1,-1,0)
-                    }
-                    if (y<END) {
-                        NN[ 1].template scatter<1, 0, 0>(mAcc, origin, n+1, oldWord);// #11: (+1,+1,0)
-                    } else {//y=END
-                        NN[11].template scatter<1, 1, 0>(mAcc, origin, n, oldWord);//   #11: (+1,+1,0)
-                    }
-                }
-
-                // -y, cases: 2
-                if (y > 0) {
-                    leaf.getValueMask().template getWord<Word>(n-1) |= mask;// #2: (0,-1,0)
-                } else {
-                    NN[2].template scatter< 0,-1, 0>(mAcc, origin, n, mask);// #2: (0,-1,0)
-                }
-
-                // +y, cases: 3
-                if (y < END)  {
-                    leaf.getValueMask().template getWord<Word>(n+1) |= mask;// #3: (0,+1,0)
-                } else {
-                    NN[3].template scatter< 0, 1, 0>(mAcc, origin, n, mask);// #3: (0,+1,0)
-                }
-
-                // -z, cases: 4, 8, 12, 14, 16
-                if (static_cast<Word>(oldWord << END)) {
-                    NN[4].template scatter< 0, 0,-1>(mAcc, origin, n, 1<<END); //             #4:  (0,0,-1)
-                    if (x > 0) {
-                        NN[4].template scatter< 0, 0,-1>(mAcc, origin, n-LEAF_DIM, 1<<END);// #8:  (-1,0,-1)
-                    } else {
-                        NN[8].template scatter<-1, 0,-1>(mAcc, origin, n, 1<<END);//          #8:  (-1,0,-1)
-                    }
-                    if (x < END) {
-                        NN[4].template scatter< 0, 0,-1>(mAcc, origin, n+LEAF_DIM, 1<<END);// #12: (+1,0-1)
-                    } else {
-                        NN[12].template scatter< 1, 0,-1>(mAcc, origin, n, 1<<END);//         #12: (+1,0-1)
-                    }
-                    if (y > 0) {
-                        NN[4].template scatter< 0, 0,-1>(mAcc, origin, n-1, 1<<END);//        #14: (0,-1,-1)
-                    } else {
-                        NN[14].template scatter<0,-1,-1>(mAcc, origin, n, 1<<END);//          #14: (0,-1,-1)
-                    }
-                    if (y < END) {
-                        NN[4].template scatter< 0, 0,-1>(mAcc, origin, n+1, 1<<END);//        #16: (0,+1,-1)
-                    } else {
-                        NN[16].template scatter<0, 1,-1>(mAcc, origin, n, 1<<END);//          #16: (0,+1,-1)
-                    }
-                }
-                // +z: cases: 5, 9, 13, 15, 17
-                if (oldWord >> END) {
-                    NN[5].template scatter< 0, 0, 1>(mAcc, origin, n, 1);//               #5: (0,0,+1)
-                    if (x > 0) {
-                        NN[5].template scatter< 0, 0, 1>(mAcc, origin, n-LEAF_DIM, 1);//  #9:  (-1,0,+1)
-                    } else {
-                        NN[9].template scatter<-1, 0, 1>(mAcc, origin, n, 1);//           #9:  (-1,0,+1)
-                    }
-                    if (x < END) {
-                        NN[ 5].template scatter< 0, 0, 1>(mAcc, origin, n+LEAF_DIM, 1);// #13: (+1,0,+1)
-                    } else {
-                        NN[13].template scatter<1, 0, 1>(mAcc, origin, n, 1);//           #13: (+1,0,+1)
-                    }
-                    if (y > 0) {
-                        NN[ 5].template scatter< 0, 0, 1>(mAcc, origin, n-1, 1);//        #15: (0,-1,+1)
-                    } else {
-                        NN[15].template scatter<0,-1, 1>(mAcc, origin, n, 1);//           #15: (0,-1,+1)
-                    }
-                    if (y < END) {
-                        NN[ 5].template scatter< 0, 0, 1>(mAcc, origin, n+1, 1);//        #17: (0,+1,+1)
-                    } else {
-                        NN[17].template scatter<0, 1, 1>(mAcc, origin, n, 1);//           #17: (0,+1,+1)
+                    if ( (cache.mask = Word(w>>(LEAF_DIM-1))) ) {
+                        cache.setOrigin(cache[0]->origin());
+                        cache.template scatter< 0, 0, 1>(2, n);
+                        cache.setOrigin(orig_pz);
+                        cache.scatterFacesXY(x, y, 2, n, 15);
                     }
                 }
             }// loop over y
         }//loop over x
-        for (int i=0; i<18; ++i) NN[i].clear();
+        cache.clear();
     }//loop over leafs
 
     mManager->rebuildLeafArray();
@@ -540,303 +493,267 @@ Morphology<TreeType>::dilateVoxels26()
 
     // Save the value masks of all leaf nodes.
     std::vector<MaskType> savedMasks(leafCount);
-    MaskManager masks(savedMasks, *mManager);
-    masks.save();
-    Neighbor NN[26];
-    Coord origin;
+    this->copyMasks(savedMasks, *mManager);
+    LeafCache cache(27, mManager->tree());
+    Coord orig_mz, orig_pz;//origins of neighbor leaf nodes in the -z and +z directions
     for (int leafIdx = 0; leafIdx < leafCount; ++leafIdx) {
         const MaskType& oldMask = savedMasks[leafIdx];//original bit-mask of current leaf node
-        LeafType& leaf = mManager->leaf(leafIdx);//current leaf node
-        leaf.getOrigin(origin);// origin of the current leaf node.
+        cache[0] = &mManager->leaf(leafIdx);
+        orig_mz = cache[0]->origin().offsetBy(0, 0, -LEAF_DIM);
+        orig_pz = cache[0]->origin().offsetBy(0, 0,  LEAF_DIM);
         for (int x = 0; x < LEAF_DIM; ++x ) {
             for (int y = 0, n = (x << LEAF_LOG2DIM); y < LEAF_DIM; ++y, ++n) {
-                // Extract the portion of the original mask that corresponds to a row in z.
-                const Word oldWord = oldMask.template getWord<Word>(n);
-                if (oldWord == 0) continue; // no active voxels
-                const Word mask = Word(oldWord | (oldWord >> 1) | (oldWord << 1));
-
-                // Dilate the current leaf node in the z direction by ORing its mask
-                // with itself shifted first left and then right by one bit.
-                leaf.getValueMask().template getWord<Word>(n) |= mask;
-
-                // -x, cases: 0, 6, 7
-                if (x > 0) {
-                    const Index m = n - LEAF_DIM;//-x
-                    leaf.getValueMask().template getWord<Word>(m) |= mask;//         #0: (-1,0,0)
-                    if (y > 0) {
-                        leaf.getValueMask().template getWord<Word>(m-1) |= mask;//   #6: (-1,-1,0)
-                    } else {//y=0
-                        NN[2].template scatter< 0,-1, 0>(mAcc, origin, m, mask);//   #6: (-1,-1,0)
+                if (const Word w = oldMask.template getWord<Word>(n)) {
+                    {
+                        cache.mask = Word(w | (w>>1) | (w<<1));
+                        cache.setOrigin(cache[0]->origin());
+                        cache.scatter(0, n);
+                        cache.scatterFacesXY(x, y, 0, n, 3);
+                        cache.scatterEdgesXY(x, y, 0, n, 3);
                     }
-                    if (y < END) {
-                        leaf.getValueMask().template getWord<Word>(m+1) |= mask;//   #7: (-1,+1,0)
-                    } else {//y=END
-                        NN[3].template scatter< 0, 1, 0>(mAcc, origin, m, mask);//   #7: (-1,+1,0)
+                    if ( (cache.mask = Word(w<<(LEAF_DIM-1))) ) {
+                        cache.setOrigin(cache[0]->origin());
+                        cache.template scatter< 0, 0,-1>(1, n);
+                        cache.setOrigin(orig_mz);
+                        cache.scatterFacesXY(x, y, 1, n, 11);
+                        cache.scatterEdgesXY(x, y, 1, n, 11);
                     }
-                } else {//x=0
-                    NN[0].template scatter<-1, 0, 0>(mAcc, origin, n, mask);//       #0: (-1,0,0)
-                    if (y > 0) {
-                        NN[0].template scatter<-1, 0, 0>(mAcc, origin, n-1, mask);// #6: (-1,-1,0)
-                    } else {//y=0
-                        NN[6].template scatter<-1,-1, 0>(mAcc, origin, n, mask);//   #6: (-1,-1,0)
-                    }
-                    if (y < END) {
-                        NN[0].template scatter<-1, 0, 0>(mAcc, origin, n+1, mask);// #7: (-1,+1,0)
-                    } else {//y=END
-                        NN[7].template scatter<-1, 1, 0>(mAcc, origin, n, mask);//   #7: (-1,+1,0)
-                    }
-                }
-
-                // +x, cases: 1, 10, 11
-                if (x < END) {
-                    const Index m = n + LEAF_DIM;//+x
-                    leaf.getValueMask().template getWord<Word>(m) |= mask;//         #1 : (+1, 0, 0)
-                    if (y > 0) {
-                        leaf.getValueMask().template getWord<Word>(m-1) |= mask;//   #10: (+1,-1, 0)
-                    } else {//y=0
-                        NN[2].template scatter<0,-1, 0>(mAcc, origin, m, mask);//    #10: (+1,-1, 0)
-                    }
-                    if (y < END) {
-                        leaf.getValueMask().template getWord<Word>(m+1) |= mask;//   #11: (+1,+1, 0)
-                    } else {//y=END
-                        NN[3].template scatter<0, 1, 0>(mAcc, origin, m, mask);//    #11: (+1,+1, 0)
-                    }
-                } else {
-                    NN[1].template scatter< 1, 0, 0>(mAcc, origin, n, mask);//       #1 : (+1, 0, 0)
-                    if (y>0) {
-                        NN[ 1].template scatter<1, 0, 0>(mAcc, origin, n-1, mask);// #10: (+1,-1, 0)
-                    } else {//y=0
-                        NN[10].template scatter<1,-1, 0>(mAcc, origin, n, mask);//   #10: (+1,-1, 0)
-                    }
-                    if (y<END) {
-                        NN[ 1].template scatter<1, 0, 0>(mAcc, origin, n+1, mask);// #11: (+1,+1, 0)
-                    } else {//y=END
-                        NN[11].template scatter<1, 1, 0>(mAcc, origin, n, mask);//   #11: (+1,+1, 0)
-                    }
-                }
-
-                // -y, cases: 2
-                if (y > 0) {
-                    leaf.getValueMask().template getWord<Word>(n-1) |= mask;// #2: (0,-1,0)
-                } else {
-                    NN[2].template scatter< 0,-1, 0>(mAcc, origin, n, mask);// #2: (0,-1,0)
-                }
-
-                // +y, cases: 3
-                if (y < END)  {
-                    leaf.getValueMask().template getWord<Word>(n+1) |= mask;// #3: (0,+1,0)
-                } else {
-                    NN[3].template scatter< 0, 1, 0>(mAcc, origin, n, mask);// #3: (0,+1,0)
-                }
-
-                // -z, cases: 4, 8, 12, 14, 16, 18, 20, 22, 24
-                if (static_cast<Word>(oldWord << END)) {
-                    NN[4].template scatter< 0, 0,-1>(mAcc, origin, n, 1<<END); //           #4: (0,0,-1)
-                    if (x > 0) {
-                        const Index m = n - LEAF_DIM;//-x
-                        NN[4].template scatter< 0, 0,-1>(mAcc, origin, m, 1<<END);//        #8:  (-1,0,-1)
-                        if (y>0) {
-                            NN[ 4].template scatter<0, 0,-1>(mAcc, origin, m-1, 1<<END);//  #18: (-1,-1,-1)
-                        } else {//y=0
-                            NN[14].template scatter<0,-1,-1>(mAcc, origin, m, 1<<END);//    #18: (-1,-1,-1)
-                        }
-                        if (y<END) {
-                            NN[ 4].template scatter<0, 0,-1>(mAcc, origin, m+1, 1<<END);//  #20: (-1,+1,-1)
-                        } else {//y=END
-                            NN[16].template scatter<0, 1,-1>(mAcc, origin, m, 1<<END);//    #20: (-1,+1,-1)
-                        }
-                    } else {//x=0
-                        NN[8].template scatter<-1, 0,-1>(mAcc, origin, n, 1<<END);//        #8:  (-1,0,-1)
-                        if (y>0) {
-                            NN[ 8].template scatter<-1, 0,-1>(mAcc, origin, n-1, 1<<END);// #18: (-1,-1,-1)
-                        } else {//y=0
-                            NN[18].template scatter<-1,-1,-1>(mAcc, origin, n, 1<<END);//   #18: (-1,-1,-1)
-                        }
-                        if (y<END) {
-                            NN[ 8].template scatter<-1, 0,-1>(mAcc, origin, n+1, 1<<END);// #20: (-1,+1,-1)
-                        } else {//y=END
-                            NN[20].template scatter<-1, 1,-1>(mAcc, origin, n, 1<<END);//   #20: (-1,+1,-1)
-                        }
-                    }
-                    if (x < END) {
-                        const Index m = n + LEAF_DIM;//+x
-                        NN[ 4].template scatter< 0, 0,-1>(mAcc, origin, m, 1<<END);//      #12: (+1,0-1)
-                        if (y>0) {
-                            NN[ 4].template scatter<0, 0,-1>(mAcc, origin, m-1, 1<<END);// #22: (+1,-1,-1)
-                        } else {//y=0
-                            NN[14].template scatter<0,-1,-1>(mAcc, origin, m, 1<<END);//   #22: (+1,-1,-1)
-                        }
-                        if (y<END) {
-                            NN[ 4].template scatter<0, 0,-1>(mAcc, origin, m+1, 1<<END);// #24: (+1,+1,-1)
-                        } else {//y=END
-                            NN[16].template scatter<0, 1,-1>(mAcc, origin, m, 1<<END);//   #24: (+1,+1,-1)
-                        }
-                    } else {//x=END
-                        NN[12].template scatter< 1, 0,-1>(mAcc, origin, n, 1<<END);//      #12: (+1,0-1)
-                        if (y>0) {
-                            NN[12].template scatter<1, 0,-1>(mAcc, origin, n-1, 1<<END);// #22: (+1,-1,-1)
-                        } else {//y=0
-                            NN[22].template scatter<1,-1,-1>(mAcc, origin, n, 1<<END);//   #22: (+1,-1,-1)
-                        }
-                        if (y<END) {
-                            NN[12].template scatter<1, 0,-1>(mAcc, origin, n+1, 1<<END);// #24: (+1,+1,-1)
-                        } else {//y=END
-                            NN[24].template scatter<1, 1,-1>(mAcc, origin, n, 1<<END);//   #24: (+1,+1,-1)
-                        }
-                    }
-                    if (y > 0) {
-                        NN[ 4].template scatter< 0, 0,-1>(mAcc, origin, n-1, 1<<END);//    #14: (0,-1,-1)
-                    } else {
-                        NN[14].template scatter<0,-1,-1>(mAcc, origin, n, 1<<END);//       #14: (0,-1,-1)
-                    }
-                    if (y < END) {
-                        NN[ 4].template scatter< 0, 0,-1>(mAcc, origin, n+1, 1<<END);//    #16: (0,+1,-1)
-                    } else {
-                        NN[16].template scatter<0, 1,-1>(mAcc, origin, n, 1<<END);//       #16: (0,+1,-1)
-                    }
-                }
-                // +z: cases: 5, 9, 13, 15, 17, 19, 21, 23, 25
-                if (oldWord >> END) {
-                    NN[5].template scatter< 0, 0, 1>(mAcc, origin, n, 1);//            #5 : (0,0,+1)
-                    if (x > 0) {
-                        const Index m = n - LEAF_DIM;//-x
-                        NN[5].template scatter< 0, 0, 1>(mAcc, origin, m, 1);//        #9 : (-1,0,+1)
-                        if (y>0) {
-                            NN[ 5].template scatter<0, 0, 1>(mAcc, origin, m-1, 1);//  #19: (-1,-1,+1)
-                        } else {//y=0
-                            NN[15].template scatter<0,-1, 1>(mAcc, origin, m, 1);//    #19: (-1,-1,+1)
-                        }
-                        if (y<END) {
-                            NN[ 5].template scatter<0, 0, 1>(mAcc, origin, m+1, 1);//  #21: (-1,+1,+1)
-                        } else {//y=END
-                            NN[17].template scatter<0, 1, 1>(mAcc, origin, m, 1);//    #21: (-1,+1,+1)
-                        }
-                    } else {//x=0
-                        NN[9].template scatter<-1, 0, 1>(mAcc, origin, n, 1);//        #9 : (-1, 0,+1)
-                        if (y>0) {
-                            NN[ 9].template scatter<-1, 0, 1>(mAcc, origin, n-1, 1);// #19: (-1,-1,+1)
-                        } else {//y=0
-                            NN[19].template scatter<-1,-1, 1>(mAcc, origin, n, 1);//   #19: (-1,-1,+1)
-                        }
-                        if (y<END) {
-                            NN[ 9].template scatter<-1, 0, 1>(mAcc, origin, n+1, 1);// #21: (-1,+1,+1)
-                        } else {//y=END
-                            NN[21].template scatter<-1, 1, 1>(mAcc, origin, n, 1);//   #21: (-1,+1,+1)
-                        }
-                    }
-                    if (x < END) {
-                        const Index m = n + LEAF_DIM;//+x
-                        NN[ 5].template scatter< 0, 0, 1>(mAcc, origin, m, 1);//       #13: (+1, 0,+1)
-                        if (y>0) {
-                            NN[ 5].template scatter<0, 0, 1>(mAcc, origin, m-1, 1);//  #23: (+1,-1,+1)
-                        } else {//y=0
-                            NN[15].template scatter<0,-1, 1>(mAcc, origin, m, 1);//    #23: (+1,-1,+1)
-                        }
-                        if (y<END) {
-                            NN[ 5].template scatter<0, 0, 1>(mAcc, origin, m+1, 1);//  #25: (+1,+1,+1)
-                        } else {//y=END
-                            NN[17].template scatter<0, 1, 1>(mAcc, origin, m, 1);//    #25: (+1,+1,+1)
-                        }
-                    } else {//x=END
-                        NN[13].template scatter<1, 0, 1>(mAcc, origin, n, 1);//        #13: (+1, 0,+1)
-                        if (y>0) {
-                            NN[13].template scatter< 1, 0, 1>(mAcc, origin, n-1, 1);// #23: (+1,-1,+1)
-                        } else {//y=0
-                            NN[23].template scatter< 1,-1, 1>(mAcc, origin, n, 1);//   #23: (+1,-1,+1)
-                        }
-                        if (y<END) {
-                            NN[13].template scatter< 1, 0, 1>(mAcc, origin, n+1, 1);// #25: (+1,+1,+1)
-                        } else {//y=END
-                            NN[25].template scatter< 1, 1, 1>(mAcc, origin, n, 1);//   #25: (+1,+1,+1)
-                        }
-                    }
-                    if (y > 0) {
-                        NN[ 5].template scatter< 0, 0, 1>(mAcc, origin, n-1, 1);//     #15: ( 0,-1,+1)
-                    } else {
-                        NN[15].template scatter<0,-1, 1>(mAcc, origin, n, 1);//        #15: ( 0,-1,+1)
-                    }
-                    if (y < END) {
-                        NN[ 5].template scatter< 0, 0, 1>(mAcc, origin, n+1, 1);//     #17: ( 0,+1,+1)
-                    } else {
-                        NN[17].template scatter<0, 1, 1>(mAcc, origin, n, 1);//        #17: ( 0,+1,+1)
+                    if ( (cache.mask = Word(w>>(LEAF_DIM-1))) ) {
+                        cache.setOrigin(cache[0]->origin());
+                        cache.template scatter< 0, 0, 1>(2, n);
+                        cache.setOrigin(orig_pz);
+                        cache.scatterFacesXY(x, y, 2, n, 19);
+                        cache.scatterEdgesXY(x, y, 2, n, 19);
                     }
                 }
             }// loop over y
         }//loop over x
-        for (int i=0; i<26; ++i) NN[i].clear();
+        cache.clear();
     }//loop over leafs
 
     mManager->rebuildLeafArray();
 }// dilateVoxels26
 
+template<typename TreeType>
+inline void Morphology<TreeType>::LeafCache::
+scatterFacesXY(int x, int y, int i1, int n, int i2)
+{
+    // dilate current leaf or neighbor in the -x direction
+    if (x > 0) {
+        this->scatter(i1, n-LEAF_DIM);
+    } else {
+        this->template scatter<-1, 0, 0>(i2, n);
+    }
+    // dilate current leaf or neighbor in the +x direction
+    if (x < LEAF_DIM-1) {
+        this->scatter(i1, n+LEAF_DIM);
+    } else {
+        this->template scatter< 1, 0, 0>(i2+1, n);
+    }
+    // dilate current leaf or neighbor in the -y direction
+    if (y > 0) {
+        this->scatter(i1, n-1);
+    } else {
+        this->template scatter< 0,-1, 0>(i2+2, n);
+    }
+    // dilate current leaf or neighbor in the +y direction
+    if (y < LEAF_DIM-1) {
+        this->scatter(i1, n+1);
+    } else {
+        this->template scatter< 0, 1, 0>(i2+3, n);
+    }
+}
+
+template<typename TreeType>
+void
+Morphology<TreeType>::LeafCache::
+scatterEdgesXY(int x, int y, int i1, int n, int i2)
+{
+    if (x > 0) {
+        if (y > 0) {
+            this->scatter(i1, n-LEAF_DIM-1);
+        } else {
+            this->template scatter< 0,-1, 0>(i2+2, n-LEAF_DIM);
+        }
+        if (y < LEAF_DIM-1) {
+            this->scatter(i1, n-LEAF_DIM+1);
+        } else {
+            this->template scatter< 0, 1, 0>(i2+3, n-LEAF_DIM);
+        }
+    } else {
+        if (y < LEAF_DIM-1) {
+            this->template scatter<-1, 0, 0>(i2  , n+1);
+        } else {
+            this->template scatter<-1, 1, 0>(i2+7, n  );
+        }
+        if (y > 0) {
+            this->template scatter<-1, 0, 0>(i2  , n-1);
+        } else {
+            this->template scatter<-1,-1, 0>(i2+4, n  );
+        }
+    }
+    if (x < LEAF_DIM-1) {
+        if (y > 0) {
+            this->scatter(i1, n+LEAF_DIM-1);
+        } else {
+            this->template scatter< 0,-1, 0>(i2+2, n+LEAF_DIM);
+        }
+        if (y < LEAF_DIM-1) {
+            this->scatter(i1, n+LEAF_DIM+1);
+        } else {
+            this->template scatter< 0, 1, 0>(i2+3, n+LEAF_DIM);
+        }
+    } else {
+        if (y > 0) {
+            this->template scatter< 1, 0, 0>(i2+1, n-1);
+        } else {
+            this->template scatter< 1,-1, 0>(i2+6, n  );
+        }
+        if (y < LEAF_DIM-1) {
+            this->template scatter< 1, 0, 0>(i2+1, n+1);
+        } else {
+            this->template scatter< 1, 1, 0>(i2+5, n  );
+        }
+    }
+}
+
+template<typename TreeType>
+inline void
+Morphology<TreeType>::ErodeVoxelsOp::
+runParallel(NearestNeighbors nn)
+{
+    switch (nn) {
+    case NN_FACE_EDGE:
+        mTask = boost::bind(&ErodeVoxelsOp::erode18, _1, _2);
+        break;
+    case NN_FACE_EDGE_VERTEX:
+        mTask = boost::bind(&ErodeVoxelsOp::erode26, _1, _2);
+        break;
+    default:
+        mTask = boost::bind(&ErodeVoxelsOp::erode6, _1, _2);
+    }
+    tbb::parallel_for(mManager.getRange(), *this);
+}
+
+template<typename TreeType>
+inline typename Morphology<TreeType>::Word
+Morphology<TreeType>::LeafCache::
+gatherFacesXY(int x, int y, int i1, int n, int i2)
+{
+    // erode current leaf or neighbor in negative x-direction
+    Word w = x>0 ? this->gather(i1,n-LEAF_DIM) : this->template gather<-1,0,0>(i2, n);
+
+    // erode current leaf or neighbor in positive x-direction
+    w = Word(w & (x<LEAF_DIM-1?this->gather(i1,n+LEAF_DIM):this->template gather<1,0,0>(i2+1,n)));
+
+    // erode current leaf or neighbor in negative y-direction
+    w = Word(w & (y>0 ? this->gather(i1, n-1) : this->template gather<0,-1,0>(i2+2, n)));
+
+    // erode current leaf or neighbor in positive y-direction
+    w = Word(w & (y<LEAF_DIM-1 ? this->gather(i1, n+1) : this->template gather<0,1,0>(i2+3, n)));
+
+    return w;
+}
+
+template<typename TreeType>
+inline
+typename Morphology<TreeType>::Word
+Morphology<TreeType>::LeafCache::
+gatherEdgesXY(int x, int y, int i1, int n, int i2)
+{
+    Word w = ~Word(0);
+
+    if (x > 0) {
+        w &= y > 0 ?          this->gather(i1, n-LEAF_DIM-1) :
+                              this->template gather< 0,-1, 0>(i2+2, n-LEAF_DIM);
+        w &= y < LEAF_DIM-1 ? this->gather(i1, n-LEAF_DIM+1) :
+                              this->template gather< 0, 1, 0>(i2+3, n-LEAF_DIM);
+    } else {
+        w &= y < LEAF_DIM-1 ? this->template gather<-1, 0, 0>(i2  , n+1):
+                              this->template gather<-1, 1, 0>(i2+7, n  );
+        w &= y > 0 ?          this->template gather<-1, 0, 0>(i2  , n-1):
+                              this->template gather<-1,-1, 0>(i2+4, n  );
+    }
+    if (x < LEAF_DIM-1) {
+        w &= y > 0 ?          this->gather(i1, n+LEAF_DIM-1) :
+                              this->template gather< 0,-1, 0>(i2+2, n+LEAF_DIM);
+        w &= y < LEAF_DIM-1 ? this->gather(i1, n+LEAF_DIM+1) :
+                              this->template gather< 0, 1, 0>(i2+3, n+LEAF_DIM);
+    } else {
+        w &= y > 0          ? this->template gather< 1, 0, 0>(i2+1, n-1):
+                              this->template gather< 1,-1, 0>(i2+6, n  );
+        w &= y < LEAF_DIM-1 ? this->template gather< 1, 0, 0>(i2+1, n+1):
+                              this->template gather< 1, 1, 0>(i2+5, n  );
+    }
+
+    return w;
+}
+
 template <typename TreeType>
 void
-Morphology<TreeType>::ErodeVoxelsOp::operator()(const tbb::blocked_range<size_t>& range) const
+Morphology<TreeType>::ErodeVoxelsOp::
+erode6(const RangeT& range) const
 {
-    AccessorType acc(mManager.tree());
-    Neighbor NN[6];
-    Coord origin;
+    LeafCache cache(7, mManager.tree());
     for (size_t leafIdx = range.begin(); leafIdx < range.end(); ++leafIdx) {
-        LeafType& leaf = mManager.leaf(leafIdx);//current leaf node
-        if (leaf.isEmpty()) continue;
+        cache[0] = &mManager.leaf(leafIdx);
+        if (cache[0]->isEmpty()) continue;
+        cache.setOrigin(cache[0]->origin());
         MaskType& newMask = mSavedMasks[leafIdx];//original bit-mask of current leaf node
-        leaf.getOrigin(origin);// origin of the current leaf node.
         for (int x = 0; x < LEAF_DIM; ++x ) {
             for (int y = 0, n = (x << LEAF_LOG2DIM); y < LEAF_DIM; ++y, ++n) {
                 // Extract the portion of the original mask that corresponds to a row in z.
-                Word& w = newMask.template getWord<Word>(n);
-                if (w == 0) continue; // no active voxels
+                if (Word& w = newMask.template getWord<Word>(n)) {
 
-                // Erode in two z directions (this is first since it uses the original w)
-                w = static_cast<Word>(w & (
-                    (w<<1 | (NN[4].template gather<0,0,-1>(acc, origin, n)>>END)) &
-                    (w>>1 | (NN[5].template gather<0,0, 1>(acc, origin, n)<<END))));
+                    // erode in two z directions (this is first since it uses the original w)
+                    w = Word(w &
+                        (Word(w<<1 | (cache.template gather<0,0,-1>(1, n)>>(LEAF_DIM-1))) &
+                         Word(w>>1 | (cache.template gather<0,0, 1>(2, n)<<(LEAF_DIM-1)))));
 
-                // dilate current leaf or neighbor in negative x-direction
-                w = static_cast<Word>(w & ((x == 0) ?
-                    NN[0].template gather<-1, 0, 0>(acc, origin, n) :
-                    leaf.getValueMask().template getWord<Word>(n-LEAF_DIM)));
-
-                // dilate current leaf or neighbor in positive x-direction
-                w = static_cast<Word>(w & ((x == END) ?
-                    NN[1].template gather< 1, 0, 0>(acc, origin, n) :
-                    leaf.getValueMask().template getWord<Word>(n+LEAF_DIM)));
-
-                // dilate current leaf or neighbor in negative y-direction
-                w = static_cast<Word>(w & ((y == 0) ?
-                    NN[2].template gather< 0,-1, 0>(acc, origin, n) :
-                    leaf.getValueMask().template getWord<Word>(n-1)));
-
-                // dilate current leaf or neighbor in positive y-direction
-                w = static_cast<Word>(w & ((y == END) ?
-                    NN[3].template gather< 0, 1, 0>(acc, origin, n) :
-                    leaf.getValueMask().template getWord<Word>(n+1)));
+                    w = Word(w & cache.gatherFacesXY(x, y, 0, n, 3));
+                }
             }// loop over y
         }//loop over x
-        for (int i=0; i<6; ++i) NN[i].clear();
+        cache.clear();
     }//loop over leafs
+}
+
+template <typename TreeType>
+void
+Morphology<TreeType>::ErodeVoxelsOp::
+erode18(const RangeT&) const
+{
+    OPENVDB_THROW(RuntimeError, "tools::erode18 is not implemented yet!");
+}
+
+template <typename TreeType>
+void
+Morphology<TreeType>::ErodeVoxelsOp::
+erode26(const RangeT&) const
+{
+    OPENVDB_THROW(RuntimeError, "tools::erode26 is not implemented yet!");
 }
 
 
 template<typename TreeType>
 void
-Morphology<TreeType>::doErosion()
+Morphology<TreeType>::doErosion(NearestNeighbors nn)
 {
     /// @todo Currently operates only on leaf voxels; need to extend to tiles.
     const size_t leafCount = mManager->leafCount();
 
     // Save the value masks of all leaf nodes.
     std::vector<MaskType> savedMasks(leafCount);
-    MaskManager masks(savedMasks, *mManager);
-    masks.save();
-
+    this->copyMasks(savedMasks, *mManager);
+    UpdateMasks a(savedMasks, *mManager);
     ErodeVoxelsOp erode(savedMasks, *mManager);
+
     for (int i = 0; i < mSteps; ++i) {
-        erode.runParallel();
-        masks.update();
+        erode.runParallel(nn);
+        a.update();
     }
 
-    mManager->tree().pruneLevelSet();
+    tools::pruneLevelSet(mManager->tree());
 }
 
 
@@ -865,21 +782,21 @@ dilateVoxels(TreeType& tree, int iterations, NearestNeighbors nn)
 
 template<typename TreeType>
 OPENVDB_STATIC_SPECIALIZATION inline void
-erodeVoxels(tree::LeafManager<TreeType>& manager, int iterations)
+erodeVoxels(tree::LeafManager<TreeType>& manager, int iterations, NearestNeighbors nn)
 {
     if (iterations > 0 ) {
         Morphology<TreeType> m(&manager);
-        m.erodeVoxels(iterations);
+        m.erodeVoxels(iterations, nn);
     }
 }
 
 template<typename TreeType>
 OPENVDB_STATIC_SPECIALIZATION inline void
-erodeVoxels(TreeType& tree, int iterations)
+erodeVoxels(TreeType& tree, int iterations, NearestNeighbors nn)
 {
     if (iterations > 0 ) {
         Morphology<TreeType> m(tree);
-        m.erodeVoxels(iterations);
+        m.erodeVoxels(iterations, nn);
     }
 }
 

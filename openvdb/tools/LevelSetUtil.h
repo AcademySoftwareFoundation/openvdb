@@ -38,6 +38,7 @@
 
 #include <openvdb/Grid.h>
 #include <openvdb/tree/LeafManager.h>
+#include <openvdb/tools/Prune.h>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_reduce.h>
 #include <limits>
@@ -383,7 +384,7 @@ sdfInteriorMask(const GridType& grid, typename GridType::ValueType iso)
         iter.setActiveState(acc.getValue(iter.getCoord()) < iso);
     }
 
-    maskTree.pruneInactive();
+    tools::pruneInactive(maskTree);
 
     return maskGrid;
 }

@@ -33,9 +33,6 @@ Optional:
 - Houdini HDK (ftp://ftp.sidefx.com/public/Houdini12.0), version 12.0.628
   or later
 
-- Blosc compression library (www.blosc.org), version 1.3.6 or later
-  (included in the Houdini HDK as of version 14.0)
-
 - Ghostscript (www.ghostscript.com), version 8.70 or later, for documentation
   in PDF format
 
@@ -71,15 +68,15 @@ Installation
     BOOST_LIB_DIR       the directory containing libboost_iostreams, etc.
     BOOST_LIB           linker flags for libboost_iostreams and libboost_system
 
-    EXR_INCL_DIR        the parent directory of the OpenEXR/ header directory
-    EXR_LIB_DIR         the directory containing libIlmImf, etc.
-    EXR_LIB             linker flags for libIlmImf, libIlmThread, libIex
-                        and libImath
-
-    HALF_INCL_DIR       the parent directory of the OpenEXR/ header directory
+    ILMBASE_INCL_DIR    the parent directory of the OpenEXR/ header directory
                         (which contains half.h)
-    HALF_LIB_DIR        the directory containing libHalf.so and/or libHalf.a
+    ILMBASE_LIB_DIR     the directory containing libHalf.so and/or libHalf.a
+    ILMBASE_LIB         linker flags for libIlmThread, libIex and libImath
     HALF_LIB            linker flag(s) for the Half library (e.g., -lHalf)
+
+    EXR_INCL_DIR        the parent directory of the OpenEXR/ header directory
+    EXR_LIB_DIR         the directory containing libIlmImf
+    EXR_LIB             linker flags for libIlmImf
 
     TBB_INCL_DIR        the parent directory of the tbb/ header directory
     TBB_LIB_DIR         the directory containing libtbb

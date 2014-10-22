@@ -50,6 +50,8 @@
 #include <openvdb/tree/Tree.h>
 #include <openvdb/tree/LeafNode.h>
 #include <openvdb/tree/LeafManager.h>
+#include <openvdb/util/CpuTimer.h>
+#include <openvdb/util/logging.h>
 #include "PointPartitioner.h"
 
 #include <boost/scoped_array.hpp>
@@ -161,15 +163,64 @@ struct PointIndexIterator
     PointIndexIterator(const CoordBBox& bbox, ConstAccessor& acc);
 
 
-    /// @todo Floating-point range query.
-    //template<typename PointArray>
-    //static PointIndexIterator getPointRange(const BBoxd& bbox, ConstAccessor&,
-    //    const PointArray& points, const math::Transform&);
+    /// @brief Clears the iterator and updates it with the result of the given voxel query.
+    /// @param ijk  the voxel containing the points over which to iterate
+    /// @param acc  an accessor for the grid or tree that holds the point indices
+    void searchAndUpdate(const Coord& ijk, ConstAccessor& acc);
 
-    /// @todo Radial query.
-    //template<typename PointArray>
-    //static PointIndexIterator getPointRange(const Vec3d& xyz, double radius, ConstAccessor&,
-    //    const PointArray& points, const math::Transform&);
+
+    /// @brief Clears the iterator and updates it with the result of the given voxel region query.
+    /// @param bbox  the bounding box of the voxels containing the points over which to iterate
+    /// @param acc   an accessor for the grid or tree that holds the point indices
+    /// @note        The range of the @a bbox is inclusive. Thus, a bounding box with
+    ///              min = max is not empty but rather encloses a single voxel.
+    void searchAndUpdate(const CoordBBox& bbox, ConstAccessor& acc);
+
+
+    /// @brief Clears the iterator and updates it with the result of the given
+    ///        index space bounding box query.
+    /// @param bbox     index space bounding box.
+    /// @param acc      an accessor for the grid or tree that holds the point indices.
+    /// @param points   list of world space points.
+    /// @param xform    linear uniform scale transform (i.e. cubical voxels).
+    template<typename PointArray>
+    void searchAndUpdate(const BBoxd& bbox, ConstAccessor& acc,
+        const PointArray& points, const math::Transform& xform);
+
+
+    /// @brief Clears the iterator and updates it with the result of the given
+    ///        index space radial query.
+    /// @param center   index space center.
+    /// @param radius   index space radius.
+    /// @param acc      an accessor for the grid or tree that holds the point indices.
+    /// @param points   list of world space points.
+    /// @param xform    linear uniform scale transform (i.e. cubical voxels).
+    template<typename PointArray>
+    void searchAndUpdate(const Vec3d& center, double radius, ConstAccessor& acc,
+        const PointArray& points, const math::Transform& xform);
+
+
+    /// @brief Clears the iterator and updates it with the result of the given
+    ///        world space bounding box query.
+    /// @param bbox     world space bounding box.
+    /// @param acc      an accessor for the grid or tree that holds the point indices.
+    /// @param points   list of world space points.
+    /// @param xform    linear uniform scale transform (i.e. cubical voxels).
+    template<typename PointArray>
+    void worldSpaceSearchAndUpdate(const BBoxd& bbox, ConstAccessor& acc,
+        const PointArray& points, const math::Transform& xform);
+
+
+    /// @brief Clears the iterator and updates it with the result of the given
+    ///        world space radial query.
+    /// @param center   world space center.
+    /// @param radius   world space radius.
+    /// @param acc      an accessor for the grid or tree that holds the point indices.
+    /// @param points   list of world space points.
+    /// @param xform    linear uniform scale transform (i.e. cubical voxels).
+    template<typename PointArray>
+    void worldSpaceSearchAndUpdate(const Vec3d& center, double radius, ConstAccessor& acc,
+        const PointArray& points, const math::Transform& xform);
 
 
     /// @brief  Reset the iterator to point to the first item.
@@ -181,7 +232,7 @@ struct PointIndexIterator
 
     /// @{
     /// @brief  Returns @c true if this iterator is not yet exhausted.
-    bool test() const { return mRange.first < mRange.second && mIter != mRangeList.end(); }
+    bool test() const { return mRange.first < mRange.second || mIter != mRangeList.end(); }
     operator bool() const { return this->test(); }
     /// @}
 
@@ -207,200 +258,27 @@ struct PointIndexIterator
 
 
 private:
-
-    void get(const LeafNodeType&, const Coord& min, const Coord& max);
-
     typedef std::pair<const ValueType*, const ValueType*> Range;
-    typedef std::deque<Range> RangeList;
+    typedef std::deque<Range>                             RangeDeque;
+    typedef typename RangeDeque::const_iterator           RangeDequeCIter;
+    typedef boost::scoped_array<ValueType>                IndexArray;
 
-    Range mRange;
-    RangeList mRangeList;
-    typename RangeList::const_iterator mIter;
+    void clear();
+
+    // Primary index collection
+    Range           mRange;
+    RangeDeque      mRangeList;
+    RangeDequeCIter mIter;
+    // Secondary index collection
+    IndexArray      mIndexArray;
+    size_t          mIndexArraySize;
 }; // struct PointIndexIterator
-
-
-template<typename TreeType>
-inline
-PointIndexIterator<TreeType>::PointIndexIterator()
-    : mRange(static_cast<ValueType*>(NULL), static_cast<ValueType*>(NULL))
-    , mRangeList()
-    , mIter(mRangeList.begin())
-{
-}
-
-
-template<typename TreeType>
-inline
-PointIndexIterator<TreeType>::PointIndexIterator(const PointIndexIterator& rhs)
-    : mRange(rhs.mRange)
-    , mRangeList(rhs.mRangeList)
-    , mIter(mRangeList.begin())
-{
-}
-
-
-template<typename TreeType>
-inline PointIndexIterator<TreeType>&
-PointIndexIterator<TreeType>::operator=(const PointIndexIterator& rhs)
-{
-    if (&rhs != this) {
-        mRange = rhs.mRange;
-        mRangeList = rhs.mRangeList;
-        mIter = mRangeList.begin();
-    }
-}
-
-
-template<typename TreeType>
-inline
-PointIndexIterator<TreeType>::PointIndexIterator(const Coord& ijk, ConstAccessor& acc)
-    : mRange(static_cast<ValueType*>(NULL), static_cast<ValueType*>(NULL))
-    , mRangeList()
-    , mIter(mRangeList.begin())
-{
-    const LeafNodeType* leaf = acc.probeConstLeaf(ijk);
-    if (leaf && leaf->getIndices(ijk, mRange.first, mRange.second)) {
-        mRangeList.push_back(mRange);
-        mIter = mRangeList.begin();
-    }
-}
-
-
-template<typename TreeType>
-inline
-PointIndexIterator<TreeType>::PointIndexIterator(const CoordBBox& bbox, ConstAccessor& acc)
-    : mRange(static_cast<ValueType*>(NULL), static_cast<ValueType*>(NULL))
-    , mRangeList()
-    , mIter(mRangeList.begin())
-{
-    Coord ijk, ijkMax, ijkA, ijkB;
-    const Coord leafMin = bbox.min() & ~(LeafNodeType::DIM - 1);
-    const Coord leafMax = bbox.max() & ~(LeafNodeType::DIM - 1);
-
-    for (ijk[0] = leafMin[0]; ijk[0] <= leafMax[0]; ijk[0] += LeafNodeType::DIM) {
-        for (ijk[1] = leafMin[1]; ijk[1] <= leafMax[1]; ijk[1] += LeafNodeType::DIM) {
-            for (ijk[2] = leafMin[2]; ijk[2] <= leafMax[2]; ijk[2] += LeafNodeType::DIM) {
-
-                if (const LeafNodeType* leaf = acc.probeConstLeaf(ijk)) {
-                    ijkMax = ijk;
-                    ijkMax.offset(LeafNodeType::DIM - 1);
-
-                    // intersect leaf bbox with search region.
-                    ijkA = Coord::maxComponent(bbox.min(), ijk);
-                    ijkB = Coord::minComponent(bbox.max(), ijkMax);
-
-                    if (ijkA != ijk || ijkB != ijkMax) {
-                        get(*leaf, ijkA, ijkB);
-                    } else {
-                        // leaf bbox is inside the search region, add all indices.
-                        const ValueType* begin = &leaf->indices().front();
-                        mRangeList.push_back(Range(begin, (begin + leaf->indices().size())));
-                    }
-                }
-            }
-        }
-    }
-
-    if (!mRangeList.empty()) {
-        mIter = mRangeList.begin();
-        mRange = mRangeList.front();
-    }
-}
-
-
-template<typename TreeType>
-inline void
-PointIndexIterator<TreeType>::get(const LeafNodeType& leaf, const Coord& min, const Coord& max)
-{
-    typedef typename LeafNodeType::ValueType PointIndexT;
-    Index xPos, pos, zStride = Index(max[2] - min[2]);
-    Coord ijk;
-
-    const ValueType* dataPtr = &leaf.indices().front();
-    PointIndexT beginOffset, endOffset,
-        previousOffset = PointIndexT(leaf.indices().size() + size_t(1));
-    Range range;
-
-    for (ijk[0] = min[0]; ijk[0] <= max[0]; ++ijk[0]) {
-        xPos = (ijk[0] & (LeafNodeType::DIM - 1u)) << (2 * LeafNodeType::LOG2DIM);
-
-        for (ijk[1] = min[1]; ijk[1] <= max[1]; ++ijk[1]) {
-            pos = xPos + ((ijk[1] & (LeafNodeType::DIM - 1u)) << LeafNodeType::LOG2DIM);
-            pos += (min[2] & (LeafNodeType::DIM - 1u));
-
-            beginOffset = (pos == 0 ? PointIndexT(0) : leaf.getValue(pos - 1));
-            endOffset = leaf.getValue(pos+zStride);
-
-            if (endOffset > beginOffset) {
-
-                if (beginOffset == previousOffset) {
-                    mRangeList.back().second = dataPtr + endOffset;
-                } else {
-                    mRangeList.push_back(Range(dataPtr + beginOffset, dataPtr + endOffset));
-                }
-
-                previousOffset = endOffset;
-            }
-        }
-    }
-}
-
-
-template<typename TreeType>
-inline void
-PointIndexIterator<TreeType>::reset()
-{
-    mIter = mRangeList.begin();
-    if (!mRangeList.empty()) {
-        mRange = mRangeList.front();
-    } else {
-        mRange = Range(static_cast<ValueType*>(NULL), static_cast<ValueType*>(NULL));
-    }
-}
-
-
-template<typename TreeType>
-inline void
-PointIndexIterator<TreeType>::increment()
-{
-    ++mRange.first;
-    if (mRange.first >= mRange.second && mIter != mRangeList.end()) {
-        ++mIter;
-        if (mIter != mRangeList.end()) {
-            mRange = *mIter;
-        }
-    }
-}
-
-
-template<typename TreeType>
-inline bool
-PointIndexIterator<TreeType>::next()
-{
-    if (!this->test()) return false;
-    this->increment();
-    return this->test();
-}
-
-
-template<typename TreeType>
-inline size_t
-PointIndexIterator<TreeType>::size() const
-{
-    size_t count = 0;
-    typename RangeList::const_iterator it = mRangeList.begin();
-
-    for ( ; it != mRangeList.end(); ++it) {
-        count += it->second - it->first;
-    }
-
-    return count;
-}
 
 
 ////////////////////////////////////////
 
-// Internal operators
+// Internal operators and implementation details
+
 
 namespace point_index_grid_internal {
 
@@ -431,7 +309,7 @@ struct ValidPartitioningOp
         Coord voxelCoord;
         PointT point;
 
-        const IndexT *begin = NULL, *end = NULL;
+        const IndexT *begin = static_cast<IndexT*>(NULL), *end = static_cast<IndexT*>(NULL);
 
         for (iter = leaf.cbeginValueOn(); iter; ++iter) {
 
@@ -574,10 +452,694 @@ constructPointTree(TreeType& tree, const math::Transform& xform, const PointArra
 }
 
 
-} // namespace point_index_grid_internal
+////////////////////////////////////////
+
+
+template<typename T>
+inline void
+dequeToArray(const std::deque<T>& d, boost::scoped_array<T>& a, size_t& size)
+{
+    size = d.size();
+    a.reset(new T[size]);
+    typename std::deque<T>::const_iterator it = d.begin(), itEnd = d.end();
+    T* item = a.get();
+    for ( ; it != itEnd; ++it, ++item) *item = *it;
+}
+
+
+inline void
+constructExclusiveRegions(std::vector<CoordBBox>& regions,
+    const CoordBBox& bbox, const CoordBBox& ibox)
+{
+    regions.clear();
+    regions.reserve(6);
+    Coord cmin = ibox.min();
+    Coord cmax = ibox.max();
+
+    // left-face bbox
+    regions.push_back(bbox);
+    regions.back().max().z() = cmin.z();
+
+    // right-face bbox
+    regions.push_back(bbox);
+    regions.back().min().z() = cmax.z();
+
+    --cmax.z(); // accounting for cell centered bucketing.
+    ++cmin.z();
+
+    // front-face bbox
+    regions.push_back(bbox);
+    CoordBBox* lastRegion = &regions.back();
+    lastRegion->min().z() = cmin.z();
+    lastRegion->max().z() = cmax.z();
+    lastRegion->max().x() = cmin.x();
+
+    // back-face bbox
+    regions.push_back(*lastRegion);
+    lastRegion = &regions.back();
+    lastRegion->min().x() = cmax.x();
+    lastRegion->max().x() = bbox.max().x();
+
+    --cmax.x();
+    ++cmin.x();
+
+    // bottom-face bbox
+    regions.push_back(*lastRegion);
+    lastRegion = &regions.back();
+    lastRegion->min().x() = cmin.x();
+    lastRegion->max().x() = cmax.x();
+    lastRegion->max().y() = cmin.y();
+
+    // top-face bbox
+    regions.push_back(*lastRegion);
+    lastRegion = &regions.back();
+    lastRegion->min().y() = cmax.y();
+    lastRegion->max().y() = bbox.max().y();
+}
+
+
+template<typename PointArray, typename IndexT>
+struct BBoxFilter
+{
+    typedef typename PointArray::value_type         PointType;
+    typedef typename PointType::ValueType           PointElementType;
+    typedef std::pair<const IndexT*, const IndexT*> Range;
+    typedef std::deque<Range>                       RangeDeque;
+    typedef std::deque<IndexT>                      IndexDeque;
+
+    BBoxFilter(RangeDeque& ranges, IndexDeque& indices, const BBoxd& bbox,
+        const PointArray& points, const math::Transform& xform)
+        : mRanges(ranges)
+        , mIndices(indices)
+        , mRegion(bbox)
+        , mPoints(points)
+        , mMap(*xform.baseMap())
+    {
+    }
+
+    template <typename LeafNodeType>
+    void filterLeafNode(const LeafNodeType& leaf)
+    {
+        typename LeafNodeType::ValueOnCIter iter;
+        const IndexT *begin = static_cast<IndexT*>(NULL), *end = static_cast<IndexT*>(NULL);
+        for (iter = leaf.cbeginValueOn(); iter; ++iter) {
+            leaf.getIndices(iter.pos(), begin, end);
+            filterVoxel(iter.getCoord(), begin, end);
+        }
+    }
+
+    void filterVoxel(const Coord&, const IndexT* begin, const IndexT* end)
+    {
+        Vec3d xyz;
+        PointType vec;
+
+        for (; begin < end; ++begin) {
+            mPoints.getPos(*begin, vec);
+
+            // world to index cell centered, similar the PointPartitioner tool.
+            xyz = mMap.applyInverseMap(vec);
+            xyz[0] = math::Round(xyz[0]);
+            xyz[1] = math::Round(xyz[1]);
+            xyz[2] = math::Round(xyz[2]);
+
+            if (mRegion.isInside(xyz)) {
+                mIndices.push_back(*begin);
+            }
+        }
+    }
+
+private:
+    RangeDeque& mRanges;
+    IndexDeque& mIndices;
+    const BBoxd mRegion;
+    const PointArray& mPoints;
+    const math::MapBase& mMap;
+};
+
+
+template<typename PointArray, typename IndexT>
+struct RadialRangeFilter
+{
+    typedef typename PointArray::value_type         PointType;
+    typedef typename PointType::ValueType           PointElementType;
+    typedef std::pair<const IndexT*, const IndexT*> Range;
+    typedef std::deque<Range>                       RangeDeque;
+    typedef std::deque<IndexT>                      IndexDeque;
+
+    RadialRangeFilter(RangeDeque& ranges, IndexDeque& indices, const Vec3d& xyz, double radius,
+        const PointArray& points, const math::Transform& xform, const double leafNodeDim)
+        : mRanges(ranges)
+        , mIndices(indices)
+        , mCenter(xyz)
+        , mWSCenter(xform.indexToWorld(xyz))
+        , mVoxelDist1(0.0)
+        , mVoxelDist2(0.0)
+        , mLeafNodeDist1(0.0)
+        , mLeafNodeDist2(0.0)
+        , mWSRadiusSqr(radius * xform.voxelSize()[0])
+        , mPoints(points)
+    {
+        const PointElementType voxelRadius = std::sqrt(3.0) * 0.5;
+        mVoxelDist1 = voxelRadius + radius;
+        mVoxelDist1 *= mVoxelDist1;
+
+        if (radius > voxelRadius) {
+            mVoxelDist2 = radius - voxelRadius;
+            mVoxelDist2 *= mVoxelDist2;
+        }
+
+        const PointElementType leafNodeRadius = leafNodeDim * std::sqrt(3.0) * 0.5;
+        mLeafNodeDist1 = leafNodeRadius + radius;
+        mLeafNodeDist1 *= mLeafNodeDist1;
+
+        if (radius > leafNodeRadius) {
+            mLeafNodeDist2 = radius - leafNodeRadius;
+            mLeafNodeDist2 *= mLeafNodeDist2;
+        }
+
+        mWSRadiusSqr *= mWSRadiusSqr;
+    }
+
+    template <typename LeafNodeType>
+    void filterLeafNode(const LeafNodeType& leaf)
+    {
+        {
+            const Coord& ijk = leaf.origin();
+            PointType vec;
+            vec[0] = PointElementType(ijk[0]);
+            vec[1] = PointElementType(ijk[1]);
+            vec[2] = PointElementType(ijk[2]);
+            vec += PointElementType(LeafNodeType::DIM - 1) * 0.5;
+            vec -= mCenter;
+
+            const PointElementType dist = vec.lengthSqr();
+            if (dist > mLeafNodeDist1) return;
+
+            if (mLeafNodeDist2 > 0.0 && dist < mLeafNodeDist2) {
+                const IndexT* begin = &leaf.indices().front();
+                mRanges.push_back(Range(begin, begin + leaf.indices().size()));
+                return;
+            }
+        }
+
+        typename LeafNodeType::ValueOnCIter iter;
+        const IndexT *begin = static_cast<IndexT*>(NULL), *end = static_cast<IndexT*>(NULL);
+        for (iter = leaf.cbeginValueOn(); iter; ++iter) {
+            leaf.getIndices(iter.pos(), begin, end);
+            filterVoxel(iter.getCoord(), begin, end);
+        }
+    }
+
+    void filterVoxel(const Coord& ijk, const IndexT* begin, const IndexT* end)
+    {
+        PointType vec;
+
+        {
+            vec[0] = mCenter[0] - PointElementType(ijk[0]);
+            vec[1] = mCenter[1] - PointElementType(ijk[1]);
+            vec[2] = mCenter[2] - PointElementType(ijk[2]);
+
+            const PointElementType dist = vec.lengthSqr();
+            if (dist > mVoxelDist1) return;
+
+            if (mVoxelDist2 > 0.0 && dist < mVoxelDist2) {
+                if (!mRanges.empty() && mRanges.back().second == begin) {
+                    mRanges.back().second = end;
+                } else {
+                    mRanges.push_back(Range(begin, end));
+                }
+                return;
+            }
+        }
+
+        while (begin < end) {
+            mPoints.getPos(*begin, vec);
+            vec = mWSCenter - vec;
+
+            if (vec.lengthSqr() < mWSRadiusSqr) {
+                mIndices.push_back(*begin);
+            }
+            ++begin;
+        }
+    }
+
+private:
+    RangeDeque& mRanges;
+    IndexDeque& mIndices;
+    const PointType mCenter, mWSCenter;
+    PointElementType mVoxelDist1, mVoxelDist2, mLeafNodeDist1, mLeafNodeDist2, mWSRadiusSqr;
+    const PointArray& mPoints;
+}; // struct RadialRangeFilter
 
 
 ////////////////////////////////////////
+
+
+template<typename RangeFilterType, typename LeafNodeType>
+inline void
+filteredPointIndexSearchVoxels(RangeFilterType& filter,
+    const LeafNodeType& leaf, const Coord& min, const Coord& max)
+{
+    typedef typename LeafNodeType::ValueType PointIndexT;
+    Index xPos(0), yPos(0), pos(0);
+    Coord ijk(0);
+
+    const PointIndexT* dataPtr = &leaf.indices().front();
+    PointIndexT beginOffset, endOffset;
+
+    for (ijk[0] = min[0]; ijk[0] <= max[0]; ++ijk[0]) {
+        xPos = (ijk[0] & (LeafNodeType::DIM - 1u)) << (2 * LeafNodeType::LOG2DIM);
+        for (ijk[1] = min[1]; ijk[1] <= max[1]; ++ijk[1]) {
+            yPos = xPos + ((ijk[1] & (LeafNodeType::DIM - 1u)) << LeafNodeType::LOG2DIM);
+            for (ijk[2] = min[2]; ijk[2] <= max[2]; ++ijk[2]) {
+                pos = yPos + (ijk[2] & (LeafNodeType::DIM - 1u));
+
+                beginOffset = (pos == 0 ? PointIndexT(0) : leaf.getValue(pos - 1));
+                endOffset = leaf.getValue(pos);
+
+                if (endOffset > beginOffset) {
+                    filter.filterVoxel(ijk, dataPtr + beginOffset, dataPtr + endOffset);
+                }
+            }
+        }
+    }
+}
+
+
+template<typename RangeFilterType, typename ConstAccessor>
+inline void
+filteredPointIndexSearch(RangeFilterType& filter, ConstAccessor& acc, const CoordBBox& bbox)
+{
+    typedef typename ConstAccessor::TreeType::LeafNodeType LeafNodeType;
+    Coord ijk(0), ijkMax(0), ijkA(0), ijkB(0);
+    const Coord leafMin = bbox.min() & ~(LeafNodeType::DIM - 1);
+    const Coord leafMax = bbox.max() & ~(LeafNodeType::DIM - 1);
+
+    for (ijk[0] = leafMin[0]; ijk[0] <= leafMax[0]; ijk[0] += LeafNodeType::DIM) {
+        for (ijk[1] = leafMin[1]; ijk[1] <= leafMax[1]; ijk[1] += LeafNodeType::DIM) {
+            for (ijk[2] = leafMin[2]; ijk[2] <= leafMax[2]; ijk[2] += LeafNodeType::DIM) {
+
+                if (const LeafNodeType* leaf = acc.probeConstLeaf(ijk)) {
+                    ijkMax = ijk;
+                    ijkMax.offset(LeafNodeType::DIM - 1);
+
+                    // intersect leaf bbox with search region.
+                    ijkA = Coord::maxComponent(bbox.min(), ijk);
+                    ijkB = Coord::minComponent(bbox.max(), ijkMax);
+
+                    if (ijkA != ijk || ijkB != ijkMax) {
+                        filteredPointIndexSearchVoxels(filter, *leaf, ijkA, ijkB);
+                    } else { // leaf bbox is inside the search region
+                        filter.filterLeafNode(*leaf);
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+////////////////////////////////////////
+
+
+template<typename RangeDeque, typename LeafNodeType>
+inline void
+pointIndexSearchVoxels(RangeDeque& rangeList,
+    const LeafNodeType& leaf, const Coord& min, const Coord& max)
+{
+    typedef typename LeafNodeType::ValueType PointIndexT;
+    typedef typename RangeDeque::value_type  Range;
+
+    Index xPos(0), pos(0), zStride = Index(max[2] - min[2]);
+    const PointIndexT* dataPtr = &leaf.indices().front();
+    PointIndexT beginOffset(0), endOffset(0),
+        previousOffset = PointIndexT(leaf.indices().size() + size_t(1));
+    Coord ijk(0);
+
+    for (ijk[0] = min[0]; ijk[0] <= max[0]; ++ijk[0]) {
+        xPos = (ijk[0] & (LeafNodeType::DIM - 1u)) << (2 * LeafNodeType::LOG2DIM);
+
+        for (ijk[1] = min[1]; ijk[1] <= max[1]; ++ijk[1]) {
+            pos = xPos + ((ijk[1] & (LeafNodeType::DIM - 1u)) << LeafNodeType::LOG2DIM);
+            pos += (min[2] & (LeafNodeType::DIM - 1u));
+
+            beginOffset = (pos == 0 ? PointIndexT(0) : leaf.getValue(pos - 1));
+            endOffset = leaf.getValue(pos+zStride);
+
+            if (endOffset > beginOffset) {
+
+                if (beginOffset == previousOffset) {
+                    rangeList.back().second = dataPtr + endOffset;
+                } else {
+                    rangeList.push_back(Range(dataPtr + beginOffset, dataPtr + endOffset));
+                }
+
+                previousOffset = endOffset;
+            }
+        }
+    }
+}
+
+
+template<typename RangeDeque, typename ConstAccessor>
+inline void
+pointIndexSearch(RangeDeque& rangeList, ConstAccessor& acc, const CoordBBox& bbox)
+{
+    typedef typename ConstAccessor::TreeType::LeafNodeType LeafNodeType;
+    typedef typename LeafNodeType::ValueType PointIndexT;
+    typedef typename RangeDeque::value_type  Range;
+
+    Coord ijk(0), ijkMax(0), ijkA(0), ijkB(0);
+    const Coord leafMin = bbox.min() & ~(LeafNodeType::DIM - 1);
+    const Coord leafMax = bbox.max() & ~(LeafNodeType::DIM - 1);
+
+    for (ijk[0] = leafMin[0]; ijk[0] <= leafMax[0]; ijk[0] += LeafNodeType::DIM) {
+        for (ijk[1] = leafMin[1]; ijk[1] <= leafMax[1]; ijk[1] += LeafNodeType::DIM) {
+            for (ijk[2] = leafMin[2]; ijk[2] <= leafMax[2]; ijk[2] += LeafNodeType::DIM) {
+
+                if (const LeafNodeType* leaf = acc.probeConstLeaf(ijk)) {
+                    ijkMax = ijk;
+                    ijkMax.offset(LeafNodeType::DIM - 1);
+
+                    // intersect leaf bbox with search region.
+                    ijkA = Coord::maxComponent(bbox.min(), ijk);
+                    ijkB = Coord::minComponent(bbox.max(), ijkMax);
+
+                    if (ijkA != ijk || ijkB != ijkMax) {
+                        pointIndexSearchVoxels(rangeList, *leaf, ijkA, ijkB);
+                    } else {
+                        // leaf bbox is inside the search region, add all indices.
+                        const PointIndexT* begin = &leaf->indices().front();
+                        rangeList.push_back(Range(begin, (begin + leaf->indices().size())));
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+} // namespace point_index_grid_internal
+
+
+// PointIndexIterator implementation
+
+template<typename TreeType>
+inline
+PointIndexIterator<TreeType>::PointIndexIterator()
+    : mRange(static_cast<ValueType*>(NULL), static_cast<ValueType*>(NULL))
+    , mRangeList()
+    , mIter(mRangeList.begin())
+    , mIndexArray()
+    , mIndexArraySize(0)
+{
+}
+
+
+template<typename TreeType>
+inline
+PointIndexIterator<TreeType>::PointIndexIterator(const PointIndexIterator& rhs)
+    : mRange(rhs.mRange)
+    , mRangeList(rhs.mRangeList)
+    , mIter(mRangeList.begin())
+    , mIndexArray()
+    , mIndexArraySize(rhs.mIndexArraySize)
+{
+    if (rhs.mIndexArray) {
+        mIndexArray.reset(new ValueType[mIndexArraySize]);
+        memcpy(mIndexArray.get(), rhs.mIndexArray.get(), mIndexArraySize * sizeof(ValueType));
+    }
+}
+
+
+template<typename TreeType>
+inline PointIndexIterator<TreeType>&
+PointIndexIterator<TreeType>::operator=(const PointIndexIterator& rhs)
+{
+    if (&rhs != this) {
+        mRange = rhs.mRange;
+        mRangeList = rhs.mRangeList;
+        mIter = mRangeList.begin();
+        mIndexArray.reset();
+        mIndexArraySize = rhs.mIndexArraySize;
+
+        if (rhs.mIndexArray) {
+            mIndexArray.reset(new ValueType[mIndexArraySize]);
+            memcpy(mIndexArray.get(), rhs.mIndexArray.get(), mIndexArraySize * sizeof(ValueType));
+        }
+    }
+    return *this;
+}
+
+
+template<typename TreeType>
+inline
+PointIndexIterator<TreeType>::PointIndexIterator(const Coord& ijk, ConstAccessor& acc)
+    : mRange(static_cast<ValueType*>(NULL), static_cast<ValueType*>(NULL))
+    , mRangeList()
+    , mIter(mRangeList.begin())
+    , mIndexArray()
+    , mIndexArraySize(0)
+{
+    const LeafNodeType* leaf = acc.probeConstLeaf(ijk);
+    if (leaf && leaf->getIndices(ijk, mRange.first, mRange.second)) {
+        mRangeList.push_back(mRange);
+        mIter = mRangeList.begin();
+    }
+}
+
+
+template<typename TreeType>
+inline
+PointIndexIterator<TreeType>::PointIndexIterator(const CoordBBox& bbox, ConstAccessor& acc)
+    : mRange(static_cast<ValueType*>(NULL), static_cast<ValueType*>(NULL))
+    , mRangeList()
+    , mIter(mRangeList.begin())
+    , mIndexArray()
+    , mIndexArraySize(0)
+{
+    point_index_grid_internal::pointIndexSearch(mRangeList, acc, bbox);
+
+    if (!mRangeList.empty()) {
+        mIter = mRangeList.begin();
+        mRange = mRangeList.front();
+    }
+}
+
+
+template<typename TreeType>
+inline void
+PointIndexIterator<TreeType>::reset()
+{
+    mIter = mRangeList.begin();
+    if (!mRangeList.empty()) {
+        mRange = mRangeList.front();
+    } else if (mIndexArray) {
+        mRange.first = mIndexArray.get();
+        mRange.second = mRange.first + mIndexArraySize;
+    } else {
+        mRange.first = static_cast<ValueType*>(NULL);
+        mRange.second = static_cast<ValueType*>(NULL);
+    }
+}
+
+
+template<typename TreeType>
+inline void
+PointIndexIterator<TreeType>::increment()
+{
+    ++mRange.first;
+    if (mRange.first >= mRange.second && mIter != mRangeList.end()) {
+        ++mIter;
+        if (mIter != mRangeList.end()) {
+            mRange = *mIter;
+        } else if (mIndexArray) {
+            mRange.first = mIndexArray.get();
+            mRange.second = mRange.first + mIndexArraySize;
+        }
+    }
+}
+
+
+template<typename TreeType>
+inline bool
+PointIndexIterator<TreeType>::next()
+{
+    if (!this->test()) return false;
+    this->increment();
+    return this->test();
+}
+
+
+template<typename TreeType>
+inline size_t
+PointIndexIterator<TreeType>::size() const
+{
+    size_t count = 0;
+    typename RangeDeque::const_iterator it = mRangeList.begin();
+
+    for ( ; it != mRangeList.end(); ++it) {
+        count += it->second - it->first;
+    }
+
+    return count + mIndexArraySize;
+}
+
+
+template<typename TreeType>
+inline void
+PointIndexIterator<TreeType>::clear()
+{
+    mRange.first = static_cast<ValueType*>(NULL);
+    mRange.second = static_cast<ValueType*>(NULL);
+    mRangeList.clear();
+    mIter = mRangeList.end();
+    mIndexArray.reset();
+    mIndexArraySize = 0;
+}
+
+
+template<typename TreeType>
+inline void
+PointIndexIterator<TreeType>::searchAndUpdate(const Coord& ijk, ConstAccessor& acc)
+{
+    this->clear();
+    const LeafNodeType* leaf = acc.probeConstLeaf(ijk);
+    if (leaf && leaf->getIndices(ijk, mRange.first, mRange.second)) {
+        mRangeList.push_back(mRange);
+        mIter = mRangeList.begin();
+    }
+}
+
+
+template<typename TreeType>
+inline void
+PointIndexIterator<TreeType>::searchAndUpdate(const CoordBBox& bbox, ConstAccessor& acc)
+{
+    this->clear();
+    point_index_grid_internal::pointIndexSearch(mRangeList, acc, bbox);
+
+    if (!mRangeList.empty()) {
+        mIter = mRangeList.begin();
+        mRange = mRangeList.front();
+    }
+}
+
+
+template<typename TreeType>
+template<typename PointArray>
+inline void
+PointIndexIterator<TreeType>::searchAndUpdate(const BBoxd& bbox, ConstAccessor& acc,
+    const PointArray& points, const math::Transform& xform)
+{
+    this->clear();
+
+    std::vector<CoordBBox> searchRegions;
+    CoordBBox region(Coord::round(bbox.min()), Coord::round(bbox.max()));
+
+    const Coord dim = region.dim();
+    const int minExtent = std::min(dim[0], std::min(dim[1], dim[2]));
+
+    if (minExtent > 2) {
+        // collect indices that don't need to be tested
+        CoordBBox ibox = region;
+        ibox.expand(-1);
+
+        point_index_grid_internal::pointIndexSearch(mRangeList, acc, ibox);
+
+        // define regions for the filtered search
+        ibox.expand(1);
+        point_index_grid_internal::constructExclusiveRegions(searchRegions, region, ibox);
+    } else {
+        searchRegions.push_back(region);
+    }
+
+    // filtered search
+    std::deque<ValueType> filteredIndices;
+    point_index_grid_internal::BBoxFilter<PointArray, ValueType>
+        filter(mRangeList, filteredIndices, bbox, points, xform);
+
+    for (size_t n = 0, N = searchRegions.size(); n < N; ++n) {
+        point_index_grid_internal::filteredPointIndexSearch(filter, acc, searchRegions[n]);
+    }
+
+    point_index_grid_internal::dequeToArray(filteredIndices, mIndexArray, mIndexArraySize);
+
+    this->reset();
+}
+
+
+template<typename TreeType>
+template<typename PointArray>
+inline void
+PointIndexIterator<TreeType>::searchAndUpdate(const Vec3d& center, double radius,
+    ConstAccessor& acc, const PointArray& points, const math::Transform& xform)
+{
+    this->clear();
+    std::vector<CoordBBox> searchRegions;
+
+    // bounding box
+    CoordBBox bbox(
+        Coord::round(Vec3d(center[0] - radius, center[1] - radius, center[2] - radius)),
+        Coord::round(Vec3d(center[0] + radius, center[1] + radius, center[2] + radius)));
+    bbox.expand(1);
+
+    const double iRadius = radius * double(1.0 / std::sqrt(3.0));
+    if (iRadius > 2.0) {
+        // inscribed box
+        CoordBBox ibox(
+            Coord::round(Vec3d(center[0] - iRadius, center[1] - iRadius, center[2] - iRadius)),
+            Coord::round(Vec3d(center[0] + iRadius, center[1] + iRadius, center[2] + iRadius)));
+        ibox.expand(-1);
+
+        // collect indices that don't need to be tested
+        point_index_grid_internal::pointIndexSearch(mRangeList, acc, ibox);
+
+        ibox.expand(1);
+        point_index_grid_internal::constructExclusiveRegions(searchRegions, bbox, ibox);
+    } else {
+        searchRegions.push_back(bbox);
+    }
+
+    // filtered search
+    std::deque<ValueType> filteredIndices;
+    const double leafNodeDim = double(TreeType::LeafNodeType::DIM);
+    point_index_grid_internal::RadialRangeFilter<PointArray, ValueType>
+        filter(mRangeList, filteredIndices, center, radius, points, xform, leafNodeDim);
+    for (size_t n = 0, N = searchRegions.size(); n < N; ++n) {
+        point_index_grid_internal::filteredPointIndexSearch(filter, acc, searchRegions[n]);
+    }
+
+    point_index_grid_internal::dequeToArray(filteredIndices, mIndexArray, mIndexArraySize);
+
+    this->reset();
+}
+
+
+template<typename TreeType>
+template<typename PointArray>
+inline void
+PointIndexIterator<TreeType>::worldSpaceSearchAndUpdate(const BBoxd& bbox, ConstAccessor& acc,
+    const PointArray& points, const math::Transform& xform)
+{
+    this->searchAndUpdate(
+        BBoxd(xform.worldToIndex(bbox.min()), xform.worldToIndex(bbox.max())), acc, points, xform);
+}
+
+
+template<typename TreeType>
+template<typename PointArray>
+inline void
+PointIndexIterator<TreeType>::worldSpaceSearchAndUpdate(const Vec3d& center, double radius,
+    ConstAccessor& acc, const PointArray& points, const math::Transform& xform)
+{
+    this->searchAndUpdate(
+        xform.worldToIndex(center), (radius / xform.voxelSize()[0]), acc, points, xform);
+}
+
+
+////////////////////////////////////////
+
 
 template<typename GridT, typename PointArrayT>
 inline typename GridT::Ptr
@@ -1100,3 +1662,4 @@ struct SameLeafConfig<Dim1, openvdb::tools::PointIndexLeafNode<T2, Dim1> >
 // Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
+

@@ -11,12 +11,19 @@ Version 3.0.0 - In development
       limit (see io::File::setCopyMaxBytes()).  The limit can be set to zero
       to disable copying, but if it cannot be guaranteed that a file will not
       be modified, then it is best not to enable delayed loading for that file.
-    - .vdb files can now optionally be compressed with the Blosc LZ4 codec.
-      Blosc compresses almost as well as ZLIB, but it is much faster.
     - Added tools::PointPartitioner, a tool for fast spatial sorting
       of points stored in an external array, and tools::PointIndexGrid,
       an acceleration structure for fast range and nearest-neighbor searches.
-    - Added a fast but approximate narrow-band level set dilation method
+    - Added tree::NodeManager, which "linearizes" a tree to facilitate
+      efficient multithreading across all tree levels.
+    - Added tools::prune() (and other variants), which replaces and
+      outperforms Tree::prune().
+    - Added tools::signedFloodFill(), which replaces and outperforms
+      Tree::signedFloodFill().
+    - Added tools::changeBackground (and other variants), which replaces
+      and outperforms Tree::setBackground().
+    - Added a fast but approximate narrow-band level set dilation method,
+      a fast narrow-band level set erosion method,
       and a masked normalization method to tools::LevelSetTracker.
     - Added tools::Diagnose, which performs multithreaded diagnostics on grids
       to identify issues like values that are NaNs or out-of-range.
@@ -37,7 +44,7 @@ Version 3.0.0 - In development
       tool for large numbers (tens to hundreds of millions) of particles.
     - Added Tree::getNodes(), which allows for fast construction of
       linear arrays of tree nodes for use in multithreaded code
-      such as the LeafManager.
+      such as the LeafManager or NodeManager.
     - Added math::Extrema and tools::extrema() to efficiently compute
       minimum and maximum values in a grid.
     - Added support for material color grids to all level set shaders,
@@ -81,6 +88,8 @@ Version 3.0.0 - In development
     - Fixed a bug in LeafNode::Buffer::getValue() whereby Visual C++
       would return a reference to a temporary.
       [Contributed by SESI]
+    - Fixed a bug in tools::ParticlesToLevelSet related to attribute transfer
+      when leaf nodes are produced without active values.
     - Added util/CpuTimer.h and removed CpuTimer (with a minimal API) from
       unittest/util.h.
     - Eliminated the use of getopt() for command-line argument parsing
@@ -96,6 +105,10 @@ Version 3.0.0 - In development
       math::Transform.
     - Made many small changes to address type conversion and other warnings
       reported by newer compilers like GCC 4.8 and ICC 14.
+    - Replaced the HALF_INCL_DIR and HALF_LIB_DIR Makefile variables
+      with ILMBASE_INCL_DIR and ILMBASE_LIB_DIR and added ILMBASE_LIB,
+      to match OpenEXR's library organization.
+      [Contributed by Double Negative]
     - Eliminated most local (function-scope) static variables, because
       Visual C++ doesn't guarantee thread-safe initialization of local statics.
       [Contributed by SESI]
@@ -129,6 +142,15 @@ Version 3.0.0 - In development
       "PartialCreate" constructors that optionally bypass the allocation
       of voxel buffers.  Leaf node classes must now also provide allocate()
       and isAllocated() methods to manage the allocation of their buffers.
+    - Removed pruneInactive() and pruneLevelSet() methods from the Tree
+      and various node classes.  These methods have been replaced by
+      the much faster pruning functions found in tools/Prune.h.
+    - Removed signedFloodFill() methods from the Grid, Tree and various
+      node classes.  These methods have been replaced by the much faster
+      functions found in tools/SignedFloodFill.h.
+    - Removed Grid::setBackground() and Tree::setBackground() (use the faster
+      changeBackground() tool instead), and removed the default argument
+      from RootNode::setBackground().
 
     Python:
     - Added grid methods convertToPolygons() and convertToQuads(),
@@ -136,6 +158,12 @@ Version 3.0.0 - In development
       which converts meshes to volumes.  NumPy is required.
 
     Houdini:
+    - Added a new SOP (Trim Narrow Band) that can adjust (i.e. dilate or erode)
+      the width of a narrow band level set. This allows for a much faster workflows
+      where level sets are created (e.g. from points or polygons) with a very narrow
+      band and subsequently dilated with the new SOP.
+    - Fixed bugs in the Smooth Level Set and Reshape Level Set SOPs that ignored the
+      selected discretization scheme.
     - Added alpha mask options to the Morph Level Set SOP.
     - Added a From Points SOP to very quickly generate a level set
       from a point cloud, ignoring any radius attribute.
@@ -159,6 +187,9 @@ Version 3.0.0 - In development
       of which can be used to clip grids as they are read.  For large grids,
       clipping while reading can result in significantly lower memory usage
       than clipping after reading.
+
+    Maya:
+    - Added an adaptive polygonal surface extraction node.
 
 Version 2.3.0 - April 23, 2014
     - Added tools::extractSparseTree(), which selectively extracts and

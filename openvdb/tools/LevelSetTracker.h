@@ -54,7 +54,9 @@
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/tree/LeafManager.h>
-#include "Morphology.h"//for tools::dilateVoxels
+#include "ChangeBackground.h"// for changeLevelSetBackground
+#include "Morphology.h"//for dilateVoxels
+#include "Prune.h"// for pruneLevelSet
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -104,6 +106,10 @@ public:
     /// @brief Fast but approximate dilation of the narrow band
     /// @note This method works fine with low-order temporal and spatial schemes.
     void dilate(int iterations = 1);
+
+    /// @brief Erodes the width of the narrow-band and update the background values
+    /// @throw ValueError if @a iterations is larger then the current half-width.
+    void erode(int iterations = 1);
 
     /// @return the spatial finite difference scheme
     math::BiasedGradientScheme getSpatialScheme() const { return mSpatialScheme; }
@@ -267,7 +273,7 @@ prune()
     t.trim();
 
     // Remove inactive nodes from tree
-    mGrid->tree().pruneLevelSet();
+    tools::pruneLevelSet(mGrid->tree());
 
     // The tree topology has changes so rebuild the list of leafs
     mLeafs->rebuildLeafArray();
@@ -298,20 +304,31 @@ dilate(int iterations)
         for (int i=0; i < iterations; ++i) {
             tools::dilateVoxels(*mLeafs);
             mLeafs->rebuildLeafArray();
-            mGrid->tree().root().resetBackground(mDx + mGrid->background());
+            tools::changeLevelSetBackground(mGrid->tree(), mDx + mGrid->background());
         }
     } else {
         for (int i=0; i < iterations; ++i) {
             BoolMaskType mask0(mGrid->tree(), false, TopologyCopy());
             tools::dilateVoxels(*mLeafs);
             mLeafs->rebuildLeafArray();
-            mGrid->tree().root().resetBackground(mDx + mGrid->background());
+            tools::changeLevelSetBackground(mGrid->tree(), mDx + mGrid->background());
             BoolMaskType mask(mGrid->tree(), false, TopologyCopy());
             mask.topologyDifference(mask0);
             this->normalize(&mask);
         }
     }
 }
+
+template<typename GridT, typename InterruptT>
+inline void
+LevelSetTracker<GridT, InterruptT>::
+erode(int iterations)
+{
+    tools::erodeVoxels(*mLeafs, iterations);
+    const ValueType background = mGrid->background() - iterations*mDx;
+    tools::changeLevelSetBackground(mGrid->tree(), background);
+    mLeafs->rebuildLeafArray();
+}   
 
 template<typename GridT,  typename InterruptT>
 inline void

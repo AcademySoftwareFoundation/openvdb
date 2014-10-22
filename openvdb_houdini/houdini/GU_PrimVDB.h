@@ -244,8 +244,7 @@ public:
         const openvdb::MetaMap& meta_map,
         GEO_Detail& gdp)
     {
-	GU_PrimVDB::createAttrsFromMetadataAdapter(
-		owner, element, &meta_map, gdp);
+        GU_PrimVDB::createAttrsFromMetadataAdapter(owner, element, &meta_map, gdp);
     }
 
     /// @brief Transfer a VDB primitive's attributes to a VDB grid as metadata.
@@ -271,8 +270,7 @@ public:
         GA_Offset element,
         const GEO_Detail& geo)
     {
-	GU_PrimVDB::createMetadataFromAttrsAdapter(
-		&meta_map, owner, element, geo);
+        GU_PrimVDB::createMetadataFromAttrsAdapter(&meta_map, owner, element, geo);
     }
 
 private: // METHODS

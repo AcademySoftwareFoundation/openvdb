@@ -50,6 +50,9 @@
 #include "openvdb/math/Math.h" // for math::isExactlyEqual()
 #include "openvdb/tools/LevelSetSphere.h"
 #include "openvdb/tools/Dense.h"
+#include "openvdb/tools/ChangeBackground.h"
+#include "openvdb/tools/Prune.h"
+#include "openvdb/tools/SignedFloodFill.h"
 #include "pyutil.h"
 #include "pyAccessor.h" // for pyAccessor::AccessorWrap
 #include "pyopenvdb.h"
@@ -271,7 +274,7 @@ template<typename GridType>
 inline void
 setGridBackground(GridType& grid, py::object obj)
 {
-    grid.setBackground(extractValueArg<GridType>(obj, "setBackground"));
+    tools::changeBackground(grid.tree(), extractValueArg<GridType>(obj, "setBackground"));
 }
 
 
@@ -671,7 +674,7 @@ template<typename GridType>
 inline void
 prune(GridType& grid, py::object tolerance)
 {
-    grid.tree().prune(extractValueArg<GridType>(tolerance, "prune"));
+    tools::prune(grid.tree(), extractValueArg<GridType>(tolerance, "prune"));
 }
 
 
@@ -680,9 +683,9 @@ inline void
 pruneInactive(GridType& grid, py::object valObj)
 {
     if (valObj.is_none()) {
-        grid.tree().pruneInactive();
+        tools::pruneInactive(grid.tree());
     } else {
-        grid.tree().pruneInactive(extractValueArg<GridType>(valObj, "pruneInactive"));
+        tools::pruneInactive(grid.tree(), extractValueArg<GridType>(valObj, "pruneInactive"));
     }
 }
 
@@ -703,7 +706,7 @@ template<typename GridType>
 inline void
 signedFloodFill(GridType& grid)
 {
-    grid.signedFloodFill();
+    tools::signedFloodFill(grid.tree());
 }
 
 

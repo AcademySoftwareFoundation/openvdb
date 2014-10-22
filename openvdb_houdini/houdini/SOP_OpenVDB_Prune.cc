@@ -35,6 +35,7 @@
 /// @brief SOP to prune tree branches from OpenVDB grids
 
 #include <houdini_utils/ParmFactory.h>
+#include <openvdb/tools/Prune.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <UT/UT_Interrupt.h>
@@ -158,11 +159,11 @@ struct PruneOp {
         typedef typename GridT::ValueType ValueT;
 
         if (mode == "value") {
-            grid.tree().prune(ValueT(openvdb::zeroVal<ValueT>() + tolerance));
+            openvdb::tools::prune(grid.tree(), ValueT(openvdb::zeroVal<ValueT>() + tolerance));
         } else if (mode == "inactive") {
-            grid.tree().pruneInactive();
+            openvdb::tools::pruneInactive(grid.tree());
         } else if (mode == "levelset") {
-            grid.tree().pruneLevelSet();
+            openvdb::tools::pruneLevelSet(grid.tree());
         }
     }
 

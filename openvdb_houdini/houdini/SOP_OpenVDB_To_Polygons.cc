@@ -44,6 +44,7 @@
 #include <openvdb/tools/VolumeToMesh.h>
 #include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/tools/LevelSetUtil.h>
+#include <openvdb/tools/Prune.h>
 #include <openvdb/math/Operators.h>
 #include <openvdb/math/Mat3.h>
 
@@ -853,7 +854,7 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
             op(*refGeo, indexGrid->tree(), maskLeafs, edgetolerance);
         op.run();
 
-        maskTree->pruneInactive();
+        openvdb::tools::pruneInactive(*maskTree);
 
         openvdb::tools::dilateVoxels(*maskTree, 2);
 

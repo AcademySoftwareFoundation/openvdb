@@ -36,6 +36,7 @@
 #include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/tools/LevelSetUtil.h>
 #include <openvdb/tools/PointScatter.h>
+#include <openvdb/tools/Prune.h>
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/math/Operators.h>
 
@@ -704,7 +705,7 @@ public:
                         interiorAcc.probeConstLeaf(leafIt->origin());
                     if (leaf) leafIt->topologyDifference(*leaf, false);
                 }
-                surfaceMask->pruneInactive();
+                openvdb::tools::pruneInactive(*surfaceMask);
 
                 openvdb::tree::LeafManager<BoolTreeT> maskleafs(*surfaceMask);
                 std::vector<size_t> indexMap(maskleafs.leafCount());

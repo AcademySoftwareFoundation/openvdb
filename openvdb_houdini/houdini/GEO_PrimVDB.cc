@@ -1530,64 +1530,60 @@ struct gu_VecXformOp
 void
 GEO_PrimVDB::transform(const UT_Matrix4 &mat)
 {
-    if (!hasGrid())
-	return;
-    try
-    {
-	using openvdb::GridBase;
-	using namespace openvdb::math;
+    if (!hasGrid()) return;
 
-	// Get the transform
-	const GridBase&	  const_grid = getConstGrid();
-	MapBase::ConstPtr base_map = const_grid.transform().baseMap();
-	Mat4d base_mat4 = base_map->getAffineMap()->getMat4();
+    try {
+        using openvdb::GridBase;
+        using namespace openvdb::math;
 
-	// Get the 3x3 subcomponent of the matrix
-	Vec3d translation = base_mat4.getTranslation();
-	Mat3d vdbmatrix = base_mat4.getMat3();
+        // Get the transform
+        const GridBase&	  const_grid = getConstGrid();
+        MapBase::ConstPtr base_map = const_grid.transform().baseMap();
+        Mat4d base_mat4 = base_map->getAffineMap()->getMat4();
 
-	// Multiply our mat with the mat3
-	UT_Matrix3D transformed(mat);
-	transformed = UTvdbConvert(vdbmatrix) * transformed;
+        // Get the 3x3 subcomponent of the matrix
+        Vec3d translation = base_mat4.getTranslation();
+        Mat3d vdbmatrix = base_mat4.getMat3();
 
-	// Put it into a mat4 and translate it
-	UT_Matrix4D final;
-	final = transformed;
-	final.setTranslates(UTvdbConvert(translation));
+        // Multiply our mat with the mat3
+        UT_Matrix3D transformed(mat);
+        transformed = UTvdbConvert(vdbmatrix) * transformed;
 
-	// Make an affine matrix out of it
-	AffineMap::Ptr map(geoCreateAffineMap<AffineMap>(final));
+        // Put it into a mat4 and translate it
+        UT_Matrix4D final;
+        final = transformed;
+        final.setTranslates(UTvdbConvert(translation));
 
-	// Set the affine matrix from our base_map into this map
-	MapBase::Ptr result = simplify(map);
-	if (base_map->isType<NonlinearFrustumMap>())
-	{
-	    const NonlinearFrustumMap& frustum_map = 
-		*const_grid.transform().constMap<NonlinearFrustumMap>();
+        // Make an affine matrix out of it
+        AffineMap::Ptr map(geoCreateAffineMap<AffineMap>(final));
 
-	    MapBase::Ptr new_frustum_map (new NonlinearFrustumMap(
-	    	frustum_map.getBBox(),
-		frustum_map.getTaper(),
-		frustum_map.getDepth(),
-		result));
+        // Set the affine matrix from our base_map into this map
+        MapBase::Ptr result = simplify(map);
+        if (base_map->isType<NonlinearFrustumMap>()) {
+            const NonlinearFrustumMap& frustum_map =
+                *const_grid.transform().constMap<NonlinearFrustumMap>();
 
-	    result = new_frustum_map;
-	}
+            MapBase::Ptr new_frustum_map (new NonlinearFrustumMap(
+                frustum_map.getBBox(),
+                frustum_map.getTaper(),
+                frustum_map.getDepth(),
+                result));
 
-	// This sets the vertex position to `translation` as well
-	myGridAccessor.setTransform(Transform(result), *this);
+            result = new_frustum_map;
+        }
 
-	// If (and only if) the grid is vector-valued, apply the transform to
-	// each voxel's value.
-	if (const_grid.getVectorType() != openvdb::VEC_INVARIANT)
-	{
-	    gu_VecXformOp op(UTvdbConvert(UT_Matrix4D(mat)));
-	    GEOvdbProcessTypedGridVec3(*this, op, /*make_unique*/true);
-	}
-    }
-    catch (std::exception& /*e*/)
-    {
-	UT_ASSERT(!"Failed to apply transform");
+        // This sets the vertex position to `translation` as well
+        myGridAccessor.setTransform(Transform(result), *this);
+
+        // If (and only if) the grid is vector-valued, apply the transform to
+        // each voxel's value.
+        if (const_grid.getVectorType() != openvdb::VEC_INVARIANT) {
+            gu_VecXformOp op(UTvdbConvert(UT_Matrix4D(mat)));
+            GEOvdbProcessTypedGridVec3(*this, op, /*make_unique*/true);
+        }
+
+    } catch (std::exception& /*e*/) {
+        UT_ASSERT(!"Failed to apply transform");
     }
 }
 
@@ -2039,8 +2035,13 @@ template <typename GridTypeA, typename GridTypeB>
 static void
 geoUnion(GridTypeA& grid_a, const GridTypeB &grid_b, bool setvalue, double value, bool doclip, const openvdb::CoordBBox &clipbox)
 {
-    typename GridTypeA::Accessor 	access_a = grid_a.getAccessor();
-    typename GridTypeB::ConstAccessor 	access_b = grid_b.getAccessor();
+    typename GridTypeA::Accessor        access_a = grid_a.getAccessor();
+    typename GridTypeB::ConstAccessor   access_b = grid_b.getAccessor();
+
+    if (!doclip && !setvalue) {
+        grid_a.tree().topologyUnion(grid_b.tree());
+        return;
+    }
 
     if (!doclip && !setvalue)
     {
@@ -2049,30 +2050,26 @@ geoUnion(GridTypeA& grid_a, const GridTypeB &grid_b, bool setvalue, double value
     }
 
     // For each on value in b, set a on
-    for (typename GridTypeB::ValueOnCIter
-	 iter = grid_b.cbeginValueOn(); iter; ++iter)
-    {
-	openvdb::CoordBBox bbox = iter.getBoundingBox();
-	// Intersect with our destination
-	if (doclip)
-	{
-	    bbox.min().maxComponent(clipbox.min());
-	    bbox.max().minComponent(clipbox.max());
-	}
-	for (int k=bbox.min().z(); k<=bbox.max().z(); k++)
-	{
-	    for (int j=bbox.min().y(); j<=bbox.max().y(); j++)
-	    {
-		for (int i=bbox.min().x(); i<=bbox.max().x(); i++)
-		{
-		    openvdb::Coord coord(i, j, k);
-		    if (setvalue)
-			access_a.setValue(coord, geo_doubleToGridValue<GridTypeA>(value));
-		    else
-			access_a.setValueOn(coord);
-		}
-	    }
-	}
+    for (typename GridTypeB::ValueOnCIter iter = grid_b.cbeginValueOn(); iter; ++iter) {
+        openvdb::CoordBBox bbox = iter.getBoundingBox();
+        // Intersect with our destination
+        if (doclip) {
+            bbox.min().maxComponent(clipbox.min());
+            bbox.max().minComponent(clipbox.max());
+        }
+
+        for (int k=bbox.min().z(); k<=bbox.max().z(); k++) {
+            for (int j=bbox.min().y(); j<=bbox.max().y(); j++) {
+                for (int i=bbox.min().x(); i<=bbox.max().x(); i++) {
+                    openvdb::Coord coord(i, j, k);
+                    if (setvalue) {
+                        access_a.setValue(coord, geo_doubleToGridValue<GridTypeA>(value));
+                    } else {
+                        access_a.setValueOn(coord);
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -2587,7 +2584,7 @@ GEO_PrimVDB::saveVDB(UT_JSONWriter &w) const
 	uint32_t compression = openvdb::io::COMPRESS_ACTIVE_MASK;
 	if (vos.hasBloscCompression()
 		&& !UT_EnvControl::getInt(ENV_HOUDNI13_VOLUME_COMPATIBILITY)) {
-	    compression |= openvdb::io::COMPRESS_BLOSC_LZ4;
+	    compression |= openvdb::io::COMPRESS_BLOSC;
 	}
 	vos.setCompression(compression);
 
@@ -2745,17 +2742,12 @@ static void
 geo_sumPosDensity(const GridType &grid, fpreal64 &sum)
 {
     sum = 0;
-    for (typename GridType::ValueOnCIter
-	 iter = grid.cbeginValueOn(); iter; ++iter)
-    {
-	fpreal value = *iter;
-	if (value > 0)
-	{
-	    if (iter.isTileValue())
-		sum += value * iter.getVoxelCount();
-	    else
-		sum += value;
-	}
+    for (typename GridType::ValueOnCIter iter = grid.cbeginValueOn(); iter; ++iter) {
+        fpreal value = *iter;
+        if (value > 0) {
+            if (iter.isTileValue()) sum += value * iter.getVoxelCount();
+            else sum += value;
+        }
     }
 }
 

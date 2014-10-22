@@ -43,6 +43,7 @@
 #include <tbb/parallel_for.h>
 #include <boost/scoped_array.hpp>
 #include <boost/scoped_ptr.hpp>
+#include "Prune.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -454,7 +455,8 @@ public:
         delete mBlocks;
         mBlocks = NULL;
 
-        mTree->root().pruneTiles(mTolerance);
+        tools::pruneTiles(*mTree, mTolerance);
+        //mTree->root().pruneTiles(mTolerance);
     }
 
     /// @brief Public method called by tbb::parallel_for

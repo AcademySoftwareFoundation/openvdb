@@ -41,7 +41,6 @@
 #include <openvdb/util/NodeMasks.h>
 #include "LeafNode.h"
 #include "Iterator.h"
-#include "Util.h"
 
 
 namespace openvdb {
@@ -545,11 +544,7 @@ public:
 
     //@{
     /// This function exists only to enable template instantiation.
-    void signedFloodFill(bool) {}
-    void signedFloodFill(bool, bool) {}
-    template<typename PruneOp> void pruneOp(PruneOp&) {}
     void prune(const ValueType& /*tolerance*/ = zeroVal<ValueType>()) {}
-    void pruneInactive(const ValueType&) {}
     void addLeaf(LeafNode*) {}
     template<typename AccessorT>
     void addLeafAndCache(LeafNode*, AccessorT&) {}
