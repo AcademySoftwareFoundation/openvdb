@@ -42,7 +42,6 @@
 #include <openvdb/math/Math.h> // for isNegative and negative
 #include <openvdb/Types.h> // for Index typedef
 #include <boost/static_assert.hpp>
-#include <openvdb/Types.h>
 #include <openvdb/tree/NodeManager.h>
 
 namespace openvdb {
@@ -54,14 +53,17 @@ namespace tools {
 /// tree. The sign of the background value is perserved and only
 /// inactive values equal to the old background value are replaced.
 ///
-/// @param tree          Tree that will have its background value changed
+/// @note If a LeafManager is used the cached leaf nodes are reused
+/// resulting in slightly better overall performance.
+///
+/// @param tree          Tree (or LeafManager) that will have its background value changed
 /// @param background    The new background value
 /// @param threaded      Enable or disable threading.  (Threading is enabled by default.)
 /// @param grainSize     Used to control the granularity of the multithreaded. (default is 32).    
-template<typename TreeT>
+template<typename TreeOrLeafManagerT>
 inline void
-changeBackground(TreeT& tree,
-                 const typename TreeT::ValueType& background,
+changeBackground(TreeOrLeafManagerT& tree,
+                 const typename TreeOrLeafManagerT::ValueType& background,
                  bool threaded = true,
                  size_t grainSize = 32);
 
@@ -73,18 +75,19 @@ changeBackground(TreeT& tree,
 ///
 /// @note This method is faster then changeBackground since it does not
 /// perform tests to see if inactive values are equal to the old
-/// background value.    
+/// background value. If a LeafManager is used the cached leaf nodes are reused
+/// resulting in slightly better overall performance.    
 ///
-/// @param tree          Tree that will have its background value changed
+/// @param tree          Tree (or LeafManager) that will have its background value changed
 /// @param halfWidth     Half of the width of the symmetric narrow band
 /// @param threaded      Enable or disable threading.  (Threading is enabled by default.)
 /// @param grainSize     Used to control the granularity of the multithreaded. (default is 32).    
 ///
 /// @throw ValueError if @a halfWidth is negative (as defined by math::isNegative).    
-template<typename TreeT>
+template<typename TreeOrLeafManagerT>
 inline void
-changeLevelSetBackground(TreeT& tree,
-                         const typename TreeT::ValueType& halfWidth,
+changeLevelSetBackground(TreeOrLeafManagerT& tree,
+                         const typename TreeOrLeafManagerT::ValueType& halfWidth,
                          bool threaded = true,
                          size_t grainSize = 32);
 
@@ -98,9 +101,10 @@ changeLevelSetBackground(TreeT& tree,
 ///
 /// @note This method is faster then changeBackground since it does not
 /// perform tests to see if inactive values are equal to the old
-/// background value.  
+/// background value. If a LeafManager is used the cached leaf nodes are reused
+/// resulting in slightly better overall performance.
 ///
-/// @param tree          Tree that will have its background value changed
+/// @param tree          Tree (or LeafManager) that will have its background value changed
 /// @param outsideWidth  The width of the outside of the narrow band
 /// @param insideWidth   The width of the inside of the narrow band
 /// @param threaded      Enable or disable threading.  (Threading is enabled by default.)
@@ -108,11 +112,11 @@ changeLevelSetBackground(TreeT& tree,
 /// 
 /// @throw ValueError if @a outsideWidth is negative or @a insideWidth is
 /// not negative (as defined by math::isNegative).    
-template<typename TreeT>
+template<typename TreeOrLeafManagerT>
 inline void
-changeLevelSetBackground(TreeT& tree,
-                         const typename TreeT::ValueType& outsideWidth,
-                         const typename TreeT::ValueType& insideWidth,
+changeLevelSetBackground(TreeOrLeafManagerT& tree,
+                         const typename TreeOrLeafManagerT::ValueType& outsideWidth,
+                         const typename TreeOrLeafManagerT::ValueType& insideWidth,
                          bool threaded = true,
                          size_t grainSize = 32);
 
@@ -120,17 +124,17 @@ changeLevelSetBackground(TreeT& tree,
 
 
 // Replaces the background value in a Tree of any type.    
-template<typename TreeT>
+template<typename TreeOrLeafManagerT>
 class ChangeBackgroundOp
 {
 public:
-    typedef typename TreeT::ValueType    ValueT;
-    typedef typename TreeT::RootNodeType RootT;
-    typedef typename TreeT::LeafNodeType LeafT;
+    typedef typename TreeOrLeafManagerT::ValueType    ValueT;
+    typedef typename TreeOrLeafManagerT::RootNodeType RootT;
+    typedef typename TreeOrLeafManagerT::LeafNodeType LeafT;
 
     
-    ChangeBackgroundOp(const TreeT& tree, const ValueT& newValue)
-        : mOldValue(tree.background())
+    ChangeBackgroundOp(const TreeOrLeafManagerT& tree, const ValueT& newValue)
+        : mOldValue(tree.root().background())
         , mNewValue(newValue)
     {
     }
@@ -167,13 +171,13 @@ private:
 // level set. It is generally faster then ChangeBackgroundOp.
 // Note that is follows the sign-convension that outside is positive
 // and inside is negative!    
-template<typename TreeT>
+template<typename TreeOrLeafManagerT>
 class ChangeLevelSetBackgroundOp
 {
 public:
-    typedef typename TreeT::ValueType    ValueT;
-    typedef typename TreeT::RootNodeType RootT;
-    typedef typename TreeT::LeafNodeType LeafT;
+    typedef typename TreeOrLeafManagerT::ValueType    ValueT;
+    typedef typename TreeOrLeafManagerT::RootNodeType RootT;
+    typedef typename TreeOrLeafManagerT::LeafNodeType LeafT;
     
     /// @brief Constructor for asymetric narrow-bands
     ChangeLevelSetBackgroundOp(const ValueT& outside, const ValueT& inside)
@@ -217,35 +221,35 @@ private:
 };// ChangeLevelSetBackgroundOp
 
     
-template<typename TreeT>
-void changeBackground(TreeT& tree,
-                      const typename TreeT::ValueType& background,
+template<typename TreeOrLeafManagerT>
+void changeBackground(TreeOrLeafManagerT& tree,
+                      const typename TreeOrLeafManagerT::ValueType& background,
                       bool threaded,
                       size_t grainSize)
 {
-    tree::NodeManager<TreeT> linearTree(tree);
-    ChangeBackgroundOp<TreeT> op(tree, background);
+    tree::NodeManager<TreeOrLeafManagerT> linearTree(tree);
+    ChangeBackgroundOp<TreeOrLeafManagerT> op(tree, background);
     linearTree.processTopDown(op, threaded, grainSize);
 }
 
-template <typename TreeT>    
+template <typename TreeOrLeafManagerT>    
 inline void
-changeLevelSetBackground(TreeT& tree,
-                         const typename TreeT::ValueType& outsideValue,
-                         const typename TreeT::ValueType& insideValue,
+changeLevelSetBackground(TreeOrLeafManagerT& tree,
+                         const typename TreeOrLeafManagerT::ValueType& outsideValue,
+                         const typename TreeOrLeafManagerT::ValueType& insideValue,
                          bool threaded,
                          size_t grainSize)
 {
-    tree::NodeManager<TreeT> linearTree(tree);
-    ChangeLevelSetBackgroundOp<TreeT> op(outsideValue, insideValue);
+    tree::NodeManager<TreeOrLeafManagerT> linearTree(tree);
+    ChangeLevelSetBackgroundOp<TreeOrLeafManagerT> op(outsideValue, insideValue);
     linearTree.processTopDown(op, threaded, grainSize);
 }
 
 // If the narrow-band is symmetric only one background value is required    
-template <typename TreeT>    
+template <typename TreeOrLeafManagerT>    
 inline void
-changeLevelSetBackground(TreeT& tree,
-                         const typename TreeT::ValueType& background,
+changeLevelSetBackground(TreeOrLeafManagerT& tree,
+                         const typename TreeOrLeafManagerT::ValueType& background,
                          bool threaded,
                          size_t grainSize)
 {

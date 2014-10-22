@@ -33,10 +33,15 @@
 /// @author Ken Museth
 ///
 /// @brief NodeManager produces linear arrays of all tree nodes
-/// allowing for efficient multi-threading and bottom-up processing.
+///        allowing for efficient multi-threading and bottom-up
+///        processing. 
+///
+/// @note A NodeManager can be constructed from a Tree or LeafManager.
+///       The latter is slightly more efficient since the cached leaf
+///       nodes will be reused.
 ///
 /// @todo Currently NodeManager only support a maximum DEPTH of
-/// 5.This will be generalized to any DEPTH soon.
+///       5.This will be generalized to any DEPTH soon.
 ///
 
 #ifndef OPENVDB_TREE_NODEMANAGER_HAS_BEEN_INCLUDED
@@ -52,8 +57,8 @@ namespace OPENVDB_VERSION_NAME {
 namespace tree {
 
 /// @brief Produces linear arrays of all tree nodes
-/// allowing for efficient multi-threading and bottom-up processing.
-template<typename TreeT, Index LEVELS = TreeT::DEPTH-1>
+/// allowing for efficient multi-threading and bottom-up processing.    
+template<typename TreeOrLeafManagerT, Index LEVELS = TreeOrLeafManagerT::RootNodeType::LEVEL>
 class NodeManager;
 
 ////////////////////////////////////////
@@ -69,11 +74,15 @@ public:
 
     void push_back(NodeT* node) { mList.push_back(node); }
 
-    NodeT& operator()(size_t idx) const { return *(mList[idx]); }
+    NodeT& operator()(size_t n) const { assert(n<mList.size()); return *(mList[n]); }
 
+    NodeT*& operator[](size_t n) { assert(n<mList.size()); return mList[n]; }
+    
     Index64 nodeCount() const { return mList.size(); }
 
     void clear() { mList.clear(); }
+
+    void resize(size_t n) { mList.resize(n); }
 
     class NodeRange
     {
@@ -185,12 +194,13 @@ protected:
 
 ////////////////////////////////////////////
 
-template<typename TreeT>
+template<typename TreeOrLeafManagerT>
 class NodeManager0
 {
 public:
-    BOOST_STATIC_ASSERT(TreeT::DEPTH > 0);
-    NodeManager0(TreeT& tree) : mTree(&tree) { this->rebuild(); }
+    typedef typename TreeOrLeafManagerT::RootNodeType RootNodeType;
+    
+    NodeManager0(TreeOrLeafManagerT& tree) : mRoot(tree.root()) {}
 
     virtual ~NodeManager0() {}
 
@@ -198,51 +208,51 @@ public:
 
     void rebuild() {}
 
-    const TreeT& tree() const { return *mTree; }
+    const RootNodeType& root() const { return mRoot; }
 
-    /// @brief Return the total number of cached nodes
+    /// @brief Return the total number of cached nodes (excluding the root node)
     Index64 nodeCount() const { return 0; }
 
     Index64 nodeCount(Index) const { return 0; }
 
     template<typename NodeOp>
-    void processBottomUp(const NodeOp& op, bool, size_t)
-    {
-        op(mTree->root());
-    }
+    void processBottomUp(const NodeOp& op, bool, size_t) { op(mRoot); }
 
     template<typename NodeOp>
-    void processTopDown(const NodeOp& op, bool, size_t)
-    {
-        op(mTree->root());
-    }
+    void processTopDown(const NodeOp& op, bool, size_t) { op(mRoot); }
 
 protected:
 
-    TreeT* mTree;
+    RootNodeType& mRoot;
 };// NodeManager0
 
 ////////////////////////////////////////////
 
-template<typename TreeT>
+template<typename TreeOrLeafManagerT>
 class NodeManager1
 {
 public:
-    BOOST_STATIC_ASSERT(TreeT::DEPTH > 1);
-    NodeManager1(TreeT& tree) : mTree(&tree) { this->rebuild(); }
+    typedef typename TreeOrLeafManagerT::RootNodeType RootNodeType;
+    BOOST_STATIC_ASSERT(RootNodeType::LEVEL > 0);
+    
+    NodeManager1(TreeOrLeafManagerT& tree) : mRoot(tree.root())
+    {
+        if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
+            tree.getNodes(mList0);
+        } else {
+            this->rebuild();
+        }
+    }
 
     virtual ~NodeManager1() {}
 
     void clear() { mList0.clear(); }
 
-    void rebuild()
-    {
-        mTree->root().getNodes(mList0);
-    }
+    void rebuild() { mRoot.getNodes(mList0); }
 
-    const TreeT& tree() const { return *mTree; }
+    const RootNodeType& root() const { return mRoot; }
 
-    /// @brief Return the total number of cached nodes
+    /// @brief Return the total number of cached nodes (excluding the root node)
     Index64 nodeCount() const { return mList0.nodeCount(); }
 
     /// @brief Return the number of cached nodes at level @a i, where
@@ -253,33 +263,44 @@ public:
     void processBottomUp(const NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
         mList0.foreach(op, threaded, grainSize);
-        op(mTree->root());
+        op(mRoot);
     }
 
     template<typename NodeOp>
     void processTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
-        op(mTree->root());
+        op(mRoot);
         mList0.foreach(op, threaded, grainSize);
     }
 
 protected:
-    typedef typename TreeT::RootNodeType::ChildNodeType NodeT0;
+    typedef RootNodeType                   NodeT1;
+    typedef typename NodeT1::ChildNodeType NodeT0;
+    typedef NodeList<NodeT0>               ListT0;
 
-    typedef NodeList<NodeT0>                            ListT0;
-
-    TreeT* mTree;
+    NodeT1& mRoot;
     ListT0 mList0;
 };// NodeManager1
 
 ////////////////////////////////////////////
 
-template<typename TreeT>
+template<typename TreeOrLeafManagerT>
 class NodeManager2
 {
 public:
-    BOOST_STATIC_ASSERT(TreeT::DEPTH > 2);
-    NodeManager2(TreeT& tree) : mTree(&tree) { this->rebuild(); }
+    typedef typename TreeOrLeafManagerT::RootNodeType RootNodeType;
+    BOOST_STATIC_ASSERT(RootNodeType::LEVEL > 1);
+    
+    NodeManager2(TreeOrLeafManagerT& tree) : mRoot(tree.root())
+    {
+        mRoot.getNodes(mList1);
+        if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
+            tree.getNodes(mList0);
+        } else {
+            for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
+        }
+    }
+    
 
     virtual ~NodeManager2() {}
 
@@ -287,13 +308,13 @@ public:
 
     void rebuild()
     {
-        mTree->root().getNodes(mList1);
+        mRoot.getNodes(mList1);
         for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
     }
 
-    const TreeT& tree() const { return *mTree; }
+    const RootNodeType& root() const { return mRoot; }
 
-    /// @brief Return the total number of cached nodes
+    /// @brief Return the total number of cached nodes (excluding the root node)
     Index64 nodeCount() const { return mList0.nodeCount() + mList1.nodeCount(); }
 
     /// @brief Return the number of cached nodes at level @a i, where
@@ -308,37 +329,50 @@ public:
     {
         mList0.foreach(op, threaded, grainSize);
         mList1.foreach(op, threaded, grainSize);
-        op(mTree->root());
+        op(mRoot);
     }
 
     template<typename NodeOp>
     void processTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
-        op(mTree->root());
+        op(mRoot);
         mList1.foreach(op, threaded, grainSize);
         mList0.foreach(op, threaded, grainSize);
     }
 
 protected:
-    typedef typename TreeT::RootNodeType::ChildNodeType NodeT1;//upper level
-    typedef typename NodeT1::ChildNodeType              NodeT0;//lower level
+    typedef RootNodeType                   NodeT2;
+    typedef typename NodeT2::ChildNodeType NodeT1;//upper level
+    typedef typename NodeT1::ChildNodeType NodeT0;//lower level
 
-    typedef NodeList<NodeT1>                            ListT1;//upper level
-    typedef NodeList<NodeT0>                            ListT0;//lower level
+    typedef NodeList<NodeT1>               ListT1;//upper level
+    typedef NodeList<NodeT0>               ListT0;//lower level
 
-    TreeT* mTree;
+    NodeT2& mRoot;
     ListT1 mList1;
     ListT0 mList0;
 };// NodeManager2
 
 ////////////////////////////////////////////
 
-template<typename TreeT>
+template<typename TreeOrLeafManagerT>
 class NodeManager3
 {
 public:
-    BOOST_STATIC_ASSERT(TreeT::DEPTH > 3);
-    NodeManager3(TreeT& tree) : mTree(&tree) { this->rebuild(); }
+    typedef typename TreeOrLeafManagerT::RootNodeType RootNodeType;
+    BOOST_STATIC_ASSERT(RootNodeType::LEVEL > 2);
+    
+    NodeManager3(TreeOrLeafManagerT& tree) : mRoot(tree.root())
+    {
+        mRoot.getNodes(mList2);
+        for (size_t i=0, n=mList2.nodeCount(); i<n; ++i) mList2(i).getNodes(mList1);
+
+        if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
+            tree.getNodes(mList0);
+        } else {
+            for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
+        }
+    }
 
     virtual ~NodeManager3() {}
 
@@ -346,14 +380,14 @@ public:
 
     void rebuild()
     {
-        mTree->root().getNodes(mList2);
+        mRoot.getNodes(mList2);
         for (size_t i=0, n=mList2.nodeCount(); i<n; ++i) mList2(i).getNodes(mList1);
         for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
     }
 
-    const TreeT& tree() const { return *mTree; }
+    const RootNodeType& root() const { return mRoot; }
 
-    /// @brief Return the total number of cached nodes
+    /// @brief Return the total number of cached nodes (excluding the root node)
     Index64 nodeCount() const { return mList0.nodeCount() + mList1.nodeCount() + mList2.nodeCount(); }
 
     /// @brief Return the number of cached nodes at level @a i, where
@@ -369,28 +403,29 @@ public:
         mList0.foreach(op, threaded, grainSize);
         mList1.foreach(op, threaded, grainSize);
         mList2.foreach(op, threaded, grainSize);
-        op(mTree->root());
+        op(mRoot);
     }
 
     template<typename NodeOp>
     void processTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
-        op(mTree->root());
+        op(mRoot);
         mList2.foreach(op, threaded, grainSize);
         mList1.foreach(op, threaded, grainSize);
         mList0.foreach(op, threaded, grainSize);
     }
 
 protected:
-    typedef typename TreeT::RootNodeType::ChildNodeType NodeT2;//upper level
-    typedef typename NodeT2::ChildNodeType              NodeT1;//mid level
-    typedef typename NodeT1::ChildNodeType              NodeT0;//lower level
+    typedef RootNodeType                   NodeT3;
+    typedef typename NodeT3::ChildNodeType NodeT2;//upper level
+    typedef typename NodeT2::ChildNodeType NodeT1;//mid level
+    typedef typename NodeT1::ChildNodeType NodeT0;//lower level
 
-    typedef NodeList<NodeT2>                            ListT2;//upper level of internal nodes
-    typedef NodeList<NodeT1>                            ListT1;//lower level of internal nodes
-    typedef NodeList<NodeT0>                            ListT0;//lower level of internal nodes or leafs
+    typedef NodeList<NodeT2>                     ListT2;//upper level of internal nodes
+    typedef NodeList<NodeT1>                     ListT1;//lower level of internal nodes
+    typedef NodeList<NodeT0>                     ListT0;//lower level of internal nodes or leafs
 
-    TreeT* mTree;
+    NodeT3& mRoot;
     ListT2 mList2;
     ListT1 mList1;
     ListT0 mList0;
@@ -398,12 +433,25 @@ protected:
 
 ////////////////////////////////////////////
 
-template<typename TreeT>
+template<typename TreeOrLeafManagerT>
 class NodeManager4
 {
 public:
-    BOOST_STATIC_ASSERT(TreeT::DEPTH > 4);
-    NodeManager4(TreeT& tree) : mTree(&tree) { this->rebuild(); }
+    typedef typename TreeOrLeafManagerT::RootNodeType RootNodeType;
+    BOOST_STATIC_ASSERT(RootNodeType::LEVEL > 3);
+
+    NodeManager4(TreeOrLeafManagerT& tree) : mRoot(tree.root())
+    {
+        mRoot.getNodes(mList2);
+        for (size_t i=0, n=mList3.nodeCount(); i<n; ++i) mList3(i).getNodes(mList2);
+        for (size_t i=0, n=mList2.nodeCount(); i<n; ++i) mList2(i).getNodes(mList1);
+
+        if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
+            tree.getNodes(mList0);
+        } else {
+            for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
+        }
+    }
 
     virtual ~NodeManager4() {}
 
@@ -411,15 +459,15 @@ public:
 
     void rebuild()
     {
-        mTree->root().getNodes(mList3);
+        mRoot.getNodes(mList3);
         for (size_t i=0, n=mList3.nodeCount(); i<n; ++i) mList3(i).getNodes(mList2);
         for (size_t i=0, n=mList2.nodeCount(); i<n; ++i) mList2(i).getNodes(mList1);
         for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
     }
+    
+    const RootNodeType& root() const { return mRoot; }
 
-    const TreeT& tree() const { return *mTree; }
-
-    /// @brief Return the total number of cached nodes
+    /// @brief Return the total number of cached nodes (excluding the root node)
     Index64 nodeCount() const
     {
         return mList0.nodeCount() + mList1.nodeCount()
@@ -441,13 +489,13 @@ public:
         mList1.foreach(op, threaded, grainSize);
         mList2.foreach(op, threaded, grainSize);
         mList3.foreach(op, threaded, grainSize);
-        op(mTree->root());
+        op(mRoot);
     }
 
     template<typename NodeOp>
     void processTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
-        op(mTree->root());
+        op(mRoot);
         mList3.foreach(op, threaded, grainSize);
         mList2.foreach(op, threaded, grainSize);
         mList1.foreach(op, threaded, grainSize);
@@ -455,85 +503,81 @@ public:
     }
 
 protected:
-    typedef typename TreeT::RootNodeType::ChildNodeType NodeT3;//upper level
-    typedef typename NodeT3::ChildNodeType              NodeT2;//upper mid level
-    typedef typename NodeT2::ChildNodeType              NodeT1;//lower mid level
-    typedef typename NodeT1::ChildNodeType              NodeT0;//lower level
+    typedef RootNodeType                   NodeT4;
+    typedef typename NodeT4::ChildNodeType NodeT3;//upper level
+    typedef typename NodeT3::ChildNodeType NodeT2;//upper mid level
+    typedef typename NodeT2::ChildNodeType NodeT1;//lower mid level
+    typedef typename NodeT1::ChildNodeType NodeT0;//lower level
 
-    typedef NodeList<NodeT3>                            ListT3;//upper level of internal nodes
-    typedef NodeList<NodeT2>                            ListT2;//upper mid level of internal nodes
-    typedef NodeList<NodeT1>                            ListT1;//lower mid level of internal nodes
-    typedef NodeList<NodeT0>                            ListT0;//lower level of internal nodes or leafs
+    typedef NodeList<NodeT3>               ListT3;//upper level of internal nodes
+    typedef NodeList<NodeT2>               ListT2;//upper mid level of internal nodes
+    typedef NodeList<NodeT1>               ListT1;//lower mid level of internal nodes
+    typedef NodeList<NodeT0>               ListT0;//lower level of internal nodes or leafs
 
-    TreeT* mTree;
-    ListT3 mList3;
-    ListT2 mList2;
-    ListT1 mList1;
-    ListT0 mList0;
+    NodeT4& mRoot;
+    ListT3  mList3;
+    ListT2  mList2;
+    ListT1  mList1;
+    ListT0  mList0;
 };// NodeManager4
 
 ////////////////////////////////////////////
 
 /// Template specialization of the NodeManager with no caching of nodes
-template<typename TreeT>
-class NodeManager<TreeT, 0> : public NodeManager0<TreeT>
+template<typename TreeOrLeafManagerT>
+class NodeManager<TreeOrLeafManagerT, 0> : public NodeManager0<TreeOrLeafManagerT>
 {
 public:
-    typedef TreeT TreeType;
     static const Index LEVELS = 0;
-    NodeManager(TreeT& tree): NodeManager0<TreeT>(tree) {}
+    NodeManager(TreeOrLeafManagerT& tree): NodeManager0<TreeOrLeafManagerT>(tree) {}
     virtual ~NodeManager() {}
 private:
     NodeManager(const NodeManager&) {}//disallow copy-construction
 };
 
 /// Template specialization of the NodeManager with one level of nodes
-template<typename TreeT>
-class NodeManager<TreeT, 1> : public NodeManager1<TreeT>
+template<typename TreeOrLeafManagerT>
+class NodeManager<TreeOrLeafManagerT, 1> : public NodeManager1<TreeOrLeafManagerT>
 {
 public:
-    typedef TreeT TreeType;
     static const Index LEVELS = 1;
-    NodeManager(TreeT& tree): NodeManager1<TreeT>(tree) {}
+    NodeManager(TreeOrLeafManagerT& tree): NodeManager1<TreeOrLeafManagerT>(tree) {}
     virtual ~NodeManager() {}
 private:
     NodeManager(const NodeManager&) {}//disallow copy-construction
 };
 
 /// Template specialization of the NodeManager with two levels of nodes
-template<typename TreeT>
-class NodeManager<TreeT, 2> : public NodeManager2<TreeT>
+template<typename TreeOrLeafManagerT>
+class NodeManager<TreeOrLeafManagerT, 2> : public NodeManager2<TreeOrLeafManagerT>
 {
 public:
-    typedef TreeT TreeType;
     static const Index LEVELS = 2;
-    NodeManager(TreeT& tree): NodeManager2<TreeT>(tree) {}
+    NodeManager(TreeOrLeafManagerT& tree): NodeManager2<TreeOrLeafManagerT>(tree) {}
     virtual ~NodeManager() {}
 private:
     NodeManager(const NodeManager&) {}//disallow copy-construction
 };
 
 /// Template specialization of the NodeManager with three levels of nodes
-template<typename TreeT>
-class NodeManager<TreeT, 3> : public NodeManager3<TreeT>
+template<typename TreeOrLeafManagerT>
+class NodeManager<TreeOrLeafManagerT, 3> : public NodeManager3<TreeOrLeafManagerT>
 {
 public:
-    typedef TreeT TreeType;
     static const Index LEVELS = 3;
-    NodeManager(TreeT& tree): NodeManager3<TreeT>(tree) {}
+    NodeManager(TreeOrLeafManagerT& tree): NodeManager3<TreeOrLeafManagerT>(tree) {}
     virtual ~NodeManager() {}
 private:
     NodeManager(const NodeManager&) {}//disallow copy-construction
 };
 
 /// Template specialization of the NodeManager with four levels of nodes
-template<typename TreeT>
-class NodeManager<TreeT, 4> : public NodeManager4<TreeT>
+template<typename TreeOrLeafManagerT>
+class NodeManager<TreeOrLeafManagerT, 4> : public NodeManager4<TreeOrLeafManagerT>
 {
 public:
-    typedef TreeT TreeType;
     static const Index LEVELS = 4;
-    NodeManager(TreeT& tree): NodeManager2<TreeT>(tree) {}
+    NodeManager(TreeOrLeafManagerT& tree): NodeManager2<TreeOrLeafManagerT>(tree) {}
     virtual ~NodeManager() {}
 private:
     NodeManager(const NodeManager&) {}//disallow copy-construction
