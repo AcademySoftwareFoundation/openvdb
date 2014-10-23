@@ -2043,12 +2043,6 @@ geoUnion(GridTypeA& grid_a, const GridTypeB &grid_b, bool setvalue, double value
         return;
     }
 
-    if (!doclip && !setvalue)
-    {
-	grid_a.tree().topologyUnion(grid_b.tree());
-	return;
-    }
-
     // For each on value in b, set a on
     for (typename GridTypeB::ValueOnCIter iter = grid_b.cbeginValueOn(); iter; ++iter) {
         openvdb::CoordBBox bbox = iter.getBoundingBox();
