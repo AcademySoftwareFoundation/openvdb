@@ -577,7 +577,7 @@ class NodeManager<TreeOrLeafManagerT, 4> : public NodeManager4<TreeOrLeafManager
 {
 public:
     static const Index LEVELS = 4;
-    NodeManager(TreeOrLeafManagerT& tree): NodeManager2<TreeOrLeafManagerT>(tree) {}
+    NodeManager(TreeOrLeafManagerT& tree): NodeManager4<TreeOrLeafManagerT>(tree) {}
     virtual ~NodeManager() {}
 private:
     NodeManager(const NodeManager&) {}//disallow copy-construction

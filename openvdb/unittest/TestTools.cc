@@ -69,6 +69,7 @@ public:
     CPPUNIT_TEST(testFilter);
     CPPUNIT_TEST(testFloatApply);
     CPPUNIT_TEST(testLevelSetSphere);
+    CPPUNIT_TEST(testLevelSetSphereDepth4);
     CPPUNIT_TEST(testLevelSetAdvect);
     CPPUNIT_TEST(testLevelSetMeasure);
     CPPUNIT_TEST(testLevelSetMorph);
@@ -93,6 +94,7 @@ public:
     void testFilter();
     void testFloatApply();
     void testLevelSetSphere();
+    void testLevelSetSphereDepth4();
     void testLevelSetAdvect();
     void testLevelSetMeasure();
     void testLevelSetMorph();
@@ -855,6 +857,50 @@ TestTools::testLevelSetSphere()
 
     CPPUNIT_ASSERT_EQUAL(grid1->activeVoxelCount(), grid2->activeVoxelCount());
 }
+
+void
+TestTools::testLevelSetSphereDepth4()
+{
+    const float radius = 4.3f;
+    const openvdb::Vec3f center(15.8f, 13.2f, 16.7f);
+    const float voxelSize = 1.5f, width = 3.25f;
+    const int dim = 32;
+
+    typedef openvdb::Grid<openvdb::tree::Tree5<float, 3, 5, 3, 3>::Type> GridT;
+
+    GridT::Ptr grid1 =
+        openvdb::tools::createLevelSetSphere<GridT>(radius, center, voxelSize, width);
+
+    /// Also test ultra slow makeSphere in unittest/util.h
+    GridT::Ptr grid2 = openvdb::createLevelSet<GridT>(voxelSize, width);
+    unittest_util::makeSphere<GridT>(
+        openvdb::Coord(dim), center, radius, *grid2, unittest_util::SPHERE_SPARSE_NARROW_BAND);
+
+    const float outside = grid1->background(), inside = -outside;
+    for (int i=0; i<dim; ++i) {
+        for (int j=0; j<dim; ++j) {
+            for (int k=0; k<dim; ++k) {
+                const openvdb::Vec3f p(voxelSize*float(i), voxelSize*float(j), voxelSize*float(k));
+                const float dist = (p-center).length() - radius;
+                const float val1 = grid1->tree().getValue(openvdb::Coord(i,j,k));
+                const float val2 = grid2->tree().getValue(openvdb::Coord(i,j,k));
+                if (dist > outside) {
+                    CPPUNIT_ASSERT_DOUBLES_EQUAL( outside, val1, 0.0001);
+                    CPPUNIT_ASSERT_DOUBLES_EQUAL( outside, val2, 0.0001);
+                } else if (dist < inside) {
+                    CPPUNIT_ASSERT_DOUBLES_EQUAL( inside, val1, 0.0001);
+                    CPPUNIT_ASSERT_DOUBLES_EQUAL( inside, val2, 0.0001);
+                } else {
+                    CPPUNIT_ASSERT_DOUBLES_EQUAL(  dist, val1, 0.0001);
+                    CPPUNIT_ASSERT_DOUBLES_EQUAL(  dist, val2, 0.0001);
+                }
+            }
+        }
+    }
+
+    CPPUNIT_ASSERT_EQUAL(grid1->activeVoxelCount(), grid2->activeVoxelCount());
+}
+
 
 void
 TestTools::testLevelSetAdvect()
