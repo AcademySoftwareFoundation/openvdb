@@ -1,7 +1,32 @@
-// DreamWorks Animation LLC Confidential Information.
-// TM and (c) 2014 DreamWorks Animation LLC.  All Rights Reserved.
-// Reproduction in whole or in part without prior written permission of a
-// duly authorized representative is prohibited.
+///////////////////////////////////////////////////////////////////////////
+//
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
+//
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
+//
+// Redistributions of source code must retain the above copyright
+// and license notice and the following restrictions and disclaimer.
+//
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
+// from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
+// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
+//
+///////////////////////////////////////////////////////////////////////////
 //
 /// @file AttributeArray.cc
 ///
@@ -10,6 +35,9 @@
 /// @authors Mihai Alden, Peter Cucka
 
 #include "AttributeArray.h"
+
+#include <algorithm> // std::equal
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -72,7 +100,7 @@ __pragma(warning(default:1711))
 
 
 AttributeArray::Ptr
-AttributeArray::create(const openvdb::Name& type, size_t length)
+AttributeArray::create(const Name& type, size_t length)
 {
     LockedAttributeRegistry* registry = getAttributeRegistry();
     tbb::spin_mutex::scoped_lock lock(registry->mMutex);
@@ -80,7 +108,7 @@ AttributeArray::create(const openvdb::Name& type, size_t length)
     AttributeFactoryMapCIter iter = registry->mMap.find(type);
 
     if (iter == registry->mMap.end()) {
-        OPENVDB_THROW(openvdb::LookupError, "Cannot create attribute of unregistered type " << type);
+        OPENVDB_THROW(LookupError, "Cannot create attribute of unregistered type " << type);
     }
 
     return (iter->second)(length);
@@ -88,7 +116,7 @@ AttributeArray::create(const openvdb::Name& type, size_t length)
 
 
 bool
-AttributeArray::isRegistered(const openvdb::Name &type)
+AttributeArray::isRegistered(const Name &type)
 {
     LockedAttributeRegistry* registry = getAttributeRegistry();
     tbb::spin_mutex::scoped_lock lock(registry->mMutex);
@@ -106,21 +134,25 @@ AttributeArray::clearRegistry()
 
 
 void
-AttributeArray::registerType(const openvdb::Name& type, FactoryMethod factory)
+AttributeArray::registerType(const Name& type, FactoryMethod factory)
 {
     LockedAttributeRegistry* registry = getAttributeRegistry();
     tbb::spin_mutex::scoped_lock lock(registry->mMutex);
 
-    if (registry->mMap.find(type) != registry->mMap.end()) {
-        OPENVDB_THROW(openvdb::KeyError, "Attribute type " << type << " is already registered");
-    }
+    AttributeFactoryMapCIter iter = registry->mMap.find(type);
 
-    registry->mMap[type] = factory;
+    if (iter == registry->mMap.end()) {
+        registry->mMap[type] = factory;
+
+    } else if (iter->second != factory) {
+        OPENVDB_THROW(KeyError, "Attribute type " << type
+            << " is already registered with different factory method.");
+    }
 }
 
 
 void
-AttributeArray::unregisterType(const openvdb::Name& type)
+AttributeArray::unregisterType(const Name& type)
 {
     LockedAttributeRegistry* registry = getAttributeRegistry();
     tbb::spin_mutex::scoped_lock lock(registry->mMutex);
@@ -132,16 +164,16 @@ AttributeArray::unregisterType(const openvdb::Name& type)
 void
 AttributeArray::setTransient(bool state)
 {
-    if (state) mFlags |= TRANSIENT;
-    else mFlags &= ~TRANSIENT;
+    if (state) mFlags |= Int16(TRANSIENT);
+    else mFlags &= ~Int16(TRANSIENT);
 }
 
 
 void
 AttributeArray::setHidden(bool state)
 {
-    if (state) mFlags |= HIDDEN;
-    else mFlags &= ~HIDDEN;
+    if (state) mFlags |= Int16(HIDDEN);
+    else mFlags &= ~Int16(HIDDEN);
 }
 
 
@@ -149,7 +181,20 @@ AttributeArray::setHidden(bool state)
 
 // AttributeSet implementation
 
-
+/*
+bool validTypes(const std::string& t1, const std::string& t2, const Descriptor::TypeConstraint c)
+{
+    if (c == Descriptor::CONSTRAIN_TYPE) {
+        const size_t p = t1.find_first_of('_');
+        if (p == std::string::npos || t1.compare(0, p, t2) != 0) {
+            return false;
+        }
+    } else if (c == Descriptor::CONSTRAIN_TYPE_AND_CODEC && t1 != t2) {
+        return false;
+    }
+    return true;
+}
+*/
 AttributeSet::AttributeSet()
     : mDescr(new Descriptor())
     , mAttrs()
@@ -198,6 +243,29 @@ size_t
 AttributeSet::find(const std::string& name) const
 {
     return mDescr->find(name);
+}
+
+
+size_t
+AttributeSet::replace(const std::string& name, const AttributeArray::Ptr& attr)
+{
+    const size_t pos = this->find(name);
+    return pos != INVALID_POS ? this->replace(pos, attr) : pos;
+}
+
+
+size_t
+AttributeSet::replace(size_t pos, const AttributeArray::Ptr& attr)
+{
+    assert(pos != INVALID_POS);
+    assert(pos < mAttrs.size());
+
+    /*if (!validTypes(attr->type(), mDescr->type(pos), mDescr->typeConstraint())) {
+        return INVALID_POS;
+    }*/
+
+    mAttrs[pos] = attr;
+    return pos;
 }
 
 
@@ -290,26 +358,74 @@ AttributeSet::write(std::ostream&) const
 // AttributeSet::Descriptor implementation
 
 
+tbb::atomic<Index64> AttributeSet::Descriptor::sNextId;
+
+
+AttributeSet::Descriptor::Descriptor()
+    : mNameMap()
+    , mTypes()
+    , mId(sNextId++)
+{
+}
+
+
+bool
+AttributeSet::Descriptor::operator==(const Descriptor& rhs) const
+{
+    if (this == &rhs) return true;
+
+    if (mTypes.size()   != rhs.mTypes.size() ||
+        mNameMap.size() != rhs.mNameMap.size()) {
+        return false;
+    }
+
+    for (size_t n = 0, N = mTypes.size(); n < N; ++n) {
+        if (mTypes[n] != rhs.mTypes[n]) return false;
+    }
+
+    return std::equal(mNameMap.begin(), mNameMap.end(), rhs.mNameMap.begin());
+}
+
+
 size_t
 AttributeSet::Descriptor::memUsage() const
 {
-    size_t strBytes = 0;
-    for (AttrDictionary::const_iterator it = mDictionary.begin(),
-        end = mDictionary.end(); it != end; ++it) {
-        strBytes += it->first.size();
+    size_t bytes = sizeof(NameToPosMap::mapped_type) * this->size();
+    for (NameToPosMap::const_iterator it = mNameMap.begin(),
+        end = mNameMap.end(); it != end; ++it) {
+        bytes += it->first.capacity();
     }
-    return sizeof(*this) + sizeof(size_t) * mDictionary.size() + strBytes;
+
+    for (size_t n = 0, N = mTypes.size(); n < N; ++n) {
+         bytes += mTypes[n].capacity();
+    }
+
+    return sizeof(*this) + bytes;
 }
 
 
 size_t
 AttributeSet::Descriptor::find(const std::string& name) const
 {
-    AttrDictionary::const_iterator it = mDictionary.find(name);
-    if (it != mDictionary.end()) {
-        return it->second.pos;
+    NameToPosMap::const_iterator it = mNameMap.find(name);
+    if (it != mNameMap.end()) {
+        return it->second;
     }
     return INVALID_POS;
+}
+
+
+size_t
+AttributeSet::Descriptor::rename(const std::string& fromName, const std::string& toName)
+{
+    size_t pos = INVALID_POS;
+    NameToPosMap::iterator it = mNameMap.find(fromName);
+    if (it != mNameMap.end()) {
+        pos = it->second;
+        mNameMap.erase(it);
+        mNameMap[toName] = pos;
+    }
+    return pos;
 }
 
 
@@ -317,57 +433,39 @@ size_t
 AttributeSet::Descriptor::insert(const std::string& name, const std::string& typeName)
 {
     size_t pos = INVALID_POS;
-    AttrDictionary::iterator it = mDictionary.find(name);
-    if (it != mDictionary.end()) {
-        pos = it->second.pos;
+    NameToPosMap::iterator it = mNameMap.find(name);
+    if (it != mNameMap.end()) {
+        pos = it->second;
     } else {
-        pos = mNextPos++;
-        AttributeInfo info;
-        info.pos = pos;
-        info.typeName = typeName;
-        mDictionary.insert(it, AttrDictionary::value_type(name, info));
+
+        if (!AttributeArray::isRegistered(typeName)) {
+            OPENVDB_THROW(KeyError, "Failed to insert '" << name
+                << "' with unregistered attribute type '" << typeName);
+        }
+
+        pos = mTypes.size();
+        mTypes.push_back(typeName);
+        mNameMap.insert(it, NameToPosMap::value_type(name, pos));
     }
     return pos;
 }
 
 
 AttributeSet::Descriptor::Ptr
-AttributeSet::Descriptor::create(const std::set<std::string>& names)
+AttributeSet::Descriptor::create(const std::vector<NameAndType>& attrs)
 {
     Ptr descr(new Descriptor());
-
-    for (std::set<std::string>::const_iterator it = names.begin(),
-        end = names.end(); it != end; ++it) {
-        descr->insert(*it);
+    for (size_t n = 0, N = attrs.size(); n < N; ++n) {
+        const std::string& name = attrs[n].name;
+        if (name.length() > 0) {
+            descr->insert(name, attrs[n].type);
+        }
     }
     return descr;
 }
 
 
-AttributeSet::Descriptor::Ptr
-AttributeSet::Descriptor::create(const std::string& names)
-{
-    std::vector<std::string> splitvec;
-    boost::algorithm::split(splitvec, names, boost::is_any_of(", "));
-
-    std::set<std::string> nameset;
-    for (size_t n = 0, N = splitvec.size(); n < N; ++n) {
-        if (0 < splitvec[n].length()) nameset.insert(splitvec[n]);
-    }
-
-    return create(nameset);
-}
-
 ////////////////////////////////////////
-
-
-
-
-
-
-
-
-
 
 
 } // namespace tools
@@ -375,6 +473,6 @@ AttributeSet::Descriptor::create(const std::string& names)
 } // namespace openvdb
 
 
-// TM and (c) 2014 DreamWorks Animation LLC.  All Rights Reserved.
-// Reproduction in whole or in part without prior written permission of a
-// duly authorized representative is prohibited.
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,7 +1,32 @@
-// DreamWorks Animation LLC Confidential Information.
-// TM and (c) 2014 DreamWorks Animation LLC.  All Rights Reserved.
-// Reproduction in whole or in part without prior written permission of a
-// duly authorized representative is prohibited.
+///////////////////////////////////////////////////////////////////////////
+//
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
+//
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
+//
+// Redistributions of source code must retain the above copyright
+// and license notice and the following restrictions and disclaimer.
+//
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
+// from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
+// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
+//
+///////////////////////////////////////////////////////////////////////////
 //
 /// @file AttributeArray.h
 ///
@@ -21,8 +46,8 @@
 #include <tbb/spin_mutex.h>
 #include <tbb/atomic.h>
 
+#include <boost/scoped_array.hpp>
 #include <boost/integer_traits.hpp> // const_max
-#include <boost/algorithm/string.hpp> // split and is_any_of
 
 #include <set>
 #include <map>
@@ -58,10 +83,10 @@ fixedPointToFloatingPoint(const IntegerT s)
 
 
 template <typename IntegerT, typename FloatT>
-inline openvdb::math::Vec3<IntegerT>
-floatingPointToFixedPoint(const openvdb::math::Vec3<FloatT>& v)
+inline math::Vec3<IntegerT>
+floatingPointToFixedPoint(const math::Vec3<FloatT>& v)
 {
-    return openvdb::math::Vec3<IntegerT>(
+    return math::Vec3<IntegerT>(
         floatingPointToFixedPoint<IntegerT>(v.x()),
         floatingPointToFixedPoint<IntegerT>(v.y()),
         floatingPointToFixedPoint<IntegerT>(v.z()));
@@ -69,10 +94,10 @@ floatingPointToFixedPoint(const openvdb::math::Vec3<FloatT>& v)
 
 
 template <typename FloatT, typename IntegerT>
-inline openvdb::math::Vec3<FloatT>
-fixedPointToFloatingPoint(const openvdb::math::Vec3<IntegerT>& v)
+inline math::Vec3<FloatT>
+fixedPointToFloatingPoint(const math::Vec3<IntegerT>& v)
 {
-    return openvdb::math::Vec3<FloatT>(
+    return math::Vec3<FloatT>(
         fixedPointToFloatingPoint<FloatT>(v.x()),
         fixedPointToFloatingPoint<FloatT>(v.y()),
         fixedPointToFloatingPoint<FloatT>(v.z()));
@@ -81,25 +106,14 @@ fixedPointToFloatingPoint(const openvdb::math::Vec3<IntegerT>& v)
 
 ////////////////////////////////////////
 
-/// Attribute compression schemes
+// Attribute codec schemes
 
 template<typename StorageType_>
 struct NullAttributeCodec
 {
     typedef StorageType_ StorageType;
-
-    template<typename ValueType>
-    static void decode(const StorageType& data, ValueType& val)
-    {
-        val = static_cast<ValueType>(data);
-    }
-
-    template<typename ValueType>
-    static void encode(const StorageType& val, ValueType& data)
-    {
-        data = static_cast<StorageType>(val);
-    }
-
+    template<typename ValueType> static void decode(const StorageType&, ValueType&);
+    template<typename ValueType> static void encode(const StorageType&, ValueType&);
     static const char* name() { return "null"; }
 };
 
@@ -108,19 +122,8 @@ template<typename IntType>
 struct FixedPointAttributeCodec
 {
     typedef IntType StorageType;
-
-    template<typename ValueType>
-    static void decode(const StorageType& data, ValueType& val)
-    {
-        val = fixedPointToFloatingPoint<ValueType>(data);
-    }
-
-    template<typename ValueType>
-    static void encode(const ValueType& val, StorageType& data)
-    {
-        data = floatingPointToFixedPoint<StorageType>(val);
-    }
-
+    template<typename ValueType> static void decode(const StorageType&, ValueType&);
+    template<typename ValueType> static void encode(const ValueType&, StorageType&);
     static const char* name() { return "fxpt"; }
 };
 
@@ -128,53 +131,17 @@ struct FixedPointAttributeCodec
 struct UnitVecAttributeCodec
 {
     typedef uint16_t StorageType;
-
-    template<typename T>
-    static void decode(const StorageType& data, openvdb::math::Vec3<T>& val)
-    {
-        val = openvdb::math::QuantizedUnitVec::unpack(data);
-    }
-
-    template<typename T>
-    static void encode(const openvdb::math::Vec3<T>& val, StorageType& data)
-    {
-        data = openvdb::math::QuantizedUnitVec::pack(val);
-    }
-
+    template<typename T> static void decode(const StorageType&, math::Vec3<T>&);
+    template<typename T> static void encode(const math::Vec3<T>&, StorageType&);
     static const char* name() { return "uvec"; }
 };
 
 
 struct VelocityAttributeCodec
 {
-    struct QuantizedVelocity {
-        float magnitude;
-        uint16_t direction;
-    };
-
-    typedef QuantizedVelocity StorageType;
-
-    template<typename T>
-    static void decode(const StorageType& data, openvdb::math::Vec3<T>& val)
-    {
-        val = openvdb::math::QuantizedUnitVec::unpack(data.direction);
-        val *= T(data.magnitude);
-    }
-
-    template<typename T>
-    static void encode(const openvdb::math::Vec3<T>& val, StorageType& data)
-    {
-        const double d = val.length();
-        data.magnitude = static_cast<float>(d);
-
-        openvdb::math::Vec3d dir = val;
-        if (!openvdb::math::isApproxEqual(d, 0.0, openvdb::math::Tolerance<double>::value())) {
-            dir *= 1.0 / d;
-        }
-
-        data.direction = openvdb::math::QuantizedUnitVec::pack(dir);
-    }
-
+    struct StorageType { float magnitude; uint16_t direction; };
+    template<typename T> static void decode(const StorageType&, math::Vec3<T>&);
+    template<typename T> static void encode(const math::Vec3<T>&, StorageType&);
     static const char* name() { return "qvel"; }
 };
 
@@ -194,6 +161,9 @@ public:
     AttributeArray() : mFlags(0) {}
     virtual ~AttributeArray() {}
 
+    /// Return a copy of this attribute.
+    virtual AttributeArray::Ptr copy() const = 0;
+
     /// Return the length of this array.
     virtual size_t size() const = 0;
 
@@ -201,18 +171,14 @@ public:
     virtual size_t memUsage() const = 0;
 
     /// Create a new attribute array of the given (registered) type and length.
-    static Ptr create(const openvdb::Name& type, size_t length);
+    static Ptr create(const Name& type, size_t length);
     /// Return @c true if the given attribute type name is registered.
-    static bool isRegistered(const openvdb::Name &type);
+    static bool isRegistered(const Name &type);
     /// Clear the attribute type registry.
     static void clearRegistry();
 
     /// Return the name of this attribute's type.
-    virtual const openvdb::Name& type() const = 0;
-
-    /// Return a copy of this attribute.
-    virtual AttributeArray::Ptr copy() const = 0;
-
+    virtual const Name& type() const = 0;
     /// Return @c true if this attribute is of the same type as the template parameter.
     template<typename AttributeArrayType>
     bool isType() const { return this->type() == AttributeArrayType::attributeType(); }
@@ -246,11 +212,10 @@ public:
     virtual void write(std::ostream&) const = 0;
 
 protected:
-
     /// Register a attribute type along with a factory function.
-    static void registerType(const openvdb::Name& type, FactoryMethod);
+    static void registerType(const Name& type, FactoryMethod);
     /// Remove a attribute type from the registry.
-    static void unregisterType(const openvdb::Name& type);
+    static void unregisterType(const Name& type);
 
     enum { TRANSIENT = 0x1, HIDDEN = 0x2 };
     uint16_t mFlags;
@@ -261,22 +226,22 @@ protected:
 
 
 /// Templated attribute class to hold specific types
-template<typename ValueType_, typename CompressionPolicy_ = NullAttributeCodec<ValueType_> >
+template<typename ValueType_, typename Codec_ = NullAttributeCodec<ValueType_> >
 class TypedAttributeArray: public AttributeArray
 {
 public:
     typedef boost::shared_ptr<TypedAttributeArray>          Ptr;
     typedef boost::shared_ptr<const TypedAttributeArray>    ConstPtr;
 
-    typedef ValueType_                                      ValueType;
-    typedef CompressionPolicy_                              CompressionPolicy;
-    typedef typename CompressionPolicy::StorageType         StorageType;
+    typedef ValueType_                  ValueType;
+    typedef Codec_                      Codec;
+    typedef typename Codec::StorageType StorageType;
 
     //////////
 
     /// Default constructor, always constructs a uniform attribute.
     explicit TypedAttributeArray(size_t n = 1,
-        const ValueType& uniformValue = openvdb::zeroVal<ValueType>());
+        const ValueType& uniformValue = zeroVal<ValueType>());
     /// Deep copy constructor
     TypedAttributeArray(const TypedAttributeArray&);
     //TypedAttributeArray& operator=(const TypedAttributeArray&); /// @todo
@@ -290,9 +255,9 @@ public:
     static Ptr create(size_t n);
 
     /// Return the name of this attribute's type.
-    static const openvdb::Name& attributeType();
+    static const Name& attributeType();
     /// Return the name of this attribute's type.
-    virtual const openvdb::Name& type() const { return attributeType(); }
+    virtual const Name& type() const { return attributeType(); }
 
     /// Return @c true if this attribute type is registered.
     static bool isRegistered();
@@ -308,14 +273,14 @@ public:
     virtual size_t memUsage() const;
 
     /// Return the value at index @a n
-    ValueType get(openvdb::Index n) const;
+    ValueType get(Index n) const;
     /// Return the @a value at index @a n
-    template<typename T> void get(openvdb::Index n, T& value) const;
+    template<typename T> void get(Index n, T& value) const;
 
     /// Set @a value at the given index @a n
-    void set(openvdb::Index n, const ValueType& value);
+    void set(Index n, const ValueType& value);
     /// Set @a value at the given index @a n
-    template<typename T> void set(openvdb::Index n, const T& value);
+    template<typename T> void set(Index n, const T& value);
 
     /// Return @c true if this array is stored as a single uniform value.
     virtual bool isUniform() const { return mIsUniform; }
@@ -341,7 +306,7 @@ private:
     /// Helper function for use with registerType()
     static AttributeArray::Ptr factory(size_t n) { return TypedAttributeArray::create(n); }
 
-    static tbb::atomic<const openvdb::Name*> sTypeName;
+    static tbb::atomic<const Name*> sTypeName;
     StorageType*    mData;
     size_t          mSize;
     bool            mIsUniform;
@@ -381,9 +346,8 @@ public:
     /// Return the number of bytes of memory used by this attribute set.
     size_t memUsage() const;
 
-    size_t find(const std::string& name) const;// { return mDescr->find(name); }
+    size_t find(const std::string& name) const;
 
-    /// @todo Enforce type constraints
     size_t replace(const std::string& name, const AttributeArray::Ptr&);
     size_t replace(size_t pos, const AttributeArray::Ptr&);
 
@@ -420,60 +384,54 @@ class AttributeSet::Descriptor
 public:
     typedef boost::shared_ptr<Descriptor> Ptr;
 
-    // The descriptor can optionally enforce value type and compression type
-    // in the associated attribute sets.
-    enum TypeConstraint {
-        CSTR_NONE = 0,
-        CSTR_VALUE_TYPE,    // Value type only
-        CSTR_FULL_TYPE      // Value type and compression type
+    struct NameAndType {
+        NameAndType(const std::string& n = "", const std::string& t = ""): name(n), type(t) {}
+        std::string name, type;
     };
 
-    /// @todo Construct with type constraints
-    //static Ptr create(const std::map<std::string, std::string>&, const TypePolicy& t = VALUE_TYPE_REQUIREMENT);
+    // Utility method to construct a NameAndType sequence.
+    struct Inserter {
+        std::vector<NameAndType> vec;
+        Inserter& add(const std::string& name, const std::string& type) {
+            vec.push_back(NameAndType(name, type)); return *this;
+        }
+    };
 
+    //////////
 
-    static Ptr create(const std::set<std::string>&);
-    // Construct from list of comma or space separated attribute names
-    static Ptr create(const std::string& names);
+    Descriptor();
 
-    Descriptor(const TypeConstraint& cstr = CSTR_NONE)
-        : mTypeConstraint(cstr), mId(sNextId++), mNextPos(0)
-    {
-    }
+    static Ptr create(const std::vector<NameAndType>&);
 
-    size_t size() const { return mDictionary.size(); }
+    size_t size() const { return mTypes.size(); }
     size_t memUsage() const;
 
     size_t find(const std::string& name) const;
 
     size_t rename(const std::string& fromName, const std::string& toName);
 
+    const std::string& type(size_t pos) const { return mTypes[pos]; }
 
-    openvdb::Index64 id() const { return mId; }
-    void write(std::ostream&) const { } /// @todo
-    void read(std::istream&) { } /// @todo
+    bool operator==(const Descriptor&) const;
+    bool operator!=(const Descriptor& rhs) const { return !this->operator==(rhs); }
 
-    const TypeConstraint& typeConstraint() const { return mTypeConstraint; }
+/// @todo
+//    Index64 id() const { return mId; }
+//    void write(std::ostream&) const;
+//    void read(std::istream&);
 
 private:
 
-    size_t insert(const std::string& name, const std::string& typeName = "");
+    size_t insert(const std::string& name, const std::string& typeName);
 
-    struct AttributeInfo { std::string typeName; size_t pos; };
+    typedef std::map<std::string, size_t> NameToPosMap;
 
-    typedef std::map<std::string, AttributeInfo> AttrDictionary;
+    NameToPosMap                mNameMap;
+    std::vector<std::string>    mTypes;
 
-    const TypeConstraint mTypeConstraint;
-    const openvdb::Index64        mId;
-    size_t               mNextPos;
-    AttrDictionary       mDictionary;
-
-    static tbb::atomic<openvdb::Index64> sNextId;
+    const Index64               mId;
+    static tbb::atomic<Index64> sNextId;
 }; // class Descriptor
-
-
-/// @todo
-tbb::atomic<openvdb::Index64> AttributeSet::Descriptor::sNextId;
 
 
 ////////////////////////////////////////
@@ -490,15 +448,96 @@ private:
 
 ////////////////////////////////////////
 
+// Attribute codec implementation
+
+
+template<typename StorageType_>
+template<typename ValueType>
+inline void
+NullAttributeCodec<StorageType_>::decode(const StorageType& data, ValueType& val)
+{
+    val = static_cast<ValueType>(data);
+}
+
+
+template<typename StorageType_>
+template<typename ValueType>
+inline void
+NullAttributeCodec<StorageType_>::encode(const StorageType& val, ValueType& data)
+{
+    data = static_cast<StorageType>(val);
+}
+
+
+template<typename IntType>
+template<typename ValueType>
+inline void
+FixedPointAttributeCodec<IntType>::decode(const StorageType& data, ValueType& val)
+{
+    val = fixedPointToFloatingPoint<ValueType>(data);
+}
+
+
+template<typename IntType>
+template<typename ValueType>
+inline void
+FixedPointAttributeCodec<IntType>::encode(const ValueType& val, StorageType& data)
+{
+    data = floatingPointToFixedPoint<StorageType>(val);
+}
+
+
+template<typename T>
+inline void
+UnitVecAttributeCodec::decode(const StorageType& data, math::Vec3<T>& val)
+{
+    val = math::QuantizedUnitVec::unpack(data);
+}
+
+
+template<typename T>
+inline void UnitVecAttributeCodec::encode(const math::Vec3<T>& val, StorageType& data)
+{
+    data = math::QuantizedUnitVec::pack(val);
+}
+
+
+template<typename T>
+inline void
+VelocityAttributeCodec::decode(const StorageType& data, math::Vec3<T>& val)
+{
+    val = math::QuantizedUnitVec::unpack(data.direction);
+    val *= T(data.magnitude);
+}
+
+
+template<typename T>
+inline void
+VelocityAttributeCodec::encode(const math::Vec3<T>& val, StorageType& data)
+{
+    const double d = val.length();
+    data.magnitude = static_cast<float>(d);
+
+    math::Vec3d dir = val;
+    if (!math::isApproxEqual(d, 0.0, math::Tolerance<double>::value())) {
+        dir *= 1.0 / d;
+    }
+
+    data.direction = math::QuantizedUnitVec::pack(dir);
+}
+
+
+////////////////////////////////////////
+
 // TypedAttributeArray implementation
 
 
-template<typename ValueType_, typename CompressionPolicy_>
-tbb::atomic<const openvdb::Name*> TypedAttributeArray<ValueType_, CompressionPolicy_>::sTypeName;
+template<typename ValueType_, typename Codec_>
+tbb::atomic<const Name*> TypedAttributeArray<ValueType_, Codec_>::sTypeName;
 
 
-template<typename ValueType_, typename CompressionPolicy_>
-TypedAttributeArray<ValueType_, CompressionPolicy_>::TypedAttributeArray(
+template<typename ValueType_, typename Codec_>
+TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(
     size_t n, const ValueType& uniformValue)
     : AttributeArray()
     , mData(new StorageType[1])
@@ -507,12 +546,12 @@ TypedAttributeArray<ValueType_, CompressionPolicy_>::TypedAttributeArray(
     , mMutex()
 {
     mSize = std::max(size_t(1), mSize);
-    CompressionPolicy::encode(uniformValue, mData[0]);
+    Codec::encode(uniformValue, mData[0]);
 }
 
 
-template<typename ValueType_, typename CompressionPolicy_>
-TypedAttributeArray<ValueType_, CompressionPolicy_>::TypedAttributeArray(const TypedAttributeArray& rhs)
+template<typename ValueType_, typename Codec_>
+TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs)
     : AttributeArray(rhs)
     , mData(NULL)
     , mSize(rhs.mSize)
@@ -529,67 +568,68 @@ TypedAttributeArray<ValueType_, CompressionPolicy_>::TypedAttributeArray(const T
 }
 
 
-template<typename ValueType_, typename CompressionPolicy_>
-inline const openvdb::Name&
-TypedAttributeArray<ValueType_, CompressionPolicy_>::attributeType()
+template<typename ValueType_, typename Codec_>
+inline const Name&
+TypedAttributeArray<ValueType_, Codec_>::attributeType()
 {
     if (sTypeName == NULL) {
         std::ostringstream ostr;
-        ostr << openvdb::typeNameAsString<ValueType>() << "_" << CompressionPolicy::name()
-             << "_" << openvdb::typeNameAsString<StorageType>();
-        openvdb::Name* s = new openvdb::Name(ostr.str());
+        ostr << typeNameAsString<ValueType>() << "_" << Codec::name()
+             << "_" << typeNameAsString<StorageType>();
+        Name* s = new Name(ostr.str());
         if (sTypeName.compare_and_swap(s, NULL) != NULL) delete s;
     }
     return *sTypeName;
 }
 
-template<typename ValueType_, typename CompressionPolicy_>
+
+template<typename ValueType_, typename Codec_>
 inline bool
-TypedAttributeArray<ValueType_, CompressionPolicy_>::isRegistered()
+TypedAttributeArray<ValueType_, Codec_>::isRegistered()
 {
     return AttributeArray::isRegistered(TypedAttributeArray::attributeType());
 }
 
 
-template<typename ValueType_, typename CompressionPolicy_>
+template<typename ValueType_, typename Codec_>
 inline void
-TypedAttributeArray<ValueType_, CompressionPolicy_>::registerType()
+TypedAttributeArray<ValueType_, Codec_>::registerType()
 {
     AttributeArray::registerType(TypedAttributeArray::attributeType(), TypedAttributeArray::factory);
 }
 
 
-template<typename ValueType_, typename CompressionPolicy_>
+template<typename ValueType_, typename Codec_>
 inline void
-TypedAttributeArray<ValueType_, CompressionPolicy_>::unregisterType()
+TypedAttributeArray<ValueType_, Codec_>::unregisterType()
 {
     AttributeArray::unregisterType(TypedAttributeArray::attributeType());
 }
 
 
-template<typename ValueType_, typename CompressionPolicy_>
-inline typename TypedAttributeArray<ValueType_, CompressionPolicy_>::Ptr
-TypedAttributeArray<ValueType_, CompressionPolicy_>::create(size_t n)
+template<typename ValueType_, typename Codec_>
+inline typename TypedAttributeArray<ValueType_, Codec_>::Ptr
+TypedAttributeArray<ValueType_, Codec_>::create(size_t n)
 {
     return Ptr(new TypedAttributeArray(n));
 }
 
 
-template<typename ValueType_, typename CompressionPolicy_>
+template<typename ValueType_, typename Codec_>
 AttributeArray::Ptr
-TypedAttributeArray<ValueType_, CompressionPolicy_>::copy() const
+TypedAttributeArray<ValueType_, Codec_>::copy() const
 {
-    return AttributeArray::Ptr(new TypedAttributeArray<ValueType, CompressionPolicy>(*this));
+    return AttributeArray::Ptr(new TypedAttributeArray<ValueType, Codec>(*this));
 }
 
 
-template<typename ValueType_, typename CompressionPolicy_>
+template<typename ValueType_, typename Codec_>
 void
-TypedAttributeArray<ValueType_, CompressionPolicy_>::allocate(bool fill)
+TypedAttributeArray<ValueType_, Codec_>::allocate(bool fill)
 {
     tbb::spin_mutex::scoped_lock lock(mMutex);
 
-    StorageType val = mIsUniform ? mData[0] : openvdb::zeroVal<StorageType>();
+    StorageType val = mIsUniform ? mData[0] : zeroVal<StorageType>();
 
     if (mData) {
         delete mData;
@@ -604,9 +644,9 @@ TypedAttributeArray<ValueType_, CompressionPolicy_>::allocate(bool fill)
 }
 
 
-template<typename ValueType_, typename CompressionPolicy_>
+template<typename ValueType_, typename Codec_>
 void
-TypedAttributeArray<ValueType_, CompressionPolicy_>::deallocate()
+TypedAttributeArray<ValueType_, Codec_>::deallocate()
 {
     if (mData) {
         delete mData;
@@ -615,100 +655,100 @@ TypedAttributeArray<ValueType_, CompressionPolicy_>::deallocate()
 }
 
 
-template<typename ValueType_, typename CompressionPolicy_>
+template<typename ValueType_, typename Codec_>
 size_t
-TypedAttributeArray<ValueType_, CompressionPolicy_>::memUsage() const
+TypedAttributeArray<ValueType_, Codec_>::memUsage() const
 {
     return sizeof(*this) + (mIsUniform ? sizeof(StorageType) : (mSize * sizeof(StorageType)));
 }
 
 
-template<typename ValueType_, typename CompressionPolicy_>
-typename TypedAttributeArray<ValueType_, CompressionPolicy_>::ValueType
-TypedAttributeArray<ValueType_, CompressionPolicy_>::get(openvdb::Index n) const
+template<typename ValueType_, typename Codec_>
+typename TypedAttributeArray<ValueType_, Codec_>::ValueType
+TypedAttributeArray<ValueType_, Codec_>::get(Index n) const
 {
     if (mIsUniform) n = 0;
     ValueType val;
-    CompressionPolicy::decode(/*in=*/mData[n], /*out=*/val);
+    Codec::decode(/*in=*/mData[n], /*out=*/val);
     return val;
 }
 
 
-template<typename ValueType_, typename CompressionPolicy_>
+template<typename ValueType_, typename Codec_>
 template<typename T>
 void
-TypedAttributeArray<ValueType_, CompressionPolicy_>::get(openvdb::Index n, T& val) const
+TypedAttributeArray<ValueType_, Codec_>::get(Index n, T& val) const
 {
     if (mIsUniform) n = 0;
     ValueType tmp;
-    CompressionPolicy::decode(/*in=*/mData[n], /*out=*/tmp);
+    Codec::decode(/*in=*/mData[n], /*out=*/tmp);
     val = static_cast<T>(tmp);
 }
 
 
-template<typename ValueType_, typename CompressionPolicy_>
+template<typename ValueType_, typename Codec_>
 void
-TypedAttributeArray<ValueType_, CompressionPolicy_>::set(openvdb::Index n, const ValueType& val)
+TypedAttributeArray<ValueType_, Codec_>::set(Index n, const ValueType& val)
 {
     if (mIsUniform) this->allocate();
-    CompressionPolicy::encode(/*in=*/val, /*out=*/mData[n]);
+    Codec::encode(/*in=*/val, /*out=*/mData[n]);
 }
 
 
-template<typename ValueType_, typename CompressionPolicy_>
+template<typename ValueType_, typename Codec_>
 template<typename T>
 void
-TypedAttributeArray<ValueType_, CompressionPolicy_>::set(openvdb::Index n, const T& val)
+TypedAttributeArray<ValueType_, Codec_>::set(Index n, const T& val)
 {
     const ValueType tmp = static_cast<ValueType>(val);
     if (mIsUniform) this->allocate();
-    CompressionPolicy::encode(/*in=*/tmp, /*out=*/mData[n]);
+    Codec::encode(/*in=*/tmp, /*out=*/mData[n]);
 }
 
 
-template<typename ValueType_, typename CompressionPolicy_>
+template<typename ValueType_, typename Codec_>
 void
-TypedAttributeArray<ValueType_, CompressionPolicy_>::collapse()
+TypedAttributeArray<ValueType_, Codec_>::collapse()
 {
-    this->collapse(openvdb::zeroVal<ValueType>());
+    this->collapse(zeroVal<ValueType>());
 }
 
 
-template<typename ValueType_, typename CompressionPolicy_>
+template<typename ValueType_, typename Codec_>
 void
-TypedAttributeArray<ValueType_, CompressionPolicy_>::collapse(const ValueType& uniformValue)
+TypedAttributeArray<ValueType_, Codec_>::collapse(const ValueType& uniformValue)
 {
     if (!mIsUniform) {
         this->deallocate();
         mData = new StorageType[1];
         mIsUniform = true;
     }
-    CompressionPolicy::encode(uniformValue, mData[0]);
+    Codec::encode(uniformValue, mData[0]);
 }
 
 
-template<typename ValueType_, typename CompressionPolicy_>
+template<typename ValueType_, typename Codec_>
 void
-TypedAttributeArray<ValueType_, CompressionPolicy_>::expand(bool fill)
+TypedAttributeArray<ValueType_, Codec_>::expand(bool fill)
 {
     this->allocate(fill);
 }
 
 
-template<typename ValueType_, typename CompressionPolicy_>
+template<typename ValueType_, typename Codec_>
 void
-TypedAttributeArray<ValueType_, CompressionPolicy_>::read(std::istream& is)
+TypedAttributeArray<ValueType_, Codec_>::read(std::istream& is)
 {
-    openvdb::Int16 flags = openvdb::Int16(0);
-    is.read(reinterpret_cast<char*>(&flags), sizeof(openvdb::Int16));
+    Int16 flags = Int16(0);
+    is.read(reinterpret_cast<char*>(&flags), sizeof(Int16));
     mFlags = flags;
 
-    openvdb::Int16 isUniform = openvdb::Int16(0);
-    is.read(reinterpret_cast<char*>(&isUniform), sizeof(openvdb::Int16));
+    Int16 isUniform = Int16(0);
+    is.read(reinterpret_cast<char*>(&isUniform), sizeof(Int16));
     mIsUniform = bool(isUniform);
 
-    openvdb::Index64 arrayLength = openvdb::Index64(0);
-    is.read(reinterpret_cast<char*>(&arrayLength), sizeof(openvdb::Index64));
+    Index64 arrayLength = Index64(0);
+    is.read(reinterpret_cast<char*>(&arrayLength), sizeof(Index64));
     mSize = size_t(arrayLength);
 
     this->deallocate();
@@ -719,18 +759,18 @@ TypedAttributeArray<ValueType_, CompressionPolicy_>::read(std::istream& is)
 }
 
 
-template<typename ValueType_, typename CompressionPolicy_>
+template<typename ValueType_, typename Codec_>
 void
-TypedAttributeArray<ValueType_, CompressionPolicy_>::write(std::ostream& os) const
+TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os) const
 {
     if (!this->isTransient()) {
-        os.write(reinterpret_cast<const char*>(&mFlags), sizeof(openvdb::Int16));
+        os.write(reinterpret_cast<const char*>(&mFlags), sizeof(Int16));
 
-        openvdb::Int16 isUniform = openvdb::Int16(mIsUniform);
-        os.write(reinterpret_cast<char*>(&isUniform), sizeof(openvdb::Int16));
+        Int16 isUniform = Int16(mIsUniform);
+        os.write(reinterpret_cast<char*>(&isUniform), sizeof(Int16));
 
-        openvdb::Index64 arraylength = openvdb::Index64(mSize);
-        os.write(reinterpret_cast<const char*>(&arraylength), sizeof(openvdb::Index64));
+        Index64 arraylength = Index64(mSize);
+        os.write(reinterpret_cast<const char*>(&arraylength), sizeof(Index64));
 
         size_t count = mIsUniform ? 1 : mSize;
         os.write(reinterpret_cast<const char*>(mData), count * sizeof(StorageType));
@@ -746,6 +786,6 @@ TypedAttributeArray<ValueType_, CompressionPolicy_>::write(std::ostream& os) con
 #endif // OPENVDB_POINTS_TOOLS_ATTRIBUTE_ARRAY_HAS_BEEN_INCLUDED
 
 
-// TM and (c) 2014 DreamWorks Animation LLC.  All Rights Reserved.
-// Reproduction in whole or in part without prior written permission of a
-// duly authorized representative is prohibited.
+// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

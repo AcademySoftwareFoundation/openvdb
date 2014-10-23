@@ -238,10 +238,12 @@ ifdef LINUX
 endif
 
 INCLUDE_NAMES := \
+    tools/AttributeArray.h \
     openvdb.h \
 #
 
 SRC_NAMES := \
+    tools/AttributeArray.cc \
     openvdb.cc \
 #
 
@@ -250,6 +252,7 @@ UNITTEST_INCLUDE_NAMES := \
 
 UNITTEST_SRC_NAMES := \
     unittest/main.cc \
+    unittest/TestAttributeArray.cc \
 #
 
 DOC_FILES :=
