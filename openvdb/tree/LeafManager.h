@@ -110,13 +110,15 @@ class LeafManager
 {
 public:
     typedef TreeT                                                      TreeType;
+    typedef typename TreeT::RootNodeType                               RootNodeType;
     typedef typename TreeType::LeafNodeType                            NonConstLeafType;
     typedef typename CopyConstness<TreeType, NonConstLeafType>::Type   LeafType;
     typedef typename leafmgr::TreeTraits<TreeT>::LeafIterType          LeafIterType;
     typedef typename LeafType::Buffer                                  NonConstBufferType;
     typedef typename CopyConstness<TreeType, NonConstBufferType>::Type BufferType;
     typedef tbb::blocked_range<size_t>                                 RangeType;//leaf index range
-
+    static const Index DEPTH = 2;//root + leafs
+    
     static const bool IsConstTree = leafmgr::TreeTraits<TreeT>::IsConstTree;
 
     class LeafRange
@@ -300,6 +302,12 @@ public:
     /// Return a reference to the tree associated with this manager.
     TreeType& tree() { return *mTree; }
 
+    /// Return a const reference to root node associated with this manager.
+    const RootNodeType& root() const { return mTree->root(); }
+
+    /// Return a reference to the root node associated with this manager.
+    RootNodeType& root() { return mTree->root(); }
+
     /// Return @c true if the tree associated with this manager is immutable.
     bool isConstTree() const { return this->IsConstTree; }
 
@@ -467,6 +475,42 @@ public:
     {
         LeafTransformer<LeafOp> transform(op);
         transform.run(this->leafRange(grainSize), threaded);
+    }
+
+    
+    template<typename ArrayT>
+    void getNodes(ArrayT& array)
+    {
+        typedef typename ArrayT::value_type T;
+        BOOST_STATIC_ASSERT(boost::is_pointer<T>::value);
+        typedef typename boost::mpl::if_<boost::is_const<typename boost::remove_pointer<T>::type>,
+            const LeafType, LeafType>::type LeafT;    
+    
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+        if (boost::is_same<T, LeafT*>::value) {
+            array.resize(mLeafCount);
+            for (size_t i=0; i<mLeafCount; ++i) array[i] = reinterpret_cast<T>(mLeafs[i]);
+        } else {
+            mTree->getNodes(array);
+        }
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+            }
+    
+    template<typename ArrayT>
+    void getNodes(ArrayT& array) const
+    {
+        typedef typename ArrayT::value_type T;
+        BOOST_STATIC_ASSERT(boost::is_pointer<T>::value);
+        BOOST_STATIC_ASSERT(boost::is_const<typename boost::remove_pointer<T>::type>::value);    
+    
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+        if (boost::is_same<T, const LeafType*>::value) {
+            array.resize(mLeafCount);
+            for (size_t i=0; i<mLeafCount; ++i) array[i] = reinterpret_cast<T>(mLeafs[i]);
+        } else {
+            mTree->getNodes(array);
+        }
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
 
     ////////////////////////////////////////////////////////////////////////////////////

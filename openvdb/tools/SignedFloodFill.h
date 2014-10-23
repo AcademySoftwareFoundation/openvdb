@@ -56,16 +56,19 @@ namespace tools {
 /// level set from the signs of the active voxels, setting outside values to
 /// +background and inside values to -background.
 ///    
-/// @warning This method should only be used on closed, symetric narrow-band level sets.    
+/// @warning This method should only be used on closed, symetric narrow-band level sets.
+///    
+/// @note If a LeafManager is used the cached leaf nodes are reused
+/// resulting in slightly better overall performance.    
 ///
-/// @param tree          Tree that will be flood filled
+/// @param tree          Tree or LeafManager that will be flood filled.
 /// @param threaded      Enable or disable threading.  (Threading is enabled by default.)
 /// @param grainSize     Used to control the granularity of the multithreaded. (default is 1).   
 ///
 /// @throw TypeError if the ValueType of @a tree is not floating point.
-template<typename TreeT>
+template<typename TreeOrLeafManagerT>
 inline void
-signedFloodFill(TreeT& tree,
+signedFloodFill(TreeOrLeafManagerT& tree,
                 bool threaded = true,
                 size_t grainSize = 1);
 
@@ -75,39 +78,42 @@ signedFloodFill(TreeT& tree,
 /// of this tree to @a outsideWidth.
 ///    
 /// @warning This method should only be used on closed, narrow-band level sets.    
+///    
+/// @note If a LeafManager is used the cached leaf nodes are reused
+/// resulting in slightly better overall performance.
 ///
-/// @param tree          Tree that will be flood filled
+/// @param tree          Tree or LeafManager that will be flood filled.
 /// @param outsideWidth  The width of the outside of the narrow band
 /// @param insideWidth   The width of the inside of the narrow band    
 /// @param threaded      Enable or disable threading.  (Threading is enabled by default.)
 /// @param grainSize     Used to control the granularity of the multithreaded. (default is 1).   
 ///
 /// @throw TypeError if the ValueType of @a tree is not floating point. 
-template<typename TreeT>
+template<typename TreeOrLeafManagerT>
 inline void
-signedFloodFill(TreeT& tree,
-                const typename TreeT::ValueType& outsideWidth,
-                const typename TreeT::ValueType& insideWidth,
+signedFloodFill(TreeOrLeafManagerT& tree,
+                const typename TreeOrLeafManagerT::ValueType& outsideWidth,
+                const typename TreeOrLeafManagerT::ValueType& insideWidth,
                 bool threaded = true,
                 size_t grainSize = 1);
 
 ////////////////////////// Implementation of SignedFloodFill ////////////////////////////
 
-template<typename TreeT>
+template<typename TreeOrLeafManagerT>
 class SignedFloodFillOp
 {
 public:
-    typedef typename TreeT::ValueType    ValueT;
-    typedef typename TreeT::RootNodeType RootT;
-    typedef typename TreeT::LeafNodeType LeafT;
+    typedef typename TreeOrLeafManagerT::ValueType    ValueT;
+    typedef typename TreeOrLeafManagerT::RootNodeType RootT;
+    typedef typename TreeOrLeafManagerT::LeafNodeType LeafT;
     BOOST_STATIC_ASSERT(boost::is_floating_point<ValueT>::value);
     
-    SignedFloodFillOp(const TreeT& tree)
+    SignedFloodFillOp(const TreeOrLeafManagerT& tree)
         : mOutside(math::Abs(tree.background()))
         , mInside(math::negative(mOutside))
     {
     }
-    SignedFloodFillOp(const TreeT& tree, const ValueT& background)
+    SignedFloodFillOp(const TreeOrLeafManagerT& tree, const ValueT& background)
         : mOutside(math::Abs(background))
         , mInside(math::negative(mOutside))
     {
@@ -217,27 +223,29 @@ private:
     const ValueT mOutside, mInside;
 };// SignedFloodFillOp
 
-template <typename TreeT>
+template <typename TreeOrLeafManagerT>
 inline
-typename boost::enable_if<typename boost::is_floating_point<typename TreeT::ValueType>::type>::type
-doSignedFloodFill(TreeT& tree,
-                  typename TreeT::ValueType outsideValue,
-                  typename TreeT::ValueType insideValue,
+typename boost::enable_if<typename boost::is_floating_point<
+                          typename TreeOrLeafManagerT::ValueType>::type>::type
+doSignedFloodFill(TreeOrLeafManagerT& tree,
+                  typename TreeOrLeafManagerT::ValueType outsideValue,
+                  typename TreeOrLeafManagerT::ValueType insideValue,
                   bool threaded,
                   size_t grainSize)
 {
-    tree::NodeManager<TreeT> nodes(tree);
-    SignedFloodFillOp<TreeT> op(outsideValue, insideValue);
+    tree::NodeManager<TreeOrLeafManagerT> nodes(tree);
+    SignedFloodFillOp<TreeOrLeafManagerT> op(outsideValue, insideValue);
     nodes.processBottomUp(op, threaded, grainSize);
 }
 
 // Dummy (no-op) implementation for non-float types
-template <typename TreeT>
+template <typename TreeOrLeafManagerT>
 inline
-typename boost::disable_if<typename boost::is_floating_point<typename TreeT::ValueType>::type>::type
-doSignedFloodFill(TreeT&,
-                  const typename TreeT::ValueType&,
-                  const typename TreeT::ValueType&,
+typename boost::disable_if<typename boost::is_floating_point<
+                           typename TreeOrLeafManagerT::ValueType>::type>::type
+doSignedFloodFill(TreeOrLeafManagerT&,
+                  const typename TreeOrLeafManagerT::ValueType&,
+                  const typename TreeOrLeafManagerT::ValueType&,
                   bool,
                   size_t)
 {
@@ -246,24 +254,25 @@ doSignedFloodFill(TreeT&,
 }
 
 // If the narrow-band is symmetric and unchanged
-template <typename TreeT>
+template <typename TreeOrLeafManagerT>
 inline void
-signedFloodFill(TreeT& tree,
-                const typename TreeT::ValueType& outsideValue,
-                const typename TreeT::ValueType& insideValue,
+signedFloodFill(TreeOrLeafManagerT& tree,
+                const typename TreeOrLeafManagerT::ValueType& outsideValue,
+                const typename TreeOrLeafManagerT::ValueType& insideValue,
                 bool threaded,
                 size_t grainSize)
 {
     doSignedFloodFill(tree, outsideValue, insideValue, threaded, grainSize);
 }
 
-template <typename TreeT>
+template <typename TreeOrLeafManagerT>
 inline void
-signedFloodFill(TreeT& tree,
+signedFloodFill(TreeOrLeafManagerT& tree,
                 bool threaded,
                 size_t grainSize)
 {
-    doSignedFloodFill(tree, tree.background(), tree.background(), threaded, grainSize);
+    const typename TreeOrLeafManagerT::ValueType v = tree.root().background();
+    doSignedFloodFill(tree, v, -v, threaded, grainSize);
 }
 
 } // namespace tools

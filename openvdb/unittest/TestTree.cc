@@ -2669,20 +2669,37 @@ TestTree::testNodeManager()
     //    std::cerr << "Level=" << i << " nodes=" << nodeCount[i] << std::endl;
     //}
 
-    openvdb::tree::NodeManager<FloatTree> manager(tree);
+    {// test tree constructor
+        openvdb::tree::NodeManager<FloatTree> manager(tree);
 
-    //for (openvdb::Index i=0; i<openvdb::tree::NodeManager<FloatTree>::LEVELS; ++i) {
-    //    std::cerr << "Level=" << i << " nodes=" << manager.nodeCount(i) << std::endl;
-    //}
-
-    Index64 totalCount = 0;
-    for (openvdb::Index i=0; i<FloatTree::RootNodeType::LEVEL; ++i) {//exclute root in nodeCount
-        //std::cerr << "Level=" << i << " expected=" << nodeCount[i]
-        //          << " cached=" << manager.nodeCount(i) << std::endl;
-        CPPUNIT_ASSERT_EQUAL(nodeCount[i], manager.nodeCount(i));
-        totalCount += nodeCount[i];
+        //for (openvdb::Index i=0; i<openvdb::tree::NodeManager<FloatTree>::LEVELS; ++i) {
+        //    std::cerr << "Level=" << i << " nodes=" << manager.nodeCount(i) << std::endl;
+        //}
+        
+        Index64 totalCount = 0;
+        for (openvdb::Index i=0; i<FloatTree::RootNodeType::LEVEL; ++i) {//exclute root in nodeCount
+            //std::cerr << "Level=" << i << " expected=" << nodeCount[i]
+            //          << " cached=" << manager.nodeCount(i) << std::endl;
+            CPPUNIT_ASSERT_EQUAL(nodeCount[i], manager.nodeCount(i));
+            totalCount += nodeCount[i];
+        }
+        CPPUNIT_ASSERT_EQUAL(totalCount, manager.nodeCount());
     }
-    CPPUNIT_ASSERT_EQUAL(totalCount, manager.nodeCount());
+
+    {// test LeafManager constructor
+        typedef openvdb::tree::LeafManager<FloatTree> LeafManagerT;
+        LeafManagerT manager1(tree);
+        CPPUNIT_ASSERT_EQUAL(nodeCount[0], manager1.leafCount());
+        openvdb::tree::NodeManager<LeafManagerT> manager2(manager1);
+        Index64 totalCount = 0;
+        for (openvdb::Index i=0; i<FloatTree::RootNodeType::LEVEL; ++i) {//exclute root in nodeCount
+            //std::cerr << "Level=" << i << " expected=" << nodeCount[i]
+            //          << " cached=" << manager2.nodeCount(i) << std::endl;
+            CPPUNIT_ASSERT_EQUAL(nodeCount[i], manager2.nodeCount(i));
+            totalCount += nodeCount[i];
+        }
+        CPPUNIT_ASSERT_EQUAL(totalCount, manager2.nodeCount());
+    }
 
 }
 
