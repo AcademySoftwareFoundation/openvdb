@@ -598,7 +598,7 @@ clean:
 	$(RM) $(LIBHOUDINI_OBJ_NAMES)
 	$(RM) $(LIBHOUDINI_NAME).def
 	$(RM) $(HOUDINI_SOP_OBJ_NAMES) $(HOUDINI_SOP_SO_NAMES)
-	$(RM) *.lib *.exp *.ilk *.obj *.manifest *.pdb
+	$(RM) *.o *.lib *.exp *.ilk *.obj *.manifest *.pdb
 	$(RM) houdini/.*.d
 	$(RM) -r  openvdb_houdini houdini_utils
 	$(RM) $(HOUDINI_INSTALL_DIR)/../config/Icons/SOP_OpenVDB.svg
