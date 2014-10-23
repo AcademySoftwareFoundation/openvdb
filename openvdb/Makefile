@@ -1170,6 +1170,7 @@ clean_obj:
 	$(RM) $(CMD_OBJ_NAMES)
 	$(RM) $(LIBVIEWER_OBJ_NAMES)
 	$(RM) $(VIEW_OBJ_NAMES) 
+	$(RM) $(RENDER_OBJ_NAMES) 
 
 clean: clean_obj
 	$(RM) $(ALL_PRODUCTS) $(DEPFILES)
