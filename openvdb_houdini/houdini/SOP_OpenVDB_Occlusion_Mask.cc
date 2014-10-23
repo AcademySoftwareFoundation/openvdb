@@ -80,7 +80,7 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Grids")
         .setHelpText("Specify a subset of the input VDB grids to be clip.")
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenuInput1));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "camera", "Camera")
         .setHelpText("Reference camera path")

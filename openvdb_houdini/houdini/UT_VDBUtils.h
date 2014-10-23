@@ -586,7 +586,7 @@ inline UT_BoundingBoxD
 UTvdbConvert(const openvdb::CoordBBox &bbox)
 {
     return UT_BoundingBoxD(UTvdbConvert(bbox.getStart().asVec3d()),
-	UTvdbConvert(bbox.getEnd().asVec3d()));
+                           UTvdbConvert(bbox.getEnd().asVec3d()));
 }
 
 

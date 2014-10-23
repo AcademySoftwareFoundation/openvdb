@@ -56,7 +56,8 @@
 
 #include <UT/UT_Debug.h>
 #include <UT/UT_Defines.h>
-#include <UT/UT_FSA.h>
+#include <UT/UT_EnvControl.h>
+#include <UT/UT_FSATable.h>
 #include <UT/UT_IStream.h>
 #include <UT/UT_JSONParser.h>
 #include <UT/UT_JSONValue.h>
@@ -821,15 +822,17 @@ template <typename GridType>
 static void
 geo_calcVolume(const GridType &grid, fpreal &volume)
 {
-	bool calculated = false;
+    bool calculated = false;
     if (grid.getGridClass() == openvdb::GRID_LEVEL_SET) {
-		try {
- 	    	volume = openvdb::tools::levelSetVolume(grid);
-	    	calculated = true;
-		} catch (std::exception& /*e*/) { } // ignore
+	try {
+	    volume = openvdb::tools::levelSetVolume(grid);
+	    calculated = true;
+	} catch (std::exception& /*e*/) {
+	    // do nothing
 	}
-
-	// Simply account for the total number of active voxels
+    }
+   
+    // Simply account for the total number of active voxels
     if (!calculated) {
         const openvdb::Vec3d size = grid.voxelSize();
         volume = size[0] * size[1] * size[2] * grid.activeVoxelCount();
@@ -848,11 +851,14 @@ template <typename GridType>
 static void
 geo_calcArea(const GridType &grid, fpreal &area)
 {
-	bool calculated = false;
+    bool calculated = false;
     if (grid.getGridClass() == openvdb::GRID_LEVEL_SET) {
-    	try {
-			area = openvdb::tools::levelSetArea(grid);
-		} catch (std::exception& /*e*/) { } // ignore
+	try {
+	    area = openvdb::tools::levelSetArea(grid);
+	    calculated = true;
+	} catch (std::exception& /*e*/) {
+	    // do nothing
+	}
     }
 
     if (!calculated) {
@@ -1079,6 +1085,11 @@ geoEvaluateVDB(const GEO_PrimVDB *vdb, const UT_Vector3 &pos)
 {
     UTvdbReturnScalarType(vdb->getStorageType(),
 			  geo_sampleGrid, vdb->getGrid(), pos);
+    if (vdb->getStorageType() == UT_VDB_BOOL)
+    {
+	return geo_sampleGrid<openvdb::BoolGrid>(
+		    UTvdbGridCast<openvdb::BoolGrid>(vdb->getGrid()), pos);
+    }
     return 0;
 }
 
@@ -2532,7 +2543,18 @@ GEO_PrimVDB::getJSON() const
     return vdbJSON();
 }
 
-
+// This method is called by multiple places internally in Houdini.
+static void
+geoSetVDBStreamCompression(openvdb::io::Stream& vos, bool backwards_compatible)
+{
+    // Always enable full compression, since it is fast and compresses level
+    // sets and fog volumes well.
+    uint32_t compression = openvdb::io::COMPRESS_ACTIVE_MASK;
+    // Enable blosc compression unless we want it to be backwards compatible.
+    if (vos.hasBloscCompression() && !backwards_compatible)
+	compression |= openvdb::io::COMPRESS_BLOSC;
+    vos.setCompression(compression);
+}
 
 bool
 GEO_PrimVDB::saveVDB(UT_JSONWriter &w) const
@@ -2550,15 +2572,8 @@ GEO_PrimVDB::saveVDB(UT_JSONWriter &w) const
 	openvdb::io::Stream			vos(os);
 	openvdb::MetaMap			meta;
 
-	// Always enable active mask compression, since it is fast
-	// and compresses level sets and fog volumes well.
-	uint32_t compression = openvdb::io::COMPRESS_ACTIVE_MASK;
-	//if (vos.hasBloscCompression()) {
-	//    // Enable Blosc compression if available, since it is also fast,
-	//    // and it works well on volumes for which mask compression is not suited.
-	//    compression |= openvdb::io::COMPRESS_BLOSC;
-	//}
-	vos.setCompression(compression);
+	geoSetVDBStreamCompression(
+	    vos, UT_EnvControl::getInt(ENV_HOUDINI13_VOLUME_COMPATIBILITY));
 
 	// Visual C++ requires a default meta object declared on the stack
 	vos.write(grids, meta);
@@ -2714,12 +2729,17 @@ static void
 geo_sumPosDensity(const GridType &grid, fpreal64 &sum)
 {
     sum = 0;
-    for (typename GridType::ValueOnCIter iter = grid.cbeginValueOn(); iter; ++iter) {
-        fpreal value = *iter;
-        if (value > 0) {
-            if (iter.isTileValue()) sum += value * iter.getVoxelCount();
-            else sum += value;
-        }
+    for (typename GridType::ValueOnCIter
+	 iter = grid.cbeginValueOn(); iter; ++iter)
+    {
+	fpreal value = *iter;
+	if (value > 0)
+	{
+	    if (iter.isTileValue())
+		sum += value * iter.getVoxelCount();
+	    else
+		sum += value;
+	}
     }
 }
 
@@ -2836,6 +2856,8 @@ GEO_PrimVDB::copyPrimitive(const GEO_Primitive *psrc, GEO_Point **ptredirect)
     wireVertex(v, ppt ? ppt->getMapOffset() : GA_INVALID_OFFSET);
 #endif
     vertex_wrangler.copyAttributeValues(v, src->fastVertexOffset(0));
+
+    myVis = src->myVis;
 }
 
 #if (UT_VERSION_INT < 0x0d000000) // Deleted in 13.0
@@ -2867,6 +2889,8 @@ GEO_PrimVDB::copyOffsetPrimitive(const GEO_Primitive *psrc, int basept)
 	    src_points.indexFromOffset(src->vertexPoint(0)) + basept);
     wireVertex(v, ppt);
     vertex_wrangler.copyAttributeValues(v, src->fastVertexOffset(0));
+
+    myVis = src->myVis;
 }
 #endif
 
@@ -3024,6 +3048,8 @@ GEO_PrimVDB::copy(int preserve_shared_pts) const
 		wranglers.getVertex().copyAttributeValues(v, fastVertexOffset(i));
 	    }
 	}
+
+        vdb->myVis = myVis;
     }
     return clone;
 }
@@ -3050,6 +3076,8 @@ GEO_PrimVDB::copyUnwiredForMerge(const GA_Primitive *prim_src, const GA_MergeMap
     }
 
     copyGridFrom(*src); // makes a shallow copy
+
+    myVis = src->myVis;
 }
 
 void
@@ -3289,7 +3317,7 @@ namespace // anonymous
 	    { \
 		UT_String     str; \
 		intrinsicGetMetaString(o, ID, str); \
-        v.append(str); \
+		v.append(str); \
 		return 1; \
 	    } \
 	    static geo_Size setSS(CLASS *o, const char **v, GA_Size) \

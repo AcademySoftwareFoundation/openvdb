@@ -270,6 +270,7 @@ frustumTransformFromCamera(
         UT_Matrix4 M;
         OBJ_Node *meobj = node.getCreator()->castToOBJNode();
         if (meobj) {
+	    node.addExtraInput(meobj, OP_INTEREST_DATA);
             if (!cam.getRelativeTransform(*meobj, M, context))
                 node.addTransformError(cam, "relative");
         } else {

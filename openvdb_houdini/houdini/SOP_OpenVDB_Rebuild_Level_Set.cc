@@ -83,7 +83,7 @@ newSopOperator(OP_OperatorTable* table)
     hutil::ParmList parms;
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setChoiceList(&hutil::PrimGroupMenu)
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
         .setHelpText(
             "Specify a subset of the input VDB grids to be processed\n"
             "(scalar, floating-point grids only)"));

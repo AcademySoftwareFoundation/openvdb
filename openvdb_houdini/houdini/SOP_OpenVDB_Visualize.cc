@@ -121,7 +121,7 @@ newSopOperator(OP_OperatorTable* table)
     // Group pattern
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setHelpText("Specify a subset of the input VDB grids to be processed.")
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenuInput1));
 
 #if HAVE_SURFACING_PARM
     // Surfacing

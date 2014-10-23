@@ -35,10 +35,10 @@
 /// @brief SOP to prune tree branches from OpenVDB grids
 
 #include <houdini_utils/ParmFactory.h>
-#include <openvdb/tools/Prune.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <UT/UT_Interrupt.h>
+#include <openvdb/tools/Prune.h>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -71,7 +71,7 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setHelpText("Specify a subset of the input grids to be processed.")
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenuInput1));
 
     {
         const char* items[] = {

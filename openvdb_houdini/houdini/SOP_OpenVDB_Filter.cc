@@ -217,7 +217,7 @@ SOP_OpenVDB_Filter::registerSop(OP_OperatorTable* table)
     // Input group
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setHelpText("Specify a subset of the input VDB grids to be processed.")
-              .setChoiceList(&hutil::PrimGroupMenu));
+              .setChoiceList(&hutil::PrimGroupMenuInput1));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "mask", "")
               .setDefault(PRMoneDefaults)
@@ -226,8 +226,7 @@ SOP_OpenVDB_Filter::registerSop(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "maskname", "Alpha Mask")
               .setHelpText("Optional VDB used for alpha masking. Assumes values 0->1.")
-              .setSpareData(&SOP_Node::theSecondInput)
-              .setChoiceList(&hutil::PrimGroupMenu));
+              .setChoiceList(&hutil::PrimGroupMenuInput2));
 
     // Menu of operations
     {

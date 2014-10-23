@@ -313,8 +313,7 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_HEADING, "conversionHeading", "Conversion settings"));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Reference VDB")
-        .setChoiceList(&hutil::PrimGroupMenu)
-        .setSpareData(&SOP_Node::theSecondInput)
+        .setChoiceList(&hutil::PrimGroupMenuInput2)
         .setHelpText("References the first/selected grid's transform. The "
             "narrow band width can also be matched if the reference "
             "grid is a level set."));

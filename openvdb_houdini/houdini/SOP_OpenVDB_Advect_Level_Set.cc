@@ -171,14 +171,12 @@ newSopOperator(OP_OperatorTable* table)
     // Level set grid
     parms.add(hutil::ParmFactory(PRM_STRING, "lsGroup", "Group")
         .setHelpText("Level set grid(s) to advect.")
-        .setChoiceList(&hutil::PrimGroupMenu)
-        .setSpareData(&SOP_Node::theFirstInput));
+        .setChoiceList(&hutil::PrimGroupMenuInput1));
 
     // Velocity grid
     parms.add(hutil::ParmFactory(PRM_STRING, "velGroup", "Velocity")
         .setHelpText("Velocity grid")
-        .setChoiceList(&hutil::PrimGroupMenu)
-        .setSpareData(&SOP_Node::theSecondInput));
+        .setChoiceList(&hutil::PrimGroupMenuInput2));
 
     parms.add(hutil::ParmFactory(PRM_HEADING, "advectionHeading", "Advection"));
 

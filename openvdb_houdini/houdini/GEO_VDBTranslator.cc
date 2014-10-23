@@ -61,6 +61,7 @@
 #ifndef SESI_OPENVDB
 #include <UT/UT_DSOVersion.h>
 #endif
+#include <UT/UT_EnvControl.h>
 #include <UT/UT_IOTable.h>
 #include <UT/UT_IStream.h>
 #include <UT/UT_Version.h>
@@ -91,7 +92,7 @@ public:
     virtual const char *formatName() const;
 
     virtual int		checkExtension(const char *name);
-    virtual void    getFileExtensions(UT_StringArray &extensions) const;
+    virtual void	getFileExtensions(UT_StringArray &extensions) const;
 
     virtual int		checkMagicNumber(unsigned magic);
 
@@ -160,7 +161,7 @@ GEO_VDBTranslator::fileLoad(GEO_Detail *geogdp, UT_IStream &is, int /*ate_magic*
         // Create and open a VDB file, but don't read any grids yet.
         openvdb::io::File file(buf.buffer());
 
-        file.open();
+        file.open(/*delayLoad*/false);
 
         // Read the file-level metadata into global attributes.
         openvdb::MetaMap::Ptr fileMetadata = file.getMetadata();
@@ -216,7 +217,8 @@ bool
 fileSaveVDB(const GEO_Detail *geogdp, OutputT os)
 {
     GU_Detail *gdp = static_cast<GU_Detail*>(const_cast<GEO_Detail*>(geogdp));
-    if (!gdp) return false;
+    if (!gdp)
+	return false;
 
     try {
         // Populate an output GridMap with VDB grid primitives found in the
@@ -254,13 +256,13 @@ fileSaveVDB(const GEO_Detail *geogdp, OutputT os)
         FileT file(os);
 
         // Always enable active mask compression, since it is fast
-        // and compresses level sets and fog volumes well.
+        // and compresses level sets and fog volumes well. Enable Blosc unless
+	// backwards compatibility is requested.
         uint32_t compression = openvdb::io::COMPRESS_ACTIVE_MASK;
-        //if (openvdb::io::Archive::hasBloscCompression()) {
-        //    // Enable Blosc compression if available, since it is also fast,
-        //    // and it works well on volumes for which mask compression is not suited.
-        //    compression |= openvdb::io::COMPRESS_BLOSC;
-        //}
+        if (openvdb::io::Archive::hasBloscCompression()
+		&& !UT_EnvControl::getInt(ENV_HOUDINI13_VOLUME_COMPATIBILITY)) {
+            compression |= openvdb::io::COMPRESS_BLOSC;
+        }
         file.setCompression(compression);
 
         file.write(outGrids, fileMetadata);
