@@ -202,7 +202,7 @@ ifeq (yes,$(strip $(verbose)))
     HCUSTOM_FLAGS += -e
 endif
 # Extra flags to be passed through hcustom to the compiler or linker
-HCUSTOM_EXTRA_FLAGS := -DIGNORE_HDK_DEPRECATIONS
+HCUSTOM_EXTRA_CFLAGS := -DIGNORE_HDK_DEPRECATIONS
 HCUSTOM_EXTRA_LDFLAGS :=
 
 ifeq (full,$(strip $(debug)))
@@ -247,7 +247,7 @@ HCUSTOM_INCLDIRS := $(subst isystem,I,$(INCLDIRS))
 CXXFLAGS += $(OPTIMIZE) $(INCLDIRS) -DIGNORE_HDK_DEPRECATIONS
 ifeq (2,$(strip $(abi)))
     CXXFLAGS += -DOPENVDB_2_ABI_COMPATIBLE
-    HCUSTOM_EXTRA_FLAGS += -DOPENVDB_2_ABI_COMPATIBLE
+    HCUSTOM_EXTRA_CFLAGS += -DOPENVDB_2_ABI_COMPATIBLE
 endif
 ifdef MBSD
     # Darwin ld treats undefined symbols as errors by default;
@@ -291,7 +291,6 @@ LIBHOUDINI_SRC_NAMES := \
     houdini/GeometryUtil.cc \
     houdini/GEO_PrimVDB.cc \
     houdini/GEO_VDBTranslator.cc \
-    houdini/GR_PrimVDBPoints.cc \
     houdini/GT_GEOPrimCollectVDB.cc \
     houdini/GU_PrimVDB.cc \
     houdini/geometry.cc \
@@ -515,17 +514,14 @@ ifeq (no,$(strip $(shared)))
 # Link SOPs against static OpenVDB libraries.
 $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
 	@echo "Building $(HOUDINI_INSTALL_DIR)/$(@:.o=$(SHAREDLIB_SUFFIX)) because of $(call list_deps)"
-	@# TODO: This seems to be the only way to pass extra compiler flags to hcustom.
-	/bin/env HOUDINI_CC='$(HOUDINI_CC) $(HCUSTOM_EXTRA_FLAGS)' \
-	    $(HCUSTOM) $(HOUDINI_INCLDIRS) \
-		$(HCUSTOM_LIBS) $(HCUSTOM_LIBDEPS) $< $(QUIET)
+	$(HCUSTOM_EXPORT); $(HCUSTOM) $(HOUDINI_INCLDIRS) $(HCUSTOM_LIBS) \
+	    $(HCUSTOM_LIBDEPS) $< $(QUIET)
 else
 # Link SOPs against shared OpenVDB libraries.
 $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
 	@echo "Building $(HOUDINI_INSTALL_DIR)/$(@:.o=$(SHAREDLIB_SUFFIX)) because of $(call list_deps)"
-	@# TODO: This seems to be the only way to pass extra compiler flags to hcustom.
-	/bin/env HOUDINI_CC='$(HOUDINI_CC) $(HCUSTOM_EXTRA_FLAGS)' \
-	    $(HCUSTOM) $(HOUDINI_INCLDIRS) $(HCUSTOM_LIBDEPS) $< $(QUIET)
+	$(HCUSTOM_EXPORT); $(HCUSTOM) $(HOUDINI_INCLDIRS) \
+	    $(HCUSTOM_LIBDEPS) $< $(QUIET)
 endif
 
 $(HOUDINI_SOP_SO_NAMES): $(HOUDINI_INSTALL_DIR)/%$(SHAREDLIB_SUFFIX): houdini/%.o
