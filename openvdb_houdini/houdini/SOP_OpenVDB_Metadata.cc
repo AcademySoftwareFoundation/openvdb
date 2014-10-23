@@ -66,7 +66,7 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setHelpText("Specify a subset of the input VDB grids to be modified.")
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenuInput1));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "setclass", "")
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));

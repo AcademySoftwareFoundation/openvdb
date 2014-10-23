@@ -438,6 +438,8 @@ ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)$(HCUSTOM_EXTRA_LDFLAGS)))
 endif
 ifneq (,$(strip $(HCUSTOM_EXPORT)))
     HCUSTOM_EXPORT := export $(HCUSTOM_EXPORT)
+else
+    HCUSTOM_EXPORT := true
 endif
 
 DEPEND := houdini_deps

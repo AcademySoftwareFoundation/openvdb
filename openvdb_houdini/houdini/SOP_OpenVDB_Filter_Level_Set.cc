@@ -436,7 +436,7 @@ newSopOperator(OP_OperatorTable* table)
         // Define a string-valued group name pattern parameter and add it to the list.
         parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
             .setHelpText("Specify a subset of the input VDB grids to be processed.")
-            .setChoiceList(&hutil::PrimGroupMenu));
+            .setChoiceList(&hutil::PrimGroupMenuInput1));
 
         if (OP_TYPE_RENORM != op && OP_TYPE_TRIM != op) { // Filter menu
 
@@ -447,8 +447,7 @@ newSopOperator(OP_OperatorTable* table)
 
             parms.add(hutil::ParmFactory(PRM_STRING, "maskname", "Alpha Mask")
                 .setHelpText("Optional VDB used for alpha masking. Assumes values 0->1.")
-                .setSpareData(&SOP_Node::theSecondInput)
-                .setChoiceList(&hutil::PrimGroupMenu));
+                .setChoiceList(&hutil::PrimGroupMenuInput2));
 
             std::vector<std::string> items;
 
@@ -468,7 +467,7 @@ newSopOperator(OP_OperatorTable* table)
         // steps
         parms.add(hutil::ParmFactory(PRM_INT_J, "iterations", "Iterations")
             .setDefault(PRMfourDefaults)
-                  .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10));
+            .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10));
 
         // Narrow-Band half-width
         parms.add(hutil::ParmFactory(PRM_INT_J, "halfWidth", "Half-Width")

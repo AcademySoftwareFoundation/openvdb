@@ -466,7 +466,9 @@ private:
 
 
 // Extended group name drop-down menu incorporating "@<attr>=<value" syntax
-OPENVDB_HOUDINI_API extern const PRM_ChoiceList PrimGroupMenu;
+OPENVDB_HOUDINI_API extern const PRM_ChoiceList PrimGroupMenuInput1;
+OPENVDB_HOUDINI_API extern const PRM_ChoiceList PrimGroupMenuInput2;
+OPENVDB_HOUDINI_API extern const PRM_ChoiceList PrimGroupMenuInput3;
 
 
 } // namespace houdini_utils

@@ -831,7 +831,7 @@ geo_calcVolume(const GridType &grid, fpreal &volume)
 	    // do nothing
 	}
     }
-   
+
     // Simply account for the total number of active voxels
     if (!calculated) {
         const openvdb::Vec3d size = grid.voxelSize();
@@ -860,7 +860,7 @@ geo_calcArea(const GridType &grid, fpreal &area)
 	    // do nothing
 	}
     }
-   
+
     if (!calculated) {
         typedef typename GridType::TreeType::LeafCIter LeafIter;
         typedef typename GridType::TreeType::LeafNodeType::ValueOnCIter VoxelIter;
@@ -2552,7 +2552,7 @@ geoSetVDBStreamCompression(openvdb::io::Stream& vos, bool backwards_compatible)
     uint32_t compression = openvdb::io::COMPRESS_ACTIVE_MASK;
     // Enable blosc compression unless we want it to be backwards compatible.
     if (vos.hasBloscCompression() && !backwards_compatible)
-	compression |= openvdb::io::COMPRESS_BLOSC_LZ4;
+	compression |= openvdb::io::COMPRESS_BLOSC;
     vos.setCompression(compression);
 }
 
@@ -2572,15 +2572,8 @@ GEO_PrimVDB::saveVDB(UT_JSONWriter &w) const
 	openvdb::io::Stream vos(os);
 	openvdb::MetaMap meta;
 
-	// Always enable active mask compression, since it is fast
-	// and compresses level sets and fog volumes well. Enable Blosc
-	// as well unless we want backwards compatibility.
-	uint32_t compression = openvdb::io::COMPRESS_ACTIVE_MASK;
-	if (vos.hasBloscCompression()
-		&& !UT_EnvControl::getInt(ENV_HOUDNI13_VOLUME_COMPATIBILITY)) {
-	    compression |= openvdb::io::COMPRESS_BLOSC;
-	}
-	vos.setCompression(compression);
+	geoSetVDBStreamCompression(
+	    vos, UT_EnvControl::getInt(ENV_HOUDINI13_VOLUME_COMPATIBILITY));
 
 	// Visual C++ requires a default meta object declared on the stack
 	vos.write(grids, meta);

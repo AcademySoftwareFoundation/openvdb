@@ -171,7 +171,7 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setHelpText("Specify a subset of the input VDB grids to surface.")
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenuInput1));
 
 
     { // Convert To Menu
@@ -314,8 +314,7 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "surfacemaskname", "Surface Mask")
         .setHelpText("A single level-set or sdf grid whose interior defines the region to mesh")
-        .setSpareData(&SOP_Node::theThirdInput)
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenuInput3));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "surfacemaskoffset", "Mask Offset")
         .setDefault(PRMzeroDefaults)
@@ -333,8 +332,7 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_STRING, "adaptivityfieldname", "Adaptivity Field")
         .setHelpText(
             "A single scalar grid used as a spatial multiplier for the adaptivity threshold")
-        .setSpareData(&SOP_Node::theThirdInput)
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenuInput3));
 
 
 

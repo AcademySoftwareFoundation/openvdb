@@ -61,6 +61,7 @@
 #ifndef SESI_OPENVDB
 #include <UT/UT_DSOVersion.h>
 #endif
+#include <UT/UT_EnvControl.h>
 #include <UT/UT_IOTable.h>
 #include <UT/UT_IStream.h>
 #include <UT/UT_Version.h>

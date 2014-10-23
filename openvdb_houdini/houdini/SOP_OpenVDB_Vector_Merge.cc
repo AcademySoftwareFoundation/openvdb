@@ -95,7 +95,7 @@ newSopOperator(OP_OperatorTable* table)
             "as the x components of the merged vector grids.\n"
             "Each x grid will be paired with a y and a z grid\n"
             "(if provided) to produce an output vector grid.")
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenuInput1));
 
     // Group of Y grids
     parms.add(hutil::ParmFactory(PRM_STRING, "scalar_y_group", "Y Group")
@@ -105,7 +105,7 @@ newSopOperator(OP_OperatorTable* table)
             "as the y components of the merged vector grids.\n"
             "Each y grid will be paired with an x and a z grid\n"
             "(if provided) to produce an output vector grid.")
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenuInput1));
 
     // Group of Z grids
     parms.add(hutil::ParmFactory(PRM_STRING, "scalar_z_group", "Z Group")
@@ -115,7 +115,7 @@ newSopOperator(OP_OperatorTable* table)
             "as the z components of the merged vector grids.\n"
             "Each z grid will be paired with an x and a y grid\n"
             "(if provided) to produce an output vector grid.")
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenuInput1));
 
     // Use X name
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "usexname",  "Use Basename of X VDB")

@@ -2187,10 +2187,10 @@ template <typename MetadataT> struct MetaAttr;
 #define META_ATTR(METADATA_T, STORAGE, TUPLE_T, TUPLE_SIZE) \
     template <> \
     struct MetaAttr<METADATA_T> { \
-   typedef TUPLE_T TupleT; \
-   typedef GA_HandleT<TupleT>::RWType RWHandleT; \
-   static const int theTupleSize = TUPLE_SIZE; \
-   static const GA_Storage theStorage = STORAGE; \
+	typedef TUPLE_T TupleT; \
+	typedef GA_HandleT<TupleT>::RWType RWHandleT; \
+	static const int theTupleSize = TUPLE_SIZE; \
+	static const GA_Storage theStorage = STORAGE; \
     }; \
     /**/
 

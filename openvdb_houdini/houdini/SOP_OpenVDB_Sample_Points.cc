@@ -247,8 +247,7 @@ newSopOperator(OP_OperatorTable* table)
     // Group pattern
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setHelpText("Specify a subset of the input VDB grids to be processed.")
-        .setChoiceList(&hutil::PrimGroupMenu)
-        .setSpareData(&SOP_Node::theSecondInput));
+        .setChoiceList(&hutil::PrimGroupMenuInput2));
 
     // verbose option toggle
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "verbose", "Verbose")

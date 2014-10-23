@@ -73,7 +73,7 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Source Group")
         .setHelpText("Specify a subset of the input VDB grids to be clipped.")
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenuInput1));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "usemask", "")
         .setHelpText(
@@ -84,8 +84,7 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "mask", "Mask VDB")
         .setHelpText("Specify a VDB grid whose active voxels are to be used as a clipping mask.")
-        .setChoiceList(&hutil::PrimGroupMenu)
-        .setSpareData(&SOP_Node::theSecondInput));
+        .setChoiceList(&hutil::PrimGroupMenuInput2));
 
     hvdb::OpenVDBOpFactory("OpenVDB Clip", SOP_OpenVDB_Clip::factory, parms, *table)
         .addInput("VDBs")
