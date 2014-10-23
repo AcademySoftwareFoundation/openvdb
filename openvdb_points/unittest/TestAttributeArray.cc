@@ -234,7 +234,6 @@ TestAttributeArray::testAttributeSet()
 
 	Descriptor::Ptr descrA = Descriptor::create(names.vec);
 
-
 	Descriptor::Ptr descrB = Descriptor::create(Descriptor::Inserter()
 		.add("p", AttributeVec3s::attributeType())
 		.add("t", AttributeS::attributeType())
@@ -244,7 +243,17 @@ TestAttributeArray::testAttributeSet()
 
 	CPPUNIT_ASSERT(*descrA == *descrB);
 
-	//std::cout << descrA->type(0) << "\n";
+	typedef openvdb::tools::AttributeSet AttributeSet;
+
+	AttributeSet attributes(descrA);
+
+	AttributeArray::Ptr pAttr(new AttributeVec3s(50));
+	AttributeArray::Ptr tAttr(new AttributeS(50));
+
+	CPPUNIT_ASSERT(attributes.replace(0, pAttr) != AttributeSet::INVALID_POS);
+	CPPUNIT_ASSERT(attributes.replace(1, tAttr) != AttributeSet::INVALID_POS);
+
+	CPPUNIT_ASSERT(attributes.replace(0, tAttr) == AttributeSet::INVALID_POS);
 }
 
 

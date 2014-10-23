@@ -181,20 +181,7 @@ AttributeArray::setHidden(bool state)
 
 // AttributeSet implementation
 
-/*
-bool validTypes(const std::string& t1, const std::string& t2, const Descriptor::TypeConstraint c)
-{
-    if (c == Descriptor::CONSTRAIN_TYPE) {
-        const size_t p = t1.find_first_of('_');
-        if (p == std::string::npos || t1.compare(0, p, t2) != 0) {
-            return false;
-        }
-    } else if (c == Descriptor::CONSTRAIN_TYPE_AND_CODEC && t1 != t2) {
-        return false;
-    }
-    return true;
-}
-*/
+
 AttributeSet::AttributeSet()
     : mDescr(new Descriptor())
     , mAttrs()
@@ -219,12 +206,14 @@ AttributeSet::AttributeSet(const DescriptorPtr& descr)
 void
 AttributeSet::update(const DescriptorPtr& descr)
 {
-    AttrArrayVec attrs(descr->size(), AttributeArray::Ptr());
+    if (descr.get() != mDescr.get()) {
+        AttrArrayVec attrs(descr->size(), AttributeArray::Ptr());
 
-    /// @todo preserve similarly named attributes
+        /// @todo preserve similar attributes
 
-    mAttrs.swap(attrs);
-    mDescr = descr;
+        mAttrs.swap(attrs);
+        mDescr = descr;
+    }
 }
 
 
@@ -260,9 +249,9 @@ AttributeSet::replace(size_t pos, const AttributeArray::Ptr& attr)
     assert(pos != INVALID_POS);
     assert(pos < mAttrs.size());
 
-    /*if (!validTypes(attr->type(), mDescr->type(pos), mDescr->typeConstraint())) {
+    if (attr->type() != mDescr->type(pos)) {
         return INVALID_POS;
-    }*/
+    }
 
     mAttrs[pos] = attr;
     return pos;
