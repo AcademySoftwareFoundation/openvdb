@@ -429,17 +429,15 @@ ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)$(HCUSTOM_EXTRA_LDFLAGS)))
 	# From Houdini 13.0.548 and 14.0.105 on, hcustom recognizes
 	# the environment variables HCUSTOM_CFLAGS and HCUSTOM_LDFLAGS.
 	ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)))
-	    HCUSTOM_EXPORT += HCUSTOM_CFLAGS=$(HCUSTOM_EXTRA_CFLAGS)
+	    HCUSTOM_EXPORT += HCUSTOM_CFLAGS=$(strip $(HCUSTOM_EXTRA_CFLAGS))
 	endif
 	ifneq (,$(strip $(HCUSTOM_EXTRA_LDFLAGS)))
-	    HCUSTOM_EXPORT += HCUSTOM_LDFLAGS=$(HCUSTOM_EXTRA_LDFLAGS)
+	    HCUSTOM_EXPORT += HCUSTOM_LDFLAGS=$(strip $(HCUSTOM_EXTRA_LDFLAGS))
 	endif
     endif
 endif
 ifneq (,$(strip $(HCUSTOM_EXPORT)))
-    HCUSTOM_EXPORT := export $(HCUSTOM_EXPORT)
-else
-    HCUSTOM_EXPORT := true
+    HCUSTOM_EXPORT := export $(HCUSTOM_EXPORT);
 endif
 
 DEPEND := houdini_deps
@@ -516,13 +514,13 @@ ifeq (no,$(strip $(shared)))
 # Link SOPs against static OpenVDB libraries.
 $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
 	@echo "Building $(HOUDINI_INSTALL_DIR)/$(@:.o=$(SHAREDLIB_SUFFIX)) because of $(call list_deps)"
-	$(HCUSTOM_EXPORT); $(HCUSTOM) $(HOUDINI_INCLDIRS) $(HCUSTOM_LIBS) \
+	$(HCUSTOM_EXPORT) $(HCUSTOM) $(HOUDINI_INCLDIRS) $(HCUSTOM_LIBS) \
 	    $(HCUSTOM_LIBDEPS) $< $(QUIET)
 else
 # Link SOPs against shared OpenVDB libraries.
 $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
 	@echo "Building $(HOUDINI_INSTALL_DIR)/$(@:.o=$(SHAREDLIB_SUFFIX)) because of $(call list_deps)"
-	$(HCUSTOM_EXPORT); $(HCUSTOM) $(HOUDINI_INCLDIRS) \
+	$(HCUSTOM_EXPORT) $(HCUSTOM) $(HOUDINI_INCLDIRS) \
 	    $(HCUSTOM_LIBDEPS) $< $(QUIET)
 endif
 

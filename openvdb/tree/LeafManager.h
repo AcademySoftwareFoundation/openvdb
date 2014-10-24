@@ -110,15 +110,17 @@ class LeafManager
 {
 public:
     typedef TreeT                                                      TreeType;
+    typedef typename TreeT::ValueType                                  ValueType;
     typedef typename TreeT::RootNodeType                               RootNodeType;
     typedef typename TreeType::LeafNodeType                            NonConstLeafType;
     typedef typename CopyConstness<TreeType, NonConstLeafType>::Type   LeafType;
+    typedef LeafType                                                   LeafNodeType;
     typedef typename leafmgr::TreeTraits<TreeT>::LeafIterType          LeafIterType;
     typedef typename LeafType::Buffer                                  NonConstBufferType;
     typedef typename CopyConstness<TreeType, NonConstBufferType>::Type BufferType;
     typedef tbb::blocked_range<size_t>                                 RangeType;//leaf index range
     static const Index DEPTH = 2;//root + leafs
-    
+
     static const bool IsConstTree = leafmgr::TreeTraits<TreeT>::IsConstTree;
 
     class LeafRange
@@ -477,15 +479,15 @@ public:
         transform.run(this->leafRange(grainSize), threaded);
     }
 
-    
+
     template<typename ArrayT>
     void getNodes(ArrayT& array)
     {
         typedef typename ArrayT::value_type T;
         BOOST_STATIC_ASSERT(boost::is_pointer<T>::value);
         typedef typename boost::mpl::if_<boost::is_const<typename boost::remove_pointer<T>::type>,
-            const LeafType, LeafType>::type LeafT;    
-    
+            const LeafType, LeafType>::type LeafT;
+
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
         if (boost::is_same<T, LeafT*>::value) {
             array.resize(mLeafCount);
@@ -495,14 +497,14 @@ public:
         }
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
             }
-    
+
     template<typename ArrayT>
     void getNodes(ArrayT& array) const
     {
         typedef typename ArrayT::value_type T;
         BOOST_STATIC_ASSERT(boost::is_pointer<T>::value);
-        BOOST_STATIC_ASSERT(boost::is_const<typename boost::remove_pointer<T>::type>::value);    
-    
+        BOOST_STATIC_ASSERT(boost::is_const<typename boost::remove_pointer<T>::type>::value);
+
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
         if (boost::is_same<T, const LeafType*>::value) {
             array.resize(mLeafCount);

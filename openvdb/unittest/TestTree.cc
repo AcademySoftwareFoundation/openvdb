@@ -143,13 +143,18 @@ TestTree::testChangeBackground()
 {
     const int dim = 128;
     const openvdb::Vec3f center(0.35f, 0.35f, 0.35f);
-    const float radius = 0.15f, voxelSize = 1.0f/(dim-1), halfWidth = 4, gamma = halfWidth*voxelSize;
+    const float
+        radius = 0.15f,
+        voxelSize = 1.0f / (dim-1),
+        halfWidth = 4,
+        gamma = halfWidth * voxelSize;
     typedef openvdb::FloatGrid GridT;
     const openvdb::Coord inside(int(center[0]*dim), int(center[1]*dim), int(center[2]*dim));
     const openvdb::Coord outside(dim);
 
     {//changeBackground
-        GridT::Ptr grid = openvdb::tools::createLevelSetSphere<GridT>(radius, center, voxelSize, halfWidth);
+        GridT::Ptr grid = openvdb::tools::createLevelSetSphere<GridT>(
+            radius, center, voxelSize, halfWidth);
         openvdb::FloatTree& tree = grid->tree();
 
         CPPUNIT_ASSERT(grid->tree().isValueOff(outside));
@@ -169,7 +174,8 @@ TestTree::testChangeBackground()
     }
 
     {//changeLevelSetBackground
-        GridT::Ptr grid = openvdb::tools::createLevelSetSphere<GridT>(radius, center, voxelSize, halfWidth);
+        GridT::Ptr grid = openvdb::tools::createLevelSetSphere<GridT>(
+            radius, center, voxelSize, halfWidth);
         openvdb::FloatTree& tree = grid->tree();
 
         CPPUNIT_ASSERT(grid->tree().isValueOff(outside));
@@ -179,7 +185,7 @@ TestTree::testChangeBackground()
         ASSERT_DOUBLES_EXACTLY_EQUAL(-gamma, tree.getValue(inside));
 
         const float v1 = gamma*3.43f, v2 = -gamma*6.457f;
-        openvdb::tools::changeLevelSetBackground(tree, v1, v2);
+        openvdb::tools::changeAsymmetricLevelSetBackground(tree, v1, v2);
 
         CPPUNIT_ASSERT(grid->tree().isValueOff(outside));
         ASSERT_DOUBLES_EXACTLY_EQUAL( v1, tree.getValue(outside));
@@ -2675,9 +2681,9 @@ TestTree::testNodeManager()
         //for (openvdb::Index i=0; i<openvdb::tree::NodeManager<FloatTree>::LEVELS; ++i) {
         //    std::cerr << "Level=" << i << " nodes=" << manager.nodeCount(i) << std::endl;
         //}
-        
+
         Index64 totalCount = 0;
-        for (openvdb::Index i=0; i<FloatTree::RootNodeType::LEVEL; ++i) {//exclute root in nodeCount
+        for (openvdb::Index i=0; i<FloatTree::RootNodeType::LEVEL; ++i) {//exclude root in nodeCount
             //std::cerr << "Level=" << i << " expected=" << nodeCount[i]
             //          << " cached=" << manager.nodeCount(i) << std::endl;
             CPPUNIT_ASSERT_EQUAL(nodeCount[i], manager.nodeCount(i));
@@ -2692,7 +2698,7 @@ TestTree::testNodeManager()
         CPPUNIT_ASSERT_EQUAL(nodeCount[0], manager1.leafCount());
         openvdb::tree::NodeManager<LeafManagerT> manager2(manager1);
         Index64 totalCount = 0;
-        for (openvdb::Index i=0; i<FloatTree::RootNodeType::LEVEL; ++i) {//exclute root in nodeCount
+        for (openvdb::Index i=0; i<FloatTree::RootNodeType::LEVEL; ++i) {//exclude root in nodeCount
             //std::cerr << "Level=" << i << " expected=" << nodeCount[i]
             //          << " cached=" << manager2.nodeCount(i) << std::endl;
             CPPUNIT_ASSERT_EQUAL(nodeCount[i], manager2.nodeCount(i));

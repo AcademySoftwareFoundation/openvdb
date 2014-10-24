@@ -215,9 +215,8 @@ sopBuildAttrMenu(void* data, PRM_Name* menuEntries, int themenusize,
     menuEntries[menuIdx].setLabel(0);
 }
 
-const PRM_ChoiceList PrimAttrMenu(PRM_ChoiceListType(PRM_CHOICELIST_EXCLUSIVE |
-                                                     PRM_CHOICELIST_REPLACE), sopBuildAttrMenu);
-
+const PRM_ChoiceList PrimAttrMenu(
+    PRM_ChoiceListType(PRM_CHOICELIST_EXCLUSIVE | PRM_CHOICELIST_REPLACE), sopBuildAttrMenu);
 
 } // unnamed namespace
 

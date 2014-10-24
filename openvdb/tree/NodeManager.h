@@ -33,16 +33,10 @@
 /// @author Ken Museth
 ///
 /// @brief NodeManager produces linear arrays of all tree nodes
-///        allowing for efficient multi-threading and bottom-up
-///        processing. 
+/// allowing for efficient threading and bottom-up processing.
 ///
 /// @note A NodeManager can be constructed from a Tree or LeafManager.
-///       The latter is slightly more efficient since the cached leaf
-///       nodes will be reused.
-///
-/// @todo Currently NodeManager only support a maximum DEPTH of
-///       5.This will be generalized to any DEPTH soon.
-///
+/// The latter is slightly more efficient since the cached leaf nodes will be reused.
 
 #ifndef OPENVDB_TREE_NODEMANAGER_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_NODEMANAGER_HAS_BEEN_INCLUDED
@@ -56,13 +50,18 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tree {
 
-/// @brief Produces linear arrays of all tree nodes
-/// allowing for efficient multi-threading and bottom-up processing.    
+// Produce linear arrays of all tree nodes, to facilitate efficient threading
+// and bottom-up processing.
 template<typename TreeOrLeafManagerT, Index LEVELS = TreeOrLeafManagerT::RootNodeType::LEVEL>
 class NodeManager;
 
+
 ////////////////////////////////////////
 
+
+/// @brief This class caches tree nodes of a specific type in a linear array.
+///
+/// @note It is for internal use and should rarely be used directly.
 template<typename NodeT>
 class NodeList
 {
@@ -77,7 +76,7 @@ public:
     NodeT& operator()(size_t n) const { assert(n<mList.size()); return *(mList[n]); }
 
     NodeT*& operator[](size_t n) { assert(n<mList.size()); return mList[n]; }
-    
+
     Index64 nodeCount() const { return mList.size(); }
 
     void clear() { mList.clear(); }
@@ -192,22 +191,259 @@ protected:
     ListT mList;
 };// NodeList
 
+
+/////////////////////////////////////////////
+
+
+/// @brief This class is a link in a chain that each caches tree nodes
+/// of a specific type in a linear array.
+///
+/// @note It is for internal use and should rarely be used directly.
+template<typename NodeT, Index LEVEL>
+class NodeManagerLink
+{
+public:
+    NodeManagerLink() {}
+
+    virtual ~NodeManagerLink() {}
+
+    void clear() { mList.clear(); mNext.clear(); }
+
+    template<typename ParentT, typename TreeOrLeafManagerT>
+    void init(ParentT& parent, TreeOrLeafManagerT& tree)
+    {
+        parent.getNodes(mList);
+        for (size_t i=0, n=mList.nodeCount(); i<n; ++i) mNext.init(mList(i), tree);
+    }
+
+    template<typename ParentT>
+    void rebuild(ParentT& parent)
+    {
+        mList.clear();
+        parent.getNodes(mList);
+        for (size_t i=0, n=mList.nodeCount(); i<n; ++i) mNext.rebuild(mList(i));
+    }
+
+    Index64 nodeCount() const { return mList.nodeCount() + mNext.nodeCount(); }
+
+    Index64 nodeCount(Index i) const
+    {
+        return i==NodeT::LEVEL ? mList.nodeCount() : mNext.nodeCount(i);
+    }
+
+    template<typename NodeOp>
+    void processBottomUp(const NodeOp& op, bool threaded, size_t grainSize)
+    {
+        mNext.processBottomUp(op, threaded, grainSize);
+        mList.foreach(op, threaded, grainSize);
+    }
+
+    template<typename NodeOp>
+    void processTopDown(const NodeOp& op, bool threaded, size_t grainSize)
+    {
+        mList.foreach(op, threaded, grainSize);
+        mNext.processTopDown(op, threaded, grainSize);
+    }
+
+protected:
+    NodeList<NodeT> mList;
+    NodeManagerLink<typename NodeT::ChildNodeType, LEVEL-1> mNext;
+};// NodeManagerLink class
+
+
+////////////////////////////////////////
+
+
+/// @brief Specialization that terminates the chain of cached tree nodes
+///
+/// @note It is for internal use and should rarely be used directly.
+template<typename NodeT>
+class NodeManagerLink<NodeT, 0>
+{
+public:
+    NodeManagerLink() {}
+
+    virtual ~NodeManagerLink() {}
+
+    /// @brief Clear all the cached tree nodes
+    void clear() { mList.clear(); }
+
+    template<typename ParentT>
+    void rebuild(ParentT& parent) { mList.clear(); parent.getNodes(mList); }
+
+    Index64 nodeCount() const { return mList.nodeCount(); }
+
+    Index64 nodeCount(Index) const { return mList.nodeCount(); }
+
+    template<typename NodeOp>
+    void processBottomUp(const NodeOp& op, bool threaded, size_t grainSize)
+    {
+        mList.foreach(op, threaded, grainSize);
+    }
+
+    template<typename NodeOp>
+    void processTopDown(const NodeOp& op, bool threaded, size_t grainSize)
+    {
+        mList.foreach(op, threaded, grainSize);
+    }
+
+    template<typename ParentT, typename TreeOrLeafManagerT>
+    void init(ParentT& parent, TreeOrLeafManagerT& tree)
+    {
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+        if (TreeOrLeafManagerT::DEPTH == 2 && NodeT::LEVEL == 0) {
+            tree.getNodes(mList);
+        } else {
+            parent.getNodes(mList);
+        }
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+    }
+protected:
+    NodeList<NodeT> mList;
+};// NodeManagerLink class
+
+
+////////////////////////////////////////
+
+
+/// @brief To facilitate threading over the nodes of a tree, cache
+/// node pointers in linear arrays, one for each level of the tree.
+///
+/// @details This implementation works with trees of any depth, but
+/// optimized specializations are provided for the most typical tree depths.
+template<typename TreeOrLeafManagerT, Index _LEVELS>
+class NodeManager
+{
+public:
+    static const Index LEVELS = _LEVELS;
+    BOOST_STATIC_ASSERT(LEVELS > 0);//special implementation below
+    typedef typename TreeOrLeafManagerT::RootNodeType RootNodeType;
+    BOOST_STATIC_ASSERT(RootNodeType::LEVEL >= LEVELS);
+
+    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root()) { mChain.init(mRoot, tree); }
+
+    virtual ~NodeManager() {}
+
+    /// @brief Clear all the cached tree nodes
+    void clear() { mChain.clear(); }
+
+    /// @brief Clear and recache all the tree nodes from the
+    /// tree. This is required if tree nodes have been added or removed.
+    void rebuild() { mChain.rebuild(mRoot); }
+
+    /// @brief Return a reference to the root node.
+    const RootNodeType& root() const { return mRoot; }
+
+    /// @brief Return the total number of cached nodes (excluding the root node)
+    Index64 nodeCount() const { return mChain.nodeCount(); }
+
+    /// @brief Return the number of cached nodes at level @a i, where
+    /// 0 corresponds to the lowest level.
+    Index64 nodeCount(Index i) const { return mChain.nodeCount(i); }
+
+    //@{
+    /// @brief   Threaded method that applies a user-supplied functor
+    ///          to all the nodes in the tree.
+    ///
+    /// @param op        user-supplied functor, see examples for interface details.
+    /// @param threaded  optional toggle to disable threading, on by default.
+    /// @param grainSize optional parameter to specify the grainsize
+    ///                  for threading, one by default.
+    ///
+    /// @warning The functor object is deep-copied to create TBB tasks.
+    ///
+    /// @par Example:
+    /// @code
+    /// // Functor to offset all the inactive values of a tree. Note
+    /// // this implementation also illustrates how different
+    /// // computation can be applied to the different node types.
+    /// template<typename TreeType>
+    /// struct OffsetOp
+    /// {
+    ///     typedef typename TreeT::ValueType    ValueT;
+    ///     typedef typename TreeT::RootNodeType RootT;
+    ///     typedef typename TreeT::LeafNodeType LeafT;
+    ///     OffsetOp(const ValueT& v) : mOffset(v) {}
+    ///
+    ///     // Processes the root node. Required by the NodeManager
+    ///     void operator()(RootT& root) const
+    ///     {
+    ///         for (typename RootT::ValueOffIter i = root.beginValueOff(); i; ++i) *i += mOffset;
+    ///     }
+    ///     // Processes the leaf nodes. Required by the NodeManager
+    ///     void operator()(LeafT& leaf) const
+    ///     {
+    ///         for (typename LeafT::ValueOffIter i = leaf.beginValueOff(); i; ++i) *i += mOffset;
+    ///     }
+    ///     // Processes the internal nodes. Required by the NodeManager
+    ///     template<typename NodeT>
+    ///     void operator()(NodeT& node) const
+    ///     {
+    ///         for (typename NodeT::ValueOffIter i = node.beginValueOff(); i; ++i) *i += mOffset;
+    ///     }
+    /// private:
+    ///     const ValueT mOffset;
+    /// };
+    ///
+    /// // usage:
+    /// OffsetOp<FloatTree> op(tree);
+    /// tree::NodeManager<FloatTree> nodes(tree);
+    /// nodes.processBottomUp(op);
+    ///
+    /// // or for better performance
+    /// typedef tree::LeafManager<FloatTree> T;
+    /// OffsetOp<T> op(leafManager);
+    /// tree::NodeManager<T> nodes(leafManager);
+    /// nodes.processBottomUp(op);
+    ///
+    /// @endcode
+    template<typename NodeOp>
+    void processBottomUp(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        mChain.processBottomUp(op, threaded, grainSize);
+        op(mRoot);
+    }
+
+    template<typename NodeOp>
+    void processTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(mRoot);
+        mChain.processTopDown(op, threaded, grainSize);
+    }
+    //@}
+
+protected:
+    RootNodeType& mRoot;
+    NodeManagerLink<typename RootNodeType::ChildNodeType, LEVELS-1> mChain;
+
+private:
+    NodeManager(const NodeManager&) {}//disallow copy-construction
+};// NodeManager class
+
+
 ////////////////////////////////////////////
 
+
+/// Template specialization of the NodeManager with no caching of nodes
 template<typename TreeOrLeafManagerT>
-class NodeManager0
+class NodeManager<TreeOrLeafManagerT, 0>
 {
 public:
     typedef typename TreeOrLeafManagerT::RootNodeType RootNodeType;
-    
-    NodeManager0(TreeOrLeafManagerT& tree) : mRoot(tree.root()) {}
+    static const Index LEVELS = 0;
 
-    virtual ~NodeManager0() {}
+    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root()) {}
 
+    virtual ~NodeManager() {}
+
+    /// @brief Clear all the cached tree nodes
     void clear() {}
 
+    /// @brief Clear and recache all the tree nodes from the
+    /// tree. This is required if tree nodes have been added or removed.
     void rebuild() {}
 
+    /// @brief Return a reference to the root node.
     const RootNodeType& root() const { return mRoot; }
 
     /// @brief Return the total number of cached nodes (excluding the root node)
@@ -222,34 +458,46 @@ public:
     void processTopDown(const NodeOp& op, bool, size_t) { op(mRoot); }
 
 protected:
-
     RootNodeType& mRoot;
-};// NodeManager0
+
+private:
+    NodeManager(const NodeManager&) {} // disallow copy-construction
+}; // NodeManager<0>
+
 
 ////////////////////////////////////////////
 
+
+/// Template specialization of the NodeManager with one level of nodes
 template<typename TreeOrLeafManagerT>
-class NodeManager1
+class NodeManager<TreeOrLeafManagerT, 1>
 {
 public:
     typedef typename TreeOrLeafManagerT::RootNodeType RootNodeType;
     BOOST_STATIC_ASSERT(RootNodeType::LEVEL > 0);
-    
-    NodeManager1(TreeOrLeafManagerT& tree) : mRoot(tree.root())
+    static const Index LEVELS = 1;
+
+    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
     {
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
         if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
             tree.getNodes(mList0);
         } else {
-            this->rebuild();
+            mRoot.getNodes(mList0);
         }
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
 
-    virtual ~NodeManager1() {}
+    virtual ~NodeManager() {}
 
+    /// @brief Clear all the cached tree nodes
     void clear() { mList0.clear(); }
 
-    void rebuild() { mRoot.getNodes(mList0); }
+    /// @brief Clear and recache all the tree nodes from the
+    /// tree. This is required if tree nodes have been added or removed.
+    void rebuild() { mList0.clear(); mRoot.getNodes(mList0); }
 
+    /// @brief Return a reference to the root node.
     const RootNodeType& root() const { return mRoot; }
 
     /// @brief Return the total number of cached nodes (excluding the root node)
@@ -280,38 +528,52 @@ protected:
 
     NodeT1& mRoot;
     ListT0 mList0;
-};// NodeManager1
+
+private:
+    NodeManager(const NodeManager&) {} // disallow copy-construction
+}; // NodeManager<1>
+
 
 ////////////////////////////////////////////
 
+
+/// Template specialization of the NodeManager with two levels of nodes
 template<typename TreeOrLeafManagerT>
-class NodeManager2
+class NodeManager<TreeOrLeafManagerT, 2>
 {
 public:
     typedef typename TreeOrLeafManagerT::RootNodeType RootNodeType;
     BOOST_STATIC_ASSERT(RootNodeType::LEVEL > 1);
-    
-    NodeManager2(TreeOrLeafManagerT& tree) : mRoot(tree.root())
+    static const Index LEVELS = 2;
+
+    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
     {
         mRoot.getNodes(mList1);
+
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
         if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
             tree.getNodes(mList0);
         } else {
             for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
         }
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
-    
 
-    virtual ~NodeManager2() {}
+    virtual ~NodeManager() {}
 
+    /// @brief Clear all the cached tree nodes
     void clear() { mList0.clear(); mList1.clear(); }
 
+    /// @brief Clear and recache all the tree nodes from the
+    /// tree. This is required if tree nodes have been added or removed.
     void rebuild()
     {
+        this->clear();
         mRoot.getNodes(mList1);
         for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
     }
 
+    /// @brief Return a reference to the root node.
     const RootNodeType& root() const { return mRoot; }
 
     /// @brief Return the total number of cached nodes (excluding the root node)
@@ -351,50 +613,65 @@ protected:
     NodeT2& mRoot;
     ListT1 mList1;
     ListT0 mList0;
-};// NodeManager2
+
+private:
+    NodeManager(const NodeManager&) {} // disallow copy-construction
+}; // NodeManager<2>
+
 
 ////////////////////////////////////////////
 
+
+/// Template specialization of the NodeManager with three levels of nodes
 template<typename TreeOrLeafManagerT>
-class NodeManager3
+class NodeManager<TreeOrLeafManagerT, 3>
 {
 public:
     typedef typename TreeOrLeafManagerT::RootNodeType RootNodeType;
     BOOST_STATIC_ASSERT(RootNodeType::LEVEL > 2);
-    
-    NodeManager3(TreeOrLeafManagerT& tree) : mRoot(tree.root())
+    static const Index LEVELS = 3;
+
+    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
     {
         mRoot.getNodes(mList2);
         for (size_t i=0, n=mList2.nodeCount(); i<n; ++i) mList2(i).getNodes(mList1);
 
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
         if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
             tree.getNodes(mList0);
         } else {
             for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
         }
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
 
-    virtual ~NodeManager3() {}
+    virtual ~NodeManager() {}
 
+    /// @brief Clear all the cached tree nodes
     void clear() { mList0.clear(); mList1.clear(); mList2.clear(); }
 
+    /// @brief Clear and recache all the tree nodes from the
+    /// tree. This is required if tree nodes have been added or removed.
     void rebuild()
     {
+        this->clear();
         mRoot.getNodes(mList2);
         for (size_t i=0, n=mList2.nodeCount(); i<n; ++i) mList2(i).getNodes(mList1);
         for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
     }
 
+    /// @brief Return a reference to the root node.
     const RootNodeType& root() const { return mRoot; }
 
     /// @brief Return the total number of cached nodes (excluding the root node)
-    Index64 nodeCount() const { return mList0.nodeCount() + mList1.nodeCount() + mList2.nodeCount(); }
+    Index64 nodeCount() const { return mList0.nodeCount()+mList1.nodeCount()+mList2.nodeCount(); }
 
     /// @brief Return the number of cached nodes at level @a i, where
     /// 0 corresponds to the lowest level.
     Index64 nodeCount(Index i) const
     {
-        return i==0 ? mList0.nodeCount() : i==1 ? mList1.nodeCount() : i==2 ? mList2.nodeCount() : 0;
+        return i==0 ? mList0.nodeCount() : i==1 ? mList1.nodeCount()
+            : i==2 ? mList2.nodeCount() : 0;
     }
 
     template<typename NodeOp>
@@ -421,57 +698,71 @@ protected:
     typedef typename NodeT2::ChildNodeType NodeT1;//mid level
     typedef typename NodeT1::ChildNodeType NodeT0;//lower level
 
-    typedef NodeList<NodeT2>                     ListT2;//upper level of internal nodes
-    typedef NodeList<NodeT1>                     ListT1;//lower level of internal nodes
-    typedef NodeList<NodeT0>                     ListT0;//lower level of internal nodes or leafs
+    typedef NodeList<NodeT2>               ListT2;//upper level of internal nodes
+    typedef NodeList<NodeT1>               ListT1;//lower level of internal nodes
+    typedef NodeList<NodeT0>               ListT0;//lower level of internal nodes or leafs
 
     NodeT3& mRoot;
     ListT2 mList2;
     ListT1 mList1;
     ListT0 mList0;
-};// NodeManager3
+
+private:
+    NodeManager(const NodeManager&) {} // disallow copy-construction
+}; // NodeManager<3>
+
 
 ////////////////////////////////////////////
 
+
+/// Template specialization of the NodeManager with four levels of nodes
 template<typename TreeOrLeafManagerT>
-class NodeManager4
+class NodeManager<TreeOrLeafManagerT, 4>
 {
 public:
     typedef typename TreeOrLeafManagerT::RootNodeType RootNodeType;
     BOOST_STATIC_ASSERT(RootNodeType::LEVEL > 3);
+    static const Index LEVELS = 4;
 
-    NodeManager4(TreeOrLeafManagerT& tree) : mRoot(tree.root())
+    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
     {
         mRoot.getNodes(mList2);
         for (size_t i=0, n=mList3.nodeCount(); i<n; ++i) mList3(i).getNodes(mList2);
         for (size_t i=0, n=mList2.nodeCount(); i<n; ++i) mList2(i).getNodes(mList1);
 
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
         if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
             tree.getNodes(mList0);
         } else {
             for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
         }
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
 
-    virtual ~NodeManager4() {}
+    virtual ~NodeManager() {}
 
+    /// @brief Clear all the cached tree nodes
     void clear() { mList0.clear(); mList1.clear(); mList2.clear(); mList3.clear; }
 
+    /// @brief Clear and recache all the tree nodes from the
+    /// tree. This is required if tree nodes have been added or removed.
     void rebuild()
     {
+        this->clear();
         mRoot.getNodes(mList3);
         for (size_t i=0, n=mList3.nodeCount(); i<n; ++i) mList3(i).getNodes(mList2);
         for (size_t i=0, n=mList2.nodeCount(); i<n; ++i) mList2(i).getNodes(mList1);
         for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
     }
-    
+
+    /// @brief Return a reference to the root node.
     const RootNodeType& root() const { return mRoot; }
 
     /// @brief Return the total number of cached nodes (excluding the root node)
     Index64 nodeCount() const
     {
         return mList0.nodeCount() + mList1.nodeCount()
-             + mList2.nodeCount() + mList3.nodeCount();
+            + mList2.nodeCount() + mList3.nodeCount();
     }
 
     /// @brief Return the number of cached nodes at level @a i, where
@@ -479,7 +770,7 @@ public:
     Index64 nodeCount(Index i) const
     {
         return i==0 ? mList0.nodeCount() : i==1 ? mList1.nodeCount() :
-               i==2 ? mList2.nodeCount() : i==3 ? mList3.nodeCount() : 0;
+            i==2 ? mList2.nodeCount() : i==3 ? mList3.nodeCount() : 0;
     }
 
     template<typename NodeOp>
@@ -519,69 +810,10 @@ protected:
     ListT2  mList2;
     ListT1  mList1;
     ListT0  mList0;
-};// NodeManager4
 
-////////////////////////////////////////////
-
-/// Template specialization of the NodeManager with no caching of nodes
-template<typename TreeOrLeafManagerT>
-class NodeManager<TreeOrLeafManagerT, 0> : public NodeManager0<TreeOrLeafManagerT>
-{
-public:
-    static const Index LEVELS = 0;
-    NodeManager(TreeOrLeafManagerT& tree): NodeManager0<TreeOrLeafManagerT>(tree) {}
-    virtual ~NodeManager() {}
 private:
-    NodeManager(const NodeManager&) {}//disallow copy-construction
-};
-
-/// Template specialization of the NodeManager with one level of nodes
-template<typename TreeOrLeafManagerT>
-class NodeManager<TreeOrLeafManagerT, 1> : public NodeManager1<TreeOrLeafManagerT>
-{
-public:
-    static const Index LEVELS = 1;
-    NodeManager(TreeOrLeafManagerT& tree): NodeManager1<TreeOrLeafManagerT>(tree) {}
-    virtual ~NodeManager() {}
-private:
-    NodeManager(const NodeManager&) {}//disallow copy-construction
-};
-
-/// Template specialization of the NodeManager with two levels of nodes
-template<typename TreeOrLeafManagerT>
-class NodeManager<TreeOrLeafManagerT, 2> : public NodeManager2<TreeOrLeafManagerT>
-{
-public:
-    static const Index LEVELS = 2;
-    NodeManager(TreeOrLeafManagerT& tree): NodeManager2<TreeOrLeafManagerT>(tree) {}
-    virtual ~NodeManager() {}
-private:
-    NodeManager(const NodeManager&) {}//disallow copy-construction
-};
-
-/// Template specialization of the NodeManager with three levels of nodes
-template<typename TreeOrLeafManagerT>
-class NodeManager<TreeOrLeafManagerT, 3> : public NodeManager3<TreeOrLeafManagerT>
-{
-public:
-    static const Index LEVELS = 3;
-    NodeManager(TreeOrLeafManagerT& tree): NodeManager3<TreeOrLeafManagerT>(tree) {}
-    virtual ~NodeManager() {}
-private:
-    NodeManager(const NodeManager&) {}//disallow copy-construction
-};
-
-/// Template specialization of the NodeManager with four levels of nodes
-template<typename TreeOrLeafManagerT>
-class NodeManager<TreeOrLeafManagerT, 4> : public NodeManager4<TreeOrLeafManagerT>
-{
-public:
-    static const Index LEVELS = 4;
-    NodeManager(TreeOrLeafManagerT& tree): NodeManager2<TreeOrLeafManagerT>(tree) {}
-    virtual ~NodeManager() {}
-private:
-    NodeManager(const NodeManager&) {}//disallow copy-construction
-};
+    NodeManager(const NodeManager&) {} // disallow copy-construction
+}; // NodeManager<4>
 
 } // namespace tree
 } // namespace OPENVDB_VERSION_NAME
