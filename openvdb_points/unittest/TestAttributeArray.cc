@@ -29,8 +29,9 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include <cppunit/extensions/HelperMacros.h>
-#include <openvdb/tools/AttributeArray.h>
 #include <openvdb/Types.h>
+
+#include <openvdb_points/tools/AttributeArray.h>
 
 #include <iostream>
 #include <sstream>
