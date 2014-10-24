@@ -212,8 +212,9 @@ createEmptyGridGlyph(GU_Detail& gdp, GridCRef grid)
 
 
 OP_ERROR
-SOP_NodeVDB::cookMyGuide1(OP_Context&)
+SOP_NodeVDB::cookMyGuide1(OP_Context& context)
 {
+#ifndef SESI_OPENVDB
     myGuide1->clearAndDestroy();
     UT_Vector3 color(0.1f, 0.1f, 1.0f);
     UT_Vector3 corners[8];
@@ -226,8 +227,8 @@ SOP_NodeVDB::cookMyGuide1(OP_Context&)
             createEmptyGridGlyph(*myGuide1, it->getGrid());
         }
     }
-
-    return error();
+#endif
+    return SOP_Node::cookMyGuide1(context);
 }
 
 

@@ -184,13 +184,12 @@ newSopOperator(OP_OperatorTable* table)
 
     // Group A
     parms.add(hutil::ParmFactory(PRM_STRING, "groupA", "Group A")
-        .setChoiceList(&hutil::PrimGroupMenu)
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
         .setHelpText("Use a subset of the first input as the A grid(s)."));
 
     // Group B
     parms.add(hutil::ParmFactory(PRM_STRING, "groupB", "Group B")
-        .setChoiceList(&hutil::PrimGroupMenu)
-        .setSpareData(&SOP_Node::theSecondInput)
+        .setChoiceList(&hutil::PrimGroupMenuInput2)
         .setHelpText("Use a subset of the second input as the B grid(s)."));
 
     // Toggle to enable flattening B into A.

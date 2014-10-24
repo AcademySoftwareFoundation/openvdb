@@ -50,6 +50,7 @@
 
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_Version.h>
+#include <GEO/GEO_PolyCounts.h>
 #include <GA/GA_PageIterator.h>
 #include <GU/GU_Detail.h>
 #include <GU/GU_Surfacer.h>
@@ -98,7 +99,7 @@ public:
 
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
-    virtual unsigned disableParms();
+    virtual bool updateParmsFlags();
 
     template <class GridType>
     void referenceMeshing(
@@ -152,7 +153,7 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setHelpText("Specify a subset of the input VDB grids to surface.")
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenuInput1));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "isovalue", "Isovalue")
         .setDefault(PRMzeroDefaults)
@@ -247,8 +248,7 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "surfacemaskname", "Surface Mask")
         .setHelpText("A single level-set or sdf grid whose interior defines the region to mesh.")
-        .setSpareData(&SOP_Node::theThirdInput)
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenuInput3));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "surfacemaskoffset", "Offset")
         .setDefault(PRMzeroDefaults)
@@ -267,8 +267,7 @@ newSopOperator(OP_OperatorTable* table)
         .setHelpText(
             "A single scalar grid used as a spatial multiplier\n"
             "for the adaptivity threshold")
-        .setSpareData(&SOP_Node::theThirdInput)
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenuInput3));
 
 
     //////////
@@ -300,37 +299,37 @@ SOP_OpenVDB_To_Polygons::SOP_OpenVDB_To_Polygons(OP_Network* net,
 }
 
 
-unsigned
-SOP_OpenVDB_To_Polygons::disableParms()
+bool
+SOP_OpenVDB_To_Polygons::updateParmsFlags()
 {
-    unsigned changed = 0;
+    bool changed = false;
 
     const bool refexists = (nInputs() == 2);
 
-    changed += enableParm("internaladaptivity", refexists);
-    changed += enableParm("surfacegroup", refexists);
-    changed += enableParm("interiorgroup", refexists);
-    changed += enableParm("seamlinegroup", refexists);
-    changed += enableParm("seampoints", refexists);
-    changed += enableParm("transferattributes", refexists);
-    changed += enableParm("sharpenfeatures", refexists);
-    changed += enableParm("edgetolerance", refexists);
+    changed |= enableParm("internaladaptivity", refexists);
+    changed |= enableParm("surfacegroup", refexists);
+    changed |= enableParm("interiorgroup", refexists);
+    changed |= enableParm("seamlinegroup", refexists);
+    changed |= enableParm("seampoints", refexists);
+    changed |= enableParm("transferattributes", refexists);
+    changed |= enableParm("sharpenfeatures", refexists);
+    changed |= enableParm("edgetolerance", refexists);
 
     const bool maskexists = (nInputs() == 3);
 
-    changed += enableParm("surfacemask", maskexists);
-    changed += enableParm("adaptivitymask", maskexists);
+    changed |= enableParm("surfacemask", maskexists);
+    changed |= enableParm("adaptivitymask", maskexists);
 
     const bool surfacemask = bool(evalInt("surfacemask", 0, 0));
-    changed += enableParm("surfacemaskname", maskexists && surfacemask);
-    changed += enableParm("surfacemaskoffset", maskexists && surfacemask);
-    changed += enableParm("invertmask", maskexists && surfacemask);
+    changed |= enableParm("surfacemaskname", maskexists && surfacemask);
+    changed |= enableParm("surfacemaskoffset", maskexists && surfacemask);
+    changed |= enableParm("invertmask", maskexists && surfacemask);
 
     const bool adaptivitymask = bool(evalInt("adaptivityfield", 0, 0));
-    changed += enableParm("adaptivityfieldname", maskexists && adaptivitymask);
+    changed |= enableParm("adaptivityfieldname", maskexists && adaptivitymask);
 
     const bool partition = evalInt("automaticpartitions", 0, 0) > 1;
-    changed += enableParm("activepart", partition);
+    changed |= enableParm("activepart", partition);
 
     return changed;
 }

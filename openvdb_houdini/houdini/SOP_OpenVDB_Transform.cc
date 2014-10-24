@@ -66,7 +66,7 @@ newSopOperator(OP_OperatorTable* table)
     // Group pattern
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setHelpText("Specify a subset of the input VDB grids to be transformed.")
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenuInput1));
 
     // Translation
     parms.add(hutil::ParmFactory(PRM_XYZ_J, "t", "Translate")

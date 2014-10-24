@@ -71,7 +71,7 @@ newSopOperator(OP_OperatorTable* table)
             "Specify a subset of the input VDB grids to be split.\n"
             "Vector-valued grids will be split into component scalar grids;\n"
             "all other grids will be unchanged.")
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenuInput1));
 
     // Toggle to keep/remove source grids
     parms.add(

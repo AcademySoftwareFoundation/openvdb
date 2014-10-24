@@ -611,14 +611,12 @@ newSopOperator(OP_OperatorTable* table)
     // Velocity grid
     parms.add(hutil::ParmFactory(PRM_STRING, "velGroup", "Velocity VDB")
         .setHelpText("Velocity grid")
-        .setChoiceList(&hutil::PrimGroupMenu)
-        .setSpareData(&SOP_Node::theSecondInput));
+        .setChoiceList(&hutil::PrimGroupMenuInput2));
 
     // Closest point grid
     parms.add(hutil::ParmFactory(PRM_STRING, "cptGroup", "Closest-Point VDB")
         .setHelpText("Vector grid that in each voxel stores the closest point on a surface.")
-        .setChoiceList(&hutil::PrimGroupMenu)
-        .setSpareData(&SOP_Node::theThirdInput ));
+        .setChoiceList(&hutil::PrimGroupMenuInput3));
 
     // Propagation scheme
     {

@@ -90,7 +90,7 @@ newSopOperator(OP_OperatorTable* table)
 
     // Group
     parms.add(hutil::ParmFactory(PRM_STRING, "group",  "Group")
-        .setChoiceList(&hutil::PrimGroupMenu)
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
         .setHelpText("Write only a subset of the input grids."));
 
     // Compression
@@ -150,7 +150,7 @@ newSopOperator(OP_OperatorTable* table)
         parms.add(hutil::ParmFactory(PRM_HEADING, "float_header", "Float Precision"));
 
         parms.add(hutil::ParmFactory(PRM_STRING, "float_16_group", "Write 16-Bit")
-            .setChoiceList(&hutil::PrimGroupMenu)
+            .setChoiceList(&hutil::PrimGroupMenuInput1)
             .setHelpText(
                 "For grids that belong to the group(s) listed here,\n"
                 "write floating-point scalar or vector voxel values\n"
@@ -159,7 +159,7 @@ newSopOperator(OP_OperatorTable* table)
                 "using their existing precision settings."));
 
         parms.add(hutil::ParmFactory(PRM_STRING, "float_full_group", "Write Full-Precision")
-            .setChoiceList(&hutil::PrimGroupMenu)
+            .setChoiceList(&hutil::PrimGroupMenuInput1)
             .setHelpText(
                 "For grids that belong to the group(s) listed here,\n"
                 "write floating-point scalar or vector voxel values\n"

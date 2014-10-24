@@ -158,7 +158,7 @@ newSopOperator(OP_OperatorTable* table)
     // Define a string-valued group name pattern parameter and add it to the list.
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setHelpText("Specify a subset of the input VDB grids to be processed.")
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenuInput1));
 
     // amplitude
     parms.add(hutil::ParmFactory(PRM_FLT_J, "amp", "Amplitude")
@@ -217,8 +217,7 @@ newSopOperator(OP_OperatorTable* table)
     // Group
     parms.add(
         hutil::ParmFactory(PRM_STRING, "maskGroup",  "Mask Group")
-        .setChoiceList(&hutil::PrimGroupMenu)
-        .setSpareData(&SOP_Node::theSecondInput));
+        .setChoiceList(&hutil::PrimGroupMenuInput2));
 
     {   // Use mask
         const char* items[] = {
