@@ -45,6 +45,8 @@
 #if defined(__APPLE__) || defined(MACOSX)
 #include <OpenGL/gl.h>
 #include <OpenGL/glu.h>
+#elif defined(WIN32)
+#include <GL/glew.h>
 #else
 #include <GL/gl.h>
 #include <GL/glu.h>
@@ -163,6 +165,7 @@ windowRefreshCB()
 Viewer
 init(const std::string& progName, bool verbose)
 {
+    glewInit();
     if (sViewer == NULL) {
         tbb::mutex::scoped_lock(sLock);
         if (sViewer == NULL) {
@@ -642,10 +645,10 @@ ViewerImpl::keyCallback(int key, int action)
             toggleInfoText();
             break;
         case GLFW_KEY_LEFT:
-            showPrevGrid();
+        case '-':            showPrevGrid();
             break;
         case GLFW_KEY_RIGHT:
-            showNextGrid();
+        case '+':            showNextGrid();
             break;
         }
     }
