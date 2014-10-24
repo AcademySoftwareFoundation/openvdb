@@ -33,9 +33,6 @@ Optional:
 - Houdini HDK (ftp://ftp.sidefx.com/public/Houdini12.0), version 12.0.628
   or later
 
-- Blosc compression library (www.blosc.org), version 1.3.6 or later
-  (included in the Houdini HDK as of version 14.0)
-
 - Ghostscript (www.ghostscript.com), version 8.70 or later, for documentation
   in PDF format
 
@@ -84,10 +81,6 @@ Installation
     TBB_INCL_DIR        the parent directory of the tbb/ header directory
     TBB_LIB_DIR         the directory containing libtbb
     TBB_LIB             linker flag(s) for the TBB library (e.g., -ltbb)
-
-    BLOSC_INCL_DIR      the parent directory of the blosc.h header
-    BLOSC_LIB_DIR       the directory containing libblosc
-    BLOSC_LIB           linker flags for libblosc
 
     CONCURRENT_MALLOC_LIB_DIR
                         a directory containing a scalable, concurrent malloc
