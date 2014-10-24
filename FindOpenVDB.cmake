@@ -22,28 +22,27 @@ else(OpenVDB_INCLUDE_DIRS AND OpenVDB_LIBRARIES)
 
   #typical root dirs of installations, exactly one of them is used
   SET (OpenVDB_POSSIBLE_ROOT_DIRS  	${OpenVDB_DIR}
-									$ENV{OpenVDB_DIR}
+									$ENV{OpenVDB_DIR} $ENV{OPENVDB_DIR} $ENV{OpenVDB_ROOT}
 									"$ENV{ProgramFiles}/OpenVDB" )
 
   #select exactly ONE base directory/tree to avoid mixing different version headers and libs
   FIND_PATH(OpenVDB_ROOT_DIR NAMES include/openvdb/openvdb.h   PATHS ${OpenVDB_POSSIBLE_ROOT_DIRS})
 
-
   find_path(OpenVDB_INCLUDE_DIRS openvdb/openvdb.h  ${OpenVDB_ROOT_DIR}/include  )
   
   if(WIN32)
-	find_path(OpenVDB_BIN_DIRS OPENVDBLIB.dll  ${OpenVDB_ROOT_DIR}/bin/Release ${OpenVDB_ROOT_DIR}/lib/Release  )
+	find_path(OpenVDB_BIN_DIRS openvdbCore.dll  ${OpenVDB_ROOT_DIR}/bin/Release ${OpenVDB_ROOT_DIR}/lib/Release  )
   endif(WIN32 )
 
   if(OpenVDB_INCLUDE_DIRS)
 	
 
 	FOREACH(_libName ${OpenVDB_FIND_COMPONENTS})
-			
+					
 		#find the debug library
-		FIND_LIBRARY(OpenVDB_${_libName}_DEBUG_LIBRARY NAMES "openvdb${_libName}d" PATHS ${OpenVDB_ROOT_DIR} PATH_SUFFIXES lib/Debug  NO_CMAKE_SYSTEM_PATH )
+		FIND_LIBRARY(OpenVDB_${_libName}_DEBUG_LIBRARY NAMES "openvdb${_libName}d" PATHS ${OpenVDB_ROOT_DIR} PATH_SUFFIXES lib  NO_CMAKE_SYSTEM_PATH )
 		#find the release library
-		FIND_LIBRARY(OpenVDB_${_libName}_RELEASE_LIBRARY NAMES "openvdb${_libName}" PATHS ${OpenVDB_ROOT_DIR} PATH_SUFFIXES lib/Release  NO_CMAKE_SYSTEM_PATH )
+		FIND_LIBRARY(OpenVDB_${_libName}_RELEASE_LIBRARY NAMES "openvdb${_libName}" PATHS ${OpenVDB_ROOT_DIR} PATH_SUFFIXES lib  NO_CMAKE_SYSTEM_PATH )
 			
 		#Remove the cache value
 		SET(OpenVDB_${_libName}_LIBRARY "" CACHE STRING "" FORCE)
