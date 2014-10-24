@@ -428,7 +428,7 @@ endif
 
 CXXFLAGS += $(OPTIMIZE) $(INCLDIRS)
 ifeq (yes,$(has_blosc))
-    CXXFLAGS += -DOPENVDB_USE_BLOSC_LZ4
+    CXXFLAGS += -DOPENVDB_USE_BLOSC
 endif
 ifeq (yes,$(has_log4cplus))
     CXXFLAGS += -DOPENVDB_USE_LOG4CPLUS
