@@ -50,8 +50,10 @@
 
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_Version.h>
-#include <GEO/GEO_PolyCounts.h>
 #include <GA/GA_PageIterator.h>
+#if (UT_VERSION_INT >= 0x0c0500F5) // 12.5.245 or later
+#include <GEO/GEO_PolyCounts.h>
+#endif
 #include <GU/GU_Detail.h>
 #include <GU/GU_Surfacer.h>
 #include <GU/GU_PolyReduce.h>

@@ -616,7 +616,7 @@ SOP_OpenVDB_Filter_Level_Set::updateParmsFlags()
     const bool smooth = mOpType == OP_TYPE_SMOOTH;
     const bool reshape = mOpType == OP_TYPE_RESHAPE;
     const bool trim = mOpType == OP_TYPE_TRIM;
-    
+
     if (renorm || trim) {
         changed |= setVisibleState("invert", false);
         changed |= setVisibleState("minMask",false);
@@ -638,7 +638,7 @@ SOP_OpenVDB_Filter_Level_Set::updateParmsFlags()
     }
 
     changed |= setVisibleState("halfWidth", trim);
-    
+
     changed |= enableParm("iterations",  smooth || renorm);
     changed |= enableParm("stencilWidth", stencil);
 
@@ -784,7 +784,7 @@ SOP_OpenVDB_Filter_Level_Set::evalFilterParms(OP_Context& context,
         parms.mFilterType = FILTER_TYPE_TRIM;
     } else {
         evalString(str, "operation", 0, now);
-        parms.mFilterType = stringToFilterType(str.toStdString());   
+        parms.mFilterType = stringToFilterType(str.toStdString());
     }
 
     evalString(str, "accuracy", 0, now);
@@ -1072,7 +1072,7 @@ SOP_OpenVDB_Filter_Level_Set::renormalize(const FilterParms& parms, FilterT& fil
 template<typename FilterT>
 inline void
 SOP_OpenVDB_Filter_Level_Set::trimNarrowBand(const FilterParms& parms, FilterT& filter,
-    BossT& boss, bool verbose)
+    BossT&, bool verbose)
 {
     // We will restore the old normCount since it is important to level set tracking
     const int oldNormCount = filter.getNormCount();

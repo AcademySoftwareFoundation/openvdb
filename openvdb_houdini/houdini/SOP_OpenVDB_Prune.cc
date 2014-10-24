@@ -35,10 +35,10 @@
 /// @brief SOP to prune tree branches from OpenVDB grids
 
 #include <houdini_utils/ParmFactory.h>
+#include <openvdb/tools/Prune.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <UT/UT_Interrupt.h>
-#include <openvdb/tools/Prune.h>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;

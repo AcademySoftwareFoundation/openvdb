@@ -215,9 +215,8 @@ sopBuildAttrMenu(void* data, PRM_Name* menuEntries, int themenusize,
     menuEntries[menuIdx].setLabel(0);
 }
 
-const PRM_ChoiceList PrimAttrMenu(PRM_ChoiceListType(PRM_CHOICELIST_EXCLUSIVE |
-                                                     PRM_CHOICELIST_REPLACE), sopBuildAttrMenu);
-
+const PRM_ChoiceList PrimAttrMenu(
+    PRM_ChoiceListType(PRM_CHOICELIST_EXCLUSIVE | PRM_CHOICELIST_REPLACE), sopBuildAttrMenu);
 
 } // unnamed namespace
 
@@ -242,7 +241,7 @@ protected:
     virtual bool updateParmsFlags();
 
 private:
-    
+
     void convert(openvdb::FloatGrid::Ptr, ParticleList&, const Settings&);
     void convertWithAttributes(openvdb::FloatGrid::Ptr, ParticleList&,
         const Settings&, const GU_Detail&);
@@ -480,7 +479,7 @@ newSopOperator(OP_OperatorTable* table)
         .setHelpText("Transfer point attributes to each voxel in the level set's narrow band")
         .setMultiparms(attrParms)
         .setDefault(PRMzeroDefaults));
-    
+
     //////////
     // Obsolete parameters
 

@@ -188,7 +188,7 @@ Version 3.0.0 - In development
       clipping while reading can result in significantly lower memory usage
       than clipping after reading.
 
-    Maya:
+    MAYA:
     - Added an adaptive polygonal surface extraction node.
 
 Version 2.3.0 - April 23, 2014

@@ -40,7 +40,7 @@
 #include <openvdb/util/Util.h> // for nearestCoord()
 #include "ChangeBackground.h"
 #include "Prune.h"// for pruneInactive and pruneLevelSet
-#include "SignedFloodFill.h" // for signedFloodFill
+#include "SignedFloodFill.h" // for signedFloodFillWithValues
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
@@ -2465,7 +2465,7 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
 
     if (!unsignedDistField) { // Propagate sign information to inactive values.
         mDistGrid->tree().root().setBackground(exBandWidth, /*updateChildNodes=*/false);
-        tools::signedFloodFill(mDistGrid->tree(), exBandWidth, -inBandWidth);
+        tools::signedFloodFillWithValues(mDistGrid->tree(), exBandWidth, -inBandWidth);
     }
 
     if (wasInterrupted(46)) return;

@@ -61,7 +61,11 @@
 #ifndef SESI_OPENVDB
 #include <UT/UT_DSOVersion.h>
 #endif
+
+#if (UT_VERSION_INT >= 0x0d00023d) // 13.0.573 or later
 #include <UT/UT_EnvControl.h>
+#endif
+
 #include <UT/UT_IOTable.h>
 #include <UT/UT_IStream.h>
 #include <UT/UT_Version.h>
@@ -92,7 +96,7 @@ public:
     virtual const char *formatName() const;
 
     virtual int		checkExtension(const char *name);
-    virtual void	getFileExtensions(UT_StringArray &extensions) const;
+    virtual void    getFileExtensions(UT_StringArray &extensions) const;
 
     virtual int		checkMagicNumber(unsigned magic);
 
@@ -217,8 +221,7 @@ bool
 fileSaveVDB(const GEO_Detail *geogdp, OutputT os)
 {
     GU_Detail *gdp = static_cast<GU_Detail*>(const_cast<GEO_Detail*>(geogdp));
-    if (!gdp)
-	return false;
+    if (!gdp) return false;
 
     try {
         // Populate an output GridMap with VDB grid primitives found in the
@@ -256,13 +259,16 @@ fileSaveVDB(const GEO_Detail *geogdp, OutputT os)
         FileT file(os);
 
         // Always enable active mask compression, since it is fast
-        // and compresses level sets and fog volumes well. Enable Blosc unless
-	// backwards compatibility is requested.
+        // and compresses level sets and fog volumes well.
         uint32_t compression = openvdb::io::COMPRESS_ACTIVE_MASK;
+
+#if (UT_VERSION_INT >= 0x0d00023d) // 13.0.573 or later
+        // Enable Blosc unless backwards compatibility is requested.
         if (openvdb::io::Archive::hasBloscCompression()
-		&& !UT_EnvControl::getInt(ENV_HOUDINI13_VOLUME_COMPATIBILITY)) {
+            && !UT_EnvControl::getInt(ENV_HOUDINI13_VOLUME_COMPATIBILITY)) {
             compression |= openvdb::io::COMPRESS_BLOSC;
         }
+#endif
         file.setCompression(compression);
 
         file.write(outGrids, fileMetadata);

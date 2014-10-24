@@ -811,7 +811,7 @@ SOP_OpenVDB_Convert::updateParmsFlags()
     bool toSDF = (evalInt("vdbclass", 0, time) == CLASS_SDF);
 
     changed |= enableParm("adaptivity", toPoly);
-    changed |= enableParm("isoValue", toPoly);
+    changed |= enableParm("isoValue", toPoly || (toOpenVDB && toSDF));
     changed |= enableParm("fogisovalue", toOpenVDB && toSDF);
 
     if (toOpenVDB) {
