@@ -394,6 +394,7 @@ typedef TypedMetadata<bool>            BoolMetadata;
 typedef TypedMetadata<double>          DoubleMetadata;
 typedef TypedMetadata<float>           FloatMetadata;
 typedef TypedMetadata<boost::int32_t>  Int32Metadata;
+typedef TypedMetadata<boost::uint32_t> UInt32Metadata;
 typedef TypedMetadata<boost::int64_t>  Int64Metadata;
 typedef TypedMetadata<Vec2d>           Vec2DMetadata;
 typedef TypedMetadata<Vec2i>           Vec2IMetadata;
