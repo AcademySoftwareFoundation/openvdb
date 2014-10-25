@@ -70,19 +70,18 @@ namespace {
 // Add new items to the *end* of this list, and update NUM_OPERATOR_TYPES.
 enum OperatorType {
     OP_TYPE_RENORM = 0,
-    OP_TYPE_TRIM,
     OP_TYPE_RESHAPE,
-    OP_TYPE_SMOOTH
+    OP_TYPE_SMOOTH,
+    OP_TYPE_RESIZE
 };
 
-enum { NUM_OPERATOR_TYPES = OP_TYPE_SMOOTH + 1 };
+enum { NUM_OPERATOR_TYPES = OP_TYPE_RESIZE + 1 };
 
 
 // Add new items to the *end* of this list, and update NUM_FILTER_TYPES.
 enum FilterType {
     FILTER_TYPE_NONE = -1,
     FILTER_TYPE_RENORMALIZE = 0,
-    FILTER_TYPE_TRIM,
     FILTER_TYPE_MEAN_VALUE,
     FILTER_TYPE_MEDIAN_VALUE,
     FILTER_TYPE_MEAN_CURVATURE,
@@ -92,10 +91,11 @@ enum FilterType {
     FILTER_TYPE_OPEN,
     FILTER_TYPE_CLOSE,
     FILTER_TYPE_TRACK,
-    FILTER_TYPE_GAUSSIAN
+    FILTER_TYPE_GAUSSIAN,
+    FILTER_TYPE_RESIZE
 };
 
-enum { NUM_FILTER_TYPES = FILTER_TYPE_TRACK + 1 };
+enum { NUM_FILTER_TYPES = FILTER_TYPE_RESIZE + 1 };
 
 
 std::string
@@ -103,25 +103,25 @@ filterTypeToString(FilterType filter)
 {
     std::string ret;
     switch (filter) {
-        case FILTER_TYPE_NONE:           ret = "none";            break;
-        case FILTER_TYPE_RENORMALIZE:    ret = "renormalize";     break;
-        case FILTER_TYPE_TRIM:           ret = "trim narrow band";break;
-        case FILTER_TYPE_GAUSSIAN:       ret = "gaussian";        break;
-        case FILTER_TYPE_DILATE:         ret = "dilate";          break;
-        case FILTER_TYPE_ERODE:          ret = "erode";           break;
-        case FILTER_TYPE_OPEN:           ret = "open";            break;
-        case FILTER_TYPE_CLOSE:          ret = "close";           break;
-        case FILTER_TYPE_TRACK:          ret = "track";           break;
+        case FILTER_TYPE_NONE:           ret = "none";                  break;
+        case FILTER_TYPE_RENORMALIZE:    ret = "renormalize";           break;
+        case FILTER_TYPE_RESIZE:         ret = "resize narrow band";    break;
+        case FILTER_TYPE_GAUSSIAN:       ret = "gaussian";              break;
+        case FILTER_TYPE_DILATE:         ret = "dilate";                break;
+        case FILTER_TYPE_ERODE:          ret = "erode";                 break;
+        case FILTER_TYPE_OPEN:           ret = "open";                  break;
+        case FILTER_TYPE_CLOSE:          ret = "close";                 break;
+        case FILTER_TYPE_TRACK:          ret = "track";                 break;
 #ifndef SESI_OPENVDB
-        case FILTER_TYPE_MEAN_VALUE:     ret = "mean value";      break;
-        case FILTER_TYPE_MEDIAN_VALUE:   ret = "median value";    break;
-        case FILTER_TYPE_MEAN_CURVATURE: ret = "mean curvature";  break;
-        case FILTER_TYPE_LAPLACIAN_FLOW: ret = "laplacian flow";  break;
+        case FILTER_TYPE_MEAN_VALUE:     ret = "mean value";            break;
+        case FILTER_TYPE_MEDIAN_VALUE:   ret = "median value";          break;
+        case FILTER_TYPE_MEAN_CURVATURE: ret = "mean curvature";        break;
+        case FILTER_TYPE_LAPLACIAN_FLOW: ret = "laplacian flow";        break;
 #else
-        case FILTER_TYPE_MEAN_VALUE:     ret = "meanvalue";       break;
-        case FILTER_TYPE_MEDIAN_VALUE:   ret = "medianvalue";     break;
-        case FILTER_TYPE_MEAN_CURVATURE: ret = "meancurvature";   break;
-        case FILTER_TYPE_LAPLACIAN_FLOW: ret = "laplacianflow";   break;
+        case FILTER_TYPE_MEAN_VALUE:     ret = "meanvalue";             break;
+        case FILTER_TYPE_MEDIAN_VALUE:   ret = "medianvalue";           break;
+        case FILTER_TYPE_MEAN_CURVATURE: ret = "meancurvature";         break;
+        case FILTER_TYPE_LAPLACIAN_FLOW: ret = "laplacianflow";         break;
 #endif
     }
     return ret;
@@ -134,7 +134,7 @@ filterTypeToMenuName(FilterType filter)
     switch (filter) {
         case FILTER_TYPE_NONE: ret           = "None";                  break;
         case FILTER_TYPE_RENORMALIZE: ret    = "Renormalize";           break;
-        case FILTER_TYPE_TRIM: ret           = "Trim Narrow Band";      break;
+        case FILTER_TYPE_RESIZE: ret         = "Resize Narrow Band";    break;
         case FILTER_TYPE_MEAN_VALUE: ret     = "Mean Value";            break;
         case FILTER_TYPE_GAUSSIAN: ret       = "Gaussian";              break;
         case FILTER_TYPE_MEDIAN_VALUE: ret   = "Median Value";          break;
@@ -161,8 +161,8 @@ stringToFilterType(const std::string& s)
 
     if (str == filterTypeToString(FILTER_TYPE_RENORMALIZE)) {
         ret = FILTER_TYPE_RENORMALIZE;
-    } else if (str == filterTypeToString(FILTER_TYPE_TRIM)) {
-        ret = FILTER_TYPE_TRIM;
+    } else if (str == filterTypeToString(FILTER_TYPE_RESIZE)) {
+        ret = FILTER_TYPE_RESIZE;
     } else if (str == filterTypeToString(FILTER_TYPE_MEAN_VALUE)) {
         ret = FILTER_TYPE_MEAN_VALUE;
     } else if (str == filterTypeToString(FILTER_TYPE_GAUSSIAN)) {
@@ -397,7 +397,7 @@ private:
     void renormalize(const FilterParms&, FilterT&, BossT&, bool verbose = false);
 
     template<typename FilterT>
-    void trimNarrowBand(const FilterParms&, FilterT&, BossT&, bool verbose = false);
+    void resizeNarrowBand(const FilterParms&, FilterT&, BossT&, bool verbose = false);
 
     template<typename FilterT>
     void track(const FilterParms&, FilterT&, BossT&, bool verbose);
@@ -429,6 +429,7 @@ newSopOperator(OP_OperatorTable* table)
     if (table == NULL) return;
 
     for (int n = 0; n < NUM_OPERATOR_TYPES; ++n) {
+
         OperatorType op = OperatorType(n);
 
         hutil::ParmList parms;
@@ -438,7 +439,7 @@ newSopOperator(OP_OperatorTable* table)
             .setHelpText("Specify a subset of the input VDB grids to be processed.")
             .setChoiceList(&hutil::PrimGroupMenuInput1));
 
-        if (OP_TYPE_RENORM != op && OP_TYPE_TRIM != op) { // Filter menu
+        if (OP_TYPE_RENORM != op && OP_TYPE_RESIZE != op) { // Filter menu
 
             parms.add(hutil::ParmFactory(PRM_TOGGLE, "mask", "")
                 .setDefault(PRMoneDefaults)
@@ -556,9 +557,9 @@ newSopOperator(OP_OperatorTable* table)
                 .addInput("Input with VDBs to process")
                 .addOptionalInput("Optional VDB Alpha Mask");
 
-        } else if (OP_TYPE_TRIM == op) {
+        } else if (OP_TYPE_RESIZE == op) {
 
-            hvdb::OpenVDBOpFactory("OpenVDB Trim Narrow-Band",
+            hvdb::OpenVDBOpFactory("OpenVDB Resize Narrow Band",
                 SOP_OpenVDB_Filter_Level_Set::factoryNarrowBand, parms, *table)
                 .setObsoleteParms(obsoleteParms)
                 .addInput("Input with VDBs to process");
@@ -595,7 +596,7 @@ OP_Node*
 SOP_OpenVDB_Filter_Level_Set::factoryNarrowBand(
     OP_Network* net, const char* name, OP_Operator* op)
 {
-    return new SOP_OpenVDB_Filter_Level_Set(net, name, op, OP_TYPE_TRIM);
+    return new SOP_OpenVDB_Filter_Level_Set(net, name, op, OP_TYPE_RESIZE);
 }
 
 SOP_OpenVDB_Filter_Level_Set::SOP_OpenVDB_Filter_Level_Set(
@@ -615,9 +616,9 @@ SOP_OpenVDB_Filter_Level_Set::updateParmsFlags()
     const bool renorm = mOpType == OP_TYPE_RENORM;
     const bool smooth = mOpType == OP_TYPE_SMOOTH;
     const bool reshape = mOpType == OP_TYPE_RESHAPE;
-    const bool trim = mOpType == OP_TYPE_TRIM;
+    const bool resize = mOpType == OP_TYPE_RESIZE;
 
-    if (renorm || trim) {
+    if (renorm || resize) {
         changed |= setVisibleState("invert", false);
         changed |= setVisibleState("minMask",false);
         changed |= setVisibleState("maxMask",false);
@@ -637,7 +638,7 @@ SOP_OpenVDB_Filter_Level_Set::updateParmsFlags()
         changed |= enableParm("maskname", useMask);
     }
 
-    changed |= setVisibleState("halfWidth", trim);
+    changed |= setVisibleState("halfWidth", resize);
 
     changed |= enableParm("iterations",  smooth || renorm);
     changed |= enableParm("stencilWidth", stencil);
@@ -780,8 +781,8 @@ SOP_OpenVDB_Filter_Level_Set::evalFilterParms(OP_Context& context,
 
     if (OP_TYPE_RENORM == mOpType ) {
         parms.mFilterType = FILTER_TYPE_RENORMALIZE;
-    } else if (OP_TYPE_TRIM == mOpType) {
-        parms.mFilterType = FILTER_TYPE_TRIM;
+    } else if (OP_TYPE_RESIZE == mOpType) {
+        parms.mFilterType = FILTER_TYPE_RESIZE;
     } else {
         evalString(str, "operation", 0, now);
         parms.mFilterType = stringToFilterType(str.toStdString());
@@ -923,8 +924,8 @@ SOP_OpenVDB_Filter_Level_Set::filterGrid(OP_Context& context, FilterT& filter,
         case FILTER_TYPE_RENORMALIZE:
             renormalize(parms, filter, boss, verbose);
             break;
-        case FILTER_TYPE_TRIM:
-            trimNarrowBand(parms, filter, boss, verbose);
+        case FILTER_TYPE_RESIZE:
+            resizeNarrowBand(parms, filter, boss, verbose);
             break;
         case FILTER_TYPE_MEAN_VALUE:
             mean(parms, filter, boss, verbose, maskGrid.get());
@@ -1071,7 +1072,7 @@ SOP_OpenVDB_Filter_Level_Set::renormalize(const FilterParms& parms, FilterT& fil
 
 template<typename FilterT>
 inline void
-SOP_OpenVDB_Filter_Level_Set::trimNarrowBand(const FilterParms& parms, FilterT& filter,
+SOP_OpenVDB_Filter_Level_Set::resizeNarrowBand(const FilterParms& parms, FilterT& filter,
     BossT&, bool verbose)
 {
     // We will restore the old normCount since it is important to level set tracking
