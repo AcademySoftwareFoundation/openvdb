@@ -59,7 +59,6 @@
 #endif
 #include <GU/GU_PrimVolume.h>
 #include <GU/GU_RayIntersect.h>
-#include <GU/GU_Surfacer.h>
 
 #include <GEO/GEO_AttributeHandleList.h>
 #include <GEO/GEO_Closure.h>
@@ -90,7 +89,6 @@ typedef UT_Vector3T<int32> UT_Vector3i;
 #endif
 
 #include <UT/UT_StopWatch.h>
-#include <UT/UT_Version.h>
 
 #if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
 #include <SYS/SYS_Inline.h>
@@ -334,12 +332,12 @@ GU_PrimVDB::buildFromGridAdapter(GU_Detail& gdp, void* gridPtr,
 	// defaults.
 	if (src == NULL)
 	{
-	    if (grid->getGridClass() == openvdb::GRID_LEVEL_SET) 
+	    if (grid->getGridClass() == openvdb::GRID_LEVEL_SET)
 	    {
 		vdb->setVisualization(GEO_VOLUMEVIS_ISO,
 				      vdb->getVisIso(), vdb->getVisDensity());
-	    } 
-	    else 
+	    }
+	    else
 	    {
 		vdb->setVisualization(GEO_VOLUMEVIS_SMOKE,
 				      vdb->getVisIso(), vdb->getVisDensity());
@@ -473,7 +471,7 @@ public:
 		    myGrid->clear();
 	    }
 	}
-	
+
 	return myGrid;
     }
 
@@ -583,11 +581,11 @@ GU_PrimVDB::buildFromPrimVolume(
 	grid->setGridClass(GridClass(GRID_LEVEL_SET));
     else
 	grid->setGridClass(GridClass(GRID_FOG_VOLUME));
-    
+
     if (prune) {
         grid->pruneGrid(tolerance);
     }
-    
+
     if (flood_sdf && vol.isSDF()) {
         // only call signed flood fill on SDFs
         openvdb::tools::signedFloodFill(grid->tree());
@@ -706,7 +704,7 @@ GU_PrimVDB::registerMyself(GA_PrimitiveFactory *factory)
     }
 
     theDefinition->setLabel("Sparse Volumes (VDBs)");
-#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later 
+#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
     theDefinition->setHasLocalTransform(true);
 #endif
     theDefinition->setMergeConstructor(&gaPrimitiveMergeConstructor);
@@ -2546,7 +2544,9 @@ GU_PrimVDB::createMetadataFromAttrsAdapter(
             if (entries == 1) {
                 GA_ROHandleS handle(attrib);
                 meta_map.removeMeta(name);
-                meta_map.insertMeta(name, StringMetadata(handle.get(element)));
+                const char* str = handle.get(element);
+                if (!str) str = "";
+                meta_map.insertMeta(name, StringMetadata(str));
             } else {
                 /// @todo Add warning:
                 //std::ostringstream ostr;

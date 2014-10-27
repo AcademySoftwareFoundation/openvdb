@@ -466,6 +466,14 @@ private:
 
 
 // Extended group name drop-down menu incorporating "@<attr>=<value" syntax
+
+OPENVDB_HOUDINI_API extern const PRM_ChoiceList PrimGroupMenuInput1;
+OPENVDB_HOUDINI_API extern const PRM_ChoiceList PrimGroupMenuInput2;
+OPENVDB_HOUDINI_API extern const PRM_ChoiceList PrimGroupMenuInput3;
+
+/// @note   Use this if you have more than 3 inputs, otherwise use
+///         the input specific menus instead which automatically
+///         handle the appropriate spare data settings.
 OPENVDB_HOUDINI_API extern const PRM_ChoiceList PrimGroupMenu;
 
 

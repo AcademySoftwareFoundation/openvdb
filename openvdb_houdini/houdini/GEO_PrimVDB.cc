@@ -56,7 +56,14 @@
 
 #include <UT/UT_Debug.h>
 #include <UT/UT_Defines.h>
+
+#if (UT_VERSION_INT >= 0x0d00023d) // 13.0.573 or later
+#include <UT/UT_EnvControl.h>
+#include <UT/UT_FSATable.h>
+#else
 #include <UT/UT_FSA.h>
+#endif
+
 #include <UT/UT_IStream.h>
 #include <UT/UT_JSONParser.h>
 #include <UT/UT_JSONValue.h>
@@ -416,7 +423,7 @@ GEO_PrimVDB::getSpaceTransform(const UT_BoundingBoxD &bbox) const
 	//   node-centred samples with GEO_PrimVolume's cell-centered samples.
 	//   (NOTE: fromVoxelSpace() converts from [0,+1] to [-1,+1])
 
-	// Create transform which converts [-1,+1] unit-space to [0,+1] 
+	// Create transform which converts [-1,+1] unit-space to [0,+1]
 	transform.translate(1.0, 1.0, 1.0);
 	transform.scale(0.5, 0.5, 0.5);
 
@@ -535,7 +542,7 @@ geoCreateLinearTransform(const UT_Matrix4D& mat4)
     return Transform::Ptr(new Transform(geoCreateAffineMap<MapBase>(mat4)));
 }
 
-void 		 
+void
 GEO_PrimVDB::setSpaceTransform(
 	const GEO_PrimVolumeXform &space,
 	const UT_Vector3R &resolution,
@@ -646,7 +653,7 @@ GEO_PrimVDB::getIndexSpaceTransform() const
     // GEO_PrimVolume::fromVoxelSpace() until until myXform/myCenter is
     // applied. It has been simplified somewhat, and uses the definition that
     // gamma = taper - 1.
-    struct Local 
+    struct Local
     {
 	static fpreal taper(fpreal x, fpreal z, fpreal gamma)
 	{
@@ -1077,8 +1084,11 @@ geo_sampleVecGridMany(const GridType &grid,
 static fpreal
 geoEvaluateVDB(const GEO_PrimVDB *vdb, const UT_Vector3 &pos)
 {
-    UTvdbReturnScalarType(vdb->getStorageType(),
-			  geo_sampleGrid, vdb->getGrid(), pos);
+    UTvdbReturnScalarType(vdb->getStorageType(), geo_sampleGrid, vdb->getGrid(), pos);
+    if (vdb->getStorageType() == UT_VDB_BOOL) {
+        return geo_sampleGrid<openvdb::BoolGrid>(
+            UTvdbGridCast<openvdb::BoolGrid>(vdb->getGrid()), pos);
+    }
     return 0;
 }
 
@@ -2167,7 +2177,7 @@ GEO_PrimVDB::activateByVDB(const GEO_PrimVDB *input_vdb,
 	    UTvdbCallAllType(input_vdb->getStorageType(),
 			     geoDoUnion, input_grid,
 			     input_vdb->getIndexSpaceTransform(),
-			     *this, 
+			     *this,
 			     setvalue,
 			     value,
 			     doclip, clipbox);
@@ -2192,7 +2202,7 @@ GEO_PrimVDB::activateByVDB(const GEO_PrimVDB *input_vdb,
 	    UTvdbCallAllType(input_vdb->getStorageType(),
 			     geoDoUnion, input_grid,
 			     input_vdb->getIndexSpaceTransform(),
-			     *this, 
+			     *this,
 			     setvalue,
 			     value,
 			     doclip, clipbox);
@@ -2533,6 +2543,20 @@ GEO_PrimVDB::getJSON() const
 }
 
 
+// This method is called by multiple places internally in Houdini.
+static void
+geoSetVDBStreamCompression(openvdb::io::Stream& vos, bool backwards_compatible)
+{
+    // Always enable full compression, since it is fast and compresses level
+    // sets and fog volumes well.
+    uint32_t compression = openvdb::io::COMPRESS_ACTIVE_MASK;
+    // Enable blosc compression unless we want it to be backwards compatible.
+    if (vos.hasBloscCompression() && !backwards_compatible) {
+        compression |= openvdb::io::COMPRESS_BLOSC;
+    }
+    vos.setCompression(compression);
+}
+
 
 bool
 GEO_PrimVDB::saveVDB(UT_JSONWriter &w) const
@@ -2550,15 +2574,12 @@ GEO_PrimVDB::saveVDB(UT_JSONWriter &w) const
 	openvdb::io::Stream			vos(os);
 	openvdb::MetaMap			meta;
 
-	// Always enable active mask compression, since it is fast
-	// and compresses level sets and fog volumes well.
-	uint32_t compression = openvdb::io::COMPRESS_ACTIVE_MASK;
-	//if (vos.hasBloscCompression()) {
-	//    // Enable Blosc compression if available, since it is also fast,
-	//    // and it works well on volumes for which mask compression is not suited.
-	//    compression |= openvdb::io::COMPRESS_BLOSC;
-	//}
-	vos.setCompression(compression);
+#if (UT_VERSION_INT >= 0x0d00023d) // 13.0.573 or later
+    geoSetVDBStreamCompression(vos,
+        UT_EnvControl::getInt(ENV_HOUDINI13_VOLUME_COMPATIBILITY));
+#else
+    geoSetVDBStreamCompression(vos, /*backwards_compatible*/true);
+#endif
 
 	// Visual C++ requires a default meta object declared on the stack
 	vos.write(grids, meta);
@@ -2836,6 +2857,7 @@ GEO_PrimVDB::copyPrimitive(const GEO_Primitive *psrc, GEO_Point **ptredirect)
     wireVertex(v, ppt ? ppt->getMapOffset() : GA_INVALID_OFFSET);
 #endif
     vertex_wrangler.copyAttributeValues(v, src->fastVertexOffset(0));
+    myVis = src->myVis;
 }
 
 #if (UT_VERSION_INT < 0x0d000000) // Deleted in 13.0
@@ -2867,6 +2889,7 @@ GEO_PrimVDB::copyOffsetPrimitive(const GEO_Primitive *psrc, int basept)
 	    src_points.indexFromOffset(src->vertexPoint(0)) + basept);
     wireVertex(v, ppt);
     vertex_wrangler.copyAttributeValues(v, src->fastVertexOffset(0));
+    myVis = src->myVis;
 }
 #endif
 
@@ -3024,6 +3047,7 @@ GEO_PrimVDB::copy(int preserve_shared_pts) const
 		wranglers.getVertex().copyAttributeValues(v, fastVertexOffset(i));
 	    }
 	}
+        vdb->myVis = myVis;
     }
     return clone;
 }
@@ -3050,6 +3074,8 @@ GEO_PrimVDB::copyUnwiredForMerge(const GA_Primitive *prim_src, const GA_MergeMap
     }
 
     copyGridFrom(*src); // makes a shallow copy
+
+    myVis = src->myVis;
 }
 
 void

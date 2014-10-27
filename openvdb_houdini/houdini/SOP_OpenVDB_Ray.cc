@@ -42,8 +42,10 @@
 #include <openvdb/tools/RayIntersector.h>
 
 #include <UT/UT_Interrupt.h>
+#include <UT/UT_ParallelUtil.h>
 #include <UT/UT_Version.h>
-#include <GA/GA_PageIterator.h>
+#include <GA/GA_PageHandle.h>
+#include <GA/GA_SplittableRange.h>
 #include <GU/GU_Detail.h>
 #include <PRM/PRM_Parm.h>
 #include <GU/GU_PrimSphere.h>
@@ -88,7 +90,7 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setHelpText("Specify a subset of the input VDB grids to surface.")
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenuInput1));
 
     { // Method
         const char* items[] = {

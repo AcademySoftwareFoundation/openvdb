@@ -14,7 +14,7 @@ Version 3.0.0 - In development
     - Added tools::PointPartitioner, a tool for fast spatial sorting
       of points stored in an external array, and tools::PointIndexGrid,
       an acceleration structure for fast range and nearest-neighbor searches.
-    - Added tree::NodeManager, which "linearizes" a tree to facilitate
+    - Added tree::NodeManager, which linearizes a tree to facilitate
       efficient multithreading across all tree levels.
     - Added tools::prune() (and other variants), which replaces and
       outperforms Tree::prune().
@@ -30,10 +30,6 @@ Version 3.0.0 - In development
       It optionally generates a boolean grid of all values that fail
       user-defined tests (a feature that will soon be exposed in Houdini).
     - Added optional alpha masks to tools::LevelSetMorphing.
-    - Added tools::topologyToLevelSet(), which generates a level set
-      from the implicit boundary between active and inactive voxels
-      in an arbitrary input grid.
-      [DWA internal]
     - Improved the performance of point scattering (by orders of magnitude)
       and added a DenseUniformPointScatter class as well as support for
       fractional numbers of particles per voxel.
@@ -157,13 +153,16 @@ Version 3.0.0 - In development
       which convert volumes to meshes, and createLevelSetFromPolygons(),
       which converts meshes to volumes.  NumPy is required.
 
+    Maya:
+    - Added an adaptive polygonal surface extraction node.
+
     Houdini:
-    - Added a new SOP (Trim Narrow Band) that can adjust (i.e. dilate or erode)
-      the width of a narrow band level set. This allows for a much faster workflows
-      where level sets are created (e.g. from points or polygons) with a very narrow
-      band and subsequently dilated with the new SOP.
-    - Fixed bugs in the Smooth Level Set and Reshape Level Set SOPs that ignored the
-      selected discretization scheme.
+    - Added a new Resize Narrow Band SOP that can efficiently adjust the width
+      of a level set's narrow band.  This allows, for example, for a level set
+      to be created quickly from points or polygons with a very narrow band
+      that is then quickly resized to a desired width.
+    - Fixed bugs in the Smooth Level Set and Reshape Level Set SOPs that
+      caused them to ignore the selected discretization scheme.
     - Added alpha mask options to the Morph Level Set SOP.
     - Added a From Points SOP to very quickly generate a level set
       from a point cloud, ignoring any radius attribute.
@@ -187,9 +186,6 @@ Version 3.0.0 - In development
       of which can be used to clip grids as they are read.  For large grids,
       clipping while reading can result in significantly lower memory usage
       than clipping after reading.
-
-    Maya:
-    - Added an adaptive polygonal surface extraction node.
 
 Version 2.3.0 - April 23, 2014
     - Added tools::extractSparseTree(), which selectively extracts and

@@ -115,7 +115,7 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "inputgroup", "Group")
         .setHelpText("Select a subset of the input OpenVDB grids to fracture.")
-        .setChoiceList(&hutil::PrimGroupMenu));
+        .setChoiceList(&hutil::PrimGroupMenuInput1));
 
 
     //////////
@@ -260,17 +260,6 @@ SOP_OpenVDB_Fracture::cookMySop(OP_Context& context)
             evalString(str, "inputgroup", 0, time);
             group = matchGroup(*gdp, str.toStdString());
         }
-
-        //@{
-        /// @todo Is this needed?
-        UT_ValArray<const GA_ElementGroup*>::const_iterator groupIt;
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
-        UT_ValArray<const GA_ElementGroup*> primitiveGroups;
-#else
-        UT_PtrArray<const GA_ElementGroup*> primitiveGroups;
-#endif
-        gdp->primitiveGroups().getList(primitiveGroups);
-        //@}
 
         std::list<openvdb::GridBase::Ptr> grids;
         std::vector<GU_PrimVDB*> origvdbs;

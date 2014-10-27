@@ -43,9 +43,7 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/Grid.h>
-#include <openvdb/util/CpuTimer.h>
 #include <openvdb/tools/LevelSetUtil.h>
-#include <openvdb/tools/LevelSetTracker.h>
 #include <openvdb/tools/ParticlesToLevelSet.h>
 #include <CH/CH_Manager.h>
 #include <GA/GA_Types.h> // for GA_ATTRIB_POINT
@@ -217,70 +215,8 @@ sopBuildAttrMenu(void* data, PRM_Name* menuEntries, int themenusize,
     menuEntries[menuIdx].setLabel(0);
 }
 
-const PRM_ChoiceList PrimAttrMenu(PRM_ChoiceListType(PRM_CHOICELIST_EXCLUSIVE |
-                                                     PRM_CHOICELIST_REPLACE), sopBuildAttrMenu);
-
-// Add new items to the *end* of this list, and update NUM_ACCURACY_TYPES.
-enum Accuracy {
-    ACCURACY_UPWIND_FIRST = 0,
-    ACCURACY_UPWIND_SECOND,
-    ACCURACY_UPWIND_THIRD,
-    ACCURACY_WENO,
-    ACCURACY_HJ_WENO
-};
-
-enum { NUM_ACCURACY_TYPES = ACCURACY_HJ_WENO + 1 };
-
-std::string
-accuracyToString(Accuracy ac)
-{
-    std::string ret;
-    switch (ac) {
-        case ACCURACY_UPWIND_FIRST: ret     = "upwind first";       break;
-        case ACCURACY_UPWIND_SECOND: ret    = "upwind second";      break;
-        case ACCURACY_UPWIND_THIRD: ret     = "upwind third";       break;
-        case ACCURACY_WENO: ret             = "weno";               break;
-        case ACCURACY_HJ_WENO: ret          = "hj weno";            break;
-    }
-    return ret;
-}
-
-std::string
-accuracyToMenuName(Accuracy ac)
-{
-    std::string ret;
-    switch (ac) {
-        case ACCURACY_UPWIND_FIRST: ret     = "First-order upwinding";      break;
-        case ACCURACY_UPWIND_SECOND: ret    = "Second-order upwinding";     break;
-        case ACCURACY_UPWIND_THIRD: ret     = "Third-order upwinding";      break;
-        case ACCURACY_WENO: ret             = "Fifth-order WENO";           break;
-        case ACCURACY_HJ_WENO: ret          = "Fifth-order HJ-WENO";        break;
-    }
-    return ret;
-}
-
-
-Accuracy
-stringToAccuracy(const std::string& s)
-{
-    Accuracy ret = ACCURACY_UPWIND_FIRST;
-
-    std::string str = s;
-    boost::trim(str);
-    boost::to_lower(str);
-
-    if (str == accuracyToString(ACCURACY_UPWIND_SECOND)) {
-        ret = ACCURACY_UPWIND_SECOND;
-    } else if (str == accuracyToString(ACCURACY_UPWIND_THIRD)) {
-        ret = ACCURACY_UPWIND_THIRD;
-    } else if (str == accuracyToString(ACCURACY_WENO)) {
-        ret = ACCURACY_WENO;
-    } else if (str == accuracyToString(ACCURACY_HJ_WENO)) {
-        ret = ACCURACY_HJ_WENO;
-    }
-
-    return ret;
-}
+const PRM_ChoiceList PrimAttrMenu(
+    PRM_ChoiceListType(PRM_CHOICELIST_EXCLUSIVE | PRM_CHOICELIST_REPLACE), sopBuildAttrMenu);
 
 } // unnamed namespace
 
@@ -305,7 +241,7 @@ protected:
     virtual bool updateParmsFlags();
 
 private:
-    
+
     void convert(openvdb::FloatGrid::Ptr, ParticleList&, const Settings&);
     void convertWithAttributes(openvdb::FloatGrid::Ptr, ParticleList&,
         const Settings&, const GU_Detail&);
@@ -414,8 +350,7 @@ newSopOperator(OP_OperatorTable* table)
 
     // Group name (Transform reference)
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Reference VDB")
-        .setChoiceList(&hutil::PrimGroupMenu)
-        .setSpareData(&SOP_Node::theSecondInput)
+        .setChoiceList(&hutil::PrimGroupMenuInput2)
         .setHelpText("References the first/selected grid's transform."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "writeintoref", "Merge With Reference VDB"));
@@ -544,7 +479,7 @@ newSopOperator(OP_OperatorTable* table)
         .setHelpText("Transfer point attributes to each voxel in the level set's narrow band")
         .setMultiparms(attrParms)
         .setDefault(PRMzeroDefaults));
-    
+
     //////////
     // Obsolete parameters
 

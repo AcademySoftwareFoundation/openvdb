@@ -82,10 +82,6 @@ Installation
     TBB_LIB_DIR         the directory containing libtbb
     TBB_LIB             linker flag(s) for the TBB library (e.g., -ltbb)
 
-    BLOSC_INCL_DIR      the parent directory of the blosc.h header
-    BLOSC_LIB_DIR       the directory containing libblosc
-    BLOSC_LIB           linker flags for libblosc
-
     CONCURRENT_MALLOC_LIB_DIR
                         a directory containing a scalable, concurrent malloc
                         replacement library such as jemalloc or TBB malloc

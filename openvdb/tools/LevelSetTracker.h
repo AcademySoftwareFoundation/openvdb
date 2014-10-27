@@ -304,14 +304,14 @@ dilate(int iterations)
         for (int i=0; i < iterations; ++i) {
             tools::dilateVoxels(*mLeafs);
             mLeafs->rebuildLeafArray();
-            tools::changeLevelSetBackground(mGrid->tree(), mDx + mGrid->background());
+            tools::changeLevelSetBackground(leafs(), mDx + mGrid->background());
         }
     } else {
         for (int i=0; i < iterations; ++i) {
             BoolMaskType mask0(mGrid->tree(), false, TopologyCopy());
             tools::dilateVoxels(*mLeafs);
             mLeafs->rebuildLeafArray();
-            tools::changeLevelSetBackground(mGrid->tree(), mDx + mGrid->background());
+            tools::changeLevelSetBackground(leafs(), mDx + mGrid->background());
             BoolMaskType mask(mGrid->tree(), false, TopologyCopy());
             mask.topologyDifference(mask0);
             this->normalize(&mask);
@@ -325,10 +325,10 @@ LevelSetTracker<GridT, InterruptT>::
 erode(int iterations)
 {
     tools::erodeVoxels(*mLeafs, iterations);
-    const ValueType background = mGrid->background() - iterations*mDx;
-    tools::changeLevelSetBackground(mGrid->tree(), background);
     mLeafs->rebuildLeafArray();
-}   
+    const ValueType background = mGrid->background() - iterations*mDx;
+    tools::changeLevelSetBackground(leafs(), background);
+}
 
 template<typename GridT,  typename InterruptT>
 inline void

@@ -86,13 +86,12 @@ newSopOperator(OP_OperatorTable* table)
 
     // Group pattern
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
-        .setChoiceList(&hutil::PrimGroupMenu)
+        .setChoiceList(&hutil::PrimGroupMenuInput1)
         .setHelpText("Specify a subset of the input\nVDB grids to be resampled"));
 
     // Reference grid group
     parms.add(hutil::ParmFactory(PRM_STRING, "reference_grid", "Reference")
-        .setChoiceList(&hutil::PrimGroupMenu)
-        .setSpareData(&SOP_Node::theSecondInput)
+        .setChoiceList(&hutil::PrimGroupMenuInput2)
         .setHelpText(
             "Specify a single reference grid from the\n"
             "first input whose transform is to be matched.\n"
