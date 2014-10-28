@@ -456,22 +456,7 @@ WARN_LOGFILE           =
 # directories like "/usr/src/myproject". Separate the files or directories 
 # with spaces.
 
-INPUT                 = ${CMAKE_CURRENT_SOURCE_DIR} /
-                        ${CMAKE_CURRENT_SOURCE_DIR} / io /
-                        ${CMAKE_CURRENT_SOURCE_DIR} / math /
-                        ${CMAKE_CURRENT_SOURCE_DIR} / metadata /
-                        ${CMAKE_CURRENT_SOURCE_DIR} / python/pyopenvdb.h /
-                        ${CMAKE_CURRENT_SOURCE_DIR} / tools /
-                        ${CMAKE_CURRENT_SOURCE_DIR} / tree /
-                        ${CMAKE_CURRENT_SOURCE_DIR} / util /
-                        ${CMAKE_CURRENT_SOURCE_DIR} / doc/doc.txt /
-                        ${CMAKE_CURRENT_SOURCE_DIR} / doc/faq.txt /
-                        ${CMAKE_CURRENT_SOURCE_DIR} / doc/math.txt /
-                        ${CMAKE_CURRENT_SOURCE_DIR} / doc/changes.txt /
-                        ${CMAKE_CURRENT_SOURCE_DIR} / doc/codingstyle.txt /
-                        ${CMAKE_CURRENT_SOURCE_DIR} / doc/api_0_98_0.txt /
-                        ${CMAKE_CURRENT_SOURCE_DIR} / doc/examplecode.txt /
-                        ${CMAKE_CURRENT_SOURCE_DIR} / doc/python.txt
+INPUT                 = ${CMAKE_CURRENT_SOURCE_DIR}    ${CMAKE_CURRENT_SOURCE_DIR}/io  ${CMAKE_CURRENT_SOURCE_DIR}/math   ${CMAKE_CURRENT_SOURCE_DIR}/metadata  ${CMAKE_CURRENT_SOURCE_DIR}/python/pyopenvdb.h  ${CMAKE_CURRENT_SOURCE_DIR}/tools  ${CMAKE_CURRENT_SOURCE_DIR}/tree   ${CMAKE_CURRENT_SOURCE_DIR}/util   ${CMAKE_CURRENT_SOURCE_DIR}/doc/doc.txt   ${CMAKE_CURRENT_SOURCE_DIR}/doc/faq.txt   ${CMAKE_CURRENT_SOURCE_DIR}/doc/math.txt  ${CMAKE_CURRENT_SOURCE_DIR}/doc/changes.txt   ${CMAKE_CURRENT_SOURCE_DIR}/doc/codingstyle.txt   ${CMAKE_CURRENT_SOURCE_DIR}/doc/api_0_98_0.txt   ${CMAKE_CURRENT_SOURCE_DIR}/doc/examplecode.txt   ${CMAKE_CURRENT_SOURCE_DIR}/doc/python.txt
 
 # If the value of the INPUT tag contains directories, you can use the 
 # FILE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp 
