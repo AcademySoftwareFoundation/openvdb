@@ -109,6 +109,10 @@ INSTALL(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} DESTINATION include COMPONENT Deve
 
 
 
+
+
+
+
 ######################################################################################################################################################
 ######################################################################################################################################################
 ######################################################################################################################################################
@@ -136,6 +140,7 @@ TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${Boost_LIBRARIES} ${ZLIB_LIBRARY} ${OPENG
 # some object files (tree)
 set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS "/bigobj")
 set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "/FORCE:MULTIPLE")
+set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "/STACK:2000000")
 SET_TARGET_PROPERTIES(${PROJECT_NAME} PROPERTIES VERSION ${OPENVDB_VERSION})
 SET_TARGET_PROPERTIES(${PROJECT_NAME} PROPERTIES FOLDER apps)
 
@@ -176,6 +181,7 @@ TARGET_LINK_LIBRARIES(${PROJECT_NAME} ${Boost_LIBRARIES} ${ZLIB_LIBRARY} ${OPENE
 # some object files (tree)
 set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS "/bigobj")
 set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "/FORCE:MULTIPLE")
+set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "/STACK:2000000")
 SET_TARGET_PROPERTIES(${PROJECT_NAME} PROPERTIES VERSION ${OPENVDB_VERSION})
 SET_TARGET_PROPERTIES(${PROJECT_NAME} PROPERTIES FOLDER apps)
 
@@ -187,3 +193,33 @@ INSTALL(TARGETS ${PROJECT_NAME}
 	
 #copy header files to include directory
 INSTALL(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} DESTINATION include COMPONENT Development FILES_MATCHING PATTERN "*.h" )
+
+
+
+
+
+########################DOCUMENTATION
+
+FIND_PACKAGE(Doxygen)
+
+IF (DOXYGEN_FOUND)
+
+	SET(DOXYGEN_INPUT ${CMAKE_CURRENT_SOURCE_DIR}/doxygen-config)
+	SET(DOXYGEN_OUTPUT ${CMAKE_INSTALL_PREFIX}/docs)
+	
+	# This processes our doxyfile.cmake and substitutes paths to generate  a final Doxyfile
+    CONFIGURE_FILE(${PROJECT_SOURCE_DIR}/doxygen-config.cmake  ${DOXYGEN_INPUT} )
+	
+	# Create the doxygen command
+	ADD_CUSTOM_COMMAND(
+	  OUTPUT ${DOXYGEN_OUTPUT}
+	  COMMAND ${CMAKE_COMMAND} -E echo_append "Building API Documentation..."
+	  COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_INPUT}
+	  COMMAND ${CMAKE_COMMAND} -E echo "Done."
+	  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+	  DEPENDS ${DOXYGEN_INPUT}
+	  )
+
+	ADD_CUSTOM_TARGET(apidoc ALL DEPENDS ${DOXYGEN_OUTPUT})
+
+ENDIF (DOXYGEN_FOUND)
