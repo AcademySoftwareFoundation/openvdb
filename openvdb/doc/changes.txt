@@ -40,10 +40,11 @@
 - Added @vdblink::tools::Diagnose Diagnose@endlink, which performs
   multithreaded diagnostics on grids to identify issues like values that
   are NaNs or out-of-range. It optionally generates a boolean grid of all
-  values that fail user-defined tests (a feature that will soon be exposed
-  in Houdini).
+  values that fail user-defined tests.
 - Added optional alpha masks to @vdblink::tools::LevelSetMorphing
   LevelSetMorphing@endlink.
+- Fixed an intermittent crash in
+  @vdblink::tools::LevelSetMorphing LevelSetMorphing@endlink.
 - Improved the performance of point scattering (by orders of magnitude)
   and added a
   @vdblink::tools::DenseUniformPointScatter DenseUniformPointScatter@endlink
@@ -51,10 +52,10 @@
 - Improved the performance and memory footprint of
   the @vdblink::tools::ParticlesToLevelSet ParticlesToLevelSet@endlink tool
   for large numbers (tens to hundreds of millions) of particles.
-- Added edge-adjacent (6+12=18) and vertex-adjacent (6+12+8=26)
-  dilation algorithms to @vdblink::tools::Morphology::dilateVoxels
-  Morphology::dilateVoxels@endlink. Still defaults to a face-adjacent
-  (6) dilation pattern.
+- Added edge-adjacent (6+12=18 neighbors) and vertex-adjacent (6+12+8=26
+  neighbors) dilation algorithms to
+  @vdblink::tools::Morphology::dilateVoxels Morphology::dilateVoxels@endlink.
+  The default dilation pattern is still face-adjacent (6&nbsp;neighbors).
 - Added @vdblink::tree::Tree::getNodes() Tree::getNodes@endlink, which allows
   for fast construction of linear arrays of tree nodes for use in multithreaded
   code such as the @vdblink::tree::LeafManager LeafManager@endlink or
@@ -122,12 +123,12 @@
   tools::ParticlesToLevelSet@endlink related to attribute transfer
   when leaf nodes are produced without active values.
 - Added @vdblink::util::CpuTimer util::CpuTimer@endlink and removed
-  @c unittest_util::CpuTimer (with a minimal API) from @c unittest/util.h.
+  the more simplistic @c unittest_util::CpuTimer from @c unittest/util.h.
 - Eliminated the use of @c getopt for command-line argument parsing
   in @c vdb_test.
-- Fixed the @c vdb_print, @c vdb_render and @c vdb_view tools so that they
-  properly initialize <A HREF="http://log4cplus.sourceforge.net/">log4cplus</A>
-  if it is enabled.
+- @vdblink::initialize() openvdb::initialize@endlink now properly initializes
+  <A HREF="http://log4cplus.sourceforge.net/">log4cplus</A> if it is enabled,
+  eliminating &ldquo;No appenders could be found&rdquo; errors.
 - Fixed a bug in the
   @vdblink::math::QuantizedUnitVec::pack() QuantizedUnitVec::pack@endlink
   method that caused quantization artifacts.
@@ -226,7 +227,7 @@ Houdini:
   narrow band that is then quickly resized to a desired width.
 - Fixed bugs in the Smooth Level Set and Reshape Level Set SOPs that
   caused them to ignore the selected discretization scheme.
-- Added alpha mask options to the Morph Level Set SOP.
+- Added a Morph Level Set SOP.
 - Added a From Points SOP to very quickly generate a level set
   from a point cloud, ignoring any radius attribute.
   <I>[DWA internal]</I>

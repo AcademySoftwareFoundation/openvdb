@@ -25,7 +25,7 @@ Other compilers or versions might work but have not been tested.
 
 Optional:
 
-- Doxygen 1.8 (www.stack.nl/~dimitri/doxygen/)
+- Doxygen 1.8 (www.stack.nl/~dimitri/doxygen/), for documentation
 
 - CppUnit (www.freedesktop.org/wiki/Software/cppunit), version 1.10 or later
   (Linux: yum install cppunit-devel)
@@ -36,10 +36,11 @@ Optional:
 - Ghostscript (www.ghostscript.com), version 8.70 or later, for documentation
   in PDF format
 
-- log4cplus (log4cplus.sourceforge.net), version 1.0 or later
-
 - pdfLaTeX (www.pdftex.org), version 1.21 or later, for documentation
   in PDF format
+
+- log4cplus (log4cplus.sourceforge.net), version 1.0 or later,
+  for error logging
 
 - GLFW 2.7 (www.glfw.org), for the OpenVDB viewer
 
@@ -75,12 +76,22 @@ Installation
     HALF_LIB            linker flag(s) for the Half library (e.g., -lHalf)
 
     EXR_INCL_DIR        the parent directory of the OpenEXR/ header directory
+                        (Note: some OpenEXR headers incorrectly include other
+                        OpenEXR headers with, e.g., '#include <ImfName.h>'
+                        instead of '#include "ImfName.h"'.  When compiling
+                        with Clang, set EXR_INCL_DIR to the parent directory
+                        of the OpenEXR/ directory and ILMBASE_INCL_DIR to the
+                        OpenEXR/ directory itself to avoid errors.)
     EXR_LIB_DIR         the directory containing libIlmImf
     EXR_LIB             linker flags for libIlmImf
 
     TBB_INCL_DIR        the parent directory of the tbb/ header directory
     TBB_LIB_DIR         the directory containing libtbb
     TBB_LIB             linker flag(s) for the TBB library (e.g., -ltbb)
+
+    BLOSC_INCL_DIR      the parent directory of the blosc.h header
+    BLOSC_LIB_DIR       the directory containing libblosc
+    BLOSC_LIB           linker flags for libblosc
 
     CONCURRENT_MALLOC_LIB_DIR
                         a directory containing a scalable, concurrent malloc

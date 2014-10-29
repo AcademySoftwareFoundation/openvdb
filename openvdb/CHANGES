@@ -28,14 +28,15 @@ Version 3.0.0 - In development
     - Added tools::Diagnose, which performs multithreaded diagnostics on grids
       to identify issues like values that are NaNs or out-of-range.
       It optionally generates a boolean grid of all values that fail
-      user-defined tests (a feature that will soon be exposed in Houdini).
+      user-defined tests.
     - Added optional alpha masks to tools::LevelSetMorphing.
+    - Fixed an intermittent crash in tools::LevelSetMorphing.
     - Improved the performance of point scattering (by orders of magnitude)
       and added a DenseUniformPointScatter class as well as support for
       fractional numbers of particles per voxel.
-    - Added edge-adjacent (6+12=18) and vertex-adjacent (6+12+8=26)
-      dilation algorithms to tools::Morphology::dilateVoxels().
-      Still defaults to a face-adjacent (6) dilation pattern.
+    - Added edge-adjacent (6+12=18 neighbors) and vertex-adjacent (6+12+8=26
+      neighbors) dilation algorithms to tools::Morphology::dilateVoxels().
+      The default dilation pattern is still face-adjacent (6 neighbors).
     - Improved the performance and memory footprint of the ParticlesToLevelSet
       tool for large numbers (tens to hundreds of millions) of particles.
     - Added Tree::getNodes(), which allows for fast construction of
@@ -86,12 +87,12 @@ Version 3.0.0 - In development
       [Contributed by SESI]
     - Fixed a bug in tools::ParticlesToLevelSet related to attribute transfer
       when leaf nodes are produced without active values.
-    - Added util/CpuTimer.h and removed CpuTimer (with a minimal API) from
-      unittest/util.h.
+    - Added util/CpuTimer.h and removed the more simplistic CpuTimer
+      from unittest/util.h.
     - Eliminated the use of getopt() for command-line argument parsing
       in vdb_test.
-    - Fixed the vdb_print, vdb_render and vdb_view tools so that they
-      properly initialize log4cplus if it is enabled.
+    - openvdb::initialize() now properly initializes log4cplus if it is
+      enabled, eliminating "No appenders could be found" errors.
     - Fixed a bug in the QuantizedUnitVec::pack() method that caused
       quantization artifacts.
     - Added convenience class tools::AlphaMask to tools/Interpolation.h
@@ -163,7 +164,7 @@ Version 3.0.0 - In development
       that is then quickly resized to a desired width.
     - Fixed bugs in the Smooth Level Set and Reshape Level Set SOPs that
       caused them to ignore the selected discretization scheme.
-    - Added alpha mask options to the Morph Level Set SOP.
+    - Added a Morph Level Set SOP.
     - Added a From Points SOP to very quickly generate a level set
       from a point cloud, ignoring any radius attribute.
       [DWA internal]
