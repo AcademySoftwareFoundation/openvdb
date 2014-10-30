@@ -31,7 +31,7 @@
 #include "ClipBox.h"
 
 #include <deque>
-#include <GL/glfw.h>
+#include <GLFW/glfw3.h>
 
 
 namespace openvdb_viewer {
@@ -281,14 +281,15 @@ ClipBox::render()
 
 
 bool
-ClipBox::mouseButtonCallback(int /*button*/, int /*action*/)
+ClipBox::mouseButtonCallback(GLFWwindow* /*window*/,
+		int /*button*/, int /*action*/, int /*mods*/)
 {
     return false; // unhandled
 }
 
 
 bool
-ClipBox::mousePosCallback(int /*x*/, int /*y*/)
+ClipBox::mousePosCallback(GLFWwindow* /*window*/, double /*x*/, double /*y*/)
 {
     return false; // unhandled
 }

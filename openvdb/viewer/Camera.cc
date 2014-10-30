@@ -40,7 +40,7 @@
 #include <GL/glu.h>
 #endif
 
-#include <GL/glfw.h>
+#include <GLFW/glfw3.h>
 
 
 namespace openvdb_viewer {
@@ -114,12 +114,8 @@ Camera::setTarget(const openvdb::Vec3d& p, double dist)
 
 
 void
-Camera::aim()
+Camera::aim(int width, int height)
 {
-    // Get the window size
-    int width, height;
-    glfwGetWindowSize(&width, &height);
-
     // Make sure that height is non-zero to avoid division by zero
     height = std::max(1, height);
 
@@ -164,15 +160,16 @@ Camera::aim()
 
 
 void
-Camera::keyCallback(int key, int )
+Camera::keyCallback(GLFWwindow* window, int key, int scancode, int action,
+        int mods)
 {
-    if (glfwGetKey(key) == GLFW_PRESS) {
+    if (action == GLFW_PRESS) {
         switch(key) {
             case GLFW_KEY_SPACE:
                 mZoomMode = true;
                 break;
         }
-    } else if (glfwGetKey(key) == GLFW_RELEASE) {
+    } else if (action == GLFW_RELEASE) {
         switch(key) {
             case GLFW_KEY_SPACE:
                 mZoomMode = false;
@@ -185,7 +182,8 @@ Camera::keyCallback(int key, int )
 
 
 void
-Camera::mouseButtonCallback(int button, int action)
+Camera::mouseButtonCallback(GLFWwindow* window, int button, int action,
+        int mods)
 {
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
         if (action == GLFW_PRESS) mMouseDown = true;
@@ -207,7 +205,7 @@ Camera::mouseButtonCallback(int button, int action)
 
 
 void
-Camera::mousePosCallback(int x, int y)
+Camera::mousePosCallback(GLFWwindow* window, double x, double y)
 {
     if (mStartTumbling) {
         mMouseXPos = x;
@@ -235,11 +233,10 @@ Camera::mousePosCallback(int x, int y)
 
 
 void
-Camera::mouseWheelCallback(int pos, int prevPos)
+Camera::mouseWheelCallback(GLFWwindow* window, double x, double y)
 {
-    double speed = std::abs(prevPos - pos);
-
-    if (prevPos < pos) {
+    double speed = std::abs(y);
+    if (y < 0) {
         mDistance += speed * mZoomSpeed;
         setSpeed(mDistance * 0.1, mDistance * 0.002, mDistance * 0.02);
     } else {

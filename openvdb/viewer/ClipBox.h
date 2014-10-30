@@ -41,6 +41,7 @@
 #include <GL/glu.h>
 #endif
 
+struct GLFWwindow;
 
 namespace openvdb_viewer {
 
@@ -69,8 +70,9 @@ public:
     bool& shiftIsDown() { return mShiftIsDown; }
     bool& ctrlIsDown() { return mCtrlIsDown; }
 
-    bool mouseButtonCallback(int button, int action);
-    bool mousePosCallback(int x, int y);
+    bool mouseButtonCallback(GLFWwindow* window, int button, int action,
+			int mods);
+    bool mousePosCallback(GLFWwindow* window, double x, double y);
 
 private:
     void update() const;

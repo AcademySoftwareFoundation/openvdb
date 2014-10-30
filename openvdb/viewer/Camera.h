@@ -36,6 +36,7 @@
 
 #include <openvdb/Types.h>
 
+struct GLFWwindow;
 
 namespace openvdb_viewer {
 
@@ -44,7 +45,7 @@ class Camera
 public:
     Camera();
 
-    void aim();
+    void aim(int width, int height);
 
     void lookAt(const openvdb::Vec3d& p, double dist = 1.0);
     void lookAtTarget();
@@ -55,10 +56,12 @@ public:
     void setFieldOfView(double degrees) { mFov = degrees; }
     void setSpeed(double zoomSpeed, double strafeSpeed, double tumblingSpeed);
 
-    void keyCallback(int key, int action);
-    void mouseButtonCallback(int button, int action);
-    void mousePosCallback(int x, int y);
-    void mouseWheelCallback(int pos, int prevPos);
+    void keyCallback(GLFWwindow* window, int key, int scancode, int action,
+        int mods);
+    void mouseButtonCallback(GLFWwindow* window, int button, int action,
+            int mods);
+    void mousePosCallback(GLFWwindow* window, double x, double y);
+    void mouseWheelCallback(GLFWwindow* window, double y, double prevY);
 
     bool needsDisplay() const { return mNeedsDisplay; }
 
