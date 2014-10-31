@@ -2695,16 +2695,16 @@ TestTree::testNodeManager()
     {// test LeafManager constructor
         typedef openvdb::tree::LeafManager<FloatTree> LeafManagerT;
         LeafManagerT manager1(tree);
-        CPPUNIT_ASSERT_EQUAL(nodeCount[0], manager1.leafCount());
+        CPPUNIT_ASSERT_EQUAL(nodeCount[0], Index64(manager1.leafCount()));
         openvdb::tree::NodeManager<LeafManagerT> manager2(manager1);
         Index64 totalCount = 0;
         for (openvdb::Index i=0; i<FloatTree::RootNodeType::LEVEL; ++i) {//exclude root in nodeCount
             //std::cerr << "Level=" << i << " expected=" << nodeCount[i]
             //          << " cached=" << manager2.nodeCount(i) << std::endl;
-            CPPUNIT_ASSERT_EQUAL(nodeCount[i], manager2.nodeCount(i));
+            CPPUNIT_ASSERT_EQUAL(nodeCount[i], Index64(manager2.nodeCount(i)));
             totalCount += nodeCount[i];
         }
-        CPPUNIT_ASSERT_EQUAL(totalCount, manager2.nodeCount());
+        CPPUNIT_ASSERT_EQUAL(totalCount, Index64(manager2.nodeCount()));
     }
 
 }

@@ -726,7 +726,7 @@ public:
 
     NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
     {
-        mRoot.getNodes(mList2);
+        mRoot.getNodes(mList3);
         for (size_t i=0, n=mList3.nodeCount(); i<n; ++i) mList3(i).getNodes(mList2);
         for (size_t i=0, n=mList2.nodeCount(); i<n; ++i) mList2(i).getNodes(mList1);
 

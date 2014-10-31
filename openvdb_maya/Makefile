@@ -29,7 +29,7 @@
 
 # Targets:
 #   all                 [default target] all Maya plugins
-#   install             install plugins, scripts, etc. into MAYA_INSTALL_DIR
+#   install             install plugins, scripts, etc. into MAYA_DESTDIR
 #   clean               delete generated files from the local directory
 #   depend              recompute source file header dependencies
 #
@@ -43,7 +43,7 @@
 
 #
 # The following variables must be defined, either here or on the command line
-# (e.g., "make install INSTALL_DIR=/usr/local"):
+# (e.g., "make install DESTDIR=/usr/local"):
 #
 # Note that the OpenVDB library and these Maya plugins must be built
 # against compatible versions of the Boost, OpenEXR and TBB libraries.
@@ -56,17 +56,17 @@ endif
 
 
 # The directory into which to install libraries and header files
-# (it is recommended that this match the INSTALL_DIR in the OpenVDB
+# (it is recommended that this match the DESTDIR in the OpenVDB
 # library makefile)
-INSTALL_DIR := /tmp/OpenVDB
+DESTDIR := /tmp/OpenVDB
 
 # The directory into which to install Maya plugins, scripts, etc.
-MAYA_INSTALL_DIR := $(INSTALL_DIR)/maya
+MAYA_DESTDIR := $(DESTDIR)/maya
 
 # The parent directory of the openvdb/ header directory
-OPENVDB_INCL_DIR := $(INSTALL_DIR)/include
+OPENVDB_INCL_DIR := $(DESTDIR)/include
 # The directory containing libopenvdb
-OPENVDB_LIB_DIR := $(INSTALL_DIR)/lib
+OPENVDB_LIB_DIR := $(DESTDIR)/lib
 OPENVDB_LIB := -lopenvdb
 
 # The parent directory of the boost/ header directory
@@ -96,6 +96,10 @@ SHELL = /bin/bash
 
 # Turn off implicit rules for speed
 .SUFFIXES:
+
+ifneq (,$(INSTALL_DIR))
+    $(warning Warning: $$(INSTALL_DIR) is no longer used; set $$(DESTDIR) instead.)
+endif
 
 # Determine the platform.
 ifeq ("$(OS)","Windows_NT")
@@ -268,14 +272,14 @@ $(MAYA_SO_NAME): $(MAYA_OBJ_NAMES)
 	$(CXX) $(CXXFLAGS) -fPIC -Wl,-Bsymbolic -shared -o $@ $^ $(LIBS)
 
 install: $(MAYA_SO_NAME)
-	mkdir -p $(MAYA_INSTALL_DIR)/plugins
-	@echo "Created $(MAYA_INSTALL_DIR)/plugins"
-	cp -f $(MAYA_SO_NAME) $(MAYA_INSTALL_DIR)/plugins/
-	@echo "Copied $(MAYA_SO_NAME) to $(MAYA_INSTALL_DIR)/plugins/"
-	mkdir -p $(MAYA_INSTALL_DIR)/scripts
-	@echo "Created $(MAYA_INSTALL_DIR)/scripts"
-	cp -f $(MAYA_SCRIPTS) $(MAYA_INSTALL_DIR)/scripts/
-	@echo "Copied MEL scripts to $(MAYA_INSTALL_DIR)/scripts/"
+	mkdir -p $(MAYA_DESTDIR)/plugins
+	@echo "Created $(MAYA_DESTDIR)/plugins"
+	cp -f $(MAYA_SO_NAME) $(MAYA_DESTDIR)/plugins/
+	@echo "Copied $(MAYA_SO_NAME) to $(MAYA_DESTDIR)/plugins/"
+	mkdir -p $(MAYA_DESTDIR)/scripts
+	@echo "Created $(MAYA_DESTDIR)/scripts"
+	cp -f $(MAYA_SCRIPTS) $(MAYA_DESTDIR)/scripts/
+	@echo "Copied MEL scripts to $(MAYA_DESTDIR)/scripts/"
 
 # TODO: This accumulates all source file dependencies into a single file
 # containing a rule for each *.o file.  Consider generating a separate

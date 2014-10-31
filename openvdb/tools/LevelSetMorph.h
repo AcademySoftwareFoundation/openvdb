@@ -272,12 +272,12 @@ LevelSetMorphing<GridT, InterruptT>::advect(ScalarType time0, ScalarType time1)
     switch (mSpatialScheme) {
     case math::FIRST_BIAS:
         return this->advect1<math::FIRST_BIAS  >(time0, time1);
-        //case math::SECOND_BIAS:
-        //return this->advect1<math::SECOND_BIAS >(time0, time1);
-        //case math::THIRD_BIAS:
-        //return this->advect1<math::THIRD_BIAS  >(time0, time1);
-        //case math::WENO5_BIAS:
-        //return this->advect1<math::WENO5_BIAS  >(time0, time1);
+    //case math::SECOND_BIAS:
+    //return this->advect1<math::SECOND_BIAS >(time0, time1);
+    //case math::THIRD_BIAS:
+    //return this->advect1<math::THIRD_BIAS  >(time0, time1);
+    //case math::WENO5_BIAS:
+    //return this->advect1<math::WENO5_BIAS  >(time0, time1);
     case math::HJWENO5_BIAS:
         return this->advect1<math::HJWENO5_BIAS>(time0, time1);
     default:
@@ -503,7 +503,8 @@ sampleXformedSpeed(const LeafRange& range, Index speedBuffer)
     const MapT& map = *mMap;
     mParent->mTracker.checkInterrupter();
 
-    SamplerT target(mParent->mTarget->getAccessor(), mParent->mTarget->transform());
+    typename GridT::ConstAccessor targetAcc = mParent->mTarget->getAccessor();
+    SamplerT target(targetAcc, mParent->mTarget->transform());
     if (mParent->mMask == NULL) {
         for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
             BufferType& speed = leafIter.buffer(speedBuffer);
@@ -516,7 +517,8 @@ sampleXformedSpeed(const LeafRange& range, Index speedBuffer)
     } else {
         const ScalarType min = mParent->mMinMask, invNorm = 1.0f/(mParent->mDeltaMask);
         const bool invMask = mParent->isMaskInverted();
-        SamplerT mask(mParent->mMask->getAccessor(),  mParent->mMask->transform());
+        typename GridT::ConstAccessor maskAcc = mParent->mMask->getAccessor();
+        SamplerT mask(maskAcc,  mParent->mMask->transform());
         for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
             BufferType& source = leafIter.buffer(speedBuffer);
             for (VoxelIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter) {

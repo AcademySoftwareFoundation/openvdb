@@ -45,7 +45,7 @@
 #
 #   all                 [default target] all of the above
 #   install             install all of the above except vdb_test
-#                       into subdirectories of INSTALL_DIR
+#                       into subdirectories of DESTDIR
 #   depend              recompute source file header dependencies
 #   clean               delete generated files from the local directory
 #   test                run tests
@@ -61,7 +61,7 @@
 
 #
 # The following variables must be defined, either here or on the command line
-# (e.g., "make install INSTALL_DIR=/usr/local"):
+# (e.g., "make install DESTDIR=/usr/local"):
 #
 # Note that if you plan to build the Houdini OpenVDB tools (distributed
 # separately), you must build the OpenVDB library and the Houdini tools
@@ -81,7 +81,7 @@
 #
 
 # The directory into which to install libraries, executables and header files
-INSTALL_DIR := /tmp/OpenVDB
+DESTDIR := /tmp/OpenVDB
 
 # The parent directory of the boost/ header directory
 BOOST_INCL_DIR := $(HT)/include
@@ -177,6 +177,10 @@ SHELL = /bin/bash
 
 # Turn off implicit rules for speed.
 .SUFFIXES:
+
+ifneq (,$(INSTALL_DIR))
+    $(warning Warning: $$(INSTALL_DIR) is no longer used; set $$(DESTDIR) instead.)
+endif
 
 # Determine the platform.
 ifeq ("$(OS)","Windows_NT")
@@ -571,19 +575,31 @@ SO_VERSION=$(LIB_MAJOR_VERSION).$(LIB_MINOR_VERSION)
 
 LIBOPENVDB_NAME=libopenvdb
 LIBOPENVDB_STATIC := $(LIBOPENVDB_NAME).a
+ifndef MBSD
+LIBOPENVDB_SHARED_NAME := $(LIBOPENVDB_NAME).so
 LIBOPENVDB_SHARED := $(LIBOPENVDB_NAME).so.$(LIB_VERSION)
 LIBOPENVDB_SONAME := $(LIBOPENVDB_NAME).so.$(SO_VERSION)
-ifndef MBSD
 LIBOPENVDB_SONAME_FLAGS := -Wl,-soname,$(LIBOPENVDB_SONAME)
+else
+LIBOPENVDB_SHARED_NAME := $(LIBOPENVDB_NAME).dylib
+LIBOPENVDB_SHARED := $(LIBOPENVDB_NAME).$(LIB_VERSION).dylib
+LIBOPENVDB_SONAME := $(LIBOPENVDB_NAME).$(SO_VERSION).dylib
+LIBOPENVDB_SONAME_FLAGS := -Wl,-install_name,$(DESTDIR)/lib/$(LIBOPENVDB_SONAME)
 endif
 
 # TODO: libopenvdb_viewer is currently built into vdb_view and is not installed separately.
 LIBVIEWER_NAME=libopenvdb_viewer
 LIBVIEWER_STATIC := $(LIBVIEWER_NAME).a
+ifndef MBSD
+LIBVIEWER_SHARED_NAME := $(LIBVIEWER_NAME).so
 LIBVIEWER_SHARED := $(LIBVIEWER_NAME).so.$(LIB_VERSION)
 LIBVIEWER_SONAME := $(LIBVIEWER_NAME).so.$(SO_VERSION)
-ifndef MBSD
 LIBVIEWER_SONAME_FLAGS := -Wl,-soname,$(LIBVIEWER_SONAME)
+else
+LIBVIEWER_SHARED_NAME := $(LIBVIEWER_NAME).dylib
+LIBVIEWER_SHARED := $(LIBVIEWER_NAME).$(LIB_VERSION).dylib
+LIBVIEWER_SONAME := $(LIBVIEWER_NAME).$(SO_VERSION).dylib
+LIBVIEWER_SONAME_FLAGS := -Wl,-install_name,$(DESTDIR)/lib/$(LIBVIEWER_SONAME)
 endif
 
 PYTHON_MODULE_NAME=pyopenvdb
@@ -599,7 +615,7 @@ ifeq (no,$(strip $(shared)))
 else
     LIBOPENVDB := $(LIBOPENVDB_SHARED)
     LIBVIEWER := $(LIBVIEWER_SHARED)
-    LIBOPENVDB_RPATH := -Wl,-rpath,$(INSTALL_DIR)/lib
+    LIBOPENVDB_RPATH := -Wl,-rpath,$(DESTDIR)/lib
 endif # shared
 
 DEPEND := dependencies
@@ -615,7 +631,7 @@ ALL_PRODUCTS := \
     vdb_render \
     vdb_view \
     $(DEPEND) \
-    $(LIBOPENVDB_NAME).so \
+    $(LIBOPENVDB_SHARED_NAME) \
     $(LIBOPENVDB_SONAME) \
     $(PYTHON_MODULE) \
 #
@@ -637,9 +653,9 @@ $(OBJ_NAMES): %.o: %.cc
 ifneq (no,$(strip $(shared)))
 
 # Build shared library
-lib: $(LIBOPENVDB_NAME).so $(LIBOPENVDB_SONAME)
+lib: $(LIBOPENVDB_SHARED_NAME) $(LIBOPENVDB_SONAME)
 
-$(LIBOPENVDB_NAME).so: $(LIBOPENVDB_SHARED)
+$(LIBOPENVDB_SHARED_NAME): $(LIBOPENVDB_SHARED)
 	ln -f -s $< $@
 
 $(LIBOPENVDB_SONAME): $(LIBOPENVDB_SHARED)
@@ -696,14 +712,15 @@ vdb_render: $(LIBOPENVDB) cmd/openvdb_render/main.cc
 	    -Wl,-rpath,$(ILMBASE_LIB_DIR) -L$(ILMBASE_LIB_DIR) $(ILMBASE_LIB) \
 	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB)
 
-ifneq (yes,$(has_glfw))
-vdb_view:
-	@echo "$@"': GLFW is unavailable'
-else
 # Create an openvdb_viewer/ symlink to the viewer/ subdirectory,
 # to mirror the DWA directory structure.
 openvdb_viewer:
 	ln -f -s viewer openvdb_viewer
+
+ifneq (yes,$(has_glfw))
+vdb_view:
+	@echo "$@"': GLFW is unavailable'
+else
 $(LIBVIEWER_INCLUDE_NAMES): openvdb_viewer
 
 $(LIBVIEWER_OBJ_NAMES): $(LIBVIEWER_INCLUDE_NAMES)
@@ -784,50 +801,50 @@ test:
 endif
 
 install: lib python vdb_print vdb_render vdb_view doc pydoc
-	mkdir -p $(INSTALL_DIR)/include/openvdb
-	@echo "Created $(INSTALL_DIR)/include/openvdb"
-	pushd $(INSTALL_DIR)/include/openvdb > /dev/null; \
+	mkdir -p $(DESTDIR)/include/openvdb
+	@echo "Created $(DESTDIR)/include/openvdb"
+	pushd $(DESTDIR)/include/openvdb > /dev/null; \
 	    mkdir -p $(HEADER_SUBDIRS); popd > /dev/null
 	for f in $(INCLUDE_NAMES); \
-	    do cp -f $$f $(INSTALL_DIR)/include/openvdb/$$f; done
+	    do cp -f $$f $(DESTDIR)/include/openvdb/$$f; done
 	@#
 	if [ -f $(LIBVIEWER) ]; \
 	then \
-	    mkdir -p $(INSTALL_DIR)/include/openvdb_viewer; \
-	    echo "Created $(INSTALL_DIR)/include/openvdb_viewer"; \
-	    cp -f $(LIBVIEWER_PUBLIC_INCLUDE_NAMES) $(INSTALL_DIR)/include/openvdb_viewer/; \
+	    mkdir -p $(DESTDIR)/include/openvdb_viewer; \
+	    echo "Created $(DESTDIR)/include/openvdb_viewer"; \
+	    cp -f $(LIBVIEWER_PUBLIC_INCLUDE_NAMES) $(DESTDIR)/include/openvdb_viewer/; \
 	fi
-	@echo "Copied header files to $(INSTALL_DIR)/include"
+	@echo "Copied header files to $(DESTDIR)/include"
 	@#
-	mkdir -p $(INSTALL_DIR)/lib
-	@echo "Created $(INSTALL_DIR)/lib/"
-	cp -f $(LIBOPENVDB) $(INSTALL_DIR)/lib
-	pushd $(INSTALL_DIR)/lib > /dev/null; \
+	mkdir -p $(DESTDIR)/lib
+	@echo "Created $(DESTDIR)/lib/"
+	cp -f $(LIBOPENVDB) $(DESTDIR)/lib
+	pushd $(DESTDIR)/lib > /dev/null; \
 	    if [ -f $(LIBOPENVDB_SHARED) ]; then \
-	        ln -f -s $(LIBOPENVDB_SHARED) $(LIBOPENVDB_NAME).so; \
+	        ln -f -s $(LIBOPENVDB_SHARED) $(LIBOPENVDB_SHARED_NAME); \
 	        ln -f -s $(LIBOPENVDB_SHARED) $(LIBOPENVDB_SONAME); \
 	    fi; \
 	    popd > /dev/null
-	@echo "Copied libopenvdb to $(INSTALL_DIR)/lib/"
+	@echo "Copied libopenvdb to $(DESTDIR)/lib/"
 	@#
 	if [ -f $(LIBVIEWER) ]; \
 	then \
-	    cp -f $(LIBVIEWER) $(INSTALL_DIR)/lib; \
-	    pushd $(INSTALL_DIR)/lib > /dev/null; \
+	    cp -f $(LIBVIEWER) $(DESTDIR)/lib; \
+	    pushd $(DESTDIR)/lib > /dev/null; \
 	        if [ -f $(LIBVIEWER_SHARED) ]; then \
-	            ln -f -s $(LIBVIEWER_SHARED) $(LIBVIEWER_NAME).so; fi; \
+	            ln -f -s $(LIBVIEWER_SHARED) $(LIBVIEWER_SHARED_NAME); fi; \
 	        popd > /dev/null; \
-	    echo "Copied libopenvdb_viewer to $(INSTALL_DIR)/lib/"; \
+	    echo "Copied libopenvdb_viewer to $(DESTDIR)/lib/"; \
 	fi
 	@#
 	if [ -f $(PYTHON_MODULE) ]; \
 	then \
-	    installdir=$(INSTALL_DIR)/python/include/python$(PYTHON_VERSION); \
+	    installdir=$(DESTDIR)/python/include/python$(PYTHON_VERSION); \
 	    mkdir -p $${installdir}; \
 	    echo "Created $${installdir}"; \
 	    cp -f $(PYTHON_PUBLIC_INCLUDE_NAMES) $${installdir}/; \
 	    echo "Copied Python header files to $${installdir}"; \
-	    installdir=$(INSTALL_DIR)/python/lib/python$(PYTHON_VERSION); \
+	    installdir=$(DESTDIR)/python/lib/python$(PYTHON_VERSION); \
 	    mkdir -p $${installdir}; \
 	    echo "Created $${installdir}"; \
 	    cp -f $(PYTHON_MODULE) $${installdir}/; \
@@ -837,30 +854,30 @@ install: lib python vdb_print vdb_render vdb_view doc pydoc
 	    echo "Copied Python module to $${installdir}"; \
 	fi
 	@#
-	mkdir -p $(INSTALL_DIR)/bin
-	@echo "Created $(INSTALL_DIR)/bin/"
-	cp -f vdb_print $(INSTALL_DIR)/bin
-	@echo "Copied vdb_print to $(INSTALL_DIR)/bin/"
-	cp -f vdb_render $(INSTALL_DIR)/bin
-	@echo "Copied vdb_render to $(INSTALL_DIR)/bin/"
+	mkdir -p $(DESTDIR)/bin
+	@echo "Created $(DESTDIR)/bin/"
+	cp -f vdb_print $(DESTDIR)/bin
+	@echo "Copied vdb_print to $(DESTDIR)/bin/"
+	cp -f vdb_render $(DESTDIR)/bin
+	@echo "Copied vdb_render to $(DESTDIR)/bin/"
 	if [ -f vdb_view ]; \
 	then \
-	    cp -f vdb_view $(INSTALL_DIR)/bin; \
-	    echo "Copied vdb_view to $(INSTALL_DIR)/bin/"; \
+	    cp -f vdb_view $(DESTDIR)/bin; \
+	    echo "Copied vdb_view to $(DESTDIR)/bin/"; \
 	fi
 	@#
 	if [ -d doc/html ]; \
 	then \
-	    mkdir -p $(INSTALL_DIR)/share/doc/openvdb; \
-	    echo "Created $(INSTALL_DIR)/share/doc/openvdb/"; \
-	    cp -r -f doc/html $(INSTALL_DIR)/share/doc/openvdb; \
-	    echo "Copied documentation to $(INSTALL_DIR)/share/doc/openvdb/"; \
+	    mkdir -p $(DESTDIR)/share/doc/openvdb; \
+	    echo "Created $(DESTDIR)/share/doc/openvdb/"; \
+	    cp -r -f doc/html $(DESTDIR)/share/doc/openvdb; \
+	    echo "Copied documentation to $(DESTDIR)/share/doc/openvdb/"; \
 	fi
 
 # TODO: This accumulates all source file dependencies into a single file
 # containing a rule for each *.o file.  Consider generating a separate
 # dependency file for each *.o file instead.
-$(DEPEND): $(ALL_INCLUDE_FILES) $(ALL_SRC_FILES)
+$(DEPEND): $(ALL_INCLUDE_FILES) $(ALL_SRC_FILES) openvdb_viewer
 	@echo "Generating dependencies because of $(call list_deps)"
 	$(RM) $(DEPEND)
 	for f in $(SRC_NAMES) $(CMD_SRC_NAMES); \
