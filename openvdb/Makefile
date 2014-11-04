@@ -45,7 +45,7 @@
 #
 #   all                 [default target] all of the above
 #   install             install all of the above except vdb_test
-#                       into subdirectories of INSTALL_DIR
+#                       into subdirectories of DESTDIR
 #   depend              recompute source file header dependencies
 #   clean               delete generated files from the local directory
 #   test                run tests
@@ -88,7 +88,7 @@ endif
 
 #
 # The following variables must be defined, either here or on the command line
-# (e.g., "make install INSTALL_DIR=/usr/local"):
+# (e.g., "make install DESTDIR=/usr/local"):
 #
 # Note that if you plan to build the Houdini OpenVDB tools (distributed
 # separately), you must build the OpenVDB library and the Houdini tools
@@ -108,19 +108,8 @@ endif
 #
 
 # The directory into which to install libraries, executables and header files
-INSTALL_DIR := $(prefix)
+DESTDIR := $(prefix)
 include platform.mk
-
-# The directory into which to install Houdini SOPs
-HOUDINI_INSTALL_DIR := ./dso
-
-# Default to $HFS if it already exists.
-# The directory within which to source the houdini_setup script
-ifneq (,$(HFS))
-HOUDINI_DIR := $(HFS)
-else
-HOUDINI_DIR := /rel/third_party/houdini/12.5.376_64
-endif
 
 ifeq (,$(prefix))
   $(warning === WARNING === No prefix set)
@@ -138,6 +127,7 @@ ifdef WINDOWS_NT
 else
   BOOST_LIB := -lboost_iostreams -lboost_system
 endif
+BOOST_THREAD_LIB := -lboost_thread
 
 # The parent directory of the OpenEXR/ header directory
 EXR_INCL_DIR := $(LOCAL_INCLUDE)
@@ -303,6 +293,9 @@ GLFW_INCL_DIR :=
 # The directory containing libglfw
 GLFW_LIB_DIR :=
 GLFW_LIB :=
+# The major version number of the GLFW library
+# (header filenames changed between GLFW 2 and 3, so this must be specified explicitly)
+GLFW_MAJOR_VERSION := 3
 
 # The version of Python for which to build the OpenVDB module
 # (leave blank if Python is unavailable)
@@ -358,6 +351,10 @@ SHELL = /bin/bash
 
 # Turn off implicit rules for speed.
 .SUFFIXES:
+
+ifneq (,$(INSTALL_DIR))
+    $(warning Warning: $$(INSTALL_DIR) is no longer used; set $$(DESTDIR) instead.)
+endif
 
 ifeq (full,$(strip $(debug)))
   OPTIMIZE := $(DEBUG_FLAGS)
@@ -435,6 +432,9 @@ ifeq (yes,$(has_log4cplus))
 endif
 ifeq (2,$(strip $(abi)))
 	CXXFLAGS += -DOPENVDB_2_ABI_COMPATIBLE
+endif
+ifneq (2,$(strip $(GLFW_MAJOR_VERSION)))
+	CXXFLAGS += -DOPENVDB_USE_GLFW_3
 endif
 
 LIBS := \
@@ -813,7 +813,7 @@ else
   else
     LIBOPENVDB := $(LIBOPENVDB_SHARED)
   endif
-  LIBOPENVDB_RPATH := -Wl,-rpath,$(INSTALL_DIR)/lib $(LIBOPENVDB)
+  LIBOPENVDB_RPATH := -Wl,-rpath,$(DESTDIR)/lib $(LIBOPENVDB)
 endif # shared
 
 CPPUNIT_RPATH := -Wl,-rpath,$(CPPUNIT_LIB_DIR) $(LDDIROPT)$(CPPUNIT_LIB_DIR) $(CPPUNIT_LIB)
@@ -960,7 +960,7 @@ $(LIBVIEWER_INCLUDE_NAMES): openvdb_viewer
 
 $(LIBVIEWER_OBJ_NAMES): $(LIBVIEWER_INCLUDE_NAMES)
 $(LIBVIEWER_OBJ_NAMES): %.o: %.cc
-	$(call CompileCXX,-I $(GLFW_INCL_DIR) -DGL_GLEXT_PROTOTYPES=1)
+	$(call CompileCXX,$(CXXISYSTEM) $(GLFW_INCL_DIR) -DGL_GLEXT_PROTOTYPES=1)
 
 ifneq (,$(strip $(EXE_SUFFIX)))
 vdb_view: vdb_view$(EXE_SUFFIX)
@@ -969,7 +969,7 @@ endif
 vdb_view$(EXE_SUFFIX): $(LIBOPENVDB) $(LIBVIEWER_OBJ_NAMES) $(VIEW_OBJ_NAMES)
 	$(call BuildExecutable, $(VIEW_OBJ_NAMES) $(LIBVIEWER_OBJ_NAMES) \
 		$(GLFW_RPATH) \
-		$(LIBVIEWER_FLAGS) $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
+		$(LIBVIEWER_FLAGS) $(LIBS_RPATH) $(BOOST_THREAD_LIB) \
 		$(LIBOPENVDB_RPATH) \
 		$(ALLOC_LIBS_RPATH))
 endif
@@ -1048,33 +1048,33 @@ endif
 # END vdb_test RULES
 
 install_headers: $(INCLUDE_NAMES)
-	/bin/mkdir -p $(INSTALL_DIR)/include/openvdb
-	@echo "Created $(INSTALL_DIR)/include/openvdb"
-	pushd $(INSTALL_DIR)/include/openvdb > /dev/null; \
+	/bin/mkdir -p $(DESTDIR)/include/openvdb
+	@echo "Created $(DESTDIR)/include/openvdb"
+	pushd $(DESTDIR)/include/openvdb > /dev/null; \
 	    /bin/mkdir -p $(HEADER_SUBDIRS); popd > /dev/null
 	for f in $(INCLUDE_NAMES); \
-	    do /bin/cp -f $$f $(INSTALL_DIR)/include/openvdb/$$f; done
+	    do /bin/cp -f $$f $(DESTDIR)/include/openvdb/$$f; done
 	@#
-	@echo "Copied header files to $(INSTALL_DIR)/include"
+	@echo "Copied header files to $(DESTDIR)/include"
 
 install: install_headers lib python vdb_print vdb_render vdb_view doc pydoc
-	mkdir -p $(INSTALL_DIR)/lib
-	@echo "Created $(INSTALL_DIR)/lib/"
-	cp -f $(LIBOPENVDB) $(LIBOPENVDB_IMPORT) $(INSTALL_DIR)/lib
-	pushd $(INSTALL_DIR)/lib > /dev/null; \
+	mkdir -p $(DESTDIR)/lib
+	@echo "Created $(DESTDIR)/lib/"
+	cp -f $(LIBOPENVDB) $(LIBOPENVDB_IMPORT) $(DESTDIR)/lib
+	pushd $(DESTDIR)/lib > /dev/null; \
 	    if [ -f $(LIBOPENVDB_SHARED_VERSIONED) ]; then \
 		    $(LN) $(LIBOPENVDB_SHARED_VERSIONED) $(LIBOPENVDB_SHARED); fi; \
 	    popd > /dev/null
-	@echo "Copied libopenvdb to $(INSTALL_DIR)/lib/"
+	@echo "Copied libopenvdb to $(DESTDIR)/lib/"
 	@#
 	if [ -f $(PYTHON_MODULE) ]; \
 	then \
-	    installdir=$(INSTALL_DIR)/python/include/python$(PYTHON_VERSION); \
+	    installdir=$(DESTDIR)/python/include/python$(PYTHON_VERSION); \
 	    mkdir -p $${installdir}; \
 	    echo "Created $${installdir}"; \
 	    /bin/cp -f $(PYTHON_PUBLIC_INCLUDE_NAMES) $${installdir}/; \
 	    echo "Copied Python header files to $${installdir}"; \
-	    installdir=$(INSTALL_DIR)/python/lib/python$(PYTHON_VERSION); \
+	    installdir=$(DESTDIR)/python/lib/python$(PYTHON_VERSION); \
 	    mkdir -p $${installdir}; \
 	    echo "Created $${installdir}"; \
 	    /bin/cp -f $(PYTHON_MODULE) $${installdir}/; \
@@ -1084,24 +1084,24 @@ install: install_headers lib python vdb_print vdb_render vdb_view doc pydoc
 	    echo "Copied Python module to $${installdir}"; \
 	fi
 	@#
-	mkdir -p $(INSTALL_DIR)/bin
-	@echo "Created $(INSTALL_DIR)/bin/"
-	cp -f vdb_print$(EXE_SUFFIX) $(INSTALL_DIR)/bin
-	@echo "Copied vdb_print$(EXE_SUFFIX) to $(INSTALL_DIR)/bin/"
-	cp -f vdb_render$(EXE_SUFFIX) $(INSTALL_DIR)/bin
-	@echo "Copied vdb_render to $(INSTALL_DIR)/bin/"
+	mkdir -p $(DESTDIR)/bin
+	@echo "Created $(DESTDIR)/bin/"
+	cp -f vdb_print$(EXE_SUFFIX) $(DESTDIR)/bin
+	@echo "Copied vdb_print$(EXE_SUFFIX) to $(DESTDIR)/bin/"
+	cp -f vdb_render$(EXE_SUFFIX) $(DESTDIR)/bin
+	@echo "Copied vdb_render to $(DESTDIR)/bin/"
 	if [ -f vdb_view$(EXE_SUFFIX) ]; \
 	then \
-		cp -f vdb_view$(EXE_SUFFIX) $(INSTALL_DIR)/bin; \
-		echo "Copied vdb_view to $(INSTALL_DIR)/bin/"; \
+		cp -f vdb_view$(EXE_SUFFIX) $(DESTDIR)/bin; \
+		echo "Copied vdb_view to $(DESTDIR)/bin/"; \
 	fi
 	@#
 	if [ -d doc/html ]; \
 	then \
-	    mkdir -p $(INSTALL_DIR)/share/doc/openvdb; \
-	    echo "Created $(INSTALL_DIR)/share/doc/openvdb/"; \
-	    cp -r -f doc/html $(INSTALL_DIR)/share/doc/openvdb; \
-	    echo "Copied documentation to $(INSTALL_DIR)/share/doc/openvdb/"; \
+	    mkdir -p $(DESTDIR)/share/doc/openvdb; \
+	    echo "Created $(DESTDIR)/share/doc/openvdb/"; \
+	    cp -r -f doc/html $(DESTDIR)/share/doc/openvdb; \
+	    echo "Copied documentation to $(DESTDIR)/share/doc/openvdb/"; \
 	fi
 
 SESI_ARCHIVE_CONTENTS := \

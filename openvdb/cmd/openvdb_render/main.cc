@@ -645,8 +645,8 @@ main(int argc, char *argv[])
         {
             openvdb::io::File file(vdbFilename);
 
-            file.open();
             if (!gridName.empty()) {
+                file.open();
                 grid = openvdb::gridPtrCast<openvdb::FloatGrid>(file.readGrid(gridName));
                 if (!grid) {
                     OPENVDB_THROW(openvdb::ValueError,
@@ -654,6 +654,7 @@ main(int argc, char *argv[])
                 }
             } else {
                 // If no grid was specified by name, retrieve the first float grid from the file.
+                file.open(/*delayLoad=*/false);
                 openvdb::io::File::NameIterator it = file.beginName();
                 openvdb::GridPtrVecPtr grids = file.readAllGridMetadata();
                 for (size_t i = 0; i < grids->size(); ++i, ++it) {

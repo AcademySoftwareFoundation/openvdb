@@ -25,7 +25,7 @@ Other compilers or versions might work but have not been tested.
 
 Optional:
 
-- Doxygen 1.8 (www.stack.nl/~dimitri/doxygen/)
+- Doxygen 1.8 (www.stack.nl/~dimitri/doxygen/), for documentation
 
 - CppUnit (www.freedesktop.org/wiki/Software/cppunit), version 1.10 or later
   (Linux: yum install cppunit-devel)
@@ -33,13 +33,17 @@ Optional:
 - Houdini HDK (ftp://ftp.sidefx.com/public/Houdini12.0), version 12.0.628
   or later
 
+- Blosc compression library (www.blosc.org), version 1.5.0 or later
+  (included in the Houdini HDK as of version 14.0)
+
 - Ghostscript (www.ghostscript.com), version 8.70 or later, for documentation
   in PDF format
 
-- log4cplus (log4cplus.sourceforge.net), version 1.0 or later
-
 - pdfLaTeX (www.pdftex.org), version 1.21 or later, for documentation
   in PDF format
+
+- log4cplus (log4cplus.sourceforge.net), version 1.0 or later,
+  for error logging
 
 - GLFW 2.7 (www.glfw.org), for the OpenVDB viewer
 
@@ -67,6 +71,7 @@ Installation
                         (e.g., /usr/include)
     BOOST_LIB_DIR       the directory containing libboost_iostreams, etc.
     BOOST_LIB           linker flags for libboost_iostreams and libboost_system
+    BOOST_THREAD_LIB    linker flags for libboost_thread
 
     ILMBASE_INCL_DIR    the parent directory of the OpenEXR/ header directory
                         (which contains half.h)
@@ -75,6 +80,12 @@ Installation
     HALF_LIB            linker flag(s) for the Half library (e.g., -lHalf)
 
     EXR_INCL_DIR        the parent directory of the OpenEXR/ header directory
+                        (Note: some OpenEXR headers incorrectly include other
+                        OpenEXR headers with, e.g., '#include <ImfName.h>'
+                        instead of '#include "ImfName.h"'.  When compiling
+                        with Clang, set EXR_INCL_DIR to the parent directory
+                        of the OpenEXR/ directory and ILMBASE_INCL_DIR to the
+                        OpenEXR/ directory itself to avoid errors.)
     EXR_LIB_DIR         the directory containing libIlmImf
     EXR_LIB             linker flags for libIlmImf
 
@@ -103,6 +114,9 @@ Installation
                         GLFW is needed only for the command-line viewer tool)
     GLFW_LIB_DIR        the directory containing libglfw
     GLFW_LIB            linker flags for the GLFW library (e.g., -lglfw)
+    GLFW_MAJOR_VERSION  the major version number of the GLFW library
+                        (header filenames changed between GLFW 2 and 3,
+                        so this must be specified explicitly)
 
     LOG4CPLUS_INCL_DIR  the parent directory of the log4cplus/ header directory
                         (leave blank if log4cplus is not available)
