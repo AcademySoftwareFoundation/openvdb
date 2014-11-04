@@ -88,6 +88,7 @@ BOOST_INCL_DIR := $(HT)/include
 # The directory containing libboost_iostreams, libboost_system, etc.
 BOOST_LIB_DIR := $(HDSO)
 BOOST_LIB := -lboost_iostreams -lboost_system
+BOOST_THREAD_LIB := -lboost_thread
 
 # The parent directory of the OpenEXR/ header directory
 EXR_INCL_DIR := $(HT)/include
@@ -132,10 +133,13 @@ LOG4CPLUS_LIB := -llog4cplus
 
 # The directory containing glfw.h
 # (leave blank if GLFW is unavailable)
-GLFW_INCL_DIR := /rel/third_party/glfw/current/include
+GLFW_INCL_DIR := /rel/third_party/glfw/glfw-3.0.1/include
 # The directory containing libglfw
-GLFW_LIB_DIR := /rel/third_party/glfw/current/lib
+GLFW_LIB_DIR := /rel/third_party/glfw/glfw-3.0.1/lib
 GLFW_LIB := -lglfw
+# The major version number of the GLFW library
+# (header filenames changed between GLFW 2 and 3, so this must be specified explicitly)
+GLFW_MAJOR_VERSION := 3
 
 # The version of Python for which to build the OpenVDB module
 # (leave blank if Python is unavailable)
@@ -248,6 +252,9 @@ ifeq (yes,$(has_log4cplus))
 endif
 ifeq (2,$(strip $(abi)))
 	CXXFLAGS += -DOPENVDB_2_ABI_COMPATIBLE
+endif
+ifneq (2,$(strip $(GLFW_MAJOR_VERSION)))
+	CXXFLAGS += -DOPENVDB_USE_GLFW_3
 endif
 
 LIBS := \
@@ -732,7 +739,7 @@ vdb_view: $(LIBOPENVDB) $(LIBVIEWER_OBJ_NAMES) cmd/openvdb_view/main.cc
 	@echo "Building $@ because of $(call list_deps)"
 	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_view/main.cc $(LIBVIEWER_OBJ_NAMES) \
 		-I . -Wl,-rpath,$(GLFW_LIB_DIR) -L$(GLFW_LIB_DIR) $(GLFW_LIB) \
-		$(LIBVIEWER_FLAGS) $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
+		$(LIBVIEWER_FLAGS) $(LIBS_RPATH) $(BOOST_THREAD_LIB) $(CONCURRENT_MALLOC_LIB) \
 	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB)
 endif
 

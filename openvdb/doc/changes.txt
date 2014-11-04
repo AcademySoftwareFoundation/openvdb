@@ -141,6 +141,7 @@
   @vdblink::math::Transform::worldToIndex(const BBoxd&) const bounding@endlink
   @vdblink::math::Transform::worldToIndexCellCentered(const BBoxd&) const boxes@endlink
   to @vdblink::math::Transform math::Transform@endlink.
+- @c vdb_view is now compatible with both GLFW&nbsp;2 and GLFW&nbsp;3.
 - Made many small changes to address type conversion and other warnings
   reported by newer compilers like GCC&nbsp;4.8 and ICC&nbsp;14.
 - Replaced the @c HALF_INCL_DIR and @c HALF_LIB_DIR Makefile variables

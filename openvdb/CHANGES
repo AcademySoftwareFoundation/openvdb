@@ -100,6 +100,7 @@ Version 3.0.0 - In development
       to set and reset the random seed value.
     - Added convenience methods for transforming bounding boxes to
       math::Transform.
+    - vdb_view is now compatible with both GLFW 2 and GLFW 3.
     - Made many small changes to address type conversion and other warnings
       reported by newer compilers like GCC 4.8 and ICC 14.
     - Replaced the HALF_INCL_DIR and HALF_LIB_DIR Makefile variables
