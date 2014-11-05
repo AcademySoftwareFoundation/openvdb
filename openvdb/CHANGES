@@ -74,6 +74,8 @@ Version 3.0.0 - In development
       (for files written starting with this version of the OpenVDB library).
     - Fixed a bug in Tree::ValueOffIter that could cause depth-bounded
       iterators to return incorrect values.
+    - Eliminated a recursive call in TreeValueIteratorBase::advance() that
+      could cause crashes on systems with a limited stack size.
     - Fixed memory leaks in RootNode::topologyDifference() and
       RootNode::topologyIntersection().
     - Fixed a memory leak in io::Queue when the queue was full and
