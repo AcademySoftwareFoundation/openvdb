@@ -35,9 +35,13 @@
 #ifndef OPENVDB_HOUDINI_GEOMETRY_UTIL_HAS_BEEN_INCLUDED
 #define OPENVDB_HOUDINI_GEOMETRY_UTIL_HAS_BEEN_INCLUDED
 
+#include <houdini_utils/geometry.h> // for PointList
+
 #include <openvdb/openvdb.h>
+#include <openvdb/tools/PointIndexGrid.h>
 #include <openvdb/tools/MeshToVolume.h> // for openvdb::tools::MeshToVoxelEdgeData
 #include <openvdb/util/Util.h> // for openvdb::util::COORD_OFFSETS
+
 #include <GU/GU_Detail.h>
 #include <UT/UT_Version.h>
 #include <boost/shared_ptr.hpp>
@@ -283,6 +287,75 @@ GenAdaptivityMaskOp<IndexTreeType, BoolTreeType>::operator()(
         }
     }
 }
+
+
+////////////////////////////////////////
+
+// PointIndexGrid utility methods
+
+
+namespace geometry_util_internal {
+
+template<typename PointArrayType>
+struct IndexToOffsetOp {
+    IndexToOffsetOp(const PointArrayType& points): mPointList(&points) {}
+
+    template <typename LeafT>
+    void operator()(LeafT &leaf, size_t /*leafIndex*/) const {
+        typename LeafT::IndexArray& indices = leaf.indices();
+        for (size_t n = 0, N = indices.size(); n < N; ++n) {
+             indices[n] = typename LeafT::ValueType(mPointList->offsetFromIndex(size_t(indices[n])));
+        }
+    }
+    PointArrayType const * const mPointList;
+};
+
+} // namespace geometry_util_internal
+
+
+/// @brief Utility method to change point indices into Houdini geometry offsets
+/// @note PointIndexGrid's that store Houdini geometry offsets are not
+///       safe to write to disk, offsets are not guaranteed to be immutable
+///       under defragmentation operations or I/O.
+template<typename PointIndexTreeType, typename PointArrayType>
+inline void
+convertIndexToOffset(PointIndexTreeType& tree, const PointArrayType& points)
+{
+    openvdb::tree::LeafManager<PointIndexTreeType> leafnodes(tree);
+    leafnodes.foreach(geometry_util_internal::IndexToOffsetOp<PointArrayType>(points));
+}
+
+
+/// Utility method to construct a PointIndexGrid
+inline openvdb::tools::PointIndexGrid::Ptr
+createPointIndexGrid(const openvdb::math::Transform& xform,
+    const GU_Detail& detail, const GA_PointGroup* pointGroup = NULL)
+{
+    houdini_utils::PointList<openvdb::Vec3s> points(detail, pointGroup);
+    return openvdb::tools::createPointIndexGrid<openvdb::tools::PointIndexGrid>(points, xform);
+}
+
+
+/// @brief  Utility method to construct a PointIndexGrid that stores
+///         Houdini geometry offsets.
+///
+/// @note PointIndexGrid's that store Houdini geometry offsets are not
+///       safe to write to disk, offsets are not guaranteed to be immutable
+///       under defragmentation operations or I/O.
+inline openvdb::tools::PointIndexGrid::Ptr
+createPointOffsetGrid(const openvdb::math::Transform& xform,
+    const GU_Detail& detail, const GA_PointGroup* pointGroup = NULL)
+{
+    houdini_utils::PointList<openvdb::Vec3s> points(detail, pointGroup);
+
+    openvdb::tools::PointIndexGrid::Ptr grid =
+        openvdb::tools::createPointIndexGrid<openvdb::tools::PointIndexGrid>(points, xform);
+
+    convertIndexToOffset(grid->tree(), points);
+
+    return grid;
+}
+
 
 } // namespace openvdb_houdini
 

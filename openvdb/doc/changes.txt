@@ -105,6 +105,9 @@
   that could cause
   @vdblink::tree::TreeValueIteratorBase::setMaxDepth() depth-bounded@endlink
   iterators to return incorrect values.
+- Eliminated a recursive call in @vdblink::tree::TreeValueIteratorBase::next()
+  TreeValueIteratorBase::next@endlink that could cause crashes on systems
+  with a limited stack size.
 - Fixed memory leaks in @vdblink::tree::RootNode::topologyDifference()
   RootNode::topologyDifference@endlink and
   @vdblink::tree::RootNode::topologyIntersection()
