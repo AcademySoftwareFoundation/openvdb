@@ -296,16 +296,18 @@ GenAdaptivityMaskOp<IndexTreeType, BoolTreeType>::operator()(
 
 namespace geometry_util_internal {
 
+template<typename PointArrayType>
 struct IndexToOffsetOp {
-    IndexToOffsetOp(const GU_Detail& detail): mIndexMap(&detail.getP()->getIndexMap()) {}
+    IndexToOffsetOp(const PointArrayType& points): mPointList(&points) {}
+
     template <typename LeafT>
     void operator()(LeafT &leaf, size_t /*leafIndex*/) const {
         typename LeafT::IndexArray& indices = leaf.indices();
         for (size_t n = 0, N = indices.size(); n < N; ++n) {
-             indices[n] = typename LeafT::ValueType(mIndexMap->offsetFromIndex(GA_Index(indices[n])));
+             indices[n] = typename LeafT::ValueType(mPointList->offsetFromIndex(size_t(indices[n])));
         }
     }
-    GA_IndexMap const * const mIndexMap;
+    PointArrayType const * const mPointList;
 };
 
 } // namespace geometry_util_internal
@@ -315,12 +317,12 @@ struct IndexToOffsetOp {
 /// @note PointIndexGrid's that store Houdini geometry offsets are not
 ///       safe to write to disk, offsets are not guaranteed to be immutable
 ///       under defragmentation operations or I/O.
-template<typename PointIndexGridType>
+template<typename PointArrayType, typename PointIndexTreeType = openvdb::tools::PointIndexTree>
 inline void
-convertIndexToOffset(PointIndexGridType& grid, const GU_Detail& detail)
+convertIndexToOffset(PointIndexTreeType& tree, const PointArrayType& points)
 {
-    openvdb::tree::LeafManager<typename PointIndexGridType::TreeType> leafnodes(grid.tree());
-    leafnodes.foreach(geometry_util_internal::IndexToOffsetOp(detail));
+    openvdb::tree::LeafManager<PointIndexTreeType> leafnodes(tree);
+    leafnodes.foreach(geometry_util_internal::IndexToOffsetOp<PointArrayType>(points));
 }
 
 
@@ -349,7 +351,7 @@ createPointOffsetGrid(const openvdb::math::Transform& xform,
     openvdb::tools::PointIndexGrid::Ptr grid =
         openvdb::tools::createPointIndexGrid<openvdb::tools::PointIndexGrid>(points, xform);
 
-    convertIndexToOffset(*grid, detail);
+    convertIndexToOffset(grid->tree(), points);
 
     return grid;
 }
