@@ -32,6 +32,10 @@
 
 #include <cmath>
 
+#ifdef OPENVDB_USE_GLFW_3
+#define GLFW_INCLUDE_GLU
+#include <GLFW/glfw3.h>
+#else // if !defined(OPENVDB_USE_GLFW_3)
 #if defined(__APPLE__) || defined(MACOSX)
 #include <OpenGL/gl.h>
 #include <OpenGL/glu.h>
@@ -41,8 +45,8 @@
 #include <GL/gl.h>
 #include <GL/glu.h>
 #endif
-
 #include <GL/glfw.h>
+#endif // !defined(OPENVDB_USE_GLFW_3)
 
 
 namespace openvdb_viewer {
@@ -75,6 +79,9 @@ Camera::Camera()
     , mMouseXPos(0.0)
     , mMouseYPos(0.0)
     , mWheelPos(0)
+#if GLFW_VERSION_MAJOR >= 3
+    , mWindow(NULL)
+#endif
 {
 }
 
@@ -100,10 +107,10 @@ Camera::lookAtTarget()
 void
 Camera::setSpeed(double zoomSpeed, double strafeSpeed, double tumblingSpeed)
 {
-    mZoomSpeed = std::max(0.0001, zoomSpeed);
-    mStrafeSpeed = std::max(0.0001, strafeSpeed);
-    mTumblingSpeed = std::max(0.2, tumblingSpeed);
-    mTumblingSpeed = std::min(1.0, tumblingSpeed);
+    mZoomSpeed = std::max(0.0001, mDistance * zoomSpeed);
+    mStrafeSpeed = std::max(0.0001, mDistance * strafeSpeed);
+    mTumblingSpeed = std::max(0.2, mDistance * tumblingSpeed);
+    mTumblingSpeed = std::min(1.0, mDistance * tumblingSpeed);
 }
 
 
@@ -118,9 +125,17 @@ Camera::setTarget(const openvdb::Vec3d& p, double dist)
 void
 Camera::aim()
 {
+#if GLFW_VERSION_MAJOR >= 3
+    if (mWindow == NULL) return;
+#endif
+
     // Get the window size
     int width, height;
+#if GLFW_VERSION_MAJOR >= 3
+    glfwGetWindowSize(mWindow, &width, &height);
+#else
     glfwGetWindowSize(&width, &height);
+#endif
 
     // Make sure that height is non-zero to avoid division by zero
     height = std::max(1, height);
@@ -166,22 +181,30 @@ Camera::aim()
 
 
 void
-Camera::keyCallback(int key, int )
+Camera::keyCallback(int key, int)
 {
-    if (glfwGetKey(key) == GLFW_PRESS) {
-        switch(key) {
-            case GLFW_KEY_SPACE:
-                mZoomMode = true;
-                break;
-        }
-    } else if (glfwGetKey(key) == GLFW_RELEASE) {
-        switch(key) {
-            case GLFW_KEY_SPACE:
-                mZoomMode = false;
-                break;
-        }
+#if GLFW_VERSION_MAJOR >= 3
+    if (mWindow == NULL) return;
+    int state = glfwGetKey(mWindow, key);
+#else
+    int state = glfwGetKey(key);
+#endif
+    switch (state) {
+        case GLFW_PRESS:
+            switch(key) {
+                case GLFW_KEY_SPACE:
+                    mZoomMode = true;
+                    break;
+            }
+            break;
+        case GLFW_RELEASE:
+            switch(key) {
+                case GLFW_KEY_SPACE:
+                    mZoomMode = false;
+                    break;
+            }
+            break;
     }
-
     mChanged = true;
 }
 
@@ -243,12 +266,11 @@ Camera::mouseWheelCallback(int pos, int prevPos)
 
     if (prevPos < pos) {
         mDistance += speed * mZoomSpeed;
-        setSpeed(mDistance * 0.1, mDistance * 0.002, mDistance * 0.02);
     } else {
         double temp = mDistance - speed * mZoomSpeed;
         mDistance = std::max(0.0, temp);
-        setSpeed(mDistance * 0.1, mDistance * 0.002, mDistance * 0.02);
     }
+    setSpeed();
 
     mChanged = true;
     mNeedsDisplay = true;

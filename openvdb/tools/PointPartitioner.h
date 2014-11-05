@@ -330,7 +330,7 @@ struct BucketAndVoxelOffsetOp
         VoxelOffsetT voxelOffset = 0;
 
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
-            
+
             mPoints->getPos(n, pos);
             ijk = mXForm.worldToIndexCellCentered(pos);
 
@@ -764,8 +764,17 @@ computeLeafBounds(const PointArray& points, const math::Transform& m, unsigned l
     tbb::parallel_reduce(tbb::blocked_range<size_t>(0, points.size()), bboxOp);
 
     CoordBBox box;
-    box.min() = m.worldToIndexCellCentered(bboxOp.mMin);
-    box.max() = m.worldToIndexCellCentered(bboxOp.mMax);
+
+    if (m.isLinear()) {
+        box.min() = m.worldToIndexCellCentered(bboxOp.mMin);
+        box.max() = m.worldToIndexCellCentered(bboxOp.mMax);
+    } else {
+        Vec3d minIS, maxIS;
+        math::calculateBounds(m, bboxOp.mMin, bboxOp.mMax, minIS, maxIS);
+        box.min() = math::Coord::round(minIS);
+        box.max() = math::Coord::round(maxIS);
+    }
+
     box.min() >>= log2dim;
     box.max() >>= log2dim;
     return box;
@@ -1042,7 +1051,7 @@ PointPartitioner<PointIndexT, Log2Dim>::construct(const PointArray& points,
 
     if(!point_partitioner_internal::isVolumeCalculationOverflowSafe<PointIndexT>(bbox)) {
         // the bbox is computed in leafnode space (the lattice composing of only
-        // leafnode origins) and should rarely overflow a uint32 volume calc. in practice.
+        // leafnode origins) and should rarely overflow the volume calc. in practice.
         OPENVDB_THROW(ArithmeticError, "Detected overflow in bbox volume computation, "
             "use uint64 for the PointIndexT type in the PointPartitioner.");
 

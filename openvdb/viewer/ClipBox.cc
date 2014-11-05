@@ -30,9 +30,6 @@
 
 #include "ClipBox.h"
 
-#include <deque>
-#include <GL/glfw.h>
-
 
 namespace openvdb_viewer {
 
@@ -184,94 +181,94 @@ ClipBox::render()
 
     const GLenum geoMode = GL_LINE_LOOP;
 
-    glColor3f(0.1, 0.1, 0.9);
+    glColor3d(0.1, 0.1, 0.9);
     if (-mFrontPlane[3] > mBBox.min().z()) {
         glBegin(geoMode);
-        glVertex3f(mBBox.min().x(), mBBox.min().y(), -mFrontPlane[3]);
-        glVertex3f(mBBox.min().x(), mBBox.max().y(), -mFrontPlane[3]);
-        glVertex3f(mBBox.max().x(), mBBox.max().y(), -mFrontPlane[3]);
-        glVertex3f(mBBox.max().x(), mBBox.min().y(), -mFrontPlane[3]);
+        glVertex3d(mBBox.min().x(), mBBox.min().y(), -mFrontPlane[3]);
+        glVertex3d(mBBox.min().x(), mBBox.max().y(), -mFrontPlane[3]);
+        glVertex3d(mBBox.max().x(), mBBox.max().y(), -mFrontPlane[3]);
+        glVertex3d(mBBox.max().x(), mBBox.min().y(), -mFrontPlane[3]);
         glEnd();
         drawBbox = true;
     }
 
     if (mBackPlane[3] < mBBox.max().z()) {
         glBegin(geoMode);
-        glVertex3f(mBBox.min().x(), mBBox.min().y(), mBackPlane[3]);
-        glVertex3f(mBBox.min().x(), mBBox.max().y(), mBackPlane[3]);
-        glVertex3f(mBBox.max().x(), mBBox.max().y(), mBackPlane[3]);
-        glVertex3f(mBBox.max().x(), mBBox.min().y(), mBackPlane[3]);
+        glVertex3d(mBBox.min().x(), mBBox.min().y(), mBackPlane[3]);
+        glVertex3d(mBBox.min().x(), mBBox.max().y(), mBackPlane[3]);
+        glVertex3d(mBBox.max().x(), mBBox.max().y(), mBackPlane[3]);
+        glVertex3d(mBBox.max().x(), mBBox.min().y(), mBackPlane[3]);
         glEnd();
         drawBbox = true;
     }
 
-    glColor3f(0.9, 0.1, 0.1);
+    glColor3d(0.9, 0.1, 0.1);
     if (-mLeftPlane[3] > mBBox.min().x()) {
         glBegin(geoMode);
-        glVertex3f(-mLeftPlane[3], mBBox.min().y(), mBBox.min().z());
-        glVertex3f(-mLeftPlane[3], mBBox.max().y(), mBBox.min().z());
-        glVertex3f(-mLeftPlane[3], mBBox.max().y(), mBBox.max().z());
-        glVertex3f(-mLeftPlane[3], mBBox.min().y(), mBBox.max().z());
+        glVertex3d(-mLeftPlane[3], mBBox.min().y(), mBBox.min().z());
+        glVertex3d(-mLeftPlane[3], mBBox.max().y(), mBBox.min().z());
+        glVertex3d(-mLeftPlane[3], mBBox.max().y(), mBBox.max().z());
+        glVertex3d(-mLeftPlane[3], mBBox.min().y(), mBBox.max().z());
         glEnd();
         drawBbox = true;
     }
 
     if (mRightPlane[3] < mBBox.max().x()) {
         glBegin(geoMode);
-        glVertex3f(mRightPlane[3], mBBox.min().y(), mBBox.min().z());
-        glVertex3f(mRightPlane[3], mBBox.max().y(), mBBox.min().z());
-        glVertex3f(mRightPlane[3], mBBox.max().y(), mBBox.max().z());
-        glVertex3f(mRightPlane[3], mBBox.min().y(), mBBox.max().z());
+        glVertex3d(mRightPlane[3], mBBox.min().y(), mBBox.min().z());
+        glVertex3d(mRightPlane[3], mBBox.max().y(), mBBox.min().z());
+        glVertex3d(mRightPlane[3], mBBox.max().y(), mBBox.max().z());
+        glVertex3d(mRightPlane[3], mBBox.min().y(), mBBox.max().z());
         glEnd();
         drawBbox = true;
     }
 
-    glColor3f(0.1, 0.9, 0.1);
+    glColor3d(0.1, 0.9, 0.1);
     if (-mTopPlane[3] > mBBox.min().y()) {
         glBegin(geoMode);
-        glVertex3f(mBBox.min().x(), -mTopPlane[3], mBBox.min().z());
-        glVertex3f(mBBox.min().x(), -mTopPlane[3], mBBox.max().z());
-        glVertex3f(mBBox.max().x(), -mTopPlane[3], mBBox.max().z());
-        glVertex3f(mBBox.max().x(), -mTopPlane[3], mBBox.min().z());
+        glVertex3d(mBBox.min().x(), -mTopPlane[3], mBBox.min().z());
+        glVertex3d(mBBox.min().x(), -mTopPlane[3], mBBox.max().z());
+        glVertex3d(mBBox.max().x(), -mTopPlane[3], mBBox.max().z());
+        glVertex3d(mBBox.max().x(), -mTopPlane[3], mBBox.min().z());
         glEnd();
         drawBbox = true;
     }
 
     if (mBottomPlane[3] < mBBox.max().y()) {
         glBegin(geoMode);
-        glVertex3f(mBBox.min().x(), mBottomPlane[3], mBBox.min().z());
-        glVertex3f(mBBox.min().x(), mBottomPlane[3], mBBox.max().z());
-        glVertex3f(mBBox.max().x(), mBottomPlane[3], mBBox.max().z());
-        glVertex3f(mBBox.max().x(), mBottomPlane[3], mBBox.min().z());
+        glVertex3d(mBBox.min().x(), mBottomPlane[3], mBBox.min().z());
+        glVertex3d(mBBox.min().x(), mBottomPlane[3], mBBox.max().z());
+        glVertex3d(mBBox.max().x(), mBottomPlane[3], mBBox.max().z());
+        glVertex3d(mBBox.max().x(), mBottomPlane[3], mBBox.min().z());
         glEnd();
         drawBbox = true;
     }
 
     if (drawBbox) {
-        glColor3f(0.5, 0.5, 0.5);
+        glColor3d(0.5, 0.5, 0.5);
         glBegin(GL_LINE_LOOP);
-        glVertex3f(mBBox.min().x(), mBBox.min().y(), mBBox.min().z());
-        glVertex3f(mBBox.min().x(), mBBox.min().y(), mBBox.max().z());
-        glVertex3f(mBBox.max().x(), mBBox.min().y(), mBBox.max().z());
-        glVertex3f(mBBox.max().x(), mBBox.min().y(), mBBox.min().z());
+        glVertex3d(mBBox.min().x(), mBBox.min().y(), mBBox.min().z());
+        glVertex3d(mBBox.min().x(), mBBox.min().y(), mBBox.max().z());
+        glVertex3d(mBBox.max().x(), mBBox.min().y(), mBBox.max().z());
+        glVertex3d(mBBox.max().x(), mBBox.min().y(), mBBox.min().z());
         glEnd();
 
         glBegin(GL_LINE_LOOP);
-        glVertex3f(mBBox.min().x(), mBBox.max().y(), mBBox.min().z());
-        glVertex3f(mBBox.min().x(), mBBox.max().y(), mBBox.max().z());
-        glVertex3f(mBBox.max().x(), mBBox.max().y(), mBBox.max().z());
-        glVertex3f(mBBox.max().x(), mBBox.max().y(), mBBox.min().z());
+        glVertex3d(mBBox.min().x(), mBBox.max().y(), mBBox.min().z());
+        glVertex3d(mBBox.min().x(), mBBox.max().y(), mBBox.max().z());
+        glVertex3d(mBBox.max().x(), mBBox.max().y(), mBBox.max().z());
+        glVertex3d(mBBox.max().x(), mBBox.max().y(), mBBox.min().z());
         glEnd();
 
         glBegin(GL_LINES);
-        glVertex3f(mBBox.min().x(), mBBox.min().y(), mBBox.min().z());
-        glVertex3f(mBBox.min().x(), mBBox.max().y(), mBBox.min().z());
-        glVertex3f(mBBox.min().x(), mBBox.min().y(), mBBox.max().z());
-        glVertex3f(mBBox.min().x(), mBBox.max().y(), mBBox.max().z());
-        glVertex3f(mBBox.max().x(), mBBox.min().y(), mBBox.max().z());
-        glVertex3f(mBBox.max().x(), mBBox.max().y(), mBBox.max().z());
-        glVertex3f(mBBox.max().x(), mBBox.min().y(), mBBox.min().z());
-        glVertex3f(mBBox.max().x(), mBBox.max().y(), mBBox.min().z());
+        glVertex3d(mBBox.min().x(), mBBox.min().y(), mBBox.min().z());
+        glVertex3d(mBBox.min().x(), mBBox.max().y(), mBBox.min().z());
+        glVertex3d(mBBox.min().x(), mBBox.min().y(), mBBox.max().z());
+        glVertex3d(mBBox.min().x(), mBBox.max().y(), mBBox.max().z());
+        glVertex3d(mBBox.max().x(), mBBox.min().y(), mBBox.max().z());
+        glVertex3d(mBBox.max().x(), mBBox.max().y(), mBBox.max().z());
+        glVertex3d(mBBox.max().x(), mBBox.min().y(), mBBox.min().z());
+        glVertex3d(mBBox.max().x(), mBBox.max().y(), mBBox.min().z());
         glEnd();
     }
 }

@@ -857,68 +857,76 @@ template<typename TreeT, typename ValueIterT>
 inline bool
 TreeValueIteratorBase<TreeT, ValueIterT>::advance(bool dontIncrement)
 {
-    Index
-        vPos = mValueIterList.pos(mLevel),
-        cPos = mChildIterList.pos(mLevel);
-    if (vPos == cPos && mChildIterList.test(mLevel)) {
-        /// @todo Once ValueOff iterators properly skip child pointers, remove this block.
-        mValueIterList.next(mLevel);
-        vPos = mValueIterList.pos(mLevel);
-    }
-    if (vPos < cPos) {
-        if (dontIncrement) return true;
-        if (mValueIterList.next(mLevel)) {
-            if (mValueIterList.pos(mLevel) == cPos && mChildIterList.test(mLevel)) {
-                /// @todo Once ValueOff iterators properly skip child pointers, remove this block.
-                mValueIterList.next(mLevel);
-            }
-            // If there is a next value and it precedes the next child, return.
-            if (mValueIterList.pos(mLevel) < cPos) return true;
+    bool recurse = false;
+    do {
+        recurse = false;
+        Index
+            vPos = mValueIterList.pos(mLevel),
+            cPos = mChildIterList.pos(mLevel);
+        if (vPos == cPos && mChildIterList.test(mLevel)) {
+            /// @todo Once ValueOff iterators properly skip child pointers, remove this block.
+            mValueIterList.next(mLevel);
+            vPos = mValueIterList.pos(mLevel);
         }
-    } else {
-        // Advance to the next child, which may or may not precede the next value.
-        if (!dontIncrement) mChildIterList.next(mLevel);
-    }
-#ifdef DEBUG_TREE_VALUE_ITERATOR
-    std::cout << "\n" << this->summary() << std::flush;
-#endif
-
-    // Descend to the lowest level at which the next value precedes the next child.
-    while (mChildIterList.pos(mLevel) < mValueIterList.pos(mLevel)) {
-#ifdef ENABLE_TREE_VALUE_DEPTH_BOUND_OPTIMIZATION
-        if (int(mLevel) == mMinLevel) {
-            // If the current node lies at the lowest allowed level, none of its
-            // children can be visited, so just advance its child iterator.
-            mChildIterList.next(mLevel);
-            if (mValueIterList.pos(mLevel) == mChildIterList.pos(mLevel)
-                && mChildIterList.test(mLevel))
-            {
-                /// @todo Once ValueOff iterators properly skip child pointers, remove this block.
-                mValueIterList.next(mLevel);
+        if (vPos < cPos) {
+            if (dontIncrement) return true;
+            if (mValueIterList.next(mLevel)) {
+                if (mValueIterList.pos(mLevel) == cPos && mChildIterList.test(mLevel)) {
+                    /// @todo Once ValueOff iterators properly skip child pointers,
+                    /// remove this block.
+                    mValueIterList.next(mLevel);
+                }
+                // If there is a next value and it precedes the next child, return.
+                if (mValueIterList.pos(mLevel) < cPos) return true;
             }
-        } else
-#endif
-        if (mChildIterList.down(mLevel)) {
-            --mLevel; // descend one level
-            mValueIterList.initLevel(mLevel, mChildIterList);
-            if (mValueIterList.pos(mLevel) == mChildIterList.pos(mLevel)
-                && mChildIterList.test(mLevel))
-            {
-                /// @todo Once ValueOff iterators properly skip child pointers, remove this block.
-                mValueIterList.next(mLevel);
-            }
-        } else break;
+        } else {
+            // Advance to the next child, which may or may not precede the next value.
+            if (!dontIncrement) mChildIterList.next(mLevel);
+        }
 #ifdef DEBUG_TREE_VALUE_ITERATOR
         std::cout << "\n" << this->summary() << std::flush;
 #endif
-    }
-    // Ascend to the nearest level at which one of the iterators is not yet exhausted.
-    while (!mChildIterList.test(mLevel) && !mValueIterList.test(mLevel)) {
-        if (mLevel == ROOT_LEVEL) return false;
-        ++mLevel;
-        mChildIterList.next(mLevel);
-        this->advance(/*dontIncrement=*/true);
-    }
+
+        // Descend to the lowest level at which the next value precedes the next child.
+        while (mChildIterList.pos(mLevel) < mValueIterList.pos(mLevel)) {
+#ifdef ENABLE_TREE_VALUE_DEPTH_BOUND_OPTIMIZATION
+            if (int(mLevel) == mMinLevel) {
+                // If the current node lies at the lowest allowed level, none of its
+                // children can be visited, so just advance its child iterator.
+                mChildIterList.next(mLevel);
+                if (mValueIterList.pos(mLevel) == mChildIterList.pos(mLevel)
+                    && mChildIterList.test(mLevel))
+                {
+                    /// @todo Once ValueOff iterators properly skip child pointers,
+                    /// remove this block.
+                    mValueIterList.next(mLevel);
+                }
+            } else
+#endif
+                if (mChildIterList.down(mLevel)) {
+                    --mLevel; // descend one level
+                    mValueIterList.initLevel(mLevel, mChildIterList);
+                    if (mValueIterList.pos(mLevel) == mChildIterList.pos(mLevel)
+                        && mChildIterList.test(mLevel))
+                    {
+                        /// @todo Once ValueOff iterators properly skip child pointers,
+                        /// remove this block.
+                        mValueIterList.next(mLevel);
+                    }
+                } else break;
+#ifdef DEBUG_TREE_VALUE_ITERATOR
+            std::cout << "\n" << this->summary() << std::flush;
+#endif
+        }
+        // Ascend to the nearest level at which one of the iterators is not yet exhausted.
+        while (!mChildIterList.test(mLevel) && !mValueIterList.test(mLevel)) {
+            if (mLevel == ROOT_LEVEL) return false;
+            ++mLevel;
+            mChildIterList.next(mLevel);
+            dontIncrement = true;
+            recurse = true;
+        }
+    } while (recurse);
     return true;
 }
 

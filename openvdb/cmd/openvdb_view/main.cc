@@ -113,7 +113,11 @@ main(int argc, char *argv[])
             }
         }
 
-        openvdb_viewer::Viewer viewer = openvdb_viewer::init(progName, printDebugInfo);
+        openvdb_viewer::Viewer viewer = openvdb_viewer::init(progName, /*bg=*/false);
+
+        if (printDebugInfo) {
+            std::cout << viewer.getVersionString() << std::endl;
+        }
 
         const size_t numFiles = filenames.size();
         if (numFiles == 0) usage(progName, EXIT_FAILURE);
@@ -145,7 +149,10 @@ main(int argc, char *argv[])
             }
         }
 
+        viewer.open();
         viewer.view(allGrids);
+
+        openvdb_viewer::exit();
 
     } catch (const char* s) {
         OPENVDB_LOG_ERROR(progName << ": " << s);

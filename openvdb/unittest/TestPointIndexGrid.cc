@@ -42,9 +42,11 @@ class TestPointIndexGrid: public CppUnit::TestCase
 public:
     CPPUNIT_TEST_SUITE(TestPointIndexGrid);
     CPPUNIT_TEST(testPointIndexGrid);
+    CPPUNIT_TEST(testPointIndexFilter);
     CPPUNIT_TEST_SUITE_END();
 
     void testPointIndexGrid();
+    void testPointIndexFilter();
 
 private:
     // Generate random points by uniformly distributing points
@@ -128,6 +130,28 @@ bool hasDuplicates(const std::vector<T>& items)
     return duplicates != 0;
 }
 
+
+template<typename T>
+struct WeightedAverageAccumulator {
+    typedef T ValueType;
+    WeightedAverageAccumulator(T const * const array, const T radius)
+        : mValues(array), mInvRadius(1.0/radius), mWeightSum(0.0), mValueSum(0.0) {}
+
+    void reset() { mWeightSum = mValueSum = T(0.0); }
+
+    void operator()(const T distSqr, const size_t pointIndex) {
+        const T weight = T(1.0) - openvdb::math::Sqrt(distSqr) * mInvRadius;
+        mWeightSum += weight;
+        mValueSum += weight * mValues[pointIndex];
+    }
+
+    T result() const { return mWeightSum > T(0.0) ? mValueSum / mWeightSum : T(0.0); }
+
+private:
+    T const * const mValues;
+    const T mInvRadius;
+    T mWeightSum, mValueSum;
+}; // struct WeightedAverageAccumulator
 
 } // namespace
 
@@ -264,6 +288,48 @@ TestPointIndexGrid::testPointIndexGrid()
         openvdb::tools::getValidPointIndexGrid<PointIndexGrid>(pointList, pointGridPtr);
 
     CPPUNIT_ASSERT(openvdb::tools::isValidPartition(pointList, *pointGrid2Ptr));
+}
+
+
+void
+TestPointIndexGrid::testPointIndexFilter()
+{
+    // generate points
+    const float voxelSize = 0.01f;
+    const size_t pointCount = 10000;
+    const openvdb::math::Transform::Ptr transform =
+            openvdb::math::Transform::createLinearTransform(voxelSize);
+
+    std::vector<openvdb::Vec3d> points;
+    genPoints(pointCount, points);
+
+    PointList pointList(points);
+
+    // construct data structure
+    typedef openvdb::tools::PointIndexGrid PointIndexGrid;
+
+    PointIndexGrid::Ptr pointGridPtr =
+        openvdb::tools::createPointIndexGrid<PointIndexGrid>(pointList, *transform);
+
+
+    std::vector<double> pointDensity(pointCount, 1.0);
+
+    openvdb::tools::PointIndexFilter<PointList>
+        filter(pointList, pointGridPtr->tree(), pointGridPtr->transform());
+
+    const double radius = 3.0 * voxelSize;
+
+    WeightedAverageAccumulator<double>
+        accumulator(&pointDensity.front(), radius);
+
+    double sum = 0.0;
+    for (size_t n = 0, N = points.size(); n < N; ++n) {
+        accumulator.reset();
+        filter.searchAndApply(points[n], radius, accumulator);
+        sum += accumulator.result();
+    }
+
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(sum, double(points.size()), 1e-6);
 }
 
 
