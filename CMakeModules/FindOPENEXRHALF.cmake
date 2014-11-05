@@ -8,17 +8,54 @@
 # 
 
 IF (WIN32)
-	FIND_PATH( OPENEXRHALF_INCLUDE_PATH half.h
-		$ENV{OPENEXRHALF_DIR}/Half
+  # include
+	FIND_PATH( OPENEXRHALF_INCLUDE_PATH OpenEXR/half.h
+		$ENV{OPENEXRHALF_DIR}
 		DOC "The directory where Half.h resides")
-	FIND_LIBRARY( OPENEXRHALF_LIBRARY
-		NAMES Half
-		PATHS
-		$ENV{OPENEXRHALF_DIR}/vc/vc9/IlmBase/x64/Release
-		DOC "The Half library")
+
+  # include
+  IF( CMAKE_CL_64 )
+    FIND_LIBRARY( OPENEXRHALF_LIBRARY
+      NAMES Half
+      PATHS
+      $ENV{OPENEXRHALF_DIR}/lib/x64/Release
+      DOC "The Half library")
+
+    FIND_LIBRARY( OPENEXRHALF_LIBRARY_DEBUG
+      NAMES Half
+      PATHS
+      $ENV{OPENEXRHALF_DIR}/lib/x64/Debug
+      DOC "The Half library")
+    
+  ELSE( CMAKE_CL_64 )
+    FIND_LIBRARY( OPENEXRHALF_LIBRARY
+      NAMES Half
+      PATHS
+      $ENV{OPENEXRHALF_DIR}/lib/win32/Release
+      DOC "The Half library")
+
+    FIND_LIBRARY( OPENEXRHALF_LIBRARY_DEBUG
+      NAMES Half
+      PATHS
+      $ENV{OPENEXRHALF_DIR}/lib/win32/Debug
+      DOC "The Half library")
+  
+  ENDIF( CMAKE_CL_64 )
 ELSE (WIN32)
   # TODO
 ENDIF (WIN32)
+
+ if(NOT OPENEXRHALF_LIBRARY_DEBUG)
+    # There is no debug library
+    set(OPENEXRHALF_LIBRARY_DEBUG ${OPENEXRHALF_LIBRARY})
+    set(OPENEXRHALF_LIBRARIES     ${OPENEXRHALF_LIBRARY})
+ else()
+    # There IS a debug library
+    set(OPENEXRHALF_LIBRARIES
+        optimized ${OPENEXRHALF_LIBRARY}
+        debug     ${OPENEXRHALF_LIBRARY_DEBUG}
+    )
+ endif()
 
 IF (OPENEXRHALF_INCLUDE_PATH)
 	SET( OPENEXRHALF_FOUND 1 CACHE STRING "Set to 1 if OPENEXRHALF is found, 0 otherwise")
