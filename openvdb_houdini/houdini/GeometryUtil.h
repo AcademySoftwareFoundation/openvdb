@@ -317,7 +317,7 @@ struct IndexToOffsetOp {
 /// @note PointIndexGrid's that store Houdini geometry offsets are not
 ///       safe to write to disk, offsets are not guaranteed to be immutable
 ///       under defragmentation operations or I/O.
-template<typename PointArrayType, typename PointIndexTreeType = openvdb::tools::PointIndexTree>
+template<typename PointIndexTreeType, typename PointArrayType>
 inline void
 convertIndexToOffset(PointIndexTreeType& tree, const PointArrayType& points)
 {
