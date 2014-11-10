@@ -283,6 +283,7 @@ LIBHOUDINI_INCLUDE_NAMES := \
     houdini/GEO_PrimVDB.h \
     houdini/GT_GEOPrimCollectVDB.h \
     houdini/GU_PrimVDB.h \
+    houdini/GU_VDBPointTools.h \
     houdini/OP_NodeChain.h \
     houdini/geometry.h \
     houdini/ParmFactory.h \
@@ -297,6 +298,7 @@ LIBHOUDINI_SRC_NAMES := \
     houdini/GEO_VDBTranslator.cc \
     houdini/GT_GEOPrimCollectVDB.cc \
     houdini/GU_PrimVDB.cc \
+    houdini/GU_VDBPointTools.cc \
     houdini/geometry.cc \
     houdini/ParmFactory.cc \
     houdini/SOP_NodeVDB.cc \
