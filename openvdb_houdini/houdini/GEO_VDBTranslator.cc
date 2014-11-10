@@ -259,8 +259,7 @@ fileSaveVDB(const GEO_Detail *geogdp, OutputT os)
         FileT file(os);
 
         // Always enable active mask compression, since it is fast
-        // and compresses level sets and fog volumes well. Enable Blosc unless
-	// backwards compatibility is requested.
+        // and compresses level sets and fog volumes well.
         uint32_t compression = openvdb::io::COMPRESS_ACTIVE_MASK;
 
 #if (UT_VERSION_INT >= 0x0d00023d) // 13.0.573 or later
