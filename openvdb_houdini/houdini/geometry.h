@@ -39,7 +39,7 @@
 #include <UT/UT_VectorTypes.h>
 #include <GU/GU_Detail.h>
 
-#if defined(PRODDEV_BUILD) || defined(DWREAL_IS_DOUBLE)
+#if defined(PRODDEV_BUILD) || defined(DWREAL_IS_DOUBLE) || defined(SESI_OPENVDB)
   // OPENVDB_HOUDINI_API, which has no meaning in a DWA build environment but
   // must at least exist, is normally defined by including openvdb/Platform.h.
   // For DWA builds (i.e., if either PRODDEV_BUILD or DWREAL_IS_DOUBLE exists),
