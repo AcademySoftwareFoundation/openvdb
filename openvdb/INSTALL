@@ -33,9 +33,6 @@ Optional:
 - Houdini HDK (ftp://ftp.sidefx.com/public/Houdini12.0), version 12.0.628
   or later
 
-- Blosc compression library (www.blosc.org), version 1.5.0 or later
-  (included in the Houdini HDK as of version 14.0)
-
 - Ghostscript (www.ghostscript.com), version 8.70 or later, for documentation
   in PDF format
 

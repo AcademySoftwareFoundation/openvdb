@@ -50,8 +50,6 @@
 #include <openvdb/tree/Tree.h>
 #include <openvdb/tree/LeafNode.h>
 #include <openvdb/tree/LeafManager.h>
-#include <openvdb/util/CpuTimer.h>
-#include <openvdb/util/logging.h>
 #include "PointPartitioner.h"
 
 #include <boost/scoped_array.hpp>
@@ -66,67 +64,72 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 
-// forward declaration
 namespace tree {
-    template<Index, typename> struct SameLeafConfig;
+template<Index, typename> struct SameLeafConfig; // forward declaration
 }
 
 namespace tools {
 
 template<typename T, Index Log2Dim> struct PointIndexLeafNode; // forward declaration
 
-/// @brief Point index tree configured to match the default VDB configurations.
+/// Point index tree configured to match the default OpenVDB tree configuration
 typedef tree::Tree<tree::RootNode<tree::InternalNode<tree::InternalNode
     <PointIndexLeafNode<PointIndex32, 3>, 4>, 5> > > PointIndexTree;
 
-
-/// @brief Point index grid.
+/// Point index grid
 typedef Grid<PointIndexTree> PointIndexGrid;
 
 
 ////////////////////////////////////////
 
 
-// Expected interface for the PointArray container:
-//
-// template<typename VectorType>
-// struct PointList {
-//   typedef VectorType value_type;
-//   size_t size() const;
-//   void getPos(size_t n, VectorType& xyz) const;
-// };
+/// @interface PointArray
+/// Expected interface for the PointArray container:
+/// @code
+/// template<typename VectorType>
+/// struct PointArray
+/// {
+///     // The type used to represent world-space point positions
+///     typedef VectorType value_type;
+///
+///     // Return the number of points in the array
+///     size_t size() const;
+///
+///     // Return the world-space position of the nth point in the array.
+///     void getPos(size_t n, VectorType& xyz) const;
+/// };
+/// @endcode
 
 
 ////////////////////////////////////////
 
 
-/// @brief  Partitions points into a point index grid to accelerate range and
-///         nearest neighbor searches.
+/// @brief  Partition points into a point index grid to accelerate range and
+///         nearest-neighbor searches.
 ///
-/// @param points   list of world space points, see interface requirements at the top of this file.
-/// @param xform    world to index space transform.
+/// @param points   world-space point array conforming to the PointArray interface
+/// @param xform    world-to-index-space transform
 template<typename GridT, typename PointArrayT>
 inline typename GridT::Ptr
 createPointIndexGrid(const PointArrayT& points, const math::Transform& xform);
 
 
-/// @brief  Checks if the partitioning is still valid, returns false if the given
-///         grid does not represent a valid partitioning of the given point list.
+/// @brief  Return @c true if the given point index grid represents a valid partitioning
+///         of the given point array.
 ///
-/// @param points   list of world space points, see interface requirements at the top of this file.
-/// @param grid     point index grid to validate.
+/// @param points   world-space point array conforming to the PointArray interface
+/// @param grid     point index grid to validate
 template<typename PointArrayT, typename GridT>
 inline bool
 isValidPartition(const PointArrayT& points, const GridT& grid);
 
 
-/// @brief  Re-partitions the @a points if needed, otherwise the input @a grid is returned.
+/// Repartition the @a points if needed, otherwise return the input @a grid.
 template<typename GridT, typename PointArrayT>
 inline typename GridT::ConstPtr
 getValidPointIndexGrid(const PointArrayT& points, const typename GridT::ConstPtr& grid);
 
-
-/// @brief  Re-partitions the @a points if needed, otherwise the input @a grid is returned.
+/// Repartition the @a points if needed, otherwise return the input @a grid.
 template<typename GridT, typename PointArrayT>
 inline typename GridT::Ptr
 getValidPointIndexGrid(const PointArrayT& points, const typename GridT::Ptr& grid);
@@ -135,7 +138,7 @@ getValidPointIndexGrid(const PointArrayT& points, const typename GridT::Ptr& gri
 ////////////////////////////////////////
 
 
-/// @brief  Accelerated range and nearest neighbor searches for point index grids.
+/// Accelerated range and nearest-neighbor searches for point index grids
 template<typename TreeType = PointIndexTree>
 struct PointIndexIterator
 {
@@ -155,112 +158,110 @@ struct PointIndexIterator
     PointIndexIterator(const Coord& ijk, ConstAccessor& acc);
 
 
-    /// @brief Construct an iterator over the indices of the points contained in the given bounding box.
+    /// @brief Construct an iterator over the indices of the points contained in
+    ///        the given bounding box.
     /// @param bbox  the bounding box of the voxels containing the points over which to iterate
     /// @param acc   an accessor for the grid or tree that holds the point indices
-    /// @note        The range of the @a bbox is inclusive. Thus, a bounding box with
-    ///              min = max is not empty but rather encloses a single voxel.
+    /// @note  The range of the @a bbox is inclusive. Thus, a bounding box with
+    ///        min = max is not empty but rather encloses a single voxel.
     PointIndexIterator(const CoordBBox& bbox, ConstAccessor& acc);
 
 
-    /// @brief Clears the iterator and updates it with the result of the given voxel query.
+    /// @brief Clear the iterator and update it with the result of the given voxel query.
     /// @param ijk  the voxel containing the points over which to iterate
     /// @param acc  an accessor for the grid or tree that holds the point indices
     void searchAndUpdate(const Coord& ijk, ConstAccessor& acc);
 
 
-    /// @brief Clears the iterator and updates it with the result of the given voxel region query.
+    /// @brief Clear the iterator and update it with the result of the given voxel region query.
     /// @param bbox  the bounding box of the voxels containing the points over which to iterate
     /// @param acc   an accessor for the grid or tree that holds the point indices
-    /// @note        The range of the @a bbox is inclusive. Thus, a bounding box with
-    ///              min = max is not empty but rather encloses a single voxel.
+    /// @note  The range of the @a bbox is inclusive. Thus, a bounding box with
+    ///        min = max is not empty but rather encloses a single voxel.
     void searchAndUpdate(const CoordBBox& bbox, ConstAccessor& acc);
 
 
-    /// @brief Clears the iterator and updates it with the result of the given
-    ///        index space bounding box query.
-    /// @param bbox     index space bounding box.
-    /// @param acc      an accessor for the grid or tree that holds the point indices.
-    /// @param points   list of world space points, see interface requirements at the top of this file.
-    /// @param xform    linear uniform scale transform (i.e. cubical voxels).
+    /// @brief Clear the iterator and update it with the result of the given
+    ///        index-space bounding box query.
+    /// @param bbox     index-space bounding box
+    /// @param acc      an accessor for the grid or tree that holds the point indices
+    /// @param points   world-space point array conforming to the PointArray interface
+    /// @param xform    linear, uniform-scale transform (i.e., cubical voxels)
     template<typename PointArray>
     void searchAndUpdate(const BBoxd& bbox, ConstAccessor& acc,
         const PointArray& points, const math::Transform& xform);
 
 
-    /// @brief Clears the iterator and updates it with the result of the given
-    ///        index space radial query.
-    /// @param center   index space center.
-    /// @param radius   index space radius.
-    /// @param acc      an accessor for the grid or tree that holds the point indices.
-    /// @param points   list of world space points, see interface requirements at the top of this file.
-    /// @param xform    linear uniform scale transform (i.e. cubical voxels).
-    /// @param subvoxelAccuracy If @c true check individual points against the search region
-    ///                         otherwise return all points that reside in voxels that are inside
-    ///                         or intersect the search region.
+    /// @brief Clear the iterator and update it with the result of the given
+    ///        index-space radial query.
+    /// @param center   index-space center
+    /// @param radius   index-space radius
+    /// @param acc      an accessor for the grid or tree that holds the point indices
+    /// @param points   world-space point array conforming to the PointArray interface
+    /// @param xform    linear, uniform-scale transform (i.e., cubical voxels)
+    /// @param subvoxelAccuracy  if true, check individual points against the search region,
+    ///                 otherwise return all points that reside in voxels that are inside
+    ///                 or intersect the search region
     template<typename PointArray>
     void searchAndUpdate(const Vec3d& center, double radius, ConstAccessor& acc,
         const PointArray& points, const math::Transform& xform, bool subvoxelAccuracy = true);
 
 
-    /// @brief Clears the iterator and updates it with the result of the given
-    ///        world space bounding box query.
-    /// @param bbox     world space bounding box.
-    /// @param acc      an accessor for the grid or tree that holds the point indices.
-    /// @param points   list of world space points, see interface requirements at the top of this file.
-    /// @param xform    linear uniform scale transform (i.e. cubical voxels).
+    /// @brief Clear the iterator and update it with the result of the given
+    ///        world-space bounding box query.
+    /// @param bbox     world-space bounding box
+    /// @param acc      an accessor for the grid or tree that holds the point indices
+    /// @param points   world-space point array conforming to the PointArray interface
+    /// @param xform    linear, uniform-scale transform (i.e., cubical voxels)
     template<typename PointArray>
     void worldSpaceSearchAndUpdate(const BBoxd& bbox, ConstAccessor& acc,
         const PointArray& points, const math::Transform& xform);
 
 
-    /// @brief Clears the iterator and updates it with the result of the given
-    ///        world space radial query.
-    /// @param center   world space center.
-    /// @param radius   world space radius.
-    /// @param acc      an accessor for the grid or tree that holds the point indices.
-    /// @param points   list of world space points, see interface requirements at the top of this file.
-    /// @param xform    linear uniform scale transform (i.e. cubical voxels).
-    /// @param subvoxelAccuracy If @c true check individual points against the search region
-    ///                         otherwise return all points that reside in voxels that are inside
-    ///                         or intersect the search region.
+    /// @brief Clear the iterator and update it with the result of the given
+    ///        world-space radial query.
+    /// @param center   world-space center
+    /// @param radius   world-space radius
+    /// @param acc      an accessor for the grid or tree that holds the point indices
+    /// @param points   world-space point array conforming to the PointArray interface
+    /// @param xform    linear, uniform-scale transform (i.e., cubical voxels)
+    /// @param subvoxelAccuracy  if true, check individual points against the search region,
+    ///                 otherwise return all points that reside in voxels that are inside
+    ///                 or intersect the search region
     template<typename PointArray>
     void worldSpaceSearchAndUpdate(const Vec3d& center, double radius, ConstAccessor& acc,
         const PointArray& points, const math::Transform& xform, bool subvoxelAccuracy = true);
 
 
-    /// @brief  Reset the iterator to point to the first item.
+    /// Reset the iterator to point to the first item.
     void reset();
 
-    /// @brief  Returns a const reference to the item to which
-    ///         this iterator is pointing.
+    /// Return a const reference to the item to which this iterator is pointing.
     const ValueType& operator*() const { return *mRange.first; }
 
     /// @{
-    /// @brief  Returns @c true if this iterator is not yet exhausted.
+    /// @brief  Return @c true if this iterator is not yet exhausted.
     bool test() const { return mRange.first < mRange.second || mIter != mRangeList.end(); }
     operator bool() const { return this->test(); }
     /// @}
 
-    /// @brief  Advance iterator to next item.
+    /// Advance iterator to next item.
     void increment();
 
-    /// @brief  Advance iterator to next item.
+    /// Advance iterator to next item.
     void operator++() { this->increment(); }
 
 
-    /// @brief  Advance iterator to next item.
+    /// @brief Advance iterator to next item.
     /// @return @c true if this iterator is not yet exhausted.
     bool next();
 
-    /// @brief  Number of point indices in the iterator range.
+    /// Return the number of point indices in the iterator range.
     size_t size() const;
 
-    /// @brief Equality operator, returns true if both iterators point to the same element.
-    bool operator==(const PointIndexIterator& other) const {return mRange.first == other.mRange.first;}
-
-    /// @brief Inequality operator.
-    bool operator!=(const PointIndexIterator& other) const { return !this->operator==(other); }
+    /// Return @c true if both iterators point to the same element.
+    bool operator==(const PointIndexIterator& p) const { return mRange.first == p.mRange.first; }
+    bool operator!=(const PointIndexIterator& p) const { return !this->operator==(p); }
 
 
 private:
@@ -284,6 +285,7 @@ private:
 /// @brief Selectively extract and filter point data using a custom filter operator.
 ///
 /// @par FilterType example:
+/// @interface FilterType
 /// @code
 /// template<typename T>
 /// struct WeightedAverageAccumulator {
@@ -317,20 +319,19 @@ struct PointIndexFilter
     typedef tree::ValueAccessor<const TreeType>     ConstAccessor;
 
     /// @brief Constructor
-    /// @param points   list of world space points, see interface requirements at the top of this file.
+    /// @param points   world-space point array conforming to the PointArray interface
     /// @param tree     a point index tree
-    /// @param xform    linear uniform scale transform (i.e. cubical voxels).
+    /// @param xform    linear, uniform-scale transform (i.e., cubical voxels)
     PointIndexFilter(const PointArray& points, const TreeType& tree, const math::Transform& xform);
 
     /// Thread safe copy constructor
     PointIndexFilter(const PointIndexFilter& rhs);
 
-    /// @brief  Performs a radial search query and applies the given filter
+    /// @brief  Perform a radial search query and apply the given filter
     ///         operator to the selected points.
-    /// @param center  world space center.
-    /// @param radius  world space radius.
-    /// @param op      custom filter operator, see the FilterType example
-    ///                for interface details.
+    /// @param center  world-space center
+    /// @param radius  world-space radius
+    /// @param op      custom filter operator (see the FilterType example for interface details)
     template<typename FilterType>
     void searchAndApply(const PointType& center, PointElementType radius, FilterType& op);
 
@@ -492,7 +493,7 @@ struct PopulateLeafNodesOp
 };
 
 
-/// @brief  Constructs a @c PointIndexTree
+/// Construct a @c PointIndexTree
 template<typename TreeType, typename PointArray>
 inline void
 constructPointTree(TreeType& tree, const math::Transform& xform, const PointArray& points)
@@ -1145,7 +1146,8 @@ template<typename TreeType>
 template<typename PointArray>
 inline void
 PointIndexIterator<TreeType>::searchAndUpdate(const Vec3d& center, double radius,
-    ConstAccessor& acc, const PointArray& points, const math::Transform& xform, bool subvoxelAccuracy)
+    ConstAccessor& acc, const PointArray& points, const math::Transform& xform,
+    bool subvoxelAccuracy)
 {
     this->clear();
     std::vector<CoordBBox> searchRegions;
@@ -1207,7 +1209,8 @@ template<typename TreeType>
 template<typename PointArray>
 inline void
 PointIndexIterator<TreeType>::worldSpaceSearchAndUpdate(const Vec3d& center, double radius,
-    ConstAccessor& acc, const PointArray& points, const math::Transform& xform, bool subvoxelAccuracy)
+    ConstAccessor& acc, const PointArray& points, const math::Transform& xform,
+    bool subvoxelAccuracy)
 {
     this->searchAndUpdate(xform.worldToIndex(center),
         (radius / xform.voxelSize()[0]), acc, points, xform, subvoxelAccuracy);
@@ -1222,7 +1225,7 @@ template<typename PointArray, typename TreeType>
 inline
 PointIndexFilter<PointArray, TreeType>::PointIndexFilter(
     const PointArray& points, const TreeType& tree, const math::Transform& xform)
-    : mPoints(&points), mAcc(tree), mXform(xform), mInvVoxelSize(1.0/xform.voxelSize()[0]), mIter()
+    : mPoints(&points), mAcc(tree), mXform(xform), mInvVoxelSize(1.0/xform.voxelSize()[0])
 {
 }
 
@@ -1230,7 +1233,10 @@ PointIndexFilter<PointArray, TreeType>::PointIndexFilter(
 template<typename PointArray, typename TreeType>
 inline
 PointIndexFilter<PointArray, TreeType>::PointIndexFilter(const PointIndexFilter& rhs)
-    : mPoints(rhs.mPoints), mAcc(rhs.mAcc.tree()), mXform(rhs.mXform), mInvVoxelSize(rhs.mInvVoxelSize), mIter()
+    : mPoints(rhs.mPoints)
+    , mAcc(rhs.mAcc.tree())
+    , mXform(rhs.mXform)
+    , mInvVoxelSize(rhs.mInvVoxelSize)
 {
 }
 
@@ -1239,8 +1245,8 @@ template<typename PointArray, typename TreeType>
 template<typename FilterType>
 inline void
 PointIndexFilter<PointArray, TreeType>::searchAndApply(
-    const PointType& center, PointElementType radius, FilterType& op) {
-
+    const PointType& center, PointElementType radius, FilterType& op)
+{
     if (radius * mInvVoxelSize < PointElementType(8.0)) {
         mIter.searchAndUpdate(openvdb::CoordBBox(
             mXform.worldToIndexCellCentered(center - radius),
@@ -1641,7 +1647,8 @@ public:
 
 template<typename T, Index Log2Dim>
 inline bool
-PointIndexLeafNode<T, Log2Dim>::getIndices(const Coord& ijk, const ValueType*& begin, const ValueType*& end) const
+PointIndexLeafNode<T, Log2Dim>::getIndices(const Coord& ijk,
+    const ValueType*& begin, const ValueType*& end) const
 {
     return getIndices(LeafNodeType::coordToOffset(ijk), begin, end);
 }
@@ -1649,7 +1656,8 @@ PointIndexLeafNode<T, Log2Dim>::getIndices(const Coord& ijk, const ValueType*& b
 
 template<typename T, Index Log2Dim>
 inline bool
-PointIndexLeafNode<T, Log2Dim>::getIndices(Index offset, const ValueType*& begin, const ValueType*& end) const
+PointIndexLeafNode<T, Log2Dim>::getIndices(Index offset,
+    const ValueType*& begin, const ValueType*& end) const
 {
     if (this->isValueMaskOn(offset)) {
         const ValueType* dataPtr = &mIndices.front();
@@ -1739,6 +1747,15 @@ PointIndexLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& b
         boost::scoped_array<char> buf(new char[numBytes]);
         is.read(buf.get(), numBytes);
     }
+
+    // Reserved for future use
+    Index64 auxDataBytes = Index64(0);
+    is.read(reinterpret_cast<char*>(&auxDataBytes), sizeof(Index64));
+    if (auxDataBytes > 0) {
+        // For now, read and discard any auxiliary data.
+        boost::scoped_array<char> auxData(new char[auxDataBytes]);
+        is.read(auxData.get(), auxDataBytes);
+    }
 }
 
 
@@ -1751,6 +1768,10 @@ PointIndexLeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) cons
     Index64 numIndices = Index64(mIndices.size());
     os.write(reinterpret_cast<const char*>(&numIndices), sizeof(Index64));
     os.write(reinterpret_cast<const char*>(mIndices.data()), numIndices * sizeof(T));
+
+    // Reserved for future use
+    const Index64 auxDataBytes = Index64(0);
+    os.write(reinterpret_cast<const char*>(&auxDataBytes), sizeof(Index64));
 }
 
 
@@ -1761,11 +1782,10 @@ PointIndexLeafNode<T, Log2Dim>::memUsage() const
     return BaseLeaf::memUsage() + Index64((sizeof(T)*mIndices.capacity()) + sizeof(mIndices));
 }
 
+} // namespace tools
+
 
 ////////////////////////////////////////
-
-
-} // namespace tools
 
 
 namespace tree {
@@ -1782,11 +1802,8 @@ struct SameLeafConfig<Dim1, openvdb::tools::PointIndexLeafNode<T2, Dim1> >
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-
 #endif // OPENVDB_TOOLS_POINT_INDEX_GRID_HAS_BEEN_INCLUDED
-
 
 // Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-
