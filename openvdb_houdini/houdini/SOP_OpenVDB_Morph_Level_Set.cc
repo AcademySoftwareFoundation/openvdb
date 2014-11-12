@@ -129,7 +129,7 @@ public:
 
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
-    virtual unsigned disableParms();
+    virtual bool updateParmsFlags();
 
     OP_ERROR evalMorphingParms(OP_Context&, MorphingParms&);
 
@@ -299,10 +299,10 @@ SOP_OpenVDB_Morph_Level_Set::SOP_OpenVDB_Morph_Level_Set(OP_Network* net,
 
 // Enable/disable or show/hide parameters in the UI.
 
-unsigned
-SOP_OpenVDB_Morph_Level_Set::disableParms()
+bool
+SOP_OpenVDB_Morph_Level_Set::updateParmsFlags()
 {
-    unsigned changed = 0;
+    bool changed = false;
 
     const bool hasMask = (this->nInputs() == 3);
     changed |= enableParm("mask", hasMask);
