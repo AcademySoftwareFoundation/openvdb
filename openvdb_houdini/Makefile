@@ -192,6 +192,7 @@ LIBHOUDINI_INCLUDE_NAMES := \
     houdini/GEO_PrimVDB.h \
     houdini/GT_GEOPrimCollectVDB.h \
     houdini/GU_PrimVDB.h \
+    houdini/GU_VDBPointTools.h \
     houdini/OP_NodeChain.h \
     houdini/geometry.h \
     houdini/ParmFactory.h \
@@ -206,6 +207,7 @@ LIBHOUDINI_SRC_NAMES := \
     houdini/GEO_VDBTranslator.cc \
     houdini/GT_GEOPrimCollectVDB.cc \
     houdini/GU_PrimVDB.cc \
+    houdini/GU_VDBPointTools.cc \
     houdini/geometry.cc \
     houdini/ParmFactory.cc \
     houdini/SOP_NodeVDB.cc \
@@ -370,7 +372,7 @@ all: depend houdinilib houdinisops
 # to mirror the DWA directory structure.
 openvdb_houdini:
 	ln -f -s houdini openvdb_houdini
-openvdb_houdini/AttributeTransferUtil.h openvdb_houdini/GeometryUtil.h openvdb_houdini/GEO_PrimVDB.h openvdb_houdini/GT_GEOPrimCollectVDB.h openvdb_houdini/GU_PrimVDB.h openvdb_houdini/SOP_NodeVDB.h openvdb_houdini/UT_VDBTools.h openvdb_houdini/UT_VDBUtils.h openvdb_houdini/Utils.h: openvdb_houdini
+openvdb_houdini/AttributeTransferUtil.h openvdb_houdini/GeometryUtil.h openvdb_houdini/GEO_PrimVDB.h openvdb_houdini/GT_GEOPrimCollectVDB.h openvdb_houdini/GU_PrimVDB.h openvdb_houdini/GU_VDBPointTools.h openvdb_houdini/SOP_NodeVDB.h openvdb_houdini/UT_VDBTools.h openvdb_houdini/UT_VDBUtils.h openvdb_houdini/Utils.h: openvdb_houdini
 
 # Create a houdini_utils/ symlink to the houdini/ subdirectory,
 # to mirror the DWA directory structure.
@@ -378,7 +380,7 @@ houdini_utils:
 	ln -f -s houdini houdini_utils
 houdini_utils/geometry.h houdini_utils/ParmFactory.h houdini_utils/OP_NodeChain.h: houdini_utils
 
-$(LIBHOUDINI_OBJ_NAMES): houdini_utils/geometry.h houdini_utils/ParmFactory.h houdini_utils/OP_NodeChain.h openvdb_houdini/AttributeTransferUtil.h openvdb_houdini/GeometryUtil.h openvdb_houdini/GEO_PrimVDB.h openvdb_houdini/GT_GEOPrimCollectVDB.h openvdb_houdini/GU_PrimVDB.h openvdb_houdini/SOP_NodeVDB.h openvdb_houdini/UT_VDBTools.h openvdb_houdini/UT_VDBUtils.h openvdb_houdini/Utils.h
+$(LIBHOUDINI_OBJ_NAMES): houdini_utils/geometry.h houdini_utils/ParmFactory.h houdini_utils/OP_NodeChain.h openvdb_houdini/AttributeTransferUtil.h openvdb_houdini/GeometryUtil.h openvdb_houdini/GEO_PrimVDB.h openvdb_houdini/GT_GEOPrimCollectVDB.h openvdb_houdini/GU_PrimVDB.h openvdb_houdini/GU_VDBPointTools.h openvdb_houdini/SOP_NodeVDB.h openvdb_houdini/UT_VDBTools.h openvdb_houdini/UT_VDBUtils.h openvdb_houdini/Utils.h
 
 $(LIBHOUDINI_OBJ_NAMES): %.o: %.cc
 	@echo "Building $@ because of $(call list_deps)"
