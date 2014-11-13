@@ -87,6 +87,7 @@ ClipBox::update(double steps)
             mRightPlane[3] = std::min(mRightPlane[3], mBBox.max().x());
             mRightPlane[3] = std::max(mRightPlane[3], (-mLeftPlane[3] + mStepSize.x()));
         }
+		
     }
 
     if (mYIsActive) {
@@ -103,6 +104,7 @@ ClipBox::update(double steps)
             mBottomPlane[3] = std::min(mBottomPlane[3], mBBox.max().y());
             mBottomPlane[3] = std::max(mBottomPlane[3], (-mTopPlane[3] + mStepSize.y()));
         }
+		
     }
 
     if (mZIsActive) {
@@ -119,7 +121,12 @@ ClipBox::update(double steps)
             mBackPlane[3] = std::min(mBackPlane[3], mBBox.max().z());
             mBackPlane[3] = std::max(mBackPlane[3], (-mFrontPlane[3] + mStepSize.z()));
         }
+		
     }
+
+	std::cout << "--xclip \"" <<  -mLeftPlane[3] << " " <<  mRightPlane[3] << "\""<< std::endl;
+	std::cout << "--yclip \"" <<  -mBottomPlane[3] << " " <<  mTopPlane[3] << "\"" << std::endl;
+	std::cout << "--zclip \"" <<  -mBackPlane[3] << " " <<  mFrontPlane[3] << "\""  << std::endl;
 }
 
 

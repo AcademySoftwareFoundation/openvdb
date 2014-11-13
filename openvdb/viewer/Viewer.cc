@@ -835,10 +835,12 @@ ViewerImpl::sleep(double secs)
 {
     secs = fabs(secs);
     int isecs = int(secs);
-//    struct timespec sleepTime = { isecs /*sec*/, int(1.0e9 * (secs - isecs)) /*nsec*/ };
+#ifndef WIN32
+	struct timespec sleepTime = { isecs /*sec*/, int(1.0e9 * (secs - isecs)) /*nsec*/ };
 //    nanosleep(&sleepTime, /*remainingTime=*/NULL);
-
-	sleep(secs);
+#else
+	Sleep(int(secs*1000));
+#endif
 }
 
 

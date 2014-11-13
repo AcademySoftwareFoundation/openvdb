@@ -94,6 +94,10 @@ main(int argc, char *argv[])
     try {
         openvdb::initialize();
 
+		if (!openvdb::Grid<openvdb::UInt32Tree>::isRegistered()) 	openvdb::Grid<openvdb::UInt32Tree>::registerGrid();
+
+
+
         bool printInfo = false, printDebugInfo = false;
 
         // Parse the command line.

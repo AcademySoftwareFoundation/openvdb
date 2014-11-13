@@ -34,6 +34,9 @@
 #include <openvdb/openvdb.h>
 #include <string>
 
+#ifdef WIN32
+	#include "windows.h" //for Sleep
+#endif
 
 namespace openvdb_viewer {
 
