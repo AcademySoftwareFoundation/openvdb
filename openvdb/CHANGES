@@ -114,6 +114,8 @@ Version 3.0.0 - In development
       [Contributed by SESI]
     - Fixed a bug in readString() related to empty strings.
       [Contributed by Fabio Piparo]
+    - Fixed a bug in the tools::VolumeToMesh simplification scheme that
+      was creating visual artifacts.
 
     API changes:
     - The addition of a GridBase::readBuffers() virtual function overload
@@ -190,6 +192,8 @@ Version 3.0.0 - In development
       of which can be used to clip grids as they are read.  For large grids,
       clipping while reading can result in significantly lower memory usage
       than clipping after reading.
+    - The From Polygons and Convert SOPs now default to using the polygon soup
+      mesh representation, which uses less memory.
 
 Version 2.3.0 - April 23, 2014
     - Added tools::extractSparseTree(), which selectively extracts and

@@ -157,6 +157,8 @@
 - Fixed a bug in @vdblink::readString() readString@endlink related
   to empty strings.
   <I>[Contributed by Fabio&nbsp;Piparo]</I>
+- Fixed a bug in the @vdblink::tools::VolumeToMesh VolumeToMesh@endlink
+  simplification scheme that was creating visual artifacts.
 
 @par
 API changes:
@@ -254,7 +256,8 @@ Houdini:
   of which can be used to clip grids as they are read.  For large grids,
   clipping while reading can result in significantly lower memory usage
   than clipping after reading.
-
+- The From Polygons and Convert SOPs now default to using the polygon soup
+  mesh representation, which uses less memory.
 
 @htmlonly <a name="v2_3_0_changes"></a>@endhtmlonly
 @par
