@@ -109,6 +109,13 @@ TBB_INCL_DIR := $(HT)/include
 TBB_LIB_DIR := $(HDSO)
 TBB_LIB := -ltbb
 
+# The parent directory of the blosc.h header
+# (leave blank if Blosc is unavailable)
+BLOSC_INCL_DIR := $(HT)/include
+# The directory containing libblosc
+BLOSC_LIB_DIR := $(HDSO)
+BLOSC_LIB := -lblosc
+
 # A scalable, concurrent malloc replacement library
 # such as jemalloc (included in the Houdini HDK) or TBB malloc
 # (leave blank if unavailable)

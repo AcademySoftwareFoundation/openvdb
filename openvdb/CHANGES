@@ -11,6 +11,8 @@ Version 3.0.0 - In development
       limit (see io::File::setCopyMaxBytes()).  The limit can be set to zero
       to disable copying, but if it cannot be guaranteed that a file will not
       be modified, then it is best not to enable delayed loading for that file.
+    - .vdb files can now optionally be compressed with the Blosc LZ4 codec.
+      Blosc compresses almost as well as ZLIB, but it is much faster.
     - Added tools::PointPartitioner, a tool for fast spatial sorting
       of points stored in an external array, and tools::PointIndexGrid,
       an acceleration structure for fast range and nearest-neighbor searches.
