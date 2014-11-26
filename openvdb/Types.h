@@ -114,17 +114,20 @@ typedef math::Quat<Real>    QuatR;
 
 
 /// @brief  Integer wrapper, required to distinguish PointIndexGrid and
-///         PointDataGrid from Int32Grid and Int64Grid.
+///         PointDataGrid from Int32Grid and Int64Grid
 /// @note   @c Kind is a dummy parameter used to create distinct types.
-template <typename IntType, Index Kind>
-struct PointIndex {
-    BOOST_STATIC_ASSERT(boost::is_integral<IntType>::value);
+template<typename IntType_, Index Kind>
+struct PointIndex
+{
+    BOOST_STATIC_ASSERT(boost::is_integral<IntType_>::value);
 
-    PointIndex(IntType i = IntType(0)) : mIndex(i) {}
+    typedef IntType_ IntType;
+
+    PointIndex(IntType i = IntType(0)): mIndex(i) {}
 
     operator IntType() const { return mIndex; }
 
-    /// @brief Needed to support the <tt>(zeroVal<PointIndex>() + val)</tt> idiom.
+    /// Needed to support the <tt>(zeroVal<PointIndex>() + val)</tt> idiom.
     template<typename T>
     PointIndex operator+(T x) { return PointIndex(mIndex + IntType(x)); }
 
