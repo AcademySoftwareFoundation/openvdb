@@ -183,7 +183,7 @@ SOP_OpenVDB_Prune::cookMySop(OP_Context& context)
 
         // This does a deep copy of native Houdini primitives
         // but only a shallow copy of OpenVDB grids.
-        duplicateSource(0, context);
+        duplicateSourceStealable(0, context);
 
         // Get the group of grids to process.
         UT_String groupStr;

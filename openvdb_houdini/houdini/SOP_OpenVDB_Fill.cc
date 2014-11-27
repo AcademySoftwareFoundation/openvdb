@@ -305,7 +305,7 @@ SOP_OpenVDB_Fill::cookMySop(OP_Context& context)
 
         const fpreal t = context.getTime();
 
-        duplicateSource(0, context);
+        duplicateSourceStealable(0, context);
 
         UT_String groupStr;
         evalString(groupStr, "group", 0, t);

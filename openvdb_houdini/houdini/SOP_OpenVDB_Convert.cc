@@ -1310,7 +1310,7 @@ SOP_OpenVDB_Convert::cookMySop(OP_Context& context)
     try {
         hutil::ScopedInputLock lock(*this, context);
 
-        duplicateSource(0, context);
+        duplicateSourceStealable(0, context);
 
         const fpreal t = context.getTime();
 

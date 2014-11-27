@@ -305,7 +305,7 @@ SOP_OpenVDB_Advect_Level_Set::cookMySop(OP_Context& context)
     try {
         hutil::ScopedInputLock lock(*this, context);
         gdp->clearAndDestroy();
-        duplicateSource(0, context);
+        duplicateSourceStealable(0, context);
 
         // Evaluate UI parameters
         AdvectionParms parms;
