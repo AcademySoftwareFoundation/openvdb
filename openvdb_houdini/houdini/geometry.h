@@ -62,7 +62,6 @@ namespace houdini_utils {
 OPENVDB_HOUDINI_API void createBox(GU_Detail&, UT_Vector3 corners[8],
     const UT_Vector3* color = NULL, bool shaded = false, float alpha = 1.0);
 
-
 } // namespace houdini_utils
 
 #endif // HOUDINI_UTILS_GEOMETRY_HAS_BEEN_INCLUDED

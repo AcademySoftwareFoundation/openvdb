@@ -152,14 +152,17 @@ bloscToStream(std::ostream& os, const char* data, size_t valSize, size_t numVals
     int outBytes = int(inBytes) + BLOSC_MAX_OVERHEAD;
     boost::shared_array<char> compressedData(new char[outBytes]);
 
-    outBytes = blosc_compress(
+    outBytes = blosc_compress_ctx(
         /*clevel=*/9, // 0 (no compression) to 9 (maximum compression)
         /*doshuffle=*/true,
         /*typesize=*/valSize, ///< @todo use size that gives best compression?
         /*srcsize=*/inBytes,
         /*src=*/data,
         /*dest=*/compressedData.get(),
-        /*destsize=*/outBytes);
+        /*destsize=*/outBytes,
+        BLOSC_LZ4_COMPNAME,
+        /*blocksize=*/256,
+        /*numthreads=*/1);
 
     if (outBytes <= 0) {
         std::ostringstream ostr;
@@ -210,8 +213,8 @@ bloscFromStream(std::istream& is, char* data, size_t numBytes)
         boost::shared_array<char> compressedData(new char[numCompressedBytes]);
         is.read(reinterpret_cast<char*>(compressedData.get()), numCompressedBytes);
         // Uncompress the data.
-        const int numUncompressedBytes = blosc_decompress(
-            /*src=*/compressedData.get(), /*dest=*/data, numBytes);
+        const int numUncompressedBytes = blosc_decompress_ctx(
+            /*src=*/compressedData.get(), /*dest=*/data, numBytes, /*numthreads=*/1);
         if (numUncompressedBytes < 1) {
             OPENVDB_LOG_DEBUG("blosc_decompress() returned error code " << numUncompressedBytes);
         }

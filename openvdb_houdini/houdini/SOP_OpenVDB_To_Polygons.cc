@@ -48,13 +48,24 @@
 #include <openvdb/math/Operators.h>
 #include <openvdb/math/Mat3.h>
 
+#include <CH/CH_Manager.h>
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_Version.h>
 #include <GEO/GEO_PolyCounts.h>
 #include <GA/GA_PageIterator.h>
+
 #if (UT_VERSION_INT >= 0x0c0500F5) // 12.5.245 or later
 #include <GEO/GEO_PolyCounts.h>
 #endif
+
+#if (UT_VERSION_INT >= 0x0c050000) // 12.5.0 or later
+#define HAVE_POLYSOUP 1
+#include <GU/GU_PrimPolySoup.h>
+#else
+#define HAVE_POLYSOUP 0
+#endif
+
+
 #include <GU/GU_Detail.h>
 #include <GU/GU_Surfacer.h>
 #include <GU/GU_PolyReduce.h>
@@ -92,7 +103,7 @@ class SOP_OpenVDB_To_Polygons: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_To_Polygons(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_To_Polygons() {};
+    virtual ~SOP_OpenVDB_To_Polygons() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
@@ -103,6 +114,7 @@ public:
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
     virtual bool updateParmsFlags();
+    virtual void resolveObsoleteParms(PRM_ParmList*);
 
     template <class GridType>
     void referenceMeshing(
@@ -157,6 +169,21 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setHelpText("Specify a subset of the input VDB grids to surface.")
         .setChoiceList(&hutil::PrimGroupMenuInput1));
+
+    { // Geometry Type
+        const char* items[] = {
+            "polysoup", "Polygon Soup",
+            "poly",     "Polygons",
+            NULL
+        };
+
+        parms.add(hutil::ParmFactory(PRM_ORD, "geometrytype", "Geometry Type")
+            .setDefault(PRMzeroDefaults)
+            .setHelpText("Type of geometry to output. A polygon soup is a primitive "
+                "that stores polygons using a compact memory representation. Note "
+                "that not all geometry nodes can operate directly on this primitive.")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+    }
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "isovalue", "Isovalue")
         .setDefault(PRMzeroDefaults)
@@ -258,7 +285,7 @@ newSopOperator(OP_OperatorTable* table)
         .setHelpText("Isovalue used to offset the interior region of the surface mask.")
         .setRange(PRM_RANGE_UI, -1.0, PRM_RANGE_UI, 1.0));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "invertmask", "Invert Surface Mask")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "invertsurfacemask", "Invert Surface Mask")
         .setHelpText("Used to mesh the complement of the mask."));
 
 
@@ -276,6 +303,7 @@ newSopOperator(OP_OperatorTable* table)
     //////////
     hutil::ParmList obsoleteParms;
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "smoothseams", "Smooth Seams"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "invertmask", "").setDefault(PRMoneDefaults));
 
     hvdb::OpenVDBOpFactory("OpenVDB To Polygons", SOP_OpenVDB_To_Polygons::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
@@ -302,13 +330,36 @@ SOP_OpenVDB_To_Polygons::SOP_OpenVDB_To_Polygons(OP_Network* net,
 }
 
 
+void
+SOP_OpenVDB_To_Polygons::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
+{
+    if (!obsoleteParms) return;
+
+    // using the invertmask attribute to detect old houdini files that
+    // had the regular polygon representation.
+    PRM_Parm* parm = obsoleteParms->getParmPtr("invertmask");
+    if (parm && !parm->isFactoryDefault()) {
+        setInt("geometrytype", 0, 0, 1);
+    }
+    hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
+}
+
+
 bool
 SOP_OpenVDB_To_Polygons::updateParmsFlags()
 {
     bool changed = false;
+    const fpreal time = CHgetEvalTime();
 
     const bool refexists = (nInputs() == 2);
+    bool usePolygonSoup = evalInt("geometrytype", 0, time) == 0;
 
+#if !HAVE_POLYSOUP
+    changed |= setVisibleState("geometrytype", false);
+    usePolygonSoup = false;
+#endif
+
+    changed |= enableParm("computenormals", !usePolygonSoup);
     changed |= enableParm("internaladaptivity", refexists);
     changed |= enableParm("surfacegroup", refexists);
     changed |= enableParm("interiorgroup", refexists);
@@ -326,7 +377,7 @@ SOP_OpenVDB_To_Polygons::updateParmsFlags()
     const bool surfacemask = bool(evalInt("surfacemask", 0, 0));
     changed |= enableParm("surfacemaskname", maskexists && surfacemask);
     changed |= enableParm("surfacemaskoffset", maskexists && surfacemask);
-    changed |= enableParm("invertmask", maskexists && surfacemask);
+    changed |= enableParm("invertsurfacemask", maskexists && surfacemask);
 
     const bool adaptivitymask = bool(evalInt("adaptivityfield", 0, 0));
     changed |= enableParm("adaptivityfieldname", maskexists && adaptivitymask);
@@ -340,7 +391,6 @@ SOP_OpenVDB_To_Polygons::updateParmsFlags()
 
 ////////////////////////////////////////
 
-
 void
 copyMesh(
     GU_Detail& detail,
@@ -350,6 +400,7 @@ copyMesh(
 #else
     hvdb::Interrupter&,
 #endif
+    const bool usePolygonSoup = true,
     const char* gridName = NULL,
     GA_PrimitiveGroup* surfaceGroup = NULL,
     GA_PrimitiveGroup* interiorGroup = NULL,
@@ -511,6 +562,20 @@ copyMesh(
         }
     }
 
+    bool shared_vertices = true;
+    if (usePolygonSoup) {
+        // NOTE: Since we could be using the same points for multiple
+        //       polysoups, and the shared vertices option assumes that
+        //       the points are only used by this polysoup, we have to
+        //       use the unique vertices option.
+        int num_prims = 0;
+        for (int flags = 0; flags < 4; ++flags) {
+            if (!nquads[flags] && !ntris[flags]) continue;
+            num_prims++;
+        }
+        shared_vertices = (num_prims <= 1);
+    }
+
 
     for (int flags = 0; flags < 4; ++flags) {
         if (!nquads[flags] && !ntris[flags]) continue;
@@ -519,16 +584,38 @@ copyMesh(
         if (nquads[flags]) sizelist.append(4, nquads[flags]);
         if (ntris[flags])  sizelist.append(3, ntris[flags]);
 
+#if (UT_VERSION_INT >= 0x0d050013) // 13.5.19 or later
+        GA_Detail::OffsetMarker marker(detail);
+#else
         GU_ConvertMarker marker(detail);
+#endif
 
-        GU_PrimPoly::buildBlock(&detail, startpt, npoints, sizelist, verts[flags].array());
+        if (usePolygonSoup) {
+            GU_PrimPolySoup::build(
+                &detail, startpt, npoints, sizelist, verts[flags].array(), shared_vertices);
+        } else {
+            GU_PrimPoly::buildBlock(&detail, startpt, npoints, sizelist, verts[flags].array());
+        }
 
-        GA_Range range = marker.getPrimitives();
+#if (UT_VERSION_INT >= 0x0d050013) // 13.5.19 or later
+        GA_Range range(marker.primitiveRange());
+        //GA_Range pntRange(marker.pointRange());
+#else
+        GA_Range range(marker.getPrimitives());
+        //GA_Range pntRange(marker.getPoints());
+#endif
+        /*GU_ConvertParms parms;
+        parms.preserveGroups = true;
+        GUconvertCopySingleVertexPrimAttribsAndGroups(parms,
+            *srcvdb->getParent(), srcvdb->getMapOffset(), detail,
+            range, pntRange);*/
 
+        //if (delgroup)                       delgroup->removeRange(range);
         if (seamGroup && (flags & 1))       seamGroup->addRange(range);
         if (surfaceGroup && (flags & 2))    surfaceGroup->addRange(range);
         if (interiorGroup && !(flags & 2))  interiorGroup->addRange(range);
     }
+
 #endif // 12.5.245 or later
 
 
@@ -582,12 +669,19 @@ SOP_OpenVDB_To_Polygons::cookMySop(OP_Context& context)
         }
 
         // Eval attributes
+#if HAVE_POLYSOUP
+        const bool usePolygonSoup = evalInt("geometrytype", 0, time) == 0;
+#else
+        const bool usePolygonSoup = false;
+#endif
+
         const double adaptivity = double(evalFloat("adaptivity", 0, time));
         const double iso = double(evalFloat("isovalue", 0, time));
-        const bool computeNormals = evalInt("computenormals", 0, time);
+        const bool computeNormals = !usePolygonSoup && evalInt("computenormals", 0, time);
         const bool keepVdbName = evalInt("keepvdbname", 0, time);
         const float maskoffset = static_cast<float>(evalFloat("surfacemaskoffset", 0, time));
-        const bool invertmask = evalInt("invertmask", 0, time);
+        const bool invertmask = evalInt("invertsurfacemask", 0, time);
+
 
         // Setup level set mesher
         openvdb::tools::VolumeToMesh mesher(iso, adaptivity);
@@ -723,7 +817,7 @@ SOP_OpenVDB_To_Polygons::cookMySop(OP_Context& context)
                     }
                 }
 
-                copyMesh(*gdp, mesher, boss,
+                copyMesh(*gdp, mesher, boss, usePolygonSoup,
                     keepVdbName ? vdbIt.getPrimitive()->getGridName() : NULL);
             }
 
@@ -757,7 +851,8 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
     const fpreal time)
 {
     if (refGeo == NULL) return;
-    const bool computeNormals = evalInt("computenormals", 0, time);
+    const bool usePolygonSoup = evalInt("geometrytype", 0, time) == 0;
+    const bool computeNormals = !usePolygonSoup && evalInt("computenormals", 0, time);
     const bool transferAttributes = evalInt("transferattributes", 0, time);
     const bool keepVdbName = evalInt("keepvdbname", 0, time);
     const bool sharpenFeatures = evalInt("sharpenfeatures", 0, time);
@@ -927,7 +1022,7 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
 
         mesher(*grid);
 
-        copyMesh(*gdp, mesher, boss, keepVdbName ? grid->getName().c_str() : NULL,
+        copyMesh(*gdp, mesher, boss, usePolygonSoup, keepVdbName ? grid->getName().c_str() : NULL,
             surfaceGroup, interiorGroup, seamGroup, seamPointGroup);
     }
 
@@ -944,7 +1039,7 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
     if (!boss.wasInterrupted() && computeNormals) {
 
         UTparallelFor(GA_SplittableRange(gdp->getPrimitiveRange()),
-            hvdb::VertexNormalOp(*gdp, interiorGroup, (transferAttributes ? -1.0 : 0.7) ));
+            hvdb::VertexNormalOp(*gdp, interiorGroup, (transferAttributes ? -1.0f : 0.7f) ));
 
         if (!interiorGroup) {
             addWarning(SOP_MESSAGE, "More accurate vertex normals can be generated "

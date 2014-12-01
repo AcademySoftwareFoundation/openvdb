@@ -617,11 +617,13 @@ ViewerImpl::handleEvents()
 void
 ViewerImpl::close()
 {
-    OPENVDB_LOG_DEBUG_RUNTIME("about to close window"
 #if GLFW_VERSION_MAJOR >= 3
-        << " " << std::hex << mWindow << std::dec
-#endif
+    OPENVDB_LOG_DEBUG_RUNTIME("about to close window " << std::hex << mWindow << std::dec
         << " from thread " << boost::this_thread::get_id());
+#else
+    OPENVDB_LOG_DEBUG_RUNTIME("about to close window from thread "
+        << boost::this_thread::get_id());
+#endif
 
     mViewportModule.reset();
     mRenderModules.clear();
@@ -709,11 +711,12 @@ ViewerImpl::view(const openvdb::GridCPtrVec& gridList)
 
     glfwSwapInterval(1);
 
-    OPENVDB_LOG_DEBUG_RUNTIME("starting to render"
 #if GLFW_VERSION_MAJOR >= 3
-        << " in window " << std::hex << mWindow << std::dec
-#endif
+    OPENVDB_LOG_DEBUG_RUNTIME("starting to render in window " << std::hex << mWindow << std::dec
         << " from thread " << boost::this_thread::get_id());
+#else
+    OPENVDB_LOG_DEBUG_RUNTIME("starting to render from thread " << boost::this_thread::get_id());
+#endif
 
     mInterrupt = false;
     for (bool stop = false; !stop; ) {
@@ -751,11 +754,12 @@ ViewerImpl::view(const openvdb::GridCPtrVec& gridList)
     }
 #endif
 
-    OPENVDB_LOG_DEBUG_RUNTIME("finished rendering"
 #if GLFW_VERSION_MAJOR >= 3
-        << " in window " << std::hex << mWindow << std::dec
-#endif
+    OPENVDB_LOG_DEBUG_RUNTIME("finished rendering in window " << std::hex << mWindow << std::dec
         << " from thread " << boost::this_thread::get_id());
+#else
+    OPENVDB_LOG_DEBUG_RUNTIME("finished rendering from thread " << boost::this_thread::get_id());
+#endif
 }
 
 

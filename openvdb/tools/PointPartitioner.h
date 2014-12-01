@@ -684,6 +684,24 @@ struct VoxelOrderOp
 };
 
 
+template<typename IndexT>
+struct IndexOrderOp
+{
+    typedef boost::scoped_array<IndexT> IndexArray;
+
+    IndexOrderOp(IndexArray& indices, const IndexArray& pages)
+        : mIndices(indices.get()) , mPages(pages.get()) { }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+        for (size_t n(range.begin()), N(range.end()); n != N; ++n)
+            std::sort(mIndices + mPages[n], mIndices + mPages[n+1]);
+    }
+
+    IndexT       * const mIndices;
+    IndexT const * const mPages;
+};
+
+
 template<typename PointArray, typename IndexT>
 struct LeafNodeOriginOp
 {
@@ -855,8 +873,7 @@ inline void partition(
     bucketMap.reset();
 
     // Bucket order indices
-    tbb::parallel_for(pointRange,
-        BucketOrderOp<IndexT>(pointIndices, bucketOffsets));
+    tbb::parallel_for(pointRange, BucketOrderOp<IndexT>(pointIndices, bucketOffsets));
 
     pointIndices.swap(bucketOffsets);
     bucketOffsets.reset();
@@ -984,7 +1001,7 @@ inline void sortPartition(
         }
     }
 
-   pointIndices.reset(new IndexT[pointCount]);
+    pointIndices.reset(new IndexT[pointCount]);
     tbb::parallel_for(pointRange, PageOrderOp<IndexT>(pointIndices, bucketOffsets));
 }
 
@@ -1069,6 +1086,9 @@ PointPartitioner<PointIndexT, Log2Dim>::construct(const PointArray& points,
     }
 
     const tbb::blocked_range<size_t> pageRange(0, mPageCount);
+
+    tbb::parallel_for(pageRange,
+        point_partitioner_internal::IndexOrderOp<IndexType>(mPointIndices, mPageOffsets));
 
     mPageCoordinates.reset(new Coord[mPageCount]);
 

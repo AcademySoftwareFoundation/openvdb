@@ -2352,7 +2352,7 @@ TestFile::testAsync()
 
 
 #ifdef OPENVDB_USE_BLOSC
-// This tests for a data corruption bug that existed in versions of Blosc prior to 1.4.2
+// This tests for a data corruption bug that existed in versions of Blosc prior to 1.5.0
 // (see https://github.com/Blosc/c-blosc/pull/63).
 void
 TestFile::testBlosc()
@@ -2455,9 +2455,7 @@ TestFile::testBlosc()
                 const char* mesg = "Your version of the Blosc library is most likely"
                     " out of date; please install the latest version.  "
                     "(Earlier versions have a bug that can cause data corruption.)";
-                /// @todo Enable this once Blosc 1.4.2 is widely available.
-                //CPPUNIT_ASSERT_MESSAGE(mesg, diff == 0);
-                OPENVDB_LOG_FATAL(mesg);
+                CPPUNIT_ASSERT_MESSAGE(mesg, diff == 0);
                 return;
             }
         }

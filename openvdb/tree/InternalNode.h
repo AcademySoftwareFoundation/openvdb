@@ -240,15 +240,15 @@ public:
     ChildAllIter   beginChildAll() { return ChildAllIter(mChildMask.beginDense(), this); }
 
     ValueOnCIter  cbeginValueOn()  const { return ValueOnCIter(mValueMask.beginOn(), this); }
-    /// @warning This iterator will also visit child nodes so use isChildMaskOn to skip them! 
+    /// @warning This iterator will also visit child nodes so use isChildMaskOn to skip them!
     ValueOffCIter cbeginValueOff() const { return ValueOffCIter(mValueMask.beginOff(), this); }
     ValueAllCIter cbeginValueAll() const { return ValueAllCIter(mChildMask.beginOff(), this); }
     ValueOnCIter   beginValueOn()  const { return cbeginValueOn(); }
-    /// @warning This iterator will also visit child nodes so use isChildMaskOn to skip them! 
+    /// @warning This iterator will also visit child nodes so use isChildMaskOn to skip them!
     ValueOffCIter  beginValueOff() const { return cbeginValueOff(); }
     ValueAllCIter  beginValueAll() const { return cbeginValueAll(); }
     ValueOnIter    beginValueOn()  { return ValueOnIter(mValueMask.beginOn(), this); }
-    /// @warning This iterator will also visit child nodes so use isChildMaskOn to skip them! 
+    /// @warning This iterator will also visit child nodes so use isChildMaskOn to skip them!
     ValueOffIter   beginValueOff() { return ValueOffIter(mValueMask.beginOff(), this); }
     ValueAllIter   beginValueAll() { return ValueAllIter(mChildMask.beginOff(), this); }
 
@@ -1398,12 +1398,14 @@ template<typename ChildT, Index Log2Dim>
 inline bool
 InternalNode<ChildT, Log2Dim>::hasActiveTiles() const
 {
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
     const bool anyActiveTiles = !mValueMask.isOff();
     if (LEVEL==1 || anyActiveTiles) return anyActiveTiles;
     for (ChildOnCIter iter = this->cbeginChildOn(); iter; ++iter) {
         if (iter->hasActiveTiles()) return true;
     }
     return false;
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
 
 

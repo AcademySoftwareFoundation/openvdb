@@ -431,10 +431,10 @@ ifeq (yes,$(has_log4cplus))
     CXXFLAGS += -DOPENVDB_USE_LOG4CPLUS
 endif
 ifeq (2,$(strip $(abi)))
-	CXXFLAGS += -DOPENVDB_2_ABI_COMPATIBLE
+    CXXFLAGS += -DOPENVDB_2_ABI_COMPATIBLE
 endif
 ifneq (2,$(strip $(GLFW_MAJOR_VERSION)))
-	CXXFLAGS += -DOPENVDB_USE_GLFW_3
+    CXXFLAGS += -DOPENVDB_USE_GLFW_3
 endif
 
 LIBS := \
@@ -831,10 +831,6 @@ endif
 
 DEPEND := dependencies
 
-# Get the list of dependencies that are newer than the current target,
-# but limit the list to at most three entries.
-list_deps = $(if $(wordlist 4,5,$(?F)),$(firstword $(?F)) and others,$(wordlist 1,3,$(?F)))
-
 ALL_PRODUCTS := \
     $(LIBOPENVDB_STATIC) \
     $(LIBOPENVDB_SHARED) \
@@ -892,18 +888,18 @@ else
 lib: $(LIBOPENVDB_STATIC)
 
 $(LIBOPENVDB_STATIC): $(OBJ_NAMES)
-	@echo "Building $@ because of $(call list_deps)"
+	@echo "Building $@ because of $(list_deps)"
 	$(AR) $(ARFLAGS) $(AROUTPUT)$@ $^
 
 endif # shared
 
 # BEGIN doc RULES
 $(DOC_INDEX): doxygen-config $(INCLUDE_NAMES) $(SRC_NAMES) $(DOC_FILES)
-	@echo "Generating documentation because of $(call list_deps)"
+	@echo "Generating documentation because of $(list_deps)"
 	echo 'OUTPUT_DIRECTORY=./doc' | cat doxygen-config - | $(DOXYGEN) - $(QUIET)
 
 $(DOC_PDF): doxygen-config $(INCLUDE_NAMES) $(SRC_NAMES) $(DOC_FILES)
-	@echo "Generating documentation because of $(call list_deps)"
+	@echo "Generating documentation because of $(list_deps)"
 	echo -e 'OUTPUT_DIRECTORY=./doc\nGENERATE_LATEX=YES\nGENERATE_HTML=NO' \
 	    | cat doxygen-config - | $(DOXYGEN) - $(QUIET) \
 	    && cd ./doc/latex && make refman.pdf $(QUIET) \
@@ -986,7 +982,7 @@ $(PYTHON_MODULE): $(LIBOPENVDB) $(PYTHON_OBJ_NAMES)
 ifeq (yes,$(has_python))
 ifneq (,$(strip $(EPYDOC)))
 pydoc: $(PYTHON_MODULE) $(LIBOPENVDB_SONAME)
-	@echo "Generating Python module documentation because of $(call list_deps)"
+	@echo "Generating Python module documentation because of $(list_deps)"
 	pydocdir=doc/html/python; \
 	/bin/mkdir -p $${pydocdir}; \
 	echo "Created $${pydocdir}"; \
@@ -1146,7 +1142,7 @@ DEPFILES = $(call DepFromSrc,$(ALL_SRC_FILES))
 # containing a rule for each *.o file.  Consider generating a separate
 # dependency file for each *.o file instead.
 $(DEPEND): $(ALL_INCLUDE_FILES) $(ALL_SRC_FILES)
-	@echo "Generating dependencies because of $(call list_deps)"
+	@echo "Generating dependencies because of $(list_deps)"
 	$(RM) $(DEPEND)
 	for f in $(SRC_NAMES) $(LIBVIEWER_SRC_NAMES) $(CMD_SRC_NAMES) $(RENDER_SRC_NAMES) $(VIEW_SRC_NAMES); \
 		do $(CXX) $(CXXFLAGS) -O0 \

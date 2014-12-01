@@ -17,6 +17,9 @@
   The limit can be set to zero to disable copying, but if it cannot be
   guaranteed that a file will not be modified, then it is best not to enable
   delayed loading for that file.
+- <TT>.vdb</TT> files can now optionally be compressed with the Blosc&nbsp;LZ4
+  codec.  <A HREF="http://www.blosc.org/">Blosc</A> compresses almost as well
+  as ZLIB, but it is much faster.
 - Added @vdblink::tools::PointPartitioner PointPartitioner@endlink, a tool
   for fast spatial sorting of points stored in an external array, and
   @link PointIndexGrid.h PointIndexGrid@endlink, an acceleration structure
@@ -157,6 +160,8 @@
 - Fixed a bug in @vdblink::readString() readString@endlink related
   to empty strings.
   <I>[Contributed by Fabio&nbsp;Piparo]</I>
+- Fixed a bug in the @vdblink::tools::VolumeToMesh VolumeToMesh@endlink
+  simplification scheme that was creating visual artifacts.
 
 @par
 API changes:
@@ -254,7 +259,8 @@ Houdini:
   of which can be used to clip grids as they are read.  For large grids,
   clipping while reading can result in significantly lower memory usage
   than clipping after reading.
-
+- The From Polygons and Convert SOPs now default to using the polygon soup
+  mesh representation, which uses less memory.
 
 @htmlonly <a name="v2_3_0_changes"></a>@endhtmlonly
 @par

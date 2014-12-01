@@ -473,7 +473,7 @@ all: houdinilib houdinisops
 # to mirror the DWA directory structure.
 openvdb_houdini:
 	$(LN) houdini openvdb_houdini
-openvdb_houdini/AttributeTransferUtil.h openvdb_houdini/GeometryUtil.h openvdb_houdini/GEO_PrimVDB.h openvdb_houdini/GT_GEOPrimCollectVDB.h openvdb_houdini/GU_PrimVDB.h openvdb_houdini/SOP_NodeVDB.h openvdb_houdini/UT_VDBTools.h openvdb_houdini/UT_VDBUtils.h openvdb_houdini/Utils.h: openvdb_houdini
+openvdb_houdini/AttributeTransferUtil.h openvdb_houdini/GeometryUtil.h openvdb_houdini/GEO_PrimVDB.h openvdb_houdini/GT_GEOPrimCollectVDB.h openvdb_houdini/GU_PrimVDB.h openvdb_houdini/GU_VDBPointTools.h openvdb_houdini/SOP_NodeVDB.h openvdb_houdini/UT_VDBTools.h openvdb_houdini/UT_VDBUtils.h openvdb_houdini/Utils.h: openvdb_houdini
 
 # Create a houdini_utils/ symlink to the houdini/ subdirectory,
 # to mirror the DWA directory structure.
@@ -481,7 +481,7 @@ houdini_utils:
 	$(LN) houdini houdini_utils
 houdini_utils/geometry.h houdini_utils/ParmFactory.h houdini_utils/OP_NodeChain.h: houdini_utils
 
-$(LIBHOUDINI_OBJ_NAMES): houdini_utils/geometry.h houdini_utils/ParmFactory.h houdini_utils/OP_NodeChain.h openvdb_houdini/AttributeTransferUtil.h openvdb_houdini/GeometryUtil.h openvdb_houdini/GEO_PrimVDB.h openvdb_houdini/GT_GEOPrimCollectVDB.h openvdb_houdini/GU_PrimVDB.h openvdb_houdini/SOP_NodeVDB.h openvdb_houdini/UT_VDBTools.h openvdb_houdini/UT_VDBUtils.h openvdb_houdini/Utils.h
+$(LIBHOUDINI_OBJ_NAMES): houdini_utils/geometry.h houdini_utils/ParmFactory.h houdini_utils/OP_NodeChain.h openvdb_houdini/AttributeTransferUtil.h openvdb_houdini/GeometryUtil.h openvdb_houdini/GEO_PrimVDB.h openvdb_houdini/GT_GEOPrimCollectVDB.h openvdb_houdini/GU_PrimVDB.h openvdb_houdini/GU_VDBPointTools.h openvdb_houdini/SOP_NodeVDB.h openvdb_houdini/UT_VDBTools.h openvdb_houdini/UT_VDBUtils.h openvdb_houdini/Utils.h
 
 $(LIBHOUDINI_OBJ_NAMES): %.o: %.cc
 	$(call CompileCXX,-DOPENVDB_HOUDINI_PRIVATE $(HOUDINI_CXXFLAGS))

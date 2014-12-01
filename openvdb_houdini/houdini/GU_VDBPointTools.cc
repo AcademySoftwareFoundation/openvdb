@@ -27,17 +27,10 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
-/// @file GU_VDBPointTools.cc
-/// @author FX R&D OpenVDB team
 
 #include "GU_VDBPointTools.h"
 
 
-namespace houdini_utils {
-
-
-} // namespace houdini_utils
 
 // Copyright (c) 2012-2014 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

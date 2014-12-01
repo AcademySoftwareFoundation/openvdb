@@ -121,7 +121,7 @@ class SOP_OpenVDB_Morph_Level_Set: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Morph_Level_Set(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Morph_Level_Set() {};
+    virtual ~SOP_OpenVDB_Morph_Level_Set() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
@@ -433,13 +433,13 @@ SOP_OpenVDB_Morph_Level_Set::evalMorphingParms(OP_Context& context, MorphingParm
         const GA_PrimitiveGroup *maskGroup =
             matchGroup(const_cast<GU_Detail&>(*maskGeo), str.toStdString());
 
-        hvdb::VdbPrimCIterator it(maskGeo, maskGroup);
-        if (it) {
-            if (it->getStorageType() != UT_VDB_FLOAT) {
+        hvdb::VdbPrimCIterator maskIt(maskGeo, maskGroup);
+        if (maskIt) {
+            if (maskIt->getStorageType() != UT_VDB_FLOAT) {
                 addError(SOP_MESSAGE, "Unrecognized alpha mask grid type.");
                 return UT_ERROR_ABORT;
             }
-            parms.mMaskGrid = hvdb::Grid::constGrid<openvdb::FloatGrid>(it->getConstGridPtr());
+            parms.mMaskGrid = hvdb::Grid::constGrid<openvdb::FloatGrid>(maskIt->getConstGridPtr());
         }
 
         if (!parms.mMaskGrid) {

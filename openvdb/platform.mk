@@ -45,6 +45,10 @@ ifeq ("$(PROCESSOR)","x86_64")
 AMD64	    := 1
 endif
 
+# Get the list of dependencies that are newer than the current target,
+# but limit the list to at most three entries.
+list_deps = $(if $(wordlist 4,5,$(?F)),$(firstword $(?F)) and others,$(wordlist 1,3,$(?F)))
+
 DepFromSrc = $(join $(dir $(1)),$(addsuffix .d,$(basename $(addprefix .,$(notdir $(1))))))
 
 # Set Windows-specific variables. It assumes Cygwin (http://cygwin.org) has
@@ -152,17 +156,17 @@ endif
     MAKEDEPEND		:= $(SELF_DIR)/clmakedep.py $(MAKEDEP_SYSINCLUDES)
 
     define BuildSharedLibrary
-	@echo "Building $@ because of $(call list_deps)"; \
+	@echo "Building $@ because of $(list_deps)"; \
 	 $(LINK) -DLL $(LDFLAGS) $(LDOUTPUT)$@ $^ $(1)
     endef
 
     define BuildExecutable
-	@echo "Building $@ because of $(call list_deps)"; \
+	@echo "Building $@ because of $(list_deps)"; \
 	 $(LINK) $(LDFLAGS) $(LDOUTPUT)$@ $(1)
     endef
 
     define CompileCXX
-	@echo "Building $@ because of $(call list_deps)"; \
+	@echo "Building $@ because of $(list_deps)"; \
 	 $(CXX) -c $(CXXFLAGS) $(1) $(CXXOUTPUT)$@ $< \
 	 && echo "... making deps" \
 	 && $(MAKEDEPEND) -- $(CXXFLAGS) $(1) -- $< > $(call DepFromSrc,$<)
@@ -221,17 +225,17 @@ endif
     VERSIONED_LIBS	:=
 
     define BuildSharedLibrary
-	@echo "Building $@ because of $(call list_deps)"; \
+	@echo "Building $@ because of $(list_deps)"; \
 	 $(LINK) $(LDFLAGS) $(LDOUTPUT) $@ $^ $(1) $(LDLIBS)
     endef
 
     define BuildExecutable
-	@echo "Building $@ because of $(call list_deps)"; \
+	@echo "Building $@ because of $(list_deps)"; \
 	 $(CXX) $(CXXFLAGS) $(CXXOUTPUT) $@ $(1) $(LDLIBS)
     endef
 
     define CompileCXX
-	@echo "Building $@ because of $(call list_deps)"; \
+	@echo "Building $@ because of $(list_deps)"; \
 	 $(CXX) -c $(CXXFLAGS) -MD -MP -MF .$(notdir $(@:.o=.d)) $(1) \
                 $(CXXOUTPUT) $@ $<
     endef
