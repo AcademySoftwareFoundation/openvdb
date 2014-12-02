@@ -3,7 +3,8 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
 PROJECT ( OpenVDB )
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
+set(DESTDIR "/opt/openvdb")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/../../cmake/")
 
 find_package(PkgConfig REQUIRED)
 
@@ -41,66 +42,73 @@ FILE ( MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/dwa/openvdb_viewer )
 FILE ( COPY ${VIEWER_SOURCE_FILES} DESTINATION ${CMAKE_BINARY_DIR}/dwa/openvdb_viewer )
 INCLUDE_DIRECTORIES ( ${CMAKE_BINARY_DIR}/dwa )
 
+# ---
+# libopenvdb
 SET ( OPENVDB_LIBRARY_SOURCE_FILES
-  ${OPENVDB_PATH}/Grid.cc
-  ${OPENVDB_PATH}/io/Archive.cc
-  ${OPENVDB_PATH}/io/Compression.cc
-  ${OPENVDB_PATH}/io/File.cc
-  ${OPENVDB_PATH}/io/GridDescriptor.cc
-  ${OPENVDB_PATH}/io/Queue.cc
-  ${OPENVDB_PATH}/io/Stream.cc
-  ${OPENVDB_PATH}/io/TempFile.cc
-  ${OPENVDB_PATH}/math/Hermite.cc
-  ${OPENVDB_PATH}/math/Maps.cc
-  ${OPENVDB_PATH}/math/Proximity.cc
-  ${OPENVDB_PATH}/math/QuantizedUnitVec.cc
-  ${OPENVDB_PATH}/math/Transform.cc
-  ${OPENVDB_PATH}/metadata/Metadata.cc
-  ${OPENVDB_PATH}/metadata/MetaMap.cc
-  ${OPENVDB_PATH}/openvdb.cc
-  ${OPENVDB_PATH}/Platform.cc
-  ${OPENVDB_PATH}/util/Formats.cc
-  ${OPENVDB_PATH}/util/Util.cc
+  Grid.cc
+  io/Archive.cc
+  io/Compression.cc
+  io/File.cc
+  io/GridDescriptor.cc
+  io/Queue.cc
+  io/Stream.cc
+  io/TempFile.cc
+  math/Hermite.cc
+  math/Maps.cc
+  math/Proximity.cc
+  math/QuantizedUnitVec.cc
+  math/Transform.cc
+  metadata/Metadata.cc
+  metadata/MetaMap.cc
+  openvdb.cc
+  Platform.cc
+  util/Formats.cc
+  util/Util.cc
   )
-
 ADD_LIBRARY ( openvdb STATIC
   ${OPENVDB_LIBRARY_SOURCE_FILES}
   )
-
 TARGET_LINK_LIBRARIES ( openvdb
   ${Boost_LIBRARIES}
   ${TBB_LIBRARIES}
   ${ILMBASE_LIBRARIES}
   ${ZLIB_LIBRARY}
   )
+install(TARGETS openvdb DESTINATION ${DESTDIR}/lib)
+install(DIRECTORY . DESTINATION ${DESTDIR}/include FILES_MATCHING PATTERN "*.h")
 
+# ---
+# vdb_print
 ADD_EXECUTABLE ( vdb_print
-  ${OPENVDB_PATH}/cmd/openvdb_print/main.cc
+  cmd/openvdb_print/main.cc
   )
-
 TARGET_LINK_LIBRARIES ( vdb_print
   openvdb
   )
+install(TARGETS vdb_print DESTINATION ${DESTDIR}/bin)
 
+# ---
+# vdb_render
 ADD_EXECUTABLE ( vdb_render
-  ${OPENVDB_PATH}/cmd/openvdb_render/main.cc
+  cmd/openvdb_render/main.cc
   )
-
 TARGET_LINK_LIBRARIES ( vdb_render
   openvdb
   ${ILMBASE_LIBRARIES}
   ${OPENEXR_LIBRARIES}
   )
+install(TARGETS vdb_render DESTINATION ${DESTDIR}/bin)
 
+# ---
+# vdb_view
 ADD_EXECUTABLE ( vdb_view
-  ${OPENVDB_PATH}/cmd/openvdb_view/main.cc
-  ${OPENVDB_PATH}/viewer/Camera.cc
-  ${OPENVDB_PATH}/viewer/ClipBox.cc
-  ${OPENVDB_PATH}/viewer/Font.cc
-  ${OPENVDB_PATH}/viewer/RenderModules.cc
-  ${OPENVDB_PATH}/viewer/Viewer.cc
+  cmd/openvdb_view/main.cc
+  viewer/Camera.cc
+  viewer/ClipBox.cc
+  viewer/Font.cc
+  viewer/RenderModules.cc
+  viewer/Viewer.cc
   )
-
 #MESSAGE ( "OPENGL_LIBRARIES = ${OPENGL_LIBRARIES}")
 #MESSAGE ( "GLFW_LIBRARIES = ${GLFW_STATIC_LIBRARIES}")
 TARGET_LINK_LIBRARIES ( vdb_view
@@ -108,3 +116,4 @@ TARGET_LINK_LIBRARIES ( vdb_view
   ${OPENGL_LIBRARIES}
   ${GLFW_STATIC_LIBRARIES}
   )
+install(TARGETS vdb_view DESTINATION ${DESTDIR}/bin)
