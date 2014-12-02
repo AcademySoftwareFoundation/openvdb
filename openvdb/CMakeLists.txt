@@ -3,7 +3,11 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
 PROJECT ( OpenVDB )
 
-set(DESTDIR "/opt/openvdb")
+set(DESTDIR "/usr/local")
+set(OPENVDB_INCLUDE_DIR "${DESTDIR}/include/openvdb")
+set(OPENVDB_LIB_DIR "${DESTDIR}/lib/openvdb")
+set(OPENVDB_BIN_DIR "${DESTDIR}/bin")
+
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/../../cmake/")
 
 find_package(PkgConfig REQUIRED)
@@ -74,8 +78,8 @@ TARGET_LINK_LIBRARIES ( openvdb
   ${ILMBASE_LIBRARIES}
   ${ZLIB_LIBRARY}
   )
-install(TARGETS openvdb DESTINATION ${DESTDIR}/lib)
-install(DIRECTORY . DESTINATION ${DESTDIR}/include FILES_MATCHING PATTERN "*.h")
+install(TARGETS openvdb DESTINATION ${OPENVDB_LIB_DIR})
+install(DIRECTORY . DESTINATION ${OPENVDB_INCLUDE_DIR} FILES_MATCHING PATTERN "*.h")
 
 # ---
 # vdb_print
@@ -85,7 +89,7 @@ ADD_EXECUTABLE ( vdb_print
 TARGET_LINK_LIBRARIES ( vdb_print
   openvdb
   )
-install(TARGETS vdb_print DESTINATION ${DESTDIR}/bin)
+install(TARGETS vdb_print DESTINATION ${OPENVDB_BIN_DIR})
 
 # ---
 # vdb_render
@@ -97,7 +101,7 @@ TARGET_LINK_LIBRARIES ( vdb_render
   ${ILMBASE_LIBRARIES}
   ${OPENEXR_LIBRARIES}
   )
-install(TARGETS vdb_render DESTINATION ${DESTDIR}/bin)
+install(TARGETS vdb_render DESTINATION ${OPENVDB_BIN_DIR})
 
 # ---
 # vdb_view
@@ -116,4 +120,4 @@ TARGET_LINK_LIBRARIES ( vdb_view
   ${OPENGL_LIBRARIES}
   ${GLFW_STATIC_LIBRARIES}
   )
-install(TARGETS vdb_view DESTINATION ${DESTDIR}/bin)
+install(TARGETS vdb_view DESTINATION ${OPENVDB_BIN_DIR})
