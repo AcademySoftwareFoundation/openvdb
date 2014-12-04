@@ -30,8 +30,6 @@
 //
 /// @file AttributeArray.cc
 ///
-/// @note For evaluation purposes, do not distribute.
-///
 /// @authors Mihai Alden, Peter Cucka
 
 #include "AttributeArray.h"
@@ -52,7 +50,6 @@ namespace {
 
 typedef std::map<std::string, AttributeArray::FactoryMethod> AttributeFactoryMap;
 typedef AttributeFactoryMap::const_iterator AttributeFactoryMapCIter;
-
 
 struct LockedAttributeRegistry
 {
@@ -209,7 +206,18 @@ AttributeSet::update(const DescriptorPtr& descr)
     if (descr.get() != mDescr.get()) {
         AttrArrayVec attrs(descr->size(), AttributeArray::Ptr());
 
-        /// @todo preserve similar attributes
+        // preserve similar attributes
+
+        for (Descriptor::NameToPosMap::const_iterator it = mDescr->map().begin(),
+            end = mDescr->map().end(); it != end; ++it) {
+
+            const size_t pos = descr->find(it->first);
+            if (pos != INVALID_POS) {
+                if (mDescr->type(it->second) == descr->type(pos)) {
+                    attrs[pos] = mAttrs[it->second];
+                }
+            }
+        }
 
         mAttrs.swap(attrs);
         mDescr = descr;
@@ -239,7 +247,7 @@ size_t
 AttributeSet::replace(const std::string& name, const AttributeArray::Ptr& attr)
 {
     const size_t pos = this->find(name);
-    return pos != INVALID_POS ? this->replace(pos, attr) : pos;
+    return pos != INVALID_POS ? this->replace(pos, attr) : INVALID_POS;
 }
 
 
@@ -330,15 +338,60 @@ AttributeSet::makeUnique(size_t pos)
 
 
 void
-AttributeSet::read(std::istream&)
+AttributeSet::read(std::istream& is)
 {
-    /// @todo
+    this->readMetadata(is);
+    this->readAttributes(is);
 }
 
+
 void
-AttributeSet::write(std::ostream&) const
+AttributeSet::write(std::ostream& os) const
 {
-    /// @todo
+    this->writeMetadata(os);
+    this->writeAttributes(os);
+}
+
+
+void
+AttributeSet::readMetadata(std::istream& is)
+{
+    mDescr->read(is);
+}
+
+
+void
+AttributeSet::writeMetadata(std::ostream& os) const
+{
+    mDescr->write(os);
+}
+
+
+void
+AttributeSet::readAttributes(std::istream& is)
+{
+    if (!mDescr) {
+        OPENVDB_THROW(IllegalValueException, "Attribute set descriptor not defined.");
+    }
+ 
+    AttrArrayVec(mDescr->size()).swap(mAttrs); // allocate vector
+
+    for (Descriptor::NameToPosMap::const_iterator it = mDescr->map().begin(),
+        end = mDescr->map().end(); it != end; ++it) {
+
+        const size_t pos = it->second;
+        mAttrs[pos] = AttributeArray::create(mDescr->type(pos), 1);
+        mAttrs[pos]->read(is);
+    }
+}
+
+
+void
+AttributeSet::writeAttributes(std::ostream& os) const
+{
+    for (size_t n = 0, N = mAttrs.size(); n < N; ++n) {
+        mAttrs[n]->write(os);
+    }
 }
 
 
@@ -347,13 +400,9 @@ AttributeSet::write(std::ostream&) const
 // AttributeSet::Descriptor implementation
 
 
-tbb::atomic<Index64> AttributeSet::Descriptor::sNextId;
-
-
 AttributeSet::Descriptor::Descriptor()
     : mNameMap()
     , mTypes()
-    , mId(sNextId++)
 {
 }
 
@@ -408,7 +457,12 @@ size_t
 AttributeSet::Descriptor::rename(const std::string& fromName, const std::string& toName)
 {
     size_t pos = INVALID_POS;
-    NameToPosMap::iterator it = mNameMap.find(fromName);
+
+    // check if the new name is already used.
+    NameToPosMap::iterator it = mNameMap.find(toName);
+    if (it != mNameMap.end()) return pos;
+
+    it = mNameMap.find(fromName);
     if (it != mNameMap.end()) {
         pos = it->second;
         mNameMap.erase(it);
@@ -452,6 +506,48 @@ AttributeSet::Descriptor::create(const std::vector<NameAndType>& attrs)
     }
     return descr;
 }
+
+
+void
+AttributeSet::Descriptor::write(std::ostream& os) const
+{
+    const Index64 arraylength = Index64(mTypes.size());
+    os.write(reinterpret_cast<const char*>(&arraylength), sizeof(Index64));
+
+    for(Index64 n = 0; n < arraylength; ++n) {
+        writeString(os, mTypes[n]);
+    }
+
+    NameToPosMap::const_iterator it = mNameMap.begin(), endIt = mNameMap.end();
+    for (; it != endIt; ++it) {
+        writeString(os, it->first);
+        os.write(reinterpret_cast<const char*>(&it->second), sizeof(Index64));
+    }
+}
+
+
+void
+AttributeSet::Descriptor::read(std::istream& is)
+{
+    Index64 arraylength = 0;
+    is.read(reinterpret_cast<char*>(&arraylength), sizeof(Index64));
+
+    std::vector<std::string>(size_t(arraylength)).swap(mTypes);
+
+    for(Index64 n = 0; n < arraylength; ++n) {
+         mTypes[n] = readString(is);
+    }
+
+    mNameMap.clear();
+    std::pair<std::string, size_t> nameAndOffset;
+
+    for(Index64 n = 0; n < arraylength; ++n) {
+        nameAndOffset.first = readString(is);
+        is.read(reinterpret_cast<char*>(&nameAndOffset.second), sizeof(Index64));
+        mNameMap.insert(nameAndOffset);
+    }
+}
+
 
 
 ////////////////////////////////////////

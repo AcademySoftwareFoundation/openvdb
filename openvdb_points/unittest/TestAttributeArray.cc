@@ -29,9 +29,8 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include <cppunit/extensions/HelperMacros.h>
-#include <openvdb/Types.h>
-
 #include <openvdb_points/tools/AttributeArray.h>
+#include <openvdb/Types.h>
 
 #include <iostream>
 #include <sstream>
@@ -41,10 +40,12 @@ class TestAttributeArray: public CppUnit::TestCase
 public:
     CPPUNIT_TEST_SUITE(TestAttributeArray);
     CPPUNIT_TEST(testAttributeArray);
+    CPPUNIT_TEST(testAttributeSetDescriptor);
     CPPUNIT_TEST(testAttributeSet);
     CPPUNIT_TEST_SUITE_END();
 
     void testAttributeArray();
+    void testAttributeSetDescriptor();
     void testAttributeSet();
 }; // class TestPointDataGrid
 
@@ -56,205 +57,266 @@ CPPUNIT_TEST_SUITE_REGISTRATION(TestAttributeArray);
 void
 TestAttributeArray::testAttributeArray()
 {
-	typedef openvdb::tools::TypedAttributeArray<double> AttributeArrayD;
+    typedef openvdb::tools::TypedAttributeArray<double> AttributeArrayD;
 
-	{
-		openvdb::tools::AttributeArray::Ptr attr(new AttributeArrayD(50));
+    {
+        openvdb::tools::AttributeArray::Ptr attr(new AttributeArrayD(50));
 
-		CPPUNIT_ASSERT_EQUAL(size_t(50), attr->size());
+        CPPUNIT_ASSERT_EQUAL(size_t(50), attr->size());
 
-		AttributeArrayD& typedAttr = static_cast<AttributeArrayD&>(*attr);
+        AttributeArrayD& typedAttr = static_cast<AttributeArrayD&>(*attr);
 
-		typedAttr.set(0, 0.5);
+        typedAttr.set(0, 0.5);
 
-		double value = 0.0;
-		typedAttr.get(0, value);
+        double value = 0.0;
+        typedAttr.get(0, value);
 
-		CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.5), value, /*tolerance=*/double(0.0));
-	}
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.5), value, /*tolerance=*/double(0.0));
+    }
 
-	typedef openvdb::tools::FixedPointAttributeCodec<uint16_t> Codec;
-	typedef openvdb::tools::TypedAttributeArray<double, Codec> AttributeArrayC;
+    typedef openvdb::tools::FixedPointAttributeCodec<uint16_t> Codec;
+    typedef openvdb::tools::TypedAttributeArray<double, Codec> AttributeArrayC;
 
-	{
-		openvdb::tools::AttributeArray::Ptr attr(new AttributeArrayC(50));
+    {
+        openvdb::tools::AttributeArray::Ptr attr(new AttributeArrayC(50));
 
-		AttributeArrayC& typedAttr = static_cast<AttributeArrayC&>(*attr);
+        AttributeArrayC& typedAttr = static_cast<AttributeArrayC&>(*attr);
 
-		typedAttr.set(0, 0.5);
+        typedAttr.set(0, 0.5);
 
-		double value = 0.0;
-		typedAttr.get(0, value);
+        double value = 0.0;
+        typedAttr.get(0, value);
 
-		CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.5), value, /*tolerance=*/double(0.0001));
-	}
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.5), value, /*tolerance=*/double(0.0001));
+    }
 
-	typedef openvdb::tools::TypedAttributeArray<int> AttributeArrayI;
+    typedef openvdb::tools::TypedAttributeArray<int> AttributeArrayI;
 
-	{ // Base class API
+    { // Base class API
 
-		openvdb::tools::AttributeArray::Ptr attr(new AttributeArrayI(50));
+        openvdb::tools::AttributeArray::Ptr attr(new AttributeArrayI(50));
 
-		CPPUNIT_ASSERT_EQUAL(size_t(50), attr->size());
+        CPPUNIT_ASSERT_EQUAL(size_t(50), attr->size());
 
-		CPPUNIT_ASSERT_EQUAL((sizeof(AttributeArrayI) + sizeof(int)), attr->memUsage());
+        CPPUNIT_ASSERT_EQUAL((sizeof(AttributeArrayI) + sizeof(int)), attr->memUsage());
 
-		CPPUNIT_ASSERT(attr->isType<AttributeArrayI>());
-		CPPUNIT_ASSERT(!attr->isType<AttributeArrayD>());
-	}
+        CPPUNIT_ASSERT(attr->isType<AttributeArrayI>());
+        CPPUNIT_ASSERT(!attr->isType<AttributeArrayD>());
+    }
 
-	{ // Typed class API
+    { // Typed class API
 
-		const size_t count = 50;
-		const size_t uniformMemUsage = sizeof(AttributeArrayI) + sizeof(int);
-		const size_t expandedMemUsage = sizeof(AttributeArrayI) + count * sizeof(int);
+        const size_t count = 50;
+        const size_t uniformMemUsage = sizeof(AttributeArrayI) + sizeof(int);
+        const size_t expandedMemUsage = sizeof(AttributeArrayI) + count * sizeof(int);
 
-		AttributeArrayI attr(count);
+        AttributeArrayI attr(count);
 
-		CPPUNIT_ASSERT_EQUAL(attr.get(0), 0);
-		CPPUNIT_ASSERT_EQUAL(attr.get(10), 0);
+        CPPUNIT_ASSERT_EQUAL(attr.get(0), 0);
+        CPPUNIT_ASSERT_EQUAL(attr.get(10), 0);
 
-		CPPUNIT_ASSERT(attr.isUniform());
-		CPPUNIT_ASSERT_EQUAL(uniformMemUsage, attr.memUsage());
+        CPPUNIT_ASSERT(attr.isUniform());
+        CPPUNIT_ASSERT_EQUAL(uniformMemUsage, attr.memUsage());
 
-		attr.set(0, 10);
-		CPPUNIT_ASSERT(!attr.isUniform());
-		CPPUNIT_ASSERT_EQUAL(expandedMemUsage, attr.memUsage());
+        attr.set(0, 10);
+        CPPUNIT_ASSERT(!attr.isUniform());
+        CPPUNIT_ASSERT_EQUAL(expandedMemUsage, attr.memUsage());
 
-		attr.collapse(5);
-		CPPUNIT_ASSERT(attr.isUniform());
-		CPPUNIT_ASSERT_EQUAL(uniformMemUsage, attr.memUsage());
+        attr.collapse(5);
+        CPPUNIT_ASSERT(attr.isUniform());
+        CPPUNIT_ASSERT_EQUAL(uniformMemUsage, attr.memUsage());
 
-		CPPUNIT_ASSERT_EQUAL(attr.get(0), 5);
-		CPPUNIT_ASSERT_EQUAL(attr.get(20), 5);
+        CPPUNIT_ASSERT_EQUAL(attr.get(0), 5);
+        CPPUNIT_ASSERT_EQUAL(attr.get(20), 5);
 
-		attr.expand();
-		CPPUNIT_ASSERT(!attr.isUniform());
-		CPPUNIT_ASSERT_EQUAL(expandedMemUsage, attr.memUsage());
+        attr.expand();
+        CPPUNIT_ASSERT(!attr.isUniform());
+        CPPUNIT_ASSERT_EQUAL(expandedMemUsage, attr.memUsage());
 
-		for (size_t i = 0; i < count; ++i) {
-			CPPUNIT_ASSERT_EQUAL(attr.get(i), 5);
-		}
+        for (unsigned i = 0; i < unsigned(count); ++i) {
+            CPPUNIT_ASSERT_EQUAL(attr.get(i), 5);
+        }
 
-		CPPUNIT_ASSERT(!attr.isTransient());
-		CPPUNIT_ASSERT(!attr.isHidden());
+        CPPUNIT_ASSERT(!attr.isTransient());
+        CPPUNIT_ASSERT(!attr.isHidden());
 
-		attr.setTransient(true);
-		CPPUNIT_ASSERT(attr.isTransient());
-		CPPUNIT_ASSERT(!attr.isHidden());
+        attr.setTransient(true);
+        CPPUNIT_ASSERT(attr.isTransient());
+        CPPUNIT_ASSERT(!attr.isHidden());
 
-		attr.setHidden(true);
-		CPPUNIT_ASSERT(attr.isTransient());
-		CPPUNIT_ASSERT(attr.isHidden());
+        attr.setHidden(true);
+        CPPUNIT_ASSERT(attr.isTransient());
+        CPPUNIT_ASSERT(attr.isHidden());
 
-		attr.setTransient(false);
-		CPPUNIT_ASSERT(!attr.isTransient());
-		CPPUNIT_ASSERT(attr.isHidden());
+        attr.setTransient(false);
+        CPPUNIT_ASSERT(!attr.isTransient());
+        CPPUNIT_ASSERT(attr.isHidden());
 
-		AttributeArrayI attrB(attr);
-		CPPUNIT_ASSERT_EQUAL(attr.type(), attrB.type());
-		CPPUNIT_ASSERT_EQUAL(attr.size(), attrB.size());
-		CPPUNIT_ASSERT_EQUAL(attr.memUsage(), attrB.memUsage());
-		CPPUNIT_ASSERT_EQUAL(attr.isUniform(), attrB.isUniform());
-		CPPUNIT_ASSERT_EQUAL(attr.isTransient(), attrB.isTransient());
-		CPPUNIT_ASSERT_EQUAL(attr.isHidden(), attrB.isHidden());
+        AttributeArrayI attrB(attr);
+        CPPUNIT_ASSERT_EQUAL(attr.type(), attrB.type());
+        CPPUNIT_ASSERT_EQUAL(attr.size(), attrB.size());
+        CPPUNIT_ASSERT_EQUAL(attr.memUsage(), attrB.memUsage());
+        CPPUNIT_ASSERT_EQUAL(attr.isUniform(), attrB.isUniform());
+        CPPUNIT_ASSERT_EQUAL(attr.isTransient(), attrB.isTransient());
+        CPPUNIT_ASSERT_EQUAL(attr.isHidden(), attrB.isHidden());
 
-		for (size_t i = 0; i < count; ++i) {
-			CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.get(i));
-		}
-	}
+        for (unsigned i = 0; i < unsigned(count); ++i) {
+            CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.get(i));
+        }
+    }
 
-	{ // IO
-		const size_t count = 50;
-		AttributeArrayI attrA(count);
+    { // IO
+        const size_t count = 50;
+        AttributeArrayI attrA(count);
 
-		for (size_t i = 0; i < count; ++i) {
-			attrA.set(i, int(i));
-		}
+        for (unsigned i = 0; i < unsigned(count); ++i) {
+            attrA.set(i, int(i));
+        }
 
-		attrA.setHidden(true);
+        attrA.setHidden(true);
 
-		std::ostringstream ostr(std::ios_base::binary);
-		attrA.write(ostr);
+        std::ostringstream ostr(std::ios_base::binary);
+        attrA.write(ostr);
 
-		AttributeArrayI attrB;
+        AttributeArrayI attrB;
 
-		std::istringstream istr(ostr.str(), std::ios_base::binary);
-		attrB.read(istr);
+        std::istringstream istr(ostr.str(), std::ios_base::binary);
+        attrB.read(istr);
 
-		CPPUNIT_ASSERT_EQUAL(attrA.type(), attrB.type());
-		CPPUNIT_ASSERT_EQUAL(attrA.size(), attrB.size());
-		CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
-		CPPUNIT_ASSERT_EQUAL(attrA.isUniform(), attrB.isUniform());
-		CPPUNIT_ASSERT_EQUAL(attrA.isTransient(), attrB.isTransient());
-		CPPUNIT_ASSERT_EQUAL(attrA.isHidden(), attrB.isHidden());
+        CPPUNIT_ASSERT_EQUAL(attrA.type(), attrB.type());
+        CPPUNIT_ASSERT_EQUAL(attrA.size(), attrB.size());
+        CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
+        CPPUNIT_ASSERT_EQUAL(attrA.isUniform(), attrB.isUniform());
+        CPPUNIT_ASSERT_EQUAL(attrA.isTransient(), attrB.isTransient());
+        CPPUNIT_ASSERT_EQUAL(attrA.isHidden(), attrB.isHidden());
 
-		for (size_t i = 0; i < count; ++i) {
-			CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrB.get(i));
-		}
+        for (unsigned i = 0; i < unsigned(count); ++i) {
+            CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrB.get(i));
+        }
 
-		AttributeArrayI attrC(count, 3);
-		attrC.setTransient(true);
+        AttributeArrayI attrC(count, 3);
+        attrC.setTransient(true);
 
-		std::ostringstream ostrC(std::ios_base::binary);
-		attrC.write(ostrC);
+        std::ostringstream ostrC(std::ios_base::binary);
+        attrC.write(ostrC);
 
-		CPPUNIT_ASSERT_EQUAL(ostrC.str().size(), size_t(0));
-	}
+        CPPUNIT_ASSERT_EQUAL(ostrC.str().size(), size_t(0));
+    }
 
-	// Registry
-	AttributeArrayI::registerType();
+    // Registry
+    AttributeArrayI::registerType();
 
-	openvdb::tools::AttributeArray::Ptr attr =
-		openvdb::tools::AttributeArray::create(
-			AttributeArrayI::attributeType(), 34);
+    openvdb::tools::AttributeArray::Ptr attr =
+        openvdb::tools::AttributeArray::create(
+            AttributeArrayI::attributeType(), 34);
 }
+
+
+void
+TestAttributeArray::testAttributeSetDescriptor()
+{
+    // Define and register some common attribute types
+    typedef openvdb::tools::TypedAttributeArray<float>  AttributeS;
+    typedef openvdb::tools::TypedAttributeArray<double> AttributeD;
+    typedef openvdb::tools::TypedAttributeArray<int>    AttributeI;
+
+    AttributeS::registerType();
+    AttributeD::registerType();
+    AttributeI::registerType();
+
+    typedef openvdb::tools::AttributeSet::Descriptor Descriptor;
+
+    Descriptor::Inserter names;
+    names.add("density", AttributeS::attributeType());
+    names.add("id", AttributeI::attributeType());
+
+    Descriptor::Ptr descrA = Descriptor::create(names.vec);
+
+    Descriptor::Ptr descrB = Descriptor::create(Descriptor::Inserter()
+        .add("density", AttributeS::attributeType())
+        .add("id", AttributeI::attributeType())
+        .vec);
+
+    CPPUNIT_ASSERT_EQUAL(descrA->size(), descrB->size());
+
+    CPPUNIT_ASSERT(*descrA == *descrB);
+
+    // I/O test
+
+    std::ostringstream ostr(std::ios_base::binary);
+    descrA->write(ostr);
+
+    Descriptor inputDescr;
+
+    std::istringstream istr(ostr.str(), std::ios_base::binary);
+    inputDescr.read(istr);
+
+    CPPUNIT_ASSERT_EQUAL(descrA->size(), inputDescr.size());
+    CPPUNIT_ASSERT(*descrA == inputDescr);
+}
+
 
 void
 TestAttributeArray::testAttributeSet()
 {
-	typedef openvdb::tools::AttributeArray AttributeArray;
-	typedef openvdb::tools::AttributeSet::Descriptor Descriptor;
+    typedef openvdb::tools::AttributeArray AttributeArray;
 
-	// Define and register some common attribute types
-	typedef openvdb::tools::TypedAttributeArray<float> 			AttributeS;
-	typedef openvdb::tools::TypedAttributeArray<double> 		AttributeD;
-	typedef openvdb::tools::TypedAttributeArray<int> 			AttributeI;
-	typedef openvdb::tools::TypedAttributeArray<openvdb::Vec3s> AttributeVec3s;
-	typedef openvdb::tools::TypedAttributeArray<openvdb::Vec3d> AttributeVec3d;
+    // Define and register some common attribute types
+    typedef openvdb::tools::TypedAttributeArray<float>             AttributeS;
+    typedef openvdb::tools::TypedAttributeArray<double>         AttributeD;
+    typedef openvdb::tools::TypedAttributeArray<int>             AttributeI;
+    typedef openvdb::tools::TypedAttributeArray<openvdb::Vec3s> AttributeVec3s;
+    typedef openvdb::tools::TypedAttributeArray<openvdb::Vec3d> AttributeVec3d;
 
-	AttributeS::registerType();
-	AttributeD::registerType();
-	AttributeI::registerType();
-	AttributeVec3s::registerType();
-	AttributeVec3d::registerType();
+    AttributeS::registerType();
+    AttributeD::registerType();
+    AttributeI::registerType();
+    AttributeVec3s::registerType();
+    AttributeVec3d::registerType();
 
-	Descriptor::Inserter names;
-	names.add("p", AttributeVec3s::attributeType());
-	names.add("t", AttributeS::attributeType());
+    typedef openvdb::tools::AttributeSet AttributeSet;
+    typedef openvdb::tools::AttributeSet::Descriptor Descriptor;
 
-	Descriptor::Ptr descrA = Descriptor::create(names.vec);
+    Descriptor::Ptr descr = Descriptor::create(Descriptor::Inserter()
+        .add("p", AttributeVec3s::attributeType())
+        .add("t", AttributeS::attributeType())
+        .vec);
 
-	Descriptor::Ptr descrB = Descriptor::create(Descriptor::Inserter()
-		.add("p", AttributeVec3s::attributeType())
-		.add("t", AttributeS::attributeType())
-		.vec);
+    AttributeSet attributes(descr);
 
-	CPPUNIT_ASSERT_EQUAL(descrA->size(), descrB->size());
+    AttributeArray::Ptr pAttr(new AttributeVec3s(50));
+    AttributeArray::Ptr tAttr(new AttributeS(50));
 
-	CPPUNIT_ASSERT(*descrA == *descrB);
+    CPPUNIT_ASSERT(attributes.replace(0, pAttr) != AttributeSet::INVALID_POS);
+    CPPUNIT_ASSERT(attributes.replace(1, tAttr) != AttributeSet::INVALID_POS);
+    CPPUNIT_ASSERT(attributes.replace(0, tAttr) == AttributeSet::INVALID_POS);
 
-	typedef openvdb::tools::AttributeSet AttributeSet;
+    // I/O test
+    std::ostringstream ostr(std::ios_base::binary);
+    attributes.write(ostr);
 
-	AttributeSet attributes(descrA);
+    AttributeSet inputAttributes;
 
-	AttributeArray::Ptr pAttr(new AttributeVec3s(50));
-	AttributeArray::Ptr tAttr(new AttributeS(50));
+    std::istringstream istr(ostr.str(), std::ios_base::binary);
+    inputAttributes.read(istr);
 
-	CPPUNIT_ASSERT(attributes.replace(0, pAttr) != AttributeSet::INVALID_POS);
-	CPPUNIT_ASSERT(attributes.replace(1, tAttr) != AttributeSet::INVALID_POS);
 
-	CPPUNIT_ASSERT(attributes.replace(0, tAttr) == AttributeSet::INVALID_POS);
+    CPPUNIT_ASSERT_EQUAL(attributes.size(), inputAttributes.size());
+
+    CPPUNIT_ASSERT_EQUAL(attributes.memUsage(), inputAttributes.memUsage());
+
+    for (size_t n = 0, N = attributes.size(); n < N; ++n) {
+
+        const AttributeArray* a1 = attributes.getConst(n);
+        const AttributeArray* a2 = inputAttributes.getConst(n);
+
+        CPPUNIT_ASSERT_EQUAL(a1->size(), a2->size());
+        CPPUNIT_ASSERT_EQUAL(a1->isUniform(), a2->isUniform());
+        CPPUNIT_ASSERT_EQUAL(a1->isCompressed(), a2->isCompressed());
+        CPPUNIT_ASSERT_EQUAL(a1->isHidden(), a2->isHidden());
+
+        CPPUNIT_ASSERT(a1->type() == a2->type());
+    }
 }
 
 

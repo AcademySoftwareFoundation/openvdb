@@ -30,18 +30,21 @@
 //
 /// @file AttributeArray.h
 ///
-/// @note For evaluation purposes, do not distribute.
-///
 /// @authors Mihai Alden, Peter Cucka
 
 
-#ifndef OPENVDB_POINTS_TOOLS_ATTRIBUTE_ARRAY_HAS_BEEN_INCLUDED
-#define OPENVDB_POINTS_TOOLS_ATTRIBUTE_ARRAY_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_TOOLS_ATTRIBUTE_ARRAY_HAS_BEEN_INCLUDED
+#define OPENVDB_TOOLS_ATTRIBUTE_ARRAY_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h>
 #include <openvdb/Types.h>
 #include <openvdb/math/QuantizedUnitVec.h>
 #include <openvdb/util/Name.h>
+#include <openvdb/util/logging.h>
+
+#ifdef OPENVDB_USE_BLOSC
+#include <blosc.h>
+#endif
 
 #include <tbb/spin_mutex.h>
 #include <tbb/atomic.h>
@@ -62,7 +65,7 @@ namespace tools {
 
 ////////////////////////////////////////
 
-/// @todo move the following functions to math.h
+// Utility methods 
 
 template <typename IntegerT, typename FloatT>
 inline IntegerT
@@ -158,7 +161,7 @@ public:
 
     typedef Ptr (*FactoryMethod)(size_t);
 
-    AttributeArray() : mFlags(0) {}
+    AttributeArray() : mFlags(0), mCompressedBytes(0) {}
     virtual ~AttributeArray() {}
 
     /// Return a copy of this attribute.
@@ -191,6 +194,13 @@ public:
     /// Replace the existing array with a uniform zero value.
     virtual void collapse() = 0;
 
+    /// Return @c true if this array is compressed.
+    bool isCompressed() const { return mCompressedBytes != 0; }
+    /// Compress the attribute array.
+    virtual bool compress() = 0;
+    /// Uncompress the attribute array.
+    virtual bool decompress() = 0;
+
     /// @brief   Specify whether this attribute should be hidden (e.g., from UI or iterators).
     /// @details This is useful if the attribute is used for blind data or as scratch space
     ///          for a calculation.
@@ -219,6 +229,7 @@ protected:
 
     enum { TRANSIENT = 0x1, HIDDEN = 0x2 };
     uint16_t mFlags;
+    size_t mCompressedBytes;
 }; // class AttributeArray
 
 
@@ -294,12 +305,18 @@ public:
     /// Replace the existing array with the given uniform value.
     void collapse(const ValueType& uniformValue);
 
+    /// Compress the attribute array.
+    virtual bool compress();
+    /// Uncompress the attribute array.
+    virtual bool decompress();
+
     /// Read attribute data from a stream.
     virtual void read(std::istream& is);
     /// Write attribute data to a stream.
     virtual void write(std::ostream& os) const;
 
 private:
+    size_t arrayMemUsage() const;
     void allocate(bool fill = true);
     void deallocate();
 
@@ -365,8 +382,24 @@ public:
     bool isUnique(size_t pos) const;
     void makeUnique(size_t pos);
 
+    /// Write the entire set to a stream.
     void read(std::istream&);
+    /// Read the entire set from a stream.
     void write(std::ostream&) const;
+
+    //
+    /// @todo implement a I/O registry to handle shared descriptor objects.d
+    //
+
+    /// This will read the attribute descriptor from a stream, but not attribute data.
+    void readMetadata(std::istream&);
+    /// This will write the attribute descriptor to a stream, but not attribute data.
+    void writeMetadata(std::ostream&) const;
+
+    /// Read all attribute data from a stream.
+    void readAttributes(std::istream&);
+    /// Write all attribute data to a stream.
+    void writeAttributes(std::ostream&) const;
 
 private:
     typedef std::vector<AttributeArray::Ptr> AttrArrayVec;
@@ -383,13 +416,14 @@ class AttributeSet::Descriptor
 {
 public:
     typedef boost::shared_ptr<Descriptor> Ptr;
+    typedef std::map<std::string, size_t> NameToPosMap;
 
     struct NameAndType {
         NameAndType(const std::string& n = "", const std::string& t = ""): name(n), type(t) {}
         std::string name, type;
     };
 
-    // Utility method to construct a NameAndType sequence.
+    /// Utility method to construct a NameAndType sequence.
     struct Inserter {
         std::vector<NameAndType> vec;
         Inserter& add(const std::string& name, const std::string& type) {
@@ -415,35 +449,16 @@ public:
     bool operator==(const Descriptor&) const;
     bool operator!=(const Descriptor& rhs) const { return !this->operator==(rhs); }
 
-/// @todo
-//    Index64 id() const { return mId; }
-//    void write(std::ostream&) const;
-//    void read(std::istream&);
+    const NameToPosMap& map() const { return mNameMap; }
+
+    void write(std::ostream&) const;
+    void read(std::istream&);
 
 private:
-
     size_t insert(const std::string& name, const std::string& typeName);
-
-    typedef std::map<std::string, size_t> NameToPosMap;
-
     NameToPosMap                mNameMap;
     std::vector<std::string>    mTypes;
-
-    const Index64               mId;
-    static tbb::atomic<Index64> sNextId;
 }; // class Descriptor
-
-
-////////////////////////////////////////
-
-
-class AttributeSet::Iterator
-{
-public:
-    Iterator() {}
-
-private:
-};
 
 
 ////////////////////////////////////////
@@ -561,6 +576,8 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttribut
     if (mIsUniform) {
         mData = new StorageType[1];
         mData[0] = rhs.mData[0];
+    } else if (mCompressedBytes != 0) {
+        memcpy(mData, rhs.mData, mCompressedBytes);
     } else {
         mData = new StorageType[mSize];
         memcpy(mData, rhs.mData, mSize * sizeof(StorageType));
@@ -624,6 +641,15 @@ TypedAttributeArray<ValueType_, Codec_>::copy() const
 
 
 template<typename ValueType_, typename Codec_>
+size_t
+TypedAttributeArray<ValueType_, Codec_>::arrayMemUsage() const
+{
+    return mCompressedBytes != 0 ? mCompressedBytes :
+        (mIsUniform ? sizeof(StorageType) : (mSize * sizeof(StorageType)));
+}
+
+
+template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::allocate(bool fill)
 {
@@ -632,11 +658,13 @@ TypedAttributeArray<ValueType_, Codec_>::allocate(bool fill)
     StorageType val = mIsUniform ? mData[0] : zeroVal<StorageType>();
 
     if (mData) {
-        delete mData;
+        delete[] mData;
         mData = NULL;
     }
 
+    mCompressedBytes = 0;
     mIsUniform = false;
+
     mData = new StorageType[mSize];
     if (fill) {
         for (size_t i = 0; i < mSize; ++i) mData[i] = val;
@@ -649,7 +677,7 @@ void
 TypedAttributeArray<ValueType_, Codec_>::deallocate()
 {
     if (mData) {
-        delete mData;
+        delete[] mData;
         mData = NULL;
     }
 }
@@ -659,7 +687,7 @@ template<typename ValueType_, typename Codec_>
 size_t
 TypedAttributeArray<ValueType_, Codec_>::memUsage() const
 {
-    return sizeof(*this) + (mIsUniform ? sizeof(StorageType) : (mSize * sizeof(StorageType)));
+    return sizeof(*this) + (mData != NULL ? this->arrayMemUsage() : 0);
 }
 
 
@@ -667,7 +695,9 @@ template<typename ValueType_, typename Codec_>
 typename TypedAttributeArray<ValueType_, Codec_>::ValueType
 TypedAttributeArray<ValueType_, Codec_>::get(Index n) const
 {
+    if (mCompressedBytes != 0) const_cast<TypedAttributeArray*>(this)->decompress();
     if (mIsUniform) n = 0;
+
     ValueType val;
     Codec::decode(/*in=*/mData[n], /*out=*/val);
     return val;
@@ -679,7 +709,9 @@ template<typename T>
 void
 TypedAttributeArray<ValueType_, Codec_>::get(Index n, T& val) const
 {
+    if (mCompressedBytes != 0) const_cast<TypedAttributeArray*>(this)->decompress();
     if (mIsUniform) n = 0;
+
     ValueType tmp;
     Codec::decode(/*in=*/mData[n], /*out=*/tmp);
     val = static_cast<T>(tmp);
@@ -690,7 +722,9 @@ template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::set(Index n, const ValueType& val)
 {
+    if (mCompressedBytes != 0) this->decompress();
     if (mIsUniform) this->allocate();
+
     Codec::encode(/*in=*/val, /*out=*/mData[n]);
 }
 
@@ -701,7 +735,10 @@ void
 TypedAttributeArray<ValueType_, Codec_>::set(Index n, const T& val)
 {
     const ValueType tmp = static_cast<ValueType>(val);
+
+    if (mCompressedBytes != 0) this->decompress();
     if (mIsUniform) this->allocate();
+
     Codec::encode(/*in=*/tmp, /*out=*/mData[n]);
 }
 
@@ -736,13 +773,117 @@ TypedAttributeArray<ValueType_, Codec_>::expand(bool fill)
 
 
 template<typename ValueType_, typename Codec_>
+inline bool
+TypedAttributeArray<ValueType_, Codec_>::compress()
+{
+#ifdef OPENVDB_USE_BLOSC
+
+    tbb::spin_mutex::scoped_lock lock(mMutex);
+
+    if (!mIsUniform && mCompressedBytes == 0) {
+
+        const int inBytes = int(mSize * sizeof(StorageType));
+        int bufBytes = inBytes + BLOSC_MAX_OVERHEAD;
+        boost::scoped_array<char> outBuf(new char[bufBytes]);
+
+        bufBytes = blosc_compress_ctx(
+            /*clevel=*/9, // 0 (no compression) to 9 (maximum compression)
+            /*doshuffle=*/true,
+            /*typesize=*/1,
+            /*srcsize=*/inBytes,
+            /*src=*/mData,
+            /*dest=*/outBuf.get(),
+            /*destsize=*/bufBytes,
+            BLOSC_LZ4_COMPNAME,
+            /*blocksize=*/256,
+            /*numthreads=*/1);
+
+        if (bufBytes <= 0) {
+            std::ostringstream ostr;
+            ostr << "Blosc failed to compress " << inBytes << " byte" << (inBytes == 1 ? "" : "s");
+            if (bufBytes < 0) ostr << " (internal error " << bufBytes << ")";
+            OPENVDB_LOG_DEBUG(ostr.str());
+            return false;
+        }
+
+        this->deallocate();
+
+        char* outData = new char[bufBytes];
+        std::memcpy(outData, outBuf.get(), size_t(bufBytes));
+        mData = reinterpret_cast<StorageType*>(outData);
+
+        mCompressedBytes = size_t(bufBytes);
+        return true;
+    }
+
+#else
+    OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
+#endif
+
+    return false;
+}
+
+
+template<typename ValueType_, typename Codec_>
+inline bool
+TypedAttributeArray<ValueType_, Codec_>::decompress()
+{
+#ifdef OPENVDB_USE_BLOSC
+
+    tbb::spin_mutex::scoped_lock lock(mMutex);
+
+    if (mCompressedBytes != 0) {
+
+        size_t inBytes = 0;
+        blosc_cbuffer_sizes(mData, &inBytes, NULL, NULL);
+
+        int bufBytes = inBytes + BLOSC_MAX_OVERHEAD;
+        boost::scoped_array<char> outBuf(new char[bufBytes]);
+
+        const int outBytes = blosc_decompress_ctx(
+             /*src=*/mData, /*dest=*/outBuf.get(), bufBytes, /*numthreads=*/1);
+
+        if (bufBytes < 1) {
+            OPENVDB_LOG_DEBUG("blosc_decompress() returned error code " << bufBytes);
+            return false;
+        }
+
+        if (mData) delete[] mData;
+
+        char* outData = new char[outBytes];
+        std::memcpy(outData, outBuf.get(), size_t(outBytes));
+        mData = reinterpret_cast<StorageType*>(outData);
+
+        mCompressedBytes = 0;
+        return true;
+    }
+
+#else
+
+    if (mCompressedBytes != 0) { // throw if the array is compressed.
+        OPENVDB_THROW(RuntimeError, "Can't extract compressed data without the blosc library.");
+    }
+
+#endif
+
+    return false;
+}
+
+
+template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::read(std::istream& is)
 {
+    // AttributeArray data
     Int16 flags = Int16(0);
     is.read(reinterpret_cast<char*>(&flags), sizeof(Int16));
     mFlags = flags;
 
+    Index64 compressedBytes = Index64(0);
+    is.read(reinterpret_cast<char*>(&compressedBytes), sizeof(Index64));
+    mCompressedBytes = size_t(compressedBytes);
+
+    // TypedAttributeArray data
     Int16 isUniform = Int16(0);
     is.read(reinterpret_cast<char*>(&isUniform), sizeof(Int16));
     mIsUniform = bool(isUniform);
@@ -753,9 +894,11 @@ TypedAttributeArray<ValueType_, Codec_>::read(std::istream& is)
 
     this->deallocate();
 
-    size_t count = mIsUniform ? 1 : mSize;
-    mData = new StorageType[count];
-    is.read(reinterpret_cast<char*>(mData), count * sizeof(StorageType));
+    const size_t bufferSize = this->arrayMemUsage();
+    char* buffer = new char[bufferSize];
+    is.read(buffer, bufferSize);
+
+    mData = reinterpret_cast<StorageType*>(buffer);
 }
 
 
@@ -764,16 +907,21 @@ void
 TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os) const
 {
     if (!this->isTransient()) {
+
+        // AttributeArray data
         os.write(reinterpret_cast<const char*>(&mFlags), sizeof(Int16));
 
+        Index64 compressedBytes = Index64(mCompressedBytes);
+        os.write(reinterpret_cast<const char*>(&compressedBytes), sizeof(Index64));
+
+        // TypedAttributeArray data
         Int16 isUniform = Int16(mIsUniform);
         os.write(reinterpret_cast<char*>(&isUniform), sizeof(Int16));
 
-        Index64 arraylength = Index64(mSize);
-        os.write(reinterpret_cast<const char*>(&arraylength), sizeof(Index64));
+        Index64 arrayLength = Index64(mSize);
+        os.write(reinterpret_cast<const char*>(&arrayLength), sizeof(Index64));
 
-        size_t count = mIsUniform ? 1 : mSize;
-        os.write(reinterpret_cast<const char*>(mData), count * sizeof(StorageType));
+        os.write(reinterpret_cast<const char*>(mData), this->arrayMemUsage());
     }
 }
 
@@ -783,7 +931,7 @@ TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os) const
 } // namespace openvdb
 
 
-#endif // OPENVDB_POINTS_TOOLS_ATTRIBUTE_ARRAY_HAS_BEEN_INCLUDED
+#endif // OPENVDB_TOOLS_ATTRIBUTE_ARRAY_HAS_BEEN_INCLUDED
 
 
 // Copyright (c) 2012-2014 DreamWorks Animation LLC
