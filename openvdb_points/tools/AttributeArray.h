@@ -65,7 +65,7 @@ namespace tools {
 
 ////////////////////////////////////////
 
-// Utility methods 
+// Utility methods
 
 template <typename IntegerT, typename FloatT>
 inline IntegerT
@@ -161,7 +161,7 @@ public:
 
     typedef Ptr (*FactoryMethod)(size_t);
 
-    AttributeArray() : mFlags(0), mCompressedBytes(0) {}
+    AttributeArray() : mCompressedBytes(0), mFlags(0) {}
     virtual ~AttributeArray() {}
 
     /// Return a copy of this attribute.
@@ -228,8 +228,8 @@ protected:
     static void unregisterType(const Name& type);
 
     enum { TRANSIENT = 0x1, HIDDEN = 0x2 };
-    uint16_t mFlags;
     size_t mCompressedBytes;
+    uint16_t mFlags;
 }; // class AttributeArray
 
 
@@ -253,9 +253,10 @@ public:
     /// Default constructor, always constructs a uniform attribute.
     explicit TypedAttributeArray(size_t n = 1,
         const ValueType& uniformValue = zeroVal<ValueType>());
-    /// Deep copy constructor
+    /// Deep copy constructor.
     TypedAttributeArray(const TypedAttributeArray&);
-    //TypedAttributeArray& operator=(const TypedAttributeArray&); /// @todo
+    /// Deep copy assignment operator.
+    TypedAttributeArray& operator=(const TypedAttributeArray&);
 
     virtual ~TypedAttributeArray() { this->deallocate(); }
 
@@ -296,7 +297,7 @@ public:
     /// Return @c true if this array is stored as a single uniform value.
     virtual bool isUniform() const { return mIsUniform; }
 
-    /// @brief  Replace the the single value storage with a an array of length size().
+    /// @brief  Replace the single value storage with an array of length size().
     /// @note   Non-uniform attributes are unchanged.
     /// @param  fill toggle to initialize the array elements with the pre-expanded value.
     virtual void expand(bool fill = true);
@@ -340,84 +341,124 @@ class AttributeSet
 public:
     enum { INVALID_POS = boost::integer_traits<size_t>::const_max };
 
-    class Iterator;
     class Descriptor;
+
     typedef boost::shared_ptr<Descriptor> DescriptorPtr;
     typedef boost::shared_ptr<const Descriptor> DescriptorConstPtr;
 
     //////////
 
     AttributeSet();
+
+    /// Construct from the given descriptor
+    explicit AttributeSet(const DescriptorPtr&, size_t arrayLength = 1);
+
+    /// Shallow copy constructor, the descriptor and attribute arrays will be shared.
     AttributeSet(const AttributeSet&);
-    explicit AttributeSet(const DescriptorPtr&);
 
-    /// Update this attribute set to match the given descriptor.
-    void update(const DescriptorPtr&);
-
+    //@{
+    /// @brief  Return a reference to this attribute set's descriptor, which might
+    ///         be shared with other sets.
     Descriptor& descriptor() { return *mDescr; }
     const Descriptor& descriptor() const { return *mDescr; }
+    //@}
+
+    /// @brief Return a pointer to this attribute set's descriptor, which might be
+    /// shared with other sets
     DescriptorPtr descriptorPtr() const { return mDescr; }
 
     /// Return the number of attributes in this set.
     size_t size() const { return mAttrs.size(); }
+
     /// Return the number of bytes of memory used by this attribute set.
     size_t memUsage() const;
 
+    /// @brief  Return the position of the attribute array whose name is @a name,
+    ///         or @c INVALID_POS if no match is found.
     size_t find(const std::string& name) const;
 
+    /// @brief  Replace the attribute array whose name is @a name.
+    /// @return The position of the updated attribute array or @c INVALID_POS
+    ///         if the given name does not exist or if the replacement failed because
+    ///         the new array type does not comply with the descriptor.
     size_t replace(const std::string& name, const AttributeArray::Ptr&);
+
+    /// @brief  Replace the attribute array stored at position @a pos in this container.
+    /// @return The position of the updated attribute array or @c INVALID_POS
+    ///         if replacement failed because the new array type does not comply with
+    ///         the descriptor.
     size_t replace(size_t pos, const AttributeArray::Ptr&);
 
+    //@{
+    /// @brief  Return a pointer to the attribute array whose name is @a name or
+    ///         a null pointer if no match is found.
     const AttributeArray* getConst(const std::string& name) const;
     const AttributeArray* get(const std::string& name) const;
     AttributeArray*       get(const std::string& name);
+    //@}
 
+
+    //@{
+    /// @brief  Return a pointer to the attribute array stored at position @a pos
+    ///         in this set.
     const AttributeArray* getConst(size_t pos) const;
     const AttributeArray* get(size_t pos) const;
     AttributeArray*       get(size_t pos);
+    //@}
 
-    AttributeArray::Ptr   getSharedPtr(const std::string& name);
-    AttributeArray::Ptr   getSharedPtr(size_t pos);
 
-    bool isUnique(size_t pos) const;
+    /// Return true if the attribute array stored at position @a pos is shared.
+    bool isShared(size_t pos) const;
+    /// @brief  If the attribute array stored at position @a pos is shared,
+    ///         replace the array with a deep copy of itself that is not
+    ///         shared with anyone else.
     void makeUnique(size_t pos);
 
-    /// Write the entire set to a stream.
-    void read(std::istream&);
+    //
+    /// @todo implement a I/O registry to handle shared descriptor objects.
+    //
+
     /// Read the entire set from a stream.
+    void read(std::istream&);
+    /// Write the entire set to a stream.
     void write(std::ostream&) const;
 
-    //
-    /// @todo implement a I/O registry to handle shared descriptor objects.d
-    //
-
-    /// This will read the attribute descriptor from a stream, but not attribute data.
+    /// This will read the attribute descriptor from a stream, but no attribute data.
     void readMetadata(std::istream&);
-    /// This will write the attribute descriptor to a stream, but not attribute data.
+    /// This will write the attribute descriptor to a stream, but no attribute data.
     void writeMetadata(std::ostream&) const;
 
-    /// Read all attribute data from a stream.
+    /// Read attribute data from a stream.
     void readAttributes(std::istream&);
-    /// Write all attribute data to a stream.
+    /// Write attribute data to a stream.
     void writeAttributes(std::ostream&) const;
 
 private:
+    /// Disallow assignment, since it wouldn't be obvious whether the copy is deep or shallow.
+    AttributeSet& operator=(const AttributeSet&);
+
     typedef std::vector<AttributeArray::Ptr> AttrArrayVec;
 
-    DescriptorPtr   mDescr;
-    AttrArrayVec    mAttrs;
+    DescriptorPtr mDescr;
+    AttrArrayVec  mAttrs;
 }; // class AttributeSet
 
 
 ////////////////////////////////////////
 
 
+/// @brief  An immutable object that stores name, type and AttributeSet position
+///         for a constant collection of attribute arrays.
+/// @note   The attribute name is actually mutable, but the attribute type
+///         and position can not be changed after creation.
 class AttributeSet::Descriptor
 {
 public:
     typedef boost::shared_ptr<Descriptor> Ptr;
     typedef std::map<std::string, size_t> NameToPosMap;
+    typedef NameToPosMap::const_iterator  ConstIterator;
 
+    /// Attribute and type name pair.
     struct NameAndType {
         NameAndType(const std::string& n = "", const std::string& t = ""): name(n), type(t) {}
         std::string name, type;
@@ -435,23 +476,36 @@ public:
 
     Descriptor();
 
+    /// Create a new descriptor from the given attribute and type name pairs.
     static Ptr create(const std::vector<NameAndType>&);
 
+    /// Return the number of attributes in this descriptor.
     size_t size() const { return mTypes.size(); }
+
+    /// Return the number of bytes of memory used by this attribute set.
     size_t memUsage() const;
 
+    /// @brief  Return the position of the attribute array whose name is @a name,
+    ///         or @c INVALID_POS if no match is found.
     size_t find(const std::string& name) const;
 
+    /// Rename an attribute array
     size_t rename(const std::string& fromName, const std::string& toName);
 
+    /// Return the name of the attribute array's type.
     const std::string& type(size_t pos) const { return mTypes[pos]; }
 
+    /// Return true if this descriptor is equal to the given one.
     bool operator==(const Descriptor&) const;
+    /// Return true if this descriptor is not equal to the given one.
     bool operator!=(const Descriptor& rhs) const { return !this->operator==(rhs); }
 
+    /// Return a reference to the name-to-position map.
     const NameToPosMap& map() const { return mNameMap; }
 
+    /// Serialize this descriptor to the given stream.
     void write(std::ostream&) const;
+    /// Unserialize this transform from the given stream.
     void read(std::istream&);
 
 private:
@@ -577,10 +631,39 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttribut
         mData = new StorageType[1];
         mData[0] = rhs.mData[0];
     } else if (mCompressedBytes != 0) {
-        memcpy(mData, rhs.mData, mCompressedBytes);
+        char* buffer = new char[mCompressedBytes];
+        memcpy(buffer, rhs.mData, mCompressedBytes);
+        mData = reinterpret_cast<StorageType*>(buffer);
     } else {
         mData = new StorageType[mSize];
         memcpy(mData, rhs.mData, mSize * sizeof(StorageType));
+    }
+}
+
+
+template<typename ValueType_, typename Codec_>
+typename TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray&
+TypedAttributeArray<ValueType_, Codec_>::operator=(const TypedAttributeArray& rhs)
+{
+    if (&rhs != this) {
+        this->deallocate();
+
+        mFlags= rhs.mFlags;
+        mCompressedBytes = rhs.mCompressedBytes;
+        mSize = rhs.mSize;
+        mIsUniform = rhs.mIsUniform;
+
+        if (mIsUniform) {
+            mData = new StorageType[1];
+            mData[0] = rhs.mData[0];
+        } else if (mCompressedBytes != 0) {
+            char* buffer = new char[mCompressedBytes];
+            memcpy(buffer, rhs.mData, mCompressedBytes);
+            mData = reinterpret_cast<StorageType*>(buffer);
+        } else {
+            mData = new StorageType[mSize];
+            memcpy(mData, rhs.mData, mSize * sizeof(StorageType));
+        }
     }
 }
 
@@ -893,11 +976,10 @@ TypedAttributeArray<ValueType_, Codec_>::read(std::istream& is)
     mSize = size_t(arrayLength);
 
     this->deallocate();
-
     const size_t bufferSize = this->arrayMemUsage();
+
     char* buffer = new char[bufferSize];
     is.read(buffer, bufferSize);
-
     mData = reinterpret_cast<StorageType*>(buffer);
 }
 
@@ -922,6 +1004,7 @@ TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os) const
         os.write(reinterpret_cast<const char*>(&arrayLength), sizeof(Index64));
 
         os.write(reinterpret_cast<const char*>(mData), this->arrayMemUsage());
+
     }
 }
 

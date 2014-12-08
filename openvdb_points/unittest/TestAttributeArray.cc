@@ -54,6 +54,40 @@ CPPUNIT_TEST_SUITE_REGISTRATION(TestAttributeArray);
 
 ////////////////////////////////////////
 
+
+namespace {
+
+bool
+matchingAttributeSets(const openvdb::tools::AttributeSet& lhs,
+    const openvdb::tools::AttributeSet& rhs)
+{
+    if (lhs.size() != rhs.size()) return false;
+    if (lhs.memUsage() != rhs.memUsage()) return false;
+    //if (lhs.descriptor() != rhs.descriptor()) return false;
+
+    typedef openvdb::tools::AttributeArray AttributeArray;
+
+    for (size_t n = 0, N = lhs.size(); n < N; ++n) {
+
+        const AttributeArray* a = lhs.getConst(n);
+        const AttributeArray* b = rhs.getConst(n);
+
+        if (a->size() != b->size()) return false;
+        if (a->isUniform() != b->isUniform()) return false;
+        if (a->isCompressed() != b->isCompressed()) return false;
+        if (a->isHidden() != b->isHidden()) return false;
+        if (a->type() != b->type()) return false;
+    }
+
+    return true;
+}
+
+} //unnamed  namespace
+
+
+////////////////////////////////////////
+
+
 void
 TestAttributeArray::testAttributeArray()
 {
@@ -262,61 +296,77 @@ TestAttributeArray::testAttributeSet()
     typedef openvdb::tools::AttributeArray AttributeArray;
 
     // Define and register some common attribute types
-    typedef openvdb::tools::TypedAttributeArray<float>             AttributeS;
-    typedef openvdb::tools::TypedAttributeArray<double>         AttributeD;
-    typedef openvdb::tools::TypedAttributeArray<int>             AttributeI;
+    typedef openvdb::tools::TypedAttributeArray<float>          AttributeS;
+    typedef openvdb::tools::TypedAttributeArray<int>            AttributeI;
     typedef openvdb::tools::TypedAttributeArray<openvdb::Vec3s> AttributeVec3s;
-    typedef openvdb::tools::TypedAttributeArray<openvdb::Vec3d> AttributeVec3d;
 
     AttributeS::registerType();
-    AttributeD::registerType();
     AttributeI::registerType();
     AttributeVec3s::registerType();
-    AttributeVec3d::registerType();
 
     typedef openvdb::tools::AttributeSet AttributeSet;
     typedef openvdb::tools::AttributeSet::Descriptor Descriptor;
 
+    // construct
+
     Descriptor::Ptr descr = Descriptor::create(Descriptor::Inserter()
-        .add("p", AttributeVec3s::attributeType())
-        .add("t", AttributeS::attributeType())
+        .add("pos", AttributeVec3s::attributeType())
+        .add("id", AttributeI::attributeType())
         .vec);
 
-    AttributeSet attributes(descr);
+    AttributeSet attrSetA(descr, /*arrayLength=*/50);
 
-    AttributeArray::Ptr pAttr(new AttributeVec3s(50));
-    AttributeArray::Ptr tAttr(new AttributeS(50));
 
-    CPPUNIT_ASSERT(attributes.replace(0, pAttr) != AttributeSet::INVALID_POS);
-    CPPUNIT_ASSERT(attributes.replace(1, tAttr) != AttributeSet::INVALID_POS);
-    CPPUNIT_ASSERT(attributes.replace(0, tAttr) == AttributeSet::INVALID_POS);
+    CPPUNIT_ASSERT_EQUAL(size_t(2), attrSetA.size());
+    CPPUNIT_ASSERT_EQUAL(size_t(50), attrSetA.get(0)->size());
+    CPPUNIT_ASSERT_EQUAL(size_t(50), attrSetA.get(1)->size());
+
+    { // copy
+        CPPUNIT_ASSERT(!attrSetA.isShared(0));
+        CPPUNIT_ASSERT(!attrSetA.isShared(1));
+
+        AttributeSet attrSetB(attrSetA);
+
+        CPPUNIT_ASSERT(matchingAttributeSets(attrSetA, attrSetB));
+
+        CPPUNIT_ASSERT(attrSetA.isShared(0));
+        CPPUNIT_ASSERT(attrSetA.isShared(1));
+        CPPUNIT_ASSERT(attrSetB.isShared(0));
+        CPPUNIT_ASSERT(attrSetB.isShared(1));
+
+        attrSetB.makeUnique(0);
+        attrSetB.makeUnique(1);
+
+        CPPUNIT_ASSERT(matchingAttributeSets(attrSetA, attrSetB));
+
+        CPPUNIT_ASSERT(!attrSetA.isShared(0));
+        CPPUNIT_ASSERT(!attrSetA.isShared(1));
+        CPPUNIT_ASSERT(!attrSetB.isShared(0));
+        CPPUNIT_ASSERT(!attrSetB.isShared(1));
+    }
+
+    // replace existing arrays
+
+    // this replace call should not take effect since the new attribute
+    // array type does not match with the descriptor type for the given position.
+    AttributeArray::Ptr floatAttr(new AttributeS(15));
+    CPPUNIT_ASSERT(attrSetA.replace(1, floatAttr) == AttributeSet::INVALID_POS);
+
+    AttributeArray::Ptr intAttr(new AttributeI(10));
+    CPPUNIT_ASSERT(attrSetA.replace(1, intAttr) != AttributeSet::INVALID_POS);
+
+    CPPUNIT_ASSERT_EQUAL(size_t(10), attrSetA.get(1)->size());
 
     // I/O test
+
     std::ostringstream ostr(std::ios_base::binary);
-    attributes.write(ostr);
+    attrSetA.write(ostr);
 
-    AttributeSet inputAttributes;
-
+    AttributeSet attrSetB;
     std::istringstream istr(ostr.str(), std::ios_base::binary);
-    inputAttributes.read(istr);
+    attrSetB.read(istr);
 
-
-    CPPUNIT_ASSERT_EQUAL(attributes.size(), inputAttributes.size());
-
-    CPPUNIT_ASSERT_EQUAL(attributes.memUsage(), inputAttributes.memUsage());
-
-    for (size_t n = 0, N = attributes.size(); n < N; ++n) {
-
-        const AttributeArray* a1 = attributes.getConst(n);
-        const AttributeArray* a2 = inputAttributes.getConst(n);
-
-        CPPUNIT_ASSERT_EQUAL(a1->size(), a2->size());
-        CPPUNIT_ASSERT_EQUAL(a1->isUniform(), a2->isUniform());
-        CPPUNIT_ASSERT_EQUAL(a1->isCompressed(), a2->isCompressed());
-        CPPUNIT_ASSERT_EQUAL(a1->isHidden(), a2->isHidden());
-
-        CPPUNIT_ASSERT(a1->type() == a2->type());
-    }
+    CPPUNIT_ASSERT(matchingAttributeSets(attrSetA, attrSetB));
 }
 
 

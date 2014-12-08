@@ -30,6 +30,8 @@
 //
 /// @file AttributeArray.cc
 ///
+/// @note For evaluation purposes, do not distribute.
+///
 /// @authors Mihai Alden, Peter Cucka
 
 #include "AttributeArray.h"
@@ -186,42 +188,22 @@ AttributeSet::AttributeSet()
 }
 
 
+AttributeSet::AttributeSet(const DescriptorPtr& descr, size_t arrayLength)
+    : mDescr(descr)
+    , mAttrs(descr->size(), AttributeArray::Ptr())
+{
+    for (Descriptor::ConstIterator it = mDescr->map().begin(),
+        end = mDescr->map().end(); it != end; ++it) {
+        const size_t pos = it->second;
+        mAttrs[pos] = AttributeArray::create(mDescr->type(pos), arrayLength);
+    }
+}
+
+
 AttributeSet::AttributeSet(const AttributeSet& rhs)
     : mDescr(rhs.mDescr)
     , mAttrs(rhs.mAttrs)
 {
-}
-
-
-AttributeSet::AttributeSet(const DescriptorPtr& descr)
-    : mDescr(descr)
-    , mAttrs(descr->size(), AttributeArray::Ptr())
-{
-}
-
-
-void
-AttributeSet::update(const DescriptorPtr& descr)
-{
-    if (descr.get() != mDescr.get()) {
-        AttrArrayVec attrs(descr->size(), AttributeArray::Ptr());
-
-        // preserve similar attributes
-
-        for (Descriptor::NameToPosMap::const_iterator it = mDescr->map().begin(),
-            end = mDescr->map().end(); it != end; ++it) {
-
-            const size_t pos = descr->find(it->first);
-            if (pos != INVALID_POS) {
-                if (mDescr->type(it->second) == descr->type(pos)) {
-                    attrs[pos] = mAttrs[it->second];
-                }
-            }
-        }
-
-        mAttrs.swap(attrs);
-        mDescr = descr;
-    }
 }
 
 
@@ -318,11 +300,11 @@ AttributeSet::get(size_t pos)
 
 
 bool
-AttributeSet::isUnique(size_t pos) const
+AttributeSet::isShared(size_t pos) const
 {
     assert(pos != INVALID_POS);
     assert(pos < mAttrs.size());
-    return mAttrs[pos].unique();
+    return !mAttrs[pos].unique();
 }
 
 
@@ -373,15 +355,12 @@ AttributeSet::readAttributes(std::istream& is)
     if (!mDescr) {
         OPENVDB_THROW(IllegalValueException, "Attribute set descriptor not defined.");
     }
- 
+
     AttrArrayVec(mDescr->size()).swap(mAttrs); // allocate vector
 
-    for (Descriptor::NameToPosMap::const_iterator it = mDescr->map().begin(),
-        end = mDescr->map().end(); it != end; ++it) {
-
-        const size_t pos = it->second;
-        mAttrs[pos] = AttributeArray::create(mDescr->type(pos), 1);
-        mAttrs[pos]->read(is);
+    for (size_t n = 0, N = mAttrs.size(); n < N; ++n) {
+        mAttrs[n] = AttributeArray::create(mDescr->type(n), 1);
+        mAttrs[n]->read(is);
     }
 }
 
@@ -393,7 +372,6 @@ AttributeSet::writeAttributes(std::ostream& os) const
         mAttrs[n]->write(os);
     }
 }
-
 
 ////////////////////////////////////////
 
