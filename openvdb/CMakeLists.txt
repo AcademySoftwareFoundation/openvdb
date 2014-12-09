@@ -69,7 +69,7 @@ SET ( OPENVDB_LIBRARY_SOURCE_FILES
   util/Formats.cc
   util/Util.cc
   )
-ADD_LIBRARY ( openvdb STATIC
+ADD_LIBRARY ( openvdb SHARED
   ${OPENVDB_LIBRARY_SOURCE_FILES}
   )
 TARGET_LINK_LIBRARIES ( openvdb
