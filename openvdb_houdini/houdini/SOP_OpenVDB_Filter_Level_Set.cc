@@ -50,6 +50,7 @@
 
 #include <OP/OP_AutoLockInputs.h>
 #include <UT/UT_Interrupt.h>
+#include <UT/UT_Version.h>
 
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/trim.hpp>
@@ -338,7 +339,7 @@ class SOP_OpenVDB_Filter_Level_Set: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Filter_Level_Set(OP_Network*, const char* name, OP_Operator*, OperatorType);
-    virtual ~SOP_OpenVDB_Filter_Level_Set() {};
+    virtual ~SOP_OpenVDB_Filter_Level_Set() {}
 
     static OP_Node* factoryRenormalize(OP_Network*, const char* name, OP_Operator*);
     static OP_Node* factorySmooth(OP_Network*, const char* name, OP_Operator*);
@@ -691,7 +692,12 @@ SOP_OpenVDB_Filter_Level_Set::cookMySop(OP_Context& context)
                 }
             }
         }
+#if (UT_VERSION_INT >= 0x0e0000b0) // 14.0.176 or later
+        lock.setNode(startNode);
+        if (lock.lock(context) >= UT_ERROR_ABORT) return error();
+#else
         if (lock.lock(*startNode, context) >= UT_ERROR_ABORT) return error();
+#endif
 
         // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
         if (startNode->duplicateSource(0, context, gdp) >= UT_ERROR_ABORT) return error();

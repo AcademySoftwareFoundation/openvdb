@@ -52,7 +52,6 @@
 #include <UT/UT_Version.h>
 #include <UT/UT_VoxelArray.h>
 #include <SYS/SYS_Math.h>
-#include <PRM/PRM_Parm.h>
 
 #include <boost/algorithm/string/join.hpp>
 #include <boost/math/special_functions/round.hpp>
@@ -82,7 +81,11 @@ namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 
 namespace {
+#if HAVE_POLYSOUP
+enum ConvertTo { HVOLUME, OPENVDB, POLYGONS, POLYSOUP /*, SIMDATA*/ };
+#else
 enum ConvertTo { HVOLUME, OPENVDB, POLYGONS /*, SIMDATA*/ };
+#endif
 enum ConvertClass { CLASS_NO_CHANGE, CLASS_SDF, CLASS_FOG_VOLUME };
 }
 
@@ -104,7 +107,6 @@ public:
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
     virtual bool updateParmsFlags();
-    virtual void resolveObsoleteParms(PRM_ParmList*);
 
 private:
     void convertToPoly(
@@ -176,11 +178,14 @@ newSopOperator(OP_OperatorTable* table)
         const char* items[] = {
             "volume",   "Volume",
             "vdb",      "VDB",
-            "poly",     "Polygon Surface",
+            "poly",     "Polygons",
+#if HAVE_POLYSOUP
+            "polysoup", "Polygon Soup",
+#endif
             NULL
         };
 
-        parms.add(hutil::ParmFactory(PRM_ORD, "convertto", "Convert To")
+        parms.add(hutil::ParmFactory(PRM_ORD, "conversion", "Convert To")
             .setDefault(PRMzeroDefaults)
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
@@ -192,26 +197,10 @@ newSopOperator(OP_OperatorTable* table)
             "fog",  "Convert SDF to Fog",
             NULL
         };
-//
 
         parms.add(hutil::ParmFactory(PRM_ORD, "vdbclass", "VDB Class")
             .setDefault(PRMzeroDefaults)
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, class_items));
-    }
-
-    { // Geometry Type
-        const char* items[] = {
-            "polysoup", "Polygon Soup",
-            "poly",     "Polygons",
-            NULL
-        };
-
-        parms.add(hutil::ParmFactory(PRM_ORD, "geometrytype", "Geometry Type")
-            .setDefault(PRMzeroDefaults)
-            .setHelpText("Type of geometry to output. A polygon soup is a primitive "
-                "that stores polygons using a compact memory representation. Note "
-                "that not all geometry nodes can operate directly on this primitive.")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
 
     //////////
@@ -372,23 +361,6 @@ newSopOperator(OP_OperatorTable* table)
     hutil::ParmList obsoleteParms;
     obsoleteParms.add(hutil::ParmFactory(PRM_SEPARATOR,"sep1", ""));
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "smoothseams", "Smooth Seams"));
-
-    { // old conversion menu
-        const char* items[] = {
-            "volume",   "Volume",
-            "vdb",      "VDB",
-            "poly",     "Polygons",
-#if HAVE_POLYSOUP
-            "polysoup", "Polygon Soup",
-#endif
-            NULL
-        };
-
-        obsoleteParms.add(hutil::ParmFactory(PRM_ORD, "conversion", "Convert To")
-            .setDefault(PRMzeroDefaults)
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
-    }
-
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Convert",
@@ -824,22 +796,20 @@ SOP_OpenVDB_Convert::updateParmsFlags()
     bool changed = false;
     const fpreal time = CHgetEvalTime();
 
-    ConvertTo target = static_cast<ConvertTo>(evalInt("convertto", 0, time));
+    ConvertTo target = static_cast<ConvertTo>(evalInt("conversion", 0, time));
 #if HAVE_SPLITTING
     bool toVolume = (target == HVOLUME);
 #endif
     bool toOpenVDB = (target == OPENVDB);
-    bool toSDF = (evalInt("vdbclass", 0, time) == CLASS_SDF);
-
     bool toPoly = (target == POLYGONS);
-    bool toPolySoup = evalInt("geometrytype", 0, time) == 0;
-
-#if !HAVE_POLYSOUP
-    changed |= setVisibleState("geometrytype", false);
-    toPolySoup = false;
+    bool toPolySoup = false;
+#if HAVE_POLYSOUP
+    toPolySoup = (target == POLYSOUP);
+    toPoly |= toPolySoup;
 #endif
 
-    changed |= enableParm("geometrytype", toPoly);
+    bool toSDF = (evalInt("vdbclass", 0, time) == CLASS_SDF);
+
     changed |= enableParm("adaptivity", toPoly);
     changed |= enableParm("isoValue", toPoly || (toOpenVDB && toSDF));
     changed |= enableParm("fogisovalue", toOpenVDB && toSDF);
@@ -913,28 +883,6 @@ SOP_OpenVDB_Convert::updateParmsFlags()
     changed |= setVisibleState("vdbclass", toOpenVDB);
 
     return changed;
-}
-
-void
-SOP_OpenVDB_Convert::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
-{
-    if (!obsoleteParms) return;
-
-    PRM_Parm* parm = obsoleteParms->getParmPtr("conversion");
-    if (parm && !parm->isFactoryDefault()) {
-
-        const int conversion = obsoleteParms->evalInt("conversion", 0, 0);
-        if (conversion == 1) {
-            setInt("convertto", 0, 0, 1);
-        } else if (conversion == 2) {
-            setInt("convertto", 0, 0, 2);
-            setInt("geometrytype", 0, 0, 1);
-        } else if (conversion == 3) {
-            setInt("convertto", 0, 0, 2);
-            setInt("geometrytype", 0, 0, 0);
-        }
-    }
-    hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
 }
 
 
@@ -1114,14 +1062,14 @@ SOP_OpenVDB_Convert::referenceMeshing(
 
     grids.clear();
 
-    bool toPolySoup = false;
-
-#if HAVE_POLYSOUP
-    toPolySoup = evalInt("geometrytype", 0, time) == 0;
-#endif
-
     for (size_t i = 0, I = fragments.size(); i < I; ++i) {
         mesher(*fragments[i]);
+#if HAVE_POLYSOUP
+        ConvertTo target = static_cast<ConvertTo>(evalInt("conversion", 0, time));
+        bool toPolySoup = (target == POLYSOUP);
+#else
+        bool toPolySoup = false;
+#endif
         copyMesh(*gdp, fragment_vdbs[i], delgroup, mesher, toPolySoup,
             surfaceGroup, interiorGroup, seamGroup, seamPointGroup);
     }
@@ -1320,10 +1268,11 @@ SOP_OpenVDB_Convert::convertToPoly(
 
     } else {
 
-     bool toPolySoup = false;
-
 #if HAVE_POLYSOUP
-    toPolySoup = evalInt("geometrytype", 0, time) == 0;
+        ConvertTo target = static_cast<ConvertTo>(evalInt("conversion", 0, time));
+        bool toPolySoup = (target == POLYSOUP);
+#else
+        bool toPolySoup = false;
 #endif
 
         // Mesh each VDB primitive independently
@@ -1371,7 +1320,7 @@ SOP_OpenVDB_Convert::cookMySop(OP_Context& context)
 
         hvdb::Interrupter interrupter("Convert");
 
-        switch (evalInt("convertto",  0, t))
+        switch (evalInt("conversion",  0, t))
         {
             case HVOLUME: {
 #if HAVE_SPLITTING
@@ -1403,13 +1352,16 @@ SOP_OpenVDB_Convert::cookMySop(OP_Context& context)
                 break;
             }
             case POLYGONS: {
-                bool usePolygonSoup = false;
-#if HAVE_POLYSOUP
-                usePolygonSoup = evalInt("geometrytype", 0, t) == 0;
-#endif
-                convertToPoly(t, group, usePolygonSoup, interrupter);
+                convertToPoly(t, group, false, interrupter);
                 break;
             }
+
+#if HAVE_POLYSOUP
+            case POLYSOUP: {
+                convertToPoly(t, group, true, interrupter);
+                break;
+            }
+#endif
 
             default: {
                 addWarning(SOP_MESSAGE, "Unrecognized conversion type");
