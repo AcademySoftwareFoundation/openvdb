@@ -7,6 +7,7 @@ set(DESTDIR "/usr/local")
 set(OPENVDB_INCLUDE_DIR "${DESTDIR}/include/openvdb")
 set(OPENVDB_LIB_DIR "${DESTDIR}/lib/openvdb")
 set(OPENVDB_BIN_DIR "${DESTDIR}/bin")
+set(OPENVDB_PYTHON_LIB_DIR "${DESTDIR}/lib/python2.7/dist-packages/openvdb")
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/../../cmake/")
 
@@ -14,7 +15,7 @@ find_package(PkgConfig REQUIRED)
 
 pkg_search_module(GLFW REQUIRED glfw3)
 
-FIND_PACKAGE ( Boost REQUIRED COMPONENTS iostreams system thread )
+FIND_PACKAGE ( Boost REQUIRED COMPONENTS python iostreams system thread )
 
 FIND_PACKAGE ( IlmBase REQUIRED )
 FIND_PACKAGE ( OpenEXR REQUIRED )
@@ -22,6 +23,7 @@ FIND_PACKAGE ( OpenEXR REQUIRED )
 FIND_PACKAGE ( TBB REQUIRED )
 FIND_PACKAGE ( ZLIB REQUIRED )
 FIND_PACKAGE ( OpenGL REQUIRED )
+FIND_PACKAGE ( PythonLibs 2.7 REQUIRED )
 
 INCLUDE_DIRECTORIES ( ${Boost_INCLUDE_DIR} )
 INCLUDE_DIRECTORIES ( ${ILMBASE_INCLUDE_DIR} )
@@ -29,8 +31,11 @@ INCLUDE_DIRECTORIES ( ${TBB_INCLUDE_DIR} )
 INCLUDE_DIRECTORIES ( ${OPENGL_INCLUDE_DIR} )
 INCLUDE_DIRECTORIES ( ${ZLIB_INCLUDE_DIR} )
 INCLUDE_DIRECTORIES ( ${GLFW_INCLUDE_DIR} )
+INCLUDE_DIRECTORIES ( ${PYTHON_INCLUDE_DIR} )
 INCLUDE_DIRECTORIES ( .. ) # So they can simulate referencing installed headers
 INCLUDE_DIRECTORIES ( . ) # So they can simulate referencing installed headers
+
+LINK_DIRECTORIES( ${PYTHON_LIBRARY_DIRS} )
 
 ADD_DEFINITIONS (
   -DGL_GLEXT_PROTOTYPES=1
@@ -121,3 +126,21 @@ TARGET_LINK_LIBRARIES ( vdb_view
   ${GLFW_STATIC_LIBRARIES}
   )
 install(TARGETS vdb_view DESTINATION ${OPENVDB_BIN_DIR})
+
+# ---
+# pyopenvdb
+ADD_LIBRARY ( pyopenvdb SHARED
+  python/pyFloatGrid.cc
+  python/pyIntGrid.cc
+  python/pyMetadata.cc
+  python/pyOpenVDBModule.cc
+  python/pyTransform.cc
+  python/pyVec3Grid.cc
+  )
+TARGET_LINK_LIBRARIES ( pyopenvdb
+  openvdb
+  ${Boost_LIBRARIES}
+  )
+set_target_properties(pyopenvdb PROPERTIES PREFIX "")
+install(TARGETS pyopenvdb DESTINATION ${OPENVDB_PYTHON_LIB_DIR})
+
