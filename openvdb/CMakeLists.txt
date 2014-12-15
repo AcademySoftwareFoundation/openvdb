@@ -7,7 +7,7 @@ set(DESTDIR "/usr/local")
 set(OPENVDB_INCLUDE_DIR "${DESTDIR}/include/openvdb")
 set(OPENVDB_LIB_DIR "${DESTDIR}/lib/openvdb")
 set(OPENVDB_BIN_DIR "${DESTDIR}/bin")
-set(OPENVDB_PYTHON_LIB_DIR "${DESTDIR}/lib/python2.7/dist-packages/openvdb")
+set(OPENVDB_PYTHON_LIB_DIR "${DESTDIR}/lib/python2.7/dist-packages")
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/../../cmake/")
 
