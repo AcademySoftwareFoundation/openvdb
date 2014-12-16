@@ -3,6 +3,25 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
 PROJECT ( OpenVDB )
 
+# -----------------------------------------------------
+# default build type
+if (NOT CMAKE_BUILD_TYPE)
+    message(STATUS "No build type selected, default to Release")
+    set(CMAKE_BUILD_TYPE "Release")
+endif()
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+
+IF(CMAKE_BUILD_TYPE MATCHES "Debug")
+    set(CMAKE_CC_FLAGS "${CMAKE_CC_FLAGS} -g -O0")
+    add_definitions(-DDEBUG)
+ENDIF(CMAKE_BUILD_TYPE MATCHES "Debug")
+
+IF(CMAKE_BUILD_TYPE MATCHES "Release")
+    set(CMAKE_CC_FLAGS "${CMAKE_CC_FLAGS} -O3")
+    add_definitions(-DNDEBUG)
+ENDIF(CMAKE_BUILD_TYPE MATCHES "Release")
+# -----------------------------------------------------
+
 set(DESTDIR "/usr/local")
 set(OPENVDB_INCLUDE_DIR "${DESTDIR}/include/openvdb")
 set(OPENVDB_LIB_DIR "${DESTDIR}/lib/openvdb")
@@ -143,4 +162,6 @@ TARGET_LINK_LIBRARIES ( pyopenvdb
   )
 set_target_properties(pyopenvdb PROPERTIES PREFIX "")
 install(TARGETS pyopenvdb DESTINATION ${OPENVDB_PYTHON_LIB_DIR})
+
+message(STATUS "CC flags: ${CMAKE_CC_FLAGS}")
 
