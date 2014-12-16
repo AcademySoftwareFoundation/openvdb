@@ -47,6 +47,7 @@
 
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_StopWatch.h>
+#include <UT/UT_Version.h>
 #include <GA/GA_Types.h>
 #include <GA/GA_Handle.h>
 #include <GU/GU_ConvertParms.h>
@@ -541,10 +542,17 @@ VDBTopologyVisualizer::operator()(const GridType& grid)
             }
         }
 
+#if (UT_VERSION_INT >= 0x0e0000b4) // 14.0.180 or later
+        mCdHandle.bind(mGeo->findDiffuseAttribute(GA_ATTRIB_POINT));
+        if (!mCdHandle.isValid()) {
+            mCdHandle.bind(mGeo->addDiffuseAttribute(GA_ATTRIB_POINT));
+        }
+#else
         mCdHandle.bind(mGeo->findDiffuseAttribute(GA_ATTRIB_POINT).getAttribute());
         if (!mCdHandle.isValid()) {
             mCdHandle.bind(mGeo->addDiffuseAttribute(GA_ATTRIB_POINT).getAttribute());
         }
+#endif
 
         const bool staggered = !mIgnoreStaggered &&
             (grid.getGridClass() == openvdb::GRID_STAGGERED);
