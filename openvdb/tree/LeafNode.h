@@ -204,6 +204,7 @@ public:
                     if (other.isOutOfCore()) this->deallocate();
                 }
                 if (other.isOutOfCore()) {
+                    mOutOfCore = other.mOutOfCore;
                     mFileInfo = new FileInfo(*other.mFileInfo);
                 } else {
 #endif
@@ -684,7 +685,7 @@ public:
         this->setValueOn(LeafNode::coordToOffset(xyz), val);
     }
     /// Set the value of the voxel at the given coordinates and mark the voxel as active.
-    void setValue(const Coord& xyz, const ValueType& val) { this->setValueOn(xyz, val); };
+    void setValue(const Coord& xyz, const ValueType& val) { this->setValueOn(xyz, val); }
     /// Set the value of the voxel at the given offset and mark the voxel as active.
     void setValueOn(Index offset, const ValueType& val) {
         mBuffer.setValue(offset, val);
@@ -882,7 +883,7 @@ public:
 
     void negate();
 
-    void voxelizeActiveTiles() {};
+    void voxelizeActiveTiles() {}
 
     template<MergePolicy Policy> void merge(const LeafNode&);
     template<MergePolicy Policy> void merge(const ValueType& tileValue, bool tileActive);
