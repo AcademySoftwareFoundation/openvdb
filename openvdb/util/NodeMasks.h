@@ -435,7 +435,7 @@ public:
     /// Toggle the state of the <i>n</i>th bit
     void toggle(Index32 n) {
         assert( (n >> 6) < WORD_COUNT );
-        mWords[n >> 6] ^= 1 << (n & 63);
+        mWords[n >> 6] ^= Word(1) << (n & 63);
     }
     /// Toggle the state of all bits in the mask
     void toggle()
