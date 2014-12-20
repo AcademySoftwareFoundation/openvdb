@@ -320,6 +320,24 @@ AttributeSet::makeUnique(size_t pos)
 
 
 void
+AttributeSet::copyAttributeValues(const Index n, const AttributeSet& attributeSet, const Index source)
+{
+    const Descriptor& sourceDescriptor = attributeSet.descriptor();
+
+    if (sourceDescriptor != *mDescr) {
+        OPENVDB_THROW(LookupError, "Attribute set descriptors are not equal.");
+    }
+
+    // copy the attribute values for each attribute array
+
+    for (size_t i = 0; i < this->size(); i++) {
+        AttributeArray* array = this->get(i);
+        array->set(n, *attributeSet.getConst(i), source);
+    }
+}
+
+
+void
 AttributeSet::read(std::istream& is)
 {
     this->readMetadata(is);

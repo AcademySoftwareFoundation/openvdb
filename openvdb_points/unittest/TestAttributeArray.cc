@@ -379,6 +379,58 @@ TestAttributeArray::testAttributeSet()
         CPPUNIT_ASSERT(!attrSetB.isShared(1));
     }
 
+    { // value copy
+        AttributeSet attrSetB(attrSetA);
+        AttributeSet attrSetC(attrSetA);
+
+        attrSetB.makeUnique(0);
+        attrSetB.makeUnique(1);
+        attrSetC.makeUnique(0);
+        attrSetC.makeUnique(1);
+
+        AttributeVec3s* attrB0 = static_cast<AttributeVec3s*>(attrSetB.get(0));
+        AttributeI* attrB1 = static_cast<AttributeI*>(attrSetB.get(1));
+
+        // assign arbitrary values to pos and id
+
+        for (openvdb::Index i = 0; i < 50; i++) {
+            attrB0->set(i, openvdb::Vec3s(i, i+50, i+100));
+            attrB1->set(i, int(i));
+        }
+
+        // copy attribute values from attrSetB to attrSetC with an offset of 10 modulo
+
+        for (openvdb::Index i = 0; i < 50; i++) {
+            openvdb::Index offset = (i + 10) % 50;
+            attrSetC.copyAttributeValues(i, attrSetB, offset);
+        }
+
+        // verify attribute set arrays match only when using the correct offset
+
+        AttributeVec3s* attrC0 = static_cast<AttributeVec3s*>(attrSetC.get(0));
+        AttributeI* attrC1 = static_cast<AttributeI*>(attrSetC.get(1));
+
+        for (openvdb::Index i = 0; i < 50; i++) {
+            openvdb::Index offset = (i + 10) % 50;
+
+            CPPUNIT_ASSERT(attrC0->get(i) != attrB0->get(i));
+            CPPUNIT_ASSERT(attrC1->get(i) != attrB1->get(i));
+
+            CPPUNIT_ASSERT_EQUAL(attrC0->get(i), attrB0->get(offset));
+            CPPUNIT_ASSERT_EQUAL(attrC1->get(i), attrB1->get(offset));
+        }
+
+        // ensure an attempt to copy values for attribute sets with mis-matching descriptors throws
+
+        Descriptor::Ptr descrD = Descriptor::create(Descriptor::Inserter()
+        .add("pos", AttributeVec3s::attributeType())
+        .vec);
+
+        AttributeSet attrSetD(descrD, /*arrayLength=*/50);
+
+        CPPUNIT_ASSERT_THROW(attrSetD.copyAttributeValues(0, attrSetA, 0), openvdb::LookupError);
+    }
+
     // replace existing arrays
 
     // this replace call should not take effect since the new attribute

@@ -185,6 +185,9 @@ public:
     template<typename AttributeArrayType>
     bool isType() const { return this->type() == AttributeArrayType::attributeType(); }
 
+    /// Set value at given index @a n from @a sourceIndex of another @a sourceArray
+    virtual void set(const Index n, const AttributeArray& sourceArray, const Index sourceIndex) = 0;
+
     /// Return @c true if this array is stored as a single uniform value.
     virtual bool isUniform() const = 0;
     /// @brief  If this array is uniform, replace it with an array of length size().
@@ -292,6 +295,9 @@ public:
     void set(Index n, const ValueType& value);
     /// Set @a value at the given index @a n
     template<typename T> void set(Index n, const T& value);
+
+    /// Set value at given index @a n from @a sourceIndex of another @a sourceArray
+    virtual void set(const Index n, const AttributeArray& sourceArray, const Index sourceIndex);
 
     /// Return @c true if this array is stored as a single uniform value.
     virtual bool isUniform() const { return mIsUniform; }
@@ -428,6 +434,9 @@ public:
     ///         replace the array with a deep copy of itself that is not
     ///         shared with anyone else.
     void makeUnique(size_t pos);
+
+    /// Copy attribute values for a target index @a n from another @a attributeSet for index @a source
+    void copyAttributeValues(const Index n, const AttributeSet& attributeSet, const Index source);
 
     //
     /// @todo implement a I/O registry to handle shared descriptor objects.
@@ -847,6 +856,19 @@ TypedAttributeArray<ValueType_, Codec_>::set(Index n, const T& val)
     if (mIsUniform) this->allocate();
 
     Codec::encode(/*in=*/tmp, /*out=*/mData[n]);
+}
+
+
+template<typename ValueType_, typename Codec_>
+void
+TypedAttributeArray<ValueType_, Codec_>::set(Index n, const AttributeArray& sourceArray, const Index sourceIndex)
+{
+    const TypedAttributeArray& sourceTypedArray = static_cast<const TypedAttributeArray&>(sourceArray);
+
+    ValueType sourceValue;
+    sourceTypedArray.get(sourceIndex, sourceValue);
+
+    this->set(n, sourceValue);
 }
 
 
