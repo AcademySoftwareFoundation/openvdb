@@ -524,6 +524,9 @@ public:
     /// Return a reference to the name-to-position map.
     const NameToPosMap& map() const { return mNameMap; }
 
+    /// Append to a vector of names and types from this Descriptor in position order
+    void appendTo(NameAndTypeVec& attrs) const;
+
     /// Serialize this descriptor to the given stream.
     void write(std::ostream&) const;
     /// Unserialize this transform from the given stream.

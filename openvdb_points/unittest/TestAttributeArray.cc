@@ -295,6 +295,20 @@ TestAttributeArray::testAttributeSetDescriptor()
 
     CPPUNIT_ASSERT(*descrA == *descrB);
 
+    // Rebuild NameAndTypeVec
+
+    Descriptor::NameAndTypeVec rebuildNames;
+    descrA->appendTo(rebuildNames);
+
+    CPPUNIT_ASSERT_EQUAL(rebuildNames.size(), names.vec.size());
+
+    for (Descriptor::NameAndTypeVec::const_iterator itA = rebuildNames.begin(), itB = names.vec.begin(),
+                                                    itEndA = rebuildNames.end(), itEndB = names.vec.end();
+                                                    itA != itEndA && itB != itEndB; ++itA, ++itB) {
+        CPPUNIT_ASSERT_EQUAL(itA->name, itB->name);
+        CPPUNIT_ASSERT_EQUAL(itA->type, itB->type);
+    }
+
     // I/O test
 
     std::ostringstream ostr(std::ios_base::binary);

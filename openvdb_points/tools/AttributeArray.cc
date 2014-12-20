@@ -518,6 +518,33 @@ AttributeSet::Descriptor::duplicateDrop(const std::vector<size_t>& pos) const
 }
 
 void
+AttributeSet::Descriptor::appendTo(NameAndTypeVec& attrs) const
+{
+    const size_t size = mNameMap.size();
+
+    // build a std::map<pos, name> (ie key and value swapped)
+
+    typedef std::map<size_t, std::string> PosToNameMap;
+
+    PosToNameMap posToNameMap;
+
+    for (NameToPosMap::const_iterator   it = mNameMap.begin(),
+                                        endIt = mNameMap.end(); it != endIt; ++it) {
+
+        posToNameMap[it->second] = it->first;
+    }
+
+    // std::map is sorted by key, so attributes can now be inserted in position order
+
+    for (PosToNameMap::const_iterator   it = posToNameMap.begin(),
+                                        endIt = posToNameMap.end(); it != endIt; ++it) {
+
+        attrs.push_back(NameAndType(it->second, this->type(it->first)));
+    }
+}
+
+
+void
 AttributeSet::Descriptor::write(std::ostream& os) const
 {
     const Index64 arraylength = Index64(mTypes.size());
