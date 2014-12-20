@@ -350,6 +350,19 @@ public:
 
     //////////
 
+    struct Util
+    {
+        /// Attribute and type name pair.
+        struct NameAndType {
+            NameAndType(const std::string& n = "", const std::string& t = ""): name(n), type(t) {}
+            std::string name, type;
+        };
+
+        typedef std::vector<NameAndType> NameAndTypeVec;
+    };
+
+    //////////
+
     AttributeSet();
 
     /// Construct from the given descriptor
@@ -460,17 +473,20 @@ public:
     typedef std::map<std::string, size_t> NameToPosMap;
     typedef NameToPosMap::const_iterator  ConstIterator;
 
-    /// Attribute and type name pair.
-    struct NameAndType {
-        NameAndType(const std::string& n = "", const std::string& t = ""): name(n), type(t) {}
-        std::string name, type;
-    };
+    typedef Util::NameAndType             NameAndType;
+    typedef Util::NameAndTypeVec          NameAndTypeVec;
 
     /// Utility method to construct a NameAndType sequence.
     struct Inserter {
-        std::vector<NameAndType> vec;
+        NameAndTypeVec vec;
         Inserter& add(const std::string& name, const std::string& type) {
             vec.push_back(NameAndType(name, type)); return *this;
+        }
+        Inserter& add(const NameAndTypeVec& other) {
+            for (NameAndTypeVec::const_iterator it = other.begin(), itEnd = other.end(); it != itEnd; ++it) {
+                vec.push_back(NameAndType(it->name, it->type));
+            }
+            return *this;
         }
     };
 
@@ -479,7 +495,7 @@ public:
     Descriptor();
 
     /// Create a new descriptor from the given attribute and type name pairs.
-    static Ptr create(const std::vector<NameAndType>&);
+    static Ptr create(const NameAndTypeVec&);
 
     /// Return the number of attributes in this descriptor.
     size_t size() const { return mTypes.size(); }

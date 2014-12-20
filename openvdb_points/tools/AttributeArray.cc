@@ -473,7 +473,7 @@ AttributeSet::Descriptor::insert(const std::string& name, const std::string& typ
 
 
 AttributeSet::Descriptor::Ptr
-AttributeSet::Descriptor::create(const std::vector<NameAndType>& attrs)
+AttributeSet::Descriptor::create(const NameAndTypeVec& attrs)
 {
     Ptr descr(new Descriptor());
     for (size_t n = 0, N = attrs.size(); n < N; ++n) {
