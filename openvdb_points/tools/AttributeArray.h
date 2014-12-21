@@ -497,6 +497,9 @@ public:
     /// Create a new descriptor from the given attribute and type name pairs.
     static Ptr create(const NameAndTypeVec&);
 
+    Ptr duplicateAppend(const NameAndTypeVec& vec) const;
+    Ptr duplicateDrop(const std::vector<size_t>& pos) const;
+
     /// Return the number of attributes in this descriptor.
     size_t size() const { return mTypes.size(); }
 

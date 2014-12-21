@@ -485,6 +485,37 @@ AttributeSet::Descriptor::create(const NameAndTypeVec& attrs)
     return descr;
 }
 
+AttributeSet::Descriptor::Ptr
+AttributeSet::Descriptor::duplicateAppend(const NameAndTypeVec& vec) const
+{
+    Inserter attributes;
+
+    this->appendTo(attributes.vec);
+    attributes.add(vec);
+
+    return Descriptor::create(attributes.vec);
+}
+
+AttributeSet::Descriptor::Ptr
+AttributeSet::Descriptor::duplicateDrop(const std::vector<size_t>& pos) const
+{
+    NameAndTypeVec vec;
+    this->appendTo(vec);
+
+    // sort the positions to remove
+
+    std::vector<size_t> orderedPos(pos);
+    std::sort(orderedPos.begin(), orderedPos.end());
+
+    // erase elements in reverse order
+
+    for (std::vector<size_t>::const_reverse_iterator    it = pos.rbegin();
+                                                        it != pos.rend(); ++it) {
+        vec.erase(vec.begin() + (*it));
+    }
+
+    return Descriptor::create(vec);
+}
 
 void
 AttributeSet::Descriptor::write(std::ostream& os) const
