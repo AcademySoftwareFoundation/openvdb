@@ -338,6 +338,76 @@ AttributeSet::copyAttributeValues(const Index n, const AttributeSet& attributeSe
 
 
 void
+AttributeSet::appendAttributes(const Descriptor::NameAndTypeVec& vec)
+{
+    Descriptor::Ptr descriptor = mDescr->duplicateAppend(vec);
+
+    this->appendAttributes(vec, *mDescr, descriptor);
+}
+
+
+void
+AttributeSet::appendAttributes(const Descriptor::NameAndTypeVec& vec,
+                               const Descriptor& expected, DescriptorPtr& replacement)
+{
+    // ensure the descriptor is as expected
+    if (*mDescr != expected) {
+        OPENVDB_THROW(LookupError, "Cannot append attributes as descriptors do not match.")
+    }
+
+    const size_t offset = mDescr->size();
+
+    mDescr = replacement;
+
+    assert(mDescr->size() >= offset);
+
+    // extract the array length from the first attribute array if it exists
+
+    const size_t arrayLength = offset > 0 ? this->get(0)->size() : 1;
+
+    // append the new arrays
+
+    for (Descriptor::NameAndTypeVec::const_iterator it = vec.begin(), itEnd = vec.end(); it != itEnd; ++it) {
+        mAttrs.push_back(AttributeArray::create(it->type, arrayLength));
+    }
+}
+
+
+void
+AttributeSet::dropAttributes(const std::vector<size_t>& pos)
+{
+    Descriptor::Ptr descriptor = mDescr->duplicateDrop(pos);
+
+    this->dropAttributes(pos, *mDescr, descriptor);
+}
+
+
+void
+AttributeSet::dropAttributes(   const std::vector<size_t>& pos,
+                                const Descriptor& expected, DescriptorPtr& replacement)
+{
+    // ensure the descriptor is as expected
+    if (*mDescr != expected) {
+        OPENVDB_THROW(LookupError, "Cannot drop attributes as descriptors do not match.")
+    }
+
+    mDescr = replacement;
+
+    // sort the positions to remove
+
+    std::vector<size_t> orderedPos(pos);
+    std::sort(orderedPos.begin(), orderedPos.end());
+
+    // erase elements in reverse order
+
+    for (std::vector<size_t>::const_reverse_iterator    it = pos.rbegin();
+                                                        it != pos.rend(); ++it) {
+        mAttrs.erase(mAttrs.begin() + (*it));
+    }
+}
+
+
+void
 AttributeSet::read(std::istream& is)
 {
     this->readMetadata(is);

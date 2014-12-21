@@ -431,6 +431,107 @@ TestAttributeArray::testAttributeSet()
         CPPUNIT_ASSERT_THROW(attrSetD.copyAttributeValues(0, attrSetA, 0), openvdb::LookupError);
     }
 
+    { // attribute insertion
+        AttributeSet attrSetB(attrSetA);
+
+        attrSetB.makeUnique(0);
+        attrSetB.makeUnique(1);
+
+        Descriptor::NameAndTypeVec newAttributes;
+        newAttributes.push_back(Descriptor::NameAndType("test", AttributeS::attributeType()));
+
+        Descriptor::Ptr targetDescr = Descriptor::create(Descriptor::Inserter()
+            .add("pos", AttributeVec3s::attributeType())
+            .add("id", AttributeI::attributeType())
+            .add("test", AttributeS::attributeType())
+            .vec);
+
+        Descriptor::Ptr descrB = attrSetB.descriptor().duplicateAppend(newAttributes);
+
+        // ensure attribute order persists
+
+        CPPUNIT_ASSERT_EQUAL(descrB->find("pos"), size_t(0));
+        CPPUNIT_ASSERT_EQUAL(descrB->find("id"), size_t(1));
+        CPPUNIT_ASSERT_EQUAL(descrB->find("test"), size_t(2));
+
+        { // simple method
+            AttributeSet attrSetC(attrSetB);
+
+            attrSetC.makeUnique(0);
+            attrSetC.makeUnique(1);
+
+            attrSetC.appendAttributes(newAttributes);
+
+            CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *descrB));
+        }
+        { // descriptor-sharing method
+            AttributeSet attrSetC(attrSetB);
+
+            attrSetC.makeUnique(0);
+            attrSetC.makeUnique(1);
+
+            attrSetC.appendAttributes(newAttributes, attrSetC.descriptor(), descrB);
+
+            CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
+        }
+    }
+
+    { // attribute removal
+
+        Descriptor::Ptr descr = Descriptor::create(Descriptor::Inserter()
+            .add("pos", AttributeVec3s::attributeType())
+            .add("test", AttributeI::attributeType())
+            .add("id", AttributeI::attributeType())
+            .add("test2", AttributeI::attributeType())
+            .vec);
+
+        Descriptor::Ptr targetDescr = Descriptor::create(Descriptor::Inserter()
+            .add("pos", AttributeVec3s::attributeType())
+            .add("id", AttributeI::attributeType())
+            .vec);
+
+        AttributeSet attrSetB(descr, /*arrayLength=*/50);
+
+        std::vector<size_t> toDrop;
+        toDrop.push_back(descr->find("test"));
+        toDrop.push_back(descr->find("test2"));
+
+        CPPUNIT_ASSERT_EQUAL(toDrop[0], size_t(1));
+        CPPUNIT_ASSERT_EQUAL(toDrop[1], size_t(3));
+
+        { // simple method
+            AttributeSet attrSetC(attrSetB);
+
+            attrSetC.makeUnique(0);
+            attrSetC.makeUnique(1);
+            attrSetC.makeUnique(2);
+            attrSetC.makeUnique(3);
+
+            attrSetC.dropAttributes(toDrop);
+
+            CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(2));
+
+            CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
+        }
+
+        { // descriptor-sharing method
+            AttributeSet attrSetC(attrSetB);
+
+            attrSetC.makeUnique(0);
+            attrSetC.makeUnique(1);
+            attrSetC.makeUnique(2);
+            attrSetC.makeUnique(3);
+
+            Descriptor::Ptr descrB = attrSetB.descriptor().duplicateDrop(toDrop);
+
+            attrSetC.dropAttributes(toDrop, attrSetC.descriptor(), descrB);
+
+            CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(2));
+
+            CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
+        }
+    }
+
     // replace existing arrays
 
     // this replace call should not take effect since the new attribute

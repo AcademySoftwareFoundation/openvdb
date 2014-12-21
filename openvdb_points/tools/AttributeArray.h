@@ -438,6 +438,25 @@ public:
     /// Copy attribute values for a target index @a n from another @a attributeSet for index @a source
     void copyAttributeValues(const Index n, const AttributeSet& attributeSet, const Index source);
 
+    /// Append attributes from @a vec (simple method)
+    void appendAttributes(const Util::NameAndTypeVec& vec);
+
+    /// Append attributes from @a vec (descriptor-sharing method)
+    /// Requires current descriptor to match @a expected
+    /// On append, current descriptor is replaced with @a replacement
+    void appendAttributes(const Util::NameAndTypeVec& vec,
+                          const Descriptor& expected, DescriptorPtr& replacement);
+
+    /// Drop attributes with @a pos indices (simple method)
+    /// Creates a new descriptor for this attribute set
+    void dropAttributes(const std::vector<size_t>& pos);
+
+    /// Drop attributes with @a pos indices (descriptor-sharing method)
+    /// Requires current descriptor to match @a expected
+    /// On drop, current descriptor is replaced with @a replacement
+    void dropAttributes(const std::vector<size_t>& pos,
+                        const Descriptor& expected, DescriptorPtr& replacement);
+
     //
     /// @todo implement a I/O registry to handle shared descriptor objects.
     //
