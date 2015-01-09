@@ -132,9 +132,9 @@ MStatus OpenVDBReadNode::compute(const MPlug& plug, MDataBlock& data)
         MDataHandle filePathHandle = data.inputValue (aVdbFilePath, &status);
         if (status != MS::kSuccess) return status;
 
-		MFileObject cacheFile;
-		cacheFile.setRawFullName( filePathHandle.asString() );
-		if (! cacheFile.exists() ) return MS::kFailure;
+	MFileObject cacheFile;
+	cacheFile.setRawFullName( filePathHandle.asString() );
+	if (! cacheFile.exists() ) return MS::kFailure;
 
         std::ifstream ifile(filePathHandle.asString().asChar(), std::ios_base::binary);
         openvdb::GridPtrVecPtr grids = openvdb::io::Stream(ifile).getGrids();
