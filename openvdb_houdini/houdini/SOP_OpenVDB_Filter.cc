@@ -41,6 +41,7 @@
 #include <openvdb/tools/Filter.h>
 #include <OP/OP_AutoLockInputs.h>
 #include <UT/UT_Interrupt.h>
+#include <UT/UT_Version.h>
 #include <algorithm>
 #include <vector>
 
@@ -499,7 +500,12 @@ SOP_OpenVDB_Filter::cookMySop(OP_Context& context)
                 }
             }
         }
+#if (UT_VERSION_INT >= 0x0e0000b0) // 14.0.176 or later
+        lock.setNode(startNode);
+        if (lock.lock(context) >= UT_ERROR_ABORT) return error();
+#else
         if (lock.lock(*startNode, context) >= UT_ERROR_ABORT) return error();
+#endif
         if (startNode->duplicateSource(0, context, gdp) >= UT_ERROR_ABORT) return error();
 
         // Get the group of grids to process.

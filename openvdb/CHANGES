@@ -1,7 +1,7 @@
 OpenVDB Version History
 =======================
 
-Version 3.0.0 - In development
+Version 3.0.0 - Release Candidate
     - The io::File class now supports delayed loading of .vdb files,
       meaning that memory is not allocated for voxel values until the values
       are actually accessed.  (This feature is enabled by default.)

@@ -40,6 +40,7 @@
 #include <UT/UT_ScopedPtr.h>
 #include <UT/UT_String.h>
 #include <UT/UT_BoundingBox.h>
+#include <UT/UT_Version.h>
 #include <GU/GU_PrimPoly.h>
 #include <GU/GU_ConvertParms.h>
 #include <GA/GA_ElementWrangler.h>
@@ -130,7 +131,11 @@ drawFrustum(
         size_t total_count = 0;
 
         if (tickColor) {
+#if (UT_VERSION_INT >= 0x0e0000b4) // 14.0.180 or later
+            cd.bind(geo.addDiffuseAttribute(GA_ATTRIB_POINT));
+#else
             cd.bind(geo.addDiffuseAttribute(GA_ATTRIB_POINT).getAttribute());
+#endif
         }
 
         for (double z = bbox.min()[2] + 1, Z = bbox.max()[2]; z < Z; ++z) {

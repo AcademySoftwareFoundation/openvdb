@@ -930,7 +930,7 @@ findClosestPrimitiveToPoint(
 {
     std::set<GA_Index>::const_iterator it = primitives.begin();
 
-    GA_Offset primOffset;
+    GA_Offset primOffset = GA_INVALID_OFFSET;
     const GA_Primitive * primRef = NULL;
     double minDist = std::numeric_limits<double>::max();
 
@@ -1394,12 +1394,18 @@ transferPrimitiveAttributes(
 
     // Primitive attributes
     for (; !it.atEnd(); ++it) {
-        if (!targetGeo.findPrimitiveAttribute(it.name()).isValid()) {
-            targetGeo.addPrimAttrib(it.attrib());
-        }
-
         const GA_Attribute* sourceAttr = it.attrib();
+#if (UT_VERSION_INT >= 0x0e0000b0) // 14.0.176 or later
+        if (NULL == targetGeo.findPrimitiveAttribute(it.name())) {
+            targetGeo.addPrimAttrib(sourceAttr);
+        }
+        GA_Attribute* targetAttr = targetGeo.findPrimitiveAttribute(it.name());
+#else
+        if (!targetGeo.findPrimitiveAttribute(it.name()).isValid()) {
+            targetGeo.addPrimAttrib(sourceAttr);
+        }
         GA_Attribute* targetAttr = targetGeo.findPrimitiveAttribute(it.name()).getAttribute();
+#endif
 
         if (sourceAttr && targetAttr) {
             AttributeCopyBase::Ptr att = createAttributeCopier(*sourceAttr, *targetAttr);
@@ -1415,12 +1421,18 @@ transferPrimitiveAttributes(
 
     // Vertex attributes
     for (; !it.atEnd(); ++it) {
-        if (!targetGeo.findVertexAttribute(it.name()).isValid()) {
-            targetGeo.addVertexAttrib(it.attrib());
-        }
-
         const GA_Attribute* sourceAttr = it.attrib();
+#if (UT_VERSION_INT >= 0x0e0000b0) // 14.0.176 or later
+        if (NULL == targetGeo.findVertexAttribute(it.name())) {
+            targetGeo.addVertexAttrib(sourceAttr);
+        }
+        GA_Attribute* targetAttr = targetGeo.findVertexAttribute(it.name());
+#else
+        if (!targetGeo.findVertexAttribute(it.name()).isValid()) {
+            targetGeo.addVertexAttrib(sourceAttr);
+        }
         GA_Attribute* targetAttr = targetGeo.findVertexAttribute(it.name()).getAttribute();
+#endif
 
         if (sourceAttr && targetAttr) {
 #if (UT_VERSION_INT >= 0x0c01007D) // 12.1.125 or later
@@ -1445,12 +1457,19 @@ transferPrimitiveAttributes(
         // Point attributes
         for (; !it.atEnd(); ++it) {
             if (std::string(it.name()) == "P") continue; // Ignore previous point positions.
-            if (!targetGeo.findPointAttribute(it.name()).isValid()) {
-                targetGeo.addPointAttrib(it.attrib());
-            }
 
             const GA_Attribute* sourceAttr = it.attrib();
+#if (UT_VERSION_INT >= 0x0e0000b0) // 14.0.176 or later
+            if (NULL == targetGeo.findPointAttribute(it.name())) {
+                targetGeo.addPointAttrib(sourceAttr);
+            }
+            GA_Attribute* targetAttr = targetGeo.findPointAttribute(it.name());
+#else
+            if (!targetGeo.findPointAttribute(it.name()).isValid()) {
+                targetGeo.addPointAttrib(sourceAttr);
+            }
             GA_Attribute* targetAttr = targetGeo.findPointAttribute(it.name()).getAttribute();
+#endif
 
             if (sourceAttr && targetAttr) {
                 AttributeCopyBase::Ptr att = createAttributeCopier(*sourceAttr, *targetAttr);

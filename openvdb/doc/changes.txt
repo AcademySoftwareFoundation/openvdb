@@ -5,7 +5,7 @@
 
 @htmlonly <a name="v3_0_0_changes"></a>@endhtmlonly
 @par
-<B>Version 3.0.0</B> - <I>In development</I>
+<B>Version 3.0.0</B> - <I>Release Candidate</I>
 - The @vdblink::io::File File@endlink class now supports delayed loading of
   <TT>.vdb</TT> files, meaning that memory is not allocated for voxel values
   until the values are actually accessed. (This feature is enabled by default.)
