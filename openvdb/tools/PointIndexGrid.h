@@ -1507,7 +1507,7 @@ public:
     void setValueOff(Index, const ValueType&) { assertNonmodifiable(); }
 
     void setValueOn(const Coord&) { assertNonmodifiable(); }
-    void setValueOn(Index offset) { assertNonmodifiable(); }
+    void setValueOn(Index) { assertNonmodifiable(); }
 
     void setValueOn(const Coord&, const ValueType&) { assertNonmodifiable(); }
     void setValueOn(Index, const ValueType&) { assertNonmodifiable(); }
