@@ -85,25 +85,24 @@ fixedPointToFloatingPoint(const IntegerT s)
 }
 
 
-template <typename IntegerT, typename FloatT>
-inline math::Vec3<IntegerT>
+template <typename IntegerVectorT, typename FloatT>
+inline IntegerVectorT
 floatingPointToFixedPoint(const math::Vec3<FloatT>& v)
 {
-    return math::Vec3<IntegerT>(
-        floatingPointToFixedPoint<IntegerT>(v.x()),
-        floatingPointToFixedPoint<IntegerT>(v.y()),
-        floatingPointToFixedPoint<IntegerT>(v.z()));
+    return IntegerVectorT(
+        floatingPointToFixedPoint<typename IntegerVectorT::ValueType>(v.x()),
+        floatingPointToFixedPoint<typename IntegerVectorT::ValueType>(v.y()),
+        floatingPointToFixedPoint<typename IntegerVectorT::ValueType>(v.z()));
 }
 
-
-template <typename FloatT, typename IntegerT>
-inline math::Vec3<FloatT>
+template <typename FloatVectorT, typename IntegerT>
+inline FloatVectorT
 fixedPointToFloatingPoint(const math::Vec3<IntegerT>& v)
 {
-    return math::Vec3<FloatT>(
-        fixedPointToFloatingPoint<FloatT>(v.x()),
-        fixedPointToFloatingPoint<FloatT>(v.y()),
-        fixedPointToFloatingPoint<FloatT>(v.z()));
+    return FloatVectorT(
+        fixedPointToFloatingPoint<typename FloatVectorT::ValueType>(v.x()),
+        fixedPointToFloatingPoint<typename FloatVectorT::ValueType>(v.y()),
+        fixedPointToFloatingPoint<typename FloatVectorT::ValueType>(v.z()));
 }
 
 
