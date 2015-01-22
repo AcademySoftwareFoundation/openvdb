@@ -42,6 +42,7 @@ public:
     CPPUNIT_TEST(testAttributeArray);
     CPPUNIT_TEST(testAttributeSetDescriptor);
     CPPUNIT_TEST(testAttributeSet);
+
     CPPUNIT_TEST_SUITE_END();
 
     void testAttributeArray();
@@ -156,6 +157,8 @@ TestAttributeArray::testAttributeArray()
 
         CPPUNIT_ASSERT(attr->isType<AttributeArrayI>());
         CPPUNIT_ASSERT(!attr->isType<AttributeArrayD>());
+
+        CPPUNIT_ASSERT(*attr == *attr);
     }
 
     { // Typed class API
@@ -175,6 +178,11 @@ TestAttributeArray::testAttributeArray()
         attr.set(0, 10);
         CPPUNIT_ASSERT(!attr.isUniform());
         CPPUNIT_ASSERT_EQUAL(expandedMemUsage, attr.memUsage());
+
+        AttributeArrayI attr2(count);
+        attr2.set(0, 10);
+
+        CPPUNIT_ASSERT(attr == attr2);
 
         attr.collapse(5);
         CPPUNIT_ASSERT(attr.isUniform());
@@ -385,6 +393,23 @@ TestAttributeArray::testAttributeSet()
 
     AttributeSet attrSetA(descr, /*arrayLength=*/50);
 
+    // check equality against duplicate array
+
+    Descriptor::Ptr descr2 = Descriptor::create(Descriptor::Inserter()
+        .add("pos", AttributeVec3s::attributeType())
+        .add("id", AttributeI::attributeType())
+        .vec);
+
+    AttributeSet attrSetA2(descr2, /*arrayLength=*/50);
+
+    CPPUNIT_ASSERT(attrSetA == attrSetA2);
+
+    // expand uniform values and check equality
+
+    attrSetA.get("pos")->expand();
+    attrSetA2.get("pos")->expand();
+
+    CPPUNIT_ASSERT(attrSetA == attrSetA2);
 
     CPPUNIT_ASSERT_EQUAL(size_t(2), attrSetA.size());
     CPPUNIT_ASSERT_EQUAL(size_t(50), attrSetA.get(0)->size());

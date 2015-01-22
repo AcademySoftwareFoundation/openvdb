@@ -238,6 +238,17 @@ public:
     /// Write attribute data to a stream.
     virtual void write(std::ostream&) const = 0;
 
+    /// Check the compressed bytes and flags. If they are equal, perform a deeper
+    /// comparison check necessary on the inherited types (TypedAttributeArray)
+    /// Requires non operator implementation due to inheritance
+    bool operator==(const AttributeArray& other) const;
+    bool operator!=(const AttributeArray& other) const { return !this->operator==(other); }
+
+private:
+    /// Virtual function used by the comparison operator to perform
+    /// comparisons on inherited types
+    virtual bool isEqual(const AttributeArray& other) const = 0;
+
 protected:
     /// Register a attribute type along with a factory function.
     static void registerType(const Name& type, FactoryMethod);
@@ -337,6 +348,9 @@ public:
     virtual void write(std::ostream& os) const;
 
 private:
+    /// Compare the this data to another attribute array. Used by the base class comparison operator
+    virtual bool isEqual(const AttributeArray& other) const;
+
     size_t arrayMemUsage() const;
     void allocate(bool fill = true);
     void deallocate();
@@ -350,7 +364,6 @@ private:
     bool            mIsUniform;
     tbb::spin_mutex mMutex;
 }; // class TypedAttributeArray
-
 
 ////////////////////////////////////////
 
@@ -490,6 +503,11 @@ public:
     void readAttributes(std::istream&);
     /// Write attribute data to a stream.
     void writeAttributes(std::ostream&) const;
+
+    /// Compare the descriptors and attribute arrays on the attribute sets
+    /// Exit early if the descriptors do not match
+    bool operator==(const AttributeSet& other) const;
+    bool operator!=(const AttributeSet& other) const { return !this->operator==(other); }
 
 private:
     /// Disallow assignment, since it wouldn't be obvious whether the copy is deep or shallow.
@@ -1086,6 +1104,25 @@ TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os) const
         os.write(reinterpret_cast<const char*>(mData), this->arrayMemUsage());
 
     }
+}
+
+
+template<typename ValueType_, typename Codec_>
+bool
+TypedAttributeArray<ValueType_, Codec_>::isEqual(const AttributeArray& other) const
+{
+    const TypedAttributeArray<ValueType_, Codec_>* const otherT = dynamic_cast<const TypedAttributeArray<ValueType_, Codec_>* >(&other);
+    if(!otherT) return false;
+    if(this->mSize != otherT->mSize ||
+       this->mIsUniform != otherT->mIsUniform ||
+       *this->sTypeName != *otherT->sTypeName) return false;
+
+    const StorageType *target = this->mData, *source = otherT->mData;
+    if (!target && !source) return true;
+    if (!target || !source) return false;
+    Index n = this->mIsUniform ? 1 : mSize;
+    while (n && math::isExactlyEqual(*target++, *source++)) --n;
+    return n == 0;
 }
 
 

@@ -176,6 +176,13 @@ AttributeArray::setHidden(bool state)
 }
 
 
+bool
+AttributeArray::operator==(const AttributeArray& other) const {
+    if(this->mCompressedBytes != other.mCompressedBytes ||
+       this->mFlags != other.mFlags) return false;
+    return this->isEqual(other);
+}
+
 ////////////////////////////////////////
 
 // AttributeSet implementation
@@ -459,6 +466,18 @@ AttributeSet::writeAttributes(std::ostream& os) const
     for (size_t n = 0, N = mAttrs.size(); n < N; ++n) {
         mAttrs[n]->write(os);
     }
+}
+
+
+bool
+AttributeSet::operator==(const AttributeSet& other) const {
+    if(*this->mDescr != *other.mDescr) return false;
+    if(this->mAttrs.size() != other.mAttrs.size()) return false;
+
+    for (size_t n = 0; n < this->mAttrs.size(); ++n) {
+        if (*this->mAttrs[n] != *other.mAttrs[n]) return false;
+    }
+    return true;
 }
 
 ////////////////////////////////////////
