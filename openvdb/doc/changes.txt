@@ -5,7 +5,7 @@
 
 @htmlonly <a name="v3_0_0_changes"></a>@endhtmlonly
 @par
-<B>Version 3.0.0</B> - <I>Release Candidate</I>
+<B>Version 3.0.0</B> - <I>January 14, 2015</I>
 - The @vdblink::io::File File@endlink class now supports delayed loading of
   <TT>.vdb</TT> files, meaning that memory is not allocated for voxel values
   until the values are actually accessed. (This feature is enabled by default.)
@@ -48,6 +48,10 @@
   LevelSetMorphing@endlink.
 - Fixed an intermittent crash in
   @vdblink::tools::LevelSetMorphing LevelSetMorphing@endlink.
+- Added @c tools::topologyToLevelSet(),
+  which generates a level set from the implicit boundary between active
+  and inactive voxels in an arbitrary input grid.
+  <I>[DWA internal]</I>
 - Improved the performance of point scattering (by orders of magnitude)
   and added a
   @vdblink::tools::DenseUniformPointScatter DenseUniformPointScatter@endlink
