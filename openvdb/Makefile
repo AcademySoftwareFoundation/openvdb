@@ -86,6 +86,10 @@ prefix := /tmp/OpenVDB
 # The temporary staging directory, used for creating staged installs
 # DESTDIR =
 
+# The library subdirectory, relative to $(prefix)
+LIB := lib
+libdir := $(prefix)/$(LIB)
+
 # The parent directory of the boost/ header directory
 BOOST_INCL_DIR := $(HT)/include
 # The directory containing libboost_iostreams, libboost_system, etc.
@@ -601,7 +605,7 @@ else
 LIBOPENVDB_SHARED_NAME := $(LIBOPENVDB_NAME).dylib
 LIBOPENVDB_SHARED := $(LIBOPENVDB_NAME).$(LIB_VERSION).dylib
 LIBOPENVDB_SONAME := $(LIBOPENVDB_NAME).$(SO_VERSION).dylib
-LIBOPENVDB_SONAME_FLAGS := -Wl,-install_name,$(prefix)/lib/$(LIBOPENVDB_SONAME)
+LIBOPENVDB_SONAME_FLAGS := -Wl,-install_name,$(libdir)/$(LIBOPENVDB_SONAME)
 endif
 
 # TODO: libopenvdb_viewer is currently built into vdb_view and is not installed separately.
@@ -616,7 +620,7 @@ else
 LIBVIEWER_SHARED_NAME := $(LIBVIEWER_NAME).dylib
 LIBVIEWER_SHARED := $(LIBVIEWER_NAME).$(LIB_VERSION).dylib
 LIBVIEWER_SONAME := $(LIBVIEWER_NAME).$(SO_VERSION).dylib
-LIBVIEWER_SONAME_FLAGS := -Wl,-install_name,$(prefix)/lib/$(LIBVIEWER_SONAME)
+LIBVIEWER_SONAME_FLAGS := -Wl,-install_name,$(libdir)/$(LIBVIEWER_SONAME)
 endif
 
 PYTHON_MODULE_NAME=pyopenvdb
@@ -632,7 +636,7 @@ ifeq (no,$(strip $(shared)))
 else
     LIBOPENVDB := $(LIBOPENVDB_SHARED)
     LIBVIEWER := $(LIBVIEWER_SHARED)
-    LIBOPENVDB_RPATH := -Wl,-rpath,$(prefix)/lib
+    LIBOPENVDB_RPATH := -Wl,-rpath,$(libdir)
 endif # shared
 
 DEPEND := dependencies
@@ -834,25 +838,25 @@ install: lib python vdb_print vdb_render vdb_view doc pydoc
 	fi
 	@echo "Copied header files to $(DESTDIR)$(prefix)/include"
 	@#
-	mkdir -p $(DESTDIR)$(prefix)/lib
-	@echo "Created $(DESTDIR)$(prefix)/lib/"
-	cp -f $(LIBOPENVDB) $(DESTDIR)$(prefix)/lib
-	pushd $(DESTDIR)$(prefix)/lib > /dev/null; \
+	mkdir -p $(DESTDIR)$(libdir)
+	@echo "Created $(DESTDIR)$(libdir)/"
+	cp -f $(LIBOPENVDB) $(DESTDIR)$(libdir)
+	pushd $(DESTDIR)$(libdir) > /dev/null; \
 	    if [ -f $(LIBOPENVDB_SHARED) ]; then \
 	        ln -f -s $(LIBOPENVDB_SHARED) $(LIBOPENVDB_SHARED_NAME); \
 	        ln -f -s $(LIBOPENVDB_SHARED) $(LIBOPENVDB_SONAME); \
 	    fi; \
 	    popd > /dev/null
-	@echo "Copied libopenvdb to $(DESTDIR)$(prefix)/lib/"
+	@echo "Copied libopenvdb to $(DESTDIR)$(libdir)/"
 	@#
 	if [ -f $(LIBVIEWER) ]; \
 	then \
-	    cp -f $(LIBVIEWER) $(DESTDIR)$(prefix)/lib; \
-	    pushd $(DESTDIR)$(prefix)/lib > /dev/null; \
+	    cp -f $(LIBVIEWER) $(DESTDIR)$(libdir); \
+	    pushd $(DESTDIR)$(libdir) > /dev/null; \
 	        if [ -f $(LIBVIEWER_SHARED) ]; then \
 	            ln -f -s $(LIBVIEWER_SHARED) $(LIBVIEWER_SHARED_NAME); fi; \
 	        popd > /dev/null; \
-	    echo "Copied libopenvdb_viewer to $(DESTDIR)$(prefix)/lib/"; \
+	    echo "Copied libopenvdb_viewer to $(DESTDIR)$(libdir)/"; \
 	fi
 	@#
 	if [ -f $(PYTHON_MODULE) ]; \
@@ -862,7 +866,7 @@ install: lib python vdb_print vdb_render vdb_view doc pydoc
 	    echo "Created $${installdir}"; \
 	    cp -f $(PYTHON_PUBLIC_INCLUDE_NAMES) $${installdir}/; \
 	    echo "Copied Python header files to $${installdir}"; \
-	    installdir=$(DESTDIR)$(prefix)/python/lib/python$(PYTHON_VERSION); \
+	    installdir=$(DESTDIR)$(prefix)/python/$(LIB)/python$(PYTHON_VERSION); \
 	    mkdir -p $${installdir}; \
 	    echo "Created $${installdir}"; \
 	    cp -f $(PYTHON_MODULE) $${installdir}/; \
