@@ -90,6 +90,12 @@ prefix := /tmp/OpenVDB
 LIB := lib
 libdir := $(prefix)/$(LIB)
 
+# The python modules directory, relative to $(prefix)
+python_site := python/$(LIB)/python$(PYTHON_VERSION)
+
+# The python headers directory, relative to $(prefix)
+python_headers := python/include/python$(PYTHON_VERSION)
+
 # The parent directory of the boost/ header directory
 BOOST_INCL_DIR := $(HT)/include
 # The directory containing libboost_iostreams, libboost_system, etc.
@@ -861,12 +867,12 @@ install: lib python vdb_print vdb_render vdb_view doc pydoc
 	@#
 	if [ -f $(PYTHON_MODULE) ]; \
 	then \
-	    installdir=$(DESTDIR)$(prefix)/python/include/python$(PYTHON_VERSION); \
+	    installdir=$(DESTDIR)$(prefix)/$(python_headers); \
 	    mkdir -p $${installdir}; \
 	    echo "Created $${installdir}"; \
 	    cp -f $(PYTHON_PUBLIC_INCLUDE_NAMES) $${installdir}/; \
 	    echo "Copied Python header files to $${installdir}"; \
-	    installdir=$(DESTDIR)$(prefix)/python/$(LIB)/python$(PYTHON_VERSION); \
+	    installdir=$(DESTDIR)$(prefix)/$(python_site); \
 	    mkdir -p $${installdir}; \
 	    echo "Created $${installdir}"; \
 	    cp -f $(PYTHON_MODULE) $${installdir}/; \
