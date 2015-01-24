@@ -139,7 +139,7 @@ class SOP_OpenVDB_Advect_Level_Set: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Advect_Level_Set(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Advect_Level_Set() {};
+    virtual ~SOP_OpenVDB_Advect_Level_Set() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 

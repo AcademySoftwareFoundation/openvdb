@@ -80,7 +80,6 @@ private:
     bool mXIsActive, mYIsActive, mZIsActive, mShiftIsDown, mCtrlIsDown;
     GLdouble mFrontPlane[4], mBackPlane[4], mLeftPlane[4], mRightPlane[4],
         mTopPlane[4], mBottomPlane[4];
-    double mMouseXPos, mMouseYPos;
 }; // class ClipBox
 
 } // namespace openvdb_viewer

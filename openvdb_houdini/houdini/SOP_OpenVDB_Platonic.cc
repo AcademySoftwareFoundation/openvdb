@@ -47,7 +47,7 @@ class SOP_OpenVDB_Platonic: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Platonic(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Platonic() {};
+    virtual ~SOP_OpenVDB_Platonic() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 

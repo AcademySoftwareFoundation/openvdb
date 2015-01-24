@@ -54,6 +54,8 @@
 
 // Compile pragmas
 
+#define PRAGMA(x) _Pragma(#x)
+
 // Intel(r) compiler fires remark #1572: floating-point equality and inequality
 // comparisons are unrealiable when == or != is used with floating point operands.
 #if defined(__INTEL_COMPILER)
@@ -62,6 +64,12 @@
         _Pragma("warning (disable:1572)")
     #define OPENVDB_NO_FP_EQUALITY_WARNING_END \
         _Pragma("warning (pop)")
+#elif defined(__clang__)
+    #define OPENVDB_NO_FP_EQUALITY_WARNING_BEGIN \
+        PRAGMA(clang diagnostic push) \
+        PRAGMA(clang diagnostic ignored "-Wfloat-equal")
+    #define OPENVDB_NO_FP_EQUALITY_WARNING_END \
+        PRAGMA(clang diagnostic pop)
 #else
     // For GCC, #pragma GCC diagnostic ignored "-Wfloat-equal"
     // isn't working until gcc 4.2+,

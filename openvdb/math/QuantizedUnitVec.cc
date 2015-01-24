@@ -45,8 +45,10 @@ namespace math {
 bool QuantizedUnitVec::sInitialized = false;
 float QuantizedUnitVec::sNormalizationWeights[MASK_SLOTS + 1];
 
+namespace {
 // Declare this at file scope to ensure thread-safe initialization.
 tbb::mutex sInitMutex;
+}
 
 
 ////////////////////////////////////////

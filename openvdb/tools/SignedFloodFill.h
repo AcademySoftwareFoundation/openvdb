@@ -116,12 +116,6 @@ public:
     {
     }
 
-    SignedFloodFillOp(const TreeOrLeafManagerT& tree, const ValueT& background)
-        : mOutside(math::Abs(background))
-        , mInside(math::negative(mOutside))
-    {
-    }
-
     SignedFloodFillOp(ValueT outsideValue, ValueT insideValue)
         : mOutside(math::Abs(outsideValue))
         , mInside(math::negative(math::Abs(insideValue)))

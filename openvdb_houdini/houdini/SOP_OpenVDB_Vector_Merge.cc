@@ -67,7 +67,7 @@ class SOP_OpenVDB_Vector_Merge: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Vector_Merge(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Vector_Merge() {};
+    virtual ~SOP_OpenVDB_Vector_Merge() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 

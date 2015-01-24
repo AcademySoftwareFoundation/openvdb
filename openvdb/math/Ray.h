@@ -105,7 +105,7 @@ public:
     }
 
     inline void scaleTimes(RealT scale) { mTimeSpan.scale(scale); }
-    
+
     inline void reset(const Vec3Type& eye,
                       const Vec3Type& direction,
                       RealT t0 = math::Delta<RealT>::value(),
@@ -146,7 +146,7 @@ public:
       {
           return mTimeSpan.valid(eps);
       }
-    
+
     /// @brief Return @c true if @a time is within t0 and t1, both inclusive.
     inline bool test(RealT time) const { return mTimeSpan.test(time); }
 
@@ -193,13 +193,13 @@ public:
     }
 
     /// @brief Return a new ray in the index space of the specified
-    /// grid, assuming the existing ray is represented in world space. 
+    /// grid, assuming the existing ray is represented in world space.
     template<typename GridType>
     inline Ray worldToIndex(const GridType& grid) const
     {
         return this->applyInverseMap(*(grid.transform().baseMap()));
     }
-    
+
     /// @brief Return true if this ray intersects the specified sphere.
     /// @param center The center of the sphere in the same space as this ray.
     /// @param radius The radius of the sphere in the same units as this ray.
@@ -213,7 +213,7 @@ public:
         const RealT A = mDir.lengthSqr();
         const RealT B = 2 * mDir.dot(origin);
         const RealT C = origin.lengthSqr() - radius * radius;
-        const RealT D = B * B - 4 * A * C;   
+        const RealT D = B * B - 4 * A * C;
 
         if (D < 0) return false;
 
@@ -221,13 +221,13 @@ public:
 
         t0 = Q / A;
         t1 = C / Q;
-        
+
         if (t0 > t1) std::swap(t0, t1);
         if (t0 < mTimeSpan.t0) t0 = mTimeSpan.t0;
         if (t1 > mTimeSpan.t1) t1 = mTimeSpan.t1;
         return t0 <= t1;
     }
-    
+
     /// @brief Return true if this ray intersects the specified sphere.
     /// @param center The center of the sphere in the same space as this ray.
     /// @param radius The radius of the sphere in the same units as this ray.
@@ -237,7 +237,7 @@ public:
         return this->intersects(center, radius, t0, t1)>0;
     }
 
-    /// @brief Return true if this ray intersects the specified sphere. 
+    /// @brief Return true if this ray intersects the specified sphere.
     /// @note For intersection this ray is clipped to the two intersection points.
     /// @param center The center of the sphere in the same space as this ray.
     /// @param radius The radius of the sphere in the same units as this ray.
@@ -260,7 +260,7 @@ public:
     inline bool intersects(const BBoxT& bbox, RealT& t0, RealT& t1) const
     {
         mTimeSpan.get(t0, t1);
-        for (size_t i = 0; i < 3; ++i) {
+        for (int i = 0; i < 3; ++i) {
             RealT a = (bbox.min()[i] - mEye[i]) * mInvDir[i];
             RealT b = (bbox.max()[i] - mEye[i]) * mInvDir[i];
             if (a > b) std::swap(a, b);
@@ -280,7 +280,7 @@ public:
         return this->intersects(bbox, t0, t1);
     }
 
-    /// @brief Return true if this ray intersects the specified bounding box. 
+    /// @brief Return true if this ray intersects the specified bounding box.
     /// @note For intersection this ray is clipped to the two intersection points.
     /// @param bbox Axis-aligned bounding box in the same space as this ray.
     template<typename BBoxT>
@@ -319,7 +319,7 @@ private:
     Vec3T mEye, mDir, mInvDir;
     TimeSpan mTimeSpan;
 }; // end of Ray class
-    
+
 /// @brief Output streaming of the Ray class.
 /// @note Primarily intended for debugging.
 template<typename RealT>

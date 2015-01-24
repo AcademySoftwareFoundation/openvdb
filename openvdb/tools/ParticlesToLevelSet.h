@@ -397,7 +397,7 @@ ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::finalize(bool prune)
             }
         }
     }
-    
+
     tools::signedFloodFill(*sdfTree);//required since we only transferred active voxels!
 
     if (mSdfGrid->empty()) {
@@ -539,7 +539,7 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
     }
 private:
     /// Disallow assignment since some of the members are references
-    Raster& operator=(const Raster& other) { return *this; }
+    Raster& operator=(const Raster&) { return *this; }
 
     /// @return true if the particle is too small or too large
     bool ignoreParticle(SdfT R)
@@ -801,12 +801,14 @@ public:
     }
     const VisibleT& visible() const { return mVisible; }
     const BlindT&   blind()   const { return mBlind; }
+    OPENVDB_NO_FP_EQUALITY_WARNING_BEGIN
     bool operator==(const BlindData& rhs)     const { return mVisible == rhs.mVisible; }
-    bool operator< (const BlindData& rhs)     const { return mVisible <  rhs.mVisible; };
-    bool operator> (const BlindData& rhs)     const { return mVisible >  rhs.mVisible; };
-    BlindData operator+(const BlindData& rhs) const { return BlindData(mVisible + rhs.mVisible); };
-    BlindData operator+(const VisibleT&  rhs) const { return BlindData(mVisible + rhs); };
-    BlindData operator-(const BlindData& rhs) const { return BlindData(mVisible - rhs.mVisible); };
+    OPENVDB_NO_FP_EQUALITY_WARNING_END
+    bool operator< (const BlindData& rhs)     const { return mVisible <  rhs.mVisible; }
+    bool operator> (const BlindData& rhs)     const { return mVisible >  rhs.mVisible; }
+    BlindData operator+(const BlindData& rhs) const { return BlindData(mVisible + rhs.mVisible); }
+    BlindData operator+(const VisibleT&  rhs) const { return BlindData(mVisible + rhs); }
+    BlindData operator-(const BlindData& rhs) const { return BlindData(mVisible - rhs.mVisible); }
     BlindData operator-() const { return BlindData(-mVisible, mBlind); }
 
 protected:

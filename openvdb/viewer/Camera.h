@@ -80,7 +80,6 @@ private:
     // Input states
     bool mMouseDown, mStartTumbling, mZoomMode, mChanged, mNeedsDisplay;
     double mMouseXPos, mMouseYPos;
-    int mWheelPos;
 
 #ifdef OPENVDB_USE_GLFW_3
     GLFWwindow* mWindow;

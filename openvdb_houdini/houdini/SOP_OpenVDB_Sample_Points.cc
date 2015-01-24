@@ -55,7 +55,7 @@ class SOP_OpenVDB_Sample_Points: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Sample_Points(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Sample_Points() {};
+    virtual ~SOP_OpenVDB_Sample_Points() {}
 
     static OP_Node* factory(OP_Network*, const char*, OP_Operator*);
 

@@ -579,7 +579,7 @@ class SOP_OpenVDBAdvectPoints: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDBAdvectPoints(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDBAdvectPoints() {};
+    virtual ~SOP_OpenVDBAdvectPoints() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 

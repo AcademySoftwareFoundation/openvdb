@@ -47,7 +47,7 @@ class SOP_OpenVDB_Metadata: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Metadata(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Metadata() {};
+    virtual ~SOP_OpenVDB_Metadata() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 

@@ -815,7 +815,7 @@ TestFile::testGridNaming()
         gridVec[n]->insertMeta("index", Int32Metadata(n));
     }
 
-    const char* filename = "/tmp/testGridNaming.vdb2";
+    const char* filename = "testGridNaming.vdb2";
     boost::shared_ptr<const char> scopedFile(filename, ::remove);
 
     // Test first with grid instancing disabled, then with instancing enabled.
@@ -940,7 +940,7 @@ TestFile::testEmptyFile()
     using namespace openvdb;
     using namespace openvdb::io;
 
-    const char* filename = "/tmp/testEmptyFile.vdb2";
+    const char* filename = "testEmptyFile.vdb2";
     boost::shared_ptr<const char> scopedFile(filename, ::remove);
 
     {
@@ -969,7 +969,7 @@ TestFile::testEmptyGridIO()
 
     typedef Int32Grid GridType;
 
-    const char* filename = "/tmp/something.vdb2";
+    const char* filename = "something.vdb2";
     boost::shared_ptr<const char> scopedFile(filename, ::remove);
 
     File file(filename);
@@ -1398,7 +1398,7 @@ TestFile::testReadGridMetadata()
 
     openvdb::initialize();
 
-    const char* filename = "/tmp/testReadGridMetadata.vdb2";
+    const char* filename = "testReadGridMetadata.vdb2";
     boost::shared_ptr<const char> scopedFile(filename, ::remove);
 
     // Create grids
@@ -1771,7 +1771,7 @@ TestFile::testReadClippedGrid()
     srcGrids.push_back(fgrid);
     srcGrids.push_back(vgrid);
 
-    const char* filename = "/tmp/testReadClippedGrid.vdb";
+    const char* filename = "testReadClippedGrid.vdb";
     boost::shared_ptr<const char> scopedFile(filename, ::remove);
 
     enum { OUTPUT_TO_FILE = 0, OUTPUT_TO_STREAM = 1 };
@@ -1993,7 +1993,7 @@ TestFile::testNameIterator()
     // Register types.
     openvdb::initialize();
 
-    const char* filename = "/tmp/testNameIterator.vdb2";
+    const char* filename = "testNameIterator.vdb2";
     boost::shared_ptr<const char> scopedFile(filename, ::remove);
 
     // Write the grids out to a file.
@@ -2068,7 +2068,7 @@ TestFile::testCompression()
     grids.push_back(lsGrid);
     grids.push_back(fogGrid);
 
-    const char* filename = "/tmp/testCompression.vdb2";
+    const char* filename = "testCompression.vdb2";
     boost::shared_ptr<const char> scopedFile(filename, ::remove);
 
     size_t uncompressedSize = 0;
@@ -2262,7 +2262,7 @@ TestFile::testAsync()
     size_t refFileSize = 0;
     {
         // Write a reference file without using asynchronous I/O.
-        const char* filename = "/tmp/testAsyncref.vdb";
+        const char* filename = "testAsyncref.vdb";
         boost::shared_ptr<const char> scopedFile(filename, ::remove);
         io::File f(filename);
         f.write(grids, fileMetadata);
@@ -2283,7 +2283,7 @@ TestFile::testAsync()
         io::Queue queue;
         for (int i = 1; i < 10; ++i) {
             std::ostringstream ostr;
-            ostr << "/tmp/testAsync." << i << ".vdb";
+            ostr << "testAsync." << i << ".vdb";
             const std::string filename = ostr.str();
             io::Queue::Id id = queue.write(grids, io::File(filename), fileMetadata);
             helper.insert(id, filename);
@@ -2318,7 +2318,7 @@ TestFile::testAsync()
 
         for (int i = 1; i < 10; ++i) {
             std::ostringstream ostr;
-            ostr << "/tmp/testAsync" << i << ".vdb";
+            ostr << "testAsync" << i << ".vdb";
             const std::string filename = ostr.str();
             io::Queue::Id id = queue.write(grids, io::File(filename), fileMetadata);
             helper.insert(id, filename);
@@ -2334,8 +2334,8 @@ TestFile::testAsync()
         queue.setTimeout(0/*sec*/);
 
         boost::shared_ptr<const char>
-            scopedFile1("/tmp/testAsyncIOa.vdb", ::remove),
-            scopedFile2("/tmp/testAsyncIOb.vdb", ::remove);
+            scopedFile1("testAsyncIOa.vdb", ::remove),
+            scopedFile2("testAsyncIOb.vdb", ::remove);
         std::ofstream
             file1(scopedFile1.get()),
             file2(scopedFile2.get());

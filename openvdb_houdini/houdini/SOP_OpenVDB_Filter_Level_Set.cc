@@ -1063,41 +1063,36 @@ inline void
 SOP_OpenVDB_Filter_Level_Set::renormalize(const FilterParms& parms, FilterT& filter,
     BossT& boss, bool verbose)
 {
-    // We will restore the old normCount since it is important to level set tracking
-    const int oldNormCount = filter.getNormCount();
-    filter.setNormCount(1); // only one normalization per iteration
+    // We will restore the old state since it is important to level set tracking
+    const typename FilterT::State s = filter.getState();
+
+    filter.setNormCount(parms.mIterations);
+
+    filter.setTemporalScheme(openvdb::math::TVD_RK3);
 
     if (verbose) std::cout << "Renormalize #" << parms.mIterations << std::endl;
 
-    for (int n = 0, N = parms.mIterations; n < N && !boss.wasInterrupted(); ++n) {
-        filter.normalize();
-    }
+    filter.normalize();
 
-    filter.setNormCount(oldNormCount);
+    filter.prune();
+
+    filter.setState(s);
 }
 
 template<typename FilterT>
 inline void
 SOP_OpenVDB_Filter_Level_Set::resizeNarrowBand(const FilterParms& parms, FilterT& filter,
-    BossT&, bool verbose)
+    BossT&, bool /*verbose*/)
 {
-    // We will restore the old normCount since it is important to level set tracking
-    const int oldNormCount = filter.getNormCount();
+    // The filter is a statemachine so we will restore the old
+    // state since it is important to subsequent level set tracking
+    const typename FilterT::State s = filter.getState();
+
     filter.setNormCount(1); // only one normalization per iteration
 
-    const typename FilterT::ValueType gamma = filter.grid().background();
-    const int wOld = static_cast<int>(openvdb::math::Round(gamma/mVoxelSize));
-    const int wNew = parms.mHalfWidth;
+    filter.resize(parms.mHalfWidth);
 
-    if (wOld < wNew) {
-        if (verbose) std::cout << "Dilate narrow band #" << (wNew - wOld) << std::endl;
-        filter.dilate(wNew - wOld);
-    } else if (wOld > wNew) {
-        if (verbose) std::cout << "Erode narrow band #" << (wOld - wNew) << std::endl;
-        filter.erode(wOld - wNew);
-    }
-
-    filter.setNormCount(oldNormCount);
+    filter.setState(s);
 }
 
 template<typename FilterT>

@@ -82,7 +82,7 @@ public:
     {
     }
     void setConstraintIterations(unsigned int cptIterations) { mCptIterations = cptIterations; }
-    unsigned int numIterations() { return mCptIterations;};
+    unsigned int numIterations() { return mCptIterations; }
 
     // point constraint
     template <typename LocationType>

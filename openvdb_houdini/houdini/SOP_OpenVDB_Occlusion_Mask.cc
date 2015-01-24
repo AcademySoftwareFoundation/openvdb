@@ -53,7 +53,7 @@ class SOP_OpenVDB_Occlusion_Mask: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Occlusion_Mask(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Occlusion_Mask() {};
+    virtual ~SOP_OpenVDB_Occlusion_Mask() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 

@@ -126,7 +126,6 @@ private:
     int mWheelPos;
     bool mShiftIsDown, mCtrlIsDown, mShowInfo;
     bool mInterrupt;
-    int mWinWidth, mWinHeight;
 #if GLFW_VERSION_MAJOR >= 3
     GLFWwindow* mWindow;
 #endif

@@ -884,7 +884,7 @@ TestTree::testIterators()
 void
 TestTree::testIO()
 {
-    const char* filename = "/tmp/test.dbg";
+    const char* filename = "testIO.dbg";
     boost::shared_ptr<const char> scopedFile(filename, ::remove);
     {
         ValueType background=5.0f;
@@ -2339,8 +2339,10 @@ TestTree::testAddTile()
     CPPUNIT_ASSERT(tree.probeLeaf(ijk) != NULL);
 
     const Index lvl = FloatTree::DEPTH >> 1;
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
     if (lvl > 0) tree.addTile(lvl,ijk, 3.0, /*active=*/true);
     else tree.addTile(1,ijk, 3.0, /*active=*/true);
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 
     CPPUNIT_ASSERT(tree.probeLeaf(ijk) == NULL);
     ASSERT_DOUBLES_EXACTLY_EQUAL(3.0, tree.getValue(ijk));

@@ -46,9 +46,11 @@ namespace OPENVDB_VERSION_NAME {
 typedef tbb::mutex Mutex;
 typedef Mutex::scoped_lock Lock;
 
+namespace {
 // Declare this at file scope to ensure thread-safe initialization.
 Mutex sInitMutex;
 bool sIsInitialized = false;
+}
 
 void
 initialize()

@@ -84,6 +84,8 @@ public:
     class Buffer
     {
     public:
+        typedef typename NodeMaskType::Word WordType;
+        static const Index WORD_COUNT = NodeMaskType::WORD_COUNT;
         Buffer() {}
         Buffer(bool on) : mData(on) {}
         Buffer(const NodeMaskType& other): mData(other) {}
@@ -110,6 +112,22 @@ public:
 
         Index memUsage() const { return mData.memUsage(); }
         static Index size() { return SIZE; }
+
+        /// Return a point to the c-style array of words encoding the bits.
+        /// @warning This method should only be used by experts that
+        /// seek low-level optimizations.
+        WordType* data()
+        {
+            return &(mData.template getWord<WordType>(0));
+        }
+        /// Return a const point to the c-style array of words
+        /// encoding the bits.
+        /// @warning This method should only be used by experts that
+        /// seek low-level optimizations.
+        const WordType* data() const
+        {
+            return const_cast<Buffer*>(this)->data();
+        }
 
     private:
         friend class ::TestLeaf;
@@ -306,7 +324,7 @@ public:
     /// Set the value of the voxel at the given coordinates and mark the voxel as active.
     void setValueOn(const Coord& xyz, bool val);
     /// Set the value of the voxel at the given coordinates and mark the voxel as active.
-    void setValue(const Coord& xyz, bool val) { this->setValueOn(xyz, val); };
+    void setValue(const Coord& xyz, bool val) { this->setValueOn(xyz, val); }
     /// Set the value of the voxel at the given offset and mark the voxel as active.
     void setValueOn(Index offset, bool val);
 
@@ -473,7 +491,7 @@ public:
     void merge(const LeafNode& other, bool bg = false, bool otherBG = false);
     template<MergePolicy Policy> void merge(bool tileValue, bool tileActive);
 
-    void voxelizeActiveTiles() {};
+    void voxelizeActiveTiles() {}
 
     /// @brief Union this node's set of active values with the active values
     /// of the other node, whose @c ValueType may be different. So a

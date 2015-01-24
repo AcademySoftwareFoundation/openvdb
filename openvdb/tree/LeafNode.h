@@ -126,6 +126,8 @@ public:
         /// Allocate memory for this buffer if it has not already been allocated.
         bool allocate() { if (mData == NULL) mData = new ValueType[SIZE]; return !this->empty(); }
 #else
+        typedef ValueType WordType;
+        static const Index WORD_COUNT = SIZE;
         /// Default constructor
         Buffer(): mData(new ValueType[SIZE]), mOutOfCore(0) {}
         /// Construct a buffer populated with the specified value.
@@ -260,6 +262,30 @@ public:
         }
         /// Return the number of values contained in this buffer.
         static Index size() { return SIZE; }
+
+        /// @brief Return a const pointer to the array of voxel values.
+        /// @details This method guarantees that the buffer is allocated and loaded.
+        /// @warning This method should only be used by experts seeking low-level optimizations.
+        const ValueType* data() const
+        {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+            this->loadValues();
+            if (mData == NULL) mData = new ValueType[SIZE];
+#endif
+            return mData;
+        }
+
+        /// @brief Return a pointer to the array of voxel values.
+        /// @details This method guarantees that the buffer is allocated and loaded.
+        /// @warning This method should only be used by experts seeking low-level optimizations.
+        ValueType* data()
+        {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+            this->loadValues();
+            if (mData == NULL) mData = new ValueType[SIZE];
+#endif
+            return mData;
+        }
 
     private:
         /// If this buffer is empty, return zero, otherwise return the value at index @ i.

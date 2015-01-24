@@ -138,7 +138,6 @@ public:
     typedef typename GridType::TreeType          TreeType;
     typedef typename TreeType::ValueType         ValueType;
     typedef typename tree::LeafManager<const TreeType> ManagerType;
-    typedef typename ManagerType::LeafRange      RangeType;
     BOOST_STATIC_ASSERT(boost::is_floating_point<ValueType>::value);
 
     /// @brief Main constructor from a grid
@@ -156,10 +155,10 @@ public:
     void reinit(ManagerType& leafs, Real dx);
 
     /// @brief Destructor
-    ~LevelSetMeasure() {}
+    virtual ~LevelSetMeasure() {}
 
      /// @return the grain-size used for multi-threading
-    int  getGrainSize() const { return mGrainSize; }
+    int getGrainSize() const { return mGrainSize; }
 
     /// @brief Set the grain-size used for multi-threading.
     /// @note A grainsize of 0 or less disables multi-threading!
@@ -179,39 +178,56 @@ public:
     /// above that only computes the area and volume.
     void measure(Real& area, Real& volume, Real& avgMeanCurvature, bool useWorldUnits = true);
 
-    /// @brief Used internally by tbb::parallel_reduce().
-    /// @param range The range over which to perform multi-threading.
-    /// @warning Never call this method directly!
-    void operator()(const RangeType& range) const
-    {
-        if (mTask) mTask(const_cast<LevelSetMeasure*>(this), range);
-        else OPENVDB_THROW(ValueError, "task is undefined");
-    }
-
 private:
-    typedef typename GridT::ConstAccessor       AccT;
-    typedef typename TreeType::LeafNodeType     LeafT;
-    typedef typename LeafT::ValueOnCIter        VoxelCIterT;
-    typedef typename ManagerType::BufferType    BufferT;
-    typedef typename RangeType::Iterator        LeafIterT;
-
-    AccT         mAcc;
-    ManagerType* mLeafs;
-    InterruptT*  mInterrupter;
-    double       mDx;
-    double*      mArray;
-    typename boost::function<void (LevelSetMeasure*, const RangeType&)> mTask;
-    int          mGrainSize;
+    // disallow copy construction and copy by assinment!
+    LevelSetMeasure(const LevelSetMeasure&);// not implemented
+    LevelSetMeasure& operator=(const LevelSetMeasure&);// not implemented
+   
+    const TreeType* mTree;
+    ManagerType*    mLeafs;
+    InterruptT*     mInterrupter;
+    double          mDx;
+    double*         mArray;
+    int             mGrainSize;
 
     // @brief Return false if the process was interrupted
     bool checkInterrupter();
 
-    // Private methods called by tbb::parallel_reduce threads
-    void measure2( const RangeType& );
-
-    // Private methods called by tbb::parallel_reduce threads
-    void measure3( const RangeType& );
-
+    typedef typename TreeType::LeafNodeType  LeafT;
+    typedef typename LeafT::ValueOnCIter     VoxelCIterT;
+    typedef typename ManagerType::LeafRange  LeafRange;
+    typedef typename LeafRange::Iterator     LeafIterT;
+    
+    struct Measure2
+    {
+        Measure2(LevelSetMeasure* parent) : mParent(parent), mAcc(*mParent->mTree)
+        {
+            if (parent->mGrainSize>0) {
+                tbb::parallel_for(parent->mLeafs->leafRange(parent->mGrainSize), *this);
+            } else {
+                (*this)(parent->mLeafs->leafRange());
+            }
+        }
+        Measure2(const Measure2& other) : mParent(other.mParent), mAcc(*mParent->mTree) {}
+        void operator()(const LeafRange& range) const;
+        LevelSetMeasure* mParent;
+        typename GridT::ConstAccessor mAcc;
+    };
+    struct Measure3
+    {
+        Measure3(LevelSetMeasure* parent) : mParent(parent), mAcc(*mParent->mTree)
+        {
+            if (parent->mGrainSize>0) {
+                tbb::parallel_for(parent->mLeafs->leafRange(parent->mGrainSize), *this);
+            } else {
+                (*this)(parent->mLeafs->leafRange());
+            }
+        }
+        Measure3(const Measure3& other) : mParent(other.mParent), mAcc(*mParent->mTree) {}
+        void operator()(const LeafRange& range) const;
+        LevelSetMeasure* mParent;
+        typename GridT::ConstAccessor mAcc;
+    };
     inline double reduce(double* first, double scale)
     {
         double* last = first + mLeafs->leafCount();
@@ -227,12 +243,11 @@ private:
 template<typename GridT, typename InterruptT>
 inline
 LevelSetMeasure<GridT, InterruptT>::LevelSetMeasure(const GridType& grid, InterruptT* interrupt)
-    : mAcc(grid.tree())
+    : mTree(&(grid.tree()))
     , mLeafs(NULL)
     , mInterrupter(interrupt)
     , mDx(grid.voxelSize()[0])
     , mArray(NULL)
-    , mTask(0)
     , mGrainSize(1)
 {
     if (!grid.hasUniformVoxels()) {
@@ -251,12 +266,11 @@ template<typename GridT, typename InterruptT>
 inline
 LevelSetMeasure<GridT, InterruptT>::LevelSetMeasure(
     ManagerType& leafs, Real dx, InterruptT* interrupt)
-    : mAcc(leafs.tree())
+    : mTree(&(leafs.tree()))
     , mLeafs(&leafs)
     , mInterrupter(interrupt)
     , mDx(dx)
     , mArray(NULL)
-    , mTask(0)
     , mGrainSize(1)
 {
 }
@@ -274,8 +288,8 @@ LevelSetMeasure<GridT, InterruptT>::reinit(const GridType& grid)
             "LevelSetMeasure only supports level sets;"
             " try setting the grid class to \"level set\"");
     }
+    mTree = &(grid.tree());
     mLeafs = NULL;
-    mAcc = grid.getConstAccessor();
     mDx = grid.voxelSize()[0];
 }
 
@@ -285,7 +299,7 @@ inline void
 LevelSetMeasure<GridT, InterruptT>::reinit(ManagerType& leafs, Real dx)
 {
     mLeafs = &leafs;
-    mAcc = AccT(leafs.tree());
+    mTree = &(leafs.tree());
     mDx = dx;
 }
 
@@ -297,10 +311,10 @@ inline void
 LevelSetMeasure<GridT, InterruptT>::measure(Real& area, Real& volume, bool useWorldUnits)
 {
     if (mInterrupter) mInterrupter->start("Measuring level set");
-    mTask = boost::bind(&LevelSetMeasure::measure2, _1, _2);
+    
 
     const bool newLeafs = mLeafs == NULL;
-    if (newLeafs) mLeafs = new ManagerType(mAcc.tree());
+    if (newLeafs) mLeafs = new ManagerType(*mTree);
     const size_t leafCount = mLeafs->leafCount();
     if (leafCount == 0) {
         area = volume = 0;
@@ -308,11 +322,7 @@ LevelSetMeasure<GridT, InterruptT>::measure(Real& area, Real& volume, bool useWo
     }
     mArray = new double[2*leafCount];
 
-    if (mGrainSize>0) {
-        tbb::parallel_for(mLeafs->leafRange(mGrainSize), *this);
-    } else {
-        (*this)(mLeafs->leafRange());
-    }
+    Measure2 m(this);
 
     const double dx = useWorldUnits ? mDx : 1.0;
     area = this->reduce(mArray, math::Pow2(dx));
@@ -330,14 +340,14 @@ LevelSetMeasure<GridT, InterruptT>::measure(Real& area, Real& volume, bool useWo
 
 template<typename GridT, typename InterruptT>
 inline void
-LevelSetMeasure<GridT, InterruptT>::measure(Real& area, Real& volume, Real& avgMeanCurvature,
+LevelSetMeasure<GridT, InterruptT>::measure(Real& area, Real& volume,
+                                            Real& avgMeanCurvature,
                                             bool useWorldUnits)
 {
     if (mInterrupter) mInterrupter->start("Measuring level set");
-    mTask = boost::bind(&LevelSetMeasure::measure3, _1, _2);
 
     const bool newLeafs = mLeafs == NULL;
-    if (newLeafs) mLeafs = new ManagerType(mAcc.tree());
+    if (newLeafs) mLeafs = new ManagerType(*mTree);
     const size_t leafCount = mLeafs->leafCount();
     if (leafCount == 0) {
         area = volume = avgMeanCurvature = 0;
@@ -345,11 +355,7 @@ LevelSetMeasure<GridT, InterruptT>::measure(Real& area, Real& volume, Real& avgM
     }
     mArray = new double[3*leafCount];
 
-    if (mGrainSize>0) {
-        tbb::parallel_for(mLeafs->leafRange(mGrainSize), *this);
-    } else {
-        (*this)(mLeafs->leafRange());
-    }
+    Measure3 m(this);
 
     const double dx = useWorldUnits ? mDx : 1.0;
     area = this->reduce(mArray, math::Pow2(dx));
@@ -382,14 +388,15 @@ LevelSetMeasure<GridT, InterruptT>::checkInterrupter()
 
 template<typename GridT, typename InterruptT>
 inline void
-LevelSetMeasure<GridT, InterruptT>::measure2(const RangeType& range)
+LevelSetMeasure<GridT, InterruptT>::
+Measure2::operator()(const LeafRange& range) const
 {
     typedef math::Vec3<ValueType> Vec3T;
     typedef math::ISGradient<math::CD_2ND> Grad;
-    this->checkInterrupter();
-    const Real invDx = 1.0/mDx;
+    mParent->checkInterrupter();
+    const Real invDx = 1.0/mParent->mDx;
     const DiracDelta<Real> DD(1.5);
-    const size_t leafCount = mLeafs->leafCount();
+    const size_t leafCount = mParent->mLeafs->leafCount();
     for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
         Real sumA = 0, sumV = 0;//reduce risk of catastrophic cancellation
         for (VoxelCIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter) {
@@ -401,26 +408,26 @@ LevelSetMeasure<GridT, InterruptT>::measure2(const RangeType& range)
                 sumV += dd * (g[0]*p[0]+g[1]*p[1]+g[2]*p[2]);
             }
         }
-        double* v = mArray + leafIter.pos();
+        double* v = mParent->mArray + leafIter.pos();
         *v = sumA;
         v += leafCount;
         *v = sumV;
     }
 }
 
-
 template<typename GridT, typename InterruptT>
 inline void
-LevelSetMeasure<GridT, InterruptT>::measure3(const RangeType& range)
+LevelSetMeasure<GridT, InterruptT>::
+Measure3::operator()(const LeafRange& range) const
 {
     typedef math::Vec3<ValueType> Vec3T;
     typedef math::ISGradient<math::CD_2ND> Grad;
     typedef math::ISMeanCurvature<math::CD_SECOND, math::CD_2ND> Curv;
-    this->checkInterrupter();
-    const Real invDx = 1.0/mDx;
+    mParent->checkInterrupter();
+    const Real invDx = 1.0/mParent->mDx;
     const DiracDelta<Real> DD(1.5);
     ValueType alpha, beta;
-    const size_t leafCount = mLeafs->leafCount();
+    const size_t leafCount = mParent->mLeafs->leafCount();
     for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
         Real sumA = 0, sumV = 0, sumC = 0;//reduce risk of catastrophic cancellation
         for (VoxelCIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter) {
@@ -435,7 +442,7 @@ LevelSetMeasure<GridT, InterruptT>::measure3(const RangeType& range)
                 sumC += dA * alpha/(2*math::Pow2(beta))*invDx;
             }
         }
-        double* v = mArray + leafIter.pos();
+        double* v = mParent->mArray + leafIter.pos();
         *v = sumA;
         v += leafCount;
         *v = sumV;

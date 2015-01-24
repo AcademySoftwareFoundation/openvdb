@@ -846,12 +846,11 @@ struct D1<FD_3RD>
 {
 
     // the difference opperator
-    template <typename ValueType>
+    template<typename ValueType>
     static ValueType difference(const ValueType& xp3, const ValueType& xp2,
         const ValueType& xp1, const ValueType& xp0)
     {
-        return ValueType(1./3.)*xp3 - ValueType(1.5)*xp2
-            + ValueType(3.)*xp1 - ValueType(11./6.)*xp0;
+        return static_cast<ValueType>(xp3/3.0 - 1.5*xp2 + 3.0*xp1 - 11.0*xp0/6.0);
     }
 
 

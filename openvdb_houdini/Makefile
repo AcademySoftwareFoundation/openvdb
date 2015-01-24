@@ -222,6 +222,7 @@ HOUDINI_SOP_SRC_NAMES := \
     houdini/SOP_OpenVDB_Combine.cc \
     houdini/SOP_OpenVDB_Convert.cc \
     houdini/SOP_OpenVDB_Create.cc \
+    houdini/SOP_OpenVDB_Diagnostics.cc \
     houdini/SOP_OpenVDB_Fill.cc \
     houdini/SOP_OpenVDB_Filter.cc \
     houdini/SOP_OpenVDB_Filter_Level_Set.cc \
@@ -332,14 +333,14 @@ ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)$(HCUSTOM_EXTRA_LDFLAGS)))
         endif
         HCUSTOM_EXPORT := HOUDINI_CC='$(HOUDINI_CC) $(HCUSTOM_EXTRA_CFLAGS) $(HCUSTOM_EXTRA_LDFLAGS)'
     else
-	# From Houdini 13.0.548 and 14.0.105 on, hcustom recognizes
-	# the environment variables HCUSTOM_CFLAGS and HCUSTOM_LDFLAGS.
-	ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)))
-	    HCUSTOM_EXPORT += HCUSTOM_CFLAGS=$(strip $(HCUSTOM_EXTRA_CFLAGS))
-	endif
-	ifneq (,$(strip $(HCUSTOM_EXTRA_LDFLAGS)))
-	    HCUSTOM_EXPORT += HCUSTOM_LDFLAGS=$(strip $(HCUSTOM_EXTRA_LDFLAGS))
-	endif
+        # From Houdini 13.0.548 and 14.0.105 on, hcustom recognizes
+        # the environment variables HCUSTOM_CFLAGS and HCUSTOM_LDFLAGS.
+        ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)))
+            HCUSTOM_EXPORT += HCUSTOM_CFLAGS=$(strip $(HCUSTOM_EXTRA_CFLAGS))
+        endif
+        ifneq (,$(strip $(HCUSTOM_EXTRA_LDFLAGS)))
+            HCUSTOM_EXPORT += HCUSTOM_LDFLAGS=$(strip $(HCUSTOM_EXTRA_LDFLAGS))
+        endif
     endif
 endif
 ifneq (,$(strip $(HCUSTOM_EXPORT)))
