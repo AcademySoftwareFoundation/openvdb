@@ -1,0 +1,11 @@
+/openvdb/dependencies
+/openvdb/doc/html
+/openvdb/openvdb_viewer
+/openvdb/vdb_print
+/openvdb/vdb_render
+/openvdb/vdb_test
+/openvdb/vdb_view
+*.o
+*.so
+*.so.*
+*.swp
