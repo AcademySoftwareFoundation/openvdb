@@ -32,11 +32,11 @@
 
 # Targets:
 #   houdinilib          utility library for Houdini OpenVDB SOPs
-#   houdinisops         Houdini OpenVDB SOPs (installed into HOUDINI_DESTDIR)
+#   houdinisops         Houdini OpenVDB SOPs (installed into HOUDINI_DSO_DIR)
 #
 #   all                 [default target] all of the above
-#   install             install houdinilib into subdirectories of DESTDIR,
-#                       and the SOPs into HOUDINI_DESTDIR
+#   install             install houdinilib into subdirectories of prefix,
+#                       and the SOPs into HOUDINI_DSO_DIR
 #   clean               delete generated files from the local directory
 #   depend              recompute source file header dependencies
 #
@@ -52,7 +52,7 @@
 
 #
 # The following variables must be defined, either here or on the command line
-# (e.g., "make install DESTDIR=/usr/local"):
+# (e.g., "make install prefix=/usr/local DESTDIR=/tmp/staging-area"):
 #
 # Note that the OpenVDB library and these Houdini tools must be built
 # against compatible versions of the Boost, OpenEXR and TBB libraries.
@@ -68,17 +68,24 @@ endif
 
 
 # The directory into which to install libraries and header files
-# (it's recommended that this match the DESTDIR in the OpenVDB
+# (it's recommended that this match the prefix in the OpenVDB
 # library makefile)
-DESTDIR := /tmp/OpenVDB
+prefix := /tmp/OpenVDB
+
+# The temporary staging directory, used for creating staged installs
+# DESTDIR =
+
+# The library subdirectory, relative to $(prefix)
+LIB := lib
+libdir := $(prefix)/$(LIB)
 
 # The directory into which to install Houdini SOPs
-HOUDINI_DESTDIR := $(HIH)/dso
+HOUDINI_DSO_DIR := $(HIH)/dso
 
 # The parent directory of the openvdb/ header directory
-OPENVDB_INCL_DIR := $(DESTDIR)/include
+OPENVDB_INCL_DIR := $(DESTDIR)$(prefix)/include
 # The directory containing libopenvdb
-OPENVDB_LIB_DIR := $(DESTDIR)/lib
+OPENVDB_LIB_DIR := $(DESTDIR)$(prefix)/$(LIB)
 OPENVDB_LIB := -lopenvdb
 
 # The parent directory of the boost/ header directory
@@ -110,7 +117,7 @@ SHELL = /bin/bash
 .SUFFIXES:
 
 ifneq (,$(INSTALL_DIR))
-    $(warning Warning: $$(INSTALL_DIR) is no longer used; set $$(DESTDIR) instead.)
+    $(warning Warning: $$(INSTALL_DIR) is no longer used; set $$(DESTDIR) and $$(prefix) instead.)
 endif
 
 # Determine the platform.
@@ -129,7 +136,7 @@ endif
 
 HOUDINI_INCL_DIR := $(HT)/include
 # Flags to be passed to the hcustom build script
-HCUSTOM_FLAGS := -i $(HOUDINI_DESTDIR)
+HCUSTOM_FLAGS := -i $(HOUDINI_DSO_DIR)
 ifeq (yes,$(strip $(verbose)))
     HCUSTOM_FLAGS += -e
 endif
@@ -266,7 +273,7 @@ ALL_SRC_FILES := $(HOUDINI_SRC_FILES)
 
 LIBHOUDINI_OBJ_NAMES := $(LIBHOUDINI_SRC_NAMES:.cc=.o)
 HOUDINI_SOP_OBJ_NAMES := $(HOUDINI_SOP_SRC_NAMES:.cc=.o)
-HOUDINI_SOP_SO_NAMES := $(addprefix $(HOUDINI_DESTDIR)/,\
+HOUDINI_SOP_SO_NAMES := $(addprefix $(HOUDINI_DSO_DIR)/,\
     $(notdir $(HOUDINI_SOP_SRC_NAMES:.cc=.so)))
 
 LIB_MAJOR_VERSION=$(shell grep 'define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER ' \
@@ -411,46 +418,46 @@ $(HOUDINI_SOP_OBJ_NAMES): $(LIBHOUDINI)
 ifeq (no,$(strip $(shared)))
 # Link SOPs against static OpenVDB libraries.
 $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
-	@echo "Building $(HOUDINI_DESTDIR)/$(@:.o=.so) because of $(call list_deps)"
+	@echo "Building $(HOUDINI_DSO_DIR)/$(@:.o=.so) because of $(call list_deps)"
 	$(HCUSTOM_EXPORT) $(HB)/hcustom $(HCUSTOM_FLAGS) $(HCUSTOM_INCLDIRS) $(LIBS) \
 	    -L. -lopenvdb_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) $< $(QUIET)
 else
 # Link SOPs against shared OpenVDB libraries.
 $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
-	@echo "Building $(HOUDINI_DESTDIR)/$(@:.o=.so) because of $(call list_deps)"
+	@echo "Building $(HOUDINI_DSO_DIR)/$(@:.o=.so) because of $(call list_deps)"
 	$(HCUSTOM_EXPORT) $(HB)/hcustom $(HCUSTOM_FLAGS) $(HCUSTOM_INCLDIRS) \
 	    -L. -lopenvdb_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) $< $(QUIET)
 endif
 
-$(HOUDINI_SOP_SO_NAMES): $(HOUDINI_DESTDIR)/%.so: houdini/%.o
+$(HOUDINI_SOP_SO_NAMES): $(HOUDINI_DSO_DIR)/%.so: houdini/%.o
 
 houdinisops: $(HOUDINI_SOP_SO_NAMES) houdini/SOP_OpenVDB.svg
-	if [ -d "$(HOUDINI_DESTDIR)/../config/Icons" ]; \
+	if [ -d "$(HOUDINI_DSO_DIR)/../config/Icons" ]; \
 	then \
-	    cp -f houdini/SOP_OpenVDB.svg $(HOUDINI_DESTDIR)/../config/Icons/; \
+	    cp -f houdini/SOP_OpenVDB.svg $(HOUDINI_DSO_DIR)/../config/Icons/; \
 	fi
 
 install: houdinilib houdinisops
-	mkdir -p $(DESTDIR)/include/openvdb_houdini
-	@echo "Created $(DESTDIR)/include/openvdb_houdini"
-	mkdir -p $(DESTDIR)/include/houdini_utils
-	@echo "Created $(DESTDIR)/include/houdini_utils"
-	cp -f $(LIBHOUDINI_INCLUDE_NAMES) $(DESTDIR)/include/openvdb_houdini/
+	mkdir -p $(DESTDIR)$(prefix)/include/openvdb_houdini
+	@echo "Created $(DESTDIR)$(prefix)/include/openvdb_houdini"
+	mkdir -p $(DESTDIR)$(prefix)/include/houdini_utils
+	@echo "Created $(DESTDIR)$(prefix)/include/houdini_utils"
+	cp -f $(LIBHOUDINI_INCLUDE_NAMES) $(DESTDIR)$(prefix)/include/openvdb_houdini/
 	@# Move headers from openvdb_houdini/ to houdini_utils/.
-	mv -f $(DESTDIR)/include/openvdb_houdini/geometry.h \
-        $(DESTDIR)/include/openvdb_houdini/ParmFactory.h \
-	    $(DESTDIR)/include/openvdb_houdini/OP_NodeChain.h \
-	    $(DESTDIR)/include/houdini_utils/
-	@echo "Copied header files to $(DESTDIR)/include"
+	mv -f $(DESTDIR)$(prefix)/include/openvdb_houdini/geometry.h \
+        $(DESTDIR)$(prefix)/include/openvdb_houdini/ParmFactory.h \
+	    $(DESTDIR)$(prefix)/include/openvdb_houdini/OP_NodeChain.h \
+	    $(DESTDIR)$(prefix)/include/houdini_utils/
+	@echo "Copied header files to $(DESTDIR)$(prefix)/include"
 	@#
-	mkdir -p $(DESTDIR)/lib
-	@echo "Created $(DESTDIR)/lib/"
-	cp -f $(LIBHOUDINI) $(DESTDIR)/lib
-	pushd $(DESTDIR)/lib > /dev/null; \
+	mkdir -p $(DESTDIR)$(libdir)
+	@echo "Created $(DESTDIR)$(libdir)/"
+	cp -f $(LIBHOUDINI) $(DESTDIR)$(libdir)
+	pushd $(DESTDIR)$(libdir) > /dev/null; \
 	    if [ -f $(LIBHOUDINI_SHARED) ]; then \
 	        ln -f -s $(LIBHOUDINI_SHARED) $(LIBHOUDINI_NAME).so; fi; \
 	    popd > /dev/null
-	@echo "Copied libopenvdb_houdini to $(DESTDIR)/lib/"
+	@echo "Copied libopenvdb_houdini to $(DESTDIR)$(libdir)/"
 
 # TODO: This accumulates all source file dependencies into a single file
 # containing a rule for each *.o file.  Consider generating a separate
@@ -472,7 +479,7 @@ clean:
 	$(RM) $(LIBHOUDINI_SHARED)
 	$(RM) $(LIBHOUDINI_OBJ_NAMES)
 	$(RM) $(HOUDINI_SOP_OBJ_NAMES) $(HOUDINI_SOP_SO_NAMES)
-	$(RM) $(HOUDINI_DESTDIR)/../config/Icons/SOP_OpenVDB.svg
+	$(RM) $(HOUDINI_DSO_DIR)/../config/Icons/SOP_OpenVDB.svg
 
 ifneq (,$(strip $(wildcard $(DEPEND))))
     include $(DEPEND)
