@@ -128,8 +128,8 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.5), value, /*tolerance=*/double(0.0));
     }
 
-    typedef openvdb::tools::FixedPointAttributeCodec<uint16_t> Codec;
-    typedef openvdb::tools::TypedAttributeArray<double, Codec> AttributeArrayC;
+    typedef openvdb::tools::FixedPointAttributeCodec<uint16_t> FixedPointCodec;
+    typedef openvdb::tools::TypedAttributeArray<double, FixedPointCodec> AttributeArrayC;
 
     {
         openvdb::tools::AttributeArray::Ptr attr(new AttributeArrayC(50));
@@ -217,6 +217,41 @@ TestAttributeArray::testAttributeArray()
         for (unsigned i = 0; i < unsigned(count); ++i) {
             CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.get(i));
         }
+    }
+
+    typedef openvdb::tools::FixedPositionAttributeCodec<uint16_t> FixedPositionCodec;
+    typedef openvdb::tools::TypedAttributeArray<double, FixedPositionCodec> AttributeArrayP;
+
+    { // Fixed codec range
+        openvdb::tools::AttributeArray::Ptr attr1(new AttributeArrayC(50));
+        openvdb::tools::AttributeArray::Ptr attr2(new AttributeArrayP(50));
+
+        AttributeArrayC& fixedPoint = static_cast<AttributeArrayC&>(*attr1);
+        AttributeArrayP& fixedPosition = static_cast<AttributeArrayP&>(*attr2);
+
+        // fixed point range is 0.0 => 1.0
+
+        fixedPoint.set(0, -0.1);
+        fixedPoint.set(1, 0.1);
+        fixedPoint.set(2, 0.9);
+        fixedPoint.set(3, 1.1);
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.0), fixedPoint.get(0), /*tolerance=*/double(0.0001));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.1), fixedPoint.get(1), /*tolerance=*/double(0.0001));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.9), fixedPoint.get(2), /*tolerance=*/double(0.0001));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(1.0), fixedPoint.get(3), /*tolerance=*/double(0.0001));
+
+        // fixed position range is -0.5 => 0.5
+
+        fixedPosition.set(0, -0.6);
+        fixedPosition.set(1, -0.4);
+        fixedPosition.set(2, 0.4);
+        fixedPosition.set(3, 0.6);
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(-0.5), fixedPosition.get(0), /*tolerance=*/double(0.0001));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(-0.4), fixedPosition.get(1), /*tolerance=*/double(0.0001));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.4), fixedPosition.get(2), /*tolerance=*/double(0.0001));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.5), fixedPosition.get(3), /*tolerance=*/double(0.0001));
     }
 
     { // IO

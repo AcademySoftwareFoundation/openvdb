@@ -130,6 +130,21 @@ struct FixedPointAttributeCodec
 };
 
 
+template<typename IntType>
+struct FixedPositionAttributeCodec
+{
+    typedef IntType StorageType;
+    template<typename ValueType> static void decode(const StorageType& s, ValueType& v){
+        FixedPointAttributeCodec<IntType>::decode(s, v);
+        v -= ValueType(0.5);
+    }
+    template<typename ValueType> static void encode(const ValueType& v, StorageType& s){
+        FixedPointAttributeCodec<IntType>::encode(v + ValueType(0.5), s);
+    }
+    static const char* name() { return "fxps"; }
+};
+
+
 struct UnitVecAttributeCodec
 {
     typedef uint16_t StorageType;
