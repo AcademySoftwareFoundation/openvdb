@@ -126,6 +126,8 @@ public:
         /// Allocate memory for this buffer if it has not already been allocated.
         bool allocate() { if (mData == NULL) mData = new ValueType[SIZE]; return !this->empty(); }
 #else
+        typedef ValueType WordType;
+        static const Index WORD_COUNT = SIZE;
         /// Default constructor
         Buffer(): mData(new ValueType[SIZE]), mOutOfCore(0) {}
         /// Construct a buffer populated with the specified value.
@@ -204,6 +206,7 @@ public:
                     if (other.isOutOfCore()) this->deallocate();
                 }
                 if (other.isOutOfCore()) {
+                    mOutOfCore = other.mOutOfCore;
                     mFileInfo = new FileInfo(*other.mFileInfo);
                 } else {
 #endif
@@ -259,6 +262,30 @@ public:
         }
         /// Return the number of values contained in this buffer.
         static Index size() { return SIZE; }
+
+        /// @brief Return a const pointer to the array of voxel values.
+        /// @details This method guarantees that the buffer is allocated and loaded.
+        /// @warning This method should only be used by experts seeking low-level optimizations.
+        const ValueType* data() const
+        {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+            this->loadValues();
+            if (mData == NULL) mData = new ValueType[SIZE];
+#endif
+            return mData;
+        }
+
+        /// @brief Return a pointer to the array of voxel values.
+        /// @details This method guarantees that the buffer is allocated and loaded.
+        /// @warning This method should only be used by experts seeking low-level optimizations.
+        ValueType* data()
+        {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+            this->loadValues();
+            if (mData == NULL) mData = new ValueType[SIZE];
+#endif
+            return mData;
+        }
 
     private:
         /// If this buffer is empty, return zero, otherwise return the value at index @ i.
@@ -684,7 +711,7 @@ public:
         this->setValueOn(LeafNode::coordToOffset(xyz), val);
     }
     /// Set the value of the voxel at the given coordinates and mark the voxel as active.
-    void setValue(const Coord& xyz, const ValueType& val) { this->setValueOn(xyz, val); };
+    void setValue(const Coord& xyz, const ValueType& val) { this->setValueOn(xyz, val); }
     /// Set the value of the voxel at the given offset and mark the voxel as active.
     void setValueOn(Index offset, const ValueType& val) {
         mBuffer.setValue(offset, val);
@@ -882,7 +909,7 @@ public:
 
     void negate();
 
-    void voxelizeActiveTiles() {};
+    void voxelizeActiveTiles() {}
 
     template<MergePolicy Policy> void merge(const LeafNode&);
     template<MergePolicy Policy> void merge(const ValueType& tileValue, bool tileActive);

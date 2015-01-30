@@ -48,7 +48,7 @@ class SOP_OpenVDB_Prune: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Prune(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Prune() {};
+    virtual ~SOP_OpenVDB_Prune() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 

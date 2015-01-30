@@ -48,7 +48,7 @@ class SOP_OpenVDB_Clip: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Clip(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Clip() {};
+    virtual ~SOP_OpenVDB_Clip() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
@@ -138,7 +138,6 @@ struct LevelSetMaskOp
 
 struct BBoxClipOp
 {
-    BBoxClipOp() {}
     BBoxClipOp(const openvdb::BBoxd& bbox_): bbox(bbox_) {}
 
     template<typename GridType>

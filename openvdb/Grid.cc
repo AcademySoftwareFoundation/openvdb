@@ -74,7 +74,6 @@ typedef Mutex::scoped_lock Lock;
 
 struct LockedGridRegistry {
     LockedGridRegistry() {}
-    ~LockedGridRegistry() {}
     Mutex mMutex;
     GridFactoryMap mMap;
 };

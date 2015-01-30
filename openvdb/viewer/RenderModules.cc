@@ -999,10 +999,10 @@ public:
         const Index64 maxVoxelPoints = 26000000;
 
         openvdb::Vec3s colorMap[4];
-        colorMap[0] = openvdb::Vec3s(0.3, 0.9, 0.3); // green
-        colorMap[1] = openvdb::Vec3s(0.9, 0.3, 0.3); // red
-        colorMap[2] = openvdb::Vec3s(0.9, 0.9, 0.3); // yellow
-        colorMap[3] = openvdb::Vec3s(0.3, 0.3, 0.9); // blue
+        colorMap[0] = openvdb::Vec3s(0.3f, 0.9f, 0.3f); // green
+        colorMap[1] = openvdb::Vec3s(0.9f, 0.3f, 0.3f); // red
+        colorMap[2] = openvdb::Vec3s(0.9f, 0.9f, 0.3f); // yellow
+        colorMap[3] = openvdb::Vec3s(0.3f, 0.3f, 0.9f); // blue
 
         //////////
 
@@ -1392,7 +1392,7 @@ public:
                 const double length = normal.length();
                 if (length > 1.0e-7) normal *= (1.0 / length);
 
-                for (Index64 v = 0; v < 4; ++v) {
+                for (int v = 0; v < 4; ++v) {
                     normals[quad[v]*3]    = static_cast<GLfloat>(-normal[0]);
                     normals[quad[v]*3+1]  = static_cast<GLfloat>(-normal[1]);
                     normals[quad[v]*3+2]  = static_cast<GLfloat>(-normal[2]);

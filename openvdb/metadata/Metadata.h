@@ -52,41 +52,43 @@ public:
     typedef boost::shared_ptr<Metadata> Ptr;
     typedef boost::shared_ptr<const Metadata> ConstPtr;
 
-    /// Constructor
     Metadata() {}
-
-    /// Destructor
     virtual ~Metadata() {}
 
-    /// @return the type name of the metadata.
+    /// Return the type name of the metadata.
     virtual Name typeName() const = 0;
 
-    /// @return a copy of the metadata.
+    /// Return a copy of the metadata.
     virtual Metadata::Ptr copy() const = 0;
 
-    /// Copy value from the given metadata into the curent metadata
-    virtual void copy(const Metadata &other) = 0;
+    /// Copy the given metadata into this metadata.
+    virtual void copy(const Metadata& other) = 0;
 
-    /// @return string representation of Metadata
+    /// Return a textual representation of this metadata.
     virtual std::string str() const = 0;
 
     /// Return the boolean representation of this metadata (empty strings
     /// and zeroVals evaluate to false; most other values evaluate to true).
     virtual bool asBool() const = 0;
 
-    /// @return the size of the attribute in bytes.
+    /// Return @c true if the given metadata is equivalent to this metadata.
+    bool operator==(const Metadata& other) const;
+    /// Return @c true if the given metadata is different from this metadata.
+    bool operator!=(const Metadata& other) const { return !(*this == other); }
+
+    /// Return the size of this metadata in bytes.
     virtual Index32 size() const = 0;
 
-    /// Read the attribute from a stream.
+    /// Unserialize this metadata from a stream.
     void read(std::istream&);
-    /// Write the attribute to a stream.
+    /// Serialize this metadata to a stream.
     void write(std::ostream&) const;
 
-    /// Creates a new Metadata from the metadata type registry.
-    static Metadata::Ptr createMetadata(const Name &typeName);
+    /// Create new metadata of the given type.
+    static Metadata::Ptr createMetadata(const Name& typeName);
 
     /// Return @c true if the given type is known by the metadata type registry.
-    static bool isRegisteredType(const Name &typeName);
+    static bool isRegisteredType(const Name& typeName);
 
     /// Clear out the metadata registry.
     static void clearRegistry();
@@ -96,14 +98,14 @@ public:
     static void unregisterType(const Name& typeName);
 
 protected:
-    /// Read the size of the attribute from a stream.
+    /// Read the size of the metadata from a stream.
     static Index32 readSize(std::istream&);
-    /// Write the size of the attribute to a stream.
+    /// Write the size of the metadata to a stream.
     void writeSize(std::ostream&) const;
 
-    /// Read the attribute from a stream.
+    /// Read the metadata from a stream.
     virtual void readValue(std::istream&, Index32 numBytes) = 0;
-    /// Write the attribute to a stream.
+    /// Write the metadata to a stream.
     virtual void writeValue(std::ostream&) const = 0;
 
 private:
@@ -140,56 +142,37 @@ public:
     typedef boost::shared_ptr<TypedMetadata<T> > Ptr;
     typedef boost::shared_ptr<const TypedMetadata<T> > ConstPtr;
 
-    // Constructors & destructors
     TypedMetadata();
-    TypedMetadata(const T &value);
-    TypedMetadata(const TypedMetadata<T> &other);
+    TypedMetadata(const T& value);
+    TypedMetadata(const TypedMetadata<T>& other);
     virtual ~TypedMetadata();
 
-    /// @return the type name of the metadata.
     virtual Name typeName() const;
-
-    /// @return a copy of the metadata
     virtual Metadata::Ptr copy() const;
-
-    /// Copy value from the given metadata into the curent metadata
-    virtual void copy(const Metadata &other);
-
-    /// @return string representation of value
+    virtual void copy(const Metadata& other);
     virtual std::string str() const;
-
-    /// Return the boolean representation of this metadata (empty strings
-    /// and zeroVals evaluate to false; most other values evaluate to true).
     virtual bool asBool() const;
-
-    /// @return the size of the attribute in bytes.
     virtual Index32 size() const { return static_cast<Index32>(sizeof(T)); }
 
     /// Set this metadata's value.
     void setValue(const T&);
-    /// @return this metadata's value.
+    /// Return this metadata's value.
     T& value();
     const T& value() const;
 
-    /// Static specialized function for the type name. This function must be
-    /// template specialized for each type T.
+    // Static specialized function for the type name. This function must be
+    // template specialized for each type T.
     static Name staticTypeName() { return typeNameAsString<T>(); }
 
-    /// Creates a new metadata of this type.
+    /// Create new metadata of this type.
     static Metadata::Ptr createMetadata();
 
-    /// Register the given metadata type and a function that knows how to create
-    /// the metadata type. This way the registry will know how to create certain
-    /// metadata types.
     static void registerType();
     static void unregisterType();
-
     static bool isRegisteredType();
 
 protected:
-    /// Read the attribute from a stream.
     virtual void readValue(std::istream&, Index32 numBytes);
-    /// Write the attribute to a stream.
     virtual void writeValue(std::ostream&) const;
 
 private:

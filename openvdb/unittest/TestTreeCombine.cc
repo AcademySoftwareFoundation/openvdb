@@ -144,25 +144,25 @@ template<typename TreeT> void compSum(TreeT& a, TreeT& b) { openvdb::tools::comp
 template<typename TreeT> void compMul(TreeT& a, TreeT& b) { openvdb::tools::compMul(a, b); }\
 template<typename TreeT> void compDiv(TreeT& a, TreeT& b) { openvdb::tools::compDiv(a, b); }\
 
-float orderf(float a, float b) { return a + 100 * b; }
-float maxf(float a, float b) { return std::max(a, b); }
-float minf(float a, float b) { return std::min(a, b); }
-float sumf(float a, float b) { return a + b; }
-float mulf(float a, float b) { return a * b; }
-float divf(float a, float b) { return a / b; }
+inline float orderf(float a, float b) { return a + 100 * b; }
+inline float maxf(float a, float b) { return std::max(a, b); }
+inline float minf(float a, float b) { return std::min(a, b); }
+inline float sumf(float a, float b) { return a + b; }
+inline float mulf(float a, float b) { return a * b; }
+inline float divf(float a, float b) { return a / b; }
 
-openvdb::Vec3f orderv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) { return a + 100 * b; }
-openvdb::Vec3f maxv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) {
+inline openvdb::Vec3f orderv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) { return a+100*b; }
+inline openvdb::Vec3f maxv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) {
     const float aMag = a.lengthSqr(), bMag = b.lengthSqr();
     return (aMag > bMag ? a : (bMag > aMag ? b : std::max(a, b)));
 }
-openvdb::Vec3f minv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) {
+inline openvdb::Vec3f minv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) {
     const float aMag = a.lengthSqr(), bMag = b.lengthSqr();
     return (aMag < bMag ? a : (bMag < aMag ? b : std::min(a, b)));
 }
-openvdb::Vec3f sumv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) { return a + b; }
-openvdb::Vec3f mulv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) { return a * b; }
-openvdb::Vec3f divv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) { return a / b; }
+inline openvdb::Vec3f sumv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) { return a + b; }
+inline openvdb::Vec3f mulv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) { return a * b; }
+inline openvdb::Vec3f divv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) { return a / b; }
 
 } // namespace Local
 } // unnamed namespace
@@ -745,14 +745,14 @@ TestTreeCombine::testCsg()
             return tree;
         }
 
-        static void writeFile(TreePtr tree, const std::string& filename) {
-            openvdb::io::File file(filename);
-            openvdb::GridPtrVec grids;
-            GridT::Ptr grid = openvdb::createGrid(tree);
-            grid->setName("LevelSet");
-            grids.push_back(grid);
-            file.write(grids);
-        }
+        //static void writeFile(TreePtr tree, const std::string& filename) {
+        //    openvdb::io::File file(filename);
+        //    openvdb::GridPtrVec grids;
+        //    GridT::Ptr grid = openvdb::createGrid(tree);
+        //    grid->setName("LevelSet");
+        //    grids.push_back(grid);
+        //    file.write(grids);
+        //}
 
         static void visitorUnion(TreeT& a, TreeT& b) { openvdb::tools::csgUnion(a, b); }
         static void visitorIntersect(TreeT& a, TreeT& b) { openvdb::tools::csgIntersection(a, b); }
@@ -785,30 +785,30 @@ TestTreeCombine::testCsg()
 #endif
     refTree = Local::readFile(testDir + "small_union.vdb2");
     outTree = visitCsg(*smallTree1, *smallTree2, *refTree, Local::visitorUnion);
-    //Local::writeFile(outTree, "/tmp/small_union_out.vdb2");
+    //Local::writeFile(outTree, "small_union_out.vdb2");
     refTree = Local::readFile(testDir + "large_union.vdb2");
     outTree = visitCsg(*largeTree1, *largeTree2, *refTree, Local::visitorUnion);
-    //Local::writeFile(outTree, "/tmp/large_union_out.vdb2");
+    //Local::writeFile(outTree, "large_union_out.vdb2");
 
 #if TEST_CSG_VERBOSE
     std::cerr << "\n<intersection>\n";
 #endif
     refTree = Local::readFile(testDir + "small_intersection.vdb2");
     outTree = visitCsg(*smallTree1, *smallTree2, *refTree, Local::visitorIntersect);
-    //Local::writeFile(outTree, "/tmp/small_intersection_out.vdb2");
+    //Local::writeFile(outTree, "small_intersection_out.vdb2");
     refTree = Local::readFile(testDir + "large_intersection.vdb2");
     outTree = visitCsg(*largeTree1, *largeTree2, *refTree, Local::visitorIntersect);
-    //Local::writeFile(outTree, "/tmp/large_intersection_out.vdb2");
+    //Local::writeFile(outTree, "large_intersection_out.vdb2");
 
 #if TEST_CSG_VERBOSE
     std::cerr << "\n<difference>\n";
 #endif
     refTree = Local::readFile(testDir + "small_difference.vdb2");
     outTree = visitCsg(*smallTree1, *smallTree2, *refTree, Local::visitorDiff);
-    //Local::writeFile(outTree, "/tmp/small_difference_out.vdb2");
+    //Local::writeFile(outTree, "small_difference_out.vdb2");
     refTree = Local::readFile(testDir + "large_difference.vdb2");
     outTree = visitCsg(*largeTree1, *largeTree2, *refTree, Local::visitorDiff);
-    //Local::writeFile(outTree, "/tmp/large_difference_out.vdb2");
+    //Local::writeFile(outTree, "large_difference_out.vdb2");
 }
 
 

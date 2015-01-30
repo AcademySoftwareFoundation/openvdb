@@ -57,7 +57,7 @@ public:
         Vec3i tmpMin, tmpMax;
         is.read(reinterpret_cast<char*>(&tmpMin), sizeof(Vec3i::ValueType) * 3);
         is.read(reinterpret_cast<char*>(&tmpMax), sizeof(Vec3i::ValueType) * 3);
-        
+
         Coord tmpMinCoord(tmpMin);
         Coord tmpMaxCoord(tmpMax);
 
@@ -127,7 +127,7 @@ public:
         mFrFarYBasis = frFarYTip - mFrFarOrigin;
     }
 
-    ~LegacyFrustum(){};
+    ~LegacyFrustum() {}
 
     const Mat4d& getCamXForm() const {return mC2W; }
 
@@ -154,7 +154,7 @@ public:
     Vec3d unitToWorld(const Vec3d& in) const {return mLocalToWorld.transform( unitToLocal(in) ); }
 
 private:
-    LegacyFrustum(){};
+    LegacyFrustum() {}
 
     Vec3d unitToLocal(const Vec3d& U) const {
 

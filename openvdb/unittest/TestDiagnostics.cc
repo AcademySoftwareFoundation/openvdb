@@ -46,11 +46,15 @@ public:
     CPPUNIT_TEST_SUITE(TestDiagnostics);
     CPPUNIT_TEST(testCheck);
     CPPUNIT_TEST(testDiagnose);
+    CPPUNIT_TEST(testCheckLevelSet);
+    CPPUNIT_TEST(testCheckFogVolume);
     CPPUNIT_TEST(testUniqueInactiveValues);
     CPPUNIT_TEST_SUITE_END();
 
     void testCheck();
     void testDiagnose();
+    void testCheckLevelSet();
+    void testCheckFogVolume();
     void testUniqueInactiveValues();
 };
 
@@ -271,6 +275,15 @@ TestDiagnostics::testDiagnose()
         CPPUNIT_ASSERT_EQUAL(0, int(d.failureCount()));
     }
     {// check norm of gradient of sphere w/o mask
+        tools::CheckEikonal<FloatGrid> c(*gridSphere, 0.97f, 1.03f);
+        tools::Diagnose<FloatGrid> d(*gridSphere);
+        std::string str = d.check(c, false, true, false, false);
+        //std::cerr << "NormGrad:\n" << str;
+        CPPUNIT_ASSERT(str.empty());
+        CPPUNIT_ASSERT_EQUAL(0, int(d.valueCount()));
+        CPPUNIT_ASSERT_EQUAL(0, int(d.failureCount()));
+    }
+    {// check norm of gradient of sphere w/o mask
         tools::CheckNormGrad<FloatGrid> c(*gridSphere, 0.75f, 1.25f);
         tools::Diagnose<FloatGrid> d(*gridSphere);
         std::string str = d.check(c, false, true, false, false);
@@ -288,7 +301,66 @@ TestDiagnostics::testDiagnose()
         CPPUNIT_ASSERT_EQUAL(0, int(d.valueCount()));
         CPPUNIT_ASSERT_EQUAL(0, int(d.failureCount()));
     }
-}
+}// testDiagnose
+
+void
+TestDiagnostics::testCheckLevelSet()
+{
+    using namespace openvdb;
+    const float radius = 4.3f;
+    const Vec3f center(15.8f, 13.2f, 16.7f);
+    const float voxelSize = 0.1f, width = LEVEL_SET_HALF_WIDTH;
+
+    FloatGrid::Ptr grid =
+        tools::createLevelSetSphere<FloatGrid>(radius, center, voxelSize, width);
+    
+    //tools::CheckLevelSet<FloatGrid> c(*grid);
+    //std::string str = c.check();
+    std::string str = tools::checkLevelSet(*grid);
+    CPPUNIT_ASSERT(str.empty());
+    //std::cerr << "\n" << str << std::endl;
+    
+    grid->tree().setValue(Coord(0,0,0), voxelSize*(width+0.5f));
+    //str = c.check();
+    str = tools::checkLevelSet(*grid);
+    CPPUNIT_ASSERT(!str.empty());
+    //std::cerr << "\n" << str << std::endl;
+
+    //str = c.check(6);
+    str = tools::checkLevelSet(*grid, 6);
+    CPPUNIT_ASSERT(str.empty());
+    
+}// testCheckLevelSet
+
+void
+TestDiagnostics::testCheckFogVolume()
+{
+    using namespace openvdb;
+    const float radius = 4.3f;
+    const Vec3f center(15.8f, 13.2f, 16.7f);
+    const float voxelSize = 0.1f, width = LEVEL_SET_HALF_WIDTH;
+
+    FloatGrid::Ptr grid =
+        tools::createLevelSetSphere<FloatGrid>(radius, center, voxelSize, width);
+    tools::sdfToFogVolume(*grid);
+    
+    //tools::CheckFogVolume<FloatGrid> c(*grid);
+    //std::string str = c.check();
+    std::string str = tools::checkFogVolume(*grid);
+    CPPUNIT_ASSERT(str.empty());
+    //std::cerr << "\n" << str << std::endl;
+
+    grid->tree().setValue(Coord(0,0,0), 1.5f);
+    //str = c.check();
+    str = tools::checkFogVolume(*grid);
+    CPPUNIT_ASSERT(!str.empty());
+    //std::cerr << "\n" << str << std::endl;
+
+    str = tools::checkFogVolume(*grid, 5);
+    //str = c.check(5);
+    CPPUNIT_ASSERT(str.empty());
+    
+}// testCheckFogVolume
 
 void
 TestDiagnostics::testUniqueInactiveValues()

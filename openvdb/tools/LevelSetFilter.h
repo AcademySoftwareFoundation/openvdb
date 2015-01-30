@@ -70,7 +70,6 @@ public:
     typedef typename GridType::TreeType                     TreeType;
     typedef typename TreeType::ValueType                    ValueType;
     typedef typename MaskType::ValueType                    AlphaType;
-    typedef typename tree::LeafManager<TreeType>::LeafRange RangeType;
     BOOST_STATIC_ASSERT(boost::is_floating_point<AlphaType>::value);
 
     /// @brief Main constructor from a grid
@@ -78,36 +77,13 @@ public:
     /// @param interrupt Optional interrupter.
     LevelSetFilter(GridType& grid, InterruptT* interrupt = NULL)
         : BaseType(grid, interrupt)
-        , mTask(0)
-        , mMask(NULL)
         , mMinMask(0)
         , mMaxMask(1)
         , mInvertMask(false)
     {
     }
-    /// @brief Shallow copy constructor called by tbb::parallel_for()
-    /// threads during filtering.
-    /// @param other The other LevelSetFilter from which to copy.
-    LevelSetFilter(const LevelSetFilter& other)
-        : BaseType(other)
-        , mTask(other.mTask)
-        , mMask(other.mMask)
-        , mMinMask(other.mMinMask)
-        , mMaxMask(other.mMaxMask)
-        , mInvertMask(other.mInvertMask)
-    {
-    }
-    /// @brief Destructor
-    virtual ~LevelSetFilter() {};
-
-    /// @brief Used internally by tbb::parallel_for().
-    /// @param range The range over which to perform multi-threading.
-    /// @warning Never call this method directly!
-    void operator()(const RangeType& range) const
-    {
-        if (mTask) mTask(const_cast<LevelSetFilter*>(this), range);
-        else OPENVDB_THROW(ValueError, "task is undefined - call offset(), etc");
-    }
+    /// @brief Default destructor
+    virtual ~LevelSetFilter() {}
 
     /// @brief Return the minimum value of the mask to be used for the
     /// derivation of a smooth alpha value.
@@ -138,11 +114,17 @@ public:
 
     /// @brief One iteration of mean-curvature flow of the level set.
     /// @param mask Optional alpha mask.
-    void meanCurvature(const MaskType* mask = NULL);
+    void meanCurvature(const MaskType* mask = NULL)
+    {
+        Filter f(this, mask); f.meanCurvature();
+    }
 
     /// @brief One iteration of laplacian flow of the level set.
     /// @param mask Optional alpha mask.
-    void laplacian(const MaskType* mask = NULL);
+    void laplacian(const MaskType* mask = NULL)
+    {
+        Filter f(this, mask); f.laplacian();
+    }
 
     /// @brief One iteration of a fast separable gaussian filter.
     /// @param width Width of the gaussian kernel in voxel units.
@@ -150,12 +132,18 @@ public:
     ///
     /// @note This is approximated as 4 iterations of a separable mean filter
     /// which typically leads an approximation that's better than 95%!
-    void gaussian(int width = 1, const MaskType* mask = NULL);
+    void gaussian(int width = 1, const MaskType* mask = NULL)
+    {
+        Filter f(this, mask); f.gaussian(width);
+    }
 
     /// @brief Offset the level set by the specified (world) distance.
     /// @param offset Value of the offset.
     /// @param mask Optional alpha mask.
-    void offset(ValueType offset, const MaskType* mask = NULL);
+    void offset(ValueType offset, const MaskType* mask = NULL)
+    {
+        Filter f(this, mask); f.offset(offset);
+    }
 
     /// @brief One iteration of median-value flow of the level set.
     /// @param width Width of the median-value kernel in voxel units.
@@ -163,72 +151,98 @@ public:
     ///
     /// @warning This filter is not separable and is hence relatively
     /// slow!
-    void median(int width = 1, const MaskType* mask = NULL);
+    void median(int width = 1, const MaskType* mask = NULL)
+    {
+        Filter f(this, mask); f.median(width);
+    }
 
     /// @brief One iteration of mean-value flow of the level set.
     /// @param width Width of the mean-value kernel in voxel units.
     /// @param mask Optional alpha mask.
     ///
     /// @note This filter is separable so it's fast!
-    void mean(int width = 1, const MaskType* mask = NULL);
-
-private:
-    typedef typename TreeType::LeafNodeType                  LeafT;
-    typedef typename LeafT::ValueOnIter                      VoxelIterT;
-    typedef typename LeafT::ValueOnCIter                     VoxelCIterT;
-    typedef typename tree::LeafManager<TreeType>::BufferType BufferT;
-    typedef typename RangeType::Iterator                     LeafIterT;
-    typedef tools::AlphaMask<GridT, MaskT>                   AlphaMaskT;
-
-    // Only two private member data
-    typename boost::function<void (LevelSetFilter*, const RangeType&)> mTask;
-    const MaskType* mMask;
-    AlphaType       mMinMask, mMaxMask;
-    bool            mInvertMask;
-
-    // Private cook method calling tbb::parallel_for
-    void cook(bool swap)
+    void mean(int width = 1, const MaskType* mask = NULL)
     {
-        const int n = BaseType::getGrainSize();
-        if (n>0) {
-            tbb::parallel_for(BaseType::leafs().leafRange(n), *this);
-        } else {
-            (*this)(BaseType::leafs().leafRange());
-        }
-        if (swap) BaseType::leafs().swapLeafBuffer(1, n==0);
+        Filter f(this, mask); f.mean(width);
     }
 
-    // Private driver method for mean and gaussian filtering
-    void box(int width);
+private:
+    // disallow copy construction and copy by assinment!
+    LevelSetFilter(const LevelSetFilter&);// not implemented
+    LevelSetFilter& operator=(const LevelSetFilter&);// not implemented
 
-    template <size_t Axis>
-    struct Avg {
-        Avg(const GridT& grid, Int32 w) :
-            acc(grid.tree()), width(w), frac(1/ValueType(2*w+1))
-        {
-        }
-        ValueType operator()(Coord xyz)
-        {
-            ValueType sum = zeroVal<ValueType>();
-            Int32& i = xyz[Axis], j = i + width;
-            for (i -= width; i <= j; ++i) sum += acc.getValue(xyz);
-            return sum*frac;
-        }
-        typename GridT::ConstAccessor acc;
-        const Int32 width;
-        const ValueType frac;
-    };
+    // Private struct that implements all the filtering.
+    struct Filter
+    {
+        typedef typename TreeType::LeafNodeType                  LeafT;
+        typedef typename LeafT::ValueOnIter                      VoxelIterT;
+        typedef typename LeafT::ValueOnCIter                     VoxelCIterT;
+        typedef typename tree::LeafManager<TreeType>::BufferType BufferT;
+        typedef typename tree::LeafManager<TreeType>::LeafRange  LeafRange;
+        typedef typename LeafRange::Iterator                     LeafIterT;
+        typedef tools::AlphaMask<GridT, MaskT>                   AlphaMaskT;
 
-    // Private methods called by tbb::parallel_for threads
-    template <typename AvgT>
-    void doBox( const RangeType& r, Int32 w);
-    void doBoxX(const RangeType& r, Int32 w) { this->doBox<Avg<0> >(r,w); }
-    void doBoxZ(const RangeType& r, Int32 w) { this->doBox<Avg<1> >(r,w); }
-    void doBoxY(const RangeType& r, Int32 w) { this->doBox<Avg<2> >(r,w); }
-    void doMedian(const RangeType&, int);
-    void doMeanCurvature(const RangeType&);
-    void doLaplacian(const RangeType&);
-    void doOffset(const RangeType&, ValueType);
+        Filter(LevelSetFilter* parent, const MaskType* mask) : mParent(parent), mMask(mask) {}
+        virtual ~Filter() {}
+
+        void box(int width);
+        void median(int width);
+        void mean(int width);
+        void gaussian(int width);
+        void laplacian();
+        void meanCurvature();
+        void offset(ValueType value);
+        void operator()(const LeafRange& r) const
+        {
+            if (mTask) mTask(const_cast<Filter*>(this), r);
+            else OPENVDB_THROW(ValueError, "task is undefined - don\'t call this method directly");
+        }
+        void cook(bool swap)
+        {
+            const int n = mParent->getGrainSize();
+            if (n>0) {
+                tbb::parallel_for(mParent->leafs().leafRange(n), *this);
+            } else {
+                (*this)(mParent->leafs().leafRange());
+            }
+            if (swap) mParent->leafs().swapLeafBuffer(1, n==0);
+        }
+
+        template <size_t Axis>
+        struct Avg {
+            Avg(const GridT& grid, Int32 w) :
+                acc(grid.tree()), width(w), frac(1/ValueType(2*w+1)) {}
+            inline ValueType operator()(Coord xyz)
+            {
+                ValueType sum = zeroVal<ValueType>();
+                Int32& i = xyz[Axis], j = i + width;
+                for (i -= width; i <= j; ++i) sum += acc.getValue(xyz);
+                return sum*frac;
+            }
+            typename GridT::ConstAccessor acc;
+            const Int32 width;
+            const ValueType frac;
+        };
+
+        template <typename AvgT>
+        void box( const LeafRange& r, Int32 w);
+
+        void boxX(const LeafRange& r, Int32 w) { this->box<Avg<0> >(r,w); }
+        void boxZ(const LeafRange& r, Int32 w) { this->box<Avg<1> >(r,w); }
+        void boxY(const LeafRange& r, Int32 w) { this->box<Avg<2> >(r,w); }
+
+        void median(const LeafRange&, int);
+        void meanCurvature(const LeafRange&);
+        void laplacian(const LeafRange&);
+        void offset(const LeafRange&, ValueType);
+
+        LevelSetFilter* mParent;
+        const MaskType* mMask;
+        typename boost::function<void (Filter*, const LeafRange&)> mTask;
+    }; // end of private Filter struct
+
+    AlphaType mMinMask, mMaxMask;
+    bool      mInvertMask;
 
 }; // end of LevelSetFilter class
 
@@ -237,127 +251,122 @@ private:
 
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT>::median(int width, const MaskType* mask)
+LevelSetFilter<GridT, MaskT, InterruptT>::
+Filter::median(int width)
 {
-    mMask = mask;
+    mParent->startInterrupter("Median-value flow of level set");
 
-    BaseType::startInterrupter("Median-value flow of level set");
+    mParent->leafs().rebuildAuxBuffers(1, mParent->getGrainSize()==0);
 
-    BaseType::leafs().rebuildAuxBuffers(1, BaseType::getGrainSize()==0);
-
-    mTask = boost::bind(&LevelSetFilter::doMedian, _1, _2, std::max(1, width));
+    mTask = boost::bind(&Filter::median, _1, _2, std::max(1, width));
     this->cook(true);
 
-    BaseType::track();
+    mParent->track();
 
-    BaseType::endInterrupter();
+    mParent->endInterrupter();
 }
 
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT>::mean(int width, const MaskType* mask)
+LevelSetFilter<GridT, MaskT, InterruptT>::
+Filter::mean(int width)
 {
-    mMask = mask;
-
-    BaseType::startInterrupter("Mean-value flow of level set");
+    mParent->startInterrupter("Mean-value flow of level set");
 
     this->box(width);
 
-    BaseType::endInterrupter();
+    mParent->endInterrupter();
 }
 
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT>::gaussian(int width, const MaskType* mask)
+LevelSetFilter<GridT, MaskT, InterruptT>::
+Filter::gaussian(int width)
 {
-    mMask = mask;
-
-    BaseType::startInterrupter("Gaussian flow of level set");
+    mParent->startInterrupter("Gaussian flow of level set");
 
     for (int n=0; n<4; ++n) this->box(width);
 
-    BaseType::endInterrupter();
+    mParent->endInterrupter();
 }
 
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT>::box(int width)
+LevelSetFilter<GridT, MaskT, InterruptT>::
+Filter::box(int width)
 {
-    BaseType::leafs().rebuildAuxBuffers(1, BaseType::getGrainSize()==0);
+    mParent->leafs().rebuildAuxBuffers(1, mParent->getGrainSize()==0);
 
     width = std::max(1, width);
 
-    mTask = boost::bind(&LevelSetFilter::doBoxX, _1, _2, width);
+    mTask = boost::bind(&Filter::boxX, _1, _2, width);
     this->cook(true);
 
-    mTask = boost::bind(&LevelSetFilter::doBoxY, _1, _2, width);
+    mTask = boost::bind(&Filter::boxY, _1, _2, width);
     this->cook(true);
 
-    mTask = boost::bind(&LevelSetFilter::doBoxZ, _1, _2, width);
+    mTask = boost::bind(&Filter::boxZ, _1, _2, width);
     this->cook(true);
 
-    BaseType::track();
+    mParent->track();
 }
 
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT>::meanCurvature(const MaskType* mask)
+LevelSetFilter<GridT, MaskT, InterruptT>::
+Filter::meanCurvature()
 {
-    mMask = mask;
+    mParent->startInterrupter("Mean-curvature flow of level set");
 
-    BaseType::startInterrupter("Mean-curvature flow of level set");
+    mParent->leafs().rebuildAuxBuffers(1, mParent->getGrainSize()==0);
 
-    BaseType::leafs().rebuildAuxBuffers(1, BaseType::getGrainSize()==0);
-
-    mTask = boost::bind(&LevelSetFilter::doMeanCurvature, _1, _2);
+    mTask = boost::bind(&Filter::meanCurvature, _1, _2);
     this->cook(true);
 
-    BaseType::track();
+    mParent->track();
 
-    BaseType::endInterrupter();
+    mParent->endInterrupter();
 }
 
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT>::laplacian(const MaskType* mask)
+LevelSetFilter<GridT, MaskT, InterruptT>::
+Filter::laplacian()
 {
-    mMask = mask;
+    mParent->startInterrupter("Laplacian flow of level set");
 
-    BaseType::startInterrupter("Laplacian flow of level set");
+    mParent->leafs().rebuildAuxBuffers(1, mParent->getGrainSize()==0);
 
-    BaseType::leafs().rebuildAuxBuffers(1, BaseType::getGrainSize()==0);
-
-    mTask = boost::bind(&LevelSetFilter::doLaplacian, _1, _2);
+    mTask = boost::bind(&Filter::laplacian, _1, _2);
     this->cook(true);
 
-    BaseType::track();
+    mParent->track();
 
-    BaseType::endInterrupter();
+    mParent->endInterrupter();
 }
 
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT>::offset(ValueType value, const MaskType* mask)
+LevelSetFilter<GridT, MaskT, InterruptT>::
+Filter::offset(ValueType value)
 {
-    mMask = mask;
+    mParent->startInterrupter("Offsetting level set");
 
-    BaseType::startInterrupter("Offsetting level set");
+    mParent->leafs().removeAuxBuffers();// no auxiliary buffers required
 
-    BaseType::leafs().removeAuxBuffers();// no auxiliary buffers required
-
-    const ValueType CFL = ValueType(0.5) * BaseType::voxelSize(), offset = openvdb::math::Abs(value);
+    const ValueType CFL = ValueType(0.5) * mParent->voxelSize(), offset = openvdb::math::Abs(value);
     ValueType dist = 0.0;
-    while (offset-dist > ValueType(0.001)*CFL && BaseType::checkInterrupter()) {
+    while (offset-dist > ValueType(0.001)*CFL && mParent->checkInterrupter()) {
         const ValueType delta = openvdb::math::Min(offset-dist, CFL);
         dist += delta;
 
-        mTask = boost::bind(&LevelSetFilter::doOffset, _1, _2, copysign(delta, value));
+        mTask = boost::bind(&Filter::offset, _1, _2, copysign(delta, value));
         this->cook(false);
 
-        BaseType::track();
+        mParent->track();
     }
 
-    BaseType::endInterrupter();
+    mParent->endInterrupter();
 }
 
 
@@ -366,31 +375,33 @@ LevelSetFilter<GridT, MaskT, InterruptT>::offset(ValueType value, const MaskType
 /// Performs parabolic mean-curvature diffusion
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT>::doMeanCurvature(const RangeType& range)
+LevelSetFilter<GridT, MaskT, InterruptT>::
+Filter::meanCurvature(const LeafRange& range)
 {
-    BaseType::checkInterrupter();
+    mParent->checkInterrupter();
     //const float CFL = 0.9f, dt = CFL * mDx * mDx / 6.0f;
-    const ValueType dx = BaseType::voxelSize(), dt = math::Pow2(dx) / ValueType(3.0);
-    math::CurvatureStencil<GridType> stencil(BaseType::grid(), dx);
+    const ValueType dx = mParent->voxelSize(), dt = math::Pow2(dx) / ValueType(3.0);
+    math::CurvatureStencil<GridType> stencil(mParent->grid(), dx);
     if (mMask) {
         typename AlphaMaskT::FloatType a, b;
-        AlphaMaskT alpha(BaseType::grid(), *mMask, mMinMask, mMaxMask, mInvertMask);
+        AlphaMaskT alpha(mParent->grid(), *mMask, mParent->minMask(),
+                         mParent->maxMask(), mParent->isMaskInverted());
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
-            BufferT& buffer = leafIter.buffer(1);
+            ValueType* buffer = leafIter.buffer(1).data();
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 if (alpha(iter.getCoord(), a, b)) {
                     stencil.moveTo(iter);
                     const ValueType phi0 = *iter, phi1 = phi0 + dt*stencil.meanCurvatureNormGrad();
-                    buffer.setValue(iter.pos(), b*phi0 + a*phi1);
+                    buffer[iter.pos()] = b * phi0 + a * phi1;
                 }
             }
         }
     } else {
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
-            BufferT& buffer = leafIter.buffer(1);
+            ValueType* buffer = leafIter.buffer(1).data();
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 stencil.moveTo(iter);
-                buffer.setValue(iter.pos(), *iter + dt*stencil.meanCurvatureNormGrad());
+                buffer[iter.pos()] = *iter + dt*stencil.meanCurvatureNormGrad();
             }
         }
     }
@@ -405,31 +416,33 @@ LevelSetFilter<GridT, MaskT, InterruptT>::doMeanCurvature(const RangeType& range
 /// performing laplacian diffusion over mean curvature flow!
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT>::doLaplacian(const RangeType& range)
+LevelSetFilter<GridT, MaskT, InterruptT>::
+Filter::laplacian(const LeafRange& range)
 {
-    BaseType::checkInterrupter();
+    mParent->checkInterrupter();
     //const float CFL = 0.9f, half_dt = CFL * mDx * mDx / 12.0f;
-    const ValueType dx = BaseType::voxelSize(), dt = math::Pow2(dx) / ValueType(6.0);
-    math::GradStencil<GridType> stencil(BaseType::grid(), dx);
+    const ValueType dx = mParent->voxelSize(), dt = math::Pow2(dx) / ValueType(6.0);
+    math::GradStencil<GridType> stencil(mParent->grid(), dx);
     if (mMask) {
         typename AlphaMaskT::FloatType a, b;
-        AlphaMaskT alpha(BaseType::grid(), *mMask, mMinMask, mMaxMask, mInvertMask);
+        AlphaMaskT alpha(mParent->grid(), *mMask, mParent->minMask(),
+                         mParent->maxMask(), mParent->isMaskInverted());
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
-            BufferT& buffer = leafIter.buffer(1);
+            ValueType* buffer = leafIter.buffer(1).data();
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 if (alpha(iter.getCoord(), a, b)) {
                     stencil.moveTo(iter);
                     const ValueType phi0 = *iter, phi1 = phi0 + dt*stencil.laplacian();
-                    buffer.setValue(iter.pos(), b*phi0 + a*phi1);
+                    buffer[iter.pos()] = b * phi0 + a * phi1;
                 }
             }
         }
     } else {
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
-            BufferT& buffer = leafIter.buffer(1);
+            ValueType* buffer = leafIter.buffer(1).data();
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 stencil.moveTo(iter);
-                buffer.setValue(iter.pos(), *iter + dt*stencil.laplacian());
+                buffer[iter.pos()] = *iter + dt*stencil.laplacian();
             }
         }
     }
@@ -438,12 +451,14 @@ LevelSetFilter<GridT, MaskT, InterruptT>::doLaplacian(const RangeType& range)
 /// Offsets the values by a constant
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT>::doOffset(const RangeType& range, ValueType offset)
+LevelSetFilter<GridT, MaskT, InterruptT>::
+Filter::offset(const LeafRange& range, ValueType offset)
 {
-    BaseType::checkInterrupter();
+    mParent->checkInterrupter();
     if (mMask) {
         typename AlphaMaskT::FloatType a, b;
-        AlphaMaskT alpha(BaseType::grid(), *mMask, mMinMask, mMaxMask, mInvertMask);
+        AlphaMaskT alpha(mParent->grid(), *mMask, mParent->minMask(),
+                         mParent->maxMask(), mParent->isMaskInverted());
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
             for (VoxelIterT iter = leafIter->beginValueOn(); iter; ++iter) {
                 if (alpha(iter.getCoord(), a, b)) iter.setValue(*iter + a*offset);
@@ -461,28 +476,30 @@ LevelSetFilter<GridT, MaskT, InterruptT>::doOffset(const RangeType& range, Value
 /// Performs simple but slow median-value diffusion
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT>::doMedian(const RangeType& range, int width)
+LevelSetFilter<GridT, MaskT, InterruptT>::
+Filter::median(const LeafRange& range, int width)
 {
-    BaseType::checkInterrupter();
-    typename math::DenseStencil<GridType> stencil(BaseType::grid(), width);//creates local cache!
+    mParent->checkInterrupter();
+    typename math::DenseStencil<GridType> stencil(mParent->grid(), width);//creates local cache!
     if (mMask) {
         typename AlphaMaskT::FloatType a, b;
-        AlphaMaskT alpha(BaseType::grid(), *mMask, mMinMask, mMaxMask, mInvertMask);
+        AlphaMaskT alpha(mParent->grid(), *mMask, mParent->minMask(),
+                         mParent->maxMask(), mParent->isMaskInverted());
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
-            BufferT& buffer = leafIter.buffer(1);
+            ValueType* buffer = leafIter.buffer(1).data();
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 if (alpha(iter.getCoord(), a, b)) {
                     stencil.moveTo(iter);
-                    buffer.setValue(iter.pos(), b*(*iter) + a*stencil.median());
+                    buffer[iter.pos()] = b * (*iter) + a * stencil.median();
                 }
             }
         }
     } else {
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
-            BufferT& buffer = leafIter.buffer(1);
+            ValueType* buffer = leafIter.buffer(1).data();
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 stencil.moveTo(iter);
-                buffer.setValue(iter.pos(), stencil.median());
+                buffer[iter.pos()] = stencil.median();
             }
         }
     }
@@ -492,25 +509,27 @@ LevelSetFilter<GridT, MaskT, InterruptT>::doMedian(const RangeType& range, int w
 template<typename GridT, typename MaskT, typename InterruptT>
 template <typename AvgT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT>::doBox(const RangeType& range, Int32 w)
+LevelSetFilter<GridT, MaskT, InterruptT>::
+Filter::box(const LeafRange& range, Int32 w)
 {
-    BaseType::checkInterrupter();
-    AvgT avg(BaseType::grid(), w);
+    mParent->checkInterrupter();
+    AvgT avg(mParent->grid(), w);
     if (mMask) {
         typename AlphaMaskT::FloatType a, b;
-        AlphaMaskT alpha(BaseType::grid(), *mMask, mMinMask, mMaxMask, mInvertMask);
+        AlphaMaskT alpha(mParent->grid(), *mMask, mParent->minMask(),
+                         mParent->maxMask(), mParent->isMaskInverted());
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
-            BufferT& buffer = leafIter.buffer(1);
+            ValueType* buffer = leafIter.buffer(1).data();
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 const Coord xyz = iter.getCoord();
-                if (alpha(xyz, a, b)) buffer.setValue(iter.pos(), b*(*iter)+ a*avg(xyz));
+                if (alpha(xyz, a, b)) buffer[iter.pos()] = b * (*iter)+ a * avg(xyz);
             }
         }
     } else {
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
-            BufferT& buffer = leafIter.buffer(1);
+            ValueType* buffer = leafIter.buffer(1).data();
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
-                buffer.setValue(iter.pos(), avg(iter.getCoord()));
+                buffer[iter.pos()] = avg(iter.getCoord());
             }
         }
     }

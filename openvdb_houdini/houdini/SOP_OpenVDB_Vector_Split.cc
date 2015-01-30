@@ -49,7 +49,7 @@ class SOP_OpenVDB_Vector_Split: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Vector_Split(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Vector_Split() {};
+    virtual ~SOP_OpenVDB_Vector_Split() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 

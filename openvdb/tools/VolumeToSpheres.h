@@ -595,7 +595,7 @@ public:
         bool overlapping);
 
     float radius() const { return mRadius; }
-    int index() const { return mIndex; };
+    int index() const { return mIndex; }
 
     inline void run(bool threaded = true);
 

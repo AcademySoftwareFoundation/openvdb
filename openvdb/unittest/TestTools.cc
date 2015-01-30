@@ -35,6 +35,7 @@
 #include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/ChangeBackground.h>
+#include <openvdb/tools/Diagnostics.h>
 #include <openvdb/tools/Clip.h>
 #include <openvdb/tools/GridOperators.h>
 #include <openvdb/tools/Filter.h>
@@ -128,7 +129,7 @@ public:
     void operator()(const std::string& name, float time, size_t n)
     {
         std::ostringstream ostr;
-        ostr << "/tmp/" << name << "_" << mVersion << "_" << mFrame << ".vdb";
+        ostr << name << "_" << mVersion << "_" << mFrame << ".vdb";
         openvdb::io::File file(ostr.str());
         openvdb::GridPtrVec grids;
         grids.push_back(mGrid);
@@ -620,40 +621,49 @@ TestTools::testErodeVoxels()
             }
         }
     }
-    /* Not completed yet 
+
+#if 0
     {//erode18
-        //for (int x=0; x<8; ++x) {
-        //for (int y=0; y<8; ++y) {
-        //for (int z=0; z<8; ++z) {
-        int x=3, y=3, z=3;
-                    const openvdb::Coord ijk(x,y,z);
-                    std::cerr << ijk;
-                    tree->clear();
-                    CPPUNIT_ASSERT_EQUAL(Index64(0), tree->activeVoxelCount());
-                    tree->setValue(ijk, 1.0f);
-                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeVoxelCount());
-                    CPPUNIT_ASSERT(tree->isValueOn(ijk));
-                    openvdb::tools::dilateVoxels(*tree, 1, openvdb::tools::NN_FACE_EDGE);
-                    std::cerr << " dilated to " << tree->activeVoxelCount();
-                    CPPUNIT_ASSERT_EQUAL(Index64(1 + 6 + 12), tree->activeVoxelCount());
-                    openvdb::tools::erodeVoxels( *tree, 1, openvdb::tools::NN_FACE_EDGE);
-                    std::cerr << ", eroded to " << tree->activeVoxelCount() << std::endl;
-                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeVoxelCount());
-                    CPPUNIT_ASSERT(tree->isValueOn(ijk));
-                    //      }
-                    //}
-                    //}
+        /// @todo Not implemented yet
+        for (int iter=1; iter<4; ++iter) {
+            for (int x=0; x<8; ++x) {
+                for (int y=0; y<8; ++y) {
+                    for (int z=0; z<8; ++z) {
+                        const openvdb::Coord ijk(x,y,z);
+                        tree->clear();
+                        CPPUNIT_ASSERT_EQUAL(Index64(0), tree->activeVoxelCount());
+                        tree->setValue(ijk, 1.0f);
+                        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeVoxelCount());
+                        CPPUNIT_ASSERT(tree->isValueOn(ijk));
+                        //openvdb::tools::dilateVoxels(*tree, iter, openvdb::tools::NN_FACE_EDGE);
+                        openvdb::tools::dilateVoxels(*tree, iter, openvdb::tools::NN_FACE);
+                        //std::cerr << "Dilated to: " << tree->activeVoxelCount() << std::endl;
+                        //if (iter==1) {
+                        //    CPPUNIT_ASSERT_EQUAL(Index64(1 + 6 + 12), tree->activeVoxelCount());
+                        //}
+                        openvdb::tools::erodeVoxels( *tree, iter, openvdb::tools::NN_FACE_EDGE);
+                        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeVoxelCount());
+                        CPPUNIT_ASSERT(tree->isValueOn(ijk));
+                    }
+                }
+            }
+        }
     }
-    
+#endif
+#if 0
     {//erode26
+        /// @todo Not implemented yet
         tree->clear();
         tree->setValue(openvdb::Coord(3,4,5), 1.0f);
-        openvdb::tools::dilateVoxels(*tree, 12, openvdb::tools::NN_FACE_EDGE_VERTEX);
-        openvdb::tools::erodeVoxels( *tree, 12, openvdb::tools::NN_FACE_EDGE_VERTEX);
+        openvdb::tools::dilateVoxels(*tree, 1, openvdb::tools::NN_FACE_EDGE_VERTEX);
+        CPPUNIT_ASSERT_EQUAL(Index64(1 + 6 + 12 + 8), tree->activeVoxelCount());
+        openvdb::tools::erodeVoxels( *tree, 1, openvdb::tools::NN_FACE_EDGE_VERTEX);
+        //openvdb::tools::dilateVoxels(*tree, 12, openvdb::tools::NN_FACE_EDGE);
+        //openvdb::tools::erodeVoxels( *tree, 12, openvdb::tools::NN_FACE_EDGE);
         CPPUNIT_ASSERT_EQUAL(1, int(tree->activeVoxelCount()));
         CPPUNIT_ASSERT(tree->isValueOn(openvdb::Coord(3,4,5)));
         }
-    */
+#endif
 }
 
 
@@ -860,15 +870,72 @@ void
 TestTools::testLevelSetAdvect()
 {
     // Uncomment sections below to run this (time-consuming) test
-    /*
-    const int dim = 64;//256
-    const openvdb::Vec3f center(0.35f, 0.35f, 0.35f);
+    using namespace openvdb;
+
+    const int dim = 128;
+    const Vec3f center(0.35f, 0.35f, 0.35f);
     const float radius = 0.15f, voxelSize = 1.0f/(dim-1);
+    const float halfWidth = 3.0f, gamma = halfWidth*voxelSize;
 
-    typedef openvdb::FloatGrid GridT;
-    typedef openvdb::Vec3fGrid VectT;
+    typedef FloatGrid GridT;
+    //typedef Vec3fGrid VectT;
 
-    */
+    {//test tracker::resize
+        GridT::Ptr grid = tools::createLevelSetSphere<GridT>(radius, center, voxelSize, halfWidth);
+        typedef tools::LevelSetTracker<GridT>  TrackerT;
+        TrackerT tracker(*grid);
+        tracker.setSpatialScheme(math::FIRST_BIAS);
+        tracker.setTemporalScheme(math::TVD_RK1);
+
+        ASSERT_DOUBLES_EXACTLY_EQUAL( gamma, grid->background());
+        ASSERT_DOUBLES_EXACTLY_EQUAL( halfWidth, tracker.getHalfWidth());
+
+        CPPUNIT_ASSERT(!tracker.resize());
+
+        {// check range of on values in a sphere w/o mask
+            tools::CheckRange<GridT, true, true, GridT::ValueOnCIter> c(-gamma, gamma);
+            tools::Diagnose<GridT> d(*grid);
+            std::string str = d.check(c);
+            //std::cerr << "Values out of range:\n" << str;
+            CPPUNIT_ASSERT(str.empty());
+            CPPUNIT_ASSERT_EQUAL(0, int(d.valueCount()));
+            CPPUNIT_ASSERT_EQUAL(0, int(d.failureCount()));
+        }
+        {// check norm of gradient of sphere w/o mask
+            tools::CheckNormGrad<GridT> c(*grid, 0.9f, 1.1f);
+            tools::Diagnose<GridT> d(*grid);
+            std::string str = d.check(c, false, true, false, false);
+            //std::cerr << "NormGrad:\n" << str;
+            CPPUNIT_ASSERT(str.empty());
+            CPPUNIT_ASSERT_EQUAL(0, int(d.valueCount()));
+            CPPUNIT_ASSERT_EQUAL(0, int(d.failureCount()));
+        }
+
+        CPPUNIT_ASSERT(tracker.resize(4));
+
+        ASSERT_DOUBLES_EXACTLY_EQUAL( 4*voxelSize, grid->background());
+        ASSERT_DOUBLES_EXACTLY_EQUAL( 4.0f, tracker.getHalfWidth());
+
+        {// check range of on values in a sphere w/o mask
+            const float g = gamma + voxelSize;
+            tools::CheckRange<GridT, true, true, GridT::ValueOnCIter> c(-g, g);
+            tools::Diagnose<GridT> d(*grid);
+            std::string str = d.check(c);
+            //std::cerr << "Values out of range:\n" << str;
+            CPPUNIT_ASSERT(str.empty());
+            CPPUNIT_ASSERT_EQUAL(0, int(d.valueCount()));
+            CPPUNIT_ASSERT_EQUAL(0, int(d.failureCount()));
+        }
+        {// check norm of gradient of sphere w/o mask
+            tools::CheckNormGrad<GridT> c(*grid, 0.4f, 1.1f);
+            tools::Diagnose<GridT> d(*grid);
+            std::string str = d.check(c, false, true, false, false);
+            //std::cerr << "NormGrad:\n" << str;
+            CPPUNIT_ASSERT(str.empty());
+            CPPUNIT_ASSERT_EQUAL(0, int(d.valueCount()));
+            CPPUNIT_ASSERT_EQUAL(0, int(d.failureCount()));
+        }
+    }
     /*
     {//test tracker
         GridT::Ptr grid = openvdb::tools::createLevelSetSphere<GridT>(radius, center, voxelSize);
@@ -885,8 +952,8 @@ TestTools::testLevelSetAdvect()
             tracker.track();
             fw("Tracker", 0, 0);
         }
-        }
     */
+
     /*
     {//test EnrightField
         GridT::Ptr grid = openvdb::tools::createLevelSetSphere<GridT>(radius, center, voxelSize);

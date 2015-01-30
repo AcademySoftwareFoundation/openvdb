@@ -240,7 +240,7 @@ TestVolumeRayIntersector::testAll()
         const RayT ray(eye, dir);//ray in index space
         tools::VolumeRayIntersector<FloatGrid> inter(grid);
         CPPUNIT_ASSERT(inter.setIndexRay(ray));
-        
+
         std::deque<RayT::TimeSpan> list;
         inter.hits(list);
         CPPUNIT_ASSERT(list.size() == 2);
@@ -298,7 +298,7 @@ TestVolumeRayIntersector::testAll()
 
         //GridPtrVec grids;
         //grids.push_back(grid);
-        //io::File vdbfile("/tmp/trevor_v1.vdb");
+        //io::File vdbfile("trevor_v1.vdb");
         //vdbfile.write(grids);
 
         //std::cerr << "BBox = " << inter.bbox() << std::endl;

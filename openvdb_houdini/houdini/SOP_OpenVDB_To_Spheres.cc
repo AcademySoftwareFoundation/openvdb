@@ -67,7 +67,7 @@ class SOP_OpenVDB_To_Spheres: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_To_Spheres(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_To_Spheres() {};
+    virtual ~SOP_OpenVDB_To_Spheres() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 

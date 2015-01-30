@@ -476,9 +476,7 @@ TestDense::testDense2Sparse()
     typedef tools::Dense<float, Layout> DenseT;
 
     // Test Domain Resolution
-    size_t sizeX = 8;
-    size_t sizeY = 8;
-    size_t sizeZ = 9;
+    Int32 sizeX = 8, sizeY = 8, sizeZ = 9;
 
     // Define a dense grid
     DenseT dense(Coord(sizeX, sizeY, sizeZ));
@@ -486,7 +484,7 @@ TestDense::testDense2Sparse()
     // std::cerr <<  "\nDense bbox" << bboxD << std::endl;
 
     // Verify that the CoordBBox is truely used as [inclusive, inclusive]
-    CPPUNIT_ASSERT(dense.valueCount() == sizeX * sizeY * sizeZ );
+    CPPUNIT_ASSERT(int(dense.valueCount()) == int(sizeX * sizeY * sizeZ));
 
     // Fill the dense grid with constant value 1.
     dense.fill(1.0f);

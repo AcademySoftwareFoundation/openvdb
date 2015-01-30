@@ -109,6 +109,13 @@ TBB_INCL_DIR := $(HT)/include
 TBB_LIB_DIR := $(HDSO)
 TBB_LIB := -ltbb
 
+# The parent directory of the blosc.h header
+# (leave blank if Blosc is unavailable)
+BLOSC_INCL_DIR := $(HT)/include
+# The directory containing libblosc
+BLOSC_LIB_DIR := $(HDSO)
+BLOSC_LIB := -lblosc
+
 # A scalable, concurrent malloc replacement library
 # such as jemalloc (included in the Houdini HDK) or TBB malloc
 # (leave blank if unavailable)
@@ -237,24 +244,24 @@ endif
 
 INCLDIRS := -I . -I .. -isystem $(BOOST_INCL_DIR) -isystem $(ILMBASE_INCL_DIR) -isystem $(TBB_INCL_DIR)
 ifeq (yes,$(has_blosc))
-	INCLDIRS += -isystem $(BLOSC_INCL_DIR)
+    INCLDIRS += -isystem $(BLOSC_INCL_DIR)
 endif
 ifeq (yes,$(has_log4cplus))
-	INCLDIRS += -isystem $(LOG4CPLUS_INCL_DIR)
+    INCLDIRS += -isystem $(LOG4CPLUS_INCL_DIR)
 endif
 
 CXXFLAGS += -pthread $(OPTIMIZE) $(INCLDIRS)
 ifeq (yes,$(has_blosc))
-	CXXFLAGS += -DOPENVDB_USE_BLOSC
+    CXXFLAGS += -DOPENVDB_USE_BLOSC
 endif
 ifeq (yes,$(has_log4cplus))
-	CXXFLAGS += -DOPENVDB_USE_LOG4CPLUS
+    CXXFLAGS += -DOPENVDB_USE_LOG4CPLUS
 endif
 ifeq (2,$(strip $(abi)))
-	CXXFLAGS += -DOPENVDB_2_ABI_COMPATIBLE
+    CXXFLAGS += -DOPENVDB_2_ABI_COMPATIBLE
 endif
 ifneq (2,$(strip $(GLFW_MAJOR_VERSION)))
-	CXXFLAGS += -DOPENVDB_USE_GLFW_3
+    CXXFLAGS += -DOPENVDB_USE_GLFW_3
 endif
 
 LIBS := \
@@ -504,9 +511,9 @@ LIBVIEWER_SRC_NAMES := \
     viewer/Viewer.cc \
 #
 ifdef MBSD
-	LIBVIEWER_FLAGS := -framework Cocoa -framework OpenGL -framework IOKit
+    LIBVIEWER_FLAGS := -framework Cocoa -framework OpenGL -framework IOKit
 else
-	LIBVIEWER_FLAGS := -lGL -lGLU
+    LIBVIEWER_FLAGS := -lGL -lGLU
 endif
 
 
@@ -669,7 +676,7 @@ $(LIBOPENVDB_SONAME): $(LIBOPENVDB_SHARED)
 	ln -f -s $< $@
 
 $(LIBOPENVDB_SHARED): $(OBJ_NAMES)
-	@echo "Building $@ because of $(call list_deps)"
+	@echo "Building $@ because of $(list_deps)"
 	$(CXX) $(CXXFLAGS) -shared -o $@ $^ $(LIBS_RPATH) $(LIBOPENVDB_SONAME_FLAGS)
 
 else
@@ -678,17 +685,18 @@ else
 lib: $(LIBOPENVDB)
 
 $(LIBOPENVDB_STATIC): $(OBJ_NAMES)
-	@echo "Building $@ because of $(call list_deps)"
+	@echo "Building $@ because of $(list_deps)"
 	$(AR) cr $@ $^
 
 endif # shared
 
+
 $(DOC_INDEX): doxygen-config $(INCLUDE_NAMES) $(SRC_NAMES) $(DOC_FILES)
-	@echo "Generating documentation because of $(call list_deps)"
+	@echo "Generating documentation because of $(list_deps)"
 	echo 'OUTPUT_DIRECTORY=./doc' | cat doxygen-config - | $(DOXYGEN) - $(QUIET)
 
 $(DOC_PDF): doxygen-config $(INCLUDE_NAMES) $(SRC_NAMES) $(DOC_FILES)
-	@echo "Generating documentation because of $(call list_deps)"
+	@echo "Generating documentation because of $(list_deps)"
 	echo -e 'OUTPUT_DIRECTORY=./doc\nGENERATE_LATEX=YES\nGENERATE_HTML=NO' \
 	    | cat doxygen-config - | $(DOXYGEN) - $(QUIET) \
 	    && cd ./doc/latex && make refman.pdf $(QUIET) \
@@ -705,19 +713,19 @@ pdfdoc:
 endif
 
 vdb_print: $(LIBOPENVDB) cmd/openvdb_print/main.cc
-	@echo "Building $@ because of $(call list_deps)"
+	@echo "Building $@ because of $(list_deps)"
 	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_print/main.cc -I . \
-	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
-	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB)
+	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB) \
+	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB)
 
 vdb_render: $(LIBOPENVDB) cmd/openvdb_render/main.cc
-	@echo "Building $@ because of $(call list_deps)"
+	@echo "Building $@ because of $(list_deps)"
 	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_render/main.cc -I . \
 	    -isystem $(EXR_INCL_DIR) -isystem $(ILMBASE_INCL_DIR) \
-	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
 	    -Wl,-rpath,$(EXR_LIB_DIR) -L$(EXR_LIB_DIR) $(EXR_LIB) \
 	    -Wl,-rpath,$(ILMBASE_LIB_DIR) -L$(ILMBASE_LIB_DIR) $(ILMBASE_LIB) \
-	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB)
+	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB) \
+	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB)
 
 # Create an openvdb_viewer/ symlink to the viewer/ subdirectory,
 # to mirror the DWA directory structure.
@@ -732,35 +740,35 @@ $(LIBVIEWER_INCLUDE_NAMES): openvdb_viewer
 
 $(LIBVIEWER_OBJ_NAMES): $(LIBVIEWER_INCLUDE_NAMES)
 $(LIBVIEWER_OBJ_NAMES): %.o: %.cc
-	@echo "Building $@ because of $(call list_deps)"
+	@echo "Building $@ because of $(list_deps)"
 	$(CXX) -c $(CXXFLAGS) -I . -isystem $(GLFW_INCL_DIR) -DGL_GLEXT_PROTOTYPES=1 -fPIC -o $@ $<
 
 vdb_view: $(LIBOPENVDB) $(LIBVIEWER_OBJ_NAMES) cmd/openvdb_view/main.cc
-	@echo "Building $@ because of $(call list_deps)"
+	@echo "Building $@ because of $(list_deps)"
 	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_view/main.cc $(LIBVIEWER_OBJ_NAMES) \
-		-I . -Wl,-rpath,$(GLFW_LIB_DIR) -L$(GLFW_LIB_DIR) $(GLFW_LIB) \
-		$(LIBVIEWER_FLAGS) $(LIBS_RPATH) $(BOOST_THREAD_LIB) $(CONCURRENT_MALLOC_LIB) \
-	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB)
+	    -I . -Wl,-rpath,$(GLFW_LIB_DIR) -L$(GLFW_LIB_DIR) $(GLFW_LIB) \
+	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB) \
+	    $(LIBVIEWER_FLAGS) $(LIBS_RPATH) $(BOOST_THREAD_LIB) $(CONCURRENT_MALLOC_LIB)
 endif
 
 
 # Build the Python module
 $(PYTHON_OBJ_NAMES): $(PYTHON_INCLUDE_NAMES)
 $(PYTHON_OBJ_NAMES): %.o: %.cc
-	@echo "Building $@ because of $(call list_deps)"
+	@echo "Building $@ because of $(list_deps)"
 	$(CXX) -c $(CXXFLAGS) -I . $(PYCXXFLAGS) -o $@ $<
 $(PYTHON_MODULE): $(LIBOPENVDB) $(PYTHON_OBJ_NAMES)
-	@echo "Building $@ because of $(call list_deps)"
-	$(CXX) $(CXXFLAGS) $(PYCXXFLAGS) -shared $(PYTHON_SONAME_FLAGS) \
-	    -o $@ $(PYTHON_OBJ_NAMES) $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
+	@echo "Building $@ because of $(list_deps)"
+	$(CXX) $(CXXFLAGS) $(PYCXXFLAGS) -shared $(PYTHON_SONAME_FLAGS) -o $@ $(PYTHON_OBJ_NAMES) \
 	    -Wl,-rpath,$(PYTHON_LIB_DIR) -L$(PYTHON_LIB_DIR) $(PYTHON_LIB) \
 	    -Wl,-rpath,$(BOOST_PYTHON_LIB_DIR) -L$(BOOST_PYTHON_LIB_DIR) $(BOOST_PYTHON_LIB) \
-	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB)
+	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB) \
+	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB)
 
 ifeq (yes,$(has_python))
 ifneq (,$(strip $(EPYDOC)))
 pydoc: $(PYTHON_MODULE) $(LIBOPENVDB_SONAME)
-	@echo "Generating Python module documentation because of $(call list_deps)"
+	@echo "Generating Python module documentation because of $(list_deps)"
 	pydocdir=doc/html/python; \
 	mkdir -p $${pydocdir}; \
 	echo "Created $${pydocdir}"; \
@@ -786,16 +794,16 @@ endif
 
 
 $(UNITTEST_OBJ_NAMES): %.o: %.cc
-	@echo "Building $@ because of $(call list_deps)"
+	@echo "Building $@ because of $(list_deps)"
 	$(CXX) -c $(CXXFLAGS) -isystem $(CPPUNIT_INCL_DIR) -fPIC -o $@ $<
 
 ifneq (,$(strip $(CPPUNIT_INCL_DIR)))
 vdb_test: $(LIBOPENVDB) $(UNITTEST_OBJ_NAMES)
-	@echo "Building $@ because of $(call list_deps)"
+	@echo "Building $@ because of $(list_deps)"
 	$(CXX) $(CXXFLAGS) -o $@ $(UNITTEST_OBJ_NAMES) \
-	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
 	    -Wl,-rpath,$(CPPUNIT_LIB_DIR) -L$(CPPUNIT_LIB_DIR) $(CPPUNIT_LIB) \
-	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB)
+	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB) \
+	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB)
 
 test: lib vdb_test
 	@echo "Testing $(LIBOPENVDB_NAME)"
@@ -885,7 +893,7 @@ install: lib python vdb_print vdb_render vdb_view doc pydoc
 # containing a rule for each *.o file.  Consider generating a separate
 # dependency file for each *.o file instead.
 $(DEPEND): $(ALL_INCLUDE_FILES) $(ALL_SRC_FILES) openvdb_viewer
-	@echo "Generating dependencies because of $(call list_deps)"
+	@echo "Generating dependencies because of $(list_deps)"
 	$(RM) $(DEPEND)
 	for f in $(SRC_NAMES) $(CMD_SRC_NAMES); \
 	    do $(CXX) $(CXXFLAGS) -O0 \

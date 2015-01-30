@@ -52,6 +52,7 @@
 
 #include <boost/scoped_array.hpp>
 #include <boost/integer.hpp> // boost::int_t<N>::least
+#include <boost/math/special_functions/fpclassify.hpp>//for boost::math::isfinite
 
 #include <tbb/atomic.h>
 #include <tbb/blocked_range.h>
@@ -245,16 +246,21 @@ struct ComputeBBoxOp {
 
     void operator()(const tbb::blocked_range<size_t>& range) {
 
-        PointType point, tmpMin(mMin), tmpMax(mMax);
+        PointType pos, tmpMin(mMin), tmpMax(mMax);
 
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
-            mPoints->getPos(n, point);
-            tmpMin[0] = std::min(tmpMin[0], point[0]);
-            tmpMin[1] = std::min(tmpMin[1], point[1]);
-            tmpMin[2] = std::min(tmpMin[2], point[2]);
-            tmpMax[0] = std::max(tmpMax[0], point[0]);
-            tmpMax[1] = std::max(tmpMax[1], point[1]);
-            tmpMax[2] = std::max(tmpMax[2], point[2]);
+            mPoints->getPos(n, pos);
+            
+            if (boost::math::isfinite(pos[0]) &&
+                boost::math::isfinite(pos[1]) &&
+                boost::math::isfinite(pos[2])) {
+                tmpMin[0] = std::min(tmpMin[0], pos[0]);
+                tmpMin[1] = std::min(tmpMin[1], pos[1]);
+                tmpMin[2] = std::min(tmpMin[2], pos[2]);
+                tmpMax[0] = std::max(tmpMax[0], pos[0]);
+                tmpMax[1] = std::max(tmpMax[1], pos[1]);
+                tmpMax[2] = std::max(tmpMax[2], pos[2]);
+            }
         }
 
         mMin[0] = std::min(tmpMin[0], mMin[0]);
@@ -332,30 +338,34 @@ struct BucketAndVoxelOffsetOp
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
 
             mPoints->getPos(n, pos);
-            ijk = mXForm.worldToIndexCellCentered(pos);
 
-            // coord to offset
-            if (mVoxelOffsets) {
-                loc[0] = ijk[0] & mask;
-                loc[1] = ijk[1] & mask;
-                loc[2] = ijk[2] & mask;
+            if (boost::math::isfinite(pos[0]) &&
+                boost::math::isfinite(pos[1]) &&
+                boost::math::isfinite(pos[2])) {
+                
+                ijk = mXForm.worldToIndexCellCentered(pos);
 
-                voxelOffset = VoxelOffsetT((loc[0] << log2dim2) + (loc[1] << log2dim) + loc[2]);
-            }
-
-            ijk[0] >>= log2dim;
-            ijk[1] >>= log2dim;
-            ijk[2] >>= log2dim;
-
-            ijk[0] -= xMin;
-            ijk[1] -= yMin;
-            ijk[2] -= zMin;
-
-            bucketOffset = IndexT(ijk[0] * yzDim + ijk[1] * zDim + ijk[2]);
-            mBucketOffsets[n] = bucketOffset;
-
-            if (mVoxelOffsets) {
-                mVoxelOffsets[n] = voxelOffset;
+                // coord to offset
+                if (mVoxelOffsets) {
+                    loc[0] = ijk[0] & mask;
+                    loc[1] = ijk[1] & mask;
+                    loc[2] = ijk[2] & mask;
+                    
+                    voxelOffset = VoxelOffsetT((loc[0] << log2dim2) + (loc[1] << log2dim) + loc[2]);
+                }
+                
+                ijk[0] >>= log2dim;
+                ijk[1] >>= log2dim;
+                ijk[2] >>= log2dim;
+                
+                ijk[0] -= xMin;
+                ijk[1] -= yMin;
+                ijk[2] -= zMin;
+                
+                bucketOffset = IndexT(ijk[0] * yzDim + ijk[1] * zDim + ijk[2]);
+                mBucketOffsets[n] = bucketOffset;
+                
+                if (mVoxelOffsets) mVoxelOffsets[n] = voxelOffset;
             }
         }
     }
@@ -412,34 +422,37 @@ struct ComputeOffsetOp
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
 
             mPoints->getPos(n, pos);
-            ijk = mXForm.worldToIndexCellCentered(pos);
 
-            // coord to offset
-            if (mVoxelOffsets) {
-                loc[0] = ijk[0] & mask;
-                loc[1] = ijk[1] & mask;
-                loc[2] = ijk[2] & mask;
+            if (boost::math::isfinite(pos[0]) &&
+                boost::math::isfinite(pos[1]) &&
+                boost::math::isfinite(pos[2])) {
+                ijk = mXForm.worldToIndexCellCentered(pos);
 
-                voxelOffset = VoxelOffsetT((loc[0] << log2dim2) + (loc[1] << log2dim) + loc[2]);
-            }
-
-            ijk[0] >>= log2dim;
-            ijk[1] >>= log2dim;
-            ijk[2] >>= log2dim;
-
-            ijk[0] -= xMin;
-            ijk[1] -= yMin;
-            ijk[2] -= zMin;
-
-            bucketOffset = IndexT(ijk[0] * yzDim + ijk[1] * zDim + ijk[2]);
-
-            IndexPairT& item = mBucketOffsets[n];
-
-            item.first  = bucketOffset;
-            item.second = IndexT(n);
-
-            if (mVoxelOffsets) {
-                mVoxelOffsets[n] = voxelOffset;
+                // coord to offset
+                if (mVoxelOffsets) {
+                    loc[0] = ijk[0] & mask;
+                    loc[1] = ijk[1] & mask;
+                    loc[2] = ijk[2] & mask;
+                    
+                    voxelOffset = VoxelOffsetT((loc[0] << log2dim2) + (loc[1] << log2dim) + loc[2]);
+                }
+                
+                ijk[0] >>= log2dim;
+                ijk[1] >>= log2dim;
+                ijk[2] >>= log2dim;
+                
+                ijk[0] -= xMin;
+                ijk[1] -= yMin;
+                ijk[2] -= zMin;
+                
+                bucketOffset = IndexT(ijk[0] * yzDim + ijk[1] * zDim + ijk[2]);
+                
+                IndexPairT& item = mBucketOffsets[n];
+                
+                item.first  = bucketOffset;
+                item.second = IndexT(n);
+                
+                if (mVoxelOffsets) mVoxelOffsets[n] = voxelOffset;
             }
         }
     }
@@ -728,13 +741,19 @@ struct LeafNodeOriginOp
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
 
             mPoints->getPos(mIndices[mPages[n]], pos);
-            ijk = mXForm.worldToIndexCellCentered(pos);
 
-            ijk[0] &= mask;
-            ijk[1] &= mask;
-            ijk[2] &= mask;
-
-            mCoordinates[n] = ijk;
+            if (boost::math::isfinite(pos[0]) &&
+                boost::math::isfinite(pos[1]) &&
+                boost::math::isfinite(pos[2])) {
+                
+                ijk = mXForm.worldToIndexCellCentered(pos);
+                
+                ijk[0] &= mask;
+                ijk[1] &= mask;
+                ijk[2] &= mask;
+                
+                mCoordinates[n] = ijk;
+            }
         }
     }
 

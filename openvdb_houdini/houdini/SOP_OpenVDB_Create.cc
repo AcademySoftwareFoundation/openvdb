@@ -136,7 +136,7 @@ class SOP_OpenVDB_Create : public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Create(OP_Network *net, const char *name, OP_Operator *op);
-    virtual ~SOP_OpenVDB_Create() {};
+    virtual ~SOP_OpenVDB_Create() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 

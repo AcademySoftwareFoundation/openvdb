@@ -57,7 +57,7 @@ struct FractalBoltzmanGenerator
         float lacunarity, float roughness, int mode):
         mOctaves(octaves), mNoiseMode(mode), mFreq(freq), mAmp(amp), mGain(gain),
         mLacunarity(lacunarity), mRoughness(roughness)
-    {};
+    {}
 
     // produce the noise as float
     float noise(cvdb::Vec3R point, float freqMult = 1.0f) const
@@ -123,7 +123,7 @@ class SOP_OpenVDB_Noise: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Noise(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Noise() {};
+    virtual ~SOP_OpenVDB_Noise() {}
 
     static OP_Node* factory(OP_Network*, const char*, OP_Operator*);
 

@@ -408,7 +408,7 @@ public:
         // Clean up an unused leaf.
 
         if (leaf != NULL) delete leaf;
-    };
+    }
 
     void join(SparseExtractor& rhs) {
         mMask->merge(*rhs.mMask);
@@ -575,7 +575,7 @@ public:
         // Clean up an unused leaf.
 
         if (leaf != NULL) delete leaf;
-    };
+    }
 
     void join(SparseMaskedExtractor& rhs) {
         mResult->merge(*rhs.mResult);
@@ -766,7 +766,7 @@ public:
 template <typename ValueT, typename PointWiseOp>
 struct ContiguousOp
 {
-    ContiguousOp(const PointWiseOp& op) : mOp(op){};
+    ContiguousOp(const PointWiseOp& op) : mOp(op){}
 
     typedef Dense<ValueT, openvdb::tools::LayoutZYX>  DenseT;
     inline void transform(DenseT& dense, openvdb::math::Coord& ijk, size_t size) const
@@ -822,7 +822,7 @@ public:
 
     SparseToDenseCompositor(const SparseToDenseCompositor& other):
         mDense(other.mDense), mSource(other.mSource), mAlpha(other.mAlpha),
-        mBeta(other.mBeta), mStrength(other.mStrength) {};
+        mBeta(other.mBeta), mStrength(other.mStrength) {}
 
 
 
@@ -1095,7 +1095,7 @@ private:
         typedef typename LeafT::ValueType ValueT;
 
         typedef Line   BaseT;
-        UniformLeaf(const ValueT& value) : BaseT(init(value)){};
+        UniformLeaf(const ValueT& value) : BaseT(init(value)) {}
 
         static const BaseT init(const ValueT& value) {
             BaseT tmp;

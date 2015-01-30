@@ -302,7 +302,7 @@ SOP_OpenVDB_Morph_Level_Set::SOP_OpenVDB_Morph_Level_Set(OP_Network* net,
 bool
 SOP_OpenVDB_Morph_Level_Set::updateParmsFlags()
 {
-    bool changed = 0;
+    bool changed = false;
 
     const bool hasMask = (this->nInputs() == 3);
     changed |= enableParm("mask", hasMask);

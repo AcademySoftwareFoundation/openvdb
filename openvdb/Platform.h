@@ -35,6 +35,8 @@
 
 #include "PlatformConfig.h"
 
+#define PRAGMA(x) _Pragma(#x)
+
 /// Use OPENVDB_DEPRECATED to mark functions as deprecated.
 /// It should be placed right before the signature of the function,
 /// e.g., "OPENVDB_DEPRECATED void functionName();".
@@ -117,6 +119,12 @@
         _Pragma("warning (disable:280)")
     #define OPENVDB_NO_UNREACHABLE_CODE_WARNING_END \
         _Pragma("warning (pop)")
+#elif defined(__clang__)
+    #define OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN \
+        PRAGMA(clang diagnostic push) \
+        PRAGMA(clang diagnostic ignored "-Wunreachable-code")
+    #define OPENVDB_NO_UNREACHABLE_CODE_WARNING_END \
+        PRAGMA(clang diagnostic pop)
 #else
     #define OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
     #define OPENVDB_NO_UNREACHABLE_CODE_WARNING_END

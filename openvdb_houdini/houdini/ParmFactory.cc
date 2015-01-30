@@ -762,10 +762,14 @@ DWAOpPolicy::getName(const OpFactory&, const std::string& english)
 std::string
 DWAOpPolicy::getHelpURL(const OpFactory& factory)
 {
+#if defined(PRODDEV_BUILD) || defined(DWREAL_IS_DOUBLE)
     std::string url("http://mydw.anim.dreamworks.com/display/FX/Houdini+");
     url += factory.flavorString(); // append "SOP", "POP", etc.
     url += "_" + factory.name();
     return url;
+#else
+    return "";
+#endif
 }
 
 

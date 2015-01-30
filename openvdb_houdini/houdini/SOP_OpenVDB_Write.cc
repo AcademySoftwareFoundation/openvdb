@@ -49,7 +49,7 @@ class SOP_OpenVDB_Write: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Write(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Write() {};
+    virtual ~SOP_OpenVDB_Write() {}
 
     virtual void getDescriptiveParmName(UT_String& s) const { s = "file_name"; }
 

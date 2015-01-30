@@ -27,13 +27,21 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-
+///
+/// @file Diagnostics.h
+///
+/// @author Ken Museth
+///
+/// @brief Various diagnostic tools to identify potential issues with
+///        for example narrow-band level sets or fog volumes
+///
 #ifndef OPENVDB_TOOLS_DIAGNOSTICS_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_DIAGNOSTICS_HAS_BEEN_INCLUDED
 
 #include <openvdb/Grid.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/math/Vec3.h>
+#include <openvdb/math/Stencils.h>
 #include <openvdb/math/Operators.h>
 #include <openvdb/tree/LeafManager.h>
 #include <tbb/blocked_range.h>
@@ -42,36 +50,67 @@
 #include <boost/math/special_functions/fpclassify.hpp>
 #include <boost/utility/enable_if.hpp>
 
-/* TODO: Ken Museth
-
-checkLevelSet
-1) has level set class type
-2) value type is floating point
-3) has uniform scale
-4) background value is positive and n*dx
-5) active values in range between +-background
-6) no active tiles
-8) abs of inactive values = background
-9) norm grad is close to one
-
-checkDensity volume
-1) has fog class tag
-2) value type is a floating point
-3) background = 0
-4) all inactive values are zero
-5) all active values are 0-1
-
-*/
-
-
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
+////////////////////////////////////////////////////////////////////////////////
 
-////////////////////////////////////////
+/// @brief Perform checks on a grid to see if it is a valid symmetric,
+/// narrow-band level set.
+///
+/// @param grid      Grid to be checked
+/// @param number    Number of the checks to be performed (see below)
+/// @return string with a message indicating the nature of the
+/// issue. If no issue is detected the return string is empty.
+///
+/// @details @a number refers to the following ordered list of
+/// checks - always starting from the top.
+/// Fast checks
+/// 1: value type is floating point
+/// 2: has level set class type
+/// 3: has uniform scale
+/// 4: background value is positive and n*dx
+///
+/// Slower checks
+/// 5: no active tiles
+/// 6: all the values are finite, i.e not NaN or infinite
+/// 7: active values in range between +-background
+/// 8: abs of inactive values = background, i.e. assuming a symmetric
+/// narrow band!
+///
+/// Relatively slow check (however multithreaded)
+/// 9: norm gradient is close to one, i.e. satisfied the Eikonal equation.
+template<class GridType>
+std::string
+checkLevelSet(const GridType& grid, size_t number=9);
 
+////////////////////////////////////////////////////////////////////////////////
+
+/// @brief Perform checks on a grid to see if it is a valid fog volume.
+///
+/// @param grid      Grid to be checked
+/// @param number    Number of the checks to be performed (see below)
+/// @return string with a message indicating the nature of the
+/// issue. If no issue is detected the return string is empty.
+///
+/// @details @a number refers to the following ordered list of
+/// checks - always starting from the top.
+/// Fast checks
+/// 1: value type is floating point
+/// 2: has FOG volume class type
+/// 3: background value is zero
+///
+/// Slower checks
+/// 4: all the values are finite, i.e not NaN or infinite
+/// 5: inactive values are zero
+/// 6: active values are in the range [0,1]
+template<class GridType>
+std::string
+checkFogVolume(const GridType& grid, size_t number=6);
+
+////////////////////////////////////////////////////////////////////////////////
 
 /// @brief  Threaded method to find unique inactive values.
 ///
@@ -87,7 +126,7 @@ uniqueInactiveValues(const GridType& grid,
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/// @brief Checks nan values
+/// @brief Checks NaN values
 template <typename GridT,
           typename TreeIterT = typename GridT::ValueOnCIter>
 struct CheckNan
@@ -100,10 +139,10 @@ struct CheckNan
     /// @brief Default constructor
     CheckNan() {}
 
-    /// Return true if the scalar value is nan
+    /// Return true if the scalar value is NaN
     inline bool operator()(const ElementType& v) const { return boost::math::isnan(v); }
 
-    /// @brief This allow for vector values to be checked componentwise
+    /// @brief This allows for vector values to be checked componentwise
     template <typename T>
     inline typename boost::enable_if_c<VecTraits<T>::IsVec, bool>::type
     operator()(const T& v) const
@@ -112,16 +151,18 @@ struct CheckNan
         return false;
     }
 
-    /// @brief Return true if the tile at the iterator location is nan
+    /// @brief Return true if the tile at the iterator location is NaN
     bool operator()(const TreeIterT  &iter) const { return (*this)(*iter); }
 
-    /// @brief Return true if the voxel at the iterator location is nan
+    /// @brief Return true if the voxel at the iterator location is NaN
     bool operator()(const VoxelIterT &iter) const { return (*this)(*iter); }
 
     /// @brief Return a string describing a failed check.
-    std::string str() const { return "nan"; }
+    std::string str() const { return "NaN"; }
 
 };// CheckNan
+
+////////////////////////////////////////////////////////////////////////////////
 
 /// @brief Checks for infinite values, e.g. 1/0 or -1/0
 template <typename GridT,
@@ -157,6 +198,8 @@ struct CheckInf
     std::string str() const { return "infinite"; }
 };// CheckInf
 
+////////////////////////////////////////////////////////////////////////////////
+
 /// @brief Checks for both NaN and inf values, i.e. any value that is not finite.
 template <typename GridT,
           typename TreeIterT = typename GridT::ValueOnCIter>
@@ -170,10 +213,10 @@ struct CheckFinite
     /// @brief Default constructor
     CheckFinite() {}
 
-    /// Return true if the value is NOT finite, i.e. it's Nan or infinite
+    /// Return true if the value is NOT finite, i.e. it's NaN or infinite
     inline bool operator()(const ElementType& v) const { return !boost::math::isfinite(v); }
 
-    /// Return true if any of the vector components are Nan or infinite.
+    /// Return true if any of the vector components are NaN or infinite.
     template <typename T>
     inline typename boost::enable_if_c<VecTraits<T>::IsVec, bool>::type
     operator()(const T& v) const {
@@ -181,15 +224,17 @@ struct CheckFinite
         return false;
     }
 
-    /// @brief Return true if the tile at the iterator location is Nan or infinite.
+    /// @brief Return true if the tile at the iterator location is NaN or infinite.
     bool operator()(const TreeIterT  &iter) const { return (*this)(*iter); }
 
-    /// @brief Return true if the tile at the iterator location is Nan or infinite.
+    /// @brief Return true if the tile at the iterator location is NaN or infinite.
     bool operator()(const VoxelIterT &iter) const { return (*this)(*iter); }
 
     /// @brief Return a string describing a failed check.
     std::string str() const { return "not finite"; }
 };// CheckFinite
+
+////////////////////////////////////////////////////////////////////////////////
 
 /// @brief Check that the magnitude of a value, a, is close to a fixed
 /// magnitude, b, given a fixed tolerance c. That is | |a| - |b| | <= c
@@ -204,7 +249,7 @@ struct CheckMagnitude
 
     /// @brief Default constructor
     CheckMagnitude(const ElementType& a,
-                  const ElementType& t = math::Tolerance<ElementType>::value())
+                   const ElementType& t = math::Tolerance<ElementType>::value())
         : absVal(math::Abs(a)), tolVal(math::Abs(t))
     {
     }
@@ -240,7 +285,9 @@ struct CheckMagnitude
 
     const ElementType absVal, tolVal;
 };// CheckMagnitude
-    
+
+////////////////////////////////////////////////////////////////////////////////
+
 /// @brief Checks a value against a range
 template <typename GridT,
           bool MinInclusive = true,//is min part of the range?
@@ -258,7 +305,7 @@ struct CheckRange
     {
     }
 
-    /// Return true if the value is smaller then min or larger then max.
+    /// Return true if the value is smaller than min or larger than max.
     inline bool operator()(const ElementType& v) const
     {
         return (MinInclusive ? v<minVal : v<=minVal) ||
@@ -283,13 +330,15 @@ struct CheckRange
     std::string str() const
     {
         std::ostringstream ss;
-        ss << "outside the range "    << (MinInclusive ? "[" : "]")
-           << minVal << "," << maxVal << (MaxInclusive ? "]" : "[");
+        ss << "outside the value range " << (MinInclusive ? "[" : "]")
+           << minVal << "," << maxVal    << (MaxInclusive ? "]" : "[");
         return ss.str();
     }
 
     const ElementType minVal, maxVal;
 };// CheckRange
+
+////////////////////////////////////////////////////////////////////////////////
 
 /// @brief Checks a value against a minimum
 template <typename GridT,
@@ -304,10 +353,10 @@ struct CheckMin
     // @brief Constructor taking a minimum to be tested against.
     CheckMin(const ElementType& _min) : minVal(_min) {}
 
-    /// Return true if the value is smaller then min.
+    /// Return true if the value is smaller than min.
     inline bool operator()(const ElementType& v) const { return v<minVal; }
 
-    /// Return true if any of the vector components are smaller then min.
+    /// Return true if any of the vector components are smaller than min.
     template <typename T>
     inline typename boost::enable_if_c<VecTraits<T>::IsVec, bool>::type
     operator()(const T& v) const {
@@ -315,22 +364,24 @@ struct CheckMin
         return false;
     }
 
-    /// @brief Return true if the voxel at the iterator location is smaller then min.
+    /// @brief Return true if the voxel at the iterator location is smaller than min.
     bool operator()(const TreeIterT  &iter) const { return (*this)(*iter); }
 
-    /// @brief Return true if the tile at the iterator location is smaller then min.
+    /// @brief Return true if the tile at the iterator location is smaller than min.
     bool operator()(const VoxelIterT &iter) const { return (*this)(*iter); }
 
     /// @brief Return a string describing a failed check.
     std::string str() const
     {
         std::ostringstream ss;
-        ss << "smaller then "<<minVal;
+        ss << "smaller than "<<minVal;
         return ss.str();
     }
 
     const ElementType minVal;
 };// CheckMin
+
+////////////////////////////////////////////////////////////////////////////////
 
 /// @brief Checks a value against a maximum
 template <typename GridT,
@@ -345,10 +396,10 @@ struct CheckMax
     /// @brief Constructor taking a maximum to be tested against.
     CheckMax(const ElementType& _max) : maxVal(_max) {}
 
-    /// Return true if the value is larger then max.
+    /// Return true if the value is larger than max.
     inline bool operator()(const ElementType& v) const { return v>maxVal; }
 
-    /// Return true if any of the vector components are larger then max.
+    /// Return true if any of the vector components are larger than max.
     template <typename T>
     inline typename boost::enable_if_c<VecTraits<T>::IsVec, bool>::type
     operator()(const T& v) const {
@@ -356,22 +407,24 @@ struct CheckMax
         return false;
     }
 
-    /// @brief Return true if the tile at the iterator location is larger then max.
+    /// @brief Return true if the tile at the iterator location is larger than max.
     bool operator()(const TreeIterT  &iter) const { return (*this)(*iter); }
 
-    /// @brief Return true if the voxel at the iterator location is larger then max.
+    /// @brief Return true if the voxel at the iterator location is larger than max.
     bool operator()(const VoxelIterT &iter) const { return (*this)(*iter); }
 
     /// @brief Return a string describing a failed check.
     std::string str() const
     {
         std::ostringstream ss;
-        ss << "larger then "<<maxVal;
+        ss << "larger than "<<maxVal;
         return ss.str();
     }
 
     const ElementType maxVal;
 };// CheckMax
+
+////////////////////////////////////////////////////////////////////////////////
 
 /// @brief Checks the norm of the gradient against a range
 template<typename GridT,
@@ -407,18 +460,7 @@ struct CheckNormGrad
     {
     }
 
-    CheckNormGrad& operator=(const CheckNormGrad& other)
-    {
-        if (&other != this) {
-            acc = AccT(other.acc.tree());
-            invdx2 = other.invdx2;
-            minVal = other.minVal;
-            maxVal = other.maxVal;
-        }
-        return *this;
-    }
-
-    /// Return true if the value is smaller then min or larger then max.
+    /// Return true if the value is smaller than min or larger than max.
     inline bool operator()(const ValueType& v) const { return v<minVal || v>maxVal; }
 
     /// @brief Return true if zero is outside the range.
@@ -437,13 +479,75 @@ struct CheckNormGrad
     std::string str() const
     {
         std::ostringstream ss;
-        ss << "outside the range ["<<minVal<<","<<maxVal<<"]";
+        ss << "outside the range of NormGrad ["<<minVal<<","<<maxVal<<"]";
         return ss.str();
     }
 
     AccT acc;
     const ValueType invdx2, minVal, maxVal;
 };// CheckNormGrad
+
+////////////////////////////////////////////////////////////////////////////////
+
+/// @brief Checks the norm of the gradient at zero-crossing voxels against a range
+/// @details CheckEikonal differs from CheckNormGrad in that it only
+/// checks the norm of the gradient at voxel locations where the
+/// FD-stencil crosses the zero isosurface!
+template<typename GridT,
+         typename TreeIterT = typename GridT::ValueOnCIter,
+         typename StencilT  = math::WenoStencil<GridT> >//math::GradStencil<GridT>
+struct CheckEikonal
+{
+    typedef typename GridT::ValueType ValueType;
+    BOOST_STATIC_ASSERT(boost::is_floating_point<ValueType>::value);
+    typedef TreeIterT TileIterT;
+    typedef typename tree::IterTraits<typename TreeIterT::NodeT, typename TreeIterT::ValueIterT>
+    ::template NodeConverter<typename GridT::TreeType::LeafNodeType>::Type VoxelIterT;
+
+    /// @brief Constructor taking a grid and a range to be tested against.
+    CheckEikonal(const GridT&  grid, const ValueType& _min, const ValueType& _max)
+        : stencil(grid), minVal(_min), maxVal(_max)
+    {
+        if ( !grid.hasUniformVoxels() ) {
+         OPENVDB_THROW(RuntimeError,
+             "The transform must have uniform scale for CheckEikonal to function");
+        }
+    }
+
+    CheckEikonal(const CheckEikonal& other)
+        : stencil(other.stencil.grid()), minVal(other.minVal), maxVal(other.maxVal)
+    {
+    }
+
+    /// Return true if the value is smaller than min or larger than max.
+    inline bool operator()(const ValueType& v) const { return v<minVal || v>maxVal; }
+
+    /// @brief Return true if zero is outside the range.
+    /// @note We assume that the norm of the gradient of a tile is always zero.
+    inline bool operator()(const TreeIterT&) const { return (*this)(ValueType(0)); }
+
+    /// @brief Return true if the norm of the gradient at a
+    /// zero-crossing voxel location of the iterator is out of range.
+    inline bool operator()(const VoxelIterT &iter) const
+    {
+        stencil.moveTo(iter);
+        if (!stencil.zeroCrossing()) return false;
+        return (*this)(stencil.normSqGrad());
+    }
+
+    /// @brief Return a string describing a failed check.
+    std::string str() const
+    {
+        std::ostringstream ss;
+        ss << "outside the range of NormGrad ["<<minVal<<","<<maxVal<<"]";
+        return ss.str();
+    }
+
+    mutable StencilT stencil;
+    const ValueType minVal, maxVal;
+};// CheckEikonal
+
+////////////////////////////////////////////////////////////////////////////////
 
 /// @brief Checks the divergence against a range
 template<typename GridT,
@@ -473,7 +577,7 @@ struct CheckDivergence
              "The transform must have uniform scale for CheckDivergence to function");
         }
     }
-    /// Return true if the value is smaller then min or larger then max.
+    /// Return true if the value is smaller than min or larger than max.
     inline bool operator()(const ElementType& v) const { return v<minVal || v>maxVal; }
 
     /// @brief Return true if zero is outside the range.
@@ -492,13 +596,15 @@ struct CheckDivergence
     std::string str() const
     {
         std::ostringstream ss;
-        ss << "outside the range ["<<minVal<<","<<maxVal<<"]";
+        ss << "outside the range of divergence ["<<minVal<<","<<maxVal<<"]";
         return ss.str();
     }
 
     AccT acc;
     const ValueType invdx, minVal, maxVal;
 };// CheckDivergence
+
+////////////////////////////////////////////////////////////////////////////////
 
 /// @brief Performs multithreaded diagnostics of a grid
 /// @note More documentation will be added soon!
@@ -544,7 +650,17 @@ class Diagnose
     /// failureCount equals valueCount.
     Index64 failureCount() const { return mCount; }
 
+    /// @brief Return a const reference to the grid
+    const GridT& grid() const { return *mGrid; }
+
+    /// @brief Clear the mask and error counter
+    void clear() { mMask = new MaskType(); mCount = 0; }
+
 private:
+    // disallow copy construction and copy by assinment!
+    Diagnose(const Diagnose&);// not implemented
+    Diagnose& operator=(const Diagnose&);// not implemented
+
     const GridT*           mGrid;
     typename MaskType::Ptr mMask;
     Index64                mCount;
@@ -602,7 +718,7 @@ private:
                 }
             }
             if (const Index64 m = mCount - n) {
-                ss << m << (m==1?" tile is ":" tiles are ") + mCheck.str() << std::endl;
+                ss << m << " tile" << (m==1 ? " is " : "s are ") + mCheck.str() << std::endl;
             }
             return ss.str();
         }
@@ -614,7 +730,7 @@ private:
               const Index64 n = mCount;
               tbb::parallel_reduce(leafs.leafRange(), *this);
               if (const Index64 m = mCount - n) {
-                  ss << m << (m==1?" voxel is ":" voxels are ") + mCheck.str() << std::endl;
+                  ss << m << " voxel" << (m==1 ? " is " : "s are ") + mCheck.str() << std::endl;
               }
               return ss.str();
           }
@@ -649,6 +765,312 @@ private:
     };//End of private class CheckValues
 
 };// End of public class Diagnose
+
+
+////////////////////////////////////////////////////////////////////////////////
+
+/// @brief Class that performs various types of checks on narrow-band level sets.
+///
+/// @note The most common usage is to simply call CheckLevelSet::check()
+template<class GridType>
+class CheckLevelSet
+{
+public:
+    typedef typename GridType::ValueType ValueType;
+    typedef typename GridType::template ValueConverter<bool>::Type  MaskType;
+
+    CheckLevelSet(const GridType& grid) : mDiagnose(grid) {}
+
+    /// @brief Return a boolean mask of all the values
+    /// (i.e. tiles and/or voxels) that have failed one or
+    /// more checks.
+    typename MaskType::ConstPtr mask() const { return mDiagnose.mask(); }
+
+    /// @brief Return the number of values (i.e. background, tiles or
+    /// voxels) that have failed one or more checks.
+    Index64 valueCount() const { return mDiagnose.valueCount(); }
+
+    /// @brief Return total number of failed checks
+    /// @note If only one check was performed and the mask was updated
+    /// failureCount equals valueCount.
+    Index64 failureCount() const { return mDiagnose.failureCount(); }
+
+    /// @brief Return a const reference to the grid
+    const GridType& grid() const { return mDiagnose.grid(); }
+
+    /// @brief Clear the mask and error counter
+    void clear() { mDiagnose.clear(); }
+
+    /// @brief Return a nonempty message if the grid's value type is a floating point.
+    ///
+    /// @note No run-time overhead
+    static std::string checkValueType()
+    {
+        static const bool test = boost::is_floating_point<ValueType>::value;
+        return test ? "" : "Value type is not floating point\n";
+    }
+
+    /// @brief Return message if the grid's class is a level set.
+    ///
+    /// @note Small run-time overhead
+    std::string checkClassType() const
+    {
+        const bool test = mDiagnose.grid().getGridClass() == GRID_LEVEL_SET;
+        return test ? "" : "Class type is not \"GRID_LEVEL_SET\"\n";
+    }
+
+    /// @brief Return a nonempty message if the grid's transform does not have uniform scaling.
+    ///
+    /// @note Small run-time overhead
+    std::string checkTransform() const
+    {
+        return mDiagnose.grid().hasUniformVoxels() ? "" : "Does not have uniform voxels\n";
+    }
+
+    /// @brief Return a nonempty message if the background value is larger than or
+    /// equal to the halfWidth*voxelSize.
+    ///
+    /// @note Small run-time overhead
+    std::string checkBackground(Real halfWidth = LEVEL_SET_HALF_WIDTH) const
+    {
+        const Real w = mDiagnose.grid().background() / mDiagnose.grid().voxelSize()[0];
+        if (w < halfWidth) {
+            std::ostringstream ss;
+            ss << "The background value ("<< mDiagnose.grid().background()<<") is less than "
+               << halfWidth << " voxel units\n";
+            return ss.str();
+        }
+        return "";
+    }
+
+    /// @brief Return a nonempty message if the grid has no active tile values.
+    ///
+    /// @note Medium run-time overhead
+    std::string checkTiles() const
+    {
+        const bool test = mDiagnose.grid().tree().hasActiveTiles();
+        return test ? "Has active tile values\n" : "";
+    }
+
+    /// @brief Return a nonempty message if any of the values are not finite. i.e. NaN or inf.
+    ///
+    /// @note Medium run-time overhead
+    std::string checkFinite(bool updateMask = false)
+    {
+        CheckFinite<GridType,typename GridType::ValueAllCIter> c;
+        return mDiagnose.check(c, updateMask, /*voxel*/true, /*tiles*/true, /*background*/true);
+    }
+
+    /// @brief Return a nonempty message if the active voxel values are out-of-range.
+    ///
+    /// @note Medium run-time overhead
+    std::string checkRange(bool updateMask = false)
+    {
+        const ValueType& background = mDiagnose.grid().background();
+        CheckRange<GridType> c(-background, background);
+        return mDiagnose.check(c, updateMask, /*voxel*/true, /*tiles*/false, /*background*/false);
+    }
+
+    /// @brief Return a nonempty message if the the inactive values do not have a
+    /// magnitude equal to the background value.
+    ///
+    /// @note Medium run-time overhead
+    std::string checkInactiveValues(bool updateMask = false)
+    {
+        const ValueType& background = mDiagnose.grid().background();
+        CheckMagnitude<GridType, typename GridType::ValueOffCIter> c(background);
+        return mDiagnose.check(c, updateMask, /*voxel*/true, /*tiles*/true, /*background*/false);
+    }
+
+    /// @brief Return a nonempty message if the norm of the gradient of the
+    /// active voxels is out of the range minV to maxV.
+    ///
+    /// @note Significant run-time overhead
+    std::string checkEikonal(bool updateMask = false, ValueType minV = 0.5, ValueType maxV = 1.5)
+    {
+        CheckEikonal<GridType> c(mDiagnose.grid(), minV, maxV);
+        return mDiagnose.check(c, updateMask, /*voxel*/true, /*tiles*/false, /*background*/false);
+    }
+
+    /// @brief Return a nonempty message if an error or issue is detected. Only
+    /// runs tests with a number lower than or equal to n, where:
+    ///
+    /// Fast checks
+    /// 1: value type is floating point
+    /// 2: has level set class type
+    /// 3: has uniform scale
+    /// 4: background value is positive and n*dx
+    ///
+    /// Slower checks
+    /// 5: no active tiles
+    /// 6: all the values are finite, i.e not NaN or infinite
+    /// 7: active values in range between +-background
+    /// 8: abs of inactive values = background, i.e. assuming a symmetric narrow band!
+    ///
+    /// Relatively slow check (however multi-threaded)
+    /// 9: norm of gradient at zero-crossings is one, i.e. satisfied the Eikonal equation.
+    std::string check(size_t n=9, bool updateMask = false)
+    {
+        std::string str = this->checkValueType();
+        if (str.empty() && n>1) str = this->checkClassType();
+        if (str.empty() && n>2) str = this->checkTransform();
+        if (str.empty() && n>3) str = this->checkBackground();
+        if (str.empty() && n>4) str = this->checkTiles();
+        if (str.empty() && n>5) str = this->checkFinite(updateMask);
+        if (str.empty() && n>6) str = this->checkRange(updateMask);
+        if (str.empty() && n>7) str = this->checkInactiveValues(updateMask);
+        if (str.empty() && n>8) str = this->checkEikonal(updateMask);
+        return str;
+    }
+
+private:
+    // disallow copy construction and copy by assinment!
+    CheckLevelSet(const CheckLevelSet&);// not implemented
+    CheckLevelSet& operator=(const CheckLevelSet&);// not implemented
+
+    // Memeber data
+    Diagnose<GridType> mDiagnose;
+};// CheckLevelSet
+
+template<class GridType>
+std::string
+checkLevelSet(const GridType& grid, size_t n)
+{
+    CheckLevelSet<GridType> c(grid);
+    return c.check(n, false);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+/// @brief Class that performs various types of checks on fog volumes.
+///
+/// @note The most common usage is to simply call CheckFogVolume::check()
+template<class GridType>
+class CheckFogVolume
+{
+public:
+    typedef typename GridType::ValueType ValueType;
+    typedef typename GridType::template ValueConverter<bool>::Type  MaskType;
+
+    CheckFogVolume(const GridType& grid) : mDiagnose(grid) {}
+
+    /// @brief Return a boolean mask of all the values
+    /// (i.e. tiles and/or voxels) that have failed one or
+    /// more checks.
+    typename MaskType::ConstPtr mask() const { return mDiagnose.mask(); }
+
+    /// @brief Return the number of values (i.e. background, tiles or
+    /// voxels) that have failed one or more checks.
+    Index64 valueCount() const { return mDiagnose.valueCount(); }
+
+    /// @brief Return total number of failed checks
+    /// @note If only one check was performed and the mask was updated
+    /// failureCount equals valueCount.
+    Index64 failureCount() const { return mDiagnose.failureCount(); }
+
+    /// @brief Return a const reference to the grid
+    const GridType& grid() const { return mDiagnose.grid(); }
+
+    /// @brief Clear the mask and error counter
+    void clear() { mDiagnose.clear(); }
+
+    /// @brief Return a nonempty message if the grid's value type is a floating point.
+    ///
+    /// @note No run-time overhead
+    static std::string checkValueType()
+    {
+        static const bool test = boost::is_floating_point<ValueType>::value;
+        return test ? "" : "Value type is not floating point";
+    }
+
+    /// @brief Return a nonempty message if the grid's class is a level set.
+    ///
+    /// @note Small run-time overhead
+    std::string checkClassType() const
+    {
+        const bool test = mDiagnose.grid().getGridClass() == GRID_FOG_VOLUME;
+        return test ? "" : "Class type is not \"GRID_LEVEL_SET\"";
+    }
+
+    /// @brief Return a nonempty message if the background value is not zero.
+    ///
+    /// @note Small run-time overhead
+    std::string checkBackground() const
+    {
+        if (!math::isApproxZero(mDiagnose.grid().background())) {
+            std::ostringstream ss;
+            ss << "The background value ("<< mDiagnose.grid().background()<<") is not zero";
+            return ss.str();
+        }
+        return "";
+    }
+
+    /// @brief Return a nonempty message if any of the values are not finite. i.e. NaN or inf.
+    ///
+    /// @note Medium run-time overhead
+    std::string checkFinite(bool updateMask = false)
+    {
+        CheckFinite<GridType,typename GridType::ValueAllCIter> c;
+        return mDiagnose.check(c, updateMask, /*voxel*/true, /*tiles*/true, /*background*/true);
+    }
+
+    /// @brief Return a nonempty message if any of the inactive values are not zero.
+    ///
+    /// @note Medium run-time overhead
+    std::string checkInactiveValues(bool updateMask = false)
+    {
+        CheckMagnitude<GridType, typename GridType::ValueOffCIter> c(0);
+        return mDiagnose.check(c, updateMask, /*voxel*/true, /*tiles*/true, /*background*/true);
+    }
+
+    /// @brief Return a nonempty message if the active voxel values are out-of-range.
+    ///
+    /// @note Medium run-time overhead
+    std::string checkRange(bool updateMask = false)
+    {
+        CheckRange<GridType> c(0, 1);
+        return mDiagnose.check(c, updateMask, /*voxel*/true, /*tiles*/true, /*background*/false);
+    }
+
+    /// @brief Return a nonempty message if an error or issue is detected. Only
+    /// runs tests with a number lower than or equal to n, where:
+    ///
+    /// Fast checks
+    /// 1: value type is floating point
+    /// 2: has FOG volume class type
+    /// 3: background value is zero
+    ///
+    /// Slower checks
+    /// 4: all the values are finite, i.e not NaN or infinite
+    /// 5: inactive values are zero
+    /// 6: active values are in the range [0,1]
+    std::string check(size_t n=6, bool updateMask = false)
+    {
+        std::string str = this->checkValueType();
+        if (str.empty() && n>1) str = this->checkClassType();
+        if (str.empty() && n>2) str = this->checkBackground();
+        if (str.empty() && n>3) str = this->checkFinite(updateMask);
+        if (str.empty() && n>4) str = this->checkInactiveValues(updateMask);
+        if (str.empty() && n>5) str = this->checkRange(updateMask);
+        return str;
+    }
+
+private:
+    // disallow copy construction and copy by assinment!
+    CheckFogVolume(const CheckFogVolume&);// not implemented
+    CheckFogVolume& operator=(const CheckFogVolume&);// not implemented
+
+    // Memeber data
+    Diagnose<GridType> mDiagnose;
+};// CheckFogVolume
+
+template<class GridType>
+std::string
+checkFogVolume(const GridType& grid, size_t n)
+{
+    CheckFogVolume<GridType> c(grid);
+    return c.check(n, false);
+}
 
 
 ////////////////////////////////////////////////////////////////////////////////

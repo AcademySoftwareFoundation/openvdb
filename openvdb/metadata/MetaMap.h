@@ -120,6 +120,11 @@ public:
     /// Return a string describing this metadata map.  Prefix each line with @a indent.
     std::string str(const std::string& indent = "") const;
 
+    /// Return @c true if the given map is equivalent to this map.
+    bool operator==(const MetaMap& other) const;
+    /// Return @c true if the given map is different from this map.
+    bool operator!=(const MetaMap& other) const { return !(*this == other); }
+
 private:
     /// @brief Return a pointer to TypedMetadata with the given template parameter.
     /// @throw LookupError if no field with the given name is found.

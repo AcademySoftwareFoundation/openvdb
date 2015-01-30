@@ -47,7 +47,7 @@ class SOP_OpenVDB_Read: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Read(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Read() {};
+    virtual ~SOP_OpenVDB_Read() {}
 
     virtual void getDescriptiveParmName(UT_String& s) const { s = "file_name"; }
 

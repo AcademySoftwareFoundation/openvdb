@@ -295,8 +295,8 @@ struct ISGradientNormSqrd<HJWENO5_BIAS>
             const Accessor& acc;
             GetValue(const Accessor& acc_): acc(acc_) {}
             // Return the grid value at ijk converted to simd::Float4::value_type (= float).
-            inline simd::Float4::value_type operator()(const Coord& ijk) {
-                return static_cast<simd::Float4::value_type>(acc.getValue(ijk));
+            inline simd::Float4::value_type operator()(const Coord& ijk_) {
+                return static_cast<simd::Float4::value_type>(acc.getValue(ijk_));
             }
         }
         valueAt(grid);

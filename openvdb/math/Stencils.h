@@ -1294,7 +1294,6 @@ private:
     const ValueType mInv2Dx, mInvDx2;
 }; // class GradStencil
 
-
 ////////////////////////////////////////
 
 

@@ -45,6 +45,7 @@ public:
     CPPUNIT_TEST(testCopyConstructor);
     CPPUNIT_TEST(testCopyConstructorEmpty);
     CPPUNIT_TEST(testAssignment);
+    CPPUNIT_TEST(testEquality);
     CPPUNIT_TEST_SUITE_END();
 
     void testInsert();
@@ -55,6 +56,7 @@ public:
     void testCopyConstructor();
     void testCopyConstructorEmpty();
     void testAssignment();
+    void testEquality();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestMetaMap);
@@ -153,7 +155,7 @@ TestMetaMap::testGetMetadata()
     //CPPUNIT_ASSERT(dm->value() == 2.0);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0,cdm->value(),0);
 
-    CPPUNIT_ASSERT(meta.getMetadata<StringMetadata>("meta2") == NULL);
+    CPPUNIT_ASSERT(!meta.getMetadata<StringMetadata>("meta2"));
 
     CPPUNIT_ASSERT_THROW(meta.metaValue<int32_t>("meta3"),
                          openvdb::TypeError);
@@ -310,6 +312,57 @@ TestMetaMap::testAssignment()
     meta.insertMeta("meta1", StringMetadata("changed"));
     std::string str = meta.metaValue<std::string>("meta1");
     CPPUNIT_ASSERT_EQUAL(std::string("testing"), meta2.metaValue<std::string>("meta1"));
+}
+
+
+void
+TestMetaMap::testEquality()
+{
+    using namespace openvdb;
+
+    // Populate a map with data.
+    MetaMap meta;
+    meta.insertMeta("meta1", StringMetadata("testing"));
+    meta.insertMeta("meta2", Int32Metadata(20));
+    meta.insertMeta("meta3", FloatMetadata(3.14159f));
+
+    // Create an empty map.
+    MetaMap meta2;
+
+    // Verify that the two maps differ.
+    CPPUNIT_ASSERT(meta != meta2);
+    CPPUNIT_ASSERT(meta2 != meta);
+
+    // Copy the first map to the second.
+    meta2 = meta;
+
+    // Verify that the two maps are equivalent.
+    CPPUNIT_ASSERT(meta == meta2);
+    CPPUNIT_ASSERT(meta2 == meta);
+
+    // Modify the first map.
+    meta.removeMeta("meta1");
+    meta.insertMeta("abc", DoubleMetadata(2.0));
+
+    // Verify that the two maps differ.
+    CPPUNIT_ASSERT(meta != meta2);
+    CPPUNIT_ASSERT(meta2 != meta);
+
+    // Modify the second map and verify that the two maps differ.
+    meta2 = meta;
+    meta2.insertMeta("meta2", Int32Metadata(42));
+    CPPUNIT_ASSERT(meta != meta2);
+    CPPUNIT_ASSERT(meta2 != meta);
+
+    meta2 = meta;
+    meta2.insertMeta("meta3", FloatMetadata(2.0001f));
+    CPPUNIT_ASSERT(meta != meta2);
+    CPPUNIT_ASSERT(meta2 != meta);
+
+    meta2 = meta;
+    meta2.insertMeta("abc", DoubleMetadata(2.0001));
+    CPPUNIT_ASSERT(meta != meta2);
+    CPPUNIT_ASSERT(meta2 != meta);
 }
 
 // Copyright (c) 2012-2014 DreamWorks Animation LLC

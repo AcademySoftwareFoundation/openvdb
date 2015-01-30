@@ -853,7 +853,7 @@ mergeVoxels(LeafType& leaf, const Coord& start, int dim, int regionId)
     for (ijk[0] = start[0]; ijk[0] < end[0]; ++ijk[0]) {
         for (ijk[1] = start[1]; ijk[1] < end[1]; ++ijk[1]) {
             for (ijk[2] = start[2]; ijk[2] < end[2]; ++ijk[2]) {
-                if(leaf.isValueOn(ijk)) leaf.setValue(ijk, regionId);
+                leaf.setValueOnly(ijk, regionId);
             }
         }
     }
@@ -864,7 +864,7 @@ mergeVoxels(LeafType& leaf, const Coord& start, int dim, int regionId)
 // thinking that it is a constructor.
 template <class LeafType>
 inline bool
-isMergeable(LeafType& leaf, const Coord& start, int dim,
+isMergable(LeafType& leaf, const Coord& start, int dim,
     typename LeafType::ValueType::value_type adaptivity)
 {
     if (adaptivity < 1e-6) return false;
@@ -2081,10 +2081,11 @@ private:
 
     const math::Transform* mTransform;
     const FloatGridT* mAdaptivityGrid;
-    const BoolTreeT* mMask;
+    const BoolTreeT* mAdaptivityMask;
 
     const Int16TreeT* mRefSignTree;
 };
+
 
 template <typename TreeT, typename LeafManagerT>
 MergeVoxelRegions<TreeT, LeafManagerT>::MergeVoxelRegions(
@@ -2101,7 +2102,7 @@ MergeVoxelRegions<TreeT, LeafManagerT>::MergeVoxelRegions(
     , mInternalAdaptivity(adaptivity)
     , mTransform(NULL)
     , mAdaptivityGrid(NULL)
-    , mMask(NULL)
+    , mAdaptivityMask(NULL)
     , mRefSignTree(NULL)
 {
 }
@@ -2130,7 +2131,7 @@ template <typename TreeT, typename LeafManagerT>
 void
 MergeVoxelRegions<TreeT, LeafManagerT>::setAdaptivityMask(const BoolTreeT* mask)
 {
-    mMask = mask;
+    mAdaptivityMask = mask;
 }
 
 template <typename TreeT, typename LeafManagerT>
@@ -2173,24 +2174,23 @@ MergeVoxelRegions<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size
 
     typedef typename tree::ValueAccessor<const BoolTreeT> BoolTreeCAccessorT;
     boost::scoped_ptr<BoolTreeCAccessorT> maskAcc;
-    if (mMask) {
-        maskAcc.reset(new BoolTreeCAccessorT(*mMask));
+    if (mAdaptivityMask) {
+        maskAcc.reset(new BoolTreeCAccessorT(*mAdaptivityMask));
     }
 
-    // Allocate reusable leaf buffers
+
     BoolLeafT mask;
-    Vec3LeafT gradientBuffer;
-    Coord ijk, nijk, coord, end;
+    Vec3LeafT gradients;
+    Coord ijk, end;
 
     for (size_t n = range.begin(); n != range.end(); ++n) {
 
+        mask.setValuesOff();
+
         const Coord& origin = mSignLeafs.leaf(n).origin();
 
-        ValueT adaptivity = mSurfaceAdaptivity;
-
-        if (refAcc && refAcc->probeConstLeaf(origin) == NULL) {
-            adaptivity = mInternalAdaptivity;
-        }
+        ValueT adaptivity = (refAcc && !refAcc->probeConstLeaf(origin)) ?
+            mInternalAdaptivity : mSurfaceAdaptivity;
 
         IntLeafT& idxLeaf = *idxAcc.probeLeaf(origin);
 
@@ -2198,26 +2198,19 @@ MergeVoxelRegions<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size
         end[1] = origin[1] + LeafDim;
         end[2] = origin[2] + LeafDim;
 
-        mask.setValuesOff();
-
         // Mask off seam line adjacent voxels
         if (maskAcc) {
             const BoolLeafT* maskLeaf = maskAcc->probeConstLeaf(origin);
             if (maskLeaf != NULL) {
                 typename BoolLeafT::ValueOnCIter it;
                 for (it = maskLeaf->cbeginValueOn(); it; ++it) {
-                    ijk = it.getCoord();
-                    coord[0] = ijk[0] - (ijk[0] % 2);
-                    coord[1] = ijk[1] - (ijk[1] % 2);
-                    coord[2] = ijk[2] - (ijk[2] % 2);
-                    mask.setActiveState(coord, true);
+                    mask.setActiveState(it.getCoord() & ~1u, true);
                 }
             }
         }
 
-
+        // Set region adaptivity
         LeafT adaptivityLeaf(origin, adaptivity);
-
         if (mAdaptivityGrid) {
             for (Index offset = 0; offset < LeafT::NUM_VALUES; ++offset) {
                 ijk = adaptivityLeaf.offsetToGlobalCoord(offset);
@@ -2230,37 +2223,18 @@ MergeVoxelRegions<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size
 
         // Mask off ambiguous voxels
         for (iter = mSignLeafs.leaf(n).cbeginValueOn(); iter; ++iter) {
-            ijk = iter.getCoord();
-            coord[0] = ijk[0] - (ijk[0] % 2);
-            coord[1] = ijk[1] - (ijk[1] % 2);
-            coord[2] = ijk[2] - (ijk[2] % 2);
-            if(mask.isValueOn(coord)) continue;
-
-
-
-            int flags = int(iter.getValue());
-            unsigned char signs = uint8_t(SIGNS & flags);
-            if ((flags & SEAM) || !sAdaptable[signs] || sEdgeGroupTable[signs][0] > 1) {
-                mask.setActiveState(coord, true);
-                continue;
-            }
-
-            for (int i = 0; i < 26; ++i) {
-                nijk = ijk + util::COORD_OFFSETS[i];
-                signs = uint8_t(SIGNS & mSignAcc.getValue(nijk));
-                if (!sAdaptable[signs] || sEdgeGroupTable[signs][0] > 1) {
-                    mask.setActiveState(coord, true);
-                    break;
-                }
+            unsigned char signs = static_cast<unsigned char>(SIGNS & int(iter.getValue()));
+            if (!sAdaptable[signs] || sEdgeGroupTable[signs][0] > 1) {
+                mask.setActiveState(iter.getCoord() & ~1u, true);
             }
         }
 
-        int dim = 2;
         // Mask off topologically ambiguous 2x2x2 voxel sub-blocks
+        int dim = 2;
         for (ijk[0] = origin[0]; ijk[0] < end[0]; ijk[0] += dim) {
             for (ijk[1] = origin[1]; ijk[1] < end[1]; ijk[1] += dim) {
                 for (ijk[2] = origin[2]; ijk[2] < end[2]; ijk[2] += dim) {
-                    if (isNonManifold(mDistAcc, ijk, mIsovalue, dim)) {
+                    if (!mask.isValueOn(ijk) & isNonManifold(mDistAcc, ijk, mIsovalue, dim)) {
                         mask.setActiveState(ijk, true);
                     }
                 }
@@ -2268,73 +2242,35 @@ MergeVoxelRegions<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size
         }
 
         // Compute the gradient for the remaining voxels
-        gradientBuffer.setValuesOff();
+        gradients.setValuesOff();
         for (iter = mSignLeafs.leaf(n).cbeginValueOn(); iter; ++iter) {
-
             ijk = iter.getCoord();
-            coord[0] = ijk[0] - (ijk[0] % dim);
-            coord[1] = ijk[1] - (ijk[1] % dim);
-            coord[2] = ijk[2] - (ijk[2] % dim);
-            if(mask.isValueOn(coord)) continue;
-
-            Vec3T norm(math::ISGradient<math::CD_2ND>::result(mDistAcc, ijk));
-            // Normalize (Vec3's normalize uses isApproxEqual, which uses abs and does more work)
-            ValueT length = norm.length();
-            if (length > ValueT(1.0e-7)) {
-                norm *= ValueT(1.0) / length;
-            }
-            gradientBuffer.setValue(ijk, norm);
-        }
-
-        int regionId = 1, next_dim = dim << 1;
-
-        // Process the first adaptivity level.
-        for (ijk[0] = 0; ijk[0] < LeafDim; ijk[0] += dim) {
-            coord[0] = ijk[0] - (ijk[0] % next_dim);
-            for (ijk[1] = 0; ijk[1] < LeafDim; ijk[1] += dim) {
-                coord[1] = ijk[1] - (ijk[1] % next_dim);
-                for (ijk[2] = 0; ijk[2] < LeafDim; ijk[2] += dim) {
-                    coord[2] = ijk[2] - (ijk[2] % next_dim);
-                    adaptivity = adaptivityLeaf.getValue(ijk);
-                    if (mask.isValueOn(ijk)
-                        || !isMergeable(gradientBuffer, ijk, dim, adaptivity))
-                    {
-                        mask.setActiveState(coord, true);
-                        continue;
-                    }
-                    mergeVoxels(idxLeaf, ijk, dim, regionId++);
-                }
+            if(!mask.isValueOn(ijk & ~1u)) {
+                Vec3T dir(math::ISGradient<math::CD_2ND>::result(mDistAcc, ijk));
+                dir.normalize();
+                gradients.setValueOn(iter.pos(), dir);
             }
         }
 
-
-        // Process remaining adaptivity levels
-        for (dim = 4; dim < LeafDim; dim = dim << 1) {
-            next_dim = dim << 1;
-            coord[0] = ijk[0] - (ijk[0] % next_dim);
+        // Merge regions
+        int regionId = 1;
+        for ( ; dim <= LeafDim; dim = dim << 1) {
+            const unsigned coordMask = ~((dim << 1) - 1);
             for (ijk[0] = origin[0]; ijk[0] < end[0]; ijk[0] += dim) {
-                coord[1] = ijk[1] - (ijk[1] % next_dim);
                 for (ijk[1] = origin[1]; ijk[1] < end[1]; ijk[1] += dim) {
-                    coord[2] = ijk[2] - (ijk[2] % next_dim);
                     for (ijk[2] = origin[2]; ijk[2] < end[2]; ijk[2] += dim) {
+
                         adaptivity = adaptivityLeaf.getValue(ijk);
-                        if (mask.isValueOn(ijk) || isNonManifold(mDistAcc, ijk, mIsovalue, dim) ||
-                            !isMergeable(gradientBuffer, ijk, dim, adaptivity))
-                        {
-                            mask.setActiveState(coord, true);
-                            continue;
+
+                        if (mask.isValueOn(ijk) || isNonManifold(mDistAcc, ijk, mIsovalue, dim)
+                            || !isMergable(gradients, ijk, dim, adaptivity)) {
+                            mask.setActiveState(ijk & coordMask, true);
+                        } else {
+                            mergeVoxels(idxLeaf, ijk, dim, regionId++);
                         }
-                        mergeVoxels(idxLeaf, ijk, dim, regionId++);
                     }
                 }
             }
-        }
-
-        adaptivity = adaptivityLeaf.getValue(origin);
-        if (!(mask.isValueOn(origin) || isNonManifold(mDistAcc, origin, mIsovalue, LeafDim))
-            && isMergeable(gradientBuffer, origin, LeafDim, adaptivity))
-        {
-            mergeVoxels(idxLeaf, origin, LeafDim, regionId++);
         }
     }
 }

@@ -3,9 +3,48 @@
 @page changes Release Notes
 
 
+@htmlonly <a name="v3_1_0_changes"></a>@endhtmlonly
+@par
+<B>Version 3.1.0</B> - <I>In development</I>
+- Added @vdblink::tree::LeafNode::Buffer::data() LeafNode::Buffer::data@endlink,
+  which allows direct access to a leaf node&rsquo;s voxel value array.
+- Made various optimizations and improvements to the
+  @vdblink::tools::LevelSetMorphing level set morphing@endlink tool.
+- Added equality and inequality operators to
+  @vdblink::Metadata Metadata@endlink and @vdblink::MetaMap MetaMap@endlink.
+- Added a @vdblink::tools::CheckLevelSet CheckLevelSet@endlink tool that 
+  performs various tests on symmetric, narrow-band level sets to diagnose 
+  potential issues.
+- Added a @vdblink::tools::CheckFogVolume CheckFogVolume@endlink tool that 
+  performs various tests on fog volumes to diagnose potential issues.
+- Added NaN and inf checks to
+  @vdblink::tools::PointPartitioner PointPartitioner@endlink.
+- Fixed a build issue that could result in spurious &ldquo;Blosc encoding
+  is not supported&rdquo; errors unless @c OPENVDB_USE_BLOSC was
+  <TT>@#define</TT>d when compiling client code.
+
+@par
+API changes:
+- Refactored the @vdblink::tools::LevelSetAdvection level set advection@endlink,
+  @vdblink::tools::LevelSetFilter level set filtering@endlink,
+  @vdblink::tools::LevelSetMeasure level set measuring@endlink
+  and @vdblink::tools::LevelSetTracker level set tracking@endlink tools.
+- Extended the API of the @vdblink::tools::Diagnose Diagnose@endlink tool
+  and disabled copy construction.
+
+@par
+Houdini:
+- Added a Diagnostics SOP that performs validation tests on grids to 
+  detect potential issues. The tests are currently automated, but manual
+  selections will be added soon.
+- Redesigned the UI of the Visualize SOP and added toggles to draw with
+  or without color, to use the grid name as the attribute name for points
+  with values, and to attach grid index coordinates to points.
+
+
 @htmlonly <a name="v3_0_0_changes"></a>@endhtmlonly
 @par
-<B>Version 3.0.0</B> - <I>In development</I>
+<B>Version 3.0.0</B> - <I>January 14, 2014</I>
 - The @vdblink::io::File File@endlink class now supports delayed loading of
   <TT>.vdb</TT> files, meaning that memory is not allocated for voxel values
   until the values are actually accessed. (This feature is enabled by default.)
@@ -17,6 +56,9 @@
   The limit can be set to zero to disable copying, but if it cannot be
   guaranteed that a file will not be modified, then it is best not to enable
   delayed loading for that file.
+- <TT>.vdb</TT> files can now optionally be compressed with the Blosc&nbsp;LZ4
+  codec.  <A HREF="http://www.blosc.org/">Blosc</A> compresses almost as well
+  as ZLIB, but it is much faster.
 - Added @vdblink::tools::PointPartitioner PointPartitioner@endlink, a tool
   for fast spatial sorting of points stored in an external array, and
   @link PointIndexGrid.h PointIndexGrid@endlink, an acceleration structure
@@ -45,6 +87,10 @@
   LevelSetMorphing@endlink.
 - Fixed an intermittent crash in
   @vdblink::tools::LevelSetMorphing LevelSetMorphing@endlink.
+- Added @c tools::topologyToLevelSet(),
+  which generates a level set from the implicit boundary between active
+  and inactive voxels in an arbitrary input grid.
+  <I>[DWA internal]</I>
 - Improved the performance of point scattering (by orders of magnitude)
   and added a
   @vdblink::tools::DenseUniformPointScatter DenseUniformPointScatter@endlink
@@ -157,6 +203,8 @@
 - Fixed a bug in @vdblink::readString() readString@endlink related
   to empty strings.
   <I>[Contributed by Fabio&nbsp;Piparo]</I>
+- Fixed a bug in the @vdblink::tools::VolumeToMesh VolumeToMesh@endlink
+  simplification scheme that was creating visual artifacts.
 
 @par
 API changes:
@@ -254,7 +302,8 @@ Houdini:
   of which can be used to clip grids as they are read.  For large grids,
   clipping while reading can result in significantly lower memory usage
   than clipping after reading.
-
+- The From Polygons and Convert SOPs now default to using the polygon soup
+  mesh representation, which uses less memory.
 
 @htmlonly <a name="v2_3_0_changes"></a>@endhtmlonly
 @par

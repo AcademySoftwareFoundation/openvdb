@@ -94,7 +94,7 @@ class SOP_OpenVDB_Convert: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Convert(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Convert() {};
+    virtual ~SOP_OpenVDB_Convert() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
@@ -1085,7 +1085,7 @@ SOP_OpenVDB_Convert::referenceMeshing(
     if (!boss.wasInterrupted() && computeNormals) {
 
         UTparallelFor(GA_SplittableRange(gdp->getPrimitiveRange()),
-            hvdb::VertexNormalOp(*gdp, interiorGroup, (transferAttributes ? -1.0 : 0.7) ));
+            hvdb::VertexNormalOp(*gdp, interiorGroup, (transferAttributes ? -1.0f : 0.7f) ));
 
         if (!interiorGroup) {
             addWarning(SOP_MESSAGE, "More accurate vertex normals can be generated "

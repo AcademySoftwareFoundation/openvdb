@@ -140,7 +140,7 @@ INCLDIRS := \
 
 CXXFLAGS += -pthread $(OPTIMIZE) $(INCLDIRS)
 ifeq (2,$(strip $(abi)))
-	CXXFLAGS += -DOPENVDB_2_ABI_COMPATIBLE
+    CXXFLAGS += -DOPENVDB_2_ABI_COMPATIBLE
 endif
 # From $(MAYA_LOCATION)/devkit/plug-ins/buildconfig:
 CXXFLAGS += \
@@ -173,13 +173,13 @@ ifdef LINUX
     endif
 endif
 ifdef MBSD
-	# Darwin ld treats undefined symbols as errors by default;
-	# change to runtime resolution, like Linux.
+    # Darwin ld treats undefined symbols as errors by default;
+    # change to runtime resolution, like Linux.
     CXXFLAGS += -undefined dynamic_lookup
 endif
 
 MAYA_LIBS := \
-	-lOpenMayaFX \
+    -lOpenMayaFX \
     -lOpenMaya \
     -lFoundation \
 #

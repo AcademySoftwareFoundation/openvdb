@@ -78,7 +78,6 @@ Camera::Camera()
     , mNeedsDisplay(true)
     , mMouseXPos(0.0)
     , mMouseYPos(0.0)
-    , mWheelPos(0)
 #if GLFW_VERSION_MAJOR >= 3
     , mWindow(NULL)
 #endif

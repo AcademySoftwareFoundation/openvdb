@@ -110,13 +110,41 @@ template<typename T>
 struct RealToHalf {
     enum { isReal = false }; // unless otherwise specified, type T is not a floating-point type
     typedef T HalfT; // type T's half float analogue is T itself
+    static HalfT convert(const T& val) { return val; }
 };
-template<> struct RealToHalf<float>  { enum { isReal = true }; typedef half  HalfT; };
-template<> struct RealToHalf<double> { enum { isReal = true }; typedef half  HalfT; };
-template<> struct RealToHalf<Vec2s>  { enum { isReal = true }; typedef Vec2H HalfT; };
-template<> struct RealToHalf<Vec2d>  { enum { isReal = true }; typedef Vec2H HalfT; };
-template<> struct RealToHalf<Vec3s>  { enum { isReal = true }; typedef Vec3H HalfT; };
-template<> struct RealToHalf<Vec3d>  { enum { isReal = true }; typedef Vec3H HalfT; };
+template<> struct RealToHalf<float> {
+    enum { isReal = true };
+    typedef half HalfT;
+    static HalfT convert(float val) { return HalfT(val); }
+};
+template<> struct RealToHalf<double> {
+    enum { isReal = true };
+    typedef half HalfT;
+    // A half can only be constructed from a float, so cast the value to a float first.
+    static HalfT convert(double val) { return HalfT(float(val)); }
+};
+template<> struct RealToHalf<Vec2s> {
+    enum { isReal = true };
+    typedef Vec2H HalfT;
+    static HalfT convert(const Vec2s& val) { return HalfT(val); }
+};
+template<> struct RealToHalf<Vec2d> {
+    enum { isReal = true };
+    typedef Vec2H HalfT;
+    // A half can only be constructed from a float, so cast the vector's elements to floats first.
+    static HalfT convert(const Vec2d& val) { return HalfT(Vec2s(val)); }
+};
+template<> struct RealToHalf<Vec3s> {
+    enum { isReal = true };
+    typedef Vec3H HalfT;
+    static HalfT convert(const Vec3s& val) { return HalfT(val); }
+};
+template<> struct RealToHalf<Vec3d> {
+    enum { isReal = true };
+    typedef Vec3H HalfT;
+    // A half can only be constructed from a float, so cast the vector's elements to floats first.
+    static HalfT convert(const Vec3d& val) { return HalfT(Vec3s(val)); }
+};
 
 
 /// Return the given value truncated to 16-bit float precision.
@@ -124,7 +152,7 @@ template<typename T>
 inline T
 truncateRealToHalf(const T& val)
 {
-    return T(typename RealToHalf<T>::HalfT(val));
+    return T(RealToHalf<T>::convert(val));
 }
 
 
@@ -151,11 +179,7 @@ inline void
 readData(std::istream& is, T* data, Index count, uint32_t compression)
 {
     if (compression & COMPRESS_BLOSC) {
-#ifdef OPENVDB_USE_BLOSC
         bloscFromStream(is, reinterpret_cast<char*>(data), sizeof(T) * count);
-#else
-        OPENVDB_THROW(IoError, "Blosc decoding is not supported");
-#endif
     } else if (compression & COMPRESS_ZIP) {
         unzipFromStream(is, reinterpret_cast<char*>(data), sizeof(T) * count);
     } else {
@@ -221,11 +245,7 @@ inline void
 writeData(std::ostream &os, const T *data, Index count, uint32_t compression)
 {
     if (compression & COMPRESS_BLOSC) {
-#ifdef OPENVDB_USE_BLOSC
         bloscToStream(os, reinterpret_cast<const char*>(data), sizeof(T), count);
-#else
-        OPENVDB_THROW(IoError, "Blosc encoding is not supported");
-#endif
     } else if (compression & COMPRESS_ZIP) {
         zipToStream(os, reinterpret_cast<const char*>(data), sizeof(T) * count);
     } else {
@@ -267,7 +287,7 @@ struct HalfWriter</*IsReal=*/true, T> {
         if (count < 1) return;
         // Convert full float values to half float, then output the half float array.
         std::vector<HalfT> halfData(count);
-        for (Index i = 0; i < count; ++i) halfData[i] = static_cast<HalfT>(data[i]);
+        for (Index i = 0; i < count; ++i) halfData[i] = RealToHalf<T>::convert(data[i]);
         writeData<HalfT>(os, reinterpret_cast<const HalfT*>(&halfData[0]), count, compression);
     }
 };
@@ -282,7 +302,7 @@ struct HalfWriter</*IsReal=*/true, double> {
         if (count < 1) return;
         // Convert full float values to half float, then output the half float array.
         std::vector<HalfT> halfData(count);
-        for (Index i = 0; i < count; ++i) halfData[i] = float(data[i]);
+        for (Index i = 0; i < count; ++i) halfData[i] = RealToHalf<double>::convert(data[i]);
         writeData<HalfT>(os, reinterpret_cast<const HalfT*>(&halfData[0]), count, compression);
     }
 };

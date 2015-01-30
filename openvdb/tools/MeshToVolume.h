@@ -295,8 +295,8 @@ public:
         //@{
         /// Required by several of the tree nodes
         /// @note These methods don't perform meaningful operations.
-        bool operator< (const EdgeData&) const { return false; };
-        bool operator> (const EdgeData&) const { return false; };
+        bool operator< (const EdgeData&) const { return false; }
+        bool operator> (const EdgeData&) const { return false; }
         template<class T> EdgeData operator+(const T&) const { return *this; }
         template<class T> EdgeData operator-(const T&) const { return *this; }
         EdgeData operator-() const { return *this; }
@@ -2522,8 +2522,9 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
     // Renormalize distances to smooth out bumps caused by self-intersecting
     // and overlapping portions of the mesh and renormalize the level set.
     if (!unsignedDistField && !rawData) {
-        
-        tools::pruneLevelSet(mDistGrid->tree());
+
+        tools::pruneLevelSet(mDistGrid->tree(), exBandWidth, -inBandWidth);
+
         tree::LeafManager<FloatTreeT> leafs(mDistGrid->tree(), 1);
 
         const FloatValueT offset = FloatValueT(0.8 * voxelSize);
@@ -2557,8 +2558,8 @@ MeshToVolume<FloatGridT, InterruptT>::doConvert(
         tree::LeafManager<FloatTreeT> leafs(mDistGrid->tree());
         leafs.foreach(internal::TrimOp<FloatValueT>(
             exBandWidth, unsignedDistField ? exBandWidth : inBandWidth));
-        
-        tools::pruneLevelSet(mDistGrid->tree(), exBandWidth, -inBandWidth);
+
+        tools::pruneLevelSet(mDistGrid->tree(), exBandWidth, unsignedDistField ? -exBandWidth : -inBandWidth);
     }
 }
 

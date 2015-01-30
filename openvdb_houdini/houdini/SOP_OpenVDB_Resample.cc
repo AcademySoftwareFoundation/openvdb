@@ -59,7 +59,7 @@ public:
     enum { MODE_PARMS = 0, MODE_REF_GRID, MODE_VOXEL_SIZE, MODE_VOXEL_SCALE };
 
     SOP_OpenVDB_Resample(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Resample() {};
+    virtual ~SOP_OpenVDB_Resample() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 

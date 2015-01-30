@@ -108,7 +108,7 @@ public:
     //@{
     /// @return true if this Hermite object has intersection data
     /// for the corresponding edge.
-    bool hasOffsetX() const { return mXNormal; };
+    bool hasOffsetX() const { return mXNormal; }
     bool hasOffsetY() const { return mYNormal; }
     bool hasOffsetZ() const { return MASK_ZFLAG & mData; }
     //@}
@@ -162,8 +162,8 @@ public:
     //@{
     /// Operators required by OpenVDB.
     /// @note These methods don't perform meaningful operations on Hermite data.
-    bool operator< (const Hermite&) const { return false; };
-    bool operator> (const Hermite&) const { return false; };
+    bool operator< (const Hermite&) const { return false; }
+    bool operator> (const Hermite&) const { return false; }
     template<class T> Hermite operator+(const T&) const { return *this; }
     template<class T> Hermite operator-(const T&) const { return *this; }
     //@}

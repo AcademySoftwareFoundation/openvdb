@@ -75,6 +75,15 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace io {
 
+#ifdef OPENVDB_USE_BLOSC
+const uint32_t Archive::DEFAULT_COMPRESSION_FLAGS = (COMPRESS_BLOSC | COMPRESS_ACTIVE_MASK);
+#else
+const uint32_t Archive::DEFAULT_COMPRESSION_FLAGS = (COMPRESS_ZIP | COMPRESS_ACTIVE_MASK);
+#endif
+
+
+namespace {
+
 // Indices into a stream's internal extensible array of values used by readers and writers
 struct StreamState
 {
@@ -99,12 +108,6 @@ sStreamState;
 
 const long StreamState::MAGIC_NUMBER =
     long((uint64_t(OPENVDB_MAGIC) << 32) | (uint64_t(OPENVDB_MAGIC)));
-
-#ifdef OPENVDB_USE_BLOSC
-const uint32_t Archive::DEFAULT_COMPRESSION_FLAGS = (COMPRESS_BLOSC | COMPRESS_ACTIVE_MASK);
-#else
-const uint32_t Archive::DEFAULT_COMPRESSION_FLAGS = (COMPRESS_ZIP | COMPRESS_ACTIVE_MASK);
-#endif
 
 
 ////////////////////////////////////////
@@ -178,6 +181,8 @@ StreamState::~StreamState()
     std::cout.iword(magicNumber) = 0;
     std::cout.pword(magicNumber) = NULL;
 }
+
+} // unnamed namespace
 
 
 ////////////////////////////////////////

@@ -352,7 +352,7 @@ TestMeshToVolume::testConversion()
     points.push_back(Vec3s(5, 2, 2)); // 1      /|       /|
     points.push_back(Vec3s(2, 5, 2)); // 2     2--------3 |
     points.push_back(Vec3s(5, 5, 2)); // 3     | |      | |
-    points.push_back(Vec3s(2, 2, 5)); // 4     | 4----- |-5
+    points.push_back(Vec3s(2, 2, 5)); // 4     | 4------|-5
     points.push_back(Vec3s(5, 2, 5)); // 5     |/       |/
     points.push_back(Vec3s(2, 5, 5)); // 6     0--------1
     points.push_back(Vec3s(5, 5, 5)); // 7
@@ -368,7 +368,7 @@ TestMeshToVolume::testConversion()
     FloatGrid::Ptr grid = tools::meshToLevelSet<FloatGrid>(
         *math::Transform::createLinearTransform(), points, quads);
 
-    //io::File("/tmp/cube.vdb").write(GridPtrVec(1, grid));
+    //io::File("testConversion.vdb").write(GridPtrVec(1, grid));
 
     CPPUNIT_ASSERT(grid.get() != NULL);
     CPPUNIT_ASSERT_EQUAL(int(GRID_LEVEL_SET), int(grid->getGridClass()));

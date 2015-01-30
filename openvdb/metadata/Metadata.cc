@@ -139,6 +139,27 @@ Metadata::clearRegistry()
 ////////////////////////////////////////
 
 
+bool
+Metadata::operator==(const Metadata& other) const
+{
+    if (other.size() != this->size()) return false;
+    if (other.typeName() != this->typeName()) return false;
+
+    std::ostringstream
+        bytes(std::ios_base::binary),
+        otherBytes(std::ios_base::binary);
+    try {
+        this->writeValue(bytes);
+        other.writeValue(otherBytes);
+        return (bytes.str() == otherBytes.str());
+    } catch (Exception&) {}
+    return false;
+}
+
+
+////////////////////////////////////////
+
+
 void
 UnknownMetadata::readValue(std::istream& is, Index32 numBytes)
 {

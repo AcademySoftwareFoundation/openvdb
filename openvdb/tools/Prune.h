@@ -37,7 +37,6 @@
 #ifndef OPENVDB_TOOLS_PRUNE_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_PRUNE_HAS_BEEN_INCLUDED
 
-#include <boost/utility/enable_if.hpp>
 #include <openvdb/math/Math.h> // for isNegative and negative
 #include <openvdb/Types.h> // for Index typedef
 #include <boost/static_assert.hpp>
@@ -175,7 +174,7 @@ public:
     }
 
     // Nothing to do at the leaf node level
-    void operator()(LeafT& node) const {;}
+    void operator()(LeafT&) const {}
     // Prune the child nodes of the internal nodes
     template<typename NodeT>
     void operator()(NodeT& node) const
@@ -215,7 +214,7 @@ public:
     }
 
     // Nothing to do at the leaf node level
-    void operator()(LeafT& node) const {;}
+    void operator()(LeafT&) const {}
     // Prune the child nodes of the internal nodes
     template<typename NodeT>
     void operator()(NodeT& node) const
@@ -278,7 +277,7 @@ public:
         tree.clearAllAccessors();//clear cache of nodes that could be pruned
     }
     // Nothing to do at the leaf node level
-    void operator()(LeafT& node) const {;}
+    void operator()(LeafT&) const {}
     // Prune the child nodes of the internal nodes
     template<typename NodeT>
     void operator()(NodeT& node) const
