@@ -306,6 +306,7 @@ INCLUDE_NAMES := \
     io/Stream.h \
     io/TempFile.h \
     math/BBox.h \
+    math/ConjGradient.h \
     math/Coord.h \
     math/DDA.h \
     math/FiniteDifference.h \
@@ -361,6 +362,7 @@ INCLUDE_NAMES := \
     tools/PointIndexGrid.h \
     tools/PointPartitioner.h \
     tools/PointScatter.h \
+    tools/PoissonSolver.h \
     tools/Prune.h \
     tools/RayIntersector.h \
     tools/RayTracer.h \
@@ -422,6 +424,7 @@ UNITTEST_INCLUDE_NAMES := \
 UNITTEST_SRC_NAMES := \
     unittest/main.cc \
     unittest/TestBBox.cc \
+    unittest/TestConjGradient.cc \
     unittest/TestCoord.cc \
     unittest/TestCpt.cc \
     unittest/TestCurl.cc \
@@ -466,6 +469,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestParticlesToLevelSet.cc \
     unittest/TestPointIndexGrid.cc \
     unittest/TestPointPartitioner.cc \
+    unittest/TestPoissonSolver.cc \
     unittest/TestPrePostAPI.cc \
     unittest/TestQuadraticInterp.cc \
     unittest/TestQuantizedUnitVec.cc \

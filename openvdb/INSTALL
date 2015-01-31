@@ -8,7 +8,7 @@ Requirements
 
 - GNU gmake (www.gnu.org/software/make/), version 3.81 or later
 
-- Boost (www.boost.org), version 1.42.0 or later
+- Boost (www.boost.org), version 1.46.0 or later
   (Linux: yum install boost-devel; OS X: port install boost +python26)
 
 - libz (zlib.net)
@@ -25,7 +25,7 @@ Other compilers or versions might work but have not been tested.
 
 Optional:
 
-- Doxygen 1.8 (www.stack.nl/~dimitri/doxygen/), for documentation
+- Doxygen 1.8.7 (www.stack.nl/~dimitri/doxygen/), for documentation
 
 - CppUnit (www.freedesktop.org/wiki/Software/cppunit), version 1.10 or later
   (Linux: yum install cppunit-devel)
