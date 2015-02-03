@@ -23,10 +23,10 @@ PROJECT_NAME           = OpenVDB
 # This could be handy for archiving the generated documentation or 
 # if some version control system is used.
 
-PROJECT_NUMBER         = 3.1.0
+PROJECT_NUMBER         = 3.0.0
 
-ALIASES += vdbnamespace="openvdb::v3_1_0"
-PREDEFINED = OPENVDB_VERSION_NAME=v3_1_0
+ALIASES += vdbnamespace="openvdb::v3_0_0"
+PREDEFINED = OPENVDB_VERSION_NAME=v3_0_0
 
 PREDEFINED += __declspec(x):= __attribute__(x):=
 #EXPAND_AS_DEFINED = \
@@ -42,7 +42,7 @@ PREDEFINED += __declspec(x):= __attribute__(x):=
 # If a relative path is entered, it will be relative to the location 
 # where doxygen was started. If left blank the current directory will be used.
 
-OUTPUT_DIRECTORY       = obj/doc
+OUTPUT_DIRECTORY       = C:/libs/openvdb-repository/msvc2013-x64/build/installation/docs
 
 # If the CREATE_SUBDIRS tag is set to YES, then doxygen will create 
 # 4096 sub-directories (in 2 levels) under the output directory of each output 
@@ -456,22 +456,7 @@ WARN_LOGFILE           =
 # directories like "/usr/src/myproject". Separate the files or directories 
 # with spaces.
 
-INPUT                  = . \
-                         io \
-                         math \
-                         metadata \
-                         python/pyopenvdb.h \
-                         tools \
-                         tree \
-                         util \
-                         doc/doc.txt \
-                         doc/faq.txt \
-                         doc/math.txt \
-                         doc/changes.txt \
-                         doc/codingstyle.txt \
-                         doc/api_0_98_0.txt \
-                         doc/examplecode.txt \
-                         doc/python.txt
+INPUT                 = C:/libs/openvdb-repository/source/openvdb    C:/libs/openvdb-repository/source/openvdb/io  C:/libs/openvdb-repository/source/openvdb/math   C:/libs/openvdb-repository/source/openvdb/metadata  C:/libs/openvdb-repository/source/openvdb/python/pyopenvdb.h  C:/libs/openvdb-repository/source/openvdb/tools  C:/libs/openvdb-repository/source/openvdb/tree   C:/libs/openvdb-repository/source/openvdb/util   C:/libs/openvdb-repository/source/openvdb/doc/doc.txt   C:/libs/openvdb-repository/source/openvdb/doc/faq.txt   C:/libs/openvdb-repository/source/openvdb/doc/math.txt  C:/libs/openvdb-repository/source/openvdb/doc/changes.txt   C:/libs/openvdb-repository/source/openvdb/doc/codingstyle.txt   C:/libs/openvdb-repository/source/openvdb/doc/api_0_98_0.txt   C:/libs/openvdb-repository/source/openvdb/doc/examplecode.txt   C:/libs/openvdb-repository/source/openvdb/doc/python.txt
 
 # If the value of the INPUT tag contains directories, you can use the 
 # FILE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp 
