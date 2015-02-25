@@ -58,7 +58,7 @@ public:
     /// Constructor with one argument, e.g.   Vec4f v(0);
     explicit Vec4(T val) { this->mm[0] = this->mm[1] = this->mm[2] = this->mm[3] = val; }
 
-    /// Constructor with three arguments, e.g.   Vec4f v(1,2,3);
+	/// Constructor with four arguments, e.g.   Vec4f v(1,2,3,4);
     Vec4(T x, T y, T z, T w)
     {
         this->mm[0] = x;
