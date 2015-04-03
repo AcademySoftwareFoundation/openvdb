@@ -145,9 +145,10 @@ struct FixedPositionAttributeCodec
 };
 
 
+template <typename IntType>
 struct UnitVecAttributeCodec
 {
-    typedef uint16_t StorageType;
+    typedef IntType StorageType;
     template<typename T> static void decode(const StorageType&, math::Vec3<T>&);
     template<typename T> static void encode(const math::Vec3<T>&, StorageType&);
     static const char* name() { return "uvec"; }
@@ -647,16 +648,18 @@ FixedPointAttributeCodec<IntType>::encode(const ValueType& val, StorageType& dat
 }
 
 
+template<>
 template<typename T>
 inline void
-UnitVecAttributeCodec::decode(const StorageType& data, math::Vec3<T>& val)
+UnitVecAttributeCodec<uint16_t>::decode(const StorageType& data, math::Vec3<T>& val)
 {
     val = math::QuantizedUnitVec::unpack(data);
 }
 
 
+template<>
 template<typename T>
-inline void UnitVecAttributeCodec::encode(const math::Vec3<T>& val, StorageType& data)
+inline void UnitVecAttributeCodec<uint16_t>::encode(const math::Vec3<T>& val, StorageType& data)
 {
     data = math::QuantizedUnitVec::pack(val);
 }
