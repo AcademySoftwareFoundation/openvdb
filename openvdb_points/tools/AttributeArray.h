@@ -154,10 +154,11 @@ struct UnitVecAttributeCodec
 };
 
 
+template <typename FloatType, typename IntType>
 struct VecAttributeCodec
 {
-    struct StorageType { float magnitude; uint16_t direction;
-        static const char* typeNameAsString() { return "floatuint16"; }
+    struct StorageType { FloatType magnitude; IntType direction;
+        StorageType(): magnitude(0), direction(0) { }
     };
     template<typename T> static void decode(const StorageType&, math::Vec3<T>&);
     template<typename T> static void encode(const math::Vec3<T>&, StorageType&);
@@ -661,28 +662,30 @@ inline void UnitVecAttributeCodec::encode(const math::Vec3<T>& val, StorageType&
 }
 
 
+template<typename FloatType, typename IntType>
 template<typename T>
 inline void
-VecAttributeCodec::decode(const StorageType& data, math::Vec3<T>& val)
+VecAttributeCodec<FloatType, IntType>::decode(const StorageType& data, math::Vec3<T>& val)
 {
-    val = math::QuantizedUnitVec::unpack(data.direction);
+    UnitVecAttributeCodec<IntType>::template decode<T>(data.direction, val);
     val *= T(data.magnitude);
 }
 
 
+template<typename FloatType, typename IntType>
 template<typename T>
 inline void
-VecAttributeCodec::encode(const math::Vec3<T>& val, StorageType& data)
+VecAttributeCodec<FloatType, IntType>::encode(const math::Vec3<T>& val, StorageType& data)
 {
     const double d = val.length();
-    data.magnitude = static_cast<float>(d);
+    data.magnitude = static_cast<FloatType>(d);
 
     math::Vec3d dir = val;
     if (!math::isApproxEqual(d, 0.0, math::Tolerance<double>::value())) {
         dir *= 1.0 / d;
     }
 
-    data.direction = math::QuantizedUnitVec::pack(dir);
+    UnitVecAttributeCodec<IntType>::template encode<T>(dir, data.direction);
 }
 
 
@@ -1133,29 +1136,25 @@ TypedAttributeArray<ValueType_, Codec_>::isEqual(const AttributeArray& other) co
 
 } // namespace tools
 
+namespace attrstorage {
+typedef tools::VecAttributeCodec<float, uint16_t>::StorageType FloatUInt16;
+} // namespace attrstorage
 
 namespace math {
 
 template<> inline bool
-isExactlyEqual< tools::VecAttributeCodec::StorageType,
-                tools::VecAttributeCodec::StorageType>(const tools::VecAttributeCodec::StorageType& a,
-                                                            const tools::VecAttributeCodec::StorageType& b)
+isExactlyEqual< attrstorage::FloatUInt16, attrstorage::FloatUInt16>(
+                    const attrstorage::FloatUInt16& a, const attrstorage::FloatUInt16& b)
 {
     return a.magnitude == b.magnitude && a.direction == b.direction;
 }
 } // namespace math
 
-template<> inline tools::VecAttributeCodec::StorageType
-zeroVal<tools::VecAttributeCodec::StorageType>()
-{
-    tools::VecAttributeCodec::StorageType ret;
-    ret.magnitude = 0;
-    ret.direction = 0;
-    return ret;
-}
+template<> inline attrstorage::FloatUInt16
+zeroVal<attrstorage::FloatUInt16>() { return attrstorage::FloatUInt16(); }
 
-template<> inline const char* typeNameAsString<tools::VecAttributeCodec::StorageType>() {
-    return tools::VecAttributeCodec::StorageType::typeNameAsString();
+template<> inline const char* typeNameAsString<attrstorage::FloatUInt16>() {
+    return "floatuint16";
 }
 
 } // namespace OPENVDB_VERSION_NAME
