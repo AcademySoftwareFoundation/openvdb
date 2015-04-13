@@ -1137,10 +1137,19 @@ TypedAttributeArray<ValueType_, Codec_>::isEqual(const AttributeArray& other) co
 } // namespace tools
 
 namespace attrstorage {
+typedef tools::VecAttributeCodec<half, uint16_t>::StorageType HalfUInt16;
 typedef tools::VecAttributeCodec<float, uint16_t>::StorageType FloatUInt16;
+typedef tools::VecAttributeCodec<double, uint16_t>::StorageType DoubleUInt16;
 } // namespace attrstorage
 
 namespace math {
+
+template<> inline bool
+isExactlyEqual< attrstorage::HalfUInt16, attrstorage::HalfUInt16>(
+                    const attrstorage::HalfUInt16& a, const attrstorage::HalfUInt16& b)
+{
+    return a.magnitude == b.magnitude && a.direction == b.direction;
+}
 
 template<> inline bool
 isExactlyEqual< attrstorage::FloatUInt16, attrstorage::FloatUInt16>(
@@ -1148,13 +1157,30 @@ isExactlyEqual< attrstorage::FloatUInt16, attrstorage::FloatUInt16>(
 {
     return a.magnitude == b.magnitude && a.direction == b.direction;
 }
+
+template<> inline bool
+isExactlyEqual< attrstorage::DoubleUInt16, attrstorage::DoubleUInt16>(
+                    const attrstorage::DoubleUInt16& a, const attrstorage::DoubleUInt16& b)
+{
+    return a.magnitude == b.magnitude && a.direction == b.direction;
+}
 } // namespace math
 
+template<> inline attrstorage::HalfUInt16
+zeroVal<attrstorage::HalfUInt16>() { return attrstorage::HalfUInt16(); }
 template<> inline attrstorage::FloatUInt16
 zeroVal<attrstorage::FloatUInt16>() { return attrstorage::FloatUInt16(); }
+template<> inline attrstorage::DoubleUInt16
+zeroVal<attrstorage::DoubleUInt16>() { return attrstorage::DoubleUInt16(); }
 
+template<> inline const char* typeNameAsString<attrstorage::HalfUInt16>() {
+    return "halfuint16";
+}
 template<> inline const char* typeNameAsString<attrstorage::FloatUInt16>() {
     return "floatuint16";
+}
+template<> inline const char* typeNameAsString<attrstorage::DoubleUInt16>() {
+    return "doubleuint16";
 }
 
 } // namespace OPENVDB_VERSION_NAME
