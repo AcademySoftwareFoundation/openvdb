@@ -123,6 +123,7 @@ protected:
     /// the data. In certain cases where the geometry isn't being used elsewhere, the data can be
     /// explictly re-used to avoid the cost of a deep-copy when modifying the data. This method will
     /// insert the existing data into the gdp and update the gdp handle in the SOP.
+    /// (Disabled prior to H13)
     ///
     /// Reference counting of the Houdini VDB Primitive shared pointers ensures we cannot steal data
     /// in use elsewhere. If so, this method falls back to copying the shared pointer, effectively
@@ -134,11 +135,9 @@ protected:
     /// @note No attempt to call duplicateSource() or inputGeo() should be made after calling this
     /// method, as there will be no data on the input stream if isSourceStealable() returns true
     OP_ERROR duplicateSourceStealable(const unsigned index, OP_Context& context,
-                                      GU_Detail **pgdp, GU_DetailHandle& gdh, int clean=1,
-                                      GA_DataIdStrategy data_id_strategy = GA_DATA_ID_BUMP);
+                                      GU_Detail **pgdp, GU_DetailHandle& gdh, bool clean=true);
 
-    OP_ERROR duplicateSourceStealable(const unsigned index, OP_Context& context, int clean=1,
-                                      GA_DataIdStrategy data_id_strategy = GA_DATA_ID_BUMP);
+    OP_ERROR duplicateSourceStealable(const unsigned index, OP_Context& context, bool clean=true);
 
 private:
 
