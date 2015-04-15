@@ -40,11 +40,14 @@
 #include <GU/GU_Detail.h>
 #include <GU/GU_PrimPoly.h>
 #include <OP/OP_NodeInfoParms.h>
-#include <SOP/SOP_Cache.h> // for stealable
 #include <PRM/PRM_Parm.h>
 #include <PRM/PRM_Type.h>
 #include <UT/UT_InfoTree.h>
 #include <sstream>
+
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
+#include <SOP/SOP_Cache.h> // for stealable
+#endif
 
 namespace openvdb_houdini {
 
@@ -247,26 +250,19 @@ SOP_NodeVDB::isSourceStealable(const unsigned index, OP_Context& context) const
 
     return false;
 }
-#else
-SOP_NodeVDB::duplicateSourceStealable(const unsigned index, OP_Context& context,
-                                      GU_Detail **pgdp, GU_DetailHandle& gdh, bool clean)
-{
-    duplicateSource(index, context, *pgdp, clean);
-    unlockInput(index);
-    return error();
-}
-
-bool
-SOP_NodeVDB::isSourceStealable(const unsigned index, OP_Context& context) const
-{
-    return false;
-}
-#endif
 
 OP_ERROR
 SOP_NodeVDB::duplicateSourceStealable(const unsigned index, OP_Context& context, bool clean) {
     return this->duplicateSourceStealable(index, context, &gdp, myGdpHandle, clean);
 }
+#else
+OP_ERROR
+SOP_NodeVDB::duplicateSourceStealable(const unsigned index, OP_Context& context, bool clean) {
+    duplicateSource(index, context, gdp, clean);
+    unlockInput(index);
+    return error();
+}
+#endif
 
 ////////////////////////////////////////
 

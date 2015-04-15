@@ -43,6 +43,8 @@
 #include <UT/UT_DSOVersion.h>
 #endif
 
+#include <UT/UT_Version.h>
+
 class GU_Detail;
 
 namespace openvdb_houdini {
@@ -134,8 +136,10 @@ protected:
     ///
     /// @note No attempt to call duplicateSource() or inputGeo() should be made after calling this
     /// method, as there will be no data on the input stream if isSourceStealable() returns true
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
     OP_ERROR duplicateSourceStealable(const unsigned index, OP_Context& context,
                                       GU_Detail **pgdp, GU_DetailHandle& gdh, bool clean=true);
+#endif
 
     OP_ERROR duplicateSourceStealable(const unsigned index, OP_Context& context, bool clean=true);
 
@@ -150,7 +154,9 @@ private:
     ///
     /// @param index    the index of the input from which to perform this operation
     /// @param context  the current SOP context is used for cook time for network traversal
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
     bool isSourceStealable(const unsigned index, OP_Context& context) const;
+#endif
 };
 
 } // namespace openvdb_houdini
