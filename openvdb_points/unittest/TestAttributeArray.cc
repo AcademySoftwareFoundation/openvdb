@@ -82,6 +82,26 @@ matchingAttributeSets(const openvdb::tools::AttributeSet& lhs,
     return true;
 }
 
+bool
+attributeSetMatchesDescriptor(  const openvdb::tools::AttributeSet& attrSet,
+                                const openvdb::tools::AttributeSet::Descriptor& descriptor)
+{
+    if (descriptor.size() != attrSet.size())    return false;
+
+    // ensure descriptor and attributes are still in sync
+
+    for (openvdb::tools::AttributeSet::Descriptor::ConstIterator  it = attrSet.descriptor().map().begin(),
+                                    itEnd = attrSet.descriptor().map().end(); it != itEnd; ++it)
+    {
+        const size_t pos = descriptor.find(it->first);
+
+        if (pos != size_t(it->second))  return false;
+        if (descriptor.type(pos) != attrSet.get(pos)->type())   return false;
+    }
+
+    return true;
+}
+
 } //unnamed  namespace
 
 
