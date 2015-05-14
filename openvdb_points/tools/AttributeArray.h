@@ -341,6 +341,9 @@ class AttributeSet
 public:
     enum { INVALID_POS = boost::integer_traits<size_t>::const_max };
 
+    typedef boost::shared_ptr<AttributeSet> Ptr;
+    typedef boost::shared_ptr<const AttributeSet> ConstPtr;
+
     class Descriptor;
 
     typedef boost::shared_ptr<Descriptor> DescriptorPtr;
