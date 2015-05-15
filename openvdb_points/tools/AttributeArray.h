@@ -154,12 +154,14 @@ struct UnitVecAttributeCodec
 };
 
 
-struct VelocityAttributeCodec
+struct VecAttributeCodec
 {
-    struct StorageType { float magnitude; uint16_t direction; };
+    struct StorageType { float magnitude; uint16_t direction;
+        static const char* typeNameAsString() { return "floatuint16"; }
+    };
     template<typename T> static void decode(const StorageType&, math::Vec3<T>&);
     template<typename T> static void encode(const math::Vec3<T>&, StorageType&);
-    static const char* name() { return "qvel"; }
+    static const char* name() { return "vec"; }
 };
 
 
@@ -661,7 +663,7 @@ inline void UnitVecAttributeCodec::encode(const math::Vec3<T>& val, StorageType&
 
 template<typename T>
 inline void
-VelocityAttributeCodec::decode(const StorageType& data, math::Vec3<T>& val)
+VecAttributeCodec::decode(const StorageType& data, math::Vec3<T>& val)
 {
     val = math::QuantizedUnitVec::unpack(data.direction);
     val *= T(data.magnitude);
@@ -670,7 +672,7 @@ VelocityAttributeCodec::decode(const StorageType& data, math::Vec3<T>& val)
 
 template<typename T>
 inline void
-VelocityAttributeCodec::encode(const math::Vec3<T>& val, StorageType& data)
+VecAttributeCodec::encode(const math::Vec3<T>& val, StorageType& data)
 {
     const double d = val.length();
     data.magnitude = static_cast<float>(d);
