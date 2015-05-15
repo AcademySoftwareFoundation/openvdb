@@ -1132,6 +1132,32 @@ TypedAttributeArray<ValueType_, Codec_>::isEqual(const AttributeArray& other) co
 
 
 } // namespace tools
+
+
+namespace math {
+
+template<> inline bool
+isExactlyEqual< tools::VecAttributeCodec::StorageType,
+                tools::VecAttributeCodec::StorageType>(const tools::VecAttributeCodec::StorageType& a,
+                                                            const tools::VecAttributeCodec::StorageType& b)
+{
+    return a.magnitude == b.magnitude && a.direction == b.direction;
+}
+} // namespace math
+
+template<> inline tools::VecAttributeCodec::StorageType
+zeroVal<tools::VecAttributeCodec::StorageType>()
+{
+    tools::VecAttributeCodec::StorageType ret;
+    ret.magnitude = 0;
+    ret.direction = 0;
+    return ret;
+}
+
+template<> inline const char* typeNameAsString<tools::VecAttributeCodec::StorageType>() {
+    return tools::VecAttributeCodec::StorageType::typeNameAsString();
+}
+
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
