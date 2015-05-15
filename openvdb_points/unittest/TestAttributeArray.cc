@@ -520,7 +520,7 @@ TestAttributeArray::testAttributeSet()
             attrSetC.makeUnique(0);
             attrSetC.makeUnique(1);
 
-            attrSetC.appendAttributes(newAttributes);
+            attrSetC.appendAttribute(newAttributes[0]);
 
             CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *descrB));
         }
@@ -530,7 +530,7 @@ TestAttributeArray::testAttributeSet()
             attrSetC.makeUnique(0);
             attrSetC.makeUnique(1);
 
-            attrSetC.appendAttributes(newAttributes, attrSetC.descriptor(), descrB);
+            attrSetC.appendAttribute(newAttributes[0], attrSetC.descriptor(), descrB);
 
             CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
         }

@@ -466,14 +466,14 @@ public:
     /// Copy attribute values for a target index @a n from another @a attributeSet for index @a source
     void copyAttributeValues(const Index n, const AttributeSet& attributeSet, const Index source);
 
-    /// Append attributes from @a vec (simple method)
-    void appendAttributes(const Util::NameAndTypeVec& vec);
+    /// Append attribute @a attribute (simple method)
+    AttributeArray::Ptr appendAttribute(const Util::NameAndType& attribute);
 
-    /// Append attributes from @a vec (descriptor-sharing method)
+    /// Append attribute @a attribute (descriptor-sharing)
     /// Requires current descriptor to match @a expected
     /// On append, current descriptor is replaced with @a replacement
-    void appendAttributes(const Util::NameAndTypeVec& vec,
-                          const Descriptor& expected, DescriptorPtr& replacement);
+    AttributeArray::Ptr appendAttribute(const Util::NameAndType& attribute,
+                                        const Descriptor& expected, DescriptorPtr& replacement);
 
     /// Drop attributes with @a pos indices (simple method)
     /// Creates a new descriptor for this attribute set
@@ -519,7 +519,6 @@ private:
     AttrArrayVec  mAttrs;
 }; // class AttributeSet
 
-
 ////////////////////////////////////////
 
 
@@ -540,6 +539,9 @@ public:
     /// Utility method to construct a NameAndType sequence.
     struct Inserter {
         NameAndTypeVec vec;
+        Inserter& add(const NameAndType& nameAndType) {
+            vec.push_back(nameAndType); return *this;
+        }
         Inserter& add(const std::string& name, const std::string& type) {
             vec.push_back(NameAndType(name, type)); return *this;
         }
@@ -558,6 +560,7 @@ public:
     /// Create a new descriptor from the given attribute and type name pairs.
     static Ptr create(const NameAndTypeVec&);
 
+    Ptr duplicateAppend(const NameAndType& attribute) const;
     Ptr duplicateAppend(const NameAndTypeVec& vec) const;
     Ptr duplicateDrop(const std::vector<size_t>& pos) const;
 

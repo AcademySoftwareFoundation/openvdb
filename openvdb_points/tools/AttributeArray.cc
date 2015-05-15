@@ -344,18 +344,21 @@ AttributeSet::copyAttributeValues(const Index n, const AttributeSet& attributeSe
 }
 
 
-void
-AttributeSet::appendAttributes(const Descriptor::NameAndTypeVec& vec)
+AttributeArray::Ptr
+AttributeSet::appendAttribute(const Descriptor::NameAndType& attribute)
 {
+    Descriptor::NameAndTypeVec vec;
+    vec.push_back(attribute);
+
     Descriptor::Ptr descriptor = mDescr->duplicateAppend(vec);
 
-    this->appendAttributes(vec, *mDescr, descriptor);
+    return this->appendAttribute(attribute, *mDescr, descriptor);
 }
 
 
-void
-AttributeSet::appendAttributes(const Descriptor::NameAndTypeVec& vec,
-                               const Descriptor& expected, DescriptorPtr& replacement)
+AttributeArray::Ptr
+AttributeSet::appendAttribute(const Descriptor::NameAndType& attribute,
+                              const Descriptor& expected, DescriptorPtr& replacement)
 {
     // ensure the descriptor is as expected
     if (*mDescr != expected) {
@@ -372,11 +375,13 @@ AttributeSet::appendAttributes(const Descriptor::NameAndTypeVec& vec,
 
     const size_t arrayLength = offset > 0 ? this->get(0)->size() : 1;
 
-    // append the new arrays
+    // append the new array
 
-    for (Descriptor::NameAndTypeVec::const_iterator it = vec.begin(), itEnd = vec.end(); it != itEnd; ++it) {
-        mAttrs.push_back(AttributeArray::create(it->type, arrayLength));
-    }
+    AttributeArray::Ptr array = AttributeArray::create(attribute.type, arrayLength);
+
+    mAttrs.push_back(array);
+
+    return array;
 }
 
 
@@ -591,6 +596,19 @@ AttributeSet::Descriptor::create(const NameAndTypeVec& attrs)
     }
     return descr;
 }
+
+
+AttributeSet::Descriptor::Ptr
+AttributeSet::Descriptor::duplicateAppend(const NameAndType& attribute) const
+{
+    Inserter attributes;
+
+    this->appendTo(attributes.vec);
+    attributes.add(attribute);
+
+    return Descriptor::create(attributes.vec);
+}
+
 
 AttributeSet::Descriptor::Ptr
 AttributeSet::Descriptor::duplicateAppend(const NameAndTypeVec& vec) const
