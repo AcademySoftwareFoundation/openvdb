@@ -61,6 +61,7 @@ class TestLevelSetRayIntersector : public CppUnit::TestCase
 {
 public:
     CPPUNIT_TEST_SUITE(TestLevelSetRayIntersector);
+    CPPUNIT_TEST(testLevelSetHDDA);
     CPPUNIT_TEST(tests);
 
 #ifdef STATS_TEST
@@ -69,6 +70,7 @@ public:
 
     CPPUNIT_TEST_SUITE_END();
 
+    void testLevelSetHDDA();
     void tests();
 #ifdef STATS_TEST
     void stats();
@@ -76,6 +78,63 @@ public:
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestLevelSetRayIntersector);
+
+void
+TestLevelSetRayIntersector::testLevelSetHDDA()
+{
+    using namespace openvdb;
+    typedef math::Ray<double>  RayT;
+    typedef RayT::Vec3Type     Vec3T;
+
+    {// intersection testing against a single voxel
+        FloatGrid::Ptr ls = createLevelSet<FloatGrid>(/*voxelSize*/ 1.0, /*halfWidth*/ 0.5);
+
+        // background value is 0.5
+
+        // 0.5  0.5  0.5  0.5
+        // 0.5 -0.5 -0.5  0.5
+        // 0.5  0.5  0.5  0.5
+
+        Coord ijk(10, 11, 12);
+
+        ls->tree().setValue(ijk, -0.5);
+        ls->tree().setValue(ijk.offsetBy(1, 0, 0), -0.5);
+
+        tools::LinearSearchImpl<FloatGrid> lsi(*ls);
+
+        bool hit;
+
+        {
+            // fire a ray directly at center of the the voxel
+            // success
+
+            CPPUNIT_ASSERT(lsi.setWorldRay(RayT(/*eye*/ Vec3T(0.0, 11.0, 12.0), /*dir*/ Vec3T(1.0, 0.0, 0.0))));
+            hit = math::LevelSetHDDA<FloatGrid::TreeType, /*NodeLevel*/ -1>::test(lsi);
+            CPPUNIT_ASSERT(hit);
+        }
+
+        {
+            // fire a ray at a slight offset from the center of the voxel (y += 0.1)
+            // success
+
+            CPPUNIT_ASSERT(lsi.setWorldRay(RayT(/*eye*/ Vec3T(0.0, 11.1, 12.0), /*dir*/ Vec3T(1.0, 0.0, 0.0))));
+            hit = math::LevelSetHDDA<FloatGrid::TreeType, /*NodeLevel*/ -1>::test(lsi);
+            CPPUNIT_ASSERT(hit);
+        }
+
+        {
+            // fire a ray at an offset in the other direction from the center of the voxel (y -= 0.1)
+            // failure
+
+            CPPUNIT_ASSERT(lsi.setWorldRay(RayT(/*eye*/ Vec3T(0.0, 10.9, 12.0), /*dir*/ Vec3T(1.0, 0.0, 0.0))));
+            hit = math::LevelSetHDDA<FloatGrid::TreeType, /*NodeLevel*/ -1>::test(lsi);
+            CPPUNIT_ASSERT(hit);
+
+            // fixed by switching the position rounding from floor() to round()
+            // which matches the behaviour in PointSampler::sample() and this intersection is detected
+        }
+    }
+}
 
 void
 TestLevelSetRayIntersector::tests()
