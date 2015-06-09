@@ -93,6 +93,9 @@ typedef Grid<PointDataTree> PointDataGrid;
 
 ////////////////////////////////////////
 
+namespace point_masks { enum PointCountMask { Active = 0, Inactive, All }; }
+
+////////////////////////////////////////
 
 // Internal utility methods
 namespace point_data_grid_internal {
@@ -179,6 +182,69 @@ public:
     const AttributeSet& attributeSet() const
     {
         return *mAttributeSet;
+    }
+
+
+    ValueTypePair pointIndex(const unsigned index) const
+    {
+        assert(index < BaseLeaf::SIZE);
+
+        const ValueType end = this->getValue(index);
+
+        const ValueType start = (index == 0) ? ValueType(0) : this->getValue(index - 1);
+
+        return std::make_pair(start, end);
+    }
+
+    Index64 pointCount(const unsigned n) const
+    {
+        ValueTypePair index = this->pointIndex(n);
+
+        return index.second - index.first;
+    }
+
+    Index64 pointCount(const point_masks::PointCountMask mask = point_masks::Active) const
+    {
+        const util::NodeMask<Log2Dim>& valueMask = this->getValueMask();
+
+        // return the number of points in every voxel if the mask matches the ValueMask
+        // or mask == All
+        if ((mask == point_masks::All)                              ||
+            (mask == point_masks::Active && valueMask.isOn())       ||
+            (mask == point_masks::Inactive && valueMask.isOff()))   return this->getValue(NUM_VOXELS - 1);
+
+        // if the leaf is off and we are querying active points, or
+        // if the leaf is on and we are querying inactive points, return 0
+        if ((mask == point_masks::Active && valueMask.isOff())          ||
+            (mask == point_masks::Inactive && valueMask.isOn()))    return 0;
+
+        // otherwise portions of the leaf are inactive/active. loop to find these
+        // depending on the mask
+        Index64 totalPointCount = 0;
+
+        const bool active = mask == point_masks::Active;
+        const bool inactive = mask == point_masks::Inactive;
+
+        for (unsigned i = 0; i < NUM_VOXELS; i++)
+        {
+            bool valueOn = this->isValueOn(i);
+            if((valueOn && active) || (!valueOn && inactive))
+            {
+                ValueTypePair index = this->pointIndex(i);
+                totalPointCount += (index.second - index.first);
+            }
+        }
+
+        return totalPointCount;
+    }
+
+    void deactivateEmptyVoxels()
+    {
+        for (Index n = 0; n < LeafNodeType::NUM_VALUES; n++) {
+            if (this->pointCount(n) > 0)         continue;
+
+            this->setValueMaskOff(n);
+        }
     }
 
     ////////////////////////////////////////

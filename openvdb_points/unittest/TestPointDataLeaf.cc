@@ -46,12 +46,14 @@ public:
     CPPUNIT_TEST(testOffsets);
     CPPUNIT_TEST(testSetValue);
     CPPUNIT_TEST(testMonotonicity);
+    CPPUNIT_TEST(testPointCount);
     CPPUNIT_TEST_SUITE_END();
 
     void testEmptyLeaf();
     void testOffsets();
     void testSetValue();
     void testMonotonicity();
+    void testPointCount();
 
 }; // class TestPointDataLeaf
 
@@ -233,6 +235,57 @@ TestPointDataLeaf::testMonotonicity()
     CPPUNIT_ASSERT(!monotonicOffsets(leaf));
 }
 
+
+void
+TestPointDataLeaf::testPointCount()
+{
+    using namespace openvdb::tools;
+
+    LeafType leaf(openvdb::Coord(0, 0, 0));
+
+    leaf.setOffsetOn(0, 4);
+    leaf.setOffsetOn(1, 7);
+
+    CPPUNIT_ASSERT_EQUAL(int(leaf.pointIndex(0).first), 0);
+    CPPUNIT_ASSERT_EQUAL(int(leaf.pointIndex(0).second), 4);
+
+    CPPUNIT_ASSERT_EQUAL(int(leaf.pointIndex(1).first), 4);
+    CPPUNIT_ASSERT_EQUAL(int(leaf.pointIndex(1).second), 7);
+
+    // one point per voxel
+
+    for (int i = 0; i < LeafType::SIZE; i++) {
+        leaf.setOffsetOn(i, i);
+    }
+
+    CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::All), Index64(LeafType::SIZE - 1));
+    CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::Active), Index64(LeafType::SIZE - 1));
+    CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::Inactive), Index64(0));
+
+    // manually de-activate two voxels
+
+    leaf.setValueOff(100);
+    leaf.setValueOff(101);
+
+    CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::All), Index64(LeafType::SIZE - 1));
+    CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::Active), Index64(LeafType::SIZE - 3));
+    CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::Inactive), Index64(2));
+
+    // one point per every other voxel and de-activate empty voxels
+
+    unsigned sum = 0;
+
+    for (int i = 0; i < LeafType::SIZE; i++) {
+        leaf.setOffsetOn(i, sum);
+        if (i % 2 == 0)     sum++;
+    }
+
+    leaf.deactivateEmptyVoxels();
+
+    CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::All), Index64(LeafType::SIZE / 2));
+    CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::Active), Index64(LeafType::SIZE / 2));
+    CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::Inactive), Index64(0));
+}
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestPointDataLeaf);
 
