@@ -21,12 +21,16 @@ Version 3.1.0 - In development
     - Extended the API of tools::Diagnose and disabled copy construction.
 
     Houdini:
-    - Added a Diagnostics SOP that performs validation tests on grids to 
+    - Added a Diagnostics SOP that performs validation tests on grids to
       detect potential issues. The tests are currently automated, but manual
       selections will be added soon.
     - Redesigned the UI of the Visualize SOP and added toggles to draw with
       or without color, to use the grid name as the attribute name for points
       with values, and to attach grid index coordinates to points.
+    - Added SOP_NodeVDB::duplicateSourceStealable() to avoid the cost of a
+      deep-copy when using Houdini's unload flag and updated the following SOPs:
+      Advect_Level_Set, Convert, Fill, Filter, Filter_Level_Set, Fracture, Noise,
+      Prune, Resample, Transform.
 
 Version 3.0.0 - January 14, 2014
     - The io::File class now supports delayed loading of .vdb files,

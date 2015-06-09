@@ -700,7 +700,7 @@ SOP_OpenVDB_Filter_Level_Set::cookMySop(OP_Context& context)
 #endif
 
         // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
-        if (startNode->duplicateSource(0, context, gdp) >= UT_ERROR_ABORT) return error();
+        if (startNode->duplicateSourceStealable(0, context) >= UT_ERROR_ABORT) return error();
 
         BossT boss("Processing level sets");
 
