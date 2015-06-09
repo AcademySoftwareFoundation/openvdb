@@ -254,6 +254,7 @@ UNITTEST_INCLUDE_NAMES := \
 UNITTEST_SRC_NAMES := \
     unittest/main.cc \
     unittest/TestAttributeArray.cc \
+    unittest/TestPointDataLeaf.cc \
 #
 
 DOC_FILES :=
