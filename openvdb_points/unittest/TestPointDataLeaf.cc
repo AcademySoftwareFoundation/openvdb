@@ -48,6 +48,7 @@ public:
     CPPUNIT_TEST(testMonotonicity);
     CPPUNIT_TEST(testPointCount);
     CPPUNIT_TEST(testAttributes);
+    CPPUNIT_TEST(testTopologyCopy);
     CPPUNIT_TEST_SUITE_END();
 
     void testEmptyLeaf();
@@ -56,6 +57,7 @@ public:
     void testMonotonicity();
     void testPointCount();
     void testAttributes();
+    void testTopologyCopy();
 
 }; // class TestPointDataLeaf
 
@@ -419,6 +421,41 @@ TestPointDataLeaf::testAttributes()
     CPPUNIT_ASSERT_EQUAL(memUsage, leaf.memUsage());
 }
 
+
+void
+TestPointDataLeaf::testTopologyCopy()
+{
+    // create a float leaf and activate some values
+
+    typedef openvdb::FloatTree::LeafNodeType FloatLeaf;
+
+    FloatLeaf floatLeaf(openvdb::Coord(0, 0, 0));
+
+    floatLeaf.setValueOn(1);
+    floatLeaf.setValueOn(4);
+    floatLeaf.setValueOn(7);
+    floatLeaf.setValueOn(8);
+
+    CPPUNIT_ASSERT_EQUAL(floatLeaf.onVoxelCount(), Index64(4));
+
+    // validate construction of a PointDataLeaf using a TopologyCopy
+
+    LeafType leaf(floatLeaf, openvdb::TopologyCopy());
+
+    CPPUNIT_ASSERT_EQUAL(leaf.onVoxelCount(), Index64(4));
+
+    LeafType leaf2(openvdb::Coord(8, 8, 8));
+
+    leaf2.setValueOn(1);
+    leaf2.setValueOn(4);
+    leaf2.setValueOn(7);
+
+    CPPUNIT_ASSERT(!leaf.hasSameTopology(&leaf2));
+
+    leaf2.setValueOn(8);
+
+    CPPUNIT_ASSERT(leaf.hasSameTopology(&leaf2));
+}
 CPPUNIT_TEST_SUITE_REGISTRATION(TestPointDataLeaf);
 
 
