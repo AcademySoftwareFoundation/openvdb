@@ -578,7 +578,7 @@ GEO_PrimVDB::setSpaceTransform(
 	// to [-1,1] space so that we can post-multiply by space's transform to
 	// get into world-space.
 	//
-	// NonlinearFrustumMap use's 1/taper as it's taper value, going from
+	// NonlinearFrustumMap use's 1/taper as its taper value, going from
 	// Z=0 to Z=1. So we first scale it by the taper to undo this.
 	UT_Matrix4D transform(1.0);
 	transform.scale(taper, taper, 1.0);

@@ -404,7 +404,7 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(PRMzeroDefaults)
         .setHelpText("Enable / disable the pruning of nodes, i.e. leafs filled with "
                      "the inside values are compactly represented by a tile value. "
-                     "This option only has an effect if the particles are larger then "
+                     "This option only has an effect if the particles are larger than "
                      "the leaf nodes so it is normally recommended to leave it disabled."));
 
     // Width of the mask for constraining subsequent deformations

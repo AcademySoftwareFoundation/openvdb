@@ -225,7 +225,7 @@ public:
     /// @note A grainsize of 0 or less disables multi-threading!
     void setGrainSize(int grainsize) { mTracker.setGrainSize(grainsize); }
 
-    /// Advect the level set from it's current time, time0, to it's
+    /// Advect the level set from its current time, time0, to its
     /// final time, time1. If time0>time1 backward advection is performed.
     ///
     /// @return number of CFL iterations used to advect from time0 to time1
@@ -250,7 +250,7 @@ private:
         Advect(Advect& other, tbb::split);
         /// destructor
         virtual ~Advect() { if (mIsMaster) this->clearField(); }
-        /// Advect the level set from it's current time, time0, to it's final time, time1.
+        /// Advect the level set from its current time, time0, to its final time, time1.
         /// @return number of CFL iterations
         size_t advect(ValueType time0, ValueType time1);
         /// Used internally by tbb::parallel_for()

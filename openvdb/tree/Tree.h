@@ -87,7 +87,7 @@ public:
 
     /// @brief Return in @a bbox the axis-aligned bounding box of all
     /// leaf nodes and active tiles.
-    /// @details This is faster then calling evalActiveVoxelBoundingBox,
+    /// @details This is faster than calling evalActiveVoxelBoundingBox,
     /// which visits the individual active voxels, and hence
     /// evalLeafBoundingBox produces a less tight, i.e. approximate, bbox.
     /// @return @c false if the bounding box is empty (in which case

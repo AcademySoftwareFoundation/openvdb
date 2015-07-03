@@ -152,7 +152,7 @@ public:
     ///
     /// @note The input grid is assumed to be a valid level set and if
     /// it already contains voxels (with SDF values) partices are unioned
-    /// onto the exisinting level set surface. However, if attribute tranfer
+    /// onto the existing level set surface. However, if attribute tranfer
     /// is enabled, i.e. AttributeT != void, attributes are only
     /// generated for voxels that overlap with particles, not the existing
     /// voxels in the input grid (for which no attributes exist!).
@@ -174,7 +174,7 @@ public:
     /// and therefore needs to be called before any of these grids are
     /// used and after the last call to any of the rasterizer methods.
     ///
-    /// @note Avoid calling this method more then once and only after
+    /// @note Avoid calling this method more than once and only after
     /// all the particles have been rasterized. It has no effect or
     /// overhead if attribute transfer is disabled, i.e. AttributeT =
     /// void and prune is false.
@@ -708,7 +708,7 @@ private:
     /// value that is converted to world units (e.g. the grid stores
     /// the closest Euclidian signed distances measured in world
     /// units). Also note we use the convention of positive distances
-    /// outside the surface an negative distances inside the surface.
+    /// outside the surface and negative distances inside the surface.
     bool makeSphere(const Vec3R &P, SdfT R, const AttT& att, AccessorT& acc)
     {
         const ValueT inside = -mGrid->background();

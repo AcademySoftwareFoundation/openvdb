@@ -854,11 +854,11 @@ struct promote {
 
 /// @brief Return the index [0,1,2] of the smallest value in a 3D vector.
 /// @note This methods assumes operator[] exists and avoids branching.
-/// @details If two components of the input vector are equal and smaller then the
+/// @details If two components of the input vector are equal and smaller than the
 /// third component, the largest index of the two is always returned.
 /// If all three vector components are equal the largest index, i.e. 2, is
 /// returned. In other words the return value corresponds to the largest index
-/// of the of the smallest vector components.
+/// of the smallest vector components.
 template<typename Vec3T>
 size_t
 MinIndex(const Vec3T& v)
@@ -875,11 +875,11 @@ MinIndex(const Vec3T& v)
 
 /// @brief Return the index [0,1,2] of the largest value in a 3D vector.
 /// @note This methods assumes operator[] exists and avoids branching.
-/// @details If two components of the input vector are equal and larger then the
+/// @details If two components of the input vector are equal and larger than the
 /// third component, the largest index of the two is always returned.
 /// If all three vector components are equal the largest index, i.e. 2, is
 /// returned. In other words the return value corresponds to the largest index
-/// of the of the largest vector components.
+/// of the largest vector components.
 template<typename Vec3T>
 size_t
 MaxIndex(const Vec3T& v)

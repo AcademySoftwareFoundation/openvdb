@@ -791,7 +791,7 @@ transformDense(Dense<ValueT, openvdb::tools::LayoutZYX>& dense,
 {
     typedef ContiguousOp<ValueT, PointwiseOpT>  OpT;
 
-    // Convert the Op so it operates on an contiguous line in memory
+    // Convert the Op so it operates on a contiguous line in memory
 
     OpT op(functor);
 

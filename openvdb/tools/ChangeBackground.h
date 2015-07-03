@@ -172,7 +172,7 @@ private:
 
 
 // Replaces the background value in a Tree assumed to represent a
-// level set. It is generally faster then ChangeBackgroundOp.
+// level set. It is generally faster than ChangeBackgroundOp.
 // Note that is follows the sign-convension that outside is positive
 // and inside is negative!
 template<typename TreeOrLeafManagerT>
