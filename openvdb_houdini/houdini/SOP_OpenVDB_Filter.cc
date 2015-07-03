@@ -506,7 +506,7 @@ SOP_OpenVDB_Filter::cookMySop(OP_Context& context)
 #else
         if (lock.lock(*startNode, context) >= UT_ERROR_ABORT) return error();
 #endif
-        if (startNode->duplicateSource(0, context, gdp) >= UT_ERROR_ABORT) return error();
+        if (startNode->duplicateSourceStealable(0, context) >= UT_ERROR_ABORT) return error();
 
         // Get the group of grids to process.
         UT_String groupStr;

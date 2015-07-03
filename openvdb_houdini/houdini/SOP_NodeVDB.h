@@ -43,6 +43,7 @@
 #include <UT/UT_DSOVersion.h>
 #endif
 
+#include <UT/UT_Version.h>
 
 class GU_Detail;
 
@@ -115,6 +116,47 @@ protected:
     /// @c resolveObsoleteParms(), when that function is implemented.
     void resolveRenamedParm(PRM_ParmList& obsoleteParms,
         const char* oldName, const char* newName);
+
+protected:
+
+    /// @brief Steal the geometry on the specified input if possible, instead of copying the data.
+    ///
+    /// @details The "unload" flag on an upstream SOP will prevent the node from caching a copy of
+    /// the data. In certain cases where the geometry isn't being used elsewhere, the data can be
+    /// explictly re-used to avoid the cost of a deep-copy when modifying the data. This method will
+    /// insert the existing data into the gdp and update the gdp handle in the SOP.
+    /// (Disabled prior to H13)
+    ///
+    /// Reference counting of the Houdini VDB Primitive shared pointers ensures we cannot steal data
+    /// in use elsewhere. If so, this method falls back to copying the shared pointer, effectively
+    /// performing a duplicateSource().
+    ///
+    /// @param index    the index of the input from which to perform this operation
+    /// @param context  the current SOP context is used for cook time for network traversal
+    ///
+    /// @note No attempt to call duplicateSource() or inputGeo() should be made after calling this
+    /// method, as there will be no data on the input stream if isSourceStealable() returns true
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
+    OP_ERROR duplicateSourceStealable(const unsigned index, OP_Context& context,
+                                      GU_Detail **pgdp, GU_DetailHandle& gdh, bool clean=true);
+#endif
+
+    OP_ERROR duplicateSourceStealable(const unsigned index, OP_Context& context, bool clean=true);
+
+private:
+
+    /// @brief Traverses the upstream network to determine if the source input can be stolen.
+    ///
+    /// An upstream SOP cannot be stolen if it is implicitly caching the data (no "unload" flag)
+    /// or explictly caching the data (using a Cache SOP)
+    ///
+    /// The traversal ignores pass through nodes such as null SOPs and bypassing.
+    ///
+    /// @param index    the index of the input from which to perform this operation
+    /// @param context  the current SOP context is used for cook time for network traversal
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
+    bool isSourceStealable(const unsigned index, OP_Context& context) const;
+#endif
 };
 
 } // namespace openvdb_houdini

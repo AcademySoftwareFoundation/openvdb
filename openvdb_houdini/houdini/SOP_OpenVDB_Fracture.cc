@@ -229,7 +229,7 @@ SOP_OpenVDB_Fracture::cookMySop(OP_Context& context)
     try {
         hutil::ScopedInputLock lock(*this, context);
         const fpreal time = context.getTime();
-        duplicateSource(0, context);
+        duplicateSourceStealable(0, context);
 
         hvdb::Interrupter boss("Converting geometry to volume");
 
@@ -283,7 +283,9 @@ SOP_OpenVDB_Fracture::cookMySop(OP_Context& context)
 
             GU_PrimVDB* vdb = vdbIter.getPrimitive();
 
-            grids.push_back(vdb->getGrid().deepCopyGrid());
+            vdb->makeGridUnique();
+
+            grids.push_back(vdb->getGrid().copyGrid());
             grids.back()->setName(vdb->getGridName());
 
             grids.back()->insertMeta("houdiniorigoffset",

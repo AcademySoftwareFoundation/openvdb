@@ -45,6 +45,9 @@
 #include <UT/UT_InfoTree.h>
 #include <sstream>
 
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
+#include <SOP/SOP_Cache.h> // for stealable
+#endif
 
 namespace openvdb_houdini {
 
@@ -162,6 +165,104 @@ SOP_NodeVDB::getNodeSpecificInfoText(OP_Context &context, OP_NodeInfoParms &parm
 #endif
 }
 
+
+////////////////////////////////////////
+
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
+OP_ERROR
+SOP_NodeVDB::duplicateSourceStealable(const unsigned index, OP_Context& context,
+                                      GU_Detail **pgdp, GU_DetailHandle& gdh, bool clean)
+{
+    // traverse upstream nodes, if unload is not possible, duplicate the source
+    if (!isSourceStealable(index, context)) {
+        duplicateSource(index, context, *pgdp, clean);
+        unlockInput(index);
+        return error();
+    }
+
+    // get the input GU_Detail handle and unlock the inputs
+    GU_DetailHandle inputgdh = inputGeoHandle(index);
+
+    unlockInput(index);
+    SOP_Node *input = CAST_SOPNODE(getInput(index));
+
+    if (!input) {
+        addError(SOP_MESSAGE, "Invalid input SOP Node when attempting to unload.");
+        return error();
+    }
+
+    // explicitly unload the data from the input SOP
+    const bool unloadSuccessful = input->unloadData();
+
+    // check if we only have one reference
+    const bool soleReference = (inputgdh.getRefCount() == 1);
+
+    // if the unload was unsuccessful or the reference count is not one, we fall back to
+    // explicitly copying the input onto the gdp
+    if (!(unloadSuccessful && soleReference)) {
+        const GU_Detail *src = inputgdh.readLock();
+        assert(src);
+        if (src)  (*pgdp)->copy(*src);
+        inputgdh.unlock(src);
+        return error();
+    }
+
+    // release our old write lock on gdp (setup by cookMe())
+    gdh.unlock(*pgdp);
+    // point to the input's old gdp and setup a write lock
+    gdh = inputgdh;
+    *pgdp = gdh.writeLock();
+
+    return error();
+}
+
+bool
+SOP_NodeVDB::isSourceStealable(const unsigned index, OP_Context& context) const
+{
+    struct Local {
+        static inline OP_Node* nextStealableInput(const unsigned index, const fpreal now, const OP_Node* node)
+        {
+            OP_Node* input = node->getInput(index);
+            while (input) {
+                OP_Node* passThrough = input->getPassThroughNode(now);
+                if (!passThrough) break;
+                input = passThrough;
+            }
+            return input;
+        }
+    }; // struct Local
+
+    const fpreal now = context.getTime();
+
+    for (OP_Node*   node = Local::nextStealableInput(index, now, this); node != NULL;
+                    node = Local::nextStealableInput(index, now, node)) {
+
+        // cont'd if it is a SOP_NULL.
+        std::string opname = node->getName().toStdString().substr(0, 4);
+        if (opname == "null") continue;
+
+        // if the SOP is a cache SOP we don't want to try and alter its data without a deep copy
+        if (dynamic_cast<SOP_Cache*>(node))  return false;
+
+        if(node->getUnload() == true) return true;
+        else  return false;
+    }
+
+    return false;
+}
+
+OP_ERROR
+SOP_NodeVDB::duplicateSourceStealable(const unsigned index, OP_Context& context, bool clean) {
+    return this->duplicateSourceStealable(index, context, &gdp, myGdpHandle, clean);
+}
+#else
+OP_ERROR
+SOP_NodeVDB::duplicateSourceStealable(const unsigned index, OP_Context& context, bool clean) {
+    duplicateSource(index, context, gdp, clean);
+    unlockInput(index);
+    return error();
+}
+#endif
 
 ////////////////////////////////////////
 

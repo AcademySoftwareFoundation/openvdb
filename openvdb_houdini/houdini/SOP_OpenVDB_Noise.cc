@@ -463,7 +463,7 @@ SOP_OpenVDB_Noise::cookMySop(OP_Context &context)
         const fpreal time = context.getTime();
 
         // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
-        duplicateSource(0, context);
+        duplicateSourceStealable(0, context);
 
         // Evaluate the FractalBoltzman noise parameters from UI
         FractalBoltzmanGenerator fbGenerator(static_cast<float>(evalFloat("freq", 0, time)),
