@@ -245,7 +245,7 @@ public:
     /// @note The mask's tree configuration has to match @c GridT's tree configuration.
     void setSurfaceMask(const GridBase::ConstPtr& mask, bool invertMask = false);
 
-	/// @param grid A scalar grid used as a spatial multiplier for the adaptivity threshold.
+    /// @param grid A scalar grid used as a spatial multiplier for the adaptivity threshold.
     /// @note The grid's tree configuration has to match @c GridT's tree configuration.
     void setSpatialAdaptivity(const GridBase::ConstPtr& grid);
 
