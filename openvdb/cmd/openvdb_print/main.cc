@@ -53,6 +53,7 @@ usage(int exitStatus = EXIT_FAILURE)
     std::cerr <<
 "Usage: " << gProgName << " in.vdb [in.vdb ...] [options]\n" <<
 "Which: prints information about OpenVDB grids\n" <<
+"Build: library version " << openvdb::getLibraryVersionString() << "\n" <<       
 "Options:\n" <<
 "    -l, -stats     long printout, including grid statistics\n" <<
 "    -m, -metadata  print per-file and per-grid metadata\n";

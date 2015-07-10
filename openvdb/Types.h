@@ -43,7 +43,6 @@
 #include <openvdb/math/Mat3.h>
 #include <openvdb/math/Mat4.h>
 #include <openvdb/math/Coord.h>
-#include <openvdb/math/Hermite.h>
 #include <boost/type_traits/is_convertible.hpp>
 #include <boost/type_traits/is_integral.hpp>
 #include <boost/static_assert.hpp>
@@ -102,9 +101,6 @@ typedef math::Mat3<Real>    Mat3R;
 typedef math::Mat4<Real>    Mat4R;
 typedef math::Mat4<double>  Mat4d;
 typedef math::Mat4<float>   Mat4s;
-
-// Compressed Hermite data
-typedef math::Hermite       Hermite;
 
 // Quaternions
 typedef math::Quat<Real>    QuatR;
@@ -275,7 +271,6 @@ template<> inline const char* typeNameAsString<double>()            { return "do
 template<> inline const char* typeNameAsString<int32_t>()           { return "int32"; }
 template<> inline const char* typeNameAsString<uint32_t>()          { return "uint32"; }
 template<> inline const char* typeNameAsString<int64_t>()           { return "int64"; }
-template<> inline const char* typeNameAsString<Hermite>()           { return "Hermite"; }
 template<> inline const char* typeNameAsString<Vec2i>()             { return "vec2i"; }
 template<> inline const char* typeNameAsString<Vec2s>()             { return "vec2s"; }
 template<> inline const char* typeNameAsString<Vec2d>()             { return "vec2d"; }

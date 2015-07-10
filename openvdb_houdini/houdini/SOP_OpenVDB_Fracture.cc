@@ -648,7 +648,7 @@ SOP_OpenVDB_Fracture::process(
 #endif
 
     const int cutterObjects = separatecutters ? primClassifier.getNumClass() : 1;
-    const ValueType bandWidth = ValueType(backgroundValue / transform->voxelSize()[0]);
+    const float bandWidth = float(backgroundValue / transform->voxelSize()[0]);
 
     if (cutterObjects > 1) {
         GA_Offset start, end;
@@ -710,12 +710,9 @@ SOP_OpenVDB_Fracture::process(
                     }
                 }
 
-                openvdb::tools::MeshToVolume<GridType, hvdb::Interrupter>
-                    converter(transform, /*conversion flags*/0, &boss);
+                openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec4I> mesh(pointList, primList);
 
-                converter.convertToLevelSet(pointList, primList, bandWidth, bandWidth);
-                cutterGrid = converter.distGridPtr();
-
+                cutterGrid = openvdb::tools::meshToVolume<GridType>(boss, mesh, *transform, bandWidth, bandWidth);
             }
 
             if (!cutterGrid || cutterGrid->activeVoxelCount() == 0) continue;
@@ -735,11 +732,10 @@ SOP_OpenVDB_Fracture::process(
             UTparallelFor(GA_SplittableRange(cutterGeo->getPrimitiveRange()),
                 hvdb::PrimCpyOp(cutterGeo, primList));
 
-            openvdb::tools::MeshToVolume<GridType, hvdb::Interrupter>
-                converter(transform, /*conversion flags*/0, &boss);
 
-            converter.convertToLevelSet(pointList, primList, bandWidth, bandWidth);
-            cutterGrid = converter.distGridPtr();
+            openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec4I> mesh(pointList, primList);
+
+            cutterGrid = openvdb::tools::meshToVolume<GridType>(boss, mesh, *transform, bandWidth, bandWidth);
         }
 
         if (!cutterGrid || cutterGrid->activeVoxelCount() == 0 || boss.wasInterrupted()) return;

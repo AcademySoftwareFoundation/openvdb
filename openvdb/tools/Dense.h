@@ -105,7 +105,22 @@ public:
     /// @brief Return the linear offset into this grid's value array given by
     /// unsigned coordinates (i, j, k), i.e., coordinates relative to
     /// the origin of this grid's bounding box.
+    ///
+    /// @warning The input coordinates are assume to be relative to
+    /// the grid's origin, i.e. minimum of its index bounding box! 
     inline size_t coordToOffset(size_t i, size_t j, size_t k) const { return i*mX + j*mY + k; }
+
+    /// @brief Return the local coordinate corresponding to the specified linear offset.
+    ///
+    /// @warning The returned coordinate is relative to the origin of this
+    /// grid's bounding box so add dense.origin() to get absolute coordinates.
+    inline Coord offsetToLocalCoord(size_t n) const
+    {
+      const size_t x = n / mX;
+      n -= mX*x;
+      const size_t y = n / mY;
+      return Coord(Coord::ValueType(x), Coord::ValueType(y), Coord::ValueType(n - mY*y));
+    }
 
     /// @brief Return the stride of the array in the x direction ( = dimY*dimZ).
     /// @note This method is required by both CopyToDense and CopyFromDense.
@@ -137,7 +152,22 @@ public:
     /// @brief Return the linear offset into this grid's value array given by
     /// unsigned coordinates (i, j, k), i.e., coordinates relative to
     /// the origin of this grid's bounding box.
+    ///
+    /// @warning The input coordinates are assume to be relative to
+    /// the grid's origin, i.e. minimum of its index bounding box! 
     inline size_t coordToOffset(size_t i, size_t j, size_t k) const { return i + j*mY + k*mZ; }
+
+    /// @brief Return the index coordinate corresponding to the specified linear offset.
+    ///
+    /// @warning The returned coordinate is relative to the origin of this
+    /// grid's bounding box so add dense.origin() to get absolute coordinates.
+    inline Coord offsetToLocalCoord(size_t n) const
+    {
+        const size_t z = n / mZ;
+        n -= mZ*z;
+        const size_t y = n / mY;
+        return Coord(Coord::ValueType(n - mY*y), Coord::ValueType(y), Coord::ValueType(z));
+    }
 
     /// @brief Return the stride of the array in the x direction ( = 1).
     /// @note This method is required by both CopyToDense and CopyFromDense.
@@ -241,6 +271,9 @@ public:
     /// @note This method is required by both CopyToDense and CopyFromDense.
     inline const CoordBBox& bbox() const { return BaseT::mBBox; }
 
+     /// Return the grid's origin in index coordinates.
+    inline const Coord& origin() const { return BaseT::mBBox.min(); }
+
     /// @brief Return the number of voxels contained in this grid.
     inline Index64 valueCount() const { return BaseT::mBBox.volume(); }
 
@@ -292,12 +325,18 @@ public:
     ///
     /// @note This method reflects the fact that we assume the same
     /// layout of values as an OpenVDB grid, i.e., the fastest coordinate is @e z.
-    inline size_t coordToOffset(Coord xyz) const
+    inline size_t coordToOffset(const Coord& xyz) const
     {
         assert(BaseT::mBBox.isInside(xyz));
         return BaseT::coordToOffset(size_t(xyz[0]-BaseT::mBBox.min()[0]),
                                     size_t(xyz[1]-BaseT::mBBox.min()[1]),
                                     size_t(xyz[2]-BaseT::mBBox.min()[2]));
+    }
+
+    /// @brief Return the global coordinate corresponding to the specified linear offset.
+    inline Coord offsetToCoord(size_t n) const
+    {
+      return this->offsetToLocalCoord(n) + BaseT::mBBox.min();
     }
 
     /// @brief Return the memory footprint of this Dense grid in bytes.
@@ -455,8 +494,7 @@ public:
         delete mBlocks;
         mBlocks = NULL;
 
-        tools::pruneTiles(*mTree, mTolerance);
-        //mTree->root().pruneTiles(mTolerance);
+        tools::pruneTiles(*mTree, mTolerance);//multi-threaded
     }
 
     /// @brief Public method called by tbb::parallel_for

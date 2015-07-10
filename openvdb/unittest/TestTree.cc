@@ -93,6 +93,7 @@ public:
     CPPUNIT_TEST(testAddLeaf);
     CPPUNIT_TEST(testAddTile);
     CPPUNIT_TEST(testGetNodes);
+    CPPUNIT_TEST(testStealNodes);
     CPPUNIT_TEST(testLeafManager);
     CPPUNIT_TEST(testNodeManager);
     CPPUNIT_TEST(testProcessBBox);
@@ -125,6 +126,7 @@ public:
     void testAddLeaf();
     void testAddTile();
     void testGetNodes();
+    void testStealNodes();
     void testLeafManager();
     void testNodeManager();
     void testProcessBBox();
@@ -2432,6 +2434,7 @@ TestTree::testGetNodes()
         tree.getNodes(array);
         //timer.stop();
         CPPUNIT_ASSERT_EQUAL(leafCount, array.size());
+        CPPUNIT_ASSERT_EQUAL(leafCount, size_t(tree.leafCount()));
         size_t sum = 0;
         for (size_t i=0; i<array.size(); ++i) sum += array[i]->onVoxelCount();
         CPPUNIT_ASSERT_EQUAL(voxelCount, sum);
@@ -2443,6 +2446,7 @@ TestTree::testGetNodes()
         tree.getNodes(array);
         //timer.stop();
         CPPUNIT_ASSERT_EQUAL(leafCount, array.size());
+        CPPUNIT_ASSERT_EQUAL(leafCount, size_t(tree.leafCount()));
         size_t sum = 0;
         for (size_t i=0; i<array.size(); ++i) sum += array[i]->onVoxelCount();
         CPPUNIT_ASSERT_EQUAL(voxelCount, sum);
@@ -2455,6 +2459,7 @@ TestTree::testGetNodes()
         tmp.getNodes(array);
         //timer.stop();
         CPPUNIT_ASSERT_EQUAL(leafCount, array.size());
+        CPPUNIT_ASSERT_EQUAL(leafCount, size_t(tree.leafCount()));
         size_t sum = 0;
         for (size_t i=0; i<array.size(); ++i) sum += array[i]->onVoxelCount();
         CPPUNIT_ASSERT_EQUAL(voxelCount, sum);
@@ -2467,6 +2472,7 @@ TestTree::testGetNodes()
         tree.getNodes(array);
         //timer.stop();
         CPPUNIT_ASSERT_EQUAL(leafCount, array.size());
+        CPPUNIT_ASSERT_EQUAL(leafCount, size_t(tree.leafCount()));
         size_t sum = 0;
         for (size_t i=0; i<array.size(); ++i) sum += array[i]->onVoxelCount();
         CPPUNIT_ASSERT_EQUAL(voxelCount, sum);
@@ -2478,6 +2484,7 @@ TestTree::testGetNodes()
         tree.getNodes(array);
         //timer.stop();
         CPPUNIT_ASSERT_EQUAL(leafCount, array.size());
+        CPPUNIT_ASSERT_EQUAL(leafCount, size_t(tree.leafCount()));
         size_t sum = 0;
         for (size_t i=0; i<array.size(); ++i) sum += array[i]->onVoxelCount();
         CPPUNIT_ASSERT_EQUAL(voxelCount, sum);
@@ -2489,6 +2496,7 @@ TestTree::testGetNodes()
         tree.getNodes(array);
         //timer.stop();
         CPPUNIT_ASSERT_EQUAL(size_t(1), array.size());
+        CPPUNIT_ASSERT_EQUAL(leafCount, size_t(tree.leafCount()));
     }
     {//testing Tree::getNodes() with std::deque<T*>
         std::deque<const openvdb::FloatTree::RootNodeType::ChildNodeType::ChildNodeType*> array;
@@ -2497,6 +2505,7 @@ TestTree::testGetNodes()
         tree.getNodes(array);
         //timer.stop();
         CPPUNIT_ASSERT_EQUAL(size_t(1), array.size());
+        CPPUNIT_ASSERT_EQUAL(leafCount, size_t(tree.leafCount()));
     }
     /*
     {//testing Tree::getNodes() with std::deque<T*> where T is not part of the tree configuration
@@ -2512,6 +2521,127 @@ TestTree::testGetNodes()
     }
     */
 }// testGetNodes
+
+void
+TestTree::testStealNodes()
+{
+    //unittest_util::CpuTimer timer;
+    using openvdb::CoordBBox;
+    using openvdb::Coord;
+    using openvdb::Vec3f;
+    using openvdb::FloatGrid;
+    using openvdb::FloatTree;
+
+    const Vec3f center(0.35f, 0.35f, 0.35f);
+    const float radius = 0.15f;
+    const int dim = 128, half_width = 5;
+    const float voxel_size = 1.0f/dim;
+
+    FloatGrid::Ptr grid = FloatGrid::create(/*background=*/half_width*voxel_size);
+    const FloatTree& tree = grid->tree();
+    grid->setTransform(openvdb::math::Transform::createLinearTransform(/*voxel size=*/voxel_size));
+
+    unittest_util::makeSphere<FloatGrid>(
+        Coord(dim), center, radius, *grid, unittest_util::SPHERE_SPARSE_NARROW_BAND);
+    const size_t leafCount = tree.leafCount();
+    const size_t voxelCount = tree.activeVoxelCount();
+
+    {//testing Tree::stealNodes() with std::vector<T*>
+        FloatTree tree2 = tree; 
+        std::vector<openvdb::FloatTree::LeafNodeType*> array;
+        CPPUNIT_ASSERT_EQUAL(size_t(0), array.size());
+        //timer.start("\nstd::vector<T*> and Tree::stealNodes()");
+        tree2.stealNodes(array);
+        //timer.stop();
+        CPPUNIT_ASSERT_EQUAL(leafCount, array.size());
+        CPPUNIT_ASSERT_EQUAL(size_t(0), size_t(tree2.leafCount()));
+        size_t sum = 0;
+        for (size_t i=0; i<array.size(); ++i) sum += array[i]->onVoxelCount();
+        CPPUNIT_ASSERT_EQUAL(voxelCount, sum);
+    }
+    {//testing Tree::stealNodes() with std::vector<const T*>
+        FloatTree tree2 = tree; 
+        std::vector<const openvdb::FloatTree::LeafNodeType*> array;
+        CPPUNIT_ASSERT_EQUAL(size_t(0), array.size());
+        //timer.start("\nstd::vector<const T*> and Tree::stealNodes()");
+        tree2.stealNodes(array);
+        //timer.stop();
+        CPPUNIT_ASSERT_EQUAL(leafCount, array.size());
+        CPPUNIT_ASSERT_EQUAL(size_t(0), size_t(tree2.leafCount()));
+        size_t sum = 0;
+        for (size_t i=0; i<array.size(); ++i) sum += array[i]->onVoxelCount();
+        CPPUNIT_ASSERT_EQUAL(voxelCount, sum);
+    }
+    {//testing Tree::stealNodes() const with std::vector<const T*>
+        FloatTree tree2 = tree; 
+        std::vector<const openvdb::FloatTree::LeafNodeType*> array;
+        CPPUNIT_ASSERT_EQUAL(size_t(0), array.size());
+        //timer.start("\nstd::vector<const T*> and Tree::stealNodes() const");
+        tree2.stealNodes(array);
+        //timer.stop();
+        CPPUNIT_ASSERT_EQUAL(leafCount, array.size());
+        CPPUNIT_ASSERT_EQUAL(size_t(0), size_t(tree2.leafCount()));
+        size_t sum = 0;
+        for (size_t i=0; i<array.size(); ++i) sum += array[i]->onVoxelCount();
+        CPPUNIT_ASSERT_EQUAL(voxelCount, sum);
+    }
+    {//testing Tree::stealNodes() with std::vector<T*> and std::vector::reserve
+        FloatTree tree2 = tree; 
+        std::vector<openvdb::FloatTree::LeafNodeType*> array;
+        CPPUNIT_ASSERT_EQUAL(size_t(0), array.size());
+        //timer.start("\nstd::vector<T*>, std::vector::reserve and Tree::stealNodes");
+        array.reserve(tree2.leafCount());
+        tree2.stealNodes(array, 0.0f, false);
+        //timer.stop();
+        CPPUNIT_ASSERT_EQUAL(leafCount, array.size());
+        CPPUNIT_ASSERT_EQUAL(size_t(0), size_t(tree2.leafCount()));
+        size_t sum = 0;
+        for (size_t i=0; i<array.size(); ++i) sum += array[i]->onVoxelCount();
+        CPPUNIT_ASSERT_EQUAL(voxelCount, sum);
+    }
+    {//testing Tree::getNodes() with std::deque<T*>
+        FloatTree tree2 = tree;
+        std::deque<const openvdb::FloatTree::LeafNodeType*> array;
+        CPPUNIT_ASSERT_EQUAL(size_t(0), array.size());
+        //timer.start("\nstd::deque<T*> and Tree::stealNodes");
+        tree2.stealNodes(array);
+        //timer.stop();
+        CPPUNIT_ASSERT_EQUAL(leafCount, array.size());
+        CPPUNIT_ASSERT_EQUAL(size_t(0), size_t(tree2.leafCount()));
+        size_t sum = 0;
+        for (size_t i=0; i<array.size(); ++i) sum += array[i]->onVoxelCount();
+        CPPUNIT_ASSERT_EQUAL(voxelCount, sum);
+    }
+    {//testing Tree::getNodes() with std::deque<T*>
+        FloatTree tree2 = tree;
+        std::deque<const openvdb::FloatTree::RootNodeType::ChildNodeType*> array;
+        CPPUNIT_ASSERT_EQUAL(size_t(0), array.size());
+        //timer.start("\nstd::deque<T*> and Tree::stealNodes");
+        tree2.stealNodes(array, 0.0f, true);
+        //timer.stop();
+        CPPUNIT_ASSERT_EQUAL(size_t(1), array.size());
+        CPPUNIT_ASSERT_EQUAL(size_t(0), size_t(tree2.leafCount()));
+    }
+    {//testing Tree::getNodes() with std::deque<T*>
+        FloatTree tree2 = tree;
+        std::deque<const openvdb::FloatTree::RootNodeType::ChildNodeType::ChildNodeType*> array;
+        CPPUNIT_ASSERT_EQUAL(size_t(0), array.size());
+        //timer.start("\nstd::deque<T*> and Tree::stealNodes");
+        tree2.stealNodes(array);
+        //timer.stop();
+        CPPUNIT_ASSERT_EQUAL(size_t(1), array.size());
+        CPPUNIT_ASSERT_EQUAL(size_t(0), size_t(tree2.leafCount()));
+    }
+    /*
+    {//testing Tree::stealNodes() with std::deque<T*> where T is not part of the tree configuration
+        FloatTree tree2 = tree;
+        typedef openvdb::tree::LeafNode<float, 5> NodeT;
+        std::deque<const NodeT*> array;
+        //should NOT compile since NodeT is not part of the FloatTree configuration
+        tree2.stealNodes(array, 0.0f, true);
+    }
+    */
+}// testStealNodes
 
 void
 TestTree::testLeafManager()

@@ -39,7 +39,6 @@
 #ifndef OPENVDB_TOOLS_FILTER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_FILTER_HAS_BEEN_INCLUDED
 
-#include <tbb/parallel_reduce.h>
 #include <tbb/parallel_for.h>
 #include <boost/bind.hpp>
 #include <boost/function.hpp>

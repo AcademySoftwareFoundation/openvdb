@@ -37,6 +37,7 @@
 
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/MeshToVolume.h> // for openvdb::tools::MeshToVoxelEdgeData
+#include <openvdb/tree/LeafManager.h>
 #include <openvdb/util/Util.h> // for openvdb::util::COORD_OFFSETS
 
 #include <GU/GU_Detail.h>

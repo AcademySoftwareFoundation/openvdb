@@ -166,12 +166,11 @@ SOP_NodeVDB::getNodeSpecificInfoText(OP_Context &context, OP_NodeInfoParms &parm
 }
 
 
-////////////////////////////////////////
-
 #if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
+
 OP_ERROR
-SOP_NodeVDB::duplicateSourceStealable(const unsigned index, OP_Context& context,
-                                      GU_Detail **pgdp, GU_DetailHandle& gdh, bool clean)
+SOP_NodeVDB::duplicateSourceStealable(const unsigned index,
+    OP_Context& context, GU_Detail **pgdp, GU_DetailHandle& gdh, bool clean)
 {
     // traverse upstream nodes, if unload is not possible, duplicate the source
     if (!isSourceStealable(index, context)) {
@@ -216,6 +215,7 @@ SOP_NodeVDB::duplicateSourceStealable(const unsigned index, OP_Context& context,
     return error();
 }
 
+
 bool
 SOP_NodeVDB::isSourceStealable(const unsigned index, OP_Context& context) const
 {
@@ -251,18 +251,23 @@ SOP_NodeVDB::isSourceStealable(const unsigned index, OP_Context& context) const
     return false;
 }
 
+
 OP_ERROR
 SOP_NodeVDB::duplicateSourceStealable(const unsigned index, OP_Context& context, bool clean) {
     return this->duplicateSourceStealable(index, context, &gdp, myGdpHandle, clean);
 }
-#else
+
+#else // earlier than 13.0
+
 OP_ERROR
 SOP_NodeVDB::duplicateSourceStealable(const unsigned index, OP_Context& context, bool clean) {
     duplicateSource(index, context, gdp, clean);
     unlockInput(index);
     return error();
 }
+
 #endif
+
 
 ////////////////////////////////////////
 

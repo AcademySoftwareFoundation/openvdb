@@ -183,6 +183,7 @@ usage(int exitStatus = EXIT_FAILURE)
     ostr << std::setprecision(3) <<
 "Usage: " << gProgName << " in.vdb out.{exr,ppm} [options]\n" <<
 "Which: ray-traces OpenVDB volumes\n" <<
+"Build: library version " << openvdb::getLibraryVersionString() << "\n" << 
 "Options:\n" <<
 "    -aperture F       perspective camera aperture in mm (default: " << opts.aperture << ")\n" <<
 "    -camera S         camera type; either \"persp[ective]\" or \"ortho[graphic]\"\n" <<

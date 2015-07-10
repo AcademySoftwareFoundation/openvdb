@@ -122,50 +122,101 @@ TestLinearInterp<GridType>::test()
     tree.setValue(openvdb::Coord(10,  9, 9), 4.0);
     tree.setValue(openvdb::Coord(11,  9, 9), 4.0);
 
-    // transform used for worldspace interpolation)
-    openvdb::tools::GridSampler<GridType, openvdb::tools::BoxSampler>
-        interpolator(grid);
-    //openvdb::tools::LinearInterp<GridType> interpolator(*tree);
+    {//using BoxSampler
+    
+        // transform used for worldspace interpolation)
+        openvdb::tools::GridSampler<GridType, openvdb::tools::BoxSampler>
+            interpolator(grid);
+        //openvdb::tools::LinearInterp<GridType> interpolator(*tree);
+        
+        typename GridType::ValueType val =
+            interpolator.sampleVoxel(10.5, 10.5, 10.5);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.375, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(11.0, 10.0, 10.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(11.0, 11.0, 10.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(11.0, 11.0, 11.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(9.0, 11.0, 9.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(9.0, 10.0, 9.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.1, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.792, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.41, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.41, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.71, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.01, val, TOLERANCE);
 
-    typename GridType::ValueType val =
-        interpolator.sampleVoxel(10.5, 10.5, 10.5);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.375, val, TOLERANCE);
-
-    val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, val, TOLERANCE);
-
-    val = interpolator.sampleVoxel(11.0, 10.0, 10.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
-
-    val = interpolator.sampleVoxel(11.0, 11.0, 10.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
-
-    val = interpolator.sampleVoxel(11.0, 11.0, 11.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, val, TOLERANCE);
-
-    val = interpolator.sampleVoxel(9.0, 11.0, 9.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, val, TOLERANCE);
-
-    val = interpolator.sampleVoxel(9.0, 10.0, 9.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, val, TOLERANCE);
-
-    val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.1, val, TOLERANCE);
-
-    val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.792, val, TOLERANCE);
-
-    val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.41, val, TOLERANCE);
-
-    val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.41, val, TOLERANCE);
-
-    val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.71, val, TOLERANCE);
-
-    val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.01, val, TOLERANCE);
+    }
+    {//using Sampler<1>
+        
+        // transform used for worldspace interpolation)
+        openvdb::tools::GridSampler<GridType, openvdb::tools::Sampler<1> > 
+            interpolator(grid);
+        //openvdb::tools::LinearInterp<GridType> interpolator(*tree);
+        
+        typename GridType::ValueType val =
+            interpolator.sampleVoxel(10.5, 10.5, 10.5);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.375, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(11.0, 10.0, 10.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(11.0, 11.0, 10.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(11.0, 11.0, 11.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(9.0, 11.0, 9.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(9.0, 10.0, 9.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.1, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.792, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.41, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.41, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.71, val, TOLERANCE);
+        
+        val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.01, val, TOLERANCE);
+    }
 }
 
 

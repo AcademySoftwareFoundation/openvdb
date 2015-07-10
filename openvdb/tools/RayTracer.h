@@ -322,7 +322,9 @@ public:
 
     void savePPM(const std::string& fileName)
     {
-        std::string name(fileName + ".ppm");
+        std::string name(fileName);
+        if (name.find_last_of(".") == std::string::npos) name.append(".ppm");
+        
         boost::scoped_array<unsigned char> buffer(new unsigned char[3*mSize]);
         unsigned char *tmp = buffer.get(), *q = tmp;
         RGBA* p = mPixels.get();
@@ -346,7 +348,8 @@ public:
 #ifdef OPENVDB_TOOLS_RAYTRACER_USE_EXR
     void saveEXR(const std::string& fileName, size_t compression = 2, size_t threads = 8)
     {
-        std::string name(fileName + ".exr");
+        std::string name(fileName);
+        if (name.find_last_of(".") == std::string::npos) name.append(".exr");
 
         if (threads>0) Imf::setGlobalThreadCount(threads);
         Imf::Header header(mWidth, mHeight);

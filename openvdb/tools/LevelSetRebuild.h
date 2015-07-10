@@ -268,10 +268,15 @@ doLevelSetRebuild(const GridType& grid, typename GridType::ValueType iso,
         primCpy.runParallel();
     }
 
-    MeshToVolume<GridType, InterruptT> vol(transform, OUTPUT_RAW_DATA, interrupter);
-    vol.convertToLevelSet(points, primitives, exBandWidth, inBandWidth);
+    QuadAndTriangleDataAdapter<Vec3s, Vec4I> mesh(points, primitives);
 
-    return vol.distGridPtr();
+    if (interrupter) {
+        return meshToVolume<GridType>(*interrupter, mesh, *transform, exBandWidth, inBandWidth,
+            DISABLE_RENORMALIZATION, NULL);
+    }
+
+    return meshToVolume<GridType>(mesh, *transform, exBandWidth, inBandWidth,
+        DISABLE_RENORMALIZATION, NULL);
 }
 
 

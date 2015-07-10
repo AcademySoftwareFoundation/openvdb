@@ -841,12 +841,13 @@ pointIndexSearchVoxels(RangeDeque& rangeList,
     const LeafNodeType& leaf, const Coord& min, const Coord& max)
 {
     typedef typename LeafNodeType::ValueType PointIndexT;
+    typedef typename PointIndexT::IntType    IntT;
     typedef typename RangeDeque::value_type  Range;
 
     Index xPos(0), pos(0), zStride = Index(max[2] - min[2]);
     const PointIndexT* dataPtr = &leaf.indices().front();
     PointIndexT beginOffset(0), endOffset(0),
-        previousOffset = PointIndexT(leaf.indices().size() + size_t(1));
+        previousOffset(static_cast<IntT>(leaf.indices().size() + 1u));
     Coord ijk(0);
 
     for (ijk[0] = min[0]; ijk[0] <= max[0]; ++ijk[0]) {

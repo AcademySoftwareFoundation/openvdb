@@ -658,6 +658,8 @@ public:
     /// @brief Reduce the memory footprint of this tree by replacing with tiles
     /// any nodes whose values are all the same (optionally to within a tolerance)
     /// and have the same active state.
+    ///
+    /// @note Consider instead using tools::pruneTiles which is multi-threaded!
     void prune(const ValueType& tolerance = zeroVal<ValueType>());
 
     /// @brief Add the given leaf node to this tree, creating a new branch if necessary.
@@ -773,6 +775,36 @@ public:
     /// @endcode
     template<typename ArrayT> void getNodes(ArrayT& array);
     template<typename ArrayT> void getNodes(ArrayT& array) const;
+    //@}
+
+    //@{
+    /// @brief Steals all nodes of a certain type from the tree and
+    /// adds them to a container with the following API:
+    /// @code
+    /// struct ArrayT {
+    ///    typedef value_type;// defines the type of nodes to be added to the array
+    ///    void push_back(value_type nodePtr);// method that add nodes to the array
+    /// };
+    /// @endcode
+    /// @details An example of a wrapper around a c-style array is:
+    /// @code
+    /// struct MyArray {
+    ///    typedef LeafType* value_type;
+    ///    value_type* ptr;
+    ///    MyArray(value_type* array) : ptr(array) {}
+    ///    void push_back(value_type leaf) { *ptr++ = leaf; }
+    ///};
+    /// @endcode
+    /// @details An example that constructs a list of pointer to all leaf nodes is:
+    /// @code
+    /// std::vector<const LeafNodeType*> array;//most std contains have the required API
+    /// array.reserve(tree.leafCount());//this is a fast preallocation.
+    /// tree.stealNodes(array);
+    /// @endcode
+    template<typename ArrayT>
+    void stealNodes(ArrayT& array, const ValueType& value, bool state);
+    template<typename ArrayT>
+    void stealNodes(ArrayT& array) { this->stealNodes(array, mBackground, false); }
     //@}
     
     /// Densify active tiles, i.e., replace them with leaf-level active voxels.
@@ -2759,6 +2791,35 @@ RootNode<ChildT>::getNodes(ArrayT& array) const
                 array.push_back(reinterpret_cast<NodePtr>(iter->second.child));
             } else {
                 child->getNodes(array);//descent
+            }
+            OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        }
+    }
+}
+
+////////////////////////////////////////
+
+template<typename ChildT>
+template<typename ArrayT>
+inline void
+RootNode<ChildT>::stealNodes(ArrayT& array, const ValueType& value, bool state)
+{
+    typedef typename ArrayT::value_type NodePtr;
+    BOOST_STATIC_ASSERT(boost::is_pointer<NodePtr>::value);
+    typedef typename boost::remove_pointer<NodePtr>::type NodeType;
+    typedef typename boost::remove_const<NodeType>::type NonConstNodeType;
+    typedef typename boost::mpl::contains<NodeChainType, NonConstNodeType>::type result;
+    BOOST_STATIC_ASSERT(result::value);
+    typedef typename boost::mpl::if_<boost::is_const<NodeType>,
+                                     const ChildT, ChildT>::type ArrayChildT;
+
+    for (MapIter iter=mTable.begin(); iter!=mTable.end(); ++iter) {
+        if (ChildT* child = iter->second.child) {
+            OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+            if (boost::is_same<NodePtr, ArrayChildT*>::value) {
+                array.push_back(reinterpret_cast<NodePtr>(&stealChild(iter, Tile(value, state))));
+            } else {
+                child->stealNodes(array, value, state);//descent
             }
             OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
         }
