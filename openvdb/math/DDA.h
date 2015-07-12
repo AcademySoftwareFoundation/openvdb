@@ -216,11 +216,11 @@ public:
 
     typedef typename TreeT::RootNodeType::NodeChainType ChainT;
     typedef typename boost::mpl::at<ChainT, boost::mpl::int_<ChildNodeLevel> >::type NodeT;
-    typedef typename tree::ValueAccessor<const TreeT> AccessorT;
     typedef typename RayT::TimeSpan TimeSpanT;
 
     VolumeHDDA() {}
 
+    template <typename AccessorT>
     TimeSpanT march(RayT& ray, AccessorT &acc)
     {
         TimeSpanT t(-1, -1);
@@ -232,8 +232,8 @@ public:
     /// have the two methods: clear() and push_back(). Thus, it could
     /// be std::vector<typename RayType::TimeSpan> or
     /// std::deque<typename RayType::TimeSpan>.  
-    template <typename ListType>
-    void hits(RayT& ray, AccessorT &acc, ListType& times)
+    template <typename AccessorT, typename ListT>
+    void hits(RayT& ray, AccessorT &acc, ListT& times)
     {
         TimeSpanT t(-1,-1);
         times.clear();
@@ -245,6 +245,7 @@ private:
 
     friend class VolumeHDDA<TreeT, RayT, ChildNodeLevel+1>;
 
+    template <typename AccessorT>
     bool march(RayT& ray, AccessorT &acc, TimeSpanT& t)
     {
         mDDA.init(ray);
@@ -268,8 +269,8 @@ private:
     /// have the two methods: clear() and push_back(). Thus, it could
     /// be std::vector<typename RayType::TimeSpan> or
     /// std::deque<typename RayType::TimeSpan>.
-    template <typename ListType>
-    void hits(RayT& ray, AccessorT &acc, ListType& times, TimeSpanT& t)
+    template <typename AccessorT, typename ListT>
+    void hits(RayT& ray, AccessorT &acc, ListT& times, TimeSpanT& t)
     {
         mDDA.init(ray);
         do {
@@ -299,11 +300,11 @@ class VolumeHDDA<TreeT, RayT, 0>
 public:
 
     typedef typename TreeT::LeafNodeType LeafT;
-    typedef typename tree::ValueAccessor<const TreeT> AccessorT;
     typedef typename RayT::TimeSpan TimeSpanT;
 
     VolumeHDDA() {}
 
+    template <typename AccessorT>
     TimeSpanT march(RayT& ray, AccessorT &acc)
     {
         TimeSpanT t(-1, -1);
@@ -311,8 +312,8 @@ public:
         return t;
     }
 
-    template <typename ListType>
-    void hits(RayT& ray, AccessorT &acc, ListType& times)
+    template <typename AccessorT, typename ListT>
+    void hits(RayT& ray, AccessorT &acc, ListT& times)
     {
         TimeSpanT t(-1,-1);
         times.clear();
@@ -324,6 +325,7 @@ private:
 
     friend class VolumeHDDA<TreeT, RayT, 1>;
 
+    template <typename AccessorT>
     bool march(RayT& ray, AccessorT &acc, TimeSpanT& t)
     {
         mDDA.init(ray);
@@ -341,8 +343,8 @@ private:
         return false;
     }
 
-    template <typename ListType>
-    void hits(RayT& ray, AccessorT &acc, ListType& times, TimeSpanT& t)
+    template <typename AccessorT, typename ListT>
+    void hits(RayT& ray, AccessorT &acc, ListT& times, TimeSpanT& t)
     {
         mDDA.init(ray);
         do {

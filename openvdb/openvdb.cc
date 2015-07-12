@@ -105,7 +105,6 @@ initialize()
     DoubleGrid::registerGrid();
     Int32Grid::registerGrid();
     Int64Grid::registerGrid();
-    HermiteGrid::registerGrid();
     StringGrid::registerGrid();
     Vec3IGrid::registerGrid();
     Vec3SGrid::registerGrid();

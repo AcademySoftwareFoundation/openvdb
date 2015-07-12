@@ -324,7 +324,7 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
         const fpreal time = context.getTime();
 
         // This does a shallow copy of VDB grids and deep copy of native Houdini primitives.
-        duplicateSourceStealable(0, context);
+        duplicateSource(0, context);
 
         const GU_Detail* refGdp = inputGeo(1, context);
 

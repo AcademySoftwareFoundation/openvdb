@@ -303,6 +303,7 @@ inline double Abs(double x) { return fabs(x); }
 inline long double Abs(long double x) { return fabsl(x); }
 inline uint32_t Abs(uint32_t i) { return i; }
 inline uint64_t Abs(uint64_t i) { return i; }
+inline bool Abs(bool b) { return b; }    
 // On OSX size_t and uint64_t are different types
 #if defined(__APPLE__) || defined(MACOSX)
 inline size_t Abs(size_t i) { return i; }

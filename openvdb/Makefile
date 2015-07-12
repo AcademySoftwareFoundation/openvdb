@@ -310,7 +310,6 @@ INCLUDE_NAMES := \
     math/Coord.h \
     math/DDA.h \
     math/FiniteDifference.h \
-    math/Hermite.h \
     math/LegacyFrustum.h \
     math/Maps.h \
     math/Mat.h \
@@ -341,6 +340,7 @@ INCLUDE_NAMES := \
     tools/Composite.h \
     tools/Dense.h \
     tools/DenseSparseTools.h \
+    tools/DensityAdvect.h \
     tools/Diagnostics.h \
     tools/Filter.h \
     tools/GridOperators.h \
@@ -370,6 +370,7 @@ INCLUDE_NAMES := \
     tools/Statistics.h \
     tools/ValueTransformer.h \
     tools/VectorTransformer.h \
+    tools/VelocityFields.h \
     tools/VolumeToMesh.h \
     tools/VolumeToSpheres.h \
     tree/InternalNode.h \
@@ -391,6 +392,7 @@ INCLUDE_NAMES := \
     util/Name.h \
     util/NodeMasks.h \
     util/NullInterrupter.h \
+    util/PagedArray.h \
     util/Util.h \
     version.h \
 #
@@ -404,7 +406,6 @@ SRC_NAMES := \
     io/Queue.cc \
     io/Stream.cc \
     io/TempFile.cc \
-    math/Hermite.cc \
     math/Maps.cc \
     math/Proximity.cc \
     math/QuantizedUnitVec.cc \
@@ -442,7 +443,6 @@ UNITTEST_SRC_NAMES := \
     unittest/TestGridDescriptor.cc \
     unittest/TestGridIO.cc \
     unittest/TestGridTransformer.cc \
-    unittest/TestHermite.cc \
     unittest/TestInit.cc \
     unittest/TestInt32Metadata.cc \
     unittest/TestInt64Metadata.cc \
@@ -485,6 +485,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestTreeGetSetValues.cc \
     unittest/TestTreeIterators.cc \
     unittest/TestTreeVisitor.cc \
+    unittest/TestUtil.cc \
     unittest/TestValueAccessor.cc \
     unittest/TestVec2Metadata.cc \
     unittest/TestVec3Metadata.cc \

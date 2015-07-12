@@ -123,8 +123,6 @@ public:
         bool isOutOfCore() const { return false; }
         /// Return @c true if memory for this buffer has not yet been allocated.
         bool empty() const { return (mData == NULL); }
-        /// Allocate memory for this buffer if it has not already been allocated.
-        bool allocate() { if (mData == NULL) mData = new ValueType[SIZE]; return !this->empty(); }
 #else
         typedef ValueType WordType;
         static const Index WORD_COUNT = SIZE;
@@ -164,9 +162,9 @@ public:
         bool isOutOfCore() const { return bool(mOutOfCore); }
         /// Return @c true if memory for this buffer has not yet been allocated.
         bool empty() const { return !mData || this->isOutOfCore(); }
+#endif
         /// Allocate memory for this buffer if it has not already been allocated.
         bool allocate() { if (mData == NULL) mData = new ValueType[SIZE]; return !this->empty(); }
-#endif
 
         /// Populate this buffer with a constant value.
         void fill(const ValueType& val)
@@ -270,7 +268,15 @@ public:
         {
 #ifndef OPENVDB_2_ABI_COMPATIBLE
             this->loadValues();
-            if (mData == NULL) mData = new ValueType[SIZE];
+            if (mData == NULL) {
+
+                Buffer* self = const_cast<Buffer*>(this);
+
+                // Since this method is const we need a lock (which
+                // will be contended at most once) to make it thread-safe.
+                tbb::spin_mutex::scoped_lock lock(self->mMutex);
+                if (mData == NULL) self->mData = new ValueType[SIZE];
+            }
 #endif
             return mData;
         }
@@ -351,7 +357,7 @@ public:
 #else
         union {
             ValueType* mData;
-            FileInfo* mFileInfo;
+            FileInfo*  mFileInfo;
         };
         Index32 mOutOfCore; // currently interpreted as bool; extra bits reserved for future use
         tbb::spin_mutex mMutex; // 1 byte
@@ -997,6 +1003,7 @@ public:
     template<typename NodeT>
     const NodeT* probeConstNode(const Coord&) const { return NULL; }
     template<typename ArrayT> void getNodes(ArrayT&) const {}
+    template<typename ArrayT> void stealNodes(ArrayT&, const ValueType&, bool) {}
     //@}
 
     void addTile(Index level, const Coord&, const ValueType&, bool);

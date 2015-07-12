@@ -134,7 +134,7 @@ solve(const TreeType&, math::pcg::State&, Interrupter&);
 //@{
 /// @brief Solve &nabla;<sup><small>2</small></sup><i>x</i> = <i>b</i> for <i>x</i>
 /// with user-specified boundary conditions, where @e b is a vector comprising
-/// the values of all of the active voxels in the input tree.
+/// the values of all of the active voxels in the input tree or domain mask if provided
 /// @return a new tree, with the same active voxel topology as the input tree,
 /// whose voxel values are the elements of the solution vector <i>x</i>.
 /// @details On input, the State object should specify convergence criteria
@@ -169,7 +169,12 @@ solveWithBoundaryConditions(const TreeType&, const BoundaryOp&, math::pcg::State
 template<typename PreconditionerType, typename TreeType, typename BoundaryOp, typename Interrupter>
 inline typename TreeType::Ptr
 solveWithBoundaryConditionsAndPreconditioner(const TreeType&, const BoundaryOp&,
-    math::pcg::State&, Interrupter&);
+                                             math::pcg::State&, Interrupter&);
+
+template<typename PreconditionerType, typename TreeType, typename DomainTreeType, typename BoundaryOp, typename Interrupter>
+inline typename TreeType::Ptr
+solveWithBoundaryConditionsAndPreconditioner(const TreeType&, const DomainTreeType&, const BoundaryOp&, 
+                                             math::pcg::State&, Interrupter&);
 //@}
 
 
@@ -318,7 +323,7 @@ populateIndexTree(VIndexTreeType& result)
     }
 
     // The last accumulated value should be the total of all active voxels.
-    assert(perLeafCount[leafCount-1] == result.activeVoxelCount());
+    assert(Index64(perLeafCount[leafCount-1]) == result.activeVoxelCount());
 
     // Parallelize over the leaf nodes of the tree, storing a unique index
     // in each active voxel.
@@ -678,6 +683,19 @@ inline typename TreeType::Ptr
 solveWithBoundaryConditionsAndPreconditioner(const TreeType& inTree,
     const BoundaryOp& boundaryOp, math::pcg::State& state, Interrupter& interrupter)
 {
+    
+    return solveWithBoundaryConditionsAndPreconditioner<PreconditionerType>(inTree /*source*/, inTree /*domain mask*/, 
+                                                                            boundaryOp, state, interrupter);
+}
+
+template<typename PreconditionerType, typename TreeType, typename DomainTreeType, typename BoundaryOp, typename Interrupter>
+inline typename TreeType::Ptr
+solveWithBoundaryConditionsAndPreconditioner(const TreeType& inTree,
+                                             const DomainTreeType& domainMask,
+                                             const BoundaryOp& boundaryOp, 
+                                             math::pcg::State& state, Interrupter& interrupter)
+{
+
     typedef typename TreeType::ValueType           TreeValueT;
     typedef LaplacianMatrix::ValueType             VecValueT;
     typedef typename math::pcg::Vector<VecValueT>  VectorT;
@@ -685,7 +703,7 @@ solveWithBoundaryConditionsAndPreconditioner(const TreeType& inTree,
     typedef typename TreeType::template ValueConverter<bool>::Type    MaskTreeT;
 
     // 1. Create a mapping from active voxels of the input tree to elements of a vector.
-    typename VIdxTreeT::ConstPtr idxTree = createIndexTree(inTree);
+    typename VIdxTreeT::ConstPtr idxTree = createIndexTree(domainMask);
 
     // 2. Populate a vector with values from the input tree.
     typename VectorT::Ptr b = createVectorFromTree<VecValueT>(inTree, *idxTree);

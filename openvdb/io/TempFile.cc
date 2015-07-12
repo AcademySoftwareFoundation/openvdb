@@ -36,6 +36,7 @@
 #ifndef _MSC_VER
 #include <boost/iostreams/stream.hpp>
 #include <boost/iostreams/device/file_descriptor.hpp>
+#include <boost/version.hpp> // for BOOST_VERSION
 #include <cstdlib> // for std::getenv(), mkstemp()
 #include <sys/types.h> // for mode_t
 #include <sys/stat.h> // for mkdir(), umask()
@@ -48,6 +49,10 @@
 #include <sstream>
 #include <string>
 #include <vector>
+
+#ifndef DWA_BOOST_VERSION
+#define DWA_BOOST_VERSION (10 * BOOST_VERSION)
+#endif
 
 
 namespace openvdb {
@@ -82,7 +87,11 @@ struct TempFile::TempFileImpl
 
         mPath.assign(&fnbuf[0]);
 
+#if DWA_BOOST_VERSION >= 1046000
         mDevice = DeviceType(mFileDescr, boost::iostreams::never_close_handle);
+#else
+        mDevice = DeviceType(mFileDescr, /*closeOnExit=*/false);
+#endif
         mBuffer.open(mDevice);
         os.rdbuf(&mBuffer);
 

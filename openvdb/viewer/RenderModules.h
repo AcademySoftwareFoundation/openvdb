@@ -34,7 +34,6 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/VolumeToMesh.h>
 #include <openvdb/tools/MeshToVolume.h>
-#include <openvdb/tools/LevelSetUtil.h>
 #include <openvdb/tools/PointScatter.h>
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/math/Operators.h>

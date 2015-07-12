@@ -874,7 +874,7 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
     const openvdb::GridClass gridClass = firstGrid->getGridClass();
 
     typename GridType::ConstPtr refGrid;
-    typedef typename openvdb::tools::MeshToVolume<GridType>::IntGridT IntGridT;
+    typedef typename GridType::template ValueConverter<openvdb::Int32>::Type IntGridT;
     typename IntGridT::Ptr indexGrid; // replace
 
     openvdb::tools::MeshToVoxelEdgeData edgeData;
@@ -917,19 +917,18 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
 
         if (boss.wasInterrupted()) return;
 
-        openvdb::tools::MeshToVolume<GridType, hvdb::Interrupter>
-            converter(transform, openvdb::tools::GENERATE_PRIM_INDEX_GRID, &boss);
+        openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec4I> mesh(pointList, primList);
 
-        if (gridClass == openvdb::GRID_LEVEL_SET) {
-            converter.convertToLevelSet(pointList, primList);
-        } else {
-            const ValueType bandWidth =
-                static_cast<ValueType>(backgroundValue / transform->voxelSize()[0]);
-            converter.convertToLevelSet(pointList, primList, bandWidth, bandWidth);
+        float bandWidth = 3.0;
+
+        if (gridClass != openvdb::GRID_LEVEL_SET) {
+            bandWidth = float(backgroundValue) / float(transform->voxelSize()[0]);
         }
 
-        refGrid = converter.distGridPtr();
-        indexGrid = converter.indexGridPtr();
+        indexGrid.reset(new IntGridT(0));
+
+        refGrid = openvdb::tools::meshToVolume<GridType>(boss,
+            mesh, *transform, bandWidth, bandWidth, 0, indexGrid.get());
 
         if (sharpenFeatures) edgeData.convert(pointList, primList);
     }

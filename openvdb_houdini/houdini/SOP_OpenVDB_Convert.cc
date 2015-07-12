@@ -71,6 +71,12 @@
 #define HAVE_SPLITTING 0
 #endif
 
+#if (UT_VERSION_INT >= 0x0e05005b) // 14.5.91 or later
+#define HAVE_ACTIVATEINSIDE 1
+#else
+#define HAVE_ACTIVATEINSIDE 0
+#endif
+
 #if defined(__GNUC__) && !defined(__INTEL_COMPILER)
 // GA_RWHandleV3 fails to initialize its member variables in some cases.
 #pragma GCC diagnostic ignored "-Wuninitialized"
@@ -355,6 +361,12 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(PRMoneDefaults)
         .setHelpText("Reclassify inactive output voxels as either inside or outside."));
 
+#if HAVE_ACTIVATEINSIDE
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "activateinsidesdf", "Activate Inside Voxels")
+        .setDefault(PRMoneDefaults)
+        .setHelpText("Activate all voxels inside a converted level set."));
+#endif
+
     //////////
 
     // Obsolete parameters
@@ -438,13 +450,18 @@ convertToOpenVDB(
     GA_PrimitiveGroup* group,
     bool flood,
     bool prune,
-    fpreal tolerance)
+    fpreal tolerance,
+    bool activateinsidesdf)
 {
     GU_ConvertParms parms;
     parms.primGroup = group;
     parms.preserveGroups = true;
     GU_PrimVDB::convertVolumesToVDBs(
-        dst, dst, parms, flood, prune, tolerance, /*keep_original*/false);
+        dst, dst, parms, flood, prune, tolerance, /*keep_original*/false
+#if HAVE_ACTIVATEINSIDE
+	, activateinsidesdf
+#endif
+	);
 }
 
 
@@ -519,12 +536,12 @@ convertVDBClass(
                     }
                 }
 
-                tools::MeshToVolume<FloatGrid> vol(transform);
-                vol.convertToLevelSet(points, primitives,
-                    LEVEL_SET_HALF_WIDTH, LEVEL_SET_HALF_WIDTH);
+                openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec4I> mesh(points, primitives);
+
+                openvdb::FloatGrid::Ptr sdfGrid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(mesh, *transform);
 
                 // Set grid and visualization
-                it->setGrid(*vol.distGridPtr());
+                it->setGrid(*sdfGrid);
                 it->setVisualization(
                     GEO_VOLUMEVIS_ISO, it->getVisIso(), it->getVisDensity());
                 break;
@@ -882,6 +899,12 @@ SOP_OpenVDB_Convert::updateParmsFlags()
     changed |= setVisibleState("tolerance", toOpenVDB);
     changed |= setVisibleState("vdbclass", toOpenVDB);
 
+#if HAVE_ACTIVATEINSIDE
+    changed |= setVisibleState("activateinsidesdf", toOpenVDB);
+    if (toOpenVDB)
+	changed |= enableParm("activateinsidesdf", evalInt("flood",  0, time));
+#endif
+
     return changed;
 }
 
@@ -923,8 +946,10 @@ SOP_OpenVDB_Convert::referenceMeshing(
     const openvdb::GridClass gridClass = firstGrid->getGridClass();
 
     typename GridType::ConstPtr refGrid;
-    typedef typename openvdb::tools::MeshToVolume<GridType>::IntGridT IntGridT;
+
+    typedef typename GridType::template ValueConverter<openvdb::Int32>::Type IntGridT;
     typename IntGridT::Ptr indexGrid;
+
     openvdb::tools::MeshToVoxelEdgeData edgeData;
 
     boost::shared_ptr<GU_Detail> geoPtr;
@@ -951,19 +976,19 @@ SOP_OpenVDB_Convert::referenceMeshing(
 
         if (boss.wasInterrupted()) return;
 
-        openvdb::tools::MeshToVolume<GridType, hvdb::Interrupter>
-            converter(transform, openvdb::tools::GENERATE_PRIM_INDEX_GRID, &boss);
+        openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec4I> mesh(pointList, primList);
 
-        if (gridClass == openvdb::GRID_LEVEL_SET) {
-            converter.convertToLevelSet(pointList, primList);
-        } else {
-            const ValueType bandWidth = static_cast<ValueType>(
-                backgroundValue / transform->voxelSize()[0]);
-            converter.convertToLevelSet(pointList, primList, bandWidth, bandWidth);
+        float bandWidth = 3.0;
+
+        if (gridClass != openvdb::GRID_LEVEL_SET) {
+            bandWidth = float(backgroundValue) / float(transform->voxelSize()[0]);
         }
 
-        refGrid = converter.distGridPtr();
-        indexGrid = converter.indexGridPtr();
+        indexGrid.reset(new IntGridT(0));
+
+        refGrid = openvdb::tools::meshToVolume<GridType>(boss,
+            mesh, *transform, bandWidth, bandWidth, 0, indexGrid.get());
+
         if (sharpenFeatures) edgeData.convert(pointList, primList);
     }
 
@@ -1332,10 +1357,16 @@ SOP_OpenVDB_Convert::cookMySop(OP_Context& context)
                 break;
             }
             case OPENVDB: {
+#if HAVE_ACTIVATEINSIDE
+		const bool activateinside = (evalInt("activateinsidesdf", 0, t) != 0);
+#else
+		const bool activateinside = true;
+#endif
                 convertToOpenVDB(*gdp, group,
                     (evalInt("flood", 0, t) != 0),
                     (evalInt("prune", 0, t) != 0),
-                    evalFloat("tolerance", 0, t));
+                    evalFloat("tolerance", 0, t),
+		    activateinside);
 
                 switch (evalInt("vdbclass", 0, t)) {
                     case CLASS_SDF:

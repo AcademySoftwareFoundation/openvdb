@@ -1104,7 +1104,7 @@ private:
     LeafArray& mLeafArray;
     SetType mInactiveValues;
     size_t mNumValues;
-};
+};// InactiveVoxelValues
 
 template<typename TreeType>
 InactiveVoxelValues<TreeType>::InactiveVoxelValues(LeafArray& leafs, size_t numValues)

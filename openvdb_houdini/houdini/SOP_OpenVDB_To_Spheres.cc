@@ -150,6 +150,9 @@ newSopOperator(OP_OperatorTable* table)
 #endif
         .setHelpText("Enable to add an id point attribute that corresponds to different VDBs."));
 
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "dopscale", "Add PScale Attribute")
+        .setDefault(PRMzeroDefaults));
+
     //////////
 
     hvdb::OpenVDBOpFactory("OpenVDB To Spheres", SOP_OpenVDB_To_Spheres::factory, parms, *table)
@@ -219,7 +222,7 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
         const int scatter = evalInt("scatter", 0, time);
         const bool preserve = evalInt("preserve", 0, time);
 
-        const bool addID = evalInt("doid", 0, time);
+        const bool addID = evalInt("doid", 0, time) != 0;
         GA_RWHandleI idAttr;
         if (addID) {
             GA_RWAttributeRef aRef = gdp->findPointAttribute("id");
@@ -229,6 +232,20 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
             idAttr = aRef.getAttribute();
             if(!idAttr.isValid()) {
                 addWarning(SOP_MESSAGE, "Failed to create the point ID attribute.");
+                return error();
+            }
+        }
+
+        const bool addPScale = evalInt("dopscale", 0, time) != 0;
+        GA_RWHandleF pscaleAttr;
+        if (addPScale) {
+            GA_RWAttributeRef aRef = gdp->findFloatTuple(GA_ATTRIB_POINT, GEO_STD_ATTRIB_PSCALE);
+            if (!aRef.isValid()) {
+                aRef = gdp->addFloatTuple(GA_ATTRIB_POINT, GEO_STD_ATTRIB_PSCALE, 1, GA_Defaults(0));
+            }
+            pscaleAttr = aRef.getAttribute();
+            if(!pscaleAttr.isValid()) {
+                addWarning(SOP_MESSAGE, "Failed to create the point pscale attribute.");
                 return error();
             }
         }
@@ -289,6 +306,11 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
                 if (addID) {
                     idAttr.set(ptoff, idNumber);
                 }
+
+                if (addPScale) {
+                    pscaleAttr.set(ptoff, sphere[3]);
+                }
+
                 UT_Matrix4 mat = UT_Matrix4::getIdentityMatrix();
                 mat.scale(sphere[3],sphere[3],sphere[3]);
 

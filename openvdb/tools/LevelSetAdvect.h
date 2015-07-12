@@ -39,10 +39,11 @@
 #ifndef OPENVDB_TOOLS_LEVEL_SET_ADVECT_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_LEVEL_SET_ADVECT_HAS_BEEN_INCLUDED
 
+#include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 #include <openvdb/Platform.h>
 #include "LevelSetTracker.h"
-#include "Interpolation.h" // for BoxSampler, etc.
+#include "VelocityFields.h" // for EnrightField
 #include <openvdb/math/FiniteDifference.h>
 #include <boost/math/constants/constants.hpp>
 
@@ -50,85 +51,6 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
-
-/// Below are two simple wrapper classes for advection velocity fields
-/// DiscreteField wraps a velocity grid and EnrightField is mostly
-/// intended for debugging (it's an analytical divergence free and
-/// periodic field). They both share the same API required by the
-/// LevelSetAdvection class defined below. Thus, any class with this
-/// API should work with LevelSetAdvection.
-
-/// Note the Field wrapper classes below always assume the velocity
-/// is represented in the world-frame of reference. For DiscreteField
-/// this implies the input grid must contain velocities in world
-/// coordinates.
-
-/// @brief Thin wrapper class for a velocity grid
-/// @note Consider replacing BoxSampler with StaggeredBoxSampler
-template <typename VelGridT, typename Interpolator = BoxSampler>
-class DiscreteField
-{
-public:
-    typedef typename VelGridT::ValueType     VectorType;
-    typedef typename VectorType::ValueType   ValueType;
-
-    DiscreteField(const VelGridT &vel): mAccessor(vel.tree()), mTransform(&vel.transform()) {}
-
-    /// @return const reference to the transfrom between world and index space
-    /// @note Use this method to determine if a client grid is
-    /// aligned with the coordinate space of the velocity grid.
-    const math::Transform& transform() const { return *mTransform; }
-
-    /// @return the interpolated velocity at the world space position xyz
-    inline VectorType operator() (const Vec3d& xyz, ValueType) const
-    {
-        VectorType result = zeroVal<VectorType>();
-        Interpolator::sample(mAccessor, mTransform->worldToIndex(xyz), result);
-        return result;
-    }
-
-    /// @return the velocity at the coordinate space position ijk
-    inline VectorType operator() (const Coord& ijk, ValueType) const
-    {
-        return mAccessor.getValue(ijk);
-    }
-
-private:
-    const typename VelGridT::ConstAccessor mAccessor;//Not thread-safe
-    const math::Transform*                 mTransform;
-
-}; // end of DiscreteField
-
-/// @brief Analytical, divergence-free and periodic vecloity field
-/// @note Primarily intended for debugging!
-/// @warning This analytical velocity only produce meaningfull values
-/// in the unitbox in world space. In other words make sure any level
-/// set surface in fully enclodes in the axis aligned bounding box
-/// spanning 0->1 in world units.
-template <typename ScalarT = float>
-class EnrightField
-{
-public:
-    typedef ScalarT             ValueType;
-    typedef math::Vec3<ScalarT> VectorType;
-
-    EnrightField() {}
-
-    /// @return const reference to the identity transfrom between world and index space
-    /// @note Use this method to determine if a client grid is
-    /// aligned with the coordinate space of this velocity field
-    math::Transform transform() const { return math::Transform(); }
-
-    /// @return the velocity in world units, evaluated at the world
-    /// position xyz and at the specified time
-    inline VectorType operator() (const Vec3d& xyz, ValueType time) const;
-
-    /// @return the velocity at the coordinate space position ijk
-    inline VectorType operator() (const Coord& ijk, ValueType time) const
-    {
-        return (*this)(ijk.asVec3d(), time);
-    }
-}; // end of EnrightField
 
 /// @brief  Hyperbolic advection of narrow-band level sets in an
 /// external velocity field
@@ -386,25 +308,6 @@ LevelSetAdvection<GridT, FieldT, InterruptT>::advect3(ValueType time0, ValueType
     return tmp.advect(time0, time1);
 }
 
-///////////////////////////////////////////////////////////////////////
-
-template <typename ScalarT>
-inline math::Vec3<ScalarT>
-EnrightField<ScalarT>::operator() (const Vec3d& xyz, ValueType time) const
-{
-    const ScalarT pi = boost::math::constants::pi<ScalarT>();
-    const ScalarT phase = pi / ScalarT(3.0);
-    const ScalarT Px =  pi * ScalarT(xyz[0]), Py = pi * ScalarT(xyz[1]), Pz = pi * ScalarT(xyz[2]);
-    const ScalarT tr =  cos(ScalarT(time) * phase);
-    const ScalarT a  =  sin(ScalarT(2.0)*Py);
-    const ScalarT b  = -sin(ScalarT(2.0)*Px);
-    const ScalarT c  =  sin(ScalarT(2.0)*Pz);
-    return math::Vec3<ScalarT>(
-        tr * ( ScalarT(2) * math::Pow2(sin(Px)) * a * c ),
-        tr * ( b * math::Pow2(sin(Py)) * c ),
-        tr * ( b * a * math::Pow2(sin(Pz)) ));
-}
-
 
 ///////////////////////////////////////////////////////////////////////
 
@@ -640,14 +543,14 @@ cook(ThreadingMode mode, size_t swapBuffer)
     const int grainSize   = mParent.mTracker.getGrainSize();
     const LeafRange range = mParent.mTracker.leafs().leafRange(grainSize);
 
-    if (mParent.mTracker.getGrainSize()==0) {
+    if (grainSize == 0) {
         (*this)(range);
     } else if (mode == PARALLEL_FOR) {
         tbb::parallel_for(range, *this);
     } else if (mode == PARALLEL_REDUCE) {
         tbb::parallel_reduce(range, *this);
     } else {
-        throw std::runtime_error("Undefined threading mode");
+        OPENVDB_THROW(ValueError,"Undefined threading mode");
     }
 
     mParent.mTracker.leafs().swapLeafBuffer(swapBuffer, grainSize == 0);

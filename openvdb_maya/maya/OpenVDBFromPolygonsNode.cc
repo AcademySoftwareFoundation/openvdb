@@ -435,25 +435,28 @@ MStatus OpenVDBFromPolygonsNode::compute(const MPlug& plug, MDataBlock& data)
 
         if (exportDistanceGrid || exportDensityGrid) {
 
-            openvdb::tools::MeshToVolume<openvdb::FloatGrid> converter(transform);
-            const float exteriorBandWidth = data.inputValue(aExteriorBandWidth, &status).asFloat();
+            float exteriorBandWidth = data.inputValue(aExteriorBandWidth, &status).asFloat();
+            float interiorBandWidth = exteriorBandWidth;
+
+            int conversionFlags = 0;
 
             // convert to SDF
             if (!data.inputValue(aUnsignedDistanceField, &status).asBool()) {
 
-                float interiorBandWidth = std::numeric_limits<float>::max();
                 if (!data.inputValue(aFillInterior, &status).asBool()) {
                     interiorBandWidth = data.inputValue(aInteriorBandWidth, &status).asFloat();
+                } else {
+                    interiorBandWidth = std::numeric_limits<float>::max();
                 }
 
-                converter.convertToLevelSet(pointList, primList, exteriorBandWidth, interiorBandWidth);
-
-            // or convert to UDF
             } else {
-                 converter.convertToUnsignedDistanceField(pointList, primList, exteriorBandWidth);
+                conversionFlags = openvdb::tools::UNSIGNED_DISTANCE_FIELD;
             }
 
-            openvdb::FloatGrid::Ptr grid = converter.distGridPtr();
+            openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec4I> mesh(pointList, primList);
+
+            openvdb::FloatGrid::Ptr grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
+                mesh, *transform, exteriorBandWidth, interiorBandWidth, conversionFlags);
 
             // export distance grid
             if (exportDistanceGrid) {

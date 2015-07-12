@@ -8,7 +8,7 @@ Requirements
 
 - GNU gmake (www.gnu.org/software/make/), version 3.81 or later
 
-- Boost (www.boost.org), version 1.46.0 or later
+- Boost (www.boost.org), version 1.42.0 or later
   (Linux: yum install boost-devel; OS X: port install boost +python26)
 
 - libz (zlib.net)
