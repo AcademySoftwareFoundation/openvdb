@@ -36,7 +36,7 @@
 ///
 /// @brief Hyperbolic advection of density (vs a level set interface)
 ///
-/// @warning Currently assumes that the velocity and density grids are alinged.
+/// @warning Currently assumes that the velocity and density grids are aligned.
 ///
 /// @todo Allow for misaligned grids (as is the case for LevelSetAdvection).
 
@@ -92,7 +92,7 @@ public:
     {
     }
 
-    /// @brief Define the number of integrations steps to be performed per
+    /// @brief Define the number of integration steps to be performed per
     /// advection step (the default is one).
     void setIntegrationCount(size_t iterations) { mCountRK = iterations; }
 
@@ -100,7 +100,7 @@ public:
     size_t getIntegrationCount() const { return mCountRK; }
 
     /// @brief Define the order of the Runge-Kutta integration scheme
-    /// employed during the back-tracing in the semi-lagrgangian integration.
+    /// employed during the back-tracing in the semi-lagrangian integration.
     ///
     /// @note Note the order of the velocity sampling is always one,
     ///       i.e. based on tri-linear interpolation! However the
@@ -109,7 +109,7 @@ public:
     void setIntegrationOrder(size_t orderRK) { mOrderRK = math::Min(orderRK, size_t(4)); }
 
     /// @return The order of the Runge-Kutta integration scheme employed
-    ///         during the back-tracing in the semi-lagrgangian integration.
+    ///         during the back-tracing in the semi-lagrangian integration.
     size_t getIntegrationOrder() const { return mOrderRK; }
 
      /// @return the grain-size used for multi-threading
@@ -119,11 +119,11 @@ public:
     /// @note A grainsize of 0 or less disables multi-threading!
     void setGrainSize(size_t grainsize) { mGrainSize = grainsize; }
 
-    /// @return Returns a new density grid that is the results of passive advection
+    /// @return Returns a new density grid that is the result of passive advection
     ///         of all the active values the input density for the
     ///         time = dt * IntegrationCount.
     ///
-    /// @param grid0   The input densit grid to be advected (unmodified)
+    /// @param grid0   The input density grid to be advected (unmodified)
     /// @param dt      Time-step of the Runge-Kutta integrator.
     ///
     /// @note It is important to note that the input density @c grid1 is assumed
@@ -151,7 +151,7 @@ public:
         return grid1;
     }
 
-    /// @return Returns a new density grid that is the results of
+    /// @return Returns a new density grid that is the result of
     ///         passive advection of the active values in @a grid0
     ///         that intersect the active values in @c mask. The time
     ///         of the output grid corresponds to dt * IntegrationCount.
@@ -287,7 +287,7 @@ private:
     const VelocityGridT& mVelGrid;
     double               mMaxVelocity;
     InterrupterType*     mInterrupter;
-    float                mDt;// time step per RK integration steps
+    float                mDt;// time step per RK integration step
     size_t               mCountRK;// number of RK integration steps
     size_t               mOrderRK;// order of the RK integrator
     size_t               mGrainSize;// for multi-threading (0 means no threading)
