@@ -378,6 +378,8 @@ public:
     virtual bool compress();
     /// Uncompress the attribute array.
     virtual bool decompress();
+    /// Uncompress the compressed buffer supplied into the attribute array.
+    bool decompress(const StorageType* compressedData);
 
     /// Read attribute data from a stream.
     virtual void read(std::istream& is);
@@ -1117,45 +1119,49 @@ TypedAttributeArray<ValueType_, Codec_>::compress()
 
 template<typename ValueType_, typename Codec_>
 inline bool
-TypedAttributeArray<ValueType_, Codec_>::decompress()
+TypedAttributeArray<ValueType_, Codec_>::decompress(const StorageType* compressedData)
 {
 #ifdef OPENVDB_USE_BLOSC
 
-    tbb::spin_mutex::scoped_lock lock(mMutex);
+    size_t inBytes, compressedBytes, blockSize;
+    blosc_cbuffer_sizes(compressedData, &inBytes, &compressedBytes, &blockSize);
 
-    if (mCompressedBytes != 0) {
+    int bufBytes = inBytes + BLOSC_MAX_OVERHEAD;
+    boost::scoped_array<char> outBuf(new char[bufBytes]);
 
-        size_t inBytes = 0;
-        blosc_cbuffer_sizes(mData, &inBytes, NULL, NULL);
+    const int outBytes = blosc_decompress_ctx(
+         /*src=*/compressedData, /*dest=*/outBuf.get(), bufBytes, /*numthreads=*/1);
 
-        int bufBytes = inBytes + BLOSC_MAX_OVERHEAD;
-        boost::scoped_array<char> outBuf(new char[bufBytes]);
-
-        const int outBytes = blosc_decompress_ctx(
-             /*src=*/mData, /*dest=*/outBuf.get(), bufBytes, /*numthreads=*/1);
-
-        if (bufBytes < 1) {
-            OPENVDB_LOG_DEBUG("blosc_decompress() returned error code " << bufBytes);
-            return false;
-        }
-
-        if (mData) delete[] mData;
-
-        char* outData = new char[outBytes];
-        std::memcpy(outData, outBuf.get(), size_t(outBytes));
-        mData = reinterpret_cast<StorageType*>(outData);
-
-        mCompressedBytes = 0;
-        return true;
+    if (bufBytes < 1) {
+        OPENVDB_LOG_DEBUG("blosc_decompress() returned error code " << bufBytes);
+        return false;
     }
+
+    if (mData) delete[] mData;
+
+    char* outData = new char[outBytes];
+    std::memcpy(outData, outBuf.get(), size_t(outBytes));
+    mData = reinterpret_cast<StorageType*>(outData);
+
+    mCompressedBytes = 0;
+    return true;
 
 #else
 
-    if (mCompressedBytes != 0) { // throw if the array is compressed.
-        OPENVDB_THROW(RuntimeError, "Can't extract compressed data without the blosc library.");
-    }
+    OPENVDB_THROW(RuntimeError, "Can't extract compressed data without the blosc library.");
 
 #endif
+}
+
+template<typename ValueType_, typename Codec_>
+inline bool
+TypedAttributeArray<ValueType_, Codec_>::decompress()
+{
+    tbb::spin_mutex::scoped_lock lock(mMutex);
+
+    if (mCompressedBytes != 0) {
+        return this->decompress(this->mData);
+    }
 
     return false;
 }
