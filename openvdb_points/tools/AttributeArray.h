@@ -321,6 +321,12 @@ public:
     /// Return the @a value at index @a n
     template<typename T> void get(Index n, T& value) const;
 
+    /// Non-member equivalent to get() that static_casts array to this TypedAttributeArray
+    static ValueType get(const AttributeArray* array, const Index n);
+
+    /// Non-member equivalent to set() that static_casts array to this TypedAttributeArray
+    static void set(AttributeArray* array, const Index n, const ValueType& value);
+
     /// Set @a value at the given index @a n
     void set(Index n, const ValueType& value);
     /// Set @a value at the given index @a n
@@ -898,6 +904,14 @@ TypedAttributeArray<ValueType_, Codec_>::get(Index n, T& val) const
 
 
 template<typename ValueType_, typename Codec_>
+typename TypedAttributeArray<ValueType_, Codec_>::ValueType
+TypedAttributeArray<ValueType_, Codec_>::get(const AttributeArray* array, const Index n)
+{
+    return static_cast<const TypedAttributeArray<ValueType, Codec>*>(array)->get(n);
+}
+
+
+template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::set(Index n, const ValueType& val)
 {
@@ -932,6 +946,14 @@ TypedAttributeArray<ValueType_, Codec_>::set(Index n, const AttributeArray& sour
     sourceTypedArray.get(sourceIndex, sourceValue);
 
     this->set(n, sourceValue);
+}
+
+
+template<typename ValueType_, typename Codec_>
+void
+TypedAttributeArray<ValueType_, Codec_>::set(AttributeArray* array, const Index n, const ValueType& value)
+{
+    static_cast<TypedAttributeArray<ValueType, Codec>*>(array)->set(n, value);
 }
 
 
