@@ -402,6 +402,49 @@ private:
     tbb::spin_mutex mMutex;
 }; // class TypedAttributeArray
 
+
+////////////////////////////////////////
+
+
+/// AttributeHandles provide access to specific TypedAttributeArray methods without needing
+/// to know the compression codec, however these methods also incur the cost of a function pointer
+template <typename T>
+class AttributeHandle
+{
+protected:
+    typedef T (*GetterPtr)(const AttributeArray* array, const Index n);
+    typedef void (*SetterPtr)(AttributeArray* array, const Index n, const T& value);
+
+public:
+    AttributeHandle(const AttributeArray* array);
+
+    T get(Index n) const;
+
+protected:
+    AttributeArray* mArray;
+
+    GetterPtr mGetter;
+    SetterPtr mSetter;
+}; // class AttributeHandle
+
+
+/// Write-able version of AttributeHandle
+template <typename T>
+class AttributeWriteHandle : public AttributeHandle<T>
+{
+public:
+    AttributeWriteHandle(const AttributeArray* array);
+
+    void set(Index n, const T& value);
+}; // class AttributeWriteHandle
+
+
+typedef AttributeHandle<float> AttributeHandleROF;
+typedef AttributeWriteHandle<float> AttributeHandleRWF;
+
+typedef AttributeHandle<Vec3f> AttributeHandleROVec3f;
+typedef AttributeWriteHandle<Vec3f> AttributeHandleRWVec3f;
+
 ////////////////////////////////////////
 
 
@@ -1190,6 +1233,43 @@ TypedAttributeArray<ValueType_, Codec_>::isEqual(const AttributeArray& other) co
     Index n = this->mIsUniform ? 1 : mSize;
     while (n && math::isExactlyEqual(*target++, *source++)) --n;
     return n == 0;
+}
+
+
+template <typename T>
+AttributeHandle<T>::AttributeHandle(const AttributeArray* array)
+    : mArray(const_cast<AttributeArray*>(array))
+{
+    // bind getter and setter methods
+
+    AttributeArray::AccessorBasePtr accessor = mArray->mAccessor;
+    assert(accessor);
+
+    AttributeArray::Accessor<T>* typedAccessor = static_cast<AttributeArray::Accessor<T>*>(accessor.get());
+
+    if (!typedAccessor) {
+        OPENVDB_THROW(RuntimeError, "Cannot bind AttributeHandle due to mis-matching types.");
+    }
+
+    mGetter = typedAccessor->mGetter;
+    mSetter = typedAccessor->mSetter;
+}
+
+
+template <typename T>
+T AttributeHandle<T>::get(Index n) const
+{
+    return mGetter(mArray, n);
+}
+
+template <typename T>
+AttributeWriteHandle<T>::AttributeWriteHandle(const AttributeArray* array)
+    : AttributeHandle<T>(array, /*preserveCompression = */ false) { }
+
+template <typename T>
+void AttributeWriteHandle<T>::set(Index n, const T& value)
+{
+    this->mSetter(this->mArray, n, value);
 }
 
 

@@ -42,12 +42,14 @@ public:
     CPPUNIT_TEST(testAttributeArray);
     CPPUNIT_TEST(testAttributeSetDescriptor);
     CPPUNIT_TEST(testAttributeSet);
+    CPPUNIT_TEST(testAttributeHandle);
 
     CPPUNIT_TEST_SUITE_END();
 
     void testAttributeArray();
     void testAttributeSetDescriptor();
     void testAttributeSet();
+    void testAttributeHandle();
 }; // class TestPointDataGrid
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestAttributeArray);
@@ -621,6 +623,72 @@ TestAttributeArray::testAttributeSet()
 
     CPPUNIT_ASSERT(matchingAttributeSets(attrSetA, attrSetB));
 }
+
+void
+TestAttributeArray::testAttributeHandle()
+{
+    using namespace openvdb;
+    using namespace openvdb::tools;
+    using namespace openvdb::math;
+
+    typedef TypedAttributeArray<float, NullAttributeCodec<half> >                             AttributeFH;
+    typedef TypedAttributeArray<Vec3f>                                                        AttributeVec3f;
+
+    AttributeFH::registerType();
+    AttributeVec3f::registerType();
+
+    // create a Descriptor and AttributeSet
+
+    typedef AttributeSet::Descriptor Descriptor;
+
+    Descriptor::Ptr descr = Descriptor::create(Descriptor::Inserter()
+        .add("pos", AttributeVec3f::attributeType())
+        .add("truncate", AttributeFH::attributeType())
+        .vec);
+
+    AttributeSet attrSet(descr, /*arrayLength=*/50);
+
+    // modify some values using handles
+
+    {
+        AttributeArray* array = attrSet.get(0);
+
+        AttributeHandleRWVec3f handle(array);
+
+        handle.set(5, Vec3f(10));
+
+        CPPUNIT_ASSERT_EQUAL(handle.get(5), Vec3f(10));
+    }
+
+    {
+        AttributeArray* array = attrSet.get(1);
+
+        AttributeHandleRWF handle(array);
+
+        handle.set(6, float(11));
+
+        CPPUNIT_ASSERT_EQUAL(handle.get(6), float(11));
+    }
+
+    // check values have been correctly set without using handles
+
+    {
+        AttributeVec3f* array = static_cast<AttributeVec3f*>(attrSet.get(0));
+
+        CPPUNIT_ASSERT(array);
+
+        CPPUNIT_ASSERT_EQUAL(array->get(5), Vec3f(10));
+    }
+
+    {
+        AttributeFH* array = static_cast<AttributeFH*>(attrSet.get(1));
+
+        CPPUNIT_ASSERT(array);
+
+        CPPUNIT_ASSERT_EQUAL(array->get(6), float(11));
+    }
+}
+
 
 
 // Copyright (c) 2012-2014 DreamWorks Animation LLC
