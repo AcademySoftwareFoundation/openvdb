@@ -54,9 +54,9 @@ class Ray
 {
 public:
     BOOST_STATIC_ASSERT(boost::is_floating_point<RealT>::value);
-    typedef RealT      RealType;
-    typedef Vec3<Real> Vec3Type;
-    typedef Vec3Type   Vec3T;
+    typedef RealT       RealType;
+    typedef Vec3<RealT> Vec3Type;
+    typedef Vec3Type    Vec3T;
     struct TimeSpan {
         RealT t0, t1;
         /// @brief Default constructor
@@ -160,7 +160,7 @@ public:
     inline Ray applyMap(const MapType& map) const
     {
         assert(map.isLinear());
-        assert(math::isApproxEqual(mDir.length(), RealT(1)));
+        assert(math::isRelOrApproxEqual(mDir.length(), RealT(1), Tolerance<RealT>::value(), Delta<RealT>::value()));
         const Vec3T eye = map.applyMap(mEye);
         const Vec3T dir = map.applyJacobian(mDir);
         const RealT length = dir.length();
@@ -177,7 +177,7 @@ public:
     inline Ray applyInverseMap(const MapType& map) const
     {
         assert(map.isLinear());
-        assert(math::isApproxEqual(mDir.length(), RealT(1)));
+        assert(math::isRelOrApproxEqual(mDir.length(), RealT(1), Tolerance<RealT>::value(), Delta<RealT>::value()));
         const Vec3T eye = map.applyInverseMap(mEye);
         const Vec3T dir = map.applyInverseJacobian(mDir);
         const RealT length = dir.length();
