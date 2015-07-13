@@ -320,7 +320,7 @@ template<typename T>
 inline bool
 writeAsType(std::ostream& os, const boost::any& val)
 {
-    if (val.type() == typeid(T)) {
+    if (val.type() == BOOST_SP_TYPEID(T)) {
         os << boost::any_cast<T>(val);
         return true;
     }

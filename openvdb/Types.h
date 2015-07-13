@@ -264,7 +264,7 @@ enum MergePolicy {
 ////////////////////////////////////////
 
 
-template<typename T> const char* typeNameAsString()                 { return typeid(T).name(); }
+template<typename T> const char* typeNameAsString()                 { return BOOST_SP_TYPEID(T).name(); }
 template<> inline const char* typeNameAsString<bool>()              { return "bool"; }
 template<> inline const char* typeNameAsString<float>()             { return "float"; }
 template<> inline const char* typeNameAsString<double>()            { return "double"; }
