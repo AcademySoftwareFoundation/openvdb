@@ -663,11 +663,31 @@ TestAttributeArray::testAttributeHandle()
     {
         AttributeArray* array = attrSet.get(1);
 
+        array->compress();
+
         AttributeHandleRWF handle(array);
 
         handle.set(6, float(11));
 
         CPPUNIT_ASSERT_EQUAL(handle.get(6), float(11));
+
+        CPPUNIT_ASSERT(!array->isCompressed());
+
+        array->compress();
+
+        CPPUNIT_ASSERT(array->isCompressed());
+
+        {
+            AttributeHandleROF handleRO(array);
+
+            CPPUNIT_ASSERT(array->isCompressed());
+
+            CPPUNIT_ASSERT_EQUAL(handleRO.get(6), float(11));
+
+            CPPUNIT_ASSERT(array->isCompressed());
+        }
+
+        CPPUNIT_ASSERT(array->isCompressed());
     }
 
     // check values have been correctly set without using handles

@@ -192,6 +192,9 @@ public:
     /// Return a copy of this attribute.
     virtual AttributeArray::Ptr copy() const = 0;
 
+    /// Return an uncompressed copy of this attribute (will return a copy if not compressed).
+    virtual AttributeArray::Ptr copyUncompressed() const = 0;
+
     /// Return the length of this array.
     virtual size_t size() const = 0;
 
@@ -312,8 +315,8 @@ public:
     /// Default constructor, always constructs a uniform attribute.
     explicit TypedAttributeArray(size_t n = 1,
         const ValueType& uniformValue = zeroVal<ValueType>());
-    /// Deep copy constructor.
-    TypedAttributeArray(const TypedAttributeArray&);
+    /// Deep copy constructor (optionally decompress during copy).
+    TypedAttributeArray(const TypedAttributeArray&, const bool decompress = false);
     /// Deep copy assignment operator.
     TypedAttributeArray& operator=(const TypedAttributeArray&);
 
@@ -321,6 +324,9 @@ public:
 
     /// Return a copy of this attribute.
     virtual AttributeArray::Ptr copy() const;
+
+    /// Return an uncompressed copy of this attribute (will just return a copy if not compressed).
+    virtual AttributeArray::Ptr copyUncompressed() const;
 
     /// Return a new attribute array of the given length @a n with uniform value zero.
     static Ptr create(size_t n);
@@ -418,7 +424,7 @@ protected:
     typedef void (*SetterPtr)(AttributeArray* array, const Index n, const T& value);
 
 public:
-    AttributeHandle(const AttributeArray* array);
+    AttributeHandle(const AttributeArray* array, const bool preserveCompression = true);
 
     T get(Index n) const;
 
@@ -427,6 +433,10 @@ protected:
 
     GetterPtr mGetter;
     SetterPtr mSetter;
+
+private:
+    // local copy of AttributeArray (to preserve compression)
+    AttributeArray::Ptr mLocalArray;
 }; // class AttributeHandle
 
 
@@ -801,7 +811,7 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(
 
 
 template<typename ValueType_, typename Codec_>
-TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs)
+TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs, const bool decompress)
     : AttributeArray(rhs)
     , mData(NULL)
     , mSize(rhs.mSize)
@@ -811,6 +821,8 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttribut
     if (mIsUniform) {
         mData = new StorageType[1];
         mData[0] = rhs.mData[0];
+    } else if (mCompressedBytes != 0 && decompress) {
+        this->decompress(rhs.mData);
     } else if (mCompressedBytes != 0) {
         char* buffer = new char[mCompressedBytes];
         memcpy(buffer, rhs.mData, mCompressedBytes);
@@ -901,6 +913,14 @@ AttributeArray::Ptr
 TypedAttributeArray<ValueType_, Codec_>::copy() const
 {
     return AttributeArray::Ptr(new TypedAttributeArray<ValueType, Codec>(*this));
+}
+
+
+template<typename ValueType_, typename Codec_>
+AttributeArray::Ptr
+TypedAttributeArray<ValueType_, Codec_>::copyUncompressed() const
+{
+    return AttributeArray::Ptr(new TypedAttributeArray<ValueType, Codec>(*this, /*decompress = */true));
 }
 
 
@@ -1243,9 +1263,18 @@ TypedAttributeArray<ValueType_, Codec_>::isEqual(const AttributeArray& other) co
 
 
 template <typename T>
-AttributeHandle<T>::AttributeHandle(const AttributeArray* array)
+AttributeHandle<T>::AttributeHandle(const AttributeArray* array, const bool preserveCompression)
     : mArray(const_cast<AttributeArray*>(array))
 {
+    // if array is compressed and preserve compression is true, copy and decompress
+    // into a local copy that is destroyed with handle to maintain thread-safety
+
+    if (array->isCompressed() && preserveCompression) {
+        mLocalArray = array->copyUncompressed();
+        mLocalArray->decompress();
+        mArray = mLocalArray.get();
+    }
+
     // bind getter and setter methods
 
     AttributeArray::AccessorBasePtr accessor = mArray->mAccessor;
