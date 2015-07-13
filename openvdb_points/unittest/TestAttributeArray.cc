@@ -117,6 +117,12 @@ TestAttributeArray::testAttributeArray()
     {
         openvdb::tools::AttributeArray::Ptr attr(new AttributeArrayD(50));
 
+        CPPUNIT_ASSERT_EQUAL(attr->size(), size_t(1));
+    }
+
+    {
+        openvdb::tools::AttributeArray::Ptr attr(new AttributeArrayD(50));
+
         CPPUNIT_ASSERT_EQUAL(size_t(50), attr->size());
 
         AttributeArrayD& typedAttr = static_cast<AttributeArrayD&>(*attr);
