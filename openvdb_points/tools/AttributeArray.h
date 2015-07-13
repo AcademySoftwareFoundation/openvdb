@@ -177,6 +177,13 @@ public:
     typedef boost::shared_ptr<AttributeArray>           Ptr;
     typedef boost::shared_ptr<const AttributeArray>     ConstPtr;
 
+    struct AccessorBase;
+    template <typename T> struct Accessor;
+
+    typedef boost::shared_ptr<AccessorBase>             AccessorBasePtr;
+
+    template <typename> friend class AttributeHandle;
+
     typedef Ptr (*FactoryMethod)(size_t);
 
     AttributeArray() : mCompressedBytes(0), mFlags(0) {}
@@ -262,7 +269,27 @@ protected:
     enum { TRANSIENT = 0x1, HIDDEN = 0x2 };
     size_t mCompressedBytes;
     uint16_t mFlags;
+    AccessorBasePtr mAccessor;
 }; // class AttributeArray
+
+
+////////////////////////////////////////
+
+
+/// Accessor base class for AttributeArray storage where type is not available
+struct AttributeArray::AccessorBase { };
+
+/// Templated accessor stores typed getter and setter function pointers
+/// which is used to bind AttributeHandles
+template <typename T>
+struct AttributeArray::Accessor : public AttributeArray::AccessorBase
+{
+    typedef T (*GetterPtr)(const AttributeArray* array, const Index n);
+    typedef void (*SetterPtr)(AttributeArray* array, const Index n, const T& value);
+
+    GetterPtr mGetter;
+    SetterPtr mSetter;
+}; // class AttributeArray::Accessor
 
 
 ////////////////////////////////////////
@@ -718,6 +745,13 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(
 {
     mSize = std::max(size_t(1), mSize);
     Codec::encode(uniformValue, mData[0]);
+
+    AttributeArray::Accessor<ValueType_>* accessor = new AttributeArray::Accessor<ValueType_>();
+
+    accessor->mGetter = &TypedAttributeArray<ValueType_, Codec_>::get;
+    accessor->mSetter = &TypedAttributeArray<ValueType_, Codec_>::set;
+
+    mAccessor.reset(accessor);
 }
 
 
