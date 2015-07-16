@@ -151,7 +151,7 @@ public:
     /// @param iRay  ray represented in index space.
     /// @param iTime if an intersection was found it is assigned the time of the
     ///              intersection along the index ray.
-    bool intersectsIS(const RayType& iRay, Real &iTime) const
+    bool intersectsIS(const RayType& iRay, RealType &iTime) const
     {
         if (!mTester.setIndexRay(iRay)) return false;//missed bbox
         iTime = mTester.getIndexTime();
@@ -176,7 +176,7 @@ public:
     ///              intersection point in index space, otherwise it is unchanged.
     /// @param iTime if an intersection was found it is assigned the time of the
     ///              intersection along the index ray.
-    bool intersectsIS(const RayType& iRay, Vec3Type& xyz, Real &iTime) const
+    bool intersectsIS(const RayType& iRay, Vec3Type& xyz, RealType &iTime) const
     {
         if (!mTester.setIndexRay(iRay)) return false;//missed bbox
         if (!math::LevelSetHDDA<TreeT, NodeLevel>::test(mTester)) return false;//missed level set
@@ -197,7 +197,7 @@ public:
     /// @param wRay   ray represented in world space.
     /// @param wTime  if an intersection was found it is assigned the time of the
     ///               intersection along the world ray.
-    bool intersectsWS(const RayType& wRay, Real &wTime) const
+    bool intersectsWS(const RayType& wRay, RealType &wTime) const
     {
         if (!mTester.setWorldRay(wRay)) return false;//missed bbox
         wTime = mTester.getWorldTime();
@@ -222,7 +222,7 @@ public:
     ///               intersection point in world space, otherwise it is unchanged.
     /// @param wTime  if an intersection was found it is assigned the time of the
     ///               intersection along the world ray.
-    bool intersectsWS(const RayType& wRay, Vec3Type& world, Real &wTime) const
+    bool intersectsWS(const RayType& wRay, Vec3Type& world, RealType &wTime) const
     {
         if (!mTester.setWorldRay(wRay)) return false;//missed bbox
         if (!math::LevelSetHDDA<TreeT, NodeLevel>::test(mTester)) return false;//missed level set
@@ -253,7 +253,7 @@ public:
     ///               of the level set surface in world space, otherwise it is unchanged.
     /// @param wTime  if an intersection was found it is assigned the time of the
     ///               intersection along the world ray.
-    bool intersectsWS(const RayType& wRay, Vec3Type& world, Vec3Type& normal, Real &wTime) const
+    bool intersectsWS(const RayType& wRay, Vec3Type& world, Vec3Type& normal, RealType &wTime) const
     {
         if (!mTester.setWorldRay(wRay)) return false;//missed bbox
         if (!math::LevelSetHDDA<TreeT, NodeLevel>::test(mTester)) return false;//missed level set
