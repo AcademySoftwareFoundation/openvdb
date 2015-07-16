@@ -2345,9 +2345,19 @@ struct ExpandNarrowband
 
             if (!distNodePt && !indexNodePt) {
 
+                const ValueType backgroundDist = distAcc.getValue(ijk);
+
                 if (!newDistNodePt && !newIndexNodePt) {
-                    newDistNodePt = new LeafNodeType(ijk, distAcc.getValue(ijk));
+                    newDistNodePt = new LeafNodeType(ijk, backgroundDist);
                     newIndexNodePt = new Int32LeafNodeType(ijk, indexAcc.getValue(ijk));
+                } else {
+
+                    if ((backgroundDist < ValueType(0.0)) != (newDistNodePt->getValue(0) < ValueType(0.0))) {
+                        newDistNodePt->buffer().fill(backgroundDist);
+                    }
+
+                    newDistNodePt->setOrigin(ijk);
+                    newIndexNodePt->setOrigin(ijk);
                 }
 
                 distNodePt = newDistNodePt;
@@ -2582,7 +2592,6 @@ expandNarrowband(
         UnionValueMasks<LeafNodeType, Int32LeafNodeType>(expandOp.updatedDistNodes(), expandOp.updatedIndexNodes()));
 
     maskTree.clear();
-
     maskTree.merge(expandOp.newMaskTree());
 }
 
