@@ -1430,6 +1430,25 @@ TestTree::testTopologyUnion()
             ASSERT_DOUBLES_EXACTLY_EQUAL(tree0.getValue(p), *iter);
         }
     }
+    {// test union of a leaf and a tile
+
+        if (openvdb::FloatTree::DEPTH > 2) {
+
+            const openvdb::Coord xyz(0);
+
+            openvdb::FloatTree tree0;
+            const int leafLevel = openvdb::FloatTree::DEPTH - 1;
+            const int tileLevel = leafLevel - 1;
+            tree0.addTile(tileLevel, xyz, /*value=*/0, /*activeState=*/true);
+
+            openvdb::FloatTree tree1;
+            tree1.touchLeaf(xyz)->setValuesOn();
+
+            tree0.topologyUnion(tree1);
+
+            CPPUNIT_ASSERT_EQUAL(tree0.getValueDepth(xyz), leafLevel);
+        }
+    }
 
 }// testTopologyUnion
 
