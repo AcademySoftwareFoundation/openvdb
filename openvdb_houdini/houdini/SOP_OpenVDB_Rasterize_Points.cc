@@ -648,8 +648,6 @@ struct ConstructCandidateVoxelMask
                     box.max() = mXform.worldToIndexCellCentered(bboxMax);
                     activateRegion(box);
                 }
-
-                mMaskAccessor.setValueOn(it.getCoord());
             }
         }
 
@@ -906,8 +904,6 @@ constructROIMask(const PointIndexGridCollection& idxGridCollection,
 
         ConstructCandidateVoxelMask op(*maskTree, pointCache,
             pointIndexLeafNodes, volumeTransform, interrupter);
-
-        //op(tbb::blocked_range<size_t>(0, pointIndexLeafNodes.size()));
 
         tbb::parallel_reduce(tbb::blocked_range<size_t>(0, pointIndexLeafNodes.size()), op);
     }
