@@ -1434,11 +1434,12 @@ TestTree::testTopologyUnion()
 
         if (openvdb::FloatTree::DEPTH > 2) {
 
+            const int leafLevel = openvdb::FloatTree::DEPTH - 1;
+            const int tileLevel = leafLevel - 1;
+
             const openvdb::Coord xyz(0);
 
             openvdb::FloatTree tree0;
-            const int leafLevel = openvdb::FloatTree::DEPTH - 1;
-            const int tileLevel = leafLevel - 1;
             tree0.addTile(tileLevel, xyz, /*value=*/0, /*activeState=*/true);
 
             openvdb::FloatTree tree1;
