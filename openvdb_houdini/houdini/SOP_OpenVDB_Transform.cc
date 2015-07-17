@@ -156,7 +156,7 @@ SOP_OpenVDB_Transform::cookMySop(OP_Context& context)
         const fpreal time = context.getTime();
 
         // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
-        duplicateSource(0, context);
+        duplicateSourceStealable(0, context);
 
         // Get UI parameters
         openvdb::Vec3R t(evalVec3R("t", time)), r(evalVec3R("r", time)),

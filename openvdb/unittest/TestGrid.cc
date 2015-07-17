@@ -36,7 +36,7 @@
 #include <openvdb/math/Transform.h>
 #include <openvdb/Grid.h>
 #include <openvdb/tree/Tree.h>
-
+#include <openvdb/util/CpuTimer.h>
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
@@ -426,6 +426,30 @@ TestGrid::testClipping()
 #endif
         validateClippedGrid(cube, fg);
     }
+    /*
+    {// Benchmark multi-threaded copy construction
+        openvdb::util::CpuTimer timer;
+        openvdb::initialize();
+        openvdb::io::File file("/usr/pic1/Data/OpenVDB/LevelSetModels/crawler.vdb");
+        file.open();
+        openvdb::GridBase::Ptr baseGrid = file.readGrid("ls_crawler");
+        file.close();
+        openvdb::FloatGrid::Ptr grid = openvdb::gridPtrCast<openvdb::FloatGrid>(baseGrid);
+        //grid->tree().print();
+        timer.start("\nCopy construction");
+        openvdb::FloatTree fTree(grid->tree());
+        timer.stop();
+
+        timer.start("\nBoolean topology copy construction");
+        openvdb::BoolTree bTree(grid->tree(), false, openvdb::TopologyCopy());
+        timer.stop();
+
+        timer.start("\nBoolean topology union");
+        bTree.topologyUnion(fTree);
+        timer.stop();
+        //bTree.print();
+    }
+    */
 }
 
 // Copyright (c) 2012-2014 DreamWorks Animation LLC

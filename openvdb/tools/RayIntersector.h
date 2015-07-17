@@ -373,7 +373,7 @@ public:
         : mIsMaster(false)
         , mTree(other.mTree)//shallow copy
         , mGrid(other.mGrid)//shallow copy
-        , mAccessor(*mTree)//deep copy
+        , mAccessor(*mTree)//initialize new (vs deep copy)
         , mRay(other.mRay)//deep copy
         , mTmax(other.mTmax)//deep copy
         , mBBox(other.mBBox)//deep copy
@@ -495,7 +495,7 @@ public:
 
 private:
 
-    typedef typename tree::ValueAccessor<const TreeT> AccessorT;
+    typedef typename tree::ValueAccessor<const TreeT,/*IsSafe=*/false> AccessorT;
 
     const bool      mIsMaster;
     TreeT*          mTree;
@@ -543,7 +543,6 @@ public:
     typedef typename GridT::ValueType     ValueT;
     typedef typename GridT::ConstAccessor AccessorT;
     typedef math::BoxStencil<GridT>       StencilT;
-    typedef typename StencilT::Vec3Type   Vec3T;
 
     /// @brief Constructor from a grid.
     /// @throw RunTimeError if the grid is empty.

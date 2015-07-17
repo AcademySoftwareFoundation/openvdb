@@ -42,7 +42,7 @@ share a tree.
 
 
 
-@section Contents
+@section sPyContents
 - @ref sPyBasics
 - @ref sPyHandlingMetadata
 - @ref sPyAccessors

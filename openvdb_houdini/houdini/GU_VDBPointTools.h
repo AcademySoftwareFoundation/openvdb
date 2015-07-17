@@ -182,7 +182,7 @@ struct IndexToOffsetOp {
     void operator()(LeafT &leaf, size_t /*leafIndex*/) const {
         typename LeafT::IndexArray& indices = leaf.indices();
         for (size_t n = 0, N = indices.size(); n < N; ++n) {
-             indices[n] = typename LeafT::ValueType(mPointList->offsetFromIndex(size_t(indices[n])));
+             indices[n] = typename LeafT::ValueType(mPointList->offsetFromIndex(GA_Index(indices[n])));
         }
     }
     PointArrayType const * const mPointList;

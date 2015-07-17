@@ -36,6 +36,7 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/ChangeBackground.h>
 #include <openvdb/tools/Diagnostics.h>
+#include <openvdb/tools/DensityAdvect.h>
 #include <openvdb/tools/Clip.h>
 #include <openvdb/tools/GridOperators.h>
 #include <openvdb/tools/Filter.h>
@@ -79,6 +80,7 @@ public:
     CPPUNIT_TEST(testMaskedNormalize);
     CPPUNIT_TEST(testPointAdvect);
     CPPUNIT_TEST(testPointScatter);
+    CPPUNIT_TEST(testDensityAdvect);
     CPPUNIT_TEST(testTransformValues);
     CPPUNIT_TEST(testVectorApply);
     CPPUNIT_TEST(testAccumulate);
@@ -103,6 +105,7 @@ public:
     void testMaskedNormalize();
     void testPointAdvect();
     void testPointScatter();
+    void testDensityAdvect();
     void testTransformValues();
     void testVectorApply();
     void testAccumulate();
@@ -1668,6 +1671,79 @@ TestTools::testPointScatter()
     }
 }
 
+////////////////////////////////////////
+
+void
+TestTools::testDensityAdvect()
+{
+    using namespace openvdb;
+
+    Vec3fGrid velocity(Vec3f(1.0f, 0.0f, 0.0f));
+
+    {//test misaligned grids (throws)
+        FloatGrid::Ptr density0 = FloatGrid::create(0.0f);
+        density0->setTransform(math::Transform::createLinearTransform(0.5));
+        tools::DensityAdvection<Vec3fGrid> a(velocity);
+        CPPUNIT_ASSERT_THROW((a.advect<FloatGrid, tools::Sampler<1> >(*density0, 0.1f)), RuntimeError);
+    }
+
+    {//test advect without a mask
+        FloatGrid::Ptr density0 = FloatGrid::create(0.0f), density1;
+        density0->fill(CoordBBox(Coord(0),Coord(6)), 1.0f);
+        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord( 3,3,3)), 1.0f);
+        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(24,3,3)), 0.0f);
+        CPPUNIT_ASSERT( density0->tree().isValueOn(Coord( 3,3,3)));
+        CPPUNIT_ASSERT(!density0->tree().isValueOn(Coord(24,3,3)));
+        
+        tools::DensityAdvection<Vec3fGrid> a(velocity);
+        a.setIntegrationOrder(4);
+        for (int i=1; i<=240; ++i) {
+            density1 = a.advect<FloatGrid, tools::Sampler<1> >(*density0, 0.1f);
+            //std::ostringstream ostr;
+            //ostr << "densityAdvect" << "_" << i << ".vdb";
+            //std::cerr << "Writing " << ostr.str() << std::endl;
+            //openvdb::io::File file(ostr.str());
+            //openvdb::GridPtrVec grids;
+            //grids.push_back(density1);
+            //file.write(grids);
+            density0 = density1;
+        }
+        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(3,3,3)), 0.0f); 
+        CPPUNIT_ASSERT(density0->tree().getValue(Coord(24,3,3)) > 0.0f);
+        CPPUNIT_ASSERT(!density0->tree().isValueOn(Coord( 3,3,3)));
+        CPPUNIT_ASSERT( density0->tree().isValueOn(Coord(24,3,3)));
+    }
+    
+    {//test advect with a mask
+        FloatGrid::Ptr density0 = FloatGrid::create(0.0f), density1;
+        density0->fill(CoordBBox(Coord(0),Coord(6)), 1.0f);
+        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord( 3,3,3)), 1.0f);
+        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(24,3,3)), 0.0f);
+        CPPUNIT_ASSERT( density0->tree().isValueOn(Coord( 3,3,3)));
+        CPPUNIT_ASSERT(!density0->tree().isValueOn(Coord(24,3,3)));
+
+        BoolGrid::Ptr mask = BoolGrid::create(false);
+        mask->fill(CoordBBox(Coord(4,0,0),Coord(30,8,8)), true);
+        
+        tools::DensityAdvection<Vec3fGrid> a(velocity);
+        a.setIntegrationOrder(4);
+        for (int i=1; i<=240; ++i) {
+            density1 = a.advect<FloatGrid, BoolGrid, tools::Sampler<1> >(*density0, *mask, 0.1f);
+            //std::ostringstream ostr;
+            //ostr << "densityAdvectMask" << "_" << i << ".vdb";
+            //std::cerr << "Writing " << ostr.str() << std::endl;
+            //openvdb::io::File file(ostr.str());
+            //openvdb::GridPtrVec grids;
+            //grids.push_back(density1);
+            //file.write(grids);
+            density0 = density1;
+        }
+        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(3,3,3)), 1.0f); 
+        CPPUNIT_ASSERT(density0->tree().getValue(Coord(24,3,3)) > 0.0f);
+        CPPUNIT_ASSERT(density0->tree().isValueOn(Coord( 3,3,3)));
+        CPPUNIT_ASSERT(density0->tree().isValueOn(Coord(24,3,3)));
+    }
+}//testDensityAdvect
 
 ////////////////////////////////////////
 

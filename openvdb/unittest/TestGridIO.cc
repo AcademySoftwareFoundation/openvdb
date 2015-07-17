@@ -54,14 +54,12 @@ public:
     CPPUNIT_TEST(testReadAllFloat);
     CPPUNIT_TEST(testReadAllVec3S);
     CPPUNIT_TEST(testReadAllFloat5432);
-    CPPUNIT_TEST(testReadAllHermite);
     CPPUNIT_TEST_SUITE_END();
 
     void testReadAllBool() { readAllTest<openvdb::BoolGrid>(); }
     void testReadAllFloat() { readAllTest<openvdb::FloatGrid>(); }
     void testReadAllVec3S() { readAllTest<openvdb::Vec3SGrid>(); }
     void testReadAllFloat5432() { Float5432Grid::registerGrid(); readAllTest<Float5432Grid>(); }
-    void testReadAllHermite() { readAllTest<openvdb::HermiteGrid>(); }
 private:
     template<typename GridType> void readAllTest();
 };

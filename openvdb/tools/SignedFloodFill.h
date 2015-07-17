@@ -44,6 +44,8 @@
 #include <openvdb/Types.h> // for Index typedef
 #include <boost/static_assert.hpp>
 #include <boost/type_traits/is_floating_point.hpp>
+#include <boost/type_traits/is_signed.hpp>
+
 #include <openvdb/tree/NodeManager.h>
 
 
@@ -108,17 +110,17 @@ public:
     typedef typename TreeOrLeafManagerT::ValueType    ValueT;
     typedef typename TreeOrLeafManagerT::RootNodeType RootT;
     typedef typename TreeOrLeafManagerT::LeafNodeType LeafT;
-    BOOST_STATIC_ASSERT(boost::is_floating_point<ValueT>::value);
+    BOOST_STATIC_ASSERT(boost::is_floating_point<ValueT>::value || boost::is_signed<ValueT>::value);
 
     SignedFloodFillOp(const TreeOrLeafManagerT& tree)
-        : mOutside(math::Abs(tree.background()))
-        , mInside(math::negative(mOutside))
+        : mOutside(ValueT(math::Abs(tree.background())))
+        , mInside(ValueT(math::negative(mOutside)))
     {
     }
 
     SignedFloodFillOp(ValueT outsideValue, ValueT insideValue)
-        : mOutside(math::Abs(outsideValue))
-        , mInside(math::negative(math::Abs(insideValue)))
+        : mOutside(ValueT(math::Abs(outsideValue)))
+        , mInside(ValueT(math::negative(math::Abs(insideValue))))
     {
     }
 
@@ -228,8 +230,9 @@ private:
 
 template<typename TreeOrLeafManagerT>
 inline
-typename boost::enable_if<typename boost::is_floating_point<
-                          typename TreeOrLeafManagerT::ValueType>::type>::type
+typename boost::enable_if_c<
+    boost::is_floating_point<typename TreeOrLeafManagerT::ValueType>::value ||
+    boost::is_signed<typename TreeOrLeafManagerT::ValueType>::value, void>::type
 doSignedFloodFill(TreeOrLeafManagerT& tree,
                   typename TreeOrLeafManagerT::ValueType outsideValue,
                   typename TreeOrLeafManagerT::ValueType insideValue,
@@ -244,8 +247,9 @@ doSignedFloodFill(TreeOrLeafManagerT& tree,
 // Dummy (no-op) implementation for non-float types
 template <typename TreeOrLeafManagerT>
 inline
-typename boost::disable_if<typename boost::is_floating_point<
-                           typename TreeOrLeafManagerT::ValueType>::type>::type
+typename boost::disable_if_c<
+    boost::is_floating_point<typename TreeOrLeafManagerT::ValueType>::value ||
+    boost::is_signed<typename TreeOrLeafManagerT::ValueType>::value, void>::type
 doSignedFloodFill(TreeOrLeafManagerT&,
                   const typename TreeOrLeafManagerT::ValueType&,
                   const typename TreeOrLeafManagerT::ValueType&,
@@ -253,7 +257,7 @@ doSignedFloodFill(TreeOrLeafManagerT&,
                   size_t)
 {
     OPENVDB_THROW(TypeError,
-        "signedFloodFill is supported only for scalar, floating-point grids");
+        "signedFloodFill is supported only for signed value grids");
 }
 
 

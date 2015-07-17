@@ -46,6 +46,7 @@
 #include <boost/system/error_code.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <boost/version.hpp> // for BOOST_VERSION
 
 #include <tbb/atomic.h>
 
@@ -68,6 +69,10 @@ namespace boost { namespace interprocess { namespace detail {} namespace ipcdeta
 #include <iostream>
 #include <map>
 #include <sstream>
+
+#ifndef DWA_BOOST_VERSION
+#define DWA_BOOST_VERSION (10 * BOOST_VERSION)
+#endif
 
 
 namespace openvdb {
@@ -503,7 +508,11 @@ MappedFile::clearNotifier()
 std::string
 getErrorString(int errorNum)
 {
+#if DWA_BOOST_VERSION >= 1043000
     return boost::system::error_code(errorNum, boost::system::generic_category()).message();
+#else
+    return boost::system::error_code(errorNum, boost::system::get_generic_category()).message();
+#endif
 }
 
 
