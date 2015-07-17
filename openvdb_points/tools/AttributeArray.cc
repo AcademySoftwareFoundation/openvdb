@@ -562,6 +562,18 @@ AttributeSet::Descriptor::rename(const std::string& fromName, const std::string&
 }
 
 
+const std::string&
+AttributeSet::Descriptor::type(size_t pos) const
+{
+    // assert that pos is valid and in-range
+
+    assert(pos != AttributeSet::INVALID_POS);
+    assert(pos < mTypes.size());
+
+    return mTypes[pos];
+}
+
+
 size_t
 AttributeSet::Descriptor::insert(const std::string& name, const std::string& typeName)
 {

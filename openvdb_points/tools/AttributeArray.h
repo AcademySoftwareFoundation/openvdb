@@ -670,7 +670,7 @@ public:
     size_t rename(const std::string& fromName, const std::string& toName);
 
     /// Return the name of the attribute array's type.
-    const std::string& type(size_t pos) const { assert(pos != AttributeSet::INVALID_POS); return mTypes[pos]; }
+    const std::string& type(size_t pos) const;
 
     /// Return true if this descriptor is equal to the given one.
     bool operator==(const Descriptor&) const;
