@@ -769,7 +769,7 @@ protected:
     const ChildNodeType* getChildNode(Index n) const;
     ///@}
    
-    // Protected multi-threaded member classes for copy construction
+    // Protected member classes for multi-threading
     template<typename OtherInternalNode> struct DeepCopy;
     template<typename OtherInternalNode> struct TopologyCopy1;
     template<typename OtherInternalNode> struct TopologyCopy2;
@@ -2348,14 +2348,19 @@ template<typename ChildT, Index Log2Dim>
 template<typename OtherInternalNode>
 struct InternalNode<ChildT, Log2Dim>::TopologyUnion
 {
+    typedef typename NodeMaskType::Word W;
+    struct A { inline void operator()(W &tV, const W& sV, const W& tC) const
+        { tV = (tV | sV) & ~tC; }
+    };
     TopologyUnion(const OtherInternalNode* source, InternalNode* target) : s(source), t(target) {
         //(*this)(tbb::blocked_range<Index>(0, NUM_VALUES));//single thread for debugging
         tbb::parallel_for(tbb::blocked_range<Index>(0, NUM_VALUES), *this);
 
         // Bit processing is done in a single thread!
         t->mChildMask |= s->mChildMask;//serial but very fast bitwise post-process
-        t->mValueMask |= s->mValueMask;
-        assert((t->mValueMask&t->mChildMask).isOff());//no overlapping active tiles and child nodes
+        A op;
+        t->mValueMask.foreach(s->mValueMask, t->mChildMask, op);
+        assert((t->mValueMask & t->mChildMask).isOff());//no overlapping active tiles and child nodes
     }
     void operator()(const tbb::blocked_range<Index> &r) const {
         for (Index i = r.begin(), end=r.end(); i!=end; ++i) {
@@ -2403,7 +2408,7 @@ struct InternalNode<ChildT, Log2Dim>::TopologyIntersection
         t->mChildMask.foreach(s->mChildMask, s->mValueMask, t->mValueMask, op);
         
         t->mValueMask &= s->mValueMask;
-        assert((t->mValueMask&t->mChildMask).isOff());//no overlapping active tiles and child nodes
+        assert((t->mValueMask & t->mChildMask).isOff());//no overlapping active tiles and child nodes
     }
     void operator()(const tbb::blocked_range<Index> &r) const {
         for (Index i = r.begin(), end=r.end(); i!=end; ++i) {
@@ -2458,7 +2463,7 @@ struct InternalNode<ChildT, Log2Dim>::TopologyDifference
         
         B op2;
         t->mValueMask.foreach(t->mChildMask, s->mValueMask, oldChildMask, op2);
-        assert((t->mValueMask&t->mChildMask).isOff());//no overlapping active tiles and child nodes
+        assert((t->mValueMask & t->mChildMask).isOff());//no overlapping active tiles and child nodes
     }
     void operator()(const tbb::blocked_range<Index> &r) const {
         for (Index i = r.begin(), end=r.end(); i!=end; ++i) {

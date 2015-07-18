@@ -118,6 +118,8 @@ Houdini:
   contains a VOP sub-network which can be used to define VEX procedures for
   procedural density modeling. The accompanying creation script defines a
   default VOP network with UI parameters.
+- Added an Advect Density SOP to advect non-level-sets, e.g. density or 
+  velocity.  
 - Added a Sort Points SOP that spatially reorders points that are close
   together in space to also be close in the insertion order. This
   operation can help improve CPU cache coherency and performance for

@@ -210,7 +210,7 @@ private:
         pruneInactive(grid1.tree(), mGrainSize>0, mGrainSize);
     }
 
-    // Private class that implements the semi-lagrantian integration
+    // Private class that implements the semi-lagrangian integration
     template<typename DensityGridT, size_t OrderRK, typename SamplerT>
     struct Advect
     {
