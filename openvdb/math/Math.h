@@ -456,7 +456,7 @@ doubleToInt64(const double aDoubleValue)
 
 // aUnitsInLastPlace is the allowed difference between the least significant digits
 // of the numbers' floating point representation
-// Please read reference paper before trying to use isUlpsEqual
+// Please read the reference paper before trying to use isUlpsEqual
 // http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm
 inline bool
 isUlpsEqual(const double aLeft, const double aRight, const int64_t aUnitsInLastPlace)
