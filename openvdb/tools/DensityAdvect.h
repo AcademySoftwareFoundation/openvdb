@@ -123,7 +123,7 @@ public:
     ///         of all the active values the input density for the
     ///         time = dt * IntegrationCount.
     ///
-    /// @param grid0   The input densit grid to be advected (unmodified)
+    /// @param grid0   The input density grid to be advected (unmodified)
     /// @param dt      Time-step of the Runge-Kutta integrator.
     ///
     /// @note It is important to note that the input density @c grid1 is assumed
@@ -210,7 +210,7 @@ private:
         pruneInactive(grid1.tree(), mGrainSize>0, mGrainSize);
     }
 
-    // Private class that implements the semi-lagrantian integration
+    // Private class that implements the semi-lagrangian integration
     template<typename DensityGridT, size_t OrderRK, typename SamplerT>
     struct Advect
     {
