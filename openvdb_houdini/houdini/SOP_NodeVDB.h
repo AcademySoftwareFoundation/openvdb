@@ -117,7 +117,6 @@ protected:
     void resolveRenamedParm(PRM_ParmList& obsoleteParms,
         const char* oldName, const char* newName);
 
-#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
     /// @brief Steal the geometry on the specified input if possible, instead of copying the data.
     ///
     /// @details In certain cases where a node's input geometry isn't being shared with
@@ -135,15 +134,15 @@ protected:
     /// @param gdh      handle to manage input locking
     /// @param clean    (forwarded to duplicateSource())
     ///
-    /// @note From Houdini 13.0 on, this method will insert the existing data into the detail
-    /// and update the detail handle in the SOP.
+    /// @note Prior to Houdini 13.0, this method peforms a duplicateSource() and unlocks the
+    /// inputs to the SOP. From Houdini 13.0 on, this method will insert the existing data
+    /// into the detail and update the detail handle in the SOP.
     ///
     /// @warning No attempt to call duplicateSource() or inputGeo() should be made after
     /// calling this method, as there will be no data on the input stream if isSourceStealable()
     /// returns @c true.
     OP_ERROR duplicateSourceStealable(const unsigned index,
         OP_Context& context, GU_Detail **pgdp, GU_DetailHandle& gdh, bool clean = true);
-#endif
 
     /// @brief Steal the geometry on the specified input if possible, instead of copying the data.
     ///
@@ -156,10 +155,13 @@ protected:
     /// this method falls back to copying the shared pointer, effectively performing
     /// a duplicateSource().
     ///
+    /// @note Prior to Houdini 13.0, this method peforms a duplicateSource() and unlocks the
+    /// inputs to the SOP. From Houdini 13.0 on, this method will insert the existing data
+    /// into the detail and update the detail handle in the SOP.
+    ///
     /// @param index    the index of the input from which to perform this operation
     /// @param context  the current SOP context is used for cook time for network traversal
-    /// @param clean    (forwarded to duplicateSource())
-    OP_ERROR duplicateSourceStealable(const unsigned index, OP_Context& context, bool clean = true);
+    OP_ERROR duplicateSourceStealable(const unsigned index, OP_Context& context);
 
 private:
 #if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
