@@ -700,7 +700,7 @@ SOP_OpenVDB_Filter_Level_Set::cookMySop(OP_Context& context)
 #endif
 
         // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
-        if (startNode->duplicateSourceStealable(0, context) >= UT_ERROR_ABORT) return error();
+        if (startNode->duplicateSourceStealable(0, context, &gdp, myGdpHandle, /*clean = */ true) >= UT_ERROR_ABORT) return error();
 
         BossT boss("Processing level sets");
 
@@ -827,7 +827,12 @@ SOP_OpenVDB_Filter_Level_Set::applyFilters(
     GU_Detail&,
     bool verbose)
 {
-    typename GridT::Ptr grid = openvdb::deepCopyTypedGrid<GridT>(vdbPrim->getGrid());
+    // instead of deep copying the grid directly and then performing a hvdb::replaceVdbPrimitive,
+    // we ask the primitive to make the grid unique and then modify the grid directly (workflow
+    // required for duplicateSourceStealable)
+
+    vdbPrim->makeGridUnique();
+    typename GridT::Ptr grid = openvdb::gridPtrCast<GridT>(vdbPrim->getGridPtr());
 
     if (!grid) return false;
 
@@ -857,10 +862,6 @@ SOP_OpenVDB_Filter_Level_Set::applyFilters(
 
         if (boss.wasInterrupted()) break;
     }
-
-    // Replace the original VDB primitive with a new primitive that contains
-    // the output grid and has the same attributes and group membership.
-    hvdb::replaceVdbPrimitive(*gdp, grid, *vdbPrim, true, vdbPrim->getGridName());
 
     return true;
 }
