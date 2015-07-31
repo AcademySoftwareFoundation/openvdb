@@ -258,6 +258,9 @@ public:
     bool operator==(const AttributeArray& other) const;
     bool operator!=(const AttributeArray& other) const { return !this->operator==(other); }
 
+
+    virtual AccessorBasePtr getAccessor() const = 0;
+
 private:
     /// Virtual function used by the comparison operator to perform
     /// comparisons on inherited types
@@ -272,7 +275,6 @@ protected:
     enum { TRANSIENT = 0x1, HIDDEN = 0x2 };
     size_t mCompressedBytes;
     uint16_t mFlags;
-    AccessorBasePtr mAccessor;
 }; // class AttributeArray
 
 
@@ -289,6 +291,8 @@ struct AttributeArray::Accessor : public AttributeArray::AccessorBase
 {
     typedef T (*GetterPtr)(const AttributeArray* array, const Index n);
     typedef void (*SetterPtr)(AttributeArray* array, const Index n, const T& value);
+
+    Accessor(GetterPtr getter, SetterPtr setter) : mGetter(getter), mSetter(setter) {}
 
     GetterPtr mGetter;
     SetterPtr mSetter;
@@ -392,6 +396,12 @@ public:
     /// Write attribute data to a stream.
     virtual void write(std::ostream& os) const;
 
+
+    virtual AccessorBasePtr getAccessor() const {
+        return AccessorBasePtr(new AttributeArray::Accessor<ValueType_>(
+            &TypedAttributeArray<ValueType_, Codec_>::get, &TypedAttributeArray<ValueType_, Codec_>::set));
+    }
+
 private:
     /// Compare the this data to another attribute array. Used by the base class comparison operator
     virtual bool isEqual(const AttributeArray& other) const;
@@ -424,12 +434,12 @@ protected:
     typedef void (*SetterPtr)(AttributeArray* array, const Index n, const T& value);
 
 public:
-    AttributeHandle(const AttributeArray* array, const bool preserveCompression = true);
+    AttributeHandle(const AttributeArray& array, const bool preserveCompression = true);
 
     T get(Index n) const;
 
 protected:
-    AttributeArray* mArray;
+    const AttributeArray* mArray;
 
     GetterPtr mGetter;
     SetterPtr mSetter;
@@ -445,7 +455,7 @@ template <typename T>
 class AttributeWriteHandle : public AttributeHandle<T>
 {
 public:
-    AttributeWriteHandle(const AttributeArray* array);
+    AttributeWriteHandle(AttributeArray& array);
 
     void set(Index n, const T& value);
 }; // class AttributeWriteHandle
@@ -800,13 +810,6 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(
 {
     mSize = std::max(size_t(1), mSize);
     Codec::encode(uniformValue, mData[0]);
-
-    AttributeArray::Accessor<ValueType_>* accessor = new AttributeArray::Accessor<ValueType_>();
-
-    accessor->mGetter = &TypedAttributeArray<ValueType_, Codec_>::get;
-    accessor->mSetter = &TypedAttributeArray<ValueType_, Codec_>::set;
-
-    mAccessor.reset(accessor);
 }
 
 
@@ -1263,21 +1266,21 @@ TypedAttributeArray<ValueType_, Codec_>::isEqual(const AttributeArray& other) co
 
 
 template <typename T>
-AttributeHandle<T>::AttributeHandle(const AttributeArray* array, const bool preserveCompression)
-    : mArray(const_cast<AttributeArray*>(array))
+AttributeHandle<T>::AttributeHandle(const AttributeArray& array, const bool preserveCompression)
+    : mArray(&array)
 {
     // if array is compressed and preserve compression is true, copy and decompress
     // into a local copy that is destroyed with handle to maintain thread-safety
 
-    if (array->isCompressed() && preserveCompression) {
-        mLocalArray = array->copyUncompressed();
+    if (array.isCompressed() && preserveCompression) {
+        mLocalArray = array.copyUncompressed();
         mLocalArray->decompress();
         mArray = mLocalArray.get();
     }
 
     // bind getter and setter methods
 
-    AttributeArray::AccessorBasePtr accessor = mArray->mAccessor;
+    AttributeArray::AccessorBasePtr accessor = mArray->getAccessor();
     assert(accessor);
 
     AttributeArray::Accessor<T>* typedAccessor = static_cast<AttributeArray::Accessor<T>*>(accessor.get());
@@ -1298,13 +1301,13 @@ T AttributeHandle<T>::get(Index n) const
 }
 
 template <typename T>
-AttributeWriteHandle<T>::AttributeWriteHandle(const AttributeArray* array)
+AttributeWriteHandle<T>::AttributeWriteHandle(AttributeArray& array)
     : AttributeHandle<T>(array, /*preserveCompression = */ false) { }
 
 template <typename T>
 void AttributeWriteHandle<T>::set(Index n, const T& value)
 {
-    this->mSetter(this->mArray, n, value);
+    this->mSetter(const_cast<AttributeArray*>(this->mArray), n, value);
 }
 
 

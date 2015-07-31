@@ -29,7 +29,7 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include <cppunit/extensions/HelperMacros.h>
-#include <openvdb_points/tools/AttributeArray.h>
+#include <openvdb/tools/AttributeArray.h>
 #include <openvdb/Types.h>
 
 #include <iostream>
@@ -119,7 +119,7 @@ TestAttributeArray::testAttributeArray()
     {
         openvdb::tools::AttributeArray::Ptr attr(new AttributeArrayD(50));
 
-        CPPUNIT_ASSERT_EQUAL(attr->size(), size_t(1));
+        CPPUNIT_ASSERT_EQUAL(attr->size(), size_t(50));
     }
 
     {
@@ -653,7 +653,7 @@ TestAttributeArray::testAttributeHandle()
     {
         AttributeArray* array = attrSet.get(0);
 
-        AttributeHandleRWVec3f handle(array);
+        AttributeHandleRWVec3f handle(*array);
 
         handle.set(5, Vec3f(10));
 
@@ -665,7 +665,7 @@ TestAttributeArray::testAttributeHandle()
 
         array->compress();
 
-        AttributeHandleRWF handle(array);
+        AttributeHandleRWF handle(*array);
 
         handle.set(6, float(11));
 
@@ -678,7 +678,7 @@ TestAttributeArray::testAttributeHandle()
         CPPUNIT_ASSERT(array->isCompressed());
 
         {
-            AttributeHandleROF handleRO(array);
+            AttributeHandleROF handleRO(*array);
 
             CPPUNIT_ASSERT(array->isCompressed());
 
