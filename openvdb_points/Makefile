@@ -239,13 +239,12 @@ endif
 
 INCLUDE_NAMES := \
     tools/AttributeArray.h \
-    tools/PointDataGrid.h \
-    openvdb_points.h \
+    openvdb.h \
 #
 
 SRC_NAMES := \
     tools/AttributeArray.cc \
-    openvdb_points.cc \
+    openvdb.cc \
 #
 
 UNITTEST_INCLUDE_NAMES := \
