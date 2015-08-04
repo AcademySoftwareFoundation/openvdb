@@ -409,12 +409,12 @@ test:
 endif
 
 install: lib doc
-	mkdir -p $(DESTDIR)/include/openvdb
-	@echo "Created $(DESTDIR)/include/openvdb"
-	pushd $(DESTDIR)/include/openvdb > /dev/null; \
+	mkdir -p $(DESTDIR)/include/openvdb_points
+	@echo "Created $(DESTDIR)/include/openvdb_points"
+	pushd $(DESTDIR)/include/openvdb_points > /dev/null; \
 	    mkdir -p $(HEADER_SUBDIRS); popd > /dev/null
 	for f in $(INCLUDE_NAMES); \
-	    do cp -f $$f $(DESTDIR)/include/openvdb/$$f; done
+	    do cp -f $$f $(DESTDIR)/include/openvdb_points/$$f; done
 	@echo "Copied header files to $(DESTDIR)/include"
 	@#
 	mkdir -p $(DESTDIR)/lib
