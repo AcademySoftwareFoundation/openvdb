@@ -50,6 +50,8 @@ public:
     CPPUNIT_TEST(testAttributes);
     CPPUNIT_TEST(testTopologyCopy);
     CPPUNIT_TEST(testEquivalence);
+    CPPUNIT_TEST(testIO);
+    CPPUNIT_TEST(testPointDataAccessor);
     CPPUNIT_TEST_SUITE_END();
 
     void testEmptyLeaf();
@@ -60,6 +62,8 @@ public:
     void testAttributes();
     void testTopologyCopy();
     void testEquivalence();
+    void testIO();
+    void testPointDataAccessor();
 
 private:
     // Generate random points by uniformly distributing points
@@ -638,6 +642,115 @@ TestPointDataLeaf::testEquivalence()
         CPPUNIT_ASSERT(leaf != leaf2);
     }
 }
+
+
+void
+TestPointDataLeaf::testIO()
+{
+    using namespace openvdb::tools;
+
+    // Define and register some common attribute types
+
+    typedef TypedAttributeArray<float>  AttributeS;
+    typedef TypedAttributeArray<int>    AttributeI;
+
+    AttributeS::registerType();
+    AttributeI::registerType();
+
+    // create a descriptor
+
+    typedef AttributeSet::Descriptor Descriptor;
+
+    Descriptor::Inserter names;
+    names.add("density", AttributeS::attributeType());
+    names.add("id", AttributeI::attributeType());
+
+    Descriptor::Ptr descrA = Descriptor::create(names.vec);
+
+    // create a leaf and initialize attributes using this descriptor
+
+    LeafType leaf(openvdb::Coord(0, 0, 0));
+    leaf.initializeAttributes(descrA, /*arrayLength=*/100);
+
+    // manually activate some voxels
+
+    leaf.setOffsetOn(1, 10);
+    leaf.setOffsetOn(4, 20);
+    leaf.setOffsetOn(7, 5);
+
+    // manually change some values in the density array
+
+    TypedAttributeArray<float>& attr = leaf.typedAttributeArray<AttributeS>("density");
+
+    attr.set(0, 5.0f);
+    attr.set(50, 2.0f);
+    attr.set(51, 8.1f);
+
+    // read and write topology to disk
+
+    {
+        LeafType leaf2(openvdb::Coord(0, 0, 0));
+
+        std::ostringstream ostr(std::ios_base::binary);
+        leaf.writeTopology(ostr);
+
+        std::istringstream istr(ostr.str(), std::ios_base::binary);
+        leaf2.readTopology(istr);
+
+        // check topology matches
+
+        CPPUNIT_ASSERT_EQUAL(leaf.onVoxelCount(), leaf2.onVoxelCount());
+        CPPUNIT_ASSERT(leaf2.isValueOn(4));
+        CPPUNIT_ASSERT(!leaf2.isValueOn(5));
+
+        // check only topology (values and attributes still empty)
+
+        CPPUNIT_ASSERT_EQUAL(leaf2.getValue(4), ValueType(0));
+        CPPUNIT_ASSERT_EQUAL(leaf2.attributeSet().size(), size_t(0));
+    }
+
+    // read and write buffers to disk
+
+    {
+        LeafType leaf2(openvdb::Coord(0, 0, 0));
+
+        std::ostringstream ostr(std::ios_base::binary);
+        leaf.writeTopology(ostr);
+        leaf.writeBuffers(ostr);
+
+        std::istringstream istr(ostr.str(), std::ios_base::binary);
+
+        // Since the input stream doesn't include a VDB header with file format version info,
+        // tag the input stream explicitly with the current version number.
+        openvdb::io::setCurrentVersion(istr);
+
+        leaf2.readTopology(istr);
+        leaf2.readBuffers(istr);
+
+        // check topology matches
+
+        CPPUNIT_ASSERT_EQUAL(leaf.onVoxelCount(), leaf2.onVoxelCount());
+        CPPUNIT_ASSERT(leaf2.isValueOn(4));
+        CPPUNIT_ASSERT(!leaf2.isValueOn(5));
+
+        // check only topology (values and attributes still empty)
+
+        CPPUNIT_ASSERT_EQUAL(leaf2.getValue(4), ValueType(20));
+        CPPUNIT_ASSERT_EQUAL(leaf2.attributeSet().size(), size_t(2));
+    }
+}
+
+
+void
+TestPointDataLeaf::testPointDataAccessor()
+{
+    // get()
+
+    // pointCount()
+
+    // totalPointCount()
+}
+
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestPointDataLeaf);
 
