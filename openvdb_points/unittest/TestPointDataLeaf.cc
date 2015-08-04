@@ -49,6 +49,7 @@ public:
     CPPUNIT_TEST(testPointCount);
     CPPUNIT_TEST(testAttributes);
     CPPUNIT_TEST(testTopologyCopy);
+    CPPUNIT_TEST(testEquivalence);
     CPPUNIT_TEST_SUITE_END();
 
     void testEmptyLeaf();
@@ -58,7 +59,47 @@ public:
     void testPointCount();
     void testAttributes();
     void testTopologyCopy();
+    void testEquivalence();
 
+private:
+    // Generate random points by uniformly distributing points
+    // on a unit-sphere.
+    // (borrowed from PointIndexGrid unit test)
+    void genPoints(const int numPoints, std::vector<openvdb::Vec3R>& points) const
+    {
+        // init
+        openvdb::math::Random01 randNumber(0);
+        const int n = int(std::sqrt(double(numPoints)));
+        const double xScale = (2.0 * M_PI) / double(n);
+        const double yScale = M_PI / double(n);
+
+        double x, y, theta, phi;
+        openvdb::Vec3R pos;
+
+        points.reserve(n*n);
+
+        // loop over a [0 to n) x [0 to n) grid.
+        for (int a = 0; a < n; ++a) {
+            for (int b = 0; b < n; ++b) {
+
+                // jitter, move to random pos. inside the current cell
+                x = double(a) + randNumber();
+                y = double(b) + randNumber();
+
+                // remap to a lat/long map
+                theta = y * yScale; // [0 to PI]
+                phi   = x * xScale; // [0 to 2PI]
+
+                // convert to cartesian coordinates on a unit sphere.
+                // spherical coordinate triplet (r=1, theta, phi)
+                pos[0] = std::sin(theta)*std::cos(phi);
+                pos[1] = std::sin(theta)*std::sin(phi);
+                pos[2] = std::cos(theta);
+
+                points.push_back(pos);
+            }
+        }
+    }
 }; // class TestPointDataLeaf
 
 using openvdb::tools::PointDataTree;
@@ -103,6 +144,30 @@ monotonicOffsets(const LeafType& leafNode)
 
     return true;
 }
+
+// (borrowed from PointIndexGrid unit test)
+
+class PointList
+{
+public:
+    typedef openvdb::Vec3R value_type;
+
+    PointList(const std::vector<openvdb::Vec3R>& points)
+        : mPoints(&points)
+    {
+    }
+
+    size_t size() const {
+        return mPoints->size();
+    }
+
+    void getPos(size_t n, openvdb::Vec3R& xyz) const {
+        xyz = (*mPoints)[n];
+    }
+
+protected:
+    std::vector<openvdb::Vec3R> const * const mPoints;
+}; // PointList
 
 } // namespace
 
@@ -425,37 +490,155 @@ TestPointDataLeaf::testAttributes()
 void
 TestPointDataLeaf::testTopologyCopy()
 {
-    // create a float leaf and activate some values
+    // test topology copy from a float Leaf
 
-    typedef openvdb::FloatTree::LeafNodeType FloatLeaf;
+    {
+        typedef openvdb::FloatTree::LeafNodeType FloatLeaf;
 
-    FloatLeaf floatLeaf(openvdb::Coord(0, 0, 0));
+        // create a float leaf and activate some values
 
-    floatLeaf.setValueOn(1);
-    floatLeaf.setValueOn(4);
-    floatLeaf.setValueOn(7);
-    floatLeaf.setValueOn(8);
+        FloatLeaf floatLeaf(openvdb::Coord(0, 0, 0));
 
-    CPPUNIT_ASSERT_EQUAL(floatLeaf.onVoxelCount(), Index64(4));
+        floatLeaf.setValueOn(1);
+        floatLeaf.setValueOn(4);
+        floatLeaf.setValueOn(7);
+        floatLeaf.setValueOn(8);
 
-    // validate construction of a PointDataLeaf using a TopologyCopy
+        CPPUNIT_ASSERT_EQUAL(floatLeaf.onVoxelCount(), Index64(4));
 
-    LeafType leaf(floatLeaf, openvdb::TopologyCopy());
+        // validate construction of a PointDataLeaf using a TopologyCopy
 
-    CPPUNIT_ASSERT_EQUAL(leaf.onVoxelCount(), Index64(4));
+        LeafType leaf(floatLeaf, openvdb::TopologyCopy());
 
-    LeafType leaf2(openvdb::Coord(8, 8, 8));
+        CPPUNIT_ASSERT_EQUAL(leaf.onVoxelCount(), Index64(4));
 
-    leaf2.setValueOn(1);
-    leaf2.setValueOn(4);
-    leaf2.setValueOn(7);
+        LeafType leaf2(openvdb::Coord(8, 8, 8));
 
-    CPPUNIT_ASSERT(!leaf.hasSameTopology(&leaf2));
+        leaf2.setValueOn(1);
+        leaf2.setValueOn(4);
+        leaf2.setValueOn(7);
 
-    leaf2.setValueOn(8);
+        CPPUNIT_ASSERT(!leaf.hasSameTopology(&leaf2));
 
-    CPPUNIT_ASSERT(leaf.hasSameTopology(&leaf2));
+        leaf2.setValueOn(8);
+
+        CPPUNIT_ASSERT(leaf.hasSameTopology(&leaf2));
+    }
+
+    // test topology copy from a PointIndexLeaf
+
+    {
+        // generate points
+        // (borrowed from PointIndexGrid unit test)
+
+        const float voxelSize = 0.01f;
+        const openvdb::math::Transform::Ptr transform =
+                openvdb::math::Transform::createLinearTransform(voxelSize);
+
+        std::vector<openvdb::Vec3R> points;
+        genPoints(40000, points);
+
+        PointList pointList(points);
+
+        // construct point index grid
+
+        typedef openvdb::tools::PointIndexGrid PointIndexGrid;
+
+        PointIndexGrid::Ptr pointGridPtr =
+            openvdb::tools::createPointIndexGrid<PointIndexGrid>(pointList, *transform);
+
+        PointIndexGrid::TreeType::LeafCIter iter = pointGridPtr->tree().cbeginLeaf();
+
+        CPPUNIT_ASSERT(iter);
+
+        // check that the active voxel counts match for all leaves
+
+        for ( ; iter; ++iter) {
+            LeafType leaf(*iter);
+
+            CPPUNIT_ASSERT_EQUAL(iter->onVoxelCount(), leaf.onVoxelCount());
+        }
+    }
 }
+
+
+void
+TestPointDataLeaf::testEquivalence()
+{
+    using namespace openvdb::tools;
+
+    // Define and register some common attribute types
+
+    typedef TypedAttributeArray<float>  AttributeS;
+    typedef TypedAttributeArray<int>    AttributeI;
+
+    AttributeS::registerType();
+    AttributeI::registerType();
+
+    // create a descriptor
+
+    typedef AttributeSet::Descriptor Descriptor;
+
+    Descriptor::Inserter names;
+    names.add("density", AttributeS::attributeType());
+    names.add("id", AttributeI::attributeType());
+
+    Descriptor::Ptr descrA = Descriptor::create(names.vec);
+
+    // create a leaf and initialize attributes using this descriptor
+
+    LeafType leaf(openvdb::Coord(0, 0, 0));
+    leaf.initializeAttributes(descrA, /*arrayLength=*/100);
+
+    // manually activate some voxels
+
+    leaf.setValueOn(1);
+    leaf.setValueOn(4);
+    leaf.setValueOn(7);
+
+    // manually change some values in the density array
+
+    TypedAttributeArray<float>& attr = leaf.typedAttributeArray<AttributeS>("density");
+
+    attr.set(0, 5.0f);
+    attr.set(50, 2.0f);
+    attr.set(51, 8.1f);
+
+    // check deep copy construction (topology and attributes)
+
+    {
+        LeafType leaf2(leaf);
+
+        CPPUNIT_ASSERT_EQUAL(leaf.onVoxelCount(), leaf2.onVoxelCount());
+        CPPUNIT_ASSERT(leaf.hasSameTopology(&leaf2));
+
+        CPPUNIT_ASSERT_EQUAL(leaf.attributeSet().size(), leaf2.attributeSet().size());
+        CPPUNIT_ASSERT_EQUAL(leaf.attributeSet().get(0)->size(), leaf2.attributeSet().get(0)->size());
+    }
+
+    // check equivalence
+
+    {
+        LeafType leaf2(leaf);
+
+        CPPUNIT_ASSERT(leaf == leaf2);
+
+        leaf2.setOrigin(openvdb::Coord(0, 8, 0));
+
+        CPPUNIT_ASSERT(leaf != leaf2);
+    }
+
+    {
+        LeafType leaf2(leaf);
+
+        CPPUNIT_ASSERT(leaf == leaf2);
+
+        leaf2.setValueOn(10);
+
+        CPPUNIT_ASSERT(leaf != leaf2);
+    }
+}
+
 CPPUNIT_TEST_SUITE_REGISTRATION(TestPointDataLeaf);
 
 
