@@ -30,9 +30,9 @@
 
 #include <cppunit/extensions/HelperMacros.h>
 
-#include <openvdb/tools/PointDataGrid.h>
+#include <openvdb_points/tools/PointDataGrid.h>
+#include <openvdb_points/openvdb.h>
 #include <openvdb/openvdb.h>
-#include <openvdb/openvdb_points.h>
 
 class TestPointDataLeaf: public CppUnit::TestCase
 {
