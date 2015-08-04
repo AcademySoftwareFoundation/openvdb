@@ -47,6 +47,7 @@ public:
     CPPUNIT_TEST(testSetValue);
     CPPUNIT_TEST(testMonotonicity);
     CPPUNIT_TEST(testPointCount);
+    CPPUNIT_TEST(testAttributes);
     CPPUNIT_TEST_SUITE_END();
 
     void testEmptyLeaf();
@@ -54,6 +55,7 @@ public:
     void testSetValue();
     void testMonotonicity();
     void testPointCount();
+    void testAttributes();
 
 }; // class TestPointDataLeaf
 
@@ -285,6 +287,136 @@ TestPointDataLeaf::testPointCount()
     CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::All), Index64(LeafType::SIZE / 2));
     CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::Active), Index64(LeafType::SIZE / 2));
     CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::Inactive), Index64(0));
+}
+
+
+void
+TestPointDataLeaf::testAttributes()
+{
+    using namespace openvdb::tools;
+
+    // Define and register some common attribute types
+    typedef openvdb::tools::TypedAttributeArray<float>  AttributeS;
+    typedef openvdb::tools::TypedAttributeArray<int>    AttributeI;
+
+    AttributeS::registerType();
+    AttributeI::registerType();
+
+    // create a descriptor
+
+    typedef openvdb::tools::AttributeSet::Descriptor Descriptor;
+
+    Descriptor::Inserter names;
+    names.add("density", AttributeS::attributeType());
+    names.add("id", AttributeI::attributeType());
+
+    Descriptor::Ptr descrA = Descriptor::create(names.vec);
+
+    // create a leaf and initialize attributes using this descriptor
+
+    LeafType leaf(openvdb::Coord(0, 0, 0));
+
+    CPPUNIT_ASSERT_EQUAL(leaf.attributeSet().size(), size_t(0));
+
+    leaf.initializeAttributes(descrA, /*arrayLength=*/100);
+
+    CPPUNIT_ASSERT_EQUAL(leaf.attributeSet().size(), size_t(2));
+
+    {
+        const AttributeArray* array = leaf.attributeSet().get(/*pos=*/0);
+
+        CPPUNIT_ASSERT_EQUAL(array->size(), size_t(100));
+    }
+
+    // manually set a voxel
+
+    leaf.setOffsetOn(LeafType::SIZE - 1, 10);
+
+    CPPUNIT_ASSERT(!zeroLeafValues(&leaf));
+
+    // clear the attributes and check voxel values have been zeroed
+
+    leaf.clearAttributes();
+
+    CPPUNIT_ASSERT_EQUAL(leaf.attributeSet().size(), size_t(2));
+
+    CPPUNIT_ASSERT(leaf.isDense());
+    CPPUNIT_ASSERT(zeroLeafValues(&leaf));
+
+    leaf.deactivateEmptyVoxels();
+
+    CPPUNIT_ASSERT(leaf.isEmpty());
+
+    // ensure arrays are uniform
+
+    const AttributeArray* array0 = leaf.attributeSet().get(/*pos=*/0);
+    const AttributeArray* array1 = leaf.attributeSet().get(/*pos=*/1);
+
+    CPPUNIT_ASSERT_EQUAL(array0->size(), size_t(1));
+    CPPUNIT_ASSERT_EQUAL(array1->size(), size_t(1));
+
+    // test leaf returns expected result for hasAttribute()
+
+    CPPUNIT_ASSERT(leaf.hasAttribute<AttributeS>(/*pos=*/0));
+    CPPUNIT_ASSERT(!leaf.hasAttribute<AttributeI>(/*pos=*/0));
+    CPPUNIT_ASSERT(leaf.hasAttribute<AttributeS>("density"));
+    CPPUNIT_ASSERT(!leaf.hasAttribute<AttributeI>("density"));
+
+    CPPUNIT_ASSERT(leaf.hasAttribute<AttributeI>(/*pos=*/1));
+    CPPUNIT_ASSERT(!leaf.hasAttribute<AttributeS>(/*pos=*/1));
+    CPPUNIT_ASSERT(leaf.hasAttribute<AttributeI>("id"));
+    CPPUNIT_ASSERT(!leaf.hasAttribute<AttributeS>("id"));
+
+    CPPUNIT_ASSERT(!leaf.hasAttribute<AttributeS>(/*pos=*/2));
+    CPPUNIT_ASSERT(!leaf.hasAttribute<AttributeS>("test"));
+
+    // test leaf can be successfully cast to TypedAttributeArray and check types
+
+    CPPUNIT_ASSERT_EQUAL(leaf.typedAttributeArray<AttributeS>(/*pos=*/0).type(),
+                         AttributeS::attributeType());
+    CPPUNIT_ASSERT_EQUAL(leaf.typedAttributeArray<AttributeS>("density").type(),
+                         AttributeS::attributeType());
+    CPPUNIT_ASSERT_EQUAL(leaf.typedAttributeArray<AttributeI>(/*pos=*/1).type(),
+                         AttributeI::attributeType());
+    CPPUNIT_ASSERT_EQUAL(leaf.typedAttributeArray<AttributeI>("id").type(),
+                         AttributeI::attributeType());
+
+    const LeafType* constLeaf = &leaf;
+
+    CPPUNIT_ASSERT_EQUAL(constLeaf->typedAttributeArray<AttributeS>(/*pos=*/0).type(),
+                         AttributeS::attributeType());
+    CPPUNIT_ASSERT_EQUAL(constLeaf->typedAttributeArray<AttributeS>("density").type(),
+                         AttributeS::attributeType());
+    CPPUNIT_ASSERT_EQUAL(constLeaf->typedAttributeArray<AttributeI>(/*pos=*/1).type(),
+                         AttributeI::attributeType());
+    CPPUNIT_ASSERT_EQUAL(constLeaf->typedAttributeArray<AttributeI>("id").type(),
+                         AttributeI::attributeType());
+
+    // check invalid type, pos or name throws
+
+    CPPUNIT_ASSERT_THROW(leaf.typedAttributeArray<AttributeI>(/*pos=*/0), openvdb::LookupError);
+    CPPUNIT_ASSERT_THROW(leaf.typedAttributeArray<AttributeI>("density"), openvdb::LookupError);
+    CPPUNIT_ASSERT_THROW(leaf.typedAttributeArray<AttributeS>(/*pos=*/1), openvdb::LookupError);
+    CPPUNIT_ASSERT_THROW(leaf.typedAttributeArray<AttributeS>("id"), openvdb::LookupError);
+    CPPUNIT_ASSERT_THROW(leaf.typedAttributeArray<AttributeS>(/*pos=*/2), openvdb::LookupError);
+    CPPUNIT_ASSERT_THROW(leaf.typedAttributeArray<AttributeS>("test"), openvdb::LookupError);
+
+    CPPUNIT_ASSERT_THROW(constLeaf->typedAttributeArray<AttributeI>(/*pos=*/0), openvdb::LookupError);
+    CPPUNIT_ASSERT_THROW(constLeaf->typedAttributeArray<AttributeI>("density"), openvdb::LookupError);
+    CPPUNIT_ASSERT_THROW(constLeaf->typedAttributeArray<AttributeS>(/*pos=*/1), openvdb::LookupError);
+    CPPUNIT_ASSERT_THROW(constLeaf->typedAttributeArray<AttributeS>("id"), openvdb::LookupError);
+    CPPUNIT_ASSERT_THROW(constLeaf->typedAttributeArray<AttributeS>(/*pos=*/2), openvdb::LookupError);
+    CPPUNIT_ASSERT_THROW(constLeaf->typedAttributeArray<AttributeS>("test"), openvdb::LookupError);
+
+    // check memory usage = attribute set + base leaf
+
+    leaf.initializeAttributes(descrA, /*arrayLength=*/100);
+
+    const LeafType::BaseLeaf& baseLeaf = static_cast<LeafType::BaseLeaf&>(leaf);
+
+    const Index64 memUsage = baseLeaf.memUsage() + leaf.attributeSet().memUsage();
+
+    CPPUNIT_ASSERT_EQUAL(memUsage, leaf.memUsage());
 }
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestPointDataLeaf);
