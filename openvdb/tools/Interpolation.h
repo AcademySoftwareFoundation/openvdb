@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -97,14 +97,16 @@ struct Sampler
     static bool staggered();
     static size_t order();
 
-    /// @brief Sample @a inTree at @a inCoord
+    /// @brief Sample @a inTree at the floating-point index coordinate @a inCoord
     /// and store the result in @a result.
+    ///
     /// @return @c true if the sampled value is active.
     template<class TreeT>
     static bool sample(const TreeT& inTree, const Vec3R& inCoord,
                        typename TreeT::ValueType& result);
 
-    /// @brief Sample @a inTree at @a inCoord.
+    /// @brief Sample @a inTree at the floating-point index coordinate @a inCoord.
+    ///
     /// @return the reconstructed value
     template<class TreeT>
     static typename TreeT::ValueType sample(const TreeT& inTree, const Vec3R& inCoord);
@@ -156,7 +158,7 @@ public:
     /// @return @c true if any one of the sampled values is active.
     template<class TreeT>
     static bool sample(const TreeT& inTree, const Vec3R& inCoord,
-        typename TreeT::ValueType& result);
+                       typename TreeT::ValueType& result);
 
     /// @brief Trilinearly reconstruct @a inTree at @a inCoord.
     /// @return the reconstructed value
@@ -821,7 +823,7 @@ QuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
     for (int dx = 0, ix = inLoIdx.x(); dx < 3; ++dx, ++ix) {
         for (int dy = 0, iy = inLoIdx.y(); dy < 3; ++dy, ++iy) {
             for (int dz = 0, iz = inLoIdx.z(); dz < 3; ++dz, ++iz) {
-                data[dx][dy][dz] = inTree.probeValue(Coord(ix, iy, iz));
+                data[dx][dy][dz] = inTree.getValue(Coord(ix, iy, iz));
             }
         }
     }
@@ -970,6 +972,6 @@ struct Sampler<2, true> : public StaggeredQuadraticSampler {};
 
 #endif // OPENVDB_TOOLS_INTERPOLATION_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
