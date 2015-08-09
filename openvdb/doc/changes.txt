@@ -72,6 +72,9 @@ Improvements:
   converter with significant performance and parallel scaling improvements,
   reduced runtime memory usage and a more robust inside / outside sign
   classification scheme.
+- A new implementation of @vdblink::tools::PointPartitioner PointPartitioner@endlink
+  improves performance, concurrency, runtime memory usage and is now unbounded
+  meaning that points may be distributed anywhere in index space.
 - A new implementation of the @vdblink::tools::sdfToFogVolume
   sdfToFogVolume@endlink converter that improves performance up to 11x.
 - A new implementation of the @vdblink::tools::sdfInteriorMask
@@ -98,6 +101,7 @@ Bug fixes:
 - Fixed a <TT>vdb_view</TT> issue whereby the frame buffer size did not
   necessarily match the window size.
   <I>[Contributed by Rafael&nbsp;Campos]</I>
+- Fixed a bug in tools::QuadraticSampler::sample.
 
 @par
 API changes:
@@ -118,6 +122,8 @@ Houdini:
   contains a VOP sub-network which can be used to define VEX procedures for
   procedural density modeling. The accompanying creation script defines a
   default VOP network with UI parameters.
+- Added an Advect Density SOP to advect non-level-sets, e.g. density or
+  velocity.
 - Added a Sort Points SOP that spatially reorders points that are close
   together in space to also be close in the insertion order. This
   operation can help improve CPU cache coherency and performance for
