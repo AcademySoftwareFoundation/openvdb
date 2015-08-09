@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -32,7 +32,9 @@
 ///
 /// @author Ken Museth
 ///
-/// @brief Density (or non-level-set) advection SOP
+/// @brief Density or veclocity (i.e. non-level-set) advection SOP
+///
+/// @todo Add optional mask (allready supported by tools::DensityAdvect)
 
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>
@@ -65,6 +67,7 @@ struct AdvectionParms {
         , mVelocityGrid()
         , mCountRK(1)
         , mOrderRK(1)
+        , mSampleOrder(1)
         , mTimeStep(0.0)
         , mStaggered(false)
     {
@@ -72,7 +75,7 @@ struct AdvectionParms {
 
     const GA_PrimitiveGroup *mGroup;
     hvdb::Grid::ConstPtr mVelocityGrid;
-    size_t mCountRK, mOrderRK;
+    size_t mCountRK, mOrderRK, mSampleOrder;
     float mTimeStep;
     bool mStaggered;
 };
@@ -100,7 +103,7 @@ protected:
 
     OP_ERROR evalAdvectionParms(OP_Context&, AdvectionParms&);
 
-    template <bool StaggeredVelocity>
+    template <bool StaggeredVelocity, size_t SampleOrder>
     bool processGrids(const AdvectionParms&, hvdb::Interrupter&);
 };
 
@@ -132,6 +135,12 @@ newSopOperator(OP_OperatorTable* table)
     // Timestep
     parms.add(hutil::ParmFactory(PRM_FLT, "timestep", "Time Step")
         .setDefault(1, "1.0/$FPS"));
+              
+    // Density interpolation order
+    parms.add(hutil::ParmFactory(PRM_INT_J, "OrderOfSampling", "Sampling Order")
+        .setDefault(PRMoneDefaults)
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_RESTRICTED, 2)
+        .setHelpText("The order of the interpolation scheme to resample density"));
 
     // Integration order
     parms.add(hutil::ParmFactory(PRM_INT_J, "OrderOfRK", "Runge-Kutta Order")
@@ -146,7 +155,7 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
         .setHelpText("The number of integrations steps to be performed per advection step."));
-
+              
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Advect Density",
         SOP_OpenVDB_Advect_Density::factory, parms, *table)
@@ -202,9 +211,27 @@ SOP_OpenVDB_Advect_Density::cookMySop(OP_Context& context)
         hvdb::Interrupter boss("Advecting VDBs");
 
         if (parms.mStaggered) {
-            this->processGrids<true >(parms, boss);
+            if (parms.mSampleOrder == 0) {
+                this->processGrids<true, 0>(parms, boss);
+            } else if (parms.mSampleOrder == 1) {
+                this->processGrids<true, 1>(parms, boss);
+            } else if (parms.mSampleOrder == 2) {
+                this->processGrids<true, 2>(parms, boss);
+            } else {
+                addError(SOP_MESSAGE, "Unsupported order of staggered velocity sampling");
+                return UT_ERROR_ABORT;
+            }
         } else {
-            this->processGrids<false>(parms, boss);
+            if (parms.mSampleOrder == 0) {
+                this->processGrids<false, 0>(parms, boss);
+            } else if (parms.mSampleOrder == 1) {
+                this->processGrids<false, 1>(parms, boss);
+            } else if (parms.mSampleOrder == 2) {
+                this->processGrids<false, 2>(parms, boss);
+            } else {
+                addError(SOP_MESSAGE, "Unsupported order of density sampling");
+                return UT_ERROR_ABORT;
+            }
         }
 
         if (boss.wasInterrupted()) addWarning(SOP_MESSAGE, "Process was interrupted");
@@ -262,6 +289,8 @@ SOP_OpenVDB_Advect_Density::evalAdvectionParms(OP_Context& context, AdvectionPar
 
     parms.mOrderRK = evalInt("OrderOfRK", 0, now);
 
+    parms.mSampleOrder = evalInt("OrderOfSampling", 0, now);
+
     parms.mStaggered = parms.mVelocityGrid->getGridClass() == openvdb::GRID_STAGGERED;
 
     return error();
@@ -271,7 +300,7 @@ SOP_OpenVDB_Advect_Density::evalAdvectionParms(OP_Context& context, AdvectionPar
 ////////////////////////////////////////
 
 
-template <bool StaggeredVelocity>
+template <bool StaggeredVelocity, size_t SampleOrder>
 bool
 SOP_OpenVDB_Advect_Density::processGrids(const AdvectionParms& parms, hvdb::Interrupter& boss)
 {
@@ -300,13 +329,19 @@ SOP_OpenVDB_Advect_Density::processGrids(const AdvectionParms& parms, hvdb::Inte
         if (vdbPrim->getStorageType() == UT_VDB_FLOAT) {
             const openvdb::FloatGrid& inGrid = UTvdbGridCast<openvdb::FloatGrid>(vdbPrim->getGrid());
             typename openvdb::FloatGrid::Ptr outGrid = adv.template advect<openvdb::FloatGrid,
-                openvdb::tools::Sampler<1> >(inGrid, parms.mTimeStep);
+                openvdb::tools::Sampler<SampleOrder, false> >(inGrid, parms.mTimeStep);
             hvdb::replaceVdbPrimitive(*gdp, outGrid, *vdbPrim);
         } else if (vdbPrim->getStorageType() == UT_VDB_VEC3F) {
             vdbPrim->makeGridUnique();
             const openvdb::Vec3SGrid& inGrid = UTvdbGridCast<openvdb::Vec3SGrid>(vdbPrim->getGrid());
-            typename openvdb::Vec3SGrid::Ptr outGrid = adv.template advect<openvdb::Vec3SGrid,
-                openvdb::tools::Sampler<1> >(inGrid, parms.mTimeStep);
+            typename openvdb::Vec3SGrid::Ptr outGrid;
+            if (inGrid.getGridClass() == openvdb::GRID_STAGGERED) {
+                outGrid = adv.template advect<openvdb::Vec3SGrid,
+                    openvdb::tools::Sampler<SampleOrder, true> >(inGrid, parms.mTimeStep);
+            } else {
+                outGrid = adv.template advect<openvdb::Vec3SGrid,
+                    openvdb::tools::Sampler<SampleOrder, false> >(inGrid, parms.mTimeStep);
+            }
             hvdb::replaceVdbPrimitive(*gdp, outGrid, *vdbPrim);
         } else {
             skippedGrids.push_back(it.getPrimitiveNameOrIndex().toStdString());
@@ -328,6 +363,6 @@ SOP_OpenVDB_Advect_Density::processGrids(const AdvectionParms& parms, hvdb::Inte
     return true;
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

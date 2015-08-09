@@ -54,6 +54,9 @@ Version 3.1.0 - In development
       significant performance and parallel scaling improvements, reduced
       runtime memory usage and a more robust inside / outside sign
       classification scheme.
+    - A new implementation of tools::PointPartitioner improves performance,
+      concurrency, runtime memory usage and is now unbounded meaning that
+      points may be distributed anywhere in index space.
     - A new implementation of the tools::sdfToFogVolume converter that
       improves performance up to 11x.
     - A new implementation of the tools::sdfInteriorMask tool that improves
@@ -74,6 +77,7 @@ Version 3.1.0 - In development
     - Fixed a vdb_view issue whereby the frame buffer size did not
       necessarily match the window size.
       [Contributed by Rafael Campos]
+    - Fixed a bug in tools::QuadraticSampler::sample.
 
     API changes:
     - Removed the Hermite class since it was no longer used and caused build
@@ -89,8 +93,8 @@ Version 3.1.0 - In development
       contains a VOP sub-network which can be used to define VEX procedures for
       procedural density modeling. The accompanying creation script defines a
       default VOP network with UI parameters.
-    - Added an Advect Density SOP to advect non-level-sets, e.g. density or 
-      velocity. 
+    - Added an Advect Density SOP to advect non-level-sets, e.g. density or
+      velocity.
     - Added a Sort Points SOP that spatially reorders points that are close
       together in space to also be close in the insertion order. This
       operation can help improve CPU cache coherency and performance for

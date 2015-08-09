@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -670,6 +670,6 @@ struct LeafManagerImpl<LeafManager<const TreeT> >
 
 #endif // OPENVDB_TREE_LEAFMANAGER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

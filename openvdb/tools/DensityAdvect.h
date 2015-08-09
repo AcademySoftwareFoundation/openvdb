@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -34,11 +34,8 @@
 ///
 /// @file DensityAdvect.h
 ///
-/// @brief Hyperbolic advection of density (vs a level set interface)
-///
-/// @warning Currently assumes that the velocity and density grids are aligned.
-///
-/// @todo Allow for misaligned grids (as is the case for LevelSetAdvection).
+/// @brief Sparse hyperbolic advection of volumes, e.g. a density or
+///        velocity (vs a level set interface).
 
 #ifndef OPENVDB_TOOLS_DENSITY_ADVECT_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_DENSITY_ADVECT_HAS_BEEN_INCLUDED
@@ -86,6 +83,7 @@ public:
         math::Extrema e = extrema(velGrid.cbeginValueAll(), /*threading*/true);
         e.add(velGrid.background().length());
         mMaxVelocity = e.max();
+        //std::cerr << "Max |v| = " << mMaxVelocity << std::endl;
     }
 
     virtual ~DensityAdvection()
@@ -123,65 +121,80 @@ public:
     ///         of all the active values the input density for the
     ///         time = dt * IntegrationCount.
     ///
-    /// @param grid0   The input density grid to be advected (unmodified)
+    /// @param inGrid  The input density grid to be advected (unmodified)
     /// @param dt      Time-step of the Runge-Kutta integrator.
     ///
     /// @note It is important to note that the input density @c grid1 is assumed
     ///       to be represented in the same frame of reference as the velocity field!
     ///
     /// @details This method will advect all of the active values in
-    ///          the input density @a grid0. To achieve this a
+    ///          the input density @a inGrid. To achieve this a
     ///          deep-copy is dilated to account for the material
-    ///          transport. So for large time-steps and/or fast
-    ///          velocity fields this dilation can be slow. In such
-    ///          cases consider using the alternate advect method below.
+    ///          transport. This dilation step can be slow for large
+    ///          time steps @a dt or fast moving velocity fields.
     ///
-    /// @throw RuntimeError if @a grid0 is not aligned with the velocity grid.
+    /// @throw RuntimeError if @a inGrid does not have uniform voxels.
     template<typename DensityGridT,
              typename DensitySamplerT>
-    typename DensityGridT::Ptr advect(const DensityGridT& grid0, float dt)
+    typename DensityGridT::Ptr advect(const DensityGridT& inGrid, float dt)
     {
-        if (grid0.transform() != mVelGrid.transform()) {
-            OPENVDB_THROW(RuntimeError, "Density grid and velocity grid are misaligned! Consider "
-                          "resampling either of the two grids into the index space of the other.");
+        if (!inGrid.hasUniformVoxels()) {
+            OPENVDB_THROW(RuntimeError, "Density grid does not have uniform voxels!");
         }
-        typename DensityGridT::Ptr grid1 = grid0.deepCopy();
-        dilateVoxels( grid1->tree(), static_cast<int>(math::RoundUp(mMaxVelocity * dt * mCountRK)));
-        this->template process<DensityGridT, DensitySamplerT>(*grid1, grid0, dt);
-        return grid1;
+        typename DensityGridT::Ptr outGrid = inGrid.deepCopy();
+        const double voxel_distance = math::RoundUp(mMaxVelocity*dt*mCountRK/inGrid.voxelSize()[0]);
+        //std::cerr << "Dilated " << static_cast<int>(voxel_distance) << " voxel units" << std::endl;
+        dilateVoxels( outGrid->tree(), static_cast<int>(voxel_distance) );
+        this->template process<DensityGridT, DensitySamplerT>(*outGrid, inGrid, dt);
+        return outGrid;
     }
 
-    /// @return Returns a new density grid that is the result of
-    ///         passive advection of the active values in @a grid0
+    /// @return Returns a new density grid that is the results of
+    ///         passive advection of the active values in @a inGrid
     ///         that intersect the active values in @c mask. The time
     ///         of the output grid corresponds to dt * IntegrationCount.
     ///
-    /// @param grid0     The input density grid to be advected (unmodified).
+    /// @param inGrid    The input density grid to be advected (unmodified).
     /// @param mask      The mask of active values defining the active voxels
-    ///                  in @c grid0 on which to perform advection. Only
+    ///                  in @c inGrid on which to perform advection. Only
     ///                  if a value is active in both grids will it be modified.
     /// @param dt        Time-step for a single Runge-Kutta integration step.
     ///
-    /// @note It is important to note that the input density @c grid0 is assumed
-    ///       to be represented in the same frame of reference as the velocity field!
+    /// @note It is important to note that the input density @a inGrid is assumed
+    ///       to be represented in the same frame of reference as the
+    ///       input @a mask grid!
     ///
-    /// @throw RuntimeError if @a grid0 is not aligned with the velocity grid.
+    /// @details This method will advect all of the active values in
+    ///          the input density @a inGrid that intersects with the
+    ///          active values in @a mask. To achieve this a
+    ///          deep-copy is dilated to account for the material
+    ///          transport and finally cropped to the intersection
+    ///          with @a mask. The dilation step can be slow for large
+    ///          time steps @a dt or fast moving velocity fields.
+    ///
+    /// @throw RuntimeError if @a inGrid is not aligned with @a mask
+    ///        or if its voxels are not uniform.
     template<typename DensityGridT,
              typename MaskGridT,
              typename DensitySamplerT>
-    typename DensityGridT::Ptr advect(const DensityGridT& grid0, const MaskGridT& mask, float dt)
+    typename DensityGridT::Ptr advect(const DensityGridT& inGrid, const MaskGridT& mask, float dt)
     {
-        if (grid0.transform() != mVelGrid.transform()) {
-            OPENVDB_THROW(RuntimeError, "Density grid and velocity grid are misaligned! Consider "
+        if (!inGrid.hasUniformVoxels()) {
+            OPENVDB_THROW(RuntimeError, "Density grid does not have uniform voxels!");
+        }
+        if (inGrid.transform() != mask.transform()) {
+            OPENVDB_THROW(RuntimeError, "Density grid and mask grid are misaligned! Consider "
                           "resampling either of the two grids into the index space of the other.");
         }
-        typename DensityGridT::Ptr grid1 = grid0.deepCopy();
-        dilateVoxels( grid1->tree(), static_cast<int>(math::RoundUp(mMaxVelocity * dt * mCountRK)));
-        grid1->topologyIntersection(mask);
-        pruneInactive(grid1->tree(), mGrainSize>0, mGrainSize);
-        this->template process<DensityGridT, DensitySamplerT>(*grid1, grid0, dt);
-        grid1->topologyUnion(grid0);
-        return grid1;
+        typename DensityGridT::Ptr outGrid = inGrid.deepCopy();
+        const double voxel_distance = math::RoundUp(mMaxVelocity*dt*mCountRK/inGrid.voxelSize()[0]);
+        //std::cerr << "Dilated " << static_cast<int>(voxel_distance) << " voxel units" << std::endl;
+        dilateVoxels( outGrid->tree(), static_cast<int>(voxel_distance) );
+        outGrid->topologyIntersection(mask);
+        pruneInactive(outGrid->tree(), mGrainSize>0, mGrainSize);
+        this->template process<DensityGridT, DensitySamplerT>(*outGrid, inGrid, dt);
+        outGrid->topologyUnion(inGrid);
+        return outGrid;
     }
 
 private:
@@ -190,24 +203,24 @@ private:
     DensityAdvection& operator=(const DensityAdvection&);// not implemented
 
     template<typename DensityGridT, typename DensitySamplerT>
-    void process(DensityGridT& grid1, const DensityGridT& grid0, float dt)
+    void process(DensityGridT& outGrid, const DensityGridT& inGrid, float dt)
     {
         mDt = dt;
-        grid1.tree().voxelizeActiveTiles();
+        outGrid.tree().voxelizeActiveTiles();
         if (mOrderRK == 1) {
-            Advect<DensityGridT, 1, DensitySamplerT> adv(grid0, *this);
-            adv.run(grid1);
+            Advect<DensityGridT, 1, DensitySamplerT> adv(inGrid, *this);
+            adv.run(outGrid);
         } else if (mOrderRK == 2) {
-            Advect<DensityGridT, 2, DensitySamplerT> adv(grid0, *this);
-            adv.run(grid1);
+            Advect<DensityGridT, 2, DensitySamplerT> adv(inGrid, *this);
+            adv.run(outGrid);
         } else if (mOrderRK == 3) {
-            Advect<DensityGridT, 3, DensitySamplerT> adv(grid0, *this);
-            adv.run(grid1);
+            Advect<DensityGridT, 3, DensitySamplerT> adv(inGrid, *this);
+            adv.run(outGrid);
         } else if (mOrderRK == 4) {
-            Advect<DensityGridT, 4, DensitySamplerT> adv(grid0, *this);
-            adv.run(grid1);
+            Advect<DensityGridT, 4, DensitySamplerT> adv(inGrid, *this);
+            adv.run(outGrid);
         }
-        pruneInactive(grid1.tree(), mGrainSize>0, mGrainSize);
+        pruneInactive(outGrid.tree(), mGrainSize>0, mGrainSize);
     }
 
     // Private class that implements the semi-lagrangian integration
@@ -221,23 +234,25 @@ private:
         typedef typename LeafManagerT::LeafRange     LeafRangeT;
         typedef VelocityIntegrator<VelocityGridT, StaggeredVelocity> VelocityIntegratorT;
 
-        Advect(const DensityGridT& grid, const DensityAdvection& parent)
-            : mDensityAcc(grid.getAccessor())
+        Advect(const DensityGridT& inGrid, const DensityAdvection& parent)
+            : mTransform(&inGrid.transform())
+            , mDensityAcc(inGrid.getAccessor())
             , mVelocityInt(parent.mVelGrid)
             , mParent(&parent)
         {
         }
         Advect(const Advect& other)
-            : mDensityAcc(other.mDensityAcc.tree())
+            : mTransform(other.mTransform)
+            , mDensityAcc(other.mDensityAcc.tree())
             , mVelocityInt(other.mVelocityInt)
             , mParent(other.mParent)
         {
         }
-        void run(DensityGridT& grid)
+        void run(DensityGridT& outGrid)
         {
             if (mParent->mInterrupter) mParent->mInterrupter->start("Advecting density");
 
-            const LeafManagerT manger(grid.tree());
+            const LeafManagerT manger(outGrid.tree());
             const LeafRangeT range = manger.leafRange(mParent->mGrainSize);
 
             if (mParent->mGrainSize > 0) {
@@ -262,11 +277,11 @@ private:
                 ValueT* phi = leafIter.buffer(0).data();
                 typedef typename TreeT::LeafNodeType::ValueOnIter VoxelIterT;
                 for (VoxelIterT voxelIter = leafIter->beginValueOn(); voxelIter; ++voxelIter) {
-                    Vec3s p = voxelIter.getCoord().asVec3s();
+                    Vec3d w = mTransform->indexToWorld(voxelIter.getCoord());
                     for (int i = 0; i < n; ++i) {
-                        mVelocityInt.template rungeKutta<OrderRK, Vec3s>(dt, p);
+                        mVelocityInt.template rungeKutta<OrderRK, Vec3d>(dt, w);
                     }
-                    const ValueT sample = SamplerT::sample(mDensityAcc, p);
+                    const ValueT sample = SamplerT::sample(mDensityAcc, mTransform->worldToIndex(w));
                     const Index j = voxelIter.pos();
                     if (math::isApproxEqual(sample, backg, math::Delta<ValueT>::value())) {
                         phi[j] = backg;
@@ -278,6 +293,7 @@ private:
             }//loop over leaf nodes
         }
         // Public member data of the private Advect class
+        const math::Transform*  mTransform;
         AccT                    mDensityAcc;
         VelocityIntegratorT     mVelocityInt;
         const DensityAdvection* mParent;
@@ -299,6 +315,6 @@ private:
 
 #endif // OPENVDB_TOOLS_DENSITY_ADVECT_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

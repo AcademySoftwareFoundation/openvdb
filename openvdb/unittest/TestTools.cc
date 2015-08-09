@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -1680,9 +1680,9 @@ TestTools::testDensityAdvect()
 
     Vec3fGrid velocity(Vec3f(1.0f, 0.0f, 0.0f));
 
-    {//test misaligned grids (throws)
+    {//test non-uniform grids (throws)
         FloatGrid::Ptr density0 = FloatGrid::create(0.0f);
-        density0->setTransform(math::Transform::createLinearTransform(0.5));
+        density0->transform().preScale(Vec3d(1.0, 2.0, 3.0));//i.e. non-uniform voxels
         tools::DensityAdvection<Vec3fGrid> a(velocity);
         CPPUNIT_ASSERT_THROW((a.advect<FloatGrid, tools::Sampler<1> >(*density0, 0.1f)), RuntimeError);
     }
@@ -2195,6 +2195,6 @@ TestTools::testClipping()
     }
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
