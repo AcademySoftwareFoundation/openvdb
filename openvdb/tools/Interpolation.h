@@ -371,7 +371,7 @@ private:
 ///
 /// @warning Since this version stores a pointer to an (externally
 /// allocated) value accessor it is not threadsafe. Hence each thread
-/// should have it own instance of a GridSampler constructed from a
+/// should have its own instance of a GridSampler constructed from a
 /// local ValueAccessor. Alternatively the Grid/Tree-based GridSampler
 /// is threadsafe, but also slower.
 template<typename TreeT, typename SamplerType>

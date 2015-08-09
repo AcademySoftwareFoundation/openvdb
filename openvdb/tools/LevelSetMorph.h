@@ -160,7 +160,7 @@ public:
     /// @details Mask values outside the range maps to alpha values of
     /// respectfully zero and one, and values inside the range maps
     /// smoothly to 0->1 (unless of course the mask is inverted).
-    /// @throw ValueError if @a min is not smaller then @a max.
+    /// @throw ValueError if @a min is not smaller than @a max.
     void setMaskRange(ValueType min, ValueType max)
     {
         if (!(min < max)) OPENVDB_THROW(ValueError, "Invalid mask range (expects min < max)");
@@ -219,7 +219,7 @@ private:
         Morph(Morph& other, tbb::split);
         /// destructor
         virtual ~Morph() {}
-        /// Advect the level set from it's current time, time0, to it's final time, time1.
+        /// Advect the level set from its current time, time0, to its final time, time1.
         /// @return number of CFL iterations
         size_t advect(ValueType time0, ValueType time1);
         /// Used internally by tbb::parallel_for()

@@ -137,7 +137,7 @@ public:
     /// @brief Set the shader derived from the abstract BaseShader class.
     ///
     /// @note The shader is not assumed to be thread-safe so each
-    /// thread will get it's only deep copy. For instance it could
+    /// thread will get its only deep copy. For instance it could
     /// contains a ValueAccessor into another grid with auxiliary
     /// shading information. Thus, make sure it is relatively
     /// light-weight and efficient to copy (which is the case for ValueAccesors).
@@ -147,7 +147,7 @@ public:
     void setCamera(BaseCamera& camera);
 
     /// @brief Set the number of pixel samples and the seed for
-    /// jittered sub-rays. A value larger then one implies
+    /// jittered sub-rays. A value larger than one implies
     /// anti-aliasing by jittered super-sampling.
     /// @throw ValueError if pixelSamples is equal to zero.
     void setPixelSamples(size_t pixelSamples, unsigned int seed = 0);
@@ -897,7 +897,7 @@ setPixelSamples(size_t pixelSamples, unsigned int seed)
 {
     assert(mIsMaster);
     if (pixelSamples == 0) {
-        OPENVDB_THROW(ValueError, "pixelSamples must be larger then zero!");
+        OPENVDB_THROW(ValueError, "pixelSamples must be larger than zero!");
     }
     mSubPixels = pixelSamples - 1;
     delete [] mRand;
@@ -1016,7 +1016,7 @@ operator()(const tbb::blocked_range<size_t>& range) const
 {
     SamplerType sampler(mAccessor, mShadow->grid().transform());//light-weight wrapper
 
-    // Any variable prefixed with p (or s) means it's associate with a primay (or shadow) ray
+    // Any variable prefixed with p (or s) means it's associated with a primay (or shadow) ray
     const Vec3R extinction = -mScattering-mAbsorption, One(1.0);
     const Vec3R albedo = mLightColor*mScattering/(mScattering+mAbsorption);//single scattering
     const Real sGain = mLightGain;//in-scattering along shadow ray

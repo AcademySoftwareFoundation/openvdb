@@ -90,7 +90,7 @@ public:
     {
     }
 
-    /// @brief Define the number of integrations steps to be performed per
+    /// @brief Define the number of integration steps to be performed per
     /// advection step (the default is one).
     void setIntegrationCount(size_t iterations) { mCountRK = iterations; }
 
@@ -98,7 +98,7 @@ public:
     size_t getIntegrationCount() const { return mCountRK; }
 
     /// @brief Define the order of the Runge-Kutta integration scheme
-    /// employed during the back-tracing in the semi-lagrgangian integration.
+    /// employed during the back-tracing in the semi-lagrangian integration.
     ///
     /// @note Note the order of the velocity sampling is always one,
     ///       i.e. based on tri-linear interpolation! However the
@@ -107,7 +107,7 @@ public:
     void setIntegrationOrder(size_t orderRK) { mOrderRK = math::Min(orderRK, size_t(4)); }
 
     /// @return The order of the Runge-Kutta integration scheme employed
-    ///         during the back-tracing in the semi-lagrgangian integration.
+    ///         during the back-tracing in the semi-lagrangian integration.
     size_t getIntegrationOrder() const { return mOrderRK; }
 
      /// @return the grain-size used for multi-threading
@@ -117,7 +117,7 @@ public:
     /// @note A grainsize of 0 or less disables multi-threading!
     void setGrainSize(size_t grainsize) { mGrainSize = grainsize; }
 
-    /// @return Returns a new density grid that is the results of passive advection
+    /// @return Returns a new density grid that is the result of passive advection
     ///         of all the active values the input density for the
     ///         time = dt * IntegrationCount.
     ///
@@ -303,7 +303,7 @@ private:
     const VelocityGridT& mVelGrid;
     double               mMaxVelocity;
     InterrupterType*     mInterrupter;
-    float                mDt;// time step per RK integration steps
+    float                mDt;// time step per RK integration step
     size_t               mCountRK;// number of RK integration steps
     size_t               mOrderRK;// order of the RK integrator
     size_t               mGrainSize;// for multi-threading (0 means no threading)

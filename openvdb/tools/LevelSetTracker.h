@@ -123,16 +123,16 @@ public:
     /// effectively allows very narrow bands to be created from points
     /// or polygons (e.g. with a half voxel width of 1), followed by a
     /// fast but approximate dilation (typically with a half voxel
-    /// width of 3). This can be significantly faster then generating
-    /// the final width ofthe narrow band from points or polygons.
+    /// width of 3). This can be significantly faster than generating
+    /// the final width of the narrow band from points or polygons.
     void dilate(int iterations = 1);
 
     /// @brief Erodes the width of the narrow-band and update the background values
-    /// @throw ValueError if @a iterations is larger then the current half-width.
+    /// @throw ValueError if @a iterations is larger than the current half-width.
     void erode(int iterations = 1);
 
     /// @brief Resize the width of the narrow band, i.e. perform
-    /// dilation and renormaliztion or erosion as required. 
+    /// dilation and renormalization or erosion as required.
     bool resize(Index halfWidth = static_cast<Index>(LEVEL_SET_HALF_WIDTH));
 
     /// @brief Return the half width of the narrow band in floating-point voxel units.

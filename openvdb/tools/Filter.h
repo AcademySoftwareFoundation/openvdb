@@ -124,7 +124,7 @@ public:
     /// @param max Maximum value of the range.
     /// @details Mask values outside the range are clamped to zero or one, and
     /// values inside the range map smoothly to 0->1 (unless the mask is inverted).
-    /// @throw ValueError if @a min is not smaller then @a max.
+    /// @throw ValueError if @a min is not smaller than @a max.
     void setMaskRange(AlphaType min, AlphaType max)
     {
         if (!(min < max)) OPENVDB_THROW(ValueError, "Invalid mask range (expects min < max)");

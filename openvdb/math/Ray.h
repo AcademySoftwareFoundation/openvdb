@@ -67,7 +67,7 @@ public:
         inline void set(RealT _t0, RealT _t1) { t0=_t0; t1=_t1; }
         /// @brief Get both times
         inline void get(RealT& _t0, RealT& _t1) const { _t0=t0; _t1=t1; }
-        /// @brief Return @c true if t1 is larger then t0 by at least eps.
+        /// @brief Return @c true if t1 is larger than t0 by at least eps.
         inline bool valid(RealT eps=math::Delta<RealT>::value()) const { return (t1-t0)>eps; }
         /// @brief Return the midpoint of the ray.
         inline RealT mid() const { return 0.5*(t0 + t1); }
@@ -138,10 +138,10 @@ public:
     /// @brief Return the midpoint of the ray.
     inline Vec3R mid() const { return (*this)(mTimeSpan.mid()); }
 
-    /// @brief Return @c true if t0 is strictly less then t1.
+    /// @brief Return @c true if t0 is strictly less than t1.
     OPENVDB_DEPRECATED inline bool test() const { return mTimeSpan.valid(RealT(0)); }
 
-    /// @brief Return @c true if t1 is larger then t0 by at least eps.
+    /// @brief Return @c true if t1 is larger than t0 by at least eps.
     inline bool valid(RealT eps=math::Delta<float>::value()) const
       {
           return mTimeSpan.valid(eps);
@@ -152,7 +152,7 @@ public:
 
     /// @brief Return a new Ray that is transformed with the specified map.
     /// @param map  the map from which to construct the new Ray.
-    /// @warning Assumes a linear map and a normalize direction.
+    /// @warning Assumes a linear map and a normalized direction.
     /// @details The requirement that the direction is normalized
     /// follows from the transformation of t0 and t1 - and that fact that
     /// we want applyMap and applyInverseMap to be inverse operations.
@@ -169,7 +169,7 @@ public:
 
     /// @brief Return a new Ray that is transformed with the inverse of the specified map.
     /// @param map  the map from which to construct the new Ray by inverse mapping.
-    /// @warning Assumes a linear map and a normalize direction.
+    /// @warning Assumes a linear map and a normalized direction.
     /// @details The requirement that the direction is normalized
     /// follows from the transformation of t0 and t1 - and that fact that
     /// we want applyMap and applyInverseMap to be inverse operations.

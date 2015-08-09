@@ -297,7 +297,7 @@ MinMaxVoxel<TreeType>::join(const MinMaxVoxel<TreeType>& rhs)
 
 ////////////////////////////////////////
 
-///@todo Move this into an graphics library.
+///@todo Move this into a graphics library.
 // Should be shared with the stand alone viewer.
 
 class WireBoxBuilder
