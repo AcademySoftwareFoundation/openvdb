@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -28,16 +28,19 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 //
-/// @file   PointPartitioner.h
+/// @file    PointPartitioner.h
 ///
-/// @brief  Multi-threaded space-partitioning scheme for points.
+/// @brief   Spatially partitions points using a parallel radix-based
+///          sorting algorithm.
 ///
-/// @note   This tool is deterministic; partitioning the same point
-///         sequence will produce the same result each time.
-///         The actual points are never stored in the tool, only
-///         offsets into an external array.
+/// @details Performs a stable deterministic sort; partitioning the same
+///          point sequence will produce the same result each time.
+/// @details The algorithm is unbounded meaning that points may be
+///          distributed anywhere in index space.
+/// @details The actual points are never stored in the tool, only
+///          offsets into an external array.
 ///
-/// @author Mihai Alden
+/// @author  Mihai Alden
 
 #ifndef OPENVDB_TOOLS_POINT_PARTITIONER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_POINT_PARTITIONER_HAS_BEEN_INCLUDED
@@ -46,21 +49,20 @@
 #include <openvdb/Types.h>
 #include <openvdb/math/Transform.h>
 
-#include <vector>
 #include <deque>
-#include <algorithm> // std::swap
+#include <map>
+#include <set>
+#include <vector>
 
-#include <boost/scoped_array.hpp>
 #include <boost/integer.hpp> // boost::int_t<N>::least
+#include <boost/scoped_array.hpp>
+#include <boost/shared_ptr.hpp>
 #include <boost/math/special_functions/fpclassify.hpp>//for boost::math::isfinite
 
-#include <tbb/atomic.h>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
-#include <tbb/parallel_reduce.h>
-#include <tbb/parallel_sort.h>
-#include <tbb/task_group.h>
 #include <tbb/task_scheduler_init.h>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -214,113 +216,66 @@ private:
 
 
 ////////////////////////////////////////
+////////////////////////////////////////
 
 // Implementation details
 
 
 namespace point_partitioner_internal {
 
-enum { LEAF_NODE_LIMIT = 1000000000 };
-
-////////////////////////////////////////
-
-
-template<typename PointArray>
-struct ComputeBBoxOp {
-    typedef typename PointArray::value_type PointType;
-    typedef typename PointType::value_type  ElementType;
-
-    ComputeBBoxOp(const PointArray& points)
-        : mPoints(&points)
-        , mMin(std::numeric_limits<ElementType>::max())
-        , mMax(-std::numeric_limits<ElementType>::max())
-    {
-    }
-
-    ComputeBBoxOp(const ComputeBBoxOp& other, tbb::split)
-        : mPoints(other.mPoints)
-        , mMin(std::numeric_limits<ElementType>::max())
-        , mMax(-std::numeric_limits<ElementType>::max())
-    {
-    }
-
-    void operator()(const tbb::blocked_range<size_t>& range) {
-
-        PointType pos, tmpMin(mMin), tmpMax(mMax);
-
-        for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
-            mPoints->getPos(n, pos);
-            
-            if (boost::math::isfinite(pos[0]) &&
-                boost::math::isfinite(pos[1]) &&
-                boost::math::isfinite(pos[2])) {
-                tmpMin[0] = std::min(tmpMin[0], pos[0]);
-                tmpMin[1] = std::min(tmpMin[1], pos[1]);
-                tmpMin[2] = std::min(tmpMin[2], pos[2]);
-                tmpMax[0] = std::max(tmpMax[0], pos[0]);
-                tmpMax[1] = std::max(tmpMax[1], pos[1]);
-                tmpMax[2] = std::max(tmpMax[2], pos[2]);
-            }
-        }
-
-        mMin[0] = std::min(tmpMin[0], mMin[0]);
-        mMin[1] = std::min(tmpMin[1], mMin[1]);
-        mMin[2] = std::min(tmpMin[2], mMin[2]);
-        mMax[0] = std::max(tmpMax[0], mMax[0]);
-        mMax[1] = std::max(tmpMax[1], mMax[1]);
-        mMax[2] = std::max(tmpMax[2], mMax[2]);
-    }
-
-    void join(ComputeBBoxOp& other) {
-        mMin[0] = std::min(mMin[0], other.mMin[0]);
-        mMin[1] = std::min(mMin[1], other.mMin[1]);
-        mMin[2] = std::min(mMin[2], other.mMin[2]);
-        mMax[0] = std::max(mMax[0], other.mMax[0]);
-        mMax[1] = std::max(mMax[1], other.mMax[1]);
-        mMax[2] = std::max(mMax[2], other.mMax[2]);
-    }
-
-    //////////
-
-    PointArray const * const mPoints;
-    PointType mMin, mMax;
-};
-
-
-////////////////////////////////////////
-
 
 template<typename IndexT>
-struct IndexPair {
-    IndexT first, second;
+struct PointBin
+{
+    typedef boost::shared_ptr<PointBin> Ptr;
 
-    bool operator<(const IndexPair& rhs) const {
-        return first < rhs.first;
+    PointBin(size_t size, const Coord& min, const Coord& max)
+        : mSize(size)
+        , mIndices(new IndexT[size])
+        , mBBox(min, max)
+    {
     }
-};
+
+    const CoordBBox& bbox() const { return mBBox; }
+
+    size_t size() const { return mSize; }
+
+    IndexT& operator[](size_t n) { return mIndices[n]; }
+    const IndexT& operator[](size_t n) const { return mIndices[n]; }
+
+    IndexT* data() { return mIndices.get(); }
+    const IndexT* data() const { return mIndices.get(); }
+
+private:
+    const size_t mSize;
+    boost::scoped_array<IndexT> mIndices;
+    const CoordBBox mBBox;
+}; // struct PointBin
+
+
+////////////////////////////////////////
 
 
 template<typename PointArray, typename IndexT, typename VoxelOffsetT>
 struct BucketAndVoxelOffsetOp
 {
     typedef typename PointArray::value_type   PointType;
-    typedef boost::scoped_array<IndexT>       IndexArray;
-    typedef boost::scoped_array<VoxelOffsetT> VoxelOffsetArray;
 
     BucketAndVoxelOffsetOp(
-        VoxelOffsetArray& voxelOffsets, IndexArray& bucketOffsets,
+        VoxelOffsetT* voxelOffsets, IndexT* bucketOffsets,
         const PointArray& points, const math::Transform& m,
-        const CoordBBox& bbox, int log2dim)
-        : mVoxelOffsets(voxelOffsets.get())
-        , mBucketOffsets(bucketOffsets.get())
+        const CoordBBox& bbox, int log2dim,
+        const IndexT* pointIndexMap = NULL)
+        : mVoxelOffsets(voxelOffsets)
+        , mBucketOffsets(bucketOffsets)
         , mPoints(&points)
         , mXForm(m)
         , mBBox(bbox)
         , mDim(bbox.dim())
         , mBlockLog2Dim(log2dim)
+        , mPointIndexMap(pointIndexMap)
     {
     }
-
 
     void operator()(const tbb::blocked_range<size_t>& range) const {
         PointType pos;
@@ -332,305 +287,157 @@ struct BucketAndVoxelOffsetOp
         const int log2dim = mBlockLog2Dim, log2dim2 = 2 * mBlockLog2Dim,
             mask = unsigned(1u << mBlockLog2Dim) - 1u;
 
+        const bool remapPointIndex = mPointIndexMap != NULL;
+
         IndexT bucketOffset = 0;
         VoxelOffsetT voxelOffset = 0;
 
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
 
-            mPoints->getPos(n, pos);
+            const size_t pointIndex = remapPointIndex ? size_t(mPointIndexMap[n]) : n;
+
+            mPoints->getPos(pointIndex, pos);
 
             if (boost::math::isfinite(pos[0]) &&
                 boost::math::isfinite(pos[1]) &&
                 boost::math::isfinite(pos[2])) {
-                
+
                 ijk = mXForm.worldToIndexCellCentered(pos);
 
-                // coord to offset
+                // coord to voxel offset
                 if (mVoxelOffsets) {
                     loc[0] = ijk[0] & mask;
                     loc[1] = ijk[1] & mask;
                     loc[2] = ijk[2] & mask;
-                    
+
                     voxelOffset = VoxelOffsetT((loc[0] << log2dim2) + (loc[1] << log2dim) + loc[2]);
                 }
-                
+
                 ijk[0] >>= log2dim;
                 ijk[1] >>= log2dim;
                 ijk[2] >>= log2dim;
-                
+
                 ijk[0] -= xMin;
                 ijk[1] -= yMin;
                 ijk[2] -= zMin;
-                
+
                 bucketOffset = IndexT(ijk[0] * yzDim + ijk[1] * zDim + ijk[2]);
                 mBucketOffsets[n] = bucketOffset;
-                
-                if (mVoxelOffsets) mVoxelOffsets[n] = voxelOffset;
+
+                if (mVoxelOffsets) mVoxelOffsets[pointIndex] = voxelOffset;
             }
         }
     }
 
-    //////////
-
-    VoxelOffsetT       * const mVoxelOffsets;
-    IndexT             * const mBucketOffsets;
-    PointArray   const * const mPoints;
-
-    const math::Transform mXForm;
-    const CoordBBox mBBox;
-    const Coord mDim;
-    const int mBlockLog2Dim;
-};
-
-
-template<typename PointArray, typename IndexT, typename VoxelOffsetT>
-struct ComputeOffsetOp
-{
-    typedef typename PointArray::value_type     PointType;
-    typedef IndexPair<IndexT>                   IndexPairT;
-    typedef boost::scoped_array<IndexPairT>     IndexPairArray;
-    typedef boost::scoped_array<VoxelOffsetT>   VoxelOffsetArray;
-
-    ComputeOffsetOp(
-        VoxelOffsetArray& voxelOffsets, IndexPairArray& bucketOffsets,
-        const PointArray& points, const math::Transform& m,
-        const CoordBBox& bbox, int log2dim)
-        : mVoxelOffsets(voxelOffsets.get())
-        , mBucketOffsets(bucketOffsets.get())
-        , mPoints(&points)
-        , mXForm(m)
-        , mBBox(bbox)
-        , mDim(bbox.dim())
-        , mBlockLog2Dim(log2dim)
-    {
-    }
-
-
-    void operator()(const tbb::blocked_range<size_t>& range) const {
-        PointType pos;
-        Coord ijk(0, 0, 0), loc(0, 0, 0);
-
-        const int xMin = mBBox.min()[0], yMin = mBBox.min()[1], zMin = mBBox.min()[2];
-        const int yzDim = mDim[1] * mDim[2], zDim = mDim[2];
-
-        const int log2dim = mBlockLog2Dim, log2dim2 = 2 * mBlockLog2Dim,
-            mask = unsigned(1u << mBlockLog2Dim) - 1u;
-
-        IndexT bucketOffset = 0;
-        VoxelOffsetT voxelOffset = 0;
-
-        for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
-
-            mPoints->getPos(n, pos);
-
-            if (boost::math::isfinite(pos[0]) &&
-                boost::math::isfinite(pos[1]) &&
-                boost::math::isfinite(pos[2])) {
-                ijk = mXForm.worldToIndexCellCentered(pos);
-
-                // coord to offset
-                if (mVoxelOffsets) {
-                    loc[0] = ijk[0] & mask;
-                    loc[1] = ijk[1] & mask;
-                    loc[2] = ijk[2] & mask;
-                    
-                    voxelOffset = VoxelOffsetT((loc[0] << log2dim2) + (loc[1] << log2dim) + loc[2]);
-                }
-                
-                ijk[0] >>= log2dim;
-                ijk[1] >>= log2dim;
-                ijk[2] >>= log2dim;
-                
-                ijk[0] -= xMin;
-                ijk[1] -= yMin;
-                ijk[2] -= zMin;
-                
-                bucketOffset = IndexT(ijk[0] * yzDim + ijk[1] * zDim + ijk[2]);
-                
-                IndexPairT& item = mBucketOffsets[n];
-                
-                item.first  = bucketOffset;
-                item.second = IndexT(n);
-                
-                if (mVoxelOffsets) mVoxelOffsets[n] = voxelOffset;
-            }
-        }
-    }
-
-    //////////
-
-    VoxelOffsetT       * const mVoxelOffsets;
-    IndexPairT         * const mBucketOffsets;
-    PointArray   const * const mPoints;
-
-    const math::Transform mXForm;
-    const CoordBBox mBBox;
-    const Coord mDim;
-    const int mBlockLog2Dim;
-};
-
+    VoxelOffsetT          * const mVoxelOffsets;
+    IndexT                * const mBucketOffsets;
+    PointArray      const * const mPoints;
+    math::Transform         const mXForm;
+    CoordBBox               const mBBox;
+    Coord                   const mDim;
+    int                     const mBlockLog2Dim;
+    IndexT          const * const mPointIndexMap;
+}; // struct BucketAndVoxelOffsetOp
 
 
 template<typename IndexT>
-struct BucketMapOp
+struct ComputePointOrderOp
 {
-    typedef tbb::atomic<IndexT>                 AtomicIndex;
-    typedef boost::scoped_array<AtomicIndex>    AtomicIndexArray;
-    typedef boost::scoped_array<IndexT>         IndexArray;
-
-    BucketMapOp(IndexArray& bucketIndices,
-        AtomicIndexArray& bucketMap, const IndexArray& bucketOffsets)
-        : mBucketIndices(bucketIndices.get())
-        , mBucketMap(bucketMap.get())
-        , mBucketOffsets(bucketOffsets.get())
+    ComputePointOrderOp(IndexT* pointIndices, const IndexT* bucketCounters,
+        const IndexT* bucketOffsets)
+        : mPointIndices(pointIndices)
+        , mBucketCounters(bucketCounters)
+        , mBucketOffsets(bucketOffsets)
     {
     }
 
     void operator()(const tbb::blocked_range<size_t>& range) const {
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
-            mBucketIndices[n] = mBucketMap[mBucketOffsets[n]].fetch_and_increment();
+            mPointIndices[n] += mBucketCounters[mBucketOffsets[n]];
         }
     }
 
-    IndexT             * const mBucketIndices;
-    AtomicIndex        * const mBucketMap;
-    IndexT       const * const mBucketOffsets;
-};
+    IndexT       * const mPointIndices;
+    IndexT const * const mBucketCounters;
+    IndexT const * const mBucketOffsets;
+}; // struct ComputePointOrderOp
 
 
 template<typename IndexT>
-struct MergeOffsetsOp
-{
-    typedef tbb::atomic<IndexT>                 AtomicIndex;
-    typedef boost::scoped_array<AtomicIndex>    AtomicIndexArray;
-    typedef boost::scoped_array<IndexT>         IndexArray;
-
-    MergeOffsetsOp(IndexArray& pointIndices,
-        const AtomicIndexArray& bucketMap, const IndexArray& bucketOffsets)
-        : mPointIndices(pointIndices.get())
-        , mBucketMap(bucketMap.get())
-        , mBucketOffsets(bucketOffsets.get())
-    {
-    }
-
-    void operator()(const tbb::blocked_range<size_t>& range) const {
-        for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
-            mPointIndices[n] += mBucketMap[mBucketOffsets[n]];
-        }
-    }
-
-    IndexT            * const mPointIndices;
-    AtomicIndex const * const mBucketMap;
-    IndexT      const * const mBucketOffsets;
-};
-
-
-template<typename IndexT>
-struct BucketOrderOp
+struct CreateOrderedPointIndexArrayOp
 {
     typedef boost::scoped_array<IndexT> IndexArray;
 
-    BucketOrderOp(IndexArray& pointIndices, IndexArray& bucketOffsets)
+    CreateOrderedPointIndexArrayOp(IndexArray& pointIndices,
+        IndexArray& bucketOffsets, IndexT* indexMap)
         : mPointIndices(pointIndices.get())
         , mBucketOffsets(bucketOffsets.get())
+        , mIndexMap(indexMap)
     {
     }
 
     void operator()(const tbb::blocked_range<size_t>& range) const {
-        for (IndexT n = static_cast<IndexT>(range.begin()), N = static_cast<IndexT>(range.end());
-            n != N; ++n)
-        {
-            mBucketOffsets[mPointIndices[n]] = n;
+        for (IndexT i = IndexT(range.begin()), I = IndexT(range.end()); i != I; ++i) {
+            mBucketOffsets[mPointIndices[i]] = mIndexMap[i];
         }
     }
 
     IndexT const * const mPointIndices;
     IndexT       * const mBucketOffsets;
-};
+    IndexT const * const mIndexMap;
+}; // struct CreateOrderedPointIndexArrayOp
+
 
 template<typename IndexT>
-struct PageOrderOp
+struct CopyIndexArrayOp
 {
-    typedef boost::scoped_array<IndexT> IndexArray;
-    typedef boost::scoped_array<IndexPair<IndexT> > IndexPairArray;
+    CopyIndexArrayOp(IndexT* lhs, const IndexT* rhs) : mLhs(lhs), mRhs(rhs) { }
 
-    PageOrderOp(IndexArray& pointIndices, const IndexPairArray& pairs)
-        : mPointIndices(pointIndices.get())
-        , mPairs(pairs.get())
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+        for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
+            mLhs[n] = mRhs[n];
+        }
+    }
+
+    IndexT       * const mLhs;
+    IndexT const * const mRhs;
+}; // struct CopyIndexArrayOp
+
+
+template<typename IndexT>
+struct CopyBinArrayOp
+{
+    typedef typename PointBin<IndexT>::Ptr PointBinPtr;
+
+    CopyBinArrayOp(std::vector<IndexT*>& lhs, std::vector<PointBinPtr>& rhs)
+        : mIndexLists(&lhs[0])
+        , mBins(&rhs[0])
     {
     }
 
     void operator()(const tbb::blocked_range<size_t>& range) const {
         for (size_t n(range.begin()), N(range.end()); n != N; ++n) {
-            mPointIndices[n] = mPairs[n].second;
+
+            IndexT* indices = mIndexLists[n];
+            PointBinPtr& bin = mBins[n];
+
+            tbb::parallel_for(tbb::blocked_range<size_t>(0, bin->size()),
+                CopyIndexArrayOp<IndexT>(indices, bin->data()));
+            bin.reset();
         }
     }
 
-    IndexT                  * const mPointIndices;
-    IndexPair<IndexT> const * const mPairs;
-};
-
-template<typename IndexT>
-struct PageBreakOp
-{
-    typedef std::pair<IndexT, IndexT> Range;
-    typedef boost::scoped_array<IndexT> IndexArray;
-    typedef boost::scoped_array<IndexPair<IndexT> > IndexPairArray;
-
-    PageBreakOp(const Range& range, const IndexPairArray& pairs,
-        IndexArray& segment, IndexT& size)
-        : mRange(range)
-        , mPairs(pairs.get())
-        , mSegment(&segment)
-        , mSize(&size)
-    {
-    }
-
-    void operator()() const {
-
-        const IndexT start = mRange.first;
-        const IndexT end = mRange.second;
-
-        std::deque<IndexT> pageBreaks;
-
-        IndexT last = mPairs[start].first;
-        for (IndexT n = start + 1; n != end; ++n) {
-            const IndexPair<IndexT>& pair = mPairs[n];
-            if (last != pair.first) {
-                last = pair.first;
-                pageBreaks.push_back(n);
-            }
-        }
-
-        if (!pageBreaks.empty()) {
-
-            IndexArray segment(new IndexT[pageBreaks.size()]);
-            IndexT* item = segment.get();
-
-            typename std::deque<IndexT>::iterator it = pageBreaks.begin();
-            while (it != pageBreaks.end()) {
-                *item++ = *it++;
-            }
-
-            mSegment->swap(segment);
-            *mSize = static_cast<IndexT>(pageBreaks.size());
-        }
-    }
-
-    Range mRange;
-    IndexPair<IndexT> const * const mPairs;
-    IndexArray              * const mSegment;
-    IndexT                  * const mSize;
-};
-
+    IndexT      * const * const mIndexLists;
+    PointBinPtr         * const mBins;
+}; // struct CopyBinArrayOp
 
 
 template<typename IndexT, Index Log2Dim>
 struct VoxelOrderOp
 {
     typedef typename boost::int_t<1 + (3 * Log2Dim)>::least VoxelOffsetT;
-    typedef boost::scoped_array<VoxelOffsetT>   VoxelOffsetArray;
-    typedef boost::scoped_array<IndexT>         IndexArray;
+    typedef boost::scoped_array<VoxelOffsetT>               VoxelOffsetArray;
+    typedef boost::scoped_array<IndexT>                     IndexArray;
 
     VoxelOrderOp(IndexArray& indices, const IndexArray& pages,const VoxelOffsetArray& offsets)
         : mIndices(indices.get())
@@ -638,7 +445,6 @@ struct VoxelOrderOp
         , mVoxelOffsets(offsets.get())
     {
     }
-
 
     void operator()(const tbb::blocked_range<size_t>& range) const {
 
@@ -690,29 +496,10 @@ struct VoxelOrderOp
         }
     }
 
-
     IndexT                * const mIndices;
     IndexT          const * const mPages;
     VoxelOffsetT    const * const mVoxelOffsets;
-};
-
-
-template<typename IndexT>
-struct IndexOrderOp
-{
-    typedef boost::scoped_array<IndexT> IndexArray;
-
-    IndexOrderOp(IndexArray& indices, const IndexArray& pages)
-        : mIndices(indices.get()) , mPages(pages.get()) { }
-
-    void operator()(const tbb::blocked_range<size_t>& range) const {
-        for (size_t n(range.begin()), N(range.end()); n != N; ++n)
-            std::sort(mIndices + mPages[n], mIndices + mPages[n+1]);
-    }
-
-    IndexT       * const mIndices;
-    IndexT const * const mPages;
-};
+}; // struct VoxelOrderOp
 
 
 template<typename PointArray, typename IndexT>
@@ -745,165 +532,355 @@ struct LeafNodeOriginOp
             if (boost::math::isfinite(pos[0]) &&
                 boost::math::isfinite(pos[1]) &&
                 boost::math::isfinite(pos[2])) {
-                
+
                 ijk = mXForm.worldToIndexCellCentered(pos);
-                
+
                 ijk[0] &= mask;
                 ijk[1] &= mask;
                 ijk[2] &= mask;
-                
+
                 mCoordinates[n] = ijk;
             }
         }
     }
 
-    //////////
-
-    Coord             * const mCoordinates;
-    IndexT      const * const mIndices;
-    IndexT      const * const mPages;
-    PointArray  const * const mPoints;
-
-    const math::Transform mXForm;
-    const int mLog2Dim;
-};
+    Coord                 * const mCoordinates;
+    IndexT          const * const mIndices;
+    IndexT          const * const mPages;
+    PointArray      const * const mPoints;
+    math::Transform         const mXForm;
+    int                     const mLog2Dim;
+}; // struct LeafNodeOriginOp
 
 
 ////////////////////////////////////////
 
 
-// Tests whether the given bbox volume can be computed without
-// overflowing the given IntType
-template<typename IntType>
-inline bool
-isVolumeCalculationOverflowSafe(const CoordBBox& bbox)
+template<typename IndexT>
+struct MergePointBins
 {
-    const uint64_t xdim = uint64_t(bbox.max()[0] - bbox.min()[0]);
-    const uint64_t ydim = uint64_t(bbox.max()[1] - bbox.min()[1]);
-    const uint64_t zdim = uint64_t(bbox.max()[2] - bbox.min()[2]);
+    typedef typename PointBin<IndexT>::Ptr          PointBinPtr;
+    typedef std::deque<IndexT>                      PointIndexList;
+    typedef boost::shared_ptr<PointIndexList>       PointIndexListPtr;
+    typedef std::map<Coord, PointIndexListPtr>      PointIndexListMap;
+    typedef boost::shared_ptr<PointIndexListMap>    PointIndexListMapPtr;
 
-    uint64_t product = xdim * ydim;
-    if (product > std::numeric_limits<IntType>::max()) return false;
-
-    product *= zdim;
-    if (product > std::numeric_limits<IntType>::max()) return false;
-    return true;
-}
-
-
-////////////////////////////////////////
-
-template<typename PointArray>
-inline CoordBBox
-computeLeafBounds(const PointArray& points, const math::Transform& m, unsigned log2dim)
-{
-    ComputeBBoxOp<PointArray> bboxOp(points);
-    tbb::parallel_reduce(tbb::blocked_range<size_t>(0, points.size()), bboxOp);
-
-    CoordBBox box;
-
-    if (m.isLinear()) {
-        box.min() = m.worldToIndexCellCentered(bboxOp.mMin);
-        box.max() = m.worldToIndexCellCentered(bboxOp.mMax);
-    } else {
-        Vec3d minIS, maxIS;
-        math::calculateBounds(m, bboxOp.mMin, bboxOp.mMax, minIS, maxIS);
-        box.min() = math::Coord::round(minIS);
-        box.max() = math::Coord::round(maxIS);
+    MergePointBins(PointIndexListMapPtr* data, std::vector<PointBinPtr>& bins,
+        const std::vector<Coord>& coords, Index binLog2Dim, size_t numSegments)
+        : mData(data), mBins(&bins[0]), mCoords(&coords[0])
+        , mBinLog2Dim(binLog2Dim), mNumSegments(numSegments)
+    {
     }
 
-    box.min() >>= log2dim;
-    box.max() >>= log2dim;
-    return box;
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+
+        const int binDim = int(1u << mBinLog2Dim) - 1;
+
+        std::vector<PointIndexListPtr*> lists;
+        std::vector<IndexT*> dataPointers;
+
+        for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
+
+            const Coord& ijk = mCoords[n];
+            size_t numIndices = 0;
+
+            lists.clear();
+
+            for (size_t i = 0; i < mNumSegments; ++i) {
+
+                PointIndexListMap& idxMap = *mData[i];
+                typename PointIndexListMap::iterator iter = idxMap.find(ijk);
+
+                if (iter != idxMap.end() && iter->second) {
+                    PointIndexListPtr& idxListPtr = iter->second;
+
+                    lists.push_back(&idxListPtr);
+                    numIndices += idxListPtr->size();
+                }
+            }
+
+            if (lists.empty() || numIndices == 0) continue;
+
+            PointBinPtr& binPtr = mBins[n];
+            if (!binPtr) binPtr.reset(new PointBin<IndexT>(numIndices, ijk, ijk.offsetBy(binDim)));
+
+            dataPointers.clear();
+            IndexT* data = binPtr->data();
+
+            for (size_t i = 0, count = 0, I = lists.size(); i < I; ++i) {
+                dataPointers.push_back(data);
+                count += (*lists[i])->size();
+                data += (*lists[i])->size();
+            }
+
+            tbb::parallel_for(tbb::blocked_range<size_t>(0, dataPointers.size()),
+                CopyData(&lists[0], &dataPointers[0]));
+        }
+    }
+
+private:
+
+    struct CopyData
+    {
+        CopyData(PointIndexListPtr** indexLists, IndexT** dataPointers)
+            : mIndexLists(indexLists), mDataPointers(dataPointers)
+        {
+        }
+
+        void operator()(const tbb::blocked_range<size_t>& range) const {
+            for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
+
+                PointIndexListPtr& listPtr = *mIndexLists[n];
+                IndexT* dataPtr = mDataPointers[n];
+
+                typename PointIndexList::iterator it = listPtr->begin(), end = listPtr->end();
+
+                for ( ; it != end; ++it) {
+                    *dataPtr = *it;
+                    ++dataPtr;
+                }
+
+                listPtr.reset();
+            }
+        }
+
+        PointIndexListPtr * const * const mIndexLists;
+        IndexT            * const * const mDataPointers;
+    }; // struct CopyData
+
+    PointIndexListMapPtr      * const mData;
+    PointBinPtr               * const mBins;
+    Coord               const * const mCoords;
+    Index                       const mBinLog2Dim;
+    size_t                      const mNumSegments;
+}; // struct MergePointBins
+
+
+template<typename PointArray, typename IndexT>
+struct BinPointIndices
+{
+    typedef typename PointArray::value_type         PointType;
+    typedef std::deque<IndexT>                      PointIndexList;
+    typedef boost::shared_ptr<PointIndexList>       PointIndexListPtr;
+    typedef std::map<Coord, PointIndexListPtr>      PointIndexListMap;
+    typedef boost::shared_ptr<PointIndexListMap>    PointIndexListMapPtr;
+
+    BinPointIndices(PointIndexListMapPtr* data, const PointArray& points,
+        const math::Transform& m, Index binLog2Dim, size_t numSegments)
+        : mData(data), mPoints(&points), mXForm(m)
+        , mBinLog2Dim(binLog2Dim), mNumSegments(numSegments)
+    {
+    }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+
+        const int mask = ~((1u << mBinLog2Dim) - 1u);
+
+        PointIndexList * idxList = NULL;
+        Coord ijk(0, 0, 0), lastCoord(1, 2, 3);
+        PointType pos;
+
+        const size_t numPoints = mPoints->size();
+        const size_t segmentSize = numPoints / mNumSegments;
+
+        for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
+
+            PointIndexListMapPtr& dataPtr = mData[n];
+            if (!dataPtr) dataPtr.reset(new PointIndexListMap());
+            PointIndexListMap& idxMap = *dataPtr;
+
+            const bool isLastSegment = (n + 1) >= mNumSegments;
+
+            const size_t start = n * segmentSize;
+            const size_t end = isLastSegment ? numPoints : (start + segmentSize);
+
+            for (size_t i = start; i != end; ++i) {
+
+                mPoints->getPos(i, pos);
+
+                if (boost::math::isfinite(pos[0]) &&
+                    boost::math::isfinite(pos[1]) &&
+                    boost::math::isfinite(pos[2])) {
+
+                    ijk = mXForm.worldToIndexCellCentered(pos);
+
+                    ijk[0] &= mask;
+                    ijk[1] &= mask;
+                    ijk[2] &= mask;
+
+                    if (ijk != lastCoord) {
+                        lastCoord = ijk;
+                        PointIndexListPtr& idxListPtr = idxMap[ijk];
+                        if (!idxListPtr) idxListPtr.reset(new PointIndexList());
+                        idxList = idxListPtr.get();
+                    }
+
+                    idxList->push_back(IndexT(i));
+                }
+            }
+        }
+    }
+
+    PointIndexListMapPtr       * const mData;
+    PointArray           const * const mPoints;
+    math::Transform              const mXForm;
+    Index                        const mBinLog2Dim;
+    size_t                       const mNumSegments;
+}; // struct BinPointIndices
+
+
+template<typename IndexT, typename PointArray>
+inline void
+binPoints(std::vector<typename PointBin<IndexT>::Ptr>& bins,
+    const PointArray& points, const math::Transform& xform, Index binLog2Dim)
+{
+    typedef std::deque<IndexT>                      PointIndexList;
+    typedef boost::shared_ptr<PointIndexList>       PointIndexListPtr;
+    typedef std::map<Coord, PointIndexListPtr>      PointIndexListMap;
+    typedef boost::shared_ptr<PointIndexListMap>    PointIndexListMapPtr;
+
+    const size_t numThreads = size_t(tbb::task_scheduler_init::default_num_threads());
+
+    size_t numTasks = 1;
+    if (points.size() > (numThreads * 2)) numTasks = numThreads * 2;
+    else if (points.size() > numThreads) numTasks = numThreads;
+
+    boost::scoped_array<PointIndexListMapPtr> binData(new PointIndexListMapPtr[numTasks]);
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, numTasks),
+        BinPointIndices<PointArray, IndexT>(binData.get(), points, xform, binLog2Dim, numTasks));
+
+    std::set<Coord> uniqueCoords;
+
+    for (size_t i = 0; i < numTasks; ++i) {
+        PointIndexListMap& idxMap = *binData[i];
+        for (typename PointIndexListMap::iterator it = idxMap.begin(); it != idxMap.end(); ++it) {
+            uniqueCoords.insert(it->first);
+        }
+    }
+
+    std::vector<Coord> coords(uniqueCoords.begin(), uniqueCoords.end());
+
+    const size_t binCount = coords.size();
+    bins.resize(binCount);
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, binCount),
+        MergePointBins<IndexT>(binData.get(), bins, coords, binLog2Dim, numTasks));
 }
+
+
+template<typename IndexT, typename VoxelOffsetT, typename PointArray>
+struct OrderBinIndices
+{
+    typedef boost::scoped_array<IndexT>     IndexArray;
+    typedef typename PointBin<IndexT>::Ptr  PointBinPtr;
+
+    OrderBinIndices(std::vector<PointBinPtr>& pointBins, const PointArray& points,
+        IndexArray* pageOffsetArrays, VoxelOffsetT* voxelOffsets,
+        const math::Transform& xform, Index log2Dim)
+        : mBins(&pointBins[0])
+        , mPoints(&points)
+        , mPageOffsetArrays(pageOffsetArrays)
+        , mVoxelOffsets(voxelOffsets)
+        , mLog2Dim(log2Dim)
+        , mXform(xform)
+    {
+    }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+
+        size_t maxBinSize = 0;
+        for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
+            maxBinSize = std::max(maxBinSize, mBins[n]->size());
+        }
+
+        IndexArray bucketOffsets(new IndexT[maxBinSize]), bucketIndices(new IndexT[maxBinSize]);
+        IndexArray bucketCounters;
+
+        size_t bucketCountersSize = 0;
+        int log2Dim = int(mLog2Dim);
+
+        for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
+
+            const size_t pointCount = mBins[n]->size();
+            const tbb::blocked_range<size_t> pointRange(0, pointCount);
+
+            IndexT* binPointIndices = mBins[n]->data();
+
+            CoordBBox bbox = mBins[n]->bbox();
+            bbox.min() >>= log2Dim;
+            bbox.max() >>= log2Dim;
+
+            // Compute bucket and (optionally) voxel offsets for all points.
+            tbb::parallel_for(pointRange,
+                BucketAndVoxelOffsetOp<PointArray, IndexT, VoxelOffsetT>(
+                    mVoxelOffsets, bucketOffsets.get(), *mPoints, mXform, bbox, log2Dim, binPointIndices));
+
+
+            const size_t volume = size_t(bbox.volume());
+            if (!bucketCounters || volume != bucketCountersSize) {
+                bucketCountersSize = volume;
+                bucketCounters.reset(new Index[bucketCountersSize]);
+            }
+
+            memset(bucketCounters.get(), 0, sizeof(IndexT) * bucketCountersSize);
+
+            // Count the number of points per bucket and assign a local bucket index
+            // to each point.
+            for (size_t i = 0; i < pointCount; ++i) {
+                bucketIndices[i] = bucketCounters[bucketOffsets[i]]++;
+            }
+
+
+            IndexT nonemptyBucketCount = 0;
+            for (size_t i = 0; i < bucketCountersSize; ++i) {
+                nonemptyBucketCount += static_cast<IndexT>(bucketCounters[i] != 0);
+            }
+
+            IndexArray& pageOffsets = mPageOffsetArrays[n];
+            pageOffsets.reset(new IndexT[nonemptyBucketCount + 1]);
+            pageOffsets[0] = nonemptyBucketCount + 1; // stores array size in first element
+
+            // Compute prefix sum of bucket counters.
+            IndexT count = 0, idx = 1;
+            for (size_t i = 0; i < bucketCountersSize; ++i) {
+                if (bucketCounters[i] != 0) {
+                    pageOffsets[idx] = bucketCounters[i];
+                    bucketCounters[i] = count;
+                    count += pageOffsets[idx];
+                    ++idx;
+                }
+            }
+
+            // Compute final point order by incrementing the local bucket point index
+            // with the prefix sum offset.
+            tbb::parallel_for(pointRange, ComputePointOrderOp<IndexT>(
+                bucketIndices.get(), bucketCounters.get(), bucketOffsets.get()));
+
+            tbb::parallel_for(pointRange, CreateOrderedPointIndexArrayOp<IndexT>(
+                bucketIndices, bucketOffsets, binPointIndices));
+
+            // Update bin index array
+            tbb::parallel_for(pointRange, CopyIndexArrayOp<IndexT>(binPointIndices, bucketOffsets.get()));
+        }
+    }
+
+    PointBinPtr           * const mBins;
+    PointArray      const * const mPoints;
+    IndexArray            * const mPageOffsetArrays;
+    VoxelOffsetT          * const mVoxelOffsets;
+    Index                   const mLog2Dim;
+    math::Transform         const mXform;
+}; // struct OrderBinIndices
+
+
+////////////////////////////////////////
 
 
 template<Index Log2Dim, typename IndexT, typename VoxelOffsetT, typename PointArray>
 inline void partition(
     const PointArray& points,
     const math::Transform& xform,
-    const CoordBBox& bbox,
-    boost::scoped_array<IndexT>& pointIndices,
-    boost::scoped_array<IndexT>& pageOffsets,
-    IndexT& pageCount,
-    boost::scoped_array<VoxelOffsetT>& voxelOffsets,
-    bool recordVoxelOffsets)
-{
-    typedef tbb::atomic<IndexT>                 AtomicIndexT;
-    typedef boost::scoped_array<AtomicIndexT>   AtomicIndexArray;
-    typedef boost::scoped_array<IndexT>         IndexArray;
-
-    //////////
-
-    // Compute voxel and bucket offsets
-
-    const size_t pointCount = points.size();
-    const tbb::blocked_range<size_t> pointRange(0, pointCount);
-
-    if (recordVoxelOffsets) {
-        voxelOffsets.reset(new VoxelOffsetT[pointCount]);
-    } else {
-        voxelOffsets.reset();
-    }
-
-    IndexArray bucketOffsets(new IndexT[pointCount]);
-
-    tbb::parallel_for(pointRange, BucketAndVoxelOffsetOp<
-        PointArray, IndexT, VoxelOffsetT>(
-            voxelOffsets, bucketOffsets, points, xform, bbox, int(Log2Dim)));
-
-    // Compute bucket indices and bucket point counts
-
-    const Index64 volume = bbox.volume();
-
-    pointIndices.reset(new IndexT[pointCount]);
-    AtomicIndexArray bucketMap(new AtomicIndexT[volume]);
-    memset(&bucketMap[0], 0, sizeof(AtomicIndexT) * volume);
-
-    tbb::parallel_for(pointRange,
-        BucketMapOp<IndexT>(pointIndices, bucketMap, bucketOffsets));
-
-    // Initialize page offsets and update bucket map with global start index.
-    {
-        pageCount = 0;
-        for (size_t n(0), N(volume); n < N; ++n) {
-            pageCount += static_cast<IndexT>(bucketMap[n] != 0);
-        }
-
-        pageOffsets.reset(new IndexT[pageCount + 1]);
-        IndexT count = 0;
-        for (size_t n = 0, idx = 0; n < volume; ++n) {
-            if (bucketMap[n] != 0) {
-                pageOffsets[idx] = count;
-                count += bucketMap[n];
-                bucketMap[n] = pageOffsets[idx];
-                ++idx;
-            }
-        }
-
-        pageOffsets[pageCount] = count;
-    }
-
-
-    // Merge bucket offsets with bucket indices
-    tbb::parallel_for(pointRange,
-        MergeOffsetsOp<IndexT>(pointIndices, bucketMap, bucketOffsets));
-
-    bucketMap.reset();
-
-    // Bucket order indices
-    tbb::parallel_for(pointRange, BucketOrderOp<IndexT>(pointIndices, bucketOffsets));
-
-    pointIndices.swap(bucketOffsets);
-    bucketOffsets.reset();
-}
-
-
-template<Index Log2Dim, typename IndexT, typename VoxelOffsetT, typename PointArray>
-inline void sortPartition(
-    const PointArray& points,
-    const math::Transform& xform,
-    const CoordBBox& bbox,
     boost::scoped_array<IndexT>& pointIndices,
     boost::scoped_array<IndexT>& pageOffsets,
     IndexT& pageCount,
@@ -911,13 +888,13 @@ inline void sortPartition(
     bool recordVoxelOffsets)
 {
     typedef boost::scoped_array<IndexT>         IndexArray;
-    typedef IndexPair<IndexT>                   IndexPairT;
-    typedef boost::scoped_array<IndexPairT>     IndexPairArray;
 
-    //////////
+    Index binLog2Dim = 5u + Log2Dim;
+
+    std::vector<typename PointBin<IndexT>::Ptr> pointBins;
+    binPoints<IndexT>(pointBins, points, xform, binLog2Dim);
 
     const size_t pointCount = points.size();
-    const tbb::blocked_range<size_t> pointRange(0, pointCount);
 
     if (recordVoxelOffsets) {
         voxelOffsets.reset(new VoxelOffsetT[pointCount]);
@@ -925,104 +902,49 @@ inline void sortPartition(
         voxelOffsets.reset();
     }
 
-    IndexPairArray bucketOffsets(new IndexPairT[pointCount]);
-    tbb::parallel_for(pointRange, ComputeOffsetOp<
-        PointArray, IndexT, VoxelOffsetT>(
-            voxelOffsets, bucketOffsets, points, xform, bbox, int(Log2Dim)));
 
-    tbb::parallel_sort(bucketOffsets.get(), bucketOffsets.get() + pointCount);
+    const size_t numBins = pointBins.size();
+    const tbb::blocked_range<size_t> binRange(0, numBins);
 
-    { // Compute page offsets
-        const size_t nthreads = tbb::task_scheduler_init::default_num_threads();
-        const size_t ntasks = nthreads > 1 ? 2 * nthreads : 1;
+    boost::scoped_array<IndexArray> pageOffsetArrays(new IndexArray[numBins]);
 
-        if (ntasks > 1) {
+    tbb::parallel_for(binRange, OrderBinIndices<IndexT, VoxelOffsetT, PointArray>
+        (pointBins, points, pageOffsetArrays.get(), voxelOffsets.get(), xform, Log2Dim));
 
-            IndexArray segmentSizes(new IndexT[ntasks]);
-            memset(segmentSizes.get(), 0, ntasks * sizeof(IndexT));
-            boost::scoped_array<IndexArray> segments(new IndexArray[ntasks]);
+    pageCount = 0;
+    for (size_t n = 0; n < numBins; ++n) {
+        pageCount += pageOffsetArrays[n][0] - 1;
+    }
 
-            const IndexT grainSize = static_cast<IndexT>(pointCount / ntasks);
-            const IndexT end = static_cast<IndexT>(grainSize * (ntasks - 1));
+    pageOffsets.reset(new IndexT[pageCount + 1]);
 
-            tbb::task_group tasks;
+    IndexT count = 0, idx = 0;
+    for (size_t n = 0; n < numBins; ++n) {
 
-            IndexT idx = 0;
-            std::pair<IndexT, IndexT> range;
+        IndexT* offsets = pageOffsetArrays[n].get();
+        size_t size = size_t(offsets[0]);
 
-            // create tasks
-            range.first  = 0;
-            range.second = grainSize;
-            tasks.run(PageBreakOp<IndexT>(range, bucketOffsets, segments[idx], segmentSizes[idx]));
-            ++idx;
-
-            for (IndexT n = grainSize; n < end; n += grainSize) {
-                range.first  = n-1;
-                range.second = n+grainSize;
-                tasks.run(PageBreakOp<IndexT>(range, bucketOffsets, segments[idx], segmentSizes[idx]));
-                ++idx;
-            }
-
-            range.first  = end-1;
-            range.second = static_cast<IndexT>(pointCount);
-            tasks.run(PageBreakOp<IndexT>(range, bucketOffsets, segments[idx], segmentSizes[idx]));
-
-            tasks.wait();
-
-            // collect data
-            size_t pcount = 1;
-            for (size_t n = 0; n < ntasks; ++n) {
-                pcount += segmentSizes[n];
-            }
-
-            pageCount = static_cast<IndexT>(pcount);
-            pageOffsets.reset(new IndexT[pageCount + 1]);
-
-            pcount = 1;
-            for (size_t n = 0; n < ntasks; ++n) {
-                const IndexT size = segmentSizes[n];
-                if(size != 0) {
-                    memcpy(pageOffsets.get() + pcount, segments[n].get(), size * sizeof(IndexT));
-                    pcount += size;
-                }
-            }
-
-            pageOffsets[0] = 0;
-            pageOffsets[pageCount] = static_cast<IndexT>(pointCount);
-
-        } else {
-
-            std::deque<IndexT> pageBreaks;
-            IndexT last = bucketOffsets[0].first;
-
-            for (IndexT n = 1; n != pointCount; ++n) {
-                if (last != bucketOffsets[n].first) {
-                    last = bucketOffsets[n].first;
-                    pageBreaks.push_back(n);
-                }
-            }
-
-            pageCount = static_cast<IndexT>(pageBreaks.size() + 1);
-            pageOffsets.reset(new IndexT[pageCount + 1]);
-
-            if (!pageBreaks.empty()) {
-
-                IndexT* item = pageOffsets.get() + 1;
-
-                typename std::deque<IndexT>::iterator it = pageBreaks.begin();
-                while (it != pageBreaks.end()) {
-                    *item++ = *it++;
-                }
-            }
-
-            pageOffsets[0] = 0;
-            pageOffsets[pageCount] = static_cast<IndexT>(pointCount);
+        for (size_t i = 1; i < size; ++i) {
+            pageOffsets[idx++] = count;
+            count += offsets[i];
         }
     }
 
+    pageOffsets[pageCount] = count;
+
     pointIndices.reset(new IndexT[pointCount]);
-    tbb::parallel_for(pointRange, PageOrderOp<IndexT>(pointIndices, bucketOffsets));
+
+    std::vector<IndexT*> indexArray;
+
+    IndexT* index = pointIndices.get();
+    for (size_t n = 0; n < numBins; ++n) {
+        indexArray.push_back(index);
+        index += pointBins[n]->size();
+    }
+
+    tbb::parallel_for(binRange, CopyBinArrayOp<IndexT>(indexArray, pointBins));
 }
+
 
 } // namespace point_partitioner_internal
 
@@ -1057,7 +979,10 @@ template<typename PointIndexT, Index Log2Dim>
 inline void
 PointPartitioner<PointIndexT, Log2Dim>::swap(PointPartitioner& rhs)
 {
-    std::swap(mPageCount, rhs.mPageCount);
+    const IndexType tmpLhsPageCount = mPageCount;
+    mPageCount = rhs.mPageCount;
+    rhs.mPageCount = tmpLhsPageCount;
+
     mPointIndices.swap(rhs.mPointIndices);
     mVoxelOffsets.swap(rhs.mVoxelOffsets);
     mPageOffsets.swap(rhs.mPageOffsets);
@@ -1082,33 +1007,10 @@ inline void
 PointPartitioner<PointIndexT, Log2Dim>::construct(const PointArray& points,
     const math::Transform& xform, bool voxelOrder, bool recordVoxelOffsets)
 {
-    const CoordBBox bbox =
-        point_partitioner_internal::computeLeafBounds(points, xform, int(Log2Dim));
-
-    if(!point_partitioner_internal::isVolumeCalculationOverflowSafe<PointIndexT>(bbox)) {
-        // the bbox is computed in leafnode space (the lattice composing of only
-        // leafnode origins) and should rarely overflow the volume calc. in practice.
-        OPENVDB_THROW(ArithmeticError, "Detected overflow in bbox volume computation, "
-            "use uint64 for the PointIndexT type in the PointPartitioner.");
-
-        /// @todo This can be avoided using boost::int_t<N>::least to determine the
-        ///       bucket offset type instead of PointIndexT in the @c sortPartition
-        ///       and @c partition algorithms.
-    }
-
-    if (bbox.volume() > Index64(point_partitioner_internal::LEAF_NODE_LIMIT)) {
-        point_partitioner_internal::sortPartition<Log2Dim>(points, xform, bbox,
-            mPointIndices, mPageOffsets, mPageCount, mVoxelOffsets, (voxelOrder || recordVoxelOffsets));
-    } else {
-        point_partitioner_internal::partition<Log2Dim>(points, xform, bbox,
-            mPointIndices, mPageOffsets, mPageCount, mVoxelOffsets, (voxelOrder || recordVoxelOffsets));
-    }
+    point_partitioner_internal::partition<Log2Dim>(points, xform,
+        mPointIndices, mPageOffsets, mPageCount, mVoxelOffsets, (voxelOrder || recordVoxelOffsets));
 
     const tbb::blocked_range<size_t> pageRange(0, mPageCount);
-
-    tbb::parallel_for(pageRange,
-        point_partitioner_internal::IndexOrderOp<IndexType>(mPointIndices, mPageOffsets));
-
     mPageCoordinates.reset(new Coord[mPageCount]);
 
     tbb::parallel_for(pageRange,
@@ -1148,6 +1050,6 @@ PointPartitioner<PointIndexT, Log2Dim>::create(const PointArray& points, const m
 
 #endif // OPENVDB_TOOLS_POINT_PARTITIONER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
