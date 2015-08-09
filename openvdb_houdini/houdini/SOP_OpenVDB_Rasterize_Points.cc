@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -648,8 +648,6 @@ struct ConstructCandidateVoxelMask
                     box.max() = mXform.worldToIndexCellCentered(bboxMax);
                     activateRegion(box);
                 }
-
-                mMaskAccessor.setValueOn(it.getCoord());
             }
         }
 
@@ -906,8 +904,6 @@ constructROIMask(const PointIndexGridCollection& idxGridCollection,
 
         ConstructCandidateVoxelMask op(*maskTree, pointCache,
             pointIndexLeafNodes, volumeTransform, interrupter);
-
-        //op(tbb::blocked_range<size_t>(0, pointIndexLeafNodes.size()));
 
         tbb::parallel_reduce(tbb::blocked_range<size_t>(0, pointIndexLeafNodes.size()), op);
     }
@@ -2335,6 +2331,6 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

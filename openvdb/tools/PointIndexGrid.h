@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -662,29 +662,29 @@ struct RadialRangeFilter
         , mIndices(indices)
         , mCenter(xyz)
         , mWSCenter(xform.indexToWorld(xyz))
-        , mVoxelDist1(0.0)
-        , mVoxelDist2(0.0)
-        , mLeafNodeDist1(0.0)
-        , mLeafNodeDist2(0.0)
-        , mWSRadiusSqr(radius * xform.voxelSize()[0])
+        , mVoxelDist1(PointElementType(0.0))
+        , mVoxelDist2(PointElementType(0.0))
+        , mLeafNodeDist1(PointElementType(0.0))
+        , mLeafNodeDist2(PointElementType(0.0))
+        , mWSRadiusSqr(PointElementType(radius * xform.voxelSize()[0]))
         , mPoints(points)
         , mSubvoxelAccuracy(subvoxelAccuracy)
     {
-        const PointElementType voxelRadius = std::sqrt(3.0) * 0.5;
-        mVoxelDist1 = voxelRadius + radius;
+        const PointElementType voxelRadius = PointElementType(std::sqrt(3.0) * 0.5);
+        mVoxelDist1 = voxelRadius + PointElementType(radius);
         mVoxelDist1 *= mVoxelDist1;
 
         if (radius > voxelRadius) {
-            mVoxelDist2 = radius - voxelRadius;
+            mVoxelDist2 = PointElementType(radius) - voxelRadius;
             mVoxelDist2 *= mVoxelDist2;
         }
 
-        const PointElementType leafNodeRadius = leafNodeDim * std::sqrt(3.0) * 0.5;
-        mLeafNodeDist1 = leafNodeRadius + radius;
+        const PointElementType leafNodeRadius = PointElementType(leafNodeDim * std::sqrt(3.0) * 0.5);
+        mLeafNodeDist1 = leafNodeRadius + PointElementType(radius);
         mLeafNodeDist1 *= mLeafNodeDist1;
 
         if (radius > leafNodeRadius) {
-            mLeafNodeDist2 = radius - leafNodeRadius;
+            mLeafNodeDist2 = PointElementType(radius) - leafNodeRadius;
             mLeafNodeDist2 *= mLeafNodeDist2;
         }
 
@@ -1805,6 +1805,6 @@ struct SameLeafConfig<Dim1, openvdb::tools::PointIndexLeafNode<T2, Dim1> >
 
 #endif // OPENVDB_TOOLS_POINT_INDEX_GRID_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
