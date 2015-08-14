@@ -820,7 +820,7 @@ struct OrderBinIndices
             const size_t volume = size_t(bbox.volume());
             if (!bucketCounters || volume != bucketCountersSize) {
                 bucketCountersSize = volume;
-                bucketCounters.reset(new Index[bucketCountersSize]);
+                bucketCounters.reset(new IndexT[bucketCountersSize]);
             }
 
             memset(bucketCounters.get(), 0, sizeof(IndexT) * bucketCountersSize);
