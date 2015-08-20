@@ -230,7 +230,7 @@ public:
     /// @param dt     Time sub-step for the Runge-Kutte integrator of order OrderRK
     /// @param world  Location in world space coordinates (both input and output)
     template<size_t OrderRK, typename LocationType>
-    inline void rungeKutta(const float dt, LocationType& world) const
+    inline void rungeKutta(const ElementType dt, LocationType& world) const
     {
         BOOST_STATIC_ASSERT(OrderRK < 5);
         VecType P(static_cast<ElementType>(world[0]),
@@ -242,25 +242,25 @@ public:
         } else if (OrderRK == 1) {
             VecType V0;
             mVelSampler.sample(P, V0);
-            P =  dt*V0;
+            P =  dt * V0;
         } else if (OrderRK == 2) {
             VecType V0, V1;
             mVelSampler.sample(P, V0);
-            mVelSampler.sample(P + ElementType(0.5) * ElementType(dt) * V0, V1);
-            P = dt*V1;
+            mVelSampler.sample(P + ElementType(0.5) * dt * V0, V1);
+            P = dt * V1;
         } else if (OrderRK == 3) {
             VecType V0, V1, V2;
             mVelSampler.sample(P, V0);
-            mVelSampler.sample(P+ElementType(0.5)*ElementType(dt)*V0, V1);
-            mVelSampler.sample(P+dt*(ElementType(2.0)*V1-V0), V2);
-            P = dt*(V0 + ElementType(4.0)*V1 + V2)*ElementType(1.0/6.0);
+            mVelSampler.sample(P + ElementType(0.5) * dt * V0, V1);
+            mVelSampler.sample(P + dt * (ElementType(2.0) * V1 - V0), V2);
+            P = dt * (V0 + ElementType(4.0) * V1 + V2) * ElementType(1.0 / 6.0);
         } else if (OrderRK == 4) {
             VecType V0, V1, V2, V3;
             mVelSampler.sample(P, V0);
-            mVelSampler.sample(P+ElementType(0.5)*ElementType(dt)*V0, V1);
-            mVelSampler.sample(P+ElementType(0.5)*ElementType(dt)*V1, V2);
-            mVelSampler.sample(P+     dt*V2, V3);
-            P = dt*(V0 + ElementType(2.0)*(V1 + V2) + V3)*ElementType(1.0/6.0);
+            mVelSampler.sample(P + ElementType(0.5) * dt * V0, V1);
+            mVelSampler.sample(P + ElementType(0.5) * dt * V1, V2);
+            mVelSampler.sample(P + dt * V2, V3);
+            P = dt * (V0 + ElementType(2.0) * (V1 + V2) + V3) * ElementType(1.0 / 6.0);
         }
         typedef typename LocationType::ValueType OutType;
         world += LocationType(static_cast<OutType>(P[0]),

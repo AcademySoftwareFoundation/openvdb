@@ -328,12 +328,26 @@ SOP_OpenVDB_Advect_Density::processGrids(const AdvectionParms& parms, hvdb::Inte
 
         if (vdbPrim->getStorageType() == UT_VDB_FLOAT) {
             const openvdb::FloatGrid& inGrid = UTvdbGridCast<openvdb::FloatGrid>(vdbPrim->getGrid());
+            const int d = adv.getMaxDistance(inGrid, parms.mTimeStep);
+            if (d > 20) {
+                std::ostringstream tmp;
+                tmp << "Dilation by " << d << " voxels could be slow!"
+                    << " Consider lowing time-step or integration count!";
+                addWarning(SOP_MESSAGE, tmp.str().c_str());
+            }
             typename openvdb::FloatGrid::Ptr outGrid = adv.template advect<openvdb::FloatGrid,
                 openvdb::tools::Sampler<SampleOrder, false> >(inGrid, parms.mTimeStep);
             hvdb::replaceVdbPrimitive(*gdp, outGrid, *vdbPrim);
         } else if (vdbPrim->getStorageType() == UT_VDB_VEC3F) {
             vdbPrim->makeGridUnique();
             const openvdb::Vec3SGrid& inGrid = UTvdbGridCast<openvdb::Vec3SGrid>(vdbPrim->getGrid());
+            const int d = adv.getMaxDistance(inGrid, parms.mTimeStep);
+            if (d > 20) {
+                std::ostringstream tmp;
+                tmp << "Dilation by " << d << " voxels could be slow!"
+                    << " Consider lowing time-step or integration count!";
+                addWarning(SOP_MESSAGE, tmp.str().c_str());
+            }
             typename openvdb::Vec3SGrid::Ptr outGrid;
             if (inGrid.getGridClass() == openvdb::GRID_STAGGERED) {
                 outGrid = adv.template advect<openvdb::Vec3SGrid,

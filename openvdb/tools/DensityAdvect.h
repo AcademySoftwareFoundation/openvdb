@@ -65,7 +65,7 @@ template<typename VelocityGridT = Vec3fGrid,
          typename InterrupterType = util::NullInterrupter>
 class DensityAdvection
 {
-public:
+public: 
     /// @brief Constructor
     ///
     /// @param velGrid     Velocity grid responsible for the (passive) density advection.
@@ -83,7 +83,6 @@ public:
         math::Extrema e = extrema(velGrid.cbeginValueAll(), /*threading*/true);
         e.add(velGrid.background().length());
         mMaxVelocity = e.max();
-        //std::cerr << "Max |v| = " << mMaxVelocity << std::endl;
     }
 
     virtual ~DensityAdvection()
@@ -117,6 +116,30 @@ public:
     /// @note A grainsize of 0 or less disables multi-threading!
     void setGrainSize(size_t grainsize) { mGrainSize = grainsize; }
 
+    /// @brief Return the maximum magnitude of the velocity in the
+    /// advection velocity field (defined during construction).
+    double getMaxVelocity() const { return mMaxVelocity; }
+
+    /// @return Returns the maximum distance in voxel units of @a inGrid
+    /// that a particle might travel in the time-step @a dt when advected
+    /// in the velocity field defined during construction (given the
+    /// current number of integration steps).
+    ///
+    /// @details This method is useful when dilating sparse density
+    /// grids to pad boundary regions. Excessive dilation can be
+    /// computationally expensive so use this method to prevent
+    /// or warn againt run-away computation.
+    ///
+    /// @throw RuntimeError if @a inGrid does not have uniform voxels.
+    template<typename DensityGridT>
+    int getMaxDistance(const DensityGridT& inGrid, double dt) const
+    {
+        if (!inGrid.hasUniformVoxels()) {
+            OPENVDB_THROW(RuntimeError, "Density grid does not have uniform voxels!");
+        }
+        return static_cast<int>(math::RoundUp(mMaxVelocity*dt*mCountRK/inGrid.voxelSize()[0]));
+    }
+
     /// @return Returns a new density grid that is the results of passive advection
     ///         of all the active values the input density for the
     ///         time = dt * IntegrationCount.
@@ -136,15 +159,10 @@ public:
     /// @throw RuntimeError if @a inGrid does not have uniform voxels.
     template<typename DensityGridT,
              typename DensitySamplerT>
-    typename DensityGridT::Ptr advect(const DensityGridT& inGrid, float dt)
+    typename DensityGridT::Ptr advect(const DensityGridT& inGrid, double dt)
     {
-        if (!inGrid.hasUniformVoxels()) {
-            OPENVDB_THROW(RuntimeError, "Density grid does not have uniform voxels!");
-        }
         typename DensityGridT::Ptr outGrid = inGrid.deepCopy();
-        const double voxel_distance = math::RoundUp(mMaxVelocity*dt*mCountRK/inGrid.voxelSize()[0]);
-        //std::cerr << "Dilated " << static_cast<int>(voxel_distance) << " voxel units" << std::endl;
-        dilateVoxels( outGrid->tree(), static_cast<int>(voxel_distance) );
+        dilateVoxels( outGrid->tree(), this->getMaxDistance(inGrid, dt) );
         this->template process<DensityGridT, DensitySamplerT>(*outGrid, inGrid, dt);
         return outGrid;
     }
@@ -177,19 +195,14 @@ public:
     template<typename DensityGridT,
              typename MaskGridT,
              typename DensitySamplerT>
-    typename DensityGridT::Ptr advect(const DensityGridT& inGrid, const MaskGridT& mask, float dt)
+    typename DensityGridT::Ptr advect(const DensityGridT& inGrid, const MaskGridT& mask, double dt)
     {
-        if (!inGrid.hasUniformVoxels()) {
-            OPENVDB_THROW(RuntimeError, "Density grid does not have uniform voxels!");
-        }
         if (inGrid.transform() != mask.transform()) {
             OPENVDB_THROW(RuntimeError, "Density grid and mask grid are misaligned! Consider "
                           "resampling either of the two grids into the index space of the other.");
         }
         typename DensityGridT::Ptr outGrid = inGrid.deepCopy();
-        const double voxel_distance = math::RoundUp(mMaxVelocity*dt*mCountRK/inGrid.voxelSize()[0]);
-        //std::cerr << "Dilated " << static_cast<int>(voxel_distance) << " voxel units" << std::endl;
-        dilateVoxels( outGrid->tree(), static_cast<int>(voxel_distance) );
+        dilateVoxels( outGrid->tree(), this->getMaxDistance(inGrid, dt) );
         outGrid->topologyIntersection(mask);
         pruneInactive(outGrid->tree(), mGrainSize>0, mGrainSize);
         this->template process<DensityGridT, DensitySamplerT>(*outGrid, inGrid, dt);
@@ -203,7 +216,7 @@ private:
     DensityAdvection& operator=(const DensityAdvection&);// not implemented
 
     template<typename DensityGridT, typename DensitySamplerT>
-    void process(DensityGridT& outGrid, const DensityGridT& inGrid, float dt)
+    void process(DensityGridT& outGrid, const DensityGridT& inGrid, double dt)
     {
         mDt = dt;
         outGrid.tree().voxelizeActiveTiles();
@@ -233,6 +246,7 @@ private:
         typedef typename tree::LeafManager<TreeT>    LeafManagerT;
         typedef typename LeafManagerT::LeafRange     LeafRangeT;
         typedef VelocityIntegrator<VelocityGridT, StaggeredVelocity> VelocityIntegratorT;
+        typedef typename VelocityIntegratorT::ElementType RealT;
 
         Advect(const DensityGridT& inGrid, const DensityAdvection& parent)
             : mTransform(&inGrid.transform())
@@ -270,7 +284,8 @@ private:
                 tbb::task::self().cancel_group_execution();
                 return;
             }
-            const float dt = - mParent->mDt;//back-tracking
+            typedef typename VelocityIntegratorT::ElementType RealT;
+            const RealT dt = static_cast<RealT>(- mParent->mDt);//back-tracking
             const int n = static_cast<int>(mParent->mCountRK);
             const ValueT backg = mDensityAcc.tree().background();
             for (typename LeafRangeT::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
@@ -303,7 +318,7 @@ private:
     const VelocityGridT& mVelGrid;
     double               mMaxVelocity;
     InterrupterType*     mInterrupter;
-    float                mDt;// time step per RK integration steps
+    double               mDt;// time step per RK integration steps
     size_t               mCountRK;// number of RK integration steps
     size_t               mOrderRK;// order of the RK integrator
     size_t               mGrainSize;// for multi-threading (0 means no threading)
