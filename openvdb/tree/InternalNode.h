@@ -308,8 +308,28 @@ public:
     /// Return @c true if all of this node's table entries have the same active state
     /// and the same constant value to within the given tolerance,
     /// and return that value in @a constValue and the active state in @a state.
+    ///
+    /// @note This method also returns @c false if this node contains any child nodes. 
     bool isConstant(ValueType& constValue, bool& state,
-        const ValueType& tolerance = zeroVal<ValueType>()) const;
+                    const ValueType& tolerance = zeroVal<ValueType>()) const;
+
+    /// Return @c true if all of this node's tables entries have
+    /// the same active @a state and the values are in the range
+    /// (@a maxValue + @a minValue)/2 +/- @a tolerance.
+    ///
+    /// @param minValue  Is updated with the minimum of all values IF method
+    ///                  returns @c true. Else the value is undefined!
+    /// @param maxValue  Is updated with the maximum of all values IF method
+    ///                  returns @c true. Else the value is undefined!
+    /// @param state     Is updated with the state of all values IF method
+    ///                  returns @c true. Else the value is undefined!
+    /// @param tolerance The tolerance used to determine if values are
+    ///                  approximatly constant.
+    ///
+    /// @note This method also returns @c false if this node contains any child nodes.
+    bool isConstant(ValueType& minValue, ValueType& maxValue,
+                    bool& state, const ValueType& tolerance = zeroVal<ValueType>()) const;
+    
     /// Return @c true if this node has no children and only contains inactive values.
     bool isInactive() const { return this->isChildMaskOff() && this->isValueMaskOff(); }
 
@@ -1432,47 +1452,47 @@ InternalNode<ChildT, Log2Dim>::touchLeafAndCache(const Coord& xyz, AccessorT& ac
 
 template<typename ChildT, Index Log2Dim>
 inline bool
-InternalNode<ChildT, Log2Dim>::isConstant(ValueType& constValue, bool& state,
-    const ValueType& tolerance) const
+InternalNode<ChildT, Log2Dim>::isConstant(ValueType& value, bool& state,
+                                          const ValueType& tolerance) const
 {
-    bool allEqual = true, firstValue = true, valueState = true;
-    ValueType value = zeroVal<ValueType>();
-    for (Index i = 0; allEqual && i < NUM_VALUES; ++i) {
-        if (this->isChildMaskOff(i)) {
-            // If entry i is a value, check if it is within tolerance
-            // and whether its active state matches the other entries.
-            if (firstValue) {
-                firstValue = false;
-                valueState = isValueMaskOn(i);
-                value = mNodes[i].getValue();
-            } else {
-                allEqual = (isValueMaskOn(i) == valueState)
-                    && math::isApproxEqual(mNodes[i].getValue(), value, tolerance);
-            }
-        } else {
-            // If entry i is a child, check if the child is constant and within tolerance
-            // and whether its active state matches the other entries.
-            ValueType childValue = zeroVal<ValueType>();
-            bool isChildOn = false;
-            if (mNodes[i].getChild()->isConstant(childValue, isChildOn, tolerance)) {
-                if (firstValue) {
-                    firstValue = false;
-                    valueState = isChildOn;
-                    value = childValue;
-                } else {
-                    allEqual = (isChildOn == valueState)
-                        && math::isApproxEqual(childValue, value, tolerance);
-                }
-            } else { // child is not constant
-                allEqual = false;
-            }
+    if ( !(mChildMask.isOff()) ) return false;
+
+    state = mValueMask.isOn();
+    if (!(state || mValueMask.isOff())) return false;// Are values neither active nor inactive?
+    
+    value = mNodes[0].getValue();
+    for (Index i = 1; i < NUM_VALUES; ++i) {
+        if ( !math::isApproxEqual(mNodes[i].getValue(), value, tolerance) ) return false;
+    }
+    return true;
+}
+
+////////////////////////////////////////
+
+
+template<typename ChildT, Index Log2Dim>
+inline bool
+InternalNode<ChildT, Log2Dim>::isConstant(ValueType& minValue, ValueType& maxValue,
+                                          bool& state, const ValueType& tolerance) const
+{
+    if ( !(mChildMask.isOff()) ) return false;
+
+    state = mValueMask.isOn();
+    if (!(state || mValueMask.isOff())) return false;// Are values neither active nor inactive?
+    
+    const ValueType range = 2 * tolerance;
+    minValue = maxValue = mNodes[0].getValue();
+    for (Index i = 1; i < NUM_VALUES; ++i) {
+        const ValueType& v = mNodes[i].getValue();
+        if (v < minValue) {
+            if ((maxValue - v) > range) return false;
+            minValue = v;
+        } else if (v > maxValue) {
+            if ((v - minValue) > range) return false;
+            maxValue = v;
         }
     }
-    if (allEqual) {
-        constValue = value;
-        state = valueState;
-    }
-    return allEqual;
+    return true;
 }
 
 

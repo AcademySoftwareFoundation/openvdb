@@ -92,6 +92,9 @@
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/tree/Tree.h>
 #include <openvdb/util/NullInterrupter.h>
+
+#include "Morphology.h" // for erodeVoxels
+
 #include <boost/scoped_array.hpp>
 
 
@@ -173,7 +176,7 @@ solveWithBoundaryConditionsAndPreconditioner(const TreeType&, const BoundaryOp&,
 
 template<typename PreconditionerType, typename TreeType, typename DomainTreeType, typename BoundaryOp, typename Interrupter>
 inline typename TreeType::Ptr
-solveWithBoundaryConditionsAndPreconditioner(const TreeType&, const DomainTreeType&, const BoundaryOp&, 
+solveWithBoundaryConditionsAndPreconditioner(const TreeType&, const DomainTreeType&, const BoundaryOp&,
                                              math::pcg::State&, Interrupter&);
 //@}
 
@@ -683,8 +686,8 @@ inline typename TreeType::Ptr
 solveWithBoundaryConditionsAndPreconditioner(const TreeType& inTree,
     const BoundaryOp& boundaryOp, math::pcg::State& state, Interrupter& interrupter)
 {
-    
-    return solveWithBoundaryConditionsAndPreconditioner<PreconditionerType>(inTree /*source*/, inTree /*domain mask*/, 
+
+    return solveWithBoundaryConditionsAndPreconditioner<PreconditionerType>(inTree /*source*/, inTree /*domain mask*/,
                                                                             boundaryOp, state, interrupter);
 }
 
@@ -692,7 +695,7 @@ template<typename PreconditionerType, typename TreeType, typename DomainTreeType
 inline typename TreeType::Ptr
 solveWithBoundaryConditionsAndPreconditioner(const TreeType& inTree,
                                              const DomainTreeType& domainMask,
-                                             const BoundaryOp& boundaryOp, 
+                                             const BoundaryOp& boundaryOp,
                                              math::pcg::State& state, Interrupter& interrupter)
 {
 

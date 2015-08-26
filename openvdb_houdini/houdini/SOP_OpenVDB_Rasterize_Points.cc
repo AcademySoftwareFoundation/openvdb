@@ -963,14 +963,17 @@ struct WeightedAverageOp
 
     WeightedAverageOp(const GA_Attribute& attrib, boost::scoped_array<LeafNodeType*>& nodes)
         : mHandle(&attrib), mNodes(nodes.get()), mNode(NULL), mNodeVoxelData(NULL)
-        , mNodeOffset(0), mValue(ElementType(0.0))
+        , mNodeOffset(0), mValue(ElementType(0.0)), mVaryingDataBuffer(NULL), mVaryingData(false)
     {
     }
 
     ~WeightedAverageOp() { if (mNode) delete mNode; }
 
+    const char* getName() const { return mHandle.getAttribute()->getName(); }
+
     void beginNodeProcessing(const openvdb::Coord& origin, size_t nodeOffset)
     {
+        mVaryingData = false;
         mNodeOffset = nodeOffset;
         if (mNode) mNode->setOrigin(origin);
         else mNode = new LeafNodeType(origin, openvdb::zeroVal<ValueType>());
@@ -982,17 +985,31 @@ struct WeightedAverageOp
         ValueTypeTraits<ValueType>::convert(mValue, val);
     }
 
-    void updateVoxel(const openvdb::Index voxelOffset, const ElementType weight) {
-        ValueType& value = mNodeVoxelData[voxelOffset];
-        value += mValue * weight;
+    void updateVoxelData(const std::vector<std::pair<float, openvdb::Index> >& densitySamples) {
+
+        typedef std::pair<float, openvdb::Index> DensitySample;
+
+        for (size_t n = 0, N = densitySamples.size(); n < N; ++n) {
+
+            const DensitySample& sample = densitySamples[n];
+
+            ValueType& value = mNodeVoxelData[sample.second];
+
+            if (mVaryingData) {
+                ValueTypeTraits<ValueType>::convert(mValue, mVaryingDataBuffer[n]);
+            }
+
+            value += mValue * sample.first;
+        }
     }
+
 
     template<typename LeafNodeT>
     void endNodeProcessing(const LeafNodeT& maskNode, float *voxelWeightArray)
     {
         mNode->topologyUnion(maskNode);
 
-        ValueType* values = const_cast<ValueType*>(&mNode->getValue(0));//mNode->buffer().data();
+        ValueType* values = const_cast<ValueType*>(&mNode->getValue(0));
         for (size_t n = 0; n < LeafNodeType::SIZE; ++n) {
             values[n] *= voxelWeightArray[n];
         }
@@ -1001,13 +1018,28 @@ struct WeightedAverageOp
         mNode = NULL;
     }
 
+
+    HoudiniType* varyingData()
+    {
+        mVaryingData = true;
+
+        if (!mVaryingDataBuffer) {
+            mVaryingDataBuffer.reset(new HoudiniType[LeafNodeType::SIZE]);
+        }
+
+        return mVaryingDataBuffer.get();
+    }
+
+
 private:
-    GA_ROHandleT<HoudiniType>   mHandle;
-    LeafNodeType * * const      mNodes;
-    LeafNodeType   *            mNode;
-    ValueType      *            mNodeVoxelData;
-    size_t                      mNodeOffset;
-    ValueType                   mValue;
+    GA_ROHandleT<HoudiniType>           mHandle;
+    LeafNodeType ** const               mNodes;
+    LeafNodeType *                      mNode;
+    ValueType *                         mNodeVoxelData;
+    size_t                              mNodeOffset;
+    ValueType                           mValue;
+    boost::scoped_array<HoudiniType>    mVaryingDataBuffer;
+    bool                                mVaryingData;
 }; // struct WeightedAverageOp
 
 
@@ -1558,6 +1590,7 @@ private:
 
         VEXProgram * cvex = mVEXContext ? &mVEXContext->getThereadLocalVEXProgram() : NULL;
         ElementType * const densityData = densityAttribute ? densityAttribute->data() : NULL;
+        const bool exportDensity = densityData != NULL;
         const float * pointRadiusData = pointCache.radiusData();
         const openvdb::Vec3s * pointPosData = pointCache.posData();
 
@@ -1649,7 +1682,8 @@ private:
 
             // Apply VEX shader program to density samples
             if (cvex && !densitySamples.empty()) {
-                hasNonzeroDensityValues |= executeVEXShader(*cvex, densitySamples, nodeBoundingBox.min(), xyz, radius, pointOffset);
+                hasNonzeroDensityValues |= executeVEXShader(*cvex, densitySamples, exportDensity,
+                    vecAttributes, floatAttributes, nodeBoundingBox.min(), xyz, radius, pointOffset);
             }
 
             // Transfer density data to leafnode buffer
@@ -1676,17 +1710,16 @@ private:
             if (transferAttributes && hasNonzeroDensityValues) {
 
                 for (size_t n = 0, N = densitySamples.size(); n < N; ++n) {
-
                     const DensitySample& sample = densitySamples[n];
                     voxelWeightArray[sample.second] += sample.first;
+                }
 
-                    for (size_t i = 0, I = vecAttributes.size(); i < I; ++i) {
-                        vecAttributes[i]->updateVoxel(sample.second, sample.first);
-                    }
+                for (size_t i = 0, I = vecAttributes.size(); i < I; ++i) {
+                    vecAttributes[i]->updateVoxelData(densitySamples);
+                }
 
-                    for (size_t i = 0, I = floatAttributes.size(); i < I; ++i) {
-                        floatAttributes[i]->updateVoxel(sample.second, sample.first);
-                    }
+                for (size_t i = 0, I = floatAttributes.size(); i < I; ++i) {
+                    floatAttributes[i]->updateVoxelData(densitySamples);
                 }
             }
 
@@ -1698,6 +1731,9 @@ private:
 
     bool executeVEXShader(VEXProgram& cvex,
             std::vector<DensitySample>& densitySamples,
+            bool exportDensity,
+            std::vector<Vec3sAttribute::OperatorType::Ptr>& vecAttributes,
+            std::vector<FloatAttribute::OperatorType::Ptr>& floatAttributes,
             const openvdb::Coord& nodeOrigin,
             const PointType& point,
             ElementType radius,
@@ -1799,26 +1835,60 @@ private:
             timeDependantVEX = true;
         }
 
-        bool hasNonzeroDensityValues = false;
+        bool hasNonzeroDensityValues = false, runProcess = false;
 
-        // Compute density scales
-        if (CVEX_Value* val = cvex.findOutput("output", CVEX_TYPE_FLOAT)) {
 
-            fpreal32* data = cvex.getNoiseBuffer();
-            for (int n = 0; n < numValues; ++n) data[n] = 1.0f;
+        fpreal32* densityScales = NULL;
+
+        if (exportDensity) {
+            if (CVEX_Value* val = cvex.findOutput("output", CVEX_TYPE_FLOAT)) {
+                runProcess = true;
+                densityScales = cvex.getNoiseBuffer();
+                for (int n = 0; n < numValues; ++n) densityScales[n] = 1.0f;
 #if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
-            val->setTypedData(data, numValues);
+                val->setTypedData(densityScales, numValues);
 #else
-            val->setData(data, numValues);
+                val->setData(densityScales, numValues);
 #endif
+            }
+        }
+
+
+        for (size_t i = 0, I = vecAttributes.size(); i < I; ++i) {
+            if (CVEX_Value* val = cvex.findOutput(vecAttributes[i]->getName(), CVEX_TYPE_VECTOR3)) {
+                runProcess = true;
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
+                val->setTypedData(vecAttributes[i]->varyingData(), numValues);
+#else
+                val->setData(vecAttributes[i]->varyingData(), numValues);
+#endif
+            }
+        }
+
+
+        for (size_t i = 0, I = floatAttributes.size(); i < I; ++i) {
+            if (CVEX_Value* val = cvex.findOutput(floatAttributes[i]->getName(), CVEX_TYPE_FLOAT)) {
+                runProcess = true;
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
+                val->setTypedData(floatAttributes[i]->varyingData(), numValues);
+#else
+                val->setData(floatAttributes[i]->varyingData(), numValues);
+#endif
+            }
+        }
+
+
+        if (runProcess) {
 
             cvex.run(numValues);
 
             timeDependantVEX |= cvex.isTimeDependant();
 
-            for (int n = 0; n < numValues; ++n) {
-                densitySamples[n].first *= data[n];
-                hasNonzeroDensityValues |= densitySamples[n].first > 0.0f;
+            if (densityScales) {
+                for (int n = 0; n < numValues; ++n) {
+                    densitySamples[n].first *= densityScales[n];
+                    hasNonzeroDensityValues |= densitySamples[n].first > 0.0f;
+                }
             }
         }
 
@@ -2100,10 +2170,10 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_HEADING,"noiseheading", ""));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "modeling", "Procedural Density Modeling")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "modeling", "Enable VEX Processing")
         .setDefault(PRMzeroDefaults)
         .setHelpText("Use the contained VOP network to define a VEX procedure that "
-            "determines the object's density."));
+            "determines density and attribute values."));
 
     hvdb::OpenVDBOpFactory("OpenVDB Rasterize Points",
         SOP_OpenVDB_Rasterize_Points::factory, parms, *table)
@@ -2119,12 +2189,21 @@ SOP_OpenVDB_Rasterize_Points::updateParmsFlags()
 
     const bool createDensity = evalInt("createdensity", 0, 0) != 0;
 
-    changed |= enableParm("modeling", createDensity);
+    bool transferAttributes = false;
+    {
+        UT_String attributeNameStr;
+        evalString(attributeNameStr, "attributes", 0, 0);
+        transferAttributes = attributeNameStr.length() > 0;
+    }
 
-    const bool proceduralModeling = evalInt("modeling", 0, 0) != 0 && createDensity;
+    bool enableVEX = createDensity || transferAttributes;
+
+    changed |= enableParm("modeling", enableVEX);
+
+    /*const bool proceduralModeling = evalInt("modeling", 0, 0) != 0 && enableVEX;
     for (int i = mInitialParmNum; i < this->getParmList()->getEntries(); ++i) {
         changed |= enableParm(i, proceduralModeling);
-    }
+    }*/
 
     return changed;
 }
@@ -2134,7 +2213,6 @@ SOP_OpenVDB_Rasterize_Points::factory(OP_Network* net, const char* name, OP_Oper
 {
     return new SOP_OpenVDB_Rasterize_Points(net, name, op);
 }
-
 
 SOP_OpenVDB_Rasterize_Points::SOP_OpenVDB_Rasterize_Points(OP_Network* net, const char* name, OP_Operator* op)
     : hvdb::SOP_NodeVDB(net, name, op)
@@ -2216,7 +2294,6 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
             boost::shared_ptr<VEXContext> vexContextPtr;
 
             if (applyVEX) {
-
                 UT_String shoppath = "", script = "op:";
                 getFullPath(shoppath);
                 script += shoppath;

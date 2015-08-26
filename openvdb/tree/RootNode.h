@@ -659,7 +659,7 @@ public:
     /// any nodes whose values are all the same (optionally to within a tolerance)
     /// and have the same active state.
     ///
-    /// @note Consider instead using tools::pruneTiles which is multi-threaded!
+    /// @note Consider instead using tools::prune which is multi-threaded!
     void prune(const ValueType& tolerance = zeroVal<ValueType>());
 
     /// @brief Add the given leaf node to this tree, creating a new branch if necessary.

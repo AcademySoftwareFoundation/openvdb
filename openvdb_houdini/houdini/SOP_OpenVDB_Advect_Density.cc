@@ -32,7 +32,7 @@
 ///
 /// @author Ken Museth
 ///
-/// @brief Density or veclocity (i.e. non-level-set) advection SOP
+/// @brief Density and veclocity (i.e. non-level-set) advection SOP
 ///
 /// @todo Add optional mask (allready supported by tools::DensityAdvect)
 
@@ -154,7 +154,8 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_INT_J, "StepsOfRK", "Runge-Kutta Steps")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
-        .setHelpText("The number of integrations steps to be performed per advection step."));
+        .setHelpText("The number of backwards Runge-Kutta sub-steps to be performed"
+                     "per time integration step."));
               
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Advect Density",

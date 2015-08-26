@@ -556,7 +556,7 @@ normalize()
         default:
             OPENVDB_THROW(ValueError, "Temporal integration scheme not supported!");
         }
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END   
     }
     mTracker.mLeafs->removeAuxBuffers();
 }
@@ -604,7 +604,8 @@ eval(StencilT& stencil, const ValueType* phi, ValueType* result, Index n) const
 
     const ValueType normSqGradPhi = GradientT::result(stencil);
     const ValueType phi0 = stencil.getValue();
-    ValueType v = phi0 / (math::Sqrt(math::Pow2(phi0) + normSqGradPhi));
+    ValueType v = phi0 / ( math::Sqrt(math::Pow2(phi0) + normSqGradPhi) +
+                           math::Tolerance<ValueType>::value() );
     v = phi0 - mDt * v * (math::Sqrt(normSqGradPhi) * mInvDx - 1.0f);
     result[n] = Nominator ? alpha * phi[n] + beta * v : v;
 }
@@ -631,14 +632,14 @@ euler(const LeafRange& range, Index phiBuffer, Index resultBuffer)
         if (mMask == NULL) {
             for (VoxelIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 stencil.moveTo(iter);
-                this->eval<Nominator,Denominator>(stencil, phi, result, iter.pos());
+                this->eval<Nominator, Denominator>(stencil, phi, result, iter.pos());
             }//loop over active voxels in the leaf of the level set
         } else if (const MaskLeafT* mask = mMask->probeLeaf(leafIter->origin())) {
             const ValueType* phi0 = leafIter->buffer().data();
             for (MaskIterT iter  = mask->cbeginValueOn(); iter; ++iter) {
                 const Index i = iter.pos();
                 stencil.moveTo(iter.getCoord(), phi0[i]);
-                this->eval<Nominator,Denominator>(stencil, phi, result, i);
+                this->eval<Nominator, Denominator>(stencil, phi, result, i);
             }//loop over active voxels in the leaf of the mask
         }
     }//loop over leafs of the level set

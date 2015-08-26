@@ -36,6 +36,8 @@
 ///
 /// @brief Sparse hyperbolic advection of volumes, e.g. a density or
 ///        velocity (vs a level set interface).
+///
+/// @todo  MacCormack, BFECC and better estimate of padding by dilation.
 
 #ifndef OPENVDB_TOOLS_DENSITY_ADVECT_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_DENSITY_ADVECT_HAS_BEEN_INCLUDED
@@ -89,11 +91,12 @@ public:
     {
     }
 
-    /// @brief Define the number of integrations steps to be performed per
-    /// advection step (the default is one).
+    /// @brief Define the number of integrations sub-steps to be performed per
+    /// advection time-step (the default is one).
     void setIntegrationCount(size_t iterations) { mCountRK = iterations; }
 
-    /// @return the number of integration steps performed per advection step.
+    /// @return the number of integration sub-steps performed per
+    /// advection time-step.
     size_t getIntegrationCount() const { return mCountRK; }
 
     /// @brief Define the order of the Runge-Kutta integration scheme
@@ -122,8 +125,7 @@ public:
 
     /// @return Returns the maximum distance in voxel units of @a inGrid
     /// that a particle might travel in the time-step @a dt when advected
-    /// in the velocity field defined during construction (given the
-    /// current number of integration steps).
+    /// in the velocity field defined during construction.
     ///
     /// @details This method is useful when dilating sparse density
     /// grids to pad boundary regions. Excessive dilation can be
@@ -137,7 +139,8 @@ public:
         if (!inGrid.hasUniformVoxels()) {
             OPENVDB_THROW(RuntimeError, "Density grid does not have uniform voxels!");
         }
-        return static_cast<int>(math::RoundUp(mMaxVelocity*dt*mCountRK/inGrid.voxelSize()[0]));
+        const double d = mMaxVelocity*math::Abs(dt)/inGrid.voxelSize()[0];
+        return static_cast<int>( math::RoundUp(d) );
     }
 
     /// @return Returns a new density grid that is the results of passive advection
@@ -218,7 +221,7 @@ private:
     template<typename DensityGridT, typename DensitySamplerT>
     void process(DensityGridT& outGrid, const DensityGridT& inGrid, double dt)
     {
-        mDt = dt;
+        mDt = dt/mCountRK;
         outGrid.tree().voxelizeActiveTiles();
         if (mOrderRK == 1) {
             Advect<DensityGridT, 1, DensitySamplerT> adv(inGrid, *this);
@@ -285,8 +288,8 @@ private:
                 return;
             }
             typedef typename VelocityIntegratorT::ElementType RealT;
-            const RealT dt = static_cast<RealT>(- mParent->mDt);//back-tracking
             const int n = static_cast<int>(mParent->mCountRK);
+            const RealT dt = static_cast<RealT>(- mParent->mDt);//back-tracking
             const ValueT backg = mDensityAcc.tree().background();
             for (typename LeafRangeT::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
                 ValueT* phi = leafIter.buffer(0).data();
@@ -319,7 +322,7 @@ private:
     double               mMaxVelocity;
     InterrupterType*     mInterrupter;
     double               mDt;// time step per RK integration steps
-    size_t               mCountRK;// number of RK integration steps
+    size_t               mCountRK;// number of RK integration sub-steps
     size_t               mOrderRK;// order of the RK integrator
     size_t               mGrainSize;// for multi-threading (0 means no threading)
 };//end of DensityAdvection class

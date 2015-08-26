@@ -48,6 +48,7 @@
 #include <openvdb/tools/Morphology.h>
 #include <openvdb/tools/PointAdvect.h>
 #include <openvdb/tools/PointScatter.h>
+#include <openvdb/tools/Prune.h>
 #include <openvdb/tools/ValueTransformer.h>
 #include <openvdb/tools/VectorTransformer.h>
 #include <openvdb/util/Util.h>
@@ -80,6 +81,7 @@ public:
     CPPUNIT_TEST(testMaskedNormalize);
     CPPUNIT_TEST(testPointAdvect);
     CPPUNIT_TEST(testPointScatter);
+    CPPUNIT_TEST(testPrune);
     CPPUNIT_TEST(testDensityAdvect);
     CPPUNIT_TEST(testTransformValues);
     CPPUNIT_TEST(testVectorApply);
@@ -105,6 +107,7 @@ public:
     void testMaskedNormalize();
     void testPointAdvect();
     void testPointScatter();
+    void testPrune();
     void testDensityAdvect();
     void testTransformValues();
     void testVectorApply();
@@ -2193,6 +2196,59 @@ TestTools::testClipping()
         FloatGrid::Ptr clipped = tools::clip(cube, mask);
         Local::validate(*clipped);
     }
+}
+
+void
+TestTools::testPrune()
+{
+    /// @todo Add more unit-tests!
+    
+    using namespace openvdb;
+
+    const float value = 5.345f;
+    
+    FloatTree tree(value);
+    CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
+    CPPUNIT_ASSERT_EQUAL(Index32(1), tree.nonLeafCount()); // root node
+    CPPUNIT_ASSERT(tree.empty());
+    
+    tree.fill(CoordBBox(Coord(-10), Coord(10)), value, /*active=*/false);
+    CPPUNIT_ASSERT(!tree.empty());
+    
+    tools::prune(tree);
+    
+    CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
+    CPPUNIT_ASSERT_EQUAL(Index32(1), tree.nonLeafCount()); // root node
+    CPPUNIT_ASSERT(tree.empty());
+
+    /*
+    {// Bechmark serial prune
+        util::CpuTimer timer;
+        initialize();//required whenever I/O of OpenVDB files is performed!
+        io::File sourceFile("/usr/pic1/Data/OpenVDB/LevelSetModels/crawler.vdb");
+        sourceFile.open(false);//disable delayed loading
+        FloatGrid::Ptr grid = gridPtrCast<FloatGrid>(sourceFile.getGrids()->at(0));
+        const Index32 leafCount = grid->tree().leafCount();
+        
+        timer.start("\nSerial tolerance prune");
+        grid->tree().prune();
+        timer.stop();
+        CPPUNIT_ASSERT_EQUAL(leafCount, grid->tree().leafCount());
+    }
+    {// Bechmark parallel prune
+        util::CpuTimer timer;
+        initialize();//required whenever I/O of OpenVDB files is performed!
+        io::File sourceFile("/usr/pic1/Data/OpenVDB/LevelSetModels/crawler.vdb");
+        sourceFile.open(false);//disable delayed loading
+        FloatGrid::Ptr grid = gridPtrCast<FloatGrid>(sourceFile.getGrids()->at(0));
+        const Index32 leafCount = grid->tree().leafCount();
+
+        timer.start("\nParallel tolerance prune");
+        tools::prune(grid->tree());
+        timer.stop();
+        CPPUNIT_ASSERT_EQUAL(leafCount, grid->tree().leafCount());
+        }
+    */
 }
 
 // Copyright (c) 2012-2015 DreamWorks Animation LLC

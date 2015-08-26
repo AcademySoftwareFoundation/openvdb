@@ -62,12 +62,15 @@ Version 3.1.0 - In development
     - A new implementation of the tools::sdfInteriorMask tool that improves
       performance up to 5x and supports both grid and tree volume inputs.
     - Made various optimizations and improvements to the LevelSetMorph tool.
+    - Improved performance of @vdblink::tools::Prune Prune@endlink.
     - Aggregated tools::DiscreteField and tools::EnrightField (formerly in
       tools/LevelSetAdvect.h) and tools::VelocitySampler and
       tools::VelocityIntegrator (formerly in tools/PointAdvect.h) into
       a single header, tools/VelocityFields.h.
     - Loosened floating point type requirement in tools::signedFloodFill()
       to signed scalar type.
+    - tools::prune now employs an improved compression technique when
+      applied to trees with floating-point values.
 
     Bug fixes:
     - Fixed a build issue that could result in spurious "Blosc encoding
@@ -78,6 +81,7 @@ Version 3.1.0 - In development
       necessarily match the window size.
       [Contributed by Rafael Campos]
     - Fixed a bug in tools::QuadraticSampler::sample.
+    - Fixed a bug in tools::LevelSetTracker that could generate NaNs.
 
     API changes:
     - Removed the Hermite class since it was no longer used and caused build
@@ -95,6 +99,8 @@ Version 3.1.0 - In development
       default VOP network with UI parameters.
     - Added an Advect Density SOP to advect non-level-sets, e.g. density or
       velocity.
+    - Added a Remove Divergence SOP that removes any divergent portions of a
+      velocity field.
     - Added a Sort Points SOP that spatially reorders points that are close
       together in space to also be close in the insertion order. This
       operation can help improve CPU cache coherency and performance for

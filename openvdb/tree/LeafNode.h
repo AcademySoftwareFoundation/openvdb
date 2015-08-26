@@ -1047,10 +1047,31 @@ public:
     //@}
 
     /// Return @c true if all of this node's values have the same active state
-    /// and are equal to within the given tolerance, and return the value in @a constValue
-    /// and the active state in @a state.
+    /// and are in the range this->getFirstValue() +/- @a tolerance.
+    ///
+    ///
+    /// @param constValue  Is updated with the first value of this leaf node.
+    /// @param state       Is updated with the state of all values IF method
+    ///                    returns @c true. Else the value is undefined!
+    /// @param tolerance   The tolerance used to determine if values are
+    ///                    approximatly equal to the for value.
     bool isConstant(ValueType& constValue, bool& state,
                     const ValueType& tolerance = zeroVal<ValueType>()) const;
+
+    /// Return @c true if all of this node's values have the same active state
+    /// and are in the range (@a maxValue + @a minValue)/2 +/- @a tolerance.
+    ///
+    /// @param minValue  Is updated with the minimum of all values IF method
+    ///                  returns @c true. Else the value is undefined!
+    /// @param maxValue  Is updated with the maximum of all values IF method
+    ///                  returns @c true. Else the value is undefined!
+    /// @param state     Is updated with the state of all values IF method
+    ///                  returns @c true. Else the value is undefined!
+    /// @param tolerance The tolerance used to determine if values are
+    ///                  approximatly constant.
+    bool isConstant(ValueType& minValue, ValueType& maxValue,
+                    bool& state, const ValueType& tolerance = zeroVal<ValueType>()) const;
+    
     /// Return @c true if all of this node's values are inactive.
     bool isInactive() const { return mValueMask.isOff(); }
 
@@ -1725,23 +1746,41 @@ LeafNode<T, Log2Dim>::hasSameTopology(const LeafNode<OtherType, OtherLog2Dim>* o
 
 template<typename T, Index Log2Dim>
 inline bool
-LeafNode<T, Log2Dim>::isConstant(ValueType& constValue,
+LeafNode<T, Log2Dim>::isConstant(ValueType& value, bool& state,
+                                 const ValueType& tolerance) const
+{
+    state = mValueMask.isOn();
+    if (!(state || mValueMask.isOff())) return false;// Are values neither active nor inactive?
+    
+    value = mBuffer[0];
+    for (Index i = 1; i < SIZE; ++i) {
+        if ( !math::isApproxEqual(mBuffer[i], value, tolerance) ) return false;
+    }
+    return true;
+}
+
+template<typename T, Index Log2Dim>
+inline bool
+LeafNode<T, Log2Dim>::isConstant(ValueType& minValue, ValueType& maxValue,
                                  bool& state, const ValueType& tolerance) const
 {
     state = mValueMask.isOn();
-
-    if (!(state || mValueMask.isOff())) return false;
-
-    bool allEqual = true;
-    const T value = mBuffer[0];
-    for (Index i = 1; allEqual && i < SIZE; ++i) {
-        /// @todo Alternatively, allEqual = !((maxVal - minVal) > (2 * tolerance))
-        allEqual = math::isApproxEqual(mBuffer[i], value, tolerance);
+    if (!(state || mValueMask.isOff())) return false;// Are values neither active nor inactive?
+    
+    const T range = 2 * tolerance;
+    minValue = maxValue = mBuffer[0];
+    for (Index i = 1; i < SIZE; ++i) {// early termination
+        const T& v = mBuffer[i];
+        if (v < minValue) {
+            if ((maxValue - v) > range) return false;
+            minValue = v;
+        } else if (v > maxValue) {
+            if ((v - minValue) > range) return false;
+            maxValue = v;
+        }
     }
-    if (allEqual) constValue = value; ///< @todo return average/median value?
-    return allEqual;
+    return true;
 }
-
 
 ////////////////////////////////////////
 

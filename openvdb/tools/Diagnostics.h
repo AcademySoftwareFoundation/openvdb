@@ -303,6 +303,9 @@ struct CheckRange
     // @brief Constructor taking a range to be tested against.
     CheckRange(const ElementType& _min, const ElementType& _max) : minVal(_min), maxVal(_max)
     {
+        if (minVal > maxVal) {
+            OPENVDB_THROW(ValueError, "CheckRange: Invalid range (min > max)");
+        }
     }
 
     /// Return true if the value is smaller than min or larger than max.
@@ -447,8 +450,10 @@ struct CheckNormGrad
         , maxVal(_max)
     {
         if ( !grid.hasUniformVoxels() ) {
-         OPENVDB_THROW(RuntimeError,
-             "The transform must have uniform scale for CheckNormGrad to function");
+            OPENVDB_THROW(ValueError, "CheckNormGrad: The transform must have uniform scale");
+        }
+        if (minVal > maxVal) {
+            OPENVDB_THROW(ValueError, "CheckNormGrad: Invalid range (min > max)");
         }
     }
 
@@ -470,10 +475,10 @@ struct CheckNormGrad
     /// @brief Return true if the norm of the gradient at a voxel
     /// location of the iterator is out of range.
     inline bool operator()(const VoxelIterT &iter) const
-      {
-          const Coord ijk = iter.getCoord();
-          return (*this)(invdx2 * math::ISGradientNormSqrd<GradScheme>::result(acc, ijk));
-      }
+    {
+        const Coord ijk = iter.getCoord();
+        return (*this)(invdx2 * math::ISGradientNormSqrd<GradScheme>::result(acc, ijk));
+    }
 
     /// @brief Return a string describing a failed check.
     std::string str() const
@@ -509,8 +514,10 @@ struct CheckEikonal
         : stencil(grid), minVal(_min), maxVal(_max)
     {
         if ( !grid.hasUniformVoxels() ) {
-         OPENVDB_THROW(RuntimeError,
-             "The transform must have uniform scale for CheckEikonal to function");
+            OPENVDB_THROW(ValueError, "CheckEikonal: The transform must have uniform scale");
+        }
+        if (minVal > maxVal) {
+            OPENVDB_THROW(ValueError, "CheckEikonal: Invalid range (min > max)");
         }
     }
 
@@ -573,8 +580,10 @@ struct CheckDivergence
         , maxVal(_max)
     {
         if ( !grid.hasUniformVoxels() ) {
-         OPENVDB_THROW(RuntimeError,
-             "The transform must have uniform scale for CheckDivergence to function");
+            OPENVDB_THROW(ValueError, "CheckDivergence: The transform must have uniform scale");
+        }
+        if (minVal > maxVal) {
+            OPENVDB_THROW(ValueError, "CheckDivergence: Invalid range (min > max)");
         }
     }
     /// Return true if the value is smaller than min or larger than max.
@@ -587,10 +596,10 @@ struct CheckDivergence
     /// @brief Return true if the divergence at a voxel location of
     /// the iterator is out of range.
     inline bool operator()(const VoxelIterT &iter) const
-      {
-          const Coord ijk = iter.getCoord();
-          return (*this)(invdx * math::ISDivergence<DiffScheme>::result(acc, ijk));
-      }
+    {
+        const Coord ijk = iter.getCoord();
+        return (*this)(invdx * math::ISDivergence<DiffScheme>::result(acc, ijk));
+    }
 
     /// @brief Return a string describing a failed check.
     std::string str() const
@@ -615,9 +624,9 @@ class Diagnose
     typedef typename GridT::template ValueConverter<bool>::Type  MaskType;
 
     Diagnose(const GridT& grid) : mGrid(&grid), mMask(new MaskType()), mCount(0)
-      {
-          mMask->setTransform(grid.transformPtr()->copy());
-      }
+    {
+        mMask->setTransform(grid.transformPtr()->copy());
+    }
 
     template <typename CheckT>
     std::string check(const CheckT& check,
@@ -636,10 +645,13 @@ class Diagnose
         return ss.str();
     }
 
+    //@{
     /// @brief Return a boolean mask of all the values
     /// (i.e. tiles and/or voxels) that have failed one or
     /// more checks.
     typename MaskType::ConstPtr mask() const { return mMask; }
+    typename MaskType::Ptr mask() { return mMask; }
+    //@}
 
     /// @brief Return the number of values (i.e. background, tiles or
     /// voxels) that have failed one or more checks.
@@ -724,39 +736,39 @@ private:
         }
 
         std::string checkVoxels()
-          {
-              std::ostringstream ss;
-              LeafManagerT leafs(mGrid->tree());
-              const Index64 n = mCount;
-              tbb::parallel_reduce(leafs.leafRange(), *this);
-              if (const Index64 m = mCount - n) {
-                  ss << m << " voxel" << (m==1 ? " is " : "s are ") + mCheck.str() << std::endl;
-              }
-              return ss.str();
-          }
+        {
+            std::ostringstream ss;
+            LeafManagerT leafs(mGrid->tree());
+            const Index64 n = mCount;
+            tbb::parallel_reduce(leafs.leafRange(), *this);
+            if (const Index64 m = mCount - n) {
+                ss << m << " voxel" << (m==1 ? " is " : "s are ") + mCheck.str() << std::endl;
+            }
+            return ss.str();
+        }
 
         void operator()(const typename LeafManagerT::LeafRange& r)
-          {
-              typedef typename CheckT::VoxelIterT VoxelIterT;
-              if (mMask) {
-                  for (typename LeafManagerT::LeafRange::Iterator i=r.begin(); i; ++i) {
-                      typename MaskT::LeafNodeType* maskLeaf = NULL;
-                      for (VoxelIterT j = tree::IterTraits<LeafT, VoxelIterT>::begin(*i); j; ++j) {
-                          if (mCheck(j)) {
-                              ++mCount;
-                              if (maskLeaf == NULL) maskLeaf = mMask->touchLeaf(j.getCoord());
-                              maskLeaf->setValueOn(j.pos(), true);
-                          }
-                      }
-                  }
-              } else {
-                  for (typename LeafManagerT::LeafRange::Iterator i=r.begin(); i; ++i) {
-                      for (VoxelIterT j = tree::IterTraits<LeafT, VoxelIterT>::begin(*i); j; ++j) {
-                          if (mCheck(j)) ++mCount;
-                      }
-                  }
-              }
-          }
+        {
+            typedef typename CheckT::VoxelIterT VoxelIterT;
+            if (mMask) {
+                for (typename LeafManagerT::LeafRange::Iterator i=r.begin(); i; ++i) {
+                    typename MaskT::LeafNodeType* maskLeaf = NULL;
+                    for (VoxelIterT j = tree::IterTraits<LeafT, VoxelIterT>::begin(*i); j; ++j) {
+                        if (mCheck(j)) {
+                            ++mCount;
+                            if (maskLeaf == NULL) maskLeaf = mMask->touchLeaf(j.getCoord());
+                            maskLeaf->setValueOn(j.pos(), true);
+                        }
+                    }
+                }
+            } else {
+                for (typename LeafManagerT::LeafRange::Iterator i=r.begin(); i; ++i) {
+                    for (VoxelIterT j = tree::IterTraits<LeafT, VoxelIterT>::begin(*i); j; ++j) {
+                        if (mCheck(j)) ++mCount;
+                    }
+                }
+            }
+        }
         void join(const CheckValues& other)
         {
             if (mMask) mMask->merge(*(other.mMask), openvdb::MERGE_ACTIVE_STATES_AND_NODES);
@@ -781,10 +793,13 @@ public:
 
     CheckLevelSet(const GridType& grid) : mDiagnose(grid) {}
 
+    //@{
     /// @brief Return a boolean mask of all the values
     /// (i.e. tiles and/or voxels) that have failed one or
     /// more checks.
     typename MaskType::ConstPtr mask() const { return mDiagnose.mask(); }
+    typename MaskType::Ptr mask() { return mDiagnose.mask(); }
+    //@}
 
     /// @brief Return the number of values (i.e. background, tiles or
     /// voxels) that have failed one or more checks.
@@ -954,10 +969,13 @@ public:
 
     CheckFogVolume(const GridType& grid) : mDiagnose(grid) {}
 
+    //@{
     /// @brief Return a boolean mask of all the values
     /// (i.e. tiles and/or voxels) that have failed one or
     /// more checks.
     typename MaskType::ConstPtr mask() const { return mDiagnose.mask(); }
+    typename MaskType::Ptr mask() { return mDiagnose.mask(); }
+    //@}
 
     /// @brief Return the number of values (i.e. background, tiles or
     /// voxels) that have failed one or more checks.
@@ -1023,7 +1041,8 @@ public:
         return mDiagnose.check(c, updateMask, /*voxel*/true, /*tiles*/true, /*background*/true);
     }
 
-    /// @brief Return a nonempty message if the active voxel values are out-of-range.
+    /// @brief Return a nonempty message if the active voxel values
+    /// are out-of-range, i.e. not in the range [0,1].
     ///
     /// @note Medium run-time overhead
     std::string checkRange(bool updateMask = false)

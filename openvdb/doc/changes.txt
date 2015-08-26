@@ -82,6 +82,7 @@ Improvements:
   both grid and tree volume inputs.
 - Made various optimizations and improvements to the
   @vdblink::tools::LevelSetMorphing level set morphing@endlink tool.
+- Improved performance of @vdblink::tools::prune prune@endlink.
 - Aggregated @vdblink::tools::DiscreteField DiscreteField@endlink and
   @vdblink::tools::EnrightField EnrightField@endlink (formerly in
   tools/LevelSetAdvect.h) and
@@ -90,6 +91,8 @@ Improvements:
   in tools/PointAdvect.h) into a single header, tools/VelocityFields.h.
 - Loosened floating point type requirement in @vdblink::tools::signedFloodFill
   signedFloodFill@endlink to signed scalar type.
+- @vdblink::tools::prune prune@endlink now employs an improved compression
+  technique when applied to trees with floating-point values.
 
 @par
 Bug fixes:
@@ -101,7 +104,9 @@ Bug fixes:
 - Fixed a <TT>vdb_view</TT> issue whereby the frame buffer size did not
   necessarily match the window size.
   <I>[Contributed by Rafael&nbsp;Campos]</I>
-- Fixed a bug in tools::QuadraticSampler::sample.
+- Fixed a bug in @vdblink::tools::QuadraticSampler::sample QuadraticSampler@endlink.
+- Fixed a roundoff issue in @vdblink::tools::LevelSetTracker LevelSetTrackerthat@endlink
+  that could generate NaNs.
 
 @par
 API changes:
@@ -124,6 +129,8 @@ Houdini:
   default VOP network with UI parameters.
 - Added an Advect Density SOP to advect non-level-sets, e.g. density or
   velocity.
+- Added a Remove Divergence SOP that removes any divergent portions of a
+  velocity field.
 - Added a Sort Points SOP that spatially reorders points that are close
   together in space to also be close in the insertion order. This
   operation can help improve CPU cache coherency and performance for

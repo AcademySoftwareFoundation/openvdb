@@ -112,6 +112,9 @@ TestDiagnostics::testCheck()
         CPPUNIT_ASSERT(!c(-0.1f));
     }
     {//test CheckRange
+        // first check throw on construction from an invalid range
+        CPPUNIT_ASSERT_THROW(openvdb::tools::CheckRange<openvdb::FloatGrid> c(1.0f, 0.0f),
+                             openvdb::ValueError);
         openvdb::tools::CheckRange<openvdb::FloatGrid> c(0.0f, 1.0f);
         CPPUNIT_ASSERT(!c(0.5f));
         CPPUNIT_ASSERT(!c(0.0f));

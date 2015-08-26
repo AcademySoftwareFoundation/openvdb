@@ -1,5 +1,4 @@
-# Automatically generated script: Monday June 29, 10:50 2015
-
+# Automatically generated script: Wednesday August 26, 15:42 2015
 \set noalias = 1
 #
 #  Creation script for DW_OpenVDBRasterizePoints operator
@@ -11,8 +10,9 @@ if ( "$arg1" == "" ) then
 endif
 
 # Node $arg1 (Sop/DW_OpenVDBRasterizePoints)
-opspareds '    parm { 	name	"pointgroup" 	baseparm 	export	none     }     parm { 	name	"voxelsize" 	baseparm 	export	none     }     parm { 	name	"createdensity" 	baseparm 	export	none     }     parm { 	name	"compositing" 	baseparm 	export	none     }     parm { 	name	"densityscale" 	baseparm 	export	none     }     parm { 	name	"particlescale" 	baseparm 	export	none     }     parm { 	name	"solidratio" 	baseparm 	export	none     }     parm { 	name	"attributes" 	baseparm 	export	none     }     parm { 	name	"noiseheading" 	baseparm 	export	none     }     parm { 	name	"modeling" 	baseparm 	export	none     }     parm { 	name	"lookup" 	label	"Noise Lookup" 	type	integer 	default	{ "0" } 	menu	{ 	    "0"	"Displacement" 	    "1"	"World Space" 	    "2"	"Local Space" 	    "3"	"Unit Space" 	} 	range	{ 0 10 } 	export	none 	parmtag	{ "parmvop" "1" } 	parmtag	{ "shaderparmcontexts" "cvex" }     }     parm { 	name	"treatment" 	label	"Noise Treatment" 	type	integer 	default	{ "0" } 	menu	{ 	    "0"	"Abs" 	    "1"	"1 - Abs" 	    "2"	"Clamp" 	} 	range	{ 0 10 } 	export	none 	parmtag	{ "parmvop" "1" } 	parmtag	{ "shaderparmcontexts" "cvex" }     }     parm { 	name	"amp" 	label	"Amplitude" 	type	float 	default	{ "1" } 	range	{ 0 1 } 	export	none 	parmtag	{ "parmvop" "1" } 	parmtag	{ "shaderparmcontexts" "cvex" }     }     parm { 	name	"excavation" 	label	"Excavation" 	type	float 	default	{ "0.07" } 	range	{ 0 1 } 	export	none 	parmtag	{ "parmvop" "1" } 	parmtag	{ "shaderparmcontexts" "cvex" }     }     parm { 	name	"falloff" 	label	"Falloff" 	type	float 	default	{ "0.1" } 	range	{ 0 1 } 	export	none 	parmtag	{ "parmvop" "1" } 	parmtag	{ "shaderparmcontexts" "cvex" }     }     parm { 	name	"freq" 	label	"Frequency" 	type	float 	default	{ "1.74" } 	range	{ 0 1 } 	export	none 	parmtag	{ "parmvop" "1" } 	parmtag	{ "shaderparmcontexts" "cvex" }     }     parm { 	name	"rough" 	label	"Roughness" 	type	float 	default	{ "0.5" } 	range	{ 0 1 } 	export	none 	parmtag	{ "parmvop" "1" } 	parmtag	{ "shaderparmcontexts" "cvex" }     }     parm { 	name	"ocataves" 	label	"Ocataves" 	type	integer 	default	{ "2" } 	range	{ 0 10 } 	export	none 	parmtag	{ "parmvop" "1" } 	parmtag	{ "shaderparmcontexts" "cvex" }     }     parm { 	name	"offset" 	label	"Offset" 	type	float 	size	3 	default	{ "0" "0" "0" } 	range	{ 0 10 } 	export	none 	parmtag	{ "parmvop" "1" } 	parmtag	{ "shaderparmcontexts" "cvex" }     }     parm { 	name	"billowing" 	label	"Billowing Motion" 	type	toggle 	default	{ "off" } 	range	{ 0 1 } 	export	none 	parmtag	{ "parmvop" "1" } 	parmtag	{ "shaderparmcontexts" "cvex" }     }     parm { 	name	"billowingspeed" 	label	"Billowing Speed" 	type	float 	default	{ "0.1" } 	disablewhen	"{ billowing != 1 }" 	range	{ 0 1 } 	export	none 	parmtag	{ "parmvop" "1" } 	parmtag	{ "shaderparmcontexts" "cvex" }     }     parm { 	name	"swirling" 	label	"Swirling Motion" 	type	toggle 	default	{ "off" } 	range	{ 0 1 } 	export	none 	parmtag	{ "parmvop" "1" } 	parmtag	{ "shaderparmcontexts" "cvex" }     }     parm { 	name	"swirlingspeed" 	label	"Swirling Speed" 	type	float 	default	{ "0.1" } 	disablewhen	"{ billowing != 1 }" 	range	{ 0 1 } 	export	none 	parmtag	{ "parmvop" "1" } 	parmtag	{ "shaderparmcontexts" "cvex" }     } ' $arg1
-opparm -V 14.0.254 $arg1 pointgroup ( "" ) voxelsize ( 0.10000000000000001 ) createdensity ( on ) compositing ( max ) densityscale ( 1 ) particlescale ( 1 ) solidratio ( 0 ) attributes ( "" ) noiseheading ( ) modeling ( off ) lookup ( 0 ) treatment ( 0 ) amp ( 1 ) excavation ( 0.070000000000000007 ) falloff ( 0.10000000000000001 ) freq ( 1.74 ) rough ( 0.5 ) ocataves ( 2 ) offset ( 0 0 0 ) billowing ( off ) billowingspeed ( 0.10000000000000001 ) swirling ( off ) swirlingspeed ( 0.10000000000000001 )
+opspareds '    parm { 	name	"pointgroup" 	baseparm 	export	none     }     parm { 	name	"voxelsize" 	baseparm 	export	none     }     parm { 	name	"createdensity" 	baseparm 	export	none     }     parm { 	name	"compositing" 	baseparm 	export	none     }     parm { 	name	"densityscale" 	baseparm 	export	none     }     parm { 	name	"particlescale" 	baseparm 	export	none     }     parm { 	name	"solidratio" 	baseparm 	export	none     }     parm { 	name	"attributes" 	baseparm 	export	none     }     parm { 	name	"noiseheading" 	baseparm 	export	none     }     parm { 	name	"modeling" 	baseparm 	export	none     }     group { 	name	"density_folder" 	label	"Density"  	parm { 	    name	"process_density" 	    label	"Process Density" 	    type	toggle 	    default	{ "off" } 	    disablewhen	"{ modeling != 1 } { createdensity != 1 }" 	    range	{ 0 1 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	} 	parm { 	    name	"lookup" 	    label	"Noise Lookup" 	    type	integer 	    default	{ "0" } 	    disablewhen	"{ process_density != 1 } { modeling != 1 } { createdensity != 1 }" 	    menu	{ 		"0"	"Displacement" 		"1"	"World Space" 		"2"	"Local Space" 		"3"	"Unit Space" 	    } 	    range	{ 0 10 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	} 	parm { 	    name	"treatment" 	    label	"Noise Treatment" 	    type	integer 	    default	{ "0" } 	    disablewhen	"{ process_density != 1 } { modeling != 1 } { createdensity != 1 }" 	    menu	{ 		"0"	"Abs" 		"1"	"1 - Abs" 		"2"	"Clamp" 	    } 	    range	{ 0 10 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	} 	parm { 	    name	"amp" 	    label	"Amplitude" 	    type	float 	    default	{ "1" } 	    disablewhen	"{ process_density != 1 } { modeling != 1 } { createdensity != 1 }" 	    range	{ 0 1 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	} 	parm { 	    name	"excavation" 	    label	"Excavation" 	    type	float 	    default	{ "0.07" } 	    disablewhen	"{ process_density != 1 } { modeling != 1 } { createdensity != 1 }" 	    range	{ 0 1 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	} 	parm { 	    name	"falloff" 	    label	"Falloff" 	    type	float 	    default	{ "0.1" } 	    disablewhen	"{ process_density != 1 } { modeling != 1 } { createdensity != 1 }" 	    range	{ 0 1 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	} 	parm { 	    name	"freq" 	    label	"Frequency" 	    type	float 	    default	{ "1.74" } 	    disablewhen	"{ process_density != 1 } { modeling != 1 } { createdensity != 1 }" 	    range	{ 0 1 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	} 	parm { 	    name	"rough" 	    label	"Roughness" 	    type	float 	    default	{ "0.5" } 	    disablewhen	"{ process_density != 1 } { modeling != 1 } { createdensity != 1 }" 	    range	{ 0 1 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	} 	parm { 	    name	"ocataves" 	    label	"Ocataves" 	    type	integer 	    default	{ "2" } 	    disablewhen	"{ process_density != 1 } { modeling != 1 } { createdensity != 1 }" 	    range	{ 0 10 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	} 	parm { 	    name	"offset" 	    label	"Offset" 	    type	float 	    size	3 	    default	{ "0" "0" "0" } 	    disablewhen	"{ process_density != 1 } { modeling != 1 } { createdensity != 1 }" 	    range	{ 0 10 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	} 	parm { 	    name	"billowing" 	    label	"Billowing Motion" 	    type	toggle 	    default	{ "off" } 	    disablewhen	"{ process_density != 1 } { modeling != 1 } { createdensity != 1 }" 	    range	{ 0 1 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	} 	parm { 	    name	"billowingspeed" 	    label	"Billowing Speed" 	    type	float 	    default	{ "0.1" } 	    disablewhen	"{ billowing != 1 } { process_density != 1 } { modeling != 1 } { createdensity != 1 }" 	    range	{ 0 1 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	} 	parm { 	    name	"swirling" 	    label	"Swirling Motion" 	    type	toggle 	    default	{ "off" } 	    disablewhen	"{ process_density != 1 } { modeling != 1 } { createdensity != 1 }" 	    range	{ 0 1 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	} 	parm { 	    name	"swirlingspeed" 	    label	"Swirling Speed" 	    type	float 	    default	{ "0.1" } 	    disablewhen	"{ swirling != 1 } { process_density != 1 } { modeling != 1 } { createdensity != 1 }" 	    range	{ 0 1 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	}     }      group { 	name	"density_folder_1" 	label	"Velocity"  	parm { 	    name	"process_velocity" 	    label	"Process Velocity" 	    type	toggle 	    default	{ "off" } 	    disablewhen	"{ modeling != 1 }" 	    range	{ 0 1 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	} 	parm { 	    name	"velocity_scale" 	    label	"Velocity Scale" 	    type	float 	    default	{ "1" } 	    help	"Scale the input velocity" 	    disablewhen	"{ process_velocity != 1 } { modeling != 1 }" 	    range	{ -2 2 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	} 	parm { 	    name	"radial_component" 	    label	"Radial" 	    type	float 	    default	{ "0" } 	    help	"Add velocity components that diverge or converge from the center." 	    disablewhen	"{ process_velocity != 1 } { modeling != 1 }" 	    range	{ -1 1 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	} 	parm { 	    name	"rotational_component" 	    label	"Rotational" 	    type	float 	    default	{ "0" } 	    help	"Add velocity components that circulate about the input velocity direction." 	    disablewhen	"{ process_velocity != 1 } { modeling != 1 }" 	    range	{ -1 1 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	} 	parm { 	    name	"orthogonal_component" 	    label	"Orthogonal" 	    type	float 	    default	{ "0" } 	    help	"Add velocity components that are orthogonal to the input velocity direction." 	    disablewhen	"{ process_velocity != 1 } { modeling != 1 }" 	    range	{ -1 1 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	} 	parm { 	    name	"scale_components" 	    label	"Scale Radial, Rotational and Orthogonal Components " 	    type	toggle 	    default	{ "on" } 	    help	"Scale radial, rotational and orthogonal components with input velocity magnitude." 	    disablewhen	"{ process_velocity != 1 } { modeling != 1 }" 	    range	{ 0 1 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	} 	parm { 	    name	"velocity_noise" 	    label	"Multiplicative Noise" 	    type	toggle 	    default	{ "off" } 	    disablewhen	"{ process_velocity != 1 } { modeling != 1 }" 	    range	{ 0 1 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	} 	parm { 	    name	"velocity_freq" 	    label	"Frequency" 	    type	float 	    size	3 	    default	{ "0.5" "0.5" "0.5" } 	    disablewhen	"{ process_velocity != 1 } { velocity_noise != 1 } { modeling != 1 }" 	    range	{ 0 10 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	} 	parm { 	    name	"velocity_amp" 	    label	"Amplitude" 	    type	float 	    default	{ "1" } 	    disablewhen	"{ process_velocity != 1 } { velocity_noise != 1 } { modeling != 1 }" 	    range	{ -1 1 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	} 	parm { 	    name	"magnitude_falloff" 	    label	"Magnitude Falloff" 	    type	toggle 	    default	{ "off" } 	    disablewhen	"{ process_velocity != 1 } { modeling != 1 }" 	    range	{ 0 1 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	} 	parm { 	    name	"velocity_falloff" 	    label	"Falloff" 	    type	ramp_flt 	    default	{ "2" } 	    disablewhen	"{ process_velocity != 1 } { magnitude_falloff != 1 } { modeling != 1 }" 	    range	{ 1! 10 } 	    export	none 	    parmtag	{ "parmvop" "1" } 	    parmtag	{ "rampbasis_var" "velocity_falloff_the_basis_strings" } 	    parmtag	{ "rampbasisdefault" "catmull-rom" } 	    parmtag	{ "rampkeys_var" "velocity_falloff_the_key_positions" } 	    parmtag	{ "rampshowcontrolsdefault" "0" } 	    parmtag	{ "rampvalues_var" "velocity_falloff_the_key_values" } 	    parmtag	{ "shaderparmcontexts" "cvex" } 	}     }  ' $arg1
+opparm $arg1  velocity_falloff ( 2 )
+opparm -V 14.0.254 $arg1 pointgroup ( "" ) voxelsize ( 0.10000000000000001 ) createdensity ( on ) compositing ( max ) densityscale ( 1 ) particlescale ( 1 ) solidratio ( 0 ) attributes ( "" ) noiseheading ( ) modeling ( off ) density_folder ( 1 1 ) process_density ( off ) lookup ( 0 ) treatment ( 0 ) amp ( 1 ) excavation ( 0.070000000000000007 ) falloff ( 0.10000000000000001 ) freq ( 1.74 ) rough ( 0.5 ) ocataves ( 2 ) offset ( 0 0 0 ) billowing ( off ) billowingspeed ( 0.10000000000000001 ) swirling ( off ) swirlingspeed ( 0.10000000000000001 ) process_velocity ( off ) velocity_scale ( 1 ) radial_component ( 0 ) rotational_component ( 0 ) orthogonal_component ( 0 ) scale_components ( on ) velocity_noise ( off ) velocity_freq ( 0.5 0.5 0.5 ) velocity_amp ( 1 ) magnitude_falloff ( off ) velocity_falloff ( 2 ) velocity_falloff1pos ( 0.63636362552642822 ) velocity_falloff1value ( 0.95454543828964233 ) velocity_falloff1interp ( catmull-rom ) velocity_falloff2pos ( 1 ) velocity_falloff2value ( 0 ) velocity_falloff2interp ( catmull-rom )
 chlock $arg1 -*
 chautoscope $arg1 -*
 opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 $arg1
@@ -28,18 +28,18 @@ nbsize -w 9.83121 -h 5.57119 apply_billowing_motion
 nbset  -m off apply_billowing_motion
 nbcolor -c 0.8 1 0.8 apply_billowing_motion
 
-# Node density_scale (Vop/bind)
-opadd -e -n bind density_scale
-oplocate -x 19.233899999999998 -y 5.9932499999999997 density_scale
-opspareds "" density_scale
-opparm -V 14.0.254 density_scale parmname ( output ) parmtype ( float ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( on ) exportcontext ( cvex )
-chlock density_scale -*
-chautoscope density_scale -*
-opcolor -c 0.60000002384185791 0.60000002384185791 1 density_scale
-opset -d on -r on -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on density_scale
-opwire -n clamp1 -0 density_scale
-opexprlanguage -s hscript density_scale
-opuserdata -n '___Version___' -v '14.0.254' density_scale
+# Node density_output (Vop/bind)
+opadd -e -n bind density_output
+oplocate -x 26.125800000000002 -y 1.2933399999999999 density_output
+opspareds "" density_output
+opparm -V 14.0.254 density_output parmname ( output ) parmtype ( float ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( whenconnected ) exportcontext ( cvex )
+chlock density_output -*
+chautoscope density_output -*
+opcolor -c 0.60000002384185791 0.60000002384185791 1 density_output
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on density_output
+opwire -n twoway4 -0 density_output
+opexprlanguage -s hscript density_output
+opuserdata -n '___Version___' -v '14.0.254' density_output
 
 # Node Inputs (Vop/subnet)
 opadd -e -n subnet Inputs
@@ -296,6 +296,7 @@ chlock get_ang_attribute -*
 chautoscope get_ang_attribute -*
 opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 get_ang_attribute
 opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on get_ang_attribute
+opwire -n particle_index1 -3 get_ang_attribute
 nbop customize_particle_orientation add get_ang_attribute
 opexprlanguage -s hscript get_ang_attribute
 opuserdata -n '___Version___' -v '' get_ang_attribute
@@ -367,6 +368,7 @@ chlock get_orient_attribute -*
 chautoscope get_orient_attribute -*
 opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 get_orient_attribute
 opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on get_orient_attribute
+opwire -n particle_index1 -3 get_orient_attribute
 nbop customize_particle_orientation add get_orient_attribute
 opexprlanguage -s hscript get_orient_attribute
 opuserdata -n '___Version___' -v '' get_orient_attribute
@@ -395,6 +397,7 @@ chlock get_rot_attribute -*
 chautoscope get_rot_attribute -*
 opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 get_rot_attribute
 opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on get_rot_attribute
+opwire -n particle_index1 -3 get_rot_attribute
 nbop customize_particle_orientation add get_rot_attribute
 opexprlanguage -s hscript get_rot_attribute
 opuserdata -n '___Version___' -v '' get_rot_attribute
@@ -475,11 +478,23 @@ opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e o
 opwire -n rotation3 -0 CP
 opexprlanguage -s hscript CP
 opuserdata -n '___Version___' -v '14.0.254' CP
+
+# Node particle_index1 (Vop/bind)
+opadd -e -n bind particle_index1
+oplocate -x -22.675699999999999 -y 13.854100000000001 particle_index1
+opspareds "" particle_index1
+opparm -V 14.0.254 particle_index1 parmname ( pindex ) parmtype ( int ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex )
+chlock particle_index1 -*
+chautoscope particle_index1 -*
+opcolor -c 0.60000002384185791 0.60000002384185791 1 particle_index1
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on particle_index1
+opexprlanguage -s hscript particle_index1
+opuserdata -n '___Version___' -v '14.0.254' particle_index1
 opcf ..
 
 # Node divide1 (Vop/divide)
 opadd -e -n divide divide1
-oplocate -x -21.139087677001953 -y 8.2904300689697266 divide1
+oplocate -x -21.139099999999999 -y 8.2904300000000006 divide1
 opspareds "" divide1
 opparm -V 14.0.254 divide1
 chlock divide1 -*
@@ -493,7 +508,7 @@ opuserdata -n '___Version___' -v '14.0.254' divide1
 
 # Node direction (Vop/normalize)
 opadd -e -n normalize direction
-oplocate -x -17.750411987304688 -y 7.5322451591491699 direction
+oplocate -x -17.750399999999999 -y 7.5322500000000003 direction
 opspareds "" direction
 opparm direction signature ( default ) vec ( 1 0 0 ) vec_p ( 1 0 0 ) vec_v ( 1 0 0 ) vec_v4 ( 0 0 0 1 ) vec_un ( 1 0 0 ) vec_up ( 1 0 0 ) vec_uv ( 1 0 0 )
 chlock direction -*
@@ -593,7 +608,7 @@ opuserdata -n '___Version___' -v '' clamp1
 opadd -e -n parameter Excavation
 oplocate -x 3.9055900000000001 -y 5.2791499999999996 Excavation
 opspareds "" Excavation
-opparm -V 14.0.254 Excavation parmscope ( shaderparm ) parmaccess ( "" ) parmname ( excavation ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( Excavation ) showlabel ( on ) parmtype ( float ) parmtypename ( "" ) floatdef ( 0.070000000000000007 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( "" ) hidewhen ( "" ) callback ( "" ) help ( "" )
+opparm -V 14.0.254 Excavation parmscope ( shaderparm ) parmaccess ( "" ) parmname ( excavation ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( Excavation ) showlabel ( on ) parmtype ( float ) parmtypename ( "" ) floatdef ( 0.070000000000000007 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ process_density != 1 } { modeling != 1 } { createdensity != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( "" )
 chlock Excavation -*
 chautoscope Excavation -*
 opcolor -c 1 1 0.40000000596046448 Excavation
@@ -620,7 +635,7 @@ opuserdata -n '___Version___' -v '' fit1
 opadd -e -n parameter Falloff
 oplocate -x 4.3218800000000002 -y 4.2399199999999997 Falloff
 opspareds "" Falloff
-opparm -V 14.0.254 Falloff parmscope ( shaderparm ) parmaccess ( "" ) parmname ( falloff ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( Falloff ) showlabel ( on ) parmtype ( float ) parmtypename ( "" ) floatdef ( 0.10000000000000001 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( "" ) hidewhen ( "" ) callback ( "" ) help ( "" )
+opparm -V 14.0.254 Falloff parmscope ( shaderparm ) parmaccess ( "" ) parmname ( falloff ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( Falloff ) showlabel ( on ) parmtype ( float ) parmtypename ( "" ) floatdef ( 0.10000000000000001 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ process_density != 1 } { modeling != 1 } { createdensity != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( "" )
 chlock Falloff -*
 chautoscope Falloff -*
 opcolor -c 1 1 0.40000000596046448 Falloff
@@ -715,7 +730,7 @@ opuserdata -n '___Version___' -v '14.0.254' noise_value
 opadd -e -n parameter Noise_Treatment
 oplocate -x 0.43536200000000003 -y 8.8107299999999995 Noise_Treatment
 opspareds "" Noise_Treatment
-opparm -V 14.0.254 Noise_Treatment parmscope ( shaderparm ) parmaccess ( "" ) parmname ( treatment ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( 'Noise Treatment' ) showlabel ( on ) parmtype ( int ) parmtypename ( "" ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( on ) menuchoices ( '0 "Abs" 1 "1 - Abs" 2 "Clamp"' ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( "" ) hidewhen ( "" ) callback ( "" ) help ( "" )
+opparm -V 14.0.254 Noise_Treatment parmscope ( shaderparm ) parmaccess ( "" ) parmname ( treatment ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( 'Noise Treatment' ) showlabel ( on ) parmtype ( int ) parmtypename ( "" ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( on ) menuchoices ( '0 "Abs" 1 "1 - Abs" 2 "Clamp"' ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ process_density != 1 } { modeling != 1 } { createdensity != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( "" )
 chlock Noise_Treatment -*
 chautoscope Noise_Treatment -*
 opcolor -c 1 1 0.40000000596046448 Noise_Treatment
@@ -742,9 +757,9 @@ opuserdata -n '___Version___' -v '14.0.254' 3d_pos
 
 # Node Noise_Lookup (Vop/parameter)
 opadd -e -n parameter Noise_Lookup
-oplocate -x -18.146059036254883 -y 10.654242515563965 Noise_Lookup
+oplocate -x -18.146100000000001 -y 10.654199999999999 Noise_Lookup
 opspareds "" Noise_Lookup
-opparm -V 14.0.254 Noise_Lookup parmscope ( shaderparm ) parmaccess ( "" ) parmname ( lookup ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( 'Noise Lookup' ) showlabel ( on ) parmtype ( int ) parmtypename ( "" ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( on ) menuchoices ( '0 "Displacement" 1 "World Space" 2 "Local Space" 3 "Unit Space"' ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( "" ) hidewhen ( "" ) callback ( "" ) help ( "" )
+opparm -V 14.0.254 Noise_Lookup parmscope ( shaderparm ) parmaccess ( "" ) parmname ( lookup ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( 'Noise Lookup' ) showlabel ( on ) parmtype ( int ) parmtypename ( "" ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( on ) menuchoices ( '0 "Displacement" 1 "World Space" 2 "Local Space" 3 "Unit Space"' ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ process_density != 1 } { modeling != 1 } { createdensity != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( "" )
 chlock Noise_Lookup -*
 chautoscope Noise_Lookup -*
 opcolor -c 1 1 0.40000000596046448 Noise_Lookup
@@ -756,7 +771,7 @@ opuserdata -n '___Version___' -v '14.0.254' Noise_Lookup
 opadd -e -n parameter Frequency
 oplocate -x -17.312799999999999 -y 2.9494899999999999 Frequency
 opspareds "" Frequency
-opparm -V 14.0.254 Frequency parmscope ( shaderparm ) parmaccess ( "" ) parmname ( freq ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( Frequency ) showlabel ( on ) parmtype ( float ) parmtypename ( "" ) floatdef ( 1.74 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( "" ) hidewhen ( "" ) callback ( "" ) help ( "" )
+opparm -V 14.0.254 Frequency parmscope ( shaderparm ) parmaccess ( "" ) parmname ( freq ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( Frequency ) showlabel ( on ) parmtype ( float ) parmtypename ( "" ) floatdef ( 1.74 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ process_density != 1 } { modeling != 1 } { createdensity != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( "" )
 chlock Frequency -*
 chautoscope Frequency -*
 opcolor -c 1 1 0.40000000596046448 Frequency
@@ -781,9 +796,9 @@ opuserdata -n '___Version___' -v '' 3d_frequency
 
 # Node Roughness (Vop/parameter)
 opadd -e -n parameter Roughness
-oplocate -x -13.04542350769043 -y 0.4955751895904541 Roughness
+oplocate -x -13.045400000000001 -y 0.49557499999999999 Roughness
 opspareds "" Roughness
-opparm -V 14.0.254 Roughness parmscope ( shaderparm ) parmaccess ( "" ) parmname ( rough ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( Roughness ) showlabel ( on ) parmtype ( float ) parmtypename ( "" ) floatdef ( 0.5 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( "" ) hidewhen ( "" ) callback ( "" ) help ( "" )
+opparm -V 14.0.254 Roughness parmscope ( shaderparm ) parmaccess ( "" ) parmname ( rough ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( Roughness ) showlabel ( on ) parmtype ( float ) parmtypename ( "" ) floatdef ( 0.5 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ process_density != 1 } { modeling != 1 } { createdensity != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( "" )
 chlock Roughness -*
 chautoscope Roughness -*
 opcolor -c 1 1 0.40000000596046448 Roughness
@@ -793,9 +808,9 @@ opuserdata -n '___Version___' -v '14.0.254' Roughness
 
 # Node Ocataves (Vop/parameter)
 opadd -e -n parameter Ocataves
-oplocate -x -11.501758575439453 -y -0.22595334053039551 Ocataves
+oplocate -x -11.501799999999999 -y -0.22595299999999999 Ocataves
 opspareds "" Ocataves
-opparm -V 14.0.254 Ocataves parmscope ( shaderparm ) parmaccess ( "" ) parmname ( ocataves ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( Ocataves ) showlabel ( on ) parmtype ( int ) parmtypename ( "" ) floatdef ( 1.74 ) intdef ( 2 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( "" ) hidewhen ( "" ) callback ( "" ) help ( "" )
+opparm -V 14.0.254 Ocataves parmscope ( shaderparm ) parmaccess ( "" ) parmname ( ocataves ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( Ocataves ) showlabel ( on ) parmtype ( int ) parmtypename ( "" ) floatdef ( 1.74 ) intdef ( 2 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ process_density != 1 } { modeling != 1 } { createdensity != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( "" )
 chlock Ocataves -*
 chautoscope Ocataves -*
 opcolor -c 1 1 0.40000000596046448 Ocataves
@@ -807,7 +822,7 @@ opuserdata -n '___Version___' -v '14.0.254' Ocataves
 opadd -e -n parameter Offset
 oplocate -x -15.4032 -y 6.5237400000000001 Offset
 opspareds "" Offset
-opparm -V 14.0.254 Offset parmscope ( shaderparm ) parmaccess ( "" ) parmname ( offset ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( Offset ) showlabel ( on ) parmtype ( vector ) parmtypename ( "" ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( "" ) hidewhen ( "" ) callback ( "" ) help ( "" )
+opparm -V 14.0.254 Offset parmscope ( shaderparm ) parmaccess ( "" ) parmname ( offset ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( Offset ) showlabel ( on ) parmtype ( vector ) parmtypename ( "" ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ process_density != 1 } { modeling != 1 } { createdensity != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( "" )
 chlock Offset -*
 chautoscope Offset -*
 opcolor -c 1 1 0.40000000596046448 Offset
@@ -819,7 +834,7 @@ opuserdata -n '___Version___' -v '14.0.254' Offset
 opadd -e -n parameter Billowing_Speed
 oplocate -x -34.326599999999999 -y 5.0532000000000004 Billowing_Speed
 opspareds "" Billowing_Speed
-opparm -V 14.0.254 Billowing_Speed parmscope ( shaderparm ) parmaccess ( "" ) parmname ( billowingspeed ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( 'Billowing Speed' ) showlabel ( on ) parmtype ( float ) parmtypename ( "" ) floatdef ( 0.10000000000000001 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ billowing != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( "" )
+opparm -V 14.0.254 Billowing_Speed parmscope ( shaderparm ) parmaccess ( "" ) parmname ( billowingspeed ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( 'Billowing Speed' ) showlabel ( on ) parmtype ( float ) parmtypename ( "" ) floatdef ( 0.10000000000000001 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ billowing != 1 } { process_density != 1 } { modeling != 1 } { createdensity != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( "" )
 chlock Billowing_Speed -*
 chautoscope Billowing_Speed -*
 opcolor -c 0.80000001192092896 1 0.80000001192092896 Billowing_Speed
@@ -986,7 +1001,7 @@ opuserdata -n '___Version___' -v '' 4d_pos
 opadd -e -n parameter Billowing_Motion
 oplocate -x -26.450500000000002 -y 12.151199999999999 Billowing_Motion
 opspareds "" Billowing_Motion
-opparm -V 14.0.254 Billowing_Motion parmscope ( shaderparm ) parmaccess ( "" ) parmname ( billowing ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( 'Billowing Motion' ) showlabel ( on ) parmtype ( toggle ) parmtypename ( "" ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( "" ) hidewhen ( "" ) callback ( "" ) help ( "" )
+opparm -V 14.0.254 Billowing_Motion parmscope ( shaderparm ) parmaccess ( "" ) parmname ( billowing ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( 'Billowing Motion' ) showlabel ( on ) parmtype ( toggle ) parmtypename ( "" ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ process_density != 1 } { modeling != 1 } { createdensity != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( "" )
 chlock Billowing_Motion -*
 chautoscope Billowing_Motion -*
 opcolor -c 1 1 0.40000000596046448 Billowing_Motion
@@ -998,7 +1013,7 @@ opuserdata -n '___Version___' -v '14.0.254' Billowing_Motion
 opadd -e -n parameter Swirling_Motion
 oplocate -x -6.8648800000000003 -y 8.6094399999999993 Swirling_Motion
 opspareds "" Swirling_Motion
-opparm -V 14.0.254 Swirling_Motion parmscope ( shaderparm ) parmaccess ( "" ) parmname ( swirling ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( 'Swirling Motion' ) showlabel ( on ) parmtype ( toggle ) parmtypename ( "" ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( "" ) hidewhen ( "" ) callback ( "" ) help ( "" )
+opparm -V 14.0.254 Swirling_Motion parmscope ( shaderparm ) parmaccess ( "" ) parmname ( swirling ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( 'Swirling Motion' ) showlabel ( on ) parmtype ( toggle ) parmtypename ( "" ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ process_density != 1 } { modeling != 1 } { createdensity != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( "" )
 chlock Swirling_Motion -*
 chautoscope Swirling_Motion -*
 opcolor -c 1 1 0.40000000596046448 Swirling_Motion
@@ -1010,7 +1025,7 @@ opuserdata -n '___Version___' -v '14.0.254' Swirling_Motion
 opadd -e -n parameter Swirling_Speed
 oplocate -x -22.192499999999999 -y 4.6841600000000003 Swirling_Speed
 opspareds "" Swirling_Speed
-opparm -V 14.0.254 Swirling_Speed parmscope ( shaderparm ) parmaccess ( "" ) parmname ( swirlingspeed ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( 'Swirling Speed' ) showlabel ( on ) parmtype ( float ) parmtypename ( "" ) floatdef ( 0.10000000000000001 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ billowing != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( "" )
+opparm -V 14.0.254 Swirling_Speed parmscope ( shaderparm ) parmaccess ( "" ) parmname ( swirlingspeed ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( 'Swirling Speed' ) showlabel ( on ) parmtype ( float ) parmtypename ( "" ) floatdef ( 0.10000000000000001 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ swirling != 1 } { process_density != 1 } { modeling != 1 } { createdensity != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( "" )
 chlock Swirling_Speed -*
 chautoscope Swirling_Speed -*
 opcolor -c 1 1 0.40000000596046448 Swirling_Speed
@@ -1067,7 +1082,7 @@ opuserdata -n '___Version___' -v '' noise_val
 
 # Node add2 (Vop/add)
 opadd -e -n add add2
-oplocate -x -21.989009857177734 -y 11.118959426879883 add2
+oplocate -x -21.989000000000001 -y 11.119 add2
 opspareds "" add2
 opparm -V 14.0.254 add2
 chlock add2 -*
@@ -1081,18 +1096,669 @@ opuserdata -n '___Version___' -v '14.0.254' add2
 
 # Node Amplitude (Vop/parameter)
 opadd -e -n parameter Amplitude
-oplocate -x -14.204265594482422 -y 1.6479486227035522 Amplitude
+oplocate -x -14.2043 -y 1.64795 Amplitude
 opspareds "" Amplitude
-opparm -V 14.0.254 Amplitude parmscope ( shaderparm ) parmaccess ( "" ) parmname ( amp ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( Amplitude ) showlabel ( on ) parmtype ( float ) parmtypename ( "" ) floatdef ( 1 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( "" ) hidewhen ( "" ) callback ( "" ) help ( "" )
+opparm -V 14.0.254 Amplitude parmscope ( shaderparm ) parmaccess ( "" ) parmname ( amp ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( Amplitude ) showlabel ( on ) parmtype ( float ) parmtypename ( "" ) floatdef ( 1 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ process_density != 1 } { modeling != 1 } { createdensity != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( "" )
 chlock Amplitude -*
 chautoscope Amplitude -*
 opcolor -c 1 1 0.40000000596046448 Amplitude
 opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on Amplitude
 opexprlanguage -s hscript Amplitude
 opuserdata -n '___Version___' -v '14.0.254' Amplitude
+
+# Node get_v (Vop/getattrib)
+opadd -e -n getattrib get_v
+oplocate -x -18.477699999999999 -y -7.1693800000000003 get_v
+opspareds "" get_v
+opparm get_v signature ( default ) opinput ( opinput:0 ) file ( '$HH/geo/defgeo.bgeo' ) atype ( point ) attrib ( v ) i1 ( 0 ) i2 ( 0 )
+chlock get_v -*
+chautoscope get_v -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 get_v
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on get_v
+opwire -n particle_index1 -3 get_v
+opexprlanguage -s hscript get_v
+opuserdata -n '___Version___' -v '' get_v
+
+# Node velocity_direction (Vop/normalize)
+opadd -e -n normalize velocity_direction
+oplocate -x -15.551600000000001 -y -9.4965100000000007 velocity_direction
+opspareds "" velocity_direction
+opparm velocity_direction signature ( default ) vec ( 1 0 0 ) vec_p ( 1 0 0 ) vec_v ( 1 0 0 ) vec_v4 ( 0 0 0 1 ) vec_un ( 1 0 0 ) vec_up ( 1 0 0 ) vec_uv ( 1 0 0 )
+chlock velocity_direction -*
+chautoscope velocity_direction -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 velocity_direction
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on velocity_direction
+opwire -n -o 1 get_v -0 velocity_direction
+opexprlanguage -s hscript velocity_direction
+opuserdata -n '___Version___' -v '' velocity_direction
+
+# Node voxel_pos (Vop/bind)
+opadd -e -n bind voxel_pos
+oplocate -x -22.834399999999999 -y -9.53749 voxel_pos
+opspareds "" voxel_pos
+opparm -V 14.0.254 voxel_pos parmname ( voxelpos ) parmtype ( float3 ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex )
+chlock voxel_pos -*
+chautoscope voxel_pos -*
+opcolor -c 0.60000002384185791 0.60000002384185791 1 voxel_pos
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on voxel_pos
+opexprlanguage -s hscript voxel_pos
+opuserdata -n '___Version___' -v '14.0.254' voxel_pos
+
+# Node particle_center (Vop/bind)
+opadd -e -n bind particle_center
+oplocate -x -23.430199999999999 -y -11.233700000000001 particle_center
+opspareds "" particle_center
+opparm -V 14.0.254 particle_center parmname ( pcenter ) parmtype ( vector ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex )
+chlock particle_center -*
+chautoscope particle_center -*
+opcolor -c 0.60000002384185791 0.60000002384185791 1 particle_center
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on particle_center
+opexprlanguage -s hscript particle_center
+opuserdata -n '___Version___' -v '14.0.254' particle_center
+
+# Node local_pos (Vop/subtract)
+opadd -e -n subtract local_pos
+oplocate -x -20.295300000000001 -y -10.3446 local_pos
+opspareds "" local_pos
+opparm -V 14.0.254 local_pos
+chlock local_pos -*
+chautoscope local_pos -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 local_pos
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on local_pos
+opwire -n voxel_pos -0 local_pos
+opwire -n particle_center -1 local_pos
+opexprlanguage -s hscript local_pos
+opuserdata -n '___Version___' -v '14.0.254' local_pos
+
+# Node particle_index1 (Vop/bind)
+opadd -e -n bind particle_index1
+oplocate -x -20.946400000000001 -y -6.7457799999999999 particle_index1
+opspareds "" particle_index1
+opparm -V 14.0.254 particle_index1 parmname ( pindex ) parmtype ( int ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex )
+chlock particle_index1 -*
+chautoscope particle_index1 -*
+opcolor -c 0.60000002384185791 0.60000002384185791 1 particle_index1
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on particle_index1
+opexprlanguage -s hscript particle_index1
+opuserdata -n '___Version___' -v '14.0.254' particle_index1
+
+# Node cross2 (Vop/cross)
+opadd -e -n cross cross2
+oplocate -x -9.2041400000000007 -y -9.7846499999999992 cross2
+opspareds "" cross2
+opparm cross2 signature ( default ) vec1 ( 1 0 0 ) vec2 ( 0 1 0 )
+chlock cross2 -*
+chautoscope cross2 -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 cross2
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on cross2
+opwire -n velocity_direction -0 cross2
+opwire -n normalize4 -1 cross2
+opexprlanguage -s hscript cross2
+opuserdata -n '___Version___' -v '' cross2
+
+# Node normalize4 (Vop/normalize)
+opadd -e -n normalize normalize4
+oplocate -x -16.188800000000001 -y -11.6378 normalize4
+opspareds "" normalize4
+opparm normalize4 signature ( default ) vec ( 1 0 0 ) vec_p ( 1 0 0 ) vec_v ( 1 0 0 ) vec_v4 ( 0 0 0 1 ) vec_un ( 1 0 0 ) vec_up ( 1 0 0 ) vec_uv ( 1 0 0 )
+chlock normalize4 -*
+chautoscope normalize4 -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 normalize4
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on normalize4
+opwire -n local_pos -0 normalize4
+opexprlanguage -s hscript normalize4
+opuserdata -n '___Version___' -v '' normalize4
+
+# Node normalize5 (Vop/normalize)
+opadd -e -n normalize normalize5
+oplocate -x -6.6486299999999998 -y -9.64344 normalize5
+opspareds "" normalize5
+opparm normalize5 signature ( default ) vec ( 1 0 0 ) vec_p ( 1 0 0 ) vec_v ( 1 0 0 ) vec_v4 ( 0 0 0 1 ) vec_un ( 1 0 0 ) vec_up ( 1 0 0 ) vec_uv ( 1 0 0 )
+chlock normalize5 -*
+chautoscope normalize5 -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 normalize5
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on normalize5
+opwire -n cross2 -0 normalize5
+opexprlanguage -s hscript normalize5
+opuserdata -n '___Version___' -v '' normalize5
+
+# Node dot1 (Vop/dot)
+opadd -e -n dot dot1
+oplocate -x -11.9146 -y -13.1912 dot1
+opspareds "" dot1
+opparm dot1 signature ( default ) vec1 ( 1 0 0 ) vec2 ( 0 1 0 ) vec1_c ( 1 0 0 ) vec2_c ( 0 1 0 ) vec1_uv ( 1 0 0 ) vec2_uv ( 0 1 0 ) vec1_uc ( 1 0 0 ) vec2_uc ( 0 1 0 )
+chlock dot1 -*
+chautoscope dot1 -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 dot1
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on dot1
+opwire -n velocity_direction -0 dot1
+opwire -n normalize4 -1 dot1
+opexprlanguage -s hscript dot1
+opuserdata -n '___Version___' -v '' dot1
+
+# Node multiply9 (Vop/multiply)
+opadd -e -n multiply multiply9
+oplocate -x -9.5316299999999998 -y -12.164999999999999 multiply9
+opspareds "" multiply9
+opparm -V 14.0.254 multiply9
+chlock multiply9 -*
+chautoscope multiply9 -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 multiply9
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on multiply9
+opwire -n velocity_direction -0 multiply9
+opwire -n dot1 -1 multiply9
+opexprlanguage -s hscript multiply9
+opuserdata -n '___Version___' -v '14.0.254' multiply9
+
+# Node subtract3 (Vop/subtract)
+opadd -e -n subtract subtract3
+oplocate -x -7.4253499999999999 -y -11.278499999999999 subtract3
+opspareds "" subtract3
+opparm -V 14.0.254 subtract3
+chlock subtract3 -*
+chautoscope subtract3 -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 subtract3
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on subtract3
+opwire -n normalize4 -0 subtract3
+opwire -n multiply9 -1 subtract3
+opexprlanguage -s hscript subtract3
+opuserdata -n '___Version___' -v '14.0.254' subtract3
+
+# Node normalize6 (Vop/normalize)
+opadd -e -n normalize normalize6
+oplocate -x -5.5822500000000002 -y -11.670299999999999 normalize6
+opspareds "" normalize6
+opparm normalize6 signature ( default ) vec ( 1 0 0 ) vec_p ( 1 0 0 ) vec_v ( 1 0 0 ) vec_v4 ( 0 0 0 1 ) vec_un ( 1 0 0 ) vec_up ( 1 0 0 ) vec_uv ( 1 0 0 )
+chlock normalize6 -*
+chautoscope normalize6 -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 normalize6
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on normalize6
+opwire -n subtract3 -0 normalize6
+opexprlanguage -s hscript normalize6
+opuserdata -n '___Version___' -v '' normalize6
+
+# Node new_velocity (Vop/add)
+opadd -e -n add new_velocity
+oplocate -x 8.8963800000000006 -y -9.1233299999999993 new_velocity
+opspareds "" new_velocity
+opparm -V 14.0.254 new_velocity
+chlock new_velocity -*
+chautoscope new_velocity -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 new_velocity
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on new_velocity
+opwire -n multiply_velocity -0 new_velocity
+opwire -n twoway1 -1 new_velocity
+opexprlanguage -s hscript new_velocity
+opuserdata -n '___Version___' -v '14.0.254' new_velocity
+
+# Node multiply_velocity (Vop/multiply)
+opadd -e -n multiply multiply_velocity
+oplocate -x 5.4260700000000002 -y -6.8869800000000003 multiply_velocity
+opspareds "" multiply_velocity
+opparm -V 14.0.254 multiply_velocity
+chlock multiply_velocity -*
+chautoscope multiply_velocity -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 multiply_velocity
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on multiply_velocity
+opwire -n -o 1 get_v -0 multiply_velocity
+opwire -n velocity_scale -1 multiply_velocity
+opexprlanguage -s hscript multiply_velocity
+opuserdata -n '___Version___' -v '14.0.254' multiply_velocity
+
+# Node velocity_scale (Vop/parameter)
+opadd -e -n parameter velocity_scale
+oplocate -x 2.9033199999999999 -y -7.4203799999999998 velocity_scale
+opspareds "" velocity_scale
+opparm -V 14.0.254 velocity_scale parmscope ( shaderparm ) parmaccess ( "" ) parmname ( velocity_scale ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( 'Velocity Scale' ) showlabel ( on ) parmtype ( float ) parmtypename ( "" ) floatdef ( 1 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( -2 2 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ process_velocity != 1 } { modeling != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( 'Scale the input velocity' )
+chlock velocity_scale -*
+chautoscope velocity_scale -*
+opcolor -c 1 1 0.40000000596046448 velocity_scale
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on velocity_scale
+opexprlanguage -s hscript velocity_scale
+opuserdata -n '___Version___' -v '14.0.254' velocity_scale
+
+# Node rotational_component (Vop/parameter)
+opadd -e -n parameter rotational_component
+oplocate -x -4.9459099999999996 -y -10.5966 rotational_component
+opspareds "" rotational_component
+opparm -V 14.0.254 rotational_component parmscope ( shaderparm ) parmaccess ( "" ) parmname ( rotational_component ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( Rotational ) showlabel ( on ) parmtype ( float ) parmtypename ( "" ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( -1 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ process_velocity != 1 } { modeling != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( 'Add velocity components that circulate about the input velocity direction.' )
+chlock rotational_component -*
+chautoscope rotational_component -*
+opcolor -c 1 1 0.40000000596046448 rotational_component
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on rotational_component
+opexprlanguage -s hscript rotational_component
+opuserdata -n '___Version___' -v '14.0.254' rotational_component
+
+# Node orthogonal_component (Vop/parameter)
+opadd -e -n parameter orthogonal_component
+oplocate -x -4.9473700000000003 -y -13.135300000000001 orthogonal_component
+opspareds "" orthogonal_component
+opparm -V 14.0.254 orthogonal_component parmscope ( shaderparm ) parmaccess ( "" ) parmname ( orthogonal_component ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( Orthogonal ) showlabel ( on ) parmtype ( float ) parmtypename ( "" ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( -1 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ process_velocity != 1 } { modeling != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( 'Add velocity components that are orthogonal to the input velocity direction.' )
+chlock orthogonal_component -*
+chautoscope orthogonal_component -*
+opcolor -c 1 1 0.40000000596046448 orthogonal_component
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on orthogonal_component
+opexprlanguage -s hscript orthogonal_component
+opuserdata -n '___Version___' -v '14.0.254' orthogonal_component
+
+# Node multiply6 (Vop/multiply)
+opadd -e -n multiply multiply6
+oplocate -x -2.68804 -y -9.9258400000000009 multiply6
+opspareds "" multiply6
+opparm -V 14.0.254 multiply6
+chlock multiply6 -*
+chautoscope multiply6 -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 multiply6
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on multiply6
+opwire -n normalize5 -0 multiply6
+opwire -n rotational_component -1 multiply6
+opexprlanguage -s hscript multiply6
+opuserdata -n '___Version___' -v '14.0.254' multiply6
+
+# Node multiply10 (Vop/multiply)
+opadd -e -n multiply multiply10
+oplocate -x -2.6898 -y -11.9527 multiply10
+opspareds "" multiply10
+opparm -V 14.0.254 multiply10
+chlock multiply10 -*
+chautoscope multiply10 -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 multiply10
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on multiply10
+opwire -n normalize6 -0 multiply10
+opwire -n orthogonal_component -1 multiply10
+opexprlanguage -s hscript multiply10
+opuserdata -n '___Version___' -v '14.0.254' multiply10
+
+# Node v_falloff (Vop/rampparm)
+opadd -e -n rampparm v_falloff
+oplocate -x -1.8596999999999999 -y -18.358499999999999 v_falloff
+opspareds "" v_falloff
+opparm -V 14.0.254 v_falloff parmscope ( shaderparm ) parmaccess ( "" ) parmname ( velocity_falloff ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( Falloff ) ramptype ( flt ) rampcolortype ( rgb ) rampbasisdefault ( catmull-rom ) separator1 ( ) useasparmdefiner ( off ) separator2 ( ) rampshowcontrolsdefault ( off ) disablewhen ( '{ process_velocity != 1 } { magnitude_falloff != 1 } { modeling != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( "" )
+chlock v_falloff -*
+chautoscope v_falloff -*
+opcolor -c 1 1 0.40000000596046448 v_falloff
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on v_falloff
+opwire -n fit2 -0 v_falloff
+opexprlanguage -s hscript v_falloff
+opuserdata -n '___Version___' -v '14.0.254' v_falloff
+
+# Node length2 (Vop/length)
+opadd -e -n length length2
+oplocate -x -9.5434900000000003 -y -16.484500000000001 length2
+opspareds "" length2
+opparm length2 signature ( default ) vec ( 1 1 1 ) vec_p ( 1 1 1 ) vec_n ( 1 1 1 ) vec_v4 ( 1 1 1 1 ) vec_uv ( 1 1 1 ) vec_up ( 1 1 1 ) vec_un ( 1 1 1 )
+chlock length2 -*
+chautoscope length2 -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 length2
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on length2
+opwire -n local_pos -0 length2
+opexprlanguage -s hscript length2
+opuserdata -n '___Version___' -v '' length2
+
+# Node v_noise (Vop/aanoise)
+opadd -e -n aanoise v_noise
+oplocate -x -10.529400000000001 -y -20.1218 v_noise
+opspareds "" v_noise
+chblockbegin
+chadd -t 0 0 v_noise freq1
+chkey -t 0 -v 1 -m 0 -a 0 -A 0 -T a  -F 'ch(\'../v_freq/float3def1\')' v_noise/freq1
+chadd -t 0 0 v_noise freq2
+chkey -t 0 -v 1 -m 0 -a 0 -A 0 -T a  -F 'ch(\'../v_freq/float3def2\')' v_noise/freq2
+chadd -t 0 0 v_noise freq3
+chkey -t 0 -v 1 -m 0 -a 0 -A 0 -T a  -F 'ch(\'../v_freq/float3def3\')' v_noise/freq3
+chadd -t 0 0 v_noise offset1
+chkey -t 0 -v 0 -m 0 -a 0 -A 0 -T a  -F 'ch(\'../offset2/pointdef1\')' v_noise/offset1
+chadd -t 0 0 v_noise offset2
+chkey -t 0 -v 0 -m 0 -a 0 -A 0 -T a  -F 'ch(\'../offset2/pointdef2\')' v_noise/offset2
+chadd -t 0 0 v_noise offset3
+chkey -t 0 -v 0 -m 0 -a 0 -A 0 -T a  -F 'ch(\'../offset2/pointdef3\')' v_noise/offset3
+chadd -t 0 0 v_noise amp
+chkey -t 0 -v 1 -m 0 -a 0 -A 0 -T a  -F 'ch(\'../v_amp/floatdef\')' v_noise/amp
+chblockend
+opparm v_noise signature ( default ) pos_ff ( 0 ) pos ( 0 0 0 ) pos_fp ( 0 0 0 0 ) freq_ff ( 1 ) freq ( freq1 freq2 freq3 ) freq_fp ( 1 1 1 1 ) offset_ff ( 0 ) offset ( offset1 offset2 offset3 ) offset_fp ( 0 0 0 0 ) amp ( amp ) rough ( 0.5 ) maxoctave ( 8 ) noisetype ( noise )
+chlock v_noise -*
+chautoscope v_noise -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 v_noise
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on v_noise
+opwire -n local_pos -0 v_noise
+opwire -n v_freq -1 v_noise
+opwire -n inttovec1 -2 v_noise
+opwire -n v_amp -3 v_noise
+opexprlanguage -s hscript v_noise
+opuserdata -n '___Version___' -v '' v_noise
+
+# Node particle_radius (Vop/bind)
+opadd -e -n bind particle_radius
+oplocate -x -9.6593099999999996 -y -17.616499999999998 particle_radius
+opspareds "" particle_radius
+opparm -V 14.0.254 particle_radius parmname ( pradius ) parmtype ( float ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex )
+chlock particle_radius -*
+chautoscope particle_radius -*
+opcolor -c 0.60000002384185791 0.60000002384185791 1 particle_radius
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on particle_radius
+opexprlanguage -s hscript particle_radius
+opuserdata -n '___Version___' -v '14.0.254' particle_radius
+
+# Node fit2 (Vop/fit)
+opadd -e -n fit fit2
+oplocate -x -7.3133600000000003 -y -17.049299999999999 fit2
+opspareds "" fit2
+opparm fit2 signature ( default ) srcmin ( 0 ) srcmax ( 1 ) destmin ( 0 ) destmax ( 1 ) srcmin_v ( 0 0 0 ) srcmax_v ( 1 1 1 ) destmin_v ( 0 0 0 ) destmax_v ( 1 1 1 ) srcmin_p ( 0 0 0 ) srcmax_p ( 1 1 1 ) destmin_p ( 0 0 0 ) destmax_p ( 1 1 1 ) srcmin_n ( 0 0 0 ) srcmax_n ( 1 1 1 ) destmin_n ( 0 0 0 ) destmax_n ( 1 1 1 ) srcmin_c ( 0 0 0 ) srcmax_c ( 1 1 1 ) destmin_c ( 0 0 0 ) destmax_c ( 1 1 1 ) srcmin_v4 ( 0 0 0 0 ) srcmax_v4 ( 1 1 1 1 ) destmin_v4 ( 0 0 0 0 ) destmax_v4 ( 1 1 1 1 ) srcmin_uf ( 0 ) srcmax_uf ( 1 ) destmin_uf ( 0 ) destmax_uf ( 1 ) srcmin_uv ( 0 0 0 ) srcmax_uv ( 1 1 1 ) destmin_uv ( 0 0 0 ) destmax_uv ( 1 1 1 ) srcmin_up ( 0 0 0 ) srcmax_up ( 1 1 1 ) destmin_up ( 0 0 0 ) destmax_up ( 1 1 1 ) srcmin_un ( 0 0 0 ) srcmax_un ( 1 1 1 ) destmin_un ( 0 0 0 ) destmax_un ( 1 1 1 ) srcmin_uc ( 0 0 0 ) srcmax_uc ( 1 1 1 ) destmin_uc ( 0 0 0 ) destmax_uc ( 1 1 1 )
+chlock fit2 -*
+chautoscope fit2 -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 fit2
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on fit2
+opwire -n length2 -0 fit2
+opwire -n particle_radius -2 fit2
+opexprlanguage -s hscript fit2
+opuserdata -n '___Version___' -v '' fit2
+
+# Node fit3 (Vop/fit)
+opadd -e -n fit fit3
+oplocate -x 0.412609 -y -21.6983 fit3
+opspareds "" fit3
+opparm fit3 signature ( default ) srcmin ( -0.5 ) srcmax ( 0.5 ) destmin ( 0 ) destmax ( 1.5 ) srcmin_v ( 0 0 0 ) srcmax_v ( 1 1 1 ) destmin_v ( 0 0 0 ) destmax_v ( 1 1 1 ) srcmin_p ( 0 0 0 ) srcmax_p ( 1 1 1 ) destmin_p ( 0 0 0 ) destmax_p ( 1 1 1 ) srcmin_n ( 0 0 0 ) srcmax_n ( 1 1 1 ) destmin_n ( 0 0 0 ) destmax_n ( 1 1 1 ) srcmin_c ( 0 0 0 ) srcmax_c ( 1 1 1 ) destmin_c ( 0 0 0 ) destmax_c ( 1 1 1 ) srcmin_v4 ( 0 0 0 0 ) srcmax_v4 ( 1 1 1 1 ) destmin_v4 ( 0 0 0 0 ) destmax_v4 ( 1 1 1 1 ) srcmin_uf ( 0 ) srcmax_uf ( 1 ) destmin_uf ( 0 ) destmax_uf ( 1 ) srcmin_uv ( 0 0 0 ) srcmax_uv ( 1 1 1 ) destmin_uv ( 0 0 0 ) destmax_uv ( 1 1 1 ) srcmin_up ( 0 0 0 ) srcmax_up ( 1 1 1 ) destmin_up ( 0 0 0 ) destmax_up ( 1 1 1 ) srcmin_un ( 0 0 0 ) srcmax_un ( 1 1 1 ) destmin_un ( 0 0 0 ) destmax_un ( 1 1 1 ) srcmin_uc ( 0 0 0 ) srcmax_uc ( 1 1 1 ) destmin_uc ( 0 0 0 ) destmax_uc ( 1 1 1 )
+chlock fit3 -*
+chautoscope fit3 -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 fit3
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on fit3
+opwire -n v_noise -0 fit3
+opexprlanguage -s hscript fit3
+opuserdata -n '___Version___' -v '' fit3
+
+# Node multiply4 (Vop/multiply)
+opadd -e -n multiply multiply4
+oplocate -x 14.512 -y -9.6923899999999996 multiply4
+opspareds "" multiply4
+opparm -V 14.0.254 multiply4
+chlock multiply4 -*
+chautoscope multiply4 -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 multiply4
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on multiply4
+opwire -n new_velocity -0 multiply4
+opwire -n twoway2 -1 multiply4
+opwire -n twoway3 -2 multiply4
+opexprlanguage -s hscript multiply4
+opuserdata -n '___Version___' -v '14.0.254' multiply4
+
+# Node twoway2 (Vop/twoway)
+opadd -e -n twoway twoway2
+oplocate -x 1.7657400000000001 -y -17.934899999999999 twoway2
+opspareds "" twoway2
+opparm twoway2 signature ( default ) condtype ( 0 ) input2 ( 1 ) input2_i ( 0 ) input2_s ( "" ) input2_v ( 0 0 0 ) input2_p ( 0 0 0 ) input2_n ( 0 0 0 ) input2_c ( 1 1 1 ) input2_v4 ( 0 0 0 0 ) input2_m3 ( 1 0 0 0 1 0 0 0 1 ) input2_m ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) input2_uf ( 0 ) input2_uv ( 0 0 0 ) input2_up ( 0 0 0 ) input2_un ( 0 0 0 ) input2_uc ( 0 0 0 ) input2_um ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 )
+chlock twoway2 -*
+chautoscope twoway2 -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 twoway2
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on twoway2
+opwire -n magnitude_falloff -0 twoway2
+opwire -n v_falloff -1 twoway2
+opexprlanguage -s hscript twoway2
+opuserdata -n '___Version___' -v '' twoway2
+
+# Node magnitude_falloff (Vop/parameter)
+opadd -e -n parameter magnitude_falloff
+oplocate -x -0.52105699999999999 -y -16.3323 magnitude_falloff
+opspareds "" magnitude_falloff
+opparm -V 14.0.254 magnitude_falloff parmscope ( shaderparm ) parmaccess ( "" ) parmname ( magnitude_falloff ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( 'Magnitude Falloff' ) showlabel ( on ) parmtype ( toggle ) parmtypename ( "" ) floatdef ( 0 ) intdef ( 1 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ process_velocity != 1 } { modeling != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( "" )
+chlock magnitude_falloff -*
+chautoscope magnitude_falloff -*
+opcolor -c 1 1 0.40000000596046448 magnitude_falloff
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on magnitude_falloff
+opexprlanguage -s hscript magnitude_falloff
+opuserdata -n '___Version___' -v '14.0.254' magnitude_falloff
+
+# Node twoway3 (Vop/twoway)
+opadd -e -n twoway twoway3
+oplocate -x 2.60581 -y -20.634 twoway3
+opspareds "" twoway3
+opparm twoway3 signature ( default ) condtype ( 0 ) input2 ( 1 ) input2_i ( 0 ) input2_s ( "" ) input2_v ( 0 0 0 ) input2_p ( 0 0 0 ) input2_n ( 0 0 0 ) input2_c ( 1 1 1 ) input2_v4 ( 0 0 0 0 ) input2_m3 ( 1 0 0 0 1 0 0 0 1 ) input2_m ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) input2_uf ( 0 ) input2_uv ( 0 0 0 ) input2_up ( 0 0 0 ) input2_un ( 0 0 0 ) input2_uc ( 0 0 0 ) input2_um ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 )
+chlock twoway3 -*
+chautoscope twoway3 -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 twoway3
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on twoway3
+opwire -n velocity_noise -0 twoway3
+opwire -n fit3 -1 twoway3
+opexprlanguage -s hscript twoway3
+opuserdata -n '___Version___' -v '' twoway3
+
+# Node velocity_noise (Vop/parameter)
+opadd -e -n parameter velocity_noise
+oplocate -x 0.49780799999999997 -y -20.012499999999999 velocity_noise
+opspareds "" velocity_noise
+opparm -V 14.0.254 velocity_noise parmscope ( shaderparm ) parmaccess ( "" ) parmname ( velocity_noise ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( 'Multiplicative Noise' ) showlabel ( on ) parmtype ( toggle ) parmtypename ( "" ) floatdef ( 0 ) intdef ( 1 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ process_velocity != 1 } { modeling != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( "" )
+chlock velocity_noise -*
+chautoscope velocity_noise -*
+opcolor -c 1 1 0.40000000596046448 velocity_noise
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on velocity_noise
+opexprlanguage -s hscript velocity_noise
+opuserdata -n '___Version___' -v '14.0.254' velocity_noise
+
+# Node v_freq (Vop/parameter)
+opadd -e -n parameter v_freq
+oplocate -x -14.1884 -y -19.073899999999998 v_freq
+opspareds "" v_freq
+opparm -V 14.0.254 v_freq parmscope ( shaderparm ) parmaccess ( "" ) parmname ( velocity_freq ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( Frequency ) showlabel ( on ) parmtype ( float3 ) parmtypename ( "" ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0.5 0.5 0.5 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ process_velocity != 1 } { velocity_noise != 1 } { modeling != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( "" )
+chlock v_freq -*
+chautoscope v_freq -*
+opcolor -c 1 1 0.40000000596046448 v_freq
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on v_freq
+opexprlanguage -s hscript v_freq
+opuserdata -n '___Version___' -v '14.0.254' v_freq
+
+# Node v_amp (Vop/parameter)
+opadd -e -n parameter v_amp
+oplocate -x -14.1106 -y -20.877700000000001 v_amp
+opspareds "" v_amp
+opparm -V 14.0.254 v_amp parmscope ( shaderparm ) parmaccess ( "" ) parmname ( velocity_amp ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( Amplitude ) showlabel ( on ) parmtype ( float ) parmtypename ( "" ) floatdef ( 1 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( -1 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ process_velocity != 1 } { velocity_noise != 1 } { modeling != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( "" )
+chlock v_amp -*
+chautoscope v_amp -*
+opcolor -c 1 1 0.40000000596046448 v_amp
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on v_amp
+opexprlanguage -s hscript v_amp
+opuserdata -n '___Version___' -v '14.0.254' v_amp
+
+# Node particle_index2 (Vop/bind)
+opadd -e -n bind particle_index2
+oplocate -x -17.847100000000001 -y -19.855899999999998 particle_index2
+opspareds "" particle_index2
+opparm -V 14.0.254 particle_index2 parmname ( pindex ) parmtype ( int ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex )
+chlock particle_index2 -*
+chautoscope particle_index2 -*
+opcolor -c 0.60000002384185791 0.60000002384185791 1 particle_index2
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on particle_index2
+opexprlanguage -s hscript particle_index2
+opuserdata -n '___Version___' -v '14.0.254' particle_index2
+
+# Node inttovec1 (Vop/inttovec)
+opadd -e -n inttovec inttovec1
+oplocate -x -15.618600000000001 -y -19.9971 inttovec1
+opspareds "" inttovec1
+opparm inttovec1 int1 ( 0 ) int2 ( 0 ) int3 ( 0 )
+chlock inttovec1 -*
+chautoscope inttovec1 -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 inttovec1
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on inttovec1
+opwire -n particle_index2 -1 inttovec1
+opexprlanguage -s hscript inttovec1
+opuserdata -n '___Version___' -v '' inttovec1
+
+# Node velocity_output (Vop/bind)
+opadd -e -n bind velocity_output
+oplocate -x 26.219999999999999 -y -2.5619900000000002 velocity_output
+opspareds "" velocity_output
+opparm -V 14.0.254 velocity_output parmname ( v ) parmtype ( float3 ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) useasparmdefiner ( on ) parmuniform ( on ) usebound ( off ) exportparm ( whenconnected ) exportcontext ( cvex )
+chlock velocity_output -*
+chautoscope velocity_output -*
+opcolor -c 0.60000002384185791 0.60000002384185791 1 velocity_output
+opset -d on -r on -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on velocity_output
+opwire -n twoway5 -0 velocity_output
+opexprlanguage -s hscript velocity_output
+opuserdata -n '___Version___' -v '14.0.254' velocity_output
+
+# Node twoway4 (Vop/twoway)
+opadd -e -n twoway twoway4
+oplocate -x 18.808199999999999 -y 6.9044400000000001 twoway4
+opspareds "" twoway4
+opparm twoway4 signature ( default ) condtype ( 0 ) input2 ( 1 ) input2_i ( 0 ) input2_s ( "" ) input2_v ( 0 0 0 ) input2_p ( 0 0 0 ) input2_n ( 0 0 0 ) input2_c ( 1 1 1 ) input2_v4 ( 0 0 0 0 ) input2_m3 ( 1 0 0 0 1 0 0 0 1 ) input2_m ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) input2_uf ( 0 ) input2_uv ( 0 0 0 ) input2_up ( 0 0 0 ) input2_un ( 0 0 0 ) input2_uc ( 0 0 0 ) input2_um ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 )
+chlock twoway4 -*
+chautoscope twoway4 -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 twoway4
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on twoway4
+opwire -n process_density -0 twoway4
+opwire -n clamp1 -1 twoway4
+opexprlanguage -s hscript twoway4
+opuserdata -n '___Version___' -v '' twoway4
+
+# Node process_density (Vop/parameter)
+opadd -e -n parameter process_density
+oplocate -x 16.707599999999999 -y 7.8435600000000001 process_density
+opspareds "" process_density
+opparm -V 14.0.254 process_density parmscope ( shaderparm ) parmaccess ( "" ) parmname ( process_density ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( 'Process Density' ) showlabel ( on ) parmtype ( toggle ) parmtypename ( "" ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ modeling != 1 } { createdensity != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( "" )
+chlock process_density -*
+chautoscope process_density -*
+opcolor -c 1 1 0.40000000596046448 process_density
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on process_density
+opexprlanguage -s hscript process_density
+opuserdata -n '___Version___' -v '14.0.254' process_density
+
+# Node twoway5 (Vop/twoway)
+opadd -e -n twoway twoway5
+oplocate -x 17.350000000000001 -y -8.1232799999999994 twoway5
+opspareds "" twoway5
+opparm twoway5 signature ( v ) condtype ( 0 ) input2 ( 1 ) input2_i ( 0 ) input2_s ( "" ) input2_v ( 0 0 0 ) input2_p ( 0 0 0 ) input2_n ( 0 0 0 ) input2_c ( 1 1 1 ) input2_v4 ( 0 0 0 0 ) input2_m3 ( 1 0 0 0 1 0 0 0 1 ) input2_m ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) input2_uf ( 0 ) input2_uv ( 0 0 0 ) input2_up ( 0 0 0 ) input2_un ( 0 0 0 ) input2_uc ( 0 0 0 ) input2_um ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 )
+chlock twoway5 -*
+chautoscope twoway5 -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 twoway5
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on twoway5
+opwire -n process_velocity -0 twoway5
+opwire -n multiply4 -1 twoway5
+opwire -n -o 1 get_v -2 twoway5
+opexprlanguage -s hscript twoway5
+opuserdata -n '___Version___' -v '' twoway5
+
+# Node process_velocity (Vop/parameter)
+opadd -e -n parameter process_velocity
+oplocate -x 15.2494 -y -7.1841699999999999 process_velocity
+opspareds "" process_velocity
+opparm -V 14.0.254 process_velocity parmscope ( shaderparm ) parmaccess ( "" ) parmname ( process_velocity ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( 'Process Velocity' ) showlabel ( on ) parmtype ( toggle ) parmtypename ( "" ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( 0 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ modeling != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( "" )
+chlock process_velocity -*
+chautoscope process_velocity -*
+opcolor -c 1 1 0.40000000596046448 process_velocity
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on process_velocity
+opexprlanguage -s hscript process_velocity
+opuserdata -n '___Version___' -v '14.0.254' process_velocity
+
+# Node radial_component (Vop/parameter)
+opadd -e -n parameter radial_component
+oplocate -x -4.8677099999999998 -y -15.0085 radial_component
+opspareds "" radial_component
+opparm -V 14.0.254 radial_component parmscope ( shaderparm ) parmaccess ( "" ) parmname ( radial_component ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( Radial ) showlabel ( on ) parmtype ( float ) parmtypename ( "" ) floatdef ( 0 ) intdef ( 0 ) toggledef ( off ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( -1 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ process_velocity != 1 } { modeling != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( 'Add velocity components that diverge or converge from the center.' )
+chlock radial_component -*
+chautoscope radial_component -*
+opcolor -c 1 1 0.40000000596046448 radial_component
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on radial_component
+opexprlanguage -s hscript radial_component
+opuserdata -n '___Version___' -v '14.0.254' radial_component
+
+# Node multiply11 (Vop/multiply)
+opadd -e -n multiply multiply11
+oplocate -x -2.5985200000000002 -y -14.122299999999999 multiply11
+opspareds "" multiply11
+opparm -V 14.0.254 multiply11
+chlock multiply11 -*
+chautoscope multiply11 -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 multiply11
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on multiply11
+opwire -n normalize4 -0 multiply11
+opwire -n radial_component -1 multiply11
+opexprlanguage -s hscript multiply11
+opuserdata -n '___Version___' -v '14.0.254' multiply11
+
+# Node new_velocity_components (Vop/add)
+opadd -e -n add new_velocity_components
+oplocate -x 0.20522299999999999 -y -12.4038 new_velocity_components
+opspareds "" new_velocity_components
+opparm -V 14.0.254 new_velocity_components
+chlock new_velocity_components -*
+chautoscope new_velocity_components -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 new_velocity_components
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on new_velocity_components
+opwire -n multiply6 -0 new_velocity_components
+opwire -n multiply10 -1 new_velocity_components
+opwire -n multiply11 -2 new_velocity_components
+opexprlanguage -s hscript new_velocity_components
+opuserdata -n '___Version___' -v '14.0.254' new_velocity_components
+
+# Node scale_components (Vop/parameter)
+opadd -e -n parameter scale_components
+oplocate -x 2.6542500000000002 -y -9.0706399999999991 scale_components
+opspareds "" scale_components
+opparm -V 14.0.254 scale_components parmscope ( shaderparm ) parmaccess ( "" ) parmname ( scale_components ) parmprefix ( "" ) parmpostfix ( "" ) parmlabel ( 'Scale Radial, Rotational and Orthogonal Components ' ) showlabel ( on ) parmtype ( toggle ) parmtypename ( "" ) floatdef ( 0 ) intdef ( 0 ) toggledef ( on ) angledef ( 0 ) logfloatdef ( 0 ) float2def ( 0 0 ) float3def ( 0 0 0 ) vectordef ( 0 0 0 ) normaldef ( 0 0 0 ) pointdef ( 0 0 0 ) directiondef ( 1 0 0 ) float4def ( 0 0 0 0 ) floatm2def ( 1 0 0 1 ) float9def ( 1 0 0 0 1 0 0 0 1 ) float16def ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) stringdef ( "" ) filedef ( "" ) imagedef ( "" ) geometrydef ( "" ) colordef ( 0 0 0 ) color4def ( 0 0 0 0 ) coshaderdef ( "" ) floatadef ( ) intadef ( ) vector2adef ( ) vectoradef ( ) float4adef ( ) floatm2adef ( ) float9adef ( ) float16adef ( ) stringadef ( ) coshaderadef ( "" ) structdef ( "" ) rangeflt ( -1 1 ) rangeint ( 0 10 ) stringtype ( off ) opfilter ( !!OBJ/LIGHT!! ) parmcomment ( "" ) separator1 ( ) useasparmdefiner ( off ) parmuniform ( on ) usebound ( off ) exportparm ( off ) exportcontext ( cvex ) providemenu ( off ) menuchoices ( "" ) separator2 ( ) invisible ( off ) joinnext ( off ) disablewhen ( '{ process_velocity != 1 } { modeling != 1 }' ) hidewhen ( "" ) callback ( "" ) help ( 'Scale radial, rotational and orthogonal components with input velocity magnitude.' )
+chlock scale_components -*
+chautoscope scale_components -*
+opcolor -c 1 1 0.40000000596046448 scale_components
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on scale_components
+opexprlanguage -s hscript scale_components
+opuserdata -n '___Version___' -v '14.0.254' scale_components
+
+# Node length3 (Vop/length)
+opadd -e -n length length3
+oplocate -x -1.6192599999999999 -y -8.5905100000000001 length3
+opspareds "" length3
+opparm length3 signature ( default ) vec ( 1 1 1 ) vec_p ( 1 1 1 ) vec_n ( 1 1 1 ) vec_v4 ( 1 1 1 1 ) vec_uv ( 1 1 1 ) vec_up ( 1 1 1 ) vec_un ( 1 1 1 )
+chlock length3 -*
+chautoscope length3 -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 length3
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on length3
+opwire -n -o 1 get_v -0 length3
+opexprlanguage -s hscript length3
+opuserdata -n '___Version___' -v '' length3
+
+# Node twoway1 (Vop/twoway)
+opadd -e -n twoway twoway1
+oplocate -x 5.3993900000000004 -y -10.4575 twoway1
+opspareds "" twoway1
+opparm twoway1 signature ( v ) condtype ( 0 ) input2 ( 0 ) input2_i ( 0 ) input2_s ( "" ) input2_v ( 0 0 0 ) input2_p ( 0 0 0 ) input2_n ( 0 0 0 ) input2_c ( 1 1 1 ) input2_v4 ( 0 0 0 0 ) input2_m3 ( 1 0 0 0 1 0 0 0 1 ) input2_m ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 ) input2_uf ( 0 ) input2_uv ( 0 0 0 ) input2_up ( 0 0 0 ) input2_un ( 0 0 0 ) input2_uc ( 0 0 0 ) input2_um ( 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 )
+chlock twoway1 -*
+chautoscope twoway1 -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 twoway1
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on twoway1
+opwire -n scale_components -0 twoway1
+opwire -n multiply7 -1 twoway1
+opwire -n new_velocity_components -2 twoway1
+opexprlanguage -s hscript twoway1
+opuserdata -n '___Version___' -v '' twoway1
+
+# Node multiply7 (Vop/multiply)
+opadd -e -n multiply multiply7
+oplocate -x 2.3395700000000001 -y -10.4575 multiply7
+opspareds "" multiply7
+opparm -V 14.0.254 multiply7
+chlock multiply7 -*
+chautoscope multiply7 -*
+opcolor -c 0.80000001192092896 0.80000001192092896 0.80000001192092896 multiply7
+opset -d off -r off -h off -f off -y off -t off -l off -s off -u off -c off -e on -b off -L off -M off -H on multiply7
+opwire -n new_velocity_components -0 multiply7
+opwire -n length3 -1 multiply7
+opexprlanguage -s hscript multiply7
+opuserdata -n '___Version___' -v '14.0.254' multiply7
 opcf Inputs
-oporder -e voxel_pos voxel_size particle_center particle_radius particle_index Frame Time TimeInc suboutput1 subinput1 length1 split spherical_coord atan1 divide1 trig1 get_ang_attribute quaternion1 qrotate1 subtract1 P get_orient_attribute qrotate2 get_rot_attribute qrotate3 rotation1 rotation2 rotation3 CP
+oporder -e voxel_pos voxel_size particle_center particle_radius particle_index Frame Time TimeInc suboutput1 subinput1 length1 split spherical_coord atan1 divide1 trig1 get_ang_attribute quaternion1 qrotate1 subtract1 P get_orient_attribute qrotate2 get_rot_attribute qrotate3 rotation1 rotation2 rotation3 CP particle_index1 
 opcf ..
-oporder -e density_scale Inputs divide1 direction 3d_noise abs1 pow1 length1 subtract1 clamp1 Excavation fit1 Falloff scale_falloff negate_falloff min_clamp_falloff complement1 clamp2 noise_value Noise_Treatment 3d_pos Noise_Lookup Frequency 3d_frequency Roughness Ocataves Offset Billowing_Speed multiply1 switch1 vectofloat1 normalize_theta normalize_phi add1 frompolar1 4d_offset 4d_frequency 4d_pos Billowing_Motion Swirling_Motion Swirling_Speed multiply2 4d_noise noise_val add2 Amplitude
+
+# Sticky Note modify_any_point_attribute
+
+python -c 'hou.pwd().createStickyNote("modify_any_point_attribute")'
+
+python -c 'hou.pwd().findStickyNote("modify_any_point_attribute").setColor(hou.Color([1, 0.969, 0.522]))'
+
+python -c 'hou.pwd().findStickyNote("modify_any_point_attribute").setText("All output grids can be modified using VEX. ")'
+
+python -c 'hou.pwd().findStickyNote("modify_any_point_attribute").setPosition(hou.Vector2(28.5342, -1.28699))'
+
+python -c 'hou.pwd().findStickyNote("modify_any_point_attribute").setSize(hou.Vector2(2.71573, 2.2475))'
+
+python -c 'hou.pwd().findStickyNote("modify_any_point_attribute").setMinimized(False)'
+oporder -e density_output Inputs divide1 direction 3d_noise abs1 pow1 length1 subtract1 clamp1 Excavation fit1 Falloff scale_falloff negate_falloff min_clamp_falloff complement1 clamp2 noise_value Noise_Treatment 3d_pos Noise_Lookup Frequency 3d_frequency Roughness Ocataves Offset Billowing_Speed multiply1 switch1 vectofloat1 normalize_theta normalize_phi add1 frompolar1 4d_offset 4d_frequency 4d_pos Billowing_Motion Swirling_Motion Swirling_Speed multiply2 4d_noise noise_val add2 Amplitude get_v velocity_direction voxel_pos particle_center local_pos particle_index1 cross2 normalize4 normalize5 dot1 multiply9 subtract3 normalize6 new_velocity multiply_velocity velocity_scale rotational_component orthogonal_component multiply6 multiply10 v_falloff length2 v_noise particle_radius fit2 fit3 multiply4 twoway2 magnitude_falloff twoway3 velocity_noise v_freq v_amp particle_index2 inttovec1 velocity_output twoway4 process_density twoway5 process_velocity radial_component multiply11 new_velocity_components scale_components length3 twoway1 multiply7 
 
 opcf ..

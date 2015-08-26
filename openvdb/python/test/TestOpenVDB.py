@@ -230,7 +230,7 @@ class TestOpenVDB(unittest.TestCase):
 
         grid.prune(tolerance=0.2)
         self.assertEqual(grid.activeVoxelCount(), activeCount)
-        self.assertEqual(acc.getValue(ijk), 2)
+        self.assertEqual(acc.getValue(ijk), 2.0625) # = (2 + 2.125)/2
         self.assert_(acc.isValueOn(ijk))
         self.assert_(grid.leafCount() < leafCount)
 
