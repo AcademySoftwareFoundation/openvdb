@@ -146,36 +146,44 @@ public:
         : BaseLeaf()
         , mAttributeSet(new AttributeSet) { }
 
-    /// Construct using supplied origin
-    explicit PointDataLeafNode(const Coord& coords)
-        : BaseLeaf(coords)
-        , mAttributeSet(new AttributeSet) { }
+    ~PointDataLeafNode() { }
 
     /// Construct using deep copy of other PointDataLeafNode
     explicit PointDataLeafNode(const PointDataLeafNode& other)
         : BaseLeaf(other)
         , mAttributeSet(new AttributeSet(*other.mAttributeSet)) { }
 
+    /// Construct using supplied origin, value and active status
+    explicit
+    PointDataLeafNode(const Coord& coords, const T& value = zeroVal<T>(), bool active = false)
+        : BaseLeaf(coords, value, active)
+        , mAttributeSet(new AttributeSet) { }
+
+    /// Construct using supplied origin, value and active status
+    /// use attribute map from another PointDataLeafNode
+    PointDataLeafNode(const PointDataLeafNode& other, const Coord& coords, const T& value = zeroVal<T>(), bool active = false)
+        : BaseLeaf(coords, value, active)
+        , mAttributeSet(new AttributeSet(*other.mAttributeSet)) { }
+
     // Copy-construct from a PointIndexLeafNode with the same configuration but a different ValueType.
     template<typename OtherValueType>
     PointDataLeafNode(const tools::PointIndexLeafNode<OtherValueType, Log2Dim>& other)
-        : BaseLeaf(other, zeroVal<T>(), TopologyCopy())
+        : BaseLeaf(other)
         , mAttributeSet(new AttributeSet) { }
 
     // Copy-construct from a LeafNode with the same configuration but a different ValueType.
     // Used for topology copies - explicitly sets the value (background) to zeroVal
     template <typename ValueType>
-    PointDataLeafNode(const tree::LeafNode<ValueType, Log2Dim>& other, TopologyCopy)
+    PointDataLeafNode(const tree::LeafNode<ValueType, Log2Dim>& other, const T& value, TopologyCopy)
         : BaseLeaf(other, zeroVal<T>(), TopologyCopy())
         , mAttributeSet(new AttributeSet) { }
 
 #ifndef OPENVDB_2_ABI_COMPATIBLE
-    PointDataLeafNode(PartialCreate, const Coord& coords)
-        : BaseLeaf(PartialCreate(), coords)
+    PointDataLeafNode(PartialCreate, const Coord& coords,
+        const T& value = zeroVal<T>(), bool active = false)
+        : BaseLeaf(PartialCreate(), coords, value, active)
         , mAttributeSet(new AttributeSet) { }
 #endif
-
-    ~PointDataLeafNode() { }
 
 public:
 

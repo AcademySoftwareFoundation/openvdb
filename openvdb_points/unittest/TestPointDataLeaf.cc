@@ -512,7 +512,7 @@ TestPointDataLeaf::testTopologyCopy()
 
         // validate construction of a PointDataLeaf using a TopologyCopy
 
-        LeafType leaf(floatLeaf, openvdb::TopologyCopy());
+        LeafType leaf(floatLeaf, 0, openvdb::TopologyCopy());
 
         CPPUNIT_ASSERT_EQUAL(leaf.onVoxelCount(), Index64(4));
 
