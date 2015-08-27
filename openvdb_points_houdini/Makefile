@@ -82,10 +82,10 @@ OPENVDB_LIB_DIR := $(DESTDIR)/lib
 OPENVDB_LIB := -lopenvdb
 
 # The parent directory of the openvdb_points/ header directory
-OPENVDB_POINTS_INCL_DIR ?= $(DESTDIR)/include
+OPENVDB_POINTS_INCL_DIR := $(DESTDIR)/include
 # The directory containing libopenvdb_points
-OPENVDB_POINTS_LIB_DIR ?= $(DESTDIR)/lib
-OPENVDB_POINTS_LIB ?= -lopenvdb_points
+OPENVDB_POINTS_LIB_DIR := $(DESTDIR)/lib
+OPENVDB_POINTS_LIB :=  -lopenvdb_points
 
 # The parent directory of the boost/ header directory
 BOOST_INCL_DIR := $(HT)/include
@@ -94,9 +94,9 @@ BOOST_LIB_DIR := $(HDSO)
 BOOST_LIB := -lboost_iostreams -lboost_system
 
 # The parent directory of the OpenEXR/ header directory (which contains half.h)
-ILMBASE_INCL_DIR := $(HT)/include
+HALF_INCL_DIR := $(HT)/include
 # The directory containing libHalf
-ILMBASE_LIB_DIR := $(HDSO)
+HALF_LIB_DIR := $(HDSO)
 HALF_LIB := -lHalf
 
 # The parent directory of the tbb/ header directory
@@ -114,10 +114,6 @@ SHELL = /bin/bash
 
 # Turn off implicit rules for speed
 .SUFFIXES:
-
-ifneq (,$(INSTALL_DIR))
-    $(warning Warning: $$(INSTALL_DIR) is no longer used; set $$(DESTDIR) instead.)
-endif
 
 # Determine the platform.
 ifeq ("$(OS)","Windows_NT")
@@ -156,7 +152,7 @@ else
     QUIET := > /dev/null
 endif
 
-INCLDIRS := -I . -I .. -isystem $(BOOST_INCL_DIR) -isystem $(ILMBASE_INCL_DIR) -isystem $(TBB_INCL_DIR)
+INCLDIRS := -I . -I .. -I $(OPENVDB_INCL_DIR) -I $(OPENVDB_POINTS_INCL_DIR) -isystem $(BOOST_INCL_DIR) -isystem $(HALF_INCL_DIR) -isystem $(TBB_INCL_DIR)
 HCUSTOM_INCLDIRS := $(subst isystem,I,$(INCLDIRS))
 
 CXXFLAGS += -pthread $(OPTIMIZE) $(INCLDIRS) -DIGNORE_HDK_DEPRECATIONS
@@ -177,13 +173,15 @@ endif
 
 LIBS := \
     -ldl -lm -lz \
-    -L$(ILMBASE_LIB_DIR) $(HALF_LIB) \
+    -L$(HALF_LIB_DIR) $(HALF_LIB) \
     -L$(TBB_LIB_DIR) $(TBB_LIB) \
     -L$(BOOST_LIB_DIR) $(BOOST_LIB) \
+    -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) \
+    -L$(OPENVDB_POINTS_LIB_DIR) $(OPENVDB_POINTS_LIB) \
 #
 LIBS_RPATH := \
     -ldl -lm -lz \
-    -Wl,-rpath,$(ILMBASE_LIB_DIR) -L$(ILMBASE_LIB_DIR) $(HALF_LIB) \
+    -Wl,-rpath,$(HALF_LIB_DIR) -L$(HALF_LIB_DIR) $(HALF_LIB) \
     -Wl,-rpath,$(TBB_LIB_DIR) -L$(TBB_LIB_DIR) $(TBB_LIB) \
     -Wl,-rpath,$(BOOST_LIB_DIR) -L$(BOOST_LIB_DIR) $(BOOST_LIB) \
 #
@@ -231,10 +229,7 @@ SO_VERSION=$(LIB_MAJOR_VERSION).$(LIB_MINOR_VERSION)
 
 LIBHOUDINI_NAME=libopenvdb_points_houdini
 LIBHOUDINI_STATIC := $(LIBHOUDINI_NAME).a
-LIBHOUDINI_SHARED_NAME := $(LIBHOUDINI_NAME).so
-LIBHOUDINI_SHARED := $(LIBHOUDINI_NAME).so.$(LIB_VERSION)
-LIBHOUDINI_SONAME := $(LIBHOUDINI_NAME).so.$(SO_VERSION)
-LIBHOUDINI_SONAME_FLAGS := -Wl,-soname,$(LIBHOUDINI_SONAME)
+LIBHOUDINI_SHARED := $(LIBHOUDINI_NAME).$(LIB_VERSION).so
 
 ifeq (no,$(strip $(shared)))
     LIBHOUDINI := $(LIBHOUDINI_STATIC)
@@ -246,12 +241,14 @@ else
     # containing libopenvdb.so will need to be added to LD_LIBRARY_PATH.
     ifeq (no,$(strip $(rpath)))
         LIBOPENVDB_RPATH :=
-        LIBOPENVDBPOINTS_RPATH :=
     else
-        LIBOPENVDB_RPATH := -Wl,-rpath,$(OPENVDB_LIB_DIR)
-        LIBOPENVDBPOINTS_RPATH := -Wl,-rpath,$(OPENVDB_POINTS_LIB_DIR)
+        ifdef MBSD
+            LIBOPENVDB_RPATH := -install_name @rpath$(OPENVDB_LIB_DIR) -install_name @rpath$(OPENVDB_POINTS_LIB_DIR)
+        else
+            LIBOPENVDB_RPATH := -Wl,-rpath,$(OPENVDB_LIB_DIR) -Wl,-rpath,$(OPENVDB_POINTS_LIB_DIR)
+        endif
     endif # rpath
-    HCUSTOM_EXTRA_LDFLAGS += $(LIBOPENVDB_RPATH) $(LIBOPENVDBPOINTS_RPATH)
+    HCUSTOM_EXTRA_LDFLAGS += $(LIBOPENVDB_RPATH)
 endif # shared
 
 # Environment variables to pass to hcustom
@@ -286,16 +283,16 @@ ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)$(HCUSTOM_EXTRA_LDFLAGS)))
         ifeq (,$(strip $(HOUDINI_CC)))
             $(error Cannot determine which C++ compiler to use with hcustom; please specify a compiler by setting $$(CXX))
         endif
-        HCUSTOM_EXPORT := HOUDINI_CC='$(HOUDINI_CC) $(HCUSTOM_EXTRA_CFLAGS) $(HCUSTOM_EXTRA_LDFLAGS)'
+        HCUSTOM_EXPORT := HOUDINI_CC='\"$(HOUDINI_CC) $(HCUSTOM_EXTRA_CFLAGS) $(HCUSTOM_EXTRA_LDFLAGS)\"'
     else
-		# From Houdini 13.0.548 and 14.0.105 on, hcustom recognizes
-		# the environment variables HCUSTOM_CFLAGS and HCUSTOM_LDFLAGS.
-		ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)))
-		    HCUSTOM_EXPORT += HCUSTOM_CFLAGS="$(strip $(HCUSTOM_EXTRA_CFLAGS))"
-		endif
-		ifneq (,$(strip $(HCUSTOM_EXTRA_LDFLAGS)))
-		    HCUSTOM_EXPORT += HCUSTOM_LDFLAGS="$(strip $(HCUSTOM_EXTRA_LDFLAGS))"
-		endif
+	# From Houdini 13.0.548 and 14.0.105 on, hcustom recognizes
+	# the environment variables HCUSTOM_CFLAGS and HCUSTOM_LDFLAGS.
+	ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)))
+	    HCUSTOM_EXPORT += HCUSTOM_CFLAGS="$(strip $(HCUSTOM_EXTRA_CFLAGS))"
+	endif
+	ifneq (,$(strip $(HCUSTOM_EXTRA_LDFLAGS)))
+	    HCUSTOM_EXPORT += HCUSTOM_LDFLAGS="$(strip $(HCUSTOM_EXTRA_LDFLAGS))"
+	endif
     endif
 endif
 ifneq (,$(strip $(HCUSTOM_EXPORT)))
@@ -328,15 +325,6 @@ all: depend houdinilib houdinisops
 # to mirror the DWA directory structure.
 openvdb_houdini:
 	ln -f -s houdini openvdb_houdini
-#openvdb_houdini/header1.h openvdb_houdini/header2.h: openvdb_houdini
-
-# Create a houdini_utils/ symlink to the houdini/ subdirectory,
-# to mirror the DWA directory structure.
-houdini_utils:
-	ln -f -s houdini houdini_utils
-#houdini_utils/header1.h houdini_utils/header2.h: houdini_utils
-
-#$(LIBHOUDINI_OBJ_NAMES): houdini_utils/header1.h openvdb_houdini/header1.h
 
 $(LIBHOUDINI_OBJ_NAMES): %.o: %.cc
 	@echo "Building $@ because of $(call list_deps)"
@@ -349,10 +337,7 @@ $(LIBHOUDINI_STATIC): $(LIBHOUDINI_OBJ_NAMES)
 
 $(LIBHOUDINI_SHARED): $(LIBHOUDINI_OBJ_NAMES)
 	@echo "Building $@ because of $(call list_deps)"
-	$(CXX) $(CXXFLAGS) $(HOUDINI_LDFLAGS) -shared -o $@ $^ $(LIBS_RPATH) $(LIBHOUDINI_SONAME_FLAGS)
-
-$(LIBHOUDINI_SONAME): $(LIBHOUDINI_SHARED)
-	ln -f -s $< $@
+	$(CXX) $(CXXFLAGS) $(HOUDINI_LDFLAGS) -shared -o $@ $^ $(LIBS_RPATH)
 
 $(LIBHOUDINI_NAME).so: $(LIBHOUDINI_SHARED)
 	@# hcustom expects a library named "libname.so", not "libname.so.1.0".
@@ -360,7 +345,7 @@ $(LIBHOUDINI_NAME).so: $(LIBHOUDINI_SHARED)
 
 houdinilib: $(LIBHOUDINI)
 ifneq (no,$(strip $(shared)))
-houdinilib: $(LIBHOUDINI_NAME).so $(LIBHOUDINI_SONAME)
+houdinilib: $(LIBHOUDINI_NAME).so
 endif
 
 # hcustom (see below) outputs both a .o and a .so file.
@@ -372,15 +357,13 @@ ifeq (no,$(strip $(shared)))
 $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
 	@echo "Building $(HOUDINI_DESTDIR)/$(@:.o=.so) because of $(call list_deps)"
 	$(HCUSTOM_EXPORT) $(HB)/hcustom $(HCUSTOM_FLAGS) $(HCUSTOM_INCLDIRS) $(LIBS) \
-		-L. -lopenvdb_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) \
-		-lopenvdb_points_houdini -L$(OPENVDB_POINTS_LIB_DIR) $(OPENVDB_POINTS_LIB) $< $(QUIET)
+	        -L. -lopenvdb_houdini -lopenvdb_points_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) -L$(OPENVDB_POINTS_LIB_DIR) $(OPENVDB_POINTS_LIB) $< $(QUIET)
 else
 # Link SOPs against shared OpenVDB libraries.
 $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
 	@echo "Building $(HOUDINI_DESTDIR)/$(@:.o=.so) because of $(call list_deps)"
-	$(HCUSTOM_EXPORT) $(HB)/hcustom $(HCUSTOM_FLAGS) $(HCUSTOM_INCLDIRS) \
-		-L. -lopenvdb_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) \
-		-lopenvdb_points_houdini -L$(OPENVDB_POINTS_LIB_DIR) $(OPENVDB_POINTS_LIB) $< $(QUIET)
+	$(HCUSTOM_EXPORT) $(HB)/hcustom $(HCUSTOM_FLAGS) $(HCUSTOM_INCLDIRS) $(LIBS) \
+	        -L. -lopenvdb_houdini -lopenvdb_points_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) -L$(OPENVDB_POINTS_LIB_DIR) $(OPENVDB_POINTS_LIB) $< $(QUIET)
 endif
 
 $(HOUDINI_SOP_SO_NAMES): $(HOUDINI_DESTDIR)/%.so: houdini/%.o
@@ -397,19 +380,13 @@ install: houdinilib houdinisops
 	mkdir -p $(DESTDIR)/include/houdini_utils
 	@echo "Created $(DESTDIR)/include/houdini_utils"
 	cp -f $(LIBHOUDINI_INCLUDE_NAMES) $(DESTDIR)/include/openvdb_houdini/
-	@# Move headers from openvdb_houdini/ to houdini_utils/.
-	#mv -f $(DESTDIR)/include/openvdb_houdini/header1.h \
-	#    $(DESTDIR)/include/houdini_utils/
-	@echo "Copied header files to $(DESTDIR)/include"
 	@#
 	mkdir -p $(DESTDIR)/lib
 	@echo "Created $(DESTDIR)/lib/"
 	cp -f $(LIBHOUDINI) $(DESTDIR)/lib
 	pushd $(DESTDIR)/lib > /dev/null; \
 	    if [ -f $(LIBHOUDINI_SHARED) ]; then \
-	        ln -f -s $(LIBHOUDINI_SHARED) $(LIBHOUDINI_SHARED_NAME); \
-	        ln -f -s $(LIBHOUDINI_SHARED) $(LIBHOUDINI_SONAME); \
-	    fi; \
+	        ln -f -s $(LIBHOUDINI_SHARED) $(LIBHOUDINI_NAME).so; fi; \
 	    popd > /dev/null
 	@echo "Copied libopenvdb_points_houdini to $(DESTDIR)/lib/"
 
@@ -435,7 +412,7 @@ clean:
 	$(RM) $(HOUDINI_SOP_OBJ_NAMES) $(HOUDINI_SOP_SO_NAMES)
 	$(RM) $(HOUDINI_DESTDIR)/../config/Icons/SOP_OpenVDB.svg
 
-ifneq (,$(strip $(wildcard $(DEPEND))))
+ifneq ($(strip $(wildcard $(DEPEND))),)
     include $(DEPEND)
 endif
 
