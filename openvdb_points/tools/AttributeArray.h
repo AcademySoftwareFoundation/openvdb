@@ -63,6 +63,8 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
+typedef std::pair<Name, Name> NamePair;
+
 
 ////////////////////////////////////////
 
@@ -175,14 +177,14 @@ public:
     virtual size_t memUsage() const = 0;
 
     /// Create a new attribute array of the given (registered) type and length.
-    static Ptr create(const Name& type, size_t length);
+    static Ptr create(const NamePair& type, size_t length);
     /// Return @c true if the given attribute type name is registered.
-    static bool isRegistered(const Name &type);
+    static bool isRegistered(const NamePair& type);
     /// Clear the attribute type registry.
     static void clearRegistry();
 
     /// Return the name of this attribute's type.
-    virtual const Name& type() const = 0;
+    virtual const NamePair& type() const = 0;
     /// Return @c true if this attribute is of the same type as the template parameter.
     template<typename AttributeArrayType>
     bool isType() const { return this->type() == AttributeArrayType::attributeType(); }
@@ -241,9 +243,9 @@ private:
 
 protected:
     /// Register a attribute type along with a factory function.
-    static void registerType(const Name& type, FactoryMethod);
+    static void registerType(const NamePair& type, FactoryMethod);
     /// Remove a attribute type from the registry.
-    static void unregisterType(const Name& type);
+    static void unregisterType(const NamePair& type);
 
     enum { TRANSIENT = 0x1, HIDDEN = 0x2 };
     size_t mCompressedBytes;
@@ -308,10 +310,10 @@ public:
     /// Return a new attribute array of the given length @a n with uniform value zero.
     static Ptr create(size_t n);
 
+    /// Return the name of this attribute's type (includes codec)
+    static const NamePair& attributeType();
     /// Return the name of this attribute's type.
-    static const Name& attributeType();
-    /// Return the name of this attribute's type.
-    virtual const Name& type() const { return attributeType(); }
+    virtual const NamePair& type() const { return attributeType(); }
 
     /// Return @c true if this attribute type is registered.
     static bool isRegistered();
@@ -386,7 +388,7 @@ private:
     /// Helper function for use with registerType()
     static AttributeArray::Ptr factory(size_t n) { return TypedAttributeArray::create(n); }
 
-    static tbb::atomic<const Name*> sTypeName;
+    static tbb::atomic<const NamePair*> sTypeName;
     StorageType*    mData;
     size_t          mSize;
     bool            mIsUniform;
@@ -817,14 +819,14 @@ TypedAttributeArray<ValueType_, Codec_>::operator=(const TypedAttributeArray& rh
 
 
 template<typename ValueType_, typename Codec_>
-inline const Name&
+inline const NamePair&
 TypedAttributeArray<ValueType_, Codec_>::attributeType()
 {
     if (sTypeName == NULL) {
-        std::ostringstream ostr;
-        ostr << typeNameAsString<ValueType>() << "_" << Codec::name()
-             << "_" << typeNameAsString<StorageType>();
-        Name* s = new Name(ostr.str());
+        std::ostringstream ostr1, ostr2;
+        ostr1 << typeNameAsString<ValueType>();
+        ostr2 << Codec::name() << "_" << typeNameAsString<StorageType>();
+        NamePair* s = new NamePair(ostr1.str(), ostr2.str());
         if (sTypeName.compare_and_swap(s, NULL) != NULL) delete s;
     }
     return *sTypeName;

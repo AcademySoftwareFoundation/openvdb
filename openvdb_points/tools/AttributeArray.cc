@@ -50,7 +50,7 @@ namespace tools {
 
 namespace {
 
-typedef std::map<std::string, AttributeArray::FactoryMethod> AttributeFactoryMap;
+typedef std::map<NamePair, AttributeArray::FactoryMethod> AttributeFactoryMap;
 typedef AttributeFactoryMap::const_iterator AttributeFactoryMapCIter;
 
 struct LockedAttributeRegistry
@@ -99,7 +99,7 @@ __pragma(warning(default:1711))
 
 
 AttributeArray::Ptr
-AttributeArray::create(const Name& type, size_t length)
+AttributeArray::create(const NamePair& type, size_t length)
 {
     LockedAttributeRegistry* registry = getAttributeRegistry();
     tbb::spin_mutex::scoped_lock lock(registry->mMutex);
@@ -107,7 +107,7 @@ AttributeArray::create(const Name& type, size_t length)
     AttributeFactoryMapCIter iter = registry->mMap.find(type);
 
     if (iter == registry->mMap.end()) {
-        OPENVDB_THROW(LookupError, "Cannot create attribute of unregistered type " << type);
+        OPENVDB_THROW(LookupError, "Cannot create attribute of unregistered type " << type.first << "_" << type.second);
     }
 
     return (iter->second)(length);
@@ -115,7 +115,7 @@ AttributeArray::create(const Name& type, size_t length)
 
 
 bool
-AttributeArray::isRegistered(const Name &type)
+AttributeArray::isRegistered(const NamePair& type)
 {
     LockedAttributeRegistry* registry = getAttributeRegistry();
     tbb::spin_mutex::scoped_lock lock(registry->mMutex);
@@ -133,7 +133,7 @@ AttributeArray::clearRegistry()
 
 
 void
-AttributeArray::registerType(const Name& type, FactoryMethod factory)
+AttributeArray::registerType(const NamePair& type, FactoryMethod factory)
 {
     LockedAttributeRegistry* registry = getAttributeRegistry();
     tbb::spin_mutex::scoped_lock lock(registry->mMutex);
@@ -144,14 +144,14 @@ AttributeArray::registerType(const Name& type, FactoryMethod factory)
         registry->mMap[type] = factory;
 
     } else if (iter->second != factory) {
-        OPENVDB_THROW(KeyError, "Attribute type " << type
+        OPENVDB_THROW(KeyError, "Attribute type " << type.first << "_" << type.second
             << " is already registered with different factory method.");
     }
 }
 
 
 void
-AttributeArray::unregisterType(const Name& type)
+AttributeArray::unregisterType(const NamePair& type)
 {
     LockedAttributeRegistry* registry = getAttributeRegistry();
     tbb::spin_mutex::scoped_lock lock(registry->mMutex);
