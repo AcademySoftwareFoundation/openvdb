@@ -38,6 +38,7 @@
 
 #include <openvdb/version.h>
 #include <openvdb/Types.h>
+#include <openvdb_points/Types.h>
 #include <openvdb/math/QuantizedUnitVec.h>
 #include <openvdb/util/Name.h>
 #include <openvdb/util/logging.h>

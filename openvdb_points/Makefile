@@ -240,6 +240,7 @@ endif
 INCLUDE_NAMES := \
     tools/AttributeArray.h \
     tools/PointDataGrid.h \
+    Types.h \
     openvdb.h \
 #
 
