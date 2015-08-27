@@ -96,6 +96,94 @@ typedef Grid<PointDataTree> PointDataGrid;
 
 namespace point_masks { enum PointCountMask { Active = 0, Inactive, All }; }
 
+template<typename TreeT>
+struct PointDataAccessor {
+    typedef typename TreeT::ValueType       ValueType;
+    typedef typename TreeT::LeafNodeType    LeafNode;
+    typedef typename TreeT::LeafNodeType::ValueType PointIndexT;
+    typedef typename TreeT::LeafNodeType::ValueTypePair PointDataIndex;
+
+    explicit PointDataAccessor(const TreeT& tree)
+        : mTree(&tree)
+        , mAccessor(tree) { }
+
+    /// @{
+    /// @brief Individual voxel access.
+
+    PointDataIndex get(const Coord& ijk) const;
+
+    /// Returns the number of points at a particular leaf/voxel coordinate. Does
+    /// not take into account the active state of the leaf/voxel
+    Index64 pointCount(const Coord& ijk) const;
+
+    /// Returns the total number of points in the entire tree pointed to by
+    /// this accessor.
+    /// @param mask   a PointCountMask which can be used to only increment the total
+    /// count returned based on the active state of the leaves/voxels. By default,
+    /// returns the total number of points stored in active voxels
+    Index64 totalPointCount(const point_masks::PointCountMask mask = point_masks::Active) const;
+
+    tree::ValueAccessor<const TreeT>& valueAccessor() const { return mAccessor; }
+
+    /// @}
+
+    /// Return a reference to the tree associated with this accessor.
+    const TreeT& tree() const { assert(mTree); return *mTree; }
+
+private:
+    typedef tree::ValueAccessor<const TreeT>  ConstAccessor;
+    const TreeT* mTree;
+    mutable ConstAccessor mAccessor;
+}; // struct PointDataAccessor
+
+// PointDataAccessor implementation
+
+template<typename TreeT>
+inline typename PointDataAccessor<TreeT>::PointDataIndex
+PointDataAccessor<TreeT>::get(const Coord& ijk) const
+{
+    typedef typename TreeT::LeafNodeType::ValueType PointIndexT;
+
+    const LeafNode* leaf = mAccessor.probeConstLeaf(ijk);
+
+    // leaf not active - no particles
+
+    if (!leaf) return std::make_pair(0, 0);
+
+    const unsigned index = LeafNode::coordToOffset(ijk);
+
+    return leaf->pointIndex(index);
+}
+
+
+template<typename TreeT>
+inline Index64
+PointDataAccessor<TreeT>::pointCount(const Coord& ijk) const
+{
+    PointDataIndex index = get(ijk);
+
+    return index.second - index.first;
+}
+
+template<typename TreeT>
+inline Index64
+PointDataAccessor<TreeT>::totalPointCount(const point_masks::PointCountMask mask) const
+{
+    typedef typename TreeT::LeafCIter LeafCIter;
+
+    Index64 count = 0;
+
+    for (LeafCIter iter = mTree->cbeginLeaf(); iter; ++iter) {
+        const LeafNode* leaf = iter.getLeaf();
+
+        Index64 size = leaf->pointCount(mask);
+
+        count += size;
+    }
+
+    return count;
+}
+
 ////////////////////////////////////////
 
 // Internal utility methods

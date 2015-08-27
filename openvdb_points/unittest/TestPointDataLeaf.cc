@@ -51,7 +51,6 @@ public:
     CPPUNIT_TEST(testTopologyCopy);
     CPPUNIT_TEST(testEquivalence);
     CPPUNIT_TEST(testIO);
-    CPPUNIT_TEST(testPointDataAccessor);
     CPPUNIT_TEST_SUITE_END();
 
     void testEmptyLeaf();
@@ -63,7 +62,6 @@ public:
     void testTopologyCopy();
     void testEquivalence();
     void testIO();
-    void testPointDataAccessor();
 
 private:
     // Generate random points by uniformly distributing points
@@ -324,7 +322,37 @@ TestPointDataLeaf::testPointCount()
 {
     using namespace openvdb::tools;
 
+    typedef PointDataAccessor<PointDataTree> Accessor;
+    typedef PointDataAccessor<PointDataTree>::PointDataIndex Index;
+
+    // create a tree and check an accessor returns no data
+
+    PointDataTree tree;
+    Accessor accessor(tree);
+
+    {
+        Index index = accessor.get(openvdb::Coord(0, 0, 0));
+
+        CPPUNIT_ASSERT_EQUAL(int(index.first), 0);
+        CPPUNIT_ASSERT_EQUAL(int(index.second), 0);
+    }
+
+    // add a new leaf to a tree and re-test
+
     LeafType leaf(openvdb::Coord(0, 0, 0));
+
+    tree.addLeaf(leaf);
+
+    {
+        Index index = accessor.get(openvdb::Coord(0, 0, 0));
+
+        CPPUNIT_ASSERT_EQUAL(int(index.first), 0);
+        CPPUNIT_ASSERT_EQUAL(int(index.second), 0);
+
+        CPPUNIT_ASSERT_EQUAL(accessor.pointCount(openvdb::Coord(0, 0, 0)), Index64(0));
+    }
+
+    // now manually set some offsets
 
     leaf.setOffsetOn(0, 4);
     leaf.setOffsetOn(1, 7);
@@ -334,6 +362,30 @@ TestPointDataLeaf::testPointCount()
 
     CPPUNIT_ASSERT_EQUAL(int(leaf.pointIndex(1).first), 4);
     CPPUNIT_ASSERT_EQUAL(int(leaf.pointIndex(1).second), 7);
+
+    {
+        Index index = accessor.get(openvdb::Coord(0, 0, 0));
+
+        CPPUNIT_ASSERT_EQUAL(int(index.first), 0);
+        CPPUNIT_ASSERT_EQUAL(int(index.second), 4);
+
+        CPPUNIT_ASSERT_EQUAL(accessor.pointCount(openvdb::Coord(0, 0, 0)), Index64(4));
+
+        Index index2 = accessor.get(openvdb::Coord(0, 0, 1));
+
+        CPPUNIT_ASSERT_EQUAL(int(index2.first), 4);
+        CPPUNIT_ASSERT_EQUAL(int(index2.second), 7);
+
+        CPPUNIT_ASSERT_EQUAL(accessor.pointCount(openvdb::Coord(0, 0, 1)), Index64(7 - 4));
+
+        // check pointCount ignores active/inactive state
+
+        leaf.setValueOff(1);
+
+        CPPUNIT_ASSERT_EQUAL(accessor.pointCount(openvdb::Coord(0, 0, 1)), Index64(7 - 4));
+
+        leaf.setValueOn(1);
+    }
 
     // one point per voxel
 
@@ -345,6 +397,10 @@ TestPointDataLeaf::testPointCount()
     CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::Active), Index64(LeafType::SIZE - 1));
     CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::Inactive), Index64(0));
 
+    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::All), Index64(LeafType::SIZE - 1));
+    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::Active), Index64(LeafType::SIZE - 1));
+    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::Inactive), Index64(0));
+
     // manually de-activate two voxels
 
     leaf.setValueOff(100);
@@ -353,6 +409,10 @@ TestPointDataLeaf::testPointCount()
     CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::All), Index64(LeafType::SIZE - 1));
     CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::Active), Index64(LeafType::SIZE - 3));
     CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::Inactive), Index64(2));
+
+    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::All), Index64(LeafType::SIZE - 1));
+    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::Active), Index64(LeafType::SIZE - 3));
+    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::Inactive), Index64(2));
 
     // one point per every other voxel and de-activate empty voxels
 
@@ -368,6 +428,29 @@ TestPointDataLeaf::testPointCount()
     CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::All), Index64(LeafType::SIZE / 2));
     CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::Active), Index64(LeafType::SIZE / 2));
     CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::Inactive), Index64(0));
+
+    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::All), Index64(LeafType::SIZE / 2));
+    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::Active), Index64(LeafType::SIZE / 2));
+    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::Inactive), Index64(0));
+
+    // add a new non-empty leaf and check totalPointCount is correct
+
+    LeafType leaf2(openvdb::Coord(0, 0, 8));
+
+    for (int i = 0; i < LeafType::SIZE; i++) {
+        leaf2.setOffsetOn(i, i);
+    }
+
+    tree.addLeaf(leaf2);
+
+    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::All), Index64(LeafType::SIZE / 2 + LeafType::SIZE - 1));
+    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::Active), Index64(LeafType::SIZE / 2 + LeafType::SIZE - 1));
+    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::Inactive), Index64(0));
+
+    // steal the leaf nodes back to recover ownership (and prevent them being deleted twice)
+
+    std::vector<LeafType*> array;
+    tree.stealNodes(array);
 }
 
 
@@ -750,16 +833,6 @@ TestPointDataLeaf::testIO()
     }
 }
 
-
-void
-TestPointDataLeaf::testPointDataAccessor()
-{
-    // get()
-
-    // pointCount()
-
-    // totalPointCount()
-}
 
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestPointDataLeaf);
