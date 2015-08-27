@@ -194,6 +194,7 @@ LIBHOUDINI_INCLUDE_NAMES := \
 	houdini/SOP_NodeVDBPoints.h \
 #
 LIBHOUDINI_SRC_NAMES := \
+	houdini/GR_PrimVDBPoints.cc \
 #
 HOUDINI_SOP_SRC_NAMES := \
 #
