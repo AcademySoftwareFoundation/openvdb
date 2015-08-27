@@ -1748,7 +1748,7 @@ Tree<RootNodeType>::getBackgroundValue() const
     if (Metadata::isRegisteredType(valueType())) {
         typedef TypedMetadata<ValueType> MetadataT;
         result = Metadata::createMetadata(valueType());
-        if (MetadataT* m = dynamic_cast<MetadataT*>(result.get())) {
+        if (MetadataT* m = reinterpret_cast<MetadataT*>(result.get())) {
             m->value() = mRoot.background();
         }
     }

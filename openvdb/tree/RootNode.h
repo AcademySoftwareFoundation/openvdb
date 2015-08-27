@@ -1097,8 +1097,8 @@ struct RootNodeCopyHelper
         self.enforceCompatibleValueTypes(other);
         // One of the above two tests should throw, so we should never get here:
         std::ostringstream ostr;
-        ostr << "cannot convert a " << typeid(OtherRootT).name()
-            << " to a " << typeid(RootT).name();
+        ostr << "cannot convert a " << BOOST_SP_TYPEID(OtherRootT).name()
+            << " to a " << BOOST_SP_TYPEID(RootT).name();
         OPENVDB_THROW(TypeError, ostr.str());
     }
 };
@@ -3144,8 +3144,8 @@ struct RootNodeCombineHelper
         self.enforceCompatibleValueTypes(other1);
         // One of the above two tests should throw, so we should never get here:
         std::ostringstream ostr;
-        ostr << "cannot combine a " << typeid(OtherRootT).name()
-            << " into a " << typeid(RootT).name();
+        ostr << "cannot combine a " << BOOST_SP_TYPEID(OtherRootT).name()
+            << " into a " << BOOST_SP_TYPEID(RootT).name();
         OPENVDB_THROW(TypeError, ostr.str());
     }
 };
