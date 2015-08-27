@@ -191,6 +191,7 @@ ifdef LINUX
 endif
 
 LIBHOUDINI_INCLUDE_NAMES := \
+	houdini/SOP_NodeVDBPoints.h \
 #
 LIBHOUDINI_SRC_NAMES := \
 #
