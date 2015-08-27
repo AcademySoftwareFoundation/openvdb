@@ -506,7 +506,9 @@ SOP_OpenVDB_Filter::cookMySop(OP_Context& context)
 #else
         if (lock.lock(*startNode, context) >= UT_ERROR_ABORT) return error();
 #endif
-        if (startNode->duplicateSourceStealable(0, context) >= UT_ERROR_ABORT) return error();
+
+        // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
+        if (startNode->duplicateSourceStealable(0, context, &gdp, myGdpHandle, /*clean = */ true) >= UT_ERROR_ABORT) return error();
 
         // Get the group of grids to process.
         UT_String groupStr;
