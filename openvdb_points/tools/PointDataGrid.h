@@ -563,7 +563,7 @@ protected:
 
     // During topology-only construction, access is needed
     // to protected/private members of other template instances.
-    template<typename, Index> friend struct PointDataLeafNode;
+    template<typename, Index> friend class PointDataLeafNode;
 
     friend class tree::IteratorBase<MaskOnIterator, PointDataLeafNode>;
     friend class tree::IteratorBase<MaskOffIterator, PointDataLeafNode>;
