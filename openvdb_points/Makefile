@@ -239,6 +239,7 @@ endif
 
 INCLUDE_NAMES := \
     tools/AttributeArray.h \
+    tools/AttributeSet.h \
     tools/PointDataGrid.h \
     Types.h \
     openvdb.h \
@@ -246,6 +247,7 @@ INCLUDE_NAMES := \
 
 SRC_NAMES := \
     tools/AttributeArray.cc \
+    tools/AttributeSet.cc \
     openvdb.cc \
 #
 
@@ -255,6 +257,7 @@ UNITTEST_INCLUDE_NAMES := \
 UNITTEST_SRC_NAMES := \
     unittest/main.cc \
     unittest/TestAttributeArray.cc \
+    unittest/TestAttributeSet.cc \
     unittest/TestPointDataLeaf.cc \
 #
 

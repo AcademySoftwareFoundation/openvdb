@@ -52,6 +52,7 @@
 #include <openvdb/tools/PointIndexGrid.h>
 
 #include <openvdb_points/tools/AttributeArray.h>
+#include <openvdb_points/tools/AttributeSet.h>
 
 #include <utility> // std::pair, std::make_pair
 #include <map>

@@ -117,6 +117,16 @@ using openvdb::Index64;
 namespace {
 
 bool
+matchingNamePairs(const openvdb::tools::NamePair& lhs,
+                  const openvdb::tools::NamePair& rhs)
+{
+    if (lhs.first != rhs.first)     return false;
+    if (lhs.second != rhs.second)     return false;
+
+    return true;
+}
+
+bool
 zeroLeafValues(const LeafType* leafNode)
 {
     const LeafType::ValueType* data = leafNode->buffer().data();
@@ -443,25 +453,25 @@ TestPointDataLeaf::testAttributes()
 
     // test leaf can be successfully cast to TypedAttributeArray and check types
 
-    CPPUNIT_ASSERT_EQUAL(leaf.typedAttributeArray<AttributeS>(/*pos=*/0).type(),
-                         AttributeS::attributeType());
-    CPPUNIT_ASSERT_EQUAL(leaf.typedAttributeArray<AttributeS>("density").type(),
-                         AttributeS::attributeType());
-    CPPUNIT_ASSERT_EQUAL(leaf.typedAttributeArray<AttributeI>(/*pos=*/1).type(),
-                         AttributeI::attributeType());
-    CPPUNIT_ASSERT_EQUAL(leaf.typedAttributeArray<AttributeI>("id").type(),
-                         AttributeI::attributeType());
+    CPPUNIT_ASSERT(matchingNamePairs(leaf.typedAttributeArray<AttributeS>(/*pos=*/0).type(),
+                         AttributeS::attributeType()));
+    CPPUNIT_ASSERT(matchingNamePairs(leaf.typedAttributeArray<AttributeS>("density").type(),
+                         AttributeS::attributeType()));
+    CPPUNIT_ASSERT(matchingNamePairs(leaf.typedAttributeArray<AttributeI>(/*pos=*/1).type(),
+                         AttributeI::attributeType()));
+    CPPUNIT_ASSERT(matchingNamePairs(leaf.typedAttributeArray<AttributeI>("id").type(),
+                         AttributeI::attributeType()));
 
     const LeafType* constLeaf = &leaf;
 
-    CPPUNIT_ASSERT_EQUAL(constLeaf->typedAttributeArray<AttributeS>(/*pos=*/0).type(),
-                         AttributeS::attributeType());
-    CPPUNIT_ASSERT_EQUAL(constLeaf->typedAttributeArray<AttributeS>("density").type(),
-                         AttributeS::attributeType());
-    CPPUNIT_ASSERT_EQUAL(constLeaf->typedAttributeArray<AttributeI>(/*pos=*/1).type(),
-                         AttributeI::attributeType());
-    CPPUNIT_ASSERT_EQUAL(constLeaf->typedAttributeArray<AttributeI>("id").type(),
-                         AttributeI::attributeType());
+    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->typedAttributeArray<AttributeS>(/*pos=*/0).type(),
+                         AttributeS::attributeType()));
+    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->typedAttributeArray<AttributeS>("density").type(),
+                         AttributeS::attributeType()));
+    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->typedAttributeArray<AttributeI>(/*pos=*/1).type(),
+                         AttributeI::attributeType()));
+    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->typedAttributeArray<AttributeI>("id").type(),
+                         AttributeI::attributeType()));
 
     // check invalid type, pos or name throws
 
