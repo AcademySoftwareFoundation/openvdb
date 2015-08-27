@@ -30,12 +30,17 @@
 
 #include "openvdb.h"
 
+#include <openvdb_points/tools/AttributeArray.h>
+
 #include <tbb/mutex.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace points {
+
+using namespace openvdb::tools;
+using namespace openvdb::math;
 
 typedef tbb::mutex Mutex;
 typedef Mutex::scoped_lock Lock;
@@ -49,6 +54,33 @@ initialize()
 {
     Lock lock(sInitMutex);
     if (sIsInitialized) return;
+
+    // no compression
+
+    TypedAttributeArray<bool>::registerType();
+    TypedAttributeArray<short>::registerType();
+    TypedAttributeArray<int>::registerType();
+    TypedAttributeArray<long>::registerType();
+    TypedAttributeArray<half>::registerType();
+    TypedAttributeArray<float>::registerType();
+    TypedAttributeArray<double>::registerType();
+    TypedAttributeArray<Vec3<half> >::registerType();
+    TypedAttributeArray<Vec3<float> >::registerType();
+    TypedAttributeArray<Vec3<double> >::registerType();
+
+    // truncate compression
+
+    TypedAttributeArray<float, NullAttributeCodec<half> >::registerType();
+    TypedAttributeArray<Vec3<float>, NullAttributeCodec<Vec3<half> > >::registerType();
+
+    // fixed point compression
+
+    TypedAttributeArray<Vec3<float>, FixedPointAttributeCodec<Vec3<uint8_t> > >::registerType();
+    TypedAttributeArray<Vec3<float>, FixedPointAttributeCodec<Vec3<uint16_t> > >::registerType();
+
+    // unit vector compression
+
+    TypedAttributeArray<Vec3<float>, UnitVecAttributeCodec>::registerType();
 
 #ifdef __ICC
 // Disable ICC "assignment to statically allocated variable" warning.<
