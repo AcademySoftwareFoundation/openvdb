@@ -131,40 +131,12 @@ struct FixedPointAttributeCodec
 };
 
 
-template<typename IntType>
-struct FixedPositionAttributeCodec
-{
-    typedef IntType StorageType;
-    template<typename ValueType> static void decode(const StorageType& s, ValueType& v){
-        FixedPointAttributeCodec<IntType>::decode(s, v);
-        v -= ValueType(0.5);
-    }
-    template<typename ValueType> static void encode(const ValueType& v, StorageType& s){
-        FixedPointAttributeCodec<IntType>::encode(v + ValueType(0.5), s);
-    }
-    static const char* name() { return "fxps"; }
-};
-
-
-template <typename IntType>
 struct UnitVecAttributeCodec
 {
-    typedef IntType StorageType;
+    typedef uint16_t StorageType;
     template<typename T> static void decode(const StorageType&, math::Vec3<T>&);
     template<typename T> static void encode(const math::Vec3<T>&, StorageType&);
     static const char* name() { return "uvec"; }
-};
-
-
-template <typename FloatType, typename IntType>
-struct VecAttributeCodec
-{
-    struct StorageType { FloatType magnitude; IntType direction;
-        StorageType(): magnitude(0), direction(0) { }
-    };
-    template<typename T> static void decode(const StorageType&, math::Vec3<T>&);
-    template<typename T> static void encode(const math::Vec3<T>&, StorageType&);
-    static const char* name() { return "vec"; }
 };
 
 
@@ -735,6 +707,10 @@ inline void
 FixedPointAttributeCodec<IntType>::decode(const StorageType& data, ValueType& val)
 {
     val = fixedPointToFloatingPoint<ValueType>(data);
+
+    // shift value range to be -0.5 => 0.5 (as this is most commonly used for position)
+
+    val -= ValueType(0.5);
 }
 
 
@@ -743,51 +719,27 @@ template<typename ValueType>
 inline void
 FixedPointAttributeCodec<IntType>::encode(const ValueType& val, StorageType& data)
 {
-    data = floatingPointToFixedPoint<StorageType>(val);
+    // shift value range to be -0.5 => 0.5 (as this is most commonly used for position)
+
+    const ValueType newVal = val + ValueType(0.5);
+
+    data = floatingPointToFixedPoint<StorageType>(newVal);
 }
 
 
-template<>
 template<typename T>
 inline void
-UnitVecAttributeCodec<uint16_t>::decode(const StorageType& data, math::Vec3<T>& val)
+UnitVecAttributeCodec::decode(const StorageType& data, math::Vec3<T>& val)
 {
     val = math::QuantizedUnitVec::unpack(data);
 }
 
 
-template<>
 template<typename T>
-inline void UnitVecAttributeCodec<uint16_t>::encode(const math::Vec3<T>& val, StorageType& data)
+inline void
+UnitVecAttributeCodec::encode(const math::Vec3<T>& val, StorageType& data)
 {
     data = math::QuantizedUnitVec::pack(val);
-}
-
-
-template<typename FloatType, typename IntType>
-template<typename T>
-inline void
-VecAttributeCodec<FloatType, IntType>::decode(const StorageType& data, math::Vec3<T>& val)
-{
-    UnitVecAttributeCodec<IntType>::template decode<T>(data.direction, val);
-    val *= T(data.magnitude);
-}
-
-
-template<typename FloatType, typename IntType>
-template<typename T>
-inline void
-VecAttributeCodec<FloatType, IntType>::encode(const math::Vec3<T>& val, StorageType& data)
-{
-    const double d = val.length();
-    data.magnitude = static_cast<FloatType>(d);
-
-    math::Vec3d dir = val;
-    if (!math::isApproxEqual(d, 0.0, math::Tolerance<double>::value())) {
-        dir *= 1.0 / d;
-    }
-
-    UnitVecAttributeCodec<IntType>::template encode<T>(dir, data.direction);
 }
 
 
@@ -795,9 +747,8 @@ VecAttributeCodec<FloatType, IntType>::encode(const math::Vec3<T>& val, StorageT
 
 // TypedAttributeArray implementation
 
-
 template<typename ValueType_, typename Codec_>
-tbb::atomic<const Name*> TypedAttributeArray<ValueType_, Codec_>::sTypeName;
+tbb::atomic<const NamePair*> TypedAttributeArray<ValueType_, Codec_>::sTypeName;
 
 
 template<typename ValueType_, typename Codec_>
@@ -1313,53 +1264,6 @@ void AttributeWriteHandle<T>::set(Index n, const T& value)
 
 
 } // namespace tools
-
-namespace attrstorage {
-typedef tools::VecAttributeCodec<half, uint16_t>::StorageType HalfUInt16;
-typedef tools::VecAttributeCodec<float, uint16_t>::StorageType FloatUInt16;
-typedef tools::VecAttributeCodec<double, uint16_t>::StorageType DoubleUInt16;
-} // namespace attrstorage
-
-namespace math {
-
-template<> inline bool
-isExactlyEqual< attrstorage::HalfUInt16, attrstorage::HalfUInt16>(
-                    const attrstorage::HalfUInt16& a, const attrstorage::HalfUInt16& b)
-{
-    return a.magnitude == b.magnitude && a.direction == b.direction;
-}
-
-template<> inline bool
-isExactlyEqual< attrstorage::FloatUInt16, attrstorage::FloatUInt16>(
-                    const attrstorage::FloatUInt16& a, const attrstorage::FloatUInt16& b)
-{
-    return a.magnitude == b.magnitude && a.direction == b.direction;
-}
-
-template<> inline bool
-isExactlyEqual< attrstorage::DoubleUInt16, attrstorage::DoubleUInt16>(
-                    const attrstorage::DoubleUInt16& a, const attrstorage::DoubleUInt16& b)
-{
-    return a.magnitude == b.magnitude && a.direction == b.direction;
-}
-} // namespace math
-
-template<> inline attrstorage::HalfUInt16
-zeroVal<attrstorage::HalfUInt16>() { return attrstorage::HalfUInt16(); }
-template<> inline attrstorage::FloatUInt16
-zeroVal<attrstorage::FloatUInt16>() { return attrstorage::FloatUInt16(); }
-template<> inline attrstorage::DoubleUInt16
-zeroVal<attrstorage::DoubleUInt16>() { return attrstorage::DoubleUInt16(); }
-
-template<> inline const char* typeNameAsString<attrstorage::HalfUInt16>() {
-    return "halfuint16";
-}
-template<> inline const char* typeNameAsString<attrstorage::FloatUInt16>() {
-    return "floatuint16";
-}
-template<> inline const char* typeNameAsString<attrstorage::DoubleUInt16>() {
-    return "doubleuint16";
-}
 
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
