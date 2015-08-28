@@ -380,7 +380,7 @@ public:
     }
 
     /// @brief Iterate sequentially over LeafNodes and voxels in the output
-    /// grid and compute the laplacian using a valueAccessor for the
+    /// grid and compute the Laplacian using a valueAccessor for the
     /// input grid.
     ///
     /// @note Never call this public method directly - it is called by

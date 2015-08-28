@@ -81,7 +81,7 @@ template<typename IterT>
 inline math::Stats
 statistics(const IterT& iter, bool threaded = true);
 
-/// @brief Iterate over a grid and compute extremas (min/max) of
+/// @brief Iterate over a grid and compute extrema (min/max) of
 /// the values produced by applying the given functor at each voxel that is visited.
 /// @param iter      an iterator over the values of a grid or its tree
 ///                  (@c Grid::ValueOnCIter, @c Tree::ValueOffIter, etc.)

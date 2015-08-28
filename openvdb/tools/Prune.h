@@ -55,8 +55,8 @@ namespace tools {
 /// any nodes whose values are all the same (optionally to within a tolerance)
 /// and have the same active state.
 ///
-/// @note For trees with floating-point values a child node with (appproximatly)
-/// constant values are replaced with a tile value corresponding to the average 
+/// @note For trees with floating-point values a child node with (approximately)
+/// constant values are replaced with a tile value corresponding to the average
 /// of the extrema values in said child node. Else the first value encountered
 /// in the child node is used.
 ///
@@ -231,7 +231,7 @@ public:
         }
         root.eraseBackgroundTiles();
     }
-    
+
     // Prune the child nodes of the internal nodes
     template<typename NodeT>
     inline void operator()(NodeT& node) const
@@ -247,7 +247,7 @@ public:
 
     // Nothing to do at the leaf node level
     inline void operator()(LeafT&) const {}
-    
+
 private:
 
     // For floating-point value types set tile values to

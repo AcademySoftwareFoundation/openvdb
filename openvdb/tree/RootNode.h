@@ -39,6 +39,7 @@
 #include <set>
 #include <sstream>
 #include <deque>
+#include <boost/detail/sp_typeinfo.hpp>
 #include <boost/type_traits/remove_const.hpp>
 #include <boost/type_traits/remove_pointer.hpp>
 #include <boost/type_traits/is_pointer.hpp>
@@ -449,9 +450,9 @@ public:
     ///
     /// @note Instead of setting @a updateChildNodes to true, consider
     /// using tools::changeBackground or
-    /// tools::changeLevelSetBackground which are multi-threaded!  
+    /// tools::changeLevelSetBackground which are multi-threaded!
     void setBackground(const ValueType& value, bool updateChildNodes);
-    
+
     /// Return this node's background value.
     const ValueType& background() const { return mBackground; }
 
@@ -685,7 +686,7 @@ public:
     /// @brief Add a tile containing voxel (x, y, z) at the root level,
     /// deleting the existing branch if necessary.
     void addTile(const Coord& xyz, const ValueType& value, bool state);
-    
+
     /// @brief Add a tile containing voxel (x, y, z) at the specified tree level,
     /// creating a new branch if necessary.  Delete any existing lower-level nodes
     /// that contain (x, y, z).
@@ -806,7 +807,7 @@ public:
     template<typename ArrayT>
     void stealNodes(ArrayT& array) { this->stealNodes(array, mBackground, false); }
     //@}
-    
+
     /// Densify active tiles, i.e., replace them with leaf-level active voxels.
     void voxelizeActiveTiles();
 
@@ -1097,8 +1098,8 @@ struct RootNodeCopyHelper
         self.enforceCompatibleValueTypes(other);
         // One of the above two tests should throw, so we should never get here:
         std::ostringstream ostr;
-        ostr << "cannot convert a " << typeid(OtherRootT).name()
-            << " to a " << typeid(RootT).name();
+        ostr << "cannot convert a " << BOOST_SP_TYPEID(OtherRootT).name()
+            << " to a " << BOOST_SP_TYPEID(RootT).name();
         OPENVDB_THROW(TypeError, ostr.str());
     }
 };
@@ -3144,8 +3145,8 @@ struct RootNodeCombineHelper
         self.enforceCompatibleValueTypes(other1);
         // One of the above two tests should throw, so we should never get here:
         std::ostringstream ostr;
-        ostr << "cannot combine a " << typeid(OtherRootT).name()
-            << " into a " << typeid(RootT).name();
+        ostr << "cannot combine a " << BOOST_SP_TYPEID(OtherRootT).name()
+            << " into a " << BOOST_SP_TYPEID(RootT).name();
         OPENVDB_THROW(TypeError, ostr.str());
     }
 };

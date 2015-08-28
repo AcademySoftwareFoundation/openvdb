@@ -1335,7 +1335,10 @@ SOP_OpenVDB_Convert::cookMySop(OP_Context& context)
     try {
         hutil::ScopedInputLock lock(*this, context);
 
-        duplicateSourceStealable(0, context);
+        // We are intentionally not performing a duplicateSourceStealable() here due to
+        // specific implementation in this SOP which causes undesirable behavior when
+        // attempting to "steal" the geometry
+        duplicateSource(0, context);
 
         const fpreal t = context.getTime();
 

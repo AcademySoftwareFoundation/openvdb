@@ -82,6 +82,12 @@ Version 3.1.0 - In development
       [Contributed by Rafael Campos]
     - Fixed a bug in tools::QuadraticSampler::sample.
     - Fixed a bug in tools::LevelSetTracker that could generate NaNs.
+    - Updated vdb_view to use GLFW keys definitions. [Contributed by Kevin Dietrich]
+    - Fixed parameter type inconsistencies in math::Ray.h and
+      tools::RayIntersector.h [Contributed by Kevin Dietrich]
+    - Replaced typeid keyword with BOOST_SP_TYPEID, this change is required for
+      the Cycles render engine, from the Blender Foundation.
+      [Contributed by Kevin Dietrich]
 
     API changes:
     - Removed the Hermite class since it was no longer used and caused build

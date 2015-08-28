@@ -110,7 +110,7 @@ public:
     /// @return the grain-size used for multi-threading
     int  getGrainSize() const { return mGrainSize; }
     /// @brief Set the grain-size used for multi-threading.
-    /// @note A grainsize of 0 or less disables multi-threading!
+    /// @note A grain size of 0 or less disables multi-threading!
     void setGrainSize(int grainsize) { mGrainSize = grainsize; }
 
     /// @brief Return the minimum value of the mask to be used for the
@@ -124,7 +124,7 @@ public:
     /// @param max Maximum value of the range.
     /// @details Mask values outside the range are clamped to zero or one, and
     /// values inside the range map smoothly to 0->1 (unless the mask is inverted).
-    /// @throw ValueError if @a min is not smaller then @a max.
+    /// @throw ValueError if @a min is not smaller than @a max.
     void setMaskRange(AlphaType min, AlphaType max)
     {
         if (!(min < max)) OPENVDB_THROW(ValueError, "Invalid mask range (expects min < max)");
@@ -145,12 +145,12 @@ public:
     /// @param mask Optional alpha mask.
     void mean(int width = 1, int iterations = 1, const MaskType* mask = NULL);
 
-    /// @brief One iteration of a fast separable gaussian filter.
+    /// @brief One iteration of a fast separable Gaussian filter.
     ///
     /// @note This is approximated as 4 iterations of a separable mean filter
     /// which typically leads an approximation that's better than 95%!
     /// @param width The width of the mean-value filter is 2*width+1 voxels.
-    /// @param iterations Numer of times the mean-value filter is applied.
+    /// @param iterations Number of times the mean-value filter is applied.
     /// @param mask Optional alpha mask.
     void gaussian(int width = 1, int iterations = 1, const MaskType* mask = NULL);
 
@@ -158,7 +158,7 @@ public:
     ///
     /// @note This filter is not separable and is hence relatively slow!
     /// @param width The width of the mean-value filter is 2*width+1 voxels.
-    /// @param iterations Numer of times the mean-value filter is applied.
+    /// @param iterations Number of times the mean-value filter is applied.
     /// @param mask Optional alpha mask.
     void median(int width = 1, int iterations = 1, const MaskType* mask = NULL);
 
@@ -276,7 +276,7 @@ Filter<GridT, MaskT, InterruptT>::gaussian(int width, int iterations, const Mask
 {
     mMask = mask;
 
-    if (mInterrupter) mInterrupter->start("Applying gaussian filter");
+    if (mInterrupter) mInterrupter->start("Applying Gaussian filter");
 
     const int w = std::max(1, width);
 

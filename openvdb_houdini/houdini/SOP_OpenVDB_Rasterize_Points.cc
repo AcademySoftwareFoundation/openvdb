@@ -1958,8 +1958,14 @@ populateMeshMenu(void *data, PRM_Name *choicenames, int themenusize,
 
                     const int tupleSize = attrib->getTupleSize();
 
+#if (UT_VERSION_INT >= 0x0f000000) // 15.0 or later
+                    const UT_StringHolder& attribName = attrib->getName();
+                    if (tupleSize == 1) scalarNames.push_back(attribName.buffer());
+                    else if (tupleSize == 3) vectorNames.push_back(attribName.buffer());
+#else
                     if (tupleSize == 1) scalarNames.push_back(attrib->getName());
                     else if (tupleSize == 3) vectorNames.push_back(attrib->getName());
+#endif
                 }
             }
 

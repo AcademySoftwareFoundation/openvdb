@@ -107,7 +107,7 @@ public:
     /// the origin of this grid's bounding box.
     ///
     /// @warning The input coordinates are assume to be relative to
-    /// the grid's origin, i.e. minimum of its index bounding box! 
+    /// the grid's origin, i.e. minimum of its index bounding box!
     inline size_t coordToOffset(size_t i, size_t j, size_t k) const { return i*mX + j*mY + k; }
 
     /// @brief Return the local coordinate corresponding to the specified linear offset.
@@ -143,7 +143,7 @@ protected:
 };// end of DenseBase<ValueT, LayoutZYX>
 
 /// @brief Partial template specialization of DenseBase.
-/// @note This is the memory-layout emplayed in Houdini and Maya. It leads
+/// @note This is the memory-layout employed in Houdini and Maya. It leads
 /// to nested for-loops of the order z, y, x.
 template<typename ValueT>
 class DenseBase<ValueT, LayoutXYZ>
@@ -154,7 +154,7 @@ public:
     /// the origin of this grid's bounding box.
     ///
     /// @warning The input coordinates are assume to be relative to
-    /// the grid's origin, i.e. minimum of its index bounding box! 
+    /// the grid's origin, i.e. minimum of its index bounding box!
     inline size_t coordToOffset(size_t i, size_t j, size_t k) const { return i + j*mY + k*mZ; }
 
     /// @brief Return the index coordinate corresponding to the specified linear offset.
@@ -369,7 +369,7 @@ private:
 /// @note Only voxels that intersect the dense grid's bounding box are copied
 /// from the OpenVDB tree.  But both active and inactive voxels are copied,
 /// so all existing values in the dense grid are overwritten, regardless of
-/// the OpenVDB tree's tolopogy.
+/// the OpenVDB tree's topology.
 template<typename _TreeT, typename _DenseT = Dense<typename _TreeT::ValueType> >
 class CopyToDense
 {
@@ -459,7 +459,7 @@ public:
     {
         mBlocks = new std::vector<Block>();
         const CoordBBox& bbox = mDense->bbox();
-        // Pre-process: Construct a list of blocks alligned with (potential) leaf nodes
+        // Pre-process: Construct a list of blocks aligned with (potential) leaf nodes
         for (CoordBBox sub=bbox; sub.min()[0] <= bbox.max()[0]; sub.min()[0] = sub.max()[0] + 1) {
             for (sub.min()[1] = bbox.min()[1]; sub.min()[1] <= bbox.max()[1];
                  sub.min()[1] = sub.max()[1] + 1)

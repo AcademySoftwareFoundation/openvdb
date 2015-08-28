@@ -80,13 +80,13 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
-    
+
 /// @brief Provises a unified interface for sampling, i.e. interpolation.
 /// @details Order = 0: closest point
 ///          Order = 1: tri-linear
 ///          Order = 2: tri-quadratic
-///          Staggered: Set to true for MAC grids    
-template <size_t Order, bool Staggered = false>    
+///          Staggered: Set to true for MAC grids
+template <size_t Order, bool Staggered = false>
 struct Sampler
 {
     BOOST_STATIC_ASSERT(Order < 3);
@@ -111,9 +111,9 @@ struct Sampler
     template<class TreeT>
     static typename TreeT::ValueType sample(const TreeT& inTree, const Vec3R& inCoord);
 };
-    
+
 //////////////////////////////////////// Non-Staggered Samplers
-    
+
 // The following samplers operate in voxel space.
 // When the samplers are applied to grids holding vector or other non-scalar data,
 // the data is assumed to be collocated.  For example, using the BoxSampler on a grid
@@ -364,14 +364,14 @@ private:
 
 /// @brief Specialization of GridSampler for construction from a ValueAccessor type
 ///
-/// @note This version should normally be favoured over the one above
+/// @note This version should normally be favored over the one above
 /// that takes a Grid or Tree. The reason is this version uses a
 /// ValueAccessor that performs fast (cached) access where the
-/// tree-based flavour performs slower (uncached) access.
+/// tree-based flavor performs slower (uncached) access.
 ///
 /// @warning Since this version stores a pointer to an (externally
 /// allocated) value accessor it is not threadsafe. Hence each thread
-/// should have it own instance of a GridSampler constructed from a
+/// should have its own instance of a GridSampler constructed from a
 /// local ValueAccessor. Alternatively the Grid/Tree-based GridSampler
 /// is threadsafe, but also slower.
 template<typename TreeT, typename SamplerType>
@@ -631,7 +631,7 @@ inline typename TreeT::ValueType
 PointSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 {
     return inTree.getValue(Coord(local_util::roundVec3(inCoord)));
-}    
+}
 
 
 //////////////////////////////////////// BoxSampler
@@ -695,7 +695,7 @@ BoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
     hasActiveValues |= inTree.probeValue(ijk, data[1][1][0]); // i+1, j+1, k
 
     result = BoxSampler::trilinearInterpolation(data, uvw);
-    
+
     return hasActiveValues;
 }
 
@@ -780,7 +780,7 @@ QuadraticSampler::triquadraticInterpolation(ValueT (& data)[N][N][N], const Vec3
         cx = static_cast<ValueT>(vx[1]);
     return static_cast<ValueT>(uvw.x() * (uvw.x() * ax + bx) + cx);
 }
-    
+
 template<class TreeT>
 inline bool
 QuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
@@ -804,7 +804,7 @@ QuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
     }
 
     result = QuadraticSampler::triquadraticInterpolation(data, uvw);
-    
+
     return active;
 }
 
@@ -948,22 +948,22 @@ StaggeredQuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 
 //////////////////////////////////////// Sampler
 
-template <>    
+template <>
 struct Sampler<0, false> : public PointSampler {};
 
-template <>    
+template <>
 struct Sampler<1, false> : public BoxSampler {};
 
-template <>    
+template <>
 struct Sampler<2, false> : public QuadraticSampler {};
 
-template <>    
+template <>
 struct Sampler<0, true> : public StaggeredPointSampler {};
 
-template <>    
+template <>
 struct Sampler<1, true> : public StaggeredBoxSampler {};
 
-template <>    
+template <>
 struct Sampler<2, true> : public StaggeredQuadraticSampler {};
 
 } // namespace tools

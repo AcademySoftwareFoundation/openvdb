@@ -67,7 +67,7 @@ template<typename VelocityGridT = Vec3fGrid,
          typename InterrupterType = util::NullInterrupter>
 class DensityAdvection
 {
-public: 
+public:
     /// @brief Constructor
     ///
     /// @param velGrid     Velocity grid responsible for the (passive) density advection.
@@ -91,7 +91,7 @@ public:
     {
     }
 
-    /// @brief Define the number of integrations sub-steps to be performed per
+    /// @brief Define the number of integration sub-steps to be performed per
     /// advection time-step (the default is one).
     void setIntegrationCount(size_t iterations) { mCountRK = iterations; }
 
@@ -100,7 +100,7 @@ public:
     size_t getIntegrationCount() const { return mCountRK; }
 
     /// @brief Define the order of the Runge-Kutta integration scheme
-    /// employed during the back-tracing in the semi-lagrgangian integration.
+    /// employed during the back-tracing in the semi-lagrangian integration.
     ///
     /// @note Note the order of the velocity sampling is always one,
     ///       i.e. based on tri-linear interpolation! However the
@@ -109,7 +109,7 @@ public:
     void setIntegrationOrder(size_t orderRK) { mOrderRK = math::Min(orderRK, size_t(4)); }
 
     /// @return The order of the Runge-Kutta integration scheme employed
-    ///         during the back-tracing in the semi-lagrgangian integration.
+    ///         during the back-tracing in the semi-Lagrangian integration.
     size_t getIntegrationOrder() const { return mOrderRK; }
 
      /// @return the grain-size used for multi-threading
@@ -130,7 +130,7 @@ public:
     /// @details This method is useful when dilating sparse density
     /// grids to pad boundary regions. Excessive dilation can be
     /// computationally expensive so use this method to prevent
-    /// or warn againt run-away computation.
+    /// or warn against run-away computation.
     ///
     /// @throw RuntimeError if @a inGrid does not have uniform voxels.
     template<typename DensityGridT>
@@ -143,7 +143,7 @@ public:
         return static_cast<int>( math::RoundUp(d) );
     }
 
-    /// @return Returns a new density grid that is the results of passive advection
+    /// @return Returns a new density grid that is the result of passive advection
     ///         of all the active values the input density for the
     ///         time = dt * IntegrationCount.
     ///
@@ -170,7 +170,7 @@ public:
         return outGrid;
     }
 
-    /// @return Returns a new density grid that is the results of
+    /// @return Returns a new density grid that is the result of
     ///         passive advection of the active values in @a inGrid
     ///         that intersect the active values in @c mask. The time
     ///         of the output grid corresponds to dt * IntegrationCount.
@@ -214,7 +214,7 @@ public:
     }
 
 private:
-    // disallow copy construction and copy by assinment!
+    // disallow copy construction and copy by assignment!
     DensityAdvection(const DensityAdvection&);// not implemented
     DensityAdvection& operator=(const DensityAdvection&);// not implemented
 
@@ -239,7 +239,7 @@ private:
         pruneInactive(outGrid.tree(), mGrainSize>0, mGrainSize);
     }
 
-    // Private class that implements the semi-lagrangian integration
+    // Private class that implements the semi-Lagrangian integration
     template<typename DensityGridT, size_t OrderRK, typename SamplerT>
     struct Advect
     {
@@ -321,7 +321,7 @@ private:
     const VelocityGridT& mVelGrid;
     double               mMaxVelocity;
     InterrupterType*     mInterrupter;
-    double               mDt;// time step per RK integration steps
+    double               mDt;// time step per RK integration step
     size_t               mCountRK;// number of RK integration sub-steps
     size_t               mOrderRK;// order of the RK integrator
     size_t               mGrainSize;// for multi-threading (0 means no threading)

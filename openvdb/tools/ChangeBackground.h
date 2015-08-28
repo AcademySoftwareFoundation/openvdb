@@ -49,7 +49,7 @@ namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
 /// @brief Replace the background value in all the nodes of a tree.
-/// @details The sign of the background value is perserved, and only
+/// @details The sign of the background value is preserved, and only
 /// inactive values equal to the old background value are replaced.
 ///
 /// @note If a LeafManager is used the cached leaf nodes are reused,
@@ -172,8 +172,8 @@ private:
 
 
 // Replaces the background value in a Tree assumed to represent a
-// level set. It is generally faster then ChangeBackgroundOp.
-// Note that is follows the sign-convension that outside is positive
+// level set. It is generally faster than ChangeBackgroundOp.
+// Note that is follows the sign-convention that outside is positive
 // and inside is negative!
 template<typename TreeOrLeafManagerT>
 class ChangeLevelSetBackgroundOp
@@ -183,7 +183,7 @@ public:
     typedef typename TreeOrLeafManagerT::RootNodeType RootT;
     typedef typename TreeOrLeafManagerT::LeafNodeType LeafT;
 
-    /// @brief Constructor for asymetric narrow-bands
+    /// @brief Constructor for asymmetric narrow-bands
     ChangeLevelSetBackgroundOp(const ValueT& outside, const ValueT& inside)
         : mOutside(outside)
         , mInside(inside)

@@ -142,7 +142,7 @@ struct CheckNan
     /// Return true if the scalar value is NaN
     inline bool operator()(const ElementType& v) const { return boost::math::isnan(v); }
 
-    /// @brief This allows for vector values to be checked componentwise
+    /// @brief This allows for vector values to be checked component-wise
     template <typename T>
     inline typename boost::enable_if_c<VecTraits<T>::IsVec, bool>::type
     operator()(const T& v) const
@@ -254,7 +254,7 @@ struct CheckMagnitude
     {
     }
 
-    /// Return true if the magnitude of the value is not approximatly
+    /// Return true if the magnitude of the value is not approximately
     /// equal to totVal.
     inline bool operator()(const ElementType& v) const
     {
@@ -669,7 +669,7 @@ class Diagnose
     void clear() { mMask = new MaskType(); mCount = 0; }
 
 private:
-    // disallow copy construction and copy by assinment!
+    // disallow copy construction and copy by assignment!
     Diagnose(const Diagnose&);// not implemented
     Diagnose& operator=(const Diagnose&);// not implemented
 
@@ -939,11 +939,11 @@ public:
     }
 
 private:
-    // disallow copy construction and copy by assinment!
+    // disallow copy construction and copy by assignment!
     CheckLevelSet(const CheckLevelSet&);// not implemented
     CheckLevelSet& operator=(const CheckLevelSet&);// not implemented
 
-    // Memeber data
+    // Member data
     Diagnose<GridType> mDiagnose;
 };// CheckLevelSet
 
@@ -1075,11 +1075,11 @@ public:
     }
 
 private:
-    // disallow copy construction and copy by assinment!
+    // disallow copy construction and copy by assignment!
     CheckFogVolume(const CheckFogVolume&);// not implemented
     CheckFogVolume& operator=(const CheckFogVolume&);// not implemented
 
-    // Memeber data
+    // Member data
     Diagnose<GridType> mDiagnose;
 };// CheckFogVolume
 

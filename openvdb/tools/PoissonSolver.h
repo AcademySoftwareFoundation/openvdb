@@ -29,7 +29,9 @@
 ///////////////////////////////////////////////////////////////////////////
 //
 /// @file PoissonSolver.h
+///
 /// @authors D.J. Hill, Peter Cucka
+///
 /// @brief Solve Poisson's equation &nabla;<sup><small>2</small></sup><i>x</i> = <i>b</i>
 /// for <i>x</i>, where @e b is a vector comprising the values of all of the active voxels
 /// in a grid.

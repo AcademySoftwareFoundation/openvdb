@@ -161,7 +161,7 @@ public:
     int getGrainSize() const { return mGrainSize; }
 
     /// @brief Set the grain-size used for multi-threading.
-    /// @note A grainsize of 0 or less disables multi-threading!
+    /// @note A grain size of 0 or less disables multi-threading!
     void setGrainSize(int grainsize) { mGrainSize = grainsize; }
 
     /// @brief Compute the surface area and volume of the level
@@ -172,17 +172,17 @@ public:
     void measure(Real& area, Real& volume, bool useWorldUnits = true);
 
     /// @brief Compute the surface area, volume, and average
-    /// mean-curvatue of the level set. Use the last argument to
+    /// mean-curvature of the level set. Use the last argument to
     /// specify the result in world or voxel units.
     /// @note This method is slower (about 3x) then the measure method
     /// above that only computes the area and volume.
     void measure(Real& area, Real& volume, Real& avgMeanCurvature, bool useWorldUnits = true);
 
 private:
-    // disallow copy construction and copy by assinment!
+    // disallow copy construction and copy by assignment!
     LevelSetMeasure(const LevelSetMeasure&);// not implemented
     LevelSetMeasure& operator=(const LevelSetMeasure&);// not implemented
-   
+
     const TreeType* mTree;
     ManagerType*    mLeafs;
     InterruptT*     mInterrupter;
@@ -197,7 +197,7 @@ private:
     typedef typename LeafT::ValueOnCIter     VoxelCIterT;
     typedef typename ManagerType::LeafRange  LeafRange;
     typedef typename LeafRange::Iterator     LeafIterT;
-    
+
     struct Measure2
     {
         Measure2(LevelSetMeasure* parent) : mParent(parent), mAcc(*mParent->mTree)
@@ -311,7 +311,7 @@ inline void
 LevelSetMeasure<GridT, InterruptT>::measure(Real& area, Real& volume, bool useWorldUnits)
 {
     if (mInterrupter) mInterrupter->start("Measuring level set");
-    
+
 
     const bool newLeafs = mLeafs == NULL;
     if (newLeafs) mLeafs = new ManagerType(*mTree);

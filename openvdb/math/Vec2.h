@@ -57,7 +57,7 @@ public:
     /// Constructor with one argument, e.g.   Vec2f v(0);
     explicit Vec2(T val) { this->mm[0] = this->mm[1] = val; }
 
-    /// Constructor with three arguments, e.g.   Vec2f v(1,2,3);
+    /// Constructor with two arguments, e.g.   Vec2f v(1,2,3);
     Vec2(T x, T y)
     {
         this->mm[0] = x;

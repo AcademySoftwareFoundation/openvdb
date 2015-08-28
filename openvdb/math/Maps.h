@@ -1866,10 +1866,10 @@ private:
 
 
 /// @brief  This map is composed of three steps.
-/// Frist it will take a box of size (Lx X  Ly X Lz) defined by an member data bounding box
-/// and map it into a frustum with near plane (1 X Ly/Lx) and precribed depth
+/// First it will take a box of size (Lx X  Ly X Lz) defined by a member data bounding box
+/// and map it into a frustum with near plane (1 X Ly/Lx) and prescribed depth
 /// Then this frustum is transformed by an internal second map: most often a uniform scale,
-/// but other affects can be achieved by accumulating translation, shear and rotation: these
+/// but other effects can be achieved by accumulating translation, shear and rotation: these
 /// are all applied to the second map
 class OPENVDB_API NonlinearFrustumMap: public MapBase
 {

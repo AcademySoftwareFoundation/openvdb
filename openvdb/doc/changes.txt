@@ -107,6 +107,12 @@ Bug fixes:
 - Fixed a bug in @vdblink::tools::QuadraticSampler::sample QuadraticSampler@endlink.
 - Fixed a roundoff issue in @vdblink::tools::LevelSetTracker LevelSetTrackerthat@endlink
   that could generate NaNs.
+- Updated vdb_view to use GLFW keys definitions. <I>[Contributed by Kevin Dietrich]</I>
+- Fixed parameter type inconsistencies in math::Ray.h and
+  tools::RayIntersector.h <I>[Contributed by Kevin Dietrich]</I>
+- Replaced typeid keyword with BOOST_SP_TYPEID, this change is required for
+  the Cycles render engine, from the Blender Foundation.
+  <I>[Contributed by Kevin Dietrich]</I>
 
 @par
 API changes:

@@ -43,6 +43,7 @@
 #include <openvdb/math/Mat3.h>
 #include <openvdb/math/Mat4.h>
 #include <openvdb/math/Coord.h>
+#include <boost/detail/sp_typeinfo.hpp>
 #include <boost/type_traits/is_convertible.hpp>
 #include <boost/type_traits/is_integral.hpp>
 #include <boost/static_assert.hpp>
@@ -264,7 +265,7 @@ enum MergePolicy {
 ////////////////////////////////////////
 
 
-template<typename T> const char* typeNameAsString()                 { return typeid(T).name(); }
+template<typename T> const char* typeNameAsString()                 { return BOOST_SP_TYPEID(T).name(); }
 template<> inline const char* typeNameAsString<bool>()              { return "bool"; }
 template<> inline const char* typeNameAsString<float>()             { return "float"; }
 template<> inline const char* typeNameAsString<double>()            { return "double"; }

@@ -123,7 +123,7 @@ fillWithSpheres(
 
 
 /// @brief  Accelerated closest surface point queries for narrow band level sets.
-///         Supports queries that originate at arbitrary worldspace locations, is
+///         Supports queries that originate at arbitrary world-space locations, is
 ///         not confined to the narrow band region of the input volume geometry.
 template<typename GridT>
 class ClosestSurfacePoint

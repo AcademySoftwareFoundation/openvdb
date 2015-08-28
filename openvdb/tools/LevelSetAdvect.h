@@ -144,10 +144,10 @@ public:
     /// @return the grain-size used for multi-threading
     int  getGrainSize() const { return mTracker.getGrainSize(); }
     /// @brief Set the grain-size used for multi-threading.
-    /// @note A grainsize of 0 or less disables multi-threading!
+    /// @note A grain size of 0 or less disables multi-threading!
     void setGrainSize(int grainsize) { mTracker.setGrainSize(grainsize); }
 
-    /// Advect the level set from it's current time, time0, to it's
+    /// Advect the level set from its current time, time0, to its
     /// final time, time1. If time0>time1 backward advection is performed.
     ///
     /// @return number of CFL iterations used to advect from time0 to time1
@@ -172,7 +172,7 @@ private:
         Advect(Advect& other, tbb::split);
         /// destructor
         virtual ~Advect() { if (mIsMaster) this->clearField(); }
-        /// Advect the level set from it's current time, time0, to it's final time, time1.
+        /// Advect the level set from its current time, time0, to its final time, time1.
         /// @return number of CFL iterations
         size_t advect(ValueType time0, ValueType time1);
         /// Used internally by tbb::parallel_for()
@@ -189,7 +189,7 @@ private:
         }
         /// This is only called by tbb::parallel_reduce() threads
         void join(const Advect& other) { mMaxAbsV = math::Max(mMaxAbsV, other.mMaxAbsV); }
-        /// Enum to defeing the type of multi-threading
+        /// Enum to define multi-threading type
         enum ThreadingMode { PARALLEL_FOR, PARALLEL_REDUCE }; // for internal use
         // method calling tbb
         void cook(ThreadingMode mode, size_t swapBuffer = 0);

@@ -37,7 +37,7 @@
 /// @brief Defines two simple wrapper classes for advection velocity
 ///        fields as well as VelocitySampler and VelocityIntegrator
 ///
-///     
+///
 /// @details DiscreteField wraps a velocity grid and EnrightField is mostly
 ///          intended for debugging (it's an analytical divergence free and
 ///          periodic field). They both share the same API required by the
@@ -77,7 +77,7 @@ public:
     {
     }
 
-    /// @return const reference to the transfrom between world and index space
+    /// @return const reference to the transform between world and index space
     /// @note Use this method to determine if a client grid is
     /// aligned with the coordinate space of the velocity grid.
     const math::Transform& transform() const { return *mTransform; }
@@ -101,12 +101,12 @@ private:
 }; // end of DiscreteField
 
 ///////////////////////////////////////////////////////////////////////
-    
-/// @brief Analytical, divergence-free and periodic vecloity field
+
+/// @brief Analytical, divergence-free and periodic velocity field
 /// @note Primarily intended for debugging!
-/// @warning This analytical velocity only produce meaningfull values
-/// in the unitbox in world space. In other words make sure any level
-/// set surface in fully enclodes in the axis aligned bounding box
+/// @warning This analytical velocity only produce meaningful values
+/// in the unit box in world space. In other words make sure any level
+/// set surface is fully enclosed in the axis aligned bounding box
 /// spanning 0->1 in world units.
 template <typename ScalarT = float>
 class EnrightField
@@ -118,7 +118,7 @@ public:
 
     EnrightField() {}
 
-    /// @return const reference to the identity transfrom between world and index space
+    /// @return const reference to the identity transform between world and index space
     /// @note Use this method to determine if a client grid is
     /// aligned with the coordinate space of this velocity field
     math::Transform transform() const { return math::Transform(); }
@@ -154,7 +154,7 @@ EnrightField<ScalarT>::operator() (const Vec3d& xyz, ValueType time) const
 
 ///////////////////////////////////////////////////////////////////////
 
-/// Class to hold a Vec3 field interperated as a velocity field.
+/// Class to hold a Vec3 field interpreted as a velocity field.
 /// Primarily exists to provide a method(s) that integrate a passive
 /// point forward in the velocity field for a single time-step (dt)
 template<typename GridT = Vec3fGrid,
@@ -206,7 +206,7 @@ private:
 
 ///////////////////////////////////////////////////////////////////////
 
-/// @brief Performs runge-kutta time integration of variable order in
+/// @brief Performs Runge-Kutta time integration of variable order in
 /// a static velocity field.
 ///
 /// @note Note that the order of the velocity sampling is controlled
@@ -236,7 +236,7 @@ public:
         VecType P(static_cast<ElementType>(world[0]),
                   static_cast<ElementType>(world[1]),
                   static_cast<ElementType>(world[2]));
-        // Note the if-braching below is optimized away at compile time
+        // Note the if-branching below is optimized away at compile time
         if (OrderRK == 0) {
             return;// do nothing
         } else if (OrderRK == 1) {
