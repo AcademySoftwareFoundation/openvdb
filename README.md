@@ -9,7 +9,7 @@ OpenVDB is an open source C++ library comprising a novel hierarchical data struc
 
 ### Development Repository
 
-This GitHub repository hosts the trunk of the OpenVDB development. This implies that it is the newest public version with the latest features and bug fixes. However, it also means that it has not undergone a lot of testing and is generally less stable than the production releases that we will continue to deliver as [tarballs](http://www.openvdb.org/download/).
+This GitHub repository hosts the trunk of the OpenVDB development. This implies that it is the newest public version with the latest features and bug fixes. However, it also means that it has not undergone a lot of testing and is generally less stable than the [production releases](https://github.com/dreamworksanimation/openvdb/releases).
 
 
 ### Contributing
