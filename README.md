@@ -1,15 +1,15 @@
 ![OpenVDB](http://www.openvdb.org/images/openvdb_logo.png)
 
 [Website](http://www.openvdb.org) |
-[Discussion forum](http://www.openvdb.org/forum) |
-[Documentation](www.openvdb.org/documentation/doxygen)
+[Discussion Forum](http://www.openvdb.org/forum) |
+[Documentation](http://www.openvdb.org/documentation/)
 
 OpenVDB is an open source C++ library comprising a novel hierarchical data structure and a large suite of tools for the efficient storage and manipulation of sparse volumetric data discretized on three-dimensional grids. It is developed and maintained by DreamWorks Animation for use in volumetric applications typically encountered in feature film production.
 
 
 ### Development Repository
 
-This GitHub repository hosts the trunk of the OpenVDB development. This implies that it is the newest public version with the latest features and bug fixes. However, it also means that it has not undergone a lot of testing and is generally less stable than the production releases that we will continue to deliver as [tar-balls](www.openvdb.org/download).
+This GitHub repository hosts the trunk of the OpenVDB development. This implies that it is the newest public version with the latest features and bug fixes. However, it also means that it has not undergone a lot of testing and is generally less stable than the production releases that we will continue to deliver as [tarballs](www.openvdb.org/download).
 
 
 ### Contributing
