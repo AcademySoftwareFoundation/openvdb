@@ -82,12 +82,10 @@ Version 3.1.0 - In development
       [Contributed by Rafael Campos]
     - Fixed a bug in tools::QuadraticSampler::sample.
     - Fixed a bug in tools::LevelSetTracker that could generate NaNs.
-    - Updated vdb_view to use GLFW keys definitions. [Contributed by Kevin Dietrich]
     - Fixed parameter type inconsistencies in math::Ray.h and
       tools::RayIntersector.h [Contributed by Kevin Dietrich]
-    - Replaced typeid keyword with BOOST_SP_TYPEID, this change is required for
-      the Cycles render engine, from the Blender Foundation.
-      [Contributed by Kevin Dietrich]
+    - Fixed a bug in tools::clip (and the corresponding SOP) that was caused 
+      by incorrect handeling of signed values.
 
     API changes:
     - Removed the Hermite class since it was no longer used and caused build
@@ -101,19 +99,19 @@ Version 3.1.0 - In development
     - Added a Rasterize Points SOP that produces density volumes and transfers
       arbitrary point attributes using a weighted average scheme. This node
       contains a VOP sub-network which can be used to define VEX procedures for
-      procedural density modeling. The accompanying creation script defines a
-      default VOP network with UI parameters.
+      procedural modeling. The accompanying creation script defines a
+      default VOP network with UI parameters for procedural cloud and velocity
+      field modeling.
     - Added an Advect Density SOP to advect non-level-sets, e.g. density or
       velocity.
     - Added a Remove Divergence SOP that removes any divergent portions of a
       velocity field.
+    - Added a Diagnostics SOP that can perform various type of tests on LevelSet,
+      FOG and other classes of grids. Use it for debugging.
     - Added a Sort Points SOP that spatially reorders points that are close
       together in space to also be close in the insertion order. This
       operation can help improve CPU cache coherency and performance for
       random access operations.
-    - Added a Diagnostics SOP that performs validation tests on grids to
-      detect potential issues.  The tests are currently automated, but manual
-      selections will be added soon.
     - Added an option to the Convert SOP to activate interior voxels.
       [Contributed by SESI]
     - The To Polygons SOP can now optionally output a pscale attribute.

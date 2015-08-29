@@ -33,6 +33,8 @@
 /// @author Ken Museth
 ///
 /// @brief Perform diagnostics on VDB volumes to detect potential issues.
+///
+/// @todo Add more types of tests for volumes of type "Other"
 
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>
@@ -65,16 +67,19 @@ public:
     static const char* sOpName[];
 
 protected:
-
+    
     struct CheckFinite {
-        CheckFinite() : str() {}
+        CheckFinite(bool _makeMask = false) : str(), makeMask(_makeMask) {}
         template<typename GridT>
         void operator() (const GridT& grid) {
             openvdb::tools::Diagnose<GridT> d(grid);
             openvdb::tools::CheckFinite<GridT,typename GridT::ValueAllCIter> c;
-            str = d.check(c, false, /*voxel*/true, /*tiles*/true, /*background*/true);
+            str = d.check(c, makeMask, /*voxel*/true, /*tiles*/true, /*background*/true);
+            if (makeMask) mask = d.mask();
         }
         std::string str;
+        const bool makeMask;
+        openvdb::BoolGrid::Ptr mask;
     };
     
     virtual OP_ERROR cookMySop(OP_Context&);
@@ -91,16 +96,148 @@ newSopOperator(OP_OperatorTable* table)
 
     hutil::ParmList parms;
 
-    // Group pattern
+     // Group pattern
     parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
         .setHelpText("Specify a subset of the input VDB grids to be processed.")
         .setChoiceList(&hutil::PrimGroupMenu));
+
+    // Tabs
+    std::vector<PRM_Default> tab_parms;
+    tab_parms.push_back(PRM_Default(11,"Level Sets"));
+    tab_parms.push_back(PRM_Default(5, "FOG Volumes"));
+    tab_parms.push_back(PRM_Default(9, "Other Volumes"));
+    parms.add(hutil::ParmFactory(PRM_SWITCHER,
+                                 PRMswitcherName.getToken(),
+                                 PRMswitcherName.getLabel())
+              .setVectorSize(3)
+              .setDefault(tab_parms));
+
+    const char* items1[] = {"off","disabled", "on", "enabled", NULL};
+    const char* items2[] = {"off","disabled",
+                            "onoff", "enabled w/o mask",
+                            "onon",  "enabled with mask",NULL};
+    
+    ///////////// Level Set Options
+
+    parms.add(hutil::ParmFactory(PRM_ORD, "CheckLS", "Check level sets")
+              .setChoiceListItems(PRM_CHOICELIST_SINGLE, items1)
+              .setHelpText("Master switch to perform diagnostics of level sets.")
+              .setDefault(PRMoneDefaults));   
+    
+    parms.add(hutil::ParmFactory(PRM_ORD, "ScaleLS", "Uniform voxels")
+              .setChoiceListItems(PRM_CHOICELIST_SINGLE, items1)
+              .setHelpText("Verify that the voxels are uniform.")
+              .setDefault(PRMoneDefaults));
+    
+    parms.add(hutil::ParmFactory(PRM_ORD, "BackgLS", "Background value")
+              .setChoiceListItems(PRM_CHOICELIST_SINGLE, items1)
+              .setTypeExtended(PRM_TYPE_JOIN_PAIR)
+              .setHelpText("Verify that the background value is bounded by "
+                           "the minimum narrow-band width.")
+              .setDefault(PRMoneDefaults));
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "WidthLS", "Width")
+              .setDefault(3.0)
+              .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 5.0)
+              .setHelpText("Minimum allowed half-width of the narrow band in voxel units."));
+    
+    parms.add(hutil::ParmFactory(PRM_ORD, "TilesLS", "No active tiles")
+              .setChoiceListItems(PRM_CHOICELIST_SINGLE, items1)
+              .setHelpText("Verify that all the tiles are inactive")
+              .setDefault(PRMoneDefaults));
+    
+    parms.add(hutil::ParmFactory(PRM_ORD, "NaNLS", "No NaN values")
+              .setChoiceListItems(PRM_CHOICELIST_SINGLE, items2)
+              .setHelpText("Verify that none of the values are NaN or infinite."
+                           "Optionally generate a bool grid masking all "
+                           "the values faling the test.")
+              .setDefault(PRMoneDefaults));
+    
+    parms.add(hutil::ParmFactory(PRM_ORD, "ActiveLS", "Active values")
+              .setChoiceListItems(PRM_CHOICELIST_SINGLE, items2)
+              .setHelpText("Verify that the active values are bounded by +/- the "
+                           "background value. Optionally generate a bool grid masking "
+                           "all the values faling the test.")
+              .setDefault(PRMoneDefaults));
+    
+    parms.add(hutil::ParmFactory(PRM_ORD, "InactiveLS", "Inactive values")
+              .setChoiceListItems(PRM_CHOICELIST_SINGLE, items2)
+              .setHelpText("Verify that the inactive values equal +/- the background value."
+                           "Optionally generate a bool grid masking all "
+                           "the values faling the test.")
+              .setDefault(PRMoneDefaults));
+    
+    parms.add(hutil::ParmFactory(PRM_ORD, "GradLS", "Gradient norm")
+              .setChoiceListItems(PRM_CHOICELIST_SINGLE, items2)
+              .setTypeExtended(PRM_TYPE_JOIN_PAIR)
+              .setHelpText("Verify that norm of the gradient is bounded."
+                           "Optionally generate a bool grid masking all "
+                           "the values faling the test.")
+              .setDefault(PRMzeroDefaults));
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "MinGrad", "Min")
+              .setDefault(0.5)
+              .setTypeExtended(PRM_TYPE_JOIN_PAIR)
+              .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 2.0)
+              .setHelpText("Minimum length of the gradient vector"));
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "MaxGrad", "Max")
+              .setDefault(1.5)
+              .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 2.0)
+              .setHelpText("Maximum length of the gradient vector"));
+    
+
+    ///////////// FOG Volume Options
+
+    parms.add(hutil::ParmFactory(PRM_ORD, "CheckFOG", "Check FOG volumes")
+              .setChoiceListItems(PRM_CHOICELIST_SINGLE, items1)
+              .setHelpText("Master switch to perform diagnostics of FOG volumes.")
+              .setDefault(PRMoneDefaults));
+    
+    parms.add(hutil::ParmFactory(PRM_ORD, "BackgFOG", "Background value")
+              .setChoiceListItems(PRM_CHOICELIST_SINGLE, items1)
+              .setHelpText("Verify that the background value is zero.")
+              .setDefault(PRMoneDefaults));
+    
+    parms.add(hutil::ParmFactory(PRM_ORD, "NaNFOG", "No NaN values")
+              .setChoiceListItems(PRM_CHOICELIST_SINGLE, items2)
+              .setHelpText("Verify that none of the values are NaN or infinite."
+                           "Optionally generate a bool grid masking all "
+                           "the values faling the test.")
+              .setDefault(PRMoneDefaults));
+    
+    parms.add(hutil::ParmFactory(PRM_ORD, "ActiveFOG", "Active values")
+              .setChoiceListItems(PRM_CHOICELIST_SINGLE, items2)
+              .setHelpText("Verify that the active values are bounded by 0->1."
+                           "Optionally generate a bool grid masking "
+                           "all the values faling the test.")
+              .setDefault(PRMoneDefaults));
+    
+    parms.add(hutil::ParmFactory(PRM_ORD, "InactiveFOG", "Inactive values")
+              .setChoiceListItems(PRM_CHOICELIST_SINGLE, items2)
+              .setHelpText("Verify that the inactive values are zero."
+                           "Optionally generate a bool grid masking "
+                           "all the values faling the test.")
+              .setDefault(PRMoneDefaults));
+    
+    ///////////// Other Volume Options
+    
+    parms.add(hutil::ParmFactory(PRM_ORD, "CheckOther", "Check other volumes")
+              .setChoiceListItems(PRM_CHOICELIST_SINGLE, items1)
+              .setHelpText("Select the type of the voxel values.")
+              .setDefault(PRMzeroDefaults));
+
+    parms.add(hutil::ParmFactory(PRM_ORD, "NaNOther", "No NaN values")
+              .setChoiceListItems(PRM_CHOICELIST_SINGLE, items2)
+              .setHelpText("Verify that none of the values are NaN or infinite."
+                           "Optionally generate a bool grid masking all "
+                           "the values faling the test.")
+              .setDefault(PRMoneDefaults));
    
+    ///////////////////////
+
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Diagnostics", SOP_OpenVDB_Diagnostics::factory, parms, *table)
         .addInput("VDBs to diagnose");
 }
-
+    
 
 ////////////////////////////////////////
 
@@ -127,6 +264,30 @@ bool
 SOP_OpenVDB_Diagnostics::updateParmsFlags()
 {
     bool changed = false;
+
+    // Level Sets
+    const bool checkLS = evalInt("CheckLS", 0, 0) == 1;
+    changed |= enableParm("ScaleLS",   checkLS);
+    changed |= enableParm("BackgLS",   checkLS);
+    changed |= enableParm("WidthLS",   checkLS && evalInt("BackgLS",0,0)==1);
+    changed |= enableParm("TilesLS",   checkLS);
+    changed |= enableParm("NaNLS",     checkLS);
+    changed |= enableParm("ActiveLS",  checkLS);
+    changed |= enableParm("InactiveLS",checkLS);
+    changed |= enableParm("GradLS",    checkLS);
+    changed |= enableParm("MinGrad",   checkLS && evalInt("GradLS",0,0)>0);
+    changed |= enableParm("MaxGrad",   checkLS && evalInt("GradLS",0,0)>0);
+
+    // FOG Volumes
+    const bool checkFOG = evalInt("CheckFOG", 0, 0) == 1;
+    changed |= enableParm("BackgFOG",  checkFOG);
+    changed |= enableParm("NaNFOG",    checkFOG);
+    changed |= enableParm("ActiveFOG", checkFOG);
+    changed |= enableParm("InactiveFOG",checkFOG);
+
+    // Other Volumes
+    changed |= enableParm("TypesOther",  evalInt("CheckOther", 0, 0) > 0);
+    changed |= enableParm("NaNOther",    evalInt("CheckOther", 0, 0) > 0);
     
     return changed;
 }
@@ -161,45 +322,115 @@ SOP_OpenVDB_Diagnostics::cookMySop(OP_Context& context)
             ss << it.getIndex() <<" (" << it.getPrimitiveName("unnamed") << ") ";
             
             const openvdb::GridClass gridClass = vdbPrim->getGrid().getGridClass();
-            if (gridClass == openvdb::GRID_LEVEL_SET) {//level set
+            
+            if (gridClass == openvdb::GRID_LEVEL_SET && evalInt("CheckLS",0,0)>0) {
                 if (vdbPrim->getStorageType() != UT_VDB_FLOAT) {
                     ss << "failed a level set test: Value type is not floating point\n";
                     ++nErr;
                 } else {
+                    
                     openvdb::FloatGrid& grid = UTvdbGridCast<openvdb::FloatGrid>(vdbPrim->getGrid());
-                    const std::string str = openvdb::tools::checkLevelSet(grid);
+                    openvdb::tools::CheckLevelSet<openvdb::FloatGrid> c(grid);
+                    std::string str = evalInt("ScaleLS",0,0)==1 ? c.checkTransform() : "";
+                    if (str.empty() && evalInt("BackgLS",0,0)==1) {
+                        str = c.checkBackground(evalFloat("WidthLS",0,0));
+                    }
+                    if (str.empty() && evalInt("TilesLS",0,0)==1) {
+                        str = c.checkTiles();
+                    }
+                    if (str.empty() && evalInt("NaNLS",0,0)>0) {
+                        str = c.checkFinite(evalInt("NaNLS",0,0)==2);
+                    }
+                    if (str.empty() && evalInt("ActiveLS",0,0)>0) {
+                        str = c.checkRange(evalInt("ActiveLS",0,0)==2);
+                    }
+                    if (str.empty() && evalInt("InactiveLS",0,0)>0) {
+                        str = c.checkInactiveValues(evalInt("InactiveLS",0,0)==2);
+                    }
+                    if (str.empty() && evalInt("GradLS",0,0)>0) {
+                        str = c.checkEikonal(evalInt("GradLS",0,0)==2,
+                                             float(evalFloat("MinGrad",0,0)),
+                                             float(evalFloat("MaxGrad",0,0)));
+                    }
                     if (str.empty()) {
                         ss << "passed all level set tests\n";
                     } else {
                         ss << "failed a level set test: " << str;
                         ++nErr;
                     }
+                    if (!c.mask()->empty()) {
+                        std::ostringstream tmp;
+                        tmp << it.getPrimitiveName("unnamed") << "_mask";
+                        hvdb::createVdbPrimitive(*gdp, c.mask(), tmp.str().c_str());
+                    }
                 }
-            } else if (gridClass == openvdb::GRID_FOG_VOLUME) {//fog volume 
+            } else if (gridClass == openvdb::GRID_FOG_VOLUME && evalInt("CheckFOG",0,0)>0) { 
                 if (vdbPrim->getStorageType() != UT_VDB_FLOAT) {
                     ss << "failed a FOG volume test: Value type is not floating point\n";
                     ++nErr;
                 } else {
                     openvdb::FloatGrid& grid = UTvdbGridCast<openvdb::FloatGrid>(vdbPrim->getGrid());
-                    const std::string str = openvdb::tools::checkFogVolume(grid);
+                    openvdb::tools::CheckFogVolume<openvdb::FloatGrid> c(grid);
+                    std::string str = evalInt("BackgFOG",0,0)==1 ? c.checkBackground() : "";
+                    if (str.empty() && evalInt("NaNFOG",0,0)>0) {
+                        str = c.checkFinite(evalInt("NaNFOG",0,0)==2);
+                    }
+                    if (str.empty() && evalInt("ActiveFOG",0,0)>0) {
+                        str = c.checkRange(evalInt("ActiveFOG",0,0)==2);
+                    }
+                    if (str.empty() && evalInt("InactiveFOG",0,0)>0) {
+                        str = c.checkInactiveValues(evalInt("InactiveFOG",0,0)==2);
+                    }
                     if (str.empty()) {
                         ss << "passed all FOG volume tests\n";
                     } else {
                         ss << "failed a FOG volume test: " << str;
                         ++nErr;
                     }
+                    if (!c.mask()->empty()) {
+                        std::ostringstream tmp;
+                        tmp << it.getPrimitiveName("unnamed") << "_mask";
+                        hvdb::createVdbPrimitive(*gdp, c.mask(), tmp.str().c_str());
+                    }
                 }
-            } else {//unknown grid class
-                CheckFinite c;
-                GEOvdbProcessTypedGridTopology(*vdbPrim, c, /*makeUnique=*/false);
-                if (c.str.empty()) {
+            } else if ((gridClass == openvdb::GRID_UNKNOWN ||
+                        gridClass == openvdb::GRID_STAGGERED) && evalInt("CheckOther",0,0)>0) {
+                std::string str;
+                if (gridClass == openvdb::GRID_STAGGERED &&
+                    (vdbPrim->getStorageType()!=UT_VDB_VEC3F ||
+                     vdbPrim->getStorageType()!=UT_VDB_VEC3D) ) {
+                    ss << "failed a test: staggered grid should contain vector values!\n";
+                    str = ss.str();
+                }
+                openvdb::BoolGrid::Ptr mask;
+                if (str.empty() && evalInt("NaNOther",0,0)>0) {
+                    CheckFinite c(evalInt("NaNOther",0,0)==2);
+                    GEOvdbProcessTypedGridTopology(*vdbPrim, c, /*makeUnique=*/false);
+                    str = c.str;
+                    mask = c.mask;
+                    if (evalInt("NaNOther",0,0)==2 && !c.mask->empty()) {
+                        std::ostringstream tmp;
+                        tmp << it.getPrimitiveName("unnamed") << "_mask";
+                        hvdb::createVdbPrimitive(*gdp, c.mask, tmp.str().c_str());
+                    }
+                }
+                
+                if (str.empty()) {
                     ss << "passed all tests\n";
                 } else {
-                    ss << "failed a test: " << c.str;
+                    ss << "failed a test: " << str;
                     ++nErr;
                 }
+                if (mask && !mask->empty()) {
+                    std::ostringstream tmp;
+                    tmp << it.getPrimitiveName("unnamed") << "_mask";
+                    hvdb::createVdbPrimitive(*gdp, mask, tmp.str().c_str());
+                }
+               
+            } else {
+                ss << "ignored!\n";
             }
-        }
+        }//loop over vdb grids
         addMessage(SOP_MESSAGE, ss.str().c_str());
         ss.str("");
         if (nErr>0) {

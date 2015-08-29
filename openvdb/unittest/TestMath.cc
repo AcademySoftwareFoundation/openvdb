@@ -84,6 +84,23 @@ TestMath::testAll()
         const double a = math::Cbrt(3.0);
         CPPUNIT_ASSERT(math::isApproxEqual(a*a*a, 3.0, 1e-6));
     }
+    {// isNegative
+        CPPUNIT_ASSERT(!boost::is_signed<unsigned int>::value);
+        CPPUNIT_ASSERT(boost::is_signed<int>::value);
+        CPPUNIT_ASSERT(!boost::is_signed<bool>::value);
+        //CPPUNIT_ASSERT(boost::is_signed<double>::value);//fails!
+        //CPPUNIT_ASSERT(boost::is_signed<float>::value);//fails!
+        
+        CPPUNIT_ASSERT( math::isNegative(-1.0f));
+        CPPUNIT_ASSERT(!math::isNegative( 1.0f));
+        CPPUNIT_ASSERT( math::isNegative(-1.0));
+        CPPUNIT_ASSERT(!math::isNegative( 1.0));
+        CPPUNIT_ASSERT(!math::isNegative(true));
+        CPPUNIT_ASSERT(!math::isNegative(false));
+        CPPUNIT_ASSERT(!math::isNegative(1u));
+        CPPUNIT_ASSERT( math::isNegative(-1));
+        CPPUNIT_ASSERT(!math::isNegative( 1));
+    }
 }
 
 

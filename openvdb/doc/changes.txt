@@ -107,12 +107,10 @@ Bug fixes:
 - Fixed a bug in @vdblink::tools::QuadraticSampler::sample QuadraticSampler@endlink.
 - Fixed a roundoff issue in @vdblink::tools::LevelSetTracker LevelSetTrackerthat@endlink
   that could generate NaNs.
-- Updated vdb_view to use GLFW keys definitions. <I>[Contributed by Kevin Dietrich]</I>
 - Fixed parameter type inconsistencies in math::Ray.h and
   tools::RayIntersector.h <I>[Contributed by Kevin Dietrich]</I>
-- Replaced typeid keyword with BOOST_SP_TYPEID, this change is required for
-  the Cycles render engine, from the Blender Foundation.
-  <I>[Contributed by Kevin Dietrich]</I>
+- Fixed a bug in @vdblink::tools::clip clip@endlink (and the corresponding SOP)
+  that was caused by incorrect handeling of signed values.
 
 @par
 API changes:
@@ -131,19 +129,19 @@ Houdini:
 - Added a Rasterize Points SOP that produces density volumes and transfers
   arbitrary point attributes using a weighted average scheme. This node
   contains a VOP sub-network which can be used to define VEX procedures for
-  procedural density modeling. The accompanying creation script defines a
-  default VOP network with UI parameters.
+  procedural modeling. The accompanying creation script defines a
+  default VOP network with UI parameters for procedural cloud and velocity
+  field modeling.
 - Added an Advect Density SOP to advect non-level-sets, e.g. density or
   velocity.
 - Added a Remove Divergence SOP that removes any divergent portions of a
   velocity field.
+- Added a Diagnostics SOP that can perform various type of tests on LevelSet,
+  FOG and other classes of grids. Use it for debugging.
 - Added a Sort Points SOP that spatially reorders points that are close
   together in space to also be close in the insertion order. This
   operation can help improve CPU cache coherency and performance for
   random access operations.
-- Added a Diagnostics SOP that performs validation tests on grids to
-  detect potential issues. The tests are currently automated, but manual
-  selections will be added soon.
 - Added an option to the Convert SOP to activate interior voxels.
   <I>[Contributed by SESI]</I>
 - The To Polygons SOP can now optionally output a <TT>pscale</TT> attribute.

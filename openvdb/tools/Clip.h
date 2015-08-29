@@ -37,6 +37,7 @@
 #define OPENVDB_TOOLS_CLIP_HAS_BEEN_INCLUDED
 
 #include <openvdb/Grid.h>
+#include <openvdb/math/Math.h>// for isNegative
 #include <openvdb/tree/LeafManager.h>
 #include "GridTransformer.h" // for resampleToMatch()
 #include <boost/type_traits/is_same.hpp>
@@ -78,16 +79,6 @@ inline typename GridType::Ptr clip(const GridType& grid, const Grid<MaskTreeType
 
 namespace clip_internal {
 
-// If T is a signed type, return bool(T < 0).
-template<typename T>
-inline typename boost::enable_if<boost::is_signed<T>, bool>::type
-lessThanZero(const T& v) { return v < zeroVal<T>(); }
-
-// If T is an unsigned type, no value of type T is less than zero.
-template<typename T>
-inline typename boost::disable_if<boost::is_signed<T>, bool>::type
-lessThanZero(const T&) { return false; }
-
 
 ////////////////////////////////////////
 
@@ -109,7 +100,7 @@ public:
             typename LeafNodeType::ValueOffIter iter = leaf.beginValueOff();
             for ( ; iter; ++iter) {
                 const Index pos = iter.pos();
-                leaf.setActiveState(pos, lessThanZero(refLeaf->getValue(pos)));
+                leaf.setActiveState(pos, math::isNegative(refLeaf->getValue(pos)));
             }
         }
     }
@@ -312,7 +303,7 @@ doClip(const GridType& grid, const typename GridType::template ValueConverter<bo
         iter.setMaxDepth(BoolTreeT::ValueAllIter::LEAF_DEPTH - 1);
 
         for ( ; iter; ++iter) {
-            iter.setActiveState(lessThanZero(acc.getValue(iter.getCoord())));
+            iter.setActiveState(math::isNegative(acc.getValue(iter.getCoord())));
         }
     }
 

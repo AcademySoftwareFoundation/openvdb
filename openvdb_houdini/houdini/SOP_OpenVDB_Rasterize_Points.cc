@@ -75,11 +75,12 @@
 #include <OP/OP_VexFunction.h>
 
 
-#include <string>
-#include <sstream>
-#include <vector>
 #include <algorithm> // std::sort
 #include <math.h> // trigonometric functions
+#include <set>
+#include <sstream>
+#include <string>
+#include <vector>
 
 
 #include <tbb/blocked_range.h>
@@ -2244,16 +2245,28 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
 
         const GU_Detail* pointsGeo = inputGeo(0);
         const bool createDensity = 0 != evalInt("createdensity", 0, time);
+        const bool applyVEX = evalInt("modeling", 0, time);
+
 
         std::vector<std::string> attributeNames;
-
         {
             UT_String attributeNameStr;
             evalString(attributeNameStr, "attributes", 0, time);
+
+            std::vector<std::string> tmpAttributeNames;
+
             if (attributeNameStr.length() > 0) {
                 std::string tmpStr = attributeNameStr.toStdString();
-                boost::algorithm::split(attributeNames, tmpStr, boost::is_any_of(", "));
+                boost::algorithm::split(tmpAttributeNames, tmpStr, boost::is_any_of(", "));
             }
+
+            std::set<std::string> uniqueAttributeNames(tmpAttributeNames.begin(), tmpAttributeNames.end());
+
+            if (applyVEX && hasParm("process_velocity") && evalInt("process_velocity", 0, time) == 1) {
+                uniqueAttributeNames.insert("v");
+            }
+
+            attributeNames.insert(attributeNames.end(), uniqueAttributeNames.begin(), uniqueAttributeNames.end());
         }
 
         if (createDensity || hasValidPointAttributes(*pointsGeo, attributeNames)) {
@@ -2274,7 +2287,7 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
                 RasterizePoints::ACCUMULATE : RasterizePoints::MAXIMUM;
 
             const float voxelSize = float(evalFloat("voxelsize", 0, time));
-            const bool applyVEX = evalInt("modeling", 0, time);
+
 
             const openvdb::math::Transform::Ptr volumeTransform =
                 openvdb::math::Transform::createLinearTransform(voxelSize);

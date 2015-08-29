@@ -871,7 +871,6 @@ SOP_OpenVDB_Filter_Level_Set::filterGrid(OP_Context& context, FilterT& filter,
     const FilterParms& parms, BossT& boss, bool verbose)
 {
     // Alpha-masking
-    typedef typename FilterT::GridType GridT;
     typedef typename FilterT::MaskType MaskT;
     typename MaskT::ConstPtr maskGrid;
 
@@ -919,7 +918,6 @@ SOP_OpenVDB_Filter_Level_Set::filterGrid(OP_Context& context, FilterT& filter,
       case ACCURACY_HJ_WENO:       filter.setSpatialScheme(openvdb::math::HJWENO5_BIAS); break;
     }
 
-    typedef typename FilterT::ValueType ValueT;
     const float ds = (parms.mWorldUnits ? 1.f : mVoxelSize) * parms.mVoxelOffset;
 
     switch (parms.mFilterType) {

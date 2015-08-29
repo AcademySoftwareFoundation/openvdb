@@ -268,7 +268,6 @@ struct ConstructShadow
     void operator()(const GridType& grid)
     {
         typedef typename GridType::TreeType TreeType;
-        typedef openvdb::BoolTree BoolTree;
 
         const TreeType& tree = grid.tree();
 

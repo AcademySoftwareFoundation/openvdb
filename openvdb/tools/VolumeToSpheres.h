@@ -724,11 +724,6 @@ fillWithSpheres(
     typedef typename TreeT::template ValueConverter<int>::Type IntTreeT;
     typedef typename TreeT::template ValueConverter<Int16>::Type Int16TreeT;
 
-    typedef tree::LeafManager<const TreeT> LeafManagerT;
-    typedef tree::LeafManager<IntTreeT>    IntLeafManagerT;
-    typedef tree::LeafManager<Int16TreeT>  Int16LeafManagerT;
-
-
     typedef boost::mt11213b RandGen;
     RandGen mtRand(/*seed=*/0);
 

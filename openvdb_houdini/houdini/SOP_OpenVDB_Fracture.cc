@@ -370,7 +370,6 @@ SOP_OpenVDB_Fracture::process(
     const int visualization = evalInt("visualizepieces", 0, time);
     const bool segmentFragments = bool(evalInt("segmentfragments", 0, time));
 
-    typedef typename GridType::TreeType TreeType;
     typedef typename GridType::ValueType ValueType;
 
     typename GridType::Ptr firstGrid = openvdb::gridPtrCast<GridType>(grids.front());

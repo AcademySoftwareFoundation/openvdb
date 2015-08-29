@@ -368,7 +368,6 @@ struct LeafNodeOriginOp
     void operator()(const tbb::blocked_range<size_t>& range) const {
 
         typedef typename PointArray::value_type     PointType;
-        typedef typename PointType::value_type      PointElementType;
 
         const int mask = ~((1 << mLog2Dim) - 1);
         Coord ijk;

@@ -915,7 +915,6 @@ computeEnclosedRegionMask(const TreeType& tree, typename TreeType::ValueType iso
     typedef typename CharTreeType::LeafNodeType                                     CharLeafNodeType;
     typedef typename CharTreeType::RootNodeType                                     CharRootNodeType;
     typedef typename CharRootNodeType::NodeChainType                                CharNodeChainType;
-    typedef typename boost::mpl::at<CharNodeChainType, boost::mpl::int_<1> >::type  CharInternalNodeType;
 
     typedef typename TreeType::template ValueConverter<bool>::Type                  BoolTreeType;
     typedef typename BoolTreeType::LeafNodeType                                     BoolLeafNodeType;

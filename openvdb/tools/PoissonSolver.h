@@ -407,7 +407,6 @@ createVectorFromTree(const SourceTreeType& tree,
 {
     typedef typename SourceTreeType::template ValueConverter<VIndex>::Type VIdxTreeT;
     typedef tree::LeafManager<const VIdxTreeT>           VIdxLeafMgrT;
-    typedef typename SourceTreeType::ValueType           ValueT;
     typedef typename math::pcg::Vector<VectorValueType>  VectorT;
 
     // Allocate the vector.
@@ -629,10 +628,8 @@ createISLaplacianWithBoundaryConditions(
     const BoundaryOp& boundaryOp,
     typename math::pcg::Vector<LaplacianMatrix::ValueType>& source)
 {
-    typedef LaplacianMatrix::ValueType                   ValueT;
     typedef typename BoolTreeType::template ValueConverter<VIndex>::Type VIdxTreeT;
     typedef typename tree::LeafManager<const VIdxTreeT>  VIdxLeafMgrT;
-    typedef typename VIdxTreeT::LeafNodeType             VIdxLeafT;
 
     // The number of active voxels is the number of degrees of freedom.
     const Index64 numDoF = idxTree.activeVoxelCount();
