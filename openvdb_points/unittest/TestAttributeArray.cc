@@ -32,19 +32,25 @@
 #include <openvdb_points/tools/AttributeArray.h>
 #include <openvdb_points/tools/AttributeSet.h>
 #include <openvdb/Types.h>
+#include <openvdb/math/Transform.h>
 
 #include <iostream>
 #include <sstream>
+
+using namespace openvdb;
+using namespace openvdb::tools;
 
 class TestAttributeArray: public CppUnit::TestCase
 {
 public:
     CPPUNIT_TEST_SUITE(TestAttributeArray);
+    CPPUNIT_TEST(testFixedPointConversion);
     CPPUNIT_TEST(testAttributeArray);
     CPPUNIT_TEST(testAttributeHandle);
 
     CPPUNIT_TEST_SUITE_END();
 
+    void testFixedPointConversion();
     void testAttributeArray();
     void testAttributeHandle();
 }; // class TestPointDataGrid
@@ -72,6 +78,30 @@ matchingNamePairs(const openvdb::tools::NamePair& lhs,
 
 ////////////////////////////////////////
 
+void
+TestAttributeArray::testFixedPointConversion()
+{
+    openvdb::math::Transform::Ptr transform(openvdb::math::Transform::createLinearTransform(/*voxelSize=*/0.1));
+
+    const float value = 33.5688040469035f;
+
+    // convert to fixed-point value
+
+    const openvdb::Vec3f worldSpaceValue(value);
+    const openvdb::Vec3f indexSpaceValue = transform->worldToIndex(worldSpaceValue);
+    const float voxelSpaceValue = indexSpaceValue.x() - math::Round(indexSpaceValue.x()) + 0.5f;
+    const int intValue = floatingPointToFixedPoint<int>(voxelSpaceValue);
+
+    // convert back to floating-point value
+
+    const float newVoxelSpaceValue = fixedPointToFloatingPoint<float>(intValue);
+    const openvdb::Vec3f newIndexSpaceValue(newVoxelSpaceValue + math::Round(indexSpaceValue.x()) - 0.5f);
+    const openvdb::Vec3f newWorldSpaceValue = transform->indexToWorld(newIndexSpaceValue);
+
+    const float newValue = newWorldSpaceValue.x();
+
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(value, newValue, /*tolerance=*/1e-6);
+}
 
 void
 TestAttributeArray::testAttributeArray()

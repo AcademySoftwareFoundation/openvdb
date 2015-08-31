@@ -30,7 +30,7 @@
 //
 /// @file AttributeArray.h
 ///
-/// @authors Mihai Alden, Peter Cucka
+/// @authors Dan Bailey, Mihai Alden, Peter Cucka
 
 
 #ifndef OPENVDB_TOOLS_ATTRIBUTE_ARRAY_HAS_BEEN_INCLUDED
@@ -76,7 +76,7 @@ floatingPointToFixedPoint(const FloatT s)
 {
     if (FloatT(0.0) > s) return std::numeric_limits<IntegerT>::min();
     else if (FloatT(1.0) <= s) return std::numeric_limits<IntegerT>::max();
-    return IntegerT(std::floor(s * FloatT(std::numeric_limits<IntegerT>::max() + 1)));
+    return IntegerT(std::floor(s * FloatT(std::numeric_limits<IntegerT>::max())));
 }
 
 
@@ -84,7 +84,7 @@ template <typename FloatT, typename IntegerT>
 inline FloatT
 fixedPointToFloatingPoint(const IntegerT s)
 {
-    return FloatT(s) / FloatT((std::numeric_limits<IntegerT>::max() + 1));
+    return FloatT(s) / FloatT((std::numeric_limits<IntegerT>::max()));
 }
 
 
@@ -233,15 +233,15 @@ public:
     bool operator==(const AttributeArray& other) const;
     bool operator!=(const AttributeArray& other) const { return !this->operator==(other); }
 
-
-    virtual AccessorBasePtr getAccessor() const = 0;
-
 private:
     /// Virtual function used by the comparison operator to perform
     /// comparisons on inherited types
     virtual bool isEqual(const AttributeArray& other) const = 0;
 
 protected:
+    /// Obtain an Accessor that stores getter and setter functors.
+    virtual AccessorBasePtr getAccessor() const = 0;
+
     /// Register a attribute type along with a factory function.
     static void registerType(const NamePair& type, FactoryMethod);
     /// Remove a attribute type from the registry.
@@ -372,10 +372,8 @@ public:
     virtual void write(std::ostream& os) const;
 
 
-    virtual AccessorBasePtr getAccessor() const {
-        return AccessorBasePtr(new AttributeArray::Accessor<ValueType_>(
-            &TypedAttributeArray<ValueType_, Codec_>::get, &TypedAttributeArray<ValueType_, Codec_>::set));
-    }
+protected:
+    virtual AccessorBasePtr getAccessor() const;
 
 private:
     /// Compare the this data to another attribute array. Used by the base class comparison operator
@@ -960,6 +958,15 @@ TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os) const
         os.write(reinterpret_cast<const char*>(mData), this->arrayMemUsage());
 
     }
+}
+
+
+template<typename ValueType_, typename Codec_>
+AttributeArray::AccessorBasePtr
+TypedAttributeArray<ValueType_, Codec_>::getAccessor() const
+{
+    return AccessorBasePtr(new AttributeArray::Accessor<ValueType_>(
+        &TypedAttributeArray<ValueType_, Codec_>::get, &TypedAttributeArray<ValueType_, Codec_>::set));
 }
 
 

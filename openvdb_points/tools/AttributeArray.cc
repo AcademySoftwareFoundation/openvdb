@@ -30,13 +30,10 @@
 //
 /// @file AttributeArray.cc
 ///
-/// @note For evaluation purposes, do not distribute.
-///
-/// @authors Mihai Alden, Peter Cucka
+/// @authors Dan Bailey, Mihai Alden, Peter Cucka
+
 
 #include "AttributeArray.h"
-
-#include <algorithm> // std::equal
 
 
 namespace openvdb {
