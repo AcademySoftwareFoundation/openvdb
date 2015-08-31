@@ -300,7 +300,7 @@ public:
 
     /// @brief Returns whether an attribute exists. This method is faster
     /// than hasAttribute(const Name&) as it avoids a map lookup.
-    /// @param index    Index of the attribute
+    /// @param pos    Index of the attribute
     template <typename TypedAttributeArrayType>
     bool hasAttribute(const size_t pos) const
     {

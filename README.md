@@ -11,6 +11,6 @@ For instructions on library installation and dependencies see INSTALL
 For documentation of the library and code examples see:
 www.openvdb.org/documentation/doxygen
 
-For more details visit the project's home page:
+For more details visit the OpenVDB project's home page:
 www.openvdb.org
 

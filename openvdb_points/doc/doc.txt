@@ -1,0 +1,34 @@
+/**
+@mainpage OpenVDB Points
+
+The @b OpenVDB @b Points library is an extension to the @b OpenVDB library
+to add support for storing point data in a VDB Grid. Points are
+spatially organised into VDB voxels which offers faster access and a
+greater opportunity for data compression compared with linear point arrays.
+
+The library has been developed by Double Negative in collaboration with
+Dreamworks Animation. While the open-source library is currently hosted
+by Double Negative, the intention is to integrate the source into the main
+OpenVDB repository once the library is deemed sufficiently stable.
+
+This initial Beta release contains the core Attribute API and a Houdini
+plug-in.
+
+This library was presented at Siggraph 2015 for which the slides can be
+found online at <a href="http://www.openvdb.org/download/openvdb_particle_storage_2015.pdf">Advanced
+Applications in Particle Storage at Double Negative</a>.
+
+@b OpenVDB @b Points is maintained by
+<a href="http://www.dneg.com">Double Negative</A>
+and was developed primarily by
+- Dan Bailey (Dneg)
+- Mihai Ald&eacute;n (DWA)
+- Nick Avramoussis (Dneg)
+- Matt Warner (Dneg)
+- Harry Biddle (Dneg)
+- Peter Cucka (DWA)
+- Ken Museth (DWA)
+
+<I>To be written</I>
+
+*/
