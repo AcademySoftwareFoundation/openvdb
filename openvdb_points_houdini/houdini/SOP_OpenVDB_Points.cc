@@ -250,6 +250,10 @@ public:
     typedef boost::shared_ptr<PointAttribute> Ptr;
     typedef boost::shared_ptr<std::vector<GA_Offset> > OffsetListPtr;
 
+    static Ptr create(GA_Attribute const * attribute, OffsetListPtr offsets, const int compression = 0) {
+        return Ptr(new PointAttribute(attribute, offsets, compression));
+    }
+
     explicit PointAttribute(GA_Attribute const * attribute, OffsetListPtr offsets, const int compression = 0)
         : mAttribute(attribute)
         , mOffsets(offsets)
@@ -341,7 +345,7 @@ operator<(const PointAttribute::Ptr& lhs, const PointAttribute::Ptr& rhs) {
 ///                         2: 8-bit fixed-point)
 /// @param group            an optional Houdini group to selectively filter the points
 template<typename PositionT, typename PointAttributeT>
-inline PointAttributeList<PositionT, PointAttributeT>::Ptr
+inline typename PointAttributeList<PositionT, PointAttributeT>::Ptr
 createPointAttributeList(
     const GU_Detail& detail,
     const std::vector<std::pair<Name, int> >& attributes,
@@ -389,9 +393,9 @@ createPointAttributeList(
         }
     }
 
-    PointAttributePtr positionAttribute = PointAttributeT::create(detail.getP(), offsets, positionCompression);
+    PointAttributePtr positionAttribute =  PointAttributeT::create(detail.getP(), offsets, positionCompression);
 
-    PointAttributeList::Ptr attributeList(new PointAttributeList(positionAttribute));
+    typename PointAttributeList::Ptr attributeList(new PointAttributeList(positionAttribute));
 
     // add arbitary attributes to point attribute list as requested
 
@@ -407,6 +411,10 @@ createPointAttributeList(
         if (!attribute)             continue;
 
         PointAttributePtr pointAttribute = PointAttributeT::create(attribute, offsets, it->second);
+
+        // skip position as this has already been added
+
+        if (pointAttribute->name() == "P")  continue;
 
         attributeList->addAttribute(pointAttribute);
     }
@@ -621,7 +629,7 @@ convertPointDataGrid(GU_Detail& detail, openvdb_houdini::VdbPrimCIterator& vdbIt
                 convertPointDataGridAttribute<Vec3<double> >(tree, index, attribute, geo);
             }
             else {
-                throw std::runtime_error("Unknown Attribute Type for Conversion: " + attrType.first);
+                throw std::runtime_error("Unknown Attribute Type for Conversion: " + type);
             }
 
             attribute.tryCompressAllPages();

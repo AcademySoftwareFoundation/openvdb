@@ -36,8 +36,9 @@
 ///         within the leaf nodes themselves and ordered locally by voxels.
 ///
 
-#ifndef OPENVDB_POINTS_TOOLS_POINT_CONVERSION_HAS_BEEN_INCLUDED
-#define OPENVDB_POINTS_TOOLS_POINT_CONVERSION_HAS_BEEN_INCLUDED
+
+#ifndef OPENVDB_TOOLS_POINT_CONVERSION_HAS_BEEN_INCLUDED
+#define OPENVDB_TOOLS_POINT_CONVERSION_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h>
 #include <openvdb/Types.h>
@@ -121,7 +122,7 @@ public:
     typedef typename PointAttributeType::Ptr                            PointAttributePtr;
     typedef typename PointAttributeType::template Accessor<PositionT>   PositionAccessor;
     typedef typename PositionAccessor::Ptr                              PositionAccessorPtr;
-    typedef boost::scoped_ptr<PointAttributeList>                       ScopedPtr;
+    typedef boost::shared_ptr<PointAttributeList>                       Ptr;
     typedef typename std::vector<PointAttributePtr>::const_iterator     const_iterator;
     typedef AttributeSet::Descriptor                                    Descriptor;
 
@@ -130,6 +131,9 @@ public:
         , mPositionAccessor(mPositionAttribute->template getAccessor<PositionT>())
         , mSize(mPositionAttribute->size())
     {
+        // implicitly insert position into attribute list
+
+        mAttributes.push_back(positionAttribute);
     }
 
     Index64 attributes() const { return mAttributes.size(); }
@@ -142,7 +146,15 @@ public:
         mPositionAccessor->getValue(n, xyz);
     }
 
-    void addAttribute(PointAttributePtr attribute) {
+    void addAttribute(PointAttributePtr attribute)
+    {
+        for (const_iterator it = cbegin(), itEnd = cend(); it != itEnd; ++it)
+        {
+            if (attribute->name() == (*it)->name()) {
+                throw std::runtime_error("Duplicate attribute: " + attribute->name());
+            }
+        }
+
         mAttributes.push_back(attribute);
 
         // sort the elements after every insertion
@@ -452,19 +464,22 @@ createPointDataGrid(const PointIndexGridT& pointIndexGrid,
             if (attrType.first == "vec3s") {
                 populatePositionAttribute<PointAttributeT, openvdb::Vec3f>(*treePtr, pointIndexTree, xform, *attribute, index);
             }
+            else {
+                throw std::runtime_error("Unknown Position Attribute Type for Conversion: " + attrType.first);
+            }
         }
         else {
 
             if (attrType.first == "bool") {
                 populateAttribute<PointAttributeT, bool>(*treePtr, pointIndexTree, *attribute, index);
             }
-            else if (attrType.first == "short") {
+            else if (attrType.first == "int16") {
                 populateAttribute<PointAttributeT, short>(*treePtr, pointIndexTree, *attribute, index);
             }
-            else if (attrType.first == "int") {
+            else if (attrType.first == "int32") {
                 populateAttribute<PointAttributeT, int>(*treePtr, pointIndexTree, *attribute, index);
             }
-            else if (attrType.first == "long") {
+            else if (attrType.first == "int64") {
                 populateAttribute<PointAttributeT, long>(*treePtr, pointIndexTree, *attribute, index);
             }
             else if (attrType.first == "half") {
@@ -484,6 +499,9 @@ createPointDataGrid(const PointIndexGridT& pointIndexGrid,
             }
             else if (attrType.first == "vec3d") {
                 populateAttribute<PointAttributeT, openvdb::math::Vec3<double> >(*treePtr, pointIndexTree, *attribute, index);
+            }
+            else {
+                throw std::runtime_error("Unknown Attribute Type for Conversion: " + attrType.first);
             }
         }
     }
@@ -508,7 +526,7 @@ createPointDataGrid(const PointArrayT& points, const math::Transform& xform)
 } // namespace openvdb
 
 
-#endif // OPENVDB_POINTS_TOOLS_POINT_CONVERSION_HAS_BEEN_INCLUDED
+#endif // OPENVDB_TOOLS_POINT_CONVERSION_HAS_BEEN_INCLUDED
 
 
 // Copyright (c) 2012-2014 DreamWorks Animation LLC
