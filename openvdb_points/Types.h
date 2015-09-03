@@ -31,9 +31,9 @@
 #ifndef OPENVDB_POINTS_TYPES_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_TYPES_HAS_BEEN_INCLUDED
 
-#include <OpenVDB/version.h>
-#include <OpenVDB/Platform.h>
-#include <OpenVDB/Types.h>
+#include <openvdb/version.h>
+#include <openvdb/Platform.h>
+#include <openvdb/Types.h>
 #include <OpenEXR/half.h>
 
 namespace openvdb {

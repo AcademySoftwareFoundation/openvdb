@@ -39,8 +39,7 @@
 #include <openvdb_points/tools/PointDataGrid.h>
 #include <openvdb_points/tools/PointConversion.h>
 
-#include <openvdb_houdini/SOP_NodeVDBPoints.h>
-#include <openvdb_houdini/Utils.h>
+#include "SOP_NodeVDBPoints.h"
 
 #include <houdini_utils/geometry.h>
 #include <houdini_utils/ParmFactory.h>
