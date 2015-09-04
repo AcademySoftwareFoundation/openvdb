@@ -58,7 +58,11 @@
 #include <GT/GT_PrimVDB.h>
 #include <GUI/GUI_PrimitiveHook.h>
 #include <RE/RE_Geometry.h>
+#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
 #include <RE/RE_BufferCache.h>
+#else
+#include <RE/RE_GraphicsCache.h>
+#endif
 #include <RE/RE_Render.h>
 #include <RE/RE_ShaderHandle.h>
 #include <RE/RE_VertexArray.h>
@@ -455,9 +459,16 @@ GR_PrimVDBPoints::update(RE_Render *r,
     if (pos->getCacheVersion() != p.geo_version ||
        (hasColor && col->getCacheVersion() != p.geo_version))
     {
+#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
         RE_BufferCache* gCache = RE_BufferCache::getCache();
 
         size_t availableGraphicsMemory(gCache->getMaxSizeB() -  gCache->getCurSizeB());
+#else
+        RE_GraphicsCache* gCache = RE_GraphicsCache::getCache();
+
+        size_t availableGraphicsMemory(gCache->getMaxSize() -  gCache->getCurrentSize());
+#endif
+
         size_t sizeOfVector3InBytes = (REsizeOfGPUType(RE_GPU_FLOAT32) * 3) / 8;
         size_t pointAttributeBytes = hasColor ? 2 * sizeOfVector3InBytes : sizeOfVector3InBytes;
 
