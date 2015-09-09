@@ -268,6 +268,10 @@ DOC_FILES :=
 DOC_INDEX := doc/html/index.html
 DOC_PDF := doc/latex/refman.pdf
 
+CMD_SRC_NAMES := \
+    cmd/openvdb_print/main.cc \
+#
+
 
 HEADER_SUBDIRS := $(dir $(INCLUDE_NAMES))
 
@@ -277,6 +281,7 @@ ALL_INCLUDE_FILES := \
 #
 SRC_FILES := \
     $(SRC_NAMES) \
+    $(CMD_SRC_NAMES) \
     $(UNITTEST_SRC_NAMES) \
 #
 ALL_SRC_FILES := $(SRC_FILES)
@@ -324,6 +329,7 @@ list_deps = $(if $(wordlist 4,5,$(?F)),$(firstword $(?F)) and others,$(wordlist 
 ALL_PRODUCTS := \
     $(LIBOPENVDBPOINTS) \
     vdb_test \
+    vdb_print \
     $(DEPEND) \
     $(LIBOPENVDBPOINTS_SHARED_NAME) \
     $(LIBOPENVDBPOINTS_SONAME) \
@@ -337,7 +343,7 @@ ALL_PRODUCTS := \
 	@echo "Building $@ because of $(call list_deps)"
 	$(CXX) -c $(CXXFLAGS) -fPIC -o $@ $<
 
-all: lib vdb_test depend
+all: lib vdb_print vdb_test depend
 
 $(OBJ_NAMES): %.o: %.cc
 	@echo "Building $@ because of $(call list_deps)"
@@ -391,6 +397,13 @@ pdfdoc:
 	@echo "$@"': $$DOXYGEN is undefined'
 endif
 
+vdb_print: $(LIBOPENVDB) cmd/openvdb_print/main.cc
+	@echo "Building $@ because of $(list_deps)"
+	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_print/main.cc -I . \
+	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB) \
+	    $(LIBOPENVDBPOINTS_RPATH) -L$(CURDIR) $(LIBOPENVDBPOINTS) \
+	    $(LIBS_RPATH) $(CONCURRENT_MALLOC_LIB) \
+	    -I$(EXR_INCL_DIR)
 
 $(UNITTEST_OBJ_NAMES): %.o: %.cc
 	@echo "Building $@ because of $(list_deps)"
@@ -414,7 +427,7 @@ test:
 	@echo "$@"': $$(CPPUNIT_INCL_DIR) is undefined'
 endif
 
-install: lib doc
+install: lib vdb_print doc
 	mkdir -p $(DESTDIR)/include/openvdb_points
 	@echo "Created $(DESTDIR)/include/openvdb_points"
 	pushd $(DESTDIR)/include/openvdb_points > /dev/null; \
@@ -433,6 +446,12 @@ install: lib doc
 	    fi; \
 	    popd > /dev/null
 	@echo "Copied libopenvdb_points to $(DESTDIR)/lib/"
+	@#
+	mkdir -p $(DESTDIR)/bin
+	@echo "Created $(DESTDIR)/bin/"
+	cp -f vdb_print $(DESTDIR)/bin
+	@echo "Copied vdb_print to $(DESTDIR)/bin/"
+	@#
 	if [ -d doc/html ]; \
 	then \
 	    mkdir -p $(DESTDIR)/share/doc/openvdb; \
@@ -447,7 +466,7 @@ install: lib doc
 $(DEPEND): $(ALL_INCLUDE_FILES) $(ALL_SRC_FILES)
 	@echo "Generating dependencies because of $(list_deps)"
 	$(RM) $(DEPEND)
-	for f in $(SRC_NAMES); \
+	for f in $(SRC_NAMES) $(CMD_SRC_NAMES); \
 	    do $(CXX) $(CXXFLAGS) -O0 \
 	        -MM $$f -MT `echo $$f | sed 's%\.[^.]*%.o%'` >> $(DEPEND); \
 	done

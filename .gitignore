@@ -30,6 +30,7 @@ openvdb_points_houdini/houdini_deps
 
 # Binaries
 openvdb_points/vdb_test
+openvdb_points/vdb_print
 
 # Doxygen
 openvdb_points/doc/html
