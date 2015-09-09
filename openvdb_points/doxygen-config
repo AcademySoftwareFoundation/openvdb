@@ -23,7 +23,7 @@ PROJECT_NAME           = OpenVDBPoints
 # This could be handy for archiving the generated documentation or
 # if some version control system is used.
 
-PROJECT_NUMBER         = 3.1.0
+PROJECT_NUMBER         = 0.1.0
 
 ALIASES += vdbnamespace="openvdb::v3_1_0"
 PREDEFINED = OPENVDB_VERSION_NAME=v3_1_0
@@ -891,6 +891,18 @@ GENERATE_XML           = NO
 # put in front of it. If left blank `xml' will be used as the default path.
 
 XML_OUTPUT             = xml
+
+# The XML_SCHEMA tag can be used to specify an XML schema,
+# which can be used by a validating XML parser to check the
+# syntax of the XML files.
+
+XML_SCHEMA             =
+
+# The XML_DTD tag can be used to specify an XML DTD,
+# which can be used by a validating XML parser to check the
+# syntax of the XML files.
+
+XML_DTD                =
 
 # If the XML_PROGRAMLISTING tag is set to YES Doxygen will
 # dump the program listings (including syntax highlighting
