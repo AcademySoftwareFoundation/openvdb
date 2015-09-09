@@ -835,7 +835,6 @@ TestPointDataLeaf::testIO()
 }
 
 
-
 CPPUNIT_TEST_SUITE_REGISTRATION(TestPointDataLeaf);
 
 

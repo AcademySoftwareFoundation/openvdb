@@ -31,6 +31,9 @@
 /// @file AttributeSet.h
 ///
 /// @authors Dan Bailey, Mihai Alden, Peter Cucka
+///
+/// @brief  Set of Attribute Arrays which tracks metadata about each array.
+///
 
 
 #ifndef OPENVDB_TOOLS_ATTRIBUTE_SET_HAS_BEEN_INCLUDED

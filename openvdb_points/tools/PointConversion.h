@@ -32,8 +32,7 @@
 ///
 /// @file PointConversion.h
 ///
-/// @brief  Attribute-owned data structure for points. Point attributes are stored
-///         within the leaf nodes themselves and ordered locally by voxels.
+/// @brief  Convert a generic point data structure into a VDB Point Data Grid.
 ///
 
 

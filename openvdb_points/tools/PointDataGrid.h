@@ -32,8 +32,10 @@
 ///
 /// @file PointDataGrid.h
 ///
-/// @brief  Attribute-owned data structure for points. Point attributes are stored
-///         within the leaf nodes themselves and ordered locally by voxels.
+/// @brief  Attribute-owned data structure for points. Point attributes are
+///         stored in leaf nodes and ordered by voxel for fast random and
+///         sequential access.
+///
 
 
 #ifndef OPENVDB_TOOLS_POINT_DATA_GRID_HAS_BEEN_INCLUDED

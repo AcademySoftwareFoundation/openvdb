@@ -31,6 +31,9 @@
 /// @file AttributeArray.h
 ///
 /// @authors Dan Bailey, Mihai Alden, Peter Cucka
+///
+/// @brief  Attribute Array storage templated on type and compression codec.
+///
 
 
 #ifndef OPENVDB_TOOLS_ATTRIBUTE_ARRAY_HAS_BEEN_INCLUDED
@@ -145,7 +148,7 @@ struct UnitVecAttributeCodec
 ////////////////////////////////////////
 
 
-/// Base class for storing point attribute information in a LeafNode
+/// Base class for storing attribute data
 class AttributeArray
 {
 private:
@@ -260,8 +263,8 @@ protected:
 /// Accessor base class for AttributeArray storage where type is not available
 struct AttributeArray::AccessorBase { };
 
-/// Templated accessor stores typed getter and setter function pointers
-/// which is used to bind AttributeHandles
+/// Templated Accessor stores typed function pointers used in binding
+/// AttributeHandles
 template <typename T>
 struct AttributeArray::Accessor : public AttributeArray::AccessorBase
 {
@@ -279,7 +282,7 @@ struct AttributeArray::Accessor : public AttributeArray::AccessorBase
 ////////////////////////////////////////
 
 
-/// Templated attribute class to hold specific types
+/// Typed class for storing attribute data
 template<typename ValueType_, typename Codec_ = NullAttributeCodec<ValueType_> >
 class TypedAttributeArray: public AttributeArray
 {
