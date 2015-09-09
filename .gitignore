@@ -32,5 +32,4 @@ openvdb_points_houdini/houdini_deps
 openvdb_points/vdb_test
 
 # Doxygen
-doc
 openvdb_points/doc/html
