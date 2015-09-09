@@ -67,9 +67,18 @@ enum COMPRESSION_TYPE
 inline NamePair
 attrTypeFromGAAttribute(GA_Attribute const * attribute, const int compression = 0)
 {
-    if (!attribute)     throw std::runtime_error("Invalid attribute type requested");
+    if (!attribute) {
+        std::stringstream ss; ss << "Invalid attribute - " << attribute->getName();
+        throw std::runtime_error(ss.str());
+    }
 
     const GA_AIFTuple* tupleAIF = attribute->getAIFTuple();
+
+    if (!tupleAIF) {
+        std::stringstream ss; ss << "Invalid attribute type - " << attribute->getName();
+        throw std::runtime_error(ss.str());
+    }
+
     const GA_Storage storage = tupleAIF->getStorage(attribute);
 
     const int16_t width = static_cast<int16_t>(tupleAIF->getTupleSize(attribute));
@@ -134,15 +143,25 @@ attrTypeFromGAAttribute(GA_Attribute const * attribute, const int compression = 
         }
     }
 
-    throw std::runtime_error("Unknown attribute type requested");
+    std::stringstream ss; ss << "Unknown attribute type - " << attribute->getName();
+    throw std::runtime_error(ss.str());
 }
 
 inline Name
 attrStringTypeFromGAAttribute(GA_Attribute const * attribute)
 {
-    if (!attribute)     throw std::runtime_error("Invalid attribute type requested");
+    if (!attribute) {
+        std::stringstream ss; ss << "Invalid attribute - " << attribute->getName();
+        throw std::runtime_error(ss.str());
+    }
 
     const GA_AIFTuple* tupleAIF = attribute->getAIFTuple();
+
+    if (!tupleAIF) {
+        std::stringstream ss; ss << "Invalid attribute type - " << attribute->getName();
+        throw std::runtime_error(ss.str());
+    }
+
     const GA_Storage storage = tupleAIF->getStorage(attribute);
 
     const int16_t width = static_cast<int16_t>(tupleAIF->getTupleSize(attribute));
@@ -166,7 +185,8 @@ attrStringTypeFromGAAttribute(GA_Attribute const * attribute)
         else if (storage == GA_STORE_REAL64)    return "vec3d";
     }
 
-    throw std::runtime_error("Unknown attribute type requested");
+    std::stringstream ss; ss << "Unknown attribute type - " << attribute->getName();
+    throw std::runtime_error(ss.str());
 }
 
 inline GA_Storage
@@ -963,7 +983,14 @@ SOP_OpenVDB_Points::updateParmsFlags()
                 continue;
             }
 
-            const Name type(attrStringTypeFromGAAttribute(attribute));
+            Name type;
+
+            try {
+                type = attrStringTypeFromGAAttribute(attribute);
+            }
+            catch (std::exception& e) {
+                continue;
+            }
 
             changed |= setVisibleStateInst("valuecompressionA#", &i, (type == "float"));
             changed |= setVisibleStateInst("valuecompressionB#", &i, (type == "vec3s"));
