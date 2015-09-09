@@ -148,14 +148,15 @@ struct UnitVecAttributeCodec
 /// Base class for storing point attribute information in a LeafNode
 class AttributeArray
 {
-public:
-    typedef boost::shared_ptr<AttributeArray>           Ptr;
-    typedef boost::shared_ptr<const AttributeArray>     ConstPtr;
-
+private:
     struct AccessorBase;
     template <typename T> struct Accessor;
 
     typedef boost::shared_ptr<AccessorBase>             AccessorBasePtr;
+
+public:
+    typedef boost::shared_ptr<AttributeArray>           Ptr;
+    typedef boost::shared_ptr<const AttributeArray>     ConstPtr;
 
     template <typename> friend class AttributeHandle;
 
@@ -267,11 +268,12 @@ struct AttributeArray::Accessor : public AttributeArray::AccessorBase
     typedef T (*GetterPtr)(const AttributeArray* array, const Index n);
     typedef void (*SetterPtr)(AttributeArray* array, const Index n, const T& value);
 
-    Accessor(GetterPtr getter, SetterPtr setter) : mGetter(getter), mSetter(setter) {}
+    Accessor(GetterPtr getter, SetterPtr setter) :
+        mGetter(getter), mSetter(setter) { }
 
     GetterPtr mGetter;
     SetterPtr mSetter;
-}; // class AttributeArray::Accessor
+}; // struct AttributeArray::Accessor
 
 
 ////////////////////////////////////////
