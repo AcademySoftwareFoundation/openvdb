@@ -468,7 +468,7 @@ clean:
 	$(RM) $(LIBOPENVDBPOINTS_STATIC)
 	$(RM) $(LIBOPENVDBPOINTS_SHARED)
 	$(RM) $(UNITTEST_OBJ_NAMES)
-	$(RM) -r ./doc/html ./doc/latex
+	$(RM) -r ./doc/html/* ./doc/latex
 
 ifneq (,$(strip $(wildcard $(DEPEND))))
     include $(DEPEND)
