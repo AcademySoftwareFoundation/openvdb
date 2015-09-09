@@ -31,6 +31,7 @@
 #include "openvdb.h"
 
 #include <openvdb_points/tools/AttributeArray.h>
+#include <openvdb_points/tools/PointDataGrid.h>
 
 #include <tbb/mutex.h>
 
@@ -81,6 +82,11 @@ initialize()
     // unit vector compression
 
     TypedAttributeArray<Vec3<float>, UnitVecAttributeCodec>::registerType();
+
+    // Register types associated with point data grids.
+    Metadata::registerType(typeNameAsString<PointDataIndex32>(), Int32Metadata::createMetadata);
+    Metadata::registerType(typeNameAsString<PointDataIndex64>(), Int64Metadata::createMetadata);
+    tools::PointDataGrid::registerGrid();
 
 #ifdef __ICC
 // Disable ICC "assignment to statically allocated variable" warning.<
