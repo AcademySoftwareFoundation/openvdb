@@ -220,12 +220,12 @@ HOUDINI_SOP_OBJ_NAMES := $(HOUDINI_SOP_SRC_NAMES:.cc=.o)
 HOUDINI_SOP_SO_NAMES := $(addprefix $(HOUDINI_DESTDIR)/,\
     $(notdir $(HOUDINI_SOP_SRC_NAMES:.cc=.so)))
 
-LIB_MAJOR_VERSION=$(shell grep 'define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER ' \
-    $(OPENVDB_INCL_DIR)/openvdb/version.h | sed 's/[^0-9]*//g')
-LIB_MINOR_VERSION=$(shell grep 'define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER ' \
-    $(OPENVDB_INCL_DIR)/openvdb/version.h | sed 's/[^0-9]*//g')
-LIB_PATCH_VERSION=$(shell grep 'define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER ' \
-    $(OPENVDB_INCL_DIR)/openvdb/version.h | sed 's/[^0-9]*//g')
+LIB_MAJOR_VERSION=$(shell grep 'define OPENVDB_POINTS_LIBRARY_MAJOR_VERSION_NUMBER ' \
+    $(OPENVDB_POINTS_INCL_DIR)/openvdb_points/version.h | sed 's/[^0-9]*//g')
+LIB_MINOR_VERSION=$(shell grep 'define OPENVDB_POINTS_LIBRARY_MINOR_VERSION_NUMBER ' \
+    $(OPENVDB_POINTS_INCL_DIR)/openvdb_points/version.h | sed 's/[^0-9]*//g')
+LIB_PATCH_VERSION=$(shell grep 'define OPENVDB_POINTS_LIBRARY_PATCH_VERSION_NUMBER ' \
+    $(OPENVDB_POINTS_INCL_DIR)/openvdb_points/version.h | sed 's/[^0-9]*//g')
 
 LIB_VERSION=$(LIB_MAJOR_VERSION).$(LIB_MINOR_VERSION).$(LIB_PATCH_VERSION)
 SO_VERSION=$(LIB_MAJOR_VERSION).$(LIB_MINOR_VERSION)

@@ -244,6 +244,7 @@ INCLUDE_NAMES := \
     tools/PointConversion.h \
     Types.h \
     openvdb.h \
+    version.h \
 #
 
 SRC_NAMES := \
@@ -283,14 +284,12 @@ ALL_SRC_FILES := $(SRC_FILES)
 OBJ_NAMES := $(SRC_NAMES:.cc=.o)
 UNITTEST_OBJ_NAMES := $(UNITTEST_SRC_NAMES:.cc=.o)
 
-VERSION_H=$(OPENVDB_INCL_DIR)/openvdb/version.h
-
-LIB_MAJOR_VERSION=$(shell grep 'define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER ' \
-    $(VERSION_H) | sed 's/[^0-9]*//g')
-LIB_MINOR_VERSION=$(shell grep 'define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER ' \
-    $(VERSION_H) | sed 's/[^0-9]*//g')
-LIB_PATCH_VERSION=$(shell grep 'define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER ' \
-    $(VERSION_H) | sed 's/[^0-9]*//g')
+LIB_MAJOR_VERSION=$(shell grep 'define OPENVDB_POINTS_LIBRARY_MAJOR_VERSION_NUMBER ' \
+    version.h | sed 's/[^0-9]*//g')
+LIB_MINOR_VERSION=$(shell grep 'define OPENVDB_POINTS_LIBRARY_MINOR_VERSION_NUMBER ' \
+    version.h | sed 's/[^0-9]*//g')
+LIB_PATCH_VERSION=$(shell grep 'define OPENVDB_POINTS_LIBRARY_PATCH_VERSION_NUMBER ' \
+    version.h | sed 's/[^0-9]*//g')
 
 LIB_VERSION=$(LIB_MAJOR_VERSION).$(LIB_MINOR_VERSION).$(LIB_PATCH_VERSION)
 SO_VERSION=$(LIB_MAJOR_VERSION).$(LIB_MINOR_VERSION)
