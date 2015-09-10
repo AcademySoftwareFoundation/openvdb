@@ -397,7 +397,7 @@ pdfdoc:
 	@echo "$@"': $$DOXYGEN is undefined'
 endif
 
-vdb_print: $(LIBOPENVDB) cmd/openvdb_print/main.cc
+vdb_print: $(LIBOPENVDBPOINTS) cmd/openvdb_print/main.cc
 	@echo "Building $@ because of $(list_deps)"
 	$(CXX) $(CXXFLAGS) -o $@ cmd/openvdb_print/main.cc -I . \
 	    $(LIBOPENVDB_RPATH) -L$(CURDIR) $(LIBOPENVDB) \
