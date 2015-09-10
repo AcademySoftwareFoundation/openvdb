@@ -34,6 +34,7 @@
 #include <vector>
 #include <openvdb/openvdb.h>
 #include <openvdb_points/openvdb.h>
+#include <openvdb_points/tools/PointDataGrid.h>
 
 namespace {
 
@@ -115,6 +116,51 @@ bkgdValueAsString(const openvdb::GridBase::ConstPtr& grid)
     return ostr.str();
 }
 
+// some common typedefs
+typedef openvdb::tools::PointDataTree PointDataTree;
+typedef openvdb::tools::PointDataGrid PointDataGrid;
+typedef openvdb::tools::PointDataAccessor<PointDataTree> PointDataAccessor;
+typedef openvdb::tools::AttributeSet AttributeSet;
+
+std::vector<std::string>
+attributesAsString(const PointDataTree::LeafCIter& iter)
+{
+    assert(iter);
+
+    std::vector<std::string> strs;
+
+    std::ostringstream ostr;
+
+    const AttributeSet& attributeSet = iter->attributeSet();
+    const AttributeSet::Descriptor& descriptor = attributeSet.descriptor();
+
+    typedef AttributeSet::Descriptor::NameToPosMap NameToPosMap;
+
+    const NameToPosMap map = descriptor.map();
+
+    int index = 0;
+
+    for (NameToPosMap::const_iterator it = map.begin(), itEnd = map.end();
+        it != itEnd; ++it) {
+        const std::string& name = it->first;
+        const size_t pos = it->second;
+
+        assert(pos != INVALID_POS);
+
+        const openvdb::tools::NamePair& type = descriptor.type(pos);
+        const openvdb::Name& valueType = type.first;
+        const openvdb::Name& codec = type.second;
+
+        ostr.str("");
+
+        ostr << "attribute[" << index++ << "]: " << name <<
+            " (value_type: " << valueType << ", compression: " << codec << ")";
+
+        strs.push_back(ostr.str());
+    }
+
+    return strs;
+}
 
 /// Print detailed information about the given VDB files.
 /// If @a metadata is true, include file-level metadata key, value pairs.
@@ -211,8 +257,8 @@ printShortListing(const StringVec& filenames, bool metadata)
             if (!grid) continue;
 
             // Print the grid name and its voxel value datatype.
-            std::cout << indent << std::left << std::setw(11) << grid->getName()
-                << " " << std::right << std::setw(6) << grid->valueType();
+            std::cout << indent << std::left << std::setw(15) << grid->getName()
+                << " " << std::right << std::setw(13) << grid->valueType();
 
             // Print the grid's bounding box and dimensions.
             openvdb::CoordBBox bbox = grid->evalActiveVoxelBoundingBox();
@@ -226,6 +272,22 @@ printShortListing(const StringVec& filenames, bool metadata)
             // Print the number of active voxels.
             std::cout << "  " << std::right << std::setw(8)
                 << sizeAsString(grid->activeVoxelCount(), "Vox");
+
+            // Print the number of points (if a PointDataGrid)
+            if (grid->isType<PointDataGrid>()) {
+                PointDataGrid::ConstPtr pointDataGrid = openvdb::gridConstPtrCast<PointDataGrid>(grid);
+
+                PointDataAccessor accessor(pointDataGrid->tree());
+
+                const openvdb::Index64 pointCount = accessor.totalPointCount();
+
+                std::cout << "  " << std::right << std::setw(8)
+                    << sizeAsString(pointCount, "Pts");
+            }
+            else {
+                std::cout << "  " << std::right << std::setw(8)
+                    << " ";
+            }
 
             // Print the grid's in-core size, in bytes.
             std::cout << " " << std::right << std::setw(6) << bytesAsString(grid->memUsage());
@@ -244,6 +306,25 @@ printShortListing(const StringVec& filenames, bool metadata)
                 // Print custom metadata.
                 str = grid->str(indent2);
                 if (!str.empty()) std::cout << str << "\n";
+
+                // if PointDataGrid, print attributes
+                // @todo: move this code into a print function on the LeafNode itself
+
+                if (grid->isType<PointDataGrid>()) {
+                    PointDataGrid::ConstPtr pointDataGrid = openvdb::gridConstPtrCast<PointDataGrid>(grid);
+
+                    PointDataTree::LeafCIter iter = pointDataGrid->tree().cbeginLeaf();
+
+                    if (iter) {
+                        std::vector<std::string> strs = attributesAsString(iter);
+                        for (std::vector<std::string>::const_iterator strIt = strs.begin(),
+                            strItEnd = strs.end(); strIt != strItEnd; ++strIt) {
+                            std::string str = *strIt;
+                            if (!str.empty())   std::cout << indent2 << str << "\n";
+                        }
+                    }
+                }
+
                 std::cout << std::flush;
             }
         }
