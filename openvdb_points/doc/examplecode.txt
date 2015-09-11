@@ -9,10 +9,97 @@ illustrate how to use OpenVDB Points and how to perform common tasks.
 @section Contents
 - @ref sHelloWorld
   - @ref sCompilingHelloWorld
+- @ref sPointCreation
+- @ref sPointConversion
 
 
 @section sHelloWorld "Hello, World" for OpenVDB Points
-This is a very simple example showing how to create a VDB Points grid with one leaf node and to insert a point per voxel with position only. OpenVDB supports both random access to voxels by coordinates and sequential access by means of iterators.  This example illustrates both types of access:
+This is a very simple example showing how to convert a std::vector of point positions into a VDB Point Grid and write it out to disk:
+@code
+#include <openvdb/openvdb.h>
+#include <openvdb_points/openvdb.h>
+#include <openvdb_points/tools/PointDataGrid.h>
+#include <openvdb_points/tools/PointConversion.h>
+
+#include <iostream>
+
+using namespace openvdb::tools;
+
+int main()
+{
+    // Initialize the OpenVDB and OpenVDB Points library.  This must be called at least
+    // once per program and may safely be called multiple times.
+    openvdb::initialize();
+    openvdb::points::initialize();
+
+    // Create some point positions
+    std::vector<openvdb::Vec3f> positions;
+
+    positions.push_back(openvdb::Vec3f(1.2, 4.1, 0.5));
+    positions.push_back(openvdb::Vec3f(0.9, 8.1, 3.2));
+    positions.push_back(openvdb::Vec3f(-3.6, 1.3, 1.5));
+    positions.push_back(openvdb::Vec3f(-3.8, 1.4, 1.51));
+    positions.push_back(openvdb::Vec3f(-6.8, -9.1, -3.7));
+    positions.push_back(openvdb::Vec3f(1.4, 40302.5, 9.5));
+
+    // Create a linear transform with voxel size of 10.0
+    const float voxelSize = 10.0f;
+    openvdb::math::Transform::Ptr transform = openvdb::math::Transform::createLinearTransform(voxelSize);
+
+    // Create the PointDataGrid, position attribute is mandatory
+    PointDataGrid::Ptr pointDataGrid = createPointDataGrid<PointDataGrid>(
+                    positions, TypedAttributeArray<openvdb::Vec3f>::attributeType(), *transform);
+
+    // Output leaf nodes
+    std::cout << "Leaf Nodes: " << pointDataGrid->tree().leafCount() << std::endl;
+
+    // Create an accessor and output point count
+    PointDataAccessor<PointDataTree> accessor(pointDataGrid->tree());
+    std::cout << "Point Count: " << accessor.totalPointCount() << std::endl;
+
+    // Create a VDB file object.
+    openvdb::io::File file("mygrids.vdb");
+
+    // Add the grid pointer to a container.
+    openvdb::GridPtrVec grids;
+    grids.push_back(pointDataGrid);
+
+    // Write out the contents of the container.
+    file.write(grids);
+    file.close();
+}
+
+@endcode
+Output:
+@code
+Leaf Nodes: 3
+Point Count: 6
+@endcode
+
+@subsection sCompilingHelloWorld Compiling
+See the @c Makefile and @c INSTALL file included in this distribution for
+details on how to build and install the OpenVDB library.
+By default, installation is into the directory tree rooted at
+<tt>/tmp/OpenVDB/</tt>, but this can be changed either by editing the value
+of the @c INSTALL_DIR variable in the makefile or by setting the desired
+value from the command line, as in the following example:
+@code
+make install INSTALL_DIR=/usr/local
+@endcode
+Once OpenVDB and OpenVDB Points has been installed, the simplest way to
+compile a program like the &ldquo;Hello, World&rdquo; example above is
+to examine the commands that are used to build the @c vdb_print tool:
+@code
+rm vdb_print
+make verbose=yes vdb_print
+@endcode
+and then replace &ldquo;<tt>-o vdb_print</tt>&rdquo; with, for example,
+&ldquo;<tt>-o helloworld</tt>&rdquo;
+and &ldquo;<tt>cmd/openvdb_print/main.cc</tt>&rdquo;
+with &ldquo;<tt>helloworld.cc</tt>&rdquo;.
+
+@section sPointCreation Assemble a VDB Point Grid
+This example shows how to create a VDB Points grid with one leaf node and to insert a point per voxel with position only. OpenVDB supports both random access to voxels by coordinates and sequential access by means of iterators.  This example illustrates both types of access:
 @code
 
 #include <openvdb/openvdb.h>
@@ -130,28 +217,81 @@ Point Position[256]: [4, 0, 0]
 Testing sequential access:
 @endcode
 
-@subsection sCompilingHelloWorld Compiling
-See the @c Makefile and @c INSTALL file included in this distribution for
-details on how to build and install the OpenVDB library.
-By default, installation is into the directory tree rooted at
-<tt>/tmp/OpenVDB/</tt>, but this can be changed either by editing the value
-of the @c INSTALL_DIR variable in the makefile or by setting the desired
-value from the command line, as in the following example:
+@section sPointConversion Point Conversion
+This is a more comprehensive conversion example that demonstrates how to convert points with multiple attributes:
 @code
-make install INSTALL_DIR=/usr/local
-@endcode
-Once OpenVDB and OpenVDB Points has been installed, the simplest way to
-compile a program like the &ldquo;Hello, World&rdquo; example above is
-to examine the commands that are used to build the @c vdb_print tool:
-@code
-rm vdb_print
-make verbose=yes vdb_print
-@endcode
-and then replace &ldquo;<tt>-o vdb_print</tt>&rdquo; with, for example,
-&ldquo;<tt>-o helloworld</tt>&rdquo;
-and &ldquo;<tt>cmd/openvdb_print/main.cc</tt>&rdquo;
-with &ldquo;<tt>helloworld.cc</tt>&rdquo;.
+#include <openvdb/openvdb.h>
+#include <openvdb_points/openvdb.h>
+#include <openvdb_points/tools/PointDataGrid.h>
+#include <openvdb_points/tools/PointAttribute.h>
+#include <openvdb_points/tools/PointConversion.h>
 
+#include <iostream>
 
+using namespace openvdb::tools;
+
+int main()
+{
+    // Initialize the OpenVDB and OpenVDB Points library.  This must be called at least
+    // once per program and may safely be called multiple times.
+    openvdb::initialize();
+    openvdb::points::initialize();
+
+    // Create some point positions
+    std::vector<openvdb::Vec3f> positions;
+
+    positions.push_back(openvdb::Vec3f(1.2, 4.1, 0.5));
+    positions.push_back(openvdb::Vec3f(0.9, 100.1, 3.2));
+
+    // Create a linear transform with voxel size of 10.0
+    const float voxelSize = 10.0f;
+    openvdb::math::Transform::Ptr transform = openvdb::math::Transform::createLinearTransform(voxelSize);
+
+    std::cout << "Creating VDB Points grid" << std::endl;
+
+    // Create a PointPartitioner-compatible point list using the std::vector wrapper provided
+    const PointAttributeVector<openvdb::Vec3f> pointList(positions);
+
+    // Create a PointIndexGrid from the point positions, this extra step is only required
+    // as we're adding extra attributes beyond just position and wish to re-use the index ordering
+    PointIndexGrid::Ptr pointIndexGrid = createPointIndexGrid<PointIndexGrid>(pointList, *transform);
+
+    // Create the PointDataGrid, position attribute is mandatory
+    PointDataGrid::Ptr pointDataGrid = createPointDataGrid<PointDataGrid>(*pointIndexGrid,
+                    pointList, TypedAttributeArray<openvdb::Vec3f>::attributeType(), *transform);
+
+    // Retrieve an iterator pointing to the first leaf node
+    PointDataTree::LeafCIter iter = pointDataGrid->tree().cbeginLeaf();
+
+    // No leaf nodes means no points, best to always check before dereferencing
+    if (!iter)  std::cout << "No Points" << std::endl;
+
+    // Output the number of attributes stored in this leaf node
+    std::cout << "Attributes: " << iter->attributeSet().descriptor().size() << std::endl;
+
+    std::cout << "Adding pscale attribute" << std::endl;
+
+    // Add a new pscale attribute
+    AttributeSet::Util::NameAndType pscaleAttribute("pscale", TypedAttributeArray<float>::attributeType());
+
+    appendAttribute(pointDataGrid->tree(), pscaleAttribute);
+
+    // Create some point pscale values
+    std::vector<float> pscales;
+
+    pscales.push_back(1.1f);
+    pscales.push_back(0.9f);
+
+    // Create a point attribute list using the std::vector wrapper provided
+    const PointAttributeVector<float> pscalesList(pscales);
+
+    // Now populate the pscale attribute according to these values
+    populateAttribute(pointDataGrid->tree(), pointIndexGrid->tree(), "pscale", pscalesList);
+
+    // Output the number of attributes stored in this leaf node
+    std::cout << "Attributes: " << iter->attributeSet().descriptor().size() << std::endl;
+}
+
+@endcode
 
 */
