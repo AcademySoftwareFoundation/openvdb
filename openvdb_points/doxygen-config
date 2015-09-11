@@ -458,7 +458,8 @@ WARN_LOGFILE           =
 
 INPUT                  = . \
                          tools \
-                         doc/doc.txt
+                         doc/doc.txt \
+                         doc/examplecode.txt
 
 # If the value of the INPUT tag contains directories, you can use the
 # FILE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp

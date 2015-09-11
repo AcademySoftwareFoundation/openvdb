@@ -1,0 +1,157 @@
+/**
+
+@page codeExamples OpenVDB Points Cookbook
+
+This section provides code snippets and some complete programs that
+illustrate how to use OpenVDB Points and how to perform common tasks.
+
+
+@section Contents
+- @ref sHelloWorld
+  - @ref sCompilingHelloWorld
+
+
+@section sHelloWorld "Hello, World" for OpenVDB Points
+This is a very simple example showing how to create a VDB Points grid with one leaf node and to insert a point per voxel with position only. OpenVDB supports both random access to voxels by coordinates and sequential access by means of iterators.  This example illustrates both types of access:
+@code
+
+#include <openvdb/openvdb.h>
+#include <openvdb_points/openvdb.h>
+#include <openvdb_points/tools/PointDataGrid.h>
+
+#include <iostream>
+
+using namespace openvdb::tools;
+
+int main()
+{
+    // Initialize the OpenVDB and OpenVDB Points library.  This must be called at least
+    // once per program and may safely be called multiple times.
+    openvdb::initialize();
+    openvdb::points::initialize();
+
+    // Create an empty point data grid
+    PointDataGrid::Ptr grid = PointDataGrid::create();
+
+    // Introduce a typedef for our position attribute (note no compression codec here)
+    typedef TypedAttributeArray<openvdb::Vec3f> PositionAttribute;
+
+    // Create a list of names and attribute types (in this case, just position)
+    AttributeSet::Descriptor::NameAndTypeVec attributes;
+    attributes.push_back(AttributeSet::Descriptor::NameAndType("P", PositionAttribute::attributeType()));
+
+    // Create an AttributeSet Descriptor for this list
+    AttributeSet::Descriptor::Ptr descriptor = AttributeSet::Descriptor::create(attributes);
+
+    // Touch a leaf at the origin to create it and confirm just one leaf
+    PointDataTree::LeafNodeType* leaf = grid->tree().touchLeaf(openvdb::Coord(0, 0, 0));
+
+    std::cout << "Leaf Count: " << grid->tree().leafCount() << std::endl;
+
+    // Decide how many points per voxel we want
+
+    const int pointsPerVoxel = 1;
+    const size_t totalPoints = pointsPerVoxel * PointDataTree::LeafNodeType::NUM_VOXELS;
+
+    // Initialize sets up the AttributeSet on the leaf and sizes it
+    leaf->initializeAttributes(descriptor, /*arrayLength = */ totalPoints);
+
+    // Values store the end offset of the attribute array for each voxel
+    for (size_t i = 0; i < PointDataTree::LeafNodeType::NUM_VOXELS; i++) {
+        const uint arrayOffset = (i + 1) * pointsPerVoxel;
+        leaf->setOffsetOn(i, arrayOffset);
+    }
+
+    // Retrieve a write-able attribute handle for position
+    AttributeWriteHandle<openvdb::Vec3f>* attributeWriteHandle = leaf->attributeWriteHandle<openvdb::Vec3f>("P");
+
+    // Set the point positions to be at the center of each voxel (range is -0.5 -> 0.5)
+    for (size_t i = 0; i < totalPoints; i++) {
+        attributeWriteHandle->set(i, openvdb::Vec3f(0.0, 0.0, 0.0));
+    }
+
+    // Create an accessor which has some useful utilities for retrieving point data
+    PointDataAccessor<PointDataTree> accessor(grid->tree());
+
+    // Output the total number of points stored in our Point Grid
+    std::cout << "Point Count: " << accessor.totalPointCount() << std::endl;
+
+    std::cout << "Testing random access:" << std::endl;
+
+    // Retrieve a read-only attribute handle for position
+    AttributeHandle<openvdb::Vec3f>* attributeHandle = leaf->attributeHandle<openvdb::Vec3f>("P");
+
+    // Create a co-ordinate to perform the look-up and voxel position in index space
+    const openvdb::Coord ijk(4, 0, 0);
+    const openvdb::Vec3f voxelIndexSpace = ijk.asVec3d();
+
+    // Retrieve the grid transform
+    const openvdb::math::Transform& transform = grid->transform();
+
+    // Create a PointDataIndex for accessing the co-ordinate (4, 0, 0)
+    PointDataAccessor<PointDataTree>::PointDataIndex index = accessor.get(ijk);
+
+    // Iterate over all the points in the (4, 0, 0) voxel
+    for (size_t i = index.first; i < index.second; i++) {
+        // Retrieve point position in voxel space
+        const openvdb::Vec3f& pointVoxelSpace = attributeHandle->get(i);
+
+        // Compute point position in index space
+        const openvdb::Vec3f pointIndexSpace = pointVoxelSpace + voxelIndexSpace;
+
+        // Compute point position in world space using grid transform
+        const openvdb::Vec3f pointWorldSpace = transform.indexToWorld(pointIndexSpace);
+
+        // Output the world space point position
+        std::cout << "Point Position[" << i << "]: " << pointWorldSpace << std::endl;
+    }
+
+    std::cout << "Testing sequential access:" << std::endl;
+
+    // Now iterate over all points within all leaves
+    for (PointDataTree::LeafCIter iter = grid->tree().cbeginLeaf(); iter; ++iter) {
+        AttributeHandle<openvdb::Vec3f>* attributeHandle = iter->attributeHandle<openvdb::Vec3f>("P");
+
+        for (size_t i = 0; i < totalPoints; i++) {
+            /*point position = */ attributeHandle->get(i);
+
+            // see example above for how to compute the world space point position
+        }
+    }
+}
+
+@endcode
+Output:
+@code
+Leaf Count: 1
+Point Count: 512
+Testing random access:
+Point Position[256]: [4, 0, 0]
+Testing sequential access:
+@endcode
+
+@subsection sCompilingHelloWorld Compiling
+See the @c Makefile and @c INSTALL file included in this distribution for
+details on how to build and install the OpenVDB library.
+By default, installation is into the directory tree rooted at
+<tt>/tmp/OpenVDB/</tt>, but this can be changed either by editing the value
+of the @c INSTALL_DIR variable in the makefile or by setting the desired
+value from the command line, as in the following example:
+@code
+make install INSTALL_DIR=/usr/local
+@endcode
+Once OpenVDB and OpenVDB Points has been installed, the simplest way to
+compile a program like the &ldquo;Hello, World&rdquo; example above is
+to examine the commands that are used to build the @c vdb_print tool:
+@code
+rm vdb_print
+make verbose=yes vdb_print
+@endcode
+and then replace &ldquo;<tt>-o vdb_print</tt>&rdquo; with, for example,
+&ldquo;<tt>-o helloworld</tt>&rdquo;
+and &ldquo;<tt>cmd/openvdb_print/main.cc</tt>&rdquo;
+with &ldquo;<tt>helloworld.cc</tt>&rdquo;.
+
+
+
+*/
