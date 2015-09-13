@@ -345,6 +345,7 @@ TestAttributeArray::testAttributeHandle()
 
         CPPUNIT_ASSERT(!array->isCompressed());
 
+#ifdef OPENVDB_USE_BLOSC
         array->compress();
 
         CPPUNIT_ASSERT(array->isCompressed());
@@ -360,6 +361,7 @@ TestAttributeArray::testAttributeHandle()
         }
 
         CPPUNIT_ASSERT(array->isCompressed());
+#endif
     }
 
     // check values have been correctly set without using handles

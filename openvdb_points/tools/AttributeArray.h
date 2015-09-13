@@ -151,7 +151,7 @@ struct UnitVecAttributeCodec
 /// Base class for storing attribute data
 class AttributeArray
 {
-private:
+protected:
     struct AccessorBase;
     template <typename T> struct Accessor;
 
