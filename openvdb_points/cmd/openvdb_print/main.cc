@@ -147,7 +147,7 @@ attributesAsString(const PointDataTree::LeafCIter& iter)
 
         assert(pos != INVALID_POS);
 
-        const openvdb::tools::NamePair& type = descriptor.type(pos);
+        const openvdb::NamePair& type = descriptor.type(pos);
         const openvdb::Name& valueType = type.first;
         const openvdb::Name& codec = type.second;
 

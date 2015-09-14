@@ -1083,7 +1083,7 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
 
         const int positionCompression = evalInt("poscompression", 0, time);
 
-        const openvdb::tools::NamePair positionAttributeType =
+        const openvdb::NamePair positionAttributeType =
                     positionAttrTypeFromCompression(positionCompression);
 
         // compute list of offsets (if group supplied)

@@ -184,7 +184,7 @@ public:
                     else {
                         infoStr_pts << ", ";
                     }
-                    const openvdb::tools::NamePair& type = descriptor->type(it->second);
+                    const openvdb::NamePair& type = descriptor->type(it->second);
 
                     // if no value compression, hide the codec from the middle-click output
 

@@ -64,9 +64,13 @@
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
-namespace tools {
 
+
+// Add new typedef for a Name pair
 typedef std::pair<Name, Name> NamePair;
+
+
+namespace tools {
 
 
 ////////////////////////////////////////

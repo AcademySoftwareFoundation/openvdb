@@ -65,8 +65,8 @@ CPPUNIT_TEST_SUITE_REGISTRATION(TestAttributeArray);
 namespace {
 
 bool
-matchingNamePairs(const openvdb::tools::NamePair& lhs,
-                  const openvdb::tools::NamePair& rhs)
+matchingNamePairs(const openvdb::NamePair& lhs,
+                  const openvdb::NamePair& rhs)
 {
     if (lhs.first != rhs.first)     return false;
     if (lhs.second != rhs.second)     return false;

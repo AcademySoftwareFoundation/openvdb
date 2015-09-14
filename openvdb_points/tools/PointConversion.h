@@ -78,7 +78,7 @@ namespace tools {
 template<typename PointDataGridT, typename PositionArrayT, typename PointIndexGridT>
 inline typename PointDataGridT::Ptr
 createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT& positions,
-                    const openvdb::tools::NamePair& positionType, const math::Transform& xform);
+                    const openvdb::NamePair& positionType, const math::Transform& xform);
 
 
 /// @brief  Convenience method to create a @c PointDataGrid from a std::vector of
@@ -94,7 +94,7 @@ createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT&
 template <typename PointDataGridT, typename ValueT>
 inline typename PointDataGridT::Ptr
 createPointDataGrid(const std::vector<ValueT>& positions,
-                    const openvdb::tools::NamePair& positionType, const math::Transform& xform);
+                    const openvdb::NamePair& positionType, const math::Transform& xform);
 
 
 /// @brief  Stores point attribute data in an existing @c PointDataGrid attribute.
@@ -313,7 +313,7 @@ struct PopulateAttributeOp {
 template<typename PointDataGridT, typename PositionArrayT, typename PointIndexGridT>
 inline typename PointDataGridT::Ptr
 createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT& positions,
-                    const openvdb::tools::NamePair& positionType, const math::Transform& xform)
+                    const openvdb::NamePair& positionType, const math::Transform& xform)
 {
     typedef typename PointDataGridT::TreeType                       PointDataTreeT;
     typedef typename PointIndexGridT::TreeType                      PointIndexTreeT;
@@ -363,7 +363,7 @@ createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT&
 template <typename PointDataGridT, typename ValueT>
 inline typename PointDataGridT::Ptr
 createPointDataGrid(const std::vector<ValueT>& positions,
-                    const openvdb::tools::NamePair& positionType,
+                    const openvdb::NamePair& positionType,
                     const math::Transform& xform)
 {
     const PointAttributeVector<ValueT> pointList(positions);
