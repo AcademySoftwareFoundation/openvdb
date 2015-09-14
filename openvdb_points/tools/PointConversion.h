@@ -32,7 +32,7 @@
 ///
 /// @file PointConversion.h
 ///
-/// @brief  Convert a generic point data structure into a VDB Point Data Grid.
+/// @brief  Convert existing points and attributes into VDB Point Data grids and attributes.
 ///
 
 
@@ -51,14 +51,6 @@
 
 #include <openvdb/tools/PointIndexGrid.h>
 
-#include <utility> // std::pair, std::make_pair
-#include <map>
-#include <limits> // for std::numeric_limit
-
-#include <boost/scoped_ptr.hpp>
-#include <boost/ptr_container/ptr_vector.hpp>
-#include <boost/type_traits/is_floating_point.hpp>
-#include <boost/utility/enable_if.hpp>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -66,129 +58,90 @@ namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
 
-/// @brief  Stores points within leaf nodes of a point data grid.
+/// @brief  Localises points with position into a @c PointDataGrid into two stages:
+///         allocation of the leaf attribute data and population of the positions.
 ///
-/// @param points   list of world space points.
-/// @param xform    world to index space transform.
-template<typename PointDataGridT, typename PointArrayT>
-inline typename PointDataGridT::Ptr
-createPointDataGrid(const PointArrayT& points, const math::Transform& xform);
+/// @param  pointIndexGrid  a PointIndexGrid into the points.
+/// @param  positions       list of world space point positions.
+/// @param  positionType    the type of the position (includes compression info).
+/// @param  xform           world to index space transform.
+///
+/// @note   The position data must be supplied in a Point-Partitioner compatible
+///         data structure. A convenience PointAttributeVector class is offered.
+///
+/// @note   The position data is populated separately to perform world space to
+///         voxel space conversion and apply quantisation.
+///
+/// @note   A @c PointIndexGrid to the points must be supplied to perform this
+///         operation. Typically this is built implicitly by the PointDataGrid constructor.
 
-/// @brief  Stores points within leaf nodes of a point data grid.
-///
-/// @param pointIndexGrid   a PointIndexGrid into the points
-/// @param points   list of world space points.
-/// @param xform    world to index space transform.
-template<typename PointDataGridT, typename PointArrayT, typename PointIndexGridT>
+template<typename PointDataGridT, typename PositionArrayT, typename PointIndexGridT>
 inline typename PointDataGridT::Ptr
-createPointDataGrid(const PointIndexGridT& pointIndexGrid,
-    const PointArrayT& points, const math::Transform& xform);
+createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT& positions,
+                    const openvdb::tools::NamePair& positionType, const math::Transform& xform);
+
+
+/// @brief  Convenience method to create a @c PointDataGrid from a std::vector of
+///         point positions.
+///
+/// @param  positions     list of world space point positions.
+/// @param  positionType  the type of the position (includes compression info).
+/// @param  xform         world to index space transform.
+///
+/// @note   This method implicitly wraps the std::vector for a Point-Partitioner compatible
+///         data structure and creates the required @c PointIndexGrid to the points.
+
+template <typename PointDataGridT, typename ValueT>
+inline typename PointDataGridT::Ptr
+createPointDataGrid(const std::vector<ValueT>& positions,
+                    const openvdb::tools::NamePair& positionType, const math::Transform& xform);
+
+
+/// @brief  Stores point attribute data in an existing @c PointDataGrid attribute.
+///
+/// @param  tree            the PointDataGrid to be populated.
+/// @param  pointIndexTree  a PointIndexTree into the points.
+/// @param  attributeName   the name of the VDB Points attribute to be populated.
+/// @param  data            a wrapper to the attribute data.
+///
+/// @note   A @c PointIndexGrid to the points must be supplied to perform this
+///         operation. This is required to ensure the same point index ordering.
+
+template <typename PointDataTreeT, typename PointIndexTreeT, typename PointArrayT>
+inline void
+populateAttribute(  PointDataTreeT& tree, const PointIndexTreeT& pointIndexTree,
+                    const openvdb::Name& attributeName, const PointArrayT& data);
+
 
 ////////////////////////////////////////
 
-/// @brief A list of wrapped point attributes
-/// @param PositionT vector type used to represent the position attribute
-/// @param PointAttributeT PointAttribute class
-///
-/// @note The point attributes are application-specific
-/// and must match the following interface
-/// @code
-/// struct PointAttribute {
-///   typedef shared_ptr<PointAttribute> Ptr;
-///   typedef VectorType position_type;
-///   PointAttrPair info() const;
-///   const Name& name() const;
-///   AttrType type() const;
-///   Index64 size() const;
-///
-///   template <typename T>
-///   struct Accessor {
-///   typedef shared_ptr<Accessor<T> > Ptr;
-///   void getValue(Index64, T& xyz) const; };
-///
-///   template <typename T> Accessor<T>::Ptr getAccessor() const;
-/// };
-/// @endcode
 
-
-template <typename PositionT, typename PointAttributeT>
-class PointAttributeList
-{
+/// @brief Point-partitioner compatible STL vector attribute wrapper for convenience
+template<typename ValueType>
+class PointAttributeVector {
 public:
-    typedef PositionT                                                   value_type;
-    typedef PositionT                                                   position_type;
-    typedef PointAttributeT                                             PointAttributeType;
-    typedef typename PointAttributeType::Ptr                            PointAttributePtr;
-    typedef typename PointAttributeType::template Accessor<PositionT>   PositionAccessor;
-    typedef typename PositionAccessor::Ptr                              PositionAccessorPtr;
-    typedef boost::shared_ptr<PointAttributeList>                       Ptr;
-    typedef typename std::vector<PointAttributePtr>::const_iterator     const_iterator;
-    typedef AttributeSet::Descriptor                                    Descriptor;
+    typedef ValueType value_type;
 
-    explicit PointAttributeList(PointAttributePtr positionAttribute)
-        : mPositionAttribute(positionAttribute)
-        , mPositionAccessor(mPositionAttribute->template getAccessor<PositionT>())
-        , mSize(mPositionAttribute->size())
-    {
-        // implicitly insert position into attribute list
+    PointAttributeVector(const std::vector<value_type>& data)
+        : mData(data) { }
 
-        mAttributes.push_back(positionAttribute);
-    }
+    size_t size() const { return mData.size(); }
+    void getPos(size_t n, ValueType& xyz) const { xyz = mData[n]; }
 
-    Index64 attributes() const { return mAttributes.size(); }
-
-    PointAttributePtr attribute(const unsigned index) const { return mAttributes[index]; }
-
-    Index64 size() const { return mSize; }
-
-    void getPos(Index64 n, PositionT& xyz) const {
-        mPositionAccessor->getValue(n, xyz);
-    }
-
-    void addAttribute(PointAttributePtr attribute)
-    {
-        for (const_iterator it = cbegin(), itEnd = cend(); it != itEnd; ++it)
-        {
-            if (attribute->name() == (*it)->name()) {
-                throw std::runtime_error("Duplicate attribute: " + attribute->name());
-            }
-        }
-
-        mAttributes.push_back(attribute);
-
-        // sort the elements after every insertion
-
-        std::sort(mAttributes.begin(), mAttributes.end());
-    }
-
-    const_iterator cbegin() const { return mAttributes.begin(); }
-    const_iterator cend() const { return mAttributes.end(); }
-
-    Descriptor::Ptr attributeDescriptor() const {
-        Descriptor::Ptr descriptor;
-
-        std::vector<Descriptor::NameAndType> vec;
-
-        for (const_iterator it = cbegin(), it_end = cend(); it != it_end; ++it) {
-            vec.push_back(Descriptor::NameAndType((*it)->name(), (*it)->type()));
-        }
-
-        return Descriptor::create(vec);
-    }
+    template <typename T>
+    void get(size_t n, T& value) const { value = mData[n]; }
 
 private:
-    PointAttributePtr mPositionAttribute;
-    PositionAccessorPtr mPositionAccessor;
-    Index64 mSize;
+    const std::vector<value_type>& mData;
+}; // PointAttributeVector
 
-    std::vector<PointAttributePtr> mAttributes;
-}; // class PointAttributeList
 
-// Internal operators
+////////////////////////////////////////
 
-namespace point_data_grid_internal {
 
-template<typename PointDataTreeType, typename PointIndexTreeType, typename PointArray>
+namespace point_conversion_internal {
+
+template<typename PointDataTreeType, typename PointIndexTreeType>
 struct InitialiseAttributesOp {
 
     typedef typename tree::LeafManager<PointDataTreeType> LeafManagerT;
@@ -199,11 +152,9 @@ struct InitialiseAttributesOp {
 
     InitialiseAttributesOp( PointDataTreeType& tree,
                             const PointIndexTreeType& pointIndexTree,
-                            const PointArray& points,
                             const AttributeSet::Descriptor::Ptr& attributeDescriptor)
         : mTree(tree)
         , mPointIndexTree(pointIndexTree)
-        , mPoints(&points)
         , mAttributeDescriptor(attributeDescriptor) { }
 
     void operator()(const typename LeafManagerT::LeafRange& range) const {
@@ -231,70 +182,12 @@ struct InitialiseAttributesOp {
 
     const PointDataTreeType&                mTree;
     const PointIndexTreeType&               mPointIndexTree;
-    PointArray      const * const           mPoints;
     const AttributeSet::Descriptor::Ptr&    mAttributeDescriptor;
 };
 
 template<   typename PointDataTreeType,
             typename PointIndexTreeType,
-            typename HoudiniAttributeType,
-            typename AccessorType>
-struct PopulateAttributeOp {
-
-    typedef typename tree::LeafManager<PointDataTreeType>       LeafManagerT;
-    typedef typename LeafManagerT::LeafRange                    LeafRangeT;
-    typedef typename PointDataTreeType::LeafNodeType            PointDataLeafNode;
-
-    typedef typename PointIndexTreeType::LeafNodeType           PointIndexLeafNode;
-    typedef typename PointIndexLeafNode::IndexArray             IndexArray;
-
-    PopulateAttributeOp(const PointIndexTreeType& pointIndexTree,
-                        const AccessorType& accessor,
-                        const unsigned attributeIndex)
-        : mPointIndexTree(pointIndexTree)
-        , mAccessor(accessor)
-        , mAttributeIndex(attributeIndex) { }
-
-    void operator()(const typename LeafManagerT::LeafRange& range) const {
-
-        HoudiniAttributeType value;
-
-        for (typename LeafManagerT::LeafRange::Iterator leaf=range.begin(); leaf; ++leaf) {
-
-            // obtain the PointIndexLeafNode (using the origin of the current leaf)
-
-            const PointIndexLeafNode* pointIndexLeaf = mPointIndexTree.probeConstLeaf(leaf->origin());
-
-            if (!pointIndexLeaf)    continue;
-
-            AttributeWriteHandle<HoudiniAttributeType>* attributeWriteHandle = leaf->template attributeWriteHandle<HoudiniAttributeType>(mAttributeIndex);
-
-            Index64 index = 0;
-
-            const IndexArray& indices = pointIndexLeaf->indices();
-
-            for (typename IndexArray::const_iterator it = indices.begin(), it_end = indices.end(); it != it_end; ++it)
-            {
-                mAccessor.getValue(*it, value);
-
-                attributeWriteHandle->set(index, value);
-
-                index++;
-            }
-        }
-    }
-
-    //////////
-
-    const PointIndexTreeType&   mPointIndexTree;
-    const AccessorType          mAccessor;
-    const unsigned              mAttributeIndex;
-};
-
-template<   typename PointDataTreeType,
-            typename PointIndexTreeType,
-            typename HoudiniAttributeType,
-            typename AccessorType>
+            typename PositionListType>
 struct PopulatePositionAttributeOp {
 
     typedef typename tree::LeafManager<PointDataTreeType> LeafManagerT;
@@ -303,18 +196,16 @@ struct PopulatePositionAttributeOp {
     typedef typename PointIndexTreeType::LeafNodeType PointIndexLeafNode;
     typedef typename PointIndexLeafNode::IndexArray IndexArray;
 
+    typedef typename PositionListType::value_type ValueType;
+
     PopulatePositionAttributeOp(const PointIndexTreeType& pointIndexTree,
                                 const math::Transform& transform,
-                                const AccessorType& accessor,
-                                const unsigned attributeIndex)
+                                const PositionListType& positions)
         : mPointIndexTree(pointIndexTree)
         , mTransform(transform)
-        , mAccessor(accessor)
-        , mAttributeIndex(attributeIndex) { }
+        , mPositions(positions) { }
 
     void operator()(const typename LeafManagerT::LeafRange& range) const {
-
-        HoudiniAttributeType positionWorldSpace;
 
         for (typename LeafManagerT::LeafRange::Iterator leaf=range.begin(); leaf; ++leaf) {
 
@@ -324,7 +215,8 @@ struct PopulatePositionAttributeOp {
 
             if (!pointIndexLeaf)    continue;
 
-            AttributeWriteHandle<Vec3f>* attributeWriteHandle = leaf->template attributeWriteHandle<Vec3f>(mAttributeIndex);
+            AttributeWriteHandle<ValueType>* attributeWriteHandle =
+                leaf->template attributeWriteHandle<ValueType>("P");
 
             Index64 index = 0;
 
@@ -332,11 +224,12 @@ struct PopulatePositionAttributeOp {
 
             for (typename IndexArray::const_iterator it = indices.begin(), it_end = indices.end(); it != it_end; ++it)
             {
-                mAccessor.getValue(*it, positionWorldSpace);
+                ValueType positionWorldSpace;
+                mPositions.getPos(*it, positionWorldSpace);
 
-                const HoudiniAttributeType positionIndexSpace = mTransform.worldToIndex(positionWorldSpace);
+                const ValueType positionIndexSpace = mTransform.worldToIndex(positionWorldSpace);
 
-                const HoudiniAttributeType positionVoxelSpace = HoudiniAttributeType(
+                const ValueType positionVoxelSpace = ValueType(
                             positionIndexSpace.x() - math::Round(positionIndexSpace.x()),
                             positionIndexSpace.y() - math::Round(positionIndexSpace.y()),
                             positionIndexSpace.z() - math::Round(positionIndexSpace.z()));
@@ -352,79 +245,83 @@ struct PopulatePositionAttributeOp {
 
     const PointIndexTreeType&   mPointIndexTree;
     const math::Transform&      mTransform;
-    const AccessorType          mAccessor;
-    const unsigned              mAttributeIndex;
+    const PositionListType&     mPositions;
 };
 
-template <typename PointAttributeT, typename AttributeT, typename PointDataTreeT, typename PointIndexTreeT>
-void populatePositionAttribute(PointDataTreeT& tree, const PointIndexTreeT& pointIndexTree, const math::Transform& xform, PointAttributeT& attribute, const unsigned index)
-{
-    typedef typename PointAttributeT::template Accessor<AttributeT> AttributeAccessor;
+template<   typename PointDataTreeType,
+            typename PointIndexTreeType,
+            typename AttributeListType>
+struct PopulateAttributeOp {
 
-    typename AttributeAccessor::Ptr accessor = attribute.template getAccessor<AttributeT>();
+    typedef typename tree::LeafManager<PointDataTreeType> LeafManagerT;
+    typedef typename LeafManagerT::LeafRange LeafRangeT;
 
-    PopulatePositionAttributeOp<PointDataTreeT,
-                                PointIndexTreeT,
-                                AttributeT,
-                                AttributeAccessor> populate(pointIndexTree,
-                                                            xform,
-                                                            *accessor,
-                                                            index);
+    typedef typename PointIndexTreeType::LeafNodeType PointIndexLeafNode;
+    typedef typename PointIndexLeafNode::IndexArray IndexArray;
 
-    typename tree::template LeafManager<PointDataTreeT> leafManager(tree);
-    tbb::parallel_for(leafManager.leafRange(), populate);
-}
+    typedef typename AttributeListType::value_type ValueType;
 
-template <typename PointAttributeT, typename AttributeT, typename PointDataTreeT, typename PointIndexTreeT>
-void populateAttribute(PointDataTreeT& tree, const PointIndexTreeT& pointIndexTree, PointAttributeT& attribute, const unsigned index)
-{
-    typedef typename PointAttributeT::template Accessor<AttributeT> AttributeAccessor;
+    PopulateAttributeOp(const PointIndexTreeType& pointIndexTree,
+                        const AttributeListType& data,
+                        const openvdb::Name& attributeName)
+        : mPointIndexTree(pointIndexTree)
+        , mData(data)
+        , mAttributeName(attributeName) { }
 
-    typename AttributeAccessor::Ptr accessor = attribute.template getAccessor<AttributeT>();
+    void operator()(const typename LeafManagerT::LeafRange& range) const {
 
-    PopulateAttributeOp<PointDataTreeT,
-                        PointIndexTreeT,
-                        AttributeT,
-                        AttributeAccessor> populate(pointIndexTree,
-                                                    *accessor,
-                                                    index);
+        for (typename LeafManagerT::LeafRange::Iterator leaf=range.begin(); leaf; ++leaf) {
 
-    typename tree::template LeafManager<PointDataTreeT> leafManager(tree);
-    tbb::parallel_for(leafManager.leafRange(), populate);
-}
+            // obtain the PointIndexLeafNode (using the origin of the current leaf)
 
-} // namespace point_data_grid_internal
+            const PointIndexLeafNode* pointIndexLeaf = mPointIndexTree.probeConstLeaf(leaf->origin());
+
+            if (!pointIndexLeaf)    continue;
+
+            AttributeWriteHandle<ValueType>* attributeWriteHandle =
+                leaf->template attributeWriteHandle<ValueType>(mAttributeName);
+
+            Index64 index = 0;
+
+            const IndexArray& indices = pointIndexLeaf->indices();
+
+            for (typename IndexArray::const_iterator it = indices.begin(), it_end = indices.end(); it != it_end; ++it)
+            {
+                ValueType value;
+                mData.template get<ValueType>(*it, value);
+
+                attributeWriteHandle->set(index, value);
+
+                index++;
+            }
+        }
+    }
+
+    //////////
+
+    const PointIndexTreeType&   mPointIndexTree;
+    const AttributeListType&    mData;
+    const openvdb::Name&        mAttributeName;
+};
+
+} // namespace point_conversion_internal
 
 
 ////////////////////////////////////////
 
-/// @brief  Localises point attributes into a @c PointDataGrid into two stages:
-///         allocation of the leaf attribute data and population of this data.
-///
-/// @note   The position data is populated separately to perform world space to
-///         voxel space conversion and apply quantisation.
-///
-/// @note   A @c PointIndexGrid to the points must be supplied to perform this
-///         operation. Typically this is built implicitly by the PointDataGrid constructor.
 
-template<typename PointDataGridT, typename PointArrayT, typename PointIndexGridT>
+template<typename PointDataGridT, typename PositionArrayT, typename PointIndexGridT>
 inline typename PointDataGridT::Ptr
-createPointDataGrid(const PointIndexGridT& pointIndexGrid,
-    const PointArrayT& points, const math::Transform& xform)
+createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT& positions,
+                    const openvdb::tools::NamePair& positionType, const math::Transform& xform)
 {
     typedef typename PointDataGridT::TreeType                       PointDataTreeT;
     typedef typename PointIndexGridT::TreeType                      PointIndexTreeT;
     typedef typename tree::template LeafManager<PointDataTreeT>     LeafManagerT;
     typedef typename LeafManagerT::LeafRange                        LeafRangeT;
-    typedef typename PointArrayT::PointAttributeType                PointAttributeT;
-    typedef typename PointArrayT::position_type                     PositionT;
-    typedef typename PointArrayT::PositionAccessor                  PositionAccessorT;
 
-    using point_data_grid_internal::InitialiseAttributesOp;
-    using point_data_grid_internal::populateAttribute;
-    using point_data_grid_internal::populatePositionAttribute;
-
-    using math::Vec3;
+    using point_conversion_internal::InitialiseAttributesOp;
+    using point_conversion_internal::PopulatePositionAttributeOp;
 
     // construct the Tree using a topology copy of the PointIndexGrid
 
@@ -434,91 +331,70 @@ createPointDataGrid(const PointIndexGridT& pointIndexGrid,
     LeafManagerT leafManager = LeafManagerT(*treePtr);
     LeafRangeT leafRange = leafManager.leafRange();
 
-    // create point attribute map
+    // create attribute descriptor from position type
 
-    AttributeSet::Descriptor::Ptr attributeDescriptor(points.attributeDescriptor());
+    AttributeSet::Descriptor::Ptr descriptor = AttributeSet::Descriptor::create(positionType);
 
     // create point attribute storage on each leaf
 
-    InitialiseAttributesOp<PointDataTreeT, PointIndexTreeT, PointArrayT> initialise(
-                                *treePtr, pointIndexGrid.tree(), points, attributeDescriptor);
+    InitialiseAttributesOp<PointDataTreeT, PointIndexTreeT> initialise(
+                                *treePtr, pointIndexGrid.tree(), descriptor);
     tbb::parallel_for(leafRange, initialise);
 
-    // populate attributes
+    // populate position attribute
 
-    for (typename PointArrayT::const_iterator it = points.cbegin(), it_end = points.cend();
-            it != it_end; ++it) {
+    PopulatePositionAttributeOp<PointDataTreeT,
+                                PointIndexTreeT,
+                                PositionArrayT> populate(pointIndexTree,
+                                                        xform,
+                                                        positions);
 
-        const Name& name = (*it)->name();
-        const unsigned index = attributeDescriptor->find(name);
-
-        const openvdb::tools::NamePair& attrType = (*it)->type();
-
-        typename PointAttributeT::Ptr attribute = points.attribute(index);
-
-        if (name == "P") {
-            // "P" (i.e. position) attributes are constructed differently since
-            // they can be stored in quantized values
-
-            if (attrType.first == "vec3s") {
-                populatePositionAttribute<PointAttributeT, openvdb::Vec3f>(*treePtr, pointIndexTree, xform, *attribute, index);
-            }
-            else {
-                throw std::runtime_error("Unknown Position Attribute Type for Conversion: " + attrType.first);
-            }
-        }
-        else {
-
-            if (attrType.first == "bool") {
-                populateAttribute<PointAttributeT, bool>(*treePtr, pointIndexTree, *attribute, index);
-            }
-            else if (attrType.first == "int16") {
-                populateAttribute<PointAttributeT, short>(*treePtr, pointIndexTree, *attribute, index);
-            }
-            else if (attrType.first == "int32") {
-                populateAttribute<PointAttributeT, int>(*treePtr, pointIndexTree, *attribute, index);
-            }
-            else if (attrType.first == "int64") {
-                populateAttribute<PointAttributeT, long>(*treePtr, pointIndexTree, *attribute, index);
-            }
-            else if (attrType.first == "half") {
-                populateAttribute<PointAttributeT, half>(*treePtr, pointIndexTree, *attribute, index);
-            }
-            else if (attrType.first == "float") {
-                populateAttribute<PointAttributeT, float>(*treePtr, pointIndexTree, *attribute, index);
-            }
-            else if (attrType.first == "double") {
-                populateAttribute<PointAttributeT, double>(*treePtr, pointIndexTree, *attribute, index);
-            }
-            else if (attrType.first == "vec3h") {
-                populateAttribute<PointAttributeT, openvdb::math::Vec3<half> >(*treePtr, pointIndexTree, *attribute, index);
-            }
-            else if (attrType.first == "vec3s") {
-                populateAttribute<PointAttributeT, openvdb::math::Vec3<float> >(*treePtr, pointIndexTree, *attribute, index);
-            }
-            else if (attrType.first == "vec3d") {
-                populateAttribute<PointAttributeT, openvdb::math::Vec3<double> >(*treePtr, pointIndexTree, *attribute, index);
-            }
-            else {
-                throw std::runtime_error("Unknown Attribute Type for Conversion: " + attrType.first);
-            }
-        }
-    }
+    tbb::parallel_for(leafRange, populate);
 
     typename PointDataGridT::Ptr grid = PointDataGridT::create(treePtr);
     grid->setTransform(xform.copy());
     return grid;
 }
 
-template <typename PointDataGridT, typename PointArrayT>
-inline typename PointDataGridT::Ptr
-createPointDataGrid(const PointArrayT& points, const math::Transform& xform)
-{
-    PointIndexGrid::Ptr pointGridPtr = createPointIndexGrid<PointIndexGrid>(points, xform);
-    return createPointDataGrid<PointDataGridT>(*pointGridPtr, points, xform);
-}
 
 ////////////////////////////////////////
+
+
+template <typename PointDataGridT, typename ValueT>
+inline typename PointDataGridT::Ptr
+createPointDataGrid(const std::vector<ValueT>& positions,
+                    const openvdb::tools::NamePair& positionType,
+                    const math::Transform& xform)
+{
+    const PointAttributeVector<ValueT> pointList(positions);
+
+    PointIndexGrid::Ptr pointIndexGrid = createPointIndexGrid<PointIndexGrid>(pointList, xform);
+    return createPointDataGrid<PointDataGridT>(*pointIndexGrid, pointList, positionType, xform);
+}
+
+
+////////////////////////////////////////
+
+
+template <typename PointDataTreeT, typename PointIndexTreeT, typename PointArrayT>
+inline void
+populateAttribute(  PointDataTreeT& tree, const PointIndexTreeT& pointIndexTree,
+                    const openvdb::Name& attributeName, const PointArrayT& data)
+{
+    using point_conversion_internal::PopulateAttributeOp;
+
+    // populate attribute
+
+    PopulateAttributeOp<PointDataTreeT,
+                        PointIndexTreeT,
+                        PointArrayT> populate(pointIndexTree, data, attributeName);
+
+    tbb::parallel_for(typename tree::template LeafManager<PointDataTree>(tree).leafRange(), populate);
+}
+
+
+////////////////////////////////////////
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

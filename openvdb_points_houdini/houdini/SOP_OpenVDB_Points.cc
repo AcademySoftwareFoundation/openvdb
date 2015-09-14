@@ -37,6 +37,7 @@
 
 #include <openvdb_points/openvdb.h>
 #include <openvdb_points/tools/PointDataGrid.h>
+#include <openvdb_points/tools/PointAttribute.h>
 #include <openvdb_points/tools/PointConversion.h>
 
 #include "SOP_NodeVDBPoints.h"
@@ -62,6 +63,24 @@ enum COMPRESSION_TYPE
     TRUNCATE_16,
     UNIT_VECTOR
 };
+
+/// @brief Translate the type of a GA_Attribute into a position Attribute Type
+inline NamePair
+positionAttrTypeFromCompression(const int compression)
+{
+    if (compression == FIXED_POSITION_16) {
+        return TypedAttributeArray<Vec3<float>,
+                            FixedPointAttributeCodec<Vec3<uint16_t> > >::attributeType();
+    }
+    else if (compression == FIXED_POSITION_8) {
+        return TypedAttributeArray<Vec3<float>,
+                            FixedPointAttributeCodec<Vec3<uint8_t> > >::attributeType();
+    }
+
+    // compression == NONE
+
+    return TypedAttributeArray<Vec3<float> >::attributeType();
+}
 
 /// @brief Translate the type of a GA_Attribute into our AttrType
 inline NamePair
@@ -124,12 +143,6 @@ attrTypeFromGAAttribute(GA_Attribute const * attribute, const int compression = 
         {
             if (compression == NONE) {
                 return TypedAttributeArray<Vec3<float> >::attributeType();
-            }
-            else if (compression == FIXED_POSITION_16) {
-                return TypedAttributeArray<Vec3<float>, FixedPointAttributeCodec<Vec3<uint16_t> > >::attributeType();
-            }
-            else if (compression == FIXED_POSITION_8) {
-                return TypedAttributeArray<Vec3<float>, FixedPointAttributeCodec<Vec3<uint8_t> > >::attributeType();
             }
             else if (compression == TRUNCATE_16) {
                 return TypedAttributeArray<Vec3<float>, NullAttributeCodec<Vec3<half> > >::attributeType();
@@ -232,6 +245,33 @@ widthFromAttrString(const Name& type)
 ////////////////////////////////////////
 
 
+typedef std::vector<GA_Offset> OffsetList;
+typedef boost::shared_ptr<OffsetList> OffsetListPtr;
+
+OffsetListPtr computeOffsets(GA_PointGroup* group)
+{
+    if (!group) return OffsetListPtr();
+
+    OffsetListPtr offsets = OffsetListPtr(new OffsetList());
+
+    size_t size = group->entries();
+    offsets->reserve(size);
+
+    GA_Offset start, end;
+    GA_Range range(*group);
+    for (GA_Iterator it = range.begin(); it.blockAdvance(start, end); ) {
+        for (GA_Offset off = start; off < end; ++off) {
+            offsets->push_back(off);
+        }
+    }
+
+    return offsets;
+}
+
+
+////////////////////////////////////////
+
+
 template <typename T, typename T0>
 T attributeValue(GA_Attribute const * const attribute, GA_Offset n, unsigned i)
 {
@@ -261,184 +301,99 @@ half attributeValue(GA_Attribute const * const attribute, GA_Offset n, unsigned 
     return attributeValue<half, float>(attribute, n, i);
 }
 
+
+////////////////////////////////////////
+
+
 /// @brief Wrapper class around Houdini point attributes which hold a pointer to the
 /// GA_Attribute to access the data and optionally a list of offsets
+template <typename AttributeType>
 class PointAttribute
 {
 public:
-    typedef boost::shared_ptr<PointAttribute> Ptr;
-    typedef boost::shared_ptr<std::vector<GA_Offset> > OffsetListPtr;
+    typedef AttributeType value_type;
 
-    static Ptr create(GA_Attribute const * attribute, OffsetListPtr offsets, const int compression = 0) {
-        return Ptr(new PointAttribute(attribute, offsets, compression));
-    }
-
-    explicit PointAttribute(GA_Attribute const * attribute, OffsetListPtr offsets, const int compression = 0)
+    PointAttribute(GA_Attribute const * attribute, OffsetListPtr offsets)
         : mAttribute(attribute)
-        , mOffsets(offsets)
-        , mName(attribute->getName())
-        , mType(attrTypeFromGAAttribute(attribute, compression)) { }
-    ~PointAttribute() { }
+        , mOffsets(offsets) { }
 
-    PointAttribute(const PointAttribute& attribute)
-        : mAttribute(attribute.mAttribute)
-        , mOffsets(attribute.mOffsets)
-        , mName(attribute.mName)
-        , mType(attribute.mType) { }
-
-    const Name& name() const { return mName; }
-    const NamePair& type() const { return mType; }
-
-    size_t size() const { return mAttribute->getIndexMap().indexSize(); }
-
-    // comparison function to enable sorting by name
-
-    bool
-    operator<(const PointAttribute& rhs) {
-        return this->name() < rhs.name();
+    size_t size() const
+    {
+        return mAttribute->getIndexMap().indexSize();
     }
 
-public:
-    template <typename attributeT>
-    struct Accessor
+    GA_Offset getOffset(size_t n) const
     {
-        typedef boost::shared_ptr<Accessor<attributeT> > Ptr;
-
-        friend class PointAttribute;
-
-    private:
-        GA_Offset
-        getOffset(size_t n) const {
-            return mOffsets ? (*mOffsets)[n] : mAttribute->getIndexMap().offsetFromIndex(GA_Index(n));
-        }
-
-    public:
-        template<typename T> typename boost::enable_if_c<VecTraits<T>::IsVec, void>::type
-        getValue(size_t n, T& value) const {
-            for (unsigned i = 0; i < VecTraits<T>::Size; ++i) {
-                value[i] = attributeValue<typename VecTraits<T>::ElementType>(mAttribute, getOffset(n), i);
-            }
-        }
-
-        template<typename T> typename boost::disable_if_c<VecTraits<T>::IsVec, void>::type
-        getValue(size_t n, T& value) const {
-            value = attributeValue<T>(mAttribute, getOffset(n), 0);
-        }
-
-    protected:
-        explicit Accessor(GA_Attribute const * attribute, OffsetListPtr offsets = OffsetListPtr())
-            : mAttribute(attribute)
-            , mOffsets(offsets) { }
-
-    private:
-        GA_Attribute const * const mAttribute;
-        OffsetListPtr mOffsets;
-    }; // Accessor
-
-    template <typename AttributeT>
-    typename Accessor<AttributeT>::Ptr
-    getAccessor() const
-    {
-        return typename Accessor<AttributeT>::Ptr(new Accessor<AttributeT>(mAttribute, mOffsets));
+        return mOffsets ? (*mOffsets)[n] : mAttribute->getIndexMap().offsetFromIndex(GA_Index(n));
     }
+
+    // Return the value of the nth point in the array (scalar type only)
+    template <typename T> typename boost::disable_if_c<VecTraits<T>::IsVec, void>::type
+    get(size_t n, T& value) const
+    {
+        value = attributeValue<T>(mAttribute, getOffset(n), 0);
+    }
+
+    // Return the value of the nth point in the array (vector type only)
+    template <typename T> typename boost::enable_if_c<VecTraits<T>::IsVec, void>::type
+    get(size_t n, T& value) const
+    {
+        for (unsigned i = 0; i < VecTraits<T>::Size; ++i) {
+            value[i] = attributeValue<typename VecTraits<T>::ElementType>(mAttribute, getOffset(n), i);
+        }
+    }
+
+    // Only provided to match the required interface for the PointPartitioner
+    void getPos(size_t n, AttributeType& xyz) const { return this->get<AttributeType>(n, xyz); }
 
 private:
     GA_Attribute const * const mAttribute;
-
     OffsetListPtr mOffsets;
-    const Name mName;
-    const NamePair mType;
 }; // PointAttribute
 
-// comparison function to enable sorting PointAttribute shared pointers
 
-inline bool
-operator<(const PointAttribute::Ptr& lhs, const PointAttribute::Ptr& rhs) {
-    return lhs->name() < rhs->name();
-}
+////////////////////////////////////////
 
-/// @brief Factory method to generate the PointAttributeList
-/// @param detail           Houdini GU_Detail from which to access the attributes
-/// @param attributes       a list of pairs of attribute names with their
-///                         compression scheme (0: none, 1: 16-bit fixed-point,
-///                         2: 8-bit fixed-point)
-/// @param group            an optional Houdini group to selectively filter the points
-template<typename PositionT, typename PointAttributeT>
-inline typename PointAttributeList<PositionT, PointAttributeT>::Ptr
-createPointAttributeList(
-    const GU_Detail& detail,
-    const std::vector<std::pair<Name, int> >& attributes,
-    const GA_PointGroup* group = NULL)
+
+/// @brief Populate a VDB Points attribute using the PointAttribute wrapper
+void populateAttributeFromHoudini(  PointDataTree& tree, const PointIndexTree& indexTree, const openvdb::Name& name,
+                                    const NamePair& attributeType, GA_Attribute const * attribute, OffsetListPtr offsets)
 {
-    typedef PointAttributeList<PositionT, PointAttributeT> PointAttributeList;
-    typedef typename PointAttributeT::Ptr PointAttributePtr;
-    typedef typename PointAttributeT::OffsetListPtr OffsetListPtr;
-    typedef std::vector<GA_Offset> OffsetList;
-    typedef std::pair<Name, int> NameAndCompression;
-    typedef std::vector<NameAndCompression> NameAndCompressionVec;
+    const openvdb::Name type = attributeType.first;
 
-    OffsetListPtr offsets = OffsetListPtr();
-
-    // compute list of offsets (if group supplied)
-
-    if (group)
-    {
-        offsets = OffsetListPtr(new OffsetList());
-
-        size_t size = group->entries();
-        offsets->reserve(size);
-
-        GA_Offset start, end;
-        GA_Range range(*group);
-        for (GA_Iterator it = range.begin(); it.blockAdvance(start, end); ) {
-            for (GA_Offset off = start; off < end; ++off) {
-                offsets->push_back(off);
-            }
-        }
+    if (type == "bool") {
+        populateAttribute(tree, indexTree, name, PointAttribute<bool>(attribute, offsets));
     }
-
-    // position attribute is the only 'special' attribute as spatial information
-    // is typically needed (and this is special in Houdini)
-
-    unsigned int positionCompression = 0;
-
-    for (NameAndCompressionVec::const_iterator it = attributes.begin(),
-                it_end = attributes.end(); it != it_end; ++it) {
-        const NameAndCompression& nameAndCompression = *it;
-
-        if (nameAndCompression.first == "P") {
-            positionCompression = nameAndCompression.second;
-            break;
-        }
+    else if (type == "int16") {
+        populateAttribute(tree, indexTree, name, PointAttribute<short>(attribute, offsets));
     }
-
-    PointAttributePtr positionAttribute =  PointAttributeT::create(detail.getP(), offsets, positionCompression);
-
-    typename PointAttributeList::Ptr attributeList(new PointAttributeList(positionAttribute));
-
-    // add arbitary attributes to point attribute list as requested
-
-    for (NameAndCompressionVec::const_iterator it = attributes.begin(),
-                it_end = attributes.end(); it != it_end; ++it) {
-
-        GA_ROAttributeRef attrRef = detail.findPointAttribute(it->first.c_str());
-
-        if (!attrRef.isValid())     continue;
-
-        GA_Attribute const * attribute = attrRef.getAttribute();
-
-        if (!attribute)             continue;
-
-        PointAttributePtr pointAttribute = PointAttributeT::create(attribute, offsets, it->second);
-
-        // skip position as this has already been added
-
-        if (pointAttribute->name() == "P")  continue;
-
-        attributeList->addAttribute(pointAttribute);
+    else if (type == "int32") {
+        populateAttribute(tree, indexTree, name, PointAttribute<int>(attribute, offsets));
     }
-
-    return attributeList;
+    else if (type == "int64") {
+        populateAttribute(tree, indexTree, name, PointAttribute<long>(attribute, offsets));
+    }
+    else if (type == "half") {
+        populateAttribute(tree, indexTree, name, PointAttribute<half>(attribute, offsets));
+    }
+    else if (type == "float") {
+        populateAttribute(tree, indexTree, name, PointAttribute<float>(attribute, offsets));
+    }
+    else if (type == "double") {
+        populateAttribute(tree, indexTree, name, PointAttribute<double>(attribute, offsets));
+    }
+    else if (type == "vec3h") {
+        populateAttribute(tree, indexTree, name, PointAttribute<Vec3<half> >(attribute, offsets));
+    }
+    else if (type == "vec3s") {
+        populateAttribute(tree, indexTree, name, PointAttribute<Vec3<float> >(attribute, offsets));
+    }
+    else if (type == "vec3d") {
+        populateAttribute(tree, indexTree, name, PointAttribute<Vec3<double> >(attribute, offsets));
+    }
+    else {
+        throw std::runtime_error("Unknown Attribute Type for Conversion: " + type);
+    }
 }
 
 
@@ -1124,20 +1079,64 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
             }
         }
 
-        // Always add P
+        // Determine position compression
+
         const int positionCompression = evalInt("poscompression", 0, time);
-        attributes.push_back(NameAndCompression("P", positionCompression));
 
-        typedef PointAttributeList<Vec3f, PointAttribute> PointAttributeList;
+        const openvdb::tools::NamePair positionAttributeType =
+                    positionAttrTypeFromCompression(positionCompression);
 
-        PointAttributeList::Ptr points(
-            createPointAttributeList<Vec3f, PointAttribute>(*ptGeo, attributes));
+        // compute list of offsets (if group supplied)
 
-        // Construct
+        GA_PointGroup* group = NULL;
 
-        typedef PointDataGrid PointDataGrid;
+        const OffsetListPtr offsets = computeOffsets(group);
 
-        PointDataGrid::Ptr pointDataGrid = createPointDataGrid<PointDataGrid, PointAttributeList>(*points, *transform);
+        // Create PointPartitioner compatible P attribute wrapper
+
+        PointAttribute<openvdb::Vec3f> points(ptGeo->getP(), offsets);
+
+        // Create PointIndexGrid used for consistent index ordering in all attribute conversion
+
+        PointIndexGrid::Ptr pointIndexGrid = createPointIndexGrid<PointIndexGrid>(points, *transform);
+
+        // Create PointDataGrid using position attribute
+
+        PointDataGrid::Ptr pointDataGrid = createPointDataGrid<PointDataGrid>(
+                                *pointIndexGrid, points, positionAttributeType, *transform);
+
+        PointIndexTree& indexTree = pointIndexGrid->tree();
+        PointDataTree& tree = pointDataGrid->tree();
+
+        // Add other attributes to PointDataGrid
+
+        for (NameAndCompressionVec::const_iterator it = attributes.begin(),
+                    it_end = attributes.end(); it != it_end; ++it)
+        {
+            const openvdb::Name name = it->first;
+            const int compression = it->second;
+
+            // skip position as this has already been added
+
+            if (name == "P")  continue;
+
+            GA_ROAttributeRef attrRef = ptGeo->findPointAttribute(name.c_str());
+
+            if (!attrRef.isValid())     continue;
+
+            GA_Attribute const * attribute = attrRef.getAttribute();
+
+            if (!attribute)             continue;
+
+            // Append the new attribute to the PointDataGrid
+            AttributeSet::Util::NameAndType nameAndType(name,
+                                    attrTypeFromGAAttribute(attribute, compression));
+
+            appendAttribute(tree, nameAndType);
+
+            // Now populate the attribute using the Houdini attribute
+            populateAttributeFromHoudini(tree, indexTree, nameAndType.name, nameAndType.type, attribute, offsets);
+        }
 
         UT_String nameStr = "";
         evalString(nameStr, "name", 0, time);

@@ -32,6 +32,7 @@
 #include <cppunit/extensions/HelperMacros.h>
 
 #include <openvdb_points/tools/PointDataGrid.h>
+#include <openvdb_points/tools/PointAttribute.h>
 #include <openvdb_points/tools/PointConversion.h>
 #include <openvdb_points/openvdb.h>
 
@@ -74,6 +75,41 @@ inline bool operator<(const Point& lhs, const Point& rhs) {
 }
 
 typedef boost::ptr_vector<Point> PointData;
+
+
+// wrapper to retrieve position
+class PointPosition
+{
+public:
+    typedef openvdb::Vec3f value_type;
+
+    PointPosition(const PointData& pointData)
+        : mPointData(pointData) { }
+
+    size_t size() const { return mPointData.size(); }
+    void getPos(size_t n, openvdb::Vec3f& xyz) const { xyz = mPointData[n].position; }
+
+private:
+    const PointData& mPointData;
+};
+
+// wrapper to retrieve id
+class PointId
+{
+public:
+    typedef int value_type;
+
+    PointId(const PointData& pointData)
+        : mPointData(pointData) { }
+
+    size_t size() const { return mPointData.size(); }
+
+    template <typename T>
+    void get(size_t n, T& value) const { value = mPointData[n].id; }
+
+private:
+    const PointData& mPointData;
+};
 
 // Generate random points by uniformly distributing points
 // on a unit-sphere.
@@ -209,9 +245,6 @@ TestPointConversion::testPointConversion()
     AttributeI::registerType();
     AttributeVec3s::registerType();
 
-    typedef PointAttributeList<openvdb::Vec3f, PointAttribute> PointAttributeList;
-    typedef boost::scoped_ptr<PointAttributeList> PointAttributeListScopedPtr;
-
     // generate points
 
     PointData data;
@@ -222,18 +255,26 @@ TestPointConversion::testPointConversion()
 
     CPPUNIT_ASSERT_EQUAL(data.size(), count);
 
-    PointAttributeListScopedPtr points(new PointAttributeList(
-        PointAttribute::create("P", AttributeVec3s::attributeType(), data)));
+    PointPosition pointPos(data);
 
-    points->addAttribute(PointAttribute::create("id",  AttributeI::attributeType(), data));
-
-    // convert points into a Point Data Grid
+    // convert point positions into a Point Data Grid
 
     const float voxelSize = 1.0f;
     openvdb::math::Transform::Ptr transform(openvdb::math::Transform::createLinearTransform(voxelSize));
 
-    PointIndexGrid::Ptr pointIndexGrid = createPointIndexGrid<PointIndexGrid>(*points, *transform);
-    PointDataGrid::Ptr pointDataGrid = createPointDataGrid<PointDataGrid>(*pointIndexGrid, *points, *transform);
+    PointIndexGrid::Ptr pointIndexGrid = createPointIndexGrid<PointIndexGrid>(pointPos, *transform);
+    PointDataGrid::Ptr pointDataGrid = createPointDataGrid<PointDataGrid>(*pointIndexGrid, pointPos,
+                                            AttributeVec3s::attributeType(), *transform);
+
+    // add id and populate
+
+    AttributeSet::Util::NameAndType nameAndType("id", AttributeI::attributeType());
+
+    appendAttribute(pointDataGrid->tree(), nameAndType);
+
+    PointId pointId(data);
+
+    populateAttribute(pointDataGrid->tree(), pointIndexGrid->tree(), "id", pointId);
 
     CPPUNIT_ASSERT_EQUAL(pointIndexGrid->tree().leafCount(), pointDataGrid->tree().leafCount());
 
