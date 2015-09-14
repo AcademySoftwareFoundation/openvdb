@@ -472,6 +472,13 @@ AttributeSet::Descriptor::create(const NameAndTypeVec& attrs)
     return descr;
 }
 
+AttributeSet::Descriptor::Ptr
+AttributeSet::Descriptor::create(const NamePair& positionType)
+{
+    Ptr descr(new Descriptor());
+    descr->insert("P", positionType);
+    return descr;
+}
 
 AttributeSet::Descriptor::Ptr
 AttributeSet::Descriptor::duplicateAppend(const NameAndType& attribute) const

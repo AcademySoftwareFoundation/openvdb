@@ -241,6 +241,9 @@ public:
     /// Create a new descriptor from the given attribute and type name pairs.
     static Ptr create(const NameAndTypeVec&);
 
+    /// Create a new descriptor from a position attribute type and assumes "P" (for convenience).
+    static Ptr create(const NamePair&);
+
     Ptr duplicateAppend(const NameAndType& attribute) const;
     Ptr duplicateAppend(const NameAndTypeVec& vec) const;
     Ptr duplicateDrop(const std::vector<size_t>& pos) const;
