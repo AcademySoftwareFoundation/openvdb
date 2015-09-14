@@ -91,7 +91,7 @@ TestAttributeArray::testFixedPointConversion()
     const openvdb::Vec3f worldSpaceValue(value);
     const openvdb::Vec3f indexSpaceValue = transform->worldToIndex(worldSpaceValue);
     const float voxelSpaceValue = indexSpaceValue.x() - math::Round(indexSpaceValue.x()) + 0.5f;
-    const int intValue = floatingPointToFixedPoint<int>(voxelSpaceValue);
+    const int32_t intValue = floatingPointToFixedPoint<int32_t>(voxelSpaceValue);
 
     // convert back to floating-point value
 
@@ -146,7 +146,7 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.5), value, /*tolerance=*/double(0.0001));
     }
 
-    typedef openvdb::tools::TypedAttributeArray<int> AttributeArrayI;
+    typedef openvdb::tools::TypedAttributeArray<int32_t> AttributeArrayI;
 
     { // Base class API
 

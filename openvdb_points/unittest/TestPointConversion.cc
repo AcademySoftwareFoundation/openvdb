@@ -239,7 +239,7 @@ void
 TestPointConversion::testPointConversion()
 {
     // Define and register some common attribute types
-    typedef TypedAttributeArray<int>            AttributeI;
+    typedef TypedAttributeArray<int32_t>        AttributeI;
     typedef TypedAttributeArray<openvdb::Vec3s> AttributeVec3s;
 
     AttributeI::registerType();
@@ -297,7 +297,7 @@ TestPointConversion::testPointConversion()
     for (; leafIter; ++leafIter) {
 
         AttributeHandle<Vec3f>* posHandle = leafIter->attributeHandle<Vec3f>("P");
-        AttributeHandle<int>* idHandle = leafIter->attributeHandle<int>("id");
+        AttributeHandle<int32_t>* idHandle = leafIter->attributeHandle<int32_t>("id");
 
         for (PointDataTree::LeafNodeType::ValueOnCIter valueIter = leafIter->cbeginValueOn(); valueIter; ++valueIter) {
 

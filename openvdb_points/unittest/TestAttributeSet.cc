@@ -114,7 +114,7 @@ TestAttributeSet::testAttributeSetDescriptor()
     // Define and register some common attribute types
     typedef openvdb::tools::TypedAttributeArray<float>  AttributeS;
     typedef openvdb::tools::TypedAttributeArray<double> AttributeD;
-    typedef openvdb::tools::TypedAttributeArray<int>    AttributeI;
+    typedef openvdb::tools::TypedAttributeArray<int32_t>    AttributeI;
 
     AttributeS::registerType();
     AttributeD::registerType();
@@ -174,7 +174,7 @@ TestAttributeSet::testAttributeSet()
 
     // Define and register some common attribute types
     typedef openvdb::tools::TypedAttributeArray<float>          AttributeS;
-    typedef openvdb::tools::TypedAttributeArray<int>            AttributeI;
+    typedef openvdb::tools::TypedAttributeArray<int32_t>        AttributeI;
     typedef openvdb::tools::TypedAttributeArray<openvdb::Vec3s> AttributeVec3s;
 
     AttributeS::registerType();

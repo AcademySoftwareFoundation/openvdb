@@ -108,13 +108,13 @@ attrTypeFromGAAttribute(GA_Attribute const * attribute, const int compression = 
             return TypedAttributeArray<bool>::attributeType();
         }
         else if (storage == GA_STORE_INT16) {
-            return TypedAttributeArray<short>::attributeType();
+            return TypedAttributeArray<int16_t>::attributeType();
         }
         else if (storage == GA_STORE_INT32) {
-            return TypedAttributeArray<int>::attributeType();
+            return TypedAttributeArray<int32_t>::attributeType();
         }
         else if (storage == GA_STORE_INT64) {
-            return TypedAttributeArray<long>::attributeType();
+            return TypedAttributeArray<int64_t>::attributeType();
         }
         else if (storage == GA_STORE_REAL16) {
             return TypedAttributeArray<half>::attributeType();
@@ -365,13 +365,13 @@ void populateAttributeFromHoudini(  PointDataTree& tree, const PointIndexTree& i
         populateAttribute(tree, indexTree, name, PointAttribute<bool>(attribute, offsets));
     }
     else if (type == "int16") {
-        populateAttribute(tree, indexTree, name, PointAttribute<short>(attribute, offsets));
+        populateAttribute(tree, indexTree, name, PointAttribute<int16_t>(attribute, offsets));
     }
     else if (type == "int32") {
-        populateAttribute(tree, indexTree, name, PointAttribute<int>(attribute, offsets));
+        populateAttribute(tree, indexTree, name, PointAttribute<int32_t>(attribute, offsets));
     }
     else if (type == "int64") {
-        populateAttribute(tree, indexTree, name, PointAttribute<long>(attribute, offsets));
+        populateAttribute(tree, indexTree, name, PointAttribute<int64_t>(attribute, offsets));
     }
     else if (type == "half") {
         populateAttribute(tree, indexTree, name, PointAttribute<half>(attribute, offsets));
@@ -478,9 +478,9 @@ setAttributeValue(const Vec3<VDBElementType>& v, AttrHandle& handle, const GA_Of
 template <typename T> struct GAHandleTraits { typedef GA_RWHandleF RW; };
 template <typename T> struct GAHandleTraits<Vec3<T> > { typedef GA_RWHandleV3 RW; };
 template <> struct GAHandleTraits<bool> { typedef GA_RWHandleI RW; };
-template <> struct GAHandleTraits<int> { typedef GA_RWHandleI RW; };
-template <> struct GAHandleTraits<short> { typedef GA_RWHandleI RW; };
-template <> struct GAHandleTraits<long> { typedef GA_RWHandleI RW; };
+template <> struct GAHandleTraits<int16_t> { typedef GA_RWHandleI RW; };
+template <> struct GAHandleTraits<int32_t> { typedef GA_RWHandleI RW; };
+template <> struct GAHandleTraits<int64_t> { typedef GA_RWHandleI RW; };
 template <> struct GAHandleTraits<half> { typedef GA_RWHandleF RW; };
 template <> struct GAHandleTraits<float> { typedef GA_RWHandleF RW; };
 template <> struct GAHandleTraits<double> { typedef GA_RWHandleF RW; };
@@ -576,13 +576,13 @@ convertPointDataGrid(GU_Detail& detail, openvdb_houdini::VdbPrimCIterator& vdbIt
                 convertPointDataGridAttribute<bool>(tree, index, attribute, geo);
             }
             else if (type == "int16") {
-                convertPointDataGridAttribute<short>(tree, index, attribute, geo);
+                convertPointDataGridAttribute<int16_t>(tree, index, attribute, geo);
             }
             else if (type == "int32") {
-                convertPointDataGridAttribute<int>(tree, index, attribute, geo);
+                convertPointDataGridAttribute<int32_t>(tree, index, attribute, geo);
             }
             else if (type == "int64") {
-                convertPointDataGridAttribute<long>(tree, index, attribute, geo);
+                convertPointDataGridAttribute<int64_t>(tree, index, attribute, geo);
             }
             else if (type == "half") {
                 convertPointDataGridAttribute<half>(tree, index, attribute, geo);

@@ -59,9 +59,9 @@ initialize()
     // no compression
 
     TypedAttributeArray<bool>::registerType();
-    TypedAttributeArray<short>::registerType();
-    TypedAttributeArray<int>::registerType();
-    TypedAttributeArray<long>::registerType();
+    TypedAttributeArray<int16_t>::registerType();
+    TypedAttributeArray<int32_t>::registerType();
+    TypedAttributeArray<int64_t>::registerType();
     TypedAttributeArray<half>::registerType();
     TypedAttributeArray<float>::registerType();
     TypedAttributeArray<double>::registerType();

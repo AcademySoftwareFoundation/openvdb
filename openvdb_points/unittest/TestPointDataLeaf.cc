@@ -461,8 +461,8 @@ TestPointDataLeaf::testAttributes()
     using namespace openvdb::tools;
 
     // Define and register some common attribute types
-    typedef openvdb::tools::TypedAttributeArray<float>  AttributeS;
-    typedef openvdb::tools::TypedAttributeArray<int>    AttributeI;
+    typedef openvdb::tools::TypedAttributeArray<float>    AttributeS;
+    typedef openvdb::tools::TypedAttributeArray<int32_t>  AttributeI;
 
     AttributeS::registerType();
     AttributeI::registerType();
@@ -667,8 +667,8 @@ TestPointDataLeaf::testEquivalence()
 
     // Define and register some common attribute types
 
-    typedef TypedAttributeArray<float>  AttributeS;
-    typedef TypedAttributeArray<int>    AttributeI;
+    typedef TypedAttributeArray<float>    AttributeS;
+    typedef TypedAttributeArray<int32_t>  AttributeI;
 
     AttributeS::registerType();
     AttributeI::registerType();
@@ -745,8 +745,8 @@ TestPointDataLeaf::testIO()
 
     // Define and register some common attribute types
 
-    typedef TypedAttributeArray<float>  AttributeS;
-    typedef TypedAttributeArray<int>    AttributeI;
+    typedef TypedAttributeArray<float>    AttributeS;
+    typedef TypedAttributeArray<int32_t>  AttributeI;
 
     AttributeS::registerType();
     AttributeI::registerType();
