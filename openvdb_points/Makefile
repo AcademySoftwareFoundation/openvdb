@@ -240,6 +240,7 @@ endif
 INCLUDE_NAMES := \
     tools/AttributeArray.h \
     tools/AttributeSet.h \
+    tools/PointAttribute.h \
     tools/PointDataGrid.h \
     tools/PointConversion.h \
     Types.h \

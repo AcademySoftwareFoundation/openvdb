@@ -325,6 +325,13 @@ public:
         return hasAttribute<TypedAttributeArrayType>(pos);
     }
 
+    /// @brief Append an attribute to the leaf.
+    void appendAttribute(const AttributeSet::Util::NameAndType& attribute,
+                         const Descriptor& expected, Descriptor::Ptr& replacement)
+    {
+        mAttributeSet->appendAttribute(attribute, expected, replacement);
+    }
+
     template <typename AttributeType>
     AttributeWriteHandle<AttributeType>* attributeWriteHandle(const size_t pos)
     {
