@@ -51,19 +51,24 @@
 
 #include <openvdb/tools/PointIndexGrid.h>
 
-#include <utility> // std::pair, std::make_pair
-#include <map>
-#include <limits> // for std::numeric_limit
-
-#include <boost/scoped_ptr.hpp>
-#include <boost/ptr_container/ptr_vector.hpp>
-#include <boost/type_traits/is_floating_point.hpp>
-#include <boost/utility/enable_if.hpp>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
+
+/// @brief Appends a new attribute to the VDB tree.
+///
+/// @param tree          the PointDataTree to be appended to.
+/// @param newAttribute  name and type for the new attribute.
+
+template <typename PointDataTree>
+inline void appendAttribute(PointDataTree& tree,
+                            const AttributeSet::Util::NameAndType& newAttribute);
+
+
+////////////////////////////////////////
+
 
 namespace point_attribute_internal {
 
@@ -101,6 +106,10 @@ struct AppendAttributeOp {
 
 } // namespace point_attribute_internal
 
+
+////////////////////////////////////////
+
+
 template <typename PointDataTree>
 inline void appendAttribute(PointDataTree& tree,
                             const AttributeSet::Util::NameAndType& newAttribute)
@@ -128,6 +137,9 @@ inline void appendAttribute(PointDataTree& tree,
     AppendAttributeOp<PointDataTree> append(tree, newAttribute, descriptor);
     tbb::parallel_for(typename tree::template LeafManager<PointDataTree>(tree).leafRange(), append);
 }
+
+
+////////////////////////////////////////
 
 
 } // namespace tools
