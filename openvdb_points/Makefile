@@ -263,7 +263,12 @@ UNITTEST_SRC_NAMES := \
     unittest/TestPointConversion.cc \
 #
 
-DOC_FILES := doc/doc.txt doc/examplecode.txt
+DOC_FILES := 	doc/doc.txt \
+				doc/examplecode.txt \
+				doc/changes.txt \
+				doc/faq.txt \
+				doc/roadmap.txt \
+#
 DOC_INDEX := doc/html/index.html
 DOC_PDF := doc/latex/refman.pdf
 
