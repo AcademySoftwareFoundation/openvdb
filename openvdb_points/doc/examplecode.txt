@@ -81,10 +81,10 @@ See the @c Makefile and @c INSTALL file included in this distribution for
 details on how to build and install the OpenVDB library.
 By default, installation is into the directory tree rooted at
 <tt>/tmp/OpenVDB/</tt>, but this can be changed either by editing the value
-of the @c INSTALL_DIR variable in the makefile or by setting the desired
+of the @c DESTDIR variable in the makefile or by setting the desired
 value from the command line, as in the following example:
 @code
-make install INSTALL_DIR=/usr/local
+make install DESTDIR=/usr/local
 @endcode
 Once OpenVDB and OpenVDB Points has been installed, the simplest way to
 compile a program like the &ldquo;Hello, World&rdquo; example above is

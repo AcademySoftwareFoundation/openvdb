@@ -74,8 +74,6 @@ OPENVDB_INCL_DIR := $(DESTDIR)/include
 OPENVDB_LIB_DIR := $(DESTDIR)/lib
 OPENVDB_LIB := -lopenvdb
 
-OPENVDB_POINTS_LIB := -lopenvdb_points
-
 # The parent directory of the boost/ header directory
 BOOST_INCL_DIR := $(HT)/include
 # The directory containing libboost_iostreams, libboost_system, etc.
