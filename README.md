@@ -3,6 +3,8 @@
 
 ## OpenVDB Points
 
+[Documentation](dneg.github.io/openvdb_points_dev)
+
 The OpenVDB Points library extends Dreamworks' OpenVDB library to provide the ability to efficiently represent point and attribute data in VDB Grids. Points are spatially-organised into VDB voxels to provide faster access and a greater opportunity for data compression compared with linear point arrays. In using OpenVDB, this extension library can leverage the extensive toolset and active user community that has developed over the last few years.
 
 The primary intended audience for this library is simulation and rendering for VFX studios. This is a particularly data-intensive portion of a production pipeline where the effects of improved data compression, I/O and performance are most beneficial.
