@@ -39,8 +39,7 @@
 #ifndef OPENVDB_TOOLS_ATTRIBUTE_ARRAY_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_ATTRIBUTE_ARRAY_HAS_BEEN_INCLUDED
 
-#include <openvdb/version.h>
-#include <openvdb/Types.h>
+#include <openvdb/openvdb.h>
 #include <openvdb_points/Types.h>
 #include <openvdb/math/QuantizedUnitVec.h>
 #include <openvdb/util/Name.h>
@@ -56,10 +55,8 @@
 #include <boost/scoped_array.hpp>
 #include <boost/integer_traits.hpp> // const_max
 
-#include <set>
-#include <map>
-#include <vector>
 #include <string>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

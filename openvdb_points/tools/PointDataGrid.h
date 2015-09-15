@@ -41,28 +41,17 @@
 #ifndef OPENVDB_TOOLS_POINT_DATA_GRID_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_POINT_DATA_GRID_HAS_BEEN_INCLUDED
 
-#include <openvdb/version.h>
-#include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/Grid.h>
-#include <openvdb/math/Transform.h>
 #include <openvdb/tree/Tree.h>
 #include <openvdb/tree/LeafNode.h>
-#include <openvdb/tree/LeafNodeBool.h>
-#include <openvdb/util/Name.h>
 
 #include <openvdb/tools/PointIndexGrid.h>
 
-#include <openvdb_points/tools/AttributeArray.h>
 #include <openvdb_points/tools/AttributeSet.h>
 
 #include <utility> // std::pair, std::make_pair
-#include <map>
-#include <limits> // for std::numeric_limit
 
-#include <boost/scoped_ptr.hpp>
-#include <boost/ptr_container/ptr_vector.hpp>
-#include <boost/type_traits/is_floating_point.hpp>
 
 class TestPointDataLeaf;
 

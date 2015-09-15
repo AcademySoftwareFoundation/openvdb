@@ -32,8 +32,9 @@
 ///
 /// @authors Dan Bailey, Mihai Alden, Peter Cucka
 
+#include <map>
 
-#include "AttributeArray.h"
+#include <openvdb_points/tools/AttributeArray.h>
 
 
 namespace openvdb {

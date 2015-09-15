@@ -36,6 +36,8 @@
 #include <openvdb_points/tools/PointConversion.h>
 #include <openvdb_points/openvdb.h>
 
+#include <boost/ptr_container/ptr_vector.hpp>
+
 using namespace openvdb;
 using namespace openvdb::tools;
 

@@ -33,7 +33,7 @@
 /// @authors Dan Bailey, Mihai Alden, Peter Cucka
 
 
-#include "AttributeSet.h"
+#include <openvdb_points/tools/AttributeSet.h>
 
 #include <algorithm> // std::equal
 

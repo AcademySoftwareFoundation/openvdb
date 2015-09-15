@@ -39,7 +39,14 @@
 #ifndef OPENVDB_TOOLS_ATTRIBUTE_SET_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_ATTRIBUTE_SET_HAS_BEEN_INCLUDED
 
-#include "AttributeArray.h"
+#include <openvdb/version.h>
+
+#include <boost/integer_traits.hpp> // integer_traits
+#include <boost/shared_ptr.hpp> // shared_ptr
+
+#include <vector>
+
+#include <openvdb_points/tools/AttributeArray.h>
 
 
 namespace openvdb {

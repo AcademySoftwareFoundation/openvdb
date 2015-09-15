@@ -39,17 +39,10 @@
 #ifndef OPENVDB_TOOLS_POINT_ATTRIBUTE_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_POINT_ATTRIBUTE_HAS_BEEN_INCLUDED
 
-#include <openvdb/version.h>
-#include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
-#include <openvdb/Grid.h>
-#include <openvdb/math/Transform.h>
-#include <openvdb/tree/Tree.h>
-#include <openvdb/tree/LeafNode.h>
-#include <openvdb/tree/LeafNodeBool.h>
-#include <openvdb/util/Name.h>
 
-#include <openvdb/tools/PointIndexGrid.h>
+#include <openvdb_points/tools/AttributeSet.h>
+#include <openvdb_points/tools/PointDataGrid.h>
 
 
 namespace openvdb {
