@@ -1,0 +1,31 @@
+/**
+
+@page changes Release Notes
+
+@htmlonly <a name="v0_1_0_changes"></a>@endhtmlonly
+@par
+<B>Version 0.1.0</B> - <I>In Development</I> (initial public beta)
+
+@par
+Core API:
+- AttributeArray and AttributeSet classes for storing and managing
+  attribute data.
+- Extended tree::LeafNode to hold attribute data as new
+  @vdblink::tools::PointDataLeafNode@endlink and introduced
+  @vdblink::tools::PointDataTree@endlink and
+  @vdblink::tools::PointDataGrid@endlink specialisations.
+- Added a @link PointConversion.h PointConversion @endlink tool to convert arbitrary
+  point data arrays into PointDataGrids and extensible framework to provide custom
+  structures for conversion.
+- Added a @c vdb_print command-line application that matches OpenVDB's
+  vdb_print, but with extensions to output point information.
+
+@par
+Houdini:
+- Added an OpenVDB Points SOP for converting point data back-and-forth
+  between native Houdini points and OpenVDB Points.
+- A SOP base class that adds middle-click information to OpenVDB Points SOPs.
+- A custom GR primitive for rendering OpenVDB Points natively in the
+  Houdini viewport.
+
+*/

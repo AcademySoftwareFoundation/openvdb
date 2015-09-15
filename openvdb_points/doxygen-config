@@ -459,6 +459,7 @@ WARN_LOGFILE           =
 INPUT                  = . \
                          tools \
                          doc/doc.txt \
+                         doc/changes.txt \
                          doc/examplecode.txt
 
 # If the value of the INPUT tag contains directories, you can use the

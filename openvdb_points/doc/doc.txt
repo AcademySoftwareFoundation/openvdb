@@ -10,6 +10,10 @@ for the large, open-source OpenVDB toolset and active community of users.
 
 See the <a href="https://github.com/dneg/openvdb_points_dev">GitHub Overview</A> for a more comprehensive introduction to the library.
 
-See the @subpage codeExamples "Cookbook" to get started using @b OpenVDB Points.
+See the @subpage codeExamples "Cookbook" to get started using @b OpenVDB @b Points.
+
+See the @subpage changes "Release Notes" for what's new in this version of @b OpenVDB @b Points.
+
+Contributors, please familiarize yourselves with OpenVDB's "coding standards".
 
 */
