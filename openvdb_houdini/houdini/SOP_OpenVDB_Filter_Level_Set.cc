@@ -306,7 +306,9 @@ struct FilterParms {
         , mIterations(0)
         , mHalfWidth(3)
         , mStencilWidth(0)
-        , mVoxelOffset(0.0)
+        , mVoxelOffset(0.0f)
+        , mHalfWidthWorld(0.1f)
+        , mStencilWidthWorld(0.1f) 
         , mWorldUnits(false)
         , mMinMask(0)
         , mMaxMask(1)
@@ -320,7 +322,7 @@ struct FilterParms {
     bool mSecondInputConnected;
     FilterType mFilterType;
     int mIterations, mHalfWidth, mStencilWidth;
-    float mVoxelOffset;
+    float mVoxelOffset, mHalfWidthWorld, mStencilWidthWorld;
     bool  mWorldUnits;
     float mMinMask, mMaxMask;
     bool  mInvertMask;
@@ -348,20 +350,15 @@ public:
 
     virtual int isRefInput(unsigned input) const { return (input == 1); }
 
-    int convertUnits();
-
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
     virtual bool updateParmsFlags();
 
 private:
     typedef hvdb::Interrupter BossT;
-
     const OperatorType mOpType;
-    float mVoxelSize;
 
     OP_ERROR evalFilterParms(OP_Context&, FilterParms&);
-
 
     template<typename GridT>
     bool applyFilters(GU_PrimVDB*, std::vector<FilterParms>&, BossT&,
@@ -404,21 +401,6 @@ private:
     void track(const FilterParms&, FilterT&, BossT&, bool verbose);
 };//SOP_OpenVDB_Filter_Level_Set
 
-////////////////////////////////////////
-
-namespace
-{
-
-// Callback to convert from voxel to world space units
-int
-convertUnitsCB(void* data, int /*idx*/, float /*time*/, const PRM_Template*)
-{
-   SOP_OpenVDB_Filter_Level_Set* sop = static_cast<SOP_OpenVDB_Filter_Level_Set*>(data);
-   if (sop == NULL) return 0;
-   return sop->convertUnits();
-}
-
-} // unnamed namespace
 
 ////////////////////////////////////////
 
@@ -461,10 +443,17 @@ newSopOperator(OP_OperatorTable* table)
 
         }
 
+        // Toggle between world- and index-space units for offset
+        parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldSpaceUnits", "Use World Space Units"));
+
         // Stencil width
         parms.add(hutil::ParmFactory(PRM_INT_J, "stencilWidth", "Filter Voxel Radius")
             .setDefault(PRMoneDefaults)
             .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 5));
+
+        parms.add(hutil::ParmFactory(PRM_FLT_J, "stencilWidthWorld", "Filter Radius")
+            .setDefault(0.1)
+            .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 10));
 
         // steps
         parms.add(hutil::ParmFactory(PRM_INT_J, "iterations", "Iterations")
@@ -472,16 +461,16 @@ newSopOperator(OP_OperatorTable* table)
             .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10));
 
         // Narrow-Band half-width
-        parms.add(hutil::ParmFactory(PRM_INT_J, "halfWidth", "Half-Width")
-            .setHelpText("Desired half-width in voxel units of the narrow-band "
-                         "level set (3 is normally best).")
+        parms.add(hutil::ParmFactory(PRM_INT_J, "halfWidth", "Half-Width") 
             .setDefault(PRMthreeDefaults)
-            .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10));
+            .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
+            .setHelpText("Desired narrow band half-width in voxel units "
+                         "(3 voxel units is optimal for level set operations.)."));
 
-        // Toggle between world- and index-space units for offset
-        parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldSpaceUnits",
-                  "Specify Offset in World (vs Voxel) Units")
-                  .setCallbackFunc(&convertUnitsCB));
+        parms.add(hutil::ParmFactory(PRM_FLT_J, "halfWidthWorld", "Half-Width")
+            .setDefault(0.1)
+            .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 10)
+            .setHelpText("Desired narrow band half-width in world units"));
 
         // Offset
         parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelOffset", "Offset")
@@ -603,7 +592,7 @@ SOP_OpenVDB_Filter_Level_Set::factoryNarrowBand(
 SOP_OpenVDB_Filter_Level_Set::SOP_OpenVDB_Filter_Level_Set(
     OP_Network* net, const char* name, OP_Operator* op, OperatorType opType)
     : hvdb::SOP_NodeVDB(net, name, op)
-    , mOpType(opType), mVoxelSize(1.0f)
+    , mOpType(opType) 
 {
 }
 
@@ -639,30 +628,24 @@ SOP_OpenVDB_Filter_Level_Set::updateParmsFlags()
         changed |= enableParm("maskname", useMask);
     }
 
-    changed |= setVisibleState("halfWidth", resize);
+    const bool worldUnits = bool(evalInt("worldSpaceUnits", 0, 0));
+
+    changed |= setVisibleState("halfWidth", resize && !worldUnits);
+    changed |= setVisibleState("halfWidthWorld", resize && worldUnits);
 
     changed |= enableParm("iterations",  smooth || renorm);
-    changed |= enableParm("stencilWidth", stencil);
+    changed |= enableParm("stencilWidth", stencil && !worldUnits);
+    changed |= enableParm("stencilWidthWorld", stencil && worldUnits);
 
     changed |= setVisibleState("stencilWidth", getEnableState("stencilWidth"));
+    changed |= setVisibleState("stencilWidthWorld", getEnableState("stencilWidthWorld"));
+
     changed |= setVisibleState("iterations",   getEnableState("iterations"));
 
-    changed |= setVisibleState("worldSpaceUnits", reshape);
+    changed |= setVisibleState("worldSpaceUnits", !renorm);
     changed |= setVisibleState("voxelOffset",     reshape);
 
     return changed;
-}
-
-////////////////////////////////////////
-
-
-int
-SOP_OpenVDB_Filter_Level_Set::convertUnits()
-{
-    const bool toWS = static_cast<bool>(evalInt("worldSpaceUnits", 0, 0));
-    const fpreal offset = evalFloat("voxelOffset", 0, 0) * (toWS ? mVoxelSize : 1.0f/mVoxelSize);
-    setFloat("voxelOffset", 0, 0, offset);
-    return 1;
 }
 
 ////////////////////////////////////////
@@ -778,12 +761,14 @@ SOP_OpenVDB_Filter_Level_Set::evalFilterParms(OP_Context& context,
 
     parms.mIterations   = evalInt("iterations", 0, now);
     parms.mHalfWidth    = evalInt("halfWidth", 0, now);
+    parms.mHalfWidthWorld = float(evalFloat("halfWidthWorld", 0, now));
     parms.mStencilWidth = evalInt("stencilWidth", 0, now);
+    parms.mStencilWidthWorld = float(evalFloat("stencilWidthWorld", 0, now));
     parms.mVoxelOffset  = static_cast<float>(evalFloat("voxelOffset", 0, now));
     parms.mMinMask      = static_cast<float>(evalFloat("minMask", 0, now));
     parms.mMaxMask      = static_cast<float>(evalFloat("maxMask", 0, now));
-    parms.mInvertMask   = evalInt("invert", 0, now);
-    parms.mWorldUnits   = evalInt("worldSpaceUnits", 0, now);
+    parms.mInvertMask   = bool(evalInt("invert", 0, now));
+    parms.mWorldUnits   = bool(evalInt("worldSpaceUnits", 0, now));
 
     UT_String str;
 
@@ -838,11 +823,11 @@ SOP_OpenVDB_Filter_Level_Set::applyFilters(
     typedef openvdb::FloatGrid MaskT;
     typedef openvdb::tools::LevelSetFilter<GridT, MaskT, BossT> FilterT;
 
-    mVoxelSize = static_cast<float>(grid->voxelSize()[0]);
+    const float voxelSize = static_cast<float>(grid->voxelSize()[0]);
     FilterT filter(*grid, &boss);
     filter.setTemporalScheme(openvdb::math::TVD_RK1);
 
-    if (grid->background() < ValueT(openvdb::LEVEL_SET_HALF_WIDTH * mVoxelSize)) {
+    if (grid->background() < ValueT(openvdb::LEVEL_SET_HALF_WIDTH * voxelSize)) {
         std::string msg = "VDB primitive '"
             + std::string(vdbPrim->getGridName())
             + "' has a narrow band width that is less than 3 voxel units. ";
@@ -918,7 +903,9 @@ SOP_OpenVDB_Filter_Level_Set::filterGrid(OP_Context& context, FilterT& filter,
       case ACCURACY_HJ_WENO:       filter.setSpatialScheme(openvdb::math::HJWENO5_BIAS); break;
     }
 
-    const float ds = (parms.mWorldUnits ? 1.f : mVoxelSize) * parms.mVoxelOffset;
+    const float voxelSize = float(filter.grid().voxelSize()[0]);
+
+    const float ds = (parms.mWorldUnits ? 1.0f : voxelSize) * parms.mVoxelOffset;
 
     switch (parms.mFilterType) {
 
@@ -988,13 +975,22 @@ void
 SOP_OpenVDB_Filter_Level_Set::mean(const FilterParms& parms, FilterT& filter,
     BossT& boss, bool verbose, const typename FilterT::MaskType* mask)
 {
+    const double voxelScale = 1.0 / filter.grid().voxelSize()[0];
+
     for (int n = 0, N = parms.mIterations; n < N && !boss.wasInterrupted(); ++n) {
 
-        if (verbose) {
-            std::cout << "Mean filter of radius " <<  parms.mStencilWidth << std::endl;
+        int radius = parms.mStencilWidth;
+
+        if (parms.mWorldUnits) {
+            double voxelRadius = double(parms.mStencilWidthWorld) * voxelScale;
+            radius = std::max(1, int(voxelRadius));
         }
 
-        filter.mean(parms.mStencilWidth, mask);
+        if (verbose) {
+            std::cout << "Mean filter of radius " << radius << std::endl;
+        }
+
+        filter.mean(radius, mask);
     }
 }
 
@@ -1003,13 +999,22 @@ void
 SOP_OpenVDB_Filter_Level_Set::gaussian(const FilterParms& parms, FilterT& filter,
     BossT& boss, bool verbose, const typename FilterT::MaskType* mask)
 {
+    const double voxelScale = 1.0 / filter.grid().voxelSize()[0];
+
     for (int n = 0, N = parms.mIterations; n < N && !boss.wasInterrupted(); ++n) {
 
-        if (verbose) {
-            std::cout << "Gaussian filter of radius " <<  parms.mStencilWidth << std::endl;
+        int radius = parms.mStencilWidth;
+
+        if (parms.mWorldUnits) {
+            double voxelRadius = double(parms.mStencilWidthWorld) * voxelScale;
+            radius = std::max(1, int(voxelRadius));
         }
 
-        filter.gaussian(parms.mStencilWidth, mask);
+        if (verbose) {
+            std::cout << "Gaussian filter of radius " << radius << std::endl;
+        }
+
+        filter.gaussian(radius, mask);
     }
 }
 
@@ -1018,13 +1023,22 @@ void
 SOP_OpenVDB_Filter_Level_Set::median(const FilterParms& parms, FilterT& filter,
     BossT& boss, bool verbose, const typename FilterT::MaskType* mask)
 {
+    const double voxelScale = 1.0 / filter.grid().voxelSize()[0];
+
     for (int n = 0, N = parms.mIterations; n < N && !boss.wasInterrupted(); ++n) {
 
-        if (verbose) {
-            std::cout << "Median filter of radius " << parms.mStencilWidth << std::endl;
+        int radius = parms.mStencilWidth;
+
+        if (parms.mWorldUnits) {
+            double voxelRadius = double(parms.mStencilWidthWorld) * voxelScale;
+            radius = std::max(1, int(voxelRadius));
         }
 
-        filter.median(parms.mStencilWidth, mask);
+        if (verbose) {
+            std::cout << "Median filter of radius " << radius << std::endl;
+        }
+
+        filter.median(radius, mask);
     }
 }
 
@@ -1086,7 +1100,14 @@ SOP_OpenVDB_Filter_Level_Set::resizeNarrowBand(const FilterParms& parms, FilterT
 
     filter.setNormCount(1); // only one normalization per iteration
 
-    filter.resize(parms.mHalfWidth);
+    int width = parms.mHalfWidth;
+
+    if (parms.mWorldUnits) {
+        double voxelWidth = double(parms.mHalfWidthWorld) / filter.grid().voxelSize()[0];
+        width = std::max(1, int(voxelWidth));
+    }
+
+    filter.resize(width);
 
     filter.setState(s);
 }

@@ -183,7 +183,6 @@ usage(int exitStatus = EXIT_FAILURE)
     ostr << std::setprecision(3) <<
 "Usage: " << gProgName << " in.vdb out.{exr,ppm} [options]\n" <<
 "Which: ray-traces OpenVDB volumes\n" <<
-"Build: library version " << openvdb::getLibraryVersionString() << "\n" << 
 "Options:\n" <<
 "    -aperture F       perspective camera aperture in mm (default: " << opts.aperture << ")\n" <<
 "    -camera S         camera type; either \"persp[ective]\" or \"ortho[graphic]\"\n" <<
@@ -213,6 +212,7 @@ usage(int exitStatus = EXIT_FAILURE)
 "                      (default: " << opts.up << ")\n" <<
 "\n" <<
 "    -v                verbose (print timing and diagnostics)\n" <<
+"    -version          print version information and exit\n" <<
 "    -h, -help         print this usage message and exit\n" <<
 "\n" <<
 "Level set options:\n" <<
@@ -592,6 +592,12 @@ main(int argc, char *argv[])
                 opts.up = strToVec3d(argv[i]);
             } else if (arg == "-v") {
                 opts.verbose = true;
+            } else if (arg == "-version" || arg == "--version") {
+                std::cout << "OpenVDB library version: "
+                    << openvdb::getLibraryVersionString() << "\n";
+                std::cout << "OpenVDB file format version: "
+                    << openvdb::OPENVDB_FILE_VERSION << std::endl;
+                return EXIT_SUCCESS;
             } else if (arg == "-h" || arg == "-help" || arg == "--help") {
                 usage(EXIT_SUCCESS);
             } else {

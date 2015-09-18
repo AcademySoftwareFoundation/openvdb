@@ -463,6 +463,20 @@ isApproxEqual(const Vec2<T>& a, const Vec2<T>& b, const Vec2<T>& eps)
            isApproxEqual(a.y(), b.y(), eps.y());
 }
 
+template<typename T>
+inline bool
+isFinite(const Vec2<T>& v)
+{
+    return isFinite(v[0]) && isFinite(v[1]);
+}
+
+template<typename T>
+inline Vec2<T>
+Abs(const Vec2<T>& v)
+{
+    return Vec2<T>(Abs(v[0]), Abs(v[1]));
+}
+
 /// Orthonormalize vectors v1 and v2 and store back the resulting basis
 /// e.g.   Vec2f::orthonormalize(v1,v2);
 template <typename T>

@@ -232,7 +232,7 @@ public:
     template<size_t OrderRK, typename LocationType>
     inline void rungeKutta(const ElementType dt, LocationType& world) const
     {
-        BOOST_STATIC_ASSERT(OrderRK < 5);
+        BOOST_STATIC_ASSERT(OrderRK <= 4);
         VecType P(static_cast<ElementType>(world[0]),
                   static_cast<ElementType>(world[1]),
                   static_cast<ElementType>(world[2]));

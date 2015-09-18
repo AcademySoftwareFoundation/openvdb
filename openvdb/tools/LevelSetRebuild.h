@@ -304,9 +304,9 @@ levelSetRebuild(const GridType& grid, float iso, float exWidth, float inWidth,
 {
     typedef typename GridType::ValueType ValueT;
     ValueT
-        isovalue(zeroVal<ValueT>() + iso),
-        exBandWidth(zeroVal<ValueT>() + exWidth),
-        inBandWidth(zeroVal<ValueT>() + inWidth);
+        isovalue(zeroVal<ValueT>() + ValueT(iso)),
+        exBandWidth(zeroVal<ValueT>() + ValueT(exWidth)),
+        inBandWidth(zeroVal<ValueT>() + ValueT(inWidth));
 
     return doLevelSetRebuild(grid, isovalue, exBandWidth, inBandWidth, xform, interrupter);
 }
@@ -319,9 +319,9 @@ levelSetRebuild(const GridType& grid, float iso, float exWidth, float inWidth,
 {
     typedef typename GridType::ValueType ValueT;
     ValueT
-        isovalue(zeroVal<ValueT>() + iso),
-        exBandWidth(zeroVal<ValueT>() + exWidth),
-        inBandWidth(zeroVal<ValueT>() + inWidth);
+        isovalue(zeroVal<ValueT>() + ValueT(iso)),
+        exBandWidth(zeroVal<ValueT>() + ValueT(exWidth)),
+        inBandWidth(zeroVal<ValueT>() + ValueT(inWidth));
 
     return doLevelSetRebuild<GridType, util::NullInterrupter>(
         grid, isovalue, exBandWidth, inBandWidth, xform, NULL);
@@ -334,8 +334,8 @@ levelSetRebuild(const GridType& grid, float iso, float halfVal, const math::Tran
 {
     typedef typename GridType::ValueType ValueT;
     ValueT
-        isovalue(zeroVal<ValueT>() + iso),
-        halfWidth(zeroVal<ValueT>() + halfVal);
+        isovalue(zeroVal<ValueT>() + ValueT(iso)),
+        halfWidth(zeroVal<ValueT>() + ValueT(halfVal));
 
     return doLevelSetRebuild<GridType, util::NullInterrupter>(
         grid, isovalue, halfWidth, halfWidth, xform, NULL);

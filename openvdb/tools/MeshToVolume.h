@@ -50,6 +50,7 @@
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Util.h>
 
+#include "ChangeBackground.h"
 #include "Prune.h" // for pruneInactive and pruneLevelSet
 #include "SignedFloodFill.h" // for signedFloodFillWithValues
 
@@ -2625,7 +2626,7 @@ struct TransformValues
 
             for (iter = mNodes[n]->beginValueOn(); iter; ++iter) {
                 ValueType& val = const_cast<ValueType&>(iter.getValue());
-                val = w[!udf && (val < ValueType(0.0))] * std::sqrt(std::abs(val));
+                val = w[udf || (val < ValueType(0.0))] * std::sqrt(std::abs(val));
             }
         }
     }
@@ -2681,7 +2682,6 @@ private:
     LeafNodeType * * const mNodes;
     const ValueType mExBandWidth, mInBandWidth;
 };
-
 
 
 template<typename TreeType>
@@ -3064,6 +3064,8 @@ meshToVolume(
     if (computeSignedDistanceField) {
         distTree.root().setBackground(exteriorWidth, /*updateChildNodes=*/false);
         tools::signedFloodFillWithValues(distTree, exteriorWidth, -interiorWidth);
+    } else {
+        tools::changeBackground(distTree, exteriorWidth);
     }
 
     if (interrupter.wasInterrupted(54)) return distGrid;

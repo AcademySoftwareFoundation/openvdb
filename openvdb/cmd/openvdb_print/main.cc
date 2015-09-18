@@ -53,10 +53,10 @@ usage(int exitStatus = EXIT_FAILURE)
     std::cerr <<
 "Usage: " << gProgName << " in.vdb [in.vdb ...] [options]\n" <<
 "Which: prints information about OpenVDB grids\n" <<
-"Build: library version " << openvdb::getLibraryVersionString() << "\n" <<       
 "Options:\n" <<
 "    -l, -stats     long printout, including grid statistics\n" <<
-"    -m, -metadata  print per-file and per-grid metadata\n";
+"    -m, -metadata  print per-file and per-grid metadata\n" <<
+"    -version       print version information\n";
     exit(exitStatus);
 }
 
@@ -275,7 +275,7 @@ main(int argc, char *argv[])
 
     if (argc == 1) usage();
 
-    bool stats = false, metadata = false;
+    bool stats = false, metadata = false, version = false;
     StringVec filenames;
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -286,6 +286,8 @@ main(int argc, char *argv[])
                 stats = true;
             } else if (arg == "-h" || arg == "-help" || arg == "--help") {
                 usage(EXIT_SUCCESS);
+            } else if (arg == "-version" || arg == "--version") {
+                version = true;
             } else {
                 std::cerr << gProgName << ": \"" << arg << "\" is not a valid option\n";
                 usage();
@@ -294,6 +296,15 @@ main(int argc, char *argv[])
             filenames.push_back(arg);
         }
     }
+
+    if (version) {
+        std::cout << "OpenVDB library version: "
+            << openvdb::getLibraryVersionString() << "\n";
+        std::cout << "OpenVDB file format version: "
+            << openvdb::OPENVDB_FILE_VERSION << std::endl;
+        if (filenames.empty()) return EXIT_SUCCESS;
+    }
+
     if (filenames.empty()) {
         std::cerr << gProgName << ": expected one or more OpenVDB files\n";
         usage();

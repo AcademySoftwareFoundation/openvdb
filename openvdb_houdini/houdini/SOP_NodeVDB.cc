@@ -138,8 +138,7 @@ SOP_NodeVDB::getNodeSpecificInfoText(OP_Context &context, OP_NodeInfoParms &parm
         openvdb::Coord dim = grid.evalActiveVoxelDim();
         const UT_String gridName = it.getPrimitiveName();
 
-        infoStr << "    ";
-        infoStr << "(" << it.getIndex() << ")";
+        infoStr << "  (" << it.getIndex() << ")";
         if(gridName.isstring()) infoStr << " name: '" << gridName << "',";
         infoStr << " voxel size: " << grid.transform().voxelSize()[0] << ",";
         infoStr << " type: "<< grid.valueType() << ",";
@@ -148,6 +147,11 @@ SOP_NodeVDB::getNodeSpecificInfoText(OP_Context &context, OP_NodeInfoParms &parm
             infoStr << " dim: " << dim[0] << "x" << dim[1] << "x" << dim[2];
         } else {
             infoStr <<" <empty>";
+        }
+
+        const openvdb::GridClass gClass = grid.getGridClass();
+        if (openvdb::GRID_LEVEL_SET == gClass || openvdb::GRID_FOG_VOLUME == gClass) {
+            infoStr<<" (" << grid.gridClassToMenuName(gClass) << ")";
         }
 
         infoStr<<"\n";

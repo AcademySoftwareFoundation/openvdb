@@ -508,6 +508,36 @@ inline Vec4<typename promote<S, T>::type> operator-(const Vec4<T> &v, S scalar)
     return result;
 }
 
+template <typename T>
+inline bool
+isApproxEqual(const Vec4<T>& a, const Vec4<T>& b)
+{
+    return a.eq(b);
+}
+template <typename T>
+inline bool
+isApproxEqual(const Vec4<T>& a, const Vec4<T>& b, const Vec4<T>& eps)
+{
+    return isApproxEqual(a[0], b[0], eps[0]) &&
+           isApproxEqual(a[1], b[1], eps[1]) &&
+           isApproxEqual(a[2], b[2], eps[2]) &&
+           isApproxEqual(a[3], b[3], eps[3]);
+}
+
+template<typename T>
+inline bool
+isFinite(const Vec4<T>& v)
+{
+    return isFinite(v[0]) && isFinite(v[1]) && isFinite(v[2]) && isFinite(v[3]);
+}
+
+template<typename T>
+inline Vec4<T>
+Abs(const Vec4<T>& v)
+{
+    return Vec4<T>(Abs(v[0]), Abs(v[1]), Abs(v[2]), Abs(v[3]));
+}
+
 /// @remark We are switching to a more explicit name because the semantics
 /// are different from std::min/max. In that case, the function returns a
 /// reference to one of the objects based on a comparator. Here, we must

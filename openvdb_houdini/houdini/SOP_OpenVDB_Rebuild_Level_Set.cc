@@ -91,8 +91,9 @@ newSopOperator(OP_OperatorTable* table)
         .setRange(PRM_RANGE_UI, -1, PRM_RANGE_UI, 1)
         .setHelpText("The isovalue that defines the implicit surface"));
 
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldunits", "Use World Space Units"));
 
-    // Narrow-band width {
+    // Voxel unit narrow-band width {
     parms.add(hutil::ParmFactory(PRM_FLT_J, "exteriorBandWidth", "Exterior Band Voxels")
         .setDefault(PRMthreeDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
@@ -104,6 +105,18 @@ newSopOperator(OP_OperatorTable* table)
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
         .setHelpText("Specify the width of the interior (d < 0) portion of the narrow band. "
             "(3 voxel units is optimal for level set operations.)"));
+    // }
+    
+    // World unit narrow-band width {
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "exteriorBandWidthWS", "Exterior Band")
+        .setDefault(0.1)
+        .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 10)
+        .setHelpText("Specify the width of the exterior (d >= 0) portion of the narrow band."));
+
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "interiorBandWidthWS",  "Interior Band")
+        .setDefault(0.1)
+        .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 10)
+        .setHelpText("Specify the width of the interior (d < 0) portion of the narrow band."));
     // }
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "fillinterior", "Fill Interior")
@@ -178,8 +191,17 @@ SOP_OpenVDB_Rebuild_Level_Set::updateParmsFlags()
 {
     bool changed = false;
 
-    const bool fillinterior = bool(evalInt("fillinterior", 0, 0));
-    changed |= enableParm("interiorBandWidth", !fillinterior);
+    const bool fillInterior = bool(evalInt("fillinterior", 0, 0));
+    changed |= enableParm("interiorBandWidth", !fillInterior);
+    changed |= enableParm("interiorBandWidthWS", !fillInterior);
+
+    const bool worldUnits = bool(evalInt("worldunits", 0, 0));
+
+    changed |= setVisibleState("interiorBandWidth", !worldUnits);
+    changed |= setVisibleState("interiorBandWidthWS", worldUnits);
+
+    changed |= setVisibleState("exteriorBandWidth", !worldUnits);
+    changed |= setVisibleState("exteriorBandWidthWS", worldUnits);
 
     return changed;
 }
@@ -205,12 +227,19 @@ SOP_OpenVDB_Rebuild_Level_Set::cookMySop(OP_Context& context)
         const GA_PrimitiveGroup* group = this->matchGroup(*gdp, groupStr.toStdString());
 
         // Get other UI parameters.
-        const float exBandWidth = static_cast<float>(evalFloat("exteriorBandWidth", 0, time));
-        const float inBandWidth = bool(evalInt("fillinterior", 0, time))
-            ? std::numeric_limits<float>::max()
-            : static_cast<float>(evalFloat("interiorBandWidth", 0, time));
 
-        const float iso = static_cast<float>(evalFloat("isovalue", 0, time));
+        const bool fillInterior = bool(evalInt("fillinterior", 0, time));
+        const bool worldUnits = bool(evalInt("worldunits", 0, time));
+
+        float exBandWidthVoxels = float(evalFloat("exteriorBandWidth", 0, time));
+        float inBandWidthVoxels = fillInterior ? std::numeric_limits<float>::max() :
+                                    float(evalFloat("interiorBandWidth", 0, time));
+
+        float exBandWidthWorld = float(evalFloat("exteriorBandWidthWS", 0, time));
+        float inBandWidthWorld = fillInterior ? std::numeric_limits<float>::max() :
+                                    float(evalFloat("interiorBandWidthWS", 0, time));
+
+        const float iso = float(evalFloat("isovalue", 0, time));
 
         hvdb::Interrupter boss("Rebuilding Level Set Grids");
 
@@ -223,15 +252,44 @@ SOP_OpenVDB_Rebuild_Level_Set::cookMySop(OP_Context& context)
 
             GU_PrimVDB* vdbPrim = *it;
 
+            float exWidth = exBandWidthVoxels, inWidth = inBandWidthVoxels;
+            
+            if (worldUnits) {
+                const float voxelSize = float(vdbPrim->getGrid().voxelSize()[0]);
+
+                exWidth = exBandWidthWorld / voxelSize;
+                if (!fillInterior) inWidth = inBandWidthWorld / voxelSize;
+
+                if (exWidth < 1.0f || inWidth < 1.0f) {                    
+                    exWidth = std::max(exWidth, 1.0f);
+                    inWidth = std::max(inWidth, 1.0f);
+                    std::string s = it.getPrimitiveNameOrIndex().toStdString();
+                    s += " - band width is smaller than one voxel.";
+                    addWarning(SOP_MESSAGE, s.c_str());
+                }
+            }
+
             // Process floating point grids.
+
             if (vdbPrim->getStorageType() == UT_VDB_FLOAT) {
+
                 openvdb::FloatGrid& grid = UTvdbGridCast<openvdb::FloatGrid>(vdbPrim->getGrid());
+
                 vdbPrim->setGrid(*openvdb::tools::levelSetRebuild(
-                    grid, iso, exBandWidth, inBandWidth, /*xform=*/NULL, &boss));
+                    grid, iso, exWidth, inWidth, /*xform=*/NULL, &boss));
+
+                const GEO_VolumeOptions& visOps = vdbPrim->getVisOptions();
+                vdbPrim->setVisualization(GEO_VOLUMEVIS_ISO, visOps.myIso, visOps.myDensity);
+
             } else if (vdbPrim->getStorageType() == UT_VDB_DOUBLE) {
+
                 openvdb::DoubleGrid& grid = UTvdbGridCast<openvdb::DoubleGrid>(vdbPrim->getGrid());
+
                 vdbPrim->setGrid(*openvdb::tools::levelSetRebuild(
-                    grid, iso, exBandWidth, inBandWidth, /*xform=*/NULL, &boss));
+                    grid, iso, exWidth, inWidth, /*xform=*/NULL, &boss));
+
+                const GEO_VolumeOptions& visOps = vdbPrim->getVisOptions();
+                vdbPrim->setVisualization(GEO_VOLUMEVIS_ISO, visOps.myIso, visOps.myDensity);
             } else {
                 skippedGrids.push_back(it.getPrimitiveNameOrIndex().toStdString());
             }

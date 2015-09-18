@@ -5,36 +5,39 @@
 
 @htmlonly <a name="v3_1_0_changes"></a>@endhtmlonly
 @par
-<B>Version 3.1.0</B> - <I>In development</I>
+<B>Version 3.1.0</B> - <I>September 4, 2015</I>
+
+@par
+Highlights:
+- New features: advection of arbitrary volumes, general-purpose preconditioned
+  linear solver and Poisson solver, segmentation of topologically-enclosed
+  regions of a volume, new and faster bitmask operators, threadsafe paged array,
+  volume diagnostics
+- Optimizations: threaded grid constructors and topology operations;
+  faster mesh to volume conversion, SDF to fog volume conversion
+  and grid pruning; faster, unbounded particle partitioning
+- New Houdini nodes: Advect Density, Diagnostics, Rasterize Points,
+  Remove Divergence, Sort Points
 
 @par
 New features:
-- Added @vdblink::tools::DensityAdvection DensityAdvection@endlink
+- Added a @vdblink::tools::DensityAdvection density advection@endlink tool
   for sparse advection of non-level-set volumes.
-- Added @vdblink::tools::extractEnclosedRegion extractEnclosedRegion@endlink
-  to detect topologically enclosed (watertight) exterior regions (cavities)
-  that can arise as the result of a CSG union operation between different
-  level set shapes where at least one of the shapes has a concavity that
-  is capped.
 - Added a preconditioned
   @vdblink::math::pcg::solve() conjugate gradient solver@endlink.
 - Added a @vdblink::tools::poisson::solve() Poisson solver@endlink
-  for incompressible fluids.  Often procedural animation of objects
-  (e.g. characters) interacting with liquid will result in boundary
-  conditions that describe multiple disjoint regions: regions of free
-  surface flow and regions of of trapped fluid. It is this second type
-  of region for which there may be no consistent pressure (e.g. a
-  shrinking watertight region filled with incompressible liquid).
-  The unit test TestPoissonSolver::testSolveWithSegmentDomain
-  demonstrates how to use @vdblink::tools::extractEnclosedRegion
-  extractEnclosedRegion@endlink in conjuction with the Poisson solver.
-- Added @vdblink::util::PagedArray PagedArray@endlink, a thread-safe,
+  for functions sampled on grids.
+- Added @vdblink::tools::extractEnclosedRegion extractEnclosedRegion@endlink,
+  which detects topologically-enclosed (watertight) exterior regions (cavities)
+  that can result from CSG union operations between level sets with concavities
+  that are capped.
+  (See the unit test @c TestPoissonSolver::testSolveWithSegmentDomain
+  for an example in which this tool is used to identify regions of trapped
+  fluid when solving for pressure in a volume of incompressible fluid.)
+- Added @vdblink::util::PagedArray PagedArray@endlink, a concurrent,
   dynamic linear array data structure with fast <I>O</I>(1) value access
   (both random and sequential).
-- Added @vdblink::tree::LeafNode::Buffer::data() LeafNode::Buffer::data@endlink,
-  which provides direct access to a leaf node&rsquo;s voxel value array,
-  avoiding out-of-core overhead.
-- Added @vdblink::tools::Sampler Sampler@endlink, which proves a unified API
+- Added @vdblink::tools::Sampler Sampler@endlink, which provides a unified API
   for both staggered and non-staggered interpolation of various orders.
 - Added equality and inequality operators to
   @vdblink::Metadata Metadata@endlink and @vdblink::MetaMap MetaMap@endlink.
@@ -43,56 +46,58 @@ New features:
   perform various tests on symmetric, narrow-band level sets and fog volumes,
   respectively, to diagnose potential issues.
 - Added support for value accessors that are not registered with their trees.
-  Bypassing accessor registration can improve performance in rare cases
+  (Bypassing accessor registration can improve performance in rare cases
   but should be used with caution, since the accessor will be left in an
-  invalid state if the tree topology is modified.
+  invalid state if the tree topology is modified.)
 - Added a @vdblink::tree::Tree::stealNodes() stealNodes@endlink method that
   transfers ownership of all nodes in a tree of a certain type and inserts
   them into a linear array.
-- Added @vdblink::tools::createLevelSetBox() tools::createLevelSetBox@endlink
-  factory function for level set grids.
-- Added @vdblink::util::NodeMask::foreach NodeMask::foreach@endlink method for
-  fast but complex bit operations.
-- Added the member method @vdblink::tools::Dense::offsetToCoord
-  Dense::offsetToCoord@endlink.
-- Added bitwise difference method to @vdblink::util::NodeMask NodeMask@endlink.
-- Added an optional template argument to the
-  @vdblink::tree::ValueAccessor ValueAccessor@endlink class
-  to allow for unregistered accessors.
+- Added a @vdblink::tools::createLevelSetBox() tools::createLevelSetBox@endlink
+  factory function for level-set grids.
+- Added @vdblink::tools::Dense::offsetToCoord() Dense::offsetToCoord@endlink.
+- Added @vdblink::tree::LeafNode::Buffer::data() LeafNode::Buffer::data@endlink,
+  which provides direct access to a leaf node&rsquo;s voxel value array,
+  avoiding out-of-core overhead.  Use with caution.
+- Added a @vdblink::util::NodeMask::foreach() NodeMask::foreach@endlink method
+  for efficient evaluation of complex bitwise operations.
+- Added a bitwise difference method to
+  @vdblink::util::NodeMask::operator-=() NodeMask@endlink.
 
 @par
 Improvements:
-- Deep, conversion and topology copy constructors on the @vdblink::Grid
-  Grid@endlink are now up to 5x faster due to multi-threading.
+- Deep, conversion and topology copy @vdblink::Grid Grid@endlink constructors
+  are now threaded and up to five times faster.
 - @vdblink::Grid::topologyUnion() Grid::topologyUnion@endlink,
   @vdblink::Grid::topologyIntersection() Grid::topologyIntersection@endlink, and
   @vdblink::Grid::topologyDifference() Grid::topologyDifference@endlink are now
-  much faster due to a rewrite and multi-threading.
-- A new implementation of the @vdblink::tools::meshToVolume MeshToVolume@endlink
-  converter with significant performance and parallel scaling improvements,
-  reduced runtime memory usage and a more robust inside / outside sign
-  classification scheme.
-- A new implementation of @vdblink::tools::PointPartitioner PointPartitioner@endlink
-  improves performance, concurrency, runtime memory usage and is now unbounded
-  meaning that points may be distributed anywhere in index space.
-- A new implementation of the @vdblink::tools::sdfToFogVolume
-  sdfToFogVolume@endlink converter that improves performance up to 11x.
-- A new implementation of the @vdblink::tools::sdfInteriorMask
-  sdfInteriorMask@endlink tool that improves performance up to 5x and supports
-  both grid and tree volume inputs.
+  much faster due to threading.
+- Significantly improved the performance, parallel scaling and memory usage
+  of the @vdblink::tools::meshToVolume() mesh to volume@endlink converter,
+  and implemented a more robust inside/outside sign classification scheme.
+- Reimplemented the
+  @vdblink::tools::PointPartitioner point partitioning@endlink
+  tool for improved performance, concurrency and memory usage.
+  The tool is now unbounded in the sense that points may be distributed
+  anywhere in index space.
+- Significantly improved the performance of the
+  @vdblink::tools::sdfToFogVolume() SDF to fog volume@endlink converter.
+- Significantly improved the performance of the
+  @vdblink::tools::sdfInteriorMask() sdfInteriorMask@endlink tool
+  and added support for both grid and tree inputs.
 - Made various optimizations and improvements to the
   @vdblink::tools::LevelSetMorphing level set morphing@endlink tool.
-- Improved performance of @vdblink::tools::prune prune@endlink.
 - Aggregated @vdblink::tools::DiscreteField DiscreteField@endlink and
   @vdblink::tools::EnrightField EnrightField@endlink (formerly in
   tools/LevelSetAdvect.h) and
   @vdblink::tools::VelocitySampler VelocitySampler@endlink and
   @vdblink::tools::VelocityIntegrator VelocityIntegrator@endlink (formerly
   in tools/PointAdvect.h) into a single header, tools/VelocityFields.h.
-- Loosened floating point type requirement in @vdblink::tools::signedFloodFill
-  signedFloodFill@endlink to signed scalar type.
-- @vdblink::tools::prune prune@endlink now employs an improved compression
-  technique when applied to trees with floating-point values.
+- Modified the @vdblink::tools::signedFloodFill() signed flood fill@endlink
+  tool to accept grids of any signed scalar value type, not just
+  floating-point grids.
+- The @vdblink::tools::prune() prune@endlink tool is now faster, and it employs
+  an improved compression technique on trees with floating-point values.
+- Added a @c -version option to @c vdb_print, @c vdb_render and @c vdb_view.
 
 @par
 Bug fixes:
@@ -100,17 +105,20 @@ Bug fixes:
   is not supported&rdquo; errors unless @c OPENVDB_USE_BLOSC was
   <TT>@#define</TT>d when compiling client code.
 - Added NaN and inf checks to the
-  @vdblink::tools::PointPartitioner PointPartitioner@endlink tool.
+  @vdblink::tools::PointPartitioner point partitioning@endlink tool.
 - Fixed a <TT>vdb_view</TT> issue whereby the frame buffer size did not
   necessarily match the window size.
   <I>[Contributed by Rafael&nbsp;Campos]</I>
-- Fixed a bug in @vdblink::tools::QuadraticSampler::sample QuadraticSampler@endlink.
-- Fixed a roundoff issue in @vdblink::tools::LevelSetTracker LevelSetTrackerthat@endlink
-  that could generate NaNs.
-- Fixed parameter type inconsistencies in math::Ray.h and
-  tools::RayIntersector.h <I>[Contributed by Kevin Dietrich]</I>
-- Fixed a bug in @vdblink::tools::clip clip@endlink (and the corresponding SOP)
-  that was caused by incorrect handeling of signed values.
+- Fixed a roundoff issue in
+  @vdblink::tools::LevelSetTracker LevelSetTracker@endlink
+  that could result in NaNs.
+- Changed @vdblink::tools::CheckNormGrad CheckNormGrad@endlink so it checks 
+  the magnitute of the gradient vs its square. 
+- Fixed parameter type inconsistencies in math/Ray.h and
+  tools/RayIntersector.h.
+  <I>[Contributed by K&eacute;vin&nbsp;Dietrich]</I>
+- Fixed incorrect handling of signed values in the
+  @vdblink::tools::clip() clip@endlink tool (and the Clip SOP).
 
 @par
 API changes:
@@ -123,42 +131,50 @@ API changes:
 - Extended the API of the @vdblink::tools::Diagnose Diagnose@endlink tool
   and disabled copy construction.
 - Extended and unified the API of various Samplers.
+- Added an optional template argument to the
+  @vdblink::tree::ValueAccessor ValueAccessor@endlink class
+  to allow for unregistered accessors.
 
 @par
 Houdini:
 - Added a Rasterize Points SOP that produces density volumes and transfers
-  arbitrary point attributes using a weighted average scheme. This node
-  contains a VOP sub-network which can be used to define VEX procedures for
-  procedural modeling. The accompanying creation script defines a
-  default VOP network with UI parameters for procedural cloud and velocity
-  field modeling.
-- Added an Advect Density SOP to advect non-level-sets, e.g. density or
-  velocity.
-- Added a Remove Divergence SOP that removes any divergent portions of a
+  arbitrary point attributes using a weighted-average scheme.
+  The node incorporates a VOP subnetwork for procedural modeling,
+  and its accompanying creation script defines a default network with
+  VEX procedures for cloud and velocity field modeling.
+- Added an Advect Density SOP to advect density, velocity and other
+  non-level-set grids.
+- Added a Remove Divergence SOP that eliminates divergence from a
   velocity field.
-- Added a Diagnostics SOP that can perform various type of tests on LevelSet,
-  FOG and other classes of grids. Use it for debugging.
-- Added a Sort Points SOP that spatially reorders points that are close
-  together in space to also be close in the insertion order. This
-  operation can help improve CPU cache coherency and performance for
-  random access operations.
+- Added a Diagnostics SOP that can identify various problems with
+  level sets, fog volumes and other grids.
+- Added a Sort Points SOP that spatially reorders a list of points
+  so that points that are close together in space are also close together
+  in the list.
+  This can improve CPU cache coherency and performance for
+  random-access operations.
 - Added an option to the Convert SOP to activate interior voxels.
   <I>[Contributed by SESI]</I>
 - The To Polygons SOP can now optionally output a <TT>pscale</TT> attribute.
 - Added <TT>openvdb_houdini::SOP_NodeVDB::duplicateSourceStealable()</TT>,
   which in conjunction with the Unload flag can help to minimize deep copying
-  of grids between nodes.  The Advect Level Set, Convert, Fill, Filter,
-  Filter Level Set, Fracture, Noise, Prune and Transform SOPs have all been
-  updated to enable this optimization.
+  of grids between nodes.
+  The Advect Level Set, Convert, Fill, Filter, Filter Level Set, Fracture,
+  Noise, Prune and Transform SOPs have all been updated to enable this
+  optimization.
   <I>[Contributed by Double&nbsp;Negative]</I>
 - Redesigned the UI of the Visualize SOP and added toggles to draw with
   or without color, to use the grid name as the attribute name for points
   with values, and to attach grid index coordinates to points.
-
+- Updated Filter, Rebuild Level Set, Resize Narrow Band, Smooth Level Set
+  and To Spheres SOPs with world unit options to enable a voxel size
+  independent workflow.
+- Updated Rebuild Level Set SOP to set surface visualization options on
+  output grids.
 
 @htmlonly <a name="v3_0_0_changes"></a>@endhtmlonly
 @par
-<B>Version 3.0.0</B> - <I>January 14, 2014</I>
+<B>Version 3.0.0</B> - <I>January 14, 2015</I>
 - The @vdblink::io::File File@endlink class now supports delayed loading of
   <TT>.vdb</TT> files, meaning that memory is not allocated for voxel values
   until the values are actually accessed. (This feature is enabled by default.)

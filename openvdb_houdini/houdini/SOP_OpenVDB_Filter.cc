@@ -84,16 +84,24 @@ protected:
             : op(_op)
             , iterations(1)
             , radius(1)
+            , worldRadius(0.1f)
+            , minMask(0.0f)
+            , maxMask(0.0f)
+            , invertMask(false)
+            , useWorldRadius(false)
+            , mask(NULL)
 #ifndef SESI_OPENVDB
             , offset(0.0)
+            , verbose(false)
 #endif
         {
         }
         Operation op;
         int iterations;
         int radius;
+        float worldRadius;
         float minMask, maxMask;
-        bool  invertMask;
+        bool  invertMask, useWorldRadius;
         const openvdb::FloatGrid* mask;
 #ifndef SESI_OPENVDB
         float offset;
@@ -244,9 +252,16 @@ SOP_OpenVDB_Filter::registerSop(OP_OperatorTable* table)
     }
 
     // Filter radius
+
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldunits", "Use World Space Radius Units"));
+
     parms.add(hutil::ParmFactory(PRM_INT_J, "radius", "Filter Voxel Radius")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 5));
+
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "worldradius", "Filter Radius")
+        .setDefault(0.1)
+        .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 10));
 
     // Number of iterations
     parms.add(hutil::ParmFactory(PRM_INT_J, "iterations", "Iterations")
@@ -308,11 +323,13 @@ SOP_OpenVDB_Filter::updateParmsFlags()
     changed |= enableParm("maxMask", useMask);
     changed |= enableParm("maskname", useMask);
 
+    const bool worldUnits = bool(evalInt("worldunits", 0, 0));
+
 #ifndef SESI_OPENVDB
     UT_String s;
     evalString(s, "operation", 0, 0);
 
-    Operation op;
+    Operation op = OP_MEAN;
     bool gotOp = false;
     try { op = stringToOp(s.toStdString()); gotOp = true; }
     catch (std::runtime_error&) {}
@@ -322,13 +339,19 @@ SOP_OpenVDB_Filter::updateParmsFlags()
         bool enable = (op == OP_MEAN || op == OP_GAUSS || op == OP_MEDIAN);
         changed |= enableParm("iterations", enable);
         changed |= enableParm("radius", enable);
+        changed |= enableParm("worldradius", enable);
         changed |= setVisibleState("iterations", enable);
-        changed |= setVisibleState("radius", enable);
+        changed |= setVisibleState("worldunits", enable);
+        changed |= setVisibleState("radius", enable && !worldUnits);
+        changed |= setVisibleState("worldradius", enable && worldUnits);
 
         enable = (op == OP_OFFSET);
         changed |= enableParm("offset", enable);
         changed |= setVisibleState("offset", enable);
     }
+#else
+    changed |= setVisibleState("radius", !worldUnits);
+    changed |= setVisibleState("worldradius", worldUnits);
 #endif
 
     return changed;
@@ -356,6 +379,14 @@ struct SOP_OpenVDB_Filter::FilterOp
             if (interrupt && interrupt->wasInterrupted()) return;
 
             const FilterParms& parms = opSequence[i];
+
+            int radius = parms.radius;
+
+            if (parms.useWorldRadius) {
+                double voxelRadius = double(parms.worldRadius) / grid.voxelSize()[0];
+                radius = std::max(1, int(voxelRadius));
+            }
+
             filter.setMaskRange(parms.minMask, parms.maxMask);
             filter.invertMask(parms.invertMask);
 
@@ -373,30 +404,30 @@ struct SOP_OpenVDB_Filter::FilterOp
 #ifndef SESI_OPENVDB
                 if (parms.verbose) {
                     std::cout << "Applying " << parms.iterations << " iterations of mean value"
-                        " filtering with a radius of " << parms.radius << std::endl;
+                        " filtering with a radius of " << radius << std::endl;
                 }
 #endif
-                filter.mean(parms.radius, parms.iterations, parms.mask);
+                filter.mean(radius, parms.iterations, parms.mask);
                 break;
 
             case OP_GAUSS:
 #ifndef SESI_OPENVDB
                 if (parms.verbose) {
                     std::cout << "Applying " << parms.iterations << " iterations of gaussian"
-                        " filtering with a radius of " << parms.radius << std::endl;
+                        " filtering with a radius of " <<radius << std::endl;
                 }
 #endif
-                filter.gaussian(parms.radius, parms.iterations, parms.mask);
+                filter.gaussian(radius, parms.iterations, parms.mask);
                 break;
 
             case OP_MEDIAN:
 #ifndef SESI_OPENVDB
                 if (parms.verbose) {
                     std::cout << "Applying " << parms.iterations << " iterations of median value"
-                        " filtering with a radius of " << parms.radius << std::endl;
+                        " filtering with a radius of " << radius << std::endl;
                 }
 #endif
-                filter.median(parms.radius, parms.iterations, parms.mask);
+                filter.median(radius, parms.iterations, parms.mask);
                 break;
 
             case NUM_OPERATIONS:
@@ -422,6 +453,8 @@ SOP_OpenVDB_Filter::evalFilterParms(OP_Context& context, GU_Detail&, FilterParmV
 
     FilterParms parms(op);
     parms.radius = evalInt("radius", 0, now);
+    parms.worldRadius = float(evalFloat("worldradius", 0, now));
+    parms.useWorldRadius = bool(evalInt("worldunits", 0, now));
     parms.iterations = evalInt("iterations", 0, now);
 #ifndef SESI_OPENVDB
     parms.offset = static_cast<float>(evalFloat("offset", 0, now));

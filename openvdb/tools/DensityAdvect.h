@@ -38,6 +38,12 @@
 ///        velocity (vs a level set interface).
 ///
 /// @todo  MacCormack, BFECC and better estimate of padding by dilation.
+///
+/// @warning The current implementationn can exhibit instabilities when
+///          second order spatial interpolation is enabled! This is a known
+///          problem (cf. Gudonov's theorem) and will be address in a future
+///          version of this tool.
+
 
 #ifndef OPENVDB_TOOLS_DENSITY_ADVECT_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_DENSITY_ADVECT_HAS_BEEN_INCLUDED

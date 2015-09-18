@@ -563,6 +563,20 @@ isApproxEqual(const Vec3<T>& a, const Vec3<T>& b, const Vec3<T>& eps)
            isApproxEqual(a.z(), b.z(), eps.z());
 }
 
+template<typename T>
+inline bool
+isFinite(const Vec3<T>& v)
+{
+    return isFinite(v[0]) && isFinite(v[1]) && isFinite(v[2]);
+}
+
+template<typename T>
+inline Vec3<T>
+Abs(const Vec3<T>& v)
+{
+    return Vec3<T>(Abs(v[0]), Abs(v[1]), Abs(v[2]));
+}
+
 /// Orthonormalize vectors v1, v2 and v3 and store back the resulting
 /// basis e.g.   Vec3d::orthonormalize(v1,v2,v3);
 template <typename T>

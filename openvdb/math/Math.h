@@ -44,6 +44,7 @@
 #include <string>
 #include <boost/numeric/conversion/conversion_traits.hpp>
 #include <boost/math/special_functions/cbrt.hpp>
+#include <boost/math/special_functions/fpclassify.hpp> // boost::math::isfinite
 #include <boost/random/mersenne_twister.hpp> // for boost::random::mt19937
 #include <boost/random/uniform_01.hpp>
 #include <boost/random/uniform_int.hpp>
@@ -354,6 +355,12 @@ isNegative(const Type& x) { return x < zeroVal<Type>(); }
 
 /// Return @c false, since @c bool values are never less than zero.
 template<> inline bool isNegative<bool>(const bool&) { return false; }
+
+
+/// Return @c true if @a x is finite.
+template<typename Type>
+inline bool
+isFinite(const Type& x) { return boost::math::isfinite(x); }
 
 
 /// @brief Return @c true if @a a is equal to @a b to within

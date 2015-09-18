@@ -429,7 +429,10 @@ struct CheckMax
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/// @brief Checks the norm of the gradient against a range
+/// @brief Checks the norm of the gradient against a range, i.e. @f$|\nabla\phi|\in[min,max]@f$
+///
+/// @note Internally the test is performed as @f$|\nabla\phi|^2\in[min^2,max^2]@f$
+/// for optimization reasons.  
 template<typename GridT,
          typename TreeIterT = typename GridT::ValueOnCIter,
          math::BiasedGradientScheme GradScheme = math::FIRST_BIAS>//math::WENO5_BIAS>
@@ -446,13 +449,13 @@ struct CheckNormGrad
     CheckNormGrad(const GridT&  grid, const ValueType& _min, const ValueType& _max)
         : acc(grid.getConstAccessor())
         , invdx2(ValueType(1.0/math::Pow2(grid.voxelSize()[0])))
-        , minVal(_min)
-        , maxVal(_max)
+        , minVal2(_min*_min)
+        , maxVal2(_max*_max)
     {
         if ( !grid.hasUniformVoxels() ) {
             OPENVDB_THROW(ValueError, "CheckNormGrad: The transform must have uniform scale");
         }
-        if (minVal > maxVal) {
+        if (_min > _max) {
             OPENVDB_THROW(ValueError, "CheckNormGrad: Invalid range (min > max)");
         }
     }
@@ -460,13 +463,13 @@ struct CheckNormGrad
     CheckNormGrad(const CheckNormGrad& other)
         : acc(other.acc.tree())
         , invdx2(other.invdx2)
-        , minVal(other.minVal)
-        , maxVal(other.maxVal)
+        , minVal2(other.minVal2)
+        , maxVal2(other.maxVal2)
     {
     }
 
     /// Return true if the value is smaller than min or larger than max.
-    inline bool operator()(const ValueType& v) const { return v<minVal || v>maxVal; }
+    inline bool operator()(const ValueType& v) const { return v<minVal2 || v>maxVal2; }
 
     /// @brief Return true if zero is outside the range.
     /// @note We assume that the norm of the gradient of a tile is always zero.
@@ -484,12 +487,12 @@ struct CheckNormGrad
     std::string str() const
     {
         std::ostringstream ss;
-        ss << "outside the range of NormGrad ["<<minVal<<","<<maxVal<<"]";
+        ss << "outside the range of NormGrad ["<<math::Sqrt(minVal2)<<","<<math::Sqrt(maxVal2)<<"]";
         return ss.str();
     }
 
     AccT acc;
-    const ValueType invdx2, minVal, maxVal;
+    const ValueType invdx2, minVal2, maxVal2;
 };// CheckNormGrad
 
 ////////////////////////////////////////////////////////////////////////////////

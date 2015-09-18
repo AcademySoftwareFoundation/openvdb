@@ -1,30 +1,32 @@
 OpenVDB Version History
 =======================
 
-Version 3.1.0 - In development
+Version 3.1.0 - September 4, 2015
+
+    Highlights:
+    - New features: advection of arbitrary volumes, general-purpose preconditioned
+      linear solver and Poisson solver, segmentation of topologically-enclosed
+      regions of a volume, new and faster bitmask operators, threadsafe paged array,
+      volume diagnostics
+    - Optimizations: threaded grid constructors and topology operations;
+      faster mesh to volume conversion, SDF to fog volume conversion
+      and grid pruning; faster, unbounded particle partitioning
+    - New Houdini nodes: Advect Density, Diagnostics, Rasterize Points,
+      Remove Divergence, Sort Points
 
     New features:
-    - Added tools::DensityAdvection for sparse advection of non-level-set
+    - Added tools::DensityAdvection, for sparse advection of non-level-set
       volumes.
-    - Added tools::extractEnclosedRegion to detect topologically enclosed
-      (watertight) exterior regions (cavities) that can arise as the result
-      of a CSG union operation between different level set shapes where at
-      least one of the shapes has a concavity that is capped.
     - Added a preconditioned conjugate gradient solver.
-    - Added a Poisson solver for incompressible fluids that operates
-      on a given domain. Often procedural animation of objects
-      (e.g. characters) interacting with liquid will result in boundary
-      conditions that describe multiple disjoint regions: regions of free
-      surface flow and regions of of trapped fluid. It is this second type
-      of region for which there may be no consistent pressure (e.g. a
-      shrinking watertight region filled with incompressible liquid).
-      The unit test TestPoissonSolver::testSolveWithSegmentDomain
-      demonstrates how to use tools::extractEnclosedRegion in conjuction
-      with the Poisson solver.
-    - Added util::PagedArray, a thread-safe, dynamic linear array data
+    - Added a Poisson solver for functions sampled on grids.
+    - Added tools::extractEnclosedRegion, which detects topologically-enclosed
+      (watertight) exterior regions (cavities) that can result from CSG union
+      operations between level sets with concavities that are capped.
+      (See the unit test TestPoissonSolver::testSolveWithSegmentDomain
+      for an example in which this tool is used to identify regions of trapped
+      fluid when solving for pressure in a volume of incompressible fluid.)
+    - Added util::PagedArray, a concurrent, dynamic linear array data
       structure with fast O(1) value access (both random and sequential).
-    - Added LeafNode::Buffer::data(), which provides direct access to
-      a leaf node's voxel value array, avoiding out-of-core overhead.
     - Added tools::Sampler, which provides a unified API for both staggered
       and non-staggered interpolation of various orders.
     - Added equality and inequality operators to Metadata and MetaMap.
@@ -32,45 +34,44 @@ Version 3.1.0 - In development
       various tests on symmetric, narrow-band level sets and fog volumes,
       respectively, to diagnose potential issues.
     - Added support for value accessors that aren't registered with their trees.
-      Bypassing accessor registration can improve performance in rare cases
+      (Bypassing accessor registration can improve performance in rare cases
       but should be used with caution, since the accessor will be left in an
-      invalid state if the tree topology is modified.
+      invalid state if the tree topology is modified.)
     - Added a tree::stealNodes() method that transfers ownership of all nodes
       of a certain type and inserts them into a linear array.
-    - Added tools::createLevelSetBox() factory function for level set grids.
-    - Added util::NodeMask::foreach method for fast but complex bit operations.
-    - Added the member method tools::Dense::offsetToCoord.
-    - Added bitwise difference method to util::NodeMask.
-    - Added an optional template argument to the ValueAccessor class
-      to allow for unregistered accessors.
+    - Added a tools::createLevelSetBox() factory function for level-set grids.
+    - Added tools::Dense::offsetToCoord().
+    - Added LeafNode::Buffer::data(), which provides direct access to
+      a leaf node's voxel value array, avoiding out-of-core overhead.
+      Use with caution.
+    - Added a util::NodeMask::foreach() method for efficient evaluation
+      of complex bitwise operations.
+    - Added a bitwise difference method to util::NodeMask.
 
     Improvements:
-    - Deep, conversion and topology copy constructors on the Grid are now up
-      to 16x faster due to multi-threading.
-    - Tree::topologoyUnion, Tree::topologoyIntersection and
-      Tree::topologoyDifference are now much faster due to a rewrite and
-      multi-threading.
-    - A new implementation of the tools::meshToVolume converter with
-      significant performance and parallel scaling improvements, reduced
-      runtime memory usage and a more robust inside / outside sign
-      classification scheme.
-    - A new implementation of tools::PointPartitioner improves performance,
-      concurrency, runtime memory usage and is now unbounded meaning that
-      points may be distributed anywhere in index space.
-    - A new implementation of the tools::sdfToFogVolume converter that
-      improves performance up to 11x.
-    - A new implementation of the tools::sdfInteriorMask tool that improves
-      performance up to 5x and supports both grid and tree volume inputs.
-    - Made various optimizations and improvements to the LevelSetMorph tool.
-    - Improved performance of @vdblink::tools::Prune Prune@endlink.
+    - Deep, conversion and topology copy Grid constructors are now threaded
+      and up to five times faster.
+    - Grid::topologyUnion(), Grid::topologyIntersection() and
+      Grid::topologyDifference() are now much faster due to threading.
+    - Significantly improved the performance, parallel scaling and memory
+      usage of the tools::meshToVolume(), and implemented a more robust
+      inside/outside sign classification scheme.
+    - Reimplemented tools::PointPartitioner for improved performance,
+      concurrency and memory usage.  The tool is now unbounded in the sense
+      that points may be distributed anywhere in index space.
+    - Significantly improved the performance of tools::sdfToFogVolume().
+    - Significantly improved the performance of the tools::sdfInteriorMask()
+      and added support for both grid and tree inputs.
+    - Made various optimizations and improvements to tools::LevelSetMorphing.
     - Aggregated tools::DiscreteField and tools::EnrightField (formerly in
       tools/LevelSetAdvect.h) and tools::VelocitySampler and
       tools::VelocityIntegrator (formerly in tools/PointAdvect.h) into
       a single header, tools/VelocityFields.h.
-    - Loosened floating point type requirement in tools::signedFloodFill()
-      to signed scalar type.
-    - tools::prune now employs an improved compression technique when
-      applied to trees with floating-point values.
+    - Modified tools::signedFloodFill() to accept grids of any signed
+      scalar value type, not just floating-point grids.
+    - tools::prune() is now faster, and it employs an improved compression
+      technique on trees with floating-point values.
+    - Added a -version flag to vdb_print, vdb_render and vdb_view.
 
     Bug fixes:
     - Fixed a build issue that could result in spurious "Blosc encoding
@@ -80,38 +81,42 @@ Version 3.1.0 - In development
     - Fixed a vdb_view issue whereby the frame buffer size did not
       necessarily match the window size.
       [Contributed by Rafael Campos]
-    - Fixed a bug in tools::QuadraticSampler::sample.
-    - Fixed a bug in tools::LevelSetTracker that could generate NaNs.
-    - Fixed parameter type inconsistencies in math::Ray.h and
-      tools::RayIntersector.h [Contributed by Kevin Dietrich]
-    - Fixed a bug in tools::clip (and the corresponding SOP) that was caused 
-      by incorrect handeling of signed values.
+    - Fixed a roundoff issue in tools::LevelSetTracker that could
+      result in NaNs.
+    - Changed tools::CheckNormGrad so it checks the magnitute of the 
+      gradient vs its square.
+    - Fixed parameter type inconsistencies in math/Ray.h and
+      tools/RayIntersector.h.
+      [Contributed by Kévin Dietrich]
+    - Fixed incorrect handling of signed values in tools::clip()
+      (and the Clip SOP).
 
     API changes:
-    - Removed the Hermite class since it was no longer used and caused build
-      issues for some.
+    - Removed the math::Hermite class since it was no longer used
+      and caused build issues for some.
     - Refactored the LevelSetAdvection, LevelSetFilter, LevelSetMeasure
       and LevelSetTracker tools.
     - Extended the API of tools::Diagnose and disabled copy construction.
     - Extended and unified the API of various Samplers.
+    - Added an optional template argument to the ValueAccessor class
+      to allow for unregistered accessors.
 
     Houdini:
     - Added a Rasterize Points SOP that produces density volumes and transfers
-      arbitrary point attributes using a weighted average scheme. This node
-      contains a VOP sub-network which can be used to define VEX procedures for
-      procedural modeling. The accompanying creation script defines a
-      default VOP network with UI parameters for procedural cloud and velocity
-      field modeling.
-    - Added an Advect Density SOP to advect non-level-sets, e.g. density or
-      velocity.
-    - Added a Remove Divergence SOP that removes any divergent portions of a
+      arbitrary point attributes using a weighted-average scheme.
+      The node incorporates a VOP subnetwork for procedural modeling,
+      and its accompanying creation script defines a default network with
+      VEX procedures for cloud and velocity field modeling.
+    - Added an Advect Density SOP to advect density, velocity and other
+      non-level-set grids.
+    - Added a Remove Divergence SOP that eliminates divergence from a
       velocity field.
-    - Added a Diagnostics SOP that can perform various type of tests on LevelSet,
-      FOG and other classes of grids. Use it for debugging.
-    - Added a Sort Points SOP that spatially reorders points that are close
-      together in space to also be close in the insertion order. This
-      operation can help improve CPU cache coherency and performance for
-      random access operations.
+    - Added a Diagnostics SOP that can identify various problems with
+      level sets, fog volumes and other grids.
+    - Added a Sort Points SOP that spatially reorders a list of points
+      so that points that are close together in space are also close together
+      in the list.  This can improve CPU cache coherency and performance
+      for random-access operations.
     - Added an option to the Convert SOP to activate interior voxels.
       [Contributed by SESI]
     - The To Polygons SOP can now optionally output a pscale attribute.
@@ -124,6 +129,11 @@ Version 3.1.0 - In development
     - Redesigned the UI of the Visualize SOP and added toggles to draw with
       or without color, to use the grid name as the attribute name for points
       with values, and to attach grid index coordinates to points.
+    - Updated Filter, Rebuild Level Set, Resize Narrow Band, Smooth Level Set
+      and To Spheres SOPs with world unit options to enable a voxel size
+      independent workflow.
+    - Updated Rebuild Level Set SOP to set surface visualization options on
+      output grids.
 
 Version 3.0.0 - January 14, 2015
     - The io::File class now supports delayed loading of .vdb files,
