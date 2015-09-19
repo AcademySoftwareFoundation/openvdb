@@ -91,7 +91,7 @@ TestAttributeArray::testFixedPointConversion()
     const openvdb::Vec3f worldSpaceValue(value);
     const openvdb::Vec3f indexSpaceValue = transform->worldToIndex(worldSpaceValue);
     const float voxelSpaceValue = indexSpaceValue.x() - math::Round(indexSpaceValue.x()) + 0.5f;
-    const int32_t intValue = floatingPointToFixedPoint<int32_t>(voxelSpaceValue);
+    const uint32_t intValue = floatingPointToFixedPoint<uint32_t>(voxelSpaceValue);
 
     // convert back to floating-point value
 
