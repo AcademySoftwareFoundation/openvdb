@@ -78,6 +78,7 @@ template <typename IntegerT, typename FloatT>
 inline IntegerT
 floatingPointToFixedPoint(const FloatT s)
 {
+    BOOST_STATIC_ASSERT(boost::is_unsigned<IntegerT>::value);
     if (FloatT(0.0) > s) return std::numeric_limits<IntegerT>::min();
     else if (FloatT(1.0) <= s) return std::numeric_limits<IntegerT>::max();
     return IntegerT(std::floor(s * FloatT(std::numeric_limits<IntegerT>::max())));
@@ -88,6 +89,7 @@ template <typename FloatT, typename IntegerT>
 inline FloatT
 fixedPointToFloatingPoint(const IntegerT s)
 {
+    BOOST_STATIC_ASSERT(boost::is_unsigned<IntegerT>::value);
     return FloatT(s) / FloatT((std::numeric_limits<IntegerT>::max()));
 }
 
