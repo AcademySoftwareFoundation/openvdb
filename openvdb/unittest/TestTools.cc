@@ -1682,26 +1682,29 @@ TestTools::testDensityAdvect()
     using namespace openvdb;
 
     Vec3fGrid velocity(Vec3f(1.0f, 0.0f, 0.0f));
+    typedef FloatGrid GridT;
+    typedef tools::DensityAdvection<Vec3fGrid> AdvT;
+    typedef tools::Sampler<1> SamplerT;
 
     {//test non-uniform grids (throws)
-        FloatGrid::Ptr density0 = FloatGrid::create(0.0f);
+        GridT::Ptr density0 = GridT::create(0.0f);
         density0->transform().preScale(Vec3d(1.0, 2.0, 3.0));//i.e. non-uniform voxels
-        tools::DensityAdvection<Vec3fGrid> a(velocity);
-        CPPUNIT_ASSERT_THROW((a.advect<FloatGrid, tools::Sampler<1> >(*density0, 0.1f)), RuntimeError);
+        AdvT a(velocity);
+        CPPUNIT_ASSERT_THROW((a.advect<GridT, SamplerT>(*density0, 0.1f)), RuntimeError);
     }
-
+    
     {//test advect without a mask
-        FloatGrid::Ptr density0 = FloatGrid::create(0.0f), density1;
+        GridT::Ptr density0 = GridT::create(0.0f), density1;
         density0->fill(CoordBBox(Coord(0),Coord(6)), 1.0f);
         CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord( 3,3,3)), 1.0f);
         CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(24,3,3)), 0.0f);
         CPPUNIT_ASSERT( density0->tree().isValueOn(Coord( 3,3,3)));
         CPPUNIT_ASSERT(!density0->tree().isValueOn(Coord(24,3,3)));
         
-        tools::DensityAdvection<Vec3fGrid> a(velocity);
-        a.setIntegrationOrder(4);
+        AdvT a(velocity);
+        a.setIntegrator(tools::Scheme::RK4);
         for (int i=1; i<=240; ++i) {
-            density1 = a.advect<FloatGrid, tools::Sampler<1> >(*density0, 0.1f);
+            density1 = a.advect<GridT, SamplerT>(*density0, 0.1f);
             //std::ostringstream ostr;
             //ostr << "densityAdvect" << "_" << i << ".vdb";
             //std::cerr << "Writing " << ostr.str() << std::endl;
@@ -1716,9 +1719,8 @@ TestTools::testDensityAdvect()
         CPPUNIT_ASSERT(!density0->tree().isValueOn(Coord( 3,3,3)));
         CPPUNIT_ASSERT( density0->tree().isValueOn(Coord(24,3,3)));
     }
-    
     {//test advect with a mask
-        FloatGrid::Ptr density0 = FloatGrid::create(0.0f), density1;
+        GridT::Ptr density0 = GridT::create(0.0f), density1;
         density0->fill(CoordBBox(Coord(0),Coord(6)), 1.0f);
         CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord( 3,3,3)), 1.0f);
         CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(24,3,3)), 0.0f);
@@ -1728,10 +1730,11 @@ TestTools::testDensityAdvect()
         BoolGrid::Ptr mask = BoolGrid::create(false);
         mask->fill(CoordBBox(Coord(4,0,0),Coord(30,8,8)), true);
         
-        tools::DensityAdvection<Vec3fGrid> a(velocity);
-        a.setIntegrationOrder(4);
+        AdvT a(velocity);
+        a.setIntegrator(tools::Scheme::MAC);
+        //a.setIntegrator(tools::Scheme::RK4);
         for (int i=1; i<=240; ++i) {
-            density1 = a.advect<FloatGrid, BoolGrid, tools::Sampler<1> >(*density0, *mask, 0.1f);
+            density1 = a.advect<GridT, BoolGrid, SamplerT>(*density0, *mask, 0.1f);
             //std::ostringstream ostr;
             //ostr << "densityAdvectMask" << "_" << i << ".vdb";
             //std::cerr << "Writing " << ostr.str() << std::endl;

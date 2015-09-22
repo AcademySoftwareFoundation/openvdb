@@ -978,7 +978,7 @@ fixValues(const GridType& grid, std::vector<MaskData<GridType> > fixMasks,
 
 template<typename GridType>
 inline void
-outputMaskAndPoints(const GridType& grid,
+outputMaskAndPoints(const GridType& grid, const std::string& gridName,
     std::vector<typename GridType::TreeType::template ValueConverter<bool>::Type::Ptr> masks,
     bool outputMask,
     bool outputPoints,
@@ -1038,7 +1038,7 @@ outputMaskAndPoints(const GridType& grid,
         if (interupter.wasInterrupted()) return;
 
         if (outputMask && !mask.empty()) {
-            maskGrid->setName(grid.getName() + "_mask");
+            maskGrid->setName(gridName + "_mask");
             maskGrid->setTransform(grid.transform().copy());
             hvdb::createVdbPrimitive(detail, maskGrid, maskGrid->getName().c_str());
         }
@@ -1057,6 +1057,7 @@ struct TestCollection
         , mInterupter(&interupter)
         , mErrorManager(errorManager)
         , mMessageStr()
+        , mPrimitiveName()
         , mPrimitiveIndex(0)
         , mGridsFailed(0)
         , mReplacementGrid()
@@ -1084,6 +1085,8 @@ struct TestCollection
 
     void setPrimitiveIndex(int i) { mPrimitiveIndex = i; }
 
+    void setPrimitiveName(const std::string& name) { mPrimitiveName = name; }
+
     bool hasReplacementGrid() const { return mReplacementGrid != NULL; }
 
     openvdb::GridBase::Ptr replacementGrid() { return mReplacementGrid; }
@@ -1103,7 +1106,7 @@ struct TestCollection
         //////////
 
         const double voxelSize = grid.transform().voxelSize()[0];
-        const std::string gridName = grid.getName();
+        const std::string gridName = mPrimitiveName.empty() ? grid.getName() : mPrimitiveName;
         const TreeType& tree = grid.tree();
 
         GridTestLog log(mPrimitiveIndex, gridName);
@@ -1365,7 +1368,7 @@ struct TestCollection
 
         if (mInterupter->wasInterrupted()) return;
 
-        outputMaskAndPoints<GridType>(grid, idMasks, mTest.useMask, mTest.usePoints,
+        outputMaskAndPoints<GridType>(grid, gridName, idMasks, mTest.useMask, mTest.usePoints,
             *mDetail, *mInterupter, replacement.get());
 
         // log diagnostics info
@@ -1378,7 +1381,7 @@ private:
     GU_Detail           * const mDetail;
     hvdb::Interrupter   * const mInterupter;
     UT_ErrorManager     * const mErrorManager;
-    std::string                 mMessageStr;
+    std::string                 mMessageStr, mPrimitiveName;
     int                         mPrimitiveIndex, mGridsFailed;
     openvdb::GridBase::Ptr      mReplacementGrid;
 }; // struct TestCollection
@@ -1920,11 +1923,14 @@ SOP_OpenVDB_Diagnostics::cookMySop(OP_Context& context)
 
             if (boss.wasInterrupted()) break;
 
+            tests.setPrimitiveName(it.getPrimitiveName().toStdString());
             tests.setPrimitiveIndex(int(it.getIndex()));
 
-            if (!GEOvdbProcessTypedGridScalar(**it, tests, /*makeUnique=*/false)) {
-                GEOvdbProcessTypedGridVec3(**it, tests, /*makeUnique=*/false);
-            }
+#if (UT_VERSION_INT < 0x0d000000) // earlier than 13.0.0
+            GEOvdbProcessTypedGrid(**it, tests, /*makeUnique=*/false);
+#else
+            GEOvdbProcessTypedGridTopology(**it, tests, /*makeUnique=*/false);
+#endif
 
             if (tests.replacementGrid()) {
                 hvdb::replaceVdbPrimitive(*gdp, tests.replacementGrid(), **it, true,

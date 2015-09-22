@@ -37,18 +37,15 @@
 /// @brief Sparse hyperbolic advection of volumes, e.g. a density or
 ///        velocity (vs a level set interface).
 ///
-/// @todo  MacCormack, BFECC and better estimate of padding by dilation.
-///
-/// @warning The current implementationn can exhibit instabilities when
-///          second order spatial interpolation is enabled! This is a known
-///          problem (cf. Gudonov's theorem) and will be address in a future
-///          version of this tool.
-
+/// @todo  Fix potential bug in MacCormack (missing flux-limitor!?)
+///        Improve (i.e. limit) padding by topology dilation.
 
 #ifndef OPENVDB_TOOLS_DENSITY_ADVECT_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_DENSITY_ADVECT_HAS_BEEN_INCLUDED
 
 #include <tbb/parallel_for.h>
+#include <boost/bind.hpp>
+#include <boost/function.hpp>
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/util/NullInterrupter.h>
@@ -61,31 +58,45 @@
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
-namespace tools {
+namespace tools {      
 
-/// @brief Performs Semi-Lagrangian advection of an arbitrary grid in a
-///        passive velocity field.
+namespace Scheme { enum SemiLagrangian { SEMI, MID, RK3, RK4, MAC, BFECC }; }
+    
+/// @brief Performs advections of an arbitrary types of volumes in a
+///        static velocity field. The advections is performed by means
+///        of various derivatives of Semi-Lagrangian integration, i.e.
+///        backwards tracking by of the hyperbolic characteristics.     
 ///
-/// @warning The velocity field is currently assumed to be in the same
-///          frame of reference as the density grid.
+/// @details The supported integrations schemes:
+///    =================================================================
+///    |  Lable | Accuracy |  Integration Scheme    |  Interpolations  |
+///    |        |Time/Space|                        | velocity/density |
+///    =================================================================    
+///    |  SEMI  |   1/1    | Semi-Lagrangian        |        1/1       | 
+///    |  MID   |   2/1    | Mid-Point              |        2/1       |
+///    |  RK3   |   3/1    | 3'rd Order Runge-Kutta |        3/1       |
+///    |  RK4   |   4/1    | 4'th Order Runge-Kutta |        4/1       |
+///    |  MAC   |   2/2    | MacCormack             |        2/2       |
+///    |  BFECC |   2/2    | BFECC                  |        3/2       |           
+///    =================================================================
 template<typename VelocityGridT = Vec3fGrid,
          bool StaggeredVelocity = false,
          typename InterrupterType = util::NullInterrupter>
 class DensityAdvection
 {
 public:
+    
     /// @brief Constructor
     ///
-    /// @param velGrid     Velocity grid responsible for the (passive) density advection.
+    /// @param velGrid     Velocity grid responsible for the (passive) advection.
     /// @param interrupter Optional interrupter used to prematurely end computations.
     ///
     /// @note The velocity field is assumed to be constant for the duration of the
-    ///       advection and in the same frame of reference as the density grid.
+    ///       advection.
     DensityAdvection(const VelocityGridT& velGrid, InterrupterType* interrupter = NULL)
         : mVelGrid(velGrid)
         , mInterrupter(interrupter)
-        , mCountRK(1)
-        , mOrderRK(1)
+        , mIntegrator( Scheme::SEMI )
         , mGrainSize(1)
     {
         math::Extrema e = extrema(velGrid.cbeginValueAll(), /*threading*/true);
@@ -97,29 +108,14 @@ public:
     {
     }
 
-    /// @brief Define the number of integration sub-steps to be performed per
-    /// advection time-step (the default is one).
-    void setIntegrationCount(size_t iterations) { mCountRK = iterations; }
+    /// @brief Set the integrator (see details in the table above)
+    void setIntegrator(Scheme::SemiLagrangian integrator) { mIntegrator = integrator; }
 
-    /// @return the number of integration sub-steps performed per
-    /// advection time-step.
-    size_t getIntegrationCount() const { return mCountRK; }
-
-    /// @brief Define the order of the Runge-Kutta integration scheme
-    /// employed during the back-tracing in the semi-lagrangian integration.
-    ///
-    /// @note Note the order of the velocity sampling is always one,
-    ///       i.e. based on tri-linear interpolation! However the
-    ///       order of the interpolation kernel used to interpolate
-    ///       the density is defined by the DensitySampleT template type.
-    void setIntegrationOrder(size_t orderRK) { mOrderRK = math::Min(orderRK, size_t(4)); }
-
-    /// @return The order of the Runge-Kutta integration scheme employed
-    ///         during the back-tracing in the semi-Lagrangian integration.
-    size_t getIntegrationOrder() const { return mOrderRK; }
+    /// @brief Retrun the integrator (see details in the table above)
+    Scheme::SemiLagrangian getIntegrator() const { return mIntegrator; }
 
      /// @return the grain-size used for multi-threading
-    size_t  getGrainSize() const { return mGrainSize; }
+    size_t getGrainSize() const { return mGrainSize; }
 
     /// @brief Set the grain-size used for multi-threading.
     /// @note A grainsize of 0 or less disables multi-threading!
@@ -165,14 +161,19 @@ public:
     ///          transport. This dilation step can be slow for large
     ///          time steps @a dt or fast moving velocity fields.
     ///
+    /// @warning If the DensitySamplerT is of higher order the one
+    ///          (i.e. tri-linear interpolation) instabilities are
+    ///          known to occure. To suppress those monotonicity
+    ///          constrains or flux-limiters need to be applies.
+    ///
     /// @throw RuntimeError if @a inGrid does not have uniform voxels.
     template<typename DensityGridT,
-             typename DensitySamplerT>
+             typename DensitySamplerT>//only C++11 allows for a default argument
     typename DensityGridT::Ptr advect(const DensityGridT& inGrid, double dt)
     {
         typename DensityGridT::Ptr outGrid = inGrid.deepCopy();
         dilateVoxels( outGrid->tree(), this->getMaxDistance(inGrid, dt) );
-        this->template process<DensityGridT, DensitySamplerT>(*outGrid, inGrid, dt);
+        this->template cook<DensityGridT, DensitySamplerT>(*outGrid, inGrid, dt);
         return outGrid;
     }
 
@@ -199,11 +200,16 @@ public:
     ///          with @a mask. The dilation step can be slow for large
     ///          time steps @a dt or fast moving velocity fields.
     ///
+    /// @warning If the DensitySamplerT is of higher order the one
+    ///          (i.e. tri-linear interpolation) instabilities are
+    ///          known to occure. To suppress those monotonicity
+    ///          constrains or flux-limiters need to be applies.
+    ///
     /// @throw RuntimeError if @a inGrid is not aligned with @a mask
     ///        or if its voxels are not uniform.
     template<typename DensityGridT,
              typename MaskGridT,
-             typename DensitySamplerT>
+             typename DensitySamplerT>//only C++11 allows for a default argument
     typename DensityGridT::Ptr advect(const DensityGridT& inGrid, const MaskGridT& mask, double dt)
     {
         if (inGrid.transform() != mask.transform()) {
@@ -214,7 +220,7 @@ public:
         dilateVoxels( outGrid->tree(), this->getMaxDistance(inGrid, dt) );
         outGrid->topologyIntersection(mask);
         pruneInactive(outGrid->tree(), mGrainSize>0, mGrainSize);
-        this->template process<DensityGridT, DensitySamplerT>(*outGrid, inGrid, dt);
+        this->template cook<DensityGridT, DensitySamplerT>(*outGrid, inGrid, dt);
         outGrid->topologyUnion(inGrid);
         return outGrid;
     }
@@ -224,115 +230,238 @@ private:
     DensityAdvection(const DensityAdvection&);// not implemented
     DensityAdvection& operator=(const DensityAdvection&);// not implemented
 
-    template<typename DensityGridT, typename DensitySamplerT>
-    void process(DensityGridT& outGrid, const DensityGridT& inGrid, double dt)
+    void start(const char* str) const
     {
-        mDt = dt/mCountRK;
+        if (mInterrupter) mInterrupter->start(str);
+    }
+    void stop() const
+    {
+        if (mInterrupter) mInterrupter->end();
+    }      
+    bool interrupt() const
+    {
+        if (mInterrupter && util::wasInterrupted(mInterrupter)) {
+            tbb::task::self().cancel_group_execution();
+            return true;
+        }
+        return false;
+    }
+    
+    template<typename DensityGridT, typename DensitySamplerT>
+    void cook(DensityGridT& outGrid, const DensityGridT& inGrid, double dt)
+    {
         outGrid.tree().voxelizeActiveTiles();
-        if (mOrderRK == 1) {
+        switch (mIntegrator) {
+        case Scheme::SEMI: {
             Advect<DensityGridT, 1, DensitySamplerT> adv(inGrid, *this);
-            adv.run(outGrid);
-        } else if (mOrderRK == 2) {
+            adv.cook(outGrid, dt);
+            break;
+        }
+        case Scheme::MID: {
             Advect<DensityGridT, 2, DensitySamplerT> adv(inGrid, *this);
-            adv.run(outGrid);
-        } else if (mOrderRK == 3) {
+            adv.cook(outGrid, dt);
+            break;
+        }
+        case Scheme::RK3: {
             Advect<DensityGridT, 3, DensitySamplerT> adv(inGrid, *this);
-            adv.run(outGrid);
-        } else if (mOrderRK == 4) {
+            adv.cook(outGrid, dt);
+            break;
+        }
+        case Scheme::RK4: {
             Advect<DensityGridT, 4, DensitySamplerT> adv(inGrid, *this);
-            adv.run(outGrid);
+            adv.cook(outGrid, dt);
+            break;
+        }
+        case Scheme::BFECC: {
+            Advect<DensityGridT, 1, DensitySamplerT> adv(inGrid, *this);
+            adv.cook(outGrid, dt);
+            break;
+        }
+        case Scheme::MAC: {
+            Advect<DensityGridT, 1, DensitySamplerT> adv(inGrid, *this);
+            adv.cook(outGrid, dt);
+            break;
+        } 
+        default:
+            OPENVDB_THROW(ValueError, "Spatial difference scheme not supported!");
         }
         pruneInactive(outGrid.tree(), mGrainSize>0, mGrainSize);
     }
 
-    // Private class that implements the semi-Lagrangian integration
-    template<typename DensityGridT, size_t OrderRK, typename SamplerT>
-    struct Advect
+    // Private class that implements the multi-threaded advection
+    template<typename DensityGridT, size_t OrderRK, typename SamplerT> struct Advect;
+
+    // Private member data of DensityAdvection
+    const VelocityGridT&   mVelGrid;
+    double                 mMaxVelocity;
+    InterrupterType*       mInterrupter;
+    Scheme::SemiLagrangian mIntegrator;
+    size_t                 mGrainSize;
+};//end of DensityAdvection class
+    
+// Private class that implements the multi-threaded advection
+template<typename VelocityGridT, bool StaggeredVelocity, typename InterrupterType>
+template<typename DensityGridT, size_t OrderRK, typename SamplerT>
+struct DensityAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advect
+{
+    typedef typename DensityGridT::TreeType      TreeT;
+    typedef typename TreeT::ValueType            ValueT;
+    typedef typename tree::LeafManager<TreeT>    LeafManagerT;
+    typedef typename LeafManagerT::LeafNodeType  LeafNodeT;
+    typedef typename LeafManagerT::LeafRange     LeafRangeT;
+    typedef VelocityIntegrator<VelocityGridT, StaggeredVelocity> VelocityIntegratorT;
+    typedef typename VelocityIntegratorT::ElementType RealT;
+    typedef typename TreeT::LeafNodeType::ValueOnIter VoxelIterT;
+    
+    
+    Advect(const DensityGridT& inGrid, const DensityAdvection& parent)
+        : mTask(0)
+        , mInGrid(&inGrid)
+        , mVelocityInt(parent.mVelGrid)
+        , mParent(&parent)
     {
-        typedef typename DensityGridT::TreeType      TreeT;
-        typedef typename DensityGridT::ConstAccessor AccT;
-        typedef typename TreeT::ValueType            ValueT;
-        typedef typename tree::LeafManager<TreeT>    LeafManagerT;
-        typedef typename LeafManagerT::LeafRange     LeafRangeT;
-        typedef VelocityIntegrator<VelocityGridT, StaggeredVelocity> VelocityIntegratorT;
-        typedef typename VelocityIntegratorT::ElementType RealT;
-
-        Advect(const DensityGridT& inGrid, const DensityAdvection& parent)
-            : mTransform(&inGrid.transform())
-            , mDensityAcc(inGrid.getAccessor())
-            , mVelocityInt(parent.mVelGrid)
-            , mParent(&parent)
-        {
+    }
+    inline void cook(const LeafRangeT& range)
+    {
+        if (mParent->mGrainSize > 0) {
+            tbb::parallel_for(range, *this);
+        } else {
+            (*this)(range);
         }
-        Advect(const Advect& other)
-            : mTransform(other.mTransform)
-            , mDensityAcc(other.mDensityAcc.tree())
-            , mVelocityInt(other.mVelocityInt)
-            , mParent(other.mParent)
-        {
+    }
+    void operator()(const LeafRangeT& range) const
+    {
+        assert(mTask);
+        mTask(const_cast<Advect*>(this), range);
+    }
+    void cook(DensityGridT& outGrid, double time_step)
+    {
+        mParent->start("Advecting density");
+        const int auxBufferCount = (mParent->mIntegrator == Scheme::MAC ||
+                                    mParent->mIntegrator == Scheme::BFECC) ? 1 : 0;
+        LeafManagerT manager(outGrid.tree(), auxBufferCount);
+        const LeafRangeT range = manager.leafRange(mParent->mGrainSize);
+        
+        const RealT dt = static_cast<RealT>(-time_step);//method of characteristics backtracks
+        if (mParent->mIntegrator == Scheme::MAC) {
+            mTask = boost::bind(&Advect::rk,  _1, _2, dt, 0, *mInGrid, false);//out[0]=forward 
+            this->cook(range);
+            mTask = boost::bind(&Advect::rk,  _1, _2,-dt, 1,  outGrid, false);//out[1]=backward
+            this->cook(range);
+            mTask = boost::bind(&Advect::mac, _1, _2);//out[0] = out[0] + (in[0] - out[1])/2
+            this->cook(range);
+        } else if (mParent->mIntegrator == Scheme::BFECC) {
+            mTask = boost::bind(&Advect::rk, _1, _2, dt, 0, *mInGrid, false);//out[0]=forward
+            this->cook(range);
+            mTask = boost::bind(&Advect::rk, _1, _2,-dt, 1,  outGrid, false);//out[1]=backward
+            this->cook(range);
+            mTask = boost::bind(&Advect::bfecc, _1, _2);//out[0] = (3*in[0] - out[1])/2
+            this->cook(range);
+            mTask = boost::bind(&Advect::rk, _1, _2, dt, 1,  outGrid, true);//out[1]=forward
+            this->cook(range);
+            manager.swapLeafBuffer(1);// out[0] = out[1]
+        } else {// SEMI, MID, RK3 and RK4
+            mTask = boost::bind(&Advect::rk, _1, _2,  dt, 0, *mInGrid, true);//forward
+            this->cook(range);
         }
-        void run(DensityGridT& outGrid)
-        {
-            if (mParent->mInterrupter) mParent->mInterrupter->start("Advecting density");
-
-            const LeafManagerT manger(outGrid.tree());
-            const LeafRangeT range = manger.leafRange(mParent->mGrainSize);
-
-            if (mParent->mGrainSize > 0) {
-                tbb::parallel_for(range, *this);
-            } else {
-                (*this)(range);
-            }
-
-            if (mParent->mInterrupter) mParent->mInterrupter->end();
-        }
-        // Called by tbb::parallel_for()
-        void operator() (const LeafRangeT& range) const
-        {
-            if (mParent->mInterrupter && util::wasInterrupted(mParent->mInterrupter)) {
-                tbb::task::self().cancel_group_execution();
-                return;
-            }
-            typedef typename VelocityIntegratorT::ElementType RealT;
-            const int n = static_cast<int>(mParent->mCountRK);
-            const RealT dt = static_cast<RealT>(- mParent->mDt);//back-tracking
-            const ValueT backg = mDensityAcc.tree().background();
-            for (typename LeafRangeT::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
-                ValueT* phi = leafIter.buffer(0).data();
-                typedef typename TreeT::LeafNodeType::ValueOnIter VoxelIterT;
+        
+        manager.removeAuxBuffers();
+        
+        mParent->stop();
+    }
+    // Last step of the MacCormack scheme
+    void mac(const LeafRangeT& range) const
+    {
+        if (mParent->interrupt()) return;
+        typename DensityGridT::ConstAccessor acc = mInGrid->getAccessor();
+        const ValueT backg = mInGrid->background();
+        for (typename LeafRangeT::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
+            ValueT* out0 = leafIter.buffer( 0 ).data();// forward
+            const ValueT* out1 = leafIter.buffer( 1 ).data();// backward
+            const LeafNodeT* leaf = acc.probeConstLeaf( leafIter->origin() );
+            // const ValueT* in0 = leaf != NULL ? leaf->buffer().data() : NULL;
+            // for (VoxelIterT voxelIter = leafIter->beginValueOn(); voxelIter; ++voxelIter) {
+            //     const Index i = voxelIter.pos();
+            //     const ValueT phi = in0 != NULL ? in0[i] : acc.getValue(voxelIter.getCoord());
+            //     out0[i] += RealT(0.5) * ( phi - out1[i] );
+            //     if (math::isApproxEqual(out0[i], backg, math::Delta<ValueT>::value())) {
+            //         out0[i] = backg;
+            //         leafIter->setValueOff(i);
+            //     }
+            // }//loop over active voxels
+            if (leaf !=NULL) {
+                const ValueT* in0 = leaf->buffer().data();
                 for (VoxelIterT voxelIter = leafIter->beginValueOn(); voxelIter; ++voxelIter) {
-                    Vec3d w = mTransform->indexToWorld(voxelIter.getCoord());
-                    for (int i = 0; i < n; ++i) {
-                        mVelocityInt.template rungeKutta<OrderRK, Vec3d>(dt, w);
+                    const Index i = voxelIter.pos();
+                    out0[i] += RealT(0.5) * ( in0[i] - out1[i] );
+                    if (math::isApproxEqual(out0[i], backg, math::Delta<ValueT>::value())) {
+                        out0[i] = backg;
+                        leafIter->setValueOff(i);
                     }
-                    const ValueT sample = SamplerT::sample(mDensityAcc, mTransform->worldToIndex(w));
-                    const Index j = voxelIter.pos();
-                    if (math::isApproxEqual(sample, backg, math::Delta<ValueT>::value())) {
-                        phi[j] = backg;
-                        leafIter->setValueOff(j);
-                    } else {
-                        phi[j] = sample;
+                }
+            } else {
+                for (VoxelIterT voxelIter = leafIter->beginValueOn(); voxelIter; ++voxelIter) {
+                    const Index i = voxelIter.pos();
+                    out0[i] += RealT(0.5) * ( acc.getValue(voxelIter.getCoord()) - out1[i] );
+                    if (math::isApproxEqual(out0[i], backg, math::Delta<ValueT>::value())) {
+                        out0[i] = backg;
+                        leafIter->setValueOff(i);
                     }
                 }//loop over active voxels
-            }//loop over leaf nodes
-        }
-        // Public member data of the private Advect class
-        const math::Transform*  mTransform;
-        AccT                    mDensityAcc;
-        VelocityIntegratorT     mVelocityInt;
-        const DensityAdvection* mParent;
-    };// end of private Advect class
-
-    // Protected member data of DensityAdvection
-    const VelocityGridT& mVelGrid;
-    double               mMaxVelocity;
-    InterrupterType*     mInterrupter;
-    double               mDt;// time step per RK integration step
-    size_t               mCountRK;// number of RK integration sub-steps
-    size_t               mOrderRK;// order of the RK integrator
-    size_t               mGrainSize;// for multi-threading (0 means no threading)
-};//end of DensityAdvection class
-
+            }
+        }//loop over leaf nodes
+    }
+    // Intermediate step in the BFECC scheme
+    void bfecc(const LeafRangeT& range) const
+    {
+        if (mParent->interrupt()) return;
+        typename DensityGridT::ConstAccessor acc = mInGrid->getAccessor();
+        for (typename LeafRangeT::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
+            ValueT* out0 = leafIter.buffer( 0 ).data();// forward
+            const ValueT* out1 = leafIter.buffer( 1 ).data();// backward
+            const LeafNodeT* leaf = acc.probeConstLeaf(leafIter->origin());
+            if (leaf !=NULL) {
+                const ValueT* in0 = leaf->buffer().data();
+                for (VoxelIterT voxelIter = leafIter->beginValueOn(); voxelIter; ++voxelIter) {
+                    const Index i = voxelIter.pos();
+                    out0[i] = RealT(0.5)*( RealT(3)*in0[i] - out1[i] );
+                }//loop over active voxels
+            } else {
+                for (VoxelIterT voxelIter = leafIter->beginValueOn(); voxelIter; ++voxelIter) {
+                    const Index i = voxelIter.pos();
+                    out0[i] = RealT(0.5)*( RealT(3)*acc.getValue(voxelIter.getCoord()) - out1[i] );
+                }//loop over active voxels
+            }
+        }//loop over leaf nodes
+    }
+    // Semi-Lagrangian integration with Runge-Kutta of various orders (1->4)
+    void rk(const LeafRangeT& range, RealT dt, size_t n, const DensityGridT& grid, bool trim) const
+    {
+        if (mParent->interrupt()) return;
+        const math::Transform& xform = mInGrid->transform();
+        typename DensityGridT::ConstAccessor acc = grid.getAccessor();
+        const ValueT backg = mInGrid->background();
+        for (typename LeafRangeT::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
+            ValueT* phi = leafIter.buffer( n ).data();
+            for (VoxelIterT voxelIter = leafIter->beginValueOn(); voxelIter; ++voxelIter) {
+                ValueT& value = phi[voxelIter.pos()];
+                Vec3d wPos = xform.indexToWorld(voxelIter.getCoord());
+                mVelocityInt.template rungeKutta<OrderRK, Vec3d>(dt, wPos);
+                value = SamplerT::sample(acc, xform.worldToIndex(wPos));
+                if (trim && math::isApproxEqual(value, backg, math::Delta<ValueT>::value())) {
+                    value = backg;
+                    leafIter->setValueOff( voxelIter.pos() );
+                }
+            }//loop over active voxels
+        }//loop over leaf nodes
+    }
+    // Public member data of the private Advect class
+    typename boost::function<void (Advect*, const LeafRangeT&)> mTask;
+    const DensityGridT*     mInGrid;
+    VelocityIntegratorT     mVelocityInt;//very lightweight!
+    const DensityAdvection* mParent;
+};// end of private member class Advect    
+    
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

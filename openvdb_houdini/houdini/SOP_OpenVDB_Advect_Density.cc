@@ -34,8 +34,10 @@
 ///
 /// @brief Density and veclocity (i.e. non-level-set) advection SOP
 ///
-/// @todo Add optional mask (allready supported by tools::DensityAdvect)
-
+/// @todo 1) Fix a potential bug in MacCormack
+///       2) Add optional mask (allready supported by tools::DensityAdvect)
+///       3) Improve performance of tools::DensityAdvect
+///
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
@@ -65,17 +67,14 @@ struct AdvectionParms {
     AdvectionParms()
         : mGroup(NULL)
         , mVelocityGrid()
-        , mCountRK(1)
-        , mOrderRK(1)
-        , mSampleOrder(1)
+        , mIntegrator( openvdb::tools::Scheme::SEMI )
         , mTimeStep(0.0)
         , mStaggered(false)
     {
     }
-
     const GA_PrimitiveGroup *mGroup;
     hvdb::Grid::ConstPtr mVelocityGrid;
-    size_t mCountRK, mOrderRK, mSampleOrder;
+    openvdb::tools::Scheme::SemiLagrangian mIntegrator;
     float mTimeStep;
     bool mStaggered;
 };
@@ -103,7 +102,7 @@ protected:
 
     OP_ERROR evalAdvectionParms(OP_Context&, AdvectionParms&);
 
-    template <bool StaggeredVelocity, size_t SampleOrder>
+    template <bool StaggeredVelocity>
     bool processGrids(const AdvectionParms&, hvdb::Interrupter&);
 };
 
@@ -135,28 +134,29 @@ newSopOperator(OP_OperatorTable* table)
     // Timestep
     parms.add(hutil::ParmFactory(PRM_FLT, "timestep", "Time Step")
         .setDefault(1, "1.0/$FPS"));
-              
-    // Density interpolation order
-    parms.add(hutil::ParmFactory(PRM_INT_J, "OrderOfSampling", "Sampling Order")
-        .setDefault(PRMoneDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_RESTRICTED, 2)
-        .setHelpText("The order of the interpolation scheme to resample density"));
 
-    // Integration order
-    parms.add(hutil::ParmFactory(PRM_INT_J, "OrderOfRK", "Runge-Kutta Order")
-        .setDefault(PRMthreeDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_RESTRICTED, 4)
-        .setHelpText("The order of the Runge-Kutta integration scheme"
-                     "employed during the back-tracing in the semi-lagrgangian"
-                     "integration."));
+    // Advection Scheme
+    {
+        std::vector<std::string> items;
+        items.push_back("semi");
+        items.push_back("Semi-Lagrangian");
+        items.push_back("mid");
+        items.push_back("Mid-Point");
+        items.push_back("rk3");
+        items.push_back("3rd Order Runge-Kutta");
+        items.push_back("rk4");
+        items.push_back("4th Order Runge-Kutta");
+        items.push_back("mac");
+        items.push_back("MacCormack");
+        items.push_back("bfecc");
+        items.push_back("BFECC");
 
-    // Integration steps
-    parms.add(hutil::ParmFactory(PRM_INT_J, "StepsOfRK", "Runge-Kutta Steps")
-        .setDefault(PRMoneDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
-        .setHelpText("The number of backwards Runge-Kutta sub-steps to be performed"
-                     "per time integration step."));
-              
+        parms.add(hutil::ParmFactory(PRM_STRING, "scheme", "Advection Scheme")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setDefault(0, ::strdup("semi"))
+            .setHelpText("Set the numerical advection scheme."));
+    }
+      
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB Advect Density",
         SOP_OpenVDB_Advect_Density::factory, parms, *table)
@@ -212,27 +212,9 @@ SOP_OpenVDB_Advect_Density::cookMySop(OP_Context& context)
         hvdb::Interrupter boss("Advecting VDBs");
 
         if (parms.mStaggered) {
-            if (parms.mSampleOrder == 0) {
-                this->processGrids<true, 0>(parms, boss);
-            } else if (parms.mSampleOrder == 1) {
-                this->processGrids<true, 1>(parms, boss);
-            } else if (parms.mSampleOrder == 2) {
-                this->processGrids<true, 2>(parms, boss);
-            } else {
-                addError(SOP_MESSAGE, "Unsupported order of staggered velocity sampling");
-                return UT_ERROR_ABORT;
-            }
+            this->processGrids<true >(parms, boss);
         } else {
-            if (parms.mSampleOrder == 0) {
-                this->processGrids<false, 0>(parms, boss);
-            } else if (parms.mSampleOrder == 1) {
-                this->processGrids<false, 1>(parms, boss);
-            } else if (parms.mSampleOrder == 2) {
-                this->processGrids<false, 2>(parms, boss);
-            } else {
-                addError(SOP_MESSAGE, "Unsupported order of density sampling");
-                return UT_ERROR_ABORT;
-            }
+            this->processGrids<false>(parms, boss);
         }
 
         if (boss.wasInterrupted()) addWarning(SOP_MESSAGE, "Process was interrupted");
@@ -285,12 +267,24 @@ SOP_OpenVDB_Advect_Density::evalAdvectionParms(OP_Context& context, AdvectionPar
     }
 
     parms.mTimeStep = static_cast<float>(evalFloat("timestep", 0, now));
-
-    parms.mCountRK = evalInt("StepsOfRK", 0, now);
-
-    parms.mOrderRK = evalInt("OrderOfRK", 0, now);
-
-    parms.mSampleOrder = evalInt("OrderOfSampling", 0, now);
+    
+    evalString(str, "scheme", 0, now);
+    if ( str == "semi" )
+        parms.mIntegrator = openvdb::tools::Scheme::SEMI;
+    else if ( str == "mid" )
+        parms.mIntegrator = openvdb::tools::Scheme::MID;
+    else if ( str == "rk3" )
+        parms.mIntegrator = openvdb::tools::Scheme::RK3;
+    else if ( str == "rk4" )
+        parms.mIntegrator = openvdb::tools::Scheme::RK4;
+    else if ( str == "mac" )
+        parms.mIntegrator = openvdb::tools::Scheme::MAC;
+    else if ( str == "bfecc" )
+        parms.mIntegrator = openvdb::tools::Scheme::BFECC;
+    else {
+        addError(SOP_MESSAGE, "Invalid scheme");
+        return UT_ERROR_ABORT;
+    }
 
     parms.mStaggered = parms.mVelocityGrid->getGridClass() == openvdb::GRID_STAGGERED;
 
@@ -301,7 +295,7 @@ SOP_OpenVDB_Advect_Density::evalAdvectionParms(OP_Context& context, AdvectionPar
 ////////////////////////////////////////
 
 
-template <bool StaggeredVelocity, size_t SampleOrder>
+template <bool StaggeredVelocity>
 bool
 SOP_OpenVDB_Advect_Density::processGrids(const AdvectionParms& parms, hvdb::Interrupter& boss)
 {
@@ -311,8 +305,7 @@ SOP_OpenVDB_Advect_Density::processGrids(const AdvectionParms& parms, hvdb::Inte
     if (!velGrid) return false;
 
     AdvT adv(*velGrid, &boss);
-    adv.setIntegrationCount(parms.mCountRK);
-    adv.setIntegrationOrder(parms.mOrderRK);
+    adv.setIntegrator(parms.mIntegrator);
 
     std::vector<std::string> skippedGrids, levelSetGrids;
 
@@ -333,11 +326,11 @@ SOP_OpenVDB_Advect_Density::processGrids(const AdvectionParms& parms, hvdb::Inte
             if (d > 20) {
                 std::ostringstream tmp;
                 tmp << "Dilation by " << d << " voxels could be slow!"
-                    << " Consider lowing time-step or integration count!";
+                    << " Consider reducing the time-step!";
                 addWarning(SOP_MESSAGE, tmp.str().c_str());
             }
             typename openvdb::FloatGrid::Ptr outGrid = adv.template advect<openvdb::FloatGrid,
-                openvdb::tools::Sampler<SampleOrder, false> >(inGrid, parms.mTimeStep);
+                openvdb::tools::Sampler<1, false> >(inGrid, parms.mTimeStep);
             hvdb::replaceVdbPrimitive(*gdp, outGrid, *vdbPrim);
         } else if (vdbPrim->getStorageType() == UT_VDB_VEC3F) {
             vdbPrim->makeGridUnique();
@@ -346,16 +339,16 @@ SOP_OpenVDB_Advect_Density::processGrids(const AdvectionParms& parms, hvdb::Inte
             if (d > 20) {
                 std::ostringstream tmp;
                 tmp << "Dilation by " << d << " voxels could be slow!"
-                    << " Consider lowing time-step or integration count!";
+                    << " Consider reducing the time-step!";
                 addWarning(SOP_MESSAGE, tmp.str().c_str());
             }
             typename openvdb::Vec3SGrid::Ptr outGrid;
             if (inGrid.getGridClass() == openvdb::GRID_STAGGERED) {
                 outGrid = adv.template advect<openvdb::Vec3SGrid,
-                    openvdb::tools::Sampler<SampleOrder, true> >(inGrid, parms.mTimeStep);
+                    openvdb::tools::Sampler<1, true> >(inGrid, parms.mTimeStep);
             } else {
                 outGrid = adv.template advect<openvdb::Vec3SGrid,
-                    openvdb::tools::Sampler<SampleOrder, false> >(inGrid, parms.mTimeStep);
+                    openvdb::tools::Sampler<1, false> >(inGrid, parms.mTimeStep);
             }
             hvdb::replaceVdbPrimitive(*gdp, outGrid, *vdbPrim);
         } else {

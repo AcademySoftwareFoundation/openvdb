@@ -508,7 +508,7 @@ MappedFile::clearNotifier()
 std::string
 getErrorString(int errorNum)
 {
-#if DWA_BOOST_VERSION >= 1043000
+#if DWA_BOOST_VERSION >= 1044000
     return boost::system::error_code(errorNum, boost::system::generic_category()).message();
 #else
     return boost::system::error_code(errorNum, boost::system::get_generic_category()).message();
