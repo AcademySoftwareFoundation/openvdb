@@ -216,47 +216,63 @@ struct Visitor
     typedef typename boost::mpl::at<NodeChainType, boost::mpl::int_<1> >::type  InternalNodeType;
 
     typedef typename TreeType::template ValueConverter<bool>::Type              BoolTreeType;
+    typedef typename BoolTreeType::Ptr                                          BoolTreePtr;
 
     //////////
 
-    Visitor(const TreeType& tree) : mTree(tree) {
+    Visitor(const TreeType& tree) : mTree(tree), mValueMask(new BoolTreeType(false))
+    {
         tree.getNodes(mLeafNodes);
         tree.getNodes(mInternalNodes);
     }
 
-    template<typename TestType>
-    bool run(ValueKind kind, const ValueState& state,
-        const TestType& test, BoolTreeType* mask = NULL)
-    {
-        bool passedTest = true;
+    BoolTreePtr& valueMask() { return mValueMask; }
 
-        if (kind == TILES_AND_VOXELS || kind == VOXELS) {
-            LeafNodeReduction<TestType> op(state, &mLeafNodes[0], test, mask);
-            tbb::parallel_reduce(tbb::blocked_range<size_t>(0, mLeafNodes.size()), op);
-            passedTest = op.passedTest();
+    std::string invalidValuesInfo() const
+    {
+        std::stringstream info;
+    
+         if (!mValueMask->empty()) {
+
+            info << "invalid: ";
+
+            const size_t voxelCount = size_t(mValueMask->activeLeafVoxelCount());
+            if (voxelCount > 0) info << voxelCount << " voxels ";
+
+            const size_t tileCount = size_t(mValueMask->activeTileCount());
+            if (tileCount > 0) {
+                if (voxelCount > 0) info << "& ";
+                info << tileCount << " tiles";
+            }
         }
 
-        if (!passedTest && !mask) return false;
+        return info.str();
+    }
+
+
+    template<typename TestType>
+    bool run(ValueKind kind, const ValueState& state, const TestType& test)
+    {
+        mValueMask.reset(new BoolTreeType(false));
+
+        if (kind == TILES_AND_VOXELS || kind == VOXELS) {
+            LeafNodeReduction<TestType> op(state, &mLeafNodes[0], test, *mValueMask);
+            tbb::parallel_reduce(tbb::blocked_range<size_t>(0, mLeafNodes.size()), op);
+        }
 
         if (kind == TILES_AND_VOXELS || kind == TILES) {
 
-            InternalNodeReduction<TestType> op(state, &mInternalNodes[0], test, mask);
+            InternalNodeReduction<TestType> op(state, &mInternalNodes[0], test, *mValueMask);
             tbb::parallel_reduce(tbb::blocked_range<size_t>(0, mInternalNodes.size()), op);
-            passedTest = op.passedTest();
-
-            if (!passedTest && !mask) return false;
 
             TestType myTest(test);
-            const bool createMask = mask != NULL;
 
             if (state == ACTIVE_VALUES) {
                 typename TreeType::ValueOnCIter it(mTree);
                 it.setMaxDepth(TreeType::ValueOnCIter::LEAF_DEPTH - 2);
                 for ( ; it; ++it) {
                     if (!myTest(it)) {
-                        passedTest = false;
-                        if (createMask) mask->fill(it.getBoundingBox(), true);
-                        else break;
+                        mValueMask->fill(it.getBoundingBox(), true);
                     }
                 }
             } else if (state == INACTIVE_VALUES) {
@@ -264,9 +280,7 @@ struct Visitor
                 it.setMaxDepth(TreeType::ValueOffCIter::LEAF_DEPTH - 2);
                 for ( ; it; ++it) {
                     if (!myTest(it)) {
-                        passedTest = false;
-                        if (createMask) mask->fill(it.getBoundingBox(), true);
-                        else break;
+                        mValueMask->fill(it.getBoundingBox(), true);
                     }
                 }
             } else {
@@ -274,15 +288,13 @@ struct Visitor
                 it.setMaxDepth(TreeType::ValueAllCIter::LEAF_DEPTH - 2);
                 for ( ; it; ++it) {
                     if (!myTest(it)) {
-                        passedTest = false;
-                        if (createMask) mask->fill(it.getBoundingBox(), true);
-                        else break;
+                        mValueMask->fill(it.getBoundingBox(), true);
                     }
                 }
             }
         }
 
-        return passedTest;
+        return mValueMask->empty(); // passed if mask is empty
     }
 
 private:
@@ -291,39 +303,30 @@ private:
     struct LeafNodeReduction
     {
         LeafNodeReduction(const ValueState& state, const LeafNodeType ** nodes,
-            const TestType& test, BoolTreeType* mask = NULL)
-            : mState(state), mNodes(nodes), mPrimMask(mask), mTempMask(false),
-              mMask(mPrimMask ? mPrimMask : &mTempMask), mTest(test), mPassedTest(true)
+            const TestType& test, BoolTreeType& mask)
+            : mState(state), mNodes(nodes), mPrimMask(&mask), mTempMask(false),
+              mMask(mPrimMask ? mPrimMask : &mTempMask), mTest(test)
         {}
 
         LeafNodeReduction(LeafNodeReduction& other, tbb::split)
             : mState(other.mState), mNodes(other.mNodes), mPrimMask(other.mPrimMask),
-              mTempMask(false), mMask(&mTempMask), mTest(other.mTest), mPassedTest(true)
+              mTempMask(false), mMask(&mTempMask), mTest(other.mTest)
         {}
 
-        bool passedTest() const { return mPassedTest; }
-
-        void join(LeafNodeReduction& other) {
-            mMask->merge(*other.mMask); if (!other.mPassedTest) mPassedTest = false;
-        }
+        void join(LeafNodeReduction& other) { mMask->merge(*other.mMask); }
 
         void operator()(const tbb::blocked_range<size_t>& range) {
 
             openvdb::tree::ValueAccessor<BoolTreeType> mask(*mMask);
-            const bool constructMask = mPrimMask != NULL;
-
+  
             for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
-
-                if (!constructMask && !mPassedTest) break;
 
                 const LeafNodeType& node = *mNodes[n];
 
                 if (mState == ACTIVE_VALUES) {
                     for (typename LeafNodeType::ValueOnCIter it = node.cbeginValueOn(); it; ++it) {
                         if (!mTest(it)) {
-                            mPassedTest = false;
-                            if (constructMask) mask.setValueOn(it.getCoord());
-                            else break;
+                            mask.setValueOn(it.getCoord());
                         }
                     }
                 } else if (mState == INACTIVE_VALUES) {
@@ -331,17 +334,13 @@ private:
                         it; ++it)
                     {
                         if (!mTest(it)) {
-                            mPassedTest = false;
-                            if (constructMask) mask.setValueOn(it.getCoord());
-                            else break;
+                            mask.setValueOn(it.getCoord());
                         }
                     }
                 } else {
                     for (typename LeafNodeType::ValueAllCIter it=node.cbeginValueAll(); it; ++it) {
                         if (!mTest(it)) {
-                            mPassedTest = false;
-                            if (constructMask) mask.setValueOn(it.getCoord());
-                            else break;
+                            mask.setValueOn(it.getCoord());
                         }
                     }
                 }
@@ -355,38 +354,30 @@ private:
         BoolTreeType                       mTempMask;
         BoolTreeType               * const mMask;
         TestType                           mTest;
-        bool                               mPassedTest;
     }; // struct LeafNodeReduction
 
     template<typename TestType>
     struct InternalNodeReduction
     {
         InternalNodeReduction(const ValueState& state, const InternalNodeType** nodes,
-            const TestType& test, BoolTreeType* mask = NULL)
-            : mState(state), mNodes(nodes), mPrimMask(mask), mTempMask(false),
-              mMask(mPrimMask ? mPrimMask : &mTempMask), mTest(test), mPassedTest(true)
+            const TestType& test, BoolTreeType& mask)
+            : mState(state), mNodes(nodes), mPrimMask(&mask), mTempMask(false),
+              mMask(mPrimMask ? mPrimMask : &mTempMask), mTest(test)
         {}
 
         InternalNodeReduction(InternalNodeReduction& other, tbb::split)
             : mState(other.mState), mNodes(other.mNodes), mPrimMask(other.mPrimMask),
-              mTempMask(false), mMask(&mTempMask), mTest(other.mTest), mPassedTest(true)
+              mTempMask(false), mMask(&mTempMask), mTest(other.mTest)
         {}
 
-        bool passedTest() const { return mPassedTest; }
-
-        void join(InternalNodeReduction& other) {
-            mMask->merge(*other.mMask); if (!other.mPassedTest) mPassedTest = false;
-        }
+        void join(InternalNodeReduction& other) { mMask->merge(*other.mMask); }
 
         void operator()(const tbb::blocked_range<size_t>& range) {
 
             openvdb::Coord ijk;
             const int dim = int(InternalNodeType::ChildNodeType::DIM) - 1;
-            const bool constructMask = mPrimMask != NULL;
 
             for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
-
-                if (!constructMask && !mPassedTest) break;
 
                 const InternalNodeType& node = *mNodes[n];
 
@@ -395,13 +386,8 @@ private:
                         it; ++it)
                     {
                         if (!node.isChildMaskOn(it.pos()) && !mTest(it)) {
-                            mPassedTest = false;
-                            if (constructMask) {
-                                ijk = it.getCoord();
-                                mMask->fill(openvdb::CoordBBox(ijk, ijk.offsetBy(dim)), true);
-                            } else {
-                                break;
-                            }
+                            ijk = it.getCoord();
+                            mMask->fill(openvdb::CoordBBox(ijk, ijk.offsetBy(dim)), true);
                         }
                     }
                 } else if (mState == INACTIVE_VALUES) {
@@ -409,13 +395,8 @@ private:
                         it; ++it)
                     {
                         if (!node.isChildMaskOn(it.pos()) && !mTest(it)) {
-                            mPassedTest = false;
-                            if (constructMask) {
-                                ijk = it.getCoord();
-                                mMask->fill(openvdb::CoordBBox(ijk, ijk.offsetBy(dim)), true);
-                            } else {
-                                break;
-                            }
+                            ijk = it.getCoord();
+                            mMask->fill(openvdb::CoordBBox(ijk, ijk.offsetBy(dim)), true);
                         }
                     }
                 } else {
@@ -423,13 +404,8 @@ private:
                         it; ++it)
                     {
                         if (!node.isChildMaskOn(it.pos()) && !mTest(it)) {
-                            mPassedTest = false;
-                            if (constructMask) {
-                                ijk = it.getCoord();
-                                mMask->fill(openvdb::CoordBBox(ijk, ijk.offsetBy(dim)), true);
-                            } else {
-                                break;
-                            }
+                            ijk = it.getCoord();
+                            mMask->fill(openvdb::CoordBBox(ijk, ijk.offsetBy(dim)), true);
                         }
                     }
                 }
@@ -443,12 +419,13 @@ private:
         BoolTreeType                           mTempMask;
         BoolTreeType                   * const mMask;
         TestType                               mTest;
-        bool                                   mPassedTest;
-    }; // struct InternalNodeReduction
+     }; // struct InternalNodeReduction
 
-    const TreeType& mTree;
+    const TreeType&                         mTree;
+    BoolTreePtr                             mValueMask;
     std::vector<const LeafNodeType*>        mLeafNodes;
     std::vector<const InternalNodeType*>    mInternalNodes;
+    
 }; // struct Visitor
 
 
@@ -736,12 +713,9 @@ struct GridTestLog
     size_t passedCount() const { return mPassed; }
     size_t skippedCount() const { return mSkipped; }
 
-    void appendFailed(const std::string& msg) {
+    void appendFailed(const std::string& testName, const std::string& msg = "") {
         mFailed++;
-        if (!mFailedMsg.empty()) mFailedMsg += ", ";
-        mFailedMsg += "'";
-        mFailedMsg += msg;
-        mFailedMsg += "'";
+        mFailedMsg += "   - '" + testName + "' " + msg + "\n";
     }
 
     void appendPassed() { mPassed++; }
@@ -771,7 +745,7 @@ struct GridTestLog
         }
 
         if (!mFailedMsg.empty()) {
-            log << "   - failed test" << (mFailed > 1 ? "s: " : ": ") << mFailedMsg << "\n";
+            log << mFailedMsg << "\n";
         }
 
         return log.str();
@@ -1122,22 +1096,19 @@ struct TestCollection
 
         if (mTest.testFinite) {
 
-            typename BoolTreeType::Ptr mask(
-                (mTest.idFinite || mTest.fixFinite) ? new BoolTreeType(false) : NULL);
+            if (!visitor.run(VisitorType::TILES_AND_VOXELS, VisitorType::ALL_VALUES, FiniteValue())) {
 
-            if (!visitor.run(VisitorType::TILES_AND_VOXELS, VisitorType::ALL_VALUES,
-                FiniteValue(), mask.get()))
-            {
-                log.appendFailed("Finite Values");
+                log.appendFailed("Finite Values", visitor.invalidValuesInfo());
 
                 if (mTest.fixFinite) {
-                    fixMasks.push_back(MaskDataType(mask, tree.background()));
+                    fixMasks.push_back(MaskDataType(visitor.valueMask(), tree.background()));
                 }
+
+                if (mTest.idFinite) idMasks.push_back(visitor.valueMask());
+
             } else {
                 log.appendPassed();
-            }
-
-            if (mTest.idFinite) idMasks.push_back(mask);
+            } 
         }
 
         if (mInterupter->wasInterrupted()) return;
@@ -1145,24 +1116,20 @@ struct TestCollection
         if (mTest.testUniformBackground
             && (!mTest.respectGridClass || grid.getGridClass() != openvdb::GRID_LEVEL_SET))
         {
-            typename BoolTreeType::Ptr
-                mask((mTest.idUniformBackground || mTest.fixUniformBackground)
-                    ? new BoolTreeType(false) : NULL);
-
             ApproxEqual<ValueType> test(tree.background());
-            if (!visitor.run(VisitorType::TILES_AND_VOXELS, VisitorType::INACTIVE_VALUES,
-                test, mask.get()))
-            {
-                log.appendFailed("Uniform Background");
+            if (!visitor.run(VisitorType::TILES_AND_VOXELS, VisitorType::INACTIVE_VALUES, test)) {
+                
+                log.appendFailed("Uniform Background", visitor.invalidValuesInfo());
 
                 if (mTest.fixUniformBackground) {
-                    fixMasks.push_back(MaskDataType(mask, tree.background()));
+                    fixMasks.push_back(MaskDataType(visitor.valueMask(), tree.background()));
                 }
+
+                if (mTest.idUniformBackground) idMasks.push_back(visitor.valueMask());
+
             } else {
                 log.appendPassed();
             }
-
-            if (mTest.idUniformBackground) idMasks.push_back(mask);
         }
 
         if (mInterupter->wasInterrupted()) return;
@@ -1170,24 +1137,22 @@ struct TestCollection
 
         if (mTest.testInRange) {
 
-            typename BoolTreeType::Ptr mask((mTest.idInRange || mTest.fixInRange) ? new BoolTreeType(false) : NULL);
-
             InRange test(mTest.rangeMin, mTest.rangeMax);
-            if (!visitor.run(VisitorType::TILES_AND_VOXELS, VisitorType::ALL_VALUES,
-                test, mask.get()))
-            {
-                log.appendFailed("Values in Range");
+            if (!visitor.run(VisitorType::TILES_AND_VOXELS, VisitorType::ALL_VALUES, test)) {
+
+                log.appendFailed("Values in Range", visitor.invalidValuesInfo());
 
                 if (mTest.fixInRange) {
 
-                    fixMasks.push_back(MaskDataType(mask, ValueType(mTest.rangeMin), ValueType(mTest.rangeMax)));
+                    fixMasks.push_back(MaskDataType(visitor.valueMask(),
+                        ValueType(mTest.rangeMin), ValueType(mTest.rangeMax)));
                 }
+
+                if (mTest.idInRange) idMasks.push_back(visitor.valueMask());
+
             } else {
                 log.appendPassed();
             }
-
-
-            if (mTest.idInRange) idMasks.push_back(mask);
         }
 
 
@@ -1198,26 +1163,23 @@ struct TestCollection
         if (!mTest.respectGridClass || grid.getGridClass() == openvdb::GRID_LEVEL_SET) {
 
             if (mTest.testUniformVoxelSize) {
-                if (!grid.hasUniformVoxels()) log.appendFailed("Uniform Voxel Size");
+                if (!grid.hasUniformVoxels()) log.appendFailed("'Uniform Voxel Size'");
                 else log.appendPassed();
             }
 
             if (mTest.testNoActiveTiles) {
 
-                typename BoolTreeType::Ptr mask(
-                    mTest.idNoActiveTiles ? new BoolTreeType(false) : NULL);
+                if (!visitor.run(VisitorType::TILES, VisitorType::ACTIVE_VALUES, AlwaysFalse())) {
 
-                if (!visitor.run(VisitorType::TILES, VisitorType::ACTIVE_VALUES,
-                        AlwaysFalse(), mask.get()))
-                {
-                    log.appendFailed("Inactive Tiles");
+                    log.appendFailed("Inactive Tiles", visitor.invalidValuesInfo());
 
                     if (mTest.fixNoActiveTiles) inactivateTiles = true;
+
+                    if (mTest.idNoActiveTiles) idMasks.push_back(visitor.valueMask());
+
                 } else {
                     log.appendPassed();
                 }
-
-                if (mTest.idNoActiveTiles) idMasks.push_back(mask);
             }
 
             if (mTest.testSymmetricNarrowBand) {
@@ -1285,21 +1247,20 @@ struct TestCollection
             if (mTest.testGradientMagnitude) {
 
                 if (boost::is_floating_point<ValueType>::value) {
-                    typename BoolTreeType::Ptr mask(
-                        mTest.idGradientMagnitude ? new BoolTreeType(false) : NULL);
 
                     GradientNorm<TreeType> test(tree, voxelSize, ValueType(mTest.gradientTolerance));
-                    if (!visitor.run(VisitorType::VOXELS, VisitorType::ACTIVE_VALUES,
-                            test, mask.get()))
-                    {
-                        log.appendFailed("Gradient Magnitude");
+                    if (!visitor.run(VisitorType::VOXELS, VisitorType::ACTIVE_VALUES, test)) {
+
+                        log.appendFailed("Gradient Magnitude", visitor.invalidValuesInfo());
 
                         if (mTest.fixGradientMagnitude) renormalizeLevelSet = true;
+
+                        if (mTest.idGradientMagnitude) idMasks.push_back(visitor.valueMask());
+
                     } else {
                         log.appendPassed();
                     }
 
-                    if (mTest.idGradientMagnitude) idMasks.push_back(mask);
                 } else {
                     log.appendSkipped();
                 }
@@ -1312,49 +1273,38 @@ struct TestCollection
 
             if (mTest.testBackgroundZero) {
 
-                typename BoolTreeType::Ptr mask(
-                    (mTest.idBackgroundZero || mTest.fixBackgroundZero)
-                        ? new BoolTreeType(false) : NULL);
-
                 ApproxEqual<ValueType> test(ValueType(0.0));
-                if (!visitor.run(VisitorType::TILES_AND_VOXELS, VisitorType::INACTIVE_VALUES,
-                    test, mask.get()))
-                {
-                    log.appendFailed("Background Zero");
+                if (!visitor.run(VisitorType::TILES_AND_VOXELS, VisitorType::INACTIVE_VALUES, test)) {
+
+                    log.appendFailed("Background Zero", visitor.invalidValuesInfo());
 
                     if (mTest.fixBackgroundZero) {
-                        fixMasks.push_back(MaskDataType(mask, ValueType(0.0)));
+                        fixMasks.push_back(MaskDataType(visitor.valueMask(), ValueType(0.0)));
                     }
+
+                    if (mTest.idBackgroundZero) idMasks.push_back(visitor.valueMask());
+
                 } else {
                     log.appendPassed();
                 }
-
-
-                if (mTest.idBackgroundZero) idMasks.push_back(mask);
             }
 
             if (mTest.testActiveValuesFromZeroToOne) {
 
-                typename BoolTreeType::Ptr mask(
-                    (mTest.idActiveValuesFromZeroToOne || mTest.fixActiveValuesFromZeroToOne)
-                        ? new BoolTreeType(false) : NULL);
-
                 InRange test(0.0f, 1.0f);
-                if (!visitor.run(VisitorType::TILES_AND_VOXELS, VisitorType::ACTIVE_VALUES,
-                    test, mask.get()))
-                {
-                    log.appendFailed("Active Values in [0, 1]");
+                if (!visitor.run(VisitorType::TILES_AND_VOXELS, VisitorType::ACTIVE_VALUES, test)) {
+
+                    log.appendFailed("Active Values in [0, 1]", visitor.invalidValuesInfo());
 
                     if (mTest.fixActiveValuesFromZeroToOne) {
-                        fixMasks.push_back(MaskDataType(mask, ValueType(0.0), ValueType(1.0)));
+                        fixMasks.push_back(MaskDataType(visitor.valueMask(), ValueType(0.0), ValueType(1.0)));
                     }
+
+                    if (mTest.idActiveValuesFromZeroToOne) idMasks.push_back(visitor.valueMask());
 
                 } else {
                     log.appendPassed();
                 }
-
-
-                if (mTest.idActiveValuesFromZeroToOne) idMasks.push_back(mask);
             }
         } // end Fog Volume tests
 
@@ -1551,15 +1501,15 @@ newSopOperator(OP_OperatorTable* table)
         .setHelpText("Specify a subset of the input grids to examine.")
         .setChoiceList(&hutil::PrimGroupMenu));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "usemask", "Identify Using Mask Grid")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "usemask", "Mark in Mask Grid")
         .setHelpText(
-            "For tests set to Identify, output a mask grid that highlights\n"
+            "For tests set to Mark, output a mask grid that highlights\n"
             "problematic regions in input grids."));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "usepoints", "Identify Using Points With Values")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "usepoints", "Mark as Points With Values")
         .setDefault(PRMoneDefaults)
         .setHelpText(
-            "For tests set to Identify, output a point cloud that highlights\n"
+            "For tests set to Mark, output a point cloud that highlights\n"
             "problematic regions in input grids."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "respectclass", "Respect Grid Class")
@@ -1612,7 +1562,7 @@ newSopOperator(OP_OperatorTable* table)
         .setTypeExtended(PRM_TYPE_MENU_JOIN)
         .setHelpText("Verify that all values are finite and non-NaN."));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "id_finite", "Identify")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "id_finite", "Mark")
         .setHelpText("Add incorrect values to the output mask and/or point cloud."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "fix_finite", "Fix")
@@ -1626,7 +1576,7 @@ newSopOperator(OP_OperatorTable* table)
         .setTypeExtended(PRM_TYPE_MENU_JOIN)
         .setHelpText("Verify that all inactive voxels are set to the background value."));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "id_background", "Identify")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "id_background", "Mark")
         .setHelpText("Add incorrect values to the output mask and/or point cloud."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "fix_background", "Fix")
@@ -1642,7 +1592,7 @@ newSopOperator(OP_OperatorTable* table)
             "Verify that all scalar voxel values and vector magnitudes\n"
             "are in the given range."));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "id_valrange", "Identify")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "id_valrange", "Mark")
         .setHelpText("Add incorrect values to the output mask and/or point cloud."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "fix_valrange", "Fix")
@@ -1701,7 +1651,7 @@ newSopOperator(OP_OperatorTable* table)
             "Verify that the level set gradient has magnitude one everywhere\n"
             "(within a given tolerance)."));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "id_gradient", "Identify")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "id_gradient", "Mark")
         .setHelpText("Add incorrect values to the output mask and/or point cloud."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "fix_gradient", "Fix")
@@ -1719,7 +1669,7 @@ newSopOperator(OP_OperatorTable* table)
         .setTypeExtended(PRM_TYPE_MENU_JOIN)
         .setHelpText("Verify that level sets have no active tiles."));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "id_activetiles", "Identify")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "id_activetiles", "Mark")
         .setHelpText("Add incorrect values to the output mask and/or point cloud."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "fix_activetiles", "Fix")
@@ -1744,7 +1694,7 @@ newSopOperator(OP_OperatorTable* table)
         .setTypeExtended(PRM_TYPE_MENU_JOIN)
         .setHelpText("Verify that all inactive voxels in fog volumes have value zero."));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "id_backgroundzero", "Identify")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "id_backgroundzero", "Mark")
         .setHelpText("Add incorrect values to the output mask and/or point cloud."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "fix_backgroundzero", "Fix")
@@ -1761,7 +1711,7 @@ newSopOperator(OP_OperatorTable* table)
             "Verify that all active voxels in fog volumes\n"
             "have values in the range [0, 1]."));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "id_fogvalues", "Identify")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "id_fogvalues", "Mark")
         .setHelpText("Add incorrect values to the output mask and/or point cloud."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "fix_fogvalues", "Fix")

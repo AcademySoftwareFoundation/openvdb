@@ -33,6 +33,10 @@
 /// @author Mihai Alden
 ///
 /// @decription Rasterize points into density and attribute grids.
+///
+/// @note   This SOP has a accompanying creation script that adds a default VOP
+///         subnetwork and UI parameters for cloud and velocity field modeling.
+///         See creation script file header for installation details.
 
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>

@@ -213,7 +213,20 @@ SOP_OpenVDB_Metadata::cookMySop(OP_Context& context)
             hvdb::Grid& grid = vdb->getGrid();
 
             // Set various grid metadata items.
-            if (setclass)   grid.setGridClass(gridclass);
+            if (setclass) {
+                grid.setGridClass(gridclass);
+
+                // Update view port visualization options
+                if (gridclass == openvdb::GRID_LEVEL_SET) {
+                    const GEO_VolumeOptions& visOps = vdb->getVisOptions();
+                    vdb->setVisualization(GEO_VOLUMEVIS_ISO, visOps.myIso, visOps.myDensity);
+                } else if (gridclass == openvdb::GRID_FOG_VOLUME) {
+                    const GEO_VolumeOptions& visOps = vdb->getVisOptions();
+                    vdb->setVisualization(GEO_VOLUMEVIS_SMOKE, visOps.myIso, visOps.myDensity);
+                }
+            }
+
+
             if (setcreator) grid.setCreator(creator);
             if (setfloat16) grid.setSaveFloatAsHalf(float16);
             if (setvectype) grid.setVectorType(vectype);

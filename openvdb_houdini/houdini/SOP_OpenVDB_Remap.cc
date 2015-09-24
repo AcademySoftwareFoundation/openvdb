@@ -31,12 +31,12 @@
 /// @file SOP_OpenVDB_Remap.cc
 ///
 /// @author FX R&D OpenVDB team
-///
 
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
 
+#include <openvdb/math/Math.h> // Tolerance and isApproxEqual
 #include <openvdb/tools/ValueTransformer.h>
 
 #include <UT/UT_Version.h>
@@ -144,6 +144,33 @@ struct NodeMinMax
     ValueType mBackground, mMin, mMax;
 };
 
+template<typename NodeType>
+struct Deactivate
+{
+    typedef typename NodeType::ValueType    ValueType;
+
+    Deactivate(std::vector<NodeType*>& nodes, ValueType background)
+        : mNodes(&nodes[0]), mBackground(background)
+    {}
+
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+        const ValueType
+            background(mBackground),
+            delta = openvdb::math::Tolerance<ValueType>::value();
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+            for (typename NodeType::ValueOnIter it = mNodes[n]->beginValueOn(); it; ++it) {
+                if (openvdb::math::isApproxEqual(background, *it, delta)) {
+                    it.setValueOff();
+                }
+            }
+        }
+    }
+
+    NodeType * const * const mNodes;
+    ValueType mBackground;
+};
+
+
 template<typename TreeType>
 void
 evalMinMax(const TreeType& tree,
@@ -159,7 +186,7 @@ evalMinMax(const TreeType& tree,
 
         NodeMinMax<LeafNodeType> op(nodes, tree.background());
         tbb::parallel_reduce(tbb::blocked_range<size_t>(0, nodes.size()), op);
-        
+
         minVal = minValue(minVal, op.mMin);
         maxVal = maxValue(maxVal, op.mMax);
     }
@@ -174,7 +201,7 @@ evalMinMax(const TreeType& tree,
 
         NodeMinMax<InternalNodeType> op(nodes, tree.background());
         tbb::parallel_reduce(tbb::blocked_range<size_t>(0, nodes.size()), op);
-        
+
         minVal = minValue(minVal, op.mMin);
         maxVal = maxValue(maxVal, op.mMax);
     }
@@ -194,23 +221,78 @@ evalMinMax(const TreeType& tree,
     }
 }
 
+template<typename TreeType>
+void
+deactivateBackgroundValues(TreeType& tree)
+{
+    { // eval voxels
+        typedef typename TreeType::LeafNodeType   LeafNodeType;
+        std::vector<LeafNodeType*> nodes;
+        tree.getNodes(nodes);
+
+        Deactivate<LeafNodeType> op(nodes, tree.background());
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()), op);
+    }
+
+    { // eval first tiles
+        typedef typename TreeType::RootNodeType                                     RootNodeType;
+        typedef typename RootNodeType::NodeChainType                                NodeChainType;
+        typedef typename boost::mpl::at<NodeChainType, boost::mpl::int_<1> >::type  InternalNodeType;
+
+        std::vector<InternalNodeType*> nodes;
+        tree.getNodes(nodes);
+
+        Deactivate<InternalNodeType> op(nodes, tree.background());
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()), op);
+    }
+
+    { // eval remaining tiles
+        typedef typename TreeType::ValueType  ValueType;
+        const ValueType
+            background(tree.background()),
+            delta = openvdb::math::Tolerance<ValueType>::value();
+        typename TreeType::ValueOnIter it(tree);
+        it.setMaxDepth(TreeType::ValueAllCIter::LEAF_DEPTH - 2);
+        for ( ; it; ++it) {
+            if (openvdb::math::isApproxEqual(background, *it, delta)) {
+               it.setValueOff();
+            }
+        }
+    }
+}
+
+
+
 
 ////////////////////////////////////////
 
 
 struct RemapGridValues {
 
-    RemapGridValues(UT_Ramp& ramp, const fpreal inMin, const fpreal inMax,
-        const fpreal outMin, const fpreal outMax, UT_ErrorManager* errorManager = NULL)
-        : mRamp(&ramp), mErrorManager(errorManager), mPrimitiveIndex(0), mPrimitiveName()
-        , mInfo("\n"), mInMin(inMin), mInMax(inMax), mOutMin(outMin), mOutMax(outMax)
+    enum Extrapolation { CLAMP, PRESERVE, EXTRAPOLATE };
+
+    RemapGridValues(Extrapolation belowExt, Extrapolation aboveExt, UT_Ramp& ramp,
+        const fpreal inMin, const fpreal inMax, const fpreal outMin, const fpreal outMax,
+        bool deactivate, UT_ErrorManager* errorManager = NULL)
+        : mBelowExtrapolation(belowExt)
+        , mAboveExtrapolation(aboveExt)
+        , mRamp(&ramp)
+        , mErrorManager(errorManager)
+        , mPrimitiveIndex(0)
+        , mPrimitiveName()
+        , mInfo("Remapped grids: (first range shows actual min/max values)\n")
+        , mInMin(inMin)
+        , mInMax(inMax)
+        , mOutMin(outMin)
+        , mOutMax(outMax)
+        , mDeactivate(deactivate)
     {
         mRamp->ensureRampIsBuilt();
     }
 
     ~RemapGridValues() {
         if (mErrorManager) {
-            mErrorManager->addMessage(SOP_OPTYPE_NAME, SOP_MESSAGE, mInfo.c_str());    
+            mErrorManager->addMessage(SOP_OPTYPE_NAME, SOP_MESSAGE, mInfo.c_str());
         }
     }
 
@@ -229,7 +311,8 @@ struct RemapGridValues {
         ValueType inputMin, inputMax;
         evalMinMax(grid.tree(), inputMin, inputMax);
 
-        ValueTransform<GridType> op(*mRamp, leafnodes, mInMin, mInMax, mOutMin, mOutMax);
+        ValueTransform<GridType> op(*mRamp, leafnodes, mBelowExtrapolation, mAboveExtrapolation,
+            mInMin, mInMax, mOutMin, mOutMax);
 
         // update voxels
         tbb::parallel_for(tbb::blocked_range<size_t>(0, leafnodes.size()), op);
@@ -241,19 +324,28 @@ struct RemapGridValues {
 
         // update background value
         grid.tree().root().setBackground(op.map(grid.background()), /*updateChildNodes=*/false);
-
         grid.setGridClass(openvdb::GRID_UNKNOWN);
 
         ValueType outputMin, outputMax;
         evalMinMax(grid.tree(), outputMin, outputMax);
 
+        size_t activeVoxelDelta = size_t(grid.tree().activeVoxelCount());
+        if (mDeactivate) {
+            deactivateBackgroundValues(grid.tree());
+            activeVoxelDelta -= size_t(grid.tree().activeVoxelCount());
+        }
 
         { // log
             std::stringstream msg;
             msg << "  (" << mPrimitiveIndex << ") '" << mPrimitiveName << "'"
                 << " [" << minComponent(inputMin) << ", " << maxComponent(inputMax) << "]"
-                << " -> [" << minComponent(outputMin) << ", " << maxComponent(outputMax) << "]"
-                << "\n";
+                << " -> [" << minComponent(outputMin) << ", " << maxComponent(outputMax) << "]";
+
+            if (mDeactivate && activeVoxelDelta > 0) {
+                msg << ", deactivated " << activeVoxelDelta << " voxels.";
+            }
+
+            msg << "\n";
             mInfo += msg.str();
         }
     }
@@ -264,9 +356,12 @@ private:
         typedef typename GridType::TreeType::LeafNodeType LeafNodeType;
 
         ValueTransform(const UT_Ramp& utramp, std::vector<LeafNodeType*>& leafnodes,
-            const fpreal inMin, const fpreal inMax, const fpreal outMin, const fpreal outMax)
+            Extrapolation belowExt, Extrapolation aboveExt, const fpreal inMin,
+            const fpreal inMax, const fpreal outMin, const fpreal outMax)
             : ramp(&utramp)
             , nodes(&leafnodes[0])
+            , belowExtrapolation(belowExt)
+            , aboveExtrapolation(aboveExt)
             , xMin(inMin)
             , xScale((inMax - inMin))
             , yMin(outMin)
@@ -290,8 +385,23 @@ private:
 
         template<typename T>
         inline T map(const T s) const {
+
+            fpreal pos = (fpreal(s) - xMin) * xScale;
+
+            if (pos < fpreal(0.0)) { // below (normalized) minimum
+                if (belowExtrapolation == PRESERVE) return s;
+                if (belowExtrapolation == EXTRAPOLATE) return T((pos * xScale) * yScale);
+                pos = std::max(pos, fpreal(0.0)); // clamp
+            }
+
+            if (pos > fpreal(1.0)) { // above (normalized) maximum
+                if (aboveExtrapolation == PRESERVE) return s;
+                if (aboveExtrapolation == EXTRAPOLATE) return T((pos * xScale) * yScale);
+                pos = std::min(pos, fpreal(1.0)); //clamp
+            }
+
             float values[4] = { 0.0f };
-            ramp->rampLookup((fpreal(s) - xMin) * xScale, values);
+            ramp->rampLookup(pos, values);
             return T(yMin + (values[0] * yScale));
         }
 
@@ -306,15 +416,19 @@ private:
 
         UT_Ramp         const * const ramp;
         LeafNodeType  * const * const nodes;
+        const Extrapolation belowExtrapolation, aboveExtrapolation;
         fpreal xMin, xScale, yMin, yScale;
     }; // struct ValueTransform
 
-    UT_Ramp         * const mRamp;
-    UT_ErrorManager * const mErrorManager;
-    int                     mPrimitiveIndex;
-    std::string             mPrimitiveName, mInfo;
+    //////////
 
+    Extrapolation mBelowExtrapolation, mAboveExtrapolation;
+    UT_Ramp * const mRamp;
+    UT_ErrorManager * const mErrorManager;
+    int mPrimitiveIndex;
+    std::string mPrimitiveName, mInfo;
     const fpreal mInMin, mInMax, mOutMin, mOutMax;
+    const bool mDeactivate;
 }; // struct RemapGridValues
 
 } // unnamed namespace
@@ -344,6 +458,32 @@ newSopOperator(OP_OperatorTable* table)
         .setHelpText("Specify a subset of the input grids.")
         .setChoiceList(&hutil::PrimGroupMenu));
 
+    { // Extrapolation
+        const char* items[] = {
+            "clamp",        "Clamp",
+            "preserve",     "Preserve",
+            "extrapolate",  "Extrapolate",
+            NULL
+        };
+
+        parms.add(hutil::ParmFactory(PRM_ORD, "below", "Below Minimum")
+            .setDefault(PRMzeroDefaults)
+            .setHelpText(
+                "Specify how to handle input values below the input range minimum:"
+                " either by clamping to the output minimum (Clamp),"
+                " leaving out-of-range values intact (Preserve),"
+                " or extrapolating linearly from the output minimum (Extrapolate).")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+
+        parms.add(hutil::ParmFactory(PRM_ORD, "above", "Above Maximum")
+            .setDefault(PRMzeroDefaults)
+            .setHelpText(
+                "Specify how to handle output values above the output range maximum:"
+                " either by clamping to the output maximum (Clamp),"
+                " leaving out-of-range values intact (Preserve),"
+                " or extrapolating linearly from the output maximum (Extrapolate).")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+    }
 
     std::vector<fpreal> defaultRange;
     defaultRange.push_back(fpreal(0.0));
@@ -362,16 +502,19 @@ newSopOperator(OP_OperatorTable* table)
     {
         std::map<std::string, std::string> rampSpare;
         rampSpare[PRM_SpareData::getFloatRampDefaultToken()] =
-            "1pos ( 0.0 ) 1value ( 1.00 ) 1interp ( linear ) "
-            "2pos ( 0.5 ) 2value ( 1.00 ) 2interp ( linear ) "
-            "3pos ( 1.0 ) 3value ( 0.00 ) 3interp ( linear )";
+            "1pos ( 0.0 ) 1value ( 0.0 ) 1interp ( linear ) "
+            "2pos ( 1.0 ) 2value ( 1.0 ) 2interp ( linear )";
 
         rampSpare[PRM_SpareData::getRampShowControlsDefaultToken()] = "0";
 
         parms.add(hutil::ParmFactory(PRM_MULTITYPE_RAMP_FLT, "function", "Transfer Function")
-            .setDefault(PRMthreeDefaults)
+            .setDefault(PRMtwoDefaults)
             .setSpareData(rampSpare));
     }
+
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "deactivate", "Deactivate Background Voxels")
+        .setHelpText("Deactivate voxels with values equal to the remapped background value."));
+
 
     hvdb::OpenVDBOpFactory("OpenVDB Remap",
         SOP_OpenVDB_Remap::factory, parms, *table)
@@ -403,18 +546,31 @@ SOP_OpenVDB_Remap::cookMySop(OP_Context& context)
         const fpreal inMax = evalFloat("inrange", 1, time);
         const fpreal outMin = evalFloat("outrange", 0, time);
         const fpreal outMax = evalFloat("outrange", 1, time);
+        const bool deactivate = bool(evalInt("deactivate", 0, time));
+
+        RemapGridValues::Extrapolation belowExtrapolation = RemapGridValues::CLAMP;
+        RemapGridValues::Extrapolation aboveExtrapolation = RemapGridValues::CLAMP;
+
+        int extrapolation = evalInt("below", 0, time);
+        if (extrapolation == 1) belowExtrapolation = RemapGridValues::PRESERVE;
+        else if (extrapolation == 2) belowExtrapolation = RemapGridValues::EXTRAPOLATE;
+
+
+        extrapolation = evalInt("above", 0, time);
+        if (extrapolation == 1) aboveExtrapolation = RemapGridValues::PRESERVE;
+        else if (extrapolation == 2) aboveExtrapolation = RemapGridValues::EXTRAPOLATE;
 
         UT_Ramp ramp;
         updateRampFromMultiParm(time, getParm("function"), ramp);
 
-        
         UT_String groupStr;
         evalString(groupStr, "group", 0, time);
         const GA_PrimitiveGroup* group = matchGroup(*gdp, groupStr.toStdString());
 
         size_t vdbPrimCount = 0;
 
-        RemapGridValues remap(ramp, inMin, inMax, outMin, outMax, UTgetErrorManager());
+        RemapGridValues remap(belowExtrapolation, aboveExtrapolation, ramp,
+            inMin, inMax, outMin, outMax, deactivate, UTgetErrorManager());
 
         for (hvdb::VdbPrimIterator it(gdp, group); it; ++it) {
 
@@ -442,7 +598,6 @@ SOP_OpenVDB_Remap::cookMySop(OP_Context& context)
 
     return error();
 }
-
 
 // Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

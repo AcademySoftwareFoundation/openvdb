@@ -1,4 +1,13 @@
-# Automatically generated script: Friday August 28, 17:13 2015
+# This creation script augment the "Rasterize Points" SOP with a default
+# VOP subnetwork and UI parameters for cloud and velocity field modeling.
+#
+# Installation:
+# 1. Verify that script file name matches "Rasterize Points" operator name.
+# 2. Move to scripts/sop/ subdirectory.
+# 3. Update HOUDINI_SCRIPT_PATH environment variable.
+#
+# See "Using Creation Scripts" section in HDK documentation for more details.
+
 \set noalias = 1
 #
 #  Creation script for DW_OpenVDBRasterizePoints operator

@@ -36,7 +36,6 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/ChangeBackground.h>
 #include <openvdb/tools/Diagnostics.h>
-#include <openvdb/tools/DensityAdvect.h>
 #include <openvdb/tools/Clip.h>
 #include <openvdb/tools/GridOperators.h>
 #include <openvdb/tools/Filter.h>
@@ -51,6 +50,7 @@
 #include <openvdb/tools/Prune.h>
 #include <openvdb/tools/ValueTransformer.h>
 #include <openvdb/tools/VectorTransformer.h>
+#include <openvdb/tools/VolumeAdvect.h>
 #include <openvdb/util/Util.h>
 #include <openvdb/util/CpuTimer.h>
 #include <openvdb/math/Stats.h>
@@ -82,7 +82,7 @@ public:
     CPPUNIT_TEST(testPointAdvect);
     CPPUNIT_TEST(testPointScatter);
     CPPUNIT_TEST(testPrune);
-    CPPUNIT_TEST(testDensityAdvect);
+    CPPUNIT_TEST(testVolumeAdvect);
     CPPUNIT_TEST(testTransformValues);
     CPPUNIT_TEST(testVectorApply);
     CPPUNIT_TEST(testAccumulate);
@@ -108,7 +108,7 @@ public:
     void testPointAdvect();
     void testPointScatter();
     void testPrune();
-    void testDensityAdvect();
+    void testVolumeAdvect();
     void testTransformValues();
     void testVectorApply();
     void testAccumulate();
@@ -1677,13 +1677,13 @@ TestTools::testPointScatter()
 ////////////////////////////////////////
 
 void
-TestTools::testDensityAdvect()
+TestTools::testVolumeAdvect()
 {
     using namespace openvdb;
 
     Vec3fGrid velocity(Vec3f(1.0f, 0.0f, 0.0f));
     typedef FloatGrid GridT;
-    typedef tools::DensityAdvection<Vec3fGrid> AdvT;
+    typedef tools::VolumeAdvection<Vec3fGrid> AdvT;
     typedef tools::Sampler<1> SamplerT;
 
     {//test non-uniform grids (throws)
@@ -1692,8 +1692,52 @@ TestTools::testDensityAdvect()
         AdvT a(velocity);
         CPPUNIT_ASSERT_THROW((a.advect<GridT, SamplerT>(*density0, 0.1f)), RuntimeError);
     }
+
+    {// test spatialOrder and temporalOrder
+        AdvT a(velocity);
+
+        // Default should be SEMI
+        CPPUNIT_ASSERT_EQUAL(1, a.spatialOrder());
+        CPPUNIT_ASSERT_EQUAL(1, a.temporalOrder());
+        CPPUNIT_ASSERT(!a.limiterActive());
+
+        a.setIntegrator(tools::Scheme::SEMI);
+        CPPUNIT_ASSERT_EQUAL(1, a.spatialOrder());
+        CPPUNIT_ASSERT_EQUAL(1, a.temporalOrder());
+        CPPUNIT_ASSERT(!a.limiterActive());
+
+        a.setIntegrator(tools::Scheme::MID);
+        CPPUNIT_ASSERT_EQUAL(1, a.spatialOrder());
+        CPPUNIT_ASSERT_EQUAL(2, a.temporalOrder());
+        CPPUNIT_ASSERT(!a.limiterActive());
+
+        a.setIntegrator(tools::Scheme::RK3);
+        CPPUNIT_ASSERT_EQUAL(1, a.spatialOrder());
+        CPPUNIT_ASSERT_EQUAL(3, a.temporalOrder());
+        CPPUNIT_ASSERT(!a.limiterActive());
+            
+        a.setIntegrator(tools::Scheme::RK4);
+        CPPUNIT_ASSERT_EQUAL(1, a.spatialOrder());
+        CPPUNIT_ASSERT_EQUAL(4, a.temporalOrder());
+        CPPUNIT_ASSERT(!a.limiterActive());
+
+        a.setIntegrator(tools::Scheme::MAC);
+        CPPUNIT_ASSERT_EQUAL(2, a.spatialOrder());
+        CPPUNIT_ASSERT_EQUAL(2, a.temporalOrder());
+        CPPUNIT_ASSERT( a.limiterActive());
+
+        a.setIntegrator(tools::Scheme::BFECC);
+        CPPUNIT_ASSERT_EQUAL(2, a.spatialOrder());
+        CPPUNIT_ASSERT_EQUAL(2, a.temporalOrder());
+        CPPUNIT_ASSERT( a.limiterActive());
+        
+        a.setLimiter(tools::Scheme::NO_LIMITER);
+        CPPUNIT_ASSERT_EQUAL(2, a.spatialOrder());
+        CPPUNIT_ASSERT_EQUAL(2, a.temporalOrder());
+        CPPUNIT_ASSERT(!a.limiterActive());
+    }
     
-    {//test advect without a mask
+    {//test RK4 advect without a mask
         GridT::Ptr density0 = GridT::create(0.0f), density1;
         density0->fill(CoordBBox(Coord(0),Coord(6)), 1.0f);
         CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord( 3,3,3)), 1.0f);
@@ -1703,6 +1747,32 @@ TestTools::testDensityAdvect()
         
         AdvT a(velocity);
         a.setIntegrator(tools::Scheme::RK4);
+        for (int i=1; i<=240; ++i) {
+            density1 = a.advect<GridT, SamplerT>(*density0, 0.1f);
+            //std::ostringstream ostr;
+            //ostr << "densityAdvect" << "_" << i << ".vdb";
+            //std::cerr << "Writing " << ostr.str() << std::endl;
+            //openvdb::io::File file(ostr.str());
+            //openvdb::GridPtrVec grids;
+            //grids.push_back(density1);
+            //file.write(grids);
+            density0 = density1;
+        }
+        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(3,3,3)), 0.0f); 
+        CPPUNIT_ASSERT(density0->tree().getValue(Coord(24,3,3)) > 0.0f);
+        CPPUNIT_ASSERT(!density0->tree().isValueOn(Coord( 3,3,3)));
+        CPPUNIT_ASSERT( density0->tree().isValueOn(Coord(24,3,3)));
+    }
+    {//test MAC advect without a mask
+        GridT::Ptr density0 = GridT::create(0.0f), density1;
+        density0->fill(CoordBBox(Coord(0),Coord(6)), 1.0f);
+        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord( 3,3,3)), 1.0f);
+        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(24,3,3)), 0.0f);
+        CPPUNIT_ASSERT( density0->tree().isValueOn(Coord( 3,3,3)));
+        CPPUNIT_ASSERT(!density0->tree().isValueOn(Coord(24,3,3)));
+        
+        AdvT a(velocity);
+        a.setIntegrator(tools::Scheme::BFECC);
         for (int i=1; i<=240; ++i) {
             density1 = a.advect<GridT, SamplerT>(*density0, 0.1f);
             //std::ostringstream ostr;
@@ -1731,7 +1801,9 @@ TestTools::testDensityAdvect()
         mask->fill(CoordBBox(Coord(4,0,0),Coord(30,8,8)), true);
         
         AdvT a(velocity);
+        a.setGrainSize(0);
         a.setIntegrator(tools::Scheme::MAC);
+        //a.setIntegrator(tools::Scheme::BFECC);
         //a.setIntegrator(tools::Scheme::RK4);
         for (int i=1; i<=240; ++i) {
             density1 = a.advect<GridT, BoolGrid, SamplerT>(*density0, *mask, 0.1f);
@@ -1744,12 +1816,12 @@ TestTools::testDensityAdvect()
             //file.write(grids);
             density0 = density1;
         }
-        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(3,3,3)), 1.0f); 
+        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(3,3,3)), 1.0f);
         CPPUNIT_ASSERT(density0->tree().getValue(Coord(24,3,3)) > 0.0f);
         CPPUNIT_ASSERT(density0->tree().isValueOn(Coord( 3,3,3)));
         CPPUNIT_ASSERT(density0->tree().isValueOn(Coord(24,3,3)));
     }
-}//testDensityAdvect
+}//testVolumeAdvect
 
 ////////////////////////////////////////
 

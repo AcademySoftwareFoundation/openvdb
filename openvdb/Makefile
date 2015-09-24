@@ -340,7 +340,6 @@ INCLUDE_NAMES := \
     tools/Composite.h \
     tools/Dense.h \
     tools/DenseSparseTools.h \
-    tools/DensityAdvect.h \
     tools/Diagnostics.h \
     tools/Filter.h \
     tools/GridOperators.h \
@@ -371,6 +370,7 @@ INCLUDE_NAMES := \
     tools/ValueTransformer.h \
     tools/VectorTransformer.h \
     tools/VelocityFields.h \
+    tools/VolumeAdvect.h \
     tools/VolumeToMesh.h \
     tools/VolumeToSpheres.h \
     tree/InternalNode.h \

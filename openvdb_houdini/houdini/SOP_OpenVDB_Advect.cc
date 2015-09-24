@@ -28,7 +28,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 //
-/// @file SOP_OpenVDB_Advect_Level_Set.cc
+/// @file SOP_OpenVDB_Advect.cc
 ///
 /// @author FX R&D OpenVDB team
 ///
@@ -37,11 +37,16 @@
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
+
 #include <openvdb/tools/LevelSetAdvect.h>
+#include <openvdb/tools/Interpolation.h>
+#include <openvdb/tools/VolumeAdvect.h>
 
 #include <UT/UT_Interrupt.h>
 #include <GA/GA_PageIterator.h>
 #include <GU/GU_PrimPoly.h>
+#include <CH/CH_Manager.h>
+#include <PRM/PRM_Parm.h>
 
 #include <boost/smart_ptr/scoped_ptr.hpp>
 #include <boost/algorithm/string/case_conv.hpp>
@@ -60,24 +65,30 @@ namespace {
 
 struct AdvectionParms {
     AdvectionParms()
-        : mLSGroup(NULL)
+        : mGroup(NULL)
         , mAdvectSpatial(openvdb::math::UNKNOWN_BIAS)
         , mRenormSpatial(openvdb::math::UNKNOWN_BIAS)
         , mAdvectTemporal(openvdb::math::UNKNOWN_TIS)
         , mRenormTemporal(openvdb::math::UNKNOWN_TIS)
+        , mIntegrator(openvdb::tools::Scheme::SEMI)
+        , mLimiter(openvdb::tools::Scheme::NO_LIMITER)
         , mNormCount(1)
+        , mSubSteps(1)
         , mTimeStep(0.0)
         , mStaggered(false)
+        , mRespectClass(true)
     {
     }
 
-    const GA_PrimitiveGroup *mLSGroup;
-    hvdb::Grid::ConstPtr mVelocityGrid;
-    openvdb::math::BiasedGradientScheme mAdvectSpatial, mRenormSpatial;
-    openvdb::math::TemporalIntegrationScheme mAdvectTemporal, mRenormTemporal;
-    int mNormCount;
-    float mTimeStep;
-    bool mStaggered;
+    const GA_PrimitiveGroup *                   mGroup;
+    hvdb::Grid::ConstPtr                        mVelocityGrid;
+    openvdb::math::BiasedGradientScheme         mAdvectSpatial, mRenormSpatial;
+    openvdb::math::TemporalIntegrationScheme    mAdvectTemporal, mRenormTemporal;
+    openvdb::tools::Scheme::SemiLagrangian      mIntegrator;
+    openvdb::tools::Scheme::Limiter             mLimiter;
+    int                                         mNormCount, mSubSteps;
+    float                                       mTimeStep;
+    bool                                        mStaggered, mRespectClass;
 };
 
 
@@ -135,11 +146,11 @@ private:
 
 // SOP Declaration
 
-class SOP_OpenVDB_Advect_Level_Set: public hvdb::SOP_NodeVDB
+class SOP_OpenVDB_Advect: public hvdb::SOP_NodeVDB
 {
 public:
-    SOP_OpenVDB_Advect_Level_Set(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Advect_Level_Set() {}
+    SOP_OpenVDB_Advect(OP_Network*, const char* name, OP_Operator*);
+    virtual ~SOP_OpenVDB_Advect() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
@@ -148,10 +159,11 @@ public:
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
     virtual bool updateParmsFlags();
+    virtual void resolveObsoleteParms(PRM_ParmList*);
 
     OP_ERROR evalAdvectionParms(OP_Context&, AdvectionParms&);
 
-    template <class VelocityGridT>
+    template <typename VelocityGridT, bool StaggeredVelocity>
     bool processGrids(AdvectionParms&, hvdb::Interrupter&);
 };
 
@@ -169,8 +181,8 @@ newSopOperator(OP_OperatorTable* table)
     hutil::ParmList parms;
 
     // Level set grid
-    parms.add(hutil::ParmFactory(PRM_STRING, "lsGroup", "Group")
-        .setHelpText("Level set grid(s) to advect.")
+    parms.add(hutil::ParmFactory(PRM_STRING, "group", "Group")
+        .setHelpText("VDB grid(s) to advect.")
         .setChoiceList(&hutil::PrimGroupMenuInput1));
 
     // Velocity grid
@@ -178,11 +190,72 @@ newSopOperator(OP_OperatorTable* table)
         .setHelpText("Velocity grid")
         .setChoiceList(&hutil::PrimGroupMenuInput2));
 
-    parms.add(hutil::ParmFactory(PRM_HEADING, "advectionHeading", "Advection"));
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "respectclass", "Respect Grid Class")
+        .setDefault(PRMoneDefaults)
+        .setHelpText("If disabled, advect level sets using general "
+            "advection scheme."));
 
     // Advect: timestep
     parms.add(hutil::ParmFactory(PRM_FLT, "timestep", "Time Step")
         .setDefault(1, "1.0/$FPS"));
+
+    parms.add(hutil::ParmFactory(PRM_HEADING, "general", "General Advection"));
+
+
+    // SubSteps
+    parms.add(hutil::ParmFactory(PRM_INT_J, "substeps", "Sub-steps")
+         .setDefault(1)
+         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
+         .setHelpText("The number of substeps per integration step. The only "
+                      "reason to increase it above its default value of one "
+                      "is to reduce the memory-footprint from dilations "
+                      "- likely at the cost of more smoothing!"));
+
+
+    // Advection Scheme
+    {
+        std::vector<std::string> items;
+        items.push_back("semi");
+        items.push_back("Semi-Lagrangian");
+        items.push_back("mid");
+        items.push_back("Mid-Point");
+        items.push_back("rk3");
+        items.push_back("3rd order Runge-Kutta");
+        items.push_back("rk4");
+        items.push_back("4th order Runge-Kutta");
+        items.push_back("mac");
+        items.push_back("MacCormack");
+        items.push_back("bfecc");
+        items.push_back("BFECC");
+
+        parms.add(hutil::ParmFactory(PRM_STRING, "advection", "Advection Scheme")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setDefault(0, ::strdup("semi"))
+            .setHelpText("Set the numerical advection scheme."));
+    }
+
+    // Limiter Scheme
+    {
+        std::vector<std::string> items;
+        items.push_back("none");
+        items.push_back("No limiter");
+        items.push_back("clamp");
+        items.push_back("Clamp to extrema");
+        items.push_back("revert");
+        items.push_back("Revert to 1st order");
+
+        parms.add(hutil::ParmFactory(PRM_STRING, "limiter", "Limiter Scheme")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setDefault(2, ::strdup("revert"))
+            .setHelpText("Set the limiter scheme use to stabalize the 2nd "
+                         "order schemes MacCormack and BFECC."));
+    }
+
+
+
+
+
+    parms.add(hutil::ParmFactory(PRM_HEADING, "advectionHeading", "Level Set Advection"));
 
     // Advect: spatial menu
     {
@@ -215,9 +288,7 @@ newSopOperator(OP_OperatorTable* table)
             .setHelpText("Set the temporal integration scheme."));
     }
 
-    parms.add(hutil::ParmFactory(PRM_HEADING, "renormHeading", "Renormalization"));
-
-    parms.add(hutil::ParmFactory(PRM_INT_J, "normSteps", "Steps")
+    parms.add(hutil::ParmFactory(PRM_INT_J, "normSteps", "Renormalization Steps")
         .setDefault(PRMthreeDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
         .setHelpText("The number of normalizations performed after each CFL iteration."));
@@ -231,7 +302,7 @@ newSopOperator(OP_OperatorTable* table)
         items.push_back(biasedGradientSchemeToString(HJWENO5_BIAS));
         items.push_back(biasedGradientSchemeToMenuName(HJWENO5_BIAS));
 
-        parms.add(hutil::ParmFactory(PRM_STRING, "renormSpatial", "Spatial Scheme")
+        parms.add(hutil::ParmFactory(PRM_STRING, "renormSpatial", "Spatial Renormalization")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
             .setDefault(1, ::strdup(biasedGradientSchemeToString(HJWENO5_BIAS).c_str()))
             .setHelpText("Set the spatial finite difference scheme."));
@@ -246,7 +317,7 @@ newSopOperator(OP_OperatorTable* table)
             items.push_back(temporalIntegrationSchemeToMenuName(it)); // label
         }
 
-        parms.add(hutil::ParmFactory(PRM_STRING, "renormTemporal", "Temporal Scheme")
+        parms.add(hutil::ParmFactory(PRM_STRING, "renormTemporal", "Temporal Renormalization")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
             .setDefault(1, ::strdup(items[0].c_str()))
             .setHelpText("Set the temporal integration scheme."));
@@ -256,12 +327,17 @@ newSopOperator(OP_OperatorTable* table)
     hutil::ParmList obsoleteParms;
     obsoleteParms.add(hutil::ParmFactory(PRM_FLT, "beginTime", "Begin time"));
     obsoleteParms.add(hutil::ParmFactory(PRM_FLT, "endTime", "Time step"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "lsGroup", "Group"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "densityGroup", "Group"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_HEADING, "renormHeading", ""));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB Advect Level Set",
-        SOP_OpenVDB_Advect_Level_Set::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("OpenVDB Advect",
+        SOP_OpenVDB_Advect::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
-        .addInput("SDF VDBs to Advect")
+        .addAlias("OpenVDB Advect Level Set")
+        .addAlias("OpenVDB Advect Density")
+        .addInput("VDBs to Advect")
         .addInput("Velocity VDB");
 }
 
@@ -270,28 +346,69 @@ newSopOperator(OP_OperatorTable* table)
 
 
 OP_Node*
-SOP_OpenVDB_Advect_Level_Set::factory(OP_Network* net,
+SOP_OpenVDB_Advect::factory(OP_Network* net,
     const char* name, OP_Operator* op)
 {
-    return new SOP_OpenVDB_Advect_Level_Set(net, name, op);
+    return new SOP_OpenVDB_Advect(net, name, op);
 }
 
 
-SOP_OpenVDB_Advect_Level_Set::SOP_OpenVDB_Advect_Level_Set(OP_Network* net,
+SOP_OpenVDB_Advect::SOP_OpenVDB_Advect(OP_Network* net,
     const char* name, OP_Operator* op):
     hvdb::SOP_NodeVDB(net, name, op)
 {
 }
 
+////////////////////////////////////////
+
+
+void
+SOP_OpenVDB_Advect::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
+{
+    if (!obsoleteParms) return;
+
+    const fpreal time = CHgetEvalTime();
+    UT_String groupStr;
+
+    PRM_Parm* parm = obsoleteParms->getParmPtr("lsGroup");
+
+    if (parm && !parm->isFactoryDefault()) {
+        obsoleteParms->evalString(groupStr, "lsGroup", 0, time);
+        if (groupStr.length() > 0) {
+            setString(groupStr, CH_STRING_LITERAL, "group", 0, time);
+        }
+    }
+
+    parm = obsoleteParms->getParmPtr("densityGroup");
+
+    if (parm && !parm->isFactoryDefault()) {
+        obsoleteParms->evalString(groupStr, "densityGroup", 0, time);
+        if (groupStr.length() > 0) {
+            setString(groupStr, CH_STRING_LITERAL, "group", 0, time);
+        }
+    }
+
+    hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
+}
+
 
 ////////////////////////////////////////
 
-// Enable/disable or show/hide parameters in the UI.
 
 bool
-SOP_OpenVDB_Advect_Level_Set::updateParmsFlags()
+SOP_OpenVDB_Advect::updateParmsFlags()
 {
-    return false;
+    bool changed = false;
+
+    const bool respectClass = bool(evalInt("respectclass", 0, 0));
+
+    changed |= enableParm("advectSpatial", respectClass);
+    changed |= enableParm("advectTemporal", respectClass);
+    changed |= enableParm("normSteps", respectClass);
+    changed |= enableParm("renormSpatial", respectClass);
+    changed |= enableParm("renormTemporal", respectClass);
+
+    return changed;
 }
 
 
@@ -300,7 +417,7 @@ SOP_OpenVDB_Advect_Level_Set::updateParmsFlags()
 
 
 OP_ERROR
-SOP_OpenVDB_Advect_Level_Set::cookMySop(OP_Context& context)
+SOP_OpenVDB_Advect::cookMySop(OP_Context& context)
 {
     try {
         hutil::ScopedInputLock lock(*this, context);
@@ -313,7 +430,11 @@ SOP_OpenVDB_Advect_Level_Set::cookMySop(OP_Context& context)
 
         hvdb::Interrupter boss("Advecting level set");
 
-        processGrids<openvdb::Vec3SGrid>(parms, boss);
+        if (parms.mStaggered) {
+            processGrids<openvdb::Vec3SGrid, true>(parms, boss);
+        } else {
+            processGrids<openvdb::Vec3SGrid, false>(parms, boss);
+        }
 
         if (boss.wasInterrupted()) addWarning(SOP_MESSAGE, "Process was interrupted");
         boss.end();
@@ -330,13 +451,13 @@ SOP_OpenVDB_Advect_Level_Set::cookMySop(OP_Context& context)
 
 
 OP_ERROR
-SOP_OpenVDB_Advect_Level_Set::evalAdvectionParms(OP_Context& context, AdvectionParms& parms)
+SOP_OpenVDB_Advect::evalAdvectionParms(OP_Context& context, AdvectionParms& parms)
 {
     fpreal now = context.getTime();
     UT_String str;
 
-    evalString(str, "lsGroup", 0, now);
-    parms.mLSGroup = matchGroup(*gdp, str.toStdString());
+    evalString(str, "group", 0, now);
+    parms.mGroup = matchGroup(*gdp, str.toStdString());
 
     parms.mTimeStep = static_cast<float>(evalFloat("timestep", 0, now));
 
@@ -407,7 +528,45 @@ SOP_OpenVDB_Advect_Level_Set::evalAdvectionParms(OP_Context& context, AdvectionP
     }
 
     parms.mStaggered = parms.mVelocityGrid->getGridClass() == openvdb::GRID_STAGGERED;
+    parms.mRespectClass = bool(evalInt("respectclass", 0, now));
 
+    // General advection options
+
+    parms.mSubSteps = static_cast<int>(evalInt("substeps", 0, now));
+
+    evalString(str, "advection", 0, now);
+    if ( str == "semi" ) {
+        parms.mIntegrator = openvdb::tools::Scheme::SEMI;
+    } else if ( str == "mid" ) {
+        parms.mIntegrator = openvdb::tools::Scheme::MID;
+    } else if ( str == "rk3" ) {
+        parms.mIntegrator = openvdb::tools::Scheme::RK3;
+    } else if ( str == "rk4" ) {
+        parms.mIntegrator = openvdb::tools::Scheme::RK4;
+    } else if ( str == "mac" ) {
+        parms.mIntegrator = openvdb::tools::Scheme::MAC;
+    } else if ( str == "bfecc" ) {
+        parms.mIntegrator = openvdb::tools::Scheme::BFECC;
+    } else {
+        addError(SOP_MESSAGE, "Invalid advection scheme");
+        return UT_ERROR_ABORT;
+    }
+
+    evalString(str, "limiter", 0, now);
+    if ( str == "none" ) {
+        parms.mLimiter = openvdb::tools::Scheme::NO_LIMITER;
+        if (parms.mIntegrator == openvdb::tools::Scheme::MAC) {
+            addWarning(SOP_MESSAGE, "MacCormack is unstable without a limiter");
+        }
+    } else if ( str == "clamp" ) {
+        parms.mLimiter = openvdb::tools::Scheme::CLAMP;
+    } else if ( str == "revert" ) {
+        parms.mLimiter = openvdb::tools::Scheme::REVERT;
+    } else {
+        addError(SOP_MESSAGE, "Invalid limiter scheme");
+        return UT_ERROR_ABORT;
+    }
+    
     return error();
 }
 
@@ -415,67 +574,96 @@ SOP_OpenVDB_Advect_Level_Set::evalAdvectionParms(OP_Context& context, AdvectionP
 ////////////////////////////////////////
 
 
-template <class VelocityGridT>
+template <typename VelocityGridT, bool StaggeredVelocity>
 bool
-SOP_OpenVDB_Advect_Level_Set::processGrids(AdvectionParms& parms, hvdb::Interrupter& boss)
+SOP_OpenVDB_Advect::processGrids(AdvectionParms& parms, hvdb::Interrupter& boss)
 {
-    typename VelocityGridT::ConstPtr velGrid =
-        hvdb::Grid::constGrid<VelocityGridT>(parms.mVelocityGrid);
+    typedef openvdb::tools::VolumeAdvection<VelocityGridT, StaggeredVelocity, hvdb::Interrupter> VolumeAdvection;
+    typedef typename VelocityGridT::ConstPtr  VelocityGridCPtr;
+
+    VelocityGridCPtr velGrid = hvdb::Grid::constGrid<VelocityGridT>(parms.mVelocityGrid);
     if (!velGrid) return false;
 
-    AdvectOp<VelocityGridT> op(parms, *velGrid, boss);
+    AdvectOp<VelocityGridT> advectLevelSet(parms, *velGrid, boss);
 
-    std::vector<std::string> skippedGrids, nonLevelSetGrids, narrowBands;
+    VolumeAdvection advectVolume(*velGrid, &boss);
+    advectVolume.setIntegrator(parms.mIntegrator);
+    advectVolume.setLimiter(parms.mLimiter);
+    advectVolume.setSubSteps(parms.mSubSteps);
 
-    for (hvdb::VdbPrimIterator it(gdp, parms.mLSGroup); it; ++it) {
+
+    std::vector<std::string> skippedGrids, doubleGrids;
+
+    for (hvdb::VdbPrimIterator it(gdp, parms.mGroup); it; ++it) {
 
         if (boss.wasInterrupted()) break;
 
         GU_PrimVDB* vdbPrim = *it;
+        
+        if (parms.mRespectClass && vdbPrim->getGrid().getGridClass() == openvdb::GRID_LEVEL_SET) {
 
-        const openvdb::GridClass gridClass = vdbPrim->getGrid().getGridClass();
-        if (gridClass != openvdb::GRID_LEVEL_SET) {
-            nonLevelSetGrids.push_back(it.getPrimitiveNameOrIndex().toStdString());
-            continue;
+            if (vdbPrim->getStorageType() == UT_VDB_FLOAT) {
+                vdbPrim->makeGridUnique();
+                openvdb::FloatGrid& grid = UTvdbGridCast<openvdb::FloatGrid>(vdbPrim->getGrid());
+                advectLevelSet(grid);
+
+            } /*else if (vdbPrim->getStorageType() == UT_VDB_DOUBLE) {
+                vdbPrim->makeGridUnique();
+                openvdb::DoubleGrid& grid = UTvdbGridCast<openvdb::DoubleGrid>(vdbPrim->getGrid());
+                advectLevelSet(grid);
+
+            }*/ else {
+                skippedGrids.push_back(it.getPrimitiveNameOrIndex().toStdString());
+            }
+
+
+        } else { 
+
+            if (vdbPrim->getStorageType() == UT_VDB_FLOAT) {
+
+                const openvdb::FloatGrid& inGrid = UTvdbGridCast<openvdb::FloatGrid>(vdbPrim->getConstGrid());
+
+                openvdb::FloatGrid::Ptr outGrid = advectVolume.template advect<openvdb::FloatGrid,
+                    openvdb::tools::Sampler<1, false> >(inGrid, parms.mTimeStep);
+
+                hvdb::replaceVdbPrimitive(*gdp, outGrid, *vdbPrim);
+ 
+            } else if (vdbPrim->getStorageType() == UT_VDB_DOUBLE) {
+
+                const openvdb::DoubleGrid& inGrid = UTvdbGridCast<openvdb::DoubleGrid>(vdbPrim->getConstGrid());
+
+                openvdb::DoubleGrid::Ptr outGrid = advectVolume.template advect<openvdb::DoubleGrid,
+                    openvdb::tools::Sampler<1, false> >(inGrid, parms.mTimeStep);
+
+                hvdb::replaceVdbPrimitive(*gdp, outGrid, *vdbPrim);
+ 
+            } else if (vdbPrim->getStorageType() == UT_VDB_VEC3F) {
+
+                const openvdb::Vec3SGrid& inGrid = UTvdbGridCast<openvdb::Vec3SGrid>(vdbPrim->getConstGrid());
+
+                openvdb::Vec3SGrid::Ptr outGrid;
+
+                if (inGrid.getGridClass() == openvdb::GRID_STAGGERED) {
+                    outGrid = advectVolume.template advect<openvdb::Vec3SGrid,
+                        openvdb::tools::Sampler<1, true> >(inGrid, parms.mTimeStep);
+                } else {
+                    outGrid = advectVolume.template advect<openvdb::Vec3SGrid,
+                        openvdb::tools::Sampler<1, false> >(inGrid, parms.mTimeStep);
+                }
+
+                hvdb::replaceVdbPrimitive(*gdp, outGrid, *vdbPrim);
+
+            } else {
+                skippedGrids.push_back(it.getPrimitiveNameOrIndex().toStdString());
+            }
         }
 
-        if (vdbPrim->getStorageType() == UT_VDB_FLOAT) {
-            vdbPrim->makeGridUnique();
-            openvdb::FloatGrid& grid = UTvdbGridCast<openvdb::FloatGrid>(vdbPrim->getGrid());
-            if ( grid.background() < float(openvdb::LEVEL_SET_HALF_WIDTH * grid.voxelSize()[0]) ) {
-                narrowBands.push_back(it.getPrimitiveNameOrIndex().toStdString());
-            }
-            op(grid);
-#if 0
-        } else if (vdbPrim->getStorageType() == UT_VDB_FLOAT) {
-            vdbPrim->makeGridUnique();
-            openvdb::DoubleGrid& grid =
-                UTvdbGridCast<openvdb::DoubleGrid>(vdbPrim->getGrid());
-            if (grid.background() < float(openvdb::LEVEL_SET_HALF_WIDTH * grid.voxelSize()[0])) {
-                narrowBands.push_back(it.getPrimitiveNameOrIndex().toStdString());
-            }
-            op(grid);
-#endif
-        } else {
-            skippedGrids.push_back(it.getPrimitiveNameOrIndex().toStdString());
-        }
+
     }
 
     if (!skippedGrids.empty()) {
         std::string s = "The following non-floating-point grids were skipped: "
             + boost::algorithm::join(skippedGrids, ", ");
-        addWarning(SOP_MESSAGE, s.c_str());
-    }
-
-    if (!nonLevelSetGrids.empty()) {
-        std::string s = "The following non-level-set grids were skipped: "
-            + boost::algorithm::join(nonLevelSetGrids, ", ");
-        addWarning(SOP_MESSAGE, s.c_str());
-    }
-
-    if (!narrowBands.empty()) {
-        std::string s = "The following grids have a narrow band width that is"
-            " less than 3 voxel units: " + boost::algorithm::join(narrowBands, ", ");
         addWarning(SOP_MESSAGE, s.c_str());
     }
 
