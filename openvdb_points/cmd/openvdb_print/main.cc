@@ -145,7 +145,7 @@ attributesAsString(const PointDataTree::LeafCIter& iter)
         const std::string& name = it->first;
         const size_t pos = it->second;
 
-        assert(pos != INVALID_POS);
+        assert(pos != AttributeSet::INVALID_POS);
 
         const openvdb::NamePair& type = descriptor.type(pos);
         const openvdb::Name& valueType = type.first;
