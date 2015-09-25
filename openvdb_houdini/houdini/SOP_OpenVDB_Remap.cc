@@ -443,9 +443,57 @@ struct SOP_OpenVDB_Remap: public hvdb::SOP_NodeVDB {
     SOP_OpenVDB_Remap(OP_Network*, const char* name, OP_Operator*);
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
+    int sortInputRange();
+    int sortOutputRange();
+
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
 };
+
+int
+inputRangeCB(void* data, int /*idx*/, float /*time*/, const PRM_Template*)
+{
+   SOP_OpenVDB_Remap* sop = static_cast<SOP_OpenVDB_Remap*>(data);
+   if (sop == NULL) return 0;
+   return sop->sortInputRange();
+}
+
+int
+outputRangeCB(void* data, int /*idx*/, float /*time*/, const PRM_Template*)
+{
+   SOP_OpenVDB_Remap* sop = static_cast<SOP_OpenVDB_Remap*>(data);
+   if (sop == NULL) return 0;
+   return sop->sortOutputRange();
+}
+
+
+int
+SOP_OpenVDB_Remap::sortInputRange()
+{
+    const fpreal inMin = evalFloat("inrange", 0, 0);
+    const fpreal inMax = evalFloat("inrange", 1, 0);
+
+    if (inMin > inMax) {
+        setFloat("inrange", 0, 0, inMax);
+        setFloat("inrange", 1, 0, inMin);
+    }
+
+    return 1;
+}
+
+int
+SOP_OpenVDB_Remap::sortOutputRange()
+{
+    const fpreal outMin = evalFloat("outrange", 0, 0);
+    const fpreal outMax = evalFloat("outrange", 1, 0);
+
+    if (outMin > outMax) {
+        setFloat("outrange", 0, 0, outMax);
+        setFloat("outrange", 1, 0, outMin);
+    }
+
+    return 1;
+}
 
 void
 newSopOperator(OP_OperatorTable* table)
@@ -492,12 +540,14 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_FLT_J, "inrange", "Input Range")
         .setDefault(defaultRange)
         .setVectorSize(2)
-        .setHelpText("Input min/max value range"));
+        .setHelpText("Input min/max value range")
+        .setCallbackFunc(&inputRangeCB));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "outrange", "Output Range")
         .setDefault(defaultRange)
         .setVectorSize(2)
-        .setHelpText("Output min/max value range"));
+        .setHelpText("Output min/max value range")
+        .setCallbackFunc(&outputRangeCB));
 
     {
         std::map<std::string, std::string> rampSpare;
@@ -509,7 +559,9 @@ newSopOperator(OP_OperatorTable* table)
 
         parms.add(hutil::ParmFactory(PRM_MULTITYPE_RAMP_FLT, "function", "Transfer Function")
             .setDefault(PRMtwoDefaults)
-            .setSpareData(rampSpare));
+            .setSpareData(rampSpare)
+            .setHelpText("X Axis: 0 = input range minimum, 1 = input range maximum.\n"
+                "Y Axis: 0 = output range minimum, 1 = output range maximum.\n"));
     }
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "deactivate", "Deactivate Background Voxels")
