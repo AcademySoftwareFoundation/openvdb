@@ -460,7 +460,6 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
         if (mParent->interrupt()) return;
         assert( mParent->mIntegrator == Scheme::MAC );
         AccT acc = mInGrid->getAccessor();
-        const ValueT backg = mInGrid->background();
         for (typename LeafRangeT::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
             ValueT* out0 = leafIter.buffer( 0 ).data();// forward
             const ValueT* out1 = leafIter.buffer( 1 ).data();// backward
@@ -509,7 +508,6 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
         if (mParent->interrupt()) return;
         const math::Transform& xform = mInGrid->transform();
         AccT acc = grid.getAccessor();
-        const ValueT backg = mInGrid->background();
         for (typename LeafRangeT::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
             ValueT* phi = leafIter.buffer( n ).data();
             for (VoxelIterT voxelIter = leafIter->beginValueOn(); voxelIter; ++voxelIter) {

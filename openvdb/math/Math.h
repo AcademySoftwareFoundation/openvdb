@@ -245,7 +245,7 @@ template<typename Type>
 inline Type
 Clamp(Type x, Type min, Type max)
 {
-    assert(min<max);
+    assert( !(min>max) );
     return x > min ? x < max ? x : max : min;
 }
 

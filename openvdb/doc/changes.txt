@@ -162,9 +162,11 @@ Houdini:
 - Added <TT>openvdb_houdini::SOP_NodeVDB::duplicateSourceStealable()</TT>,
   which in conjunction with the Unload flag can help to minimize deep copying
   of grids between nodes.
-  The Advect, Convert, Fill, Filter, Filter Level Set, Fracture,
-  Noise, Prune and Transform SOPs have all been updated to enable this
-  optimization.
+  The Advect, Convert, Fill, Filter, Fracture, Noise, Offset Level Set, Prune,
+  Remap, Remove Divergence, Renormalize Level Set, Resize Narrow Band,
+  Smooth Level Set and Transform SOPs have all been updated to enable this
+  optimization, meaning that they can potentially steal data from upstream
+  nodes that have the unload flag enabled instead of copying it.
   <I>[Contributed by Double&nbsp;Negative]</I>
 - Redesigned the UI of the Visualize SOP and added toggles to draw with
   or without color, to use the grid name as the attribute name for points
