@@ -879,6 +879,7 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
 
     openvdb::tools::MeshToVoxelEdgeData edgeData;
 
+# if 0
     // Check for reference VDB
     {
         const GA_PrimitiveGroup *refGroup =
@@ -891,6 +892,7 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
             }
         }
     }
+#endif
 
     // Check for reference mesh
     boost::shared_ptr<GU_Detail> geoPtr;

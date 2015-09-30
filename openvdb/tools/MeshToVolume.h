@@ -1827,7 +1827,6 @@ combineData(DistTreeType& lhsDist, IndexTreeType& lhsIdx,
     tasks.wait();
 
     // Combine overlapping leaf nodes
-
     if (!overlappingDistNodes.empty() && !overlappingIdxNodes.empty()) {
         tbb::parallel_for(tbb::blocked_range<size_t>(0, overlappingDistNodes.size()),
             CombineLeafNodes<DistTreeType>(lhsDist, lhsIdx, &overlappingDistNodes[0], &overlappingIdxNodes[0]));
@@ -3222,7 +3221,9 @@ doMeshConversion(
     float inBandWidth,
     bool unsignedDistanceField = false)
 {
-    if (points.empty()) typename GridType::Ptr();
+    if (points.empty()) {
+        return typename GridType::Ptr(new GridType(typename GridType::ValueType(exBandWidth)));
+    }
 
     const size_t numPoints = points.size();
     boost::scoped_array<Vec3s> indexSpacePoints(new Vec3s[numPoints]);
