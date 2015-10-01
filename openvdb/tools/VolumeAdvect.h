@@ -161,10 +161,10 @@ public:
     /// @brief Retrun the limiter (see details above)
     Scheme::Limiter getLimiter() const { return mLimiter; }
 
-    /// @brief Return @c true if a limiter will be applied based in
+    /// @brief Return @c true if a limiter will be applied based on
     /// the current settings.
-    bool limiterActive() const { return this->spatialOrder()>1 &&
-                                        mLimiter != Scheme::NO_LIMITER; }
+    bool isLimiterOn() const { return this->spatialOrder()>1 &&
+                                      mLimiter != Scheme::NO_LIMITER; }
     
     /// @return the grain-size used for multi-threading
     /// @note A grainsize of 0 implies serial execution
@@ -521,7 +521,7 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
     void limiter(const LeafRangeT& range, RealT dt) const
     {
         if (mParent->interrupt()) return;
-        const bool doLimiter = mParent->limiterActive();
+        const bool doLimiter = mParent->isLimiterOn();
         const bool doClamp = mParent->mLimiter == Scheme::CLAMP;
         ValueT data[2][2][2], vMin, vMax;
         const math::Transform& xform = mInGrid->transform();
@@ -558,7 +558,7 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
     // Public member data of the private Advect class
     typename boost::function<void (Advect*, const LeafRangeT&)> mTask;
     const VolumeGridT*        mInGrid;
-    const VelocityIntegratorT mVelocityInt;//very lightweight!
+    const VelocityIntegratorT mVelocityInt;// lightweight!
     const VolumeAdvection*    mParent;
 };// end of private member class Advect    
     

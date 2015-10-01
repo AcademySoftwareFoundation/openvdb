@@ -1699,42 +1699,42 @@ TestTools::testVolumeAdvect()
         // Default should be SEMI
         CPPUNIT_ASSERT_EQUAL(1, a.spatialOrder());
         CPPUNIT_ASSERT_EQUAL(1, a.temporalOrder());
-        CPPUNIT_ASSERT(!a.limiterActive());
+        CPPUNIT_ASSERT(!a.isLimiterOn());
 
         a.setIntegrator(tools::Scheme::SEMI);
         CPPUNIT_ASSERT_EQUAL(1, a.spatialOrder());
         CPPUNIT_ASSERT_EQUAL(1, a.temporalOrder());
-        CPPUNIT_ASSERT(!a.limiterActive());
+        CPPUNIT_ASSERT(!a.isLimiterOn());
 
         a.setIntegrator(tools::Scheme::MID);
         CPPUNIT_ASSERT_EQUAL(1, a.spatialOrder());
         CPPUNIT_ASSERT_EQUAL(2, a.temporalOrder());
-        CPPUNIT_ASSERT(!a.limiterActive());
+        CPPUNIT_ASSERT(!a.isLimiterOn());
 
         a.setIntegrator(tools::Scheme::RK3);
         CPPUNIT_ASSERT_EQUAL(1, a.spatialOrder());
         CPPUNIT_ASSERT_EQUAL(3, a.temporalOrder());
-        CPPUNIT_ASSERT(!a.limiterActive());
+        CPPUNIT_ASSERT(!a.isLimiterOn());
             
         a.setIntegrator(tools::Scheme::RK4);
         CPPUNIT_ASSERT_EQUAL(1, a.spatialOrder());
         CPPUNIT_ASSERT_EQUAL(4, a.temporalOrder());
-        CPPUNIT_ASSERT(!a.limiterActive());
+        CPPUNIT_ASSERT(!a.isLimiterOn());
 
         a.setIntegrator(tools::Scheme::MAC);
         CPPUNIT_ASSERT_EQUAL(2, a.spatialOrder());
         CPPUNIT_ASSERT_EQUAL(2, a.temporalOrder());
-        CPPUNIT_ASSERT( a.limiterActive());
+        CPPUNIT_ASSERT( a.isLimiterOn());
 
         a.setIntegrator(tools::Scheme::BFECC);
         CPPUNIT_ASSERT_EQUAL(2, a.spatialOrder());
         CPPUNIT_ASSERT_EQUAL(2, a.temporalOrder());
-        CPPUNIT_ASSERT( a.limiterActive());
+        CPPUNIT_ASSERT( a.isLimiterOn());
         
         a.setLimiter(tools::Scheme::NO_LIMITER);
         CPPUNIT_ASSERT_EQUAL(2, a.spatialOrder());
         CPPUNIT_ASSERT_EQUAL(2, a.temporalOrder());
-        CPPUNIT_ASSERT(!a.limiterActive());
+        CPPUNIT_ASSERT(!a.isLimiterOn());
     }
     
     {//test RK4 advect without a mask
