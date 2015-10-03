@@ -11,6 +11,7 @@ The primary intended audience for this library is simulation and rendering for V
 
 An overview of this library was presented at Siggraph 2015 for which the slides can be found online at [OpenVDB Particle Storage](http://www.openvdb.org/download/openvdb_particle_storage_2015.pdf).
 
+Please use the [OpenVDB Forum](http://www.openvdb.org/forum/) for discussion related to this project or email the developers directly at openvdbpoints@dneg.com.
 
 ### Beta Release
 
