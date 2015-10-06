@@ -238,6 +238,8 @@ TestPointDataLeaf::testOffsets()
 
         CPPUNIT_ASSERT(leafNode->getValue(10) == 10);
         CPPUNIT_ASSERT(leafNode->isDense());
+
+        delete leafNode;
     }
 
     // offsets for one point per voxel (active = false)
@@ -251,6 +253,8 @@ TestPointDataLeaf::testOffsets()
 
         CPPUNIT_ASSERT(leafNode->getValue(10) == 10);
         CPPUNIT_ASSERT(leafNode->isEmpty());
+
+        delete leafNode;
     }
 }
 

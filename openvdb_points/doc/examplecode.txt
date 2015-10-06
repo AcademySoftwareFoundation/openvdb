@@ -166,7 +166,7 @@ int main()
     std::cout << "Testing random access:" << std::endl;
 
     // Retrieve a read-only attribute handle for position
-    AttributeHandle<openvdb::Vec3f>* attributeHandle = leaf->attributeHandle<openvdb::Vec3f>("P");
+    AttributeHandle<openvdb::Vec3f>::Ptr attributeHandle = leaf->attributeHandle<openvdb::Vec3f>("P");
 
     // Create a co-ordinate to perform the look-up and voxel position in index space
     const openvdb::Coord ijk(4, 0, 0);
@@ -197,7 +197,7 @@ int main()
 
     // Now iterate over all points within all leaves
     for (PointDataTree::LeafCIter iter = grid->tree().cbeginLeaf(); iter; ++iter) {
-        AttributeHandle<openvdb::Vec3f>* attributeHandle = iter->attributeHandle<openvdb::Vec3f>("P");
+        AttributeHandle<openvdb::Vec3f>::Ptr attributeHandle = iter->attributeHandle<openvdb::Vec3f>("P");
 
         for (size_t i = 0; i < totalPoints; i++) {
             /*point position = */ attributeHandle->get(i);

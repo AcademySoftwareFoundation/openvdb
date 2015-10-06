@@ -425,7 +425,7 @@ convertPointDataGridPosition(const PointDataGrid& grid, GU_Detail& detail)
 #endif
 
     const Transform& xform = grid.transform();
-    AttributeHandle<Vec3f>* handle = NULL;
+    AttributeHandle<Vec3f>::Ptr handle;
 
     GA_Offset offset = 0;
     for (; iter; ++iter) {
@@ -501,7 +501,7 @@ convertPointDataGridAttribute(const PointDataTree& tree,
     GA_Offset offset = 0;
     for (PointDataTree::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
 
-        AttributeHandle<Type>* handle = iter->attributeHandle<Type>(arrayIndex);
+        typename AttributeHandle<Type>::Ptr handle = iter->attributeHandle<Type>(arrayIndex);
 
         for (PointDataTree::LeafNodeType::ValueOnCIter vIt = iter->cbeginValueOn(); vIt; ++vIt) {
 

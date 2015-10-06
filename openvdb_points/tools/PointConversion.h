@@ -210,7 +210,7 @@ struct PopulatePositionAttributeOp {
 
             if (!pointIndexLeaf)    continue;
 
-            AttributeWriteHandle<ValueType>* attributeWriteHandle =
+            typename AttributeWriteHandle<ValueType>::Ptr attributeWriteHandle =
                 leaf->template attributeWriteHandle<ValueType>("P");
 
             Index64 index = 0;
@@ -273,7 +273,7 @@ struct PopulateAttributeOp {
 
             if (!pointIndexLeaf)    continue;
 
-            AttributeWriteHandle<ValueType>* attributeWriteHandle =
+            typename AttributeWriteHandle<ValueType>::Ptr attributeWriteHandle =
                 leaf->template attributeWriteHandle<ValueType>(mAttributeName);
 
             Index64 index = 0;

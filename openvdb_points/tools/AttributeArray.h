@@ -410,11 +410,16 @@ private:
 template <typename T>
 class AttributeHandle
 {
+public:
+    typedef boost::shared_ptr<AttributeHandle<T> > Ptr;
+
 protected:
     typedef T (*GetterPtr)(const AttributeArray* array, const Index n);
     typedef void (*SetterPtr)(AttributeArray* array, const Index n, const T& value);
 
 public:
+    static Ptr create(const AttributeArray& array, const bool preserveCompression = true);
+
     AttributeHandle(const AttributeArray& array, const bool preserveCompression = true);
 
     T get(Index n) const;
@@ -436,6 +441,10 @@ template <typename T>
 class AttributeWriteHandle : public AttributeHandle<T>
 {
 public:
+    typedef boost::shared_ptr<AttributeWriteHandle<T> > Ptr;
+
+    static Ptr create(AttributeArray& array);
+
     AttributeWriteHandle(AttributeArray& array);
 
     void set(Index n, const T& value);
@@ -1001,6 +1010,13 @@ TypedAttributeArray<ValueType_, Codec_>::isEqual(const AttributeArray& other) co
 // AttributeHandle implementation
 
 template <typename T>
+typename AttributeHandle<T>::Ptr
+AttributeHandle<T>::create(const AttributeArray& array, const bool preserveCompression)
+{
+    return typename AttributeHandle<T>::Ptr(new AttributeHandle<T>(array, preserveCompression));
+}
+
+template <typename T>
 AttributeHandle<T>::AttributeHandle(const AttributeArray& array, const bool preserveCompression)
     : mArray(&array)
 {
@@ -1038,6 +1054,13 @@ T AttributeHandle<T>::get(Index n) const
 ////////////////////////////////////////
 
 // AttributeWriteHandle implementation
+
+template <typename T>
+typename AttributeWriteHandle<T>::Ptr
+AttributeWriteHandle<T>::create(AttributeArray& array)
+{
+    return typename AttributeWriteHandle<T>::Ptr(new AttributeWriteHandle<T>(array));
+}
 
 template <typename T>
 AttributeWriteHandle<T>::AttributeWriteHandle(AttributeArray& array)
