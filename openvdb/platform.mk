@@ -110,20 +110,35 @@ ifdef WINDOWS_NT
 			   -DWIN32_LEAN_AND_MEAN \
 			   -D_WIN32_WINNT=0x0501 \
 			    $(NULL)
+
+ifeq (full,$(strip $(debug)))
+ifeq (yes,$(strip $(shared)))
+    RUNTIME          = -MDd
+else
+    RUNTIME          = -MTd
+endif
+else
+ifeq (yes,$(strip $(shared)))
+    RUNTIME          = -MD
+else
+    RUNTIME          = -MT
+endif
+endif
+
     DEBUG_FLAGS		+= -Od -Z7
 ifeq (full,$(strip $(debug)))
-    DEBUG_FLAGS		+= -MDd -RTC1
-else
-    DEBUG_FLAGS		+= -MD
+    DEBUG_FLAGS		+= -RTC1
 endif
-    OPTIMIZE_FLAGS	+= -MD -O2 -DNDEBUG
+
+    OPTIMIZE_FLAGS	+= -O2 -DNDEBUG
     CXX			:= $(TOOL_BINPATH)/cl -nologo
     CXXFLAGS		+= -bigobj -EHsc -Zc:forScope -TP \
-                           $(WARNINGS) \
-			   $(DEFINES) \
-			   -I "$(TOOL_INCLUDEPATH)" \
-			   -I "$(TOOL_SDKINCLUDEPATH)" \
-			   $(NULL)
+                        $(RUNTIME) \
+                        $(WARNINGS) \
+        			   $(DEFINES) \
+        			   -I "$(TOOL_INCLUDEPATH)" \
+        			   -I "$(TOOL_SDKINCLUDEPATH)" \
+        			   $(NULL)
     CXXISYSTEM		:= -I
     CXXOUTPUT		:= -Fo
     LINK		:= $(TOOL_BINPATH)/link -nologo
@@ -192,6 +207,9 @@ else
 			   -fvisibility=hidden -fvisibility-inlines-hidden \
 			   $(CXX_WARNFLAGS) \
 			   $(NULL)
+ifdef MBSD
+    CXXFLAGS		+= -I/usr/include
+endif
     CXXISYSTEM		:= -isystem
     CXXOUTPUT		:= -o
 ifdef MBSD
@@ -261,14 +279,19 @@ ifdef MBSD
     else ifeq ($(DARWIN_OS_MAJOR_VER),14)
 	# Yosemite
 	MACOSX_SDK := MacOSX10.10
+    else ifeq ($(DARWIN_OS_MAJOR_VER),15)
+	# El Capitan
+	MACOSX_SDK := MacOSX10.11
     else
         $(error Unknown MacOSX Darwin major version $(DARWIN_OS_MAJOR_VER))
     endif
 
-    MACOSX_SDK_PATH := /Developer/SDKs/$(MACOSX_SDK).sdk
-    ifeq ($(wildcard $(MACOSX_SDK_PATH)),)
-        # The SDK moved to /Applications/Xcode.app as of XCode 4.3.1.
-        MACOSX_SDK_PATH := /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/$(MACOSX_SDK).sdk
+    ifndef MACOSX_SDK_PATH
+	MACOSX_SDK_PATH := /Developer/SDKs/$(MACOSX_SDK).sdk
+	ifeq ($(wildcard $(MACOSX_SDK_PATH)),)
+	    # The SDK moved to /Applications/Xcode.app as of XCode 4.3.1.
+	    MACOSX_SDK_PATH := /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/$(MACOSX_SDK).sdk
+	endif
     endif
 
     # If MBSD_TARGET_VERSION is set, then we use it as the mininum target SDK
