@@ -40,7 +40,7 @@ We are very interested in hearing about the needs of software vendors and of oth
 
 @subsection sClarisseRaytrace Native Raytracing (Clarisse)
 
-We are in the final stages of re-working our Clarisse plug-in for public release and intend to include this in the first public release. This will introduce native OpenVDB Points ray-tracing to Isotropix's Clarisse.
+We are in the final stages of re-working our Clarisse plug-in for public release. This will introduce native OpenVDB Points ray-tracing to Isotropix's Clarisse.
 
 @subsection sClarisseScatter Geometry Instancing (Clarisse)
 

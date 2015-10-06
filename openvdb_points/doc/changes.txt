@@ -4,7 +4,7 @@
 
 @htmlonly <a name="v0_1_0_changes"></a>@endhtmlonly
 @par
-<B>Version 0.1.0</B> - <I>In Development</I> (initial public beta)
+<B>Version 0.1.0</B> - October 1, 2015
 
 @par
 Core API:
