@@ -258,6 +258,13 @@ public:
         : BaseLeaf(other, zeroVal<T>(), TopologyCopy())
         , mAttributeSet(new AttributeSet) { }
 
+    // Copy-construct from a LeafNode with the same configuration but a different ValueType.
+    // Used for topology copies - explicitly sets the on and off value (background) to zeroVal
+    template <typename ValueType>
+    PointDataLeafNode(const tree::LeafNode<ValueType, Log2Dim>& other, const T& offValue, const T& onValue, TopologyCopy)
+        : BaseLeaf(other, zeroVal<T>(), zeroVal<T>(), TopologyCopy())
+        , mAttributeSet(new AttributeSet) { }
+
 #ifndef OPENVDB_2_ABI_COMPATIBLE
     PointDataLeafNode(PartialCreate, const Coord& coords,
         const T& value = zeroVal<T>(), bool active = false)
