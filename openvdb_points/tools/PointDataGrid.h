@@ -321,6 +321,14 @@ public:
         mAttributeSet->appendAttribute(attribute, expected, replacement);
     }
 
+    /// @brief Remove attributes located at the indices given in @a indices. Creates a new
+    /// descriptor for the underlying attribute set.
+    /// @param indices    The indices of the attributes that should be removed
+    void dropAttributes(const std::vector<size_t>& indices)
+    {
+        mAttributeSet->dropAttributes(indices);
+    }
+
     template <typename AttributeType>
     typename AttributeWriteHandle<AttributeType>::Ptr attributeWriteHandle(const size_t pos)
     {
