@@ -328,12 +328,13 @@ public:
         mAttributeSet->appendAttribute(attribute, expected, replacement);
     }
 
-    /// @brief Remove attributes located at the indices given in @a indices. Creates a new
-    /// descriptor for the underlying attribute set.
-    /// @param indices    The indices of the attributes that should be removed
-    void dropAttributes(const std::vector<size_t>& indices)
+    /// @brief Drop attributes with @a pos indices.
+    /// Requires the current descriptor to match @a expacted
+    /// On drop, current descriptor is replaced with @a replacement
+    void dropAttributes(const std::vector<size_t>& pos,
+                        const Descriptor& expected, Descriptor::Ptr& replacement)
     {
-        mAttributeSet->dropAttributes(indices);
+        mAttributeSet->dropAttributes(pos, expected, replacement);
     }
 
     template <typename AttributeType>
