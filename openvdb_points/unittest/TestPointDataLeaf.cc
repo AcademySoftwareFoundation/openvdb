@@ -524,26 +524,26 @@ TestPointDataLeaf::testAttributes()
     CPPUNIT_ASSERT_EQUAL(array0->size(), size_t(1));
     CPPUNIT_ASSERT_EQUAL(array1->size(), size_t(1));
 
-    // test leaf returns expected result for hasAttribute()
+    // test leaf returns expected result for hasAttribute() and hasTypedAttribute<T>()
 
     CPPUNIT_ASSERT(leaf.hasAttribute(/*pos*/0));
-    CPPUNIT_ASSERT(leaf.hasAttribute<AttributeS>(/*pos=*/0));
-    CPPUNIT_ASSERT(!leaf.hasAttribute<AttributeI>(/*pos=*/0));
+    CPPUNIT_ASSERT(leaf.hasTypedAttribute<AttributeS>(/*pos=*/0));
+    CPPUNIT_ASSERT(!leaf.hasTypedAttribute<AttributeI>(/*pos=*/0));
     CPPUNIT_ASSERT(leaf.hasAttribute("density"));
-    CPPUNIT_ASSERT(leaf.hasAttribute<AttributeS>("density"));
-    CPPUNIT_ASSERT(!leaf.hasAttribute<AttributeI>("density"));
+    CPPUNIT_ASSERT(leaf.hasTypedAttribute<AttributeS>("density"));
+    CPPUNIT_ASSERT(!leaf.hasTypedAttribute<AttributeI>("density"));
 
     CPPUNIT_ASSERT(leaf.hasAttribute(/*pos*/1));
-    CPPUNIT_ASSERT(leaf.hasAttribute<AttributeI>(/*pos=*/1));
-    CPPUNIT_ASSERT(!leaf.hasAttribute<AttributeS>(/*pos=*/1));
+    CPPUNIT_ASSERT(leaf.hasTypedAttribute<AttributeI>(/*pos=*/1));
+    CPPUNIT_ASSERT(!leaf.hasTypedAttribute<AttributeS>(/*pos=*/1));
     CPPUNIT_ASSERT(leaf.hasAttribute("id"));
-    CPPUNIT_ASSERT(leaf.hasAttribute<AttributeI>("id"));
-    CPPUNIT_ASSERT(!leaf.hasAttribute<AttributeS>("id"));
+    CPPUNIT_ASSERT(leaf.hasTypedAttribute<AttributeI>("id"));
+    CPPUNIT_ASSERT(!leaf.hasTypedAttribute<AttributeS>("id"));
 
     CPPUNIT_ASSERT(!leaf.hasAttribute(/*pos*/2));
-    CPPUNIT_ASSERT(!leaf.hasAttribute<AttributeS>(/*pos=*/2));
+    CPPUNIT_ASSERT(!leaf.hasTypedAttribute<AttributeS>(/*pos=*/2));
     CPPUNIT_ASSERT(!leaf.hasAttribute("test"));
-    CPPUNIT_ASSERT(!leaf.hasAttribute<AttributeS>("test"));
+    CPPUNIT_ASSERT(!leaf.hasTypedAttribute<AttributeS>("test"));
 
     // test leaf can be successfully cast to TypedAttributeArray and check types
 
