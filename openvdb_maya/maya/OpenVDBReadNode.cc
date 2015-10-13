@@ -58,6 +58,7 @@ struct OpenVDBReadNode : public MPxNode
     static void* creator();
     static MStatus initialize();
     static MObject aVdbFilePath;
+    static MObject aCurrentFrame;
     static MObject aVdbOutput;
     static MTypeId id;
 };
@@ -65,6 +66,7 @@ struct OpenVDBReadNode : public MPxNode
 
 MTypeId OpenVDBReadNode::id(0x00108A51);
 MObject OpenVDBReadNode::aVdbFilePath;
+MObject OpenVDBReadNode::aCurrentFrame;
 MObject OpenVDBReadNode::aVdbOutput;
 
 
@@ -100,6 +102,16 @@ MStatus OpenVDBReadNode::initialize()
     stat = addAttribute(aVdbFilePath);
     if (stat != MS::kSuccess) return stat;
 
+    // frame number parameter
+    MFnNumericAttribute nAttr;
+    aCurrentFrame = nAttr.create("currentFrame", "frame", MFnNumericData::kInt);
+    nAttr.setDefault(0);
+    if (stat != MS::kSuccess) return stat;
+
+    nAttr.setConnectable(true);
+    stat = addAttribute(aCurrentFrame);
+    if (stat != MS::kSuccess) return stat;
+
     // Setup the output attributes
 
     aVdbOutput = tAttr.create("VdbOutput", "vdb", OpenVDBData::id, MObject::kNullObj, &stat);
@@ -114,6 +126,9 @@ MStatus OpenVDBReadNode::initialize()
     // Set the attribute dependencies
 
     stat = attributeAffects(aVdbFilePath, aVdbOutput);
+    if (stat != MS::kSuccess) return stat;
+
+    stat = attributeAffects(aCurrentFrame, aVdbOutput);
     if (stat != MS::kSuccess) return stat;
 
     return MS::kSuccess;
@@ -131,7 +146,18 @@ MStatus OpenVDBReadNode::compute(const MPlug& plug, MDataBlock& data)
         MDataHandle filePathHandle = data.inputValue (aVdbFilePath, &status);
         if (status != MS::kSuccess) return status;
 
-        std::ifstream ifile(filePathHandle.asString().asChar(), std::ios_base::binary);
+        MDataHandle frameHandle = data.inputValue(aCurrentFrame, &status);
+        if (status != MS::kSuccess) return status;
+
+        int cFNum =  frameHandle.asInt();
+        char* cFChar;
+        sprintf(cFChar,"%d",cFNum); 
+        std::string filename = filePathHandle.asString().asChar();
+
+        size_t f = filename.find("####");
+        filename.replace(f, std::string("####").length(), cFChar);
+
+        std::ifstream ifile(filename.c_str(), std::ios_base::binary);
         openvdb::GridPtrVecPtr grids = openvdb::io::Stream(ifile).getGrids();
 
         if (!grids->empty()) {
