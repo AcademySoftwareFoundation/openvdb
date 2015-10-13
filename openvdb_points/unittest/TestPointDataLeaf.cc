@@ -52,7 +52,6 @@ public:
     CPPUNIT_TEST(testTopologyCopy);
     CPPUNIT_TEST(testEquivalence);
     CPPUNIT_TEST(testIO);
-    CPPUNIT_TEST(testDropAttributes);
     CPPUNIT_TEST_SUITE_END();
 
     void testEmptyLeaf();
@@ -64,7 +63,6 @@ public:
     void testTopologyCopy();
     void testEquivalence();
     void testIO();
-    void testDropAttributes();
 
 private:
     // Generate random points by uniformly distributing points
@@ -844,55 +842,6 @@ TestPointDataLeaf::testIO()
         CPPUNIT_ASSERT_EQUAL(leaf2.getValue(4), ValueType(20));
         CPPUNIT_ASSERT_EQUAL(leaf2.attributeSet().size(), size_t(2));
     }
-}
-
-
-void TestPointDataLeaf::testDropAttributes()
-{
-    using namespace openvdb::tools;
-
-    // Define and register some common attribute types
-
-    typedef TypedAttributeArray<float>    AttributeS;
-    typedef TypedAttributeArray<int32_t>  AttributeI;
-
-    AttributeS::registerType();
-    AttributeI::registerType();
-
-    // create a descriptor
-
-    typedef AttributeSet::Descriptor Descriptor;
-
-    Descriptor::Inserter names;
-    names.add("density", AttributeS::attributeType());
-    names.add("id", AttributeI::attributeType());
-
-    Descriptor::Ptr descrA = Descriptor::create(names.vec);
-
-    // create a leaf and initialize attributes using this descriptor
-
-    LeafType leaf(openvdb::Coord(0, 0, 0));
-    leaf.initializeAttributes(descrA, /*arrayLength=*/100);
-
-    // ensure both attributes exist on the leaf node
-
-    CPPUNIT_ASSERT(leaf.hasAttribute<AttributeS>("density"));
-    CPPUNIT_ASSERT(leaf.hasAttribute<AttributeI>("id"));
-
-    // drop density attribute
-
-    std::vector<size_t> indices;
-    indices.push_back(0);
-
-    const AttributeSet::Descriptor& expected = leaf.attributeSet().descriptor();
-    Descriptor::Ptr descrB = expected.duplicateDrop(indices);
-
-    leaf.dropAttributes(indices, expected, descrB);
-
-    // ensure only id remains
-
-    CPPUNIT_ASSERT(leaf.hasAttribute<AttributeS>("density") == false);
-    CPPUNIT_ASSERT(leaf.hasAttribute<AttributeI>("id") == true);
 }
 
 
