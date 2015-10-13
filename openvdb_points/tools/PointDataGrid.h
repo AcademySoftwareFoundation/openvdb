@@ -329,7 +329,7 @@ public:
     }
 
     /// @brief Drop attributes with @a pos indices.
-    /// Requires the current descriptor to match @a expacted
+    /// Requires the current descriptor to match @a expected
     /// On drop, current descriptor is replaced with @a replacement
     void dropAttributes(const std::vector<size_t>& pos,
                         const Descriptor& expected, Descriptor::Ptr& replacement)
