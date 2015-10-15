@@ -1,7 +1,7 @@
 OpenVDB Points Version History
 ==============================
 
-Version 0.1.0 - Initial Public Beta
+Version 0.1.0 - October 1, 2015
 
     Core API:
     - AttributeArray and AttributeSet classes for storing and managing
@@ -22,3 +22,13 @@ Version 0.1.0 - Initial Public Beta
       SOPs.
     - A custom GR primitive for rendering OpenVDB Points natively in the
       Houdini viewport.
+
+Version 0.2.0 - In Development
+
+    Core API:
+    - Added a new TopologyCopy constructor for PointDataLeafNode to precisely
+      match those provided by OpenVDB Leaf nodes (contributed by ILM)
+
+    Clarisse:
+    - New Isotropix Clarisse ray-tracing module introduced to provide native
+      geometry ray-tracing.

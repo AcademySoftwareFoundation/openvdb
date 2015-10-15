@@ -28,4 +28,18 @@ Houdini:
 - A custom GR primitive for rendering OpenVDB Points natively in the
   Houdini viewport.
 
+@htmlonly <a name="v0_2_0_changes"></a>@endhtmlonly
+@par
+<B>Version 0.2.0</B> - In Development
+
+@par
+Core API:
+- Added a new TopologyCopy constructor for PointDataLeafNode to precisely
+  match those provided by OpenVDB Leaf nodes (contributed by ILM)
+
+@par
+Clarisse:
+- New Isotropix Clarisse ray-tracing module introduced to provide native
+  geometry ray-tracing.
+
 */
