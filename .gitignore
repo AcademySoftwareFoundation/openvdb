@@ -28,6 +28,9 @@ openvdb_points_houdini/openvdb_houdini
 openvdb_points/dependencies
 openvdb_points_houdini/houdini_deps
 
+# Clarisse
+openvdb_points_clarisse/clarisse/module/*.cma
+
 # Binaries
 openvdb_points/vdb_test
 openvdb_points/vdb_print
