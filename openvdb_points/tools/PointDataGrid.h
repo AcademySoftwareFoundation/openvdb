@@ -328,6 +328,15 @@ public:
         mAttributeSet->appendAttribute(attribute, expected, replacement);
     }
 
+    /// @brief Drop attributes with @a pos indices.
+    /// Requires the current descriptor to match @a expected
+    /// On drop, current descriptor is replaced with @a replacement
+    void dropAttributes(const std::vector<size_t>& pos,
+                        const Descriptor& expected, Descriptor::Ptr& replacement)
+    {
+        mAttributeSet->dropAttributes(pos, expected, replacement);
+    }
+
     template <typename AttributeType>
     typename AttributeWriteHandle<AttributeType>::Ptr attributeWriteHandle(const size_t pos)
     {
