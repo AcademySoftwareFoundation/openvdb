@@ -282,6 +282,28 @@ AttributeSet::dropAttributes(   const std::vector<size_t>& pos,
 
 
 void
+AttributeSet::reorderAttributes(const DescriptorPtr& replacement)
+{
+    if (!mDescr->hasSameAttributes(*replacement)) {
+        OPENVDB_THROW(LookupError, "Cannot reorder attributes as descriptors do not contain the same attributes.")
+    }
+
+    AttrArrayVec attrs(replacement->size());
+
+    // compute target indices for attributes from the given decriptor
+    for (Descriptor::ConstIterator it = mDescr->map().begin(),
+        end = mDescr->map().end(); it != end; ++it) {
+        const size_t index = replacement->find(it->first);
+        attrs[index] = AttributeArray::Ptr(mAttrs[it->second]);
+    }
+
+    // copy the ordering to the member attributes vector and update descriptor to be target
+    std::copy(attrs.begin(), attrs.end(), mAttrs.begin());
+    mDescr = replacement;
+}
+
+
+void
 AttributeSet::read(std::istream& is)
 {
     this->readMetadata(is);

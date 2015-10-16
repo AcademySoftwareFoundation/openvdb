@@ -177,6 +177,10 @@ public:
     void dropAttributes(const std::vector<size_t>& pos,
                         const Descriptor& expected, DescriptorPtr& replacement);
 
+    /// Re order attribute set to match a provided descriptor
+    /// Replaces own descriptor with @a replacement
+    void reorderAttributes(const DescriptorPtr& replacement);
+
     /// Read the entire set from a stream.
     void read(std::istream&);
     /// Write the entire set to a stream.

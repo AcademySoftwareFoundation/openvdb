@@ -337,6 +337,13 @@ public:
         mAttributeSet->dropAttributes(pos, expected, replacement);
     }
 
+    /// @brief Reorder attribute set based on a decriptor which contains
+    /// the same attributes in a different order
+    void reorderAttributes(const Descriptor::Ptr& replacement)
+    {
+        mAttributeSet->reorderAttributes(replacement);
+    }
+
     template <typename AttributeType>
     typename AttributeWriteHandle<AttributeType>::Ptr attributeWriteHandle(const size_t pos)
     {
