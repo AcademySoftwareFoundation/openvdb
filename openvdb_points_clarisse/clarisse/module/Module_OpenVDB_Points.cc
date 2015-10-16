@@ -105,6 +105,10 @@ namespace resource
     enum {
         RESOURCE_ID_VDB_GRID = ModuleGeometry::RESOURCE_ID_COUNT,
     };
+
+    ResourceData* create_vdb_grid(OfObject& object);
+
+    ResourceData* create_openvdb_points_geometry(OfObject& object);
 } // namespace resource
 
 
@@ -130,6 +134,7 @@ IX_MODULE_CLBK::init_class(OfClass& cls)
     geo_attrs.add("explicit_radius");
     geo_attrs.add("override_radius");
     geo_attrs.add("radius_scale");
+    geo_attrs.add("mode");
 
     deps.add(resource::RESOURCE_ID_VDB_GRID);
     cls.set_resource_attrs(ModuleGeometry::RESOURCE_ID_GEOMETRY, geo_attrs);
@@ -247,6 +252,29 @@ IX_MODULE_CLBK::create_resource(OfObject& object,
 {
     if (resource_id == resource::RESOURCE_ID_VDB_GRID)
     {
+        return resource::create_vdb_grid(object);
+    }
+    else if (resource_id == ModuleGeometry::RESOURCE_ID_GEOMETRY)
+    {
+        const long mode = object.get_attribute("mode")->get_long();
+
+        if (mode == 0) {
+            return resource::create_openvdb_points_geometry(object);
+        }
+    }
+
+    return 0;
+}
+
+
+////////////////////////////////////////
+
+
+namespace resource
+{
+    ResourceData*
+    create_vdb_grid(OfObject& object)
+    {
         const CoreString filename = object.get_attribute("output_filename")->get_string();
         const CoreString gridname = object.get_attribute("grid")->get_string();
 
@@ -310,7 +338,9 @@ IX_MODULE_CLBK::create_resource(OfObject& object,
 
         return resourceData;
     }
-    else if (resource_id == ModuleGeometry::RESOURCE_ID_GEOMETRY)
+
+    ResourceData*
+    create_openvdb_points_geometry(OfObject& object)
     {
         ModuleGeometry* module = (ModuleGeometry*) object.get_module();
         ResourceData_OpenVDBPoints* data = (ResourceData_OpenVDBPoints*) module->get_resource(resource::RESOURCE_ID_VDB_GRID);
@@ -363,8 +393,7 @@ IX_MODULE_CLBK::create_resource(OfObject& object,
         return geometry;
     }
 
-    return 0;
-}
+} // namespace resource
 
 
 ////////////////////////////////////////
