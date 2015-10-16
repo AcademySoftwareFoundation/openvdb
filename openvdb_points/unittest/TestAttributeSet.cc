@@ -152,6 +152,42 @@ TestAttributeSet::testAttributeSetDescriptor()
         CPPUNIT_ASSERT_EQUAL(itA->type.second, itB->type.second);
     }
 
+     // Test hasSameAttributes
+    {
+        Descriptor::Ptr descr1 = Descriptor::create(Descriptor::Inserter()
+                .add("pos", AttributeD::attributeType())
+                .add("test", AttributeI::attributeType())
+                .add("id", AttributeI::attributeType())
+                .vec);
+
+        // Test same names with different types, should be false
+        Descriptor::Ptr descr2 = Descriptor::create(Descriptor::Inserter()
+                .add("pos", AttributeD::attributeType())
+                .add("test", AttributeS::attributeType())
+                .add("id", AttributeI::attributeType())
+                .vec);
+
+        CPPUNIT_ASSERT(!descr1->hasSameAttributes(*descr2));
+
+        // Test different names, should be false
+        Descriptor::Ptr descr3 = Descriptor::create(Descriptor::Inserter()
+                .add("pos", AttributeD::attributeType())
+                .add("test2", AttributeI::attributeType())
+                .add("id", AttributeI::attributeType())
+                .vec);
+
+        CPPUNIT_ASSERT(!descr1->hasSameAttributes(*descr3));
+
+        // Test same names and types but different order, should be true
+        Descriptor::Ptr descr4 = Descriptor::create(Descriptor::Inserter()
+                .add("test", AttributeI::attributeType())
+                .add("id", AttributeI::attributeType())
+                .add("pos", AttributeD::attributeType())
+                .vec);
+
+        CPPUNIT_ASSERT(descr1->hasSameAttributes(*descr4));
+    }
+
     // I/O test
 
     std::ostringstream ostr(std::ios_base::binary);

@@ -277,6 +277,9 @@ public:
     bool operator==(const Descriptor&) const;
     /// Return true if this descriptor is not equal to the given one.
     bool operator!=(const Descriptor& rhs) const { return !this->operator==(rhs); }
+    /// Return true if this descriptor contains the same attributes
+    /// as the given descriptor, ignoring attribute order
+    bool hasSameAttributes(const Descriptor& rhs) const;
 
     /// Return a reference to the name-to-position map.
     const NameToPosMap& map() const { return mNameMap; }

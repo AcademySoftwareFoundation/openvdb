@@ -377,6 +377,29 @@ AttributeSet::Descriptor::operator==(const Descriptor& rhs) const
 }
 
 
+bool
+AttributeSet::Descriptor::hasSameAttributes(const Descriptor& rhs) const
+{
+    if (this == &rhs) return true;
+
+    if (mTypes.size()   != rhs.mTypes.size() ||
+        mNameMap.size() != rhs.mNameMap.size()) {
+        return false;
+    }
+
+    for (NameToPosMap::const_iterator it = mNameMap.begin(),
+        end = mNameMap.end(); it != end; ++it) {
+        const size_t index = rhs.find(it->first);
+
+        if (index == INVALID_POS) return false;
+
+        if (mTypes[it->second] != rhs.mTypes[index]) return false;
+    }
+
+    return true;
+}
+
+
 size_t
 AttributeSet::Descriptor::memUsage() const
 {
