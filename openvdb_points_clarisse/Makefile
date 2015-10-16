@@ -76,12 +76,14 @@ CLARISSE_DESTDIR := $(CLARISSE_ROOT)/module
 # The parent directory of the clarisse_sdk/ header directory
 CLARISSE_INCL_DIR := $(CLARISSE_SDK_ROOT)/include
 # The directory containing clarisse libs
-CLARISSE_LIB_DIR := $(CLARISSE_SDK_ROOT)/lib
-CLARISSE_LIB := ix_core \
-				ix_gmath \
-				ix_geometry \
-				ix_of ix_module \
-				ix_poly
+CLARISSE_LIB_DIR := $(CLARISSE_ROOT)
+CLARISSE_LIB := -lix_core \
+                -lix_gmath \
+                -lix_geometry \
+                -lix_of \
+                -lix_module \
+                -lix_particle \
+                -lix_point_cloud
 
 # The parent directory of the openvdb/ header directory
 OPENVDB_INCL_DIR := $(DESTDIR)/include
@@ -182,6 +184,7 @@ LIBS := \
     -L$(BOOST_LIB_DIR) $(BOOST_LIB) \
     -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) \
     -L$(OPENVDB_POINTS_LIB_DIR) $(OPENVDB_POINTS_LIB) \
+    -L$(CLARISSE_LIB_DIR) $(CLARISSE_LIB) \
 #
 LIBS_RPATH := \
     -ldl -lm -lz \
