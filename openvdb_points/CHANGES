@@ -27,8 +27,12 @@ Version 0.2.0 - In Development
 
     Core API:
     - Added a new TopologyCopy constructor for PointDataLeafNode to precisely
-      match those provided by OpenVDB Leaf nodes (contributed by ILM)
+      match those provided by OpenVDB Leaf nodes (contributed by ILM).
+
+    Houdini:
+    - Multi-thread the conversion from VDB Points back to Houdini points using
+      OpenVDB Points SOP.
 
     Clarisse:
     - New Isotropix Clarisse ray-tracing module introduced to provide native
-      geometry ray-tracing.
+      VDB point ray-tracing and geometry instancing.

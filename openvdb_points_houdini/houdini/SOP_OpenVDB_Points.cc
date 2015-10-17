@@ -48,6 +48,8 @@
 #include <CH/CH_Manager.h>
 #include <GA/GA_Types.h> // for GA_ATTRIB_POINT
 
+#include <boost/ptr_container/ptr_vector.hpp>
+
 using namespace openvdb;
 using namespace openvdb::tools;
 using namespace openvdb::math;
@@ -400,63 +402,68 @@ void populateAttributeFromHoudini(  PointDataTree& tree, const PointIndexTree& i
 ////////////////////////////////////////
 
 
-template <typename TypedAttributeType>
-inline void
-convertPointDataGridPosition(const PointDataGrid& grid, GU_Detail& detail)
-{
-    typedef PointDataTree                           PointDataTree;
-    typedef PointDataAccessor<const PointDataTree>  PointDataAccessor;
-    typedef AttributeSet                            AttributeSet;
+namespace sop_openvdb_points_internal {
 
-    const PointDataTree& tree = grid.tree();
 
-    PointDataTree::LeafCIter iter = tree.cbeginLeaf();
+template<typename PointDataTreeType, typename LeafOffsetArray>
+struct ConvertPointDataGridPositionOp {
 
-    // determine the position index
-    const size_t positionIndex = iter->attributeSet().find("P");
-    const bool hasPosition = positionIndex != AttributeSet::INVALID_POS;
+    typedef typename PointDataTreeType::LeafNodeType    PointDataLeaf;
+    typedef PointDataAccessor<const PointDataTreeType>  PointDataAccessor;
 
-    PointDataAccessor acc(tree);
+    typedef typename LeafOffsetArray::const_reference   LeafOffsetPair;
 
-#if (UT_VERSION_INT < 0x0c0500F5) // earlier than 12.5.245
-    for (size_t n = 0, N = acc.totalPointCount(); n < N; ++n) detail.appendPointOffset();
-#else
-    detail.appendPointBlock(acc.totalPointCount());
-#endif
+    ConvertPointDataGridPositionOp( GU_Detail& detail,
+                                    const PointDataTreeType& tree,
+                                    const math::Transform& transform,
+                                    const size_t index,
+                                    const LeafOffsetArray& leafOffsets)
+        : mDetail(detail)
+        , mTree(tree)
+        , mTransform(transform)
+        , mIndex(index)
+        , mLeafOffsets(leafOffsets) { }
 
-    const Transform& xform = grid.transform();
-    AttributeHandle<Vec3f>::Ptr handle;
+    void operator()(const tbb::blocked_range<size_t>& range) const {
 
-    GA_Offset offset = 0;
-    for (; iter; ++iter) {
+        PointDataAccessor acc(mTree);
 
-        if (hasPosition) {
-            handle = iter->attributeHandle<Vec3f>(positionIndex);
-        }
+        for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
 
-        Coord ijk;
-        Vec3d xyz, pos;
+            assert(n < mLeafOffsets.size());
 
-        for (PointDataTree::LeafNodeType::ValueOnCIter vIt = iter->cbeginValueOn(); vIt; ++vIt) {
+            // extract leaf and offset
 
-            ijk = vIt.getCoord();
-            xyz = ijk.asVec3d();
+            const LeafOffsetPair& leafOffset = mLeafOffsets[n];
+            const PointDataLeaf& leaf = leafOffset.first;
+            GA_Offset offset = leafOffset.second;
 
-            PointDataAccessor::PointDataIndex pointIndexRange = acc.get(ijk);
-            for (Index64 n = pointIndexRange.first, N = pointIndexRange.second; n < N; ++n) {
+            AttributeHandle<Vec3f>::Ptr handle = leaf.template attributeHandle<Vec3f>(mIndex);
 
-                if (hasPosition) {
-                    pos = Vec3d(handle->get(n)) + xyz;
-                    pos = xform.indexToWorld(pos);
-                    detail.setPos3(offset++, pos.x(), pos.y(), pos.z());
-                } else {
-                    pos = xform.indexToWorld(xyz);
-                    detail.setPos3(offset++, pos.x(), pos.y(), pos.z());
+            for (PointDataTree::LeafNodeType::ValueOnCIter iter = leaf.cbeginValueOn(); iter; ++iter) {
+
+                Coord ijk = iter.getCoord();
+                Vec3d xyz = ijk.asVec3d();
+
+                typename PointDataAccessor::PointDataIndex pointIndex = acc.get(ijk);
+                for (Index64 index = pointIndex.first; index < pointIndex.second; ++index) {
+
+                    Vec3d pos = Vec3d(handle->get(index)) + xyz;
+                    pos = mTransform.indexToWorld(pos);
+                    mDetail.setPos3(offset++, pos.x(), pos.y(), pos.z());
                 }
             }
         }
     }
-}
+
+    //////////
+
+    GU_Detail&                              mDetail;
+    const PointDataTreeType&                mTree;
+    const math::Transform&                  mTransform;
+    const size_t                            mIndex;
+    const LeafOffsetArray&                  mLeafOffsets;
+}; // ConvertPointDataGridPositionOp
 
 
 template <typename VDBType, typename AttrHandle>
@@ -486,40 +493,110 @@ template <> struct GAHandleTraits<float> { typedef GA_RWHandleF RW; };
 template <> struct GAHandleTraits<double> { typedef GA_RWHandleF RW; };
 
 
-template <typename Type>
-inline void
-convertPointDataGridAttribute(const PointDataTree& tree,
-    const unsigned arrayIndex, GA_Attribute& attribute, GU_Detail&)
-{
-    typedef PointDataTree                           PointDataTree;
-    typedef PointDataAccessor<const PointDataTree>  PointDataAccessor;
-    typedef typename GAHandleTraits<Type>::RW GAHandleType;
+template<typename PointDataTreeType, typename LeafOffsetArray, typename AttributeType>
+struct ConvertPointDataGridAttributeOp {
 
-    GAHandleType attributeHandle(&attribute);
-    PointDataAccessor acc(tree);
+    typedef typename PointDataTreeType::LeafNodeType    PointDataLeaf;
+    typedef PointDataAccessor<const PointDataTreeType>  PointDataAccessor;
 
-    GA_Offset offset = 0;
-    for (PointDataTree::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
+    typedef typename LeafOffsetArray::const_reference   LeafOffsetPair;
 
-        typename AttributeHandle<Type>::Ptr handle = iter->attributeHandle<Type>(arrayIndex);
+    typedef typename GAHandleTraits<AttributeType>::RW GAHandleType;
 
-        for (PointDataTree::LeafNodeType::ValueOnCIter vIt = iter->cbeginValueOn(); vIt; ++vIt) {
+    ConvertPointDataGridAttributeOp(GA_Attribute& attribute,
+                                    const PointDataTreeType& tree,
+                                    const size_t index,
+                                    const LeafOffsetArray& leafOffsets)
+        : mAttribute(attribute)
+        , mTree(tree)
+        , mIndex(index)
+        , mLeafOffsets(leafOffsets) { }
 
-            PointDataAccessor::PointDataIndex pointIndexRange = acc.get(vIt.getCoord());
-            for (Index64 n = pointIndexRange.first, N = pointIndexRange.second; n < N; ++n) {
-                setAttributeValue(handle->get(n), attributeHandle, offset++);
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+
+        PointDataAccessor acc(mTree);
+
+        GAHandleType attributeHandle(&mAttribute);
+
+        for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
+
+            assert(n < mLeafOffsets.size());
+
+            // extract leaf and offset
+
+            const LeafOffsetPair& leafOffset = mLeafOffsets[n];
+            const PointDataLeaf& leaf = leafOffset.first;
+            GA_Offset offset = leafOffset.second;
+
+            typename AttributeHandle<AttributeType>::Ptr handle = leaf.template attributeHandle<AttributeType>(mIndex);
+
+            for (PointDataTree::LeafNodeType::ValueOnCIter iter = leaf.cbeginValueOn(); iter; ++iter) {
+
+                Coord ijk = iter.getCoord();
+
+                typename PointDataAccessor::PointDataIndex pointIndex = acc.get(ijk);
+                for (Index64 index = pointIndex.first; index < pointIndex.second; ++index) {
+                    setAttributeValue(handle->get(n), attributeHandle, offset++);
+                }
             }
         }
     }
+
+    //////////
+
+    GA_Attribute&                           mAttribute;
+    const PointDataTreeType&                mTree;
+    const size_t                            mIndex;
+    const LeafOffsetArray&                  mLeafOffsets;
+}; // ConvertPointDataGridAttributeOp
+
+
+}
+
+
+template <typename LeafOffsetArray>
+inline void
+convertPointDataGridPosition(   GU_Detail& detail,
+                                const PointDataGrid& grid,
+                                const LeafOffsetArray& leafOffsets)
+{
+    using sop_openvdb_points_internal::ConvertPointDataGridPositionOp;
+
+    const PointDataTree& tree = grid.tree();
+    PointDataTree::LeafCIter iter = tree.cbeginLeaf();
+
+    const size_t positionIndex = iter->attributeSet().find("P");
+
+    // perform threaded conversion
+
+    ConvertPointDataGridPositionOp<PointDataTree, LeafOffsetArray> convert(
+                    detail, tree, grid.transform(), positionIndex, leafOffsets);
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, leafOffsets.size()), convert);
+}
+
+
+template <typename LeafOffsetArray, typename AttributeType>
+inline void
+convertPointDataGridAttribute(  GA_Attribute& attribute,
+                                const PointDataTree& tree,
+                                const unsigned arrayIndex,
+                                const LeafOffsetArray& leafOffsets)
+{
+    using sop_openvdb_points_internal::ConvertPointDataGridAttributeOp;
+
+    // perform threaded conversion
+
+    ConvertPointDataGridAttributeOp<PointDataTree, LeafOffsetArray, AttributeType> convert(
+                    attribute, tree, arrayIndex, leafOffsets);
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, leafOffsets.size()), convert);
 }
 
 
 inline void
 convertPointDataGrid(GU_Detail& detail, openvdb_houdini::VdbPrimCIterator& vdbIt)
 {
-    typedef PointDataGrid   PointDataGrid;
-    typedef PointDataGrid::TreeType         PointDataTree;
-    typedef AttributeSet    AttributeSet;
+    typedef PointDataTree::LeafNodeType             PointDataLeaf;
+    typedef PointDataAccessor<const PointDataTree>  PointDataAccessor;
 
     GU_Detail geo;
 
@@ -535,18 +612,39 @@ convertPointDataGrid(GU_Detail& detail, openvdb_houdini::VdbPrimCIterator& vdbIt
         PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
         if (!leafIter) continue;
 
+        // position attribute is mandatory
+
         const AttributeSet::Descriptor& descriptor = leafIter->attributeSet().descriptor();
-        { //
-            const size_t positionIndex = descriptor.find("P");
+        const bool hasPosition = descriptor.find("P") != AttributeSet::INVALID_POS;
+        if (!hasPosition)   continue;
 
-            // determine whether position and color exist
+        // allocate Houdini point array
 
-            const bool hasPosition = positionIndex != AttributeSet::INVALID_POS;
+        PointDataAccessor accessor(tree);
 
-            if (hasPosition) {
-                convertPointDataGridPosition<Vec3f>(grid, geo);
-            }
+#if (UT_VERSION_INT < 0x0c0500F5) // earlier than 12.5.245
+        for (size_t n = 0, N = accessor.totalPointCount(); n < N; ++n) geo.appendPointOffset();
+#else
+        geo.appendPointBlock(accessor.totalPointCount());
+#endif
+
+        // compute global point offsets for each leaf
+
+        typedef std::pair<const PointDataLeaf&, Index64> LeafOffsetPair;
+        typedef boost::ptr_vector<LeafOffsetPair> LeafOffsetArray;
+
+        const Index64 leafCount = tree.leafCount();
+
+        LeafOffsetArray leafOffsets;
+        leafOffsets.reserve(leafCount);
+
+        Index64 count = 0;
+        for ( ; leafIter; ++leafIter) {
+            leafOffsets.push_back(new LeafOffsetPair(*leafIter, count));
+            count += leafIter->pointCount();
         }
+
+        convertPointDataGridPosition<LeafOffsetArray>(geo, grid, leafOffsets);
 
         // add other point attributes to the hdk detail
         const AttributeSet::Descriptor::NameToPosMap& nameToPosMap = descriptor.map();
@@ -573,34 +671,34 @@ convertPointDataGrid(GU_Detail& detail, openvdb_houdini::VdbPrimCIterator& vdbIt
             attribute.hardenAllPages();
 
             if (type == "bool") {
-                convertPointDataGridAttribute<bool>(tree, index, attribute, geo);
+                convertPointDataGridAttribute<LeafOffsetArray, bool>(attribute, tree, index, leafOffsets);
             }
             else if (type == "int16") {
-                convertPointDataGridAttribute<int16_t>(tree, index, attribute, geo);
+                convertPointDataGridAttribute<LeafOffsetArray, int16_t>(attribute, tree, index, leafOffsets);
             }
             else if (type == "int32") {
-                convertPointDataGridAttribute<int32_t>(tree, index, attribute, geo);
+                convertPointDataGridAttribute<LeafOffsetArray, int32_t>(attribute, tree, index, leafOffsets);
             }
             else if (type == "int64") {
-                convertPointDataGridAttribute<int64_t>(tree, index, attribute, geo);
+                convertPointDataGridAttribute<LeafOffsetArray, int64_t>(attribute, tree, index, leafOffsets);
             }
             else if (type == "half") {
-                convertPointDataGridAttribute<half>(tree, index, attribute, geo);
+                convertPointDataGridAttribute<LeafOffsetArray, half>(attribute, tree, index, leafOffsets);
             }
             else if (type == "float") {
-                convertPointDataGridAttribute<float>(tree, index, attribute, geo);
+                convertPointDataGridAttribute<LeafOffsetArray, float>(attribute, tree, index, leafOffsets);
             }
             else if (type == "double") {
-                convertPointDataGridAttribute<double>(tree, index, attribute, geo);
+                convertPointDataGridAttribute<LeafOffsetArray, double>(attribute, tree, index, leafOffsets);
             }
             else if (type == "vec3h") {
-                convertPointDataGridAttribute<Vec3<half> >(tree, index, attribute, geo);
+                convertPointDataGridAttribute<LeafOffsetArray, Vec3<half> >(attribute, tree, index, leafOffsets);
             }
             else if (type == "vec3s") {
-                convertPointDataGridAttribute<Vec3<float> >(tree, index, attribute, geo);
+                convertPointDataGridAttribute<LeafOffsetArray, Vec3<float> >(attribute, tree, index, leafOffsets);
             }
             else if (type == "vec3d") {
-                convertPointDataGridAttribute<Vec3<double> >(tree, index, attribute, geo);
+                convertPointDataGridAttribute<LeafOffsetArray, Vec3<double> >(attribute, tree, index, leafOffsets);
             }
             else {
                 throw std::runtime_error("Unknown Attribute Type for Conversion: " + type);

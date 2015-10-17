@@ -38,8 +38,13 @@ Core API:
   match those provided by OpenVDB Leaf nodes (contributed by ILM)
 
 @par
+Houdini:
+- Multi-thread the conversion from VDB Points back to Houdini points using OpenVDB
+  Points SOP
+
+@par
 Clarisse:
 - New Isotropix Clarisse ray-tracing module introduced to provide native
-  geometry ray-tracing.
+  VDB point ray-tracing and geometry instancing.
 
 */
