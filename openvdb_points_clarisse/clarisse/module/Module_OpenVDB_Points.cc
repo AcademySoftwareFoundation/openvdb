@@ -47,6 +47,8 @@
 #include <dso_export.h>
 #include <module_geometry.h>
 #include <module_object.h>
+#include <particle_cloud.h>
+#include <geometry_point_cloud.h>
 #include <app_object.h>
 #include <of_app.h>
 #include <of_class.h>
@@ -112,6 +114,8 @@ namespace resource
     ResourceData* create_openvdb_points_geometry(OfObject& object);
 
     ResourceData* create_openvdb_points_geometry_property(OfObject& object);
+
+    ResourceData* create_clarisse_particle_cloud(OfObject& object);
 } // namespace resource
 
 
@@ -255,16 +259,19 @@ IX_MODULE_CLBK::create_resource(OfObject& object,
                                 const int& resource_id,
                                 void* data)
 {
+    const long mode = object.get_attribute("mode")->get_long();
+
     if (resource_id == resource::RESOURCE_ID_VDB_GRID)
     {
         return resource::create_vdb_grid(object);
     }
     else if (resource_id == ModuleGeometry::RESOURCE_ID_GEOMETRY)
     {
-        const long mode = object.get_attribute("mode")->get_long();
-
         if (mode == 0) {
             return resource::create_openvdb_points_geometry(object);
+        }
+        else if (mode == 1) {
+            return resource::create_clarisse_particle_cloud(object);
         }
     }
     else if (resource_id == ModuleGeometry::RESOURCE_ID_GEOMETRY_PROPERTIES)
@@ -446,6 +453,134 @@ namespace resource
         return property_array;
     }
 
+    ResourceData*
+    create_clarisse_particle_cloud(OfObject& object)
+    {
+        ModuleGeometry* module = (ModuleGeometry*) object.get_module();
+        ResourceData_OpenVDBPoints* data = (ResourceData_OpenVDBPoints*) module->get_resource(resource::RESOURCE_ID_VDB_GRID);
+
+        if (!data)                          return new ParticleCloud();
+
+        const openvdb::tools::PointDataGrid::Ptr grid = data->grid();
+
+        if (!grid)                          return new ParticleCloud();
+        if (!grid->tree().cbeginLeaf())     return new ParticleCloud();
+
+        typedef openvdb::tools::PointDataTree PointDataTree;
+        typedef openvdb::tools::PointDataAccessor<PointDataTree> PointDataAccessor;
+
+        const openvdb::math::Transform& transform = grid->transform();
+        const PointDataTree& tree = grid->tree();
+        const PointDataAccessor accessor(tree);
+
+        const openvdb::Index64 size = accessor.totalPointCount();
+
+        if (size == 0)                      return new ParticleCloud();
+
+        CoreArray<GMathVec3d> array;
+
+        array.resize(size);
+
+        // load Clarisse particle positions
+
+        AppProgressBar* convert_progress_bar = object.get_application().create_progress_bar(CoreString("Converting Point Positions into Clarisse"));
+
+        unsigned arrayIndex = 0;
+
+        for (PointDataTree::LeafCIter leaf = tree.cbeginLeaf(); leaf; ++leaf)
+        {
+            const openvdb::tools::AttributeHandle<openvdb::Vec3f>::Ptr positionHandle = leaf->attributeHandle<openvdb::Vec3f>("P");
+
+            for (PointDataTree::LeafNodeType::ValueOnCIter value = leaf->cbeginValueOn(); value; ++value)
+            {
+                const openvdb::Coord ijk = value.getCoord();
+
+                if (accessor.pointCount(ijk) == 0)  continue;
+
+                const openvdb::Vec3i gridIndexSpace = ijk.asVec3i();
+
+                PointDataAccessor::PointDataIndex pointDataIndex = accessor.get(ijk);
+
+                const unsigned start = pointDataIndex.first;
+                const unsigned end = pointDataIndex.second;
+
+                for (unsigned index = start; index < end; index++) {
+
+                    const openvdb::Index64 index64(index);
+
+                    const openvdb::Vec3f positionVoxelSpace = positionHandle->get(index64);
+                    const openvdb::Vec3f positionIndexSpace = positionVoxelSpace + gridIndexSpace;
+                    const openvdb::Vec3f positionWorldSpace = transform.indexToWorld(positionIndexSpace);
+
+                    array[arrayIndex][0] = positionWorldSpace[0];
+                    array[arrayIndex][1] = positionWorldSpace[1];
+                    array[arrayIndex][2] = positionWorldSpace[2];
+
+                    arrayIndex++;
+                }
+            }
+        }
+
+        convert_progress_bar->destroy();
+
+        // construct the point cloud
+
+        AppProgressBar* cloud_progress_bar = object.get_application().create_progress_bar(CoreString("Creating Clarisse Point Cloud"));
+
+        GeometryPointCloud pointCloud;
+
+        pointCloud.init(array.get_count());
+        pointCloud.init_positions(array.get_data());
+
+        cloud_progress_bar->destroy();
+
+        // load the velocities
+
+        if (tree.cbeginLeaf()->hasAttribute<openvdb::tools::TypedAttributeArray<openvdb::Vec3f> >("v"))
+        {
+            AppProgressBar* velocity_progress_bar = object.get_application().create_progress_bar(CoreString("Loading Velocities into Point Cloud"));
+
+            arrayIndex = 0;
+
+            for (PointDataTree::LeafCIter leaf = tree.cbeginLeaf(); leaf; ++leaf)
+            {
+                const openvdb::tools::AttributeHandle<openvdb::Vec3f>::Ptr velocityHandle = leaf->attributeHandle<openvdb::Vec3f>("v");
+
+                for (PointDataTree::LeafNodeType::ValueOnCIter value = leaf->cbeginValueOn(); value; ++value)
+                {
+                    const openvdb::Coord ijk = value.getCoord();
+
+                    if (accessor.pointCount(ijk) == 0)  continue;
+
+                    PointDataAccessor::PointDataIndex pointDataIndex = accessor.get(ijk);
+
+                    const unsigned start = pointDataIndex.first;
+                    const unsigned end = pointDataIndex.second;
+
+                    for (unsigned index = start; index < end; index++) {
+
+                        const openvdb::Index64 index64(index);
+
+                        // VDB Points resource uses index-space velocity so need to revert this back to world-space
+
+                        const openvdb::Vec3f velocity = transform.indexToWorld(velocityHandle->get(index64));
+
+                        array[arrayIndex][0] = velocity.x();
+                        array[arrayIndex][1] = velocity.y();
+                        array[arrayIndex][2] = velocity.z();
+
+                        arrayIndex++;
+                    }
+                }
+            }
+
+            pointCloud.init_velocities(array.get_data());
+
+            velocity_progress_bar->destroy();
+        }
+
+        return new ParticleCloud(pointCloud);
+    }
 } // namespace resource
 
 
