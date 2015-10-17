@@ -57,6 +57,7 @@
 
 #include "ResourceData_OpenVDBPoints.h"
 #include "Geometry_OpenVDBPoints.h"
+#include "GeometryProperty_OpenVDBPoints.h"
 
 
 ////////////////////////////////////////
@@ -109,6 +110,8 @@ namespace resource
     ResourceData* create_vdb_grid(OfObject& object);
 
     ResourceData* create_openvdb_points_geometry(OfObject& object);
+
+    ResourceData* create_openvdb_points_geometry_property(OfObject& object);
 } // namespace resource
 
 
@@ -123,12 +126,17 @@ IX_MODULE_CLBK::init_class(OfClass& cls)
     openvdb::initialize();
     openvdb::points::initialize();
 
-    CoreVector<CoreString> data_attrs;
     CoreVector<int> deps;
 
+    CoreVector<CoreString> data_attrs;
     data_attrs.add("filename");
     data_attrs.add("grid");
     cls.add_resource(resource::RESOURCE_ID_VDB_GRID, data_attrs, deps, "vdb_points_data");
+
+    deps.add(resource::RESOURCE_ID_VDB_GRID);
+
+    cls.set_resource_attrs(ModuleGeometry::RESOURCE_ID_GEOMETRY_PROPERTIES, data_attrs);
+    cls.set_resource_deps(ModuleGeometry::RESOURCE_ID_GEOMETRY_PROPERTIES, deps);
 
     CoreVector<CoreString> geo_attrs;
     geo_attrs.add("explicit_radius");
@@ -136,13 +144,8 @@ IX_MODULE_CLBK::init_class(OfClass& cls)
     geo_attrs.add("radius_scale");
     geo_attrs.add("mode");
 
-    deps.add(resource::RESOURCE_ID_VDB_GRID);
     cls.set_resource_attrs(ModuleGeometry::RESOURCE_ID_GEOMETRY, geo_attrs);
     cls.set_resource_deps(ModuleGeometry::RESOURCE_ID_GEOMETRY, deps);
-
-    deps.add(ModuleGeometry::RESOURCE_ID_GEOMETRY);
-    cls.set_resource_attrs(ModuleGeometry::RESOURCE_ID_GEOMETRY_PROPERTIES, geo_attrs);
-    cls.set_resource_deps(ModuleGeometry::RESOURCE_ID_GEOMETRY_PROPERTIES, deps);
 }
 
 
@@ -194,6 +197,8 @@ IX_MODULE_CLBK::on_attribute_change(OfObject& object,
     }
     else if (attr_name == "override_radius")
     {
+        // adjust whether radius attributes are read-only based on override
+
         if (attr.get_bool())
         {
             object.get_attribute("explicit_radius")->set_read_only(false);
@@ -261,6 +266,10 @@ IX_MODULE_CLBK::create_resource(OfObject& object,
         if (mode == 0) {
             return resource::create_openvdb_points_geometry(object);
         }
+    }
+    else if (resource_id == ModuleGeometry::RESOURCE_ID_GEOMETRY_PROPERTIES)
+    {
+        return resource::create_openvdb_points_geometry_property(object);
     }
 
     return 0;
@@ -391,6 +400,50 @@ namespace resource
         }
 
         return geometry;
+    }
+
+    ResourceData*
+    create_openvdb_points_geometry_property(OfObject& object)
+    {
+        GeometryPropertyArray *property_array = new GeometryPropertyArray;
+
+        CoreVector<GeometryProperty*> properties;
+
+        ModuleGeometry* module = (ModuleGeometry*) object.get_module();
+        ResourceData_OpenVDBPoints* data = (ResourceData_OpenVDBPoints*) module->get_resource(resource::RESOURCE_ID_VDB_GRID);
+
+        if (!data)  return property_array;
+
+        openvdb::tools::PointDataGrid::Ptr grid = data->grid();
+
+        if (!grid)      return property_array;
+
+        const openvdb::tools::PointDataTree& tree = grid->tree();
+
+        openvdb::tools::PointDataTree::LeafCIter iter = tree.cbeginLeaf();
+
+        if (!iter)  return property_array;
+
+        const openvdb::tools::AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
+
+        for (openvdb::tools::AttributeSet::Descriptor::ConstIterator it = descriptor.map().begin(),
+            end = descriptor.map().end(); it != end; ++it) {
+
+            const openvdb::NamePair& type = descriptor.type(it->second);
+
+            // only floating point property types are supported
+
+            if (type.first != "float" &&
+                type.first != "half" &&
+                type.first != "vec3s" &&
+                type.first != "vec3h")   continue;
+
+            properties.add(new GeometryProperty_OpenVDBPoints(data, it->first, type.first));
+        }
+
+        property_array->set(properties);
+
+        return property_array;
     }
 
 } // namespace resource

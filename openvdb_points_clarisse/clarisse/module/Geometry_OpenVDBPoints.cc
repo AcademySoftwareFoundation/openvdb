@@ -488,16 +488,6 @@ Geometry_OpenVDBPoints* Geometry_OpenVDBPoints::get_copy() const
                                         m_overrideRadius, m_radius, m_timeSegment, m_timeOffset);
 }
 
-const PointDataGrid::Ptr Geometry_OpenVDBPoints::grid() const
-{
-    return m_grid;
-}
-
-const PointDataTree::LeafNodeType* Geometry_OpenVDBPoints::leaf(const unsigned int id) const
-{
-    return (id < m_leaves.size()) ? m_leaves[id] : 0;
-}
-
 size_t Geometry_OpenVDBPoints::get_memory_size() const
 {
     return  sizeof(*this) +

@@ -284,6 +284,32 @@ ResourceData_OpenVDBPoints::ResourceData_OpenVDBPoints(const PointDataGrid::Ptr&
     : m_grid(grid)
     , m_descriptor(grid->tree().cbeginLeaf()->attributeSet().descriptorPtr())
 {
+    PointDataTree& tree = m_grid->tree();
+
+    // cache the grid leaves in an array
+
+    PointDataTree::LeafIter iter = tree.beginLeaf();
+
+    for (; iter; ++iter)
+    {
+        PointDataLeaf& leaf = *iter;
+
+        m_leaves.push_back(&leaf);
+    }
+}
+
+
+const PointDataGrid::Ptr
+ResourceData_OpenVDBPoints::grid() const
+{
+    return m_grid;
+}
+
+
+const PointDataTree::LeafNodeType*
+ResourceData_OpenVDBPoints::leaf(const unsigned int id) const
+{
+    return (id < m_leaves.size()) ? m_leaves[id] : 0;
 }
 
 
@@ -306,7 +332,7 @@ ResourceData_OpenVDBPoints::destroy_thread_data(void *data) const
 size_t
 ResourceData_OpenVDBPoints::get_memory_size() const
 {
-    return sizeof(*this) + m_grid->memUsage();
+    return sizeof(*this) + m_grid->memUsage() + m_leaves.size();
 }
 
 

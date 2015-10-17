@@ -199,10 +199,12 @@ endif
 
 LIBCLARISSE_INCLUDE_NAMES := \
 	clarisse/module/Geometry_OpenVDBPoints.h \
+	clarisse/module/GeometryProperty_OpenVDBPoints.h \
 	clarisse/module/ResourceData_OpenVDBPoints.h \
 #
 LIBCLARISSE_SRC_NAMES := \
 	clarisse/module/Geometry_OpenVDBPoints.cc \
+	clarisse/module/GeometryProperty_OpenVDBPoints.cc \
 	clarisse/module/ResourceData_OpenVDBPoints.cc \
 #
 LIBCLARISSE_CID_NAMES := \

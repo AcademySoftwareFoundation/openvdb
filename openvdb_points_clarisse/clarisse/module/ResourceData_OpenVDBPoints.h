@@ -67,11 +67,15 @@ void localise(openvdb::tools::PointDataGrid::Ptr& grid);
 class ResourceData_OpenVDBPoints : public ResourceData
 {
 public:
+    typedef openvdb::tools::PointDataTree::LeafNodeType PointDataLeaf;
+
     static ResourceData_OpenVDBPoints* create(const openvdb::tools::PointDataGrid::Ptr& grid);
 
     ResourceData_OpenVDBPoints(const openvdb::tools::PointDataGrid::Ptr& grid);
 
-    const openvdb::tools::PointDataGrid::Ptr grid() const { return m_grid; }
+    const openvdb::tools::PointDataGrid::Ptr grid() const;
+
+    const PointDataLeaf* leaf(const unsigned int id) const;
 
     std::string attribute_type(const std::string& name) const;
 
@@ -83,6 +87,8 @@ public:
 private:
     const openvdb::tools::PointDataGrid::Ptr m_grid;
     const openvdb::tools::AttributeSet::Descriptor::Ptr m_descriptor;
+
+    std::vector<PointDataLeaf*> m_leaves;
 }; // ResourceData_OpenVDBPoints
 
 #endif // OPENVDB_CLARISSE_RESOURCEDATA_OPENVDBPOINTS_HAS_BEEN_INCLUDED

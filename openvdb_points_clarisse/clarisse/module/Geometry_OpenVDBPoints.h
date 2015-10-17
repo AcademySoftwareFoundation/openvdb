@@ -41,6 +41,7 @@
 
 #include <boost/ptr_container/ptr_vector.hpp>
 
+#include <app_base.h>
 #include <geometry_object.h>
 #include <geometry_raytrace_ctx.h>
 
@@ -198,10 +199,6 @@ public:
                             const double& radius,
                             const double& timeSegment,
                             const double& timeOffset);
-
-    const openvdb::tools::PointDataGrid::Ptr grid() const;
-
-    const PointDataLeaf* leaf(const unsigned int id) const;
 
     void computeAccelerationStructures();
 
