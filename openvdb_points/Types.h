@@ -44,6 +44,7 @@ namespace OPENVDB_VERSION_NAME {
 
 template<> inline const char* typeNameAsString<half>()                   { return "half"; }
 template<> inline const char* typeNameAsString<int16_t>()                { return "int16"; }
+template<> inline const char* typeNameAsString<uint16_t>()               { return "uint16"; }
 template<> inline const char* typeNameAsString<math::Vec3<half> >()      { return "vec3h"; }
 template<> inline const char* typeNameAsString<math::Vec3<uint8_t> >()   { return "vec3u8"; }
 template<> inline const char* typeNameAsString<math::Vec3<uint16_t> >()  { return "vec3u16"; }
