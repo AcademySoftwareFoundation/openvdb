@@ -177,6 +177,10 @@ public:
     void dropAttributes(const std::vector<size_t>& pos,
                         const Descriptor& expected, DescriptorPtr& replacement);
 
+    /// Re order attribute set to match a provided descriptor
+    /// Replaces own descriptor with @a replacement
+    void reorderAttributes(const DescriptorPtr& replacement);
+
     /// Read the entire set from a stream.
     void read(std::istream&);
     /// Write the entire set to a stream.
@@ -277,6 +281,9 @@ public:
     bool operator==(const Descriptor&) const;
     /// Return true if this descriptor is not equal to the given one.
     bool operator!=(const Descriptor& rhs) const { return !this->operator==(rhs); }
+    /// Return true if this descriptor contains the same attributes
+    /// as the given descriptor, ignoring attribute order
+    bool hasSameAttributes(const Descriptor& rhs) const;
 
     /// Return a reference to the name-to-position map.
     const NameToPosMap& map() const { return mNameMap; }

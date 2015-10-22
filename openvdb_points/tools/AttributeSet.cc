@@ -282,6 +282,28 @@ AttributeSet::dropAttributes(   const std::vector<size_t>& pos,
 
 
 void
+AttributeSet::reorderAttributes(const DescriptorPtr& replacement)
+{
+    if (!mDescr->hasSameAttributes(*replacement)) {
+        OPENVDB_THROW(LookupError, "Cannot reorder attributes as descriptors do not contain the same attributes.")
+    }
+
+    AttrArrayVec attrs(replacement->size());
+
+    // compute target indices for attributes from the given decriptor
+    for (Descriptor::ConstIterator it = mDescr->map().begin(),
+        end = mDescr->map().end(); it != end; ++it) {
+        const size_t index = replacement->find(it->first);
+        attrs[index] = AttributeArray::Ptr(mAttrs[it->second]);
+    }
+
+    // copy the ordering to the member attributes vector and update descriptor to be target
+    std::copy(attrs.begin(), attrs.end(), mAttrs.begin());
+    mDescr = replacement;
+}
+
+
+void
 AttributeSet::read(std::istream& is)
 {
     this->readMetadata(is);
@@ -374,6 +396,29 @@ AttributeSet::Descriptor::operator==(const Descriptor& rhs) const
     }
 
     return std::equal(mNameMap.begin(), mNameMap.end(), rhs.mNameMap.begin());
+}
+
+
+bool
+AttributeSet::Descriptor::hasSameAttributes(const Descriptor& rhs) const
+{
+    if (this == &rhs) return true;
+
+    if (mTypes.size()   != rhs.mTypes.size() ||
+        mNameMap.size() != rhs.mNameMap.size()) {
+        return false;
+    }
+
+    for (NameToPosMap::const_iterator it = mNameMap.begin(),
+        end = mNameMap.end(); it != end; ++it) {
+        const size_t index = rhs.find(it->first);
+
+        if (index == INVALID_POS) return false;
+
+        if (mTypes[it->second] != rhs.mTypes[index]) return false;
+    }
+
+    return true;
 }
 
 
