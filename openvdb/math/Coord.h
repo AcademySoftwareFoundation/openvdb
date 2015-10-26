@@ -213,9 +213,15 @@ private:
 // Verify the fundamental assumption of the union in the Coord implementaiton
 namespace {    
 struct MyUnionTest { union { struct { int32_t mX, mY, mZ; }; int32_t mVec[3]; }; };
-BOOST_STATIC_ASSERT(offsetof(MyUnionTest, mX) == offsetof(MyUnionTest, mVec[0]) );
-BOOST_STATIC_ASSERT(offsetof(MyUnionTest, mY) == offsetof(MyUnionTest, mVec[1]) );
-BOOST_STATIC_ASSERT(offsetof(MyUnionTest, mZ) == offsetof(MyUnionTest, mVec[2]) );
+#ifndef _WIN32
+	BOOST_STATIC_ASSERT(offsetof(MyUnionTest, mX) == offsetof(MyUnionTest, mVec[0])); 
+	BOOST_STATIC_ASSERT(offsetof(MyUnionTest, mY) == offsetof(MyUnionTest, mVec[1]));
+	BOOST_STATIC_ASSERT(offsetof(MyUnionTest, mZ) == offsetof(MyUnionTest, mVec[2]));
+#elif (_MSC_VER > 1800) //does not compile under visual studio 2013
+	BOOST_STATIC_ASSERT(offsetof(MyUnionTest, mX) == offsetof(MyUnionTest, mVec[0]) ); 
+	BOOST_STATIC_ASSERT(offsetof(MyUnionTest, mY) == offsetof(MyUnionTest, mVec[1]) ); 
+	BOOST_STATIC_ASSERT(offsetof(MyUnionTest, mZ) == offsetof(MyUnionTest, mVec[2]) );
+#endif
 }
     
 ////////////////////////////////////////
