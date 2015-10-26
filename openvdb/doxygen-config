@@ -42,7 +42,7 @@ PREDEFINED += __declspec(x):= __attribute__(x):=
 # If a relative path is entered, it will be relative to the location 
 # where doxygen was started. If left blank the current directory will be used.
 
-OUTPUT_DIRECTORY       = C:/libs/openvdb-repository/msvc2013-x64/build/installation/docs
+OUTPUT_DIRECTORY       = C:/libs/openvdb-repository/out/installation/docs
 
 # If the CREATE_SUBDIRS tag is set to YES, then doxygen will create 
 # 4096 sub-directories (in 2 levels) under the output directory of each output 
@@ -889,6 +889,18 @@ GENERATE_XML           = NO
 # put in front of it. If left blank `xml' will be used as the default path.
 
 XML_OUTPUT             = xml
+
+# The XML_SCHEMA tag can be used to specify an XML schema, 
+# which can be used by a validating XML parser to check the 
+# syntax of the XML files.
+
+XML_SCHEMA             = 
+
+# The XML_DTD tag can be used to specify an XML DTD, 
+# which can be used by a validating XML parser to check the 
+# syntax of the XML files.
+
+XML_DTD                = 
 
 # If the XML_PROGRAMLISTING tag is set to YES Doxygen will 
 # dump the program listings (including syntax highlighting 

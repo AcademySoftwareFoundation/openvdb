@@ -29,8 +29,8 @@ MARK_AS_ADVANCED(LIBRARY_OUTPUT_PATH EXECUTABLE_OUTPUT_PATH)
 
 
 ####################### projects general dependencies
-set(Boost_USE_STATIC_LIBS ON)
-FIND_PACKAGE(Boost REQUIRED COMPONENTS system thread date_time chrono) 
+
+FIND_PACKAGE(boost COMPONENTS system thread date_time chrono REQUIRED CONFIG) 
 FIND_PACKAGE(zlib REQUIRED CONFIG)
 ADD_DEFINITIONS(-DZLIB_WINAPI)
 
