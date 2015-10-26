@@ -42,7 +42,7 @@ PREDEFINED += __declspec(x):= __attribute__(x):=
 # If a relative path is entered, it will be relative to the location 
 # where doxygen was started. If left blank the current directory will be used.
 
-OUTPUT_DIRECTORY       = C:/libs/openvdb-repository/out/installation/docs
+OUTPUT_DIRECTORY       = ${DOXYGEN_OUTPUT}
 
 # If the CREATE_SUBDIRS tag is set to YES, then doxygen will create 
 # 4096 sub-directories (in 2 levels) under the output directory of each output 
@@ -456,7 +456,7 @@ WARN_LOGFILE           =
 # directories like "/usr/src/myproject". Separate the files or directories 
 # with spaces.
 
-INPUT                 = C:/libs/openvdb-repository/source/openvdb    C:/libs/openvdb-repository/source/openvdb/io  C:/libs/openvdb-repository/source/openvdb/math   C:/libs/openvdb-repository/source/openvdb/metadata  C:/libs/openvdb-repository/source/openvdb/python/pyopenvdb.h  C:/libs/openvdb-repository/source/openvdb/tools  C:/libs/openvdb-repository/source/openvdb/tree   C:/libs/openvdb-repository/source/openvdb/util   C:/libs/openvdb-repository/source/openvdb/doc/doc.txt   C:/libs/openvdb-repository/source/openvdb/doc/faq.txt   C:/libs/openvdb-repository/source/openvdb/doc/math.txt  C:/libs/openvdb-repository/source/openvdb/doc/changes.txt   C:/libs/openvdb-repository/source/openvdb/doc/codingstyle.txt   C:/libs/openvdb-repository/source/openvdb/doc/api_0_98_0.txt   C:/libs/openvdb-repository/source/openvdb/doc/examplecode.txt   C:/libs/openvdb-repository/source/openvdb/doc/python.txt
+INPUT                 = ${CMAKE_CURRENT_SOURCE_DIR}    ${CMAKE_CURRENT_SOURCE_DIR}/io  ${CMAKE_CURRENT_SOURCE_DIR}/math   ${CMAKE_CURRENT_SOURCE_DIR}/metadata  ${CMAKE_CURRENT_SOURCE_DIR}/python/pyopenvdb.h  ${CMAKE_CURRENT_SOURCE_DIR}/tools  ${CMAKE_CURRENT_SOURCE_DIR}/tree   ${CMAKE_CURRENT_SOURCE_DIR}/util   ${CMAKE_CURRENT_SOURCE_DIR}/doc/doc.txt   ${CMAKE_CURRENT_SOURCE_DIR}/doc/faq.txt   ${CMAKE_CURRENT_SOURCE_DIR}/doc/math.txt  ${CMAKE_CURRENT_SOURCE_DIR}/doc/changes.txt   ${CMAKE_CURRENT_SOURCE_DIR}/doc/codingstyle.txt   ${CMAKE_CURRENT_SOURCE_DIR}/doc/api_0_98_0.txt   ${CMAKE_CURRENT_SOURCE_DIR}/doc/examplecode.txt   ${CMAKE_CURRENT_SOURCE_DIR}/doc/python.txt
 
 # If the value of the INPUT tag contains directories, you can use the 
 # FILE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp 

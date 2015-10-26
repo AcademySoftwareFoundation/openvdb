@@ -28,7 +28,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-#include <openvdb_viewer/Viewer.h>
+#include <viewer/Viewer.h>
 #include <boost/algorithm/string/classification.hpp> // for boost::is_any_of()
 #include <boost/algorithm/string/predicate.hpp> // for boost::starts_with()
 #include <boost/algorithm/string/split.hpp>
@@ -100,6 +100,7 @@ main(int argc, char *argv[])
     try {
         openvdb::initialize();
 
+		if (!openvdb::Grid<openvdb::UInt32Tree>::isRegistered()) 	openvdb::Grid<openvdb::UInt32Tree>::registerGrid();
         bool printInfo = false, printGLInfo = false, printVersionInfo = false;
 
         // Parse the command line.
@@ -141,7 +142,7 @@ main(int argc, char *argv[])
             // Now that the viewer window is open, we can get the OpenGL version, if requested.
             if (!printVersionInfo) {
                 // Preserve the behavior of the deprecated -d option.
-                std::cout << viewer.getVersionString() << std::endl;
+            std::cout << viewer.getVersionString() << std::endl;
             } else {
                 // Print OpenGL and GLFW versions.
                 std::ostringstream ostr;
@@ -154,7 +155,7 @@ main(int argc, char *argv[])
                     // Don't print the OpenVDB library version again.
                     if (!boost::starts_with(elems[i], "OpenVDB:")) {
                         std::cout << elems[i] << std::endl;
-                    }
+        }
                 }
             }
             if (numFiles == 0) return EXIT_SUCCESS;

@@ -55,6 +55,8 @@
 #if defined(__APPLE__) || defined(MACOSX)
 #include <OpenGL/gl.h>
 #include <OpenGL/glu.h>
+#elif defined(WIN32)
+#include <GL/glew.h>
 #else
 #include <GL/gl.h>
 #include <GL/glu.h>
@@ -248,6 +250,7 @@ windowRefreshCB()
 Viewer
 init(const std::string& progName, bool background)
 {
+    glewInit();
     if (sViewer == NULL) {
         tbb::mutex::scoped_lock lock(sLock);
         if (sViewer == NULL) {
@@ -835,8 +838,12 @@ ViewerImpl::sleep(double secs)
 {
     secs = fabs(secs);
     int isecs = int(secs);
-    struct timespec sleepTime = { isecs /*sec*/, int(1.0e9 * (secs - isecs)) /*nsec*/ };
-    nanosleep(&sleepTime, /*remainingTime=*/NULL);
+#ifndef WIN32
+	struct timespec sleepTime = { isecs /*sec*/, int(1.0e9 * (secs - isecs)) /*nsec*/ };
+//    nanosleep(&sleepTime, /*remainingTime=*/NULL);
+#else
+	Sleep(int(secs*1000));
+#endif
 }
 
 
@@ -1108,10 +1115,10 @@ ViewerImpl::keyCallback(int key, int action)
             toggleInfoText();
             break;
         case GLFW_KEY_LEFT:
-            showPrevGrid();
+        case '-':            showPrevGrid();
             break;
         case GLFW_KEY_RIGHT:
-            showNextGrid();
+        case '+':            showNextGrid();
             break;
 #if GLFW_VERSION_MAJOR >= 3
         case GLFW_KEY_ESCAPE:
