@@ -2,7 +2,7 @@
 # Included project can access these information using OPENVDB_VERSION, VERSION_H_IN and VERSION_RC_IN
 # Remember to call CONFIGURE_FILE( VERSION_RC_IN ${PROJECT_BINARY_DIR}/version.rc) to generate the resource file
 SET(VERSION_MAJOR 3  CACHE STRING "Major version" FORCE)
-SET(VERSION_MINOR 0 CACHE STRING "Minor version" FORCE)
+SET(VERSION_MINOR 1 CACHE STRING "Minor version" FORCE)
 SET(VERSION_PATCH 0  CACHE STRING "Patch version" FORCE)
 SET(VERSION_BUILD 0  CACHE STRING "Build version")
 
