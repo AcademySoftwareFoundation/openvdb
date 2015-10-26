@@ -409,7 +409,7 @@ template<typename PointDataTreeType, typename LeafOffsetArray>
 struct ConvertPointDataGridPositionOp {
 
     typedef typename PointDataTreeType::LeafNodeType    PointDataLeaf;
-    typedef PointDataAccessor<const PointDataTreeType>  PointDataAccessor;
+    typedef PointDataAccessor<const PointDataTreeType>  PointDataAccessorT;
 
     typedef typename LeafOffsetArray::const_reference   LeafOffsetPair;
 
@@ -426,7 +426,7 @@ struct ConvertPointDataGridPositionOp {
 
     void operator()(const tbb::blocked_range<size_t>& range) const {
 
-        PointDataAccessor acc(mTree);
+        PointDataAccessorT acc(mTree);
 
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
 
@@ -445,7 +445,7 @@ struct ConvertPointDataGridPositionOp {
                 Coord ijk = iter.getCoord();
                 Vec3d xyz = ijk.asVec3d();
 
-                typename PointDataAccessor::PointDataIndex pointIndex = acc.get(ijk);
+                typename PointDataAccessorT::PointDataIndex pointIndex = acc.get(ijk);
                 for (Index64 index = pointIndex.first; index < pointIndex.second; ++index) {
 
                     Vec3d pos = Vec3d(handle->get(index)) + xyz;
@@ -497,7 +497,7 @@ template<typename PointDataTreeType, typename LeafOffsetArray, typename Attribut
 struct ConvertPointDataGridAttributeOp {
 
     typedef typename PointDataTreeType::LeafNodeType    PointDataLeaf;
-    typedef PointDataAccessor<const PointDataTreeType>  PointDataAccessor;
+    typedef PointDataAccessor<const PointDataTreeType>  PointDataAccessorT;
 
     typedef typename LeafOffsetArray::const_reference   LeafOffsetPair;
 
@@ -514,7 +514,7 @@ struct ConvertPointDataGridAttributeOp {
 
     void operator()(const tbb::blocked_range<size_t>& range) const {
 
-        PointDataAccessor acc(mTree);
+        PointDataAccessorT acc(mTree);
 
         GAHandleType attributeHandle(&mAttribute);
 
@@ -534,7 +534,7 @@ struct ConvertPointDataGridAttributeOp {
 
                 Coord ijk = iter.getCoord();
 
-                typename PointDataAccessor::PointDataIndex pointIndex = acc.get(ijk);
+                typename PointDataAccessorT::PointDataIndex pointIndex = acc.get(ijk);
                 for (Index64 index = pointIndex.first; index < pointIndex.second; ++index) {
                     setAttributeValue(handle->get(n), attributeHandle, offset++);
                 }
