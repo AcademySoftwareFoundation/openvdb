@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -80,13 +80,13 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
-    
+
 /// @brief Provises a unified interface for sampling, i.e. interpolation.
 /// @details Order = 0: closest point
 ///          Order = 1: tri-linear
 ///          Order = 2: tri-quadratic
-///          Staggered: Set to true for MAC grids    
-template <size_t Order, bool Staggered = false>    
+///          Staggered: Set to true for MAC grids
+template <size_t Order, bool Staggered = false>
 struct Sampler
 {
     BOOST_STATIC_ASSERT(Order < 3);
@@ -97,21 +97,23 @@ struct Sampler
     static bool staggered();
     static size_t order();
 
-    /// @brief Sample @a inTree at @a inCoord
+    /// @brief Sample @a inTree at the floating-point index coordinate @a inCoord
     /// and store the result in @a result.
+    ///
     /// @return @c true if the sampled value is active.
     template<class TreeT>
     static bool sample(const TreeT& inTree, const Vec3R& inCoord,
                        typename TreeT::ValueType& result);
 
-    /// @brief Sample @a inTree at @a inCoord.
+    /// @brief Sample @a inTree at the floating-point index coordinate @a inCoord.
+    ///
     /// @return the reconstructed value
     template<class TreeT>
     static typename TreeT::ValueType sample(const TreeT& inTree, const Vec3R& inCoord);
 };
-    
+
 //////////////////////////////////////// Non-Staggered Samplers
-    
+
 // The following samplers operate in voxel space.
 // When the samplers are applied to grids holding vector or other non-scalar data,
 // the data is assumed to be collocated.  For example, using the BoxSampler on a grid
@@ -141,9 +143,8 @@ struct PointSampler
 };
 
 
-class BoxSampler
+struct BoxSampler
 {
-public:
     static const char* name() { return "box"; }
     static int radius() { return 1; }
     static bool mipmap() { return true; }
@@ -156,22 +157,37 @@ public:
     /// @return @c true if any one of the sampled values is active.
     template<class TreeT>
     static bool sample(const TreeT& inTree, const Vec3R& inCoord,
-        typename TreeT::ValueType& result);
+                       typename TreeT::ValueType& result);
 
     /// @brief Trilinearly reconstruct @a inTree at @a inCoord.
     /// @return the reconstructed value
     template<class TreeT>
     static typename TreeT::ValueType sample(const TreeT& inTree, const Vec3R& inCoord);
 
-private:
+    /// @brief Import all eight values from @a inTree to support
+    /// tri-linear interpolation. 
+    template<class ValueT, class TreeT, size_t N>
+    static inline void getValues(ValueT (&data)[N][N][N], const TreeT& inTree, Coord ijk);
+
+    /// @brief Import all eight values from @a inTree to support
+    /// tri-linear interpolation.
+    /// @return @c true if any of the eight values are active
+    template<class ValueT, class TreeT, size_t N>
+    static inline bool probeValues(ValueT (&data)[N][N][N], const TreeT& inTree, Coord ijk);
+
+    /// @brief Find the minimum and maximum values of the eight cell
+    /// values in @ data.
     template<class ValueT, size_t N>
-    static inline ValueT trilinearInterpolation(ValueT (& data)[N][N][N], const Vec3R& uvw);
+    static inline void extrema(ValueT (&data)[N][N][N], ValueT& vMin, ValueT& vMax);
+
+    /// @return the tri-linear interpolation with the unit cell coordinates @a uvw
+    template<class ValueT, size_t N>
+    static inline ValueT trilinearInterpolation(ValueT (&data)[N][N][N], const Vec3R& uvw);
 };
 
 
-class QuadraticSampler
+struct QuadraticSampler
 {
-public:
     static const char* name() { return "quadratic"; }
     static int radius() { return 1; }
     static bool mipmap() { return true; }
@@ -190,9 +206,9 @@ public:
     /// @return the reconstructed value
     template<class TreeT>
     static typename TreeT::ValueType sample(const TreeT& inTree, const Vec3R& inCoord);
-private:
+
     template<class ValueT, size_t N>
-    static inline ValueT triquadraticInterpolation(ValueT (& data)[N][N][N], const Vec3R& uvw);
+    static inline ValueT triquadraticInterpolation(ValueT (&data)[N][N][N], const Vec3R& uvw);
 };
 
 
@@ -362,14 +378,14 @@ private:
 
 /// @brief Specialization of GridSampler for construction from a ValueAccessor type
 ///
-/// @note This version should normally be favoured over the one above
+/// @note This version should normally be favored over the one above
 /// that takes a Grid or Tree. The reason is this version uses a
 /// ValueAccessor that performs fast (cached) access where the
-/// tree-based flavour performs slower (uncached) access.
+/// tree-based flavor performs slower (uncached) access.
 ///
 /// @warning Since this version stores a pointer to an (externally
 /// allocated) value accessor it is not threadsafe. Hence each thread
-/// should have it own instance of a GridSampler constructed from a
+/// should have its own instance of a GridSampler constructed from a
 /// local ValueAccessor. Alternatively the Grid/Tree-based GridSampler
 /// is threadsafe, but also slower.
 template<typename TreeT, typename SamplerType>
@@ -629,15 +645,97 @@ inline typename TreeT::ValueType
 PointSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 {
     return inTree.getValue(Coord(local_util::roundVec3(inCoord)));
-}    
+}
 
 
 //////////////////////////////////////// BoxSampler
 
+template<class ValueT, class TreeT, size_t N>
+inline void
+BoxSampler::getValues(ValueT (&data)[N][N][N], const TreeT& inTree, Coord ijk)
+{
+    data[0][0][0] = inTree.getValue(ijk); // i, j, k
+
+    ijk[2] += 1;
+    data[0][0][1] = inTree.getValue(ijk); // i, j, k + 1
+
+    ijk[1] += 1;
+    data[0][1][1] = inTree.getValue(ijk); // i, j+1, k + 1
+
+    ijk[2] -= 1;
+    data[0][1][0] = inTree.getValue(ijk); // i, j+1, k
+
+    ijk[0] += 1;
+    ijk[1] -= 1;
+    data[1][0][0] = inTree.getValue(ijk); // i+1, j, k
+
+    ijk[2] += 1;
+    data[1][0][1] = inTree.getValue(ijk); // i+1, j, k + 1
+
+    ijk[1] += 1;
+    data[1][1][1] = inTree.getValue(ijk); // i+1, j+1, k + 1
+
+    ijk[2] -= 1;
+    data[1][1][0] = inTree.getValue(ijk); // i+1, j+1, k
+}
+
+template<class ValueT, class TreeT, size_t N>
+inline bool
+BoxSampler::probeValues(ValueT (&data)[N][N][N], const TreeT& inTree, Coord ijk)
+{
+    bool hasActiveValues = false;
+    hasActiveValues |= inTree.probeValue(ijk, data[0][0][0]); // i, j, k
+
+    ijk[2] += 1;
+    hasActiveValues |= inTree.probeValue(ijk, data[0][0][1]); // i, j, k + 1
+
+    ijk[1] += 1;
+    hasActiveValues |= inTree.probeValue(ijk, data[0][1][1]); // i, j+1, k + 1
+
+    ijk[2] -= 1;
+    hasActiveValues |= inTree.probeValue(ijk, data[0][1][0]); // i, j+1, k
+
+    ijk[0] += 1;
+    ijk[1] -= 1;
+    hasActiveValues |= inTree.probeValue(ijk, data[1][0][0]); // i+1, j, k
+
+    ijk[2] += 1;
+    hasActiveValues |= inTree.probeValue(ijk, data[1][0][1]); // i+1, j, k + 1
+
+    ijk[1] += 1;
+    hasActiveValues |= inTree.probeValue(ijk, data[1][1][1]); // i+1, j+1, k + 1
+
+    ijk[2] -= 1;
+    hasActiveValues |= inTree.probeValue(ijk, data[1][1][0]); // i+1, j+1, k
+
+    return hasActiveValues;
+}
+
+template<class ValueT, size_t N>
+inline void
+BoxSampler::extrema(ValueT (&data)[N][N][N], ValueT& vMin, ValueT &vMax)
+{
+    vMin = vMax = data[0][0][0];
+    vMin = math::Min(vMin, data[0][0][1]);
+    vMax = math::Max(vMax, data[0][0][1]);
+    vMin = math::Min(vMin, data[0][1][0]);
+    vMax = math::Max(vMax, data[0][1][0]);
+    vMin = math::Min(vMin, data[0][1][1]);
+    vMax = math::Max(vMax, data[0][1][1]);
+    vMin = math::Min(vMin, data[1][0][0]);
+    vMax = math::Max(vMax, data[1][0][0]);
+    vMin = math::Min(vMin, data[1][0][1]);
+    vMax = math::Max(vMax, data[1][0][1]);
+    vMin = math::Min(vMin, data[1][1][0]);
+    vMax = math::Max(vMax, data[1][1][0]);
+    vMin = math::Min(vMin, data[1][1][1]);
+    vMax = math::Max(vMax, data[1][1][1]);
+}
+
 
 template<class ValueT, size_t N>
 inline ValueT
-BoxSampler::trilinearInterpolation(ValueT (& data)[N][N][N], const Vec3R& uvw)
+BoxSampler::trilinearInterpolation(ValueT (&data)[N][N][N], const Vec3R& uvw)
 {
     // Trilinear interpolation:
     // The eight surrounding latice values are used to construct the result. \n
@@ -673,27 +771,10 @@ BoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
     // fractional source coordinates.
     ValueT data[2][2][2];
 
-    bool hasActiveValues = false;
-    Coord ijk(inIdx);
-    hasActiveValues |= inTree.probeValue(ijk, data[0][0][0]);  // i, j, k
-    ijk[2] += 1;
-    hasActiveValues |= inTree.probeValue(ijk, data[0][0][1]);  // i, j, k + 1
-    ijk[1] += 1;
-    hasActiveValues |= inTree.probeValue(ijk, data[0][1][1]); // i, j+1, k + 1
-    ijk[2] = inIdx[2];
-    hasActiveValues |= inTree.probeValue(ijk, data[0][1][0]);  // i, j+1, k
-    ijk[0] += 1;
-    ijk[1] = inIdx[1];
-    hasActiveValues |= inTree.probeValue(ijk, data[1][0][0]); // i+1, j, k
-    ijk[2] += 1;
-    hasActiveValues |= inTree.probeValue(ijk, data[1][0][1]); // i+1, j, k + 1
-    ijk[1] += 1;
-    hasActiveValues |= inTree.probeValue(ijk, data[1][1][1]); // i+1, j+1, k + 1
-    ijk[2] = inIdx[2];
-    hasActiveValues |= inTree.probeValue(ijk, data[1][1][0]); // i+1, j+1, k
+    const bool hasActiveValues = BoxSampler::probeValues(data, inTree, Coord(inIdx));
 
     result = BoxSampler::trilinearInterpolation(data, uvw);
-    
+
     return hasActiveValues;
 }
 
@@ -711,24 +792,8 @@ BoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
     // fractional source coordinates.
     ValueT data[2][2][2];
 
-    Coord ijk(inIdx);
-    data[0][0][0] = inTree.getValue(ijk);  // i, j, k
-    ijk[2] += 1;
-    data[0][0][1] = inTree.getValue(ijk);  // i, j, k + 1
-    ijk[1] += 1;
-    data[0][1][1] = inTree.getValue(ijk); // i, j+1, k + 1
-    ijk[2] = inIdx[2];
-    data[0][1][0] = inTree.getValue(ijk);  // i, j+1, k
-    ijk[0] += 1;
-    ijk[1] = inIdx[1];
-    data[1][0][0] = inTree.getValue(ijk); // i+1, j, k
-    ijk[2] += 1;
-    data[1][0][1] = inTree.getValue(ijk); // i+1, j, k + 1
-    ijk[1] += 1;
-    data[1][1][1] = inTree.getValue(ijk); // i+1, j+1, k + 1
-    ijk[2] = inIdx[2];
-    data[1][1][0] = inTree.getValue(ijk); // i+1, j+1, k
-
+    BoxSampler::getValues(data, inTree, Coord(inIdx));
+   
     return BoxSampler::trilinearInterpolation(data, uvw);
 }
 
@@ -737,7 +802,7 @@ BoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 
 template<class ValueT, size_t N>
 inline ValueT
-QuadraticSampler::triquadraticInterpolation(ValueT (& data)[N][N][N], const Vec3R& uvw)
+QuadraticSampler::triquadraticInterpolation(ValueT (&data)[N][N][N], const Vec3R& uvw)
 {
     /// @todo For vector types, interpolate over each component independently.
     ValueT vx[3];
@@ -778,7 +843,7 @@ QuadraticSampler::triquadraticInterpolation(ValueT (& data)[N][N][N], const Vec3
         cx = static_cast<ValueT>(vx[1]);
     return static_cast<ValueT>(uvw.x() * (uvw.x() * ax + bx) + cx);
 }
-    
+
 template<class TreeT>
 inline bool
 QuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
@@ -802,7 +867,7 @@ QuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
     }
 
     result = QuadraticSampler::triquadraticInterpolation(data, uvw);
-    
+
     return active;
 }
 
@@ -821,7 +886,7 @@ QuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
     for (int dx = 0, ix = inLoIdx.x(); dx < 3; ++dx, ++ix) {
         for (int dy = 0, iy = inLoIdx.y(); dy < 3; ++dy, ++iy) {
             for (int dz = 0, iz = inLoIdx.z(); dz < 3; ++dz, ++iz) {
-                data[dx][dy][dz] = inTree.probeValue(Coord(ix, iy, iz));
+                data[dx][dy][dz] = inTree.getValue(Coord(ix, iy, iz));
             }
         }
     }
@@ -946,22 +1011,22 @@ StaggeredQuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 
 //////////////////////////////////////// Sampler
 
-template <>    
+template <>
 struct Sampler<0, false> : public PointSampler {};
 
-template <>    
+template <>
 struct Sampler<1, false> : public BoxSampler {};
 
-template <>    
+template <>
 struct Sampler<2, false> : public QuadraticSampler {};
 
-template <>    
+template <>
 struct Sampler<0, true> : public StaggeredPointSampler {};
 
-template <>    
+template <>
 struct Sampler<1, true> : public StaggeredBoxSampler {};
 
-template <>    
+template <>
 struct Sampler<2, true> : public StaggeredQuadraticSampler {};
 
 } // namespace tools
@@ -970,6 +1035,6 @@ struct Sampler<2, true> : public StaggeredQuadraticSampler {};
 
 #endif // OPENVDB_TOOLS_INTERPOLATION_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

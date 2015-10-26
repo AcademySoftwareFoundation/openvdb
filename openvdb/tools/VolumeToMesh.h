@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -87,7 +87,7 @@ volumeToMesh(
 ///
 /// @param grid         a scalar grid to mesh
 /// @param points       output list of world space points
-/// @param triangles    output quad index list
+/// @param triangles    output triangle index list
 /// @param quads        output quad index list
 /// @param isovalue     determines which isosurface to mesh
 /// @param adaptivity   surface adaptivity threshold [0 to 1]
@@ -245,7 +245,7 @@ public:
     /// @note The mask's tree configuration has to match @c GridT's tree configuration.
     void setSurfaceMask(const GridBase::ConstPtr& mask, bool invertMask = false);
 
-    /// @param grid A scalar grid used as an spatial multiplier for the adaptivity threshold.
+    /// @param grid A scalar grid used as a spatial multiplier for the adaptivity threshold.
     /// @note The grid's tree configuration has to match @c GridT's tree configuration.
     void setSpatialAdaptivity(const GridBase::ConstPtr& grid);
 
@@ -4678,6 +4678,6 @@ volumeToMesh(
 
 #endif // OPENVDB_TOOLS_VOLUME_TO_MESH_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

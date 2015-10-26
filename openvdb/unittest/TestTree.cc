@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -1430,7 +1430,27 @@ TestTree::testTopologyUnion()
             ASSERT_DOUBLES_EXACTLY_EQUAL(tree0.getValue(p), *iter);
         }
     }
+    
+    {// test union of a leaf and a tile
+        if (openvdb::FloatTree::DEPTH > 2) {
+            const int leafLevel = openvdb::FloatTree::DEPTH - 1;
+            const int tileLevel = leafLevel - 1;
+            const openvdb::Coord xyz(0);
+            
+            openvdb::FloatTree tree0;
+            tree0.addTile(tileLevel, xyz, /*value=*/0, /*activeState=*/true);
+            CPPUNIT_ASSERT(tree0.isValueOn(xyz));
 
+            openvdb::FloatTree tree1;
+            tree1.touchLeaf(xyz)->setValuesOn();
+            CPPUNIT_ASSERT(tree1.isValueOn(xyz));
+
+            tree0.topologyUnion(tree1);
+            CPPUNIT_ASSERT(tree0.isValueOn(xyz));
+            CPPUNIT_ASSERT_EQUAL(tree0.getValueDepth(xyz), leafLevel);
+        }
+    }
+     
 }// testTopologyUnion
 
 void
@@ -2927,6 +2947,6 @@ TestTree::testStealNode()
     }
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

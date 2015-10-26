@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -915,7 +915,6 @@ computeEnclosedRegionMask(const TreeType& tree, typename TreeType::ValueType iso
     typedef typename CharTreeType::LeafNodeType                                     CharLeafNodeType;
     typedef typename CharTreeType::RootNodeType                                     CharRootNodeType;
     typedef typename CharRootNodeType::NodeChainType                                CharNodeChainType;
-    typedef typename boost::mpl::at<CharNodeChainType, boost::mpl::int_<1> >::type  CharInternalNodeType;
 
     typedef typename TreeType::template ValueConverter<bool>::Type                  BoolTreeType;
     typedef typename BoolTreeType::LeafNodeType                                     BoolLeafNodeType;
@@ -1287,7 +1286,7 @@ extractEnclosedRegion(const GridOrTreeType& volume,
 
 #endif // OPENVDB_TOOLS_LEVEL_SET_UTIL_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
 

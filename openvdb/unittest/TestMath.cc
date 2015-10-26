@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -83,6 +83,23 @@ TestMath::testAll()
     {// Cbrt
         const double a = math::Cbrt(3.0);
         CPPUNIT_ASSERT(math::isApproxEqual(a*a*a, 3.0, 1e-6));
+    }
+    {// isNegative
+        CPPUNIT_ASSERT(!boost::is_signed<unsigned int>::value);
+        CPPUNIT_ASSERT(boost::is_signed<int>::value);
+        CPPUNIT_ASSERT(!boost::is_signed<bool>::value);
+        //CPPUNIT_ASSERT(boost::is_signed<double>::value);//fails!
+        //CPPUNIT_ASSERT(boost::is_signed<float>::value);//fails!
+        
+        CPPUNIT_ASSERT( math::isNegative(-1.0f));
+        CPPUNIT_ASSERT(!math::isNegative( 1.0f));
+        CPPUNIT_ASSERT( math::isNegative(-1.0));
+        CPPUNIT_ASSERT(!math::isNegative( 1.0));
+        CPPUNIT_ASSERT(!math::isNegative(true));
+        CPPUNIT_ASSERT(!math::isNegative(false));
+        CPPUNIT_ASSERT(!math::isNegative(1u));
+        CPPUNIT_ASSERT( math::isNegative(-1));
+        CPPUNIT_ASSERT(!math::isNegative( 1));
     }
 }
 
@@ -216,6 +233,6 @@ TestMath::testMinMaxIndex()
     CPPUNIT_ASSERT_EQUAL(size_t(2), openvdb::math::MaxIndex(j));
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

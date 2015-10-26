@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -117,7 +117,7 @@ extractSparseTree(const DenseType& dense, const OpType& functor,
                   const typename OpType::ResultValueType& background,
                   bool threaded = true);
 
-/// This struct that aids template resoluion of a new tree type
+/// This struct that aids template resolution of a new tree type
 /// has the same configuration at TreeType, but the ValueType from
 /// DenseType.
 template <typename DenseType, typename TreeType> struct DSConverter {
@@ -319,14 +319,14 @@ public:
         const Index kmax = range.cols().end();
 
 
-        // loop over all the canidate leafs. Adding only those with 'true' values
+        // loop over all the candidate leafs. Adding only those with 'true' values
         // to the tree
 
         for (Index i = imin; i < imax; ++i) {
             for (Index j = jmin; j < jmax; ++j) {
                 for (Index k = kmin; k < kmax; ++k) {
 
-                    // Calculate the origin of canidate leaf
+                    // Calculate the origin of candidate leaf
                     const openvdb::math::Coord origin =
                         mMin + openvdb::math::Coord(mWidth * i,
                                                     mWidth * j,
@@ -340,7 +340,7 @@ public:
                         leaf->setValuesOff();
                     }
 
-                    // The bouding box for this leaf
+                    // The bounding box for this leaf
 
                     openvdb::math::CoordBBox localBBox = leaf->getNodeBoundingBox();
 
@@ -423,7 +423,7 @@ extractSparseTree(const DenseType& dense, const OpType& functor,
                   bool threaded)
 {
 
-    // Construct the mask using a parallel reduce patern.
+    // Construct the mask using a parallel reduce pattern.
     // Each thread computes disjoint mask-trees.  The join merges
     // into a single tree.
 
@@ -434,7 +434,7 @@ extractSparseTree(const DenseType& dense, const OpType& functor,
 
 
 /// @brief Functor-based class used to extract data from a dense grid, at
-/// the index-space intersection with a suppiled maks in the form of a sparse tree.
+/// the index-space intersection with a supplied mask in the form of a sparse tree.
 /// The @c extractSparseTreeWithMask function wraps this class.
 template <typename DenseType, typename MaskTreeType>
 class SparseMaskedExtractor
@@ -489,14 +489,14 @@ public:
         ResultLeafNodeType* leaf = NULL;
 
 
-        // loop over all the canidate leafs. Adding only those with 'true' values
+        // loop over all the candidate leafs. Adding only those with 'true' values
         // to the tree
 
         for (size_t idx = range.begin(); idx < range.end(); ++ idx) {
 
             const typename BoolTree::LeafNodeType* boolLeaf = mLeafVec[idx];
 
-            // The bouding box for this leaf
+            // The bounding box for this leaf
 
             openvdb::math::CoordBBox localBBox = boolLeaf->getNodeBoundingBox();
 
@@ -707,7 +707,7 @@ public:
                      const OpType& functor):
         mDense(dense), mOp(functor), mBBox(dense.bbox())
     {
-        // The interation space is the intersection of the
+        // The iteration space is the intersection of the
         // input bbox and the index-space covered by the dense grid
         mBBox.intersect(bbox);
     }
@@ -717,7 +717,7 @@ public:
 
     void apply(bool threaded = true) {
 
-        // Early out if the interation space is empty
+        // Early out if the iteration space is empty
 
         if (mBBox.empty()) return;
 
@@ -725,7 +725,7 @@ public:
         const openvdb::math::Coord start = mBBox.getStart();
         const openvdb::math::Coord end   = mBBox.getEnd();
 
-        // The interation range only the slower two directions.
+        // The iteration range only the slower two directions.
         const RangeType range(start.x(), end.x(), 1,
                               start.y(), end.y(), 1);
 
@@ -791,7 +791,7 @@ transformDense(Dense<ValueT, openvdb::tools::LayoutZYX>& dense,
 {
     typedef ContiguousOp<ValueT, PointwiseOpT>  OpT;
 
-    // Convert the Op so it operates on an contiguous line in memory
+    // Convert the Op so it operates on a contiguous line in memory
 
     OpT op(functor);
 
@@ -836,13 +836,13 @@ public:
         BoolTreeT boolTree(mSource, false /*background*/, openvdb::TopologyCopy());
         boolTree.topologyUnion(mAlpha);
 
-        // Coposite regions that are represented by leafnodes in either mAlpha or mSource
+        // Composite regions that are represented by leafnodes in either mAlpha or mSource
         // Parallelize over bool-leafs
 
         openvdb::tree::LeafManager<const BoolTreeT> boolLeafs(boolTree);
         boolLeafs.foreach(*this, threaded);
 
-        // Composite tregions that are represnted by tiles
+        // Composite regions that are represented by tiles
         // Parallelize within each tile.
 
         typename BoolTreeT::ValueOnCIter citer = boolTree.cbeginValueOn();
@@ -944,7 +944,7 @@ public:
 
         if (alpha.isDense() /*all active values*/) {
 
-            // Optial path for dense alphaLeaf
+            // Optimal path for dense alphaLeaf
             const IntType size = bbox.max().z() + 1 - bbox.min().z();
 
             for (ijk[0] = bbox.min().x(); ijk[0] < bbox.max().x() + 1; ++ijk[0]) {
@@ -1008,7 +1008,7 @@ public:
                        bbox.min().y(), bbox.max().y(), LeafT::DIM,
                        bbox.min().z(), bbox.max().z(), LeafT::DIM);
 
-        // Interate over the range, compositing into
+        // Iterate over the range, compositing into
         // the dense grid using value accessors for
         // sparse the grids.
         if (threaded) {
@@ -1254,6 +1254,6 @@ void compositeToDense(
 
 #endif //OPENVDB_TOOLS_DENSESPARSETOOLS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

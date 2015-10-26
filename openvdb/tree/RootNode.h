@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -449,9 +449,9 @@ public:
     ///
     /// @note Instead of setting @a updateChildNodes to true, consider
     /// using tools::changeBackground or
-    /// tools::changeLevelSetBackground which are multi-threaded!  
+    /// tools::changeLevelSetBackground which are multi-threaded!
     void setBackground(const ValueType& value, bool updateChildNodes);
-    
+
     /// Return this node's background value.
     const ValueType& background() const { return mBackground; }
 
@@ -659,7 +659,7 @@ public:
     /// any nodes whose values are all the same (optionally to within a tolerance)
     /// and have the same active state.
     ///
-    /// @note Consider instead using tools::pruneTiles which is multi-threaded!
+    /// @note Consider instead using tools::prune which is multi-threaded!
     void prune(const ValueType& tolerance = zeroVal<ValueType>());
 
     /// @brief Add the given leaf node to this tree, creating a new branch if necessary.
@@ -685,7 +685,7 @@ public:
     /// @brief Add a tile containing voxel (x, y, z) at the root level,
     /// deleting the existing branch if necessary.
     void addTile(const Coord& xyz, const ValueType& value, bool state);
-    
+
     /// @brief Add a tile containing voxel (x, y, z) at the specified tree level,
     /// creating a new branch if necessary.  Delete any existing lower-level nodes
     /// that contain (x, y, z).
@@ -806,7 +806,7 @@ public:
     template<typename ArrayT>
     void stealNodes(ArrayT& array) { this->stealNodes(array, mBackground, false); }
     //@}
-    
+
     /// Densify active tiles, i.e., replace them with leaf-level active voxels.
     void voxelizeActiveTiles();
 
@@ -3393,6 +3393,6 @@ RootNode<ChildT>::doVisit2(RootNodeT& self, OtherRootNodeT& other, VisitorOp& op
 
 #endif // OPENVDB_TREE_ROOTNODE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

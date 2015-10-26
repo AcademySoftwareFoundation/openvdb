@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2014 DreamWorks Animation LLC
+# Copyright (c) 2012-2015 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -340,7 +340,6 @@ INCLUDE_NAMES := \
     tools/Composite.h \
     tools/Dense.h \
     tools/DenseSparseTools.h \
-    tools/DensityAdvect.h \
     tools/Diagnostics.h \
     tools/Filter.h \
     tools/GridOperators.h \
@@ -371,6 +370,7 @@ INCLUDE_NAMES := \
     tools/ValueTransformer.h \
     tools/VectorTransformer.h \
     tools/VelocityFields.h \
+    tools/VolumeAdvect.h \
     tools/VolumeToMesh.h \
     tools/VolumeToSpheres.h \
     tree/InternalNode.h \
@@ -928,6 +928,6 @@ ifneq (,$(strip $(wildcard $(DEPEND))))
     include $(DEPEND)
 endif
 
-# Copyright (c) 2012-2014 DreamWorks Animation LLC
+# Copyright (c) 2012-2015 DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

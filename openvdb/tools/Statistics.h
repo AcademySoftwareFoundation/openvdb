@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -81,7 +81,7 @@ template<typename IterT>
 inline math::Stats
 statistics(const IterT& iter, bool threaded = true);
 
-/// @brief Iterate over a grid and compute extremas (min/max) of
+/// @brief Iterate over a grid and compute extrema (min/max) of
 /// the values produced by applying the given functor at each voxel that is visited.
 /// @param iter      an iterator over the values of a grid or its tree
 ///                  (@c Grid::ValueOnCIter, @c Tree::ValueOffIter, etc.)
@@ -433,6 +433,6 @@ opStatistics(const IterT& iter, const OperatorT& op, bool threaded)
 
 #endif // OPENVDB_TOOLS_STATISTICS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

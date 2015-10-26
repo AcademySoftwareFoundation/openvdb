@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -370,7 +370,6 @@ SOP_OpenVDB_Fracture::process(
     const int visualization = evalInt("visualizepieces", 0, time);
     const bool segmentFragments = bool(evalInt("segmentfragments", 0, time));
 
-    typedef typename GridType::TreeType TreeType;
     typedef typename GridType::ValueType ValueType;
 
     typename GridType::Ptr firstGrid = openvdb::gridPtrCast<GridType>(grids.front());
@@ -940,6 +939,6 @@ SOP_OpenVDB_Fracture::process(
     }
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -87,7 +87,7 @@ public:
 
     /// @brief Return in @a bbox the axis-aligned bounding box of all
     /// leaf nodes and active tiles.
-    /// @details This is faster then calling evalActiveVoxelBoundingBox,
+    /// @details This is faster than calling evalActiveVoxelBoundingBox,
     /// which visits the individual active voxels, and hence
     /// evalLeafBoundingBox produces a less tight, i.e. approximate, bbox.
     /// @return @c false if the bounding box is empty (in which case
@@ -567,7 +567,7 @@ public:
     template<typename ArrayT> void getNodes(ArrayT& array) { mRoot.getNodes(array); }
     template<typename ArrayT> void getNodes(ArrayT& array) const { mRoot.getNodes(array); }
     //@}
-    
+
     /// @brief Steals all nodes of a certain type from the tree and
     /// adds them to a container with the following API:
     /// @code
@@ -624,13 +624,13 @@ public:
     void attachAccessor(ValueAccessorBase<Tree, false>&) const {}
     void attachAccessor(ValueAccessorBase<const Tree, false>&) const {}
     //@}
-    
+
     //@{
     /// Deregister an accessor so that it is no longer automatically cleared.
     void releaseAccessor(ValueAccessorBase<Tree, true>&) const;
     void releaseAccessor(ValueAccessorBase<const Tree, true>&) const;
     //@}
-    
+
     //@{
     /// Dummy implementations
     void releaseAccessor(ValueAccessorBase<Tree, false>&) const {}
@@ -640,7 +640,7 @@ public:
     /// @brief Return this tree's background value wrapped as metadata.
     /// @note Query the metadata object for the value's type.
     virtual Metadata::Ptr getBackgroundValue() const;
-    
+
     /// @brief Return this tree's background value.
     ///
     /// @note Use tools::changeBackground to efficiently modify the
@@ -1748,7 +1748,8 @@ Tree<RootNodeType>::getBackgroundValue() const
     if (Metadata::isRegisteredType(valueType())) {
         typedef TypedMetadata<ValueType> MetadataT;
         result = Metadata::createMetadata(valueType());
-        if (MetadataT* m = dynamic_cast<MetadataT*>(result.get())) {
+        if (result->typeName() == MetadataT::staticTypeName()) {
+            MetadataT* m = static_cast<MetadataT*>(result.get());
             m->value() = mRoot.background();
         }
     }
@@ -2291,6 +2292,6 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
 
 #endif // OPENVDB_TREE_TREE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

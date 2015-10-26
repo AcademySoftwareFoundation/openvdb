@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -297,7 +297,7 @@ MinMaxVoxel<TreeType>::join(const MinMaxVoxel<TreeType>& rhs)
 
 ////////////////////////////////////////
 
-///@todo Move this into an graphics library.
+///@todo Move this into a graphics library.
 // Should be shared with the stand alone viewer.
 
 class WireBoxBuilder
@@ -1067,6 +1067,6 @@ processTypedVectorGrid(GridPtrType grid, OpType& op)
 
 #endif // OPENVDB_MAYA_UTIL_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

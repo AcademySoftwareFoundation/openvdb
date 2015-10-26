@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -201,7 +201,7 @@ struct AdvectionParms
     const GU_PrimVDB *mCptPrim;
     PropagationType mPropagationType;
     IntegrationType mIntegrationType;
-    float mTimeStep;
+    double mTimeStep;
     int mIterations, mSteps;
     bool mStaggered, mStreamlines;
 };
@@ -357,7 +357,7 @@ class AdvectionOp
 public:
 
     AdvectionOp(const GridType& velocityGrid, GU_Detail& geo, hvdb::Interrupter& boss,
-        float timeStep, GA_ROHandleF traillen, int steps)
+        double timeStep, GA_ROHandleF traillen, int steps)
         : mVelocityGrid(velocityGrid)
         , mCptGrid(NULL)
         , mGeo(geo)
@@ -370,7 +370,7 @@ public:
     }
 
     AdvectionOp(const GridType& velocityGrid, const GridType& cptGrid, GU_Detail& geo,
-        hvdb::Interrupter& boss, float timeStep, int steps, int cptIterations)
+        hvdb::Interrupter& boss, double timeStep, int steps, int cptIterations)
         : mVelocityGrid(velocityGrid)
         , mCptGrid(&cptGrid)
         , mGeo(geo)
@@ -410,9 +410,9 @@ public:
                     w[1] = ElementType(p[1]);
                     w[2] = ElementType(p[2]);
 
-                    float timestep = mTimeStep;
+                    ElementType timestep = static_cast<ElementType>(mTimeStep);
                     if (mTrailLen.isValid()) {
-                        timestep *= mTrailLen.get(i);
+                        timestep *= static_cast<ElementType>(mTrailLen.get(i));
                     }
 
                     for (int n = 0; n < mSteps; ++n) {
@@ -435,7 +435,7 @@ private:
     const GridType* mCptGrid;
     GU_Detail& mGeo;
     hvdb::Interrupter& mBoss;
-    float mTimeStep;
+    double mTimeStep;
     GA_ROHandleF mTrailLen;
     const int mSteps, mCptIterations;
 };
@@ -564,7 +564,7 @@ public:
     }
 
 private:
-    AdvectionParms& mParms;
+    AdvectionParms&    mParms;
     hvdb::Interrupter& mBoss;
 };
 
@@ -887,6 +887,6 @@ SOP_OpenVDBAdvectPoints::evalAdvectionParms(OP_Context& context, AdvectionParms&
     return true;
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

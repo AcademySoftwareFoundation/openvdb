@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -54,9 +54,9 @@ class Ray
 {
 public:
     BOOST_STATIC_ASSERT(boost::is_floating_point<RealT>::value);
-    typedef RealT      RealType;
-    typedef Vec3<Real> Vec3Type;
-    typedef Vec3Type   Vec3T;
+    typedef RealT       RealType;
+    typedef Vec3<RealT> Vec3Type;
+    typedef Vec3Type    Vec3T;
     struct TimeSpan {
         RealT t0, t1;
         /// @brief Default constructor
@@ -67,7 +67,7 @@ public:
         inline void set(RealT _t0, RealT _t1) { t0=_t0; t1=_t1; }
         /// @brief Get both times
         inline void get(RealT& _t0, RealT& _t1) const { _t0=t0; _t1=t1; }
-        /// @brief Return @c true if t1 is larger then t0 by at least eps.
+        /// @brief Return @c true if t1 is larger than t0 by at least eps.
         inline bool valid(RealT eps=math::Delta<RealT>::value()) const { return (t1-t0)>eps; }
         /// @brief Return the midpoint of the ray.
         inline RealT mid() const { return 0.5*(t0 + t1); }
@@ -138,10 +138,10 @@ public:
     /// @brief Return the midpoint of the ray.
     inline Vec3R mid() const { return (*this)(mTimeSpan.mid()); }
 
-    /// @brief Return @c true if t0 is strictly less then t1.
+    /// @brief Return @c true if t0 is strictly less than t1.
     OPENVDB_DEPRECATED inline bool test() const { return mTimeSpan.valid(RealT(0)); }
 
-    /// @brief Return @c true if t1 is larger then t0 by at least eps.
+    /// @brief Return @c true if t1 is larger than t0 by at least eps.
     inline bool valid(RealT eps=math::Delta<float>::value()) const
       {
           return mTimeSpan.valid(eps);
@@ -152,7 +152,7 @@ public:
 
     /// @brief Return a new Ray that is transformed with the specified map.
     /// @param map  the map from which to construct the new Ray.
-    /// @warning Assumes a linear map and a normalize direction.
+    /// @warning Assumes a linear map and a normalized direction.
     /// @details The requirement that the direction is normalized
     /// follows from the transformation of t0 and t1 - and that fact that
     /// we want applyMap and applyInverseMap to be inverse operations.
@@ -160,7 +160,7 @@ public:
     inline Ray applyMap(const MapType& map) const
     {
         assert(map.isLinear());
-        assert(math::isApproxEqual(mDir.length(), RealT(1)));
+        assert(math::isRelOrApproxEqual(mDir.length(), RealT(1), Tolerance<RealT>::value(), Delta<RealT>::value()));
         const Vec3T eye = map.applyMap(mEye);
         const Vec3T dir = map.applyJacobian(mDir);
         const RealT length = dir.length();
@@ -169,7 +169,7 @@ public:
 
     /// @brief Return a new Ray that is transformed with the inverse of the specified map.
     /// @param map  the map from which to construct the new Ray by inverse mapping.
-    /// @warning Assumes a linear map and a normalize direction.
+    /// @warning Assumes a linear map and a normalized direction.
     /// @details The requirement that the direction is normalized
     /// follows from the transformation of t0 and t1 - and that fact that
     /// we want applyMap and applyInverseMap to be inverse operations.
@@ -177,7 +177,7 @@ public:
     inline Ray applyInverseMap(const MapType& map) const
     {
         assert(map.isLinear());
-        assert(math::isApproxEqual(mDir.length(), RealT(1)));
+        assert(math::isRelOrApproxEqual(mDir.length(), RealT(1), Tolerance<RealT>::value(), Delta<RealT>::value()));
         const Vec3T eye = map.applyInverseMap(mEye);
         const Vec3T dir = map.applyInverseJacobian(mDir);
         const RealT length = dir.length();
@@ -337,6 +337,6 @@ inline std::ostream& operator<<(std::ostream& os, const Ray<RealT>& r)
 
 #endif // OPENVDB_MATH_RAY_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

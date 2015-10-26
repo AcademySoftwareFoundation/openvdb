@@ -10,7 +10,7 @@ consistency and maintainability.  If there is a rule that you would like
 clarified, changed, or added, please send a note to openvdb@gmail.com.
 
 
-@section sStyleContents
+@section sStyleContents Contents
 - @ref sNamingConventions
   - @ref sNamespaceConventions
   - @ref sClassConventions

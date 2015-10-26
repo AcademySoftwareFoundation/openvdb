@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -56,7 +56,7 @@ namespace tools {
 /// optional scalar field can be used to produce a (smooth) alpha mask
 /// for the filtering.
 ///
-/// @note This class performs propper interface tracking which allows
+/// @note This class performs proper interface tracking which allows
 /// for unrestricted surface deformations
 template<typename GridT,
          typename MaskT = typename GridT::template ValueConverter<float>::Type,
@@ -97,7 +97,7 @@ public:
     /// @details Mask values outside the range maps to alpha values of
     /// respectfully zero and one, and values inside the range maps
     /// smoothly to 0->1 (unless of course the mask is inverted).
-    /// @throw ValueError if @a min is not smaller then @a max.
+    /// @throw ValueError if @a min is not smaller than @a max.
     void setMaskRange(AlphaType min, AlphaType max)
     {
         if (!(min < max)) OPENVDB_THROW(ValueError, "Invalid mask range (expects min < max)");
@@ -119,15 +119,15 @@ public:
         Filter f(this, mask); f.meanCurvature();
     }
 
-    /// @brief One iteration of laplacian flow of the level set.
+    /// @brief One iteration of Laplacian flow of the level set.
     /// @param mask Optional alpha mask.
     void laplacian(const MaskType* mask = NULL)
     {
         Filter f(this, mask); f.laplacian();
     }
 
-    /// @brief One iteration of a fast separable gaussian filter.
-    /// @param width Width of the gaussian kernel in voxel units.
+    /// @brief One iteration of a fast separable Gaussian filter.
+    /// @param width Width of the Gaussian kernel in voxel units.
     /// @param mask Optional alpha mask.
     ///
     /// @note This is approximated as 4 iterations of a separable mean filter
@@ -167,7 +167,7 @@ public:
     }
 
 private:
-    // disallow copy construction and copy by assinment!
+    // disallow copy construction and copy by assignment!
     LevelSetFilter(const LevelSetFilter&);// not implemented
     LevelSetFilter& operator=(const LevelSetFilter&);// not implemented
 
@@ -407,13 +407,13 @@ Filter::meanCurvature(const LeafRange& range)
     }
 }
 
-/// Performs laplacian diffusion. Note if the grids contains a true
+/// Performs Laplacian diffusion. Note if the grids contains a true
 /// signed distance field (e.g. a solution to the Eikonal equation)
 /// Laplacian diffusions (e.g. geometric heat equation) is actually
 /// identical to mean curvature diffusion, yet less computationally
 /// expensive! In other words if you're performing renormalization
 /// anyway (e.g. rebuilding the narrow-band) you should consider
-/// performing laplacian diffusion over mean curvature flow!
+/// performing Laplacian diffusion over mean curvature flow!
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
 LevelSetFilter<GridT, MaskT, InterruptT>::
@@ -541,6 +541,6 @@ Filter::box(const LeafRange& range, Int32 w)
 
 #endif // OPENVDB_TOOLS_LEVELSETFILTER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

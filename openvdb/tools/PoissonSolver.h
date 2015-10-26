@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -29,7 +29,9 @@
 ///////////////////////////////////////////////////////////////////////////
 //
 /// @file PoissonSolver.h
+///
 /// @authors D.J. Hill, Peter Cucka
+///
 /// @brief Solve Poisson's equation &nabla;<sup><small>2</small></sup><i>x</i> = <i>b</i>
 /// for <i>x</i>, where @e b is a vector comprising the values of all of the active voxels
 /// in a grid.
@@ -92,6 +94,9 @@
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/tree/Tree.h>
 #include <openvdb/util/NullInterrupter.h>
+
+#include "Morphology.h" // for erodeVoxels
+
 #include <boost/scoped_array.hpp>
 
 
@@ -173,7 +178,7 @@ solveWithBoundaryConditionsAndPreconditioner(const TreeType&, const BoundaryOp&,
 
 template<typename PreconditionerType, typename TreeType, typename DomainTreeType, typename BoundaryOp, typename Interrupter>
 inline typename TreeType::Ptr
-solveWithBoundaryConditionsAndPreconditioner(const TreeType&, const DomainTreeType&, const BoundaryOp&, 
+solveWithBoundaryConditionsAndPreconditioner(const TreeType&, const DomainTreeType&, const BoundaryOp&,
                                              math::pcg::State&, Interrupter&);
 //@}
 
@@ -402,7 +407,6 @@ createVectorFromTree(const SourceTreeType& tree,
 {
     typedef typename SourceTreeType::template ValueConverter<VIndex>::Type VIdxTreeT;
     typedef tree::LeafManager<const VIdxTreeT>           VIdxLeafMgrT;
-    typedef typename SourceTreeType::ValueType           ValueT;
     typedef typename math::pcg::Vector<VectorValueType>  VectorT;
 
     // Allocate the vector.
@@ -624,10 +628,8 @@ createISLaplacianWithBoundaryConditions(
     const BoundaryOp& boundaryOp,
     typename math::pcg::Vector<LaplacianMatrix::ValueType>& source)
 {
-    typedef LaplacianMatrix::ValueType                   ValueT;
     typedef typename BoolTreeType::template ValueConverter<VIndex>::Type VIdxTreeT;
     typedef typename tree::LeafManager<const VIdxTreeT>  VIdxLeafMgrT;
-    typedef typename VIdxTreeT::LeafNodeType             VIdxLeafT;
 
     // The number of active voxels is the number of degrees of freedom.
     const Index64 numDoF = idxTree.activeVoxelCount();
@@ -683,8 +685,8 @@ inline typename TreeType::Ptr
 solveWithBoundaryConditionsAndPreconditioner(const TreeType& inTree,
     const BoundaryOp& boundaryOp, math::pcg::State& state, Interrupter& interrupter)
 {
-    
-    return solveWithBoundaryConditionsAndPreconditioner<PreconditionerType>(inTree /*source*/, inTree /*domain mask*/, 
+
+    return solveWithBoundaryConditionsAndPreconditioner<PreconditionerType>(inTree /*source*/, inTree /*domain mask*/,
                                                                             boundaryOp, state, interrupter);
 }
 
@@ -692,7 +694,7 @@ template<typename PreconditionerType, typename TreeType, typename DomainTreeType
 inline typename TreeType::Ptr
 solveWithBoundaryConditionsAndPreconditioner(const TreeType& inTree,
                                              const DomainTreeType& domainMask,
-                                             const BoundaryOp& boundaryOp, 
+                                             const BoundaryOp& boundaryOp,
                                              math::pcg::State& state, Interrupter& interrupter)
 {
 
@@ -743,7 +745,7 @@ solveWithBoundaryConditionsAndPreconditioner(const TreeType& inTree,
 
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

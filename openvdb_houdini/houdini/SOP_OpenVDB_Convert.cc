@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -1335,7 +1335,10 @@ SOP_OpenVDB_Convert::cookMySop(OP_Context& context)
     try {
         hutil::ScopedInputLock lock(*this, context);
 
-        duplicateSourceStealable(0, context);
+        // We are intentionally not performing a duplicateSourceStealable() here due to
+        // specific implementation in this SOP which causes undesirable behavior when
+        // attempting to "steal" the geometry
+        duplicateSource(0, context);
 
         const fpreal t = context.getTime();
 
@@ -1412,6 +1415,6 @@ SOP_OpenVDB_Convert::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

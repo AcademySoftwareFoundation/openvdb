@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -50,6 +50,7 @@
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Util.h>
 
+#include "ChangeBackground.h"
 #include "Prune.h" // for pruneInactive and pruneLevelSet
 #include "SignedFloodFill.h" // for signedFloodFillWithValues
 
@@ -189,9 +190,9 @@ struct QuadAndTriangleDataAdapter {
 
     QuadAndTriangleDataAdapter(const std::vector<PointType>& points,
         const std::vector<PolygonType>& polygons)
-        : mPointArray(&points[0])
+        : mPointArray(points.empty() ? NULL : &points[0])
         , mPointArraySize(points.size())
-        , mPolygonArray(&polygons[0])
+        , mPolygonArray(polygons.empty() ? NULL : &polygons[0])
         , mPolygonArraySize(polygons.size())
     {
     }
@@ -604,7 +605,7 @@ struct StashOriginAndStoreOffset
     typedef typename TreeType::LeafNodeType LeafNodeType;
 
     StashOriginAndStoreOffset(std::vector<LeafNodeType*>& nodes, Coord* coordinates)
-        : mNodes(&nodes[0]), mCoordinates(coordinates)
+        : mNodes(nodes.empty() ? NULL : &nodes[0]), mCoordinates(coordinates)
     {
     }
 
@@ -627,7 +628,7 @@ struct RestoreOrigin
     typedef typename TreeType::LeafNodeType LeafNodeType;
 
     RestoreOrigin(std::vector<LeafNodeType*>& nodes, const Coord* coordinates)
-        : mNodes(&nodes[0]), mCoordinates(coordinates)
+        : mNodes(nodes.empty() ? NULL : &nodes[0]), mCoordinates(coordinates)
     {
     }
 
@@ -780,7 +781,7 @@ public:
     typedef LeafNodeConnectivityTable<TreeType>     ConnectivityTable;
 
     SweepExteriorSign(Axis axis, const std::vector<size_t>& startNodeIndices, ConnectivityTable& connectivity)
-        : mStartNodeIndices(&startNodeIndices[0])
+        : mStartNodeIndices(startNodeIndices.empty() ? NULL : &startNodeIndices[0])
         , mConnectivity(&connectivity)
         , mAxis(axis)
     {
@@ -1044,7 +1045,7 @@ public:
     typedef typename TreeType::LeafNodeType         LeafNodeType;
 
     SeedFillExteriorSign(std::vector<LeafNodeType*>& nodes, bool* changedNodeMask)
-        : mNodes(&nodes[0])
+        : mNodes(nodes.empty() ? NULL : &nodes[0])
         , mChangedNodeMask(changedNodeMask)
     {
     }
@@ -1098,7 +1099,7 @@ public:
     typedef typename TreeType::LeafNodeType         LeafNodeType;
 
     SyncVoxelMask(std::vector<LeafNodeType*>& nodes, const bool* changedNodeMask,  bool* changedVoxelMask)
-        : mNodes(&nodes[0])
+        : mNodes(nodes.empty() ? NULL : &nodes[0])
         , mChangedNodeMask(changedNodeMask)
         , mChangedVoxelMask(changedVoxelMask)
     {
@@ -1300,7 +1301,7 @@ struct ComputeIntersectingVoxelSign
         const TreeType& distTree,
         const Int32TreeType& indexTree,
         const MeshDataAdapter& mesh)
-        : mDistNodes(&distNodes[0])
+        : mDistNodes(distNodes.empty() ? NULL : &distNodes[0])
         , mDistTree(&distTree)
         , mIndexTree(&indexTree)
         , mMesh(&mesh)
@@ -1630,7 +1631,7 @@ struct ValidateIntersectingVoxels
 
     ValidateIntersectingVoxels(TreeType& tree, std::vector<LeafNodeType*>& nodes)
         : mTree(&tree)
-        , mNodes(&nodes[0])
+        , mNodes(nodes.empty() ? NULL : &nodes[0])
     {
     }
 
@@ -1683,7 +1684,7 @@ struct RemoveSelfIntersectingSurface
 
     RemoveSelfIntersectingSurface(std::vector<LeafNodeType*>& nodes,
         TreeType& distTree, Int32TreeType& indexTree)
-        : mNodes(&nodes[0])
+        : mNodes(nodes.empty() ? NULL : &nodes[0])
         , mDistTree(&distTree)
         , mIndexTree(&indexTree)
     {
@@ -1764,7 +1765,7 @@ releaseLeafNodes(TreeType& tree)
     tree.getNodes(nodes);
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
-        ReleaseChildNodes<InternalNodeType>(&nodes[0]));
+        ReleaseChildNodes<InternalNodeType>(nodes.empty() ? NULL : &nodes[0]));
 }
 
 
@@ -1826,8 +1827,10 @@ combineData(DistTreeType& lhsDist, IndexTreeType& lhsIdx,
     tasks.wait();
 
     // Combine overlapping leaf nodes
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, overlappingDistNodes.size()),
-        CombineLeafNodes<DistTreeType>(lhsDist, lhsIdx, &overlappingDistNodes[0], &overlappingIdxNodes[0]));
+    if (!overlappingDistNodes.empty() && !overlappingIdxNodes.empty()) {
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, overlappingDistNodes.size()),
+            CombineLeafNodes<DistTreeType>(lhsDist, lhsIdx, &overlappingDistNodes[0], &overlappingIdxNodes[0]));
+    }
 }
 
 
@@ -2098,7 +2101,7 @@ struct DiffLeafNodeMask
 
     DiffLeafNodeMask(const TreeType& rhsTree,
         std::vector<BoolLeafNodeType*>& lhsNodes)
-        : mRhsTree(&rhsTree), mLhsNodes(&lhsNodes[0])
+        : mRhsTree(&rhsTree), mLhsNodes(lhsNodes.empty() ? NULL : &lhsNodes[0])
     {
     }
 
@@ -2125,8 +2128,8 @@ template<typename LeafNodeTypeA, typename LeafNodeTypeB>
 struct UnionValueMasks
 {
     UnionValueMasks(std::vector<LeafNodeTypeA*>& nodesA, std::vector<LeafNodeTypeB*>& nodesB)
-        : mNodesA(&nodesA[0])
-        , mNodesB(&nodesB[0])
+        : mNodesA(nodesA.empty() ? NULL : &nodesA[0])
+        , mNodesB(nodesB.empty() ? NULL : &nodesB[0])
     {
     }
 
@@ -2152,7 +2155,7 @@ struct ConstructVoxelMask
 
     ConstructVoxelMask(BoolTreeType& maskTree, const TreeType& tree, std::vector<LeafNodeType*>& nodes)
         : mTree(&tree)
-        , mNodes(&nodes[0])
+        , mNodes(nodes.empty() ? NULL : &nodes[0])
         , mLocalMaskTree(false)
         , mMaskTree(&maskTree)
     {
@@ -2273,7 +2276,7 @@ struct ExpandNarrowband
         ValueType exteriorBandWidth,
         ValueType interiorBandWidth,
         ValueType voxelSize)
-        : mMaskNodes(&maskNodes[0])
+        : mMaskNodes(maskNodes.empty() ? NULL : &maskNodes[0])
         , mMaskTree(&maskTree)
         , mDistTree(&distTree)
         , mIndexTree(&indexTree)
@@ -2625,7 +2628,7 @@ struct TransformValues
 
             for (iter = mNodes[n]->beginValueOn(); iter; ++iter) {
                 ValueType& val = const_cast<ValueType&>(iter.getValue());
-                val = w[!udf && (val < ValueType(0.0))] * std::sqrt(std::abs(val));
+                val = w[udf || (val < ValueType(0.0))] * std::sqrt(std::abs(val));
             }
         }
     }
@@ -2646,7 +2649,7 @@ struct InactivateValues
 
     InactivateValues(std::vector<LeafNodeType*>& nodes,
         ValueType exBandWidth, ValueType inBandWidth)
-        : mNodes(&nodes[0])
+        : mNodes(nodes.empty() ? NULL : &nodes[0])
         , mExBandWidth(exBandWidth)
         , mInBandWidth(inBandWidth)
     {
@@ -2683,7 +2686,6 @@ private:
 };
 
 
-
 template<typename TreeType>
 struct OffsetValues
 {
@@ -2691,7 +2693,7 @@ struct OffsetValues
     typedef typename TreeType::ValueType      ValueType;
 
     OffsetValues(std::vector<LeafNodeType*>& nodes, ValueType offset)
-        : mNodes(&nodes[0]), mOffset(offset)
+        : mNodes(nodes.empty() ? NULL : &nodes[0]), mOffset(offset)
     {
     }
 
@@ -2724,7 +2726,7 @@ struct Renormalize
 
     Renormalize(const TreeType& tree, const std::vector<LeafNodeType*>& nodes, ValueType* buffer, ValueType voxelSize)
         : mTree(&tree)
-        , mNodes(&nodes[0])
+        , mNodes(nodes.empty() ? NULL : &nodes[0])
         , mBuffer(buffer)
         , mVoxelSize(voxelSize)
     {
@@ -2786,7 +2788,7 @@ struct MinCombine
     typedef typename TreeType::ValueType      ValueType;
 
     MinCombine(std::vector<LeafNodeType*>& nodes, const ValueType* buffer)
-        : mNodes(&nodes[0]), mBuffer(buffer)
+        : mNodes(nodes.empty() ? NULL : &nodes[0]), mBuffer(buffer)
     {
     }
 
@@ -3064,6 +3066,8 @@ meshToVolume(
     if (computeSignedDistanceField) {
         distTree.root().setBackground(exteriorWidth, /*updateChildNodes=*/false);
         tools::signedFloodFillWithValues(distTree, exteriorWidth, -interiorWidth);
+    } else {
+        tools::changeBackground(distTree, exteriorWidth);
     }
 
     if (interrupter.wasInterrupted(54)) return distGrid;
@@ -3217,6 +3221,10 @@ doMeshConversion(
     float inBandWidth,
     bool unsignedDistanceField = false)
 {
+    if (points.empty()) {
+        return typename GridType::Ptr(new GridType(typename GridType::ValueType(exBandWidth)));
+    }
+
     const size_t numPoints = points.size();
     boost::scoped_array<Vec3s> indexSpacePoints(new Vec3s[numPoints]);
 
@@ -3911,6 +3919,6 @@ createLevelSetBox(const math::BBox<VecType>& bbox,
 
 #endif // OPENVDB_TOOLS_MESH_TO_VOLUME_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -39,8 +39,8 @@
 /// as the level set grid.
 ///
 /// @note This fast particle to level set converter is always intended
-/// to be combined with some kind of surface postprocessing,
-/// i.e. tools::Filter. Without such postprocessing the generated
+/// to be combined with some kind of surface post processing,
+/// i.e. tools::Filter. Without such post processing the generated
 /// surface is typically too noisy and blobby. However it serves as a
 /// great and fast starting point for subsequent level set surface
 /// processing and convolution.
@@ -122,7 +122,7 @@ namespace tools {
 namespace p2ls_internal {
 // This is a simple type that combines a distance value and a particle
 // attribute. It's required for attribute transfer which is performed
-// in the ParticlesToLevelSet::Raster memberclass defined below.
+// in the ParticlesToLevelSet::Raster member class defined below.
 template<typename VisibleT, typename BlindT> class BlindData;
 }// namespace p2ls_internal
 
@@ -151,8 +151,8 @@ public:
     /// @param interrupt Callback to interrupt a long-running process
     ///
     /// @note The input grid is assumed to be a valid level set and if
-    /// it already contains voxels (with SDF values) partices are unioned
-    /// onto the exisinting level set surface. However, if attribute tranfer
+    /// it already contains voxels (with SDF values) particles are unioned
+    /// onto the existing level set surface. However, if attribute transfer
     /// is enabled, i.e. AttributeT != void, attributes are only
     /// generated for voxels that overlap with particles, not the existing
     /// voxels in the input grid (for which no attributes exist!).
@@ -174,7 +174,7 @@ public:
     /// and therefore needs to be called before any of these grids are
     /// used and after the last call to any of the rasterizer methods.
     ///
-    /// @note Avoid calling this method more then once and only after
+    /// @note Avoid calling this method more than once and only after
     /// all the particles have been rasterized. It has no effect or
     /// overhead if attribute transfer is disabled, i.e. AttributeT =
     /// void and prune is false.
@@ -210,7 +210,7 @@ public:
     /// @brief set the largest radius allowed in voxel units
     void setRmax(Real Rmax) { mRmax = math::Max(mRmin,Rmax); }
 
-    /// @brief Rreturn the grain-size used for multi-threading
+    /// @brief Returns the grain-size used for multi-threading
     int  getGrainSize() const { return mGrainSize; }
     /// @brief Set the grain-size used for multi-threading.
     /// @note A grainsize of 0 or less disables multi-threading!
@@ -377,7 +377,7 @@ ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::finalize(bool prune)
     for (LeafIterT n = tree.cbeginLeaf(); n; ++n) {
         const LeafT& leaf = *n;
         const openvdb::Coord xyz = leaf.origin();
-        // Get leafnodes that were allocated during topology contruction!
+        // Get leafnodes that were allocated during topology construction!
         SdfLeafT* sdfLeaf = sdfTree->probeLeaf(xyz);
         AttLeafT* attLeaf = attTree->probeLeaf(xyz);
         // Use linear offset (vs coordinate) access for better performance!
@@ -706,9 +706,9 @@ private:
     /// @note For best performance all computations are performed in
     /// voxel-space with the important exception of the final level set
     /// value that is converted to world units (e.g. the grid stores
-    /// the closest Euclidian signed distances measured in world
+    /// the closest Euclidean signed distances measured in world
     /// units). Also note we use the convention of positive distances
-    /// outside the surface an negative distances inside the surface.
+    /// outside the surface and negative distances inside the surface.
     bool makeSphere(const Vec3R &P, SdfT R, const AttT& att, AccessorT& acc)
     {
         const ValueT inside = -mGrid->background();
@@ -841,6 +841,6 @@ inline BlindData<VisibleT, BlindT> Abs(const BlindData<VisibleT, BlindT>& x)
 
 #endif // OPENVDB_TOOLS_PARTICLES_TO_LEVELSET_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

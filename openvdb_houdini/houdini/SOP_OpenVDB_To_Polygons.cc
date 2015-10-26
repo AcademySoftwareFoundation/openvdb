@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -879,6 +879,7 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
 
     openvdb::tools::MeshToVoxelEdgeData edgeData;
 
+# if 0
     // Check for reference VDB
     {
         const GA_PrimitiveGroup *refGroup =
@@ -891,6 +892,7 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
             }
         }
     }
+#endif
 
     // Check for reference mesh
     boost::shared_ptr<GU_Detail> geoPtr;
@@ -1072,6 +1074,6 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
     }
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

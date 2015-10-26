@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -37,7 +37,7 @@
 /// @brief Defines two simple wrapper classes for advection velocity
 ///        fields as well as VelocitySampler and VelocityIntegrator
 ///
-///     
+///
 /// @details DiscreteField wraps a velocity grid and EnrightField is mostly
 ///          intended for debugging (it's an analytical divergence free and
 ///          periodic field). They both share the same API required by the
@@ -77,7 +77,7 @@ public:
     {
     }
 
-    /// @return const reference to the transfrom between world and index space
+    /// @return const reference to the transform between world and index space
     /// @note Use this method to determine if a client grid is
     /// aligned with the coordinate space of the velocity grid.
     const math::Transform& transform() const { return *mTransform; }
@@ -101,12 +101,12 @@ private:
 }; // end of DiscreteField
 
 ///////////////////////////////////////////////////////////////////////
-    
-/// @brief Analytical, divergence-free and periodic vecloity field
+
+/// @brief Analytical, divergence-free and periodic velocity field
 /// @note Primarily intended for debugging!
-/// @warning This analytical velocity only produce meaningfull values
-/// in the unitbox in world space. In other words make sure any level
-/// set surface in fully enclodes in the axis aligned bounding box
+/// @warning This analytical velocity only produce meaningful values
+/// in the unit box in world space. In other words make sure any level
+/// set surface is fully enclosed in the axis aligned bounding box
 /// spanning 0->1 in world units.
 template <typename ScalarT = float>
 class EnrightField
@@ -118,7 +118,7 @@ public:
 
     EnrightField() {}
 
-    /// @return const reference to the identity transfrom between world and index space
+    /// @return const reference to the identity transform between world and index space
     /// @note Use this method to determine if a client grid is
     /// aligned with the coordinate space of this velocity field
     math::Transform transform() const { return math::Transform(); }
@@ -154,7 +154,7 @@ EnrightField<ScalarT>::operator() (const Vec3d& xyz, ValueType time) const
 
 ///////////////////////////////////////////////////////////////////////
 
-/// Class to hold a Vec3 field interperated as a velocity field.
+/// Class to hold a Vec3 field interpreted as a velocity field.
 /// Primarily exists to provide a method(s) that integrate a passive
 /// point forward in the velocity field for a single time-step (dt)
 template<typename GridT = Vec3fGrid,
@@ -166,33 +166,35 @@ public:
     typedef typename GridT::ConstAccessor AccessorType;
     typedef typename GridT::ValueType     ValueType;
 
+    /// @brief Constructor from a grid
     VelocitySampler(const GridT& grid):
         mGrid(&grid),
         mAcc(grid.getAccessor())
     {
     }
+    /// @brief Copy-constructor
     VelocitySampler(const VelocitySampler& other):
         mGrid(other.mGrid),
         mAcc(mGrid->getAccessor())
     {
     }
-    /// Samples the velocity at position W onto result. Supports both
+    /// @brief Samples the velocity at world position onto result. Supports both
     /// staggered (i.e. MAC) and collocated velocity grids.
     /// @return @c true if any one of the sampled values is active.
     template <typename LocationType>
-    inline bool sample(const LocationType& W, ValueType& result) const
+    inline bool sample(const LocationType& world, ValueType& result) const
     {
-        const Vec3R xyz = mGrid->worldToIndex(Vec3R(W[0], W[1], W[2]));
+        const Vec3R xyz = mGrid->worldToIndex(Vec3R(world[0], world[1], world[2]));
         bool active = Sampler<Order, Staggered>::sample(mAcc, xyz, result);
         return active;
     }
 
-    /// Samples the velocity at position W onto result. Supports both
-    /// staggered (i.e. MAC) and collocated velocity grids.
+    /// @brief Samples the velocity at world position onto result. Supports both
+    /// staggered (i.e. MAC) and co-located velocity grids.
     template <typename LocationType>
-    inline ValueType sample(const LocationType& W) const
+    inline ValueType sample(const LocationType& world) const
     {
-        const Vec3R xyz = mGrid->worldToIndex(Vec3R(W[0], W[1], W[2]));
+        const Vec3R xyz = mGrid->worldToIndex(Vec3R(world[0], world[1], world[2]));
         return Sampler<Order, Staggered>::sample(mAcc, xyz);
     }
 
@@ -204,10 +206,15 @@ private:
 
 ///////////////////////////////////////////////////////////////////////
 
-/// @brief Performs runge-kutta time integration of variable order in
-/// a static velocity field
+/// @brief Performs Runge-Kutta time integration of variable order in
+/// a static velocity field.
+///
+/// @note Note that the order of the velocity sampling is controlled
+/// with the SampleOrder template parameter, which defaults
+/// to one, i.e. a tri-linear interpolation kernel.
 template<typename GridT = Vec3fGrid,
-         bool Staggered = false>
+         bool Staggered = false,
+         size_t SampleOrder = 1>
 class VelocityIntegrator
 {
 public:
@@ -219,44 +226,49 @@ public:
     {
     }
     /// @brief Variable order Runge-Kutta time integration for a single time step
-    /// @note  Note the order of the velocity sampling is always one,
-    ///        i.e. based on tri-linear interpolation!
-    template<size_t Order, typename LocationType>
-    inline void rungeKutta(const float dt, LocationType& loc) const
+    ///
+    /// @param dt     Time sub-step for the Runge-Kutte integrator of order OrderRK
+    /// @param world  Location in world space coordinates (both input and output)
+    template<size_t OrderRK, typename LocationType>
+    inline void rungeKutta(const ElementType dt, LocationType& world) const
     {
-        BOOST_STATIC_ASSERT(Order < 5);
-        VecType P(loc[0],loc[1],loc[2]);
-        // Note the if-braching below is optimized away at compile time
-        if (Order == 0) {
+        BOOST_STATIC_ASSERT(OrderRK <= 4);
+        VecType P(static_cast<ElementType>(world[0]),
+                  static_cast<ElementType>(world[1]),
+                  static_cast<ElementType>(world[2]));
+        // Note the if-branching below is optimized away at compile time
+        if (OrderRK == 0) {
             return;// do nothing
-        } else if (Order == 1) {
+        } else if (OrderRK == 1) {
             VecType V0;
             mVelSampler.sample(P, V0);
-            P =  dt*V0;
-        } else if (Order == 2) {
+            P =  dt * V0;
+        } else if (OrderRK == 2) {
             VecType V0, V1;
             mVelSampler.sample(P, V0);
-            mVelSampler.sample(P + ElementType(0.5) * ElementType(dt) * V0, V1);
-            P = dt*V1;
-        } else if (Order == 3) {
+            mVelSampler.sample(P + ElementType(0.5) * dt * V0, V1);
+            P = dt * V1;
+        } else if (OrderRK == 3) {
             VecType V0, V1, V2;
             mVelSampler.sample(P, V0);
-            mVelSampler.sample(P+ElementType(0.5)*ElementType(dt)*V0, V1);
-            mVelSampler.sample(P+dt*(ElementType(2.0)*V1-V0), V2);
-            P = dt*(V0 + ElementType(4.0)*V1 + V2)*ElementType(1.0/6.0);
-        } else if (Order == 4) {
+            mVelSampler.sample(P + ElementType(0.5) * dt * V0, V1);
+            mVelSampler.sample(P + dt * (ElementType(2.0) * V1 - V0), V2);
+            P = dt * (V0 + ElementType(4.0) * V1 + V2) * ElementType(1.0 / 6.0);
+        } else if (OrderRK == 4) {
             VecType V0, V1, V2, V3;
             mVelSampler.sample(P, V0);
-            mVelSampler.sample(P+ElementType(0.5)*ElementType(dt)*V0, V1);
-            mVelSampler.sample(P+ElementType(0.5)*ElementType(dt)*V1, V2);
-            mVelSampler.sample(P+     dt*V2, V3);
-            P = dt*(V0 + ElementType(2.0)*(V1 + V2) + V3)*ElementType(1.0/6.0);
+            mVelSampler.sample(P + ElementType(0.5) * dt * V0, V1);
+            mVelSampler.sample(P + ElementType(0.5) * dt * V1, V2);
+            mVelSampler.sample(P + dt * V2, V3);
+            P = dt * (V0 + ElementType(2.0) * (V1 + V2) + V3) * ElementType(1.0 / 6.0);
         }
-        loc += LocationType(P[0], P[1], P[2]);
-
+        typedef typename LocationType::ValueType OutType;
+        world += LocationType(static_cast<OutType>(P[0]),
+                              static_cast<OutType>(P[1]),
+                              static_cast<OutType>(P[2]));
     }
 private:
-    VelocitySampler<GridT, Staggered, /*order=*/1> mVelSampler;
+    VelocitySampler<GridT, Staggered, SampleOrder> mVelSampler;
 };// end of VelocityIntegrator class
 
 
@@ -266,6 +278,6 @@ private:
 
 #endif // OPENVDB_TOOLS_VELOCITY_FIELDS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

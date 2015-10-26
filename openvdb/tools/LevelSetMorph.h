@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -160,7 +160,7 @@ public:
     /// @details Mask values outside the range maps to alpha values of
     /// respectfully zero and one, and values inside the range maps
     /// smoothly to 0->1 (unless of course the mask is inverted).
-    /// @throw ValueError if @a min is not smaller then @a max.
+    /// @throw ValueError if @a min is not smaller than @a max.
     void setMaskRange(ValueType min, ValueType max)
     {
         if (!(min < max)) OPENVDB_THROW(ValueError, "Invalid mask range (expects min < max)");
@@ -183,7 +183,7 @@ public:
 
 private:
 
-    // disallow copy construction and copy by assinment!
+    // disallow copy construction and copy by assignment!
     LevelSetMorphing(const LevelSetMorphing&);// not implemented
     LevelSetMorphing& operator=(const LevelSetMorphing&);// not implemented
 
@@ -219,7 +219,7 @@ private:
         Morph(Morph& other, tbb::split);
         /// destructor
         virtual ~Morph() {}
-        /// Advect the level set from it's current time, time0, to it's final time, time1.
+        /// Advect the level set from its current time, time0, to its final time, time1.
         /// @return number of CFL iterations
         size_t advect(ValueType time0, ValueType time1);
         /// Used internally by tbb::parallel_for()
@@ -236,7 +236,7 @@ private:
         }
         /// This is only called by tbb::parallel_reduce() threads
         void join(const Morph& other) { mMaxAbsS = math::Max(mMaxAbsS, other.mMaxAbsS); }
-        
+
         /// Enum to define the type of multithreading
         enum ThreadingMode { PARALLEL_FOR, PARALLEL_REDUCE }; // for internal use
         // method calling tbb
@@ -416,14 +416,14 @@ advect(ValueType time0, ValueType time1)
             // Perform one explicit Euler step: t1 = t0 + dt
             // Phi_t1(1) = Phi_t0(0) - dt * Speed(2) * |Grad[Phi(0)]|
             mTask = boost::bind(&Morph::euler01, _1, _2, dt, /*speed*/2);
-            
+
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
             this->cook(PARALLEL_FOR, 1);
 
             // Convex combine explict Euler step: t2 = t0 + dt
             // Phi_t2(1) = 1/2 * Phi_t0(1) + 1/2 * (Phi_t1(0) - dt * Speed(2) * |Grad[Phi(0)]|)
             mTask = boost::bind(&Morph::euler12, _1, _2, dt);
-            
+
             // Cook and swap buffer 0 and 1 such that Phi_t2(0) and Phi_t1(1)
             this->cook(PARALLEL_FOR, 1);
             break;
@@ -438,14 +438,14 @@ advect(ValueType time0, ValueType time1)
             // Convex combine explict Euler step: t2 = t0 + dt/2
             // Phi_t2(2) = 3/4 * Phi_t0(1) + 1/4 * (Phi_t1(0) - dt * Speed(3) * |Grad[Phi(0)]|)
             mTask = boost::bind(&Morph::euler34, _1, _2, dt);
-            
+
             // Cook and swap buffer 0 and 2 such that Phi_t2(0) and Phi_t1(2)
             this->cook(PARALLEL_FOR, 2);
 
             // Convex combine explict Euler step: t3 = t0 + dt
             // Phi_t3(2) = 1/3 * Phi_t0(1) + 2/3 * (Phi_t2(0) - dt * Speed(3) * |Grad[Phi(0)]|)
             mTask = boost::bind(&Morph::euler13, _1, _2, dt);
-            
+
             // Cook and swap buffer 0 and 2 such that Phi_t3(0) and Phi_t2(2)
             this->cook(PARALLEL_FOR, 2);
             break;
@@ -659,6 +659,6 @@ euler(const LeafRange& range, ValueType dt,
 
 #endif // OPENVDB_TOOLS_LEVEL_SET_MORPH_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

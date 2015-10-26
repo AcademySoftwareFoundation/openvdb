@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -36,7 +36,6 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/ChangeBackground.h>
 #include <openvdb/tools/Diagnostics.h>
-#include <openvdb/tools/DensityAdvect.h>
 #include <openvdb/tools/Clip.h>
 #include <openvdb/tools/GridOperators.h>
 #include <openvdb/tools/Filter.h>
@@ -48,8 +47,10 @@
 #include <openvdb/tools/Morphology.h>
 #include <openvdb/tools/PointAdvect.h>
 #include <openvdb/tools/PointScatter.h>
+#include <openvdb/tools/Prune.h>
 #include <openvdb/tools/ValueTransformer.h>
 #include <openvdb/tools/VectorTransformer.h>
+#include <openvdb/tools/VolumeAdvect.h>
 #include <openvdb/util/Util.h>
 #include <openvdb/util/CpuTimer.h>
 #include <openvdb/math/Stats.h>
@@ -80,7 +81,8 @@ public:
     CPPUNIT_TEST(testMaskedNormalize);
     CPPUNIT_TEST(testPointAdvect);
     CPPUNIT_TEST(testPointScatter);
-    CPPUNIT_TEST(testDensityAdvect);
+    CPPUNIT_TEST(testPrune);
+    CPPUNIT_TEST(testVolumeAdvect);
     CPPUNIT_TEST(testTransformValues);
     CPPUNIT_TEST(testVectorApply);
     CPPUNIT_TEST(testAccumulate);
@@ -105,7 +107,8 @@ public:
     void testMaskedNormalize();
     void testPointAdvect();
     void testPointScatter();
-    void testDensityAdvect();
+    void testPrune();
+    void testVolumeAdvect();
     void testTransformValues();
     void testVectorApply();
     void testAccumulate();
@@ -1674,31 +1677,78 @@ TestTools::testPointScatter()
 ////////////////////////////////////////
 
 void
-TestTools::testDensityAdvect()
+TestTools::testVolumeAdvect()
 {
     using namespace openvdb;
 
     Vec3fGrid velocity(Vec3f(1.0f, 0.0f, 0.0f));
+    typedef FloatGrid GridT;
+    typedef tools::VolumeAdvection<Vec3fGrid> AdvT;
+    typedef tools::Sampler<1> SamplerT;
 
-    {//test misaligned grids (throws)
-        FloatGrid::Ptr density0 = FloatGrid::create(0.0f);
-        density0->setTransform(math::Transform::createLinearTransform(0.5));
-        tools::DensityAdvection<Vec3fGrid> a(velocity);
-        CPPUNIT_ASSERT_THROW((a.advect<FloatGrid, tools::Sampler<1> >(*density0, 0.1f)), RuntimeError);
+    {//test non-uniform grids (throws)
+        GridT::Ptr density0 = GridT::create(0.0f);
+        density0->transform().preScale(Vec3d(1.0, 2.0, 3.0));//i.e. non-uniform voxels
+        AdvT a(velocity);
+        CPPUNIT_ASSERT_THROW((a.advect<GridT, SamplerT>(*density0, 0.1f)), RuntimeError);
     }
 
-    {//test advect without a mask
-        FloatGrid::Ptr density0 = FloatGrid::create(0.0f), density1;
+    {// test spatialOrder and temporalOrder
+        AdvT a(velocity);
+
+        // Default should be SEMI
+        CPPUNIT_ASSERT_EQUAL(1, a.spatialOrder());
+        CPPUNIT_ASSERT_EQUAL(1, a.temporalOrder());
+        CPPUNIT_ASSERT(!a.isLimiterOn());
+
+        a.setIntegrator(tools::Scheme::SEMI);
+        CPPUNIT_ASSERT_EQUAL(1, a.spatialOrder());
+        CPPUNIT_ASSERT_EQUAL(1, a.temporalOrder());
+        CPPUNIT_ASSERT(!a.isLimiterOn());
+
+        a.setIntegrator(tools::Scheme::MID);
+        CPPUNIT_ASSERT_EQUAL(1, a.spatialOrder());
+        CPPUNIT_ASSERT_EQUAL(2, a.temporalOrder());
+        CPPUNIT_ASSERT(!a.isLimiterOn());
+
+        a.setIntegrator(tools::Scheme::RK3);
+        CPPUNIT_ASSERT_EQUAL(1, a.spatialOrder());
+        CPPUNIT_ASSERT_EQUAL(3, a.temporalOrder());
+        CPPUNIT_ASSERT(!a.isLimiterOn());
+            
+        a.setIntegrator(tools::Scheme::RK4);
+        CPPUNIT_ASSERT_EQUAL(1, a.spatialOrder());
+        CPPUNIT_ASSERT_EQUAL(4, a.temporalOrder());
+        CPPUNIT_ASSERT(!a.isLimiterOn());
+
+        a.setIntegrator(tools::Scheme::MAC);
+        CPPUNIT_ASSERT_EQUAL(2, a.spatialOrder());
+        CPPUNIT_ASSERT_EQUAL(2, a.temporalOrder());
+        CPPUNIT_ASSERT( a.isLimiterOn());
+
+        a.setIntegrator(tools::Scheme::BFECC);
+        CPPUNIT_ASSERT_EQUAL(2, a.spatialOrder());
+        CPPUNIT_ASSERT_EQUAL(2, a.temporalOrder());
+        CPPUNIT_ASSERT( a.isLimiterOn());
+        
+        a.setLimiter(tools::Scheme::NO_LIMITER);
+        CPPUNIT_ASSERT_EQUAL(2, a.spatialOrder());
+        CPPUNIT_ASSERT_EQUAL(2, a.temporalOrder());
+        CPPUNIT_ASSERT(!a.isLimiterOn());
+    }
+    
+    {//test RK4 advect without a mask
+        GridT::Ptr density0 = GridT::create(0.0f), density1;
         density0->fill(CoordBBox(Coord(0),Coord(6)), 1.0f);
         CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord( 3,3,3)), 1.0f);
         CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(24,3,3)), 0.0f);
         CPPUNIT_ASSERT( density0->tree().isValueOn(Coord( 3,3,3)));
         CPPUNIT_ASSERT(!density0->tree().isValueOn(Coord(24,3,3)));
         
-        tools::DensityAdvection<Vec3fGrid> a(velocity);
-        a.setIntegrationOrder(4);
+        AdvT a(velocity);
+        a.setIntegrator(tools::Scheme::RK4);
         for (int i=1; i<=240; ++i) {
-            density1 = a.advect<FloatGrid, tools::Sampler<1> >(*density0, 0.1f);
+            density1 = a.advect<GridT, SamplerT>(*density0, 0.1f);
             //std::ostringstream ostr;
             //ostr << "densityAdvect" << "_" << i << ".vdb";
             //std::cerr << "Writing " << ostr.str() << std::endl;
@@ -1713,9 +1763,34 @@ TestTools::testDensityAdvect()
         CPPUNIT_ASSERT(!density0->tree().isValueOn(Coord( 3,3,3)));
         CPPUNIT_ASSERT( density0->tree().isValueOn(Coord(24,3,3)));
     }
-    
+    {//test MAC advect without a mask
+        GridT::Ptr density0 = GridT::create(0.0f), density1;
+        density0->fill(CoordBBox(Coord(0),Coord(6)), 1.0f);
+        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord( 3,3,3)), 1.0f);
+        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(24,3,3)), 0.0f);
+        CPPUNIT_ASSERT( density0->tree().isValueOn(Coord( 3,3,3)));
+        CPPUNIT_ASSERT(!density0->tree().isValueOn(Coord(24,3,3)));
+        
+        AdvT a(velocity);
+        a.setIntegrator(tools::Scheme::BFECC);
+        for (int i=1; i<=240; ++i) {
+            density1 = a.advect<GridT, SamplerT>(*density0, 0.1f);
+            //std::ostringstream ostr;
+            //ostr << "densityAdvect" << "_" << i << ".vdb";
+            //std::cerr << "Writing " << ostr.str() << std::endl;
+            //openvdb::io::File file(ostr.str());
+            //openvdb::GridPtrVec grids;
+            //grids.push_back(density1);
+            //file.write(grids);
+            density0 = density1;
+        }
+        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(3,3,3)), 0.0f); 
+        CPPUNIT_ASSERT(density0->tree().getValue(Coord(24,3,3)) > 0.0f);
+        CPPUNIT_ASSERT(!density0->tree().isValueOn(Coord( 3,3,3)));
+        CPPUNIT_ASSERT( density0->tree().isValueOn(Coord(24,3,3)));
+    }
     {//test advect with a mask
-        FloatGrid::Ptr density0 = FloatGrid::create(0.0f), density1;
+        GridT::Ptr density0 = GridT::create(0.0f), density1;
         density0->fill(CoordBBox(Coord(0),Coord(6)), 1.0f);
         CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord( 3,3,3)), 1.0f);
         CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(24,3,3)), 0.0f);
@@ -1725,10 +1800,13 @@ TestTools::testDensityAdvect()
         BoolGrid::Ptr mask = BoolGrid::create(false);
         mask->fill(CoordBBox(Coord(4,0,0),Coord(30,8,8)), true);
         
-        tools::DensityAdvection<Vec3fGrid> a(velocity);
-        a.setIntegrationOrder(4);
+        AdvT a(velocity);
+        a.setGrainSize(0);
+        a.setIntegrator(tools::Scheme::MAC);
+        //a.setIntegrator(tools::Scheme::BFECC);
+        //a.setIntegrator(tools::Scheme::RK4);
         for (int i=1; i<=240; ++i) {
-            density1 = a.advect<FloatGrid, BoolGrid, tools::Sampler<1> >(*density0, *mask, 0.1f);
+            density1 = a.advect<GridT, BoolGrid, SamplerT>(*density0, *mask, 0.1f);
             //std::ostringstream ostr;
             //ostr << "densityAdvectMask" << "_" << i << ".vdb";
             //std::cerr << "Writing " << ostr.str() << std::endl;
@@ -1738,12 +1816,12 @@ TestTools::testDensityAdvect()
             //file.write(grids);
             density0 = density1;
         }
-        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(3,3,3)), 1.0f); 
+        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(3,3,3)), 1.0f);
         CPPUNIT_ASSERT(density0->tree().getValue(Coord(24,3,3)) > 0.0f);
         CPPUNIT_ASSERT(density0->tree().isValueOn(Coord( 3,3,3)));
         CPPUNIT_ASSERT(density0->tree().isValueOn(Coord(24,3,3)));
     }
-}//testDensityAdvect
+}//testVolumeAdvect
 
 ////////////////////////////////////////
 
@@ -2195,6 +2273,59 @@ TestTools::testClipping()
     }
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+void
+TestTools::testPrune()
+{
+    /// @todo Add more unit-tests!
+    
+    using namespace openvdb;
+
+    const float value = 5.345f;
+    
+    FloatTree tree(value);
+    CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
+    CPPUNIT_ASSERT_EQUAL(Index32(1), tree.nonLeafCount()); // root node
+    CPPUNIT_ASSERT(tree.empty());
+    
+    tree.fill(CoordBBox(Coord(-10), Coord(10)), value, /*active=*/false);
+    CPPUNIT_ASSERT(!tree.empty());
+    
+    tools::prune(tree);
+    
+    CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
+    CPPUNIT_ASSERT_EQUAL(Index32(1), tree.nonLeafCount()); // root node
+    CPPUNIT_ASSERT(tree.empty());
+
+    /*
+    {// Bechmark serial prune
+        util::CpuTimer timer;
+        initialize();//required whenever I/O of OpenVDB files is performed!
+        io::File sourceFile("/usr/pic1/Data/OpenVDB/LevelSetModels/crawler.vdb");
+        sourceFile.open(false);//disable delayed loading
+        FloatGrid::Ptr grid = gridPtrCast<FloatGrid>(sourceFile.getGrids()->at(0));
+        const Index32 leafCount = grid->tree().leafCount();
+        
+        timer.start("\nSerial tolerance prune");
+        grid->tree().prune();
+        timer.stop();
+        CPPUNIT_ASSERT_EQUAL(leafCount, grid->tree().leafCount());
+    }
+    {// Bechmark parallel prune
+        util::CpuTimer timer;
+        initialize();//required whenever I/O of OpenVDB files is performed!
+        io::File sourceFile("/usr/pic1/Data/OpenVDB/LevelSetModels/crawler.vdb");
+        sourceFile.open(false);//disable delayed loading
+        FloatGrid::Ptr grid = gridPtrCast<FloatGrid>(sourceFile.getGrids()->at(0));
+        const Index32 leafCount = grid->tree().leafCount();
+
+        timer.start("\nParallel tolerance prune");
+        tools::prune(grid->tree());
+        timer.stop();
+        CPPUNIT_ASSERT_EQUAL(leafCount, grid->tree().leafCount());
+        }
+    */
+}
+
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -85,7 +85,7 @@ public:
             : spatialScheme(s), temporalScheme(t), normCount(n), grainSize(g) {}
         math::BiasedGradientScheme      spatialScheme;
         math::TemporalIntegrationScheme temporalScheme;
-        int                             normCount;// Number of iteratations of normalization
+        int                             normCount;// Number of iterations of normalization
         int                             grainSize;
     };
 
@@ -113,26 +113,26 @@ public:
     /// @brief Fast but approximate dilation of the narrow band - one
     /// layer at a time. Normally we recommend using the resize method below
     /// which internally calls dilate (or erode) with the correct
-    /// number of @a iterations to achive the desired half voxel width
+    /// number of @a iterations to achieve the desired half voxel width
     /// of the narrow band (3 is recomended for most level set applications).
     ///
     /// @note Since many level set applications perform
     /// interface-tracking, which in turn rebuilds the narrow-band
-    /// accuratly, this dilate method can often be used with a
+    /// accurately, this dilate method can often be used with a
     /// single iterations of low-order re-normalization. This
     /// effectively allows very narrow bands to be created from points
     /// or polygons (e.g. with a half voxel width of 1), followed by a
     /// fast but approximate dilation (typically with a half voxel
-    /// width of 3). This can be significantly faster then generating
-    /// the final width ofthe narrow band from points or polygons.
+    /// width of 3). This can be significantly faster than generating
+    /// the final width of the narrow band from points or polygons.
     void dilate(int iterations = 1);
 
     /// @brief Erodes the width of the narrow-band and update the background values
-    /// @throw ValueError if @a iterations is larger then the current half-width.
+    /// @throw ValueError if @a iterations is larger than the current half-width.
     void erode(int iterations = 1);
 
     /// @brief Resize the width of the narrow band, i.e. perform
-    /// dilation and renormaliztion or erosion as required. 
+    /// dilation and renormalization or erosion as required.
     bool resize(Index halfWidth = static_cast<Index>(LEVEL_SET_HALF_WIDTH));
 
     /// @brief Return the half width of the narrow band in floating-point voxel units.
@@ -143,7 +143,7 @@ public:
 
     /// @brief Set the state of the tracker (see struct defined above)
     void setState(const State& s) { mState =s; }
-    
+
     /// @return the spatial finite difference scheme
     math::BiasedGradientScheme getSpatialScheme() const { return mState.spatialScheme; }
 
@@ -188,7 +188,7 @@ public:
 
 private:
 
-    // disallow copy construction and copy by assinment!
+    // disallow copy construction and copy by assignment!
     LevelSetTracker(const LevelSetTracker&);// not implemented
     LevelSetTracker& operator=(const LevelSetTracker&);// not implemented
 
@@ -269,7 +269,7 @@ LevelSetTracker(GridT& grid, InterruptT* interrupt):
             + "\" [hint: Grid::setGridClass(openvdb::GRID_LEVEL_SET)]");
     }
 }
-   
+
 template<typename GridT, typename InterruptT>
 inline void
 LevelSetTracker<GridT, InterruptT>::
@@ -352,7 +352,7 @@ resize(Index halfWidth)
         this->erode(wOld - wNew);
     }
     return wOld != wNew;
-}    
+}
 
 template<typename GridT,  typename InterruptT>
 inline void
@@ -443,7 +443,7 @@ Trim::trim()
 {
     const int grainSize = mTracker.getGrainSize();
     const LeafRange range = mTracker.leafs().leafRange(grainSize);
-    
+
     if (grainSize>0) {
         tbb::parallel_for(range, *this);
     } else {
@@ -460,7 +460,7 @@ Trim::operator()(const LeafRange& range) const
     typedef typename LeafType::ValueOnIter VoxelIterT;
     mTracker.checkInterrupter();
     const ValueType gamma = mTracker.mGrid->background();
-    
+
     for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
         LeafType &leaf = *leafIter;
         for (VoxelIterT iter = leaf.beginValueOn(); iter; ++iter) {
@@ -524,7 +524,7 @@ normalize()
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
             this->cook(1);
 
-            // Convex combine explict Euler step: t2 = t0 + dt
+            // Convex combine explicit Euler step: t2 = t0 + dt
             // Phi_t2(1) = 1/2 * Phi_t0(1) + 1/2 * (Phi_t1(0) - dt * V.Grad_t1(0))
             mTask = boost::bind(&Normalizer::euler12, _1, _2);
 
@@ -539,14 +539,14 @@ normalize()
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
             this->cook(1);
 
-            // Convex combine explict Euler step: t2 = t0 + dt/2
+            // Convex combine explicit Euler step: t2 = t0 + dt/2
             // Phi_t2(2) = 3/4 * Phi_t0(1) + 1/4 * (Phi_t1(0) - dt * V.Grad_t1(0))
             mTask = boost::bind(&Normalizer::euler34, _1, _2);
 
             // Cook and swap buffer 0 and 2 such that Phi_t2(0) and Phi_t1(2)
             this->cook(2);
 
-            // Convex combine explict Euler step: t3 = t0 + dt
+            // Convex combine explicit Euler step: t3 = t0 + dt
             // Phi_t3(2) = 1/3 * Phi_t0(1) + 2/3 * (Phi_t2(0) - dt * V.Grad_t2(0)
             mTask = boost::bind(&Normalizer::euler13, _1, _2);
 
@@ -573,7 +573,7 @@ Normalizer<SpatialScheme, TemporalScheme, MaskT>::
 cook(int swapBuffer)
 {
     mTracker.startInterrupter("Normalizing Level Set");
-    
+
     const int grainSize   = mTracker.getGrainSize();
     const LeafRange range = mTracker.leafs().leafRange(grainSize);
 
@@ -604,7 +604,8 @@ eval(StencilT& stencil, const ValueType* phi, ValueType* result, Index n) const
 
     const ValueType normSqGradPhi = GradientT::result(stencil);
     const ValueType phi0 = stencil.getValue();
-    ValueType v = phi0 / (math::Sqrt(math::Pow2(phi0) + normSqGradPhi));
+    ValueType v = phi0 / ( math::Sqrt(math::Pow2(phi0) + normSqGradPhi) +
+                           math::Tolerance<ValueType>::value() );
     v = phi0 - mDt * v * (math::Sqrt(normSqGradPhi) * mInvDx - 1.0f);
     result[n] = Nominator ? alpha * phi[n] + beta * v : v;
 }
@@ -624,21 +625,21 @@ euler(const LeafRange& range, Index phiBuffer, Index resultBuffer)
     mTracker.checkInterrupter();
 
     StencilT stencil(mTracker.grid());
-    
+
     for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
         const ValueType* phi = leafIter.buffer(phiBuffer).data();
         ValueType* result = leafIter.buffer(resultBuffer).data();
         if (mMask == NULL) {
             for (VoxelIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 stencil.moveTo(iter);
-                this->eval<Nominator,Denominator>(stencil, phi, result, iter.pos());
+                this->eval<Nominator, Denominator>(stencil, phi, result, iter.pos());
             }//loop over active voxels in the leaf of the level set
         } else if (const MaskLeafT* mask = mMask->probeLeaf(leafIter->origin())) {
             const ValueType* phi0 = leafIter->buffer().data();
             for (MaskIterT iter  = mask->cbeginValueOn(); iter; ++iter) {
                 const Index i = iter.pos();
                 stencil.moveTo(iter.getCoord(), phi0[i]);
-                this->eval<Nominator,Denominator>(stencil, phi, result, i);
+                this->eval<Nominator, Denominator>(stencil, phi, result, i);
             }//loop over active voxels in the leaf of the mask
         }
     }//loop over leafs of the level set
@@ -650,6 +651,6 @@ euler(const LeafRange& range, Index phiBuffer, Index resultBuffer)
 
 #endif // OPENVDB_TOOLS_LEVEL_SET_TRACKER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

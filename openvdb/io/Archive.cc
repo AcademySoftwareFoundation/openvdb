@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -508,7 +508,7 @@ MappedFile::clearNotifier()
 std::string
 getErrorString(int errorNum)
 {
-#if DWA_BOOST_VERSION >= 1043000
+#if DWA_BOOST_VERSION >= 1044000
     return boost::system::error_code(errorNum, boost::system::generic_category()).message();
 #else
     return boost::system::error_code(errorNum, boost::system::get_generic_category()).message();
@@ -1371,6 +1371,6 @@ Archive::writeGridInstance(GridDescriptor& gd, GridBase::ConstPtr grid,
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

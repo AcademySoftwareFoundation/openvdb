@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -366,14 +366,15 @@ TestTreeGetSetValues::testFill()
     tree.clear();
     CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), tree.leafCount());
     CPPUNIT_ASSERT_EQUAL(openvdb::Index32(1), tree.nonLeafCount()); // root node
-
-    // Partially fill a region with the background value.
+    CPPUNIT_ASSERT(tree.empty());
+    
+    // Partially fill a region with inactive background values.
     tree.fill(CoordBBox(Coord(27), Coord(254)), background, /*active=*/false);
     // Confirm that after pruning, the tree is empty.
     openvdb::tools::prune(tree);
-    CPPUNIT_ASSERT(tree.empty());
     CPPUNIT_ASSERT_EQUAL(openvdb::Index32(0), tree.leafCount());
     CPPUNIT_ASSERT_EQUAL(openvdb::Index32(1), tree.nonLeafCount()); // root node
+    CPPUNIT_ASSERT(tree.empty());
 }
 
 
@@ -461,6 +462,6 @@ TestTreeGetSetValues::testHasActiveTiles()
     CPPUNIT_ASSERT(tree.hasActiveTiles());
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
