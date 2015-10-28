@@ -227,9 +227,13 @@ struct ComputeBBoxPerPrimitiveOp {
 
             const unsigned id = mOriginToIndex.at(leaf->origin());
 
-            const AttributeHandle<Vec3f>::Ptr positionHandle = leaf->attributeHandle<Vec3f>("P");
-            const AttributeHandle<Vec3f>::Ptr velocityHandle = leaf->attributeHandle<Vec3f>("v");
-            const AttributeHandle<float>::Ptr radiusHandle = leaf->attributeHandle<float>("pscale");
+            const AttributeHandle<Vec3f>::Ptr positionHandle = AttributeHandle<Vec3f>::create(leaf->attributeArray("P"));
+
+            AttributeHandle<Vec3f>::Ptr velocityHandle;
+            AttributeHandle<float>::Ptr radiusHandle;
+
+            if (leaf->hasAttribute("v"))        velocityHandle = AttributeHandle<Vec3f>::create(leaf->attributeArray("v"));
+            if (leaf->hasAttribute("pscale"))   radiusHandle = AttributeHandle<float>::create(leaf->attributeArray("pscale"));
 
             Geometry_OpenVDBPoints::LeafBVHTree& bvhTree = bvhTrees[id];
 
@@ -257,6 +261,7 @@ struct ComputeBBoxPerPrimitiveOp {
                     positionValue = positionHandle->get(index64);
 
                     if (velocityHandle)  velocityValue = velocityHandle->get(index64);
+                    else                 velocityValue = Vec3f(0, 0, 0);
 
                     if (radiusHandle && !mOverrideRadius)
                     {
@@ -333,17 +338,17 @@ Geometry_OpenVDBPoints::create( const PointDataGrid::Ptr& grid,
 
     PointDataTree::LeafCIter iter = tree.cbeginLeaf();
 
-    assert(iter);
+    if (!iter)  return 0;
 
     const AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
 
     if (descriptor.find("P") == AttributeSet::INVALID_POS)    return 0;
 
+    const bool enableMotionBlur = iter->hasAttribute("v");
+    const bool enableRadius = iter->hasAttribute("pscale");
+
     const size_t velocityIndex = descriptor.find("v");
     const size_t radiusIndex = descriptor.find("pscale");
-
-    const bool enableMotionBlur = velocityIndex != AttributeSet::INVALID_POS;
-    const bool enableRadius = radiusIndex != AttributeSet::INVALID_POS;
 
     // retrieve the velocity and radius types
 
@@ -431,8 +436,6 @@ Geometry_OpenVDBPoints::Geometry_OpenVDBPoints( const PointDataGrid::Ptr& grid,
     // convert world space radius to index space
 
     m_radiusIndexSpace = m_radius / m_baseMap.voxelSize()[0];
-
-    assert(m_descriptor.find("v") != AttributeSet::INVALID_POS);
 }
 
 void Geometry_OpenVDBPoints::computeAccelerationStructures()
@@ -698,11 +701,13 @@ void Geometry_OpenVDBPoints::intersect_typed_primitive(
 
     // obtain the attribute handles
 
-    const AttributeHandle<Vec3f>::Ptr positionHandle = leaf.attributeHandle<Vec3f>("P");
-    const typename AttributeHandle<VelocityType>::Ptr velocityHandle = leaf.attributeHandle<VelocityType>("v");
-    const typename AttributeHandle<RadiusType>::Ptr radiusHandle =  m_overrideRadius ?
-                                                                    typename AttributeHandle<RadiusType>::Ptr() :
-                                                                    leaf.attributeHandle<RadiusType>("pscale");
+    const AttributeHandle<Vec3f>::Ptr positionHandle = AttributeHandle<Vec3f>::create(leaf.attributeArray("P"));
+
+    typename AttributeHandle<VelocityType>::Ptr velocityHandle;
+    typename AttributeHandle<RadiusType>::Ptr radiusHandle;
+
+    if (leaf.hasAttribute("v"))                             velocityHandle = AttributeHandle<VelocityType>::create(leaf.attributeArray("v"));
+    if (leaf.hasAttribute("pscale") && !m_overrideRadius)   radiusHandle = AttributeHandle<RadiusType>::create(leaf.attributeArray("pscale"));
 
     // three-level leaf BVH tree:
     //     level1: 8x8x8 voxels

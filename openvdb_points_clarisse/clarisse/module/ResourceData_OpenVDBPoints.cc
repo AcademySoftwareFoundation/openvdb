@@ -101,7 +101,7 @@ struct ConvertVelocityToIndexSpaceOp {
         for (LeafManager::LeafRange::Iterator leaf=range.begin(); leaf; ++leaf) {
 
             typename AttributeWriteHandle<VelocityType>::Ptr velocityWriteHandle =
-                leaf->attributeWriteHandle<VelocityType>(mIndex);
+                AttributeWriteHandle<VelocityType>::create(leaf->attributeArray(mIndex));
 
             // @todo: need to extend the AttributeWriteHandle API to support uniform values
 
@@ -159,7 +159,7 @@ struct ConvertScalarToIndexSpaceOp {
         for (LeafManagerT::LeafRange::Iterator leaf=range.begin(); leaf; ++leaf) {
 
             typename AttributeWriteHandle<ScalarType>::Ptr scalarWriteHandle =
-                leaf->attributeWriteHandle<ScalarType>(mIndex);
+                AttributeWriteHandle<ScalarType>::create(leaf->attributeArray(mIndex));
 
             // @todo: need to extend the AttributeWriteHandle API to support uniform values
 
@@ -230,10 +230,9 @@ void localise(PointDataGrid::Ptr& grid)
 
     // localise velocity
 
-    const size_t velocityIndex = descriptor.find("v");
-
-    if (velocityIndex != AttributeSet::INVALID_POS)
+    if (iter->hasAttribute("v"))
     {
+        const size_t velocityIndex = descriptor.find("v");
         const NamePair& type = descriptor.type(velocityIndex);
 
         if (type.first == "vec3s") {
@@ -249,10 +248,9 @@ void localise(PointDataGrid::Ptr& grid)
 
     // localise radius
 
-    const size_t pscaleIndex = descriptor.find("pscale");
-
-    if (pscaleIndex != AttributeSet::INVALID_POS)
+    if (iter->hasAttribute("pscale"))
     {
+        const size_t pscaleIndex = descriptor.find("pscale");
         const NamePair& type = descriptor.type(pscaleIndex);
 
         if (type.first == "float") {

@@ -126,7 +126,7 @@ GeometryProperty_OpenVDBPoints::extract_value_float(const GeometryProperty& prop
 
     if (!leaf)  return 0;
 
-    const typename AttributeHandle<ValueType>::Ptr attributeHandle = leaf->attributeHandle<ValueType>(prop.name());
+    const typename AttributeHandle<ValueType>::Ptr attributeHandle = AttributeHandle<ValueType>::create(leaf->attributeArray(prop.name()));
 
     const ValueType& value = attributeHandle->get(Index64(sub_primitive_id));
 

@@ -293,6 +293,19 @@ TestAttributeArray::testAttributeArray()
     openvdb::tools::AttributeArray::Ptr attr =
         openvdb::tools::AttributeArray::create(
             AttributeArrayI::attributeType(), 34);
+
+    { // Casting
+        using namespace openvdb;
+        using namespace openvdb::tools;
+
+        AttributeArray::Ptr array = TypedAttributeArray<float>::create(0);
+        CPPUNIT_ASSERT_NO_THROW(TypedAttributeArray<float>::cast(*array));
+        CPPUNIT_ASSERT_THROW(TypedAttributeArray<int>::cast(*array), TypeError);
+
+        AttributeArray::ConstPtr constArray = array;
+        CPPUNIT_ASSERT_NO_THROW(TypedAttributeArray<float>::cast(*constArray));
+        CPPUNIT_ASSERT_THROW(TypedAttributeArray<int>::cast(*constArray), TypeError);
+    }
 }
 
 

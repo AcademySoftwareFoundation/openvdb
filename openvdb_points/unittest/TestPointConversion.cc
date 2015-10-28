@@ -298,8 +298,8 @@ TestPointConversion::testPointConversion()
 
     for (; leafIter; ++leafIter) {
 
-        AttributeHandle<Vec3f>::Ptr posHandle = leafIter->attributeHandle<Vec3f>("P");
-        AttributeHandle<int32_t>::Ptr idHandle = leafIter->attributeHandle<int32_t>("id");
+        AttributeHandle<Vec3f>::Ptr posHandle = AttributeHandle<Vec3f>::create(leafIter->attributeArray("P"));
+        AttributeHandle<int32_t>::Ptr idHandle = AttributeHandle<int32_t>::create(leafIter->attributeArray("id"));
 
         for (PointDataTree::LeafNodeType::ValueOnCIter valueIter = leafIter->cbeginValueOn(); valueIter; ++valueIter) {
 
