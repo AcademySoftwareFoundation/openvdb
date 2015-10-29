@@ -155,9 +155,6 @@ public:
     ///         shared with anyone else.
     void makeUnique(size_t pos);
 
-    /// Copy attribute values for a target index @a n from another @a attributeSet for index @a source
-    void copyAttributeValues(const Index n, const AttributeSet& attributeSet, const Index source);
-
     /// Append attribute @a attribute (simple method)
     AttributeArray::Ptr appendAttribute(const Util::NameAndType& attribute);
 
