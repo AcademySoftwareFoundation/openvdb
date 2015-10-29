@@ -299,8 +299,24 @@ public:
     /// @brief Returns whether an attribute exists. This method is faster
     /// than hasAttribute(const Name&) as it avoids a map lookup.
     /// @param pos    Index of the attribute
-    template <typename TypedAttributeArrayType>
     bool hasAttribute(const size_t pos) const
+    {
+        return pos < mAttributeSet->size();
+    }
+
+    /// @brief Returns whether an attribute exists.
+    /// @param attributeName    Name of the attribute
+    bool hasAttribute(const Name& attributeName) const
+    {
+        const size_t pos = mAttributeSet->find(attributeName);
+        return pos != AttributeSet::INVALID_POS;
+    }
+
+    /// @brief Returns whether an attribute exists. This method is faster
+    /// than hasTypedAttribute(const Name&) as it avoids a map lookup.
+    /// @param pos    Index of the attribute
+    template <typename TypedAttributeArrayType>
+    bool hasTypedAttribute(const size_t pos) const
     {
         if (pos >= mAttributeSet->size())     return false;
 
@@ -312,13 +328,13 @@ public:
     /// @brief Returns whether an attribute exists.
     /// @param attributeName    Name of the attribute
     template <typename TypedAttributeArrayType>
-    bool hasAttribute(const Name& attributeName) const
+    bool hasTypedAttribute(const Name& attributeName) const
     {
         const size_t pos = mAttributeSet->find(attributeName);
 
         if (pos == AttributeSet::INVALID_POS)   return false;
 
-        return hasAttribute<TypedAttributeArrayType>(pos);
+        return hasTypedAttribute<TypedAttributeArrayType>(pos);
     }
 
     /// @brief Append an attribute to the leaf.
