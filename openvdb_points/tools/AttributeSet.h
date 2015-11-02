@@ -40,6 +40,7 @@
 #define OPENVDB_TOOLS_ATTRIBUTE_SET_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h>
+#include <openvdb/metadata/MetaMap.h>
 
 #include <boost/integer_traits.hpp> // integer_traits
 #include <boost/shared_ptr.hpp> // shared_ptr
@@ -277,6 +278,10 @@ public:
     /// Return the name of the attribute array's type.
     const NamePair& type(size_t pos) const;
 
+    /// Retrieve metadata map
+    MetaMap& getMetadata();
+    const MetaMap& getMetadata() const;
+
     /// Return true if this descriptor is equal to the given one.
     bool operator==(const Descriptor&) const;
     /// Return true if this descriptor is not equal to the given one.
@@ -300,6 +305,7 @@ private:
     size_t insert(const std::string& name, const NamePair& typeName);
     NameToPosMap                mNameMap;
     std::vector<NamePair>       mTypes;
+    MetaMap                     mMetadata;
 }; // class Descriptor
 
 

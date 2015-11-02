@@ -359,12 +359,15 @@ AttributeSet::operator==(const AttributeSet& other) const {
 AttributeSet::Descriptor::Descriptor()
     : mNameMap()
     , mTypes()
+    , mMetadata()
 {
 }
+
 
 AttributeSet::Descriptor::Descriptor(const Descriptor& rhs)
     : mNameMap(rhs.mNameMap)
     , mTypes(rhs.mTypes)
+    , mMetadata(rhs.mMetadata)
 {
 }
 
@@ -382,6 +385,8 @@ AttributeSet::Descriptor::operator==(const Descriptor& rhs) const
     for (size_t n = 0, N = mTypes.size(); n < N; ++n) {
         if (mTypes[n] != rhs.mTypes[n]) return false;
     }
+
+    if (this->mMetadata != rhs.mMetadata)  return false;
 
     return std::equal(mNameMap.begin(), mNameMap.end(), rhs.mNameMap.begin());
 }
@@ -467,6 +472,20 @@ AttributeSet::Descriptor::type(size_t pos) const
     assert(pos < mTypes.size());
 
     return mTypes[pos];
+}
+
+
+MetaMap&
+AttributeSet::Descriptor::getMetadata()
+{
+    return mMetadata;
+}
+
+
+const MetaMap&
+AttributeSet::Descriptor::getMetadata() const
+{
+    return mMetadata;
 }
 
 
@@ -600,6 +619,8 @@ AttributeSet::Descriptor::write(std::ostream& os) const
         writeString(os, it->first);
         os.write(reinterpret_cast<const char*>(&it->second), sizeof(Index64));
     }
+
+    mMetadata.writeMeta(os);
 }
 
 
@@ -625,6 +646,8 @@ AttributeSet::Descriptor::read(std::istream& is)
         is.read(reinterpret_cast<char*>(&nameAndOffset.second), sizeof(Index64));
         mNameMap.insert(nameAndOffset);
     }
+
+    mMetadata.readMeta(is);
 }
 
 

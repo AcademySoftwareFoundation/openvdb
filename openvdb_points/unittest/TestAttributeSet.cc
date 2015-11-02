@@ -32,6 +32,7 @@
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb_points/tools/AttributeSet.h>
 #include <openvdb/Types.h>
+#include <openvdb/Metadata.h>
 
 #include <iostream>
 #include <sstream>
@@ -412,6 +413,35 @@ TestAttributeSet::testAttributeSet()
 
         CPPUNIT_ASSERT(attrSetA == attrSetB);
     }
+
+    { // metadata test
+        Descriptor::Ptr descr1 = Descriptor::create(Descriptor::Inserter()
+            .add("pos", AttributeVec3s::attributeType())
+            .add("id", AttributeI::attributeType())
+            .vec);
+
+        Descriptor::Ptr descr2 = Descriptor::create(Descriptor::Inserter()
+            .add("pos", AttributeVec3s::attributeType())
+            .add("id", AttributeI::attributeType())
+            .vec);
+
+        openvdb::MetaMap& meta = descr1->getMetadata();
+        meta.insertMeta("default", openvdb::FloatMetadata(2.0));
+
+        AttributeSet attrSetA(descr1);
+        AttributeSet attrSetB(descr2);
+        AttributeSet attrSetC(attrSetA);
+
+        CPPUNIT_ASSERT(attrSetA != attrSetB);
+        CPPUNIT_ASSERT(attrSetA == attrSetC);
+    }
+
+    // add some metadata and register the type
+
+    openvdb::FloatMetadata::registerType();
+
+    openvdb::MetaMap& meta = attrSetA.descriptor().getMetadata();
+    meta.insertMeta("default", openvdb::FloatMetadata(2.0));
 
     // I/O test
 
