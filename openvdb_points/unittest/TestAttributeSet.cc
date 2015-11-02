@@ -63,7 +63,7 @@ matchingAttributeSets(const openvdb::tools::AttributeSet& lhs,
 {
     if (lhs.size() != rhs.size()) return false;
     if (lhs.memUsage() != rhs.memUsage()) return false;
-    //if (lhs.descriptor() != rhs.descriptor()) return false;
+    if (lhs.descriptor() != rhs.descriptor()) return false;
 
     typedef openvdb::tools::AttributeArray AttributeArray;
 
@@ -152,7 +152,7 @@ TestAttributeSet::testAttributeSetDescriptor()
         CPPUNIT_ASSERT_EQUAL(itA->type.second, itB->type.second);
     }
 
-     // Test hasSameAttributes
+    // Test hasSameAttributes
     {
         Descriptor::Ptr descr1 = Descriptor::create(Descriptor::Inserter()
                 .add("pos", AttributeD::attributeType())

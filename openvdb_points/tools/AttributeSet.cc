@@ -362,6 +362,12 @@ AttributeSet::Descriptor::Descriptor()
 {
 }
 
+AttributeSet::Descriptor::Descriptor(const Descriptor& rhs)
+    : mNameMap(rhs.mNameMap)
+    , mTypes(rhs.mTypes)
+{
+}
+
 
 bool
 AttributeSet::Descriptor::operator==(const Descriptor& rhs) const

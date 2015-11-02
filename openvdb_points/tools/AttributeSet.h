@@ -246,6 +246,9 @@ public:
 
     Descriptor();
 
+    /// Copy constructor
+    Descriptor(const Descriptor&);
+
     /// Create a new descriptor from the given attribute and type name pairs.
     static Ptr create(const NameAndTypeVec&);
 
