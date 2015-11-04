@@ -1,0 +1,54 @@
+sudo: required
+
+dist: trusty
+
+language:
+  - cpp
+
+os:
+  - linux
+
+compiler:
+  - gcc
+  - clang
+
+notifications:
+  email:
+    recipients:
+      - openvdbpoints@dneg.com
+
+install:
+  - sudo apt-get update
+  - sudo apt-get install -y libboost-all-dev
+  - sudo apt-get install -y libtbb-dev
+  - sudo apt-get install -y libcppunit-dev
+  - wget http://www.openvdb.org/download/openvdb_3_1_0_library.zip
+  - unzip openvdb_3_1_0_library.zip
+  - make -C openvdb
+    BOOST_LIB_DIR=/usr/lib/x86_64-linux-gnu
+    EXR_INCL_DIR=/usr/include/OpenEXR
+    CONCURRENT_MALLOC_LIB=""
+    DOXYGEN=""
+    LOG4CPLUS_INCL_DIR=""
+    PYTHON_INCL_DIR=""
+    GLFW_INCL_DIR=""
+    BLOSC_INCL_DIR=""
+    lib -j
+
+script:
+  - make -C openvdb_points
+    DESTDIR=/tmp/OpenVDB_3_1_0
+    BOOST_LIB_DIR=/usr/lib/x86_64-linux-gnu
+    HALF_LIB="-lHalf -lIlmThread -lIex -lImath -lIlmImf"
+    OPENVDB_LIB_DIR=$PWD/openvdb
+    TBB_LIB_DIR=/usr/lib DOXYGEN=""
+    EXR_INCL_DIR=/usr/include/OpenEXR
+    EXR_LIB_DIR=/usr/local/lib
+    CONCURRENT_MALLOC_LIB=""
+    DOXYGEN=""
+    LOG4CPLUS_INCL_DIR=""
+    PYTHON_INCL_DIR=""
+    GLFW_INCL_DIR=""
+    BLOSC_INCL_DIR=""
+    test -j
+
