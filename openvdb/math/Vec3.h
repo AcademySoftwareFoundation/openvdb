@@ -570,6 +570,14 @@ isFinite(const Vec3<T>& v)
     return isFinite(v[0]) && isFinite(v[1]) && isFinite(v[2]);
 }
 
+/// Return @c true if all components are exactly equal to zero.
+template<typename T>
+inline bool
+isZero(const Vec3<T>& v)
+{
+    return isZero(v[0]) && isZero(v[1]) && isZero(v[2]);
+}
+
 template<typename T>
 inline Vec3<T>
 Abs(const Vec3<T>& v)

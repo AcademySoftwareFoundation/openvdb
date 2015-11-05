@@ -101,6 +101,7 @@ initialize()
     // Register common grid types.
     GridBase::clearRegistry();
     BoolGrid::registerGrid();
+    MaskGrid::registerGrid();
     FloatGrid::registerGrid();
     DoubleGrid::registerGrid();
     Int32Grid::registerGrid();

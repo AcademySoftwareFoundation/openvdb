@@ -85,6 +85,8 @@ template <typename T>
 inline uint16_t
 QuantizedUnitVec::pack(const Vec3<T>& vec)
 {
+    if (math::isZero(vec)) return 0;
+
     uint16_t data = 0;
     T x(vec[0]), y(vec[1]), z(vec[2]);
 

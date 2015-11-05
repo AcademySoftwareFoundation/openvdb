@@ -86,7 +86,7 @@ namespace tools {
 /// class Rule
 /// {
 /// public:
-///     // Standard tree type (e.g. BoolTree or FloatTree in openvdb.h)
+///     // Standard tree type (e.g. MaskTree or FloatTree in openvdb.h)
 ///     typedef typename openvdb::tree::Tree4<ValueType, 5, 4, 3>::Type  ResultTreeType;
 ///
 ///     typedef typename ResultTreeType::LeafNodeType  ResultLeafNodeType;
@@ -205,7 +205,7 @@ public:
     typedef typename OpType::ResultTreeType               ResultTreeType;
     typedef typename ResultTreeType::ValueType            ResultValueType;
     typedef typename ResultTreeType::LeafNodeType         ResultLeafNodeType;
-    typedef typename ResultTreeType::template ValueConverter<bool>::Type BoolTree;
+    typedef typename ResultTreeType::template ValueConverter<ValueMask>::Type MaskTree;
 
     typedef tbb::blocked_range3d<Index, Index, Index>     Range3d;
 
@@ -447,14 +447,14 @@ public:
     typedef typename ResultTreeType::ValueType                   ResultValueType;
     typedef ResultValueType                                      DenseValueType;
 
-    typedef typename ResultTreeType::template ValueConverter<bool>::Type  BoolTree;
-    typedef typename BoolTree::LeafCIter                         BoolLeafCIter;
-    typedef std::vector<const typename BoolTree::LeafNodeType*>  BoolLeafVec;
+    typedef typename ResultTreeType::template ValueConverter<ValueMask>::Type  MaskTree;
+    typedef typename MaskTree::LeafCIter                         MaskLeafCIter;
+    typedef std::vector<const typename MaskTree::LeafNodeType*>  MaskLeafVec;
 
 
     SparseMaskedExtractor(const DenseType& dense,
                   const ResultValueType& background,
-                  const BoolLeafVec& leafVec
+                  const MaskLeafVec& leafVec
                   ):
         mDense(dense), mBackground(background), mBBox(dense.bbox()),
         mLeafVec(leafVec),
@@ -494,11 +494,11 @@ public:
 
         for (size_t idx = range.begin(); idx < range.end(); ++ idx) {
 
-            const typename BoolTree::LeafNodeType* boolLeaf = mLeafVec[idx];
+            const typename MaskTree::LeafNodeType* maskLeaf = mLeafVec[idx];
 
             // The bounding box for this leaf
 
-            openvdb::math::CoordBBox localBBox = boolLeaf->getNodeBoundingBox();
+            openvdb::math::CoordBBox localBBox = maskLeaf->getNodeBoundingBox();
 
             // Shrink to the intersection with the dense volume
 
@@ -511,9 +511,9 @@ public:
             // Reset or allocate the target leaf
 
             if (leaf == NULL) {
-                leaf = new ResultLeafNodeType(boolLeaf->origin(), mBackground);
+                leaf = new ResultLeafNodeType(maskLeaf->origin(), mBackground);
             } else {
-                leaf->setOrigin(boolLeaf->origin());
+                leaf->setOrigin(maskLeaf->origin());
                 leaf->fill(mBackground);
                 leaf->setValuesOff();
             }
@@ -529,7 +529,7 @@ public:
             openvdb::math::Coord ijk;
 
             if (mDense.memoryLayout() == openvdb::tools::LayoutZYX
-                  && boolLeaf->isDense()) {
+                  && maskLeaf->isDense()) {
 
                 Index offset;
                 const DenseValueType* src;
@@ -556,7 +556,7 @@ public:
                                  offset = ResultLeafNodeType::coordToOffset(ijk);
                              ijk[2] < end.z(); ++ijk[2], ++offset) {
 
-                            if (boolLeaf->isValueOn(offset)) {
+                            if (maskLeaf->isValueOn(offset)) {
                                 const ResultValueType denseValue =  mDense.getValue(ijk);
                                 leaf->setValueOn(offset, denseValue);
                             }
@@ -586,7 +586,7 @@ private:
     const DenseType&                   mDense;
     const ResultValueType              mBackground;
     const openvdb::math::CoordBBox&    mBBox;
-    const BoolLeafVec&                 mLeafVec;
+    const MaskLeafVec&                 mLeafVec;
 
     typename ResultTreeType::Ptr       mResult;
 
@@ -611,27 +611,27 @@ struct ExtractAll
 template <typename DenseType, typename MaskTreeType>
 typename DSConverter<DenseType, MaskTreeType>::Type::Ptr
 extractSparseTreeWithMask(const DenseType& dense,
-                          const MaskTreeType& mask,
+                          const MaskTreeType& maskProxy,
                           const typename DenseType::ValueType& background,
                           bool threaded)
 {
     typedef SparseMaskedExtractor<DenseType, MaskTreeType>       LeafExtractor;
     typedef typename LeafExtractor::DenseValueType               DenseValueType;
     typedef typename LeafExtractor::ResultTreeType               ResultTreeType;
-    typedef typename LeafExtractor::BoolLeafVec                  BoolLeafVec;
-    typedef typename LeafExtractor::BoolTree                     BoolTree;
-    typedef typename LeafExtractor::BoolLeafCIter                BoolLeafCIter;
+    typedef typename LeafExtractor::MaskLeafVec                  MaskLeafVec;
+    typedef typename LeafExtractor::MaskTree                     MaskTree;
+    typedef typename LeafExtractor::MaskLeafCIter                MaskLeafCIter;
     typedef ExtractAll<ResultTreeType, DenseValueType>           ExtractionRule;
 
-    // Use Bool tree to hold the topology
+    // Use Mask tree to hold the topology
 
-    BoolTree boolTree(mask, false, TopologyCopy());
+    MaskTree maskTree(maskProxy, false, TopologyCopy());
 
     // Construct an array of pointers to the mask leafs.
 
-    const size_t leafCount = boolTree.leafCount();
-    BoolLeafVec leafarray(leafCount);
-    BoolLeafCIter leafiter = boolTree.cbeginLeaf();
+    const size_t leafCount = maskTree.leafCount();
+    MaskLeafVec leafarray(leafCount);
+    MaskLeafCIter leafiter = maskTree.cbeginLeaf();
     for (size_t n = 0; n != leafCount; ++n, ++leafiter) {
         leafarray[n] = leafiter.getLeaf();
     }
@@ -650,7 +650,7 @@ extractSparseTreeWithMask(const DenseType& dense,
     // These trees will be leaf-orthogonal to the leafTree (i.e. no leaf
     // nodes will overlap).  Merge these trees into the result.
 
-    typename MaskTreeType::ValueOnCIter tileIter(mask);
+    typename MaskTreeType::ValueOnCIter tileIter(maskProxy);
     tileIter.setMaxDepth(MaskTreeType::ValueOnCIter::LEAF_DEPTH - 1);
 
     // Return the leaf tree if the mask had no tiles
@@ -809,8 +809,8 @@ public:
     typedef _TreeT                                               TreeT;
     typedef typename TreeT::ValueType                            ValueT;
     typedef typename TreeT::LeafNodeType                         LeafT;
-    typedef typename TreeT::template ValueConverter<bool>::Type  BoolTreeT;
-    typedef typename BoolTreeT::LeafNodeType                     BoolLeafT;
+    typedef typename TreeT::template ValueConverter<ValueMask>::Type  MaskTreeT;
+    typedef typename MaskTreeT::LeafNodeType                     MaskLeafT;
     typedef Dense<ValueT, openvdb::tools::LayoutZYX>             DenseT;
     typedef openvdb::math::Coord::ValueType                      Index;
     typedef tbb::blocked_range3d<Index, Index, Index>            Range3d;
@@ -833,20 +833,20 @@ public:
 
         // construct a tree that defines the iteration space
 
-        BoolTreeT boolTree(mSource, false /*background*/, openvdb::TopologyCopy());
-        boolTree.topologyUnion(mAlpha);
+        MaskTreeT maskTree(mSource, false /*background*/, openvdb::TopologyCopy());
+        maskTree.topologyUnion(mAlpha);
 
         // Composite regions that are represented by leafnodes in either mAlpha or mSource
         // Parallelize over bool-leafs
 
-        openvdb::tree::LeafManager<const BoolTreeT> boolLeafs(boolTree);
-        boolLeafs.foreach(*this, threaded);
+        openvdb::tree::LeafManager<const MaskTreeT> maskLeafs(maskTree);
+        maskLeafs.foreach(*this, threaded);
 
         // Composite regions that are represented by tiles
         // Parallelize within each tile.
 
-        typename BoolTreeT::ValueOnCIter citer = boolTree.cbeginValueOn();
-        citer.setMaxDepth(BoolTree::ValueOnCIter::LEAF_DEPTH - 1);
+        typename MaskTreeT::ValueOnCIter citer = maskTree.cbeginValueOn();
+        citer.setMaxDepth(MaskTree::ValueOnCIter::LEAF_DEPTH - 1);
 
         if (!citer) return;
 
@@ -882,18 +882,18 @@ public:
 
     // Composites leaf values where the alpha values are active.
     // Used in sparseComposite
-    void inline operator()(const BoolLeafT& boolLeaf, size_t /*i*/) const
+    void inline operator()(const MaskLeafT& maskLeaf, size_t /*i*/) const
     {
 
         typedef UniformLeaf   ULeaf;
-        openvdb::math::CoordBBox localBBox = boolLeaf.getNodeBoundingBox();
+        openvdb::math::CoordBBox localBBox = maskLeaf.getNodeBoundingBox();
         localBBox.intersect(mDense.bbox());
 
         // Early out for non-overlapping leafs
 
         if (localBBox.empty()) return;
 
-        const openvdb::math::Coord org = boolLeaf.origin();
+        const openvdb::math::Coord org = maskLeaf.origin();
         const LeafT* alphaLeaf = mAlpha.probeLeaf(org);
         const LeafT* sourceLeaf   = mSource.probeLeaf(org);
 

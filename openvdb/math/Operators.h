@@ -266,7 +266,7 @@ struct ISGradientNormSqrd
 
         Vec3Type up   = ISGradient<FD>::result(grid, ijk);
         Vec3Type down = ISGradient<BD>::result(grid, ijk);
-        return math::GudonovsNormSqrd(grid.getValue(ijk)>0, down, up);
+        return math::GodunovsNormSqrd(grid.getValue(ijk)>0, down, up);
     }
 
     // stencil access version
@@ -279,7 +279,7 @@ struct ISGradientNormSqrd
 
         Vec3Type up   = ISGradient<FD>::result(stencil);
         Vec3Type down = ISGradient<BD>::result(stencil);
-        return math::GudonovsNormSqrd(stencil.template getValue<0, 0, 0>()>0, down, up);
+        return math::GodunovsNormSqrd(stencil.template getValue<0, 0, 0>()>0, down, up);
     }
 };
 
@@ -324,8 +324,8 @@ struct ISGradientNormSqrd<HJWENO5_BIAS>
                valueAt(ijk.offsetBy( 0, 0, 3)) - valueAt(ijk.offsetBy( 0, 0, 2)), 0),
             down = math::WENO5(v1, v2, v3, v4, v5),
             up   = math::WENO5(v6, v5, v4, v3, v2);
-
-        return math::GudonovsNormSqrd(grid.getValue(ijk)>0, down, up);
+        
+        return math::GodunovsNormSqrd(grid.getValue(ijk)>0, down, up);
     }
 
     // stencil access version
@@ -357,7 +357,7 @@ struct ISGradientNormSqrd<HJWENO5_BIAS>
             down = math::WENO5(v1, v2, v3, v4, v5),
             up   = math::WENO5(v6, v5, v4, v3, v2);
 
-        return math::GudonovsNormSqrd(s.template getValue<0, 0, 0>()>0, down, up);
+        return math::GodunovsNormSqrd(s.template getValue<0, 0, 0>()>0, down, up);
     }
 };
 #endif //DWA_OPENVDB  // for SIMD - note will do the computations in float
@@ -873,7 +873,7 @@ struct GradientNormSqrd
 
         Vec3Type up   = Gradient<MapType, FD>::result(map, grid, ijk);
         Vec3Type down = Gradient<MapType, BD>::result(map, grid, ijk);
-        return math::GudonovsNormSqrd(grid.getValue(ijk)>0, down, up);
+        return math::GodunovsNormSqrd(grid.getValue(ijk)>0, down, up);
     }
 
     // stencil access version
@@ -886,7 +886,7 @@ struct GradientNormSqrd
 
         Vec3Type up   = Gradient<MapType, FD>::result(map, stencil);
         Vec3Type down = Gradient<MapType, BD>::result(map, stencil);
-        return math::GudonovsNormSqrd(stencil.template getValue<0, 0, 0>()>0, down, up);
+        return math::GodunovsNormSqrd(stencil.template getValue<0, 0, 0>()>0, down, up);
     }
 };
 

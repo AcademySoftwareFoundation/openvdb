@@ -32,6 +32,7 @@
 #define OPENVDB_UNITTEST_UTIL_HAS_BEEN_INCLUDED
 
 #include <openvdb/openvdb.h>
+#include <openvdb/math/Math.h> // for math::Random01
 #include <openvdb/tools/Prune.h>// for pruneLevelSet
 #include <sstream>
 
@@ -117,6 +118,44 @@ makeSphere(const openvdb::Coord& dim, const openvdb::Vec3f& center, float radius
 {
     grid.setTransform(openvdb::math::Transform::createLinearTransform(/*voxel size=*/dx));
     makeSphere<GridType>(dim, center, radius, grid, mode);
+}
+
+// Generate random points by uniformly distributing points
+// on a unit-sphere.
+inline void genPoints(const int numPoints, std::vector<openvdb::Vec3R>& points)
+{
+    // init
+    openvdb::math::Random01 randNumber(0);
+    const int n = int(std::sqrt(double(numPoints)));
+    const double xScale = (2.0 * M_PI) / double(n);
+    const double yScale = M_PI / double(n);
+    
+    double x, y, theta, phi;
+    openvdb::Vec3R pos;
+    
+    points.reserve(n*n);
+    
+    // loop over a [0 to n) x [0 to n) grid.
+    for (int a = 0; a < n; ++a) {
+        for (int b = 0; b < n; ++b) {
+            
+            // jitter, move to random pos. inside the current cell
+            x = double(a) + randNumber();
+            y = double(b) + randNumber();
+            
+            // remap to a lat/long map
+            theta = y * yScale; // [0 to PI]
+            phi   = x * xScale; // [0 to 2PI]
+            
+            // convert to cartesian coordinates on a unit sphere.
+            // spherical coordinate triplet (r=1, theta, phi)
+            pos[0] = std::sin(theta)*std::cos(phi);
+            pos[1] = std::sin(theta)*std::sin(phi);
+            pos[2] = std::cos(theta);
+            
+            points.push_back(pos);
+        }
+    }
 }
 
 // @todo makePlane

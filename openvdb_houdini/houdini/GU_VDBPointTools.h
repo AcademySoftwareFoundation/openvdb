@@ -46,6 +46,7 @@
 
 #include <openvdb/Platform.h>
 #include <openvdb/tools/PointIndexGrid.h>
+#include <openvdb/tools/PointMaskGrid.h>
 
 
 /// @brief Houdini point attribute wrapper
@@ -213,6 +214,17 @@ GUvdbCreatePointIndexGrid(
 {
     GU_VDBPointList<openvdb::Vec3s> points(detail, pointGroup);
     return openvdb::tools::createPointIndexGrid<openvdb::tools::PointIndexGrid>(points, xform);
+}
+
+/// Utility method to construct a boolean PointMaskGrid
+inline openvdb::MaskGrid::Ptr
+GUvdbCreatePointMaskGrid(
+    const openvdb::math::Transform& xform,
+    const GU_Detail& detail,
+    const GA_PointGroup* pointGroup = NULL)
+{
+    GU_VDBPointList<openvdb::Vec3R> points( detail, pointGroup );
+    return openvdb::tools::createPointMaskGrid( points, xform );
 }
 
 

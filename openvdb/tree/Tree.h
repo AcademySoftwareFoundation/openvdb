@@ -208,6 +208,7 @@ public:
 
     typedef _RootNodeType                        RootNodeType;
     typedef typename RootNodeType::ValueType     ValueType;
+    typedef typename RootNodeType::BuildType     BuildType;
     typedef typename RootNodeType::LeafNodeType  LeafNodeType;
 
     static const Index DEPTH = RootNodeType::LEVEL + 1;
@@ -2035,7 +2036,7 @@ Tree<RootNodeType>::treeType()
         std::vector<Index> dims;
         Tree::getNodeLog2Dims(dims);
         std::ostringstream ostr;
-        ostr << "Tree_" << typeNameAsString<ValueType>();
+        ostr << "Tree_" << typeNameAsString<BuildType>();
         for (size_t i = 1, N = dims.size(); i < N; ++i) { // start from 1 to skip the RootNode
             ostr << "_" << dims[i];
         }

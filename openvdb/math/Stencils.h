@@ -42,10 +42,10 @@
 
 #include <algorithm>
 #include <vector>
-#include <openvdb/math/Math.h>             // for Pow2, needed by WENO and  Gudonov
+#include <openvdb/math/Math.h>             // for Pow2, needed by WENO and Godunov
 #include <openvdb/Types.h>                 // for Real
 #include <openvdb/math/Coord.h>            // for Coord
-#include <openvdb/math/FiniteDifference.h> // for WENO5 and GudonovsNormSqrd
+#include <openvdb/math/FiniteDifference.h> // for WENO5 and GodunovsNormSqrd
 #include <openvdb/tree/ValueAccessor.h>
 
 namespace openvdb {
@@ -1227,13 +1227,13 @@ public:
     }
 
     /// @brief Return the norm square of the single-sided upwind gradient
-    /// (computed via Gudonov's scheme) at the previously buffered location.
+    /// (computed via Godunov's scheme) at the previously buffered location.
     ///
     /// @note This method should not be called until the stencil
     /// buffer has been populated via a call to moveTo(ijk).
     inline ValueType normSqGrad() const
     {
-        return mInvDx2 * math::GudonovsNormSqrd(mStencil[0] > 0,
+        return mInvDx2 * math::GodunovsNormSqrd(mStencil[0] > 0,
                                                 mStencil[0] - mStencil[1],
                                                 mStencil[2] - mStencil[0],
                                                 mStencil[0] - mStencil[3],
@@ -1356,7 +1356,7 @@ public:
     }
 
     /// @brief Return the norm-square of the WENO upwind gradient (computed via
-    /// WENO upwinding and Gudonov's scheme) at the previously buffered location.
+    /// WENO upwinding and Godunov's scheme) at the previously buffered location.
     ///
     /// @note This method should not be called until the stencil
     /// buffer has been populated via a call to moveTo(ijk).
@@ -1375,7 +1375,7 @@ public:
             dP_m = math::WENO5(v1, v2, v3, v4, v5, mDx2),
             dP_p = math::WENO5(v6, v5, v4, v3, v2, mDx2);
 
-        return mInvDx2 * math::GudonovsNormSqrd(mStencil[0] > 0, dP_m, dP_p);
+        return mInvDx2 * math::GodunovsNormSqrd(mStencil[0] > 0, dP_m, dP_p);
 #else
         const Real
             dP_xm = math::WENO5(v[ 2]-v[ 1],v[ 3]-v[ 2],v[ 0]-v[ 3],v[ 4]-v[ 0],v[ 5]-v[ 4],mDx2),
@@ -1385,7 +1385,7 @@ public:
             dP_zm = math::WENO5(v[14]-v[13],v[15]-v[14],v[ 0]-v[15],v[16]-v[ 0],v[17]-v[16],mDx2),
             dP_zp = math::WENO5(v[18]-v[17],v[17]-v[16],v[16]-v[ 0],v[ 0]-v[15],v[15]-v[14],mDx2);
         return static_cast<ValueType>(
-            mInvDx2*math::GudonovsNormSqrd(v[0]>0,dP_xm,dP_xp,dP_ym,dP_yp,dP_zm,dP_zp));
+            mInvDx2*math::GodunovsNormSqrd(v[0]>0,dP_xm,dP_xp,dP_ym,dP_yp,dP_zm,dP_zp));
 #endif
     }
 

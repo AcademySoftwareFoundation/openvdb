@@ -81,7 +81,8 @@ namespace Scheme {
 ///        reverting to a first-order schemes when the function is not
 ///        bounded by the cell values used for tri-linear interpolation. 
 ///    
-/// @details The supported integrations schemes:
+/// @verbatim The supported integrations schemes:
+///    
 ///    ================================================================
 ///    |  Lable | Accuracy |  Integration Scheme   |  Interpolations  |
 ///    |        |Time/Space|                       |  velocity/volume |
@@ -93,6 +94,8 @@ namespace Scheme {
 ///    |  MAC   |   2/2    | MacCormack            |        2/2       |
 ///    |  BFECC |   2/2    | BFECC                 |        3/2       |           
 ///    ================================================================
+/// @endverbatim
+    
 template<typename VelocityGridT = Vec3fGrid,
          bool StaggeredVelocity = false,
          typename InterrupterType = util::NullInterrupter>

@@ -29,17 +29,16 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include <cppunit/extensions/HelperMacros.h>
-#include <openvdb/math/Math.h> // for math::Random01
 #include <openvdb/tools/PointIndexGrid.h>
 
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include "util.h" // for genPoints
 
 
-class TestPointIndexGrid: public CppUnit::TestCase
+struct TestPointIndexGrid: public CppUnit::TestCase
 {
-public:
     CPPUNIT_TEST_SUITE(TestPointIndexGrid);
     CPPUNIT_TEST(testPointIndexGrid);
     CPPUNIT_TEST(testPointIndexFilter);
@@ -47,45 +46,6 @@ public:
 
     void testPointIndexGrid();
     void testPointIndexFilter();
-
-private:
-    // Generate random points by uniformly distributing points
-    // on a unit-sphere.
-    void genPoints(const int numPoints, std::vector<openvdb::Vec3R>& points) const
-    {
-        // init
-        openvdb::math::Random01 randNumber(0);
-        const int n = int(std::sqrt(double(numPoints)));
-        const double xScale = (2.0 * M_PI) / double(n);
-        const double yScale = M_PI / double(n);
-
-        double x, y, theta, phi;
-        openvdb::Vec3R pos;
-
-        points.reserve(n*n);
-
-        // loop over a [0 to n) x [0 to n) grid.
-        for (int a = 0; a < n; ++a) {
-            for (int b = 0; b < n; ++b) {
-
-                // jitter, move to random pos. inside the current cell
-                x = double(a) + randNumber();
-                y = double(b) + randNumber();
-
-                // remap to a lat/long map
-                theta = y * yScale; // [0 to PI]
-                phi   = x * xScale; // [0 to 2PI]
-
-                // convert to cartesian coordinates on a unit sphere.
-                // spherical coordinate triplet (r=1, theta, phi)
-                pos[0] = std::sin(theta)*std::cos(phi);
-                pos[1] = std::sin(theta)*std::sin(phi);
-                pos[2] = std::cos(theta);
-
-                points.push_back(pos);
-            }
-        }
-    }
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestPointIndexGrid);
@@ -170,7 +130,7 @@ TestPointIndexGrid::testPointIndexGrid()
     // generate points
 
     std::vector<openvdb::Vec3R> points;
-    genPoints(40000, points);
+    unittest_util::genPoints(40000, points);
 
     PointList pointList(points);
 
@@ -301,7 +261,7 @@ TestPointIndexGrid::testPointIndexFilter()
             openvdb::math::Transform::createLinearTransform(voxelSize);
 
     std::vector<openvdb::Vec3d> points;
-    genPoints(pointCount, points);
+    unittest_util::genPoints(pointCount, points);
 
     PointList pointList(points);
 

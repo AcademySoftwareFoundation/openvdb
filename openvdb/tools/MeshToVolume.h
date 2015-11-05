@@ -45,7 +45,7 @@
 #define OPENVDB_TOOLS_MESH_TO_VOLUME_HAS_BEEN_INCLUDED
 
 #include <openvdb/Types.h>
-#include <openvdb/math/FiniteDifference.h> // for GudonovsNormSqrd
+#include <openvdb/math/FiniteDifference.h> // for GodunovsNormSqrd
 #include <openvdb/math/Proximity.h> // for closestPointOnTriangleToPoint()
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Util.h>
@@ -2762,7 +2762,7 @@ struct Renormalize
                 down[1] = phi0 - acc.getValue(ijk.offsetBy(0, -1, 0));
                 down[2] = phi0 - acc.getValue(ijk.offsetBy(0, 0, -1));
 
-                const ValueType normSqGradPhi = math::GudonovsNormSqrd(phi0 > 0.0, down, up);
+                const ValueType normSqGradPhi = math::GodunovsNormSqrd(phi0 > 0.0, down, up);
 
                 const ValueType diff = math::Sqrt(normSqGradPhi) * invDx - ValueType(1.0);
                 const ValueType S = phi0 / (math::Sqrt(math::Pow2(phi0) + normSqGradPhi));

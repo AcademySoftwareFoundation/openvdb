@@ -36,6 +36,7 @@
 #ifndef OPENVDB_TOOLS_CLIP_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_CLIP_HAS_BEEN_INCLUDED
 
+#include <openvdb/Types.h>// for ValueMask
 #include <openvdb/Grid.h>
 #include <openvdb/math/Math.h>// for isNegative
 #include <openvdb/tree/LeafManager.h>
@@ -117,10 +118,10 @@ template<typename TreeT>
 class CopyLeafNodes
 {
 public:
-    typedef typename TreeT::template ValueConverter<bool>::Type BoolTreeT;
-    typedef tree::LeafManager<const BoolTreeT> BoolLeafManagerT;
+    typedef typename TreeT::template ValueConverter<ValueMask>::Type MaskTreeT;
+    typedef tree::LeafManager<const MaskTreeT> MaskLeafManagerT;
 
-    CopyLeafNodes(const TreeT& tree, const BoolLeafManagerT& leafNodes);
+    CopyLeafNodes(const TreeT& tree, const MaskLeafManagerT& leafNodes);
 
     void run(bool threaded = true);
 
@@ -131,15 +132,15 @@ public:
     void join(const CopyLeafNodes& rhs) { mNewTree->merge(*rhs.mNewTree); }
 
 private:
-    const BoolTreeT* mClipMask;
+    const MaskTreeT* mClipMask;
     const TreeT* mTree;
-    const BoolLeafManagerT* mLeafNodes;
+    const MaskLeafManagerT* mLeafNodes;
     typename TreeT::Ptr mNewTree;
 };
 
 
 template<typename TreeT>
-CopyLeafNodes<TreeT>::CopyLeafNodes(const TreeT& tree, const BoolLeafManagerT& leafNodes)
+CopyLeafNodes<TreeT>::CopyLeafNodes(const TreeT& tree, const MaskLeafManagerT& leafNodes)
     : mTree(&tree)
     , mLeafNodes(&leafNodes)
     , mNewTree(new TreeT(mTree->background()))
@@ -170,14 +171,14 @@ void
 CopyLeafNodes<TreeT>::operator()(const tbb::blocked_range<size_t>& range)
 {
     typedef typename TreeT::LeafNodeType LeafT;
-    typedef typename BoolTree::LeafNodeType BoolLeafT;
-    typename BoolLeafT::ValueOnCIter it;
+    typedef typename MaskTree::LeafNodeType MaskLeafT;
+    typename MaskLeafT::ValueOnCIter it;
 
     tree::ValueAccessor<TreeT> acc(*mNewTree);
     tree::ValueAccessor<const TreeT> refAcc(*mTree);
 
     for (size_t n = range.begin(); n != range.end(); ++n) {
-        const BoolLeafT& maskLeaf = mLeafNodes->leaf(n);
+        const MaskLeafT& maskLeaf = mLeafNodes->leaf(n);
         const Coord& ijk = maskLeaf.origin();
         const LeafT* refLeaf = refAcc.probeConstLeaf(ijk);
 
@@ -251,27 +252,27 @@ struct ConvertGrid<GridT, GridT>
 ////////////////////////////////////////
 
 
-// Convert a grid of arbitrary type to a boolean mask grid and return a pointer to the new grid.
+// Convert a grid of arbitrary type to a mask grid and return a pointer to the new grid.
 template<typename GridT>
-inline typename boost::disable_if<boost::is_same<bool, typename GridT::ValueType>,
-    typename GridT::template ValueConverter<bool>::Type::Ptr>::type
-convertToBoolMaskGrid(const GridT& grid)
+inline typename boost::disable_if<boost::is_same<ValueMask, typename GridT::BuildType>,
+    typename GridT::template ValueConverter<ValueMask>::Type::Ptr>::type
+convertToMaskGrid(const GridT& grid)
 {
-    typedef typename GridT::template ValueConverter<bool>::Type BoolGridT;
-    typedef typename BoolGridT::Ptr BoolGridPtrT;
+    typedef typename GridT::template ValueConverter<ValueMask>::Type MaskGridT;
+    typedef typename MaskGridT::Ptr MaskGridPtrT;
 
     // Convert the input grid to a boolean mask grid (with the same tree configuration).
-    BoolGridPtrT mask = BoolGridT::create(/*background=*/false);
+    MaskGridPtrT mask = MaskGridT::create(/*background=*/false);
     mask->topologyUnion(grid);
     mask->setTransform(grid.constTransform().copy());
     return mask;
 }
 
-// Overload that avoids any processing if the input grid is already a boolean grid
+// Overload that avoids any processing if the input grid is already a mask grid
 template<typename GridT>
-inline typename boost::enable_if<boost::is_same<bool, typename GridT::ValueType>,
-    typename GridT::Ptr>::type
-convertToBoolMaskGrid(const GridT& grid)
+inline typename boost::enable_if<boost::is_same<ValueMask, typename GridT::BuildType>,
+                                 typename GridT::Ptr>::type
+convertToMaskGrid(const GridT& grid)
 {
     return grid.copy(); // shallow copy
 }
@@ -282,25 +283,25 @@ convertToBoolMaskGrid(const GridT& grid)
 
 template<typename GridType>
 inline typename GridType::Ptr
-doClip(const GridType& grid, const typename GridType::template ValueConverter<bool>::Type& aMask)
+doClip(const GridType& grid, const typename GridType::template ValueConverter<ValueMask>::Type& aMask)
 {
     typedef typename GridType::TreeType TreeT;
-    typedef typename GridType::TreeType::template ValueConverter<bool>::Type BoolTreeT;
+    typedef typename GridType::TreeType::template ValueConverter<ValueMask>::Type MaskTreeT;
 
     const GridClass gridClass = grid.getGridClass();
     const TreeT& tree = grid.tree();
 
-    BoolTreeT mask(false);
+    MaskTreeT mask(false);
     mask.topologyUnion(tree);
 
     if (gridClass == GRID_LEVEL_SET) {
-        tree::LeafManager<BoolTreeT> leafNodes(mask);
+        tree::LeafManager<MaskTreeT> leafNodes(mask);
         leafNodes.foreach(MaskInteriorVoxels<TreeT>(tree));
 
         tree::ValueAccessor<const TreeT> acc(tree);
 
-        typename BoolTreeT::ValueAllIter iter(mask);
-        iter.setMaxDepth(BoolTreeT::ValueAllIter::LEAF_DEPTH - 1);
+        typename MaskTreeT::ValueAllIter iter(mask);
+        iter.setMaxDepth(MaskTreeT::ValueAllIter::LEAF_DEPTH - 1);
 
         for ( ; iter; ++iter) {
             iter.setActiveState(math::isNegative(acc.getValue(iter.getCoord())));
@@ -312,7 +313,7 @@ doClip(const GridType& grid, const typename GridType::template ValueConverter<bo
     typename GridType::Ptr outGrid;
     {
         // Copy voxel values and states.
-        tree::LeafManager<const BoolTreeT> leafNodes(mask);
+        tree::LeafManager<const MaskTreeT> leafNodes(mask);
         CopyLeafNodes<TreeT> maskOp(tree, leafNodes);
         maskOp.run();
         outGrid = GridType::create(maskOp.tree());
@@ -320,7 +321,7 @@ doClip(const GridType& grid, const typename GridType::template ValueConverter<bo
     {
         // Copy tile values and states.
         tree::ValueAccessor<const TreeT> refAcc(tree);
-        tree::ValueAccessor<const BoolTreeT> maskAcc(mask);
+        tree::ValueAccessor<const MaskTreeT> maskAcc(mask);
 
         typename TreeT::ValueAllIter it(outGrid->tree());
         it.setMaxDepth(TreeT::ValueAllIter::LEAF_DEPTH - 1);
@@ -354,7 +355,7 @@ OPENVDB_STATIC_SPECIALIZATION
 inline typename GridType::Ptr
 clip(const GridType& grid, const BBoxd& bbox)
 {
-    typedef typename GridType::template ValueConverter<bool>::Type BoolGridT;
+    typedef typename GridType::template ValueConverter<ValueMask>::Type MaskGridT;
 
     // Transform the world-space bounding box into the source grid's index space.
     Vec3d idxMin, idxMax;
@@ -362,43 +363,43 @@ clip(const GridType& grid, const BBoxd& bbox)
     CoordBBox region(Coord::floor(idxMin), Coord::floor(idxMax));
     // Construct a boolean mask grid that is true inside the index-space bounding box
     // and false everywhere else.
-    BoolGridT clipMask(/*background=*/false);
+    MaskGridT clipMask(/*background=*/false);
     clipMask.fill(region, /*value=*/true, /*active=*/true);
 
     return clip_internal::doClip(grid, clipMask);
 }
 
 
-template<typename GridType, typename MaskTreeType>
+template<typename GridType1, typename TreeType2>
 OPENVDB_STATIC_SPECIALIZATION
-inline typename GridType::Ptr
-clip(const GridType& grid, const Grid<MaskTreeType>& maskGrid)
+inline typename GridType1::Ptr
+clip(const GridType1& grid1, const Grid<TreeType2>& grid2)
 {
-    typedef typename GridType::template ValueConverter<bool>::Type BoolGridT;
-    typedef typename BoolGridT::Ptr BoolGridPtrT;
+    typedef typename GridType1::template ValueConverter<ValueMask>::Type MaskGridT1;
+    typedef typename MaskGridT1::Ptr MaskGridPtrT1;
 
-    typedef Grid<MaskTreeType> MaskGridType;
-    typedef typename MaskGridType::template ValueConverter<bool>::Type BoolMaskGridT;
-    typedef typename BoolMaskGridT::Ptr BoolMaskGridPtrT;
+    typedef Grid<TreeType2> GridType2;
+    typedef typename GridType2::template ValueConverter<ValueMask>::Type MaskGridT2;
+    typedef typename MaskGridT2::Ptr MaskGridPtrT2;
 
     // Convert the mask grid to a boolean grid with the same tree configuration.
-    BoolMaskGridPtrT boolMaskGrid = clip_internal::convertToBoolMaskGrid(maskGrid);
+    MaskGridPtrT2 maskGrid = clip_internal::convertToMaskGrid( grid2 );
 
     // Resample the boolean mask grid into the source grid's index space.
-    if (grid.constTransform() != boolMaskGrid->constTransform()) {
-        BoolMaskGridPtrT resampledMask = BoolMaskGridT::create(/*background=*/false);
-        resampledMask->setTransform(grid.constTransform().copy());
-        tools::resampleToMatch<clip_internal::BoolSampler>(*boolMaskGrid, *resampledMask);
+    if (grid1.constTransform() != maskGrid->constTransform()) {
+        MaskGridPtrT2 resampledMask = MaskGridT2::create(/*background=*/false);
+        resampledMask->setTransform(grid1.constTransform().copy());
+        tools::resampleToMatch<clip_internal::BoolSampler>(*maskGrid, *resampledMask);
         tools::prune(resampledMask->tree());
-        boolMaskGrid = resampledMask;
+        maskGrid = resampledMask;
     }
 
     // Convert the bool mask grid to a bool grid of the same configuration as the source grid.
-    BoolGridPtrT clipMask =
-        clip_internal::ConvertGrid</*from=*/BoolMaskGridT, /*to=*/BoolGridT>()(boolMaskGrid);
+    MaskGridPtrT1 clipMask =
+        clip_internal::ConvertGrid</*from=*/MaskGridT2, /*to=*/MaskGridT1>()( maskGrid );
 
     // Clip the source grid against the boolean mask grid.
-    return clip_internal::doClip(grid, *clipMask);
+    return clip_internal::doClip(grid1, *clipMask);
 }
 
 } // namespace tools

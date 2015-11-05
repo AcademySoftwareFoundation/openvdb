@@ -107,6 +107,16 @@ typedef Grid<PointIndexTree> PointIndexGrid;
 /// @brief  Partition points into a point index grid to accelerate range and
 ///         nearest-neighbor searches.
 ///
+/// @param points       world-space point array conforming to the PointArray interface
+/// @param voxelSize    voxel size in world units
+template<typename GridT, typename PointArrayT>
+inline typename GridT::Ptr
+createPointIndexGrid(const PointArrayT& points, double voxelSize);
+
+
+/// @brief  Partition points into a point index grid to accelerate range and
+///         nearest-neighbor searches.
+///
 /// @param points   world-space point array conforming to the PointArray interface
 /// @param xform    world-to-index-space transform
 template<typename GridT, typename PointArrayT>
@@ -1288,6 +1298,15 @@ createPointIndexGrid(const PointArrayT& points, const math::Transform& xform)
     }
 
     return grid;
+}
+
+
+template<typename GridT, typename PointArrayT>
+inline typename GridT::Ptr
+createPointIndexGrid(const PointArrayT& points, double voxelSize)
+{
+    math::Transform::Ptr xform = math::Transform::createLinearTransform(voxelSize);
+    return createPointIndexGrid<GridT>(points, *xform);
 }
 
 

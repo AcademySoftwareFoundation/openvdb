@@ -489,6 +489,7 @@ public:
     typedef typename _TreeType::Ptr                       TreePtrType;
     typedef typename _TreeType::ConstPtr                  ConstTreePtrType;
     typedef typename _TreeType::ValueType                 ValueType;
+    typedef typename _TreeType::BuildType                 BuildType;
 
     typedef typename _TreeType::ValueOnIter               ValueOnIter;
     typedef typename _TreeType::ValueOnCIter              ValueOnCIter;
@@ -546,7 +547,7 @@ public:
     Grid(const Grid&, ShallowCopy);
     /// @brief Deep copy another grid's metadata and transform, but construct a new tree
     /// with background value zero.
-    Grid(const GridBase&);
+    explicit Grid(const GridBase&);
 
     virtual ~Grid() {}
 

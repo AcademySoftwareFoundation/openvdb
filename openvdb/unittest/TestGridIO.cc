@@ -46,17 +46,19 @@ public:
         Float5432Tree;
     typedef openvdb::Grid<Float5432Tree> Float5432Grid;
 
-    virtual void setUp() { openvdb::initialize(); }
+    virtual void setUp()    { openvdb::initialize(); }
     virtual void tearDown() { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestGridIO);
     CPPUNIT_TEST(testReadAllBool);
+    CPPUNIT_TEST(testReadAllMask);
     CPPUNIT_TEST(testReadAllFloat);
     CPPUNIT_TEST(testReadAllVec3S);
     CPPUNIT_TEST(testReadAllFloat5432);
     CPPUNIT_TEST_SUITE_END();
 
-    void testReadAllBool() { readAllTest<openvdb::BoolGrid>(); }
+    void testReadAllBool()  { readAllTest<openvdb::BoolGrid>(); }
+    void testReadAllMask()  { readAllTest<openvdb::MaskGrid>(); }
     void testReadAllFloat() { readAllTest<openvdb::FloatGrid>(); }
     void testReadAllVec3S() { readAllTest<openvdb::Vec3SGrid>(); }
     void testReadAllFloat5432() { Float5432Grid::registerGrid(); readAllTest<Float5432Grid>(); }

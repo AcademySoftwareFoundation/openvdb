@@ -69,6 +69,7 @@ public:
     typedef _ChildNodeType                        ChildNodeType;
     typedef typename ChildNodeType::LeafNodeType  LeafNodeType;
     typedef typename ChildNodeType::ValueType     ValueType;
+    typedef typename ChildNodeType::BuildType     BuildType;
     typedef NodeUnion<ValueType, ChildNodeType>   UnionType;
     typedef util::NodeMask<Log2Dim>               NodeMaskType;
 

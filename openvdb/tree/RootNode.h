@@ -78,6 +78,7 @@ public:
     typedef ChildType                         ChildNodeType;
     typedef typename ChildType::LeafNodeType  LeafNodeType;
     typedef typename ChildType::ValueType     ValueType;
+    typedef typename ChildType::BuildType     BuildType;
 
     static const Index LEVEL = 1 + ChildType::LEVEL; // level 0 = leaf
 

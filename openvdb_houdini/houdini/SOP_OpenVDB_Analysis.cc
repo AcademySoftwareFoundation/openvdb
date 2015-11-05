@@ -208,7 +208,7 @@ struct ToolOp
             mOutGrid = tool.process(mThreaded);
 
         } else {
-            ToolT<GridType, cvdb::BoolGrid, hvdb::Interrupter> tool(inGrid, &mBoss);
+            ToolT<GridType, cvdb::BoolGrid/*dummy*/, hvdb::Interrupter> tool(inGrid, &mBoss);
             mOutGrid = tool.process(mThreaded);
         }
     }

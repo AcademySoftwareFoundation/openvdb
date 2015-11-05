@@ -74,7 +74,7 @@ public:
     typedef typename tree::LeafManager<TreeType> LeafManagerType; // leafs + buffers
     typedef typename LeafManagerType::LeafRange  LeafRange;
     typedef typename LeafManagerType::BufferType BufferType;
-    typedef typename TreeType::template ValueConverter<bool>::Type BoolMaskType;
+    typedef typename TreeType::template ValueConverter<ValueMask>::Type MaskTreeType;
     BOOST_STATIC_ASSERT(boost::is_floating_point<ValueType>::value);
 
     /// Lightweight struct that stores the state of the LevelSetTracker
@@ -101,7 +101,7 @@ public:
     void normalize(const MaskType* mask);
 
     /// @brief Iterative normalization, i.e. solving the Eikonal equation
-    void normalize() { this->normalize<BoolMaskType>(NULL); }
+    void normalize() { this->normalize<MaskTreeType>(NULL); }
 
     /// @brief Track the level set interface, i.e. rebuild and normalize the
     /// narrow band of the level set.
@@ -317,11 +317,11 @@ dilate(int iterations)
         }
     } else {
         for (int i=0; i < iterations; ++i) {
-            BoolMaskType mask0(mGrid->tree(), false, TopologyCopy());
+            MaskTreeType mask0(mGrid->tree(), false, TopologyCopy());
             tools::dilateVoxels(*mLeafs);
             mLeafs->rebuildLeafArray();
             tools::changeLevelSetBackground(this->leafs(), mDx + mGrid->background());
-            BoolMaskType mask(mGrid->tree(), false, TopologyCopy());
+            MaskTreeType mask(mGrid->tree(), false, TopologyCopy());
             mask.topologyDifference(mask0);
             this->normalize(&mask);
         }

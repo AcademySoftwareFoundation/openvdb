@@ -2258,6 +2258,13 @@ TestTools::testClipping()
         Local::validate(*clipped);
     }
     {
+        // Test clipping against a mask grid.
+        MaskGrid mask(false);
+        mask.fill(CoordBBox(Coord(4, 4, -6), Coord(4, 4, 6)), true, true);
+        FloatGrid::Ptr clipped = tools::clip(cube, mask);
+        Local::validate(*clipped);
+    }
+    {
         // Test clipping against a boolean mask grid.
         BoolGrid mask(false);
         mask.fill(CoordBBox(Coord(4, 4, -6), Coord(4, 4, 6)), true, true);

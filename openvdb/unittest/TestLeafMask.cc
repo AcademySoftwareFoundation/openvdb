@@ -33,17 +33,18 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/Types.h>
 #include <openvdb/tools/Filter.h>
+#include <openvdb/tree/LeafNode.h>
 #include <openvdb/util/logging.h>
 #include "util.h" // for unittest_util::makeSphere()
 
 
-class TestLeafBool: public CppUnit::TestCase
+class TestLeafMask: public CppUnit::TestCase
 {
 public:
     virtual void setUp() { openvdb::initialize(); }
     virtual void tearDown() { openvdb::uninitialize(); }
 
-    CPPUNIT_TEST_SUITE(TestLeafBool);
+    CPPUNIT_TEST_SUITE(TestLeafMask);
     CPPUNIT_TEST(testGetValue);
     CPPUNIT_TEST(testSetValue);
     CPPUNIT_TEST(testProbeValue);
@@ -56,7 +57,7 @@ public:
     CPPUNIT_TEST(testTopologyCopy);
     CPPUNIT_TEST(testMerge);
     CPPUNIT_TEST(testCombine);
-    CPPUNIT_TEST(testBoolTree);
+    CPPUNIT_TEST(testTopologyTree);
     //CPPUNIT_TEST(testFilter);
     CPPUNIT_TEST_SUITE_END();
 
@@ -72,35 +73,42 @@ public:
     void testTopologyCopy();
     void testMerge();
     void testCombine();
-    void testBoolTree();
+    void testTopologyTree();
     //void testFilter();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestLeafBool);
+CPPUNIT_TEST_SUITE_REGISTRATION(TestLeafMask);
 
-typedef openvdb::tree::LeafNode<bool, 3> LeafType;
+typedef openvdb::tree::LeafNode<openvdb::ValueMask, 3> LeafType;
 
 
 ////////////////////////////////////////
 
 
 void
-TestLeafBool::testGetValue()
+TestLeafMask::testGetValue()
 {
     {
-        LeafType leaf(openvdb::Coord(0, 0, 0), /*background=*/false);
+        LeafType leaf1(openvdb::Coord(0, 0, 0));
+        openvdb::tree::LeafNode<bool, 3> leaf2(openvdb::Coord(0, 0, 0));
+        CPPUNIT_ASSERT( leaf1.memUsage() < leaf2.memUsage() );
+        //std::cerr << "\nLeafNode<ActiveState, 3> uses " << leaf1.memUsage() << " bytes" << std::endl;
+        //std::cerr << "LeafNode<bool, 3> uses " << leaf2.memUsage() << " bytes" << std::endl;
+    }
+    {
+        LeafType leaf(openvdb::Coord(0, 0, 0), false);
         for (openvdb::Index n = 0; n < leaf.numValues(); ++n) {
             CPPUNIT_ASSERT_EQUAL(false, leaf.getValue(leaf.offsetToLocalCoord(n)));
         }
     }
     {
-        LeafType leaf(openvdb::Coord(0, 0, 0), /*background=*/true);
+        LeafType leaf(openvdb::Coord(0, 0, 0), true);
         for (openvdb::Index n = 0; n < leaf.numValues(); ++n) {
             CPPUNIT_ASSERT_EQUAL(true, leaf.getValue(leaf.offsetToLocalCoord(n)));
         }
     }
     {// test Buffer::data()
-        LeafType leaf(openvdb::Coord(0, 0, 0), /*background=*/false);
+        LeafType leaf(openvdb::Coord(0, 0, 0), false);
         leaf.fill(true);
         LeafType::Buffer::WordType* w = leaf.buffer().data();
         for (openvdb::Index n = 0; n < LeafType::Buffer::WORD_COUNT; ++n) {
@@ -108,7 +116,7 @@ TestLeafBool::testGetValue()
         }
     }
     {// test const Buffer::data()
-        LeafType leaf(openvdb::Coord(0, 0, 0), /*background=*/false);
+        LeafType leaf(openvdb::Coord(0, 0, 0), false);
         leaf.fill(true);
         const LeafType& cleaf = leaf;
         const LeafType::Buffer::WordType* w = cleaf.buffer().data();
@@ -120,7 +128,7 @@ TestLeafBool::testGetValue()
 
 
 void
-TestLeafBool::testSetValue()
+TestLeafMask::testSetValue()
 {
     LeafType leaf(openvdb::Coord(0, 0, 0), false);
 
@@ -133,10 +141,10 @@ TestLeafBool::testSetValue()
     CPPUNIT_ASSERT(!leaf.isValueOn(xyz));
     leaf.setValueOn(xyz);
     CPPUNIT_ASSERT(leaf.isValueOn(xyz));
-    leaf.setValueOn(xyz, /*value=*/true); // value argument should be ignored
+    leaf.setValueOn(xyz, true);
     CPPUNIT_ASSERT(leaf.isValueOn(xyz));
-    leaf.setValueOn(xyz, /*value=*/false); // value argument should be ignored
-    CPPUNIT_ASSERT(leaf.isValueOn(xyz));
+    leaf.setValueOn(xyz, false); // value and state are the same!
+    CPPUNIT_ASSERT(!leaf.isValueOn(xyz));
 
     leaf.setValueOff(xyz);
     CPPUNIT_ASSERT(!leaf.isValueOn(xyz));
@@ -149,9 +157,8 @@ TestLeafBool::testSetValue()
     CPPUNIT_ASSERT(!leaf.isValueOn(xyz));
 }
 
-
 void
-TestLeafBool::testProbeValue()
+TestLeafMask::testProbeValue()
 {
     LeafType leaf(openvdb::Coord(0, 0, 0));
     leaf.setValueOn(openvdb::Coord(1, 6, 5));
@@ -163,7 +170,7 @@ TestLeafBool::testProbeValue()
 
 
 void
-TestLeafBool::testIterators()
+TestLeafMask::testIterators()
 {
     LeafType leaf(openvdb::Coord(0, 0, 0));
     leaf.setValueOn(openvdb::Coord(1, 2, 3));
@@ -197,7 +204,7 @@ TestLeafBool::testIterators()
 
 
 void
-TestLeafBool::testIteratorGetCoord()
+TestLeafMask::testIteratorGetCoord()
 {
     using namespace openvdb;
 
@@ -219,7 +226,7 @@ TestLeafBool::testIteratorGetCoord()
 
 
 void
-TestLeafBool::testEquivalence()
+TestLeafMask::testEquivalence()
 {
     using openvdb::CoordBBox;
     using openvdb::Coord;
@@ -229,7 +236,7 @@ TestLeafBool::testEquivalence()
         
         CPPUNIT_ASSERT(leaf != leaf2);
         
-        leaf.fill(CoordBBox(Coord(0), Coord(LeafType::DIM - 1)), true, /*active=*/false);
+        leaf.fill(CoordBBox(Coord(0), Coord(LeafType::DIM - 1)), true, false);
         CPPUNIT_ASSERT(leaf == leaf2); // true and inactive
         
         leaf.setValuesOn(); // true and active
@@ -259,11 +266,11 @@ TestLeafBool::testEquivalence()
         
         leaf2.setValueOff(Coord(0, 0, 1), false);
         
-        CPPUNIT_ASSERT(leaf != leaf2);
+        CPPUNIT_ASSERT(leaf == leaf2);//values and states coinside
         
         leaf2.setValueOn(Coord(0, 0, 1));
         
-        CPPUNIT_ASSERT(leaf == leaf2);
+        CPPUNIT_ASSERT(leaf != leaf2);//values and states coinside
     }
     {// test LeafNode<bool>::operator==()
         LeafType leaf1(Coord(0            , 0, 0), true); // true and inactive
@@ -273,8 +280,8 @@ TestLeafBool::testEquivalence()
         CPPUNIT_ASSERT(leaf1 == leaf2);
         CPPUNIT_ASSERT(leaf1 != leaf3);
         CPPUNIT_ASSERT(leaf2 != leaf3);
-        CPPUNIT_ASSERT(leaf1 != leaf4);
-        CPPUNIT_ASSERT(leaf2 != leaf4);
+        CPPUNIT_ASSERT(leaf1 == leaf4);
+        CPPUNIT_ASSERT(leaf2 == leaf4);
         CPPUNIT_ASSERT(leaf3 != leaf4);
     }
         
@@ -282,7 +289,7 @@ TestLeafBool::testEquivalence()
 
 
 void
-TestLeafBool::testGetOrigin()
+TestLeafMask::testGetOrigin()
 {
     {
         LeafType leaf(openvdb::Coord(1, 0, 0), 1);
@@ -320,7 +327,7 @@ TestLeafBool::testGetOrigin()
 
 
 void
-TestLeafBool::testNegativeIndexing()
+TestLeafMask::testNegativeIndexing()
 {
     using namespace openvdb;
 
@@ -345,7 +352,7 @@ TestLeafBool::testNegativeIndexing()
 
 
 void
-TestLeafBool::testIO()
+TestLeafMask::testIO()
 {
     LeafType leaf(openvdb::Coord(1, 3, 5));
     const openvdb::Coord origin = leaf.origin();
@@ -377,14 +384,14 @@ TestLeafBool::testIO()
 
 
 void
-TestLeafBool::testTopologyCopy()
+TestLeafMask::testTopologyCopy()
 {
     using openvdb::Coord;
 
     // LeafNode<float, Log2Dim> having the same Log2Dim as LeafType
     typedef LeafType::ValueConverter<float>::Type FloatLeafType;
 
-    FloatLeafType fleaf(Coord(10, 20, 30), /*background=*/-1.0);
+    FloatLeafType fleaf(Coord(10, 20, 30), -1.0);
     std::set<Coord> coords;
     for (openvdb::Index n = 0; n < fleaf.numValues(); n += 10) {
         Coord xyz = fleaf.offsetToGlobalCoord(n);
@@ -405,7 +412,7 @@ TestLeafBool::testTopologyCopy()
 
 
 void
-TestLeafBool::testMerge()
+TestLeafMask::testMerge()
 {
     LeafType leaf(openvdb::Coord(0, 0, 0));
     for (openvdb::Index n = 0; n < leaf.numValues(); n += 10) {
@@ -433,41 +440,37 @@ TestLeafBool::testMerge()
 
 
 void
-TestLeafBool::testCombine()
+TestLeafMask::testCombine()
 {
     struct Local {
         static void op(openvdb::CombineArgs<bool>& args) {
-            args.setResult(false); // result should be ignored
-            args.setResultIsActive(args.aIsActive() ^ args.bIsActive());
+            args.setResult(args.aIsActive() ^ args.bIsActive());// state = value
         }
     };
-
+    
     LeafType leaf(openvdb::Coord(0, 0, 0));
-    for (openvdb::Index n = 0; n < leaf.numValues(); n += 10) {
-        leaf.setValueOn(n);
-    }
+    for (openvdb::Index n = 0; n < leaf.numValues(); n += 10) leaf.setValueOn(n);
     CPPUNIT_ASSERT(!leaf.isValueMaskOn());
     CPPUNIT_ASSERT(!leaf.isValueMaskOff());
     const LeafType::NodeMaskType savedMask = leaf.getValueMask();
     OPENVDB_LOG_DEBUG_RUNTIME(leaf.str());
-
+    
     LeafType leaf2(leaf);
-    for (openvdb::Index n = 0; n < leaf.numValues(); n += 4) {
-        leaf2.setValueOn(n);
-    }
+    for (openvdb::Index n = 0; n < leaf.numValues(); n += 4) leaf2.setValueOn(n);
+    
     CPPUNIT_ASSERT(!leaf2.isValueMaskOn());
     CPPUNIT_ASSERT(!leaf2.isValueMaskOff());
     OPENVDB_LOG_DEBUG_RUNTIME(leaf2.str());
-
+    
     leaf.combine(leaf2, Local::op);
     OPENVDB_LOG_DEBUG_RUNTIME(leaf.str());
-
+    
     CPPUNIT_ASSERT(leaf.getValueMask() == (savedMask ^ leaf2.getValueMask()));
 }
 
 
 void
-TestLeafBool::testBoolTree()
+TestLeafMask::testTopologyTree()
 {
     using namespace openvdb;
 
@@ -489,9 +492,9 @@ TestLeafBool::testBoolTree()
     FloatTree& inTree = inGrid->tree();
     inGrid->setName("LevelSet");
 
-    unittest_util::makeSphere<FloatGrid>(/*dim   =*/Coord(128),
-                                         /*center=*/Vec3f(0, 0, 0),
-                                         /*radius=*/5,
+    unittest_util::makeSphere<FloatGrid>(Coord(128),//dim
+                                         Vec3f(0, 0, 0),//center
+                                         5,//radius
                                          *inGrid, unittest_util::SPHERE_DENSE);
 #endif
 
@@ -500,10 +503,10 @@ TestLeafBool::testBoolTree()
         floatTreeLeafCount = inTree.leafCount(),
         floatTreeVoxelCount = inTree.activeVoxelCount();
 
-    TreeBase::Ptr outTree(new BoolTree(inTree, false, true, TopologyCopy()));
+    TreeBase::Ptr outTree(new TopologyTree(inTree, false, true, TopologyCopy()));
     CPPUNIT_ASSERT(outTree.get() != NULL);
 
-    BoolGrid::Ptr outGrid = BoolGrid::create(*inGrid); // copy transform and metadata
+    TopologyGrid::Ptr outGrid = TopologyGrid::create(*inGrid); // copy transform and metadata
     outGrid->setTree(outTree);
     outGrid->setName("Boolean");
 
@@ -536,7 +539,7 @@ TestLeafBool::testBoolTree()
 
 
 // void
-// TestLeafBool::testFilter()
+// TestLeafMask::testFilter()
 // {
 //     using namespace openvdb;
 
@@ -546,9 +549,9 @@ TestLeafBool::testBoolTree()
 //     CPPUNIT_ASSERT(tree.get() != NULL);
 //     grid->setName("filtered");
 
-//     unittest_util::makeSphere<BoolGrid>(/*dim=*/Coord(32),
-//                                         /*ctr=*/Vec3f(0, 0, 0),
-//                                         /*radius=*/10,
+//     unittest_util::makeSphere<BoolGrid>(Coord(32),// dim
+//                                         Vec3f(0, 0, 0),// center
+//                                         10,// radius
 //                                         *grid, unittest_util::SPHERE_DENSE);
 
 //     BoolTree::Ptr copyOfTree(new BoolTree(*tree));
@@ -562,7 +565,7 @@ TestLeafBool::testBoolTree()
 //     GridPtrVec grids;
 //     grids.push_back(copyOfGrid);
 //     grids.push_back(grid);
-//     io::File vdbFile("TestLeafBool::testFilter.vdb2");
+//     io::File vdbFile("TestLeafMask::testFilter.vdb2");
 //     vdbFile.write(grids);
 //     vdbFile.close();
 // #endif

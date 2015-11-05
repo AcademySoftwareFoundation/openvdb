@@ -1,6 +1,41 @@
 OpenVDB Version History
 =======================
 
+Version 3.2.0 - In development
+
+    Highlights:
+    - Faster point to level set conversion tool (also exposed in the From Particle SOP).
+    - More memory efficient Grid, dubbed MaskGrid, that uses a single bit per voxel.
+
+    New features:
+    - Added tools::ParticlesToLevelSet::rasterizePoints which offers a fast generation of
+      level sets from points, i.e. particles without a radius. It is typically orders of magnitude
+      faster than the older techniques based on spherical footprints.
+    - Added tools::PointMaskGrid which activates voxels in a grid if they intersect a point.
+    - Added a new specialized MaskGrid that uses a single bit per voxel to encode a binary
+      state or value (same thing in this case). This allows for extremely memory efficient
+      grids that represent a binary mask.
+    - Added tools::topologyToLevelSet(), which generates a level set from the implicit boundary
+      between active and inactive voxels in an arbitrary input grid.
+
+    Improvements:
+
+    Bug fixes:
+    - Fixed a bug which allowed for implicit (vs explicit) conversion between Grids
+      templated on different value types.
+    - Fixed a bug in tree::LeafNode<bool>::operator==() that caused the origin of
+      the node to be ignored.
+    - Resolved floating point exception in math::QuantizedUnitVec::pack method.
+      [Contributed by Rick Hankins]
+
+    API changes:
+    - Renamed math::GudonovsNormSqrd to math::GodunovsNormSqrd
+     [Contributed by Branislav Radjenovic]
+
+    Houdini:
+    - Added a new option (called "Voxelized Point") to the From Particles SOP which
+      allows for very fast generation of level sets from points, i.e. particles without a radius.
+
 Version 3.1.0 - October 1, 2015
 
     Highlights:

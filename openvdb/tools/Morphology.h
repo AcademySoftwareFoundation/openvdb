@@ -386,9 +386,14 @@ Morphology<TreeType>::dilateVoxels(int iterations, NearestNeighbors nn)
 {
     for (int i=0; i<iterations; ++i) {
         switch (nn) {
-        case NN_FACE_EDGE: this->dilateVoxels18(); break;
-        case NN_FACE_EDGE_VERTEX: this->dilateVoxels26(); break;
-        default: this->dilateVoxels6();
+        case NN_FACE_EDGE:
+            this->dilateVoxels18();
+            break;
+        case NN_FACE_EDGE_VERTEX:
+            this->dilateVoxels26();
+            break;
+        default:
+            this->dilateVoxels6();
         }
     }
 }

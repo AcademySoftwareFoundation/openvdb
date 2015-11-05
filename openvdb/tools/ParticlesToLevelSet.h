@@ -53,6 +53,7 @@
 /// class ParticleList {
 ///   ...
 /// public:
+///   typedef openvdb::Vec3R  value_type;
 ///
 ///   // Return the total number of particles in list.
 ///   // Always required!
@@ -99,6 +100,7 @@
 
 #include <tbb/parallel_reduce.h>
 #include <tbb/blocked_range.h>
+#include <tbb/task_group.h>
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
 #include <boost/type_traits/is_floating_point.hpp>
@@ -110,9 +112,12 @@
 #include <openvdb/math/Transform.h>
 #include <openvdb/util/NullInterrupter.h>
 #include "Composite.h" // for csgUnion()
+#include "PointMaskGrid.h"
 #include "PointPartitioner.h"
+#include "Morphology.h" // for {dilate|erode}Voxels
 #include "Prune.h"
 #include "SignedFloodFill.h"
+#include "LevelSetTracker.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -216,6 +221,19 @@ public:
     /// @note A grainsize of 0 or less disables multi-threading!
     void setGrainSize(int grainSize) { mGrainSize = grainSize; }
 
+    /// @brief Very fast generation of a level set from points
+    /// (e.g. particles without a radius). It employes a MaskGrid
+    /// an various bit-wise topology operations.
+    ///
+    /// @param points Points with radius (no radius required).
+    /// @param dilationInVoxels Dilation in voxel units.
+    /// @param erosionInVoxels  Erosion in voxel units. It is
+    /// recommended that erosionInVoxels <= dilationInVoxels.
+    template <typename PointListT>
+    void rasterizePoints(const PointListT& points,
+                         const int dilationInVoxels = 1,
+                         const int erosionInVoxels  = 1);
+    
     /// @brief Rasterize a sphere per particle derived from their
     /// position and radius. All spheres are CSG unioned.
     ///
@@ -298,6 +316,66 @@ ParticlesToLevelSet(SdfGridT& grid, InterrupterT* interrupter) :
     }
 }
 
+namespace {
+
+template<typename TreeT> struct DilationHandler
+{
+    DilationHandler(TreeT& t, int n) : tree(&t), size(n) {}
+    void operator()() const { dilateVoxels( *tree, size); }
+    TreeT* tree;
+    const int size;
+};
+template<typename TreeT> struct ErosionHandler
+{
+    ErosionHandler(TreeT& t, int n) : tree(&t), size(n) {}
+    void operator()() const { erodeVoxels( *tree, size); }
+    TreeT* tree;
+    const int size;
+};    
+    
+}
+    
+template<typename SdfGridT, typename AttributeT, typename InterrupterT>
+template <typename PointListT>
+inline void ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::
+rasterizePoints(const PointListT& points, int dilationInVoxels, int erosionInVoxels)
+{
+    typedef typename SdfGridT::TreeType                                 SdfTreeT;
+    typedef typename SdfTreeT::Ptr                                      SdfTreePtr;
+    typedef typename SdfGridT::template ValueConverter<ValueMask>::Type MaskGrid;
+    typedef typename MaskGrid::TreeType                                 MaskTree;
+    typedef typename MaskTree::Ptr                                      MaskTreePtr;
+    
+    // Generate a MaskGrid of the points
+    MaskGrid maskGrid(MaskTreePtr(new MaskTree(mSdfGrid->tree(), false, TopologyCopy())));
+    maskGrid.setTransform( mSdfGrid->transform().copy() );
+    PointMaskGrid<MaskGrid, InterrupterT> pmg( maskGrid, mInterrupter );
+    pmg.addPoints( points );
+
+    // Morphological closing of the MaskGrid
+    dilateVoxels( maskGrid.tree(), dilationInVoxels);
+    erodeVoxels(  maskGrid.tree(), erosionInVoxels);
+    
+    const float backg = mSdfGrid->background();
+    mSdfGrid->setTree(SdfTreePtr(new SdfTreeT(maskGrid.tree(), backg, -backg, TopologyCopy())));
+    
+    // Create the narrow band
+    tbb::task_group g;
+    ErosionHandler< MaskTree> eh( maskGrid.tree(),  int(mHalfWidth) );
+    DilationHandler<SdfTreeT> dh( mSdfGrid->tree(), int(mHalfWidth) );
+    g.run( eh );// spwan a task to erode the mask grid
+    g.run( dh );// spawn a task to dilate the sdf grid
+    g.wait();// wait for both tasks to complete
+    mSdfGrid->tree().topologyDifference( maskGrid.tree() );
+
+    // Compute distances in the narrow band
+    LevelSetTracker<SdfGridT, InterrupterT> tracker(*mSdfGrid, mInterrupter);
+    tracker.setSpatialScheme( openvdb::math::FIRST_BIAS );
+    tracker.setNormCount( int(3 * mHalfWidth) );
+    tracker.normalize();
+    tracker.prune();
+}
+    
 template<typename SdfGridT, typename AttributeT, typename InterrupterT>
 template <typename ParticleListT>
 inline void ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::

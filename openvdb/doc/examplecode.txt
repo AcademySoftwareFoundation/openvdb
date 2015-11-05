@@ -6,7 +6,7 @@ This section provides code snippets and some complete programs that
 illustrate how to use OpenVDB and how to perform common tasks.
 
 
-@section sCookbookContents
+@section sCookbookContents Contents
 - @ref sHelloWorld
   - @ref sCompilingHelloWorld
 - @ref sAllocatingGrids

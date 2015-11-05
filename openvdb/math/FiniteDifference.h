@@ -350,10 +350,10 @@ WENO5(const ValueType& v1, const ValueType& v2, const ValueType& v3,
 
 
 template <typename Real>
-inline Real GudonovsNormSqrd(bool isOutside,
-                     Real dP_xm, Real dP_xp,
-                     Real dP_ym, Real dP_yp,
-                     Real dP_zm, Real dP_zp)
+inline Real GodunovsNormSqrd(bool isOutside,
+                             Real dP_xm, Real dP_xp,
+                             Real dP_ym, Real dP_yp,
+                             Real dP_zm, Real dP_zp)
 {
     using math::Max;
     using math::Min;
@@ -373,16 +373,31 @@ inline Real GudonovsNormSqrd(bool isOutside,
     return dPLen2; // |\nabla\phi|^2
 }
 
+    
+template <typename Real>
+OPENVDB_DEPRECATED inline Real GudonovsNormSqrd(bool isOutside,
+                                                Real dP_xm, Real dP_xp,
+                                                Real dP_ym, Real dP_yp,
+                                                Real dP_zm, Real dP_zp)
+{ return GodunovsNormSqrd(isOutside, dP_xm, dP_xp, dP_ym, dP_yp, dP_zm, dP_zp); }    
 
 template<typename Real>
 inline Real
-GudonovsNormSqrd(bool isOutside, const Vec3<Real>& gradient_m, const Vec3<Real>& gradient_p)
+GodunovsNormSqrd(bool isOutside, const Vec3<Real>& gradient_m, const Vec3<Real>& gradient_p)
 {
-    return GudonovsNormSqrd<Real>(isOutside,
+    return GodunovsNormSqrd<Real>(isOutside,
                                   gradient_m[0], gradient_p[0],
                                   gradient_m[1], gradient_p[1],
                                   gradient_m[2], gradient_p[2]);
 }
+
+template<typename Real>
+OPENVDB_DEPRECATED inline Real GudonovsNormSqrd(bool isOutside,
+                                                const Vec3<Real>& gradient_m,
+                                                const Vec3<Real>& gradient_p)
+{
+    return GodunovsNormSqrd<Real>(isOutside, gradient_m, gradient_p);
+}    
 
 
 #ifdef DWA_OPENVDB
@@ -428,7 +443,7 @@ simdSum(const simd::Float4& v)
 }
 
 inline float
-GudonovsNormSqrd(bool isOutside, const simd::Float4& dP_m, const simd::Float4& dP_p)
+GodunovsNormSqrd(bool isOutside, const simd::Float4& dP_m, const simd::Float4& dP_p)
 {
     const simd::Float4 zero(0.0);
     simd::Float4 v = isOutside
@@ -436,6 +451,13 @@ GudonovsNormSqrd(bool isOutside, const simd::Float4& dP_m, const simd::Float4& d
         : simdMax(math::Pow2(simdMin(dP_m, zero)), math::Pow2(simdMax(dP_p, zero)));
     return simdSum(v);//should be v[0]+v[1]+v[2]
 }
+
+OPENVDB_DEPRECATED inline float GudonovsNormSqrd(bool isOutside,
+                                                 const simd::Float4& dP_m,
+                                                 const simd::Float4& dP_p)
+{
+    return GodunovsNormSqrd(isOutside, dP_m, dP_p);
+}    
 #endif
 
 template<DScheme DiffScheme>

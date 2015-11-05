@@ -75,6 +75,7 @@ class ProxyTree: public openvdb::TreeBase
 {
 public:
     typedef int ValueType;
+    typedef int BuildType;
     typedef void ValueAllCIter;
     typedef void ValueAllIter;
     typedef void ValueOffCIter;

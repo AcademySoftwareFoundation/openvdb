@@ -105,6 +105,9 @@ typedef math::Mat4<float>   Mat4s;
 // Quaternions
 typedef math::Quat<Real>    QuatR;
 
+// Dummy type for a voxel with a binary mask value, e.g. the active state
+class ValueMask {};
+
 
 ////////////////////////////////////////
 
@@ -195,8 +198,12 @@ struct CanConvertType<T0, math::Vec3<T1> > { enum { value = CanConvertType<T0, T
 template<typename T0, typename T1>
 struct CanConvertType<T0, math::Vec4<T1> > { enum { value = CanConvertType<T0, T1>::value }; };
 template<> struct CanConvertType<PointIndex32, PointDataIndex32> { enum {value = true}; };
-template<> struct CanConvertType<PointDataIndex32, PointIndex32> { enum {value = true}; };
-
+template<> struct CanConvertType<PointDataIndex32, PointIndex32> { enum {value = true}; };    
+template<typename T>
+struct CanConvertType<T, ValueMask> { enum {value = CanConvertType<T, bool>::value}; };
+template<typename T>
+struct CanConvertType<ValueMask, T> { enum {value = CanConvertType<bool, T>::value}; };
+    
 ////////////////////////////////////////
 
 
@@ -266,6 +273,7 @@ enum MergePolicy {
 
 template<typename T> const char* typeNameAsString()                 { return typeid(T).name(); }
 template<> inline const char* typeNameAsString<bool>()              { return "bool"; }
+template<> inline const char* typeNameAsString<ValueMask>()         { return "mask"; }
 template<> inline const char* typeNameAsString<float>()             { return "float"; }
 template<> inline const char* typeNameAsString<double>()            { return "double"; }
 template<> inline const char* typeNameAsString<int32_t>()           { return "int32"; }
@@ -307,23 +315,38 @@ public:
     typedef AValueType AValueT;
     typedef BValueType BValueT;
 
-    CombineArgs():
-        mAValPtr(NULL), mBValPtr(NULL), mResultValPtr(&mResultVal),
-        mAIsActive(false), mBIsActive(false), mResultIsActive(false)
-        {}
+    CombineArgs()
+        : mAValPtr(NULL)
+        , mBValPtr(NULL)
+        , mResultValPtr(&mResultVal)
+        , mAIsActive(false)
+        , mBIsActive(false)
+        , mResultIsActive(false)
+    {
+    }
 
     /// Use this constructor when the result value is stored externally.
     CombineArgs(const AValueType& a, const BValueType& b, AValueType& result,
-        bool aOn = false, bool bOn = false):
-        mAValPtr(&a), mBValPtr(&b), mResultValPtr(&result),
-        mAIsActive(aOn), mBIsActive(bOn)
-        { updateResultActive(); }
+                bool aOn = false, bool bOn = false)
+        : mAValPtr(&a)
+        , mBValPtr(&b)
+        , mResultValPtr(&result)
+        , mAIsActive(aOn)
+        , mBIsActive(bOn)
+    {
+        this->updateResultActive();
+    }
 
     /// Use this constructor when the result value should be stored in this struct.
-    CombineArgs(const AValueType& a, const BValueType& b, bool aOn = false, bool bOn = false):
-        mAValPtr(&a), mBValPtr(&b), mResultValPtr(&mResultVal),
-        mAIsActive(aOn), mBIsActive(bOn)
-        { updateResultActive(); }
+    CombineArgs(const AValueType& a, const BValueType& b, bool aOn = false, bool bOn = false)
+        : mAValPtr(&a)
+        , mBValPtr(&b)
+        , mResultValPtr(&mResultVal)
+        , mAIsActive(aOn)
+        , mBIsActive(bOn)
+    {
+        this->updateResultActive();
+    }
 
     /// Get the A input value.
     const AValueType& a() const { return *mAValPtr; }
