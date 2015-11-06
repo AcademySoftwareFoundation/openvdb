@@ -489,7 +489,8 @@ namespace resource
 
         for (PointDataTree::LeafCIter leaf = tree.cbeginLeaf(); leaf; ++leaf)
         {
-            const openvdb::tools::AttributeHandle<openvdb::Vec3f>::Ptr positionHandle = leaf->attributeHandle<openvdb::Vec3f>("P");
+            const openvdb::tools::AttributeHandle<openvdb::Vec3f>::Ptr positionHandle =
+                openvdb::tools::AttributeHandle<openvdb::Vec3f>::create(leaf->attributeArray("P"));
 
             for (PointDataTree::LeafNodeType::ValueOnCIter value = leaf->cbeginValueOn(); value; ++value)
             {
@@ -536,7 +537,7 @@ namespace resource
 
         // load the velocities
 
-        if (tree.cbeginLeaf()->hasAttribute<openvdb::tools::TypedAttributeArray<openvdb::Vec3f> >("v"))
+        if (tree.cbeginLeaf()->hasAttribute("v"))
         {
             AppProgressBar* velocity_progress_bar = object.get_application().create_progress_bar(CoreString("Loading Velocities into Point Cloud"));
 
@@ -544,7 +545,8 @@ namespace resource
 
             for (PointDataTree::LeafCIter leaf = tree.cbeginLeaf(); leaf; ++leaf)
             {
-                const openvdb::tools::AttributeHandle<openvdb::Vec3f>::Ptr velocityHandle = leaf->attributeHandle<openvdb::Vec3f>("v");
+                const openvdb::tools::AttributeHandle<openvdb::Vec3f>::Ptr velocityHandle =
+                    openvdb::tools::AttributeHandle<openvdb::Vec3f>::create(leaf->attributeArray("v"));
 
                 for (PointDataTree::LeafNodeType::ValueOnCIter value = leaf->cbeginValueOn(); value; ++value)
                 {

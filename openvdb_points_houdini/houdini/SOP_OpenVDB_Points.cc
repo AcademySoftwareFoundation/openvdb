@@ -438,7 +438,7 @@ struct ConvertPointDataGridPositionOp {
             const PointDataLeaf& leaf = leafOffset.first;
             GA_Offset offset = leafOffset.second;
 
-            AttributeHandle<Vec3f>::Ptr handle = leaf.template attributeHandle<Vec3f>(mIndex);
+            AttributeHandle<Vec3f>::Ptr handle = AttributeHandle<Vec3f>::create(leaf.template attributeArray(mIndex));
 
             for (PointDataTree::LeafNodeType::ValueOnCIter iter = leaf.cbeginValueOn(); iter; ++iter) {
 
@@ -528,7 +528,8 @@ struct ConvertPointDataGridAttributeOp {
             const PointDataLeaf& leaf = leafOffset.first;
             GA_Offset offset = leafOffset.second;
 
-            typename AttributeHandle<AttributeType>::Ptr handle = leaf.template attributeHandle<AttributeType>(mIndex);
+            typename AttributeHandle<AttributeType>::Ptr handle =
+                AttributeHandle<AttributeType>::create(leaf.template attributeArray(mIndex));
 
             for (PointDataTree::LeafNodeType::ValueOnCIter iter = leaf.cbeginValueOn(); iter; ++iter) {
 

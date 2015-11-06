@@ -278,7 +278,8 @@ struct FillGPUBuffersPosition {
             const openvdb::Index64 leafOffset = mLeafOffsets[n].second;
 
             typename openvdb::tools::AttributeHandle<AttributeType>::Ptr handle =
-                            leaf->template attributeHandle<AttributeType>(mAttributeIndex);
+                openvdb::tools::AttributeHandle<AttributeType>::create(
+                    leaf->template attributeArray(mAttributeIndex));
 
             openvdb::Index64 offset = 0;
 
@@ -350,7 +351,8 @@ struct FillGPUBuffersColor {
             const openvdb::Index64 leafOffset = mLeafOffsets[n].second;
 
             typename openvdb::tools::AttributeHandle<AttributeType>::Ptr handle =
-                            leaf->template attributeHandle<AttributeType>(mAttributeIndex);
+                openvdb::tools::AttributeHandle<AttributeType>::create(
+                    leaf->template attributeArray(mAttributeIndex));
 
             openvdb::Index64 offset = 0;
 
