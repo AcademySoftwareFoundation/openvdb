@@ -82,7 +82,7 @@ template<typename GridType>
 inline typename GridType::template ValueConverter<float>::Type::Ptr
 topologyToLevelSet(const GridType& grid, int halfBandWidth = 3, int closingWidth = 1,
     int dilation = 0, int smoothingSteps = 0);
-  
+
 
 /// @brief  Compute the narrow-band signed distance to the boundary
 ///         between active and inactive voxels in the input grid.
@@ -97,58 +97,20 @@ topologyToLevelSet(const GridType& grid, int halfBandWidth = 3, int closingWidth
 ///                       This causes holes and valleys to be filled.
 /// @param dilation       Number of iterations used to expand the filled voxel region.
 /// @param smoothingSteps Number of smoothing interations
-/// @param interrupter    Optional object adhering to the util::NullInterrupter interface.
+/// @param interrupt      Optional object adhering to the util::NullInterrupter interface.
 template<typename GridType, typename InterrupterType>
 inline typename GridType::template ValueConverter<float>::Type::Ptr
 topologyToLevelSet(const GridType& grid, int halfBandWidth = 3, int closingWidth = 1,
-    int dilation = 0, int smoothingSteps = 0, InterrupterType* interrupter = NULL);
+    int dilation = 0, int smoothingSteps = 0, InterrupterType* interrupt = NULL);
 
 
 ////////////////////////////////////////
+////////////////////////////////////////
+
+// Implementation details
 
 
 namespace ttls_internal {
-
-
-template<typename NodeType>
-struct InactivateVoxels
-{
-    typedef typename NodeType::ValueType ValueType;
-
-    InactivateVoxels(std::vector<NodeType*>& nodes, ValueType insideValue, ValueType outsideValue)
-        : mNodes(nodes.empty() ? NULL : &nodes.front())
-        , mInsideValue(insideValue)
-        , mOutsideValue(outsideValue)
-    {
-    }
-
-    void operator()(const tbb::blocked_range<size_t>& range) const
-    {    
-        const ValueType outVal = mOutsideValue;
-        const ValueType inVal = -std::abs(mInsideValue);
-
-        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
-
-            for (typename NodeType::ValueOnIter it = mNodes[n]->beginValueOn(); it; ++it) {
-
-                ValueType& val = const_cast<ValueType&>(it.getValue());
-
-                const bool inside = val < ValueType(0.0);
-
-                if (inside && !(val > inVal)) {
-                    val = inVal;
-                    it.setValueOff();
-                } else if (!inside && !(val < outVal)) {
-                    val = outVal;
-                    it.setValueOff();
-                }
-            }
-        }
-    }
-
-    NodeType * * const mNodes;
-    ValueType mInsideValue, mOutsideValue;
-}; // struct InactivateVoxels
 
 
 template<typename TreeType>
@@ -168,7 +130,7 @@ struct OffsetAndMinComp
 
         tree::ValueAccessor<const TreeType> rhsAcc(*mRhsTree);
         const ValueType offset = mOffset;
-    
+
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
 
             LeafNodeType& lhsNode = *mLhsNodes[n];
@@ -189,52 +151,21 @@ private:
 }; // struct OffsetAndMinComp
 
 
-////////////////////////////////////////
-
-
-/// @brief  Clamp active voxel values to exclusive (-background, backgound) range
-///         and prune any inactive regions.
-template<typename GridType>
+template<typename GridType, typename InterrupterType>
 inline void
-trimAndPrune(GridType& grid)
+normalizeLevelSet(GridType& grid, const int halfWidthInVoxels, InterrupterType* interrupt = NULL)
 {
-    typedef typename GridType::ValueType        ValueType;
-    typedef typename GridType::TreeType         TreeType;
-    typedef typename TreeType::LeafNodeType     LeafNodeType;
-
-    const ValueType outside = grid.background();
-    const ValueType inside  = -outside;
-
-    std::vector<LeafNodeType*> nodes;
-    grid.tree().getNodes(nodes);
-
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
-        InactivateVoxels<LeafNodeType>(nodes, inside, outside));
-
-    tools::pruneLevelSet(grid.tree(), outside, inside);
-}
-
-template<typename FloatGridT, typename InterrupterT>
-inline void
-normalizeLevelSet(FloatGridT& grid, const int halfWidthInVoxels, InterrupterT* interrupt = NULL)
-{
-    // Use a PDE based scheme to propagate distance values from the
-    // implicit zero crossing.
-    LevelSetFilter<FloatGridT, FloatGridT, InterrupterT> filter(grid, interrupt);
-
+    LevelSetFilter<GridType, GridType, InterrupterType> filter(grid, interrupt);
     filter.setSpatialScheme(math::FIRST_BIAS);
-    filter.setNormCount(3 * halfWidthInVoxels);
+    filter.setNormCount(halfWidthInVoxels);
     filter.normalize();
-
-    // The vdb level set convention requires that active values are in the exclusive
-    // (inside, outside) range. Clamp these values and prune any inactive tiles.
-    ttls_internal::trimAndPrune(grid);
+    filter.prune();
 }
 
 
-template<typename GridType, typename Interrupter>
+template<typename GridType, typename InterrupterType>
 inline void
-smoothLevelSet(GridType& grid, int iterations, int halfBandWidthInVoxels, Interrupter* interrupt = NULL)
+smoothLevelSet(GridType& grid, int iterations, int halfBandWidthInVoxels, InterrupterType* interrupt = NULL)
 {
     typedef typename GridType::ValueType        ValueType;
     typedef typename GridType::TreeType         TreeType;
@@ -242,7 +173,7 @@ smoothLevelSet(GridType& grid, int iterations, int halfBandWidthInVoxels, Interr
 
     GridType filterGrid(grid);
 
-    LevelSetFilter<GridType, GridType, Interrupter> filter(filterGrid, interrupt);
+    LevelSetFilter<GridType, GridType, InterrupterType> filter(filterGrid, interrupt);
     filter.setSpatialScheme(math::FIRST_BIAS);
 
     for (int n = 0; n < iterations; ++n) {
@@ -254,7 +185,7 @@ smoothLevelSet(GridType& grid, int iterations, int halfBandWidthInVoxels, Interr
     grid.tree().getNodes(nodes);
 
     const ValueType offset = ValueType(double(0.5) * grid.transform().voxelSize()[0]);
- 
+
     tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
         OffsetAndMinComp<TreeType>(nodes, filterGrid.tree(), -offset));
 
@@ -272,7 +203,7 @@ smoothLevelSet(GridType& grid, int iterations, int halfBandWidthInVoxels, Interr
 template<typename GridType, typename InterrupterType>
 inline typename GridType::template ValueConverter<float>::Type::Ptr
 topologyToLevelSet(const GridType& grid, int halfBandWidth, int closingWidth,
-    int dilation, int smoothingSteps, InterrupterType* interrupter)
+    int dilation, int smoothingSteps, InterrupterType* interrupt)
 {
     typedef typename GridType::template ValueConverter<float>::Type             FloatGridType;
     typedef typename FloatGridType::TreeType                                    FloatTreeType;
@@ -320,11 +251,11 @@ topologyToLevelSet(const GridType& grid, int halfBandWidth, int closingWidth,
 
     // Use a PDE based scheme to propagate distance values from the
     // implicit zero crossing.
-    ttls_internal::normalizeLevelSet(*resultGrid, halfBandWidth, interrupter);
+    ttls_internal::normalizeLevelSet(*resultGrid, 3*halfBandWidth, interrupt);
 
     // Optinal smooting operation
     if (smoothingSteps > 0) {
-        ttls_internal::smoothLevelSet(*resultGrid, smoothingSteps, halfBandWidth, interrupter);
+        ttls_internal::smoothLevelSet(*resultGrid, smoothingSteps, halfBandWidth, interrupt);
     }
 
     return resultGrid;
@@ -335,8 +266,8 @@ template<typename GridType>
 inline typename GridType::template ValueConverter<float>::Type::Ptr
 topologyToLevelSet(const GridType& grid, int halfBandWidth, int closingWidth, int dilation, int smoothingSteps)
 {
-    util::NullInterrupter nullInterrupter;
-    return topologyToLevelSet(grid, halfBandWidth, closingWidth, dilation, smoothingSteps, &nullInterrupter);
+    util::NullInterrupter interrupt;
+    return topologyToLevelSet(grid, halfBandWidth, closingWidth, dilation, smoothingSteps, &interrupt);
 }
 
 

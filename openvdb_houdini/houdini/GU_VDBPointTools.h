@@ -44,6 +44,19 @@
 #include <GA/GA_ElementGroup.h>
 #include <UT/UT_VectorTypes.h>
 
+#include <UT/UT_Version.h>
+
+#if (UT_MAJOR_VERSION_INT >= 15)
+    #include <GU/GU_PackedContext.h>
+#endif
+
+#if (UT_MAJOR_VERSION_INT >= 14)
+    #include <GU/GU_PrimPacked.h>
+    #include <GU/GU_PackedGeometry.h>
+    #include <GU/GU_PackedFragment.h>
+    #include <GU/GU_DetailHandle.h>
+#endif
+
 #include <openvdb/Platform.h>
 #include <openvdb/tools/PointIndexGrid.h>
 #include <openvdb/tools/PointMaskGrid.h>
@@ -189,7 +202,110 @@ struct IndexToOffsetOp {
     PointArrayType const * const mPointList;
 };
 
+#if (UT_MAJOR_VERSION_INT >= 14)
+
+struct PackedMaskConstructor
+{
+    PackedMaskConstructor(const std::vector<const GA_Primitive*>& prims,
+        const openvdb::math::Transform& xform)
+        : mPrims(prims.empty() ? NULL : &prims.front())
+        , mXForm(xform)
+        , mMaskGrid(new openvdb::MaskGrid(false))
+    {
+        mMaskGrid->setTransform(mXForm.copy());
+    }
+
+    PackedMaskConstructor(PackedMaskConstructor& rhs, tbb::split)
+        : mPrims(rhs.mPrims)
+        , mXForm(rhs.mXForm)
+        , mMaskGrid(new openvdb::MaskGrid(false))
+    {
+        mMaskGrid->setTransform(mXForm.copy());
+    }
+
+    openvdb::MaskGrid::Ptr getMaskGrid() { return mMaskGrid; }
+
+    void join(PackedMaskConstructor& rhs) { mMaskGrid->tree().topologyUnion(rhs.mMaskGrid->tree()); }
+
+    void operator()(const tbb::blocked_range<size_t>& range)
+    {
+
+#if (UT_MAJOR_VERSION_INT >= 15)
+        GU_PackedContext packedcontext;
+#endif
+
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+            const GA_Primitive *prim = mPrims[n];
+            if (!prim || !GU_PrimPacked::isPackedPrimitive(*prim)) continue;
+
+            const GU_PrimPacked * pprim = static_cast<const GU_PrimPacked*>(prim);
+
+            GU_Detail tmpdetail;
+            const GU_Detail *detailtouse;
+
+#if (UT_MAJOR_VERSION_INT >= 15)
+
+            GU_DetailHandleAutoReadLock readlock(pprim->getPackedDetail(packedcontext));
+
+            UT_Matrix4D mat;
+            pprim->getFullTransform4(mat);
+            if (mat.isIdentity() && readlock.isValid() && readlock.getGdp()) {
+                detailtouse = readlock.getGdp();
+            } else {
+                pprim->unpackWithContext(tmpdetail, packedcontext);
+                detailtouse = &tmpdetail;
+            }
+#else
+            pprim->unpack(tmpdetail);
+            detailtouse = &tmpdetail;
+#endif
+
+            GU_VDBPointList<openvdb::Vec3R>  points(*detailtouse);
+            openvdb::MaskGrid::Ptr grid = openvdb::tools::createPointMaskGrid(points, mXForm);
+            mMaskGrid->tree().topologyUnion(grid->tree());
+        }
+    }
+
+private:
+    GA_Primitive const * const * const  mPrims;
+    openvdb::math::Transform            mXForm;
+    openvdb::MaskGrid::Ptr              mMaskGrid;
+}; // struct PackedMaskConstructor
+
+
+inline void
+getPackedPrimitiveOffsets(const GU_Detail& detail, std::vector<const GA_Primitive*>& primitives)
+{
+    const GA_Size numPacked = GU_PrimPacked::countPackedPrimitives(detail);
+
+    primitives.clear();
+    primitives.reserve(size_t(numPacked));
+
+    if (numPacked != GA_Size(0)) {
+        GA_Offset start, end;
+        GA_Range range = detail.getPrimitiveRange();
+        const GA_PrimitiveList& primList = detail.getPrimitiveList();
+
+        for (GA_Iterator it = range.begin(); it.blockAdvance(start, end); ) {
+            for (GA_Offset off = start; off < end; ++off) {
+
+                const GA_Primitive *prim = primList.get(off);
+
+                if (prim && GU_PrimPacked::isPackedPrimitive(*prim)) {
+                    primitives.push_back(prim);
+                }
+            }
+        }
+    }
+}
+
+#endif
+
+
 } // namespace GU_VDBPointToolsInternal
+
+
+////////////////////////////////////////
 
 
 /// @brief Utility method to change point indices into Houdini geometry offsets
@@ -216,6 +332,7 @@ GUvdbCreatePointIndexGrid(
     return openvdb::tools::createPointIndexGrid<openvdb::tools::PointIndexGrid>(points, xform);
 }
 
+
 /// Utility method to construct a boolean PointMaskGrid
 inline openvdb::MaskGrid::Ptr
 GUvdbCreatePointMaskGrid(
@@ -223,6 +340,19 @@ GUvdbCreatePointMaskGrid(
     const GU_Detail& detail,
     const GA_PointGroup* pointGroup = NULL)
 {
+#if (UT_MAJOR_VERSION_INT >= 14)
+
+    std::vector<const GA_Primitive*> packed;
+    GU_VDBPointToolsInternal::getPackedPrimitiveOffsets(detail, packed);
+
+    if (!packed.empty()) {
+        GU_VDBPointToolsInternal::PackedMaskConstructor op(packed, xform);
+        tbb::parallel_reduce(tbb::blocked_range<size_t>(0, packed.size()), op);
+        return op.getMaskGrid();
+    }
+
+#endif
+
     GU_VDBPointList<openvdb::Vec3R> points( detail, pointGroup );
     return openvdb::tools::createPointMaskGrid( points, xform );
 }

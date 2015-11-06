@@ -47,6 +47,10 @@ API changes:
 
 @par
 Houdini:
+- Added a From Mask SOP which generates a level set from the implicit
+  boundary between active and inactive voxels in arbitrary input grids.
+  This node will automatically fill and convert a mask grid from points
+  and it natively supports Houdini 15 Packed Points.
 - Added a new option (called "Voxelized Point") to the From Particles SOP which
   allows for very fast generation of level sets from points, i.e. particles without a radius.
 

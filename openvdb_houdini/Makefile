@@ -232,6 +232,7 @@ HOUDINI_SOP_SRC_NAMES := \
     houdini/SOP_OpenVDB_Filter.cc \
     houdini/SOP_OpenVDB_Filter_Level_Set.cc \
     houdini/SOP_OpenVDB_Fracture.cc \
+    houdini/SOP_OpenVDB_From_Mask.cc \
     houdini/SOP_OpenVDB_From_Particles.cc \
     houdini/SOP_OpenVDB_From_Polygons.cc \
     houdini/SOP_OpenVDB_Metadata.cc \
