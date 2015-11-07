@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -127,22 +127,70 @@ public:
 
     // Test odd combinations of trees and ValueAccessors
     // cache node level 0 and 1
-    void testTree3Accessor2()        { accessorTest<ValueAccessor<Tree3Type,2> >(); }
-    void testTree3ConstAccessor2()   { constAccessorTest<ValueAccessor<const Tree3Type,2> >(); }
-    void testTree4Accessor2()        { accessorTest<ValueAccessor<Tree4Type,2> >(); }
-    void testTree4ConstAccessor2()   { constAccessorTest<ValueAccessor<const Tree4Type,2> >(); }
-    void testTree5Accessor2()        { accessorTest<ValueAccessor<Tree5Type,2> >(); }
-    void testTree5ConstAccessor2()   { constAccessorTest<ValueAccessor<const Tree5Type,2> >(); }
+    void testTree3Accessor2()
+    {
+        accessorTest<ValueAccessor<Tree3Type, true,  2> >();
+        accessorTest<ValueAccessor<Tree3Type, false, 2> >();
+    }
+    void testTree3ConstAccessor2()
+    {
+        constAccessorTest<ValueAccessor<const Tree3Type, true,  2> >();
+        constAccessorTest<ValueAccessor<const Tree3Type, false, 2> >();
+    }
+    void testTree4Accessor2()
+    {
+        accessorTest<ValueAccessor<Tree4Type, true,  2> >();
+        accessorTest<ValueAccessor<Tree4Type, false, 2> >();
+    }
+    void testTree4ConstAccessor2()
+    {
+        constAccessorTest<ValueAccessor<const Tree4Type, true,  2> >();
+        constAccessorTest<ValueAccessor<const Tree4Type, false, 2> >();
+    }
+    void testTree5Accessor2()
+    {
+        accessorTest<ValueAccessor<Tree5Type, true,  2> >();
+        accessorTest<ValueAccessor<Tree5Type, false, 2> >();
+    }
+    void testTree5ConstAccessor2()
+    {
+        constAccessorTest<ValueAccessor<const Tree5Type, true,  2> >();
+        constAccessorTest<ValueAccessor<const Tree5Type, false, 2> >();
+    }
     // only cache leaf level
-    void testTree4Accessor1()        { accessorTest<ValueAccessor<Tree5Type,1> >(); }
-    void testTree4ConstAccessor1()   { constAccessorTest<ValueAccessor<const Tree5Type,1> >(); }
+    void testTree4Accessor1()
+    {
+        accessorTest<ValueAccessor<Tree5Type, true,  1> >();
+        accessorTest<ValueAccessor<Tree5Type, false, 1> >();
+    }
+    void testTree4ConstAccessor1()
+    {
+        constAccessorTest<ValueAccessor<const Tree5Type, true,  1> >();
+        constAccessorTest<ValueAccessor<const Tree5Type, false, 1> >();
+    }
     // disable node caching
-    void testTree4Accessor0()        { accessorTest<ValueAccessor<Tree5Type,0> >(); }
-    void testTree4ConstAccessor0()   { constAccessorTest<ValueAccessor<const Tree5Type,0> >(); }
+    void testTree4Accessor0()
+    {
+        accessorTest<ValueAccessor<Tree5Type, true,  0> >();
+        accessorTest<ValueAccessor<Tree5Type, false, 0> >();
+    }
+    void testTree4ConstAccessor0()
+    {
+        constAccessorTest<ValueAccessor<const Tree5Type, true,  0> >();
+        constAccessorTest<ValueAccessor<const Tree5Type, false, 0> >();
+    }
     //cache node level 2
-    void testTree4Accessor12()       { accessorTest<ValueAccessor1<Tree4Type,2> >(); }
+    void testTree4Accessor12()
+    {
+        accessorTest<ValueAccessor1<Tree4Type, true,  2> >();
+        accessorTest<ValueAccessor1<Tree4Type, false, 2> >();
+    }
     //cache node level 1 and 3
-    void testTree5Accessor213()       { accessorTest<ValueAccessor2<Tree5Type,1,3> >(); }
+    void testTree5Accessor213()
+    {
+        accessorTest<ValueAccessor2<Tree5Type, true, 1,3> >();
+        accessorTest<ValueAccessor2<Tree5Type, false, 1,3> >();
+    }
 
     void testMultithreadedAccessor();
     void testAccessorRegistration();
@@ -546,6 +594,6 @@ TestValueAccessor::testGetNode()
     }
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -671,7 +671,7 @@ public:
     Index64 nodeCount(Index i) const
     {
         return i==0 ? mList0.nodeCount() : i==1 ? mList1.nodeCount()
-            : i==2 ? mList2.nodeCount() : 0;
+             : i==2 ? mList2.nodeCount() : 0;
     }
 
     template<typename NodeOp>
@@ -762,7 +762,7 @@ public:
     Index64 nodeCount() const
     {
         return mList0.nodeCount() + mList1.nodeCount()
-            + mList2.nodeCount() + mList3.nodeCount();
+             + mList2.nodeCount() + mList3.nodeCount();
     }
 
     /// @brief Return the number of cached nodes at level @a i, where
@@ -770,7 +770,7 @@ public:
     Index64 nodeCount(Index i) const
     {
         return i==0 ? mList0.nodeCount() : i==1 ? mList1.nodeCount() :
-            i==2 ? mList2.nodeCount() : i==3 ? mList3.nodeCount() : 0;
+               i==2 ? mList2.nodeCount() : i==3 ? mList3.nodeCount() : 0;
     }
 
     template<typename NodeOp>
@@ -821,6 +821,6 @@ private:
 
 #endif // OPENVDB_TREE_NODEMANAGER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

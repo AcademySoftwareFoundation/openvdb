@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -175,13 +175,30 @@ MetaMap::insertMeta(const MetaMap& other)
 void
 MetaMap::removeMeta(const Name &name)
 {
-    // Find the required metadata
     MetaIterator iter = mMeta.find(name);
+    if (iter != mMeta.end()) {
+        mMeta.erase(iter);
+    }
+}
 
-    if(iter == mMeta.end())
-        return;
-    // else, delete the metadata and remove from the map
-    mMeta.erase(iter);
+
+bool
+MetaMap::operator==(const MetaMap& other) const
+{
+    // Check if the two maps have the same number of elements.
+    if (this->mMeta.size() != other.mMeta.size()) return false;
+    // Iterate over the two maps in sorted order.
+    for (ConstMetaIterator it = beginMeta(), otherIt = other.beginMeta(), end = endMeta();
+        it != end; ++it, ++otherIt)
+    {
+        // Check if the two keys match.
+        if (it->first != otherIt->first) return false;
+        // Check if the two values are either both null or both non-null pointers.
+        if (bool(it->second) != bool(otherIt->second)) return false;
+        // If the two values are both non-null, compare their contents.
+        if (it->second && otherIt->second && *it->second != *otherIt->second) return false;
+    }
+    return true;
 }
 
 
@@ -211,6 +228,6 @@ operator<<(std::ostream& ostr, const MetaMap& metamap)
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

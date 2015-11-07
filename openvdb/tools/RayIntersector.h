@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -51,7 +51,7 @@
 /// Analyzer, relies on partial template specialization, so it has to
 /// be a standalone class (as opposed to a member class of
 /// LevelSetRayIntersector). The VolumeRayIntersector is conceptually
-/// much simpler then the LevelSetRayIntersector, and hence it only
+/// much simpler than the LevelSetRayIntersector, and hence it only
 /// depends on VolumeHDDA that implements the hierarchical
 /// Differential Digital Analyzer.
 
@@ -88,7 +88,7 @@ class LinearSearchImpl;
 /// @brief This class provides the public API for intersecting a ray
 /// with a narrow-band level set.
 ///
-/// @details It wraps an SearchImplT with a simple public API and
+/// @details It wraps a SearchImplT with a simple public API and
 /// performs the actual hierarchical tree node and voxel traversal.
 ///
 /// @warning Use the (default) copy-constructor to make sure each
@@ -151,7 +151,7 @@ public:
     /// @param iRay  ray represented in index space.
     /// @param iTime if an intersection was found it is assigned the time of the
     ///              intersection along the index ray.
-    bool intersectsIS(const RayType& iRay, Real &iTime) const
+    bool intersectsIS(const RayType& iRay, RealType &iTime) const
     {
         if (!mTester.setIndexRay(iRay)) return false;//missed bbox
         iTime = mTester.getIndexTime();
@@ -176,7 +176,7 @@ public:
     ///              intersection point in index space, otherwise it is unchanged.
     /// @param iTime if an intersection was found it is assigned the time of the
     ///              intersection along the index ray.
-    bool intersectsIS(const RayType& iRay, Vec3Type& xyz, Real &iTime) const
+    bool intersectsIS(const RayType& iRay, Vec3Type& xyz, RealType &iTime) const
     {
         if (!mTester.setIndexRay(iRay)) return false;//missed bbox
         if (!math::LevelSetHDDA<TreeT, NodeLevel>::test(mTester)) return false;//missed level set
@@ -197,7 +197,7 @@ public:
     /// @param wRay   ray represented in world space.
     /// @param wTime  if an intersection was found it is assigned the time of the
     ///               intersection along the world ray.
-    bool intersectsWS(const RayType& wRay, Real &wTime) const
+    bool intersectsWS(const RayType& wRay, RealType &wTime) const
     {
         if (!mTester.setWorldRay(wRay)) return false;//missed bbox
         wTime = mTester.getWorldTime();
@@ -222,7 +222,7 @@ public:
     ///               intersection point in world space, otherwise it is unchanged.
     /// @param wTime  if an intersection was found it is assigned the time of the
     ///               intersection along the world ray.
-    bool intersectsWS(const RayType& wRay, Vec3Type& world, Real &wTime) const
+    bool intersectsWS(const RayType& wRay, Vec3Type& world, RealType &wTime) const
     {
         if (!mTester.setWorldRay(wRay)) return false;//missed bbox
         if (!math::LevelSetHDDA<TreeT, NodeLevel>::test(mTester)) return false;//missed level set
@@ -253,7 +253,7 @@ public:
     ///               of the level set surface in world space, otherwise it is unchanged.
     /// @param wTime  if an intersection was found it is assigned the time of the
     ///               intersection along the world ray.
-    bool intersectsWS(const RayType& wRay, Vec3Type& world, Vec3Type& normal, Real &wTime) const
+    bool intersectsWS(const RayType& wRay, Vec3Type& world, Vec3Type& normal, RealType &wTime) const
     {
         if (!mTester.setWorldRay(wRay)) return false;//missed bbox
         if (!math::LevelSetHDDA<TreeT, NodeLevel>::test(mTester)) return false;//missed level set
@@ -284,7 +284,7 @@ private:
 /// @code
 /// // Create an instance for the master thread
 /// VolumeRayIntersector inter(grid);
-/// // For each additional thread use the copy contructor. This
+/// // For each additional thread use the copy constructor. This
 /// // amortizes the overhead of computing the bbox of the active voxels!
 /// VolumeRayIntersector inter2(inter);
 /// // Before each ray-traversal set the index ray.
@@ -373,7 +373,7 @@ public:
         : mIsMaster(false)
         , mTree(other.mTree)//shallow copy
         , mGrid(other.mGrid)//shallow copy
-        , mAccessor(*mTree)//deep copy
+        , mAccessor(*mTree)//initialize new (vs deep copy)
         , mRay(other.mRay)//deep copy
         , mTmax(other.mTmax)//deep copy
         , mBBox(other.mBBox)//deep copy
@@ -401,7 +401,7 @@ public:
     /// @warning Call this method (or setIndexRay) before the ray
     /// traversal starts and use the return value to decide if further
     /// marching is required.
-    /// @details Since hit times are computed with repect to the ray
+    /// @details Since hit times are computed with respect to the ray
     /// represented in index space of the current grid, it is
     /// recommended that either the client code uses getIndexPos to
     /// compute index position from hit times or alternatively keeps
@@ -424,16 +424,16 @@ public:
     /// detected are t0 and t1 updated with the corresponding entry
     /// and exit times along the INDEX ray!
     /// @note Note that t0 and t1 are only resolved at the node level
-    /// (e.g. a LeafNode with active voxels) as oppose the individual
+    /// (e.g. a LeafNode with active voxels) as opposed to the individual
     /// active voxels.
     /// @param t0 If the return value > 0 this is the time of the
     /// first hit of an active tile or leaf.
     /// @param t1 If the return value > t0 this is the time of the
     /// first hit (> t0) of an inactive tile or exit point of the
     /// BBOX for the leaf nodes.
-    /// @warning t0 and t1 are computed with repect to the ray represented in
+    /// @warning t0 and t1 are computed with respect to the ray represented in
     /// index space of the current grid, not world space!
-    inline bool march(Real& t0, Real& t1)
+    inline bool march(RealType& t0, RealType& t1)
     {
         const typename RayT::TimeSpan t = this->march();
         t.get(t0, t1);
@@ -447,7 +447,7 @@ public:
     /// @note ListType is a list of RayType::TimeSpan and is required to
     /// have the two methods: clear() and push_back(). Thus, it could
     /// be std::vector<typename RayType::TimeSpan> or
-    /// std::deque<typename RayType::TimeSpan>. 
+    /// std::deque<typename RayType::TimeSpan>.
     template <typename ListType>
     inline void hits(ListType& list)
     {
@@ -456,13 +456,13 @@ public:
 
     /// @brief Return the floating-point index position along the
     /// current index ray at the specified time.
-    inline Vec3R getIndexPos(Real time) const { return mRay(time); }
+    inline Vec3R getIndexPos(RealType time) const { return mRay(time); }
 
     /// @brief Return the floating-point world position along the
     /// current index ray at the specified time.
-    inline Vec3R getWorldPos(Real time) const { return mGrid->indexToWorld(mRay(time)); }
+    inline Vec3R getWorldPos(RealType time) const { return mGrid->indexToWorld(mRay(time)); }
 
-    inline Real getWorldTime(Real time) const
+    inline RealType getWorldTime(RealType time) const
     {
         return time*mGrid->transform().baseMap()->applyJacobian(mRay.dir()).length();
     }
@@ -495,14 +495,14 @@ public:
 
 private:
 
-    typedef typename tree::ValueAccessor<const TreeT> AccessorT;
+    typedef typename tree::ValueAccessor<const TreeT,/*IsSafe=*/false> AccessorT;
 
     const bool      mIsMaster;
     TreeT*          mTree;
     const GridT*    mGrid;
     AccessorT       mAccessor;
     RayT            mRay;
-    Real            mTmax;
+    RealType        mTmax;
     math::CoordBBox mBBox;
     math::VolumeHDDA<TreeT, RayType, NodeLevel> mHDDA;
 
@@ -513,7 +513,7 @@ private:
 
 
 /// @brief Implements linear iterative search for an iso-value of
-/// the level set along along the direction of the ray.
+/// the level set along the direction of the ray.
 ///
 /// @note Since this class is used internally in
 /// LevelSetRayIntersector (define above) and LevelSetHDDA (defined below)
@@ -529,7 +529,7 @@ private:
 /// @warning Since the root-searching algorithm is approximate
 /// (first-order) it is possible to miss intersections if the
 /// iso-value is too close to the inside or outside of the narrow
-/// band (typically a distance less then a voxel unit).
+/// band (typically a distance less than a voxel unit).
 ///
 /// @warning Since this class internally stores a ValueAccessor it is NOT thread-safe,
 /// so make sure to give each thread its own instance.  This of course also means that
@@ -543,7 +543,6 @@ public:
     typedef typename GridT::ValueType     ValueT;
     typedef typename GridT::ConstAccessor AccessorT;
     typedef math::BoxStencil<GridT>       StencilT;
-    typedef typename StencilT::Vec3Type   Vec3T;
 
     /// @brief Constructor from a grid.
     /// @throw RunTimeError if the grid is empty.
@@ -567,7 +566,7 @@ public:
     /// @brief Return the iso-value used for ray-intersections
     const ValueT& getIsoValue() const { return mIsoValue; }
 
-    /// @brief Return @c false the ray misses the bbox of the grid.
+    /// @brief Return @c false if the ray misses the bbox of the grid.
     /// @param iRay Ray represented in index space.
     /// @warning Call this method before the ray traversal starts.
     inline bool setIndexRay(const RayT& iRay)
@@ -576,7 +575,7 @@ public:
         return mRay.clip(mBBox);//did it hit the bbox
     }
 
-    /// @brief Return @c false the ray misses the bbox of the grid.
+    /// @brief Return @c false if the ray misses the bbox of the grid.
     /// @param wRay Ray represented in world space.
     /// @warning Call this method before the ray traversal starts.
     inline bool setWorldRay(const RayT& wRay)
@@ -629,7 +628,7 @@ private:
     /// @brief Return a const reference to the ray.
     inline const RayT& ray() const { return mRay; }
 
-    /// @brief Return true if a node of the the specified type exists at ijk.
+    /// @brief Return true if a node of the specified type exists at ijk.
     template <typename NodeT>
     inline bool hasNode(const Coord& ijk)
     {
@@ -639,7 +638,7 @@ private:
     /// @brief Return @c true if an intersection is detected.
     /// @param ijk Grid coordinate of the node origin or voxel being tested.
     /// @param time Time along the index ray being tested.
-    /// @warning Only if and intersection is detected is it safe to
+    /// @warning Only if an intersection is detected is it safe to
     /// call getIndexPos, getWorldPos and getWorldPosAndNml!
     inline bool operator()(const Coord& ijk, RealT time)
     {
@@ -697,6 +696,6 @@ private:
 
 #endif // OPENVDB_TOOLS_RAYINTERSECTOR_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -45,8 +45,10 @@ namespace math {
 bool QuantizedUnitVec::sInitialized = false;
 float QuantizedUnitVec::sNormalizationWeights[MASK_SLOTS + 1];
 
+namespace {
 // Declare this at file scope to ensure thread-safe initialization.
 tbb::mutex sInitMutex;
+}
 
 
 ////////////////////////////////////////
@@ -92,6 +94,6 @@ QuantizedUnitVec::init()
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

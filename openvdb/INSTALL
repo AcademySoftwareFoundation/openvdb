@@ -25,7 +25,7 @@ Other compilers or versions might work but have not been tested.
 
 Optional:
 
-- Doxygen 1.8 (www.stack.nl/~dimitri/doxygen/), for documentation
+- Doxygen 1.8.7 (www.stack.nl/~dimitri/doxygen/), for documentation
 
 - CppUnit (www.freedesktop.org/wiki/Software/cppunit), version 1.10 or later
   (Linux: yum install cppunit-devel)
@@ -191,8 +191,8 @@ Installation
     A default local build generates the following libraries and executables
     (but see the Makefile for additional targets and build options):
 
-    openvdb/libopenvdb.so.3.0.0         the OpenVDB library
-    openvdb/libopenvdb.so               symlink to libopenvdb.so.3.0.0
+    openvdb/libopenvdb.so.3.2.0         the OpenVDB library
+    openvdb/libopenvdb.so               symlink to libopenvdb.so.3.2.0
     openvdb/pyopenvdb.so                the OpenVDB Python module (if Python
                                         and Boost.Python are available)
     openvdb/vdb_print                   command-line tool that prints info
@@ -238,8 +238,8 @@ Installation
                 version.h
         lib/
             libopenvdb.so
-            libopenvdb.so.3.0
-            libopenvdb.so.3.0.0
+            libopenvdb.so.3.2
+            libopenvdb.so.3.2.0
 
         python/
             include/
@@ -248,7 +248,7 @@ Installation
             lib/
                 python$(PYTHON_VERSION)/
                     pyopenvdb.so
-                    pyopenvdb.so.3.0
+                    pyopenvdb.so.3.2
 
         share/
             doc/

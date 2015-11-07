@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -234,7 +234,8 @@ inline typename boost::enable_if_c<
     ValueType>::type
 convertValue(const openvdb::Vec3R& val)
 {
-    return ValueType(val[0], val[1]);
+    typedef typename openvdb::VecTraits<ValueType>::ElementType ElemType;
+    return ValueType(ElemType(val[0]), ElemType(val[1]));
 }
 
 // Overload for Vec3 types
@@ -244,7 +245,8 @@ inline typename boost::enable_if_c<
     ValueType>::type
 convertValue(const openvdb::Vec3R& val)
 {
-    return ValueType(val[0], val[1], val[2]);
+    typedef typename openvdb::VecTraits<ValueType>::ElementType ElemType;
+    return ValueType(ElemType(val[0]), ElemType(val[1]), ElemType(val[2]));
 }
 
 // Overload for Vec4 types (not currently used)
@@ -254,7 +256,8 @@ inline typename boost::enable_if_c<
     ValueType>::type
 convertValue(const openvdb::Vec3R& val)
 {
-    return ValueType(val[0], val[1], val[2], 1.0);
+    typedef typename openvdb::VecTraits<ValueType>::ElementType ElemType;
+    return ValueType(ElemType(val[0]), ElemType(val[1]), ElemType(val[2]), ElemType(1.0));
 }
 
 
@@ -302,7 +305,7 @@ SOP_OpenVDB_Fill::cookMySop(OP_Context& context)
 
         const fpreal t = context.getTime();
 
-        duplicateSource(0, context);
+        duplicateSourceStealable(0, context);
 
         UT_String groupStr;
         evalString(groupStr, "group", 0, t);
@@ -376,6 +379,6 @@ SOP_OpenVDB_Fill::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

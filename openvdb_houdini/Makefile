@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2014 DreamWorks Animation LLC
+# Copyright (c) 2012-2015 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -214,18 +214,25 @@ LIBHOUDINI_SRC_NAMES := \
     houdini/UT_VDBUtils.cc \
     houdini/Utils.cc \
 #
+# Note that creation script names coincide with operator names,
+# not (necessarily) with SOP names.
+HOUDINI_SOP_SCRIPT_NAMES := \
+    houdini/DW_OpenVDBRasterizePoints.cmd \
+#
 HOUDINI_SOP_SRC_NAMES := \
-    houdini/SOP_OpenVDB_Advect_Level_Set.cc \
+    houdini/SOP_OpenVDB_Advect.cc \
     houdini/SOP_OpenVDB_Advect_Points.cc \
     houdini/SOP_OpenVDB_Analysis.cc \
     houdini/SOP_OpenVDB_Clip.cc \
     houdini/SOP_OpenVDB_Combine.cc \
     houdini/SOP_OpenVDB_Convert.cc \
     houdini/SOP_OpenVDB_Create.cc \
+    houdini/SOP_OpenVDB_Diagnostics.cc \
     houdini/SOP_OpenVDB_Fill.cc \
     houdini/SOP_OpenVDB_Filter.cc \
     houdini/SOP_OpenVDB_Filter_Level_Set.cc \
     houdini/SOP_OpenVDB_Fracture.cc \
+    houdini/SOP_OpenVDB_From_Mask.cc \
     houdini/SOP_OpenVDB_From_Particles.cc \
     houdini/SOP_OpenVDB_From_Polygons.cc \
     houdini/SOP_OpenVDB_Metadata.cc \
@@ -234,11 +241,15 @@ HOUDINI_SOP_SRC_NAMES := \
     houdini/SOP_OpenVDB_Occlusion_Mask.cc \
     houdini/SOP_OpenVDB_Platonic.cc \
     houdini/SOP_OpenVDB_Prune.cc \
+    houdini/SOP_OpenVDB_Rasterize_Points.cc \
     houdini/SOP_OpenVDB_Ray.cc \
     houdini/SOP_OpenVDB_Read.cc \
     houdini/SOP_OpenVDB_Rebuild_Level_Set.cc \
+    houdini/SOP_OpenVDB_Remap.cc \
+    houdini/SOP_OpenVDB_Remove_Divergence.cc \
     houdini/SOP_OpenVDB_Resample.cc \
     houdini/SOP_OpenVDB_Sample_Points.cc \
+    houdini/SOP_OpenVDB_Sort_Points.cc \
     houdini/SOP_OpenVDB_Scatter.cc \
     houdini/SOP_OpenVDB_To_Polygons.cc \
     houdini/SOP_OpenVDB_To_Spheres.cc \
@@ -332,14 +343,14 @@ ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)$(HCUSTOM_EXTRA_LDFLAGS)))
         endif
         HCUSTOM_EXPORT := HOUDINI_CC='$(HOUDINI_CC) $(HCUSTOM_EXTRA_CFLAGS) $(HCUSTOM_EXTRA_LDFLAGS)'
     else
-	# From Houdini 13.0.548 and 14.0.105 on, hcustom recognizes
-	# the environment variables HCUSTOM_CFLAGS and HCUSTOM_LDFLAGS.
-	ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)))
-	    HCUSTOM_EXPORT += HCUSTOM_CFLAGS=$(strip $(HCUSTOM_EXTRA_CFLAGS))
-	endif
-	ifneq (,$(strip $(HCUSTOM_EXTRA_LDFLAGS)))
-	    HCUSTOM_EXPORT += HCUSTOM_LDFLAGS=$(strip $(HCUSTOM_EXTRA_LDFLAGS))
-	endif
+        # From Houdini 13.0.548 and 14.0.105 on, hcustom recognizes
+        # the environment variables HCUSTOM_CFLAGS and HCUSTOM_LDFLAGS.
+        ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)))
+            HCUSTOM_EXPORT += HCUSTOM_CFLAGS=$(strip $(HCUSTOM_EXTRA_CFLAGS))
+        endif
+        ifneq (,$(strip $(HCUSTOM_EXTRA_LDFLAGS)))
+            HCUSTOM_EXPORT += HCUSTOM_LDFLAGS=$(strip $(HCUSTOM_EXTRA_LDFLAGS))
+        endif
     endif
 endif
 ifneq (,$(strip $(HCUSTOM_EXPORT)))
@@ -424,11 +435,17 @@ endif
 
 $(HOUDINI_SOP_SO_NAMES): $(HOUDINI_DESTDIR)/%.so: houdini/%.o
 
-houdinisops: $(HOUDINI_SOP_SO_NAMES) houdini/SOP_OpenVDB.svg
+houdinisops: $(HOUDINI_SOP_SO_NAMES) $(HOUDINI_SOP_SCRIPT_NAMES) houdini/SOP_OpenVDB.svg
 	if [ -d "$(HOUDINI_DESTDIR)/../config/Icons" ]; \
 	then \
 	    cp -f houdini/SOP_OpenVDB.svg $(HOUDINI_DESTDIR)/../config/Icons/; \
 	fi
+	if [ ! -d "$(HOUDINI_DESTDIR)/../scripts/sop" ]; \
+	then \
+	    mkdir -p $(HOUDINI_DESTDIR)/../scripts/sop; \
+	    echo "Created $(HOUDINI_DESTDIR)/../scripts/sop/"; \
+	fi
+	cp -f $(HOUDINI_SOP_SCRIPT_NAMES) $(HOUDINI_DESTDIR)/../scripts/sop/
 
 install: houdinilib houdinisops
 	mkdir -p $(DESTDIR)/include/openvdb_houdini
@@ -459,9 +476,9 @@ $(DEPEND): $(ALL_INCLUDE_FILES) $(ALL_SRC_FILES)
 	@echo "Generating dependencies because of $(call list_deps)"
 	$(RM) $(DEPEND)
 	for f in $(HOUDINI_SRC_FILES); \
-		do $(CXX) $(CXXFLAGS) $(HOUDINI_CXXFLAGS) -O0 \
-			-MM $$f -MT `echo $$f | sed 's%\.[^.]*%.o%'` \
-			-isystem $(HOUDINI_INCL_DIR) >> $(DEPEND); \
+	    do $(CXX) $(CXXFLAGS) $(HOUDINI_CXXFLAGS) -O0 \
+	        -MM $$f -MT `echo $$f | sed 's%\.[^.]*%.o%'` \
+	        -isystem $(HOUDINI_INCL_DIR) >> $(DEPEND); \
 	done
 
 depend: $(DEPEND)
@@ -473,11 +490,13 @@ clean:
 	$(RM) $(LIBHOUDINI_OBJ_NAMES)
 	$(RM) $(HOUDINI_SOP_OBJ_NAMES) $(HOUDINI_SOP_SO_NAMES)
 	$(RM) $(HOUDINI_DESTDIR)/../config/Icons/SOP_OpenVDB.svg
+	$(RM) $(addprefix $(HOUDINI_DESTDIR)/../scripts/sop/,\
+	    $(notdir $(HOUDINI_SOP_SCRIPT_NAMES)))
 
 ifneq (,$(strip $(wildcard $(DEPEND))))
     include $(DEPEND)
 endif
 
-# Copyright (c) 2012-2014 DreamWorks Animation LLC
+# Copyright (c) 2012-2015 DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

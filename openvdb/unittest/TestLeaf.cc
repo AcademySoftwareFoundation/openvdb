@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -46,6 +46,7 @@ public:
     CPPUNIT_TEST(testGetOrigin);
     CPPUNIT_TEST(testIteratorGetCoord);
     CPPUNIT_TEST(testNegativeIndexing);
+    CPPUNIT_TEST(testIsConstant);
     CPPUNIT_TEST_SUITE_END();
 
     void testBuffer();
@@ -58,6 +59,7 @@ public:
     void testGetOrigin();
     void testIteratorGetCoord();
     void testNegativeIndexing();
+    void testIsConstant();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestLeaf);
@@ -308,6 +310,122 @@ TestLeaf::testNegativeIndexing()
     CPPUNIT_ASSERT_EQUAL(Coord(-11, -6, -5), xyz);
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+void
+TestLeaf::testIsConstant()
+{
+    using namespace openvdb;
+    const Coord origin(-9, -2, -8);
+
+    {// check old version (v3.0 and older) with float
+        // Acceptable range: first-value +/- tolerance
+        const float val = 1.0f, tol = 0.01f;
+        tree::LeafNode<float, 3> leaf(origin, val, true);
+        float v = 0.0f;
+        bool stat = false;
+        CPPUNIT_ASSERT(leaf.isConstant(v, stat, tol));
+        CPPUNIT_ASSERT(stat);
+        CPPUNIT_ASSERT_EQUAL(val, v);
+        
+        leaf.setValueOff(0);
+        CPPUNIT_ASSERT(!leaf.isConstant(v, stat, tol));
+
+        leaf.setValueOn(0);
+        CPPUNIT_ASSERT(leaf.isConstant(v, stat, tol));
+        
+        leaf.setValueOn(0, val + 0.99f*tol);
+        CPPUNIT_ASSERT(leaf.isConstant(v, stat, tol));
+        CPPUNIT_ASSERT(stat);
+        CPPUNIT_ASSERT_EQUAL(val + 0.99f*tol, v);
+
+        leaf.setValueOn(0, val + 1.01f*tol);
+        CPPUNIT_ASSERT(!leaf.isConstant(v, stat, tol));
+    }
+    {// check old version (v3.0 and older) with double
+        // Acceptable range: first-value +/- tolerance
+        const double val = 1.0, tol = 0.00001;
+        tree::LeafNode<double, 3> leaf(origin, val, true);
+        double v = 0.0;
+        bool stat = false;
+        CPPUNIT_ASSERT(leaf.isConstant(v, stat, tol));
+        CPPUNIT_ASSERT(stat);
+        CPPUNIT_ASSERT_EQUAL(val, v);
+        
+        leaf.setValueOff(0);
+        CPPUNIT_ASSERT(!leaf.isConstant(v, stat, tol));
+
+        leaf.setValueOn(0);
+        CPPUNIT_ASSERT(leaf.isConstant(v, stat, tol));
+        
+        leaf.setValueOn(0, val + 0.99*tol);
+        CPPUNIT_ASSERT(leaf.isConstant(v, stat, tol));
+        CPPUNIT_ASSERT(stat);
+        CPPUNIT_ASSERT_EQUAL(val + 0.99*tol, v);
+
+        leaf.setValueOn(0, val + 1.01*tol);
+        CPPUNIT_ASSERT(!leaf.isConstant(v, stat, tol));
+    }
+    {// check newer version (v3.1 and never) with float
+        // Acceptable range: (max+min)/2 +/- tolerance
+        const float val = 1.0, tol = 0.01f;
+        tree::LeafNode<float, 3> leaf(origin, val, true);
+        float vmin = 0.0f, vmax = 0.0f;
+        bool stat = false;
+        CPPUNIT_ASSERT(leaf.isConstant(vmin, vmax, stat, tol));
+        CPPUNIT_ASSERT(stat);
+        CPPUNIT_ASSERT_EQUAL(val, vmin);
+        CPPUNIT_ASSERT_EQUAL(val, vmax);
+        
+        leaf.setValueOff(0);
+        CPPUNIT_ASSERT(!leaf.isConstant(vmin, vmax, stat, tol));
+        
+        leaf.setValueOn(0);
+        CPPUNIT_ASSERT(leaf.isConstant(vmin, vmax, stat, tol));
+
+        leaf.setValueOn(0, val + 0.99f*tol);
+        CPPUNIT_ASSERT(leaf.isConstant(vmin, vmax, stat, tol));
+        CPPUNIT_ASSERT_EQUAL(val, vmin);
+        CPPUNIT_ASSERT_EQUAL(val + 0.99f*tol, vmax);
+        
+        leaf.setValueOn(0, val + 1.99f*tol);
+        CPPUNIT_ASSERT(leaf.isConstant(vmin, vmax, stat, tol));
+        CPPUNIT_ASSERT_EQUAL(val, vmin);
+        CPPUNIT_ASSERT_EQUAL(val + 1.99f*tol, vmax);
+
+        leaf.setValueOn(0, val + 2.01f*tol);
+        CPPUNIT_ASSERT(!leaf.isConstant(vmin, vmax, stat, tol));
+    }
+    {// check newer version (v3.1 and never) with double
+        // Acceptable range: (max+min)/2 +/- tolerance
+        const double val = 1.0, tol = 0.000001;
+        tree::LeafNode<double, 3> leaf(origin, val, true);
+        double vmin = 0.0, vmax = 0.0;
+        bool stat = false;
+        CPPUNIT_ASSERT(leaf.isConstant(vmin, vmax, stat, tol));
+        CPPUNIT_ASSERT(stat);
+        CPPUNIT_ASSERT_EQUAL(val, vmin);
+        CPPUNIT_ASSERT_EQUAL(val, vmax);
+        
+        leaf.setValueOff(0);
+        CPPUNIT_ASSERT(!leaf.isConstant(vmin, vmax, stat, tol));
+        
+        leaf.setValueOn(0);
+        CPPUNIT_ASSERT(leaf.isConstant(vmin, vmax, stat, tol));
+
+        leaf.setValueOn(0, val + 0.99*tol);
+        CPPUNIT_ASSERT(leaf.isConstant(vmin, vmax, stat, tol));
+        CPPUNIT_ASSERT_EQUAL(val, vmin);
+        CPPUNIT_ASSERT_EQUAL(val + 0.99*tol, vmax);
+        
+        leaf.setValueOn(0, val + 1.99*tol);
+        CPPUNIT_ASSERT(leaf.isConstant(vmin, vmax, stat, tol));
+        CPPUNIT_ASSERT_EQUAL(val, vmin);
+        CPPUNIT_ASSERT_EQUAL(val + 1.99*tol, vmax);
+
+        leaf.setValueOn(0, val + 2.01*tol);
+        CPPUNIT_ASSERT(!leaf.isConstant(vmin, vmax, stat, tol));
+    }
+}
+
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

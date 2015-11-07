@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -32,7 +32,7 @@
 ///
 /// @file PointScatter.h
 ///
-/// @brief We offer three differet algorithms (each in its own class)
+/// @brief We offer three different algorithms (each in its own class)
 ///        for scattering of point in active voxels:
 ///
 /// 1) UniformPointScatter. Has two modes: Either randomly distributes
@@ -168,7 +168,7 @@ public:
                 ++valueIter;
                 n += valueIter.getVoxelCount();
             }
-            if (valueIter.isVoxelValue()) {// a majorty is expected to be voxels
+            if (valueIter.isVoxelValue()) {// a majority is expected to be voxels
                 BaseT::addPoint(grid, valueIter.getCoord() - offset);
             } else {// tiles contain multiple (virtual) voxels
                 valueIter.getBoundingBox(bbox);
@@ -240,7 +240,7 @@ public:
 
         for (ValueIter iter = grid.cbeginValueOn(); iter; ++iter) {
             if (BaseT::interrupt()) return false;
-            if (iter.isVoxelValue()) {// a majorty is expected to be voxels
+            if (iter.isVoxelValue()) {// a majority is expected to be voxels
                 const Vec3R dmin = iter.getCoord() - offset;
                 for (int n = 0; n != ppv; ++n) BaseT::addPoint(grid, dmin);
                 if (fractional && BaseT::getRand() < delta) BaseT::addPoint(grid, dmin);
@@ -263,7 +263,7 @@ public:
     // the operator() method was called
     void print(const std::string &name, std::ostream& os = std::cout) const
     {
-        os << "Dense uniformely scattered " << mPointCount << " points into " << mVoxelCount
+        os << "Dense uniformly scattered " << mPointCount << " points into " << mVoxelCount
            << " active voxels in \"" << name << "\" corresponding to "
            << mPointsPerVoxel << " points per voxel." << std::endl;
     }
@@ -300,7 +300,7 @@ public:
                            InterruptType* interrupt = NULL)
         : BaseT(points, randGen, interrupt)
         , mPointsPerVolume(pointsPerVolume)//note this is merely a
-                                           //multiplyer for the local point density
+                                           //multiplier for the local point density
     {
     }
 
@@ -321,7 +321,7 @@ public:
             if (BaseT::interrupt()) return false;
             const double d = (*iter) * pointsPerVoxel * iter.getVoxelCount();
             const int n = int(d);
-            if (iter.isVoxelValue()) { // a majorty is expected to be voxels
+            if (iter.isVoxelValue()) { // a majority is expected to be voxels
                 const Vec3R dmin =iter.getCoord() - offset;
                 for (int i = 0; i < n; ++i) BaseT::addPoint(grid, dmin);
                 if (BaseT::getRand() < (d - n)) BaseT::addPoint(grid, dmin);
@@ -341,7 +341,7 @@ public:
     // the operator() method was called
     void print(const std::string &name, std::ostream& os = std::cout) const
     {
-        os << "Non-uniformely scattered " << mPointCount << " points into " << mVoxelCount
+        os << "Non-uniformly scattered " << mPointCount << " points into " << mVoxelCount
            << " active voxels in \"" << name << "\"." << std::endl;
     }
 
@@ -432,6 +432,6 @@ protected:
 
 #endif // OPENVDB_TOOLS_POINT_SCATTER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

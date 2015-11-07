@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -119,6 +119,11 @@ public:
 
     /// Return a string describing this metadata map.  Prefix each line with @a indent.
     std::string str(const std::string& indent = "") const;
+
+    /// Return @c true if the given map is equivalent to this map.
+    bool operator==(const MetaMap& other) const;
+    /// Return @c true if the given map is different from this map.
+    bool operator!=(const MetaMap& other) const { return !(*this == other); }
 
 private:
     /// @brief Return a pointer to TypedMetadata with the given template parameter.
@@ -241,6 +246,6 @@ MetaMap::metaValue(const Name &name) const
 
 #endif // OPENVDB_METADATA_METAMAP_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

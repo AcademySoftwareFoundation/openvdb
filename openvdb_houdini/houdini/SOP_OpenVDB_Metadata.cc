@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -47,7 +47,7 @@ class SOP_OpenVDB_Metadata: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Metadata(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Metadata() {};
+    virtual ~SOP_OpenVDB_Metadata() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
@@ -213,7 +213,20 @@ SOP_OpenVDB_Metadata::cookMySop(OP_Context& context)
             hvdb::Grid& grid = vdb->getGrid();
 
             // Set various grid metadata items.
-            if (setclass)   grid.setGridClass(gridclass);
+            if (setclass) {
+                grid.setGridClass(gridclass);
+
+                // Update view port visualization options
+                if (gridclass == openvdb::GRID_LEVEL_SET) {
+                    const GEO_VolumeOptions& visOps = vdb->getVisOptions();
+                    vdb->setVisualization(GEO_VOLUMEVIS_ISO, visOps.myIso, visOps.myDensity);
+                } else if (gridclass == openvdb::GRID_FOG_VOLUME) {
+                    const GEO_VolumeOptions& visOps = vdb->getVisOptions();
+                    vdb->setVisualization(GEO_VOLUMEVIS_SMOKE, visOps.myIso, visOps.myDensity);
+                }
+            }
+
+
             if (setcreator) grid.setCreator(creator);
             if (setfloat16) grid.setSaveFloatAsHalf(float16);
             if (setvectype) grid.setVectorType(vectype);
@@ -225,6 +238,6 @@ SOP_OpenVDB_Metadata::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

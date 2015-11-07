@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -139,6 +139,27 @@ Metadata::clearRegistry()
 ////////////////////////////////////////
 
 
+bool
+Metadata::operator==(const Metadata& other) const
+{
+    if (other.size() != this->size()) return false;
+    if (other.typeName() != this->typeName()) return false;
+
+    std::ostringstream
+        bytes(std::ios_base::binary),
+        otherBytes(std::ios_base::binary);
+    try {
+        this->writeValue(bytes);
+        other.writeValue(otherBytes);
+        return (bytes.str() == otherBytes.str());
+    } catch (Exception&) {}
+    return false;
+}
+
+
+////////////////////////////////////////
+
+
 void
 UnknownMetadata::readValue(std::istream& is, Index32 numBytes)
 {
@@ -163,6 +184,6 @@ UnknownMetadata::writeValue(std::ostream&) const
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

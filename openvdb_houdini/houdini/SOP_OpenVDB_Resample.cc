@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -59,7 +59,7 @@ public:
     enum { MODE_PARMS = 0, MODE_REF_GRID, MODE_VOXEL_SIZE, MODE_VOXEL_SCALE };
 
     SOP_OpenVDB_Resample(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Resample() {};
+    virtual ~SOP_OpenVDB_Resample() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
@@ -539,6 +539,6 @@ SOP_OpenVDB_Resample::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

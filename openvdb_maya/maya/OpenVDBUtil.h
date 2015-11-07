@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -40,7 +40,6 @@
 #include <openvdb/Types.h>
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/tools/VolumeToMesh.h>
-#include <openvdb/tools/LevelSetUtil.h>
 #include <openvdb/util/Formats.h> // printBytes
 
 #include <tbb/tick_count.h>
@@ -201,9 +200,104 @@ private:
     GLuint mProgram, mVertShader, mFragShader;
 };
 
+
 ////////////////////////////////////////
 
-///@todo Move this into an graphics library.
+
+namespace util {
+
+template<class TreeType>
+class MinMaxVoxel
+{
+public:
+    typedef openvdb::tree::LeafManager<TreeType> LeafArray;
+    typedef typename TreeType::ValueType ValueType;
+
+    // LeafArray = openvdb::tree::LeafManager<TreeType> leafs(myTree)
+    MinMaxVoxel(LeafArray&);
+
+    void runParallel();
+    void runSerial();
+
+    const ValueType& minVoxel() const { return mMin; }
+    const ValueType& maxVoxel() const { return mMax; }
+
+    inline MinMaxVoxel(const MinMaxVoxel<TreeType>&, tbb::split);
+    inline void operator()(const tbb::blocked_range<size_t>&);
+    inline void join(const MinMaxVoxel<TreeType>&);
+
+private:
+    LeafArray& mLeafArray;
+    ValueType mMin, mMax;
+};
+
+
+template <class TreeType>
+MinMaxVoxel<TreeType>::MinMaxVoxel(LeafArray& leafs)
+    : mLeafArray(leafs)
+    , mMin(std::numeric_limits<ValueType>::max())
+    , mMax(-mMin)
+{
+}
+
+
+template <class TreeType>
+inline
+MinMaxVoxel<TreeType>::MinMaxVoxel(const MinMaxVoxel<TreeType>& rhs, tbb::split)
+    : mLeafArray(rhs.mLeafArray)
+    , mMin(std::numeric_limits<ValueType>::max())
+    , mMax(-mMin)
+{
+}
+
+
+template <class TreeType>
+void
+MinMaxVoxel<TreeType>::runParallel()
+{
+    tbb::parallel_reduce(mLeafArray.getRange(), *this);
+}
+
+
+template <class TreeType>
+void
+MinMaxVoxel<TreeType>::runSerial()
+{
+    (*this)(mLeafArray.getRange());
+}
+
+
+template <class TreeType>
+inline void
+MinMaxVoxel<TreeType>::operator()(const tbb::blocked_range<size_t>& range)
+{
+    typename TreeType::LeafNodeType::ValueOnCIter iter;
+
+    for (size_t n = range.begin(); n < range.end(); ++n) {
+        iter = mLeafArray.leaf(n).cbeginValueOn();
+        for (; iter; ++iter) {
+            const ValueType value = iter.getValue();
+            mMin = std::min(mMin, value);
+            mMax = std::max(mMax, value);
+        }
+    }
+}
+
+
+template <class TreeType>
+inline void
+MinMaxVoxel<TreeType>::join(const MinMaxVoxel<TreeType>& rhs)
+{
+    mMin = std::min(mMin, rhs.mMin);
+    mMax = std::max(mMax, rhs.mMax);
+}
+
+} // namespace util
+
+
+////////////////////////////////////////
+
+///@todo Move this into a graphics library.
 // Should be shared with the stand alone viewer.
 
 class WireBoxBuilder
@@ -804,7 +898,7 @@ public:
         openvdb::tree::LeafManager<const TreeType> leafs(tree);
 
         {
-            openvdb::tools::MinMaxVoxel<const TreeType> minmax(leafs);
+            util::MinMaxVoxel<const TreeType> minmax(leafs);
             minmax.runParallel();
             minValue = minmax.minVoxel();
             maxValue = minmax.maxVoxel();
@@ -973,6 +1067,6 @@ processTypedVectorGrid(GridPtrType grid, OpType& op)
 
 #endif // OPENVDB_MAYA_UTIL_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

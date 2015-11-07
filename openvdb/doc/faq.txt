@@ -2,7 +2,7 @@
 
 @page faq Frequently Asked Questions
 
-@section Contents
+@section sFAQContents Contents
 - @ref sWhatIsVDB
 - @ref sWhatLicense
 - @ref sWhatCLA

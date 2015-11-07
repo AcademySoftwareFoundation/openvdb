@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -43,7 +43,6 @@
 #include <openvdb/math/Mat3.h>
 #include <openvdb/math/Mat4.h>
 #include <openvdb/math/Coord.h>
-#include <openvdb/math/Hermite.h>
 #include <boost/type_traits/is_convertible.hpp>
 #include <boost/type_traits/is_integral.hpp>
 #include <boost/static_assert.hpp>
@@ -103,11 +102,11 @@ typedef math::Mat4<Real>    Mat4R;
 typedef math::Mat4<double>  Mat4d;
 typedef math::Mat4<float>   Mat4s;
 
-// Compressed Hermite data
-typedef math::Hermite       Hermite;
-
 // Quaternions
 typedef math::Quat<Real>    QuatR;
+
+// Dummy type for a voxel with a binary mask value, e.g. the active state
+class ValueMask {};
 
 
 ////////////////////////////////////////
@@ -199,8 +198,12 @@ struct CanConvertType<T0, math::Vec3<T1> > { enum { value = CanConvertType<T0, T
 template<typename T0, typename T1>
 struct CanConvertType<T0, math::Vec4<T1> > { enum { value = CanConvertType<T0, T1>::value }; };
 template<> struct CanConvertType<PointIndex32, PointDataIndex32> { enum {value = true}; };
-template<> struct CanConvertType<PointDataIndex32, PointIndex32> { enum {value = true}; };
-
+template<> struct CanConvertType<PointDataIndex32, PointIndex32> { enum {value = true}; };    
+template<typename T>
+struct CanConvertType<T, ValueMask> { enum {value = CanConvertType<T, bool>::value}; };
+template<typename T>
+struct CanConvertType<ValueMask, T> { enum {value = CanConvertType<bool, T>::value}; };
+    
 ////////////////////////////////////////
 
 
@@ -270,12 +273,12 @@ enum MergePolicy {
 
 template<typename T> const char* typeNameAsString()                 { return typeid(T).name(); }
 template<> inline const char* typeNameAsString<bool>()              { return "bool"; }
+template<> inline const char* typeNameAsString<ValueMask>()         { return "mask"; }
 template<> inline const char* typeNameAsString<float>()             { return "float"; }
 template<> inline const char* typeNameAsString<double>()            { return "double"; }
 template<> inline const char* typeNameAsString<int32_t>()           { return "int32"; }
 template<> inline const char* typeNameAsString<uint32_t>()          { return "uint32"; }
 template<> inline const char* typeNameAsString<int64_t>()           { return "int64"; }
-template<> inline const char* typeNameAsString<Hermite>()           { return "Hermite"; }
 template<> inline const char* typeNameAsString<Vec2i>()             { return "vec2i"; }
 template<> inline const char* typeNameAsString<Vec2s>()             { return "vec2s"; }
 template<> inline const char* typeNameAsString<Vec2d>()             { return "vec2d"; }
@@ -312,23 +315,38 @@ public:
     typedef AValueType AValueT;
     typedef BValueType BValueT;
 
-    CombineArgs():
-        mAValPtr(NULL), mBValPtr(NULL), mResultValPtr(&mResultVal),
-        mAIsActive(false), mBIsActive(false), mResultIsActive(false)
-        {}
+    CombineArgs()
+        : mAValPtr(NULL)
+        , mBValPtr(NULL)
+        , mResultValPtr(&mResultVal)
+        , mAIsActive(false)
+        , mBIsActive(false)
+        , mResultIsActive(false)
+    {
+    }
 
     /// Use this constructor when the result value is stored externally.
     CombineArgs(const AValueType& a, const BValueType& b, AValueType& result,
-        bool aOn = false, bool bOn = false):
-        mAValPtr(&a), mBValPtr(&b), mResultValPtr(&result),
-        mAIsActive(aOn), mBIsActive(bOn)
-        { updateResultActive(); }
+                bool aOn = false, bool bOn = false)
+        : mAValPtr(&a)
+        , mBValPtr(&b)
+        , mResultValPtr(&result)
+        , mAIsActive(aOn)
+        , mBIsActive(bOn)
+    {
+        this->updateResultActive();
+    }
 
     /// Use this constructor when the result value should be stored in this struct.
-    CombineArgs(const AValueType& a, const BValueType& b, bool aOn = false, bool bOn = false):
-        mAValPtr(&a), mBValPtr(&b), mResultValPtr(&mResultVal),
-        mAIsActive(aOn), mBIsActive(bOn)
-        { updateResultActive(); }
+    CombineArgs(const AValueType& a, const BValueType& b, bool aOn = false, bool bOn = false)
+        : mAValPtr(&a)
+        , mBValPtr(&b)
+        , mResultValPtr(&mResultVal)
+        , mAIsActive(aOn)
+        , mBIsActive(bOn)
+    {
+        this->updateResultActive();
+    }
 
     /// Get the A input value.
     const AValueType& a() const { return *mAValPtr; }
@@ -481,6 +499,6 @@ class PartialCreate {};
 
 #endif // OPENVDB_TYPES_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

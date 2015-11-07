@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -37,6 +37,7 @@
 
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/MeshToVolume.h> // for openvdb::tools::MeshToVoxelEdgeData
+#include <openvdb/tree/LeafManager.h>
 #include <openvdb/util/Util.h> // for openvdb::util::COORD_OFFSETS
 
 #include <GU/GU_Detail.h>
@@ -354,6 +355,6 @@ using GU_Convert_H12_5::GUconvertCopySingleVertexPrimAttribsAndGroups;
 
 #endif // OPENVDB_HOUDINI_GEOMETRY_UTIL_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

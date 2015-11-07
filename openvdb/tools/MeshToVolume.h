@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -27,30 +27,50 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
+//
+/// @file   MeshToVolume.h
+///
+/// @brief  Convert polygonal meshes that consist of quads and/or triangles
+///         into signed or unsigned distance field volumes.
+///
+/// @note   The signed distance field conversion requires a closed surface
+///         but not necessarily a manifold surface. Supports surfaces with
+///         self intersections and degenerate faces and is independent of
+///         mesh surface normals / polygon orientation.
+///
+/// @author Mihai Alden
+
 
 #ifndef OPENVDB_TOOLS_MESH_TO_VOLUME_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_MESH_TO_VOLUME_HAS_BEEN_INCLUDED
 
 #include <openvdb/Types.h>
-#include <openvdb/math/FiniteDifference.h>
-#include <openvdb/math/Operators.h> // for ISGradientNormSqrd
+#include <openvdb/math/FiniteDifference.h> // for GodunovsNormSqrd
 #include <openvdb/math/Proximity.h> // for closestPointOnTriangleToPoint()
-#include <openvdb/tools/Morphology.h> // for dilateVoxels()
 #include <openvdb/util/NullInterrupter.h>
-#include <openvdb/util/Util.h> // for nearestCoord()
+#include <openvdb/util/Util.h>
+
 #include "ChangeBackground.h"
-#include "Prune.h"// for pruneInactive and pruneLevelSet
+#include "Prune.h" // for pruneInactive and pruneLevelSet
 #include "SignedFloodFill.h" // for signedFloodFillWithValues
 
 #include <tbb/blocked_range.h>
+#include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
+#include <tbb/partitioner.h>
+#include <tbb/task_group.h>
+#include <tbb/task_scheduler_init.h>
+#include <tbb/tick_count.h>
 
+#include <boost/integer_traits.hpp> // const_max
 #include <boost/math/special_functions/fpclassify.hpp> // for isfinite()
+#include <boost/scoped_array.hpp>
 
 #include <deque>
 #include <limits>
 #include <sstream>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -61,7 +81,160 @@ namespace tools {
 ////////////////////////////////////////
 
 
-// Wrapper functions for the MeshToVolume converter
+/// @brief Mesh to volume conversion flags
+enum MeshToVolumeFlags {
+
+    /// Switch from the default signed distance field conversion that classifies
+    /// regions as either inside or outside the mesh boundary to a unsigned distance
+    /// field conversion that only computes distance values. This conversion type
+    /// does not require a closed watertight mesh.
+    UNSIGNED_DISTANCE_FIELD = 0x1,
+
+    /// Disable the cleanup step that removes voxels created by self intersecting
+    /// portions of the mesh.
+    DISABLE_INTERSECTING_VOXEL_REMOVAL = 0x2,
+
+    /// Disable the distance renormalization step that smooths out bumps caused
+    /// by self intersecting or overlapping portions of the mesh
+    DISABLE_RENORMALIZATION = 0x4,
+
+    /// Disable the cleanup step that removes active voxels that exceed the
+    /// narrow band limits. (Only relevant for small limits)
+    DISABLE_NARROW_BAND_TRIMMING = 0x8
+};
+
+
+/// @brief  Convert polygonal meshes that consist of quads and/or triangles into
+///         signed or unsigned distance field volumes.
+///
+/// @note   Requires a closed surface but not necessarily a manifold surface.
+///         Supports surfaces with self intersections and degenerate faces
+///         and is independent of mesh surface normals.
+///
+/// @interface MeshDataAdapter
+/// Expected interface for the MeshDataAdapter class
+/// @code
+/// struct MeshDataAdapter {
+///   size_t polygonCount() const;        // Total number of polygons
+///   size_t pointCount() const;          // Total number of points
+///   size_t vertexCount(size_t n) const; // Vertex count for polygon n
+///
+///   // Return position pos in local grid index space for polygon n and vertex v
+///   void getIndexSpacePoint(size_t n, size_t v, openvdb::Vec3d& pos) const;
+/// };
+/// @endcode
+///
+/// @param mesh               mesh data access class that conforms to the MeshDataAdapter
+///                           interface
+/// @param transform          world-to-index-space transform
+/// @param exteriorBandWidth  exterior narrow band width in voxel units
+/// @param interiorBandWidth  interior narrow band width in voxel units
+///                           (set to std::numeric_limits<float>::max() to fill object
+///                           interior with distance values)
+/// @param flags              optional conversion flags defined in @c MeshToVolumeFlags
+/// @param polygonIndexGrid   optional grid output that will contain the closest-polygon
+///                           index for each voxel in the narrow band region
+template <typename GridType, typename MeshDataAdapter>
+inline typename GridType::Ptr
+meshToVolume(
+  const MeshDataAdapter& mesh,
+  const math::Transform& transform,
+  float exteriorBandWidth = 3.0f,
+  float interiorBandWidth = 3.0f,
+  int flags = 0,
+  typename GridType::template ValueConverter<Int32>::Type * polygonIndexGrid = NULL);
+
+
+/// @brief  Convert polygonal meshes that consist of quads and/or triangles into
+///         signed or unsigned distance field volumes.
+///
+/// @param interrupter        a callback to interrupt the conversion process that conforms
+///                           to the util::NullInterrupter interface
+/// @param mesh               mesh data access class that conforms to the MeshDataAdapter
+///                           interface
+/// @param transform          world-to-index-space transform
+/// @param exteriorBandWidth  exterior narrow band width in voxel units
+/// @param interiorBandWidth  interior narrow band width in voxel units (set this value to
+///                           std::numeric_limits<float>::max() to fill interior regions
+///                           with distance values)
+/// @param flags              optional conversion flags defined in @c MeshToVolumeFlags
+/// @param polygonIndexGrid   optional grid output that will contain the closest-polygon
+///                           index for each voxel in the active narrow band region
+template <typename GridType, typename MeshDataAdapter, typename Interrupter>
+inline typename GridType::Ptr
+meshToVolume(
+    Interrupter& interrupter,
+    const MeshDataAdapter& mesh,
+    const math::Transform& transform,
+    float exteriorBandWidth = 3.0f,
+    float interiorBandWidth = 3.0f,
+    int flags = 0,
+    typename GridType::template ValueConverter<Int32>::Type * polygonIndexGrid = NULL);
+
+
+////////////////////////////////////////
+
+
+/// @brief    Contiguous quad and triangle data adapter class
+///
+/// @details  PointType and PolygonType must provide element access
+///           through the square brackets operator.
+/// @details  Points are assumed to be in local grid index space.
+/// @details  The PolygonType tuple can have either three or four components
+///           this property must be specified in a static member variable
+///           named @c size, similar to the math::Tuple class.
+/// @details  A four component tuple can represent a quads or a triangle
+///           if the fourth component set to @c util::INVALID_INDEX
+template<typename PointType, typename PolygonType>
+struct QuadAndTriangleDataAdapter {
+
+    QuadAndTriangleDataAdapter(const std::vector<PointType>& points,
+        const std::vector<PolygonType>& polygons)
+        : mPointArray(points.empty() ? NULL : &points[0])
+        , mPointArraySize(points.size())
+        , mPolygonArray(polygons.empty() ? NULL : &polygons[0])
+        , mPolygonArraySize(polygons.size())
+    {
+    }
+
+    QuadAndTriangleDataAdapter(const PointType * pointArray, size_t pointArraySize,
+        const PolygonType* polygonArray, size_t polygonArraySize)
+        : mPointArray(pointArray)
+        , mPointArraySize(pointArraySize)
+        , mPolygonArray(polygonArray)
+        , mPolygonArraySize(polygonArraySize)
+    {
+    }
+
+    size_t polygonCount() const { return mPolygonArraySize; }
+    size_t pointCount() const { return mPointArraySize; }
+
+    /// @brief  Vertex count for polygon @a n
+    size_t vertexCount(size_t n) const {
+        return (PolygonType::size == 3 || mPolygonArray[n][3] == util::INVALID_IDX) ? 3 : 4;
+    }
+
+    /// @brief  Returns position @a pos in local grid index space
+    ///         for polygon @a n and vertex @a v
+    void getIndexSpacePoint(size_t n, size_t v, Vec3d& pos) const {
+        const PointType& p = mPointArray[mPolygonArray[n][int(v)]];
+        pos[0] = double(p[0]);
+        pos[1] = double(p[1]);
+        pos[2] = double(p[2]);
+    }
+
+private:
+    PointType     const * const mPointArray;
+    size_t                const mPointArraySize;
+    PolygonType   const * const mPolygonArray;
+    size_t                const mPolygonArraySize;
+}; // struct QuadAndTriangleDataAdapter
+
+
+////////////////////////////////////////
+
+
+// Wrapper functions for the mesh to volume converter
 
 
 /// @brief Convert a triangle mesh to a level set volume.
@@ -194,82 +367,31 @@ meshToUnsignedDistanceField(
 ////////////////////////////////////////
 
 
-/// Conversion flags, used to control the MeshToVolume output
-enum { GENERATE_PRIM_INDEX_GRID = 0x1, OUTPUT_RAW_DATA = 0x2};
+/// @brief  Return a grid of type @c GridType containing a narrow-band level set
+///         representation of a box.
+///
+/// @param bbox       a bounding box in world units
+/// @param xform      world-to-index-space transform
+/// @param halfWidth  half the width of the narrow band, in voxel units
+template<typename GridType, typename VecType>
+inline typename GridType::Ptr
+createLevelSetBox(const math::BBox<VecType>& bbox,
+    const openvdb::math::Transform& xform,
+    typename VecType::ValueType halfWidth = LEVEL_SET_HALF_WIDTH);
 
 
-// MeshToVolume
-template<typename FloatGridT, typename InterruptT = util::NullInterrupter>
-class MeshToVolume
-{
-public:
-    typedef typename FloatGridT::TreeType FloatTreeT;
-    typedef typename FloatTreeT::ValueType FloatValueT;
-    typedef typename FloatTreeT::template ValueConverter<Int32>::Type IntTreeT;
-    typedef Grid<IntTreeT> IntGridT;
-    typedef typename FloatTreeT::template ValueConverter<bool>::Type BoolTreeT;
-    typedef Grid<BoolTreeT> BoolGridT;
+////////////////////////////////////////
 
-    MeshToVolume(openvdb::math::Transform::Ptr&, int conversionFlags = 0,
-        InterruptT *interrupter = NULL, int signSweeps = 1);
 
-    /// @brief  Mesh to Level Set / Signed Distance Field conversion
-    ///
-    /// @note   Requires a closed surface but not necessarily a manifold surface.
-    ///         Supports surfaces with self intersections, degenerate faces and
-    ///         is independent of mesh surface normals.
-    ///
-    /// @param pointList    List of points in grid index space, preferably unique
-    ///                     and shared by different polygons.
-    /// @param polygonList  List of triangles and/or quads.
-    /// @param exBandWidth  The exterior narrow-band width in voxel units.
-    /// @param inBandWidth  The interior narrow-band width in voxel units.
-    void convertToLevelSet(
-        const std::vector<Vec3s>& pointList,
-        const std::vector<Vec4I>& polygonList,
-        FloatValueT exBandWidth = FloatValueT(LEVEL_SET_HALF_WIDTH),
-        FloatValueT inBandWidth = FloatValueT(LEVEL_SET_HALF_WIDTH));
-
-    /// @brief Mesh to Unsigned Distance Field conversion
-    ///
-    /// @note Does not requires a closed surface.
-    ///
-    /// @param pointList    List of points in grid index space, preferably unique
-    ///                     and shared by different polygons.
-    /// @param polygonList  List of triangles and/or quads.
-    /// @param exBandWidth  The narrow-band width in voxel units.
-    void convertToUnsignedDistanceField(const std::vector<Vec3s>& pointList,
-        const std::vector<Vec4I>& polygonList, FloatValueT exBandWidth);
-
-    void clear();
-
-    /// Returns a narrow-band (signed) distance field / level set grid.
-    typename FloatGridT::Ptr distGridPtr() const { return mDistGrid; }
-
-    /// Returns a grid containing the closest-primitive index for each
-    /// voxel in the narrow-band.
-    typename IntGridT::Ptr indexGridPtr() const { return mIndexGrid; }
-
-private:
-    // disallow copy by assignment
-    void operator=(const MeshToVolume<FloatGridT, InterruptT>&) {}
-
-    void doConvert(const std::vector<Vec3s>&, const std::vector<Vec4I>&,
-        FloatValueT exBandWidth, FloatValueT inBandWidth, bool unsignedDistField = false);
-
-    bool wasInterrupted(int percent = -1) const {
-        return mInterrupter && mInterrupter->wasInterrupted(percent);
-    }
-
-    openvdb::math::Transform::Ptr mTransform;
-    int mConversionFlags, mSignSweeps;
-
-    typename FloatGridT::Ptr mDistGrid;
-    typename IntGridT::Ptr mIndexGrid;
-    typename BoolGridT::Ptr mIntersectingVoxelsGrid;
-
-    InterruptT *mInterrupter;
-};
+/// @brief  Traces the exterior voxel boundary of closed objects in the input
+///         volume @a tree. Exterior voxels are marked with a negative sign,
+///         voxels with a value below @c 0.75 are left unchanged and act as
+///         the boundary layer.
+///
+/// @note   Does not propagate sign information into tile regions.
+template <typename FloatTreeT>
+inline void
+traceExteriorBoundaries(FloatTreeT& tree);
 
 
 ////////////////////////////////////////
@@ -353,41 +475,41 @@ private:
 
 // Internal utility objects and implementation details
 
-namespace internal {
+namespace mesh_to_volume_internal {
 
+template<typename PointType>
+struct TransformPoints {
 
-class PointTransform
-{
-public:
-    PointTransform(const std::vector<Vec3s>& pointsIn, std::vector<Vec3s>& pointsOut,
+    TransformPoints(const PointType* pointsIn, PointType* pointsOut,
         const math::Transform& xform)
-        : mPointsIn(pointsIn)
-        , mPointsOut(&pointsOut)
-        , mXform(xform)
+        : mPointsIn(pointsIn), mPointsOut(pointsOut), mXform(&xform)
     {
     }
 
-    void run(bool threaded = true)
-    {
-        if (threaded) {
-            tbb::parallel_for(tbb::blocked_range<size_t>(0, mPointsOut->size()), *this);
-        } else {
-            (*this)(tbb::blocked_range<size_t>(0, mPointsOut->size()));
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+
+        Vec3d pos;
+
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+
+            const PointType& wsP = mPointsIn[n];
+            pos[0] = double(wsP[0]);
+            pos[1] = double(wsP[1]);
+            pos[2] = double(wsP[2]);
+
+            pos = mXform->worldToIndex(pos);
+
+            PointType& isP = mPointsOut[n];
+            isP[0] = typename PointType::value_type(pos[0]);
+            isP[1] = typename PointType::value_type(pos[1]);
+            isP[2] = typename PointType::value_type(pos[2]);
         }
     }
 
-    inline void operator()(const tbb::blocked_range<size_t>& range) const
-    {
-        for (size_t n = range.begin(); n < range.end(); ++n) {
-            (*mPointsOut)[n] = Vec3s(mXform.worldToIndex(mPointsIn[n]));
-        }
-    }
-
-private:
-    const std::vector<Vec3s>& mPointsIn;
-    std::vector<Vec3s> * const mPointsOut;
-    const math::Transform& mXform;
-};
+    PointType        const * const mPointsIn;
+    PointType              * const mPointsOut;
+    math::Transform  const * const mXform;
+}; // TransformPoints
 
 
 template<typename ValueType>
@@ -398,2169 +520,2688 @@ struct Tolerance
 };
 
 
-template<typename FloatTreeT, typename IntTreeT>
-inline void
-combine(FloatTreeT& lhsDist, IntTreeT& lhsIndex, FloatTreeT& rhsDist, IntTreeT& rhsIndex)
+////////////////////////////////////////
+
+
+template<typename TreeType>
+class CombineLeafNodes
 {
-    typedef typename FloatTreeT::ValueType FloatValueT;
-    typename tree::ValueAccessor<FloatTreeT> lhsDistAccessor(lhsDist);
-    typename tree::ValueAccessor<IntTreeT> lhsIndexAccessor(lhsIndex);
-    typename tree::ValueAccessor<IntTreeT> rhsIndexAccessor(rhsIndex);
-    typename FloatTreeT::LeafCIter iter = rhsDist.cbeginLeaf();
+public:
 
-    FloatValueT rhsValue;
-    Coord ijk;
+    typedef typename TreeType::template ValueConverter<Int32>::Type     Int32TreeType;
 
-    for ( ; iter; ++iter) {
-        typename FloatTreeT::LeafNodeType::ValueOnCIter it = iter->cbeginValueOn();
+    typedef typename TreeType::LeafNodeType         LeafNodeType;
+    typedef typename Int32TreeType::LeafNodeType    Int32LeafNodeType;
 
-        for ( ; it; ++it) {
+    CombineLeafNodes(TreeType& lhsDistTree, Int32TreeType& lhsIdxTree,
+        LeafNodeType ** rhsDistNodes, Int32LeafNodeType ** rhsIdxNodes)
+        : mDistTree(&lhsDistTree)
+        , mIdxTree(&lhsIdxTree)
+        , mRhsDistNodes(rhsDistNodes)
+        , mRhsIdxNodes(rhsIdxNodes)
+    {
+    }
 
-            ijk = it.getCoord();
-            rhsValue = it.getValue();
-            FloatValueT& lhsValue = const_cast<FloatValueT&>(lhsDistAccessor.getValue(ijk));
+    void operator()(const tbb::blocked_range<size_t>& range) const {
 
-            if (-rhsValue < std::abs(lhsValue)) {
-                lhsValue = rhsValue;
-                lhsIndexAccessor.setValue(ijk, rhsIndexAccessor.getValue(ijk));
+        tree::ValueAccessor<TreeType> distAcc(*mDistTree);
+        tree::ValueAccessor<Int32TreeType> idxAcc(*mIdxTree);
+
+        typedef typename LeafNodeType::ValueType DistValueType;
+        typedef typename Int32LeafNodeType::ValueType IndexValueType;
+
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+
+            const Coord& origin = mRhsDistNodes[n]->origin();
+
+            LeafNodeType* lhsDistNode = distAcc.probeLeaf(origin);
+            Int32LeafNodeType* lhsIdxNode = idxAcc.probeLeaf(origin);
+
+            DistValueType* lhsDistData = lhsDistNode->buffer().data();
+            IndexValueType* lhsIdxData = lhsIdxNode->buffer().data();
+
+            const DistValueType* rhsDistData = mRhsDistNodes[n]->buffer().data();
+            const IndexValueType* rhsIdxData = mRhsIdxNodes[n]->buffer().data();
+
+
+            for (Index32 offset = 0; offset < LeafNodeType::SIZE; ++offset) {
+
+                if (rhsIdxData[offset] != Int32(util::INVALID_IDX)) {
+
+                    const DistValueType& lhsValue = lhsDistData[offset];
+                    const DistValueType& rhsValue = rhsDistData[offset];
+
+                    if (rhsValue < lhsValue) {
+                        lhsDistNode->setValueOn(offset, rhsValue);
+                        lhsIdxNode->setValueOn(offset, rhsIdxData[offset]);
+                    } else if (math::isExactlyEqual(rhsValue, lhsValue)) {
+                        lhsIdxNode->setValueOn(offset,
+                            std::min(lhsIdxData[offset], rhsIdxData[offset]));
+                    }
+                }
             }
+
+            delete mRhsDistNodes[n];
+            delete mRhsIdxNodes[n];
         }
     }
-}
+
+private:
+
+    TreeType * const mDistTree;
+    Int32TreeType * const mIdxTree;
+
+    LeafNodeType ** const mRhsDistNodes;
+    Int32LeafNodeType ** const mRhsIdxNodes;
+}; // class CombineLeafNodes
 
 
 ////////////////////////////////////////
 
 
-/// MeshVoxelizer
+template<typename TreeType>
+struct StashOriginAndStoreOffset
+{
+    typedef typename TreeType::LeafNodeType LeafNodeType;
+
+    StashOriginAndStoreOffset(std::vector<LeafNodeType*>& nodes, Coord* coordinates)
+        : mNodes(nodes.empty() ? NULL : &nodes[0]), mCoordinates(coordinates)
+    {
+    }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+            Coord& origin = const_cast<Coord&>(mNodes[n]->origin());
+            mCoordinates[n] = origin;
+            origin[0] = static_cast<int>(n);
+        }
+    }
+
+    LeafNodeType ** const mNodes;
+    Coord * const mCoordinates;
+};
+
+
+template<typename TreeType>
+struct RestoreOrigin
+{
+    typedef typename TreeType::LeafNodeType LeafNodeType;
+
+    RestoreOrigin(std::vector<LeafNodeType*>& nodes, const Coord* coordinates)
+        : mNodes(nodes.empty() ? NULL : &nodes[0]), mCoordinates(coordinates)
+    {
+    }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+            Coord& origin = const_cast<Coord&>(mNodes[n]->origin());
+            origin[0] = mCoordinates[n][0];
+        }
+    }
+
+    LeafNodeType         ** const mNodes;
+    Coord           const * const mCoordinates;
+};
+
+
+template<typename TreeType>
+class ComputeNodeConnectivity
+{
+public:
+    typedef typename TreeType::LeafNodeType LeafNodeType;
+
+    ComputeNodeConnectivity(const TreeType& tree, const Coord* coordinates,
+        size_t* offsets, size_t numNodes, const CoordBBox& bbox)
+        : mTree(&tree)
+        , mCoordinates(coordinates)
+        , mOffsets(offsets)
+        , mNumNodes(numNodes)
+        , mBBox(bbox)
+    {
+    }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+
+        size_t* offsetsNextX = mOffsets;
+        size_t* offsetsPrevX = mOffsets + mNumNodes;
+        size_t* offsetsNextY = mOffsets + mNumNodes * 2;
+        size_t* offsetsPrevY = mOffsets + mNumNodes * 3;
+        size_t* offsetsNextZ = mOffsets + mNumNodes * 4;
+        size_t* offsetsPrevZ = mOffsets + mNumNodes * 5;
+
+        tree::ValueAccessor<const TreeType> acc(*mTree);
+        Coord ijk;
+
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+            const Coord& origin = mCoordinates[n];
+            offsetsNextX[n] = findNeighbourNode(acc, origin, Coord(LeafNodeType::DIM, 0, 0));
+            offsetsPrevX[n] = findNeighbourNode(acc, origin, Coord(-LeafNodeType::DIM, 0, 0));
+            offsetsNextY[n] = findNeighbourNode(acc, origin, Coord(0, LeafNodeType::DIM, 0));
+            offsetsPrevY[n] = findNeighbourNode(acc, origin, Coord(0, -LeafNodeType::DIM, 0));
+            offsetsNextZ[n] = findNeighbourNode(acc, origin, Coord(0, 0, LeafNodeType::DIM));
+            offsetsPrevZ[n] = findNeighbourNode(acc, origin, Coord(0, 0, -LeafNodeType::DIM));
+        }
+    }
+
+    size_t findNeighbourNode(tree::ValueAccessor<const TreeType>& acc, const Coord& start, const Coord& step) const {
+
+        Coord ijk = start + step;
+        CoordBBox bbox(mBBox);
+
+        while (bbox.isInside(ijk)) {
+            const LeafNodeType* node = acc.probeConstLeaf(ijk);
+            if (node) return static_cast<size_t>(node->origin()[0]);
+            ijk += step;
+        }
+
+        return boost::integer_traits<size_t>::const_max;
+    }
+
+
+private:
+    // Disallow assignment
+    ComputeNodeConnectivity& operator=(const ComputeNodeConnectivity&);
+
+    TreeType    const * const mTree;
+    Coord       const * const mCoordinates;
+    size_t            * const mOffsets;
+
+    const size_t    mNumNodes;
+    const CoordBBox mBBox;
+}; // class ComputeNodeConnectivity
+
+
+template<typename TreeType>
+struct LeafNodeConnectivityTable {
+
+    enum { INVALID_OFFSET = boost::integer_traits<size_t>::const_max };
+
+    typedef typename TreeType::LeafNodeType LeafNodeType;
+
+    LeafNodeConnectivityTable(TreeType& tree)
+        : mLeafNodes()
+        , mOffsets(NULL)
+    {
+        mLeafNodes.reserve(tree.leafCount());
+        tree.getNodes(mLeafNodes);
+
+        if (mLeafNodes.empty()) return;
+
+        CoordBBox bbox;
+        tree.evalLeafBoundingBox(bbox);
+
+        const tbb::blocked_range<size_t> range(0, mLeafNodes.size());
+
+        // stash the leafnode origin coordinate and temporarily store the
+        // linear offset in the origin.x variable.
+        boost::scoped_array<Coord> coordinates(new Coord[mLeafNodes.size()]);
+        tbb::parallel_for(range, StashOriginAndStoreOffset<TreeType>(mLeafNodes, coordinates.get()));
+
+        // build the leafnode offset table
+        mOffsets.reset(new size_t[mLeafNodes.size() * 6]);
+
+
+        tbb::parallel_for(range,
+            ComputeNodeConnectivity<TreeType>(tree, coordinates.get(), mOffsets.get(), mLeafNodes.size(), bbox));
+
+        // restore the leafnode origin coordinate
+        tbb::parallel_for(range, RestoreOrigin<TreeType>(mLeafNodes, coordinates.get()));
+    }
+
+    size_t size() const { return mLeafNodes.size(); }
+
+    std::vector<LeafNodeType*>& nodes() { return mLeafNodes; }
+    const std::vector<LeafNodeType*>& nodes() const { return mLeafNodes; }
+
+
+    const size_t* offsetsNextX() const { return mOffsets.get(); }
+    const size_t* offsetsPrevX() const { return mOffsets.get() + mLeafNodes.size(); }
+
+    const size_t* offsetsNextY() const { return mOffsets.get() + mLeafNodes.size() * 2; }
+    const size_t* offsetsPrevY() const { return mOffsets.get() + mLeafNodes.size() * 3; }
+
+    const size_t* offsetsNextZ() const { return mOffsets.get() + mLeafNodes.size() * 4; }
+    const size_t* offsetsPrevZ() const { return mOffsets.get() + mLeafNodes.size() * 5; }
+
+private:
+    std::vector<LeafNodeType*> mLeafNodes;
+    boost::scoped_array<size_t> mOffsets;
+}; // struct LeafNodeConnectivityTable
+
+
+template<typename TreeType>
+class SweepExteriorSign
+{
+public:
+
+    enum Axis { X_AXIS = 0, Y_AXIS = 1, Z_AXIS = 2 };
+
+    typedef typename TreeType::ValueType            ValueType;
+    typedef typename TreeType::LeafNodeType         LeafNodeType;
+    typedef LeafNodeConnectivityTable<TreeType>     ConnectivityTable;
+
+    SweepExteriorSign(Axis axis, const std::vector<size_t>& startNodeIndices, ConnectivityTable& connectivity)
+        : mStartNodeIndices(startNodeIndices.empty() ? NULL : &startNodeIndices[0])
+        , mConnectivity(&connectivity)
+        , mAxis(axis)
+    {
+    }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+
+        std::vector<LeafNodeType*>& nodes = mConnectivity->nodes();
+
+        // Z Axis
+        size_t idxA = 0, idxB = 1;
+        Index step = 1;
+
+        const size_t* nextOffsets = mConnectivity->offsetsNextZ();
+        const size_t* prevOffsets = mConnectivity->offsetsPrevZ();
+
+        if (mAxis == Y_AXIS) {
+
+            idxA = 0;
+            idxB = 2;
+            step = LeafNodeType::DIM;
+
+            nextOffsets = mConnectivity->offsetsNextY();
+            prevOffsets = mConnectivity->offsetsPrevY();
+
+        } else if (mAxis == X_AXIS) {
+
+            idxA = 1;
+            idxB = 2;
+            step = LeafNodeType::DIM * LeafNodeType::DIM;
+
+            nextOffsets = mConnectivity->offsetsNextX();
+            prevOffsets = mConnectivity->offsetsPrevX();
+        }
+
+        Coord ijk(0, 0, 0);
+
+        int& a = ijk[idxA];
+        int& b = ijk[idxB];
+
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+
+            size_t startOffset = mStartNodeIndices[n];
+            size_t lastOffset = startOffset;
+
+            Index pos(0);
+
+            for (a = 0; a < int(LeafNodeType::DIM); ++a) {
+                for (b = 0; b < int(LeafNodeType::DIM); ++b) {
+
+                    pos =  LeafNodeType::coordToOffset(ijk);
+                    size_t offset = startOffset;
+
+                    // sweep in +axis direction until a boundary voxel is hit.
+                    while ( offset != ConnectivityTable::INVALID_OFFSET &&
+                            traceVoxelLine(*nodes[offset], pos, step) ) {
+
+                        lastOffset = offset;
+                        offset = nextOffsets[offset];
+                    }
+
+                    // find last leafnode in +axis direction
+                    offset = lastOffset;
+                    while (offset != ConnectivityTable::INVALID_OFFSET) {
+                        lastOffset = offset;
+                        offset = nextOffsets[offset];
+                    }
+
+                    // sweep in -axis direction until a boundary voxel is hit.
+                    offset = lastOffset;
+                    pos += step * (LeafNodeType::DIM - 1);
+                    while ( offset != ConnectivityTable::INVALID_OFFSET &&
+                            traceVoxelLine(*nodes[offset], pos, -step)) {
+                        offset = prevOffsets[offset];
+                    }
+                }
+            }
+        }
+    }
+
+
+    bool traceVoxelLine(LeafNodeType& node, Index pos, Index step) const {
+
+        ValueType* data = node.buffer().data();
+
+        bool isOutside = true;
+
+        for (Index i = 0; i < LeafNodeType::DIM; ++i) {
+
+            ValueType& dist = data[pos];
+
+            if (dist < ValueType(0.0)) {
+                isOutside = true;
+            } else {
+                // Boundary voxel check. (Voxel that intersects the surface)
+                if (!(dist > ValueType(0.75))) isOutside = false;
+
+                if (isOutside) dist = ValueType(-dist);
+            }
+
+            pos += step;
+        }
+
+        return isOutside;
+    }
+
+
+private:
+    size_t              const * const mStartNodeIndices;
+    ConnectivityTable         * const mConnectivity;
+
+    const Axis mAxis;
+}; // class SweepExteriorSign
+
+
+template<typename LeafNodeType>
+inline void
+seedFill(LeafNodeType& node)
+{
+    typedef typename LeafNodeType::ValueType ValueType;
+    typedef std::deque<Index> Queue;
+
+
+    ValueType* data = node.buffer().data();
+
+    // find seed points
+    Queue seedPoints;
+    for (Index pos = 0; pos < LeafNodeType::SIZE; ++pos) {
+        if (data[pos] < 0.0) seedPoints.push_back(pos);
+    }
+
+    if (seedPoints.empty()) return;
+
+    // clear sign information
+    for (Queue::iterator it = seedPoints.begin(); it != seedPoints.end(); ++it) {
+        ValueType& dist = data[*it];
+        dist = -dist;
+    }
+
+    // flood fill
+
+    Coord ijk(0, 0, 0);
+    Index pos(0), nextPos(0);
+
+    while (!seedPoints.empty()) {
+
+        pos = seedPoints.back();
+        seedPoints.pop_back();
+
+        ValueType& dist = data[pos];
+
+        if (!(dist < ValueType(0.0))) {
+
+            dist = -dist; // flip sign
+
+            ijk = LeafNodeType::offsetToLocalCoord(pos);
+
+            if (ijk[0] != 0) { // i - 1, j, k
+                nextPos = pos - LeafNodeType::DIM * LeafNodeType::DIM;
+                if (data[nextPos] > ValueType(0.75)) seedPoints.push_back(nextPos);
+            }
+
+            if (ijk[0] != (LeafNodeType::DIM - 1)) { // i + 1, j, k
+                nextPos = pos + LeafNodeType::DIM * LeafNodeType::DIM;
+                if (data[nextPos] > ValueType(0.75)) seedPoints.push_back(nextPos);
+            }
+
+            if (ijk[1] != 0) { // i, j - 1, k
+                nextPos = pos - LeafNodeType::DIM;
+                if (data[nextPos] > ValueType(0.75)) seedPoints.push_back(nextPos);
+            }
+
+            if (ijk[1] != (LeafNodeType::DIM - 1)) { // i, j + 1, k
+                nextPos = pos + LeafNodeType::DIM;
+                if (data[nextPos] > ValueType(0.75)) seedPoints.push_back(nextPos);
+            }
+
+            if (ijk[2] != 0) { // i, j, k - 1
+                nextPos = pos - 1;
+                if (data[nextPos] > ValueType(0.75)) seedPoints.push_back(nextPos);
+            }
+
+            if (ijk[2] != (LeafNodeType::DIM - 1)) { // i, j, k + 1
+                nextPos = pos + 1;
+                if (data[nextPos] > ValueType(0.75)) seedPoints.push_back(nextPos);
+            }
+        }
+    }
+} // seedFill()
+
+
+template<typename LeafNodeType>
+inline bool
+scanFill(LeafNodeType& node)
+{
+    bool updatedNode = false;
+
+    typedef typename LeafNodeType::ValueType ValueType;
+    ValueType* data = node.buffer().data();
+
+    Coord ijk(0, 0, 0);
+
+    bool updatedSign = true;
+    while (updatedSign) {
+
+        updatedSign = false;
+
+        for (Index pos = 0; pos < LeafNodeType::SIZE; ++pos) {
+
+            ValueType& dist = data[pos];
+
+            if (!(dist < ValueType(0.0)) && dist > ValueType(0.75)) {
+
+                ijk = LeafNodeType::offsetToLocalCoord(pos);
+
+                // i, j, k - 1
+                if (ijk[2] != 0 && data[pos - 1] < ValueType(0.0)) {
+                    updatedSign = true;
+                    dist = ValueType(-dist);
+
+                // i, j, k + 1
+                } else if (ijk[2] != (LeafNodeType::DIM - 1) && data[pos + 1] < ValueType(0.0)) {
+                    updatedSign = true;
+                    dist = ValueType(-dist);
+
+                // i, j - 1, k
+                } else if (ijk[1] != 0 && data[pos - LeafNodeType::DIM] < ValueType(0.0)) {
+                    updatedSign = true;
+                    dist = ValueType(-dist);
+
+                // i, j + 1, k
+                } else if (ijk[1] != (LeafNodeType::DIM - 1) && data[pos + LeafNodeType::DIM] < ValueType(0.0)) {
+                    updatedSign = true;
+                    dist = ValueType(-dist);
+
+                // i - 1, j, k
+                } else if (ijk[0] != 0 && data[pos - LeafNodeType::DIM * LeafNodeType::DIM] < ValueType(0.0)) {
+                    updatedSign = true;
+                    dist = ValueType(-dist);
+
+                // i + 1, j, k
+                } else if (ijk[0] != (LeafNodeType::DIM - 1) && data[pos + LeafNodeType::DIM * LeafNodeType::DIM] < ValueType(0.0)) {
+                    updatedSign = true;
+                    dist = ValueType(-dist);
+                }
+            }
+        } // end value loop
+
+        updatedNode |= updatedSign;
+    } // end update loop
+
+    return updatedNode;
+} // scanFill()
+
+
+template<typename TreeType>
+class SeedFillExteriorSign
+{
+public:
+    typedef typename TreeType::ValueType            ValueType;
+    typedef typename TreeType::LeafNodeType         LeafNodeType;
+
+    SeedFillExteriorSign(std::vector<LeafNodeType*>& nodes, bool* changedNodeMask)
+        : mNodes(nodes.empty() ? NULL : &nodes[0])
+        , mChangedNodeMask(changedNodeMask)
+    {
+    }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+            if (mChangedNodeMask[n]) {
+                //seedFill(*mNodes[n]);
+                mChangedNodeMask[n] = scanFill(*mNodes[n]);
+            }
+        }
+    }
+
+    LeafNodeType    ** const mNodes;
+    bool             * const mChangedNodeMask;
+};
+
+
+template<typename ValueType>
+struct FillArray
+{
+    FillArray(ValueType* array, const ValueType v) : mArray(array), mValue(v) { }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+        const ValueType v = mValue;
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+            mArray[n] = v;
+        }
+    }
+
+    ValueType * const mArray;
+    const ValueType mValue;
+};
+
+
+template<typename ValueType>
+inline void
+fillArray(ValueType* array, const ValueType val, const size_t length)
+{
+    const size_t grainSize = length / tbb::task_scheduler_init::default_num_threads();
+    const tbb::blocked_range<size_t> range(0, length, grainSize);
+    tbb::parallel_for(range, FillArray<ValueType>(array, val), tbb::simple_partitioner());
+}
+
+
+template<typename TreeType>
+class SyncVoxelMask
+{
+public:
+    typedef typename TreeType::ValueType            ValueType;
+    typedef typename TreeType::LeafNodeType         LeafNodeType;
+
+    SyncVoxelMask(std::vector<LeafNodeType*>& nodes, const bool* changedNodeMask,  bool* changedVoxelMask)
+        : mNodes(nodes.empty() ? NULL : &nodes[0])
+        , mChangedNodeMask(changedNodeMask)
+        , mChangedVoxelMask(changedVoxelMask)
+    {
+    }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+
+            if (mChangedNodeMask[n]) {
+                bool* mask = &mChangedVoxelMask[n * LeafNodeType::SIZE];
+
+                ValueType* data = mNodes[n]->buffer().data();
+
+                for (Index pos = 0; pos < LeafNodeType::SIZE; ++pos) {
+                    if (mask[pos]) {
+                        data[pos] = ValueType(-data[pos]);
+                        mask[pos] = false;
+                    }
+                }
+            }
+        }
+    }
+
+    LeafNodeType      ** const mNodes;
+    bool         const * const mChangedNodeMask;
+    bool          * const mChangedVoxelMask;
+};
+
+
+template<typename TreeType>
+class SeedPoints
+{
+public:
+    typedef typename TreeType::ValueType            ValueType;
+    typedef typename TreeType::LeafNodeType         LeafNodeType;
+    typedef LeafNodeConnectivityTable<TreeType>     ConnectivityTable;
+
+    SeedPoints(ConnectivityTable& connectivity, bool* changedNodeMask, bool* nodeMask, bool* changedVoxelMask)
+        : mConnectivity(&connectivity)
+        , mChangedNodeMask(changedNodeMask)
+        , mNodeMask(nodeMask)
+        , mChangedVoxelMask(changedVoxelMask)
+    {
+    }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+
+            if (!mChangedNodeMask[n]) {
+
+                bool changedValue = false;
+
+                changedValue |= processZ(n, /*firstFace=*/true);
+                changedValue |= processZ(n, /*firstFace=*/false);
+
+                changedValue |= processY(n, /*firstFace=*/true);
+                changedValue |= processY(n, /*firstFace=*/false);
+
+                changedValue |= processX(n, /*firstFace=*/true);
+                changedValue |= processX(n, /*firstFace=*/false);
+
+                mNodeMask[n] = changedValue;
+            }
+        }
+    }
+
+
+    bool processZ(const size_t n, bool firstFace) const
+    {
+        const size_t offset = firstFace ? mConnectivity->offsetsPrevZ()[n] : mConnectivity->offsetsNextZ()[n];
+        if (offset != ConnectivityTable::INVALID_OFFSET && mChangedNodeMask[offset]) {
+
+            bool* mask = &mChangedVoxelMask[n * LeafNodeType::SIZE];
+
+            const ValueType* lhsData = mConnectivity->nodes()[n]->buffer().data();
+            const ValueType* rhsData = mConnectivity->nodes()[offset]->buffer().data();
+
+            const Index lastOffset = LeafNodeType::DIM - 1;
+            const Index lhsOffset = firstFace ? 0 : lastOffset, rhsOffset = firstFace ? lastOffset : 0;
+
+            Index tmpPos(0), pos(0);
+            bool changedValue = false;
+
+            for (Index x = 0; x < LeafNodeType::DIM; ++x) {
+                tmpPos = x << (2 * LeafNodeType::LOG2DIM);
+                for (Index y = 0; y < LeafNodeType::DIM; ++y) {
+                    pos = tmpPos + (y << LeafNodeType::LOG2DIM);
+
+                    if (lhsData[pos + lhsOffset] > ValueType(0.75)) {
+                        if (rhsData[pos + rhsOffset] < ValueType(0.0)) {
+                            changedValue = true;
+                            mask[pos + lhsOffset] = true;
+                        }
+                    }
+                }
+            }
+
+            return changedValue;
+        }
+
+        return false;
+    }
+
+    bool processY(const size_t n, bool firstFace) const
+    {
+        const size_t offset = firstFace ? mConnectivity->offsetsPrevY()[n] : mConnectivity->offsetsNextY()[n];
+        if (offset != ConnectivityTable::INVALID_OFFSET && mChangedNodeMask[offset]) {
+
+            bool* mask = &mChangedVoxelMask[n * LeafNodeType::SIZE];
+
+            const ValueType* lhsData = mConnectivity->nodes()[n]->buffer().data();
+            const ValueType* rhsData = mConnectivity->nodes()[offset]->buffer().data();
+
+            const Index lastOffset = LeafNodeType::DIM * (LeafNodeType::DIM - 1);
+            const Index lhsOffset = firstFace ? 0 : lastOffset, rhsOffset = firstFace ? lastOffset : 0;
+
+            Index tmpPos(0), pos(0);
+            bool changedValue = false;
+
+            for (Index x = 0; x < LeafNodeType::DIM; ++x) {
+                tmpPos = x << (2 * LeafNodeType::LOG2DIM);
+                for (Index z = 0; z < LeafNodeType::DIM; ++z) {
+                    pos = tmpPos + z;
+
+                    if (lhsData[pos + lhsOffset] > ValueType(0.75)) {
+                        if (rhsData[pos + rhsOffset] < ValueType(0.0)) {
+                            changedValue = true;
+                            mask[pos + lhsOffset] = true;
+                        }
+                    }
+                }
+            }
+
+            return changedValue;
+        }
+
+        return false;
+    }
+
+    bool processX(const size_t n, bool firstFace) const
+    {
+        const size_t offset = firstFace ? mConnectivity->offsetsPrevX()[n] : mConnectivity->offsetsNextX()[n];
+        if (offset != ConnectivityTable::INVALID_OFFSET && mChangedNodeMask[offset]) {
+
+            bool* mask = &mChangedVoxelMask[n * LeafNodeType::SIZE];
+
+            const ValueType* lhsData = mConnectivity->nodes()[n]->buffer().data();
+            const ValueType* rhsData = mConnectivity->nodes()[offset]->buffer().data();
+
+            const Index lastOffset =  LeafNodeType::DIM * LeafNodeType::DIM * (LeafNodeType::DIM - 1);
+            const Index lhsOffset = firstFace ? 0 : lastOffset, rhsOffset = firstFace ? lastOffset : 0;
+
+            Index tmpPos(0), pos(0);
+            bool changedValue = false;
+
+            for (Index y = 0; y < LeafNodeType::DIM; ++y) {
+                tmpPos = y << LeafNodeType::LOG2DIM;
+                for (Index z = 0; z < LeafNodeType::DIM; ++z) {
+                    pos = tmpPos + z;
+
+                    if (lhsData[pos + lhsOffset] > ValueType(0.75)) {
+                        if (rhsData[pos + rhsOffset] < ValueType(0.0)) {
+                            changedValue = true;
+                            mask[pos + lhsOffset] = true;
+                        }
+                    }
+                }
+            }
+
+            return changedValue;
+        }
+
+        return false;
+    }
+
+    ConnectivityTable   * const mConnectivity;
+    bool                * const mChangedNodeMask;
+    bool                * const mNodeMask;
+    bool                * const mChangedVoxelMask;
+};
+
+
+////////////////////////////////////////
+
+template<typename TreeType, typename MeshDataAdapter>
+struct ComputeIntersectingVoxelSign
+{
+    typedef typename TreeType::ValueType                            ValueType;
+    typedef typename TreeType::LeafNodeType                         LeafNodeType;
+    typedef typename TreeType::template ValueConverter<Int32>::Type Int32TreeType;
+    typedef typename Int32TreeType::LeafNodeType                    Int32LeafNodeType;
+
+    typedef std::pair<boost::shared_array<Vec3d>, boost::shared_array<bool> >   LocalData;
+    typedef tbb::enumerable_thread_specific<LocalData>                          LocalDataTable;
+
+    ComputeIntersectingVoxelSign(
+        std::vector<LeafNodeType*>& distNodes,
+        const TreeType& distTree,
+        const Int32TreeType& indexTree,
+        const MeshDataAdapter& mesh)
+        : mDistNodes(distNodes.empty() ? NULL : &distNodes[0])
+        , mDistTree(&distTree)
+        , mIndexTree(&indexTree)
+        , mMesh(&mesh)
+        , mLocalDataTable(new LocalDataTable())
+    {
+    }
+
+
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+
+        tree::ValueAccessor<const TreeType> distAcc(*mDistTree);
+        tree::ValueAccessor<const Int32TreeType> idxAcc(*mIndexTree);
+
+        ValueType nval;
+        CoordBBox bbox;
+        Index xPos(0), yPos(0);
+        Coord ijk, nijk, nodeMin, nodeMax;
+        Vec3d cp, xyz, nxyz, dir1, dir2;
+
+        LocalData& localData = mLocalDataTable->local();
+
+        boost::shared_array<Vec3d>& points = localData.first;
+        if (!points) points.reset(new Vec3d[LeafNodeType::SIZE * 2]);
+
+        boost::shared_array<bool>& mask = localData.second;
+        if (!mask) mask.reset(new bool[LeafNodeType::SIZE]);
+
+
+        typename LeafNodeType::ValueOnCIter it;
+
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+
+            LeafNodeType& node = *mDistNodes[n];
+            ValueType* data = node.buffer().data();
+
+            const Int32LeafNodeType* idxNode = idxAcc.probeConstLeaf(node.origin());
+            const Int32* idxData = idxNode->buffer().data();
+
+            nodeMin = node.origin();
+            nodeMax = nodeMin.offsetBy(LeafNodeType::DIM - 1);
+
+            // reset computed voxel mask.
+            memset(mask.get(), 0, sizeof(bool) * LeafNodeType::SIZE);
+
+            for (it = node.cbeginValueOn(); it; ++it) {
+                Index pos = it.pos();
+
+                ValueType& dist = data[pos];
+                if (dist < 0.0 || dist > 0.75) continue;
+
+                ijk = node.offsetToGlobalCoord(pos);
+
+                xyz[0] = double(ijk[0]);
+                xyz[1] = double(ijk[1]);
+                xyz[2] = double(ijk[2]);
+
+
+                bbox.min() = Coord::maxComponent(ijk.offsetBy(-1), nodeMin);
+                bbox.max() = Coord::minComponent(ijk.offsetBy(1), nodeMax);
+
+                bool flipSign = false;
+
+                for (nijk[0] = bbox.min()[0]; nijk[0] <= bbox.max()[0] && !flipSign; ++nijk[0]) {
+                    xPos = (nijk[0] & (LeafNodeType::DIM - 1u)) << (2 * LeafNodeType::LOG2DIM);
+                    for (nijk[1] = bbox.min()[1]; nijk[1] <= bbox.max()[1] && !flipSign; ++nijk[1]) {
+                        yPos = xPos + ((nijk[1] & (LeafNodeType::DIM - 1u)) << LeafNodeType::LOG2DIM);
+                        for (nijk[2] = bbox.min()[2]; nijk[2] <= bbox.max()[2]; ++nijk[2]) {
+                            pos = yPos + (nijk[2] & (LeafNodeType::DIM - 1u));
+
+                            const Int32& polyIdx = idxData[pos];
+
+                            if (polyIdx == Int32(util::INVALID_IDX) || !(data[pos] < -0.75)) continue;
+
+                            const Index pointIndex = pos * 2;
+
+                            if (!mask[pos]) {
+
+                                mask[pos] = true;
+
+                                nxyz[0] = double(nijk[0]);
+                                nxyz[1] = double(nijk[1]);
+                                nxyz[2] = double(nijk[2]);
+
+                                Vec3d& point = points[pointIndex];
+
+                                point = closestPoint(nxyz, polyIdx);
+
+                                Vec3d& direction = points[pointIndex + 1];
+                                direction = nxyz - point;
+                                direction.normalize();
+                            }
+
+                            dir1 = xyz - points[pointIndex];
+                            dir1.normalize();
+
+                            if (points[pointIndex + 1].dot(dir1) > 0.0) {
+                                flipSign = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (flipSign) {
+                    dist = -dist;
+                } else {
+                    for (Int32 m = 0; m < 26; ++m) {
+                        nijk = ijk + util::COORD_OFFSETS[m];
+
+                        if (!bbox.isInside(nijk) && distAcc.probeValue(nijk, nval) && nval < -0.75) {
+                            nxyz[0] = double(nijk[0]);
+                            nxyz[1] = double(nijk[1]);
+                            nxyz[2] = double(nijk[2]);
+
+                            cp = closestPoint(nxyz, idxAcc.getValue(nijk));
+
+                            dir1 = xyz - cp;
+                            dir1.normalize();
+
+                            dir2 = nxyz - cp;
+                            dir2.normalize();
+
+                            if (dir2.dot(dir1) > 0.0) {
+                                dist = -dist;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+            } // active voxel loop
+        } // leaf node loop
+    }
+
+private:
+
+    Vec3d closestPoint(const Vec3d& center, Int32 polyIdx) const
+    {
+        Vec3d a, b, c, cp, uvw;
+
+        const size_t polygon = size_t(polyIdx);
+        mMesh->getIndexSpacePoint(polygon, 0, a);
+        mMesh->getIndexSpacePoint(polygon, 1, b);
+        mMesh->getIndexSpacePoint(polygon, 2, c);
+
+        cp = closestPointOnTriangleToPoint(a, c, b, center, uvw);
+
+        if (4 == mMesh->vertexCount(polygon)) {
+
+            mMesh->getIndexSpacePoint(polygon, 3, b);
+
+            c = closestPointOnTriangleToPoint(a, b, c, center, uvw);
+
+            if ((center - c).lengthSqr() < (center - cp).lengthSqr()) {
+                cp = c;
+            }
+        }
+
+        return cp;
+    }
+
+
+    LeafNodeType         ** const mDistNodes;
+    TreeType        const * const mDistTree;
+    Int32TreeType   const * const mIndexTree;
+    MeshDataAdapter const * const mMesh;
+
+    boost::shared_ptr<LocalDataTable> mLocalDataTable;
+}; // ComputeIntersectingVoxelSign
+
+
+////////////////////////////////////////
+
+
+template<typename LeafNodeType>
+inline void
+maskNodeInternalNeighbours(const Index pos, bool (&mask)[26])
+{
+    typedef LeafNodeType NodeT;
+
+    const Coord ijk = NodeT::offsetToLocalCoord(pos);
+
+    // Face adjacent neighbours
+    // i+1, j, k
+    mask[0] = ijk[0] != (NodeT::DIM - 1);
+    // i-1, j, k
+    mask[1] = ijk[0] != 0;
+    // i, j+1, k
+    mask[2] = ijk[1] != (NodeT::DIM - 1);
+    // i, j-1, k
+    mask[3] = ijk[1] != 0;
+    // i, j, k+1
+    mask[4] = ijk[2] != (NodeT::DIM - 1);
+    // i, j, k-1
+    mask[5] = ijk[2] != 0;
+
+    // Edge adjacent neighbour
+    // i+1, j, k-1
+    mask[6] = mask[0] && mask[5];
+    // i-1, j, k-1
+    mask[7] = mask[1] && mask[5];
+    // i+1, j, k+1
+    mask[8] = mask[0] && mask[4];
+    // i-1, j, k+1
+    mask[9] = mask[1] && mask[4];
+    // i+1, j+1, k
+    mask[10] = mask[0] && mask[2];
+    // i-1, j+1, k
+    mask[11] = mask[1] && mask[2];
+    // i+1, j-1, k
+    mask[12] = mask[0] && mask[3];
+    // i-1, j-1, k
+    mask[13] = mask[1] && mask[3];
+    // i, j-1, k+1
+    mask[14] = mask[3] && mask[4];
+    // i, j-1, k-1
+    mask[15] = mask[3] && mask[5];
+    // i, j+1, k+1
+    mask[16] = mask[2] && mask[4];
+    // i, j+1, k-1
+    mask[17] = mask[2] && mask[5];
+
+    // Corner adjacent neighbours
+    // i-1, j-1, k-1
+    mask[18] = mask[1] && mask[3] && mask[5];
+    // i-1, j-1, k+1
+    mask[19] = mask[1] && mask[3] && mask[4];
+    // i+1, j-1, k+1
+    mask[20] = mask[0] && mask[3] && mask[4];
+    // i+1, j-1, k-1
+    mask[21] = mask[0] && mask[3] && mask[5];
+    // i-1, j+1, k-1
+    mask[22] = mask[1] && mask[2] && mask[5];
+    // i-1, j+1, k+1
+    mask[23] = mask[1] && mask[2] && mask[4];
+    // i+1, j+1, k+1
+    mask[24] = mask[0] && mask[2] && mask[4];
+    // i+1, j+1, k-1
+    mask[25] = mask[0] && mask[2] && mask[5];
+}
+
+
+template<typename Compare, typename LeafNodeType>
+inline bool
+checkNeighbours(const Index pos, const typename LeafNodeType::ValueType * data, bool (&mask)[26])
+{
+    typedef LeafNodeType NodeT;
+
+    // i, j, k - 1
+    if (mask[5] && Compare::check(data[pos - 1]))                                         return true;
+    // i, j, k + 1
+    if (mask[4] && Compare::check(data[pos + 1]))                                         return true;
+    // i, j - 1, k
+    if (mask[3] && Compare::check(data[pos - NodeT::DIM]))                                return true;
+    // i, j + 1, k
+    if (mask[2] && Compare::check(data[pos + NodeT::DIM]))                                return true;
+    // i - 1, j, k
+    if (mask[1] && Compare::check(data[pos - NodeT::DIM * NodeT::DIM]))                   return true;
+    // i + 1, j, k
+    if (mask[0] && Compare::check(data[pos + NodeT::DIM * NodeT::DIM]))                   return true;
+    // i+1, j, k-1
+    if (mask[6] && Compare::check(data[pos + NodeT::DIM * NodeT::DIM]))                   return true;
+    // i-1, j, k-1
+    if (mask[7] && Compare::check(data[pos - NodeT::DIM * NodeT::DIM - 1]))               return true;
+    // i+1, j, k+1
+    if (mask[8] && Compare::check(data[pos + NodeT::DIM * NodeT::DIM + 1]))               return true;
+    // i-1, j, k+1
+    if (mask[9] && Compare::check(data[pos - NodeT::DIM * NodeT::DIM + 1]))               return true;
+    // i+1, j+1, k
+    if (mask[10] && Compare::check(data[pos + NodeT::DIM * NodeT::DIM + NodeT::DIM]))     return true;
+    // i-1, j+1, k
+    if (mask[11] && Compare::check(data[pos - NodeT::DIM * NodeT::DIM + NodeT::DIM]))     return true;
+    // i+1, j-1, k
+    if (mask[12] && Compare::check(data[pos + NodeT::DIM * NodeT::DIM - NodeT::DIM]))     return true;
+    // i-1, j-1, k
+    if (mask[13] && Compare::check(data[pos - NodeT::DIM * NodeT::DIM - NodeT::DIM]))     return true;
+    // i, j-1, k+1
+    if (mask[14] && Compare::check(data[pos - NodeT::DIM + 1]))                           return true;
+    // i, j-1, k-1
+    if (mask[15] && Compare::check(data[pos - NodeT::DIM - 1]))                           return true;
+    // i, j+1, k+1
+    if (mask[16] && Compare::check(data[pos + NodeT::DIM + 1]))                           return true;
+    // i, j+1, k-1
+    if (mask[17] && Compare::check(data[pos + NodeT::DIM - 1]))                           return true;
+    // i-1, j-1, k-1
+    if (mask[18] && Compare::check(data[pos - NodeT::DIM * NodeT::DIM - NodeT::DIM - 1])) return true;
+    // i-1, j-1, k+1
+    if (mask[19] && Compare::check(data[pos - NodeT::DIM * NodeT::DIM - NodeT::DIM + 1])) return true;
+    // i+1, j-1, k+1
+    if (mask[20] && Compare::check(data[pos + NodeT::DIM * NodeT::DIM - NodeT::DIM + 1])) return true;
+    // i+1, j-1, k-1
+    if (mask[21] && Compare::check(data[pos + NodeT::DIM * NodeT::DIM - NodeT::DIM - 1])) return true;
+    // i-1, j+1, k-1
+    if (mask[22] && Compare::check(data[pos - NodeT::DIM * NodeT::DIM + NodeT::DIM - 1])) return true;
+    // i-1, j+1, k+1
+    if (mask[23] && Compare::check(data[pos - NodeT::DIM * NodeT::DIM + NodeT::DIM + 1])) return true;
+    // i+1, j+1, k+1
+    if (mask[24] && Compare::check(data[pos + NodeT::DIM * NodeT::DIM + NodeT::DIM + 1])) return true;
+    // i+1, j+1, k-1
+    if (mask[25] && Compare::check(data[pos + NodeT::DIM * NodeT::DIM + NodeT::DIM - 1])) return true;
+
+    return false;
+}
+
+
+template<typename Compare, typename AccessorType>
+inline bool
+checkNeighbours(const Coord& ijk, AccessorType& acc, bool (&mask)[26])
+{
+    for (Int32 m = 0; m < 26; ++m) {
+        if (!mask[m] && Compare::check(acc.getValue(ijk + util::COORD_OFFSETS[m]))) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+template<typename TreeType>
+struct ValidateIntersectingVoxels
+{
+    typedef typename TreeType::ValueType            ValueType;
+    typedef typename TreeType::LeafNodeType         LeafNodeType;
+
+    struct IsNegative { static bool check(const ValueType v) { return v < ValueType(0.0); } };
+
+    ValidateIntersectingVoxels(TreeType& tree, std::vector<LeafNodeType*>& nodes)
+        : mTree(&tree)
+        , mNodes(nodes.empty() ? NULL : &nodes[0])
+    {
+    }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const
+    {
+        tree::ValueAccessor<const TreeType> acc(*mTree);
+        bool neighbourMask[26];
+
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+
+            LeafNodeType& node = *mNodes[n];
+            ValueType* data = node.buffer().data();
+
+            typename LeafNodeType::ValueOnCIter it;
+            for (it = node.cbeginValueOn(); it; ++it) {
+
+                const Index pos = it.pos();
+
+                ValueType& dist = data[pos];
+                if (dist < 0.0 || dist > 0.75) continue;
+
+                // Mask node internal neighbours
+                maskNodeInternalNeighbours<LeafNodeType>(pos, neighbourMask);
+
+                const bool hasNegativeNeighbour =
+                    checkNeighbours<IsNegative, LeafNodeType>(pos, data, neighbourMask) ||
+                    checkNeighbours<IsNegative>(node.offsetToGlobalCoord(pos), acc, neighbourMask);
+
+                if (!hasNegativeNeighbour) {
+                    // push over boundary voxel distance
+                    dist = ValueType(0.75) + Tolerance<ValueType>::epsilon();
+                }
+            }
+        }
+    }
+
+    TreeType         * const mTree;
+    LeafNodeType    ** const mNodes;
+}; // ValidateIntersectingVoxels
+
+
+template<typename TreeType>
+struct RemoveSelfIntersectingSurface
+{
+    typedef typename TreeType::ValueType            ValueType;
+    typedef typename TreeType::LeafNodeType         LeafNodeType;
+    typedef typename TreeType::template ValueConverter<Int32>::Type Int32TreeType;
+
+    struct Comp { static bool check(const ValueType v) { return !(v > ValueType(0.75)); } };
+
+    RemoveSelfIntersectingSurface(std::vector<LeafNodeType*>& nodes,
+        TreeType& distTree, Int32TreeType& indexTree)
+        : mNodes(nodes.empty() ? NULL : &nodes[0])
+        , mDistTree(&distTree)
+        , mIndexTree(&indexTree)
+    {
+    }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const
+    {
+        tree::ValueAccessor<const TreeType> distAcc(*mDistTree);
+        tree::ValueAccessor<Int32TreeType> idxAcc(*mIndexTree);
+        bool neighbourMask[26];
+
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+
+            LeafNodeType& distNode = *mNodes[n];
+            ValueType* data = distNode.buffer().data();
+
+            typename Int32TreeType::LeafNodeType* idxNode =
+                idxAcc.probeLeaf(distNode.origin());
+
+            typename LeafNodeType::ValueOnCIter it;
+            for (it = distNode.cbeginValueOn(); it; ++it) {
+
+                const Index pos = it.pos();
+
+                if (!(data[pos] > 0.75)) continue;
+
+                // Mask node internal neighbours
+                maskNodeInternalNeighbours<LeafNodeType>(pos, neighbourMask);
+
+                const bool hasBoundaryNeighbour =
+                    checkNeighbours<Comp, LeafNodeType>(pos, data, neighbourMask) ||
+                    checkNeighbours<Comp>(distNode.offsetToGlobalCoord(pos), distAcc, neighbourMask);
+
+                if (!hasBoundaryNeighbour) {
+                    distNode.setValueOff(pos);
+                    idxNode->setValueOff(pos);
+                }
+            }
+        }
+    }
+
+    LeafNodeType   * * const mNodes;
+    TreeType         * const mDistTree;
+    Int32TreeType    * const mIndexTree;
+}; // RemoveSelfIntersectingSurface
+
+
+////////////////////////////////////////
+
+
+template<typename NodeType>
+struct ReleaseChildNodes
+{
+    ReleaseChildNodes(NodeType ** nodes) : mNodes(nodes) {}
+
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+
+        typedef typename NodeType::NodeMaskType NodeMaskType;
+
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+            const_cast<NodeMaskType&>(mNodes[n]->getChildMask()).setOff();
+        }
+    }
+
+    NodeType ** const mNodes;
+};
+
+
+template<typename TreeType>
+inline void
+releaseLeafNodes(TreeType& tree)
+{
+    typedef typename TreeType::RootNodeType         RootNodeType;
+    typedef typename RootNodeType::NodeChainType    NodeChainType;
+    typedef typename boost::mpl::at<NodeChainType, boost::mpl::int_<1> >::type InternalNodeType;
+
+    std::vector<InternalNodeType*> nodes;
+    tree.getNodes(nodes);
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
+        ReleaseChildNodes<InternalNodeType>(nodes.empty() ? NULL : &nodes[0]));
+}
+
+
+template<typename TreeType>
+struct StealUniqueLeafNodes
+{
+    typedef typename TreeType::LeafNodeType LeafNodeType;
+
+    StealUniqueLeafNodes(TreeType& lhsTree, TreeType& rhsTree,
+        std::vector<LeafNodeType*>& overlappingNodes)
+        : mLhsTree(&lhsTree)
+        , mRhsTree(&rhsTree)
+        , mNodes(&overlappingNodes)
+    {
+    }
+
+    void operator()() const {
+
+        std::vector<LeafNodeType*> rhsLeafNodes;
+
+        rhsLeafNodes.reserve(mRhsTree->leafCount());
+        //mRhsTree->getNodes(rhsLeafNodes);
+        //releaseLeafNodes(*mRhsTree);
+        mRhsTree->stealNodes(rhsLeafNodes);
+
+        tree::ValueAccessor<TreeType> acc(*mLhsTree);
+
+        for (size_t n = 0, N = rhsLeafNodes.size(); n < N; ++n) {
+            if (!acc.probeLeaf(rhsLeafNodes[n]->origin())) {
+                acc.addLeaf(rhsLeafNodes[n]);
+            } else {
+                mNodes->push_back(rhsLeafNodes[n]);
+            }
+        }
+    }
+
+private:
+    TreeType * const mLhsTree;
+    TreeType * const mRhsTree;
+    std::vector<LeafNodeType*> * const mNodes;
+};
+
+
+template<typename DistTreeType, typename IndexTreeType>
+inline void
+combineData(DistTreeType& lhsDist, IndexTreeType& lhsIdx,
+    DistTreeType& rhsDist, IndexTreeType& rhsIdx)
+{
+    typedef typename DistTreeType::LeafNodeType     DistLeafNodeType;
+    typedef typename IndexTreeType::LeafNodeType    IndexLeafNodeType;
+
+    std::vector<DistLeafNodeType*>  overlappingDistNodes;
+    std::vector<IndexLeafNodeType*> overlappingIdxNodes;
+
+    // Steal unique leafnodes
+    tbb::task_group tasks;
+    tasks.run(StealUniqueLeafNodes<DistTreeType>(lhsDist, rhsDist, overlappingDistNodes));
+    tasks.run(StealUniqueLeafNodes<IndexTreeType>(lhsIdx, rhsIdx, overlappingIdxNodes));
+    tasks.wait();
+
+    // Combine overlapping leaf nodes
+    if (!overlappingDistNodes.empty() && !overlappingIdxNodes.empty()) {
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, overlappingDistNodes.size()),
+            CombineLeafNodes<DistTreeType>(lhsDist, lhsIdx, &overlappingDistNodes[0], &overlappingIdxNodes[0]));
+    }
+}
+
+
 /// @brief TBB body object to voxelize a mesh of triangles and/or quads into a collection
 /// of VDB grids, namely a squared distance grid, a closest primitive grid and an
 /// intersecting voxels grid (masks the mesh intersecting voxels)
 /// @note Only the leaf nodes that intersect the mesh are allocated, and only voxels in
 /// a narrow band (of two to three voxels in proximity to the mesh's surface) are activated.
 /// They are populated with distance values and primitive indices.
-template<typename FloatTreeT, typename InterruptT = util::NullInterrupter>
-class MeshVoxelizer
-{
-public:
-    typedef typename FloatTreeT::ValueType                              FloatValueT;
-    typedef typename FloatTreeT::LeafNodeType                           FloatLeafT;
-    typedef typename tree::ValueAccessor<FloatTreeT>                    FloatAccessorT;
-    typedef typename FloatTreeT::template ValueConverter<Int32>::Type   IntTreeT;
-    typedef typename IntTreeT::LeafNodeType                             IntLeafT;
-    typedef typename tree::ValueAccessor<IntTreeT>                      IntAccessorT;
-    typedef typename FloatTreeT::template ValueConverter<bool>::Type    BoolTreeT;
-    typedef typename BoolTreeT::LeafNodeType                            BoolLeafT;
-    typedef typename tree::ValueAccessor<BoolTreeT>                     BoolAccessorT;
+template<typename TreeType>
+struct VoxelizationData {
+
+    typedef boost::scoped_ptr<VoxelizationData>                         Ptr;
+    typedef typename TreeType::ValueType                                ValueType;
+
+    typedef typename TreeType::template ValueConverter<Int32>::Type         Int32TreeType;
+    typedef typename TreeType::template ValueConverter<unsigned char>::Type UCharTreeType;
+
+    typedef tree::ValueAccessor<TreeType>       FloatTreeAcc;
+    typedef tree::ValueAccessor<Int32TreeType>  Int32TreeAcc;
+    typedef tree::ValueAccessor<UCharTreeType>  UCharTreeAcc;
 
 
-    MeshVoxelizer(const std::vector<Vec3s>& pointList,
-        const std::vector<Vec4I>& polygonList, InterruptT *interrupter = NULL);
+    VoxelizationData()
+        : distTree(std::numeric_limits<ValueType>::max())
+        , distAcc(distTree)
+        , indexTree(Int32(util::INVALID_IDX))
+        , indexAcc(indexTree)
+        , primIdTree(MaxPrimId)
+        , primIdAcc(primIdTree)
+        , mPrimCount(0)
+    {
+    }
 
-    ~MeshVoxelizer() {}
+    TreeType        distTree;
+    FloatTreeAcc    distAcc;
 
-    void run(bool threaded = true);
+    Int32TreeType   indexTree;
+    Int32TreeAcc    indexAcc;
 
-    MeshVoxelizer(MeshVoxelizer<FloatTreeT, InterruptT>& rhs, tbb::split);
-    void operator() (const tbb::blocked_range<size_t> &range);
-    void join(MeshVoxelizer<FloatTreeT, InterruptT>& rhs);
+    UCharTreeType   primIdTree;
+    UCharTreeAcc    primIdAcc;
 
-    FloatTreeT& sqrDistTree() { return mSqrDistTree; }
-    IntTreeT& primIndexTree() { return mPrimIndexTree; }
-    BoolTreeT& intersectionTree() { return mIntersectionTree; }
+    unsigned char getNewPrimId() {
+
+        if (mPrimCount == MaxPrimId || primIdTree.leafCount() > 1000) {
+            mPrimCount = 0;
+            primIdTree.clear();
+        }
+
+        return mPrimCount++;
+    }
 
 private:
-    // disallow copy by assignment
-    void operator=(const MeshVoxelizer<FloatTreeT, InterruptT>&) {}
-    bool wasInterrupted() const { return mInterrupter && mInterrupter->wasInterrupted(); }
 
-    bool evalVoxel(const Coord& ijk, const Int32 polyIdx);
+    enum { MaxPrimId = 100 };
 
-    const std::vector<Vec3s>& mPointList;
-    const std::vector<Vec4I>& mPolygonList;
-
-    FloatTreeT mSqrDistTree;
-    FloatAccessorT mSqrDistAccessor;
-
-    IntTreeT mPrimIndexTree;
-    IntAccessorT mPrimIndexAccessor;
-
-    BoolTreeT mIntersectionTree;
-    BoolAccessorT mIntersectionAccessor;
-
-    // Used internally for acceleration
-    IntTreeT mLastPrimTree;
-    IntAccessorT mLastPrimAccessor;
-
-    InterruptT *mInterrupter;
-
-
-    struct Primitive { Vec3d a, b, c, d; Int32 index; };
-
-    template<bool IsQuad>
-    bool evalPrimitive(const Coord&, const Primitive&);
-
-    template<bool IsQuad>
-    void voxelize(const Primitive&);
+    unsigned char mPrimCount;
 };
 
 
-template<typename FloatTreeT, typename InterruptT>
-void
-MeshVoxelizer<FloatTreeT, InterruptT>::run(bool threaded)
+template<typename TreeType, typename MeshDataAdapter, typename Interrupter = util::NullInterrupter>
+class VoxelizePolygons
 {
-    if (threaded) {
-        tbb::parallel_reduce(tbb::blocked_range<size_t>(0, mPolygonList.size()), *this);
-    } else {
-        (*this)(tbb::blocked_range<size_t>(0, mPolygonList.size()));
+public:
+
+    typedef VoxelizationData<TreeType>                                          VoxelizationDataType;
+    typedef tbb::enumerable_thread_specific<typename VoxelizationDataType::Ptr> DataTable;
+
+    VoxelizePolygons(DataTable& dataTable,
+        const MeshDataAdapter& mesh,
+        Interrupter* interrupter = NULL)
+        : mDataTable(&dataTable)
+        , mMesh(&mesh)
+        , mInterrupter(interrupter)
+    {
     }
-}
 
-template<typename FloatTreeT, typename InterruptT>
-MeshVoxelizer<FloatTreeT, InterruptT>::MeshVoxelizer(
-    const std::vector<Vec3s>& pointList, const std::vector<Vec4I>& polygonList,
-    InterruptT *interrupter)
-    : mPointList(pointList)
-    , mPolygonList(polygonList)
-    , mSqrDistTree(std::numeric_limits<FloatValueT>::max())
-    , mSqrDistAccessor(mSqrDistTree)
-    , mPrimIndexTree(Int32(util::INVALID_IDX))
-    , mPrimIndexAccessor(mPrimIndexTree)
-    , mIntersectionTree(false)
-    , mIntersectionAccessor(mIntersectionTree)
-    , mLastPrimTree(Int32(util::INVALID_IDX))
-    , mLastPrimAccessor(mLastPrimTree)
-    , mInterrupter(interrupter)
-{
-}
+    void operator()(const tbb::blocked_range<size_t>& range) const {
 
-template<typename FloatTreeT, typename InterruptT>
-MeshVoxelizer<FloatTreeT, InterruptT>::MeshVoxelizer(
-    MeshVoxelizer<FloatTreeT, InterruptT>& rhs, tbb::split)
-    : mPointList(rhs.mPointList)
-    , mPolygonList(rhs.mPolygonList)
-    , mSqrDistTree(std::numeric_limits<FloatValueT>::max())
-    , mSqrDistAccessor(mSqrDistTree)
-    , mPrimIndexTree(Int32(util::INVALID_IDX))
-    , mPrimIndexAccessor(mPrimIndexTree)
-    , mIntersectionTree(false)
-    , mIntersectionAccessor(mIntersectionTree)
-    , mLastPrimTree(Int32(util::INVALID_IDX))
-    , mLastPrimAccessor(mLastPrimTree)
-    , mInterrupter(rhs.mInterrupter)
-{
-}
+        typename VoxelizationDataType::Ptr& dataPtr = mDataTable->local();
+        if (!dataPtr) dataPtr.reset(new VoxelizationDataType());
 
+        Triangle prim;
 
-template<typename FloatTreeT, typename InterruptT>
-void
-MeshVoxelizer<FloatTreeT, InterruptT>::operator()(const tbb::blocked_range<size_t> &range)
-{
-    Primitive prim;
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
 
-    for (size_t n = range.begin(); n < range.end(); ++n) {
+            if (this->wasInterrupted()) {
+                tbb::task::self().cancel_group_execution();
+                break;
+            }
 
-        if (mInterrupter && mInterrupter->wasInterrupted()) {
-            tbb::task::self().cancel_group_execution();
-            break;
-        }
+            const size_t numVerts = mMesh->vertexCount(n);
 
-        const Vec4I& verts = mPolygonList[n];
+            // rasterize triangles and quads.
+            if (numVerts == 3 || numVerts == 4) {
 
-        prim.index = Int32(n);
-        prim.a = Vec3d(mPointList[verts[0]]);
-        prim.b = Vec3d(mPointList[verts[1]]);
-        prim.c = Vec3d(mPointList[verts[2]]);
+                prim.index = Int32(n);
 
-        if (util::INVALID_IDX != verts[3]) {
-            prim.d = Vec3d(mPointList[verts[3]]);
-            voxelize<true>(prim);
-        } else {
-            voxelize<false>(prim);
-        }
-    }
-}
+                mMesh->getIndexSpacePoint(n, 0, prim.a);
+                mMesh->getIndexSpacePoint(n, 1, prim.b);
+                mMesh->getIndexSpacePoint(n, 2, prim.c);
 
+                evalTriangle(prim, *dataPtr);
 
-template<typename FloatTreeT, typename InterruptT>
-template<bool IsQuad>
-void
-MeshVoxelizer<FloatTreeT, InterruptT>::voxelize(const Primitive& prim)
-{
-    std::deque<Coord> coordList;
-    Coord ijk, nijk;
-
-    ijk = util::nearestCoord(prim.a);
-    coordList.push_back(ijk);
-
-    evalPrimitive<IsQuad>(ijk, prim);
-
-    while (!coordList.empty()) {
-        if(wasInterrupted()) break;
-
-        ijk = coordList.back();
-        coordList.pop_back();
-
-        mIntersectionAccessor.setActiveState(ijk, true);
-
-        for (Int32 i = 0; i < 26; ++i) {
-            nijk = ijk + util::COORD_OFFSETS[i];
-            if (prim.index != mLastPrimAccessor.getValue(nijk)) {
-                mLastPrimAccessor.setValue(nijk, prim.index);
-                if(evalPrimitive<IsQuad>(nijk, prim)) coordList.push_back(nijk);
+                if (numVerts == 4) {
+                    mMesh->getIndexSpacePoint(n, 3, prim.b);
+                    evalTriangle(prim, *dataPtr);
+                }
             }
         }
     }
-}
+
+private:
+
+    bool wasInterrupted() const { return mInterrupter && mInterrupter->wasInterrupted(); }
+
+    struct Triangle { Vec3d a, b, c; Int32 index; };
+
+    struct SubTask
+    {
+        SubTask(const Triangle& prim, DataTable& dataTable, size_t polygonCount)
+            : mLocalDataTable(&dataTable)
+            , mPrim(prim)
+            , mPolygonCount(polygonCount)
+        {
+        }
+
+        void operator()() const
+        {
+            const size_t minNumTask = size_t(tbb::task_scheduler_init::default_num_threads() * 10);
+
+            if (mPolygonCount > minNumTask) {
+
+                typename VoxelizationDataType::Ptr& dataPtr = mLocalDataTable->local();
+                if (!dataPtr) dataPtr.reset(new VoxelizationDataType());
+
+                voxelizeTriangle(mPrim, *dataPtr);
+
+            } else {
+                spawnTasks(mPrim, *mLocalDataTable, mPolygonCount);
+            }
+        }
+
+        DataTable * const mLocalDataTable;
+        const Triangle mPrim;
+        const size_t mPolygonCount;
+    };
 
 
-template<typename FloatTreeT, typename InterruptT>
-template<bool IsQuad>
-bool
-MeshVoxelizer<FloatTreeT, InterruptT>::evalPrimitive(const Coord& ijk, const Primitive& prim)
-{
-    Vec3d uvw, voxelCenter(ijk[0], ijk[1], ijk[2]);
+    void evalTriangle(const Triangle& prim, VoxelizationDataType& data) const
+    {
+        const size_t minNumTask = size_t(tbb::task_scheduler_init::default_num_threads() * 10);
 
-    // Evaluate first triangle
-    FloatValueT dist = FloatValueT((voxelCenter -
-        closestPointOnTriangleToPoint(prim.a, prim.c, prim.b, voxelCenter, uvw)).lengthSqr());
+        if (mMesh->polygonCount() > minNumTask) {
 
-    if (IsQuad) {
-        // Split quad into a second triangle and calculate distance.
-        FloatValueT secondDist = FloatValueT((voxelCenter -
-            closestPointOnTriangleToPoint(prim.a, prim.d, prim.c, voxelCenter, uvw)).lengthSqr());
-
-        if (secondDist < dist) dist = secondDist;
-    }
-
-    FloatValueT oldDist = std::abs(mSqrDistAccessor.getValue(ijk));
-
-    if (dist < oldDist) {
-        mSqrDistAccessor.setValue(ijk, -dist);
-        mPrimIndexAccessor.setValue(ijk, prim.index);
-    } else if (math::isExactlyEqual(dist, oldDist)) {
-        // makes reduction deterministic when different polygons
-        // produce the same distance value.
-        mPrimIndexAccessor.setValue(ijk, std::min(prim.index, mPrimIndexAccessor.getValue(ijk)));
-    }
-
-    return (dist < 0.86602540378443861);
-}
-
-
-template<typename FloatTreeT, typename InterruptT>
-void
-MeshVoxelizer<FloatTreeT, InterruptT>::join(MeshVoxelizer<FloatTreeT, InterruptT>& rhs)
-{
-    typedef typename FloatTreeT::RootNodeType FloatRootNodeT;
-    typedef typename FloatRootNodeT::NodeChainType  FloatNodeChainT;
-    BOOST_STATIC_ASSERT(boost::mpl::size<FloatNodeChainT>::value > 1);
-    typedef typename boost::mpl::at<FloatNodeChainT, boost::mpl::int_<1> >::type FloatInternalNodeT;
-
-    typedef typename IntTreeT::RootNodeType IntRootNodeT;
-    typedef typename IntRootNodeT::NodeChainType  IntNodeChainT;
-    BOOST_STATIC_ASSERT(boost::mpl::size<IntNodeChainT>::value > 1);
-    typedef typename boost::mpl::at<IntNodeChainT, boost::mpl::int_<1> >::type IntInternalNodeT;
-
-    const FloatValueT background = std::numeric_limits<FloatValueT>::max();
-
-    Coord ijk;
-    Index offset;
-
-    rhs.mSqrDistTree.clearAllAccessors();
-    rhs.mPrimIndexTree.clearAllAccessors();
-
-    typename FloatTreeT::LeafIter leafIt = rhs.mSqrDistTree.beginLeaf();
-    for ( ; leafIt; ++leafIt) {
-
-        ijk = leafIt->origin();
-        FloatLeafT* lhsDistLeafPt = mSqrDistAccessor.probeLeaf(ijk);
-
-        if (!lhsDistLeafPt) {
-
-            // Steals leaf nodes through their parent, always the last internal-node
-            // stored in the ValueAccessor's node chain, avoiding the overhead of
-            // the root node. This is significantly faster than going through the
-            // tree or root node.
-            mSqrDistAccessor.addLeaf(rhs.mSqrDistAccessor.probeLeaf(ijk));
-            FloatInternalNodeT* floatNode =
-                rhs.mSqrDistAccessor.template getNode<FloatInternalNodeT>();
-            floatNode->template stealNode<FloatLeafT>(ijk, background, false);
-
-            mPrimIndexAccessor.addLeaf(rhs.mPrimIndexAccessor.probeLeaf(ijk));
-            IntInternalNodeT* intNode =
-                rhs.mPrimIndexAccessor.template getNode<IntInternalNodeT>();
-            intNode->template stealNode<IntLeafT>(ijk, util::INVALID_IDX, false);
+            voxelizeTriangle(prim, data);
 
         } else {
 
-            IntLeafT* lhsIdxLeafPt = mPrimIndexAccessor.probeLeaf(ijk);
-            IntLeafT* rhsIdxLeafPt = rhs.mPrimIndexAccessor.probeLeaf(ijk);
-            FloatValueT lhsValue, rhsValue;
-
-            typename FloatLeafT::ValueOnCIter it = leafIt->cbeginValueOn();
-            for ( ; it; ++it) {
-
-                offset = it.pos();
-
-                lhsValue = std::abs(lhsDistLeafPt->getValue(offset));
-                rhsValue = std::abs(it.getValue());
-
-                if (rhsValue < lhsValue) {
-                    lhsDistLeafPt->setValueOn(offset, it.getValue());
-                    lhsIdxLeafPt->setValueOn(offset, rhsIdxLeafPt->getValue(offset));
-                } else if (math::isExactlyEqual(rhsValue, lhsValue)) {
-                    lhsIdxLeafPt->setValueOn(offset,
-                        std::min(lhsIdxLeafPt->getValue(offset), rhsIdxLeafPt->getValue(offset)));
-                }
-            }
+            spawnTasks(prim, *mDataTable, mMesh->polygonCount());
         }
     }
 
-    mIntersectionTree.merge(rhs.mIntersectionTree);
+    static void spawnTasks(const Triangle& mainPrim, DataTable& dataTable, size_t primCount)
+    {
+        const size_t newPrimCount = primCount * 4;
 
-    rhs.mSqrDistTree.clear();
-    rhs.mPrimIndexTree.clear();
-    rhs.mIntersectionTree.clear();
-}
+        tbb::task_group tasks;
 
+        const Vec3d ac = (mainPrim.a + mainPrim.c) * 0.5;
+        const Vec3d bc = (mainPrim.b + mainPrim.c) * 0.5;
+        const Vec3d ab = (mainPrim.a + mainPrim.b) * 0.5;
 
-////////////////////////////////////////
+        Triangle prim;
+        prim.index = mainPrim.index;
 
+        prim.a = mainPrim.a;
+        prim.b = ab;
+        prim.c = ac;
+        tasks.run(SubTask(prim, dataTable, newPrimCount));
 
-// ContourTracer
-/// @brief TBB body object that partitions a volume into 2D slices that can be processed
-/// in parallel and marks the exterior contour of disjoint voxel sets in each slice
-template<typename FloatTreeT, typename InterruptT = util::NullInterrupter>
-class ContourTracer
-{
-public:
-    typedef typename FloatTreeT::ValueType FloatValueT;
-    typedef typename tree::ValueAccessor<FloatTreeT> DistAccessorT;
-    typedef typename FloatTreeT::template ValueConverter<bool>::Type BoolTreeT;
-    typedef typename tree::ValueAccessor<const BoolTreeT> BoolAccessorT;
+        prim.a = ab;
+        prim.b = bc;
+        prim.c = ac;
+        tasks.run(SubTask(prim, dataTable, newPrimCount));
 
-    ContourTracer(FloatTreeT&, const BoolTreeT&, InterruptT *interrupter = NULL);
-    ~ContourTracer() {}
+        prim.a = ab;
+        prim.b = mainPrim.b;
+        prim.c = bc;
+        tasks.run(SubTask(prim, dataTable, newPrimCount));
 
-    void run(bool threaded = true);
+        prim.a = ac;
+        prim.b = bc;
+        prim.c = mainPrim.c;
+        tasks.run(SubTask(prim, dataTable, newPrimCount));
 
-    ContourTracer(const ContourTracer<FloatTreeT, InterruptT>& rhs);
-    void operator()(const tbb::blocked_range<int> &range) const;
-
-private:
-    void operator=(const ContourTracer<FloatTreeT, InterruptT>&) {}
-
-    int sparseScan(int slice) const;
-
-    FloatTreeT& mDistTree;
-    DistAccessorT mDistAccessor;
-
-    const BoolTreeT& mIntersectionTree;
-    BoolAccessorT mIntersectionAccessor;
-
-    CoordBBox mBBox;
-
-    /// List of value-depth dependant step sizes.
-    std::vector<Index> mStepSize;
-
-    InterruptT *mInterrupter;
-};
-
-
-template<typename FloatTreeT, typename InterruptT>
-void
-ContourTracer<FloatTreeT, InterruptT>::run(bool threaded)
-{
-    if (threaded) {
-        tbb::parallel_for(tbb::blocked_range<int>(mBBox.min()[0], mBBox.max()[0]+1), *this);
-    } else {
-        (*this)(tbb::blocked_range<int>(mBBox.min()[0], mBBox.max()[0]+1));
-    }
-}
-
-
-template<typename FloatTreeT, typename InterruptT>
-ContourTracer<FloatTreeT, InterruptT>::ContourTracer(
-    FloatTreeT& distTree, const BoolTreeT& intersectionTree, InterruptT *interrupter)
-    : mDistTree(distTree)
-    , mDistAccessor(mDistTree)
-    , mIntersectionTree(intersectionTree)
-    , mIntersectionAccessor(mIntersectionTree)
-    , mBBox(CoordBBox())
-    , mStepSize(0)
-    , mInterrupter(interrupter)
-{
-    // Build the step size table for different tree value depths.
-    std::vector<Index> dims;
-    mDistTree.getNodeLog2Dims(dims);
-
-    mStepSize.resize(dims.size()+1, 1);
-    Index exponent = 0;
-    for (int idx = static_cast<int>(dims.size()) - 1; idx > -1; --idx) {
-        exponent += dims[idx];
-        mStepSize[idx] = 1 << exponent;
+        tasks.wait();
     }
 
-    mDistTree.evalLeafBoundingBox(mBBox);
+    static void voxelizeTriangle(const Triangle& prim, VoxelizationDataType& data)
+    {
+        std::deque<Coord> coordList;
+        Coord ijk, nijk;
 
-    // Make sure that mBBox coincides with the min and max corners of the internal nodes.
-    const int tileDim = mStepSize[0];
+        ijk = Coord::floor(prim.a);
+        coordList.push_back(ijk);
 
-    for (size_t i = 0; i < 3; ++i) {
+        computeDistance(ijk, prim, data);
 
-        int n;
-        double diff = std::abs(double(mBBox.min()[i])) / double(tileDim);
+        unsigned char primId = data.getNewPrimId();
+        data.primIdAcc.setValueOnly(ijk, primId);
 
-        if (mBBox.min()[i] <= tileDim) {
-            n = int(std::ceil(diff));
-            mBBox.min()[i] = - n * tileDim;
-        } else {
-            n = int(std::floor(diff));
-            mBBox.min()[i] = n * tileDim;
-        }
-
-        n = int(std::ceil(std::abs(double(mBBox.max()[i] - mBBox.min()[i])) / double(tileDim)));
-        mBBox.max()[i] =  mBBox.min()[i] + n * tileDim;
-    }
-}
-
-
-template<typename FloatTreeT, typename InterruptT>
-ContourTracer<FloatTreeT, InterruptT>::ContourTracer(
-    const ContourTracer<FloatTreeT, InterruptT> &rhs)
-    : mDistTree(rhs.mDistTree)
-    , mDistAccessor(mDistTree)
-    , mIntersectionTree(rhs.mIntersectionTree)
-    , mIntersectionAccessor(mIntersectionTree)
-    , mBBox(rhs.mBBox)
-    , mStepSize(rhs.mStepSize)
-    , mInterrupter(rhs.mInterrupter)
-{
-}
-
-
-template<typename FloatTreeT, typename InterruptT>
-void
-ContourTracer<FloatTreeT, InterruptT>::operator()(const tbb::blocked_range<int> &range) const
-{
-    // Slice up the volume and trace contours.
-    int iStep = 1;
-    for (int n = range.begin(); n < range.end(); n += iStep) {
-
-        if (mInterrupter && mInterrupter->wasInterrupted()) {
-            tbb::task::self().cancel_group_execution();
-            break;
-        }
-
-        iStep = sparseScan(n);
-    }
-}
-
-
-template<typename FloatTreeT, typename InterruptT>
-int
-ContourTracer<FloatTreeT, InterruptT>::sparseScan(int slice) const
-{
-    bool lastVoxelWasOut = true;
-    int last_k = mBBox.min()[2];
-
-    Coord ijk(slice, mBBox.min()[1], mBBox.min()[2]);
-    Coord step(mStepSize[mDistAccessor.getValueDepth(ijk) + 1]);
-    Coord n_ijk;
-
-    for (ijk[1] = mBBox.min()[1]; ijk[1] <= mBBox.max()[1]; ijk[1] += step[1]) { // j
-
-        if (mInterrupter && mInterrupter->wasInterrupted()) {
-            break;
-        }
-
-        step[1] = mStepSize[mDistAccessor.getValueDepth(ijk) + 1];
-        step[0] = std::min(step[0], step[1]);
-
-        for (ijk[2] = mBBox.min()[2]; ijk[2] <= mBBox.max()[2]; ijk[2] += step[2]) { // k
-
-            step[2] = mStepSize[mDistAccessor.getValueDepth(ijk) + 1];
-            step[1] = std::min(step[1], step[2]);
-            step[0] = std::min(step[0], step[2]);
-
-            // If the current voxel is set?
-            if (mDistAccessor.isValueOn(ijk)) {
-
-                // Is this a boundary voxel?
-                if (mIntersectionAccessor.isValueOn(ijk)) {
-
-                    lastVoxelWasOut = false;
-                    last_k = ijk[2];
-
-                } else if (lastVoxelWasOut) {
-
-                    FloatValueT& val = const_cast<FloatValueT&>(mDistAccessor.getValue(ijk));
-                    val = -val; // flip sign
-
-                } else {
-
-                    FloatValueT val;
-                    for (Int32 n = 3; n < 6; n += 2) {
-                        n_ijk = ijk + util::COORD_OFFSETS[n];
-
-                        if (mDistAccessor.probeValue(n_ijk, val) && val > 0) {
-                            lastVoxelWasOut = true;
-                            break;
-                        }
-                    }
-
-                    if (lastVoxelWasOut) {
-
-                        FloatValueT& v = const_cast<FloatValueT&>(mDistAccessor.getValue(ijk));
-                        v = -v; // flip sign
-
-                        const int tmp_k = ijk[2];
-
-                        // backtrace
-                        for (--ijk[2]; ijk[2] >= last_k; --ijk[2]) {
-                            if (mIntersectionAccessor.isValueOn(ijk)) break;
-                            FloatValueT& vb =
-                                const_cast<FloatValueT&>(mDistAccessor.getValue(ijk));
-                            if (vb < FloatValueT(0.0)) vb = -vb; // flip sign
-                        }
-
-                        last_k = tmp_k;
-                        ijk[2] = tmp_k;
-
-                    } else {
-                        last_k = std::min(ijk[2], last_k);
-                    }
-
-                }
-
-            } // end isValueOn check
-        } // end k
-    } // end j
-    return step[0];
-}
-
-
-////////////////////////////////////////
-
-
-/// @brief TBB body object that that finds seed points for the parallel flood fill.
-template<typename FloatTreeT, typename InterruptT = util::NullInterrupter>
-class SignMask
-{
-public:
-    typedef typename FloatTreeT::ValueType                              FloatValueT;
-    typedef typename FloatTreeT::LeafNodeType                           FloatLeafT;
-    typedef tree::LeafManager<FloatTreeT>                               FloatLeafManager;
-    typedef typename tree::ValueAccessor<const FloatTreeT>              FloatAccessorT;
-    typedef typename FloatTreeT::template ValueConverter<bool>::Type    BoolTreeT;
-    typedef typename BoolTreeT::LeafNodeType                            BoolLeafT;
-    typedef typename tree::ValueAccessor<BoolTreeT>                     BoolAccessorT;
-    typedef typename tree::ValueAccessor<const BoolTreeT>               BoolConstAccessorT;
-
-
-    SignMask(const FloatLeafManager&, const FloatTreeT&, const BoolTreeT&,
-        InterruptT *interrupter = NULL);
-
-    ~SignMask() {}
-
-    void run(bool threaded = true);
-
-    SignMask(SignMask<FloatTreeT, InterruptT>& rhs, tbb::split);
-    void operator() (const tbb::blocked_range<size_t> &range);
-    void join(SignMask<FloatTreeT, InterruptT>& rhs);
-
-    BoolTreeT& signMaskTree() { return mSignMaskTree; }
-
-private:
-    // disallow copy by assignment
-    void operator=(const SignMask<FloatTreeT, InterruptT>&) {}
-    bool wasInterrupted() const { return mInterrupter && mInterrupter->wasInterrupted(); }
-
-    const FloatLeafManager& mDistLeafs;
-    const FloatTreeT& mDistTree;
-    const BoolTreeT& mIntersectionTree;
-
-    BoolTreeT mSignMaskTree;
-
-    InterruptT *mInterrupter;
-}; // class SignMask
-
-
-template<typename FloatTreeT, typename InterruptT>
-SignMask<FloatTreeT, InterruptT>::SignMask(
-    const FloatLeafManager& distLeafs, const FloatTreeT& distTree,
-    const BoolTreeT& intersectionTree, InterruptT *interrupter)
-    : mDistLeafs(distLeafs)
-    , mDistTree(distTree)
-    , mIntersectionTree(intersectionTree)
-    , mSignMaskTree(false)
-    , mInterrupter(interrupter)
-{
-}
-
-
-template<typename FloatTreeT, typename InterruptT>
-SignMask<FloatTreeT, InterruptT>::SignMask(
-    SignMask<FloatTreeT, InterruptT>& rhs, tbb::split)
-    : mDistLeafs(rhs.mDistLeafs)
-    , mDistTree(rhs.mDistTree)
-    , mIntersectionTree(rhs.mIntersectionTree)
-    , mSignMaskTree(false)
-    , mInterrupter(rhs.mInterrupter)
-{
-}
-
-
-template<typename FloatTreeT, typename InterruptT>
-void
-SignMask<FloatTreeT, InterruptT>::run(bool threaded)
-{
-    if (threaded) tbb::parallel_reduce(mDistLeafs.getRange(), *this);
-    else (*this)(mDistLeafs.getRange());
-}
-
-
-template<typename FloatTreeT, typename InterruptT>
-void
-SignMask<FloatTreeT, InterruptT>::operator()(const tbb::blocked_range<size_t> &range)
-{
-    FloatAccessorT distAcc(mDistTree);
-    BoolConstAccessorT intersectionAcc(mIntersectionTree);
-    BoolAccessorT maskAcc(mSignMaskTree);
-
-    FloatValueT value;
-    CoordBBox bbox;
-    Coord& maxCoord = bbox.max();
-    Coord& minCoord = bbox.min();
-    Coord ijk;
-    const int extent = BoolLeafT::DIM - 1;
-
-    for (size_t n = range.begin(); n < range.end(); ++n) {
-
-        const FloatLeafT& distLeaf = mDistLeafs.leaf(n);
-
-        minCoord = distLeaf.origin();
-        maxCoord[0] = minCoord[0] + extent;
-        maxCoord[1] = minCoord[1] + extent;
-        maxCoord[2] = minCoord[2] + extent;
-
-        const BoolLeafT* intersectionLeaf = intersectionAcc.probeConstLeaf(minCoord);
-
-        BoolLeafT* maskLeafPt = new BoolLeafT(minCoord, false);
-        BoolLeafT& maskLeaf = *maskLeafPt;
-        bool addLeaf = false;
-
-        bbox.expand(-1);
-
-        typename FloatLeafT::ValueOnCIter it = distLeaf.cbeginValueOn();
-        for (; it; ++it) {
-            if (intersectionLeaf && intersectionLeaf->isValueOn(it.pos())) continue;
-            if (it.getValue() < FloatValueT(0.0)) {
-                ijk = it.getCoord();
-                if (bbox.isInside(ijk)) {
-                    for (size_t i   = 0; i < 6; ++i) {
-                        if (distLeaf.probeValue(ijk+util::COORD_OFFSETS[i], value) && value>0.0) {
-                            maskLeaf.setValueOn(ijk);
-                            addLeaf = true;
-                            break;
-                        }
-                    }
-                } else {
-                    for (size_t i = 0; i < 6; ++i) {
-                        if (distAcc.probeValue(ijk+util::COORD_OFFSETS[i], value) && value>0.0) {
-                            maskLeaf.setValueOn(ijk);
-                            addLeaf = true;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        if (addLeaf) maskAcc.addLeaf(maskLeafPt);
-        else delete maskLeafPt;
-    }
-}
-
-
-template<typename FloatTreeT, typename InterruptT>
-void
-SignMask<FloatTreeT, InterruptT>::join(SignMask<FloatTreeT, InterruptT>& rhs)
-{
-    mSignMaskTree.merge(rhs.mSignMaskTree);
-}
-
-
-////////////////////////////////////////
-
-
-/// @brief TBB body object that performs a parallel flood fill
-template<typename FloatTreeT, typename InterruptT = util::NullInterrupter>
-class PropagateSign
-{
-public:
-    typedef typename FloatTreeT::ValueType                              FloatValueT;
-    typedef typename FloatTreeT::LeafNodeType                           FloatLeafT;
-    typedef typename tree::ValueAccessor<FloatTreeT>                    FloatAccessorT;
-    typedef typename FloatTreeT::template ValueConverter<bool>::Type    BoolTreeT;
-    typedef typename BoolTreeT::LeafNodeType                            BoolLeafT;
-    typedef tree::LeafManager<BoolTreeT>                                BoolLeafManager;
-    typedef typename tree::ValueAccessor<BoolTreeT>                     BoolAccessorT;
-    typedef typename tree::ValueAccessor<const BoolTreeT>               BoolConstAccessorT;
-
-    PropagateSign(BoolLeafManager&, FloatTreeT&, const BoolTreeT&, InterruptT *interrupter = NULL);
-
-    ~PropagateSign() {}
-
-    void run(bool threaded = true);
-
-    PropagateSign(PropagateSign<FloatTreeT, InterruptT>& rhs, tbb::split);
-    void operator() (const tbb::blocked_range<size_t> &range);
-    void join(PropagateSign<FloatTreeT, InterruptT>& rhs);
-
-    BoolTreeT& signMaskTree() { return mSignMaskTree; }
-
-private:
-    // disallow copy by assignment
-    void operator=(const PropagateSign<FloatTreeT, InterruptT>&);
-    bool wasInterrupted() const { return mInterrupter && mInterrupter->wasInterrupted(); }
-
-    BoolLeafManager& mOldSignMaskLeafs;
-    FloatTreeT& mDistTree;
-    const BoolTreeT& mIntersectionTree;
-
-    BoolTreeT mSignMaskTree;
-    InterruptT *mInterrupter;
-};
-
-
-template<typename FloatTreeT, typename InterruptT>
-PropagateSign<FloatTreeT, InterruptT>::PropagateSign(BoolLeafManager& signMaskLeafs,
-    FloatTreeT& distTree, const BoolTreeT& intersectionTree, InterruptT *interrupter)
-    : mOldSignMaskLeafs(signMaskLeafs)
-    , mDistTree(distTree)
-    , mIntersectionTree(intersectionTree)
-    , mSignMaskTree(false)
-    , mInterrupter(interrupter)
-{
-}
-
-
-template<typename FloatTreeT, typename InterruptT>
-PropagateSign<FloatTreeT, InterruptT>::PropagateSign(
-    PropagateSign<FloatTreeT, InterruptT>& rhs, tbb::split)
-    : mOldSignMaskLeafs(rhs.mOldSignMaskLeafs)
-    , mDistTree(rhs.mDistTree)
-    , mIntersectionTree(rhs.mIntersectionTree)
-    , mSignMaskTree(false)
-    , mInterrupter(rhs.mInterrupter)
-{
-}
-
-
-template<typename FloatTreeT, typename InterruptT>
-void
-PropagateSign<FloatTreeT, InterruptT>::run(bool threaded)
-{
-    if (threaded) tbb::parallel_reduce(mOldSignMaskLeafs.getRange(), *this);
-    else (*this)(mOldSignMaskLeafs.getRange());
-}
-
-
-template<typename FloatTreeT, typename InterruptT>
-void
-PropagateSign<FloatTreeT, InterruptT>::operator()(const tbb::blocked_range<size_t> &range)
-{
-    FloatAccessorT distAcc(mDistTree);
-    BoolConstAccessorT intersectionAcc(mIntersectionTree);
-    BoolAccessorT maskAcc(mSignMaskTree);
-
-    std::deque<Coord> coordList;
-
-    FloatValueT value;
-    CoordBBox bbox;
-    Coord& maxCoord = bbox.max();
-    Coord& minCoord = bbox.min();
-    Coord ijk, nijk;
-    const int extent = BoolLeafT::DIM - 1;
-
-    for (size_t n = range.begin(); n < range.end(); ++n) {
-        BoolLeafT& oldMaskLeaf = mOldSignMaskLeafs.leaf(n);
-
-        minCoord = oldMaskLeaf.origin();
-        maxCoord[0] = minCoord[0] + extent;
-        maxCoord[1] = minCoord[1] + extent;
-        maxCoord[2] = minCoord[2] + extent;
-
-        FloatLeafT& distLeaf = *distAcc.probeLeaf(minCoord);
-        const BoolLeafT* intersectionLeaf = intersectionAcc.probeConstLeaf(minCoord);
-
-        typename BoolLeafT::ValueOnCIter it = oldMaskLeaf.cbeginValueOn();
-        for (; it; ++it) {
-            coordList.push_back(it.getCoord());
-
-            while (!coordList.empty()) {
-
-                ijk = coordList.back();
-                coordList.pop_back();
-
-                FloatValueT& dist = const_cast<FloatValueT&>(distLeaf.getValue(ijk));
-                if (dist < FloatValueT(0.0)) {
-                    dist = -dist; // flip sign
-
-                    for (size_t i = 0; i < 6; ++i) {
-                        nijk = ijk + util::COORD_OFFSETS[i];
-                        if (bbox.isInside(nijk)) {
-                            if (intersectionLeaf && intersectionLeaf->isValueOn(nijk)) continue;
-
-                            if (distLeaf.probeValue(nijk, value) && value < 0.0) {
-                                coordList.push_back(nijk);
-                            }
-
-                        } else {
-                            if(!intersectionAcc.isValueOn(nijk) &&
-                                distAcc.probeValue(nijk, value) && value < 0.0) {
-                                maskAcc.setValueOn(nijk);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-
-template<typename FloatTreeT, typename InterruptT>
-void
-PropagateSign<FloatTreeT, InterruptT>::join(PropagateSign<FloatTreeT, InterruptT>& rhs)
-{
-    mSignMaskTree.merge(rhs.mSignMaskTree);
-}
-
-
-////////////////////////////////////////
-
-
-// IntersectingVoxelSign
-/// @brief TBB body object that traversers all intersecting voxels (defined by the
-/// intersectingVoxelsGrid) and potentially flips their sign, by comparing the "closest point"
-/// directions of outside-marked and non-intersecting neighboring voxels
-template<typename FloatTreeT>
-class IntersectingVoxelSign
-{
-public:
-    typedef typename FloatTreeT::ValueType                              FloatValueT;
-    typedef typename tree::ValueAccessor<FloatTreeT>                    FloatAccessorT;
-    typedef typename FloatTreeT::template ValueConverter<Int32>::Type   IntTreeT;
-    typedef typename tree::ValueAccessor<IntTreeT>                      IntAccessorT;
-    typedef typename FloatTreeT::template ValueConverter<bool>::Type    BoolTreeT;
-    typedef typename tree::ValueAccessor<BoolTreeT>                     BoolAccessorT;
-    typedef tree::LeafManager<BoolTreeT>                                BoolLeafManager;
-
-    IntersectingVoxelSign(
-        const std::vector<Vec3s>& pointList,
-        const std::vector<Vec4I>& polygonList,
-        FloatTreeT& distTree,
-        IntTreeT& indexTree,
-        BoolTreeT& intersectionTree,
-        BoolLeafManager& leafs);
-
-    ~IntersectingVoxelSign() {}
-
-    void run(bool threaded = true);
-
-    IntersectingVoxelSign(const IntersectingVoxelSign<FloatTreeT> &rhs);
-    void operator()(const tbb::blocked_range<size_t>&) const;
-
-private:
-    void operator=(const IntersectingVoxelSign<FloatTreeT>&) {}
-
-    Vec3d getClosestPoint(const Coord& ijk, const Vec4I& prim) const;
-
-    std::vector<Vec3s> const * const mPointList;
-    std::vector<Vec4I> const * const mPolygonList;
-
-    FloatTreeT& mDistTree;
-    IntTreeT&   mIndexTree;
-    BoolTreeT&  mIntersectionTree;
-
-    BoolLeafManager& mLeafs;
-};
-
-
-template<typename FloatTreeT>
-void
-IntersectingVoxelSign<FloatTreeT>::run(bool threaded)
-{
-    if (threaded) tbb::parallel_for(mLeafs.getRange(), *this);
-    else (*this)(mLeafs.getRange());
-}
-
-
-template<typename FloatTreeT>
-IntersectingVoxelSign<FloatTreeT>::IntersectingVoxelSign(
-    const std::vector<Vec3s>& pointList,
-    const std::vector<Vec4I>& polygonList,
-    FloatTreeT& distTree,
-    IntTreeT& indexTree,
-    BoolTreeT& intersectionTree,
-    BoolLeafManager& leafs)
-    : mPointList(&pointList)
-    , mPolygonList(&polygonList)
-    , mDistTree(distTree)
-    , mIndexTree(indexTree)
-    , mIntersectionTree(intersectionTree)
-    , mLeafs(leafs)
-{
-}
-
-
-template<typename FloatTreeT>
-IntersectingVoxelSign<FloatTreeT>::IntersectingVoxelSign(
-    const IntersectingVoxelSign<FloatTreeT> &rhs)
-    : mPointList(rhs.mPointList)
-    , mPolygonList(rhs.mPolygonList)
-    , mDistTree(rhs.mDistTree)
-    , mIndexTree(rhs.mIndexTree)
-    , mIntersectionTree(rhs.mIntersectionTree)
-    , mLeafs(rhs.mLeafs)
-{
-}
-
-
-template<typename FloatTreeT>
-void
-IntersectingVoxelSign<FloatTreeT>::operator()(
-    const tbb::blocked_range<size_t>& range) const
-{
-    Coord ijk, nijk;
-
-    FloatAccessorT distAcc(mDistTree);
-    BoolAccessorT maskAcc(mIntersectionTree);
-    IntAccessorT idxAcc(mIndexTree);
-
-    FloatValueT tmpValue;
-    Vec3d cpt, center, dir1, dir2;
-
-    typename BoolTreeT::LeafNodeType::ValueOnCIter iter;
-    for (size_t n = range.begin(); n < range.end(); ++n) {
-        iter = mLeafs.leaf(n).cbeginValueOn();
-        for (; iter; ++iter) {
-
-            ijk = iter.getCoord();
-
-            FloatValueT value = distAcc.getValue(ijk);
-
-            if (!(value < FloatValueT(0.0))) continue;
-
-            center = Vec3d(ijk[0], ijk[1], ijk[2]);
+        while (!coordList.empty()) {
+            ijk = coordList.back();
+            coordList.pop_back();
 
             for (Int32 i = 0; i < 26; ++i) {
                 nijk = ijk + util::COORD_OFFSETS[i];
-
-                if (!maskAcc.isValueOn(nijk) && distAcc.probeValue(nijk, tmpValue)) {
-                    if (tmpValue < FloatValueT(0.0)) continue;
-
-                    const Vec4I& prim = (*mPolygonList)[idxAcc.getValue(nijk)];
-
-                    cpt = getClosestPoint(nijk, prim);
-
-                    dir1 = center - cpt;
-                    dir1.normalize();
-
-                    dir2 = Vec3d(nijk[0], nijk[1], nijk[2]) - cpt;
-                    dir2.normalize();
-
-                    if (dir2.dot(dir1) > 0.0) {
-                        distAcc.setValue(ijk, -value);
-                        break;
-                    }
+                if (primId != data.primIdAcc.getValue(nijk)) {
+                    data.primIdAcc.setValueOnly(nijk, primId);
+                    if(computeDistance(nijk, prim, data)) coordList.push_back(nijk);
                 }
             }
         }
     }
-}
 
+    static bool computeDistance(const Coord& ijk, const Triangle& prim, VoxelizationDataType& data)
+    {
+        Vec3d uvw, voxelCenter(ijk[0], ijk[1], ijk[2]);
 
-template<typename FloatTreeT>
-Vec3d
-IntersectingVoxelSign<FloatTreeT>::getClosestPoint(const Coord& ijk, const Vec4I& prim) const
-{
-    Vec3d voxelCenter(ijk[0], ijk[1], ijk[2]);
+        typedef typename TreeType::ValueType ValueType;
 
-    // Evaluate first triangle
-    const Vec3d a((*mPointList)[prim[0]]);
-    const Vec3d b((*mPointList)[prim[1]]);
-    const Vec3d c((*mPointList)[prim[2]]);
+        const ValueType dist = ValueType((voxelCenter -
+                closestPointOnTriangleToPoint(prim.a, prim.c, prim.b, voxelCenter, uvw)).lengthSqr());
 
-    Vec3d uvw;
-    Vec3d cpt1 = closestPointOnTriangleToPoint(a, c, b, voxelCenter, uvw);
+        const ValueType oldDist = data.distAcc.getValue(ijk);
 
-    // Evaluate second triangle if quad.
-    if (prim[3] != util::INVALID_IDX) {
-
-        Vec3d diff1 = voxelCenter - cpt1;
-
-        const Vec3d d((*mPointList)[prim[3]]);
-
-        Vec3d cpt2 = closestPointOnTriangleToPoint(a, d, c, voxelCenter, uvw);
-        Vec3d diff2 = voxelCenter - cpt2;
-
-        if (diff2.lengthSqr() < diff1.lengthSqr()) {
-            return cpt2;
+        if (dist < oldDist) {
+            data.distAcc.setValue(ijk, dist);
+            data.indexAcc.setValue(ijk, prim.index);
+        } else if (math::isExactlyEqual(dist, oldDist)) {
+            // makes reduction deterministic when different polygons
+            // produce the same distance value.
+            data.indexAcc.setValueOnly(ijk, std::min(prim.index, data.indexAcc.getValue(ijk)));
         }
+
+        return !(dist > 0.75); // true if the primitive intersects the voxel.
     }
 
-    return cpt1;
-}
-
-
-////////////////////////////////////////
-
-
-// IntersectingVoxelCleaner
-/// @brief TBB body object that removes intersecting voxels that were set via
-/// voxelization of self-intersecting parts of a mesh
-template<typename FloatTreeT>
-class IntersectingVoxelCleaner
-{
-public:
-    typedef typename FloatTreeT::ValueType FloatValueT;
-    typedef typename tree::ValueAccessor<FloatTreeT> DistAccessorT;
-    typedef typename FloatTreeT::LeafNodeType DistLeafT;
-    typedef typename FloatTreeT::template ValueConverter<Int32>::Type IntTreeT;
-    typedef typename tree::ValueAccessor<IntTreeT> IntAccessorT;
-    typedef typename IntTreeT::LeafNodeType IntLeafT;
-    typedef typename FloatTreeT::template ValueConverter<bool>::Type BoolTreeT;
-    typedef typename tree::ValueAccessor<BoolTreeT> BoolAccessorT;
-    typedef typename BoolTreeT::LeafNodeType BoolLeafT;
-    typedef tree::LeafManager<BoolTreeT> BoolLeafManager;
-
-    IntersectingVoxelCleaner(FloatTreeT& distTree, IntTreeT& indexTree,
-        BoolTreeT& intersectionTree, BoolLeafManager& leafs);
-
-    ~IntersectingVoxelCleaner() {}
-
-    void run(bool threaded = true);
-
-    IntersectingVoxelCleaner(const IntersectingVoxelCleaner<FloatTreeT> &rhs);
-    void operator()(const tbb::blocked_range<size_t>&) const;
-
-private:
-    void operator=(const IntersectingVoxelCleaner<FloatTreeT>&) {}
-
-    FloatTreeT& mDistTree;
-    IntTreeT& mIndexTree;
-    BoolTreeT& mIntersectionTree;
-    BoolLeafManager& mLeafs;
-};
-
-
-template<typename FloatTreeT>
-void
-IntersectingVoxelCleaner<FloatTreeT>::run(bool threaded)
-{
-    if (threaded) tbb::parallel_for(mLeafs.getRange(), *this);
-    else (*this)(mLeafs.getRange());
-
-    tools::pruneInactive(mIntersectionTree, threaded);
-}
-
-
-template<typename FloatTreeT>
-IntersectingVoxelCleaner<FloatTreeT>::IntersectingVoxelCleaner(
-    FloatTreeT& distTree,
-    IntTreeT& indexTree,
-    BoolTreeT& intersectionTree,
-    BoolLeafManager& leafs)
-    : mDistTree(distTree)
-    , mIndexTree(indexTree)
-    , mIntersectionTree(intersectionTree)
-    , mLeafs(leafs)
-{
-}
-
-
-template<typename FloatTreeT>
-IntersectingVoxelCleaner<FloatTreeT>::IntersectingVoxelCleaner(
-    const IntersectingVoxelCleaner<FloatTreeT>& rhs)
-    : mDistTree(rhs.mDistTree)
-    , mIndexTree(rhs.mIndexTree)
-    , mIntersectionTree(rhs.mIntersectionTree)
-    , mLeafs(rhs.mLeafs)
-{
-}
-
-
-template<typename FloatTreeT>
-void
-IntersectingVoxelCleaner<FloatTreeT>::operator()(
-    const tbb::blocked_range<size_t>& range) const
-{
-    Coord ijk, m_ijk;
-    bool turnOff;
-    FloatValueT value;
-    Index offset;
-
-    typename BoolLeafT::ValueOnCIter iter;
-
-    IntAccessorT      indexAcc(mIndexTree);
-    DistAccessorT       distAcc(mDistTree);
-    BoolAccessorT    maskAcc(mIntersectionTree);
-
-    for (size_t n = range.begin(); n < range.end(); ++n) {
-
-        BoolLeafT& maskLeaf = mLeafs.leaf(n);
-
-        ijk = maskLeaf.origin();
-
-        DistLeafT * distLeaf = distAcc.probeLeaf(ijk);
-        if (distLeaf) {
-            iter = maskLeaf.cbeginValueOn();
-            for (; iter; ++iter) {
-
-                offset = iter.pos();
-
-                if(distLeaf->getValue(offset) > 0.0) continue;
-
-                ijk = iter.getCoord();
-                turnOff = true;
-                for (Int32 m = 0; m < 26; ++m) {
-                    m_ijk = ijk + util::COORD_OFFSETS[m];
-                    if (distAcc.probeValue(m_ijk, value)) {
-                        if (value > 0.0) {
-                            turnOff = false;
-                            break;
-                        }
-                    }
-                }
-
-                if (turnOff) {
-                    maskLeaf.setValueOff(offset);
-                    distLeaf->setValueOn(offset, FloatValueT(-0.86602540378443861));
-                }
-            }
-        }
-    }
-}
-
-
-////////////////////////////////////////
-
-
-// ShellVoxelCleaner
-/// @brief TBB body object that removes non-intersecting voxels that where set by rasterizing
-/// self-intersecting parts of the mesh.
-template<typename FloatTreeT>
-class ShellVoxelCleaner
-{
-public:
-    typedef typename FloatTreeT::ValueType FloatValueT;
-    typedef typename tree::ValueAccessor<FloatTreeT> DistAccessorT;
-    typedef typename FloatTreeT::LeafNodeType DistLeafT;
-    typedef tree::LeafManager<FloatTreeT> DistArrayT;
-    typedef typename FloatTreeT::template ValueConverter<Int32>::Type IntTreeT;
-    typedef typename tree::ValueAccessor<IntTreeT> IntAccessorT;
-    typedef typename IntTreeT::LeafNodeType IntLeafT;
-    typedef typename FloatTreeT::template ValueConverter<bool>::Type BoolTreeT;
-    typedef typename tree::ValueAccessor<BoolTreeT> BoolAccessorT;
-    typedef typename BoolTreeT::LeafNodeType BoolLeafT;
-
-    ShellVoxelCleaner(FloatTreeT& distTree, DistArrayT& leafs, IntTreeT& indexTree,
-        BoolTreeT& intersectionTree);
-
-    ~ShellVoxelCleaner() {}
-
-    void run(bool threaded = true);
-
-    ShellVoxelCleaner(const ShellVoxelCleaner<FloatTreeT> &rhs);
-    void operator()(const tbb::blocked_range<size_t>&) const;
-
-private:
-    void operator=(const ShellVoxelCleaner<FloatTreeT>&) {}
-
-    FloatTreeT& mDistTree;
-    DistArrayT& mLeafs;
-    IntTreeT& mIndexTree;
-    BoolTreeT& mIntersectionTree;
-};
-
-
-template<typename FloatTreeT>
-void
-ShellVoxelCleaner<FloatTreeT>::run(bool threaded)
-{
-    if (threaded) tbb::parallel_for(mLeafs.getRange(), *this);
-    else (*this)(mLeafs.getRange());
-
-    tools::pruneInactive(mDistTree,  threaded);
-    tools::pruneInactive(mIndexTree, threaded);
-}
-
-
-template<typename FloatTreeT>
-ShellVoxelCleaner<FloatTreeT>::ShellVoxelCleaner(
-    FloatTreeT& distTree,
-    DistArrayT& leafs,
-    IntTreeT& indexTree,
-    BoolTreeT& intersectionTree)
-    : mDistTree(distTree)
-    , mLeafs(leafs)
-    , mIndexTree(indexTree)
-    , mIntersectionTree(intersectionTree)
-{
-}
-
-
-template<typename FloatTreeT>
-ShellVoxelCleaner<FloatTreeT>::ShellVoxelCleaner(
-    const ShellVoxelCleaner<FloatTreeT> &rhs)
-    : mDistTree(rhs.mDistTree)
-    , mLeafs(rhs.mLeafs)
-    , mIndexTree(rhs.mIndexTree)
-    , mIntersectionTree(rhs.mIntersectionTree)
-{
-}
-
-
-template<typename FloatTreeT>
-void
-ShellVoxelCleaner<FloatTreeT>::operator()(
-    const tbb::blocked_range<size_t>& range) const
-{
-    Coord ijk, m_ijk;
-    bool turnOff;
-    FloatValueT value;
-    Index offset;
-
-    typename DistLeafT::ValueOnCIter iter;
-    const FloatValueT distBG = mDistTree.background();
-    const Int32 indexBG = mIntersectionTree.background();
-
-    IntAccessorT      indexAcc(mIndexTree);
-    DistAccessorT       distAcc(mDistTree);
-    BoolAccessorT    maskAcc(mIntersectionTree);
-
-
-    for (size_t n = range.begin(); n < range.end(); ++n) {
-
-        DistLeafT& distLeaf = mLeafs.leaf(n);
-
-        ijk = distLeaf.origin();
-
-        const BoolLeafT* maskLeaf = maskAcc.probeConstLeaf(ijk);
-        IntLeafT& indexLeaf = *indexAcc.probeLeaf(ijk);
-
-        iter = distLeaf.cbeginValueOn();
-        for (; iter; ++iter) {
-
-            value = iter.getValue();
-            if(value > 0.0) continue;
-
-            offset = iter.pos();
-            if (maskLeaf && maskLeaf->isValueOn(offset)) continue;
-
-            ijk = iter.getCoord();
-            turnOff = true;
-            for (Int32 m = 0; m < 26; ++m) {
-                m_ijk = ijk + util::COORD_OFFSETS[m];
-                if (maskAcc.isValueOn(m_ijk)) {
-                    turnOff = false;
-                    break;
-                }
-            }
-
-            if (turnOff) {
-                distLeaf.setValueOff(offset, distBG);
-                indexLeaf.setValueOff(offset, indexBG);
-            }
-        }
-    }
-}
+    DataTable                 * const mDataTable;
+    MeshDataAdapter     const * const mMesh;
+    Interrupter               * const mInterrupter;
+}; // VoxelizePolygons
 
 
 ////////////////////////////////////////
 
 
 template<typename TreeType>
-struct CopyActiveVoxelsOp
+struct DiffLeafNodeMask
 {
-    typedef typename tree::ValueAccessor<TreeType> AccessorT;
+    typedef typename tree::ValueAccessor<TreeType>  AccessorType;
+    typedef typename TreeType::LeafNodeType         LeafNodeType;
 
-    CopyActiveVoxelsOp(TreeType& tree) : mAcc(tree) { }
+    typedef typename TreeType::template ValueConverter<bool>::Type  BoolTreeType;
+    typedef typename BoolTreeType::LeafNodeType                     BoolLeafNodeType;
 
-    template <typename LeafNodeType>
-    void operator()(LeafNodeType &leaf, size_t) const
+    DiffLeafNodeMask(const TreeType& rhsTree,
+        std::vector<BoolLeafNodeType*>& lhsNodes)
+        : mRhsTree(&rhsTree), mLhsNodes(lhsNodes.empty() ? NULL : &lhsNodes[0])
     {
-        LeafNodeType* rhsLeaf = const_cast<LeafNodeType*>(mAcc.probeLeaf(leaf.origin()));
-        typename LeafNodeType::ValueOnIter iter = leaf.beginValueOn();
-        for (; iter; ++iter) {
-            rhsLeaf->setValueOnly(iter.pos(), iter.getValue());
+    }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+
+        tree::ValueAccessor<const TreeType> acc(*mRhsTree);
+
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+
+            BoolLeafNodeType* lhsNode = mLhsNodes[n];
+            const LeafNodeType* rhsNode = acc.probeConstLeaf(lhsNode->origin());
+
+            if (rhsNode) lhsNode->topologyDifference(*rhsNode, false);
         }
     }
 
 private:
-    AccessorT mAcc;
+    TreeType            const * const mRhsTree;
+    BoolLeafNodeType         ** const mLhsNodes;
 };
 
 
-// ExpandNB
-/// @brief TBB body object to expand the level set narrow band
+template<typename LeafNodeTypeA, typename LeafNodeTypeB>
+struct UnionValueMasks
+{
+    UnionValueMasks(std::vector<LeafNodeTypeA*>& nodesA, std::vector<LeafNodeTypeB*>& nodesB)
+        : mNodesA(nodesA.empty() ? NULL : &nodesA[0])
+        , mNodesB(nodesB.empty() ? NULL : &nodesB[0])
+    {
+    }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+            mNodesA[n]->topologyUnion(*mNodesB[n]);
+        }
+    }
+
+private:
+    LeafNodeTypeA ** const  mNodesA;
+    LeafNodeTypeB ** const  mNodesB;
+};
+
+
+template<typename TreeType>
+struct ConstructVoxelMask
+{
+    typedef typename TreeType::LeafNodeType                         LeafNodeType;
+
+    typedef typename TreeType::template ValueConverter<bool>::Type  BoolTreeType;
+    typedef typename BoolTreeType::LeafNodeType                     BoolLeafNodeType;
+
+    ConstructVoxelMask(BoolTreeType& maskTree, const TreeType& tree, std::vector<LeafNodeType*>& nodes)
+        : mTree(&tree)
+        , mNodes(nodes.empty() ? NULL : &nodes[0])
+        , mLocalMaskTree(false)
+        , mMaskTree(&maskTree)
+    {
+    }
+
+    ConstructVoxelMask(ConstructVoxelMask& rhs, tbb::split)
+        : mTree(rhs.mTree)
+        , mNodes(rhs.mNodes)
+        , mLocalMaskTree(false)
+        , mMaskTree(&mLocalMaskTree)
+    {
+    }
+
+    void operator()(const tbb::blocked_range<size_t>& range)
+    {
+        typedef typename LeafNodeType::ValueOnCIter Iterator;
+
+        tree::ValueAccessor<const TreeType> acc(*mTree);
+        tree::ValueAccessor<BoolTreeType> maskAcc(*mMaskTree);
+
+        Coord ijk, nijk, localCorod;
+        Index pos, npos;
+
+        for (size_t n = range.begin(); n != range.end(); ++n) {
+
+            LeafNodeType& node = *mNodes[n];
+
+            CoordBBox bbox = node.getNodeBoundingBox();
+            bbox.expand(-1);
+
+            BoolLeafNodeType& maskNode = *maskAcc.touchLeaf(node.origin());
+
+            for (Iterator it = node.cbeginValueOn(); it; ++it) {
+                ijk = it.getCoord();
+                pos = it.pos();
+
+                localCorod = LeafNodeType::offsetToLocalCoord(pos);
+
+                if (localCorod[2] < int(LeafNodeType::DIM - 1)) {
+                    npos = pos + 1;
+                    if (!node.isValueOn(npos)) maskNode.setValueOn(npos);
+                } else {
+                    nijk = ijk.offsetBy(0, 0, 1);
+                    if (!acc.isValueOn(nijk)) maskAcc.setValueOn(nijk);
+                }
+
+                if (localCorod[2] > 0) {
+                    npos = pos - 1;
+                    if (!node.isValueOn(npos)) maskNode.setValueOn(npos);
+                } else {
+                    nijk = ijk.offsetBy(0, 0, -1);
+                    if (!acc.isValueOn(nijk)) maskAcc.setValueOn(nijk);
+                }
+
+                if (localCorod[1] < int(LeafNodeType::DIM - 1)) {
+                    npos = pos + LeafNodeType::DIM;
+                    if (!node.isValueOn(npos)) maskNode.setValueOn(npos);
+                } else {
+                    nijk = ijk.offsetBy(0, 1, 0);
+                    if (!acc.isValueOn(nijk)) maskAcc.setValueOn(nijk);
+                }
+
+                if (localCorod[1] > 0) {
+                    npos = pos - LeafNodeType::DIM;
+                    if (!node.isValueOn(npos)) maskNode.setValueOn(npos);
+                } else {
+                    nijk = ijk.offsetBy(0, -1, 0);
+                    if (!acc.isValueOn(nijk)) maskAcc.setValueOn(nijk);
+                }
+
+                if (localCorod[0] < int(LeafNodeType::DIM - 1)) {
+                    npos = pos + LeafNodeType::DIM * LeafNodeType::DIM;
+                    if (!node.isValueOn(npos)) maskNode.setValueOn(npos);
+                } else {
+                    nijk = ijk.offsetBy(1, 0, 0);
+                    if (!acc.isValueOn(nijk)) maskAcc.setValueOn(nijk);
+                }
+
+                if (localCorod[0] > 0) {
+                    npos = pos - LeafNodeType::DIM * LeafNodeType::DIM;
+                    if (!node.isValueOn(npos)) maskNode.setValueOn(npos);
+                } else {
+                    nijk = ijk.offsetBy(-1, 0, 0);
+                    if (!acc.isValueOn(nijk)) maskAcc.setValueOn(nijk);
+                }
+            }
+        }
+    }
+
+    void join(ConstructVoxelMask& rhs) { mMaskTree->merge(*rhs.mMaskTree); }
+
+private:
+    TreeType        const   * const mTree;
+    LeafNodeType           ** const mNodes;
+
+    BoolTreeType         mLocalMaskTree;
+    BoolTreeType * const mMaskTree;
+};
+
+
 /// @note The interior and exterior widths should be in world space units and squared.
-template<typename FloatTreeT>
-class ExpandNB
+template<typename TreeType, typename MeshDataAdapter>
+struct ExpandNarrowband
 {
-public:
-    typedef typename FloatTreeT::ValueType                              FloatValueT;
-    typedef typename FloatTreeT::LeafNodeType                           FloatLeafT;
-    typedef typename tree::ValueAccessor<FloatTreeT>                    FloatAccessorT;
-    typedef typename FloatTreeT::template ValueConverter<Int32>::Type   IntTreeT;
-    typedef typename IntTreeT::LeafNodeType                             IntLeafT;
-    typedef typename tree::ValueAccessor<IntTreeT>                      IntAccessorT;
-    typedef typename FloatTreeT::template ValueConverter<bool>::Type    BoolTreeT;
-    typedef typename BoolTreeT::LeafNodeType                            BoolLeafT;
-    typedef tree::LeafManager<BoolTreeT>                                BoolLeafManager;
-    typedef typename tree::ValueAccessor<BoolTreeT>                     BoolAccessorT;
+    typedef typename TreeType::ValueType                            ValueType;
+    typedef typename TreeType::LeafNodeType                         LeafNodeType;
+    typedef typename TreeType::template ValueConverter<Int32>::Type Int32TreeType;
+    typedef typename Int32TreeType::LeafNodeType                    Int32LeafNodeType;
+    typedef typename TreeType::template ValueConverter<bool>::Type  BoolTreeType;
+    typedef typename BoolTreeType::LeafNodeType                     BoolLeafNodeType;
 
-    ExpandNB(BoolLeafManager& leafs,
-        FloatTreeT& distTree, IntTreeT& indexTree, BoolTreeT& maskTree,
-        FloatValueT exteriorBandWidth, FloatValueT interiorBandWidth, FloatValueT voxelSize,
-        const std::vector<Vec3s>& pointList, const std::vector<Vec4I>& polygonList);
+    ExpandNarrowband(
+        std::vector<BoolLeafNodeType*>& maskNodes,
+        BoolTreeType& maskTree,
+        TreeType& distTree,
+        Int32TreeType& indexTree,
+        const MeshDataAdapter& mesh,
+        ValueType exteriorBandWidth,
+        ValueType interiorBandWidth,
+        ValueType voxelSize)
+        : mMaskNodes(maskNodes.empty() ? NULL : &maskNodes[0])
+        , mMaskTree(&maskTree)
+        , mDistTree(&distTree)
+        , mIndexTree(&indexTree)
+        , mMesh(&mesh)
+        , mNewMaskTree(false)
+        , mDistNodes()
+        , mUpdatedDistNodes()
+        , mIndexNodes()
+        , mUpdatedIndexNodes()
+        , mExteriorBandWidth(exteriorBandWidth)
+        , mInteriorBandWidth(interiorBandWidth)
+        , mVoxelSize(voxelSize)
+    {
+    }
 
-    void run(bool threaded = true);
+    ExpandNarrowband(const ExpandNarrowband& rhs, tbb::split)
+        : mMaskNodes(rhs.mMaskNodes)
+        , mMaskTree(rhs.mMaskTree)
+        , mDistTree(rhs.mDistTree)
+        , mIndexTree(rhs.mIndexTree)
+        , mMesh(rhs.mMesh)
+        , mNewMaskTree(false)
+        , mDistNodes()
+        , mUpdatedDistNodes()
+        , mIndexNodes()
+        , mUpdatedIndexNodes()
+        , mExteriorBandWidth(rhs.mExteriorBandWidth)
+        , mInteriorBandWidth(rhs.mInteriorBandWidth)
+        , mVoxelSize(rhs.mVoxelSize)
+    {
+    }
 
-    void operator()(const tbb::blocked_range<size_t>&);
-    void join(ExpandNB<FloatTreeT>&);
-    ExpandNB(const ExpandNB<FloatTreeT>&, tbb::split);
-    ~ExpandNB() {}
+    void join(ExpandNarrowband& rhs) {
+        mDistNodes.insert(mDistNodes.end(), rhs.mDistNodes.begin(), rhs.mDistNodes.end());
+        mIndexNodes.insert(mIndexNodes.end(), rhs.mIndexNodes.begin(), rhs.mIndexNodes.end());
+
+        mUpdatedDistNodes.insert(mUpdatedDistNodes.end(), rhs.mUpdatedDistNodes.begin(), rhs.mUpdatedDistNodes.end());
+        mUpdatedIndexNodes.insert(mUpdatedIndexNodes.end(), rhs.mUpdatedIndexNodes.begin(), rhs.mUpdatedIndexNodes.end());
+
+        mNewMaskTree.merge(rhs.mNewMaskTree);
+    }
+
+
+    void operator()(const tbb::blocked_range<size_t>& range) {
+
+        tree::ValueAccessor<BoolTreeType>   newMaskAcc(mNewMaskTree);
+        tree::ValueAccessor<TreeType>       distAcc(*mDistTree);
+        tree::ValueAccessor<Int32TreeType>  indexAcc(*mIndexTree);
+
+        std::vector<Int32> primitives;
+        primitives.reserve(26);
+
+        LeafNodeType        * newDistNodePt = NULL;
+        Int32LeafNodeType   * newIndexNodePt = NULL;
+
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+
+            BoolLeafNodeType& maskNode = *mMaskNodes[n];
+            if (maskNode.isEmpty()) continue;
+
+            Coord ijk = maskNode.origin();
+
+            bool usingNewNodes = false;
+
+            LeafNodeType        * distNodePt = distAcc.probeLeaf(ijk);
+            Int32LeafNodeType   * indexNodePt = indexAcc.probeLeaf(ijk);
+
+            assert(!distNodePt == !indexNodePt);
+
+            if (!distNodePt && !indexNodePt) {
+
+                const ValueType backgroundDist = distAcc.getValue(ijk);
+
+                if (!newDistNodePt && !newIndexNodePt) {
+                    newDistNodePt = new LeafNodeType(ijk, backgroundDist);
+                    newIndexNodePt = new Int32LeafNodeType(ijk, indexAcc.getValue(ijk));
+                } else {
+
+                    if ((backgroundDist < ValueType(0.0)) != (newDistNodePt->getValue(0) < ValueType(0.0))) {
+                        newDistNodePt->buffer().fill(backgroundDist);
+                    }
+
+                    newDistNodePt->setOrigin(ijk);
+                    newIndexNodePt->setOrigin(ijk);
+                }
+
+                distNodePt = newDistNodePt;
+                indexNodePt = newIndexNodePt;
+
+                usingNewNodes = true;
+            }
+
+            bool updatedValues = false;
+
+            for (typename BoolLeafNodeType::ValueOnIter it = maskNode.beginValueOn(); it; ++it) {
+
+                ijk = it.getCoord();
+                const Index pos = it.pos();
+
+                Int32 closestPrimIdx = 0;
+                const ValueType distance =
+                    computeDistance(ijk, distAcc, indexAcc, primitives, closestPrimIdx);
+
+                const bool inside = distNodePt->getValue(pos) < ValueType(0.0);
+
+                if (!inside && distance < mExteriorBandWidth) {
+                    distNodePt->setValueOnly(pos, distance);
+                    indexNodePt->setValueOn(pos, closestPrimIdx);
+                } else if (inside && distance < mInteriorBandWidth) {
+                    distNodePt->setValueOnly(pos, -distance);
+                    indexNodePt->setValueOn(pos, closestPrimIdx);
+                } else {
+                    continue;
+                }
+
+                for (Int32 i = 0; i < 6; ++i) {
+                    newMaskAcc.setValueOn(ijk + util::COORD_OFFSETS[i]);
+                }
+
+                updatedValues = true;
+            }
+
+
+            if (updatedValues && usingNewNodes) {
+
+                distNodePt->topologyUnion(*indexNodePt);
+
+                mDistNodes.push_back(distNodePt);
+                mIndexNodes.push_back(indexNodePt);
+
+                newDistNodePt = NULL;
+                newIndexNodePt = NULL;
+
+            } else if (updatedValues) {
+
+                mUpdatedDistNodes.push_back(distNodePt);
+                mUpdatedIndexNodes.push_back(indexNodePt);
+            }
+        }
+
+
+    }
+
+    //////////
+
+    BoolTreeType& newMaskTree() { return mNewMaskTree; }
+
+    std::vector<LeafNodeType*>& newDistNodes() { return mDistNodes; }
+    std::vector<LeafNodeType*>& updatedDistNodes() { return mUpdatedDistNodes; }
+
+    std::vector<Int32LeafNodeType*>& newIndexNodes() { return mIndexNodes; }
+    std::vector<Int32LeafNodeType*>& updatedIndexNodes() { return mUpdatedIndexNodes; }
 
 private:
-    void operator=(const ExpandNB<FloatTreeT>&) {}
 
-    double evalVoxelDist(const Coord&, FloatAccessorT&, IntAccessorT&,
-        BoolAccessorT&, std::vector<Int32>&, Int32&) const;
+    ValueType
+    computeDistance(const Coord& ijk,
+        tree::ValueAccessor<TreeType>& distAcc, tree::ValueAccessor<Int32TreeType>& idxAcc,
+        std::vector<Int32>& primitives, Int32& closestPrimIdx) const
+    {
+        ValueType minDist = std::numeric_limits<ValueType>::max();
+        primitives.clear();
 
-    double evalVoxelDist(const Coord&, FloatLeafT&, IntLeafT&,
-        BoolLeafT&, std::vector<Int32>&, Int32&) const;
+        const Coord ijkMin = ijk.offsetBy(-1);
+        const Coord ijkMax = ijk.offsetBy(1);
+        const Coord nodeMin = ijkMin & ~(LeafNodeType::DIM - 1);
+        const Coord nodeMax = ijkMax & ~(LeafNodeType::DIM - 1);
 
-    double closestPrimDist(const Coord&, std::vector<Int32>&, Int32&) const;
+        CoordBBox bbox;
+        Coord nijk;
 
-    BoolLeafManager& mMaskLeafs;
+        for (nijk[0] = nodeMin[0]; nijk[0] <= nodeMax[0]; nijk[0] += LeafNodeType::DIM) {
+            for (nijk[1] = nodeMin[1]; nijk[1] <= nodeMax[1]; nijk[1] += LeafNodeType::DIM) {
+                for (nijk[2] = nodeMin[2]; nijk[2] <= nodeMax[2]; nijk[2] += LeafNodeType::DIM) {
 
-    FloatTreeT& mDistTree;
-    IntTreeT& mIndexTree;
-    BoolTreeT& mMaskTree;
+                    if (LeafNodeType* distleaf = distAcc.probeLeaf(nijk)) {
 
-    const FloatValueT mExteriorBandWidth, mInteriorBandWidth, mVoxelSize;
-    const std::vector<Vec3s>& mPointList;
-    const std::vector<Vec4I>& mPolygonList;
+                        bbox.min() = Coord::maxComponent(ijkMin, nijk);
+                        bbox.max() = Coord::minComponent(ijkMax, nijk.offsetBy(LeafNodeType::DIM - 1));
 
-    FloatTreeT mNewDistTree;
-    IntTreeT mNewIndexTree;
-    BoolTreeT mNewMaskTree;
-};
-
-
-template<typename FloatTreeT>
-ExpandNB<FloatTreeT>::ExpandNB(
-    BoolLeafManager& leafs,
-    FloatTreeT& distTree,
-    IntTreeT& indexTree,
-    BoolTreeT& maskTree,
-    FloatValueT exteriorBandWidth,
-    FloatValueT interiorBandWidth,
-    FloatValueT voxelSize,
-    const std::vector<Vec3s>& pointList,
-    const std::vector<Vec4I>& polygonList)
-    : mMaskLeafs(leafs)
-    , mDistTree(distTree)
-    , mIndexTree(indexTree)
-    , mMaskTree(maskTree)
-    , mExteriorBandWidth(exteriorBandWidth)
-    , mInteriorBandWidth(interiorBandWidth)
-    , mVoxelSize(voxelSize)
-    , mPointList(pointList)
-    , mPolygonList(polygonList)
-    , mNewDistTree(std::numeric_limits<FloatValueT>::max())
-    , mNewIndexTree(Int32(util::INVALID_IDX))
-    , mNewMaskTree(false)
-{
-}
-
-
-template<typename FloatTreeT>
-ExpandNB<FloatTreeT>::ExpandNB(const ExpandNB<FloatTreeT>& rhs, tbb::split)
-    : mMaskLeafs(rhs.mMaskLeafs)
-    , mDistTree(rhs.mDistTree)
-    , mIndexTree(rhs.mIndexTree)
-    , mMaskTree(rhs.mMaskTree)
-    , mExteriorBandWidth(rhs.mExteriorBandWidth)
-    , mInteriorBandWidth(rhs.mInteriorBandWidth)
-    , mVoxelSize(rhs.mVoxelSize)
-    , mPointList(rhs.mPointList)
-    , mPolygonList(rhs.mPolygonList)
-    , mNewDistTree(std::numeric_limits<FloatValueT>::max())
-    , mNewIndexTree(Int32(util::INVALID_IDX))
-    , mNewMaskTree(false)
-{
-}
-
-
-template<typename FloatTreeT>
-void
-ExpandNB<FloatTreeT>::run(bool threaded)
-{
-    if (threaded) tbb::parallel_reduce(mMaskLeafs.getRange(), *this);
-    else (*this)(mMaskLeafs.getRange());
-
-    // Copy only the active voxels (tree::merge does branch stealing
-    // which also moves indicative values).
-    mDistTree.topologyUnion(mNewDistTree);
-    tree::LeafManager<FloatTreeT> leafs(mNewDistTree);
-    leafs.foreach(CopyActiveVoxelsOp<FloatTreeT>(mDistTree));
-
-    mIndexTree.merge(mNewIndexTree);
-
-    mMaskTree.clear();
-    mMaskTree.merge(mNewMaskTree);
-
-}
-
-
-template<typename FloatTreeT>
-void
-ExpandNB<FloatTreeT>::operator()(const tbb::blocked_range<size_t>& range)
-{
-    Coord ijk;
-    Int32 closestPrim = 0;
-    Index pos = 0;
-    FloatValueT distance;
-    bool inside;
-
-    FloatAccessorT newDistAcc(mNewDistTree);
-    IntAccessorT newIndexAcc(mNewIndexTree);
-    BoolAccessorT newMaskAcc(mNewMaskTree);
-
-    FloatAccessorT distAcc(mDistTree);
-    IntAccessorT indexAcc(mIndexTree);
-    BoolAccessorT maskAcc(mMaskTree);
-
-    CoordBBox bbox;
-    std::vector<Int32> primitives(18);
-
-    for (size_t n = range.begin(); n < range.end(); ++n) {
-
-        BoolLeafT& maskLeaf = mMaskLeafs.leaf(n);
-
-        if (maskLeaf.isEmpty()) continue;
-
-        ijk = maskLeaf.origin();
-
-        FloatLeafT* distLeafPt = distAcc.probeLeaf(ijk);
-
-        if (!distLeafPt) {
-            distLeafPt = new FloatLeafT(ijk, distAcc.getValue(ijk));
-            newDistAcc.addLeaf(distLeafPt);
+                        evalLeafNode(bbox, *distleaf, *idxAcc.probeLeaf(nijk), primitives, minDist);
+                    }
+                }
+            }
         }
 
-        IntLeafT* indexLeafPt = indexAcc.probeLeaf(ijk);
-        if (!indexLeafPt) indexLeafPt =  newIndexAcc.touchLeaf(ijk);
+        const ValueType tmpDist = evalPrimitives(ijk, primitives, closestPrimIdx);
+        return tmpDist > minDist ? tmpDist : minDist + mVoxelSize;
+    }
 
-        bbox = maskLeaf.getNodeBoundingBox();
-        bbox.expand(-1);
+    void
+    evalLeafNode(const CoordBBox& bbox, LeafNodeType& distLeaf,
+        Int32LeafNodeType& idxLeaf, std::vector<Int32>& primitives, ValueType& minNeighbourDist) const
+    {
+        ValueType tmpDist;
+        Index xPos(0), yPos(0), pos(0);
 
-        typename BoolLeafT::ValueOnIter iter = maskLeaf.beginValueOn();
-        for (; iter; ++iter) {
-
-            ijk = iter.getCoord();
-
-            if (bbox.isInside(ijk)) {
-                distance = FloatValueT(evalVoxelDist(ijk, *distLeafPt, *indexLeafPt, maskLeaf,
-                    primitives, closestPrim));
-            } else {
-                distance = FloatValueT(evalVoxelDist(ijk, distAcc, indexAcc, maskAcc,
-                    primitives, closestPrim));
-            }
-
-            pos = iter.pos();
-
-            inside = distLeafPt->getValue(pos) < FloatValueT(0.0);
-
-            if (!inside && distance < mExteriorBandWidth) {
-                distLeafPt->setValueOn(pos, distance);
-                indexLeafPt->setValueOn(pos, closestPrim);
-            } else if (inside && distance < mInteriorBandWidth) {
-                distLeafPt->setValueOn(pos, -distance);
-                indexLeafPt->setValueOn(pos, closestPrim);
-            } else {
-                continue;
-            }
-
-            for (Int32 i = 0; i < 6; ++i) {
-                newMaskAcc.setValueOn(ijk + util::COORD_OFFSETS[i]);
+        for (int x = bbox.min()[0]; x <= bbox.max()[0]; ++x) {
+            xPos = (x & (LeafNodeType::DIM - 1u)) << (2 * LeafNodeType::LOG2DIM);
+            for (int y = bbox.min()[1]; y <= bbox.max()[1]; ++y) {
+                yPos = xPos + ((y & (LeafNodeType::DIM - 1u)) << LeafNodeType::LOG2DIM);
+                for (int z = bbox.min()[2]; z <= bbox.max()[2]; ++z) {
+                    pos = yPos + (z & (LeafNodeType::DIM - 1u));
+                    if (distLeaf.probeValue(pos, tmpDist)) {
+                        primitives.push_back(idxLeaf.getValue(pos));
+                        minNeighbourDist = std::min(std::abs(tmpDist), minNeighbourDist);
+                    }
+                }
             }
         }
     }
-}
+
+    ValueType
+    evalPrimitives(const Coord& ijk, std::vector<Int32>& primitives, Int32& closestPrimIdx) const
+    {
+        std::sort(primitives.begin(), primitives.end());
+
+        Int32 lastPrim = -1;
+        Vec3d a, b, c, uvw, voxelCenter(ijk[0], ijk[1], ijk[2]);
+        double primDist, tmpDist, dist = std::numeric_limits<double>::max();
+        for (size_t n = 0, N = primitives.size(); n < N; ++n) {
+
+            if (primitives[n] == lastPrim) continue;
+
+            lastPrim = primitives[n];
+
+            const size_t polygon = size_t(lastPrim);
+
+            mMesh->getIndexSpacePoint(polygon, 0, a);
+            mMesh->getIndexSpacePoint(polygon, 1, b);
+            mMesh->getIndexSpacePoint(polygon, 2, c);
+
+            primDist = (voxelCenter -
+                closestPointOnTriangleToPoint(a, c, b, voxelCenter, uvw)).lengthSqr();
+
+            // Split-up quad into a second triangle
+            if (4 == mMesh->vertexCount(polygon)) {
+
+                mMesh->getIndexSpacePoint(polygon, 3, b);
+
+                tmpDist = (voxelCenter - closestPointOnTriangleToPoint(
+                    a, b, c, voxelCenter, uvw)).lengthSqr();
+
+                if (tmpDist < primDist) primDist = tmpDist;
+            }
+
+            if (primDist < dist) {
+                dist = primDist;
+                closestPrimIdx = lastPrim;
+            }
+        }
+
+        return ValueType(std::sqrt(dist)) * mVoxelSize;
+    }
 
 
-template<typename FloatTreeT>
-double
-ExpandNB<FloatTreeT>::evalVoxelDist(
-    const Coord& ijk,
-    FloatAccessorT& distAcc,
-    IntAccessorT& indexAcc,
-    BoolAccessorT& maskAcc,
-    std::vector<Int32>& prims,
-    Int32& closestPrim) const
+    //////////
+
+
+    BoolLeafNodeType     ** const mMaskNodes;
+    BoolTreeType          * const mMaskTree;
+    TreeType              * const mDistTree;
+    Int32TreeType         * const mIndexTree;
+
+    MeshDataAdapter const * const mMesh;
+
+    BoolTreeType mNewMaskTree;
+
+    std::vector<LeafNodeType*> mDistNodes, mUpdatedDistNodes;
+    std::vector<Int32LeafNodeType*> mIndexNodes, mUpdatedIndexNodes;
+
+    const ValueType mExteriorBandWidth, mInteriorBandWidth, mVoxelSize;
+}; // ExpandNarrowband
+
+
+template<typename TreeType, typename Int32TreeType, typename BoolTreeType, typename MeshDataAdapter>
+inline void
+expandNarrowband(
+    TreeType& distTree,
+    Int32TreeType& indexTree,
+    BoolTreeType& maskTree,
+    std::vector<typename BoolTreeType::LeafNodeType*>& maskNodes,
+    const MeshDataAdapter& mesh,
+    typename TreeType::ValueType exteriorBandWidth,
+    typename TreeType::ValueType interiorBandWidth,
+    typename TreeType::ValueType voxelSize)
 {
-    FloatValueT tmpDist, minDist = std::numeric_limits<FloatValueT>::max();
-    prims.clear();
+    typedef typename TreeType::LeafNodeType         LeafNodeType;
+    typedef typename Int32TreeType::LeafNodeType    Int32LeafNodeType;
 
-    // Collect primitive indices from active neighbors and min distance.
-    Coord n_ijk;
-    for (Int32 n = 0; n < 18; ++n) {
-        n_ijk = ijk + util::COORD_OFFSETS[n];
-        if (!maskAcc.isValueOn(n_ijk) && distAcc.probeValue(n_ijk, tmpDist)) {
-            prims.push_back(indexAcc.getValue(n_ijk));
-            tmpDist = std::abs(tmpDist);
-            if (tmpDist < minDist) minDist = tmpDist;
+    ExpandNarrowband<TreeType, MeshDataAdapter>
+        expandOp(maskNodes, maskTree, distTree, indexTree,
+            mesh, exteriorBandWidth, interiorBandWidth, voxelSize);
+
+    tbb::parallel_reduce(tbb::blocked_range<size_t>(0, maskNodes.size()), expandOp);
+
+    {
+        tree::ValueAccessor<TreeType> acc(distTree);
+        typedef typename std::vector<LeafNodeType*> LeafNodePtVec;
+        LeafNodePtVec& nodes = expandOp.newDistNodes();
+        for (typename LeafNodePtVec::iterator it = nodes.begin(), end = nodes.end(); it != end; ++it) {
+            acc.addLeaf(*it);
         }
     }
 
-    // Calc. this voxels distance to the closest primitive.
-    tmpDist = FloatValueT(closestPrimDist(ijk, prims, closestPrim));
-
-    // Forces the gradient to be monotonic for non-manifold
-    // polygonal models with self-intersections.
-    return tmpDist > minDist ? tmpDist : minDist + mVoxelSize;
-}
-
-
-// Leaf specialized version.
-template<typename FloatTreeT>
-double
-ExpandNB<FloatTreeT>::evalVoxelDist(
-    const Coord& ijk,
-    FloatLeafT& distLeaf,
-    IntLeafT& indexLeaf,
-    BoolLeafT& maskLeaf,
-    std::vector<Int32>& prims,
-    Int32& closestPrim) const
-{
-    FloatValueT tmpDist, minDist = std::numeric_limits<FloatValueT>::max();
-    prims.clear();
-
-    Index pos;
-    for (Int32 n = 0; n < 18; ++n) {
-        pos = FloatLeafT::coordToOffset(ijk + util::COORD_OFFSETS[n]);
-        if (!maskLeaf.isValueOn(pos) && distLeaf.probeValue(pos, tmpDist)) {
-            prims.push_back(indexLeaf.getValue(pos));
-            tmpDist = std::abs(tmpDist);
-            if (tmpDist < minDist) minDist = tmpDist;
+    {
+        tree::ValueAccessor<Int32TreeType> acc(indexTree);
+        typedef typename std::vector<Int32LeafNodeType*> LeafNodePtVec;
+        LeafNodePtVec& nodes = expandOp.newIndexNodes();
+        for (typename LeafNodePtVec::iterator it = nodes.begin(), end = nodes.end(); it != end; ++it) {
+            acc.addLeaf(*it);
         }
     }
 
-    tmpDist = FloatValueT(closestPrimDist(ijk, prims, closestPrim));
-    return tmpDist > minDist ? tmpDist : minDist + mVoxelSize;
-}
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, expandOp.updatedIndexNodes().size()),
+        UnionValueMasks<LeafNodeType, Int32LeafNodeType>(expandOp.updatedDistNodes(), expandOp.updatedIndexNodes()));
 
-
-template<typename FloatTreeT>
-double
-ExpandNB<FloatTreeT>::closestPrimDist(const Coord& ijk,
-    std::vector<Int32>& prims, Int32& closestPrim) const
-{
-    std::sort(prims.begin(), prims.end());
-
-    Int32 lastPrim = -1;
-    Vec3d uvw, voxelCenter(ijk[0], ijk[1], ijk[2]);
-    double primDist, tmpDist, dist = std::numeric_limits<double>::max();
-
-    for (size_t n = 0, N = prims.size(); n < N; ++n) {
-        if (prims[n] == lastPrim) continue;
-
-        lastPrim = prims[n];
-
-        const Vec4I& verts = mPolygonList[lastPrim];
-
-        // Evaluate first triangle
-        const Vec3d a(mPointList[verts[0]]);
-        const Vec3d b(mPointList[verts[1]]);
-        const Vec3d c(mPointList[verts[2]]);
-
-        primDist = (voxelCenter -
-            closestPointOnTriangleToPoint(a, c, b, voxelCenter, uvw)).lengthSqr();
-
-        // Split-up quad into a second triangle and calac distance.
-        if (util::INVALID_IDX != verts[3]) {
-            const Vec3d d(mPointList[verts[3]]);
-
-            tmpDist = (voxelCenter -
-                closestPointOnTriangleToPoint(a, d, c, voxelCenter, uvw)).lengthSqr();
-
-            if (tmpDist < primDist) primDist = tmpDist;
-        }
-
-        if (primDist < dist) {
-            dist = primDist;
-            closestPrim = lastPrim;
-        }
-    }
-
-    return std::sqrt(dist) * double(mVoxelSize);
-}
-
-
-template<typename FloatTreeT>
-void
-ExpandNB<FloatTreeT>::join(ExpandNB<FloatTreeT>& rhs)
-{
-    mNewDistTree.merge(rhs.mNewDistTree);
-    mNewIndexTree.merge(rhs.mNewIndexTree);
-    mNewMaskTree.merge(rhs.mNewMaskTree);
+    maskTree.clear();
+    maskTree.merge(expandOp.newMaskTree());
 }
 
 
 ////////////////////////////////////////
 
 
-template<typename ValueType>
-struct SqrtAndScaleOp
+// Transform values (sqrt, world space scaling and sign flip if sdf)
+template<typename TreeType>
+struct TransformValues
 {
-    SqrtAndScaleOp(ValueType voxelSize, bool unsignedDist = false)
-        : mVoxelSize(voxelSize)
+    typedef typename TreeType::LeafNodeType   LeafNodeType;
+    typedef typename TreeType::ValueType      ValueType;
+
+    TransformValues(std::vector<LeafNodeType*>& nodes,
+        ValueType voxelSize, bool unsignedDist)
+        : mNodes(&nodes[0])
+        , mVoxelSize(voxelSize)
         , mUnsigned(unsignedDist)
     {
     }
 
-    template <typename LeafNodeType>
-    void operator()(LeafNodeType &leaf, size_t/*leafIndex*/) const
-    {
-        ValueType w[2];
-        w[0] = mVoxelSize;
-        w[1] = -mVoxelSize;
+    void operator()(const tbb::blocked_range<size_t>& range) const {
 
-        typename LeafNodeType::ValueOnIter iter = leaf.beginValueOn();
-        for (; iter; ++iter) {
-            ValueType& val = const_cast<ValueType&>(iter.getValue());
-            val = w[!mUnsigned && int(val < ValueType(0.0))] * std::sqrt(std::abs(val));
-        }
-    }
+        typename LeafNodeType::ValueOnIter iter;
 
-private:
-    ValueType mVoxelSize;
-    const bool mUnsigned;
-};
+        const bool udf = mUnsigned;
+        const ValueType w[2] = { -mVoxelSize, mVoxelSize };
 
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
 
-template<typename ValueType>
-struct VoxelSignOp
-{
-    VoxelSignOp(ValueType exBandWidth, ValueType inBandWidth)
-        : mExBandWidth(exBandWidth)
-        , mInBandWidth(inBandWidth)
-    {
-    }
-
-    template <typename LeafNodeType>
-    void operator()(LeafNodeType &leaf, size_t/*leafIndex*/) const
-    {
-        ValueType bgValues[2];
-        bgValues[0] = mExBandWidth;
-        bgValues[1] = -mInBandWidth;
-
-        typename LeafNodeType::ValueOffIter iter = leaf.beginValueOff();
-
-        for (; iter; ++iter) {
-            ValueType& val = const_cast<ValueType&>(iter.getValue());
-            val = bgValues[int(val < ValueType(0.0))];
-        }
-    }
-
-private:
-    ValueType mExBandWidth, mInBandWidth;
-};
-
-
-template<typename ValueType>
-struct TrimOp
-{
-    TrimOp(ValueType exBandWidth, ValueType inBandWidth)
-        : mExBandWidth(exBandWidth)
-        , mInBandWidth(inBandWidth)
-    {
-    }
-
-    template <typename LeafNodeType>
-    void operator()(LeafNodeType &leaf, size_t/*leafIndex*/) const
-    {
-        typename LeafNodeType::ValueOnIter iter = leaf.beginValueOn();
-
-        for (; iter; ++iter) {
-            ValueType& val = const_cast<ValueType&>(iter.getValue());
-            const bool inside = val < ValueType(0.0);
-
-            if (inside && !(val > -mInBandWidth)) {
-                val = -mInBandWidth;
-                iter.setValueOff();
-            } else if (!inside && !(val < mExBandWidth)) {
-                val = mExBandWidth;
-                iter.setValueOff();
+            for (iter = mNodes[n]->beginValueOn(); iter; ++iter) {
+                ValueType& val = const_cast<ValueType&>(iter.getValue());
+                val = w[udf || (val < ValueType(0.0))] * std::sqrt(std::abs(val));
             }
         }
     }
 
 private:
-    ValueType mExBandWidth, mInBandWidth;
+    LeafNodeType * * const  mNodes;
+    const ValueType         mVoxelSize;
+    const bool              mUnsigned;
 };
 
 
-template<typename ValueType>
-struct OffsetOp
+// Inactivate values outside the (exBandWidth, inBandWidth) range.
+template<typename TreeType>
+struct InactivateValues
 {
-    OffsetOp(ValueType offset): mOffset(offset) {}
+    typedef typename TreeType::LeafNodeType   LeafNodeType;
+    typedef typename TreeType::ValueType      ValueType;
 
-    void resetOffset(ValueType offset) { mOffset = offset; }
-
-    template <typename LeafNodeType>
-    void operator()(LeafNodeType &leaf, size_t/*leafIndex*/) const
+    InactivateValues(std::vector<LeafNodeType*>& nodes,
+        ValueType exBandWidth, ValueType inBandWidth)
+        : mNodes(nodes.empty() ? NULL : &nodes[0])
+        , mExBandWidth(exBandWidth)
+        , mInBandWidth(inBandWidth)
     {
-        typename LeafNodeType::ValueOnIter iter = leaf.beginValueOn();
-        for (; iter; ++iter) {
-            ValueType& val = const_cast<ValueType&>(iter.getValue());
-            val += mOffset;
+    }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+
+        typename LeafNodeType::ValueOnIter iter;
+        const ValueType exVal = mExBandWidth;
+        const ValueType inVal = -mInBandWidth;
+
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+
+            for (iter = mNodes[n]->beginValueOn(); iter; ++iter) {
+
+                ValueType& val = const_cast<ValueType&>(iter.getValue());
+
+                const bool inside = val < ValueType(0.0);
+
+                if (inside && !(val > inVal)) {
+                    val = inVal;
+                    iter.setValueOff();
+                } else if (!inside && !(val < exVal)) {
+                    val = exVal;
+                    iter.setValueOff();
+                }
+            }
         }
     }
 
 private:
-    ValueType mOffset;
-};
-
-
-template<typename GridType, typename ValueType>
-struct RenormOp
-{
-    typedef math::BIAS_SCHEME<math::FIRST_BIAS> Scheme;
-    typedef typename Scheme::template ISStencil<GridType>::StencilType Stencil;
-    typedef tree::LeafManager<typename GridType::TreeType> LeafManagerType;
-    typedef typename LeafManagerType::BufferType BufferType;
-
-    RenormOp(GridType& grid, LeafManagerType& leafs, ValueType voxelSize, ValueType cfl = 1.0)
-        : mGrid(grid)
-        , mLeafs(leafs)
-        , mVoxelSize(voxelSize)
-        , mCFL(cfl)
-    {
-    }
-
-    void resetCFL(ValueType cfl) { mCFL = cfl; }
-
-    template <typename LeafNodeType>
-    void operator()(LeafNodeType &leaf, size_t leafIndex) const
-    {
-        const ValueType dt = mCFL * mVoxelSize, one(1.0), invDx = one / mVoxelSize;
-        Stencil stencil(mGrid);
-        BufferType& buffer = mLeafs.getBuffer(leafIndex, 1);
-
-        typename LeafNodeType::ValueOnIter iter = leaf.beginValueOn();
-        for (; iter; ++iter) {
-            stencil.moveTo(iter);
-
-            const ValueType normSqGradPhi =
-                math::ISGradientNormSqrd<math::FIRST_BIAS>::result(stencil);
-
-            const ValueType phi0 = iter.getValue();
-            const ValueType diff = math::Sqrt(normSqGradPhi) * invDx - one;
-            const ValueType S = phi0 / (math::Sqrt(math::Pow2(phi0) + normSqGradPhi));
-
-            buffer.setValue(iter.pos(), phi0 - dt * S * diff);
-        }
-    }
-
-private:
-    GridType& mGrid;
-    LeafManagerType& mLeafs;
-    ValueType mVoxelSize, mCFL;
-};
-
-
-template<typename TreeType, typename ValueType>
-struct MinOp
-{
-    typedef tree::LeafManager<TreeType> LeafManagerType;
-    typedef typename LeafManagerType::BufferType BufferType;
-
-    MinOp(LeafManagerType& leafs): mLeafs(leafs) {}
-
-    template <typename LeafNodeType>
-    void operator()(LeafNodeType &leaf, size_t leafIndex) const
-    {
-        BufferType& buffer = mLeafs.getBuffer(leafIndex, 1);
-        typename LeafNodeType::ValueOnIter iter = leaf.beginValueOn();
-
-        for (; iter; ++iter) {
-            ValueType& val = const_cast<ValueType&>(iter.getValue());
-            val = std::min(val, buffer.getValue(iter.pos()));
-        }
-    }
-
-private:
-    LeafManagerType& mLeafs;
-};
-
-
-template<typename TreeType, typename ValueType>
-struct MergeBufferOp
-{
-    typedef tree::LeafManager<TreeType> LeafManagerType;
-    typedef typename LeafManagerType::BufferType BufferType;
-
-    MergeBufferOp(LeafManagerType& leafs, size_t bufferIndex = 1)
-        : mLeafs(leafs)
-        , mBufferIndex(bufferIndex)
-    {
-    }
-
-    template <typename LeafNodeType>
-    void operator()(LeafNodeType &leaf, size_t leafIndex) const
-    {
-        BufferType& buffer = mLeafs.getBuffer(leafIndex, mBufferIndex);
-        typename LeafNodeType::ValueOnIter iter = leaf.beginValueOn();
-        Index offset;
-
-        for (; iter; ++iter) {
-            offset = iter.pos();
-            leaf.setValueOnly(offset, buffer.getValue(offset));
-        }
-    }
-
-private:
-    LeafManagerType& mLeafs;
-    const size_t mBufferIndex;
+    LeafNodeType * * const mNodes;
+    const ValueType mExBandWidth, mInBandWidth;
 };
 
 
 template<typename TreeType>
-struct LeafTopologyDiffOp
+struct OffsetValues
 {
-    typedef typename tree::ValueAccessor<TreeType> AccessorT;
-    typedef typename TreeType::LeafNodeType LeafNodeT;
+    typedef typename TreeType::LeafNodeType   LeafNodeType;
+    typedef typename TreeType::ValueType      ValueType;
 
-    LeafTopologyDiffOp(TreeType& tree) : mAcc(tree) { }
-
-    template <typename LeafNodeType>
-    void operator()(LeafNodeType &leaf, size_t) const
+    OffsetValues(std::vector<LeafNodeType*>& nodes, ValueType offset)
+        : mNodes(nodes.empty() ? NULL : &nodes[0]), mOffset(offset)
     {
-        const LeafNodeT* rhsLeaf = mAcc.probeConstLeaf(leaf.origin());
-        if (rhsLeaf) leaf.topologyDifference(*rhsLeaf, false);
+    }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+
+        const ValueType offset = mOffset;
+
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+
+            typename LeafNodeType::ValueOnIter iter = mNodes[n]->beginValueOn();
+
+            for (; iter; ++iter) {
+                ValueType& val = const_cast<ValueType&>(iter.getValue());
+                val += offset;
+            }
+        }
     }
 
 private:
-    AccessorT mAcc;
+    LeafNodeType * * const mNodes;
+    const ValueType mOffset;
 };
 
-} // internal namespace
+
+template<typename TreeType>
+struct Renormalize
+{
+    typedef typename TreeType::LeafNodeType     LeafNodeType;
+    typedef typename TreeType::ValueType        ValueType;
+
+    Renormalize(const TreeType& tree, const std::vector<LeafNodeType*>& nodes, ValueType* buffer, ValueType voxelSize)
+        : mTree(&tree)
+        , mNodes(nodes.empty() ? NULL : &nodes[0])
+        , mBuffer(buffer)
+        , mVoxelSize(voxelSize)
+    {
+    }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const
+    {
+        typedef math::Vec3<ValueType>   Vec3Type;
+
+        tree::ValueAccessor<const TreeType> acc(*mTree);
+
+        Coord ijk;
+        Vec3Type up, down;
+
+        const ValueType dx = mVoxelSize, invDx = ValueType(1.0) / mVoxelSize;
+
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+
+            ValueType* bufferData = &mBuffer[n * LeafNodeType::SIZE];
+
+            typename LeafNodeType::ValueOnCIter iter = mNodes[n]->cbeginValueOn();
+            for (; iter; ++iter) {
+
+                const ValueType phi0 = *iter;
+
+                ijk = iter.getCoord();
+
+                up[0] = acc.getValue(ijk.offsetBy(1, 0, 0)) - phi0;
+                up[1] = acc.getValue(ijk.offsetBy(0, 1, 0)) - phi0;
+                up[2] = acc.getValue(ijk.offsetBy(0, 0, 1)) - phi0;
+
+                down[0] = phi0 - acc.getValue(ijk.offsetBy(-1, 0, 0));
+                down[1] = phi0 - acc.getValue(ijk.offsetBy(0, -1, 0));
+                down[2] = phi0 - acc.getValue(ijk.offsetBy(0, 0, -1));
+
+                const ValueType normSqGradPhi = math::GodunovsNormSqrd(phi0 > 0.0, down, up);
+
+                const ValueType diff = math::Sqrt(normSqGradPhi) * invDx - ValueType(1.0);
+                const ValueType S = phi0 / (math::Sqrt(math::Pow2(phi0) + normSqGradPhi));
+
+                bufferData[iter.pos()] = phi0 - dx * S * diff;
+            }
+        }
+    }
+
+private:
+    TreeType             const * const mTree;
+    LeafNodeType const * const * const mNodes;
+    ValueType                  * const mBuffer;
+
+    const ValueType mVoxelSize;
+};
+
+
+template<typename TreeType>
+struct MinCombine
+{
+    typedef typename TreeType::LeafNodeType   LeafNodeType;
+    typedef typename TreeType::ValueType      ValueType;
+
+    MinCombine(std::vector<LeafNodeType*>& nodes, const ValueType* buffer)
+        : mNodes(nodes.empty() ? NULL : &nodes[0]), mBuffer(buffer)
+    {
+    }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+
+            const ValueType* bufferData = &mBuffer[n * LeafNodeType::SIZE];
+
+            typename LeafNodeType::ValueOnIter iter = mNodes[n]->beginValueOn();
+
+            for (; iter; ++iter) {
+                ValueType& val = const_cast<ValueType&>(iter.getValue());
+                val = std::min(val, bufferData[iter.pos()]);
+            }
+        }
+    }
+
+private:
+    LeafNodeType * * const mNodes;
+    ValueType const * const mBuffer;
+};
+
+
+} // mesh_to_volume_internal namespace
+
+
+////////////////////////////////////////
+
+// Utility method implementation
+
+
+template <typename FloatTreeT>
+inline void
+traceExteriorBoundaries(FloatTreeT& tree)
+{
+    typedef mesh_to_volume_internal::LeafNodeConnectivityTable<FloatTreeT> ConnectivityTable;
+
+    ConnectivityTable nodeConnectivity(tree);
+
+    std::vector<size_t> zStartNodes, yStartNodes, xStartNodes;
+
+    for (size_t n = 0; n < nodeConnectivity.size(); ++n) {
+        if (ConnectivityTable::INVALID_OFFSET == nodeConnectivity.offsetsPrevX()[n]) {
+            xStartNodes.push_back(n);
+        }
+
+        if (ConnectivityTable::INVALID_OFFSET == nodeConnectivity.offsetsPrevY()[n]) {
+            yStartNodes.push_back(n);
+        }
+
+        if (ConnectivityTable::INVALID_OFFSET == nodeConnectivity.offsetsPrevZ()[n]) {
+            zStartNodes.push_back(n);
+        }
+    }
+
+    typedef mesh_to_volume_internal::SweepExteriorSign<FloatTreeT> SweepingOp;
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, zStartNodes.size()),
+        SweepingOp(SweepingOp::Z_AXIS, zStartNodes, nodeConnectivity));
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, yStartNodes.size()),
+        SweepingOp(SweepingOp::Y_AXIS, yStartNodes, nodeConnectivity));
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, xStartNodes.size()),
+        SweepingOp(SweepingOp::X_AXIS, xStartNodes, nodeConnectivity));
+
+    const size_t numLeafNodes = nodeConnectivity.size();
+    const size_t numVoxels = numLeafNodes * FloatTreeT::LeafNodeType::SIZE;
+
+    boost::scoped_array<bool> changedNodeMaskA(new bool[numLeafNodes]);
+    boost::scoped_array<bool> changedNodeMaskB(new bool[numLeafNodes]);
+    boost::scoped_array<bool> changedVoxelMask(new bool[numVoxels]);
+
+    memset(changedNodeMaskA.get(), 1, sizeof(bool) * numLeafNodes);
+    mesh_to_volume_internal::fillArray(changedVoxelMask.get(), false, numVoxels);
+
+    const tbb::blocked_range<size_t> nodeRange(0, numLeafNodes);
+
+    bool nodesUpdated = false;
+    do {
+        tbb::parallel_for(nodeRange, mesh_to_volume_internal::SeedFillExteriorSign<FloatTreeT>(
+            nodeConnectivity.nodes(), changedNodeMaskA.get()));
+
+        tbb::parallel_for(nodeRange, mesh_to_volume_internal::SeedPoints<FloatTreeT>(nodeConnectivity,
+            changedNodeMaskA.get(), changedNodeMaskB.get(), changedVoxelMask.get()));
+
+        changedNodeMaskA.swap(changedNodeMaskB);
+
+        nodesUpdated = false;
+        for (size_t n = 0; n < numLeafNodes; ++n) {
+            nodesUpdated |= changedNodeMaskA[n];
+            if (nodesUpdated) break;
+        }
+
+        if (nodesUpdated) {
+            tbb::parallel_for(nodeRange, mesh_to_volume_internal::SyncVoxelMask<FloatTreeT>(
+                nodeConnectivity.nodes(), changedNodeMaskA.get(), changedVoxelMask.get()));
+        }
+    } while (nodesUpdated);
+
+} // void traceExteriorBoundaries()
 
 
 ////////////////////////////////////////
 
 
-// MeshToVolume
-
-template<typename FloatGridT, typename InterruptT>
-MeshToVolume<FloatGridT, InterruptT>::MeshToVolume(
-    openvdb::math::Transform::Ptr& transform, int conversionFlags,
-    InterruptT *interrupter, int signSweeps)
-    : mTransform(transform)
-    , mConversionFlags(conversionFlags)
-    , mSignSweeps(signSweeps)
-    , mInterrupter(interrupter)
+template <typename GridType, typename MeshDataAdapter, typename Interrupter>
+inline typename GridType::Ptr
+meshToVolume(
+  Interrupter& interrupter,
+  const MeshDataAdapter& mesh,
+  const math::Transform& transform,
+  float exteriorBandWidth,
+  float interiorBandWidth,
+  int flags,
+  typename GridType::template ValueConverter<Int32>::Type * polygonIndexGrid)
 {
-    clear();
-    mSignSweeps = std::min(mSignSweeps, 1);
-}
+    typedef typename GridType::Ptr              GridTypePtr;
+    typedef typename GridType::TreeType         TreeType;
+    typedef typename TreeType::LeafNodeType     LeafNodeType;
+    typedef typename GridType::ValueType        ValueType;
 
+    typedef typename GridType::template ValueConverter<Int32>::Type  Int32GridType;
+    typedef typename Int32GridType::TreeType                         Int32TreeType;
 
-template<typename FloatGridT, typename InterruptT>
-void
-MeshToVolume<FloatGridT, InterruptT>::clear()
-{
-    mDistGrid = FloatGridT::create(std::numeric_limits<FloatValueT>::max());
-    mIndexGrid = IntGridT::create(Int32(util::INVALID_IDX));
-    mIntersectingVoxelsGrid = BoolGridT::create(false);
-}
+    typedef typename TreeType::template ValueConverter<bool>::Type   BoolTreeType;
 
+    //////////
 
-template<typename FloatGridT, typename InterruptT>
-inline void
-MeshToVolume<FloatGridT, InterruptT>::convertToLevelSet(
-    const std::vector<Vec3s>& pointList, const std::vector<Vec4I>& polygonList,
-    FloatValueT exBandWidth, FloatValueT inBandWidth)
-{
-    // The narrow band width is exclusive, the shortest valid distance has to be > 1 voxel
-    exBandWidth = std::max(internal::Tolerance<FloatValueT>::minNarrowBandWidth(), exBandWidth);
-    inBandWidth = std::max(internal::Tolerance<FloatValueT>::minNarrowBandWidth(), inBandWidth);
-    const FloatValueT vs = FloatValueT(mTransform->voxelSize()[0]);
+    // Setup
 
-    // Convert from index space units to world-space units. To fill the
-    // interior, inBandWidth is passed FLOAT_MAX. Don't multiply with vs if so.
-    exBandWidth *= vs;
-    if (inBandWidth < std::numeric_limits<FloatValueT>::max()) {
-        inBandWidth *= vs;
-    }
+    GridTypePtr distGrid(new GridType(std::numeric_limits<ValueType>::max()));
+    distGrid->setTransform(transform.copy());
 
-    doConvert(pointList, polygonList, exBandWidth, inBandWidth);
-    mDistGrid->setGridClass(GRID_LEVEL_SET);
-}
+    ValueType exteriorWidth = ValueType(exteriorBandWidth);
+    ValueType interiorWidth = ValueType(interiorBandWidth);
 
-
-template<typename FloatGridT, typename InterruptT>
-inline void
-MeshToVolume<FloatGridT, InterruptT>::convertToUnsignedDistanceField(
-    const std::vector<Vec3s>& pointList, const std::vector<Vec4I>& polygonList,
-    FloatValueT exBandWidth)
-{
-    // The narrow band width is exclusive, the shortest valid distance has to be > 1 voxel
-    exBandWidth = std::max(internal::Tolerance<FloatValueT>::minNarrowBandWidth(), exBandWidth);
-    const FloatValueT vs = FloatValueT(mTransform->voxelSize()[0]);
-    doConvert(pointList, polygonList, vs * exBandWidth, 0.0, true);
-    mDistGrid->setGridClass(GRID_UNKNOWN);
-}
-
-
-template<typename FloatGridT, typename InterruptT>
-void
-MeshToVolume<FloatGridT, InterruptT>::doConvert(
-    const std::vector<Vec3s>& pointList, const std::vector<Vec4I>& polygonList,
-    FloatValueT exBandWidth, FloatValueT inBandWidth, bool unsignedDistField)
-{
-    mDistGrid->setTransform(mTransform);
-    mIndexGrid->setTransform(mTransform);
-    const bool rawData = OUTPUT_RAW_DATA & mConversionFlags;
-
-    // Note that inBandWidth is allowed to be infinite when filling the interior.
-    if (!boost::math::isfinite(exBandWidth) || boost::math::isnan(inBandWidth)) {
+    // inf interior width is all right, this value makes the converter fill
+    // interior regions with distance values.
+    if (!boost::math::isfinite(exteriorWidth) || boost::math::isnan(interiorWidth)) {
         std::stringstream msg;
-        msg << "Illegal narrow band width: exterior = " << exBandWidth
-            << ", interior = " << inBandWidth;
-        OPENVDB_THROW(ValueError, msg.str());
+        msg << "Illegal narrow band width: exterior = " << exteriorWidth
+            << ", interior = " << interiorWidth;
+        OPENVDB_LOG_DEBUG(msg.str());
+        return distGrid;
     }
 
+    const ValueType voxelSize = ValueType(transform.voxelSize()[0]);
 
-    // The progress estimates given to the interrupter are based on the
-    // observed average time for each stage and therefore not alway
-    // accurate. The goal is to give some progression feedback to the user.
+    if (!boost::math::isfinite(voxelSize) || math::isZero(voxelSize)) {
+        std::stringstream msg;
+        msg << "Illegal transform, voxel size = " << voxelSize;
+        OPENVDB_LOG_DEBUG(msg.str());
+        return distGrid;
+    }
 
-    if (wasInterrupted(1)) return;
+    // convert narrow band width from voxel units to world space units.
+    exteriorWidth *= voxelSize;
+    // avoid the unit conversion if the interior band width is set to
+    // inf or std::numeric_limits<float>::max()
+    if (interiorWidth < std::numeric_limits<ValueType>::max()) {
+        interiorWidth *= voxelSize;
+    }
+
+    const bool computeSignedDistanceField = (flags & UNSIGNED_DISTANCE_FIELD) == 0;
+    const bool removeIntersectingVoxels = (flags & DISABLE_INTERSECTING_VOXEL_REMOVAL) == 0;
+    const bool renormalizeValues = (flags & DISABLE_RENORMALIZATION) == 0;
+    const bool trimNarrowBand = (flags & DISABLE_NARROW_BAND_TRIMMING) == 0;
+
+    Int32GridType* indexGrid = NULL;
+
+    typename Int32GridType::Ptr temporaryIndexGrid;
+
+    if (polygonIndexGrid) {
+        indexGrid = polygonIndexGrid;
+    } else {
+        temporaryIndexGrid.reset(new Int32GridType(Int32(util::INVALID_IDX)));
+        indexGrid = temporaryIndexGrid.get();
+    }
+
+    indexGrid->newTree();
+    indexGrid->setTransform(transform.copy());
+
+    if (computeSignedDistanceField) {
+        distGrid->setGridClass(GRID_LEVEL_SET);
+    } else {
+        distGrid->setGridClass(GRID_UNKNOWN);
+        interiorWidth = ValueType(0.0);
+    }
+
+    TreeType& distTree = distGrid->tree();
+    Int32TreeType& indexTree = indexGrid->tree();
+
+
+    //////////
 
     // Voxelize mesh
+
     {
-        internal::MeshVoxelizer<FloatTreeT, InterruptT>
-            voxelizer(pointList, polygonList, mInterrupter);
+        typedef mesh_to_volume_internal::VoxelizationData<TreeType> VoxelizationDataType;
+        typedef tbb::enumerable_thread_specific<typename VoxelizationDataType::Ptr> DataTable;
 
-        voxelizer.run();
+        DataTable data;
+        typedef mesh_to_volume_internal::VoxelizePolygons<TreeType, MeshDataAdapter, Interrupter> Voxelizer;
 
-        if (wasInterrupted(18)) return;
+        const tbb::blocked_range<size_t> polygonRange(0, mesh.polygonCount());
 
-        mDistGrid->tree().merge(voxelizer.sqrDistTree());
-        mIndexGrid->tree().merge(voxelizer.primIndexTree());
-        mIntersectingVoxelsGrid->tree().merge(voxelizer.intersectionTree());
+        tbb::parallel_for(polygonRange, Voxelizer(data, mesh, &interrupter));
+
+        for (typename DataTable::iterator i = data.begin(); i != data.end(); ++i) {
+            VoxelizationDataType& dataItem = **i;
+            mesh_to_volume_internal::combineData(distTree, indexTree, dataItem.distTree, dataItem.indexTree);
+        }
     }
 
-    if (!unsignedDistField) {
-        // Determine the inside/outside state for the narrow band of voxels.
+    // the progress estimates are based on the observed average time for a few different
+    // test cases and is only intended to provide some rough progression feedback to the user.
+    if (interrupter.wasInterrupted(30)) return distGrid;
+
+
+    //////////
+
+    // Classify interior and exterior regions
+
+    if (computeSignedDistanceField) {
+
+        // determines the inside/outside state for the narrow band of voxels.
+        traceExteriorBoundaries(distTree);
+
+        std::vector<LeafNodeType*> nodes;
+        nodes.reserve(distTree.leafCount());
+        distTree.getNodes(nodes);
+
+        const tbb::blocked_range<size_t> nodeRange(0, nodes.size());
+
+        typedef mesh_to_volume_internal::ComputeIntersectingVoxelSign<TreeType, MeshDataAdapter> SignOp;
+
+        tbb::parallel_for(nodeRange, SignOp(nodes, distTree, indexTree, mesh));
+
+        if (interrupter.wasInterrupted(45)) return distGrid;
+
+        // remove voxels created by self intersecting portions of the mesh
+        if (removeIntersectingVoxels) {
+
+            tbb::parallel_for(nodeRange,
+                mesh_to_volume_internal::ValidateIntersectingVoxels<TreeType>(distTree, nodes));
+
+            tbb::parallel_for(nodeRange,
+                mesh_to_volume_internal::RemoveSelfIntersectingSurface<TreeType>(nodes, distTree, indexTree));
+
+            tools::pruneInactive(distTree,  /*threading=*/true);
+            tools::pruneInactive(indexTree, /*threading=*/true);
+        }
+    }
+
+    if (interrupter.wasInterrupted(50)) return distGrid;
+
+    if (distTree.activeVoxelCount() == 0) {
+        distGrid.reset((new GridType(ValueType(0.0))));
+        return distGrid;
+    }
+
+    // transform values (world space scaling etc.)
+    {
+        std::vector<LeafNodeType*> nodes;
+        nodes.reserve(distTree.leafCount());
+        distTree.getNodes(nodes);
+
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
+            mesh_to_volume_internal::TransformValues<TreeType>(nodes, voxelSize, !computeSignedDistanceField));
+    }
+
+    // propagate sign information into tile regions
+    if (computeSignedDistanceField) {
+        distTree.root().setBackground(exteriorWidth, /*updateChildNodes=*/false);
+        tools::signedFloodFillWithValues(distTree, exteriorWidth, -interiorWidth);
+    } else {
+        tools::changeBackground(distTree, exteriorWidth);
+    }
+
+    if (interrupter.wasInterrupted(54)) return distGrid;
+
+
+    //////////
+
+    // Expand the narrow band region
+
+    const ValueType minBandWidth = voxelSize * ValueType(2.0);
+
+    if (interiorWidth > minBandWidth || exteriorWidth > minBandWidth) {
+
+        // create the initial voxel mask.
+        BoolTreeType maskTree(false);
+
         {
-            // Slices up the volume and label the exterior contour of each slice in parallel.
-            internal::ContourTracer<FloatTreeT, InterruptT> trace(
-                mDistGrid->tree(), mIntersectingVoxelsGrid->tree(), mInterrupter);
-            for (int i = 0; i < mSignSweeps; ++i) {
+            std::vector<LeafNodeType*> nodes;
+            nodes.reserve(distTree.leafCount());
+            distTree.getNodes(nodes);
 
-                if (wasInterrupted(19)) return;
-
-                trace.run();
-
-                if (wasInterrupted(24)) return;
-
-                // Propagate sign information between the slices.
-                BoolTreeT signMaskTree(false);
-                {
-                    tree::LeafManager<FloatTreeT> leafs(mDistGrid->tree());
-                    internal::SignMask<FloatTreeT, InterruptT> signMaskOp(leafs,
-                        mDistGrid->tree(), mIntersectingVoxelsGrid->tree(), mInterrupter);
-                    signMaskOp.run();
-                    signMaskTree.merge(signMaskOp.signMaskTree());
-                }
-
-                if (wasInterrupted(25)) return;
-
-                while (true) {
-                    tree::LeafManager<BoolTreeT> leafs(signMaskTree);
-                    if(leafs.leafCount() == 0) break;
-
-                    internal::PropagateSign<FloatTreeT, InterruptT> sign(leafs,
-                        mDistGrid->tree(), mIntersectingVoxelsGrid->tree(), mInterrupter);
-
-                    sign.run();
-
-                    signMaskTree.clear();
-                    signMaskTree.merge(sign.signMaskTree());
-                }
-            }
+            mesh_to_volume_internal::ConstructVoxelMask<TreeType> op(maskTree, distTree, nodes);
+            tbb::parallel_reduce(tbb::blocked_range<size_t>(0, nodes.size()), op);
         }
 
-
-        if (wasInterrupted(28)) return;
-        {
-            tree::LeafManager<BoolTreeT> leafs(mIntersectingVoxelsGrid->tree());
-
-            // Determine the sign of the mesh intersecting voxels.
-            internal::IntersectingVoxelSign<FloatTreeT> sign(pointList, polygonList,
-                mDistGrid->tree(), mIndexGrid->tree(), mIntersectingVoxelsGrid->tree(), leafs);
-
-            sign.run();
-
-            if (wasInterrupted(34)) return;
-
-            // Remove mesh intersecting voxels that where set by rasterizing
-            // self-intersecting portions of the mesh.
-            internal::IntersectingVoxelCleaner<FloatTreeT> cleaner(mDistGrid->tree(),
-                mIndexGrid->tree(), mIntersectingVoxelsGrid->tree(), leafs);
-            cleaner.run();
-        }
-
-        // Remove shell voxels that where set by rasterizing
-        // self-intersecting portions of the mesh.
-        {
-            tree::LeafManager<FloatTreeT> leafs(mDistGrid->tree());
-
-            internal::ShellVoxelCleaner<FloatTreeT> cleaner(mDistGrid->tree(),
-                leafs, mIndexGrid->tree(), mIntersectingVoxelsGrid->tree());
-
-            cleaner.run();
-        }
-
-        if (wasInterrupted(38)) return;
-
-    } else { // if unsigned dist. field
-        inBandWidth = FloatValueT(0.0);
-    }
-
-    if (mDistGrid->activeVoxelCount() == 0) {
-        tools::changeBackground(mDistGrid->tree(), exBandWidth);
-        return;
-    }
-
-    mIntersectingVoxelsGrid->clear();
-    const FloatValueT voxelSize = FloatValueT(mTransform->voxelSize()[0]);
-
-    { // Transform values (world space scaling etc.)
-        tree::LeafManager<FloatTreeT> leafs(mDistGrid->tree());
-        leafs.foreach(internal::SqrtAndScaleOp<FloatValueT>(voxelSize, unsignedDistField));
-    }
-
-    if (wasInterrupted(40)) return;
-
-    if (!unsignedDistField) { // Propagate sign information to inactive values.
-        mDistGrid->tree().root().setBackground(exBandWidth, /*updateChildNodes=*/false);
-        tools::signedFloodFillWithValues(mDistGrid->tree(), exBandWidth, -inBandWidth);
-    }
-
-    if (wasInterrupted(46)) return;
-
-    // Narrow-band dilation
-    const FloatValueT minWidth = FloatValueT(voxelSize * 2.0);
-    if (inBandWidth > minWidth || exBandWidth > minWidth) {
-
-        // Create the initial voxel mask.
-        BoolTreeT maskTree(false);
-        maskTree.topologyUnion(mDistGrid->tree());
-
-        if (wasInterrupted(48)) return;
-
-        internal::LeafTopologyDiffOp<FloatTreeT> diffOp(mDistGrid->tree());
-        openvdb::tools::dilateVoxels(maskTree);
-
+        // progress estimation
         unsigned maxIterations = std::numeric_limits<unsigned>::max();
-        float progress = 48, step = 0.0;
-        // progress estimation..
+
+        float progress = 54.0f, step = 0.0f;
         double estimated =
-            2.0 * std::ceil((std::max(inBandWidth, exBandWidth) - minWidth) / voxelSize);
+            2.0 * std::ceil((std::max(interiorWidth, exteriorWidth) - minBandWidth) / voxelSize);
+
         if (estimated < double(maxIterations)) {
             maxIterations = unsigned(estimated);
-            step = 42.f / float(maxIterations);
+            step = 40.0f / float(maxIterations);
         }
 
+        std::vector<typename BoolTreeType::LeafNodeType*> maskNodes;
+
+        // expand
         unsigned count = 0;
         while (true) {
 
-            if (wasInterrupted(int(progress))) return;
+            if (interrupter.wasInterrupted(int(progress))) return distGrid;
 
-            tree::LeafManager<BoolTreeT> leafs(maskTree);
+            const size_t maskNodeCount = maskTree.leafCount();
+            if (maskNodeCount == 0) break;
 
-            if (leafs.leafCount() == 0) break;
+            maskNodes.clear();
+            maskNodes.reserve(maskNodeCount);
+            maskTree.getNodes(maskNodes);
 
-            leafs.foreach(diffOp);
+            const tbb::blocked_range<size_t> range(0, maskNodes.size());
 
-            internal::ExpandNB<FloatTreeT> expand(
-                leafs, mDistGrid->tree(), mIndexGrid->tree(), maskTree,
-                exBandWidth, inBandWidth, voxelSize, pointList, polygonList);
+            tbb::parallel_for(range,
+                mesh_to_volume_internal::DiffLeafNodeMask<TreeType>(distTree, maskNodes));
 
-            expand.run();
+            mesh_to_volume_internal::expandNarrowband(distTree, indexTree, maskTree, maskNodes,
+                mesh, exteriorWidth, interiorWidth, voxelSize);
 
             if ((++count) >= maxIterations) break;
             progress += step;
         }
     }
 
-    if (!bool(GENERATE_PRIM_INDEX_GRID & mConversionFlags)) mIndexGrid->clear();
+    if (interrupter.wasInterrupted(94)) return distGrid;
 
-    if (wasInterrupted(80)) return;
+    if (!polygonIndexGrid) indexGrid->clear();
 
-    // Renormalize distances to smooth out bumps caused by self-intersecting
+
+    /////////
+
+    // Renormalize distances to smooth out bumps caused by self intersecting
     // and overlapping portions of the mesh and renormalize the level set.
-    if (!unsignedDistField && !rawData) {
 
-        tools::pruneLevelSet(mDistGrid->tree(), exBandWidth, -inBandWidth);
+    if (computeSignedDistanceField && renormalizeValues) {
 
-        tree::LeafManager<FloatTreeT> leafs(mDistGrid->tree(), 1);
+        std::vector<LeafNodeType*> nodes;
+        nodes.reserve(distTree.leafCount());
+        distTree.getNodes(nodes);
 
-        const FloatValueT offset = FloatValueT(0.8 * voxelSize);
-        if (wasInterrupted(82)) return;
+        boost::scoped_array<ValueType> buffer(new ValueType[LeafNodeType::SIZE * nodes.size()]);
 
-        internal::OffsetOp<FloatValueT> offsetOp(-offset);
+        const ValueType offset = ValueType(0.8 * voxelSize);
 
-        leafs.foreach(offsetOp);
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
+            mesh_to_volume_internal::OffsetValues<TreeType>(nodes, -offset));
 
-        if (wasInterrupted(84)) return;
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
+            mesh_to_volume_internal::Renormalize<TreeType>(distTree, nodes, buffer.get(), voxelSize));
 
-        leafs.foreach(internal::RenormOp<FloatGridT, FloatValueT>(*mDistGrid, leafs, voxelSize));
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
+            mesh_to_volume_internal::MinCombine<TreeType>(nodes, buffer.get()));
 
-        leafs.foreach(internal::MinOp<FloatTreeT, FloatValueT>(leafs));
-
-        if (wasInterrupted(95)) return;
-
-        offsetOp.resetOffset(offset - internal::Tolerance<FloatValueT>::epsilon());
-        leafs.foreach(offsetOp);
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
+            mesh_to_volume_internal::OffsetValues<TreeType>(nodes, offset - mesh_to_volume_internal::Tolerance<ValueType>::epsilon()));
     }
 
-    if (wasInterrupted(98)) return;
+    if (interrupter.wasInterrupted(99)) return distGrid;
 
-    const FloatValueT minTrimWidth = FloatValueT(voxelSize * 4.0);
-    if (inBandWidth < minTrimWidth || exBandWidth < minTrimWidth) {
 
-        // If the narrow band was not expanded, we might need to trim off
-        // some of the active voxels in order to respect the narrow band limits.
-        // (The mesh voxelization step generates some extra 'shell' voxels)
+    /////////
 
-        tree::LeafManager<FloatTreeT> leafs(mDistGrid->tree());
-        leafs.foreach(internal::TrimOp<FloatValueT>(
-            exBandWidth, unsignedDistField ? exBandWidth : inBandWidth));
+    // Remove active voxels that exceed the narrow band limits
 
-        tools::pruneLevelSet(mDistGrid->tree(), exBandWidth, unsignedDistField ? -exBandWidth : -inBandWidth);
+    if (trimNarrowBand && std::min(interiorWidth, exteriorWidth) < voxelSize * ValueType(4.0)) {
+
+        std::vector<LeafNodeType*> nodes;
+        nodes.reserve(distTree.leafCount());
+        distTree.getNodes(nodes);
+
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
+            mesh_to_volume_internal::InactivateValues<TreeType>(nodes, exteriorWidth, computeSignedDistanceField ? interiorWidth : exteriorWidth));
+
+        tools::pruneLevelSet(distTree, exteriorWidth, computeSignedDistanceField ? -interiorWidth : -exteriorWidth);
     }
+
+    return distGrid;
+}
+
+
+template <typename GridType, typename MeshDataAdapter>
+inline typename GridType::Ptr
+meshToVolume(
+  const MeshDataAdapter& mesh,
+  const math::Transform& transform,
+  float exteriorBandWidth,
+  float interiorBandWidth,
+  int flags,
+  typename GridType::template ValueConverter<Int32>::Type * polygonIndexGrid)
+{
+    util::NullInterrupter nullInterrupter;
+    return meshToVolume<GridType>(nullInterrupter, mesh, transform,
+        exteriorBandWidth, interiorBandWidth, flags, polygonIndexGrid);
 }
 
 
@@ -2580,43 +3221,58 @@ doMeshConversion(
     float inBandWidth,
     bool unsignedDistanceField = false)
 {
-    std::vector<Vec3s> indexSpacePoints(points.size());
-
-    { // Copy and transform (required for MeshToVolume) points to grid space.
-        internal::PointTransform ptnXForm(points, indexSpacePoints, xform);
-        ptnXForm.run();
+    if (points.empty()) {
+        return typename GridType::Ptr(new GridType(typename GridType::ValueType(exBandWidth)));
     }
 
-    // Copy primitives
-    std::vector<Vec4I> primitives(triangles.size() + quads.size());
+    const size_t numPoints = points.size();
+    boost::scoped_array<Vec3s> indexSpacePoints(new Vec3s[numPoints]);
+
+    // transform points to local grid index space
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, numPoints),
+        mesh_to_volume_internal::TransformPoints<Vec3s>(
+                &points[0], indexSpacePoints.get(), xform));
+
+    const int conversionFlags = unsignedDistanceField ? UNSIGNED_DISTANCE_FIELD : 0;
+
+    if (quads.empty()) {
+
+        QuadAndTriangleDataAdapter<Vec3s, Vec3I>
+            mesh(indexSpacePoints.get(), numPoints, &triangles[0], triangles.size());
+
+        return meshToVolume<GridType>(mesh, xform, exBandWidth, inBandWidth, conversionFlags);
+
+    } else if (triangles.empty()) {
+
+        QuadAndTriangleDataAdapter<Vec3s, Vec4I>
+            mesh(indexSpacePoints.get(), numPoints, &quads[0], quads.size());
+
+        return meshToVolume<GridType>(mesh, xform, exBandWidth, inBandWidth, conversionFlags);
+    }
+
+    // pack primitives
+
+    const size_t numPrimitives = triangles.size() + quads.size();
+    boost::scoped_array<Vec4I> prims(new Vec4I[numPrimitives]);
 
     for (size_t n = 0, N = triangles.size(); n < N; ++n) {
-        Vec4I& prim = primitives[n];
         const Vec3I& triangle = triangles[n];
+        Vec4I& prim = prims[n];
         prim[0] = triangle[0];
         prim[1] = triangle[1];
         prim[2] = triangle[2];
         prim[3] = util::INVALID_IDX;
     }
 
+    const size_t offset = triangles.size();
     for (size_t n = 0, N = quads.size(); n < N; ++n) {
-        primitives[n + triangles.size()] = quads[n];
+        prims[offset + n] = quads[n];
     }
 
-    typename GridType::ValueType exWidth(exBandWidth);
-    typename GridType::ValueType inWidth(inBandWidth);
+    QuadAndTriangleDataAdapter<Vec3s, Vec4I>
+        mesh(indexSpacePoints.get(), numPoints, prims.get(), numPrimitives);
 
-
-    math::Transform::Ptr transform = xform.copy();
-    MeshToVolume<GridType> vol(transform);
-
-    if (!unsignedDistanceField) {
-        vol.convertToLevelSet(indexSpacePoints, primitives, exWidth, inWidth);
-    } else {
-        vol.convertToUnsignedDistanceField(indexSpacePoints, primitives, exWidth);
-    }
-
-    return vol.distGridPtr();
+    return meshToVolume<GridType>(mesh, xform, exBandWidth, inBandWidth, conversionFlags);
 }
 
 
@@ -2635,7 +3291,7 @@ doMeshConversion(
     bool /*unsignedDistanceField*/ = false)
 {
     OPENVDB_THROW(TypeError,
-        "mesh to volume conversion is supported only for scalar, floating-point grids");
+        "mesh to volume conversion is supported only for scalar floating-point grids");
 }
 
 
@@ -2911,7 +3567,7 @@ MeshToVoxelEdgeData::GenEdgeData::voxelize(const Primitive& prim)
     std::deque<Coord> coordList;
     Coord ijk, nijk;
 
-    ijk = util::nearestCoord(prim.a);
+    ijk = Coord::floor(prim.a);
     coordList.push_back(ijk);
 
     evalPrimitive<IsQuad>(ijk, prim);
@@ -3224,12 +3880,45 @@ MeshToVoxelEdgeData::getEdgeData(
 }
 
 
+template<typename GridType, typename VecType>
+inline typename GridType::Ptr
+createLevelSetBox(const math::BBox<VecType>& bbox,
+    const openvdb::math::Transform& xform,
+    typename VecType::ValueType halfWidth)
+{
+    const Vec3s pmin = Vec3s(xform.worldToIndex(bbox.min()));
+    const Vec3s pmax = Vec3s(xform.worldToIndex(bbox.max()));
+
+    Vec3s points[8];
+    points[0] = Vec3s(pmin[0], pmin[1], pmin[2]);
+    points[1] = Vec3s(pmin[0], pmin[1], pmax[2]);
+    points[2] = Vec3s(pmax[0], pmin[1], pmax[2]);
+    points[3] = Vec3s(pmax[0], pmin[1], pmin[2]);
+    points[4] = Vec3s(pmin[0], pmax[1], pmin[2]);
+    points[5] = Vec3s(pmin[0], pmax[1], pmax[2]);
+    points[6] = Vec3s(pmax[0], pmax[1], pmax[2]);
+    points[7] = Vec3s(pmax[0], pmax[1], pmin[2]);
+
+    Vec4I faces[6];
+    faces[0] = Vec4I(0, 1, 2, 3); // bottom
+    faces[1] = Vec4I(7, 6, 5, 4); // top
+    faces[2] = Vec4I(4, 5, 1, 0); // front
+    faces[3] = Vec4I(6, 7, 3, 2); // back
+    faces[4] = Vec4I(0, 3, 7, 4); // left
+    faces[5] = Vec4I(1, 5, 6, 2); // right
+
+    QuadAndTriangleDataAdapter<Vec3s, Vec4I> mesh(points, 8, faces, 6);
+
+    return meshToVolume<GridType>(mesh, xform, halfWidth, halfWidth);
+}
+
+
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
 #endif // OPENVDB_TOOLS_MESH_TO_VOLUME_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -28,8 +28,8 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-#ifndef OPENVDB_TREE_LEAFNODEBOOL_HAS_BEEN_INCLUDED
-#define OPENVDB_TREE_LEAFNODEBOOL_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_TREE_LEAF_NODE_BOOL_HAS_BEEN_INCLUDED
+#define OPENVDB_TREE_LEAF_NODE_BOOL_HAS_BEEN_INCLUDED
 
 #include <iostream>
 #include <boost/shared_ptr.hpp>
@@ -56,6 +56,7 @@ class LeafNode<bool, Log2Dim>
 public:
     typedef LeafNode<bool, Log2Dim>         LeafNodeType;
     typedef boost::shared_ptr<LeafNodeType> Ptr;
+    typedef bool                            BuildType; 
     typedef bool                            ValueType;
     typedef util::NodeMask<Log2Dim>         NodeMaskType;
 
@@ -84,6 +85,8 @@ public:
     class Buffer
     {
     public:
+        typedef typename NodeMaskType::Word WordType;
+        static const Index WORD_COUNT = NodeMaskType::WORD_COUNT;
         Buffer() {}
         Buffer(bool on) : mData(on) {}
         Buffer(const NodeMaskType& other): mData(other) {}
@@ -110,6 +113,22 @@ public:
 
         Index memUsage() const { return mData.memUsage(); }
         static Index size() { return SIZE; }
+
+        /// Return a point to the c-style array of words encoding the bits.
+        /// @warning This method should only be used by experts that
+        /// seek low-level optimizations.
+        WordType* data()
+        {
+            return &(mData.template getWord<WordType>(0));
+        }
+        /// Return a const point to the c-style array of words
+        /// encoding the bits.
+        /// @warning This method should only be used by experts that
+        /// seek low-level optimizations.
+        const WordType* data() const
+        {
+            return const_cast<Buffer*>(this)->data();
+        }
 
     private:
         friend class ::TestLeaf;
@@ -306,7 +325,7 @@ public:
     /// Set the value of the voxel at the given coordinates and mark the voxel as active.
     void setValueOn(const Coord& xyz, bool val);
     /// Set the value of the voxel at the given coordinates and mark the voxel as active.
-    void setValue(const Coord& xyz, bool val) { this->setValueOn(xyz, val); };
+    void setValue(const Coord& xyz, bool val) { this->setValueOn(xyz, val); }
     /// Set the value of the voxel at the given offset and mark the voxel as active.
     void setValueOn(Index offset, bool val);
 
@@ -473,7 +492,7 @@ public:
     void merge(const LeafNode& other, bool bg = false, bool otherBG = false);
     template<MergePolicy Policy> void merge(bool tileValue, bool tileActive);
 
-    void voxelizeActiveTiles() {};
+    void voxelizeActiveTiles() {}
 
     /// @brief Union this node's set of active values with the active values
     /// of the other node, whose @c ValueType may be different. So a
@@ -555,6 +574,7 @@ public:
     template<typename NodeT>
     const NodeT* probeConstNode(const Coord&) const { return NULL; }
     template<typename ArrayT> void getNodes(ArrayT&) const {}
+    template<typename ArrayT> void stealNodes(ArrayT&, const ValueType&, bool) {}
     //@}
 
     void addTile(Index level, const Coord&, bool val, bool active);
@@ -730,6 +750,7 @@ public:
     bool isValueMaskOff(Index n) const { return mValueMask.isOff(n); }
     bool isValueMaskOff() const { return mValueMask.isOff(); }
     const NodeMaskType& getValueMask() const { return mValueMask; }
+    const NodeMaskType& valueMask() const { return mValueMask; }
     NodeMaskType& getValueMask() { return mValueMask; }
     void setValueMask(const NodeMaskType& mask) { mValueMask = mask; }
     bool isChildMaskOn(Index) const { return false; } // leaf nodes have no children
@@ -802,17 +823,18 @@ template<Index Log2Dim> const bool LeafNode<bool, Log2Dim>::sOff = false;
 
 template<Index Log2Dim>
 inline
-LeafNode<bool, Log2Dim>::LeafNode(): mOrigin(0, 0, 0)
+LeafNode<bool, Log2Dim>::LeafNode()
+  : mOrigin(0, 0, 0)
 {
 }
 
 
 template<Index Log2Dim>
 inline
-LeafNode<bool, Log2Dim>::LeafNode(const Coord& xyz, bool value, bool active):
-    mValueMask(active),
-    mBuffer(value),
-    mOrigin(xyz & (~(DIM - 1)))
+LeafNode<bool, Log2Dim>::LeafNode(const Coord& xyz, bool value, bool active)
+    : mValueMask(active)
+    , mBuffer(value)
+    , mOrigin(xyz & (~(DIM - 1)))
 {
 }
 
@@ -820,10 +842,10 @@ LeafNode<bool, Log2Dim>::LeafNode(const Coord& xyz, bool value, bool active):
 #ifndef OPENVDB_2_ABI_COMPATIBLE
 template<Index Log2Dim>
 inline
-LeafNode<bool, Log2Dim>::LeafNode(PartialCreate, const Coord& xyz, bool value, bool active):
-    mValueMask(active),
-    mBuffer(value),
-    mOrigin(xyz & (~(DIM - 1)))
+LeafNode<bool, Log2Dim>::LeafNode(PartialCreate, const Coord& xyz, bool value, bool active)
+    : mValueMask(active)
+    , mBuffer(value)
+    , mOrigin(xyz & (~(DIM - 1)))
 {
     /// @todo For now, this is identical to the non-PartialCreate constructor.
     /// Consider modifying the Buffer class to allow it to be constructed
@@ -834,10 +856,10 @@ LeafNode<bool, Log2Dim>::LeafNode(PartialCreate, const Coord& xyz, bool value, b
 
 template<Index Log2Dim>
 inline
-LeafNode<bool, Log2Dim>::LeafNode(const LeafNode &other):
-    mValueMask(other.mValueMask),
-    mBuffer(other.mBuffer),
-    mOrigin(other.mOrigin)
+LeafNode<bool, Log2Dim>::LeafNode(const LeafNode &other)
+    : mValueMask(other.valueMask())
+    , mBuffer(other.mBuffer)
+    , mOrigin(other.mOrigin)
 {
 }
 
@@ -846,9 +868,9 @@ LeafNode<bool, Log2Dim>::LeafNode(const LeafNode &other):
 template<Index Log2Dim>
 template<typename ValueT>
 inline
-LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other):
-    mValueMask(other.getValueMask()),
-    mOrigin(other.origin())
+LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other)
+    : mValueMask(other.valueMask())
+    , mOrigin(other.origin())
 {
     struct Local {
         /// @todo Consider using a value conversion functor passed as an argument instead.
@@ -865,10 +887,10 @@ template<Index Log2Dim>
 template<typename ValueT>
 inline
 LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other,
-                                  bool background, TopologyCopy):
-    mValueMask(other.getValueMask()),
-    mBuffer(background),
-    mOrigin(other.origin())
+                                  bool background, TopologyCopy)
+    : mValueMask(other.valueMask())
+    , mBuffer(background)
+    , mOrigin(other.origin())
 {
 }
 
@@ -876,10 +898,10 @@ LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other,
 template<Index Log2Dim>
 template<typename ValueT>
 inline
-LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other, TopologyCopy):
-    mValueMask(other.getValueMask()),
-    mBuffer(other.getValueMask()), // value = active state
-    mOrigin(other.origin())
+LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other, TopologyCopy)
+    : mValueMask(other.valueMask())
+    , mBuffer(other.valueMask())// value = active state
+    , mOrigin(other.origin())
 {
 }
 
@@ -888,10 +910,10 @@ template<Index Log2Dim>
 template<typename ValueT>
 inline
 LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other,
-                                  bool offValue, bool onValue, TopologyCopy):
-    mValueMask(other.getValueMask()),
-    mBuffer(other.getValueMask()),
-    mOrigin(other.origin())
+                                  bool offValue, bool onValue, TopologyCopy)
+    : mValueMask(other.valueMask())
+    , mBuffer(other.valueMask())
+    , mOrigin(other.origin())
 {
     if (offValue) { if (!onValue) mBuffer.mData.toggle(); else mBuffer.mData.setOn(); }
 }
@@ -1087,7 +1109,9 @@ template<Index Log2Dim>
 inline bool
 LeafNode<bool, Log2Dim>::operator==(const LeafNode& other) const
 {
-    return (mValueMask == other.mValueMask && mBuffer.mData == other.mBuffer.mData);
+    return mOrigin == other.mOrigin &&
+           mValueMask == other.valueMask() &&
+           mBuffer == other.mBuffer;
 }
 
 
@@ -1109,11 +1133,10 @@ LeafNode<bool, Log2Dim>::isConstant(bool& constValue, bool& state, bool toleranc
     state = mValueMask.isOn();
 
     if (!(state || mValueMask.isOff())) return false;
-
+    
     // Note: if tolerance is true (i.e., 1), then all boolean values compare equal.
     if (!tolerance && !(mBuffer.mData.isOn() || mBuffer.mData.isOff())) return false;
-
-    state = mValueMask.isOn();
+    
     constValue = mBuffer.mData.isOn();
     return true;
 }
@@ -1134,8 +1157,8 @@ inline void
 LeafNode<bool, Log2Dim>::addTile(Index offset, bool val, bool active)
 {
     assert(offset < SIZE);
-    setValueOnly(offset, val);
-    setActiveState(offset, active);
+    this->setValueOnly(offset, val);
+    this->setActiveState(offset, active);
 }
 
 template<Index Log2Dim>
@@ -1292,7 +1315,7 @@ LeafNode<bool, Log2Dim>::merge(const LeafNode& other, bool /*bg*/, bool /*otherB
 {
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
     if (Policy == MERGE_NODES) return;
-    for (typename NodeMaskType::OnIterator iter = other.mValueMask.beginOn(); iter; ++iter) {
+    for (typename NodeMaskType::OnIterator iter = other.valueMask().beginOn(); iter; ++iter) {
         const Index n = iter.pos();
         if (mValueMask.isOff(n)) {
             mBuffer.mData.set(n, other.mBuffer.mData.isOn(n));
@@ -1326,7 +1349,7 @@ template<typename OtherType>
 inline void
 LeafNode<bool, Log2Dim>::topologyUnion(const LeafNode<OtherType, Log2Dim>& other)
 {
-    mValueMask |= other.getValueMask();
+    mValueMask |= other.valueMask();
 }
 
 
@@ -1336,7 +1359,7 @@ inline void
 LeafNode<bool, Log2Dim>::topologyIntersection(const LeafNode<OtherType, Log2Dim>& other,
                                               const bool&)
 {
-    mValueMask &= other.getValueMask();
+    mValueMask &= other.valueMask();
 }
 
 
@@ -1346,7 +1369,7 @@ inline void
 LeafNode<bool, Log2Dim>::topologyDifference(const LeafNode<OtherType, Log2Dim>& other,
                                             const bool&)
 {
-    mValueMask &= !other.getValueMask();
+    mValueMask &= !other.valueMask();
 }
 
 
@@ -1504,7 +1527,7 @@ LeafNode<bool, Log2Dim>::combine(const LeafNode& other, CombineOp& op)
         op(args.setARef(aVal)
             .setAIsActive(mValueMask.isOn(i))
             .setBRef(bVal)
-            .setBIsActive(other.mValueMask.isOn(i))
+            .setBIsActive(other.valueMask().isOn(i))
             .setResultRef(result));
         mValueMask.set(i, args.resultIsActive());
         mBuffer.mData.set(i, result);
@@ -1544,7 +1567,7 @@ LeafNode<bool, Log2Dim>::combine2(const LeafNode& other, const OtherType& value,
     for (Index i = 0; i < SIZE; ++i) {
         bool result = false, aVal = other.mBuffer.mData.isOn(i);
         op(args.setARef(aVal)
-            .setAIsActive(other.mValueMask.isOn(i))
+            .setAIsActive(other.valueMask().isOn(i))
             .setResultRef(result));
         mValueMask.set(i, args.resultIsActive());
         mBuffer.mData.set(i, result);
@@ -1563,7 +1586,7 @@ LeafNode<bool, Log2Dim>::combine2(bool value, const OtherNodeT& other,
     for (Index i = 0; i < SIZE; ++i) {
         bool result = false, bVal = other.mBuffer.mData.isOn(i);
         op(args.setBRef(bVal)
-            .setBIsActive(other.mValueMask.isOn(i))
+            .setBIsActive(other.valueMask().isOn(i))
             .setResultRef(result));
         mValueMask.set(i, args.resultIsActive());
         mBuffer.mData.set(i, result);
@@ -1579,13 +1602,13 @@ LeafNode<bool, Log2Dim>::combine2(const LeafNode& b0, const OtherNodeT& b1, Comb
     CombineArgs<bool, typename OtherNodeT::ValueType> args;
     for (Index i = 0; i < SIZE; ++i) {
         // Default behavior: output voxel is active if either input voxel is active.
-        mValueMask.set(i, b0.mValueMask.isOn(i) || b1.mValueMask.isOn(i));
+        mValueMask.set(i, b0.valueMask().isOn(i) || b1.valueMask().isOn(i));
 
         bool result = false, b0Val = b0.mBuffer.mData.isOn(i), b1Val = b1.mBuffer.mData.isOn(i);
         op(args.setARef(b0Val)
-            .setAIsActive(b0.mValueMask.isOn(i))
+            .setAIsActive(b0.valueMask().isOn(i))
             .setBRef(b1Val)
-            .setBIsActive(b1.mValueMask.isOn(i))
+            .setBIsActive(b1.valueMask().isOn(i))
             .setResultRef(result));
         mValueMask.set(i, args.resultIsActive());
         mBuffer.mData.set(i, result);
@@ -1741,8 +1764,8 @@ LeafNode<bool, Log2Dim>::doVisit2(NodeT& self, OtherChildAllIterT& otherIter,
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-#endif // OPENVDB_TREE_LEAFNODEBOOL_HAS_BEEN_INCLUDED
+#endif // OPENVDB_TREE_LEAF_NODE_BOOL_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

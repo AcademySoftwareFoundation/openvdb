@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -874,11 +874,12 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
     const openvdb::GridClass gridClass = firstGrid->getGridClass();
 
     typename GridType::ConstPtr refGrid;
-    typedef typename openvdb::tools::MeshToVolume<GridType>::IntGridT IntGridT;
+    typedef typename GridType::template ValueConverter<openvdb::Int32>::Type IntGridT;
     typename IntGridT::Ptr indexGrid; // replace
 
     openvdb::tools::MeshToVoxelEdgeData edgeData;
 
+# if 0
     // Check for reference VDB
     {
         const GA_PrimitiveGroup *refGroup =
@@ -891,6 +892,7 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
             }
         }
     }
+#endif
 
     // Check for reference mesh
     boost::shared_ptr<GU_Detail> geoPtr;
@@ -917,19 +919,18 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
 
         if (boss.wasInterrupted()) return;
 
-        openvdb::tools::MeshToVolume<GridType, hvdb::Interrupter>
-            converter(transform, openvdb::tools::GENERATE_PRIM_INDEX_GRID, &boss);
+        openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec4I> mesh(pointList, primList);
 
-        if (gridClass == openvdb::GRID_LEVEL_SET) {
-            converter.convertToLevelSet(pointList, primList);
-        } else {
-            const ValueType bandWidth =
-                static_cast<ValueType>(backgroundValue / transform->voxelSize()[0]);
-            converter.convertToLevelSet(pointList, primList, bandWidth, bandWidth);
+        float bandWidth = 3.0;
+
+        if (gridClass != openvdb::GRID_LEVEL_SET) {
+            bandWidth = float(backgroundValue) / float(transform->voxelSize()[0]);
         }
 
-        refGrid = converter.distGridPtr();
-        indexGrid = converter.indexGridPtr();
+        indexGrid.reset(new IntGridT(0));
+
+        refGrid = openvdb::tools::meshToVolume<GridType>(boss,
+            mesh, *transform, bandWidth, bandWidth, 0, indexGrid.get());
 
         if (sharpenFeatures) edgeData.convert(pointList, primList);
     }
@@ -1073,6 +1074,6 @@ SOP_OpenVDB_To_Polygons::referenceMeshing(
     }
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

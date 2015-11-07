@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -57,7 +57,7 @@ public:
     /// Constructor with one argument, e.g.   Vec2f v(0);
     explicit Vec2(T val) { this->mm[0] = this->mm[1] = val; }
 
-    /// Constructor with three arguments, e.g.   Vec2f v(1,2,3);
+    /// Constructor with two arguments, e.g.   Vec2f v(1,2,3);
     Vec2(T x, T y)
     {
         this->mm[0] = x;
@@ -463,6 +463,28 @@ isApproxEqual(const Vec2<T>& a, const Vec2<T>& b, const Vec2<T>& eps)
            isApproxEqual(a.y(), b.y(), eps.y());
 }
 
+template<typename T>
+inline bool
+isFinite(const Vec2<T>& v)
+{
+    return isFinite(v[0]) && isFinite(v[1]);
+}
+
+/// Return @c true if all components are exactly equal to zero.
+template<typename T>
+inline bool
+isZero(const Vec2<T>& v)
+{
+    return isZero(v[0]) && isZero(v[1]);
+}
+
+template<typename T>
+inline Vec2<T>
+Abs(const Vec2<T>& v)
+{
+    return Vec2<T>(Abs(v[0]), Abs(v[1]));
+}
+
 /// Orthonormalize vectors v1 and v2 and store back the resulting basis
 /// e.g.   Vec2f::orthonormalize(v1,v2);
 template <typename T>
@@ -526,6 +548,6 @@ typedef Vec2<double>    Vec2d;
 
 #endif // OPENVDB_MATH_VEC2_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

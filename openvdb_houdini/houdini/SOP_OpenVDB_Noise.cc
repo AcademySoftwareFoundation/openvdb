@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -57,7 +57,7 @@ struct FractalBoltzmanGenerator
         float lacunarity, float roughness, int mode):
         mOctaves(octaves), mNoiseMode(mode), mFreq(freq), mAmp(amp), mGain(gain),
         mLacunarity(lacunarity), mRoughness(roughness)
-    {};
+    {}
 
     // produce the noise as float
     float noise(cvdb::Vec3R point, float freqMult = 1.0f) const
@@ -123,7 +123,7 @@ class SOP_OpenVDB_Noise: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Noise(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Noise() {};
+    virtual ~SOP_OpenVDB_Noise() {}
 
     static OP_Node* factory(OP_Network*, const char*, OP_Operator*);
 
@@ -463,7 +463,7 @@ SOP_OpenVDB_Noise::cookMySop(OP_Context &context)
         const fpreal time = context.getTime();
 
         // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
-        duplicateSource(0, context);
+        duplicateSourceStealable(0, context);
 
         // Evaluate the FractalBoltzman noise parameters from UI
         FractalBoltzmanGenerator fbGenerator(static_cast<float>(evalFloat("freq", 0, time)),
@@ -551,6 +551,6 @@ SOP_OpenVDB_Noise::cookMySop(OP_Context &context)
     return error();
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

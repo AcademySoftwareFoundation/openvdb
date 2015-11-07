@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -563,6 +563,28 @@ isApproxEqual(const Vec3<T>& a, const Vec3<T>& b, const Vec3<T>& eps)
            isApproxEqual(a.z(), b.z(), eps.z());
 }
 
+template<typename T>
+inline bool
+isFinite(const Vec3<T>& v)
+{
+    return isFinite(v[0]) && isFinite(v[1]) && isFinite(v[2]);
+}
+
+/// Return @c true if all components are exactly equal to zero.
+template<typename T>
+inline bool
+isZero(const Vec3<T>& v)
+{
+    return isZero(v[0]) && isZero(v[1]) && isZero(v[2]);
+}
+
+template<typename T>
+inline Vec3<T>
+Abs(const Vec3<T>& v)
+{
+    return Vec3<T>(Abs(v[0]), Abs(v[1]), Abs(v[2]));
+}
+
 /// Orthonormalize vectors v1, v2 and v3 and store back the resulting
 /// basis e.g.   Vec3d::orthonormalize(v1,v2,v3);
 template <typename T>
@@ -634,6 +656,6 @@ typedef Vec3<double>    Vec3d;
 
 #endif // OPENVDB_MATH_VEC3_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

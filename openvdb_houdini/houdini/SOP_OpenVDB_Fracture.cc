@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -229,7 +229,7 @@ SOP_OpenVDB_Fracture::cookMySop(OP_Context& context)
     try {
         hutil::ScopedInputLock lock(*this, context);
         const fpreal time = context.getTime();
-        duplicateSource(0, context);
+        duplicateSourceStealable(0, context);
 
         hvdb::Interrupter boss("Converting geometry to volume");
 
@@ -283,7 +283,9 @@ SOP_OpenVDB_Fracture::cookMySop(OP_Context& context)
 
             GU_PrimVDB* vdb = vdbIter.getPrimitive();
 
-            grids.push_back(vdb->getGrid().deepCopyGrid());
+            vdb->makeGridUnique();
+
+            grids.push_back(vdb->getGrid().copyGrid());
             grids.back()->setName(vdb->getGridName());
 
             grids.back()->insertMeta("houdiniorigoffset",
@@ -368,7 +370,6 @@ SOP_OpenVDB_Fracture::process(
     const int visualization = evalInt("visualizepieces", 0, time);
     const bool segmentFragments = bool(evalInt("segmentfragments", 0, time));
 
-    typedef typename GridType::TreeType TreeType;
     typedef typename GridType::ValueType ValueType;
 
     typename GridType::Ptr firstGrid = openvdb::gridPtrCast<GridType>(grids.front());
@@ -646,7 +647,7 @@ SOP_OpenVDB_Fracture::process(
 #endif
 
     const int cutterObjects = separatecutters ? primClassifier.getNumClass() : 1;
-    const ValueType bandWidth = ValueType(backgroundValue / transform->voxelSize()[0]);
+    const float bandWidth = float(backgroundValue / transform->voxelSize()[0]);
 
     if (cutterObjects > 1) {
         GA_Offset start, end;
@@ -708,12 +709,9 @@ SOP_OpenVDB_Fracture::process(
                     }
                 }
 
-                openvdb::tools::MeshToVolume<GridType, hvdb::Interrupter>
-                    converter(transform, /*conversion flags*/0, &boss);
+                openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec4I> mesh(pointList, primList);
 
-                converter.convertToLevelSet(pointList, primList, bandWidth, bandWidth);
-                cutterGrid = converter.distGridPtr();
-
+                cutterGrid = openvdb::tools::meshToVolume<GridType>(boss, mesh, *transform, bandWidth, bandWidth);
             }
 
             if (!cutterGrid || cutterGrid->activeVoxelCount() == 0) continue;
@@ -733,11 +731,10 @@ SOP_OpenVDB_Fracture::process(
             UTparallelFor(GA_SplittableRange(cutterGeo->getPrimitiveRange()),
                 hvdb::PrimCpyOp(cutterGeo, primList));
 
-            openvdb::tools::MeshToVolume<GridType, hvdb::Interrupter>
-                converter(transform, /*conversion flags*/0, &boss);
 
-            converter.convertToLevelSet(pointList, primList, bandWidth, bandWidth);
-            cutterGrid = converter.distGridPtr();
+            openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec4I> mesh(pointList, primList);
+
+            cutterGrid = openvdb::tools::meshToVolume<GridType>(boss, mesh, *transform, bandWidth, bandWidth);
         }
 
         if (!cutterGrid || cutterGrid->activeVoxelCount() == 0 || boss.wasInterrupted()) return;
@@ -942,6 +939,6 @@ SOP_OpenVDB_Fracture::process(
     }
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

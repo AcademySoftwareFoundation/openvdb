@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -105,7 +105,22 @@ public:
     /// @brief Return the linear offset into this grid's value array given by
     /// unsigned coordinates (i, j, k), i.e., coordinates relative to
     /// the origin of this grid's bounding box.
+    ///
+    /// @warning The input coordinates are assume to be relative to
+    /// the grid's origin, i.e. minimum of its index bounding box!
     inline size_t coordToOffset(size_t i, size_t j, size_t k) const { return i*mX + j*mY + k; }
+
+    /// @brief Return the local coordinate corresponding to the specified linear offset.
+    ///
+    /// @warning The returned coordinate is relative to the origin of this
+    /// grid's bounding box so add dense.origin() to get absolute coordinates.
+    inline Coord offsetToLocalCoord(size_t n) const
+    {
+      const size_t x = n / mX;
+      n -= mX*x;
+      const size_t y = n / mY;
+      return Coord(Coord::ValueType(x), Coord::ValueType(y), Coord::ValueType(n - mY*y));
+    }
 
     /// @brief Return the stride of the array in the x direction ( = dimY*dimZ).
     /// @note This method is required by both CopyToDense and CopyFromDense.
@@ -128,7 +143,7 @@ protected:
 };// end of DenseBase<ValueT, LayoutZYX>
 
 /// @brief Partial template specialization of DenseBase.
-/// @note This is the memory-layout emplayed in Houdini and Maya. It leads
+/// @note This is the memory-layout employed in Houdini and Maya. It leads
 /// to nested for-loops of the order z, y, x.
 template<typename ValueT>
 class DenseBase<ValueT, LayoutXYZ>
@@ -137,7 +152,22 @@ public:
     /// @brief Return the linear offset into this grid's value array given by
     /// unsigned coordinates (i, j, k), i.e., coordinates relative to
     /// the origin of this grid's bounding box.
+    ///
+    /// @warning The input coordinates are assume to be relative to
+    /// the grid's origin, i.e. minimum of its index bounding box!
     inline size_t coordToOffset(size_t i, size_t j, size_t k) const { return i + j*mY + k*mZ; }
+
+    /// @brief Return the index coordinate corresponding to the specified linear offset.
+    ///
+    /// @warning The returned coordinate is relative to the origin of this
+    /// grid's bounding box so add dense.origin() to get absolute coordinates.
+    inline Coord offsetToLocalCoord(size_t n) const
+    {
+        const size_t z = n / mZ;
+        n -= mZ*z;
+        const size_t y = n / mY;
+        return Coord(Coord::ValueType(n - mY*y), Coord::ValueType(y), Coord::ValueType(z));
+    }
 
     /// @brief Return the stride of the array in the x direction ( = 1).
     /// @note This method is required by both CopyToDense and CopyFromDense.
@@ -241,6 +271,9 @@ public:
     /// @note This method is required by both CopyToDense and CopyFromDense.
     inline const CoordBBox& bbox() const { return BaseT::mBBox; }
 
+     /// Return the grid's origin in index coordinates.
+    inline const Coord& origin() const { return BaseT::mBBox.min(); }
+
     /// @brief Return the number of voxels contained in this grid.
     inline Index64 valueCount() const { return BaseT::mBBox.volume(); }
 
@@ -292,12 +325,18 @@ public:
     ///
     /// @note This method reflects the fact that we assume the same
     /// layout of values as an OpenVDB grid, i.e., the fastest coordinate is @e z.
-    inline size_t coordToOffset(Coord xyz) const
+    inline size_t coordToOffset(const Coord& xyz) const
     {
         assert(BaseT::mBBox.isInside(xyz));
         return BaseT::coordToOffset(size_t(xyz[0]-BaseT::mBBox.min()[0]),
                                     size_t(xyz[1]-BaseT::mBBox.min()[1]),
                                     size_t(xyz[2]-BaseT::mBBox.min()[2]));
+    }
+
+    /// @brief Return the global coordinate corresponding to the specified linear offset.
+    inline Coord offsetToCoord(size_t n) const
+    {
+      return this->offsetToLocalCoord(n) + BaseT::mBBox.min();
     }
 
     /// @brief Return the memory footprint of this Dense grid in bytes.
@@ -330,7 +369,7 @@ private:
 /// @note Only voxels that intersect the dense grid's bounding box are copied
 /// from the OpenVDB tree.  But both active and inactive voxels are copied,
 /// so all existing values in the dense grid are overwritten, regardless of
-/// the OpenVDB tree's tolopogy.
+/// the OpenVDB tree's topology.
 template<typename _TreeT, typename _DenseT = Dense<typename _TreeT::ValueType> >
 class CopyToDense
 {
@@ -420,7 +459,7 @@ public:
     {
         mBlocks = new std::vector<Block>();
         const CoordBBox& bbox = mDense->bbox();
-        // Pre-process: Construct a list of blocks alligned with (potential) leaf nodes
+        // Pre-process: Construct a list of blocks aligned with (potential) leaf nodes
         for (CoordBBox sub=bbox; sub.min()[0] <= bbox.max()[0]; sub.min()[0] = sub.max()[0] + 1) {
             for (sub.min()[1] = bbox.min()[1]; sub.min()[1] <= bbox.max()[1];
                  sub.min()[1] = sub.max()[1] + 1)
@@ -455,8 +494,7 @@ public:
         delete mBlocks;
         mBlocks = NULL;
 
-        tools::pruneTiles(*mTree, mTolerance);
-        //mTree->root().pruneTiles(mTolerance);
+        tools::pruneTiles(*mTree, mTolerance);//multi-threaded
     }
 
     /// @brief Public method called by tbb::parallel_for
@@ -530,6 +568,6 @@ copyFromDense(const DenseT& dense, GridOrTreeT& sparse,
 
 #endif // OPENVDB_TOOLS_DENSE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

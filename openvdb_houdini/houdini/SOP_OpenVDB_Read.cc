@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -47,7 +47,7 @@ class SOP_OpenVDB_Read: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Read(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Read() {};
+    virtual ~SOP_OpenVDB_Read() {}
 
     virtual void getDescriptiveParmName(UT_String& s) const { s = "file_name"; }
 
@@ -446,6 +446,6 @@ SOP_OpenVDB_Read::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

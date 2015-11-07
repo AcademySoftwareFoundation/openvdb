@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -40,18 +40,18 @@
 /// openvdb::vX_Y_Z::Vec3i, openvdb::vX_Y_Z::io::File, openvdb::vX_Y_Z::tree::Tree, etc.,
 /// where X, Y and Z are OPENVDB_LIBRARY_MAJOR_VERSION, OPENVDB_LIBRARY_MINOR_VERSION
 /// and OPENVDB_LIBRARY_PATCH_VERSION, respectively (defined below).
-#define OPENVDB_VERSION_NAME v3_0_0
+#define OPENVDB_VERSION_NAME v3_2_0
 
 // Library major, minor and patch version numbers
 #define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 3
-#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 0
+#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 2
 #define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 0
 
 /// @brief Library version number string of the form "<major>.<minor>.<patch>"
 /// @details This is a macro rather than a static constant because we typically
 /// want the compile-time version number, not the runtime version number
 /// (although the two are usually the same).
-#define OPENVDB_LIBRARY_VERSION_STRING "3.0.0"
+#define OPENVDB_LIBRARY_VERSION_STRING "3.2.0"
 
 /// Library version number as a packed integer ("%02x%02x%04x", major, minor, patch)
 #define OPENVDB_LIBRARY_VERSION_NUMBER \
@@ -128,6 +128,6 @@ struct VersionId {
 
 #endif // OPENVDB_VERSION_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -48,7 +48,7 @@ class SOP_OpenVDB_Clip: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Clip(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Clip() {};
+    virtual ~SOP_OpenVDB_Clip() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
@@ -138,7 +138,6 @@ struct LevelSetMaskOp
 
 struct BBoxClipOp
 {
-    BBoxClipOp() {}
     BBoxClipOp(const openvdb::BBoxd& bbox_): bbox(bbox_) {}
 
     template<typename GridType>
@@ -289,6 +288,6 @@ SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

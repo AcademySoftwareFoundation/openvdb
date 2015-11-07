@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -153,9 +153,9 @@ struct BIAS_SCHEME {
     static const DScheme FD = FD_1ST;
     static const DScheme BD = BD_1ST;
 
-    template<typename GridType>
+    template<typename GridType, bool IsSafe = true>
     struct ISStencil {
-        typedef SevenPointStencil<GridType>  StencilType;
+        typedef SevenPointStencil<GridType, IsSafe>  StencilType;
     };
 };
 
@@ -164,9 +164,9 @@ template<> struct BIAS_SCHEME<FIRST_BIAS>
     static const DScheme FD = FD_1ST;
     static const DScheme BD = BD_1ST;
 
-    template<typename GridType>
+    template<typename GridType, bool IsSafe = true>
     struct ISStencil {
-        typedef SevenPointStencil<GridType>  StencilType;
+        typedef SevenPointStencil<GridType, IsSafe>  StencilType;
     };
 };
 
@@ -175,9 +175,9 @@ template<> struct BIAS_SCHEME<SECOND_BIAS>
     static const DScheme FD = FD_2ND;
     static const DScheme BD = BD_2ND;
 
-    template<typename GridType>
+    template<typename GridType, bool IsSafe = true>
     struct ISStencil {
-        typedef ThirteenPointStencil<GridType>  StencilType;
+        typedef ThirteenPointStencil<GridType, IsSafe>  StencilType;
       };
 };
 template<> struct BIAS_SCHEME<THIRD_BIAS>
@@ -185,9 +185,9 @@ template<> struct BIAS_SCHEME<THIRD_BIAS>
     static const DScheme FD = FD_3RD;
     static const DScheme BD = BD_3RD;
 
-    template<typename GridType>
+    template<typename GridType, bool IsSafe = true>
     struct ISStencil {
-        typedef NineteenPointStencil<GridType>  StencilType;
+        typedef NineteenPointStencil<GridType, IsSafe>  StencilType;
     };
 };
 template<> struct BIAS_SCHEME<WENO5_BIAS>
@@ -195,9 +195,9 @@ template<> struct BIAS_SCHEME<WENO5_BIAS>
     static const DScheme FD = FD_WENO5;
     static const DScheme BD = BD_WENO5;
 
-    template<typename GridType>
+    template<typename GridType, bool IsSafe = true>
     struct ISStencil {
-        typedef NineteenPointStencil<GridType>  StencilType;
+        typedef NineteenPointStencil<GridType, IsSafe>  StencilType;
     };
 };
 template<> struct BIAS_SCHEME<HJWENO5_BIAS>
@@ -205,9 +205,9 @@ template<> struct BIAS_SCHEME<HJWENO5_BIAS>
     static const DScheme FD = FD_HJWENO5;
     static const DScheme BD = BD_HJWENO5;
 
-    template<typename GridType>
+    template<typename GridType, bool IsSafe = true>
     struct ISStencil {
-        typedef NineteenPointStencil<GridType>  StencilType;
+        typedef NineteenPointStencil<GridType, IsSafe>  StencilType;
     };
 };
 
@@ -222,7 +222,8 @@ struct ISGradientBiased
     static const DScheme BD = BIAS_SCHEME<GradScheme>::BD;
 
     // random access version
-    template<typename Accessor> static Vec3<typename Accessor::ValueType>
+    template<typename Accessor>
+    static Vec3<typename Accessor::ValueType>
     result(const Accessor& grid, const Coord& ijk, const Vec3Bias& V)
     {
         typedef typename Accessor::ValueType ValueType;
@@ -234,11 +235,12 @@ struct ISGradientBiased
     }
 
     // stencil access version
-    template<typename StencilT> static Vec3<typename StencilT::ValueType>
+    template<typename StencilT>
+    static Vec3<typename StencilT::ValueType>
     result(const StencilT& stencil, const Vec3Bias& V)
     {
         typedef typename StencilT::ValueType  ValueType;
-        typedef Vec3<ValueType>              Vec3Type;
+        typedef Vec3<ValueType>               Vec3Type;
 
         return Vec3Type(V[0]<0 ? D1<FD>::inX(stencil) : D1<BD>::inX(stencil),
                         V[1]<0 ? D1<FD>::inY(stencil) : D1<BD>::inY(stencil),
@@ -264,7 +266,7 @@ struct ISGradientNormSqrd
 
         Vec3Type up   = ISGradient<FD>::result(grid, ijk);
         Vec3Type down = ISGradient<BD>::result(grid, ijk);
-        return math::GudonovsNormSqrd(grid.getValue(ijk)>0, down, up);
+        return math::GodunovsNormSqrd(grid.getValue(ijk)>0, down, up);
     }
 
     // stencil access version
@@ -272,12 +274,12 @@ struct ISGradientNormSqrd
     static typename StencilT::ValueType
     result(const StencilT& stencil)
     {
-        typedef typename StencilT::ValueType      ValueType;
+        typedef typename StencilT::ValueType     ValueType;
         typedef math::Vec3<ValueType>            Vec3Type;
 
         Vec3Type up   = ISGradient<FD>::result(stencil);
         Vec3Type down = ISGradient<BD>::result(stencil);
-        return math::GudonovsNormSqrd(stencil.template getValue<0, 0, 0>()>0, down, up);
+        return math::GodunovsNormSqrd(stencil.template getValue<0, 0, 0>()>0, down, up);
     }
 };
 
@@ -287,16 +289,15 @@ struct ISGradientNormSqrd<HJWENO5_BIAS>
 {
     // random access version
     template<typename Accessor>
-    static typename Accessor::ValueType
-    result(const Accessor& grid, const Coord& ijk)
+    static typename Accessor::ValueType result(const Accessor& grid, const Coord& ijk)
     {
         struct GetValue
         {
             const Accessor& acc;
             GetValue(const Accessor& acc_): acc(acc_) {}
             // Return the grid value at ijk converted to simd::Float4::value_type (= float).
-            inline simd::Float4::value_type operator()(const Coord& ijk) {
-                return static_cast<simd::Float4::value_type>(acc.getValue(ijk));
+            inline simd::Float4::value_type operator()(const Coord& ijk_) {
+                return static_cast<simd::Float4::value_type>(acc.getValue(ijk_));
             }
         }
         valueAt(grid);
@@ -323,14 +324,13 @@ struct ISGradientNormSqrd<HJWENO5_BIAS>
                valueAt(ijk.offsetBy( 0, 0, 3)) - valueAt(ijk.offsetBy( 0, 0, 2)), 0),
             down = math::WENO5(v1, v2, v3, v4, v5),
             up   = math::WENO5(v6, v5, v4, v3, v2);
-
-        return math::GudonovsNormSqrd(grid.getValue(ijk)>0, down, up);
+        
+        return math::GodunovsNormSqrd(grid.getValue(ijk)>0, down, up);
     }
 
     // stencil access version
     template<typename StencilT>
-    static typename StencilT::ValueType
-    result(const StencilT& s)
+    static typename StencilT::ValueType result(const StencilT& s)
     {
         typedef simd::Float4::value_type F4Val;
 
@@ -357,7 +357,7 @@ struct ISGradientNormSqrd<HJWENO5_BIAS>
             down = math::WENO5(v1, v2, v3, v4, v5),
             up   = math::WENO5(v6, v5, v4, v3, v2);
 
-        return math::GudonovsNormSqrd(s.template getValue<0, 0, 0>()>0, down, up);
+        return math::GodunovsNormSqrd(s.template getValue<0, 0, 0>()>0, down, up);
     }
 };
 #endif //DWA_OPENVDB  // for SIMD - note will do the computations in float
@@ -873,7 +873,7 @@ struct GradientNormSqrd
 
         Vec3Type up   = Gradient<MapType, FD>::result(map, grid, ijk);
         Vec3Type down = Gradient<MapType, BD>::result(map, grid, ijk);
-        return math::GudonovsNormSqrd(grid.getValue(ijk)>0, down, up);
+        return math::GodunovsNormSqrd(grid.getValue(ijk)>0, down, up);
     }
 
     // stencil access version
@@ -886,7 +886,7 @@ struct GradientNormSqrd
 
         Vec3Type up   = Gradient<MapType, FD>::result(map, stencil);
         Vec3Type down = Gradient<MapType, BD>::result(map, stencil);
-        return math::GudonovsNormSqrd(stencil.template getValue<0, 0, 0>()>0, down, up);
+        return math::GodunovsNormSqrd(stencil.template getValue<0, 0, 0>()>0, down, up);
     }
 };
 
@@ -2118,6 +2118,6 @@ private:
 
 #endif // OPENVDB_MATH_OPERATORS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

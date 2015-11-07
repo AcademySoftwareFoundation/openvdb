@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -46,7 +46,6 @@ typedef std::vector<std::string> StringVec;
 const char* INDENT = "   ";
 const char* gProgName = "";
 
-
 void
 usage(int exitStatus = EXIT_FAILURE)
 {
@@ -55,7 +54,8 @@ usage(int exitStatus = EXIT_FAILURE)
 "Which: prints information about OpenVDB grids\n" <<
 "Options:\n" <<
 "    -l, -stats     long printout, including grid statistics\n" <<
-"    -m, -metadata  print per-file and per-grid metadata\n";
+"    -m, -metadata  print per-file and per-grid metadata\n" <<
+"    -version       print version information\n";
     exit(exitStatus);
 }
 
@@ -98,10 +98,11 @@ bytesAsString(openvdb::Index64 n)
 
 
 std::string
-coordAsString(const openvdb::Coord ijk, const std::string& sep)
+coordAsString(const openvdb::Coord ijk, const std::string& sep,
+              const std::string& start, const std::string& stop)
 {
     std::ostringstream ostr;
-    ostr << ijk[0] << sep << ijk[1] << sep << ijk[2];
+    ostr << start << ijk[0] << sep << ijk[1] << sep << ijk[2] << stop;
     return ostr.str();
 }
 
@@ -221,8 +222,9 @@ printShortListing(const StringVec& filenames, bool metadata)
             // Print the grid's bounding box and dimensions.
             openvdb::CoordBBox bbox = grid->evalActiveVoxelBoundingBox();
             std::string
-                boxStr = coordAsString(bbox.min()," ") + "  " + coordAsString(bbox.max()," "),
-                dimStr = coordAsString(bbox.extents(), "x");
+                boxStr = coordAsString(bbox.min(), ",", "(", ")") + "->" +
+                         coordAsString(bbox.max(), ",", "(", ")"),
+                dimStr = coordAsString(bbox.extents(), "x", "", "");
             boxStr += std::string(
                 std::max(1, int(40 - boxStr.size() - dimStr.size())), ' ') + dimStr;
             std::cout << " " << std::left << std::setw(40) << boxStr;
@@ -274,7 +276,7 @@ main(int argc, char *argv[])
 
     if (argc == 1) usage();
 
-    bool stats = false, metadata = false;
+    bool stats = false, metadata = false, version = false;
     StringVec filenames;
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -285,6 +287,8 @@ main(int argc, char *argv[])
                 stats = true;
             } else if (arg == "-h" || arg == "-help" || arg == "--help") {
                 usage(EXIT_SUCCESS);
+            } else if (arg == "-version" || arg == "--version") {
+                version = true;
             } else {
                 std::cerr << gProgName << ": \"" << arg << "\" is not a valid option\n";
                 usage();
@@ -293,6 +297,15 @@ main(int argc, char *argv[])
             filenames.push_back(arg);
         }
     }
+
+    if (version) {
+        std::cout << "OpenVDB library version: "
+            << openvdb::getLibraryVersionString() << "\n";
+        std::cout << "OpenVDB file format version: "
+            << openvdb::OPENVDB_FILE_VERSION << std::endl;
+        if (filenames.empty()) return EXIT_SUCCESS;
+    }
+
     if (filenames.empty()) {
         std::cerr << gProgName << ": expected one or more OpenVDB files\n";
         usage();
@@ -332,6 +345,6 @@ main(int argc, char *argv[])
     return exitStatus;
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

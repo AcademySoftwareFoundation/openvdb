@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -240,7 +240,7 @@ TestVolumeRayIntersector::testAll()
         const RayT ray(eye, dir);//ray in index space
         tools::VolumeRayIntersector<FloatGrid> inter(grid);
         CPPUNIT_ASSERT(inter.setIndexRay(ray));
-        
+
         std::deque<RayT::TimeSpan> list;
         inter.hits(list);
         CPPUNIT_ASSERT(list.size() == 2);
@@ -298,7 +298,7 @@ TestVolumeRayIntersector::testAll()
 
         //GridPtrVec grids;
         //grids.push_back(grid);
-        //io::File vdbfile("/tmp/trevor_v1.vdb");
+        //io::File vdbfile("trevor_v1.vdb");
         //vdbfile.write(grids);
 
         //std::cerr << "BBox = " << inter.bbox() << std::endl;
@@ -331,6 +331,6 @@ TestVolumeRayIntersector::testAll()
     }
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
