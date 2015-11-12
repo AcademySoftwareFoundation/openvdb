@@ -922,6 +922,7 @@ TypedAttributeArray<ValueType_, Codec_>::decompress(const StorageType* compresse
     return true;
 
 #else
+    (void) compressedData;
 
     OPENVDB_THROW(RuntimeError, "Can't extract compressed data without the blosc library.");
 

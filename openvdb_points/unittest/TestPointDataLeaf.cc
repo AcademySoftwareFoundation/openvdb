@@ -128,8 +128,6 @@ matchingNamePairs(const openvdb::NamePair& lhs,
 bool
 zeroLeafValues(const LeafType* leafNode)
 {
-    const LeafType::ValueType* data = leafNode->buffer().data();
-
     for (openvdb::Index i = 0; i < LeafType::SIZE; i++) {
         if (leafNode->buffer().getValue(i) != LeafType::ValueType(0))   return false;
     }
@@ -302,9 +300,9 @@ TestPointDataLeaf::testMonotonicity()
 
     unsigned sum = 0;
 
-    for (int i = 0; i < LeafType::DIM; i++) {
-        for (int j = 0; j < LeafType::DIM; j++) {
-            for (int k = 0; k < LeafType::DIM; k++) {
+    for (unsigned int i = 0; i < LeafType::DIM; i++) {
+        for (unsigned int j = 0; j < LeafType::DIM; j++) {
+            for (unsigned int k = 0; k < LeafType::DIM; k++) {
                 if (((i + j + k) % 2) == 0)     continue;
 
                 leaf.setOffsetOn(LeafType::coordToOffset(openvdb::Coord(i, j, k)), sum++);
@@ -394,7 +392,7 @@ TestPointDataLeaf::testPointCount()
 
     // one point per voxel
 
-    for (int i = 0; i < LeafType::SIZE; i++) {
+    for (unsigned int i = 0; i < LeafType::SIZE; i++) {
         leaf.setOffsetOn(i, i);
     }
 
@@ -423,7 +421,7 @@ TestPointDataLeaf::testPointCount()
 
     unsigned sum = 0;
 
-    for (int i = 0; i < LeafType::SIZE; i++) {
+    for (unsigned int i = 0; i < LeafType::SIZE; i++) {
         leaf.setOffsetOn(i, sum);
         if (i % 2 == 0)     sum++;
     }
@@ -442,7 +440,7 @@ TestPointDataLeaf::testPointCount()
 
     LeafType leaf2(openvdb::Coord(0, 0, 8));
 
-    for (int i = 0; i < LeafType::SIZE; i++) {
+    for (unsigned int i = 0; i < LeafType::SIZE; i++) {
         leaf2.setOffsetOn(i, i);
     }
 

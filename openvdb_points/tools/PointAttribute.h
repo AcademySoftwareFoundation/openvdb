@@ -110,9 +110,6 @@ inline void appendAttribute(PointDataTree& tree,
     typedef AttributeSet::Util::NameAndTypeVec                    NameAndTypeVec;
     typedef AttributeSet::Descriptor                              Descriptor;
 
-    typedef typename tree::LeafManager<PointDataTree>             LeafManagerT;
-    typedef typename LeafManagerT::LeafRange                      LeafRangeT;
-
     using point_attribute_internal::AppendAttributeOp;
 
     typename PointDataTree::LeafCIter iter = tree.cbeginLeaf();

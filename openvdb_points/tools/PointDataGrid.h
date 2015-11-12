@@ -133,8 +133,6 @@ template<typename TreeT>
 inline typename PointDataAccessor<TreeT>::PointDataIndex
 PointDataAccessor<TreeT>::get(const Coord& ijk) const
 {
-    typedef typename TreeT::LeafNodeType::ValueType PointIndexT;
-
     const LeafNode* leaf = mAccessor.probeConstLeaf(ijk);
 
     // leaf not active - no particles
@@ -254,14 +252,14 @@ public:
     // Copy-construct from a LeafNode with the same configuration but a different ValueType.
     // Used for topology copies - explicitly sets the value (background) to zeroVal
     template <typename ValueType>
-    PointDataLeafNode(const tree::LeafNode<ValueType, Log2Dim>& other, const T& value, TopologyCopy)
+    PointDataLeafNode(const tree::LeafNode<ValueType, Log2Dim>& other, const T& /*value*/, TopologyCopy)
         : BaseLeaf(other, zeroVal<T>(), TopologyCopy())
         , mAttributeSet(new AttributeSet) { }
 
     // Copy-construct from a LeafNode with the same configuration but a different ValueType.
     // Used for topology copies - explicitly sets the on and off value (background) to zeroVal
     template <typename ValueType>
-    PointDataLeafNode(const tree::LeafNode<ValueType, Log2Dim>& other, const T& offValue, const T& onValue, TopologyCopy)
+    PointDataLeafNode(const tree::LeafNode<ValueType, Log2Dim>& other, const T& /*offValue*/, const T& /*onValue*/, TopologyCopy)
         : BaseLeaf(other, zeroVal<T>(), zeroVal<T>(), TopologyCopy())
         , mAttributeSet(new AttributeSet) { }
 

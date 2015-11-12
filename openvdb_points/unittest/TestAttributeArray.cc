@@ -229,7 +229,6 @@ TestAttributeArray::testAttributeArray()
     }
 
     typedef openvdb::tools::FixedPointAttributeCodec<uint16_t> FixedPointCodec;
-    typedef openvdb::tools::TypedAttributeArray<double, FixedPointCodec> AttributeArrayP;
 
     { // Fixed codec range
         openvdb::tools::AttributeArray::Ptr attr1(new AttributeArrayC(50));

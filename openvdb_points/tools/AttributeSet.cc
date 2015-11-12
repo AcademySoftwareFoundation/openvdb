@@ -579,8 +579,6 @@ AttributeSet::Descriptor::duplicateDrop(const std::vector<size_t>& pos) const
 void
 AttributeSet::Descriptor::appendTo(NameAndTypeVec& attrs) const
 {
-    const size_t size = mNameMap.size();
-
     // build a std::map<pos, name> (ie key and value swapped)
 
     typedef std::map<size_t, std::string> PosToNameMap;
