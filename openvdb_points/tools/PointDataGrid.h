@@ -360,6 +360,66 @@ public:
         mAttributeSet->reorderAttributes(replacement);
     }
 
+    /// @brief Swap the underlying attribute set with the given @a attributeSet.
+    /// This leaf will assume ownership of the given attribute set. The new
+    /// attributes must have an equal descriptor. Additionally, if the new
+    /// attributes have different topology, then the voxel offset values must
+    /// be updated to reflect this new topology after a call to this method.
+    void swap(AttributeSet* attributeSet)
+    {
+        if (!attributeSet) {
+            OPENVDB_THROW(ValueError, "Cannot swap with a null attribute set");
+        }
+
+        if (mAttributeSet->descriptor() != attributeSet->descriptor()) {
+            OPENVDB_THROW(ValueError, "Attribute set descriptors are not equal.");
+        }
+
+        mAttributeSet.reset(attributeSet);
+    }
+
+    /// @brief Sets all of the voxel offset values on this leaf, from the given vector
+    /// of @a offsets. If @a updateValueMask is true, then the active value mask will
+    /// also be updated such that voxels with points are marked as active, and empty voxels
+    /// are marked as inactive.
+    void setOffsets(const std::vector<ValueType>& offsets, const bool updateValueMask = true)
+    {
+        if (offsets.size() != LeafNodeType::NUM_VALUES) {
+            OPENVDB_THROW(ValueError, "Offset vector size doesn't match number of voxels.")
+        }
+
+        for (size_t index = 0; index < offsets.size(); ++index) {
+            setOffsetOnly(index, offsets[index]);
+        }
+
+        if (updateValueMask) this->updateValueMask();
+    }
+
+    /// @brief Validates the voxel offset values on this leaf to ensure that they are both
+    /// monotonically increasing, and that they are within the bounds of the attribute
+    /// arrays on this leaf node. Throws an exception if any of these checks fail.
+    void validateOffsets() const
+    {
+        // Ensure all of the offset values are monotonically increasing
+        for (size_t index = 1; index < BaseLeaf::SIZE; ++index) {
+            if (this->getValue(index-1) > this->getValue(index)) {
+                OPENVDB_THROW(ValueError, "Voxel offset values are not monotonically increasing");
+            }
+        }
+
+        // Ensure all attribute arrays are of equal length
+        for (size_t attributeIndex = 1; attributeIndex < mAttributeSet->size(); ++attributeIndex ) {
+            if (mAttributeSet->get(attributeIndex-1)->size() != mAttributeSet->get(attributeIndex)->size()) {
+                OPENVDB_THROW(ValueError, "Attribute arrays have inconsistent length");
+            }
+        }
+
+        // Ensure the last voxel's offset value matches the size of each attribute array
+        if (mAttributeSet->size() > 0 && this->getValue(BaseLeaf::SIZE-1) != mAttributeSet->get(0)->size()) {
+            OPENVDB_THROW(ValueError, "Last voxel offset value does not match attribute array length");
+        }
+    }
+
     AttributeArray& attributeArray(const size_t pos)
     {
         if (pos >= mAttributeSet->size())             OPENVDB_THROW(LookupError, "Attribute Out Of Range");
@@ -439,12 +499,13 @@ public:
         return totalPointCount;
     }
 
-    void deactivateEmptyVoxels()
+    /// @brief Uses the point count of each voxel to update the value mask on this
+    /// leaf node. Voxels with a point count of zero will be deactivated, and voxels with
+    /// a non-zero point count will be activated.
+    void updateValueMask()
     {
         for (Index n = 0; n < LeafNodeType::NUM_VALUES; n++) {
-            if (this->pointCount(n) > 0)         continue;
-
-            this->setValueMaskOff(n);
+            this->setValueMask(n, this->pointCount(n) > 0);
         }
     }
 

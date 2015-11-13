@@ -52,6 +52,7 @@ public:
     CPPUNIT_TEST(testTopologyCopy);
     CPPUNIT_TEST(testEquivalence);
     CPPUNIT_TEST(testIO);
+    CPPUNIT_TEST(testSwap);
     CPPUNIT_TEST_SUITE_END();
 
     void testEmptyLeaf();
@@ -63,6 +64,7 @@ public:
     void testTopologyCopy();
     void testEquivalence();
     void testIO();
+    void testSwap();
 
 private:
     // Generate random points by uniformly distributing points
@@ -256,6 +258,160 @@ TestPointDataLeaf::testOffsets()
 
         delete leafNode;
     }
+
+    // test bulk offset replacement without activity mask update
+
+    {
+        LeafType* leafNode = new LeafType();
+
+        for (openvdb::Index i = 0; i < LeafType::SIZE; ++i) {
+            leafNode->setOffsetOn(i, 10);
+        }
+
+        std::vector<LeafType::ValueType> newOffsets;
+        newOffsets.resize(LeafType::SIZE);
+
+        leafNode->setOffsets(newOffsets, /*updateValueMask*/false);
+
+        const LeafType::NodeMaskType& valueMask = leafNode->getValueMask();
+        for (openvdb::Index i = 0; i < LeafType::SIZE; ++i ) {
+            CPPUNIT_ASSERT(valueMask.isOn(i));
+        }
+
+        delete leafNode;
+    }
+
+    // test bulk offset replacement with activity mask update
+
+    {
+        LeafType* leafNode = new LeafType();
+
+        for (openvdb::Index i = 0; i < LeafType::SIZE; ++i) {
+            leafNode->setOffsetOn(i, 10);
+        }
+
+        std::vector<LeafType::ValueType> newOffsets;
+        newOffsets.resize(LeafType::SIZE);
+
+        leafNode->setOffsets(newOffsets, /*updateValueMask*/true);
+
+        const LeafType::NodeMaskType& valueMask = leafNode->getValueMask();
+        for (openvdb::Index i = 0; i < LeafType::SIZE; ++i ) {
+            CPPUNIT_ASSERT(valueMask.isOff(i));
+        }
+
+        delete leafNode;
+    }
+
+    // ensure bulk offset replacement fails when vector size doesn't equal number of voxels
+
+    {
+        LeafType* leafNode = new LeafType();
+
+        std::vector<LeafType::ValueType> newOffsets;
+        CPPUNIT_ASSERT_THROW(leafNode->setOffsets(newOffsets), openvdb::ValueError);
+
+        delete leafNode;
+    }
+
+    // test offset validation
+
+    {
+        typedef openvdb::tools::TypedAttributeArray<float>    AttributeS;
+        typedef openvdb::tools::TypedAttributeArray<int32_t>  AttributeI;
+        typedef openvdb::tools::AttributeSet::Descriptor      Descriptor;
+
+        Descriptor::Inserter names;
+        names.add("density", AttributeS::attributeType());
+        names.add("id", AttributeI::attributeType());
+        Descriptor::Ptr descriptor = Descriptor::create(names.vec);
+
+        // ensure validateOffsets succeeds for monotonically increasing offsets that fully
+        // utilise the underlying attribute arrays
+
+        {
+            const size_t numAttributes = 1;
+            LeafType* leafNode = new LeafType();
+            leafNode->initializeAttributes(descriptor, numAttributes);
+
+            std::vector<LeafType::ValueType> offsets;
+            offsets.resize(LeafType::SIZE);
+            offsets.back() = numAttributes;
+            leafNode->setOffsets(offsets);
+
+            leafNode->validateOffsets();
+            delete leafNode;
+        }
+
+        // ensure validateOffsets detects non-monotonic offset values
+
+        {
+            LeafType* leafNode = new LeafType();
+
+            std::vector<LeafType::ValueType> offsets;
+            offsets.resize(LeafType::SIZE);
+            *offsets.begin() = 1;
+            leafNode->setOffsets(offsets);
+
+            CPPUNIT_ASSERT_THROW(leafNode->validateOffsets(), openvdb::ValueError);
+            delete leafNode;
+        }
+
+        // ensure validateOffsets detects inconsistent attribute array sizes
+
+        {
+            using openvdb::tools::AttributeSet;
+
+            const size_t numAttributes = 1;
+            LeafType* leafNode = new LeafType();
+            leafNode->initializeAttributes(descriptor, numAttributes);
+
+            AttributeSet* newSet = new AttributeSet(descriptor, numAttributes);
+            newSet->replace("density", AttributeS::create(numAttributes+1));
+            leafNode->swap(newSet);
+
+            std::vector<LeafType::ValueType> offsets;
+            offsets.resize(LeafType::SIZE);
+            offsets.back() = numAttributes;
+            leafNode->setOffsets(offsets);
+
+            CPPUNIT_ASSERT_THROW(leafNode->validateOffsets(), openvdb::ValueError);
+            delete leafNode;
+        }
+
+        // ensure validateOffsets detects unused attributes (e.g. final voxel offset not
+        // equal to size of attribute arrays)
+
+        {
+            const size_t numAttributes = 1;
+            LeafType* leafNode = new LeafType();
+            leafNode->initializeAttributes(descriptor, numAttributes);
+
+            std::vector<LeafType::ValueType> offsets;
+            offsets.resize(LeafType::SIZE);
+            offsets.back() = numAttributes - 1;
+            leafNode->setOffsets(offsets);
+
+            CPPUNIT_ASSERT_THROW(leafNode->validateOffsets(), openvdb::ValueError);
+            delete leafNode;
+        }
+
+        // ensure validateOffsets detects out-of-bounds offset values
+
+        {
+            const size_t numAttributes = 1;
+            LeafType* leafNode = new LeafType();
+            leafNode->initializeAttributes(descriptor, numAttributes);
+
+            std::vector<LeafType::ValueType> offsets;
+            offsets.resize(LeafType::SIZE);
+            offsets.back() = numAttributes + 1;
+            leafNode->setOffsets(offsets);
+
+            CPPUNIT_ASSERT_THROW(leafNode->validateOffsets(), openvdb::ValueError);
+            delete leafNode;
+        }
+    }
 }
 
 
@@ -428,7 +584,7 @@ TestPointDataLeaf::testPointCount()
         if (i % 2 == 0)     sum++;
     }
 
-    leaf.deactivateEmptyVoxels();
+    leaf.updateValueMask();
 
     CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::All), Index64(LeafType::SIZE / 2));
     CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::Active), Index64(LeafType::SIZE / 2));
@@ -512,7 +668,7 @@ TestPointDataLeaf::testAttributes()
     CPPUNIT_ASSERT(leaf.isDense());
     CPPUNIT_ASSERT(zeroLeafValues(&leaf));
 
-    leaf.deactivateEmptyVoxels();
+    leaf.updateValueMask();
 
     CPPUNIT_ASSERT(leaf.isEmpty());
 
@@ -859,6 +1015,62 @@ TestPointDataLeaf::testIO()
         CPPUNIT_ASSERT_EQUAL(leaf2.getValue(4), ValueType(20));
         CPPUNIT_ASSERT_EQUAL(leaf2.attributeSet().size(), size_t(2));
     }
+}
+
+
+void
+TestPointDataLeaf::testSwap()
+{
+    using namespace openvdb::tools;
+
+    // Define and register some common attribute types
+
+    typedef TypedAttributeArray<float>    AttributeS;
+    typedef TypedAttributeArray<int32_t>  AttributeI;
+
+    AttributeS::registerType();
+    AttributeI::registerType();
+
+    // create a descriptor
+
+    typedef AttributeSet::Descriptor Descriptor;
+
+    Descriptor::Inserter names;
+    names.add("density", AttributeS::attributeType());
+    names.add("id", AttributeI::attributeType());
+
+    Descriptor::Ptr descrA = Descriptor::create(names.vec);
+
+    // create a leaf and initialize attributes using this descriptor
+
+    const size_t initialArrayLength = 100;
+    LeafType leaf(openvdb::Coord(0, 0, 0));
+    leaf.initializeAttributes(descrA, /*arrayLength=*/initialArrayLength);
+
+    // swap out the underlying attribute set with a new attribute set with a matching
+    // descriptor
+
+    CPPUNIT_ASSERT_EQUAL(initialArrayLength, leaf.attributeSet().get("density")->size());
+    CPPUNIT_ASSERT_EQUAL(initialArrayLength, leaf.attributeSet().get("id")->size());
+
+    const size_t newArrayLength = initialArrayLength / 2;
+    leaf.swap(new AttributeSet(descrA, /*arrayLength*/newArrayLength));
+
+    CPPUNIT_ASSERT_EQUAL(newArrayLength, leaf.attributeSet().get("density")->size());
+    CPPUNIT_ASSERT_EQUAL(newArrayLength, leaf.attributeSet().get("id")->size());
+
+    // ensure we refuse to swap when the attribute set is null
+
+    CPPUNIT_ASSERT_THROW(leaf.swap(0), openvdb::ValueError);
+
+    // ensure we refuse to swap when the descriptors do not match
+
+    names.add("extra", AttributeS::attributeType());
+    Descriptor::Ptr descrB = Descriptor::create(names.vec);
+    AttributeSet* attributeSet = new AttributeSet(descrB, newArrayLength);
+
+    CPPUNIT_ASSERT_THROW(leaf.swap(attributeSet), openvdb::ValueError);
+    delete attributeSet;
 }
 
 
