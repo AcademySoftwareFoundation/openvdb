@@ -537,7 +537,7 @@ struct ConvertPointDataGridAttributeOp {
 
                 typename PointDataAccessorT::PointDataIndex pointIndex = acc.get(ijk);
                 for (Index64 index = pointIndex.first; index < pointIndex.second; ++index) {
-                    setAttributeValue(handle->get(n), attributeHandle, offset++);
+                    setAttributeValue(handle->get(index), attributeHandle, offset++);
                 }
             }
         }
