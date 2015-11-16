@@ -31,7 +31,6 @@
 #
 
 # Targets:
-#   houdinilib          utility library for Houdini OpenVDB Points SOPs
 #   houdinisops         Houdini OpenVDB Points SOPs (installed into HOUDINI_DESTDIR)
 #
 #   all                 [default target] all of the above
@@ -193,10 +192,8 @@ endif
 LIBHOUDINI_INCLUDE_NAMES := \
 	houdini/SOP_NodeVDBPoints.h \
 #
-LIBHOUDINI_SRC_NAMES := \
-	houdini/GR_PrimVDBPoints.cc \
-#
 HOUDINI_SOP_SRC_NAMES := \
+	houdini/GR_PrimVDBPoints.cc \
 	houdini/SOP_OpenVDB_Points.cc \
 #
 HOUDINI_SOP_NAMES := $(basename $(notdir $(HOUDINI_SOP_SRC_NAMES)))
@@ -210,12 +207,10 @@ ALL_INCLUDE_FILES := \
     $(LIBHOUDINI_INCLUDE_NAMES) \
 #
 HOUDINI_SRC_FILES := \
-    $(LIBHOUDINI_SRC_NAMES) \
     $(HOUDINI_SOP_SRC_NAMES) \
 #
 ALL_SRC_FILES := $(HOUDINI_SRC_FILES)
 
-LIBHOUDINI_OBJ_NAMES := $(LIBHOUDINI_SRC_NAMES:.cc=.o)
 HOUDINI_SOP_OBJ_NAMES := $(HOUDINI_SOP_SRC_NAMES:.cc=.o)
 HOUDINI_SOP_SO_NAMES := $(addprefix $(HOUDINI_DESTDIR)/,\
     $(notdir $(HOUDINI_SOP_SRC_NAMES:.cc=.so)))
@@ -229,15 +224,7 @@ LIB_PATCH_VERSION=$(shell grep 'define OPENVDB_POINTS_LIBRARY_PATCH_VERSION_NUMB
 
 LIB_VERSION=$(LIB_MAJOR_VERSION).$(LIB_MINOR_VERSION).$(LIB_PATCH_VERSION)
 
-LIBHOUDINI_NAME=libopenvdb_points_houdini
-LIBHOUDINI_STATIC := $(LIBHOUDINI_NAME).a
-LIBHOUDINI_SHARED := $(LIBHOUDINI_NAME).so.$(LIB_VERSION)
-
-ifeq (no,$(strip $(shared)))
-    LIBHOUDINI := $(LIBHOUDINI_STATIC)
-else
-    LIBHOUDINI := $(LIBHOUDINI_SHARED)
-
+ifeq (yes,$(strip $(shared)))
     # For debugging, pass "rpath=yes" (the default setting) to encode
     # the path to libopenvdb.so into SOPs.  With "rpath=no", the directory
     # containing libopenvdb.so will need to be added to LD_LIBRARY_PATH.
@@ -308,64 +295,36 @@ DEPEND := houdini_deps
 list_deps = $(if $(wordlist 4,5,$(?F)),$(firstword $(?F)) and others,$(wordlist 1,3,$(?F)))
 
 ALL_TARGETS := \
-    $(LIBHOUDINI) \
     $(DEPEND) \
-    $(LIBHOUDINI_NAME).so \
 #
 
 .SUFFIXES: .o .cc
 
-.PHONY: all clean depend houdinisops houdinilib install
+.PHONY: all clean depend houdinisops install
 
 .cc.o:
 	@echo "Building $@ because of $(call list_deps)"
 	$(CXX) -c $(CXXFLAGS) -fPIC -o $@ $<
 
-all: depend houdinilib houdinisops
+all: depend houdinisops
 
 # Create an openvdb_houdini/ symlink to the houdini/ subdirectory,
 # to mirror the DWA directory structure.
 openvdb_houdini:
 	ln -f -s houdini openvdb_houdini
 
-$(LIBHOUDINI_OBJ_NAMES): %.o: %.cc
-	@echo "Building $@ because of $(call list_deps)"
-	$(CXX) -c $(CXXFLAGS) $(HOUDINI_CXXFLAGS) \
-	    -isystem $(HOUDINI_INCL_DIR) -fPIC -o $@ $<
-
-$(LIBHOUDINI_STATIC): $(LIBHOUDINI_OBJ_NAMES)
-	@echo "Building $@ because of $(call list_deps)"
-	$(AR) cr $@ $^
-
-$(LIBHOUDINI_SHARED): $(LIBHOUDINI_OBJ_NAMES)
-	@echo "Building $@ because of $(call list_deps)"
-	$(CXX) $(CXXFLAGS) $(HOUDINI_LDFLAGS) -shared -o $@ $^ $(LIBS_RPATH)
-
-$(LIBHOUDINI_NAME).so: $(LIBHOUDINI_SHARED)
-	@# hcustom expects a library named "libname.so", not "libname.so.1.0".
-	ln -f -s $< $@
-
-houdinilib: $(LIBHOUDINI)
-ifneq (no,$(strip $(shared)))
-houdinilib: $(LIBHOUDINI_NAME).so
-endif
-
-# hcustom (see below) outputs both a .o and a .so file.
-# The .o isn't dependent on $(LIBHOUDINI), but the .so is.
-$(HOUDINI_SOP_OBJ_NAMES): $(LIBHOUDINI)
-
 ifeq (no,$(strip $(shared)))
 # Link SOPs against static OpenVDB libraries.
 $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
 	@echo "Building $(HOUDINI_DESTDIR)/$(@:.o=.so) because of $(call list_deps)"
 	$(HCUSTOM_EXPORT) $(HB)/hcustom $(HCUSTOM_FLAGS) $(HCUSTOM_INCLDIRS) $(LIBS) \
-	        -L. -lopenvdb_houdini -lopenvdb_points_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) -L$(OPENVDB_POINTS_LIB_DIR) $(OPENVDB_POINTS_LIB) $< $(QUIET)
+	        -L. -lopenvdb_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) -L$(OPENVDB_POINTS_LIB_DIR) $(OPENVDB_POINTS_LIB) $< $(QUIET)
 else
 # Link SOPs against shared OpenVDB libraries.
 $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
 	@echo "Building $(HOUDINI_DESTDIR)/$(@:.o=.so) because of $(call list_deps)"
 	$(HCUSTOM_EXPORT) $(HB)/hcustom $(HCUSTOM_FLAGS) $(HCUSTOM_INCLDIRS) $(LIBS) \
-	        -L. -lopenvdb_houdini -lopenvdb_points_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) -L$(OPENVDB_POINTS_LIB_DIR) $(OPENVDB_POINTS_LIB) $< $(QUIET)
+	        -L. -lopenvdb_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) -L$(OPENVDB_POINTS_LIB_DIR) $(OPENVDB_POINTS_LIB) $< $(QUIET)
 endif
 
 $(HOUDINI_SOP_SO_NAMES): $(HOUDINI_DESTDIR)/%.so: houdini/%.o
@@ -376,21 +335,13 @@ houdinisops: $(HOUDINI_SOP_SO_NAMES) houdini/SOP_OpenVDB.svg
 	    cp -f houdini/SOP_OpenVDB.svg $(HOUDINI_DESTDIR)/../config/Icons/; \
 	fi
 
-install: houdinilib houdinisops
+install: houdinisops
 	mkdir -p $(DESTDIR)/include/openvdb_houdini
 	@echo "Created $(DESTDIR)/include/openvdb_houdini"
 	mkdir -p $(DESTDIR)/include/houdini_utils
 	@echo "Created $(DESTDIR)/include/houdini_utils"
 	cp -f $(LIBHOUDINI_INCLUDE_NAMES) $(DESTDIR)/include/openvdb_houdini/
 	@#
-	mkdir -p $(DESTDIR)/lib
-	@echo "Created $(DESTDIR)/lib/"
-	cp -f $(LIBHOUDINI) $(DESTDIR)/lib
-	pushd $(DESTDIR)/lib > /dev/null; \
-	    if [ -f $(LIBHOUDINI_SHARED) ]; then \
-	        ln -f -s $(LIBHOUDINI_SHARED) $(LIBHOUDINI_NAME).so; fi; \
-	    popd > /dev/null
-	@echo "Copied libopenvdb_points_houdini to $(DESTDIR)/lib/"
 
 # TODO: This accumulates all source file dependencies into a single file
 # containing a rule for each *.o file.  Consider generating a separate
@@ -408,9 +359,6 @@ depend: $(DEPEND)
 
 clean:
 	$(RM) $(ALL_TARGETS) $(DEPEND)
-	$(RM) $(LIBHOUDINI_STATIC)
-	$(RM) $(LIBHOUDINI_SHARED)
-	$(RM) $(LIBHOUDINI_OBJ_NAMES)
 	$(RM) $(HOUDINI_SOP_OBJ_NAMES) $(HOUDINI_SOP_SO_NAMES)
 	$(RM) $(HOUDINI_DESTDIR)/../config/Icons/SOP_OpenVDB.svg
 
