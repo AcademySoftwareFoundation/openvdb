@@ -248,9 +248,9 @@ ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)$(HCUSTOM_EXTRA_LDFLAGS)))
     # environment variable HOUDINI_CC.
     ifeq (use_houdini_cc,$(shell test \
         \( $(HOUDINI_MAJOR_RELEASE) -lt 13 \) \
-        -o \( \( $(HOUDINI_MAJOR_RELEASE) -eq 13 \) -a \( $(HOUDINI_BUILD_VERSION) -lt 548 \) \) \
+        -o \( \( $(HOUDINI_MAJOR_RELEASE) -eq 13 \) -a \( $(firstword $(subst ., ,$(HOUDINI_BUILD_VERSION))) -lt 548 \) \) \
         -o \( \( $(HOUDINI_MAJOR_RELEASE) -eq 14 \) -a \( $(HOUDINI_MINOR_RELEASE) -eq 0 \) \
-            -a \( $(HOUDINI_BUILD_VERSION) -lt 105 \) \) \
+            -a \( $(firstword $(subst ., ,$(HOUDINI_BUILD_VERSION))) -lt 105 \) \) \
         && echo use_houdini_cc))
         ifeq (,$(strip $(HOUDINI_CC)))
             # If HOUDINI_CC is not set, set it to CXX if CXX is set, otherwise set it to
