@@ -45,10 +45,12 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 
+#if (UT_VERSION_INT < 0x0f000000) // earlier than 15.0.0
 #if defined(__APPLE__) || defined(MACOSX)
 #include <GLUT/glut.h>
 #else
 #include <GL/glx.h>
+#endif
 #endif
 
 #include <DM/DM_RenderTable.h>
