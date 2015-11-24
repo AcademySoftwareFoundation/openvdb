@@ -444,15 +444,33 @@ TestAttributeSet::testAttributeSet()
     meta.insertMeta("default", openvdb::FloatMetadata(2.0));
 
     // I/O test
+    {
+        std::ostringstream ostr(std::ios_base::binary);
+        attrSetA.write(ostr);
 
-    std::ostringstream ostr(std::ios_base::binary);
-    attrSetA.write(ostr);
+        AttributeSet attrSetB;
+        std::istringstream istr(ostr.str(), std::ios_base::binary);
+        attrSetB.read(istr);
 
-    AttributeSet attrSetB;
-    std::istringstream istr(ostr.str(), std::ios_base::binary);
-    attrSetB.read(istr);
+        CPPUNIT_ASSERT(matchingAttributeSets(attrSetA, attrSetB));
+    }
 
-    CPPUNIT_ASSERT(matchingAttributeSets(attrSetA, attrSetB));
+    // I/O transient test
+    {
+        AttributeArray* array = attrSetA.get(0);
+        array->setTransient(true);
+
+        std::ostringstream ostr(std::ios_base::binary);
+        attrSetA.write(ostr);
+
+        AttributeSet attrSetB;
+        std::istringstream istr(ostr.str(), std::ios_base::binary);
+        attrSetB.read(istr);
+
+        // ensures transient attribute is not written out
+
+        CPPUNIT_ASSERT_EQUAL(attrSetB.size(), size_t(1));
+    }
 }
 
 // Copyright (c) 2015 Double Negative Visual Effects

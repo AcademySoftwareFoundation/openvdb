@@ -311,7 +311,26 @@ AttributeSet::readMetadata(std::istream& is)
 void
 AttributeSet::writeMetadata(std::ostream& os) const
 {
-    mDescr->write(os);
+    // build a vector of all attribute arrays that have a transient flag
+
+    std::vector<size_t> transient;
+
+    for (size_t i = 0; i < size(); i++) {
+        const AttributeArray* array = this->getConst(i);
+        if (array->isTransient()) {
+            transient.push_back(i);
+        }
+    }
+
+    // write out a descriptor without transient attributes
+
+    if (transient.empty()) {
+        mDescr->write(os);
+    }
+    else {
+        Descriptor::Ptr descr = mDescr->duplicateDrop(transient);
+        descr->write(os);
+    }
 }
 
 
