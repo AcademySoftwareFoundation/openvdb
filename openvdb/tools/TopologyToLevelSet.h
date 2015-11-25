@@ -46,7 +46,7 @@
 
 #include "LevelSetFilter.h"
 #include "Morphology.h" // for {dilate|erode}Voxels
-#include "Prune.h"// for pruneLevelSet
+#include "Prune.h"// for pruneInactive
 #include "SignedFloodFill.h" // for signedFloodFill
 
 #include <openvdb/Types.h>
@@ -225,6 +225,7 @@ topologyToLevelSet(const GridType& grid, int halfBandWidth, int closingWidth,
     openvdb::tools::erodeVoxels(coreMask, halfBandWidth);
 
     regionMask.topologyDifference(coreMask);
+    tools::pruneInactive(regionMask,  /*threading=*/true);
 
     // Generate a volume with an implicit zero crossing at the boundary
     // between active and inactive values in the input grid.
@@ -232,11 +233,12 @@ topologyToLevelSet(const GridType& grid, int halfBandWidth, int closingWidth,
     const float width = float(grid.transform().voxelSize()[0] * double(halfBandWidth));
 
     typename FloatTreeType::Ptr resultTree(
-        new FloatTreeType(regionMask, /*inactive=*/ width, /*active=*/-width, openvdb::TopologyCopy()));
+        new FloatTreeType(regionMask, /*inactive=*/width, /*active=*/-width, openvdb::TopologyCopy()));
 
     // Construct outside band mask
     openvdb::tools::dilateVoxels(regionMask, halfBandWidth);
     regionMask.topologyDifference(coreMask);
+    tools::pruneInactive(regionMask,  /*threading=*/true);
 
     // Activate outside band
     resultTree->topologyUnion(regionMask);
