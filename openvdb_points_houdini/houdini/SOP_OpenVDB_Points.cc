@@ -405,6 +405,33 @@ void populateAttributeFromHoudini(  PointDataTree& tree, const PointIndexTree& i
 namespace sop_openvdb_points_internal {
 
 
+template <typename T> struct GAHandleTraits { typedef GA_RWHandleF RW; };
+template <typename T> struct GAHandleTraits<Vec3<T> > { typedef GA_RWHandleV3 RW; };
+template <> struct GAHandleTraits<bool> { typedef GA_RWHandleI RW; };
+template <> struct GAHandleTraits<int16_t> { typedef GA_RWHandleI RW; };
+template <> struct GAHandleTraits<int32_t> { typedef GA_RWHandleI RW; };
+template <> struct GAHandleTraits<int64_t> { typedef GA_RWHandleI RW; };
+template <> struct GAHandleTraits<half> { typedef GA_RWHandleF RW; };
+template <> struct GAHandleTraits<float> { typedef GA_RWHandleF RW; };
+template <> struct GAHandleTraits<double> { typedef GA_RWHandleF RW; };
+
+
+template <typename VDBType, typename AttrHandle>
+inline void
+setAttributeValue(const VDBType value, AttrHandle& handle, const GA_Offset& offset)
+{
+    handle.set(offset, value);
+}
+
+
+template <typename VDBElementType, typename AttrHandle>
+inline void
+setAttributeValue(const Vec3<VDBElementType>& v, AttrHandle& handle, const GA_Offset& offset)
+{
+    handle.set(offset, UT_Vector3(v.x(), v.y(), v.z()));
+}
+
+
 template<typename PointDataTreeType, typename LeafOffsetArray>
 struct ConvertPointDataGridPositionOp {
 
@@ -428,6 +455,8 @@ struct ConvertPointDataGridPositionOp {
 
         PointDataAccessorT acc(mTree);
 
+        GA_RWHandleV3 pHandle(mDetail.getP());
+
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
 
             assert(n < mLeafOffsets.size());
@@ -450,7 +479,7 @@ struct ConvertPointDataGridPositionOp {
 
                     Vec3d pos = Vec3d(handle->get(index)) + xyz;
                     pos = mTransform.indexToWorld(pos);
-                    mDetail.setPos3(offset++, pos.x(), pos.y(), pos.z());
+                    setAttributeValue(pos, pHandle, offset++);
                 }
             }
         }
@@ -464,33 +493,6 @@ struct ConvertPointDataGridPositionOp {
     const size_t                            mIndex;
     const LeafOffsetArray&                  mLeafOffsets;
 }; // ConvertPointDataGridPositionOp
-
-
-template <typename VDBType, typename AttrHandle>
-inline void
-setAttributeValue(const VDBType value, AttrHandle& handle, const GA_Offset& offset)
-{
-    handle.set(offset, value);
-}
-
-
-template <typename VDBElementType, typename AttrHandle>
-inline void
-setAttributeValue(const Vec3<VDBElementType>& v, AttrHandle& handle, const GA_Offset& offset)
-{
-    handle.set(offset, UT_Vector3(v.x(), v.y(), v.z()));
-}
-
-
-template <typename T> struct GAHandleTraits { typedef GA_RWHandleF RW; };
-template <typename T> struct GAHandleTraits<Vec3<T> > { typedef GA_RWHandleV3 RW; };
-template <> struct GAHandleTraits<bool> { typedef GA_RWHandleI RW; };
-template <> struct GAHandleTraits<int16_t> { typedef GA_RWHandleI RW; };
-template <> struct GAHandleTraits<int32_t> { typedef GA_RWHandleI RW; };
-template <> struct GAHandleTraits<int64_t> { typedef GA_RWHandleI RW; };
-template <> struct GAHandleTraits<half> { typedef GA_RWHandleF RW; };
-template <> struct GAHandleTraits<float> { typedef GA_RWHandleF RW; };
-template <> struct GAHandleTraits<double> { typedef GA_RWHandleF RW; };
 
 
 template<typename PointDataTreeType, typename LeafOffsetArray, typename AttributeType>
@@ -570,9 +572,11 @@ convertPointDataGridPosition(   GU_Detail& detail,
 
     // perform threaded conversion
 
+    detail.getP()->hardenAllPages();
     ConvertPointDataGridPositionOp<PointDataTree, LeafOffsetArray> convert(
                     detail, tree, grid.transform(), positionIndex, leafOffsets);
     tbb::parallel_for(tbb::blocked_range<size_t>(0, leafOffsets.size()), convert);
+    detail.getP()->tryCompressAllPages();
 }
 
 
