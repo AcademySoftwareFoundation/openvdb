@@ -196,6 +196,10 @@ public:
     template<typename AttributeArrayType>
     bool isType() const { return this->type() == AttributeArrayType::attributeType(); }
 
+    /// Return @c true if this attribute has a value type the same as the template parameter
+    template<typename ValueType>
+    bool hasValueType() const { return this->type().first == typeNameAsString<ValueType>();}
+
     /// Set value at given index @a n from @a sourceIndex of another @a sourceArray
     virtual void set(const Index n, const AttributeArray& sourceArray, const Index sourceIndex) = 0;
 

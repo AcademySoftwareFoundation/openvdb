@@ -107,6 +107,7 @@ TestAttributeArray::testFixedPointConversion()
 void
 TestAttributeArray::testAttributeArray()
 {
+    typedef openvdb::tools::TypedAttributeArray<float> AttributeArrayF;
     typedef openvdb::tools::TypedAttributeArray<double> AttributeArrayD;
 
     {
@@ -132,6 +133,20 @@ TestAttributeArray::testAttributeArray()
 
     typedef openvdb::tools::FixedPointAttributeCodec<uint16_t> FixedPointCodec;
     typedef openvdb::tools::TypedAttributeArray<double, FixedPointCodec> AttributeArrayC;
+
+    { // test hasValueType()
+        openvdb::tools::AttributeArray::Ptr attrC(new AttributeArrayC(50));
+        openvdb::tools::AttributeArray::Ptr attrD(new AttributeArrayD(50));
+        openvdb::tools::AttributeArray::Ptr attrF(new AttributeArrayF(50));
+
+        CPPUNIT_ASSERT(attrD->hasValueType<double>());
+        CPPUNIT_ASSERT(attrC->hasValueType<double>());
+        CPPUNIT_ASSERT(!attrF->hasValueType<double>());
+
+        CPPUNIT_ASSERT(!attrD->hasValueType<float>());
+        CPPUNIT_ASSERT(!attrC->hasValueType<float>());
+        CPPUNIT_ASSERT(attrF->hasValueType<float>());
+    }
 
     {
         openvdb::tools::AttributeArray::Ptr attr(new AttributeArrayC(50));
