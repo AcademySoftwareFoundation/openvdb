@@ -310,31 +310,6 @@ public:
         return pos != AttributeSet::INVALID_POS;
     }
 
-    /// @brief Returns whether an attribute exists. This method is faster
-    /// than hasTypedAttribute(const Name&) as it avoids a map lookup.
-    /// @param pos    Index of the attribute
-    template <typename TypedAttributeArrayType>
-    bool hasTypedAttribute(const size_t pos) const
-    {
-        if (pos >= mAttributeSet->size())     return false;
-
-        const AttributeArray* array = mAttributeSet->getConst(pos);
-
-        return array->isType<TypedAttributeArrayType>();
-    }
-
-    /// @brief Returns whether an attribute exists.
-    /// @param attributeName    Name of the attribute
-    template <typename TypedAttributeArrayType>
-    bool hasTypedAttribute(const Name& attributeName) const
-    {
-        const size_t pos = mAttributeSet->find(attributeName);
-
-        if (pos == AttributeSet::INVALID_POS)   return false;
-
-        return hasTypedAttribute<TypedAttributeArrayType>(pos);
-    }
-
     /// @brief Append an attribute to the leaf.
     void appendAttribute(const AttributeSet::Util::NameAndType& attribute,
                          const Descriptor& expected, Descriptor::Ptr& replacement)
