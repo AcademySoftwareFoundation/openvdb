@@ -344,7 +344,7 @@ $(CLARISSE_MODULE_OBJ_NAMES): $(LIBCLARISSE)
 
 $(CLARISSE_MODULE_OBJ_NAMES): %.o: %.cc
 	@echo "Building $(CLARISSE_DESTDIR)/$(@:.o=.so) because of $(call list_deps)"
-	mkdir -p $(CLARISSE_DESTDIR)
+	mkdir -p $(CLARISSE_DESTDIR)/clarisse/module
 	$(CLARISSE_CC) -shared -o $(CLARISSE_DESTDIR)/$(@:.o=.so) $(CXXFLAGS) $(CLARISSE_FLAGS) -fPIC $(CLARISSE_LDFLAGS) $(CLARISSE_INCLDIRS) $(LIBS) \
 	        -L. -lopenvdb_points_clarisse -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) -L$(OPENVDB_POINTS_LIB_DIR) $(OPENVDB_POINTS_LIB) $< $(QUIET)
 
