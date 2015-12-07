@@ -102,7 +102,6 @@ SET ( OPENVDB_LIBRARY_SOURCE_FILES
   io/Queue.cc
   io/Stream.cc
   io/TempFile.cc
-  math/Hermite.cc
   math/Maps.cc
   math/Proximity.cc
   math/QuantizedUnitVec.cc
