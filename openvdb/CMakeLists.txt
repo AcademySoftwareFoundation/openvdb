@@ -1,6 +1,27 @@
 # yue.nicholas@gmail.com
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
+# ====================================================================
+# use clang instead of gcc? (this must come before declaring the project)
+option(USE_CLANG "Build application with clang" OFF)
+if(USE_CLANG)
+    SET (CMAKE_C_COMPILER   "/usr/bin/clang")
+    SET (CMAKE_CXX_COMPILER "/usr/bin/clang++")
+    SET (CMAKE_AR      "/usr/bin/llvm-ar")
+    SET (CMAKE_LINKER  "/usr/bin/llvm-ld")
+    SET (CMAKE_NM      "/usr/bin/llvm-nm")
+    SET (CMAKE_OBJDUMP "/usr/bin/llvm-objdump")
+    SET (CMAKE_RANLIB  "/usr/bin/llvm-ranlib")
+else(USE_CLANG)
+    SET (CMAKE_C_COMPILER   "/usr/bin/gcc")
+    SET (CMAKE_CXX_COMPILER "/usr/bin/g++")
+    SET (CMAKE_AR      "/usr/bin/ar")
+    SET (CMAKE_LINKER  "/usr/bin/ld")
+    SET (CMAKE_NM      "/usr/bin/nm")
+    SET (CMAKE_OBJDUMP "/usr/bin/objdump")
+    SET (CMAKE_RANLIB  "/usr/bin/ranlib")
+endif(USE_CLANG)
+
 PROJECT ( OpenVDB )
 
 # -----------------------------------------------------
