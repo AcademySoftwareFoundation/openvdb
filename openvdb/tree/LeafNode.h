@@ -270,11 +270,8 @@ public:
 #ifndef OPENVDB_2_ABI_COMPATIBLE
             this->loadValues();
             if (mData == NULL) {
-
                 Buffer* self = const_cast<Buffer*>(this);
-
-                // Since this method is const we need a lock (which
-                // will be contended at most once) to make it thread-safe.
+                // This lock will be contended at most once.
                 tbb::spin_mutex::scoped_lock lock(self->mMutex);
                 if (mData == NULL) self->mData = new ValueType[SIZE];
             }
@@ -289,7 +286,11 @@ public:
         {
 #ifndef OPENVDB_2_ABI_COMPATIBLE
             this->loadValues();
-            if (mData == NULL) mData = new ValueType[SIZE];
+            if (mData == NULL) {
+                // This lock will be contended at most once.
+                tbb::spin_mutex::scoped_lock lock(mMutex);
+                if (mData == NULL) mData = new ValueType[SIZE];
+            }
 #endif
             return mData;
         }
