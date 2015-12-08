@@ -127,142 +127,157 @@ install(DIRECTORY . DESTINATION ${OPENVDB_INCLUDE_DIR} FILES_MATCHING PATTERN "*
 
 # ---
 # vdb_print
-ADD_EXECUTABLE ( vdb_print
-  cmd/openvdb_print/main.cc
-  )
-TARGET_LINK_LIBRARIES ( vdb_print
-  openvdb
-  )
-install(TARGETS vdb_print DESTINATION ${OPENVDB_BIN_DIR})
+option(BUILD_PRINT "Build application to print OpenVDB files" OFF)
+if(BUILD_PRINT)
+    ADD_EXECUTABLE ( vdb_print
+      cmd/openvdb_print/main.cc
+      )
+    TARGET_LINK_LIBRARIES ( vdb_print
+      openvdb
+      )
+    install(TARGETS vdb_print DESTINATION ${OPENVDB_BIN_DIR})
+endif(BUILD_PRINT)
 
 # ---
 # vdb_render
-ADD_EXECUTABLE ( vdb_render
-  cmd/openvdb_render/main.cc
-  )
-TARGET_LINK_LIBRARIES ( vdb_render
-  openvdb
-  ${ILMBASE_LIBRARIES}
-  ${OPENEXR_LIBRARIES}
-  )
-install(TARGETS vdb_render DESTINATION ${OPENVDB_BIN_DIR})
+option(BUILD_RENDER "Build application to render OpenVDB files" OFF)
+if(BUILD_RENDER)
+    ADD_EXECUTABLE ( vdb_render
+      cmd/openvdb_render/main.cc
+      )
+    TARGET_LINK_LIBRARIES ( vdb_render
+      openvdb
+      ${ILMBASE_LIBRARIES}
+      ${OPENEXR_LIBRARIES}
+      )
+    install(TARGETS vdb_render DESTINATION ${OPENVDB_BIN_DIR})
+endif(BUILD_RENDER)
 
 # ---
 # vdb_view
-ADD_EXECUTABLE ( vdb_view
-  cmd/openvdb_view/main.cc
-  viewer/Camera.cc
-  viewer/ClipBox.cc
-  viewer/Font.cc
-  viewer/RenderModules.cc
-  viewer/Viewer.cc
-  )
-#MESSAGE ( "OPENGL_LIBRARIES = ${OPENGL_LIBRARIES}")
-#MESSAGE ( "GLFW_LIBRARIES = ${GLFW_STATIC_LIBRARIES}")
-TARGET_LINK_LIBRARIES ( vdb_view
-  openvdb
-  ${OPENGL_LIBRARIES}
-  ${GLFW_STATIC_LIBRARIES}
-  )
-install(TARGETS vdb_view DESTINATION ${OPENVDB_BIN_DIR})
+option(BUILD_VIEWER "Build application to view OpenVDB files" OFF)
+if(BUILD_VIEWER)
+    ADD_EXECUTABLE ( vdb_view
+      cmd/openvdb_view/main.cc
+      viewer/Camera.cc
+      viewer/ClipBox.cc
+      viewer/Font.cc
+      viewer/RenderModules.cc
+      viewer/Viewer.cc
+      )
+      #MESSAGE ( "OPENGL_LIBRARIES = ${OPENGL_LIBRARIES}")
+      #MESSAGE ( "GLFW_LIBRARIES = ${GLFW_STATIC_LIBRARIES}")
+    TARGET_LINK_LIBRARIES ( vdb_view
+      openvdb
+      ${OPENGL_LIBRARIES}
+      ${GLFW_STATIC_LIBRARIES}
+      )
+    install(TARGETS vdb_view DESTINATION ${OPENVDB_BIN_DIR})
+endif(BUILD_VIEWER)
 
 # ---
 # openvdb_unittest
-ADD_EXECUTABLE ( openvdb_unittest
-  unittest/main.cc
-  unittest/TestBBox.cc
-  unittest/TestConjGradient.cc
-  unittest/TestCoord.cc
-  unittest/TestCpt.cc
-  unittest/TestCurl.cc
-  unittest/TestDense.cc
-  unittest/TestDenseSparseTools.cc
-  unittest/TestDiagnostics.cc
-  unittest/TestDivergence.cc
-  unittest/TestDoubleMetadata.cc
-  unittest/TestExceptions.cc
-  unittest/TestFile.cc
-  unittest/TestFloatMetadata.cc
-  unittest/TestGradient.cc
-  unittest/TestGridBbox.cc
-  unittest/TestGrid.cc
-  unittest/TestGridDescriptor.cc
-  unittest/TestGridIO.cc
-  unittest/TestGridTransformer.cc
-  unittest/TestInit.cc
-  unittest/TestInt32Metadata.cc
-  unittest/TestInt64Metadata.cc
-  unittest/TestInternalOrigin.cc
-  unittest/TestLaplacian.cc
-  unittest/TestLeafBool.cc
-  unittest/TestLeaf.cc
-  unittest/TestLeafIO.cc
-  unittest/TestLeafMask.cc
-  unittest/TestLeafOrigin.cc
-  unittest/TestLevelSetRayIntersector.cc
-  unittest/TestLevelSetUtil.cc
-  unittest/TestLinearInterp.cc
-  unittest/TestMaps.cc
-  unittest/TestMat4Metadata.cc
-  unittest/TestMath.cc
-  unittest/TestMeanCurvature.cc
-  unittest/TestMeshToVolume.cc
-  unittest/TestMetadata.cc
-  unittest/TestMetadataIO.cc
-  unittest/TestMetaMap.cc
-  unittest/TestName.cc
-  unittest/TestNodeIterator.cc
-  unittest/TestNodeMask.cc
-  unittest/TestParticlesToLevelSet.cc
-  unittest/TestPointIndexGrid.cc
-  unittest/TestPointMaskGrid.cc
-  unittest/TestPointPartitioner.cc
-  unittest/TestPoissonSolver.cc
-  unittest/TestPrePostAPI.cc
-  unittest/TestQuadraticInterp.cc
-  unittest/TestQuantizedUnitVec.cc
-  unittest/TestQuat.cc
-  unittest/TestRay.cc
-  unittest/TestStats.cc
-  unittest/TestStream.cc
-  unittest/TestStringMetadata.cc
-  unittest/TestTools.cc
-  unittest/TestTopologyToLevelSet.cc
-  unittest/TestTransform.cc
-  unittest/TestTree.cc
-  unittest/TestTreeCombine.cc
-  unittest/TestTreeGetSetValues.cc
-  unittest/TestTreeIterators.cc
-  unittest/TestTreeVisitor.cc
-  unittest/TestUtil.cc
-  unittest/TestValueAccessor.cc
-  unittest/TestVec2Metadata.cc
-  unittest/TestVec3Metadata.cc
-  unittest/TestVolumeRayIntersector.cc
-  unittest/TestVolumeToMesh.cc
-  )
-TARGET_LINK_LIBRARIES ( openvdb_unittest
-  openvdb
-  cppunit
-  )
-install(TARGETS openvdb_unittest DESTINATION ${OPENVDB_BIN_DIR})
+option(BUILD_TESTS "Build unit tests" OFF)
+if(BUILD_TESTS)
+    ADD_EXECUTABLE ( openvdb_unittest
+      unittest/main.cc
+      unittest/TestBBox.cc
+      unittest/TestConjGradient.cc
+      unittest/TestCoord.cc
+      unittest/TestCpt.cc
+      unittest/TestCurl.cc
+      unittest/TestDense.cc
+      unittest/TestDenseSparseTools.cc
+      unittest/TestDiagnostics.cc
+      unittest/TestDivergence.cc
+      unittest/TestDoubleMetadata.cc
+      unittest/TestExceptions.cc
+      unittest/TestFile.cc
+      unittest/TestFloatMetadata.cc
+      unittest/TestGradient.cc
+      unittest/TestGridBbox.cc
+      unittest/TestGrid.cc
+      unittest/TestGridDescriptor.cc
+      unittest/TestGridIO.cc
+      unittest/TestGridTransformer.cc
+      unittest/TestInit.cc
+      unittest/TestInt32Metadata.cc
+      unittest/TestInt64Metadata.cc
+      unittest/TestInternalOrigin.cc
+      unittest/TestLaplacian.cc
+      unittest/TestLeafBool.cc
+      unittest/TestLeaf.cc
+      unittest/TestLeafIO.cc
+      unittest/TestLeafMask.cc
+      unittest/TestLeafOrigin.cc
+      unittest/TestLevelSetRayIntersector.cc
+      unittest/TestLevelSetUtil.cc
+      unittest/TestLinearInterp.cc
+      unittest/TestMaps.cc
+      unittest/TestMat4Metadata.cc
+      unittest/TestMath.cc
+      unittest/TestMeanCurvature.cc
+      unittest/TestMeshToVolume.cc
+      unittest/TestMetadata.cc
+      unittest/TestMetadataIO.cc
+      unittest/TestMetaMap.cc
+      unittest/TestName.cc
+      unittest/TestNodeIterator.cc
+      unittest/TestNodeMask.cc
+      unittest/TestParticlesToLevelSet.cc
+      unittest/TestPointIndexGrid.cc
+      unittest/TestPointMaskGrid.cc
+      unittest/TestPointPartitioner.cc
+      unittest/TestPoissonSolver.cc
+      unittest/TestPrePostAPI.cc
+      unittest/TestQuadraticInterp.cc
+      unittest/TestQuantizedUnitVec.cc
+      unittest/TestQuat.cc
+      unittest/TestRay.cc
+      unittest/TestStats.cc
+      unittest/TestStream.cc
+      unittest/TestStringMetadata.cc
+      unittest/TestTools.cc
+      unittest/TestTopologyToLevelSet.cc
+      unittest/TestTransform.cc
+      unittest/TestTree.cc
+      unittest/TestTreeCombine.cc
+      unittest/TestTreeGetSetValues.cc
+      unittest/TestTreeIterators.cc
+      unittest/TestTreeVisitor.cc
+      unittest/TestUtil.cc
+      unittest/TestValueAccessor.cc
+      unittest/TestVec2Metadata.cc
+      unittest/TestVec3Metadata.cc
+      unittest/TestVolumeRayIntersector.cc
+      unittest/TestVolumeToMesh.cc
+      )
+    TARGET_LINK_LIBRARIES ( openvdb_unittest
+      openvdb
+      cppunit
+      )
+    install(TARGETS openvdb_unittest DESTINATION ${OPENVDB_BIN_DIR})
+endif(BUILD_TESTS)
 
 # ---
 # pyopenvdb
-ADD_LIBRARY ( pyopenvdb SHARED
-  python/pyFloatGrid.cc
-  python/pyIntGrid.cc
-  python/pyMetadata.cc
-  python/pyOpenVDBModule.cc
-  python/pyTransform.cc
-  python/pyVec3Grid.cc
-  )
-TARGET_LINK_LIBRARIES ( pyopenvdb
-  openvdb
-  ${Boost_LIBRARIES}
-  )
-set_target_properties(pyopenvdb PROPERTIES PREFIX "")
-install(TARGETS pyopenvdb DESTINATION ${OPENVDB_PYTHON_LIB_DIR})
+option(BUILD_PYTHON "Build python wrappers" ON)
+if(BUILD_PYTHON)
+    ADD_LIBRARY ( pyopenvdb SHARED
+      python/pyFloatGrid.cc
+      python/pyIntGrid.cc
+      python/pyMetadata.cc
+      python/pyOpenVDBModule.cc
+      python/pyTransform.cc
+      python/pyVec3Grid.cc
+      )
+    TARGET_LINK_LIBRARIES ( pyopenvdb
+      openvdb
+      ${Boost_LIBRARIES}
+      )
+    set_target_properties(pyopenvdb PROPERTIES PREFIX "")
+    install(TARGETS pyopenvdb DESTINATION ${OPENVDB_PYTHON_LIB_DIR})
+if(BUILD_PYTHON)
 
 message(STATUS "CC flags: ${CMAKE_CC_FLAGS}")
 
