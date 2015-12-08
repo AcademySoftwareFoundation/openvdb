@@ -972,7 +972,7 @@ public:
     }
 
     template<typename NodeOp>
-    void reduceBottomUp(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void reduceBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
         mList0.reduce(op, threaded, grainSize);
         mList1.reduce(op, threaded, grainSize);
@@ -982,7 +982,7 @@ public:
     }
 
     template<typename NodeOp>
-    void reduceTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
         op(mRoot);
         mList3.reduce(op, threaded, grainSize);
