@@ -167,6 +167,87 @@ TARGET_LINK_LIBRARIES ( vdb_view
 install(TARGETS vdb_view DESTINATION ${OPENVDB_BIN_DIR})
 
 # ---
+# openvdb_unittest
+ADD_EXECUTABLE ( openvdb_unittest
+  unittest/main.cc
+  unittest/TestBBox.cc
+  unittest/TestConjGradient.cc
+  unittest/TestCoord.cc
+  unittest/TestCpt.cc
+  unittest/TestCurl.cc
+  unittest/TestDense.cc
+  unittest/TestDenseSparseTools.cc
+  unittest/TestDiagnostics.cc
+  unittest/TestDivergence.cc
+  unittest/TestDoubleMetadata.cc
+  unittest/TestExceptions.cc
+  unittest/TestFile.cc
+  unittest/TestFloatMetadata.cc
+  unittest/TestGradient.cc
+  unittest/TestGridBbox.cc
+  unittest/TestGrid.cc
+  unittest/TestGridDescriptor.cc
+  unittest/TestGridIO.cc
+  unittest/TestGridTransformer.cc
+  unittest/TestInit.cc
+  unittest/TestInt32Metadata.cc
+  unittest/TestInt64Metadata.cc
+  unittest/TestInternalOrigin.cc
+  unittest/TestLaplacian.cc
+  unittest/TestLeafBool.cc
+  unittest/TestLeaf.cc
+  unittest/TestLeafIO.cc
+  unittest/TestLeafMask.cc
+  unittest/TestLeafOrigin.cc
+  unittest/TestLevelSetRayIntersector.cc
+  unittest/TestLevelSetUtil.cc
+  unittest/TestLinearInterp.cc
+  unittest/TestMaps.cc
+  unittest/TestMat4Metadata.cc
+  unittest/TestMath.cc
+  unittest/TestMeanCurvature.cc
+  unittest/TestMeshToVolume.cc
+  unittest/TestMetadata.cc
+  unittest/TestMetadataIO.cc
+  unittest/TestMetaMap.cc
+  unittest/TestName.cc
+  unittest/TestNodeIterator.cc
+  unittest/TestNodeMask.cc
+  unittest/TestParticlesToLevelSet.cc
+  unittest/TestPointIndexGrid.cc
+  unittest/TestPointMaskGrid.cc
+  unittest/TestPointPartitioner.cc
+  unittest/TestPoissonSolver.cc
+  unittest/TestPrePostAPI.cc
+  unittest/TestQuadraticInterp.cc
+  unittest/TestQuantizedUnitVec.cc
+  unittest/TestQuat.cc
+  unittest/TestRay.cc
+  unittest/TestStats.cc
+  unittest/TestStream.cc
+  unittest/TestStringMetadata.cc
+  unittest/TestTools.cc
+  unittest/TestTopologyToLevelSet.cc
+  unittest/TestTransform.cc
+  unittest/TestTree.cc
+  unittest/TestTreeCombine.cc
+  unittest/TestTreeGetSetValues.cc
+  unittest/TestTreeIterators.cc
+  unittest/TestTreeVisitor.cc
+  unittest/TestUtil.cc
+  unittest/TestValueAccessor.cc
+  unittest/TestVec2Metadata.cc
+  unittest/TestVec3Metadata.cc
+  unittest/TestVolumeRayIntersector.cc
+  unittest/TestVolumeToMesh.cc
+  )
+TARGET_LINK_LIBRARIES ( openvdb_unittest
+  openvdb
+  cppunit
+  )
+install(TARGETS openvdb_unittest DESTINATION ${OPENVDB_BIN_DIR})
+
+# ---
 # pyopenvdb
 ADD_LIBRARY ( pyopenvdb SHARED
   python/pyFloatGrid.cc
