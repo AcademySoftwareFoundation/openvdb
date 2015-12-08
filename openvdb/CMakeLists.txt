@@ -277,7 +277,7 @@ if(BUILD_PYTHON)
       )
     set_target_properties(pyopenvdb PROPERTIES PREFIX "")
     install(TARGETS pyopenvdb DESTINATION ${OPENVDB_PYTHON_LIB_DIR})
-if(BUILD_PYTHON)
+endif(BUILD_PYTHON)
 
 message(STATUS "CC flags: ${CMAKE_CC_FLAGS}")
 
