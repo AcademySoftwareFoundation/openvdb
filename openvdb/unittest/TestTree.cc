@@ -2881,7 +2881,7 @@ TestTree::testNodeManager()
         NodeCountOp<FloatTree> bottomUpOp;
         NodeCountOp<FloatTree> topDownOp;
         manager.reduceBottomUp(bottomUpOp);
-        manager.reduceBottomUp(topDownOp);
+        manager.reduceTopDown(topDownOp);
         for (openvdb::Index i=0; i<FloatTree::RootNodeType::LEVEL; ++i) {//exclude root in nodeCount
             CPPUNIT_ASSERT_EQUAL(bottomUpOp.nodeCount[i], manager.nodeCount(i));
             CPPUNIT_ASSERT_EQUAL(topDownOp.nodeCount[i], manager.nodeCount(i));
@@ -2908,7 +2908,7 @@ TestTree::testNodeManager()
         NodeCountOp<FloatTree> bottomUpOp;
         NodeCountOp<FloatTree> topDownOp;
         manager2.reduceBottomUp(bottomUpOp);
-        manager2.reduceBottomUp(topDownOp);
+        manager2.reduceTopDown(topDownOp);
         for (openvdb::Index i=0; i<FloatTree::RootNodeType::LEVEL; ++i) {//exclude root in nodeCount
             CPPUNIT_ASSERT_EQUAL(bottomUpOp.nodeCount[i], manager2.nodeCount(i));
             CPPUNIT_ASSERT_EQUAL(topDownOp.nodeCount[i], manager2.nodeCount(i));
