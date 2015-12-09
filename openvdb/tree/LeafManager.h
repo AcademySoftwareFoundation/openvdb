@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -30,10 +30,10 @@
 //
 /// @file LeafManager.h
 ///
-/// A LeafManager manages a linear array of pointers to a given tree's
+/// @brief A LeafManager manages a linear array of pointers to a given tree's
 /// leaf nodes, as well as optional auxiliary buffers (one or more per leaf)
 /// that can be swapped with the leaf nodes' voxel data buffers.
-/// The leaf array is useful for multithreaded computations over
+/// @details The leaf array is useful for multithreaded computations over
 /// leaf voxels in a tree with static topology but varying voxel values.
 /// The auxiliary buffers are convenient for temporal integration.
 /// Efficient methods are provided for multithreaded swapping and synching
@@ -45,6 +45,11 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
+#include <boost/mpl/if.hpp>
+#include <boost/type_traits/is_const.hpp>
+#include <boost/type_traits/is_pointer.hpp>
+#include <boost/type_traits/is_same.hpp>
+#include <boost/type_traits/remove_pointer.hpp>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <openvdb/Types.h>
@@ -665,6 +670,6 @@ struct LeafManagerImpl<LeafManager<const TreeT> >
 
 #endif // OPENVDB_TREE_LEAFMANAGER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

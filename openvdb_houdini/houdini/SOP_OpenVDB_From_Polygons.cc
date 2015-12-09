@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -648,17 +648,18 @@ SOP_OpenVDB_From_Polygons::cookMySop(OP_Context& context)
         // Evaluate the UI parameters.
 
         const bool outputDistanceField = bool(evalInt("distanceField", 0, time));
+        const bool unsignedDistanceFieldConversion = bool(evalInt("unsignedDist", 0, time));
         const bool outputFogVolumeGrid = bool(evalInt("fogVolume", 0, time));
         const bool outputAttributeGrid = bool(evalInt("attrList", 0, time) > 0);
+
+
+
 
         if (!outputDistanceField && !outputFogVolumeGrid && !outputAttributeGrid) {
 
             addWarning(SOP_MESSAGE, "No output selected");
             return error();
         }
-
-        unsigned int conversionFlags = 0;
-        if (outputAttributeGrid) conversionFlags |= openvdb::tools::GENERATE_PRIM_INDEX_GRID;
 
         mVoxelSize = static_cast<float>(evalFloat("voxelSize", 0, time));
         openvdb::math::Transform::Ptr transform;
@@ -742,18 +743,20 @@ SOP_OpenVDB_From_Polygons::cookMySop(OP_Context& context)
         //////////
         // Mesh to volume conversion
 
-        openvdb::tools::MeshToVolume<openvdb::FloatGrid, hvdb::Interrupter>
-            converter(transform, conversionFlags, &boss);
 
-        const bool unsignedDist = bool(evalInt("unsignedDist", 0, time));
+        openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec4I> mesh(pointList, primList);
 
-        if (!boss.wasInterrupted()) {
-            if (unsignedDist) {
-                converter.convertToUnsignedDistanceField(pointList, primList, exBand);
-            } else {
-                converter.convertToLevelSet(pointList, primList, exBand, inBand);
-            }
+        int conversionFlags = unsignedDistanceFieldConversion ? openvdb::tools::UNSIGNED_DISTANCE_FIELD : 0;
+
+
+        openvdb::Int32Grid::Ptr primitiveIndexGrid;
+
+        if (outputAttributeGrid) {
+            primitiveIndexGrid.reset(new openvdb::Int32Grid(0));
         }
+
+        openvdb::FloatGrid::Ptr grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
+            boss, mesh, *transform, exBand, inBand, conversionFlags, primitiveIndexGrid.get());
 
         //////////
         // Output
@@ -762,22 +765,21 @@ SOP_OpenVDB_From_Polygons::cookMySop(OP_Context& context)
         if (!boss.wasInterrupted() && outputDistanceField) {
             UT_String gridNameStr;
             evalString(gridNameStr, "distanceFieldGridName", 0, time);
-            hvdb::createVdbPrimitive(*gdp, converter.distGridPtr(),
-                gridNameStr.toStdString().c_str());
+            hvdb::createVdbPrimitive(*gdp, grid, gridNameStr.toStdString().c_str());
         }
 
 
         // Fog volume
-        if (!boss.wasInterrupted() && outputFogVolumeGrid && !unsignedDist) {
+        if (!boss.wasInterrupted() && outputFogVolumeGrid && !unsignedDistanceFieldConversion) {
 
             // If no level set grid is exported the original level set
             // grid is modified in place.
             openvdb::FloatGrid::Ptr outputGrid;
 
             if (outputDistanceField) {
-                outputGrid = converter.distGridPtr()->deepCopy();
+                outputGrid = grid->deepCopy();
             } else {
-                outputGrid = converter.distGridPtr();
+                outputGrid = grid;
             }
 
             openvdb::tools::sdfToFogVolume(*outputGrid);
@@ -796,10 +798,10 @@ SOP_OpenVDB_From_Polygons::cookMySop(OP_Context& context)
 
             int closestPrimIndexInstance =
                 constructGenericAtttributeLists(pointAttributes, vertexAttributes,
-                    primitiveAttributes, *inputGdp, *converter.indexGridPtr(), float(time));
+                    primitiveAttributes, *inputGdp, *primitiveIndexGrid, float(time));
 
             transferAttributes(pointAttributes, vertexAttributes, primitiveAttributes,
-                *converter.indexGridPtr(), transform, *inputGdp);
+                *primitiveIndexGrid, transform, *inputGdp);
 
             // Export the closest prim idx grid.
             if (!boss.wasInterrupted() && closestPrimIndexInstance > -1) {
@@ -807,8 +809,7 @@ SOP_OpenVDB_From_Polygons::cookMySop(OP_Context& context)
                 evalStringInst("attributeGridName#", &closestPrimIndexInstance,
                     gridNameStr, 0, time);
                 if (gridNameStr.length() == 0) gridNameStr = "primitive_list_index";
-                hvdb::createVdbPrimitive(*gdp, converter.indexGridPtr(),
-                    gridNameStr.toStdString().c_str());
+                hvdb::createVdbPrimitive(*gdp, primitiveIndexGrid, gridNameStr.toStdString().c_str());
             }
         }
 
@@ -1072,6 +1073,6 @@ SOP_OpenVDB_From_Polygons::transferAttributes(
     }
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

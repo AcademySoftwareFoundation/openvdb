@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -80,13 +80,12 @@ private:
     bool mXIsActive, mYIsActive, mZIsActive, mShiftIsDown, mCtrlIsDown;
     GLdouble mFrontPlane[4], mBackPlane[4], mLeftPlane[4], mRightPlane[4],
         mTopPlane[4], mBottomPlane[4];
-    double mMouseXPos, mMouseYPos;
 }; // class ClipBox
 
 } // namespace openvdb_viewer
 
 #endif // OPENVDB_VIEWER_CLIPBOX_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

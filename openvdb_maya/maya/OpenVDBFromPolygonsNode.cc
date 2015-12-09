@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -108,13 +108,15 @@ namespace {
 ////////////////////////////////////////
 
 
-void* OpenVDBFromPolygonsNode::creator()
+void*
+OpenVDBFromPolygonsNode::creator()
 {
     return new OpenVDBFromPolygonsNode();
 }
 
 
-MStatus OpenVDBFromPolygonsNode::initialize()
+MStatus
+OpenVDBFromPolygonsNode::initialize()
 {
     MStatus stat;
     MFnTypedAttribute tAttr;
@@ -141,14 +143,16 @@ MStatus OpenVDBFromPolygonsNode::initialize()
 
     // Conversion settings
 
-    aExportDistanceGrid = nAttr.create("ExportDistanceVDB", "exportdistance", MFnNumericData::kBoolean);
+    aExportDistanceGrid = nAttr.create(
+        "ExportDistanceVDB", "exportdistance", MFnNumericData::kBoolean);
     nAttr.setDefault(true);
     nAttr.setConnectable(false);
 
     stat = addAttribute(aExportDistanceGrid);
     if (stat != MS::kSuccess) return stat;
 
-    aDistanceGridName = tAttr.create("DistanceGridName", "distancename", MFnData::kString, distName, &stat);
+    aDistanceGridName = tAttr.create(
+        "DistanceGridName", "distancename", MFnData::kString, distName, &stat);
     if (stat != MS::kSuccess) return stat;
 
     tAttr.setConnectable(false);
@@ -156,14 +160,16 @@ MStatus OpenVDBFromPolygonsNode::initialize()
     if (stat != MS::kSuccess) return stat;
 
 
-    aExportDensityGrid = nAttr.create("ExportDensityVDB", "exportdensity", MFnNumericData::kBoolean);
+    aExportDensityGrid = nAttr.create(
+        "ExportDensityVDB", "exportdensity", MFnNumericData::kBoolean);
     nAttr.setDefault(false);
     nAttr.setConnectable(false);
 
     stat = addAttribute(aExportDensityGrid);
     if (stat != MS::kSuccess) return stat;
 
-    aDensityGridName = tAttr.create("DensityGridName", "densityname", MFnData::kString, densName, &stat);
+    aDensityGridName = tAttr.create(
+        "DensityGridName", "densityname", MFnData::kString, densName, &stat);
     if (stat != MS::kSuccess) return stat;
 
     tAttr.setConnectable(false);
@@ -181,7 +187,8 @@ MStatus OpenVDBFromPolygonsNode::initialize()
     if (stat != MS::kSuccess) return stat;
 
 
-    aExteriorBandWidth = nAttr.create("ExteriorBandWidth", "exteriorbandwidth", MFnNumericData::kFloat);
+    aExteriorBandWidth = nAttr.create(
+        "ExteriorBandWidth", "exteriorbandwidth", MFnNumericData::kFloat);
     nAttr.setDefault(3.0);
     nAttr.setMin(1.0);
     nAttr.setSoftMin(1.0);
@@ -190,7 +197,8 @@ MStatus OpenVDBFromPolygonsNode::initialize()
     stat = addAttribute(aExteriorBandWidth);
     if (stat != MS::kSuccess) return stat;
 
-    aInteriorBandWidth = nAttr.create("InteriorBandWidth", "interiorbandwidth", MFnNumericData::kFloat);
+    aInteriorBandWidth = nAttr.create(
+        "InteriorBandWidth", "interiorbandwidth", MFnNumericData::kFloat);
     nAttr.setDefault(3.0);
     nAttr.setMin(1.0);
     nAttr.setSoftMin(1.0);
@@ -208,7 +216,8 @@ MStatus OpenVDBFromPolygonsNode::initialize()
     if (stat != MS::kSuccess) return stat;
 
 
-    aUnsignedDistanceField = nAttr.create("UnsignedDistanceField", "udf", MFnNumericData::kBoolean);
+    aUnsignedDistanceField = nAttr.create(
+        "UnsignedDistanceField", "udf", MFnNumericData::kBoolean);
     nAttr.setDefault(false);
     nAttr.setConnectable(false);
 
@@ -227,7 +236,8 @@ MStatus OpenVDBFromPolygonsNode::initialize()
     if (stat != MS::kSuccess) return stat;
 
     // VDB Info
-    aEstimatedGridResolution = tAttr.create("EstimatedGridResolution", "res", MFnData::kString, emptyStr, &stat);
+    aEstimatedGridResolution = tAttr.create(
+        "EstimatedGridResolution", "res", MFnData::kString, emptyStr, &stat);
     if (stat != MS::kSuccess) return stat;
     tAttr.setConnectable(false);
     tAttr.setWritable(false);
@@ -275,7 +285,8 @@ MStatus OpenVDBFromPolygonsNode::initialize()
 ////////////////////////////////////////
 
 
-MStatus OpenVDBFromPolygonsNode::compute(const MPlug& plug, MDataBlock& data)
+MStatus
+OpenVDBFromPolygonsNode::compute(const MPlug& plug, MDataBlock& data)
 {
     MStatus status;
 
@@ -398,7 +409,8 @@ MStatus OpenVDBFromPolygonsNode::compute(const MPlug& plug, MDataBlock& data)
 
             if (vertices.length() < 3) {
 
-                MGlobal::displayWarning("Skipped unsupported geometry, sigle point or line primitive.");
+                MGlobal::displayWarning(
+                    "Skipped unsupported geometry, sigle point or line primitive.");
 
             } else if (vertices.length() > 4) {
 
@@ -435,25 +447,29 @@ MStatus OpenVDBFromPolygonsNode::compute(const MPlug& plug, MDataBlock& data)
 
         if (exportDistanceGrid || exportDensityGrid) {
 
-            openvdb::tools::MeshToVolume<openvdb::FloatGrid> converter(transform);
-            const float exteriorBandWidth = data.inputValue(aExteriorBandWidth, &status).asFloat();
+            float exteriorBandWidth = data.inputValue(aExteriorBandWidth, &status).asFloat();
+            float interiorBandWidth = exteriorBandWidth;
+
+            int conversionFlags = 0;
 
             // convert to SDF
             if (!data.inputValue(aUnsignedDistanceField, &status).asBool()) {
 
-                float interiorBandWidth = std::numeric_limits<float>::max();
                 if (!data.inputValue(aFillInterior, &status).asBool()) {
                     interiorBandWidth = data.inputValue(aInteriorBandWidth, &status).asFloat();
+                } else {
+                    interiorBandWidth = std::numeric_limits<float>::max();
                 }
 
-                converter.convertToLevelSet(pointList, primList, exteriorBandWidth, interiorBandWidth);
-
-            // or convert to UDF
             } else {
-                 converter.convertToUnsignedDistanceField(pointList, primList, exteriorBandWidth);
+                conversionFlags = openvdb::tools::UNSIGNED_DISTANCE_FIELD;
             }
 
-            openvdb::FloatGrid::Ptr grid = converter.distGridPtr();
+            openvdb::tools::QuadAndTriangleDataAdapter<openvdb::Vec3s, openvdb::Vec4I>
+                theMesh(pointList, primList);
+
+            openvdb::FloatGrid::Ptr grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
+                theMesh, *transform, exteriorBandWidth, interiorBandWidth, conversionFlags);
 
             // export distance grid
             if (exportDistanceGrid) {
@@ -494,6 +510,6 @@ MStatus OpenVDBFromPolygonsNode::compute(const MPlug& plug, MDataBlock& data)
     return MS::kUnknownParameter;
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -490,15 +490,17 @@ public:
     typedef typename _TreeType::ConstPtr                  ConstTreePtrType;
     typedef typename _TreeType::ValueType                 ValueType;
 
-    typedef typename tree::ValueAccessor<_TreeType>       Accessor;
-    typedef typename tree::ValueAccessor<const _TreeType> ConstAccessor;
-
     typedef typename _TreeType::ValueOnIter               ValueOnIter;
     typedef typename _TreeType::ValueOnCIter              ValueOnCIter;
     typedef typename _TreeType::ValueOffIter              ValueOffIter;
     typedef typename _TreeType::ValueOffCIter             ValueOffCIter;
     typedef typename _TreeType::ValueAllIter              ValueAllIter;
     typedef typename _TreeType::ValueAllCIter             ValueAllCIter;
+
+    typedef typename tree::ValueAccessor<_TreeType, true>        Accessor;
+    typedef typename tree::ValueAccessor<const _TreeType, true>  ConstAccessor;
+    typedef typename tree::ValueAccessor<_TreeType, false>       UnsafeAccessor;
+    typedef typename tree::ValueAccessor<const _TreeType, false> ConstUnsafeAccessor;
 
     /// @brief ValueConverter<T>::Type is the type of a grid having the same
     /// hierarchy as this grid but a different value type, T.
@@ -585,13 +587,33 @@ public:
     /// Empty this grid, so that all voxels become inactive background voxels.
     virtual void clear() { tree().clear(); }
 
-    /// Return an accessor that provides random read and write access to this grid's voxels.
+    /// @brief Return an accessor that provides random read and write access
+    /// to this grid's voxels. The accessor is safe in the sense that
+    /// it is registered by the tree of this grid.
     Accessor getAccessor() { return Accessor(tree()); }
+    /// @brief Return an accessor that provides random read and write access
+    /// to this grid's voxels. The accessor is unsafe in the sense that
+    /// it is not registered by the tree of this grid. In some rare
+    /// cases this can give a performance advantage over a registered
+    /// accessor but it is unsafe if the tree topology is modified.
+    ///
+    /// @warning Only use this method if you're an expert and know the
+    /// risks of using an unregistered accessor (see tree/ValueAccessor.h)
+    Accessor getUnsafeAccessor() { return UnsafeAccessor(tree()); }
     //@{
     /// Return an accessor that provides random read-only access to this grid's voxels.
     ConstAccessor getAccessor() const { return ConstAccessor(tree()); }
     ConstAccessor getConstAccessor() const { return ConstAccessor(tree()); }
     //@}
+    /// @brief Return an accessor that provides random read-only access
+    /// to this grid's voxels. The accessor is unsafe in the sense that
+    /// it is not registered by the tree of this grid. In some rare
+    /// cases this can give a performance advantage over a registered
+    /// accessor but it is unsafe if the tree topology is modified.
+    ///
+    /// @warning Only use this method if you're an expert and know the
+    /// risks of using an unregistered accessor (see tree/ValueAccessor.h)
+    ConstAccessor getConstUnsafeAccessor() const { return ConstUnsafeAccessor(tree()); }
 
     //@{
     /// Return an iterator over all of this grid's active values (tile and voxel).
@@ -1374,6 +1396,6 @@ createLevelSet(Real voxelSize, Real halfWidth)
 
 #endif // OPENVDB_GRID_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

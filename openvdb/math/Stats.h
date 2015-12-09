@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -29,6 +29,8 @@
 ///////////////////////////////////////////////////////////////////////////
 //
 /// @file Stats.h
+///
+/// @author Ken Museth
 ///
 /// @brief Classes to compute statistics and histograms
 
@@ -88,6 +90,9 @@ public:
     /// Return the maximum value.
     inline double max() const { return mMax; }
 
+    /// Return the range defined as the maximum value minus the minimum value.
+    inline double range() const { return mMax - mMin; }
+
     /// Add the samples from the other Stats instance.
     void add(const Extrema& other)
     {
@@ -104,9 +109,10 @@ public:
         os << "Extrema ";
         if (!name.empty()) os << "for \"" << name << "\" ";
         if (mSize>0) {
-            os << "with " << mSize << " samples:\n"
-               << "  Min=" << mMin
-               << ", Max=" << mMax << std::endl;
+            os << "with "   << mSize << " samples:\n"
+               << "  Min="  << mMin
+               << ", Max="  << mMax
+               << ", Range="<< this->range() << std::endl;
         } else {
             os << ": no samples were added." << std::endl;
         }
@@ -332,6 +338,6 @@ private:
 
 #endif // OPENVDB_MATH_STATS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

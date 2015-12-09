@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -39,8 +39,8 @@
 ///
 /// @note These classes are included mainly as reference implementations for
 /// ray-tracing of OpenVDB volumes. In other words they are not intended for
-/// production-quality rendering, but could be used for fast pre-visualiztion
-/// or as a startingpoint for a more serious render.
+/// production-quality rendering, but could be used for fast pre-visualization
+/// or as a starting point for a more serious render.
 
 #ifndef OPENVDB_TOOLS_RAYTRACER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_RAYTRACER_HAS_BEEN_INCLUDED
@@ -137,7 +137,7 @@ public:
     /// @brief Set the shader derived from the abstract BaseShader class.
     ///
     /// @note The shader is not assumed to be thread-safe so each
-    /// thread will get it's only deep copy. For instance it could
+    /// thread will get its only deep copy. For instance it could
     /// contains a ValueAccessor into another grid with auxiliary
     /// shading information. Thus, make sure it is relatively
     /// light-weight and efficient to copy (which is the case for ValueAccesors).
@@ -147,7 +147,7 @@ public:
     void setCamera(BaseCamera& camera);
 
     /// @brief Set the number of pixel samples and the seed for
-    /// jittered sub-rays. A value larger then one implies
+    /// jittered sub-rays. A value larger than one implies
     /// anti-aliasing by jittered super-sampling.
     /// @throw ValueError if pixelSamples is equal to zero.
     void setPixelSamples(size_t pixelSamples, unsigned int seed = 0);
@@ -207,7 +207,7 @@ public:
     /// @throw ArithmeticError if input is a null vector.
     void setLightDir(Real x, Real y, Real z) { mLightDir = Vec3R(x,y,z).unit(); }
 
-    /// @brief Set the color of the direcitonal light source.
+    /// @brief Set the color of the directional light source.
     void setLightColor(Real r, Real g, Real b) { mLightColor = Vec3R(r,g,b); }
 
     /// @brief Set the integration step-size in voxel units for the primay ray.
@@ -322,7 +322,9 @@ public:
 
     void savePPM(const std::string& fileName)
     {
-        std::string name(fileName + ".ppm");
+        std::string name(fileName);
+        if (name.find_last_of(".") == std::string::npos) name.append(".ppm");
+
         boost::scoped_array<unsigned char> buffer(new unsigned char[3*mSize]);
         unsigned char *tmp = buffer.get(), *q = tmp;
         RGBA* p = mPixels.get();
@@ -346,7 +348,8 @@ public:
 #ifdef OPENVDB_TOOLS_RAYTRACER_USE_EXR
     void saveEXR(const std::string& fileName, size_t compression = 2, size_t threads = 8)
     {
-        std::string name(fileName + ".exr");
+        std::string name(fileName);
+        if (name.find_last_of(".") == std::string::npos) name.append(".exr");
 
         if (threads>0) Imf::setGlobalThreadCount(threads);
         Imf::Header header(mWidth, mHeight);
@@ -575,7 +578,7 @@ public:
 /// @brief Shader that produces a simple matte.
 ///
 /// @details The color can either be constant (if GridT =
-/// Film::RGBA which is the default) or defined in a seperate Vec3
+/// Film::RGBA which is the default) or defined in a separate Vec3
 /// color grid. Use SamplerType to define the order of interpolation
 /// (default is zero order, i.e. closes-point).
 template <typename GridT = Film::RGBA,
@@ -622,7 +625,7 @@ private:
 /// RGB color.
 ///
 /// @details The color can either be constant (if GridT =
-/// Film::RGBA which is the default) or defined in a seperate Vec3
+/// Film::RGBA which is the default) or defined in a separate Vec3
 /// color grid. Use SamplerType to define the order of interpolation
 /// (default is zero order, i.e. closes-point).
 template <typename GridT = Film::RGBA,
@@ -666,7 +669,7 @@ private:
 /// cube defined from an axis-aligned bounding box in world space.
 ///
 /// @details The color can either be constant (if GridT =
-/// Film::RGBA which is the default) or defined in a seperate Vec3
+/// Film::RGBA which is the default) or defined in a separate Vec3
 /// color grid. Use SamplerType to define the order of interpolation
 /// (default is zero order, i.e. closes-point).
 template <typename GridT = Film::RGBA,
@@ -719,7 +722,7 @@ private:
 /// @brief Simple diffuse Lambertian surface shader.
 ///
 /// @details The diffuse color can either be constant (if GridT =
-/// Film::RGBA which is the default) or defined in a seperate Vec3
+/// Film::RGBA which is the default) or defined in a separate Vec3
 /// color grid. Lambertian implies that the (radiant) intensity is
 /// directly proportional to the cosine of the angle between the
 /// surface normal and the direction of the light source. Use
@@ -894,7 +897,7 @@ setPixelSamples(size_t pixelSamples, unsigned int seed)
 {
     assert(mIsMaster);
     if (pixelSamples == 0) {
-        OPENVDB_THROW(ValueError, "pixelSamples must be larger then zero!");
+        OPENVDB_THROW(ValueError, "pixelSamples must be larger than zero!");
     }
     mSubPixels = pixelSamples - 1;
     delete [] mRand;
@@ -1013,7 +1016,7 @@ operator()(const tbb::blocked_range<size_t>& range) const
 {
     SamplerType sampler(mAccessor, mShadow->grid().transform());//light-weight wrapper
 
-    // Any variable prefixed with p (or s) means it's associate with a primay (or shadow) ray
+    // Any variable prefixed with p (or s) means it's associated with a primary (or shadow) ray
     const Vec3R extinction = -mScattering-mAbsorption, One(1.0);
     const Vec3R albedo = mLightColor*mScattering/(mScattering+mAbsorption);//single scattering
     const Real sGain = mLightGain;//in-scattering along shadow ray
@@ -1094,6 +1097,6 @@ operator()(const tbb::blocked_range<size_t>& range) const
 
 #endif // OPENVDB_TOOLS_RAYTRACER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

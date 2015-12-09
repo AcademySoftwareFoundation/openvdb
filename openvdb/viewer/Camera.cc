@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -76,7 +76,6 @@ Camera::Camera()
     , mNeedsDisplay(true)
     , mMouseXPos(0.0)
     , mMouseYPos(0.0)
-    , mWheelPos(0)
 #if GLFW_VERSION_MAJOR >= 3
     , mWindow(NULL)
 #endif
@@ -130,7 +129,7 @@ Camera::aim()
     // Get the window size
     int width, height;
 #if GLFW_VERSION_MAJOR >= 3
-    glfwGetWindowSize(mWindow, &width, &height);
+    glfwGetFramebufferSize(mWindow, &width, &height);
 #else
     glfwGetWindowSize(&width, &height);
 #endif
@@ -276,6 +275,6 @@ Camera::mouseWheelCallback(int pos, int prevPos)
 
 } // namespace openvdb_viewer
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

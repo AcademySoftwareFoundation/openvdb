@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -380,8 +380,9 @@ protected:
     void copyMasks(std::vector<MaskType>& a, const ManagerType& b) {CopyMasks c(a, b); c.copy();}
 };// Morphology
 
+
 template<typename TreeType>
-void
+inline void
 Morphology<TreeType>::dilateVoxels(int iterations, NearestNeighbors nn)
 {
     for (int i=0; i<iterations; ++i) {
@@ -393,8 +394,9 @@ Morphology<TreeType>::dilateVoxels(int iterations, NearestNeighbors nn)
     }
 }
 
+
 template<typename TreeType>
-void
+inline void
 Morphology<TreeType>::dilateVoxels6()
 {
     /// @todo Currently operates only on leaf voxels; need to extend to tiles.
@@ -435,8 +437,9 @@ Morphology<TreeType>::dilateVoxels6()
     mManager->rebuildLeafArray();
 }//dilateVoxels6
 
+
 template<typename TreeType>
-void
+inline void
 Morphology<TreeType>::dilateVoxels18()
 {
     /// @todo Currently operates only on leaf voxels; need to extend to tiles.
@@ -484,8 +487,9 @@ Morphology<TreeType>::dilateVoxels18()
     mManager->rebuildLeafArray();
 }// dilateVoxels18
 
+
 template<typename TreeType>
-void
+inline void
 Morphology<TreeType>::dilateVoxels26()
 {
     /// @todo Currently operates only on leaf voxels; need to extend to tiles.
@@ -534,9 +538,10 @@ Morphology<TreeType>::dilateVoxels26()
     mManager->rebuildLeafArray();
 }// dilateVoxels26
 
+
 template<typename TreeType>
-inline void Morphology<TreeType>::LeafCache::
-scatterFacesXY(int x, int y, int i1, int n, int i2)
+inline void
+Morphology<TreeType>::LeafCache::scatterFacesXY(int x, int y, int i1, int n, int i2)
 {
     // dilate current leaf or neighbor in the -x direction
     if (x > 0) {
@@ -564,10 +569,10 @@ scatterFacesXY(int x, int y, int i1, int n, int i2)
     }
 }
 
+
 template<typename TreeType>
-void
-Morphology<TreeType>::LeafCache::
-scatterEdgesXY(int x, int y, int i1, int n, int i2)
+inline void
+Morphology<TreeType>::LeafCache::scatterEdgesXY(int x, int y, int i1, int n, int i2)
 {
     if (x > 0) {
         if (y > 0) {
@@ -617,10 +622,10 @@ scatterEdgesXY(int x, int y, int i1, int n, int i2)
     }
 }
 
+
 template<typename TreeType>
 inline void
-Morphology<TreeType>::ErodeVoxelsOp::
-runParallel(NearestNeighbors nn)
+Morphology<TreeType>::ErodeVoxelsOp::runParallel(NearestNeighbors nn)
 {
     switch (nn) {
     case NN_FACE_EDGE:
@@ -635,10 +640,10 @@ runParallel(NearestNeighbors nn)
     tbb::parallel_for(mManager.getRange(), *this);
 }
 
+
 template<typename TreeType>
 inline typename Morphology<TreeType>::Word
-Morphology<TreeType>::LeafCache::
-gatherFacesXY(int x, int y, int i1, int n, int i2)
+Morphology<TreeType>::LeafCache::gatherFacesXY(int x, int y, int i1, int n, int i2)
 {
     // erode current leaf or neighbor in negative x-direction
     Word w = x>0 ? this->gather(i1,n-LEAF_DIM) : this->template gather<-1,0,0>(i2, n);
@@ -655,11 +660,10 @@ gatherFacesXY(int x, int y, int i1, int n, int i2)
     return w;
 }
 
+
 template<typename TreeType>
-inline
-typename Morphology<TreeType>::Word
-Morphology<TreeType>::LeafCache::
-gatherEdgesXY(int x, int y, int i1, int n, int i2)
+inline typename Morphology<TreeType>::Word
+Morphology<TreeType>::LeafCache::gatherEdgesXY(int x, int y, int i1, int n, int i2)
 {
     Word w = ~Word(0);
 
@@ -689,10 +693,10 @@ gatherEdgesXY(int x, int y, int i1, int n, int i2)
     return w;
 }
 
+
 template <typename TreeType>
-void
-Morphology<TreeType>::ErodeVoxelsOp::
-erode6(const RangeT& range) const
+inline void
+Morphology<TreeType>::ErodeVoxelsOp::erode6(const RangeT& range) const
 {
     LeafCache cache(7, mManager.tree());
     for (size_t leafIdx = range.begin(); leafIdx < range.end(); ++leafIdx) {
@@ -718,25 +722,25 @@ erode6(const RangeT& range) const
     }//loop over leafs
 }
 
-template <typename TreeType>
-void
-Morphology<TreeType>::ErodeVoxelsOp::
-erode18(const RangeT&) const
-{
-    OPENVDB_THROW(RuntimeError, "tools::erode18 is not implemented yet!");
-}
 
 template <typename TreeType>
-void
-Morphology<TreeType>::ErodeVoxelsOp::
-erode26(const RangeT&) const
+inline void
+Morphology<TreeType>::ErodeVoxelsOp::erode18(const RangeT&) const
 {
-    OPENVDB_THROW(RuntimeError, "tools::erode26 is not implemented yet!");
+    OPENVDB_THROW(NotImplementedError, "tools::erode18 is not implemented yet!");
+}
+
+
+template <typename TreeType>
+inline void
+Morphology<TreeType>::ErodeVoxelsOp::erode26(const RangeT&) const
+{
+    OPENVDB_THROW(NotImplementedError, "tools::erode26 is not implemented yet!");
 }
 
 
 template<typename TreeType>
-void
+inline void
 Morphology<TreeType>::doErosion(NearestNeighbors nn)
 {
     /// @todo Currently operates only on leaf voxels; need to extend to tiles.
@@ -910,6 +914,6 @@ deactivate(GridOrTree& gridOrTree, const typename GridOrTree::ValueType& value,
 
 #endif // OPENVDB_TOOLS_MORPHOLOGY_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

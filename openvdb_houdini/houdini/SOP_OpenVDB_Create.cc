@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -136,7 +136,7 @@ class SOP_OpenVDB_Create : public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Create(OP_Network *net, const char *name, OP_Operator *op);
-    virtual ~SOP_OpenVDB_Create() {};
+    virtual ~SOP_OpenVDB_Create() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
@@ -795,6 +795,6 @@ SOP_OpenVDB_Create::buildTransform(OP_Context& context, openvdb::math::Transform
     return error();
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

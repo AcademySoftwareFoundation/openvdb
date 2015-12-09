@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -34,7 +34,6 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/VolumeToMesh.h>
 #include <openvdb/tools/MeshToVolume.h>
-#include <openvdb/tools/LevelSetUtil.h>
 #include <openvdb/tools/PointScatter.h>
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/math/Operators.h>
@@ -209,6 +208,6 @@ private:
 
 #endif // OPENVDB_VIEWER_RENDERMODULES_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

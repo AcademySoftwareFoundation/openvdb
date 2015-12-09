@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2014 DreamWorks Animation LLC
+# Copyright (c) 2012-2015 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -486,10 +486,10 @@ INCLUDE_NAMES := \
     io/Stream.h \
     io/TempFile.h \
     math/BBox.h \
+    math/ConjGradient.h \
     math/Coord.h \
     math/DDA.h \
     math/FiniteDifference.h \
-    math/Hermite.h \
     math/LegacyFrustum.h \
     math/Maps.h \
     math/Mat.h \
@@ -541,6 +541,7 @@ INCLUDE_NAMES := \
     tools/PointIndexGrid.h \
     tools/PointPartitioner.h \
     tools/PointScatter.h \
+    tools/PoissonSolver.h \
     tools/Prune.h \
     tools/RayIntersector.h \
     tools/RayTracer.h \
@@ -548,6 +549,8 @@ INCLUDE_NAMES := \
     tools/Statistics.h \
     tools/ValueTransformer.h \
     tools/VectorTransformer.h \
+    tools/VelocityFields.h \
+    tools/VolumeAdvect.h \
     tools/VolumeToMesh.h \
     tools/VolumeToSpheres.h \
     tree/InternalNode.h \
@@ -569,6 +572,7 @@ INCLUDE_NAMES := \
     util/Name.h \
     util/NodeMasks.h \
     util/NullInterrupter.h \
+    util/PagedArray.h \
     util/Util.h \
     version.h \
 #
@@ -582,7 +586,6 @@ SRC_NAMES := \
     io/Queue.cc \
     io/Stream.cc \
     io/TempFile.cc \
-    math/Hermite.cc \
     math/Maps.cc \
     math/Proximity.cc \
     math/QuantizedUnitVec.cc \
@@ -602,6 +605,7 @@ UNITTEST_INCLUDE_NAMES := \
 UNITTEST_SRC_NAMES := \
     unittest/main.cc \
     unittest/TestBBox.cc \
+    unittest/TestConjGradient.cc \
     unittest/TestCoord.cc \
     unittest/TestCpt.cc \
     unittest/TestCurl.cc \
@@ -619,7 +623,6 @@ UNITTEST_SRC_NAMES := \
     unittest/TestGridDescriptor.cc \
     unittest/TestGridIO.cc \
     unittest/TestGridTransformer.cc \
-    unittest/TestHermite.cc \
     unittest/TestInit.cc \
     unittest/TestInt32Metadata.cc \
     unittest/TestInt64Metadata.cc \
@@ -646,6 +649,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestParticlesToLevelSet.cc \
     unittest/TestPointIndexGrid.cc \
     unittest/TestPointPartitioner.cc \
+    unittest/TestPoissonSolver.cc \
     unittest/TestPrePostAPI.cc \
     unittest/TestQuadraticInterp.cc \
     unittest/TestQuantizedUnitVec.cc \
@@ -661,6 +665,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestTreeGetSetValues.cc \
     unittest/TestTreeIterators.cc \
     unittest/TestTreeVisitor.cc \
+    unittest/TestUtil.cc \
     unittest/TestValueAccessor.cc \
     unittest/TestVec2Metadata.cc \
     unittest/TestVec3Metadata.cc \
@@ -1183,6 +1188,6 @@ ifneq ($(DEPFILES),)
 -include $(DEPFILES)
 endif
 
-# Copyright (c) 2012-2014 DreamWorks Animation LLC
+# Copyright (c) 2012-2015 DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -123,9 +123,9 @@ public:
         bool isOutOfCore() const { return false; }
         /// Return @c true if memory for this buffer has not yet been allocated.
         bool empty() const { return (mData == NULL); }
-        /// Allocate memory for this buffer if it has not already been allocated.
-        bool allocate() { if (mData == NULL) mData = new ValueType[SIZE]; return !this->empty(); }
 #else
+        typedef ValueType WordType;
+        static const Index WORD_COUNT = SIZE;
         /// Default constructor
         Buffer(): mData(new ValueType[SIZE]), mOutOfCore(0) {}
         /// Construct a buffer populated with the specified value.
@@ -162,9 +162,9 @@ public:
         bool isOutOfCore() const { return bool(mOutOfCore); }
         /// Return @c true if memory for this buffer has not yet been allocated.
         bool empty() const { return !mData || this->isOutOfCore(); }
+#endif
         /// Allocate memory for this buffer if it has not already been allocated.
         bool allocate() { if (mData == NULL) mData = new ValueType[SIZE]; return !this->empty(); }
-#endif
 
         /// Populate this buffer with a constant value.
         void fill(const ValueType& val)
@@ -261,6 +261,38 @@ public:
         /// Return the number of values contained in this buffer.
         static Index size() { return SIZE; }
 
+        /// @brief Return a const pointer to the array of voxel values.
+        /// @details This method guarantees that the buffer is allocated and loaded.
+        /// @warning This method should only be used by experts seeking low-level optimizations.
+        const ValueType* data() const
+        {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+            this->loadValues();
+            if (mData == NULL) {
+
+                Buffer* self = const_cast<Buffer*>(this);
+
+                // Since this method is const we need a lock (which
+                // will be contended at most once) to make it thread-safe.
+                tbb::spin_mutex::scoped_lock lock(self->mMutex);
+                if (mData == NULL) self->mData = new ValueType[SIZE];
+            }
+#endif
+            return mData;
+        }
+
+        /// @brief Return a pointer to the array of voxel values.
+        /// @details This method guarantees that the buffer is allocated and loaded.
+        /// @warning This method should only be used by experts seeking low-level optimizations.
+        ValueType* data()
+        {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+            this->loadValues();
+            if (mData == NULL) mData = new ValueType[SIZE];
+#endif
+            return mData;
+        }
+
     private:
         /// If this buffer is empty, return zero, otherwise return the value at index @ i.
         const ValueType& at(Index i) const
@@ -325,7 +357,7 @@ public:
 #else
         union {
             ValueType* mData;
-            FileInfo* mFileInfo;
+            FileInfo*  mFileInfo;
         };
         Index32 mOutOfCore; // currently interpreted as bool; extra bits reserved for future use
         tbb::spin_mutex mMutex; // 1 byte
@@ -971,6 +1003,7 @@ public:
     template<typename NodeT>
     const NodeT* probeConstNode(const Coord&) const { return NULL; }
     template<typename ArrayT> void getNodes(ArrayT&) const {}
+    template<typename ArrayT> void stealNodes(ArrayT&, const ValueType&, bool) {}
     //@}
 
     void addTile(Index level, const Coord&, const ValueType&, bool);
@@ -1014,10 +1047,31 @@ public:
     //@}
 
     /// Return @c true if all of this node's values have the same active state
-    /// and are equal to within the given tolerance, and return the value in @a constValue
-    /// and the active state in @a state.
+    /// and are in the range this->getFirstValue() +/- @a tolerance.
+    ///
+    ///
+    /// @param constValue  Is updated with the first value of this leaf node.
+    /// @param state       Is updated with the state of all values IF method
+    ///                    returns @c true. Else the value is undefined!
+    /// @param tolerance   The tolerance used to determine if values are
+    ///                    approximatly equal to the for value.
     bool isConstant(ValueType& constValue, bool& state,
                     const ValueType& tolerance = zeroVal<ValueType>()) const;
+
+    /// Return @c true if all of this node's values have the same active state
+    /// and are in the range (@a maxValue + @a minValue)/2 +/- @a tolerance.
+    ///
+    /// @param minValue  Is updated with the minimum of all values IF method
+    ///                  returns @c true. Else the value is undefined!
+    /// @param maxValue  Is updated with the maximum of all values IF method
+    ///                  returns @c true. Else the value is undefined!
+    /// @param state     Is updated with the state of all values IF method
+    ///                  returns @c true. Else the value is undefined!
+    /// @param tolerance The tolerance used to determine if values are
+    ///                  approximatly constant.
+    bool isConstant(ValueType& minValue, ValueType& maxValue,
+                    bool& state, const ValueType& tolerance = zeroVal<ValueType>()) const;
+    
     /// Return @c true if all of this node's values are inactive.
     bool isInactive() const { return mValueMask.isOff(); }
 
@@ -1692,23 +1746,41 @@ LeafNode<T, Log2Dim>::hasSameTopology(const LeafNode<OtherType, OtherLog2Dim>* o
 
 template<typename T, Index Log2Dim>
 inline bool
-LeafNode<T, Log2Dim>::isConstant(ValueType& constValue,
+LeafNode<T, Log2Dim>::isConstant(ValueType& value, bool& state,
+                                 const ValueType& tolerance) const
+{
+    state = mValueMask.isOn();
+    if (!(state || mValueMask.isOff())) return false;// Are values neither active nor inactive?
+    
+    value = mBuffer[0];
+    for (Index i = 1; i < SIZE; ++i) {
+        if ( !math::isApproxEqual(mBuffer[i], value, tolerance) ) return false;
+    }
+    return true;
+}
+
+template<typename T, Index Log2Dim>
+inline bool
+LeafNode<T, Log2Dim>::isConstant(ValueType& minValue, ValueType& maxValue,
                                  bool& state, const ValueType& tolerance) const
 {
     state = mValueMask.isOn();
-
-    if (!(state || mValueMask.isOff())) return false;
-
-    bool allEqual = true;
-    const T value = mBuffer[0];
-    for (Index i = 1; allEqual && i < SIZE; ++i) {
-        /// @todo Alternatively, allEqual = !((maxVal - minVal) > (2 * tolerance))
-        allEqual = math::isApproxEqual(mBuffer[i], value, tolerance);
+    if (!(state || mValueMask.isOff())) return false;// Are values neither active nor inactive?
+    
+    const T range = 2 * tolerance;
+    minValue = maxValue = mBuffer[0];
+    for (Index i = 1; i < SIZE; ++i) {// early termination
+        const T& v = mBuffer[i];
+        if (v < minValue) {
+            if ((maxValue - v) > range) return false;
+            minValue = v;
+        } else if (v > maxValue) {
+            if ((v - minValue) > range) return false;
+            maxValue = v;
+        }
     }
-    if (allEqual) constValue = value; ///< @todo return average/median value?
-    return allEqual;
+    return true;
 }
-
 
 ////////////////////////////////////////
 
@@ -2134,6 +2206,6 @@ operator<<(std::ostream& os, const typename LeafNode<T, Log2Dim>::Buffer& buf)
 
 #endif // OPENVDB_TREE_LEAFNODE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

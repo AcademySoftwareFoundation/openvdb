@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -97,6 +97,23 @@ TestLeafBool::testGetValue()
         LeafType leaf(openvdb::Coord(0, 0, 0), /*background=*/true);
         for (openvdb::Index n = 0; n < leaf.numValues(); ++n) {
             CPPUNIT_ASSERT_EQUAL(true, leaf.getValue(leaf.offsetToLocalCoord(n)));
+        }
+    }
+    {// test Buffer::data()
+        LeafType leaf(openvdb::Coord(0, 0, 0), /*background=*/false);
+        leaf.fill(true);
+        LeafType::Buffer::WordType* w = leaf.buffer().data();
+        for (openvdb::Index n = 0; n < LeafType::Buffer::WORD_COUNT; ++n) {
+            CPPUNIT_ASSERT_EQUAL(~LeafType::Buffer::WordType(0), w[n]);
+        }
+    }
+    {// test const Buffer::data()
+        LeafType leaf(openvdb::Coord(0, 0, 0), /*background=*/false);
+        leaf.fill(true);
+        const LeafType& cleaf = leaf;
+        const LeafType::Buffer::WordType* w = cleaf.buffer().data();
+        for (openvdb::Index n = 0; n < LeafType::Buffer::WORD_COUNT; ++n) {
+            CPPUNIT_ASSERT_EQUAL(~LeafType::Buffer::WordType(0), w[n]);
         }
     }
 }
@@ -485,7 +502,7 @@ TestLeafBool::testBoolTree()
     GridPtrVec grids;
     grids.push_back(inGrid);
     grids.push_back(outGrid);
-    io::File vdbFile("/tmp/bool_tree.vdb2");
+    io::File vdbFile("bool_tree.vdb2");
     vdbFile.write(grids);
     vdbFile.close();
 #endif
@@ -531,7 +548,7 @@ TestLeafBool::testBoolTree()
 //     GridPtrVec grids;
 //     grids.push_back(copyOfGrid);
 //     grids.push_back(grid);
-//     io::File vdbFile("/tmp/TestLeafBool::testFilter.vdb2");
+//     io::File vdbFile("TestLeafBool::testFilter.vdb2");
 //     vdbFile.write(grids);
 //     vdbFile.close();
 // #endif
@@ -541,6 +558,6 @@ TestLeafBool::testBoolTree()
 //     CPPUNIT_ASSERT(tree->hasSameTopology(*copyOfTree));
 // }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

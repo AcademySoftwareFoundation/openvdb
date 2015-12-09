@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -182,7 +182,7 @@ struct IndexToOffsetOp {
     void operator()(LeafT &leaf, size_t /*leafIndex*/) const {
         typename LeafT::IndexArray& indices = leaf.indices();
         for (size_t n = 0, N = indices.size(); n < N; ++n) {
-             indices[n] = typename LeafT::ValueType(mPointList->offsetFromIndex(size_t(indices[n])));
+             indices[n] = typename LeafT::ValueType(mPointList->offsetFromIndex(GA_Index(indices[n])));
         }
     }
     PointArrayType const * const mPointList;
@@ -241,6 +241,6 @@ GUvdbCreatePointOffsetGrid(
 
 #endif // __GU_VDBPOINTTOOLS_H_HAS_BEEN_INCLUDED__
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

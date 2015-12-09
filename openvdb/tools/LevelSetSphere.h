@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -115,8 +115,8 @@ public:
     /// @param interrupt pointer to optional interrupter. Use template
     /// argument util::NullInterrupter if no interruption is desired.
     ///
-    /// @note If the radius of the sphere is smaller then
-    /// 1.5*voxelSize, i.e. the sphere is smaller then the Nyquist
+    /// @note If the radius of the sphere is smaller than
+    /// 1.5*voxelSize, i.e. the sphere is smaller than the Nyquist
     /// frequency of the grid, it is ignored!
     LevelSetSphere(ValueT radius, const Vec3T &center, InterruptT* interrupt = NULL)
         : mRadius(radius), mCenter(center), mInterrupt(interrupt)
@@ -158,7 +158,7 @@ private:
         const int jmin=math::Floor(c[1]-rmax), jmax=math::Ceil(c[1]+rmax);
         const int kmin=math::Floor(c[2]-rmax), kmax=math::Ceil(c[2]+rmax);
 
-        // Allocate an ValueAccessor for accelerated random access
+        // Allocate a ValueAccessor for accelerated random access
         typename GridT::Accessor accessor = mGrid->getAccessor();
 
         if (mInterrupt) mInterrupt->start("Generating level set of sphere");
@@ -182,9 +182,9 @@ private:
             }//end loop over j
         }//end loop over i
 
-        // Define consistant signed distances outside the narrow-band
+        // Define consistent signed distances outside the narrow-band
         tools::signedFloodFill(mGrid->tree());
-        
+
         if (mInterrupt) mInterrupt->end();
     }
 
@@ -217,6 +217,6 @@ createLevelSetSphere(float radius, const openvdb::Vec3f& center, float voxelSize
 
 #endif // OPENVDB_TOOLS_LEVELSETSPHERE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

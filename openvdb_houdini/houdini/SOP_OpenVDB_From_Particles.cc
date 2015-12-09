@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -404,7 +404,7 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(PRMzeroDefaults)
         .setHelpText("Enable / disable the pruning of nodes, i.e. leafs filled with "
                      "the inside values are compactly represented by a tile value. "
-                     "This option only has an effect if the particles are larger then "
+                     "This option only has an effect if the particles are larger than "
                      "the leaf nodes so it is normally recommended to leave it disabled."));
 
     // Width of the mask for constraining subsequent deformations
@@ -1086,6 +1086,6 @@ SOP_OpenVDB_From_Particles::transferAttributes(
     }
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

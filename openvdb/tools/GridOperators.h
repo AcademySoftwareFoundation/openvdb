@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -380,7 +380,7 @@ public:
     }
 
     /// @brief Iterate sequentially over LeafNodes and voxels in the output
-    /// grid and compute the laplacian using a valueAccessor for the
+    /// grid and compute the Laplacian using a valueAccessor for the
     /// input grid.
     ///
     /// @note Never call this public method directly - it is called by
@@ -1085,6 +1085,6 @@ normalize(const GridType& grid, const MaskT& mask, bool threaded, InterruptT* in
 
 #endif // OPENVDB_TOOLS_GRID_OPERATORS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -87,7 +87,7 @@ public:
 
     /// @brief Return in @a bbox the axis-aligned bounding box of all
     /// leaf nodes and active tiles.
-    /// @details This is faster then calling evalActiveVoxelBoundingBox,
+    /// @details This is faster than calling evalActiveVoxelBoundingBox,
     /// which visits the individual active voxels, and hence
     /// evalLeafBoundingBox produces a less tight, i.e. approximate, bbox.
     /// @return @c false if the bounding box is empty (in which case
@@ -541,7 +541,6 @@ public:
     const LeafNodeType* probeLeaf(const Coord& xyz) const { return this->probeConstLeaf(xyz); }
     //@}
 
-
     //@{
     /// @brief Adds all nodes of a certain type to a container with the following API:
     /// @code
@@ -569,6 +568,37 @@ public:
     template<typename ArrayT> void getNodes(ArrayT& array) const { mRoot.getNodes(array); }
     //@}
 
+    /// @brief Steals all nodes of a certain type from the tree and
+    /// adds them to a container with the following API:
+    /// @code
+    /// struct ArrayT {
+    ///    typedef value_type;// defines the type of nodes to be added to the array
+    ///    void push_back(value_type nodePtr);// method that add nodes to the array
+    /// };
+    /// @endcode
+    /// @details An example of a wrapper around a c-style array is:
+    /// @code
+    /// struct MyArray {
+    ///    typedef LeafType* value_type;
+    ///    value_type* ptr;
+    ///    MyArray(value_type* array) : ptr(array) {}
+    ///    void push_back(value_type leaf) { *ptr++ = leaf; }
+    ///};
+    /// @endcode
+    /// @details An example that constructs a list of pointer to all leaf nodes is:
+    /// @code
+    /// std::vector<const LeafNodeType*> array;//most std contains have the required API
+    /// array.reserve(tree.leafCount());//this is a fast preallocation.
+    /// tree.stealNodes(array);
+    /// @endcode
+    template<typename ArrayT>
+    void stealNodes(ArrayT& array) { mRoot.stealNodes(array); }
+    template<typename ArrayT>
+    void stealNodes(ArrayT& array, const ValueType& value, bool state)
+    {
+        mRoot.stealNodes(array, value, state);
+    }
+
     //
     // Aux methods
     //
@@ -585,19 +615,32 @@ public:
     //@{
     /// @brief Register an accessor for this tree.  Registered accessors are
     /// automatically cleared whenever one of this tree's nodes is deleted.
-    void attachAccessor(ValueAccessorBase<Tree>&) const;
-    void attachAccessor(ValueAccessorBase<const Tree>&) const;
+    void attachAccessor(ValueAccessorBase<Tree, true>&) const;
+    void attachAccessor(ValueAccessorBase<const Tree, true>&) const;
     //@}
+
+    //@{
+    /// Dummy implementations
+    void attachAccessor(ValueAccessorBase<Tree, false>&) const {}
+    void attachAccessor(ValueAccessorBase<const Tree, false>&) const {}
+    //@}
+
     //@{
     /// Deregister an accessor so that it is no longer automatically cleared.
-    void releaseAccessor(ValueAccessorBase<Tree>&) const;
-    void releaseAccessor(ValueAccessorBase<const Tree>&) const;
+    void releaseAccessor(ValueAccessorBase<Tree, true>&) const;
+    void releaseAccessor(ValueAccessorBase<const Tree, true>&) const;
+    //@}
+
+    //@{
+    /// Dummy implementations
+    void releaseAccessor(ValueAccessorBase<Tree, false>&) const {}
+    void releaseAccessor(ValueAccessorBase<const Tree, false>&) const {}
     //@}
 
     /// @brief Return this tree's background value wrapped as metadata.
     /// @note Query the metadata object for the value's type.
     virtual Metadata::Ptr getBackgroundValue() const;
-    
+
     /// @brief Return this tree's background value.
     ///
     /// @note Use tools::changeBackground to efficiently modify the
@@ -1137,8 +1180,8 @@ public:
 
 
 protected:
-    typedef tbb::concurrent_hash_map<ValueAccessorBase<Tree>*, bool> AccessorRegistry;
-    typedef tbb::concurrent_hash_map<ValueAccessorBase<const Tree>*, bool> ConstAccessorRegistry;
+    typedef tbb::concurrent_hash_map<ValueAccessorBase<Tree, true>*, bool> AccessorRegistry;
+    typedef tbb::concurrent_hash_map<ValueAccessorBase<const Tree, true>*, bool> ConstAccessorRegistry;
 
     // Disallow assignment of instances of this class.
     Tree& operator=(const Tree&);
@@ -1166,7 +1209,7 @@ tbb::atomic<const Name*> Tree<_RootNodeType>::sTreeTypeName;
 /// (Root, Internal, Leaf) with value type T and
 /// internal and leaf node log dimensions N1 and N2, respectively.
 /// @note This is NOT the standard tree configuration (Tree4 is).
-template<typename T, Index N1, Index N2>
+template<typename T, Index N1=4, Index N2=3>
 struct Tree3 {
     typedef Tree<RootNode<InternalNode<LeafNode<T, N2>, N1> > > Type;
 };
@@ -1176,17 +1219,16 @@ struct Tree3 {
 /// (Root, Internal, Internal, Leaf) with value type T and
 /// internal and leaf node log dimensions N1, N2 and N3, respectively.
 /// @note This is the standard tree configuration.
-template<typename T, Index N1, Index N2, Index N3>
+template<typename T, Index N1=5, Index N2=4, Index N3=3>
 struct Tree4 {
     typedef Tree<RootNode<InternalNode<InternalNode<LeafNode<T, N3>, N2>, N1> > > Type;
 };
-
 
 /// @brief Tree5<T, N1, N2, N3, N4>::Type is the type of a five-level tree
 /// (Root, Internal, Internal, Internal, Leaf) with value type T and
 /// internal and leaf node log dimensions N1, N2, N3 and N4, respectively.
 /// @note This is NOT the standard tree configuration (Tree4 is).
-template<typename T, Index N1, Index N2, Index N3, Index N4>
+template<typename T, Index N1=6, Index N2=5, Index N3=4, Index N4=3>
 struct Tree5 {
     typedef Tree<RootNode<InternalNode<InternalNode<InternalNode<LeafNode<T, N4>, N3>, N2>, N1> > >
         Type;
@@ -1398,7 +1440,7 @@ Tree<RootNodeType>::writeBuffers(std::ostream &os, bool saveFloatAsHalf) const
 
 template<typename RootNodeType>
 inline void
-Tree<RootNodeType>::attachAccessor(ValueAccessorBase<Tree>& accessor) const
+Tree<RootNodeType>::attachAccessor(ValueAccessorBase<Tree, true>& accessor) const
 {
     typename AccessorRegistry::accessor a;
     mAccessorRegistry.insert(a, &accessor);
@@ -1407,7 +1449,7 @@ Tree<RootNodeType>::attachAccessor(ValueAccessorBase<Tree>& accessor) const
 
 template<typename RootNodeType>
 inline void
-Tree<RootNodeType>::attachAccessor(ValueAccessorBase<const Tree>& accessor) const
+Tree<RootNodeType>::attachAccessor(ValueAccessorBase<const Tree, true>& accessor) const
 {
     typename ConstAccessorRegistry::accessor a;
     mConstAccessorRegistry.insert(a, &accessor);
@@ -1416,7 +1458,7 @@ Tree<RootNodeType>::attachAccessor(ValueAccessorBase<const Tree>& accessor) cons
 
 template<typename RootNodeType>
 inline void
-Tree<RootNodeType>::releaseAccessor(ValueAccessorBase<Tree>& accessor) const
+Tree<RootNodeType>::releaseAccessor(ValueAccessorBase<Tree, true>& accessor) const
 {
     mAccessorRegistry.erase(&accessor);
 }
@@ -1424,7 +1466,7 @@ Tree<RootNodeType>::releaseAccessor(ValueAccessorBase<Tree>& accessor) const
 
 template<typename RootNodeType>
 inline void
-Tree<RootNodeType>::releaseAccessor(ValueAccessorBase<const Tree>& accessor) const
+Tree<RootNodeType>::releaseAccessor(ValueAccessorBase<const Tree, true>& accessor) const
 {
     mConstAccessorRegistry.erase(&accessor);
 }
@@ -1706,7 +1748,8 @@ Tree<RootNodeType>::getBackgroundValue() const
     if (Metadata::isRegisteredType(valueType())) {
         typedef TypedMetadata<ValueType> MetadataT;
         result = Metadata::createMetadata(valueType());
-        if (MetadataT* m = dynamic_cast<MetadataT*>(result.get())) {
+        if (result->typeName() == MetadataT::staticTypeName()) {
+            MetadataT* m = static_cast<MetadataT*>(result.get());
             m->value() = mRoot.background();
         }
     }
@@ -2249,6 +2292,6 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
 
 #endif // OPENVDB_TREE_TREE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -48,7 +48,7 @@ class SOP_OpenVDB_Prune: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Prune(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Prune() {};
+    virtual ~SOP_OpenVDB_Prune() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
@@ -183,7 +183,7 @@ SOP_OpenVDB_Prune::cookMySop(OP_Context& context)
 
         // This does a deep copy of native Houdini primitives
         // but only a shallow copy of OpenVDB grids.
-        duplicateSource(0, context);
+        duplicateSourceStealable(0, context);
 
         // Get the group of grids to process.
         UT_String groupStr;
@@ -216,6 +216,6 @@ SOP_OpenVDB_Prune::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

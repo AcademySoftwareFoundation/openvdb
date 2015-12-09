@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -57,7 +57,7 @@ public:
         Vec3i tmpMin, tmpMax;
         is.read(reinterpret_cast<char*>(&tmpMin), sizeof(Vec3i::ValueType) * 3);
         is.read(reinterpret_cast<char*>(&tmpMax), sizeof(Vec3i::ValueType) * 3);
-        
+
         Coord tmpMinCoord(tmpMin);
         Coord tmpMaxCoord(tmpMax);
 
@@ -127,7 +127,7 @@ public:
         mFrFarYBasis = frFarYTip - mFrFarOrigin;
     }
 
-    ~LegacyFrustum(){};
+    ~LegacyFrustum() {}
 
     const Mat4d& getCamXForm() const {return mC2W; }
 
@@ -154,7 +154,7 @@ public:
     Vec3d unitToWorld(const Vec3d& in) const {return mLocalToWorld.transform( unitToLocal(in) ); }
 
 private:
-    LegacyFrustum(){};
+    LegacyFrustum() {}
 
     Vec3d unitToLocal(const Vec3d& U) const {
 
@@ -191,6 +191,6 @@ private:
 
 #endif // OPENVDB_MATH_LEGACYFRUSTUM_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

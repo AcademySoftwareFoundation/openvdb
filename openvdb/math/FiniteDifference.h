@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -846,12 +846,11 @@ struct D1<FD_3RD>
 {
 
     // the difference opperator
-    template <typename ValueType>
+    template<typename ValueType>
     static ValueType difference(const ValueType& xp3, const ValueType& xp2,
         const ValueType& xp1, const ValueType& xp0)
     {
-        return ValueType(1./3.)*xp3 - ValueType(1.5)*xp2
-            + ValueType(3.)*xp1 - ValueType(11./6.)*xp0;
+        return static_cast<ValueType>(xp3/3.0 - 1.5*xp2 + 3.0*xp1 - 11.0*xp0/6.0);
     }
 
 
@@ -2350,6 +2349,6 @@ struct D2<CD_SIXTH>
 
 #endif // OPENVDB_MATH_FINITEDIFFERENCE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

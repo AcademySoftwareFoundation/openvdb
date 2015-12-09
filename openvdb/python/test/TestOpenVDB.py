@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-# Copyright (c) 2012-2014 DreamWorks Animation LLC
+# Copyright (c) 2012-2015 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -230,7 +230,7 @@ class TestOpenVDB(unittest.TestCase):
 
         grid.prune(tolerance=0.2)
         self.assertEqual(grid.activeVoxelCount(), activeCount)
-        self.assertEqual(acc.getValue(ijk), 2)
+        self.assertEqual(acc.getValue(ijk), 2.0625) # = (2 + 2.125)/2
         self.assert_(acc.isValueOn(ijk))
         self.assert_(grid.leafCount() < leafCount)
 
@@ -793,6 +793,6 @@ if __name__ == '__main__':
     unittest.main(argv=args)
 
 
-# Copyright (c) 2012-2014 DreamWorks Animation LLC
+# Copyright (c) 2012-2015 DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

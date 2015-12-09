@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -52,7 +52,6 @@ typedef tree::Tree4<double,  5, 4, 3>::Type     DoubleTree;
 typedef tree::Tree4<int32_t, 5, 4, 3>::Type     Int32Tree;
 typedef tree::Tree4<uint32_t, 5, 4, 3>::Type    UInt32Tree;
 typedef tree::Tree4<int64_t, 5, 4, 3>::Type     Int64Tree;
-typedef tree::Tree4<Hermite, 5, 4, 3>::Type     HermiteTree;
 typedef tree::Tree4<Vec2i, 5, 4, 3>::Type       Vec2ITree;
 typedef tree::Tree4<Vec2s, 5, 4, 3>::Type       Vec2STree;
 typedef tree::Tree4<Vec2d, 5, 4, 3>::Type       Vec2DTree;
@@ -71,7 +70,6 @@ typedef Grid<FloatTree>     FloatGrid;
 typedef Grid<DoubleTree>    DoubleGrid;
 typedef Grid<Int32Tree>     Int32Grid;
 typedef Grid<Int64Tree>     Int64Grid;
-typedef Grid<HermiteTree>   HermiteGrid;
 typedef Grid<Vec3ITree>     Vec3IGrid;
 typedef Grid<Vec3STree>     Vec3SGrid;
 typedef Grid<Vec3DTree>     Vec3DGrid;
@@ -93,6 +91,6 @@ OPENVDB_API void uninitialize();
 
 #endif // OPENVDB_INIT_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
