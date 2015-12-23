@@ -42,6 +42,7 @@
 #define OPENVDB_TREE_NODEMANAGER_HAS_BEEN_INCLUDED
 
 #include <tbb/parallel_for.h>
+#include <tbb/parallel_reduce.h>
 #include <openvdb/Types.h>
 #include <deque>
 
@@ -187,6 +188,35 @@ public:
         transform.run(this->nodeRange(grainSize), threaded);
     }
 
+    template<typename NodeOp>
+    struct NodeTransformerReduce
+    {
+        NodeTransformerReduce(const NodeOp& nodeOp) : mNodeOp(nodeOp) {}
+        NodeTransformerReduce(const NodeTransformerReduce& other, tbb::split t) : 
+            mNodeOp(other.mNodeOp, t) {}
+        NodeOp run(const NodeRange& range, bool threaded = true)
+        {
+            threaded ? tbb::parallel_reduce(range, *this) : (*this)(range);
+            return mNodeOp;
+        }
+        void operator()(const NodeRange& range)
+        {
+            for (typename NodeRange::Iterator it = range.begin(); it; ++it) mNodeOp(*it);
+        }
+        void join(const NodeTransformerReduce& other)
+        {
+            mNodeOp.join(other.mNodeOp);
+        }
+        NodeOp mNodeOp;
+    };// NodeTransformerReduce
+
+    template<typename NodeOp>
+    void reduce(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        NodeTransformerReduce<NodeOp> transform(op);
+        op = transform.run(this->nodeRange(grainSize), threaded);
+    }
+
 protected:
     ListT mList;
 };// NodeList
@@ -245,6 +275,20 @@ public:
         mNext.processTopDown(op, threaded, grainSize);
     }
 
+    template<typename NodeOp>
+    void reduceBottomUp(NodeOp& op, bool threaded, size_t grainSize)
+    {
+        mNext.processBottomUp(op, threaded, grainSize);
+        mList.reduce(op, threaded, grainSize);
+    }
+
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded, size_t grainSize)
+    {
+        mList.reduce(op, threaded, grainSize);
+        mNext.processTopDown(op, threaded, grainSize);
+    }
+
 protected:
     NodeList<NodeT> mList;
     NodeManagerLink<typename NodeT::ChildNodeType, LEVEL-1> mNext;
@@ -285,6 +329,18 @@ public:
     void processTopDown(const NodeOp& op, bool threaded, size_t grainSize)
     {
         mList.foreach(op, threaded, grainSize);
+    }
+
+    template<typename NodeOp>
+    void reduceBottomUp(NodeOp& op, bool threaded, size_t grainSize)
+    {
+        mList.reduce(op, threaded, grainSize);
+    }
+
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded, size_t grainSize)
+    {
+        mList.reduce(op, threaded, grainSize);
     }
 
     template<typename ParentT, typename TreeOrLeafManagerT>
@@ -412,6 +468,80 @@ public:
     }
     //@}
 
+    //@{
+    /// @brief   Threaded method that processes nodes with a user supplied functor
+    ///
+    /// @param op        user-supplied functor, see examples for interface details.
+    /// @param threaded  optional toggle to disable threading, on by default.
+    /// @param grainSize optional parameter to specify the grainsize
+    ///                  for threading, one by default.
+    ///
+    /// @warning The functor object is deep-copied to create TBB tasks.
+    ///
+    /// @par Example:
+    /// @code
+    ///  // Functor to count nodes in a tree
+    ///  template<typename TreeType>
+    ///  struct NodeCountOp
+    ///  {
+    ///      NodeCountOp() : 
+    ///          nodeCount(TreeType::DEPTH, 0), 
+    ///          totalCount(0) {}
+    ///      NodeCountOp(const NodeCountOp& other, tbb::split) :
+    ///          nodeCount(TreeType::DEPTH, 0),
+    ///          totalCount(0) {}
+    ///  
+    ///      void join(const NodeCountOp& other)
+    ///      {
+    ///          for (size_t i = 0; i < nodeCount.size(); ++i) {
+    ///              nodeCount[i] += other.nodeCount[i];
+    ///          }
+    ///          totalCount += other.totalCount;
+    ///      }
+    /// 
+    ///      // do nothing for the root node
+    ///      void operator()(const typename TreeT::RootNodeType& node) {}
+    ///  
+    ///      // count the internal and leaf nodes
+    ///      template<typename NodeT>
+    ///      void operator()(const NodeT& node) 
+    ///      {
+    ///          ++(nodeCount[NodeT::LEVEL]);
+    ///          ++totalCount;
+    ///      }
+    ///  
+    ///      std::vector<openvdb::Index64> nodeCount;
+    ///      openvdb::Index64 totalCount;
+    /// };
+    ///
+    /// // usage:
+    /// NodeCountOp<FloatTree> op;
+    /// tree::NodeManager<FloatTree> nodes(tree);
+    /// nodes.reduceBottomUp(op);
+    ///
+    /// // or for better performance
+    /// NodeCountOp<FloatTree> op;
+    /// typedef tree::LeafManager<FloatTree> T;
+    /// T leafManager(tree);
+    /// tree::NodeManager<T> nodes(leafManager);
+    /// nodes.reduceBottomUp(op);
+    ///
+    /// @endcode
+    template<typename NodeOp>
+    void reduceBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        mChain.reduceBottomUp(op, threaded, grainSize);
+        op(mRoot);
+    }
+
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(mRoot);
+        mChain.reduceTopDown(op, threaded, grainSize);
+    }
+    //@}
+
 protected:
     RootNodeType& mRoot;
     NodeManagerLink<typename RootNodeType::ChildNodeType, LEVELS-1> mChain;
@@ -521,6 +651,20 @@ public:
         mList0.foreach(op, threaded, grainSize);
     }
 
+    template<typename NodeOp>
+    void reduceBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        mList0.reduce(op, threaded, grainSize);
+        op(mRoot);
+    }
+
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(mRoot);
+        mList0.reduce(op, threaded, grainSize);
+    }
+
 protected:
     typedef RootNodeType                   NodeT1;
     typedef typename NodeT1::ChildNodeType NodeT0;
@@ -600,6 +744,22 @@ public:
         op(mRoot);
         mList1.foreach(op, threaded, grainSize);
         mList0.foreach(op, threaded, grainSize);
+    }
+
+    template<typename NodeOp>
+    void reduceBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        mList0.reduce(op, threaded, grainSize);
+        mList1.reduce(op, threaded, grainSize);
+        op(mRoot);
+    }
+
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(mRoot);
+        mList1.reduce(op, threaded, grainSize);
+        mList0.reduce(op, threaded, grainSize);
     }
 
 protected:
@@ -690,6 +850,24 @@ public:
         mList2.foreach(op, threaded, grainSize);
         mList1.foreach(op, threaded, grainSize);
         mList0.foreach(op, threaded, grainSize);
+    }
+
+    template<typename NodeOp>
+    void reduceBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        mList0.reduce(op, threaded, grainSize);
+        mList1.reduce(op, threaded, grainSize);
+        mList2.reduce(op, threaded, grainSize);
+        op(mRoot);
+    }
+
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(mRoot);
+        mList2.reduce(op, threaded, grainSize);
+        mList1.reduce(op, threaded, grainSize);
+        mList0.reduce(op, threaded, grainSize);
     }
 
 protected:
@@ -791,6 +969,26 @@ public:
         mList2.foreach(op, threaded, grainSize);
         mList1.foreach(op, threaded, grainSize);
         mList0.foreach(op, threaded, grainSize);
+    }
+
+    template<typename NodeOp>
+    void reduceBottomUp(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        mList0.reduce(op, threaded, grainSize);
+        mList1.reduce(op, threaded, grainSize);
+        mList2.reduce(op, threaded, grainSize);
+        mList3.reduce(op, threaded, grainSize);
+        op(mRoot);
+    }
+
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        op(mRoot);
+        mList3.reduce(op, threaded, grainSize);
+        mList2.reduce(op, threaded, grainSize);
+        mList1.reduce(op, threaded, grainSize);
+        mList0.reduce(op, threaded, grainSize);
     }
 
 protected:

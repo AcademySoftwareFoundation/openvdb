@@ -2794,6 +2794,40 @@ TestTree::testLeafManager()
     }
 }
 
+namespace {
+template<typename TreeT>
+struct NodeCountOp {
+    NodeCountOp() : 
+        nodeCount(TreeT::DEPTH, 0), 
+        totalCount(0) {}
+    NodeCountOp(const NodeCountOp& other, tbb::split) :
+        nodeCount(TreeT::DEPTH, 0),
+        totalCount(0) {}
+
+    void join(const NodeCountOp& other)
+    {
+        for (size_t i = 0; i < nodeCount.size(); ++i) {
+            nodeCount[i] += other.nodeCount[i];
+        }
+        totalCount += other.totalCount;
+    }
+
+    // do nothing for the root node
+    void operator()(const typename TreeT::RootNodeType& node) {}
+
+    // count the internal and leaf nodes
+    template<typename NodeT>
+    void operator()(const NodeT& node) 
+    {
+        ++(nodeCount[NodeT::LEVEL]);
+        ++totalCount;
+    }
+
+    std::vector<openvdb::Index64> nodeCount;
+    openvdb::Index64 totalCount;
+};
+}
+
 void
 TestTree::testNodeManager()
 {
@@ -2842,6 +2876,18 @@ TestTree::testNodeManager()
             totalCount += nodeCount[i];
         }
         CPPUNIT_ASSERT_EQUAL(totalCount, manager.nodeCount());
+
+        // test the map reduce functionality
+        NodeCountOp<FloatTree> bottomUpOp;
+        NodeCountOp<FloatTree> topDownOp;
+        manager.reduceBottomUp(bottomUpOp);
+        manager.reduceTopDown(topDownOp);
+        for (openvdb::Index i=0; i<FloatTree::RootNodeType::LEVEL; ++i) {//exclude root in nodeCount
+            CPPUNIT_ASSERT_EQUAL(bottomUpOp.nodeCount[i], manager.nodeCount(i));
+            CPPUNIT_ASSERT_EQUAL(topDownOp.nodeCount[i], manager.nodeCount(i));
+        }
+        CPPUNIT_ASSERT_EQUAL(bottomUpOp.totalCount, manager.nodeCount());
+        CPPUNIT_ASSERT_EQUAL(topDownOp.totalCount, manager.nodeCount());
     }
 
     {// test LeafManager constructor
@@ -2857,6 +2903,18 @@ TestTree::testNodeManager()
             totalCount += nodeCount[i];
         }
         CPPUNIT_ASSERT_EQUAL(totalCount, Index64(manager2.nodeCount()));
+
+        // test the map reduce functionality
+        NodeCountOp<FloatTree> bottomUpOp;
+        NodeCountOp<FloatTree> topDownOp;
+        manager2.reduceBottomUp(bottomUpOp);
+        manager2.reduceTopDown(topDownOp);
+        for (openvdb::Index i=0; i<FloatTree::RootNodeType::LEVEL; ++i) {//exclude root in nodeCount
+            CPPUNIT_ASSERT_EQUAL(bottomUpOp.nodeCount[i], manager2.nodeCount(i));
+            CPPUNIT_ASSERT_EQUAL(topDownOp.nodeCount[i], manager2.nodeCount(i));
+        }
+        CPPUNIT_ASSERT_EQUAL(bottomUpOp.totalCount, manager2.nodeCount());
+        CPPUNIT_ASSERT_EQUAL(topDownOp.totalCount, manager2.nodeCount());
     }
 
 }

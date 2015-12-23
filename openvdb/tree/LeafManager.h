@@ -52,6 +52,7 @@
 #include <boost/type_traits/remove_pointer.hpp>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
+#include <tbb/parallel_reduce.h>
 #include <openvdb/Types.h>
 #include "TreeIterator.h" // for CopyConstness
 
@@ -483,6 +484,12 @@ public:
         LeafTransformer<LeafOp> transform(op);
         transform.run(this->leafRange(grainSize), threaded);
     }
+    template<typename LeafOp>
+    void reduce(LeafOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        LeafTransformerReduce<LeafOp> transform(op);
+        op = transform.run(this->leafRange(grainSize), threaded);
+    }
 
 
     template<typename ArrayT>
@@ -635,6 +642,27 @@ public:
             for (typename LeafRange::Iterator it = range.begin(); it; ++it) mLeafOp(*it, it.pos());
         }
         const LeafOp mLeafOp;
+    };
+    template<typename LeafOp>
+    struct LeafTransformerReduce
+    {
+        LeafTransformerReduce(LeafOp& leafOp) : mLeafOp(leafOp) {}
+        LeafTransformerReduce(const LeafTransformerReduce& other, tbb::split t) : 
+            mLeafOp(other.mLeafOp, t) {}
+        LeafOp run(const LeafRange& range, bool threaded = true)
+        {
+            threaded ? tbb::parallel_reduce(range, *this) : (*this)(range);
+            return mLeafOp;
+        }
+        void operator()(const LeafRange& range)
+        {
+            for (typename LeafRange::Iterator it = range.begin(); it; ++it) mLeafOp(*it, it.pos());
+        }
+        void join(const LeafTransformerReduce& other)
+        {
+            mLeafOp.join(other.mLeafOp);
+        }
+        LeafOp mLeafOp;
     };
 
     typedef typename boost::function<void (LeafManager*, const RangeType&)> FuncType;
