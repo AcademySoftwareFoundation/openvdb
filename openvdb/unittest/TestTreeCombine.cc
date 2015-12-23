@@ -32,6 +32,7 @@
 #include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Composite.h>
+#include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/util/CpuTimer.h>
 #include "util.h" // for unittest_util::makeSphere()
 #include <limits> // for std::numeric_limits
@@ -69,6 +70,7 @@ public:
 #ifdef DWA_OPENVDB
     CPPUNIT_TEST(testCsg);
 #endif
+    CPPUNIT_TEST(testCsgCopy);
     CPPUNIT_TEST_SUITE_END();
 
     void testCombine();
@@ -82,6 +84,7 @@ public:
     void testCompReplace();
     void testBoolTree();
     void testCsg();
+    void testCsgCopy();
 
 private:
     template<class TreeT, typename TreeComp, typename ValueComp>
@@ -862,6 +865,59 @@ TestTreeCombine::visitCsg(const TreeT& aInputTree, const TreeT& bInputTree,
 
     return aTree;
 }
+
+
+////////////////////////////////////////
+
+
+void
+TestTreeCombine::testCsgCopy()
+{
+    const float voxelSize = 0.2f;
+    const float radius = 3.0f;
+    openvdb::Vec3f center(0.0f, 0.0f, 0.0f);
+
+    openvdb::FloatGrid::Ptr gridA =
+        openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(radius, center, voxelSize);
+
+    openvdb::Coord ijkA = gridA->transform().worldToIndexNodeCentered(center);
+    CPPUNIT_ASSERT(gridA->tree().getValue(ijkA) < 0.0f); // center is inside
+
+    center.x() += 3.5f;
+
+    openvdb::FloatGrid::Ptr gridB =
+        openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(radius, center, voxelSize);
+
+    openvdb::Coord ijkB = gridA->transform().worldToIndexNodeCentered(center);
+    CPPUNIT_ASSERT(gridB->tree().getValue(ijkB) < 0.0f); // center is inside
+
+    openvdb::FloatGrid::Ptr unionGrid = openvdb::tools::csgUnionCopy(*gridA, *gridB);
+    openvdb::FloatGrid::Ptr intersectionGrid = openvdb::tools::csgIntersectionCopy(*gridA, *gridB);
+    openvdb::FloatGrid::Ptr differenceGrid = openvdb::tools::csgDifferenceCopy(*gridA, *gridB);
+
+    CPPUNIT_ASSERT(unionGrid.get() != NULL);
+    CPPUNIT_ASSERT(intersectionGrid.get() != NULL);
+    CPPUNIT_ASSERT(differenceGrid.get() != NULL);
+
+    CPPUNIT_ASSERT(!unionGrid->empty());
+    CPPUNIT_ASSERT(!intersectionGrid->empty());
+    CPPUNIT_ASSERT(!differenceGrid->empty());
+
+    // test inside / outside sign
+
+    CPPUNIT_ASSERT(unionGrid->tree().getValue(ijkA) < 0.0f);
+    CPPUNIT_ASSERT(unionGrid->tree().getValue(ijkB) < 0.0f);
+
+    CPPUNIT_ASSERT(!(intersectionGrid->tree().getValue(ijkA) < 0.0f));
+    CPPUNIT_ASSERT(!(intersectionGrid->tree().getValue(ijkB) < 0.0f));
+
+    CPPUNIT_ASSERT(differenceGrid->tree().getValue(ijkA) < 0.0f);
+    CPPUNIT_ASSERT(!(differenceGrid->tree().getValue(ijkB) < 0.0f));
+}
+
+
+////////////////////////////////////////
+
 
 // Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

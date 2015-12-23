@@ -73,7 +73,16 @@ public:
     typedef typename VectorType::ValueType   ValueType;
     BOOST_STATIC_ASSERT(boost::is_floating_point<ValueType>::value);
 
-    DiscreteField(const VelGridT &vel): mAccessor(vel.tree()), mTransform(&vel.transform())
+    DiscreteField(const VelGridT &vel)
+        : mAccessor(vel.tree())
+        , mTransform(&vel.transform())
+    {
+    }
+
+    /// @brief Copy constructor
+    DiscreteField(const DiscreteField& other)
+        : mAccessor(other.mAccessor.tree())
+        , mTransform(other.mTransform)
     {
     }
 
@@ -83,13 +92,19 @@ public:
     const math::Transform& transform() const { return *mTransform; }
 
     /// @return the interpolated velocity at the world space position xyz
-    inline VectorType operator() (const Vec3d& xyz, ValueType) const
+    ///
+    /// @warning Not threadsafe since it uses a ValueAccessor! So use
+    /// one instance per thread (which is fine since its lightweight).
+    inline VectorType operator() (const Vec3d& xyz, ValueType/*dummy time*/) const
     {
         return Interpolator::sample(mAccessor, mTransform->worldToIndex(xyz));
     }
 
     /// @return the velocity at the coordinate space position ijk
-    inline VectorType operator() (const Coord& ijk, ValueType) const
+    ///
+    /// @warning Not threadsafe since it uses a ValueAccessor! So use
+    /// one instance per thread (which is fine since its lightweight).
+    inline VectorType operator() (const Coord& ijk, ValueType/*dummy time*/) const
     {
         return mAccessor.getValue(ijk);
     }
@@ -180,7 +195,11 @@ public:
     }
     /// @brief Samples the velocity at world position onto result. Supports both
     /// staggered (i.e. MAC) and collocated velocity grids.
+    ///
     /// @return @c true if any one of the sampled values is active.
+    ///
+    /// @warning Not threadsafe since it uses a ValueAccessor! So use
+    /// one instance per thread (which is fine since its lightweight).
     template <typename LocationType>
     inline bool sample(const LocationType& world, ValueType& result) const
     {
@@ -191,6 +210,9 @@ public:
 
     /// @brief Samples the velocity at world position onto result. Supports both
     /// staggered (i.e. MAC) and co-located velocity grids.
+    ///
+    /// @warning Not threadsafe since it uses a ValueAccessor! So use
+    /// one instance per thread (which is fine since its lightweight).
     template <typename LocationType>
     inline ValueType sample(const LocationType& world) const
     {

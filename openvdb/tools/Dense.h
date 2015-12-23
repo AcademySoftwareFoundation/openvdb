@@ -40,6 +40,7 @@
 #include <openvdb/Grid.h>
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/Exceptions.h>
+#include <openvdb/util/Formats.h>
 #include <tbb/parallel_for.h>
 #include <boost/scoped_array.hpp>
 #include <boost/scoped_ptr.hpp>
@@ -207,6 +208,8 @@ class Dense : public DenseBase<ValueT, Layout>
 public:
     typedef ValueT ValueType;
     typedef DenseBase<ValueT, Layout> BaseT;
+    typedef boost::shared_ptr<Dense> Ptr;
+    typedef boost::shared_ptr<const Dense> ConstPtr;
 
     /// @brief Construct a dense grid with a given range of coordinates.
     ///
@@ -345,6 +348,21 @@ public:
         return sizeof(*this) + BaseT::mBBox.volume() * sizeof(ValueType);
     }
 
+    /// @brief Output a human-readable description of this grid to the
+    /// specified stream.
+    void print(const std::string& name = "", std::ostream& os = std::cout) const
+    {
+        const Coord dim = BaseT::mBBox.dim();
+        os << "Dense Grid";
+        if (!name.empty()) os << " \"" << name << "\"";
+        util::printBytes(os, this->memUsage(), ":\n  Memory footprint:     ");
+        os << "  Dimensions of grid  :   " << dim[0] << " x " << dim[1] << " x " << dim[2] << "\n";
+        os << "  Number of voxels:       " << util::formattedInt(this->valueCount()) << "\n";
+        os << "  Bounding box of voxels: " << BaseT::mBBox << "\n";
+        os << "  Memory layout:          " << (Layout == LayoutZYX ? "ZYX (" : "XYZ (dis")
+           << "similar to VDB)\n";        
+    }
+    
 private:
 
     /// @brief Private method to initialize the dense value array.

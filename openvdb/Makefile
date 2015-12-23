@@ -354,6 +354,7 @@ INCLUDE_NAMES := \
     tools/LevelSetSphere.h \
     tools/LevelSetTracker.h \
     tools/LevelSetUtil.h \
+    tools/MaskToLevelSet.h \
     tools/MeshToVolume.h \
     tools/Morphology.h \
     tools/ParticlesToLevelSet.h \
@@ -453,6 +454,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestLaplacian.cc \
     unittest/TestLeaf.cc \
     unittest/TestLeafBool.cc \
+    unittest/TestLeafManager.cc \
     unittest/TestLeafMask.cc \
     unittest/TestLeafIO.cc \
     unittest/TestLeafOrigin.cc \
@@ -460,6 +462,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestLevelSetUtil.cc \
     unittest/TestLinearInterp.cc \
     unittest/TestMaps.cc \
+    unittest/TestMaskToLevelSet.cc \
     unittest/TestMat4Metadata.cc \
     unittest/TestMath.cc \
     unittest/TestMeanCurvature.cc \
@@ -469,6 +472,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestMetaMap.cc \
     unittest/TestName.cc \
     unittest/TestNodeIterator.cc \
+    unittest/TestNodeManager.cc \
     unittest/TestNodeMask.cc \
     unittest/TestParticlesToLevelSet.cc \
     unittest/TestPointIndexGrid.cc \

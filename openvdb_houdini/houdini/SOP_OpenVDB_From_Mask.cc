@@ -38,8 +38,8 @@
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb_houdini/GU_VDBPointTools.h>
 
-#include <openvdb/tools/PointMaskGrid.h>
 #include <openvdb/tools/TopologyToLevelSet.h>
+#include <openvdb/tools/LevelSetUtil.h>
 
 #include <UT/UT_Interrupt.h>
 #include <GA/GA_Handle.h>
@@ -61,13 +61,8 @@ public:
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    int convertUnits();
-
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
-
-private:
-    float mVoxelSize;
 };
 
 
@@ -77,25 +72,24 @@ private:
 namespace
 {
 
-// Callback to convert from voxel to world space units
-int
-convertUnitsCB(void* data, int /*idx*/, float /*time*/, const PRM_Template*)
+struct Converter
 {
-   SOP_OpenVDB_From_Mask* sop = static_cast<SOP_OpenVDB_From_Mask*>(data);
-   if (sop == NULL) return 0;
-   return sop->convertUnits();
-}
+    float bandWidthWorld;
+    int bandWidthVoxels, closingWidth, dilation, smoothingSteps, outputName;
+    bool worldSpaceUnits, exportDist, exportFog;
+    std::string customName;
 
-
-struct TopologyConverter
-{
-    int bandWidthInVoxels, closingWidth, dilation, smoothingSteps; // public settings
-
-    TopologyConverter(GU_Detail& geo, hvdb::Interrupter& boss)
-        : bandWidthInVoxels(3)
+    Converter(GU_Detail& geo, hvdb::Interrupter& boss)
+        : bandWidthWorld(0)
+        , bandWidthVoxels(3)
         , closingWidth(1)
         , dilation(0)
         , smoothingSteps(0)
+        , outputName(0)
+        , worldSpaceUnits(false)
+        , exportDist(true)
+        , exportFog(false)
+        , customName("vdb")
         , mGeoPt(&geo)
         , mBossPt(&boss)
     {
@@ -104,16 +98,46 @@ struct TopologyConverter
     template<typename GridType>
     void operator()(const GridType& grid)
     {
-        openvdb::FloatGrid::Ptr sdfGrid = openvdb::tools::topologyToLevelSet(
-           grid, bandWidthInVoxels, closingWidth, dilation, smoothingSteps, mBossPt);
+        int bandWidth = bandWidthVoxels;
+        if (worldSpaceUnits) {
+            bandWidth = int(openvdb::math::Round(bandWidthWorld / grid.transform().voxelSize()[0]));
+        }
 
-        hvdb::createVdbPrimitive(*mGeoPt, sdfGrid, grid.getName().c_str());
+        openvdb::FloatGrid::Ptr sdfGrid = openvdb::tools::topologyToLevelSet(
+           grid, bandWidth, closingWidth, dilation, smoothingSteps, mBossPt);
+
+        if (exportDist) {
+
+            std::string name = grid.getName();
+            if (outputName == 1) name += "_distance";
+            else if (outputName == 2) name = "distance";
+            else if (outputName == 3) name = customName;
+
+            hvdb::createVdbPrimitive(*mGeoPt, sdfGrid, name.c_str());
+        }
+
+        if (exportFog) {
+
+            // Modify sdfGrid in place if only fog volume conversion is selected.
+            openvdb::FloatGrid::Ptr outputGrid;
+            if (exportDist) outputGrid = sdfGrid->deepCopy();
+            else outputGrid = sdfGrid;
+
+            openvdb::tools::sdfToFogVolume(*outputGrid);
+
+            std::string name = grid.getName();
+            if (outputName == 1) name += "_density";
+            if (outputName == 2) name = "density";
+            else if (outputName == 3) name = customName;
+
+            hvdb::createVdbPrimitive(*mGeoPt, outputGrid, name.c_str());
+        }
     }
 
 private:
     GU_Detail         * const mGeoPt;
     hvdb::Interrupter * const mBossPt;
-}; // struct TopologyConverter
+}; // struct Converter
 
 
 } // unnamed namespace
@@ -131,18 +155,34 @@ newSopOperator(OP_OperatorTable* table)
         .setHelpText("Specify a subset of the input grids.")
         .setChoiceList(&hutil::PrimGroupMenu));
 
-    parms.add(hutil::ParmFactory(PRM_STRING, "gridname", "Distance VDB")
-        .setDefault("surface")
-        .setHelpText("Output grid name, ignored for VDB inputs."));
+    /// Output
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "distance", "Distance VDB")
+        .setDefault(PRMoneDefaults)
+        .setHelpText("Enable / disable the level set conversion."));
 
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelsize", "Voxel Size")
-        .setDefault(PRMpointOneDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 5)
-        .setHelpText("Ignored for VDB inputs."));
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "fogvolume", "Fog VDB")
+        .setHelpText("Enable / disable the fog volume conversion."));
+
+    { 
+        const char* items[] = {
+            "keep",     "Keep Incoming VDB Names",
+            "append",   "Append Volume Type",
+            "type",     "Volume Type",
+            "custom",   "Custom Name",
+            NULL
+        };
+
+        parms.add(hutil::ParmFactory(PRM_ORD, "outputName", "Output Name")
+            .setDefault(PRMzeroDefaults)
+            .setHelpText("Rename output grid(s)")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+
+        parms.add(hutil::ParmFactory(PRM_STRING, "customName", "Custom Name")
+            .setHelpText("Rename all output grids with this custom name"));
+    }
 
     /// Narrow-band width {
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldSpaceUnits", "Use World Space for Band")
-        .setCallbackFunc(&convertUnitsCB));
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldSpaceUnits", "Use World Space for Band"));
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "bandWidth", "Half-Band in Voxels")
         .setDefault(PRMthreeDefaults)
@@ -175,11 +215,10 @@ newSopOperator(OP_OperatorTable* table)
               .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
               .setHelpText("Number of smoothing interations"));
 
-
     // Register this operator.
     hvdb::OpenVDBOpFactory("OpenVDB From Mask",
         SOP_OpenVDB_From_Mask::factory, parms, *table)
-        .addInput("VDB Grids, Points and Packed Points");
+        .addInput("VDB Grids");
 }
 
 ////////////////////////////////////////
@@ -196,29 +235,7 @@ SOP_OpenVDB_From_Mask::factory(OP_Network* net,
 SOP_OpenVDB_From_Mask::SOP_OpenVDB_From_Mask(OP_Network* net,
     const char* name, OP_Operator* op):
     hvdb::SOP_NodeVDB(net, name, op)
-    , mVoxelSize(0.1f)
 {
-}
-
-////////////////////////////////////////
-
-int
-SOP_OpenVDB_From_Mask::convertUnits()
-{
-    const bool toWSUnits = static_cast<bool>(evalInt("worldSpaceUnits", 0, 0));
-    float width;
-
-    if (toWSUnits) {
-        width = static_cast<float>(evalInt("bandWidth", 0, 0));
-        setFloat("bandWidthWS", 0, 0, width * mVoxelSize);
-        return 1;
-    }
-
-    width = static_cast<float>(evalFloat("bandWidthWS", 0, 0));
-    int voxelWidth = std::max(static_cast<int>(width / mVoxelSize), 1);
-    setInt("bandWidth", 0, 0, voxelWidth);
-
-    return 1;
 }
 
 
@@ -227,25 +244,19 @@ bool
 SOP_OpenVDB_From_Mask::updateParmsFlags()
 {
     bool changed = false;
-    const fpreal time = 0; // No point using CHgetTime as that is unstable.
-
-
-    // Conversion
+    const fpreal time = 0;
     const bool wsUnits = bool(evalInt("worldSpaceUnits", 0, time));
 
-
-    changed |= enableParm("bandWidth",
-                          !wsUnits);
-
-    changed |= enableParm("bandWidthWS",
-                          wsUnits);
-
+    changed |= enableParm("bandWidth", !wsUnits);
+    changed |= enableParm("bandWidthWS", wsUnits);
     changed |= enableParm("bandWidth", !wsUnits);
     changed |= enableParm("bandWidthWS", wsUnits);
 
     changed |= setVisibleState("bandWidth", !wsUnits);
     changed |= setVisibleState("bandWidthWS", wsUnits);
 
+    const bool useCustomName = evalInt("outputName", 0, time) == 3;
+    changed |= enableParm("customName", useCustomName);
 
     return changed;
 }
@@ -265,85 +276,61 @@ SOP_OpenVDB_From_Mask::cookMySop(OP_Context& context)
         const GU_Detail* inputGeoPt = inputGeo(0);
         if(inputGeoPt == NULL) return error();
 
+        hvdb::Interrupter boss;
+
         // Get UI settings
 
-        const float voxelSize = float(evalFloat("voxelsize", 0, time));
-        if (voxelSize < 1e-5) {
-            std::ostringstream ostr;
-            ostr << "The voxel size ("<< mVoxelSize << ") is too small.";
-            addError(SOP_MESSAGE, ostr.str().c_str());
+        UT_String customName, groupStr;
+        evalString(customName, "customName", 0, time);
+        evalString(groupStr, "group", 0, time);
+
+        Converter converter(*gdp, boss);
+        converter.worldSpaceUnits = evalInt("worldSpaceUnits", 0, time) != 0;
+        converter.exportDist = evalInt("distance", 0, time) != 0;
+        converter.exportFog = evalInt("fogvolume", 0, time) != 0;
+        converter.bandWidthWorld = float(evalFloat("bandWidthWS", 0, time));
+        converter.bandWidthVoxels = evalInt("bandWidth", 0, time);
+        converter.closingWidth = evalInt("closingwidth", 0, time);
+        converter.dilation = evalInt("dilation", 0, time);
+        converter.smoothingSteps = evalInt("smoothingsteps", 0, time);
+        converter.outputName = evalInt("outputName", 0, time);
+        converter.customName = customName.toStdString();
+
+        if (!converter.exportDist && !converter.exportFog) {
+            addWarning(SOP_MESSAGE, "No output selected");
             return error();
         }
 
-        mVoxelSize = voxelSize; // stash for world to index conversion.
-
-        const openvdb::math::Transform::Ptr transform =
-            openvdb::math::Transform::createLinearTransform(voxelSize);
-
-        int bandWidthInVoxels = 3;
-        if (evalInt("worldSpaceUnits", 0, time) != 0) {
-            bandWidthInVoxels = int(openvdb::math::Round(evalFloat("bandWidthWS", 0, time) / voxelSize));
-        } else {
-            bandWidthInVoxels = evalInt("bandWidth", 0, time);
-        }
-
-        const int dilation = evalInt("dilation", 0, time);
-        const int closingWidth = evalInt("closingwidth", 0, time);
-        const int smoothingSteps = evalInt("smoothingsteps", 0, time);
-
-        UT_String gridName;
-        evalString(gridName, "gridname", 0, time);
-
-        hvdb::Interrupter boss;
-
-
         // Process VDB primitives
 
-        UT_String groupStr;
-        evalString(groupStr, "group", 0, time);
         const GA_PrimitiveGroup* group = matchGroup(const_cast<GU_Detail&>(*inputGeoPt), groupStr.toStdString());
 
         hvdb::VdbPrimCIterator vdbIt(inputGeoPt, group);
 
+        if (!vdbIt) {
+            addWarning(SOP_MESSAGE, "No VDB grids to process.");
+            return error();
+        }
 
-        if (vdbIt) {
+        for (; vdbIt; ++vdbIt) {
 
-            TopologyConverter converter(*gdp, boss);
+            if (boss.wasInterrupted()) break;
 
-            converter.bandWidthInVoxels = bandWidthInVoxels;
-            converter.closingWidth = closingWidth;
-            converter.dilation = dilation;
-            converter.smoothingSteps = smoothingSteps;
+            const GU_PrimVDB *vdb = *vdbIt;
 
-            for (; vdbIt; ++vdbIt) {
+            if (!GEOvdbProcessTypedGridTopology(*vdb, converter)) { // all hdk supported grid types
 
-                if (boss.wasInterrupted()) break;
+                if (vdb->getGrid().type() == openvdb::tools::PointIndexGrid::gridType()) { // point index grid
+                    openvdb::tools::PointIndexGrid::ConstPtr grid =
+                        openvdb::gridConstPtrCast<openvdb::tools::PointIndexGrid>(vdb->getGridPtr());
+                    converter(*grid);
 
-                const GU_PrimVDB *vdb = *vdbIt;
-
-                if (!GEOvdbProcessTypedGridTopology(*vdb, converter)) { // all hdk supported grid types
-
-                    if (vdb->getGrid().type() == openvdb::tools::PointIndexGrid::gridType()) { // point index grid
-                        openvdb::tools::PointIndexGrid::ConstPtr grid =
-                            openvdb::gridConstPtrCast<openvdb::tools::PointIndexGrid>(vdb->getGridPtr());
-                        converter(*grid);
-
-                    } else if (vdb->getGrid().type() == openvdb::MaskGrid::gridType()) { // mask grid
-                        openvdb::MaskGrid::ConstPtr grid =
-                            openvdb::gridConstPtrCast<openvdb::MaskGrid>(vdb->getGridPtr());
-                        converter(*grid);
-                    }
+                } else if (vdb->getGrid().type() == openvdb::MaskGrid::gridType()) { // mask grid
+                    openvdb::MaskGrid::ConstPtr grid =
+                        openvdb::gridConstPtrCast<openvdb::MaskGrid>(vdb->getGridPtr());
+                    converter(*grid);
                 }
             }
-
-        } else {
-
-            openvdb::MaskGrid::Ptr maskGrid = GUvdbCreatePointMaskGrid(*transform, *inputGeoPt);
-
-            openvdb::FloatGrid::Ptr sdfGrid = openvdb::tools::topologyToLevelSet(
-                *maskGrid, bandWidthInVoxels, closingWidth, dilation, smoothingSteps, &boss);
-
-            hvdb::createVdbPrimitive(*gdp, sdfGrid, gridName.buffer());
         }
 
     } catch (std::exception& e) {

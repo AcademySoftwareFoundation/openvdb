@@ -118,18 +118,19 @@
 #include "Prune.h"
 #include "SignedFloodFill.h"
 #include "LevelSetTracker.h"
+#include "MaskToLevelSet.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
-namespace p2ls_internal {
+namespace {
 // This is a simple type that combines a distance value and a particle
 // attribute. It's required for attribute transfer which is performed
 // in the ParticlesToLevelSet::Raster member class defined below.
 template<typename VisibleT, typename BlindT> class BlindData;
-}// namespace p2ls_internal
+}// unnamed namespace
 
 
 template<typename SdfGridT,
@@ -221,6 +222,18 @@ public:
     /// @note A grainsize of 0 or less disables multi-threading!
     void setGrainSize(int grainSize) { mGrainSize = grainSize; }
 
+    /// @brief Very fast generation of a level set from the active
+    /// mask of an input grid, e.g. a MaskGrid generated from points.
+    ///
+    /// @param grid Points with radius (no radius required).
+    /// @param dilationInVoxels Dilation in voxel units.
+    /// @param erosionInVoxels  Erosion in voxel units. It is
+    /// recommended that erosionInVoxels <= dilationInVoxels.
+    template <typename GridT>
+    void rasterizeMask(const GridT& grid,
+                       const int dilationInVoxels = 1,
+                       const int erosionInVoxels  = 1);
+    
     /// @brief Very fast generation of a level set from points
     /// (e.g. particles without a radius). It employes a MaskGrid
     /// an various bit-wise topology operations.
@@ -269,7 +282,7 @@ public:
     void rasterizeTrails(const ParticleListT& pa, Real delta=1.0);
 
 private:
-    typedef p2ls_internal::BlindData<SdfType, AttType> BlindType;
+    typedef BlindData<SdfType, AttType> BlindType;
     typedef typename SdfGridT::template ValueConverter<BlindType>::Type BlindGridType;
 
     /// Class with multi-threaded implementation of particle rasterization
@@ -334,46 +347,33 @@ template<typename TreeT> struct ErosionHandler
 };    
     
 }
-    
+
+template<typename SdfGridT, typename AttributeT, typename InterrupterT>
+template <typename MaskGrid>
+inline void ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::
+rasterizeMask(const MaskGrid& maskGrid, int dilation, int erosion)
+{
+    // Generate a level set from the mask
+    mSdfGrid->setTree( maskToLevelSet<MaskGrid, math::FIRST_BIAS, InterrupterT>
+                       ( maskGrid, int(mHalfWidth), dilation, erosion, mInterrupter )->treePtr() );
+}    
+
 template<typename SdfGridT, typename AttributeT, typename InterrupterT>
 template <typename PointListT>
 inline void ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::
-rasterizePoints(const PointListT& points, int dilationInVoxels, int erosionInVoxels)
+rasterizePoints(const PointListT& points, int dilation, int erosion)
 {
-    typedef typename SdfGridT::TreeType                                 SdfTreeT;
-    typedef typename SdfTreeT::Ptr                                      SdfTreePtr;
     typedef typename SdfGridT::template ValueConverter<ValueMask>::Type MaskGrid;
     typedef typename MaskGrid::TreeType                                 MaskTree;
     typedef typename MaskTree::Ptr                                      MaskTreePtr;
     
-    // Generate a MaskGrid of the points
+    // Generate a mask grid of the points
     MaskGrid maskGrid(MaskTreePtr(new MaskTree(mSdfGrid->tree(), false, TopologyCopy())));
     maskGrid.setTransform( mSdfGrid->transform().copy() );
     PointMaskGrid<MaskGrid, InterrupterT> pmg( maskGrid, mInterrupter );
     pmg.addPoints( points );
-
-    // Morphological closing of the MaskGrid
-    dilateVoxels( maskGrid.tree(), dilationInVoxels);
-    erodeVoxels(  maskGrid.tree(), erosionInVoxels);
-    
-    const float backg = mSdfGrid->background();
-    mSdfGrid->setTree(SdfTreePtr(new SdfTreeT(maskGrid.tree(), backg, -backg, TopologyCopy())));
-    
-    // Create the narrow band
-    tbb::task_group g;
-    ErosionHandler< MaskTree> eh( maskGrid.tree(),  int(mHalfWidth) );
-    DilationHandler<SdfTreeT> dh( mSdfGrid->tree(), int(mHalfWidth) );
-    g.run( eh );// spwan a task to erode the mask grid
-    g.run( dh );// spawn a task to dilate the sdf grid
-    g.wait();// wait for both tasks to complete
-    mSdfGrid->tree().topologyDifference( maskGrid.tree() );
-
-    // Compute distances in the narrow band
-    LevelSetTracker<SdfGridT, InterrupterT> tracker(*mSdfGrid, mInterrupter);
-    tracker.setSpatialScheme( openvdb::math::FIRST_BIAS );
-    tracker.setNormCount( int(3 * mHalfWidth) );
-    tracker.normalize();
-    tracker.prune();
+    // Generate a level set from the mask
+    this->rasterizeMask( maskGrid, dilation, erosion );
 }
     
 template<typename SdfGridT, typename AttributeT, typename InterrupterT>
@@ -388,7 +388,7 @@ rasterizeSpheres(const ParticleListT& pa)
         Raster<ParticleListT, BlindGridType> r(*this, mBlindGrid, pa);
         r.rasterizeSpheres();
     }
-}
+}    
 
 template<typename SdfGridT, typename AttributeT, typename InterrupterT>
 template <typename ParticleListT>
@@ -855,7 +855,7 @@ private:
 
 ///////////////////// YOU CAN SAFELY IGNORE THIS SECTION /////////////////////
 
-namespace p2ls_internal {
+namespace {
 
 // This is a simple type that combines a distance value and a particle
 // attribute. It's required for attribute transfer which is defined in the
@@ -909,7 +909,7 @@ inline BlindData<VisibleT, BlindT> Abs(const BlindData<VisibleT, BlindT>& x)
     return BlindData<VisibleT, BlindT>(math::Abs(x.visible()), x.blind());
 }
 
-} // namespace p2ls_internal
+} // unnamed namespace
 
 //////////////////////////////////////////////////////////////////////////////
 

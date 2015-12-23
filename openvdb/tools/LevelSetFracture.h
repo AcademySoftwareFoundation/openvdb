@@ -39,16 +39,17 @@
 
 #include <openvdb/Grid.h>
 #include <openvdb/math/Quat.h>
-#include <openvdb/tree/LeafManager.h>
-#include <openvdb/tools/Prune.h>
-#include <openvdb/tools/SignedFloodFill.h>
 #include <openvdb/util/NullInterrupter.h>
-#include "Composite.h" // for csgIntersection() and csgDifference()
+
+#include "Composite.h" // for csgIntersectionCopy() and csgDifferenceCopy()
 #include "GridTransformer.h" // for resampleToMatch()
+#include "LevelSetUtil.h" // for sdfSegmentation()
 
 #include <limits>
 #include <list>
-#include <deque>
+
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_reduce.h>
 
 
 namespace openvdb {
@@ -122,158 +123,50 @@ private:
 
 // Internal utility objects and implementation details
 
-namespace internal {
+namespace level_set_fracture_internal {
 
-/// @brief Segmentation scheme, splits disjoint fragments into separate grids.
-/// @note This is a temporary solution and it will be replaced soon.
-template<typename GridType, typename InterruptType>
-inline std::vector<typename GridType::Ptr>
-segment(GridType& grid, InterruptType* interrupter = NULL)
-{
-    typedef typename GridType::Ptr GridPtr;
-    typedef typename GridType::TreeType TreeType;
-    typedef typename TreeType::Ptr TreePtr;
-    typedef typename TreeType::ValueType ValueType;
 
-    std::vector<GridPtr> segments;
+template<typename LeafNodeType>
+struct FindMinMaxVoxelValue {
 
-    while (grid.activeVoxelCount() > 0) {
+    typedef typename LeafNodeType::ValueType    ValueType;
 
-        if (interrupter && interrupter->wasInterrupted()) break;
+    FindMinMaxVoxelValue(const std::vector<const LeafNodeType*>& nodes)
+        : minValue(std::numeric_limits<ValueType>::max())
+        , maxValue(-minValue)
+        , mNodes(nodes.empty() ? NULL : &nodes.front())
+    {
+    }
 
-        // Deep copy the grid's metadata (tree and transform are shared)
-        GridPtr segment(new GridType(grid, ShallowCopy()));
-        // Make the transform unique and insert an empty tree
-        segment->setTransform(grid.transform().copy());
-        TreePtr tree(new TreeType(grid.background()));
-        segment->setTree(tree);
+    FindMinMaxVoxelValue(FindMinMaxVoxelValue& rhs, tbb::split)
+        : minValue(std::numeric_limits<ValueType>::max())
+        , maxValue(-minValue)
+        , mNodes(rhs.mNodes)
+    {
+    }
 
-        std::deque<Coord> coordList;
-        coordList.push_back(grid.tree().beginLeaf()->beginValueOn().getCoord());
-
-        Coord ijk, n_ijk;
-        ValueType value;
-
-        typename tree::ValueAccessor<TreeType> sourceAcc(grid.tree());
-        typename tree::ValueAccessor<TreeType> targetAcc(segment->tree());
-
-        while (!coordList.empty()) {
-
-            if (interrupter && interrupter->wasInterrupted()) break;
-
-            ijk = coordList.back();
-            coordList.pop_back();
-
-            if (!sourceAcc.probeValue(ijk, value)) continue;
-            if (targetAcc.isValueOn(ijk)) continue;
-
-            targetAcc.setValue(ijk, value);
-            sourceAcc.setValueOff(ijk);
-
-            for (int n = 0; n < 6; n++) {
-                n_ijk = ijk + util::COORD_OFFSETS[n];
-                if (!targetAcc.isValueOn(n_ijk) && sourceAcc.isValueOn(n_ijk)) {
-                    coordList.push_back(n_ijk);
-                }
+    void operator()(const tbb::blocked_range<size_t>& range) {
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+            const ValueType* data = mNodes[n]->buffer().data();
+            for (Index i = 0; i < LeafNodeType::SIZE; ++i) {
+                minValue = std::min(minValue, data[i]);
+                maxValue = std::max(maxValue, data[i]);
             }
         }
-
-        tools::pruneInactive(grid.tree());
-        tools::signedFloodFill(segment->tree());
-        segments.push_back(segment);
     }
-    return segments;
-}
 
-
-template<class TreeType>
-class MinMaxVoxel
-{
-public:
-    typedef tree::LeafManager<TreeType> LeafArray;
-    typedef typename TreeType::ValueType ValueType;
-
-    // LeafArray = openvdb::tree::LeafManager<TreeType> leafs(myTree)
-    MinMaxVoxel(LeafArray&);
-
-    void runParallel();
-    void runSerial();
-
-    const ValueType& minVoxel() const { return mMin; }
-    const ValueType& maxVoxel() const { return mMax; }
-
-    inline MinMaxVoxel(const MinMaxVoxel<TreeType>&, tbb::split);
-    inline void operator()(const tbb::blocked_range<size_t>&);
-    inline void join(const MinMaxVoxel<TreeType>&);
-
-private:
-    LeafArray& mLeafArray;
-    ValueType mMin, mMax;
-};
-
-
-template <class TreeType>
-MinMaxVoxel<TreeType>::MinMaxVoxel(LeafArray& leafs)
-    : mLeafArray(leafs)
-    , mMin(std::numeric_limits<ValueType>::max())
-    , mMax(-mMin)
-{
-}
-
-
-template <class TreeType>
-inline
-MinMaxVoxel<TreeType>::MinMaxVoxel(const MinMaxVoxel<TreeType>& rhs, tbb::split)
-    : mLeafArray(rhs.mLeafArray)
-    , mMin(std::numeric_limits<ValueType>::max())
-    , mMax(-mMin)
-{
-}
-
-
-template <class TreeType>
-void
-MinMaxVoxel<TreeType>::runParallel()
-{
-    tbb::parallel_reduce(mLeafArray.getRange(), *this);
-}
-
-
-template <class TreeType>
-void
-MinMaxVoxel<TreeType>::runSerial()
-{
-    (*this)(mLeafArray.getRange());
-}
-
-
-template <class TreeType>
-inline void
-MinMaxVoxel<TreeType>::operator()(const tbb::blocked_range<size_t>& range)
-{
-    typename TreeType::LeafNodeType::ValueOnCIter iter;
-
-    for (size_t n = range.begin(); n < range.end(); ++n) {
-        iter = mLeafArray.leaf(n).cbeginValueOn();
-        for (; iter; ++iter) {
-            const ValueType value = iter.getValue();
-            mMin = std::min(mMin, value);
-            mMax = std::max(mMax, value);
-        }
+    void join(FindMinMaxVoxelValue& rhs) {
+        minValue = std::min(minValue, rhs.minValue);
+        maxValue = std::max(maxValue, rhs.maxValue);
     }
-}
+
+    ValueType minValue, maxValue;
+
+    LeafNodeType const * const * const mNodes;
+}; // struct FindMinMaxVoxelValue
 
 
-template <class TreeType>
-inline void
-MinMaxVoxel<TreeType>::join(const MinMaxVoxel<TreeType>& rhs)
-{
-    mMin = std::min(mMin, rhs.mMin);
-    mMax = std::max(mMax, rhs.mMax);
-}
-
-
-} // namespace internal
+} // namespace level_set_fracture_internal
 
 
 ////////////////////////////////////////
@@ -297,6 +190,7 @@ LevelSetFracture<GridType, InterruptType>::fracture(GridPtrList& grids, const Gr
     // transforms between all incoming grids and the cutter object.
     if (points && points->size() != 0) {
 
+
         math::Transform::Ptr originalCutterTransform = cutter.transform().copy();
         GridType cutterGrid(cutter, ShallowCopy());
 
@@ -305,7 +199,6 @@ LevelSetFracture<GridType, InterruptType>::fracture(GridPtrList& grids, const Gr
 
         // for each instance point..
         for (size_t p = 0, P = points->size(); p < P; ++p) {
-
             int percent = int((float(p) / float(P)) * 100.0);
             if (wasInterrupted(percent)) break;
 
@@ -325,16 +218,25 @@ LevelSetFracture<GridType, InterruptType>::fracture(GridPtrList& grids, const Gr
 
             cutterGrid.setTransform(xform);
 
-            if (wasInterrupted()) break;
-
             // Since there is no scaling, use the generic resampler instead of
             // the more expensive level set rebuild tool.
             if (mInterrupter != NULL) {
-                doResampleToMatch<BoxSampler>(cutterGrid, instCutterGrid, *mInterrupter);
+
+                if (hasInstanceRotations) {
+                    doResampleToMatch<BoxSampler>(cutterGrid, instCutterGrid, *mInterrupter);
+                } else {
+                    doResampleToMatch<PointSampler>(cutterGrid, instCutterGrid, *mInterrupter);
+                }
             } else {
                 util::NullInterrupter interrupter;
-                doResampleToMatch<BoxSampler>(cutterGrid, instCutterGrid, interrupter);
+                if (hasInstanceRotations) {
+                    doResampleToMatch<BoxSampler>(cutterGrid, instCutterGrid, interrupter);
+                } else {
+                    doResampleToMatch<PointSampler>(cutterGrid, instCutterGrid, interrupter);
+                }
             }
+
+            if (wasInterrupted(percent)) break;
 
             if (cutterOverlap && !mFragments.empty()) process(mFragments, instCutterGrid);
             process(grids, instCutterGrid);
@@ -357,16 +259,25 @@ template<class GridType, class InterruptType>
 bool
 LevelSetFracture<GridType, InterruptType>::isValidFragment(GridType& grid) const
 {
-    typedef typename GridType::TreeType TreeType;
-    if (grid.activeVoxelCount() < 27) return false;
+    typedef typename GridType::TreeType::LeafNodeType LeafNodeType;
 
-    // Check if valid level-set
-    {
-        tree::LeafManager<TreeType> leafs(grid.tree());
-        internal::MinMaxVoxel<TreeType> minmax(leafs);
-        minmax.runParallel();
+    if (grid.tree().leafCount() < 9) {
 
-        if ((minmax.minVoxel() < 0) == (minmax.maxVoxel() < 0)) return false;
+        std::vector<const LeafNodeType*> nodes;
+        grid.tree().getNodes(nodes);
+
+        Index64 activeVoxelCount = 0;
+
+        for (size_t n = 0, N = nodes.size(); n < N; ++n) {
+            activeVoxelCount += nodes[n]->onVoxelCount();
+        }
+
+        if (activeVoxelCount < 27) return false;
+
+        level_set_fracture_internal::FindMinMaxVoxelValue<LeafNodeType> op(nodes);
+        tbb::parallel_reduce(tbb::blocked_range<size_t>(0, nodes.size()), op);
+
+        if ((op.minValue < 0) == (op.maxValue < 0)) return false;
     }
 
     return true;
@@ -381,16 +292,11 @@ LevelSetFracture<GridType, InterruptType>::segmentFragments(GridPtrList& grids) 
 
     for (GridPtrListIter it = grids.begin(); it != grids.end(); ++it) {
 
-        if (wasInterrupted()) break;
+        std::vector<typename GridType::Ptr> segments;
+        segmentSDF(*(*it), segments);
 
-        std::vector<typename GridType::Ptr> segments = internal::segment(*(*it), mInterrupter);
         for (size_t n = 0, N = segments.size(); n < N; ++n) {
-
-            if (wasInterrupted()) break;
-
-            if (isValidFragment(*segments[n])) {
-                newFragments.push_back(segments[n]);
-            }
+            newFragments.push_back(segments[n]);
         }
     }
 
@@ -404,29 +310,18 @@ LevelSetFracture<GridType, InterruptType>::process(
     GridPtrList& grids, const GridType& cutter)
 {
     typedef typename GridType::Ptr GridPtr;
-
     GridPtrList newFragments;
 
     for (GridPtrListIter it = grids.begin(); it != grids.end(); ++it) {
 
         if (wasInterrupted()) break;
 
-        GridPtr grid = *it;
+        GridPtr& grid = *it;
 
-        // gen new fragment
-        GridPtr fragment = grid->deepCopy();
-        csgIntersection(*fragment, *cutter.deepCopy());
-
-        if (wasInterrupted()) break;
-
+        GridPtr fragment = csgIntersectionCopy(*grid, cutter);
         if (!isValidFragment(*fragment)) continue;
 
-        // update residual
-        GridPtr residual = grid->deepCopy();
-        csgDifference(*residual, *cutter.deepCopy());
-
-        if (wasInterrupted()) break;
-
+        GridPtr residual = csgDifferenceCopy(*grid, cutter);
         if (!isValidFragment(*residual)) continue;
 
         newFragments.push_back(fragment);
