@@ -189,6 +189,23 @@ TestAttributeSet::testAttributeSetDescriptor()
         CPPUNIT_ASSERT(descr1->hasSameAttributes(*descr4));
     }
 
+    { // Test uniqueName
+        Descriptor::Inserter names;
+        names.add("test", AttributeS::attributeType());
+        names.add("test1", AttributeI::attributeType());
+
+        Descriptor::Ptr descr1 = Descriptor::create(names.vec);
+
+        const openvdb::Name uniqueName1 = descr1->uniqueName("test");
+        CPPUNIT_ASSERT_EQUAL(uniqueName1, openvdb::Name("test0"));
+
+        const Descriptor::NameAndType newAttr(uniqueName1, AttributeI::attributeType());
+        Descriptor::Ptr descr2 = descr1->duplicateAppend(newAttr);
+
+        const openvdb::Name uniqueName2 = descr2->uniqueName("test");
+        CPPUNIT_ASSERT_EQUAL(uniqueName2, openvdb::Name("test2"));
+    }
+
     // I/O test
 
     std::ostringstream ostr(std::ios_base::binary);

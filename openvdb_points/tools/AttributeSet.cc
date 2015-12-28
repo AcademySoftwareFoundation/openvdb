@@ -620,6 +620,18 @@ AttributeSet::Descriptor::appendTo(NameAndTypeVec& attrs) const
 }
 
 
+const Name
+AttributeSet::Descriptor::uniqueName(const Name& name) const
+{
+    std::ostringstream ss;
+    for (size_t i = 0; i < this->size(); i++) {
+        ss.str("");
+        ss << name << i;
+        if (this->find(ss.str()) == INVALID_POS)    break;
+    }
+    return ss.str();
+}
+
 void
 AttributeSet::Descriptor::write(std::ostream& os) const
 {

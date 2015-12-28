@@ -296,6 +296,9 @@ public:
     /// Append to a vector of names and types from this Descriptor in position order
     void appendTo(NameAndTypeVec& attrs) const;
 
+    /// Return a unique name for an attribute array based on given name
+    const Name uniqueName(const Name& name) const;
+
     /// Serialize this descriptor to the given stream.
     void write(std::ostream&) const;
     /// Unserialize this transform from the given stream.
