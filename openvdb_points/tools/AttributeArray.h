@@ -386,6 +386,10 @@ public:
     /// Replace the existing array with the given uniform value.
     void collapse(const ValueType& uniformValue);
 
+    /// @brief Fill the existing array with the given value.
+    /// @note Identical to collapse() except a non-uniform array will not become uniform.
+    void fill(const ValueType& value);
+
     /// Compress the attribute array.
     virtual bool compress();
     /// Uncompress the attribute array.
@@ -477,6 +481,7 @@ typedef AttributeWriteHandle<Vec3f> AttributeHandleRWVec3f;
 
 
 ////////////////////////////////////////
+
 
 // Attribute codec implementation
 
@@ -664,7 +669,9 @@ template<typename ValueType_, typename Codec_>
 inline TypedAttributeArray<ValueType_, Codec_>&
 TypedAttributeArray<ValueType_, Codec_>::cast(AttributeArray& attributeArray)
 {
-    if (!attributeArray.isType<TypedAttributeArray>())     OPENVDB_THROW(TypeError, "Invalid Attribute Type");
+    if (!attributeArray.isType<TypedAttributeArray>()) {
+        OPENVDB_THROW(TypeError, "Invalid Attribute Type");
+    }
     return static_cast<TypedAttributeArray&>(attributeArray);
 }
 
@@ -672,7 +679,9 @@ template<typename ValueType_, typename Codec_>
 inline const TypedAttributeArray<ValueType_, Codec_>&
 TypedAttributeArray<ValueType_, Codec_>::cast(const AttributeArray& attributeArray)
 {
-    if (!attributeArray.isType<TypedAttributeArray>())     OPENVDB_THROW(TypeError, "Invalid Attribute Type");
+    if (!attributeArray.isType<TypedAttributeArray>()) {
+        OPENVDB_THROW(TypeError, "Invalid Attribute Type");
+    }
     return static_cast<const TypedAttributeArray&>(attributeArray);
 }
 
@@ -709,17 +718,14 @@ TypedAttributeArray<ValueType_, Codec_>::allocate(bool fill)
 
     StorageType val = mIsUniform ? mData[0] : zeroVal<StorageType>();
 
-    if (mData) {
-        delete[] mData;
-        mData = NULL;
-    }
+    this->deallocate();
 
     mCompressedBytes = 0;
     mIsUniform = false;
 
     mData = new StorageType[mSize];
     if (fill) {
-        for (size_t i = 0; i < mSize; ++i) mData[i] = val;
+        for (size_t i = 0; i < mSize; ++i)  mData[i] = val;
     }
 }
 
@@ -847,6 +853,17 @@ TypedAttributeArray<ValueType_, Codec_>::collapse(const ValueType& uniformValue)
 
 template<typename ValueType_, typename Codec_>
 void
+TypedAttributeArray<ValueType_, Codec_>::fill(const ValueType& value)
+{
+    const size_t size = mIsUniform ? 1 : mSize;
+    for (size_t i = 0; i < size; ++i)  {
+        Codec::encode(value, mData[i]);
+    }
+}
+
+
+template<typename ValueType_, typename Codec_>
+void
 TypedAttributeArray<ValueType_, Codec_>::expand(bool fill)
 {
     this->allocate(fill);
@@ -894,6 +911,7 @@ TypedAttributeArray<ValueType_, Codec_>::compress()
         mData = reinterpret_cast<StorageType*>(outData);
 
         mCompressedBytes = size_t(bufBytes);
+
         return true;
     }
 

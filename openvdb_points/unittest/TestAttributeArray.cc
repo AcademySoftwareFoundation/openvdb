@@ -215,6 +215,29 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT_EQUAL(attr.get(i), 5);
         }
 
+        attr.fill(10);
+        CPPUNIT_ASSERT(!attr.isUniform());
+        CPPUNIT_ASSERT_EQUAL(expandedMemUsage, attr.memUsage());
+
+        for (unsigned i = 0; i < unsigned(count); ++i) {
+            CPPUNIT_ASSERT_EQUAL(attr.get(i), 10);
+        }
+
+        attr.collapse(7);
+        CPPUNIT_ASSERT(attr.isUniform());
+        CPPUNIT_ASSERT_EQUAL(uniformMemUsage, attr.memUsage());
+
+        CPPUNIT_ASSERT_EQUAL(attr.get(0), 7);
+        CPPUNIT_ASSERT_EQUAL(attr.get(20), 7);
+
+        attr.fill(5);
+        CPPUNIT_ASSERT(attr.isUniform());
+        CPPUNIT_ASSERT_EQUAL(uniformMemUsage, attr.memUsage());
+
+        for (unsigned i = 0; i < unsigned(count); ++i) {
+            CPPUNIT_ASSERT_EQUAL(attr.get(i), 5);
+        }
+
         CPPUNIT_ASSERT(!attr.isTransient());
         CPPUNIT_ASSERT(!attr.isHidden());
         CPPUNIT_ASSERT(!attr.isGroup());
