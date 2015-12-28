@@ -460,8 +460,25 @@ TestAttributeSet::testAttributeSet()
     openvdb::MetaMap& meta = attrSetA.descriptor().getMetadata();
     meta.insertMeta("default", openvdb::FloatMetadata(2.0));
 
-    // I/O test
-    {
+    { // flag size test
+        Descriptor::Ptr descr = Descriptor::create(Descriptor::Inserter()
+            .add("hidden1", AttributeI::attributeType())
+            .add("group1", AttributeI::attributeType())
+            .add("hidden2", AttributeI::attributeType())
+            .vec);
+
+        AttributeSet attrSet(descr);
+
+        attrSet.get("group1")->setGroup(true);
+        attrSet.get("hidden1")->setHidden(true);
+        attrSet.get("hidden2")->setHidden(true);
+
+        CPPUNIT_ASSERT_EQUAL(attrSet.size(AttributeArray::TRANSIENT), size_t(0));
+        CPPUNIT_ASSERT_EQUAL(attrSet.size(AttributeArray::GROUP), size_t(1));
+        CPPUNIT_ASSERT_EQUAL(attrSet.size(AttributeArray::HIDDEN), size_t(2));
+    }
+
+    { // I/O test
         std::ostringstream ostr(std::ios_base::binary);
         attrSetA.write(ostr);
 
@@ -472,8 +489,7 @@ TestAttributeSet::testAttributeSet()
         CPPUNIT_ASSERT(matchingAttributeSets(attrSetA, attrSetB));
     }
 
-    // I/O transient test
-    {
+    { // I/O transient test
         AttributeArray* array = attrSetA.get(0);
         array->setTransient(true);
 

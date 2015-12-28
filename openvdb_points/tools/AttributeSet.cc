@@ -88,6 +88,18 @@ AttributeSet::memUsage() const
 
 
 size_t
+AttributeSet::size(const uint16_t flag) const
+{
+    size_t count = 0;
+    for (AttrArrayVec::const_iterator   it = mAttrs.begin(),
+                                        itEnd = mAttrs.end(); it != itEnd; ++it) {
+        if ((*it)->flags() & flag)  count++;
+    }
+    return count;
+}
+
+
+size_t
 AttributeSet::find(const std::string& name) const
 {
     return mDescr->find(name);
