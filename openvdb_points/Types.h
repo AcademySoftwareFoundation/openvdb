@@ -43,12 +43,31 @@ namespace OPENVDB_VERSION_NAME {
 // add some extra typeNameAsString specializations
 
 template<> inline const char* typeNameAsString<half>()                   { return "half"; }
+template<> inline const char* typeNameAsString<uint8_t>()                { return "uint8"; }
 template<> inline const char* typeNameAsString<int16_t>()                { return "int16"; }
 template<> inline const char* typeNameAsString<uint16_t>()               { return "uint16"; }
 template<> inline const char* typeNameAsString<math::Vec3<half> >()      { return "vec3h"; }
 template<> inline const char* typeNameAsString<math::Vec3<uint8_t> >()   { return "vec3u8"; }
 template<> inline const char* typeNameAsString<math::Vec3<uint16_t> >()  { return "vec3u16"; }
 
+////////////////////////////////////////
+
+// TypedAttributeArray forward declarations and group type typedefs
+
+namespace tools {
+
+template<typename T>
+struct NullAttributeCodec;
+
+template<typename T0, typename T1>
+class TypedAttributeArray;
+
+// Group Types
+
+typedef uint8_t GroupType;
+typedef TypedAttributeArray<GroupType, NullAttributeCodec<GroupType> > GroupAttributeArray;
+
+} // namespace tools
 
 ////////////////////////////////////////
 
