@@ -161,6 +161,8 @@ protected:
     typedef boost::shared_ptr<AccessorBase>             AccessorBasePtr;
 
 public:
+    enum Flag { TRANSIENT = 0x1, HIDDEN = 0x2, GROUP=0x4 };
+
     typedef boost::shared_ptr<AttributeArray>           Ptr;
     typedef boost::shared_ptr<const AttributeArray>     ConstPtr;
 
@@ -233,6 +235,14 @@ public:
     /// Return @c true if this attribute is not serialized during stream output.
     bool isTransient() const { return bool(mFlags & TRANSIENT); }
 
+    /// @brief Specify whether this attribute is for tracking group membership
+    /// @note  Attributes are not group attributes by default.
+    void setGroup(bool state);
+    /// Return @c true if this attribute is for tracking groups
+    bool isGroup() const { return bool(mFlags & GROUP); }
+
+    uint16_t flags() const { return mFlags; }
+
     /// Read attribute data from a stream.
     virtual void read(std::istream&) = 0;
     /// Write attribute data to a stream.
@@ -258,7 +268,6 @@ protected:
     /// Remove a attribute type from the registry.
     static void unregisterType(const NamePair& type);
 
-    enum { TRANSIENT = 0x1, HIDDEN = 0x2 };
     size_t mCompressedBytes;
     uint16_t mFlags;
 }; // class AttributeArray
