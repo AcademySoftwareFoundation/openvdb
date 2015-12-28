@@ -311,10 +311,10 @@ public:
     }
 
     /// @brief Append an attribute to the leaf.
-    void appendAttribute(const AttributeSet::Util::NameAndType& attribute,
+    AttributeArray::Ptr appendAttribute(const AttributeSet::Util::NameAndType& attribute,
                          const Descriptor& expected, Descriptor::Ptr& replacement)
     {
-        mAttributeSet->appendAttribute(attribute, expected, replacement);
+        return mAttributeSet->appendAttribute(attribute, expected, replacement);
     }
 
     /// @brief Drop attributes with @a pos indices.
@@ -395,27 +395,27 @@ public:
 
     AttributeArray& attributeArray(const size_t pos)
     {
-        if (pos >= mAttributeSet->size())             OPENVDB_THROW(LookupError, "Attribute Out Of Range");
+        if (pos >= mAttributeSet->size())             OPENVDB_THROW(LookupError, "Attribute Out Of Range - " << pos);
         return *mAttributeSet->get(pos);
     }
 
     AttributeArray& attributeArray(const Name& attributeName)
     {
         const size_t pos = mAttributeSet->find(attributeName);
-        if (pos == AttributeSet::INVALID_POS)         OPENVDB_THROW(LookupError, "Attribute Not Found");
+        if (pos == AttributeSet::INVALID_POS)         OPENVDB_THROW(LookupError, "Attribute Not Found - " << attributeName);
         return *mAttributeSet->get(pos);
     }
 
     const AttributeArray& attributeArray(const size_t pos) const
     {
-        if (pos >= mAttributeSet->size())             OPENVDB_THROW(LookupError, "Attribute Out Of Range");
+        if (pos >= mAttributeSet->size())             OPENVDB_THROW(LookupError, "Attribute Out Of Range - " << pos);
         return *mAttributeSet->get(pos);
     }
 
     const AttributeArray& attributeArray(const Name& attributeName) const
     {
         const size_t pos = mAttributeSet->find(attributeName);
-        if (pos == AttributeSet::INVALID_POS)         OPENVDB_THROW(LookupError, "Attribute Not Found");
+        if (pos == AttributeSet::INVALID_POS)         OPENVDB_THROW(LookupError, "Attribute Not Found - " << attributeName);
         return *mAttributeSet->get(pos);
     }
 
@@ -477,8 +477,11 @@ public:
     /// a non-zero point count will be activated.
     void updateValueMask()
     {
+        ValueType start = 0, end = 0;
         for (Index n = 0; n < LeafNodeType::NUM_VALUES; n++) {
-            this->setValueMask(n, this->pointCount(n) > 0);
+            end = this->getValue(n);
+            this->setValueMask(n, (end - start) > 0);
+            start = end;
         }
     }
 
