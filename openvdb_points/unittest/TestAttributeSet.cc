@@ -43,12 +43,14 @@ public:
     CPPUNIT_TEST_SUITE(TestAttributeSet);
     CPPUNIT_TEST(testAttributeSetDescriptor);
     CPPUNIT_TEST(testAttributeSet);
+    CPPUNIT_TEST(testAttributeSetGroups);
 
     CPPUNIT_TEST_SUITE_END();
 
     void testAttributeSetDescriptor();
     void testAttributeSet();
-}; // class TestPointDataGrid
+    void testAttributeSetGroups();
+}; // class TestAttributeSet
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestAttributeSet);
 
@@ -138,7 +140,7 @@ TestAttributeSet::testAttributeSetDescriptor()
 
     CPPUNIT_ASSERT(*descrA == *descrB);
 
-    // Rebuild NameAndTypeVec
+    // rebuild NameAndTypeVec
 
     Descriptor::NameAndTypeVec rebuildNames;
     descrA->appendTo(rebuildNames);
@@ -153,7 +155,7 @@ TestAttributeSet::testAttributeSetDescriptor()
         CPPUNIT_ASSERT_EQUAL(itA->type.second, itB->type.second);
     }
 
-    // Test hasSameAttributes
+    // hasSameAttributes
     {
         Descriptor::Ptr descr1 = Descriptor::create(Descriptor::Inserter()
                 .add("pos", AttributeD::attributeType())
@@ -161,7 +163,7 @@ TestAttributeSet::testAttributeSetDescriptor()
                 .add("id", AttributeI::attributeType())
                 .vec);
 
-        // Test same names with different types, should be false
+        // test same names with different types, should be false
         Descriptor::Ptr descr2 = Descriptor::create(Descriptor::Inserter()
                 .add("pos", AttributeD::attributeType())
                 .add("test", AttributeS::attributeType())
@@ -170,7 +172,7 @@ TestAttributeSet::testAttributeSetDescriptor()
 
         CPPUNIT_ASSERT(!descr1->hasSameAttributes(*descr2));
 
-        // Test different names, should be false
+        // test different names, should be false
         Descriptor::Ptr descr3 = Descriptor::create(Descriptor::Inserter()
                 .add("pos", AttributeD::attributeType())
                 .add("test2", AttributeI::attributeType())
@@ -179,7 +181,7 @@ TestAttributeSet::testAttributeSetDescriptor()
 
         CPPUNIT_ASSERT(!descr1->hasSameAttributes(*descr3));
 
-        // Test same names and types but different order, should be true
+        // test same names and types but different order, should be true
         Descriptor::Ptr descr4 = Descriptor::create(Descriptor::Inserter()
                 .add("test", AttributeI::attributeType())
                 .add("id", AttributeI::attributeType())
@@ -204,6 +206,43 @@ TestAttributeSet::testAttributeSetDescriptor()
 
         const openvdb::Name uniqueName2 = descr2->uniqueName("test");
         CPPUNIT_ASSERT_EQUAL(uniqueName2, openvdb::Name("test2"));
+    }
+
+    { // TODO: Test hasGroup(), setGroup(), dropGroup(), clearGroups()
+        Descriptor descr;
+
+        CPPUNIT_ASSERT(!descr.hasGroup("test1"));
+
+        descr.setGroup("test1", 1);
+
+        CPPUNIT_ASSERT(descr.hasGroup("test1"));
+        CPPUNIT_ASSERT_EQUAL(descr.groupMap().at("test1"), size_t(1));
+
+        descr.setGroup("test5", 5);
+
+        CPPUNIT_ASSERT(descr.hasGroup("test1"));
+        CPPUNIT_ASSERT_EQUAL(descr.groupMap().at("test1"), size_t(1));
+
+        descr.setGroup("test1", 2);
+
+        CPPUNIT_ASSERT(descr.hasGroup("test1"));
+        CPPUNIT_ASSERT_EQUAL(descr.groupMap().at("test1"), size_t(2));
+
+        descr.dropGroup("test1");
+
+        CPPUNIT_ASSERT(!descr.hasGroup("test1"));
+        CPPUNIT_ASSERT(descr.hasGroup("test5"));
+
+        descr.setGroup("test3", 3);
+
+        CPPUNIT_ASSERT(descr.hasGroup("test3"));
+        CPPUNIT_ASSERT(descr.hasGroup("test5"));
+
+        descr.clearGroups();
+
+        CPPUNIT_ASSERT(!descr.hasGroup("test1"));
+        CPPUNIT_ASSERT(!descr.hasGroup("test3"));
+        CPPUNIT_ASSERT(!descr.hasGroup("test5"));
     }
 
     // I/O test
@@ -503,6 +542,117 @@ TestAttributeSet::testAttributeSet()
         // ensures transient attribute is not written out
 
         CPPUNIT_ASSERT_EQUAL(attrSetB.size(), size_t(1));
+    }
+}
+
+class AttributeGroupAccessor
+{
+public:
+    AttributeGroupAccessor(const openvdb::tools::GroupAttributeArray& array)
+        : mArray(array) { }
+
+    bool in(const unsigned index)
+    {
+        const uint8_t value = mArray.get(index);
+        return value == 1;
+    }
+
+    bool out(const unsigned index)
+    {
+        return !in(index);
+    }
+
+private:
+    const openvdb::tools::GroupAttributeArray& mArray;
+};
+
+void
+TestAttributeSet::testAttributeSetGroups()
+{
+    using namespace openvdb;
+    using namespace openvdb::tools;
+
+    // Define and register some common attribute types
+    typedef TypedAttributeArray<int32_t>        AttributeI;
+    typedef TypedAttributeArray<openvdb::Vec3s> AttributeVec3s;
+
+    GroupAttributeArray::registerType();
+    AttributeI::registerType();
+    AttributeVec3s::registerType();
+
+    typedef AttributeSet::Descriptor Descriptor;
+
+    // construct
+
+    Descriptor::Ptr descr = Descriptor::create(Descriptor::Inserter()
+        .add("pos", AttributeVec3s::attributeType())
+        .add("id", AttributeI::attributeType())
+        .vec);
+
+    AttributeSet attrSet(descr, /*arrayLength=*/3);
+
+    {
+        CPPUNIT_ASSERT(!descr->hasGroup("test1"));
+    }
+
+    { // group offset
+        Descriptor::Ptr descr(new Descriptor);
+
+        descr->setGroup("test1", 1);
+
+        CPPUNIT_ASSERT(descr->hasGroup("test1"));
+        CPPUNIT_ASSERT_EQUAL(descr->groupMap().at("test1"), size_t(1));
+
+        AttributeSet attrSet(descr);
+
+        CPPUNIT_ASSERT_EQUAL(attrSet.groupOffset("test1"), size_t(1));
+    }
+
+    { // group index
+        Descriptor::Ptr descr = Descriptor::create(Descriptor::Inserter()
+            .add("test", AttributeI::attributeType())
+            .add("test2", AttributeI::attributeType())
+            .add("group1", GroupAttributeArray::attributeType())
+            .add("test3", AttributeI::attributeType())
+            .add("group2", GroupAttributeArray::attributeType())
+            .add("test4", AttributeI::attributeType())
+            .add("group3", GroupAttributeArray::attributeType())
+            .vec);
+
+        AttributeSet attrSet(descr);
+
+        attrSet.get("group1")->setGroup(true);
+        attrSet.get("group2")->setGroup(true);
+        attrSet.get("group3")->setGroup(true);
+
+        std::stringstream ss;
+        for (int i = 0; i < 17; i++) {
+            ss.str("");
+            ss << "test" << i;
+            descr->setGroup(ss.str(), i);
+        }
+
+        Descriptor::GroupIndex index15 = attrSet.groupIndex(15);
+        CPPUNIT_ASSERT_EQUAL(index15.first, size_t(4));
+        CPPUNIT_ASSERT_EQUAL(index15.second, uint8_t(7));
+
+        CPPUNIT_ASSERT_EQUAL(attrSet.groupOffset(index15), size_t(15));
+        CPPUNIT_ASSERT_EQUAL(attrSet.groupOffset("test15"), size_t(15));
+
+        Descriptor::GroupIndex index15b = attrSet.groupIndex("test15");
+        CPPUNIT_ASSERT_EQUAL(index15b.first, size_t(4));
+        CPPUNIT_ASSERT_EQUAL(index15b.second, uint8_t(7));
+
+        Descriptor::GroupIndex index16 = attrSet.groupIndex(16);
+        CPPUNIT_ASSERT_EQUAL(index16.first, size_t(6));
+        CPPUNIT_ASSERT_EQUAL(index16.second, uint8_t(0));
+
+        CPPUNIT_ASSERT_EQUAL(attrSet.groupOffset(index16), size_t(16));
+        CPPUNIT_ASSERT_EQUAL(attrSet.groupOffset("test16"), size_t(16));
+
+        Descriptor::GroupIndex index16b = attrSet.groupIndex("test16");
+        CPPUNIT_ASSERT_EQUAL(index16b.first, size_t(6));
+        CPPUNIT_ASSERT_EQUAL(index16b.second, uint8_t(0));
     }
 }
 
