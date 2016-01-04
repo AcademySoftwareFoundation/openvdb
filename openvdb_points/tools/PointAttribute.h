@@ -229,7 +229,6 @@ inline void dropAttributes( PointDataTree& tree,
                             const std::vector<size_t>& indices)
 {
     typedef typename tree::LeafManager<PointDataTree>       LeafManagerT;
-    typedef typename LeafManagerT::LeafRange                LeafRangeT;
 
     using point_attribute_internal::DropAttributesOp;
 
