@@ -184,10 +184,11 @@ size_t
 AttributeSet::groupOffset(const Name& group) const
 {
     const Descriptor::NameToPosMap& map = this->descriptor().groupMap();
-    if (map.find(group) == map.end()) {
+    const Descriptor::ConstIterator it = map.find(group);
+    if (it == map.end()) {
         return INVALID_POS;
     }
-    return map.at(group);
+    return it->second;
 }
 
 
