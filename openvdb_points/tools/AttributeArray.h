@@ -241,6 +241,7 @@ public:
     /// Return @c true if this attribute is for tracking groups
     bool isGroup() const { return bool(mFlags & GROUP); }
 
+    /// @brief Retrieve the attribute array flags
     uint16_t flags() const { return mFlags; }
 
     /// Read attribute data from a stream.
