@@ -201,8 +201,8 @@ inline void appendAttribute(PointDataTree& tree,
 
     // do not append a non-unique attribute
 
-    const AttributeSet& attributeSet = iter->attributeSet();
-    const size_t index = attributeSet.descriptor().find(newAttribute.name);
+    const Descriptor& descriptor = iter->attributeSet().descriptor();
+    const size_t index = descriptor.find(newAttribute.name);
 
     if (index != AttributeSet::INVALID_POS) {
         OPENVDB_THROW(KeyError, "Cannot append an attribute with a non-unique name - " << newAttribute.name << ".");
@@ -212,11 +212,11 @@ inline void appendAttribute(PointDataTree& tree,
     NameAndTypeVec vec;
     vec.push_back(newAttribute);
 
-    Descriptor::Ptr descriptor = iter->attributeSet().descriptor().duplicateAppend(vec);
+    Descriptor::Ptr newDescriptor = descriptor.duplicateAppend(vec);
 
     // insert attributes using the new descriptor
 
-    AppendAttributeOp<PointDataTree> append(tree, newAttribute, descriptor, hidden, transient, group);
+    AppendAttributeOp<PointDataTree> append(tree, newAttribute, newDescriptor, hidden, transient, group);
     tbb::parallel_for(typename tree::template LeafManager<PointDataTree>(tree).leafRange(), append);
 }
 
@@ -229,6 +229,7 @@ inline void dropAttributes( PointDataTree& tree,
                             const std::vector<size_t>& indices)
 {
     typedef typename tree::LeafManager<PointDataTree>       LeafManagerT;
+    typedef AttributeSet::Descriptor                        Descriptor;
 
     using point_attribute_internal::DropAttributesOp;
 
@@ -236,11 +237,11 @@ inline void dropAttributes( PointDataTree& tree,
 
     if (!iter)  return;
 
-    const AttributeSet& attributeSet = iter->attributeSet();
+    const Descriptor& descriptor = iter->attributeSet().descriptor();
 
     // throw if position index present in the indices as this attribute is mandatory
 
-    const size_t positionIndex = attributeSet.descriptor().find("P");
+    const size_t positionIndex = descriptor.find("P");
     if (positionIndex!= AttributeSet::INVALID_POS &&
         std::find(indices.begin(), indices.end(), positionIndex) != indices.end()) {
         OPENVDB_THROW(KeyError, "Cannot drop mandatory position attribute.");
@@ -248,8 +249,8 @@ inline void dropAttributes( PointDataTree& tree,
 
     // insert attributes using the new descriptor
 
-    AttributeSet::Descriptor::Ptr descriptor = attributeSet.descriptor().duplicateDrop(indices);
-    tbb::parallel_for(LeafManagerT(tree).leafRange(), DropAttributesOp<PointDataTree>(tree, indices, descriptor));
+    Descriptor::Ptr newDescriptor = descriptor.duplicateDrop(indices);
+    tbb::parallel_for(LeafManagerT(tree).leafRange(), DropAttributesOp<PointDataTree>(tree, indices, newDescriptor));
 }
 
 
@@ -264,7 +265,8 @@ inline void dropAttributes( PointDataTree& tree,
 
     if (!iter)  return;
 
-    const AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
+    const AttributeSet& attributeSet = iter->attributeSet();
+    const AttributeSet::Descriptor& descriptor = attributeSet.descriptor();
 
     std::vector<size_t> indices;
 
