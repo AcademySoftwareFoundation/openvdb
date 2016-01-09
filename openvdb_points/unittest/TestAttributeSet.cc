@@ -208,7 +208,7 @@ TestAttributeSet::testAttributeSetDescriptor()
         CPPUNIT_ASSERT_EQUAL(uniqueName2, openvdb::Name("test2"));
     }
 
-    { // TODO: Test hasGroup(), setGroup(), dropGroup(), clearGroups()
+    { //  Test hasGroup(), setGroup(), dropGroup(), clearGroups()
         Descriptor descr;
 
         CPPUNIT_ASSERT(!descr.hasGroup("test1"));
@@ -221,12 +221,16 @@ TestAttributeSet::testAttributeSetDescriptor()
         descr.setGroup("test5", 5);
 
         CPPUNIT_ASSERT(descr.hasGroup("test1"));
+        CPPUNIT_ASSERT(descr.hasGroup("test5"));
         CPPUNIT_ASSERT_EQUAL(descr.groupMap().at("test1"), size_t(1));
+        CPPUNIT_ASSERT_EQUAL(descr.groupMap().at("test5"), size_t(5));
 
         descr.setGroup("test1", 2);
 
         CPPUNIT_ASSERT(descr.hasGroup("test1"));
+        CPPUNIT_ASSERT(descr.hasGroup("test5"));
         CPPUNIT_ASSERT_EQUAL(descr.groupMap().at("test1"), size_t(2));
+        CPPUNIT_ASSERT_EQUAL(descr.groupMap().at("test5"), size_t(5));
 
         descr.dropGroup("test1");
 
