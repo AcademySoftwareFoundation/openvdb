@@ -152,14 +152,21 @@ public:
     AttributeArray*       get(size_t pos);
     //@}
 
-    /// Return the group offset from the name of the group
+    //@{
+    /// @brief Return the group offset from the name or index of the group
+    /// A group attribute array is a single byte (8-bit), each bit of which
+    /// can denote a group. The group offset is the position of the bit that
+    /// denotes the requested group if all group attribute arrays in the set
+    /// (and only attribute arrays marked as group) were to be laid out linearly
+    /// according to their order in the set.
     size_t groupOffset(const Name& groupName) const;
-    /// Return the group offset from the index of the group
     size_t groupOffset(const Util::GroupIndex& index) const;
+    //@}
 
     /// Return the group index from the name of the group
     Util::GroupIndex groupIndex(const Name& groupName) const;
     /// Return the group index from the offset of the group
+    /// @note see offset description for groupOffset()
     Util::GroupIndex groupIndex(const size_t offset) const;
 
     /// Return true if the attribute array stored at position @a pos is shared.
