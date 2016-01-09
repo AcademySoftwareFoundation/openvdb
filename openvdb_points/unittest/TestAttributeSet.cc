@@ -272,10 +272,12 @@ TestAttributeSet::testAttributeSet()
     // Define and register some common attribute types
     typedef openvdb::tools::TypedAttributeArray<float>          AttributeS;
     typedef openvdb::tools::TypedAttributeArray<int32_t>        AttributeI;
+    typedef openvdb::tools::TypedAttributeArray<int64_t>        AttributeL;
     typedef openvdb::tools::TypedAttributeArray<openvdb::Vec3s> AttributeVec3s;
 
     AttributeS::registerType();
     AttributeI::registerType();
+    AttributeL::registerType();
     AttributeVec3s::registerType();
 
     typedef openvdb::tools::AttributeSet AttributeSet;
@@ -386,13 +388,16 @@ TestAttributeSet::testAttributeSet()
         Descriptor::Ptr descr = Descriptor::create(Descriptor::Inserter()
             .add("pos", AttributeVec3s::attributeType())
             .add("test", AttributeI::attributeType())
-            .add("id", AttributeI::attributeType())
+            .add("id", AttributeL::attributeType())
             .add("test2", AttributeI::attributeType())
+            .add("id2", AttributeL::attributeType())
+            .add("test3", AttributeI::attributeType())
             .vec);
 
         Descriptor::Ptr targetDescr = Descriptor::create(Descriptor::Inserter()
             .add("pos", AttributeVec3s::attributeType())
-            .add("id", AttributeI::attributeType())
+            .add("id", AttributeL::attributeType())
+            .add("id2", AttributeL::attributeType())
             .vec);
 
         AttributeSet attrSetB(descr, /*arrayLength=*/50);
@@ -400,9 +405,11 @@ TestAttributeSet::testAttributeSet()
         std::vector<size_t> toDrop;
         toDrop.push_back(descr->find("test"));
         toDrop.push_back(descr->find("test2"));
+        toDrop.push_back(descr->find("test3"));
 
         CPPUNIT_ASSERT_EQUAL(toDrop[0], size_t(1));
         CPPUNIT_ASSERT_EQUAL(toDrop[1], size_t(3));
+        CPPUNIT_ASSERT_EQUAL(toDrop[2], size_t(5));
 
         { // simple method
             AttributeSet attrSetC(attrSetB);
@@ -414,7 +421,27 @@ TestAttributeSet::testAttributeSet()
 
             attrSetC.dropAttributes(toDrop);
 
-            CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(2));
+            CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(3));
+
+            CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
+        }
+
+        { // reverse removal order
+            std::vector<size_t> toDropReverse;
+            toDropReverse.push_back(descr->find("test3"));
+            toDropReverse.push_back(descr->find("test2"));
+            toDropReverse.push_back(descr->find("test"));
+
+            AttributeSet attrSetC(attrSetB);
+
+            attrSetC.makeUnique(0);
+            attrSetC.makeUnique(1);
+            attrSetC.makeUnique(2);
+            attrSetC.makeUnique(3);
+
+            attrSetC.dropAttributes(toDropReverse);
+
+            CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(3));
 
             CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
         }
@@ -431,7 +458,7 @@ TestAttributeSet::testAttributeSet()
 
             attrSetC.dropAttributes(toDrop, attrSetC.descriptor(), descrB);
 
-            CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(2));
+            CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(3));
 
             CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
         }

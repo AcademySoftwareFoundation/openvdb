@@ -44,6 +44,37 @@ namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
 
+namespace {
+    // remove the items from the vector corresponding to the indices
+    template <typename T>
+    void eraseIndices(std::vector<T>& vec,
+                      const std::vector<size_t>& indices)
+    {
+        // early-exit if no indices to erase
+
+        if (indices.empty())    return;
+
+        // build the sorted, unique indices to remove
+
+        std::vector<size_t> toRemove(indices);
+        std::sort(toRemove.rbegin(), toRemove.rend());
+        toRemove.erase(unique(toRemove.begin(), toRemove.end()), toRemove.end());
+
+        // throw if the largest index is out of range
+
+        if (*toRemove.begin() >= vec.size()) {
+            OPENVDB_THROW(LookupError, "Cannot erase indices as index is out of range.")
+        }
+
+        // erase elements from the back
+
+        for (std::vector<size_t>::const_iterator    it = toRemove.begin();
+                                                    it != toRemove.end(); ++it) {
+            vec.erase(vec.begin() + (*it));
+        }
+    }
+}
+
 ////////////////////////////////////////
 
 
@@ -323,6 +354,8 @@ void
 AttributeSet::dropAttributes(   const std::vector<size_t>& pos,
                                 const Descriptor& expected, DescriptorPtr& replacement)
 {
+    if (pos.empty())    return;
+
     // ensure the descriptor is as expected
     if (*mDescr != expected) {
         OPENVDB_THROW(LookupError, "Cannot drop attributes as descriptors do not match.")
@@ -330,17 +363,7 @@ AttributeSet::dropAttributes(   const std::vector<size_t>& pos,
 
     mDescr = replacement;
 
-    // sort the positions to remove
-
-    std::vector<size_t> orderedPos(pos);
-    std::sort(orderedPos.begin(), orderedPos.end());
-
-    // erase elements in reverse order
-
-    for (std::vector<size_t>::const_reverse_iterator    it = pos.rbegin();
-                                                        it != pos.rend(); ++it) {
-        mAttrs.erase(mAttrs.begin() + (*it));
-    }
+    eraseIndices(mAttrs, pos);
 }
 
 
@@ -673,17 +696,9 @@ AttributeSet::Descriptor::duplicateDrop(const std::vector<size_t>& pos) const
     NameAndTypeVec vec;
     this->appendTo(vec);
 
-    // sort the positions to remove
+    // drop the indices in pos from vec
 
-    std::vector<size_t> orderedPos(pos);
-    std::sort(orderedPos.begin(), orderedPos.end());
-
-    // erase elements in reverse order
-
-    for (std::vector<size_t>::const_reverse_iterator    it = pos.rbegin();
-                                                        it != pos.rend(); ++it) {
-        vec.erase(vec.begin() + (*it));
-    }
+    eraseIndices(vec, pos);
 
     return Descriptor::create(vec, mGroupMap, mMetadata);
 }
