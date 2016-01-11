@@ -215,20 +215,57 @@ TestAttributeArray::testAttributeArray()
             CPPUNIT_ASSERT_EQUAL(attr.get(i), 5);
         }
 
+        attr.fill(10);
+        CPPUNIT_ASSERT(!attr.isUniform());
+        CPPUNIT_ASSERT_EQUAL(expandedMemUsage, attr.memUsage());
+
+        for (unsigned i = 0; i < unsigned(count); ++i) {
+            CPPUNIT_ASSERT_EQUAL(attr.get(i), 10);
+        }
+
+        attr.collapse(7);
+        CPPUNIT_ASSERT(attr.isUniform());
+        CPPUNIT_ASSERT_EQUAL(uniformMemUsage, attr.memUsage());
+
+        CPPUNIT_ASSERT_EQUAL(attr.get(0), 7);
+        CPPUNIT_ASSERT_EQUAL(attr.get(20), 7);
+
+        attr.fill(5);
+        CPPUNIT_ASSERT(attr.isUniform());
+        CPPUNIT_ASSERT_EQUAL(uniformMemUsage, attr.memUsage());
+
+        for (unsigned i = 0; i < unsigned(count); ++i) {
+            CPPUNIT_ASSERT_EQUAL(attr.get(i), 5);
+        }
+
         CPPUNIT_ASSERT(!attr.isTransient());
         CPPUNIT_ASSERT(!attr.isHidden());
+        CPPUNIT_ASSERT(!attr.isGroup());
 
         attr.setTransient(true);
         CPPUNIT_ASSERT(attr.isTransient());
         CPPUNIT_ASSERT(!attr.isHidden());
+        CPPUNIT_ASSERT(!attr.isGroup());
 
         attr.setHidden(true);
         CPPUNIT_ASSERT(attr.isTransient());
         CPPUNIT_ASSERT(attr.isHidden());
+        CPPUNIT_ASSERT(!attr.isGroup());
+
+        attr.setGroup(true);
+        CPPUNIT_ASSERT(attr.isTransient());
+        CPPUNIT_ASSERT(attr.isHidden());
+        CPPUNIT_ASSERT(attr.isGroup());
 
         attr.setTransient(false);
         CPPUNIT_ASSERT(!attr.isTransient());
         CPPUNIT_ASSERT(attr.isHidden());
+        CPPUNIT_ASSERT(attr.isGroup());
+
+        attr.setGroup(false);
+        CPPUNIT_ASSERT(!attr.isTransient());
+        CPPUNIT_ASSERT(attr.isHidden());
+        CPPUNIT_ASSERT(!attr.isGroup());
 
         AttributeArrayI attrB(attr);
         CPPUNIT_ASSERT(matchingNamePairs(attr.type(), attrB.type()));
@@ -237,6 +274,7 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT_EQUAL(attr.isUniform(), attrB.isUniform());
         CPPUNIT_ASSERT_EQUAL(attr.isTransient(), attrB.isTransient());
         CPPUNIT_ASSERT_EQUAL(attr.isHidden(), attrB.isHidden());
+        CPPUNIT_ASSERT_EQUAL(attr.isGroup(), attrB.isGroup());
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
             CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.get(i));
@@ -272,6 +310,7 @@ TestAttributeArray::testAttributeArray()
         }
 
         attrA.setHidden(true);
+        attrA.setGroup(true);
 
         std::ostringstream ostr(std::ios_base::binary);
         attrA.write(ostr);
@@ -287,6 +326,7 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT_EQUAL(attrA.isUniform(), attrB.isUniform());
         CPPUNIT_ASSERT_EQUAL(attrA.isTransient(), attrB.isTransient());
         CPPUNIT_ASSERT_EQUAL(attrA.isHidden(), attrB.isHidden());
+        CPPUNIT_ASSERT_EQUAL(attrA.isGroup(), attrB.isGroup());
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
             CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrB.get(i));

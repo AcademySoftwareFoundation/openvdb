@@ -260,6 +260,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestAttributeArray.cc \
     unittest/TestAttributeSet.cc \
     unittest/TestPointDataLeaf.cc \
+    unittest/TestPointAttribute.cc \
     unittest/TestPointConversion.cc \
 #
 

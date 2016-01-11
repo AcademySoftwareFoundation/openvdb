@@ -86,6 +86,8 @@ public:
         };
 
         typedef std::vector<NameAndType> NameAndTypeVec;
+        typedef std::map<std::string, size_t> NameToPosMap;
+        typedef std::pair<size_t, uint8_t> GroupIndex;
     };
 
     //////////
@@ -111,6 +113,9 @@ public:
 
     /// Return the number of attributes in this set.
     size_t size() const { return mAttrs.size(); }
+
+    /// Return the number of attributes with this flag set
+    size_t size(const uint16_t flag) const;
 
     /// Return the number of bytes of memory used by this attribute set.
     size_t memUsage() const;
@@ -139,7 +144,6 @@ public:
     AttributeArray*       get(const std::string& name);
     //@}
 
-
     //@{
     /// @brief  Return a pointer to the attribute array stored at position @a pos
     ///         in this set.
@@ -148,6 +152,22 @@ public:
     AttributeArray*       get(size_t pos);
     //@}
 
+    //@{
+    /// @brief Return the group offset from the name or index of the group
+    /// A group attribute array is a single byte (8-bit), each bit of which
+    /// can denote a group. The group offset is the position of the bit that
+    /// denotes the requested group if all group attribute arrays in the set
+    /// (and only attribute arrays marked as group) were to be laid out linearly
+    /// according to their order in the set.
+    size_t groupOffset(const Name& groupName) const;
+    size_t groupOffset(const Util::GroupIndex& index) const;
+    //@}
+
+    /// Return the group index from the name of the group
+    Util::GroupIndex groupIndex(const Name& groupName) const;
+    /// Return the group index from the offset of the group
+    /// @note see offset description for groupOffset()
+    Util::GroupIndex groupIndex(const size_t offset) const;
 
     /// Return true if the attribute array stored at position @a pos is shared.
     bool isShared(size_t pos) const;
@@ -220,11 +240,12 @@ class AttributeSet::Descriptor
 {
 public:
     typedef boost::shared_ptr<Descriptor> Ptr;
-    typedef std::map<std::string, size_t> NameToPosMap;
-    typedef NameToPosMap::const_iterator  ConstIterator;
 
     typedef Util::NameAndType             NameAndType;
     typedef Util::NameAndTypeVec          NameAndTypeVec;
+    typedef Util::GroupIndex              GroupIndex;
+    typedef Util::NameToPosMap            NameToPosMap;
+    typedef NameToPosMap::const_iterator  ConstIterator;
 
     /// Utility method to construct a NameAndType sequence.
     struct Inserter {
@@ -252,6 +273,10 @@ public:
 
     /// Create a new descriptor from the given attribute and type name pairs.
     static Ptr create(const NameAndTypeVec&);
+
+    /// Create a new descriptor from the given attribute and type name pairs
+    /// and copy the group maps and metamap.
+    static Ptr create(const NameAndTypeVec&, const NameToPosMap&, const MetaMap&);
 
     /// Create a new descriptor from a position attribute type and assumes "P" (for convenience).
     static Ptr create(const NamePair&);
@@ -292,9 +317,23 @@ public:
 
     /// Return a reference to the name-to-position map.
     const NameToPosMap& map() const { return mNameMap; }
+    /// Return a reference to the name-to-position group map.
+    const NameToPosMap& groupMap() const { return mGroupMap; }
 
     /// Append to a vector of names and types from this Descriptor in position order
     void appendTo(NameAndTypeVec& attrs) const;
+
+    /// Return @c true if group exists
+    bool hasGroup(const Name& group) const;
+    /// Define a group name to offset mapping
+    void setGroup(const Name& group, const size_t offset);
+    /// Drop any mapping keyed by group name
+    void dropGroup(const Name& group);
+    /// Clear all groups
+    void clearGroups();
+
+    /// Return a unique name for an attribute array based on given name
+    const Name uniqueName(const Name& name) const;
 
     /// Serialize this descriptor to the given stream.
     void write(std::ostream&) const;
@@ -305,6 +344,7 @@ private:
     size_t insert(const std::string& name, const NamePair& typeName);
     NameToPosMap                mNameMap;
     std::vector<NamePair>       mTypes;
+    NameToPosMap                mGroupMap;
     MetaMap                     mMetadata;
 }; // class Descriptor
 

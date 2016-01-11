@@ -1,0 +1,254 @@
+///////////////////////////////////////////////////////////////////////////
+//
+// Copyright (c) 2015 Double Negative Visual Effects
+//
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
+//
+// Redistributions of source code must retain the above copyright
+// and license notice and the following restrictions and disclaimer.
+//
+// *     Neither the name of Double Negative Visual Effects nor the names
+// of its contributors may be used to endorse or promote products derived
+// from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
+// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
+//
+///////////////////////////////////////////////////////////////////////////
+
+
+#include <cppunit/extensions/HelperMacros.h>
+#include <openvdb_points/tools/PointAttribute.h>
+#include <openvdb_points/tools/PointConversion.h>
+
+#include <iostream>
+#include <sstream>
+
+using namespace openvdb;
+using namespace openvdb::tools;
+
+class TestPointAttribute: public CppUnit::TestCase
+{
+public:
+    CPPUNIT_TEST_SUITE(TestPointAttribute);
+    CPPUNIT_TEST(testAppendDrop);
+
+    CPPUNIT_TEST_SUITE_END();
+
+    void testAppendDrop();
+}; // class TestPointAttribute
+
+CPPUNIT_TEST_SUITE_REGISTRATION(TestPointAttribute);
+
+////////////////////////////////////////
+
+
+void
+TestPointAttribute::testAppendDrop()
+{
+    typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
+    typedef TypedAttributeArray<float>   AttributeF;
+    typedef TypedAttributeArray<int>     AttributeI;
+
+    typedef AttributeSet::Descriptor   Descriptor;
+
+    std::vector<Vec3s> positions;
+    positions.push_back(Vec3s(1, 1, 1));
+    positions.push_back(Vec3s(1, 10, 1));
+    positions.push_back(Vec3s(10, 1, 1));
+    positions.push_back(Vec3s(10, 10, 1));
+
+    const float voxelSize(1.0);
+    math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
+
+    PointDataGrid::Ptr grid = createPointDataGrid<PointDataGrid>(positions, AttributeVec3s::attributeType(), *transform);
+    PointDataTree& tree = grid->tree();
+
+    // check one leaf per point
+    CPPUNIT_ASSERT_EQUAL(tree.leafCount(), Index32(4));
+
+    // retrieve first and last leaf attribute sets
+
+    PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
+    const AttributeSet& attributeSet = leafIter->attributeSet();
+
+    ++leafIter;
+    ++leafIter;
+    ++leafIter;
+
+    const AttributeSet& attributeSet4 = leafIter->attributeSet();
+
+    // check just one attribute exists (position)
+    CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(1));
+
+    { // append an attribute, check descriptors are as expected
+        appendAttribute(tree, Descriptor::NameAndType("id", AttributeI::attributeType()));
+
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(2));
+        CPPUNIT_ASSERT(attributeSet.descriptor() == attributeSet4.descriptor());
+        CPPUNIT_ASSERT(&attributeSet.descriptor() == &attributeSet4.descriptor());
+    }
+
+    { // append three attributes, check ordering is consistent with insertion
+        appendAttribute(tree, Descriptor::NameAndType("test3", AttributeF::attributeType()));
+        appendAttribute(tree, Descriptor::NameAndType("test1", AttributeF::attributeType()));
+        appendAttribute(tree, Descriptor::NameAndType("test2", AttributeF::attributeType()));
+
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(5));
+
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("P"), size_t(0));
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("id"), size_t(1));
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("test3"), size_t(2));
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("test1"), size_t(3));
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("test2"), size_t(4));
+    }
+
+    { // drop an attribute by index, check ordering remains consistent
+        std::vector<size_t> indices;
+        indices.push_back(2);
+
+        dropAttributes(tree, indices);
+
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(4));
+
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("P"), size_t(0));
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("id"), size_t(1));
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("test1"), size_t(2));
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("test2"), size_t(3));
+    }
+
+    { // drop attributes by index, check ordering remains consistent
+        std::vector<size_t> indices;
+        indices.push_back(1);
+        indices.push_back(3);
+
+        dropAttributes(tree, indices);
+
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(2));
+
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("P"), size_t(0));
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("test1"), size_t(1));
+    }
+
+    { // drop last non-position attribute
+        std::vector<size_t> indices;
+        indices.push_back(1);
+
+        dropAttributes(tree, indices);
+
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(1));
+    }
+
+    { // attempt (and fail) to drop position
+        std::vector<size_t> indices;
+        indices.push_back(0);
+
+        CPPUNIT_ASSERT_THROW(dropAttributes(tree, indices), openvdb::KeyError);
+
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(1));
+        CPPUNIT_ASSERT(attributeSet.descriptor().find("P") != AttributeSet::INVALID_POS);
+    }
+
+    { // add back previous attributes
+        appendAttribute(tree, Descriptor::NameAndType("id", AttributeI::attributeType()));
+        appendAttribute(tree, Descriptor::NameAndType("test3", AttributeF::attributeType()));
+        appendAttribute(tree, Descriptor::NameAndType("test1", AttributeF::attributeType()));
+        appendAttribute(tree, Descriptor::NameAndType("test2", AttributeF::attributeType()));
+
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(5));
+    }
+
+    { // attempt (and fail) to drop non-existing attribute
+        std::vector<Name> names;
+        names.push_back("test1000");
+
+        CPPUNIT_ASSERT_THROW(dropAttributes(tree, names), openvdb::KeyError);
+
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(5));
+    }
+
+    { // drop by name
+        std::vector<Name> names;
+        names.push_back("test1");
+        names.push_back("test2");
+
+        dropAttributes(tree, names);
+
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(3));
+        CPPUNIT_ASSERT(attributeSet.descriptor() == attributeSet4.descriptor());
+        CPPUNIT_ASSERT(&attributeSet.descriptor() == &attributeSet4.descriptor());
+
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("P"), size_t(0));
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("id"), size_t(1));
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("test3"), size_t(2));
+    }
+
+    { // attempt (and fail) to drop position
+        std::vector<Name> names;
+        names.push_back("P");
+
+        CPPUNIT_ASSERT_THROW(dropAttributes(tree, names), openvdb::KeyError);
+
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(3));
+        CPPUNIT_ASSERT(attributeSet.descriptor().find("P") != AttributeSet::INVALID_POS);
+    }
+
+    { // drop one attribute by name
+        dropAttribute(tree, "test3");
+
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(2));
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("P"), size_t(0));
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("id"), size_t(1));
+    }
+
+    { // drop one attribute by id
+        dropAttribute(tree, 1);
+
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(1));
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("P"), size_t(0));
+    }
+
+    { // attempt to add an attribute with a name that already exists
+        appendAttribute(tree, Descriptor::NameAndType("test3", AttributeF::attributeType()));
+        CPPUNIT_ASSERT_THROW(appendAttribute(tree, Descriptor::NameAndType("test3", AttributeF::attributeType())), openvdb::KeyError);
+
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(2));
+    }
+
+    { // append attributes marked as hidden, transient and group
+        appendAttribute(tree, Descriptor::NameAndType("testHidden", AttributeF::attributeType()), true, false, false);
+        appendAttribute(tree, Descriptor::NameAndType("testTransient", AttributeF::attributeType()), false, true, false);
+        appendAttribute(tree, Descriptor::NameAndType("testGroup", AttributeF::attributeType()), false, false, true);
+
+        const AttributeArray& arrayHidden = leafIter->attributeArray("testHidden");
+        const AttributeArray& arrayTransient = leafIter->attributeArray("testTransient");
+        const AttributeArray& arrayGroup = leafIter->attributeArray("testGroup");
+
+        CPPUNIT_ASSERT(arrayHidden.isHidden());
+        CPPUNIT_ASSERT(!arrayHidden.isTransient());
+        CPPUNIT_ASSERT(!arrayHidden.isGroup());
+        CPPUNIT_ASSERT(!arrayTransient.isHidden());
+        CPPUNIT_ASSERT(arrayTransient.isTransient());
+        CPPUNIT_ASSERT(!arrayTransient.isGroup());
+        CPPUNIT_ASSERT(!arrayGroup.isHidden());
+        CPPUNIT_ASSERT(!arrayGroup.isTransient());
+        CPPUNIT_ASSERT(arrayGroup.isGroup());
+    }
+}
+
+
+// Copyright (c) 2015 Double Negative Visual Effects
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
