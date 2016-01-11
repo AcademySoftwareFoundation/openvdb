@@ -267,6 +267,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestAttributeGroup.cc \
     unittest/TestPointAttribute.cc \
     unittest/TestPointConversion.cc \
+    unittest/TestPointCount.cc \
     unittest/TestPointDataLeaf.cc \
     unittest/TestPointGroup.cc \
 #

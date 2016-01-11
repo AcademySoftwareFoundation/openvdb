@@ -283,7 +283,6 @@ TestPointConversion::testPointConversion()
     // create accessor and iterator for Point Data Tree
 
     const PointDataTree& tree = pointDataGrid->tree();
-    PointDataAccessor<PointDataTree> acc(tree);
 
     PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
 
@@ -306,18 +305,16 @@ TestPointConversion::testPointConversion()
             Coord ijk = valueIter.getCoord();
             Vec3d xyz = ijk.asVec3d();
 
-            PointDataAccessor<PointDataTree>::PointDataIndex pointIndexRange = acc.get(ijk);
-
-            for (Index64 n = pointIndexRange.first, N = pointIndexRange.second; n < N; ++n) {
+            for (IndexIter iter = leafIter->beginIndex(ijk); iter; ++iter) {
 
                 // retrieve position in index space and translate into world space
 
-                Vec3d pos = Vec3d(posHandle->get(n)) + xyz;
+                Vec3d pos = Vec3d(posHandle->get(*iter)) + xyz;
                 pos = transform->indexToWorld(pos);
 
                 // retrieve id
 
-                const int id = idHandle->get(n);
+                const int id = idHandle->get(*iter);
 
                 newData.push_back(new Point(pos, id));
             }
