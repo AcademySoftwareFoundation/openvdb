@@ -35,8 +35,10 @@
 #include <openvdb/Types.h>
 #include <openvdb/math/Transform.h>
 
-#include <iostream>
+#include "ProfileTimer.h"
+
 #include <sstream>
+#include <iostream>
 
 using namespace openvdb;
 using namespace openvdb::tools;
@@ -48,13 +50,15 @@ public:
     CPPUNIT_TEST(testFixedPointConversion);
     CPPUNIT_TEST(testAttributeArray);
     CPPUNIT_TEST(testAttributeHandle);
+    CPPUNIT_TEST(testProfile);
 
     CPPUNIT_TEST_SUITE_END();
 
     void testFixedPointConversion();
     void testAttributeArray();
     void testAttributeHandle();
-}; // class TestPointDataGrid
+    void testProfile();
+}; // class TestAttributeArray
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestAttributeArray);
 
@@ -433,6 +437,175 @@ TestAttributeArray::testAttributeHandle()
     }
 }
 
+
+namespace profile {
+
+typedef openvdb::util::ProfileTimer ProfileTimer;
+
+template <typename AttrT>
+void expand(const Name& prefix, AttrT& attr)
+{
+    ProfileTimer timer(prefix + ": expand");
+    attr.expand();
+}
+
+template <typename AttrT>
+void set(const Name& prefix, AttrT& attr)
+{
+    ProfileTimer timer(prefix + ": set");
+    for (size_t i = 0; i < attr.size(); i++) {
+        attr.set(i, typename AttrT::ValueType(i));
+    }
+}
+
+template <typename AttrT>
+void setH(const Name& prefix, AttrT& attr)
+{
+    typedef typename AttrT::ValueType ValueType;
+    ProfileTimer timer(prefix + ": setHandle");
+    AttributeWriteHandle<ValueType> handle(attr);
+    for (size_t i = 0; i < attr.size(); i++) {
+        handle.set(i, ValueType(i));
+    }
+}
+
+template <typename AttrT>
+void sum(const Name& prefix, const AttrT& attr)
+{
+    ProfileTimer timer(prefix + ": sum");
+    typename AttrT::ValueType sum = 0;
+    for (size_t i = 0; i < attr.size(); i++) {
+        sum += attr.get(i);
+    }
+    // prevent compiler optimisations removing computation
+    CPPUNIT_ASSERT(sum);
+}
+
+template <typename AttrT>
+void sumH(const Name& prefix, const AttrT& attr)
+{
+    ProfileTimer timer(prefix + ": sumHandle");
+    typedef typename AttrT::ValueType ValueType;
+    ValueType sum = 0;
+    AttributeHandle<ValueType> handle(attr);
+    for (size_t i = 0; i < attr.size(); i++) {
+        sum += handle.get(i);
+    }
+    // prevent compiler optimisations removing computation
+    CPPUNIT_ASSERT(sum);
+}
+
+template <typename AttrT>
+void sumWH(const Name& prefix, AttrT& attr)
+{
+    ProfileTimer timer(prefix + ": sumWriteHandle");
+    typedef typename AttrT::ValueType ValueType;
+    ValueType sum = 0;
+    AttributeWriteHandle<ValueType> handle(attr);
+    for (size_t i = 0; i < attr.size(); i++) {
+        sum += handle.get(i);
+    }
+    // prevent compiler optimisations removing computation
+    CPPUNIT_ASSERT(sum);
+}
+
+} // namespace profile
+
+void
+TestAttributeArray::testProfile()
+{
+    using namespace openvdb;
+    using namespace openvdb::util;
+    using namespace openvdb::math;
+    using namespace openvdb::tools;
+
+    typedef TypedAttributeArray<float>                                      AttributeArrayF;
+    typedef TypedAttributeArray<float,
+                                FixedPointAttributeCodec<uint16_t> >        AttributeArrayF16;
+    typedef TypedAttributeArray<float,
+                                FixedPointAttributeCodec<uint8_t> >         AttributeArrayF8;
+
+    ///////////////////////////////////////////////////
+
+#ifdef PROFILE
+    const int elements(1000 * 1000 * 1000);
+
+    std::cerr << std::endl;
+#else
+    const int elements(10 * 1000 * 1000);
+#endif
+
+    // std::vector
+
+    {
+        std::vector<float> values;
+        {
+            ProfileTimer timer("Vector<float>: resize");
+            values.resize(elements);
+        }
+        {
+            ProfileTimer timer("Vector<float>: set");
+            for (int i = 0; i < elements; i++) {
+                values[i] = float(i);
+            }
+        }
+        {
+            ProfileTimer timer("Vector<float>: sum");
+            float sum = 0;
+            for (int i = 0; i < elements; i++) {
+                sum += values[i];
+            }
+            // to prevent optimisation clean up
+            CPPUNIT_ASSERT(sum);
+        }
+    }
+
+    // AttributeArray
+
+    {
+        AttributeArrayF attr(elements);
+        profile::expand("AttributeArray<float>", attr);
+        profile::set("AttributeArray<float>", attr);
+        profile::sum("AttributeArray<float>", attr);
+    }
+
+    {
+        AttributeArrayF16 attr(elements);
+        profile::expand("AttributeArray<float, fp16>", attr);
+        profile::set("AttributeArray<float, fp16>", attr);
+        profile::sum("AttributeArray<float, fp16>", attr);
+    }
+
+    {
+        AttributeArrayF8 attr(elements);
+        profile::expand("AttributeArray<float, fp8>", attr);
+        profile::set("AttributeArray<float, fp8>", attr);
+        profile::sum("AttributeArray<float, fp8>", attr);
+    }
+
+    // AttributeHandle
+
+    {
+        AttributeArrayF attr(elements);
+        profile::expand("AttributeHandle<float>", attr);
+        profile::setH("AttributeHandle<float>", attr);
+        profile::sumH("AttributeHandle<float>", attr);
+    }
+
+    {
+        AttributeArrayF16 attr(elements);
+        profile::expand("AttributeHandle<float, fp16>", attr);
+        profile::setH("AttributeHandle<float, fp16>", attr);
+        profile::sumH("AttributeHandle<float, fp16>", attr);
+    }
+
+    {
+        AttributeArrayF8 attr(elements);
+        profile::expand("AttributeHandle<float, fp8>", attr);
+        profile::setH("AttributeHandle<float, fp8>", attr);
+        profile::sumH("AttributeHandle<float, fp8>", attr);
+    }
+}
 
 // Copyright (c) 2015 Double Negative Visual Effects
 // All rights reserved. This software is distributed under the

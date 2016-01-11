@@ -35,6 +35,8 @@
 #include <openvdb/Types.h>
 #include <openvdb/tree/LeafNode.h>
 
+#include "ProfileTimer.h"
+
 #include <sstream>
 #include <iostream>
 
@@ -48,12 +50,14 @@ public:
     CPPUNIT_TEST(testIndexIterator);
     CPPUNIT_TEST(testValueIndexIterator);
     CPPUNIT_TEST(testFilterIndexIterator);
+    CPPUNIT_TEST(testProfile);
 
     CPPUNIT_TEST_SUITE_END();
 
     void testIndexIterator();
     void testValueIndexIterator();
     void testFilterIndexIterator();
+    void testProfile();
 }; // class TestIndexIterator
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestIndexIterator);
@@ -347,6 +351,80 @@ TestIndexIterator::testFilterIndexIterator()
         CPPUNIT_ASSERT_EQUAL(*iter, Index32(2));
 
         CPPUNIT_ASSERT(!iter.next());
+    }
+}
+
+void
+TestIndexIterator::testProfile()
+{
+    using namespace openvdb;
+    using namespace openvdb::util;
+    using namespace openvdb::math;
+    using namespace openvdb::tools;
+    using namespace openvdb::tree;
+
+#ifdef PROFILE
+    const int elements(1000 * 1000 * 1000);
+
+    std::cerr << std::endl;
+#else
+    const int elements(10 * 1000 * 1000);
+#endif
+
+    { // for loop
+        ProfileTimer timer("ForLoop: sum");
+        volatile int sum = 0;
+        for (int i = 0; i < elements; i++) {
+            sum += i;
+        }
+        CPPUNIT_ASSERT(sum);
+    }
+
+    { // index iterator
+        ProfileTimer timer("IndexIter: sum");
+        volatile int sum = 0;
+        IndexIter iter(0, elements);
+        for (; iter; ++iter) {
+            sum += *iter;
+        }
+        CPPUNIT_ASSERT(sum);
+    }
+
+    typedef LeafNode<unsigned, 3> LeafNode;
+    LeafNode leafNode;
+
+    const int size = LeafNode::SIZE;
+
+    for (int i = 0; i < size - 1; i++) {
+        leafNode.setValueOn(i, (elements / size) * i);
+    }
+    leafNode.setValueOn(size - 1, elements);
+
+    { // manual value iteration
+        ProfileTimer timer("ValueIteratorManual: sum");
+        volatile int sum = 0;
+        LeafNode::ValueOnCIter indexIter(leafNode.cbeginValueOn());
+        int offset = 0;
+        for (; indexIter; ++indexIter) {
+            int start = offset > 0 ? leafNode.getValue(offset - 1) : 0;
+            int end = leafNode.getValue(offset);
+            for (int i = start; i < end; i++) {
+                sum += i;
+            }
+            offset++;
+        }
+        CPPUNIT_ASSERT(sum);
+    }
+
+    { // value on iterator (all on)
+        ProfileTimer timer("IndexValueIter: sum");
+        volatile int sum = 0;
+        LeafNode::ValueAllCIter indexIter(leafNode.cbeginValueAll());
+        IndexValueIter<LeafNode::ValueAllCIter> iter(indexIter);
+        for (; iter; ++iter) {
+            sum += *iter;
+        }
+        CPPUNIT_ASSERT(sum);
     }
 }
 
