@@ -243,6 +243,7 @@ INCLUDE_NAMES := \
     tools/PointAttribute.h \
     tools/PointDataGrid.h \
     tools/PointConversion.h \
+    tools/PointGroup.h \
     Types.h \
     openvdb.h \
     version.h \
@@ -267,6 +268,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestPointAttribute.cc \
     unittest/TestPointConversion.cc \
     unittest/TestPointDataLeaf.cc \
+    unittest/TestPointGroup.cc \
 #
 
 DOC_FILES := 	doc/doc.txt \
