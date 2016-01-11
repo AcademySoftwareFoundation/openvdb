@@ -316,7 +316,148 @@ private:
 void
 TestAttributeGroup::testAttributeGroupFilter()
 {
+    using namespace openvdb;
+    using namespace openvdb::tools;
 
+    typedef FilterIndexIter<IndexIter, GroupFilter> IndexGroupAllIter;
+
+    GroupAttributeArray attrGroup(4);
+    attrGroup.setGroup(true);
+    const Index32 size = attrGroup.size();
+
+    { // group values all zero
+        IndexIter indexIter(0, size);
+        GroupFilter filter(GroupHandle(attrGroup, 0));
+        IndexGroupAllIter iter(indexIter, filter);
+
+        CPPUNIT_ASSERT(!iter);
+    }
+
+    // enable attributes 0 and 2 for groups 3 and 6
+
+    const GroupType bitmask = GroupType(1) << 3 | GroupType(1) << 6;
+
+    attrGroup.set(0, bitmask);
+    attrGroup.set(2, bitmask);
+
+    // index iterator only valid in groups 3 and 6
+    {
+        IndexIter indexIter(0, size);
+
+        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 0))));
+        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 1))));
+        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 2))));
+        CPPUNIT_ASSERT(IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 3))));
+        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 4))));
+        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 5))));
+        CPPUNIT_ASSERT(IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 6))));
+        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 7))));
+    }
+
+    attrGroup.set(1, bitmask);
+    attrGroup.set(3, bitmask);
+
+    typedef FilterIndexIter<IndexIter, GroupNotFilter> IndexNotGroupAllIter;
+
+    // index iterator only not valid in groups 3 and 6
+    {
+        IndexIter indexIter(0, size);
+
+        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 0))));
+        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 1))));
+        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 2))));
+        CPPUNIT_ASSERT(!IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 3))));
+        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 4))));
+        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 5))));
+        CPPUNIT_ASSERT(!IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 6))));
+        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 7))));
+    }
+
+    // clear group membership for attributes 1 and 3
+    attrGroup.set(1, GroupType(0));
+    attrGroup.set(3, GroupType(0));
+
+    { // index in group next
+        IndexIter indexIter(0, size);
+        IndexGroupAllIter iter(indexIter, GroupFilter(GroupHandle(attrGroup, 3)));
+
+        CPPUNIT_ASSERT(iter);
+        CPPUNIT_ASSERT_EQUAL(*iter, Index32(0));
+
+        CPPUNIT_ASSERT(iter.next());
+        CPPUNIT_ASSERT_EQUAL(*iter, Index32(2));
+
+        CPPUNIT_ASSERT(!iter.next());
+    }
+
+    { // index in group prefix ++
+        IndexIter indexIter(0, size);
+        IndexGroupAllIter iter(indexIter, GroupFilter(GroupHandle(attrGroup, 3)));
+
+        CPPUNIT_ASSERT(iter);
+        CPPUNIT_ASSERT_EQUAL(*iter, Index32(0));
+
+        IndexGroupAllIter old = ++iter;
+        CPPUNIT_ASSERT_EQUAL(*old, Index32(2));
+        CPPUNIT_ASSERT_EQUAL(*iter, Index32(2));
+
+        CPPUNIT_ASSERT(!iter.next());
+    }
+
+    { // index in group postfix ++/--
+        IndexIter indexIter(0, size);
+        IndexGroupAllIter iter(indexIter, GroupFilter(GroupHandle(attrGroup, 3)));
+
+        CPPUNIT_ASSERT(iter);
+        CPPUNIT_ASSERT_EQUAL(*iter, Index32(0));
+
+        IndexGroupAllIter old = iter++;
+        CPPUNIT_ASSERT_EQUAL(*old, Index32(0));
+        CPPUNIT_ASSERT_EQUAL(*iter, Index32(2));
+
+        CPPUNIT_ASSERT(!iter.next());
+    }
+
+    { // index not in group next
+        IndexIter indexIter(0, size);
+        IndexNotGroupAllIter iter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 3)));
+
+        CPPUNIT_ASSERT(iter);
+        CPPUNIT_ASSERT_EQUAL(*iter, Index32(1));
+
+        CPPUNIT_ASSERT(iter.next());
+        CPPUNIT_ASSERT_EQUAL(*iter, Index32(3));
+
+        CPPUNIT_ASSERT(!iter.next());
+    }
+
+    { // index not in group prefix ++
+        IndexIter indexIter(0, size);
+        IndexNotGroupAllIter iter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 3)));
+
+        CPPUNIT_ASSERT(iter);
+        CPPUNIT_ASSERT_EQUAL(*iter, Index32(1));
+
+        IndexNotGroupAllIter old = ++iter;
+        CPPUNIT_ASSERT_EQUAL(*old, Index32(3));
+        CPPUNIT_ASSERT_EQUAL(*iter, Index32(3));
+
+        CPPUNIT_ASSERT(!iter.next());
+    }
+
+    { // index not in group postfix ++
+        IndexIter indexIter(0, size);
+        IndexNotGroupAllIter iter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 3)));
+
+        CPPUNIT_ASSERT(iter);
+        CPPUNIT_ASSERT_EQUAL(*iter, Index32(1));
+
+        IndexNotGroupAllIter old = iter++;
+        CPPUNIT_ASSERT_EQUAL(*old, Index32(1));
+        CPPUNIT_ASSERT_EQUAL(*iter, Index32(3));
+
+        CPPUNIT_ASSERT(!iter.next());
+    }
 }
 
 
