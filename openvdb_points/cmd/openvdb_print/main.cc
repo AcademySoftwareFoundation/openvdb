@@ -35,6 +35,7 @@
 #include <openvdb/openvdb.h>
 #include <openvdb_points/openvdb.h>
 #include <openvdb_points/tools/PointDataGrid.h>
+#include <openvdb_points/tools/PointCount.h>
 
 namespace {
 
@@ -119,7 +120,6 @@ bkgdValueAsString(const openvdb::GridBase::ConstPtr& grid)
 // some common typedefs
 typedef openvdb::tools::PointDataTree PointDataTree;
 typedef openvdb::tools::PointDataGrid PointDataGrid;
-typedef openvdb::tools::PointDataAccessor<PointDataTree> PointDataAccessor;
 typedef openvdb::tools::AttributeSet AttributeSet;
 
 std::vector<std::string>
@@ -277,12 +277,8 @@ printShortListing(const StringVec& filenames, bool metadata)
             if (grid->isType<PointDataGrid>()) {
                 PointDataGrid::ConstPtr pointDataGrid = openvdb::gridConstPtrCast<PointDataGrid>(grid);
 
-                PointDataAccessor accessor(pointDataGrid->tree());
-
-                const openvdb::Index64 pointCount = accessor.totalPointCount();
-
                 std::cout << "  " << std::right << std::setw(8)
-                    << sizeAsString(pointCount, "Pts");
+                    << sizeAsString(pointCount(pointDataGrid->tree()), "Pts");
             }
             else {
                 std::cout << "  " << std::right << std::setw(8)
