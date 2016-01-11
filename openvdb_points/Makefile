@@ -237,6 +237,7 @@ endif
 
 INCLUDE_NAMES := \
     tools/AttributeArray.h \
+    tools/AttributeGroup.h \
     tools/AttributeSet.h \
     tools/PointAttribute.h \
     tools/PointDataGrid.h \
@@ -259,9 +260,10 @@ UNITTEST_SRC_NAMES := \
     unittest/main.cc \
     unittest/TestAttributeArray.cc \
     unittest/TestAttributeSet.cc \
-    unittest/TestPointDataLeaf.cc \
+    unittest/TestAttributeGroup.cc \
     unittest/TestPointAttribute.cc \
     unittest/TestPointConversion.cc \
+    unittest/TestPointDataLeaf.cc \
 #
 
 DOC_FILES := 	doc/doc.txt \
