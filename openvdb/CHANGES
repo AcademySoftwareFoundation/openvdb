@@ -42,18 +42,24 @@ Version 3.2.0 - In development
       of tools::LevelSetFracture, and implemented a more robust level set
       segmentation scheme.
     - Improved performance of level set advection by up to 5x.
+    - Improved tools::MeshToVolume performance, primarily for large bandwidths
+      and signed distance fields with dense interior regions.
     - Threaded Tree destructor and clear method.
     - Added a @c minLevel parameter to tools::signedFloodFill and
       tools::signedFloodFillWithValues that specifies the lowest tree level to
       process.
 
     Bug fixes:
-    - Fixed a bug in the leve set advection tool that could cause non-deterministic 
+    - Fixed a bug in the leve set advection tool that could cause non-deterministic
       behavior [Thanks to Jeff Lait for reporting this issue].
     - Fixed a bug which allowed for implicit (vs explicit) conversion between Grids
       templated on different value types.
     - Fixed a bug in tree::LeafNode<bool>::operator==() that caused the origin of
       the node to be ignored.
+    - tools::GridTransformer now correctly handles affine transforms with shear
+      and/or reflection.
+    - Fixed a bug in tools::MeshToVolume that could produce incorrect distances
+      for large bandwidths.
     - Resolved floating point exception in math::QuantizedUnitVec::pack method.
       Caused by calling the method with a zero length vector.
       [Contributed by Rick Hankins]
@@ -71,6 +77,8 @@ Version 3.2.0 - In development
     - Added a From Mask SOP which generates a level set or fog volume from
       the implicit boundary between active and inactive voxels in arbitrary
       input grid.
+    - The Resample and Combine SOPs now correctly handle affine transforms
+      with shear and/or reflection.
 
 Version 3.1.0 - October 1, 2015
 

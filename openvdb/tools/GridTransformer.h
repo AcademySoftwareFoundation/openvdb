@@ -292,7 +292,6 @@ namespace local_util {
 
 /// @brief Decompose an affine transform into scale, rotation and translation components.
 /// @return @c false if the given matrix is not affine or cannot otherwise be decomposed.
-/// @todo This is not safe for matrices with shear.
 template<typename T>
 inline bool
 decompose(const math::Mat4<T>& m, math::Vec3<T>& scale,
@@ -300,24 +299,73 @@ decompose(const math::Mat4<T>& m, math::Vec3<T>& scale,
 {
     if (!math::isAffine(m)) return false;
 
-    // this is the translation in world space
+    // This is the translation in world space
     translate = m.getTranslation();
     // Extract translation.
-    math::Mat3<T> temp = m.getMat3();
+    const math::Mat3<T> xform = m.getMat3();
 
-    scale.init(
-        (math::Vec3<T>(1, 0, 0) * temp).length(),
-        (math::Vec3<T>(0, 1, 0) * temp).length(),
-        (math::Vec3<T>(0, 0, 1) * temp).length());
-    // Extract scale.
-    temp *= math::scale<math::Mat3<T> >(scale).inverse();
+    const math::Vec3<T> unsignedScale(
+        (math::Vec3<T>(1, 0, 0) * xform).length(),
+        (math::Vec3<T>(0, 1, 0) * xform).length(),
+        (math::Vec3<T>(0, 0, 1) * xform).length());
 
-    rotate = math::eulerAngles(temp, math::XYZ_ROTATION);
+    const bool hasUniformScale = unsignedScale.eq(math::Vec3<T>(unsignedScale[0]));
 
-    if (!rotate.eq(math::Vec3<T>::zero()) && !scale.eq(math::Vec3<T>(scale[0]))) {
+    bool hasRotation = false;
+    bool validDecomposition = false;
+
+    T minAngle = std::numeric_limits<T>::max();
+
+    // If the transformation matrix contains a reflection,
+    // test different negative scales to find a decomposition
+    // that favors the optimal resampling algorithm.
+    for (size_t n = 0; n < 8; ++n) {
+
+        const math::Vec3<T> signedScale(
+            n & 0x1 ? -unsignedScale.x() : unsignedScale.x(),
+            n & 0x2 ? -unsignedScale.y() : unsignedScale.y(),
+            n & 0x4 ? -unsignedScale.z() : unsignedScale.z());
+
+        // Extract scale and potentially reflection.
+        const math::Mat3<T> mat = xform * math::scale<math::Mat3<T> >(signedScale).inverse();
+        if (mat.det() < T(0.0)) continue; // Skip if mat contains a reflection.
+
+        const math::Vec3<T> tmpAngle = math::eulerAngles(mat, math::XYZ_ROTATION);
+
+        const math::Mat3<T> rebuild =
+            math::rotation<math::Mat3<T> >(math::Vec3<T>(1, 0, 0), tmpAngle.x()) *
+            math::rotation<math::Mat3<T> >(math::Vec3<T>(0, 1, 0), tmpAngle.y()) *
+            math::rotation<math::Mat3<T> >(math::Vec3<T>(0, 0, 1), tmpAngle.z()) *
+            math::scale<math::Mat3<T> >(signedScale);
+
+        if (xform.eq(rebuild)) {
+
+            const T maxAngle = std::max(std::abs(tmpAngle[0]),
+                std::max(std::abs(tmpAngle[1]), std::abs(tmpAngle[2])));
+
+            if (!(minAngle < maxAngle)) { // Update if less or equal.
+
+                minAngle = maxAngle;
+                rotate = tmpAngle;
+                scale = signedScale;
+
+                hasRotation = !rotate.eq(math::Vec3<T>::zero());
+                validDecomposition = true;
+
+                if (hasUniformScale || !hasRotation) {
+                    // Current decomposition is optimal.
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!validDecomposition || (hasRotation && !hasUniformScale)) {
+        // The decomposition is invalid if the transformation matrix contains shear.
         // No unique decomposition if scale is nonuniform and rotation is nonzero.
         return false;
     }
+
     return true;
 }
 
