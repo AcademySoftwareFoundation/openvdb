@@ -53,6 +53,7 @@ public:
     CPPUNIT_TEST(testEquivalence);
     CPPUNIT_TEST(testIO);
     CPPUNIT_TEST(testSwap);
+    CPPUNIT_TEST(testCopyOnWrite);
     CPPUNIT_TEST_SUITE_END();
 
     void testEmptyLeaf();
@@ -65,6 +66,7 @@ public:
     void testEquivalence();
     void testIO();
     void testSwap();
+    void testCopyOnWrite();
 
 private:
     // Generate random points by uniformly distributing points
@@ -1058,6 +1060,77 @@ TestPointDataLeaf::testSwap()
 
     CPPUNIT_ASSERT_THROW(leaf.swap(attributeSet), openvdb::ValueError);
     delete attributeSet;
+}
+
+void
+TestPointDataLeaf::testCopyOnWrite()
+{
+    using namespace openvdb::tools;
+
+    // Define and register some common attribute types
+    typedef openvdb::tools::TypedAttributeArray<float>    AttributeS;
+
+    AttributeS::registerType();
+
+    // create a descriptor
+
+    typedef openvdb::tools::AttributeSet::Descriptor Descriptor;
+
+    Descriptor::Inserter names;
+    names.add("density", AttributeS::attributeType());
+
+    Descriptor::Ptr descrA = Descriptor::create(names.vec);
+
+    // create a leaf and initialize attributes using this descriptor
+
+    LeafType leaf(openvdb::Coord(0, 0, 0));
+
+    leaf.initializeAttributes(descrA, /*arrayLength=*/100);
+
+    const AttributeSet& attributeSet = leaf.attributeSet();
+
+    CPPUNIT_ASSERT_EQUAL(attributeSet.size(), size_t(1));
+
+    // ensure attribute arrays are shared between leaf nodes until write
+
+    const LeafType leafCopy(leaf);
+
+    const AttributeSet& attributeSetCopy = leafCopy.attributeSet();
+
+    CPPUNIT_ASSERT(attributeSet.isShared(/*pos=*/0));
+    CPPUNIT_ASSERT(attributeSetCopy.isShared(/*pos=*/0));
+
+    // test that from a const leaf, accesses to the attribute arrays do not
+    // make then unique
+
+    const AttributeArray* constArray = attributeSetCopy.getConst(/*pos=*/0);
+    CPPUNIT_ASSERT(constArray);
+
+    CPPUNIT_ASSERT(attributeSet.isShared(/*pos=*/0));
+    CPPUNIT_ASSERT(attributeSetCopy.isShared(/*pos=*/0));
+
+    constArray = attributeSetCopy.get(/*pos=*/0);
+
+    CPPUNIT_ASSERT(attributeSet.isShared(/*pos=*/0));
+    CPPUNIT_ASSERT(attributeSetCopy.isShared(/*pos=*/0));
+
+    constArray = &(leafCopy.attributeArray(/*pos=*/0));
+
+    CPPUNIT_ASSERT(attributeSet.isShared(/*pos=*/0));
+    CPPUNIT_ASSERT(attributeSetCopy.isShared(/*pos=*/0));
+
+    constArray = &(leafCopy.attributeArray("density"));
+
+    CPPUNIT_ASSERT(attributeSet.isShared(/*pos=*/0));
+    CPPUNIT_ASSERT(attributeSetCopy.isShared(/*pos=*/0));
+
+    // test makeUnique is called from non const getters
+
+    AttributeArray* attributeArray = &(leaf.attributeArray(/*pos=*/0));
+    CPPUNIT_ASSERT(attributeArray);
+
+    CPPUNIT_ASSERT(!attributeSet.isShared(/*pos=*/0));
+    CPPUNIT_ASSERT(!attributeSetCopy.isShared(/*pos=*/0));
 }
 
 
