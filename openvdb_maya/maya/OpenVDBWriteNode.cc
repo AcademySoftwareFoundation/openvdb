@@ -40,6 +40,7 @@
 #include <maya/MFnNumericAttribute.h>
 
 
+
 namespace mvdb = openvdb_maya;
 
 
@@ -56,6 +57,7 @@ struct OpenVDBWriteNode : public MPxNode
     static void* creator();
     static MStatus initialize();
     static MObject aVdbFilePath;
+    static MObject aCurrentFrame;
     static MObject aVdbInput;
     static MObject aVdbOutput;
     static MTypeId id;
@@ -64,6 +66,7 @@ struct OpenVDBWriteNode : public MPxNode
 
 MTypeId OpenVDBWriteNode::id(0x00108A52);
 MObject OpenVDBWriteNode::aVdbFilePath;
+MObject OpenVDBWriteNode::aCurrentFrame;
 MObject OpenVDBWriteNode::aVdbOutput;
 MObject OpenVDBWriteNode::aVdbInput;
 
@@ -89,7 +92,7 @@ MStatus OpenVDBWriteNode::initialize()
     MFnTypedAttribute tAttr;
 
     MFnStringData fnStringData;
-    MObject defaultStringData = fnStringData.create("volume.vdb");
+    MObject defaultStringData = fnStringData.create("volume.####.vdb");
 
     // Setup the input attributes
 
@@ -99,6 +102,16 @@ MStatus OpenVDBWriteNode::initialize()
     tAttr.setConnectable(false);
     stat = addAttribute(aVdbFilePath);
     if (stat != MS::kSuccess) return stat;
+
+    // frame number parameter
+    MFnNumericAttribute nAttr;
+    aCurrentFrame = nAttr.create("currentFrame", "frame", MFnNumericData::kInt);
+    nAttr.setDefault(0);
+    if (stat != MS::kSuccess) return stat;
+
+    nAttr.setConnectable(true);
+    stat = addAttribute(aCurrentFrame);
+    if (stat != MS::kSuccess) return stat;    
 
     aVdbInput = tAttr.create("VdbInput", "vdbinput", OpenVDBData::id, MObject::kNullObj, &stat);
     if (stat != MS::kSuccess) return stat;
@@ -123,6 +136,9 @@ MStatus OpenVDBWriteNode::initialize()
     stat = attributeAffects(aVdbFilePath, aVdbOutput);
     if (stat != MS::kSuccess) return stat;
 
+    stat = attributeAffects(aCurrentFrame, aVdbOutput);
+    if (stat != MS::kSuccess) return stat;
+
     stat = attributeAffects(aVdbInput, aVdbOutput);
     if (stat != MS::kSuccess) return stat;
 
@@ -142,8 +158,17 @@ MStatus OpenVDBWriteNode::compute(const MPlug& plug, MDataBlock& data)
         MDataHandle filePathHandle = data.inputValue(aVdbFilePath, &status);
         if (status != MS::kSuccess) return status;
 
+        MDataHandle frameHandle = data.inputValue(aCurrentFrame, &status);
+        if (status != MS::kSuccess) return status;
 
-        const std::string filename = filePathHandle.asString().asChar();
+        int cFNum =  frameHandle.asInt();
+        char* cFChar;
+        sprintf(cFChar,"%d",cFNum); 
+        std::string filename = filePathHandle.asString().asChar();
+
+        size_t f = filename.find("####");
+        filename.replace(f, std::string("####").length(), cFChar);
+
         if (filename.empty()) {
             return MS::kUnknownParameter;
         }
