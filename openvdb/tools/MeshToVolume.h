@@ -2555,11 +2555,6 @@ private:
             const Int32 manhattan = dx + dy + dz;
             if (manhattan > manhattanLimit) continue;
 
-            double chessDistEstimate = double(
-                fragment.dist + ValueType(std::max(dx, std::max(dy, dz))) * mVoxelSize);
-            chessDistEstimate *= chessDistEstimate;
-            if (chessDistEstimate > dist) continue;
-
             lastIdx = fragment.idx;
 
             const size_t polygon = size_t(lastIdx);
@@ -2582,7 +2577,7 @@ private:
                 if (tmpDist < primDist) primDist = tmpDist;
             }
 
-            if (primDist < dist && !(primDist < chessDistEstimate)) {
+            if (primDist < dist) {
                 dist = primDist;
                 closestPrimIdx = lastIdx;
             }
