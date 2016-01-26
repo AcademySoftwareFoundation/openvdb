@@ -33,7 +33,9 @@
 #include "OpenVDBPlugin.h"
 #include <openvdb_maya/OpenVDBData.h>
 #include <openvdb_maya/OpenVDBUtil.h>
+
 #include <openvdb/io/Stream.h>
+#include <openvdb/math/Math.h>
 
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFnPluginData.h>
@@ -235,7 +237,7 @@ MStatus OpenVDBWriteNode::compute(const MPlug& plug, MDataBlock& data)
                 const double frame = time.as(MTime::uiUnit());
 
                 outMeta.insertMeta("frame", openvdb::DoubleMetadata(frame));
-                outMeta.insertMeta("tick", openvdb::Int32Metadata(int(std::round(frame * tpf))));
+                outMeta.insertMeta("tick", openvdb::Int32Metadata(int(openvdb::math::Round(frame * tpf))));
 
                 outMeta.insertMeta("frames_per_second", openvdb::Int32Metadata(int(fps)));
                 outMeta.insertMeta("ticks_per_frame", openvdb::Int32Metadata(int(tpf)));

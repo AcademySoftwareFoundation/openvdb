@@ -197,7 +197,7 @@ MStatus OpenVDBReadNode::compute(const MPlug& plug, MDataBlock& data)
         std::stringstream infoStr;
         infoStr << "File: " << filename << "\n";
 
-        std::ifstream ifile(filename, std::ios_base::binary);
+        std::ifstream ifile(filename.c_str(), std::ios_base::binary);
         openvdb::GridPtrVecPtr grids = openvdb::io::Stream(ifile).getGrids();
 
         if (grids && !grids->empty()) {

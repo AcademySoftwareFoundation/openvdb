@@ -234,13 +234,9 @@ insertFrameNumber(std::string& str, const MTime& time, int numberingScheme)
         const double tpf = 6000.0 / fps;
         const int tpfDigits = int(std::log10(int(tpf)) + 1);
 
-        // Current tick count
-        // const int ticks = openvdb::math::Round(frame * tpf);
-
         const int wholeFrame = int(frame);
         std::stringstream ss;
         ss << std::setw(int(length)) << std::setfill('0');
-
 
         if (numberingScheme == 1) { // Fractional frame values
             ss << wholeFrame;
