@@ -49,6 +49,7 @@
 #include <maya/MDataBlock.h>
 #include <maya/MDataHandle.h>
 #include <maya/MFnPluginData.h>
+#include <maya/MTime.h>
 
 #if defined(__APPLE__) || defined(MACOSX)
 #include <OpenGL/gl.h>
@@ -117,6 +118,20 @@ bool getSelectedGrids(GridCPtrVec& grids, const std::string& selection,
 /// @return @c false if no matching grids were found.
 bool getSelectedGrids(GridCPtrVec& grids, const std::string& selection,
     const OpenVDBData& inputVdb);
+
+
+/// @brief   Replaces a sequence of pound signs (#) with the current
+///          frame number.
+///
+/// @details The number of pound signs defines the zero padding width.
+///          For example '###' for frame 5 would produce "name.005.type"
+///
+/// @note   Supports three numbering schemes:
+///             0 = Frame.SubTick
+///             1 = Fractional frame values
+///             2 = Global ticks
+void
+insertFrameNumber(std::string& str, const MTime& time, int numberingScheme = 0);
 
 
 ////////////////////////////////////////

@@ -183,10 +183,10 @@ MStatus OpenVDBCopyNode::compute(const MPlug& plug, MDataBlock& data)
             return MS::kFailure;
         }
 
-        std::auto_ptr<OpenVDBData> outputVdb(static_cast<OpenVDBData*>(pluginData.data(&status)));
+        OpenVDBData* outputVdb = static_cast<OpenVDBData*>(pluginData.data(&status));
         MDataHandle output = data.outputValue(aVdbOutput);
 
-        if (inputVdbA && outputVdb.get()) {
+        if (inputVdbA && outputVdb) {
 
             const std::string selectionStr =
                 data.inputValue(aVdbSelectedGridNamesA, &status).asString().asChar();
@@ -199,7 +199,7 @@ MStatus OpenVDBCopyNode::compute(const MPlug& plug, MDataBlock& data)
             }
         }
 
-        if (inputVdbB && outputVdb.get()) {
+        if (inputVdbB && outputVdb) {
 
             const std::string selectionStr =
                 data.inputValue(aVdbSelectedGridNamesB, &status).asString().asChar();
@@ -212,7 +212,7 @@ MStatus OpenVDBCopyNode::compute(const MPlug& plug, MDataBlock& data)
             }
         }
 
-        output.set(outputVdb.release());
+        output.set(outputVdb);
         return data.setClean(plug);
 
     }

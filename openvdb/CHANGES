@@ -68,6 +68,12 @@ Version 3.2.0 - In development
     - Renamed math::GudonovsNormSqrd to math::GodunovsNormSqrd
       [Contributed by Branislav Radjenovic]
 
+    Maya:
+    - Fixed bugs related to data ownership and improved error checking.
+      [Contributed by Crawford Doran]
+    - Update the Read and Write DAG nodes to support file sequences and
+      sub frame evaluation.
+
     Houdini:
     - Added a Segment SOP which separates disjoint components in the
       input vdb grid into distinct grids.
@@ -79,8 +85,10 @@ Version 3.2.0 - In development
       input grid.
     - The Resample and Combine SOPs now correctly handle affine transforms
       with shear and/or reflection.
+    - Updated Rasterize Points SOP to match the native Copy SOPs instancing
+      behavior.
 
-Version 3.1.0 - October 1, 2015
+    Version 3.1.0 - October 1, 2015
 
     Highlights:
     - New features: advection of arbitrary volumes, general-purpose

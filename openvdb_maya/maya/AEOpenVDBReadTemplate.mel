@@ -5,9 +5,19 @@ global proc AEOpenVDBReadTemplate( string $nodeAttr )
         editorTemplate -beginLayout "OpenVDB Read File" -collapse 0;
         {
             editorTemplate -callCustom "importVDBFilePathNew" "importVDBFilePathReplace" "VdbFilePath";
+            editorTemplate -addControl "FrameNumbering";
         }
+
+        editorTemplate -beginLayout "Information" -collapse 0;
+        editorTemplate -beginNoOptimize;
+        {
+             editorTemplate -callCustom "AEAT_ReadInfoNew"
+                "AEAT_ReadInfoReplace" "NodeInfo";
+        }
+        editorTemplate -endNoOptimize;
         editorTemplate -endLayout;
-	    editorTemplate -addExtraControls;
+
+        editorTemplate -addExtraControls;
     }
     editorTemplate -endScrollLayout;
 }
@@ -27,14 +37,14 @@ global proc importVDBFilePathNew( string $attr )
     {
         text
             -label "VDB File Path"
-            -annotation "This is the VDB file."
+            -annotation ""
             importVDBFilePathLabel;
 
         textField
-            -fileName ""
+            -fileName "vdb file path and name. Insert a sequence of pound signs (#) and connect the global frame time node to embed the current frame number in the file name. (The number of pound signs defines the zero padding width.)"
             -insertionPosition 0
             -editable true
-            -annotation "The VDB file path."
+            -annotation "vdb file path and name. Insert a sequence of pound signs (#) and connect the global frame time node to embed the current frame number in the file name. (The number of pound signs defines the zero padding width.)"
             importVDBFilePathField;
 
         button
@@ -72,9 +82,9 @@ global proc browseForVDBFile( string $filePathAttr )
             $currentFilePathDir = $currentFilePath;
         }
     }
-    
+
     string $singleFilter = "VDB Files (*.vdb)";
-    
+
     string $path[] = `fileDialog2 -ds 2 -cap "VDB File" -dir $currentFilePathDir -ff $singleFilter -fm 1`;
 
     if (size($path) > 0)
@@ -82,3 +92,39 @@ global proc browseForVDBFile( string $filePathAttr )
         setAttr -type "string" $filePathAttr $path[0];
     }
 }
+
+global proc
+AEAT_ReadInfoUpdate( string $nodeName )
+{
+    string $info = `getAttr ($nodeName + ".NodeInfo")`;
+    scrollField -e -text $info readInfoField;
+}
+
+global proc
+AEAT_ReadInfoNew( string $attr )
+{
+    scrollField
+        -editable 0
+        readInfoField;
+    AEAT_ReadInfoReplace($attr);
+}
+
+global proc
+AEAT_ReadInfoReplace( string $attr )
+{
+    string $parent = `setParent -q`;
+    string $nodeName = plugNode($attr);
+
+    if( `text -exists ($parent+"|readInfoScriptJobParent")` == 1 ) {
+        deleteUI readInfoScriptJobParent;
+    }
+
+    string $scriptParent = `text -manage 0 readInfoScriptJobParent`;
+
+    scriptJob -parent $scriptParent
+        -attributeChange ($nodeName+".NodeInfo")
+        ("AEAT_ReadInfoUpdate(\""+$nodeName+"\")");
+
+    AEAT_ReadInfoUpdate($nodeName);
+}
+

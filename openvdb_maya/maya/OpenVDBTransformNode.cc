@@ -226,9 +226,9 @@ MStatus OpenVDBTransformNode::compute(const MPlug& plug, MDataBlock& data)
             return MS::kFailure;
         }
 
-        std::auto_ptr<OpenVDBData> outputVdb(static_cast<OpenVDBData*>(pluginData.data(&status)));
+        OpenVDBData* outputVdb = static_cast<OpenVDBData*>(pluginData.data(&status));
 
-        if (inputVdb && outputVdb.get()) {
+        if (inputVdb && outputVdb) {
 
             const MFloatVector t = data.inputValue(aTranslate, &status).asFloatVector();
             const MFloatVector r = data.inputValue(aRotate, &status).asFloatVector();
@@ -283,7 +283,7 @@ MStatus OpenVDBTransformNode::compute(const MPlug& plug, MDataBlock& data)
             }
 
             MDataHandle output = data.outputValue(aVdbOutput);
-            output.set(outputVdb.release());
+            output.set(outputVdb);
 
             return data.setClean(plug);
         }

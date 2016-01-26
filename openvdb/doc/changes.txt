@@ -81,6 +81,13 @@ API changes:
   [Contributed by Branislav Radjenovic]
 
 @par
+Maya:
+- Fixed bugs related to data ownership and improved error checking.
+  [Contributed by Crawford Doran]
+- Update the Read and Write DAG nodes to support file sequences and
+  sub frame evaluation.
+
+@par
 Houdini:
 - Added a Segment SOP which separates disjoint components in the
   input vdb grid into distinct grids.
@@ -92,6 +99,8 @@ Houdini:
   input grid.
 - The Resample and Combine SOPs now correctly handle affine transforms
   with shear and/or reflection.
+- Updated Rasterize Points SOP to match the native Copy SOPs instancing
+  behavior.
 
 @htmlonly <a name="v3_1_0_changes"></a>@endhtmlonly
 @par
