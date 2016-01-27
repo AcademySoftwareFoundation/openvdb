@@ -281,6 +281,14 @@ AttributeSet::groupIndex(const size_t offset) const
 }
 
 
+IndexIter
+AttributeSet::beginIndex() const
+{
+    const Index32 size = this->size() == 0 ? 0 : this->get(0)->size();
+    return IndexIter(0, size);
+}
+
+
 bool
 AttributeSet::isShared(size_t pos) const
 {

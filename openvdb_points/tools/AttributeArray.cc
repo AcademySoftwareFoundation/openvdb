@@ -174,6 +174,13 @@ AttributeArray::setHidden(bool state)
 }
 
 
+IndexIter
+AttributeArray::beginIndex() const
+{
+    return IndexIter(0, this->size());
+}
+
+
 bool
 AttributeArray::operator==(const AttributeArray& other) const {
     if(this->mCompressedBytes != other.mCompressedBytes ||
@@ -184,6 +191,7 @@ AttributeArray::operator==(const AttributeArray& other) const {
 
 
 ////////////////////////////////////////
+
 
 
 } // namespace tools
