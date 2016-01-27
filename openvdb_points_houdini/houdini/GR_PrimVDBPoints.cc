@@ -42,7 +42,7 @@
 #include <openvdb/Platform.h>
 #include <openvdb/Types.h>
 #include <openvdb_points/tools/PointDataGrid.h>
-
+#include <openvdb_points/tools/PointCount.h>
 #include <boost/algorithm/string/predicate.hpp>
 
 #if (UT_VERSION_INT < 0x0f000000) // earlier than 15.0.0
@@ -252,8 +252,6 @@ template<   typename PointDataTreeType,
             typename HoudiniBufferType>
 struct FillGPUBuffersPosition {
 
-    typedef openvdb::tools::PointDataAccessor<const PointDataTreeType> ConstAccessor;
-
     typedef typename PointDataTreeType::LeafNodeType LeafNode;
     typedef typename openvdb::tree::LeafManager<PointDataTreeType> LeafManagerT;
     typedef typename LeafManagerT::LeafRange LeafRangeT;
@@ -269,7 +267,6 @@ struct FillGPUBuffersPosition {
         , mPointDataTree(pointDataTree)
         , mLeafOffsets(leafOffsets)
         , mTransform(transform)
-        , mAcc(pointDataTree)
         , mAttributeIndex(attributeIndex) { }
 
     void operator()(const tbb::blocked_range<size_t>& range) const
@@ -291,14 +288,11 @@ struct FillGPUBuffersPosition {
 
                 const openvdb::Vec3f gridIndexSpace = ijk.asVec3d();
 
-                typename ConstAccessor::PointDataIndex pointIndex = mAcc.get(ijk);
+                openvdb::tools::IndexIter iter = leaf->beginIndex(ijk);
 
-                const unsigned start = pointIndex.first;
-                const unsigned end = pointIndex.second;
-
-                for (unsigned index = start; index < end; index++)
+                for (; iter; ++iter)
                 {
-                    const openvdb::Vec3f positionVoxelSpace = handle->get(openvdb::Index64(index));
+                    const openvdb::Vec3f positionVoxelSpace = handle->get(openvdb::Index64(*iter));
                     const openvdb::Vec3f positionIndexSpace = positionVoxelSpace + gridIndexSpace;
                     const openvdb::Vec3f positionWorldSpace = mTransform.indexToWorld(positionIndexSpace);
 
@@ -314,10 +308,9 @@ struct FillGPUBuffersPosition {
     //////////
 
     HoudiniBufferType*                  mBuffer;
-    const LeafOffsets&                   mLeafOffsets;
+    const LeafOffsets&                  mLeafOffsets;
     const PointDataTreeType&            mPointDataTree;
     const openvdb::math::Transform&     mTransform;
-    const ConstAccessor                 mAcc;
     const unsigned                      mAttributeIndex;
 }; // class FillGPUBuffersPosition
 
@@ -326,8 +319,6 @@ template<   typename PointDataTreeType,
             typename AttributeType,
             typename HoudiniBufferType>
 struct FillGPUBuffersColor {
-
-    typedef openvdb::tools::PointDataAccessor<const PointDataTreeType> ConstAccessor;
 
     typedef typename PointDataTreeType::LeafNodeType LeafNode;
     typedef typename openvdb::tree::LeafManager<PointDataTreeType> LeafManagerT;
@@ -342,7 +333,6 @@ struct FillGPUBuffersColor {
         : mBuffer(buffer)
         , mPointDataTree(pointDataTree)
         , mLeafOffsets(leafOffsets)
-        , mAcc(pointDataTree)
         , mAttributeIndex(attributeIndex) { }
 
     void operator()(const tbb::blocked_range<size_t>& range) const
@@ -362,14 +352,11 @@ struct FillGPUBuffersColor {
 
                 openvdb::Coord ijk = value.getCoord();
 
-                typename ConstAccessor::PointDataIndex pointIndex = mAcc.get(ijk);
+                openvdb::tools::IndexIter iter = leaf->beginIndex(ijk);
 
-                const unsigned start = pointIndex.first;
-                const unsigned end = pointIndex.second;
-
-                for (unsigned index = start; index < end; index++)
+                for (; iter; ++iter)
                 {
-                    const openvdb::Vec3f color = handle->get(index);
+                    const openvdb::Vec3f color = handle->get(*iter);
                     mBuffer[leafOffset + offset] = UT_Vector3F(color.x(), color.y(), color.z());
 
                     offset++;
@@ -381,9 +368,8 @@ struct FillGPUBuffersColor {
     //////////
 
     HoudiniBufferType*                  mBuffer;
-    const LeafOffsets&                   mLeafOffsets;
+    const LeafOffsets&                  mLeafOffsets;
     const PointDataTreeType&            mPointDataTree;
-    const ConstAccessor                 mAcc;
     const unsigned                      mAttributeIndex;
 }; // class FillGPUBuffersColor
 
@@ -406,7 +392,6 @@ GR_PrimVDBPoints::update(RE_Render *r,
     typedef openvdb::tools::PointDataGrid GridType;
     typedef GridType::TreeType TreeType;
     typedef TreeType::LeafNodeType LeafNode;
-    typedef openvdb::tools::PointDataAccessor<const TreeType> AccessorType;
     typedef openvdb::tools::AttributeSet AttributeSet;
 
     const openvdb::GridBase* grid =
@@ -416,9 +401,7 @@ GR_PrimVDBPoints::update(RE_Render *r,
 
     const TreeType& tree = pointDataGrid.tree();
 
-    const AccessorType accessor((tree));
-
-    const size_t num_points = accessor.totalPointCount();
+    const size_t num_points = pointCount(tree);
 
     if (num_points <= 0)    return;
 
@@ -492,7 +475,7 @@ GR_PrimVDBPoints::update(RE_Render *r,
         for (; iter; ++iter) {
             const LeafNode& leaf = *iter;
 
-            const openvdb::Index64 count = leaf.pointCount(openvdb::tools::point_masks::Active);
+            const openvdb::Index64 count = leaf.pointCount();
 
             offsets.push_back(LeafOffsets::value_type(&leaf, cumulativeOffset));
 

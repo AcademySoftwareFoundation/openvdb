@@ -39,6 +39,7 @@
 #include <openvdb_points/tools/PointDataGrid.h>
 #include <openvdb_points/tools/PointAttribute.h>
 #include <openvdb_points/tools/PointConversion.h>
+#include <openvdb_points/tools/PointGroup.h>
 
 #include "SOP_NodeVDBPoints.h"
 
@@ -436,8 +437,6 @@ template<typename PointDataTreeType, typename LeafOffsetArray>
 struct ConvertPointDataGridPositionOp {
 
     typedef typename PointDataTreeType::LeafNodeType    PointDataLeaf;
-    typedef PointDataAccessor<const PointDataTreeType>  PointDataAccessorT;
-
     typedef typename LeafOffsetArray::const_reference   LeafOffsetPair;
 
     ConvertPointDataGridPositionOp( GU_Detail& detail,
@@ -452,8 +451,6 @@ struct ConvertPointDataGridPositionOp {
         , mLeafOffsets(leafOffsets) { }
 
     void operator()(const tbb::blocked_range<size_t>& range) const {
-
-        PointDataAccessorT acc(mTree);
 
         GA_RWHandleV3 pHandle(mDetail.getP());
 
@@ -474,10 +471,10 @@ struct ConvertPointDataGridPositionOp {
                 Coord ijk = iter.getCoord();
                 Vec3d xyz = ijk.asVec3d();
 
-                typename PointDataAccessorT::PointDataIndex pointIndex = acc.get(ijk);
-                for (Index64 index = pointIndex.first; index < pointIndex.second; ++index) {
+                IndexIter indexIter = leaf.beginIndex(ijk);
+                for (; indexIter; ++indexIter) {
 
-                    Vec3d pos = Vec3d(handle->get(index)) + xyz;
+                    Vec3d pos = Vec3d(handle->get(*indexIter)) + xyz;
                     pos = mTransform.indexToWorld(pos);
                     setAttributeValue(pos, pHandle, offset++);
                 }
@@ -495,14 +492,61 @@ struct ConvertPointDataGridPositionOp {
 }; // ConvertPointDataGridPositionOp
 
 
+
+template<typename PointDataTreeType, typename LeafOffsetArray>
+struct ConvertPointDataGridGroupOp {
+
+    typedef typename PointDataTreeType::LeafNodeType    PointDataLeaf;
+    typedef typename LeafOffsetArray::const_reference   LeafOffsetPair;
+    typedef AttributeSet::Descriptor::GroupIndex        GroupIndex;
+
+    ConvertPointDataGridGroupOp(GA_PointGroup* pointGroup,
+                                const LeafOffsetArray& leafOffsets,
+                                const AttributeSet::Descriptor::GroupIndex index)
+        : mPointGroup(pointGroup)
+        , mLeafOffsets(leafOffsets)
+        , mIndex(index) { }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+
+        const GroupType bitmask = GroupType(1) << mIndex.second;
+
+        for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
+
+            assert(n < mLeafOffsets.size());
+
+            // extract leaf and offset
+
+            const LeafOffsetPair& leafOffset = mLeafOffsets[n];
+            const PointDataLeaf& leaf = leafOffset.first;
+            GA_Offset offset = leafOffset.second;
+
+            const AttributeArray& array = leaf.attributeArray(mIndex.first);
+
+            assert(GroupAttributeArray::isGroup(array));
+
+            const GroupAttributeArray& groupArray = GroupAttributeArray::cast(array);
+
+            for (Index64 index = 0; index < groupArray.size(); index++) {
+
+                if (groupArray.get(index) & bitmask)    mPointGroup->addOffset(offset + index);
+            }
+        }
+    }
+
+    //////////
+
+    GA_PointGroup*                  mPointGroup;
+    const LeafOffsetArray&          mLeafOffsets;
+    const GroupIndex                mIndex;
+}; // ConvertPointDataGridGroupOp
+
+
 template<typename PointDataTreeType, typename LeafOffsetArray, typename AttributeType>
 struct ConvertPointDataGridAttributeOp {
 
     typedef typename PointDataTreeType::LeafNodeType    PointDataLeaf;
-    typedef PointDataAccessor<const PointDataTreeType>  PointDataAccessorT;
-
     typedef typename LeafOffsetArray::const_reference   LeafOffsetPair;
-
     typedef typename GAHandleTraits<AttributeType>::RW GAHandleType;
 
     ConvertPointDataGridAttributeOp(GA_Attribute& attribute,
@@ -515,8 +559,6 @@ struct ConvertPointDataGridAttributeOp {
         , mLeafOffsets(leafOffsets) { }
 
     void operator()(const tbb::blocked_range<size_t>& range) const {
-
-        PointDataAccessorT acc(mTree);
 
         GAHandleType attributeHandle(&mAttribute);
 
@@ -537,9 +579,9 @@ struct ConvertPointDataGridAttributeOp {
 
                 Coord ijk = iter.getCoord();
 
-                typename PointDataAccessorT::PointDataIndex pointIndex = acc.get(ijk);
-                for (Index64 index = pointIndex.first; index < pointIndex.second; ++index) {
-                    setAttributeValue(handle->get(index), attributeHandle, offset++);
+                IndexIter indexIter = leaf.beginIndex(ijk);
+                for (; indexIter; ++indexIter) {
+                    setAttributeValue(handle->get(*indexIter), attributeHandle, offset++);
                 }
             }
         }
@@ -580,6 +622,28 @@ convertPointDataGridPosition(   GU_Detail& detail,
 }
 
 
+template <typename LeafOffsetArray>
+inline void
+convertPointDataGridGroup(  GA_PointGroup* pointGroup,
+                            const LeafOffsetArray& leafOffsets,
+                            const AttributeSet::Descriptor::GroupIndex index)
+{
+    using sop_openvdb_points_internal::ConvertPointDataGridGroupOp;
+
+    assert(pointGroup);
+
+    // perform threaded point group assignment
+
+    ConvertPointDataGridGroupOp<PointDataTree, LeafOffsetArray> convert(
+                    pointGroup, leafOffsets, index);
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, leafOffsets.size()), convert);
+
+    // must call this after modifying point groups in parallel
+
+    pointGroup->invalidateGroupEntries();
+}
+
+
 template <typename LeafOffsetArray, typename AttributeType>
 inline void
 convertPointDataGridAttribute(  GA_Attribute& attribute,
@@ -601,7 +665,6 @@ inline void
 convertPointDataGrid(GU_Detail& detail, openvdb_houdini::VdbPrimCIterator& vdbIt)
 {
     typedef PointDataTree::LeafNodeType             PointDataLeaf;
-    typedef PointDataAccessor<const PointDataTree>  PointDataAccessor;
 
     GU_Detail geo;
 
@@ -619,18 +682,17 @@ convertPointDataGrid(GU_Detail& detail, openvdb_houdini::VdbPrimCIterator& vdbIt
 
         // position attribute is mandatory
 
-        const AttributeSet::Descriptor& descriptor = leafIter->attributeSet().descriptor();
+        const AttributeSet& attributeSet = leafIter->attributeSet();
+        const AttributeSet::Descriptor& descriptor = attributeSet.descriptor();
         const bool hasPosition = descriptor.find("P") != AttributeSet::INVALID_POS;
         if (!hasPosition)   continue;
 
         // allocate Houdini point array
 
-        PointDataAccessor accessor(tree);
-
 #if (UT_VERSION_INT < 0x0c0500F5) // earlier than 12.5.245
-        for (size_t n = 0, N = accessor.totalPointCount(); n < N; ++n) geo.appendPointOffset();
+        for (size_t n = 0, N = pointCount(tree); n < N; ++n) geo.appendPointOffset();
 #else
-        geo.appendPointBlock(accessor.totalPointCount());
+        geo.appendPointBlock(pointCount(tree));
 #endif
 
         // compute global point offsets for each leaf
@@ -665,6 +727,9 @@ convertPointDataGrid(GU_Detail& detail, openvdb_houdini::VdbPrimCIterator& vdbIt
             if (name == "P")    continue;
 
             const unsigned index = it->second;
+
+            // don't convert group attributes
+            if (descriptor.hasGroup(name))  continue;
 
             const GA_Storage storage = gaStorageFromAttrString(type);
             const unsigned width = widthFromAttrString(type);
@@ -710,6 +775,23 @@ convertPointDataGrid(GU_Detail& detail, openvdb_houdini::VdbPrimCIterator& vdbIt
             }
 
             attribute.tryCompressAllPages();
+        }
+
+        // add point groups to the hdk detail
+        const AttributeSet::Descriptor::NameToPosMap& groupMap = descriptor.groupMap();
+
+        for (AttributeSet::Descriptor::ConstIterator    it = groupMap.begin(),
+                                                        itEnd = groupMap.end(); it != itEnd; ++it) {
+            const Name& name = it->first;
+
+            assert(!name.empty());
+
+            GA_PointGroup* pointGroup = geo.findPointGroup(name.c_str());
+            if (!pointGroup) pointGroup = geo.newPointGroup(name.c_str());
+
+            const AttributeSet::Descriptor::GroupIndex index = attributeSet.groupIndex(name);
+
+            convertPointDataGridGroup(pointGroup, leafOffsets, index);
         }
     }
 
@@ -1189,15 +1271,13 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
         const openvdb::NamePair positionAttributeType =
                     positionAttrTypeFromCompression(positionCompression);
 
-        // compute list of offsets (if group supplied)
+        // store point group information
 
-        GA_PointGroup* group = NULL;
+        const GA_PointGroupTable& pointGroups = ptGeo->pointGroups();
 
-        const OffsetListPtr offsets = computeOffsets(group);
+        // Create PointPartitioner compatible P attribute wrapper (for now no offset filtering)
 
-        // Create PointPartitioner compatible P attribute wrapper
-
-        PointAttribute<openvdb::Vec3f> points(ptGeo->getP(), offsets);
+        PointAttribute<openvdb::Vec3f> points(ptGeo->getP(), OffsetListPtr());
 
         // Create PointIndexGrid used for consistent index ordering in all attribute conversion
 
@@ -1210,6 +1290,48 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
 
         PointIndexTree& indexTree = pointIndexGrid->tree();
         PointDataTree& tree = pointDataGrid->tree();
+
+        // Append (empty) groups to tree
+
+        std::vector<Name> groupNames;
+        groupNames.reserve(pointGroups.entries());
+
+        for (GA_PointGroupTable::iterator   it = pointGroups.beginTraverse(),
+                                            itEnd = pointGroups.endTraverse(); it != itEnd; ++it)
+        {
+            GA_PointGroup* group = *it;
+
+
+            groupNames.push_back(group->getName().toStdString());
+        }
+
+        appendGroups(tree, groupNames);
+
+        // Set group membership in tree
+
+        std::vector<bool> inGroup(ptGeo->getNumPoints(), false);
+
+        for (GA_PointGroupTable::iterator   it = pointGroups.beginTraverse(),
+                                            itEnd = pointGroups.endTraverse(); it != itEnd; ++it)
+        {
+            GA_PointGroup* group = *it;
+            const Name groupName = group->getName().toStdString();
+
+            // insert group offsets
+
+            GA_Offset start, end;
+            GA_Range range(*group);
+            for (GA_Iterator it = range.begin(); it.blockAdvance(start, end); ) {
+                for (GA_Offset off = start; off < end; ++off) {
+                    assert(off < inGroup.size());
+                    inGroup[off] = true;
+                }
+            }
+
+            setGroup(tree, indexTree, inGroup, groupName);
+
+            std::fill(inGroup.begin(), inGroup.end(), false);
+        }
 
         // Add other attributes to PointDataGrid
 
@@ -1238,7 +1360,7 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
             appendAttribute(tree, nameAndType);
 
             // Now populate the attribute using the Houdini attribute
-            populateAttributeFromHoudini(tree, indexTree, nameAndType.name, nameAndType.type, attribute, offsets);
+            populateAttributeFromHoudini(tree, indexTree, nameAndType.name, nameAndType.type, attribute, OffsetListPtr());
         }
 
         UT_String nameStr = "";
