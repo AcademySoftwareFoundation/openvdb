@@ -49,7 +49,72 @@ namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
 
+typedef uint8_t GroupType;
+
+
 ////////////////////////////////////////
+
+
+class GroupAttributeArray : public TypedAttributeArray<GroupType, NullAttributeCodec<GroupType> >
+{
+public:
+    /// Default constructor, always constructs a uniform attribute.
+    explicit GroupAttributeArray(size_t n = 1,
+        const ValueType& uniformValue = zeroVal<ValueType>())
+        : TypedAttributeArray<GroupType, NullAttributeCodec<GroupType> >(n, uniformValue) { }
+    /// Deep copy constructor (optionally decompress during copy).
+    GroupAttributeArray(const TypedAttributeArray& array, const bool decompress = false)
+        : TypedAttributeArray<GroupType, NullAttributeCodec<GroupType> >(array, decompress) { }
+
+    /// Cast an AttributeArray to GroupAttributeArray
+    static GroupAttributeArray& cast(AttributeArray& attributeArray);
+
+    /// Cast an AttributeArray to GroupAttributeArray
+    static const GroupAttributeArray& cast(const AttributeArray& attributeArray);
+
+    /// Return @c true if the AttributeArray provided is a group
+    static bool isGroup(const AttributeArray& attributeArray);
+
+    /// @brief Specify whether this attribute is for tracking group membership
+    /// @note  Attributes are not group attributes by default.
+    void setGroup(bool state);
+    /// Return @c true if this attribute is for tracking groups
+    bool isGroup() const { return bool(mFlags & GROUP); }
+
+}; // class GroupAttributeArray
+
+
+inline GroupAttributeArray&
+GroupAttributeArray::cast(AttributeArray& attributeArray)
+{
+    if (!attributeArray.isType<GroupAttributeArray>()) {
+        OPENVDB_THROW(TypeError, "Invalid Attribute Type");
+    }
+    return static_cast<GroupAttributeArray&>(attributeArray);
+}
+
+
+inline const GroupAttributeArray&
+GroupAttributeArray::cast(const AttributeArray& attributeArray)
+{
+    if (!attributeArray.isType<GroupAttributeArray>()) {
+        OPENVDB_THROW(TypeError, "Invalid Attribute Type");
+    }
+    return static_cast<const GroupAttributeArray&>(attributeArray);
+}
+
+
+inline bool
+GroupAttributeArray::isGroup(const AttributeArray& attributeArray)
+{
+    if (!attributeArray.isType<GroupAttributeArray>())  return false;
+
+    return GroupAttributeArray::cast(attributeArray).isGroup();
+}
+
+
+////////////////////////////////////////
+
 
 class GroupHandle
 {
@@ -72,14 +137,15 @@ public:
 
     size_t size() const { return mArray.size(); }
 
-    bool get(Index n) const {
-        return (mArray.get(n) & mBitMask) == mBitMask;
-    }
+    bool get(Index n) const;
 
 private:
     const GroupAttributeArray& mArray;
     const GroupType mBitMask;
 }; // class GroupHandle
+
+
+////////////////////////////////////////
 
 
 class GroupWriteHandle
@@ -94,21 +160,17 @@ public:
 
     size_t size() const { return mArray.size(); }
 
-    bool get(Index n) const {
-        return (mArray.get(n) & mBitMask) == mBitMask;
-    }
+    bool get(Index n) const;
 
-    void set(Index n, bool on) {
-        const GroupType& value = mArray.get(n);
-
-        if (on)     mArray.set(n, value | mBitMask);
-        else        mArray.set(n, value & ~mBitMask);
-    }
+    void set(Index n, bool on);
 
 private:
     GroupAttributeArray& mArray;
     const GroupType mBitMask;
 }; // class GroupWriteHandle
+
+
+////////////////////////////////////////
 
 
 /// Index filtering on group membership
@@ -125,6 +187,9 @@ public:
 private:
     const GroupHandle mHandle;
 }; // class GroupFilter
+
+
+////////////////////////////////////////
 
 
 class GroupFilterFromLeaf

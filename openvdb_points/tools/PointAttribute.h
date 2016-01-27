@@ -42,6 +42,7 @@
 #include <openvdb/openvdb.h>
 
 #include <openvdb_points/tools/AttributeSet.h>
+#include <openvdb_points/tools/AttributeGroup.h>
 #include <openvdb_points/tools/PointDataGrid.h>
 
 
@@ -129,7 +130,10 @@ struct AppendAttributeOp {
 
             if (mHidden)      attribute->setHidden(true);
             if (mTransient)   attribute->setTransient(true);
-            if (mGroup)       attribute->setGroup(true);
+
+            if (mGroup) {
+                GroupAttributeArray::cast(*attribute).setGroup(true);
+            }
         }
     }
 

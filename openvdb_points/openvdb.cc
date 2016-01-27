@@ -31,6 +31,7 @@
 #include "openvdb.h"
 
 #include <openvdb_points/tools/AttributeArray.h>
+#include <openvdb_points/tools/AttributeGroup.h>
 #include <openvdb_points/tools/PointDataGrid.h>
 
 #include <tbb/mutex.h>
@@ -68,6 +69,10 @@ initialize()
     TypedAttributeArray<Vec3<half> >::registerType();
     TypedAttributeArray<Vec3<float> >::registerType();
     TypedAttributeArray<Vec3<double> >::registerType();
+
+    // group attribute
+
+    GroupAttributeArray::registerType();
 
     // truncate compression
 

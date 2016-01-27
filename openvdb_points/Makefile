@@ -249,6 +249,7 @@ INCLUDE_NAMES := \
 
 SRC_NAMES := \
     tools/AttributeArray.cc \
+    tools/AttributeGroup.cc \
     tools/AttributeSet.cc \
     openvdb.cc \
 #

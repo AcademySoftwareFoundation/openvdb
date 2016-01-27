@@ -174,13 +174,6 @@ AttributeArray::setHidden(bool state)
 }
 
 
-void
-AttributeArray::setGroup(bool state)
-{
-    if (state) mFlags |= Int16(GROUP);
-    else mFlags &= ~Int16(GROUP);
-}
-
 bool
 AttributeArray::operator==(const AttributeArray& other) const {
     if(this->mCompressedBytes != other.mCompressedBytes ||

@@ -30,7 +30,9 @@
 
 
 #include <cppunit/extensions/HelperMacros.h>
+#include <openvdb_points/tools/AttributeGroup.h>
 #include <openvdb_points/tools/AttributeSet.h>
+#include <openvdb_points/openvdb.h>
 #include <openvdb/Types.h>
 #include <openvdb/Metadata.h>
 
@@ -40,6 +42,9 @@
 class TestAttributeSet: public CppUnit::TestCase
 {
 public:
+    virtual void setUp() { openvdb::initialize(); openvdb::points::initialize(); }
+    virtual void tearDown() { openvdb::uninitialize(); openvdb::points::uninitialize(); }
+
     CPPUNIT_TEST_SUITE(TestAttributeSet);
     CPPUNIT_TEST(testAttributeSetDescriptor);
     CPPUNIT_TEST(testAttributeSet);
@@ -118,10 +123,6 @@ TestAttributeSet::testAttributeSetDescriptor()
     typedef openvdb::tools::TypedAttributeArray<float>  AttributeS;
     typedef openvdb::tools::TypedAttributeArray<double> AttributeD;
     typedef openvdb::tools::TypedAttributeArray<int32_t>    AttributeI;
-
-    AttributeS::registerType();
-    AttributeD::registerType();
-    AttributeI::registerType();
 
     typedef openvdb::tools::AttributeSet::Descriptor Descriptor;
 
@@ -267,6 +268,8 @@ TestAttributeSet::testAttributeSetDescriptor()
 void
 TestAttributeSet::testAttributeSet()
 {
+    using namespace openvdb::tools;
+
     typedef openvdb::tools::AttributeArray AttributeArray;
 
     // Define and register some common attribute types
@@ -274,11 +277,6 @@ TestAttributeSet::testAttributeSet()
     typedef openvdb::tools::TypedAttributeArray<int32_t>        AttributeI;
     typedef openvdb::tools::TypedAttributeArray<int64_t>        AttributeL;
     typedef openvdb::tools::TypedAttributeArray<openvdb::Vec3s> AttributeVec3s;
-
-    AttributeS::registerType();
-    AttributeI::registerType();
-    AttributeL::registerType();
-    AttributeVec3s::registerType();
 
     typedef openvdb::tools::AttributeSet AttributeSet;
     typedef openvdb::tools::AttributeSet::Descriptor Descriptor;
@@ -525,21 +523,20 @@ TestAttributeSet::testAttributeSet()
 
     // add some metadata and register the type
 
-    openvdb::FloatMetadata::registerType();
-
     openvdb::MetaMap& meta = attrSetA.descriptor().getMetadata();
     meta.insertMeta("default", openvdb::FloatMetadata(2.0));
 
     { // flag size test
         Descriptor::Ptr descr = Descriptor::create(Descriptor::Inserter()
             .add("hidden1", AttributeI::attributeType())
-            .add("group1", AttributeI::attributeType())
+            .add("group1", GroupAttributeArray::attributeType())
             .add("hidden2", AttributeI::attributeType())
             .vec);
 
         AttributeSet attrSet(descr);
 
-        attrSet.get("group1")->setGroup(true);
+        GroupAttributeArray::cast(*attrSet.get("group1")).setGroup(true);
+
         attrSet.get("hidden1")->setHidden(true);
         attrSet.get("hidden2")->setHidden(true);
 
@@ -576,26 +573,6 @@ TestAttributeSet::testAttributeSet()
     }
 }
 
-class AttributeGroupAccessor
-{
-public:
-    AttributeGroupAccessor(const openvdb::tools::GroupAttributeArray& array)
-        : mArray(array) { }
-
-    bool in(const unsigned index)
-    {
-        const uint8_t value = mArray.get(index);
-        return value == 1;
-    }
-
-    bool out(const unsigned index)
-    {
-        return !in(index);
-    }
-
-private:
-    const openvdb::tools::GroupAttributeArray& mArray;
-};
 
 void
 TestAttributeSet::testAttributeSetGroups()
@@ -606,10 +583,6 @@ TestAttributeSet::testAttributeSetGroups()
     // Define and register some common attribute types
     typedef TypedAttributeArray<int32_t>        AttributeI;
     typedef TypedAttributeArray<openvdb::Vec3s> AttributeVec3s;
-
-    GroupAttributeArray::registerType();
-    AttributeI::registerType();
-    AttributeVec3s::registerType();
 
     typedef AttributeSet::Descriptor Descriptor;
 
@@ -652,9 +625,9 @@ TestAttributeSet::testAttributeSetGroups()
 
         AttributeSet attrSet(descr);
 
-        attrSet.get("group1")->setGroup(true);
-        attrSet.get("group2")->setGroup(true);
-        attrSet.get("group3")->setGroup(true);
+        GroupAttributeArray::cast(*attrSet.get("group1")).setGroup(true);
+        GroupAttributeArray::cast(*attrSet.get("group2")).setGroup(true);
+        GroupAttributeArray::cast(*attrSet.get("group3")).setGroup(true);
 
         std::stringstream ss;
         for (int i = 0; i < 17; i++) {
