@@ -297,12 +297,12 @@ struct MetaMapConverter
             if (py::extract<std::string>(val).check()) {
                 value.reset(
                     new StringMetadata(py::extract<std::string>(val)));
-            } else if (PyInt_Check(val.ptr())
-                && PyInt_AsLong(val.ptr()) <= std::numeric_limits<Int32>::max()
-                && PyInt_AsLong(val.ptr()) >= std::numeric_limits<Int32>::min())
+            } else if (PyLong_Check(val.ptr())
+                && PyLong_AsLong(val.ptr()) <= std::numeric_limits<Int32>::max()
+                && PyLong_AsLong(val.ptr()) >= std::numeric_limits<Int32>::min())
             {
                 value.reset(new Int32Metadata(py::extract<Int32>(val)));
-            } else if (PyInt_Check(val.ptr()) || PyLong_Check(val.ptr())) {
+            } else if (PyLong_Check(val.ptr()) || PyLong_Check(val.ptr())) {
                 value.reset(new Int64Metadata(py::extract<Int64>(val)));
             //} else if (py::extract<float>(val).check()) {
             //    value.reset(new FloatMetadata(py::extract<float>(val)));

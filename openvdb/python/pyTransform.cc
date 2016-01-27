@@ -141,12 +141,19 @@ struct PickleSuite: public py::pickle_suite
             // Construct a state tuple comprising the Python object's __dict__,
             // the version numbers of the serialization format,
             // and the serialized Transform.
+#if PY_MAJOR_VERSION >= 3
+            // Convert the byte string to a "bytes" sequence.
+            const std::string s = ostr.str();
+            py::object bytesObj = pyutil::pyBorrow(PyBytes_FromStringAndSize(s.data(), s.size()));
+#else
+            py::str bytesObj(ostr.str());
+#endif
             state = py::make_tuple(
                 xformObj.attr("__dict__"),
                 uint32_t(OPENVDB_LIBRARY_MAJOR_VERSION),
                 uint32_t(OPENVDB_LIBRARY_MINOR_VERSION),
                 uint32_t(OPENVDB_FILE_VERSION),
-                ostr.str());
+                bytesObj);
         }
         return state;
     }
@@ -197,15 +204,35 @@ struct PickleSuite: public py::pickle_suite
 
         std::string serialized;
         if (!badState) {
-            // Extract the string containing the serialized Transform.
-            py::extract<std::string> x(state[int(STATE_XFORM)]);
+            // Extract the sequence containing the serialized Transform.
+            py::object bytesObj = state[int(STATE_XFORM)];
+#if PY_MAJOR_VERSION >= 3
+            badState = true;
+            if (PyBytes_Check(bytesObj.ptr())) {
+                // Convert the "bytes" sequence to a byte string.
+                char* buf = NULL;
+                Py_ssize_t length = 0;
+                if (-1 != PyBytes_AsStringAndSize(bytesObj.ptr(), &buf, &length)) {
+                    if (buf != NULL && length > 0) {
+                        serialized.assign(buf, buf + length);
+                        badState = false;
+                    }
+                }
+            }
+#else
+            py::extract<std::string> x(bytesObj);
             if (x.check()) serialized = x();
             else badState = true;
+#endif
         }
 
         if (badState) {
             PyErr_SetObject(PyExc_ValueError,
+#if PY_MAJOR_VERSION >= 3
+                ("expected (dict, int, int, int, bytes) tuple in call to __setstate__; found %s"
+#else
                 ("expected (dict, int, int, int, str) tuple in call to __setstate__; found %s"
+#endif
                      % stateObj.attr("__repr__")()).ptr());
             py::throw_error_already_set();
         }

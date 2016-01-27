@@ -592,7 +592,15 @@ getStatsMetadata(GridBase::ConstPtr grid)
 inline py::object
 getMetadataKeys(GridBase::ConstPtr grid)
 {
-    if (grid) return py::dict(static_cast<const MetaMap&>(*grid)).iterkeys();
+    if (grid) {
+#if PY_MAJOR_VERSION >= 3
+        // Return an iterator over the "keys" view of a dict.
+        return py::import("builtins").attr("iter")(
+            py::dict(static_cast<const MetaMap&>(*grid)).keys());
+#else
+        return py::dict(static_cast<const MetaMap&>(*grid)).iterkeys();
+#endif
+    }
     return py::object();
 }
 
@@ -1028,6 +1036,7 @@ meshToLevelSet(py::object, py::object, py::object, py::object, py::object)
 {
     PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
     boost::python::throw_error_already_set();
+    return typename GridType::Ptr();
 }
 
 template<typename GridType>
@@ -1036,6 +1045,7 @@ volumeToQuadMesh(const GridType&, py::object)
 {
     PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
     boost::python::throw_error_already_set();
+    return py::object();
 }
 
 template<typename GridType>
@@ -1044,6 +1054,7 @@ volumeToMesh(const GridType&, py::object, py::object)
 {
     PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
     boost::python::throw_error_already_set();
+    return py::object();
 }
 
 #else // if defined(PY_OPENVDB_USE_NUMPY)
@@ -1746,6 +1757,7 @@ public:
                 ("the " + gridClassName + " over which to iterate").c_str())
 
             .def("next", &IterWrap::next, ("next() -> " + valueClassName).c_str())
+            .def("__next__", &IterWrap::next, ("__next__() -> " + valueClassName).c_str())
             .def("__iter__", &returnSelf);
 
         py::class_<IterValueProxyT>(
@@ -1835,7 +1847,14 @@ struct PickleSuite: public py::pickle_suite
             }
             // Construct a state tuple comprising the Python object's __dict__
             // and the serialized Grid.
-            state = py::make_tuple(gridObj.attr("__dict__"), ostr.str());
+#if PY_MAJOR_VERSION >= 3
+            // Convert the byte string to a "bytes" sequence.
+            const std::string s = ostr.str();
+            py::object bytesObj = pyutil::pyBorrow(PyBytes_FromStringAndSize(s.data(), s.size()));
+#else
+            py::str bytesObj(ostr.str());
+#endif
+            state = py::make_tuple(gridObj.attr("__dict__"), bytesObj);
         }
         return state;
     }
@@ -1870,15 +1889,35 @@ struct PickleSuite: public py::pickle_suite
 
         std::string serialized;
         if (!badState) {
-            // Extract the string containing the serialized Grid.
-            py::extract<std::string> x(state[1]);
+            // Extract the sequence containing the serialized Grid.
+            py::object bytesObj = state[1];
+#if PY_MAJOR_VERSION >= 3
+            badState = true;
+            if (PyBytes_Check(bytesObj.ptr())) {
+                // Convert the "bytes" sequence to a byte string.
+                char* buf = NULL;
+                Py_ssize_t length = 0;
+                if (-1 != PyBytes_AsStringAndSize(bytesObj.ptr(), &buf, &length)) {
+                    if (buf != NULL && length > 0) {
+                        serialized.assign(buf, buf + length);
+                        badState = false;
+                    }
+                }
+            }
+#else
+            py::extract<std::string> x(bytesObj);
             if (x.check()) serialized = x();
             else badState = true;
+#endif
         }
 
         if (badState) {
             PyErr_SetObject(PyExc_ValueError,
+#if PY_MAJOR_VERSION >= 3
+                ("expected (dict, bytes) tuple in call to __setstate__; found %s"
+#else
                 ("expected (dict, str) tuple in call to __setstate__; found %s"
+#endif
                      % stateObj.attr("__repr__")()).ptr());
             py::throw_error_already_set();
         }

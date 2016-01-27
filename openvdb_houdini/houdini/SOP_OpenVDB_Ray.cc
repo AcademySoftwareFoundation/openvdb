@@ -336,9 +336,9 @@ closestPoints(const GridT& grid, float isovalue, const GU_Detail& gdp,
             if (transformPoints) {
                 UT_Vector3& pos = (*positions)(n);
 
-                pos.x() = tmpPoints[n].x();
-                pos.y() = tmpPoints[n].y();
-                pos.z() = tmpPoints[n].z();
+                pos.x() = float(tmpPoints[n].x());
+                pos.y() = float(tmpPoints[n].y());
+                pos.z() = float(tmpPoints[n].z());
             }
         }
     }
@@ -432,7 +432,7 @@ SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
         const bool rayIntersection = evalInt("method", 0, time) == 0;
         const double scale = double(evalFloat("scale", 0, time));
         const double bias = double(evalFloat("bias", 0, time));
-        const float isovalue = evalFloat("isovalue", 0, time);
+        const float isovalue = float(evalFloat("isovalue", 0, time));
 
         UT_Vector3Array pointNormals;
 
@@ -458,7 +458,7 @@ SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
 
         const double limit = std::numeric_limits<double>::max();
         UT_FloatArray distances;
-        distances.appendMultiple((keepMaxDist && rayIntersection) ? -limit : limit, numPoints);
+        distances.appendMultiple(float((keepMaxDist && rayIntersection) ? -limit : limit), numPoints);
 
 
 
@@ -505,7 +505,7 @@ SOP_OpenVDB_Ray::cookMySop(OP_Context& context)
 
             GA_RWAttributeRef aRef = gdp->findPointAttribute("dist");
             if (!aRef.isValid()) {
-                aRef = gdp->addIntTuple(GA_ATTRIB_POINT, "dist", 1, GA_Defaults(0));
+                aRef = gdp->addFloatTuple(GA_ATTRIB_POINT, "dist", 1, GA_Defaults(0.0));
             }
 #if (UT_VERSION_INT >= 0x0d0000c0)  // 13.0.192 or later
             gdp->setAttributeFromArray(aRef.getAttribute(), gdp->getPointRange(), distances);

@@ -4,91 +4,100 @@ OpenVDB Version History
 Version 3.2.0 - In development
 
     Highlights:
-    - Improved performance of level set advection by up to 5x.
+    - Improved the performance of level-set advection by up to five times.
     - Implemented efficient multithreaded segmentation algorithms.
-    - Faster and more memory efficient tools for point to level set conversion.
-    - A more memory efficient Grid type, dubbed MaskGrid, that uses a single
-      bit field to represent both values and active states inside leafnodes.
+    - Added faster and more memory-efficient tools for point to
+      level set conversion.
+    - Added a memory-efficient, binary-mask grid type, dubbed "MaskGrid",
+      that uses a single bit per voxel to represent the voxel's active state
+      (or, equivalently, its value).
 
-    Major new features:
-    - Added tools::segmentSDF which separates disjoint signed distance field
-      surfaces into distinct grids or trees. (specialized for sdf / level set)
-    - Added tools::segmentActiveVoxels which separates disjoint active topology
-      components into distinct grids or trees. (works on arbitrary grid types)
-    - Added tools::extractActiveVoxelSegmentMasks that constructs a mask for
-      each connected component of the given grid's active voxels.
-    - Added new threaded level set CSG tools; csgUnionCopy, csgIntersectionCopy
-      and csgDifferenceCopy that produce a new grid or tree from immutable
-      inputs. These new tools are faster and use less memory compared to the
-      previous in-place CSG schemes which require mutable inputs that generally
-      necessitate prior deep-copying of the inputs.
-    - Added tools::PointMaskGrid which activates voxels in a grid if they
-      intersect a point.
-    - Added a new specialized MaskGrid that uses a single bit per voxel to
-      encode a binary state or value (same thing in this case). This allows
-      for extremely memory efficient grids that represent a binary mask.
+    New features:
+    - Added tools::segmentActiveVoxels(), which operates on grids of arbitrary
+      type and separates connected components of a grid's active voxels into
+      distinct grids or trees.
+    - Added tools::segmentSDF(), which separates disjoint signed-distance-field
+      surfaces into distinct grids or trees.
+    - Added tools::extractActiveVoxelSegmentMasks(), which constructs a mask
+      for each connected component of a grid's active voxels.
+    - Added threaded level-set CSG tools csgUnionCopy(), csgIntersectionCopy()
+      and csgDifferenceCopy(), which, unlike the existing CSG tools, produce
+      new grids rather than modifying their input grids.  These new tools are
+      faster and use less memory than the existing tools (if only because the
+      input grids never need to be deep-copied).
+    - Added tools::pointMaskGrid(), which activates voxels that intersect
+      points from a given list.
+    - Added a memory-efficient, binary-mask grid type, dubbed "MaskGrid",
+      that uses a single bit per voxel to represent the voxel's active state
+      (or, equivalently, its value).
     - Added tools::topologyToLevelSet(), which generates a level set from the
-      implicit boundary between active and inactive voxels in an arbitrary
-      input grid.
-    - Added tools::extractIsosurfaceMask which masks the voxels that intersect
-      the implicit surface with the given @c isovalue.
-
-    Minor new features:
+      implicit boundary between active and inactive voxels in an input grid
+      of arbitrary type.
+    - Added tools::extractIsosurfaceMask(), which generates a mask of
+      the voxels that intersect the implicit surface with a given isovalue.
     - Added tree::LeafManager::getPreFixSum() for user-managed external buffers.
     - Added tools::Dense::print().
 
     Improvements:
     - Significantly improved the performance, parallel scaling and memory usage
-      of tools::LevelSetFracture, and implemented a more robust level set
+      of tools::LevelSetFracture(), and implemented a more robust level-set
       segmentation scheme.
-    - Improved performance of level set advection by up to 5x.
-    - Improved tools::MeshToVolume performance, primarily for large bandwidths
-      and signed distance fields with dense interior regions.
-    - Threaded Tree destructor and clear method.
-    - Added a @c minLevel parameter to tools::signedFloodFill and
-      tools::signedFloodFillWithValues that specifies the lowest tree level to
-      process.
+    - Improved the performance of level-set advection by up to five times.
+    - Improved the performance of tools::meshToVolume(0, particularly for
+      large narrow-band widths and for signed distance fields with dense
+      interior regions.
+    - Threaded the Tree destructor and the Tree::clear() method.
+    - Added a parameter to tools::signedFloodFill() and to
+      tools::signedFloodFillWithValues() to constrain the flood fill
+      to specific levels of the tree.
 
     Bug fixes:
-    - Fixed a bug in the leve set advection tool that could cause non-deterministic
-      behavior [Thanks to Jeff Lait for reporting this issue].
-    - Fixed a bug which allowed for implicit (vs explicit) conversion between Grids
-      templated on different value types.
-    - Fixed a bug in tree::LeafNode<bool>::operator==() that caused the origin of
-      the node to be ignored.
-    - tools::GridTransformer now correctly handles affine transforms with shear
-      and/or reflection.
-    - Fixed a bug in tools::MeshToVolume that could produce incorrect distances
-      for large bandwidths.
-    - Resolved floating point exception in math::QuantizedUnitVec::pack method.
-      Caused by calling the method with a zero length vector.
+    - Fixed a bug in the level-set advection tool that could cause
+      non-deterministic behavior.
+      [Thanks to Jeff Lait for reporting this issue.]
+    - Fixed a bug that allowed for unexpected implicit conversion
+      between grids of different value types.
+    - Fixed a bug whereby the origins of leaf nodes with value type bool
+      were ignored during equality comparisons.
+    - tools::GridTransformer now correctly handles affine transforms with
+      shear and/or reflection.
+    - Fixed a bug in tools::meshToVolume() that could produce
+      incorrect distances for large narrow-band widths.
+    - Resolved a floating-point exception in math::QuantizedUnitVec::pack()
+      caused by calling the method with a zero-length vector.
       [Contributed by Rick Hankins]
 
     API changes:
     - Renamed math::GudonovsNormSqrd to math::GodunovsNormSqrd
       [Contributed by Branislav Radjenovic]
 
+    Python:
+    - Updated the Python module for Python 3 compatibility.
+
     Maya:
-    - Fixed bugs related to data ownership and improved error checking.
+    - Fixed bugs related to data ownership, and improved error checking.
       [Contributed by Crawford Doran]
-    - Update the Read and Write DAG nodes to support file sequences and
-      sub frame evaluation.
+    - Updated the Read and Write DAG nodes to support file sequences
+      and subframe evaluation.
 
     Houdini:
-    - Added a Segment SOP which separates disjoint components in the
-      input vdb grid into distinct grids.
-    - Added a Topology Mask SOP which generates a mask grid from active
-      voxels in an arbitrary vdb grid or positions in a point cloud. This
-      tool natively supports Houdini 15 Packed Points
-    - Added a From Mask SOP which generates a level set or fog volume from
-      the implicit boundary between active and inactive voxels in arbitrary
-      input grid.
+    - Added a Segment SOP that separates a grid's connected components
+      into distinct grids.
+    - Added a Topology Mask SOP that generates a mask grid from either
+      the active voxels in a grid or from positions in a point cloud.
+      The SOP supports Houdini 15's packed points.
+    - Added a From Mask SOP that generates a level set or fog volume from
+      the implicit boundary between active and inactive voxels in an
+      input grid of arbitrary type.
     - The Resample and Combine SOPs now correctly handle affine transforms
       with shear and/or reflection.
-    - Updated Rasterize Points SOP to match the native Copy SOPs instancing
-      behavior.
+    - Updated the Rasterize Points SOP to match the native Copy SOP's
+      instancing behavior.
+    - Fixed a bug in the Ray SOP whereby the distance attribute was created
+      with the wrong data type.
+      [Contributed by Nick Avramoussis]
 
-    Version 3.1.0 - October 1, 2015
+Version 3.1.0 - October 1, 2015
 
     Highlights:
     - New features: advection of arbitrary volumes, general-purpose
