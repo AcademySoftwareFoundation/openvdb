@@ -285,12 +285,15 @@ struct AttributeArray::Accessor : public AttributeArray::AccessorBase
 {
     typedef T (*GetterPtr)(const AttributeArray* array, const Index n);
     typedef void (*SetterPtr)(AttributeArray* array, const Index n, const T& value);
+    typedef void (*ValuePtr)(AttributeArray* array, const T& value);
 
-    Accessor(GetterPtr getter, SetterPtr setter) :
-        mGetter(getter), mSetter(setter) { }
+    Accessor(GetterPtr getter, SetterPtr setter, ValuePtr collapser, ValuePtr filler) :
+        mGetter(getter), mSetter(setter), mCollapser(collapser), mFiller(filler) { }
 
     GetterPtr mGetter;
     SetterPtr mSetter;
+    ValuePtr  mCollapser;
+    ValuePtr  mFiller;
 }; // struct AttributeArray::Accessor
 
 
@@ -382,12 +385,17 @@ public:
     virtual void expand(bool fill = true);
     /// Replace the existing array with a uniform zero value.
     virtual void collapse();
+
     /// Replace the existing array with the given uniform value.
     void collapse(const ValueType& uniformValue);
-
     /// @brief Fill the existing array with the given value.
     /// @note Identical to collapse() except a non-uniform array will not become uniform.
     void fill(const ValueType& value);
+
+    /// Non-member equivalent to collapse() that static_casts array to this TypedAttributeArray
+    static void collapse(AttributeArray* array, const ValueType& value);
+    /// Non-member equivalent to fill() that static_casts array to this TypedAttributeArray
+    static void fill(AttributeArray* array, const ValueType& value);
 
     /// Compress the attribute array.
     virtual bool compress();
@@ -437,11 +445,14 @@ public:
 protected:
     typedef T (*GetterPtr)(const AttributeArray* array, const Index n);
     typedef void (*SetterPtr)(AttributeArray* array, const Index n, const T& value);
+    typedef void (*ValuePtr)(AttributeArray* array, const T& value);
 
 public:
     static Ptr create(const AttributeArray& array, const bool preserveCompression = true);
 
     AttributeHandle(const AttributeArray& array, const bool preserveCompression = true);
+
+    bool isUniform() const;
 
     T get(Index n) const;
 
@@ -450,6 +461,8 @@ protected:
 
     GetterPtr mGetter;
     SetterPtr mSetter;
+    ValuePtr  mCollapser;
+    ValuePtr  mFiller;
 
 private:
     // local copy of AttributeArray (to preserve compression)
@@ -467,6 +480,18 @@ public:
     static Ptr create(AttributeArray& array);
 
     AttributeWriteHandle(AttributeArray& array);
+
+    /// @brief  If this array is uniform, replace it with an array of length size().
+    /// @param  fill if true, assign the uniform value to each element of the array.
+    void expand(bool fill = true);
+
+    /// Replace the existing array with a uniform value (zero if none provided).
+    void collapse();
+    void collapse(const T& uniformValue);
+
+    /// @brief Fill the existing array with the given value.
+    /// @note Identical to collapse() except a non-uniform array will not become uniform.
+    void fill(const T& value);
 
     void set(Index n, const T& value);
 }; // class AttributeWriteHandle
@@ -852,12 +877,28 @@ TypedAttributeArray<ValueType_, Codec_>::collapse(const ValueType& uniformValue)
 
 template<typename ValueType_, typename Codec_>
 void
+TypedAttributeArray<ValueType_, Codec_>::collapse(AttributeArray* array, const ValueType& value)
+{
+    static_cast<TypedAttributeArray<ValueType, Codec>*>(array)->collapse(value);
+}
+
+
+template<typename ValueType_, typename Codec_>
+void
 TypedAttributeArray<ValueType_, Codec_>::fill(const ValueType& value)
 {
     const size_t size = mIsUniform ? 1 : mSize;
     for (size_t i = 0; i < size; ++i)  {
         Codec::encode(value, mData[i]);
     }
+}
+
+
+template<typename ValueType_, typename Codec_>
+void
+TypedAttributeArray<ValueType_, Codec_>::fill(AttributeArray* array, const ValueType& value)
+{
+    static_cast<TypedAttributeArray<ValueType, Codec>*>(array)->fill(value);
 }
 
 
@@ -1036,7 +1077,10 @@ AttributeArray::AccessorBasePtr
 TypedAttributeArray<ValueType_, Codec_>::getAccessor() const
 {
     return AccessorBasePtr(new AttributeArray::Accessor<ValueType_>(
-        &TypedAttributeArray<ValueType_, Codec_>::get, &TypedAttributeArray<ValueType_, Codec_>::set));
+        &TypedAttributeArray<ValueType_, Codec_>::get,
+        &TypedAttributeArray<ValueType_, Codec_>::set,
+        &TypedAttributeArray<ValueType_, Codec_>::collapse,
+        &TypedAttributeArray<ValueType_, Codec_>::fill));
 }
 
 
@@ -1095,6 +1139,8 @@ AttributeHandle<T>::AttributeHandle(const AttributeArray& array, const bool pres
 
     mGetter = typedAccessor->mGetter;
     mSetter = typedAccessor->mSetter;
+    mCollapser = typedAccessor->mCollapser;
+    mFiller = typedAccessor->mFiller;
 }
 
 
@@ -1102,6 +1148,12 @@ template <typename T>
 T AttributeHandle<T>::get(Index n) const
 {
     return mGetter(mArray, n);
+}
+
+template <typename T>
+bool AttributeHandle<T>::isUniform() const
+{
+    return mArray->isUniform();
 }
 
 ////////////////////////////////////////
@@ -1125,6 +1177,29 @@ void AttributeWriteHandle<T>::set(Index n, const T& value)
     this->mSetter(const_cast<AttributeArray*>(this->mArray), n, value);
 }
 
+template <typename T>
+void AttributeWriteHandle<T>::expand(const bool fill)
+{
+    const_cast<AttributeArray*>(this->mArray)->expand(fill);
+}
+
+template <typename T>
+void AttributeWriteHandle<T>::collapse()
+{
+    const_cast<AttributeArray*>(this->mArray)->collapse();
+}
+
+template <typename T>
+void AttributeWriteHandle<T>::collapse(const T& uniformValue)
+{
+    this->mCollapser(const_cast<AttributeArray*>(this->mArray), uniformValue);
+}
+
+template <typename T>
+void AttributeWriteHandle<T>::fill(const T& value)
+{
+    this->mFiller(const_cast<AttributeArray*>(this->mArray), value);
+}
 
 } // namespace tools
 

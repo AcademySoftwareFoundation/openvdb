@@ -357,9 +357,13 @@ TestAttributeArray::testAttributeHandle()
     using namespace openvdb::tools;
     using namespace openvdb::math;
 
+    typedef TypedAttributeArray<int>                                                          AttributeI;
     typedef TypedAttributeArray<float, NullAttributeCodec<half> >                             AttributeFH;
     typedef TypedAttributeArray<Vec3f>                                                        AttributeVec3f;
 
+    typedef AttributeWriteHandle<int> AttributeHandleRWI;
+
+    AttributeI::registerType();
     AttributeFH::registerType();
     AttributeVec3f::registerType();
 
@@ -370,11 +374,62 @@ TestAttributeArray::testAttributeHandle()
     Descriptor::Ptr descr = Descriptor::create(Descriptor::Inserter()
         .add("pos", AttributeVec3f::attributeType())
         .add("truncate", AttributeFH::attributeType())
+        .add("int", AttributeI::attributeType())
         .vec);
 
-    AttributeSet attrSet(descr, /*arrayLength=*/50);
+    unsigned count = 50;
+    AttributeSet attrSet(descr, /*arrayLength=*/count);
 
-    // modify some values using handles
+    // check uniform value implementation
+
+    {
+        AttributeArray* array = attrSet.get(2);
+
+        AttributeHandleRWI handle(*array);
+
+        CPPUNIT_ASSERT_EQUAL(handle.get(0), 0);
+        CPPUNIT_ASSERT_EQUAL(handle.get(10), 0);
+
+        CPPUNIT_ASSERT(handle.isUniform());
+
+        handle.set(0, 10);
+        CPPUNIT_ASSERT(!handle.isUniform());
+
+        handle.collapse(5);
+        CPPUNIT_ASSERT(handle.isUniform());
+
+        CPPUNIT_ASSERT_EQUAL(handle.get(0), 5);
+        CPPUNIT_ASSERT_EQUAL(handle.get(20), 5);
+
+        handle.expand();
+        CPPUNIT_ASSERT(!handle.isUniform());
+
+        for (unsigned i = 0; i < unsigned(count); ++i) {
+            CPPUNIT_ASSERT_EQUAL(handle.get(i), 5);
+        }
+
+        handle.fill(10);
+        CPPUNIT_ASSERT(!handle.isUniform());
+
+        for (unsigned i = 0; i < unsigned(count); ++i) {
+            CPPUNIT_ASSERT_EQUAL(handle.get(i), 10);
+        }
+
+        handle.collapse(7);
+        CPPUNIT_ASSERT(handle.isUniform());
+
+        CPPUNIT_ASSERT_EQUAL(handle.get(0), 7);
+        CPPUNIT_ASSERT_EQUAL(handle.get(20), 7);
+
+        handle.fill(5);
+        CPPUNIT_ASSERT(handle.isUniform());
+
+        for (unsigned i = 0; i < unsigned(count); ++i) {
+            CPPUNIT_ASSERT_EQUAL(handle.get(i), 5);
+        }
+
+        CPPUNIT_ASSERT(handle.isUniform());
+    }
 
     {
         AttributeArray* array = attrSet.get(0);

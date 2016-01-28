@@ -127,6 +127,7 @@ public:
     GroupHandle(const GroupAttributeArray& array, const GroupType& bitMask, BitMask);
 
     size_t size() const { return mArray.size(); }
+    bool isUniform() const { return mArray.isUniform(); }
 
     bool get(Index n) const;
 
