@@ -292,6 +292,12 @@ struct FillGPUBuffersPosition {
                 openvdb::tools::AttributeHandle<AttributeType>::create(
                     leaf->template attributeArray(mAttributeIndex));
 
+            openvdb::Vec3f positionVoxelSpace;
+
+            const bool uniform = handle->isUniform();
+
+            if (uniform)    positionVoxelSpace = handle->get(openvdb::Index64(0));
+
             openvdb::Index64 offset = 0;
 
             for (typename LeafNode::ValueOnCIter value=leaf->cbeginValueOn(); value; ++value) {
@@ -304,7 +310,7 @@ struct FillGPUBuffersPosition {
 
                 for (; iter; ++iter)
                 {
-                    const openvdb::Vec3f positionVoxelSpace = handle->get(openvdb::Index64(*iter));
+                    if (!uniform)   positionVoxelSpace = handle->get(openvdb::Index64(*iter));
                     const openvdb::Vec3f positionIndexSpace = positionVoxelSpace + gridIndexSpace;
                     const openvdb::Vec3f positionWorldSpace = mTransform.indexToWorld(positionIndexSpace);
 
@@ -358,6 +364,12 @@ struct FillGPUBuffersColor {
                 openvdb::tools::AttributeHandle<AttributeType>::create(
                     leaf->template attributeArray(mAttributeIndex));
 
+            openvdb::Vec3f color;
+
+            const bool uniform = handle->isUniform();
+
+            if (uniform)    color = handle->get(openvdb::Index64(0));
+
             openvdb::Index64 offset = 0;
 
             for (typename LeafNode::ValueOnCIter value=leaf->cbeginValueOn(); value; ++value) {
@@ -368,7 +380,7 @@ struct FillGPUBuffersColor {
 
                 for (; iter; ++iter)
                 {
-                    const openvdb::Vec3f color = handle->get(*iter);
+                    if (!uniform)   color = handle->get(*iter);
                     mBuffer[leafOffset + offset] = UT_Vector3F(color.x(), color.y(), color.z());
 
                     offset++;

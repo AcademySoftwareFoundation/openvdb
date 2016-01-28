@@ -494,6 +494,12 @@ struct ConvertPointDataGridPositionOp {
 
             AttributeHandle<Vec3f>::Ptr handle = AttributeHandle<Vec3f>::create(leaf.template attributeArray(mIndex));
 
+            Vec3d uniformPos;
+
+            const bool uniform = handle->isUniform();
+
+            if (uniform)    uniformPos = handle->get(Index64(0));
+
             for (PointDataTree::LeafNodeType::ValueOnCIter iter = leaf.cbeginValueOn(); iter; ++iter) {
 
                 Coord ijk = iter.getCoord();
@@ -502,8 +508,8 @@ struct ConvertPointDataGridPositionOp {
                 IndexIter indexIter = leaf.beginIndex(ijk);
                 for (; indexIter; ++indexIter) {
 
-                    Vec3d pos = Vec3d(handle->get(*indexIter)) + xyz;
-                    pos = mTransform.indexToWorld(pos);
+                    Vec3d pos = uniform ? uniformPos : Vec3d(handle->get(*indexIter));
+                    pos = mTransform.indexToWorld(pos + xyz);
                     setAttributeValue(pos, pHandle, offset++);
                 }
             }
@@ -555,9 +561,17 @@ struct ConvertPointDataGridGroupOp {
 
             const GroupAttributeArray& groupArray = GroupAttributeArray::cast(array);
 
-            for (Index64 index = 0; index < groupArray.size(); index++) {
-
-                if (groupArray.get(index) & bitmask)    mPointGroup->addOffset(offset + index);
+            if (groupArray.isUniform() && (groupArray.get(0) & bitmask))
+            {
+                for (Index64 index = 0; index < groupArray.size(); index++) {
+                    mPointGroup->addOffset(offset + index);
+                }
+            }
+            else
+            {
+                for (Index64 index = 0; index < groupArray.size(); index++) {
+                    if (groupArray.get(index) & bitmask)    mPointGroup->addOffset(offset + index);
+                }
             }
         }
     }
@@ -603,13 +617,19 @@ struct ConvertPointDataGridAttributeOp {
             typename AttributeHandle<AttributeType>::Ptr handle =
                 AttributeHandle<AttributeType>::create(leaf.template attributeArray(mIndex));
 
+            AttributeType value;
+
+            const bool uniform = handle->isUniform();
+
+            if (uniform)    value = handle->get(Index64(0));
+
             for (PointDataTree::LeafNodeType::ValueOnCIter iter = leaf.cbeginValueOn(); iter; ++iter) {
 
                 Coord ijk = iter.getCoord();
 
                 IndexIter indexIter = leaf.beginIndex(ijk);
                 for (; indexIter; ++indexIter) {
-                    setAttributeValue(handle->get(*indexIter), attributeHandle, offset++);
+                    setAttributeValue(uniform ? value : handle->get(*indexIter), attributeHandle, offset++);
                 }
             }
         }
