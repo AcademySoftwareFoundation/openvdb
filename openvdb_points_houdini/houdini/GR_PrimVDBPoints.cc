@@ -831,11 +831,13 @@ GR_PrimVDBPoints::render(RE_Render *r,
     // TODO: replace sprites with spheres and remove manual point size
 
     r->pushShader();
+    r->pushPointSize(2.0f);
     r->bindShader(thePointShader);
 
     if (myGeo)  myGeo->draw(r, RE_GEO_WIRE_IDX);
     if (myWire) myWire->draw(r, RE_GEO_WIRE_IDX);
 
+    r->popPointSize();
     r->popShader();
 }
 
