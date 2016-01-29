@@ -157,8 +157,18 @@ public:
                            GR_PickStyle, bool) { return 0; }
 #endif
 
+protected:
+    void updatePoints(  RE_Render* r,
+                        const openvdb::tools::PointDataGrid& grid,
+                        const RE_CacheVersion& version);
+
+    void updateWire(    RE_Render* r,
+                        const openvdb::tools::PointDataGrid& grid,
+                        const RE_CacheVersion& version);
+
 private:
     RE_Geometry *myGeo;
+    RE_Geometry *myWire;
 };
 
 
@@ -222,12 +232,14 @@ GR_PrimVDBPoints::GR_PrimVDBPoints(
     : GR_Primitive(info,cache_name, GA_PrimCompat::TypeMask(0))
 {
     myGeo = NULL;
+    myWire = NULL;
 }
 
 
 GR_PrimVDBPoints::~GR_PrimVDBPoints()
 {
     delete myGeo;
+    delete myWire;
 }
 
 
@@ -373,12 +385,80 @@ struct FillGPUBuffersColor {
     const unsigned                      mAttributeIndex;
 }; // class FillGPUBuffersColor
 
+struct FillGPUBuffersLeafBoxes
+{
+    FillGPUBuffersLeafBoxes(UT_Vector3F* buffer,
+                         const std::vector<openvdb::Coord>& coords,
+                         const openvdb::math::Transform& transform)
+        : mBuffer(buffer)
+        , mCoords(coords)
+        , mTransform(transform) { }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const
+    {
+        std::vector<UT_Vector3F> corners;
+        corners.reserve(8);
+
+        for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
+            const openvdb::Coord& origin = mCoords[n];
+
+            // define 8 corners
+
+            const openvdb::Vec3f pos000 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 0.0, 0.0));
+            corners.push_back(UT_Vector3F(pos000.x(), pos000.y(), pos000.z()));
+            const openvdb::Vec3f pos001 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 0.0, 8.0));
+            corners.push_back(UT_Vector3F(pos001.x(), pos001.y(), pos001.z()));
+            const openvdb::Vec3f pos010 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 8.0, 0.0));
+            corners.push_back(UT_Vector3F(pos010.x(), pos010.y(), pos010.z()));
+            const openvdb::Vec3f pos011 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 8.0, 8.0));
+            corners.push_back(UT_Vector3F(pos011.x(), pos011.y(), pos011.z()));
+            const openvdb::Vec3f pos100 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 0.0, 0.0));
+            corners.push_back(UT_Vector3F(pos100.x(), pos100.y(), pos100.z()));
+            const openvdb::Vec3f pos101 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 0.0, 8.0));
+            corners.push_back(UT_Vector3F(pos101.x(), pos101.y(), pos101.z()));
+            const openvdb::Vec3f pos110 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 8.0, 0.0));
+            corners.push_back(UT_Vector3F(pos110.x(), pos110.y(), pos110.z()));
+            const openvdb::Vec3f pos111 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 8.0, 8.0));
+            corners.push_back(UT_Vector3F(pos111.x(), pos111.y(), pos111.z()));
+
+            openvdb::Index64 offset = n*8*3;
+
+            // Z axis
+
+            mBuffer[offset++] = corners[0]; mBuffer[offset++] = corners[1];
+            mBuffer[offset++] = corners[2]; mBuffer[offset++] = corners[3];
+            mBuffer[offset++] = corners[4]; mBuffer[offset++] = corners[5];
+            mBuffer[offset++] = corners[6]; mBuffer[offset++] = corners[7];
+
+            // Y axis
+
+            mBuffer[offset++] = corners[0]; mBuffer[offset++] = corners[2];
+            mBuffer[offset++] = corners[1]; mBuffer[offset++] = corners[3];
+            mBuffer[offset++] = corners[4]; mBuffer[offset++] = corners[6];
+            mBuffer[offset++] = corners[5]; mBuffer[offset++] = corners[7];
+
+            // X axis
+
+            mBuffer[offset++] = corners[0]; mBuffer[offset++] = corners[4];
+            mBuffer[offset++] = corners[1]; mBuffer[offset++] = corners[5];
+            mBuffer[offset++] = corners[2]; mBuffer[offset++] = corners[6];
+            mBuffer[offset++] = corners[3]; mBuffer[offset++] = corners[7];
+        }
+    }
+
+    //////////
+
+    UT_Vector3F*                        mBuffer;
+    const std::vector<openvdb::Coord>&  mCoords;
+    const openvdb::math::Transform&     mTransform;
+}; // class FillGPUBuffersLeafBoxes
+
 } // namespace gr_primitive_internal
 
 void
-GR_PrimVDBPoints::update(RE_Render *r,
-             const GT_PrimitiveHandle &primh,
-             const GR_UpdateParms &p)
+GR_PrimVDBPoints::updatePoints(RE_Render* r,
+             const openvdb::tools::PointDataGrid& grid,
+             const RE_CacheVersion& version)
 {
     bool gl3 = (getRenderVersion() >= GR_RENDER_GL3);
 
@@ -387,27 +467,30 @@ GR_PrimVDBPoints::update(RE_Render *r,
         myGeo = new RE_Geometry;
     myGeo->cacheBuffers(getCacheName());
 
-    const GT_PrimVDB& gt_primVDB = static_cast<const GT_PrimVDB&>(*primh);
-
     typedef openvdb::tools::PointDataGrid GridType;
     typedef GridType::TreeType TreeType;
     typedef TreeType::LeafNodeType LeafNode;
     typedef openvdb::tools::AttributeSet AttributeSet;
 
-    const openvdb::GridBase* grid =
-        const_cast<GT_PrimVDB&>((static_cast<const GT_PrimVDB&>(gt_primVDB))).getGrid();
+    const TreeType& tree = grid.tree();
 
-    const GridType& pointDataGrid = static_cast<const GridType&>(*grid);
+    if (tree.leafCount() == 0)  return;
 
-    const TreeType& tree = pointDataGrid.tree();
+    // count up total points ignoring any leaf nodes that are out of core
 
-    const size_t num_points = pointCount(tree);
+    size_t numPoints = 0;
+    for (typename TreeType::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter)
+    {
+        if (!iter->buffer().isOutOfCore()) {
+            numPoints += iter->pointCount();
+        }
+    }
 
-    if (num_points <= 0)    return;
+    if (numPoints == 0)    return;
 
     // Initialize the number of points in the geometry.
 
-    myGeo->setNumPoints(int(num_points));
+    myGeo->setNumPoints(int(numPoints));
 
     TreeType::LeafCIter iter = tree.cbeginLeaf();
 
@@ -423,47 +506,45 @@ GR_PrimVDBPoints::update(RE_Render *r,
 
     const openvdb::Name colorType = hasColor ? descriptor.type(colorIndex).first : "vec3s";
 
-    if (tree.leafCount() == 0)  return;
-
     // Fetch P (point position). If its cache version matches, no upload is required.
 
-    RE_VertexArray *pos = NULL;
-    RE_VertexArray *col = NULL;
+    RE_VertexArray *posGeo = NULL;
+    RE_VertexArray *colGeo = NULL;
 
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
-    pos = myGeo->findCachedAttrib(r, "P", RE_GPU_FLOAT32, 3, RE_ARRAY_POINT, true);
+    posGeo = myGeo->findCachedAttrib(r, "P", RE_GPU_FLOAT32, 3, RE_ARRAY_POINT, true);
 #else
-    pos = myGeo->findCachedAttribOrArray(r, "P", RE_GPU_FLOAT32, 3, RE_ARRAY_POINT, true);
+    posGeo = myGeo->findCachedAttribOrArray(r, "P", RE_GPU_FLOAT32, 3, RE_ARRAY_POINT, true);
 #endif
 
     if (hasColor)
     {
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
-        col = myGeo->findCachedAttrib(r, "Cd", RE_GPU_FLOAT32, 3, RE_ARRAY_POINT, true);
+        colGeo = myGeo->findCachedAttrib(r, "Cd", RE_GPU_FLOAT32, 3, RE_ARRAY_POINT, true);
 #else
-        col = myGeo->findCachedAttribOrArray(r, "Cd", RE_GPU_FLOAT32, 3, RE_ARRAY_POINT, true);
+        colGeo = myGeo->findCachedAttribOrArray(r, "Cd", RE_GPU_FLOAT32, 3, RE_ARRAY_POINT, true);
 #endif
     }
 
-    if (pos->getCacheVersion() != p.geo_version ||
-       (hasColor && col->getCacheVersion() != p.geo_version))
-    {
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
-        RE_BufferCache* gCache = RE_BufferCache::getCache();
+    RE_BufferCache* gCache = RE_BufferCache::getCache();
 
-        size_t availableGraphicsMemory(gCache->getMaxSizeB() -  gCache->getCurSizeB());
+    size_t availableGraphicsMemory(gCache->getMaxSizeB() -  gCache->getCurSizeB());
 #else
-        RE_GraphicsCache* gCache = RE_GraphicsCache::getCache();
+    RE_GraphicsCache* gCache = RE_GraphicsCache::getCache();
 
-        size_t availableGraphicsMemory(gCache->getMaxSize() -  gCache->getCurrentSize());
+    size_t availableGraphicsMemory(gCache->getMaxSize() -  gCache->getCurrentSize());
 #endif
 
-        size_t sizeOfVector3InBytes = (REsizeOfGPUType(RE_GPU_FLOAT32) * 3) / 8;
-        size_t pointAttributeBytes = hasColor ? 2 * sizeOfVector3InBytes : sizeOfVector3InBytes;
+    size_t sizeOfVector3InBytes = (REsizeOfGPUType(RE_GPU_FLOAT32) * 3) / 8;
+    size_t pointAttributeBytes = hasColor ? 2 * sizeOfVector3InBytes : sizeOfVector3InBytes;
 
-        // if the points will not fit into the remaining graphics memory then don't bother doing anything
-        if (num_points * pointAttributeBytes > availableGraphicsMemory) return;
+    // if the points will not fit into the remaining graphics memory then don't bother doing anything
+    if (numPoints * pointAttributeBytes > availableGraphicsMemory) return;
 
+    if (posGeo->getCacheVersion() != version ||
+       (hasColor && colGeo->getCacheVersion() != version))
+    {
         // build cumulative leaf offset array
 
         typedef std::vector<std::pair<const LeafNode*, openvdb::Index64> > LeafOffsets;
@@ -474,6 +555,9 @@ GR_PrimVDBPoints::update(RE_Render *r,
 
         for (; iter; ++iter) {
             const LeafNode& leaf = *iter;
+
+            // skip out-of-core leaf nodes (used when delay loading VDBs)
+            if (leaf.buffer().isOutOfCore())    continue;
 
             const openvdb::Index64 count = leaf.pointCount();
 
@@ -488,14 +572,14 @@ GR_PrimVDBPoints::update(RE_Render *r,
         if (hasPosition)
         {
             // map() returns a pointer to the GL buffer
-            UT_Vector3F *pdata = static_cast<UT_Vector3F*>(pos->map(r));
+            UT_Vector3F *pdata = static_cast<UT_Vector3F*>(posGeo->map(r));
 
             FillGPUBuffersPosition< TreeType,
                                     openvdb::Vec3f,
                                     UT_Vector3F> fill(pdata,
                                                       offsets,
-                                                      pointDataGrid.tree(),
-                                                      pointDataGrid.transform(),
+                                                      grid.tree(),
+                                                      grid.transform(),
                                                       positionIndex);
 
             const tbb::blocked_range<size_t> range(0, offsets.size());
@@ -504,14 +588,14 @@ GR_PrimVDBPoints::update(RE_Render *r,
 
         if (hasColor)
         {
-            UT_Vector3F *cdata = static_cast<UT_Vector3F*>(col->map(r));
+            UT_Vector3F *cdata = static_cast<UT_Vector3F*>(colGeo->map(r));
 
             if (colorType == "vec3s") {
                 FillGPUBuffersColor<    TreeType,
                                         openvdb::Vec3f,
                                         UT_Vector3F> fill(cdata,
                                                           offsets,
-                                                          pointDataGrid.tree(),
+                                                          grid.tree(),
                                                           colorIndex);
 
                 const tbb::blocked_range<size_t> range(0, offsets.size());
@@ -522,7 +606,7 @@ GR_PrimVDBPoints::update(RE_Render *r,
                         openvdb::math::Vec3<half>,
                         UT_Vector3F> fill(cdata,
                                           offsets,
-                                          pointDataGrid.tree(),
+                                          grid.tree(),
                                           colorIndex);
 
                 const tbb::blocked_range<size_t> range(0, offsets.size());
@@ -532,13 +616,13 @@ GR_PrimVDBPoints::update(RE_Render *r,
 
         // unmap the buffer so it can be used by GL and set the cache version
 
-        pos->unmap(r);
-        pos->setCacheVersion(p.geo_version);
+        posGeo->unmap(r);
+        posGeo->setCacheVersion(version);
 
         if (hasColor)
         {
-            col->unmap(r);
-            col->setCacheVersion(p.geo_version);
+            colGeo->unmap(r);
+            colGeo->setCacheVersion(version);
         }
     }
 
@@ -556,11 +640,13 @@ GR_PrimVDBPoints::update(RE_Render *r,
 
         if (!hasColor)  myGeo->createConstAttribute(r, "Cd",    RE_GPU_FLOAT32, 3, constcol);
 
+        // TODO: point scale !?
+
         myGeo->createConstAttribute(r, "uv",    RE_GPU_FLOAT32, 2, uv);
         myGeo->createConstAttribute(r, "Alpha", RE_GPU_FLOAT32, 1, &alpha);
         myGeo->createConstAttribute(r, "pointSelection", RE_GPU_FLOAT32, 1,&pnt);
         myGeo->createConstAttribute(r, "instmat", RE_GPU_MATRIX4, 1,
-                        instance.data());
+                            instance.data());
     }
 
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
@@ -568,6 +654,164 @@ GR_PrimVDBPoints::update(RE_Render *r,
 #else
     myGeo->connectAllPrimsI(r, RE_GEO_WIRE_IDX, RE_PRIM_POINTS, NULL, true);
 #endif
+}
+
+void
+GR_PrimVDBPoints::updateWire(RE_Render *r,
+             const openvdb::tools::PointDataGrid& grid,
+             const RE_CacheVersion& version)
+{
+    bool gl3 = (getRenderVersion() >= GR_RENDER_GL3);
+
+    // Initialize the geometry with the proper name for the GL cache
+    if (!myWire)
+        myWire = new RE_Geometry;
+    myWire->cacheBuffers(getCacheName());
+
+    typedef openvdb::tools::PointDataGrid GridType;
+    typedef GridType::TreeType TreeType;
+    typedef TreeType::LeafNodeType LeafNode;
+    typedef openvdb::tools::AttributeSet AttributeSet;
+
+    const TreeType& tree = grid.tree();
+
+    if (tree.leafCount() == 0)  return;
+
+    // count up total points ignoring any leaf nodes that are out of core
+
+    size_t outOfCoreLeaves = 0;
+    for (typename TreeType::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter)
+    {
+        if (iter->buffer().isOutOfCore())   outOfCoreLeaves++;
+    }
+
+    if (outOfCoreLeaves == 0)    return;
+
+    // Initialize the number of points for the wireframe box per leaf.
+
+    myWire->setNumPoints(int(outOfCoreLeaves*8*3));
+
+    // Fetch P (point position). If its cache version matches, no upload is required.
+
+    RE_VertexArray *posWire = NULL;
+
+#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
+    posWire = myWire->findCachedAttrib(r, "P", RE_GPU_FLOAT32, 3, RE_ARRAY_POINT, true);
+#else
+    posWire = myWire->findCachedAttribOrArray(r, "P", RE_GPU_FLOAT32, 3, RE_ARRAY_POINT, true);
+#endif
+
+#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
+    RE_BufferCache* gCache = RE_BufferCache::getCache();
+
+    size_t availableGraphicsMemory(gCache->getMaxSizeB() -  gCache->getCurSizeB());
+#else
+    RE_GraphicsCache* gCache = RE_GraphicsCache::getCache();
+
+    size_t availableGraphicsMemory(gCache->getMaxSize() -  gCache->getCurrentSize());
+#endif
+
+    size_t sizeOfVector3InBytes = (REsizeOfGPUType(RE_GPU_FLOAT32) * 3) / 8;
+    size_t pointAttributeBytes = sizeOfVector3InBytes;
+
+    // if the points will not fit into the remaining graphics memory then don't bother doing anything
+    if (outOfCoreLeaves * 8 * 3 * pointAttributeBytes > availableGraphicsMemory) return;
+
+    if (posWire->getCacheVersion() != version)
+    {
+        // build cumulative leaf offset array
+
+        typedef std::vector<std::pair<const LeafNode*, openvdb::Index64> > LeafOffsets;
+
+        LeafOffsets offsets;
+
+        openvdb::Index64 cumulativeOffset = 0;
+
+        for (typename TreeType::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
+            const LeafNode& leaf = *iter;
+
+            // skip out-of-core leaf nodes (used when delay loading VDBs)
+            if (leaf.buffer().isOutOfCore())    continue;
+
+            const openvdb::Index64 count = leaf.pointCount();
+
+            offsets.push_back(LeafOffsets::value_type(&leaf, cumulativeOffset));
+
+            cumulativeOffset += count;
+        }
+
+        using gr_primitive_internal::FillGPUBuffersLeafBoxes;
+
+        // fill the wire data
+
+        UT_Vector3F *pdata = static_cast<UT_Vector3F*>(posWire->map(r));
+
+        std::vector<openvdb::Coord> coords;
+        coords.reserve(outOfCoreLeaves);
+
+        for (typename TreeType::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
+            const LeafNode& leaf = *iter;
+
+            // skip in-core leaf nodes (for use when delay loading VDBs)
+            if (!leaf.buffer().isOutOfCore())   continue;
+
+            coords.push_back(leaf.origin());
+        }
+
+        assert(coords.size() == outOfCoreLeaves);
+
+        FillGPUBuffersLeafBoxes fill(pdata, coords, grid.transform());
+        const tbb::blocked_range<size_t> range(0, coords.size());
+        tbb::parallel_for(range, fill);
+
+        // unmap the buffer so it can be used by GL and set the cache version
+
+        posWire->unmap(r);
+        posWire->setCacheVersion(version);
+    }
+
+    if (gl3)
+    {
+        // Extra constant inputs for the GL3 default shaders we are using.
+        // This isn't required unless
+
+        fpreal32 constcol[3] = { 0.0, 0.0, 0.0 };
+        fpreal32 uv[2]  = { 0.0, 0.0 };
+        fpreal32 alpha  = 1.0;
+        fpreal32 pnt    = 0.0;
+        UT_Matrix4F instance;
+        instance.identity();
+
+        myWire->createConstAttribute(r, "Cd",    RE_GPU_FLOAT32, 3, constcol);
+        myWire->createConstAttribute(r, "uv",    RE_GPU_FLOAT32, 2, uv);
+        myWire->createConstAttribute(r, "Alpha", RE_GPU_FLOAT32, 1, &alpha);
+        myWire->createConstAttribute(r, "pointSelection", RE_GPU_FLOAT32, 1,&pnt);
+        myWire->createConstAttribute(r, "instmat", RE_GPU_MATRIX4, 1,
+                    instance.data());
+    }
+
+#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
+    myWire->connectAllPrims(r, RE_GEO_WIRE_IDX, RE_PRIM_LINES, NULL, true);
+#else
+    myWire->connectAllPrimsI(r, RE_GEO_WIRE_IDX, RE_PRIM_LINES, NULL, true);
+#endif
+}
+
+void
+GR_PrimVDBPoints::update(RE_Render *r,
+             const GT_PrimitiveHandle &primh,
+             const GR_UpdateParms &p)
+{
+    const GT_PrimVDB& gt_primVDB = static_cast<const GT_PrimVDB&>(*primh);
+
+    const openvdb::GridBase* grid =
+        const_cast<GT_PrimVDB&>((static_cast<const GT_PrimVDB&>(gt_primVDB))).getGrid();
+
+    typedef openvdb::tools::PointDataGrid PointDataGrid;
+    const PointDataGrid& pointDataGrid = static_cast<const PointDataGrid&>(*grid);
+
+    updatePoints(r, pointDataGrid, p.geo_version);
+    updateWire(r, pointDataGrid, p.geo_version);
 }
 
 
@@ -578,17 +822,19 @@ GR_PrimVDBPoints::render(RE_Render *r,
              const GR_DisplayOption*,
              const RE_MaterialList*)
 {
-    if (!myGeo)
-    return;
+    if (!myGeo && !myWire)  return;
 
     bool gl3 = (getRenderVersion() >= GR_RENDER_GL3);
 
     if (!gl3)   return;
 
+    // TODO: replace sprites with spheres and remove manual point size
+
     r->pushShader();
     r->bindShader(thePointShader);
 
-    myGeo->draw(r, RE_GEO_WIRE_IDX);
+    if (myGeo)  myGeo->draw(r, RE_GEO_WIRE_IDX);
+    if (myWire) myWire->draw(r, RE_GEO_WIRE_IDX);
 
     r->popShader();
 }
