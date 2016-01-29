@@ -94,6 +94,13 @@ template <typename PointDataTree>
 inline void dropAttribute(  PointDataTree& tree,
                             const Name& name);
 
+/// @brief Apply Blosc compression to one attribute in the VDB tree.
+///
+/// @param tree          the PointDataTree.
+/// @param name          name of the attribute to compress.
+template <typename PointDataTree>
+inline void bloscCompressAttribute( PointDataTree& tree,
+                                    const Name& name);
 
 ////////////////////////////////////////
 
@@ -181,6 +188,41 @@ struct DropAttributesOp {
     const Indices&                  mIndices;
     AttributeSet::DescriptorPtr&    mDescriptor;
 }; // class DropAttributesOp
+
+
+////////////////////////////////////////
+
+
+template<typename PointDataTreeType>
+struct BloscCompressAttributesOp {
+
+    typedef typename tree::LeafManager<PointDataTreeType>       LeafManagerT;
+    typedef typename LeafManagerT::LeafRange                    LeafRangeT;
+    typedef std::vector<size_t>                                 Indices;
+
+    BloscCompressAttributesOp(  PointDataTreeType& tree,
+                                const Indices& indices)
+        : mTree(tree)
+        , mIndices(indices) { }
+
+    void operator()(const LeafRangeT& range) const {
+
+        for (typename LeafRangeT::Iterator leaf=range.begin(); leaf; ++leaf) {
+
+            for (Indices::const_iterator    it = mIndices.begin(),
+                                            itEnd = mIndices.end(); it != itEnd; ++it) {
+
+                AttributeArray& array = leaf->attributeArray(*it);
+                array.compress();
+            }
+        }
+    }
+
+    //////////
+
+    PointDataTreeType&              mTree;
+    const Indices&                  mIndices;
+}; // class BloscCompressAttributesOp
 
 
 } // namespace point_attribute_internal
@@ -311,6 +353,39 @@ inline void dropAttribute(  PointDataTree& tree,
     dropAttributes(tree, names);
 }
 
+
+////////////////////////////////////////
+
+
+template <typename PointDataTree>
+inline void bloscCompressAttribute( PointDataTree& tree,
+                                    const Name& name)
+{
+    using point_attribute_internal::BloscCompressAttributesOp;
+
+    typedef typename tree::LeafManager<PointDataTree>       LeafManagerT;
+    typedef AttributeSet::Descriptor                        Descriptor;
+
+    typename PointDataTree::LeafCIter iter = tree.cbeginLeaf();
+
+    if (!iter)  return;
+
+    const Descriptor& descriptor = iter->attributeSet().descriptor();
+
+    // throw if index cannot be found in descriptor
+
+    const size_t index = descriptor.find(name);
+    if (index == AttributeSet::INVALID_POS) {
+        OPENVDB_THROW(KeyError, "Cannot find requested attribute - " << name << ".");
+    }
+
+    // blosc compress attributes
+
+    std::vector<size_t> indices;
+    indices.push_back(index);
+
+    tbb::parallel_for(LeafManagerT(tree).leafRange(), BloscCompressAttributesOp<PointDataTree>(tree, indices));
+}
 
 ////////////////////////////////////////
 

@@ -48,10 +48,12 @@ public:
 
     CPPUNIT_TEST_SUITE(TestPointAttribute);
     CPPUNIT_TEST(testAppendDrop);
+    CPPUNIT_TEST(testBloscCompress);
 
     CPPUNIT_TEST_SUITE_END();
 
     void testAppendDrop();
+    void testBloscCompress();
 }; // class TestPointAttribute
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestPointAttribute);
@@ -252,6 +254,84 @@ TestPointAttribute::testAppendDrop()
         CPPUNIT_ASSERT(!GroupAttributeArray::isGroup(arrayTransient));
         CPPUNIT_ASSERT(GroupAttributeArray::isGroup(arrayGroup));
     }
+}
+
+
+void
+TestPointAttribute::testBloscCompress()
+{
+    typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
+    typedef TypedAttributeArray<int>     AttributeI;
+
+    typedef AttributeSet::Descriptor   Descriptor;
+
+    std::vector<Vec3s> positions;
+    for (float i = 1; i < 6; i+= 0.1) {
+        positions.push_back(Vec3s(1, i, 1));
+        positions.push_back(Vec3s(1, 1, i));
+        positions.push_back(Vec3s(10, i, 1));
+        positions.push_back(Vec3s(10, 1, i));
+    }
+
+    const float voxelSize(1.0);
+    math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
+
+    PointDataGrid::Ptr grid = createPointDataGrid<PointDataGrid>(positions, AttributeVec3s::attributeType(), *transform);
+    PointDataTree& tree = grid->tree();
+
+    // check two leaves
+    CPPUNIT_ASSERT_EQUAL(tree.leafCount(), Index32(2));
+
+    // retrieve first and last leaf attribute sets
+
+    PointDataTree::LeafIter leafIter = tree.beginLeaf();
+    PointDataTree::LeafIter leafIter2 = ++tree.beginLeaf();
+
+    { // append an attribute, check descriptors are as expected
+        appendAttribute(tree, Descriptor::NameAndType("id", AttributeI::attributeType()));
+        appendAttribute(tree, Descriptor::NameAndType("id2", AttributeI::attributeType()));
+    }
+
+    typedef AttributeWriteHandle<int> AttributeHandleRWI;
+
+    { // set some id values (leaf 1)
+        AttributeHandleRWI handleId(leafIter->attributeArray("id"));
+        AttributeHandleRWI handleId2(leafIter->attributeArray("id2"));
+
+        const int size = leafIter->attributeArray("id").size();
+
+        CPPUNIT_ASSERT_EQUAL(size, 102);
+
+        for (int i = 0; i < size; i++) {
+            handleId.set(i, i);
+            handleId2.set(i, i);
+        }
+    }
+
+    { // set some id values (leaf 2)
+        AttributeHandleRWI handleId(leafIter2->attributeArray("id"));
+        AttributeHandleRWI handleId2(leafIter2->attributeArray("id2"));
+
+        const int size = leafIter2->attributeArray("id").size();
+
+        CPPUNIT_ASSERT_EQUAL(size, 102);
+
+        for (int i = 0; i < size; i++) {
+            handleId.set(i, i);
+            handleId2.set(i, i);
+        }
+    }
+
+    bloscCompressAttribute(tree, "id");
+
+#ifdef OPENVDB_USE_BLOSC
+    CPPUNIT_ASSERT(leafIter->attributeArray("id").isCompressed());
+    CPPUNIT_ASSERT(!leafIter->attributeArray("id2").isCompressed());
+    CPPUNIT_ASSERT(leafIter2->attributeArray("id").isCompressed());
+    CPPUNIT_ASSERT(!leafIter2->attributeArray("id2").isCompressed());
+
+    CPPUNIT_ASSERT(leafIter->attributeArray("id").memUsage() < leafIter->attributeArray("id2").memUsage());
+#endif
 }
 
 

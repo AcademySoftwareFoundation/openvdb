@@ -1043,12 +1043,12 @@ newSopOperator(OP_OperatorTable* table)
             "none", "None",
             "truncate", "16-bit truncate",
             NULL
-    };
+        };
 
-    attrParms.add(hutil::ParmFactory(PRM_ORD, "valuecompressionA#", "Value Compression")
-        .setDefault(PRMzeroDefaults)
-        .setHelpText("Value Compression to use for specific attributes.")
-        .setChoiceListItems(PRM_CHOICELIST_SINGLE, itemsA));
+        attrParms.add(hutil::ParmFactory(PRM_ORD, "valuecompressionA#", "Value Compression")
+            .setDefault(PRMzeroDefaults)
+            .setHelpText("Value Compression to use for specific attributes.")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, itemsA));
     }
 
     {
@@ -1057,13 +1057,17 @@ newSopOperator(OP_OperatorTable* table)
             "truncate", "16-bit truncate",
             UnitVecAttributeCodec::name(), "Unit Vector",
             NULL
-    };
+        };
 
-    attrParms.add(hutil::ParmFactory(PRM_ORD, "valuecompressionB#", "Value Compression")
-        .setDefault(PRMzeroDefaults)
-        .setHelpText("Value Compression to use for specific attributes.")
-        .setChoiceListItems(PRM_CHOICELIST_SINGLE, itemsB));
+        attrParms.add(hutil::ParmFactory(PRM_ORD, "valuecompressionB#", "Value Compression")
+            .setDefault(PRMzeroDefaults)
+            .setHelpText("Value Compression to use for specific attributes.")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, itemsB));
     }
+
+    attrParms.add(hutil::ParmFactory(PRM_TOGGLE, "blosccompression#", "Blosc Compression")
+        .setDefault(PRMzeroDefaults)
+        .setHelpText("Enable Blosc Compression."));
 
     // Add multi parm
     parms.add(hutil::ParmFactory(PRM_MULTITYPE_LIST, "attrList", "Point Attributes")
@@ -1147,6 +1151,7 @@ SOP_OpenVDB_Points::updateParmsFlags()
         for (int i = 1, N = evalInt("attrList", 0, 0); i <= N; ++i) {
             changed |= setVisibleStateInst("valuecompressionA#", &i, false);
             changed |= setVisibleStateInst("valuecompressionB#", &i, false);
+            changed |= setVisibleStateInst("blosccompression#", &i, false);
         }
     }
     else
@@ -1160,6 +1165,7 @@ SOP_OpenVDB_Points::updateParmsFlags()
             if (!attrRef.isValid()) {
                 changed |= setVisibleStateInst("valuecompressionA#", &i, false);
                 changed |= setVisibleStateInst("valuecompressionB#", &i, false);
+                changed |= setVisibleStateInst("blosccompression#", &i, false);
                 continue;
             }
 
@@ -1168,6 +1174,7 @@ SOP_OpenVDB_Points::updateParmsFlags()
             if (!attribute) {
                 changed |= setVisibleStateInst("valuecompressionA#", &i, false);
                 changed |= setVisibleStateInst("valuecompressionB#", &i, false);
+                changed |= setVisibleStateInst("blosccompression#", &i, false);
                 continue;
             }
 
@@ -1182,6 +1189,7 @@ SOP_OpenVDB_Points::updateParmsFlags()
 
             changed |= setVisibleStateInst("valuecompressionA#", &i, (type == "float"));
             changed |= setVisibleStateInst("valuecompressionB#", &i, (type == "vec3s"));
+            changed |= setVisibleStateInst("blosccompression#", &i, true);
         }
     }
 
@@ -1191,12 +1199,29 @@ SOP_OpenVDB_Points::updateParmsFlags()
 
 ////////////////////////////////////////
 
+namespace {
+
+struct AttributeInfo
+{
+    AttributeInfo(const Name& name,
+                  const int valueCompression,
+                  const bool bloscCompression)
+        : name(name)
+        , valueCompression(valueCompression)
+        , bloscCompression(bloscCompression) { }
+
+    Name name;
+    int valueCompression;
+    bool bloscCompression;
+}; // struct AttributeInfo
+
+} // namespace
+
 
 OP_ERROR
 SOP_OpenVDB_Points::cookMySop(OP_Context& context)
 {
-    typedef std::pair<Name, int> NameAndCompression;
-    typedef std::vector<NameAndCompression> NameAndCompressionVec;
+    typedef std::vector<AttributeInfo> AttributeInfoVec;
 
     try {
         hutil::ScopedInputLock lock(*this, context);
@@ -1256,7 +1281,7 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
         }
 
         UT_String attrName;
-        NameAndCompressionVec attributes;
+        AttributeInfoVec attributes;
 
         if (evalInt("mode", 0, time) != 0) {
             // Transfer point attributes.
@@ -1286,10 +1311,12 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
                         attributeCompression = evalIntInst("valuecompressionB#", &i, 0, 0);
                     }
 
+                    const bool bloscCompression = evalIntInst("blosccompression#", &i, 0, 0);
+
                     // compression types for these attributes are offset from the position
                     // compression types at the start of the compression enum in PointUtil.h
                     if (attributeCompression != 0) attributeCompression += FIXED_POSITION_8;
-                    attributes.push_back(NameAndCompression(attributeName, attributeCompression));
+                    attributes.push_back(AttributeInfo(attributeName, attributeCompression, bloscCompression));
                 }
             }
         } else {
@@ -1306,7 +1333,7 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
                         if (attrName == "P") continue;
 
                         // when converting all attributes apply no compression
-                         attributes.push_back(NameAndCompression(attrName, 0));
+                         attributes.push_back(AttributeInfo(attrName, 0, false));
                     }
                 }
             }
@@ -1378,11 +1405,11 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
 
         // Add other attributes to PointDataGrid
 
-        for (NameAndCompressionVec::const_iterator it = attributes.begin(),
-                    it_end = attributes.end(); it != it_end; ++it)
+        for (AttributeInfoVec::const_iterator it = attributes.begin(),
+                                              it_end = attributes.end(); it != it_end; ++it)
         {
-            const openvdb::Name name = it->first;
-            const int compression = it->second;
+            const openvdb::Name name = it->name;
+            const int compression = it->valueCompression;
 
             // skip position as this has already been added
 
@@ -1404,6 +1431,16 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
 
             // Now populate the attribute using the Houdini attribute
             populateAttributeFromHoudini(tree, indexTree, nameAndType.name, nameAndType.type, attribute, OffsetListPtr());
+        }
+
+        // Apply blosc compression to attributes
+
+        for (AttributeInfoVec::const_iterator   it = attributes.begin(),
+                                                it_end = attributes.end(); it != it_end; ++it)
+        {
+            if (!it->bloscCompression)  continue;
+
+            bloscCompressAttribute(tree, it->name);
         }
 
         UT_String nameStr = "";
