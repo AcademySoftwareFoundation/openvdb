@@ -61,21 +61,21 @@ namespace hutil = houdini_utils;
 enum COMPRESSION_TYPE
 {
     NONE = 0,
-    FIXED_POSITION_16,
-    FIXED_POSITION_8,
     TRUNCATE_16,
-    UNIT_VECTOR
+    UNIT_VECTOR,
+    FIXED_POSITION_16,
+    FIXED_POSITION_8
 };
 
 /// @brief Translate the type of a GA_Attribute into a position Attribute Type
 inline NamePair
 positionAttrTypeFromCompression(const int compression)
 {
-    if (compression == FIXED_POSITION_16) {
+    if (compression > 0 && compression + FIXED_POSITION_16 - 1 == FIXED_POSITION_16) {
         return TypedAttributeArray<Vec3<float>,
                             FixedPointAttributeCodec<Vec3<uint16_t> > >::attributeType();
     }
-    else if (compression == FIXED_POSITION_8) {
+    else if (compression > 0 && compression + FIXED_POSITION_16 - 1 == FIXED_POSITION_8) {
         return TypedAttributeArray<Vec3<float>,
                             FixedPointAttributeCodec<Vec3<uint8_t> > >::attributeType();
     }
@@ -905,7 +905,6 @@ sopBuildAttrMenu(void* data, PRM_Name* menuEntries, int themenusize,
 
     size_t menuIdx = 0, menuEnd(themenusize - 2);
 
-
     // null object
     menuEntries[menuIdx].setToken("0");
     menuEntries[menuIdx++].setLabel("- no attribute selected -");
@@ -943,7 +942,7 @@ sopBuildAttrMenu(void* data, PRM_Name* menuEntries, int themenusize,
 }
 
 const PRM_ChoiceList PrimAttrMenu(
-    PRM_ChoiceListType(PRM_CHOICELIST_EXCLUSIVE | PRM_CHOICELIST_REPLACE), sopBuildAttrMenu);
+    PRM_ChoiceListType(PRM_CHOICELIST_REPLACE), sopBuildAttrMenu);
 
 } // unnamed namespace
 
@@ -1039,30 +1038,17 @@ newSopOperator(OP_OperatorTable* table)
             "arbitrary precisions and tuple sizes."));
 
     {
-        const char* itemsA[] = {
+        const char* items[] = {
             "none", "None",
-            "truncate", "16-bit truncate",
-            NULL
-        };
-
-        attrParms.add(hutil::ParmFactory(PRM_ORD, "valuecompressionA#", "Value Compression")
-            .setDefault(PRMzeroDefaults)
-            .setHelpText("Value Compression to use for specific attributes.")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, itemsA));
-    }
-
-    {
-        const char* itemsB[] = {
-            "none", "None",
-            "truncate", "16-bit truncate",
+            "truncate", "16-bit Truncate",
             UnitVecAttributeCodec::name(), "Unit Vector",
             NULL
         };
 
-        attrParms.add(hutil::ParmFactory(PRM_ORD, "valuecompressionB#", "Value Compression")
+        attrParms.add(hutil::ParmFactory(PRM_ORD, "valuecompression#", "Value Compression")
             .setDefault(PRMzeroDefaults)
             .setHelpText("Value Compression to use for specific attributes.")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, itemsB));
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
 
     attrParms.add(hutil::ParmFactory(PRM_TOGGLE, "blosccompression#", "Blosc Compression")
@@ -1141,57 +1127,6 @@ SOP_OpenVDB_Points::updateParmsFlags()
 
     changed |= enableParm("attrList", toVdbPoints && !convertAll);
     changed |= setVisibleState("attrList", toVdbPoints && !convertAll);
-
-    UT_String tmpStr;
-
-    const GU_Detail* gdp = this->getInputLastGeo(0, CHgetEvalTime());
-
-    if(!toVdbPoints || !gdp)
-    {
-        for (int i = 1, N = evalInt("attrList", 0, 0); i <= N; ++i) {
-            changed |= setVisibleStateInst("valuecompressionA#", &i, false);
-            changed |= setVisibleStateInst("valuecompressionB#", &i, false);
-            changed |= setVisibleStateInst("blosccompression#", &i, false);
-        }
-    }
-    else
-    {
-        for (int i = 1, N = evalInt("attrList", 0, 0); i <= N; ++i) {
-            evalStringInst("attribute#", &i, tmpStr, 0, 0);
-            Name attributeName = Name(tmpStr);
-
-            GA_ROAttributeRef attrRef = gdp->findPointAttribute(attributeName.c_str());
-
-            if (!attrRef.isValid()) {
-                changed |= setVisibleStateInst("valuecompressionA#", &i, false);
-                changed |= setVisibleStateInst("valuecompressionB#", &i, false);
-                changed |= setVisibleStateInst("blosccompression#", &i, false);
-                continue;
-            }
-
-            GA_Attribute const * attribute = attrRef.getAttribute();
-
-            if (!attribute) {
-                changed |= setVisibleStateInst("valuecompressionA#", &i, false);
-                changed |= setVisibleStateInst("valuecompressionB#", &i, false);
-                changed |= setVisibleStateInst("blosccompression#", &i, false);
-                continue;
-            }
-
-            Name type;
-
-            try {
-                type = attrStringTypeFromGAAttribute(attribute);
-            }
-            catch (std::exception& e) {
-                continue;
-            }
-
-            changed |= setVisibleStateInst("valuecompressionA#", &i, (type == "float"));
-            changed |= setVisibleStateInst("valuecompressionB#", &i, (type == "vec3s"));
-            changed |= setVisibleStateInst("blosccompression#", &i, true);
-        }
-    }
 
     return changed;
 }
@@ -1300,23 +1235,34 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
 
                     const Name type(attrStringTypeFromGAAttribute(attribute));
 
-                    int attributeCompression = 0;
+                    int valueCompression = 0;
 
                     // when converting specific attributes apply chosen compression.
 
-                    if (type == "float") {
-                        attributeCompression = evalIntInst("valuecompressionA#", &i, 0, 0);
+                    valueCompression = evalIntInst("valuecompression#", &i, 0, 0);
+
+                    std::stringstream ss;
+                    ss <<   "Invalid value compression for attribute - " << attributeName << ". " <<
+                            "Disabling compression for this attribute.";
+
+                    if (valueCompression == TRUNCATE_16)
+                    {
+                        if (type != "float" && type != "vec3s") {
+                            valueCompression = 0;
+                            addWarning(SOP_MESSAGE, ss.str().c_str());
+                        }
                     }
-                    if (type == "vec3s") {
-                        attributeCompression = evalIntInst("valuecompressionB#", &i, 0, 0);
+                    else if (valueCompression == UNIT_VECTOR)
+                    {
+                        if (type != "vec3s") {
+                            valueCompression = 0;
+                            addWarning(SOP_MESSAGE, ss.str().c_str());
+                        }
                     }
 
                     const bool bloscCompression = evalIntInst("blosccompression#", &i, 0, 0);
 
-                    // compression types for these attributes are offset from the position
-                    // compression types at the start of the compression enum in PointUtil.h
-                    if (attributeCompression != 0) attributeCompression += FIXED_POSITION_8;
-                    attributes.push_back(AttributeInfo(attributeName, attributeCompression, bloscCompression));
+                    attributes.push_back(AttributeInfo(attributeName, valueCompression, bloscCompression));
                 }
             }
         } else {
