@@ -66,6 +66,9 @@ initialize()
     TypedAttributeArray<half>::registerType();
     TypedAttributeArray<float>::registerType();
     TypedAttributeArray<double>::registerType();
+    TypedAttributeArray<Vec2<half> >::registerType();
+    TypedAttributeArray<Vec2<float> >::registerType();
+    TypedAttributeArray<Vec2<double> >::registerType();
     TypedAttributeArray<Vec3<half> >::registerType();
     TypedAttributeArray<Vec3<float> >::registerType();
     TypedAttributeArray<Vec3<double> >::registerType();

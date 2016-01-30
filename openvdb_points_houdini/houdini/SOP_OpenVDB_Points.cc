@@ -135,6 +135,19 @@ attrTypeFromGAAttribute(GA_Attribute const * attribute, const int compression = 
             return TypedAttributeArray<double>::attributeType();
         }
     }
+    else if (width == 2)
+    {
+        if (storage == GA_STORE_REAL16) {
+            return TypedAttributeArray<Vec2<half> >::attributeType();
+        }
+        else if (storage == GA_STORE_REAL32)
+        {
+            return TypedAttributeArray<Vec2<float> >::attributeType();
+        }
+        else if (storage == GA_STORE_REAL64) {
+            return TypedAttributeArray<Vec2<double> >::attributeType();
+        }
+    }
     else if (width == 3 || width == 4)
     {
         // note: process 4-component vectors as 3-component vectors for now
@@ -191,6 +204,12 @@ attrStringTypeFromGAAttribute(GA_Attribute const * attribute)
         else if (storage == GA_STORE_REAL16)    return "half";
         else if (storage == GA_STORE_REAL32)    return "float";
         else if (storage == GA_STORE_REAL64)    return "double";
+    }
+    else if (width == 2)
+    {
+        if (storage == GA_STORE_REAL16)         return "vec2h";
+        else if (storage == GA_STORE_REAL32)    return "vec2s";
+        else if (storage == GA_STORE_REAL64)    return "vec2d";
     }
     else if (width == 3 || width == 4)
     {
@@ -384,6 +403,15 @@ void populateAttributeFromHoudini(  PointDataTree& tree, const PointIndexTree& i
     }
     else if (type == "double") {
         populateAttribute(tree, indexTree, name, PointAttribute<double>(attribute, offsets));
+    }
+    else if (type == "vec2h") {
+        populateAttribute(tree, indexTree, name, PointAttribute<Vec2<half> >(attribute, offsets));
+    }
+    else if (type == "vec2s") {
+        populateAttribute(tree, indexTree, name, PointAttribute<Vec2<float> >(attribute, offsets));
+    }
+    else if (type == "vec2d") {
+        populateAttribute(tree, indexTree, name, PointAttribute<Vec2<double> >(attribute, offsets));
     }
     else if (type == "vec3h") {
         populateAttribute(tree, indexTree, name, PointAttribute<Vec3<half> >(attribute, offsets));
