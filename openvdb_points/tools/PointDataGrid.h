@@ -189,7 +189,6 @@ struct UniquePtr
 };
 }
 
-
 template <typename T, Index Log2Dim>
 class PointDataLeafNode : public tree::LeafNode<T, Log2Dim> {
 
@@ -382,13 +381,13 @@ public:
 
         // Ensure all attribute arrays are of equal length
         for (size_t attributeIndex = 1; attributeIndex < mAttributeSet->size(); ++attributeIndex ) {
-            if (mAttributeSet->get(attributeIndex-1)->size() != mAttributeSet->get(attributeIndex)->size()) {
+            if (mAttributeSet->getConst(attributeIndex-1)->size() != mAttributeSet->getConst(attributeIndex)->size()) {
                 OPENVDB_THROW(ValueError, "Attribute arrays have inconsistent length");
             }
         }
 
         // Ensure the last voxel's offset value matches the size of each attribute array
-        if (mAttributeSet->size() > 0 && this->getValue(BaseLeaf::SIZE-1) != mAttributeSet->get(0)->size()) {
+        if (mAttributeSet->size() > 0 && this->getValue(BaseLeaf::SIZE-1) != mAttributeSet->getConst(0)->size()) {
             OPENVDB_THROW(ValueError, "Last voxel offset value does not match attribute array length");
         }
     }
@@ -409,14 +408,14 @@ public:
     const AttributeArray& attributeArray(const size_t pos) const
     {
         if (pos >= mAttributeSet->size())             OPENVDB_THROW(LookupError, "Attribute Out Of Range - " << pos);
-        return *mAttributeSet->get(pos);
+        return *mAttributeSet->getConst(pos);
     }
 
     const AttributeArray& attributeArray(const Name& attributeName) const
     {
         const size_t pos = mAttributeSet->find(attributeName);
         if (pos == AttributeSet::INVALID_POS)         OPENVDB_THROW(LookupError, "Attribute Not Found - " << attributeName);
-        return *mAttributeSet->get(pos);
+        return *mAttributeSet->getConst(pos);
     }
 
     ValueTypePair pointIndex(const unsigned index) const
