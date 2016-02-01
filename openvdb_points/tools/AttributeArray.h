@@ -883,10 +883,12 @@ TypedAttributeArray<ValueType_, Codec_>::compress()
         int bufBytes = inBytes + BLOSC_MAX_OVERHEAD;
         boost::scoped_array<char> outBuf(new char[bufBytes]);
 
+        const size_t typeSize = sizeof(typename Codec_::StorageType);
+
         bufBytes = blosc_compress_ctx(
             /*clevel=*/9, // 0 (no compression) to 9 (maximum compression)
             /*doshuffle=*/true,
-            /*typesize=*/1,
+            /*typesize=*/typeSize,
             /*srcsize=*/inBytes,
             /*src=*/mData,
             /*dest=*/outBuf.get(),
