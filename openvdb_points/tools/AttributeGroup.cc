@@ -47,6 +47,20 @@ namespace tools {
 // GroupAttributeArray implementation
 
 
+GroupAttributeArray::GroupAttributeArray(size_t n, const ValueType& uniformValue)
+    : TypedAttributeArray<GroupType, NullAttributeCodec<GroupType> >(n, uniformValue)
+{
+    this->setGroup(true);
+}
+
+
+GroupAttributeArray::GroupAttributeArray(const TypedAttributeArray& array, const bool decompress)
+        : TypedAttributeArray<GroupType, NullAttributeCodec<GroupType> >(array, decompress)
+{
+    this->setGroup(true);
+}
+
+
 void GroupAttributeArray::setGroup(bool state)
 {
     if (state) mFlags |= Int16(GROUP);

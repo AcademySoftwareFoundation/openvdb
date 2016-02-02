@@ -97,19 +97,14 @@ TestAttributeGroup::testAttributeGroup()
 
         CPPUNIT_ASSERT(!attr.isTransient());
         CPPUNIT_ASSERT(!attr.isHidden());
-        CPPUNIT_ASSERT(!attr.isGroup());
+        CPPUNIT_ASSERT(attr.isGroup());
 
         attr.setTransient(true);
         CPPUNIT_ASSERT(attr.isTransient());
         CPPUNIT_ASSERT(!attr.isHidden());
-        CPPUNIT_ASSERT(!attr.isGroup());
+        CPPUNIT_ASSERT(attr.isGroup());
 
         attr.setHidden(true);
-        CPPUNIT_ASSERT(attr.isTransient());
-        CPPUNIT_ASSERT(attr.isHidden());
-        CPPUNIT_ASSERT(!attr.isGroup());
-
-        attr.setGroup(true);
         CPPUNIT_ASSERT(attr.isTransient());
         CPPUNIT_ASSERT(attr.isHidden());
         CPPUNIT_ASSERT(attr.isGroup());

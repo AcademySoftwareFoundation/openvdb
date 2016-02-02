@@ -59,12 +59,11 @@ class GroupAttributeArray : public TypedAttributeArray<GroupType, NullAttributeC
 {
 public:
     /// Default constructor, always constructs a uniform attribute.
-    explicit GroupAttributeArray(size_t n = 1,
-        const ValueType& uniformValue = zeroVal<ValueType>())
-        : TypedAttributeArray<GroupType, NullAttributeCodec<GroupType> >(n, uniformValue) { }
+    explicit GroupAttributeArray(   size_t n = 1,
+                                    const ValueType& uniformValue = zeroVal<ValueType>());
     /// Deep copy constructor (optionally decompress during copy).
-    GroupAttributeArray(const TypedAttributeArray& array, const bool decompress = false)
-        : TypedAttributeArray<GroupType, NullAttributeCodec<GroupType> >(array, decompress) { }
+    GroupAttributeArray(const TypedAttributeArray<GroupType, NullAttributeCodec<GroupType> >& array,
+                        const bool decompress = false);
 
     /// Cast an AttributeArray to GroupAttributeArray
     static GroupAttributeArray& cast(AttributeArray& attributeArray);
