@@ -41,6 +41,7 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/Platform.h>
 #include <openvdb_points/tools/PointDataGrid.h>
+#include <openvdb_points/tools/PointCount.h>
 
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb_houdini/Utils.h>
@@ -95,6 +96,10 @@ public:
         for (VdbPrimCIterator it(tmp_gdp); it; ++it) {
 
             const openvdb::GridBase& grid = it->getGrid();
+
+            // ignore openvdb point grids
+            if (dynamic_cast<const openvdb::tools::PointDataGrid*>(&grid))  continue;
+
             openvdb::Coord dim = grid.evalActiveVoxelDim();
             const UT_String gridName = it.getPrimitiveName();
 
@@ -152,7 +157,6 @@ public:
 
             typedef openvdb::tools::PointDataGrid PointDataGrid;
             typedef openvdb::tools::PointDataTree PointDataTree;
-            typedef openvdb::tools::PointDataAccessor<const PointDataTree> PointDataAccessor;
             typedef openvdb::tools::AttributeSet AttributeSet;
 
             const PointDataGrid* pointDataGrid = dynamic_cast<const PointDataGrid*>(&grid);
@@ -163,21 +167,52 @@ public:
 
             PointDataTree::LeafCIter iter = pointDataTree.cbeginLeaf();
 
-            const openvdb::Index64 totalPointCount = PointDataAccessor(pointDataTree).totalPointCount();
+            const openvdb::Index64 count = pointCount(pointDataTree);
 
-            infoStr_pts << " count: " << totalPointCount << ",";
-            infoStr_pts << " attributes: ";
+            infoStr_pts << " count: " << count << ",";
 
             if (!iter.getLeaf()) {
+                infoStr_pts << " attributes: ";
                 infoStr_pts << "<none>";
             }
             else {
                 const AttributeSet::DescriptorPtr& descriptor = iter->attributeSet().descriptorPtr();
-                const AttributeSet::Descriptor::NameToPosMap& nameToPosMap = descriptor->map();
+
+                infoStr_pts << " groups: ";
+
+                const AttributeSet::Descriptor::NameToPosMap& groupMap = descriptor->groupMap();
 
                 bool first = true;
+                for (AttributeSet::Descriptor::ConstIterator it = groupMap.begin(), it_end = groupMap.end();
+                        it != it_end; ++it) {
+                    if (first) {
+                        first = false;
+                    }
+                    else {
+                        infoStr_pts << ", ";
+                    }
+
+                    infoStr_pts << it->first << "(";
+
+                    infoStr_pts << groupPointCount(pointDataTree, it->first);
+
+                    infoStr_pts << ")";
+                }
+
+                if (first)  infoStr_pts << "<none>";
+
+                infoStr_pts << ",";
+
+                infoStr_pts << " attributes: ";
+
+                const AttributeSet::Descriptor::NameToPosMap& nameToPosMap = descriptor->map();
+
+                first = true;
                 for (AttributeSet::Descriptor::ConstIterator it = nameToPosMap.begin(), it_end = nameToPosMap.end();
                         it != it_end; ++it) {
+                    const openvdb::tools::AttributeArray& array = iter->attributeArray(it->second);
+                    if (openvdb::tools::GroupAttributeArray::isGroup(array))    continue;
+
                     if (first) {
                         first = false;
                     }

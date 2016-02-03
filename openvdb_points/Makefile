@@ -237,10 +237,13 @@ endif
 
 INCLUDE_NAMES := \
     tools/AttributeArray.h \
+    tools/AttributeGroup.h \
     tools/AttributeSet.h \
+    tools/IndexIterator.h \
     tools/PointAttribute.h \
     tools/PointDataGrid.h \
     tools/PointConversion.h \
+    tools/PointGroup.h \
     Types.h \
     openvdb.h \
     version.h \
@@ -248,6 +251,7 @@ INCLUDE_NAMES := \
 
 SRC_NAMES := \
     tools/AttributeArray.cc \
+    tools/AttributeGroup.cc \
     tools/AttributeSet.cc \
     openvdb.cc \
 #
@@ -257,11 +261,15 @@ UNITTEST_INCLUDE_NAMES := \
 
 UNITTEST_SRC_NAMES := \
     unittest/main.cc \
+    unittest/TestIndexIterator.cc \
     unittest/TestAttributeArray.cc \
     unittest/TestAttributeSet.cc \
-    unittest/TestPointDataLeaf.cc \
+    unittest/TestAttributeGroup.cc \
     unittest/TestPointAttribute.cc \
     unittest/TestPointConversion.cc \
+    unittest/TestPointCount.cc \
+    unittest/TestPointDataLeaf.cc \
+    unittest/TestPointGroup.cc \
 #
 
 DOC_FILES := 	doc/doc.txt \

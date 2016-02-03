@@ -32,6 +32,7 @@
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb_points/tools/PointAttribute.h>
 #include <openvdb_points/tools/PointConversion.h>
+#include <openvdb_points/openvdb.h>
 
 #include <iostream>
 #include <sstream>
@@ -42,6 +43,9 @@ using namespace openvdb::tools;
 class TestPointAttribute: public CppUnit::TestCase
 {
 public:
+    virtual void setUp() { openvdb::initialize(); openvdb::points::initialize(); }
+    virtual void tearDown() { openvdb::uninitialize(); openvdb::points::uninitialize(); }
+
     CPPUNIT_TEST_SUITE(TestPointAttribute);
     CPPUNIT_TEST(testAppendDrop);
 
@@ -230,21 +234,23 @@ TestPointAttribute::testAppendDrop()
     { // append attributes marked as hidden, transient and group
         appendAttribute(tree, Descriptor::NameAndType("testHidden", AttributeF::attributeType()), true, false, false);
         appendAttribute(tree, Descriptor::NameAndType("testTransient", AttributeF::attributeType()), false, true, false);
-        appendAttribute(tree, Descriptor::NameAndType("testGroup", AttributeF::attributeType()), false, false, true);
+        appendAttribute(tree, Descriptor::NameAndType("testGroup", GroupAttributeArray::attributeType()), false, false, true);
 
         const AttributeArray& arrayHidden = leafIter->attributeArray("testHidden");
         const AttributeArray& arrayTransient = leafIter->attributeArray("testTransient");
         const AttributeArray& arrayGroup = leafIter->attributeArray("testGroup");
 
         CPPUNIT_ASSERT(arrayHidden.isHidden());
-        CPPUNIT_ASSERT(!arrayHidden.isTransient());
-        CPPUNIT_ASSERT(!arrayHidden.isGroup());
         CPPUNIT_ASSERT(!arrayTransient.isHidden());
-        CPPUNIT_ASSERT(arrayTransient.isTransient());
-        CPPUNIT_ASSERT(!arrayTransient.isGroup());
         CPPUNIT_ASSERT(!arrayGroup.isHidden());
+
+        CPPUNIT_ASSERT(!arrayHidden.isTransient());
+        CPPUNIT_ASSERT(arrayTransient.isTransient());
         CPPUNIT_ASSERT(!arrayGroup.isTransient());
-        CPPUNIT_ASSERT(arrayGroup.isGroup());
+
+        CPPUNIT_ASSERT(!GroupAttributeArray::isGroup(arrayHidden));
+        CPPUNIT_ASSERT(!GroupAttributeArray::isGroup(arrayTransient));
+        CPPUNIT_ASSERT(GroupAttributeArray::isGroup(arrayGroup));
     }
 }
 

@@ -28,36 +28,76 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-#ifndef OPENVDB_POINTS_TYPES_HAS_BEEN_INCLUDED
-#define OPENVDB_POINTS_TYPES_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_UNITTEST_PROFILE_TIMER_HAS_BEEN_INCLUDED
+#define OPENVDB_UNITTEST_PROFILE_TIMER_HAS_BEEN_INCLUDED
 
-#include <openvdb/version.h>
-#include <openvdb/Platform.h>
-#include <openvdb/Types.h>
-#include <OpenEXR/half.h>
+#include <string>
+#include <tbb/tick_count.h>
+#include <sstream>// for ostringstream
+#include <iomanip>//for setprecision
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
+namespace util {
 
-// add some extra typeNameAsString specializations
+// TODO: expose this as an option to the vdb_test application
+//#define PROFILE
 
-template<> inline const char* typeNameAsString<half>()                   { return "half"; }
-template<> inline const char* typeNameAsString<uint8_t>()                { return "uint8"; }
-template<> inline const char* typeNameAsString<int16_t>()                { return "int16"; }
-template<> inline const char* typeNameAsString<uint16_t>()               { return "uint16"; }
-template<> inline const char* typeNameAsString<math::Vec3<half> >()      { return "vec3h"; }
-template<> inline const char* typeNameAsString<math::Vec3<uint8_t> >()   { return "vec3u8"; }
-template<> inline const char* typeNameAsString<math::Vec3<uint16_t> >()  { return "vec3u16"; }
+/// @brief Functionality similar to openvdb::util::CpuTimer except with prefix padding and no decimals.
+/// @note Profile timing should switch to use CpuTimer if these features were introduced.
+///
+/// @code
+///    ProfileTimer timer("algorithm 1");
+///    // code to be timed goes here
+///    timer.stop();
+/// @endcode
+class ProfileTimer
+{
+public:
+    /// @brief Prints message and starts timer.
+    ///
+    /// @note Should normally be followed by a call to stop()
+    ProfileTimer(const std::string& msg)
+    {
+        // padd string to 50 characters
+        std::string newMsg(msg);
+        newMsg.insert(newMsg.end(), 50 - newMsg.size(), ' ');
+#ifdef PROFILE
+        std::cerr << newMsg << " ... ";
+#endif
+        mT0 = tbb::tick_count::now();
+    }
 
+    ~ProfileTimer() { this->stop(); }
 
-////////////////////////////////////////
+    /// Return Time diference in milliseconds since construction or start was called.
+    inline double delta() const
+    {
+        tbb::tick_count::interval_t dt = tbb::tick_count::now() - mT0;
+        return 1000.0*dt.seconds();
+    }
 
+    /// @brief Print time in milliseconds since construction or start was called.
+    inline void stop() const
+    {
+        std::stringstream ss;
+        ss << std::setw(6) << ::round(this->delta());
+#ifdef PROFILE
+        std::cerr << "completed in " << ss.str() << " ms\n";
+#endif
+    }
 
+private:
+    tbb::tick_count mT0;
+};// ProfileTimer
+
+} // namespace util
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-#endif // OPENVDB_POINTS_TYPES_HAS_BEEN_INCLUDED
+
+#endif // OPENVDB_UNITTEST_PROFILE_TIMER_HAS_BEEN_INCLUDED
 
 // Copyright (c) 2015 Double Negative Visual Effects
 // All rights reserved. This software is distributed under the

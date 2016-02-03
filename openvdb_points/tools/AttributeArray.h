@@ -45,6 +45,8 @@
 #include <openvdb/util/Name.h>
 #include <openvdb/util/logging.h>
 
+#include <openvdb_points/tools/IndexIterator.h>
+
 #ifdef OPENVDB_USE_BLOSC
 #include <blosc.h>
 #endif
@@ -235,14 +237,10 @@ public:
     /// Return @c true if this attribute is not serialized during stream output.
     bool isTransient() const { return bool(mFlags & TRANSIENT); }
 
-    /// @brief Specify whether this attribute is for tracking group membership
-    /// @note  Attributes are not group attributes by default.
-    void setGroup(bool state);
-    /// Return @c true if this attribute is for tracking groups
-    bool isGroup() const { return bool(mFlags & GROUP); }
-
     /// @brief Retrieve the attribute array flags
     uint16_t flags() const { return mFlags; }
+
+    IndexIter beginIndex() const;
 
     /// Read attribute data from a stream.
     virtual void read(std::istream&) = 0;

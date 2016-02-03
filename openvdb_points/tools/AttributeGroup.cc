@@ -27,37 +27,85 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
+//
+/// @file AttributeGroup.cc
+///
+/// @authors Dan Bailey
 
-#ifndef OPENVDB_POINTS_TYPES_HAS_BEEN_INCLUDED
-#define OPENVDB_POINTS_TYPES_HAS_BEEN_INCLUDED
 
-#include <openvdb/version.h>
-#include <openvdb/Platform.h>
-#include <openvdb/Types.h>
-#include <OpenEXR/half.h>
+#include <openvdb_points/tools/AttributeGroup.h>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
+namespace tools {
 
-// add some extra typeNameAsString specializations
 
-template<> inline const char* typeNameAsString<half>()                   { return "half"; }
-template<> inline const char* typeNameAsString<uint8_t>()                { return "uint8"; }
-template<> inline const char* typeNameAsString<int16_t>()                { return "int16"; }
-template<> inline const char* typeNameAsString<uint16_t>()               { return "uint16"; }
-template<> inline const char* typeNameAsString<math::Vec3<half> >()      { return "vec3h"; }
-template<> inline const char* typeNameAsString<math::Vec3<uint8_t> >()   { return "vec3u8"; }
-template<> inline const char* typeNameAsString<math::Vec3<uint16_t> >()  { return "vec3u16"; }
+////////////////////////////////////////
+
+// GroupAttributeArray implementation
+
+
+GroupAttributeArray::GroupAttributeArray(size_t n, const ValueType& uniformValue)
+    : TypedAttributeArray<GroupType, NullAttributeCodec<GroupType> >(n, uniformValue)
+{
+    this->setGroup(true);
+}
+
+
+GroupAttributeArray::GroupAttributeArray(const TypedAttributeArray& array, const bool decompress)
+        : TypedAttributeArray<GroupType, NullAttributeCodec<GroupType> >(array, decompress)
+{
+    this->setGroup(true);
+}
+
+
+void GroupAttributeArray::setGroup(bool state)
+{
+    if (state) mFlags |= Int16(GROUP);
+    else mFlags &= ~Int16(GROUP);
+}
+
+
+////////////////////////////////////////
+
+// GroupHandle implementation
+
+
+bool GroupHandle::get(Index n) const
+{
+    return (mArray.get(n) & mBitMask) == mBitMask;
+}
+
+
+////////////////////////////////////////
+
+// GroupWriteHandle implementation
+
+
+bool GroupWriteHandle::get(Index n) const
+{
+    return (mArray.get(n) & mBitMask) == mBitMask;
+}
+
+
+void GroupWriteHandle::set(Index n, bool on)
+{
+    const GroupType& value = mArray.get(n);
+
+    if (on)     mArray.set(n, value | mBitMask);
+    else        mArray.set(n, value & ~mBitMask);
+}
 
 
 ////////////////////////////////////////
 
 
+} // namespace tools
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-#endif // OPENVDB_POINTS_TYPES_HAS_BEEN_INCLUDED
 
 // Copyright (c) 2015 Double Negative Visual Effects
 // All rights reserved. This software is distributed under the

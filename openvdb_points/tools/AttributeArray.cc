@@ -174,12 +174,12 @@ AttributeArray::setHidden(bool state)
 }
 
 
-void
-AttributeArray::setGroup(bool state)
+IndexIter
+AttributeArray::beginIndex() const
 {
-    if (state) mFlags |= Int16(GROUP);
-    else mFlags &= ~Int16(GROUP);
+    return IndexIter(0, this->size());
 }
+
 
 bool
 AttributeArray::operator==(const AttributeArray& other) const {
@@ -191,6 +191,7 @@ AttributeArray::operator==(const AttributeArray& other) const {
 
 
 ////////////////////////////////////////
+
 
 
 } // namespace tools

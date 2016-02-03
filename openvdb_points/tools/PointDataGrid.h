@@ -49,6 +49,7 @@
 #include <openvdb/tools/PointIndexGrid.h>
 
 #include <openvdb_points/tools/AttributeSet.h>
+#include <openvdb_points/tools/AttributeGroup.h>
 
 #include <utility> // std::pair, std::make_pair
 
@@ -85,96 +86,6 @@ typedef Grid<PointDataTree> PointDataGrid;
 
 ////////////////////////////////////////
 
-namespace point_masks { enum PointCountMask { Active = 0, Inactive, All }; }
-
-template<typename TreeT>
-struct PointDataAccessor {
-    typedef typename TreeT::ValueType       ValueType;
-    typedef typename TreeT::LeafNodeType    LeafNode;
-    typedef typename TreeT::LeafNodeType::ValueType PointIndexT;
-    typedef typename TreeT::LeafNodeType::ValueTypePair PointDataIndex;
-
-    explicit PointDataAccessor(const TreeT& tree)
-        : mTree(&tree)
-        , mAccessor(tree) { }
-
-    /// @{
-    /// @brief Individual voxel access.
-
-    PointDataIndex get(const Coord& ijk) const;
-
-    /// Returns the number of points at a particular leaf/voxel coordinate. Does
-    /// not take into account the active state of the leaf/voxel
-    Index64 pointCount(const Coord& ijk) const;
-
-    /// Returns the total number of points in the entire tree pointed to by
-    /// this accessor.
-    /// @param mask   a PointCountMask which can be used to only increment the total
-    /// count returned based on the active state of the leaves/voxels. By default,
-    /// returns the total number of points stored in active voxels
-    Index64 totalPointCount(const point_masks::PointCountMask mask = point_masks::Active) const;
-
-    tree::ValueAccessor<const TreeT>& valueAccessor() const { return mAccessor; }
-
-    /// @}
-
-    /// Return a reference to the tree associated with this accessor.
-    const TreeT& tree() const { assert(mTree); return *mTree; }
-
-private:
-    typedef tree::ValueAccessor<const TreeT>  ConstAccessor;
-    const TreeT* mTree;
-    mutable ConstAccessor mAccessor;
-}; // struct PointDataAccessor
-
-// PointDataAccessor implementation
-
-template<typename TreeT>
-inline typename PointDataAccessor<TreeT>::PointDataIndex
-PointDataAccessor<TreeT>::get(const Coord& ijk) const
-{
-    const LeafNode* leaf = mAccessor.probeConstLeaf(ijk);
-
-    // leaf not active - no particles
-
-    if (!leaf) return std::make_pair(0, 0);
-
-    const unsigned index = LeafNode::coordToOffset(ijk);
-
-    return leaf->pointIndex(index);
-}
-
-
-template<typename TreeT>
-inline Index64
-PointDataAccessor<TreeT>::pointCount(const Coord& ijk) const
-{
-    PointDataIndex index = get(ijk);
-
-    return index.second - index.first;
-}
-
-template<typename TreeT>
-inline Index64
-PointDataAccessor<TreeT>::totalPointCount(const point_masks::PointCountMask mask) const
-{
-    typedef typename TreeT::LeafCIter LeafCIter;
-
-    Index64 count = 0;
-
-    for (LeafCIter iter = mTree->cbeginLeaf(); iter; ++iter) {
-        const LeafNode* leaf = iter.getLeaf();
-
-        Index64 size = leaf->pointCount(mask);
-
-        count += size;
-    }
-
-    return count;
-}
-
-////////////////////////////////////////
-
 // Internal utility methods
 namespace point_data_grid_internal {
 
@@ -188,6 +99,7 @@ struct UniquePtr
 #endif
 };
 }
+
 
 template <typename T, Index Log2Dim>
 class PointDataLeafNode : public tree::LeafNode<T, Log2Dim> {
@@ -271,232 +183,85 @@ public:
 
 public:
 
-    const AttributeSet& attributeSet() const
-    {
-        return *mAttributeSet;
-    }
+    /// Retrieve the attribute set.
+    const AttributeSet& attributeSet() const { return *mAttributeSet; }
 
-    /// @brief Create a new attribute set. Any existing attributes will be
-    /// cleared.
-    void initializeAttributes(const Descriptor::Ptr& descriptor, const size_t arrayLength)
-    {
-        mAttributeSet.reset(new AttributeSet(descriptor, arrayLength));
-    }
+    /// @brief Create a new attribute set. Existing attributes will be removed.
+    void initializeAttributes(const Descriptor::Ptr& descriptor, const size_t arrayLength);
+    /// @brief Clear the attribute set.
+    void clearAttributes();
 
-    /// @brief Free all attribute storage
-    void clearAttributes()
-    {
-        mAttributeSet.reset(new AttributeSet(mAttributeSet->descriptorPtr(), 0));
-
-        for (Index n = 0; n < LeafNodeType::NUM_VALUES; n++) {
-            this->setOffsetOn(n, 0);
-        }
-    }
-
-    /// @brief Returns whether an attribute exists. This method is faster
-    /// than hasAttribute(const Name&) as it avoids a map lookup.
-    /// @param pos    Index of the attribute
-    bool hasAttribute(const size_t pos) const
-    {
-        return pos < mAttributeSet->size();
-    }
-
-    /// @brief Returns whether an attribute exists.
+    /// @brief Returns @c true if an attribute with this index exists.
+    /// @param pos Index of the attribute
+    bool hasAttribute(const size_t pos) const;
+    /// @brief Returns @c true if an attribute with this name exists.
     /// @param attributeName    Name of the attribute
-    bool hasAttribute(const Name& attributeName) const
-    {
-        const size_t pos = mAttributeSet->find(attributeName);
-        return pos != AttributeSet::INVALID_POS;
-    }
+    bool hasAttribute(const Name& attributeName) const;
 
     /// @brief Append an attribute to the leaf.
+    /// @param expected Existing descriptor is expected to match this parameter.
+    /// @param replacement New descriptor to replace the existing one.
     AttributeArray::Ptr appendAttribute(const AttributeSet::Util::NameAndType& attribute,
-                         const Descriptor& expected, Descriptor::Ptr& replacement)
-    {
-        return mAttributeSet->appendAttribute(attribute, expected, replacement);
-    }
-
-    /// @brief Drop attributes with @a pos indices.
-    /// Requires the current descriptor to match @a expected
-    /// On drop, current descriptor is replaced with @a replacement
+                                        const Descriptor& expected, Descriptor::Ptr& replacement);
+    /// @brief Drop list of attributes.
+    /// @param expected Existing descriptor is expected to match this parameter.
+    /// @param replacement New descriptor to replace the existing one.
     void dropAttributes(const std::vector<size_t>& pos,
-                        const Descriptor& expected, Descriptor::Ptr& replacement)
-    {
-        mAttributeSet->dropAttributes(pos, expected, replacement);
-    }
-
-    /// @brief Reorder attribute set based on a decriptor which contains
-    /// the same attributes in a different order
-    void reorderAttributes(const Descriptor::Ptr& replacement)
-    {
-        mAttributeSet->reorderAttributes(replacement);
-    }
+                        const Descriptor& expected, Descriptor::Ptr& replacement);
+    /// @brief Reorder attribute set.
+    /// @param a descriptor with the same attributes in a different order
+    void reorderAttributes(const Descriptor::Ptr& replacement);
 
     /// @brief Swap the underlying attribute set with the given @a attributeSet.
-    /// This leaf will assume ownership of the given attribute set. The new
-    /// attributes must have an equal descriptor. Additionally, if the new
-    /// attributes have different topology, then the voxel offset values must
-    /// be updated to reflect this new topology after a call to this method.
-    void swap(AttributeSet* attributeSet)
-    {
-        if (!attributeSet) {
-            OPENVDB_THROW(ValueError, "Cannot swap with a null attribute set");
-        }
-
-        if (mAttributeSet->descriptor() != attributeSet->descriptor()) {
-            OPENVDB_THROW(ValueError, "Attribute set descriptors are not equal.");
-        }
-
-        mAttributeSet.reset(attributeSet);
-    }
+    /// This leaf will assume ownership of the given attribute set. The descriptors must
+    /// match and the voxel offsets values will need updating if the point order is different.
+    void swap(AttributeSet* attributeSet);
 
     /// @brief Sets all of the voxel offset values on this leaf, from the given vector
     /// of @a offsets. If @a updateValueMask is true, then the active value mask will
-    /// also be updated such that voxels with points are marked as active, and empty voxels
-    /// are marked as inactive.
-    void setOffsets(const std::vector<ValueType>& offsets, const bool updateValueMask = true)
-    {
-        if (offsets.size() != LeafNodeType::NUM_VALUES) {
-            OPENVDB_THROW(ValueError, "Offset vector size doesn't match number of voxels.")
-        }
+    /// be updated so voxels with points are active and empty voxels are inactive.
+    void setOffsets(const std::vector<ValueType>& offsets, const bool updateValueMask = true);
 
-        for (size_t index = 0; index < offsets.size(); ++index) {
-            setOffsetOnly(index, offsets[index]);
-        }
+    /// @brief Throws an error if the voxel values on this leaf are not monotonically
+    /// increasing or within the bounds of the attribute arrays
+    void validateOffsets() const;
 
-        if (updateValueMask) this->updateValueMask();
-    }
+    /// @brief Read-write attribute array reference from index
+    /// {
+    AttributeArray& attributeArray(const size_t pos);
+    const AttributeArray& attributeArray(const size_t pos) const;
+    const AttributeArray& constAttributeArray(const size_t pos) const;
+    /// }
+    /// @brief Read-write attribute array reference from name
+    /// {
+    AttributeArray& attributeArray(const Name& attributeName);
+    const AttributeArray& attributeArray(const Name& attributeName) const;
+    const AttributeArray& constAttributeArray(const Name& attributeName) const;
+    /// }
 
-    /// @brief Validates the voxel offset values on this leaf to ensure that they are both
-    /// monotonically increasing, and that they are within the bounds of the attribute
-    /// arrays on this leaf node. Throws an exception if any of these checks fail.
-    void validateOffsets() const
-    {
-        // Ensure all of the offset values are monotonically increasing
-        for (size_t index = 1; index < BaseLeaf::SIZE; ++index) {
-            if (this->getValue(index-1) > this->getValue(index)) {
-                OPENVDB_THROW(ValueError, "Voxel offset values are not monotonically increasing");
-            }
-        }
+    /// @brief Read-only group handle from group index
+    GroupHandle groupHandle(const AttributeSet::Descriptor::GroupIndex& index) const;
+    /// @brief Read-only group handle from group name
+    GroupHandle groupHandle(const Name& group) const;
+    /// @brief Read-write group handle from group index
+    GroupWriteHandle groupWriteHandle(const AttributeSet::Descriptor::GroupIndex& index);
+    /// @brief Read-write group handle from group name
+    GroupWriteHandle groupWriteHandle(const Name& name);
 
-        // Ensure all attribute arrays are of equal length
-        for (size_t attributeIndex = 1; attributeIndex < mAttributeSet->size(); ++attributeIndex ) {
-            if (mAttributeSet->getConst(attributeIndex-1)->size() != mAttributeSet->getConst(attributeIndex)->size()) {
-                OPENVDB_THROW(ValueError, "Attribute arrays have inconsistent length");
-            }
-        }
+    /// @brief Compute the total point count for the leaf
+    Index64 pointCount() const;
+    /// @brief Compute the total active (on) point count for the leaf
+    Index64 onPointCount() const;
+    /// @brief Compute the total inactive (off) point count for the leaf
+    Index64 offPointCount() const;
 
-        // Ensure the last voxel's offset value matches the size of each attribute array
-        if (mAttributeSet->size() > 0 && this->getValue(BaseLeaf::SIZE-1) != mAttributeSet->getConst(0)->size()) {
-            OPENVDB_THROW(ValueError, "Last voxel offset value does not match attribute array length");
-        }
-    }
-
-    AttributeArray& attributeArray(const size_t pos)
-    {
-        if (pos >= mAttributeSet->size())             OPENVDB_THROW(LookupError, "Attribute Out Of Range - " << pos);
-        return *mAttributeSet->get(pos);
-    }
-
-    AttributeArray& attributeArray(const Name& attributeName)
-    {
-        const size_t pos = mAttributeSet->find(attributeName);
-        if (pos == AttributeSet::INVALID_POS)         OPENVDB_THROW(LookupError, "Attribute Not Found - " << attributeName);
-        return *mAttributeSet->get(pos);
-    }
-
-    const AttributeArray& attributeArray(const size_t pos) const
-    {
-        if (pos >= mAttributeSet->size())             OPENVDB_THROW(LookupError, "Attribute Out Of Range - " << pos);
-        return *mAttributeSet->getConst(pos);
-    }
-
-    const AttributeArray& attributeArray(const Name& attributeName) const
-    {
-        const size_t pos = mAttributeSet->find(attributeName);
-        if (pos == AttributeSet::INVALID_POS)         OPENVDB_THROW(LookupError, "Attribute Not Found - " << attributeName);
-        return *mAttributeSet->getConst(pos);
-    }
-
-    ValueTypePair pointIndex(const unsigned index) const
-    {
-        assert(index < BaseLeaf::SIZE);
-
-        const ValueType end = this->getValue(index);
-
-        const ValueType start = (index == 0) ? ValueType(0) : this->getValue(index - 1);
-
-        return std::make_pair(start, end);
-    }
-
-    Index64 pointCount(const unsigned n) const
-    {
-        ValueTypePair index = this->pointIndex(n);
-
-        return index.second - index.first;
-    }
-
-    Index64 pointCount(const point_masks::PointCountMask mask = point_masks::Active) const
-    {
-        const util::NodeMask<Log2Dim>& valueMask = this->getValueMask();
-
-        // return the number of points in every voxel if the mask matches the ValueMask
-        // or mask == All
-        if ((mask == point_masks::All)                              ||
-            (mask == point_masks::Active && valueMask.isOn())       ||
-            (mask == point_masks::Inactive && valueMask.isOff()))   return this->getValue(NUM_VOXELS - 1);
-
-        // if the leaf is off and we are querying active points, or
-        // if the leaf is on and we are querying inactive points, return 0
-        if ((mask == point_masks::Active && valueMask.isOff())          ||
-            (mask == point_masks::Inactive && valueMask.isOn()))    return 0;
-
-        // otherwise portions of the leaf are inactive/active. loop to find these
-        // depending on the mask
-        Index64 totalPointCount = 0;
-
-        const bool active = mask == point_masks::Active;
-        const bool inactive = mask == point_masks::Inactive;
-
-        for (unsigned i = 0; i < NUM_VOXELS; i++)
-        {
-            bool valueOn = this->isValueOn(i);
-            if((valueOn && active) || (!valueOn && inactive))
-            {
-                ValueTypePair index = this->pointIndex(i);
-                totalPointCount += (index.second - index.first);
-            }
-        }
-
-        return totalPointCount;
-    }
-
-    /// @brief Uses the point count of each voxel to update the value mask on this
-    /// leaf node. Voxels with a point count of zero will be deactivated, and voxels with
-    /// a non-zero point count will be activated.
-    void updateValueMask()
-    {
-        ValueType start = 0, end = 0;
-        for (Index n = 0; n < LeafNodeType::NUM_VALUES; n++) {
-            end = this->getValue(n);
-            this->setValueMask(n, (end - start) > 0);
-            start = end;
-        }
-    }
+    /// @brief Activate voxels with non-zero points, deactivate voxels with zero points.
+    void updateValueMask();
 
     ////////////////////////////////////////
 
-    void setOffsetOn(Index offset, const ValueType& val)
-    {
-        this->buffer().setValue(offset, val);
-        this->setValueMaskOn(offset);
-    }
-
-    void setOffsetOnly(Index offset, const ValueType& val)
-    {
-        this->buffer().setValue(offset, val);
-    }
-
+    void setOffsetOn(Index offset, const ValueType& val);
+    void setOffsetOnly(Index offset, const ValueType& val);
 
     /// @brief Return @c true if the given node (which may have a different @c ValueType
     /// than this node) has the same active value topology as this node.
@@ -637,13 +402,14 @@ public:
 
     friend class ::TestPointDataLeaf;
 
+    typedef typename BaseLeaf::ValueOn ValueOn;
+    typedef typename BaseLeaf::ValueOff ValueOff;
+    typedef typename BaseLeaf::ValueAll ValueAll;
+
 private:
     point_data_grid_internal::UniquePtr<AttributeSet>::type mAttributeSet;
 
 protected:
-    typedef typename BaseLeaf::ValueOn ValueOn;
-    typedef typename BaseLeaf::ValueOff ValueOff;
-    typedef typename BaseLeaf::ValueAll ValueAll;
     typedef typename BaseLeaf::ChildOn ChildOn;
     typedef typename BaseLeaf::ChildOff ChildOff;
     typedef typename BaseLeaf::ChildAll ChildAll;
@@ -687,6 +453,17 @@ public:
     typedef typename BaseLeaf::template DenseIter<
         const PointDataLeafNode, const ValueType, ChildAll> ChildAllCIter;
 
+    typedef IndexValueIter<ValueOnCIter> IndexOnIter;
+    typedef IndexValueIter<ValueOffCIter> IndexOffIter;
+
+    /// @brief Leaf index iterator
+    IndexIter beginIndexAll() const;
+    IndexOnIter beginIndexOn() const;
+    IndexOffIter beginIndexOff() const;
+    /// @brief Leaf index iterator from voxel
+    IndexIter beginIndex(const unsigned index) const;
+    IndexIter beginIndex(const Coord& ijk) const;
+
 #define VMASK_ this->getValueMask()
     ValueOnCIter  cbeginValueOn() const  { return ValueOnCIter(VMASK_.beginOn(), this); }
     ValueOnCIter   beginValueOn() const  { return ValueOnCIter(VMASK_.beginOn(), this); }
@@ -729,6 +506,310 @@ public:
     ChildAllIter   endChildAll()         { return ChildAllIter(VMASK_.endDense(), this); }
 #undef VMASK_
 }; // struct PointDataLeafNode
+
+////////////////////////////////////////
+
+// PointDataLeafNode implementation
+
+template<typename T, Index Log2Dim>
+inline void
+PointDataLeafNode<T, Log2Dim>::initializeAttributes(const Descriptor::Ptr& descriptor, const size_t arrayLength)
+{
+    mAttributeSet.reset(new AttributeSet(descriptor, arrayLength));
+}
+
+template<typename T, Index Log2Dim>
+inline void
+PointDataLeafNode<T, Log2Dim>::clearAttributes()
+{
+    mAttributeSet.reset(new AttributeSet(mAttributeSet->descriptorPtr(), 0));
+
+    for (Index n = 0; n < LeafNodeType::NUM_VALUES; n++) {
+        this->setOffsetOn(n, 0);
+    }
+}
+
+template<typename T, Index Log2Dim>
+inline bool
+PointDataLeafNode<T, Log2Dim>::hasAttribute(const size_t pos) const
+{
+    return pos < mAttributeSet->size();
+}
+
+template<typename T, Index Log2Dim>
+inline bool
+PointDataLeafNode<T, Log2Dim>::hasAttribute(const Name& attributeName) const
+{
+    const size_t pos = mAttributeSet->find(attributeName);
+    return pos != AttributeSet::INVALID_POS;
+}
+
+template<typename T, Index Log2Dim>
+inline AttributeArray::Ptr
+PointDataLeafNode<T, Log2Dim>::appendAttribute(const AttributeSet::Util::NameAndType& attribute,
+                     const Descriptor& expected, Descriptor::Ptr& replacement)
+{
+    return mAttributeSet->appendAttribute(attribute, expected, replacement);
+}
+
+template<typename T, Index Log2Dim>
+inline void
+PointDataLeafNode<T, Log2Dim>::dropAttributes(const std::vector<size_t>& pos,
+                    const Descriptor& expected, Descriptor::Ptr& replacement)
+{
+    mAttributeSet->dropAttributes(pos, expected, replacement);
+}
+
+template<typename T, Index Log2Dim>
+inline void
+PointDataLeafNode<T, Log2Dim>::reorderAttributes(const Descriptor::Ptr& replacement)
+{
+    mAttributeSet->reorderAttributes(replacement);
+}
+
+template<typename T, Index Log2Dim>
+inline void
+PointDataLeafNode<T, Log2Dim>::swap(AttributeSet* attributeSet)
+{
+    if (!attributeSet) {
+        OPENVDB_THROW(ValueError, "Cannot swap with a null attribute set");
+    }
+
+    if (mAttributeSet->descriptor() != attributeSet->descriptor()) {
+        OPENVDB_THROW(ValueError, "Attribute set descriptors are not equal.");
+    }
+
+    mAttributeSet.reset(attributeSet);
+}
+
+template<typename T, Index Log2Dim>
+inline void
+PointDataLeafNode<T, Log2Dim>::setOffsets(const std::vector<ValueType>& offsets, const bool updateValueMask)
+{
+    if (offsets.size() != LeafNodeType::NUM_VALUES) {
+        OPENVDB_THROW(ValueError, "Offset vector size doesn't match number of voxels.")
+    }
+
+    for (size_t index = 0; index < offsets.size(); ++index) {
+        setOffsetOnly(index, offsets[index]);
+    }
+
+    if (updateValueMask) this->updateValueMask();
+}
+
+template<typename T, Index Log2Dim>
+inline void
+PointDataLeafNode<T, Log2Dim>::validateOffsets() const
+{
+    // Ensure all of the offset values are monotonically increasing
+    for (size_t index = 1; index < BaseLeaf::SIZE; ++index) {
+        if (this->getValue(index-1) > this->getValue(index)) {
+            OPENVDB_THROW(ValueError, "Voxel offset values are not monotonically increasing");
+        }
+    }
+
+    // Ensure all attribute arrays are of equal length
+    for (size_t attributeIndex = 1; attributeIndex < mAttributeSet->size(); ++attributeIndex ) {
+        if (mAttributeSet->getConst(attributeIndex-1)->size() != mAttributeSet->getConst(attributeIndex)->size()) {
+            OPENVDB_THROW(ValueError, "Attribute arrays have inconsistent length");
+        }
+    }
+
+    // Ensure the last voxel's offset value matches the size of each attribute array
+    if (mAttributeSet->size() > 0 && this->getValue(BaseLeaf::SIZE-1) != mAttributeSet->getConst(0)->size()) {
+        OPENVDB_THROW(ValueError, "Last voxel offset value does not match attribute array length");
+    }
+}
+
+template<typename T, Index Log2Dim>
+inline AttributeArray&
+PointDataLeafNode<T, Log2Dim>::attributeArray(const size_t pos)
+{
+    if (pos >= mAttributeSet->size())             OPENVDB_THROW(LookupError, "Attribute Out Of Range - " << pos);
+    return *mAttributeSet->get(pos);
+}
+
+template<typename T, Index Log2Dim>
+inline const AttributeArray&
+PointDataLeafNode<T, Log2Dim>::attributeArray(const size_t pos) const
+{
+    if (pos >= mAttributeSet->size())             OPENVDB_THROW(LookupError, "Attribute Out Of Range - " << pos);
+    return *mAttributeSet->getConst(pos);
+}
+
+template<typename T, Index Log2Dim>
+inline const AttributeArray&
+PointDataLeafNode<T, Log2Dim>::constAttributeArray(const size_t pos) const
+{
+    return this->attributeArray(pos);
+}
+
+template<typename T, Index Log2Dim>
+inline AttributeArray&
+PointDataLeafNode<T, Log2Dim>::attributeArray(const Name& attributeName)
+{
+    const size_t pos = mAttributeSet->find(attributeName);
+    if (pos == AttributeSet::INVALID_POS)         OPENVDB_THROW(LookupError, "Attribute Not Found - " << attributeName);
+    return *mAttributeSet->get(pos);
+}
+
+template<typename T, Index Log2Dim>
+inline const AttributeArray&
+PointDataLeafNode<T, Log2Dim>::attributeArray(const Name& attributeName) const
+{
+    const size_t pos = mAttributeSet->find(attributeName);
+    if (pos == AttributeSet::INVALID_POS)         OPENVDB_THROW(LookupError, "Attribute Not Found - " << attributeName);
+    return *mAttributeSet->getConst(pos);
+}
+
+template<typename T, Index Log2Dim>
+inline const AttributeArray&
+PointDataLeafNode<T, Log2Dim>::constAttributeArray(const Name& attributeName) const
+{
+    return this->attributeArray(attributeName);
+}
+
+template<typename T, Index Log2Dim>
+inline GroupHandle
+PointDataLeafNode<T, Log2Dim>::groupHandle(const AttributeSet::Descriptor::GroupIndex& index) const
+{
+    const AttributeArray& array = this->attributeArray(index.first);
+    assert(GroupAttributeArray::isGroup(array));
+
+    const GroupAttributeArray& groupArray = GroupAttributeArray::cast(array);
+
+    return GroupHandle(groupArray, index.second);
+}
+
+template<typename T, Index Log2Dim>
+inline GroupHandle
+PointDataLeafNode<T, Log2Dim>::groupHandle(const Name& name) const
+{
+    const AttributeSet::Descriptor::GroupIndex index = this->attributeSet().groupIndex(name);
+    return this->groupHandle(index);
+}
+
+template<typename T, Index Log2Dim>
+inline GroupWriteHandle
+PointDataLeafNode<T, Log2Dim>::groupWriteHandle(const AttributeSet::Descriptor::GroupIndex& index)
+{
+    AttributeArray& array = this->attributeArray(index.first);
+    assert(GroupAttributeArray::isGroup(array));
+
+    GroupAttributeArray& groupArray = GroupAttributeArray::cast(array);
+
+    return GroupWriteHandle(groupArray, index.second);
+}
+
+template<typename T, Index Log2Dim>
+inline GroupWriteHandle
+PointDataLeafNode<T, Log2Dim>::groupWriteHandle(const Name& name)
+{
+    const AttributeSet::Descriptor::GroupIndex index = this->attributeSet().groupIndex(name);
+    return this->groupWriteHandle(index);
+}
+
+template<typename T, Index Log2Dim>
+inline IndexIter
+PointDataLeafNode<T, Log2Dim>::beginIndexAll() const
+{
+    const ValueType start = 0;
+    const ValueType end = this->getValue(NUM_VOXELS - 1);
+    return IndexIter(start, end);
+}
+
+template<typename T, Index Log2Dim>
+inline typename PointDataLeafNode<T, Log2Dim>::IndexOnIter
+PointDataLeafNode<T, Log2Dim>::beginIndexOn() const
+{
+    ValueOnCIter iter = this->cbeginValueOn();
+    return IndexOnIter(iter);
+}
+
+template<typename T, Index Log2Dim>
+inline typename PointDataLeafNode<T, Log2Dim>::IndexOffIter
+PointDataLeafNode<T, Log2Dim>::beginIndexOff() const
+{
+    ValueOffCIter iter = this->cbeginValueOff();
+    return IndexOffIter(iter);
+}
+
+template<typename T, Index Log2Dim>
+inline IndexIter
+PointDataLeafNode<T, Log2Dim>::beginIndex(const unsigned index) const
+{
+    assert(index < BaseLeaf::SIZE);
+    const ValueType end = this->getValue(index);
+    const ValueType start = (index == 0) ? ValueType(0) : this->getValue(index - 1);
+    return IndexIter(start, end);
+}
+
+template<typename T, Index Log2Dim>
+inline IndexIter
+PointDataLeafNode<T, Log2Dim>::beginIndex(const Coord& ijk) const
+{
+    return this->beginIndex(LeafNodeType::coordToOffset(ijk));
+}
+
+template<typename T, Index Log2Dim>
+inline Index64
+PointDataLeafNode<T, Log2Dim>::pointCount() const
+{
+    return this->getValue(NUM_VOXELS - 1);
+}
+
+template<typename T, Index Log2Dim>
+inline Index64
+PointDataLeafNode<T, Log2Dim>::onPointCount() const
+{
+    if (this->isEmpty())        return 0;
+    else if (this->isDense())   return this->pointCount();
+
+    // TODO: with a small change, this could use openvdb::tree::IteratorRange
+    Index64 size = 0;
+    for (IndexOnIter iter = this->beginIndexOn(); iter; ++iter, ++size) { }
+    return size;
+}
+
+template<typename T, Index Log2Dim>
+inline Index64
+PointDataLeafNode<T, Log2Dim>::offPointCount() const
+{
+    if (this->isEmpty())        return this->pointCount();
+    else if (this->isDense())   return 0;
+
+    // TODO: with a small change, this could use openvdb::tree::IteratorRange
+    Index64 size = 0;
+    for (IndexOffIter iter = this->beginIndexOff(); iter; ++iter, ++size) { }
+    return size;
+}
+
+template<typename T, Index Log2Dim>
+inline void
+PointDataLeafNode<T, Log2Dim>::updateValueMask()
+{
+    ValueType start = 0, end = 0;
+    for (Index n = 0; n < LeafNodeType::NUM_VALUES; n++) {
+        end = this->getValue(n);
+        this->setValueMask(n, (end - start) > 0);
+        start = end;
+    }
+}
+
+template<typename T, Index Log2Dim>
+inline void
+PointDataLeafNode<T, Log2Dim>::setOffsetOn(Index offset, const ValueType& val)
+{
+    this->buffer().setValue(offset, val);
+    this->setValueMaskOn(offset);
+}
+
+template<typename T, Index Log2Dim>
+inline void
+PointDataLeafNode<T, Log2Dim>::setOffsetOnly(Index offset, const ValueType& val)
+{
+    this->buffer().setValue(offset, val);
+}
 
 template<typename T, Index Log2Dim>
 inline void

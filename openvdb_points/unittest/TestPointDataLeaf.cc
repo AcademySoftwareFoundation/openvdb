@@ -47,7 +47,6 @@ public:
     CPPUNIT_TEST(testOffsets);
     CPPUNIT_TEST(testSetValue);
     CPPUNIT_TEST(testMonotonicity);
-    CPPUNIT_TEST(testPointCount);
     CPPUNIT_TEST(testAttributes);
     CPPUNIT_TEST(testTopologyCopy);
     CPPUNIT_TEST(testEquivalence);
@@ -60,7 +59,6 @@ public:
     void testOffsets();
     void testSetValue();
     void testMonotonicity();
-    void testPointCount();
     void testAttributes();
     void testTopologyCopy();
     void testEquivalence();
@@ -339,7 +337,7 @@ TestPointDataLeaf::testOffsets()
             offsets.back() = numAttributes;
             leafNode->setOffsets(offsets);
 
-            leafNode->validateOffsets();
+            CPPUNIT_ASSERT_NO_THROW(leafNode->validateOffsets());
             delete leafNode;
         }
 
@@ -475,143 +473,6 @@ TestPointDataLeaf::testMonotonicity()
     leaf.setOffsetOn(500, 4);
 
     CPPUNIT_ASSERT(!monotonicOffsets(leaf));
-}
-
-
-void
-TestPointDataLeaf::testPointCount()
-{
-    using namespace openvdb::tools;
-
-    typedef PointDataAccessor<PointDataTree> Accessor;
-    typedef PointDataAccessor<PointDataTree>::PointDataIndex Index;
-
-    // create a tree and check an accessor returns no data
-
-    PointDataTree tree;
-    Accessor accessor(tree);
-
-    {
-        Index index = accessor.get(openvdb::Coord(0, 0, 0));
-
-        CPPUNIT_ASSERT_EQUAL(int(index.first), 0);
-        CPPUNIT_ASSERT_EQUAL(int(index.second), 0);
-    }
-
-    // add a new leaf to a tree and re-test
-
-    LeafType leaf(openvdb::Coord(0, 0, 0));
-
-    tree.addLeaf(leaf);
-
-    {
-        Index index = accessor.get(openvdb::Coord(0, 0, 0));
-
-        CPPUNIT_ASSERT_EQUAL(int(index.first), 0);
-        CPPUNIT_ASSERT_EQUAL(int(index.second), 0);
-
-        CPPUNIT_ASSERT_EQUAL(accessor.pointCount(openvdb::Coord(0, 0, 0)), Index64(0));
-    }
-
-    // now manually set some offsets
-
-    leaf.setOffsetOn(0, 4);
-    leaf.setOffsetOn(1, 7);
-
-    CPPUNIT_ASSERT_EQUAL(int(leaf.pointIndex(0).first), 0);
-    CPPUNIT_ASSERT_EQUAL(int(leaf.pointIndex(0).second), 4);
-
-    CPPUNIT_ASSERT_EQUAL(int(leaf.pointIndex(1).first), 4);
-    CPPUNIT_ASSERT_EQUAL(int(leaf.pointIndex(1).second), 7);
-
-    {
-        Index index = accessor.get(openvdb::Coord(0, 0, 0));
-
-        CPPUNIT_ASSERT_EQUAL(int(index.first), 0);
-        CPPUNIT_ASSERT_EQUAL(int(index.second), 4);
-
-        CPPUNIT_ASSERT_EQUAL(accessor.pointCount(openvdb::Coord(0, 0, 0)), Index64(4));
-
-        Index index2 = accessor.get(openvdb::Coord(0, 0, 1));
-
-        CPPUNIT_ASSERT_EQUAL(int(index2.first), 4);
-        CPPUNIT_ASSERT_EQUAL(int(index2.second), 7);
-
-        CPPUNIT_ASSERT_EQUAL(accessor.pointCount(openvdb::Coord(0, 0, 1)), Index64(7 - 4));
-
-        // check pointCount ignores active/inactive state
-
-        leaf.setValueOff(1);
-
-        CPPUNIT_ASSERT_EQUAL(accessor.pointCount(openvdb::Coord(0, 0, 1)), Index64(7 - 4));
-
-        leaf.setValueOn(1);
-    }
-
-    // one point per voxel
-
-    for (unsigned int i = 0; i < LeafType::SIZE; i++) {
-        leaf.setOffsetOn(i, i);
-    }
-
-    CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::All), Index64(LeafType::SIZE - 1));
-    CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::Active), Index64(LeafType::SIZE - 1));
-    CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::Inactive), Index64(0));
-
-    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::All), Index64(LeafType::SIZE - 1));
-    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::Active), Index64(LeafType::SIZE - 1));
-    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::Inactive), Index64(0));
-
-    // manually de-activate two voxels
-
-    leaf.setValueOff(100);
-    leaf.setValueOff(101);
-
-    CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::All), Index64(LeafType::SIZE - 1));
-    CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::Active), Index64(LeafType::SIZE - 3));
-    CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::Inactive), Index64(2));
-
-    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::All), Index64(LeafType::SIZE - 1));
-    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::Active), Index64(LeafType::SIZE - 3));
-    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::Inactive), Index64(2));
-
-    // one point per every other voxel and de-activate empty voxels
-
-    unsigned sum = 0;
-
-    for (unsigned int i = 0; i < LeafType::SIZE; i++) {
-        leaf.setOffsetOn(i, sum);
-        if (i % 2 == 0)     sum++;
-    }
-
-    leaf.updateValueMask();
-
-    CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::All), Index64(LeafType::SIZE / 2));
-    CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::Active), Index64(LeafType::SIZE / 2));
-    CPPUNIT_ASSERT_EQUAL(leaf.pointCount(point_masks::Inactive), Index64(0));
-
-    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::All), Index64(LeafType::SIZE / 2));
-    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::Active), Index64(LeafType::SIZE / 2));
-    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::Inactive), Index64(0));
-
-    // add a new non-empty leaf and check totalPointCount is correct
-
-    LeafType leaf2(openvdb::Coord(0, 0, 8));
-
-    for (unsigned int i = 0; i < LeafType::SIZE; i++) {
-        leaf2.setOffsetOn(i, i);
-    }
-
-    tree.addLeaf(leaf2);
-
-    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::All), Index64(LeafType::SIZE / 2 + LeafType::SIZE - 1));
-    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::Active), Index64(LeafType::SIZE / 2 + LeafType::SIZE - 1));
-    CPPUNIT_ASSERT_EQUAL(accessor.totalPointCount(point_masks::Inactive), Index64(0));
-
-    // steal the leaf nodes back to recover ownership (and prevent them being deleted twice)
-
-    std::vector<LeafType*> array;
-    tree.stealNodes(array);
 }
 
 
