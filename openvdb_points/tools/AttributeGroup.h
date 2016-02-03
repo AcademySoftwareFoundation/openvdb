@@ -62,7 +62,7 @@ public:
     explicit GroupAttributeArray(   size_t n = 1,
                                     const ValueType& uniformValue = zeroVal<ValueType>());
     /// Deep copy constructor (optionally decompress during copy).
-    GroupAttributeArray(const TypedAttributeArray<GroupType, NullAttributeCodec<GroupType> >& array,
+    GroupAttributeArray(const GroupAttributeArray& array,
                         const bool decompress = false);
 
     /// Cast an AttributeArray to GroupAttributeArray
@@ -123,22 +123,14 @@ public:
 
     typedef std::pair<size_t, uint8_t> GroupIndex;
 
-    GroupHandle(const GroupAttributeArray& array,
-                const GroupType& offset)
-        : mArray(array)
-        , mBitMask(GroupType(1) << offset) { assert(mArray.isGroup()); }
-
-    GroupHandle(const GroupAttributeArray& array,
-                const GroupType& bitMask,
-                BitMask)
-        : mArray(array)
-        , mBitMask(bitMask) { assert(mArray.isGroup()); }
+    GroupHandle(const GroupAttributeArray& array, const GroupType& offset);
+    GroupHandle(const GroupAttributeArray& array, const GroupType& bitMask, BitMask);
 
     size_t size() const { return mArray.size(); }
 
     bool get(Index n) const;
 
-private:
+protected:
     const GroupAttributeArray& mArray;
     const GroupType mBitMask;
 }; // class GroupHandle
@@ -147,25 +139,14 @@ private:
 ////////////////////////////////////////
 
 
-class GroupWriteHandle
+class GroupWriteHandle : public GroupHandle
 {
 public:
-    typedef std::pair<size_t, uint8_t> GroupIndex;
 
-    GroupWriteHandle(   GroupAttributeArray& array,
-                        const GroupType& offset)
-        : mArray(array)
-        , mBitMask(GroupType(1) << offset) { assert(mArray.isGroup()); }
-
-    size_t size() const { return mArray.size(); }
-
-    bool get(Index n) const;
+    GroupWriteHandle(GroupAttributeArray& array, const GroupType& offset);
 
     void set(Index n, bool on);
 
-private:
-    GroupAttributeArray& mArray;
-    const GroupType mBitMask;
 }; // class GroupWriteHandle
 
 

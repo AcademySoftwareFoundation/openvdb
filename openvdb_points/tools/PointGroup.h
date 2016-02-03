@@ -105,11 +105,13 @@ inline void compactGroups(PointDataTree& tree);
 /// @param indexTree     the PointIndexTree.
 /// @param membership    @c true if the point is in the group.
 /// @param group         the name of the group.
+/// @param remove        if @c true also perform removal of points from the group.
 template <typename PointDataTree, typename PointIndexTree>
 inline void setGroup(   PointDataTree& tree,
                         const PointIndexTree& indexTree,
                         const std::vector<bool>& membership,
-                        const Name& group);
+                        const Name& group,
+                        const bool remove = false);
 
 
 ////////////////////////////////////////
@@ -156,7 +158,7 @@ struct CopyGroupOp {
 };
 
 
-template <typename PointDataTree, typename PointIndexTree>
+template <typename PointDataTree, typename PointIndexTree, bool Remove>
 struct SetGroupFromIndexOp
 {
     typedef typename tree::LeafManager<PointDataTree>   LeafManagerT;
@@ -189,19 +191,21 @@ struct SetGroupFromIndexOp
 
             // initialise the attribute storage
 
-            pointIndexLeaf->indices();
-
             Index64 index = 0;
 
             const IndexArray& indices = pointIndexLeaf->indices();
 
-            for (typename IndexArray::const_iterator it = indices.begin(), it_end = indices.end(); it != it_end; ++it)
+            for (typename IndexArray::const_iterator it = indices.begin(),
+                                                     it_end = indices.end(); it != it_end; ++it)
             {
-                if (mMembership.at(*it)) {
-                    group.set(index, true);
+                if (Remove) {
+                    group.set(index++, mMembership.at(*it));
                 }
+                else {
+                    if (mMembership.at(*it))    group.set(index, true);
 
-                index++;
+                    index++;
+                }
             }
         }
     }
@@ -540,9 +544,11 @@ template <typename PointDataTree, typename PointIndexTree>
 inline void setGroup(   PointDataTree& tree,
                         const PointIndexTree& indexTree,
                         const std::vector<bool>& membership,
-                        const Name& group)
+                        const Name& group,
+                        const bool remove)
 {
     typedef AttributeSet::Descriptor Descriptor;
+    typedef typename tree::template LeafManager<PointDataTree> LeafManagerT;
 
     if (membership.size() != pointCount(tree)) {
         OPENVDB_THROW(LookupError, "Membership vector size must match number of points.");
@@ -565,10 +571,16 @@ inline void setGroup(   PointDataTree& tree,
 
     // set membership
 
-    SetGroupFromIndexOp<PointDataTree,
-                        PointIndexTree> set(indexTree, membership, index);
-
-    tbb::parallel_for(typename tree::template LeafManager<PointDataTree>(tree).leafRange(1000000), set);
+    if (remove) {
+        SetGroupFromIndexOp<PointDataTree,
+                            PointIndexTree, false> set(indexTree, membership, index);
+        tbb::parallel_for(LeafManagerT(tree).leafRange(), set);
+    }
+    else {
+        SetGroupFromIndexOp<PointDataTree,
+                            PointIndexTree, true> set(indexTree, membership, index);
+        tbb::parallel_for(LeafManagerT(tree).leafRange(), set);
+    }
 }
 
 

@@ -103,27 +103,20 @@ template <  typename PointDataTreeT,
             typename FilterFromLeafT>
 struct PointCountOp
 {
-    typedef typename tree::LeafManager<PointDataTreeT>      LeafManagerT;
-    typedef typename PointDataTreeT::LeafNodeType           LeafT;
-    typedef IndexIterTraits<PointDataTreeT, ValueIterT>     IndexIteratorFromLeafT;
-    typedef typename IndexIteratorFromLeafT::Iterator       IndexIterator;
-    typedef typename FilterFromLeafT::Filter                Filter;
-    typedef FilterIndexIter<IndexIterator, Filter>          Iterator;
+    typedef typename tree::LeafManager<const PointDataTreeT>    LeafManagerT;
+    typedef IndexIterTraits<PointDataTreeT, ValueIterT>         IndexIteratorFromLeafT;
+    typedef typename IndexIteratorFromLeafT::Iterator           IndexIterator;
+    typedef typename FilterFromLeafT::Filter                    Filter;
+    typedef FilterIndexIter<IndexIterator, Filter>              Iterator;
 
-    PointCountOp(const PointDataTreeT& tree,
-                 const LeafManagerT& leafs,
-                 const FilterFromLeafT& filterFromLeaf)
-        : mTree(tree)
-        , mLeafs(leafs)
-        , mFilterFromLeaf(filterFromLeaf) { }
+    PointCountOp(const FilterFromLeafT& filterFromLeaf)
+        : mFilterFromLeaf(filterFromLeaf) { }
 
-    Index64 operator()(const tbb::blocked_range<size_t>& range, Index64 size) const {
+    Index64 operator()(const typename LeafManagerT::LeafRange& range, Index64 size) const {
 
-        for (size_t n = range.begin(); n != range.end(); ++n) {
-            const LeafT& leaf = mLeafs.leaf(n);
-
-            IndexIterator indexIterator(IndexIteratorFromLeafT::begin(leaf));
-            Filter filter(mFilterFromLeaf.fromLeaf(leaf));
+        for (typename LeafManagerT::LeafRange::Iterator leaf = range.begin(); leaf; ++leaf) {
+            IndexIterator indexIterator(IndexIteratorFromLeafT::begin(*leaf));
+            Filter filter(mFilterFromLeaf.fromLeaf(*leaf));
             Iterator iter(indexIterator, filter);
             size += iterCount<Iterator>(iter);
         }
@@ -136,8 +129,6 @@ struct PointCountOp
     }
 
 private:
-    const PointDataTreeT& mTree;
-    const LeafManagerT& mLeafs;
     const FilterFromLeafT& mFilterFromLeaf;
 }; // struct PointCountOp
 
@@ -148,9 +139,9 @@ Index64 threadedFilterPointCount(   const PointDataTreeT& tree,
 {
     typedef point_count_internal::PointCountOp< PointDataTreeT, ValueIterT, FilterFromLeafT> PointCountOp;
 
-    typename tree::LeafManager<PointDataTreeT> leafs(const_cast<PointDataTreeT&>(tree));
-    const PointCountOp pointCountOp(tree, leafs, filterFromLeaf);
-    return tbb::parallel_reduce(leafs.getRange(), Index64(0), pointCountOp, PointCountOp::join);
+    typename tree::LeafManager<const PointDataTreeT> leafManager(tree);
+    const PointCountOp pointCountOp(filterFromLeaf);
+    return tbb::parallel_reduce(leafManager.leafRange(), Index64(0), pointCountOp, PointCountOp::join);
 }
 
 } // namespace point_count_internal

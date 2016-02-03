@@ -120,6 +120,9 @@ TestAttributeGroup::testAttributeGroup()
         CPPUNIT_ASSERT(!attr.isGroup());
 
         GroupAttributeArray attrB(attr);
+
+        attr.setGroup(true);
+
         CPPUNIT_ASSERT(matchingNamePairs(attr.type(), attrB.type()));
         CPPUNIT_ASSERT_EQUAL(attr.size(), attrB.size());
         CPPUNIT_ASSERT_EQUAL(attr.memUsage(), attrB.memUsage());
