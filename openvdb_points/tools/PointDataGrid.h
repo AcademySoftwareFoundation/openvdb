@@ -227,13 +227,17 @@ public:
     void validateOffsets() const;
 
     /// @brief Read-write attribute array reference from index
+    /// {
     AttributeArray& attributeArray(const size_t pos);
-    /// @brief Read-write attribute array reference from name
-    AttributeArray& attributeArray(const Name& attributeName);
-    /// @brief Read-only attribute array reference from index
     const AttributeArray& attributeArray(const size_t pos) const;
-    /// @brief Read-only attribute array reference from name
+    const AttributeArray& constAttributeArray(const size_t pos) const;
+    /// }
+    /// @brief Read-write attribute array reference from name
+    /// {
+    AttributeArray& attributeArray(const Name& attributeName);
     const AttributeArray& attributeArray(const Name& attributeName) const;
+    const AttributeArray& constAttributeArray(const Name& attributeName) const;
+    /// }
 
     /// @brief Read-only group handle from group index
     GroupHandle groupHandle(const AttributeSet::Descriptor::GroupIndex& index) const;
@@ -626,6 +630,21 @@ PointDataLeafNode<T, Log2Dim>::attributeArray(const size_t pos)
 }
 
 template<typename T, Index Log2Dim>
+inline const AttributeArray&
+PointDataLeafNode<T, Log2Dim>::attributeArray(const size_t pos) const
+{
+    if (pos >= mAttributeSet->size())             OPENVDB_THROW(LookupError, "Attribute Out Of Range - " << pos);
+    return *mAttributeSet->getConst(pos);
+}
+
+template<typename T, Index Log2Dim>
+inline const AttributeArray&
+PointDataLeafNode<T, Log2Dim>::constAttributeArray(const size_t pos) const
+{
+    return this->attributeArray(pos);
+}
+
+template<typename T, Index Log2Dim>
 inline AttributeArray&
 PointDataLeafNode<T, Log2Dim>::attributeArray(const Name& attributeName)
 {
@@ -636,19 +655,18 @@ PointDataLeafNode<T, Log2Dim>::attributeArray(const Name& attributeName)
 
 template<typename T, Index Log2Dim>
 inline const AttributeArray&
-PointDataLeafNode<T, Log2Dim>::attributeArray(const size_t pos) const
-{
-    if (pos >= mAttributeSet->size())             OPENVDB_THROW(LookupError, "Attribute Out Of Range - " << pos);
-    return *mAttributeSet->getConst(pos);
-}
-
-template<typename T, Index Log2Dim>
-inline const AttributeArray&
 PointDataLeafNode<T, Log2Dim>::attributeArray(const Name& attributeName) const
 {
     const size_t pos = mAttributeSet->find(attributeName);
     if (pos == AttributeSet::INVALID_POS)         OPENVDB_THROW(LookupError, "Attribute Not Found - " << attributeName);
     return *mAttributeSet->getConst(pos);
+}
+
+template<typename T, Index Log2Dim>
+inline const AttributeArray&
+PointDataLeafNode<T, Log2Dim>::constAttributeArray(const Name& attributeName) const
+{
+    return this->attributeArray(attributeName);
 }
 
 template<typename T, Index Log2Dim>
