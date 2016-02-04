@@ -520,16 +520,24 @@ TestPointDataLeaf::testAttributes()
 
     CPPUNIT_ASSERT(!zeroLeafValues(&leaf));
 
-    // clear the attributes and check voxel values have been zeroed
+    // neither dense nor empty
 
-    leaf.clearAttributes();
+    CPPUNIT_ASSERT(!leaf.isDense());
+    CPPUNIT_ASSERT(!leaf.isEmpty());
+
+    // clear the attributes and check voxel values are zero but value mask is not touched
+
+    leaf.clearAttributes(/*updateValueMask=*/ false);
+
+    CPPUNIT_ASSERT(!leaf.isDense());
+    CPPUNIT_ASSERT(!leaf.isEmpty());
 
     CPPUNIT_ASSERT_EQUAL(leaf.attributeSet().size(), size_t(2));
-
-    CPPUNIT_ASSERT(leaf.isDense());
     CPPUNIT_ASSERT(zeroLeafValues(&leaf));
 
-    leaf.updateValueMask();
+    // call clearAttributes again, updating the value mask and check it is now inactive
+
+    leaf.clearAttributes();
 
     CPPUNIT_ASSERT(leaf.isEmpty());
 
@@ -540,6 +548,7 @@ TestPointDataLeaf::testAttributes()
 
     CPPUNIT_ASSERT_EQUAL(array0->size(), size_t(1));
     CPPUNIT_ASSERT_EQUAL(array1->size(), size_t(1));
+
     // test leaf returns expected result for hasAttribute()
 
     CPPUNIT_ASSERT(leaf.hasAttribute(/*pos*/0));
@@ -552,6 +561,7 @@ TestPointDataLeaf::testAttributes()
     CPPUNIT_ASSERT(!leaf.hasAttribute("test"));
 
     // test underlying attributeArray can be accessed by name and index, and that their types are as expected.
+
     const LeafType* constLeaf = &leaf;
 
     CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray(/*pos*/0).type(), AttributeS::attributeType()));

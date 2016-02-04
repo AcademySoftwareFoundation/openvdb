@@ -189,7 +189,7 @@ public:
     /// @brief Create a new attribute set. Existing attributes will be removed.
     void initializeAttributes(const Descriptor::Ptr& descriptor, const size_t arrayLength);
     /// @brief Clear the attribute set.
-    void clearAttributes();
+    void clearAttributes(const bool updateValueMask = true);
 
     /// @brief Returns @c true if an attribute with this index exists.
     /// @param pos Index of the attribute
@@ -520,13 +520,19 @@ PointDataLeafNode<T, Log2Dim>::initializeAttributes(const Descriptor::Ptr& descr
 
 template<typename T, Index Log2Dim>
 inline void
-PointDataLeafNode<T, Log2Dim>::clearAttributes()
+PointDataLeafNode<T, Log2Dim>::clearAttributes(const bool updateValueMask)
 {
     mAttributeSet.reset(new AttributeSet(mAttributeSet->descriptorPtr(), 0));
 
+    // zero voxel values
+
     for (Index n = 0; n < LeafNodeType::NUM_VALUES; n++) {
-        this->setOffsetOn(n, 0);
+        this->setOffsetOnly(n, 0);
     }
+
+    // if updateValueMask, also de-activate all voxels
+
+    if (updateValueMask)    this->setValuesOff();
 }
 
 template<typename T, Index Log2Dim>
