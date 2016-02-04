@@ -60,10 +60,11 @@ public:
     /// @note Should normally be followed by a call to stop()
     ProfileTimer(const std::string& msg)
     {
+        (void)msg;
+#ifdef PROFILE
         // padd string to 50 characters
         std::string newMsg(msg);
         newMsg.insert(newMsg.end(), 50 - newMsg.size(), ' ');
-#ifdef PROFILE
         std::cerr << newMsg << " ... ";
 #endif
         mT0 = tbb::tick_count::now();
@@ -81,9 +82,9 @@ public:
     /// @brief Print time in milliseconds since construction or start was called.
     inline void stop() const
     {
+#ifdef PROFILE
         std::stringstream ss;
         ss << std::setw(6) << ::round(this->delta());
-#ifdef PROFILE
         std::cerr << "completed in " << ss.str() << " ms\n";
 #endif
     }

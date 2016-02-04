@@ -197,6 +197,17 @@ struct IndexIterTraits<TreeT, typename TreeT::LeafNodeType::ValueOffCIter> {
 
 
 /// @brief A forward iterator over array indices with filtering
+/// IteratorT can be either IndexIter or IndexValueIter (or some custom index iterator)
+/// FilterT should be a struct or class with a valid() method than can be evaluated per index
+/// Here's a simple filter example that only accepts even indices:
+///
+/// struct EvenIndexFilter
+/// {
+///     bool valid(const Index32 offset) const {
+///         return (offset % 2) == 0;
+///     }
+/// };
+///
 template <typename IteratorT, typename FilterT>
 class FilterIndexIter
 {
