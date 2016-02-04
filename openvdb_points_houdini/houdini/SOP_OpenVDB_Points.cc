@@ -1273,7 +1273,7 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
 
         // store point group information
 
-        const GA_PointGroupTable& pointGroups = ptGeo->pointGroups();
+        const GA_ElementGroupTable& elementGroups = ptGeo->getElementGroupTable(GA_ATTRIB_POINT);
 
         // Create PointPartitioner compatible P attribute wrapper (for now no offset filtering)
 
@@ -1294,15 +1294,12 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
         // Append (empty) groups to tree
 
         std::vector<Name> groupNames;
-        groupNames.reserve(pointGroups.entries());
+        groupNames.reserve(elementGroups.entries());
 
-        for (GA_PointGroupTable::iterator   it = pointGroups.beginTraverse(),
-                                            itEnd = pointGroups.endTraverse(); it != itEnd; ++it)
+        for (GA_ElementGroupTable::iterator it = elementGroups.beginTraverse(),
+                                            itEnd = elementGroups.endTraverse(); it != itEnd; ++it)
         {
-            GA_PointGroup* group = *it;
-
-
-            groupNames.push_back(group->getName().toStdString());
+            groupNames.push_back((*it)->getName().toStdString());
         }
 
         appendGroups(tree, groupNames);
@@ -1311,23 +1308,21 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
 
         std::vector<bool> inGroup(ptGeo->getNumPoints(), false);
 
-        for (GA_PointGroupTable::iterator   it = pointGroups.beginTraverse(),
-                                            itEnd = pointGroups.endTraverse(); it != itEnd; ++it)
+        for (GA_ElementGroupTable::iterator it = elementGroups.beginTraverse(),
+                                            itEnd = elementGroups.endTraverse(); it != itEnd; ++it)
         {
-            GA_PointGroup* group = *it;
-            const Name groupName = group->getName().toStdString();
-
             // insert group offsets
 
             GA_Offset start, end;
-            GA_Range range(*group);
-            for (GA_Iterator it = range.begin(); it.blockAdvance(start, end); ) {
+            GA_Range range(**it);
+            for (GA_Iterator rangeIt = range.begin(); rangeIt.blockAdvance(start, end); ) {
                 for (GA_Offset off = start; off < end; ++off) {
                     assert(off < inGroup.size());
                     inGroup[off] = true;
                 }
             }
 
+            const Name groupName = (*it)->getName().toStdString();
             setGroup(tree, indexTree, inGroup, groupName);
 
             std::fill(inGroup.begin(), inGroup.end(), false);
