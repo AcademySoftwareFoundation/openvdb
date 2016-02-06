@@ -169,7 +169,6 @@ public:
     // common Point Data typedefs
 
     typedef openvdb::tools::PointDataTree::LeafNodeType PointDataLeaf;
-    typedef openvdb::tools::PointDataAccessor<openvdb::tools::PointDataTree> PointDataAccessor;
 
     // acceleration typedefs
 

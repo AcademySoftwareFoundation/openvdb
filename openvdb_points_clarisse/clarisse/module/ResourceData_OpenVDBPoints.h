@@ -79,9 +79,6 @@ public:
 
     std::string attribute_type(const std::string& name) const;
 
-    void *create_thread_data() const;
-    void destroy_thread_data(void *data) const;
-
     size_t get_memory_size() const;
 
 private:

@@ -89,11 +89,9 @@ struct ConvertVelocityToIndexSpaceOp {
     typedef tree::LeafManager<PointDataTree> LeafManager;
     typedef PointDataTree::LeafNodeType PointDataLeafNode;
 
-    ConvertVelocityToIndexSpaceOp(  const PointDataTree& tree,
-                                    const size_t velocityIndex,
+    ConvertVelocityToIndexSpaceOp(  const size_t velocityIndex,
                                     const math::Transform& transform)
-        : mAccessor(tree)
-        , mIndex(velocityIndex)
+        : mIndex(velocityIndex)
         , mTransform(transform) { }
 
     void operator()(const LeafManager::LeafRange& range) const {
@@ -103,40 +101,26 @@ struct ConvertVelocityToIndexSpaceOp {
             typename AttributeWriteHandle<VelocityType>::Ptr velocityWriteHandle =
                 AttributeWriteHandle<VelocityType>::create(leaf->attributeArray(mIndex));
 
-            // @todo: need to extend the AttributeWriteHandle API to support uniform values
-
-            // if (velocityWriteHandle.isUniform()) {
-            //     const VelocityType velocity = mTransform.worldToIndex(velocityWriteHandle.get(Index64(0)));
-            //     velocityWriteHandle.collapse(transformedVelocity);
-            // }
-            // else {
+            if (velocityWriteHandle->isUniform()) {
+                const VelocityType velocity = mTransform.worldToIndex(velocityWriteHandle->get(Index64(0)));
+                velocityWriteHandle->collapse(velocity);
+            }
+            else {
                 for (PointDataLeafNode::ValueOnCIter value = leaf->cbeginValueOn(); value; ++value)
                 {
                     Coord ijk = value.getCoord();
 
-                    if(mAccessor.pointCount(ijk) == 0) continue;
-
-                    PointDataAccessor<PointDataTree>::PointDataIndex range = mAccessor.get(ijk);
-
-                    const unsigned start = range.first;
-                    const unsigned end = range.second;
-
-                    for (unsigned index = start; index < end; index++) {
-
-                        const VelocityType velocity = velocityWriteHandle->get(Index64(index));
-
-                        const VelocityType transformedVelocity = mTransform.worldToIndex(velocity);
-
-                        velocityWriteHandle->set(Index64(index), transformedVelocity);
+                    for (IndexIter iter = leaf->beginIndex(ijk); iter; ++iter) {
+                        const VelocityType velocity = mTransform.worldToIndex(velocityWriteHandle->get(*iter));
+                        velocityWriteHandle->set(*iter, velocity);
                     }
                 }
-            // }
+            }
         }
     }
 
     //////////
 
-    PointDataAccessor<PointDataTree>    mAccessor;
     const unsigned                      mIndex;
     const math::Transform&              mTransform;
 }; // ConvertVelocityToIndexSpaceOp
@@ -147,11 +131,9 @@ struct ConvertScalarToIndexSpaceOp {
     typedef tree::LeafManager<PointDataTree> LeafManagerT;
     typedef PointDataTree::LeafNodeType PointDataLeafNode;
 
-    ConvertScalarToIndexSpaceOp(const PointDataTree& tree,
-                                const size_t index,
+    ConvertScalarToIndexSpaceOp(const size_t index,
                                 const math::Transform& transform)
-        : mAccessor(tree)
-        , mIndex(index)
+        : mIndex(index)
         , mTransform(transform) { }
 
     void operator()(const LeafManagerT::LeafRange& range) const {
@@ -161,40 +143,27 @@ struct ConvertScalarToIndexSpaceOp {
             typename AttributeWriteHandle<ScalarType>::Ptr scalarWriteHandle =
                 AttributeWriteHandle<ScalarType>::create(leaf->attributeArray(mIndex));
 
-            // @todo: need to extend the AttributeWriteHandle API to support uniform values
-
-            // if (scalarWriteHandle.isUniform()) {
-            //     const ScalarType transformedScalar = scalarWriteHandle.get(Index64(0)) / mTransform.voxelSize()[0];
-            //     scalarWriteHandle.collapse(transformedScalar);
-            // }
-            // else {
+            if (scalarWriteHandle->isUniform()) {
+                const ScalarType transformedScalar = scalarWriteHandle->get(Index64(0)) / mTransform.voxelSize()[0];
+                scalarWriteHandle->collapse(transformedScalar);
+            }
+            else {
                 for (PointDataLeafNode::ValueOnCIter value = leaf->cbeginValueOn(); value; ++value)
                 {
                     Coord ijk = value.getCoord();
 
-                    if(mAccessor.pointCount(ijk) == 0) continue;
-
-                    PointDataAccessor<PointDataTree>::PointDataIndex range = mAccessor.get(ijk);
-
-                    const unsigned start = range.first;
-                    const unsigned end = range.second;
-
-                    for (unsigned index = start; index < end; index++) {
-
-                        const ScalarType scalar = scalarWriteHandle->get(Index64(index));
-
+                    for (IndexIter iter = leaf->beginIndex(ijk); iter; ++iter) {
+                        const ScalarType scalar = scalarWriteHandle->get(*iter);
                         const ScalarType transformedScalar = scalar / mTransform.voxelSize()[0];
-
-                        scalarWriteHandle->set(Index64(index), transformedScalar);
+                        scalarWriteHandle->set(*iter, transformedScalar);
                     }
                 }
-            // }
+            }
         }
     }
 
     //////////
 
-    PointDataAccessor<PointDataTree>    mAccessor;
     const unsigned                      mIndex;
     const math::Transform&              mTransform;
 }; // ConvertScalarToIndexSpaceOp
@@ -236,10 +205,10 @@ void localise(PointDataGrid::Ptr& grid)
         const NamePair& type = descriptor.type(velocityIndex);
 
         if (type.first == "vec3s") {
-            tbb::parallel_for(range, ConvertVelocityToIndexSpaceOp<Vec3f>(tree, velocityIndex, transform));
+            tbb::parallel_for(range, ConvertVelocityToIndexSpaceOp<Vec3f>(velocityIndex, transform));
         }
         else if (type.first == "vec3h") {
-            tbb::parallel_for(range, ConvertVelocityToIndexSpaceOp<math::Vec3<half> >(tree, velocityIndex, transform));
+            tbb::parallel_for(range, ConvertVelocityToIndexSpaceOp<math::Vec3<half> >(velocityIndex, transform));
         }
         else {
             std::cerr << "Unsupported type for velocity - " << type.first << std::endl;
@@ -254,10 +223,10 @@ void localise(PointDataGrid::Ptr& grid)
         const NamePair& type = descriptor.type(pscaleIndex);
 
         if (type.first == "float") {
-            tbb::parallel_for(range, ConvertScalarToIndexSpaceOp<float>(tree, pscaleIndex, transform));
+            tbb::parallel_for(range, ConvertScalarToIndexSpaceOp<float>(pscaleIndex, transform));
         }
         else if (type.first == "half") {
-            tbb::parallel_for(range, ConvertScalarToIndexSpaceOp<half>(tree, pscaleIndex, transform));
+            tbb::parallel_for(range, ConvertScalarToIndexSpaceOp<half>(pscaleIndex, transform));
         }
         else {
             std::cerr << "Unsupported type for pscale - " << type.first << std::endl;
@@ -308,22 +277,6 @@ const PointDataTree::LeafNodeType*
 ResourceData_OpenVDBPoints::leaf(const unsigned int id) const
 {
     return (id < m_leaves.size()) ? m_leaves[id] : 0;
-}
-
-
-void*
-ResourceData_OpenVDBPoints::create_thread_data() const
-{
-    PointDataAccessor<PointDataTree>* accessor = new PointDataAccessor<PointDataTree>(m_grid->tree());
-
-    return accessor;
-}
-
-
-void
-ResourceData_OpenVDBPoints::destroy_thread_data(void *data) const
-{
-    delete static_cast<PointDataAccessor<PointDataTree>*>(data);
 }
 
 

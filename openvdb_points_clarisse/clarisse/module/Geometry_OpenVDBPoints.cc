@@ -34,6 +34,8 @@
 
 #include <app_object.h>
 
+#include <openvdb_points/tools/PointCount.h>
+
 #include "Geometry_OpenVDBPoints.h"
 
 using namespace openvdb;
@@ -213,7 +215,6 @@ struct ComputeBBoxPerPrimitiveOp {
                                 const float forwardOffset)
         : mBVHTrees(bvhTrees)
         , mOriginToIndex(originToIndex)
-        , mAccessor(tree)
         , mOverrideRadius(overrideRadius)
         , mRadius(radius)
         , mBackwardOffset(backwardOffset)
@@ -241,31 +242,22 @@ struct ComputeBBoxPerPrimitiveOp {
             {
                 Coord ijk = value.getCoord();
 
-                if(mAccessor.pointCount(ijk) == 0) continue;
-
                 const Vec3i gridIndexSpace = ijk.asVec3i();
 
-                PointDataAccessor<PointDataTree>::PointDataIndex pointDataIndex = mAccessor.get(ijk);
-
-                const unsigned start = pointDataIndex.first;
-                const unsigned end = pointDataIndex.second;
-
-                for (unsigned index = start; index < end; index++) {
-
-                    const Index64 index64(index);
+                for (IndexIter iter = leaf->beginIndex(ijk); iter; ++iter) {
 
                     Vec3f positionValue;
                     Vec3f velocityValue;
                     float radiusValue;
 
-                    positionValue = positionHandle->get(index64);
+                    positionValue = positionHandle->get(*iter);
 
-                    if (velocityHandle)  velocityValue = velocityHandle->get(index64);
+                    if (velocityHandle)  velocityValue = velocityHandle->get(*iter);
                     else                 velocityValue = Vec3f(0, 0, 0);
 
                     if (radiusHandle && !mOverrideRadius)
                     {
-                        radiusValue = radiusHandle->get(index64);
+                        radiusValue = radiusHandle->get(*iter);
 
                         // scale and convert to index space
 
@@ -311,7 +303,6 @@ struct ComputeBBoxPerPrimitiveOp {
     LeafBVHTreeContainer&               mBVHTrees;
     const OriginToIndexMap&             mOriginToIndex;
 
-    PointDataAccessor<PointDataTree>    mAccessor;
     const bool                          mOverrideRadius;
     const float                         mRadius;
     const float                         mBackwardOffset;
@@ -396,11 +387,7 @@ Geometry_OpenVDBPoints::create( const PointDataGrid::Ptr& grid,
 
     // check there are points
 
-    PointDataAccessor accessor(tree);
-
-    const Index64 pointCount = accessor.totalPointCount();
-
-    if (pointCount == 0)    return 0;
+    if (pointCount(tree) == 0)    return 0;
 
     return new Geometry_OpenVDBPoints(  grid, descriptor, velocityType, radiusType,
                                         overrideRadius, radius, timeSegment, timeOffset);
@@ -723,13 +710,6 @@ void Geometry_OpenVDBPoints::intersect_typed_primitive(
 
     CachedBVHTree cachedTree(bvhTree);
 
-    // retrieve accessor from thread local storage
-    // (more efficient than creating it each time)
-
-    void* thread_data = eval_ctx.get_thread_data();
-
-    PointDataAccessor& accessor = *static_cast<PointDataAccessor*>(thread_data);
-
     for (int ray_index  = raytrace_ctx.get_first_index();
              ray_index <= raytrace_ctx.get_last_index(); ++ray_index)
     {
@@ -789,8 +769,6 @@ void Geometry_OpenVDBPoints::intersect_typed_primitive(
 
             if (!cachedTree.hit</*level=*/3>(vdb_index_ray, adjusted_time, ijk))   continue;
 
-            PointDataAccessor::PointDataIndex range = accessor.get(ijk);
-
             bool hit = false;
 
             unsigned int sub_primitive_id(0);
@@ -798,19 +776,17 @@ void Geometry_OpenVDBPoints::intersect_typed_primitive(
             Vec3f position(0.0f);
             double radius(1.0);
 
-            for (unsigned p = range.first; p < range.second; p++)
-            {
-                const Index64 index64(p);
+            for (IndexIter iter = leaf.beginIndex(ijk); iter; ++iter) {
 
                 Vec3f positionValue;
                 RadiusType radiusValue;
 
-                positionValue = positionHandle->get(index64);
+                positionValue = positionHandle->get(*iter);
 
                 // compute radius in index space (apply scaling if required)
 
                 if (radiusHandle && !m_overrideRadius) {
-                    radiusValue = radiusHandle->get(index64) * m_radius;
+                    radiusValue = radiusHandle->get(*iter) * m_radius;
                 }
                 else {
                     radiusValue = m_radiusIndexSpace;
@@ -822,7 +798,7 @@ void Geometry_OpenVDBPoints::intersect_typed_primitive(
 
                 if (enable_velocity)
                 {
-                    position_index_space += velocityHandle->get(index64) * time;
+                    position_index_space += velocityHandle->get(*iter) * time;
                 }
 
                 const double radius0 = radiusValue;
@@ -836,7 +812,7 @@ void Geometry_OpenVDBPoints::intersect_typed_primitive(
                         t = t0;
                         position = position_index_space;
                         radius = radius0;
-                        sub_primitive_id = (unsigned int)index64;
+                        sub_primitive_id = (unsigned int)*iter;
                     }
 
                     hit = true;

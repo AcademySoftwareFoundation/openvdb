@@ -39,6 +39,7 @@
 #include <openvdb/Types.h>
 #include <openvdb_points/openvdb.h>
 #include <openvdb_points/tools/PointDataGrid.h>
+#include <openvdb_points/tools/PointCount.h>
 
 #include <iostream>
 
@@ -68,8 +69,6 @@
 IX_BEGIN_DECLARE_MODULE_CALLBACKS(OpenVDBPoints, ModuleGeometryCallbacks)
     static void init_class(OfClass& cls);
     static ResourceData* create_resource(OfObject&, const int&, void*);
-    static void* create_thread_data(const OfObject& object, const CtxEval& eval_ctx);
-    static void destroy_thread_data(const OfObject& object, const CtxEval& eval_ctx, void *thread_data);
     static void on_attribute_change(OfObject&, const OfAttr&, int&, const int&);
     static bool on_time_change(OfObject&, const double&);
     static void get_grid_tag_candidates(const OfObject&, const OfAttr&, CoreVector<CoreString>&, CoreArray<bool>&);
@@ -94,8 +93,6 @@ void registerVDBPoints(OfApp& app, CoreVector<OfClass *>& new_classes)
 
     module_callbacks->cb_on_attribute_change = IX_MODULE_CLBK::on_attribute_change;
     module_callbacks->cb_create_resource = IX_MODULE_CLBK::create_resource;
-    module_callbacks->cb_create_thread_data = IX_MODULE_CLBK::create_thread_data;
-    module_callbacks->cb_destroy_thread_data = IX_MODULE_CLBK::destroy_thread_data;
     module_callbacks->cb_on_new_time = IX_MODULE_CLBK::on_time_change;
 }
 
@@ -225,30 +222,6 @@ IX_MODULE_CLBK::on_time_change(OfObject& object, const double& time)
     const std::string filename = object.get_attribute("filename")->get_string().get_data();
     object.get_attribute("output_filename")->set_string(filename.c_str());
     return true;
-}
-
-
-// Callback to create a PointDataAccessor per thread for efficiency
-
-void*
-IX_MODULE_CLBK::create_thread_data(const OfObject& object, const CtxEval& eval_ctx)
-{
-    ModuleGeometry* module = (ModuleGeometry*) object.get_module();
-    ResourceData_OpenVDBPoints* data = (ResourceData_OpenVDBPoints*) module->get_resource(resource::RESOURCE_ID_VDB_GRID);
-    return data ? data->create_thread_data() : 0;
-}
-
-
-// Callback to destroy a PointDataAccessor per thread
-
-void
-IX_MODULE_CLBK::destroy_thread_data(const OfObject& object, const CtxEval& eval_ctx, void *thread_data)
-{
-    ModuleGeometry *module = (ModuleGeometry *)object.get_module();
-    ResourceData_OpenVDBPoints *data = (ResourceData_OpenVDBPoints *)module->get_resource(resource::RESOURCE_ID_VDB_GRID);
-    if (data && thread_data) {
-        data->destroy_thread_data(thread_data);
-    }
 }
 
 
@@ -467,13 +440,11 @@ namespace resource
         if (!grid->tree().cbeginLeaf())     return new ParticleCloud();
 
         typedef openvdb::tools::PointDataTree PointDataTree;
-        typedef openvdb::tools::PointDataAccessor<PointDataTree> PointDataAccessor;
 
         const openvdb::math::Transform& transform = grid->transform();
         const PointDataTree& tree = grid->tree();
-        const PointDataAccessor accessor(tree);
 
-        const openvdb::Index64 size = accessor.totalPointCount();
+        const openvdb::Index64 size = openvdb::tools::pointCount(grid->tree());
 
         if (size == 0)                      return new ParticleCloud();
 
@@ -496,20 +467,11 @@ namespace resource
             {
                 const openvdb::Coord ijk = value.getCoord();
 
-                if (accessor.pointCount(ijk) == 0)  continue;
-
                 const openvdb::Vec3i gridIndexSpace = ijk.asVec3i();
 
-                PointDataAccessor::PointDataIndex pointDataIndex = accessor.get(ijk);
+                for (openvdb::tools::IndexIter iter = leaf->beginIndex(ijk); iter; ++iter) {
 
-                const unsigned start = pointDataIndex.first;
-                const unsigned end = pointDataIndex.second;
-
-                for (unsigned index = start; index < end; index++) {
-
-                    const openvdb::Index64 index64(index);
-
-                    const openvdb::Vec3f positionVoxelSpace = positionHandle->get(index64);
+                    const openvdb::Vec3f positionVoxelSpace = positionHandle->get(*iter);
                     const openvdb::Vec3f positionIndexSpace = positionVoxelSpace + gridIndexSpace;
                     const openvdb::Vec3f positionWorldSpace = transform.indexToWorld(positionIndexSpace);
 
@@ -552,20 +514,11 @@ namespace resource
                 {
                     const openvdb::Coord ijk = value.getCoord();
 
-                    if (accessor.pointCount(ijk) == 0)  continue;
-
-                    PointDataAccessor::PointDataIndex pointDataIndex = accessor.get(ijk);
-
-                    const unsigned start = pointDataIndex.first;
-                    const unsigned end = pointDataIndex.second;
-
-                    for (unsigned index = start; index < end; index++) {
-
-                        const openvdb::Index64 index64(index);
+                    for (openvdb::tools::IndexIter iter = leaf->beginIndex(ijk); iter; ++iter) {
 
                         // VDB Points resource uses index-space velocity so need to revert this back to world-space
 
-                        const openvdb::Vec3f velocity = transform.indexToWorld(velocityHandle->get(index64));
+                        const openvdb::Vec3f velocity = transform.indexToWorld(velocityHandle->get(*iter));
 
                         array[arrayIndex][0] = velocity.x();
                         array[arrayIndex][1] = velocity.y();
