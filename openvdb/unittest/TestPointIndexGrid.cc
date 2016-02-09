@@ -57,9 +57,9 @@ namespace {
 class PointList
 {
 public:
-    typedef openvdb::Vec3R value_type;
+    typedef openvdb::Vec3R  PosType;
 
-    PointList(const std::vector<openvdb::Vec3R>& points)
+    PointList(const std::vector<PosType>& points)
         : mPoints(&points)
     {
     }
@@ -68,12 +68,12 @@ public:
         return mPoints->size();
     }
 
-    void getPos(size_t n, openvdb::Vec3R& xyz) const {
+    void getPos(size_t n, PosType& xyz) const {
         xyz = (*mPoints)[n];
     }
 
 protected:
-    std::vector<openvdb::Vec3R> const * const mPoints;
+    std::vector<PosType> const * const mPoints;
 }; // PointList
 
 

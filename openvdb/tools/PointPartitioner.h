@@ -78,13 +78,19 @@ namespace tools {
 ///          using a parallel radix-based sorting algorithm.
 ///
 /// @interface PointArray
-/// Expected interface for the PointArray container
+/// Expected interface for the PointArray container:
 /// @code
 /// template<typename VectorType>
-/// struct PointList {
-///   typedef VectorType value_type;
-///   size_t size() const; // total number of points
-///   void getPos(size_t n, VectorType& xyz) const;
+/// struct PointArray
+/// {
+///     // The type used to represent world-space point positions
+///     typedef VectorType  PosType;
+///
+///     // Return the number of points in the array
+///     size_t size() const;
+///
+///     // Return the world-space position of the nth point in the array.
+///     void getPos(size_t n, PosType& xyz) const;
 /// };
 /// @endcode
 ///
@@ -367,11 +373,11 @@ struct LeafNodeOriginOp
 
     void operator()(const tbb::blocked_range<size_t>& range) const {
 
-        typedef typename PointArray::value_type     PointType;
+        typedef typename PointArray::PosType  PosType;
 
         const int mask = ~((1 << mLog2Dim) - 1);
         Coord ijk;
-        PointType pos;
+        PosType pos;
 
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
 
@@ -593,9 +599,7 @@ private:
 template<typename PointArray, typename PointIndexType, typename VoxelOffsetType>
 struct BinPointIndicesOp
 {
-    typedef typename PointArray::value_type             PointType;
-    typedef typename PointType::value_type              PointElementType;
-
+    typedef typename PointArray::PosType                PosType;
     typedef std::pair<PointIndexType, PointIndexType>   IndexPair;
     typedef std::deque<IndexPair>                       IndexPairList;
     typedef boost::shared_ptr<IndexPairList>            IndexPairListPtr;
@@ -633,7 +637,7 @@ struct BinPointIndicesOp
 
         IndexPairList * idxList = NULL;
         Coord ijk(0, 0, 0), loc(0, 0, 0), binCoord(0, 0, 0), lastBinCoord(1, 2, 3);
-        PointType pos;
+        PosType pos;
 
         PointIndexType bucketOffset = 0;
         VoxelOffsetType voxelOffset = 0;

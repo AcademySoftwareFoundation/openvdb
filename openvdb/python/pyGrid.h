@@ -38,9 +38,16 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/python.hpp>
 #include <boost/type_traits/remove_const.hpp>
+#ifndef DWA_BOOST_VERSION
+#include <boost/version.hpp>
+#define DWA_BOOST_VERSION (10 * BOOST_VERSION)
+#endif
 #ifdef PY_OPENVDB_USE_NUMPY
 #define PY_ARRAY_UNIQUE_SYMBOL PY_OPENVDB_ARRAY_API
 #define NO_IMPORT_ARRAY // NumPy gets initialized during module initialization
+#ifdef NPY_1_7_API_VERSION
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#endif
 #include <arrayobject.h> // for PyArrayObject
 #include "openvdb/tools/MeshToVolume.h"
 #include "openvdb/tools/VolumeToMesh.h" // for tools::volumeToMesh()
@@ -2298,6 +2305,11 @@ exportGrid()
                 "Return a read/write iterator over all of this grid's\ntile and voxel values.")
 
             ; // py::class_<Grid>
+
+#if DWA_BOOST_VERSION >= 1060000
+        // As of Boost 1.60, the GridPtr-to-Python object converter must be explicitly registered.
+        py::register_ptr_to_python<GridPtr>();
+#endif
 
         py::implicitly_convertible<GridPtr, GridBase::Ptr>();
         py::implicitly_convertible<GridPtr, GridBase::ConstPtr>();

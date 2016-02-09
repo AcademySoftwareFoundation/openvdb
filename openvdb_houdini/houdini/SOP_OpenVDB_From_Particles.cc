@@ -62,8 +62,8 @@ namespace {
 class ParticleList
 {
 public:
-    // required typedef for bucketing
-    typedef openvdb::Vec3R    value_type;
+    // Required by @c PointPartitioner
+    typedef openvdb::Vec3R  PosType;
 
     ParticleList(const GU_Detail* gdp,
                  openvdb::Real radiusMult = 1,
@@ -378,8 +378,8 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_FLT_J, "bandWidthWS", "Half-Band")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 10));
-    
-    
+
+
     // Dilation
     parms.add(hutil::ParmFactory(PRM_INT_J, "dilate", "Dilation")
         .setDefault(PRMoneDefaults)
@@ -391,7 +391,7 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
         .setHelpText("Erosion in voxel units"));
-    
+
     // dR (radius scale)
     parms.add(hutil::ParmFactory(PRM_FLT_J, "dR", "Particle Radius Scale")
         .setDefault(PRMoneDefaults)

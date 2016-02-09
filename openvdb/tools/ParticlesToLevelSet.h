@@ -53,7 +53,7 @@
 /// class ParticleList {
 ///   ...
 /// public:
-///   typedef openvdb::Vec3R  value_type;
+///   typedef openvdb::Vec3R    PosType;
 ///
 ///   // Return the total number of particles in list.
 ///   // Always required!
@@ -233,7 +233,7 @@ public:
     void rasterizeMask(const GridT& grid,
                        const int dilationInVoxels = 1,
                        const int erosionInVoxels  = 1);
-    
+
     /// @brief Very fast generation of a level set from points
     /// (e.g. particles without a radius). It employes a MaskGrid
     /// an various bit-wise topology operations.
@@ -246,7 +246,7 @@ public:
     void rasterizePoints(const PointListT& points,
                          const int dilationInVoxels = 1,
                          const int erosionInVoxels  = 1);
-    
+
     /// @brief Rasterize a sphere per particle derived from their
     /// position and radius. All spheres are CSG unioned.
     ///
@@ -344,8 +344,8 @@ template<typename TreeT> struct ErosionHandler
     void operator()() const { erodeVoxels( *tree, size); }
     TreeT* tree;
     const int size;
-};    
-    
+};
+
 }
 
 template<typename SdfGridT, typename AttributeT, typename InterrupterT>
@@ -356,7 +356,7 @@ rasterizeMask(const MaskGrid& maskGrid, int dilation, int erosion)
     // Generate a level set from the mask
     mSdfGrid->setTree( maskToLevelSet<MaskGrid, math::FIRST_BIAS, InterrupterT>
                        ( maskGrid, int(mHalfWidth), dilation, erosion, mInterrupter )->treePtr() );
-}    
+}
 
 template<typename SdfGridT, typename AttributeT, typename InterrupterT>
 template <typename PointListT>
@@ -366,7 +366,7 @@ rasterizePoints(const PointListT& points, int dilation, int erosion)
     typedef typename SdfGridT::template ValueConverter<ValueMask>::Type MaskGrid;
     typedef typename MaskGrid::TreeType                                 MaskTree;
     typedef typename MaskTree::Ptr                                      MaskTreePtr;
-    
+
     // Generate a mask grid of the points
     MaskGrid maskGrid(MaskTreePtr(new MaskTree(mSdfGrid->tree(), false, TopologyCopy())));
     maskGrid.setTransform( mSdfGrid->transform().copy() );
@@ -375,7 +375,7 @@ rasterizePoints(const PointListT& points, int dilation, int erosion)
     // Generate a level set from the mask
     this->rasterizeMask( maskGrid, dilation, erosion );
 }
-    
+
 template<typename SdfGridT, typename AttributeT, typename InterrupterT>
 template <typename ParticleListT>
 inline void ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::
@@ -388,7 +388,7 @@ rasterizeSpheres(const ParticleListT& pa)
         Raster<ParticleListT, BlindGridType> r(*this, mBlindGrid, pa);
         r.rasterizeSpheres();
     }
-}    
+}
 
 template<typename SdfGridT, typename AttributeT, typename InterrupterT>
 template <typename ParticleListT>

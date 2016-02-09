@@ -87,7 +87,7 @@ protected:
     std::vector<MyParticle> mParticleList;
 public:
 
-    typedef openvdb::Vec3R  value_type;
+    typedef openvdb::Vec3R  PosType;
 
     MyParticleList(openvdb::Real rScale=1, openvdb::Real vScale=1)
         : mRadiusScale(rScale), mVelocityScale(vScale) {}

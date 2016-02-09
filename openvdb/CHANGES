@@ -70,6 +70,7 @@ Version 3.2.0 - In development
     API changes:
     - Renamed math::GudonovsNormSqrd to math::GodunovsNormSqrd
       [Contributed by Branislav Radjenovic]
+    - Renamed ValueType to PosType in the PointArray interface.
 
     Python:
     - Updated the Python module for Python 3 compatibility.

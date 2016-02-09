@@ -51,16 +51,16 @@ CPPUNIT_TEST_SUITE_REGISTRATION(TestPointPartitioner);
 namespace {
 
 struct PointList {
-    typedef openvdb::Vec3s value_type;
+    typedef openvdb::Vec3s PosType;
 
-    PointList(const std::vector<value_type>& points) : mPoints(&points) {}
+    PointList(const std::vector<PosType>& points) : mPoints(&points) {}
 
     size_t size() const { return mPoints->size(); }
 
-    void getPos(size_t n, value_type& xyz) const { xyz = (*mPoints)[n]; }
+    void getPos(size_t n, PosType& xyz) const { xyz = (*mPoints)[n]; }
 
 protected:
-    std::vector<value_type> const * const mPoints;
+    std::vector<PosType> const * const mPoints;
 }; // PointList
 
 } // namespace

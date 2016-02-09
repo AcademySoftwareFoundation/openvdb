@@ -120,8 +120,8 @@ namespace {
 struct PointCache
 {
     typedef boost::shared_ptr<PointCache>   Ptr;
-    typedef openvdb::Vec3s                  PointType;
-    typedef PointType                       value_type; // required by openvdb::tools::PointPartitioner
+    typedef openvdb::Vec3s                  PosType;
+    typedef PosType::value_type             ScalarType;
 
     PointCache(const GU_Detail& detail, const float radiusScale, const GA_PointGroup* group = NULL)
         : mIndexMap(&detail.getP()->getIndexMap())
@@ -545,8 +545,8 @@ private:
 ///         mask for the gather based rasterization step.
 struct ConstructCandidateVoxelMask
 {
-    typedef PointCache::PointType                       PointType;
-    typedef PointType::value_type                       ElementType;
+    typedef PointCache::PosType                         PosType;
+    typedef PosType::value_type                         ScalarType;
 
     typedef openvdb::tools::PointIndexGrid::TreeType    PointIndexTree;
     typedef PointIndexTree::LeafNodeType                PointIndexLeafNode;
@@ -586,8 +586,8 @@ struct ConstructCandidateVoxelMask
     void operator()(const tbb::blocked_range<size_t>& range) {
 
         openvdb::CoordBBox box;
-        PointType pos, bboxMin, bboxMax, pMin, pMax;
-        ElementType radius(0.0);
+        PosType pos, bboxMin, bboxMax, pMin, pMax;
+        ScalarType radius(0.0);
 
         const PointIndexType *pointIdxPt = NULL, *endIdxPt = NULL;
 
@@ -607,9 +607,9 @@ struct ConstructCandidateVoxelMask
 
                 node.getIndices(it.pos(), pointIdxPt, endIdxPt);
 
-                bboxMin[0] = std::numeric_limits<ElementType>::max();
-                bboxMin[1] = std::numeric_limits<ElementType>::max();
-                bboxMin[2] = std::numeric_limits<ElementType>::max();
+                bboxMin[0] = std::numeric_limits<ScalarType>::max();
+                bboxMin[1] = std::numeric_limits<ScalarType>::max();
+                bboxMin[2] = std::numeric_limits<ScalarType>::max();
 
                 bboxMax[0] = -bboxMin[0];
                 bboxMax[1] = -bboxMin[1];
@@ -661,9 +661,9 @@ struct ConstructCandidateVoxelMask
             radius = mPoints->radius(largeParticleIndices[n]);
             pos = mPoints->pos(largeParticleIndices[n]);
 
-            bboxMin[0] = std::numeric_limits<ElementType>::max();
-            bboxMin[1] = std::numeric_limits<ElementType>::max();
-            bboxMin[2] = std::numeric_limits<ElementType>::max();
+            bboxMin[0] = std::numeric_limits<ScalarType>::max();
+            bboxMin[1] = std::numeric_limits<ScalarType>::max();
+            bboxMin[2] = std::numeric_limits<ScalarType>::max();
 
             bboxMax[0] = -bboxMin[0];
             bboxMax[1] = -bboxMin[1];
@@ -924,7 +924,7 @@ constructROIMask(const PointIndexGridCollection& idxGridCollection,
 template<typename T> struct ValueTypeTraits {
     static const bool IsVec = false;
     static const int TupleSize = 1;
-    typedef T ElementType;
+    typedef T ScalarType;
     typedef T HoudiniType;
 
     static void convert(T& lhs, const HoudiniType rhs) {
@@ -936,7 +936,7 @@ template<typename T> struct ValueTypeTraits {
 template<typename T> struct ValueTypeTraits<openvdb::math::Vec3<T> > {
     static const bool IsVec = true;
     static const int TupleSize = 3;
-    typedef T               ElementType;
+    typedef T               ScalarType;
     typedef UT_Vector3T<T>  HoudiniType;
 
     static void convert(openvdb::math::Vec3<T>& lhs, const HoudiniType& rhs) {
@@ -961,14 +961,14 @@ struct WeightedAverageOp
 
     typedef _ValueType                                          ValueType;
     typedef openvdb::tree::LeafNode<ValueType, LOG2DIM>         LeafNodeType;
-    typedef typename ValueTypeTraits<ValueType>::ElementType    ElementType;
+    typedef typename ValueTypeTraits<ValueType>::ScalarType     ScalarType;
     typedef typename ValueTypeTraits<ValueType>::HoudiniType    HoudiniType;
 
     /////
 
     WeightedAverageOp(const GA_Attribute& attrib, boost::scoped_array<LeafNodeType*>& nodes)
         : mHandle(&attrib), mNodes(nodes.get()), mNode(NULL), mNodeVoxelData(NULL)
-        , mNodeOffset(0), mValue(ElementType(0.0)), mVaryingDataBuffer(NULL), mVaryingData(false)
+        , mNodeOffset(0), mValue(ScalarType(0.0)), mVaryingDataBuffer(NULL), mVaryingData(false)
     {
     }
 
@@ -1376,8 +1376,8 @@ private:
 ///@brief Gather based point rasterization.
 struct RasterizePoints
 {
-    typedef PointCache::PointType                                       PointType;
-    typedef PointType::value_type                                       ElementType;
+    typedef PointCache::PosType                                         PosType;
+    typedef PosType::value_type                                         ScalarType;
 
     typedef openvdb::tools::PointIndexGrid::TreeType                    PointIndexTree;
     typedef PointIndexTree::LeafNodeType                                PointIndexLeafNode;
@@ -1594,7 +1594,7 @@ private:
         bool hasNonzeroDensityValues = false;
 
         VEXProgram * cvex = mVEXContext ? &mVEXContext->getThereadLocalVEXProgram() : NULL;
-        ElementType * const densityData = densityAttribute ? densityAttribute->data() : NULL;
+        ScalarType * const densityData = densityAttribute ? densityAttribute->data() : NULL;
         const bool exportDensity = densityData != NULL;
         const float * pointRadiusData = pointCache.radiusData();
         const openvdb::Vec3s * pointPosData = pointCache.posData();
@@ -1603,7 +1603,7 @@ private:
         const double dxSqr = dx * dx;
 
         openvdb::Coord ijk, pMin, pMax;
-        PointType center, xyz;
+        PosType center, xyz;
 
         for (; pointIndexIter; ++pointIndexIter) {
 
@@ -1630,13 +1630,13 @@ private:
             xyz = pointPosData[*pointIndexIter];
             openvdb::Vec3d localPos = mVolumeXform.worldToIndex(xyz);
 
-            ElementType radius = pointRadiusData[*pointIndexIter];
+            ScalarType radius = pointRadiusData[*pointIndexIter];
             const float radiusSqr = radius * radius;
 
-            const ElementType densityScale = mDensityScale * (hasPointDensity ? densityHandle.get(pointOffset) : 1.0f);
-            const ElementType solidRadius = std::min(radius * mSolidRatio, radius);
-            const ElementType residualRadius = std::max(ElementType(0.0), radius - solidRadius);
-            const ElementType invResidualRadius = residualRadius > 0.0f ? 1.0f / residualRadius : 0.0f;
+            const ScalarType densityScale = mDensityScale * (hasPointDensity ? densityHandle.get(pointOffset) : 1.0f);
+            const ScalarType solidRadius = std::min(radius * mSolidRatio, radius);
+            const ScalarType residualRadius = std::max(ScalarType(0.0), radius - solidRadius);
+            const ScalarType invResidualRadius = residualRadius > 0.0f ? 1.0f / residualRadius : 0.0f;
 
             openvdb::Index xPos(0), yPos(0), pos(0);
             double xSqr, ySqr, zSqr;
@@ -1695,7 +1695,7 @@ private:
             if (densityData && mDensityTreatment == MAXIMUM) { // max
                 for (size_t n = 0, N = densitySamples.size(); n < N; ++n) {
                     const DensitySample& sample = densitySamples[n];
-                    ElementType& value = densityData[sample.second];
+                    ScalarType& value = densityData[sample.second];
                     value = std::max(value, sample.first);
                 }
             } else if (densityData && mDensityTreatment == ACCUMULATE) { // add
@@ -1706,7 +1706,7 @@ private:
             } else if (densityData && mDensityTreatment == MINIMUM) { // min
                 for (size_t n = 0, N = densitySamples.size(); n < N; ++n) {
                     const DensitySample& sample = densitySamples[n];
-                    ElementType& value = densityData[sample.second];
+                    ScalarType& value = densityData[sample.second];
                     value = std::min(value, sample.first);
                 }
             }
@@ -1740,8 +1740,8 @@ private:
             std::vector<Vec3sAttribute::OperatorType::Ptr>& vecAttributes,
             std::vector<FloatAttribute::OperatorType::Ptr>& floatAttributes,
             const openvdb::Coord& nodeOrigin,
-            const PointType& point,
-            ElementType radius,
+            const PosType& point,
+            ScalarType radius,
             GA_Offset pointOffset) const
     {
         bool timeDependantVEX = false;
@@ -1914,7 +1914,7 @@ private:
     VEXContext                        *       mVEXContext;
 
     openvdb::math::Transform            const mVolumeXform;
-    ElementType                         const mDensityScale, mSolidRatio;
+    ScalarType                          const mDensityScale, mSolidRatio;
     DensityTreatment                    const mDensityTreatment;
 }; // struct RasterizePoints
 

@@ -96,6 +96,7 @@ API changes:
 - Renamed @c GudonovsNormSqrd to
   @vdblink::math::GodunovsNormSqrd GodunovsNormSqrd@endlink
   <I>[Contributed by Branislav&nbsp;Radjenovic]</I>
+- Renamed ValueType to PosType in the PointArray interface.
 
 @par
 Python:

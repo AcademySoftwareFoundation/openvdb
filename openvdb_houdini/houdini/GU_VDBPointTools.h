@@ -65,8 +65,9 @@
 /// @brief Houdini point attribute wrapper
 template <typename VectorType>
 struct GU_VDBPointList {
-    typedef VectorType ValueType;   // OpenVDB convention.
-    typedef VectorType value_type;  // STL convention.
+
+    typedef VectorType                      PosType;
+    typedef typename PosType::value_type    ScalarType;
 
     GU_VDBPointList(const GU_Detail& detail, const GA_PointGroup* group = NULL)
         : mPositionHandle(detail.getP())
@@ -116,15 +117,15 @@ struct GU_VDBPointList {
 
     // Index access methods
 
-    void getPos(size_t n, VectorType& xyz) const {
+    void getPos(size_t n, PosType& xyz) const {
         getPosFromOffset((this->*getOffset)(n), xyz);
     }
 
-    void getVelocity(size_t n, VectorType& v) const {
+    void getVelocity(size_t n, PosType& v) const {
         getVelocityFromOffset((this->*getOffset)(n), v);
     }
 
-    void getRadius(size_t n, float& r) const {
+    void getRadius(size_t n, ScalarType& r) const {
         getRadiusFromOffset((this->*getOffset)(n), r);
     }
 
@@ -134,22 +135,22 @@ struct GU_VDBPointList {
         return (this->*getOffset)(n);
     }
 
-    void getPosFromOffset(const GA_Offset offset, VectorType& xyz) const {
+    void getPosFromOffset(const GA_Offset offset, PosType& xyz) const {
         const UT_Vector3 data = mPositionHandle.get(offset);
-        xyz[0] = typename VectorType::ValueType(data[0]);
-        xyz[1] = typename VectorType::ValueType(data[1]);
-        xyz[2] = typename VectorType::ValueType(data[2]);
+        xyz[0] = ScalarType(data[0]);
+        xyz[1] = ScalarType(data[1]);
+        xyz[2] = ScalarType(data[2]);
     }
 
-    void getVelocityFromOffset(const GA_Offset offset, VectorType& v) const {
+    void getVelocityFromOffset(const GA_Offset offset, PosType& v) const {
         const UT_Vector3 data = mVelocityHandle.get(offset);
-        v[0] = typename VectorType::ValueType(data[0]);
-        v[1] = typename VectorType::ValueType(data[1]);
-        v[2] = typename VectorType::ValueType(data[2]);
+        v[0] = ScalarType(data[0]);
+        v[1] = ScalarType(data[1]);
+        v[2] = ScalarType(data[2]);
     }
 
-    void getRadiusFromOffset(const GA_Offset offset, float& r) const {
-        r = mRadiusHandle.get(offset);
+    void getRadiusFromOffset(const GA_Offset offset, ScalarType& r) const {
+        r = ScalarType(mRadiusHandle.get(offset));
     }
 
 
