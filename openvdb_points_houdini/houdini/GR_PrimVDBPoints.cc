@@ -491,7 +491,7 @@ GR_PrimVDBPoints::updatePoints(RE_Render* r,
     // count up total points ignoring any leaf nodes that are out of core
 
     size_t numPoints = 0;
-    for (typename TreeType::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter)
+    for (TreeType::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter)
     {
         if (!iter->buffer().isOutOfCore()) {
             numPoints += iter->pointCount();
@@ -692,7 +692,7 @@ GR_PrimVDBPoints::updateWire(RE_Render *r,
     // count up total points ignoring any leaf nodes that are out of core
 
     size_t outOfCoreLeaves = 0;
-    for (typename TreeType::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter)
+    for (TreeType::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter)
     {
         if (iter->buffer().isOutOfCore())   outOfCoreLeaves++;
     }
@@ -739,7 +739,7 @@ GR_PrimVDBPoints::updateWire(RE_Render *r,
 
         openvdb::Index64 cumulativeOffset = 0;
 
-        for (typename TreeType::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
+        for (TreeType::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
             const LeafNode& leaf = *iter;
 
             // skip out-of-core leaf nodes (used when delay loading VDBs)
@@ -761,7 +761,7 @@ GR_PrimVDBPoints::updateWire(RE_Render *r,
         std::vector<openvdb::Coord> coords;
         coords.reserve(outOfCoreLeaves);
 
-        for (typename TreeType::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
+        for (TreeType::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
             const LeafNode& leaf = *iter;
 
             // skip in-core leaf nodes (for use when delay loading VDBs)
