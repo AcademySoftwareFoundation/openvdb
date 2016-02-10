@@ -308,7 +308,7 @@ struct FilterParms {
         , mStencilWidth(0)
         , mVoxelOffset(0.0f)
         , mHalfWidthWorld(0.1f)
-        , mStencilWidthWorld(0.1f) 
+        , mStencilWidthWorld(0.1f)
         , mWorldUnits(false)
         , mMinMask(0)
         , mMaxMask(1)
@@ -461,7 +461,7 @@ newSopOperator(OP_OperatorTable* table)
             .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10));
 
         // Narrow-Band half-width
-        parms.add(hutil::ParmFactory(PRM_INT_J, "halfWidth", "Half-Width") 
+        parms.add(hutil::ParmFactory(PRM_INT_J, "halfWidth", "Half-Width")
             .setDefault(PRMthreeDefaults)
             .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
             .setHelpText("Desired narrow band half-width in voxel units "
@@ -592,7 +592,7 @@ SOP_OpenVDB_Filter_Level_Set::factoryNarrowBand(
 SOP_OpenVDB_Filter_Level_Set::SOP_OpenVDB_Filter_Level_Set(
     OP_Network* net, const char* name, OP_Operator* op, OperatorType opType)
     : hvdb::SOP_NodeVDB(net, name, op)
-    , mOpType(opType) 
+    , mOpType(opType)
 {
 }
 
@@ -873,8 +873,13 @@ SOP_OpenVDB_Filter_Level_Set::filterGrid(OP_Context& context, FilterT& filter,
         const GU_Detail *maskGeo = maskScope.getGdp();
 
         if (maskGeo) {
+#if (UT_MAJOR_VERSION_INT >= 15)
+            const GA_PrimitiveGroup * maskGroup =
+                parsePrimitiveGroups(parms.mMaskName.c_str(), GroupCreator(maskGeo));
+#else
             const GA_PrimitiveGroup * maskGroup =
                 parsePrimitiveGroups(parms.mMaskName.c_str(), const_cast<GU_Detail*>(maskGeo));
+#endif
 
             if (!maskGroup && !parms.mMaskName.empty()) {
                 addWarning(SOP_MESSAGE, "Mask not found.");

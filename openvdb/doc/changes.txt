@@ -86,6 +86,7 @@ Bug fixes:
 - Fixed a bug in the
   @vdblink::tools::meshToVolume() mesh-to-volume converter@endlink
   that could produce incorrect distances for large bandwidths.
+- Fixed a threading bug in @vdblink::tools::tools::compReplace()@endlink.
 - Resolved a floating-point exception in
   @vdblink::math::QuantizedUnitVec::pack() math::QuantizedUnitVec::pack@endlink
   caused by calling the method with a zero-length vector.

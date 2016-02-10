@@ -308,7 +308,7 @@ closestPoints(const GridT& grid, float isovalue, const GU_Detail& gdp,
 
     std::vector<openvdb::Vec3R> tmpPoints(distances.entries());
 
-    GA_ROHandleV3 points(gdp.getP());
+    GA_ROHandleV3 points = GA_ROHandleV3(gdp.getP());
 
     for (size_t n = 0, N = tmpPoints.size(); n < N; ++n) {
         const UT_Vector3 pos = points.get(gdp.pointOffset(n));

@@ -63,6 +63,7 @@ Version 3.2.0 - In development
       shear and/or reflection.
     - Fixed a bug in tools::meshToVolume() that could produce
       incorrect distances for large narrow-band widths.
+    - Fixed a threading bug in tools::compReplace().
     - Resolved a floating-point exception in math::QuantizedUnitVec::pack()
       caused by calling the method with a zero-length vector.
       [Contributed by Rick Hankins]

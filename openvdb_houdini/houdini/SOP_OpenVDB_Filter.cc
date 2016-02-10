@@ -473,9 +473,13 @@ SOP_OpenVDB_Filter::evalFilterParms(OP_Context& context, GU_Detail&, FilterParmV
         const GU_Detail *maskGeo = maskScope.getGdp();
 
         if (maskGeo) {
+#if (UT_MAJOR_VERSION_INT >= 15)
+            const GA_PrimitiveGroup * maskGroup =
+                parsePrimitiveGroups(maskName.c_str(), GroupCreator(maskGeo));
+#else
             const GA_PrimitiveGroup * maskGroup =
                 parsePrimitiveGroups(maskName.c_str(), const_cast<GU_Detail*>(maskGeo));
-
+#endif
             if (!maskGroup && !maskName.empty()) {
                 addWarning(SOP_MESSAGE, "Mask not found.");
             } else {

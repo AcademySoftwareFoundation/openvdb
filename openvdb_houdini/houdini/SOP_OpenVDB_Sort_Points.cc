@@ -174,8 +174,13 @@ SOP_OpenVDB_Sort_Points::cookMySop(OP_Context& context)
             UT_String groupStr;
             evalString(groupStr, "pointgroup", 0, time);
 
+#if (UT_MAJOR_VERSION_INT >= 15)
+            const GA_PointGroup* pointGroup =
+                parsePointGroups(groupStr, GroupCreator(srcGeo));
+#else
             const GA_PointGroup* pointGroup =
                 parsePointGroups(groupStr, const_cast<GU_Detail*>(srcGeo));
+#endif
 
             const fpreal voxelSize = evalFloat("binsize", 0, time);
             const openvdb::math::Transform::Ptr transform =

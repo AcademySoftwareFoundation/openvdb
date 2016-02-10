@@ -698,9 +698,13 @@ SOP_OpenVDB_To_Polygons::cookMySop(OP_Context& context)
                 UT_String maskStr;
                 evalString(maskStr, "surfacemaskname", 0, time);
 
+#if (UT_MAJOR_VERSION_INT >= 15)
+                const GA_PrimitiveGroup * maskGroup =
+                    parsePrimitiveGroups(maskStr.buffer(), GroupCreator(maskGeo));
+#else
                 const GA_PrimitiveGroup * maskGroup =
                     parsePrimitiveGroups(maskStr.buffer(), const_cast<GU_Detail*>(maskGeo));
-
+#endif
                 if (!maskGroup && maskStr.length() > 0) {
                     addWarning(SOP_MESSAGE, "Surface mask not found.");
                 } else {

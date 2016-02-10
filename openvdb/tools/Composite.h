@@ -707,6 +707,7 @@ struct CompReplaceOp
 
     CompReplaceOp(TreeT& _aTree): aTree(&_aTree) {}
 
+    /// @note fill operation is not thread safe
     void operator()(const typename TreeT::ValueOnCIter& iter) const
     {
         CoordBBox bbox;
@@ -742,7 +743,7 @@ compReplace(GridOrTreeT& aTree, const GridOrTreeT& bTree)
     // Copy all active tile values from B to A.
     ValueOnCIterT iter = bTree.cbeginValueOn();
     iter.setMaxDepth(iter.getLeafDepth() - 1); // don't descend into leaf nodes
-    foreach(iter, op);
+    foreach(iter, op, /*threaded=*/false);
 
     // Copy all active voxel values from B to A.
     foreach(Adapter::tree(bTree).cbeginLeaf(), op);

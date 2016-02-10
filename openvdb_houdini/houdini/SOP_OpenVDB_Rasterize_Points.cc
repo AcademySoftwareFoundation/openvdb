@@ -2280,7 +2280,11 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
             {
                 UT_String groupStr;
                 evalString(groupStr, "pointgroup", 0, time);
+#if (UT_MAJOR_VERSION_INT >= 15)
+                pointGroup = parsePointGroups(groupStr, GroupCreator(pointsGeo));
+#else
                 pointGroup = parsePointGroups(groupStr, const_cast<GU_Detail*>(pointsGeo));
+#endif
             }
 
             const float densityScale = float(evalFloat("densityscale", 0, time));

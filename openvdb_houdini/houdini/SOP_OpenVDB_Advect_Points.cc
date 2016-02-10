@@ -801,7 +801,12 @@ SOP_OpenVDBAdvectPoints::evalAdvectionParms(OP_Context& context, AdvectionParms&
     }
 
     evalString(str, "ptnGroup", 0, now);
+
+#if (UT_MAJOR_VERSION_INT >= 15)
+    parms.mPointGroup = parsePointGroups(str,GroupCreator(gdp));
+#else
     parms.mPointGroup = parsePointGroups(str, gdp);
+#endif
 
     if (!parms.mPointGroup && str.length() > 0) {
         addWarning(SOP_MESSAGE, "Point group not found");
