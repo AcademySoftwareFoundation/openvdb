@@ -20,6 +20,9 @@ Highlights:
 
 @par
 New features:
+- Added @link ParticleAtlas.h tools::ParticleAtlas@endlink an acceleration
+  structure for fast range and nearest-neighbor searches on particles, points
+  with radius.
 - Added @vdblink::tools::segmentActiveVoxels() segmentActiveVoxels@endlink,
   which operates on grids of arbitrary type and separates connected components
   of a grid&rsquo;s active voxels into distinct grids or trees.
@@ -86,7 +89,9 @@ Bug fixes:
 - Fixed a bug in the
   @vdblink::tools::meshToVolume() mesh-to-volume converter@endlink
   that could produce incorrect distances for large bandwidths.
-- Fixed a threading bug in @vdblink::tools::tools::compReplace()@endlink.
+- Fixed a threading bug in the
+  @vdblink::tools::compReplace() compReplace@endlink tool
+  that could cause crashes.
 - Resolved a floating-point exception in
   @vdblink::math::QuantizedUnitVec::pack() math::QuantizedUnitVec::pack@endlink
   caused by calling the method with a zero-length vector.
@@ -97,11 +102,13 @@ API changes:
 - Renamed @c GudonovsNormSqrd to
   @vdblink::math::GodunovsNormSqrd GodunovsNormSqrd@endlink
   <I>[Contributed by Branislav&nbsp;Radjenovic]</I>
-- Renamed ValueType to PosType in the PointArray interface.
+- Renamed @c ValueType to @c PosType in the PointArray interface.
 
 @par
 Python:
 - Updated the Python module for Python&nbsp;3 compatibility.
+- Updated the Python module for Boost 1.60 compatibility, to address
+  &ldquo;no to_python (by-value) converter found&rdquo; exceptions.
 
 @par
 Maya:

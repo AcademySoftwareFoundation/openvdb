@@ -13,6 +13,8 @@ Version 3.2.0 - In development
       (or, equivalently, its value).
 
     New features:
+    - Added tools::ParticleAtlas an acceleration structure for fast range
+      and nearest-neighbor searches on particles, points with radius.
     - Added tools::segmentActiveVoxels(), which operates on grids of arbitrary
       type and separates connected components of a grid's active voxels into
       distinct grids or trees.
@@ -43,7 +45,7 @@ Version 3.2.0 - In development
       of tools::LevelSetFracture(), and implemented a more robust level-set
       segmentation scheme.
     - Improved the performance of level-set advection by up to five times.
-    - Improved the performance of tools::meshToVolume(0, particularly for
+    - Improved the performance of tools::meshToVolume(), particularly for
       large narrow-band widths and for signed distance fields with dense
       interior regions.
     - Threaded the Tree destructor and the Tree::clear() method.
@@ -63,7 +65,7 @@ Version 3.2.0 - In development
       shear and/or reflection.
     - Fixed a bug in tools::meshToVolume() that could produce
       incorrect distances for large narrow-band widths.
-    - Fixed a threading bug in tools::compReplace().
+    - Fixed a threading bug in tools::compReplace() that could cause crashes.
     - Resolved a floating-point exception in math::QuantizedUnitVec::pack()
       caused by calling the method with a zero-length vector.
       [Contributed by Rick Hankins]
@@ -75,6 +77,8 @@ Version 3.2.0 - In development
 
     Python:
     - Updated the Python module for Python 3 compatibility.
+    - Updated the Python module for Boost 1.60 compatibility, to address
+      "no to_python (by-value) converter found" exceptions.
 
     Maya:
     - Fixed bugs related to data ownership, and improved error checking.

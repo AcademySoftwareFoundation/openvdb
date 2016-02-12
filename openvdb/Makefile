@@ -357,6 +357,7 @@ INCLUDE_NAMES := \
     tools/MaskToLevelSet.h \
     tools/MeshToVolume.h \
     tools/Morphology.h \
+    tools/ParticleAtlas.h \
     tools/ParticlesToLevelSet.h \
     tools/PointAdvect.h \
     tools/PointIndexGrid.h \
@@ -474,6 +475,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestNodeIterator.cc \
     unittest/TestNodeManager.cc \
     unittest/TestNodeMask.cc \
+    unittest/TestParticleAtlas.cc \
     unittest/TestParticlesToLevelSet.cc \
     unittest/TestPointIndexGrid.cc \
     unittest/TestPointMaskGrid.cc \
