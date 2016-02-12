@@ -668,13 +668,6 @@ public:
         return det;
     }
 
-    /// This function snaps a specific axis to a specific direction,
-    /// preserving scaling. It does this using minimum energy, thus
-    /// posing a unique solution if basis & direction arent parralel.
-    /// Direction need not be unit.
-    Mat4 snapBasis(Axis axis, const Vec3<T> &direction)
-    {return snapBasis(*this, axis, direction);}
-
     /// Sets the matrix to a matrix that translates by v
     static Mat4 translation(const Vec3d& v)
     {

@@ -720,6 +720,40 @@ aim(const Vec3<typename MatType::value_type>& direction,
     return r;
 }
 
+/// @brief    This function snaps a specific axis to a specific direction,
+///           preserving scaling.
+/// @details  It does this using minimum energy, thus posing a unique solution if
+///           basis & direction aren't parallel.
+/// @note     @a direction need not be unit.
+template<class MatType>
+inline MatType
+snapMatBasis(const MatType& source, Axis axis, const Vec3<typename MatType::value_type>& direction)
+{
+    typedef typename MatType::value_type T;
+
+    Vec3<T> unitDir(direction.unit());
+    Vec3<T> ourUnitAxis(source.row(axis).unit());
+
+    // Are the two parallel?
+    T parallel = unitDir.dot(ourUnitAxis);
+
+    // Already snapped!
+    if (isApproxEqual(parallel, T(1.0))) return source;
+
+    if (isApproxEqual(parallel, T(-1.0))) {
+        OPENVDB_THROW(ValueError, "Cannot snap to inverse axis");
+    }
+
+    // Find angle between our basis and the one specified
+    T angleBetween(angle(unitDir, ourUnitAxis));
+    // Caclulate axis to rotate along
+    Vec3<T> rotationAxis = unitDir.cross(ourUnitAxis);
+
+    MatType rotation;
+    rotation.setToRotation(rotationAxis, angleBetween);
+
+    return source * rotation;
+}
 
 /// @brief Write 0s along Mat4's last row and column, and a 1 on its diagonal.
 /// @details Useful initialization when we're initializing just the 3x3 block.

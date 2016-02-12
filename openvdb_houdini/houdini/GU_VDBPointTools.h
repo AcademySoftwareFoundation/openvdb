@@ -318,12 +318,10 @@ getPackedPrimitiveOffsets(const GU_Detail& detail, std::vector<const GA_Primitiv
 
 /// @brief    Utility method to construct a GU_VDBPointList.
 /// @details  The GU_VDBPointList is compatible with the PointIndexGrid and ParticleAtals structures.
-inline typename GU_VDBPointList<openvdb::Vec3s>::Ptr
+inline GU_VDBPointList<openvdb::Vec3s>::Ptr
 GUvdbCreatePointList(const GU_Detail& detail, const GA_PointGroup* pointGroup = NULL)
 {
-    typedef GU_VDBPointList<openvdb::Vec3s> PointList;
-    typename PointList::Ptr list(new PointList(detail, pointGroup));
-    return list;
+    return GU_VDBPointList<openvdb::Vec3s>::create(detail, pointGroup);
 }
 
 
