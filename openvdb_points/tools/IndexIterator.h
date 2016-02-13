@@ -39,7 +39,8 @@
 #ifndef OPENVDB_TOOLS_INDEX_ITERATOR_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_INDEX_ITERATOR_HAS_BEEN_INCLUDED
 
-#include <openvdb/openvdb.h>
+#include <openvdb/version.h>
+#include <openvdb/Types.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
