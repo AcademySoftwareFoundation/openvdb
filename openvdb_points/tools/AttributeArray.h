@@ -357,21 +357,31 @@ public:
     /// Return the number of bytes of memory used by this attribute.
     virtual size_t memUsage() const;
 
+    /// Return the value at index @a n (assumes uncompressed and in-core)
+    ValueType getUnsafe(Index n) const;
     /// Return the value at index @a n
     ValueType get(Index n) const;
+    /// Return the @a value at index @a n (assumes uncompressed and in-core)
+    template<typename T> void getUnsafe(Index n, T& value) const;
     /// Return the @a value at index @a n
     template<typename T> void get(Index n, T& value) const;
 
-    /// Non-member equivalent to get() that static_casts array to this TypedAttributeArray
-    static ValueType get(const AttributeArray* array, const Index n);
+    /// Non-member equivalent to getUnsafe() that static_casts array to this TypedAttributeArray
+    /// (assumes uncompressed and in-core)
+    static ValueType getUnsafe(const AttributeArray* array, const Index n);
 
-    /// Non-member equivalent to set() that static_casts array to this TypedAttributeArray
-    static void set(AttributeArray* array, const Index n, const ValueType& value);
-
+    /// Set @a value at the given index @a n (assumes uncompressed and in-core)
+    void setUnsafe(Index n, const ValueType& value);
     /// Set @a value at the given index @a n
     void set(Index n, const ValueType& value);
+    /// Set @a value at the given index @a n (assumes uncompressed and in-core)
+    template<typename T> void setUnsafe(Index n, const T& value);
     /// Set @a value at the given index @a n
     template<typename T> void set(Index n, const T& value);
+
+    /// Non-member equivalent to setUnsafe() that static_casts array to this TypedAttributeArray
+    /// (assumes uncompressed and in-core)
+    static void setUnsafe(AttributeArray* array, const Index n, const ValueType& value);
 
     /// Set value at given index @a n from @a sourceIndex of another @a sourceArray
     virtual void set(const Index n, const AttributeArray& sourceArray, const Index sourceIndex);
@@ -775,14 +785,36 @@ TypedAttributeArray<ValueType_, Codec_>::memUsage() const
 
 template<typename ValueType_, typename Codec_>
 typename TypedAttributeArray<ValueType_, Codec_>::ValueType
-TypedAttributeArray<ValueType_, Codec_>::get(Index n) const
+TypedAttributeArray<ValueType_, Codec_>::getUnsafe(Index n) const
 {
-    if (mCompressedBytes != 0) const_cast<TypedAttributeArray*>(this)->decompress();
-    if (mIsUniform) n = 0;
+    assert(!this->isCompressed());
 
     ValueType val;
-    Codec::decode(/*in=*/mData[n], /*out=*/val);
+    Codec::decode(/*in=*/mData[mIsUniform ? 0 : n], /*out=*/val);
     return val;
+}
+
+
+template<typename ValueType_, typename Codec_>
+typename TypedAttributeArray<ValueType_, Codec_>::ValueType
+TypedAttributeArray<ValueType_, Codec_>::get(Index n) const
+{
+    if (this->isCompressed())           const_cast<TypedAttributeArray*>(this)->decompress();
+
+    return this->getUnsafe(n);
+}
+
+
+template<typename ValueType_, typename Codec_>
+template<typename T>
+void
+TypedAttributeArray<ValueType_, Codec_>::getUnsafe(Index n, T& val) const
+{
+    assert(!this->isCompressed());
+
+    ValueType tmp;
+    Codec::decode(/*in=*/mData[mIsUniform ? 0 : n], /*out=*/tmp);
+    val = static_cast<T>(tmp);
 }
 
 
@@ -791,20 +823,29 @@ template<typename T>
 void
 TypedAttributeArray<ValueType_, Codec_>::get(Index n, T& val) const
 {
-    if (mCompressedBytes != 0) const_cast<TypedAttributeArray*>(this)->decompress();
-    if (mIsUniform) n = 0;
+    if (this->isCompressed())           const_cast<TypedAttributeArray*>(this)->decompress();
 
-    ValueType tmp;
-    Codec::decode(/*in=*/mData[n], /*out=*/tmp);
-    val = static_cast<T>(tmp);
+    this->getUnsafe(n, val);
 }
 
 
 template<typename ValueType_, typename Codec_>
 typename TypedAttributeArray<ValueType_, Codec_>::ValueType
-TypedAttributeArray<ValueType_, Codec_>::get(const AttributeArray* array, const Index n)
+TypedAttributeArray<ValueType_, Codec_>::getUnsafe(const AttributeArray* array, const Index n)
 {
-    return static_cast<const TypedAttributeArray<ValueType, Codec>*>(array)->get(n);
+    return static_cast<const TypedAttributeArray<ValueType, Codec>*>(array)->getUnsafe(n);
+}
+
+
+template<typename ValueType_, typename Codec_>
+void
+TypedAttributeArray<ValueType_, Codec_>::setUnsafe(Index n, const ValueType& val)
+{
+    assert(!this->isCompressed());
+
+    if (mIsUniform)     this->expand();
+
+    Codec::encode(/*in=*/val, /*out=*/mData[n]);
 }
 
 
@@ -812,10 +853,23 @@ template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::set(Index n, const ValueType& val)
 {
-    if (mCompressedBytes != 0) this->decompress();
-    if (mIsUniform) this->allocate();
+    if (this->isCompressed())           this->decompress();
 
-    Codec::encode(/*in=*/val, /*out=*/mData[n]);
+    this->setUnsafe(n, val);
+}
+
+
+template<typename ValueType_, typename Codec_>
+template<typename T>
+void
+TypedAttributeArray<ValueType_, Codec_>::setUnsafe(Index n, const T& val)
+{
+    assert(!this->isCompressed());
+
+    if (mIsUniform)     this->expand();
+
+    const ValueType tmp = static_cast<ValueType>(val);
+    Codec::encode(/*in=*/tmp, /*out=*/mData[n]);
 }
 
 
@@ -824,12 +878,17 @@ template<typename T>
 void
 TypedAttributeArray<ValueType_, Codec_>::set(Index n, const T& val)
 {
-    const ValueType tmp = static_cast<ValueType>(val);
+    if (this->isCompressed())           this->decompress();
 
-    if (mCompressedBytes != 0) this->decompress();
-    if (mIsUniform) this->allocate();
+    this->setUnsafe(n, val);
+}
 
-    Codec::encode(/*in=*/tmp, /*out=*/mData[n]);
+
+template<typename ValueType_, typename Codec_>
+void
+TypedAttributeArray<ValueType_, Codec_>::setUnsafe(AttributeArray* array, const Index n, const ValueType& value)
+{
+    static_cast<TypedAttributeArray<ValueType, Codec>*>(array)->setUnsafe(n, value);
 }
 
 
@@ -843,14 +902,6 @@ TypedAttributeArray<ValueType_, Codec_>::set(Index n, const AttributeArray& sour
     sourceTypedArray.get(sourceIndex, sourceValue);
 
     this->set(n, sourceValue);
-}
-
-
-template<typename ValueType_, typename Codec_>
-void
-TypedAttributeArray<ValueType_, Codec_>::set(AttributeArray* array, const Index n, const ValueType& value)
-{
-    static_cast<TypedAttributeArray<ValueType, Codec>*>(array)->set(n, value);
 }
 
 
@@ -1076,9 +1127,12 @@ template<typename ValueType_, typename Codec_>
 AttributeArray::AccessorBasePtr
 TypedAttributeArray<ValueType_, Codec_>::getAccessor() const
 {
+    // use the faster 'unsafe' get and set methods as attribute handles
+    // ensure data is uncompressed and in-core when constructed
+
     return AccessorBasePtr(new AttributeArray::Accessor<ValueType_>(
-        &TypedAttributeArray<ValueType_, Codec_>::get,
-        &TypedAttributeArray<ValueType_, Codec_>::set,
+        &TypedAttributeArray<ValueType_, Codec_>::getUnsafe,
+        &TypedAttributeArray<ValueType_, Codec_>::setUnsafe,
         &TypedAttributeArray<ValueType_, Codec_>::collapse,
         &TypedAttributeArray<ValueType_, Codec_>::fill));
 }
@@ -1120,10 +1174,16 @@ AttributeHandle<T>::AttributeHandle(const AttributeArray& array, const bool pres
     // if array is compressed and preserve compression is true, copy and decompress
     // into a local copy that is destroyed with handle to maintain thread-safety
 
-    if (array.isCompressed() && preserveCompression) {
-        mLocalArray = array.copyUncompressed();
-        mLocalArray->decompress();
-        mArray = mLocalArray.get();
+    if (array.isCompressed())
+    {
+        if (preserveCompression) {
+            mLocalArray = array.copyUncompressed();
+            mLocalArray->decompress();
+            mArray = mLocalArray.get();
+        }
+        else {
+            const_cast<AttributeArray*>(mArray)->decompress();
+        }
     }
 
     // bind getter and setter methods

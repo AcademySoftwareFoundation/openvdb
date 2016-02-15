@@ -133,6 +133,13 @@ TestAttributeArray::testAttributeArray()
         typedAttr.get(0, value);
 
         CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.5), value, /*tolerance=*/double(0.0));
+
+        // test unsafe methods for get() and set()
+
+        typedAttr.setUnsafe(0, 1.5);
+        typedAttr.getUnsafe(0, value);
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(1.5), value, /*tolerance=*/double(0.0));
     }
 
     typedef openvdb::tools::FixedPointAttributeCodec<uint16_t> FixedPointCodec;
@@ -163,6 +170,14 @@ TestAttributeArray::testAttributeArray()
         typedAttr.get(0, value);
 
         CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.5), value, /*tolerance=*/double(0.0001));
+
+        // test unsafe methods for get() and set()
+
+        double value2 = 0.0;
+        typedAttr.setUnsafe(0, double(0.2));
+        typedAttr.getUnsafe(0, value2);
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.2), value2, /*tolerance=*/double(0.0001));
     }
 
     typedef openvdb::tools::TypedAttributeArray<int32_t> AttributeArrayI;
@@ -210,6 +225,7 @@ TestAttributeArray::testAttributeArray()
 
         CPPUNIT_ASSERT_EQUAL(attr.get(0), 5);
         CPPUNIT_ASSERT_EQUAL(attr.get(20), 5);
+        CPPUNIT_ASSERT_EQUAL(attr.getUnsafe(20), 5);
 
         attr.expand();
         CPPUNIT_ASSERT(!attr.isUniform());
@@ -267,6 +283,8 @@ TestAttributeArray::testAttributeArray()
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
             CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.get(i));
+            CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.getUnsafe(i));
+            CPPUNIT_ASSERT_EQUAL(attr.getUnsafe(i), attrB.getUnsafe(i));
         }
     }
 
@@ -470,6 +488,20 @@ TestAttributeArray::testAttributeHandle()
         }
 
         CPPUNIT_ASSERT(array->isCompressed());
+
+        {
+            AttributeHandleROF handleRO(*array, /*preserveCompression=*/false);
+
+            // AttributeHandle uncompresses data on construction
+
+            CPPUNIT_ASSERT(!array->isCompressed());
+
+            CPPUNIT_ASSERT_EQUAL(handleRO.get(6), float(11));
+
+            CPPUNIT_ASSERT(!array->isCompressed());
+        }
+
+        CPPUNIT_ASSERT(!array->isCompressed());
 #endif
     }
 
