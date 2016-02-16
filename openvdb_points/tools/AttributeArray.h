@@ -295,6 +295,9 @@ public:
     /// Write attribute data to a stream.
     virtual void write(std::ostream&) const = 0;
 
+    /// Ensures all data is in-core
+    virtual void loadData() const = 0;
+
     /// Check the compressed bytes and flags. If they are equal, perform a deeper
     /// comparison check necessary on the inherited types (TypedAttributeArray)
     /// Requires non operator implementation due to inheritance
@@ -339,22 +342,14 @@ struct AttributeArray::Accessor : public AttributeArray::AccessorBase
     typedef T (*GetterPtr)(const AttributeArray* array, const Index n);
     typedef void (*SetterPtr)(AttributeArray* array, const Index n, const T& value);
     typedef void (*ValuePtr)(AttributeArray* array, const T& value);
-    typedef void (*LoaderPtr)(const AttributeArray* array);
 
-    Accessor(GetterPtr getter, SetterPtr setter,
-             ValuePtr collapser, ValuePtr filler, LoaderPtr loader) :
-        mGetter(getter), mSetter(setter),
-        mCollapser(collapser), mFiller(filler), mLoader(loader) { }
-
-    void loadData(const AttributeArray* array) const { assert(mLoader); mLoader(array); }
+    Accessor(GetterPtr getter, SetterPtr setter, ValuePtr collapser, ValuePtr filler) :
+        mGetter(getter), mSetter(setter), mCollapser(collapser), mFiller(filler) { }
 
     GetterPtr mGetter;
     SetterPtr mSetter;
     ValuePtr  mCollapser;
     ValuePtr  mFiller;
-
-private:
-    LoaderPtr mLoader;
 }; // struct AttributeArray::Accessor
 
 
@@ -481,17 +476,17 @@ public:
     /// Return @c true if this buffer's values have not yet been read from disk.
     inline bool isOutOfCore() const;
 
-    /// Load data from memory-mapped file.
-    inline void loadData() const;
-    /// Non-member equivalent to loadData() that static_casts array to this TypedAttributeArray
-    static void loadData(const AttributeArray* array);
+    /// Ensures all data is in-core
+    virtual void loadData() const;
 
 protected:
     virtual AccessorBasePtr getAccessor() const;
 
 private:
-    /// Load data from memory-mapped file (note: this function is not protected by a mutex).
+    /// Load data from memory-mapped file.
     inline void doLoad() const;
+    /// Load data from memory-mapped file (unsafe as this function is not protected by a mutex).
+    inline void doLoadUnsafe() const;
 
     /// Toggle out-of-core state
     inline void setOutOfCore(const bool);
@@ -698,7 +693,7 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttribut
     } else if (this->isCompressed()) {
         char* buffer = 0;
         if (uncompress) {
-            rhs.loadData();
+            rhs.doLoad();
             const char* charBuffer = reinterpret_cast<char*>(rhs.mData);
             buffer = decompress(charBuffer, uncompressedSize(charBuffer));
         }
@@ -895,7 +890,7 @@ typename TypedAttributeArray<ValueType_, Codec_>::ValueType
 TypedAttributeArray<ValueType_, Codec_>::get(Index n) const
 {
     if (this->isCompressed())           const_cast<TypedAttributeArray*>(this)->decompress();
-    else if (this->isOutOfCore())       this->loadData();
+    else if (this->isOutOfCore())       this->doLoad();
 
     return this->getUnsafe(n);
 }
@@ -921,7 +916,7 @@ void
 TypedAttributeArray<ValueType_, Codec_>::get(Index n, T& val) const
 {
     if (this->isCompressed())           const_cast<TypedAttributeArray*>(this)->decompress();
-    else if (this->isOutOfCore())       this->loadData();
+    else if (this->isOutOfCore())       this->doLoad();
 
     this->getUnsafe(n, val);
 }
@@ -953,7 +948,7 @@ void
 TypedAttributeArray<ValueType_, Codec_>::set(Index n, const ValueType& val)
 {
     if (this->isCompressed())           this->decompress();
-    else if (this->isOutOfCore())       this->loadData();
+    else if (this->isOutOfCore())       this->doLoad();
 
     this->setUnsafe(n, val);
 }
@@ -980,7 +975,7 @@ void
 TypedAttributeArray<ValueType_, Codec_>::set(Index n, const T& val)
 {
     if (this->isCompressed())           this->decompress();
-    else if (this->isOutOfCore())       this->loadData();
+    else if (this->isOutOfCore())       this->doLoad();
 
     this->setUnsafe(n, val);
 }
@@ -1098,7 +1093,7 @@ TypedAttributeArray<ValueType_, Codec_>::compress()
 
         tbb::spin_mutex::scoped_lock lock(mMutex);
 
-        this->doLoad();
+        this->doLoadUnsafe();
 
         const size_t typeSize = sizeof(typename Codec_::StorageType);
         const int inBytes = int(mSize * sizeof(StorageType));
@@ -1127,7 +1122,7 @@ TypedAttributeArray<ValueType_, Codec_>::decompress()
     tbb::spin_mutex::scoped_lock lock(mMutex);
 
     if (this->isCompressed()) {
-        this->doLoad();
+        this->doLoadUnsafe();
         char* charBuffer = reinterpret_cast<char*>(this->mData);
         char* buffer = decompress(charBuffer, uncompressedSize(charBuffer));
         if (buffer) {
@@ -1168,7 +1163,7 @@ TypedAttributeArray<ValueType_, Codec_>::setOutOfCore(const bool b)
 
 template<typename ValueType_, typename Codec_>
 void
-TypedAttributeArray<ValueType_, Codec_>::loadData() const
+TypedAttributeArray<ValueType_, Codec_>::doLoad() const
 {
 #ifndef OPENVDB_2_ABI_COMPATIBLE
     if (!(this->isOutOfCore()))     return;
@@ -1178,16 +1173,16 @@ TypedAttributeArray<ValueType_, Codec_>::loadData() const
     // This lock will be contended at most once, after which this buffer
     // will no longer be out-of-core.
     tbb::spin_mutex::scoped_lock lock(self->mMutex);
-    this->doLoad();
+    this->doLoadUnsafe();
 #endif
 }
 
 
 template<typename ValueType_, typename Codec_>
 void
-TypedAttributeArray<ValueType_, Codec_>::loadData(const AttributeArray* array)
+TypedAttributeArray<ValueType_, Codec_>::loadData() const
 {
-    static_cast<const TypedAttributeArray<ValueType, Codec>*>(array)->loadData();
+    this->doLoad();
 }
 
 
@@ -1284,7 +1279,7 @@ TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os) const
     boost::scoped_array<char> compressedBuffer;
     int compressedBytes = 0;
 
-    this->loadData();
+    this->doLoad();
 
     if (mIsUniform)
     {
@@ -1320,7 +1315,7 @@ TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os) const
 
 template<typename ValueType_, typename Codec_>
 void
-TypedAttributeArray<ValueType_, Codec_>::doLoad() const
+TypedAttributeArray<ValueType_, Codec_>::doLoadUnsafe() const
 {
     using attribute_compression::decompress;
 
@@ -1379,8 +1374,7 @@ TypedAttributeArray<ValueType_, Codec_>::getAccessor() const
         &TypedAttributeArray<ValueType_, Codec_>::getUnsafe,
         &TypedAttributeArray<ValueType_, Codec_>::setUnsafe,
         &TypedAttributeArray<ValueType_, Codec_>::collapse,
-        &TypedAttributeArray<ValueType_, Codec_>::fill,
-        &TypedAttributeArray<ValueType_, Codec_>::loadData));
+        &TypedAttributeArray<ValueType_, Codec_>::fill));
 }
 
 
@@ -1394,7 +1388,7 @@ TypedAttributeArray<ValueType_, Codec_>::isEqual(const AttributeArray& other) co
        this->mIsUniform != otherT->mIsUniform ||
        *this->sTypeName != *otherT->sTypeName) return false;
 
-    this->loadData();
+    this->doLoad();
 
     const StorageType *target = this->mData, *source = otherT->mData;
     if (!target && !source) return true;
@@ -1419,20 +1413,9 @@ template <typename T>
 AttributeHandle<T>::AttributeHandle(const AttributeArray& array, const bool preserveCompression)
     : mArray(&array)
 {
-    // create a temporary accessor and load data if delay-loaded
+    // load data if delay-loaded
 
-    {
-        AttributeArray::AccessorBasePtr accessor = array.getAccessor();
-        assert(accessor);
-
-        AttributeArray::Accessor<T>* typedAccessor = static_cast<AttributeArray::Accessor<T>*>(accessor.get());
-
-        if (!typedAccessor) {
-            OPENVDB_THROW(RuntimeError, "Cannot bind AttributeHandle due to mis-matching types.");
-        }
-
-        typedAccessor->loadData(&array);
-    }
+    mArray->loadData();
 
     // if array is compressed and preserve compression is true, copy and decompress
     // into a local copy that is destroyed with handle to maintain thread-safety
