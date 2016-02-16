@@ -427,7 +427,7 @@ private:
     virtual bool isEqual(const AttributeArray& other) const;
 
     size_t arrayMemUsage() const;
-    void allocate(bool fill = true);
+    void allocate(const size_t size);
     void deallocate();
 
     /// Helper function for use with registerType()
@@ -611,7 +611,7 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttribut
     , mMutex()
 {
     if (mIsUniform) {
-        mData = new StorageType[1];
+        this->allocate(1);
         mData[0] = rhs.mData[0];
     } else if (mCompressedBytes != 0 && decompress) {
         this->decompress(rhs.mData);
@@ -620,7 +620,7 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttribut
         memcpy(buffer, rhs.mData, mCompressedBytes);
         mData = reinterpret_cast<StorageType*>(buffer);
     } else {
-        mData = new StorageType[mSize];
+        this->allocate(mSize);
         memcpy(mData, rhs.mData, mSize * sizeof(StorageType));
     }
 }
@@ -639,14 +639,14 @@ TypedAttributeArray<ValueType_, Codec_>::operator=(const TypedAttributeArray& rh
         mIsUniform = rhs.mIsUniform;
 
         if (mIsUniform) {
-            mData = new StorageType[1];
+            this->allocate(1);
             mData[0] = rhs.mData[0];
         } else if (mCompressedBytes != 0) {
             char* buffer = new char[mCompressedBytes];
             memcpy(buffer, rhs.mData, mCompressedBytes);
             mData = reinterpret_cast<StorageType*>(buffer);
         } else {
-            mData = new StorageType[mSize];
+            this->allocate(mSize);
             memcpy(mData, rhs.mData, mSize * sizeof(StorageType));
         }
     }
@@ -746,21 +746,10 @@ TypedAttributeArray<ValueType_, Codec_>::arrayMemUsage() const
 
 template<typename ValueType_, typename Codec_>
 void
-TypedAttributeArray<ValueType_, Codec_>::allocate(bool fill)
+TypedAttributeArray<ValueType_, Codec_>::allocate(const size_t size)
 {
-    tbb::spin_mutex::scoped_lock lock(mMutex);
-
-    StorageType val = mIsUniform ? mData[0] : zeroVal<StorageType>();
-
-    this->deallocate();
-
-    mCompressedBytes = 0;
-    mIsUniform = false;
-
-    mData = new StorageType[mSize];
-    if (fill) {
-        for (size_t i = 0; i < mSize; ++i)  mData[i] = val;
-    }
+    assert(!mData);
+    mData = new StorageType[size];
 }
 
 
@@ -907,6 +896,29 @@ TypedAttributeArray<ValueType_, Codec_>::set(Index n, const AttributeArray& sour
 
 template<typename ValueType_, typename Codec_>
 void
+TypedAttributeArray<ValueType_, Codec_>::expand(bool fill)
+{
+    if (!mIsUniform)    return;
+
+    const StorageType val = mData[0];
+
+    {
+        tbb::spin_mutex::scoped_lock lock(mMutex);
+        this->deallocate();
+        this->allocate(mSize);
+    }
+
+    mCompressedBytes = 0;
+    mIsUniform = false;
+
+    if (fill) {
+        for (size_t i = 0; i < mSize; ++i)  mData[i] = val;
+    }
+}
+
+
+template<typename ValueType_, typename Codec_>
+void
 TypedAttributeArray<ValueType_, Codec_>::collapse()
 {
     this->collapse(zeroVal<ValueType>());
@@ -919,7 +931,7 @@ TypedAttributeArray<ValueType_, Codec_>::collapse(const ValueType& uniformValue)
 {
     if (!mIsUniform) {
         this->deallocate();
-        mData = new StorageType[1];
+        this->allocate(1);
         mIsUniform = true;
     }
     Codec::encode(uniformValue, mData[0]);
@@ -950,14 +962,6 @@ void
 TypedAttributeArray<ValueType_, Codec_>::fill(AttributeArray* array, const ValueType& value)
 {
     static_cast<TypedAttributeArray<ValueType, Codec>*>(array)->fill(value);
-}
-
-
-template<typename ValueType_, typename Codec_>
-void
-TypedAttributeArray<ValueType_, Codec_>::expand(bool fill)
-{
-    this->allocate(fill);
 }
 
 
