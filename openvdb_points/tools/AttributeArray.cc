@@ -36,11 +36,150 @@
 
 #include <openvdb_points/tools/AttributeArray.h>
 
+#ifdef OPENVDB_USE_BLOSC
+#include <blosc.h>
+#endif
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
+
+////////////////////////////////////////
+
+namespace attribute_compression {
+
+
+#ifdef OPENVDB_USE_BLOSC
+
+
+bool canCompress()
+{
+    return true;
+}
+
+
+int uncompressedSize(const char* buffer)
+{
+    size_t bytes, _1, _2;
+    blosc_cbuffer_sizes(buffer, &bytes, &_1, &_2);
+    return bytes;
+}
+
+
+char* compress( char* buffer, const size_t typeSize,
+                const int uncompressedBytes, int& compressedBytes, const bool cleanup)
+{
+    int tempBytes = uncompressedBytes + BLOSC_MAX_OVERHEAD;
+    boost::scoped_array<char> outBuf(new char[tempBytes]);
+
+    compressedBytes = blosc_compress_ctx(
+        /*clevel=*/9, // 0 (no compression) to 9 (maximum compression)
+        /*doshuffle=*/true,
+        /*typesize=*/typeSize,
+        /*srcsize=*/uncompressedBytes,
+        /*src=*/buffer,
+        /*dest=*/outBuf.get(),
+        /*destsize=*/tempBytes,
+        BLOSC_LZ4_COMPNAME,
+        /*blocksize=*/256,
+        /*numthreads=*/1);
+
+    if (compressedBytes <= 0) {
+        std::ostringstream ostr;
+        ostr << "Blosc failed to compress " << uncompressedBytes << " byte" << (uncompressedBytes == 1 ? "" : "s");
+        if (compressedBytes < 0) ostr << " (internal error " << compressedBytes << ")";
+        OPENVDB_LOG_DEBUG(ostr.str());
+        return 0;
+    }
+
+    // optionally cleanup compressed buffer if requested (prior to allocating new uncompressed buffer)
+
+    if (cleanup)    delete[] buffer;
+
+    char* outData = new char[compressedBytes];
+    std::memcpy(outData, outBuf.get(), size_t(compressedBytes));
+    return outData;
+}
+
+
+char* decompress(char* buffer, const int expectedBytes, const bool cleanup)
+{
+    int tempBytes = expectedBytes + BLOSC_MAX_OVERHEAD;
+    boost::scoped_array<char> tempBuffer(new char[tempBytes]);
+
+    const int uncompressedBytes = blosc_decompress_ctx( /*src=*/buffer,
+                                                        /*dest=*/tempBuffer.get(),
+                                                        tempBytes,
+                                                        /*numthreads=*/1);
+
+    if (uncompressedBytes < 1) {
+        OPENVDB_LOG_DEBUG("blosc_decompress() returned error code " << uncompressedBytes);
+        return 0;
+    }
+    if (uncompressedBytes != Int64(expectedBytes)) {
+        OPENVDB_THROW(RuntimeError, "Expected to decompress " << expectedBytes
+            << " byte" << (expectedBytes == 1 ? "" : "s") << ", got "
+            << uncompressedBytes << " byte" << (uncompressedBytes == 1 ? "" : "s"));
+    }
+
+    // optionally cleanup compressed buffer if requested (prior to allocating new uncompressed buffer)
+
+    if (cleanup)    delete[] buffer;
+
+    char* newBuffer = new char[uncompressedBytes];
+    std::memcpy(newBuffer, tempBuffer.get(), size_t(uncompressedBytes));
+
+    return newBuffer;
+}
+
+
+#else
+
+
+bool canCompress()
+{
+    OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
+    return false;
+}
+
+
+int uncompressedSize(const char*)
+{
+    OPENVDB_THROW(RuntimeError, "Can't extract compressed data without the blosc library.");
+}
+
+
+char* compress(char*, const size_t, const int, int&, const bool)
+{
+    OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
+    return 0;
+}
+
+
+char* decompress(char*, const int, const bool)
+{
+    OPENVDB_THROW(RuntimeError, "Can't extract compressed data without the blosc library.");
+}
+
+
+#endif // OPENVDB_USE_BLOSC
+
+
+char* compress(  const char* buffer, const size_t typeSize,
+                        const int uncompressedBytes, int& compressedBytes)
+{
+    return compress(const_cast<char*>(buffer), typeSize, uncompressedBytes, compressedBytes, /*cleanup=*/false);
+}
+
+
+char* decompress(const char* buffer, const int expectedBytes)
+{
+    return decompress(const_cast<char*>(buffer), expectedBytes, /*cleanup=*/false);
+}
+
+
+} // namespace attribute_compression
 
 
 ////////////////////////////////////////

@@ -48,6 +48,7 @@ class TestAttributeArray: public CppUnit::TestCase
 public:
     CPPUNIT_TEST_SUITE(TestAttributeArray);
     CPPUNIT_TEST(testFixedPointConversion);
+    CPPUNIT_TEST(testCompression);
     CPPUNIT_TEST(testAttributeArray);
     CPPUNIT_TEST(testAttributeHandle);
     CPPUNIT_TEST(testProfile);
@@ -55,6 +56,7 @@ public:
     CPPUNIT_TEST_SUITE_END();
 
     void testFixedPointConversion();
+    void testCompression();
     void testAttributeArray();
     void testAttributeHandle();
     void testProfile();
@@ -106,6 +108,118 @@ TestAttributeArray::testFixedPointConversion()
     const float newValue = newWorldSpaceValue.x();
 
     CPPUNIT_ASSERT_DOUBLES_EQUAL(value, newValue, /*tolerance=*/1e-6);
+}
+
+void
+TestAttributeArray::testCompression()
+{
+    using namespace attribute_compression;
+
+    const int count = 256;
+
+    { // with cleanup
+        // compress
+
+        int* uncompressedBuffer = new int[count];
+
+        for (int i = 0; i < count; i++) {
+            uncompressedBuffer[i] = i / 2;
+        }
+
+        int uncompressedBytes = 256 * sizeof(int);
+        int compressedBytes;
+
+        char* compressedBuffer = compress(  reinterpret_cast<char*>(uncompressedBuffer), sizeof(int),
+                                            uncompressedBytes, compressedBytes, /*cleanup=*/ true);
+
+#ifdef OPENVDB_USE_BLOSC
+        CPPUNIT_ASSERT(compressedBytes < uncompressedBytes);
+        CPPUNIT_ASSERT(compressedBuffer);
+
+        // uncompressedSize
+
+        CPPUNIT_ASSERT_EQUAL(uncompressedBytes, uncompressedSize(compressedBuffer));
+
+        // decompress
+
+        char* newUncompressedBuffer = decompress(compressedBuffer, uncompressedBytes, /*cleanup=*/ true);
+
+        CPPUNIT_ASSERT(newUncompressedBuffer);
+
+        delete[] newUncompressedBuffer;
+#else
+        CPPUNIT_ASSERT(!compressedBuffer);
+
+        // uncompressedSize
+
+        CPPUNIT_ASSERT_THROW(uncompressedSize(compressedBuffer), openvdb::RuntimeError);
+
+        // decompress
+
+        char* newUncompressedBuffer = 0;
+        CPPUNIT_ASSERT_THROW(   newUncompressedBuffer = decompress(compressedBuffer, uncompressedBytes,
+                                                        /*cleanup=*/ true), openvdb::RuntimeError);
+
+        CPPUNIT_ASSERT(!newUncompressedBuffer);
+
+        delete[] uncompressedBuffer;
+#endif
+    }
+
+    { // without cleanup
+        // compress
+
+        int* uncompressedBuffer = new int[count];
+
+        for (int i = 0; i < count; i++) {
+            uncompressedBuffer[i] = i / 2;
+        }
+
+        int uncompressedBytes = 256 * sizeof(int);
+        int compressedBytes;
+
+        const char* compressedBuffer = compress(reinterpret_cast<const char*>(uncompressedBuffer), sizeof(int),
+                                                uncompressedBytes, compressedBytes);
+
+#ifdef OPENVDB_USE_BLOSC
+        CPPUNIT_ASSERT(compressedBytes < uncompressedBytes);
+        CPPUNIT_ASSERT(compressedBuffer);
+
+        // uncompressedSize
+
+        CPPUNIT_ASSERT_EQUAL(uncompressedBytes, uncompressedSize(compressedBuffer));
+
+        // decompress
+
+        const char* newUncompressedBuffer = decompress(compressedBuffer, uncompressedBytes);
+
+        CPPUNIT_ASSERT(newUncompressedBuffer);
+
+        for (int i = 0; i < count; i++) {
+            CPPUNIT_ASSERT_EQUAL(uncompressedBuffer[i], reinterpret_cast<const int*>(newUncompressedBuffer)[i]);
+        }
+
+        delete[] uncompressedBuffer;
+        delete[] compressedBuffer;
+        delete[] newUncompressedBuffer;
+#else
+        CPPUNIT_ASSERT(!compressedBuffer);
+
+        // uncompressedSize
+
+        CPPUNIT_ASSERT_THROW(uncompressedSize(compressedBuffer), openvdb::RuntimeError);
+
+        // decompress
+
+        char* newUncompressedBuffer = 0;
+        CPPUNIT_ASSERT_THROW(   newUncompressedBuffer = decompress(compressedBuffer, uncompressedBytes),
+                                                        openvdb::RuntimeError);
+
+        CPPUNIT_ASSERT(!newUncompressedBuffer);
+
+        delete[] uncompressedBuffer;
+#endif
+    }
 }
 
 void

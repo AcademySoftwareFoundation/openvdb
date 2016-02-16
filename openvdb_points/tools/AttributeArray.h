@@ -48,14 +48,14 @@
 
 #include <openvdb_points/tools/IndexIterator.h>
 
-#ifdef OPENVDB_USE_BLOSC
-#include <blosc.h>
-#endif
-
 #include <tbb/spin_mutex.h>
 #include <tbb/atomic.h>
 
 #include <boost/scoped_array.hpp>
+
+#ifdef OPENVDB_USE_BLOSC
+#include <blosc.h>
+#endif
 
 #include <string>
 
@@ -68,8 +68,48 @@ namespace OPENVDB_VERSION_NAME {
 // Add new typedef for a Name pair
 typedef std::pair<Name, Name> NamePair;
 
-
 namespace tools {
+
+
+////////////////////////////////////////
+
+// Attribute Compression methods
+
+
+namespace attribute_compression {
+
+/// @brief Returns true if compression is available
+bool canCompress();
+
+/// @brief Retrieves the uncompressed size of buffer when uncompressed
+///
+/// @param buffer the compressed buffer
+int uncompressedSize(const char* buffer);
+
+/// @brief Compress and return the @param buffer.
+/// The number of compressed bytes is written to @param compressedBytes.
+/// If @param cleanup is true, the supplied @param buffer will be deleted
+/// prior to allocating new memory.
+char* compress( char* buffer, const size_t typeSize,
+                const int uncompressedBytes, int& compressedBytes,
+                const bool cleanup = false);
+
+/// @brief Compress and return the @param buffer.
+/// The number of compressed bytes is written to @param compressedBytes.
+/// Unlike the non-const buffer version, the buffer will never be deleted.
+char* compress( const char* buffer, const size_t typeSize,
+                const int uncompressedBytes, int& compressedBytes);
+
+/// @brief Decompress and return the @param buffer.
+/// If @param cleanup is true, the supplied @param buffer will be deleted
+/// prior to allocating new memory.
+char* decompress(char* buffer, const int expectedBytes, const bool cleanup = false);
+
+/// @brief Decompress and return the @param buffer.
+/// Unlike the non-const buffer version, the buffer will never be deleted.
+char* decompress(const char* buffer, const int expectedBytes);
+
+} // namespace attribute_compression
 
 
 ////////////////////////////////////////
