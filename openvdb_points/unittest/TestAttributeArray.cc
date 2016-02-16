@@ -34,11 +34,39 @@
 #include <openvdb_points/tools/AttributeSet.h>
 #include <openvdb/Types.h>
 #include <openvdb/math/Transform.h>
+#include <openvdb/io/TempFile.h>
+#include <openvdb/io/Archive.h>
 
 #include "ProfileTimer.h"
 
 #include <sstream>
 #include <iostream>
+
+// redefine File because MappedFile constructor is private, but a friend of File
+
+namespace openvdb {
+OPENVDB_USE_VERSION_NAMESPACE
+namespace OPENVDB_VERSION_NAME {
+namespace io {
+
+class File
+{
+public:
+    typedef boost::shared_ptr<MappedFile> MappedPtr;
+
+    File(const std::string& filename)
+        : mMappedFile(new io::MappedFile(filename, /*autoDelete=*/false)) { }
+
+    MappedPtr mappedFile() { return mMappedFile; }
+
+private:
+    MappedPtr mMappedFile;
+};
+
+} // namespace io
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
+
 
 using namespace openvdb;
 using namespace openvdb::tools;
@@ -51,6 +79,7 @@ public:
     CPPUNIT_TEST(testCompression);
     CPPUNIT_TEST(testAttributeArray);
     CPPUNIT_TEST(testAttributeHandle);
+    CPPUNIT_TEST(testDelayedLoad);
     CPPUNIT_TEST(testProfile);
 
     CPPUNIT_TEST_SUITE_END();
@@ -59,6 +88,7 @@ public:
     void testCompression();
     void testAttributeArray();
     void testAttributeHandle();
+    void testDelayedLoad();
     void testProfile();
 }; // class TestAttributeArray
 
@@ -446,6 +476,8 @@ TestAttributeArray::testAttributeArray()
         attrA.setHidden(true);
 
         std::ostringstream ostr(std::ios_base::binary);
+        io::setDataCompression(ostr, io::COMPRESS_BLOSC);
+
         attrA.write(ostr);
 
         AttributeArrayI attrB;
@@ -455,10 +487,11 @@ TestAttributeArray::testAttributeArray()
 
         CPPUNIT_ASSERT(matchingNamePairs(attrA.type(), attrB.type()));
         CPPUNIT_ASSERT_EQUAL(attrA.size(), attrB.size());
-        CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
         CPPUNIT_ASSERT_EQUAL(attrA.isUniform(), attrB.isUniform());
         CPPUNIT_ASSERT_EQUAL(attrA.isTransient(), attrB.isTransient());
         CPPUNIT_ASSERT_EQUAL(attrA.isHidden(), attrB.isHidden());
+        CPPUNIT_ASSERT_EQUAL(attrA.isCompressed(), attrB.isCompressed());
+        CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
             CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrB.get(i));
@@ -651,6 +684,329 @@ TestAttributeArray::testAttributeHandle()
     }
 }
 
+void
+TestAttributeArray::testDelayedLoad()
+{
+    using namespace openvdb;
+    using namespace openvdb::tools;
+
+    typedef TypedAttributeArray<int>    AttributeArrayI;
+
+    AttributeArrayI::registerType();
+
+    { // IO
+        const size_t count = 50;
+        AttributeArrayI attrA(count);
+
+        for (unsigned i = 0; i < unsigned(count); ++i) {
+            attrA.set(i, int(i));
+        }
+
+        std::string filename;
+
+        // write out attribute array to a temp file
+        {
+            io::TempFile fileout;
+            io::setDataCompression(fileout, io::COMPRESS_BLOSC);
+
+            attrA.write(fileout);
+
+            filename = fileout.filename();
+            fileout.close();
+        }
+
+        // abuse File being a friend of MappedFile to get around the private constructor
+
+        io::File file(filename);
+        io::File::MappedPtr mappedFile = file.mappedFile();
+
+        // read in using delayed load and check manual loading of data
+        {
+            AttributeArrayI attrB;
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            attrB.read(filein);
+
+            CPPUNIT_ASSERT(matchingNamePairs(attrA.type(), attrB.type()));
+            CPPUNIT_ASSERT_EQUAL(attrA.size(), attrB.size());
+            CPPUNIT_ASSERT_EQUAL(attrA.isUniform(), attrB.isUniform());
+            CPPUNIT_ASSERT_EQUAL(attrA.isTransient(), attrB.isTransient());
+            CPPUNIT_ASSERT_EQUAL(attrA.isHidden(), attrB.isHidden());
+            CPPUNIT_ASSERT_EQUAL(attrA.isCompressed(), attrB.isCompressed());
+
+            CPPUNIT_ASSERT(attrB.isOutOfCore());
+            attrB.loadData();
+
+            CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
+
+            for (unsigned i = 0; i < unsigned(count); ++i) {
+                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrB.get(i));
+            }
+        }
+
+        // read in using delayed load and check implicit load through get()
+        {
+            AttributeArrayI attrB;
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            attrB.read(filein);
+
+            CPPUNIT_ASSERT(attrB.isOutOfCore());
+
+            attrB.get(0);
+
+            CPPUNIT_ASSERT(!attrB.isOutOfCore());
+
+            for (unsigned i = 0; i < unsigned(count); ++i) {
+                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrB.get(i));
+            }
+        }
+
+        // read in using delayed load and check implicit load through compress()
+        {
+            AttributeArrayI attrB;
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            attrB.read(filein);
+
+            CPPUNIT_ASSERT(attrB.isOutOfCore());
+            CPPUNIT_ASSERT(!attrB.isCompressed());
+
+            attrB.compress();
+
+#ifdef OPENVDB_USE_BLOSC
+            CPPUNIT_ASSERT(!attrB.isOutOfCore());
+            CPPUNIT_ASSERT(attrB.isCompressed());
+#else
+            CPPUNIT_ASSERT(attrB.isOutOfCore());
+            CPPUNIT_ASSERT(!attrB.isCompressed());
+#endif
+        }
+
+        // read in using delayed load and check copy and assignment constructors
+        {
+            AttributeArrayI attrB;
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            attrB.read(filein);
+
+            CPPUNIT_ASSERT(attrB.isOutOfCore());
+
+            AttributeArrayI attrC(attrB);
+            AttributeArrayI attrD = attrB;
+
+            CPPUNIT_ASSERT(attrB.isOutOfCore());
+            CPPUNIT_ASSERT(attrC.isOutOfCore());
+            CPPUNIT_ASSERT(attrD.isOutOfCore());
+
+            attrB.loadData();
+            attrC.loadData();
+            attrD.loadData();
+
+            CPPUNIT_ASSERT(!attrB.isOutOfCore());
+            CPPUNIT_ASSERT(!attrC.isOutOfCore());
+            CPPUNIT_ASSERT(!attrD.isOutOfCore());
+
+            for (unsigned i = 0; i < unsigned(count); ++i) {
+                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrB.get(i));
+                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrC.get(i));
+                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrD.get(i));
+            }
+        }
+
+        // read in using delayed load and check implicit load through AttributeHandle
+        {
+            AttributeArrayI attrB;
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            attrB.read(filein);
+
+            CPPUNIT_ASSERT(attrB.isOutOfCore());
+
+            AttributeHandle<int> handle(attrB);
+
+            CPPUNIT_ASSERT(!attrB.isOutOfCore());
+        }
+
+        // read in using delayed load and check detaching of file (using collapse())
+        {
+            AttributeArrayI attrB;
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            attrB.read(filein);
+
+            CPPUNIT_ASSERT(attrB.isOutOfCore());
+            CPPUNIT_ASSERT(!attrB.isUniform());
+
+            attrB.collapse();
+
+            CPPUNIT_ASSERT(!attrB.isOutOfCore());
+            CPPUNIT_ASSERT(attrB.isUniform());
+
+            CPPUNIT_ASSERT_EQUAL(attrB.get(0), 0);
+        }
+
+        // cleanup temp files
+
+        std::remove(mappedFile->filename().c_str());
+        std::remove(filename.c_str());
+
+        // write out compressed attribute array to a temp file
+        {
+            io::TempFile fileout;
+            io::setDataCompression(fileout, io::COMPRESS_BLOSC);
+
+            attrA.compress();
+            attrA.write(fileout);
+
+            filename = fileout.filename();
+            fileout.close();
+        }
+
+        // abuse File being a friend of MappedFile to get around the private constructor
+
+        io::File fileCompressed(filename);
+        mappedFile = fileCompressed.mappedFile();
+
+        // read in using delayed load and check manual loading of data
+        {
+            AttributeArrayI attrB;
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            attrB.read(filein);
+
+#ifdef OPENVDB_USE_BLOSC
+            CPPUNIT_ASSERT(attrB.isCompressed());
+#endif
+
+            CPPUNIT_ASSERT(attrB.isOutOfCore());
+            attrB.loadData();
+
+            CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
+
+            for (unsigned i = 0; i < unsigned(count); ++i) {
+                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrB.get(i));
+            }
+        }
+
+        // read in using delayed load and check implicit load through get()
+        {
+            AttributeArrayI attrB;
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            attrB.read(filein);
+
+            CPPUNIT_ASSERT(attrB.isOutOfCore());
+
+            attrB.get(0);
+
+            CPPUNIT_ASSERT(!attrB.isOutOfCore());
+
+            for (unsigned i = 0; i < unsigned(count); ++i) {
+                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrB.get(i));
+            }
+        }
+
+#ifdef OPENVDB_USE_BLOSC
+        // read in using delayed load and check no implicit load through compress()
+        {
+            AttributeArrayI attrB;
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            attrB.read(filein);
+
+            CPPUNIT_ASSERT(attrB.isOutOfCore());
+            CPPUNIT_ASSERT(attrB.isCompressed());
+
+            attrB.compress();
+
+            CPPUNIT_ASSERT(attrB.isOutOfCore());
+            CPPUNIT_ASSERT(attrB.isCompressed());
+        }
+
+        // read in using delayed load and check copy and assignment constructors
+        {
+            AttributeArrayI attrB;
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            attrB.read(filein);
+
+            CPPUNIT_ASSERT(attrB.isOutOfCore());
+
+            AttributeArrayI attrC(attrB);
+            AttributeArrayI attrD = attrB;
+
+            CPPUNIT_ASSERT(attrB.isOutOfCore());
+            CPPUNIT_ASSERT(attrC.isOutOfCore());
+            CPPUNIT_ASSERT(attrD.isOutOfCore());
+
+            attrB.loadData();
+            attrC.loadData();
+            attrD.loadData();
+
+            CPPUNIT_ASSERT(!attrB.isOutOfCore());
+            CPPUNIT_ASSERT(!attrC.isOutOfCore());
+            CPPUNIT_ASSERT(!attrD.isOutOfCore());
+
+            for (unsigned i = 0; i < unsigned(count); ++i) {
+                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrB.get(i));
+                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrC.get(i));
+                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrD.get(i));
+            }
+        }
+
+        // read in using delayed load and check implicit load through AttributeHandle
+        {
+            AttributeArrayI attrB;
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            attrB.read(filein);
+
+            CPPUNIT_ASSERT(attrB.isOutOfCore());
+            CPPUNIT_ASSERT(attrB.isCompressed());
+
+            AttributeHandle<int> handle(attrB);
+
+            CPPUNIT_ASSERT(!attrB.isOutOfCore());
+            CPPUNIT_ASSERT(attrB.isCompressed());
+
+            for (unsigned i = 0; i < unsigned(count); ++i) {
+                CPPUNIT_ASSERT_EQUAL(attrA.get(i), handle.get(i));
+            }
+
+            AttributeHandle<int> handle2(attrB, /*preserveCompression=*/false);
+            CPPUNIT_ASSERT(!attrB.isCompressed());
+        }
+#endif
+
+        // cleanup temp files
+
+        std::remove(mappedFile->filename().c_str());
+        std::remove(filename.c_str());
+    }
+}
 
 namespace profile {
 
