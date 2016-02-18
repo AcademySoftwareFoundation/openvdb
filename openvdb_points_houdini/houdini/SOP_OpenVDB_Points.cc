@@ -334,6 +334,7 @@ class PointAttribute
 {
 public:
     typedef AttributeType value_type;
+    typedef AttributeType PosType;
 
     PointAttribute(GA_Attribute const * attribute, OffsetListPtr offsets)
         : mAttribute(attribute)
