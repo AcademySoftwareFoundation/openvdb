@@ -14,6 +14,7 @@ An overview of this library was presented at Siggraph 2015 for which the slides 
 Please use the [OpenVDB Forum](http://www.openvdb.org/forum/) for discussion related to this project or email the developers directly at openvdbpoints@dneg.com.
 
 [![Build Status](https://travis-ci.org/dneg/openvdb_points_dev.svg?branch=master)](https://travis-ci.org/dneg/openvdb_points_dev)
+[![codecov.io](https://codecov.io/github/dneg/openvdb_points_dev/coverage.svg?branch=master)](https://codecov.io/github/dneg/openvdb_points_dev?branch=master)
 
 ### Beta Release
 
