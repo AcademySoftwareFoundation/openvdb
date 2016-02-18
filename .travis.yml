@@ -22,6 +22,9 @@ env:
   - HOUDINI_BUILD=houdini-14.0.395-linux_x86_64_gcc4.8
   - HOUDINI_BUILD=houdini-15.0.244.16-linux_x86_64_gcc4.8
 
+before_install:
+  - pip install --user codecov
+
 install:
   - bash .travis.run pre_install $HOUDINI_BUILD
   - bash .travis.run install $HOUDINI_BUILD
@@ -29,3 +32,5 @@ install:
 script:
   - bash .travis.run script $HOUDINI_BUILD
 
+after_success:
+  - codecov
