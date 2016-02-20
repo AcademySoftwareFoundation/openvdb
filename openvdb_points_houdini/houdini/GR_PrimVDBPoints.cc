@@ -416,6 +416,8 @@ struct FillGPUBuffersLeafBoxes
 
             // define 8 corners
 
+            corners.clear();
+
             const openvdb::Vec3f pos000 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 0.0, 0.0));
             corners.push_back(UT_Vector3F(pos000.x(), pos000.y(), pos000.z()));
             const openvdb::Vec3f pos001 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 0.0, 8.0));
@@ -731,27 +733,6 @@ GR_PrimVDBPoints::updateWire(RE_Render *r,
 
     if (posWire->getCacheVersion() != version)
     {
-        // build cumulative leaf offset array
-
-        typedef std::vector<std::pair<const LeafNode*, openvdb::Index64> > LeafOffsets;
-
-        LeafOffsets offsets;
-
-        openvdb::Index64 cumulativeOffset = 0;
-
-        for (TreeType::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
-            const LeafNode& leaf = *iter;
-
-            // skip out-of-core leaf nodes (used when delay loading VDBs)
-            if (leaf.buffer().isOutOfCore())    continue;
-
-            const openvdb::Index64 count = leaf.pointCount();
-
-            offsets.push_back(LeafOffsets::value_type(&leaf, cumulativeOffset));
-
-            cumulativeOffset += count;
-        }
-
         using gr_primitive_internal::FillGPUBuffersLeafBoxes;
 
         // fill the wire data
@@ -759,7 +740,6 @@ GR_PrimVDBPoints::updateWire(RE_Render *r,
         UT_Vector3F *pdata = static_cast<UT_Vector3F*>(posWire->map(r));
 
         std::vector<openvdb::Coord> coords;
-        coords.reserve(outOfCoreLeaves);
 
         for (TreeType::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
             const LeafNode& leaf = *iter;
@@ -769,8 +749,6 @@ GR_PrimVDBPoints::updateWire(RE_Render *r,
 
             coords.push_back(leaf.origin());
         }
-
-        assert(coords.size() == outOfCoreLeaves);
 
         FillGPUBuffersLeafBoxes fill(pdata, coords, grid.transform());
         const tbb::blocked_range<size_t> range(0, coords.size());
@@ -787,7 +765,7 @@ GR_PrimVDBPoints::updateWire(RE_Render *r,
         // Extra constant inputs for the GL3 default shaders we are using.
         // This isn't required unless
 
-        fpreal32 constcol[3] = { 0.0, 0.0, 0.0 };
+        fpreal32 constcol[3] = { 0.6, 0.6, 0.6 };
         fpreal32 uv[2]  = { 0.0, 0.0 };
         fpreal32 alpha  = 1.0;
         fpreal32 pnt    = 0.0;
@@ -843,13 +821,24 @@ GR_PrimVDBPoints::render(RE_Render *r,
     // TODO: replace sprites with spheres and remove manual point size
 
     r->pushShader();
-    r->pushPointSize(2.0f);
     r->bindShader(thePointShader);
 
-    if (myGeo)  myGeo->draw(r, RE_GEO_WIRE_IDX);
-    if (myWire) myWire->draw(r, RE_GEO_WIRE_IDX);
+    // draw points
 
-    r->popPointSize();
+    if (myGeo) {
+        r->pushPointSize(2.0f);
+        myGeo->draw(r, RE_GEO_WIRE_IDX);
+        r->popPointSize();
+    }
+
+    // draw leaf bboxes
+
+    if (myWire) {
+        r->pushLineWidth(1.0f);
+        myWire->draw(r, RE_GEO_WIRE_IDX);
+        r->popLineWidth();
+    }
+
     r->popShader();
 }
 
