@@ -1299,7 +1299,7 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
 
         // Create PointPartitioner compatible P attribute wrapper (for now no offset filtering)
 
-        PointAttribute<openvdb::Vec3f> points(ptGeo->getP(), OffsetListPtr());
+        PointAttribute<openvdb::Vec3d> points(ptGeo->getP(), OffsetListPtr());
 
         // Create PointIndexGrid used for consistent index ordering in all attribute conversion
 

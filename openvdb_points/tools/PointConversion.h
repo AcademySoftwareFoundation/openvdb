@@ -210,8 +210,8 @@ struct PopulatePositionAttributeOp {
 
             if (!pointIndexLeaf)    continue;
 
-            typename AttributeWriteHandle<ValueType>::Ptr attributeWriteHandle =
-                AttributeWriteHandle<ValueType>::create(leaf->template attributeArray("P"));
+            typename AttributeWriteHandle<Vec3f>::Ptr attributeWriteHandle =
+                AttributeWriteHandle<Vec3f>::create(leaf->template attributeArray("P"));
 
             Index64 index = 0;
 
@@ -229,7 +229,7 @@ struct PopulatePositionAttributeOp {
                             positionIndexSpace.y() - math::Round(positionIndexSpace.y()),
                             positionIndexSpace.z() - math::Round(positionIndexSpace.z()));
 
-                attributeWriteHandle->set(index, positionVoxelSpace);
+                attributeWriteHandle->set(index, Vec3f(positionVoxelSpace));
 
                 index++;
             }
