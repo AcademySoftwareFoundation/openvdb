@@ -245,6 +245,7 @@ INCLUDE_NAMES := \
     tools/PointConversion.h \
     tools/PointCount.h \
     tools/PointGroup.h \
+    tools/PointLoad.h \
     Types.h \
     openvdb.h \
     version.h \
@@ -271,6 +272,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestPointCount.cc \
     unittest/TestPointDataLeaf.cc \
     unittest/TestPointGroup.cc \
+    # unittest/TestPointLoad.cc \
 #
 
 DOC_FILES := 	doc/doc.txt \

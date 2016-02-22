@@ -1,0 +1,232 @@
+///////////////////////////////////////////////////////////////////////////
+//
+// Copyright (c) 2015 Double Negative Visual Effects
+//
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
+//
+// Redistributions of source code must retain the above copyright
+// and license notice and the following restrictions and disclaimer.
+//
+// *     Neither the name of Double Negative Visual Effects nor the names
+// of its contributors may be used to endorse or promote products derived
+// from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
+// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
+//
+///////////////////////////////////////////////////////////////////////////
+
+
+#include <cppunit/extensions/HelperMacros.h>
+
+#include <openvdb_points/openvdb.h>
+#include <openvdb_points/tools/PointDataGrid.h>
+#include <openvdb_points/tools/PointConversion.h>
+#include <openvdb_points/tools/PointLoad.h>
+#include <openvdb_points/tools/AttributeArray.h>
+#include <openvdb_points/tools/AttributeSet.h>
+#include <openvdb/Types.h>
+#include <openvdb/math/Transform.h>
+#include <openvdb/io/TempFile.h>
+#include <openvdb/io/File.h>
+
+
+class TestPointLoad: public CppUnit::TestCase
+{
+public:
+    virtual void setUp() { openvdb::initialize(); openvdb::points::initialize(); }
+    virtual void tearDown() { openvdb::uninitialize(); openvdb::points::uninitialize(); }
+
+    CPPUNIT_TEST_SUITE(TestPointLoad);
+    CPPUNIT_TEST(testLoad);
+
+    CPPUNIT_TEST_SUITE_END();
+
+    void testLoad();
+}; // class TestPointLoad
+
+CPPUNIT_TEST_SUITE_REGISTRATION(TestPointLoad);
+
+
+////////////////////////////////////////
+
+
+void
+TestPointLoad::testLoad()
+{
+    using namespace openvdb;
+    using namespace openvdb::tools;
+
+    typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
+
+    std::string filename;
+
+    const float voxelSize(1.0);
+    math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
+
+    // create a tree with multiple points, four leaves
+
+    std::vector<Vec3s> positions;
+    positions.push_back(Vec3s(1, 1, 1));
+    positions.push_back(Vec3s(1, 2, 1));
+    positions.push_back(Vec3s(2, 1, 1));
+    positions.push_back(Vec3s(2, 2, 1));
+    positions.push_back(Vec3s(20, 1, 1));
+    positions.push_back(Vec3s(1, 20, 1));
+    positions.push_back(Vec3s(1, 1, 20));
+
+    PointDataGrid::Ptr grid = createPointDataGrid<PointDataGrid>(positions, AttributeVec3s::attributeType(), *transform);
+    PointDataTree& tree2 = grid->tree();
+
+    CPPUNIT_ASSERT_EQUAL(tree2.leafCount(), Index32(4));
+
+    // write out grid to a temp file
+    {
+        io::TempFile tempFile;
+        filename = tempFile.filename();
+
+        io::File fileOut(filename);
+
+        GridCPtrVec grids;
+        grids.push_back(grid);
+
+        fileOut.write(grids);
+    }
+
+    // read and load all leaf nodes
+    {
+        io::File fileIn(filename);
+        fileIn.open();
+
+        GridPtrVecPtr grids = fileIn.getGrids();
+
+        fileIn.close();
+
+        CPPUNIT_ASSERT_EQUAL(grids->size(), size_t(1));
+
+        PointDataGrid::Ptr grid = GridBase::grid<PointDataGrid>((*grids)[0]);
+
+        CPPUNIT_ASSERT(grid);
+
+        PointDataGrid::TreeType::LeafCIter leafIter = grid->tree().cbeginLeaf();
+
+        // all leaves out of core
+
+        CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore()); ++leafIter;
+        CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore()); ++leafIter;
+        CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore()); ++leafIter;
+        CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore());
+
+        loadPoints(*grid);
+
+        leafIter = grid->tree().cbeginLeaf();
+
+        // all leaves loaded into memory
+
+        CPPUNIT_ASSERT(!leafIter->buffer().isOutOfCore()); ++leafIter;
+        CPPUNIT_ASSERT(!leafIter->buffer().isOutOfCore()); ++leafIter;
+        CPPUNIT_ASSERT(!leafIter->buffer().isOutOfCore()); ++leafIter;
+        CPPUNIT_ASSERT(!leafIter->buffer().isOutOfCore());
+    }
+
+    // read and load leaf nodes by bbox
+    {
+        io::File fileIn(filename);
+        fileIn.open();
+
+        GridPtrVecPtr grids = fileIn.getGrids();
+
+        fileIn.close();
+
+        CPPUNIT_ASSERT_EQUAL(grids->size(), size_t(1));
+
+        PointDataGrid::Ptr grid = GridBase::grid<PointDataGrid>((*grids)[0]);
+
+        CPPUNIT_ASSERT(grid);
+
+        PointDataGrid::TreeType::LeafCIter leafIter = grid->tree().cbeginLeaf();
+
+        // all leaves out of core
+
+        CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore()); ++leafIter;
+        CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore()); ++leafIter;
+        CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore()); ++leafIter;
+        CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore());
+
+        BBoxd bbox(Vec3i(0, 0, 0), Vec3i(4, 30, 4));
+
+        loadPoints(*grid, bbox);
+
+        leafIter = grid->tree().cbeginLeaf();
+
+        // only first and third leaf loaded into memory
+
+        CPPUNIT_ASSERT(!leafIter->buffer().isOutOfCore()); ++leafIter;
+        CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore()); ++leafIter;
+        CPPUNIT_ASSERT(!leafIter->buffer().isOutOfCore()); ++leafIter;
+        CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore());
+    }
+
+    // read and load leaf nodes by mask
+    {
+        io::File fileIn(filename);
+        fileIn.open();
+
+        GridPtrVecPtr grids = fileIn.getGrids();
+
+        fileIn.close();
+
+        CPPUNIT_ASSERT_EQUAL(grids->size(), size_t(1));
+
+        PointDataGrid::Ptr grid = GridBase::grid<PointDataGrid>((*grids)[0]);
+
+        CPPUNIT_ASSERT(grid);
+
+        PointDataGrid::TreeType::LeafCIter leafIter = grid->tree().cbeginLeaf();
+
+        // all leaves out of core
+
+        CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore()); ++leafIter;
+        CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore()); ++leafIter;
+        CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore()); ++leafIter;
+        CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore());
+
+        BoolGrid::Ptr mask = BoolGrid::create(false);
+
+        mask->tree().touchLeaf(Coord(0, 0, 0));
+        mask->tree().touchLeaf(Coord(1, 1, 20));
+
+        loadPoints(*grid, *mask);
+
+        leafIter = grid->tree().cbeginLeaf();
+
+        // only first and second leaves loaded into memory
+
+        CPPUNIT_ASSERT(!leafIter->buffer().isOutOfCore()); ++leafIter;
+        CPPUNIT_ASSERT(!leafIter->buffer().isOutOfCore()); ++leafIter;
+        CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore()); ++leafIter;
+        CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore());
+    }
+
+    // cleanup temp files
+
+    std::remove(filename.c_str());
+}
+
+
+
+// Copyright (c) 2015 Double Negative Visual Effects
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
