@@ -243,6 +243,7 @@ INCLUDE_NAMES := \
     tools/PointAttribute.h \
     tools/PointDataGrid.h \
     tools/PointConversion.h \
+    tools/PointCount.h \
     tools/PointGroup.h \
     Types.h \
     openvdb.h \
