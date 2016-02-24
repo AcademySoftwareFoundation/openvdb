@@ -3,9 +3,7 @@ sudo: required
 dist: trusty
 
 notifications:
-  email:
-    recipients:
-      - openvdbpoints@dneg.com
+  slack: openvdbpoints:pfJN91siHqukIHPBS8i3XGJQ
 
 language:
   - cpp
