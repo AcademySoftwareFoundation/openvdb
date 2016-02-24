@@ -83,6 +83,7 @@ typedef boost::ptr_vector<Point> PointData;
 class PointPosition
 {
 public:
+    typedef openvdb::Vec3f PosType;
     typedef openvdb::Vec3f value_type;
 
     PointPosition(const PointData& pointData)
@@ -99,6 +100,7 @@ private:
 class PointId
 {
 public:
+    typedef int PosType;
     typedef int value_type;
 
     PointId(const PointData& pointData)

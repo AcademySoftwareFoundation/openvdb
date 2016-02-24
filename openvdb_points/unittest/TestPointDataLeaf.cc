@@ -163,6 +163,7 @@ monotonicOffsets(const LeafType& leafNode)
 class PointList
 {
 public:
+    typedef openvdb::Vec3R PosType;
     typedef openvdb::Vec3R value_type;
 
     PointList(const std::vector<openvdb::Vec3R>& points)

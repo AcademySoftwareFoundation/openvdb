@@ -114,6 +114,7 @@ populateAttribute(  PointDataTreeT& tree, const PointIndexTreeT& pointIndexTree,
 template<typename ValueType>
 class PointAttributeVector {
 public:
+    typedef ValueType PosType;
     typedef ValueType value_type;
 
     PointAttributeVector(const std::vector<value_type>& data)
