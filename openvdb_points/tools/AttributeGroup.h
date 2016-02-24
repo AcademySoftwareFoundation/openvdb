@@ -39,7 +39,6 @@
 #ifndef OPENVDB_TOOLS_ATTRIBUTE_GROUP_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_ATTRIBUTE_GROUP_HAS_BEEN_INCLUDED
 
-#include <openvdb/openvdb.h>
 #include <openvdb_points/tools/AttributeArray.h>
 
 

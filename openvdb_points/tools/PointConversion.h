@@ -39,7 +39,6 @@
 #ifndef OPENVDB_TOOLS_POINT_CONVERSION_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_POINT_CONVERSION_HAS_BEEN_INCLUDED
 
-#include <openvdb/openvdb.h>
 #include <openvdb/math/Transform.h>
 
 #include <openvdb/tools/PointIndexGrid.h>

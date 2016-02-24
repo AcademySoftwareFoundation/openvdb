@@ -33,6 +33,7 @@
 #include <openvdb_points/tools/AttributeGroup.h>
 #include <openvdb_points/tools/AttributeSet.h>
 #include <openvdb_points/openvdb.h>
+#include <openvdb/openvdb.h>
 #include <openvdb/Types.h>
 #include <openvdb/Metadata.h>
 

@@ -41,7 +41,6 @@
 #ifndef OPENVDB_TOOLS_POINT_DATA_GRID_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_POINT_DATA_GRID_HAS_BEEN_INCLUDED
 
-#include <openvdb/openvdb.h>
 #include <openvdb/Grid.h>
 #include <openvdb/tree/Tree.h>
 #include <openvdb/tree/LeafNode.h>
