@@ -272,7 +272,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestPointCount.cc \
     unittest/TestPointDataLeaf.cc \
     unittest/TestPointGroup.cc \
-    # unittest/TestPointLoad.cc \
+    unittest/TestPointLoad.cc \
 #
 
 DOC_FILES := 	doc/doc.txt \

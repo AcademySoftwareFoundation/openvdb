@@ -39,9 +39,9 @@
 #include <openvdb_points/tools/AttributeSet.h>
 #include <openvdb/Types.h>
 #include <openvdb/math/Transform.h>
-#include <openvdb/io/TempFile.h>
 #include <openvdb/io/File.h>
 
+#include <cstdlib> // for std::getenv(), mkstemp()
 
 class TestPointLoad: public CppUnit::TestCase
 {
@@ -71,6 +71,9 @@ TestPointLoad::testLoad()
 
     typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
 
+    std::string tempDir(std::getenv("TMPDIR"));
+    if (tempDir.empty())    tempDir = P_tmpdir;
+
     std::string filename;
 
     const float voxelSize(1.0);
@@ -94,8 +97,7 @@ TestPointLoad::testLoad()
 
     // write out grid to a temp file
     {
-        io::TempFile tempFile;
-        filename = tempFile.filename();
+        filename = tempDir + "/openvdb_test_point_load";
 
         io::File fileOut(filename);
 

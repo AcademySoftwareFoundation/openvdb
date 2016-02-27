@@ -34,38 +34,72 @@
 #include <openvdb_points/tools/AttributeSet.h>
 #include <openvdb/Types.h>
 #include <openvdb/math/Transform.h>
-#include <openvdb/io/TempFile.h>
-#include <openvdb/io/Archive.h>
+#include <openvdb/io/File.h>
 
 #include "ProfileTimer.h"
 
 #include <sstream>
 #include <iostream>
 
-// redefine File because MappedFile constructor is private, but a friend of File
+// Boost.Interprocess uses a header-only portion of Boost.DateTime
+#define BOOST_DATE_TIME_NO_LIB
+#include <boost/interprocess/file_mapping.hpp>
+#include <boost/interprocess/mapped_region.hpp>
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
+#include <boost/system/error_code.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
+#include <boost/version.hpp> // for BOOST_VERSION
 
-namespace openvdb {
-OPENVDB_USE_VERSION_NAMESPACE
-namespace OPENVDB_VERSION_NAME {
-namespace io {
+#include <tbb/atomic.h>
 
-class File
+#ifdef _MSC_VER
+#include <boost/interprocess/detail/os_file_functions.hpp> // open_existing_file(), close_file()
+extern "C" __declspec(dllimport) bool __stdcall GetFileTime(
+    void* fh, void* ctime, void* atime, void* mtime);
+// boost::interprocess::detail was renamed to boost::interprocess::ipcdetail in Boost 1.48.
+// Ensure that both namespaces exist.
+namespace boost { namespace interprocess { namespace detail {} namespace ipcdetail {} } }
+#else
+#include <sys/types.h> // for struct stat
+#include <sys/stat.h> // for stat()
+#include <unistd.h> // for unlink()
+#endif
+
+/// @brief io::MappedFile has a private constructor, so this unit tests uses a matching proxy
+class ProxyMappedFile
 {
 public:
-    typedef boost::shared_ptr<MappedFile> MappedPtr;
-
-    File(const std::string& filename)
-        : mMappedFile(new io::MappedFile(filename, /*autoDelete=*/false)) { }
-
-    MappedPtr mappedFile() { return mMappedFile; }
+    explicit ProxyMappedFile(const std::string& filename)
+        : mImpl(new Impl(filename)) { }
 
 private:
-    MappedPtr mMappedFile;
-};
+    class Impl
+    {
+    public:
+        Impl(const std::string& filename)
+            : mMap(filename.c_str(), boost::interprocess::read_only)
+            , mRegion(mMap, boost::interprocess::read_only)
+            , mAutoDelete(false)
+        {
+            mLastWriteTime = 0;
+            const char* regionFilename = mMap.get_name();
+            struct stat info;
+            if (0 == ::stat(regionFilename, &info)) {
+                mLastWriteTime = openvdb::Index64(info.st_mtime);
+            }
+        }
 
-} // namespace io
-} // namespace OPENVDB_VERSION_NAME
-} // namespace openvdb
+        typedef boost::function<void(std::string /*filename*/)> Notifier;
+        boost::interprocess::file_mapping mMap;
+        boost::interprocess::mapped_region mRegion;
+        bool mAutoDelete;
+        Notifier mNotifier;
+        mutable tbb::atomic<openvdb::Index64> mLastWriteTime;
+    }; // class Impl
+    boost::scoped_ptr<Impl> mImpl;
+}; // class ProxyMappedFile
 
 
 using namespace openvdb;
@@ -694,6 +728,9 @@ TestAttributeArray::testDelayedLoad()
 
     AttributeArrayI::registerType();
 
+    std::string tempDir(std::getenv("TMPDIR"));
+    if (tempDir.empty())    tempDir = P_tmpdir;
+
     { // IO
         const size_t count = 50;
         AttributeArrayI attrA(count);
@@ -706,19 +743,20 @@ TestAttributeArray::testDelayedLoad()
 
         // write out attribute array to a temp file
         {
-            io::TempFile fileout;
+            std::ofstream fileout;
+            filename = tempDir + "/openvdb_delayed1";
+            fileout.open(filename.c_str());
             io::setDataCompression(fileout, io::COMPRESS_BLOSC);
 
             attrA.write(fileout);
 
-            filename = fileout.filename();
             fileout.close();
         }
 
         // abuse File being a friend of MappedFile to get around the private constructor
 
-        io::File file(filename);
-        io::File::MappedPtr mappedFile = file.mappedFile();
+        ProxyMappedFile* proxy = new ProxyMappedFile(filename);
+        boost::shared_ptr<io::MappedFile> mappedFile(reinterpret_cast<io::MappedFile*>(proxy));
 
         // read in using delayed load and check manual loading of data
         {
@@ -865,20 +903,21 @@ TestAttributeArray::testDelayedLoad()
 
         // write out compressed attribute array to a temp file
         {
-            io::TempFile fileout;
+            std::ofstream fileout;
+            filename = tempDir + "/openvdb_delayed2";
+            fileout.open(filename.c_str());
             io::setDataCompression(fileout, io::COMPRESS_BLOSC);
 
             attrA.compress();
             attrA.write(fileout);
 
-            filename = fileout.filename();
             fileout.close();
         }
 
         // abuse File being a friend of MappedFile to get around the private constructor
 
-        io::File fileCompressed(filename);
-        mappedFile = fileCompressed.mappedFile();
+        proxy = new ProxyMappedFile(filename);
+        mappedFile.reset(reinterpret_cast<io::MappedFile*>(proxy));
 
         // read in using delayed load and check manual loading of data
         {
