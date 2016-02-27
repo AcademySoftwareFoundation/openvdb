@@ -72,7 +72,8 @@ namespace tools {
 template<typename PointDataGridT, typename PositionArrayT, typename PointIndexGridT>
 inline typename PointDataGridT::Ptr
 createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT& positions,
-                    const openvdb::NamePair& positionType, const math::Transform& xform);
+                    const openvdb::NamePair& positionType, const math::Transform& xform,
+                    Metadata::Ptr positionDefaultValue = Metadata::Ptr());
 
 
 /// @brief  Convenience method to create a @c PointDataGrid from a std::vector of
@@ -88,7 +89,8 @@ createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT&
 template <typename PointDataGridT, typename ValueT>
 inline typename PointDataGridT::Ptr
 createPointDataGrid(const std::vector<ValueT>& positions,
-                    const openvdb::NamePair& positionType, const math::Transform& xform);
+                    const openvdb::NamePair& positionType, const math::Transform& xform,
+                    Metadata::Ptr positionDefaultValue = Metadata::Ptr());
 
 
 /// @brief  Stores point attribute data in an existing @c PointDataGrid attribute.
@@ -308,7 +310,8 @@ struct PopulateAttributeOp {
 template<typename PointDataGridT, typename PositionArrayT, typename PointIndexGridT>
 inline typename PointDataGridT::Ptr
 createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT& positions,
-                    const openvdb::NamePair& positionType, const math::Transform& xform)
+                    const openvdb::NamePair& positionType, const math::Transform& xform,
+                    Metadata::Ptr positionDefaultValue)
 {
     typedef typename PointDataGridT::TreeType                       PointDataTreeT;
     typedef typename PointIndexGridT::TreeType                      PointIndexTreeT;
@@ -329,6 +332,10 @@ createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT&
     // create attribute descriptor from position type
 
     AttributeSet::Descriptor::Ptr descriptor = AttributeSet::Descriptor::create(positionType);
+
+    // add default value for position if provided
+
+    if (positionDefaultValue)   descriptor->setDefaultValue("P", *positionDefaultValue);
 
     // create point attribute storage on each leaf
 
@@ -359,12 +366,13 @@ template <typename PointDataGridT, typename ValueT>
 inline typename PointDataGridT::Ptr
 createPointDataGrid(const std::vector<ValueT>& positions,
                     const openvdb::NamePair& positionType,
-                    const math::Transform& xform)
+                    const math::Transform& xform,
+                    Metadata::Ptr positionDefaultValue)
 {
     const PointAttributeVector<ValueT> pointList(positions);
 
     PointIndexGrid::Ptr pointIndexGrid = createPointIndexGrid<PointIndexGrid>(pointList, xform);
-    return createPointDataGrid<PointDataGridT>(*pointIndexGrid, pointList, positionType, xform);
+    return createPointDataGrid<PointDataGridT>(*pointIndexGrid, pointList, positionType, xform, positionDefaultValue);
 }
 
 

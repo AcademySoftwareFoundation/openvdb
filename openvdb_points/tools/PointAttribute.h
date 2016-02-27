@@ -58,6 +58,7 @@ namespace tools {
 template <typename PointDataTree>
 inline void appendAttribute(PointDataTree& tree,
                             const AttributeSet::Util::NameAndType& newAttribute,
+                            Metadata::Ptr defaultValue = Metadata::Ptr(),
                             const bool hidden = false,
                             const bool transient = false,
                             const bool group = false);
@@ -234,6 +235,7 @@ struct BloscCompressAttributesOp {
 template <typename PointDataTree>
 inline void appendAttribute(PointDataTree& tree,
                             const AttributeSet::Util::NameAndType& newAttribute,
+                            Metadata::Ptr defaultValue,
                             const bool hidden, const bool transient, const bool group)
 {
     typedef AttributeSet::Util::NameAndTypeVec                    NameAndTypeVec;
@@ -259,6 +261,12 @@ inline void appendAttribute(PointDataTree& tree,
     vec.push_back(newAttribute);
 
     Descriptor::Ptr newDescriptor = descriptor.duplicateAppend(vec);
+
+    // store the attribute default value in the descriptor metadata
+
+    if (defaultValue) {
+        newDescriptor->setDefaultValue(newAttribute.name, *defaultValue);
+    }
 
     // insert attributes using the new descriptor
 

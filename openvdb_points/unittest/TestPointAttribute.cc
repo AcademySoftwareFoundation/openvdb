@@ -99,12 +99,16 @@ TestPointAttribute::testAppendDrop()
     // check just one attribute exists (position)
     CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(1));
 
-    { // append an attribute, check descriptors are as expected
-        appendAttribute(tree, Descriptor::NameAndType("id", AttributeI::attributeType()));
+    { // append an attribute, check descriptors are as expected, default value test
+        appendAttribute(tree,   Descriptor::NameAndType("id", AttributeI::attributeType()),
+                                /*defaultValue*/TypedMetadata<AttributeI::ValueType>(AttributeI::ValueType(10)).copy(),
+                                /*hidden=*/false, /*transient=*/false, /*group=*/false);
 
         CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(2));
         CPPUNIT_ASSERT(attributeSet.descriptor() == attributeSet4.descriptor());
         CPPUNIT_ASSERT(&attributeSet.descriptor() == &attributeSet4.descriptor());
+
+        CPPUNIT_ASSERT(attributeSet.descriptor().getMetadata()["default:id"]);
     }
 
     { // append three attributes, check ordering is consistent with insertion
@@ -234,9 +238,9 @@ TestPointAttribute::testAppendDrop()
     }
 
     { // append attributes marked as hidden, transient and group
-        appendAttribute(tree, Descriptor::NameAndType("testHidden", AttributeF::attributeType()), true, false, false);
-        appendAttribute(tree, Descriptor::NameAndType("testTransient", AttributeF::attributeType()), false, true, false);
-        appendAttribute(tree, Descriptor::NameAndType("testGroup", GroupAttributeArray::attributeType()), false, false, true);
+        appendAttribute(tree, Descriptor::NameAndType("testHidden", AttributeF::attributeType()), Metadata::Ptr(), true, false, false);
+        appendAttribute(tree, Descriptor::NameAndType("testTransient", AttributeF::attributeType()), Metadata::Ptr(), false, true, false);
+        appendAttribute(tree, Descriptor::NameAndType("testGroup", GroupAttributeArray::attributeType()), Metadata::Ptr(), false, false, true);
 
         const AttributeArray& arrayHidden = leafIter->attributeArray("testHidden");
         const AttributeArray& arrayTransient = leafIter->attributeArray("testTransient");
