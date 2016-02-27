@@ -37,7 +37,9 @@
 #include <openvdb_points/tools/AttributeSet.h>
 
 #include <algorithm> // std::equal
+#include <string>
 
+#include <boost/algorithm/string/predicate.hpp> // boost::starts_with
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -310,12 +312,16 @@ AttributeSet::makeUnique(size_t pos)
 
 
 AttributeArray::Ptr
-AttributeSet::appendAttribute(const Descriptor::NameAndType& attribute)
+AttributeSet::appendAttribute(  const Descriptor::NameAndType& attribute,
+                                Metadata::Ptr defaultValue)
 {
     Descriptor::NameAndTypeVec vec;
     vec.push_back(attribute);
 
     Descriptor::Ptr descriptor = mDescr->duplicateAppend(vec);
+
+    // store the attribute default value in the descriptor metadata
+    if (defaultValue)   descriptor->setDefaultValue(attribute.name, *defaultValue);
 
     return this->appendAttribute(attribute, *mDescr, descriptor);
 }
@@ -353,6 +359,8 @@ AttributeSet::appendAttribute(const Descriptor::NameAndType& attribute,
 void
 AttributeSet::dropAttributes(const std::vector<size_t>& pos)
 {
+    if (pos.empty())    return;
+
     Descriptor::Ptr descriptor = mDescr->duplicateDrop(pos);
 
     this->dropAttributes(pos, *mDescr, descriptor);
@@ -373,6 +381,10 @@ AttributeSet::dropAttributes(   const std::vector<size_t>& pos,
     mDescr = replacement;
 
     eraseIndices(mAttrs, pos);
+
+    // remove any unused default values
+
+    mDescr->pruneUnusedDefaultValues();
 }
 
 
@@ -595,6 +607,14 @@ AttributeSet::Descriptor::rename(const std::string& fromName, const std::string&
 }
 
 
+const Name&
+AttributeSet::Descriptor::valueType(size_t pos) const
+{
+    // pos is assumed to exist
+    return this->type(pos).first;
+}
+
+
 const NamePair&
 AttributeSet::Descriptor::type(size_t pos) const
 {
@@ -618,6 +638,68 @@ const MetaMap&
 AttributeSet::Descriptor::getMetadata() const
 {
     return mMetadata;
+}
+
+
+void
+AttributeSet::Descriptor::setDefaultValue(const Name& name, const Metadata& defaultValue)
+{
+    const size_t pos = find(name);
+    if (pos == INVALID_POS) {
+        OPENVDB_THROW(LookupError, "Cannot find attribute name to set default value.")
+    }
+
+    // check type of metadata matches attribute type
+
+    const Name& valueType = this->valueType(pos);
+    if (valueType != defaultValue.typeName()) {
+        OPENVDB_THROW(TypeError, "Mis-matching Default Value Type");
+    }
+
+    std::stringstream ss;
+    ss << "default:" << name;
+
+    mMetadata.insertMeta(ss.str(), defaultValue);
+}
+
+
+void
+AttributeSet::Descriptor::removeDefaultValue(const Name& name)
+{
+    std::stringstream ss;
+    ss << "default:" << name;
+
+    mMetadata.removeMeta(ss.str());
+}
+
+
+void
+AttributeSet::Descriptor::pruneUnusedDefaultValues()
+{
+    // store any default metadata keys for which the attribute name is no longer present
+
+    std::vector<Name> metaToErase;
+
+    for (MetaMap::ConstMetaIterator it = mMetadata.beginMeta(),
+                                    itEnd = mMetadata.endMeta(); it != itEnd; ++it) {
+        const Name name = it->first;
+
+        // ignore non-default metadata
+        if (!boost::starts_with(name, "default:"))   continue;
+
+        const Name defaultName = name.substr(8, it->first.size() - 8);
+
+        if (mNameMap.find(defaultName) == mNameMap.end()) {
+            metaToErase.push_back(name);
+        }
+    }
+
+    // remove this metadata
+
+    for (std::vector<Name>::const_iterator  it = metaToErase.begin(),
+                                            endIt = metaToErase.end(); it != endIt; ++it) {
+        mMetadata.removeMeta(*it);
+    }
 }
 
 
@@ -709,7 +791,13 @@ AttributeSet::Descriptor::duplicateDrop(const std::vector<size_t>& pos) const
 
     eraseIndices(vec, pos);
 
-    return Descriptor::create(vec, mGroupMap, mMetadata);
+    Descriptor::Ptr descriptor = Descriptor::create(vec, mGroupMap, mMetadata);
+
+    // remove any unused default values
+
+    descriptor->pruneUnusedDefaultValues();
+
+    return descriptor;
 }
 
 void

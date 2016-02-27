@@ -40,6 +40,8 @@
 #include <iostream>
 #include <sstream>
 
+#include <boost/algorithm/string/predicate.hpp> // boost::startswith
+
 class TestAttributeSet: public CppUnit::TestCase
 {
 public:
@@ -96,6 +98,53 @@ attributeSetMatchesDescriptor(  const openvdb::tools::AttributeSet& attrSet,
                                 const openvdb::tools::AttributeSet::Descriptor& descriptor)
 {
     if (descriptor.size() != attrSet.size())    return false;
+
+    // check default metadata
+
+    const openvdb::MetaMap& meta1 = descriptor.getMetadata();
+    const openvdb::MetaMap& meta2 = attrSet.descriptor().getMetadata();
+
+    // build vector of all default keys
+
+    std::vector<openvdb::Name> defaultKeys;
+
+    for (openvdb::MetaMap::ConstMetaIterator    it = meta1.beginMeta(),
+                                                itEnd = meta1.endMeta(); it != itEnd; ++it)
+    {
+        const openvdb::Name name = it->first;
+
+        if (boost::starts_with(name, "default:")) {
+            defaultKeys.push_back(name);
+        }
+    }
+
+    for (openvdb::MetaMap::ConstMetaIterator    it = meta2.beginMeta(),
+                                                itEnd = meta2.endMeta(); it != itEnd; ++it)
+    {
+        const openvdb::Name name = it->first;
+
+        if (boost::starts_with(name, "default:"))
+        {
+            if (std::find(defaultKeys.begin(), defaultKeys.end(), name) != defaultKeys.end()) {
+                defaultKeys.push_back(name);
+            }
+        }
+    }
+
+    // compare metadata value from each metamap
+
+    for (std::vector<openvdb::Name>::const_iterator it = defaultKeys.begin(),
+                                                    itEnd = defaultKeys.end(); it != itEnd; ++it) {
+        const openvdb::Name name = *it;
+
+        openvdb::Metadata::ConstPtr metaValue1 = meta1[name];
+        openvdb::Metadata::ConstPtr metaValue2 = meta2[name];
+
+        if (!metaValue1)    return false;
+        if (!metaValue2)    return false;
+
+        if (*metaValue1 != *metaValue2)     return false;
+    }
 
     // ensure descriptor and attributes are still in sync
 
@@ -354,6 +403,28 @@ TestAttributeSet::testAttributeSet()
 
         Descriptor::Ptr descrB = attrSetB.descriptor().duplicateAppend(newAttributes);
 
+        openvdb::TypedMetadata<AttributeS::ValueType> defaultValueTest(5);
+
+        // add a default value of the wrong type
+
+        openvdb::TypedMetadata<int> defaultValueInt(5);
+
+        CPPUNIT_ASSERT_THROW(descrB->setDefaultValue("test", defaultValueInt), openvdb::TypeError);
+
+        // add a default value with a name that does not exist
+
+        CPPUNIT_ASSERT_THROW(descrB->setDefaultValue("badname", defaultValueTest), openvdb::LookupError);
+
+        // add a default value for test of 5
+
+        descrB->setDefaultValue("test", defaultValueTest);
+
+        {
+            openvdb::Metadata::Ptr meta = descrB->getMetadata()["default:test"];
+            CPPUNIT_ASSERT(meta);
+            CPPUNIT_ASSERT(meta->typeName() == "float");
+        }
+
         // ensure attribute order persists
 
         CPPUNIT_ASSERT_EQUAL(descrB->find("pos"), size_t(0));
@@ -366,7 +437,7 @@ TestAttributeSet::testAttributeSet()
             attrSetC.makeUnique(0);
             attrSetC.makeUnique(1);
 
-            attrSetC.appendAttribute(newAttributes[0]);
+            attrSetC.appendAttribute(newAttributes[0], defaultValueTest.copy());
 
             CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *descrB));
         }
@@ -380,6 +451,27 @@ TestAttributeSet::testAttributeSet()
 
             CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
         }
+
+        // add a default value for pos of (1, 3, 1)
+
+        openvdb::TypedMetadata<AttributeVec3s::ValueType> defaultValuePos(AttributeVec3s::ValueType(1, 3, 1));
+
+        descrB->setDefaultValue("pos", defaultValuePos);
+
+        {
+            openvdb::Metadata::Ptr meta = descrB->getMetadata()["default:pos"];
+            CPPUNIT_ASSERT(meta);
+            CPPUNIT_ASSERT(meta->typeName() == "vec3s");
+            CPPUNIT_ASSERT_EQUAL(descrB->getDefaultValue<AttributeVec3s::ValueType>("pos"), defaultValuePos.value());
+        }
+
+        // remove default value
+
+        CPPUNIT_ASSERT(descrB->getMetadata()["default:test"]);
+
+        descrB->removeDefaultValue("test");
+
+        CPPUNIT_ASSERT(!descrB->getMetadata()["default:test"]);
     }
 
     { // attribute removal
@@ -401,6 +493,17 @@ TestAttributeSet::testAttributeSet()
 
         AttributeSet attrSetB(descr, /*arrayLength=*/50);
 
+        // add some default values
+
+        openvdb::TypedMetadata<AttributeI::ValueType> defaultOne(AttributeI::ValueType(1));
+
+        descr->setDefaultValue("test", defaultOne);
+        descr->setDefaultValue("test2", defaultOne);
+
+        openvdb::TypedMetadata<AttributeL::ValueType> defaultThree(AttributeL::ValueType(3));
+
+        descr->setDefaultValue("id", defaultThree);
+
         std::vector<size_t> toDrop;
         toDrop.push_back(descr->find("test"));
         toDrop.push_back(descr->find("test2"));
@@ -418,11 +521,23 @@ TestAttributeSet::testAttributeSet()
             attrSetC.makeUnique(2);
             attrSetC.makeUnique(3);
 
+            CPPUNIT_ASSERT(attrSetC.descriptor().getMetadata()["default:test"]);
+
             attrSetC.dropAttributes(toDrop);
 
             CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(3));
 
             CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
+
+            // check default values have been removed for the relevant attributes
+
+            const Descriptor& descrC = attrSetC.descriptor();
+
+            CPPUNIT_ASSERT(!descrC.getMetadata()["default:test"]);
+            CPPUNIT_ASSERT(!descrC.getMetadata()["default:test2"]);
+            CPPUNIT_ASSERT(!descrC.getMetadata()["default:test3"]);
+
+            CPPUNIT_ASSERT(descrC.getMetadata()["default:id"]);
         }
 
         { // reverse removal order
@@ -512,7 +627,7 @@ TestAttributeSet::testAttributeSet()
             .vec);
 
         openvdb::MetaMap& meta = descr1->getMetadata();
-        meta.insertMeta("default", openvdb::FloatMetadata(2.0));
+        meta.insertMeta("exampleMeta", openvdb::FloatMetadata(2.0));
 
         AttributeSet attrSetA(descr1);
         AttributeSet attrSetB(descr2);
@@ -525,7 +640,7 @@ TestAttributeSet::testAttributeSet()
     // add some metadata and register the type
 
     openvdb::MetaMap& meta = attrSetA.descriptor().getMetadata();
-    meta.insertMeta("default", openvdb::FloatMetadata(2.0));
+    meta.insertMeta("exampleMeta", openvdb::FloatMetadata(2.0));
 
     { // flag size test
         Descriptor::Ptr descr = Descriptor::create(Descriptor::Inserter()

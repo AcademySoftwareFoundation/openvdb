@@ -180,7 +180,8 @@ public:
     void makeUnique(size_t pos);
 
     /// Append attribute @a attribute (simple method)
-    AttributeArray::Ptr appendAttribute(const Util::NameAndType& attribute);
+    AttributeArray::Ptr appendAttribute(const Util::NameAndType& attribute,
+                                        Metadata::Ptr defaultValue = Metadata::Ptr());
 
     /// Append attribute @a attribute (descriptor-sharing)
     /// Requires current descriptor to match @a expected
@@ -302,13 +303,23 @@ public:
     size_t rename(const std::string& fromName, const std::string& toName);
 
     /// Return the name of the attribute array's type.
-    const std::string& valueType(size_t pos) const;
+    const Name& valueType(size_t pos) const;
     /// Return the name of the attribute array's type.
     const NamePair& type(size_t pos) const;
 
     /// Retrieve metadata map
     MetaMap& getMetadata();
     const MetaMap& getMetadata() const;
+
+    /// Get a default value for an existing attribute
+    template <typename ValueType>
+    ValueType getDefaultValue(const Name& name) const;
+    /// Set a default value for an existing attribute
+    void setDefaultValue(const Name& name, const Metadata& defaultValue);
+    // Remove the default value if it exists
+    void removeDefaultValue(const Name& name);
+    // Prune any default values for which the key is no longer present
+    void pruneUnusedDefaultValues();
 
     /// Return true if this descriptor is equal to the given one.
     bool operator==(const Descriptor&) const;
@@ -350,6 +361,28 @@ private:
     NameToPosMap                mGroupMap;
     MetaMap                     mMetadata;
 }; // class Descriptor
+
+
+template <typename ValueType>
+ValueType
+AttributeSet::Descriptor::getDefaultValue(const Name& name) const
+{
+    typedef typename TypedMetadata<ValueType>::ConstPtr MetadataPtr;
+
+    const size_t pos = find(name);
+    if (pos == INVALID_POS) {
+        OPENVDB_THROW(LookupError, "Cannot find attribute name to set default value.")
+    }
+
+    std::stringstream ss;
+    ss << "default:" << name;
+
+    MetadataPtr metadata = mMetadata.getMetadata<TypedMetadata<ValueType> >(ss.str());
+
+    if (metadata)   return metadata->value();
+
+    return zeroVal<ValueType>();
+}
 
 
 } // namespace tools
