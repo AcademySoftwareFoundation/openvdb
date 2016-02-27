@@ -46,8 +46,11 @@
 #include <houdini_utils/geometry.h>
 #include <houdini_utils/ParmFactory.h>
 
+#include <openvdb_houdini/AttributeTransferUtil.h>
+
 #include <CH/CH_Manager.h>
 #include <GA/GA_Types.h> // for GA_ATTRIB_POINT
+#include <SYS/SYS_Types.h> // for int32, float32, etc
 
 #include <boost/ptr_container/ptr_vector.hpp>
 
@@ -262,6 +265,153 @@ widthFromAttrString(const Name& type)
     }
 
     return 0;
+}
+
+/// @brief Translate the default value of a GA_Defaults into default Metadata
+template <typename ValueType>
+Metadata::Ptr
+defaultMetadataFromGADefault(const GA_Defaults& defaults)
+{
+    ValueType value = hvdb::evalAttrDefault<ValueType>(defaults, 0);
+
+    // return empty metadata if default is zero
+    if (math::isZero<ValueType>(value))     return Metadata::Ptr();
+
+    return TypedMetadata<ValueType>(value).copy();
+}
+
+/// @brief Translate the default value of a GA_Attribute into default Metadata
+inline Metadata::Ptr
+defaultMetadataFromGAAttribute(GA_Attribute const * attribute)
+{
+    if (!attribute) {
+        std::stringstream ss; ss << "Invalid attribute - " << attribute->getName();
+        throw std::runtime_error(ss.str());
+    }
+
+    const GA_AIFTuple* tupleAIF = attribute->getAIFTuple();
+
+    if (!tupleAIF) {
+        std::stringstream ss; ss << "Invalid attribute type - " << attribute->getName();
+        throw std::runtime_error(ss.str());
+    }
+
+    const GA_Defaults& defaults = tupleAIF->getDefaults(attribute);
+
+    const GA_Storage storage = tupleAIF->getStorage(attribute);
+
+    const int16_t width = static_cast<int16_t>(tupleAIF->getTupleSize(attribute));
+
+    if (width == 1)
+    {
+        if (storage == GA_STORE_BOOL) {
+            return defaultMetadataFromGADefault<bool>(defaults);
+        }
+        else if (storage == GA_STORE_INT16) {
+            return defaultMetadataFromGADefault<int16_t>(defaults);
+        }
+        else if (storage == GA_STORE_INT32) {
+            return defaultMetadataFromGADefault<int32_t>(defaults);
+        }
+        else if (storage == GA_STORE_INT64) {
+            return defaultMetadataFromGADefault<int64_t>(defaults);
+        }
+        else if (storage == GA_STORE_REAL16) {
+            return defaultMetadataFromGADefault<half>(defaults);
+        }
+        else if (storage == GA_STORE_REAL32) {
+            return defaultMetadataFromGADefault<float>(defaults);
+        }
+        else if (storage == GA_STORE_REAL64) {
+            return defaultMetadataFromGADefault<double>(defaults);
+        }
+    }
+    else if (width == 2)
+    {
+        if (storage == GA_STORE_REAL16) {
+            return defaultMetadataFromGADefault<Vec2<half> >(defaults);
+        }
+        else if (storage == GA_STORE_REAL32) {
+            return defaultMetadataFromGADefault<Vec2<float> >(defaults);
+        }
+        else if (storage == GA_STORE_REAL64) {
+            return defaultMetadataFromGADefault<Vec2<double> >(defaults);
+        }
+    }
+    else if (width == 3 || width == 4)
+    {
+        // note: process 4-component vectors as 3-component vectors for now
+
+        if (storage == GA_STORE_REAL16) {
+            return defaultMetadataFromGADefault<Vec3<half> >(defaults);
+        }
+        else if (storage == GA_STORE_REAL32) {
+            return defaultMetadataFromGADefault<Vec3<float> >(defaults);
+        }
+        else if (storage == GA_STORE_REAL64) {
+            return defaultMetadataFromGADefault<Vec3<double> >(defaults);
+        }
+    }
+
+    std::stringstream ss; ss << "Unknown attribute type - " << attribute->getName();
+    throw std::runtime_error(ss.str());
+}
+
+
+template<typename ValueType, typename HoudiniType>
+typename boost::enable_if_c<VecTraits<ValueType>::IsVec, void>::type
+getValues(HoudiniType* values, const ValueType& value)
+{
+    for (unsigned i = 0; i < VecTraits<ValueType>::Size; ++i) {
+        values[i] = value(i);
+    }
+}
+
+
+template<typename ValueType, typename HoudiniType>
+typename boost::disable_if_c<VecTraits<ValueType>::IsVec, void>::type
+getValues(HoudiniType* values, const ValueType& value)
+{
+    values[0] = value;
+}
+
+
+template <typename ValueType, typename HoudiniType>
+GA_Defaults
+gaDefaultsFromDescriptorTyped(const AttributeSet::Descriptor& descriptor, const Name name)
+{
+    const int size = openvdb::VecTraits<ValueType>::Size;
+
+    boost::scoped_array<HoudiniType> values(new HoudiniType[size]);
+    ValueType defaultValue = descriptor.getDefaultValue<ValueType>(name);
+
+    getValues<ValueType, HoudiniType>(values.get(), defaultValue);
+
+    return GA_Defaults(values.get(), size);
+}
+
+
+inline GA_Defaults
+gaDefaultsFromDescriptor(const AttributeSet::Descriptor& descriptor, const Name name)
+{
+    const size_t pos = descriptor.find(name);
+
+    if (pos == AttributeSet::INVALID_POS)   return GA_Defaults(0);
+
+    const Name type = descriptor.type(pos).first;
+
+    if (type == "bool")             return gaDefaultsFromDescriptorTyped<bool, int32>(descriptor, name);
+    else if (type == "int16")       return gaDefaultsFromDescriptorTyped<int16_t, int32>(descriptor, name);
+    else if (type == "int32")       return gaDefaultsFromDescriptorTyped<int32_t, int32>(descriptor, name);
+    else if (type == "int64")       return gaDefaultsFromDescriptorTyped<int64_t, int64>(descriptor, name);
+    else if (type == "half")        return gaDefaultsFromDescriptorTyped<half, fpreal32>(descriptor, name);
+    else if (type == "float")       return gaDefaultsFromDescriptorTyped<float, fpreal32>(descriptor, name);
+    else if (type == "double")      return gaDefaultsFromDescriptorTyped<double, fpreal64>(descriptor, name);
+    else if (type == "vec3h")       return gaDefaultsFromDescriptorTyped<Vec3<half>, fpreal32>(descriptor, name);
+    else if (type == "vec3s")       return gaDefaultsFromDescriptorTyped<Vec3<float>, fpreal32>(descriptor, name);
+    else if (type == "vec3d")       return gaDefaultsFromDescriptorTyped<Vec3<double>, fpreal64>(descriptor, name);
+
+    return GA_Defaults(0);
 }
 
 ////////////////////////////////////////
@@ -782,8 +932,9 @@ convertPointDataGrid(GU_Detail& detail, openvdb_houdini::VdbPrimCIterator& vdbIt
 
             const GA_Storage storage = gaStorageFromAttrString(type);
             const unsigned width = widthFromAttrString(type);
+            const GA_Defaults defaults = gaDefaultsFromDescriptor(descriptor, name);
 
-            GA_RWAttributeRef attributeRef = geo.addTuple(storage, GA_ATTRIB_POINT, UT_String(name).buffer(), width);
+            GA_RWAttributeRef attributeRef = geo.addTuple(storage, GA_ATTRIB_POINT, name.c_str(), width, defaults);
             if (attributeRef.isInvalid()) continue;
 
             GA_Attribute& attribute = *attributeRef.getAttribute();
@@ -1373,8 +1524,9 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
             // Append the new attribute to the PointDataGrid
             AttributeSet::Util::NameAndType nameAndType(name,
                                     attrTypeFromGAAttribute(attribute, compression));
+            Metadata::Ptr defaultMetadata = defaultMetadataFromGAAttribute(attribute);
 
-            appendAttribute(tree, nameAndType);
+            appendAttribute(tree, nameAndType, defaultMetadata);
 
             // Now populate the attribute using the Houdini attribute
             populateAttributeFromHoudini(tree, indexTree, nameAndType.name, nameAndType.type, attribute, OffsetListPtr());
