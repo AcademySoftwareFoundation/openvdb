@@ -87,6 +87,7 @@ usage(const char* progName, int status)
 int
 main(int argc, char *argv[])
 {
+
 #ifdef DWA_OPENVDB
     USAGETRACK_report_basic_tool_usage(argc, argv, /*duration=*/0);
     logging_base::configure(argc, argv);
@@ -100,6 +101,7 @@ main(int argc, char *argv[])
     try {
         openvdb::initialize();
 
+        if (!openvdb::Grid<openvdb_viewer::Int8Tree>::isRegistered()) 	openvdb::Grid<openvdb_viewer::Int8Tree>::registerGrid();
 		if (!openvdb::Grid<openvdb::UInt32Tree>::isRegistered()) 	openvdb::Grid<openvdb::UInt32Tree>::registerGrid();
         bool printInfo = false, printGLInfo = false, printVersionInfo = false;
 

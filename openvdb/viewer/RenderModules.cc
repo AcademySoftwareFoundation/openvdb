@@ -106,6 +106,8 @@ processTypedGrid(GridPtrType grid, OpType& op)
     else if (grid->template isType<Vec3IGrid>())  doProcessTypedGrid<Vec3IGrid>(grid, op);
     else if (grid->template isType<Vec3SGrid>())  doProcessTypedGrid<Vec3SGrid>(grid, op);
     else if (grid->template isType<Vec3DGrid>())  doProcessTypedGrid<Vec3DGrid>(grid, op);
+    else if (grid->template isType<Int8Grid>())  doProcessTypedGrid<Int8Grid>(grid, op);
+    else if (grid->template isType<Grid<UInt32Tree>>())  doProcessTypedGrid<Grid<UInt32Tree>>(grid, op);
     else return false;
     return true;
 }

@@ -40,6 +40,9 @@
 
 #include <boost/random/mersenne_twister.hpp>
 
+
+#include "Viewer.h"
+
 #if defined(__APPLE__) || defined(MACOSX)
 #include <OpenGL/gl.h>
 #include <OpenGL/glu.h>

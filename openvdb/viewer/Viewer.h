@@ -40,6 +40,10 @@
 
 namespace openvdb_viewer {
 
+using Int8Tree = openvdb::tree::Tree4<int8_t, 5, 4, 3>::Type;
+using Int8Grid = openvdb::Grid<Int8Tree>;
+
+
 class Viewer;
 
 enum { DEFAULT_WIDTH = 900, DEFAULT_HEIGHT = 800 };
