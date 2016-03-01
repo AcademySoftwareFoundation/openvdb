@@ -91,6 +91,9 @@ public:
     bool writeGridStats() const;
     void setWriteGridStats(bool);
 
+    bool seekable() const;
+    void setSeekable(bool);
+
     //@{
     /// @brief Return a (reference to a) copy of the metadata of the grid currently
     /// being read or written.

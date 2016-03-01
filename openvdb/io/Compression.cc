@@ -108,30 +108,37 @@ unzipFromStream(std::istream& is, char* data, size_t numBytes)
 
     if (numZippedBytes <= 0) {
         // Read the uncompressed data.
-        is.read(data, -numZippedBytes);
+        if (data == NULL)   is.seekg(-numZippedBytes, std::ios_base::cur);
+        else                is.read(data, -numZippedBytes);
         if (size_t(-numZippedBytes) != numBytes) {
             OPENVDB_THROW(RuntimeError, "Expected to read a " << numBytes
                 << "-byte chunk, got a " << -numZippedBytes << "-byte chunk");
         }
     } else {
-        // Read the compressed data.
-        boost::shared_array<Bytef> zippedData(new Bytef[numZippedBytes]);
-        is.read(reinterpret_cast<char*>(zippedData.get()), numZippedBytes);
-        // Uncompress the data.
-        uLongf numUnzippedBytes = numBytes;
-        int status = uncompress(
-            /*dest=*/reinterpret_cast<Bytef*>(data), &numUnzippedBytes,
-            /*src=*/zippedData.get(), static_cast<uLongf>(numZippedBytes));
-        if (status != Z_OK) {
-            std::string errDescr;
-            if (const char* s = zError(status)) errDescr = s;
-            if (!errDescr.empty()) errDescr = " (" + errDescr + ")";
-            OPENVDB_LOG_DEBUG("zlib uncompress() returned error code " << status << errDescr);
+        if (data == NULL) {
+            // Seek over the compressed data.
+            is.seekg(numZippedBytes, std::ios_base::cur);
         }
-        if (numUnzippedBytes != numBytes) {
-            OPENVDB_THROW(RuntimeError, "Expected to decompress " << numBytes
-                << " byte" << (numBytes == 1 ? "" : "s") << ", got "
-                << numZippedBytes << " byte" << (numZippedBytes == 1 ? "" : "s"));
+        else {
+            // Read the compressed data.
+            boost::shared_array<Bytef> zippedData(new Bytef[numZippedBytes]);
+            is.read(reinterpret_cast<char*>(zippedData.get()), numZippedBytes);
+            // Uncompress the data.
+            uLongf numUnzippedBytes = numBytes;
+            int status = uncompress(
+                /*dest=*/reinterpret_cast<Bytef*>(data), &numUnzippedBytes,
+                /*src=*/zippedData.get(), static_cast<uLongf>(numZippedBytes));
+            if (status != Z_OK) {
+                std::string errDescr;
+                if (const char* s = zError(status)) errDescr = s;
+                if (!errDescr.empty()) errDescr = " (" + errDescr + ")";
+                OPENVDB_LOG_DEBUG("zlib uncompress() returned error code " << status << errDescr);
+            }
+            if (numUnzippedBytes != numBytes) {
+                OPENVDB_THROW(RuntimeError, "Expected to decompress " << numBytes
+                    << " byte" << (numBytes == 1 ? "" : "s") << ", got "
+                    << numZippedBytes << " byte" << (numZippedBytes == 1 ? "" : "s"));
+            }
         }
     }
 }
@@ -203,25 +210,32 @@ bloscFromStream(std::istream& is, char* data, size_t numBytes)
 
     if (numCompressedBytes <= 0) {
         // Read the uncompressed data.
-        is.read(data, -numCompressedBytes);
+        if (data == NULL)   is.seekg(-numCompressedBytes, std::ios_base::cur);
+        else                is.read(data, -numCompressedBytes);
         if (size_t(-numCompressedBytes) != numBytes) {
             OPENVDB_THROW(RuntimeError, "Expected to read a " << numBytes
                 << "-byte uncompressed chunk, got a " << -numCompressedBytes << "-byte chunk");
         }
     } else {
-        // Read the compressed data.
-        boost::shared_array<char> compressedData(new char[numCompressedBytes]);
-        is.read(reinterpret_cast<char*>(compressedData.get()), numCompressedBytes);
-        // Uncompress the data.
-        const int numUncompressedBytes = blosc_decompress_ctx(
-            /*src=*/compressedData.get(), /*dest=*/data, numBytes, /*numthreads=*/1);
-        if (numUncompressedBytes < 1) {
-            OPENVDB_LOG_DEBUG("blosc_decompress() returned error code " << numUncompressedBytes);
+        if (data == NULL) {
+            // Seek over the compressed data.
+            is.seekg(numCompressedBytes, std::ios_base::cur);
         }
-        if (numUncompressedBytes != Int64(numBytes)) {
-            OPENVDB_THROW(RuntimeError, "Expected to decompress " << numBytes
-                << " byte" << (numBytes == 1 ? "" : "s") << ", got "
-                << numUncompressedBytes << " byte" << (numUncompressedBytes == 1 ? "" : "s"));
+        else {
+            // Read the compressed data.
+            boost::shared_array<char> compressedData(new char[numCompressedBytes]);
+            is.read(reinterpret_cast<char*>(compressedData.get()), numCompressedBytes);
+            // Uncompress the data.
+            const int numUncompressedBytes = blosc_decompress_ctx(
+                /*src=*/compressedData.get(), /*dest=*/data, numBytes, /*numthreads=*/1);
+            if (numUncompressedBytes < 1) {
+                OPENVDB_LOG_DEBUG("blosc_decompress() returned error code " << numUncompressedBytes);
+            }
+            if (numUncompressedBytes != Int64(numBytes)) {
+                OPENVDB_THROW(RuntimeError, "Expected to decompress " << numBytes
+                    << " byte" << (numBytes == 1 ? "" : "s") << ", got "
+                    << numUncompressedBytes << " byte" << (numUncompressedBytes == 1 ? "" : "s"));
+            }
         }
     }
 }

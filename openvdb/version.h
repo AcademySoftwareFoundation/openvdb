@@ -113,6 +113,10 @@ enum {
 };
 
 
+/// Library performs I/O seeking instead of reading where possible.
+#define OPENVDB_HAS_SEEKABLE_IO
+
+
 /// Return a library version number string of the form "<major>.<minor>.<patch>".
 inline const char* getLibraryVersionString() { return OPENVDB_LIBRARY_VERSION_STRING; }
 

@@ -183,7 +183,8 @@ readData(std::istream& is, T* data, Index count, uint32_t compression)
     } else if (compression & COMPRESS_ZIP) {
         unzipFromStream(is, reinterpret_cast<char*>(data), sizeof(T) * count);
     } else {
-        is.read(reinterpret_cast<char*>(data), sizeof(T) * count);
+        if (data == NULL)   is.seekg(sizeof(T) * count, std::ios_base::cur);
+        else                is.read(reinterpret_cast<char*>(data), sizeof(T) * count);
     }
 }
 
@@ -200,7 +201,7 @@ readData<std::string>(std::istream& is, std::string* data, Index count, uint32_t
 
         std::string buffer(len+1, ' ');
         is.read(&buffer[0], len+1 );
-        data[i].assign(buffer, 0, len);
+        if (data != NULL)   data[i].assign(buffer, 0, len);
     }
 }
 
@@ -222,10 +223,16 @@ struct HalfReader</*IsReal=*/true, T> {
     typedef typename RealToHalf<T>::HalfT HalfT;
     static inline void read(std::istream& is, T* data, Index count, uint32_t compression) {
         if (count < 1) return;
-        std::vector<HalfT> halfData(count); // temp buffer into which to read half float values
-        readData<HalfT>(is, reinterpret_cast<HalfT*>(&halfData[0]), count, compression);
-        // Copy half float values from the temporary buffer to the full float output array.
-        std::copy(halfData.begin(), halfData.end(), data);
+        if (data == NULL) {
+            // seek mode - pass through null pointer
+            readData<HalfT>(is, NULL, count, compression);
+        }
+        else {
+            std::vector<HalfT> halfData(count); // temp buffer into which to read half float values
+            readData<HalfT>(is, reinterpret_cast<HalfT*>(&halfData[0]), count, compression);
+            // Copy half float values from the temporary buffer to the full float output array.
+            std::copy(halfData.begin(), halfData.end(), data);
+        }
     }
 };
 
@@ -333,11 +340,14 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     const uint32_t compression = getDataCompression(is);
     const bool maskCompressed = compression & COMPRESS_ACTIVE_MASK;
 
+    const bool seek = destBuf == NULL;
+
     int8_t metadata = NO_MASK_AND_ALL_VALS;
     if (getFormatVersion(is) >= OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
         // Read the flag that specifies what, if any, additional metadata
         // (selection mask and/or inactive value(s)) is saved.
-        is.read(reinterpret_cast<char*>(&metadata), /*bytes=*/1);
+        if (seek && !maskCompressed)    is.seekg(/*bytes=*/1, std::ios_base::cur);
+        else                            is.read(reinterpret_cast<char*>(&metadata), /*bytes=*/1);
     }
 
     ValueT background = zeroVal<ValueT>();
@@ -353,10 +363,12 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
         metadata == MASK_AND_TWO_INACTIVE_VALS)
     {
         // Read one of at most two distinct inactive values.
-        is.read(reinterpret_cast<char*>(&inactiveVal0), sizeof(ValueT));
+        if (seek)   is.seekg(/*bytes=*/sizeof(ValueT), std::ios_base::cur);
+        else        is.read(reinterpret_cast<char*>(&inactiveVal0), /*bytes=*/sizeof(ValueT));
         if (metadata == MASK_AND_TWO_INACTIVE_VALS) {
             // Read the second of two distinct inactive values.
-            is.read(reinterpret_cast<char*>(&inactiveVal1), sizeof(ValueT));
+            if (seek)   is.seekg(/*bytes=*/sizeof(ValueT), std::ios_base::cur);
+            else        is.read(reinterpret_cast<char*>(&inactiveVal1), /*bytes=*/sizeof(ValueT));
         }
     }
 
@@ -367,18 +379,20 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     {
         // For use in mask compression (only), read the bitmask that selects
         // between two distinct inactive values.
-        selectionMask.load(is);
+        if (seek)   is.seekg(/*bytes=*/selectionMask.memUsage(), std::ios_base::cur);
+        else        selectionMask.load(is);
     }
 
     ValueT* tempBuf = destBuf;
     boost::scoped_array<ValueT> scopedTempBuf;
 
     Index tempCount = destCount;
+
     if (maskCompressed && metadata != NO_MASK_AND_ALL_VALS
         && getFormatVersion(is) >= OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION)
     {
         tempCount = valueMask.countOn();
-        if (tempCount != destCount) {
+        if (!seek && tempCount != destCount) {
             // If this node has inactive voxels, allocate a temporary buffer
             // into which to read just the active values.
             scopedTempBuf.reset(new ValueT[tempCount]);
@@ -388,15 +402,16 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
 
     // Read in the buffer.
     if (fromHalf) {
-        HalfReader<RealToHalf<ValueT>::isReal, ValueT>::read(is, tempBuf, tempCount, compression);
+        HalfReader<RealToHalf<ValueT>::isReal, ValueT>::read(is, (seek ? NULL : tempBuf),
+                                                             tempCount, compression);
     } else {
-        readData<ValueT>(is, tempBuf, tempCount, compression);
+        readData<ValueT>(is, (seek ? NULL : tempBuf), tempCount, compression);
     }
 
     // If mask compression is enabled and the number of active values read into
     // the temp buffer is smaller than the size of the destination buffer,
     // then there are missing (inactive) values.
-    if (maskCompressed && tempCount != destCount) {
+    if (!seek && maskCompressed && tempCount != destCount) {
         // Restore inactive values, using the background value and, if available,
         // the inside/outside mask.  (For fog volumes, the destination buffer is assumed
         // to be initialized to background value zero, so inactive values can be ignored.)

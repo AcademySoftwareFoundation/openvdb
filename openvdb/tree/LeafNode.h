@@ -1605,6 +1605,9 @@ template<typename T, Index Log2Dim>
 inline void
 LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bool fromHalf)
 {
+    boost::shared_ptr<io::StreamMetadata> meta = io::getStreamMetadataPtr(is);
+    const bool seekable = meta && meta->seekable();
+
 #ifndef OPENVDB_2_ABI_COMPATIBLE
     std::streamoff maskpos = is.tellg();
 #endif
@@ -1624,9 +1627,15 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
     CoordBBox nodeBBox = this->getNodeBoundingBox();
     if (!clipBBox.hasOverlap(nodeBBox)) {
         // This node lies completely outside the clipping region.
-        // Read and discard its voxel values.
-        Buffer temp;
-        io::readCompressedValues(is, temp.mData, SIZE, mValueMask, fromHalf);
+        if (seekable) {
+            // Seek over voxel values.
+            io::readCompressedValues<ValueType, NodeMaskType>(is, NULL, SIZE, mValueMask, fromHalf);
+        }
+        else {
+            // Read and discard voxel values.
+            Buffer temp;
+            io::readCompressedValues(is, temp.mData, SIZE, mValueMask, fromHalf);
+        }
         mValueMask.setOff();
         mBuffer.setOutOfCore(false);
     } else {
@@ -1647,11 +1656,17 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
             // might change before the value buffer gets read.
             mBuffer.mFileInfo->maskpos = maskpos;
 
-            mBuffer.mFileInfo->meta = io::getStreamMetadataPtr(is);
+            mBuffer.mFileInfo->meta = meta;
 
-            // Read and discard voxel values.
-            Buffer temp;
-            io::readCompressedValues(is, temp.mData, SIZE, mValueMask, fromHalf);
+            if (seekable) {
+                // Seek over voxel values.
+                io::readCompressedValues<ValueType, NodeMaskType>(is, NULL, SIZE, mValueMask, fromHalf);
+            }
+            else {
+                // Read and discard voxel values.
+                Buffer temp;
+                io::readCompressedValues(is, temp.mData, SIZE, mValueMask, fromHalf);
+            }
         } else {
 #endif
             mBuffer.allocate();

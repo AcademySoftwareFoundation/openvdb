@@ -203,6 +203,7 @@ struct StreamMetadata::Impl
         , mBackgroundPtr(NULL)
         , mHalfFloat(false)
         , mWriteGridStats(false)
+        , mSeekable(false)
     {
     }
 
@@ -213,6 +214,7 @@ struct StreamMetadata::Impl
     const void* mBackgroundPtr; ///< @todo use Metadata::Ptr?
     bool mHalfFloat;
     bool mWriteGridStats;
+    bool mSeekable;
     MetaMap mGridMetadata;
     AuxDataMap mAuxData;
 }; // struct StreamMetadata
@@ -273,6 +275,7 @@ uint32_t        StreamMetadata::gridClass() const       { return mImpl->mGridCla
 const void*     StreamMetadata::backgroundPtr() const   { return mImpl->mBackgroundPtr; }
 bool            StreamMetadata::halfFloat() const       { return mImpl->mHalfFloat; }
 bool            StreamMetadata::writeGridStats() const  { return mImpl->mWriteGridStats; }
+bool            StreamMetadata::seekable() const        { return mImpl->mSeekable; }
 MetaMap&        StreamMetadata::gridMetadata()          { return mImpl->mGridMetadata; }
 const MetaMap&  StreamMetadata::gridMetadata() const    { return mImpl->mGridMetadata; }
 
@@ -286,7 +289,7 @@ void StreamMetadata::setGridClass(uint32_t c)           { mImpl->mGridClass = c;
 void StreamMetadata::setBackgroundPtr(const void* ptr)  { mImpl->mBackgroundPtr = ptr; }
 void StreamMetadata::setHalfFloat(bool b)               { mImpl->mHalfFloat = b; }
 void StreamMetadata::setWriteGridStats(bool b)          { mImpl->mWriteGridStats = b; }
-
+void StreamMetadata::setSeekable(bool b)                { mImpl->mSeekable = b; }
 
 std::string
 StreamMetadata::str() const
@@ -302,6 +305,7 @@ StreamMetadata::str() const
     if (gridMetadata().metaCount() != 0) {
         ostr << "grid_metadata:\n" << gridMetadata().str(/*indent=*/"    ");
     }
+    ostr << "seekable: " << (seekable() ? "true" : "false") << "\n";
     return ostr.str();
 }
 

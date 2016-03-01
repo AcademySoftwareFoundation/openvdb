@@ -372,6 +372,7 @@ File::open(bool delayLoad, const MappedFile::Notifier& notifier)
     // Tag the input stream with the file format and library version numbers
     // and other metadata.
     mImpl->mStreamMetadata.reset(new StreamMetadata);
+    mImpl->mStreamMetadata->setSeekable(true);
     io::setStreamMetadataPtr(inputStream(), mImpl->mStreamMetadata, /*transfer=*/false);
     Archive::setFormatVersion(inputStream());
     Archive::setLibraryVersion(inputStream());
