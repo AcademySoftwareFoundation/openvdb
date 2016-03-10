@@ -776,6 +776,7 @@ TestAttributeArray::testDelayedLoad()
 
             CPPUNIT_ASSERT(attrB.isOutOfCore());
             attrB.loadData();
+            CPPUNIT_ASSERT(!attrB.isOutOfCore());
 
             CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
 

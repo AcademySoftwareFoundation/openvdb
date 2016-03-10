@@ -295,9 +295,9 @@ public:
 
     IndexIter beginIndex() const;
 
-    /// Read attribute data from a stream.
+    /// Read attribute metadata and buffers from a stream.
     virtual void read(std::istream&) = 0;
-    /// Write attribute data to a stream.
+    /// Write attribute metadata and buffers to a stream.
     virtual void write(std::ostream&) const = 0;
 
     /// Ensures all data is in-core
@@ -734,8 +734,10 @@ TypedAttributeArray<ValueType_, Codec_>::operator=(const TypedAttributeArray& rh
         if (mIsUniform) {
             this->allocate(1);
             mData[0] = rhs.mData[0];
+#ifndef OPENVDB_2_ABI_COMPATIBLE
         } else if (rhs.isOutOfCore()) {
             mFileInfo = rhs.mFileInfo;
+#endif
         } else if (this->isCompressed()) {
             char* buffer = new char[mCompressedBytes];
             memcpy(buffer, rhs.mData, mCompressedBytes);
