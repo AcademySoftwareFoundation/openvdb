@@ -82,6 +82,11 @@ bool canCompress();
 /// @param buffer the compressed buffer
 int uncompressedSize(const char* buffer);
 
+/// @brief Retrieves the compressed size of buffer when compressed
+///
+/// @param buffer the uncompressed buffer
+int compressedSize(const char* buffer, const size_t typeSize, const int uncompressedBytes);
+
 /// @brief Compress and return the @param buffer.
 /// The number of compressed bytes is written to @param compressedBytes.
 /// If @param cleanup is true, the supplied @param buffer will be deleted

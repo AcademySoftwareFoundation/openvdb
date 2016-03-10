@@ -67,6 +67,35 @@ int uncompressedSize(const char* buffer)
 }
 
 
+int compressedSize( const char* buffer, const size_t typeSize, const int uncompressedBytes)
+{
+    int tempBytes = uncompressedBytes + BLOSC_MAX_OVERHEAD;
+    boost::scoped_array<char> outBuf(new char[tempBytes]);
+
+    int compressedBytes = blosc_compress_ctx(
+        /*clevel=*/9, // 0 (no compression) to 9 (maximum compression)
+        /*doshuffle=*/true,
+        /*typesize=*/typeSize,
+        /*srcsize=*/uncompressedBytes,
+        /*src=*/buffer,
+        /*dest=*/outBuf.get(),
+        /*destsize=*/tempBytes,
+        BLOSC_LZ4_COMPNAME,
+        /*blocksize=*/256,
+        /*numthreads=*/1);
+
+    if (compressedBytes <= 0) {
+        std::ostringstream ostr;
+        ostr << "Blosc failed to compress " << uncompressedBytes << " byte" << (uncompressedBytes == 1 ? "" : "s");
+        if (compressedBytes < 0) ostr << " (internal error " << compressedBytes << ")";
+        OPENVDB_LOG_DEBUG(ostr.str());
+        return 0;
+    }
+
+    return compressedBytes;
+}
+
+
 char* compress( char* buffer, const size_t typeSize,
                 const int uncompressedBytes, int& compressedBytes, const bool cleanup)
 {
@@ -147,6 +176,13 @@ bool canCompress()
 int uncompressedSize(const char*)
 {
     OPENVDB_THROW(RuntimeError, "Can't extract compressed data without the blosc library.");
+}
+
+
+int compressedSize(const char*, const size_t, const int)
+{
+    OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
+    return 0;
 }
 
 
