@@ -61,6 +61,19 @@
 
 class GU_Detail;
 
+namespace {
+
+template<class T>
+std::string addDigitSeparators(T value)
+{
+    std::stringstream ss;
+    ss.imbue(std::locale(""));
+    ss << std::fixed << value;
+    return ss.str();
+}
+
+} // namespace
+
 namespace openvdb_houdini {
 
 /// @brief Base class from which to derive OpenVDB Points-related Houdini SOPs
@@ -169,7 +182,7 @@ public:
 
             const openvdb::Index64 count = pointCount(pointDataTree);
 
-            infoStr_pts << " count: " << count << ",";
+            infoStr_pts << " count: " << addDigitSeparators(count) << ",";
 
             if (!iter.getLeaf()) {
                 infoStr_pts << " attributes: ";
@@ -194,7 +207,7 @@ public:
 
                     infoStr_pts << it->first << "(";
 
-                    infoStr_pts << groupPointCount(pointDataTree, it->first);
+                    infoStr_pts << addDigitSeparators(groupPointCount(pointDataTree, it->first));
 
                     infoStr_pts << ")";
                 }
