@@ -177,6 +177,10 @@ ifneq (,$(strip $(wildcard $(CLARISSE_INCL_DIR))))
     CLARISSE_LDFLAGS :=
 endif
 
+ifneq ("$(wildcard $(CLARISSE_INCL_DIR)/geometry_property_collection.h)","")
+    CLARISSE_CXXFLAGS += -DGEOMETRY_PROPERTY_COLLECTION
+endif
+
 LIBS := \
     -ldl -lm -lz \
     -L$(ILMBASE_LIB_DIR) $(HALF_LIB) \
@@ -345,7 +349,7 @@ $(CLARISSE_MODULE_OBJ_NAMES): $(LIBCLARISSE)
 $(CLARISSE_MODULE_OBJ_NAMES): %.o: %.cc
 	@echo "Building $(CLARISSE_DESTDIR)/$(@:.o=.so) because of $(call list_deps)"
 	mkdir -p $(CLARISSE_DESTDIR)/clarisse/module
-	$(CLARISSE_CC) -shared -o $(CLARISSE_DESTDIR)/$(@:.o=.so) $(CXXFLAGS) $(CLARISSE_FLAGS) -fPIC $(CLARISSE_LDFLAGS) $(CLARISSE_INCLDIRS) $(LIBS) \
+	$(CLARISSE_CC) -shared -o $(CLARISSE_DESTDIR)/$(@:.o=.so) $(CXXFLAGS) $(CLARISSE_CXXFLAGS) $(CLARISSE_FLAGS) -fPIC $(CLARISSE_LDFLAGS) $(CLARISSE_INCLDIRS) $(LIBS) \
 	        -L. -lopenvdb_points_clarisse -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) -L$(OPENVDB_POINTS_LIB_DIR) $(OPENVDB_POINTS_LIB) $< $(QUIET)
 
 $(CLARISSE_MODULE_SO_NAMES): $(CLARISSE_DESTDIR)/%.so: clarisse/module/%.o

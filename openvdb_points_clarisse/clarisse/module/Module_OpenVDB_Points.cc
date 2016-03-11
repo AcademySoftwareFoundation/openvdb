@@ -56,6 +56,10 @@
 #include <sys_filesystem.h>
 #include <app_progress_bar.h>
 
+#ifdef GEOMETRY_PROPERTY_COLLECTION
+#include <geometry_property_collection.h>
+#endif
+
 #include "Geometry_OpenVDBPoints.cma"
 
 #include "ResourceData_OpenVDBPoints.h"
@@ -381,7 +385,11 @@ namespace resource
     ResourceData*
     create_openvdb_points_geometry_property(OfObject& object)
     {
+#ifdef GEOMETRY_PROPERTY_COLLECTION
+        GeometryPropertyCollection *property_array = new GeometryPropertyCollection;
+#else
         GeometryPropertyArray *property_array = new GeometryPropertyArray;
+#endif
 
         CoreVector<GeometryProperty*> properties;
 
