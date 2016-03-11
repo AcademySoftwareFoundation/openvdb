@@ -345,15 +345,11 @@ namespace resource
         if (!grid)  return 0;
         if (!grid->tree().cbeginLeaf())     return 0;
 
-        openvdb::tools::PointDataTree& tree = grid->tree();
-
         // check descriptor for velocity and radius (pscale)
 
         openvdb::tools::PointDataTree::LeafCIter iter = grid->tree().cbeginLeaf();
 
         assert(iter);
-
-        const openvdb::tools::AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
 
         // retrieve fps, motion blur length and direction
 
