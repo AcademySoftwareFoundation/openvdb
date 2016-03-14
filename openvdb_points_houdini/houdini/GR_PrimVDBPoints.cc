@@ -316,7 +316,7 @@ struct FillGPUBuffersPosition {
                     const openvdb::Vec3f positionIndexSpace = positionVoxelSpace + gridIndexSpace;
                     const openvdb::Vec3f positionWorldSpace = mTransform.indexToWorld(positionIndexSpace);
 
-                    mBuffer[leafOffset + offset] = UT_Vector3F(
+                    mBuffer[leafOffset + offset] = UT_Vector3H(
                         positionWorldSpace.x(), positionWorldSpace.y(), positionWorldSpace.z());
 
                     offset++;
@@ -383,7 +383,7 @@ struct FillGPUBuffersColor {
                 for (; iter; ++iter)
                 {
                     if (!uniform)   color = handle->get(*iter);
-                    mBuffer[leafOffset + offset] = UT_Vector3F(color.x(), color.y(), color.z());
+                    mBuffer[leafOffset + offset] = UT_Vector3H(color.x(), color.y(), color.z());
 
                     offset++;
                 }
@@ -401,7 +401,7 @@ struct FillGPUBuffersColor {
 
 struct FillGPUBuffersLeafBoxes
 {
-    FillGPUBuffersLeafBoxes(UT_Vector3F* buffer,
+    FillGPUBuffersLeafBoxes(UT_Vector3H* buffer,
                          const std::vector<openvdb::Coord>& coords,
                          const openvdb::math::Transform& transform)
         : mBuffer(buffer)
@@ -410,7 +410,7 @@ struct FillGPUBuffersLeafBoxes
 
     void operator()(const tbb::blocked_range<size_t>& range) const
     {
-        std::vector<UT_Vector3F> corners;
+        std::vector<UT_Vector3H> corners;
         corners.reserve(8);
 
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
@@ -421,21 +421,21 @@ struct FillGPUBuffersLeafBoxes
             corners.clear();
 
             const openvdb::Vec3f pos000 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 0.0, 0.0));
-            corners.push_back(UT_Vector3F(pos000.x(), pos000.y(), pos000.z()));
+            corners.push_back(UT_Vector3H(pos000.x(), pos000.y(), pos000.z()));
             const openvdb::Vec3f pos001 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 0.0, 8.0));
-            corners.push_back(UT_Vector3F(pos001.x(), pos001.y(), pos001.z()));
+            corners.push_back(UT_Vector3H(pos001.x(), pos001.y(), pos001.z()));
             const openvdb::Vec3f pos010 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 8.0, 0.0));
-            corners.push_back(UT_Vector3F(pos010.x(), pos010.y(), pos010.z()));
+            corners.push_back(UT_Vector3H(pos010.x(), pos010.y(), pos010.z()));
             const openvdb::Vec3f pos011 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 8.0, 8.0));
-            corners.push_back(UT_Vector3F(pos011.x(), pos011.y(), pos011.z()));
+            corners.push_back(UT_Vector3H(pos011.x(), pos011.y(), pos011.z()));
             const openvdb::Vec3f pos100 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 0.0, 0.0));
-            corners.push_back(UT_Vector3F(pos100.x(), pos100.y(), pos100.z()));
+            corners.push_back(UT_Vector3H(pos100.x(), pos100.y(), pos100.z()));
             const openvdb::Vec3f pos101 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 0.0, 8.0));
-            corners.push_back(UT_Vector3F(pos101.x(), pos101.y(), pos101.z()));
+            corners.push_back(UT_Vector3H(pos101.x(), pos101.y(), pos101.z()));
             const openvdb::Vec3f pos110 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 8.0, 0.0));
-            corners.push_back(UT_Vector3F(pos110.x(), pos110.y(), pos110.z()));
+            corners.push_back(UT_Vector3H(pos110.x(), pos110.y(), pos110.z()));
             const openvdb::Vec3f pos111 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 8.0, 8.0));
-            corners.push_back(UT_Vector3F(pos111.x(), pos111.y(), pos111.z()));
+            corners.push_back(UT_Vector3H(pos111.x(), pos111.y(), pos111.z()));
 
             openvdb::Index64 offset = n*8*3;
 
@@ -464,7 +464,7 @@ struct FillGPUBuffersLeafBoxes
 
     //////////
 
-    UT_Vector3F*                        mBuffer;
+    UT_Vector3H*                        mBuffer;
     const std::vector<openvdb::Coord>&  mCoords;
     const openvdb::math::Transform&     mTransform;
 }; // class FillGPUBuffersLeafBoxes
@@ -532,17 +532,17 @@ GR_PrimVDBPoints::updatePoints(RE_Render* r,
     RE_VertexArray *colGeo = NULL;
 
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
-    posGeo = myGeo->findCachedAttrib(r, "P", RE_GPU_FLOAT32, 3, RE_ARRAY_POINT, true);
+    posGeo = myGeo->findCachedAttrib(r, "P", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
 #else
-    posGeo = myGeo->findCachedAttribOrArray(r, "P", RE_GPU_FLOAT32, 3, RE_ARRAY_POINT, true);
+    posGeo = myGeo->findCachedAttribOrArray(r, "P", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
 #endif
 
     if (hasColor)
     {
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
-        colGeo = myGeo->findCachedAttrib(r, "Cd", RE_GPU_FLOAT32, 3, RE_ARRAY_POINT, true);
+        colGeo = myGeo->findCachedAttrib(r, "Cd", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
 #else
-        colGeo = myGeo->findCachedAttribOrArray(r, "Cd", RE_GPU_FLOAT32, 3, RE_ARRAY_POINT, true);
+        colGeo = myGeo->findCachedAttribOrArray(r, "Cd", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
 #endif
     }
 
@@ -556,7 +556,7 @@ GR_PrimVDBPoints::updatePoints(RE_Render* r,
     size_t availableGraphicsMemory(gCache->getMaxSize() -  gCache->getCurrentSize());
 #endif
 
-    size_t sizeOfVector3InBytes = (REsizeOfGPUType(RE_GPU_FLOAT32) * 3) / 8;
+    size_t sizeOfVector3InBytes = (REsizeOfGPUType(RE_GPU_FLOAT16) * 3) / 8;
     size_t pointAttributeBytes = hasColor ? 2 * sizeOfVector3InBytes : sizeOfVector3InBytes;
 
     // if the points will not fit into the remaining graphics memory then don't bother doing anything
@@ -592,11 +592,11 @@ GR_PrimVDBPoints::updatePoints(RE_Render* r,
         if (hasPosition)
         {
             // map() returns a pointer to the GL buffer
-            UT_Vector3F *pdata = static_cast<UT_Vector3F*>(posGeo->map(r));
+            UT_Vector3H *pdata = static_cast<UT_Vector3H*>(posGeo->map(r));
 
             FillGPUBuffersPosition< TreeType,
                                     openvdb::Vec3f,
-                                    UT_Vector3F> fill(pdata,
+                                    UT_Vector3H> fill(pdata,
                                                       offsets,
                                                       grid.tree(),
                                                       grid.transform(),
@@ -608,12 +608,12 @@ GR_PrimVDBPoints::updatePoints(RE_Render* r,
 
         if (hasColor)
         {
-            UT_Vector3F *cdata = static_cast<UT_Vector3F*>(colGeo->map(r));
+            UT_Vector3H *cdata = static_cast<UT_Vector3H*>(colGeo->map(r));
 
             if (colorType == "vec3s") {
                 FillGPUBuffersColor<    TreeType,
                                         openvdb::Vec3f,
-                                        UT_Vector3F> fill(cdata,
+                                        UT_Vector3H> fill(cdata,
                                                           offsets,
                                                           grid.tree(),
                                                           colorIndex);
@@ -624,7 +624,7 @@ GR_PrimVDBPoints::updatePoints(RE_Render* r,
             else if (colorType == "vec3h") {
                 FillGPUBuffersColor<    TreeType,
                         openvdb::math::Vec3<half>,
-                        UT_Vector3F> fill(cdata,
+                        UT_Vector3H> fill(cdata,
                                           offsets,
                                           grid.tree(),
                                           colorIndex);
@@ -712,9 +712,9 @@ GR_PrimVDBPoints::updateWire(RE_Render *r,
     RE_VertexArray *posWire = NULL;
 
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
-    posWire = myWire->findCachedAttrib(r, "P", RE_GPU_FLOAT32, 3, RE_ARRAY_POINT, true);
+    posWire = myWire->findCachedAttrib(r, "P", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
 #else
-    posWire = myWire->findCachedAttribOrArray(r, "P", RE_GPU_FLOAT32, 3, RE_ARRAY_POINT, true);
+    posWire = myWire->findCachedAttribOrArray(r, "P", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
 #endif
 
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
@@ -727,7 +727,7 @@ GR_PrimVDBPoints::updateWire(RE_Render *r,
     size_t availableGraphicsMemory(gCache->getMaxSize() -  gCache->getCurrentSize());
 #endif
 
-    size_t sizeOfVector3InBytes = (REsizeOfGPUType(RE_GPU_FLOAT32) * 3) / 8;
+    size_t sizeOfVector3InBytes = (REsizeOfGPUType(RE_GPU_FLOAT16) * 3) / 8;
     size_t pointAttributeBytes = sizeOfVector3InBytes;
 
     // if the points will not fit into the remaining graphics memory then don't bother doing anything
@@ -739,7 +739,7 @@ GR_PrimVDBPoints::updateWire(RE_Render *r,
 
         // fill the wire data
 
-        UT_Vector3F *pdata = static_cast<UT_Vector3F*>(posWire->map(r));
+        UT_Vector3H *pdata = static_cast<UT_Vector3H*>(posWire->map(r));
 
         std::vector<openvdb::Coord> coords;
 
