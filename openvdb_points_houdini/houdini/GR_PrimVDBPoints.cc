@@ -79,7 +79,7 @@
 #define THIS_HOOK_NAME "GUI_PrimVDBPointsHook"
 #define THIS_PRIMITIVE_NAME "GR_PrimVDBPoints"
 
-static RE_ShaderHandle thePointShader("basic/GL32/const_color.prog");
+static RE_ShaderHandle thePointShader("particle/GL32/point.prog");
 
 /// @note The render hook guard should not be required..
 
@@ -169,6 +169,7 @@ protected:
 private:
     RE_Geometry *myGeo;
     RE_Geometry *myWire;
+    bool mDefaultPointColor;
 };
 
 
@@ -233,6 +234,7 @@ GR_PrimVDBPoints::GR_PrimVDBPoints(
 {
     myGeo = NULL;
     myWire = NULL;
+    mDefaultPointColor = true;
 }
 
 
@@ -518,6 +520,10 @@ GR_PrimVDBPoints::updatePoints(RE_Render* r,
     bool hasPosition = positionIndex != AttributeSet::INVALID_POS;
     bool hasColor = colorIndex != AttributeSet::INVALID_POS;
 
+    // use a default color if Cd attribute not present
+
+    mDefaultPointColor = !hasColor;
+
     const openvdb::Name colorType = hasColor ? descriptor.type(colorIndex).first : "vec3s";
 
     // Fetch P (point position). If its cache version matches, no upload is required.
@@ -643,16 +649,12 @@ GR_PrimVDBPoints::updatePoints(RE_Render* r,
     if (gl3)
     {
         // Extra constant inputs for the GL3 default shaders we are using.
-        // This isn't required unless
 
-        fpreal32 constcol[3] = { 0.0, 0.0, 0.0 };
-        fpreal32 uv[2]  = { 0.0, 0.0 };
-        fpreal32 alpha  = 1.0;
-        fpreal32 pnt    = 0.0;
+        fpreal32 uv[2]    = { 0.0, 0.0 };
+        fpreal32 alpha    = 1.0;
+        fpreal32 pnt      = 0.0;
         UT_Matrix4F instance;
         instance.identity();
-
-        if (!hasColor)  myGeo->createConstAttribute(r, "Cd",    RE_GPU_FLOAT32, 3, constcol);
 
         // TODO: point scale !?
 
@@ -763,16 +765,13 @@ GR_PrimVDBPoints::updateWire(RE_Render *r,
     if (gl3)
     {
         // Extra constant inputs for the GL3 default shaders we are using.
-        // This isn't required unless
 
-        fpreal32 constcol[3] = { 0.6, 0.6, 0.6 };
         fpreal32 uv[2]  = { 0.0, 0.0 };
         fpreal32 alpha  = 1.0;
         fpreal32 pnt    = 0.0;
         UT_Matrix4F instance;
         instance.identity();
 
-        myWire->createConstAttribute(r, "Cd",    RE_GPU_FLOAT32, 3, constcol);
         myWire->createConstAttribute(r, "uv",    RE_GPU_FLOAT32, 2, uv);
         myWire->createConstAttribute(r, "Alpha", RE_GPU_FLOAT32, 1, &alpha);
         myWire->createConstAttribute(r, "pointSelection", RE_GPU_FLOAT32, 1,&pnt);
@@ -809,7 +808,7 @@ void
 GR_PrimVDBPoints::render(RE_Render *r,
              GR_RenderMode,
              GR_RenderFlags,
-             const GR_DisplayOption*,
+             const GR_DisplayOption* dopts,
              const RE_MaterialList*)
 {
     if (!myGeo && !myWire)  return;
@@ -818,15 +817,24 @@ GR_PrimVDBPoints::render(RE_Render *r,
 
     if (!gl3)   return;
 
-    // TODO: replace sprites with spheres and remove manual point size
-
     r->pushShader();
     r->bindShader(thePointShader);
+
+    const GR_CommonDispOption& commonOpts = dopts->common();
 
     // draw points
 
     if (myGeo) {
-        r->pushPointSize(2.0f);
+        // for default point colors, use white if dark viewport background, black otherwise
+
+        if (mDefaultPointColor) {
+            const bool darkBackground = (commonOpts.color(GR_BACKGROUND_COLOR) == UT_Color(0));
+            fpreal32 white[3] = { 0.6, 0.6, 0.5 };
+            fpreal32 black[3] = { 0.01, 0.01, 0.01 };
+            myGeo->createConstAttribute(r, "Cd", RE_GPU_FLOAT32, 3, (darkBackground ? white : black));
+        }
+
+        r->pushPointSize(commonOpts.pointSize());
         myGeo->draw(r, RE_GEO_WIRE_IDX);
         r->popPointSize();
     }
@@ -834,7 +842,10 @@ GR_PrimVDBPoints::render(RE_Render *r,
     // draw leaf bboxes
 
     if (myWire) {
-        r->pushLineWidth(1.0f);
+        fpreal32 constcol[3] = { 0.6, 0.6, 0.6 };
+        myGeo->createConstAttribute(r, "Cd", RE_GPU_FLOAT32, 3, constcol);
+
+        r->pushLineWidth(commonOpts.wireWidth());
         myWire->draw(r, RE_GEO_WIRE_IDX);
         r->popLineWidth();
     }
