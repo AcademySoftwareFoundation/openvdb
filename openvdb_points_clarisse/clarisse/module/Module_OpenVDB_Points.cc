@@ -321,13 +321,15 @@ namespace resource
 
         // if radius is available on the grid, enable the option to override it
 
-        if (resourceData->attribute_type("pscale") == "") {
-            object.get_attribute("override_radius")->set_bool(true);
-            object.get_attribute("override_radius")->set_read_only(true);
-        }
-        else {
-            object.get_attribute("override_radius")->set_read_only(false);
-        }
+        const bool disable_override_radius = resourceData->attribute_type("pscale") == "";
+
+        if (disable_override_radius)    object.get_attribute("override_radius")->set_bool(true);
+
+#ifdef GEOMETRY_PROPERTY_COLLECTION
+        object.get_attribute("override_radius")->set_locked(disable_override_radius);
+#else
+        object.get_attribute("override_radius")->set_read_only(disable_override_radius);
+#endif
 
         return resourceData;
     }
