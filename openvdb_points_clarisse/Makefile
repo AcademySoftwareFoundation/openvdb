@@ -178,7 +178,11 @@ ifneq (,$(strip $(wildcard $(CLARISSE_INCL_DIR))))
 endif
 
 ifneq ("$(wildcard $(CLARISSE_INCL_DIR)/geometry_property_collection.h)","")
-    CLARISSE_CXXFLAGS += -DGEOMETRY_PROPERTY_COLLECTION
+    CLARISSE_CXXFLAGS += -DCLARISSE_R3_OR_HIGHER
+endif
+
+ifneq ("$(wildcard $(CLARISSE_INCL_DIR)/ctx_scene_object.h)","")
+    CLARISSE_CXXFLAGS += -DCLARISSE_R4_OR_HIGHER
 endif
 
 LIBS := \

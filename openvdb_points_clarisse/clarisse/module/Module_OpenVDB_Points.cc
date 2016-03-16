@@ -56,7 +56,7 @@
 #include <sys_filesystem.h>
 #include <app_progress_bar.h>
 
-#ifdef GEOMETRY_PROPERTY_COLLECTION
+#ifdef CLARISSE_R3_OR_HIGHER
 #include <geometry_property_collection.h>
 #endif
 
@@ -325,10 +325,8 @@ namespace resource
 
         if (disable_override_radius)    object.get_attribute("override_radius")->set_bool(true);
 
-#ifdef GEOMETRY_PROPERTY_COLLECTION
+#ifdef CLARISSE_R4_OR_HIGHER
         object.get_attribute("override_radius")->set_locked(disable_override_radius);
-#else
-        object.get_attribute("override_radius")->set_read_only(disable_override_radius);
 #endif
 
         return resourceData;
@@ -387,7 +385,7 @@ namespace resource
     ResourceData*
     create_openvdb_points_geometry_property(OfObject& object)
     {
-#ifdef GEOMETRY_PROPERTY_COLLECTION
+#ifdef CLARISSE_R3_OR_HIGHER
         GeometryPropertyCollection *property_array = new GeometryPropertyCollection;
 #else
         GeometryPropertyArray *property_array = new GeometryPropertyArray;
