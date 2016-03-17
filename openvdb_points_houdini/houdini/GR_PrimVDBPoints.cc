@@ -79,7 +79,11 @@
 #define THIS_HOOK_NAME "GUI_PrimVDBPointsHook"
 #define THIS_PRIMITIVE_NAME "GR_PrimVDBPoints"
 
+#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
 static RE_ShaderHandle thePointShader("particle/GL32/point.prog");
+#else
+static RE_ShaderHandle thePointShader("basic/GL32/const_color.prog");
+#endif
 
 /// @note The render hook guard should not be required..
 
@@ -155,16 +159,27 @@ public:
 
     virtual int renderPick(RE_Render*, const GR_DisplayOption*, unsigned int,
                            GR_PickStyle, bool) { return 0; }
+
+    virtual void renderDecoration(RE_Render*, GR_Decoration, const GR_DecorationParms&);
 #endif
 
 protected:
-    void updatePoints(  RE_Render* r,
+    void updatePosBuffer(  RE_Render* r,
                         const openvdb::tools::PointDataGrid& grid,
                         const RE_CacheVersion& version);
 
-    void updateWire(    RE_Render* r,
+    void updateWireBuffer(    RE_Render* r,
                         const openvdb::tools::PointDataGrid& grid,
                         const RE_CacheVersion& version);
+
+    bool updateVec3Buffer(   RE_Render* r,
+                            const openvdb::tools::PointDataGrid& grid,
+                            const std::string& name,
+                            const RE_CacheVersion& version);
+
+    bool updateVec3Buffer(   RE_Render* r, const std::string& name, const RE_CacheVersion& version);
+
+    void removeBuffer(const std::string& name);
 
 private:
     RE_Geometry *myGeo;
@@ -338,7 +353,7 @@ struct FillGPUBuffersPosition {
 template<   typename PointDataTreeType,
             typename AttributeType,
             typename HoudiniBufferType>
-struct FillGPUBuffersColor {
+struct FillGPUBuffersVec3 {
 
     typedef typename PointDataTreeType::LeafNodeType LeafNode;
     typedef typename openvdb::tree::LeafManager<PointDataTreeType> LeafManagerT;
@@ -346,7 +361,7 @@ struct FillGPUBuffersColor {
 
     typedef std::vector<std::pair<const LeafNode*, openvdb::Index64> > LeafOffsets;
 
-    FillGPUBuffersColor( HoudiniBufferType* buffer,
+    FillGPUBuffersVec3( HoudiniBufferType* buffer,
                             const LeafOffsets& leafOffsets,
                             const PointDataTreeType& pointDataTree,
                             const unsigned attributeIndex)
@@ -397,7 +412,7 @@ struct FillGPUBuffersColor {
     const LeafOffsets&                  mLeafOffsets;
     const PointDataTreeType&            mPointDataTree;
     const unsigned                      mAttributeIndex;
-}; // class FillGPUBuffersColor
+}; // class FillGPUBuffersVec3
 
 struct FillGPUBuffersLeafBoxes
 {
@@ -472,7 +487,7 @@ struct FillGPUBuffersLeafBoxes
 } // namespace gr_primitive_internal
 
 void
-GR_PrimVDBPoints::updatePoints(RE_Render* r,
+GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
              const openvdb::tools::PointDataGrid& grid,
              const RE_CacheVersion& version)
 {
@@ -513,38 +528,22 @@ GR_PrimVDBPoints::updatePoints(RE_Render* r,
     const AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
 
     const size_t positionIndex = descriptor.find("P");
-    const size_t colorIndex = descriptor.find("Cd");
 
-    // determine whether position and color exist
+    // determine whether position exists
 
     bool hasPosition = positionIndex != AttributeSet::INVALID_POS;
-    bool hasColor = colorIndex != AttributeSet::INVALID_POS;
 
-    // use a default color if Cd attribute not present
-
-    mDefaultPointColor = !hasColor;
-
-    const openvdb::Name colorType = hasColor ? descriptor.type(colorIndex).first : "vec3s";
+    if (!hasPosition)   return;
 
     // Fetch P (point position). If its cache version matches, no upload is required.
 
     RE_VertexArray *posGeo = NULL;
-    RE_VertexArray *colGeo = NULL;
 
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
     posGeo = myGeo->findCachedAttrib(r, "P", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
 #else
     posGeo = myGeo->findCachedAttribOrArray(r, "P", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
 #endif
-
-    if (hasColor)
-    {
-#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
-        colGeo = myGeo->findCachedAttrib(r, "Cd", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
-#else
-        colGeo = myGeo->findCachedAttribOrArray(r, "Cd", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
-#endif
-    }
 
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
     RE_BufferCache* gCache = RE_BufferCache::getCache();
@@ -557,13 +556,12 @@ GR_PrimVDBPoints::updatePoints(RE_Render* r,
 #endif
 
     size_t sizeOfVector3InBytes = (REsizeOfGPUType(RE_GPU_FLOAT16) * 3) / 8;
-    size_t pointAttributeBytes = hasColor ? 2 * sizeOfVector3InBytes : sizeOfVector3InBytes;
+    size_t pointAttributeBytes = sizeOfVector3InBytes;
 
     // if the points will not fit into the remaining graphics memory then don't bother doing anything
     if (numPoints * pointAttributeBytes > availableGraphicsMemory) return;
 
-    if (posGeo->getCacheVersion() != version ||
-       (hasColor && colGeo->getCacheVersion() != version))
+    if (posGeo->getCacheVersion() != version)
     {
         // build cumulative leaf offset array
 
@@ -587,63 +585,25 @@ GR_PrimVDBPoints::updatePoints(RE_Render* r,
         }
 
         using gr_primitive_internal::FillGPUBuffersPosition;
-        using gr_primitive_internal::FillGPUBuffersColor;
 
-        if (hasPosition)
-        {
-            // map() returns a pointer to the GL buffer
-            UT_Vector3H *pdata = static_cast<UT_Vector3H*>(posGeo->map(r));
+        // map() returns a pointer to the GL buffer
+        UT_Vector3H *pdata = static_cast<UT_Vector3H*>(posGeo->map(r));
 
-            FillGPUBuffersPosition< TreeType,
-                                    openvdb::Vec3f,
-                                    UT_Vector3H> fill(pdata,
-                                                      offsets,
-                                                      grid.tree(),
-                                                      grid.transform(),
-                                                      positionIndex);
+        FillGPUBuffersPosition< TreeType,
+                                openvdb::Vec3f,
+                                UT_Vector3H> fill(pdata,
+                                                  offsets,
+                                                  grid.tree(),
+                                                  grid.transform(),
+                                                  positionIndex);
 
-            const tbb::blocked_range<size_t> range(0, offsets.size());
-            tbb::parallel_for(range, fill);
-        }
-
-        if (hasColor)
-        {
-            UT_Vector3H *cdata = static_cast<UT_Vector3H*>(colGeo->map(r));
-
-            if (colorType == "vec3s") {
-                FillGPUBuffersColor<    TreeType,
-                                        openvdb::Vec3f,
-                                        UT_Vector3H> fill(cdata,
-                                                          offsets,
-                                                          grid.tree(),
-                                                          colorIndex);
-
-                const tbb::blocked_range<size_t> range(0, offsets.size());
-                tbb::parallel_for(range, fill);
-            }
-            else if (colorType == "vec3h") {
-                FillGPUBuffersColor<    TreeType,
-                        openvdb::math::Vec3<half>,
-                        UT_Vector3H> fill(cdata,
-                                          offsets,
-                                          grid.tree(),
-                                          colorIndex);
-
-                const tbb::blocked_range<size_t> range(0, offsets.size());
-                tbb::parallel_for(range, fill);
-            }
-        }
+        const tbb::blocked_range<size_t> range(0, offsets.size());
+        tbb::parallel_for(range, fill);
 
         // unmap the buffer so it can be used by GL and set the cache version
 
         posGeo->unmap(r);
         posGeo->setCacheVersion(version);
-
-        if (hasColor)
-        {
-            colGeo->unmap(r);
-            colGeo->setCacheVersion(version);
-        }
     }
 
     if (gl3)
@@ -673,7 +633,7 @@ GR_PrimVDBPoints::updatePoints(RE_Render* r,
 }
 
 void
-GR_PrimVDBPoints::updateWire(RE_Render *r,
+GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
              const openvdb::tools::PointDataGrid& grid,
              const RE_CacheVersion& version)
 {
@@ -739,7 +699,7 @@ GR_PrimVDBPoints::updateWire(RE_Render *r,
 
         // fill the wire data
 
-        UT_Vector3H *pdata = static_cast<UT_Vector3H*>(posWire->map(r));
+        UT_Vector3H *data = static_cast<UT_Vector3H*>(posWire->map(r));
 
         std::vector<openvdb::Coord> coords;
 
@@ -752,7 +712,7 @@ GR_PrimVDBPoints::updateWire(RE_Render *r,
             coords.push_back(leaf.origin());
         }
 
-        FillGPUBuffersLeafBoxes fill(pdata, coords, grid.transform());
+        FillGPUBuffersLeafBoxes fill(data, coords, grid.transform());
         const tbb::blocked_range<size_t> range(0, coords.size());
         tbb::parallel_for(range, fill);
 
@@ -799,10 +759,150 @@ GR_PrimVDBPoints::update(RE_Render *r,
     typedef openvdb::tools::PointDataGrid PointDataGrid;
     const PointDataGrid& pointDataGrid = static_cast<const PointDataGrid&>(*grid);
 
-    updatePoints(r, pointDataGrid, p.geo_version);
-    updateWire(r, pointDataGrid, p.geo_version);
+    updatePosBuffer(r, pointDataGrid, p.geo_version);
+    updateWireBuffer(r, pointDataGrid, p.geo_version);
+
+    mDefaultPointColor = !updateVec3Buffer(r, pointDataGrid, "Cd", p.geo_version);
 }
 
+bool
+GR_PrimVDBPoints::updateVec3Buffer( RE_Render* r,
+                                    const openvdb::tools::PointDataGrid& grid,
+                                    const std::string& name,
+                                    const RE_CacheVersion& version)
+{
+    // Initialize the geometry with the proper name for the GL cache
+    if (!myGeo)     return false;
+
+    typedef openvdb::tools::PointDataGrid GridType;
+    typedef GridType::TreeType TreeType;
+    typedef TreeType::LeafNodeType LeafNode;
+    typedef openvdb::tools::AttributeSet AttributeSet;
+
+    const TreeType& tree = grid.tree();
+
+    if (tree.leafCount() == 0)  return false;
+
+    const size_t numPoints = myGeo->getNumPoints();
+
+    if (numPoints == 0)         return false;
+
+    TreeType::LeafCIter iter = tree.cbeginLeaf();
+
+    const AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
+
+    const size_t index = descriptor.find(name);
+
+    // early exit if velocity does not exist
+
+    if (index == AttributeSet::INVALID_POS)     return false;
+
+    const openvdb::Name type = descriptor.type(index).first;
+
+    // fetch v (point velocity). If its cache version matches, no upload is required.
+
+    RE_VertexArray *bufferGeo = NULL;
+
+#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
+    bufferGeo = myGeo->findCachedAttrib(r, name.c_str(), RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
+#else
+    bufferGeo = myGeo->findCachedAttribOrArray(r, name.c_str(), RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
+#endif
+
+#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
+    RE_BufferCache* gCache = RE_BufferCache::getCache();
+
+    size_t availableGraphicsMemory(gCache->getMaxSizeB() -  gCache->getCurSizeB());
+#else
+    RE_GraphicsCache* gCache = RE_GraphicsCache::getCache();
+
+    size_t availableGraphicsMemory(gCache->getMaxSize() -  gCache->getCurrentSize());
+#endif
+
+    size_t sizeOfVector3InBytes = (REsizeOfGPUType(RE_GPU_FLOAT16) * 3) / 8;
+    size_t pointAttributeBytes = sizeOfVector3InBytes;
+
+    // if the points will not fit into the remaining graphics memory then don't bother doing anything
+    if (numPoints * pointAttributeBytes > availableGraphicsMemory)  return false;
+
+    if (bufferGeo->getCacheVersion() != version)
+    {
+        // build cumulative leaf offset array
+
+        typedef std::vector<std::pair<const LeafNode*, openvdb::Index64> > LeafOffsets;
+
+        LeafOffsets offsets;
+
+        openvdb::Index64 cumulativeOffset = 0;
+
+        for (; iter; ++iter) {
+            const LeafNode& leaf = *iter;
+
+            // skip out-of-core leaf nodes (used when delay loading VDBs)
+            if (leaf.buffer().isOutOfCore())    continue;
+
+            const openvdb::Index64 count = leaf.pointCount();
+
+            offsets.push_back(LeafOffsets::value_type(&leaf, cumulativeOffset));
+
+            cumulativeOffset += count;
+        }
+
+        using gr_primitive_internal::FillGPUBuffersVec3;
+
+        UT_Vector3H *data = static_cast<UT_Vector3H*>(bufferGeo->map(r));
+
+        if (type == "vec3s") {
+            FillGPUBuffersVec3< TreeType,
+                                openvdb::Vec3f,
+                                UT_Vector3H> fill(data,
+                                                      offsets,
+                                                      grid.tree(),
+                                                      index);
+
+            const tbb::blocked_range<size_t> range(0, offsets.size());
+            tbb::parallel_for(range, fill);
+        }
+        else if (type == "vec3h") {
+            FillGPUBuffersVec3< TreeType,
+                                openvdb::math::Vec3<half>,
+                                UT_Vector3H> fill(data,
+                                      offsets,
+                                      grid.tree(),
+                                      index);
+
+            const tbb::blocked_range<size_t> range(0, offsets.size());
+            tbb::parallel_for(range, fill);
+        }
+
+        // unmap the buffer so it can be used by GL and set the cache version
+
+        bufferGeo->unmap(r);
+        bufferGeo->setCacheVersion(version);
+    }
+
+    return true;
+}
+
+bool
+GR_PrimVDBPoints::updateVec3Buffer(RE_Render* r, const std::string& name, const RE_CacheVersion& version)
+{
+    const GT_PrimVDB& gt_primVDB = static_cast<const GT_PrimVDB&>(*getCachedGTPrimitive());
+
+    const openvdb::GridBase* grid =
+        const_cast<GT_PrimVDB&>((static_cast<const GT_PrimVDB&>(gt_primVDB))).getGrid();
+
+    typedef openvdb::tools::PointDataGrid PointDataGrid;
+    const PointDataGrid& pointDataGrid = static_cast<const PointDataGrid&>(*grid);
+
+    return updateVec3Buffer(r, pointDataGrid, name, version);
+}
+
+void
+GR_PrimVDBPoints::removeBuffer(const std::string& name)
+{
+    myGeo->clearAttribute(name.c_str());
+}
 
 void
 GR_PrimVDBPoints::render(RE_Render *r,
@@ -843,7 +943,7 @@ GR_PrimVDBPoints::render(RE_Render *r,
 
     if (myWire) {
         fpreal32 constcol[3] = { 0.6, 0.6, 0.6 };
-        myGeo->createConstAttribute(r, "Cd", RE_GPU_FLOAT32, 3, constcol);
+        myWire->createConstAttribute(r, "Cd", RE_GPU_FLOAT32, 3, constcol);
 
         r->pushLineWidth(commonOpts.wireWidth());
         myWire->draw(r, RE_GEO_WIRE_IDX);
@@ -852,6 +952,67 @@ GR_PrimVDBPoints::render(RE_Render *r,
 
     r->popShader();
 }
+
+
+#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
+void
+GR_PrimVDBPoints::renderDecoration(RE_Render* r, GR_Decoration decor, const GR_DecorationParms& p)
+{
+    // just render native GR_Primitive decorations if position not available
+
+    const bool hasPosition = myGeo->getAttribute("P");
+    if (!hasPosition) {
+        GR_Primitive::renderDecoration(r, decor, p);
+        return;
+    }
+
+    const RE_CacheVersion version = myGeo->getAttribute("P")->getCacheVersion();
+
+    // update normal buffer
+
+    GR_Decoration normalMarkers[2] = {GR_POINT_NORMAL, GR_NO_DECORATION};
+    const bool normalMarkerChanged = standardMarkersChanged(*p.opts, normalMarkers, false);
+
+    if (normalMarkerChanged)
+    {
+        if (p.opts->drawPointNmls()) {
+            updateVec3Buffer(r, "N", version);
+        }
+        else {
+            removeBuffer("N");
+        }
+    }
+
+    // update velocity buffer
+
+    GR_Decoration velocityMarkers[2] = {GR_POINT_VELOCITY, GR_NO_DECORATION};
+    const bool velocityMarkerChanged = standardMarkersChanged(*p.opts, velocityMarkers, false);
+
+    if (velocityMarkerChanged)
+    {
+        if (p.opts->drawPointVelocity()) {
+            updateVec3Buffer(r, "v", version);
+        }
+        else {
+            removeBuffer("v");
+        }
+    }
+
+    // render markers
+
+    if (decor == GR_POINT_MARKER ||
+        decor == GR_POINT_NORMAL ||
+        decor == GR_POINT_POSITION ||
+        decor == GR_POINT_VELOCITY)
+    {
+        drawDecorationForGeo(r, myGeo, decor, p.opts, p.render_flags,
+                 p.overlay, p.override_vis, p.instance_group,
+                 GR_SELECT_NONE);
+    }
+
+    GR_Primitive::renderDecoration(r, decor, p);
+}
+#endif
 
 
 ////////////////////////////////////////
