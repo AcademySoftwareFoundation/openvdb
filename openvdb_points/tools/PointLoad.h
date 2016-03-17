@@ -81,7 +81,9 @@ void loadPoints(PointDataGridT& grid, const BBoxd& bbox);
 template <typename PointDataGridT>
 void loadPoints(PointDataGridT& grid)
 {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
     grid.constTree().readNonresidentBuffers();
+#endif
 }
 
 
