@@ -311,6 +311,8 @@ public:
     MetaMap& getMetadata();
     const MetaMap& getMetadata() const;
 
+    /// Return true if the attribute has a default value
+    bool hasDefaultValue(const Name& name) const;
     /// Get a default value for an existing attribute
     template <typename ValueType>
     ValueType getDefaultValue(const Name& name) const;

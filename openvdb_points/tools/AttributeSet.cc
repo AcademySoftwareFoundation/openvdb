@@ -641,6 +641,16 @@ AttributeSet::Descriptor::getMetadata() const
 }
 
 
+bool
+AttributeSet::Descriptor::hasDefaultValue(const Name& name) const
+{
+    std::stringstream ss;
+    ss << "default:" << name;
+
+    return bool(mMetadata[ss.str()]);
+}
+
+
 void
 AttributeSet::Descriptor::setDefaultValue(const Name& name, const Metadata& defaultValue)
 {

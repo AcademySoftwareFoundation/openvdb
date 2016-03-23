@@ -467,11 +467,11 @@ TestAttributeSet::testAttributeSet()
 
         // remove default value
 
-        CPPUNIT_ASSERT(descrB->getMetadata()["default:test"]);
+        CPPUNIT_ASSERT(descrB->hasDefaultValue("test"));
 
         descrB->removeDefaultValue("test");
 
-        CPPUNIT_ASSERT(!descrB->getMetadata()["default:test"]);
+        CPPUNIT_ASSERT(!descrB->hasDefaultValue("test"));
     }
 
     { // attribute removal
