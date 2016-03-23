@@ -210,6 +210,9 @@ public:
     /// @brief Reorder attribute set.
     /// @param a descriptor with the same attributes in a different order
     void reorderAttributes(const Descriptor::Ptr& replacement);
+    /// @brief Rename attributes in attribute set (order must remain the same).
+    /// @param a descriptor with the same attribute types but different names
+    void renameAttributes(const Descriptor& expected, Descriptor::Ptr& replacement);
 
     /// @brief Swap the underlying attribute set with the given @a attributeSet.
     /// This leaf will assume ownership of the given attribute set. The descriptors must
@@ -570,6 +573,13 @@ inline void
 PointDataLeafNode<T, Log2Dim>::reorderAttributes(const Descriptor::Ptr& replacement)
 {
     mAttributeSet->reorderAttributes(replacement);
+}
+
+template<typename T, Index Log2Dim>
+inline void
+PointDataLeafNode<T, Log2Dim>::renameAttributes(const Descriptor& expected, Descriptor::Ptr& replacement)
+{
+    mAttributeSet->renameAttributes(expected, replacement);
 }
 
 template<typename T, Index Log2Dim>

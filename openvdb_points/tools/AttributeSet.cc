@@ -411,6 +411,18 @@ AttributeSet::reorderAttributes(const DescriptorPtr& replacement)
 
 
 void
+AttributeSet::renameAttributes(const Descriptor& expected, DescriptorPtr& replacement)
+{
+    // ensure the descriptor is as expected
+    if (*mDescr != expected) {
+        OPENVDB_THROW(LookupError, "Cannot rename attribute as descriptors do not match.")
+    }
+
+    mDescr = replacement;
+}
+
+
+void
 AttributeSet::read(std::istream& is)
 {
     this->readMetadata(is);
@@ -602,6 +614,20 @@ AttributeSet::Descriptor::rename(const std::string& fromName, const std::string&
         pos = it->second;
         mNameMap.erase(it);
         mNameMap[toName] = pos;
+
+        // rename default value if it exists
+
+        std::stringstream ss;
+        ss << "default:" << fromName;
+
+        Metadata::Ptr defaultValue = mMetadata[ss.str()];
+
+        if (defaultValue) {
+            mMetadata.removeMeta(ss.str());
+            ss.str("");
+            ss << "default:" << toName;
+            mMetadata.insertMeta(ss.str(), *defaultValue);
+        }
     }
     return pos;
 }

@@ -203,6 +203,10 @@ public:
     /// Replaces own descriptor with @a replacement
     void reorderAttributes(const DescriptorPtr& replacement);
 
+    /// Re-name attributes in set to match a provided descriptor
+    /// Replaces own descriptor with @a replacement
+    void renameAttributes(const Descriptor& expected, DescriptorPtr& replacement);
+
     /// Read the entire set from a stream.
     void read(std::istream&);
     /// Write the entire set to a stream.

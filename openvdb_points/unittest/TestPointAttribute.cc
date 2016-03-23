@@ -48,11 +48,13 @@ public:
 
     CPPUNIT_TEST_SUITE(TestPointAttribute);
     CPPUNIT_TEST(testAppendDrop);
+    CPPUNIT_TEST(testRename);
     CPPUNIT_TEST(testBloscCompress);
 
     CPPUNIT_TEST_SUITE_END();
 
     void testAppendDrop();
+    void testRename();
     void testBloscCompress();
 }; // class TestPointAttribute
 
@@ -260,6 +262,92 @@ TestPointAttribute::testAppendDrop()
     }
 }
 
+void
+TestPointAttribute::testRename()
+{
+    typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
+    typedef TypedAttributeArray<float>   AttributeF;
+    typedef TypedAttributeArray<int>     AttributeI;
+
+    typedef AttributeSet::Descriptor   Descriptor;
+
+    std::vector<Vec3s> positions;
+    positions.push_back(Vec3s(1, 1, 1));
+    positions.push_back(Vec3s(1, 10, 1));
+    positions.push_back(Vec3s(10, 1, 1));
+    positions.push_back(Vec3s(10, 10, 1));
+
+    const float voxelSize(1.0);
+    math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
+
+    PointDataGrid::Ptr grid = createPointDataGrid<PointDataGrid>(positions, AttributeVec3s::attributeType(), *transform);
+    PointDataTree& tree = grid->tree();
+
+    // check one leaf per point
+    CPPUNIT_ASSERT_EQUAL(tree.leafCount(), Index32(4));
+
+    const openvdb::TypedMetadata<float> defaultValue(5.0f);
+
+    appendAttribute(tree, Descriptor::NameAndType("test1", AttributeF::attributeType()), defaultValue.copy());
+    appendAttribute(tree, Descriptor::NameAndType("id", AttributeI::attributeType()));
+    appendAttribute(tree, Descriptor::NameAndType("test2", AttributeF::attributeType()));
+
+    // retrieve first and last leaf attribute sets
+
+    PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
+    const AttributeSet& attributeSet = leafIter->attributeSet();
+    ++leafIter;
+    const AttributeSet& attributeSet4 = leafIter->attributeSet();
+
+    { // rename one attribute
+        renameAttribute(tree, "test1", "test1renamed");
+
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(4));
+        CPPUNIT_ASSERT(attributeSet.descriptor().find("test1") == AttributeSet::INVALID_POS);
+        CPPUNIT_ASSERT(attributeSet.descriptor().find("test1renamed") != AttributeSet::INVALID_POS);
+
+        CPPUNIT_ASSERT_EQUAL(attributeSet4.descriptor().size(), size_t(4));
+        CPPUNIT_ASSERT(attributeSet4.descriptor().find("test1") == AttributeSet::INVALID_POS);
+        CPPUNIT_ASSERT(attributeSet4.descriptor().find("test1renamed") != AttributeSet::INVALID_POS);
+
+        renameAttribute(tree, "test1renamed", "test1");
+    }
+
+    { // rename non-existing, matching and existing attributes
+        CPPUNIT_ASSERT_THROW(renameAttribute(tree, "nonexist", "newname"), openvdb::KeyError);
+        CPPUNIT_ASSERT_THROW(renameAttribute(tree, "test1", "test1"), openvdb::KeyError);
+        CPPUNIT_ASSERT_THROW(renameAttribute(tree, "test2", "test1"), openvdb::KeyError);
+    }
+
+    { // rename multiple attributes
+        std::vector<Name> oldNames;
+        std::vector<Name> newNames;
+        oldNames.push_back("test1");
+        oldNames.push_back("test2");
+        newNames.push_back("test1renamed");
+
+        CPPUNIT_ASSERT_THROW(renameAttributes(tree, oldNames, newNames), openvdb::ValueError);
+
+        newNames.push_back("test2renamed");
+        renameAttributes(tree, oldNames, newNames);
+
+        renameAttribute(tree, "test1renamed", "test1");
+        renameAttribute(tree, "test2renamed", "test2");
+    }
+
+    { // don't rename group attributes
+        appendAttribute(tree, Descriptor::NameAndType("testGroup", GroupAttributeArray::attributeType()), Metadata::Ptr(), false, false, true);
+        CPPUNIT_ASSERT_THROW(renameAttribute(tree, "testGroup", "testGroup2"), openvdb::KeyError);
+    }
+
+    { // rename an attribute with a default value
+        CPPUNIT_ASSERT(attributeSet.descriptor().hasDefaultValue("test1"));
+
+        renameAttribute(tree, "test1", "test1renamed");
+
+        CPPUNIT_ASSERT(attributeSet.descriptor().hasDefaultValue("test1renamed"));
+    }
+}
 
 void
 TestPointAttribute::testBloscCompress()

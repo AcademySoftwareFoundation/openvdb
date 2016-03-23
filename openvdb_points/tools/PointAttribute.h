@@ -95,6 +95,32 @@ template <typename PointDataTree>
 inline void dropAttribute(  PointDataTree& tree,
                             const Name& name);
 
+/// @brief Rename attributes in a VDB tree.
+///
+/// @param tree          the PointDataTree.
+/// @param oldNames      a list of old attribute names to rename from.
+/// @param newNames      a list of new attribute names to rename to.
+///
+/// @note Number of oldNames must match the number of newNames.
+///
+/// @note Duplicate names and renaming group attributes are not allowed.
+template <typename PointDataTree>
+inline void renameAttributes(PointDataTree& tree,
+                            const std::vector<Name>& oldNames,
+                            const std::vector<Name>& newNames);
+
+/// @brief Rename an attribute in a VDB tree.
+///
+/// @param tree          the PointDataTree.
+/// @param oldName       the old attribute name to rename from.
+/// @param newName       the new attribute name to rename to.
+///
+/// @note newName must not already exist and must not be a group attribute.
+template <typename PointDataTree>
+inline void renameAttribute(PointDataTree& tree,
+                            const Name& oldName,
+                            const Name& newName);
+
 /// @brief Apply Blosc compression to one attribute in the VDB tree.
 ///
 /// @param tree          the PointDataTree.
@@ -359,6 +385,68 @@ inline void dropAttribute(  PointDataTree& tree,
     std::vector<Name> names;
     names.push_back(name);
     dropAttributes(tree, names);
+}
+
+
+////////////////////////////////////////
+
+
+template <typename PointDataTree>
+inline void renameAttributes(   PointDataTree& tree,
+                                const std::vector<Name>& oldNames,
+                                const std::vector<Name>& newNames)
+{
+    if (oldNames.size() != newNames.size()) {
+        OPENVDB_THROW(ValueError, "Mis-matching sizes of name vectors, cannot rename attributes.");
+    }
+
+    typedef AttributeSet::Descriptor                        Descriptor;
+
+    typename PointDataTree::LeafIter iter = tree.beginLeaf();
+
+    if (!iter)  return;
+
+    const AttributeSet& attributeSet = iter->attributeSet();
+    const Descriptor& descriptor = attributeSet.descriptor();
+    AttributeSet::DescriptorPtr newDescriptor(new Descriptor(descriptor));
+
+    for (size_t i = 0; i < oldNames.size(); i++) {
+        const Name oldName(oldNames[i]);
+        if (descriptor.find(oldName) == AttributeSet::INVALID_POS) {
+            OPENVDB_THROW(KeyError, "Cannot find requested attribute - " << oldName << ".");
+        }
+
+        const Name newName(newNames[i]);
+        if (descriptor.find(newName) != AttributeSet::INVALID_POS) {
+            OPENVDB_THROW(KeyError, "Cannot rename attribute as new name already exists - " << newName << ".");
+        }
+
+        const AttributeArray* array = attributeSet.getConst(oldName);
+        assert(array);
+
+        if (GroupAttributeArray::isGroup(*array)) {
+            OPENVDB_THROW(KeyError, "Cannot rename group attribute - " << oldName << ".");
+        }
+
+        newDescriptor->rename(oldName, newName);
+    }
+
+    for (; iter; ++iter) {
+        iter->renameAttributes(descriptor, newDescriptor);
+    }
+}
+
+
+template <typename PointDataTree>
+inline void renameAttribute(PointDataTree& tree,
+                            const Name& oldName,
+                            const Name& newName)
+{
+    std::vector<Name> oldNames;
+    std::vector<Name> newNames;
+    oldNames.push_back(oldName);
+    newNames.push_back(newName);
+    renameAttributes(tree, oldNames, newNames);
 }
 
 
