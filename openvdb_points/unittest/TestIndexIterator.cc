@@ -183,6 +183,16 @@ TestIndexIterator::testValueIndexIterator()
         CPPUNIT_ASSERT(iter);
 
         CPPUNIT_ASSERT_EQUAL(count(iter), size);
+
+        // check coord value
+        Coord xyz;
+        iter.getCoord(xyz);
+        CPPUNIT_ASSERT_EQUAL(xyz, openvdb::Coord(2, 0, 0));
+        CPPUNIT_ASSERT_EQUAL(iter.getCoord(), openvdb::Coord(2, 0, 0));
+
+        // check iterators retrieval
+        CPPUNIT_ASSERT_EQUAL(iter.valueIter().getCoord(), openvdb::Coord(2, 0, 0));
+        CPPUNIT_ASSERT_EQUAL(iter.indexIter().end(), Index32(size));
     }
 
     { // one per even voxel offsets, only these active
@@ -321,6 +331,10 @@ TestIndexIterator::testFilterIndexIterator()
         CPPUNIT_ASSERT_EQUAL(*iter, Index32(4));
 
         CPPUNIT_ASSERT(!iter.next());
+
+        CPPUNIT_ASSERT_EQUAL(iter.indexIter().end(), Index32(5));
+        CPPUNIT_ASSERT_EQUAL(filter.valid(1), iter.filter().valid(1));
+        CPPUNIT_ASSERT_EQUAL(filter.valid(2), iter.filter().valid(2));
     }
 
     { // index iterator with odd filter

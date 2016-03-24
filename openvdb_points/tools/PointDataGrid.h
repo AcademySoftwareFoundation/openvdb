@@ -455,6 +455,7 @@ public:
     typedef typename BaseLeaf::template DenseIter<
         const PointDataLeafNode, const ValueType, ChildAll> ChildAllCIter;
 
+    typedef openvdb::tools::IndexIter IndexIter;
     typedef IndexValueIter<ValueOnCIter> IndexOnIter;
     typedef IndexValueIter<ValueOffCIter> IndexOffIter;
 

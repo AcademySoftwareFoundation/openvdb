@@ -59,7 +59,7 @@ public:
     IndexIter(const IndexIter& other)
         : mEnd(other.mEnd), mItem(other.mItem) { }
 
-    inline Index32 end() { return mEnd; }
+    inline Index32 end() const { return mEnd; }
 
     /// @brief Reset the begining and end of the iterator.
     inline void reset(Index32 item, Index32 end) {
@@ -118,7 +118,7 @@ public:
     IndexValueIter(const IndexValueIter& other)
         : mIndexIter(other.mIndexIter), mIter(other.mIter), mParent(other.mParent) { }
 
-    inline Index32 end() { return mIndexIter.end(); }
+    inline Index32 end() const { return mIndexIter.end(); }
 
     inline void reset(Index32 item, Index32 end) {
         mIndexIter.reset(item, end);
@@ -151,6 +151,16 @@ public:
     /// @brief  Advance to the next (valid) item.
     inline bool next() { this->operator++(); return this->test(); }
     inline bool increment() { this->next(); return this->test(); }
+
+    /// Return the coordinates of the item to which the value iterator is pointing.
+    inline Coord getCoord() const { return mIter.getCoord(); }
+    /// Return in @a xyz the coordinates of the item to which the value iterator is pointing.
+    inline void getCoord(Coord& xyz) const { xyz = mIter.getCoord(); }
+
+    /// Return the const index iterator
+    inline const IndexIter& indexIter() const { return mIndexIter; }
+    /// Return the const value iterator
+    inline const ValueIterT& valueIter() const { return mIter; }
 
     /// @brief Equality operators
     bool operator==(const IndexValueIter& other) const { return *mIndexIter == *other.mIndexIter; }
@@ -218,7 +228,7 @@ public:
     FilterIndexIter(const FilterIndexIter& other)
         : mIterator(other.mIterator), mFilter(other.mFilter) { }
 
-    Index32 end() { return mIterator.end(); }
+    Index32 end() const { return mIterator.end(); }
 
     /// @brief Reset the begining and end of the iterator.
     void reset(Index32 begin, Index32 end) {
@@ -257,6 +267,11 @@ public:
     /// @brief  Advance to the next (valid) item.
     bool next() { this->operator++(); return this->test(); }
     bool increment() { this->next(); return this->test(); }
+
+    /// Return the const index iterator
+    inline const IteratorT& indexIter() const { return mIterator; }
+    /// Return the const filter
+    inline const FilterT& filter() const { return mFilter; }
 
     /// @brief Equality operators
     bool operator==(const FilterIndexIter& other) const { return mIterator == other.mIterator; }
