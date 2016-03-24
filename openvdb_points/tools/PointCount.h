@@ -54,13 +54,126 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
-template <typename IterT>
-inline Index64 iterCount(const IterT& iter)
+
+/// @brief Total points in the PointDataTree
+/// @param tree PointDataTree.
+template <typename PointDataTreeT>
+Index64 pointCount(const PointDataTreeT& tree);
+
+
+/// @brief Total active points in the PointDataTree
+/// @param tree PointDataTree.
+template <typename PointDataTreeT>
+Index64 activePointCount(const PointDataTreeT& tree);
+
+
+/// @brief Total inactive points in the PointDataTree
+/// @param tree PointDataTree.
+template <typename PointDataTreeT>
+Index64 inactivePointCount(const PointDataTreeT& tree);
+
+
+/// @brief Total points in the group in the PointDataTree
+/// @param tree PointDataTree.
+/// @param name group name.
+template <typename PointDataTreeT>
+Index64 groupPointCount(const PointDataTreeT& tree, const Name& name);
+
+
+/// @brief Total active points in the group in the PointDataTree
+/// @param tree PointDataTree.
+/// @param name group name.
+template <typename PointDataTreeT>
+Index64 activeGroupPointCount(const PointDataTreeT& tree, const Name& name);
+
+
+/// @brief Total inactive points in the group in the PointDataTree
+/// @param tree PointDataTree.
+/// @param name group name.
+template <typename PointDataTreeT>
+Index64 inactiveGroupPointCount(const PointDataTreeT& tree, const Name& name);
+
+
+////////////////////////////////////////
+
+
+namespace point_count_internal {
+
+template <  typename PointDataTreeT,
+            typename ValueIterT,
+            typename FilterFromLeafT>
+struct PointCountOp
 {
-    Index64 size = 0;
-    for (IterT newIter(iter); newIter; ++newIter, ++size) { }
-    return size;
+    typedef typename tree::LeafManager<const PointDataTreeT>    LeafManagerT;
+    typedef IndexIterTraits<PointDataTreeT, ValueIterT>         IndexIteratorFromLeafT;
+    typedef typename IndexIteratorFromLeafT::Iterator           IndexIterator;
+    typedef typename FilterFromLeafT::Filter                    Filter;
+    typedef FilterIndexIter<IndexIterator, Filter>              Iterator;
+
+    PointCountOp(const FilterFromLeafT& filterFromLeaf)
+        : mFilterFromLeaf(filterFromLeaf) { }
+
+    Index64 operator()(const typename LeafManagerT::LeafRange& range, Index64 size) const {
+
+        for (typename LeafManagerT::LeafRange::Iterator leaf = range.begin(); leaf; ++leaf) {
+            IndexIterator indexIterator(IndexIteratorFromLeafT::begin(*leaf));
+            Filter filter(mFilterFromLeaf.fromLeaf(*leaf));
+            Iterator iter(indexIterator, filter);
+            size += iterCount(iter);
+        }
+
+        return size;
+    }
+
+    static Index64 join(Index64 size1, Index64 size2) {
+        return size1 + size2;
+    }
+
+private:
+    const FilterFromLeafT& mFilterFromLeaf;
+}; // struct PointCountOp
+
+
+template <typename PointDataTreeT, typename FilterFromLeafT, typename ValueIterT>
+Index64 threadedFilterPointCount(   const PointDataTreeT& tree,
+                                    const FilterFromLeafT& filterFromLeaf)
+{
+    typedef point_count_internal::PointCountOp< PointDataTreeT, ValueIterT, FilterFromLeafT> PointCountOp;
+
+    typename tree::LeafManager<const PointDataTreeT> leafManager(tree);
+    const PointCountOp pointCountOp(filterFromLeaf);
+    return tbb::parallel_reduce(leafManager.leafRange(), Index64(0), pointCountOp, PointCountOp::join);
 }
+
+
+template <typename PointDataTreeT, typename FilterFromLeafT>
+Index64 filterPointCount(const PointDataTreeT& tree,
+                         const FilterFromLeafT& filterFromLeaf)
+{
+    typedef typename PointDataTreeT::LeafNodeType::ValueAllCIter ValueIterT;
+    return threadedFilterPointCount<  PointDataTreeT, FilterFromLeafT, ValueIterT>(tree, filterFromLeaf);
+}
+
+
+template <typename PointDataTreeT, typename FilterFromLeafT>
+Index64 filterActivePointCount( const PointDataTreeT& tree,
+                                const FilterFromLeafT& filterFromLeaf)
+{
+    typedef typename PointDataTreeT::LeafNodeType::ValueOnCIter ValueIterT;
+    return threadedFilterPointCount<  PointDataTreeT, FilterFromLeafT, ValueIterT>(tree, filterFromLeaf);
+}
+
+
+template <typename PointDataTreeT, typename FilterFromLeafT>
+Index64 filterInactivePointCount(   const PointDataTreeT& tree,
+                                    const FilterFromLeafT& filterFromLeaf)
+{
+    typedef typename PointDataTreeT::LeafNodeType::ValueOffCIter ValueIterT;
+    return threadedFilterPointCount<  PointDataTreeT, FilterFromLeafT, ValueIterT>(tree, filterFromLeaf);
+}
+
+
+} // namespace point_count_internal
 
 
 template <typename PointDataTreeT>
@@ -96,89 +209,11 @@ Index64 inactivePointCount(const PointDataTreeT& tree)
 }
 
 
-namespace point_count_internal {
-
-template <  typename PointDataTreeT,
-            typename ValueIterT,
-            typename FilterFromLeafT>
-struct PointCountOp
-{
-    typedef typename tree::LeafManager<const PointDataTreeT>    LeafManagerT;
-    typedef IndexIterTraits<PointDataTreeT, ValueIterT>         IndexIteratorFromLeafT;
-    typedef typename IndexIteratorFromLeafT::Iterator           IndexIterator;
-    typedef typename FilterFromLeafT::Filter                    Filter;
-    typedef FilterIndexIter<IndexIterator, Filter>              Iterator;
-
-    PointCountOp(const FilterFromLeafT& filterFromLeaf)
-        : mFilterFromLeaf(filterFromLeaf) { }
-
-    Index64 operator()(const typename LeafManagerT::LeafRange& range, Index64 size) const {
-
-        for (typename LeafManagerT::LeafRange::Iterator leaf = range.begin(); leaf; ++leaf) {
-            IndexIterator indexIterator(IndexIteratorFromLeafT::begin(*leaf));
-            Filter filter(mFilterFromLeaf.fromLeaf(*leaf));
-            Iterator iter(indexIterator, filter);
-            size += iterCount<Iterator>(iter);
-        }
-
-        return size;
-    }
-
-    static Index64 join(Index64 size1, Index64 size2) {
-        return size1 + size2;
-    }
-
-private:
-    const FilterFromLeafT& mFilterFromLeaf;
-}; // struct PointCountOp
-
-
-template <typename PointDataTreeT, typename FilterFromLeafT, typename ValueIterT>
-Index64 threadedFilterPointCount(   const PointDataTreeT& tree,
-                                    const FilterFromLeafT& filterFromLeaf)
-{
-    typedef point_count_internal::PointCountOp< PointDataTreeT, ValueIterT, FilterFromLeafT> PointCountOp;
-
-    typename tree::LeafManager<const PointDataTreeT> leafManager(tree);
-    const PointCountOp pointCountOp(filterFromLeaf);
-    return tbb::parallel_reduce(leafManager.leafRange(), Index64(0), pointCountOp, PointCountOp::join);
-}
-
-} // namespace point_count_internal
-
-
-template <typename PointDataTreeT, typename FilterFromLeafT>
-Index64 filterPointCount(const PointDataTreeT& tree,
-                         const FilterFromLeafT& filterFromLeaf)
-{
-    typedef typename PointDataTreeT::LeafNodeType::ValueAllCIter ValueIterT;
-    return point_count_internal::threadedFilterPointCount<  PointDataTreeT, FilterFromLeafT,
-                                                            ValueIterT>(tree, filterFromLeaf);
-}
-
-template <typename PointDataTreeT, typename FilterFromLeafT>
-Index64 filterActivePointCount( const PointDataTreeT& tree,
-                                const FilterFromLeafT& filterFromLeaf)
-{
-    typedef typename PointDataTreeT::LeafNodeType::ValueOnCIter ValueIterT;
-    return point_count_internal::threadedFilterPointCount<  PointDataTreeT, FilterFromLeafT,
-                                                            ValueIterT>(tree, filterFromLeaf);
-}
-
-template <typename PointDataTreeT, typename FilterFromLeafT>
-Index64 filterInactivePointCount(   const PointDataTreeT& tree,
-                                    const FilterFromLeafT& filterFromLeaf)
-{
-    typedef typename PointDataTreeT::LeafNodeType::ValueOffCIter ValueIterT;
-    return point_count_internal::threadedFilterPointCount<  PointDataTreeT, FilterFromLeafT,
-                                                            ValueIterT>(tree, filterFromLeaf);
-}
-
 template <typename PointDataTreeT>
 Index64 groupPointCount(const PointDataTreeT& tree, const Name& name)
 {
     GroupFilterFromLeaf filterFromLeaf(name);
-    return filterPointCount(tree, filterFromLeaf);
+    return point_count_internal::filterPointCount(tree, filterFromLeaf);
 }
 
 
@@ -186,7 +221,7 @@ template <typename PointDataTreeT>
 Index64 activeGroupPointCount(const PointDataTreeT& tree, const Name& name)
 {
     GroupFilterFromLeaf filterFromLeaf(name);
-    return filterActivePointCount(tree, filterFromLeaf);
+    return point_count_internal::filterActivePointCount(tree, filterFromLeaf);
 }
 
 
@@ -194,7 +229,7 @@ template <typename PointDataTreeT>
 Index64 inactiveGroupPointCount(const PointDataTreeT& tree, const Name& name)
 {
     GroupFilterFromLeaf filterFromLeaf(name);
-    return filterInactivePointCount(tree, filterFromLeaf);
+    return point_count_internal::filterInactivePointCount(tree, filterFromLeaf);
 }
 
 

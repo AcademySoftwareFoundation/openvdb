@@ -108,7 +108,7 @@ TestPointCount::testCount()
         CPPUNIT_ASSERT_EQUAL(int(*iter2), 4);
         CPPUNIT_ASSERT_EQUAL(int(iter2.end()), 7);
 
-        CPPUNIT_ASSERT_EQUAL(iterCount<IndexIter>(iter2), Index64(7 - 4));
+        CPPUNIT_ASSERT_EQUAL(iterCount(iter2), Index64(7 - 4));
 
         // check pointCount ignores active/inactive state
 
@@ -116,7 +116,7 @@ TestPointCount::testCount()
 
         IndexIter iter3 = leaf.beginIndex(openvdb::Coord(0, 0, 1));
 
-        CPPUNIT_ASSERT_EQUAL(iterCount<IndexIter>(iter3), Index64(7 - 4));
+        CPPUNIT_ASSERT_EQUAL(iterCount(iter3), Index64(7 - 4));
 
         leaf.setValueOn(1);
     }

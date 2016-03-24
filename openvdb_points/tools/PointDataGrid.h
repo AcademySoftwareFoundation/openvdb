@@ -771,7 +771,7 @@ template<typename T, Index Log2Dim>
 inline Index64
 PointDataLeafNode<T, Log2Dim>::pointCount() const
 {
-    return this->getValue(NUM_VOXELS - 1);
+    return iterCount(this->beginIndexAll());
 }
 
 template<typename T, Index Log2Dim>
@@ -780,11 +780,7 @@ PointDataLeafNode<T, Log2Dim>::onPointCount() const
 {
     if (this->isEmpty())        return 0;
     else if (this->isDense())   return this->pointCount();
-
-    // TODO: with a small change, this could use openvdb::tree::IteratorRange
-    Index64 size = 0;
-    for (IndexOnIter iter = this->beginIndexOn(); iter; ++iter, ++size) { }
-    return size;
+    return iterCount(this->beginIndexOn());
 }
 
 template<typename T, Index Log2Dim>
@@ -793,11 +789,7 @@ PointDataLeafNode<T, Log2Dim>::offPointCount() const
 {
     if (this->isEmpty())        return this->pointCount();
     else if (this->isDense())   return 0;
-
-    // TODO: with a small change, this could use openvdb::tree::IteratorRange
-    Index64 size = 0;
-    for (IndexOffIter iter = this->beginIndexOff(); iter; ++iter, ++size) { }
-    return size;
+    return iterCount(this->beginIndexOff());
 }
 
 template<typename T, Index Log2Dim>

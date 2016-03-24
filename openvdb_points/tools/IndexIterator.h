@@ -48,6 +48,18 @@ namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
 
+/// @brief Count up the number of times the iterator can iterate
+///
+/// @param iter the iterator.
+///
+/// @note counting by iteration only performed where a dynamic filter is in use,
+template <typename IterT>
+inline Index64 iterCount(const IterT& iter);
+
+
+////////////////////////////////////////
+
+
 /// @brief A forward iterator over array indices
 class IndexIter
 {
@@ -281,6 +293,37 @@ private:
     IteratorT mIterator;
     const FilterT mFilter;
 }; // class FilterIndexIter
+
+
+////////////////////////////////////////
+
+
+template <typename IterT>
+inline Index64 iterCount(const IterT& iter)
+{
+    Index64 size = 0;
+    for (IterT newIter(iter); newIter; ++newIter, ++size) { }
+    return size;
+}
+
+
+template <>
+inline Index64 iterCount(const IndexIter& iter)
+{
+    return iter ? iter.end() - *iter : 0;
+}
+
+
+template <typename T>
+inline Index64 iterCount(const IndexValueIter<T>& iter)
+{
+    T newIter(iter.valueIter());
+    Index64 size = 0;
+    for ( ; newIter; ++newIter) {
+        size += *newIter - newIter.parent().getValue(newIter.offset() - 1);
+    }
+    return size;
+}
 
 
 ////////////////////////////////////////
