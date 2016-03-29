@@ -60,11 +60,6 @@
 #include <GT/GT_PrimVDB.h>
 #include <GUI/GUI_PrimitiveHook.h>
 #include <RE/RE_Geometry.h>
-#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
-#include <RE/RE_BufferCache.h>
-#else
-#include <RE/RE_GraphicsCache.h>
-#endif
 #include <RE/RE_Render.h>
 #include <RE/RE_ShaderHandle.h>
 #include <RE/RE_VertexArray.h>
@@ -535,31 +530,13 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
 
     if (!hasPosition)   return;
 
-    // Fetch P (point position). If its cache version matches, no upload is required.
-
-    RE_VertexArray *posGeo = NULL;
+    // fetch point position attribute, if its cache version matches, no upload is required.
 
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
-    posGeo = myGeo->findCachedAttrib(r, "P", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
+    RE_VertexArray* posGeo = myGeo->findCachedAttrib(r, "P", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
 #else
-    posGeo = myGeo->findCachedAttribOrArray(r, "P", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
+    RE_VertexArray* posGeo = myGeo->findCachedAttribOrArray(r, "P", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
 #endif
-
-#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
-    RE_BufferCache* gCache = RE_BufferCache::getCache();
-
-    size_t availableGraphicsMemory(gCache->getMaxSizeB() -  gCache->getCurSizeB());
-#else
-    RE_GraphicsCache* gCache = RE_GraphicsCache::getCache();
-
-    size_t availableGraphicsMemory(gCache->getMaxSize() -  gCache->getCurrentSize());
-#endif
-
-    size_t sizeOfVector3InBytes = (REsizeOfGPUType(RE_GPU_FLOAT16) * 3) / 8;
-    size_t pointAttributeBytes = sizeOfVector3InBytes;
-
-    // if the points will not fit into the remaining graphics memory then don't bother doing anything
-    if (numPoints * pointAttributeBytes > availableGraphicsMemory) return;
 
     if (posGeo->getCacheVersion() != version)
     {
@@ -667,31 +644,13 @@ GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
 
     myWire->setNumPoints(int(outOfCoreLeaves*8*3));
 
-    // Fetch P (point position). If its cache version matches, no upload is required.
-
-    RE_VertexArray *posWire = NULL;
+    // fetch wireframe position, if its cache version matches, no upload is required.
 
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
-    posWire = myWire->findCachedAttrib(r, "P", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
+    RE_VertexArray* posWire = myWire->findCachedAttrib(r, "P", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
 #else
-    posWire = myWire->findCachedAttribOrArray(r, "P", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
+    RE_VertexArray* posWire = myWire->findCachedAttribOrArray(r, "P", RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
 #endif
-
-#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
-    RE_BufferCache* gCache = RE_BufferCache::getCache();
-
-    size_t availableGraphicsMemory(gCache->getMaxSizeB() -  gCache->getCurSizeB());
-#else
-    RE_GraphicsCache* gCache = RE_GraphicsCache::getCache();
-
-    size_t availableGraphicsMemory(gCache->getMaxSize() -  gCache->getCurrentSize());
-#endif
-
-    size_t sizeOfVector3InBytes = (REsizeOfGPUType(RE_GPU_FLOAT16) * 3) / 8;
-    size_t pointAttributeBytes = sizeOfVector3InBytes;
-
-    // if the points will not fit into the remaining graphics memory then don't bother doing anything
-    if (outOfCoreLeaves * 8 * 3 * pointAttributeBytes > availableGraphicsMemory) return;
 
     if (posWire->getCacheVersion() != version)
     {
@@ -793,37 +752,19 @@ GR_PrimVDBPoints::updateVec3Buffer( RE_Render* r,
 
     const size_t index = descriptor.find(name);
 
-    // early exit if velocity does not exist
+    // early exit if attribute does not exist
 
     if (index == AttributeSet::INVALID_POS)     return false;
 
     const openvdb::Name type = descriptor.type(index).first;
 
-    // fetch v (point velocity). If its cache version matches, no upload is required.
-
-    RE_VertexArray *bufferGeo = NULL;
+    // fetch vector attribute, if its cache version matches, no upload is required.
 
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
-    bufferGeo = myGeo->findCachedAttrib(r, name.c_str(), RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
+    RE_VertexArray* bufferGeo = myGeo->findCachedAttrib(r, name.c_str(), RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
 #else
-    bufferGeo = myGeo->findCachedAttribOrArray(r, name.c_str(), RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
+    RE_VertexArray* bufferGeo = myGeo->findCachedAttribOrArray(r, name.c_str(), RE_GPU_FLOAT16, 3, RE_ARRAY_POINT, true);
 #endif
-
-#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
-    RE_BufferCache* gCache = RE_BufferCache::getCache();
-
-    size_t availableGraphicsMemory(gCache->getMaxSizeB() -  gCache->getCurSizeB());
-#else
-    RE_GraphicsCache* gCache = RE_GraphicsCache::getCache();
-
-    size_t availableGraphicsMemory(gCache->getMaxSize() -  gCache->getCurrentSize());
-#endif
-
-    size_t sizeOfVector3InBytes = (REsizeOfGPUType(RE_GPU_FLOAT16) * 3) / 8;
-    size_t pointAttributeBytes = sizeOfVector3InBytes;
-
-    // if the points will not fit into the remaining graphics memory then don't bother doing anything
-    if (numPoints * pointAttributeBytes > availableGraphicsMemory)  return false;
 
     if (bufferGeo->getCacheVersion() != version)
     {
