@@ -174,6 +174,13 @@ protected:
 
     bool updateVec3Buffer(   RE_Render* r, const std::string& name, const RE_CacheVersion& version);
 
+    bool updateIdBuffer(    RE_Render* r,
+                            const openvdb::tools::PointDataGrid& grid,
+                            const std::string& name,
+                            const RE_CacheVersion& version);
+
+    bool updateIdBuffer(    RE_Render* r, const std::string& name, const RE_CacheVersion& version);
+
     void removeBuffer(const std::string& name);
 
 private:
@@ -393,7 +400,7 @@ struct FillGPUBuffersVec3 {
                 for (; iter; ++iter)
                 {
                     if (!uniform)   color = handle->get(*iter);
-                    mBuffer[leafOffset + offset] = UT_Vector3H(color.x(), color.y(), color.z());
+                    mBuffer[leafOffset + offset] = HoudiniBufferType(color.x(), color.y(), color.z());
 
                     offset++;
                 }
@@ -408,6 +415,82 @@ struct FillGPUBuffersVec3 {
     const PointDataTreeType&            mPointDataTree;
     const unsigned                      mAttributeIndex;
 }; // class FillGPUBuffersVec3
+
+
+template<   typename PointDataTreeType,
+            typename AttributeType,
+            typename HoudiniBufferType>
+struct FillGPUBuffersId {
+
+    typedef typename PointDataTreeType::LeafNodeType LeafNode;
+    typedef typename openvdb::tree::LeafManager<PointDataTreeType> LeafManagerT;
+    typedef typename LeafManagerT::LeafRange LeafRangeT;
+
+    typedef std::vector<std::pair<const LeafNode*, openvdb::Index64> > LeafOffsets;
+
+    FillGPUBuffersId( HoudiniBufferType* buffer,
+                            const LeafOffsets& leafOffsets,
+                            const PointDataTreeType& pointDataTree,
+                            const unsigned attributeIndex)
+        : mBuffer(buffer)
+        , mPointDataTree(pointDataTree)
+        , mLeafOffsets(leafOffsets)
+        , mAttributeIndex(attributeIndex) { }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const
+    {
+        const long maxId = std::numeric_limits<HoudiniBufferType>::max();
+
+        for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
+
+            const LeafNode* leaf = mLeafOffsets[n].first;
+            const openvdb::Index64 leafOffset = mLeafOffsets[n].second;
+
+            typename openvdb::tools::AttributeHandle<AttributeType>::Ptr handle =
+                openvdb::tools::AttributeHandle<AttributeType>::create(
+                    leaf->template attributeArray(mAttributeIndex));
+
+            HoudiniBufferType scalarValue;
+
+            // note id attribute (in the GPU cache) is only 32-bit, so use zero if id overflows
+
+            const bool uniform = handle->isUniform();
+
+            if (uniform) {
+                const long id = handle->get(openvdb::Index64(0));
+                scalarValue = id <= maxId ? HoudiniBufferType(id) : HoudiniBufferType(0);
+            }
+
+            openvdb::Index64 offset = 0;
+
+            for (typename LeafNode::ValueOnCIter value=leaf->cbeginValueOn(); value; ++value) {
+
+                openvdb::Coord ijk = value.getCoord();
+
+                openvdb::tools::IndexIter iter = leaf->beginIndex(ijk);
+
+                for (; iter; ++iter)
+                {
+                    if (!uniform) {
+                        const long id = handle->get(*iter);
+                        scalarValue = id <= maxId ? HoudiniBufferType(id) : HoudiniBufferType(0);
+                    }
+                    mBuffer[leafOffset + offset] = scalarValue;
+
+                    offset++;
+                }
+            }
+        }
+    }
+
+    //////////
+
+    HoudiniBufferType*                  mBuffer;
+    const LeafOffsets&                  mLeafOffsets;
+    const PointDataTreeType&            mPointDataTree;
+    const unsigned                      mAttributeIndex;
+}; // class FillGPUBuffersId
+
 
 struct FillGPUBuffersLeafBoxes
 {
@@ -839,6 +922,123 @@ GR_PrimVDBPoints::updateVec3Buffer(RE_Render* r, const std::string& name, const 
     return updateVec3Buffer(r, pointDataGrid, name, version);
 }
 
+bool
+GR_PrimVDBPoints::updateIdBuffer(   RE_Render* r,
+                                    const openvdb::tools::PointDataGrid& grid,
+                                    const std::string& name,
+                                    const RE_CacheVersion& version)
+{
+    // Initialize the geometry with the proper name for the GL cache
+    if (!myGeo)     return false;
+
+    typedef openvdb::tools::PointDataGrid GridType;
+    typedef GridType::TreeType TreeType;
+    typedef TreeType::LeafNodeType LeafNode;
+    typedef openvdb::tools::AttributeSet AttributeSet;
+
+    const TreeType& tree = grid.tree();
+
+    if (tree.leafCount() == 0)  return false;
+
+    const size_t numPoints = myGeo->getNumPoints();
+
+    if (numPoints == 0)         return false;
+
+    TreeType::LeafCIter iter = tree.cbeginLeaf();
+
+    const AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
+
+    const size_t index = descriptor.find("id");
+
+    // early exit if id does not exist
+
+    if (index == AttributeSet::INVALID_POS)     return false;
+
+    const openvdb::Name type = descriptor.type(index).first;
+
+    // fetch id, if its cache version matches, no upload is required.
+
+#if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
+    RE_VertexArray* bufferGeo = myGeo->findCachedAttrib(r, name.c_str(), RE_GPU_INT32, 1, RE_ARRAY_POINT, true);
+#else
+    RE_VertexArray* bufferGeo = myGeo->findCachedAttribOrArray(r, name.c_str(), RE_GPU_INT32, 1, RE_ARRAY_POINT, true);
+#endif
+
+    if (bufferGeo->getCacheVersion() != version)
+    {
+        // build cumulative leaf offset array
+
+        typedef std::vector<std::pair<const LeafNode*, openvdb::Index64> > LeafOffsets;
+
+        LeafOffsets offsets;
+
+        openvdb::Index64 cumulativeOffset = 0;
+
+        for (; iter; ++iter) {
+            const LeafNode& leaf = *iter;
+
+            // skip out-of-core leaf nodes (used when delay loading VDBs)
+            if (leaf.buffer().isOutOfCore())    continue;
+
+            const openvdb::Index64 count = leaf.pointCount();
+
+            offsets.push_back(LeafOffsets::value_type(&leaf, cumulativeOffset));
+
+            cumulativeOffset += count;
+        }
+
+        using gr_primitive_internal::FillGPUBuffersId;
+
+        int32_t *data = static_cast<int32_t*>(bufferGeo->map(r));
+
+        if (type == "int16") {
+            FillGPUBuffersId<   TreeType,
+                                int16_t,
+                                int32_t> fill(data, offsets, grid.tree(), index);
+
+            const tbb::blocked_range<size_t> range(0, offsets.size());
+            tbb::parallel_for(range, fill);
+        }
+        else if (type == "int32") {
+            FillGPUBuffersId<   TreeType,
+                                int32_t,
+                                int32_t> fill(data, offsets, grid.tree(), index);
+
+            const tbb::blocked_range<size_t> range(0, offsets.size());
+            tbb::parallel_for(range, fill);
+        }
+        else if (type == "int64") {
+            FillGPUBuffersId<   TreeType,
+                                int64_t,
+                                int32_t> fill(data, offsets, grid.tree(), index);
+
+            const tbb::blocked_range<size_t> range(0, offsets.size());
+            tbb::parallel_for(range, fill);
+        }
+
+        // unmap the buffer so it can be used by GL and set the cache version
+
+        bufferGeo->unmap(r);
+        bufferGeo->setCacheVersion(version);
+    }
+
+    return true;
+}
+
+bool
+GR_PrimVDBPoints::updateIdBuffer(RE_Render* r, const std::string& name, const RE_CacheVersion& version)
+{
+    const GT_PrimVDB& gt_primVDB = static_cast<const GT_PrimVDB&>(*getCachedGTPrimitive());
+
+    const openvdb::GridBase* grid =
+        const_cast<GT_PrimVDB&>((static_cast<const GT_PrimVDB&>(gt_primVDB))).getGrid();
+
+    typedef openvdb::tools::PointDataGrid PointDataGrid;
+    const PointDataGrid& pointDataGrid = static_cast<const PointDataGrid&>(*grid);
+
+    return updateIdBuffer(r, pointDataGrid, name, version);
+}
+
 void
 GR_PrimVDBPoints::removeBuffer(const std::string& name)
 {
@@ -909,6 +1109,21 @@ GR_PrimVDBPoints::renderDecoration(RE_Render* r, GR_Decoration decor, const GR_D
 
     const RE_CacheVersion version = myGeo->getAttribute("P")->getCacheVersion();
 
+    // update point number buffer
+
+    GR_Decoration numberMarkers[2] = {GR_POINT_NUMBER, GR_NO_DECORATION};
+    const bool numberMarkerChanged = standardMarkersChanged(*p.opts, numberMarkers, false);
+
+    if (numberMarkerChanged)
+    {
+        if (p.opts->drawPointNums()) {
+            updateIdBuffer(r, "pointID", version);
+        }
+        else {
+            removeBuffer("pointID");
+        }
+    }
+
     // update normal buffer
 
     GR_Decoration normalMarkers[2] = {GR_POINT_NORMAL, GR_NO_DECORATION};
@@ -941,7 +1156,8 @@ GR_PrimVDBPoints::renderDecoration(RE_Render* r, GR_Decoration decor, const GR_D
 
     // render markers
 
-    if (decor == GR_POINT_MARKER ||
+    if (decor == GR_POINT_NUMBER ||
+        decor == GR_POINT_MARKER ||
         decor == GR_POINT_NORMAL ||
         decor == GR_POINT_POSITION ||
         decor == GR_POINT_VELOCITY)
