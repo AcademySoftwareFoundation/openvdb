@@ -43,9 +43,8 @@ Contributors, please familiarize yourselves with OpenVDB's <a href="http://www.o
 - @ref secSparsity
   - @ref secBackground
   - @ref secActiveValues
-  - @ref secAccessor
+  - @ref secIndexIterators
 - @ref secSpaceAndTrans
-- @ref secIteration
 
 
 @section secOverview Introduction
@@ -58,7 +57,7 @@ A key motivation behind the library is to increase data compression and thus red
 
 There are three types of compression used in this library to store point attribute data - (1) @b value @b compression where the codec is selected specifically based on the intent of the data, (2) @b uniform @b value @b compression where arrays of identical values can be collapsed down into a single value, (3) @b stream @b compression where the Blosc stream compressor can be used to pack and unpack streams of data using a fast, lossless compression codec.
 
-Uniform value and stream compression are offered in other applications, notably Houdini, but with the case of stream compression, predominatly used to reduce disk storage.
+Uniform value and stream compression are offered in other applications, notably Houdini, but with the case of stream compression, predominantly used to reduce disk storage.
 
 Value compression is a relatively underused style of compression for point data and is most evident in using quantization for point positions. The floating-point representation has been around for many years and has developed into an extremely good general solution to the problem of capturing different orders of magnitude with a fixed number of digits. However, point sets typically contain positional data that is fairly uniform and within a small relative range, so floating-point is not the ideal representation for this type of data.
 
@@ -91,13 +90,13 @@ The underlying AttributeArray from which the TypedAttributeArray derives is not 
 
 AttributeHandle and AttributeWriteHandle classes provide access to the array data without requiring knowledge of the codec. This is important as it allows users to add their own attribute compression schemes without requiring any modification to existing code.
 
-Another reason for using the AttributeHandle mechanism is to allow data to be packed and unpacked efficiently using stream compression. When compressed with a stream compression scheme, the AttributeHandle unpacks attribute data into a local (uncompressed) buffer on access and discards this temporary data once the AttributeHandle goes out of scope. This has the benefit of retaining the stream compression during access wihch lowers the peak memory substantially.
+Another reason for using the AttributeHandle mechanism is to allow data to be packed and unpacked efficiently using stream compression. When compressed with a stream compression scheme, the AttributeHandle unpacks attribute data into a local (uncompressed) buffer on access and discards this temporary data once the AttributeHandle goes out of scope. This has the benefit of retaining the stream compression during access which lowers the peak memory substantially. In addition, out-of-core and compression checks are not used once the handle is created improving performance.
 
 Note that this feature is not available for AttributeWriteHandles as thread safety cannot otherwise be guaranteed.
 
 @subsection secAttributePerformance TypedAttributeArray vs AttributeHandle
 
-AttributeHandles offer a number of benefits over TypedAttributeArray, but they do have one downside in that they introduce an extra indirect dereference cost. In practice, this is almost negligible for most applications, but for the highest performance use case, it may prove worthwhile giving up the flexibility of the AttributeHandle for the raw performance of the TypedAttributeArray.
+One key benefit of AttributeHandles is that they ensure the data being accessed has been uncompressed and is in-core on creation of the handle to avoid the need to perform these checks when the data is being accessed and modified for extra performance. Performance of AttributeHandles have been compared against TypedAttributeArrays and std::vectors and have been shown to be faster in practice. Profile tests have been provided amongst the unit tests that can be used to verify this.
 
 @subsection secAttributeSet AttributeSet and AttributeDescriptor
 
@@ -141,18 +140,14 @@ There are three distinct ways of storing data in an OpenVDB tree: <B>voxel value
 
 Any voxel or tile can be classified as either @b active or @b inactive. The interpretation of this state is application-specific, however there are some conventions, such as using the active state to denote the narrow band in a levelset. For points, the most logical use of the active state is to mark a voxel as active if it contains points and inactive otherwise. This allows iteration over the points in a LeafNode to be accelerated to only iterate over voxels that contain points.
 
-@subsection secAccessor PointDataAccessor
+@subsection secIndexIterators Index Iterators
 
-Common operations provided on a PointDataTree include being able to deduce the start and end attribute offsets from an @ijk coordinate and to be able to work out the number of points per voxel. The PointDataAccessor provides a convenient way of performing these kind of tasks amongst others.
+There are three styles of index iterators - @b IndexIter, @b ValueIndexIter, @b FilterIndexIter. @b IndexIter is a basic start-to-end iterator. @b ValueIndexIter is an iterator that uses an underlying ValueOnIter/ValueOffIter/ValueAllIter to provide voxel filtering. The most common use case for this style is in performing gather-style rasterization where retrieving the points in all neighboring voxels is required. @b FilterIndexIter is an iterator that uses a custom filtering mechanism in addition to being based on an IndexIter or ValueIndexIter. The most common use case for this style is in filtering over indices that are a member of an attribute group.
+
+There are also fast implementations to sum up the number times an iterator would need to step to reach termination.
 
 @section secSpaceAndTrans Voxel Space, Index Space, World Space
 
 Points are stored in @b voxel @b space, meaning all point positions lie between (-0.5, -0.5, -0.5) and (0.5, 0.5, 0.5) with the center of the voxel being (0.0, 0.0, 0.0). The position of the point can be extracted in @b index @b space by adding the voxel space position to the ijk value of the voxel. The position of the point can be extracted in @b world @b space by using the grid transform to do an indexToWorld conversion.
-
-@section secIteration Point Iteration
-
-There are two methods for iterating over points, (1) @b iterating @b sequentially over the linear point attribute arrays or (2) @b iterating @b over @b voxels and then over the points within each voxel. The second method is useful for iteration patterns such as in performing gather-style rasterization where retrieving the points in all neighboring voxels is required.
-
-It is recommended to rely on the fast, efficient leaf and value accessors provided within OpenVDB for iteration over the OpenVDB Tree and the PointDataAccessor for the convenience methods in iterating over the points within the voxel or leaf.
 
 */

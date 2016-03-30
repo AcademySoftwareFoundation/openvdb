@@ -40,10 +40,10 @@ OpenVDB Points is released under the Mozilla Public License Version 2.0 (as is O
 <a href="http://www.mozilla.org/MPL" target="_blank">Mozilla FAQ</a>.
 
 @section sWhyUseVDB Why should I use OpenVDB Points?
-The main reason to adopt OpenVDB Points is if you are <b>working with large point sets</b> either for <b>simulation</b> or <b>raytracing</b>, as large point sets can be efficiently stored and traversed in-memory. In addition, OpenVDB Points has proven a very compact and easy way of passing point data between different applications. Finally, if you are already relying heavily on @b OpenVDB for volumes and level sets, the shared data topology and toolset makes OpenVDB Points a relatively seamless addition to the pipeline.
+The main reason to adopt OpenVDB Points is if you are <b>working with large point sets</b> either for <b>simulation</b> or <b>raytracing</b>, as large point sets can be efficiently stored and traversed in-memory. In addition, OpenVDB Points has proven to be a very compact and easy way of passing point data between different applications. Finally, if you are already relying heavily on @b OpenVDB for volumes and level sets, the shared data topology and toolset makes OpenVDB Points a relatively seamless addition to the pipeline.
 
 @section sVersionNumbering What is the version numbering system for OpenVDB Points?
-As with OpenVDB, we currently use a <I>major.minor.patch</I> version numbering system,
+As with OpenVDB, we currently use a semantic <I>major.minor.patch</I> version numbering system,
 and with every release of OpenVDB we change one or more of the three numbers, however the version numbers for OpenVDB Points are different from OpenVDB, instead we intend on supporting a minimum supported version of OpenVDB with each OpenVDB Points release.
 The patch number is incremented for new features and bug fixes that change
 neither the API nor the file format of the library nor the ABIs of the @c Grid
@@ -53,7 +53,7 @@ changing the @c AttributeArray, @c AttributeSet or @c PointDataLeaf ABIs, and fo
 the file format in such a way that older files can still be read.
 The major version is incremented when the @c Grid or @c Transform ABIs
 change, or when the file format changes in a non-backward-compatible way
-(which should be rare).
+(which should be rare). Note that we're not sticking strictly to this during the Beta phase of development.
 No release of OpenVDB Points guarantees ABI compatibility across the entire library,
 but rather only for the @c Grid classes, and primarily
 to allow third-party app plugins compiled against different versions of
@@ -78,13 +78,13 @@ Yes! The library is explicitly designed to allow for this. The default usage is 
 While, the interpretation of this binary state is application-specific, the most logical interpretation of this for OpenVDB Points is for a voxel that contains points to be active and a voxel that doesn't to be inactive. This makes visiting all voxels in a grid that contains points more efficient as this leverages the sparse iteration of OpenVDB.
 
 @section sVoxel What do voxel values represent in OpenVDB Points?
-Voxel values in a @c PointDataLeafNode represent the end position in the linear attribute arrays attached to each leaf. Using the value of the previous voxel (zero for the first voxel), the offset for the start can be deduced. It is recommended to use the convenience methods provided by the @c PointDataAccessor.
+Voxel values in a @c PointDataLeafNode represent the end position in the linear attribute arrays attached to each leaf. Using the value of the previous voxel (zero for the first voxel), the offset for the start can be deduced. It is recommended to use the ValueIndexIter to simplify the process of iterating through point indices based on voxel values.
 
 @section sBackground What is the background value for OpenVDB Points?
 For OpenVDB Points, the background value is always zero. As the voxel value is an offset, allowing a non-zero background value, while theoretically possible is only likely to prove confusing.
 
 @section sThreadSafe Is OpenVDB Points thread-safe?
-Yes and no. OpenVDB Points is thread-safe in the same way as OpenVDB.
+Yes and no. OpenVDB Points is thread-safe in the same way as OpenVDB. It is worth highlighting that getters and setters for AttributeArrays are thread-safe, however there are faster unsafe getters and setters available which are not thread-safe and used in the AttributeHandles for faster performance.
 
 @section sContribute How can I contribute to OpenVDB Points?
 If you have bug reports or ideas for improvements or new features,

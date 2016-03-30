@@ -24,15 +24,30 @@ A quick summary of what is being offered:
 
 ##### OpenVDB Points:
 
-* AttributeArray and AttributeSet - storing and accessing of typed attribute arrays and sets of these arrays.
+* AttributeArray - storing and accessing of typed attribute arrays as well as handles for fast access and manipulation of those arrays.
+* AttributeGroup - specialized attribute array that tracks and modifies point group membership.
+* AttributeSet - sets of attribute arrays and a descriptor for storing metadata describing the contents of the set.
+* IndexIterator - generic array, value and filtered iterators as well as iterator counting.
 * PointDataGrid - a specialization of OpenVDB LeafNode to store and access attribute data from an AttributeSet and typedefs for PointDataTree and PointDataGrid as well as OpenVDB-compatible serialization.
-* PointConversion - a tool to convert generic point data into a PointDataGrid.
+* PointAttribute - tools to append, drop, rename and compress attributes in a PointDataTree.
+* PointConversion - tools to convert point data into a PointDataGrid.
+* PointCount - tools to count points in a PointDataTree.
+* PointGroup - tools to append, drop, compact and change membership for groups in a PointDataTree.
+* PointLoad - tools to explicit load delay-loaded points in a PointDataTree with optional region filtering.
 
-##### OpenVDB Points Houdini-integration:
+##### OpenVDB Points Houdini integration:
 
 * OpenVDB Points SOP - efficiently convert back-and-forth between native Houdini points and OpenVDB Points.
+* OpenVDB Points Load SOP - explicitly load delay-loaded OpenVDB Points with optional region filtering.
 * SOP base class - middle-click display in Houdini for attribute data.
 * GR Primitive - Houdini visualization for OpenVDB Points in the viewport.
+
+##### OpenVDB Points Clarisse integration:
+
+* ResourceData - create an OpenVDB Points resource and load grids.
+* Geometry - new geometry object that performs VDB Points ray-tracing using a custom BVH tree.
+* GeometryProperty - extract point attributes to use in Clarisse.
+* Module - module to create OpenVDB Points resources and custom ray-tracing geometry or native Clarisse scatterer.
 
 Though this library has been in use at Double Negative for some time now, it hasn't had much use outside of the studio, so we are actively looking for external adoption to help mature the toolset. Once the library has been used more widely, the intention is to integrate this directly into OpenVDB.
 
@@ -52,8 +67,7 @@ This is how the library and their dependencies are laid out:
 ##### OpenVDB Points:
 
 * libopenvdb_points -> libopenvdb
-* libopenvdb_points_houdini -> libopenvdb, libopenvdb_houdini, libopenvdb_points
-* OpenVDB Points SOPs -> libopenvdb, libopenvdb_houdini, libopenvdb_points, libopenvdb_points_houdini
+* OpenVDB Points SOPs -> libopenvdb, libopenvdb_houdini, libopenvdb_points
 
 A PointDataGrid is a VDB Grid with a new PointDataLeaf, meaning the hierarchy remains the same as for any VDB volume but uses a different LeafNode.
 
@@ -61,7 +75,7 @@ Due to the native integration of OpenVDB into Houdini, lots of functionality com
 
 However, there are a few limitations to be aware of, here are two such examples:
 
-* The middle-click menu to display OpenVDB attribute data only works when using an OpenVDB Points SOP as the implementation for this lives in the SOP base class.
+* The middle-click menu to display OpenVDB attribute data only works when using an OpenVDB SOP or OpenVDB Points SOP as the implementation for this lives in the SOP base class (note that this is only the OpenVDB Points SOP for 0.1.0).
 * OpenVDB Visualize SOP doesn't understand OpenVDB Points and thus cannot display a LeafNode visualization.
 
 
@@ -98,10 +112,19 @@ OpenVDB Points is released under the [Mozilla Public License Version 2.0](https:
 
 ### Acknowledgements
 
-* Dan Bailey (Dneg)
-* Mihai Ald&eacute;n (DWA)
-* Nick Avramoussis (Dneg)
-* Matt Warner (Dneg)
-* Harry Biddle (Dneg)
-* Peter Cucka (DWA)
-* Ken Museth (DWA)
+Double Negative:
+
+* Dan Bailey
+* James Bird
+* Nick Avramoussis
+* Matt Warner
+* Nadine Dommanget
+* Rich Jones
+* Harry Biddle (ex-Dneg)
+
+Dreamworks:
+
+* Ken Museth
+* Mihai Ald&eacute;n
+* Peter Cucka
+* David Hill (ex-DWA)
