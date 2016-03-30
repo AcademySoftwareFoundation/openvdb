@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2015 Double Negative Visual Effects
+// Copyright (c) 2015-2016 Double Negative Visual Effects
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -294,3 +294,7 @@ private:
 }; // Geometry_OpenVDBPoints
 
 #endif // OPENVDB_CLARISSE_GEOMETRY_OPENVDBPOINTS_HAS_BEEN_INCLUDED
+
+// Copyright (c) 2015-2016 Double Negative Visual Effects
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

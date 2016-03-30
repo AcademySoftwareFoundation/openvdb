@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2015 Double Negative Visual Effects
+// Copyright (c) 2015-2016 Double Negative Visual Effects
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -858,3 +858,7 @@ void Geometry_OpenVDBPoints::compute_uv(
     u = (phi < 0.0 ? phi + gmath_two_pi : phi) * gmath_inv_two_pi;
     v = 1.0 - theta * gmath_inv_pi;
 }
+
+// Copyright (c) 2015-2016 Double Negative Visual Effects
+// All rights reserved. This software is distributed under the
+// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
