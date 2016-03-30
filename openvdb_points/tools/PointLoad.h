@@ -62,13 +62,17 @@ void loadPoints(PointDataGridT& grid);
 /// overlap with mask grid leaf nodes.
 ///
 /// @param grid  the Grid to be loaded.
+/// @param mask  the mask to denote region of points to load
 template <typename PointDataGridT, typename MaskGridT>
 void loadPoints(PointDataGridT& grid, const MaskGridT& mask);
 
 
 /// @brief Load the leaf node voxel data in the given grid that
 /// overlap with a world-space bounding box.
+///
 /// @param grid  the Grid to be loaded.
+/// @param bbox  the bbox to denote region of points to load
+///
 /// @note Does not clip to the bounding box, leaf nodes with any
 /// overlap will be loaded.
 template <typename PointDataGridT>

@@ -198,20 +198,23 @@ public:
     bool hasAttribute(const Name& attributeName) const;
 
     /// @brief Append an attribute to the leaf.
+    /// @param attribute Name and type of the attribute to append.
     /// @param expected Existing descriptor is expected to match this parameter.
     /// @param replacement New descriptor to replace the existing one.
     AttributeArray::Ptr appendAttribute(const AttributeSet::Util::NameAndType& attribute,
                                         const Descriptor& expected, Descriptor::Ptr& replacement);
     /// @brief Drop list of attributes.
+    /// @param pos vector of attribute indices to drop
     /// @param expected Existing descriptor is expected to match this parameter.
     /// @param replacement New descriptor to replace the existing one.
     void dropAttributes(const std::vector<size_t>& pos,
                         const Descriptor& expected, Descriptor::Ptr& replacement);
     /// @brief Reorder attribute set.
-    /// @param a descriptor with the same attributes in a different order
+    /// @param replacement New descriptor to replace the existing one.
     void reorderAttributes(const Descriptor::Ptr& replacement);
     /// @brief Rename attributes in attribute set (order must remain the same).
-    /// @param a descriptor with the same attribute types but different names
+    /// @param expected Existing descriptor is expected to match this parameter.
+    /// @param replacement New descriptor to replace the existing one.
     void renameAttributes(const Descriptor& expected, Descriptor::Ptr& replacement);
 
     /// @brief Swap the underlying attribute set with the given @a attributeSet.

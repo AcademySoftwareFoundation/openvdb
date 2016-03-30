@@ -55,6 +55,10 @@ namespace tools {
 ///
 /// @param tree          the PointDataTree to be appended to.
 /// @param newAttribute  name and type for the new attribute.
+/// @param defaultValue  metadata default attribute value
+/// @param hidden        mark attribute as hidden
+/// @param transient     mark attribute as transient
+/// @param group         mark attribute as group
 template <typename PointDataTree>
 inline void appendAttribute(PointDataTree& tree,
                             const AttributeSet::Util::NameAndType& newAttribute,

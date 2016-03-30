@@ -85,29 +85,45 @@ int uncompressedSize(const char* buffer);
 /// @brief Retrieves the compressed size of buffer when compressed
 ///
 /// @param buffer the uncompressed buffer
+/// @param typeSize the size of the data type
+/// @param uncompressedBytes number of uncompressed bytes
 int compressedSize(const char* buffer, const size_t typeSize, const int uncompressedBytes);
 
-/// @brief Compress and return the @param buffer.
-/// The number of compressed bytes is written to @param compressedBytes.
-/// If @param cleanup is true, the supplied @param buffer will be deleted
-/// prior to allocating new memory.
+/// @brief Compress and return the compressed buffer.
+///
+/// @param buffer the buffer to compress
+/// @param typeSize the size of the data type
+/// @param uncompressedBytes number of uncompressed bytes
+/// @param compressedBytes number of compressed bytes (written to this variable)
+/// @param cleanup if true, the supplied buffer will be deleted prior to allocating new memory
 char* compress( char* buffer, const size_t typeSize,
                 const int uncompressedBytes, int& compressedBytes,
                 const bool cleanup = false);
 
-/// @brief Compress and return the @param buffer.
-/// The number of compressed bytes is written to @param compressedBytes.
-/// Unlike the non-const buffer version, the buffer will never be deleted.
+/// @brief Compress and return the compressed buffer.
+///
+/// @param buffer the buffer to compress
+/// @param typeSize the size of the data type
+/// @param uncompressedBytes number of uncompressed bytes
+/// @param compressedBytes number of compressed bytes (written to this variable)
+///
+/// @note Unlike the non-const buffer version, the buffer will never be deleted.
 char* compress( const char* buffer, const size_t typeSize,
                 const int uncompressedBytes, int& compressedBytes);
 
-/// @brief Decompress and return the @param buffer.
-/// If @param cleanup is true, the supplied @param buffer will be deleted
-/// prior to allocating new memory.
+/// @brief Decompress and return the uncompressed buffer.
+///
+/// @param buffer the buffer to decompress
+/// @param expectedBytes the number of bytes expected once the buffer is decompressed
+/// @param cleanup if true, the supplied buffer will be deleted prior to allocating new memory
 char* decompress(char* buffer, const int expectedBytes, const bool cleanup = false);
 
-/// @brief Decompress and return the @param buffer.
-/// Unlike the non-const buffer version, the buffer will never be deleted.
+/// @brief Decompress and return the uncompressed buffer.
+///
+/// @param buffer the buffer to decompress
+/// @param expectedBytes the number of bytes expected once the buffer is decompressed
+///
+/// @note Unlike the non-const buffer version, the buffer will never be deleted.
 char* decompress(const char* buffer, const int expectedBytes);
 
 } // namespace attribute_compression

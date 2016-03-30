@@ -59,6 +59,7 @@ namespace tools {
 /// @param  positions       list of world space point positions.
 /// @param  positionType    the type of the position (includes compression info).
 /// @param  xform           world to index space transform.
+/// @param  positionDefaultValue metadata default position value
 ///
 /// @note   The position data must be supplied in a Point-Partitioner compatible
 ///         data structure. A convenience PointAttributeVector class is offered.
@@ -82,6 +83,7 @@ createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT&
 /// @param  positions     list of world space point positions.
 /// @param  positionType  the type of the position (includes compression info).
 /// @param  xform         world to index space transform.
+/// @param  positionDefaultValue metadata default position value
 ///
 /// @note   This method implicitly wraps the std::vector for a Point-Partitioner compatible
 ///         data structure and creates the required @c PointIndexGrid to the points.

@@ -82,7 +82,7 @@ inline void dropGroup(  PointDataTree& tree,
 /// @brief Drops existing groups from the VDB tree, the tree is compacted after dropping.
 ///
 /// @param tree          the PointDataTree to be dropped from.
-/// @param group         name of the group.
+/// @param groups        names of the groups.
 template <typename PointDataTree>
 inline void dropGroups( PointDataTree& tree,
                         const std::vector<Name>& groups);
