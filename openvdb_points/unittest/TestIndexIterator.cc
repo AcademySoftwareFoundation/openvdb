@@ -178,7 +178,7 @@ TestIndexIterator::testValueIndexIterator()
 
         ValueOnIter valueIter = leafNode.beginValueOn();
 
-        IndexValueIter<ValueOnIter> iter(valueIter);
+        ValueIndexIter<ValueOnIter> iter(valueIter);
 
         CPPUNIT_ASSERT(iter);
 
@@ -213,7 +213,7 @@ TestIndexIterator::testValueIndexIterator()
         {
             ValueOnIter valueIter = leafNode.beginValueOn();
 
-            IndexValueIter<ValueOnIter> iter(valueIter);
+            ValueIndexIter<ValueOnIter> iter(valueIter);
 
             CPPUNIT_ASSERT(iter);
 
@@ -239,7 +239,7 @@ TestIndexIterator::testValueIndexIterator()
         {
             ValueOnIter valueIter = leafNode.beginValueOn();
 
-            IndexValueIter<ValueOnIter> iter(valueIter);
+            ValueIndexIter<ValueOnIter> iter(valueIter);
 
             CPPUNIT_ASSERT(iter);
 
@@ -265,7 +265,7 @@ TestIndexIterator::testValueIndexIterator()
         {
             ValueOnIter valueIter = leafNode.beginValueOn();
 
-            IndexValueIter<ValueOnIter> iter(valueIter);
+            ValueIndexIter<ValueOnIter> iter(valueIter);
 
             CPPUNIT_ASSERT(iter);
 
@@ -282,7 +282,7 @@ TestIndexIterator::testValueIndexIterator()
 
         ValueOnIter valueIter = leafNode.beginValueOn();
 
-        IndexValueIter<ValueOnIter> iter(valueIter);
+        ValueIndexIter<ValueOnIter> iter(valueIter);
 
         CPPUNIT_ASSERT(!iter);
 
@@ -431,10 +431,10 @@ TestIndexIterator::testProfile()
     }
 
     { // value on iterator (all on)
-        ProfileTimer timer("IndexValueIter: sum");
+        ProfileTimer timer("ValueIndexIter: sum");
         volatile int sum = 0;
         LeafNode::ValueAllCIter indexIter(leafNode.cbeginValueAll());
-        IndexValueIter<LeafNode::ValueAllCIter> iter(indexIter);
+        ValueIndexIter<LeafNode::ValueAllCIter> iter(indexIter);
         for (; iter; ++iter) {
             sum += *iter;
         }

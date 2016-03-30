@@ -456,8 +456,8 @@ public:
         const PointDataLeafNode, const ValueType, ChildAll> ChildAllCIter;
 
     typedef openvdb::tools::IndexIter IndexIter;
-    typedef IndexValueIter<ValueOnCIter> IndexOnIter;
-    typedef IndexValueIter<ValueOffCIter> IndexOffIter;
+    typedef ValueIndexIter<ValueOnCIter> IndexOnIter;
+    typedef ValueIndexIter<ValueOffCIter> IndexOffIter;
 
     /// @brief Leaf index iterator
     IndexIter beginIndexAll() const;

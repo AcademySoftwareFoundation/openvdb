@@ -115,10 +115,10 @@ private:
 
 /// @brief A forward iterator over array indices from a value iterator (such as ValueOnCIter)
 template <typename ValueIterT>
-class IndexValueIter
+class ValueIndexIter
 {
 public:
-    IndexValueIter(ValueIterT& iter)
+    ValueIndexIter(ValueIterT& iter)
         : mIndexIter(), mIter(iter), mParent(mIter.parent())
     {
         if (mIter) {
@@ -127,7 +127,7 @@ public:
             if (!mIndexIter.test())   this->operator++();
         }
     }
-    IndexValueIter(const IndexValueIter& other)
+    ValueIndexIter(const ValueIndexIter& other)
         : mIndexIter(other.mIndexIter), mIter(other.mIter), mParent(other.mParent) { }
 
     inline Index32 end() const { return mIndexIter.end(); }
@@ -145,7 +145,7 @@ public:
     inline bool test() const { return mIter; }
 
     /// @brief  Advance to the next (valid) item (prefix).
-    inline IndexValueIter& operator++() {
+    inline ValueIndexIter& operator++() {
         mIndexIter.next();
         while (!mIndexIter.test() && mIter.next()) {
             mIndexIter.reset(mParent.getValue(mIter.offset() - 1), *mIter);
@@ -154,7 +154,7 @@ public:
     }
 
     /// @brief  Advance to the next (valid) item (postfix).
-    inline IndexValueIter operator++(int /*dummy*/) {
+    inline ValueIndexIter operator++(int /*dummy*/) {
         IndexIter newIterator(*this);
         this->operator++();
         return newIterator;
@@ -175,14 +175,14 @@ public:
     inline const ValueIterT& valueIter() const { return mIter; }
 
     /// @brief Equality operators
-    bool operator==(const IndexValueIter& other) const { return *mIndexIter == *other.mIndexIter; }
-    bool operator!=(const IndexValueIter& other) const { return !this->operator==(other); }
+    bool operator==(const ValueIndexIter& other) const { return *mIndexIter == *other.mIndexIter; }
+    bool operator!=(const ValueIndexIter& other) const { return !this->operator==(other); }
 
 private:
     IndexIter mIndexIter;
     ValueIterT mIter;
     const typename ValueIterT::NodeType& mParent;
-}; // IndexValueIter
+}; // ValueIndexIter
 
 
 /// IndexIterTraits provides the following for iterators of the three value
@@ -220,7 +220,7 @@ struct IndexIterTraits<TreeT, typename TreeT::LeafNodeType::ValueOffCIter> {
 
 
 /// @brief A forward iterator over array indices with filtering
-/// IteratorT can be either IndexIter or IndexValueIter (or some custom index iterator)
+/// IteratorT can be either IndexIter or ValueIndexIter (or some custom index iterator)
 /// FilterT should be a struct or class with a valid() method than can be evaluated per index
 /// Here's a simple filter example that only accepts even indices:
 ///
@@ -315,7 +315,7 @@ inline Index64 iterCount(const IndexIter& iter)
 
 
 template <typename T>
-inline Index64 iterCount(const IndexValueIter<T>& iter)
+inline Index64 iterCount(const ValueIndexIter<T>& iter)
 {
     T newIter(iter.valueIter());
     Index64 size = 0;
