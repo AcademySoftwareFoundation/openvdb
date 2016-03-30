@@ -23,7 +23,7 @@ PROJECT_NAME           = OpenVDBPoints
 # This could be handy for archiving the generated documentation or
 # if some version control system is used.
 
-PROJECT_NUMBER         = 0.1.0
+PROJECT_NUMBER         = 0.2.0
 
 ALIASES += vdbnamespace="openvdb::v3_1_0"
 PREDEFINED = OPENVDB_VERSION_NAME=v3_1_0

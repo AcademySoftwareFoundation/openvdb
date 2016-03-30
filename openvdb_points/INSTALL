@@ -125,9 +125,9 @@ Installation
     The Makefile supports parallel builds (e.g. "make -j 8").
 
     A default local build generates the following libraries and executables
-    (but see the Makefile for additional targets and build options0.1
-    openvdb_points/libopenvdb_points.so.0.1.0  the OpenVDB libr0.1
-    openvdb_points/libopenvdb_points.so        symlink to libopenvdb_points.so.0.1.0
+    (but see the Makefile for additional targets and build options)
+    openvdb_points/libopenvdb_points.so.0.2.0  the OpenVDB library
+    openvdb_points/libopenvdb_points.so        symlink to libopenvdb_points.so.0.2.0
     openvdb_points/vdb_print                   command-line tool that prints info
                                                about OpenVDB .vdb files
     openvdb_points/vdb_test                    unit test runner for libopenvdb_points
@@ -157,8 +157,8 @@ Installation
                 version.h
         lib/
             libopenvdb_points.so
-            libopenvdb_points.so.0.1
-            libopenvdb_points.so.0.1.0
+            libopenvdb_points.so.0.2
+            libopenvdb_points.so.0.2.0
 
         share/
             doc/
