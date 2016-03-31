@@ -156,22 +156,50 @@ TestAttributeArray::testFixedPointConversion()
 
     const float value = 33.5688040469035f;
 
-    // convert to fixed-point value
+    {
+        // convert to fixed-point value
 
-    const openvdb::Vec3f worldSpaceValue(value);
-    const openvdb::Vec3f indexSpaceValue = transform->worldToIndex(worldSpaceValue);
-    const float voxelSpaceValue = indexSpaceValue.x() - math::Round(indexSpaceValue.x()) + 0.5f;
-    const uint32_t intValue = floatingPointToFixedPoint<uint32_t>(voxelSpaceValue);
+        const openvdb::Vec3f worldSpaceValue(value);
+        const openvdb::Vec3f indexSpaceValue = transform->worldToIndex(worldSpaceValue);
+        const float voxelSpaceValue = indexSpaceValue.x() - math::Round(indexSpaceValue.x()) + 0.5f;
+        const uint32_t intValue = floatingPointToFixedPoint<uint32_t>(voxelSpaceValue);
 
-    // convert back to floating-point value
+        // convert back to floating-point value
 
-    const float newVoxelSpaceValue = fixedPointToFloatingPoint<float>(intValue);
-    const openvdb::Vec3f newIndexSpaceValue(newVoxelSpaceValue + math::Round(indexSpaceValue.x()) - 0.5f);
-    const openvdb::Vec3f newWorldSpaceValue = transform->indexToWorld(newIndexSpaceValue);
+        const float newVoxelSpaceValue = fixedPointToFloatingPoint<float>(intValue);
+        const openvdb::Vec3f newIndexSpaceValue(newVoxelSpaceValue + math::Round(indexSpaceValue.x()) - 0.5f);
+        const openvdb::Vec3f newWorldSpaceValue = transform->indexToWorld(newIndexSpaceValue);
 
-    const float newValue = newWorldSpaceValue.x();
+        const float newValue = newWorldSpaceValue.x();
 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(value, newValue, /*tolerance=*/1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(value, newValue, /*tolerance=*/1e-6);
+    }
+
+    {
+        // convert to fixed-point value (vector)
+
+        const openvdb::Vec3f worldSpaceValue(value, value+1, value+2);
+        const openvdb::Vec3f indexSpaceValue = transform->worldToIndex(worldSpaceValue);
+        const float voxelSpaceValueX = indexSpaceValue.x() - math::Round(indexSpaceValue.x()) + 0.5f;
+        const float voxelSpaceValueY = indexSpaceValue.y() - math::Round(indexSpaceValue.y()) + 0.5f;
+        const float voxelSpaceValueZ = indexSpaceValue.z() - math::Round(indexSpaceValue.z()) + 0.5f;
+        const openvdb::Vec3f voxelSpaceValue(voxelSpaceValueX, voxelSpaceValueY, voxelSpaceValueZ);
+        const openvdb::math::Vec3<uint32_t> intValue = floatingPointToFixedPoint<openvdb::math::Vec3<uint32_t> >(voxelSpaceValue);
+
+        // convert back to floating-point value (vector)
+
+        const openvdb::Vec3f newVoxelSpaceValue = fixedPointToFloatingPoint<openvdb::Vec3f>(intValue);
+        const float newIndexSpaceValueX = newVoxelSpaceValue.x() + math::Round(indexSpaceValue.x()) - 0.5f;
+        const float newIndexSpaceValueY = newVoxelSpaceValue.y() + math::Round(indexSpaceValue.y()) - 0.5f;
+        const float newIndexSpaceValueZ = newVoxelSpaceValue.z() + math::Round(indexSpaceValue.z()) - 0.5f;
+        const openvdb::Vec3f newIndexSpaceValue(newIndexSpaceValueX, newIndexSpaceValueY, newIndexSpaceValueZ);
+        const openvdb::Vec3f newWorldSpaceValue = transform->indexToWorld(newIndexSpaceValue);
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(worldSpaceValue.x(), newWorldSpaceValue.x(), /*tolerance=*/1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(worldSpaceValue.y(), newWorldSpaceValue.y(), /*tolerance=*/1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(worldSpaceValue.z(), newWorldSpaceValue.z(), /*tolerance=*/1e-6);
+
+    }
 }
 
 void
@@ -464,18 +492,81 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT(!attr.isTransient());
         CPPUNIT_ASSERT(attr.isHidden());
 
-        AttributeArrayI attrB(attr);
-        CPPUNIT_ASSERT(matchingNamePairs(attr.type(), attrB.type()));
-        CPPUNIT_ASSERT_EQUAL(attr.size(), attrB.size());
-        CPPUNIT_ASSERT_EQUAL(attr.memUsage(), attrB.memUsage());
-        CPPUNIT_ASSERT_EQUAL(attr.isUniform(), attrB.isUniform());
-        CPPUNIT_ASSERT_EQUAL(attr.isTransient(), attrB.isTransient());
-        CPPUNIT_ASSERT_EQUAL(attr.isHidden(), attrB.isHidden());
+        { // test copy construction
+            AttributeArrayI attrB(attr);
+            CPPUNIT_ASSERT(matchingNamePairs(attr.type(), attrB.type()));
+            CPPUNIT_ASSERT_EQUAL(attr.size(), attrB.size());
+            CPPUNIT_ASSERT_EQUAL(attr.memUsage(), attrB.memUsage());
+            CPPUNIT_ASSERT_EQUAL(attr.isUniform(), attrB.isUniform());
+            CPPUNIT_ASSERT_EQUAL(attr.isTransient(), attrB.isTransient());
+            CPPUNIT_ASSERT_EQUAL(attr.isHidden(), attrB.isHidden());
+            CPPUNIT_ASSERT_EQUAL(attr.isCompressed(), attrB.isCompressed());
 
-        for (unsigned i = 0; i < unsigned(count); ++i) {
-            CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.get(i));
-            CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.getUnsafe(i));
-            CPPUNIT_ASSERT_EQUAL(attr.getUnsafe(i), attrB.getUnsafe(i));
+            for (unsigned i = 0; i < unsigned(count); ++i) {
+                CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.get(i));
+                CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.getUnsafe(i));
+                CPPUNIT_ASSERT_EQUAL(attr.getUnsafe(i), attrB.getUnsafe(i));
+            }
+        }
+
+        // attribute array must not be uniform for compression
+
+        attr.set(1, 7);
+        attr.set(2, 8);
+        attr.set(6, 100);
+
+        { // test compressed copy construction
+            attr.compress();
+
+#ifdef OPENVDB_USE_BLOSC
+            CPPUNIT_ASSERT(attr.isCompressed());
+#endif
+
+            AttributeArray::Ptr attrCopy = attr.copy();
+            AttributeArrayI& attrB(AttributeArrayI::cast(*attrCopy));
+
+            CPPUNIT_ASSERT(matchingNamePairs(attr.type(), attrB.type()));
+            CPPUNIT_ASSERT_EQUAL(attr.size(), attrB.size());
+            CPPUNIT_ASSERT_EQUAL(attr.memUsage(), attrB.memUsage());
+            CPPUNIT_ASSERT_EQUAL(attr.isUniform(), attrB.isUniform());
+            CPPUNIT_ASSERT_EQUAL(attr.isTransient(), attrB.isTransient());
+            CPPUNIT_ASSERT_EQUAL(attr.isHidden(), attrB.isHidden());
+            CPPUNIT_ASSERT_EQUAL(attr.isCompressed(), attrB.isCompressed());
+
+            for (unsigned i = 0; i < unsigned(count); ++i) {
+                CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.get(i));
+                CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.getUnsafe(i));
+                CPPUNIT_ASSERT_EQUAL(attr.getUnsafe(i), attrB.getUnsafe(i));
+            }
+        }
+
+        { // test compressed copy construction (uncompress on copy)
+            attr.compress();
+
+#ifdef OPENVDB_USE_BLOSC
+            CPPUNIT_ASSERT(attr.isCompressed());
+#endif
+
+            AttributeArray::Ptr attrCopy = attr.copyUncompressed();
+            AttributeArrayI& attrB(AttributeArrayI::cast(*attrCopy));
+
+            CPPUNIT_ASSERT(!attrB.isCompressed());
+
+            attr.decompress();
+
+            CPPUNIT_ASSERT(matchingNamePairs(attr.type(), attrB.type()));
+            CPPUNIT_ASSERT_EQUAL(attr.size(), attrB.size());
+            CPPUNIT_ASSERT_EQUAL(attr.memUsage(), attrB.memUsage());
+            CPPUNIT_ASSERT_EQUAL(attr.isUniform(), attrB.isUniform());
+            CPPUNIT_ASSERT_EQUAL(attr.isTransient(), attrB.isTransient());
+            CPPUNIT_ASSERT_EQUAL(attr.isHidden(), attrB.isHidden());
+            CPPUNIT_ASSERT_EQUAL(attr.isCompressed(), attrB.isCompressed());
+
+            for (unsigned i = 0; i < unsigned(count); ++i) {
+                CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.get(i));
+                CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.getUnsafe(i));
+                CPPUNIT_ASSERT_EQUAL(attr.getUnsafe(i), attrB.getUnsafe(i));
+            }
         }
     }
 
@@ -497,6 +588,34 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(double(-0.4), fixedPoint.get(1), /*tolerance=*/double(0.0001));
         CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.4), fixedPoint.get(2), /*tolerance=*/double(0.0001));
         CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.5), fixedPoint.get(3), /*tolerance=*/double(0.0001));
+    }
+
+    typedef openvdb::tools::TypedAttributeArray<openvdb::Vec3f, openvdb::tools::UnitVecAttributeCodec> AttributeArrayU;
+
+    { // UnitVec codec test
+        openvdb::tools::AttributeArray::Ptr attr1(new AttributeArrayU(50));
+
+        AttributeArrayU& unitVec = static_cast<AttributeArrayU&>(*attr1);
+
+        // all vectors must be unit length
+
+        const openvdb::Vec3f vec1(1.0, 0.0, 0.0);
+        const openvdb::Vec3f vec2(openvdb::Vec3f(1.0, 2.0, 3.0).unit());
+        const openvdb::Vec3f vec3(openvdb::Vec3f(1.0, 2.0, 300000.0).unit());
+
+        unitVec.set(0, vec1);
+        unitVec.set(1, vec2);
+        unitVec.set(2, vec3);
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(vec1.x()), unitVec.get(0).x(), /*tolerance=*/double(0.0001));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(vec1.y()), unitVec.get(0).y(), /*tolerance=*/double(0.0001));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(vec1.z()), unitVec.get(0).z(), /*tolerance=*/double(0.0001));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(vec2.x()), unitVec.get(1).x(), /*tolerance=*/double(0.0001));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(vec2.y()), unitVec.get(1).y(), /*tolerance=*/double(0.0001));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(vec2.z()), unitVec.get(1).z(), /*tolerance=*/double(0.0001));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(vec3.x()), unitVec.get(2).x(), /*tolerance=*/double(0.0001));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(vec3.y()), unitVec.get(2).y(), /*tolerance=*/double(0.0001));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(vec3.z()), unitVec.get(2).z(), /*tolerance=*/double(0.0001));
     }
 
     { // IO
