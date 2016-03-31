@@ -4238,7 +4238,14 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
 
     std::vector<size_t> regions(signLeafs.leafCount(), 0);
-    if (regions.empty()) return;
+    if (regions.empty()) {
+	mPointListSize = 0;
+	mPoints.reset();
+	mPolygonPoolListSize = 0;
+	mPolygons.reset();
+	mPointFlags.clear();
+	return;
+    }
 
     if (adaptive) {
 
