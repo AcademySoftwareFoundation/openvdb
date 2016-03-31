@@ -16,19 +16,22 @@ compiler:
   - clang
 
 env:
-  - HOUDINI_BUILD=none
-  - HOUDINI_BUILD=houdini-14.0.395-linux_x86_64_gcc4.8
-  - HOUDINI_BUILD=houdini-15.0.244.16-linux_x86_64_gcc4.8
+  - BLOSC=no HOUDINI_BUILD=none
+  - BLOSC=no HOUDINI_BUILD=houdini-14.0.395-linux_x86_64_gcc4.8
+  - BLOSC=no HOUDINI_BUILD=houdini-15.0.244.16-linux_x86_64_gcc4.8
+  - BLOSC=yes HOUDINI_BUILD=none
+  - BLOSC=yes HOUDINI_BUILD=houdini-14.0.395-linux_x86_64_gcc4.8
+  - BLOSC=yes HOUDINI_BUILD=houdini-15.0.244.16-linux_x86_64_gcc4.8
 
 before_install:
   - pip install --user codecov
 
 install:
-  - bash .travis.run pre_install $HOUDINI_BUILD
-  - bash .travis.run install $HOUDINI_BUILD
+  - bash .travis.run pre_install $BLOSC $HOUDINI_BUILD
+  - bash .travis.run install $BLOSC $HOUDINI_BUILD
 
 script:
-  - bash .travis.run script $HOUDINI_BUILD
+  - bash .travis.run script $BLOSC $HOUDINI_BUILD
 
 after_success:
   - codecov
