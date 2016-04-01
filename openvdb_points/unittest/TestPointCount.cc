@@ -229,10 +229,14 @@ TestPointCount::testGroup()
         CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(4));
         CPPUNIT_ASSERT_EQUAL(activePointCount(tree), Index64(4));
         CPPUNIT_ASSERT_EQUAL(inactivePointCount(tree), Index64(0));
+        CPPUNIT_ASSERT_EQUAL(tree.cbeginLeaf()->pointCount(), Index64(4));
+        CPPUNIT_ASSERT_EQUAL(tree.cbeginLeaf()->onPointCount(), Index64(4));
+        CPPUNIT_ASSERT_EQUAL(tree.cbeginLeaf()->offPointCount(), Index64(0));
 
         // no points found when filtered by the empty group
 
         CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "test"), Index64(0));
+        CPPUNIT_ASSERT_EQUAL(tree.cbeginLeaf()->groupPointCount("test"), Index64(0));
     }
 
     { // assign two points to the group, test offsets and point counts
@@ -253,6 +257,7 @@ TestPointCount::testGroup()
         // only two out of four points should be found when group filtered
 
         CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "test"), Index64(2));
+        CPPUNIT_ASSERT_EQUAL(tree.cbeginLeaf()->groupPointCount("test"), Index64(2));
 
         {
             CPPUNIT_ASSERT_EQUAL(activeGroupPointCount(tree, "test"), Index64(2));
@@ -290,6 +295,7 @@ TestPointCount::testGroup()
         // ensure active / inactive point counts are correct
 
         CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "test"), Index64(2));
+        CPPUNIT_ASSERT_EQUAL(leafIter->groupPointCount("test"), Index64(2));
         CPPUNIT_ASSERT_EQUAL(activeGroupPointCount(tree, "test"), Index64(1));
         CPPUNIT_ASSERT_EQUAL(inactiveGroupPointCount(tree, "test"), Index64(1));
 
@@ -304,6 +310,7 @@ TestPointCount::testGroup()
         CPPUNIT_ASSERT_NO_THROW(leafIter->validateOffsets());
 
         CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "test"), Index64(2));
+        CPPUNIT_ASSERT_EQUAL(leafIter->groupPointCount("test"), Index64(2));
         CPPUNIT_ASSERT_EQUAL(activeGroupPointCount(tree, "test"), Index64(2));
         CPPUNIT_ASSERT_EQUAL(inactiveGroupPointCount(tree, "test"), Index64(0));
 
@@ -343,6 +350,7 @@ TestPointCount::testGroup()
         groupArray.set(3, GroupType(1) << index.second);
 
         CPPUNIT_ASSERT_EQUAL(groupPointCount(tree2, "test"), Index64(2));
+        CPPUNIT_ASSERT_EQUAL(leafIter->groupPointCount("test"), Index64(2));
         CPPUNIT_ASSERT_EQUAL(pointCount(tree2), Index64(7));
     }
 
@@ -365,6 +373,7 @@ TestPointCount::testGroup()
         groupArray.set(0, GroupType(1) << index.second);
 
         CPPUNIT_ASSERT_EQUAL(groupPointCount(tree2, "test"), Index64(3));
+        CPPUNIT_ASSERT_EQUAL(leafIter->groupPointCount("test"), Index64(1));
         CPPUNIT_ASSERT_EQUAL(pointCount(tree2), Index64(7));
     }
 }

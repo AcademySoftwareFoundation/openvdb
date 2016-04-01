@@ -259,6 +259,8 @@ public:
     Index64 onPointCount() const;
     /// @brief Compute the total inactive (off) point count for the leaf
     Index64 offPointCount() const;
+    /// @brief Compute the point count in a specific group for the leaf
+    Index64 groupPointCount(const Name& groupName) const;
 
     /// @brief Activate voxels with non-zero points, deactivate voxels with zero points.
     void updateValueMask();
@@ -793,6 +795,16 @@ PointDataLeafNode<T, Log2Dim>::offPointCount() const
     if (this->isEmpty())        return this->pointCount();
     else if (this->isDense())   return 0;
     return iterCount(this->beginIndexOff());
+}
+
+template<typename T, Index Log2Dim>
+inline Index64
+PointDataLeafNode<T, Log2Dim>::groupPointCount(const Name& groupName) const
+{
+    IndexIter indexIter = this->beginIndexAll();
+    GroupFilterFromLeaf::Filter filter(GroupFilterFromLeaf(groupName).fromLeaf(*this));
+    FilterIndexIter<IndexIter, GroupFilterFromLeaf::Filter> filterIndexIter(indexIter, filter);
+    return iterCount(filterIndexIter);
 }
 
 template<typename T, Index Log2Dim>
