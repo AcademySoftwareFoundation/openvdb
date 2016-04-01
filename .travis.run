@@ -3,8 +3,18 @@
 set -x
 
 TASK="$1"
-BLOSC="$2"
-HOUDINI_BUILD="$3"
+ABI="$2"
+BLOSC="$3"
+HOUDINI_BUILD="$4"
+
+COMMON_ARGS="DESTDIR=/tmp/OpenVDB_3_1_0 CONCURRENT_MALLOC_LIB= DOXYGEN= LOG4CPLUS_INCL_DIR= PYTHON_INCL_DIR= GLFW_INCL_DIR="
+
+STANDALONE_ARGS="BOOST_LIB_DIR=/usr/lib/x86_64-linux-gnu EXR_INCL_DIR=/usr/include/OpenEXR EXR_LIB_DIR=/usr/local/lib TBB_LIB_DIR=/usr/lib"
+HOUDINI_ARGS="BOOST_INCL_DIR=/test/hou/toolkit/include BOOST_LIB_DIR=/test/hou/dsolib TBB_LIB_DIR=/test/hou/dsolib EXR_INCL_DIR=/test/hou/toolkit/include EXR_LIB_DIR=/test/hou/dsolib"
+
+STANDALONE_BLOSC_ARGS="BLOSC_INCL_DIR=/test/blosc/include BLOSC_LIB_DIR=/test/blosc/lib"
+HOUDINI_BLOSC_ARGS="BLOSC_INCL_DIR=/test/hou/toolkit/include BLOSC_LIB_DIR=/test/hou/dsolib"
+NO_BLOSC_ARGS="BLOSC_INCL_DIR= BLOSC_LIB_DIR="
 
 if [ "$TASK" = "pre_install" ]; then
     # install main pre-requisites
@@ -50,86 +60,26 @@ if [ "$TASK" = "pre_install" ]; then
 elif [ "$TASK" = "install" ]; then
     if [ "$HOUDINI_BUILD" = "none" ]; then
         # openvdb for standalone
-        if [ "$BLOSC" = "yes" ]; then
-            make -C openvdb \
-                DESTDIR=/tmp/OpenVDB_3_1_0 \
-                BOOST_LIB_DIR=/usr/lib/x86_64-linux-gnu \
-                EXR_INCL_DIR=/usr/include/OpenEXR \
-                EXR_LIB_DIR=/usr/local/lib \
-                TBB_LIB_DIR=/usr/lib \
-                BLOSC_INCL_DIR=/test/blosc/include \
-                BLOSC_LIB_DIR=/test/blosc/lib \
-                CONCURRENT_MALLOC_LIB= DOXYGEN= LOG4CPLUS_INCL_DIR= PYTHON_INCL_DIR= GLFW_INCL_DIR= \
-                install -j
+        if [ "$ABI" = "2" ]; then
+            if [ "$BLOSC" = "yes" ]; then
+                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install abi=2 -j
+            else
+                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS install abi=2 -j
+            fi
         else
-            make -C openvdb \
-                DESTDIR=/tmp/OpenVDB_3_1_0 \
-                BOOST_LIB_DIR=/usr/lib/x86_64-linux-gnu \
-                EXR_INCL_DIR=/usr/include/OpenEXR \
-                EXR_LIB_DIR=/usr/local/lib \
-                TBB_LIB_DIR=/usr/lib \
-                BLOSC_INCL_DIR= BLOSC_LIB_DIR= \
-                CONCURRENT_MALLOC_LIB= DOXYGEN= LOG4CPLUS_INCL_DIR= PYTHON_INCL_DIR= GLFW_INCL_DIR= \
-                install -j
+            if [ "$BLOSC" = "yes" ]; then
+                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install -j
+            else
+                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS install -j
+            fi
         fi
     else
         cd hou
         source houdini_setup
         cd -
-        # openvdb for houdini
-        if [ "$BLOSC" = "yes" ]; then
-            make -C openvdb \
-                DESTDIR=/tmp/OpenVDB_3_1_0 \
-                BOOST_INCL_DIR=/test/hou/toolkit/include \
-                BOOST_LIB_DIR=/test/hou/dsolib \
-                TBB_LIB_DIR=/test/hou/dsolib \
-                EXR_INCL_DIR=/test/hou/toolkit/include \
-                EXR_LIB_DIR=/test/hou/dsolib \
-                BLOSC_INCL_DIR=/test/hou/toolkit/include \
-                BLOSC_LIB_DIR=/test/hou/dsolib \
-                CONCURRENT_MALLOC_LIB= DOXYGEN= LOG4CPLUS_INCL_DIR= PYTHON_INCL_DIR= GLFW_INCL_DIR= \
-                install -j
-        else
-            make -C openvdb \
-                DESTDIR=/tmp/OpenVDB_3_1_0 \
-                BOOST_INCL_DIR=/test/hou/toolkit/include \
-                BOOST_LIB_DIR=/test/hou/dsolib \
-                TBB_LIB_DIR=/test/hou/dsolib \
-                EXR_INCL_DIR=/test/hou/toolkit/include \
-                EXR_LIB_DIR=/test/hou/dsolib \
-                BLOSC_INCL_DIR= \
-                CONCURRENT_MALLOC_LIB= DOXYGEN= LOG4CPLUS_INCL_DIR= PYTHON_INCL_DIR= GLFW_INCL_DIR= \
-                install -j
-        fi
+        make -C openvdb $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS install -j
         # openvdb houdini (lib only)
-        if [ "$BLOSC" = "yes" ]; then
-            make -C openvdb_houdini \
-                HOUDINI_INCL_DIR=/test/hou/toolkit/include \
-                OPENVDB_INCL_DIR=/tmp/OpenVDB_3_1_0/include \
-                OPENVDB_LIB_DIR=/tmp/OpenVDB_3_1_0/lib \
-                TBB_LIB_DIR=/test/hou/dsolib \
-                BOOST_INCL_DIR=/test/hou/toolkit/include \
-                BOOST_LIB_DIR=/test/hou/dsolib \
-                EXR_INCL_DIR=/test/hou/toolkit/include \
-                EXR_LIB_DIR=/test/hou/dsolib \
-                BLOSC_INCL_DIR=/test/hou/toolkit/include \
-                BLOSC_LIB_DIR=/test/hou/dsolib \
-                CONCURRENT_MALLOC_LIB= DOXYGEN= LOG4CPLUS_INCL_DIR= PYTHON_INCL_DIR= GLFW_INCL_DIR= \
-                houdinilib -j
-        else
-            make -C openvdb_houdini \
-                HOUDINI_INCL_DIR=/test/hou/toolkit/include \
-                OPENVDB_INCL_DIR=/tmp/OpenVDB_3_1_0/include \
-                OPENVDB_LIB_DIR=/tmp/OpenVDB_3_1_0/lib \
-                TBB_LIB_DIR=/test/hou/dsolib \
-                BOOST_INCL_DIR=/test/hou/toolkit/include \
-                BOOST_LIB_DIR=/test/hou/dsolib \
-                EXR_INCL_DIR=/test/hou/toolkit/include \
-                EXR_LIB_DIR=/test/hou/dsolib \
-                BLOSC_INCL_DIR= \
-                CONCURRENT_MALLOC_LIB= DOXYGEN= LOG4CPLUS_INCL_DIR= PYTHON_INCL_DIR= GLFW_INCL_DIR= \
-                houdinilib -j
-        fi
+        make -C openvdb_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS houdinilib -j
         # manually install only headers and lib (to avoid building openvdb houdini SOPs)
         mkdir houdini_utils
         cp openvdb_houdini/houdini/*.h openvdb_houdini
@@ -139,91 +89,26 @@ elif [ "$TASK" = "install" ]; then
 elif [ "$TASK" = "script" ]; then
     if [ "$HOUDINI_BUILD" = "none" ]; then
         # openvdb points for standalone
-        if [ "$BLOSC" = "yes" ]; then
-            make -C openvdb_points \
-                DESTDIR=/tmp/OpenVDB_3_1_0 \
-                BOOST_LIB_DIR=/usr/lib/x86_64-linux-gnu \
-                OPENVDB_LIB_DIR=$PWD/openvdb \
-                TBB_LIB_DIR=/usr/lib \
-                EXR_INCL_DIR=/usr/include/OpenEXR \
-                EXR_LIB_DIR=/usr/local/lib \
-                BLOSC_INCL_DIR=/test/blosc/include \
-                BLOSC_LIB_DIR=/test/blosc/lib \
-                CONCURRENT_MALLOC_LIB= DOXYGEN= LOG4CPLUS_INCL_DIR= PYTHON_INCL_DIR= GLFW_INCL_DIR= \
-                test -j
+        if [ "$ABI" = "2" ]; then
+            if [ "$BLOSC" = "yes" ]; then
+                make -C openvdb_points $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS test abi=2 -j
+            else
+                make -C openvdb_points $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS test abi=2 -j
+            fi
         else
-            make -C openvdb_points \
-                DESTDIR=/tmp/OpenVDB_3_1_0 \
-                BOOST_LIB_DIR=/usr/lib/x86_64-linux-gnu \
-                OPENVDB_LIB_DIR=$PWD/openvdb \
-                TBB_LIB_DIR=/usr/lib \
-                EXR_INCL_DIR=/usr/include/OpenEXR \
-                EXR_LIB_DIR=/usr/local/lib \
-                BLOSC_INCL_DIR= \
-                CONCURRENT_MALLOC_LIB= DOXYGEN= LOG4CPLUS_INCL_DIR= PYTHON_INCL_DIR= GLFW_INCL_DIR= \
-                test -j
+            if [ "$BLOSC" = "yes" ]; then
+                make -C openvdb_points $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS test -j
+            else
+                make -C openvdb_points $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS test -j
+            fi
         fi
     else
         cd hou
         source houdini_setup
         cd -
         # openvdb points for houdini
-        if [ "$BLOSC" = "yes" ]; then
-            make -C openvdb_points \
-                DESTDIR=/tmp/OpenVDB_3_1_0 \
-                BOOST_LIB_DIR=/test/hou/dsolib \
-                OPENVDB_INCL_DIR=/tmp/OpenVDB_3_1_0/include \
-                OPENVDB_LIB_DIR=/tmp/OpenVDB_3_1_0/lib \
-                TBB_LIB_DIR=/test/hou/dsolib \
-                EXR_INCL_DIR=/test/hou/toolkit/include \
-                EXR_LIB_DIR=/test/hou/dsolib \
-                BLOSC_INCL_DIR=/test/hou/toolkit/include \
-                BLOSC_LIB_DIR=/test/hou/dsolib \
-                CONCURRENT_MALLOC_LIB= DOXYGEN= LOG4CPLUS_INCL_DIR= PYTHON_INCL_DIR= GLFW_INCL_DIR= \
-                install -j
-        else
-            make -C openvdb_points \
-                DESTDIR=/tmp/OpenVDB_3_1_0 \
-                BOOST_LIB_DIR=/test/hou/dsolib \
-                OPENVDB_INCL_DIR=/tmp/OpenVDB_3_1_0/include \
-                OPENVDB_LIB_DIR=/tmp/OpenVDB_3_1_0/lib \
-                TBB_LIB_DIR=/test/hou/dsolib \
-                EXR_INCL_DIR=/test/hou/toolkit/include \
-                EXR_LIB_DIR=/test/hou/dsolib \
-                BLOSC_INCL_DIR= \
-                CONCURRENT_MALLOC_LIB= DOXYGEN= LOG4CPLUS_INCL_DIR= PYTHON_INCL_DIR= GLFW_INCL_DIR= \
-                install -j
-        fi
+        make -C openvdb_points $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS install -j
         # openvdb points houdini (lib and SOPs)
-        if [ "$BLOSC" = "yes" ]; then
-            make -C openvdb_points_houdini \
-                DESTDIR=/tmp/OpenVDB_3_1_0 \
-                HOUDINI_INCL_DIR=/test/hou/toolkit/include \
-                BOOST_INCL_DIR=/test/hou/toolkit/include \
-                BOOST_LIB_DIR=/test/hou/dsolib \
-                OPENVDB_INCL_DIR=/tmp/OpenVDB_3_1_0/include \
-                OPENVDB_LIB_DIR=/tmp/OpenVDB_3_1_0/lib \
-                TBB_LIB_DIR=/test/hou/dsolib \
-                EXR_INCL_DIR=/test/hou/toolkit/include \
-                EXR_LIB_DIR=/test/hou/dsolib \
-                BLOSC_INCL_DIR=/test/hou/toolkit/include \
-                BLOSC_LIB_DIR=/test/hou/dsolib \
-                CONCURRENT_MALLOC_LIB= DOXYGEN= LOG4CPLUS_INCL_DIR= PYTHON_INCL_DIR= GLFW_INCL_DIR= \
-                all -j
-        else
-            make -C openvdb_points_houdini \
-                DESTDIR=/tmp/OpenVDB_3_1_0 \
-                HOUDINI_INCL_DIR=/test/hou/toolkit/include \
-                BOOST_INCL_DIR=/test/hou/toolkit/include \
-                BOOST_LIB_DIR=/test/hou/dsolib \
-                OPENVDB_INCL_DIR=/tmp/OpenVDB_3_1_0/include \
-                OPENVDB_LIB_DIR=/tmp/OpenVDB_3_1_0/lib \
-                TBB_LIB_DIR=/test/hou/dsolib \
-                EXR_INCL_DIR=/test/hou/toolkit/include \
-                EXR_LIB_DIR=/test/hou/dsolib \
-                BLOSC_INCL_DIR= \
-                CONCURRENT_MALLOC_LIB= DOXYGEN= LOG4CPLUS_INCL_DIR= PYTHON_INCL_DIR= GLFW_INCL_DIR= \
-                all -j
-        fi
+        make -C openvdb_points_houdini $COMMON_ARGS $HOUDINI_ARGS $HOUDINI_BLOSC_ARGS all -j
     fi
 fi
