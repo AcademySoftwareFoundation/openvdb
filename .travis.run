@@ -5,7 +5,8 @@ set -x
 TASK="$1"
 ABI="$2"
 BLOSC="$3"
-HOUDINI_BUILD="$4"
+RELEASE="$4"
+HOUDINI_BUILD="$5"
 
 COMMON_ARGS="DESTDIR=/tmp/OpenVDB_3_1_0 CONCURRENT_MALLOC_LIB= DOXYGEN= LOG4CPLUS_INCL_DIR= PYTHON_INCL_DIR= GLFW_INCL_DIR="
 
@@ -62,15 +63,31 @@ elif [ "$TASK" = "install" ]; then
         # openvdb for standalone
         if [ "$ABI" = "2" ]; then
             if [ "$BLOSC" = "yes" ]; then
-                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install abi=2 -j
+                if [ "$RELEASE" = "yes" ]; then
+                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install abi=2 -j
+                else
+                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install abi=2 debug=yes -j
+                fi
             else
-                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS install abi=2 -j
+                if [ "$RELEASE" = "yes" ]; then
+                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS install abi=2 -j
+                else
+                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS install abi=2 debug=yes -j
+                fi
             fi
         else
             if [ "$BLOSC" = "yes" ]; then
-                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install -j
+                if [ "$RELEASE" = "yes" ]; then
+                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install -j
+                else
+                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS install debug=yes -j
+                fi
             else
-                make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS install -j
+                if [ "$RELEASE" = "yes" ]; then
+                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS install -j
+                else
+                    make -C openvdb $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS install debug=yes -j
+                fi
             fi
         fi
     else
@@ -91,15 +108,31 @@ elif [ "$TASK" = "script" ]; then
         # openvdb points for standalone
         if [ "$ABI" = "2" ]; then
             if [ "$BLOSC" = "yes" ]; then
-                make -C openvdb_points $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS test abi=2 -j
+                if [ "$RELEASE" = "yes" ]; then
+                    make -C openvdb_points $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS test abi=2 -j
+                else
+                    make -C openvdb_points $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS test abi=2 debug=yes -j
+                fi
             else
-                make -C openvdb_points $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS test abi=2 -j
+                if [ "$RELEASE" = "yes" ]; then
+                    make -C openvdb_points $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS test abi=2 -j
+                else
+                    make -C openvdb_points $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS test abi=2 debug=yes -j
+                fi
             fi
         else
             if [ "$BLOSC" = "yes" ]; then
-                make -C openvdb_points $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS test -j
+                if [ "$RELEASE" = "yes" ]; then
+                    make -C openvdb_points $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS test -j
+                else
+                    make -C openvdb_points $COMMON_ARGS $STANDALONE_ARGS $STANDALONE_BLOSC_ARGS test debug=yes -j
+                fi
             else
-                make -C openvdb_points $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS test -j
+                if [ "$RELEASE" = "yes" ]; then
+                    make -C openvdb_points $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS test -j
+                else
+                    make -C openvdb_points $COMMON_ARGS $STANDALONE_ARGS $NO_BLOSC_ARGS test debug=yes -j
+                fi
             fi
         fi
     else
