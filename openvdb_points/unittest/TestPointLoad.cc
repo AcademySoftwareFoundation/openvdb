@@ -124,6 +124,7 @@ TestPointLoad::testLoad()
 
         PointDataGrid::TreeType::LeafCIter leafIter = grid->tree().cbeginLeaf();
 
+#ifndef OPENVDB_2_ABI_COMPATIBLE
         // all leaves out of core
 
         CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore()); ++leafIter;
@@ -134,6 +135,7 @@ TestPointLoad::testLoad()
         loadPoints(*grid);
 
         leafIter = grid->tree().cbeginLeaf();
+#endif
 
         // all leaves loaded into memory
 
@@ -143,6 +145,7 @@ TestPointLoad::testLoad()
         CPPUNIT_ASSERT(!leafIter->buffer().isOutOfCore());
     }
 
+#ifndef OPENVDB_2_ABI_COMPATIBLE
     // read and load leaf nodes by bbox
     {
         io::File fileIn(filename);
@@ -180,7 +183,9 @@ TestPointLoad::testLoad()
         CPPUNIT_ASSERT(!leafIter->buffer().isOutOfCore()); ++leafIter;
         CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore());
     }
+#endif
 
+#ifndef OPENVDB_2_ABI_COMPATIBLE
     // read and load leaf nodes by mask
     {
         io::File fileIn(filename);
@@ -221,6 +226,7 @@ TestPointLoad::testLoad()
         CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore()); ++leafIter;
         CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore());
     }
+#endif
 
     // cleanup temp files
 

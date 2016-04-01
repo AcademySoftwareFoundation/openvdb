@@ -82,13 +82,19 @@ void loadPoints(PointDataGridT& grid, const BBoxd& bbox);
 ////////////////////////////////////////
 
 
+#ifndef OPENVDB_2_ABI_COMPATIBLE
 template <typename PointDataGridT>
 void loadPoints(PointDataGridT& grid)
 {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
     grid.constTree().readNonresidentBuffers();
-#endif
 }
+#else
+template <typename PointDataGridT>
+void loadPoints(PointDataGridT&)
+{
+    // out-of-core not supported with ABI 2
+}
+#endif
 
 
 template <typename PointDataGridT, typename MaskGridT>
