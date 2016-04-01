@@ -320,7 +320,7 @@ inline Index64 iterCount(const ValueIndexIter<T>& iter)
     T newIter(iter.valueIter());
     Index64 size = 0;
     for ( ; newIter; ++newIter) {
-        size += *newIter - newIter.parent().getValue(newIter.offset() - 1);
+        size += *newIter - (newIter.offset() == 0 ? Index32(0) : Index32(newIter.parent().getValue(newIter.offset() - 1)));
     }
     return size;
 }

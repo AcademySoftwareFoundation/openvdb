@@ -148,16 +148,6 @@ TestIndexIterator::testIndexIterator()
     }
 }
 
-template <typename IteratorT>
-int count(IteratorT& iter)
-{
-    int total = 0;
-    for (; iter; ++iter) {
-        total++;
-    }
-    return total;
-}
-
 void
 TestIndexIterator::testValueIndexIterator()
 {
@@ -182,17 +172,30 @@ TestIndexIterator::testValueIndexIterator()
 
         CPPUNIT_ASSERT(iter);
 
-        CPPUNIT_ASSERT_EQUAL(count(iter), size);
+        CPPUNIT_ASSERT_EQUAL(iterCount(iter), Index64(size));
+
+        ++iter;
 
         // check coord value
         Coord xyz;
         iter.getCoord(xyz);
-        CPPUNIT_ASSERT_EQUAL(xyz, openvdb::Coord(2, 0, 0));
-        CPPUNIT_ASSERT_EQUAL(iter.getCoord(), openvdb::Coord(2, 0, 0));
+        CPPUNIT_ASSERT_EQUAL(xyz, openvdb::Coord(0, 0, 1));
+        CPPUNIT_ASSERT_EQUAL(iter.getCoord(), openvdb::Coord(0, 0, 1));
 
         // check iterators retrieval
-        CPPUNIT_ASSERT_EQUAL(iter.valueIter().getCoord(), openvdb::Coord(2, 0, 0));
-        CPPUNIT_ASSERT_EQUAL(iter.indexIter().end(), Index32(size));
+        CPPUNIT_ASSERT_EQUAL(iter.valueIter().getCoord(), openvdb::Coord(0, 0, 1));
+        CPPUNIT_ASSERT_EQUAL(iter.indexIter().end(), Index32(2));
+
+        ++iter;
+
+        // check coord value
+        iter.getCoord(xyz);
+        CPPUNIT_ASSERT_EQUAL(xyz, openvdb::Coord(0, 1, 0));
+        CPPUNIT_ASSERT_EQUAL(iter.getCoord(), openvdb::Coord(0, 1, 0));
+
+        // check iterators retrieval
+        CPPUNIT_ASSERT_EQUAL(iter.valueIter().getCoord(), openvdb::Coord(0, 1, 0));
+        CPPUNIT_ASSERT_EQUAL(iter.indexIter().end(), Index32(3));
     }
 
     { // one per even voxel offsets, only these active
@@ -217,7 +220,7 @@ TestIndexIterator::testValueIndexIterator()
 
             CPPUNIT_ASSERT(iter);
 
-            CPPUNIT_ASSERT_EQUAL(count(iter), size/2);
+            CPPUNIT_ASSERT_EQUAL(iterCount(iter), Index64(size/2));
         }
     }
 
@@ -243,7 +246,7 @@ TestIndexIterator::testValueIndexIterator()
 
             CPPUNIT_ASSERT(iter);
 
-            CPPUNIT_ASSERT_EQUAL(count(iter), 3);
+            CPPUNIT_ASSERT_EQUAL(iterCount(iter), Index64(3));
         }
     }
 
@@ -269,7 +272,7 @@ TestIndexIterator::testValueIndexIterator()
 
             CPPUNIT_ASSERT(iter);
 
-            CPPUNIT_ASSERT_EQUAL(count(iter), size/2);
+            CPPUNIT_ASSERT_EQUAL(iterCount(iter), Index64(size/2));
         }
     }
 
@@ -286,7 +289,7 @@ TestIndexIterator::testValueIndexIterator()
 
         CPPUNIT_ASSERT(!iter);
 
-        CPPUNIT_ASSERT_EQUAL(count(iter), 0);
+        CPPUNIT_ASSERT_EQUAL(iterCount(iter), Index64(0));
     }
 }
 
