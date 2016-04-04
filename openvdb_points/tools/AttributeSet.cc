@@ -913,6 +913,15 @@ AttributeSet::Descriptor::write(std::ostream& os) const
         os.write(reinterpret_cast<const char*>(&it->second), sizeof(Index64));
     }
 
+    const Index64 grouplength = Index64(mGroupMap.size());
+    os.write(reinterpret_cast<const char*>(&grouplength), sizeof(Index64));
+
+    NameToPosMap::const_iterator groupIt = mGroupMap.begin(), endGroupIt = mGroupMap.end();
+    for (; groupIt != endGroupIt; ++groupIt) {
+        writeString(os, groupIt->first);
+        os.write(reinterpret_cast<const char*>(&groupIt->second), sizeof(Index64));
+    }
+
     mMetadata.writeMeta(os);
 }
 
@@ -938,6 +947,15 @@ AttributeSet::Descriptor::read(std::istream& is)
         nameAndOffset.first = readString(is);
         is.read(reinterpret_cast<char*>(&nameAndOffset.second), sizeof(Index64));
         mNameMap.insert(nameAndOffset);
+    }
+
+    Index64 grouplength = 0;
+    is.read(reinterpret_cast<char*>(&grouplength), sizeof(Index64));
+
+    for(Index64 n = 0; n < grouplength; ++n) {
+        nameAndOffset.first = readString(is);
+        is.read(reinterpret_cast<char*>(&nameAndOffset.second), sizeof(Index64));
+        mGroupMap.insert(nameAndOffset);
     }
 
     mMetadata.readMeta(is);

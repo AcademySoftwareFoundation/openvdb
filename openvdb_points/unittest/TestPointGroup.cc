@@ -303,6 +303,54 @@ TestPointGroup::testSet()
 
     CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(6));
     CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "test"), Index64(4));
+
+    { // IO
+        // setup temp directory
+
+        std::string tempDir(std::getenv("TMPDIR"));
+        if (tempDir.empty())    tempDir = P_tmpdir;
+
+        std::string filename;
+
+        // write out grid to a temp file
+        {
+            filename = tempDir + "/openvdb_test_point_load";
+
+            io::File fileOut(filename);
+
+            GridCPtrVec grids;
+            grids.push_back(grid);
+
+            fileOut.write(grids);
+        }
+
+        // read test groups
+        {
+            io::File fileIn(filename);
+            fileIn.open();
+
+            GridPtrVecPtr grids = fileIn.getGrids();
+
+            fileIn.close();
+
+            CPPUNIT_ASSERT_EQUAL(grids->size(), size_t(1));
+
+            PointDataGrid::Ptr inputGrid = GridBase::grid<PointDataGrid>((*grids)[0]);
+            PointDataTree& tree = inputGrid->tree();
+
+            CPPUNIT_ASSERT(tree.cbeginLeaf());
+
+            const PointDataGrid::TreeType::LeafNodeType& leaf = *tree.cbeginLeaf();
+
+            const AttributeSet::Descriptor& descriptor = leaf.attributeSet().descriptor();
+
+            CPPUNIT_ASSERT(descriptor.hasGroup("test"));
+            CPPUNIT_ASSERT_EQUAL(descriptor.groupMap().size(), size_t(1));
+
+            CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(6));
+            CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "test"), Index64(4));
+        }
+    }
 }
 
 
