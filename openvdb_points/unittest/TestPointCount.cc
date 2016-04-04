@@ -67,11 +67,13 @@ using openvdb::Index64;
 void
 TestPointCount::testCount()
 {
+    using namespace openvdb;
     using namespace openvdb::tools;
 
     // create a tree and check there are no points
 
-    PointDataTree tree;
+    PointDataGrid::Ptr grid = createGrid<PointDataGrid>();
+    PointDataTree& tree = grid->tree();
 
     CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(0));
 
@@ -210,6 +212,13 @@ TestPointCount::testGroup()
     PointDataGrid::Ptr grid = createPointDataGrid<PointDataGrid>(positions, AttributeVec3s::attributeType(), *transform);
     PointDataTree& tree = grid->tree();
 
+    // setup temp directory
+
+    std::string tempDir(std::getenv("TMPDIR"));
+    if (tempDir.empty())    tempDir = P_tmpdir;
+
+    std::string filename;
+
     // check one leaf
     CPPUNIT_ASSERT_EQUAL(tree.leafCount(), Index32(1));
 
@@ -302,6 +311,59 @@ TestPointCount::testGroup()
         CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(4));
         CPPUNIT_ASSERT_EQUAL(activePointCount(tree), Index64(3));
         CPPUNIT_ASSERT_EQUAL(inactivePointCount(tree), Index64(1));
+
+        // write out grid to a temp file
+        {
+            filename = tempDir + "/openvdb_test_point_load";
+
+            io::File fileOut(filename);
+
+            GridCPtrVec grids;
+            grids.push_back(grid);
+
+            fileOut.write(grids);
+        }
+
+        // test point count of a delay-loaded grid
+        {
+            io::File fileIn(filename);
+            fileIn.open();
+
+            GridPtrVecPtr grids = fileIn.getGrids();
+
+            fileIn.close();
+
+            CPPUNIT_ASSERT_EQUAL(grids->size(), size_t(1));
+
+            PointDataGrid::Ptr inputGrid = GridBase::grid<PointDataGrid>((*grids)[0]);
+
+            CPPUNIT_ASSERT(inputGrid);
+
+            PointDataTree& inputTree = inputGrid->tree();
+
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, /*inCoreOnly=*/true), Index64(0));
+            CPPUNIT_ASSERT_EQUAL(activePointCount(inputTree, /*inCoreOnly=*/true), Index64(0));
+            CPPUNIT_ASSERT_EQUAL(inactivePointCount(inputTree, /*inCoreOnly=*/true), Index64(0));
+            CPPUNIT_ASSERT_EQUAL(groupPointCount(inputTree, "test", /*inCoreOnly=*/true), Index64(0));
+            CPPUNIT_ASSERT_EQUAL(activeGroupPointCount(inputTree, "test", /*inCoreOnly=*/true), Index64(0));
+            CPPUNIT_ASSERT_EQUAL(inactiveGroupPointCount(inputTree, "test", /*inCoreOnly=*/true), Index64(0));
+#else
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, /*inCoreOnly=*/true), Index64(4));
+            CPPUNIT_ASSERT_EQUAL(activePointCount(inputTree, /*inCoreOnly=*/true), Index64(3));
+            CPPUNIT_ASSERT_EQUAL(inactivePointCount(inputTree, /*inCoreOnly=*/true), Index64(1));
+            CPPUNIT_ASSERT_EQUAL(groupPointCount(inputTree, "test", /*inCoreOnly=*/true), Index64(2));
+            CPPUNIT_ASSERT_EQUAL(activeGroupPointCount(inputTree, "test", /*inCoreOnly=*/true), Index64(1));
+            CPPUNIT_ASSERT_EQUAL(inactiveGroupPointCount(inputTree, "test", /*inCoreOnly=*/true), Index64(1));
+#endif
+
+            CPPUNIT_ASSERT_EQUAL(pointCount(inputTree, /*inCoreOnly=*/false), Index64(4));
+            CPPUNIT_ASSERT_EQUAL(activePointCount(inputTree, /*inCoreOnly=*/false), Index64(3));
+            CPPUNIT_ASSERT_EQUAL(inactivePointCount(inputTree, /*inCoreOnly=*/false), Index64(1));
+            CPPUNIT_ASSERT_EQUAL(groupPointCount(inputTree, "test", /*inCoreOnly=*/false), Index64(2));
+            CPPUNIT_ASSERT_EQUAL(activeGroupPointCount(inputTree, "test", /*inCoreOnly=*/false), Index64(1));
+            CPPUNIT_ASSERT_EQUAL(inactiveGroupPointCount(inputTree, "test", /*inCoreOnly=*/false), Index64(1));
+        }
 
         // update the value mask and confirm point counts once again
 

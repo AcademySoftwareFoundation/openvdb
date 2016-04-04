@@ -57,41 +57,47 @@ namespace tools {
 
 /// @brief Total points in the PointDataTree
 /// @param tree PointDataTree.
+/// @param inCoreOnly if true, points in out-of-core leaf nodes are not counted
 template <typename PointDataTreeT>
-Index64 pointCount(const PointDataTreeT& tree);
+Index64 pointCount(const PointDataTreeT& tree, const bool inCoreOnly = false);
 
 
 /// @brief Total active points in the PointDataTree
 /// @param tree PointDataTree.
+/// @param inCoreOnly if true, points in out-of-core leaf nodes are not counted
 template <typename PointDataTreeT>
-Index64 activePointCount(const PointDataTreeT& tree);
+Index64 activePointCount(const PointDataTreeT& tree, const bool inCoreOnly = false);
 
 
 /// @brief Total inactive points in the PointDataTree
 /// @param tree PointDataTree.
+/// @param inCoreOnly if true, points in out-of-core leaf nodes are not counted
 template <typename PointDataTreeT>
-Index64 inactivePointCount(const PointDataTreeT& tree);
+Index64 inactivePointCount(const PointDataTreeT& tree, const bool inCoreOnly = false);
 
 
 /// @brief Total points in the group in the PointDataTree
 /// @param tree PointDataTree.
 /// @param name group name.
+/// @param inCoreOnly if true, points in out-of-core leaf nodes are not counted
 template <typename PointDataTreeT>
-Index64 groupPointCount(const PointDataTreeT& tree, const Name& name);
+Index64 groupPointCount(const PointDataTreeT& tree, const Name& name, const bool inCoreOnly = false);
 
 
 /// @brief Total active points in the group in the PointDataTree
 /// @param tree PointDataTree.
 /// @param name group name.
+/// @param inCoreOnly if true, points in out-of-core leaf nodes are not counted
 template <typename PointDataTreeT>
-Index64 activeGroupPointCount(const PointDataTreeT& tree, const Name& name);
+Index64 activeGroupPointCount(const PointDataTreeT& tree, const Name& name, const bool inCoreOnly = false);
 
 
 /// @brief Total inactive points in the group in the PointDataTree
 /// @param tree PointDataTree.
 /// @param name group name.
+/// @param inCoreOnly if true, points in out-of-core leaf nodes are not counted
 template <typename PointDataTreeT>
-Index64 inactiveGroupPointCount(const PointDataTreeT& tree, const Name& name);
+Index64 inactiveGroupPointCount(const PointDataTreeT& tree, const Name& name, const bool inCoreOnly = false);
 
 
 ////////////////////////////////////////
@@ -110,12 +116,17 @@ struct PointCountOp
     typedef typename FilterFromLeafT::Filter                    Filter;
     typedef FilterIndexIter<IndexIterator, Filter>              Iterator;
 
-    PointCountOp(const FilterFromLeafT& filterFromLeaf)
-        : mFilterFromLeaf(filterFromLeaf) { }
+    PointCountOp(const FilterFromLeafT& filterFromLeaf,
+                 const bool inCoreOnly = false)
+        : mFilterFromLeaf(filterFromLeaf)
+        , mInCoreOnly(inCoreOnly) { }
 
     Index64 operator()(const typename LeafManagerT::LeafRange& range, Index64 size) const {
 
         for (typename LeafManagerT::LeafRange::Iterator leaf = range.begin(); leaf; ++leaf) {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+            if (mInCoreOnly && leaf->buffer().isOutOfCore())     continue;
+#endif
             IndexIterator indexIterator(IndexIteratorFromLeafT::begin(*leaf));
             Filter filter(mFilterFromLeaf.fromLeaf(*leaf));
             Iterator iter(indexIterator, filter);
@@ -131,45 +142,50 @@ struct PointCountOp
 
 private:
     const FilterFromLeafT& mFilterFromLeaf;
+    const bool mInCoreOnly;
 }; // struct PointCountOp
 
 
 template <typename PointDataTreeT, typename FilterFromLeafT, typename ValueIterT>
 Index64 threadedFilterPointCount(   const PointDataTreeT& tree,
-                                    const FilterFromLeafT& filterFromLeaf)
+                                    const FilterFromLeafT& filterFromLeaf,
+                                    const bool inCoreOnly = false)
 {
     typedef point_count_internal::PointCountOp< PointDataTreeT, ValueIterT, FilterFromLeafT> PointCountOp;
 
     typename tree::LeafManager<const PointDataTreeT> leafManager(tree);
-    const PointCountOp pointCountOp(filterFromLeaf);
+    const PointCountOp pointCountOp(filterFromLeaf, inCoreOnly);
     return tbb::parallel_reduce(leafManager.leafRange(), Index64(0), pointCountOp, PointCountOp::join);
 }
 
 
 template <typename PointDataTreeT, typename FilterFromLeafT>
 Index64 filterPointCount(const PointDataTreeT& tree,
-                         const FilterFromLeafT& filterFromLeaf)
+                         const FilterFromLeafT& filterFromLeaf,
+                         const bool inCoreOnly = false)
 {
     typedef typename PointDataTreeT::LeafNodeType::ValueAllCIter ValueIterT;
-    return threadedFilterPointCount<  PointDataTreeT, FilterFromLeafT, ValueIterT>(tree, filterFromLeaf);
+    return threadedFilterPointCount<  PointDataTreeT, FilterFromLeafT, ValueIterT>(tree, filterFromLeaf, inCoreOnly);
 }
 
 
 template <typename PointDataTreeT, typename FilterFromLeafT>
 Index64 filterActivePointCount( const PointDataTreeT& tree,
-                                const FilterFromLeafT& filterFromLeaf)
+                                const FilterFromLeafT& filterFromLeaf,
+                                const bool inCoreOnly = false)
 {
     typedef typename PointDataTreeT::LeafNodeType::ValueOnCIter ValueIterT;
-    return threadedFilterPointCount<  PointDataTreeT, FilterFromLeafT, ValueIterT>(tree, filterFromLeaf);
+    return threadedFilterPointCount<  PointDataTreeT, FilterFromLeafT, ValueIterT>(tree, filterFromLeaf, inCoreOnly);
 }
 
 
 template <typename PointDataTreeT, typename FilterFromLeafT>
 Index64 filterInactivePointCount(   const PointDataTreeT& tree,
-                                    const FilterFromLeafT& filterFromLeaf)
+                                    const FilterFromLeafT& filterFromLeaf,
+                                    const bool inCoreOnly = false)
 {
     typedef typename PointDataTreeT::LeafNodeType::ValueOffCIter ValueIterT;
-    return threadedFilterPointCount<  PointDataTreeT, FilterFromLeafT, ValueIterT>(tree, filterFromLeaf);
+    return threadedFilterPointCount<  PointDataTreeT, FilterFromLeafT, ValueIterT>(tree, filterFromLeaf, inCoreOnly);
 }
 
 
@@ -177,10 +193,14 @@ Index64 filterInactivePointCount(   const PointDataTreeT& tree,
 
 
 template <typename PointDataTreeT>
-Index64 pointCount(const PointDataTreeT& tree)
+Index64 pointCount(const PointDataTreeT& tree, const bool inCoreOnly)
 {
+    (void) inCoreOnly;
     Index64 size = 0;
     for (typename PointDataTreeT::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+        if (inCoreOnly && iter->buffer().isOutOfCore())     continue;
+#endif
         size += iter->pointCount();
     }
     return size;
@@ -188,10 +208,14 @@ Index64 pointCount(const PointDataTreeT& tree)
 
 
 template <typename PointDataTreeT>
-Index64 activePointCount(const PointDataTreeT& tree)
+Index64 activePointCount(const PointDataTreeT& tree, const bool inCoreOnly)
 {
+    (void) inCoreOnly;
     Index64 size = 0;
     for (typename PointDataTreeT::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+        if (inCoreOnly && iter->buffer().isOutOfCore())     continue;
+#endif
         size += iter->onPointCount();
     }
     return size;
@@ -199,10 +223,14 @@ Index64 activePointCount(const PointDataTreeT& tree)
 
 
 template <typename PointDataTreeT>
-Index64 inactivePointCount(const PointDataTreeT& tree)
+Index64 inactivePointCount(const PointDataTreeT& tree, const bool inCoreOnly)
 {
+    (void) inCoreOnly;
     Index64 size = 0;
     for (typename PointDataTreeT::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+        if (inCoreOnly && iter->buffer().isOutOfCore())     continue;
+#endif
         size += iter->offPointCount();
     }
     return size;
@@ -210,26 +238,26 @@ Index64 inactivePointCount(const PointDataTreeT& tree)
 
 
 template <typename PointDataTreeT>
-Index64 groupPointCount(const PointDataTreeT& tree, const Name& name)
+Index64 groupPointCount(const PointDataTreeT& tree, const Name& name, const bool inCoreOnly)
 {
     GroupFilterFromLeaf filterFromLeaf(name);
-    return point_count_internal::filterPointCount(tree, filterFromLeaf);
+    return point_count_internal::filterPointCount(tree, filterFromLeaf, inCoreOnly);
 }
 
 
 template <typename PointDataTreeT>
-Index64 activeGroupPointCount(const PointDataTreeT& tree, const Name& name)
+Index64 activeGroupPointCount(const PointDataTreeT& tree, const Name& name, const bool inCoreOnly)
 {
     GroupFilterFromLeaf filterFromLeaf(name);
-    return point_count_internal::filterActivePointCount(tree, filterFromLeaf);
+    return point_count_internal::filterActivePointCount(tree, filterFromLeaf, inCoreOnly);
 }
 
 
 template <typename PointDataTreeT>
-Index64 inactiveGroupPointCount(const PointDataTreeT& tree, const Name& name)
+Index64 inactiveGroupPointCount(const PointDataTreeT& tree, const Name& name, const bool inCoreOnly)
 {
     GroupFilterFromLeaf filterFromLeaf(name);
-    return point_count_internal::filterInactivePointCount(tree, filterFromLeaf);
+    return point_count_internal::filterInactivePointCount(tree, filterFromLeaf, inCoreOnly);
 }
 
 
