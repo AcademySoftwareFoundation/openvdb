@@ -142,43 +142,43 @@ TestUtil::testPagedArray()
 #endif
     
     {//serial PagedArray::push_back (manual)
-        openvdb::util::PagedArray<int, 8UL> d;
+        openvdb::util::PagedArray<int, 8ULL> d;
         CPPUNIT_ASSERT(d.isEmpty());
-        CPPUNIT_ASSERT_EQUAL(0UL, d.size());
-        CPPUNIT_ASSERT_EQUAL(8UL, d.log2PageSize());
-        CPPUNIT_ASSERT_EQUAL(1UL<<d.log2PageSize(), d.pageSize());
-        CPPUNIT_ASSERT_EQUAL(0UL, d.pageCount());
-        CPPUNIT_ASSERT_EQUAL(0UL, d.capacity());
+        CPPUNIT_ASSERT_EQUAL(0ULL, d.size());
+        CPPUNIT_ASSERT_EQUAL(8ULL, d.log2PageSize());
+        CPPUNIT_ASSERT_EQUAL(1ULL<<d.log2PageSize(), d.pageSize());
+        CPPUNIT_ASSERT_EQUAL(0ULL, d.pageCount());
+        CPPUNIT_ASSERT_EQUAL(0ULL, d.capacity());
         
-        CPPUNIT_ASSERT_EQUAL(0UL, d.push_back(10));
+        CPPUNIT_ASSERT_EQUAL(0ULL, d.push_back(10));
         CPPUNIT_ASSERT_EQUAL(10, d[0]);
         CPPUNIT_ASSERT(!d.isEmpty());
-        CPPUNIT_ASSERT_EQUAL(1UL, d.size());
-        CPPUNIT_ASSERT_EQUAL(1UL, d.pageCount());
+        CPPUNIT_ASSERT_EQUAL(1ULL, d.size());
+        CPPUNIT_ASSERT_EQUAL(1ULL, d.pageCount());
         CPPUNIT_ASSERT_EQUAL(d.pageSize(), d.capacity());
 
         CPPUNIT_ASSERT_EQUAL(10, d.pop_back());
         CPPUNIT_ASSERT(d.isEmpty());
-        CPPUNIT_ASSERT_EQUAL(0UL, d.size());
-        CPPUNIT_ASSERT_EQUAL(1UL, d.pageCount());
+        CPPUNIT_ASSERT_EQUAL(0ULL, d.size());
+        CPPUNIT_ASSERT_EQUAL(1ULL, d.pageCount());
         CPPUNIT_ASSERT_EQUAL(d.pageSize(), d.capacity());
-        CPPUNIT_ASSERT_EQUAL(0UL, d.push_back(10));
+        CPPUNIT_ASSERT_EQUAL(0ULL, d.push_back(10));
         
-        CPPUNIT_ASSERT_EQUAL(1UL, d.push_back(1));
-        CPPUNIT_ASSERT_EQUAL(2UL, d.size());
-        CPPUNIT_ASSERT_EQUAL(1UL, d.pageCount());
+        CPPUNIT_ASSERT_EQUAL(1ULL, d.push_back(1));
+        CPPUNIT_ASSERT_EQUAL(2ULL, d.size());
+        CPPUNIT_ASSERT_EQUAL(1ULL, d.pageCount());
         CPPUNIT_ASSERT_EQUAL(d.pageSize(), d.capacity());
 
         for (size_t i=2; i<d.pageSize(); ++i) CPPUNIT_ASSERT_EQUAL(i, d.push_back(int(i)));
         CPPUNIT_ASSERT_EQUAL(d.pageSize(), d.size());
-        CPPUNIT_ASSERT_EQUAL(1UL, d.pageCount());
+        CPPUNIT_ASSERT_EQUAL(1ULL, d.pageCount());
         CPPUNIT_ASSERT_EQUAL(d.pageSize(), d.capacity());
 
         for (int i=2, n=int(d.size()); i<n; ++i) CPPUNIT_ASSERT_EQUAL(i, d[i]);
 
         CPPUNIT_ASSERT_EQUAL(d.pageSize(), d.push_back(1));
         CPPUNIT_ASSERT_EQUAL(d.pageSize()+1, d.size());
-        CPPUNIT_ASSERT_EQUAL(2UL, d.pageCount());
+        CPPUNIT_ASSERT_EQUAL(2ULL, d.pageCount());
         CPPUNIT_ASSERT_EQUAL(2*d.pageSize(), d.capacity());
     }
     {//serial PagedArray::push_back (using Functor)
@@ -191,8 +191,8 @@ TestUtil::testPagedArray()
 #ifdef BENCHMARK_PAGED_ARRAY
         timer.stop();
 #endif
-        CPPUNIT_ASSERT_EQUAL(10UL, d.log2PageSize());
-        CPPUNIT_ASSERT_EQUAL(1UL<<d.log2PageSize(), d.pageSize());
+        CPPUNIT_ASSERT_EQUAL(10ULL, d.log2PageSize());
+        CPPUNIT_ASSERT_EQUAL(1ULL<<d.log2PageSize(), d.pageSize());
         CPPUNIT_ASSERT_EQUAL(problemSize, d.size());
         // pageCount - 1 = max index >> log2PageSize
         CPPUNIT_ASSERT_EQUAL((d.size()-1)>>d.log2PageSize(), d.pageCount()-1);
@@ -209,8 +209,8 @@ TestUtil::testPagedArray()
 #ifdef BENCHMARK_PAGED_ARRAY
         timer.stop();
 #endif
-        CPPUNIT_ASSERT_EQUAL(10UL, d.log2PageSize());
-        CPPUNIT_ASSERT_EQUAL(1UL<<d.log2PageSize(), d.pageSize());
+        CPPUNIT_ASSERT_EQUAL(10ULL, d.log2PageSize());
+        CPPUNIT_ASSERT_EQUAL(1ULL<<d.log2PageSize(), d.pageSize());
         CPPUNIT_ASSERT_EQUAL(problemSize, d.size());
         // pageCount - 1 = max index >> log2PageSize
         CPPUNIT_ASSERT_EQUAL((d.size()-1)>>d.log2PageSize(), d.pageCount()-1);
@@ -227,7 +227,7 @@ TestUtil::testPagedArray()
 
         CPPUNIT_ASSERT_EQUAL(problemSize, d.push_back(1));
         CPPUNIT_ASSERT_EQUAL(problemSize+1, d.size());
-        CPPUNIT_ASSERT_EQUAL(1UL<<d.log2PageSize(), d.pageSize());
+        CPPUNIT_ASSERT_EQUAL(1ULL<<d.log2PageSize(), d.pageSize());
         // pageCount - 1 = max index >> log2PageSize
         CPPUNIT_ASSERT_EQUAL((d.size()-1)>>d.log2PageSize(), d.pageCount()-1);
         CPPUNIT_ASSERT_EQUAL(d.pageCount()*d.pageSize(), d.capacity());
@@ -235,7 +235,7 @@ TestUtil::testPagedArray()
 
     }
     {//parallel PagedArray::push_back
-        typedef openvdb::util::PagedArray<size_t, 3UL> ArrayT;
+        typedef openvdb::util::PagedArray<size_t, 3ULL> ArrayT;
         ArrayT d;
 #ifdef BENCHMARK_PAGED_ARRAY
         timer.start("parallel test 1: Page size of only 8");
@@ -244,8 +244,8 @@ TestUtil::testPagedArray()
 #ifdef BENCHMARK_PAGED_ARRAY
         timer.stop();
 #endif
-        CPPUNIT_ASSERT_EQUAL(3UL, d.log2PageSize());
-        CPPUNIT_ASSERT_EQUAL(1UL<<d.log2PageSize(), d.pageSize());
+        CPPUNIT_ASSERT_EQUAL(3ULL, d.log2PageSize());
+        CPPUNIT_ASSERT_EQUAL(1ULL<<d.log2PageSize(), d.pageSize());
         CPPUNIT_ASSERT_EQUAL(problemSize, d.size());
         // pageCount - 1 = max index >> log2PageSize
         CPPUNIT_ASSERT_EQUAL((d.size()-1)>>d.log2PageSize(), d.pageCount()-1);
@@ -262,7 +262,7 @@ TestUtil::testPagedArray()
 
         CPPUNIT_ASSERT_EQUAL(problemSize, d.push_back(1));
         CPPUNIT_ASSERT_EQUAL(problemSize+1, d.size());
-        CPPUNIT_ASSERT_EQUAL(1UL<<d.log2PageSize(), d.pageSize());
+        CPPUNIT_ASSERT_EQUAL(1ULL<<d.log2PageSize(), d.pageSize());
         // pageCount - 1 = max index >> log2PageSize
         CPPUNIT_ASSERT_EQUAL((d.size()-1)>>d.log2PageSize(), d.pageCount()-1);
         CPPUNIT_ASSERT_EQUAL(d.pageCount()*d.pageSize(), d.capacity());
@@ -286,9 +286,9 @@ TestUtil::testPagedArray()
         CPPUNIT_ASSERT_EQUAL(problemSize, d.size());
 
         std::deque<int> d2;
-        CPPUNIT_ASSERT_EQUAL(0UL, d2.size());
+        CPPUNIT_ASSERT_EQUAL(0ULL, d2.size());
         d2.resize(1234);
-        CPPUNIT_ASSERT_EQUAL(1234UL, d2.size());
+        CPPUNIT_ASSERT_EQUAL(1234ULL, d2.size());
     }
     {//benchmark against a tbb::concurrent_vector::push_back
         timer.start("serial tbb::concurrent_vector::push_back");
@@ -333,10 +333,10 @@ TestUtil::testPagedArray()
         typedef openvdb::util::PagedArray<size_t> ArrayT;
         ArrayT d;
 
-        CPPUNIT_ASSERT_EQUAL(0UL, d.size());
+        CPPUNIT_ASSERT_EQUAL(0ULL, d.size());
         d.resize(problemSize);
         CPPUNIT_ASSERT_EQUAL(problemSize, d.size());
-        CPPUNIT_ASSERT_EQUAL(1UL<<d.log2PageSize(), d.pageSize());
+        CPPUNIT_ASSERT_EQUAL(1ULL<<d.log2PageSize(), d.pageSize());
         // pageCount - 1 = max index >> log2PageSize
         CPPUNIT_ASSERT_EQUAL((problemSize-1)>>d.log2PageSize(), d.pageCount()-1);
         CPPUNIT_ASSERT_EQUAL(d.pageCount()*d.pageSize(), d.capacity());
@@ -351,7 +351,7 @@ TestUtil::testPagedArray()
 #endif
 
         CPPUNIT_ASSERT_EQUAL(problemSize, d.size());
-        CPPUNIT_ASSERT_EQUAL(1UL<<d.log2PageSize(), d.pageSize());
+        CPPUNIT_ASSERT_EQUAL(1ULL<<d.log2PageSize(), d.pageSize());
         CPPUNIT_ASSERT_EQUAL((d.size()-1)>>d.log2PageSize(), d.pageCount()-1);
         CPPUNIT_ASSERT_EQUAL(d.pageCount()*d.pageSize(), d.capacity());
         
@@ -365,7 +365,7 @@ TestUtil::testPagedArray()
 #endif
 
         CPPUNIT_ASSERT_EQUAL(problemSize, d.size());
-        CPPUNIT_ASSERT_EQUAL(1UL<<d.log2PageSize(), d.pageSize());
+        CPPUNIT_ASSERT_EQUAL(1ULL<<d.log2PageSize(), d.pageSize());
         CPPUNIT_ASSERT_EQUAL((d.size()-1)>>d.log2PageSize(), d.pageCount()-1);
         CPPUNIT_ASSERT_EQUAL(d.pageCount()*d.pageSize(), d.capacity());
 
@@ -379,7 +379,7 @@ TestUtil::testPagedArray()
 #endif
 
         CPPUNIT_ASSERT_EQUAL(problemSize, d.size());
-        CPPUNIT_ASSERT_EQUAL(1UL<<d.log2PageSize(), d.pageSize());
+        CPPUNIT_ASSERT_EQUAL(1ULL<<d.log2PageSize(), d.pageSize());
         CPPUNIT_ASSERT_EQUAL((d.size()-1)>>d.log2PageSize(), d.pageCount()-1);
         CPPUNIT_ASSERT_EQUAL(d.pageCount()*d.pageSize(), d.capacity());
 
@@ -393,15 +393,15 @@ TestUtil::testPagedArray()
 #endif
         
         CPPUNIT_ASSERT_EQUAL(problemSize, d.size());
-        CPPUNIT_ASSERT_EQUAL(1UL<<d.log2PageSize(), d.pageSize());
+        CPPUNIT_ASSERT_EQUAL(1ULL<<d.log2PageSize(), d.pageSize());
         CPPUNIT_ASSERT_EQUAL((d.size()-1)>>d.log2PageSize(), d.pageCount()-1);
         CPPUNIT_ASSERT_EQUAL(d.pageCount()*d.pageSize(), d.capacity());
 
         CPPUNIT_ASSERT_EQUAL(problemSize, d.push_back(1));
         CPPUNIT_ASSERT_EQUAL(problemSize+1, d.size());
-        CPPUNIT_ASSERT_EQUAL(1UL<<d.log2PageSize(), d.pageSize());
+        CPPUNIT_ASSERT_EQUAL(1ULL<<d.log2PageSize(), d.pageSize());
         // pageCount - 1 = max index >> log2PageSize
-        CPPUNIT_ASSERT_EQUAL(1UL+(problemSize>>d.log2PageSize()), d.pageCount());
+        CPPUNIT_ASSERT_EQUAL(1ULL+(problemSize>>d.log2PageSize()), d.pageCount());
         CPPUNIT_ASSERT_EQUAL(d.pageCount()*d.pageSize(), d.capacity());
 
         const size_t v = 13;
@@ -411,20 +411,20 @@ TestUtil::testPagedArray()
     {//serial PagedArray::ValueBuffer::push_back
         typedef openvdb::util::PagedArray<size_t> ArrayT;
         ArrayT d;
-        CPPUNIT_ASSERT_EQUAL(0UL, d.size());
+        CPPUNIT_ASSERT_EQUAL(0ULL, d.size());
         {
             ArrayT::ValueBuffer vc(d);
             vc.push_back(1);
             vc.push_back(2);
-            CPPUNIT_ASSERT_EQUAL(0UL, d.size());
+            CPPUNIT_ASSERT_EQUAL(0ULL, d.size());
             vc.flush();
-            CPPUNIT_ASSERT_EQUAL(2UL, d.size());
-            CPPUNIT_ASSERT_EQUAL(1UL, d[0]);
-            CPPUNIT_ASSERT_EQUAL(2UL, d[1]);
+            CPPUNIT_ASSERT_EQUAL(2ULL, d.size());
+            CPPUNIT_ASSERT_EQUAL(1ULL, d[0]);
+            CPPUNIT_ASSERT_EQUAL(2ULL, d[1]);
         }
-        CPPUNIT_ASSERT_EQUAL(2UL, d.size());
-        CPPUNIT_ASSERT_EQUAL(1UL, d[0]);
-        CPPUNIT_ASSERT_EQUAL(2UL, d[1]);
+        CPPUNIT_ASSERT_EQUAL(2ULL, d.size());
+        CPPUNIT_ASSERT_EQUAL(1ULL, d[0]);
+        CPPUNIT_ASSERT_EQUAL(2ULL, d[1]);
     }
     {//parallel PagedArray::push_back followed by parallel sort
         typedef openvdb::util::PagedArray<size_t> ArrayT;
@@ -438,7 +438,7 @@ TestUtil::testPagedArray()
         timer.stop();
 #endif
         CPPUNIT_ASSERT_EQUAL(problemSize, d.size());
-        CPPUNIT_ASSERT_EQUAL(1UL<<d.log2PageSize(), d.pageSize());
+        CPPUNIT_ASSERT_EQUAL(1ULL<<d.log2PageSize(), d.pageSize());
         CPPUNIT_ASSERT_EQUAL((d.size()-1)>>d.log2PageSize(), d.pageCount()-1);
         CPPUNIT_ASSERT_EQUAL(d.pageCount()*d.pageSize(), d.capacity());
 
@@ -468,12 +468,12 @@ TestUtil::testPagedArray()
         timer.stop();
 #endif
         CPPUNIT_ASSERT_EQUAL(problemSize, d.size());
-        CPPUNIT_ASSERT_EQUAL(1UL<<d.log2PageSize(), d.pageSize());
+        CPPUNIT_ASSERT_EQUAL(1ULL<<d.log2PageSize(), d.pageSize());
         CPPUNIT_ASSERT_EQUAL((d.size()-1)>>d.log2PageSize(), d.pageCount()-1);
         CPPUNIT_ASSERT_EQUAL(d.pageCount()*d.pageSize(), d.capacity());
         size_t unsorted = 0;
         for (size_t i=0, n=d.size(); i<n; ++i) unsorted += i != d[i];
-        CPPUNIT_ASSERT_EQUAL(0UL, unsorted);
+        CPPUNIT_ASSERT_EQUAL(0ULL, unsorted);
 
 #ifdef BENCHMARK_PAGED_ARRAY
         timer.start("parallel sort");
@@ -496,7 +496,7 @@ TestUtil::testPagedArray()
         timer.stop();
 #endif
         CPPUNIT_ASSERT_EQUAL(problemSize, d.size());
-        CPPUNIT_ASSERT_EQUAL(1UL<<d.log2PageSize(), d.pageSize());
+        CPPUNIT_ASSERT_EQUAL(1ULL<<d.log2PageSize(), d.pageSize());
         CPPUNIT_ASSERT_EQUAL((d.size()-1)>>d.log2PageSize(), d.pageCount()-1);
         CPPUNIT_ASSERT_EQUAL(d.pageCount()*d.pageSize(), d.capacity());
 
@@ -541,7 +541,7 @@ TestUtil::testPagedArray()
         //std::cerr << "Number of threads for TLS = " << (buffer.end()-buffer.begin()) << std::endl;
         //d.print();
         CPPUNIT_ASSERT_EQUAL(problemSize, d.size());
-        CPPUNIT_ASSERT_EQUAL(1UL<<d.log2PageSize(), d.pageSize());
+        CPPUNIT_ASSERT_EQUAL(1ULL<<d.log2PageSize(), d.pageSize());
         CPPUNIT_ASSERT_EQUAL((d.size()-1)>>d.log2PageSize(), d.pageCount()-1);
         CPPUNIT_ASSERT_EQUAL(d.pageCount()*d.pageSize(), d.capacity());
 
@@ -565,7 +565,7 @@ TestUtil::testPagedArray()
         
         Functor2<ArrayT> t1(0, problemSize, ArrayT::pageSize(), d, true);
         CPPUNIT_ASSERT_EQUAL(problemSize, d.size());
-        CPPUNIT_ASSERT_EQUAL(1UL<<d.log2PageSize(), d.pageSize());
+        CPPUNIT_ASSERT_EQUAL(1ULL<<d.log2PageSize(), d.pageSize());
         CPPUNIT_ASSERT_EQUAL((d.size()-1)>>d.log2PageSize(), d.pageCount()-1);
         CPPUNIT_ASSERT_EQUAL(d.pageCount()*d.pageSize(), d.capacity());
         CPPUNIT_ASSERT(!d.isPartiallyFull());
@@ -576,7 +576,7 @@ TestUtil::testPagedArray()
         //for (size_t i=d.size(), n=i+problemSize; i<n; ++i) d2.push_back(i);
         CPPUNIT_ASSERT(!d2.isPartiallyFull());
         CPPUNIT_ASSERT_EQUAL(problemSize, d2.size());
-        CPPUNIT_ASSERT_EQUAL(1UL<<d2.log2PageSize(), d2.pageSize());
+        CPPUNIT_ASSERT_EQUAL(1ULL<<d2.log2PageSize(), d2.pageSize());
         CPPUNIT_ASSERT_EQUAL((d2.size()-1)>>d2.log2PageSize(), d2.pageCount()-1);
         CPPUNIT_ASSERT_EQUAL(d2.pageCount()*d2.pageSize(), d2.capacity());
 
@@ -595,8 +595,8 @@ TestUtil::testPagedArray()
         //d2.print();
         CPPUNIT_ASSERT_EQUAL(2*problemSize+1, d.size());
         CPPUNIT_ASSERT_EQUAL((d.size()-1)>>d.log2PageSize(), d.pageCount()-1);
-        CPPUNIT_ASSERT_EQUAL(0UL, d2.size());
-        CPPUNIT_ASSERT_EQUAL(0UL, d2.pageCount());
+        CPPUNIT_ASSERT_EQUAL(0ULL, d2.size());
+        CPPUNIT_ASSERT_EQUAL(0ULL, d2.pageCount());
 
 #ifdef BENCHMARK_PAGED_ARRAY
         timer.start("parallel sort of merged array");
