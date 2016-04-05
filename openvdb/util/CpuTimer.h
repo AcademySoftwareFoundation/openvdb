@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -33,7 +33,8 @@
 
 #include <string>
 #include <tbb/tick_count.h>
-#include <sstream>
+#include <sstream>// for ostringstream
+#include <iomanip>//for setprecision
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -41,9 +42,21 @@ namespace OPENVDB_VERSION_NAME {
 namespace util {
 
 /// @brief Simple timer for basic profiling.
+///
 /// @code
-///    Cputimer timer;
-///    timer.start("My algorithm");
+///    CpuTimer timer;
+///    // code here will not be timed!    
+///    timer.start("algorithm");
+///    // code to be timed goes here
+///    timer.stop();
+/// @endcode
+///    
+/// or to time multiple blocks of code    
+///
+/// @code
+///    CpuTimer timer("algorithm 1");
+///    // code to be timed goes here
+///    timer.restart("algorithm 2");
 ///    // code to be timed goes here
 ///    timer.stop();
 /// @endcode
@@ -54,11 +67,18 @@ public:
     /// @brief Initiate timer
     CpuTimer() : mT0(tbb::tick_count::now()) {}
 
-    /// @brief Restart timer
+    /// @brief Prints message and re-start timer.
+    ///
+    /// @note Should normally be followed by a call to stop()
+    CpuTimer(const std::string& msg) { this->start(msg); }
+
+    /// @brief Start timer.
+    ///
     /// @note Should normally be followed by a call to time()
     inline void start() { mT0 = tbb::tick_count::now(); }
 
     /// @brief Print message and re-start timer.
+    ///
     /// @note Should normally be followed by a call to stop()
     inline void start(const std::string& msg)
     {
@@ -66,7 +86,8 @@ public:
         this->start();
     }
 
-    /// @brief Stops previous timer, print message and re-start timer.
+    /// @brief Stop previous timer, print message and re-start timer.
+    ///
     /// @note Should normally be followed by a call to stop()
     inline void restart(const std::string& msg)
     {
@@ -81,7 +102,7 @@ public:
         return 1000.0*dt.seconds();
     }
 
-    /// @brief Prints time in milliseconds since construction or start was called.
+    /// @brief Print time in milliseconds since construction or start was called.
     inline void stop() const
     {
         const double t = this->delta();
@@ -102,6 +123,6 @@ private:
 
 #endif // OPENVDB_UTIL_CPUTIMER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

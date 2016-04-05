@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -40,10 +40,12 @@ public:
     CPPUNIT_TEST_SUITE(TestConjGradient);
     CPPUNIT_TEST(testJacobi);
     CPPUNIT_TEST(testIncompleteCholesky);
+    CPPUNIT_TEST(testVectorDotProduct);
     CPPUNIT_TEST_SUITE_END();
 
     void testJacobi();
     void testIncompleteCholesky();
+    void testVectorDotProduct();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestConjGradient);
@@ -206,6 +208,35 @@ TestConjGradient::testIncompleteCholesky()
     CPPUNIT_ASSERT(x.eq(expected, 1.0e-5));
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+void
+TestConjGradient::testVectorDotProduct()
+{
+    using namespace openvdb;
+
+    typedef math::pcg::Vector<double>  VectorType;
+
+    // Test small vector - runs in series
+    {
+        const size_t length = 1000;
+        VectorType aVec(length, 2.f);
+        VectorType bVec(length, 3.f);
+
+        VectorType::ValueType result = aVec.dot(bVec);
+        
+        CPPUNIT_ASSERT_DOUBLES_EQUAL( result, 6.f * length, 1.e-7);
+    } 
+    // Test long vector  - runs in parallel
+    {
+        const size_t length = 10034502;
+        VectorType aVec(length, 2.f);
+        VectorType bVec(length, 3.f);
+
+        VectorType::ValueType result = aVec.dot(bVec);
+        
+        CPPUNIT_ASSERT_DOUBLES_EQUAL( result, 6.f * length, 1.e-7);
+    } 
+}
+
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

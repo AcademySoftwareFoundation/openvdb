@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -112,6 +112,9 @@ TestDiagnostics::testCheck()
         CPPUNIT_ASSERT(!c(-0.1f));
     }
     {//test CheckRange
+        // first check throw on construction from an invalid range
+        CPPUNIT_ASSERT_THROW(openvdb::tools::CheckRange<openvdb::FloatGrid> c(1.0f, 0.0f),
+                             openvdb::ValueError);
         openvdb::tools::CheckRange<openvdb::FloatGrid> c(0.0f, 1.0f);
         CPPUNIT_ASSERT(!c(0.5f));
         CPPUNIT_ASSERT(!c(0.0f));
@@ -407,6 +410,6 @@ TestDiagnostics::testUniqueInactiveValues()
     CPPUNIT_ASSERT(openvdb::math::isApproxEqual(values[0], 0.0f));
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

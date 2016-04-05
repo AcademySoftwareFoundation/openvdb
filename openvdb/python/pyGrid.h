@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -38,9 +38,16 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/python.hpp>
 #include <boost/type_traits/remove_const.hpp>
+#ifndef DWA_BOOST_VERSION
+#include <boost/version.hpp>
+#define DWA_BOOST_VERSION (10 * BOOST_VERSION)
+#endif
 #ifdef PY_OPENVDB_USE_NUMPY
 #define PY_ARRAY_UNIQUE_SYMBOL PY_OPENVDB_ARRAY_API
 #define NO_IMPORT_ARRAY // NumPy gets initialized during module initialization
+#ifdef NPY_1_7_API_VERSION
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#endif
 #include <arrayobject.h> // for PyArrayObject
 #include "openvdb/tools/MeshToVolume.h"
 #include "openvdb/tools/VolumeToMesh.h" // for tools::volumeToMesh()
@@ -592,7 +599,15 @@ getStatsMetadata(GridBase::ConstPtr grid)
 inline py::object
 getMetadataKeys(GridBase::ConstPtr grid)
 {
-    if (grid) return py::dict(static_cast<const MetaMap&>(*grid)).iterkeys();
+    if (grid) {
+#if PY_MAJOR_VERSION >= 3
+        // Return an iterator over the "keys" view of a dict.
+        return py::import("builtins").attr("iter")(
+            py::dict(static_cast<const MetaMap&>(*grid)).keys());
+#else
+        return py::dict(static_cast<const MetaMap&>(*grid)).iterkeys();
+#endif
+    }
     return py::object();
 }
 
@@ -1028,6 +1043,7 @@ meshToLevelSet(py::object, py::object, py::object, py::object, py::object)
 {
     PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
     boost::python::throw_error_already_set();
+    return typename GridType::Ptr();
 }
 
 template<typename GridType>
@@ -1036,6 +1052,7 @@ volumeToQuadMesh(const GridType&, py::object)
 {
     PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
     boost::python::throw_error_already_set();
+    return py::object();
 }
 
 template<typename GridType>
@@ -1044,6 +1061,7 @@ volumeToMesh(const GridType&, py::object, py::object)
 {
     PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
     boost::python::throw_error_already_set();
+    return py::object();
 }
 
 #else // if defined(PY_OPENVDB_USE_NUMPY)
@@ -1746,6 +1764,7 @@ public:
                 ("the " + gridClassName + " over which to iterate").c_str())
 
             .def("next", &IterWrap::next, ("next() -> " + valueClassName).c_str())
+            .def("__next__", &IterWrap::next, ("__next__() -> " + valueClassName).c_str())
             .def("__iter__", &returnSelf);
 
         py::class_<IterValueProxyT>(
@@ -1835,7 +1854,14 @@ struct PickleSuite: public py::pickle_suite
             }
             // Construct a state tuple comprising the Python object's __dict__
             // and the serialized Grid.
-            state = py::make_tuple(gridObj.attr("__dict__"), ostr.str());
+#if PY_MAJOR_VERSION >= 3
+            // Convert the byte string to a "bytes" sequence.
+            const std::string s = ostr.str();
+            py::object bytesObj = pyutil::pyBorrow(PyBytes_FromStringAndSize(s.data(), s.size()));
+#else
+            py::str bytesObj(ostr.str());
+#endif
+            state = py::make_tuple(gridObj.attr("__dict__"), bytesObj);
         }
         return state;
     }
@@ -1870,15 +1896,35 @@ struct PickleSuite: public py::pickle_suite
 
         std::string serialized;
         if (!badState) {
-            // Extract the string containing the serialized Grid.
-            py::extract<std::string> x(state[1]);
+            // Extract the sequence containing the serialized Grid.
+            py::object bytesObj = state[1];
+#if PY_MAJOR_VERSION >= 3
+            badState = true;
+            if (PyBytes_Check(bytesObj.ptr())) {
+                // Convert the "bytes" sequence to a byte string.
+                char* buf = NULL;
+                Py_ssize_t length = 0;
+                if (-1 != PyBytes_AsStringAndSize(bytesObj.ptr(), &buf, &length)) {
+                    if (buf != NULL && length > 0) {
+                        serialized.assign(buf, buf + length);
+                        badState = false;
+                    }
+                }
+            }
+#else
+            py::extract<std::string> x(bytesObj);
             if (x.check()) serialized = x();
             else badState = true;
+#endif
         }
 
         if (badState) {
             PyErr_SetObject(PyExc_ValueError,
+#if PY_MAJOR_VERSION >= 3
+                ("expected (dict, bytes) tuple in call to __setstate__; found %s"
+#else
                 ("expected (dict, str) tuple in call to __setstate__; found %s"
+#endif
                      % stateObj.attr("__repr__")()).ptr());
             py::throw_error_already_set();
         }
@@ -2260,6 +2306,11 @@ exportGrid()
 
             ; // py::class_<Grid>
 
+#if DWA_BOOST_VERSION >= 1060000
+        // As of Boost 1.60, the GridPtr-to-Python object converter must be explicitly registered.
+        py::register_ptr_to_python<GridPtr>();
+#endif
+
         py::implicitly_convertible<GridPtr, GridBase::Ptr>();
         py::implicitly_convertible<GridPtr, GridBase::ConstPtr>();
         /// @todo Is there a way to implicitly convert GridType references to GridBase
@@ -2293,6 +2344,6 @@ exportGrid()
 
 #endif // OPENVDB_PYGRID_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

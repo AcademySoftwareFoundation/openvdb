@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -499,7 +499,7 @@ public:
     /// Direction need not be unit.
     Mat3 snapBasis(Axis axis, const Vec3<T> &direction)
     {
-        return snapBasis(*this, axis, direction);
+        return snapMatBasis(*this, axis, direction);
     }
 
     /// Return the transformed vector by "this" matrix.
@@ -518,15 +518,6 @@ public:
         return static_cast< Vec3<T0> >(*this * v);
     } // xformTVectorTest
 
-    /// This function snaps a specific axis to a specific direction,
-    /// preserving scaling. It does this using minimum energy, thus
-    /// posing a unique solution if basis & direction arent parralel.
-    /// Direction need not be unit.
-    template<typename T0>
-    Mat3 snappedBasis(Axis axis, const Vec3<T0>& direction) const
-    {
-        return snapBasis(*this, axis, direction);
-    }
 
 private:
     static const Mat3<T> sIdentity;
@@ -816,6 +807,6 @@ bool diagonalizeSymmetricMatrix(const Mat3<T>& input, Mat3<T>& Q, Vec3<T>& D,
 
 #endif // OPENVDB_MATH_MAT3_H_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

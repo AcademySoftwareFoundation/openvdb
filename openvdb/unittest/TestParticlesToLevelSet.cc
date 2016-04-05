@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -87,7 +87,7 @@ protected:
     std::vector<MyParticle> mParticleList;
 public:
 
-    typedef openvdb::Vec3R  value_type;
+    typedef openvdb::Vec3R  PosType;
 
     MyParticleList(openvdb::Real rScale=1, openvdb::Real vScale=1)
         : mRadiusScale(rScale), mVelocityScale(vScale) {}
@@ -452,6 +452,6 @@ TestParticlesToLevelSet::testRasterizeTrailsAndId()
     //this->writeGrid(ls, "testRasterizeTrails");
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -55,18 +55,15 @@ public:
     typedef Int32 ValueType;
     typedef std::numeric_limits<ValueType> Limits;
 
-    Coord()
-        { mVec[0] = mVec[1] = mVec[2] = 0; }
-    explicit Coord(Int32 xyz)
-        { mVec[0] = mVec[1] = mVec[2] = xyz; }
-    Coord(Int32 x, Int32 y, Int32 z)
-        { mVec[0] = x; mVec[1] = y; mVec[2] = z; }
-    explicit Coord(const Vec3i& v)
-        { mVec[0] = v[0]; mVec[1] = v[1]; mVec[2] = v[2]; }
+    Coord() { mVec[0] = mVec[1] = mVec[2] = 0; }
+    explicit Coord(Int32 xyz) { mVec[0] = mVec[1] = mVec[2] = xyz; }
+    Coord(Int32 x, Int32 y, Int32 z) { mVec[0] = x; mVec[1] = y; mVec[2] = z; }
+    explicit Coord(const Vec3i& v) { mVec[0] = v[0]; mVec[1] = v[1]; mVec[2] = v[2]; }
     explicit Coord(const Vec3I& v)
-        { mVec[0] = Int32(v[0]); mVec[1] = Int32(v[1]); mVec[2] = Int32(v[2]); }
-    explicit Coord(const Int32* v)
-        { mVec[0] = v[0]; mVec[1] = v[1]; mVec[2] = v[2]; }
+    {
+        mVec[0] = Int32(v[0]); mVec[1] = Int32(v[1]); mVec[2] = Int32(v[2]);
+    }
+    explicit Coord(const Int32* v) { mVec[0] = v[0]; mVec[1] = v[1]; mVec[2] = v[2]; }
 
     /// @brief Return the smallest possible coordinate
     static Coord min() { return Coord(Limits::min()); }
@@ -77,62 +74,86 @@ public:
     /// @brief Return @a xyz rounded to the closest integer coordinates
     /// (cell centered conversion).
     template<typename T> static Coord round(const Vec3<T>& xyz)
-        { return Coord(Int32(Round(xyz[0])), Int32(Round(xyz[1])), Int32(Round(xyz[2]))); }
+    {
+        return Coord(Int32(Round(xyz[0])), Int32(Round(xyz[1])), Int32(Round(xyz[2])));
+    }
     /// @brief Return the largest integer coordinates that are not greater
     /// than @a xyz (node centered conversion).
     template<typename T> static Coord floor(const Vec3<T>& xyz)
-        { return Coord(Int32(Floor(xyz[0])), Int32(Floor(xyz[1])), Int32(Floor(xyz[2]))); }
+    {
+        return Coord(Int32(Floor(xyz[0])), Int32(Floor(xyz[1])), Int32(Floor(xyz[2])));
+    }
 
     /// @brief Return the largest integer coordinates that are not greater
     /// than @a xyz+1 (node centered conversion).
     template<typename T> static Coord ceil(const Vec3<T>& xyz)
-        { return Coord(Int32(Ceil(xyz[0])), Int32(Ceil(xyz[1])), Int32(Ceil(xyz[2]))); }
+    {
+        return Coord(Int32(Ceil(xyz[0])), Int32(Ceil(xyz[1])), Int32(Ceil(xyz[2])));
+    }
 
     Coord& reset(Int32 x, Int32 y, Int32 z)
-        { mVec[0] = x; mVec[1] = y; mVec[2] = z; this->dirty(); return *this; }
+    {
+        mVec[0] = x; mVec[1] = y; mVec[2] = z;
+        return *this;
+    }
     Coord& reset(Int32 xyz) { return this->reset(xyz, xyz, xyz); }
 
-    Coord& setX(Int32 x) { mVec[0] = x; dirty(); return *this; }
-    Coord& setY(Int32 y) { mVec[1] = y; dirty(); return *this; }
-    Coord& setZ(Int32 z) { mVec[2] = z; dirty(); return *this; }
+    Coord& setX(Int32 x) { mVec[0] = x; return *this; }
+    Coord& setY(Int32 y) { mVec[1] = y; return *this; }
+    Coord& setZ(Int32 z) { mVec[2] = z; return *this; }
 
     Coord& offset(Int32 dx, Int32 dy, Int32 dz)
-        { mVec[0]+=dx; mVec[1]+=dy; mVec[2]+=dz; this->dirty(); return *this; }
+    {
+        mVec[0]+=dx; mVec[1]+=dy; mVec[2]+=dz;
+        return *this;
+    }
     Coord& offset(Int32 n) { return this->offset(n, n, n); }
     Coord offsetBy(Int32 dx, Int32 dy, Int32 dz) const
-        { return Coord(mVec[0] + dx, mVec[1] + dy, mVec[2] + dz); }
+    {
+        return Coord(mVec[0] + dx, mVec[1] + dy, mVec[2] + dz);
+    }
     Coord offsetBy(Int32 n) const { return offsetBy(n, n, n); }
 
     Coord& operator+=(const Coord& rhs)
-        { mVec[0] += rhs[0]; mVec[1] += rhs[1]; mVec[2] += rhs[2]; return *this; }
+    {
+        mVec[0] += rhs[0]; mVec[1] += rhs[1]; mVec[2] += rhs[2];
+        return *this;
+    }
     Coord& operator-=(const Coord& rhs)
-        { mVec[0] -= rhs[0]; mVec[1] -= rhs[1]; mVec[2] -= rhs[2]; return *this; }
+    {
+        mVec[0] -= rhs[0]; mVec[1] -= rhs[1]; mVec[2] -= rhs[2];
+        return *this;
+    }
     Coord operator+(const Coord& rhs) const
-        { return Coord(mVec[0] + rhs[0], mVec[1] + rhs[1], mVec[2] + rhs[2]); }
+    {
+        return Coord(mVec[0] + rhs[0], mVec[1] + rhs[1], mVec[2] + rhs[2]);
+    }
     Coord operator-(const Coord& rhs) const
-        { return Coord(mVec[0] - rhs[0], mVec[1] - rhs[1], mVec[2] - rhs[2]); }
+    {
+        return Coord(mVec[0] - rhs[0], mVec[1] - rhs[1], mVec[2] - rhs[2]);
+    }
     Coord operator-() const { return Coord(-mVec[0], -mVec[1], -mVec[2]); }
 
     Coord  operator>> (size_t n) const { return Coord(mVec[0]>>n, mVec[1]>>n, mVec[2]>>n); }
     Coord  operator<< (size_t n) const { return Coord(mVec[0]<<n, mVec[1]<<n, mVec[2]<<n); }
-    Coord& operator<<=(size_t n) { mVec[0]<<=n; mVec[1]<<=n; mVec[2]<<=n; dirty(); return *this; }
-    Coord& operator>>=(size_t n) { mVec[0]>>=n; mVec[1]>>=n; mVec[2]>>=n; dirty(); return *this; }
+    Coord& operator<<=(size_t n) { mVec[0]<<=n; mVec[1]<<=n; mVec[2]<<=n; return *this; }
+    Coord& operator>>=(size_t n) { mVec[0]>>=n; mVec[1]>>=n; mVec[2]>>=n; return *this; }
     Coord  operator&  (Int32 n) const { return Coord(mVec[0] & n, mVec[1] & n, mVec[2] & n); }
     Coord  operator|  (Int32 n) const { return Coord(mVec[0] | n, mVec[1] | n, mVec[2] | n); }
-    Coord& operator&= (Int32 n) { mVec[0]&=n; mVec[1]&=n; mVec[2]&=n; dirty(); return *this; }
-    Coord& operator|= (Int32 n) { mVec[0]|=n; mVec[1]|=n; mVec[2]|=n; dirty(); return *this; }
+    Coord& operator&= (Int32 n) { mVec[0]&=n; mVec[1]&=n; mVec[2]&=n; return *this; }
+    Coord& operator|= (Int32 n) { mVec[0]|=n; mVec[1]|=n; mVec[2]|=n; return *this; }
 
     Int32 x() const { return mVec[0]; }
     Int32 y() const { return mVec[1]; }
     Int32 z() const { return mVec[2]; }
     Int32 operator[](size_t i) const { assert(i < 3); return mVec[i]; }
-    Int32& x() { dirty(); return mVec[0]; }
-    Int32& y() { dirty(); return mVec[1]; }
-    Int32& z() { dirty(); return mVec[2]; }
-    Int32& operator[](size_t i) { assert(i < 3); dirty(); return mVec[i]; }
+    Int32& x() { return mVec[0]; }
+    Int32& y() { return mVec[1]; }
+    Int32& z() { return mVec[2]; }
+    Int32& operator[](size_t i) { assert(i < 3); return mVec[i]; }
 
     const Int32* asPointer() const { return mVec; }
-    Int32* asPointer() { dirty(); return mVec; }
+    Int32* asPointer() { return mVec; }
     Vec3d asVec3d() const { return Vec3d(double(mVec[0]), double(mVec[1]), double(mVec[2])); }
     Vec3s asVec3s() const { return Vec3s(float(mVec[0]), float(mVec[1]), float(mVec[2])); }
     Vec3i asVec3i() const { return Vec3i(mVec); }
@@ -140,7 +161,9 @@ public:
     void asXYZ(Int32& x, Int32& y, Int32& z) const { x = mVec[0]; y = mVec[1]; z = mVec[2]; }
 
     bool operator==(const Coord& rhs) const
-        { return (mVec[0] == rhs.mVec[0] && mVec[1] == rhs.mVec[1] && mVec[2] == rhs.mVec[2]); }
+    {
+        return (mVec[0] == rhs.mVec[0] && mVec[1] == rhs.mVec[1] && mVec[2] == rhs.mVec[2]);
+    }
     bool operator!=(const Coord& rhs) const { return !(*this == rhs); }
 
     /// Lexicographic less than
@@ -161,8 +184,6 @@ public:
     bool operator>(const Coord& rhs) const { return !(*this <= rhs); }
     /// Lexicographic greater than or equal to
     bool operator>=(const Coord& rhs) const { return !(*this < rhs); }
-
-    //HashType hash() { if (!mHash) { mHash = ...; } return mHash; }
 
     /// Perform a component-wise minimum with the other Coord.
     void minComponent(const Coord& other)
@@ -195,6 +216,9 @@ public:
                      std::max(lhs.y(), rhs.y()),
                      std::max(lhs.z(), rhs.z()));
     }
+    
+    /// Return true if any of the components of @a a are smaller than the
+    /// corresponding components of @a b.
     static inline bool lessThan(const Coord& a, const Coord& b)
     {
             return (a[0] < b[0] || a[1] < b[1] || a[2] < b[2]);
@@ -208,14 +232,13 @@ public:
 
     void read(std::istream& is) { is.read(reinterpret_cast<char*>(mVec), sizeof(mVec)); }
     void write(std::ostream& os) const
-        { os.write(reinterpret_cast<const char*>(mVec), sizeof(mVec)); }
+    {
+        os.write(reinterpret_cast<const char*>(mVec), sizeof(mVec));
+    }
 
 private:
-    //no-op for now
-    void dirty() { /*mHash.clear();*/ }
 
     Int32 mVec[3];
-    //HashType mHash;
 }; // class Coord
 
 
@@ -439,6 +462,6 @@ operator<<(std::ostream& os, const CoordBBox& b)
 
 #endif // OPENVDB_MATH_COORD_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

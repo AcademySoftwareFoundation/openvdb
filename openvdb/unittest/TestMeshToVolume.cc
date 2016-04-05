@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -43,19 +43,14 @@ class TestMeshToVolume: public CppUnit::TestCase
 public:
     CPPUNIT_TEST_SUITE(TestMeshToVolume);
     CPPUNIT_TEST(testUtils);
-    CPPUNIT_TEST(testVoxelizer);
-    CPPUNIT_TEST(testPrimitiveVoxelRatio);
-    CPPUNIT_TEST(testIntersectingVoxelCleaner);
-    CPPUNIT_TEST(testShellVoxelCleaner);
     CPPUNIT_TEST(testConversion);
+    CPPUNIT_TEST(testCreateLevelSetBox);
     CPPUNIT_TEST_SUITE_END();
 
     void testUtils();
-    void testVoxelizer();
-    void testPrimitiveVoxelRatio();
-    void testIntersectingVoxelCleaner();
-    void testShellVoxelCleaner();
     void testConversion();
+    void testCreateLevelSetBox();
+
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestMeshToVolume);
@@ -105,240 +100,6 @@ TestMeshToVolume::testUtils()
     CPPUNIT_ASSERT( mZ == 9);
 }
 
-
-void
-TestMeshToVolume::testVoxelizer()
-{
-    std::vector<openvdb::Vec3s> pointList;
-    std::vector<openvdb::Vec4I> polygonList;
-
-    typedef openvdb::tools::internal::MeshVoxelizer<openvdb::FloatTree> MeshVoxelizer;
-
-    // CASE 1: One triangle
-
-    pointList.push_back(openvdb::Vec3s(0.0, 0.0, 0.0));
-    pointList.push_back(openvdb::Vec3s(0.0, 0.0, 3.0));
-    pointList.push_back(openvdb::Vec3s(0.0, 3.0, 0.0));
-
-    polygonList.push_back(openvdb::Vec4I(0, 1, 2, openvdb::util::INVALID_IDX));
-
-    {
-        MeshVoxelizer voxelizer(pointList, polygonList);
-        voxelizer.run();
-
-        // Check for mesh intersecting voxels
-        CPPUNIT_ASSERT(13== voxelizer.intersectionTree().activeVoxelCount());
-
-        // topologically unique voxels.
-        CPPUNIT_ASSERT(99 == voxelizer.sqrDistTree().activeVoxelCount());
-        CPPUNIT_ASSERT(99 == voxelizer.primIndexTree().activeVoxelCount());
-    }
-
-    // CASE 2: Two triangles
-
-    pointList.push_back(openvdb::Vec3s(0.0, 3.0, 3.0));
-    polygonList.push_back(openvdb::Vec4I(1, 3, 2, openvdb::util::INVALID_IDX));
-
-    {
-        MeshVoxelizer voxelizer(pointList, polygonList);
-        voxelizer.run();
-
-        // Check for mesh intersecting voxels
-        CPPUNIT_ASSERT(16 == voxelizer.intersectionTree().activeVoxelCount());
-
-        // topologically unique voxels.
-        CPPUNIT_ASSERT(108 == voxelizer.sqrDistTree().activeVoxelCount());
-        CPPUNIT_ASSERT(108 == voxelizer.primIndexTree().activeVoxelCount());
-    }
-
-    // CASE 3: One quad
-
-    polygonList.clear();
-    polygonList.push_back(openvdb::Vec4I(0, 1, 3, 2));
-
-    {
-        MeshVoxelizer voxelizer(pointList, polygonList);
-        voxelizer.run();
-
-        // Check for mesh intersecting voxels
-        CPPUNIT_ASSERT(16 == voxelizer.intersectionTree().activeVoxelCount());
-
-        // topologically unique voxels.
-        CPPUNIT_ASSERT(108 == voxelizer.sqrDistTree().activeVoxelCount());
-        CPPUNIT_ASSERT(108 == voxelizer.primIndexTree().activeVoxelCount());
-    }
-
-    // CASE 4: Two triangles and one quad
-
-    pointList.push_back(openvdb::Vec3s(0.0, 0.0, 6.0));
-    pointList.push_back(openvdb::Vec3s(0.0, 3.0, 6.0));
-
-    polygonList.clear();
-    polygonList.push_back(openvdb::Vec4I(0, 1, 2, openvdb::util::INVALID_IDX));
-    polygonList.push_back(openvdb::Vec4I(1, 3, 2, openvdb::util::INVALID_IDX));
-    polygonList.push_back(openvdb::Vec4I(1, 4, 5, 3));
-
-    {
-        MeshVoxelizer voxelizer(pointList, polygonList);
-        voxelizer.run();
-
-        // Check for 28 mesh intersecting voxels
-        CPPUNIT_ASSERT(28 == voxelizer.intersectionTree().activeVoxelCount());
-
-        // 154 topologically unique voxels.
-        CPPUNIT_ASSERT(162 == voxelizer.sqrDistTree().activeVoxelCount());
-        CPPUNIT_ASSERT(162 == voxelizer.primIndexTree().activeVoxelCount());
-    }
-}
-
-
-void
-TestMeshToVolume::testPrimitiveVoxelRatio()
-{
-    std::vector<openvdb::Vec3s> pointList;
-    std::vector<openvdb::Vec4I> polygonList;
-
-    // Create one big triangle
-    pointList.push_back(openvdb::Vec3s(0.0, 0.0, 0.0));
-    pointList.push_back(openvdb::Vec3s(0.0, 0.0, 250.0));
-    pointList.push_back(openvdb::Vec3s(0.0, 100.0, 0.0));
-
-    polygonList.push_back(openvdb::Vec4I(0, 1, 2, openvdb::util::INVALID_IDX));
-
-    openvdb::tools::internal::MeshVoxelizer<openvdb::FloatTree>
-        voxelizer(pointList, polygonList);
-
-    voxelizer.run();
-
-    CPPUNIT_ASSERT(0 != voxelizer.intersectionTree().activeVoxelCount());
-}
-
-
-void
-TestMeshToVolume::testIntersectingVoxelCleaner()
-{
-    // Empty tree's
-
-    openvdb::FloatTree distTree(std::numeric_limits<float>::max());
-    openvdb::BoolTree intersectionTree(false);
-    openvdb::Int32Tree indexTree(openvdb::util::INVALID_IDX);
-
-    openvdb::tree::ValueAccessor<openvdb::FloatTree> distAcc(distTree);
-    openvdb::tree::ValueAccessor<openvdb::BoolTree> intersectionAcc(intersectionTree);
-    openvdb::tree::ValueAccessor<openvdb::Int32Tree> indexAcc(indexTree);
-
-    // Add a row of intersecting voxels surrounded by both positive and negative distance values.
-    for (int i = 0; i < 10; ++i) {
-        for (int j = -1; j < 2; ++j) {
-            distAcc.setValue(openvdb::Coord(i,j,0), (float)j);
-            indexAcc.setValue(openvdb::Coord(i,j,0), 10);
-        }
-        intersectionAcc.setValue(openvdb::Coord(i,0,0), 1);
-    }
-
-    openvdb::Index64
-        numSDFVoxels = distTree.activeVoxelCount(),
-        numIVoxels = intersectionTree.activeVoxelCount(),
-        numCPVoxels = indexTree.activeVoxelCount();
-
-    {
-        openvdb::tree::LeafManager<openvdb::BoolTree> leafs(intersectionTree);
-
-        openvdb::tools::internal::IntersectingVoxelCleaner<openvdb::FloatTree>
-            cleaner(distTree, indexTree, intersectionTree, leafs);
-
-        cleaner.run();
-    }
-
-    CPPUNIT_ASSERT_EQUAL(numSDFVoxels, distTree.activeVoxelCount());
-    CPPUNIT_ASSERT_EQUAL(numIVoxels, intersectionTree.activeVoxelCount());
-    CPPUNIT_ASSERT_EQUAL(numCPVoxels, indexTree.activeVoxelCount());
-
-
-    // Add a row of intersecting voxels that are not surrounded by any positive distance values.
-    for (int i = 0; i < 10; ++i) {
-        for (int j = -1; j < 2; ++j) {
-            distAcc.setValue(openvdb::Coord(i,j,0), -1.0);
-            indexAcc.setValue(openvdb::Coord(i,j,0), 10);
-        }
-        intersectionAcc.setValue(openvdb::Coord(i,0,0), 1);
-    }
-
-    numIVoxels = 0;
-
-    {
-        openvdb::tree::LeafManager<openvdb::BoolTree> leafs(intersectionTree);
-
-        openvdb::tools::internal::IntersectingVoxelCleaner<openvdb::FloatTree>
-            cleaner(distTree, indexTree, intersectionTree, leafs);
-
-        cleaner.run();
-    }
-
-    CPPUNIT_ASSERT_EQUAL(numSDFVoxels, distTree.activeVoxelCount());
-    CPPUNIT_ASSERT_EQUAL(numIVoxels, intersectionTree.activeVoxelCount());
-    CPPUNIT_ASSERT_EQUAL(numCPVoxels, indexTree.activeVoxelCount());
-}
-
-
-void
-TestMeshToVolume::testShellVoxelCleaner()
-{
-    // Empty tree's
-
-    openvdb::FloatTree distTree(std::numeric_limits<float>::max());
-    openvdb::BoolTree intersectionTree(false);
-    openvdb::Int32Tree indexTree(openvdb::util::INVALID_IDX);
-
-    openvdb::tree::ValueAccessor<openvdb::FloatTree> distAcc(distTree);
-    openvdb::tree::ValueAccessor<openvdb::BoolTree> intersectionAcc(intersectionTree);
-    openvdb::tree::ValueAccessor<openvdb::Int32Tree> indexAcc(indexTree);
-
-    /// Add a row of intersecting voxels surrounded by negative distance values.
-    for (int i = 0; i < 10; ++i) {
-        for (int j = -1; j < 2; ++j) {
-            distAcc.setValue(openvdb::Coord(i,j,0), -1.0);
-            indexAcc.setValue(openvdb::Coord(i,j,0), 10);
-        }
-        intersectionAcc.setValue(openvdb::Coord(i,0,0), 1);
-    }
-
-    openvdb::Index64
-        numSDFVoxels = distTree.activeVoxelCount(),
-        numIVoxels = intersectionTree.activeVoxelCount(),
-        numCPVoxels = indexTree.activeVoxelCount();
-
-    {
-        openvdb::tree::LeafManager<openvdb::FloatTree> leafs(distTree);
-
-        openvdb::tools::internal::ShellVoxelCleaner<openvdb::FloatTree>
-            cleaner(distTree, leafs, indexTree, intersectionTree);
-
-        cleaner.run();
-    }
-
-    CPPUNIT_ASSERT_EQUAL(numSDFVoxels, distTree.activeVoxelCount());
-    CPPUNIT_ASSERT_EQUAL(numIVoxels, intersectionTree.activeVoxelCount());
-    CPPUNIT_ASSERT_EQUAL(numCPVoxels, indexTree.activeVoxelCount());
-
-    intersectionTree.clear();
-
-    {
-        openvdb::tree::LeafManager<openvdb::FloatTree> leafs(distTree);
-
-        openvdb::tools::internal::ShellVoxelCleaner<openvdb::FloatTree>
-            cleaner(distTree, leafs, indexTree, intersectionTree);
-
-        cleaner.run();
-    }
-
-    const openvdb::Index64 zero(0);
-    CPPUNIT_ASSERT_EQUAL(zero, distTree.activeVoxelCount());
-    CPPUNIT_ASSERT_EQUAL(zero, intersectionTree.activeVoxelCount());
-    CPPUNIT_ASSERT_EQUAL(zero, indexTree.activeVoxelCount());;
-}
-
-
 void
 TestMeshToVolume::testConversion()
 {
@@ -365,17 +126,50 @@ TestMeshToVolume::testConversion()
     quads.push_back(Vec4I(2, 3, 7, 6)); // top
     quads.push_back(Vec4I(0, 4, 5, 1)); // bottom
 
-    FloatGrid::Ptr grid = tools::meshToLevelSet<FloatGrid>(
-        *math::Transform::createLinearTransform(), points, quads);
+    math::Transform::Ptr xform = math::Transform::createLinearTransform();
 
-    //io::File("testConversion.vdb").write(GridPtrVec(1, grid));
+    tools::QuadAndTriangleDataAdapter<Vec3s, Vec4I> mesh(points, quads);
+
+    FloatGrid::Ptr grid = tools::meshToVolume<FloatGrid>(mesh, *xform);
 
     CPPUNIT_ASSERT(grid.get() != NULL);
     CPPUNIT_ASSERT_EQUAL(int(GRID_LEVEL_SET), int(grid->getGridClass()));
     CPPUNIT_ASSERT_EQUAL(1, int(grid->baseTree().leafCount()));
-    /// @todo validate output
+
+    grid = tools::meshToLevelSet<FloatGrid>(*xform, points, quads);
+
+    CPPUNIT_ASSERT(grid.get() != NULL);
+    CPPUNIT_ASSERT_EQUAL(int(GRID_LEVEL_SET), int(grid->getGridClass()));
+    CPPUNIT_ASSERT_EQUAL(1, int(grid->baseTree().leafCount()));
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+
+void
+TestMeshToVolume::testCreateLevelSetBox()
+{
+    typedef openvdb::FloatGrid          FloatGrid;
+    typedef openvdb::Vec3s              Vec3s;
+    typedef openvdb::math::BBox<Vec3s>  BBoxs;
+    typedef openvdb::math::Transform    Transform;
+
+    BBoxs bbox(Vec3s(0.0, 0.0, 0.0), Vec3s(1.0, 1.0, 1.0));
+
+    Transform::Ptr transform = Transform::createLinearTransform(0.1);
+
+    FloatGrid::Ptr grid = openvdb::tools::createLevelSetBox<FloatGrid>(bbox, *transform);
+
+    CPPUNIT_ASSERT(grid->tree().leafCount() > 0);
+
+    // test inside coord value
+    openvdb::Coord ijk = transform->worldToIndexNodeCentered(openvdb::Vec3d(0.5, 0.5, 0.5));
+    CPPUNIT_ASSERT(grid->tree().getValue(ijk) < 0.0f);
+
+    // test outside coord value
+    ijk = transform->worldToIndexNodeCentered(openvdb::Vec3d(1.5, 1.5, 1.5));
+    CPPUNIT_ASSERT(grid->tree().getValue(ijk) > 0.0f);
+}
+
+
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

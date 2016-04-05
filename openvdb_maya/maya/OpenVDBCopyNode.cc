@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -183,10 +183,10 @@ MStatus OpenVDBCopyNode::compute(const MPlug& plug, MDataBlock& data)
             return MS::kFailure;
         }
 
-        std::auto_ptr<OpenVDBData> outputVdb(static_cast<OpenVDBData*>(pluginData.data(&status)));
+        OpenVDBData* outputVdb = static_cast<OpenVDBData*>(pluginData.data(&status));
         MDataHandle output = data.outputValue(aVdbOutput);
 
-        if (inputVdbA && outputVdb.get()) {
+        if (inputVdbA && outputVdb) {
 
             const std::string selectionStr =
                 data.inputValue(aVdbSelectedGridNamesA, &status).asString().asChar();
@@ -199,7 +199,7 @@ MStatus OpenVDBCopyNode::compute(const MPlug& plug, MDataBlock& data)
             }
         }
 
-        if (inputVdbB && outputVdb.get()) {
+        if (inputVdbB && outputVdb) {
 
             const std::string selectionStr =
                 data.inputValue(aVdbSelectedGridNamesB, &status).asString().asChar();
@@ -212,7 +212,7 @@ MStatus OpenVDBCopyNode::compute(const MPlug& plug, MDataBlock& data)
             }
         }
 
-        output.set(outputVdb.release());
+        output.set(outputVdb);
         return data.setClean(plug);
 
     }
@@ -220,6 +220,6 @@ MStatus OpenVDBCopyNode::compute(const MPlug& plug, MDataBlock& data)
     return MS::kUnknownParameter;
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

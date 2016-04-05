@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2014 DreamWorks Animation LLC
+# Copyright (c) 2012-2015 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -310,7 +310,6 @@ INCLUDE_NAMES := \
     math/Coord.h \
     math/DDA.h \
     math/FiniteDifference.h \
-    math/Hermite.h \
     math/LegacyFrustum.h \
     math/Maps.h \
     math/Mat.h \
@@ -355,11 +354,14 @@ INCLUDE_NAMES := \
     tools/LevelSetSphere.h \
     tools/LevelSetTracker.h \
     tools/LevelSetUtil.h \
+    tools/MaskToLevelSet.h \
     tools/MeshToVolume.h \
     tools/Morphology.h \
+    tools/ParticleAtlas.h \
     tools/ParticlesToLevelSet.h \
     tools/PointAdvect.h \
     tools/PointIndexGrid.h \
+    tools/PointMaskGrid.h \
     tools/PointPartitioner.h \
     tools/PointScatter.h \
     tools/PoissonSolver.h \
@@ -368,8 +370,11 @@ INCLUDE_NAMES := \
     tools/RayTracer.h \
     tools/SignedFloodFill.h \
     tools/Statistics.h \
+    tools/TopologyToLevelSet.h \
     tools/ValueTransformer.h \
     tools/VectorTransformer.h \
+    tools/VelocityFields.h \
+    tools/VolumeAdvect.h \
     tools/VolumeToMesh.h \
     tools/VolumeToSpheres.h \
     tree/InternalNode.h \
@@ -377,6 +382,7 @@ INCLUDE_NAMES := \
     tree/LeafManager.h \
     tree/LeafNode.h \
     tree/LeafNodeBool.h \
+    tree/LeafNodeMask.h \
     tree/NodeManager.h \
     tree/NodeUnion.h \
     tree/RootNode.h \
@@ -391,6 +397,7 @@ INCLUDE_NAMES := \
     util/Name.h \
     util/NodeMasks.h \
     util/NullInterrupter.h \
+    util/PagedArray.h \
     util/Util.h \
     version.h \
 #
@@ -404,7 +411,6 @@ SRC_NAMES := \
     io/Queue.cc \
     io/Stream.cc \
     io/TempFile.cc \
-    math/Hermite.cc \
     math/Maps.cc \
     math/Proximity.cc \
     math/QuantizedUnitVec.cc \
@@ -442,7 +448,6 @@ UNITTEST_SRC_NAMES := \
     unittest/TestGridDescriptor.cc \
     unittest/TestGridIO.cc \
     unittest/TestGridTransformer.cc \
-    unittest/TestHermite.cc \
     unittest/TestInit.cc \
     unittest/TestInt32Metadata.cc \
     unittest/TestInt64Metadata.cc \
@@ -450,12 +455,15 @@ UNITTEST_SRC_NAMES := \
     unittest/TestLaplacian.cc \
     unittest/TestLeaf.cc \
     unittest/TestLeafBool.cc \
+    unittest/TestLeafManager.cc \
+    unittest/TestLeafMask.cc \
     unittest/TestLeafIO.cc \
     unittest/TestLeafOrigin.cc \
     unittest/TestLevelSetRayIntersector.cc \
     unittest/TestLevelSetUtil.cc \
     unittest/TestLinearInterp.cc \
     unittest/TestMaps.cc \
+    unittest/TestMaskToLevelSet.cc \
     unittest/TestMat4Metadata.cc \
     unittest/TestMath.cc \
     unittest/TestMeanCurvature.cc \
@@ -465,9 +473,12 @@ UNITTEST_SRC_NAMES := \
     unittest/TestMetaMap.cc \
     unittest/TestName.cc \
     unittest/TestNodeIterator.cc \
+    unittest/TestNodeManager.cc \
     unittest/TestNodeMask.cc \
+    unittest/TestParticleAtlas.cc \
     unittest/TestParticlesToLevelSet.cc \
     unittest/TestPointIndexGrid.cc \
+    unittest/TestPointMaskGrid.cc \
     unittest/TestPointPartitioner.cc \
     unittest/TestPoissonSolver.cc \
     unittest/TestPrePostAPI.cc \
@@ -479,12 +490,14 @@ UNITTEST_SRC_NAMES := \
     unittest/TestStream.cc \
     unittest/TestStringMetadata.cc \
     unittest/TestTools.cc \
+    unittest/TestTopologyToLevelSet.cc \
     unittest/TestTransform.cc \
     unittest/TestTree.cc \
     unittest/TestTreeCombine.cc \
     unittest/TestTreeGetSetValues.cc \
     unittest/TestTreeIterators.cc \
     unittest/TestTreeVisitor.cc \
+    unittest/TestUtil.cc \
     unittest/TestValueAccessor.cc \
     unittest/TestVec2Metadata.cc \
     unittest/TestVec3Metadata.cc \
@@ -927,6 +940,6 @@ ifneq (,$(strip $(wildcard $(DEPEND))))
     include $(DEPEND)
 endif
 
-# Copyright (c) 2012-2014 DreamWorks Animation LLC
+# Copyright (c) 2012-2015 DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

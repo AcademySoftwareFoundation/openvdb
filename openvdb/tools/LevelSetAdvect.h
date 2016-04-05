@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -39,96 +39,19 @@
 #ifndef OPENVDB_TOOLS_LEVEL_SET_ADVECT_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_LEVEL_SET_ADVECT_HAS_BEEN_INCLUDED
 
+#include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 #include <openvdb/Platform.h>
 #include "LevelSetTracker.h"
-#include "Interpolation.h" // for BoxSampler, etc.
+#include "VelocityFields.h" // for EnrightField
 #include <openvdb/math/FiniteDifference.h>
 #include <boost/math/constants/constants.hpp>
+#include <openvdb/util/CpuTimer.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
-
-/// Below are two simple wrapper classes for advection velocity fields
-/// DiscreteField wraps a velocity grid and EnrightField is mostly
-/// intended for debugging (it's an analytical divergence free and
-/// periodic field). They both share the same API required by the
-/// LevelSetAdvection class defined below. Thus, any class with this
-/// API should work with LevelSetAdvection.
-
-/// Note the Field wrapper classes below always assume the velocity
-/// is represented in the world-frame of reference. For DiscreteField
-/// this implies the input grid must contain velocities in world
-/// coordinates.
-
-/// @brief Thin wrapper class for a velocity grid
-/// @note Consider replacing BoxSampler with StaggeredBoxSampler
-template <typename VelGridT, typename Interpolator = BoxSampler>
-class DiscreteField
-{
-public:
-    typedef typename VelGridT::ValueType     VectorType;
-    typedef typename VectorType::ValueType   ValueType;
-
-    DiscreteField(const VelGridT &vel): mAccessor(vel.tree()), mTransform(&vel.transform()) {}
-
-    /// @return const reference to the transfrom between world and index space
-    /// @note Use this method to determine if a client grid is
-    /// aligned with the coordinate space of the velocity grid.
-    const math::Transform& transform() const { return *mTransform; }
-
-    /// @return the interpolated velocity at the world space position xyz
-    inline VectorType operator() (const Vec3d& xyz, ValueType) const
-    {
-        VectorType result = zeroVal<VectorType>();
-        Interpolator::sample(mAccessor, mTransform->worldToIndex(xyz), result);
-        return result;
-    }
-
-    /// @return the velocity at the coordinate space position ijk
-    inline VectorType operator() (const Coord& ijk, ValueType) const
-    {
-        return mAccessor.getValue(ijk);
-    }
-
-private:
-    const typename VelGridT::ConstAccessor mAccessor;//Not thread-safe
-    const math::Transform*                 mTransform;
-
-}; // end of DiscreteField
-
-/// @brief Analytical, divergence-free and periodic vecloity field
-/// @note Primarily intended for debugging!
-/// @warning This analytical velocity only produce meaningfull values
-/// in the unitbox in world space. In other words make sure any level
-/// set surface in fully enclodes in the axis aligned bounding box
-/// spanning 0->1 in world units.
-template <typename ScalarT = float>
-class EnrightField
-{
-public:
-    typedef ScalarT             ValueType;
-    typedef math::Vec3<ScalarT> VectorType;
-
-    EnrightField() {}
-
-    /// @return const reference to the identity transfrom between world and index space
-    /// @note Use this method to determine if a client grid is
-    /// aligned with the coordinate space of this velocity field
-    math::Transform transform() const { return math::Transform(); }
-
-    /// @return the velocity in world units, evaluated at the world
-    /// position xyz and at the specified time
-    inline VectorType operator() (const Vec3d& xyz, ValueType time) const;
-
-    /// @return the velocity at the coordinate space position ijk
-    inline VectorType operator() (const Coord& ijk, ValueType time) const
-    {
-        return (*this)(ijk.asVec3d(), time);
-    }
-}; // end of EnrightField
 
 /// @brief  Hyperbolic advection of narrow-band level sets in an
 /// external velocity field
@@ -151,7 +74,9 @@ public:
 /// time. Note that since the velocity is returned in the local
 /// coordinate space of the grid that is being advected, the functor
 /// typically depends on the transformation of that grid. This design
-/// is chosen for performance reasons.
+/// is chosen for performance reasons. Finally we will assume that the
+/// functor method is NOT threadsafe (typically uses a ValueAccessor)
+/// and that its lightweight enough that we can copy it per thread.    
 ///
 /// The @c InterruptType template argument below refers to any class
 /// with the following interface:
@@ -222,10 +147,10 @@ public:
     /// @return the grain-size used for multi-threading
     int  getGrainSize() const { return mTracker.getGrainSize(); }
     /// @brief Set the grain-size used for multi-threading.
-    /// @note A grainsize of 0 or less disables multi-threading!
+    /// @note A grain size of 0 or less disables multi-threading!
     void setGrainSize(int grainsize) { mTracker.setGrainSize(grainsize); }
 
-    /// Advect the level set from it's current time, time0, to it's
+    /// Advect the level set from its current time, time0, to its
     /// final time, time1. If time0>time1 backward advection is performed.
     ///
     /// @return number of CFL iterations used to advect from time0 to time1
@@ -246,11 +171,9 @@ private:
         Advect(LevelSetAdvection& parent);
         /// Shallow copy constructor called by tbb::parallel_for() threads
         Advect(const Advect& other);
-        /// Shallow copy constructor called by tbb::parallel_reduce() threads
-        Advect(Advect& other, tbb::split);
-        /// destructor
+        /// Destructor
         virtual ~Advect() { if (mIsMaster) this->clearField(); }
-        /// Advect the level set from it's current time, time0, to it's final time, time1.
+        /// Advect the level set from its current time, time0, to its final time, time1.
         /// @return number of CFL iterations
         size_t advect(ValueType time0, ValueType time1);
         /// Used internally by tbb::parallel_for()
@@ -259,24 +182,20 @@ private:
             if (mTask) mTask(const_cast<Advect*>(this), r);
             else OPENVDB_THROW(ValueError, "task is undefined - don\'t call this method directly");
         }
-        /// Used internally by tbb::parallel_reduce()
-        void operator()(const LeafRange& r)
-        {
-            if (mTask) mTask(this, r);
-            else OPENVDB_THROW(ValueError, "task is undefined - don\'t call this method directly");
-        }
-        /// This is only called by tbb::parallel_reduce() threads
-        void join(const Advect& other) { mMaxAbsV = math::Max(mMaxAbsV, other.mMaxAbsV); }
-        /// Enum to defeing the type of multi-threading
-        enum ThreadingMode { PARALLEL_FOR, PARALLEL_REDUCE }; // for internal use
-        // method calling tbb
-        void cook(ThreadingMode mode, size_t swapBuffer = 0);
-        /// Sample field and return the CFT time step
+        /// method calling tbb
+        void cook(const char* msg, size_t swapBuffer = 0);
+        /// Sample field and return the CFL time step
         typename GridT::ValueType sampleField(ValueType time0, ValueType time1);
-        void  clearField();
-        void  sampleXformedField(const LeafRange& r, ValueType time0, ValueType time1);
-        void  sampleAlignedField(const LeafRange& r, ValueType time0, ValueType time1);
-
+        template <bool Aligned> void sample(const LeafRange& r, ValueType t0, ValueType t1);
+        inline void sampleXformed(const LeafRange& r, ValueType t0, ValueType t1)
+        {
+            this->sample<false>(r, t0, t1);
+        }
+        inline void sampleAligned(const LeafRange& r, ValueType t0, ValueType t1)
+        {
+            this->sample<true>(r, t0, t1);
+        }
+        void clearField();
         // Convex combination of Phi and a forward Euler advection steps:
         // Phi(result) = alpha * Phi(phi) + (1-alpha) * (Phi(0) - dt * Speed(speed)*|Grad[Phi(0)]|);
         template <int Nominator, int Denominator>
@@ -287,14 +206,13 @@ private:
         inline void euler13(const LeafRange& r, ValueType t) {this->euler<1,3>(r, t, 1, 2);}
 
         LevelSetAdvection& mParent;
-        VectorType**       mVec;
-        const ValueType    mMinAbsV;
-        ValueType          mMaxAbsV;
+        VectorType*        mVelocity;
+        size_t*            mOffsets;
         const MapT*        mMap;
         typename boost::function<void (Advect*, const LeafRange&)> mTask;
         const bool         mIsMaster;
     }; // end of private Advect struct
-
+    
     template<math::BiasedGradientScheme SpatialScheme>
     size_t advect1(ValueType time0, ValueType time1);
 
@@ -386,25 +304,6 @@ LevelSetAdvection<GridT, FieldT, InterruptT>::advect3(ValueType time0, ValueType
     return tmp.advect(time0, time1);
 }
 
-///////////////////////////////////////////////////////////////////////
-
-template <typename ScalarT>
-inline math::Vec3<ScalarT>
-EnrightField<ScalarT>::operator() (const Vec3d& xyz, ValueType time) const
-{
-    const ScalarT pi = boost::math::constants::pi<ScalarT>();
-    const ScalarT phase = pi / ScalarT(3.0);
-    const ScalarT Px =  pi * ScalarT(xyz[0]), Py = pi * ScalarT(xyz[1]), Pz = pi * ScalarT(xyz[2]);
-    const ScalarT tr =  cos(ScalarT(time) * phase);
-    const ScalarT a  =  sin(ScalarT(2.0)*Py);
-    const ScalarT b  = -sin(ScalarT(2.0)*Px);
-    const ScalarT c  =  sin(ScalarT(2.0)*Pz);
-    return math::Vec3<ScalarT>(
-        tr * ( ScalarT(2) * math::Pow2(sin(Px)) * a * c ),
-        tr * ( b * math::Pow2(sin(Py)) * c ),
-        tr * ( b * a * math::Pow2(sin(Pz)) ));
-}
-
 
 ///////////////////////////////////////////////////////////////////////
 
@@ -415,13 +314,13 @@ template <typename MapT, math::BiasedGradientScheme SpatialScheme,
 inline
 LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
-Advect(LevelSetAdvection& parent):
-    mParent(parent),
-    mVec(NULL),
-    mMinAbsV(ValueType(1e-6)),
-    mMap(parent.mTracker.grid().transform().template constMap<MapT>().get()),
-    mTask(0),
-    mIsMaster(true)
+Advect(LevelSetAdvection& parent)
+    : mParent(parent)
+    , mVelocity(NULL)
+    , mOffsets(NULL)
+    , mMap(parent.mTracker.grid().transform().template constMap<MapT>().get())
+    , mTask(0)
+    , mIsMaster(true)
 {
 }
 
@@ -431,34 +330,16 @@ template <typename MapT, math::BiasedGradientScheme SpatialScheme,
 inline
 LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
-Advect(const Advect& other):
-    mParent(other.mParent),
-    mVec(other.mVec),
-    mMinAbsV(other.mMinAbsV),
-    mMaxAbsV(other.mMaxAbsV),
-    mMap(other.mMap),
-    mTask(other.mTask),
-    mIsMaster(false)
+Advect(const Advect& other)
+    : mParent(other.mParent)
+    , mVelocity(other.mVelocity)
+    , mOffsets(other.mOffsets)
+    , mMap(other.mMap)
+    , mTask(other.mTask)
+    , mIsMaster(false)
 {
 }
-
-template<typename GridT, typename FieldT, typename InterruptT>
-template <typename MapT, math::BiasedGradientScheme SpatialScheme,
-          math::TemporalIntegrationScheme TemporalScheme>
-inline
-LevelSetAdvection<GridT, FieldT, InterruptT>::
-Advect<MapT, SpatialScheme, TemporalScheme>::
-Advect(Advect& other, tbb::split):
-    mParent(other.mParent),
-    mVec(other.mVec),
-    mMinAbsV(other.mMinAbsV),
-    mMaxAbsV(other.mMaxAbsV),
-    mMap(other.mMap),
-    mTask(other.mTask),
-    mIsMaster(false)
-{
-}
-
+   
 template<typename GridT, typename FieldT, typename InterruptT>
 template <typename MapT, math::BiasedGradientScheme SpatialScheme,
           math::TemporalIntegrationScheme TemporalScheme>
@@ -467,13 +348,16 @@ LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
 advect(ValueType time0, ValueType time1)
 {
+    //util::CpuTimer timer;
     size_t countCFL = 0;
     if ( math::isZero(time0 - time1) ) return countCFL;
     const bool isForward = time0 < time1;
     while ((isForward ? time0<time1 : time0>time1) && mParent.mTracker.checkInterrupter()) {
         /// Make sure we have enough temporal auxiliary buffers
+        //timer.start( "\nallocate buffers" );
         mParent.mTracker.leafs().rebuildAuxBuffers(TemporalScheme == math::TVD_RK3 ? 2 : 1);
-
+        //timer.stop();
+        
         const ValueType dt = this->sampleField(time0, time1);
         if ( math::isZero(dt) ) break;//V is essentially zero so terminate
 
@@ -485,7 +369,7 @@ advect(ValueType time0, ValueType time1)
             mTask = boost::bind(&Advect::euler01, _1, _2, dt);
 
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
-            this->cook(PARALLEL_FOR, 1);
+            this->cook("Advecting level set using TVD_RK1", 1);
             break;
         case math::TVD_RK2:
             // Perform one explicit Euler step: t1 = t0 + dt
@@ -493,14 +377,14 @@ advect(ValueType time0, ValueType time1)
             mTask = boost::bind(&Advect::euler01, _1, _2, dt);
 
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
-            this->cook(PARALLEL_FOR, 1);
+            this->cook("Advecting level set using TVD_RK1 (step 1 of 2)", 1);
 
             // Convex combine explict Euler step: t2 = t0 + dt
             // Phi_t2(1) = 1/2 * Phi_t0(1) + 1/2 * (Phi_t1(0) - dt * V.Grad_t1(0))
             mTask = boost::bind(&Advect::euler12, _1, _2, dt);
 
             // Cook and swap buffer 0 and 1 such that Phi_t2(0) and Phi_t1(1)
-            this->cook(PARALLEL_FOR, 1);
+            this->cook("Advecting level set using TVD_RK1 (step 2 of 2)", 1);
             break;
         case math::TVD_RK3:
             // Perform one explicit Euler step: t1 = t0 + dt
@@ -508,27 +392,27 @@ advect(ValueType time0, ValueType time1)
             mTask = boost::bind(&Advect::euler01, _1, _2, dt);
 
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
-            this->cook(PARALLEL_FOR, 1);
+            this->cook("Advecting level set using TVD_RK3 (step 1 of 3)", 1);
 
             // Convex combine explict Euler step: t2 = t0 + dt/2
             // Phi_t2(2) = 3/4 * Phi_t0(1) + 1/4 * (Phi_t1(0) - dt * V.Grad_t1(0))
             mTask = boost::bind(&Advect::euler34, _1, _2, dt);
 
             // Cook and swap buffer 0 and 2 such that Phi_t2(0) and Phi_t1(2)
-            this->cook(PARALLEL_FOR, 2);
+            this->cook("Advecting level set using TVD_RK3 (step 2 of 3)", 2);
 
             // Convex combine explict Euler step: t3 = t0 + dt
             // Phi_t3(2) = 1/3 * Phi_t0(1) + 2/3 * (Phi_t2(0) - dt * V.Grad_t2(0)
             mTask = boost::bind(&Advect::euler13, _1, _2, dt);
 
             // Cook and swap buffer 0 and 2 such that Phi_t3(0) and Phi_t2(2)
-            this->cook(PARALLEL_FOR, 2);
+            this->cook("Advecting level set using TVD_RK3 (step 3 of 3)", 2);
             break;
         default:
             OPENVDB_THROW(ValueError, "Temporal integration scheme not supported!");
         }//end of compile-time resolved switch
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
-
+            
         time0 += isForward ? dt : -dt;
         ++countCFL;
         mParent.mTracker.leafs().removeAuxBuffers();
@@ -547,17 +431,30 @@ LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
 sampleField(ValueType time0, ValueType time1)
 {
-    mMaxAbsV = mMinAbsV;
+    const int grainSize = mParent.mTracker.getGrainSize();
     const size_t leafCount = mParent.mTracker.leafs().leafCount();
     if (leafCount==0) return ValueType(0.0);
-    mVec = new VectorType*[leafCount];
+
+    // Compute the pre-fix sum of offsets to active voxels
+    size_t size=0, voxelCount=mParent.mTracker.leafs().getPreFixSum(mOffsets, size, grainSize);
+
+    // Sample the velocity field
     if (mParent.mField.transform() == mParent.mTracker.grid().transform()) {
-        mTask = boost::bind(&Advect::sampleAlignedField, _1, _2, time0, time1);
+        mTask = boost::bind(&Advect::sampleAligned, _1, _2, time0, time1);
     } else {
-        mTask = boost::bind(&Advect::sampleXformedField, _1, _2, time0, time1);
+        mTask = boost::bind(&Advect::sampleXformed, _1, _2, time0, time1);
     }
-    this->cook(PARALLEL_REDUCE);
-    if (math::isExactlyEqual(mMinAbsV, mMaxAbsV)) return ValueType(0.0);//V is essentially zero
+    assert(voxelCount != mParent.mTracker.grid().activeVoxelCount());
+    mVelocity = new VectorType[ voxelCount ];
+    this->cook("Sampling advection field");
+
+    // Find the extrema of the magnitude of the velocities
+    ValueType maxAbsV = 0;
+    VectorType* v = mVelocity;
+    for (size_t i=0; i<voxelCount; ++i, ++v) maxAbsV = math::Max(maxAbsV, ValueType(v->lengthSqr()));
+
+    // Compute the CFL number
+    if (math::isExactlyEqual(ValueType(1e-6), maxAbsV)) return ValueType(0.0);//V is essentially zero
 #ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
     static
 #endif
@@ -565,50 +462,29 @@ sampleField(ValueType time0, ValueType time1)
         TemporalScheme == math::TVD_RK2 ? ValueType(0.9) :
         ValueType(1.0))/math::Sqrt(ValueType(3.0));
     const ValueType dt = math::Abs(time1 - time0), dx = mParent.mTracker.voxelSize();
-    return math::Min(dt, ValueType(CFL*dx/math::Sqrt(mMaxAbsV)));
+    return math::Min(dt, ValueType(CFL*dx/math::Sqrt(maxAbsV)));
 }
 
 template<typename GridT, typename FieldT, typename InterruptT>
 template <typename MapT, math::BiasedGradientScheme SpatialScheme,
           math::TemporalIntegrationScheme TemporalScheme>
+template <bool Aligned>
 inline void
 LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
-sampleXformedField(const LeafRange& range, ValueType time0, ValueType time1)
+sample(const LeafRange& range, ValueType time0, ValueType time1)
 {
     const bool isForward = time0 < time1;
     typedef typename LeafType::ValueOnCIter VoxelIterT;
     const MapT& map = *mMap;
+    const FieldT field( mParent.mField );
     mParent.mTracker.checkInterrupter();
     for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
-        VectorType* vec = new VectorType[leafIter->onVoxelCount()];
-        mVec[leafIter.pos()] = vec;
-        for (VoxelIterT iter = leafIter->cbeginValueOn(); iter; ++iter, ++vec) {
-            const VectorType v = mParent.mField(map.applyMap(iter.getCoord().asVec3d()), time0);
-            mMaxAbsV = math::Max(mMaxAbsV, ValueType(math::Pow2(v[0])+math::Pow2(v[1])+math::Pow2(v[2])));
-            *vec = isForward ? v : -v;
-        }
-    }
-}
-
-template<typename GridT, typename FieldT, typename InterruptT>
-template <typename MapT, math::BiasedGradientScheme SpatialScheme,
-          math::TemporalIntegrationScheme TemporalScheme>
-inline void
-LevelSetAdvection<GridT, FieldT, InterruptT>::
-Advect<MapT, SpatialScheme, TemporalScheme>::
-sampleAlignedField(const LeafRange& range, ValueType time0, ValueType time1)
-{
-    const bool isForward = time0 < time1;
-    typedef typename LeafType::ValueOnCIter VoxelIterT;
-    mParent.mTracker.checkInterrupter();
-    for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
-        VectorType* vec = new VectorType[leafIter->onVoxelCount()];
-        mVec[leafIter.pos()] = vec;
-        for (VoxelIterT iter = leafIter->cbeginValueOn(); iter; ++iter, ++vec) {
-            const VectorType v = mParent.mField(iter.getCoord(), time0);
-            mMaxAbsV = math::Max(mMaxAbsV, ValueType(math::Pow2(v[0])+math::Pow2(v[1])+math::Pow2(v[2])));
-            *vec = isForward ? v : -v;
+        VectorType* vel = mVelocity + mOffsets[ leafIter.pos() ];
+        for (VoxelIterT iter = leafIter->cbeginValueOn(); iter; ++iter, ++vel) {
+            const VectorType v = Aligned ? field(iter.getCoord(), time0) ://resolved at compile time
+                                 field(map.applyMap(iter.getCoord().asVec3d()), time0);
+            *vel = isForward ? v : -v;
         }
     }
 }
@@ -621,10 +497,10 @@ LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
 clearField()
 {
-    if (mVec == NULL) return;
-    for (size_t n=0, e=mParent.mTracker.leafs().leafCount(); n<e; ++n) delete [] mVec[n];
-    delete [] mVec;
-    mVec = NULL;
+    delete [] mOffsets; 
+    delete [] mVelocity;
+    mOffsets  = NULL;
+    mVelocity = NULL;
 }
 
 template<typename GridT, typename FieldT, typename InterruptT>
@@ -633,22 +509,14 @@ template <typename MapT, math::BiasedGradientScheme SpatialScheme,
 inline void
 LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
-cook(ThreadingMode mode, size_t swapBuffer)
+cook(const char* msg, size_t swapBuffer)
 {
-    mParent.mTracker.startInterrupter("Advecting level set");
+    mParent.mTracker.startInterrupter( msg );
 
     const int grainSize   = mParent.mTracker.getGrainSize();
     const LeafRange range = mParent.mTracker.leafs().leafRange(grainSize);
 
-    if (mParent.mTracker.getGrainSize()==0) {
-        (*this)(range);
-    } else if (mode == PARALLEL_FOR) {
-        tbb::parallel_for(range, *this);
-    } else if (mode == PARALLEL_REDUCE) {
-        tbb::parallel_reduce(range, *this);
-    } else {
-        throw std::runtime_error("Undefined threading mode");
-    }
+    grainSize == 0 ? (*this)(range) : tbb::parallel_for(range, *this);
 
     mParent.mTracker.leafs().swapLeafBuffer(swapBuffer, grainSize == 0);
 
@@ -678,13 +546,13 @@ euler(const LeafRange& range, ValueType dt, Index phiBuffer, Index resultBuffer)
     const MapT& map = *mMap;
     StencilT stencil(mParent.mTracker.grid());
     for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
-        const VectorType* v = mVec[leafIter.pos()];
+        const VectorType* vel = mVelocity + mOffsets[ leafIter.pos() ];
         const ValueType* phi = leafIter.buffer(phiBuffer).data();
         ValueType* result = leafIter.buffer(resultBuffer).data();
-        for (VoxelIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter, ++v) {
+        for (VoxelIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter, ++vel) {
             const Index i = voxelIter.pos();
             stencil.moveTo(voxelIter);
-            const ValueType a = stencil.getValue() - dt * v->dot(GradT::result(map, stencil,*v));
+            const ValueType a = stencil.getValue() - dt * vel->dot(GradT::result(map, stencil, *vel));
             result[i] = Nominator ? Alpha * phi[i] + Beta * a : a;
         }//loop over active voxels in the leaf of the mask
     }//loop over leafs of the level set
@@ -696,6 +564,6 @@ euler(const LeafRange& range, ValueType dt, Index phiBuffer, Index resultBuffer)
 
 #endif // OPENVDB_TOOLS_LEVEL_SET_ADVECT_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

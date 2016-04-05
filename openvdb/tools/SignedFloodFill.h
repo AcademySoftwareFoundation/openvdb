@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -44,6 +44,8 @@
 #include <openvdb/Types.h> // for Index typedef
 #include <boost/static_assert.hpp>
 #include <boost/type_traits/is_floating_point.hpp>
+#include <boost/type_traits/is_signed.hpp>
+
 #include <openvdb/tree/NodeManager.h>
 
 
@@ -64,11 +66,13 @@ namespace tools {
 /// @param tree          Tree or LeafManager that will be flood filled.
 /// @param threaded      enable or disable threading  (threading is enabled by default)
 /// @param grainSize     used to control the threading granularity (default is 1)
+/// @param minLevel      Specify the lowest tree level to process (leafnode level = 0)
 ///
 /// @throw TypeError if the ValueType of @a tree is not floating-point.
 template<typename TreeOrLeafManagerT>
 inline void
-signedFloodFill(TreeOrLeafManagerT& tree, bool threaded = true, size_t grainSize = 1);
+signedFloodFill(TreeOrLeafManagerT& tree, bool threaded = true,
+    size_t grainSize = 1, Index minLevel = 0);
 
 
 /// @brief Set the values of all inactive voxels and tiles of a narrow-band
@@ -86,6 +90,7 @@ signedFloodFill(TreeOrLeafManagerT& tree, bool threaded = true, size_t grainSize
 /// @param insideWidth   the width of the inside of the narrow band
 /// @param threaded      enable or disable threading  (threading is enabled by default)
 /// @param grainSize     used to control the threading granularity (default is 1)
+/// @param minLevel      Specify the lowest tree level to process (leafnode level = 0)
 ///
 /// @throw TypeError if the ValueType of @a tree is not floating-point.
 template<typename TreeOrLeafManagerT>
@@ -95,7 +100,8 @@ signedFloodFillWithValues(
     const typename TreeOrLeafManagerT::ValueType& outsideWidth,
     const typename TreeOrLeafManagerT::ValueType& insideWidth,
     bool threaded = true,
-    size_t grainSize = 1);
+    size_t grainSize = 1,
+    Index minLevel = 0);
 
 
 ////////////////////////// Implementation of SignedFloodFill ////////////////////////////
@@ -108,23 +114,27 @@ public:
     typedef typename TreeOrLeafManagerT::ValueType    ValueT;
     typedef typename TreeOrLeafManagerT::RootNodeType RootT;
     typedef typename TreeOrLeafManagerT::LeafNodeType LeafT;
-    BOOST_STATIC_ASSERT(boost::is_floating_point<ValueT>::value);
+    BOOST_STATIC_ASSERT(boost::is_floating_point<ValueT>::value || boost::is_signed<ValueT>::value);
 
-    SignedFloodFillOp(const TreeOrLeafManagerT& tree)
-        : mOutside(math::Abs(tree.background()))
-        , mInside(math::negative(mOutside))
+    SignedFloodFillOp(const TreeOrLeafManagerT& tree, Index minLevel = 0)
+        : mOutside(ValueT(math::Abs(tree.background())))
+        , mInside(ValueT(math::negative(mOutside)))
+        , mMinLevel(minLevel)
     {
     }
 
-    SignedFloodFillOp(ValueT outsideValue, ValueT insideValue)
-        : mOutside(math::Abs(outsideValue))
-        , mInside(math::negative(math::Abs(insideValue)))
+    SignedFloodFillOp(ValueT outsideValue, ValueT insideValue, Index minLevel = 0)
+        : mOutside(ValueT(math::Abs(outsideValue)))
+        , mInside(ValueT(math::negative(math::Abs(insideValue))))
+        , mMinLevel(minLevel)
     {
     }
 
     // Nothing to do at the leaf node level
     void operator()(LeafT& leaf) const
     {
+        if (LeafT::LEVEL < mMinLevel) return;
+
 #ifndef OPENVDB_2_ABI_COMPATIBLE
         if (!leaf.allocate()) return;//this assures that the buffer is allocated and in-memory
 #endif
@@ -163,6 +173,7 @@ public:
     template<typename NodeT>
     void operator()(NodeT& node) const
     {
+        if (NodeT::LEVEL < mMinLevel) return;
         // We assume the child nodes have already been flood filled!
         const typename NodeT::NodeMaskType& childMask = node.getChildMask();
         // WARNING: "Never do what you're about to see at home, we're what you call experts!"
@@ -199,6 +210,7 @@ public:
     // Prune the child nodes of the root node
     void operator()(RootT& root) const
     {
+        if (RootT::LEVEL < mMinLevel) return;
         typedef typename RootT::ChildNodeType ChildT;
         // Insert the child nodes into a map sorted according to their origin
         std::map<Coord, ChildT*> nodeKeys;
@@ -223,37 +235,42 @@ public:
 
 private:
     const ValueT mOutside, mInside;
+    const Index mMinLevel;
 };// SignedFloodFillOp
 
 
 template<typename TreeOrLeafManagerT>
 inline
-typename boost::enable_if<typename boost::is_floating_point<
-                          typename TreeOrLeafManagerT::ValueType>::type>::type
+typename boost::enable_if_c<
+    boost::is_floating_point<typename TreeOrLeafManagerT::ValueType>::value ||
+    boost::is_signed<typename TreeOrLeafManagerT::ValueType>::value, void>::type
 doSignedFloodFill(TreeOrLeafManagerT& tree,
                   typename TreeOrLeafManagerT::ValueType outsideValue,
                   typename TreeOrLeafManagerT::ValueType insideValue,
                   bool threaded,
-                  size_t grainSize)
+                  size_t grainSize,
+                  Index minLevel)
 {
     tree::NodeManager<TreeOrLeafManagerT> nodes(tree);
-    SignedFloodFillOp<TreeOrLeafManagerT> op(outsideValue, insideValue);
+    SignedFloodFillOp<TreeOrLeafManagerT> op(outsideValue, insideValue, minLevel);
     nodes.processBottomUp(op, threaded, grainSize);
 }
 
 // Dummy (no-op) implementation for non-float types
 template <typename TreeOrLeafManagerT>
 inline
-typename boost::disable_if<typename boost::is_floating_point<
-                           typename TreeOrLeafManagerT::ValueType>::type>::type
+typename boost::disable_if_c<
+    boost::is_floating_point<typename TreeOrLeafManagerT::ValueType>::value ||
+    boost::is_signed<typename TreeOrLeafManagerT::ValueType>::value, void>::type
 doSignedFloodFill(TreeOrLeafManagerT&,
                   const typename TreeOrLeafManagerT::ValueType&,
                   const typename TreeOrLeafManagerT::ValueType&,
                   bool,
-                  size_t)
+                  size_t,
+                  Index)
 {
     OPENVDB_THROW(TypeError,
-        "signedFloodFill is supported only for scalar, floating-point grids");
+        "signedFloodFill is supported only for signed value grids");
 }
 
 
@@ -265,9 +282,10 @@ signedFloodFillWithValues(
     const typename TreeOrLeafManagerT::ValueType& outsideValue,
     const typename TreeOrLeafManagerT::ValueType& insideValue,
     bool threaded,
-    size_t grainSize)
+    size_t grainSize,
+    Index minLevel)
 {
-    doSignedFloodFill(tree, outsideValue, insideValue, threaded, grainSize);
+    doSignedFloodFill(tree, outsideValue, insideValue, threaded, grainSize, minLevel);
 }
 
 
@@ -275,10 +293,11 @@ template <typename TreeOrLeafManagerT>
 inline void
 signedFloodFill(TreeOrLeafManagerT& tree,
                 bool threaded,
-                size_t grainSize)
+                size_t grainSize,
+                Index minLevel)
 {
     const typename TreeOrLeafManagerT::ValueType v = tree.root().background();
-    doSignedFloodFill(tree, v, math::negative(v), threaded, grainSize);
+    doSignedFloodFill(tree, v, math::negative(v), threaded, grainSize, minLevel);
 }
 
 } // namespace tools
@@ -287,6 +306,6 @@ signedFloodFill(TreeOrLeafManagerT& tree,
 
 #endif // OPENVDB_TOOLS_RESETBACKGROUND_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

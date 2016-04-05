@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -242,9 +242,9 @@ public:
 private:
     // Functor for use with tbb::parallel_for()
     template<typename Scalar> struct ScaleOp;
+    struct DeterministicDotProductOp;
     // Functors for use with tbb::parallel_reduce()
     template<typename OtherValueType> struct EqOp;
-    struct DotProductOp;
     struct InfNormOp;
     struct IsFiniteOp;
 
@@ -657,33 +657,79 @@ Vector<T>::scale(const Scalar& s)
 
 
 template<typename T>
-struct Vector<T>::DotProductOp
+struct Vector<T>::DeterministicDotProductOp
 {
-    DotProductOp(const T* a_, const T* b_): a(a_), b(b_) {}
-
-    T operator()(const SizeRange& range, T sum) const
+    DeterministicDotProductOp(const T* a_, const T* b_, 
+                              const SizeType binCount_, const SizeType arraySize_, T* reducetmp_): 
+        a(a_), b(b_), binCount(binCount_), arraySize(arraySize_), reducetmp(reducetmp_) {}
+    
+    void operator()(const SizeRange& range) const
     {
+        
+        const SizeType binSize = arraySize / binCount; 
+        
+        // Iterate over bins (array segments)
         for (SizeType n = range.begin(), N = range.end(); n < N; ++n) {
-            sum += a[n] * b[n];
+            const SizeType begin = n * binSize;
+            const SizeType end   = (n == binCount-1) ? arraySize : begin + binSize;
+
+            // Compute the partial sum for this array segment 
+            T sum = zeroVal<T>();
+            for (SizeType i = begin; i < end; ++i) {
+                
+                sum += a[i] * b[i];
+            }
+            // Store the partial sum
+            reducetmp[n] = sum;
         }
-        return sum;
     }
 
-    static T join(T sum1, T sum2) { return sum1 + sum2; }
-
+    
     const T* a;
     const T* b;
+    const SizeType binCount;
+    const SizeType arraySize; 
+    T* reducetmp;
 };
-
 
 template<typename T>
 inline T
 Vector<T>::dot(const Vector<T>& other) const
 {
     assert(this->size() == other.size());
-    // Parallelize over corresponding elements of the two vectors.
-    T result = tbb::parallel_reduce(SizeRange(0, this->size()), /*seed=*/zeroVal<T>(),
-        DotProductOp(this->data(), other.data()), DotProductOp::join);
+
+    const T* aData = this->data();
+    const T* bData = other.data();
+
+    SizeType arraySize = this->size();
+
+    T result = zeroVal<T>();
+
+    if (arraySize < 1024) {
+
+        // Compute the dot product in serial for small arrays
+
+        for (SizeType n = 0; n < arraySize; ++n) {
+            result += aData[n] * bData[n];
+        }
+
+    } else {
+
+        // Compute the dot product by segmenting the arrays into 
+        // a predetermined number of sub arrays in parallel and 
+        // accumulate the finial result in series.
+        
+        const SizeType binCount = 100;
+        T partialSums[100];
+        
+        tbb::parallel_for(SizeRange(0, binCount), 
+                          DeterministicDotProductOp(aData, bData, binCount, arraySize, partialSums));
+
+        for (SizeType n = 0; n < binCount; ++n) {
+            result += partialSums[n];
+        }
+    }
+    
     return result;
 }
 
@@ -1766,7 +1812,7 @@ solve(
 
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

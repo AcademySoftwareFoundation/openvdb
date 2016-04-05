@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -214,8 +214,13 @@ SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
             if (useMask) {
                 UT_String maskStr;
                 evalString(maskStr, "mask", 0, time);
+#if (UT_MAJOR_VERSION_INT >= 15)
+                const GA_PrimitiveGroup* maskGroup = parsePrimitiveGroups(
+                    maskStr.buffer(), GroupCreator(maskGeo));
+#else
                 const GA_PrimitiveGroup* maskGroup = parsePrimitiveGroups(
                     maskStr.buffer(), const_cast<GU_Detail*>(maskGeo));
+#endif
                 hvdb::VdbPrimCIterator maskIt(maskGeo, maskGroup);
                 if (maskIt) {
                     if (maskIt->getConstGrid().getGridClass() == openvdb::GRID_LEVEL_SET) {
@@ -288,6 +293,6 @@ SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

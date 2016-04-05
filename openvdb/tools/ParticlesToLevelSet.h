@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -39,8 +39,8 @@
 /// as the level set grid.
 ///
 /// @note This fast particle to level set converter is always intended
-/// to be combined with some kind of surface postprocessing,
-/// i.e. tools::Filter. Without such postprocessing the generated
+/// to be combined with some kind of surface post processing,
+/// i.e. tools::Filter. Without such post processing the generated
 /// surface is typically too noisy and blobby. However it serves as a
 /// great and fast starting point for subsequent level set surface
 /// processing and convolution.
@@ -53,6 +53,7 @@
 /// class ParticleList {
 ///   ...
 /// public:
+///   typedef openvdb::Vec3R    PosType;
 ///
 ///   // Return the total number of particles in list.
 ///   // Always required!
@@ -99,6 +100,7 @@
 
 #include <tbb/parallel_reduce.h>
 #include <tbb/blocked_range.h>
+#include <tbb/task_group.h>
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
 #include <boost/type_traits/is_floating_point.hpp>
@@ -110,21 +112,25 @@
 #include <openvdb/math/Transform.h>
 #include <openvdb/util/NullInterrupter.h>
 #include "Composite.h" // for csgUnion()
+#include "PointMaskGrid.h"
 #include "PointPartitioner.h"
+#include "Morphology.h" // for {dilate|erode}Voxels
 #include "Prune.h"
 #include "SignedFloodFill.h"
+#include "LevelSetTracker.h"
+#include "MaskToLevelSet.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
-namespace p2ls_internal {
+namespace {
 // This is a simple type that combines a distance value and a particle
 // attribute. It's required for attribute transfer which is performed
-// in the ParticlesToLevelSet::Raster memberclass defined below.
+// in the ParticlesToLevelSet::Raster member class defined below.
 template<typename VisibleT, typename BlindT> class BlindData;
-}// namespace p2ls_internal
+}// unnamed namespace
 
 
 template<typename SdfGridT,
@@ -151,8 +157,8 @@ public:
     /// @param interrupt Callback to interrupt a long-running process
     ///
     /// @note The input grid is assumed to be a valid level set and if
-    /// it already contains voxels (with SDF values) partices are unioned
-    /// onto the exisinting level set surface. However, if attribute tranfer
+    /// it already contains voxels (with SDF values) particles are unioned
+    /// onto the existing level set surface. However, if attribute transfer
     /// is enabled, i.e. AttributeT != void, attributes are only
     /// generated for voxels that overlap with particles, not the existing
     /// voxels in the input grid (for which no attributes exist!).
@@ -174,7 +180,7 @@ public:
     /// and therefore needs to be called before any of these grids are
     /// used and after the last call to any of the rasterizer methods.
     ///
-    /// @note Avoid calling this method more then once and only after
+    /// @note Avoid calling this method more than once and only after
     /// all the particles have been rasterized. It has no effect or
     /// overhead if attribute transfer is disabled, i.e. AttributeT =
     /// void and prune is false.
@@ -210,11 +216,36 @@ public:
     /// @brief set the largest radius allowed in voxel units
     void setRmax(Real Rmax) { mRmax = math::Max(mRmin,Rmax); }
 
-    /// @brief Rreturn the grain-size used for multi-threading
+    /// @brief Returns the grain-size used for multi-threading
     int  getGrainSize() const { return mGrainSize; }
     /// @brief Set the grain-size used for multi-threading.
     /// @note A grainsize of 0 or less disables multi-threading!
     void setGrainSize(int grainSize) { mGrainSize = grainSize; }
+
+    /// @brief Very fast generation of a level set from the active
+    /// mask of an input grid, e.g. a MaskGrid generated from points.
+    ///
+    /// @param grid Points with radius (no radius required).
+    /// @param dilationInVoxels Dilation in voxel units.
+    /// @param erosionInVoxels  Erosion in voxel units. It is
+    /// recommended that erosionInVoxels <= dilationInVoxels.
+    template <typename GridT>
+    void rasterizeMask(const GridT& grid,
+                       const int dilationInVoxels = 1,
+                       const int erosionInVoxels  = 1);
+
+    /// @brief Very fast generation of a level set from points
+    /// (e.g. particles without a radius). It employes a MaskGrid
+    /// an various bit-wise topology operations.
+    ///
+    /// @param points Points with radius (no radius required).
+    /// @param dilationInVoxels Dilation in voxel units.
+    /// @param erosionInVoxels  Erosion in voxel units. It is
+    /// recommended that erosionInVoxels <= dilationInVoxels.
+    template <typename PointListT>
+    void rasterizePoints(const PointListT& points,
+                         const int dilationInVoxels = 1,
+                         const int erosionInVoxels  = 1);
 
     /// @brief Rasterize a sphere per particle derived from their
     /// position and radius. All spheres are CSG unioned.
@@ -251,7 +282,7 @@ public:
     void rasterizeTrails(const ParticleListT& pa, Real delta=1.0);
 
 private:
-    typedef p2ls_internal::BlindData<SdfType, AttType> BlindType;
+    typedef BlindData<SdfType, AttType> BlindType;
     typedef typename SdfGridT::template ValueConverter<BlindType>::Type BlindGridType;
 
     /// Class with multi-threaded implementation of particle rasterization
@@ -296,6 +327,53 @@ ParticlesToLevelSet(SdfGridT& grid, InterrupterT* interrupter) :
         mBlindGrid = new BlindGridType(BlindType(grid.background()));
         mBlindGrid->setTransform(mSdfGrid->transform().copy());
     }
+}
+
+namespace {
+
+template<typename TreeT> struct DilationHandler
+{
+    DilationHandler(TreeT& t, int n) : tree(&t), size(n) {}
+    void operator()() const { dilateVoxels( *tree, size); }
+    TreeT* tree;
+    const int size;
+};
+template<typename TreeT> struct ErosionHandler
+{
+    ErosionHandler(TreeT& t, int n) : tree(&t), size(n) {}
+    void operator()() const { erodeVoxels( *tree, size); }
+    TreeT* tree;
+    const int size;
+};
+
+}
+
+template<typename SdfGridT, typename AttributeT, typename InterrupterT>
+template <typename MaskGrid>
+inline void ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::
+rasterizeMask(const MaskGrid& maskGrid, int dilation, int erosion)
+{
+    // Generate a level set from the mask
+    mSdfGrid->setTree( maskToLevelSet<MaskGrid, math::FIRST_BIAS, InterrupterT>
+                       ( maskGrid, int(mHalfWidth), dilation, erosion, mInterrupter )->treePtr() );
+}
+
+template<typename SdfGridT, typename AttributeT, typename InterrupterT>
+template <typename PointListT>
+inline void ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::
+rasterizePoints(const PointListT& points, int dilation, int erosion)
+{
+    typedef typename SdfGridT::template ValueConverter<ValueMask>::Type MaskGrid;
+    typedef typename MaskGrid::TreeType                                 MaskTree;
+    typedef typename MaskTree::Ptr                                      MaskTreePtr;
+
+    // Generate a mask grid of the points
+    MaskGrid maskGrid(MaskTreePtr(new MaskTree(mSdfGrid->tree(), false, TopologyCopy())));
+    maskGrid.setTransform( mSdfGrid->transform().copy() );
+    PointMaskGrid<MaskGrid, InterrupterT> pmg( maskGrid, mInterrupter );
+    pmg.addPoints( points );
+    // Generate a level set from the mask
+    this->rasterizeMask( maskGrid, dilation, erosion );
 }
 
 template<typename SdfGridT, typename AttributeT, typename InterrupterT>
@@ -377,7 +455,7 @@ ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::finalize(bool prune)
     for (LeafIterT n = tree.cbeginLeaf(); n; ++n) {
         const LeafT& leaf = *n;
         const openvdb::Coord xyz = leaf.origin();
-        // Get leafnodes that were allocated during topology contruction!
+        // Get leafnodes that were allocated during topology construction!
         SdfLeafT* sdfLeaf = sdfTree->probeLeaf(xyz);
         AttLeafT* attLeaf = attTree->probeLeaf(xyz);
         // Use linear offset (vs coordinate) access for better performance!
@@ -706,9 +784,9 @@ private:
     /// @note For best performance all computations are performed in
     /// voxel-space with the important exception of the final level set
     /// value that is converted to world units (e.g. the grid stores
-    /// the closest Euclidian signed distances measured in world
+    /// the closest Euclidean signed distances measured in world
     /// units). Also note we use the convention of positive distances
-    /// outside the surface an negative distances inside the surface.
+    /// outside the surface and negative distances inside the surface.
     bool makeSphere(const Vec3R &P, SdfT R, const AttT& att, AccessorT& acc)
     {
         const ValueT inside = -mGrid->background();
@@ -777,7 +855,7 @@ private:
 
 ///////////////////// YOU CAN SAFELY IGNORE THIS SECTION /////////////////////
 
-namespace p2ls_internal {
+namespace {
 
 // This is a simple type that combines a distance value and a particle
 // attribute. It's required for attribute transfer which is defined in the
@@ -831,7 +909,7 @@ inline BlindData<VisibleT, BlindT> Abs(const BlindData<VisibleT, BlindT>& x)
     return BlindData<VisibleT, BlindT>(math::Abs(x.visible()), x.blind());
 }
 
-} // namespace p2ls_internal
+} // unnamed namespace
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -841,6 +919,6 @@ inline BlindData<VisibleT, BlindT> Abs(const BlindData<VisibleT, BlindT>& x)
 
 #endif // OPENVDB_TOOLS_PARTICLES_TO_LEVELSET_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

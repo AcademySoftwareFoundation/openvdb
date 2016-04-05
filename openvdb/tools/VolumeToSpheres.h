@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -123,7 +123,7 @@ fillWithSpheres(
 
 
 /// @brief  Accelerated closest surface point queries for narrow band level sets.
-///         Supports queries that originate at arbitrary worldspace locations, is
+///         Supports queries that originate at arbitrary world-space locations, is
 ///         not confined to the narrow band region of the input volume geometry.
 template<typename GridT>
 class ClosestSurfacePoint
@@ -724,11 +724,6 @@ fillWithSpheres(
     typedef typename TreeT::template ValueConverter<int>::Type IntTreeT;
     typedef typename TreeT::template ValueConverter<Int16>::Type Int16TreeT;
 
-    typedef tree::LeafManager<const TreeT> LeafManagerT;
-    typedef tree::LeafManager<IntTreeT>    IntLeafManagerT;
-    typedef tree::LeafManager<Int16TreeT>  Int16LeafManagerT;
-
-
     typedef boost::mt11213b RandGen;
     RandGen mtRand(/*seed=*/0);
 
@@ -1034,6 +1029,6 @@ ClosestSurfacePoint<GridT>::searchAndReplace(std::vector<Vec3R>& points,
 
 #endif // OPENVDB_TOOLS_VOLUME_TO_MESH_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

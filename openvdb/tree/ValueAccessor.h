@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -82,31 +82,61 @@ namespace OPENVDB_VERSION_NAME {
 namespace tree {
 
 // Forward declarations of local classes that are not intended for general use
-template<typename TreeType> class ValueAccessor0;
-template<typename TreeType, Index L0 = 0> class ValueAccessor1;
-template<typename TreeType, Index L0 = 0, Index L1 = 1> class ValueAccessor2;
-template<typename TreeType, Index L0 = 0, Index L1 = 1, Index L2 = 2> class ValueAccessor3;
+// The IsSafe template parameter is explained in the warning below.
+template<typename TreeType, bool IsSafe = true>
+class ValueAccessor0;
+template<typename TreeType, bool IsSafe = true, Index L0 = 0>
+class ValueAccessor1;
+template<typename TreeType, bool IsSafe = true, Index L0 = 0, Index L1 = 1>
+class ValueAccessor2;
+template<typename TreeType, bool IsSafe = true, Index L0 = 0, Index L1 = 1, Index L2 = 2>
+class ValueAccessor3;
 template<typename TreeCacheT, typename NodeVecT, bool AtRoot> class CacheItem;
 
 
 /// @brief This base class for ValueAccessors manages registration of an accessor
 /// with a tree so that the tree can automatically clear the accessor whenever
 /// one of its nodes is deleted.
+///
 /// @internal A base class is needed because ValueAccessor is templated on both
 /// a Tree type and a mutex type.  The various instantiations of the template
 /// are distinct, unrelated types, so they can't easily be stored in a container
 /// such as the Tree's CacheRegistry.  This base class, in contrast, is templated
 /// only on the Tree type, so for any given Tree, only two distinct instantiations
 /// are possible, ValueAccessorBase<Tree> and ValueAccessorBase<const Tree>.
-template<typename TreeType>
+///
+/// @warning If IsSafe = false then the ValueAccessor will not register itself 
+/// with the tree from which it is constructed. While in some rare cases this can       
+/// lead to better performance (since it avoids the small overhead of insertion
+/// on creation and deletion on destruction) it is also unsafe if the tree is 
+/// modified. So unless you're an expert it is highly recommended to set 
+/// IsSafe = true, which is the default in all derived ValueAccessors defined
+/// below. However if you know that the tree is no being modifed for the lifespan 
+/// of the ValueAccessor AND the work performed per ValueAccessor is small relative 
+/// to overhead of registering it you should consider setting IsSafe = false. If 
+/// this turns out to improve performance you should really rewrite your code so as
+/// to better amortize the construction of the ValueAccessor, i.e. reuse it as much 
+/// as possible!  
+template<typename TreeType, bool IsSafe>
 class ValueAccessorBase
 {
 public:
     static const bool IsConstTree = boost::is_const<TreeType>::value;
 
-    ValueAccessorBase(TreeType& tree): mTree(&tree) { tree.attachAccessor(*this); }
+    /// @brief Return true if this accessor is safe, i.e. registered
+    /// by the tree from which it is constructed. Un-registered
+    /// accessors can in rare cases be faster because it avoids the
+    /// (small) overhead of registration, but they are unsafe if the
+    /// tree is modified. So unless you're an expert it is highly
+    /// recommended to set IsSafe = true (which is the default).
+    static bool isSafe() { return IsSafe; }
 
-    virtual ~ValueAccessorBase() { if (mTree) mTree->releaseAccessor(*this); }
+    ValueAccessorBase(TreeType& tree): mTree(&tree)
+    {
+        if (IsSafe) tree.attachAccessor(*this);
+    }
+
+    virtual ~ValueAccessorBase() { if (IsSafe && mTree) mTree->releaseAccessor(*this); }
 
     /// @brief Return a pointer to the tree associated with this accessor.
     /// @details The pointer will be null only if the tree from which this accessor
@@ -118,15 +148,15 @@ public:
 
     ValueAccessorBase(const ValueAccessorBase& other): mTree(other.mTree)
     {
-        if (mTree) mTree->attachAccessor(*this);
+        if (IsSafe && mTree) mTree->attachAccessor(*this);
     }
 
     ValueAccessorBase& operator=(const ValueAccessorBase& other)
     {
         if (&other != this) {
-            if (mTree) mTree->releaseAccessor(*this);
+            if (IsSafe && mTree) mTree->releaseAccessor(*this);
             mTree = other.mTree;
-            if (mTree) mTree->attachAccessor(*this);
+            if (IsSafe && mTree) mTree->attachAccessor(*this);
         }
         return *this;
     }
@@ -159,28 +189,44 @@ protected:
 /// This leads to significant acceleration of spatially-coherent accesses.
 ///
 /// @param _TreeType    the type of the tree to be accessed [required]
+/// @param IsSafe       if IsSafe = false then the ValueAccessor will
+///                     not register itself with the tree from which
+///                     it is consturcted (see warning).                     
 /// @param CacheLevels  the number of nodes to be cached, starting from the leaf level
 ///                     and not including the root (i.e., CacheLevels < DEPTH),
 ///                     and defaulting to all non-root nodes
 /// @param MutexType    the type of mutex to use (see note)
+///    
+/// @warning If IsSafe = false then the ValueAccessor will not register itself 
+/// with the tree from which it is constructed. While in some rare cases this can       
+/// lead to better performance (since it avoids the small overhead of insertion
+/// on creation and deletion on destruction) it is also unsafe if the tree is 
+/// modified. So unless you're an expert it is highly recommended to set 
+/// IsSafe = true, which is the default. However if you know that the tree is no 
+/// being modifed for the lifespan of the ValueAccessor AND the work performed 
+/// per ValueAccessor is small relative to overhead of registering it you should 
+/// consider setting IsSafe = false. If this improves performance you should 
+/// really rewrite your code so as to better amortize the construction of the 
+/// ValueAccessor, i.e. reuse it as much as possible!
 ///
 /// @note If @c MutexType is a TBB-compatible mutex, then multiple threads may
 /// safely access a single, shared accessor.  However, it is highly recommended
 /// that, instead, each thread be assigned its own, non-mutex-protected accessor.
 template<typename _TreeType,
+         bool IsSafe = true,
          Index CacheLevels = _TreeType::DEPTH-1,
          typename MutexType = tbb::null_mutex>
-class ValueAccessor: public ValueAccessorBase<_TreeType>
+class ValueAccessor: public ValueAccessorBase<_TreeType, IsSafe>
 {
 public:
     BOOST_STATIC_ASSERT(CacheLevels < _TreeType::DEPTH);
 
-    typedef _TreeType                       TreeType;
-    typedef typename TreeType::RootNodeType RootNodeT;
-    typedef typename TreeType::LeafNodeType LeafNodeT;
-    typedef typename RootNodeT::ValueType   ValueType;
-    typedef ValueAccessorBase<TreeType>     BaseT;
-    typedef typename MutexType::scoped_lock LockT;
+    typedef _TreeType                           TreeType;
+    typedef typename TreeType::RootNodeType     RootNodeT;
+    typedef typename TreeType::LeafNodeType     LeafNodeT;
+    typedef typename RootNodeT::ValueType       ValueType;
+    typedef ValueAccessorBase<TreeType, IsSafe> BaseT;
+    typedef typename MutexType::scoped_lock     LockT;
     using BaseT::IsConstTree;
 
     ValueAccessor(TreeType& tree): BaseT(tree), mCache(*this)
@@ -439,45 +485,49 @@ private:
 /// @brief Template specialization of the ValueAccessor with no mutex and no cache levels
 /// @details This specialization is provided mainly for benchmarking.
 /// Accessors with caching will almost always be faster.
-template<typename TreeType>
-class ValueAccessor<TreeType, 0, tbb::null_mutex>: public ValueAccessor0<TreeType>
+template<typename TreeType, bool IsSafe>
+class ValueAccessor<TreeType, IsSafe, 0, tbb::null_mutex>
+    : public ValueAccessor0<TreeType, IsSafe>
 {
 public:
-    ValueAccessor(TreeType& tree): ValueAccessor0<TreeType>(tree) {}
-    ValueAccessor(const ValueAccessor& other): ValueAccessor0<TreeType>(other) {}
+    ValueAccessor(TreeType& tree): ValueAccessor0<TreeType, IsSafe>(tree) {}
+    ValueAccessor(const ValueAccessor& other): ValueAccessor0<TreeType, IsSafe>(other) {}
     virtual ~ValueAccessor() {}
 };
 
 
 /// Template specialization of the ValueAccessor with no mutex and one cache level
-template<typename TreeType>
-class ValueAccessor<TreeType, 1, tbb::null_mutex>: public ValueAccessor1<TreeType>
+template<typename TreeType, bool IsSafe>
+class ValueAccessor<TreeType, IsSafe, 1, tbb::null_mutex>
+    : public ValueAccessor1<TreeType, IsSafe>
 {
 public:
-    ValueAccessor(TreeType& tree): ValueAccessor1<TreeType>(tree) {}
-    ValueAccessor(const ValueAccessor& other): ValueAccessor1<TreeType>(other) {}
+    ValueAccessor(TreeType& tree): ValueAccessor1<TreeType, IsSafe>(tree) {}
+    ValueAccessor(const ValueAccessor& other): ValueAccessor1<TreeType, IsSafe>(other) {}
     virtual ~ValueAccessor() {}
 };
 
 
 /// Template specialization of the ValueAccessor with no mutex and two cache levels
-template<typename TreeType>
-class ValueAccessor<TreeType, 2, tbb::null_mutex>: public ValueAccessor2<TreeType>
+template<typename TreeType, bool IsSafe>
+class ValueAccessor<TreeType, IsSafe, 2, tbb::null_mutex>
+    : public ValueAccessor2<TreeType, IsSafe>
 {
 public:
-    ValueAccessor(TreeType& tree): ValueAccessor2<TreeType>(tree) {}
-    ValueAccessor(const ValueAccessor& other): ValueAccessor2<TreeType>(other) {}
+    ValueAccessor(TreeType& tree): ValueAccessor2<TreeType, IsSafe>(tree) {}
+    ValueAccessor(const ValueAccessor& other): ValueAccessor2<TreeType, IsSafe>(other) {}
     virtual ~ValueAccessor() {}
 };
 
 
 /// Template specialization of the ValueAccessor with no mutex and three cache levels
-template<typename TreeType>
-class ValueAccessor<TreeType, 3, tbb::null_mutex>: public ValueAccessor3<TreeType>
+template<typename TreeType, bool IsSafe>
+class ValueAccessor<TreeType, IsSafe, 3, tbb::null_mutex>
+    : public ValueAccessor3<TreeType, IsSafe>
 {
 public:
-    ValueAccessor(TreeType& tree): ValueAccessor3<TreeType>(tree) {}
-    ValueAccessor(const ValueAccessor& other): ValueAccessor3<TreeType>(other) {}
+    ValueAccessor(TreeType& tree): ValueAccessor3<TreeType, IsSafe>(tree) {}
+    ValueAccessor(const ValueAccessor& other): ValueAccessor3<TreeType, IsSafe>(other) {}
     virtual ~ValueAccessor() {}
 };
 
@@ -493,12 +543,12 @@ public:
 /// can seriously impair performance of multithreaded applications, it
 /// is recommended that, instead, each thread be assigned its own
 /// (non-mutex protected) accessor.
-template<typename TreeType>
-class ValueAccessorRW: public ValueAccessor<TreeType, TreeType::DEPTH-1, tbb::spin_mutex>
+template<typename TreeType, bool IsSafe = true>
+class ValueAccessorRW: public ValueAccessor<TreeType, IsSafe, TreeType::DEPTH-1, tbb::spin_mutex>
 {
 public:
     ValueAccessorRW(TreeType& tree)
-        : ValueAccessor<TreeType, TreeType::DEPTH-1, tbb::spin_mutex>(tree)
+        : ValueAccessor<TreeType, IsSafe, TreeType::DEPTH-1, tbb::spin_mutex>(tree)
     {
     }
 };
@@ -992,15 +1042,15 @@ private:
 /// @brief ValueAccessor with no mutex and no node caching.
 /// @details This specialization is provided mainly for benchmarking.
 /// Accessors with caching will almost always be faster.
-template<typename _TreeType>
-class ValueAccessor0: public ValueAccessorBase<_TreeType>
+template<typename _TreeType, bool IsSafe>
+class ValueAccessor0: public ValueAccessorBase<_TreeType, IsSafe>
 {
 public:
-    typedef _TreeType                       TreeType;
-    typedef typename TreeType::ValueType    ValueType;
-    typedef typename TreeType::RootNodeType RootNodeT;
-    typedef typename TreeType::LeafNodeType LeafNodeT;
-    typedef ValueAccessorBase<TreeType>     BaseT;
+    typedef _TreeType                           TreeType;
+    typedef typename TreeType::ValueType        ValueType;
+    typedef typename TreeType::RootNodeType     RootNodeT;
+    typedef typename TreeType::LeafNodeType     LeafNodeT;
+    typedef ValueAccessorBase<TreeType, IsSafe> BaseT;
 
     ValueAccessor0(TreeType& tree): BaseT(tree) {}
 
@@ -1205,18 +1255,18 @@ private:
 ///
 /// @note This class is for experts only and should rarely be used
 /// directly. Instead use ValueAccessor with its default template arguments.
-template<typename _TreeType, Index L0>
-class ValueAccessor1 : public ValueAccessorBase<_TreeType>
+template<typename _TreeType, bool IsSafe, Index L0>
+class ValueAccessor1 : public ValueAccessorBase<_TreeType, IsSafe>
 {
 public:
     BOOST_STATIC_ASSERT(_TreeType::DEPTH >= 2);
     BOOST_STATIC_ASSERT( L0 < _TreeType::RootNodeType::LEVEL );
-    typedef _TreeType                       TreeType;
-    typedef typename TreeType::ValueType    ValueType;
-    typedef typename TreeType::RootNodeType RootNodeT;
-    typedef typename TreeType::LeafNodeType LeafNodeT;
-    typedef ValueAccessorBase<TreeType>     BaseT;
-    typedef typename RootNodeT::NodeChainType InvTreeT;
+    typedef _TreeType                           TreeType;
+    typedef typename TreeType::ValueType        ValueType;
+    typedef typename TreeType::RootNodeType     RootNodeT;
+    typedef typename TreeType::LeafNodeType     LeafNodeT;
+    typedef ValueAccessorBase<TreeType, IsSafe> BaseT;
+    typedef typename RootNodeT::NodeChainType   InvTreeT;
     typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L0> >::type NodeT0;
 
     /// Constructor from a tree
@@ -1579,18 +1629,18 @@ private:
 ///
 /// @note This class is for experts only and should rarely be used directly.
 /// Instead use ValueAccessor with its default template arguments.
-template<typename _TreeType, Index L0, Index L1>
-class ValueAccessor2 : public ValueAccessorBase<_TreeType>
+template<typename _TreeType, bool IsSafe, Index L0, Index L1>
+class ValueAccessor2 : public ValueAccessorBase<_TreeType, IsSafe>
 {
 public:
     BOOST_STATIC_ASSERT(_TreeType::DEPTH >= 3);
     BOOST_STATIC_ASSERT( L0 < L1 && L1 < _TreeType::RootNodeType::LEVEL );
-    typedef _TreeType                         TreeType;
-    typedef typename TreeType::ValueType      ValueType;
-    typedef typename TreeType::RootNodeType   RootNodeT;
-    typedef typename TreeType::LeafNodeType   LeafNodeT;
-    typedef ValueAccessorBase<TreeType>       BaseT;
-    typedef typename RootNodeT::NodeChainType InvTreeT;
+    typedef _TreeType                           TreeType;
+    typedef typename TreeType::ValueType        ValueType;
+    typedef typename TreeType::RootNodeType     RootNodeT;
+    typedef typename TreeType::LeafNodeType     LeafNodeT;
+    typedef ValueAccessorBase<TreeType, IsSafe> BaseT;
+    typedef typename RootNodeT::NodeChainType   InvTreeT;
     typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L0> >::type NodeT0;
     typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L1> >::type NodeT1;
 
@@ -2066,18 +2116,18 @@ private:
 ///
 /// @note This class is for experts only and should rarely be used
 /// directly. Instead use ValueAccessor with its default template arguments
-template<typename _TreeType, Index L0, Index L1, Index L2>
-class ValueAccessor3 : public ValueAccessorBase<_TreeType>
+template<typename _TreeType, bool IsSafe, Index L0, Index L1, Index L2>
+class ValueAccessor3 : public ValueAccessorBase<_TreeType, IsSafe>
 {
 public:
     BOOST_STATIC_ASSERT(_TreeType::DEPTH >= 4);
     BOOST_STATIC_ASSERT(L0 < L1 && L1 < L2 && L2 < _TreeType::RootNodeType::LEVEL);
-    typedef _TreeType                         TreeType;
-    typedef typename TreeType::ValueType      ValueType;
-    typedef typename TreeType::RootNodeType   RootNodeT;
-    typedef typename TreeType::LeafNodeType   LeafNodeT;
-    typedef ValueAccessorBase<TreeType>       BaseT;
-    typedef typename RootNodeT::NodeChainType InvTreeT;
+    typedef _TreeType                           TreeType;
+    typedef typename TreeType::ValueType        ValueType;
+    typedef typename TreeType::RootNodeType     RootNodeT;
+    typedef typename TreeType::LeafNodeType     LeafNodeT;
+    typedef ValueAccessorBase<TreeType, IsSafe> BaseT;
+    typedef typename RootNodeT::NodeChainType   InvTreeT;
     typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L0> >::type NodeT0;
     typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L1> >::type NodeT1;
     typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L2> >::type NodeT2;
@@ -2611,6 +2661,6 @@ private:
 
 #endif // OPENVDB_TREE_VALUEACCESSOR_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -62,8 +62,8 @@ namespace {
 class ParticleList
 {
 public:
-    // required typedef for bucketing
-    typedef openvdb::Vec3R    value_type;
+    // Required by @c PointPartitioner
+    typedef openvdb::Vec3R  PosType;
 
     ParticleList(const GU_Detail* gdp,
                  openvdb::Real radiusMult = 1,
@@ -361,7 +361,7 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(PRMpointOneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 5));
 
-    // Narrow-band {
+    // Narrow-band
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldSpaceUnits", "Use World Space for Band")
               .setCallbackFunc(&convertUnitsCB));
 
@@ -378,7 +378,19 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_FLT_J, "bandWidthWS", "Half-Band")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 10));
-    // }
+
+
+    // Dilation
+    parms.add(hutil::ParmFactory(PRM_INT_J, "dilate", "Dilation")
+        .setDefault(PRMoneDefaults)
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
+        .setHelpText("Dilation in voxel units"));
+
+    // Erosion
+    parms.add(hutil::ParmFactory(PRM_INT_J, "erode", "Erosion")
+        .setDefault(PRMoneDefaults)
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
+        .setHelpText("Erosion in voxel units"));
 
     // dR (radius scale)
     parms.add(hutil::ParmFactory(PRM_FLT_J, "dR", "Particle Radius Scale")
@@ -404,7 +416,7 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(PRMzeroDefaults)
         .setHelpText("Enable / disable the pruning of nodes, i.e. leafs filled with "
                      "the inside values are compactly represented by a tile value. "
-                     "This option only has an effect if the particles are larger then "
+                     "This option only has an effect if the particles are larger than "
                      "the leaf nodes so it is normally recommended to leave it disabled."));
 
     // Width of the mask for constraining subsequent deformations
@@ -420,13 +432,14 @@ newSopOperator(OP_OperatorTable* table)
         const char* items[] = {
             "sphere", "Spherical",
             "trail",  "Velocity Trail",
+            "points", "Voxelized Point",
             NULL
         };
 
         parms.add(hutil::ParmFactory(PRM_ORD, "footprint", "Particle Footprint")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
             .setHelpText("Use this parameter to select the "
-                "type of particle footprints (spherical or conical)."));
+                "type of particle footprints (spherical, conical or point mask)."));
     }
 
     // dV (velocity scale)
@@ -571,6 +584,14 @@ SOP_OpenVDB_From_Particles::updateParmsFlags()
     changed |= setVisibleState("bandWidth", !wsUnits);
     changed |= setVisibleState("bandWidthWS", wsUnits);
 
+    const bool ignoreRadius = evalInt("footprint", 0, 0) == 2;
+    changed |= setVisibleState("dR", !ignoreRadius);
+    changed |= setVisibleState("dilate", ignoreRadius);
+    changed |= setVisibleState("erode", ignoreRadius);
+    changed |= setVisibleState("Rmin", !ignoreRadius);
+    changed |= setVisibleState("prune", !ignoreRadius);
+    changed |= setVisibleState("transferHeading", !ignoreRadius);
+    changed |= setVisibleState("attrList", !ignoreRadius);
 
     // Particle conversion
     const bool useTrails =  evalInt("footprint", 0, 0) == 1;
@@ -594,7 +615,7 @@ SOP_OpenVDB_From_Particles::updateParmsFlags()
     UT_String attrName;
     GA_ROAttributeRef attrRef;
     const GU_Detail* ptGeo = this->getInputLastGeo(0, CHgetEvalTime());
-    if (ptGeo) {
+    if (ptGeo && !ignoreRadius) {
         for (int i = 1, N = evalInt("attrList", 0, 0); i <= N; ++i) {
 
             evalStringInst("attribute#", &i, attrName, 0, 0);
@@ -648,7 +669,8 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
         const bool outputLevelSetGrid   = bool(evalInt("levelSet",   0, mTime));
         const bool outputFogVolumeGrid  = bool(evalInt("fogVolume",  0, mTime));
         const bool outputMaskVolumeGrid = bool(evalInt("maskVolume", 0, mTime));
-        const bool outputAttributeGrid  = bool(evalInt("attrList",   0, mTime) > 0);
+        const bool outputAttributeGrid  = bool(evalInt("attrList",   0, mTime) > 0)
+                                          && evalInt("footprint", 0, 0) != 2;
 
         if (!outputFogVolumeGrid && !outputLevelSetGrid && !outputAttributeGrid) {
              addWarning(SOP_MESSAGE, "No output selected");
@@ -814,8 +836,10 @@ SOP_OpenVDB_From_Particles::convert(openvdb::FloatGrid::Ptr outputGrid,
 
     raster.setRmin(evalFloat("Rmin", 0,  mTime));
     raster.setRmax(1e15f);
-
-    if (settings.mRasterizeTrails && paList.hasVelocity()) {
+    if (evalInt("footprint", 0, 0) == 2) {
+        raster.rasterizePoints(paList, evalInt("dilate",0,0), evalInt("erode",0,0));
+        return;
+    } else if (settings.mRasterizeTrails && paList.hasVelocity()) {
         raster.rasterizeTrails(paList, settings.mDx);
     } else if (paList.hasRadius()){
         raster.rasterizeSpheres(paList);
@@ -1086,6 +1110,6 @@ SOP_OpenVDB_From_Particles::transferAttributes(
     }
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

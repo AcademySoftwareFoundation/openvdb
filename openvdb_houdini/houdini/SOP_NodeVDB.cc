@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -45,8 +45,104 @@
 #include <UT/UT_InfoTree.h>
 #include <sstream>
 
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
+#include <SOP/SOP_Cache.h> // for stealable
+#endif
+
+#include <tbb/mutex.h>
 
 namespace openvdb_houdini {
+
+namespace node_info_text {
+
+/// @brief The default information text returned for VDB grids when no
+/// override for the grid type has been found
+static void defaultNodeSpecificInfoText(std::ostream& infoStr, const openvdb::GridBase& grid)
+{
+    const openvdb::Coord dim = grid.evalActiveVoxelDim();
+
+    infoStr << " voxel size: " << grid.transform().voxelSize()[0] << ",";
+    infoStr << " type: "<< grid.valueType() << ",";
+
+    if (grid.activeVoxelCount() != 0) {
+        infoStr << " dim: " << dim[0] << "x" << dim[1] << "x" << dim[2];
+    } else {
+        infoStr << " <empty>";
+    }
+
+    const openvdb::GridClass gClass = grid.getGridClass();
+    if (openvdb::GRID_LEVEL_SET == gClass || openvdb::GRID_FOG_VOLUME == gClass) {
+        infoStr <<" (" << grid.gridClassToMenuName(gClass) << ")";
+    }
+}
+
+typedef tbb::mutex Mutex;
+typedef Mutex::scoped_lock Lock;
+// map of function callbacks to grid types
+typedef std::map<openvdb::Name, ApplyGridSpecificInfoText> ApplyGridSpecificInfoTextMap;
+
+struct LockedInfoTextRegistry
+{
+    LockedInfoTextRegistry() {}
+    ~LockedInfoTextRegistry() {}
+
+    Mutex mMutex;
+    ApplyGridSpecificInfoTextMap mApplyGridSpecificInfoTextMap;
+};
+
+// Declare this at file scope to ensure thread-safe initialization
+static Mutex theInitInfoTextRegistryMutex;
+
+// Global function for accessing the regsitry
+static LockedInfoTextRegistry* getInfoTextRegistry()
+{
+    Lock lock(theInitInfoTextRegistryMutex);
+
+    static LockedInfoTextRegistry *registry = NULL;
+
+    if(registry == NULL) {
+#if defined(__ICC)
+__pragma(warning(disable:1711)) // disable ICC "assignment to static variable" warnings
+#endif
+        registry = new LockedInfoTextRegistry();
+#if defined(__ICC)
+__pragma(warning(default:1711))
+#endif
+    }
+
+    return registry;
+}
+
+void registerGridSpecificInfoText(const std::string& gridType, ApplyGridSpecificInfoText callback)
+{
+    LockedInfoTextRegistry *registry = getInfoTextRegistry();
+    Lock lock(registry->mMutex);
+
+    if(registry->mApplyGridSpecificInfoTextMap.find(gridType) !=
+       registry->mApplyGridSpecificInfoTextMap.end()) return;
+
+    registry->mApplyGridSpecificInfoTextMap[gridType] = callback;
+}
+
+/// @brief Returns a valid pointer to an registered function, designed to populate an
+/// output stream with specific grid information. If a registered function pointer is
+/// NULL, the default implementation is returned
+ApplyGridSpecificInfoText getGridSpecificInfoText(const std::string& gridType)
+{
+    LockedInfoTextRegistry *registry = getInfoTextRegistry();
+    Lock lock(registry->mMutex);
+
+    const ApplyGridSpecificInfoTextMap::const_iterator iter = registry->mApplyGridSpecificInfoTextMap.find(gridType);
+
+    if(iter == registry->mApplyGridSpecificInfoTextMap.end() ||
+       iter->second == NULL) {
+        return &defaultNodeSpecificInfoText;
+    }
+
+    return iter->second;
+}
+
+} // node_info_text
 
 SOP_NodeVDB::SOP_NodeVDB(OP_Network* net, const char* name, OP_Operator* op):
     SOP_Node(net, name, op)
@@ -80,7 +176,11 @@ SOP_NodeVDB::matchGroup(GU_Detail& aGdp, const std::string& pattern)
     const GA_PrimitiveGroup* group = NULL;
     if (!pattern.empty()) {
         // If a pattern was provided, try to match it.
+#if (UT_MAJOR_VERSION_INT >= 15)
+        group = parsePrimitiveGroups(pattern.c_str(), GroupCreator(&aGdp));
+#else
         group = parsePrimitiveGroups(pattern.c_str(), &aGdp);
+#endif
         if (!group) {
             // Report an error if the pattern didn't match.
             throw std::runtime_error(("Invalid group (" + pattern + ")").c_str());
@@ -130,22 +230,19 @@ SOP_NodeVDB::getNodeSpecificInfoText(OP_Context &context, OP_NodeInfoParms &parm
 
     unsigned gridn = 0;
     for (VdbPrimCIterator it(tmp_gdp); it; ++it) {
-
         const openvdb::GridBase& grid = it->getGrid();
-        openvdb::Coord dim = grid.evalActiveVoxelDim();
+
+        // Note, the output string stream for every new grid is initialized with
+        // its index and houdini primitive name prior to executing the callback
         const UT_String gridName = it.getPrimitiveName();
 
-        infoStr << "    ";
-        infoStr << "(" << it.getIndex() << ")";
+        infoStr << "  (" << it.getIndex() << ")";
         if(gridName.isstring()) infoStr << " name: '" << gridName << "',";
-        infoStr << " voxel size: " << grid.transform().voxelSize()[0] << ",";
-        infoStr << " type: "<< grid.valueType() << ",";
 
-        if (grid.activeVoxelCount() != 0) {
-            infoStr << " dim: " << dim[0] << "x" << dim[1] << "x" << dim[2];
-        } else {
-            infoStr <<" <empty>";
-        }
+        node_info_text::ApplyGridSpecificInfoText callback = node_info_text::getGridSpecificInfoText(grid.type());
+        assert(callback);
+
+        (*callback)(infoStr, grid);
 
         infoStr<<"\n";
 
@@ -159,6 +256,115 @@ SOP_NodeVDB::getNodeSpecificInfoText(OP_Context &context, OP_NodeInfoParms &parm
         parms.append(headStr.str().c_str());
         parms.append(infoStr.str().c_str());
     }
+#endif
+}
+
+
+OP_ERROR
+SOP_NodeVDB::duplicateSourceStealable(const unsigned index,
+    OP_Context& context, GU_Detail **pgdp, GU_DetailHandle& gdh, bool clean)
+{
+
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
+
+    // traverse upstream nodes, if unload is not possible, duplicate the source
+    if (!isSourceStealable(index, context)) {
+        duplicateSource(index, context, *pgdp, clean);
+        unlockInput(index);
+        return error();
+    }
+
+    // get the input GU_Detail handle and unlock the inputs
+    GU_DetailHandle inputgdh = inputGeoHandle(index);
+
+    unlockInput(index);
+    SOP_Node *input = CAST_SOPNODE(getInput(index));
+
+    if (!input) {
+        addError(SOP_MESSAGE, "Invalid input SOP Node when attempting to unload.");
+        return error();
+    }
+
+    // explicitly unload the data from the input SOP
+    const bool unloadSuccessful = input->unloadData();
+
+    // check if we only have one reference
+    const bool soleReference = (inputgdh.getRefCount() == 1);
+
+    // if the unload was unsuccessful or the reference count is not one, we fall back to
+    // explicitly copying the input onto the gdp
+    if (!(unloadSuccessful && soleReference)) {
+        const GU_Detail *src = inputgdh.readLock();
+        assert(src);
+        if (src)  (*pgdp)->copy(*src);
+        inputgdh.unlock(src);
+        return error();
+    }
+
+    // release our old write lock on gdp (setup by cookMe())
+    gdh.unlock(*pgdp);
+    // point to the input's old gdp and setup a write lock
+    gdh = inputgdh;
+    *pgdp = gdh.writeLock();
+
+#else // earlier than 13.0
+
+    duplicateSource(index, context, *pgdp, clean);
+    // inputs are unlocked to match SOP state in Houdini 13.0 or later functionality
+    unlockInput(index);
+
+#endif
+
+    return error();
+}
+
+
+bool
+SOP_NodeVDB::isSourceStealable(const unsigned index, OP_Context& context) const
+{
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
+    struct Local {
+        static inline OP_Node* nextStealableInput(const unsigned index, const fpreal now, const OP_Node* node)
+        {
+            OP_Node* input = node->getInput(index);
+            while (input) {
+                OP_Node* passThrough = input->getPassThroughNode(now);
+                if (!passThrough) break;
+                input = passThrough;
+            }
+            return input;
+        }
+    }; // struct Local
+
+    const fpreal now = context.getTime();
+
+    for (OP_Node*   node = Local::nextStealableInput(index, now, this); node != NULL;
+                    node = Local::nextStealableInput(index, now, node)) {
+
+        // cont'd if it is a SOP_NULL.
+        std::string opname = node->getName().toStdString().substr(0, 4);
+        if (opname == "null") continue;
+
+        // if the SOP is a cache SOP we don't want to try and alter its data without a deep copy
+        if (dynamic_cast<SOP_Cache*>(node))  return false;
+
+        if(node->getUnload() == true) return true;
+        else  return false;
+    }
+#endif
+    return false;
+}
+
+
+OP_ERROR
+SOP_NodeVDB::duplicateSourceStealable(const unsigned index, OP_Context& context) {
+#if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
+    return this->duplicateSourceStealable(index, context, &gdp, myGdpHandle, true);
+#else
+    duplicateSource(index, context, gdp, true);
+    // inputs are unlocked to match SOP state in Houdini 13.0 or later functionality
+    unlockInput(index);
+    return error();
 #endif
 }
 
@@ -356,6 +562,6 @@ OpenVDBOpFactory::OpenVDBOpFactory(
 
 } // namespace openvdb_houdini
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

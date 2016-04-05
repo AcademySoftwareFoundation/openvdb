@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -65,6 +65,7 @@ template<typename T, Index Log2Dim>
 class LeafNode
 {
 public:
+    typedef T                            BuildType; 
     typedef T                            ValueType;
     typedef LeafNode<ValueType, Log2Dim> LeafNodeType;
     typedef boost::shared_ptr<LeafNode>  Ptr;
@@ -123,8 +124,6 @@ public:
         bool isOutOfCore() const { return false; }
         /// Return @c true if memory for this buffer has not yet been allocated.
         bool empty() const { return (mData == NULL); }
-        /// Allocate memory for this buffer if it has not already been allocated.
-        bool allocate() { if (mData == NULL) mData = new ValueType[SIZE]; return !this->empty(); }
 #else
         typedef ValueType WordType;
         static const Index WORD_COUNT = SIZE;
@@ -164,9 +163,9 @@ public:
         bool isOutOfCore() const { return bool(mOutOfCore); }
         /// Return @c true if memory for this buffer has not yet been allocated.
         bool empty() const { return !mData || this->isOutOfCore(); }
+#endif
         /// Allocate memory for this buffer if it has not already been allocated.
         bool allocate() { if (mData == NULL) mData = new ValueType[SIZE]; return !this->empty(); }
-#endif
 
         /// Populate this buffer with a constant value.
         void fill(const ValueType& val)
@@ -270,7 +269,12 @@ public:
         {
 #ifndef OPENVDB_2_ABI_COMPATIBLE
             this->loadValues();
-            if (mData == NULL) mData = new ValueType[SIZE];
+            if (mData == NULL) {
+                Buffer* self = const_cast<Buffer*>(this);
+                // This lock will be contended at most once.
+                tbb::spin_mutex::scoped_lock lock(self->mMutex);
+                if (mData == NULL) self->mData = new ValueType[SIZE];
+            }
 #endif
             return mData;
         }
@@ -282,7 +286,11 @@ public:
         {
 #ifndef OPENVDB_2_ABI_COMPATIBLE
             this->loadValues();
-            if (mData == NULL) mData = new ValueType[SIZE];
+            if (mData == NULL) {
+                // This lock will be contended at most once.
+                tbb::spin_mutex::scoped_lock lock(mMutex);
+                if (mData == NULL) mData = new ValueType[SIZE];
+            }
 #endif
             return mData;
         }
@@ -351,7 +359,7 @@ public:
 #else
         union {
             ValueType* mData;
-            FileInfo* mFileInfo;
+            FileInfo*  mFileInfo;
         };
         Index32 mOutOfCore; // currently interpreted as bool; extra bits reserved for future use
         tbb::spin_mutex mMutex; // 1 byte
@@ -997,6 +1005,7 @@ public:
     template<typename NodeT>
     const NodeT* probeConstNode(const Coord&) const { return NULL; }
     template<typename ArrayT> void getNodes(ArrayT&) const {}
+    template<typename ArrayT> void stealNodes(ArrayT&, const ValueType&, bool) {}
     //@}
 
     void addTile(Index level, const Coord&, const ValueType&, bool);
@@ -1040,10 +1049,31 @@ public:
     //@}
 
     /// Return @c true if all of this node's values have the same active state
-    /// and are equal to within the given tolerance, and return the value in @a constValue
-    /// and the active state in @a state.
+    /// and are in the range this->getFirstValue() +/- @a tolerance.
+    ///
+    ///
+    /// @param constValue  Is updated with the first value of this leaf node.
+    /// @param state       Is updated with the state of all values IF method
+    ///                    returns @c true. Else the value is undefined!
+    /// @param tolerance   The tolerance used to determine if values are
+    ///                    approximatly equal to the for value.
     bool isConstant(ValueType& constValue, bool& state,
                     const ValueType& tolerance = zeroVal<ValueType>()) const;
+
+    /// Return @c true if all of this node's values have the same active state
+    /// and are in the range (@a maxValue + @a minValue)/2 +/- @a tolerance.
+    ///
+    /// @param minValue  Is updated with the minimum of all values IF method
+    ///                  returns @c true. Else the value is undefined!
+    /// @param maxValue  Is updated with the maximum of all values IF method
+    ///                  returns @c true. Else the value is undefined!
+    /// @param state     Is updated with the state of all values IF method
+    ///                  returns @c true. Else the value is undefined!
+    /// @param tolerance The tolerance used to determine if values are
+    ///                  approximatly constant.
+    bool isConstant(ValueType& minValue, ValueType& maxValue,
+                    bool& state, const ValueType& tolerance = zeroVal<ValueType>()) const;
+    
     /// Return @c true if all of this node's values are inactive.
     bool isInactive() const { return mValueMask.isOff(); }
 
@@ -1076,6 +1106,7 @@ public:
     bool isValueMaskOff() const { return mValueMask.isOff(); }
     const NodeMaskType& getValueMask() const { return mValueMask; }
     NodeMaskType& getValueMask() { return mValueMask; }
+    const NodeMaskType& valueMask() const { return mValueMask; }
     void setValueMask(const NodeMaskType& mask) { mValueMask = mask; }
     bool isChildMaskOn(Index) const { return false; } // leaf nodes have no children
     bool isChildMaskOff(Index) const { return true; }
@@ -1167,7 +1198,7 @@ template<typename T, Index Log2Dim>
 inline
 LeafNode<T, Log2Dim>::LeafNode(const LeafNode &other):
     mBuffer(other.mBuffer),
-    mValueMask(other.mValueMask),
+    mValueMask(other.valueMask()),
     mOrigin(other.mOrigin)
 {
 }
@@ -1178,7 +1209,7 @@ template<typename T, Index Log2Dim>
 template<typename OtherValueType>
 inline
 LeafNode<T, Log2Dim>::LeafNode(const LeafNode<OtherValueType, Log2Dim>& other):
-    mValueMask(other.mValueMask),
+    mValueMask(other.valueMask()),
     mOrigin(other.mOrigin)
 {
     struct Local {
@@ -1198,7 +1229,7 @@ inline
 LeafNode<T, Log2Dim>::LeafNode(const LeafNode<OtherValueType, Log2Dim>& other,
                                const ValueType& background, TopologyCopy):
     mBuffer(background),
-    mValueMask(other.mValueMask),
+    mValueMask(other.valueMask()),
     mOrigin(other.mOrigin)
 {
 }
@@ -1209,7 +1240,7 @@ template<typename OtherValueType>
 inline
 LeafNode<T, Log2Dim>::LeafNode(const LeafNode<OtherValueType, Log2Dim>& other,
     const ValueType& offValue, const ValueType& onValue, TopologyCopy):
-    mValueMask(other.mValueMask),
+    mValueMask(other.valueMask()),
     mOrigin(other.mOrigin)
 {
     for (Index i = 0; i < SIZE; ++i) {
@@ -1674,7 +1705,7 @@ inline bool
 LeafNode<T, Log2Dim>::operator==(const LeafNode& other) const
 {
     return mOrigin == other.mOrigin &&
-           mValueMask == other.mValueMask &&
+           mValueMask == other.valueMask() &&
            mBuffer == other.mBuffer;
 }
 
@@ -1718,23 +1749,41 @@ LeafNode<T, Log2Dim>::hasSameTopology(const LeafNode<OtherType, OtherLog2Dim>* o
 
 template<typename T, Index Log2Dim>
 inline bool
-LeafNode<T, Log2Dim>::isConstant(ValueType& constValue,
+LeafNode<T, Log2Dim>::isConstant(ValueType& value, bool& state,
+                                 const ValueType& tolerance) const
+{
+    state = mValueMask.isOn();
+    if (!(state || mValueMask.isOff())) return false;// Are values neither active nor inactive?
+    
+    value = mBuffer[0];
+    for (Index i = 1; i < SIZE; ++i) {
+        if ( !math::isApproxEqual(mBuffer[i], value, tolerance) ) return false;
+    }
+    return true;
+}
+
+template<typename T, Index Log2Dim>
+inline bool
+LeafNode<T, Log2Dim>::isConstant(ValueType& minValue, ValueType& maxValue,
                                  bool& state, const ValueType& tolerance) const
 {
     state = mValueMask.isOn();
-
-    if (!(state || mValueMask.isOff())) return false;
-
-    bool allEqual = true;
-    const T value = mBuffer[0];
-    for (Index i = 1; allEqual && i < SIZE; ++i) {
-        /// @todo Alternatively, allEqual = !((maxVal - minVal) > (2 * tolerance))
-        allEqual = math::isApproxEqual(mBuffer[i], value, tolerance);
+    if (!(state || mValueMask.isOff())) return false;// Are values neither active nor inactive?
+    
+    const T range = 2 * tolerance;
+    minValue = maxValue = mBuffer[0];
+    for (Index i = 1; i < SIZE; ++i) {// early termination
+        const T& v = mBuffer[i];
+        if (v < minValue) {
+            if ((maxValue - v) > range) return false;
+            minValue = v;
+        } else if (v > maxValue) {
+            if ((v - minValue) > range) return false;
+            maxValue = v;
+        }
     }
-    if (allEqual) constValue = value; ///< @todo return average/median value?
-    return allEqual;
+    return true;
 }
-
 
 ////////////////////////////////////////
 
@@ -1801,7 +1850,7 @@ LeafNode<T, Log2Dim>::merge(const LeafNode& other)
 
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
     if (Policy == MERGE_NODES) return;
-    typename NodeMaskType::OnIterator iter = other.mValueMask.beginOn();
+    typename NodeMaskType::OnIterator iter = other.valueMask().beginOn();
     for (; iter; ++iter) {
         const Index n = iter.pos();
         if (mValueMask.isOff(n)) {
@@ -1848,7 +1897,7 @@ template<typename OtherType>
 inline void
 LeafNode<T, Log2Dim>::topologyUnion(const LeafNode<OtherType, Log2Dim>& other)
 {
-    mValueMask |= other.getValueMask();
+    mValueMask |= other.valueMask();
 }
 
 template<typename T, Index Log2Dim>
@@ -1857,7 +1906,7 @@ inline void
 LeafNode<T, Log2Dim>::topologyIntersection(const LeafNode<OtherType, Log2Dim>& other,
                                            const ValueType&)
 {
-    mValueMask &= other.getValueMask();
+    mValueMask &= other.valueMask();
 }
 
 template<typename T, Index Log2Dim>
@@ -1866,7 +1915,7 @@ inline void
 LeafNode<T, Log2Dim>::topologyDifference(const LeafNode<OtherType, Log2Dim>& other,
                                          const ValueType&)
 {
-    mValueMask &= !other.getValueMask();
+    mValueMask &= !other.valueMask();
 }
 
 template<typename T, Index Log2Dim>
@@ -1898,7 +1947,7 @@ LeafNode<T, Log2Dim>::combine(const LeafNode& other, CombineOp& op)
         op(args.setARef(mBuffer[i])
             .setAIsActive(mValueMask.isOn(i))
             .setBRef(other.mBuffer[i])
-            .setBIsActive(other.mValueMask.isOn(i))
+            .setBIsActive(other.valueMask().isOn(i))
             .setResultRef(mBuffer[i]));
         mValueMask.set(i, args.resultIsActive());
     }
@@ -1940,7 +1989,7 @@ LeafNode<T, Log2Dim>::combine2(const LeafNode& other, const OtherType& value,
     args.setBRef(value).setBIsActive(valueIsActive);
     for (Index i = 0; i < SIZE; ++i) {
         op(args.setARef(other.mBuffer[i])
-            .setAIsActive(other.mValueMask.isOn(i))
+            .setAIsActive(other.valueMask().isOn(i))
             .setResultRef(mBuffer[i]));
         mValueMask.set(i, args.resultIsActive());
     }
@@ -1960,7 +2009,7 @@ LeafNode<T, Log2Dim>::combine2(const ValueType& value, const OtherNodeT& other,
     args.setARef(value).setAIsActive(valueIsActive);
     for (Index i = 0; i < SIZE; ++i) {
         op(args.setBRef(other.mBuffer[i])
-            .setBIsActive(other.mValueMask.isOn(i))
+            .setBIsActive(other.valueMask().isOn(i))
             .setResultRef(mBuffer[i]));
         mValueMask.set(i, args.resultIsActive());
     }
@@ -1977,11 +2026,11 @@ LeafNode<T, Log2Dim>::combine2(const LeafNode& b0, const OtherNodeT& b1, Combine
 #endif
     CombineArgs<T, typename OtherNodeT::ValueType> args;
     for (Index i = 0; i < SIZE; ++i) {
-        mValueMask.set(i, b0.mValueMask.isOn(i) || b1.mValueMask.isOn(i));
+        mValueMask.set(i, b0.valueMask().isOn(i) || b1.valueMask().isOn(i));
         op(args.setARef(b0.mBuffer[i])
-            .setAIsActive(b0.mValueMask.isOn(i))
+            .setAIsActive(b0.valueMask().isOn(i))
             .setBRef(b1.mBuffer[i])
-            .setBIsActive(b1.mValueMask.isOn(i))
+            .setBIsActive(b1.valueMask().isOn(i))
             .setResultRef(mBuffer[i]));
         mValueMask.set(i, args.resultIsActive());
     }
@@ -2158,8 +2207,11 @@ operator<<(std::ostream& os, const typename LeafNode<T, Log2Dim>::Buffer& buf)
 // Specialization for LeafNodes of type bool
 #include "LeafNodeBool.h"
 
+// Specialization for LeafNodes with mask information only
+#include "LeafNodeMask.h"
+
 #endif // OPENVDB_TREE_LEAFNODE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

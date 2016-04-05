@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -124,6 +124,23 @@ TestDense::testDenseZYX()
                                   openvdb::Coord(-11, 7,22));
     openvdb::tools::Dense<float> dense(bbox);//LayoutZYX is the default
 
+    // Check Desne::origin()
+    CPPUNIT_ASSERT(openvdb::Coord(-40,-5, 6) == dense.origin());
+    
+    // Check coordToOffset and offsetToCoord
+    size_t offset = 0;
+    for (openvdb::Coord P(bbox.min()); P[0] <= bbox.max()[0]; ++P[0]) {
+        for (P[1] = bbox.min()[1]; P[1] <= bbox.max()[1]; ++P[1]) {
+            for (P[2] = bbox.min()[2]; P[2] <= bbox.max()[2]; ++P[2]) {
+                //std::cerr << "offset = " << offset << " P = " << P << std::endl;
+                CPPUNIT_ASSERT_EQUAL(offset, dense.coordToOffset(P));
+                CPPUNIT_ASSERT_EQUAL(P - dense.origin(), dense.offsetToLocalCoord(offset));
+                CPPUNIT_ASSERT_EQUAL(P, dense.offsetToCoord(offset));
+                ++offset;
+            }
+        }
+    }
+    
     // Check Dense::valueCount
     const int size = static_cast<int>(dense.valueCount());
     CPPUNIT_ASSERT_EQUAL(30*13*17, size);
@@ -183,6 +200,23 @@ TestDense::testDenseXYZ()
                                   openvdb::Coord(-11, 7,22));
     openvdb::tools::Dense<float, openvdb::tools::LayoutXYZ> dense(bbox);
 
+    // Check Desne::origin()
+    CPPUNIT_ASSERT(openvdb::Coord(-40,-5, 6) == dense.origin());
+        
+    // Check coordToOffset and offsetToCoord
+    size_t offset = 0;
+    for (openvdb::Coord P(bbox.min()); P[2] <= bbox.max()[2]; ++P[2]) {
+        for (P[1] = bbox.min()[1]; P[1] <= bbox.max()[1]; ++P[1]) {
+            for (P[0] = bbox.min()[0]; P[0] <= bbox.max()[0]; ++P[0]) {            
+                //std::cerr << "offset = " << offset << " P = " << P << std::endl;
+                CPPUNIT_ASSERT_EQUAL(offset, dense.coordToOffset(P));
+                CPPUNIT_ASSERT_EQUAL(P - dense.origin(), dense.offsetToLocalCoord(offset));
+                CPPUNIT_ASSERT_EQUAL(P, dense.offsetToCoord(offset));
+                ++offset;
+            }
+        }
+    }
+    
     // Check Dense::valueCount
     const int size = static_cast<int>(dense.valueCount());
     CPPUNIT_ASSERT_EQUAL(30*13*17, size);
@@ -829,6 +863,6 @@ TestDense::testDense2Sparse2Dense()
 }
 #undef BENCHMARK_TEST
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -386,9 +386,14 @@ Morphology<TreeType>::dilateVoxels(int iterations, NearestNeighbors nn)
 {
     for (int i=0; i<iterations; ++i) {
         switch (nn) {
-        case NN_FACE_EDGE: this->dilateVoxels18(); break;
-        case NN_FACE_EDGE_VERTEX: this->dilateVoxels26(); break;
-        default: this->dilateVoxels6();
+        case NN_FACE_EDGE:
+            this->dilateVoxels18();
+            break;
+        case NN_FACE_EDGE_VERTEX:
+            this->dilateVoxels26();
+            break;
+        default:
+            this->dilateVoxels6();
         }
     }
 }
@@ -913,6 +918,6 @@ deactivate(GridOrTree& gridOrTree, const typename GridOrTree::ValueType& value,
 
 #endif // OPENVDB_TOOLS_MORPHOLOGY_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

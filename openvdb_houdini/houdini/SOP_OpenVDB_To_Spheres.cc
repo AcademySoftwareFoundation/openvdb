@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -104,15 +104,27 @@ newSopOperator(OP_OperatorTable* table)
             "fields while fog volumes require a larger positive value, 0.5 is "
             "a good initial guess."));
 
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldunits", "Use World Space Units"));
+
     parms.add(hutil::ParmFactory(PRM_FLT_J, "minradius", "Min Radius in Voxels")
         .setDefault(PRMoneDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 2.0)
+        .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 2.0)
         .setHelpText("Determines the smallest sphere size, voxel units."));
+
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "minradiusworld", "Min Radius")
+        .setDefault(0.1)
+        .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 2.0)
+        .setHelpText("Determines the smallest sphere size, world units."));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "maxradius", "Max Radius in Voxels")
         .setDefault(std::numeric_limits<float>::max())
-        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 100.0)
+        .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 100.0)
         .setHelpText("Determines the largest sphere size, voxel units."));
+
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "maxradiusworld", "Max Radius")
+        .setDefault(std::numeric_limits<float>::max())
+        .setRange(PRM_RANGE_RESTRICTED, 1e-5, PRM_RANGE_UI, 100.0)
+        .setHelpText("Determines the largest sphere size, world units."));
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "spheres", "Max Spheres")
         .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 100)
@@ -150,6 +162,9 @@ newSopOperator(OP_OperatorTable* table)
 #endif
         .setHelpText("Enable to add an id point attribute that corresponds to different VDBs."));
 
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "dopscale", "Add PScale Attribute")
+        .setDefault(PRMzeroDefaults));
+
     //////////
 
     hvdb::OpenVDBOpFactory("OpenVDB To Spheres", SOP_OpenVDB_To_Spheres::factory, parms, *table)
@@ -176,6 +191,14 @@ bool
 SOP_OpenVDB_To_Spheres::updateParmsFlags()
 {
     bool changed = false;
+
+    const bool worldUnits = bool(evalInt("worldunits", 0, 0));
+
+    changed |= setVisibleState("minradius", !worldUnits);
+    changed |= setVisibleState("maxradius", !worldUnits);
+    changed |= setVisibleState("minradiusworld", worldUnits);
+    changed |= setVisibleState("maxradiusworld", worldUnits);
+
     return changed;
 }
 
@@ -212,14 +235,19 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
         // Eval attributes
         const float
             isovalue = static_cast<float>(evalFloat("isovalue", 0, time)),
-            minradius = static_cast<float>(evalFloat("minradius", 0, time)),
-            maxradius = static_cast<float>(evalFloat("maxradius", 0, time));
+            minradiusVoxel = static_cast<float>(evalFloat("minradius", 0, time)),
+            maxradiusVoxel = static_cast<float>(evalFloat("maxradius", 0, time)),
+            minradiusWorld = static_cast<float>(evalFloat("minradiusworld", 0, time)),
+            maxradiusWorld = static_cast<float>(evalFloat("maxradiusworld", 0, time));
+
+        const bool worldUnits = evalInt("worldunits", 0, time);
+
         const int sphereCount = evalInt("spheres", 0, time);
         const bool overlapping = evalInt("overlapping", 0, time);
         const int scatter = evalInt("scatter", 0, time);
         const bool preserve = evalInt("preserve", 0, time);
 
-        const bool addID = evalInt("doid", 0, time);
+        const bool addID = evalInt("doid", 0, time) != 0;
         GA_RWHandleI idAttr;
         if (addID) {
             GA_RWAttributeRef aRef = gdp->findPointAttribute("id");
@@ -229,6 +257,20 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
             idAttr = aRef.getAttribute();
             if(!idAttr.isValid()) {
                 addWarning(SOP_MESSAGE, "Failed to create the point ID attribute.");
+                return error();
+            }
+        }
+
+        const bool addPScale = evalInt("dopscale", 0, time) != 0;
+        GA_RWHandleF pscaleAttr;
+        if (addPScale) {
+            GA_RWAttributeRef aRef = gdp->findFloatTuple(GA_ATTRIB_POINT, GEO_STD_ATTRIB_PSCALE);
+            if (!aRef.isValid()) {
+                aRef = gdp->addFloatTuple(GA_ATTRIB_POINT, GEO_STD_ATTRIB_PSCALE, 1, GA_Defaults(0));
+            }
+            pscaleAttr = aRef.getAttribute();
+            if(!pscaleAttr.isValid()) {
+                addWarning(SOP_MESSAGE, "Failed to create the point pscale attribute.");
                 return error();
             }
         }
@@ -246,6 +288,16 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
 
         for (; vdbIt; ++vdbIt) {
             if (boss.wasInterrupted()) break;
+
+            float minradius = minradiusVoxel, maxradius = maxradiusVoxel;
+
+            if (worldUnits) {
+                const float voxelScale = float(1.0 / vdbIt->getGrid().voxelSize()[0]);
+                minradius = minradiusWorld * voxelScale;
+                maxradius = maxradiusWorld * voxelScale;
+            }
+
+            maxradius = std::max(maxradius, minradius + float(1e-5));
 
             std::vector<openvdb::Vec4s> spheres;
 
@@ -289,6 +341,11 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
                 if (addID) {
                     idAttr.set(ptoff, idNumber);
                 }
+
+                if (addPScale) {
+                    pscaleAttr.set(ptoff, sphere[3]);
+                }
+
                 UT_Matrix4 mat = UT_Matrix4::getIdentityMatrix();
                 mat.scale(sphere[3],sphere[3],sphere[3]);
 
@@ -332,6 +389,6 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

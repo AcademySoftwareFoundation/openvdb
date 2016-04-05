@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -42,6 +42,7 @@
 #include <openvdb/Grid.h>                  // grid
 #include <openvdb/util/NullInterrupter.h>
 #include "Interpolation.h"                 // sampling
+#include "VelocityFields.h"                // VelocityIntegrator
 
 #include <boost/static_assert.hpp>
 #include <tbb/blocked_range.h>             // threading
@@ -107,107 +108,6 @@ private:
     CptAccessor         mCptAccessor;
     unsigned int        mCptIterations;
 };// end of ClosestPointProjector class
-
-
-/// Class to hold a Vec3 field interperated as a velocity field.
-/// Primarily exists to provide a method(s) that integrate a passive
-/// point forward in the velocity field for a single time-step (dt)
-template<typename GridT = Vec3fGrid, bool StaggeredVelocity = false>
-class VelocitySampler
-{
-public:
-    typedef typename GridT::ConstAccessor   VelAccessor;
-    typedef typename GridT::ValueType       VelValueType;
-
-    VelocitySampler(const GridT& velGrid):
-        mVelGrid(&velGrid),
-        mVelAccessor(mVelGrid->getAccessor())
-    {
-    }
-    VelocitySampler(const VelocitySampler& other):
-        mVelGrid(other.mVelGrid),
-        mVelAccessor(mVelGrid->getAccessor())
-    {
-    }
-    ~VelocitySampler()
-    {
-    }
-    /// Samples the velocity at position W onto result. Supports both
-    /// staggered (i.e. MAC) and collocated velocity grids.
-    template <typename LocationType>
-    inline void sample(const LocationType& W, VelValueType& result) const
-    {
-        const Vec3R location = mVelGrid->worldToIndex(Vec3R(W[0], W[1], W[2]));
-        /// Note this if-branch is optimized away at compile time
-        if (StaggeredVelocity) {
-            // the velocity Grid stores data in MAC-style staggered layout
-            StaggeredBoxSampler::sample<VelAccessor>(mVelAccessor, location, result);
-        } else {
-            // the velocity Grid uses collocated data
-            BoxSampler::sample<VelAccessor>(mVelAccessor, location, result);
-        }
-    }
-
-private:
-    // holding the Grids for the transforms
-    const GridT* mVelGrid; // Velocity vector field
-    VelAccessor mVelAccessor;
-};// end of VelocitySampler class
-
-
-/// @brief Performs runge-kutta time integration of variable order in
-/// a static velocity field
-template<typename GridT = Vec3fGrid, bool StaggeredVelocity = false>
-class VelocityIntegrator
-{
-public:
-    typedef typename GridT::ValueType  VecType;
-    typedef typename VecType::ValueType ElementType;
-
-    VelocityIntegrator(const GridT& velGrid):
-        mVelField(velGrid)
-    {
-    }
-    // variable order Runge-Kutta time integration for a single time step
-    template<int Order, typename LocationType>
-    void rungeKutta(const float dt, LocationType& loc) {
-        VecType P(loc[0],loc[1],loc[2]), V0, V1, V2, V3;
-
-        BOOST_STATIC_ASSERT((Order < 5) &&  (Order > -1));
-        /// Note the if-braching below is optimized away at compile time
-        if (Order == 0) {
-            // do nothing
-            return ;
-        } else if (Order == 1) {
-            mVelField.sample(P, V0);
-            P =  dt*V0;
-
-        } else if (Order == 2) {
-            mVelField.sample(P, V0);
-            mVelField.sample(P + ElementType(0.5) * ElementType(dt) * V0, V1);
-            P = dt*V1;
-
-        } else if (Order == 3) {
-            mVelField.sample(P, V0);
-            mVelField.sample(P+ElementType(0.5)*ElementType(dt)*V0, V1);
-            mVelField.sample(P+dt*(ElementType(2.0)*V1-V0), V2);
-            P = dt*(V0 + ElementType(4.0)*V1 + V2)*ElementType(1.0/6.0);
-
-        } else if (Order == 4) {
-            mVelField.sample(P, V0);
-            mVelField.sample(P+ElementType(0.5)*ElementType(dt)*V0, V1);
-            mVelField.sample(P+ElementType(0.5)*ElementType(dt)*V1, V2);
-            mVelField.sample(P+     dt*V2, V3);
-            P = dt*(V0 + ElementType(2.0)*(V1 + V2) + V3)*ElementType(1.0/6.0);
-
-        }
-        loc += LocationType(P[0], P[1], P[2]);
-
-    }
-private:
-    VelocitySampler<GridT, StaggeredVelocity> mVelField;
-};// end of VelocityIntegrator class
-
 
 ////////////////////////////////////////
 
@@ -519,6 +419,6 @@ private:
 
 #endif // OPENVDB_TOOLS_POINT_ADVECT_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2014 DreamWorks Animation LLC
+// Copyright (c) 2012-2015 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
