@@ -117,7 +117,7 @@ endif
 LOCAL_INCLUDE	:= $(prefix)/include
 LOCAL_LIB	:= $(prefix)/lib
 
-BOOST_VERSION	?= 1_51
+BOOST_VERSION	?= 1_55
 # The parent directory of the boost/ header directory
 BOOST_INCL_DIR	:= $(LOCAL_INCLUDE)/boost-$(BOOST_VERSION)
 # The directory containing libboost_iostreams, libboost_system, etc.
