@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -283,8 +283,11 @@ public:
     /// @brief Set the value of the voxel at the given array offset.
     inline void setValue(size_t offset, const ValueT& value) { mData[offset] = value; }
 
-    /// @brief Return the value of the voxel at the given array offset.
+    /// @brief Return a const reference to the value of the voxel at the given array offset.
     const ValueT& getValue(size_t offset) const { return mData[offset]; }
+
+    /// @brief Return a non-const reference to the value of the voxel at the given array offset.
+    ValueT& getValue(size_t offset) { return mData[offset]; }
 
     /// @brief Set the value of the voxel at unsigned index coordinates (i, j, k).
     /// @note This is somewhat slower than using an array offset.
@@ -293,9 +296,16 @@ public:
         mData[BaseT::coordToOffset(i,j,k)] = value;
     }
 
-    /// @brief Return the value of the voxel at unsigned index coordinates (i, j, k).
+    /// @brief Return a const reference to the value of the voxel at unsigned index coordinates (i, j, k).
     /// @note This is somewhat slower than using an array offset.
     inline const ValueT& getValue(size_t i, size_t j, size_t k) const
+    {
+        return mData[BaseT::coordToOffset(i,j,k)];
+    }
+
+    /// @brief Return a non-const reference to the value of the voxel at unsigned index coordinates (i, j, k).
+    /// @note This is somewhat slower than using an array offset.
+    inline ValueT& getValue(size_t i, size_t j, size_t k)
     {
         return mData[BaseT::coordToOffset(i,j,k)];
     }
@@ -307,9 +317,16 @@ public:
         mData[this->coordToOffset(xyz)] = value;
     }
 
-    /// @brief Return the value of the voxel at the given signed coordinates.
+    /// @brief Return a const reference to the value of the voxel at the given signed coordinates.
     /// @note This is slower than using either an array offset or unsigned index coordinates.
     inline const ValueT& getValue(const Coord& xyz) const
+    {
+        return mData[this->coordToOffset(xyz)];
+    }
+
+    /// @brief Return a non-const reference to the value of the voxel at the given signed coordinates.
+    /// @note This is slower than using either an array offset or unsigned index coordinates.
+    inline ValueT& getValue(const Coord& xyz)
     {
         return mData[this->coordToOffset(xyz)];
     }
@@ -586,6 +603,6 @@ copyFromDense(const DenseT& dense, GridOrTreeT& sparse,
 
 #endif // OPENVDB_TOOLS_DENSE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

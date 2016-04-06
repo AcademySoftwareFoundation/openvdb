@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -348,7 +348,7 @@ prune(TreeT& tree, typename TreeT::ValueType tol, bool threaded, size_t grainSiz
 {
     tree::NodeManager<TreeT, TreeT::DEPTH-2> nodes(tree);
     TolerancePruneOp<TreeT> op(tree, tol);
-    nodes.processBottomUp(op, threaded, grainSize);
+    nodes.foreachBottomUp(op, threaded, grainSize);
 }
 
 
@@ -358,7 +358,7 @@ pruneTiles(TreeT& tree, typename TreeT::ValueType tol, bool threaded, size_t gra
 {
     tree::NodeManager<TreeT, TreeT::DEPTH-3> nodes(tree);
     TolerancePruneOp<TreeT> op(tree, tol);
-    nodes.processBottomUp(op, threaded, grainSize);
+    nodes.foreachBottomUp(op, threaded, grainSize);
 }
 
 
@@ -368,7 +368,7 @@ pruneInactive(TreeT& tree, bool threaded, size_t grainSize)
 {
     tree::NodeManager<TreeT, TreeT::DEPTH-2> nodes(tree);
     InactivePruneOp<TreeT> op(tree);
-    nodes.processBottomUp(op, threaded, grainSize);
+    nodes.foreachBottomUp(op, threaded, grainSize);
 }
 
 
@@ -379,7 +379,7 @@ pruneInactiveWithValue(TreeT& tree, const typename TreeT::ValueType& v,
 {
     tree::NodeManager<TreeT, TreeT::DEPTH-2> nodes(tree);
     InactivePruneOp<TreeT> op(tree, v);
-    nodes.processBottomUp(op, threaded, grainSize);
+    nodes.foreachBottomUp(op, threaded, grainSize);
 }
 
 
@@ -393,7 +393,7 @@ pruneLevelSet(TreeT& tree,
 {
     tree::NodeManager<TreeT, TreeT::DEPTH-2> nodes(tree);
     LevelSetPruneOp<TreeT> op(tree, outside, inside);
-    nodes.processBottomUp(op, threaded, grainSize);
+    nodes.foreachBottomUp(op, threaded, grainSize);
 }
 
 
@@ -403,7 +403,7 @@ pruneLevelSet(TreeT& tree, bool threaded, size_t grainSize)
 {
     tree::NodeManager<TreeT, TreeT::DEPTH-2> nodes(tree);
     LevelSetPruneOp<TreeT> op(tree);
-    nodes.processBottomUp(op, threaded, grainSize);
+    nodes.foreachBottomUp(op, threaded, grainSize);
 }
 
 } // namespace tools
@@ -412,6 +412,6 @@ pruneLevelSet(TreeT& tree, bool threaded, size_t grainSize)
 
 #endif // OPENVDB_TOOLS_PRUNE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

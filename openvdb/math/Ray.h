@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -337,6 +337,6 @@ inline std::ostream& operator<<(std::ostream& os, const Ray<RealT>& r)
 
 #endif // OPENVDB_MATH_RAY_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

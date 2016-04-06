@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -90,19 +90,24 @@ public:
         typedef typename NodeMaskType::Word WordType;
         static const Index WORD_COUNT = NodeMaskType::WORD_COUNT;
         Buffer() {}
-        Buffer(bool on) : mData(on) {}
+        explicit Buffer(bool on) : mData(on) {}
         Buffer(const NodeMaskType& other): mData(other) {}
         Buffer(const Buffer& other): mData(other.mData) {}
         ~Buffer() {}
         void fill(bool val) { mData.set(val); }
-        Buffer& operator=(const Buffer& b) { if (&b != this) { mData = b.mData; } return *this; }
+        Buffer& operator=(const Buffer& b)
+        {
+            if (&b != this) mData = b.mData;
+            return *this;
+        }
 
         const bool& getValue(Index i) const
         {
             assert(i < SIZE);
             // We can't use the ternary operator here, otherwise Visual C++ returns
             // a reference to a temporary.
-            if (mData.isOn(i)) return LeafNode::sOn; else return LeafNode::sOff;
+            if (mData.isOn(i)) return LeafNode::sOn;
+            return LeafNode::sOff;
         }
         const bool& operator[](Index i) const { return this->getValue(i); }
 
@@ -185,21 +190,27 @@ public:
     static Index log2dim() { return Log2Dim; }
     /// Return the number of voxels in each dimension.
     static Index dim() { return DIM; }
+    /// Return the total number of voxels represented by this LeafNode
     static Index size() { return SIZE; }
+    /// Return the total number of voxels represented by this LeafNode
     static Index numValues() { return SIZE; }
+    /// Return the level of this node, which by definition is zero for LeafNodes
     static Index getLevel() { return LEVEL; }
+    /// Append the Log2Dim of this LeafNode to the specified vector
     static void getNodeLog2Dims(std::vector<Index>& dims) { dims.push_back(Log2Dim); }
+    /// Return the dimension of child nodes of this LeafNode, which is one for voxels.
     static Index getChildDim() { return 1; }
-
+    /// Return the leaf count for this node, which is one.
     static Index32 leafCount() { return 1; }
+    /// Return the non-leaf count for this node, which is zero.
     static Index32 nonLeafCount() { return 0; }
 
     /// Return the number of active voxels.
     Index64 onVoxelCount() const { return mBuffer.mData.countOn(); }
     /// Return the number of inactive voxels.
     Index64 offVoxelCount() const { return mBuffer.mData.countOff(); }
-    Index64 onLeafVoxelCount() const { return onVoxelCount(); }
-    Index64 offLeafVoxelCount() const { return offVoxelCount(); }
+    Index64 onLeafVoxelCount() const { return this->onVoxelCount(); }
+    Index64 offLeafVoxelCount() const { return this->offVoxelCount(); }
     static Index64 onTileCount()  { return 0; }
     static Index64 offTileCount() { return 0; }
 
@@ -495,7 +506,9 @@ public:
     void merge(const LeafNode& other, bool bg = false, bool otherBG = false);
     template<MergePolicy Policy> void merge(bool tileValue, bool tileActive=false);
 
-    void voxelizeActiveTiles() {}
+    /// @brief No-op
+    /// @details This function exists only to enable template instantiation.
+    void voxelizeActiveTiles(bool = true) {}
 
     /// @brief Union this node's set of active values with the active values
     /// of the other node, whose @c ValueType may be different. So a
@@ -898,7 +911,13 @@ LeafNode<ValueMask, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other,
     : mBuffer(other.valueMask())
     , mOrigin(other.origin())
 {
-    if (offValue) { if (!onValue) mBuffer.mData.toggle(); else mBuffer.mData.setOn(); }
+    if (offValue==true) {
+        if (onValue==false) {
+            mBuffer.mData.toggle();
+        } else {
+            mBuffer.mData.setOn();
+        }
+    }
 }
 
 
@@ -1663,6 +1682,6 @@ LeafNode<ValueMask, Log2Dim>::doVisit2(NodeT& self, OtherChildAllIterT& otherIte
 
 #endif // OPENVDB_TREE_LEAF_NODE_MASK_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

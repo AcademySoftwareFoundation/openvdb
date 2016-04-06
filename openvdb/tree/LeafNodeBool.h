@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -492,7 +492,9 @@ public:
     void merge(const LeafNode& other, bool bg = false, bool otherBG = false);
     template<MergePolicy Policy> void merge(bool tileValue, bool tileActive);
 
-    void voxelizeActiveTiles() {}
+    /// @brief No-op
+    /// @details This function exists only to enable template instantiation.
+    void voxelizeActiveTiles(bool = true) {}
 
     /// @brief Union this node's set of active values with the active values
     /// of the other node, whose @c ValueType may be different. So a
@@ -1766,6 +1768,6 @@ LeafNode<bool, Log2Dim>::doVisit2(NodeT& self, OtherChildAllIterT& otherIter,
 
 #endif // OPENVDB_TREE_LEAF_NODE_BOOL_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

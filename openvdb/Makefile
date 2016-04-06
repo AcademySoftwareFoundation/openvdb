@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2015 DreamWorks Animation LLC
+# Copyright (c) 2012-2016 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -357,6 +357,7 @@ INCLUDE_NAMES := \
     tools/MaskToLevelSet.h \
     tools/MeshToVolume.h \
     tools/Morphology.h \
+    tools/MultiResGrid.h \
     tools/ParticleAtlas.h \
     tools/ParticlesToLevelSet.h \
     tools/PointAdvect.h \
@@ -471,6 +472,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestMetadata.cc \
     unittest/TestMetadataIO.cc \
     unittest/TestMetaMap.cc \
+    unittest/TestMultiResGrid.cc \
     unittest/TestName.cc \
     unittest/TestNodeIterator.cc \
     unittest/TestNodeManager.cc \
@@ -940,6 +942,6 @@ ifneq (,$(strip $(wildcard $(DEPEND))))
     include $(DEPEND)
 endif
 
-# Copyright (c) 2012-2015 DreamWorks Animation LLC
+# Copyright (c) 2012-2016 DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

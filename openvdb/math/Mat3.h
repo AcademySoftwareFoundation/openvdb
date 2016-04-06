@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -89,10 +89,17 @@ public:
         MyBase::mm[8] = static_cast<ValueType>(i);
     } // constructor1Test
 
-    /// Construct matrix given basis vectors (columns)
+    /// Construct matrix from rows or columns vectors (defaults to rows
+    /// for historical reasons)
     template<typename Source>
-    Mat3(const Vec3<Source> &v1, const Vec3<Source> &v2, const Vec3<Source> &v3)
-    { setBasis(v1, v2, v3); }
+    Mat3(const Vec3<Source> &v1, const Vec3<Source> &v2, const Vec3<Source> &v3, bool rows = true)
+    {
+        if (rows) {
+            this->setRows(v1, v2, v3);
+        } else {
+            this->setColumns(v1, v2, v3);
+        }
+    }
 
     /// Constructor given array of elements, the ordering is in row major form:\n
     /// a[0] a[1] a[2]\n
@@ -128,7 +135,7 @@ public:
     {
         for (int i=0; i<3; ++i) {
             for (int j=0; j<3; ++j) {
-                MyBase::mm[i*3 + j] = m[i][j];
+                MyBase::mm[i*3 + j] = static_cast<T>(m[i][j]);
             }
         }
     }
@@ -221,8 +228,8 @@ public:
         return MyBase::mm[3*i+j];
     } // trivial
 
-    /// Set the columns of "this" matrix to the vectors v1, v2, v3
-    void setBasis(const Vec3<T> &v1, const Vec3<T> &v2, const Vec3<T> &v3)
+    /// Set the rows of "this" matrix to the vectors v1, v2, v3
+    void setRows(const Vec3<T> &v1, const Vec3<T> &v2, const Vec3<T> &v3)
     {
         MyBase::mm[0] = v1[0];
         MyBase::mm[1] = v1[1];
@@ -233,7 +240,27 @@ public:
         MyBase::mm[6] = v3[0];
         MyBase::mm[7] = v3[1];
         MyBase::mm[8] = v3[2];
-    } // setBasisTest
+    } // setRows
+    
+    /// Set the columns of "this" matrix to the vectors v1, v2, v3
+    void setColumns(const Vec3<T> &v1, const Vec3<T> &v2, const Vec3<T> &v3)
+    {
+        MyBase::mm[0] = v1[0];
+        MyBase::mm[1] = v2[0];
+        MyBase::mm[2] = v3[0];
+        MyBase::mm[3] = v1[1];
+        MyBase::mm[4] = v2[1];
+        MyBase::mm[5] = v3[1];
+        MyBase::mm[6] = v1[2];
+        MyBase::mm[7] = v2[2];
+        MyBase::mm[8] = v3[2];
+    } // setColumns
+
+    /// Set the rows of "this" matrix to the vectors v1, v2, v3
+    OPENVDB_DEPRECATED void setBasis(const Vec3<T> &v1, const Vec3<T> &v2, const Vec3<T> &v3)
+    {
+        this->setRows(v1, v2, v3);
+    }
 
     /// Set diagonal and symmetric triangular components
     void setSymmetric(const Vec3<T> &vdiag, const Vec3<T> &vtri)
@@ -436,42 +463,57 @@ public:
         return *this;
     }
 
-    /// returns adjoint of m
+    /// @brief Return the cofactor matrix of "this"
+    Mat3 cofactor() const
+    {
+        return Mat3<T>(
+          MyBase::mm[4] * MyBase::mm[8] - MyBase::mm[5] * MyBase::mm[7],
+          MyBase::mm[5] * MyBase::mm[6] - MyBase::mm[3] * MyBase::mm[8],
+          MyBase::mm[3] * MyBase::mm[7] - MyBase::mm[4] * MyBase::mm[6],
+          MyBase::mm[2] * MyBase::mm[7] - MyBase::mm[1] * MyBase::mm[8],
+          MyBase::mm[0] * MyBase::mm[8] - MyBase::mm[2] * MyBase::mm[6],
+          MyBase::mm[1] * MyBase::mm[6] - MyBase::mm[0] * MyBase::mm[7],
+          MyBase::mm[1] * MyBase::mm[5] - MyBase::mm[2] * MyBase::mm[4],
+          MyBase::mm[2] * MyBase::mm[3] - MyBase::mm[0] * MyBase::mm[5],
+          MyBase::mm[0] * MyBase::mm[4] - MyBase::mm[1] * MyBase::mm[3]);
+    }
+
+    /// returns adjoint of "this", i.e. the transpose of the cofactor of "this" 
     Mat3 adjoint() const
     {
         return Mat3<T>(
-        MyBase::mm[4] * MyBase::mm[8] - MyBase::mm[5] * MyBase::mm[7],
-        MyBase::mm[2] * MyBase::mm[7] - MyBase::mm[1] * MyBase::mm[8],
-        MyBase::mm[1] * MyBase::mm[5] - MyBase::mm[2] * MyBase::mm[4],
-        MyBase::mm[5] * MyBase::mm[6] - MyBase::mm[3] * MyBase::mm[8],
-        MyBase::mm[0] * MyBase::mm[8] - MyBase::mm[2] * MyBase::mm[6],
-        MyBase::mm[2] * MyBase::mm[3] - MyBase::mm[0] * MyBase::mm[5],
-        MyBase::mm[3] * MyBase::mm[7] - MyBase::mm[4] * MyBase::mm[6],
-        MyBase::mm[1] * MyBase::mm[6] - MyBase::mm[0] * MyBase::mm[7],
-        MyBase::mm[0] * MyBase::mm[4] - MyBase::mm[1] * MyBase::mm[3]);
+          MyBase::mm[4] * MyBase::mm[8] - MyBase::mm[5] * MyBase::mm[7],
+          MyBase::mm[2] * MyBase::mm[7] - MyBase::mm[1] * MyBase::mm[8],
+          MyBase::mm[1] * MyBase::mm[5] - MyBase::mm[2] * MyBase::mm[4],
+          MyBase::mm[5] * MyBase::mm[6] - MyBase::mm[3] * MyBase::mm[8],
+          MyBase::mm[0] * MyBase::mm[8] - MyBase::mm[2] * MyBase::mm[6],
+          MyBase::mm[2] * MyBase::mm[3] - MyBase::mm[0] * MyBase::mm[5],
+          MyBase::mm[3] * MyBase::mm[7] - MyBase::mm[4] * MyBase::mm[6],
+          MyBase::mm[1] * MyBase::mm[6] - MyBase::mm[0] * MyBase::mm[7],
+          MyBase::mm[0] * MyBase::mm[4] - MyBase::mm[1] * MyBase::mm[3]);
+        
     } // adjointTest
-
+    
     /// returns transpose of this
     Mat3 transpose() const
     {
         return Mat3<T>(
-            MyBase::mm[0], MyBase::mm[3], MyBase::mm[6],
-            MyBase::mm[1], MyBase::mm[4], MyBase::mm[7],
-            MyBase::mm[2], MyBase::mm[5], MyBase::mm[8]);
+          MyBase::mm[0], MyBase::mm[3], MyBase::mm[6],
+          MyBase::mm[1], MyBase::mm[4], MyBase::mm[7],
+          MyBase::mm[2], MyBase::mm[5], MyBase::mm[8]);
 
     } // transposeTest
 
     /// returns inverse of this
-    /// throws FailedOperationException if singular
+    /// @throws ArithmeticError if singular
     Mat3 inverse(T tolerance = 0) const
     {
-        Mat3<T> inv(adjoint());
+        Mat3<T> inv(this->adjoint());
 
-        T det = inv.mm[0]*MyBase::mm[0] + inv.mm[1]*MyBase::mm[3] + inv.mm[2]*MyBase::mm[6];
+        const T det = inv.mm[0]*MyBase::mm[0] + inv.mm[1]*MyBase::mm[3] + inv.mm[2]*MyBase::mm[6];
 
         // If the determinant is 0, m was singular and "this" will contain junk.
-        if (isApproxEqual(det,0.0,tolerance))
-        {
+        if (isApproxEqual(det,T(0.0),tolerance)) {
             OPENVDB_THROW(ArithmeticError, "Inversion of singular 3x3 matrix");
         }
         return inv * (T(1)/det);
@@ -480,11 +522,10 @@ public:
     /// Determinant of matrix
     T det() const
     {
-        T co00 = MyBase::mm[4]*MyBase::mm[8] - MyBase::mm[5]*MyBase::mm[7];
-        T co10 = MyBase::mm[5]*MyBase::mm[6] - MyBase::mm[3]*MyBase::mm[8];
-        T co20 = MyBase::mm[3]*MyBase::mm[7] - MyBase::mm[4]*MyBase::mm[6];
-        T d    = MyBase::mm[0]*co00  + MyBase::mm[1]*co10 + MyBase::mm[2]*co20;
-        return d;
+        const T co00 = MyBase::mm[4]*MyBase::mm[8] - MyBase::mm[5]*MyBase::mm[7];
+        const T co10 = MyBase::mm[5]*MyBase::mm[6] - MyBase::mm[3]*MyBase::mm[8];
+        const T co20 = MyBase::mm[3]*MyBase::mm[7] - MyBase::mm[4]*MyBase::mm[6];
+        return MyBase::mm[0]*co00  + MyBase::mm[1]*co10 + MyBase::mm[2]*co20;
     } // determinantTest
 
     /// Trace of matrix
@@ -518,6 +559,24 @@ public:
         return static_cast< Vec3<T0> >(*this * v);
     } // xformTVectorTest
 
+
+    /// Treats diag as a diagonal matrix and returns the
+    /// multiplication of "this" with diag (from the right).
+    Mat3 timesDiagonal(const Vec3<T>& diag) const
+    {
+        Mat3 ret(*this);
+
+        ret.mm[0] *= diag(0);
+        ret.mm[1] *= diag(1);
+        ret.mm[2] *= diag(2);
+        ret.mm[3] *= diag(0);
+        ret.mm[4] *= diag(1);
+        ret.mm[5] *= diag(2);
+        ret.mm[6] *= diag(0);
+        ret.mm[7] *= diag(1);
+        ret.mm[8] *= diag(2);
+        return ret;
+    }
 
 private:
     static const Mat3<T> sIdentity;
@@ -639,19 +698,15 @@ inline Vec3<T> &operator *= (Vec3<T> &_v, const Mat3<MT> &_m)
     return _v;
 }
 
-/// this = outer product of v1, v2
-/// e.g.   M = Mat3f::outerproduct(v1,v2);
+/// Returns outer product of v1, v2, i.e. v1 v2^T if v1 and v2 are
+/// column vectors, e.g.   M = Mat3f::outerproduct(v1,v2);
 template <typename T>
 Mat3<T> outerProduct(const Vec3<T>& v1, const Vec3<T>& v2)
 {
-    Mat3<T> m;
-
-    m.setBasis(Vec3<T>(v1[0]*v2[0], v1[1]*v2[0], v1[2]*v2[0]),
-               Vec3<T>(v1[0]*v2[1], v1[1]*v2[1], v1[2]*v2[1]),
-               Vec3<T>(v1[0]*v2[2], v1[1]*v2[2], v1[2]*v2[2]));
-
-    return m;
-} // outerproductTest
+    return Mat3<T>(v1[0]*v2[0], v1[0]*v2[1], v1[0]*v2[2], 
+                   v1[1]*v2[0], v1[1]*v2[1], v1[1]*v2[2], 
+                   v1[2]*v2[0], v1[2]*v2[1], v1[2]*v2[2]);
+}// outerProduct
 
 typedef Mat3<float>  Mat3s;
 typedef Mat3<double> Mat3d;
@@ -807,6 +862,6 @@ bool diagonalizeSymmetricMatrix(const Mat3<T>& input, Mat3<T>& Q, Vec3<T>& D,
 
 #endif // OPENVDB_MATH_MAT3_H_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

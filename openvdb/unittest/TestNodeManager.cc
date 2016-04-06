@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -41,14 +41,6 @@
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
 
-
-typedef float                                            ValueType;
-typedef openvdb::tree::LeafNode<ValueType,3>             LeafNodeType;
-typedef openvdb::tree::InternalNode<LeafNodeType,4>      InternalNodeType1;
-typedef openvdb::tree::InternalNode<InternalNodeType1,5> InternalNodeType2;
-typedef openvdb::tree::RootNode<InternalNodeType2>       RootNodeType;
-
-
 class TestNodeManager: public CppUnit::TestFixture
 {
 public:
@@ -58,12 +50,48 @@ public:
     CPPUNIT_TEST_SUITE(TestNodeManager);
     CPPUNIT_TEST(testAll);
     CPPUNIT_TEST_SUITE_END();
-   
+
     void testAll();
 };
 
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestNodeManager);
+
+
+namespace {
+
+template<typename TreeT>
+struct NodeCountOp {
+    NodeCountOp() : nodeCount(TreeT::DEPTH, 0), totalCount(0)
+    {
+    }
+    NodeCountOp(const NodeCountOp&, tbb::split)
+        : nodeCount(TreeT::DEPTH, 0), totalCount(0)
+    {
+    }
+    void join(const NodeCountOp& other)
+    {
+        for (size_t i = 0; i < nodeCount.size(); ++i) {
+            nodeCount[i] += other.nodeCount[i];
+        }
+        totalCount += other.totalCount;
+    }
+    // do nothing for the root node
+    void operator()(const typename TreeT::RootNodeType&)
+    {
+    }
+    // count the internal and leaf nodes
+    template<typename NodeT>
+    void operator()(const NodeT&)
+    {
+        ++(nodeCount[NodeT::LEVEL]);
+        ++totalCount;
+    }
+    std::vector<openvdb::Index64> nodeCount;
+    openvdb::Index64 totalCount;
+};// NodeCountOp
+
+}//unnamed namespace
 
 void
 TestNodeManager::testAll()
@@ -113,6 +141,18 @@ TestNodeManager::testAll()
             totalCount += nodeCount[i];
         }
         CPPUNIT_ASSERT_EQUAL(totalCount, manager.nodeCount());
+
+        // test the map reduce functionality
+        NodeCountOp<FloatTree> bottomUpOp;
+        NodeCountOp<FloatTree> topDownOp;
+        manager.reduceBottomUp(bottomUpOp);
+        manager.reduceTopDown(topDownOp);
+        for (openvdb::Index i=0; i<FloatTree::RootNodeType::LEVEL; ++i) {//exclude root in nodeCount
+            CPPUNIT_ASSERT_EQUAL(bottomUpOp.nodeCount[i], manager.nodeCount(i));
+            CPPUNIT_ASSERT_EQUAL(topDownOp.nodeCount[i], manager.nodeCount(i));
+        }
+        CPPUNIT_ASSERT_EQUAL(bottomUpOp.totalCount, manager.nodeCount());
+        CPPUNIT_ASSERT_EQUAL(topDownOp.totalCount, manager.nodeCount());
     }
 
     {// test LeafManager constructor
@@ -128,11 +168,22 @@ TestNodeManager::testAll()
             totalCount += nodeCount[i];
         }
         CPPUNIT_ASSERT_EQUAL(totalCount, Index64(manager2.nodeCount()));
+
+        // test the map reduce functionality
+        NodeCountOp<FloatTree> bottomUpOp;
+        NodeCountOp<FloatTree> topDownOp;
+        manager2.reduceBottomUp(bottomUpOp);
+        manager2.reduceTopDown(topDownOp);
+        for (openvdb::Index i=0; i<FloatTree::RootNodeType::LEVEL; ++i) {//exclude root in nodeCount
+            CPPUNIT_ASSERT_EQUAL(bottomUpOp.nodeCount[i], manager2.nodeCount(i));
+            CPPUNIT_ASSERT_EQUAL(topDownOp.nodeCount[i], manager2.nodeCount(i));
+        }
+        CPPUNIT_ASSERT_EQUAL(bottomUpOp.totalCount, manager2.nodeCount());
+        CPPUNIT_ASSERT_EQUAL(topDownOp.totalCount, manager2.nodeCount());
     }
 
 }
 
-
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

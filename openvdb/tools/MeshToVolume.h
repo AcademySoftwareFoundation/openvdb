@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -1834,7 +1834,6 @@ combineData(DistTreeType& lhsDist, IndexTreeType& lhsIdx,
     }
 }
 
-
 /// @brief TBB body object to voxelize a mesh of triangles and/or quads into a collection
 /// of VDB grids, namely a squared distance grid, a closest primitive grid and an
 /// intersecting voxels grid (masks the mesh intersecting voxels)
@@ -1953,18 +1952,19 @@ private:
 
     struct SubTask
     {
-        SubTask(const Triangle& prim, DataTable& dataTable, size_t polygonCount)
+        enum { POLYGON_LIMIT = 1000 };
+
+        SubTask(const Triangle& prim, DataTable& dataTable, int subdivisionCount, size_t polygonCount)
             : mLocalDataTable(&dataTable)
             , mPrim(prim)
+            , mSubdivisionCount(subdivisionCount)
             , mPolygonCount(polygonCount)
         {
         }
 
         void operator()() const
         {
-            const size_t minNumTask = size_t(tbb::task_scheduler_init::default_num_threads() * 10);
-
-            if (mPolygonCount > minNumTask) {
+            if (mSubdivisionCount <= 0 || mPolygonCount >= POLYGON_LIMIT) {
 
                 typename VoxelizationDataType::Ptr& dataPtr = mLocalDataTable->local();
                 if (!dataPtr) dataPtr.reset(new VoxelizationDataType());
@@ -1972,33 +1972,47 @@ private:
                 voxelizeTriangle(mPrim, *dataPtr);
 
             } else {
-                spawnTasks(mPrim, *mLocalDataTable, mPolygonCount);
+                spawnTasks(mPrim, *mLocalDataTable, mSubdivisionCount, mPolygonCount);
             }
         }
 
         DataTable * const mLocalDataTable;
-        const Triangle mPrim;
-        const size_t mPolygonCount;
-    };
+        Triangle    const mPrim;
+        int         const mSubdivisionCount;
+        size_t      const mPolygonCount;
+    }; // struct SubTask
 
+    inline static int evalSubdivisionCount(const Triangle& prim)
+    {
+        const double ax = prim.a[0], bx = prim.b[0], cx = prim.c[0];
+        const double dx = std::max(ax, std::max(bx, cx)) - std::min(ax, std::min(bx, cx));
+
+        const double ay = prim.a[1], by = prim.b[1], cy = prim.c[1];
+        const double dy = std::max(ay, std::max(by, cy)) - std::min(ay, std::min(by, cy));
+
+        const double az = prim.a[2], bz = prim.b[2], cz = prim.c[2];
+        const double dz = std::max(az, std::max(bz, cz)) - std::min(az, std::min(bz, cz));
+
+        return int(std::max(dx, std::max(dy, dz)) / double(TreeType::LeafNodeType::DIM * 2));
+    }
 
     void evalTriangle(const Triangle& prim, VoxelizationDataType& data) const
     {
-        const size_t minNumTask = size_t(tbb::task_scheduler_init::default_num_threads() * 10);
+        const size_t polygonCount = mMesh->polygonCount();
+        const int subdivisionCount = polygonCount < SubTask::POLYGON_LIMIT ? evalSubdivisionCount(prim) : 0;
 
-        if (mMesh->polygonCount() > minNumTask) {
-
+        if (subdivisionCount <= 0) {
             voxelizeTriangle(prim, data);
-
         } else {
-
-            spawnTasks(prim, *mDataTable, mMesh->polygonCount());
+            spawnTasks(prim, *mDataTable, subdivisionCount, polygonCount);
         }
     }
 
-    static void spawnTasks(const Triangle& mainPrim, DataTable& dataTable, size_t primCount)
+    static void spawnTasks(
+        const Triangle& mainPrim, DataTable& dataTable, int subdivisionCount, size_t polygonCount)
     {
-        const size_t newPrimCount = primCount * 4;
+        subdivisionCount -= 1;
+        polygonCount *= 4;
 
         tbb::task_group tasks;
 
@@ -2012,22 +2026,22 @@ private:
         prim.a = mainPrim.a;
         prim.b = ab;
         prim.c = ac;
-        tasks.run(SubTask(prim, dataTable, newPrimCount));
+        tasks.run(SubTask(prim, dataTable, subdivisionCount, polygonCount));
 
         prim.a = ab;
         prim.b = bc;
         prim.c = ac;
-        tasks.run(SubTask(prim, dataTable, newPrimCount));
+        tasks.run(SubTask(prim, dataTable, subdivisionCount, polygonCount));
 
         prim.a = ab;
         prim.b = mainPrim.b;
         prim.c = bc;
-        tasks.run(SubTask(prim, dataTable, newPrimCount));
+        tasks.run(SubTask(prim, dataTable, subdivisionCount, polygonCount));
 
         prim.a = ac;
         prim.b = bc;
         prim.c = mainPrim.c;
-        tasks.run(SubTask(prim, dataTable, newPrimCount));
+        tasks.run(SubTask(prim, dataTable, subdivisionCount, polygonCount));
 
         tasks.wait();
     }
@@ -4013,6 +4027,6 @@ createLevelSetBox(const math::BBox<VecType>& bbox,
 
 #endif // OPENVDB_TOOLS_MESH_TO_VOLUME_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

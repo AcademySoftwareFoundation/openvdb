@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -36,48 +36,57 @@
 ///
 /// @note   This SOP has a accompanying creation script that adds a default VOP
 ///         subnetwork and UI parameters for cloud and velocity field modeling.
-///         See creation script file header for installation details.
+///         See the creation script file header for installation details.
 
 #include <houdini_utils/ParmFactory.h>
-#include <openvdb_houdini/Utils.h>
-#include <openvdb_houdini/SOP_NodeVDB.h>
+
 #include <openvdb_houdini/GU_VDBPointTools.h>
+#include <openvdb_houdini/SOP_NodeVDB.h>
+#include <openvdb_houdini/Utils.h>
+
+#include <openvdb/tools/GridTransformer.h>
 #include <openvdb/tools/PointIndexGrid.h>
+#include <openvdb/tools/Prune.h>
 
-
-#include <UT/UT_Interrupt.h>
-#include <UT/UT_WorkArgs.h>
+#include <CH/CH_Manager.h>
+#include <CVEX/CVEX_Context.h>
+#include <CVEX/CVEX_Value.h>
 #include <GA/GA_Handle.h>
 #include <GA/GA_PageIterator.h>
 #include <GA/GA_Types.h>
 #include <GU/GU_Detail.h>
+#include <GU/GU_SopResolver.h>
+#include <OP/OP_Caller.h>
+#include <OP/OP_Channels.h>
+#include <OP/OP_Director.h>
+#include <OP/OP_NodeInfoParms.h>
+#include <OP/OP_Operator.h>
+#include <OP/OP_OperatorTable.h>
+#include <OP/OP_VexFunction.h>
 #include <PRM/PRM_Parm.h>
-#include <CH/CH_Manager.h>
-
-//#include <SHOP/SHOP_Node.h>
-
-#include <VOP/VOP_CodeGenerator.h>
+#include <UT/UT_Interrupt.h>
+#include <UT/UT_WorkArgs.h>
+#include <VEX/VEX_Error.h>
 #include <VOP/VOP_CodeCompilerArgs.h>
-
+#include <VOP/VOP_CodeGenerator.h>
 #if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
 #include <VOP/VOP_ExportedParmsManager.h>
 #endif
-
 #include <VOP/VOP_LanguageContextTypeList.h>
 
-#include <VEX/VEX_Error.h>
-#include <CVEX/CVEX_Context.h>
-#include <CVEX/CVEX_Value.h>
-#include <GU/GU_SopResolver.h>
+#include <tbb/atomic.h>
+#include <tbb/blocked_range.h>
+#include <tbb/enumerable_thread_specific.h>
+#include <tbb/parallel_for.h>
+#include <tbb/parallel_reduce.h>
+#include <tbb/task_group.h>
 
-#include <OP/OP_Channels.h>
-#include <OP/OP_Operator.h>
-#include <OP/OP_Director.h>
-#include <OP/OP_OperatorTable.h>
-#include <OP/OP_Caller.h>
-#include <OP/OP_NodeInfoParms.h>
-#include <OP/OP_VexFunction.h>
-
+#include <boost/algorithm/string/classification.hpp> // is_any_of
+#include <boost/algorithm/string/join.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/scoped_array.hpp>
+#include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
 
 #include <algorithm> // std::sort
 #include <math.h> // trigonometric functions
@@ -85,21 +94,6 @@
 #include <sstream>
 #include <string>
 #include <vector>
-
-
-#include <tbb/blocked_range.h>
-#include <tbb/task_group.h>
-#include <tbb/parallel_for.h>
-#include <tbb/parallel_reduce.h>
-#include <tbb/enumerable_thread_specific.h>
-#include <tbb/atomic.h>
-
-
-#include <boost/scoped_array.hpp>
-#include <boost/scoped_ptr.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/algorithm/string/classification.hpp> // is_any_of
-#include <boost/algorithm/string/split.hpp>
 
 
 namespace hvdb = openvdb_houdini;
@@ -111,6 +105,213 @@ namespace hutil = houdini_utils;
 // Local Utility Methods
 
 namespace {
+
+
+inline hvdb::GridCPtr
+getMaskVDB(const GU_Detail * geoPt, const GA_PrimitiveGroup *group = NULL)
+{
+    if (geoPt) {
+        hvdb::VdbPrimCIterator vdbIt(geoPt, group);
+        if (vdbIt) {
+            return (*vdbIt)->getConstGridPtr();
+        }
+    }
+
+    return hvdb::GridCPtr();
+}
+
+
+inline boost::shared_ptr<openvdb::BBoxd>
+getMaskGeoBBox(const GU_Detail * geoPt)
+{
+    if (geoPt) {
+        UT_BoundingBox box;
+        geoPt->computeQuickBounds(box);
+
+        boost::shared_ptr<openvdb::BBoxd> bbox(new openvdb::BBoxd());
+        bbox->min()[0] = box.xmin();
+        bbox->min()[1] = box.ymin();
+        bbox->min()[2] = box.zmin();
+        bbox->max()[0] = box.xmax();
+        bbox->max()[1] = box.ymax();
+        bbox->max()[2] = box.zmax();
+
+        return bbox;
+    }
+
+    return boost::shared_ptr<openvdb::BBoxd>();
+}
+
+
+struct BoolSampler
+{
+    static const char* name() { return "bin"; }
+    static int radius() { return 2; }
+    static bool mipmap() { return false; }
+    static bool consistent() { return true; }
+
+    template<class TreeT>
+    static bool sample(const TreeT& inTree,
+        const openvdb::Vec3R& inCoord, typename TreeT::ValueType& result)
+    {
+        openvdb::Coord ijk;
+        ijk[0] = int(std::floor(inCoord[0]));
+        ijk[1] = int(std::floor(inCoord[1]));
+        ijk[2] = int(std::floor(inCoord[2]));
+        return inTree.probeValue(ijk, result);
+    }
+}; // struct BoolSampler
+
+
+/// z-coordinate comparison operator for std::sort.
+template<typename LeafNodeType>
+struct CompZCoord
+{
+    bool operator()(const LeafNodeType* lhs, const LeafNodeType* rhs) const {
+    	return lhs->origin().z() < rhs->origin().z();
+    }
+}; // struct CompZCoord
+
+
+/// returns the world space voxel size for the given frustum depth.
+inline openvdb::Vec3d
+computeFrustumVoxelSize(int zDepth, const openvdb::math::Transform& xform)
+{
+    typedef openvdb::math::NonlinearFrustumMap MapType;
+    MapType::ConstPtr map = xform.map<MapType>();
+
+    if (map) {
+        const openvdb::BBoxd& box = map->getBBox();
+
+        openvdb::CoordBBox bbox(
+            openvdb::Coord::floor(box.min()), openvdb::Coord::ceil(box.max()));
+
+        double nearPlaneX = 0.5 * double(bbox.min().x() + bbox.max().x());
+        double nearPlaneY = 0.5 * double(bbox.min().y() + bbox.max().y());
+
+        zDepth = std::max(zDepth, bbox.min().z());
+
+        openvdb::Vec3d xyz(nearPlaneX, nearPlaneY, double(zDepth));
+
+        return xform.voxelSize(xyz);
+    }
+
+    return xform.voxelSize();
+}
+
+
+inline double
+linearBlend(double a, double b, double w) { return a * w + b * (1.0 - w); }
+
+
+/// Inactivates the region defined by @a bbox in @a mask.
+template <typename MaskTreeType>
+inline void
+bboxClip(MaskTreeType& mask, const openvdb::BBoxd& bbox, bool invertMask,
+    const openvdb::math::Transform& maskXform, const openvdb::math::Transform * srcXform = NULL)
+{
+    typedef typename MaskTreeType::ValueType    ValueType;
+    const ValueType offVal = ValueType(0);
+    const ValueType onVal = ValueType(1);
+
+    if (!srcXform) {
+
+        openvdb::Vec3d minIS, maxIS;
+        openvdb::math::calculateBounds(maskXform, bbox.min(), bbox.max(), minIS, maxIS);
+
+        openvdb::CoordBBox clipRegion;
+        clipRegion.min()[0] = int(std::floor(minIS[0]));
+        clipRegion.min()[1] = int(std::floor(minIS[1]));
+        clipRegion.min()[2] = int(std::floor(minIS[2]));
+
+        clipRegion.max()[0] = int(std::floor(maxIS[0]));
+        clipRegion.max()[1] = int(std::floor(maxIS[1]));
+        clipRegion.max()[2] = int(std::floor(maxIS[2]));
+
+        MaskTreeType clipMask(offVal);
+        clipMask.fill(clipRegion, onVal, true);
+
+        if (invertMask) {
+            mask.topologyDifference(clipMask);
+        } else {
+            mask.topologyIntersection(clipMask);
+        }
+
+    } else {
+
+        openvdb::Vec3d minIS, maxIS;
+        openvdb::math::calculateBounds(*srcXform, bbox.min(), bbox.max(), minIS, maxIS);
+
+        openvdb::CoordBBox clipRegion;
+        clipRegion.min()[0] = int(std::floor(minIS[0]));
+        clipRegion.min()[1] = int(std::floor(minIS[1]));
+        clipRegion.min()[2] = int(std::floor(minIS[2]));
+
+        clipRegion.max()[0] = int(std::floor(maxIS[0]));
+        clipRegion.max()[1] = int(std::floor(maxIS[1]));
+        clipRegion.max()[2] = int(std::floor(maxIS[2]));
+
+        typedef openvdb::Grid<MaskTreeType> MaskGridType;
+
+        MaskGridType srcClipMask(offVal);
+        srcClipMask.setTransform(srcXform->copy());
+        srcClipMask.tree().fill(clipRegion, onVal, true);
+
+        MaskGridType dstClipMask(offVal);
+        dstClipMask.setTransform(maskXform.copy());
+
+        hvdb::Interrupter interrupter;
+        openvdb::tools::resampleToMatch<BoolSampler>(srcClipMask, dstClipMask, interrupter);
+
+        if (invertMask) {
+            mask.topologyDifference(dstClipMask.tree());
+        } else {
+            mask.topologyIntersection(dstClipMask.tree());
+        }
+    }
+}
+
+
+template <typename MaskTreeType>
+struct GridTopologyClipOp
+{
+    GridTopologyClipOp(
+        MaskTreeType& mask, const openvdb::math::Transform& maskXform, bool invertMask)
+        : mMask(&mask), mMaskXform(&maskXform), mInvertMask(invertMask)
+    {
+    }
+
+    /// Inactivates the region defined by @a grid in mMask.
+    template<typename GridType>
+    void operator()(const GridType& grid)
+    {
+        typedef openvdb::Grid<MaskTreeType>         MaskGridType;
+        typedef typename MaskTreeType::ValueType    ValueType;
+
+        const ValueType offVal = ValueType(0);
+
+        MaskGridType srcClipMask(offVal);
+        srcClipMask.setTransform(grid.transform().copy());
+        srcClipMask.tree().topologyUnion(grid.tree());
+
+        MaskGridType dstClipMask(offVal);
+        dstClipMask.setTransform(mMaskXform->copy());
+
+        hvdb::Interrupter interrupter;
+        openvdb::tools::resampleToMatch<BoolSampler>(srcClipMask, dstClipMask, interrupter);
+
+        if (mInvertMask) {
+            mMask->topologyDifference(dstClipMask.tree());
+        } else {
+            mMask->topologyIntersection(dstClipMask.tree());
+        }
+    }
+
+private:
+    MaskTreeType                   * const mMask;
+    openvdb::math::Transform const * const mMaskXform;
+    bool mInvertMask;
+}; // struct GridTopologyClipOp
 
 
 ////////////////////////////////////////
@@ -286,7 +487,8 @@ private:
             GA_ROHandleV3 posHandle(mDetail->getP());
             GA_ROHandleF scaleHandle;
 
-            GA_ROAttributeRef aRef = mDetail->findFloatTuple(GA_ATTRIB_POINT, GEO_STD_ATTRIB_PSCALE);
+            GA_ROAttributeRef aRef =
+                mDetail->findFloatTuple(GA_ATTRIB_POINT, GEO_STD_ATTRIB_PSCALE);
             bool hasScale = false;
 
             if (aRef.isValid()) {
@@ -339,13 +541,13 @@ private:
         void operator()(const tbb::blocked_range<size_t>& range) const
         {
             GA_ROHandleV3 posHandle(mDetail->getP());
-            // bind again after construction to remove uninitialized member variable compiler warning..
-            posHandle.bind(mDetail->getP());
 
             bool hasScale = false;
             GA_ROHandleF scaleHandle;
 
-            GA_ROAttributeRef aRef = mDetail->findFloatTuple(GA_ATTRIB_POINT, GEO_STD_ATTRIB_PSCALE);
+            GA_ROAttributeRef aRef =
+                mDetail->findFloatTuple(GA_ATTRIB_POINT, GEO_STD_ATTRIB_PSCALE);
+
             if (aRef.isValid()) {
                 hasScale = true;
                 scaleHandle.bind(aRef.getAttribute());
@@ -432,7 +634,8 @@ struct PointIndexGridCollection
     typedef PointIndexTree::ValueConverter<bool>::Type  BoolTreeType;
 
     PointIndexGridCollection(const GU_Detail& detail, const float radiusScale,
-        const float minVoxelSize, const GA_PointGroup* group = NULL, hvdb::Interrupter* interrupter = NULL)
+        const float minVoxelSize, const GA_PointGroup* group = NULL,
+        hvdb::Interrupter* interrupter = NULL)
         : mPointCacheArray() , mIdxGridArray(), mMinRadiusArray(), mMaxRadiusArray()
     {
         mPointCacheArray.push_back(PointCache::Ptr(new PointCache(detail, radiusScale, group)));
@@ -499,6 +702,14 @@ struct PointIndexGridCollection
     float minRadius(size_t n) const { return mMinRadiusArray[n]; }
     float maxRadius(size_t n) const { return mMaxRadiusArray[n]; }
 
+    float maxRadius() const {
+        float maxradius = mMaxRadiusArray[0];
+        for (size_t n = 0, N = mPointCacheArray.size(); n < N; ++n) {
+            maxradius = std::max(maxradius, mMaxRadiusArray[n]);
+        }
+        return maxradius;
+    }
+
     const PointCache& pointCache(size_t n) const { return *mPointCacheArray[n]; }
     const PointIndexGrid& idxGrid(size_t n) const { return *mIdxGridArray[n]; }
 
@@ -521,7 +732,8 @@ private:
         void operator()() const {
             const openvdb::math::Transform::Ptr transform =
                 openvdb::math::Transform::createLinearTransform(mVoxelSize);
-            *mIdxGrid = openvdb::tools::createPointIndexGrid<PointIndexGrid>(*mPointCache, *transform);
+            *mIdxGrid =
+                openvdb::tools::createPointIndexGrid<PointIndexGrid>(*mPointCache, *transform);
             *mMinRadius = mPointCache->evalMinRadius();
             *mMaxRadius = mPointCache->evalMaxRadius();
         }
@@ -560,6 +772,7 @@ struct ConstructCandidateVoxelMask
     ConstructCandidateVoxelMask(BoolTreeType& maskTree, const PointCache& points,
         const std::vector<const PointIndexLeafNode*>& pointIndexLeafNodes,
         const openvdb::math::Transform& xform,
+        const openvdb::CoordBBox * clipBox = NULL,
         hvdb::Interrupter* interrupter = NULL)
         : mMaskTree(false)
         , mMaskTreePt(&maskTree)
@@ -567,6 +780,7 @@ struct ConstructCandidateVoxelMask
         , mPoints(&points)
         , mPointIndexNodes(&pointIndexLeafNodes.front())
         , mXform(xform)
+        , mClipBox(clipBox)
         , mInterrupter(interrupter)
     {
     }
@@ -579,6 +793,7 @@ struct ConstructCandidateVoxelMask
         , mPoints(rhs.mPoints)
         , mPointIndexNodes(rhs.mPointIndexNodes)
         , mXform(rhs.mXform)
+        , mClipBox(rhs.mClipBox)
         , mInterrupter(rhs.mInterrupter)
     {
     }
@@ -593,6 +808,8 @@ struct ConstructCandidateVoxelMask
 
         std::vector<PointIndexType> largeParticleIndices;
         double leafnodeSize = mXform.voxelSize()[0] * double(PointIndexLeafNode::DIM);
+
+        const bool isTransformLinear = mXform.isLinear();
 
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
 
@@ -621,7 +838,7 @@ struct ConstructCandidateVoxelMask
 
                     radius = mPoints->radius(*pointIdxPt);
 
-                    if (radius > leafnodeSize) {
+                    if (isTransformLinear && radius > leafnodeSize) {
                         largeParticleIndices.push_back(*pointIdxPt);
                     } else {
                         pos = mPoints->pos(*pointIdxPt);
@@ -649,9 +866,28 @@ struct ConstructCandidateVoxelMask
                 }
 
                 if (regionIsValid) {
-                    box.min() = mXform.worldToIndexCellCentered(bboxMin);
-                    box.max() = mXform.worldToIndexCellCentered(bboxMax);
-                    activateRegion(box);
+                    if (isTransformLinear) {
+                        box.min() = mXform.worldToIndexCellCentered(bboxMin);
+                        box.max() = mXform.worldToIndexCellCentered(bboxMax);
+                    } else {
+                        openvdb::math::Vec3d ijkMin, ijkMax;
+                        openvdb::math::calculateBounds(mXform, bboxMin, bboxMax, ijkMin, ijkMax);
+
+                        box.min() = openvdb::Coord::round(ijkMin);
+                        box.max() = openvdb::Coord::round(ijkMax);
+                    }
+
+                    if (mClipBox) {
+
+                        if (mClipBox->hasOverlap(box)) {
+                            // Intersect bbox with the region of interest.
+                            box.min() = openvdb::Coord::maxComponent(box.min(), mClipBox->min());
+                            box.max() = openvdb::Coord::minComponent(box.max(), mClipBox->max());
+                            activateRegion(box);
+                        }
+                    } else {
+                        activateRegion(box);
+                    }
                 }
             }
         }
@@ -688,7 +924,17 @@ struct ConstructCandidateVoxelMask
             box.min() = mXform.worldToIndexCellCentered(bboxMin);
             box.max() = mXform.worldToIndexCellCentered(bboxMax);
 
-            activateRadialRegion(box);
+            if (mClipBox) {
+
+                if (mClipBox->hasOverlap(box)) {
+                    // Intersect bbox with the region of interest.
+                    box.min() = openvdb::Coord::maxComponent(box.min(), mClipBox->min());
+                    box.max() = openvdb::Coord::minComponent(box.max(), mClipBox->max());
+                    activateRegion(box);
+                }
+            } else {
+                activateRadialRegion(box);
+            }
         }
     }
 
@@ -750,8 +996,10 @@ private:
 
         const double iRadius = radius * double(1.0 / std::sqrt(3.0));
         openvdb::CoordBBox ibox(
-            openvdb::Coord::round(openvdb::Vec3d(center[0] - iRadius, center[1] - iRadius, center[2] - iRadius)),
-            openvdb::Coord::round(openvdb::Vec3d(center[0] + iRadius, center[1] + iRadius, center[2] + iRadius)));
+            openvdb::Coord::round(openvdb::Vec3d(
+                center[0] - iRadius, center[1] - iRadius, center[2] - iRadius)),
+            openvdb::Coord::round(openvdb::Vec3d(
+                center[0] + iRadius, center[1] + iRadius, center[2] + iRadius)));
 
         ibox.min() &= ~(LeafNodeType::DIM - 1);
         ibox.max() &= ~(LeafNodeType::DIM - 1);
@@ -866,17 +1114,122 @@ private:
     PointCache                          const * const mPoints;
     PointIndexLeafNode          const * const * const mPointIndexNodes;
     openvdb::math::Transform                    const mXform;
+    openvdb::CoordBBox                  const * const mClipBox;
     hvdb::Interrupter                         * const mInterrupter;
 }; // struct ConstructCandidateVoxelMask
 
 
-///@brief Constructs a region of interest mask for the gather based rasterization step.
-PointIndexGridCollection::BoolTreeType::Ptr
-constructROIMask(const PointIndexGridCollection& idxGridCollection,
+/// Inactivates candidate leafnodes that have no particle overlap.
+/// (The ConstructCandidateVoxelMask scheme is overestimating the region
+///  of intrest when frustum transforms are used, this culls the regions.)
+template <typename MaskLeafNodeType>
+struct CullFrustumLeafNodes
+{
+    CullFrustumLeafNodes(
+        const PointIndexGridCollection& idxGridCollection,
+        std::vector<MaskLeafNodeType*>& nodes,
+        const openvdb::math::Transform& xform)
+        : mIdxGridCollection(&idxGridCollection)
+        , mNodes(nodes.empty() ? NULL : &nodes.front())
+        , mXform(xform)
+    {
+    }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+
+        typedef openvdb::tools::PointIndexGrid::TreeType            PointIndexTree;
+        typedef openvdb::tree::ValueAccessor<const PointIndexTree>  IndexTreeAccessor;
+        typedef boost::scoped_ptr<IndexTreeAccessor>                IndexTreeAccessorPtr;
+
+        boost::scoped_array<IndexTreeAccessorPtr> accessorList(
+            new IndexTreeAccessorPtr[mIdxGridCollection->size()]);
+
+        for (size_t i = 0; i < mIdxGridCollection->size(); ++i) {
+            const PointIndexTree& tree = mIdxGridCollection->idxGrid(i).tree();
+            accessorList[i].reset(new IndexTreeAccessor(tree));
+        }
+
+        openvdb::tools::PointIndexIterator<PointIndexTree> pointIndexIter;
+
+        for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
+
+            MaskLeafNodeType& maskNode = *mNodes[n];
+            if (maskNode.isEmpty()) continue;
+
+            const openvdb::CoordBBox nodeBounds = getInclusiveNodeBounds(maskNode);
+
+            const openvdb::Vec3d tmpMin = mXform.indexToWorld(nodeBounds.min());
+            const openvdb::Vec3d tmpMax = mXform.indexToWorld(nodeBounds.max());
+
+            const openvdb::Vec3d bMin = openvdb::math::minComponent(tmpMin, tmpMax);
+            const openvdb::Vec3d bMax = openvdb::math::maxComponent(tmpMin, tmpMax);
+
+            bool hasOverlap = false;
+
+            for (size_t i = 0; i < mIdxGridCollection->size(); ++i) {
+
+                const double sarchRadius = double(mIdxGridCollection->maxRadius(i));
+
+                const openvdb::math::Transform& idxGridTransform =
+                    mIdxGridCollection->idxGrid(i).transform();
+
+                const openvdb::CoordBBox searchRegion(
+                    idxGridTransform.worldToIndexCellCentered(bMin - sarchRadius),
+                    idxGridTransform.worldToIndexCellCentered(bMax + sarchRadius));
+
+                pointIndexIter.searchAndUpdate(searchRegion, *accessorList[i]);
+
+                if (pointIndexIter) {
+                    hasOverlap = true;
+                    break;
+                }
+            }
+
+            if (!hasOverlap) {
+                maskNode.setValuesOff();
+            }
+        }
+    }
+
+private:
+
+    template <typename NodeType>
+    static inline openvdb::CoordBBox getInclusiveNodeBounds(const NodeType& node)
+    {
+        const openvdb::Coord& origin = node.origin();
+        return openvdb::CoordBBox(origin, origin.offsetBy(NodeType::DIM - 1));
+    }
+
+    PointIndexGridCollection    const * const mIdxGridCollection;
+    MaskLeafNodeType                * * const mNodes;
+    openvdb::math::Transform                  mXform;
+}; // struct CullFrustumLeafNodes
+
+
+////////////////////////////////////////
+
+
+///@brief Constructs a region of interest mask for the gather based rasterization.
+inline void
+maskRegionOfInterest(PointIndexGridCollection::BoolTreeType& mask,
+    const PointIndexGridCollection& idxGridCollection,
     const openvdb::math::Transform& volumeTransform,
+    bool clipToFrustum = false,
     hvdb::Interrupter* interrupter = NULL)
 {
-    PointIndexGridCollection::BoolTreeType::Ptr maskTree(new PointIndexGridCollection::BoolTreeType(false));
+    typedef PointIndexGridCollection::BoolTreeType::LeafNodeType BoolLeafNodeType;
+
+    boost::shared_ptr<openvdb::CoordBBox> frustumClipBox;
+
+    if (clipToFrustum && !volumeTransform.isLinear()) {
+        typedef openvdb::math::NonlinearFrustumMap MapType;
+        MapType::ConstPtr map = volumeTransform.map<MapType>();
+        if (map) {
+            const openvdb::BBoxd& bbox = map->getBBox();
+            frustumClipBox.reset(new openvdb::CoordBBox(
+                    openvdb::Coord::floor(bbox.min()), openvdb::Coord::ceil(bbox.max())));
+        }
+    }
 
     for (size_t n = 0; n < idxGridCollection.size(); ++n) {
 
@@ -897,7 +1250,8 @@ constructROIMask(const PointIndexGridCollection& idxGridCollection,
                 openvdb::math::Transform::createLinearTransform(maxPointRadius);
 
             regionPointGridPtr =
-                openvdb::tools::createPointIndexGrid<PointIndexGridCollection::PointIndexGrid>(pointCache, *xform);
+                openvdb::tools::createPointIndexGrid<PointIndexGridCollection::PointIndexGrid>(
+                    pointCache, *xform);
 
             regionPointIndexTree = &regionPointGridPtr->tree();
         }
@@ -907,13 +1261,91 @@ constructROIMask(const PointIndexGridCollection& idxGridCollection,
         pointIndexLeafNodes.reserve(regionPointIndexTree->leafCount());
         regionPointIndexTree->getNodes(pointIndexLeafNodes);
 
-        ConstructCandidateVoxelMask op(*maskTree, pointCache,
-            pointIndexLeafNodes, volumeTransform, interrupter);
+        ConstructCandidateVoxelMask op(mask, pointCache,
+            pointIndexLeafNodes, volumeTransform, frustumClipBox.get(), interrupter);
 
         tbb::parallel_reduce(tbb::blocked_range<size_t>(0, pointIndexLeafNodes.size()), op);
     }
 
-    return maskTree;
+    if (interrupter && interrupter->wasInterrupted()) return;
+
+    if (!volumeTransform.isLinear()) {
+
+        std::vector<BoolLeafNodeType*> maskNodes;
+        mask.getNodes(maskNodes);
+
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, maskNodes.size()),
+            CullFrustumLeafNodes<BoolLeafNodeType>(idxGridCollection, maskNodes, volumeTransform));
+
+        openvdb::tools::pruneInactive(mask);
+    }
+}
+
+
+/// Fills the @a bbox region with leafnode level tiles.
+/// (Partially overlapped leafnode tiles are included)
+template<typename TreeAccessorType>
+inline void
+fillWithLeafLevelTiles(TreeAccessorType& treeAcc, const openvdb::CoordBBox& bbox)
+{
+    typedef typename TreeAccessorType::TreeType::LeafNodeType LeafNodeType;
+
+    openvdb::Coord imin = bbox.min() & ~(LeafNodeType::DIM - 1);
+    openvdb::Coord imax = bbox.max() & ~(LeafNodeType::DIM - 1);
+
+    openvdb::Coord ijk(0);
+
+    for (ijk[0] = imin[0]; ijk[0] <= imax[0]; ijk[0] += LeafNodeType::DIM) {
+        for (ijk[1] = imin[1]; ijk[1] <= imax[1]; ijk[1] += LeafNodeType::DIM) {
+            for (ijk[2] = imin[2]; ijk[2] <= imax[2]; ijk[2] += LeafNodeType::DIM) {
+                treeAcc.addTile(LeafNodeType::LEVEL+1, ijk, true, true);
+            }
+        }
+    }
+}
+
+
+/// Transforms the input @a bbox from an axis-aligned box in @a srcTransform
+/// world space to an axis-aligned box i @a targetTransform world space.
+openvdb::CoordBBox
+remapBBox(openvdb::CoordBBox& bbox, const openvdb::math::Transform& srcTransform,
+    const openvdb::math::Transform& targetTransform)
+{
+    openvdb::CoordBBox output;
+
+    // corner 1
+    openvdb::Coord ijk = bbox.min();
+    output.expand(targetTransform.worldToIndexNodeCentered(srcTransform.indexToWorld(ijk)));
+
+    // corner 2
+    ijk = openvdb::Coord(bbox.min().x(), bbox.min().y(), bbox.max().z());
+    output.expand(targetTransform.worldToIndexNodeCentered(srcTransform.indexToWorld(ijk)));
+
+    // corner 3
+    ijk = openvdb::Coord(bbox.max().x(), bbox.min().y(), bbox.max().z());
+    output.expand(targetTransform.worldToIndexNodeCentered(srcTransform.indexToWorld(ijk)));
+
+    // corner 4
+    ijk = openvdb::Coord(bbox.max().x(), bbox.min().y(), bbox.min().z());
+    output.expand(targetTransform.worldToIndexNodeCentered(srcTransform.indexToWorld(ijk)));
+
+    // corner 5
+    ijk = openvdb::Coord(bbox.min().x(), bbox.max().y(), bbox.min().z());
+    output.expand(targetTransform.worldToIndexNodeCentered(srcTransform.indexToWorld(ijk)));
+
+    // corner 6
+    ijk = openvdb::Coord(bbox.min().x(), bbox.max().y(), bbox.max().z());
+    output.expand(targetTransform.worldToIndexNodeCentered(srcTransform.indexToWorld(ijk)));
+
+    // corner 7
+    ijk = bbox.max();
+    output.expand(targetTransform.worldToIndexNodeCentered(srcTransform.indexToWorld(ijk)));
+
+    // corner 8
+    ijk = openvdb::Coord(bbox.max().x(), bbox.max().y(), bbox.min().z());
+    output.expand(targetTransform.worldToIndexNodeCentered(srcTransform.indexToWorld(ijk)));
+
+    return output;
 }
 
 
@@ -1076,7 +1508,9 @@ struct DensityOp
         else mNode = new LeafNodeType(origin, openvdb::zeroVal<ValueType>());
     }
 
-    ValueType* data() { return const_cast<ValueType*>(&mNode->getValue(0)); /*mNode->buffer().data();*/ }
+    ValueType* data() {
+        return const_cast<ValueType*>(&mNode->getValue(0)); /*mNode->buffer().data();*/
+    }
 
     template<typename LeafNodeT>
     void endNodeProcessing(const LeafNodeT& maskNode)
@@ -1094,6 +1528,17 @@ private:
 }; // struct DensityOp
 
 
+
+template<typename ValueType>
+inline bool
+isValidAttribute(const std::string& name, const GU_Detail& detail)
+{
+    GA_ROAttributeRef ref =
+        detail.findFloatTuple(GA_ATTRIB_POINT, name.c_str(), ValueTypeTraits<ValueType>::TupleSize);
+    return ref.isValid();
+}
+
+
 ///@brief Wrapper object for Houdini point attributes.
 template<typename _ValueType, typename _OperatorType = WeightedAverageOp<_ValueType> >
 struct Attribute
@@ -1106,14 +1551,16 @@ struct Attribute
     typedef _OperatorType                                       OperatorType;
     typedef _ValueType                                          ValueType;
     typedef openvdb::tree::LeafNode<ValueType, LOG2DIM>         LeafNodeType;
+    typedef openvdb::tree::LeafNode<bool, LOG2DIM>              BoolLeafNodeType;
+    typedef openvdb::math::Transform                            Transform;
 
-    typedef openvdb::tools::PointIndexTree                                          PointIndexTreeType;
+    typedef openvdb::tools::PointIndexTree                      PointIndexTreeType;
     typedef typename PointIndexTreeType::template ValueConverter<ValueType>::Type   TreeType;
     typedef typename openvdb::Grid<TreeType>                                        GridType;
 
     /////
 
-    static Ptr create(const std::string& name, const GU_Detail& detail, size_t nodeCount)
+    static Ptr create(const std::string& name, const GU_Detail& detail, const Transform& transform)
     {
         GA_ROAttributeRef ref;
         std::string gridName;
@@ -1122,11 +1569,16 @@ struct Attribute
             ref = detail.getP();
             gridName = "density";
         } else {
-            ref = detail.findFloatTuple(GA_ATTRIB_POINT, name.c_str(), ValueTypeTraits<ValueType>::TupleSize);
+            ref = detail.findFloatTuple(
+                GA_ATTRIB_POINT, name.c_str(), ValueTypeTraits<ValueType>::TupleSize);
             gridName = name;
         }
 
-        if (ref.isValid()) return Ptr(new Attribute<ValueType, OperatorType>(*ref.getAttribute(), gridName, nodeCount));
+        if (ref.isValid()) {
+            return Ptr(new Attribute<ValueType, OperatorType>(
+                                *ref.getAttribute(), gridName, transform));
+        }
+
         return Ptr();
     }
 
@@ -1135,15 +1587,89 @@ struct Attribute
         return typename OperatorType::Ptr(new OperatorType(*mAttrib, mNodes));
     }
 
-    void exportVdb(GU_Detail& detail, const openvdb::math::Transform::Ptr& xform)
+    void initNodeBuffer(size_t nodeCount)
+    {
+        clearNodes();
+
+        if (nodeCount > mNodeCount) {
+            mNodes.reset(new LeafNodeType*[nodeCount]);
+            for (size_t n = 0; n < nodeCount; ++n) mNodes[n] = NULL;
+        }
+
+        mNodeCount = nodeCount;
+    }
+
+
+    void cacheNodes()
+    {
+        mOutputNodes.reserve(std::max(mOutputNodes.size() + 1, mNodeCount));
+
+        for (size_t n = 0; n < mNodeCount; ++n) {
+            if (mNodes[n]) {
+                mOutputNodes.push_back(mNodes[n]);
+                mNodes[n] = NULL;
+            }
+        }
+    }
+
+    void cacheFrustumNodes(std::vector<const BoolLeafNodeType*>& nodes, double voxelSize)
+    {
+        mOutputNodes.reserve(std::max(mOutputNodes.size() + 1, mNodeCount));
+
+        typename GridType::Ptr grid = GridType::create();
+        IFOPopulateTree op(grid->tree(), mNodes.get());
+
+        tbb::parallel_reduce(tbb::blocked_range<size_t>(0, mNodeCount), op);
+
+        grid->setTransform(
+            openvdb::math::Transform::createLinearTransform(voxelSize));
+
+        typename GridType::Ptr frustumGrid = GridType::create();
+        frustumGrid->setTransform(mTransform.copy());
+
+        hvdb::Interrupter interrupter;
+        openvdb::tools::resampleToMatch<openvdb::tools::BoxSampler>(
+            *grid, *frustumGrid, interrupter);
+
+        TreeType& frustumTree = frustumGrid->tree();
+
+        for (size_t n = 0, N = nodes.size(); n < N; ++n) {
+
+            const BoolLeafNodeType& maskNode = *nodes[n];
+
+            LeafNodeType * node = frustumTree.template stealNode<LeafNodeType>(
+                maskNode.origin(), frustumTree.background(), false);
+
+            if (node) {
+
+                if (node->getValueMask() != maskNode.getValueMask()) {
+                    typename BoolLeafNodeType::ValueOffCIter it = maskNode.cbeginValueOff();
+                    for (; it; ++it) {
+                        node->setValueOff(it.pos(), frustumTree.background());
+                    }
+                }
+
+                if (node->isEmpty()) {
+                    delete node;
+                } else {
+                    mOutputNodes.push_back(node);
+                }
+            }
+        } // end node loop
+    }
+
+
+    void exportGrid(std::vector<openvdb::GridBase::Ptr>& outputGrids)
     {
         typename GridType::Ptr grid= GridType::create();
 
-        IFOPopulateTree op(grid->tree(), mNodes);
-        tbb::parallel_reduce(tbb::blocked_range<size_t>(0, mNodeCount), op);
+        IFOPopulateTree op(grid->tree(), mOutputNodes.empty() ? NULL : &mOutputNodes.front());
+
+        tbb::parallel_reduce(tbb::blocked_range<size_t>(0, mOutputNodes.size()), op);
 
         if (!grid->tree().empty()) {
-            grid->setTransform(xform);
+            grid->setTransform(mTransform.copy());
+            grid->setName(mName);
 
             if (mName == std::string("density")) {
                 grid->setGridClass(openvdb::GRID_FOG_VOLUME);
@@ -1159,23 +1685,34 @@ struct Attribute
                 }
             }
 
-            hvdb::createVdbPrimitive(detail, grid, mName.c_str());
+            outputGrids.push_back(grid);
         }
+
+        mOutputNodes.clear();
     }
 
     ~Attribute()
+    {
+        clearNodes();
+
+        for (size_t n = 0, N = mOutputNodes.size(); n < N; ++n) {
+            if (mOutputNodes[n] != NULL) delete mOutputNodes[n];
+        }
+    }
+
+private:
+
+    void clearNodes()
     {
         for (size_t n = 0; n < mNodeCount; ++n) {
             if (mNodes[n] != NULL) delete mNodes[n];
         }
     }
 
-private:
-
-    Attribute(const GA_Attribute& attrib, const std::string& name, size_t nodeCount)
-        : mAttrib(&attrib), mName(name), mNodeCount(nodeCount), mNodes(new LeafNodeType*[nodeCount])
+    Attribute(const GA_Attribute& attrib, const std::string& name, const Transform& transform)
+        : mAttrib(&attrib), mName(name), mNodeCount(0), mNodes(NULL)
+        , mOutputNodes(), mTransform(transform)
     {
-        for (size_t n = 0; n < mNodeCount; ++n) mNodes[n] = NULL;
     }
 
     //////////
@@ -1183,8 +1720,8 @@ private:
     // Internal TBB function objects
 
     struct IFOPopulateTree {
-        IFOPopulateTree(TreeType& tree, boost::scoped_array<LeafNodeType*>& nodes)
-            : mTree(), mAccessor(tree) , mNodes(nodes.get()) {}
+        IFOPopulateTree(TreeType& tree, LeafNodeType ** nodes)
+            : mTree(), mAccessor(tree) , mNodes(nodes) {}
 
         IFOPopulateTree(IFOPopulateTree& rhs, tbb::split) // Thread safe copy constructor
             : mTree(rhs.mAccessor.tree().background()), mAccessor(mTree), mNodes(rhs.mNodes) {}
@@ -1211,9 +1748,89 @@ private:
 
     GA_Attribute const * const          mAttrib;
     const std::string                   mName;
-    const size_t                        mNodeCount;
+    size_t                              mNodeCount;
     boost::scoped_array<LeafNodeType*>  mNodes;
+    std::vector<LeafNodeType*>          mOutputNodes;
+    openvdb::math::Transform            mTransform;
 }; // struct Attribute
+
+
+// Attribute utility methods
+
+template<typename AttributeType>
+inline void
+initializeAttributeBuffers(boost::shared_ptr<AttributeType>& attr, size_t nodeCount)
+{
+    if (attr) attr->initNodeBuffer(nodeCount);
+}
+
+
+template<typename AttributeType>
+inline void
+initializeAttributeBuffers(std::vector<boost::shared_ptr<AttributeType> >& attr, size_t nodeCount)
+{
+    for (size_t n = 0, N = attr.size(); n < N; ++n) {
+        attr[n]->initNodeBuffer(nodeCount);
+    }
+}
+
+
+template<typename AttributeType>
+inline void
+cacheAttributeBuffers(boost::shared_ptr<AttributeType>& attr)
+{
+    if (attr) attr->cacheNodes();
+}
+
+
+template<typename AttributeType>
+inline void
+cacheAttributeBuffers(std::vector<boost::shared_ptr<AttributeType> >& attr)
+{
+    for (size_t n = 0, N = attr.size(); n < N; ++n) {
+        attr[n]->cacheNodes();
+    }
+}
+
+
+template<typename AttributeType, typename LeafNodeType>
+inline void
+cacheFrustumAttributeBuffers(boost::shared_ptr<AttributeType>& attr,
+    std::vector<const LeafNodeType*>& nodes, double voxelSize)
+{
+    if (attr) attr->cacheFrustumNodes(nodes, voxelSize);
+}
+
+
+template<typename AttributeType, typename LeafNodeType>
+inline void
+cacheFrustumAttributeBuffers(std::vector<boost::shared_ptr<AttributeType> >& attr,
+    std::vector<const LeafNodeType*>& nodes, double voxelSize)
+{
+    for (size_t n = 0, N = attr.size(); n < N; ++n) {
+        attr[n]->cacheFrustumNodes(nodes, voxelSize);
+    }
+}
+
+
+template<typename AttributeType>
+inline void
+exportAttributeGrid(boost::shared_ptr<AttributeType>& attr,
+    std::vector<openvdb::GridBase::Ptr>& outputGrids)
+{
+    if (attr) attr->exportGrid(outputGrids);
+}
+
+
+template<typename AttributeType>
+inline void
+exportAttributeGrid(std::vector<boost::shared_ptr<AttributeType> >& attr,
+    std::vector<openvdb::GridBase::Ptr>& outputGrids)
+{
+    for (size_t n = 0, N = attr.size(); n < N; ++n) {
+        attr[n]->exportGrid(outputGrids);
+    }
+}
 
 
 ////////////////////////////////////////
@@ -1418,13 +2035,17 @@ struct RasterizePoints
     {
     }
 
-    void setDensityAttribute(DensityAttribute& v) { mDensityAttribute = &v; }
+    void setDensityAttribute(DensityAttribute * a) { mDensityAttribute = a; }
 
-    void setVectorAttributes(std::vector<Vec3sAttribute::Ptr>& v) { mVectorAttributes = &v; }
+    void setVectorAttributes(std::vector<Vec3sAttribute::Ptr>& v) {
+       if(!v.empty()) mVectorAttributes = &v;
+    }
 
-    void setFloatAttributes(std::vector<FloatAttribute::Ptr>& v) { mFloatAttributes = &v; }
+    void setFloatAttributes(std::vector<FloatAttribute::Ptr>& v) {
+        if (!v.empty()) mFloatAttributes = &v;
+    }
 
-    void setVEXContext(VEXContext& v) { mVEXContext = &v; }
+    void setVEXContext(VEXContext * v) { mVEXContext = v; }
 
     /////
 
@@ -1483,7 +2104,8 @@ struct RasterizePoints
         typedef openvdb::tree::ValueAccessor<const PointIndexTree>  IndexTreeAccessor;
         typedef boost::scoped_ptr<IndexTreeAccessor>                IndexTreeAccessorPtr;
 
-        boost::scoped_array<IndexTreeAccessorPtr> accessorList(new IndexTreeAccessorPtr[mIdxGridCollection->size()]);
+        boost::scoped_array<IndexTreeAccessorPtr> accessorList(
+            new IndexTreeAccessorPtr[mIdxGridCollection->size()]);
 
         for (size_t i = 0; i < mIdxGridCollection->size(); ++i) {
             const PointIndexTree& tree = mIdxGridCollection->idxGrid(i).tree();
@@ -1503,6 +2125,7 @@ struct RasterizePoints
             }
 
             const BoolLeafNodeType& maskNode = *mRegionMaskNodes[n];
+            if (maskNode.isEmpty()) continue;
             const openvdb::Coord& origin = maskNode.origin();
 
             if (transferAttributes) {
@@ -1521,7 +2144,8 @@ struct RasterizePoints
                 floatAttributes[i]->beginNodeProcessing(origin, n);
             }
 
-            const openvdb::CoordBBox nodeBoundingBox(origin, origin.offsetBy(BoolLeafNodeType::DIM - 1));
+            const openvdb::CoordBBox nodeBoundingBox(
+                origin, origin.offsetBy(BoolLeafNodeType::DIM - 1));
 
             const openvdb::Vec3d bMin = mVolumeXform.indexToWorld(nodeBoundingBox.min());
             const openvdb::Vec3d bMax = mVolumeXform.indexToWorld(nodeBoundingBox.max());
@@ -1534,7 +2158,8 @@ struct RasterizePoints
 
                 const double sarchRadius = double(mIdxGridCollection->maxRadius(i));
                 const PointCache& pointCache = mIdxGridCollection->pointCache(i);
-                const openvdb::math::Transform& idxGridTransform = mIdxGridCollection->idxGrid(i).transform();
+                const openvdb::math::Transform& idxGridTransform =
+                    mIdxGridCollection->idxGrid(i).transform();
 
                 const openvdb::CoordBBox searchRegion(
                     idxGridTransform.worldToIndexCellCentered(bMin - sarchRadius),
@@ -1542,9 +2167,9 @@ struct RasterizePoints
 
                 pointIndexIter.searchAndUpdate(searchRegion, *accessorList[i]);
 
-                transferData |= gatherDensityAndAttributes(densityHandle, pointIndexIter, sarchRadius,
-                    pointCache, nodeBoundingBox, densityAttribute, vecAttributes, floatAttributes,
-                    voxelWeightArray, densitySamples);
+                transferData |= gatherDensityAndAttributes(densityHandle, pointIndexIter,
+                    sarchRadius, pointCache, nodeBoundingBox, densityAttribute, vecAttributes,
+                    floatAttributes, voxelWeightArray, densitySamples);
             }
 
             if (transferData && !this->wasInterrupted()) {
@@ -1553,7 +2178,8 @@ struct RasterizePoints
 
                 if (transferAttributes) {
                     for (size_t n = 0; n < BoolLeafNodeType::SIZE; ++n) {
-                        voxelWeightArray[n] = voxelWeightArray[n] > 0.0f ? 1.0f / voxelWeightArray[n] : 0.0f;
+                        voxelWeightArray[n] =
+                            voxelWeightArray[n] > 0.0f ? 1.0f / voxelWeightArray[n] : 0.0f;
                     }
 
                     for (size_t i = 0, I = vecAttributes.size(); i < I; ++i) {
@@ -1633,10 +2259,14 @@ private:
             ScalarType radius = pointRadiusData[*pointIndexIter];
             const float radiusSqr = radius * radius;
 
-            const ScalarType densityScale = mDensityScale * (hasPointDensity ? densityHandle.get(pointOffset) : 1.0f);
+            const ScalarType densityScale =
+                mDensityScale * (hasPointDensity ? densityHandle.get(pointOffset) : 1.0f);
+
             const ScalarType solidRadius = std::min(radius * mSolidRatio, radius);
             const ScalarType residualRadius = std::max(ScalarType(0.0), radius - solidRadius);
-            const ScalarType invResidualRadius = residualRadius > 0.0f ? 1.0f / residualRadius : 0.0f;
+
+            const ScalarType invResidualRadius =
+                residualRadius > 0.0f ? 1.0f / residualRadius : 0.0f;
 
             openvdb::Index xPos(0), yPos(0), pos(0);
             double xSqr, ySqr, zSqr;
@@ -1676,7 +2306,10 @@ private:
 
                         if (distSqr < radiusSqr) {
                             const float dist = std::sqrt(distSqr) - solidRadius;
-                            const float weight = dist > 0.0f ? densityScale * (1.0f - invResidualRadius * dist) : 1.0f;
+
+                            const float weight =
+                                dist > 0.0f ? densityScale * (1.0f - invResidualRadius * dist) : 1.0f;
+
                             if (weight > 0.0f) densitySamples.push_back(DensitySample(weight, pos));
                         }
                     }
@@ -1922,6 +2555,368 @@ private:
 ////////////////////////////////////////
 
 
+/// Collection of rasterization settings
+struct RasterizationSettings
+{
+    RasterizationSettings(const GU_Detail& geo, const GA_PointGroup* group, hvdb::Interrupter& in)
+        : createDensity(true)
+        , clipToFrustum(true)
+        , invertMask(false)
+        , densityScale(1.0f)
+        , particleScale(1.0f)
+        , solidRatio(0.0f)
+        , treatment(RasterizePoints::MAXIMUM)
+        , transform(openvdb::math::Transform::createLinearTransform(0.1))
+        , pointsGeo(&geo)
+        , pointGroup(group)
+        , interrupter(&in)
+        , vexContext(NULL)
+        , scalarAttributeNames()
+        , vectorAttributeNames()
+        , maskGrid()
+        , maskBBox()
+        , frustumQuality(0.0f)
+    {
+    }
+
+    inline bool wasInterrupted() { return interrupter->wasInterrupted(); }
+
+    // the input value is clipped to [0, 1] range.
+    void setFrustumQuality(float val) {
+        frustumQuality = std::max(std::min(val, 1.0f), 0.0f);
+    }
+
+    float getFrustumQuality() const { return frustumQuality; }
+
+    bool    createDensity, clipToFrustum, invertMask;
+    float   densityScale, particleScale, solidRatio;
+
+    RasterizePoints::DensityTreatment         treatment;
+    openvdb::math::Transform::Ptr             transform;
+    GU_Detail                   const * const pointsGeo;
+    GA_PointGroup               const * const pointGroup;
+    hvdb::Interrupter                 * const interrupter;
+    VEXContext                        *       vexContext;
+    std::vector<std::string>                  scalarAttributeNames;
+    std::vector<std::string>                  vectorAttributeNames;
+    hvdb::GridCPtr                            maskGrid;
+    boost::shared_ptr<openvdb::BBoxd>         maskBBox;
+
+private:
+    float frustumQuality;
+}; // RasterizationSettings
+
+
+/// Culls the @a mask region using a user supplied bbox or another grids active voxel topology.
+inline void
+applyClippingMask(PointIndexGridCollection::BoolTreeType& mask, RasterizationSettings& settings)
+{
+    if (settings.maskBBox) {
+
+       if (settings.transform->isLinear()) {
+            bboxClip(mask, *settings.maskBBox, settings.invertMask, *settings.transform);
+
+       } else {
+
+            openvdb::CoordBBox maskBBox;
+            mask.evalActiveVoxelBoundingBox(maskBBox);
+
+            openvdb::Vec3d locVoxelSize = computeFrustumVoxelSize(maskBBox.min().z(), *settings.transform);
+            openvdb::Vec3d nearPlaneVoxelSize = settings.transform->voxelSize();
+
+            const double weight = double(settings.getFrustumQuality());
+            double voxelSize = linearBlend(nearPlaneVoxelSize.x(), locVoxelSize.x(), weight);
+
+            openvdb::math::Transform::Ptr xform = openvdb::math::Transform::createLinearTransform(voxelSize);
+
+            bboxClip(mask, *settings.maskBBox, settings.invertMask, *settings.transform, xform.get());
+       }
+
+    } else if (settings.maskGrid) {
+
+        GridTopologyClipOp<PointIndexGridCollection::BoolTreeType>
+            op(mask, *settings.transform, settings.invertMask);
+
+        UTvdbProcessTypedGridTopology(UTvdbGetGridType(*settings.maskGrid), *settings.maskGrid, op);
+    }
+}
+
+
+inline void
+rasterize(RasterizationSettings& settings, std::vector<openvdb::GridBase::Ptr>& outputGrids)
+{
+    typedef PointIndexGridCollection::BoolTreeType      BoolTreeType;
+    typedef BoolTreeType::LeafNodeType                  BoolLeafNodeType;
+
+    typedef Attribute<float, DensityOp<float> >         DensityAttributeType;
+    typedef Attribute<openvdb::Vec3s>                   Vec3sAttribute;
+    typedef Attribute<float>                            FloatAttribute;
+
+    //////////
+
+    float partitioningVoxelSize = float(std::max(
+        settings.transform->voxelSize().x(), settings.transform->voxelSize().z()));
+
+    PointIndexGridCollection idxGridCollection(*settings.pointsGeo,
+        settings.particleScale, partitioningVoxelSize, settings.pointGroup, settings.interrupter);
+
+    // setup selected point attributes
+
+    DensityAttributeType::Ptr densityAttribute;
+
+    if (settings.createDensity) {
+        densityAttribute = DensityAttributeType::create(
+            GEO_STD_ATTRIB_POSITION, *settings.pointsGeo, *settings.transform);
+    }
+
+    std::vector<Vec3sAttribute::Ptr> vectorAttributes;
+    vectorAttributes.reserve(settings.vectorAttributeNames.size());
+
+    for (size_t n = 0; n < settings.vectorAttributeNames.size(); ++n) {
+        Vec3sAttribute::Ptr a = Vec3sAttribute::create(
+            settings.vectorAttributeNames[n], *settings.pointsGeo, *settings.transform);
+        if (a) vectorAttributes.push_back(a);
+    }
+
+    std::vector<FloatAttribute::Ptr> scalarAttributes;
+    scalarAttributes.reserve(settings.scalarAttributeNames.size());
+
+    for (size_t n = 0; n < settings.scalarAttributeNames.size(); ++n) {
+        FloatAttribute::Ptr a = FloatAttribute::create(
+            settings.scalarAttributeNames[n], *settings.pointsGeo, *settings.transform);
+        if (a) scalarAttributes.push_back(a);
+    }
+
+    const bool doTransfer = densityAttribute || !vectorAttributes.empty() || !scalarAttributes.empty();
+    if (!doTransfer || settings.wasInterrupted()) return;
+
+    // create region of interest mask
+
+    BoolTreeType roiMask;
+
+    maskRegionOfInterest(roiMask,
+        idxGridCollection, *settings.transform, settings.clipToFrustum, settings.interrupter);
+
+    applyClippingMask(roiMask, settings);
+
+    if (settings.wasInterrupted()) return;
+
+    std::vector<const BoolLeafNodeType*> maskNodes;
+    roiMask.getNodes(maskNodes);
+
+
+    if (settings.transform->isLinear()) { // ortho grid rasterization
+
+        initializeAttributeBuffers(densityAttribute, maskNodes.size());
+        initializeAttributeBuffers(vectorAttributes, maskNodes.size());
+        initializeAttributeBuffers(scalarAttributes, maskNodes.size());
+
+        RasterizePoints op(
+            *settings.pointsGeo,
+            idxGridCollection,
+            maskNodes,
+            *settings.transform,
+            settings.treatment,
+            settings.densityScale,
+            settings.solidRatio,
+            settings.interrupter);
+
+        op.setDensityAttribute(densityAttribute.get());
+        op.setVectorAttributes(vectorAttributes);
+        op.setFloatAttributes(scalarAttributes);
+        op.setVEXContext(settings.vexContext);
+
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, maskNodes.size()), op);
+
+        cacheAttributeBuffers(densityAttribute);
+        cacheAttributeBuffers(vectorAttributes);
+        cacheAttributeBuffers(scalarAttributes);
+
+    } else {  // frustum grid rasterization
+
+        openvdb::Vec3d nearPlaneVoxelSize = settings.transform->voxelSize();
+        const double sizeWeight = double(settings.getFrustumQuality());
+
+        std::sort(maskNodes.begin(), maskNodes.end(), CompZCoord<BoolLeafNodeType>());
+
+        size_t nodeIdx = 0;
+        while (nodeIdx < maskNodes.size()) {
+
+            int progress = int(double(nodeIdx) / double(maskNodes.size()) * 100.0);
+
+            if (settings.interrupter->wasInterrupted(progress)) {
+                return;
+            }
+
+            int zCoord = maskNodes[nodeIdx]->origin().z();
+            openvdb::Vec3d locVoxelSize = computeFrustumVoxelSize(zCoord, *settings.transform);
+
+            double voxelSize = linearBlend(nearPlaneVoxelSize.x(), locVoxelSize.x(), sizeWeight);
+
+            openvdb::math::Transform::Ptr xform =
+                openvdb::math::Transform::createLinearTransform(voxelSize);
+
+            std::vector<const BoolLeafNodeType*> frustumNodeQueue;
+
+            // create subregion mask
+
+            BoolTreeType subregionMask(false);
+            openvdb::tree::ValueAccessor<BoolTreeType> maskAcc(subregionMask);
+
+            for (; nodeIdx < maskNodes.size(); ++nodeIdx) {
+
+                if (settings.interrupter->wasInterrupted(progress)) {
+                    return;
+                }
+
+                const BoolLeafNodeType& node = *maskNodes[nodeIdx];
+
+                openvdb::Vec3d tmpVoxelSize =
+                    computeFrustumVoxelSize(node.origin().z(), *settings.transform);
+
+                if (tmpVoxelSize.x() > (locVoxelSize.x() * 2.0)) break;
+
+                openvdb::CoordBBox bbox;
+                node.evalActiveBoundingBox(bbox);
+                bbox = remapBBox(bbox, *settings.transform, *xform);
+                bbox.expand(1);
+
+                fillWithLeafLevelTiles(maskAcc, bbox);
+
+                frustumNodeQueue.push_back(maskNodes[nodeIdx]);
+
+                if (subregionMask.activeTileCount() >= 1000000) break;
+            }
+
+            if (subregionMask.empty()) continue;
+
+            subregionMask.voxelizeActiveTiles();
+
+            std::vector<const BoolLeafNodeType*> subregionNodes;
+            subregionMask.getNodes(subregionNodes);
+
+            size_t subregionNodeCount = subregionNodes.size();
+            if (subregionNodeCount == 0) continue;
+
+            // do subregion rasterization
+
+            initializeAttributeBuffers(densityAttribute, subregionNodeCount);
+            initializeAttributeBuffers(vectorAttributes, subregionNodeCount);
+            initializeAttributeBuffers(scalarAttributes, subregionNodeCount);
+
+            RasterizePoints op(
+                *settings.pointsGeo,
+                idxGridCollection,
+                subregionNodes,
+                *xform,
+                settings.treatment,
+                settings.densityScale,
+                settings.solidRatio,
+                settings.interrupter);
+
+            op.setDensityAttribute(densityAttribute.get());
+            op.setVectorAttributes(vectorAttributes);
+            op.setFloatAttributes(scalarAttributes);
+            op.setVEXContext(settings.vexContext);
+
+            tbb::parallel_for(tbb::blocked_range<size_t>(0, subregionNodeCount), op);
+
+            cacheFrustumAttributeBuffers(densityAttribute, frustumNodeQueue, voxelSize);
+            cacheFrustumAttributeBuffers(vectorAttributes, frustumNodeQueue, voxelSize);
+            cacheFrustumAttributeBuffers(scalarAttributes, frustumNodeQueue, voxelSize);
+        }
+    }
+
+    if (!settings.wasInterrupted()) {
+        exportAttributeGrid(densityAttribute, outputGrids);
+        exportAttributeGrid(vectorAttributes, outputGrids);
+        exportAttributeGrid(scalarAttributes, outputGrids);
+    }
+}
+
+
+////////////////////////////////////////
+
+
+/// Populates the @a scalarAttribNames and @a vectorAttribNames lists.
+inline void
+getAttributeNames(
+    const std::string& attributeNames,
+    const GU_Detail& geo,
+    std::vector<std::string>& scalarAttribNames,
+    std::vector<std::string>& vectorAttribNames,
+    bool createVelocityAttribtue,
+    UT_ErrorManager* log = NULL)
+{
+    if (attributeNames.empty() && !createVelocityAttribtue) {
+        return;
+    }
+
+    std::vector<std::string> allNames;
+
+    boost::algorithm::split(allNames, attributeNames, boost::is_any_of(", "));
+
+    std::set<std::string> uniqueNames(allNames.begin(), allNames.end());
+
+    if (createVelocityAttribtue) {
+        uniqueNames.insert("v");
+    }
+
+    std::vector<std::string> skipped;
+
+    for (std::set<std::string>::iterator it = uniqueNames.begin(); it != uniqueNames.end(); ++it) {
+
+        const std::string& name = *it;
+
+        GA_ROAttributeRef attr = geo.findFloatTuple(GA_ATTRIB_POINT, name.c_str(), 1);
+
+        if (attr.isValid()) {
+
+            scalarAttribNames.push_back(name);
+
+        } else {
+
+            attr = geo.findFloatTuple(GA_ATTRIB_POINT, name.c_str(), 3);
+
+            if (attr.isValid()) {
+                vectorAttribNames.push_back(name);
+            } else {
+                skipped.push_back(name);
+            }
+        }
+    }
+
+    if (!skipped.empty() && log) {
+
+        log->addWarning(SOP_OPTYPE_NAME, SOP_MESSAGE, ("Unable to rasterize attribute(s): " +
+            boost::algorithm::join(skipped, ", ")).c_str());
+
+        log->addWarning(SOP_OPTYPE_NAME, SOP_MESSAGE, "Only supporting point-rate attributes "
+            "of scalar or vector type with floating-point values.");
+    }
+}
+
+
+/// Returns a NULL pointer if geoPt is NULL or if no reference vdb is found.
+inline openvdb::math::Transform::Ptr
+getReferenceTransform(const GU_Detail * geoPt, const GA_PrimitiveGroup *group = NULL, UT_ErrorManager* log = NULL)
+{
+    if (geoPt) {
+        hvdb::VdbPrimCIterator vdbIt(geoPt, group);
+        if (vdbIt) {
+            return (*vdbIt)->getGrid().transform().copy();
+        } else if (log) {
+            log->addWarning(SOP_OPTYPE_NAME, SOP_MESSAGE, "Could not find a reference VDB grid");
+        }
+    }
+
+    return openvdb::math::Transform::Ptr();
+}
+
+
+////////////////////////////////////////
+
+
 inline int
 lookupAttrInput(const PRM_SpareData* spare)
 {
@@ -2003,26 +2998,8 @@ populateMeshMenu(void *data, PRM_Name *choicenames, int themenusize,
     choicenames[count].setLabel(0);
 }
 
-inline bool
-hasValidPointAttributes(const GU_Detail& detail, const std::vector<std::string>& attribNames)
-{
-    for (size_t n = 0, N = attribNames.size(); n < N; ++n) {
-        const char* name = attribNames[n].c_str();
-
-        GA_ROAttributeRef attrib = detail.findFloatTuple(GA_ATTRIB_POINT, name, 1);
-        if (attrib.isValid()) {
-            return true;
-        } else {
-            attrib = detail.findFloatTuple(GA_ATTRIB_POINT, name, 3);
-            if (attrib.isValid()) return true;
-        }
-    }
-    return false;
-}
-
 
 } // unnamed namespace
-
 
 
 ////////////////////////////////////////
@@ -2048,6 +3025,8 @@ struct SOP_OpenVDB_Rasterize_Points: public hvdb::SOP_NodeVDB
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
     virtual bool hasVexShaderParameter(const char* name) { return mCodeGenerator.hasShaderParameter(name); }
 #endif
+
+    virtual int isRefInput(unsigned i) const { return i > 0; }
 
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
@@ -2130,10 +3109,34 @@ newSopOperator(OP_OperatorTable* table)
         .setChoiceList(&SOP_Node::pointGroupMenu)
         .setHelpText("A group of points to rasterize."));
 
+    parms.add(hutil::ParmFactory(PRM_STRING, "transformvdb", "Transform VDB")
+        .setChoiceList(&hutil::PrimGroupMenuInput2)
+        .setHelpText("VDB grid that defines the output transform."));
+
+    parms.add(hutil::ParmFactory(PRM_STRING, "maskvdb", "Mask VDB")
+        .setChoiceList(&hutil::PrimGroupMenuInput3)
+        .setHelpText("VDB grid whose active topology defines what region to rasterize into."));
+
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "invertmask", "Invert Mask")
+        .setDefault(PRMzeroDefaults)
+        .setHelpText("Toggle to rasterize in the region outside the mask."));
+
     parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelsize", "Voxel Size")
         .setDefault(PRMpointOneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 5)
         .setHelpText("The size (length of a side) of the cubic voxels, in world units."));
+
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "frustumquality", "Frustum Quality")
+        .setDefault(PRMoneDefaults)
+        .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_RESTRICTED, 10)
+        .setHelpText("1 is the standard quality and fast.  10 is the highest quality "
+            "everything is rasterized at the frustum near-plane resolution and "
+            "filtered down to frustum resolution which can be slow."));
+
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "cliptofrustum", "Clip to Frustum")
+        .setDefault(PRMoneDefaults)
+        .setHelpText("When using a frustum transform only rasterize data inside "
+            "the frustum region."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "createdensity", "Create Density Volume")
         .setDefault(PRMoneDefaults)
@@ -2189,13 +3192,26 @@ newSopOperator(OP_OperatorTable* table)
     hvdb::OpenVDBOpFactory("OpenVDB Rasterize Points",
         SOP_OpenVDB_Rasterize_Points::factory, parms, *table)
         .setLocalVariables(VOP_CodeGenerator::theLocalVariables)
-        .addInput("points");
+        .addInput("Points to rasterize")
+        .addOptionalInput("Optional VDB grid that defines the output transform.")
+        .addOptionalInput("Optional VDB or bounding box mask.");
 }
 
 bool
 SOP_OpenVDB_Rasterize_Points::updateParmsFlags()
 {
     bool changed = false;
+
+    const bool refexists = getInput(1) != NULL;
+    changed |= enableParm("voxelsize", !refexists);
+    changed |= enableParm("transformvdb", refexists);
+    changed |= enableParm("cliptofrustum", refexists);
+    changed |= enableParm("frustumquality", refexists);
+
+    const bool maskexists = getInput(2) != NULL;
+    changed |= enableParm("maskvdb", maskexists);
+    changed |= enableParm("invertmask", maskexists);
+
     changed |= enableParm("compositing", evalInt("createdensity", 0, 0));
 
     const bool createDensity = evalInt("createdensity", 0, 0) != 0;
@@ -2242,80 +3258,133 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
         hutil::ScopedInputLock lock(*this, context);
         gdp->clearAndDestroy();
 
+        UT_ErrorManager* log = UTgetErrorManager();
+
+        // Get UI parameters
+
         const fpreal time = context.getTime();
+
         const fpreal samplesPerSec = OPgetDirector()->getChannelManager()->getSamplesPerSec();
         const fpreal timeinc = samplesPerSec > 0.0f ? 1.0f / samplesPerSec : 0.0f;
         const fpreal frame = OPgetDirector()->getChannelManager()->getSample(time);
 
+        const fpreal densityScale = evalFloat("densityscale", 0, time);
+        const fpreal particleScale = evalFloat("particlescale", 0, time);
+        const fpreal solidRatio = evalFloat("solidratio", 0, time);
+        const int compositing = evalInt("compositing", 0, time);
+        float voxelSize = float(evalFloat("voxelsize", 0, time));
+        const bool clipToFrustum = evalInt("cliptofrustum", 0, time) == 1;
+        const bool invertMask = evalInt("invertmask", 0, time) == 1;
+
+        // Remap the frustum quality control from [1, 10] range to [0, 1] range.
+        // (The [0, 1] range is perceived poorly in the UI. Base quality 0 looks bad.)
+        const fpreal frustumQuality = (evalFloat("frustumquality", 0, time) - 1.0) / 9.0;
+
         const GU_Detail* pointsGeo = inputGeo(0);
+        const GA_PointGroup* pointGroup = NULL;
+
+        {
+            UT_String groupStr;
+            evalString(groupStr, "pointgroup", 0, time);
+#if (UT_MAJOR_VERSION_INT >= 15)
+            pointGroup = parsePointGroups(groupStr, GroupCreator(pointsGeo));
+#else
+            pointGroup = parsePointGroups(groupStr, const_cast<GU_Detail*>(pointsGeo));
+#endif
+        }
+
+        const GU_Detail* refGeo = inputGeo(1);
+        const GA_PrimitiveGroup* refGroup = NULL;
+
+        if (refGeo) {
+            UT_String groupStr;
+            evalString(groupStr, "transformvdb", 0, time);
+#if (UT_MAJOR_VERSION_INT >= 15)
+            refGroup = parsePrimitiveGroups(groupStr, GroupCreator(refGeo));
+#else
+            refGroup = parsePrimitiveGroups(groupStr, const_cast<GU_Detail*>(refGeo));
+#endif
+        }
+
+        const GU_Detail* maskGeo = inputGeo(2);
+        const GA_PrimitiveGroup* maskGroup = NULL;
+        bool expectingVDBMask = false;
+
+        if (maskGeo) {
+            UT_String groupStr;
+            evalString(groupStr, "maskvdb", 0, time);
+
+            if (groupStr.length() > 0) {
+                expectingVDBMask = true;
+            }
+
+#if (UT_MAJOR_VERSION_INT >= 15)
+            maskGroup = parsePrimitiveGroups(groupStr, GroupCreator(maskGeo));
+#else
+            maskGroup = parsePrimitiveGroups(groupStr, const_cast<GU_Detail*>(maskGeo));
+#endif
+        }
+
         const bool createDensity = 0 != evalInt("createdensity", 0, time);
         const bool applyVEX = evalInt("modeling", 0, time);
+        const bool createVelocityAttribtue = applyVEX &&
+            hasParm("process_velocity") && evalInt("process_velocity", 0, time) == 1;
 
 
-        std::vector<std::string> attributeNames;
+        // Get selected point attribute names
+
+        std::vector<std::string> scalarAttribNames;
+        std::vector<std::string> vectorAttribNames;
+
         {
             UT_String attributeNameStr;
             evalString(attributeNameStr, "attributes", 0, time);
 
-            std::vector<std::string> tmpAttributeNames;
-
-            if (attributeNameStr.length() > 0) {
-                std::string tmpStr = attributeNameStr.toStdString();
-                boost::algorithm::split(tmpAttributeNames, tmpStr, boost::is_any_of(", "));
-            }
-
-            std::set<std::string> uniqueAttributeNames(tmpAttributeNames.begin(), tmpAttributeNames.end());
-
-            if (applyVEX && hasParm("process_velocity") && evalInt("process_velocity", 0, time) == 1) {
-                uniqueAttributeNames.insert("v");
-            }
-
-            attributeNames.insert(attributeNames.end(), uniqueAttributeNames.begin(), uniqueAttributeNames.end());
+            getAttributeNames(attributeNameStr.toStdString(), *pointsGeo,
+                scalarAttribNames, vectorAttribNames, createVelocityAttribtue, log);
         }
 
-        if (createDensity || hasValidPointAttributes(*pointsGeo, attributeNames)) {
-
-            const GA_PointGroup* pointGroup = NULL;
-
-            {
-                UT_String groupStr;
-                evalString(groupStr, "pointgroup", 0, time);
-#if (UT_MAJOR_VERSION_INT >= 15)
-                pointGroup = parsePointGroups(groupStr, GroupCreator(pointsGeo));
-#else
-                pointGroup = parsePointGroups(groupStr, const_cast<GU_Detail*>(pointsGeo));
-#endif
-            }
-
-            const float densityScale = float(evalFloat("densityscale", 0, time));
-            const float particleScale = float(evalFloat("particlescale", 0, time));
-            const float solidRatio = float(evalFloat("solidratio", 0, time));
-
-            const RasterizePoints::DensityTreatment treatment = evalInt("compositing", 0, time) == 0 ?
-                RasterizePoints::ACCUMULATE : RasterizePoints::MAXIMUM;
-
-            const float voxelSize = float(evalFloat("voxelsize", 0, time));
-
-
-            const openvdb::math::Transform::Ptr volumeTransform =
-                openvdb::math::Transform::createLinearTransform(voxelSize);
-
-            /////
+        if (createDensity || !scalarAttribNames.empty() || !vectorAttribNames.empty()) {
 
             hvdb::Interrupter boss("Rasterize Points");
 
-            // partition points
+            // Set rasterization settings
 
-            PointIndexGridCollection idxGridCollection(*pointsGeo, particleScale,
-                voxelSize, pointGroup, &boss);
+            openvdb::math::Transform::Ptr xform = getReferenceTransform(refGeo, refGroup, log);
+            if (xform) voxelSize = float(xform->voxelSize().x());
 
-            // construct region of intrest mask
 
-            PointIndexGridCollection::BoolTreeType::Ptr regionMaskTree;
+            boost::shared_ptr<openvdb::BBoxd> maskBBox;
+            hvdb::GridCPtr maskGrid = getMaskVDB(maskGeo, maskGroup);
 
-            if (!boss.wasInterrupted()) {
-                regionMaskTree = constructROIMask(idxGridCollection, *volumeTransform, &boss);
+            if (!maskGrid) {
+
+                if (expectingVDBMask) {
+                    addWarning(SOP_MESSAGE, "VDB mask not found.");
+                } else {
+                    maskBBox = getMaskGeoBBox(maskGeo);
+                }
             }
+
+
+            RasterizationSettings settings(*pointsGeo, pointGroup, boss);
+
+            settings.createDensity = createDensity;
+            settings.densityScale = float(densityScale);
+            settings.particleScale = float(particleScale);
+            settings.solidRatio = float(solidRatio);
+            settings.transform = xform ? xform : openvdb::math::Transform::createLinearTransform(double(voxelSize));
+            settings.vectorAttributeNames.swap(vectorAttribNames);
+            settings.scalarAttributeNames.swap(scalarAttribNames);
+            settings.treatment = compositing == 0 ? RasterizePoints::ACCUMULATE : RasterizePoints::MAXIMUM;
+            settings.setFrustumQuality(float(frustumQuality));
+            settings.clipToFrustum = clipToFrustum;
+            settings.maskBBox = maskBBox;
+            settings.maskGrid = maskGrid;
+            settings.invertMask = invertMask;
+
+
+            // Setup VEX context
 
             OP_Caller caller(this);
             boost::shared_ptr<VEXContext> vexContextPtr;
@@ -2336,96 +3405,24 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
 #endif
             }
 
-            // rasterize points
+            settings.vexContext = vexContextPtr.get();
 
-            if (!boss.wasInterrupted()) {
+            // Rasterize attributes and export VDB grids
 
-                const size_t leafNodeCount = regionMaskTree->leafCount();
+            std::vector<openvdb::GridBase::Ptr> outputGrids;
 
-                typedef Attribute<float, DensityOp<float> > DensityAttributeType;
-                typedef Attribute<openvdb::Vec3s>           Vec3sAttribute;
-                typedef Attribute<float>                    FloatAttribute;
+            rasterize(settings, outputGrids);
 
-                DensityAttributeType::Ptr densityAttribute;
+            if (vexContextPtr && vexContextPtr->isTimeDependant()) {
+                OP_Node::flags().timeDep = true;
+            }
 
-                if (createDensity) {
-                    densityAttribute = DensityAttributeType::create(
-                        GEO_STD_ATTRIB_POSITION, *pointsGeo, leafNodeCount);
-                }
-
-                std::vector<Vec3sAttribute::Ptr> vectorAttributes;
-                vectorAttributes.reserve(attributeNames.size());
-
-                std::vector<FloatAttribute::Ptr> floatAttributes;
-                floatAttributes.reserve(attributeNames.size());
-
-                bool skippedAttributes = false;
-
-                if (!boss.wasInterrupted() && !attributeNames.empty()) {
-                    Vec3sAttribute::Ptr vAttr;
-                    FloatAttribute::Ptr fAttr;
-
-                    for (size_t n = 0; n < attributeNames.size(); ++n) {
-                        vAttr = Vec3sAttribute::create(attributeNames[n], *pointsGeo, leafNodeCount);
-                        if (vAttr) {
-                            vectorAttributes.push_back(vAttr);
-                        } else {
-                            fAttr = FloatAttribute::create(attributeNames[n], *pointsGeo, leafNodeCount);
-                            if (fAttr) {
-                                floatAttributes.push_back(fAttr);
-                            } else {
-                                skippedAttributes = true;
-                                std::string msg = "Skipped '" + attributeNames[n] + "' attribute.";
-                                addWarning(SOP_MESSAGE, msg.c_str());
-                            }
-                        }
-                    }
-                }
-
-                if (skippedAttributes) {
-                    addWarning(SOP_MESSAGE, "Attributes are skipped if the name does not match "
-                        "a scalar or vector point attribute.");
-                }
-
-                if (!boss.wasInterrupted() && (densityAttribute || !vectorAttributes.empty() || !floatAttributes.empty())) {
-
-                    std::vector<const PointIndexGridCollection::BoolTreeType::LeafNodeType*> regionMaskLeafNodes;
-
-                    regionMaskLeafNodes.reserve(leafNodeCount);
-                    regionMaskTree->getNodes(regionMaskLeafNodes);
-
-                    RasterizePoints op(*pointsGeo, idxGridCollection, regionMaskLeafNodes,
-                        *volumeTransform, treatment, densityScale, solidRatio, &boss);
-
-                    if (densityAttribute) op.setDensityAttribute(*densityAttribute);
-                    if (!vectorAttributes.empty()) op.setVectorAttributes(vectorAttributes);
-                    if (!floatAttributes.empty()) op.setFloatAttributes(floatAttributes);
-                    if (vexContextPtr) op.setVEXContext(*vexContextPtr);
-
-                    tbb::parallel_for(tbb::blocked_range<size_t>(0, leafNodeCount), op);
-
-                    if (vexContextPtr && vexContextPtr->isTimeDependant()) {
-                        OP_Node::flags().timeDep = true;
-                    }
-
-                    // export volumes
-
-                    if (!boss.wasInterrupted() && densityAttribute) {
-                        densityAttribute->exportVdb(*gdp, volumeTransform);
-                    }
-
-                    for (size_t n = 0; n < vectorAttributes.size() && !boss.wasInterrupted(); ++n) {
-                        vectorAttributes[n]->exportVdb(*gdp, volumeTransform);
-                    }
-
-                    for (size_t n = 0; n < floatAttributes.size() && !boss.wasInterrupted(); ++n) {
-                        floatAttributes[n]->exportVdb(*gdp, volumeTransform);
-                    }
-                }
+            for (size_t n = 0, N = outputGrids.size(); n < N && !boss.wasInterrupted(); ++n) {
+                hvdb::createVdbPrimitive(*gdp, outputGrids[n]);
             }
 
         } else {
-            addWarning(SOP_MESSAGE, "No output volume selected");
+            addWarning(SOP_MESSAGE, "No output selected");
         }
 
     } catch (std::exception& e) {
@@ -2435,6 +3432,6 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

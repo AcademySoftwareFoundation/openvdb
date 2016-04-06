@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -54,7 +54,7 @@
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/tree/LeafManager.h>
 #include "ChangeBackground.h"// for changeLevelSetBackground
-#include "Morphology.h"//for dilateVoxels
+#include "Morphology.h"//for dilateActiveValues
 #include "Prune.h"// for pruneLevelSet
 
 namespace openvdb {
@@ -295,7 +295,7 @@ LevelSetTracker<GridT, InterruptT>::
 track()
 {
     // Dilate narrow-band (this also rebuilds the leaf array!)
-    tools::dilateVoxels(*mLeafs);
+    tools::dilateActiveValues( *mLeafs, 1, tools::NN_FACE, tools::IGNORE_TILES);
 
     // Compute signed distances in dilated narrow-band
     this->normalize();
@@ -311,15 +311,13 @@ dilate(int iterations)
 {
     if (this->getNormCount() == 0) {
         for (int i=0; i < iterations; ++i) {
-            tools::dilateVoxels(*mLeafs);
-            mLeafs->rebuildLeafArray();
+            tools::dilateActiveValues( *mLeafs, 1, tools::NN_FACE, tools::IGNORE_TILES);
             tools::changeLevelSetBackground(this->leafs(), mDx + mGrid->background());
         }
     } else {
         for (int i=0; i < iterations; ++i) {
             MaskTreeType mask0(mGrid->tree(), false, TopologyCopy());
-            tools::dilateVoxels(*mLeafs);
-            mLeafs->rebuildLeafArray();
+            tools::dilateActiveValues( *mLeafs, 1, tools::NN_FACE, tools::IGNORE_TILES);
             tools::changeLevelSetBackground(this->leafs(), mDx + mGrid->background());
             MaskTreeType mask(mGrid->tree(), false, TopologyCopy());
             mask.topologyDifference(mask0);
@@ -647,6 +645,6 @@ euler(const LeafRange& range, Index phiBuffer, Index resultBuffer)
 
 #endif // OPENVDB_TOOLS_LEVEL_SET_TRACKER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

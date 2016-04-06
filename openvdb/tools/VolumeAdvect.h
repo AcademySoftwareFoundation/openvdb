@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -36,8 +36,6 @@
 ///
 /// @brief Sparse hyperbolic advection of volumes, e.g. a density or
 ///        velocity (vs a level set interface).
-///
-/// @todo Improve (i.e. reduce) padding by topology dilation.
 
 #ifndef OPENVDB_TOOLS_VOLUME_ADVECT_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_VOLUME_ADVECT_HAS_BEEN_INCLUDED
@@ -50,7 +48,7 @@
 #include <openvdb/util/NullInterrupter.h>
 #include "Interpolation.h"// for Sampler
 #include "VelocityFields.h" // for VelocityIntegrator
-#include "Morphology.h"//for dilateVoxels
+#include "Morphology.h"//for dilateActiveValues and dilateVoxels
 #include "Prune.h"// for prune
 #include "Statistics.h" // for extrema
 
@@ -69,7 +67,7 @@ namespace Scheme {
 }
     
 /// @brief Performs advections of an arbitrary type of volume in a
-///        static velocity field. The advections is performed by means
+///        static velocity field. The advections are performed by means
 ///        of various derivatives of Semi-Lagrangian integration, i.e.
 ///        backwards tracking along the hyperbolic characteristics
 ///        followed by interpolation.     
@@ -239,12 +237,11 @@ public:
         typename VolumeGridT::Ptr outGrid = inGrid.deepCopy();
         const double dt = timeStep/mSubSteps;
         const int n = this->getMaxDistance(inGrid, dt);
-        dilateVoxels( outGrid->tree(), n );
+        dilateActiveValues( outGrid->tree(), n, NN_FACE, EXPAND_TILES);
         this->template cook<VolumeGridT, VolumeSamplerT>(*outGrid, inGrid, dt);
-        
         for (int step = 1; step < mSubSteps; ++step) {
             typename VolumeGridT::Ptr tmpGrid = outGrid->deepCopy();
-            dilateVoxels( tmpGrid->tree(), n );
+            dilateActiveValues( tmpGrid->tree(), n, NN_FACE, EXPAND_TILES);
             this->template cook<VolumeGridT, VolumeSamplerT>(*tmpGrid, *outGrid, dt);
             outGrid.swap( tmpGrid );
         }
@@ -291,7 +288,7 @@ public:
         typename VolumeGridT::Ptr outGrid = inGrid.deepCopy();
         const double dt = timeStep/mSubSteps;
         const int n = this->getMaxDistance(inGrid, dt);
-        dilateVoxels( outGrid->tree(), n );
+        dilateActiveValues( outGrid->tree(), n, NN_FACE, EXPAND_TILES);
         outGrid->topologyIntersection( mask );
         pruneInactive( outGrid->tree(), mGrainSize>0, mGrainSize );
         this->template cook<VolumeGridT, VolumeSamplerT>(*outGrid, inGrid, dt);
@@ -299,7 +296,7 @@ public:
 
         for (int step = 1; step < mSubSteps; ++step) {
             typename VolumeGridT::Ptr tmpGrid = outGrid->deepCopy();
-            dilateVoxels( tmpGrid->tree(), n );
+            dilateActiveValues( tmpGrid->tree(), n, NN_FACE, EXPAND_TILES);
             tmpGrid->topologyIntersection( mask );
             pruneInactive( tmpGrid->tree(), mGrainSize>0, mGrainSize );
             this->template cook<VolumeGridT, VolumeSamplerT>(*tmpGrid, *outGrid, dt);
@@ -334,7 +331,6 @@ private:
     template<typename VolumeGridT, typename VolumeSamplerT>
     void cook(VolumeGridT& outGrid, const VolumeGridT& inGrid, double dt)
     {
-        outGrid.tree().voxelizeActiveTiles();
         switch (mIntegrator) {
         case Scheme::SEMI: {
             Advect<VolumeGridT, 1, VolumeSamplerT> adv(inGrid, *this);
@@ -400,7 +396,6 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
     typedef typename VelocityIntegratorT::ElementType RealT;
     typedef typename TreeT::LeafNodeType::ValueOnIter VoxelIterT;
     
-    
     Advect(const VolumeGridT& inGrid, const VolumeAdvection& parent)
         : mTask(0)
         , mInGrid(&inGrid)
@@ -426,27 +421,26 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
         mParent->start("Advecting volume");
         LeafManagerT manager(outGrid.tree(), mParent->spatialOrder()==2 ? 1 : 0);
         const LeafRangeT range = manager.leafRange(mParent->mGrainSize);
-        
         const RealT dt = static_cast<RealT>(-time_step);//method of characteristics backtracks
         if (mParent->mIntegrator == Scheme::MAC) {
-            mTask = boost::bind(&Advect::rk,  _1, _2, dt, 0, *mInGrid);//out[0]=forward 
+            mTask = boost::bind(&Advect::rk,  _1, _2, dt, 0, mInGrid);//out[0]=forward 
             this->cook(range);
-            mTask = boost::bind(&Advect::rk,  _1, _2,-dt, 1,  outGrid);//out[1]=backward
+            mTask = boost::bind(&Advect::rk,  _1, _2,-dt, 1, &outGrid);//out[1]=backward
             this->cook(range);
             mTask = boost::bind(&Advect::mac, _1, _2);//out[0] = out[0] + (in[0] - out[1])/2
             this->cook(range);
         } else if (mParent->mIntegrator == Scheme::BFECC) {
-            mTask = boost::bind(&Advect::rk, _1, _2, dt, 0, *mInGrid);//out[0]=forward
+            mTask = boost::bind(&Advect::rk, _1, _2, dt, 0, mInGrid);//out[0]=forward
             this->cook(range);
-            mTask = boost::bind(&Advect::rk, _1, _2,-dt, 1,  outGrid);//out[1]=backward
+            mTask = boost::bind(&Advect::rk, _1, _2,-dt, 1, &outGrid);//out[1]=backward
             this->cook(range);
             mTask = boost::bind(&Advect::bfecc, _1, _2);//out[0] = (3*in[0] - out[1])/2
             this->cook(range);
-            mTask = boost::bind(&Advect::rk, _1, _2, dt, 1,  outGrid);//out[1]=forward
+            mTask = boost::bind(&Advect::rk, _1, _2, dt, 1, &outGrid);//out[1]=forward
             this->cook(range);
             manager.swapLeafBuffer(1);// out[0] = out[1]
         } else {// SEMI, MID, RK3 and RK4
-            mTask = boost::bind(&Advect::rk, _1, _2,  dt, 0, *mInGrid);//forward
+            mTask = boost::bind(&Advect::rk, _1, _2,  dt, 0, mInGrid);//forward
             this->cook(range);
         }
 
@@ -506,11 +500,11 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
         }//loop over leaf nodes
     }
     // Semi-Lagrangian integration with Runge-Kutta of various orders (1->4)
-    void rk(const LeafRangeT& range, RealT dt, size_t n, const VolumeGridT& grid) const
+    void rk(const LeafRangeT& range, RealT dt, size_t n, const VolumeGridT* grid) const
     {
         if (mParent->interrupt()) return;
         const math::Transform& xform = mInGrid->transform();
-        AccT acc = grid.getAccessor();
+        AccT acc = grid->getAccessor();
         for (typename LeafRangeT::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
             ValueT* phi = leafIter.buffer( n ).data();
             for (VoxelIterT voxelIter = leafIter->beginValueOn(); voxelIter; ++voxelIter) {
@@ -559,6 +553,7 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
         }//loop over leaf nodes
     }
     // Public member data of the private Advect class
+    
     typename boost::function<void (Advect*, const LeafRangeT&)> mTask;
     const VolumeGridT*        mInGrid;
     const VelocityIntegratorT mVelocityInt;// lightweight!
@@ -571,6 +566,6 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
 
 #endif // OPENVDB_TOOLS_VOLUME_ADVECT_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

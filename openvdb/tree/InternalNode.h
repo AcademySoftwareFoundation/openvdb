@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -475,8 +475,9 @@ public:
     /// its child nodes.
     void negate();
 
-    /// Densify active tiles, i.e., replace them with leaf-level active voxels.
-    void voxelizeActiveTiles();
+    /// @brief Densify active tiles, i.e., replace them with leaf-level active voxels.
+    /// @param threaded if true, this operation is multi-threaded (over the internal nodes).
+    void voxelizeActiveTiles(bool threaded = true);
 
     /// @brief Copy into a dense grid the values of the voxels that lie within
     /// a given bounding box.
@@ -789,14 +790,17 @@ protected:
     ChildNodeType* getChildNode(Index n);
     const ChildNodeType* getChildNode(Index n) const;
     ///@}
-   
-    // Protected member classes for multi-threading
+
+    ///@{
+    /// @brief Protected member classes for recursive multi-threading
+    struct VoxelizeActiveTiles;
     template<typename OtherInternalNode> struct DeepCopy;
     template<typename OtherInternalNode> struct TopologyCopy1;
     template<typename OtherInternalNode> struct TopologyCopy2;
     template<typename OtherInternalNode> struct TopologyUnion;
     template<typename OtherInternalNode> struct TopologyDifference;
     template<typename OtherInternalNode> struct TopologyIntersection;
+    ///@}
    
     UnionType mNodes[NUM_VALUES];
     NodeMaskType mChildMask, mValueMask;
@@ -2212,15 +2216,47 @@ InternalNode<ChildT, Log2Dim>::negate()
 
 }
 
+////////////////////////////////////////
+
+template<typename ChildT, Index Log2Dim>
+struct InternalNode<ChildT, Log2Dim>::VoxelizeActiveTiles
+{
+    VoxelizeActiveTiles(InternalNode &node) : mNode(&node) {
+        //(*this)(tbb::blocked_range<Index>(0, NUM_VALUES));//single thread for debugging
+        tbb::parallel_for(tbb::blocked_range<Index>(0, NUM_VALUES), *this);
+
+        node.mChildMask |= node.mValueMask;
+        node.mValueMask.setOff();
+    }
+    void operator()(const tbb::blocked_range<Index> &r) const
+    {    
+        for (Index i = r.begin(), end=r.end(); i!=end; ++i) {
+            if (mNode->mChildMask.isOn(i)) {// Loop over node's child nodes
+                mNode->mNodes[i].getChild()->voxelizeActiveTiles(true);    
+            } else if (mNode->mValueMask.isOn(i)) {// Loop over node's active tiles
+                const Coord &ijk = mNode->offsetToGlobalCoord(i);
+                ChildNodeType *child = new ChildNodeType(ijk, mNode->mNodes[i].getValue(), true);
+                child->voxelizeActiveTiles(true); 
+                mNode->mNodes[i].setChild(child);
+            }
+        }
+    }
+    InternalNode* mNode;
+};// VoxelizeActiveTiles
 
 template<typename ChildT, Index Log2Dim>
 inline void
-InternalNode<ChildT, Log2Dim>::voxelizeActiveTiles()
+InternalNode<ChildT, Log2Dim>::voxelizeActiveTiles(bool threaded)
 {
-    for (ValueOnIter iter = this->beginValueOn(); iter; ++iter) {
-        this->setChildNode(iter.pos(), new ChildNodeType(iter.getCoord(), iter.getValue(), true));
+    if (threaded) {
+        VoxelizeActiveTiles tmp(*this);
+    } else {
+        for (ValueOnIter iter = this->beginValueOn(); iter; ++iter) {
+            this->setChildNode(iter.pos(), new ChildNodeType(iter.getCoord(), iter.getValue(), true));
+        }
+        for (ChildOnIter iter = this->beginChildOn(); iter; ++iter)
+            iter->voxelizeActiveTiles(false);
     }
-    for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) iter->voxelizeActiveTiles();
 }
 
 
@@ -3160,6 +3196,6 @@ InternalNode<ChildT, Log2Dim>::getChildNode(Index n) const
 
 #endif // OPENVDB_TREE_INTERNALNODE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

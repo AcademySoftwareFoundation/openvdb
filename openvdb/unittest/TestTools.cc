@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -56,6 +56,10 @@
 #include <openvdb/math/Stats.h>
 #include "util.h" // for unittest_util::makeSphere()
 
+// Uncomment to test on models from our web-site
+//#define TestTools_DATA_PATH "/home/kmu/src/openvdb/data/"
+//#define TestTools_DATA_PATH "/usr/pic1/Data/OpenVDB/LevelSetModels/"
+
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
 
@@ -67,6 +71,7 @@ public:
 
     CPPUNIT_TEST_SUITE(TestTools);
     CPPUNIT_TEST(testDilateVoxels);
+    CPPUNIT_TEST(testDilateActiveValues);
     CPPUNIT_TEST(testErodeVoxels);
     CPPUNIT_TEST(testActivate);
     CPPUNIT_TEST(testFilter);
@@ -93,6 +98,7 @@ public:
     CPPUNIT_TEST_SUITE_END();
 
     void testDilateVoxels();
+    void testDilateActiveValues();
     void testErodeVoxels();
     void testActivate();
     void testFilter();
@@ -185,15 +191,19 @@ TestTools::testDilateVoxels()
         tree->fill(CoordBBox(Coord(0), Coord(leafDim - 1)), 1.0);
         CPPUNIT_ASSERT_EQUAL(Index32(0), tree->leafCount());
         CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
-
+        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
+        
         tree->setValue(Coord(leafDim, leafDim - 1, leafDim - 1), 1.0);
+        
         CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim + 1),
                              tree->activeVoxelCount());
+        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
 
         openvdb::tools::dilateVoxels(*tree);
 
         CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim + 1 + 5),
                              tree->activeVoxelCount());
+        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
     }
     {
         // Set and dilate a single voxel at each of the eight corners of a leaf node.
@@ -393,7 +403,7 @@ TestTools::testDilateVoxels()
     {// dialte a narrow band of a sphere
         const float radius = 335.3f;
         const openvdb::Vec3f center(15.8f, 13.2f, 16.7f);
-        const float voxelSize = 1.5f, width = 3.25f;
+        const float voxelSize = 0.5f, width = 3.25f;
         openvdb::FloatGrid::Ptr grid =
             openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(
                 radius, center, voxelSize, width);
@@ -409,7 +419,7 @@ TestTools::testDilateVoxels()
     {// dialte a narrow band of a sphere
         const float radius = 335.3f;
         const openvdb::Vec3f center(15.8f, 13.2f, 16.7f);
-        const float voxelSize = 1.5f, width = 3.25f;
+        const float voxelSize = 0.5f, width = 3.25f;
         openvdb::FloatGrid::Ptr grid =
             openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(
                 radius, center, voxelSize, width);
@@ -425,7 +435,7 @@ TestTools::testDilateVoxels()
     {// dialte a narrow band of a sphere
         const float radius = 335.3f;
         const openvdb::Vec3f center(15.8f, 13.2f, 16.7f);
-        const float voxelSize = 1.5f, width = 3.25f;
+        const float voxelSize = 0.5f, width = 3.25f;
         openvdb::FloatGrid::Ptr grid =
             openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(
                 radius, center, voxelSize, width);
@@ -437,8 +447,398 @@ TestTools::testDilateVoxels()
         t.stop();
         CPPUNIT_ASSERT(grid->tree().activeVoxelCount() > count);
         //grid->print(std::cerr, 3);
+    }
+    */
+
+#ifdef TestTools_DATA_PATH
+    {
+        openvdb::initialize();//required whenever I/O of OpenVDB files is performed!
+        const std::string path(TestTools_DATA_PATH);
+        std::vector<std::string> filenames;
+        filenames.push_back("armadillo.vdb");
+        filenames.push_back("buddha.vdb");
+        filenames.push_back("bunny.vdb");
+        filenames.push_back("crawler.vdb");
+        filenames.push_back("dragon.vdb");
+        filenames.push_back("iss.vdb");
+        filenames.push_back("utahteapot.vdb");
+        openvdb::util::CpuTimer timer;
+        for ( size_t i=0; i<filenames.size(); ++i) {
+            std::cerr << "\n=====================>\"" << filenames[i] << "\" =====================" << std::endl;
+            std::cerr << "Reading \"" << filenames[i] << "\" ...\n";
+            openvdb::io::File file( path + filenames[i] );
+            file.open(false);//disable delayed loading
+            openvdb::FloatGrid::Ptr model = openvdb::gridPtrCast<openvdb::FloatGrid>(file.getGrids()->at(0));
+            openvdb::MaskTree mask(model->tree(), false, true, openvdb::TopologyCopy() );
+            timer.start("Calling dilateVoxels on grid");
+            openvdb::tools::dilateVoxels(model->tree(), 1, openvdb::tools::NN_FACE);
+            timer.stop();
+            //model->tree().print(std::cout, 3);
+            timer.start("Calling dilateVoxels on mask");
+            openvdb::tools::dilateVoxels(mask, 1, openvdb::tools::NN_FACE);
+            timer.stop();
+            //mask.print(std::cout, 3);
+            CPPUNIT_ASSERT_EQUAL(model->activeVoxelCount(), mask.activeVoxelCount());
+        }
+    }
+#endif
+}
+
+void
+TestTools::testDilateActiveValues()
+{
+    using openvdb::CoordBBox;
+    using openvdb::Coord;
+    using openvdb::Index32;
+    using openvdb::Index64;
+
+    typedef openvdb::tree::Tree4<float, 5, 4, 3>::Type Tree543f;
+
+    Tree543f::Ptr tree(new Tree543f);
+    openvdb::tools::changeBackground(*tree, /*background=*/5.0);
+    CPPUNIT_ASSERT(tree->empty());
+
+    const openvdb::Index leafDim = Tree543f::LeafNodeType::DIM;
+    CPPUNIT_ASSERT_EQUAL(1 << 3, int(leafDim));
+
+    {
+        // Set and dilate a single voxel at the center of a leaf node.
+        tree->clear();
+        tree->setValue(Coord(leafDim >> 1), 1.0);
+        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeVoxelCount());
+        openvdb::tools::dilateActiveValues(*tree);
+        CPPUNIT_ASSERT_EQUAL(Index64(7), tree->activeVoxelCount());
+    }
+    {
+        // Create an active, leaf node-sized tile.
+        tree->clear();
+        tree->fill(CoordBBox(Coord(0), Coord(leafDim - 1)), 1.0);
+        CPPUNIT_ASSERT_EQUAL(Index32(0), tree->leafCount());
+        CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
+        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
+        
+        // This has no effect
+        openvdb::tools::dilateActiveValues(*tree, 1, openvdb::tools::NN_FACE, openvdb::tools::IGNORE_TILES);
+
+        CPPUNIT_ASSERT_EQUAL(Index32(0), tree->leafCount());
+        CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
+        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
+    }
+    {
+        // Create an active, leaf node-sized tile.
+        tree->clear();
+        tree->fill(CoordBBox(Coord(0), Coord(leafDim - 1)), 1.0);
+        CPPUNIT_ASSERT_EQUAL(Index32(0), tree->leafCount());
+        CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
+        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
+
+        // Adds 6 faces of voxels, each of size leafDim^2
+        openvdb::tools::dilateActiveValues(*tree, 1, openvdb::tools::NN_FACE, openvdb::tools::EXPAND_TILES);
+
+        CPPUNIT_ASSERT_EQUAL(Index32(1+6), tree->leafCount());
+        CPPUNIT_ASSERT_EQUAL(Index64((leafDim + 6) * leafDim * leafDim), tree->activeVoxelCount());
+        CPPUNIT_ASSERT_EQUAL(0UL, tree->activeTileCount());
+        
+    }
+    {
+        // Create an active, leaf node-sized tile.
+        tree->clear();
+        tree->fill(CoordBBox(Coord(0), Coord(leafDim - 1)), 1.0);
+        CPPUNIT_ASSERT_EQUAL(Index32(0), tree->leafCount());
+        CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
+        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
+
+        // Adds 6 faces of voxels, each of size leafDim^2
+        openvdb::tools::dilateActiveValues(*tree, 1, openvdb::tools::NN_FACE, openvdb::tools::PRESERVE_TILES);
+
+        CPPUNIT_ASSERT_EQUAL(Index32(6), tree->leafCount());
+        CPPUNIT_ASSERT_EQUAL(Index64((leafDim + 6) * leafDim * leafDim), tree->activeVoxelCount());
+        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
+        
+    }
+    {
+        // Set and dilate a single voxel at each of the eight corners of a leaf node.
+        for (int i = 0; i < 8; ++i) {
+            tree->clear();
+
+            openvdb::Coord xyz(
+                i & 1 ? leafDim - 1 : 0,
+                i & 2 ? leafDim - 1 : 0,
+                i & 4 ? leafDim - 1 : 0);
+            tree->setValue(xyz, 1.0);
+            CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeVoxelCount());
+
+            openvdb::tools::dilateActiveValues(*tree);
+            CPPUNIT_ASSERT_EQUAL(Index64(7), tree->activeVoxelCount());
+        }
+    }
+    {
+        tree->clear();
+        tree->setValue(Coord(0), 1.0);
+        tree->setValue(Coord( 1, 0, 0), 1.0);
+        tree->setValue(Coord(-1, 0, 0), 1.0);
+        CPPUNIT_ASSERT_EQUAL(Index64(3), tree->activeVoxelCount());
+        openvdb::tools::dilateActiveValues(*tree);
+        CPPUNIT_ASSERT_EQUAL(Index64(17), tree->activeVoxelCount());
+    }
+    {
+        struct Info { int activeVoxelCount, leafCount, nonLeafCount; };
+        Info iterInfo[11] = {
+            { 1,     1,  3 },
+            { 7,     1,  3 },
+            { 25,    1,  3 },
+            { 63,    1,  3 },
+            { 129,   4,  3 },
+            { 231,   7,  9 },
+            { 377,   7,  9 },
+            { 575,   7,  9 },
+            { 833,  10,  9 },
+            { 1159, 16,  9 },
+            { 1561, 19, 15 },
+        };
+
+        // Perform repeated dilations, starting with a single voxel.
+        tree->clear();
+        tree->setValue(Coord(leafDim >> 1), 1.0);
+        for (int i = 0; i < 11; ++i) {
+            CPPUNIT_ASSERT_EQUAL(iterInfo[i].activeVoxelCount, int(tree->activeVoxelCount()));
+            CPPUNIT_ASSERT_EQUAL(iterInfo[i].leafCount,        int(tree->leafCount()));
+            CPPUNIT_ASSERT_EQUAL(iterInfo[i].nonLeafCount,     int(tree->nonLeafCount()));
+
+            openvdb::tools::dilateActiveValues(*tree);
+        }
+    }
+
+    {// dialte a narrow band of a sphere
+        typedef openvdb::Grid<Tree543f> GridType;
+        GridType grid(tree->background());
+        unittest_util::makeSphere<GridType>(/*dim=*/openvdb::Coord(64, 64, 64),
+                                            /*center=*/openvdb::Vec3f(0, 0, 0),
+                                            /*radius=*/20, grid, /*dx=*/1.0f,
+                                            unittest_util::SPHERE_DENSE_NARROW_BAND);
+        const openvdb::Index64 count = grid.tree().activeVoxelCount();
+        openvdb::tools::dilateActiveValues(grid.tree());
+        CPPUNIT_ASSERT(grid.tree().activeVoxelCount() > count);
+    }
+
+    {// dilate a fog volume of a sphere
+        typedef openvdb::Grid<Tree543f> GridType;
+        GridType grid(tree->background());
+        unittest_util::makeSphere<GridType>(/*dim=*/openvdb::Coord(64, 64, 64),
+                                            /*center=*/openvdb::Vec3f(0, 0, 0),
+                                            /*radius=*/20, grid, /*dx=*/1.0f,
+                                            unittest_util::SPHERE_DENSE_NARROW_BAND);
+        openvdb::tools::sdfToFogVolume(grid);
+        const openvdb::Index64 count = grid.tree().activeVoxelCount();
+        //std::cerr << "\nBefore: active voxel count = " << count << std::endl;
+        //grid.print(std::cerr,5);
+        openvdb::tools::dilateActiveValues(grid.tree());
+        CPPUNIT_ASSERT(grid.tree().activeVoxelCount() > count);
+        //std::cerr << "\nAfter: active voxel count = "
+        //    << grid.tree().activeVoxelCount() << std::endl;
+    }
+//     {// Test a grid from a file that has proven to be challenging
+//         openvdb::initialize();
+//         openvdb::io::File file("/usr/home/kmuseth/Data/vdb/dilation.vdb");
+//         file.open();
+//         openvdb::GridBase::Ptr baseGrid = file.readGrid(file.beginName().gridName());
+//         file.close();
+//         openvdb::FloatGrid::Ptr grid = openvdb::gridPtrCast<openvdb::FloatGrid>(baseGrid);
+//         const openvdb::Index64 count = grid->tree().activeVoxelCount();
+//         //std::cerr << "\nBefore: active voxel count = " << count << std::endl;
+//         //grid->print(std::cerr,5);
+//         openvdb::tools::dilateActiveValues(grid->tree());
+//         CPPUNIT_ASSERT(grid->tree().activeVoxelCount() > count);
+//         //std::cerr << "\nAfter: active voxel count = "
+//         //    << grid->tree().activeVoxelCount() << std::endl;
+//     }
+
+    {// test dilateVoxels6
+        for (int x=0; x<8; ++x) {
+            for (int y=0; y<8; ++y) {
+                for (int z=0; z<8; ++z) {
+                    const openvdb::Coord ijk(x,y,z);
+                    Tree543f tree1(0.0f);
+                    CPPUNIT_ASSERT_EQUAL(Index64(0), tree1.activeVoxelCount());
+                    tree1.setValue(ijk, 1.0f);
+                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree1.activeVoxelCount());
+                    CPPUNIT_ASSERT(tree1.isValueOn(ijk));
+                    openvdb::tools::dilateActiveValues(tree1, 1, openvdb::tools::NN_FACE);
+                    //openvdb::tools::Morphology<Tree543f> m(tree1);
+                    //m.dilateVoxels6();
+                    for (int i=-1; i<=1; ++i) {
+                        for (int j=-1; j<=1; ++j) {
+                            for (int k=-1; k<=1; ++k) {
+                                const openvdb::Coord xyz = ijk.offsetBy(i,j,k), d=ijk-xyz;
+                                const int n= openvdb::math::Abs(d[0])
+                                           + openvdb::math::Abs(d[1])
+                                           + openvdb::math::Abs(d[2]);
+                                if (n<=1) {
+                                    CPPUNIT_ASSERT( tree1.isValueOn(xyz));
+                                } else {
+                                    CPPUNIT_ASSERT(!tree1.isValueOn(xyz));
+                                }
+                            }
+                        }
+                    }
+                    CPPUNIT_ASSERT_EQUAL(Index64(1 + 6), tree1.activeVoxelCount());
+                }
+            }
+        }
+    }
+    {// test dilateVoxels18
+        for (int x=0; x<8; ++x) {
+            for (int y=0; y<8; ++y) {
+                for (int z=0; z<8; ++z) {
+                    const openvdb::Coord ijk(x,y,z);
+                    Tree543f tree1(0.0f);
+                    CPPUNIT_ASSERT_EQUAL(Index64(0), tree1.activeVoxelCount());
+                    tree1.setValue(ijk, 1.0f);
+                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree1.activeVoxelCount());
+                    CPPUNIT_ASSERT(tree1.isValueOn(ijk));
+                    openvdb::tools::dilateActiveValues(tree1, 1, openvdb::tools::NN_FACE_EDGE);
+                    //openvdb::tools::Morphology<Tree543f> m(tree1);
+                    //m.dilateVoxels18();
+                    for (int i=-1; i<=1; ++i) {
+                        for (int j=-1; j<=1; ++j) {
+                            for (int k=-1; k<=1; ++k) {
+                                const openvdb::Coord xyz = ijk.offsetBy(i,j,k), d=ijk-xyz;
+                                const int n= openvdb::math::Abs(d[0])
+                                           + openvdb::math::Abs(d[1])
+                                           + openvdb::math::Abs(d[2]);
+                                if (n<=2) {
+                                    CPPUNIT_ASSERT( tree1.isValueOn(xyz));
+                                } else {
+                                    CPPUNIT_ASSERT(!tree1.isValueOn(xyz));
+                                }
+                            }
+                        }
+                    }
+                    CPPUNIT_ASSERT_EQUAL(Index64(1 + 6 + 12), tree1.activeVoxelCount());
+                }
+            }
+        }
+    }
+    {// test dilateVoxels26
+        for (int x=0; x<8; ++x) {
+            for (int y=0; y<8; ++y) {
+                for (int z=0; z<8; ++z) {
+                    const openvdb::Coord ijk(x,y,z);
+                    Tree543f tree1(0.0f);
+                    CPPUNIT_ASSERT_EQUAL(Index64(0), tree1.activeVoxelCount());
+                    tree1.setValue(ijk, 1.0f);
+                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree1.activeVoxelCount());
+                    CPPUNIT_ASSERT(tree1.isValueOn(ijk));
+                    openvdb::tools::dilateActiveValues(tree1, 1, openvdb::tools::NN_FACE_EDGE_VERTEX);
+                    //openvdb::tools::Morphology<Tree543f> m(tree1);
+                    //m.dilateVoxels26();
+                    for (int i=-1; i<=1; ++i) {
+                        for (int j=-1; j<=1; ++j) {
+                            for (int k=-1; k<=1; ++k) {
+                                const openvdb::Coord xyz = ijk.offsetBy(i,j,k), d=ijk-xyz;
+                                const int n = openvdb::math::Abs(d[0])
+                                            + openvdb::math::Abs(d[1])
+                                            + openvdb::math::Abs(d[2]);
+                                if (n<=3) {
+                                    CPPUNIT_ASSERT( tree1.isValueOn(xyz));
+                                } else {
+                                    CPPUNIT_ASSERT(!tree1.isValueOn(xyz));
+                                }
+                            }
+                        }
+                    }
+                    CPPUNIT_ASSERT_EQUAL(Index64(1 + 6 + 12 + 8), tree1.activeVoxelCount());
+                }
+            }
+        }
+    }
+    /*
+    // Performance test
+    {// dialte a narrow band of a sphere
+        const float radius = 335.3f;
+        const openvdb::Vec3f center(15.8f, 13.2f, 16.7f);
+        const float voxelSize = 0.5f, width = 3.25f;
+        openvdb::FloatGrid::Ptr grid =
+            openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(
+                radius, center, voxelSize, width);
+        //grid->print(std::cerr, 3);
+        const openvdb::Index64 count = grid->tree().activeVoxelCount();
+        openvdb::util::CpuTimer t;
+        t.start("sphere dilateActiveValues6");
+        openvdb::tools::dilateActiveValues(grid->tree(), 1, openvdb::tools::NN_FACE);
+        //openvdb::tools::dilateVoxels(grid->tree());
+        t.stop();
+        CPPUNIT_ASSERT(grid->tree().activeVoxelCount() > count);
+        // grid->print(std::cerr, 3);
+    }
+    {// dialte a narrow band of a sphere
+        const float radius = 335.3f;
+        const openvdb::Vec3f center(15.8f, 13.2f, 16.7f);
+        const float voxelSize = 0.5f, width = 3.25f;
+        openvdb::FloatGrid::Ptr grid =
+            openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(
+                radius, center, voxelSize, width);
+        //grid->print(std::cerr, 3);
+        const openvdb::Index64 count = grid->tree().activeVoxelCount();
+        openvdb::util::CpuTimer t;
+        t.start("sphere dilateActiveValues18");
+        openvdb::tools::dilateActiveValues(grid->tree(), 1, openvdb::tools::NN_FACE_EDGE);
+        //openvdb::tools::dilateVoxels(grid->tree(), 1, openvdb::tools::NN_FACE_EDGE);
+        t.stop();
+        CPPUNIT_ASSERT(grid->tree().activeVoxelCount() > count);
+        //grid->print(std::cerr, 3);
+    }
+    {// dialte a narrow band of a sphere
+        const float radius = 335.3f;
+        const openvdb::Vec3f center(15.8f, 13.2f, 16.7f);
+        const float voxelSize = 0.5f, width = 3.25f;
+        openvdb::FloatGrid::Ptr grid =
+            openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(
+                radius, center, voxelSize, width);
+        //grid->print(std::cerr, 3);
+        const openvdb::Index64 count = grid->tree().activeVoxelCount();
+        openvdb::util::CpuTimer t;
+        t.start("sphere dilateActiveValues26");
+        openvdb::tools::dilateActiveValues(grid->tree(), 1, openvdb::tools::NN_FACE_EDGE_VERTEX);
+        //openvdb::tools::dilateVoxels(grid->tree(), 1, openvdb::tools::NN_FACE_EDGE_VERTEX);
+        t.stop();
+        CPPUNIT_ASSERT(grid->tree().activeVoxelCount() > count);
+        //grid->print(std::cerr, 3);
         }
     */
+    #ifdef TestTools_DATA_PATH
+    {
+        openvdb::initialize();//required whenever I/O of OpenVDB files is performed!
+        const std::string path(TestTools_DATA_PATH);
+        std::vector<std::string> filenames;
+        filenames.push_back("armadillo.vdb");
+        filenames.push_back("buddha.vdb");
+        filenames.push_back("bunny.vdb");
+        filenames.push_back("crawler.vdb");
+        filenames.push_back("dragon.vdb");
+        filenames.push_back("iss.vdb");
+        filenames.push_back("utahteapot.vdb");
+        openvdb::util::CpuTimer timer;
+        for ( size_t i=0; i<filenames.size(); ++i) {
+            std::cerr << "\n=====================>\"" << filenames[i] << "\" =====================" << std::endl;
+            std::cerr << "Reading \"" << filenames[i] << "\" ...\n";
+            openvdb::io::File file( path + filenames[i] );
+            file.open(false);//disable delayed loading
+            openvdb::FloatGrid::Ptr model = openvdb::gridPtrCast<openvdb::FloatGrid>(file.getGrids()->at(0));
+            openvdb::MaskTree mask(model->tree(), false, true, openvdb::TopologyCopy() );
+            timer.start("Calling dilateActiveValues on grid");
+            openvdb::tools::dilateActiveValues(model->tree(), 1, openvdb::tools::NN_FACE);
+            timer.stop();
+            //model->tree().print(std::cout, 3);
+            timer.start("Calling dilateActiveValues on mask");
+            openvdb::tools::dilateActiveValues(mask, 1, openvdb::tools::NN_FACE);
+            timer.stop();
+            //mask.print(std::cout, 3);
+            CPPUNIT_ASSERT_EQUAL(model->activeVoxelCount(), mask.activeVoxelCount());
+        }
+    }
+#endif
+    
 }
 
 void
@@ -1821,7 +2221,38 @@ TestTools::testVolumeAdvect()
         CPPUNIT_ASSERT(density0->tree().isValueOn(Coord( 3,3,3)));
         CPPUNIT_ASSERT(density0->tree().isValueOn(Coord(24,3,3)));
     }
-}//testVolumeAdvect
+
+    /*
+    {//benchmark on a sphere
+        util::CpuTimer timer; 
+        GridT::Ptr density0 = GridT::create(0.0f), density1;
+        density0->fill(CoordBBox(Coord(0), Coord(600)), 1.0f);
+        timer.start("densify");
+        density0->tree().voxelizeActiveTiles();
+        timer.stop();
+        AdvT a(velocity);
+        a.setGrainSize(1);
+        //a.setLimiter(tools::Scheme::NO_LIMITER);
+        //a.setIntegrator(tools::Scheme::MAC);
+        //a.setIntegrator(tools::Scheme::BFECC);
+        a.setIntegrator(tools::Scheme::RK4);
+        
+        for (int i=1; i<=10; ++i) {
+            timer.start("Volume Advection");
+            density1 = a.advect<GridT, SamplerT>(*density0, 0.1f);
+            timer.stop();
+            std::ostringstream ostr;
+            ostr << "densityAdvectMask" << "_" << i << ".vdb";
+            std::cerr << "Writing " << ostr.str() << std::endl;
+            io::File file(ostr.str());
+            GridPtrVec grids;
+            grids.push_back(density1);
+            file.write(grids);
+            density0.swap(density1);
+            }
+            }
+    */
+}// testVolumeAdvect
 
 ////////////////////////////////////////
 
@@ -2333,6 +2764,6 @@ TestTools::testPrune()
     */
 }
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

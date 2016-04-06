@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -43,6 +43,7 @@
 #include <iomanip>
 #include <sstream>
 #include <vector>
+#include <functional>// for std::less
 #include "Math.h"
 
 namespace openvdb {
@@ -50,6 +51,55 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace math {
 
+/// @brief Templated class to compute the minimum and maximum values.
+template <typename ValueType, typename Less = std::less<ValueType> >
+class MinMax
+{
+public:
+
+    /// @brief Constructor
+    MinMax(const ValueType &min, const ValueType &max) : mMin(min), mMax(max)
+    {
+    }
+
+    /// Add a single sample.
+    inline void add(const ValueType &val, const Less &less = Less())
+    {
+        if (less(val, mMin)) mMin = val;
+        if (less(mMax, val)) mMax = val;
+    }
+
+    /// Return the minimum value.
+    inline const ValueType& min() const { return mMin; }
+
+    /// Return the maximum value.
+    inline const ValueType& max() const { return mMax; }
+
+    /// Add the samples from the other Stats instance.
+    inline void add(const MinMax& other, const Less &less = Less())
+    {
+        if (less(other.mMin, mMin)) mMin = other.mMin;
+        if (less(mMax, other.mMax)) mMax = other.mMax;
+    }
+
+    /// @brief Print MinMax to the specified output stream.
+    void print(const std::string &name= "", std::ostream &strm=std::cout, int precision=3) const
+    {
+        // Write to a temporary string stream so as not to affect the state
+        // (precision, field width, etc.) of the output stream.
+        std::ostringstream os;
+        os << std::setprecision(precision) << std::setiosflags(std::ios::fixed);
+        os << "MinMax ";
+        if (!name.empty()) os << "for \"" << name << "\" ";
+        os << "  Min="  << mMin << ", Max="  << mMax << std::endl;
+        strm << os.str();
+    }
+
+protected:
+    
+    ValueType mMin, mMax;
+};//end MinMax
+    
 /// @brief This class computes the minimum and maximum values of a population
 /// of floating-point values.
 class Extrema
@@ -244,11 +294,14 @@ class Histogram
 public:
     /// Construct with given minimum and maximum values and the given bin count.
     Histogram(double min, double max, size_t numBins = 10)
-        : mSize(0), mMin(min), mMax(max+1e-10),
+        : mSize(0), mMin(min), mMax(max + 1e-10),
           mDelta(double(numBins)/(max-min)), mBins(numBins)
     {
-        assert(numBins > 1);
-        assert(mMax-mMin > 1e-10);
+        if ( mMax <= mMin ) {
+            OPENVDB_THROW(ValueError, "Histogram: expected min < max");
+        } else if ( numBins == 0 ) {
+            OPENVDB_THROW(ValueError, "Histogram: expected at least one bin");
+        }
         for (size_t i=0; i<numBins; ++i) mBins[i]=0;
     }
 
@@ -258,8 +311,11 @@ public:
         mSize(0), mMin(s.min()), mMax(s.max()+1e-10),
         mDelta(double(numBins)/(mMax-mMin)), mBins(numBins)
     {
-        assert(numBins > 1);
-        assert(mMax-mMin > 1e-10);
+        if ( mMax <= mMin ) {
+            OPENVDB_THROW(ValueError, "Histogram: expected min < max");
+        } else if ( numBins == 0 ) {
+            OPENVDB_THROW(ValueError, "Histogram: expected at least one bin");
+        }
         for (size_t i=0; i<numBins; ++i) mBins[i]=0;
     }
 
@@ -338,6 +394,6 @@ private:
 
 #endif // OPENVDB_MATH_STATS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

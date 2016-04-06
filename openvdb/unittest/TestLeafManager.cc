@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -40,14 +40,6 @@
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
 
-
-//typedef float                                            ValueType;
-//typedef openvdb::tree::LeafNode<ValueType,3>             LeafNodeType;
-//typedef openvdb::tree::InternalNode<LeafNodeType,4>      InternalNodeType1;
-//typedef openvdb::tree::InternalNode<InternalNodeType1,5> InternalNodeType2;
-//typedef openvdb::tree::RootNode<InternalNodeType2>       RootNodeType;
-
-
 class TestLeafManager: public CppUnit::TestFixture
 {
 public:
@@ -55,17 +47,21 @@ public:
     virtual void tearDown() { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestLeafManager);
-    CPPUNIT_TEST(testAll);
+    CPPUNIT_TEST(test);
+    CPPUNIT_TEST(testForeach);
+    CPPUNIT_TEST(testReduce);
     CPPUNIT_TEST_SUITE_END();
    
-    void testAll();
+    void test();
+    void testForeach();
+    void testReduce();
 };
 
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestLeafManager);
   
 void
-TestLeafManager::testAll()
+TestLeafManager::test()
 {
     using openvdb::CoordBBox;
     using openvdb::Coord;
@@ -195,6 +191,130 @@ TestLeafManager::testAll()
     }
 }
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+namespace {
+
+struct ForeachOp
+{
+    ForeachOp(float v) : mV(v) {}
+    template <typename T>
+    void operator()(T &leaf, size_t) const
+    {
+        for (typename T::ValueOnIter iter = leaf.beginValueOn(); iter; ++iter) {
+            if ( *iter > mV) iter.setValue( 2.0f );
+        }
+    }
+    const float mV;
+};// ForeachOp
+
+struct ReduceOp
+{
+    ReduceOp(float v) : mV(v), mN(0) {}
+    ReduceOp(const ReduceOp &other) : mV(other.mV), mN(other.mN) {}
+    ReduceOp(const ReduceOp &other, tbb::split) : mV(other.mV), mN(0) {}
+    template <typename T>
+    void operator()(T &leaf, size_t)
+    {
+        for (typename T::ValueOnIter iter = leaf.beginValueOn(); iter; ++iter) {
+            if ( *iter > mV) ++mN;
+        }
+    }
+    void join(const ReduceOp &other) {mN += other.mN;}
+    const float mV;
+    openvdb::Index mN;
+};// ReduceOp
+
+}//unnamed namespace
+
+void
+TestLeafManager::testForeach()
+{
+    using namespace openvdb;
+
+    FloatTree tree( 0.0f );
+    const int dim = int(FloatTree::LeafNodeType::dim());
+    const CoordBBox bbox1(Coord(0),Coord(dim-1));
+    const CoordBBox bbox2(Coord(dim),Coord(2*dim-1));
+
+    tree.fill( bbox1, -1.0f);
+    tree.fill( bbox2,  1.0f);
+    tree.voxelizeActiveTiles();
+    
+    for (CoordBBox::Iterator<true> iter(bbox1); iter; ++iter) {
+        CPPUNIT_ASSERT_EQUAL( -1.0f, tree.getValue(*iter));
+    }
+    for (CoordBBox::Iterator<true> iter(bbox2); iter; ++iter) {
+        CPPUNIT_ASSERT_EQUAL(  1.0f, tree.getValue(*iter));
+    }
+
+    tree::LeafManager<FloatTree> r(tree);
+    CPPUNIT_ASSERT_EQUAL(size_t(2), r.leafCount());
+    CPPUNIT_ASSERT_EQUAL(size_t(0), r.auxBufferCount());
+    CPPUNIT_ASSERT_EQUAL(size_t(0), r.auxBuffersPerLeaf());
+
+    ForeachOp op(0.0f);
+    r.foreach(op);
+
+    CPPUNIT_ASSERT_EQUAL(size_t(2), r.leafCount());
+    CPPUNIT_ASSERT_EQUAL(size_t(0), r.auxBufferCount());
+    CPPUNIT_ASSERT_EQUAL(size_t(0), r.auxBuffersPerLeaf());
+
+    for (CoordBBox::Iterator<true> iter(bbox1); iter; ++iter) {
+        CPPUNIT_ASSERT_EQUAL( -1.0f, tree.getValue(*iter));
+    }
+    for (CoordBBox::Iterator<true> iter(bbox2); iter; ++iter) {
+        CPPUNIT_ASSERT_EQUAL(  2.0f, tree.getValue(*iter));
+    }
+}
+
+void
+TestLeafManager::testReduce()
+{
+    using namespace openvdb;
+
+    FloatTree tree( 0.0f );
+    const int dim = int(FloatTree::LeafNodeType::dim());
+    const CoordBBox bbox1(Coord(0),Coord(dim-1));
+    const CoordBBox bbox2(Coord(dim),Coord(2*dim-1));
+
+    tree.fill( bbox1, -1.0f);
+    tree.fill( bbox2,  1.0f);
+    tree.voxelizeActiveTiles();
+    
+    for (CoordBBox::Iterator<true> iter(bbox1); iter; ++iter) {
+        CPPUNIT_ASSERT_EQUAL( -1.0f, tree.getValue(*iter));
+    }
+    for (CoordBBox::Iterator<true> iter(bbox2); iter; ++iter) {
+        CPPUNIT_ASSERT_EQUAL(  1.0f, tree.getValue(*iter));
+    }
+
+    tree::LeafManager<FloatTree> r(tree);
+    CPPUNIT_ASSERT_EQUAL(size_t(2), r.leafCount());
+    CPPUNIT_ASSERT_EQUAL(size_t(0), r.auxBufferCount());
+    CPPUNIT_ASSERT_EQUAL(size_t(0), r.auxBuffersPerLeaf());
+
+    ReduceOp op(0.0f);
+    r.reduce(op);
+    CPPUNIT_ASSERT_EQUAL(FloatTree::LeafNodeType::numValues(), op.mN);
+
+    CPPUNIT_ASSERT_EQUAL(size_t(2), r.leafCount());
+    CPPUNIT_ASSERT_EQUAL(size_t(0), r.auxBufferCount());
+    CPPUNIT_ASSERT_EQUAL(size_t(0), r.auxBuffersPerLeaf());
+
+    Index n = 0; 
+    for (CoordBBox::Iterator<true> iter(bbox1); iter; ++iter) {
+        ++n;
+        CPPUNIT_ASSERT_EQUAL( -1.0f, tree.getValue(*iter));
+    }
+    CPPUNIT_ASSERT_EQUAL(FloatTree::LeafNodeType::numValues(), n);
+
+    n = 0;
+    for (CoordBBox::Iterator<true> iter(bbox2); iter; ++iter) {
+        ++n;
+        CPPUNIT_ASSERT_EQUAL(  1.0f, tree.getValue(*iter));
+    }
+    CPPUNIT_ASSERT_EQUAL(FloatTree::LeafNodeType::numValues(), n);
+}
+
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -30,7 +30,7 @@
 //
 /// @file    MaskToLevelSet.h
 ///
-/// @brief   This tool generated a narrob band level set from the
+/// @brief   This tool generated a narrow band level set from the
 ///          interface between the active and inactive voxels of an
 ///          input grid.
 ///
@@ -42,22 +42,15 @@
 #ifndef OPENVDB_TOOLS_MASK_TO_LEVELSET_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_MASK_TO_LEVELSET_HAS_BEEN_INCLUDED
 
-// Keep this undefined - the corresponding method appears to generate
-// artifacts when used on very narrow bands, i.e. 2 x one voxel width
-//#define EXPERIMENTAL_METHOD
-
-#if __cplusplus <= 201103L
 #include <tbb/task_group.h>
-#else
-#include <thread>
-#endif
 #include <openvdb/Grid.h>
+#include <openvdb/util/CpuTimer.h>
 #include <openvdb/Types.h>
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/math/Math.h> // for isNegative
 #include <openvdb/tree/LeafManager.h>
 #include "LevelSetFilter.h"
-#include "Morphology.h" // for erodeVoxels and dilateVoxels
+#include "Morphology.h" // for erodeVoxels and dilateActiveValues
 #include "SignedFloodFill.h" // for signedFloodFill
 
 namespace openvdb {
@@ -112,17 +105,16 @@ maskToLevelSet(const GridT& grid,
     typedef util::NullInterrupter T;
     return maskToLevelSet<GridT, math::FIRST_BIAS, T>(grid, halfWidth, dilation, erosion);
 }
-
-  
-
-#if __cplusplus <= 201103L
+    
 namespace {
 
 template<typename TreeT>
 struct DilateOp
 {
     DilateOp(TreeT& t, int n) : tree(&t), size(n) {}
-    void operator()() const { dilateVoxels( *tree, size); }
+    void operator()() const {
+        dilateActiveValues( *tree, size, tools::NN_FACE, tools::IGNORE_TILES);
+    }
     TreeT* tree;
     const int size;
 };
@@ -137,8 +129,7 @@ struct ErodeOp
     const int size;
 };        
   
-}// unnamed namespace    
-#endif
+}// unnamed namespace
     
 
 template<typename GridT, math::BiasedGradientScheme Scheme, typename InterrupterT>
@@ -157,22 +148,15 @@ maskToLevelSet(const GridT& grid, int halfWidth, int dilation, int erosion, Inte
         OPENVDB_THROW(ValueError, "Non-uniform voxels are not supported!");
     }
 
-    // background value = outside value
+    // background value = outside value 
     const float outside = static_cast<float>(grid.voxelSize()[0]) * halfWidth;
     
     // Copy the topology into a MaskGrid.
     MaskTreeT maskTree( grid.tree(), false/*background*/, openvdb::TopologyCopy() );
 
     // Morphological closing operation.
-    dilateVoxels( maskTree, dilation);
+    dilateActiveValues( maskTree, dilation, tools::NN_FACE, tools::IGNORE_TILES);
     erodeVoxels(  maskTree, erosion);
-
-#ifdef EXPERIMENTAL_METHOD    
-    // Construct mask of the interior narrow band
-    MaskTreeT coreMask( maskTree );//deep copy
-    erodeVoxels( coreMask, halfWidth );
-    maskTree.topologyDifference( coreMask );
-#endif
 
     // Generate a volume with an implicit zero crossing at the boundary
     // between active and inactive values in the input grid.
@@ -181,29 +165,13 @@ maskToLevelSet(const GridT& grid, int halfWidth, int dilation, int erosion, Inte
                                                     -outside,//= active
                                                     openvdb::TopologyCopy()) );
     
-#ifdef EXPERIMENTAL_METHOD
-    // Construct mask of the exterior narrow band 
-    dilateVoxels( maskTree, halfWidth );
-    maskTree.topologyDifference( coreMask );
-
-    // Activate outside band
-    lsTree->topologyUnion( maskTree );
-
-    // Propagate the correct sign into the interior of the level set
-    signedFloodFill( *lsTree );
-#else
-#if __cplusplus <= 201103L
     tbb::task_group pool;
     pool.run( ErodeOp< MaskTreeT >( maskTree, halfWidth ) );
     pool.run( DilateOp<FloatTreeT>( *lsTree , halfWidth ) );
     pool.wait();// wait for both tasks to complete
-#else
-    std::thread erode( [&maskTree, &halfWidth](){ erodeVoxels( maskTree, halfWidth); });
-    std::thread dilate([&lsTree,   &halfWidth](){ dilateVoxels( *lsTree, halfWidth); });
-    erode.join(); dilate.join();
-#endif
+ 
     lsTree->topologyDifference( maskTree );
-#endif
+    tools::pruneLevelSet( *lsTree,  /*threading=*/true);
     
     // Create a level set grid from the tree
     typename FloatGridT::Ptr lsGrid = FloatGridT::create( lsTree );
@@ -226,6 +194,6 @@ maskToLevelSet(const GridT& grid, int halfWidth, int dilation, int erosion, Inte
 
 #endif //OPENVDB_TOOLS_MASK_TO_LEVELSET_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

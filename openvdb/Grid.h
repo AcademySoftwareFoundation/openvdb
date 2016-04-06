@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -643,10 +643,12 @@ public:
     /// @param value   the value to which to set voxels within the box
     /// @param active  if true, mark voxels within the box as active,
     ///                otherwise mark them as inactive
-    /// @note This operation generates a sparse, but not always optimally sparse,
+    /// @param sparse  if false, active tiles are voxelized, i.e. only active voxels
+    ///                 are generated from the fill operation. Defaults to true.  
+    /// @note If @a sparse is true this operation generates a sparse, but not always optimally sparse,
     /// representation of the filled box.  Follow fill operations with a prune()
     /// operation for optimal sparseness.
-    void fill(const CoordBBox& bbox, const ValueType& value, bool active = true);
+    void fill(const CoordBBox& bbox, const ValueType& value, bool active = true, bool sparse = true);
 
     /// Reduce the memory footprint of this grid by increasing its sparseness.
     virtual void pruneGrid(float tolerance = 0.0);
@@ -1178,9 +1180,9 @@ Grid<TreeT>::newTree()
 
 template<typename TreeT>
 inline void
-Grid<TreeT>::fill(const CoordBBox& bbox, const ValueType& value, bool active)
+Grid<TreeT>::fill(const CoordBBox& bbox, const ValueType& value, bool active, bool sparse)
 {
-    tree().fill(bbox, value, active);
+    tree().fill(bbox, value, active, sparse);
 }
 
 template<typename TreeT>
@@ -1397,6 +1399,6 @@ createLevelSet(Real voxelSize, Real halfWidth)
 
 #endif // OPENVDB_GRID_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

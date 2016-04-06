@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -4237,14 +4237,14 @@ VolumeToMesh::operator()(const GridT& distGrid)
     }
 
 
-    std::vector<size_t> regions(signLeafs.leafCount(), 0);
+    std::vector<size_t> regions(signLeafs.leafCount(), 0);    
     if (regions.empty()) {
-	mPointListSize = 0;
-	mPoints.reset();
-	mPolygonPoolListSize = 0;
-	mPolygons.reset();
-	mPointFlags.clear();
-	return;
+        mPointListSize = 0;
+        mPoints.reset();
+        mPolygonPoolListSize = 0;
+        mPolygons.reset();
+        mPointFlags.clear();
+        return;
     }
 
     if (adaptive) {
@@ -4685,6 +4685,6 @@ volumeToMesh(
 
 #endif // OPENVDB_TOOLS_VOLUME_TO_MESH_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -917,7 +917,9 @@ public:
 
     void negate();
 
-    void voxelizeActiveTiles() {}
+    /// @brief No-op
+    /// @details This function exists only to enable template instantiation.
+    void voxelizeActiveTiles(bool = true) {}
 
     template<MergePolicy Policy> void merge(const LeafNode&);
     template<MergePolicy Policy> void merge(const ValueType& tileValue, bool tileActive);
@@ -2212,6 +2214,6 @@ operator<<(std::ostream& os, const typename LeafNode<T, Log2Dim>::Buffer& buf)
 
 #endif // OPENVDB_TREE_LEAFNODE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

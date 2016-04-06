@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -454,7 +454,7 @@ sampleField(ValueType time0, ValueType time1)
     for (size_t i=0; i<voxelCount; ++i, ++v) maxAbsV = math::Max(maxAbsV, ValueType(v->lengthSqr()));
 
     // Compute the CFL number
-    if (math::isExactlyEqual(ValueType(1e-6), maxAbsV)) return ValueType(0.0);//V is essentially zero
+    if (math::isApproxZero(maxAbsV, math::Delta<ValueType>::value())) return ValueType(0);
 #ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
     static
 #endif
@@ -564,6 +564,6 @@ euler(const LeafRange& range, ValueType dt, Index phiBuffer, Index resultBuffer)
 
 #endif // OPENVDB_TOOLS_LEVEL_SET_ADVECT_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

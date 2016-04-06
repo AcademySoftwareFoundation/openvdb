@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -83,6 +83,7 @@ public:
     CPPUNIT_TEST(testTopologyUnion);
     CPPUNIT_TEST(testTopologyIntersection);
     CPPUNIT_TEST(testTopologyDifference);
+    CPPUNIT_TEST(testFill);
     CPPUNIT_TEST(testSignedFloodFill);
     CPPUNIT_TEST(testPruneInactive);
     CPPUNIT_TEST(testPruneLevelSet);
@@ -114,6 +115,7 @@ public:
     void testTopologyUnion();
     void testTopologyIntersection();
     void testTopologyDifference();
+    void testFill();
     void testSignedFloodFill();
     void testPruneLevelSet();
     void testPruneInactive();
@@ -1198,6 +1200,7 @@ TestTree::testVoxelizeActiveTiles()
     const Coord xyz[] = {Coord(-1,-2,-3),Coord( 1, 2, 3)};
     //check two leaf nodes and two tiles at each level 1, 2 and 3
     const int tile_size[4]={0, 1<<2, 1<<(2*2), 1<<(3*2)};
+    // serial version
     for (int level=0; level<=3; ++level) {
 
         MyTree tree(background);
@@ -1216,11 +1219,52 @@ TestTree::testVoxelizeActiveTiles()
         CPPUNIT_ASSERT_EQUAL(3-level,tree.getValueDepth(xyz[0]));
         CPPUNIT_ASSERT_EQUAL(3-level,tree.getValueDepth(xyz[1]));
 
-        tree.voxelizeActiveTiles();
+        tree.voxelizeActiveTiles(false);
 
         CPPUNIT_ASSERT_EQUAL(3      ,tree.getValueDepth(xyz[0]));
         CPPUNIT_ASSERT_EQUAL(3      ,tree.getValueDepth(xyz[1]));
     }
+    // multi-threaded version
+    for (int level=0; level<=3; ++level) {
+
+        MyTree tree(background);
+        CPPUNIT_ASSERT_EQUAL(-1,tree.getValueDepth(xyz[0]));
+        CPPUNIT_ASSERT_EQUAL(-1,tree.getValueDepth(xyz[1]));
+
+        if (level==0) {
+            tree.setValue(xyz[0], 1.0f);
+            tree.setValue(xyz[1], 1.0f);
+        } else {
+            const int n = tile_size[level];
+            tree.fill(CoordBBox::createCube(Coord(-n,-n,-n), n), 1.0f, true);
+            tree.fill(CoordBBox::createCube(Coord( 0, 0, 0), n), 1.0f, true);
+        }
+
+        CPPUNIT_ASSERT_EQUAL(3-level,tree.getValueDepth(xyz[0]));
+        CPPUNIT_ASSERT_EQUAL(3-level,tree.getValueDepth(xyz[1]));
+
+        tree.voxelizeActiveTiles(true);
+
+        CPPUNIT_ASSERT_EQUAL(3      ,tree.getValueDepth(xyz[0]));
+        CPPUNIT_ASSERT_EQUAL(3      ,tree.getValueDepth(xyz[1]));
+    }
+#if 0
+    const CoordBBox bbox(openvdb::Coord(-30,-50,-30), openvdb::Coord(530,610,623));
+    {// benchmark serial
+        MyTree tree(background);
+        tree.fill( bbox, 1.0f, /*state*/true, /*sparse*/true);
+        openvdb::util::CpuTimer timer("\nserial voxelizeActiveTiles");
+        tree.voxelizeActiveTiles(/*threaded*/false);
+        timer.stop();
+    }
+    {// benchmark parallel
+        MyTree tree(background);
+        tree.fill( bbox, 1.0f, /*state*/true, /*sparse*/true);
+        openvdb::util::CpuTimer timer("\nparallel voxelizeActiveTiles");
+        tree.voxelizeActiveTiles(/*threaded*/true);
+        timer.stop();
+    }
+#endif
 }
 
 
@@ -1935,6 +1979,51 @@ TestTree::testTopologyDifference()
         }
     }
 }// testTopologyDifference
+
+void
+TestTree::testFill()
+{
+    // Use a custom tree configuration to ensure we flood-fill at all levels!
+    typedef openvdb::tree::LeafNode<float,2>     LeafT;//4^3
+    typedef openvdb::tree::InternalNode<LeafT,2> InternalT;//4^3
+    typedef openvdb::tree::RootNode<InternalT>   RootT;// child nodes are 16^3
+    typedef openvdb::tree::Tree<RootT>           TreeT;
+
+    const float outside = 2.0f, inside = -outside;
+    const openvdb::CoordBBox bbox(openvdb::Coord(-3,-50,30), openvdb::Coord(13,11,323));
+
+    {// sparse fill
+         openvdb::Grid<TreeT>::Ptr grid = openvdb::Grid<TreeT>::create(outside);
+         TreeT& tree = grid->tree();
+         CPPUNIT_ASSERT(!tree.hasActiveTiles());
+         CPPUNIT_ASSERT_EQUAL(size_t(0), tree.activeVoxelCount());
+         for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
+             ASSERT_DOUBLES_EXACTLY_EQUAL(outside, tree.getValue(*ijk));
+         }
+         tree.fill(bbox, inside, /*state*/true, /*sparse*/true);
+         CPPUNIT_ASSERT(tree.hasActiveTiles());
+         CPPUNIT_ASSERT_EQUAL(size_t(bbox.volume()), tree.activeVoxelCount());
+          for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
+             ASSERT_DOUBLES_EXACTLY_EQUAL(inside, tree.getValue(*ijk));
+         }
+    }
+    {// dense fill
+         openvdb::Grid<TreeT>::Ptr grid = openvdb::Grid<TreeT>::create(outside);
+         TreeT& tree = grid->tree();
+         CPPUNIT_ASSERT(!tree.hasActiveTiles());
+         CPPUNIT_ASSERT_EQUAL(size_t(0), tree.activeVoxelCount());
+         for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
+             ASSERT_DOUBLES_EXACTLY_EQUAL(outside, tree.getValue(*ijk));
+         }
+         tree.fill(bbox, inside, /*state*/true, /*sparse*/false);
+         CPPUNIT_ASSERT(!tree.hasActiveTiles());
+         CPPUNIT_ASSERT_EQUAL(size_t(bbox.volume()), tree.activeVoxelCount());
+         for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
+             ASSERT_DOUBLES_EXACTLY_EQUAL(inside, tree.getValue(*ijk));
+         }
+    }
+
+}// testFill
 
 void
 TestTree::testSignedFloodFill()
@@ -2743,6 +2832,6 @@ TestTree::testStealNode()
     }
 }
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

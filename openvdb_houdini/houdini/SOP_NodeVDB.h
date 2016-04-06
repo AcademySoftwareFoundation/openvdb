@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -180,6 +180,9 @@ private:
 };
 
 
+////////////////////////////////////////
+
+
 /// @brief Namespace to hold functionality for registering info text callbacks. Whenever
 /// getNodeSpecificInfoText() is called, the default info text is added to MMB output unless
 /// a valid callback has been registered for the grid type.
@@ -217,10 +220,11 @@ namespace node_info_text
 
 } // namespace node_info_text
 
+
 } // namespace openvdb_houdini
 
 #endif // OPENVDB_HOUDINI_SOP_NODEVDB_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -142,7 +142,11 @@ ApplyGridSpecificInfoText getGridSpecificInfoText(const std::string& gridType)
     return iter->second;
 }
 
-} // node_info_text
+} // namespace node_info_text
+
+
+////////////////////////////////////////
+
 
 SOP_NodeVDB::SOP_NodeVDB(OP_Network* net, const char* name, OP_Operator* op):
     SOP_Node(net, name, op)
@@ -258,7 +262,6 @@ SOP_NodeVDB::getNodeSpecificInfoText(OP_Context &context, OP_NodeInfoParms &parm
     }
 #endif
 }
-
 
 OP_ERROR
 SOP_NodeVDB::duplicateSourceStealable(const unsigned index,
@@ -562,6 +565,6 @@ OpenVDBOpFactory::OpenVDBOpFactory(
 
 } // namespace openvdb_houdini
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

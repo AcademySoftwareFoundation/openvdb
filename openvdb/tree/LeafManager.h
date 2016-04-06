@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -52,6 +52,7 @@
 #include <boost/type_traits/remove_pointer.hpp>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
+#include <tbb/parallel_reduce.h>
 #include <openvdb/Types.h>
 #include "TreeIterator.h" // for CopyConstness
 
@@ -232,6 +233,26 @@ public:
         , mIsMaster(true)
     {
         this->rebuild(serial);
+    }
+
+    /// @brief Constructor from a tree reference and an existing array
+    /// of pointers to LeafNodes from said tree. This c-tor is only
+    /// intended for experts that try to squice out a
+    LeafManager(TreeType& tree, LeafType** begin, LeafType** end,
+                size_t auxBuffersPerLeaf=0, bool serial=false)
+        : mTree(&tree)
+        , mLeafCount(end-begin)
+        , mAuxBufferCount(0)
+        , mAuxBuffersPerLeaf(auxBuffersPerLeaf)
+        , mLeafs(new LeafType*[mLeafCount])
+        , mAuxBuffers(NULL)
+        , mTask(0)
+        , mIsMaster(true)
+    {
+        size_t n = mLeafCount; 
+        LeafType **target = mLeafs, **source = begin;
+        while (n--) *target++ = *source++;
+        if (auxBuffersPerLeaf) this->initAuxBuffers(serial);
     }
 
     /// Shallow copy constructor called by tbb::parallel_for() threads
@@ -429,14 +450,19 @@ public:
     }
 
     /// @brief   Threaded method that applies a user-supplied functor
-    ///          to each leaf node in the LeafManager
+    ///          to each leaf node in the LeafManager.
+    ///
+    /// @details The user-supplied functor needs to define the methods
+    ///          required for tbb::parallel_for.
     ///
     /// @param op        user-supplied functor, see examples for interface details.
     /// @param threaded  optional toggle to disable threading, on by default.
     /// @param grainSize optional parameter to specify the grainsize
     ///                  for threading, one by default.
     ///
-    /// @warning The functor object is deep-copied to create TBB tasks.
+    /// @warning The functor object is deep-copied to create TBB tasks. 
+    ///          This allows the function to use non-thread-safe members
+    ///          like a ValueAccessor.
     ///
     /// @par Example:
     /// @code
@@ -451,7 +477,7 @@ public:
     ///     template <typename LeafNodeType>
     ///     void operator()(LeafNodeType &lhsLeaf, size_t) const
     ///     {
-    ///         const LeafNodeType * rhsLeaf = mRhsTreeAcc.probeConstLeaf(lhsLeaf.origin());
+    ///         const LeafNodeType *rhsLeaf = mRhsTreeAcc.probeConstLeaf(lhsLeaf.origin());
     ///         if (rhsLeaf) {
     ///             typename LeafNodeType::ValueOnIter iter = lhsLeaf.beginValueOn();
     ///             for (; iter; ++iter) {
@@ -459,7 +485,6 @@ public:
     ///             }
     ///         }
     ///     }
-    /// private:
     ///     Accessor mRhsTreeAcc;
     /// };
     ///
@@ -483,7 +508,6 @@ public:
     ///
     ///         // min ...
     ///     }
-    /// private:
     ///     LeafManagerType& mLeafs;
     /// };
     /// @endcode
@@ -491,6 +515,55 @@ public:
     void foreach(const LeafOp& op, bool threaded = true, size_t grainSize=1)
     {
         LeafTransformer<LeafOp> transform(op);
+        transform.run(this->leafRange(grainSize), threaded);
+    }
+
+    /// @brief   Threaded method that applies a user-supplied functor
+    ///          to each leaf node in the LeafManager. Unlike foreach
+    ///          (defined above) this method performs a reduction on
+    ///          all the leaf nodes.
+    ///
+    /// @details The user-supplied functor needs to define the methods
+    ///          required for tbb::parallel_reduce.
+    ///
+    /// @param op        user-supplied functor, see examples for interface details.
+    /// @param threaded  optional toggle to disable threading, on by default.
+    /// @param grainSize optional parameter to specify the grainsize
+    ///                  for threading, one by default.
+    ///
+    /// @warning The functor object is deep-copied to create TBB tasks.
+    ///          This allows the function to use non-thread-safe members
+    ///          like a ValueAccessor.
+    ///
+    /// @par Example:
+    /// @code
+    /// // Functor to count the number of negative (active) leaf values 
+    /// struct CountOp
+    /// {
+    ///     CountOp() : mCounter(0) {}
+    ///     CountOp(const CountOp &other) : mCounter(other.mCounter) {}
+    ///     CountOp(const CountOp &other, tbb::split) : mCounter(0) {}
+    ///     template <typename LeafNodeType>
+    ///     void operator()(LeafNodeType &leaf, size_t)
+    ///     {
+    ///       typename LeafNodeType::ValueOnIter iter = leaf.beginValueOn();
+    ///       for (; iter; ++iter) if (*iter < 0.0f) ++mCounter;
+    ///     }
+    ///     void join(const CountOp &other) {mCounter += other.mCounter;}
+    ///     size_t mCounter; 
+    /// };
+    ///
+    /// // usage:
+    /// tree::LeafManager<FloatTree> leafNodes(tree);
+    /// MinValueOp min;
+    /// leafNodes.reduce(min);
+    /// std::cerr << "Number of negative active voxels = " << min.mCounter << std::endl;
+    ///
+    /// @endcode
+    template<typename LeafOp>
+    void reduce(LeafOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        LeafReducer<LeafOp> transform(op);
         transform.run(this->leafRange(grainSize), threaded);
     }
 
@@ -669,21 +742,50 @@ public:
     }
 
     /// @brief Private member class that applies a user-defined
-    /// functor to all the leaf nodes.
+    /// functor to perform parallel_for on all the leaf nodes.
     template<typename LeafOp>
     struct LeafTransformer
     {
-        LeafTransformer(const LeafOp& leafOp) : mLeafOp(leafOp) {}
-        void run(const LeafRange& range, bool threaded = true)
+        LeafTransformer(const LeafOp &leafOp) : mLeafOp(leafOp)
+        {
+        }
+        void run(const LeafRange &range, bool threaded) const
         {
             threaded ? tbb::parallel_for(range, *this) : (*this)(range);
         }
-        void operator()(const LeafRange& range) const
+        void operator()(const LeafRange &range) const
         {
             for (typename LeafRange::Iterator it = range.begin(); it; ++it) mLeafOp(*it, it.pos());
         }
         const LeafOp mLeafOp;
-    };
+    };// LeafTransformer
+    
+    /// @brief Private member class that applies a user-defined
+    /// functor to perform parallel_reduce on all the leaf nodes.
+    template<typename LeafOp>
+    struct LeafReducer
+    {
+        LeafReducer(LeafOp &leafOp) : mLeafOp(&leafOp), mOwnsOp(false)
+        {
+        }
+        LeafReducer(const LeafReducer &other, tbb::split)
+            : mLeafOp(new LeafOp(*(other.mLeafOp), tbb::split())), mOwnsOp(true)
+        {
+        }
+        ~LeafReducer() { if (mOwnsOp) delete mLeafOp; }
+        void run(const LeafRange& range, bool threaded)
+        {
+            threaded ? tbb::parallel_reduce(range, *this) : (*this)(range);
+        }
+        void operator()(const LeafRange& range)
+        {
+            LeafOp &op = *mLeafOp;//local registry
+            for (typename LeafRange::Iterator it = range.begin(); it; ++it) op(*it, it.pos());
+        }
+        void join(const LeafReducer& other) { mLeafOp->join(*(other.mLeafOp)); }
+        LeafOp *mLeafOp;
+        const bool mOwnsOp;
+    };// LeafReducer
 
     // Helper class to compute a pre-fix sum of offsets to active voxels
     struct PreFixSum
@@ -739,6 +841,6 @@ struct LeafManagerImpl<LeafManager<const TreeT> >
 
 #endif // OPENVDB_TREE_LEAFMANAGER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

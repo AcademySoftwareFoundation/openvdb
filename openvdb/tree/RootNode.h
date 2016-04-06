@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -555,8 +555,10 @@ public:
     /// @param bbox    inclusive coordinates of opposite corners of an axis-aligned box
     /// @param value   the value to which to set voxels within the box
     /// @param active  if true, mark voxels within the box as active,
-    ///                otherwise mark them as inactive
-    void fill(const CoordBBox& bbox, const ValueType& value, bool active = true);
+    ///                otherwise mark them as inactive. Defaults to true.
+    /// @param sparse  if false, active tiles are voxelized, i.e. only active voxels
+    ///                are generated from the fill operation. Defaults to true.  
+    void fill(const CoordBBox& bbox, const ValueType& value, bool active = true, bool sparse = true);
 
     /// @brief Copy into a dense grid the values of all voxels, both active and inactive,
     /// that intersect a given bounding box.
@@ -807,9 +809,14 @@ public:
     template<typename ArrayT>
     void stealNodes(ArrayT& array) { this->stealNodes(array, mBackground, false); }
     //@}
-
-    /// Densify active tiles, i.e., replace them with leaf-level active voxels.
-    void voxelizeActiveTiles();
+    
+    /// @brief Densify active tiles, i.e., replace them with leaf-level active voxels.
+    ///
+    /// @param threaded if true, this operation is multi-threaded (over the internal nodes).
+    ///
+    /// @warning This method can explode the tree's memory footprint, especially if it 
+    /// contains active tiles at the upper levels, e.g. root level!
+    void voxelizeActiveTiles(bool threaded = true);
 
     /// @brief Efficiently merge another tree into this tree using one of several schemes.
     /// @details This operation is primarily intended to combine trees that are mostly
@@ -2053,7 +2060,7 @@ RootNode<ChildT>::probeValueAndCache(const Coord& xyz, ValueType& value, Accesso
 
 template<typename ChildT>
 inline void
-RootNode<ChildT>::fill(const CoordBBox& bbox, const ValueType& value, bool active)
+RootNode<ChildT>::fill(const CoordBBox& bbox, const ValueType& value, bool active, bool sparse)
 {
     if (bbox.empty()) return;
 
@@ -2104,6 +2111,7 @@ RootNode<ChildT>::fill(const CoordBBox& bbox, const ValueType& value, bool activ
             }
         }
     }
+    if (!sparse) this->voxelizeActiveTiles(/*multi-threaded=*/true);
 }
 
 template<typename ChildT>
@@ -2832,8 +2840,13 @@ RootNode<ChildT>::stealNodes(ArrayT& array, const ValueType& value, bool state)
 
 template<typename ChildT>
 inline void
-RootNode<ChildT>::voxelizeActiveTiles()
+RootNode<ChildT>::voxelizeActiveTiles(bool threaded)
 {
+    // These is little point in multi-threaded over the root table since
+    // each tile spans a huge index space (by default 4096^3) and hence we
+    // expect few if any at all. In fact, you're very likeky to run out
+    // of memory if this method is called on a tree with root-level
+    // active tiles!
     for (MapIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
         if (this->isTileOff(i)) continue;
         ChildT* child = i->second.child;
@@ -2841,7 +2854,7 @@ RootNode<ChildT>::voxelizeActiveTiles()
             child = new ChildT(i->first, this->getTile(i).value, true);
             i->second.child = child;
         }
-        child->voxelizeActiveTiles();
+        child->voxelizeActiveTiles(threaded);
     }
 }
 
@@ -3393,6 +3406,6 @@ RootNode<ChildT>::doVisit2(RootNodeT& self, OtherRootNodeT& other, VisitorOp& op
 
 #endif // OPENVDB_TREE_ROOTNODE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

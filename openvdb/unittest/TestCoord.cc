@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -255,8 +255,79 @@ TestCoord::testCoordBBox()
         CPPUNIT_ASSERT(b.empty());
     }
 
+    {// ZYX Iterator 1
+        const openvdb::Coord min(-1,-2,3), max(2,3,5);
+        const openvdb::CoordBBox b(min, max);
+        const size_t count = b.volume();
+        size_t n = 0;
+        openvdb::CoordBBox::Iterator<true> ijk(b);
+        for (int i=min[0]; i<=max[0]; ++i) {
+            for (int j=min[1]; j<=max[1]; ++j) {
+                for (int k=min[2]; k<=max[2]; ++k, ++ijk, ++n) {
+                    CPPUNIT_ASSERT( ijk );
+                    CPPUNIT_ASSERT_EQUAL( openvdb::Coord(i,j,k), *ijk );
+                }
+            }
+        }
+        CPPUNIT_ASSERT_EQUAL(count, n);
+        CPPUNIT_ASSERT( !ijk );
+        ++ijk;
+        CPPUNIT_ASSERT( !ijk );
+    }
+    
+    {// ZYX Iterator 2
+        const openvdb::Coord min(-1,-2,3), max(2,3,5);
+        const openvdb::CoordBBox b(min, max);
+        const size_t count = b.volume();
+        size_t n = 0;
+        for (openvdb::CoordBBox::Iterator<true> ijk(b); ijk; ++ijk) {
+            CPPUNIT_ASSERT( ++n <= count );
+        }
+        CPPUNIT_ASSERT_EQUAL(count, n);
+    }
+
+    {// XYZ Iterator 1
+        const openvdb::Coord min(-1,-2,3), max(2,3,5);
+        const openvdb::CoordBBox b(min, max);
+        const size_t count = b.volume();
+        size_t n = 0;
+        openvdb::CoordBBox::Iterator<false> ijk(b);
+        for (int k=min[2]; k<=max[2]; ++k) {
+            for (int j=min[1]; j<=max[1]; ++j) {
+                for (int i=min[0]; i<=max[0]; ++i, ++ijk, ++n) {
+                    CPPUNIT_ASSERT( ijk );
+                    CPPUNIT_ASSERT_EQUAL( openvdb::Coord(i,j,k), *ijk );
+                }
+            }
+        }
+        CPPUNIT_ASSERT_EQUAL(count, n);
+        CPPUNIT_ASSERT( !ijk );
+        ++ijk;
+        CPPUNIT_ASSERT( !ijk );
+    }
+
+    {// XYZ Iterator 2
+        const openvdb::Coord min(-1,-2,3), max(2,3,5);
+        const openvdb::CoordBBox b(min, max);
+        const size_t count = b.volume();
+        size_t n = 0;
+        for (openvdb::CoordBBox::Iterator<false> ijk(b); ijk; ++ijk) {
+            CPPUNIT_ASSERT( ++n <= count );
+        }
+        CPPUNIT_ASSERT_EQUAL(count, n);
+    }
+
+    {// bit-wise operations
+        const openvdb::Coord min(-1,-2,3), max(2,3,5);
+        const openvdb::CoordBBox b(min, max);
+        CPPUNIT_ASSERT_EQUAL(openvdb::CoordBBox(min>>1,max>>1), b>>1UL);
+        CPPUNIT_ASSERT_EQUAL(openvdb::CoordBBox(min>>3,max>>3), b>>3UL);
+        CPPUNIT_ASSERT_EQUAL(openvdb::CoordBBox(min<<1,max<<1), b<<1UL);
+        CPPUNIT_ASSERT_EQUAL(openvdb::CoordBBox(min&1,max&1), b&1);
+        CPPUNIT_ASSERT_EQUAL(openvdb::CoordBBox(min|1,max|1), b|1);
+    }
 }
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
