@@ -44,6 +44,7 @@
 #include <openvdb/tools/LevelSetAdvect.h>
 #include <openvdb/tools/LevelSetMeasure.h>
 #include <openvdb/tools/LevelSetMorph.h>
+#include <openvdb/tools/LevelSetPlatonic.h>
 #include <openvdb/tools/Morphology.h>
 #include <openvdb/tools/PointAdvect.h>
 #include <openvdb/tools/PointScatter.h>
@@ -77,6 +78,7 @@ public:
     CPPUNIT_TEST(testFilter);
     CPPUNIT_TEST(testFloatApply);
     CPPUNIT_TEST(testLevelSetSphere);
+    CPPUNIT_TEST(testLevelSetPlatonic);
     CPPUNIT_TEST(testLevelSetAdvect);
     CPPUNIT_TEST(testLevelSetMeasure);
     CPPUNIT_TEST(testLevelSetMorph);
@@ -104,6 +106,7 @@ public:
     void testFilter();
     void testFloatApply();
     void testLevelSetSphere();
+    void testLevelSetPlatonic();
     void testLevelSetAdvect();
     void testLevelSetMeasure();
     void testLevelSetMorph();
@@ -1270,7 +1273,71 @@ TestTools::testLevelSetSphere()
     }
 
     CPPUNIT_ASSERT_EQUAL(grid1->activeVoxelCount(), grid2->activeVoxelCount());
-}
+}// testLevelSetSphere
+
+void
+TestTools::testLevelSetPlatonic()
+{
+    using namespace openvdb;
+    
+    const float scale = 0.5f;
+    const Vec3f center(1.0f, 2.0f, 3.0f);
+    const float voxelSize = 0.025f, width = 2.0f, background = width*voxelSize;
+    const Coord ijk(int(center[0]/voxelSize),
+                    int(center[1]/voxelSize),
+                    int(center[2]/voxelSize));// inside
+
+    // The tests below are not particularly good (a visual inspection
+    // in Houdini is much better) but at least it exercises the code
+    // and performs an elementary suite of tests.
+    
+    {// test tetrahedron
+        FloatGrid::Ptr ls = tools::createLevelSetTetrahedron<FloatGrid>(scale, center,
+                                                                        voxelSize, width);
+        CPPUNIT_ASSERT(ls->activeVoxelCount() > 0);
+        CPPUNIT_ASSERT(ls->tree().isValueOff(ijk));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(-ls->background(), ls->tree().getValue(ijk), 1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(background, ls->background(), 1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(ls->background(),ls->tree().getValue(Coord(0)), 1e-6);
+    }
+    {// test cube
+        FloatGrid::Ptr ls = tools::createLevelSetCube<FloatGrid>(scale, center,
+                                                                 voxelSize, width);
+        CPPUNIT_ASSERT(ls->activeVoxelCount() > 0);
+        CPPUNIT_ASSERT(ls->tree().isValueOff(ijk));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(-ls->background(),ls->tree().getValue(ijk), 1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(background, ls->background(), 1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(ls->background(),ls->tree().getValue(Coord(0)), 1e-6);
+    }
+    {// test octahedron
+        FloatGrid::Ptr ls = tools::createLevelSetOctahedron<FloatGrid>(scale, center,
+                                                                       voxelSize, width);
+        CPPUNIT_ASSERT(ls->activeVoxelCount() > 0);
+        CPPUNIT_ASSERT(ls->tree().isValueOff(ijk));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(-ls->background(),ls->tree().getValue(ijk), 1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(background, ls->background(), 1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(ls->background(),ls->tree().getValue(Coord(0)), 1e-6);
+    }
+    {// test icosahedron
+        FloatGrid::Ptr ls = tools::createLevelSetIcosahedron<FloatGrid>(scale, center,
+                                                                        voxelSize, width);
+        CPPUNIT_ASSERT(ls->activeVoxelCount() > 0);
+        CPPUNIT_ASSERT(ls->tree().isValueOff(ijk));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(-ls->background(),ls->tree().getValue(ijk), 1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(background, ls->background(), 1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(ls->background(),ls->tree().getValue(Coord(0)), 1e-6);
+    }
+    {// test dodecahedron
+        FloatGrid::Ptr ls = tools::createLevelSetDodecahedron<FloatGrid>(scale, center,
+                                                                         voxelSize, width);
+        CPPUNIT_ASSERT(ls->activeVoxelCount() > 0);
+        CPPUNIT_ASSERT(ls->tree().isValueOff(ijk));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(-ls->background(),ls->tree().getValue(ijk), 1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(background, ls->background(), 1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(ls->background(),ls->tree().getValue(Coord(0)), 1e-6);
+    }
+    
+}// testLevelSetPlatonic
 
 void
 TestTools::testLevelSetAdvect()

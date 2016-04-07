@@ -55,6 +55,8 @@ New features:
 - Added a @vdblink::tools::topologyToLevelSet() topologyToLevelSet@endlink tool
   that generates a level set from the implicit boundary between active and
   inactive voxels in an input grid of arbitrary type.
+- Added @vdblink::tools::createLevelSetPlatonic() createLevelSetPlatonic@endlink (and
+  specializations) that generates narrow-band level sets of the five Platonic Solids.
 - Added an
   @vdblink::tools::extractIsosurfaceMask() extractIsosurfaceMask@endlink tool
   that generates a mask of the voxels that intersect the implicit surface
@@ -143,6 +145,8 @@ Bug fixes:
   @vdblink::tools::VolumeAdvection VolumeAdvection@endlink.
 - Fix bug in VolumeToMesh::operator() failing to clear its state when exiting early.
   <I>[Contributed by Edward Lam]</I>
+- Fixed bug in openvdb::tools::PointIndexIterator::worldSpaceSearchAndUpdate
+  that resulted in missing point indices.
 - Fixes TestUtil.cc build issues on Windows.
   <I>[Contributed by Edward Lam]</I>
 - Fixed @vdblink::math::isApproxZero() isApproxZero@endlink so that it works correctly
@@ -186,6 +190,7 @@ Houdini:
 - Updated the Rasterize Points SOP with support for frustum transforms,
   sub region masking and orientation logic that matches the native
   Copy SOP's orientation.
+- Improved the Platonic SOP to finally generate the five Paltonic Solids.
 - Added hooks for registering SOP_NodeVDB text callbacks for different
   grid types. <I>[Contributed by Nick&nbsp;Avramoussis]</I>
 - The Resample and Combine SOPs now correctly handle affine transforms

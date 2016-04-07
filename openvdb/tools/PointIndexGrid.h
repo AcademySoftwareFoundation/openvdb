@@ -629,19 +629,12 @@ struct BBoxFilter
 
     void filterVoxel(const Coord&, const IndexT* begin, const IndexT* end)
     {
-        Vec3d xyz;
         PosType vec;
 
         for (; begin < end; ++begin) {
             mPoints.getPos(*begin, vec);
 
-            // world to index cell centered, similar the PointPartitioner tool.
-            xyz = mMap.applyInverseMap(vec);
-            xyz[0] = math::Round(xyz[0]);
-            xyz[1] = math::Round(xyz[1]);
-            xyz[2] = math::Round(xyz[2]);
-
-            if (mRegion.isInside(xyz)) {
+            if (mRegion.isInside(mMap.applyInverseMap(vec))) {
                 mIndices.push_back(*begin);
             }
         }

@@ -42,10 +42,12 @@ struct TestPointIndexGrid: public CppUnit::TestCase
     CPPUNIT_TEST_SUITE(TestPointIndexGrid);
     CPPUNIT_TEST(testPointIndexGrid);
     CPPUNIT_TEST(testPointIndexFilter);
+    CPPUNIT_TEST(testWorldSpaceSearchAndUpdate);
     CPPUNIT_TEST_SUITE_END();
 
     void testPointIndexGrid();
     void testPointIndexFilter();
+    void testWorldSpaceSearchAndUpdate();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestPointIndexGrid);
@@ -290,6 +292,53 @@ TestPointIndexGrid::testPointIndexFilter()
     }
 
     CPPUNIT_ASSERT_DOUBLES_EQUAL(sum, double(points.size()), 1e-6);
+}
+
+
+void
+TestPointIndexGrid::testWorldSpaceSearchAndUpdate()
+{
+    // Create random particles in a cube.
+    openvdb::math::Rand01<> rnd(0);
+
+    const size_t N = 1000000;
+    std::vector<openvdb::Vec3d> pos;
+    pos.reserve(N);
+
+    // Create a box to query points.
+    openvdb::BBoxd wsBBox(openvdb::Vec3d(0.25), openvdb::Vec3d(0.75));
+
+    std::set<size_t> indexListA;
+
+    for (size_t i = 0; i < N; ++i) {
+        openvdb::Vec3d p(rnd(), rnd(), rnd());
+        pos.push_back(p);
+
+        if (wsBBox.isInside(p)) {
+            indexListA.insert(i);
+        }
+    }
+
+    // Create a point index grid
+    const double dx = 0.025;
+    openvdb::math::Transform::Ptr transform = openvdb::math::Transform::createLinearTransform(dx);
+
+    PointList pointArray(pos);
+    openvdb::tools::PointIndexGrid::Ptr pointIndexGrid
+        = openvdb::tools::createPointIndexGrid<openvdb::tools::PointIndexGrid, PointList>(pointArray, *transform);
+
+    // Search for points within the box.
+    openvdb::tools::PointIndexGrid::ConstAccessor acc = pointIndexGrid->getConstAccessor();
+
+    openvdb::tools::PointIndexIterator<openvdb::tools::PointIndexTree> pointIndexIter;
+    pointIndexIter.worldSpaceSearchAndUpdate<PointList>(wsBBox, acc, pointArray, pointIndexGrid->transform());
+
+    std::set<size_t> indexListB;
+    for (; pointIndexIter; ++pointIndexIter) {
+        indexListB.insert(*pointIndexIter);
+    }
+
+    CPPUNIT_ASSERT_EQUAL(indexListA.size(), indexListB.size());
 }
 
 

@@ -350,6 +350,7 @@ INCLUDE_NAMES := \
     tools/LevelSetFracture.h \
     tools/LevelSetMeasure.h \
     tools/LevelSetMorph.h \
+    tools/LevelSetPlatonic.h \
     tools/LevelSetRebuild.h \
     tools/LevelSetSphere.h \
     tools/LevelSetTracker.h \

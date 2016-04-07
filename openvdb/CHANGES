@@ -41,6 +41,8 @@ Version 3.2.0 - In development
     - Added tools::topologyToLevelSet(), which generates a level set from the
       implicit boundary between active and inactive voxels in an input grid
       of arbitrary type.
+    - Added tools::LevelSetPlatonic (and specializations) that generates
+      narrow-band level sets of the five Platonic Solids.
     - Added tools::extractIsosurfaceMask(), which generates a mask of
       the voxels that intersect the implicit surface with a given isovalue.
     - Added tree::LeafManager::getPreFixSum() for user-managed external buffers.
@@ -106,6 +108,8 @@ Version 3.2.0 - In development
     - Fixed a memory overallocation issue in tools::VolumeAdvect.
     - Fix bug in VolumeToMesh::operator() failing to clear its state when exiting early.
       [Contributed by Edward Lam]
+    - Fixed bug in openvdb::tools::PointIndexIterator::worldSpaceSearchAndUpdate
+      that resulted in missing point indices.
     - Fixes TestUtil.cc build issues on Windows.
       [Contributed by Edward Lam]
     - Fixed isApproxZero() so that it works correctly when tolerance is zero.
@@ -142,6 +146,7 @@ Version 3.2.0 - In development
     - Updated the Rasterize Points SOP with support for frustum transforms,
       sub region masking and orientation logic that matches the native
       Copy SOP's orientation.
+    - Improved the Platonic SOP to finally generate the five Paltonic Solids.
     - Added hooks for registering SOP_NodeVDB text callbacks for different
       grid types.
       [Contributed by Nick Avramoussis]
