@@ -425,6 +425,15 @@ TestAttributeArray::testAttributeArray()
 
         CPPUNIT_ASSERT(attr == attr2);
 
+        attr.set(1, 5);
+
+        CPPUNIT_ASSERT(!attr.compact());
+        CPPUNIT_ASSERT(!attr.isUniform());
+
+        CPPUNIT_ASSERT_EQUAL(attr.get(0), 10);
+        CPPUNIT_ASSERT_EQUAL(attr.get(1), 5);
+        CPPUNIT_ASSERT_EQUAL(attr.get(2), 0);
+
         attr.collapse(5);
         CPPUNIT_ASSERT(attr.isUniform());
         CPPUNIT_ASSERT_EQUAL(uniformMemUsage, attr.memUsage());
@@ -436,10 +445,6 @@ TestAttributeArray::testAttributeArray()
         attr.expand(/*fill=*/false);
         CPPUNIT_ASSERT(!attr.isUniform());
         CPPUNIT_ASSERT_EQUAL(expandedMemUsage, attr.memUsage());
-
-        for (unsigned i = 0; i < unsigned(count); ++i) {
-            CPPUNIT_ASSERT(attr.get(i) != 5);
-        }
 
         attr.collapse(5);
 
@@ -453,6 +458,12 @@ TestAttributeArray::testAttributeArray()
         for (unsigned i = 0; i < unsigned(count); ++i) {
             CPPUNIT_ASSERT_EQUAL(attr.get(i), 5);
         }
+
+        CPPUNIT_ASSERT(attr.compact());
+        CPPUNIT_ASSERT(attr.isUniform());
+        CPPUNIT_ASSERT(attr.compact());
+
+        attr.expand();
 
         attr.fill(10);
         CPPUNIT_ASSERT(!attr.isUniform());
@@ -738,6 +749,11 @@ TestAttributeArray::testAttributeHandle()
         for (unsigned i = 0; i < unsigned(count); ++i) {
             CPPUNIT_ASSERT_EQUAL(handle.get(i), 5);
         }
+
+        CPPUNIT_ASSERT(handle.compact());
+        CPPUNIT_ASSERT(handle.isUniform());
+
+        handle.expand();
 
         handle.fill(10);
         CPPUNIT_ASSERT(!handle.isUniform());

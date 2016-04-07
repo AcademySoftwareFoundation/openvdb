@@ -380,6 +380,7 @@ TestPointAttribute::testBloscCompress()
     PointDataTree::LeafIter leafIter2 = ++tree.beginLeaf();
 
     { // append an attribute, check descriptors are as expected
+        appendAttribute(tree, Descriptor::NameAndType("compact", AttributeI::attributeType()));
         appendAttribute(tree, Descriptor::NameAndType("id", AttributeI::attributeType()));
         appendAttribute(tree, Descriptor::NameAndType("id2", AttributeI::attributeType()));
     }
@@ -387,6 +388,7 @@ TestPointAttribute::testBloscCompress()
     typedef AttributeWriteHandle<int> AttributeHandleRWI;
 
     { // set some id values (leaf 1)
+        AttributeHandleRWI handleCompact(leafIter->attributeArray("compact"));
         AttributeHandleRWI handleId(leafIter->attributeArray("id"));
         AttributeHandleRWI handleId2(leafIter->attributeArray("id2"));
 
@@ -395,12 +397,14 @@ TestPointAttribute::testBloscCompress()
         CPPUNIT_ASSERT_EQUAL(size, 102);
 
         for (int i = 0; i < size; i++) {
+            handleCompact.set(i, 5);
             handleId.set(i, i);
             handleId2.set(i, i);
         }
     }
 
     { // set some id values (leaf 2)
+        AttributeHandleRWI handleCompact(leafIter2->attributeArray("compact"));
         AttributeHandleRWI handleId(leafIter2->attributeArray("id"));
         AttributeHandleRWI handleId2(leafIter2->attributeArray("id2"));
 
@@ -409,10 +413,16 @@ TestPointAttribute::testBloscCompress()
         CPPUNIT_ASSERT_EQUAL(size, 102);
 
         for (int i = 0; i < size; i++) {
+            handleCompact.set(i, 10);
             handleId.set(i, i);
             handleId2.set(i, i);
         }
     }
+
+    compactAttributes(tree);
+
+    CPPUNIT_ASSERT(leafIter->attributeArray("compact").isUniform());
+    CPPUNIT_ASSERT(leafIter2->attributeArray("compact").isUniform());
 
     bloscCompressAttribute(tree, "id");
 

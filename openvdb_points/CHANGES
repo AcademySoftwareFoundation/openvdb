@@ -46,6 +46,7 @@ Version 0.2.0 - In Development
       allocate functionality now replaced by an expand method.
     - Added support for attribute default values using Metadata in the
       Descriptor and extended the append and conversion methods.
+    - Added ability to compact attributes if all the values are the same.
 
     Improvements:
     - Introduced continuous integration through Travis, code coverage through
@@ -86,7 +87,7 @@ Version 0.2.0 - In Development
     - GR Primitive now draws wireframe leaf bounding boxes for out-of-core leaf
       nodes (to avoid implicit loading when using the viewport).
     - OpenVDB Points SOP no longer expands uniform values on conversion to
-      Houdini points.
+      Houdini points and automatically compacts values on conversion back.
     - Blosc compression toggle added to OpenVDB Points SOP for conversion from
       Houdini points.
     - Switched to single-replace menu for OpenVDB Points SOP to allow more

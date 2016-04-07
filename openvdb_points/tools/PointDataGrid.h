@@ -216,6 +216,8 @@ public:
     /// @param expected Existing descriptor is expected to match this parameter.
     /// @param replacement New descriptor to replace the existing one.
     void renameAttributes(const Descriptor& expected, Descriptor::Ptr& replacement);
+    /// @brief Compact all attributes in attribute set.
+    void compactAttributes();
 
     /// @brief Swap the underlying attribute set with the given @a attributeSet.
     /// This leaf will assume ownership of the given attribute set. The descriptors must
@@ -586,6 +588,16 @@ inline void
 PointDataLeafNode<T, Log2Dim>::renameAttributes(const Descriptor& expected, Descriptor::Ptr& replacement)
 {
     mAttributeSet->renameAttributes(expected, replacement);
+}
+
+template<typename T, Index Log2Dim>
+inline void
+PointDataLeafNode<T, Log2Dim>::compactAttributes()
+{
+    for (size_t i = 0; i < mAttributeSet->size(); i++) {
+        AttributeArray* array = mAttributeSet->get(i);
+        array->compact();
+    }
 }
 
 template<typename T, Index Log2Dim>

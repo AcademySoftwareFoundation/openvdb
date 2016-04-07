@@ -283,6 +283,8 @@ public:
     virtual void expand(bool fill = true) = 0;
     /// Replace the existing array with a uniform zero value.
     virtual void collapse() = 0;
+    /// Compact the existing array to become uniform if all values are identical
+    virtual bool compact() = 0;
 
     /// Return @c true if this array is compressed.
     bool isCompressed() const { return mCompressedBytes != 0; }
@@ -465,13 +467,14 @@ public:
 
     /// Return @c true if this array is stored as a single uniform value.
     virtual bool isUniform() const { return mIsUniform; }
-
     /// @brief  Replace the single value storage with an array of length size().
     /// @note   Non-uniform attributes are unchanged.
     /// @param  fill toggle to initialize the array elements with the pre-expanded value.
     virtual void expand(bool fill = true);
     /// Replace the existing array with a uniform zero value.
     virtual void collapse();
+    /// Compact the existing array to become uniform if all values are identical
+    virtual bool compact();
 
     /// Replace the existing array with the given uniform value.
     void collapse(const ValueType& uniformValue);
@@ -587,6 +590,9 @@ public:
     /// Replace the existing array with a uniform value (zero if none provided).
     void collapse();
     void collapse(const T& uniformValue);
+
+    /// Compact the existing array to become uniform if all values are identical
+    bool compact();
 
     /// @brief Fill the existing array with the given value.
     /// @note Identical to collapse() except a non-uniform array will not become uniform.
@@ -1045,6 +1051,23 @@ TypedAttributeArray<ValueType_, Codec_>::expand(bool fill)
     if (fill) {
         for (size_t i = 0; i < mSize; ++i)  mData[i] = val;
     }
+}
+
+
+template<typename ValueType_, typename Codec_>
+bool
+TypedAttributeArray<ValueType_, Codec_>::compact()
+{
+    if (mIsUniform)     return true;
+
+    // compaction is not possible if any values are different
+    const ValueType_ val = this->get(0);
+    for (size_t i = 1; i < size(); i++) {
+        if (this->get(i) != val)    return false;
+    }
+
+    this->collapse(this->get(0));
+    return true;
 }
 
 
@@ -1516,6 +1539,12 @@ template <typename T>
 void AttributeWriteHandle<T>::collapse()
 {
     const_cast<AttributeArray*>(this->mArray)->collapse();
+}
+
+template <typename T>
+bool AttributeWriteHandle<T>::compact()
+{
+    return const_cast<AttributeArray*>(this->mArray)->compact();
 }
 
 template <typename T>

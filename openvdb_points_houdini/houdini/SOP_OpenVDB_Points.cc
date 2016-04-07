@@ -1532,6 +1532,10 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
             populateAttributeFromHoudini(tree, indexTree, nameAndType.name, nameAndType.type, attribute, OffsetListPtr());
         }
 
+        // Attempt to compact attributes
+
+        compactAttributes(tree);
+
         // Apply blosc compression to attributes
 
         for (AttributeInfoVec::const_iterator   it = attributes.begin(),

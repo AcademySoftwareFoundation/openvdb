@@ -125,6 +125,12 @@ inline void renameAttribute(PointDataTree& tree,
                             const Name& oldName,
                             const Name& newName);
 
+/// @brief Compact attributes in a VDB tree (if possible).
+///
+/// @param tree          the PointDataTree.
+template <typename PointDataTree>
+inline void compactAttributes(PointDataTree& tree);
+
 /// @brief Apply Blosc compression to one attribute in the VDB tree.
 ///
 /// @param tree          the PointDataTree.
@@ -219,6 +225,25 @@ struct DropAttributesOp {
     const Indices&                  mIndices;
     AttributeSet::DescriptorPtr&    mDescriptor;
 }; // class DropAttributesOp
+
+
+////////////////////////////////////////
+
+
+template<typename PointDataTreeType>
+struct CompactAttributesOp {
+
+    typedef typename tree::LeafManager<PointDataTreeType>       LeafManagerT;
+    typedef typename LeafManagerT::LeafRange                    LeafRangeT;
+
+    CompactAttributesOp() { }
+
+    void operator()(const LeafRangeT& range) const {
+        for (typename LeafRangeT::Iterator leaf=range.begin(); leaf; ++leaf) {
+            leaf->compactAttributes();
+        }
+    }
+}; // class CompactAttributesOp
 
 
 ////////////////////////////////////////
@@ -451,6 +476,23 @@ inline void renameAttribute(PointDataTree& tree,
     oldNames.push_back(oldName);
     newNames.push_back(newName);
     renameAttributes(tree, oldNames, newNames);
+}
+
+
+////////////////////////////////////////
+
+
+template <typename PointDataTree>
+inline void compactAttributes(PointDataTree& tree)
+{
+    typedef typename tree::LeafManager<PointDataTree>       LeafManagerT;
+
+    using point_attribute_internal::CompactAttributesOp;
+
+    typename PointDataTree::LeafIter iter = tree.beginLeaf();
+    if (!iter)  return;
+
+    tbb::parallel_for(LeafManagerT(tree).leafRange(), CompactAttributesOp<PointDataTree>());
 }
 
 
