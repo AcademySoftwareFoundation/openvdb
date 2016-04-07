@@ -95,6 +95,11 @@ TestPointGroup::testAppendDrop()
 
     const AttributeSet& attributeSet4 = leafIter->attributeSet();
 
+    { // throw on append or drop an empty group
+        CPPUNIT_ASSERT_THROW(appendGroup(tree, ""), openvdb::KeyError);
+        CPPUNIT_ASSERT_THROW(dropGroup(tree, ""), openvdb::KeyError);
+    }
+
     { // append a group
         appendGroup(tree, "test");
 

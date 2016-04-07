@@ -348,6 +348,10 @@ inline void appendGroup(PointDataTree& tree, const Name& group)
     using point_attribute_internal::AppendAttributeOp;
     using point_group_internal::GroupInfo;
 
+    if (group.empty()) {
+        OPENVDB_THROW(KeyError, "Cannot use an empty group name as a key.");
+    }
+
     typename PointDataTree::LeafCIter iter = tree.cbeginLeaf();
 
     if (!iter)  return;
@@ -415,6 +419,10 @@ template <typename PointDataTree>
 inline void dropGroup(PointDataTree& tree, const Name& group, const bool compact)
 {
     typedef AttributeSet::Descriptor                              Descriptor;
+
+    if (group.empty()) {
+        OPENVDB_THROW(KeyError, "Cannot use an empty group name as a key.");
+    }
 
     typename PointDataTree::LeafCIter iter = tree.cbeginLeaf();
 

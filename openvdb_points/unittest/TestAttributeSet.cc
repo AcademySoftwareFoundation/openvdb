@@ -262,6 +262,12 @@ TestAttributeSet::testAttributeSetDescriptor()
     { //  Test hasGroup(), setGroup(), dropGroup(), clearGroups()
         Descriptor descr;
 
+        // ensure all methods throw if an empty key is used
+
+        CPPUNIT_ASSERT_THROW(descr.hasGroup(""), openvdb::KeyError);
+        CPPUNIT_ASSERT_THROW(descr.setGroup("", 0), openvdb::KeyError);
+        CPPUNIT_ASSERT_THROW(descr.dropGroup(""), openvdb::KeyError);
+
         CPPUNIT_ASSERT(!descr.hasGroup("test1"));
 
         descr.setGroup("test1", 1);
