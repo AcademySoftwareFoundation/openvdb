@@ -336,8 +336,9 @@ public:
     GroupNotFilter(const GroupHandle& handle)
         : mFilter(handle) { }
 
-    bool valid(const Index32 offset) const {
-        return !mFilter.valid(offset);
+    template <typename IterT>
+    bool valid(const IterT& iter) const {
+        return !mFilter.valid(iter);
     }
 private:
     const GroupFilter mFilter;

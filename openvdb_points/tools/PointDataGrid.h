@@ -814,8 +814,8 @@ inline Index64
 PointDataLeafNode<T, Log2Dim>::groupPointCount(const Name& groupName) const
 {
     IndexIter indexIter = this->beginIndexAll();
-    GroupFilterFromLeaf::Filter filter(GroupFilterFromLeaf(groupName).fromLeaf(*this));
-    FilterIndexIter<IndexIter, GroupFilterFromLeaf::Filter> filterIndexIter(indexIter, filter);
+    GroupFilter filter(GroupFilter::create(*this, GroupFilter::Data(groupName)));
+    FilterIndexIter<IndexIter, GroupFilter> filterIndexIter(indexIter, filter);
     return iterCount(filterIndexIter);
 }
 

@@ -304,8 +304,9 @@ TestIndexIterator::testValueIndexIterator()
 
 struct EvenIndexFilter
 {
-    bool valid(const Index32 offset) const {
-        return (offset % 2) == 0;
+    template <typename IterT>
+    bool valid(const IterT& iter) const {
+        return ((*iter) % 2) == 0;
     }
 };
 
@@ -313,11 +314,20 @@ struct EvenIndexFilter
 struct OddIndexFilter
 {
     OddIndexFilter() : mFilter() { }
-    bool valid(const Index32 offset) const {
-        return !mFilter.valid(offset);
+    template <typename IterT>
+    bool valid(const IterT& iter) const {
+        return !mFilter.valid(iter);
     }
 private:
     EvenIndexFilter mFilter;
+};
+
+
+struct ConstantIter
+{
+    ConstantIter(const int _value) : value(_value) { }
+    int operator*() const { return value; }
+    const int value;
 };
 
 
@@ -344,8 +354,8 @@ TestIndexIterator::testFilterIndexIterator()
         CPPUNIT_ASSERT(!iter.next());
 
         CPPUNIT_ASSERT_EQUAL(iter.indexIter().end(), Index32(5));
-        CPPUNIT_ASSERT_EQUAL(filter.valid(1), iter.filter().valid(1));
-        CPPUNIT_ASSERT_EQUAL(filter.valid(2), iter.filter().valid(2));
+        CPPUNIT_ASSERT_EQUAL(filter.valid(ConstantIter(1)), iter.filter().valid(ConstantIter(1)));
+        CPPUNIT_ASSERT_EQUAL(filter.valid(ConstantIter(2)), iter.filter().valid(ConstantIter(2)));
     }
 
     { // index iterator with odd filter

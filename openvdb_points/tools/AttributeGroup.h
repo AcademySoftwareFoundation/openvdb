@@ -167,37 +167,29 @@ public:
 class GroupFilter
 {
 public:
+    struct Data
+    {
+        Data(const Name& _attribute)
+            : attribute(_attribute) { }
+        const Name attribute;
+    };
+
     GroupFilter(const GroupHandle& handle)
         : mHandle(handle) { }
 
-    bool valid(const Index32 offset) const {
-        return mHandle.get(offset);
+    template <typename LeafT>
+    static GroupFilter create(const LeafT& leaf, const Data& data) {
+        return GroupFilter(leaf.groupHandle(data.attribute));
+    }
+
+    template <typename IterT>
+    bool valid(const IterT& iter) const {
+        return mHandle.get(*iter);
     }
 
 private:
     const GroupHandle mHandle;
 }; // class GroupFilter
-
-
-////////////////////////////////////////
-
-
-class GroupFilterFromLeaf
-{
-public:
-    typedef GroupFilter Filter;
-
-    GroupFilterFromLeaf(const Name& name)
-        : mName(name) { }
-
-    template <typename LeafT>
-    Filter fromLeaf(const LeafT& leaf) const {
-        return Filter(leaf.groupHandle(mName));
-    }
-
-private:
-    const Name mName;
-}; // GroupFilterFromLeaf
 
 
 ////////////////////////////////////////

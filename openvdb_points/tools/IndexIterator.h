@@ -250,7 +250,7 @@ public:
     /// @brief Reset the begining and end of the iterator.
     void reset(Index32 begin, Index32 end) {
         mIterator.reset(begin, end);
-        while (mIterator.test() && !mFilter.valid(*mIterator)) {
+        while (mIterator.test() && !mFilter.template valid<IteratorT>(mIterator)) {
             ++mIterator;
         }
     }
@@ -267,7 +267,7 @@ public:
     FilterIndexIter& operator++() {
         while (true) {
             ++mIterator;
-            if (!mIterator.test() || mFilter.valid(*mIterator)) {
+            if (!mIterator.test() || mFilter.template valid<IteratorT>(mIterator)) {
                 break;
             }
         }

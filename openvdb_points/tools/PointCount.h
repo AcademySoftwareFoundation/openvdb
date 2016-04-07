@@ -107,18 +107,18 @@ namespace point_count_internal {
 
 template <  typename PointDataTreeT,
             typename ValueIterT,
-            typename FilterFromLeafT>
+            typename FilterT>
 struct PointCountOp
 {
     typedef typename tree::LeafManager<const PointDataTreeT>    LeafManagerT;
     typedef IndexIterTraits<PointDataTreeT, ValueIterT>         IndexIteratorFromLeafT;
     typedef typename IndexIteratorFromLeafT::Iterator           IndexIterator;
-    typedef typename FilterFromLeafT::Filter                    Filter;
-    typedef FilterIndexIter<IndexIterator, Filter>              Iterator;
+    typedef typename FilterT::Data                              FilterDataT;
+    typedef FilterIndexIter<IndexIterator, FilterT>             Iterator;
 
-    PointCountOp(const FilterFromLeafT& filterFromLeaf,
+    PointCountOp(const FilterDataT& filterData,
                  const bool inCoreOnly = false)
-        : mFilterFromLeaf(filterFromLeaf)
+        : mFilterData(filterData)
         , mInCoreOnly(inCoreOnly) { }
 
     Index64 operator()(const typename LeafManagerT::LeafRange& range, Index64 size) const {
@@ -128,7 +128,7 @@ struct PointCountOp
             if (mInCoreOnly && leaf->buffer().isOutOfCore())     continue;
 #endif
             IndexIterator indexIterator(IndexIteratorFromLeafT::begin(*leaf));
-            Filter filter(mFilterFromLeaf.fromLeaf(*leaf));
+            FilterT filter(FilterT::create(*leaf, mFilterData));
             Iterator iter(indexIterator, filter);
             size += iterCount(iter);
         }
@@ -141,51 +141,51 @@ struct PointCountOp
     }
 
 private:
-    const FilterFromLeafT& mFilterFromLeaf;
+    const FilterDataT& mFilterData;
     const bool mInCoreOnly;
 }; // struct PointCountOp
 
 
-template <typename PointDataTreeT, typename FilterFromLeafT, typename ValueIterT>
+template <typename PointDataTreeT, typename FilterT, typename ValueIterT>
 Index64 threadedFilterPointCount(   const PointDataTreeT& tree,
-                                    const FilterFromLeafT& filterFromLeaf,
+                                    const typename FilterT::Data& filter,
                                     const bool inCoreOnly = false)
 {
-    typedef point_count_internal::PointCountOp< PointDataTreeT, ValueIterT, FilterFromLeafT> PointCountOp;
+    typedef point_count_internal::PointCountOp< PointDataTreeT, ValueIterT, FilterT> PointCountOp;
 
     typename tree::LeafManager<const PointDataTreeT> leafManager(tree);
-    const PointCountOp pointCountOp(filterFromLeaf, inCoreOnly);
+    const PointCountOp pointCountOp(filter, inCoreOnly);
     return tbb::parallel_reduce(leafManager.leafRange(), Index64(0), pointCountOp, PointCountOp::join);
 }
 
 
-template <typename PointDataTreeT, typename FilterFromLeafT>
+template <typename PointDataTreeT, typename FilterT>
 Index64 filterPointCount(const PointDataTreeT& tree,
-                         const FilterFromLeafT& filterFromLeaf,
+                         const typename FilterT::Data& filter,
                          const bool inCoreOnly = false)
 {
     typedef typename PointDataTreeT::LeafNodeType::ValueAllCIter ValueIterT;
-    return threadedFilterPointCount<  PointDataTreeT, FilterFromLeafT, ValueIterT>(tree, filterFromLeaf, inCoreOnly);
+    return threadedFilterPointCount<  PointDataTreeT, FilterT, ValueIterT>(tree, filter, inCoreOnly);
 }
 
 
-template <typename PointDataTreeT, typename FilterFromLeafT>
+template <typename PointDataTreeT, typename FilterT>
 Index64 filterActivePointCount( const PointDataTreeT& tree,
-                                const FilterFromLeafT& filterFromLeaf,
+                                const typename FilterT::Data& filter,
                                 const bool inCoreOnly = false)
 {
     typedef typename PointDataTreeT::LeafNodeType::ValueOnCIter ValueIterT;
-    return threadedFilterPointCount<  PointDataTreeT, FilterFromLeafT, ValueIterT>(tree, filterFromLeaf, inCoreOnly);
+    return threadedFilterPointCount<  PointDataTreeT, FilterT, ValueIterT>(tree, filter, inCoreOnly);
 }
 
 
-template <typename PointDataTreeT, typename FilterFromLeafT>
+template <typename PointDataTreeT, typename FilterT>
 Index64 filterInactivePointCount(   const PointDataTreeT& tree,
-                                    const FilterFromLeafT& filterFromLeaf,
+                                    const typename FilterT::Data& filter,
                                     const bool inCoreOnly = false)
 {
     typedef typename PointDataTreeT::LeafNodeType::ValueOffCIter ValueIterT;
-    return threadedFilterPointCount<  PointDataTreeT, FilterFromLeafT, ValueIterT>(tree, filterFromLeaf, inCoreOnly);
+    return threadedFilterPointCount<  PointDataTreeT, FilterT, ValueIterT>(tree, filter, inCoreOnly);
 }
 
 
@@ -240,24 +240,24 @@ Index64 inactivePointCount(const PointDataTreeT& tree, const bool inCoreOnly)
 template <typename PointDataTreeT>
 Index64 groupPointCount(const PointDataTreeT& tree, const Name& name, const bool inCoreOnly)
 {
-    GroupFilterFromLeaf filterFromLeaf(name);
-    return point_count_internal::filterPointCount(tree, filterFromLeaf, inCoreOnly);
+    GroupFilter::Data groupFilterData(name);
+    return point_count_internal::filterPointCount<PointDataTreeT, GroupFilter>(tree, groupFilterData, inCoreOnly);
 }
 
 
 template <typename PointDataTreeT>
 Index64 activeGroupPointCount(const PointDataTreeT& tree, const Name& name, const bool inCoreOnly)
 {
-    GroupFilterFromLeaf filterFromLeaf(name);
-    return point_count_internal::filterActivePointCount(tree, filterFromLeaf, inCoreOnly);
+    GroupFilter::Data groupFilterData(name);
+    return point_count_internal::filterActivePointCount<PointDataTreeT, GroupFilter>(tree, groupFilterData, inCoreOnly);
 }
 
 
 template <typename PointDataTreeT>
 Index64 inactiveGroupPointCount(const PointDataTreeT& tree, const Name& name, const bool inCoreOnly)
 {
-    GroupFilterFromLeaf filterFromLeaf(name);
-    return point_count_internal::filterInactivePointCount(tree, filterFromLeaf, inCoreOnly);
+    GroupFilter::Data groupFilterData(name);
+    return point_count_internal::filterInactivePointCount<PointDataTreeT, GroupFilter>(tree, groupFilterData, inCoreOnly);
 }
 
 
