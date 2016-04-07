@@ -246,6 +246,11 @@ TestAttributeGroup::testAttributeGroupHandle()
     CPPUNIT_ASSERT_EQUAL(writeHandle3.get(1), true);
     CPPUNIT_ASSERT_EQUAL(writeHandle6.get(1), false);
 
+    CPPUNIT_ASSERT(writeHandle3.collapse(false));
+
+    CPPUNIT_ASSERT(writeHandle3.isUniform());
+    CPPUNIT_ASSERT_EQUAL(writeHandle3.get(1), false);
+
     attr.fill(0);
 
     writeHandle3.set(1, true);
@@ -262,6 +267,12 @@ TestAttributeGroup::testAttributeGroupHandle()
 
     CPPUNIT_ASSERT_EQUAL(writeHandle3.get(1), true);
     CPPUNIT_ASSERT_EQUAL(writeHandle6.get(1), false);
+
+    writeHandle6.set(2, true);
+
+    CPPUNIT_ASSERT(!writeHandle3.collapse(false));
+
+    CPPUNIT_ASSERT(!writeHandle3.isUniform());
 
     attr.fill(0);
 
