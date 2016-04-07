@@ -232,6 +232,39 @@ TestAttributeGroup::testAttributeGroupHandle()
     GroupWriteHandle writeHandle3(attr, 3);
     GroupWriteHandle writeHandle6(attr, 6);
 
+    // test collapse
+
+    CPPUNIT_ASSERT_EQUAL(writeHandle3.get(1), false);
+    CPPUNIT_ASSERT_EQUAL(writeHandle6.get(1), false);
+
+    CPPUNIT_ASSERT(writeHandle3.collapse(true));
+
+    CPPUNIT_ASSERT(attr.isUniform());
+    CPPUNIT_ASSERT(writeHandle3.isUniform());
+    CPPUNIT_ASSERT(writeHandle6.isUniform());
+
+    CPPUNIT_ASSERT_EQUAL(writeHandle3.get(1), true);
+    CPPUNIT_ASSERT_EQUAL(writeHandle6.get(1), false);
+
+    attr.fill(0);
+
+    writeHandle3.set(1, true);
+
+    CPPUNIT_ASSERT(!attr.isUniform());
+    CPPUNIT_ASSERT(!writeHandle3.isUniform());
+    CPPUNIT_ASSERT(!writeHandle6.isUniform());
+
+    CPPUNIT_ASSERT(!writeHandle3.collapse(true));
+
+    CPPUNIT_ASSERT(!attr.isUniform());
+    CPPUNIT_ASSERT(!writeHandle3.isUniform());
+    CPPUNIT_ASSERT(!writeHandle6.isUniform());
+
+    CPPUNIT_ASSERT_EQUAL(writeHandle3.get(1), true);
+    CPPUNIT_ASSERT_EQUAL(writeHandle6.get(1), false);
+
+    attr.fill(0);
+
     writeHandle3.set(1, true);
     writeHandle6.set(2, true);
     writeHandle3.set(3, true);

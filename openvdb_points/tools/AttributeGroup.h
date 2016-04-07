@@ -147,6 +147,16 @@ public:
 
     void set(Index n, bool on);
 
+    /// @brief Set membership for the whole array and attempt to collapse
+    ///
+    /// @param on True or false for inclusion in group
+    ///
+    /// @note This method guarantees that all attributes will have group membership
+    /// changed according to the input bool, however compaction will not be performed
+    /// if other groups that share the same underlying array are non-uniform.
+    /// The return value indicates if the group array ends up being uniform.
+    bool collapse(bool on);
+
 }; // class GroupWriteHandle
 
 

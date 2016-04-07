@@ -118,6 +118,27 @@ void GroupWriteHandle::set(Index n, bool on)
 }
 
 
+bool GroupWriteHandle::collapse(bool on)
+{
+    GroupAttributeArray& array(const_cast<GroupAttributeArray&>(mArray));
+
+    array.compact();
+
+    if (this->isUniform()) {
+        if (on)     array.collapse(array.get(0) | mBitMask);
+        else        array.collapse(array.get(0) & ~mBitMask);
+        return true;
+    }
+
+    for (size_t i = 0; i < array.size(); i++) {
+        if (on)     array.set(i, array.get(i) | mBitMask);
+        else        array.set(i, array.get(i) & ~mBitMask);
+    }
+
+    return false;
+}
+
+
 ////////////////////////////////////////
 
 
