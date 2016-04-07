@@ -239,6 +239,7 @@ INCLUDE_NAMES := \
     tools/AttributeArray.h \
     tools/AttributeGroup.h \
     tools/AttributeSet.h \
+    tools/IndexFilter.h \
     tools/IndexIterator.h \
     tools/PointAttribute.h \
     tools/PointDataGrid.h \
@@ -263,6 +264,7 @@ UNITTEST_INCLUDE_NAMES := \
 
 UNITTEST_SRC_NAMES := \
     unittest/main.cc \
+    unittest/TestIndexFilter.cc \
     unittest/TestIndexIterator.cc \
     unittest/TestAttributeArray.cc \
     unittest/TestAttributeSet.cc \
