@@ -152,6 +152,20 @@ TestPointGroup::testAppendDrop()
         CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().groupMap().size(), size_t(0));
     }
 
+    { // set group membership
+        appendGroup(tree, "test");
+
+        setGroup(tree, "test", true);
+
+        CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "test"), Index64(4));
+
+        setGroup(tree, "test", false);
+
+        CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "test"), Index64(0));
+
+        dropGroup(tree, "test");
+    }
+
     { // drop all groups
         appendGroup(tree, "test");
         appendGroup(tree, "test2");

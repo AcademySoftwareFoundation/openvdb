@@ -42,7 +42,7 @@ New features:
   groups and GroupFilters for attribute filtering.
 - Introduced index iterators to provide consistent array, value and filtered
   iteration in the style of ValueOnCIter.
-- Added ability to append, drop and compact groups in a @vdblink::tools::PointDataTree@endlink.
+- Added ability to append, drop, set and compact groups in a @vdblink::tools::PointDataTree@endlink.
 - Added an explicit const attribute array getter to @vdblink::tools::PointDataLeafNode@endlink.
 - Added uniform value support in AttributeHandles.
 - Introduced unsafe get/set/load methods for attribute data to avoid

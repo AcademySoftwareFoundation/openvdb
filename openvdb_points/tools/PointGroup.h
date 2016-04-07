@@ -158,6 +158,36 @@ struct CopyGroupOp {
 };
 
 
+/// Set membership on or off for the specified group
+template <typename PointDataTree, bool Member>
+struct SetGroupOp
+{
+    typedef typename tree::LeafManager<PointDataTree>   LeafManagerT;
+    typedef AttributeSet::Descriptor::GroupIndex        GroupIndex;
+
+    SetGroupOp(const AttributeSet::Descriptor::GroupIndex& index)
+        : mIndex(index) { }
+
+    void operator()(const typename LeafManagerT::LeafRange& range) const
+    {
+        for (typename LeafManagerT::LeafRange::Iterator leaf=range.begin(); leaf; ++leaf) {
+
+            // obtain the group attribute array
+
+            GroupWriteHandle group(leaf->groupWriteHandle(mIndex));
+
+            // set the group value
+
+            group.collapse(Member);
+        }
+    }
+
+    //////////
+
+    const GroupIndex        mIndex;
+}; // struct SetGroupOp
+
+
 template <typename PointDataTree, typename PointIndexTree, bool Remove>
 struct SetGroupFromIndexOp
 {
@@ -589,6 +619,39 @@ inline void setGroup(   PointDataTree& tree,
                             PointIndexTree, true> set(indexTree, membership, index);
         tbb::parallel_for(LeafManagerT(tree).leafRange(), set);
     }
+}
+
+
+////////////////////////////////////////
+
+
+template <typename PointDataTree>
+inline void setGroup(   PointDataTree& tree,
+                        const Name& group,
+                        const bool member = true)
+{
+    typedef AttributeSet::Descriptor Descriptor;
+    typedef typename tree::template LeafManager<PointDataTree> LeafManagerT;
+
+    using point_group_internal::SetGroupOp;
+
+    typename PointDataTree::LeafCIter iter = tree.cbeginLeaf();
+
+    if (!iter)  return;
+
+    const AttributeSet& attributeSet = iter->attributeSet();
+    const Descriptor& descriptor = attributeSet.descriptor();
+
+    if (!descriptor.hasGroup(group)) {
+        OPENVDB_THROW(LookupError, "Group must exist on Tree before defining membership.");
+    }
+
+    const Descriptor::GroupIndex index = attributeSet.groupIndex(group);
+
+    // set membership based on member variable
+
+    if (member)     tbb::parallel_for(LeafManagerT(tree).leafRange(), SetGroupOp<PointDataTree, true>(index));
+    else            tbb::parallel_for(LeafManagerT(tree).leafRange(), SetGroupOp<PointDataTree, false>(index));
 }
 
 
