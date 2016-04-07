@@ -79,6 +79,14 @@ TestIndexIterator::testIndexIterator()
         CPPUNIT_ASSERT(!iter.next());
     }
 
+    { // throw on attempt to retrieve coord
+        IndexIter iter(0, 3);
+
+        CPPUNIT_ASSERT_THROW(iter.getCoord(), openvdb::RuntimeError);
+        openvdb::Coord xyz;
+        CPPUNIT_ASSERT_THROW(iter.getCoord(xyz), openvdb::RuntimeError);
+    }
+
     { // index iterator next
         IndexIter iter(0, 3);
 

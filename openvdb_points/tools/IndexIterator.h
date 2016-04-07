@@ -104,6 +104,11 @@ public:
     inline bool next() { this->operator++(); return this->test(); }
     inline bool increment() { this->next(); return this->test(); }
 
+    /// Throw an error as Coord methods are not available on this iterator
+    inline Coord getCoord() const { OPENVDB_THROW(RuntimeError, "IndexIter does not provide a valid Coord, use a ValueIndexIter instead."); }
+    /// Throw an error as Coord methods are not available on this iterator
+    inline void getCoord(Coord&) const { OPENVDB_THROW(RuntimeError, "IndexIter does not provide a valid Coord, use a ValueIndexIter instead."); }
+
     /// @brief Equality operators
     inline bool operator==(const IndexIter& other) const { return mItem == other.mItem; }
     inline bool operator!=(const IndexIter& other) const { return !this->operator==(other); }
