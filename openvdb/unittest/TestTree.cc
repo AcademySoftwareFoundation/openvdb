@@ -1700,16 +1700,16 @@ TestTree::testTopologyIntersection()
     }
 
     {// Test based on boolean grids
-        openvdb::CoordBBox big(  openvdb::Coord(-9), openvdb::Coord(10));
-        openvdb::CoordBBox small(openvdb::Coord( 1), openvdb::Coord(10));
+        openvdb::CoordBBox bigBox(  openvdb::Coord(-9), openvdb::Coord(10));
+        openvdb::CoordBBox smallBox(openvdb::Coord( 1), openvdb::Coord(10));
 
         openvdb::BoolGrid::Ptr gridBig = openvdb::BoolGrid::create(false);
-        gridBig->fill(big, true/*value*/, true /*make active*/);
+        gridBig->fill(bigBox, true/*value*/, true /*make active*/);
         CPPUNIT_ASSERT_EQUAL(8, int(gridBig->tree().activeTileCount()));
         CPPUNIT_ASSERT_EQUAL((20 * 20 * 20), int(gridBig->activeVoxelCount()));
 
         openvdb::BoolGrid::Ptr gridSmall = openvdb::BoolGrid::create(false);
-        gridSmall->fill(small, true/*value*/, true /*make active*/);
+        gridSmall->fill(smallBox, true/*value*/, true /*make active*/);
         CPPUNIT_ASSERT_EQUAL(0, int(gridSmall->tree().activeTileCount()));
         CPPUNIT_ASSERT_EQUAL((10 * 10 * 10), int(gridSmall->activeVoxelCount()));
 
