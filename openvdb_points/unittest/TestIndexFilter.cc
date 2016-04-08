@@ -32,12 +32,9 @@
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb_points/tools/IndexIterator.h>
 #include <openvdb_points/tools/IndexFilter.h>
+#include <openvdb_points/tools/PointConversion.h>
 
-#include <boost/random/normal_distribution.hpp>
 #include <boost/random/mersenne_twister.hpp>
-#include <boost/random/variate_generator.hpp>
-#include <boost/random/linear_congruential.hpp>
-#include <boost/random/uniform_01.hpp>
 
 #include <sstream>
 #include <iostream>
@@ -50,10 +47,12 @@ class TestIndexFilter: public CppUnit::TestCase
 public:
     CPPUNIT_TEST_SUITE(TestIndexFilter);
     CPPUNIT_TEST(testRandomLeafFilter);
+    CPPUNIT_TEST(testBBoxFilter);
 
     CPPUNIT_TEST_SUITE_END();
 
     void testRandomLeafFilter();
+    void testBBoxFilter();
 }; // class TestIndexFilter
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestIndexFilter);
@@ -70,11 +69,13 @@ struct OriginLeaf
 };
 
 
-struct SimpleIterator
+struct SimpleIter
 {
-    SimpleIterator() : i(0) { }
+    SimpleIter() : i(0) { }
     int operator*() const { return const_cast<int&>(i)++; }
+    openvdb::Coord getCoord() const { return coord; }
     int i;
+    openvdb::Coord coord;
 };
 
 
@@ -117,7 +118,7 @@ TestIndexFilter::testRandomLeafFilter()
     {
         RandFilter filter = RandFilter::create(OriginLeaf(*it), RandFilter::Data(threshold, leafSeedMap));
 
-        SimpleIterator iter;
+        SimpleIter iter;
 
         int success = 0;
 
@@ -135,6 +136,88 @@ TestIndexFilter::testRandomLeafFilter()
 
     CPPUNIT_ASSERT(errors[0] != errors[1]);
 }
+
+
+void
+TestIndexFilter::testBBoxFilter()
+{
+    using namespace openvdb;
+    using namespace openvdb::tools;
+
+    typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
+    typedef PointDataTree::LeafNodeType::ValueOnCIter ValueOnCIter;
+
+    AttributeVec3s::registerType();
+
+    std::vector<Vec3s> positions;
+    positions.push_back(Vec3s(1, 1, 1));
+    positions.push_back(Vec3s(1, 2, 1));
+    positions.push_back(Vec3s(10.1, 10, 1));
+
+    const float voxelSize(0.5);
+    math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
+
+    PointDataGrid::Ptr grid = createPointDataGrid<PointDataGrid>(positions, AttributeVec3s::attributeType(), *transform);
+    PointDataTree& tree = grid->tree();
+
+    // check one leaf per point
+    CPPUNIT_ASSERT_EQUAL(tree.leafCount(), Index32(2));
+
+    // build some bounding box filters to test
+
+    BBoxFilter::Data data1 = BBoxFilter::Data(*transform, BBoxd(Vec3d(0.5, 0.5, 0.5), Vec3d(1.5, 1.5, 1.5)));
+    BBoxFilter::Data data2 = BBoxFilter::Data(*transform, BBoxd(Vec3d(0.5, 0.5, 0.5), Vec3d(1.5, 2.01, 1.5)));
+    BBoxFilter::Data data3 = BBoxFilter::Data(*transform, BBoxd(Vec3d(0.5, 0.5, 0.5), Vec3d(11, 11, 1.5)));
+    BBoxFilter::Data data4 = BBoxFilter::Data(*transform, BBoxd(Vec3d(-10, 0, 0), Vec3d(11, 1.2, 1.2)));
+
+    // leaf 1
+
+    PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
+
+    {
+        ValueOnCIter valueIter(leafIter->beginValueOn());
+        ValueIndexIter<ValueOnCIter> iter(valueIter);
+
+        // point 1
+
+        CPPUNIT_ASSERT(BBoxFilter::create(*leafIter, data1).valid(iter));
+        CPPUNIT_ASSERT(BBoxFilter::create(*leafIter, data2).valid(iter));
+        CPPUNIT_ASSERT(BBoxFilter::create(*leafIter, data3).valid(iter));
+        CPPUNIT_ASSERT(BBoxFilter::create(*leafIter, data4).valid(iter));
+
+        ++iter;
+
+        // point 2
+
+        CPPUNIT_ASSERT(!BBoxFilter::create(*leafIter, data1).valid(iter));
+        CPPUNIT_ASSERT(BBoxFilter::create(*leafIter, data2).valid(iter));
+        CPPUNIT_ASSERT(BBoxFilter::create(*leafIter, data3).valid(iter));
+        CPPUNIT_ASSERT(!BBoxFilter::create(*leafIter, data4).valid(iter));
+
+        ++iter;
+        CPPUNIT_ASSERT(!iter);
+    }
+
+    ++leafIter;
+
+    // leaf 2
+
+    {
+        ValueOnCIter valueIter(leafIter->beginValueOn());
+        ValueIndexIter<ValueOnCIter> iter(valueIter);
+
+        // point 3
+
+        CPPUNIT_ASSERT(!BBoxFilter::create(*leafIter, data1).valid(iter));
+        CPPUNIT_ASSERT(!BBoxFilter::create(*leafIter, data2).valid(iter));
+        CPPUNIT_ASSERT(BBoxFilter::create(*leafIter, data3).valid(iter));
+        CPPUNIT_ASSERT(!BBoxFilter::create(*leafIter, data4).valid(iter));
+
+        ++iter;
+        CPPUNIT_ASSERT(!iter);
+    }
+}
+
 
 // Copyright (c) 2015-2016 Double Negative Visual Effects
 // All rights reserved. This software is distributed under the

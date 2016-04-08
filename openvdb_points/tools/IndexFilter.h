@@ -67,10 +67,10 @@ public:
 
     struct Data
     {
-        Data(const ResultT _factor, const LeafSeedMap& _leafOffsetMap)
-            : factor(_factor), leafOffsetMap(_leafOffsetMap) { }
+        Data(const ResultT _factor, const LeafSeedMap& _leafSeedMap)
+            : factor(_factor), leafSeedMap(_leafSeedMap) { }
         const ResultT factor;
-        const LeafSeedMap& leafOffsetMap;
+        const LeafSeedMap& leafSeedMap;
     };
 
     RandomLeafFilter(const Data& data, const unsigned int seed)
@@ -83,8 +83,8 @@ public:
 
     template <typename LeafT>
     static RandomLeafFilter create(const LeafT& leaf, const Data& data) {
-        const LeafSeedMap::const_iterator it = data.leafOffsetMap.find(leaf.origin());
-        if (it == data.leafOffsetMap.end()) {
+        const LeafSeedMap::const_iterator it = data.leafSeedMap.find(leaf.origin());
+        if (it == data.leafSeedMap.end()) {
             OPENVDB_THROW(openvdb::KeyError, "Cannot find leaf origin in offset map for random filter");
         }
         return RandomLeafFilter(data, (unsigned int) it->second);
@@ -99,6 +99,50 @@ private:
     const Data mData;
     Distribution mDistribution;
 }; // class RandomLeafFilter
+
+
+// BBox index filtering
+class BBoxFilter
+{
+public:
+    struct Data
+    {
+        Data(const openvdb::math::Transform& _transform,
+             const openvdb::BBoxd& _bboxWS)
+            : transform(_transform)
+            , bbox(transform.worldToIndex(_bboxWS)) { }
+        const openvdb::math::Transform transform;
+        const openvdb::BBoxd bbox;
+    };
+
+    BBoxFilter( const Data& data,
+                const AttributeHandle<openvdb::Vec3f>::Ptr& positionHandle)
+        : mData(data)
+        , mPositionHandle(positionHandle) { }
+
+    template <typename LeafT>
+    static BBoxFilter create(const LeafT& leaf, const Data& data) {
+        return BBoxFilter(data, AttributeHandle<openvdb::Vec3f>::create(leaf.constAttributeArray("P")));
+    }
+
+    template <typename IterT>
+    bool valid(const IterT& iter) const {
+        const openvdb::Coord ijk = iter.getCoord();
+        const openvdb::Vec3f voxelIndexSpace = ijk.asVec3d();
+
+        // Retrieve point position in voxel space
+        const openvdb::Vec3f& pointVoxelSpace = mPositionHandle->get(*iter);
+
+        // Compute point position in index space
+        const openvdb::Vec3f pointIndexSpace = pointVoxelSpace + voxelIndexSpace;
+
+        return mData.bbox.isInside(pointIndexSpace);
+    }
+
+private:
+    const Data mData;
+    const AttributeHandle<openvdb::Vec3f>::Ptr mPositionHandle;
+}; // class BBoxFilter
 
 
 ////////////////////////////////////////
