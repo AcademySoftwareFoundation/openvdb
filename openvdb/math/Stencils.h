@@ -66,6 +66,7 @@ public:
     typedef tree::ValueAccessor<const TreeType, IsSafe> AccessorType;
     typedef std::vector<ValueType>                      BufferType;
     typedef typename BufferType::iterator               IterType;
+    typedef Vec3<ValueType>                             VecType;
 
     /// @brief Initialize the stencil buffer with the values of voxel (i, j, k)
     /// and its neighbors.
@@ -108,7 +109,7 @@ public:
     /// @details This method will check to see if it is necessary to
     /// update the stencil based on the cached index coordinates of
     /// the center point.
-    inline void moveTo(const Vec3R& xyz)
+    inline void moveTo(const VecType& xyz)
     {
         Coord ijk = openvdb::Coord::floor(xyz);
         if (ijk != mCenter) this->moveTo(ijk);
