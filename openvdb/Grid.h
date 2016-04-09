@@ -600,7 +600,7 @@ public:
     ///
     /// @warning Only use this method if you're an expert and know the
     /// risks of using an unregistered accessor (see tree/ValueAccessor.h)
-    Accessor getUnsafeAccessor() { return UnsafeAccessor(tree()); }
+    UnsafeAccessor getUnsafeAccessor() { return UnsafeAccessor(tree()); }
     //@{
     /// Return an accessor that provides random read-only access to this grid's voxels.
     ConstAccessor getAccessor() const { return ConstAccessor(tree()); }
@@ -614,7 +614,7 @@ public:
     ///
     /// @warning Only use this method if you're an expert and know the
     /// risks of using an unregistered accessor (see tree/ValueAccessor.h)
-    ConstAccessor getConstUnsafeAccessor() const { return ConstUnsafeAccessor(tree()); }
+    ConstUnsafeAccessor getConstUnsafeAccessor() const { return ConstUnsafeAccessor(tree()); }
 
     //@{
     /// Return an iterator over all of this grid's active values (tile and voxel).
@@ -644,7 +644,7 @@ public:
     /// @param active  if true, mark voxels within the box as active,
     ///                otherwise mark them as inactive
     /// @param sparse  if false, active tiles are voxelized, i.e. only active voxels
-    ///                 are generated from the fill operation. Defaults to true.  
+    ///                 are generated from the fill operation. Defaults to true.
     /// @note If @a sparse is true this operation generates a sparse, but not always optimally sparse,
     /// representation of the filled box.  Follow fill operations with a prune()
     /// operation for optimal sparseness.

@@ -110,6 +110,9 @@ Version 3.2.0 - In development
       [Contributed by Edward Lam]
     - Fixed bug in openvdb::tools::PointIndexIterator::worldSpaceSearchAndUpdate
       that resulted in missing point indices.
+    - Removed the StaggeredBoxSampler code path in SOP_OpenVDB_Advect because it
+      introduces bias.
+      [Contributed by Fredrik Salomonsson]
     - Fixes TestUtil.cc build issues on Windows.
       [Contributed by Edward Lam]
     - Fixed isApproxZero() so that it works correctly when tolerance is zero.

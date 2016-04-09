@@ -41,7 +41,7 @@
 /// with powers of two refinements.
 ///
 /// @note While this class can arguably be used to implement a sparse
-/// Multi-Grid solver it is currently intented as a means to
+/// Multi-Grid solver it is currently intended as a means to
 /// efficiently compute LoD levels for applications like rendering
 ///
 /// @note Prolongation means interpolation from coarse -> fine
@@ -51,28 +51,31 @@
 #ifndef OPENVDB_TOOLS_MULTIRESGRID_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_MULTIRESGRID_HAS_BEEN_INCLUDED
 
-#include <tbb/tbb_thread.h>
-#include <tbb/task_scheduler_init.h>
+#include <openvdb/Grid.h>
+#include <openvdb/math/FiniteDifference.h>
+#include <openvdb/math/Math.h>
+#include <openvdb/math/Operators.h>
+#include <openvdb/math/Stencils.h>
+#include <openvdb/metadata/StringMetadata.h>
+#include <openvdb/tools/Interpolation.h>
+#include <openvdb/tools/Morphology.h>
+#include <openvdb/tools/Prune.h>
+#include <openvdb/tools/SignedFloodFill.h>
+#include <openvdb/tools/ValueTransformer.h>
+#include <openvdb/tree/LeafManager.h>
+#include <openvdb/tree/NodeManager.h>
+
 #include <tbb/enumerable_thread_specific.h>
+#include <tbb/task_scheduler_init.h>
+#include <tbb/tbb_thread.h>
 
 #include <boost/type_traits/is_floating_point.hpp>
 #include <boost/utility/enable_if.hpp>
 
-#include <openvdb/Grid.h>
-#include <openvdb/tree/LeafManager.h>
-#include <openvdb/tree/NodeManager.h>
-#include <openvdb/tools/Interpolation.h>
-#include <openvdb/tools/ValueTransformer.h>
-#include <openvdb/tools/Prune.h>
-#include <openvdb/tools/Morphology.h>
-#include <openvdb/tools/SignedFloodFill.h>
-#include <openvdb/math/Math.h>
-#include <openvdb/math/FiniteDifference.h>
-#include <openvdb/math/Operators.h>
-#include <openvdb/math/Stencils.h>
-//#include <openvdb/util/CpuTimer.h>
-
-class TestMultiResGrid;
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -107,8 +110,8 @@ public:
     /// @brief Given an initial high-resolution grid this constructor
     /// generates all the coarser grids by means of restriction.
     /// @param levels The number of trees in this MultiResGrid
-    /// @param grid High-resolution inout grid
-    /// @param useInjection Use restruction by injection, vs
+    /// @param grid High-resolution input grid
+    /// @param useInjection Use restriction by injection, vs
     /// full-weighting. It defaults to false and should rarely to used.
     /// @note This constructor will perform a deep copy of the input
     /// grid and use it as the highest level grid.
@@ -117,8 +120,8 @@ public:
     /// @brief Given an initial high-resolution grid this constructor
     /// generates all the coarser grids by means of restriction.
     /// @param levels The number of trees in this MultiResGrid
-    /// @param grid High-resolution inout grid
-    /// @param useInjection Use restruction by injection, vs
+    /// @param grid High-resolution input grid
+    /// @param useInjection Use restriction by injection, vs
     /// full-weighting. It defaults to false and should rarely to used.
     /// @note This constructor will steal the input input
     /// grid and use it as the highest level grid. On output the grid
@@ -126,7 +129,7 @@ public:
     MultiResGrid(size_t levels, GridPtr grid, bool useInjection = false);
 
     //////////////////////////////////////////////////////////////////////
-    
+
     /// @brief Return the number of levels, i.e. trees, in this MultiResGrid
     /// @note level 0 is the finest level and numLevels()-1 is the coarsest
     /// level.
@@ -135,11 +138,11 @@ public:
     /// @brief Return the level of the finest grid (always 0)
     static size_t finestLevel() { return 0; }
 
-    /// @brief Return the level of the coarest grid, i.e. numLevels()-1
+    /// @brief Return the level of the coarsest grid, i.e. numLevels()-1
     size_t coarsestLevel() const { return mTrees.size()-1; }
 
     //////////////////////////////////////////////////////////////////////
-    
+
     /// @brief Return a reference to the tree at the specified level
     /// @param level The level of the tree to be returned
     /// @note Level 0 is by definition the finest tree.
@@ -185,7 +188,7 @@ public:
     ConstTreePtr coarsestConstTreePtr() const { return mTrees.back(); }
 
     //////////////////////////////////////////////////////////////////////
-    
+
     /// @brief Return a shared pointer to the grid at the specified integer level
     /// @param level Integer level of the grid to be returned
     /// @note Level 0 is by definition the finest grid.
@@ -217,15 +220,9 @@ public:
     GridCPtrVecPtr grids() const;
 
     //////////////////////////////////////////////////////////////////////
-    
-    /// @brief Write all the grids to a file
-    /// @param filename Name of the files to write to
-    void write(const std::string &filename) const;
 
-    //////////////////////////////////////////////////////////////////////
-    
     //@{
-    /// @brief Return a reference to the finist grid's transform, which might be
+    /// @brief Return a reference to the finest grid's transform, which might be
     /// shared with other grids.
     /// @note Calling setTransform() on this grid invalidates all references
     /// previously returned by this method.
@@ -238,7 +235,7 @@ public:
     //////////////////////////////////////////////////////////////////////
 
     //@{
-    /// @brief Return the floating-point index coordiate at out_level given
+    /// @brief Return the floating-point index coordinate at out_level given
     /// the index coordinate in_xyz at in_level.
     static Vec3R xyz(const Coord& in_ijk, size_t in_level, size_t out_level);
     static Vec3R xyz(const Vec3R& in_xyz, size_t in_level, size_t out_level);
@@ -247,8 +244,10 @@ public:
 
     //////////////////////////////////////////////////////////////////////
 
+
+
     //@{
-    /// @brief Return the value at the specified  coordinate position using 
+    /// @brief Return the value at the specified  coordinate position using
     /// interpolation of the specified order into the tree at the out_level.
     ///
     /// @details First in_ijk is mapped from index space at in_level to
@@ -257,9 +256,9 @@ public:
     /// @param in_ijk Index coordinate position relative to tree at in_level
     /// @param in_level Integer level of the input coordinate in_ijk
     /// @param out_level Integer level of the interpolated value
-    template<Index Order>    
+    template<Index Order>
     ValueType sampleValue(const Coord& in_ijk, size_t in_level, size_t out_level) const;
-    template<Index Order>    
+    template<Index Order>
     ValueType sampleValue(const Vec3R& in_ijk, size_t in_level, size_t out_level) const;
     //@}
 
@@ -269,7 +268,7 @@ public:
     /// @param level Floating-point level from which to interpolate the value.
     /// @brief Non-integer values of the level will use linear-interpolation
     /// between the neighboring integer levels.
-    template<Index Order>    
+    template<Index Order>
     ValueType sampleValue(const Coord& ijk, double level) const;
 
     /// @brief Return the value at the specified floating-point coordinate position
@@ -279,7 +278,7 @@ public:
     /// the value.
     /// @brief Non-integer values of the level will use linear-interpolation
     /// between the neighboring integer levels.
-    template<Index Order>    
+    template<Index Order>
     ValueType sampleValue(const Vec3R& xyz, double level) const;
 
     //////////////////////////////////////////////////////////////////////
@@ -290,26 +289,26 @@ public:
     /// @param level The fine level to receive values from the coarser
     /// level-1
     /// @note Prolongation means to interpolation from coarse -> fine
-    ValueType prolongate(const Coord& coords, const size_t level) const;
+    ValueType prolongateVoxel(const Coord& coords, const size_t level) const;
 
 
-    /// (coarse->fine) Poplulates all the active voxel values in a fine (@a level) tree
+    /// (coarse->fine) Populates all the active voxel values in a fine (@a level) tree
     /// from the coarse (@a level+1) tree using linear interpolation
     /// This transforms multiple values of the tree in parallel
     void prolongateActiveVoxels(size_t destlevel, size_t grainSize = 1);
 
     //////////////////////////////////////////////////////////////////////
-    
+
     /// Populate a coordinate location in @a level (coarse) tree
     /// from the @a level-1 (fine) tree using trilinear interpolation
     /// input coords are relative to the mTree[level] (coarse)
     /// @note Restriction means remapping from fine -> coarse
-    ValueType restrict(Coord ijk, const size_t level, bool useInjection = false) const;
+    ValueType restrictVoxel(Coord ijk, const size_t level, bool useInjection = false) const;
 
-    /// (fine->coarse) Poplulates all the active voxel values in the coarse (@a level) tree
+    /// (fine->coarse) Populates all the active voxel values in the coarse (@a level) tree
     /// from the fine (@a level-1) tree using trilinear interpolation.
     /// For cell-centered data, this is equivalent to an average
-    /// For vertex-centered data this is equivalent to transfering the data
+    /// For vertex-centered data this is equivalent to transferring the data
     /// from the fine vertex directly above the coarse vertex.
     /// This transforms multiple values of the tree in parallel
     void restrictActiveVoxels(size_t destlevel, size_t grainSize = 1);
@@ -353,8 +352,6 @@ private:
     MultiResGrid(const MultiResGrid& other);//disallow copy construction
     MultiResGrid& operator=(const MultiResGrid& other);//disallow copy assignment
 
-    friend class ::TestMultiResGrid;
-
     // For optimal performance we disable registration of the ValueAccessor
     typedef tree::ValueAccessor<TreeType, false>       Accessor;
     typedef tree::ValueAccessor<const TreeType, false> ConstAccessor;
@@ -367,7 +364,7 @@ private:
     // in a coarse tree from the active voxels in a fine tree
     struct MaskOp;
 
-    /// Private struct that performs multi-threaded restruction
+    /// Private struct that performs multi-threaded restriction
     struct RestrictOp;
 
     /// Private struct that performs multi-threaded prolongation
@@ -484,7 +481,7 @@ typename Grid<TreeType>::Ptr MultiResGrid<TreeType>::
 createGrid(float level, size_t grainSize) const
 {
     assert( level >= 0.0f && level <= float(mTrees.size()-1) );
-    
+
     typename Grid<TreeType>::Ptr grid(new Grid<TreeType>(this->constTree(0).background()));
     math::Transform::Ptr xform = mTransform->copy();
     xform->preScale( math::Pow(2.0f, level) );
@@ -504,7 +501,7 @@ createGrid(float level, size_t grainSize) const
             pruneLevelSet( grid->tree() );//only creates inactive tiles
         }
     }
-    
+
     return grid;
 }
 
@@ -527,15 +524,6 @@ grids() const
 }
 
 template<typename TreeType>
-void MultiResGrid<TreeType>::
-write(const std::string &filename) const
-{
-    io::File file( filename );
-    file.write( *this->grids() );
-    file.close();
-}
-    
-template<typename TreeType>
 Vec3R MultiResGrid<TreeType>::
 xyz(const Coord& in_ijk, size_t in_level, size_t out_level)
 {
@@ -554,11 +542,11 @@ Vec3R MultiResGrid<TreeType>::
 xyz(const Vec3R& in_xyz, double in_level, double out_level)
 {
     return in_xyz * math::Pow(2.0, in_level - out_level);
-    
-}     
+
+}
 
 template<typename TreeType>
-template<Index Order>    
+template<Index Order>
 typename TreeType::ValueType MultiResGrid<TreeType>::
 sampleValue(const Coord& in_ijk, size_t in_level, size_t out_level) const
 {
@@ -569,7 +557,7 @@ sampleValue(const Coord& in_ijk, size_t in_level, size_t out_level) const
 }
 
 template<typename TreeType>
-template<Index Order>    
+template<Index Order>
 typename TreeType::ValueType MultiResGrid<TreeType>::
 sampleValue(const Vec3R& in_xyz, size_t in_level, size_t out_level) const
 {
@@ -580,7 +568,7 @@ sampleValue(const Vec3R& in_xyz, size_t in_level, size_t out_level) const
 }
 
 template<typename TreeType>
-template<Index Order>    
+template<Index Order>
 typename TreeType::ValueType MultiResGrid<TreeType>::
 sampleValue(const Coord& ijk, double level) const
 {
@@ -595,7 +583,7 @@ sampleValue(const Coord& ijk, double level) const
 }
 
 template<typename TreeType>
-template<Index Order>    
+template<Index Order>
 typename TreeType::ValueType MultiResGrid<TreeType>::
 sampleValue(const Vec3R& xyz, double level) const
 {
@@ -607,11 +595,11 @@ sampleValue(const Vec3R& xyz, double level) const
     const ValueType v1 = this->template sampleValue<Order>( xyz, 0, level1 );
     const ValueType a = ValueType(level1 - level);
     return a * v0 + (ValueType(1) - a) * v1;
-}      
+}
 
 template<typename TreeType>
 typename TreeType::ValueType MultiResGrid<TreeType>::
-prolongate(const Coord& ijk, const size_t level) const
+prolongateVoxel(const Coord& ijk, const size_t level) const
 {
     assert( level+1 < mTrees.size() );
     const ConstAccessor acc(*mTrees[level + 1]);// has disabled registration!
@@ -626,19 +614,18 @@ prolongateActiveVoxels(size_t destlevel, size_t grainSize)
     TreeType &fineTree = *mTrees[ destlevel ];
     const TreeType &coarseTree = *mTrees[ destlevel+1 ];
     CookOp<ProlongateOp> tmp( coarseTree, fineTree, grainSize );
-
-};
+}
 
 template<typename TreeType>
 typename TreeType::ValueType MultiResGrid<TreeType>::
-restrict(Coord ijk, const size_t destlevel, bool useInjection) const
+restrictVoxel(Coord ijk, const size_t destlevel, bool useInjection) const
 {
     assert( destlevel > 0 && destlevel < mTrees.size() );
     const TreeType &fineTree = *mTrees[ destlevel-1 ];
     if ( useInjection ) return fineTree.getValue(ijk<<1);
     const ConstAccessor acc( fineTree );// has disabled registration!
     return RestrictOp::run( ijk, acc);
-};
+}
 
 template<typename TreeType>
 void MultiResGrid<TreeType>::
@@ -648,7 +635,7 @@ restrictActiveVoxels(size_t destlevel, size_t grainSize)
     const TreeType &fineTree = *mTrees[ destlevel-1 ];
     TreeType &coarseTree = *mTrees[ destlevel ];
     CookOp<RestrictOp> tmp( fineTree, coarseTree, grainSize );
-};
+}
 
 template<typename TreeType>
 void MultiResGrid<TreeType>::
@@ -675,10 +662,10 @@ print(std::ostream& os, int verboseLevel) const
     os << "Transform:" << std::endl;
     transform().print(os, /*indent=*/"  ");
     os << std::endl;
-}    
+}
 
 template<typename TreeType>
-void MultiResGrid<TreeType>::    
+void MultiResGrid<TreeType>::
 initMeta()
 {
     const size_t levels = this->numLevels();
@@ -687,7 +674,7 @@ initMeta()
     }
     this->insertMeta("MultiResGrid_Levels", Int64Metadata( levels ) );
 }
-    
+
 template<typename TreeType>
 void MultiResGrid<TreeType>::
 topDownRestrict(bool useInjection)
@@ -722,22 +709,22 @@ struct MultiResGrid<TreeType>::MaskOp
     typedef tree::LeafManager<const MaskT>  ManagerT;
     typedef typename ManagerT::LeafRange RangeT;
     typedef typename ManagerT::LeafNodeType::ValueOnCIter VoxelIterT;
-    
+
     MaskOp(const TreeType& fineTree, TreeType& coarseTree, size_t grainSize = 1)
-        : mPool(new PoolType( coarseTree ) )// empty coarse tree acts as examplar    
+        : mPool(new PoolType( coarseTree ) )// empty coarse tree acts as examplar
     {
         assert( coarseTree.empty() );
-        
+
         // Create Mask of restruction performed on fineTree
         MaskT mask(fineTree, false, true, TopologyCopy() );
 
         // Muli-threaded dilation which also linearizes the tree to leaf nodes
         tools::dilateActiveValues(mask, 1, NN_FACE_EDGE_VERTEX, EXPAND_TILES);
-        
+
         // Restriction by injection using thread-local storage of coarse tree masks
         ManagerT leafs( mask );
         tbb::parallel_for(leafs.leafRange( grainSize ), *this);
-        
+
         // multithreaded union of thread-local coarse tree masks with the coarse tree
         typedef typename PoolType::const_iterator IterT;
         for (IterT it=mPool->begin(); it!=mPool->end(); ++it) coarseTree.topologyUnion( *it );
@@ -768,7 +755,7 @@ struct MultiResGrid<TreeType>::FractionOp
     typedef tree::LeafManager<TreeType>                   Manager2;
     typedef typename Manager1::LeafRange                  Range1;
     typedef typename Manager2::LeafRange                  Range2;
-    
+
     FractionOp(const MultiResGrid& parent,
                TreeType& midTree,
                float level,
@@ -776,7 +763,7 @@ struct MultiResGrid<TreeType>::FractionOp
         : mLevel( level )
         , mPool( NULL )
         , mTree0( &*(parent.mTrees[size_t(floorf(level))]) )//high-resolution
-        , mTree1( &*(parent.mTrees[size_t(ceilf(level))]) ) //low-resolution 
+        , mTree1( &*(parent.mTrees[size_t(ceilf(level))]) ) //low-resolution
     {
         assert( midTree.empty() );
         assert( mTree0 != mTree1 );
@@ -789,14 +776,14 @@ struct MultiResGrid<TreeType>::FractionOp
             tree::LeafManager<const TreeType> manager( *mTree1 );
             tbb::parallel_for( manager.leafRange(grainSize), *this );
         }
-        
+
         // Multi-threaded dilation of mask
         tbb::parallel_for(tbb::blocked_range<PoolIterT>(mPool->begin(),mPool->end(),1), *this);
-        
+
         // Union thread-local coarse tree masks into the coarse tree
         for (PoolIterT it=mPool->begin(); it!=mPool->end(); ++it) midTree.topologyUnion( *it );
         delete mPool;
-        
+
         {// Interpolate values into the static mid level tree
             Manager2 manager( midTree );
             tbb::parallel_for(manager.leafRange(grainSize), *this);
@@ -811,7 +798,7 @@ struct MultiResGrid<TreeType>::FractionOp
         // mid-res voxel size in world units = dx  = 2^(mLevel) = 2^(level + frac)
         // low-res index -> world: ijk * dx1
         // world -> mid-res index: world / dx
-        // low-res index -> mid-res index: (ijk * dx1) / dx = ijk * scale where 
+        // low-res index -> mid-res index: (ijk * dx1) / dx = ijk * scale where
         // scale = dx1/dx = 2^(level+1)/2^(level+frac) = 2^(1-frac)
         const float scale = math::Pow(2.0f, 1.0f - math::FractionalPart(mLevel));
         tree::ValueAccessor<MaskT, false>  acc( mPool->local() );// disabled registration
@@ -842,9 +829,9 @@ struct MultiResGrid<TreeType>::FractionOp
         // mid-res index -> world: ijk * dx
         // world -> high-res index: world / dx0
         // world -> low-res index: world / dx1
-        // mid-res index -> high-res index: (ijk * dx) / dx0 = ijk * scale0 where 
+        // mid-res index -> high-res index: (ijk * dx) / dx0 = ijk * scale0 where
         // scale0 = dx/dx0 = 2^(level+frac)/2^(level) = 2^(frac)
-        // mid-res index -> low-res index: (ijk * dx) / dx1 = ijk * scale1 where 
+        // mid-res index -> low-res index: (ijk * dx) / dx1 = ijk * scale1 where
         // scale1 = dx/dx1 = 2^(level+frac)/2^(level+1) = 2^(frac-1)
         const float b = math::FractionalPart(mLevel), a = 1.0f - b;
         const float scale0 = math::Pow( 2.0f, b );

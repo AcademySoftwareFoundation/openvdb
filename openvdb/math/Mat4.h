@@ -121,9 +121,9 @@ public:
          const Vec4<Source> &v3, const Vec4<Source> &v4, bool rows = true)
     {
         if (rows) {
-            this->setRows(v1, v2, v3);
+            this->setRows(v1, v2, v3, v4);
         } else {
-            this->setColumns(v1, v2, v3);
+            this->setColumns(v1, v2, v3, v4);
         }
     }
 
@@ -273,7 +273,7 @@ public:
         MyBase::mm[14] = v3[3];
         MyBase::mm[15] = v4[3];
     }
-    
+
     /// Set the rows of "this" matrix to the vectors v1, v2, v3, v4
     OPENVDB_DEPRECATED void setBasis(const Vec4<T> &v1, const Vec4<T> &v2,
                                      const Vec4<T> &v3, const Vec4<T> &v4)
