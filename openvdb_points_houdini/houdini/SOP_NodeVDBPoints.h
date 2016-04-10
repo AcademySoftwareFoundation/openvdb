@@ -167,7 +167,6 @@ public:
             // ignore non openvdb point grids
             if (!dynamic_cast<const openvdb::tools::PointDataGrid*>(&grid))  continue;
 
-            openvdb::Coord dim = grid.evalActiveVoxelDim();
             const UT_String gridName = it.getPrimitiveName();
 
             infoStr << "    ";
@@ -215,6 +214,11 @@ public:
             infoStr <<" <empty>,";
         }
 
+        std::string viewportGroupName = "";
+        if (openvdb::StringMetadata::ConstPtr stringMeta = grid.getMetadata<openvdb::StringMetadata>(openvdb::META_GROUP_VIEWPORT)) {
+            viewportGroupName = stringMeta->value();
+        }
+
         const PointDataTree& pointDataTree = pointDataGrid->tree();
 
         PointDataTree::LeafCIter iter = pointDataTree.cbeginLeaf();
@@ -242,6 +246,9 @@ public:
                 else {
                     infoStr << ", ";
                 }
+
+                // add an asterisk as a viewport group indicator
+                if (it->first == viewportGroupName)     infoStr << "*";
 
                 infoStr << it->first << "(";
 

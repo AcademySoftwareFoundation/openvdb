@@ -195,6 +195,7 @@ LIBHOUDINI_INCLUDE_NAMES := \
 HOUDINI_SOP_SRC_NAMES := \
 	houdini/GR_PrimVDBPoints.cc \
 	houdini/SOP_OpenVDB_Points.cc \
+	houdini/SOP_OpenVDB_Points_Group.cc \
 	houdini/SOP_OpenVDB_Points_Load.cc \
 #
 HOUDINI_SOP_NAMES := $(basename $(notdir $(HOUDINI_SOP_SRC_NAMES)))

@@ -54,6 +54,9 @@ template<> inline const char* typeNameAsString<math::Vec3<uint16_t> >()  { retur
 
 ////////////////////////////////////////
 
+// metadata name for viewport groups
+
+const std::string META_GROUP_VIEWPORT = "group_viewport";
 
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
