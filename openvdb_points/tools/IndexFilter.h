@@ -292,6 +292,24 @@ private:
 ////////////////////////////////////////
 
 
+template<typename T>
+struct FilterTraits {
+    static const bool RequiresCoord = false;
+};
+template<>
+struct FilterTraits<BBoxFilter> {
+    static const bool RequiresCoord = true;
+};
+template <typename T0, typename T1, bool And>
+struct FilterTraits<BinaryFilter<T0, T1, And> > {
+    static const bool RequiresCoord =   FilterTraits<T0>::RequiresCoord ||
+                                        FilterTraits<T1>::RequiresCoord;
+};
+
+
+////////////////////////////////////////
+
+
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
