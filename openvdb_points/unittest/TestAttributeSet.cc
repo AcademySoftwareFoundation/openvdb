@@ -779,6 +779,11 @@ TestAttributeSet::testAttributeSetGroups()
         Descriptor::GroupIndex index16b = attrSet.groupIndex("test16");
         CPPUNIT_ASSERT_EQUAL(index16b.first, size_t(6));
         CPPUNIT_ASSERT_EQUAL(index16b.second, uint8_t(0));
+
+        // check out of range exception
+
+        CPPUNIT_ASSERT_NO_THROW(attrSet.groupIndex(23));
+        CPPUNIT_ASSERT_THROW(attrSet.groupIndex(24), LookupError);
     }
 }
 

@@ -273,7 +273,7 @@ AttributeSet::groupIndex(const size_t offset) const
         if (GroupAttributeArray::isGroup(*mAttrs[i]))      groups.push_back(i);
     }
 
-    if (offset > groups.size() * GROUP_BITS) {
+    if (offset >= groups.size() * GROUP_BITS) {
         OPENVDB_THROW(LookupError, "Out of range group offset - " << offset << ".")
     }
 
