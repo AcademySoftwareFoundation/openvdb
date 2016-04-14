@@ -777,6 +777,42 @@ inline void setGroupByFilter(   PointDataTree& tree,
 ////////////////////////////////////////
 
 
+template <typename PointDataTree>
+inline void setGroupByRandomTarget( PointDataTree& tree,
+                                    const Name& group,
+                                    const Index64 targetPoints,
+                                    const unsigned int seed = 0)
+{
+    typedef RandomLeafFilter<boost::mt11213b> RandomFilter;
+
+    RandomFilter::Data data;
+    data.populateByTargetPoints(tree, targetPoints, seed);
+
+    setGroupByFilter<PointDataTree, RandomFilter>(tree, group, data);
+}
+
+
+////////////////////////////////////////
+
+
+template <typename PointDataTree>
+inline void setGroupByRandomPercentage( PointDataTree& tree,
+                                        const Name& group,
+                                        const float percentage = 10.0f,
+                                        const unsigned int seed = 0)
+{
+    typedef RandomLeafFilter<boost::mt11213b> RandomFilter;
+
+    RandomFilter::Data data;
+    data.populateByPercentagePoints(tree, percentage, seed);
+
+    setGroupByFilter<PointDataTree, RandomFilter>(tree, group, data);
+}
+
+
+////////////////////////////////////////
+
+
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

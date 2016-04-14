@@ -32,6 +32,7 @@
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb_points/tools/IndexIterator.h>
 #include <openvdb_points/tools/IndexFilter.h>
+#include <openvdb_points/tools/PointAttribute.h>
 #include <openvdb_points/tools/PointConversion.h>
 
 #include <boost/random/mersenne_twister.hpp>
@@ -47,11 +48,13 @@ class TestIndexFilter: public CppUnit::TestCase
 public:
     CPPUNIT_TEST_SUITE(TestIndexFilter);
     CPPUNIT_TEST(testRandomLeafFilter);
+    CPPUNIT_TEST(testAttributeHashFilter);
     CPPUNIT_TEST(testBBoxFilter);
     CPPUNIT_TEST(testBinaryFilter);
     CPPUNIT_TEST_SUITE_END();
 
     void testRandomLeafFilter();
+    void testAttributeHashFilter();
     void testBBoxFilter();
     void testBinaryFilter();
 }; // class TestIndexFilter
@@ -214,6 +217,161 @@ TestIndexFilter::testRandomLeafFilter()
 
             CPPUNIT_ASSERT(it == values.end());
         }
+    }
+}
+
+
+void setId(PointDataTree& tree, const size_t index, const std::vector<int>& ids)
+{
+    int offset = 0;
+    for (PointDataTree::LeafIter leafIter = tree.beginLeaf(); leafIter; ++leafIter) {
+        AttributeWriteHandle<int>::Ptr id = AttributeWriteHandle<int>::create(leafIter->attributeArray(index));
+
+        for (PointDataTree::LeafNodeType::IndexIter iter = leafIter->beginIndex(); iter; ++iter) {
+            if (offset >= int(ids.size()))   throw std::runtime_error("Out of range");
+
+            id->set(*iter, ids[offset++]);
+        }
+    }
+}
+
+
+void
+TestIndexFilter::testAttributeHashFilter()
+{
+    using namespace openvdb;
+    using namespace openvdb::tools;
+
+    typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
+    typedef TypedAttributeArray<int>     AttributeI;
+
+    AttributeVec3s::registerType();
+    AttributeI::registerType();
+
+    std::vector<Vec3s> positions;
+    positions.push_back(Vec3s(1, 1, 1));
+    positions.push_back(Vec3s(2, 2, 2));
+    positions.push_back(Vec3s(11, 11, 11));
+    positions.push_back(Vec3s(12, 12, 12));
+
+    const float voxelSize(1.0);
+    math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
+
+    PointDataGrid::Ptr grid = createPointDataGrid<PointDataGrid>(positions, AttributeVec3s::attributeType(), *transform);
+    PointDataTree& tree = grid->tree();
+
+    // four points, two leafs
+
+    CPPUNIT_ASSERT_EQUAL(tree.leafCount(), Index32(2));
+
+    appendAttribute(tree, AttributeSet::Descriptor::NameAndType("id", AttributeI::attributeType()));
+
+    const size_t index = tree.cbeginLeaf()->attributeSet().descriptor().find("id");
+
+    // ascending integers, block one
+    std::vector<int> ids;
+    ids.push_back(1);
+    ids.push_back(2);
+    ids.push_back(3);
+    ids.push_back(4);
+    setId(tree, index, ids);
+
+    typedef AttributeHashFilter<boost::mt11213b, int> HashFilter;
+
+    { // zero percent
+        HashFilter::Data data(index, 0.0f);
+
+        PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
+
+        PointDataTree::LeafNodeType::IndexIter indexIter = leafIter->beginIndex();
+        HashFilter filter = HashFilter::create(*leafIter, data);
+
+        CPPUNIT_ASSERT(!filter.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(!filter.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(!indexIter);
+        ++leafIter;
+
+        indexIter = leafIter->beginIndex();
+        HashFilter filter2 = HashFilter::create(*leafIter, data);
+        CPPUNIT_ASSERT(!filter2.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(!filter2.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(!indexIter);
+    }
+
+    { // one hundred percent
+        HashFilter::Data data(index, 100.0f);
+
+        PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
+
+        PointDataTree::LeafNodeType::IndexIter indexIter = leafIter->beginIndex();
+        HashFilter filter = HashFilter::create(*leafIter, data);
+
+        CPPUNIT_ASSERT(filter.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(filter.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(!indexIter);
+        ++leafIter;
+
+        indexIter = leafIter->beginIndex();
+        HashFilter filter2 = HashFilter::create(*leafIter, data);
+        CPPUNIT_ASSERT(filter2.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(filter2.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(!indexIter);
+    }
+
+    { // fifty percent
+        HashFilter::Data data(index, 50.0f);
+
+        PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
+
+        PointDataTree::LeafNodeType::IndexIter indexIter = leafIter->beginIndex();
+        HashFilter filter = HashFilter::create(*leafIter, data);
+
+        CPPUNIT_ASSERT(!filter.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(!filter.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(!indexIter);
+        ++leafIter;
+
+        indexIter = leafIter->beginIndex();
+        HashFilter filter2 = HashFilter::create(*leafIter, data);
+        CPPUNIT_ASSERT(filter2.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(!filter2.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(!indexIter);
+    }
+
+    { // fifty percent, new seed
+        HashFilter::Data data(index, 50.0f, /*seed=*/100);
+
+        PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
+
+        PointDataTree::LeafNodeType::IndexIter indexIter = leafIter->beginIndex();
+        HashFilter filter = HashFilter::create(*leafIter, data);
+
+        CPPUNIT_ASSERT(filter.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(filter.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(!indexIter);
+        ++leafIter;
+
+        indexIter = leafIter->beginIndex();
+        HashFilter filter2 = HashFilter::create(*leafIter, data);
+        CPPUNIT_ASSERT(!filter2.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(filter2.valid(indexIter));
+        ++indexIter;
+        CPPUNIT_ASSERT(!indexIter);
     }
 }
 

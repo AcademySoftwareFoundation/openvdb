@@ -450,26 +450,28 @@ TestPointGroup::testFilter()
 
     typedef PointIndexGrid PointIndexGrid;
 
-    // four points in the same leaf
-
-    std::vector<Vec3s> positions;
-    positions.push_back(Vec3s(1, 1, 1));
-    positions.push_back(Vec3s(1, 2, 1));
-    positions.push_back(Vec3s(2, 1, 1));
-    positions.push_back(Vec3s(2, 2, 1));
-    positions.push_back(Vec3s(100, 100, 100));
-    positions.push_back(Vec3s(100, 101, 100));
-
     const float voxelSize(1.0);
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
+    PointDataGrid::Ptr grid;
 
-    const PointAttributeVector<Vec3s> pointList(positions);
+    { // four points in the same leaf
+        std::vector<Vec3s> positions;
+        positions.push_back(Vec3s(1, 1, 1));
+        positions.push_back(Vec3s(1, 2, 1));
+        positions.push_back(Vec3s(2, 1, 1));
+        positions.push_back(Vec3s(2, 2, 1));
+        positions.push_back(Vec3s(100, 100, 100));
+        positions.push_back(Vec3s(100, 101, 100));
 
-    PointIndexGrid::Ptr pointIndexGrid =
-        openvdb::tools::createPointIndexGrid<PointIndexGrid>(pointList, *transform);
+        const PointAttributeVector<Vec3s> pointList(positions);
 
-    PointDataGrid::Ptr grid = createPointDataGrid<PointDataGrid>(*pointIndexGrid, pointList,
-                                                                 AttributeVec3s::attributeType(), *transform);
+        PointIndexGrid::Ptr pointIndexGrid =
+            openvdb::tools::createPointIndexGrid<PointIndexGrid>(pointList, *transform);
+
+        grid = createPointDataGrid<PointDataGrid>(  *pointIndexGrid, pointList,
+                                                    AttributeVec3s::attributeType(), *transform);
+    }
+
     PointDataTree& tree = grid->tree();
 
     { // first point filter
@@ -539,6 +541,50 @@ TestPointGroup::testFilter()
 
         CPPUNIT_ASSERT_EQUAL(positions.size(), size_t(1));
         CPPUNIT_ASSERT_EQUAL(positions[0], Vec3f(100, 100, 100));
+    }
+
+    { // add 1000 points in three leafs (positions aren't important)
+
+        std::vector<Vec3s> positions;
+        for (int i = 0; i < 1000; i++) {
+            positions.push_back(openvdb::Vec3f(1, 1, 1));
+        }
+        for (int i = 0; i < 1000; i++) {
+            positions.push_back(openvdb::Vec3f(1, 1, 9));
+        }
+        for (int i = 0; i < 1000; i++) {
+            positions.push_back(openvdb::Vec3f(9, 9, 9));
+        }
+
+        const PointAttributeVector<Vec3s> pointList(positions);
+
+        PointIndexGrid::Ptr pointIndexGrid =
+            openvdb::tools::createPointIndexGrid<PointIndexGrid>(pointList, *transform);
+
+        grid = createPointDataGrid<PointDataGrid>(  *pointIndexGrid, pointList,
+                                                    AttributeVec3s::attributeType(), *transform);
+
+        PointDataTree& newTree = grid->tree();
+
+        CPPUNIT_ASSERT_EQUAL(pointCount(newTree), size_t(3000));
+
+        // random - maximum
+
+        appendGroup(newTree, "random_maximum");
+
+        const size_t target = 1001;
+
+        setGroupByRandomTarget(newTree, "random_maximum", target);
+
+        CPPUNIT_ASSERT_EQUAL(groupPointCount(newTree, "random_maximum"), target);
+
+        // random - percentage
+
+        appendGroup(newTree, "random_percentage");
+
+        setGroupByRandomPercentage(newTree, "random_percentage", 33.333333f);
+
+        CPPUNIT_ASSERT_EQUAL(groupPointCount(newTree, "random_percentage"), size_t(1000));
     }
 }
 
