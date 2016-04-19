@@ -80,8 +80,8 @@ public:
     }
 
     /// @brief  Returns the item to which this iterator is currently pointing.
-    inline Index32 operator*() { return mItem; }
-    inline Index32 operator*() const { return mItem; }
+    inline Index32 operator*() { assert(this->test()); return mItem; }
+    inline Index32 operator*() const { assert(this->test()); return mItem; }
 
     /// @brief  Return @c true if this iterator is not yet exhausted.
     inline operator bool() const { return mItem < mEnd; }
@@ -124,16 +124,17 @@ class ValueIndexIter
 {
 public:
     ValueIndexIter(ValueIterT& iter)
-        : mIndexIter(), mIter(iter), mParent(mIter.parent())
+        : mIndexIter(), mIter(iter), mParent(&mIter.parent())
     {
         if (mIter) {
-            Index32 start = mIter.offset() > 0 ? Index32(mParent.getValue(mIter.offset() - 1)) : Index32(0);
+            assert(mParent);
+            Index32 start = mIter.offset() > 0 ? Index32(mParent->getValue(mIter.offset() - 1)) : Index32(0);
             mIndexIter.reset(start, *mIter);
             if (!mIndexIter.test())   this->operator++();
         }
     }
     ValueIndexIter(const ValueIndexIter& other)
-        : mIndexIter(other.mIndexIter), mIter(other.mIter), mParent(other.mParent) { }
+        : mIndexIter(other.mIndexIter), mIter(other.mIter), mParent(other.mParent) { assert(mParent); }
 
     inline Index32 end() const { return mIndexIter.end(); }
 
@@ -142,8 +143,8 @@ public:
     }
 
     /// @brief  Returns the item to which this iterator is currently pointing.
-    inline Index32 operator*() { return *mIndexIter; }
-    inline Index32 operator*() const { return *mIndexIter; }
+    inline Index32 operator*() { assert(mIter); return *mIndexIter; }
+    inline Index32 operator*() const { assert(mIter); return *mIndexIter; }
 
     /// @brief  Return @c true if this iterator is not yet exhausted.
     inline operator bool() const { return mIter; }
@@ -153,7 +154,8 @@ public:
     inline ValueIndexIter& operator++() {
         mIndexIter.next();
         while (!mIndexIter.test() && mIter.next()) {
-            mIndexIter.reset(mParent.getValue(mIter.offset() - 1), *mIter);
+            assert(mParent);
+            mIndexIter.reset(mParent->getValue(mIter.offset() - 1), *mIter);
         }
         return *this;
     }
@@ -170,9 +172,9 @@ public:
     inline bool increment() { this->next(); return this->test(); }
 
     /// Return the coordinates of the item to which the value iterator is pointing.
-    inline Coord getCoord() const { return mIter.getCoord(); }
+    inline Coord getCoord() const { assert(mIter); return mIter.getCoord(); }
     /// Return in @a xyz the coordinates of the item to which the value iterator is pointing.
-    inline void getCoord(Coord& xyz) const { xyz = mIter.getCoord(); }
+    inline void getCoord(Coord& xyz) const { assert(mIter); xyz = mIter.getCoord(); }
 
     /// Return the const index iterator
     inline const IndexIter& indexIter() const { return mIndexIter; }
@@ -186,7 +188,7 @@ public:
 private:
     IndexIter mIndexIter;
     ValueIterT mIter;
-    const typename ValueIterT::NodeType& mParent;
+    const typename ValueIterT::NodeType* mParent;
 }; // ValueIndexIter
 
 
@@ -256,8 +258,8 @@ public:
     }
 
     /// @brief  Returns the item to which this iterator is currently pointing.
-    Index32 operator*() { return *mIterator; }
-    Index32 operator*() const { return *mIterator; }
+    Index32 operator*() { assert(mIterator); return *mIterator; }
+    Index32 operator*() const { assert(mIterator); return *mIterator; }
 
     /// @brief  Return @c true if this iterator is not yet exhausted.
     operator bool() const { return mIterator.test(); }

@@ -182,6 +182,10 @@ TestIndexIterator::testValueIndexIterator()
 
         CPPUNIT_ASSERT_EQUAL(iterCount(iter), Index64(size));
 
+        // check assignment operator
+        ValueIndexIter<ValueOnIter> iter2 = iter;
+        CPPUNIT_ASSERT_EQUAL(iterCount(iter2), Index64(size));
+
         ++iter;
 
         // check coord value
