@@ -27,7 +27,15 @@ if [ "$TASK" = "pre_install" ]; then
     sudo ln -s $PWD /test
     cd /test
     # enable all warnings and treat them as errors
-    sed -i 's/-pthread/--coverage -pthread -Wall -Wextra -Werror -pedantic/g' openvdb_points*/Makefile
+    sed -i 's/-pthread/-pthread -Wall -Wextra -Werror -pedantic/g' openvdb_points*/Makefile
+    # only enable code coverage for GCC, debug, non-Houdini configurations
+    if [ "$CXX" = "g++" ]; then
+        if [ "$RELEASE" = "no" ]; then
+            if [ "$HOUDINI_BUILD" = "none" ]; then
+                sed -i 's/-pthread/--coverage -pthread/g' openvdb_points*/Makefile
+            fi
+        fi
+    fi
     # download and unpack openvdb core library
     wget http://www.openvdb.org/download/openvdb_3_1_0_library.zip
     unzip openvdb_3_1_0_library.zip
