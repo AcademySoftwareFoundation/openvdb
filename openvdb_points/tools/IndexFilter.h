@@ -43,6 +43,7 @@
 #include <openvdb/Types.h>
 
 #include <openvdb/math/Transform.h>
+#include <openvdb/tools/Interpolation.h>
 
 #include <openvdb_points/tools/IndexIterator.h>
 #include <openvdb_points/tools/AttributeArray.h>
@@ -247,6 +248,70 @@ private:
 }; // class AttributeHashFilter
 
 
+template <typename LevelSetGridT>
+class LevelSetFilter
+{
+public:
+    typedef typename LevelSetGridT::ValueType ValueT;
+
+    struct Data
+    {
+        Data(const LevelSetGridT& _grid, const math::Transform& _transform,
+             const ValueT _min, const ValueT _max)
+            : accessor(_grid.getConstAccessor())
+            , levelSetTransform(_grid.transform())
+            , transform(_transform)
+            , min(_min)
+            , max(_max) { }
+
+        // not a reference to ensure const-accessor is unique per-thread
+        const typename LevelSetGridT::ConstAccessor accessor;
+        const math::Transform& levelSetTransform;
+        const math::Transform& transform;
+        const ValueT min;
+        const ValueT max;
+    };
+
+    LevelSetFilter(const Data& data,
+                   const AttributeHandle<openvdb::Vec3f>::Ptr& positionHandle)
+        : mData(&data)
+        , mPositionHandle(positionHandle) { }
+
+    template <typename LeafT>
+    static LevelSetFilter create(const LeafT& leaf, const Data& data) {
+        return LevelSetFilter(data, AttributeHandle<openvdb::Vec3f>::create(leaf.constAttributeArray("P")));
+    }
+
+    template <typename IterT>
+    bool valid(const IterT& iter) const {
+        assert(mData);
+        assert(iter);
+
+        const openvdb::Coord ijk = iter.getCoord();
+        const openvdb::Vec3f voxelIndexSpace = ijk.asVec3d();
+
+        // Retrieve point position in voxel space
+        const openvdb::Vec3f& pointVoxelSpace = mPositionHandle->get(*iter);
+
+        // Compute point position in index space
+        const openvdb::Vec3f pointWorldSpace = mData->transform.indexToWorld(pointVoxelSpace + voxelIndexSpace);
+        const openvdb::Vec3f pointIndexSpace = mData->levelSetTransform.worldToIndex(pointWorldSpace);
+
+        // Perform level-set sampling
+        const typename LevelSetGridT::ValueType value = BoxSampler::sample(mData->accessor, pointIndexSpace);
+
+        // if min is greater than max, we invert so that values are valid outside of the range (not inside)
+        const bool invert = mData->min > mData->max;
+
+        return invert ? (value < mData->max || value > mData->min) : (value < mData->max && value > mData->min);
+    }
+
+private:
+    const Data* mData;
+    AttributeHandle<openvdb::Vec3f>::Ptr mPositionHandle;
+}; // class LevelSetFilter
+
+
 // BBox index filtering
 class BBoxFilter
 {
@@ -342,6 +407,10 @@ struct FilterTraits {
 };
 template<>
 struct FilterTraits<BBoxFilter> {
+    static const bool RequiresCoord = true;
+};
+template <typename T>
+struct FilterTraits<LevelSetFilter<T> > {
     static const bool RequiresCoord = true;
 };
 template <typename T0, typename T1, bool And>

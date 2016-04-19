@@ -49,12 +49,14 @@ public:
     CPPUNIT_TEST_SUITE(TestIndexFilter);
     CPPUNIT_TEST(testRandomLeafFilter);
     CPPUNIT_TEST(testAttributeHashFilter);
+    CPPUNIT_TEST(testLevelSetFilter);
     CPPUNIT_TEST(testBBoxFilter);
     CPPUNIT_TEST(testBinaryFilter);
     CPPUNIT_TEST_SUITE_END();
 
     void testRandomLeafFilter();
     void testAttributeHashFilter();
+    void testLevelSetFilter();
     void testBBoxFilter();
     void testBinaryFilter();
 }; // class TestIndexFilter
@@ -112,6 +114,38 @@ public:
 private:
     const int mThreshold;
 }; // class ThresholdFilter
+
+
+/// @brief Generates the signed distance to a sphere located at @a center
+/// and with a specified @a radius (both in world coordinates). Only voxels
+/// in the domain [0,0,0] -> @a dim are considered. Also note that the
+/// level set is either dense, dense narrow-band or sparse narrow-band.
+///
+/// @note This method is VERY SLOW and should only be used for debugging purposes!
+/// However it works for any transform and even with open level sets.
+/// A faster approch for closed narrow band generation is to only set voxels
+/// sparsely and then use grid::signedFloodFill to define the sign
+/// of the background values and tiles! This is implemented in openvdb/tools/LevelSetSphere.h
+template<class GridType>
+inline void
+makeSphere(const openvdb::Coord& dim, const openvdb::Vec3f& center, float radius, GridType& grid)
+{
+    typedef typename GridType::ValueType ValueT;
+    const ValueT zero = openvdb::zeroVal<ValueT>();
+
+    typename GridType::Accessor acc = grid.getAccessor();
+    openvdb::Coord xyz;
+    for (xyz[0]=0; xyz[0]<dim[0]; ++xyz[0]) {
+        for (xyz[1]=0; xyz[1]<dim[1]; ++xyz[1]) {
+            for (xyz[2]=0; xyz[2]<dim[2]; ++xyz[2]) {
+                const openvdb::Vec3R p =  grid.transform().indexToWorld(xyz);
+                const float dist = float((p-center).length() - radius);
+                ValueT val = ValueT(zero + dist);
+                acc.setValue(xyz, val);
+            }
+        }
+    }
+}
 
 
 void
@@ -372,6 +406,168 @@ TestIndexFilter::testAttributeHashFilter()
         CPPUNIT_ASSERT(filter2.valid(indexIter));
         ++indexIter;
         CPPUNIT_ASSERT(!indexIter);
+    }
+}
+
+
+void
+TestIndexFilter::testLevelSetFilter()
+{
+    using namespace openvdb;
+    using namespace openvdb::tools;
+
+    typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
+
+    AttributeVec3s::registerType();
+
+    // create a point grid
+
+    PointDataGrid::Ptr points;
+
+    {
+        std::vector<Vec3s> positions;
+        positions.push_back(Vec3s(1, 1, 1));
+        positions.push_back(Vec3s(1, 2, 1));
+        positions.push_back(Vec3s(10.1, 10, 1));
+
+        const double voxelSize(1.0);
+        math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
+
+        points = createPointDataGrid<PointDataGrid>(positions, AttributeVec3s::attributeType(), *transform);
+    }
+
+    // create a sphere levelset
+
+    FloatGrid::Ptr sphere;
+
+    {
+        double voxelSize = 0.5;
+        sphere = FloatGrid::create(/*backgroundValue=*/5.0);
+        sphere->setTransform(math::Transform::createLinearTransform(voxelSize));
+
+        const openvdb::Coord dim(10, 10, 10);
+        const openvdb::Vec3f center(0.0f, 0.0f, 0.0f);
+        const float radius = 2;
+        makeSphere<FloatGrid>(dim, center, radius, *sphere);
+    }
+
+    typedef LevelSetFilter<FloatGrid> LSFilter;
+
+    { // capture both points near origin
+        LSFilter::Data data(*sphere, points->transform(), -4.0f, 4.0f);
+        PointDataGrid::TreeType::LeafCIter leafIter = points->tree().cbeginLeaf();
+        PointDataGrid::TreeType::LeafNodeType::IndexOnIter iter = leafIter->beginIndexOn();
+        LSFilter filter = LSFilter::create(*leafIter, data);
+
+        CPPUNIT_ASSERT(filter.valid(iter));
+        ++iter;
+        CPPUNIT_ASSERT(filter.valid(iter));
+        ++iter;
+        CPPUNIT_ASSERT(!iter);
+
+        ++leafIter;
+        iter = leafIter->beginIndexOn();
+        filter = LSFilter::create(*leafIter, data);
+
+        CPPUNIT_ASSERT(iter);
+        CPPUNIT_ASSERT(!filter.valid(iter));
+        ++iter;
+        CPPUNIT_ASSERT(!iter);
+    }
+
+    { // capture just the inner-most point
+        LSFilter::Data data(*sphere, points->transform(), -0.3f, -0.25f);
+        PointDataGrid::TreeType::LeafCIter leafIter = points->tree().cbeginLeaf();
+        PointDataGrid::TreeType::LeafNodeType::IndexOnIter iter = leafIter->beginIndexOn();
+        LSFilter filter = LSFilter::create(*leafIter, data);
+
+        CPPUNIT_ASSERT(filter.valid(iter));
+        ++iter;
+        CPPUNIT_ASSERT(!filter.valid(iter));
+        ++iter;
+        CPPUNIT_ASSERT(!iter);
+
+        ++leafIter;
+        iter = leafIter->beginIndexOn();
+        filter = LSFilter::create(*leafIter, data);
+
+        CPPUNIT_ASSERT(iter);
+        CPPUNIT_ASSERT(!filter.valid(iter));
+        ++iter;
+        CPPUNIT_ASSERT(!iter);
+    }
+
+    { // capture everything but the second point (min > max)
+        LSFilter::Data data(*sphere, points->transform(), -0.25f, -0.3f);
+        PointDataGrid::TreeType::LeafCIter leafIter = points->tree().cbeginLeaf();
+        PointDataGrid::TreeType::LeafNodeType::IndexOnIter iter = leafIter->beginIndexOn();
+        LSFilter filter = LSFilter::create(*leafIter, data);
+
+        CPPUNIT_ASSERT(!filter.valid(iter));
+        ++iter;
+        CPPUNIT_ASSERT(filter.valid(iter));
+        ++iter;
+        CPPUNIT_ASSERT(!iter);
+
+        ++leafIter;
+        iter = leafIter->beginIndexOn();
+        filter = LSFilter::create(*leafIter, data);
+
+        CPPUNIT_ASSERT(iter);
+        CPPUNIT_ASSERT(filter.valid(iter));
+        ++iter;
+        CPPUNIT_ASSERT(!iter);
+    }
+
+    {
+        std::vector<Vec3s> positions;
+        positions.push_back(Vec3s(1, 1, 1));
+        positions.push_back(Vec3s(1, 2, 1));
+        positions.push_back(Vec3s(10.1, 10, 1));
+
+        const double voxelSize(0.25);
+        math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
+
+        points = createPointDataGrid<PointDataGrid>(positions, AttributeVec3s::attributeType(), *transform);
+    }
+
+    {
+        double voxelSize = 1.0;
+        sphere = FloatGrid::create(/*backgroundValue=*/5.0);
+        sphere->setTransform(math::Transform::createLinearTransform(voxelSize));
+
+        const openvdb::Coord dim(40, 40, 40);
+        const openvdb::Vec3f center(10.0f, 10.0f, 0.1f);
+        const float radius = 0.2;
+        makeSphere<FloatGrid>(dim, center, radius, *sphere);
+    }
+
+    { // capture only the last point using a different transform and a new sphere
+        LSFilter::Data data(*sphere, points->transform(), 0.5f, 1.0f);
+        PointDataGrid::TreeType::LeafCIter leafIter = points->tree().cbeginLeaf();
+        PointDataGrid::TreeType::LeafNodeType::IndexOnIter iter = leafIter->beginIndexOn();
+        LSFilter filter = LSFilter::create(*leafIter, data);
+
+        CPPUNIT_ASSERT(!filter.valid(iter));
+        ++iter;
+        CPPUNIT_ASSERT(!iter);
+
+        ++leafIter;
+        iter = leafIter->beginIndexOn();
+        filter = LSFilter::create(*leafIter, data);
+
+        CPPUNIT_ASSERT(!filter.valid(iter));
+        ++iter;
+        CPPUNIT_ASSERT(!iter);
+
+        ++leafIter;
+        iter = leafIter->beginIndexOn();
+        filter = LSFilter::create(*leafIter, data);
+
+        CPPUNIT_ASSERT(iter);
+        CPPUNIT_ASSERT(filter.valid(iter));
+        ++iter;
+        CPPUNIT_ASSERT(!iter);
     }
 }
 
