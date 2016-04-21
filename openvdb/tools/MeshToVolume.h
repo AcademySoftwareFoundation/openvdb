@@ -235,7 +235,10 @@ private:
 ////////////////////////////////////////
 
 
-// Wrapper functions for the mesh to volume converter
+// Convenience functions for the mesh to volume converter that wrap stl containers.
+//
+// Note the meshToVolume() method declared above is more flexible and better suited
+// for arbitrary data structures.
 
 
 /// @brief Convert a triangle mesh to a level set volume.
@@ -256,6 +259,16 @@ private:
 template<typename GridType>
 inline typename GridType::Ptr
 meshToLevelSet(
+    const openvdb::math::Transform& xform,
+    const std::vector<Vec3s>& points,
+    const std::vector<Vec3I>& triangles,
+    float halfWidth = float(LEVEL_SET_HALF_WIDTH));
+
+/// Adds support for a @a interrupter callback used to cancel the conversion.
+template<typename GridType, typename Interrupter>
+inline typename GridType::Ptr
+meshToLevelSet(
+    Interrupter& interrupter,
     const openvdb::math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec3I>& triangles,
@@ -285,6 +298,16 @@ meshToLevelSet(
     const std::vector<Vec4I>& quads,
     float halfWidth = float(LEVEL_SET_HALF_WIDTH));
 
+/// Adds support for a @a interrupter callback used to cancel the conversion.
+template<typename GridType, typename Interrupter>
+inline typename GridType::Ptr
+meshToLevelSet(
+    Interrupter& interrupter,
+    const openvdb::math::Transform& xform,
+    const std::vector<Vec3s>& points,
+    const std::vector<Vec4I>& quads,
+    float halfWidth = float(LEVEL_SET_HALF_WIDTH));
+
 
 /// @brief Convert a triangle and quad mesh to a level set volume.
 ///
@@ -305,6 +328,17 @@ meshToLevelSet(
 template<typename GridType>
 inline typename GridType::Ptr
 meshToLevelSet(
+    const openvdb::math::Transform& xform,
+    const std::vector<Vec3s>& points,
+    const std::vector<Vec3I>& triangles,
+    const std::vector<Vec4I>& quads,
+    float halfWidth = float(LEVEL_SET_HALF_WIDTH));
+
+/// Adds support for a @a interrupter callback used to cancel the conversion.
+template<typename GridType, typename Interrupter>
+inline typename GridType::Ptr
+meshToLevelSet(
+    Interrupter& interrupter,
     const openvdb::math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec3I>& triangles,
@@ -340,6 +374,18 @@ meshToSignedDistanceField(
     float exBandWidth,
     float inBandWidth);
 
+/// Adds support for a @a interrupter callback used to cancel the conversion.
+template<typename GridType, typename Interrupter>
+inline typename GridType::Ptr
+meshToSignedDistanceField(
+    Interrupter& interrupter,
+    const openvdb::math::Transform& xform,
+    const std::vector<Vec3s>& points,
+    const std::vector<Vec3I>& triangles,
+    const std::vector<Vec4I>& quads,
+    float exBandWidth,
+    float inBandWidth);
+
 
 /// @brief Convert a triangle and quad mesh to an unsigned distance field.
 ///
@@ -358,6 +404,17 @@ meshToSignedDistanceField(
 template<typename GridType>
 inline typename GridType::Ptr
 meshToUnsignedDistanceField(
+    const openvdb::math::Transform& xform,
+    const std::vector<Vec3s>& points,
+    const std::vector<Vec3I>& triangles,
+    const std::vector<Vec4I>& quads,
+    float bandWidth);
+
+/// Adds support for a @a interrupter callback used to cancel the conversion.
+template<typename GridType, typename Interrupter>
+inline typename GridType::Ptr
+meshToUnsignedDistanceField(
+    Interrupter& interrupter,
     const openvdb::math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec3I>& triangles,
@@ -3317,10 +3374,11 @@ meshToVolume(
 
 
 /// @internal This overload is enabled only for grids with a scalar, floating-point ValueType.
-template<typename GridType>
+template<typename GridType, typename Interrupter>
 inline typename boost::enable_if<boost::is_floating_point<typename GridType::ValueType>,
 typename GridType::Ptr>::type
 doMeshConversion(
+    Interrupter& interrupter,
     const openvdb::math::Transform& xform,
     const std::vector<Vec3s>& points,
     const std::vector<Vec3I>& triangles,
@@ -3380,16 +3438,17 @@ doMeshConversion(
     QuadAndTriangleDataAdapter<Vec3s, Vec4I>
         mesh(indexSpacePoints.get(), numPoints, prims.get(), numPrimitives);
 
-    return meshToVolume<GridType>(mesh, xform, exBandWidth, inBandWidth, conversionFlags);
+    return meshToVolume<GridType>(interrupter, mesh, xform, exBandWidth, inBandWidth, conversionFlags);
 }
 
 
 /// @internal This overload is enabled only for grids that do not have a scalar,
 /// floating-point ValueType.
-template<typename GridType>
+template<typename GridType, typename Interrupter>
 inline typename boost::disable_if<boost::is_floating_point<typename GridType::ValueType>,
 typename GridType::Ptr>::type
 doMeshConversion(
+    Interrupter&,
     const math::Transform& /*xform*/,
     const std::vector<Vec3s>& /*points*/,
     const std::vector<Vec3I>& /*triangles*/,
@@ -3414,8 +3473,24 @@ meshToLevelSet(
     const std::vector<Vec3I>& triangles,
     float halfWidth)
 {
+    util::NullInterrupter nullInterrupter;
     std::vector<Vec4I> quads(0);
-    return doMeshConversion<GridType>(xform, points, triangles, quads,
+    return doMeshConversion<GridType>(nullInterrupter, xform, points, triangles, quads,
+        halfWidth, halfWidth);
+}
+
+
+template<typename GridType, typename Interrupter>
+inline typename GridType::Ptr
+meshToLevelSet(
+    Interrupter& interrupter,
+    const openvdb::math::Transform& xform,
+    const std::vector<Vec3s>& points,
+    const std::vector<Vec3I>& triangles,
+    float halfWidth)
+{
+    std::vector<Vec4I> quads(0);
+    return doMeshConversion<GridType>(interrupter, xform, points, triangles, quads,
         halfWidth, halfWidth);
 }
 
@@ -3428,8 +3503,24 @@ meshToLevelSet(
     const std::vector<Vec4I>& quads,
     float halfWidth)
 {
+    util::NullInterrupter nullInterrupter;
     std::vector<Vec3I> triangles(0);
-    return doMeshConversion<GridType>(xform, points, triangles, quads,
+    return doMeshConversion<GridType>(nullInterrupter, xform, points, triangles, quads,
+        halfWidth, halfWidth);
+}
+
+
+template<typename GridType, typename Interrupter>
+inline typename GridType::Ptr
+meshToLevelSet(
+    Interrupter& interrupter,
+    const openvdb::math::Transform& xform,
+    const std::vector<Vec3s>& points,
+    const std::vector<Vec4I>& quads,
+    float halfWidth)
+{
+    std::vector<Vec3I> triangles(0);
+    return doMeshConversion<GridType>(interrupter, xform, points, triangles, quads,
         halfWidth, halfWidth);
 }
 
@@ -3443,7 +3534,23 @@ meshToLevelSet(
     const std::vector<Vec4I>& quads,
     float halfWidth)
 {
-    return doMeshConversion<GridType>(xform, points, triangles, quads,
+    util::NullInterrupter nullInterrupter;
+    return doMeshConversion<GridType>(nullInterrupter, xform, points, triangles, quads,
+        halfWidth, halfWidth);
+}
+
+
+template<typename GridType, typename Interrupter>
+inline typename GridType::Ptr
+meshToLevelSet(
+    Interrupter& interrupter,
+    const openvdb::math::Transform& xform,
+    const std::vector<Vec3s>& points,
+    const std::vector<Vec3I>& triangles,
+    const std::vector<Vec4I>& quads,
+    float halfWidth)
+{
+    return doMeshConversion<GridType>(interrupter, xform, points, triangles, quads,
         halfWidth, halfWidth);
 }
 
@@ -3458,7 +3565,24 @@ meshToSignedDistanceField(
     float exBandWidth,
     float inBandWidth)
 {
-    return doMeshConversion<GridType>(xform, points, triangles,
+    util::NullInterrupter nullInterrupter;
+    return doMeshConversion<GridType>(nullInterrupter, xform, points, triangles,
+        quads, exBandWidth, inBandWidth);
+}
+
+
+template<typename GridType, typename Interrupter>
+inline typename GridType::Ptr
+meshToSignedDistanceField(
+    Interrupter& interrupter,
+    const openvdb::math::Transform& xform,
+    const std::vector<Vec3s>& points,
+    const std::vector<Vec3I>& triangles,
+    const std::vector<Vec4I>& quads,
+    float exBandWidth,
+    float inBandWidth)
+{
+    return doMeshConversion<GridType>(interrupter, xform, points, triangles,
         quads, exBandWidth, inBandWidth);
 }
 
@@ -3472,7 +3596,23 @@ meshToUnsignedDistanceField(
     const std::vector<Vec4I>& quads,
     float bandWidth)
 {
-    return doMeshConversion<GridType>(xform, points, triangles, quads,
+    util::NullInterrupter nullInterrupter;
+    return doMeshConversion<GridType>(nullInterrupter, xform, points, triangles, quads,
+        bandWidth, bandWidth, true);
+}
+
+
+template<typename GridType, typename Interrupter>
+inline typename GridType::Ptr
+meshToUnsignedDistanceField(
+    Interrupter& interrupter,
+    const openvdb::math::Transform& xform,
+    const std::vector<Vec3s>& points,
+    const std::vector<Vec3I>& triangles,
+    const std::vector<Vec4I>& quads,
+    float bandWidth)
+{
+    return doMeshConversion<GridType>(interrupter, xform, points, triangles, quads,
         bandWidth, bandWidth, true);
 }
 

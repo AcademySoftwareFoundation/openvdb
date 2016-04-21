@@ -1025,7 +1025,7 @@ public:
     void operator()(const tbb::blocked_range<LeafT**> &r) const
     {
         MaskT mask;// thread-local temporary mask tree
-        for (LeafT** it=r.begin(); it!=r.end(); ++it) mask.addLeaf( **it );
+        for (LeafT** it=r.begin(); it!=r.end(); ++it) mask.addLeaf( *it );
         tree::LeafManager<MaskT> manager(mask, r.begin(), r.end());
         tools::dilateVoxels(manager, mIter, mNN);// serial dilation of active voxels
         mPool->local().merge(mask, MERGE_ACTIVE_STATES);

@@ -33,7 +33,7 @@ Version 3.2.0 - In development
       new grids rather than modifying their input grids.  These new tools are
       faster and use less memory than the existing tools (if only because the
       input grids never need to be deep-copied).
-    - Added tools::pointMaskGrid(), which activates voxels that intersect
+    - Added tools::PointsToMask, which activates voxels that intersect
       points from a given list.
     - Added a memory-efficient, binary-mask grid type, dubbed "MaskGrid",
       that uses a single bit per voxel to represent the voxel's active state
@@ -53,6 +53,7 @@ Version 3.2.0 - In development
     - Added a new (expert) constructor to tools::LeafManager
     - Added the templated math::MinMax class to compute the extrema of
       arbitrary value types.
+    - Added sparseFill and denseFill methods to the Grid, Tree and RootNode classes.
 
     Improvements:
     - Significantly improved the performance, parallel scaling and memory usage
@@ -62,8 +63,6 @@ Version 3.2.0 - In development
     - Improved the performance of morphological dilation by up to six times
       while also adding support for active tiles.
     - Improved the performance of Tree::voxelizeActiveTiles by means of multi-threading.
-    - The method Tree::fill can now produce dense, i.e. voxelized, values.
-      However, the default behavior remains sparse.
     - Improved the performance of tools::meshToVolume(), particularly for
       large narrow-band widths and for signed distance fields with dense
       interior regions.
@@ -80,6 +79,8 @@ Version 3.2.0 - In development
     - Added math::Mat3::setRows, math::Mat4::setRows,
       math::Mat3::setColumns Mat3::setColumns, and
       math::Mat4::setColumns.
+    - Added util::NodeMask::isConstant method for faster bit processing.
+    - tools::Prune performs an improved estimate of tile values by means of medians.
 
     Bug fixes:
     - Fixed a bug in the level-set advection tool that could cause
@@ -117,12 +118,14 @@ Version 3.2.0 - In development
       [Contributed by Edward Lam]
     - Fixed isApproxZero() so that it works correctly when tolerance is zero.
       [Contributed by Joshua Olson]
+    - Fixed bugs in tree::NodeUnion that could cause crashes.
 
     API changes:
     - Deprecated math::Mat3::setBasis and math::Mat4::setBasis.
     - Renamed math::GudonovsNormSqrd to math::GodunovsNormSqrd
       [Contributed by Branislav Radjenovic]
     - Renamed ValueType to PosType in the PointArray interface.
+    - Deprecated tree::Tree::addLeaf(LeafNode&) and added tree::Tree::addLeaf(LeafNode*).
 
     Python:
     - Updated the Python module for Python 3 compatibility.
@@ -140,12 +143,11 @@ Version 3.2.0 - In development
       into distinct grids.
     - Added a LOD SOP that produces a sequences of progressively lower
       resolution grids.
-    - Added a Topology Mask SOP that generates a mask grid from either
-      the active voxels in a grid or from positions in a point cloud.
-      The SOP supports Houdini 15's packed points.
-    - Added a From Mask SOP that generates a level set or fog volume from
-      the implicit boundary between active and inactive voxels in an
-      input grid of arbitrary type.
+    - Added a Topology To Level Set SOP that generates a narrow-band
+      signed distance field / level set from the interface between active
+      and inactive voxels in an arbitrary grid.
+    - Revamped the From Particles SOP UI and added a more efficient
+      level set conversion method that supports Houdini 15 packed points.
     - Updated the Rasterize Points SOP with support for frustum transforms,
       sub region masking and orientation logic that matches the native
       Copy SOP's orientation.

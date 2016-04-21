@@ -46,7 +46,7 @@ New features:
   modifying their input grids.
   These new tools are faster and use less memory than the existing tools
   (if only because the input grids never need to be deep-copied).
-- Added a @vdblink::tools::pointMaskGrid() pointMaskGrid@endlink tool,
+- Added a @vdblink::tools::PointsToMask PointsToMask@endlink tool,
   which activates voxels that intersect points from a given list.
 - Added a memory-efficient, binary-mask grid type, dubbed
   &ldquo;@link tree/LeafNodeMask.h MaskGrid@endlink&rdquo;, that uses
@@ -73,6 +73,7 @@ New features:
 - Added active tile count to @vdblink::tree::Tree::print Tree::print@endlink.
 - Added the templated @vdblink::math::MinMax MinMax@endlink class to compute the
   extrema of arbitrary value types.
+- Added sparseFill and denseFill methods to the Grid, Tree and RootNode classes.
 
 @par
 Improvements:
@@ -85,8 +86,6 @@ Improvements:
   @vdblink::tools::dilateActiveValues dilateActiveValues@endlink.
 - Improved the performance of @vdblink::tree::Tree::voxelizeActiveTiles()
   Tree::voxelizeActiveTiles@endlink by means of multi-threading.
-- The method @vdblink::tree::Tree::fill Tree::fill@endlink can now
-  produce dense, i.e. voxelized, values. However, the default behavior remains sparse.
 - Improved the performance of the
   @vdblink::tools::meshToVolume() mesh-to-volume converter@endlink,
   particularly for large narrow-band widths and for signed distance fields
@@ -107,7 +106,10 @@ Improvements:
   @vdblink&math::Mat4::setRows Mat4::setRows@endlink,
   @vdblink&math::Mat3::setColumns Mat3::setColumns@endlink and
   @vdblink&math::Mat4::setColumns Mat4::setColumns@endlink.
-
+- Added @vdblink::util::NodeMask::isConstant NodeMask::isConstant@endlink
+  method for faster bit processing.
+- @vdblink::tools::prune tools::prune@endlink performs an improved estimate
+  of tile values by means of medians.
 
 @par
 Bug fixes:
@@ -155,6 +157,7 @@ Bug fixes:
 - Fixed @vdblink::math::isApproxZero() isApproxZero@endlink so that it works correctly
   when tolerance is zero.
   <I>[Contributed by Joshua Olson]</I>
+- Fixed bugs in @vdblink::tree::NodeUnion NodeUnion@endlink that could cause crashes.
 
 @par
 API changes:
@@ -164,6 +167,7 @@ API changes:
   @vdblink::math::GodunovsNormSqrd GodunovsNormSqrd@endlink
   <I>[Contributed by Branislav&nbsp;Radjenovic]</I>
 - Renamed @c ValueType to @c PosType in the PointArray interface.
+- Deprecated tree::Tree::addLeaf(LeafNode&) and added tree::Tree::addLeaf(LeafNode*).
 
 @par
 Python:
@@ -184,12 +188,11 @@ Houdini:
   into distinct grids.
 - Added a LOD SOP that produces a sequences of progressively lower
   resolution grids.
-- Added a Topology Mask SOP that generates a mask grid from either
-  the active voxels in a grid or from positions in a point cloud.
-  The SOP supports Houdini&nbsp;15&rsquo;s packed points.
-- Added a From Mask SOP that generates a level set or fog volume from
-  the implicit boundary between active and inactive voxels in an
-  input grid of arbitrary type.
+- Added a Topology To Level Set SOP that generates a narrow-band
+  signed distance field / level set from the interface between active
+  and inactive voxels in an arbitrary grid.
+- Revamped the From Particles SOP UI and added a more efficient level set
+  conversion method that supports Houdini 15 packed points.
 - Updated the Rasterize Points SOP with support for frustum transforms,
   sub region masking and orientation logic that matches the native
   Copy SOP's orientation.

@@ -87,6 +87,23 @@ ParmList::beginSwitcher(const std::string& token, const std::string& label)
     }
     SwitcherInfo info;
     info.parmIdx = mParmVec.size();
+    info.exclusive = false;
+    mSwitchers.push_back(info);
+    // Add a switcher parameter with the given token and name, but no folders.
+    mParmVec.push_back(ParmFactory(PRM_SWITCHER, token, label).get());
+    return *this;
+}
+
+
+ParmList&
+ParmList::beginExclusiveSwitcher(const std::string& token, const std::string& label)
+{
+    if (NULL != getCurrentSwitcher()) {
+        incFolderParmCount();
+    }
+    SwitcherInfo info;
+    info.parmIdx = mParmVec.size();
+    info.exclusive = true;
     mSwitchers.push_back(info);
     // Add a switcher parameter with the given token and name, but no folders.
     mParmVec.push_back(ParmFactory(PRM_SWITCHER, token, label).get());
@@ -109,7 +126,8 @@ ParmList::endSwitcher()
             if (const char* s = switcherParm.getToken()) token = s;
             if (const char* s = switcherParm.getLabel()) label = s;
             mParmVec[info->parmIdx] =
-                ParmFactory(PRM_SWITCHER, token.c_str(), label.c_str())
+                ParmFactory(info->exclusive ? PRM_SWITCHER_EXCLUSIVE : PRM_SWITCHER,
+                    token.c_str(), label.c_str())
                 .setVectorSize(int(info->folders.size()))
                 .setDefault(info->folders)
                 .get();

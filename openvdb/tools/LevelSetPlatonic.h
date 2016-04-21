@@ -98,11 +98,8 @@ createLevelSetPlatonic(int faceCount,// 4, 6, 8, 12 or 20
                        float voxelSize = 0.1f,
                        float halfWidth = float(LEVEL_SET_HALF_WIDTH))
 {
-    return createLevelSetPlatonic<GridType, util::NullInterrupter>(faceCount,
-                                                                   scale,
-                                                                   center,
-                                                                   voxelSize,
-                                                                   halfWidth);
+    util::NullInterrupter tmp;
+    return createLevelSetPlatonic<GridType>(faceCount, scale, center, voxelSize, halfWidth, &tmp);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -145,8 +142,8 @@ createLevelSetTetrahedron(float scale = 1.0f,
                           float voxelSize = 0.1f,
                           float halfWidth = float(LEVEL_SET_HALF_WIDTH))
 {
-    return createLevelSetPlatonic<GridType, util::NullInterrupter>(4, scale, center,
-                                                                   voxelSize, halfWidth);
+    util::NullInterrupter tmp;
+    return createLevelSetPlatonic<GridType>(4, scale, center, voxelSize, halfWidth, &tmp);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -169,8 +166,7 @@ createLevelSetCube(float scale = 1.0f,
                    float halfWidth = float(LEVEL_SET_HALF_WIDTH),
                    InterruptT* interrupt =  NULL)
 {
-    return createLevelSetPlatonic<GridType, InterruptT>(6, scale, center,
-                                                        voxelSize, halfWidth, interrupt);
+    return createLevelSetPlatonic<GridType>(6, scale, center, voxelSize, halfWidth, interrupt);
 }
 
 /// @brief Return a grid of type @c GridType containing a narrow-band level set
@@ -189,8 +185,8 @@ createLevelSetCube(float scale = 1.0f,
                    float voxelSize = 0.1f,
                    float halfWidth = float(LEVEL_SET_HALF_WIDTH))
 {
-    return createLevelSetPlatonic<GridType, util::NullInterrupter>(6, scale, center,
-                                                                   voxelSize, halfWidth);
+    util::NullInterrupter tmp;
+    return createLevelSetPlatonic<GridType>(6, scale, center, voxelSize, halfWidth, &tmp);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -213,8 +209,7 @@ createLevelSetOctahedron(float scale = 1.0f,
                          float halfWidth = float(LEVEL_SET_HALF_WIDTH),
                          InterruptT* interrupt =  NULL)
 {
-    return createLevelSetPlatonic<GridType, InterruptT>(8, scale, center,
-                                                        voxelSize, halfWidth, interrupt);
+    return createLevelSetPlatonic<GridType>(8, scale, center, voxelSize, halfWidth, interrupt);
 }
 
 /// @brief Return a grid of type @c GridType containing a narrow-band level set
@@ -233,8 +228,8 @@ createLevelSetOctahedron(float scale = 1.0f,
                          float voxelSize = 0.1f,
                          float halfWidth = float(LEVEL_SET_HALF_WIDTH))
 {
-    return createLevelSetPlatonic<GridType, util::NullInterrupter>(8, scale, center,
-                                                                   voxelSize, halfWidth);
+    util::NullInterrupter tmp;
+    return createLevelSetPlatonic<GridType>(8, scale, center, voxelSize, halfWidth, &tmp);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -257,8 +252,7 @@ createLevelSetDodecahedron(float scale = 1.0f,
                            float halfWidth = float(LEVEL_SET_HALF_WIDTH),
                            InterruptT* interrupt =  NULL)
 {
-    return createLevelSetPlatonic<GridType, InterruptT>(12, scale, center,
-                                                        voxelSize, halfWidth, interrupt);
+    return createLevelSetPlatonic<GridType>(12, scale, center, voxelSize, halfWidth, interrupt);
 }
 
 /// @brief Return a grid of type @c GridType containing a narrow-band level set
@@ -277,8 +271,8 @@ createLevelSetDodecahedron(float scale = 1.0f,
                            float voxelSize = 0.1f,
                            float halfWidth = float(LEVEL_SET_HALF_WIDTH))
 {
-    return createLevelSetPlatonic<GridType, util::NullInterrupter>(12, scale, center,
-                                                                   voxelSize, halfWidth);
+    util::NullInterrupter tmp;
+    return createLevelSetPlatonic<GridType>(12, scale, center, voxelSize, halfWidth, &tmp);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -301,8 +295,7 @@ createLevelSetIcosahedron(float scale = 1.0f,
                           float halfWidth = float(LEVEL_SET_HALF_WIDTH),
                           InterruptT* interrupt =  NULL)
 {
-    return createLevelSetPlatonic<GridType, InterruptT>(20, scale, center,
-                                                        voxelSize, halfWidth, interrupt);
+    return createLevelSetPlatonic<GridType>(20, scale, center, voxelSize, halfWidth, interrupt);
 }
 
 /// @brief Return a grid of type @c GridType containing a narrow-band level set
@@ -321,8 +314,8 @@ createLevelSetIcosahedron(float scale = 1.0f,
                           float voxelSize = 0.1f,
                           float halfWidth = float(LEVEL_SET_HALF_WIDTH))
 {
-    return createLevelSetPlatonic<GridType, util::NullInterrupter>(20, scale, center,
-                                                                   voxelSize, halfWidth);
+    util::NullInterrupter tmp;
+    return createLevelSetPlatonic<GridType>(20, scale, center, voxelSize, halfWidth, &tmp);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -330,7 +323,7 @@ createLevelSetIcosahedron(float scale = 1.0f,
 template<typename GridType, typename InterruptT>
 typename GridType::Ptr
 createLevelSetPlatonic(int faceCount,float scale, const Vec3f& center,
-                       float voxelSize, float halfWidth, InterruptT*)
+                       float voxelSize, float halfWidth, InterruptT *interrupt)
 {
     // GridType::ValueType is required to be a floating-point scalar.
     BOOST_STATIC_ASSERT(boost::is_floating_point<typename GridType::ValueType>::value);
@@ -480,7 +473,16 @@ createLevelSetPlatonic(int faceCount,float scale, const Vec3f& center,
     // Apply scale and translation to all the vertices
     for ( size_t i = 0; i<vtx.size(); ++i ) vtx[i] = scale * vtx[i] + center;
 
-    return meshToLevelSet<GridType>( *xform, vtx, tri, qua, halfWidth );
+    typename GridType::Ptr grid;
+
+    if (interrupt == NULL) {
+        util::NullInterrupter tmp;
+        grid = meshToLevelSet<GridType>(tmp, *xform, vtx, tri, qua, halfWidth);
+    } else {
+        grid = meshToLevelSet<GridType>(*interrupt, *xform, vtx, tri, qua, halfWidth);
+    }
+
+    return grid;
 }
 
 } // namespace tools

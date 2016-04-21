@@ -550,16 +550,33 @@ public:
     template<typename ModifyOp>
     void modifyValueAndActiveState(const Coord& xyz, const ModifyOp& op);
 
-    /// @brief Set all voxels within a given box to a constant value, if necessary
-    /// subdividing tiles that intersect the box.
+    //@{
+    /// @brief Set all voxels within a given axis-aligned box to a constant value.
     /// @param bbox    inclusive coordinates of opposite corners of an axis-aligned box
     /// @param value   the value to which to set voxels within the box
     /// @param active  if true, mark voxels within the box as active,
-    ///                otherwise mark them as inactive. Defaults to true.
-    /// @param sparse  if false, active tiles are voxelized, i.e. only active voxels
-    ///                are generated from the fill operation. Defaults to true.  
-    void fill(const CoordBBox& bbox, const ValueType& value, bool active = true, bool sparse = true);
+    ///                otherwise mark them as inactive
+    /// @note This operation generates a sparse, but not always optimally sparse,
+    /// representation of the filled box. Follow fill operations with a prune()
+    /// operation for optimal sparseness.
+    void fill(const CoordBBox& bbox, const ValueType& value, bool active = true);
+    void sparseFill(const CoordBBox& bbox, const ValueType& value, bool active = true)
+    {
+        this->fill(bbox, value, active);
+    }
+    //@}
 
+    /// @brief Set all voxels within a given axis-aligned box to a constant value.
+    /// @param bbox    inclusive coordinates of opposite corners of an axis-aligned box.
+    /// @param value   the value to which to set voxels within the box.
+    /// @param active  if true, mark voxels within the box as active,
+    ///                otherwise mark them as inactive.
+    ///
+    /// @note This operation generates a dense representation of the
+    ///       filled box. This implies that active tiles are voxelized, i.e. only active 
+    ///       voxels are generated from this fill operation.
+    void denseFill(const CoordBBox& bbox, const ValueType& value, bool active = true);
+    
     /// @brief Copy into a dense grid the values of all voxels, both active and inactive,
     /// that intersect a given bounding box.
     /// @param bbox   inclusive bounding box of the voxels to be copied into the dense grid
@@ -2057,13 +2074,12 @@ RootNode<ChildT>::probeValueAndCache(const Coord& xyz, ValueType& value, Accesso
 
 ////////////////////////////////////////
 
-
 template<typename ChildT>
 inline void
-RootNode<ChildT>::fill(const CoordBBox& bbox, const ValueType& value, bool active, bool sparse)
+RootNode<ChildT>::fill(const CoordBBox& bbox, const ValueType& value, bool active)
 {
     if (bbox.empty()) return;
-
+    
     Coord xyz, tileMax;
     for (int x = bbox.min().x(); x <= bbox.max().x(); x = tileMax.x() + 1) {
         xyz.setX(x);
@@ -2098,8 +2114,8 @@ RootNode<ChildT>::fill(const CoordBBox& bbox, const ValueType& value, bool activ
                     }
                     // Forward the fill request to the child.
                     if (child) {
-                        child->fill(CoordBBox(xyz, Coord::minComponent(bbox.max(), tileMax)),
-                            value, active);
+                        const Coord tmp = Coord::minComponent(bbox.max(), tileMax);
+                        child->fill(CoordBBox(xyz, tmp), value, active);
                     }
                 } else {
                     // If the box given by (xyz, bbox.max()) completely encloses
@@ -2111,7 +2127,14 @@ RootNode<ChildT>::fill(const CoordBBox& bbox, const ValueType& value, bool activ
             }
         }
     }
-    if (!sparse) this->voxelizeActiveTiles(/*multi-threaded=*/true);
+}
+
+template<typename ChildT>
+inline void
+RootNode<ChildT>::denseFill(const CoordBBox& bbox, const ValueType& value, bool active)
+{
+    this->sparseFill(bbox, value, active);
+    this->voxelizeActiveTiles(true);//multi-threaded
 }
 
 template<typename ChildT>
@@ -2380,7 +2403,7 @@ RootNode<ChildT>::clip(const CoordBBox& clipBBox)
                 tileBBox.intersect(clipBBox);
                 const Tile& origTile = getTile(i);
                 setTile(this->findCoord(xyz), bgTile);
-                this->fill(tileBBox, origTile.value, origTile.active);
+                this->sparseFill(tileBBox, origTile.value, origTile.active);
             }
         } else {
             // This table entry lies completely inside the clipping region.  Leave it intact.

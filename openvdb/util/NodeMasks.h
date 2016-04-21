@@ -517,6 +517,17 @@ public:
         for (const Word *w = mWords; n-- && *w++ == Word(0);) ;
         return n == -1;
     }
+    /// Return @c true if bits are either all off OR all on.
+    /// @param isOn Takes on the values of all bits if the method
+    /// returns true - else it is undefined.
+    bool isConstant(bool &isOn) const
+    {
+        isOn = (mWords[0] == ~Word(0));//first word has all bits on
+        if ( !isOn && mWords[0] != Word(0)) return false;//early out
+        const Word *w = mWords + 1, *n = mWords + WORD_COUNT;
+        while( w<n && *w == mWords[0] ) ++w;
+        return w == n; 
+    }
     Index32 findFirstOn() const
     {
         Index32 n = 0;
@@ -756,6 +767,14 @@ public:
     bool isOn() const { return mByte == 0xFFU; }
     /// Return true if all the bits are off
     bool isOff() const { return mByte == 0; }
+    /// Return @c true if bits are either all off OR all on.
+    /// @param isOn Takes on the values of all bits if the method
+    /// returns true - else it is undefined.
+    bool isConstant(bool &isOn) const
+    {
+        isOn = this->isOn();
+        return isOn || this->isOff();
+    }
     Index32 findFirstOn() const { return mByte ? FindLowestOn(mByte) : 8; }
     Index32 findFirstOff() const
     {
@@ -967,11 +986,18 @@ public:
         return 0 != (mWord & (UINT64_C(0x01) << (n & 63)));
     }
     /// Return true if the <i>n</i>th bit is off
-    bool isOff(Index32 n) const {return !this->isOn(n); }
+    bool isOff(Index32 n) const {return !this->isOn(n); } 
     /// Return true if all the bits are on
     bool isOn() const { return mWord == UINT64_C(0xFFFFFFFFFFFFFFFF); }
     /// Return true if all the bits are off
     bool isOff() const { return mWord == 0; }
+    /// Return @c true if bits are either all off OR all on.
+    /// @param isOn Takes on the values of all bits if the method
+    /// returns true - else it is undefined.
+    bool isConstant(bool &isOn) const
+    {   isOn = this->isOn();
+        return isOn || this->isOff(); 
+    }
     Index32 findFirstOn() const { return mWord ? FindLowestOn(mWord) : 64; }
     Index32 findFirstOff() const
     {

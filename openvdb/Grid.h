@@ -638,17 +638,32 @@ public:
     /// Return the minimum and maximum active values in this grid.
     void evalMinMax(ValueType& minVal, ValueType& maxVal) const;
 
+    //@{
     /// @brief Set all voxels within a given axis-aligned box to a constant value.
     /// @param bbox    inclusive coordinates of opposite corners of an axis-aligned box
     /// @param value   the value to which to set voxels within the box
     /// @param active  if true, mark voxels within the box as active,
     ///                otherwise mark them as inactive
-    /// @param sparse  if false, active tiles are voxelized, i.e. only active voxels
-    ///                 are generated from the fill operation. Defaults to true.
-    /// @note If @a sparse is true this operation generates a sparse, but not always optimally sparse,
+    /// @note This operation generates a sparse, but not always optimally sparse,
     /// representation of the filled box.  Follow fill operations with a prune()
     /// operation for optimal sparseness.
-    void fill(const CoordBBox& bbox, const ValueType& value, bool active = true, bool sparse = true);
+    void sparseFill(const CoordBBox& bbox, const ValueType& value, bool active = true);
+    void fill(const CoordBBox& bbox, const ValueType& value, bool active = true)
+    {
+        this->sparseFill(bbox, value, active);
+    }
+    //@}
+    
+    /// @brief Set all voxels within a given axis-aligned box to a constant value.
+    /// @param bbox    inclusive coordinates of opposite corners of an axis-aligned box.
+    /// @param value   the value to which to set voxels within the box.
+    /// @param active  if true, mark voxels within the box as active,
+    ///                otherwise mark them as inactive.
+    ///
+    /// @note This operation generates a dense representation of the
+    ///       filled box. This implies that active tiles are voxelized, i.e. only active 
+    ///       voxels are generated from this fill operation.
+    void denseFill(const CoordBBox& bbox, const ValueType& value, bool active = true);
 
     /// Reduce the memory footprint of this grid by increasing its sparseness.
     virtual void pruneGrid(float tolerance = 0.0);
@@ -1180,9 +1195,16 @@ Grid<TreeT>::newTree()
 
 template<typename TreeT>
 inline void
-Grid<TreeT>::fill(const CoordBBox& bbox, const ValueType& value, bool active, bool sparse)
+Grid<TreeT>::sparseFill(const CoordBBox& bbox, const ValueType& value, bool active)
 {
-    tree().fill(bbox, value, active, sparse);
+    tree().sparseFill(bbox, value, active);
+}
+
+template<typename TreeT>
+inline void
+Grid<TreeT>::denseFill(const CoordBBox& bbox, const ValueType& value, bool active)
+{
+    tree().denseFill(bbox, value, active);
 }
 
 template<typename TreeT>

@@ -3124,7 +3124,8 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelsize", "Voxel Size")
         .setDefault(PRMpointOneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 5)
-        .setHelpText("The size (length of a side) of the cubic voxels, in world units."));
+        .setHelpText("Uniform voxel edge length in world units.  "
+            "Decrease the voxel size to increase the volume resolution."));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "frustumquality", "Frustum Quality")
         .setDefault(PRMoneDefaults)
@@ -3165,8 +3166,9 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_FLT_J, "particlescale", "Particle Scale")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
-        .setHelpText("The pscale attribute will be scaled by this. If there is "
-            "no pscale, 1 will be used as the reference."));
+        .setHelpText("The pscale point attribute, which defines the world space "
+            "particle radius, will be scaled by this.  A value of one is assumed "
+            "if the pscale attribute is missing."));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "solidratio", "Solid Ratio")
         .setDefault(PRMzeroDefaults)

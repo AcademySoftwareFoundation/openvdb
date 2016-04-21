@@ -1132,9 +1132,7 @@ template<Index Log2Dim>
 inline bool
 LeafNode<bool, Log2Dim>::isConstant(bool& constValue, bool& state, bool tolerance) const
 {
-    state = mValueMask.isOn();
-
-    if (!(state || mValueMask.isOff())) return false;
+    if (!mValueMask.isConstant(state)) return false;
     
     // Note: if tolerance is true (i.e., 1), then all boolean values compare equal.
     if (!tolerance && !(mBuffer.mData.isOn() || mBuffer.mData.isOff())) return false;

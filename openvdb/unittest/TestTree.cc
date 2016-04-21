@@ -1252,14 +1252,14 @@ TestTree::testVoxelizeActiveTiles()
     const CoordBBox bbox(openvdb::Coord(-30,-50,-30), openvdb::Coord(530,610,623));
     {// benchmark serial
         MyTree tree(background);
-        tree.fill( bbox, 1.0f, /*state*/true, /*sparse*/true);
+        tree.sparseFill( bbox, 1.0f, /*state*/true);
         openvdb::util::CpuTimer timer("\nserial voxelizeActiveTiles");
         tree.voxelizeActiveTiles(/*threaded*/false);
         timer.stop();
     }
     {// benchmark parallel
         MyTree tree(background);
-        tree.fill( bbox, 1.0f, /*state*/true, /*sparse*/true);
+        tree.sparseFill( bbox, 1.0f, /*state*/true);
         openvdb::util::CpuTimer timer("\nparallel voxelizeActiveTiles");
         tree.voxelizeActiveTiles(/*threaded*/true);
         timer.stop();
@@ -2000,7 +2000,7 @@ TestTree::testFill()
          for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
              ASSERT_DOUBLES_EXACTLY_EQUAL(outside, tree.getValue(*ijk));
          }
-         tree.fill(bbox, inside, /*state*/true, /*sparse*/true);
+         tree.sparseFill(bbox, inside, /*state*/true);
          CPPUNIT_ASSERT(tree.hasActiveTiles());
          CPPUNIT_ASSERT_EQUAL(size_t(bbox.volume()), tree.activeVoxelCount());
           for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
@@ -2015,7 +2015,7 @@ TestTree::testFill()
          for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
              ASSERT_DOUBLES_EXACTLY_EQUAL(outside, tree.getValue(*ijk));
          }
-         tree.fill(bbox, inside, /*state*/true, /*sparse*/false);
+         tree.denseFill(bbox, inside, /*state*/true);
          CPPUNIT_ASSERT(!tree.hasActiveTiles());
          CPPUNIT_ASSERT_EQUAL(size_t(bbox.volume()), tree.activeVoxelCount());
          for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
@@ -2425,7 +2425,7 @@ TestTree::testAddLeaf()
     newLeaf->setOrigin(oldLeaf->origin());
     newLeaf->fill(3.0);
 
-    tree.addLeaf(*newLeaf);
+    tree.addLeaf(newLeaf);
     CPPUNIT_ASSERT_EQUAL(newLeaf, tree.probeLeaf(ijk));
     ASSERT_DOUBLES_EXACTLY_EQUAL(3.0, tree.getValue(ijk));
 }

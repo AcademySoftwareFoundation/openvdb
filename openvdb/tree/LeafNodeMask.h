@@ -1098,9 +1098,7 @@ template<Index Log2Dim>
 inline bool
 LeafNode<ValueMask, Log2Dim>::isConstant(bool& constValue, bool& state, bool) const
 {
-    state = mBuffer.mData.isOn();
-
-    if (!(state || mBuffer.mData.isOff())) return false;
+    if (!mBuffer.mData.isConstant(state)) return false;
     
     constValue = state;
     return true;

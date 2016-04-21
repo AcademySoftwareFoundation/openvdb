@@ -28,7 +28,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 //
-/// @file SOP_OpenVDB_From_Mask.cc
+/// @file SOP_OpenVDB_Topology_To_Level_Set.cc
 ///
 /// @author FX R&D OpenVDB team
 
@@ -51,11 +51,11 @@
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 
-class SOP_OpenVDB_From_Mask: public hvdb::SOP_NodeVDB
+class SOP_OpenVDB_Topology_To_Level_Set: public hvdb::SOP_NodeVDB
 {
 public:
-    SOP_OpenVDB_From_Mask(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_From_Mask() {}
+    SOP_OpenVDB_Topology_To_Level_Set(OP_Network*, const char* name, OP_Operator*);
+    virtual ~SOP_OpenVDB_Topology_To_Level_Set() {}
 
     virtual bool updateParmsFlags();
 
@@ -76,7 +76,7 @@ struct Converter
 {
     float bandWidthWorld;
     int bandWidthVoxels, closingWidth, dilation, smoothingSteps, outputName;
-    bool worldSpaceUnits, exportDist, exportFog;
+    bool worldSpaceUnits;
     std::string customName;
 
     Converter(GU_Detail& geo, hvdb::Interrupter& boss)
@@ -87,8 +87,6 @@ struct Converter
         , smoothingSteps(0)
         , outputName(0)
         , worldSpaceUnits(false)
-        , exportDist(true)
-        , exportFog(false)
         , customName("vdb")
         , mGeoPt(&geo)
         , mBossPt(&boss)
@@ -106,32 +104,11 @@ struct Converter
         openvdb::FloatGrid::Ptr sdfGrid = openvdb::tools::topologyToLevelSet(
            grid, bandWidth, closingWidth, dilation, smoothingSteps, mBossPt);
 
-        if (exportDist) {
+        std::string name = grid.getName();
+        if (outputName == 1) name += customName;
+        else if (outputName == 2) name = customName;
 
-            std::string name = grid.getName();
-            if (outputName == 1) name += "_distance";
-            else if (outputName == 2) name = "distance";
-            else if (outputName == 3) name = customName;
-
-            hvdb::createVdbPrimitive(*mGeoPt, sdfGrid, name.c_str());
-        }
-
-        if (exportFog) {
-
-            // Modify sdfGrid in place if only fog volume conversion is selected.
-            openvdb::FloatGrid::Ptr outputGrid;
-            if (exportDist) outputGrid = sdfGrid->deepCopy();
-            else outputGrid = sdfGrid;
-
-            openvdb::tools::sdfToFogVolume(*outputGrid);
-
-            std::string name = grid.getName();
-            if (outputName == 1) name += "_density";
-            if (outputName == 2) name = "density";
-            else if (outputName == 3) name = customName;
-
-            hvdb::createVdbPrimitive(*mGeoPt, outputGrid, name.c_str());
-        }
+        hvdb::createVdbPrimitive(*mGeoPt, sdfGrid, name.c_str());
     }
 
 private:
@@ -155,20 +132,11 @@ newSopOperator(OP_OperatorTable* table)
         .setHelpText("Specify a subset of the input grids.")
         .setChoiceList(&hutil::PrimGroupMenu));
 
-    /// Output
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "distance", "Distance VDB")
-        .setDefault(PRMoneDefaults)
-        .setHelpText("Enable / disable the level set conversion."));
-
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "fogvolume", "Fog VDB")
-        .setHelpText("Enable / disable the fog volume conversion."));
-
-    { 
+    {
         const char* items[] = {
             "keep",     "Keep Incoming VDB Names",
-            "append",   "Append Volume Type",
-            "type",     "Volume Type",
-            "custom",   "Custom Name",
+            "append",   "Custom Append",
+            "replace",   "Custom Replace",
             NULL
         };
 
@@ -178,7 +146,7 @@ newSopOperator(OP_OperatorTable* table)
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
 
         parms.add(hutil::ParmFactory(PRM_STRING, "customName", "Custom Name")
-            .setHelpText("Rename all output grids with this custom name"));
+            .setHelpText("Used to rename the input grids"));
     }
 
     /// Narrow-band width {
@@ -216,8 +184,9 @@ newSopOperator(OP_OperatorTable* table)
               .setHelpText("Number of smoothing interations"));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("OpenVDB From Mask",
-        SOP_OpenVDB_From_Mask::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("OpenVDB Topology To Level Set",
+        SOP_OpenVDB_Topology_To_Level_Set::factory, parms, *table)
+        .addAlias("OpenVDB From Mask")
         .addInput("VDB Grids");
 }
 
@@ -225,14 +194,14 @@ newSopOperator(OP_OperatorTable* table)
 
 
 OP_Node*
-SOP_OpenVDB_From_Mask::factory(OP_Network* net,
+SOP_OpenVDB_Topology_To_Level_Set::factory(OP_Network* net,
     const char* name, OP_Operator* op)
 {
-    return new SOP_OpenVDB_From_Mask(net, name, op);
+    return new SOP_OpenVDB_Topology_To_Level_Set(net, name, op);
 }
 
 
-SOP_OpenVDB_From_Mask::SOP_OpenVDB_From_Mask(OP_Network* net,
+SOP_OpenVDB_Topology_To_Level_Set::SOP_OpenVDB_Topology_To_Level_Set(OP_Network* net,
     const char* name, OP_Operator* op):
     hvdb::SOP_NodeVDB(net, name, op)
 {
@@ -241,7 +210,7 @@ SOP_OpenVDB_From_Mask::SOP_OpenVDB_From_Mask(OP_Network* net,
 
 // Enable or disable parameters in the UI.
 bool
-SOP_OpenVDB_From_Mask::updateParmsFlags()
+SOP_OpenVDB_Topology_To_Level_Set::updateParmsFlags()
 {
     bool changed = false;
     const fpreal time = 0;
@@ -255,7 +224,7 @@ SOP_OpenVDB_From_Mask::updateParmsFlags()
     changed |= setVisibleState("bandWidth", !wsUnits);
     changed |= setVisibleState("bandWidthWS", wsUnits);
 
-    const bool useCustomName = evalInt("outputName", 0, time) == 3;
+    const bool useCustomName = evalInt("outputName", 0, time) != 0;
     changed |= enableParm("customName", useCustomName);
 
     return changed;
@@ -266,7 +235,7 @@ SOP_OpenVDB_From_Mask::updateParmsFlags()
 
 
 OP_ERROR
-SOP_OpenVDB_From_Mask::cookMySop(OP_Context& context)
+SOP_OpenVDB_Topology_To_Level_Set::cookMySop(OP_Context& context)
 {
     try {
         hutil::ScopedInputLock lock(*this, context);
@@ -286,8 +255,6 @@ SOP_OpenVDB_From_Mask::cookMySop(OP_Context& context)
 
         Converter converter(*gdp, boss);
         converter.worldSpaceUnits = evalInt("worldSpaceUnits", 0, time) != 0;
-        converter.exportDist = evalInt("distance", 0, time) != 0;
-        converter.exportFog = evalInt("fogvolume", 0, time) != 0;
         converter.bandWidthWorld = float(evalFloat("bandWidthWS", 0, time));
         converter.bandWidthVoxels = evalInt("bandWidth", 0, time);
         converter.closingWidth = evalInt("closingwidth", 0, time);
@@ -295,11 +262,6 @@ SOP_OpenVDB_From_Mask::cookMySop(OP_Context& context)
         converter.smoothingSteps = evalInt("smoothingsteps", 0, time);
         converter.outputName = evalInt("outputName", 0, time);
         converter.customName = customName.toStdString();
-
-        if (!converter.exportDist && !converter.exportFog) {
-            addWarning(SOP_MESSAGE, "No output selected");
-            return error();
-        }
 
         // Process VDB primitives
 
@@ -319,6 +281,8 @@ SOP_OpenVDB_From_Mask::cookMySop(OP_Context& context)
             const GU_PrimVDB *vdb = *vdbIt;
 
             if (!GEOvdbProcessTypedGridTopology(*vdb, converter)) { // all hdk supported grid types
+
+                // check grid types that are not natively supported by Houdini
 
                 if (vdb->getGrid().type() == openvdb::tools::PointIndexGrid::gridType()) { // point index grid
                     openvdb::tools::PointIndexGrid::ConstPtr grid =

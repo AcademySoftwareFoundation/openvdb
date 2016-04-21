@@ -397,7 +397,7 @@ public:
                     // Only add non-empty leafs (empty is defined as all inactive)
 
                     if (!leaf->isEmpty()) {
-                        mMask->addLeaf(*leaf);
+                        mMask->addLeaf(leaf);
                         leaf = NULL;
                     }
 
@@ -567,7 +567,7 @@ public:
             // Only add non-empty leafs (empty is defined as all inactive)
 
             if (!leaf->isEmpty()) {
-                mResult->addLeaf(*leaf);
+                mResult->addLeaf(leaf);
                 leaf = NULL;
             }
         }

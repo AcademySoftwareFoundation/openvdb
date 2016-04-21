@@ -37,6 +37,8 @@
 #ifndef OPENVDB_TOOLS_PRUNE_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_PRUNE_HAS_BEEN_INCLUDED
 
+#include <algorithm> // for std::nth_element
+
 #include <boost/utility/enable_if.hpp>
 #include <boost/static_assert.hpp>
 #include <boost/type_traits/is_floating_point.hpp>
@@ -55,10 +57,9 @@ namespace tools {
 /// any nodes whose values are all the same (optionally to within a tolerance)
 /// and have the same active state.
 ///
-/// @note For trees with floating-point values a child node with (approximately)
-/// constant values are replaced with a tile value corresponding to the average
-/// of the extrema values in said child node. Else the first value encountered
-/// in the child node is used.
+/// @note For trees with non-boolean values a child node with (approximately)
+/// constant values are replaced with a tile value corresponding to the median
+/// of the values in said child node.
 ///
 /// @param tree       the tree to be pruned
 /// @param tolerance  tolerance within which values are considered to be equal
@@ -250,29 +251,55 @@ public:
 
 private:
 
-    // For floating-point value types set tile values to
-    // the mean of the extrema values of the constant node
     template<typename NodeT>
-    inline
-    typename boost::enable_if<boost::is_floating_point<typename NodeT::ValueType>, bool>::type
-    isConstant(const NodeT& node, ValueT& value, bool& state) const
+    struct CompareOp {
+        CompareOp() {}        
+        typedef typename NodeT::UnionType T;
+        inline bool operator()(const T& a, const T& b) const {return a.getValue() < b.getValue();}
+    };// CompareOp
+
+    // Private method specialized for leaf nodes
+    inline ValueT median(LeafT& leaf) const
     {
-        ValueT tmp;
-        const bool test = node.isConstant(value, tmp, state, mTolerance);
-        if (test) value = ValueT(0.5f)*(value + tmp);
-        return test;
+        ValueT* data = leaf.buffer().data();
+        static const size_t midpoint = (LeafT::NUM_VALUES - 1) >> 1;
+        std::nth_element(data, data + midpoint, data + LeafT::NUM_VALUES);
+        return data[midpoint];
     }
 
-    // For non-floating-point value types set tile values to
-    // the first value encountered in the constant node
+    // Private method for internal nodes
+    template<typename NodeT>
+    inline typename NodeT::ValueType median(NodeT& node) const
+    {
+        typedef typename NodeT::UnionType UnionT;
+        UnionT* data = const_cast<UnionT*>(node.getTable());//never do this at home kids :)
+        static const size_t midpoint = (NodeT::NUM_VALUES - 1) >> 1;
+        CompareOp<NodeT> op;
+        std::nth_element(data, data + midpoint, data + NodeT::NUM_VALUES, op);
+        return data[midpoint].getValue();
+    }
+    
+    // Specialization to nodes templated on booleans values
     template<typename NodeT>
     inline
-    typename boost::disable_if<boost::is_floating_point<typename NodeT::ValueType>, bool>::type
-    isConstant(const NodeT& node, ValueT& value, bool& state) const
+    typename boost::enable_if<boost::is_same<bool, typename NodeT::ValueType>, bool>::type
+    isConstant(NodeT& node, bool& value, bool& state) const
     {
         return node.isConstant(value, state, mTolerance);
     }
 
+    // Nodes templated on non-boolean values
+    template<typename NodeT>
+    inline
+    typename boost::disable_if<boost::is_same<bool, typename NodeT::ValueType>, bool>::type
+    isConstant(NodeT& node, ValueT& value, bool& state) const
+    {
+        ValueT tmp;
+        const bool test = node.isConstant(value, tmp, state, mTolerance);
+        if (test) value = this->median(node);
+        return test;
+    }
+   
     const ValueT mTolerance;
 };// TolerancePruneOp
 
