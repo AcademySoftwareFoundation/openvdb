@@ -28,7 +28,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 //
-/// @file SOP_NodeVDB.h
+/// @file SOP_NodeVDBPoints.h
 ///
 /// @author Dan Bailey
 ///
@@ -52,16 +52,16 @@
 
 #include <OP/OP_NodeInfoParms.h>
 #include <SOP/SOP_Node.h>
-#include <SOP/SOP_Cache.h> // for dynamic cast
 
 #ifndef SESI_OPENVDB
 #include <UT/UT_DSOVersion.h>
 #endif
 
-
 class GU_Detail;
 
 namespace {
+
+// turn 10000 into 10,000 when output (comma-based locale)
 
 template<class T>
 std::string addDigitSeparators(T value)
@@ -81,32 +81,46 @@ class OPENVDB_HOUDINI_API SOP_NodeVDBPoints: public SOP_NodeVDB
 {
 public:
     SOP_NodeVDBPoints(OP_Network* network, const char* name, OP_Operator* op)
-        : SOP_NodeVDB(network, name, op) { }
+        : SOP_NodeVDB(network, name, op)
+    {
+// the ability to register specific info text callbacks was only introduced in OpenVDB 3.2
+#if (OPENVDB_LIBRARY_VERSION_NUMBER < 0x03020000) // earlier than OpenVDB 3.2
+        // do nothing
+#else
+        node_info_text::registerGridSpecificInfoText<openvdb::tools::PointDataGrid>(&pointDataGridSpecificInfoText);
+#endif // OPENVDB_LIBRARY_VERSION_NUMBER
+    }
+
     virtual ~SOP_NodeVDBPoints() { }
 
+// prior to OpenVDB 3.2, there was no way of associating a specific VDB primitive
+// to a function that generated output for this primitive type, so accessing the
+// GDP and generating output for all OpenVDB primitives was required
+#if (OPENVDB_LIBRARY_VERSION_NUMBER < 0x03020000) // earlier than OpenVDB 3.2
     void
     getNodeSpecificInfoText(OP_Context &context, OP_NodeInfoParms &parms)
     {
         SOP_Node::getNodeSpecificInfoText(context, parms);
 
-    #ifdef SESI_OPENVDB
-        // Nothing needed since we will report it as part of native prim info
-    #else
         // Get a handle to the geometry.
-        GU_DetailHandle gd_handle = getCookedGeoHandle(context);
+        GU_DetailHandle gridHandle = getCookedGeoHandle(context);
 
        // Check if we have a valid detail handle.
-        if (gd_handle.isNull()) return;
+        if (gridHandle.isNull()) return;
 
         // Lock it for reading.
-        GU_DetailHandleAutoReadLock gd_lock(gd_handle);
+        GU_DetailHandleAutoReadLock gridLock(gridHandle);
         // Finally, get at the actual GU_Detail.
-        const GU_Detail* tmp_gdp = gd_lock.getGdp();
+        const GU_Detail* tmpGdp = gridLock.getGdp();
 
         std::ostringstream infoStr;
 
         unsigned gridn = 0;
-        for (VdbPrimCIterator it(tmp_gdp); it; ++it) {
+
+#ifdef SESI_OPENVDB
+        // Nothing needed since we will report it as part of native prim info
+#else
+        for (VdbPrimCIterator it(tmpGdp); it; ++it) {
 
             const openvdb::GridBase& grid = it->getGrid();
 
@@ -125,10 +139,10 @@ public:
             if (grid.activeVoxelCount() != 0) {
                 infoStr << " dim: " << dim[0] << "x" << dim[1] << "x" << dim[2];
             } else {
-                infoStr <<" <empty>";
+                infoStr << " <empty>";
             }
 
-            infoStr<<"\n";
+            infoStr << "\n";
 
             ++gridn;
         }
@@ -140,125 +154,136 @@ public:
             parms.append(headStr.str().c_str());
             parms.append(infoStr.str().c_str());
         }
-    #endif
+#endif // SESI_OPENVDB
 
+        // clear the output string stream and grid counter
+        infoStr.str("");
+        gridn = 0;
 
-        // VDB points info (to be included in native VDB primitive)
-
-        // Get a handle to the geometry.
-        GU_DetailHandle gd_handle_pts = getCookedGeoHandle(context);
-
-       // Check if we have a valid detail handle.
-        if (gd_handle_pts.isNull()) return;
-
-        // Lock it for reading.
-        GU_DetailHandleAutoReadLock gd_lock_pts(gd_handle_pts);
-        // Finally, get at the actual GU_Detail.
-        const GU_Detail* tmp_gdp_pts = gd_lock_pts.getGdp();
-
-        std::ostringstream infoStr_pts;
-
-        unsigned gridn_pts = 0;
-        for (VdbPrimCIterator it(tmp_gdp_pts); it; ++it) {
+        for (VdbPrimCIterator it(tmpGdp); it; ++it) {
 
             const openvdb::GridBase& grid = it->getGrid();
+
+            // ignore non openvdb point grids
+            if (!dynamic_cast<const openvdb::tools::PointDataGrid*>(&grid))  continue;
+
+            openvdb::Coord dim = grid.evalActiveVoxelDim();
             const UT_String gridName = it.getPrimitiveName();
 
-            infoStr_pts << "    ";
-            infoStr_pts << "(" << it.getIndex() << ")";
-            if (gridName.isstring()) infoStr_pts << " name: '" << gridName << "',";
+            infoStr << "    ";
+            infoStr << "(" << it.getIndex() << ")";
+            if (gridName.isstring()) infoStr << " name: '" << gridName << "',";
 
-            typedef openvdb::tools::PointDataGrid PointDataGrid;
-            typedef openvdb::tools::PointDataTree PointDataTree;
-            typedef openvdb::tools::AttributeSet AttributeSet;
+            pointDataGridSpecificInfoText(infoStr, grid);
 
-            const PointDataGrid* pointDataGrid = dynamic_cast<const PointDataGrid*>(&grid);
+            infoStr << "\n";
 
-            if (!pointDataGrid)     continue;
-
-            const PointDataTree& pointDataTree = pointDataGrid->tree();
-
-            PointDataTree::LeafCIter iter = pointDataTree.cbeginLeaf();
-
-            const openvdb::Index64 count = pointCount(pointDataTree);
-
-            infoStr_pts << " count: " << addDigitSeparators(count) << ",";
-
-            if (!iter.getLeaf()) {
-                infoStr_pts << " attributes: ";
-                infoStr_pts << "<none>";
-            }
-            else {
-                const AttributeSet::DescriptorPtr& descriptor = iter->attributeSet().descriptorPtr();
-
-                infoStr_pts << " groups: ";
-
-                const AttributeSet::Descriptor::NameToPosMap& groupMap = descriptor->groupMap();
-
-                bool first = true;
-                for (AttributeSet::Descriptor::ConstIterator it = groupMap.begin(), it_end = groupMap.end();
-                        it != it_end; ++it) {
-                    if (first) {
-                        first = false;
-                    }
-                    else {
-                        infoStr_pts << ", ";
-                    }
-
-                    infoStr_pts << it->first << "(";
-
-                    infoStr_pts << addDigitSeparators(groupPointCount(pointDataTree, it->first));
-
-                    infoStr_pts << ")";
-                }
-
-                if (first)  infoStr_pts << "<none>";
-
-                infoStr_pts << ",";
-
-                infoStr_pts << " attributes: ";
-
-                const AttributeSet::Descriptor::NameToPosMap& nameToPosMap = descriptor->map();
-
-                first = true;
-                for (AttributeSet::Descriptor::ConstIterator it = nameToPosMap.begin(), it_end = nameToPosMap.end();
-                        it != it_end; ++it) {
-                    const openvdb::tools::AttributeArray& array = iter->attributeArray(it->second);
-                    if (openvdb::tools::GroupAttributeArray::isGroup(array))    continue;
-
-                    if (first) {
-                        first = false;
-                    }
-                    else {
-                        infoStr_pts << ", ";
-                    }
-                    const openvdb::NamePair& type = descriptor->type(it->second);
-
-                    // if no value compression, hide the codec from the middle-click output
-
-                    if (boost::starts_with(type.second, "null_") &&
-                        boost::ends_with(type.second, type.first)) {
-                        infoStr_pts << it->first << "[" << type.first << "]";
-                    }
-                    else {
-                        infoStr_pts << it->first << "[" << type.first << "_" << type.second << "]";
-                    }
-                }
-
-                if (first)  infoStr_pts << "<none>";
-            }
-
-            infoStr_pts << "\n";
-
-            ++gridn_pts;
+            gridn++;
         }
 
-        if (gridn_pts > 0) {
+        if (gridn > 0) {
             std::ostringstream headStr;
-            headStr << gridn_pts << " VDB points" << "\n";
+            headStr << gridn << " VDB point" << (gridn == 1 ? "" : "s") << "\n";
 
             parms.append(headStr.str().c_str());
-            parms.append(infoStr_pts.str().c_str());
+            parms.append(infoStr.str().c_str());
+        }
+    }
+
+#endif // OPENVDB_LIBRARY_VERSION_NUMBER
+
+    static void
+    pointDataGridSpecificInfoText(std::ostream& infoStr, const openvdb::GridBase& grid)
+    {
+        typedef openvdb::tools::PointDataGrid PointDataGrid;
+        typedef openvdb::tools::PointDataTree PointDataTree;
+        typedef openvdb::tools::AttributeSet AttributeSet;
+
+        const PointDataGrid* pointDataGrid = dynamic_cast<const PointDataGrid*>(&grid);
+
+        if (!pointDataGrid) return;
+
+        // match native OpenVDB convention as much as possible
+
+        infoStr << " voxel size: " << pointDataGrid->transform().voxelSize()[0] << ",";
+        infoStr << " type: points,";
+
+        if (pointDataGrid->activeVoxelCount() != 0) {
+            const openvdb::Coord dim = grid.evalActiveVoxelDim();
+            infoStr << " dim: " << dim[0] << "x" << dim[1] << "x" << dim[2] << ",";
+        } else {
+            infoStr <<" <empty>,";
+        }
+
+        const PointDataTree& pointDataTree = pointDataGrid->tree();
+
+        PointDataTree::LeafCIter iter = pointDataTree.cbeginLeaf();
+
+        const openvdb::Index64 totalPointCount = pointCount(pointDataTree);
+
+        infoStr << " count: " << addDigitSeparators(totalPointCount) << ",";
+
+        if (!iter.getLeaf()) {
+            infoStr << " attributes: <none>";
+        }
+        else {
+            const AttributeSet::DescriptorPtr& descriptor = iter->attributeSet().descriptorPtr();
+
+            infoStr << " groups: ";
+
+            const AttributeSet::Descriptor::NameToPosMap& groupMap = descriptor->groupMap();
+
+            bool first = true;
+            for (AttributeSet::Descriptor::ConstIterator it = groupMap.begin(), it_end = groupMap.end();
+                    it != it_end; ++it) {
+                if (first) {
+                    first = false;
+                }
+                else {
+                    infoStr << ", ";
+                }
+
+                infoStr << it->first << "(";
+
+                infoStr << addDigitSeparators(groupPointCount(pointDataTree, it->first));
+
+                infoStr << ")";
+            }
+
+            if (first)  infoStr << "<none>";
+
+            infoStr << ",";
+
+            infoStr << " attributes: ";
+
+            const AttributeSet::Descriptor::NameToPosMap& nameToPosMap = descriptor->map();
+
+            first = true;
+            for (AttributeSet::Descriptor::ConstIterator it = nameToPosMap.begin(), it_end = nameToPosMap.end();
+                    it != it_end; ++it) {
+                const openvdb::tools::AttributeArray& array = iter->attributeArray(it->second);
+                if (openvdb::tools::GroupAttributeArray::isGroup(array))    continue;
+
+                if (first) {
+                    first = false;
+                }
+                else {
+                    infoStr << ", ";
+                }
+                const openvdb::NamePair& type = descriptor->type(it->second);
+
+                // if no value compression, hide the codec from the middle-click output
+
+                if (boost::starts_with(type.second, "null_") &&
+                    boost::ends_with(type.second, type.first)) {
+                    infoStr << it->first << "[" << type.first << "]";
+                }
+                else {
+                    infoStr << it->first << "[" << type.first << "_" << type.second << "]";
+                }
+            }
+
+            if (first)  infoStr << "<none>";
         }
     }
 };
