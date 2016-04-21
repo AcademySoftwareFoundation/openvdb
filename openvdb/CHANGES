@@ -4,21 +4,18 @@ OpenVDB Version History
 Version 3.2.0 - In development
 
     Highlights:
-    - Added MultiResGrid tool and LOD Houdini Node (think MipMap for VDB).
-    - Improved the performance of level-set advection, volume advection and
-      level set morphing.
-    - Improved the performance of morphological dilation by up to six times
-      while also adding support for active tiles.
-    - Implemented efficient multithreaded segmentation algorithms.
-    - Added faster and more memory-efficient tools for point to
-      level set conversion.
-    - Added a memory-efficient, binary-mask grid type, dubbed "MaskGrid",
-      that uses a single bit per voxel to represent the voxel's active state
-      (or, equivalently, its value).
+    - New features: tool to produce and store a sequences of progressively
+      lower resolution grids (mipmaps), an acceleration structure for fast
+      range and nearest-neighbor searches on particles, arbitrary volume
+      and level set specific segmentation tools, a new binary mask grid
+      type and an efficient point to level set conversion scheme.
+    - Optimizations: threaded grid destruction, morphological dilation,
+      csg operations and fracture tool.
+    - New Houdini nodes: Segment, LOD and Topology To Level Set.
 
     New features:
-    - Added MiltiResGrid - multi-resolution grids (think mip-mapping) for VDB.
-      Even performs mapping to floating-point levels.
+    - Added tools::MultiResGrid a new tool to produce and store a sequences
+      of progressively lower resolution grids (mipmaps).
     - Added tools::ParticleAtlas an acceleration structure for fast range
       and nearest-neighbor searches on particles, points with radius.
     - Added tools::segmentActiveVoxels(), which operates on grids of arbitrary
@@ -35,16 +32,15 @@ Version 3.2.0 - In development
       input grids never need to be deep-copied).
     - Added tools::PointsToMask, which activates voxels that intersect
       points from a given list.
-    - Added a memory-efficient, binary-mask grid type, dubbed "MaskGrid",
-      that uses a single bit per voxel to represent the voxel's active state
-      (or, equivalently, its value).
+    - Added a new MaskGrid type that uses a single bit-field to represent both
+      voxel values and states for the leafnode to reduce memory usage.
     - Added tools::topologyToLevelSet(), which generates a level set from the
       implicit boundary between active and inactive voxels in an input grid
       of arbitrary type.
-    - Added tools::LevelSetPlatonic (and specializations) that generates
-      narrow-band level sets of the five Platonic Solids.
-    - Added tools::extractIsosurfaceMask(), which generates a mask of
-      the voxels that intersect the implicit surface with a given isovalue.
+    - Added tools::LevelSetPlatonic a new tool that produces narrow-band
+      level sets of the five Platonic solids.
+    - Added tools::extractIsosurfaceMask() which masks voxels that intersect the
+      implicit surface defined by the given isovalue.
     - Added tree::LeafManager::getPreFixSum() for user-managed external buffers.
     - Added tools::Dense::print().
     - Added the math::CoordBBox::Iterator class to conveniently iterate over
@@ -73,7 +69,7 @@ Version 3.2.0 - In development
     - Added active tile count to Tree::print.
     - Improved the API of tools::Dense with non-const access methods.
     - Added LeafManager::reduce and similar methods to NodeManager.
-      [With contributions from bretttully-oxyntix]
+      [Suggested by Brett Tully]
     - Improved constructors of math::Mat3 and math::Mat4.
     - Added math::Mat3::cofactor().
     - Added math::Mat3::setRows, math::Mat4::setRows,
@@ -85,7 +81,7 @@ Version 3.2.0 - In development
     Bug fixes:
     - Fixed a bug in the level-set advection tool that could cause
       non-deterministic behavior.
-      [Thanks to Jeff Lait for reporting this issue.]
+      [Reported by Jeff Lait]
     - Fixed a bug that allowed for unexpected implicit conversion
       between grids of different value types.
     - Fixed a bug whereby the origins of leaf nodes with value type bool
@@ -107,17 +103,19 @@ Version 3.2.0 - In development
     - Corrected documentation in math/Mat3.h and math/Mat4.h.
     - Fixed a bug in math::outerProduct [Contributed by Gergely Klar]
     - Fixed a memory overallocation issue in tools::VolumeAdvect.
-    - Fix bug in VolumeToMesh::operator() failing to clear its state when exiting early.
+    - Fix bug in VolumeToMesh::operator() failing to clear its state when exiting
+      early.
       [Contributed by Edward Lam]
     - Fixed bug in openvdb::tools::PointIndexIterator::worldSpaceSearchAndUpdate
       that resulted in missing point indices.
-    - Removed the StaggeredBoxSampler code path in SOP_OpenVDB_Advect because it
-      introduces bias.
+      [Reported by Rick Hankins]
+    - Removed the StaggeredBoxSampler code path in SOP_OpenVDB_Advect because
+      it introduces bias.
       [Contributed by Fredrik Salomonsson]
     - Fixes TestUtil.cc build issues on Windows.
       [Contributed by Edward Lam]
     - Fixed isApproxZero() so that it works correctly when tolerance is zero.
-      [Contributed by Joshua Olson]
+      [Reported by Joshua Olson]
     - Fixed bugs in tree::NodeUnion that could cause crashes.
 
     API changes:
@@ -125,7 +123,8 @@ Version 3.2.0 - In development
     - Renamed math::GudonovsNormSqrd to math::GodunovsNormSqrd
       [Contributed by Branislav Radjenovic]
     - Renamed ValueType to PosType in the PointArray interface.
-    - Deprecated tree::Tree::addLeaf(LeafNode&) and added tree::Tree::addLeaf(LeafNode*).
+    - Deprecated tree::Tree::addLeaf(LeafNode&) and added
+      tree::Tree::addLeaf(LeafNode*).
 
     Python:
     - Updated the Python module for Python 3 compatibility.
@@ -151,7 +150,7 @@ Version 3.2.0 - In development
     - Updated the Rasterize Points SOP with support for frustum transforms,
       sub region masking and orientation logic that matches the native
       Copy SOP's orientation.
-    - Improved the Platonic SOP to finally generate the five Paltonic Solids.
+    - Updated the Platonic SOP with support for all five Platonic solids.
     - Added hooks for registering SOP_NodeVDB text callbacks for different
       grid types.
       [Contributed by Nick Avramoussis]

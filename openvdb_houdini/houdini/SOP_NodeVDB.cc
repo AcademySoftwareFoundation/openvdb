@@ -56,7 +56,7 @@ namespace openvdb_houdini {
 namespace node_info_text {
 
 
-#if (UT_MAJOR_VERSION_INT < 15)
+#if (UT_MAJOR_VERSION_INT < 14)
 /// @brief The default information text returned for VDB grids when no
 /// override for the grid type has been found
 static void defaultNodeSpecificInfoText(std::ostream& infoStr, const openvdb::GridBase& grid)
@@ -130,7 +130,7 @@ void registerGridSpecificInfoText(const std::string& gridType, ApplyGridSpecific
 /// @brief Returns a pointer to a grid information function or NULL if no
 ///        specific function has been registered for the given grid type.
 /// @note  The @c defaultNodeSpecificInfoText method is always returned
-///        prior to Houdini 15.
+///        prior to Houdini 14.
 ApplyGridSpecificInfoText getGridSpecificInfoText(const std::string& gridType)
 {
     LockedInfoTextRegistry *registry = getInfoTextRegistry();
@@ -139,7 +139,7 @@ ApplyGridSpecificInfoText getGridSpecificInfoText(const std::string& gridType)
     const ApplyGridSpecificInfoTextMap::const_iterator iter = registry->mApplyGridSpecificInfoTextMap.find(gridType);
 
     if (iter == registry->mApplyGridSpecificInfoTextMap.end() || iter->second == NULL) {
-#if (UT_MAJOR_VERSION_INT >= 15)
+#if (UT_MAJOR_VERSION_INT >= 14)
         return NULL; // Native prim info is sufficient
 #else
         return &defaultNodeSpecificInfoText;
@@ -266,7 +266,7 @@ SOP_NodeVDB::getNodeSpecificInfoText(OP_Context &context, OP_NodeInfoParms &parm
 
     if (gridn > 0) {
         std::ostringstream headStr;
-        headStr << gridn << " VDB grid" << (gridn == 1 ? "" : "s") << "\n";
+        headStr << gridn << " Custom VDB grid" << (gridn == 1 ? "" : "s") << "\n";
 
         parms.append(headStr.str().c_str());
         parms.append(infoStr.str().c_str());

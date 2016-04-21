@@ -227,7 +227,6 @@ topologyToLevelSet(const GridT& grid, int halfWidth, int closingSteps, int dilat
 
     // Copy the topology into a MaskGrid.
     MaskTreeT maskTree( grid.tree(), false/*background*/, openvdb::TopologyCopy() );
-    maskTree.voxelizeActiveTiles();
 
     // Morphological closing operation.
     dilateActiveValues( maskTree, closingSteps + dilation, tools::NN_FACE, tools::IGNORE_TILES);
