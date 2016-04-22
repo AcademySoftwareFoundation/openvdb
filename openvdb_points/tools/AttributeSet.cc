@@ -515,6 +515,7 @@ AttributeSet::operator==(const AttributeSet& other) const {
 AttributeSet::Descriptor::Descriptor()
     : mNameMap()
     , mTypes()
+    , mGroupMap()
     , mMetadata()
 {
 }
@@ -523,6 +524,7 @@ AttributeSet::Descriptor::Descriptor()
 AttributeSet::Descriptor::Descriptor(const Descriptor& rhs)
     : mNameMap(rhs.mNameMap)
     , mTypes(rhs.mTypes)
+    , mGroupMap(rhs.mGroupMap)
     , mMetadata(rhs.mMetadata)
 {
 }
@@ -534,7 +536,8 @@ AttributeSet::Descriptor::operator==(const Descriptor& rhs) const
     if (this == &rhs) return true;
 
     if (mTypes.size()   != rhs.mTypes.size() ||
-        mNameMap.size() != rhs.mNameMap.size()) {
+        mNameMap.size() != rhs.mNameMap.size() ||
+        mGroupMap.size() != rhs.mGroupMap.size()) {
         return false;
     }
 
@@ -544,7 +547,8 @@ AttributeSet::Descriptor::operator==(const Descriptor& rhs) const
 
     if (this->mMetadata != rhs.mMetadata)  return false;
 
-    return std::equal(mNameMap.begin(), mNameMap.end(), rhs.mNameMap.begin());
+    return  std::equal(mGroupMap.begin(), mGroupMap.end(), rhs.mGroupMap.begin()) &&
+            std::equal(mNameMap.begin(), mNameMap.end(), rhs.mNameMap.begin());
 }
 
 
@@ -554,7 +558,8 @@ AttributeSet::Descriptor::hasSameAttributes(const Descriptor& rhs) const
     if (this == &rhs) return true;
 
     if (mTypes.size()   != rhs.mTypes.size() ||
-        mNameMap.size() != rhs.mNameMap.size()) {
+        mNameMap.size() != rhs.mNameMap.size() ||
+        mGroupMap.size() != rhs.mGroupMap.size()) {
         return false;
     }
 
@@ -567,7 +572,7 @@ AttributeSet::Descriptor::hasSameAttributes(const Descriptor& rhs) const
         if (mTypes[it->second] != rhs.mTypes[index]) return false;
     }
 
-    return true;
+    return std::equal(mGroupMap.begin(), mGroupMap.end(), rhs.mGroupMap.begin());
 }
 
 

@@ -191,6 +191,32 @@ TestAttributeSet::testAttributeSetDescriptor()
 
     CPPUNIT_ASSERT(*descrA == *descrB);
 
+    descrB->setGroup("test", size_t(0));
+    descrB->setGroup("test2", size_t(1));
+
+    Descriptor descrC(*descrB);
+
+    CPPUNIT_ASSERT(descrB->hasSameAttributes(descrC));
+    CPPUNIT_ASSERT(descrC.hasGroup("test"));
+    CPPUNIT_ASSERT(*descrB == descrC);
+
+    descrC.dropGroup("test");
+    descrC.dropGroup("test2");
+
+    CPPUNIT_ASSERT(!descrB->hasSameAttributes(descrC));
+    CPPUNIT_ASSERT(!descrC.hasGroup("test"));
+    CPPUNIT_ASSERT(*descrB != descrC);
+
+    descrC.setGroup("test2", size_t(1));
+    descrC.setGroup("test3", size_t(0));
+
+    CPPUNIT_ASSERT(!descrB->hasSameAttributes(descrC));
+
+    descrC.dropGroup("test3");
+    descrC.setGroup("test", size_t(0));
+
+    CPPUNIT_ASSERT(descrB->hasSameAttributes(descrC));
+
     // rebuild NameAndTypeVec
 
     Descriptor::NameAndTypeVec rebuildNames;
