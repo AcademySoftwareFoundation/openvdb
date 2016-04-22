@@ -346,6 +346,12 @@ TestAttributeArray::testAttributeArray()
         typedAttr.getUnsafe(0, value);
 
         CPPUNIT_ASSERT_DOUBLES_EQUAL(double(1.5), value, /*tolerance=*/double(0.0));
+
+        // out-of-range get() and set()
+        CPPUNIT_ASSERT_THROW(typedAttr.set(100, 0.5), openvdb::IndexError);
+        CPPUNIT_ASSERT_THROW(typedAttr.set(100, 1), openvdb::IndexError);
+        CPPUNIT_ASSERT_THROW(typedAttr.get(100, value), openvdb::IndexError);
+        CPPUNIT_ASSERT_THROW(typedAttr.get(100), openvdb::IndexError);
     }
 
     typedef openvdb::tools::FixedPointAttributeCodec<uint16_t> FixedPointCodec;

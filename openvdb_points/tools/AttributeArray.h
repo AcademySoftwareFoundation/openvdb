@@ -907,6 +907,7 @@ TypedAttributeArray<ValueType_, Codec_>::getUnsafe(Index n) const
 {
     assert(!this->isCompressed());
     assert(!this->isOutOfCore());
+    assert(n < this->size());
 
     ValueType val;
     Codec::decode(/*in=*/mData[mIsUniform ? 0 : n], /*out=*/val);
@@ -920,6 +921,7 @@ TypedAttributeArray<ValueType_, Codec_>::get(Index n) const
 {
     if (this->isCompressed())           const_cast<TypedAttributeArray*>(this)->decompress();
     else if (this->isOutOfCore())       this->doLoad();
+    else if (n >= this->size())         OPENVDB_THROW(IndexError, "Out-of-range access.");
 
     return this->getUnsafe(n);
 }
@@ -932,6 +934,7 @@ TypedAttributeArray<ValueType_, Codec_>::getUnsafe(Index n, T& val) const
 {
     assert(!this->isCompressed());
     assert(!this->isOutOfCore());
+    assert(n < this->size());
 
     ValueType tmp;
     Codec::decode(/*in=*/mData[mIsUniform ? 0 : n], /*out=*/tmp);
@@ -946,6 +949,7 @@ TypedAttributeArray<ValueType_, Codec_>::get(Index n, T& val) const
 {
     if (this->isCompressed())           const_cast<TypedAttributeArray*>(this)->decompress();
     else if (this->isOutOfCore())       this->doLoad();
+    else if (n >= this->size())         OPENVDB_THROW(IndexError, "Out-of-range access.");
 
     this->getUnsafe(n, val);
 }
@@ -965,6 +969,7 @@ TypedAttributeArray<ValueType_, Codec_>::setUnsafe(Index n, const ValueType& val
 {
     assert(!this->isCompressed());
     assert(!this->isOutOfCore());
+    assert(n < this->size());
 
     if (mIsUniform)     this->expand();
 
@@ -978,6 +983,7 @@ TypedAttributeArray<ValueType_, Codec_>::set(Index n, const ValueType& val)
 {
     if (this->isCompressed())           this->decompress();
     else if (this->isOutOfCore())       this->doLoad();
+    else if (n >= this->size())         OPENVDB_THROW(IndexError, "Out-of-range access.");
 
     this->setUnsafe(n, val);
 }
@@ -990,6 +996,7 @@ TypedAttributeArray<ValueType_, Codec_>::setUnsafe(Index n, const T& val)
 {
     assert(!this->isCompressed());
     assert(!this->isOutOfCore());
+    assert(n < this->size());
 
     if (mIsUniform)     this->expand();
 
@@ -1005,6 +1012,7 @@ TypedAttributeArray<ValueType_, Codec_>::set(Index n, const T& val)
 {
     if (this->isCompressed())           this->decompress();
     else if (this->isOutOfCore())       this->doLoad();
+    else if (n >= this->size())         OPENVDB_THROW(IndexError, "Out-of-range access.");
 
     this->setUnsafe(n, val);
 }
