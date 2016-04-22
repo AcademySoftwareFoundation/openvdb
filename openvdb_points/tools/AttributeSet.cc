@@ -389,8 +389,25 @@ AttributeSet::dropAttributes(   const std::vector<size_t>& pos,
 
 
 void
+AttributeSet::renameAttributes(const Descriptor& expected, const DescriptorPtr& replacement)
+{
+    // ensure the descriptor is as expected
+    if (*mDescr != expected) {
+        OPENVDB_THROW(LookupError, "Cannot rename attribute as descriptors do not match.")
+    }
+
+    mDescr = replacement;
+}
+
+
+void
 AttributeSet::reorderAttributes(const DescriptorPtr& replacement)
 {
+    if (*mDescr == *replacement) {
+        this->resetDescriptor(replacement);
+        return;
+    }
+
     if (!mDescr->hasSameAttributes(*replacement)) {
         OPENVDB_THROW(LookupError, "Cannot reorder attributes as descriptors do not contain the same attributes.")
     }
@@ -411,11 +428,11 @@ AttributeSet::reorderAttributes(const DescriptorPtr& replacement)
 
 
 void
-AttributeSet::renameAttributes(const Descriptor& expected, DescriptorPtr& replacement)
+AttributeSet::resetDescriptor(const DescriptorPtr& replacement)
 {
-    // ensure the descriptor is as expected
-    if (*mDescr != expected) {
-        OPENVDB_THROW(LookupError, "Cannot rename attribute as descriptors do not match.")
+    // ensure the descriptors match
+    if (*mDescr != *replacement) {
+        OPENVDB_THROW(LookupError, "Cannot swap descriptor as replacement does not match.")
     }
 
     mDescr = replacement;

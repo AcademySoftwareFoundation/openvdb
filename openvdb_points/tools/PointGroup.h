@@ -410,6 +410,12 @@ inline void appendGroup(PointDataTree& tree, const Name& group)
                                                 /*hidden=*/false, /*transient=*/false, /*group=*/true);
         tbb::parallel_for(typename tree::template LeafManager<PointDataTree>(tree).leafRange(), append);
     }
+    else {
+        // make the descriptor unique before we modify the group map
+
+        makeDescriptorUnique(tree);
+        descriptor = attributeSet.descriptorPtr();
+    }
 
     // ensure that there are now available groups
 
@@ -459,7 +465,13 @@ inline void dropGroup(PointDataTree& tree, const Name& group, const bool compact
     if (!iter)  return;
 
     const AttributeSet& attributeSet = iter->attributeSet();
+
+    // make the descriptor unique before we modify the group map
+
+    makeDescriptorUnique(tree);
     Descriptor::Ptr descriptor = attributeSet.descriptorPtr();
+
+    // now drop the group
 
     descriptor->dropGroup(group);
 
@@ -502,8 +514,12 @@ inline void dropGroups( PointDataTree& tree)
     if (!iter)  return;
 
     const AttributeSet& attributeSet = iter->attributeSet();
-    Descriptor::Ptr descriptor = attributeSet.descriptorPtr();
     GroupInfo groupInfo(attributeSet);
+
+    // make the descriptor unique before we modify the group map
+
+    makeDescriptorUnique(tree);
+    Descriptor::Ptr descriptor = attributeSet.descriptorPtr();
 
     descriptor->clearGroups();
 
@@ -535,12 +551,16 @@ inline void compactGroups(PointDataTree& tree)
     if (!iter)  return;
 
     const AttributeSet& attributeSet = iter->attributeSet();
-    Descriptor::Ptr descriptor = attributeSet.descriptorPtr();
     GroupInfo groupInfo(attributeSet);
 
     // early exit if not possible to compact
 
     if (!groupInfo.canCompactGroups())    return;
+
+    // make the descriptor unique before we modify the group map
+
+    makeDescriptorUnique(tree);
+    Descriptor::Ptr descriptor = attributeSet.descriptorPtr();
 
     // generate a list of group offsets and move them (one-by-one)
     // TODO: improve this algorithm to move multiple groups per array at once

@@ -200,13 +200,17 @@ public:
     void dropAttributes(const std::vector<size_t>& pos,
                         const Descriptor& expected, DescriptorPtr& replacement);
 
+    /// Re-name attributes in set to match a provided descriptor
+    /// Replaces own descriptor with @a replacement
+    void renameAttributes(const Descriptor& expected, const DescriptorPtr& replacement);
+
     /// Re order attribute set to match a provided descriptor
     /// Replaces own descriptor with @a replacement
     void reorderAttributes(const DescriptorPtr& replacement);
 
-    /// Re-name attributes in set to match a provided descriptor
-    /// Replaces own descriptor with @a replacement
-    void renameAttributes(const Descriptor& expected, DescriptorPtr& replacement);
+    /// Swap current descriptor with a @a replacement
+    /// Note the provided Descriptor must be identical to the replacement
+    void resetDescriptor(const DescriptorPtr& replacement);
 
     /// Read the entire set from a stream.
     void read(std::istream&);

@@ -132,6 +132,15 @@ TestPointGroup::testAppendDrop()
         CPPUNIT_ASSERT(attributeSet4.descriptor().hasGroup("test3"));
     }
 
+    { // append to a copy
+        PointDataTree tree2(tree);
+
+        appendGroup(tree2, "copy1");
+
+        CPPUNIT_ASSERT(!attributeSet.descriptor().hasGroup("copy1"));
+        CPPUNIT_ASSERT(tree2.beginLeaf()->attributeSet().descriptor().hasGroup("copy1"));
+    }
+
     { // drop a group
         dropGroup(tree, "test2");
 
@@ -150,6 +159,19 @@ TestPointGroup::testAppendDrop()
         dropGroups(tree, names);
 
         CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().groupMap().size(), size_t(0));
+    }
+
+    { // drop a copy
+        appendGroup(tree, "copy2");
+
+        PointDataTree tree2(tree);
+
+        dropGroup(tree2, "copy2");
+
+        CPPUNIT_ASSERT(attributeSet.descriptor().hasGroup("copy2"));
+        CPPUNIT_ASSERT(!tree2.beginLeaf()->attributeSet().descriptor().hasGroup("copy2"));
+
+        dropGroup(tree, "copy2");
     }
 
     { // set group membership
@@ -263,12 +285,21 @@ TestPointGroup::testCompact()
         CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().groupMap().size(), size_t(4));
         CPPUNIT_ASSERT_EQUAL(attributeSet.size(AttributeArray::GROUP), size_t(3));
 
+        // make a copy
+
+        PointDataTree tree2(tree);
+
         // compact - should now occupy one attribute
 
         compactGroups(tree);
 
         CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().groupMap().size(), size_t(4));
         CPPUNIT_ASSERT_EQUAL(attributeSet.size(AttributeArray::GROUP), size_t(1));
+
+        // check descriptor has been deep copied
+
+        CPPUNIT_ASSERT_EQUAL(tree2.cbeginLeaf()->attributeSet().descriptor().groupMap().size(), size_t(4));
+        CPPUNIT_ASSERT_EQUAL(tree2.cbeginLeaf()->attributeSet().size(AttributeArray::GROUP), size_t(3));
     }
 }
 
@@ -318,7 +349,19 @@ TestPointGroup::testSet()
     membership.push_back(false);
     membership.push_back(true);
 
+    // copy tree for descriptor sharing test
+
+    PointDataTree tree2(tree);
+
     setGroup(tree, pointIndexGrid->tree(), membership, "test");
+
+    // check that descriptor remains shared
+
+    appendGroup(tree2, "copy1");
+
+    CPPUNIT_ASSERT(!tree.cbeginLeaf()->attributeSet().descriptor().hasGroup("copy1"));
+
+    dropGroup(tree2, "copy1");
 
     CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(6));
     CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "test"), Index64(4));

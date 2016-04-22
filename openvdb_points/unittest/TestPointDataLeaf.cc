@@ -53,6 +53,7 @@ public:
     CPPUNIT_TEST(testIO);
     CPPUNIT_TEST(testSwap);
     CPPUNIT_TEST(testCopyOnWrite);
+    CPPUNIT_TEST(testCopyDescriptor);
     CPPUNIT_TEST_SUITE_END();
 
     void testEmptyLeaf();
@@ -65,6 +66,7 @@ public:
     void testIO();
     void testSwap();
     void testCopyOnWrite();
+    void testCopyDescriptor();
 
 private:
     // Generate random points by uniformly distributing points
@@ -1003,6 +1005,63 @@ TestPointDataLeaf::testCopyOnWrite()
 
     CPPUNIT_ASSERT(!attributeSet.isShared(/*pos=*/0));
     CPPUNIT_ASSERT(!attributeSetCopy.isShared(/*pos=*/0));
+}
+
+
+void
+TestPointDataLeaf::testCopyDescriptor()
+{
+    using namespace openvdb::tools;
+
+    // Define and register some common attribute types
+    typedef openvdb::tools::TypedAttributeArray<float>    AttributeS;
+
+    AttributeS::registerType();
+
+    typedef PointDataTree::LeafNodeType LeafNode;
+
+    PointDataTree tree;
+
+    LeafNode* leaf = tree.touchLeaf(openvdb::Coord(0, 0, 0));
+    LeafNode* leaf2 = tree.touchLeaf(openvdb::Coord(0, 8, 0));
+
+    // create a descriptor
+
+    typedef openvdb::tools::AttributeSet::Descriptor Descriptor;
+
+    Descriptor::Inserter names;
+    names.add("density", AttributeS::attributeType());
+
+    Descriptor::Ptr descrA = Descriptor::create(names.vec);
+
+    // initialize attributes using this descriptor
+
+    leaf->initializeAttributes(descrA, /*arrayLength=*/100);
+    leaf2->initializeAttributes(descrA, /*arrayLength=*/50);
+
+    // copy the PointDataTree and ensure that descriptors are shared
+
+    PointDataTree tree2(tree);
+
+    CPPUNIT_ASSERT_EQUAL(tree2.leafCount(), openvdb::Index32(2));
+
+    descrA->setGroup("test", size_t(1));
+
+    PointDataTree::LeafCIter iter2 = tree2.cbeginLeaf();
+    CPPUNIT_ASSERT(iter2->attributeSet().descriptor().hasGroup("test"));
+    ++iter2;
+    CPPUNIT_ASSERT(iter2->attributeSet().descriptor().hasGroup("test"));
+
+    // call makeDescriptorUnique and ensure that descriptors are no longer shared
+
+    makeDescriptorUnique(tree2);
+
+    descrA->setGroup("test2", size_t(2));
+
+    iter2 = tree2.cbeginLeaf();
+    CPPUNIT_ASSERT(!iter2->attributeSet().descriptor().hasGroup("test2"));
+    ++iter2;
+    CPPUNIT_ASSERT(!iter2->attributeSet().descriptor().hasGroup("test2"));
 }
 
 
