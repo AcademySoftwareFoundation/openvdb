@@ -863,8 +863,8 @@ AttributeSet::Descriptor::appendTo(NameAndTypeVec& attrs) const
 bool
 AttributeSet::Descriptor::hasGroup(const Name& group) const
 {
-    if (group.empty()) {
-        OPENVDB_THROW(KeyError, "Cannot use an empty group name as a key.");
+    if (!validGroupName(group)) {
+        OPENVDB_THROW(KeyError, ("Invalid group name - " + group).c_str());
     }
 
     return mGroupMap.find(group) != mGroupMap.end();
@@ -873,8 +873,8 @@ AttributeSet::Descriptor::hasGroup(const Name& group) const
 void
 AttributeSet::Descriptor::setGroup(const Name& group, const size_t offset)
 {
-    if (group.empty()) {
-        OPENVDB_THROW(KeyError, "Cannot use an empty group name as a key.");
+    if (!validGroupName(group)) {
+        OPENVDB_THROW(KeyError, ("Invalid group name - " + group).c_str());
     }
 
     mGroupMap[group] = offset;
@@ -883,8 +883,8 @@ AttributeSet::Descriptor::setGroup(const Name& group, const size_t offset)
 void
 AttributeSet::Descriptor::dropGroup(const Name& group)
 {
-    if (group.empty()) {
-        OPENVDB_THROW(KeyError, "Cannot use an empty group name as a key.");
+    if (!validGroupName(group)) {
+        OPENVDB_THROW(KeyError, ("Invalid group name - " + group).c_str());
     }
 
     mGroupMap.erase(group);

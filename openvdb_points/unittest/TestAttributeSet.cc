@@ -259,14 +259,26 @@ TestAttributeSet::testAttributeSetDescriptor()
         CPPUNIT_ASSERT_EQUAL(uniqueName2, openvdb::Name("test2"));
     }
 
+    { // Test group name validity
+        CPPUNIT_ASSERT(!Descriptor::validGroupName(""));
+        CPPUNIT_ASSERT(Descriptor::validGroupName("test1"));
+        CPPUNIT_ASSERT(!Descriptor::validGroupName("test1!"));
+        CPPUNIT_ASSERT(Descriptor::validGroupName("abc_def"));
+        CPPUNIT_ASSERT(!Descriptor::validGroupName("abc=def"));
+    }
+
     { //  Test hasGroup(), setGroup(), dropGroup(), clearGroups()
         Descriptor descr;
 
-        // ensure all methods throw if an empty key is used
+        // ensure all methods throw if an empty or invalid key is used
 
         CPPUNIT_ASSERT_THROW(descr.hasGroup(""), openvdb::KeyError);
         CPPUNIT_ASSERT_THROW(descr.setGroup("", 0), openvdb::KeyError);
         CPPUNIT_ASSERT_THROW(descr.dropGroup(""), openvdb::KeyError);
+
+        CPPUNIT_ASSERT_THROW(descr.hasGroup("abc-"), openvdb::KeyError);
+        CPPUNIT_ASSERT_THROW(descr.setGroup("abc-", 0), openvdb::KeyError);
+        CPPUNIT_ASSERT_THROW(descr.dropGroup("abc-"), openvdb::KeyError);
 
         CPPUNIT_ASSERT(!descr.hasGroup("test1"));
 
