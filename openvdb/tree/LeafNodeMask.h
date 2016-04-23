@@ -935,7 +935,8 @@ template<Index Log2Dim>
 inline Index64
 LeafNode<ValueMask, Log2Dim>::memUsage() const
 {
-    return sizeof(mOrigin) + mBuffer.memUsage();
+    // Use sizeof(*this) to capture alignment-related padding
+    return sizeof(*this);
 }
 
 

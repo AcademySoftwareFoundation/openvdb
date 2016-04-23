@@ -9,12 +9,12 @@ Version 3.2.0 - In development
       range and nearest-neighbor searches on particles, arbitrary volume
       and level set specific segmentation tools, a new binary mask grid
       type and an efficient point to level set conversion scheme.
-    - Optimizations: threaded grid destruction,¬†morphological dilation,
+    - Optimizations: Threaded grid destruction, morphological dilation,
       csg operations and fracture tool.
-    - New Houdini nodes:¬†Segment,¬†LOD and Topology To Level Set.
+    - New Houdini nodes: Segment, LOD and Topology To Level Set.
 
     New features:
-    - Added tools::MultiResGrid a new tool to produce and store a sequences
+    - Added tools::MultiResGrid a tool to produce and store a sequences
       of progressively lower resolution grids (mipmaps).
     - Added tools::ParticleAtlas an acceleration structure for fast range
       and nearest-neighbor searches on particles, points with radius.
@@ -30,9 +30,10 @@ Version 3.2.0 - In development
       new grids rather than modifying their input grids.  These new tools are
       faster and use less memory than the existing tools (if only because the
       input grids never need to be deep-copied).
+    - Added a threaded†dilateActiveValues() tool with tile value support.
     - Added tools::PointsToMask, which activates voxels that intersect
       points from a given list.
-    - Added a new¬†MaskGrid type that uses a single bit-field to represent both
+    - Added a new MaskGrid type that uses a single bit-field to represent both
       voxel values and states for the leafnode to reduce memory usage.
     - Added tools::topologyToLevelSet(), which generates a level set from the
       implicit boundary between active and inactive voxels in an input grid
@@ -46,18 +47,16 @@ Version 3.2.0 - In development
     - Added the math::CoordBBox::Iterator class to conveniently iterate over
       coordinates covered a CoordBBox.
     - Added bit-wise operations to the CoordBBox class.
-    - Added a new (expert) constructor to tools::LeafManager
+    - Added a new†LeafManager constructor to create the†structure from an
+      existing array of leafnodes.
     - Added the templated math::MinMax class to compute the extrema of
       arbitrary value types.
     - Added sparseFill and denseFill methods to the Grid, Tree and RootNode classes.
 
     Improvements:
-    - Significantly improved the performance, parallel scaling and memory usage
-      of tools::LevelSetFracture(), and implemented a more robust level-set
-      segmentation scheme.
-    - Improved the performance of level-set advection by up to five times.
-    - Improved the performance of morphological dilation by up to six times
-      while also adding support for active tiles.
+    - Improved the performance, parallel scaling and memory usage,
+      of tools::LevelSetFracture and updated to use the new†segmentSDF scheme.
+    - Improved the performance of tools::LevelSetAdvection by up to five times.
     - Improved the performance of Tree::voxelizeActiveTiles by means of multi-threading.
     - Improved the performance of tools::meshToVolume(), particularly for
       large narrow-band widths and for signed distance fields with dense
@@ -69,7 +68,7 @@ Version 3.2.0 - In development
     - Added active tile count to Tree::print.
     - Improved the API of tools::Dense with non-const access methods.
     - Added LeafManager::reduce and similar methods to NodeManager.
-      [Suggested by Brett Tully]
+      [Contributed by Brett Tully]
     - Improved constructors of math::Mat3 and math::Mat4.
     - Added math::Mat3::cofactor().
     - Added math::Mat3::setRows, math::Mat4::setRows,
@@ -79,7 +78,7 @@ Version 3.2.0 - In development
     - tools::Prune performs an improved estimate of tile values by means of medians.
 
     Bug fixes:
-    - Fixed a bug in the level-set advection tool that could cause
+    - Fixed a bug in tools::LevelSetAdvection that could cause
       non-deterministic behavior.
       [Reported by Jeff Lait]
     - Fixed a bug that allowed for unexpected implicit conversion
@@ -96,23 +95,20 @@ Version 3.2.0 - In development
     - Resolved a floating-point exception in math::QuantizedUnitVec::pack()
       caused by calling the method with a zero-length vector.
       [Contributed by Rick Hankins]
-    - Fixed a potential threading bug in openvdb/io/Queue.cc.
-      [Contributed by Josip ≈†umeƒçki]
+    - Fixed a potential threading bug in io::Queue.
+      [Contributed by Josip øumeøki]
     - Fixed a possible division-by-zero bug in openvdb/tools/LevelSetAdvect.h.
       [Contributed by Rick Hankins]
-    - Corrected documentation in math/Mat3.h and math/Mat4.h.
-    - Fixed a bug in math::outerProduct [Contributed by Gergely Klar]
+    - Corrected the outer product method to not return the transpose result.
+      [Contributed by Gergely Klar]
     - Fixed a memory overallocation issue in tools::VolumeAdvect.
-    - Fix bug in VolumeToMesh::operator() failing to clear its state when exiting
+    - Fix bug in tools::VolumeToMesh failing to clear its state when exiting
       early.
       [Contributed by Edward Lam]
-    - Fixed bug in¬†openvdb::tools::PointIndexIterator::worldSpaceSearchAndUpdate
+    - Fixed bug in tools::PointIndexIterator::worldSpaceSearchAndUpdate
       that resulted in missing point indices.
       [Reported by Rick Hankins]
-    - Removed the StaggeredBoxSampler code path in SOP_OpenVDB_Advect because
-      it introduces bias.
-      [Contributed by Fredrik Salomonsson]
-    - Fixes TestUtil.cc build issues on Windows.
+    - Fixed TestUtil.cc build issues on Windows.
       [Contributed by Edward Lam]
     - Fixed isApproxZero() so that it works correctly when tolerance is zero.
       [Reported by Joshua Olson]
@@ -156,6 +152,9 @@ Version 3.2.0 - In development
       [Contributed by Nick Avramoussis]
     - The Resample and Combine SOPs now correctly handle affine transforms
       with shear and/or reflection.
+    - Removed the StaggeredBoxSampler code path in SOP_OpenVDB_Advect because
+      it introduces bias.
+      [Contributed by Fredrik Salomonsson]
     - Fixed a bug in the Ray SOP whereby the distance attribute was created
       with the wrong data type.
       [Contributed by Nick Avramoussis]
@@ -246,7 +245,7 @@ Version 3.1.0 - October 1, 2015
       rather than the square of the magnitude.
     - Fixed parameter type inconsistencies in math/Ray.h and
       tools/RayIntersector.h.
-      [Contributed by K√©vin Dietrich]
+      [Contributed by KÈvin Dietrich]
     - Fixed incorrect handling of signed values in tools::clip()
       (and the Clip SOP).
 
