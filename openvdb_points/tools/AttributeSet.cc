@@ -900,7 +900,7 @@ const Name
 AttributeSet::Descriptor::uniqueName(const Name& name) const
 {
     std::ostringstream ss;
-    for (size_t i = 0; i < this->size(); i++) {
+    for (size_t i = 0; i < this->size() + 1; i++) {
         ss.str("");
         ss << name << i;
         if (this->find(ss.str()) == INVALID_POS)    break;
