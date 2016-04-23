@@ -321,6 +321,13 @@ TestPointDataLeaf::testOffsets()
         typedef openvdb::tools::AttributeSet::Descriptor      Descriptor;
 
         Descriptor::Inserter names;
+
+        // empty Descriptor should throw on leaf node initialize
+        Descriptor::Ptr emptyDescriptor = Descriptor::create(names.vec);
+        LeafType* emptyLeafNode = new LeafType();
+        CPPUNIT_ASSERT_THROW(emptyLeafNode->initializeAttributes(emptyDescriptor, 5), openvdb::IndexError);
+
+        // create a non-empty Descriptor
         names.add("density", AttributeS::attributeType());
         names.add("id", AttributeI::attributeType());
         Descriptor::Ptr descriptor = Descriptor::create(names.vec);
