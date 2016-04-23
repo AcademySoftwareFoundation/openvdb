@@ -47,8 +47,10 @@
 
 #include <openvdb_points/tools/IndexIterator.h>
 #include <openvdb_points/tools/AttributeArray.h>
+#include <openvdb_points/tools/AttributeGroup.h>
 
 #include <boost/random/uniform_real_distribution.hpp>
+#include <boost/ptr_container/ptr_vector.hpp>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -103,6 +105,71 @@ void generateRandomSubset(std::vector<IntType>& values, const unsigned int seed,
 
 
 } // namespace index_filter_internal
+
+
+/// Index filtering on multiple group membership for inclusion and exclusion
+///
+/// @note include filters are applied first, then exclude filters
+class MultiGroupFilter
+{
+public:
+    typedef std::vector<Name> NameVector;
+    typedef boost::ptr_vector<GroupHandle> HandleVector;
+
+    struct Data
+    {
+        Data(   const NameVector& _include,
+                const NameVector& _exclude)
+            : include(_include)
+            , exclude(_exclude) { }
+        const NameVector include;
+        const NameVector exclude;
+    };
+
+    MultiGroupFilter(   const HandleVector& includeHandles,
+                        const HandleVector& excludeHandles)
+        : mIncludeHandles(includeHandles)
+        , mExcludeHandles(excludeHandles) { }
+
+    template <typename LeafT>
+    static MultiGroupFilter create(const LeafT& leaf, const Data& data) {
+        HandleVector include;
+        HandleVector exclude;
+        for (NameVector::const_iterator  it = data.include.begin(),
+                                                itEnd = data.include.end(); it != itEnd; ++it) {
+            if (!leaf.attributeSet().descriptor().hasGroup(*it))    continue;
+            include.push_back(new GroupHandle(leaf.groupHandle(*it)));
+        }
+        for (NameVector::const_iterator  it = data.exclude.begin(),
+                                                itEnd = data.exclude.end(); it != itEnd; ++it) {
+            if (!leaf.attributeSet().descriptor().hasGroup(*it))    continue;
+            exclude.push_back(new GroupHandle(leaf.groupHandle(*it)));
+        }
+        return MultiGroupFilter(include, exclude);
+    }
+
+    template <typename IterT>
+    bool valid(const IterT& iter) const {
+        bool includeValid = false;
+        for (HandleVector::const_iterator   it = mIncludeHandles.begin(),
+                                            itEnd = mIncludeHandles.end(); it != itEnd; ++it) {
+            if (it->get(*iter)) {
+                includeValid = true;
+                break;
+            }
+        }
+        if (!includeValid)          return false;
+        for (HandleVector::const_iterator   it = mExcludeHandles.begin(),
+                                            itEnd = mExcludeHandles.end(); it != itEnd; ++it) {
+            if (it->get(*iter))     return false;
+        }
+        return true;
+    }
+
+private:
+    HandleVector mIncludeHandles;
+    HandleVector mExcludeHandles;
+}; // class MultiGroupFilter
 
 
 // Random index filtering per leaf

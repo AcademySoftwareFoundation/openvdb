@@ -34,8 +34,10 @@
 #include <openvdb_points/tools/IndexFilter.h>
 #include <openvdb_points/tools/PointAttribute.h>
 #include <openvdb_points/tools/PointConversion.h>
+#include <openvdb_points/tools/PointGroup.h>
 
 #include <boost/random/mersenne_twister.hpp>
+#include <boost/assign/std/vector.hpp> // until C++11
 
 #include <sstream>
 #include <iostream>
@@ -47,6 +49,7 @@ class TestIndexFilter: public CppUnit::TestCase
 {
 public:
     CPPUNIT_TEST_SUITE(TestIndexFilter);
+    CPPUNIT_TEST(testMultiGroupFilter);
     CPPUNIT_TEST(testRandomLeafFilter);
     CPPUNIT_TEST(testAttributeHashFilter);
     CPPUNIT_TEST(testLevelSetFilter);
@@ -54,6 +57,7 @@ public:
     CPPUNIT_TEST(testBinaryFilter);
     CPPUNIT_TEST_SUITE_END();
 
+    void testMultiGroupFilter();
     void testRandomLeafFilter();
     void testAttributeHashFilter();
     void testLevelSetFilter();
@@ -144,6 +148,137 @@ makeSphere(const openvdb::Coord& dim, const openvdb::Vec3f& center, float radius
                 acc.setValue(xyz, val);
             }
         }
+    }
+}
+
+
+template <typename LeafT>
+bool
+multiGroupMatches(  const LeafT& leaf, const Index32 size,
+                    const std::vector<Name>& include, const std::vector<Name>& exclude,
+                    const std::vector<int>& indices)
+{
+    typedef FilterIndexIter<IndexIter, MultiGroupFilter> IndexGroupIter;
+    IndexIter indexIter(0, size);
+    MultiGroupFilter::Data data(include, exclude);
+    MultiGroupFilter filter = MultiGroupFilter::create(leaf, data);
+    IndexGroupIter iter(indexIter, filter);
+    for (unsigned i = 0; i < indices.size(); ++i, ++iter) {
+        if (!iter)                                  return false;
+        if (*iter != Index32(indices[i]))           return false;
+    }
+    return !iter;
+}
+
+
+void
+TestIndexFilter::testMultiGroupFilter()
+{
+    using namespace boost::assign; // bring 'operator+=()' into scope
+
+    using namespace openvdb;
+    using namespace openvdb::tools;
+
+    typedef PointDataTree::LeafNodeType LeafNode;
+    typedef openvdb::tools::TypedAttributeArray<float>    AttributeS;
+
+    AttributeS::registerType();
+    GroupAttributeArray::registerType();
+
+    PointDataTree tree;
+    LeafNode* leaf = tree.touchLeaf(openvdb::Coord(0, 0, 0));
+
+    AttributeSet::Descriptor::Inserter names;
+    names.add("density", AttributeS::attributeType());
+    AttributeSet::Descriptor::Ptr descriptor = AttributeSet::Descriptor::create(names.vec);
+
+    const size_t size = 5;
+
+    leaf->initializeAttributes(descriptor, size);
+
+    appendGroup(tree, "even");
+    appendGroup(tree, "odd");
+    appendGroup(tree, "all");
+    appendGroup(tree, "first");
+
+    // group population
+
+    { // even
+        GroupWriteHandle groupHandle = leaf->groupWriteHandle("even");
+        groupHandle.set(0, true);
+        groupHandle.set(2, true);
+        groupHandle.set(4, true);
+    }
+
+    { // odd
+        GroupWriteHandle groupHandle = leaf->groupWriteHandle("odd");
+        groupHandle.set(1, true);
+        groupHandle.set(3, true);
+    }
+
+    setGroup(tree, "all", true);
+
+    { // first
+        GroupWriteHandle groupHandle = leaf->groupWriteHandle("first");
+        groupHandle.set(0, true);
+    }
+
+    // test multi group iteration
+
+    { // all include
+        std::vector<Name> include; include += "all";
+        std::vector<Name> exclude;
+        std::vector<int> indices; indices += 0, 1, 2, 3, 4;
+        CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
+    }
+
+    { // all exclude
+        std::vector<Name> include;
+        std::vector<Name> exclude; exclude += "all";
+        std::vector<int> indices;
+        CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
+    }
+
+    { // even include
+        std::vector<Name> include; include += "even";
+        std::vector<Name> exclude;
+        std::vector<int> indices; indices += 0, 2, 4;
+        CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
+    }
+
+    { // odd include
+        std::vector<Name> include; include += "odd";
+        std::vector<Name> exclude;
+        std::vector<int> indices; indices += 1, 3;
+        CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
+    }
+
+    { // odd and first include
+        std::vector<Name> include; include += "odd", "first";
+        std::vector<Name> exclude;
+        std::vector<int> indices; indices += 0, 1, 3;
+        CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
+    }
+
+    { // even include, first exclude
+        std::vector<Name> include; include += "even";
+        std::vector<Name> exclude; exclude += "first";
+        std::vector<int> indices; indices += 2, 4;
+        CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
+    }
+
+    { // all include, first and odd exclude
+        std::vector<Name> include; include += "all";
+        std::vector<Name> exclude; exclude += "first", "odd";
+        std::vector<int> indices; indices += 2, 4;
+        CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
+    }
+
+    { // odd and first include, even exclude
+        std::vector<Name> include; include += "odd", "first";
+        std::vector<Name> exclude; exclude += "even";
+        std::vector<int> indices; indices += 1, 3;
+        CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 }
 
