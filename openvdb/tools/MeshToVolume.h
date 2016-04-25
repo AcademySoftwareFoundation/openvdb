@@ -2540,6 +2540,11 @@ struct ExpandNarrowband
                 }
             }
         } // end leafnode loop
+
+        if (newDistNodePt || newIndexNodePt) {
+            delete newDistNodePt;
+            delete newIndexNodePt;
+        }
     }
 
     //////////

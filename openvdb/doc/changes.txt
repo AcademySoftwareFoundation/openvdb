@@ -158,6 +158,10 @@ Bug fixes:
   <I>[Reported by Joshua&nbsp;Olson]</I>
 - Fixed bugs in @vdblink::tree::NodeUnion NodeUnion@endlink that could cause
   crashes.
+- Fixed memory leak in
+  @vdblink::tools::mesh_to_volume_internal::ExpandNarrowband
+  tools::mesh_to_volume_internal::ExpandNarrowband@endlink
+  <I>[Reported by K&eacute;vin&nbsp;Dietrich]</I>
 
 @par
 API changes:

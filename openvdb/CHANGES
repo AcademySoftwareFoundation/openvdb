@@ -113,6 +113,9 @@ Version 3.2.0 - In development
     - Fixed isApproxZero() so that it works correctly when tolerance is zero.
       [Reported by Joshua Olson]
     - Fixed bugs in tree::NodeUnion that could cause crashes.
+    - Fixed memory leak in
+      tools::mesh_to_volume_internal::ExpandNarrowband
+      [Reported by Kévin Dietrich]
 
     API changes:
     - Deprecated math::Mat3::setBasis and math::Mat4::setBasis.
