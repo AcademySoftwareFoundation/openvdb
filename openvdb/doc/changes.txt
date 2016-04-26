@@ -151,8 +151,8 @@ Bug fixes:
   tools::PointIndexIterator::worldSpaceSearchAndUpdate@endlink
   that resulted in missing point indices.
   <I>[Reported by Rick&nbsp;Hankins]</I>
-- Fixed @vdblink TestUtil.cc @endlink build issues on Windows.
-  <I>[Contributed by Edward&nbsp;Lam]</I>
+- Fixed Windows build issues in unit tests.
+  <I>[Contributed by Edward&nbsp;Lam and Steven&nbsp;Caron]</I>
 - Fixed @vdblink::math::isApproxZero() isApproxZero@endlink so that it works
   correctly when tolerance is zero.
   <I>[Reported by Joshua&nbsp;Olson]</I>
@@ -162,6 +162,9 @@ Bug fixes:
   @vdblink::tools::mesh_to_volume_internal::ExpandNarrowband
   tools::mesh_to_volume_internal::ExpandNarrowband@endlink
   <I>[Reported by K&eacute;vin&nbsp;Dietrich]</I>
+- Fixed parameter type inconsistencies in @link math/Stencils.h@endlink and
+  @link tools/RayIntersector.h@endlink.
+  <I>[Contributed by K&eacute;vin&nbsp;Dietrich]</I>
 
 @par
 API changes:

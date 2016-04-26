@@ -44,6 +44,7 @@
 #ifndef OPENVDB_TOOLS_MESH_TO_VOLUME_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_MESH_TO_VOLUME_HAS_BEEN_INCLUDED
 
+#include <openvdb/Platform.h> // for OPENVDB_HAS_CXX11
 #include <openvdb/Types.h>
 #include <openvdb/math/FiniteDifference.h> // for GodunovsNormSqrd
 #include <openvdb/math/Proximity.h> // for closestPointOnTriangleToPoint
@@ -69,9 +70,9 @@
 #include <algorithm> // for std::sort
 #include <deque>
 #include <limits>
+#include <memory> // for auto_ptr/unique_ptr
 #include <sstream>
 #include <vector>
-
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -534,6 +535,18 @@ private:
 // Internal utility objects and implementation details
 
 namespace mesh_to_volume_internal {
+
+
+template<typename T>
+struct UniquePtr
+{
+#ifdef OPENVDB_HAS_CXX11
+    typedef std::unique_ptr<T>  type;
+#else
+    typedef std::auto_ptr<T>    type;
+#endif
+};
+
 
 template<typename PointType>
 struct TransformPoints {
@@ -2422,8 +2435,8 @@ struct ExpandNarrowband
         std::vector<Fragment> fragments;
         fragments.reserve(256);
 
-        LeafNodeType      * newDistNodePt = NULL;
-        Int32LeafNodeType * newIndexNodePt = NULL;
+        typename UniquePtr<LeafNodeType>::type      newDistNodePt;
+        typename UniquePtr<Int32LeafNodeType>::type newIndexNodePt;
 
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
 
@@ -2445,9 +2458,9 @@ struct ExpandNarrowband
 
                 const ValueType backgroundDist = distAcc.getValue(origin);
 
-                if (!newDistNodePt && !newIndexNodePt) {
-                    newDistNodePt = new LeafNodeType(origin, backgroundDist);
-                    newIndexNodePt = new Int32LeafNodeType(origin, indexAcc.getValue(origin));
+                if (!newDistNodePt.get() && !newIndexNodePt.get()) {
+                    newDistNodePt.reset(new LeafNodeType(origin, backgroundDist));
+                    newIndexNodePt.reset(new Int32LeafNodeType(origin, indexAcc.getValue(origin)));
                 } else {
 
                     if ((backgroundDist < ValueType(0.0)) !=
@@ -2459,8 +2472,8 @@ struct ExpandNarrowband
                     newIndexNodePt->setOrigin(origin);
                 }
 
-                distNodePt = newDistNodePt;
-                indexNodePt = newIndexNodePt;
+                distNodePt = newDistNodePt.get();
+                indexNodePt = newIndexNodePt.get();
 
                 usingNewNodes = true;
             }
@@ -2527,24 +2540,15 @@ struct ExpandNarrowband
 
                 // Export new distance values
                 if (usingNewNodes) {
-                    distNodePt->topologyUnion(*indexNodePt);
-
-                    mDistNodes.push_back(distNodePt);
-                    mIndexNodes.push_back(indexNodePt);
-
-                    newDistNodePt = NULL;
-                    newIndexNodePt = NULL;
+                    newDistNodePt->topologyUnion(*newIndexNodePt);
+                    mDistNodes.push_back(newDistNodePt.release());
+                    mIndexNodes.push_back(newIndexNodePt.release());
                 } else {
                     mUpdatedDistNodes.push_back(distNodePt);
                     mUpdatedIndexNodes.push_back(indexNodePt);
                 }
             }
         } // end leafnode loop
-
-        if (newDistNodePt || newIndexNodePt) {
-            delete newDistNodePt;
-            delete newIndexNodePt;
-        }
     }
 
     //////////
