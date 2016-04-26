@@ -244,6 +244,10 @@ TestAttributeSet::testAttributeSetDescriptor()
 
     { // Test uniqueName
         Descriptor::Inserter names;
+        Descriptor::Ptr emptyDescr = Descriptor::create(names.vec);
+        const openvdb::Name uniqueNameEmpty = emptyDescr->uniqueName("test");
+        CPPUNIT_ASSERT_EQUAL(uniqueNameEmpty, openvdb::Name("test0"));
+
         names.add("test", AttributeS::attributeType());
         names.add("test1", AttributeI::attributeType());
 
