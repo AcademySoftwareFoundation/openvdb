@@ -91,6 +91,7 @@ public:
     ParmList& add(const ParmFactory&);
 
     ParmList& beginSwitcher(const std::string& token, const std::string& label = "");
+    ParmList& beginExclusiveSwitcher(const std::string& token, const std::string& label = "");
     ParmList& endSwitcher();
 
     ParmList& addFolder(const std::string& label);
@@ -99,7 +100,7 @@ public:
     PRM_Template* get() const;
 
 private:
-    struct SwitcherInfo { size_t parmIdx; std::vector<PRM_Default> folders; };
+    struct SwitcherInfo { size_t parmIdx; std::vector<PRM_Default> folders; bool exclusive; };
     typedef std::vector<SwitcherInfo> SwitcherStack;
 
     void incFolderParmCount();

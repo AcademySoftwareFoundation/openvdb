@@ -150,6 +150,23 @@ void TestAll()
             CPPUNIT_ASSERT(m.countOn() == MaskType::SIZE);
         }
     }
+    {// isConstant
+        MaskType m(true);//all bits are on
+        bool isOn = false;
+        CPPUNIT_ASSERT(!m.isOff());
+        CPPUNIT_ASSERT(m.isOn());
+        CPPUNIT_ASSERT(m.isConstant(isOn));
+        CPPUNIT_ASSERT(isOn);
+        m.setOff(MaskType::SIZE-1);//sets last bit off
+        CPPUNIT_ASSERT(!m.isOff());
+        CPPUNIT_ASSERT(!m.isOn());
+        CPPUNIT_ASSERT(!m.isConstant(isOn));
+        m.setOff();//sets all bits off
+        CPPUNIT_ASSERT(m.isOff());
+        CPPUNIT_ASSERT(!m.isOn());
+        CPPUNIT_ASSERT(m.isConstant(isOn));
+        CPPUNIT_ASSERT(!isOn);
+    }
     {// DenseIterator
         MaskType m(false);
         for (Index i=0; i<SIZE; ++i) {

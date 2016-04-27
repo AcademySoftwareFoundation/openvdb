@@ -481,19 +481,33 @@ public:
     virtual void clipUnallocatedNodes();
 #endif
 
+    //@{
     /// @brief Set all voxels within a given axis-aligned box to a constant value.
-    /// If necessary, subdivide tiles that intersect the box.
-    /// @param bbox           inclusive coordinates of opposite corners of an axis-aligned box
-    /// @param value          the value to which to set voxels within the box
-    /// @param active         if true, mark voxels within the box as active,
-    ///                       otherwise mark them as inactive. Defaults to true.
-    /// @param sparse         if false, active tiles are voxelized, i.e. only active voxels
-    ///                       are generated from the fill operation. Defaults to true.  
-    /// @note If @a sparse is true this operation generates a sparse, but not always optimally sparse,
-    /// representation of the filled box.  Follow fill operations with a prune()
+    /// @param bbox    inclusive coordinates of opposite corners of an axis-aligned box
+    /// @param value   the value to which to set voxels within the box
+    /// @param active  if true, mark voxels within the box as active,
+    ///                otherwise mark them as inactive
+    /// @note This operation generates a sparse, but not always optimally sparse,
+    /// representation of the filled box. Follow fill operations with a prune()
     /// operation for optimal sparseness.
-    void fill(const CoordBBox& bbox, const ValueType& value, bool active = true, bool sparse = true);
+    void sparseFill(const CoordBBox& bbox, const ValueType& value, bool active = true);
+    void fill(const CoordBBox& bbox, const ValueType& value, bool active = true)
+    {
+        this->sparseFill(bbox, value, active);
+    }
+    //@}
 
+    /// @brief Set all voxels within a given axis-aligned box to a constant value.
+    /// @param bbox    inclusive coordinates of opposite corners of an axis-aligned box.
+    /// @param value   the value to which to set voxels within the box.
+    /// @param active  if true, mark voxels within the box as active,
+    ///                otherwise mark them as inactive.
+    ///
+    /// @note This operation generates a dense representation of the
+    ///       filled box. This implies that active tiles are voxelized, i.e. only active 
+    ///       voxels are generated from this fill operation.
+    void denseFill(const CoordBBox& bbox, const ValueType& value, bool active = true);
+    
     /// @brief Reduce the memory footprint of this tree by replacing with tiles
     /// any nodes whose values are all the same (optionally to within a tolerance)
     /// and have the same active state.
@@ -504,9 +518,15 @@ public:
         mRoot.prune(tolerance);
     }
 
+    //@{
     /// @brief Add the given leaf node to this tree, creating a new branch if necessary.
     /// If a leaf node with the same origin already exists, replace it.
-    void addLeaf(LeafNodeType& leaf) { mRoot.addLeaf(&leaf); }
+    ///
+    /// @warning Ownership of the leaf is transferred to the tree so
+    /// the client code should not attempt to delete the leaf pointer!
+    void addLeaf(LeafNodeType* leaf) { assert(leaf); mRoot.addLeaf(leaf); }
+    OPENVDB_DEPRECATED void addLeaf(LeafNodeType& leaf) { mRoot.addLeaf(&leaf); }
+    //@}
 
     /// @brief Add a tile containing voxel (x, y, z) at the specified tree level,
     /// creating a new branch if necessary.  Delete any existing lower-level nodes
@@ -1771,10 +1791,18 @@ Tree<RootNodeType>::clipUnallocatedNodes()
 
 template<typename RootNodeType>
 inline void
-Tree<RootNodeType>::fill(const CoordBBox& bbox, const ValueType& value, bool active, bool sparse)
+Tree<RootNodeType>::denseFill(const CoordBBox& bbox, const ValueType& value, bool active)
 {
     this->clearAllAccessors();
-    return mRoot.fill(bbox, value, active, sparse);
+    return mRoot.denseFill(bbox, value, active);
+}
+
+template<typename RootNodeType>
+inline void
+Tree<RootNodeType>::sparseFill(const CoordBBox& bbox, const ValueType& value, bool active)
+{
+    this->clearAllAccessors();
+    return mRoot.sparseFill(bbox, value, active);
 }
 
 

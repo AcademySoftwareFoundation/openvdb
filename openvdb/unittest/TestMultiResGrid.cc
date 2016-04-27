@@ -55,7 +55,7 @@ class TestMultiResGrid : public CppUnit::TestCase
         inline bool allOdd()  const { return mask == 7; }
         int mask;
     };// CoordMask
-    
+
 public:
     CPPUNIT_TEST_SUITE(TestMultiResGrid);
     CPPUNIT_TEST(testTwosComplement);
@@ -151,7 +151,7 @@ TestMultiResGrid::testManualTopology()
     // Define grid domain so they exactly overlap!
     const int w = 16;//half-width of dense patch on the finest grid level
     const CoordBBox bbox( Coord(-w), Coord(w) );// both inclusive
-    
+
     // First check all trees against the background value
     for (size_t level = 0; level < mrg->numLevels(); ++level) {
         for (CoordBBox::Iterator<true> ijk(bbox>>level); ijk; ++ijk) {
@@ -173,7 +173,7 @@ TestMultiResGrid::testManualTopology()
         mrg->tree( level ).evalActiveVoxelBoundingBox( bbox_actual );
         CPPUNIT_ASSERT_EQUAL( bbox >> level, bbox_actual );
     }
-    
+
     //pick a grid point that is shared between all the grids
     const Coord ijk(0);
 
@@ -190,9 +190,9 @@ TestMultiResGrid::testManualTopology()
 
     // Value at a floating-point position close to ijk and a floating point level
     CPPUNIT_ASSERT_DOUBLES_EQUAL(2.25, mrg->sampleValue<1>(Vec3R(0.124), 2.25f), /*tolerance=*/ 0.001);
-    
+
     // prolongate at a given point at top level
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, mrg->prolongate(ijk, 0), /*tolerance=*/ 0.0);
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, mrg->prolongateVoxel(ijk, 0), /*tolerance=*/ 0.0);
 
     // First check the coarsest level (3)
     for (CoordBBox::Iterator<true> ijk(bbox>>3UL); ijk; ++ijk) {
@@ -276,11 +276,13 @@ TestMultiResGrid::testIO()
         const float outside = mrg.sampleValue<1>( Coord( int(1.1*radius/voxelSize) ), 0UL, level );
         CPPUNIT_ASSERT_DOUBLES_EQUAL(  ls->background(), outside,/*tolerance=*/ 0.001 );
     }
-      
+
     const std::string filename( "sphere.vdb" );
 
     // Write grids
-    mrg.write( filename );
+    io::File outputFile( filename );
+    outputFile.write( *mrg.grids() );
+    outputFile.close();
 
     // Read grids
     openvdb::initialize();
@@ -295,7 +297,7 @@ TestMultiResGrid::testIO()
         //grid->print(std::cerr, 3);
     }
     file.close();
-    
+
     ::remove(filename.c_str());
 }
 
@@ -303,7 +305,7 @@ void
 TestMultiResGrid::testModels()
 {
     using namespace openvdb;
-    
+
 #ifdef TestMultiResGrid_DATA_PATH
     initialize();//required whenever I/O of OpenVDB files is performed!
     const std::string path(TestMultiResGrid_DATA_PATH);
@@ -328,7 +330,11 @@ TestMultiResGrid::testModels()
         timer.stop();
         std::cerr << "\n High-res level set " <<  tools::checkLevelSet(*mrg.grid(0)) << "\n";
         std::cerr << " done\nWriting \"" << filenames[i] << "\" ...";
-        mrg.write( "/tmp/" + filenames[i] );
+
+        io::File file( "/tmp/" + filenames[i] );
+        file.write( *mrg.grids() );
+        file.close();
+
         std::cerr << " done\n" << std::endl;
         // {// in-betweening
         //     timer.start("\nIn-betweening");

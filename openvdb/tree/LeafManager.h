@@ -221,7 +221,7 @@ public:
     };// end of LeafRange
 
     /// @brief Constructor from a tree reference and an auxiliary buffer count
-    /// (default is no auxiliary buffers)
+    /// @note  The default is no auxiliary buffers
     LeafManager(TreeType& tree, size_t auxBuffersPerLeaf=0, bool serial=false)
         : mTree(&tree)
         , mLeafCount(0)
@@ -235,9 +235,9 @@ public:
         this->rebuild(serial);
     }
 
-    /// @brief Constructor from a tree reference and an existing array
-    /// of pointers to LeafNodes from said tree. This c-tor is only
-    /// intended for experts that try to squice out a
+    /// @brief Construct directly from an existing array of leafnodes.
+    /// @warning The leafnodes are implicitly assumed to exist in the
+    ///          input @a tree.
     LeafManager(TreeType& tree, LeafType** begin, LeafType** end,
                 size_t auxBuffersPerLeaf=0, bool serial=false)
         : mTree(&tree)
@@ -249,7 +249,7 @@ public:
         , mTask(0)
         , mIsMaster(true)
     {
-        size_t n = mLeafCount; 
+        size_t n = mLeafCount;
         LeafType **target = mLeafs, **source = begin;
         while (n--) *target++ = *source++;
         if (auxBuffersPerLeaf) this->initAuxBuffers(serial);
@@ -269,7 +269,7 @@ public:
         , mIsMaster(false)
     {
     }
-    
+
     virtual ~LeafManager()
     {
         if (mIsMaster) {
@@ -460,7 +460,7 @@ public:
     /// @param grainSize optional parameter to specify the grainsize
     ///                  for threading, one by default.
     ///
-    /// @warning The functor object is deep-copied to create TBB tasks. 
+    /// @warning The functor object is deep-copied to create TBB tasks.
     ///          This allows the function to use non-thread-safe members
     ///          like a ValueAccessor.
     ///
@@ -537,7 +537,7 @@ public:
     ///
     /// @par Example:
     /// @code
-    /// // Functor to count the number of negative (active) leaf values 
+    /// // Functor to count the number of negative (active) leaf values
     /// struct CountOp
     /// {
     ///     CountOp() : mCounter(0) {}
@@ -550,7 +550,7 @@ public:
     ///       for (; iter; ++iter) if (*iter < 0.0f) ++mCounter;
     ///     }
     ///     void join(const CountOp &other) {mCounter += other.mCounter;}
-    ///     size_t mCounter; 
+    ///     size_t mCounter;
     /// };
     ///
     /// // usage:
@@ -623,7 +623,7 @@ public:
     ///                  for threading, one by default.
     /// @details If @a offsets is NULL or @a size is smaller than the
     /// total number of active voxels (the return value) then @a offsets
-    /// is re-allocated and @a size equals the total number of active voxels. 
+    /// is re-allocated and @a size equals the total number of active voxels.
     size_t getPreFixSum(size_t*& offsets, size_t& size, size_t grainSize=1) const
     {
         if (offsets == NULL || size < mLeafCount) {
@@ -759,7 +759,7 @@ public:
         }
         const LeafOp mLeafOp;
     };// LeafTransformer
-    
+
     /// @brief Private member class that applies a user-defined
     /// functor to perform parallel_reduce on all the leaf nodes.
     template<typename LeafOp>
@@ -807,7 +807,7 @@ public:
         }
         size_t* mOffsets;
     };// PreFixSum
-    
+
     typedef typename boost::function<void (LeafManager*, const RangeType&)> FuncType;
 
     TreeType*            mTree;

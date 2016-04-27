@@ -935,7 +935,8 @@ template<Index Log2Dim>
 inline Index64
 LeafNode<ValueMask, Log2Dim>::memUsage() const
 {
-    return sizeof(mOrigin) + mBuffer.memUsage();
+    // Use sizeof(*this) to capture alignment-related padding
+    return sizeof(*this);
 }
 
 
@@ -1098,9 +1099,7 @@ template<Index Log2Dim>
 inline bool
 LeafNode<ValueMask, Log2Dim>::isConstant(bool& constValue, bool& state, bool) const
 {
-    state = mBuffer.mData.isOn();
-
-    if (!(state || mBuffer.mData.isOff())) return false;
+    if (!mBuffer.mData.isConstant(state)) return false;
     
     constValue = state;
     return true;

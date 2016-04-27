@@ -55,7 +55,7 @@ namespace math {
 
 
 ////////////////////////////////////////
-    
+
 template<typename DerivedType, typename GridT, bool IsSafe>
 class BaseStencil
 {
@@ -109,7 +109,8 @@ public:
     /// @details This method will check to see if it is necessary to
     /// update the stencil based on the cached index coordinates of
     /// the center point.
-    inline void moveTo(const VecType& xyz)
+    template<typename RealType>
+    inline void moveTo(const Vec3<RealType>& xyz)
     {
         Coord ijk = openvdb::Coord::floor(xyz);
         if (ijk != mCenter) this->moveTo(ijk);
@@ -248,7 +249,7 @@ public:
     typedef GridT                             GridType;
     typedef typename GridT::TreeType          TreeType;
     typedef typename GridT::ValueType         ValueType;
-    
+
     static const int SIZE = 7;
 
     SevenPointStencil(const GridT& grid): BaseType(grid, SIZE) {}
@@ -302,7 +303,7 @@ public:
     typedef GridT                             GridType;
     typedef typename GridT::TreeType          TreeType;
     typedef typename GridT::ValueType         ValueType;
-    
+
     static const int SIZE = 8;
 
     BoxStencil(const GridType& grid): BaseType(grid, SIZE) {}

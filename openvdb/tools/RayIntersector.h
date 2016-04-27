@@ -540,6 +540,7 @@ class LinearSearchImpl
 {
 public:
     typedef math::Ray<RealT>              RayT;
+    typedef math::Vec3<RealT>             VecT;
     typedef typename GridT::ValueType     ValueT;
     typedef typename GridT::ConstAccessor AccessorT;
     typedef math::BoxStencil<GridT>       StencilT;
@@ -669,7 +670,7 @@ private:
 
     inline RealT interpTime()
     {
-        assert(math::isApproxLarger(mT[1], mT[0], RealT(1e-6)));
+        assert( math::isApproxLarger(mT[1], mT[0], RealT(1e-6) ) );
         return mT[0]+(mT[1]-mT[0])*mV[0]/(mV[0]-mV[1]);
     }
 

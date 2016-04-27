@@ -60,7 +60,7 @@
 #include <openvdb/Platform.h>
 #include <openvdb/tools/PointIndexGrid.h>
 #include <openvdb/tools/ParticleAtlas.h>
-#include <openvdb/tools/PointMaskGrid.h>
+#include <openvdb/tools/PointsToMask.h>
 
 
 /// @brief Houdini point attribute wrapper
@@ -269,7 +269,7 @@ struct PackedMaskConstructor
 #endif
 
             GU_VDBPointList<openvdb::Vec3R>  points(*detailtouse);
-            openvdb::MaskGrid::Ptr grid = openvdb::tools::createPointMaskGrid(points, mXForm);
+            openvdb::MaskGrid::Ptr grid = openvdb::tools::createPointMask(points, mXForm);
             mMaskGrid->tree().topologyUnion(grid->tree());
         }
     }
@@ -400,7 +400,7 @@ GUvdbCreatePointMaskGrid(
 #endif
 
     GU_VDBPointList<openvdb::Vec3R> points( detail, pointGroup );
-    return openvdb::tools::createPointMaskGrid( points, xform );
+    return openvdb::tools::createPointMask( points, xform );
 }
 
 

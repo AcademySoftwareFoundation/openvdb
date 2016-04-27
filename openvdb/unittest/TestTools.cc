@@ -29,6 +29,7 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include <sstream>
+#include <algorithm>// for std::sort
 #include <cppunit/extensions/HelperMacros.h>
 #include <boost/random/mersenne_twister.hpp>
 #include <tbb/atomic.h>
@@ -2785,22 +2786,61 @@ TestTools::testPrune()
     
     using namespace openvdb;
 
-    const float value = 5.345f;
+    {// try prunning a tree with const values
+        const float value = 5.345f;
     
-    FloatTree tree(value);
-    CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
-    CPPUNIT_ASSERT_EQUAL(Index32(1), tree.nonLeafCount()); // root node
-    CPPUNIT_ASSERT(tree.empty());
+        FloatTree tree(value);
+        CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
+        CPPUNIT_ASSERT_EQUAL(Index32(1), tree.nonLeafCount()); // root node
+        CPPUNIT_ASSERT(tree.empty());
+        
+        tree.fill(CoordBBox(Coord(-10), Coord(10)), value, /*active=*/false);
+        CPPUNIT_ASSERT(!tree.empty());
+        
+        tools::prune(tree);
+        
+        CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
+        CPPUNIT_ASSERT_EQUAL(Index32(1), tree.nonLeafCount()); // root node
+        CPPUNIT_ASSERT(tree.empty());
+    }
     
-    tree.fill(CoordBBox(Coord(-10), Coord(10)), value, /*active=*/false);
-    CPPUNIT_ASSERT(!tree.empty());
-    
-    tools::prune(tree);
-    
-    CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
-    CPPUNIT_ASSERT_EQUAL(Index32(1), tree.nonLeafCount()); // root node
-    CPPUNIT_ASSERT(tree.empty());
+    {// Prune a tree with a single leaf node with random values in the range [0,1]
+        typedef tree::LeafNode<float,3> LeafNodeT;
+        const float val = 1.0, tol = 1.1f;
 
+        // Fill a leaf node with random values in the range [0,1]
+        LeafNodeT *leaf = new LeafNodeT(Coord(0), val, true);
+        math::Random01 r(145);
+        std::vector<float> data(LeafNodeT::NUM_VALUES);
+        for (Index i=0; i<LeafNodeT::NUM_VALUES; ++i) {
+            const float v = float(r());
+            data[i] = v;
+            leaf->setValueOnly(i, v);
+        }
+
+        // Insert leaf node into an empty tree
+        FloatTree tree(val);
+        tree.addLeaf(leaf);
+
+        CPPUNIT_ASSERT_EQUAL(Index32(1), tree.leafCount());
+        CPPUNIT_ASSERT_EQUAL(Index32(3), tree.nonLeafCount()); // root+2*internal
+
+        tools::prune(tree);// tolerance is zero
+
+        CPPUNIT_ASSERT_EQUAL(Index32(1), tree.leafCount());
+        CPPUNIT_ASSERT_EQUAL(Index32(3), tree.nonLeafCount()); // root+2*internal
+
+        tools::prune(tree, tol);
+
+        CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
+        CPPUNIT_ASSERT_EQUAL(Index32(3), tree.nonLeafCount()); // root+2*internal
+
+        std::sort(data.begin(), data.end());
+        const float median = data[(LeafNodeT::NUM_VALUES-1)>>1];
+
+        ASSERT_DOUBLES_EXACTLY_EQUAL(median, tree.getValue(Coord(0)));
+    }
+    
     /*
     {// Bechmark serial prune
         util::CpuTimer timer;
@@ -2827,7 +2867,7 @@ TestTools::testPrune()
         tools::prune(grid->tree());
         timer.stop();
         CPPUNIT_ASSERT_EQUAL(leafCount, grid->tree().leafCount());
-        }
+    }
     */
 }
 

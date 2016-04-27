@@ -30,34 +30,25 @@
 //
 /// @file    TopologyToLevelSet.h
 ///
-/// @brief   This tool converts active grid topology to a into a signed
-///          distance field encoded as a narrow band level set.
-///
-/// @details The boundary between active and inactive voxels is treated
-///          as the zero crossing for the level set.
+/// @brief   This tool generates a narrow-band signed distance field / level set
+///          from the interface between active and inactive voxels in a vdb grid.
 ///
 /// @par Example:
-/// Combine with @c tools::createPointMaskGrid for fast point cloud to level set conversion.
-///
-/// @author  D.J. Hill
+/// Combine with @c tools::PointsToVolume for fast point cloud to level set conversion.
 
 #ifndef OPENVDB_TOOLS_TOPOLOGY_TO_LEVELSET_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_TOPOLOGY_TO_LEVELSET_HAS_BEEN_INCLUDED
 
 #include "LevelSetFilter.h"
-#include "Morphology.h" // for {dilate|erode}Voxels
-#include "Prune.h"// for pruneInactive
-#include "SignedFloodFill.h" // for signedFloodFill
+#include "Morphology.h" // for erodeVoxels and dilateActiveValues
+#include "SignedFloodFill.h"
 
-#include <openvdb/Types.h>
 #include <openvdb/Grid.h>
+#include <openvdb/Types.h>
 #include <openvdb/math/FiniteDifference.h> // for math::BiasedGradientScheme
 #include <openvdb/util/NullInterrupter.h>
 
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_for.h>
-
-#include <vector>
+#include <tbb/task_group.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -65,52 +56,69 @@ namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
 
-/// @brief  Compute the narrow-band signed distance to the boundary
-///         between active and inactive voxels in the input grid.
+/// @brief   Compute the narrow-band signed distance to the interface between
+///          active and inactive voxels in the input grid.
 ///
-/// @return A shared pointer to a new signed distance field of type @c float
+/// @return  A shared pointer to a new sdf / level set grid of type @c float
 ///
-/// @param grid           Input grid of arbitrary type whose active voxels are used
-///                       in constructing the level set.
-/// @param halfBandWidth  Half the width of the narrow band, in voxel units
-/// @param closingWidth   Number of iterations used to first expand and then shrink
-///                       the filled voxel region.
-///                       This causes holes and valleys to be filled.
-/// @param dilation       Number of iterations used to expand the filled voxel region.
-/// @param smoothingSteps Number of smoothing interations
-template<typename GridType>
-inline typename GridType::template ValueConverter<float>::Type::Ptr
-topologyToLevelSet(const GridType& grid, int halfBandWidth = 3, int closingWidth = 1,
-    int dilation = 0, int smoothingSteps = 0);
+/// @param grid            Input grid of arbitrary type whose active voxels are used
+///                        in constructing the level set.
+/// @param halfWidth       Half the width of the narrow band in voxel units.
+/// @param closingSteps    Number of morphological closing steps used to fill gaps
+///                        in the active voxel region.
+/// @param dilation        Number of voxels to expand the active voxel region.
+/// @param smoothingSteps  Number of smoothing interations.
+template<typename GridT>
+inline typename GridT::template ValueConverter<float>::Type::Ptr
+topologyToLevelSet(const GridT& grid, int halfWidth = 3, int closingSteps = 1, int dilation = 0,
+    int smoothingSteps = 0);
 
 
-/// @brief  Compute the narrow-band signed distance to the boundary
-///         between active and inactive voxels in the input grid.
+/// @brief   Compute the narrow-band signed distance to the interface between
+///          active and inactive voxels in the input grid.
 ///
-/// @return A shared pointer to a new signed distance field of type @c float
+/// @return  A shared pointer to a new sdf / level set grid of type @c float
 ///
-/// @param grid           Input grid of arbitrary type whose active voxels are used
-///                       in constructing the level set.
-/// @param halfBandWidth  Half the width of the narrow band, in voxel units
-/// @param closingWidth   Number of iterations used to first expand and then shrink
-///                       the filled voxel region.
-///                       This causes holes and valleys to be filled.
-/// @param dilation       Number of iterations used to expand the filled voxel region.
-/// @param smoothingSteps Number of smoothing interations
-/// @param interrupt      Optional object adhering to the util::NullInterrupter interface.
-template<typename GridType, typename InterrupterType>
-inline typename GridType::template ValueConverter<float>::Type::Ptr
-topologyToLevelSet(const GridType& grid, int halfBandWidth = 3, int closingWidth = 1,
-    int dilation = 0, int smoothingSteps = 0, InterrupterType* interrupt = NULL);
+/// @param grid            Input grid of arbitrary type whose active voxels are used
+///                        in constructing the level set.
+/// @param halfWidth       Half the width of the narrow band in voxel units.
+/// @param closingSteps    Number of morphological closing steps used to fill gaps
+///                        in the active voxel region.
+/// @param dilation        Number of voxels to expand the active voxel region.
+/// @param smoothingSteps  Number of smoothing interations.
+/// @param interrupt       Optional object adhering to the util::NullInterrupter interface.
+template<typename GridT, typename InterrupterT>
+inline typename GridT::template ValueConverter<float>::Type::Ptr
+topologyToLevelSet(const GridT& grid, int halfWidth = 3, int closingSteps = 1, int dilation = 0,
+    int smoothingSteps = 0, InterrupterT* interrupt = NULL);
 
 
 ////////////////////////////////////////
-////////////////////////////////////////
-
-// Implementation details
 
 
 namespace ttls_internal {
+
+
+template<typename TreeT>
+struct DilateOp
+{
+    DilateOp(TreeT& t, int n) : tree(&t), size(n) {}
+    void operator()() const {
+        dilateActiveValues( *tree, size, tools::NN_FACE, tools::IGNORE_TILES);
+    }
+    TreeT* tree;
+    const int size;
+};
+
+
+template<typename TreeT>
+struct ErodeOp
+{
+    ErodeOp(TreeT& t, int n) : tree(&t), size(n) {}
+    void operator()() const { erodeVoxels( *tree, size); }
+    TreeT* tree;
+    const int size;
+};
 
 
 template<typename TreeType>
@@ -197,79 +205,71 @@ smoothLevelSet(GridType& grid, int iterations, int halfBandWidthInVoxels, Interr
 } // namespace ttls_internal
 
 
-////////////////////////////////////////
 
-
-template<typename GridType, typename InterrupterType>
-inline typename GridType::template ValueConverter<float>::Type::Ptr
-topologyToLevelSet(const GridType& grid, int halfBandWidth, int closingWidth,
-    int dilation, int smoothingSteps, InterrupterType* interrupt)
+template<typename GridT, typename InterrupterT>
+inline typename GridT::template ValueConverter<float>::Type::Ptr
+topologyToLevelSet(const GridT& grid, int halfWidth, int closingSteps, int dilation,
+    int smoothingSteps, InterrupterT* interrupt)
 {
-    typedef typename GridType::template ValueConverter<float>::Type             FloatGridType;
-    typedef typename FloatGridType::TreeType                                    FloatTreeType;
-    typedef typename FloatTreeType::template ValueConverter<ValueMask>::Type    MaskTreeType;
+    typedef typename GridT::TreeType::template ValueConverter<ValueMask>::Type MaskTreeT;
+    typedef typename GridT::TreeType::template ValueConverter<float>::Type     FloatTreeT;
+    typedef Grid<FloatTreeT>                                                   FloatGridT;
 
-    halfBandWidth = std::max(halfBandWidth, 1);
-    closingWidth = std::max(closingWidth, 0);
+    // Check inputs
 
-    MaskTreeType regionMask(grid.tree(), false, TopologyCopy());
+    halfWidth = std::max(halfWidth, 1);
+    closingSteps = std::max(closingSteps, 0);
+    dilation = std::max(dilation, 0);
 
-    // closing operation and padding
-    openvdb::tools::dilateVoxels(regionMask, closingWidth + dilation);
-    openvdb::tools::erodeVoxels(regionMask, closingWidth);
+    if ( !grid.hasUniformVoxels() ) {
+        OPENVDB_THROW(ValueError, "Non-uniform voxels are not supported!");
+    }
 
+    // Copy the topology into a MaskGrid.
+    MaskTreeT maskTree( grid.tree(), false/*background*/, openvdb::TopologyCopy() );
 
-    // Construct inside band mask
-
-    MaskTreeType coreMask(regionMask);
-    openvdb::tools::erodeVoxels(coreMask, halfBandWidth);
-
-    regionMask.topologyDifference(coreMask);
-    tools::pruneInactive(regionMask,  /*threading=*/true);
+    // Morphological closing operation.
+    dilateActiveValues( maskTree, closingSteps + dilation, tools::NN_FACE, tools::IGNORE_TILES);
+    erodeVoxels(  maskTree, closingSteps);
 
     // Generate a volume with an implicit zero crossing at the boundary
     // between active and inactive values in the input grid.
+    const float background = static_cast<float>(grid.voxelSize()[0]) * halfWidth;
+    typename FloatTreeT::Ptr lsTree(
+        new FloatTreeT( maskTree, /*out=*/background, /*in=*/-background, openvdb::TopologyCopy() ) );
 
-    const float width = float(grid.transform().voxelSize()[0] * double(halfBandWidth));
+    tbb::task_group pool;
+    pool.run( ttls_internal::ErodeOp< MaskTreeT >( maskTree, halfWidth ) );
+    pool.run( ttls_internal::DilateOp<FloatTreeT>( *lsTree , halfWidth ) );
+    pool.wait();// wait for both tasks to complete
 
-    typename FloatTreeType::Ptr resultTree(
-        new FloatTreeType(regionMask, /*inactive=*/width, /*active=*/-width, openvdb::TopologyCopy()));
+    lsTree->topologyDifference( maskTree );
+    tools::pruneLevelSet( *lsTree,  /*threading=*/true);
 
-    // Construct outside band mask
-    openvdb::tools::dilateVoxels(regionMask, halfBandWidth);
-    regionMask.topologyDifference(coreMask);
-    tools::pruneInactive(regionMask,  /*threading=*/true);
-
-    // Activate outside band
-    resultTree->topologyUnion(regionMask);
-
-    // Update interior sign
-    tools::signedFloodFill(*resultTree);
-
-    // Embed the tree in a grid to define a transform and voxel size.
-    typename FloatGridType::Ptr resultGrid = FloatGridType::create(resultTree);
-    resultGrid->setTransform(grid.transform().copy());
-    resultGrid->setGridClass(GRID_LEVEL_SET);
+    // Create a level set grid from the tree
+    typename FloatGridT::Ptr lsGrid = FloatGridT::create( lsTree );
+    lsGrid->setTransform( grid.transform().copy() );
+    lsGrid->setGridClass( openvdb::GRID_LEVEL_SET );
 
     // Use a PDE based scheme to propagate distance values from the
     // implicit zero crossing.
-    ttls_internal::normalizeLevelSet(*resultGrid, 3*halfBandWidth, interrupt);
+    ttls_internal::normalizeLevelSet(*lsGrid, 3*halfWidth, interrupt);
 
-    // Optinal smooting operation
+    // Additional filtering
     if (smoothingSteps > 0) {
-        ttls_internal::smoothLevelSet(*resultGrid, smoothingSteps, halfBandWidth, interrupt);
+        ttls_internal::smoothLevelSet(*lsGrid, smoothingSteps, halfWidth, interrupt);
     }
 
-    return resultGrid;
+    return lsGrid;
 }
 
 
-template<typename GridType>
-inline typename GridType::template ValueConverter<float>::Type::Ptr
-topologyToLevelSet(const GridType& grid, int halfBandWidth, int closingWidth, int dilation, int smoothingSteps)
+template<typename GridT>
+inline typename GridT::template ValueConverter<float>::Type::Ptr
+topologyToLevelSet(const GridT& grid, int halfWidth, int closingSteps, int dilation, int smoothingSteps)
 {
     util::NullInterrupter interrupt;
-    return topologyToLevelSet(grid, halfBandWidth, closingWidth, dilation, smoothingSteps, &interrupt);
+    return topologyToLevelSet(grid, halfWidth, closingSteps, dilation, smoothingSteps, &interrupt);
 }
 
 
@@ -277,7 +277,8 @@ topologyToLevelSet(const GridType& grid, int halfBandWidth, int closingWidth, in
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-#endif //OPENVDB_TOOLS_DENSESPARSETOOLS_HAS_BEEN_INCLUDED
+#endif // OPENVDB_TOOLS_TOPOLOGY_TO_LEVELSET_HAS_BEEN_INCLUDED
+
 
 // Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

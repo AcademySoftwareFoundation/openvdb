@@ -30,13 +30,13 @@
 //
 /// @author Ken Museth
 ///
-/// @file PointMaskGrid.h
+/// @file PointsToMask.h
 ///
 /// @brief This tool produces a grid where every voxel that contains a
 /// point is active. It employes thread-local storage for best performance.
 ///
 /// The @c PointListT template argument below refers to any class
-/// with the following interface (see unittest/TestPointMaskGrid.cc
+/// with the following interface (see unittest/TestPointsToMask.cc
 /// and SOP_OpenVDB_From_Particles.cc for practical examples):
 /// @code
 ///
@@ -52,7 +52,7 @@
 /// };
 /// @endcode
 ///
-/// @note See unittest/TestPointMaskGrid.cc for an example.
+/// @note See unittest/TestPointsToMask.cc for an example.
 ///
 /// The @c InterruptT template argument below refers to any class
 /// with the following interface:
@@ -92,7 +92,7 @@ namespace tools {
 
 // Forward declaration of main class
 template<typename GridT = MaskGrid, typename InterrupterT = util::NullInterrupter>
-class PointMaskGrid;        
+class PointsToMask;
 
 /// @brief Makes every voxel of the  @c grid active if it contains a point.
 ///
@@ -100,9 +100,9 @@ class PointMaskGrid;
 /// @param grid       on out its voxels with points are active
 template<typename PointListT, typename GridT>
 inline void
-pointMaskGrid(const PointListT& points, GridT& grid)
+maskPoints(const PointListT& points, GridT& grid)
 {
-    PointMaskGrid<GridT, util::NullInterrupter> tmp(grid, NULL);
+    PointsToMask<GridT, util::NullInterrupter> tmp(grid, NULL);
     tmp.addPoints(points);
 }
 
@@ -115,19 +115,19 @@ pointMaskGrid(const PointListT& points, GridT& grid)
 /// @param xform      transform from world space to voxels in grid space.
 template<typename PointListT>
 inline MaskGrid::Ptr
-createPointMaskGrid(const PointListT& points, const math::Transform& xform)
+createPointMask(const PointListT& points, const math::Transform& xform)
 {
     MaskGrid::Ptr grid = createGrid<MaskGrid>( false );
     grid->setTransform( xform.copy() );
-    pointMaskGrid( points, *grid );
+    maskPoints( points, *grid );
     return grid;
 }
 
 ////////////////////////////////////////
 
-/// @brief Makes every voxel of a grid active if it contains a point.    
+/// @brief Makes every voxel of a grid active if it contains a point.
 template<typename GridT, typename InterrupterT>
-class PointMaskGrid
+class PointsToMask
 {
 public:
     typedef typename GridT::ValueType ValueT;
@@ -136,7 +136,7 @@ public:
     ///
     /// @param grid        Grid whoes voxels will have their state activated by points.
     /// @param interrupter Optional interrupter to prematurely terminate execution.
-    explicit PointMaskGrid(GridT& grid, InterrupterT* interrupter = NULL)
+    explicit PointsToMask(GridT& grid, InterrupterT* interrupter = NULL)
         : mGrid(&grid)
         , mInterrupter(interrupter)
     {
@@ -150,7 +150,7 @@ public:
     template<typename PointListT>
     void addPoints(const PointListT& points, size_t grainSize = 1024)
     {
-        if (mInterrupter) mInterrupter->start("PointMaskGrid: adding points");
+        if (mInterrupter) mInterrupter->start("PointsToMask: adding points");
         if (grainSize>0) {
             typename GridT::Ptr examplar = mGrid->copy( CP_NEW );
             PoolType pool( *examplar );//thread local storage pool of grids
@@ -172,9 +172,9 @@ public:
 
 private:
     // Disallow copy construction and copy by assignment!
-    PointMaskGrid(const PointMaskGrid&);// not implemented
-    PointMaskGrid& operator=(const PointMaskGrid&);// not implemented
-    
+    PointsToMask(const PointsToMask&);// not implemented
+    PointsToMask& operator=(const PointsToMask&);// not implemented
+
     bool interrupt() const
     {
         if (mInterrupter && util::wasInterrupted(mInterrupter)) {
@@ -191,21 +191,21 @@ private:
 
     // Private class that implements concurrent reduction of a thread-local pool
     struct ReducePool;
-    
+
     GridT*        mGrid;
     InterrupterT* mInterrupter;
-};// PointMaskGrid
+};// PointsToMask
 
 // Private member class that implements concurrent thread-local
 // insersion of points into a grid
 template<typename GridT, typename InterrupterT>
 template<typename PointListT>
-struct PointMaskGrid<GridT, InterrupterT>::AddPoints
-{   
+struct PointsToMask<GridT, InterrupterT>::AddPoints
+{
     AddPoints(const PointListT& points,
               PoolType& pool,
               size_t grainSize,
-              const PointMaskGrid& parent)
+              const PointsToMask& parent)
         : mPoints(&points)
         , mParent(&parent)
         , mPool(&pool)
@@ -225,19 +225,19 @@ struct PointMaskGrid<GridT, InterrupterT>::AddPoints
         }
     }
     const PointListT*    mPoints;
-    const PointMaskGrid* mParent;
+    const PointsToMask* mParent;
     PoolType*            mPool;
 
-};// end of private member class AddPoints 
+};// end of private member class AddPoints
 
 // Private member class that implements concurrent reduction of a thread-local pool
 template<typename GridT, typename InterrupterT>
-struct PointMaskGrid<GridT, InterrupterT>::ReducePool
+struct PointsToMask<GridT, InterrupterT>::ReducePool
 {
     typedef std::vector<GridT*>       VecT;
     typedef typename VecT::iterator   IterT;
     typedef tbb::blocked_range<IterT> RangeT;
-    
+
     ReducePool(PoolType& pool, GridT* grid, size_t grainSize = 1)
         : mOwnsGrid(false)
         , mGrid(grid)
@@ -252,23 +252,23 @@ struct PointMaskGrid<GridT, InterrupterT>::ReducePool
             tbb::parallel_reduce( RangeT( grids.begin(), grids.end(), grainSize ), *this );
         }
     }
-    
+
     ReducePool(const ReducePool&, tbb::split)
         : mOwnsGrid(true)
         , mGrid(new GridT())
     {
     }
-    
+
     ~ReducePool() { if (mOwnsGrid) delete mGrid; }
-    
+
     void operator()(const RangeT& r)
     {
         for (IterT i=r.begin(); i!=r.end(); ++i) mGrid->topologyUnion( *(*i) );
     }
-    
+
     void join(ReducePool& other) { mGrid->topologyUnion(*other.mGrid); }
-    
-    const bool mOwnsGrid;    
+
+    const bool mOwnsGrid;
     GridT*     mGrid;
 };// end of private member class ReducePool
 

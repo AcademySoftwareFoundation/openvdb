@@ -1252,14 +1252,14 @@ TestTree::testVoxelizeActiveTiles()
     const CoordBBox bbox(openvdb::Coord(-30,-50,-30), openvdb::Coord(530,610,623));
     {// benchmark serial
         MyTree tree(background);
-        tree.fill( bbox, 1.0f, /*state*/true, /*sparse*/true);
+        tree.sparseFill( bbox, 1.0f, /*state*/true);
         openvdb::util::CpuTimer timer("\nserial voxelizeActiveTiles");
         tree.voxelizeActiveTiles(/*threaded*/false);
         timer.stop();
     }
     {// benchmark parallel
         MyTree tree(background);
-        tree.fill( bbox, 1.0f, /*state*/true, /*sparse*/true);
+        tree.sparseFill( bbox, 1.0f, /*state*/true);
         openvdb::util::CpuTimer timer("\nparallel voxelizeActiveTiles");
         tree.voxelizeActiveTiles(/*threaded*/true);
         timer.stop();
@@ -1468,13 +1468,13 @@ TestTree::testTopologyUnion()
             ASSERT_DOUBLES_EXACTLY_EQUAL(tree0.getValue(p), *iter);
         }
     }
-    
+
     {// test union of a leaf and a tile
         if (openvdb::FloatTree::DEPTH > 2) {
             const int leafLevel = openvdb::FloatTree::DEPTH - 1;
             const int tileLevel = leafLevel - 1;
             const openvdb::Coord xyz(0);
-            
+
             openvdb::FloatTree tree0;
             tree0.addTile(tileLevel, xyz, /*value=*/0, /*activeState=*/true);
             CPPUNIT_ASSERT(tree0.isValueOn(xyz));
@@ -1488,7 +1488,7 @@ TestTree::testTopologyUnion()
             CPPUNIT_ASSERT_EQUAL(tree0.getValueDepth(xyz), leafLevel);
         }
     }
-     
+
 }// testTopologyUnion
 
 void
@@ -1700,16 +1700,16 @@ TestTree::testTopologyIntersection()
     }
 
     {// Test based on boolean grids
-        openvdb::CoordBBox big(  openvdb::Coord(-9), openvdb::Coord(10));
-        openvdb::CoordBBox small(openvdb::Coord( 1), openvdb::Coord(10));
+        openvdb::CoordBBox bigRegion(openvdb::Coord(-9), openvdb::Coord(10));
+        openvdb::CoordBBox smallRegion(openvdb::Coord( 1), openvdb::Coord(10));
 
         openvdb::BoolGrid::Ptr gridBig = openvdb::BoolGrid::create(false);
-        gridBig->fill(big, true/*value*/, true /*make active*/);
+        gridBig->fill(bigRegion, true/*value*/, true /*make active*/);
         CPPUNIT_ASSERT_EQUAL(8, int(gridBig->tree().activeTileCount()));
         CPPUNIT_ASSERT_EQUAL((20 * 20 * 20), int(gridBig->activeVoxelCount()));
 
         openvdb::BoolGrid::Ptr gridSmall = openvdb::BoolGrid::create(false);
-        gridSmall->fill(small, true/*value*/, true /*make active*/);
+        gridSmall->fill(smallRegion, true/*value*/, true /*make active*/);
         CPPUNIT_ASSERT_EQUAL(0, int(gridSmall->tree().activeTileCount()));
         CPPUNIT_ASSERT_EQUAL((10 * 10 * 10), int(gridSmall->activeVoxelCount()));
 
@@ -2000,7 +2000,7 @@ TestTree::testFill()
          for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
              ASSERT_DOUBLES_EXACTLY_EQUAL(outside, tree.getValue(*ijk));
          }
-         tree.fill(bbox, inside, /*state*/true, /*sparse*/true);
+         tree.sparseFill(bbox, inside, /*state*/true);
          CPPUNIT_ASSERT(tree.hasActiveTiles());
          CPPUNIT_ASSERT_EQUAL(size_t(bbox.volume()), tree.activeVoxelCount());
           for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
@@ -2015,7 +2015,7 @@ TestTree::testFill()
          for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
              ASSERT_DOUBLES_EXACTLY_EQUAL(outside, tree.getValue(*ijk));
          }
-         tree.fill(bbox, inside, /*state*/true, /*sparse*/false);
+         tree.denseFill(bbox, inside, /*state*/true);
          CPPUNIT_ASSERT(!tree.hasActiveTiles());
          CPPUNIT_ASSERT_EQUAL(size_t(bbox.volume()), tree.activeVoxelCount());
          for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
@@ -2425,7 +2425,7 @@ TestTree::testAddLeaf()
     newLeaf->setOrigin(oldLeaf->origin());
     newLeaf->fill(3.0);
 
-    tree.addLeaf(*newLeaf);
+    tree.addLeaf(newLeaf);
     CPPUNIT_ASSERT_EQUAL(newLeaf, tree.probeLeaf(ijk));
     ASSERT_DOUBLES_EXACTLY_EQUAL(3.0, tree.getValue(ijk));
 }
@@ -2650,7 +2650,7 @@ TestTree::testStealNodes()
     const size_t voxelCount = tree.activeVoxelCount();
 
     {//testing Tree::stealNodes() with std::vector<T*>
-        FloatTree tree2 = tree; 
+        FloatTree tree2 = tree;
         std::vector<openvdb::FloatTree::LeafNodeType*> array;
         CPPUNIT_ASSERT_EQUAL(size_t(0), array.size());
         //timer.start("\nstd::vector<T*> and Tree::stealNodes()");
@@ -2663,7 +2663,7 @@ TestTree::testStealNodes()
         CPPUNIT_ASSERT_EQUAL(voxelCount, sum);
     }
     {//testing Tree::stealNodes() with std::vector<const T*>
-        FloatTree tree2 = tree; 
+        FloatTree tree2 = tree;
         std::vector<const openvdb::FloatTree::LeafNodeType*> array;
         CPPUNIT_ASSERT_EQUAL(size_t(0), array.size());
         //timer.start("\nstd::vector<const T*> and Tree::stealNodes()");
@@ -2676,7 +2676,7 @@ TestTree::testStealNodes()
         CPPUNIT_ASSERT_EQUAL(voxelCount, sum);
     }
     {//testing Tree::stealNodes() const with std::vector<const T*>
-        FloatTree tree2 = tree; 
+        FloatTree tree2 = tree;
         std::vector<const openvdb::FloatTree::LeafNodeType*> array;
         CPPUNIT_ASSERT_EQUAL(size_t(0), array.size());
         //timer.start("\nstd::vector<const T*> and Tree::stealNodes() const");
@@ -2689,7 +2689,7 @@ TestTree::testStealNodes()
         CPPUNIT_ASSERT_EQUAL(voxelCount, sum);
     }
     {//testing Tree::stealNodes() with std::vector<T*> and std::vector::reserve
-        FloatTree tree2 = tree; 
+        FloatTree tree2 = tree;
         std::vector<openvdb::FloatTree::LeafNodeType*> array;
         CPPUNIT_ASSERT_EQUAL(size_t(0), array.size());
         //timer.start("\nstd::vector<T*>, std::vector::reserve and Tree::stealNodes");

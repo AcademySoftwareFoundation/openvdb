@@ -53,7 +53,7 @@
 /// class ParticleList {
 ///   ...
 /// public:
-///   typedef openvdb::Vec3R    PosType;
+///   typedef openvdb::Vec3R  PosType;
 ///
 ///   // Return the total number of particles in list.
 ///   // Always required!
@@ -100,7 +100,6 @@
 
 #include <tbb/parallel_reduce.h>
 #include <tbb/blocked_range.h>
-#include <tbb/task_group.h>
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
 #include <boost/type_traits/is_floating_point.hpp>
@@ -112,25 +111,21 @@
 #include <openvdb/math/Transform.h>
 #include <openvdb/util/NullInterrupter.h>
 #include "Composite.h" // for csgUnion()
-#include "PointMaskGrid.h"
 #include "PointPartitioner.h"
-#include "Morphology.h" // for {dilate|erode}Voxels
 #include "Prune.h"
 #include "SignedFloodFill.h"
-#include "LevelSetTracker.h"
-#include "MaskToLevelSet.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
-namespace {
+namespace p2ls_internal {
 // This is a simple type that combines a distance value and a particle
 // attribute. It's required for attribute transfer which is performed
 // in the ParticlesToLevelSet::Raster member class defined below.
 template<typename VisibleT, typename BlindT> class BlindData;
-}// unnamed namespace
+}// namespace p2ls_internal
 
 
 template<typename SdfGridT,
@@ -222,31 +217,6 @@ public:
     /// @note A grainsize of 0 or less disables multi-threading!
     void setGrainSize(int grainSize) { mGrainSize = grainSize; }
 
-    /// @brief Very fast generation of a level set from the active
-    /// mask of an input grid, e.g. a MaskGrid generated from points.
-    ///
-    /// @param grid Points with radius (no radius required).
-    /// @param dilationInVoxels Dilation in voxel units.
-    /// @param erosionInVoxels  Erosion in voxel units. It is
-    /// recommended that erosionInVoxels <= dilationInVoxels.
-    template <typename GridT>
-    void rasterizeMask(const GridT& grid,
-                       const int dilationInVoxels = 1,
-                       const int erosionInVoxels  = 1);
-
-    /// @brief Very fast generation of a level set from points
-    /// (e.g. particles without a radius). It employes a MaskGrid
-    /// an various bit-wise topology operations.
-    ///
-    /// @param points Points with radius (no radius required).
-    /// @param dilationInVoxels Dilation in voxel units.
-    /// @param erosionInVoxels  Erosion in voxel units. It is
-    /// recommended that erosionInVoxels <= dilationInVoxels.
-    template <typename PointListT>
-    void rasterizePoints(const PointListT& points,
-                         const int dilationInVoxels = 1,
-                         const int erosionInVoxels  = 1);
-
     /// @brief Rasterize a sphere per particle derived from their
     /// position and radius. All spheres are CSG unioned.
     ///
@@ -282,7 +252,7 @@ public:
     void rasterizeTrails(const ParticleListT& pa, Real delta=1.0);
 
 private:
-    typedef BlindData<SdfType, AttType> BlindType;
+    typedef p2ls_internal::BlindData<SdfType, AttType> BlindType;
     typedef typename SdfGridT::template ValueConverter<BlindType>::Type BlindGridType;
 
     /// Class with multi-threaded implementation of particle rasterization
@@ -327,53 +297,6 @@ ParticlesToLevelSet(SdfGridT& grid, InterrupterT* interrupter) :
         mBlindGrid = new BlindGridType(BlindType(grid.background()));
         mBlindGrid->setTransform(mSdfGrid->transform().copy());
     }
-}
-
-namespace {
-
-template<typename TreeT> struct DilationHandler
-{
-    DilationHandler(TreeT& t, int n) : tree(&t), size(n) {}
-    void operator()() const { dilateVoxels( *tree, size); }
-    TreeT* tree;
-    const int size;
-};
-template<typename TreeT> struct ErosionHandler
-{
-    ErosionHandler(TreeT& t, int n) : tree(&t), size(n) {}
-    void operator()() const { erodeVoxels( *tree, size); }
-    TreeT* tree;
-    const int size;
-};
-
-}
-
-template<typename SdfGridT, typename AttributeT, typename InterrupterT>
-template <typename MaskGrid>
-inline void ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::
-rasterizeMask(const MaskGrid& maskGrid, int dilation, int erosion)
-{
-    // Generate a level set from the mask
-    mSdfGrid->setTree( maskToLevelSet<MaskGrid, math::FIRST_BIAS, InterrupterT>
-                       ( maskGrid, int(mHalfWidth), dilation, erosion, mInterrupter )->treePtr() );
-}
-
-template<typename SdfGridT, typename AttributeT, typename InterrupterT>
-template <typename PointListT>
-inline void ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::
-rasterizePoints(const PointListT& points, int dilation, int erosion)
-{
-    typedef typename SdfGridT::template ValueConverter<ValueMask>::Type MaskGrid;
-    typedef typename MaskGrid::TreeType                                 MaskTree;
-    typedef typename MaskTree::Ptr                                      MaskTreePtr;
-
-    // Generate a mask grid of the points
-    MaskGrid maskGrid(MaskTreePtr(new MaskTree(mSdfGrid->tree(), false, TopologyCopy())));
-    maskGrid.setTransform( mSdfGrid->transform().copy() );
-    PointMaskGrid<MaskGrid, InterrupterT> pmg( maskGrid, mInterrupter );
-    pmg.addPoints( points );
-    // Generate a level set from the mask
-    this->rasterizeMask( maskGrid, dilation, erosion );
 }
 
 template<typename SdfGridT, typename AttributeT, typename InterrupterT>
@@ -855,7 +778,7 @@ private:
 
 ///////////////////// YOU CAN SAFELY IGNORE THIS SECTION /////////////////////
 
-namespace {
+namespace p2ls_internal {
 
 // This is a simple type that combines a distance value and a particle
 // attribute. It's required for attribute transfer which is defined in the
@@ -909,7 +832,7 @@ inline BlindData<VisibleT, BlindT> Abs(const BlindData<VisibleT, BlindT>& x)
     return BlindData<VisibleT, BlindT>(math::Abs(x.visible()), x.blind());
 }
 
-} // unnamed namespace
+} // namespace p2ls_internal
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -922,3 +845,4 @@ inline BlindData<VisibleT, BlindT> Abs(const BlindData<VisibleT, BlindT>& x)
 // Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
+

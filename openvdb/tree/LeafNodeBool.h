@@ -111,7 +111,7 @@ public:
 
         void swap(Buffer& other) { if (&other != this) std::swap(mData, other.mData); }
 
-        Index memUsage() const { return mData.memUsage(); }
+        Index memUsage() const { return sizeof(*this); }
         static Index size() { return SIZE; }
 
         /// Return a point to the c-style array of words encoding the bits.
@@ -935,7 +935,8 @@ template<Index Log2Dim>
 inline Index64
 LeafNode<bool, Log2Dim>::memUsage() const
 {
-    return sizeof(mOrigin) + mValueMask.memUsage() + mBuffer.memUsage();
+    // Use sizeof(*this) to capture alignment-related padding
+    return sizeof(*this);
 }
 
 
@@ -1132,9 +1133,7 @@ template<Index Log2Dim>
 inline bool
 LeafNode<bool, Log2Dim>::isConstant(bool& constValue, bool& state, bool tolerance) const
 {
-    state = mValueMask.isOn();
-
-    if (!(state || mValueMask.isOff())) return false;
+    if (!mValueMask.isConstant(state)) return false;
     
     // Note: if tolerance is true (i.e., 1), then all boolean values compare equal.
     if (!tolerance && !(mBuffer.mData.isOn() || mBuffer.mData.isOff())) return false;

@@ -55,6 +55,8 @@ namespace openvdb_houdini {
 
 namespace node_info_text {
 
+
+#if (UT_MAJOR_VERSION_INT < 14)
 /// @brief The default information text returned for VDB grids when no
 /// override for the grid type has been found
 static void defaultNodeSpecificInfoText(std::ostream& infoStr, const openvdb::GridBase& grid)
@@ -75,6 +77,7 @@ static void defaultNodeSpecificInfoText(std::ostream& infoStr, const openvdb::Gr
         infoStr <<" (" << grid.gridClassToMenuName(gClass) << ")";
     }
 }
+#endif
 
 typedef tbb::mutex Mutex;
 typedef Mutex::scoped_lock Lock;
@@ -124,9 +127,10 @@ void registerGridSpecificInfoText(const std::string& gridType, ApplyGridSpecific
     registry->mApplyGridSpecificInfoTextMap[gridType] = callback;
 }
 
-/// @brief Returns a valid pointer to an registered function, designed to populate an
-/// output stream with specific grid information. If a registered function pointer is
-/// NULL, the default implementation is returned
+/// @brief Returns a pointer to a grid information function or NULL if no
+///        specific function has been registered for the given grid type.
+/// @note  The @c defaultNodeSpecificInfoText method is always returned
+///        prior to Houdini 14.
 ApplyGridSpecificInfoText getGridSpecificInfoText(const std::string& gridType)
 {
     LockedInfoTextRegistry *registry = getInfoTextRegistry();
@@ -134,9 +138,12 @@ ApplyGridSpecificInfoText getGridSpecificInfoText(const std::string& gridType)
 
     const ApplyGridSpecificInfoTextMap::const_iterator iter = registry->mApplyGridSpecificInfoTextMap.find(gridType);
 
-    if(iter == registry->mApplyGridSpecificInfoTextMap.end() ||
-       iter->second == NULL) {
+    if (iter == registry->mApplyGridSpecificInfoTextMap.end() || iter->second == NULL) {
+#if (UT_MAJOR_VERSION_INT >= 14)
+        return NULL; // Native prim info is sufficient
+#else
         return &defaultNodeSpecificInfoText;
+#endif
     }
 
     return iter->second;
@@ -233,29 +240,33 @@ SOP_NodeVDB::getNodeSpecificInfoText(OP_Context &context, OP_NodeInfoParms &parm
     std::ostringstream infoStr;
 
     unsigned gridn = 0;
+
     for (VdbPrimCIterator it(tmp_gdp); it; ++it) {
+
         const openvdb::GridBase& grid = it->getGrid();
 
-        // Note, the output string stream for every new grid is initialized with
-        // its index and houdini primitive name prior to executing the callback
-        const UT_String gridName = it.getPrimitiveName();
-
-        infoStr << "  (" << it.getIndex() << ")";
-        if(gridName.isstring()) infoStr << " name: '" << gridName << "',";
-
         node_info_text::ApplyGridSpecificInfoText callback = node_info_text::getGridSpecificInfoText(grid.type());
-        assert(callback);
+        if (callback) {
 
-        (*callback)(infoStr, grid);
+            // Note, the output string stream for every new grid is initialized with
+            // its index and houdini primitive name prior to executing the callback
+            const UT_String gridName = it.getPrimitiveName();
 
-        infoStr<<"\n";
+            infoStr << "  (" << it.getIndex() << ")";
+            if(gridName.isstring()) infoStr << " name: '" << gridName << "',";
 
-        ++gridn;
+
+            (*callback)(infoStr, grid);
+
+            infoStr<<"\n";
+
+            ++gridn;
+        }
     }
 
     if (gridn > 0) {
         std::ostringstream headStr;
-        headStr << gridn << " VDB grid" << (gridn == 1 ? "" : "s") << "\n";
+        headStr << gridn << " Custom VDB grid" << (gridn == 1 ? "" : "s") << "\n";
 
         parms.append(headStr.str().c_str());
         parms.append(infoStr.str().c_str());
