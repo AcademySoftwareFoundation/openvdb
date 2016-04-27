@@ -83,6 +83,16 @@ typedef tree::Tree<tree::RootNode<tree::InternalNode<tree::InternalNode
 typedef Grid<PointDataTree> PointDataGrid;
 
 
+/// @brief  Deep copy the descriptor across all leaf nodes.
+///
+/// @param  tree the PointDataTree.
+///
+/// @note This method will fail if the Descriptors in the tree are not all identical.
+template <typename PointDataTreeT>
+inline void
+makeDescriptorUnique(PointDataTreeT& tree);
+
+
 ////////////////////////////////////////
 
 // Internal utility methods
@@ -223,6 +233,10 @@ public:
     /// This leaf will assume ownership of the given attribute set. The descriptors must
     /// match and the voxel offsets values will need updating if the point order is different.
     void swap(AttributeSet* attributeSet);
+
+    /// @brief Replace the descriptor with a new one
+    /// The new Descriptor must exactly match the old one
+    void resetDescriptor(const Descriptor::Ptr& replacement);
 
     /// @brief Sets all of the voxel offset values on this leaf, from the given vector
     /// of @a offsets. If @a updateValueMask is true, then the active value mask will
@@ -621,6 +635,13 @@ PointDataLeafNode<T, Log2Dim>::swap(AttributeSet* attributeSet)
 
 template<typename T, Index Log2Dim>
 inline void
+PointDataLeafNode<T, Log2Dim>::resetDescriptor(const Descriptor::Ptr& replacement)
+{
+    mAttributeSet->resetDescriptor(replacement);
+}
+
+template<typename T, Index Log2Dim>
+inline void
 PointDataLeafNode<T, Log2Dim>::setOffsets(const std::vector<ValueType>& offsets, const bool updateValueMask)
 {
     if (offsets.size() != LeafNodeType::NUM_VALUES) {
@@ -898,6 +919,25 @@ PointDataLeafNode<T, Log2Dim>::memUsage() const
 {
     return BaseLeaf::memUsage() + mAttributeSet->memUsage();
 }
+
+
+////////////////////////////////////////
+
+
+template <typename PointDataTreeT>
+inline void
+makeDescriptorUnique(PointDataTreeT& tree)
+{
+    typename PointDataTreeT::LeafIter leafIter = tree.beginLeaf();
+    if (!leafIter)  return;
+
+    const AttributeSet::Descriptor& descriptor = leafIter->attributeSet().descriptor();
+    AttributeSet::Descriptor::Ptr newDescriptor(new AttributeSet::Descriptor(descriptor));
+    for (; leafIter; ++leafIter) {
+        leafIter->resetDescriptor(newDescriptor);
+    }
+}
+
 
 } // namespace tools
 

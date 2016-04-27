@@ -389,8 +389,25 @@ AttributeSet::dropAttributes(   const std::vector<size_t>& pos,
 
 
 void
+AttributeSet::renameAttributes(const Descriptor& expected, const DescriptorPtr& replacement)
+{
+    // ensure the descriptor is as expected
+    if (*mDescr != expected) {
+        OPENVDB_THROW(LookupError, "Cannot rename attribute as descriptors do not match.")
+    }
+
+    mDescr = replacement;
+}
+
+
+void
 AttributeSet::reorderAttributes(const DescriptorPtr& replacement)
 {
+    if (*mDescr == *replacement) {
+        this->resetDescriptor(replacement);
+        return;
+    }
+
     if (!mDescr->hasSameAttributes(*replacement)) {
         OPENVDB_THROW(LookupError, "Cannot reorder attributes as descriptors do not contain the same attributes.")
     }
@@ -411,11 +428,11 @@ AttributeSet::reorderAttributes(const DescriptorPtr& replacement)
 
 
 void
-AttributeSet::renameAttributes(const Descriptor& expected, DescriptorPtr& replacement)
+AttributeSet::resetDescriptor(const DescriptorPtr& replacement)
 {
-    // ensure the descriptor is as expected
-    if (*mDescr != expected) {
-        OPENVDB_THROW(LookupError, "Cannot rename attribute as descriptors do not match.")
+    // ensure the descriptors match
+    if (*mDescr != *replacement) {
+        OPENVDB_THROW(LookupError, "Cannot swap descriptor as replacement does not match.")
     }
 
     mDescr = replacement;
@@ -515,6 +532,7 @@ AttributeSet::operator==(const AttributeSet& other) const {
 AttributeSet::Descriptor::Descriptor()
     : mNameMap()
     , mTypes()
+    , mGroupMap()
     , mMetadata()
 {
 }
@@ -523,6 +541,7 @@ AttributeSet::Descriptor::Descriptor()
 AttributeSet::Descriptor::Descriptor(const Descriptor& rhs)
     : mNameMap(rhs.mNameMap)
     , mTypes(rhs.mTypes)
+    , mGroupMap(rhs.mGroupMap)
     , mMetadata(rhs.mMetadata)
 {
 }
@@ -534,7 +553,8 @@ AttributeSet::Descriptor::operator==(const Descriptor& rhs) const
     if (this == &rhs) return true;
 
     if (mTypes.size()   != rhs.mTypes.size() ||
-        mNameMap.size() != rhs.mNameMap.size()) {
+        mNameMap.size() != rhs.mNameMap.size() ||
+        mGroupMap.size() != rhs.mGroupMap.size()) {
         return false;
     }
 
@@ -544,7 +564,8 @@ AttributeSet::Descriptor::operator==(const Descriptor& rhs) const
 
     if (this->mMetadata != rhs.mMetadata)  return false;
 
-    return std::equal(mNameMap.begin(), mNameMap.end(), rhs.mNameMap.begin());
+    return  std::equal(mGroupMap.begin(), mGroupMap.end(), rhs.mGroupMap.begin()) &&
+            std::equal(mNameMap.begin(), mNameMap.end(), rhs.mNameMap.begin());
 }
 
 
@@ -554,7 +575,8 @@ AttributeSet::Descriptor::hasSameAttributes(const Descriptor& rhs) const
     if (this == &rhs) return true;
 
     if (mTypes.size()   != rhs.mTypes.size() ||
-        mNameMap.size() != rhs.mNameMap.size()) {
+        mNameMap.size() != rhs.mNameMap.size() ||
+        mGroupMap.size() != rhs.mGroupMap.size()) {
         return false;
     }
 
@@ -567,7 +589,7 @@ AttributeSet::Descriptor::hasSameAttributes(const Descriptor& rhs) const
         if (mTypes[it->second] != rhs.mTypes[index]) return false;
     }
 
-    return true;
+    return std::equal(mGroupMap.begin(), mGroupMap.end(), rhs.mGroupMap.begin());
 }
 
 
@@ -863,8 +885,8 @@ AttributeSet::Descriptor::appendTo(NameAndTypeVec& attrs) const
 bool
 AttributeSet::Descriptor::hasGroup(const Name& group) const
 {
-    if (group.empty()) {
-        OPENVDB_THROW(KeyError, "Cannot use an empty group name as a key.");
+    if (!validGroupName(group)) {
+        OPENVDB_THROW(KeyError, ("Invalid group name - " + group).c_str());
     }
 
     return mGroupMap.find(group) != mGroupMap.end();
@@ -873,8 +895,8 @@ AttributeSet::Descriptor::hasGroup(const Name& group) const
 void
 AttributeSet::Descriptor::setGroup(const Name& group, const size_t offset)
 {
-    if (group.empty()) {
-        OPENVDB_THROW(KeyError, "Cannot use an empty group name as a key.");
+    if (!validGroupName(group)) {
+        OPENVDB_THROW(KeyError, ("Invalid group name - " + group).c_str());
     }
 
     mGroupMap[group] = offset;
@@ -883,8 +905,8 @@ AttributeSet::Descriptor::setGroup(const Name& group, const size_t offset)
 void
 AttributeSet::Descriptor::dropGroup(const Name& group)
 {
-    if (group.empty()) {
-        OPENVDB_THROW(KeyError, "Cannot use an empty group name as a key.");
+    if (!validGroupName(group)) {
+        OPENVDB_THROW(KeyError, ("Invalid group name - " + group).c_str());
     }
 
     mGroupMap.erase(group);

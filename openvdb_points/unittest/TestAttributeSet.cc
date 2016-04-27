@@ -191,6 +191,32 @@ TestAttributeSet::testAttributeSetDescriptor()
 
     CPPUNIT_ASSERT(*descrA == *descrB);
 
+    descrB->setGroup("test", size_t(0));
+    descrB->setGroup("test2", size_t(1));
+
+    Descriptor descrC(*descrB);
+
+    CPPUNIT_ASSERT(descrB->hasSameAttributes(descrC));
+    CPPUNIT_ASSERT(descrC.hasGroup("test"));
+    CPPUNIT_ASSERT(*descrB == descrC);
+
+    descrC.dropGroup("test");
+    descrC.dropGroup("test2");
+
+    CPPUNIT_ASSERT(!descrB->hasSameAttributes(descrC));
+    CPPUNIT_ASSERT(!descrC.hasGroup("test"));
+    CPPUNIT_ASSERT(*descrB != descrC);
+
+    descrC.setGroup("test2", size_t(1));
+    descrC.setGroup("test3", size_t(0));
+
+    CPPUNIT_ASSERT(!descrB->hasSameAttributes(descrC));
+
+    descrC.dropGroup("test3");
+    descrC.setGroup("test", size_t(0));
+
+    CPPUNIT_ASSERT(descrB->hasSameAttributes(descrC));
+
     // rebuild NameAndTypeVec
 
     Descriptor::NameAndTypeVec rebuildNames;
@@ -263,14 +289,26 @@ TestAttributeSet::testAttributeSetDescriptor()
         CPPUNIT_ASSERT_EQUAL(uniqueName2, openvdb::Name("test2"));
     }
 
+    { // Test group name validity
+        CPPUNIT_ASSERT(!Descriptor::validGroupName(""));
+        CPPUNIT_ASSERT(Descriptor::validGroupName("test1"));
+        CPPUNIT_ASSERT(!Descriptor::validGroupName("test1!"));
+        CPPUNIT_ASSERT(Descriptor::validGroupName("abc_def"));
+        CPPUNIT_ASSERT(!Descriptor::validGroupName("abc=def"));
+    }
+
     { //  Test hasGroup(), setGroup(), dropGroup(), clearGroups()
         Descriptor descr;
 
-        // ensure all methods throw if an empty key is used
+        // ensure all methods throw if an empty or invalid key is used
 
         CPPUNIT_ASSERT_THROW(descr.hasGroup(""), openvdb::KeyError);
         CPPUNIT_ASSERT_THROW(descr.setGroup("", 0), openvdb::KeyError);
         CPPUNIT_ASSERT_THROW(descr.dropGroup(""), openvdb::KeyError);
+
+        CPPUNIT_ASSERT_THROW(descr.hasGroup("abc-"), openvdb::KeyError);
+        CPPUNIT_ASSERT_THROW(descr.setGroup("abc-", 0), openvdb::KeyError);
+        CPPUNIT_ASSERT_THROW(descr.dropGroup("abc-"), openvdb::KeyError);
 
         CPPUNIT_ASSERT(!descr.hasGroup("test1"));
 
