@@ -544,6 +544,7 @@ public:
     typedef typename GridT::ValueType     ValueT;
     typedef typename GridT::ConstAccessor AccessorT;
     typedef math::BoxStencil<GridT>       StencilT;
+    typedef math::Vec3<ValueT>            VecT;
 
     /// @brief Constructor from a grid.
     /// @throw RunTimeError if the grid is empty.
