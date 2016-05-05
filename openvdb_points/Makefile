@@ -443,7 +443,7 @@ test:
 	@echo "$@"': $$(CPPUNIT_INCL_DIR) is undefined'
 endif
 
-install: lib vdb_print doc
+install_lib: lib
 	mkdir -p $(DESTDIR)/include/openvdb_points
 	@echo "Created $(DESTDIR)/include/openvdb_points"
 	pushd $(DESTDIR)/include/openvdb_points > /dev/null; \
@@ -462,7 +462,10 @@ install: lib vdb_print doc
 	    fi; \
 	    popd > /dev/null
 	@echo "Copied libopenvdb_points to $(DESTDIR)/lib/"
-	@#
+
+install: install_lib vdb_print doc
+	mkdir -p $(DESTDIR)/include/openvdb_points
+	@echo "Created $(DESTDIR)/include/openvdb_points"
 	mkdir -p $(DESTDIR)/bin
 	@echo "Created $(DESTDIR)/bin/"
 	cp -f vdb_print $(DESTDIR)/bin
