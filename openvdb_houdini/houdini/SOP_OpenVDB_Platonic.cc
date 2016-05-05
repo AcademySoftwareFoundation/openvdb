@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -37,6 +37,7 @@
 #include <UT/UT_Interrupt.h>
 #include <boost/math/constants/constants.hpp>
 #include <openvdb/tools/LevelSetSphere.h>
+#include <openvdb/tools/LevelSetPlatonic.h>
 #include <openvdb/tools/LevelSetUtil.h>
 
 namespace hvdb = openvdb_houdini;
@@ -66,11 +67,18 @@ newSopOperator(OP_OperatorTable* table)
 
     { // Shapes
         const char* items[] = {
-            "sphere", "Sphere", NULL
+            "sphere", "Sphere",
+            "tetrahedron", "Tetrahedron",
+            "cube", "Cube",
+            "octahedron", "Octahedron",
+            "dodecahedron", "Dodecahedron",
+            "icosahedron", "Icosahedron",
+            NULL
         };
 
         parms.add(hutil::ParmFactory(PRM_ORD, "solidType", "Solid Type")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+                  .setHelpText("Select a sphere or one of the five platonic solids)")
+                  .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
 
     { // Grid Class
@@ -86,7 +94,7 @@ newSopOperator(OP_OperatorTable* table)
     }
 
     // Radius
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "scalarRadius", "Radius")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "scalarRadius", "Radius/Size")
         .setDefault(PRMoneDefaults)
         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_FREE, 10));
 
@@ -173,9 +181,36 @@ SOP_OpenVDB_Platonic::cookMySop(OP_Context& context)
             }
         }
 
-        openvdb::FloatGrid::Ptr grid =
-            openvdb::tools::createLevelSetSphere<openvdb::FloatGrid, hvdb::Interrupter>
+        openvdb::FloatGrid::Ptr grid;
+        switch (evalInt("solidType", 0, time)) {
+        case 0://Sphere
+            grid = openvdb::tools::createLevelSetSphere<openvdb::FloatGrid, hvdb::Interrupter>
                 (radius, center, voxelSize, halfWidth, &boss);
+            break;
+        case 1:// Tetrahedraon
+            grid = openvdb::tools::createLevelSetTetrahedron<openvdb::FloatGrid, hvdb::Interrupter>
+                (radius, center, voxelSize, halfWidth, &boss);
+            break;
+        case 2:// Cube
+            grid = openvdb::tools::createLevelSetCube<openvdb::FloatGrid, hvdb::Interrupter>
+                (radius, center, voxelSize, halfWidth, &boss);
+            break;
+        case 3:// Octahedron
+            grid = openvdb::tools::createLevelSetOctahedron<openvdb::FloatGrid, hvdb::Interrupter>
+                (radius, center, voxelSize, halfWidth, &boss);
+            break;
+        case 4:// Dodecahedron
+            grid = openvdb::tools::createLevelSetDodecahedron<openvdb::FloatGrid, hvdb::Interrupter>
+                (radius, center, voxelSize, halfWidth, &boss);
+            break;
+        case 5:// Icosahedron
+            grid = openvdb::tools::createLevelSetIcosahedron<openvdb::FloatGrid, hvdb::Interrupter>
+                (radius, center, voxelSize, halfWidth, &boss);
+            break;
+        default:
+            addError(SOP_MESSAGE, "Illegal shape.");
+            return error();
+        }
 
         // Fog volume conversion
         if (bool(evalInt("fogVolume", 0, time))) {
@@ -191,6 +226,6 @@ SOP_OpenVDB_Platonic::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

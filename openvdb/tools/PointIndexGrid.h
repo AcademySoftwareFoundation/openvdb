@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -90,18 +90,28 @@ typedef Grid<PointIndexTree> PointIndexGrid;
 /// struct PointArray
 /// {
 ///     // The type used to represent world-space point positions
-///     typedef VectorType value_type;
+///     typedef VectorType  PosType;
 ///
 ///     // Return the number of points in the array
 ///     size_t size() const;
 ///
 ///     // Return the world-space position of the nth point in the array.
-///     void getPos(size_t n, VectorType& xyz) const;
+///     void getPos(size_t n, PosType& xyz) const;
 /// };
 /// @endcode
 
 
 ////////////////////////////////////////
+
+
+/// @brief  Partition points into a point index grid to accelerate range and
+///         nearest-neighbor searches.
+///
+/// @param points       world-space point array conforming to the PointArray interface
+/// @param voxelSize    voxel size in world units
+template<typename GridT, typename PointArrayT>
+inline typename GridT::Ptr
+createPointIndexGrid(const PointArrayT& points, double voxelSize);
 
 
 /// @brief  Partition points into a point index grid to accelerate range and
@@ -314,9 +324,9 @@ private:
 template<typename PointArray, typename TreeType = PointIndexTree>
 struct PointIndexFilter
 {
-    typedef typename PointArray::value_type         PointType;
-    typedef typename PointType::ValueType           PointElementType;
-    typedef tree::ValueAccessor<const TreeType>     ConstAccessor;
+    typedef typename PointArray::PosType        PosType;
+    typedef typename PosType::value_type        ScalarType;
+    typedef tree::ValueAccessor<const TreeType> ConstAccessor;
 
     /// @brief Constructor
     /// @param points   world-space point array conforming to the PointArray interface
@@ -333,13 +343,13 @@ struct PointIndexFilter
     /// @param radius  world-space radius
     /// @param op      custom filter operator (see the FilterType example for interface details)
     template<typename FilterType>
-    void searchAndApply(const PointType& center, PointElementType radius, FilterType& op);
+    void searchAndApply(const PosType& center, ScalarType radius, FilterType& op);
 
 private:
     PointArray const * const mPoints;
     ConstAccessor mAcc;
     const math::Transform mXform;
-    const PointElementType mInvVoxelSize;
+    const ScalarType mInvVoxelSize;
     PointIndexIterator<TreeType> mIter;
 }; // struct PointIndexFilter
 
@@ -372,11 +382,11 @@ struct ValidPartitioningOp
 
         typedef typename LeafT::IndexArray          IndexArrayT;
         typedef typename IndexArrayT::value_type    IndexT;
-        typedef typename PointArrayT::value_type    PointT;
+        typedef typename PointArrayT::PosType       PosType;
 
         typename LeafT::ValueOnCIter iter;
         Coord voxelCoord;
-        PointT point;
+        PosType point;
 
         const IndexT *begin = static_cast<IndexT*>(NULL), *end = static_cast<IndexT*>(NULL);
 
@@ -590,8 +600,8 @@ constructExclusiveRegions(std::vector<CoordBBox>& regions,
 template<typename PointArray, typename IndexT>
 struct BBoxFilter
 {
-    typedef typename PointArray::value_type         PointType;
-    typedef typename PointType::ValueType           PointElementType;
+    typedef typename PointArray::PosType            PosType;
+    typedef typename PosType::value_type            ScalarType;
     typedef std::pair<const IndexT*, const IndexT*> Range;
     typedef std::deque<Range>                       RangeDeque;
     typedef std::deque<IndexT>                      IndexDeque;
@@ -619,19 +629,12 @@ struct BBoxFilter
 
     void filterVoxel(const Coord&, const IndexT* begin, const IndexT* end)
     {
-        Vec3d xyz;
-        PointType vec;
+        PosType vec;
 
         for (; begin < end; ++begin) {
             mPoints.getPos(*begin, vec);
 
-            // world to index cell centered, similar the PointPartitioner tool.
-            xyz = mMap.applyInverseMap(vec);
-            xyz[0] = math::Round(xyz[0]);
-            xyz[1] = math::Round(xyz[1]);
-            xyz[2] = math::Round(xyz[2]);
-
-            if (mRegion.isInside(xyz)) {
+            if (mRegion.isInside(mMap.applyInverseMap(vec))) {
                 mIndices.push_back(*begin);
             }
         }
@@ -649,8 +652,8 @@ private:
 template<typename PointArray, typename IndexT>
 struct RadialRangeFilter
 {
-    typedef typename PointArray::value_type         PointType;
-    typedef typename PointType::ValueType           PointElementType;
+    typedef typename PointArray::PosType            PosType;
+    typedef typename PosType::value_type            ScalarType;
     typedef std::pair<const IndexT*, const IndexT*> Range;
     typedef std::deque<Range>                       RangeDeque;
     typedef std::deque<IndexT>                      IndexDeque;
@@ -662,29 +665,29 @@ struct RadialRangeFilter
         , mIndices(indices)
         , mCenter(xyz)
         , mWSCenter(xform.indexToWorld(xyz))
-        , mVoxelDist1(PointElementType(0.0))
-        , mVoxelDist2(PointElementType(0.0))
-        , mLeafNodeDist1(PointElementType(0.0))
-        , mLeafNodeDist2(PointElementType(0.0))
-        , mWSRadiusSqr(PointElementType(radius * xform.voxelSize()[0]))
+        , mVoxelDist1(ScalarType(0.0))
+        , mVoxelDist2(ScalarType(0.0))
+        , mLeafNodeDist1(ScalarType(0.0))
+        , mLeafNodeDist2(ScalarType(0.0))
+        , mWSRadiusSqr(ScalarType(radius * xform.voxelSize()[0]))
         , mPoints(points)
         , mSubvoxelAccuracy(subvoxelAccuracy)
     {
-        const PointElementType voxelRadius = PointElementType(std::sqrt(3.0) * 0.5);
-        mVoxelDist1 = voxelRadius + PointElementType(radius);
+        const ScalarType voxelRadius = ScalarType(std::sqrt(3.0) * 0.5);
+        mVoxelDist1 = voxelRadius + ScalarType(radius);
         mVoxelDist1 *= mVoxelDist1;
 
         if (radius > voxelRadius) {
-            mVoxelDist2 = PointElementType(radius) - voxelRadius;
+            mVoxelDist2 = ScalarType(radius) - voxelRadius;
             mVoxelDist2 *= mVoxelDist2;
         }
 
-        const PointElementType leafNodeRadius = PointElementType(leafNodeDim * std::sqrt(3.0) * 0.5);
-        mLeafNodeDist1 = leafNodeRadius + PointElementType(radius);
+        const ScalarType leafNodeRadius = ScalarType(leafNodeDim * std::sqrt(3.0) * 0.5);
+        mLeafNodeDist1 = leafNodeRadius + ScalarType(radius);
         mLeafNodeDist1 *= mLeafNodeDist1;
 
         if (radius > leafNodeRadius) {
-            mLeafNodeDist2 = PointElementType(radius) - leafNodeRadius;
+            mLeafNodeDist2 = ScalarType(radius) - leafNodeRadius;
             mLeafNodeDist2 *= mLeafNodeDist2;
         }
 
@@ -696,14 +699,14 @@ struct RadialRangeFilter
     {
         {
             const Coord& ijk = leaf.origin();
-            PointType vec;
-            vec[0] = PointElementType(ijk[0]);
-            vec[1] = PointElementType(ijk[1]);
-            vec[2] = PointElementType(ijk[2]);
-            vec += PointElementType(LeafNodeType::DIM - 1) * 0.5;
+            PosType vec;
+            vec[0] = ScalarType(ijk[0]);
+            vec[1] = ScalarType(ijk[1]);
+            vec[2] = ScalarType(ijk[2]);
+            vec += ScalarType(LeafNodeType::DIM - 1) * 0.5;
             vec -= mCenter;
 
-            const PointElementType dist = vec.lengthSqr();
+            const ScalarType dist = vec.lengthSqr();
             if (dist > mLeafNodeDist1) return;
 
             if (mLeafNodeDist2 > 0.0 && dist < mLeafNodeDist2) {
@@ -723,14 +726,14 @@ struct RadialRangeFilter
 
     void filterVoxel(const Coord& ijk, const IndexT* begin, const IndexT* end)
     {
-        PointType vec;
+        PosType vec;
 
         {
-            vec[0] = mCenter[0] - PointElementType(ijk[0]);
-            vec[1] = mCenter[1] - PointElementType(ijk[1]);
-            vec[2] = mCenter[2] - PointElementType(ijk[2]);
+            vec[0] = mCenter[0] - ScalarType(ijk[0]);
+            vec[1] = mCenter[1] - ScalarType(ijk[1]);
+            vec[2] = mCenter[2] - ScalarType(ijk[2]);
 
-            const PointElementType dist = vec.lengthSqr();
+            const ScalarType dist = vec.lengthSqr();
             if (dist > mVoxelDist1) return;
 
             if (!mSubvoxelAccuracy || (mVoxelDist2 > 0.0 && dist < mVoxelDist2)) {
@@ -758,8 +761,8 @@ struct RadialRangeFilter
 private:
     RangeDeque& mRanges;
     IndexDeque& mIndices;
-    const PointType mCenter, mWSCenter;
-    PointElementType mVoxelDist1, mVoxelDist2, mLeafNodeDist1, mLeafNodeDist2, mWSRadiusSqr;
+    const PosType mCenter, mWSCenter;
+    ScalarType mVoxelDist1, mVoxelDist2, mLeafNodeDist1, mLeafNodeDist2, mWSRadiusSqr;
     const PointArray& mPoints;
     const bool mSubvoxelAccuracy;
 }; // struct RadialRangeFilter
@@ -1246,9 +1249,9 @@ template<typename PointArray, typename TreeType>
 template<typename FilterType>
 inline void
 PointIndexFilter<PointArray, TreeType>::searchAndApply(
-    const PointType& center, PointElementType radius, FilterType& op)
+    const PosType& center, ScalarType radius, FilterType& op)
 {
-    if (radius * mInvVoxelSize < PointElementType(8.0)) {
+    if (radius * mInvVoxelSize < ScalarType(8.0)) {
         mIter.searchAndUpdate(openvdb::CoordBBox(
             mXform.worldToIndexCellCentered(center - radius),
             mXform.worldToIndexCellCentered(center + radius)), mAcc);
@@ -1257,9 +1260,9 @@ PointIndexFilter<PointArray, TreeType>::searchAndApply(
             center, radius, mAcc, *mPoints, mXform, /*subvoxelAccuracy=*/false);
     }
 
-    const PointElementType radiusSqr = radius * radius;
-    PointElementType distSqr = 0.0;
-    PointType pos;
+    const ScalarType radiusSqr = radius * radius;
+    ScalarType distSqr = 0.0;
+    PosType pos;
     for (; mIter; ++mIter) {
         mPoints->getPos(*mIter, pos);
         pos -= center;
@@ -1288,6 +1291,15 @@ createPointIndexGrid(const PointArrayT& points, const math::Transform& xform)
     }
 
     return grid;
+}
+
+
+template<typename GridT, typename PointArrayT>
+inline typename GridT::Ptr
+createPointIndexGrid(const PointArrayT& points, double voxelSize)
+{
+    math::Transform::Ptr xform = math::Transform::createLinearTransform(voxelSize);
+    return createPointIndexGrid<GridT>(points, *xform);
 }
 
 
@@ -1805,6 +1817,6 @@ struct SameLeafConfig<Dim1, openvdb::tools::PointIndexLeafNode<T2, Dim1> >
 
 #endif // OPENVDB_TOOLS_POINT_INDEX_GRID_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

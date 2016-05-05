@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -566,7 +566,7 @@ SOP_OpenVDB_Advect::evalAdvectionParms(OP_Context& context, AdvectionParms& parm
         addError(SOP_MESSAGE, "Invalid limiter scheme");
         return UT_ERROR_ABORT;
     }
-    
+
     return error();
 }
 
@@ -599,7 +599,7 @@ SOP_OpenVDB_Advect::processGrids(AdvectionParms& parms, hvdb::Interrupter& boss)
         if (boss.wasInterrupted()) break;
 
         GU_PrimVDB* vdbPrim = *it;
-        
+
         if (parms.mRespectClass && vdbPrim->getGrid().getGridClass() == openvdb::GRID_LEVEL_SET) {
 
             if (vdbPrim->getStorageType() == UT_VDB_FLOAT) {
@@ -617,7 +617,7 @@ SOP_OpenVDB_Advect::processGrids(AdvectionParms& parms, hvdb::Interrupter& boss)
             }
 
 
-        } else { 
+        } else {
 
             if (vdbPrim->getStorageType() == UT_VDB_FLOAT) {
 
@@ -627,7 +627,7 @@ SOP_OpenVDB_Advect::processGrids(AdvectionParms& parms, hvdb::Interrupter& boss)
                     openvdb::tools::Sampler<1, false> >(inGrid, parms.mTimeStep);
 
                 hvdb::replaceVdbPrimitive(*gdp, outGrid, *vdbPrim);
- 
+
             } else if (vdbPrim->getStorageType() == UT_VDB_DOUBLE) {
 
                 const openvdb::DoubleGrid& inGrid = UTvdbGridCast<openvdb::DoubleGrid>(vdbPrim->getConstGrid());
@@ -636,20 +636,15 @@ SOP_OpenVDB_Advect::processGrids(AdvectionParms& parms, hvdb::Interrupter& boss)
                     openvdb::tools::Sampler<1, false> >(inGrid, parms.mTimeStep);
 
                 hvdb::replaceVdbPrimitive(*gdp, outGrid, *vdbPrim);
- 
+
             } else if (vdbPrim->getStorageType() == UT_VDB_VEC3F) {
 
                 const openvdb::Vec3SGrid& inGrid = UTvdbGridCast<openvdb::Vec3SGrid>(vdbPrim->getConstGrid());
 
                 openvdb::Vec3SGrid::Ptr outGrid;
 
-                if (inGrid.getGridClass() == openvdb::GRID_STAGGERED) {
-                    outGrid = advectVolume.template advect<openvdb::Vec3SGrid,
-                        openvdb::tools::Sampler<1, true> >(inGrid, parms.mTimeStep);
-                } else {
-                    outGrid = advectVolume.template advect<openvdb::Vec3SGrid,
+                outGrid = advectVolume.template advect<openvdb::Vec3SGrid,
                         openvdb::tools::Sampler<1, false> >(inGrid, parms.mTimeStep);
-                }
 
                 hvdb::replaceVdbPrimitive(*gdp, outGrid, *vdbPrim);
 
@@ -670,6 +665,6 @@ SOP_OpenVDB_Advect::processGrids(AdvectionParms& parms, hvdb::Interrupter& boss)
     return true;
 }
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

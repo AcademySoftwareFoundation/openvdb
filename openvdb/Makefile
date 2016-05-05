@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2015 DreamWorks Animation LLC
+# Copyright (c) 2012-2016 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -530,23 +530,28 @@ INCLUDE_NAMES := \
     tools/LevelSetFracture.h \
     tools/LevelSetMeasure.h \
     tools/LevelSetMorph.h \
+    tools/LevelSetPlatonic.h \
     tools/LevelSetRebuild.h \
     tools/LevelSetSphere.h \
     tools/LevelSetTracker.h \
     tools/LevelSetUtil.h \
     tools/MeshToVolume.h \
     tools/Morphology.h \
+    tools/MultiResGrid.h \
+    tools/ParticleAtlas.h \
     tools/ParticlesToLevelSet.h \
     tools/PointAdvect.h \
     tools/PointIndexGrid.h \
     tools/PointPartitioner.h \
     tools/PointScatter.h \
+    tools/PointsToMask.h \
     tools/PoissonSolver.h \
     tools/Prune.h \
     tools/RayIntersector.h \
     tools/RayTracer.h \
     tools/SignedFloodFill.h \
     tools/Statistics.h \
+    tools/TopologyToLevelSet.h \
     tools/ValueTransformer.h \
     tools/VectorTransformer.h \
     tools/VelocityFields.h \
@@ -558,6 +563,7 @@ INCLUDE_NAMES := \
     tree/LeafManager.h \
     tree/LeafNode.h \
     tree/LeafNodeBool.h \
+    tree/LeafNodeMask.h \
     tree/NodeManager.h \
     tree/NodeUnion.h \
     tree/RootNode.h \
@@ -630,6 +636,8 @@ UNITTEST_SRC_NAMES := \
     unittest/TestLaplacian.cc \
     unittest/TestLeaf.cc \
     unittest/TestLeafBool.cc \
+    unittest/TestLeafManager.cc \
+    unittest/TestLeafMask.cc \
     unittest/TestLeafIO.cc \
     unittest/TestLeafOrigin.cc \
     unittest/TestLevelSetRayIntersector.cc \
@@ -643,12 +651,16 @@ UNITTEST_SRC_NAMES := \
     unittest/TestMetadata.cc \
     unittest/TestMetadataIO.cc \
     unittest/TestMetaMap.cc \
+    unittest/TestMultiResGrid.cc \
     unittest/TestName.cc \
     unittest/TestNodeIterator.cc \
+    unittest/TestNodeManager.cc \
     unittest/TestNodeMask.cc \
+    unittest/TestParticleAtlas.cc \
     unittest/TestParticlesToLevelSet.cc \
     unittest/TestPointIndexGrid.cc \
     unittest/TestPointPartitioner.cc \
+    unittest/TestPointsToMask.cc \
     unittest/TestPoissonSolver.cc \
     unittest/TestPrePostAPI.cc \
     unittest/TestQuadraticInterp.cc \
@@ -659,6 +671,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestStream.cc \
     unittest/TestStringMetadata.cc \
     unittest/TestTools.cc \
+    unittest/TestTopologyToLevelSet.cc \
     unittest/TestTransform.cc \
     unittest/TestTree.cc \
     unittest/TestTreeCombine.cc \
@@ -1188,6 +1201,6 @@ ifneq ($(DEPFILES),)
 -include $(DEPFILES)
 endif
 
-# Copyright (c) 2012-2015 DreamWorks Animation LLC
+# Copyright (c) 2012-2016 DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

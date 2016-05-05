@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -367,9 +367,8 @@ OpenVDBFromPolygonsNode::compute(const MPlug& plug, MDataBlock& data)
             return MS::kFailure;
         }
 
-        std::auto_ptr<OpenVDBData> vdb(static_cast<OpenVDBData*>(pluginData.data(&status)));
-        if (!vdb.get()) return MS::kFailure;
-
+        OpenVDBData* vdb = static_cast<OpenVDBData*>(pluginData.data(&status));
+        if (status != MS::kSuccess || !vdb) return MS::kFailure;
 
         MDataHandle outHandle = data.outputValue(aVdbOutput);
 
@@ -377,9 +376,13 @@ OpenVDBFromPolygonsNode::compute(const MPlug& plug, MDataBlock& data)
         if (status != MS::kSuccess) return status;
         if (!(voxelSize > 0.0)) return MS::kFailure;
 
-        openvdb::math::Transform::Ptr transform =
-            openvdb::math::Transform::createLinearTransform(voxelSize);
-
+        openvdb::math::Transform::Ptr transform;
+        try {
+            transform = openvdb::math::Transform::createLinearTransform(voxelSize);
+        } catch (openvdb::ArithmeticError) {
+            MGlobal::displayError("Invalid voxel size.");
+            return MS::kFailure;
+        }
 
         MFloatPointArray vertexArray;
         status = mesh.getPoints(vertexArray, MSpace::kWorld);
@@ -410,7 +413,7 @@ OpenVDBFromPolygonsNode::compute(const MPlug& plug, MDataBlock& data)
             if (vertices.length() < 3) {
 
                 MGlobal::displayWarning(
-                    "Skipped unsupported geometry, sigle point or line primitive.");
+                    "Skipped unsupported geometry, single point or line primitive.");
 
             } else if (vertices.length() > 4) {
 
@@ -503,13 +506,13 @@ OpenVDBFromPolygonsNode::compute(const MPlug& plug, MDataBlock& data)
         infoStr << "Compute Time: " << elapsedTime << "\n";
         mvdb::updateNodeInfo(infoStr, data, aNodeInfo);
 
-        outHandle.set(vdb.release());
+        outHandle.set(vdb);
         return data.setClean(plug);
     }
 
     return MS::kUnknownParameter;
 }
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

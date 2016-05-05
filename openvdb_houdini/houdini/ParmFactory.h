@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -91,6 +91,7 @@ public:
     ParmList& add(const ParmFactory&);
 
     ParmList& beginSwitcher(const std::string& token, const std::string& label = "");
+    ParmList& beginExclusiveSwitcher(const std::string& token, const std::string& label = "");
     ParmList& endSwitcher();
 
     ParmList& addFolder(const std::string& label);
@@ -99,7 +100,7 @@ public:
     PRM_Template* get() const;
 
 private:
-    struct SwitcherInfo { size_t parmIdx; std::vector<PRM_Default> folders; };
+    struct SwitcherInfo { size_t parmIdx; std::vector<PRM_Default> folders; bool exclusive; };
     typedef std::vector<SwitcherInfo> SwitcherStack;
 
     void incFolderParmCount();
@@ -481,6 +482,6 @@ OPENVDB_HOUDINI_API extern const PRM_ChoiceList PrimGroupMenu;
 
 #endif // HOUDINI_UTILS_PARM_FACTORY_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

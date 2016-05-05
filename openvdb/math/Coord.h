@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -152,6 +152,8 @@ public:
     Int32& z() { return mVec[2]; }
     Int32& operator[](size_t i) { assert(i < 3); return mVec[i]; }
 
+    const Int32* data() const { return mVec; }
+    Int32* data() { return mVec; }
     const Int32* asPointer() const { return mVec; }
     Int32* asPointer() { return mVec; }
     Vec3d asVec3d() const { return Vec3d(double(mVec[0]), double(mVec[1]), double(mVec[2])); }
@@ -255,6 +257,45 @@ public:
     typedef uint64_t         Index64;
     typedef Coord::ValueType ValueType;
 
+    /// @brief Iterator over Coord domain covered by a CoordBBox
+    ///
+    /// @note If ZYX is true Z is the fastest moving coordinate, else
+    /// it is the X coordinate, i.e. XYZ traversal
+    template<bool ZYX>
+    class Iterator {
+    public:
+        /// @brief C-tor from a bounding box
+        Iterator(const CoordBBox &b) : mPos(b.min()), mMin(b.min()), mMax(b.max()) {}
+        /// @brief Increments iterator to point to the next coordinate
+        /// @note Stops a the last + 1 coordinate of the bounding box
+        /// as defined by the template parameter.
+        Iterator& operator++() {
+            ZYX ? this->next<2,1,0>() : this->next<0,1,2>();
+            return *this;
+        }
+        /// @brief Return true if the iterator still points to a valid coordinate
+        operator bool() const {
+            return ZYX ? mPos[0] <= mMax[0] : mPos[2] <= mMax[2];
+        }
+        /// @brief Return a const reference to the coordinate currently pointed to
+        const Coord& operator*() const { return mPos; }
+    private:
+        template<size_t a, size_t b, size_t c>
+        inline void next() {
+            if ( mPos[a] < mMax[a] )  {//by far this is the most common case
+                ++mPos[a];
+            } else if ( mPos[b] < mMax[b] )  {
+                mPos[a] = mMin[a];
+                ++mPos[b];
+            } else if ( mPos[c] <= mMax[c] ) {
+                mPos[a] = mMin[a];
+                mPos[b] = mMin[b];
+                ++mPos[c];
+            }
+        }
+        Coord mPos, mMin, mMax;
+    };// CoordBBox::Iterator
+
     /// @brief The default constructor produces an empty bounding box.
     CoordBBox(): mMin(Coord::max()), mMax(Coord::min()) {}
     /// @brief Construct a bounding box with the given @a min and @a max bounds.
@@ -351,12 +392,20 @@ public:
         mMin.offset(-padding);
         mMax.offset( padding);
     }
+
+    /// Return a new instance that is expanded by the specified padding.
+    CoordBBox expandBy(ValueType padding) const
+    {
+        return CoordBBox(mMin.offsetBy(-padding),mMax.offsetBy(padding));
+    }
+    
     /// Expand this bounding box to enclose point (x, y, z).
     void expand(const Coord& xyz)
     {
         mMin.minComponent(xyz);
         mMax.maxComponent(xyz);
     }
+    
     /// Union this bounding box with the given bounding box.
     void expand(const CoordBBox& bbox)
     {
@@ -379,6 +428,18 @@ public:
     /// Translate this bounding box by @f$(t_x, t_y, t_z)@f$.
     void translate(const Coord& t) { mMin += t; mMax += t; }
 
+    //@{
+    /// @brief Bit-wise operations performed on both the min and max members
+    CoordBBox  operator>> (size_t n) const { return CoordBBox(mMin>>n, mMax>>n); }
+    CoordBBox  operator<< (size_t n) const { return CoordBBox(mMin<<n, mMax<<n); }
+    CoordBBox& operator<<=(size_t n) { mMin <<= n; mMax <<= n; return *this; }
+    CoordBBox& operator>>=(size_t n) { mMin >>= n; mMax >>= n; return *this; }
+    CoordBBox  operator&  (Coord::Int32 n) const { return CoordBBox(mMin & n, mMax & n); }
+    CoordBBox  operator|  (Coord::Int32 n) const { return CoordBBox(mMin | n, mMax | n); }
+    CoordBBox& operator&= (Coord::Int32 n) { mMin &= n; mMax &= n; return *this; }
+    CoordBBox& operator|= (Coord::Int32 n) { mMin |= n; mMax |= n; return *this; }
+    //@}
+     
     /// Unserialize this bounding box from the given stream.
     void read(std::istream& is) { mMin.read(is); mMax.read(is); }
     /// Serialize this bounding box to the given stream.
@@ -462,6 +523,6 @@ operator<<(std::ostream& os, const CoordBBox& b)
 
 #endif // OPENVDB_MATH_COORD_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

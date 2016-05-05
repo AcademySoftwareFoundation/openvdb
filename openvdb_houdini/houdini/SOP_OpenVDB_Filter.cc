@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -473,9 +473,13 @@ SOP_OpenVDB_Filter::evalFilterParms(OP_Context& context, GU_Detail&, FilterParmV
         const GU_Detail *maskGeo = maskScope.getGdp();
 
         if (maskGeo) {
+#if (UT_MAJOR_VERSION_INT >= 15)
+            const GA_PrimitiveGroup * maskGroup =
+                parsePrimitiveGroups(maskName.c_str(), GroupCreator(maskGeo));
+#else
             const GA_PrimitiveGroup * maskGroup =
                 parsePrimitiveGroups(maskName.c_str(), const_cast<GU_Detail*>(maskGeo));
-
+#endif
             if (!maskGroup && !maskName.empty()) {
                 addWarning(SOP_MESSAGE, "Mask not found.");
             } else {
@@ -586,6 +590,6 @@ SOP_OpenVDB_Filter::cookMySop(OP_Context& context)
     return error();
 }
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

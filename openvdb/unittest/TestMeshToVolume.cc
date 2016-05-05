@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -158,6 +158,11 @@ TestMeshToVolume::testCreateLevelSetBox()
 
     FloatGrid::Ptr grid = openvdb::tools::createLevelSetBox<FloatGrid>(bbox, *transform);
 
+    double gridBackground = grid->background();
+    double expectedBackground = transform->voxelSize().x() * double(openvdb::LEVEL_SET_HALF_WIDTH);
+
+    CPPUNIT_ASSERT_DOUBLES_EQUAL(expectedBackground, gridBackground, 1e-6);
+
     CPPUNIT_ASSERT(grid->tree().leafCount() > 0);
 
     // test inside coord value
@@ -170,6 +175,6 @@ TestMeshToVolume::testCreateLevelSetBox()
 }
 
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

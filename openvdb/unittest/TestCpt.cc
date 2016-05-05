@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -496,9 +496,10 @@ TestCpt::testCptMaskedTool()
     const openvdb::CoordBBox maskbbox(openvdb::Coord(35, 30, 30), openvdb::Coord(41, 41, 41));
     BoolGrid::Ptr maskGrid = BoolGrid::create(false);
     maskGrid->fill(maskbbox, true/*value*/, true/*activate*/);
-
+    
     // run the tool
-    typedef openvdb::tools::Cpt<FloatGrid> FloatCpt;
+    //typedef openvdb::tools::Cpt<FloatGrid> FloatCpt;//fails because MaskT defaults to MaskGrid
+    typedef openvdb::tools::Cpt<FloatGrid, BoolGrid> FloatCpt;
     FloatCpt cpt(*grid, *maskGrid);
     FloatCpt::OutGridType::Ptr cptGrid =
         cpt.process(true/*threaded*/, false/*use world transform*/);
@@ -560,6 +561,6 @@ TestCpt::testOldStyleStencils()
     }
 }
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

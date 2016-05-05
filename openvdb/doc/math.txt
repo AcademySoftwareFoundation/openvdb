@@ -2,7 +2,7 @@
 
 @page transformsAndMaps Transforms and Maps
 
-@section sMathContents
+@section sMathContents Contents
 - @ref sTransforms
   - @ref sLinearTransforms
   - @ref sFrustumTransforms

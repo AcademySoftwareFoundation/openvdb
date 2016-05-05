@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -322,8 +322,8 @@ Queue::Id
 Queue::writeGridVec(const GridCPtrVec& grids, const Archive& archive, const MetaMap& metadata)
 {
     // From the "GUI Thread" chapter in the TBB Design Patterns guide
-    OutputTask* task =
-        new(tbb::task::allocate_root()) OutputTask(mImpl->mNextId++, grids, archive, metadata);
+    const Queue::Id task_id = mImpl->mNextId++;
+    OutputTask* task = new(tbb::task::allocate_root()) OutputTask(task_id, grids, archive, metadata);
     try {
         mImpl->enqueue(*task);
     } catch (openvdb::RuntimeError&) {
@@ -331,13 +331,13 @@ Queue::writeGridVec(const GridCPtrVec& grids, const Archive& archive, const Meta
         tbb::task::destroy(*task);
         throw;
     }
-    return task->id();
+    return task_id;
 }
 
 } // namespace io
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

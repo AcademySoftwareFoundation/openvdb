@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -78,6 +78,7 @@ public:
     typedef ChildType                         ChildNodeType;
     typedef typename ChildType::LeafNodeType  LeafNodeType;
     typedef typename ChildType::ValueType     ValueType;
+    typedef typename ChildType::BuildType     BuildType;
 
     static const Index LEVEL = 1 + ChildType::LEVEL; // level 0 = leaf
 
@@ -155,7 +156,7 @@ public:
     template<typename OtherChildType>
     RootNode& operator=(const RootNode<OtherChildType>& other);
 
-    ~RootNode() { this->clearTable(); }
+    ~RootNode() { this->clear(); }
 
 private:
     struct Tile {
@@ -468,7 +469,7 @@ public:
     /// @brief Remove all background tiles.
     /// @return the number of tiles removed.
     size_t eraseBackgroundTiles();
-    void clear() { this->clearTable(); }
+    inline void clear();
 
     /// Return @c true if this node's table is either empty or contains only background tiles.
     bool empty() const { return mTable.size() == numBackgroundTiles(); }
@@ -549,14 +550,33 @@ public:
     template<typename ModifyOp>
     void modifyValueAndActiveState(const Coord& xyz, const ModifyOp& op);
 
-    /// @brief Set all voxels within a given box to a constant value, if necessary
-    /// subdividing tiles that intersect the box.
+    //@{
+    /// @brief Set all voxels within a given axis-aligned box to a constant value.
     /// @param bbox    inclusive coordinates of opposite corners of an axis-aligned box
     /// @param value   the value to which to set voxels within the box
     /// @param active  if true, mark voxels within the box as active,
     ///                otherwise mark them as inactive
+    /// @note This operation generates a sparse, but not always optimally sparse,
+    /// representation of the filled box. Follow fill operations with a prune()
+    /// operation for optimal sparseness.
     void fill(const CoordBBox& bbox, const ValueType& value, bool active = true);
+    void sparseFill(const CoordBBox& bbox, const ValueType& value, bool active = true)
+    {
+        this->fill(bbox, value, active);
+    }
+    //@}
 
+    /// @brief Set all voxels within a given axis-aligned box to a constant value.
+    /// @param bbox    inclusive coordinates of opposite corners of an axis-aligned box.
+    /// @param value   the value to which to set voxels within the box.
+    /// @param active  if true, mark voxels within the box as active,
+    ///                otherwise mark them as inactive.
+    ///
+    /// @note This operation generates a dense representation of the
+    ///       filled box. This implies that active tiles are voxelized, i.e. only active 
+    ///       voxels are generated from this fill operation.
+    void denseFill(const CoordBBox& bbox, const ValueType& value, bool active = true);
+    
     /// @brief Copy into a dense grid the values of all voxels, both active and inactive,
     /// that intersect a given bounding box.
     /// @param bbox   inclusive bounding box of the voxels to be copied into the dense grid
@@ -806,9 +826,14 @@ public:
     template<typename ArrayT>
     void stealNodes(ArrayT& array) { this->stealNodes(array, mBackground, false); }
     //@}
-
-    /// Densify active tiles, i.e., replace them with leaf-level active voxels.
-    void voxelizeActiveTiles();
+    
+    /// @brief Densify active tiles, i.e., replace them with leaf-level active voxels.
+    ///
+    /// @param threaded if true, this operation is multi-threaded (over the internal nodes).
+    ///
+    /// @warning This method can explode the tree's memory footprint, especially if it 
+    /// contains active tiles at the upper levels, e.g. root level!
+    void voxelizeActiveTiles(bool threaded = true);
 
     /// @brief Efficiently merge another tree into this tree using one of several schemes.
     /// @details This operation is primarily intended to combine trees that are mostly
@@ -896,7 +921,6 @@ private:
 
     /// Currently no-op, but can be used to define empty and delete keys for mTable
     void initTable() {}
-    inline void clearTable();
     //@{
     /// @internal Used by doVisit2().
     void resetTable(MapType& table) { mTable.swap(table); table.clear(); }
@@ -1124,7 +1148,7 @@ struct RootNodeCopyHelper<RootT, OtherRootT, /*Compatible=*/true>
 
         self.mBackground = Local::convertValue(other.mBackground);
 
-        self.clearTable();
+        self.clear();
         self.initTable();
 
         for (OtherMapCIter i = other.mTable.begin(), e = other.mTable.end(); i != e; ++i) {
@@ -1150,7 +1174,7 @@ RootNode<ChildT>::operator=(const RootNode& other)
     if (&other != this) {
         mBackground = other.mBackground;
 
-        this->clearTable();
+        this->clear();
         this->initTable();
 
         for (MapCIter i = other.mTable.begin(), e = other.mTable.end(); i != e; ++i) {
@@ -1451,7 +1475,7 @@ RootNode<ChildT>::memUsage() const
 
 template<typename ChildT>
 inline void
-RootNode<ChildT>::clearTable()
+RootNode<ChildT>::clear()
 {
     for (MapIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
         delete i->second.child;
@@ -2050,13 +2074,12 @@ RootNode<ChildT>::probeValueAndCache(const Coord& xyz, ValueType& value, Accesso
 
 ////////////////////////////////////////
 
-
 template<typename ChildT>
 inline void
 RootNode<ChildT>::fill(const CoordBBox& bbox, const ValueType& value, bool active)
 {
     if (bbox.empty()) return;
-
+    
     Coord xyz, tileMax;
     for (int x = bbox.min().x(); x <= bbox.max().x(); x = tileMax.x() + 1) {
         xyz.setX(x);
@@ -2091,8 +2114,8 @@ RootNode<ChildT>::fill(const CoordBBox& bbox, const ValueType& value, bool activ
                     }
                     // Forward the fill request to the child.
                     if (child) {
-                        child->fill(CoordBBox(xyz, Coord::minComponent(bbox.max(), tileMax)),
-                            value, active);
+                        const Coord tmp = Coord::minComponent(bbox.max(), tileMax);
+                        child->fill(CoordBBox(xyz, tmp), value, active);
                     }
                 } else {
                     // If the box given by (xyz, bbox.max()) completely encloses
@@ -2104,6 +2127,14 @@ RootNode<ChildT>::fill(const CoordBBox& bbox, const ValueType& value, bool activ
             }
         }
     }
+}
+
+template<typename ChildT>
+inline void
+RootNode<ChildT>::denseFill(const CoordBBox& bbox, const ValueType& value, bool active)
+{
+    this->sparseFill(bbox, value, active);
+    this->voxelizeActiveTiles(true);//multi-threaded
 }
 
 template<typename ChildT>
@@ -2192,7 +2223,7 @@ inline bool
 RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
 {
     // Delete the existing tree.
-    this->clearTable();
+    this->clear();
 
     if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_ROOTNODE_MAP) {
         // Read and convert an older-format RootNode.
@@ -2372,7 +2403,7 @@ RootNode<ChildT>::clip(const CoordBBox& clipBBox)
                 tileBBox.intersect(clipBBox);
                 const Tile& origTile = getTile(i);
                 setTile(this->findCoord(xyz), bgTile);
-                this->fill(tileBBox, origTile.value, origTile.active);
+                this->sparseFill(tileBBox, origTile.value, origTile.active);
             }
         } else {
             // This table entry lies completely inside the clipping region.  Leave it intact.
@@ -2832,8 +2863,13 @@ RootNode<ChildT>::stealNodes(ArrayT& array, const ValueType& value, bool state)
 
 template<typename ChildT>
 inline void
-RootNode<ChildT>::voxelizeActiveTiles()
+RootNode<ChildT>::voxelizeActiveTiles(bool threaded)
 {
+    // These is little point in multi-threaded over the root table since
+    // each tile spans a huge index space (by default 4096^3) and hence we
+    // expect few if any at all. In fact, you're very likeky to run out
+    // of memory if this method is called on a tree with root-level
+    // active tiles!
     for (MapIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
         if (this->isTileOff(i)) continue;
         ChildT* child = i->second.child;
@@ -2841,7 +2877,7 @@ RootNode<ChildT>::voxelizeActiveTiles()
             child = new ChildT(i->first, this->getTile(i).value, true);
             i->second.child = child;
         }
-        child->voxelizeActiveTiles();
+        child->voxelizeActiveTiles(threaded);
     }
 }
 
@@ -3393,6 +3429,6 @@ RootNode<ChildT>::doVisit2(RootNodeT& self, OtherRootNodeT& other, VisitorOp& op
 
 #endif // OPENVDB_TREE_ROOTNODE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2015 DreamWorks Animation LLC
+# Copyright (c) 2012-2016 DreamWorks Animation LLC
 #
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -325,6 +325,7 @@ HOUDINI_SOP_SRC_NAMES := \
     houdini/SOP_OpenVDB_Fracture.cc \
     houdini/SOP_OpenVDB_From_Particles.cc \
     houdini/SOP_OpenVDB_From_Polygons.cc \
+    houdini/SOP_OpenVDB_LOD.cc \
     houdini/SOP_OpenVDB_Metadata.cc \
     houdini/SOP_OpenVDB_Morph_Level_Set.cc \
     houdini/SOP_OpenVDB_Noise.cc \
@@ -341,8 +342,10 @@ HOUDINI_SOP_SRC_NAMES := \
     houdini/SOP_OpenVDB_Sample_Points.cc \
     houdini/SOP_OpenVDB_Sort_Points.cc \
     houdini/SOP_OpenVDB_Scatter.cc \
+    houdini/SOP_OpenVDB_Segment.cc \
     houdini/SOP_OpenVDB_To_Polygons.cc \
     houdini/SOP_OpenVDB_To_Spheres.cc \
+    houdini/SOP_OpenVDB_Topology_To_Level_Set.cc \
     houdini/SOP_OpenVDB_Transform.cc \
     houdini/SOP_OpenVDB_Vector_Merge.cc \
     houdini/SOP_OpenVDB_Vector_Split.cc \
@@ -630,6 +633,6 @@ ifneq ($(DEPFILES),)
 -include $(DEPFILES)
 endif
 
-# Copyright (c) 2012-2015 DreamWorks Animation LLC
+# Copyright (c) 2012-2016 DreamWorks Animation LLC
 # All rights reserved. This software is distributed under the
 # Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

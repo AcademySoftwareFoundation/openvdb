@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -64,7 +64,7 @@ private:
     union { ChildT* child; ValueT value; } mUnion;
 
 public:
-    NodeUnionImpl() { setChild(NULL); }
+    NodeUnionImpl() { mUnion.child = NULL; }
 
     ChildT* getChild() const { return mUnion.child; }
     const ValueT& getValue() const { return mUnion.value; }
@@ -81,29 +81,35 @@ class NodeUnionImpl</*ValueIsClass=*/true, ValueT, ChildT>
 {
 private:
     union { ChildT* child; ValueT* value; } mUnion;
-    bool mHasChild;
+    bool mHasValue;
 
 public:
-    NodeUnionImpl(): mHasChild(true) { setChild(NULL); }
-    NodeUnionImpl(const NodeUnionImpl& other)
+    NodeUnionImpl() : mHasValue(false) { this->setChild(NULL); }
+    NodeUnionImpl(const NodeUnionImpl& other) : mHasValue(false)
     {
-        if (other.mHasChild) setChild(other.getChild());
-        else setValue(other.getValue());
+        if (other.mHasValue) {
+            this->setValue(other.getValue());
+        } else {
+            this->setChild(other.getChild());
+        }
     }
     NodeUnionImpl& operator=(const NodeUnionImpl& other)
     {
-        if (other.mHasChild) setChild(other.getChild());
-        else setValue(other.getValue());
+        if (other.mHasValue) {
+            this->setValue(other.getValue());
+        } else {
+            this->setChild(other.getChild());
+        } 
+        return *this;
     }
-    ~NodeUnionImpl() { setChild(NULL); }
+    ~NodeUnionImpl() { this->setChild(NULL); }
 
-    ChildT* getChild() const
-        { return mHasChild ? mUnion.child : NULL; }
+    ChildT* getChild() const { return mHasValue ? NULL : mUnion.child; }
     void setChild(ChildT* child)
     {
-        if (!mHasChild) delete mUnion.value;
+        if (mHasValue) delete mUnion.value;
         mUnion.child = child;
-        mHasChild = true;
+        mHasValue = false;
     }
 
     const ValueT& getValue() const { return *mUnion.value; }
@@ -112,9 +118,9 @@ public:
     {
         /// @todo To minimize storage across nodes, intern and reuse
         /// common values, using, e.g., boost::flyweight.
-        if (!mHasChild) delete mUnion.value;
+        if (mHasValue) delete mUnion.value;
         mUnion.value = new ValueT(val);
-        mHasChild = false;
+        mHasValue = true;
     }
 };
 
@@ -132,6 +138,6 @@ struct NodeUnion: public NodeUnionImpl<
 
 #endif // OPENVDB_TREE_NODEUNION_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -235,7 +235,7 @@ changeBackground(
 {
     tree::NodeManager<TreeOrLeafManagerT> linearTree(tree);
     ChangeBackgroundOp<TreeOrLeafManagerT> op(tree, background);
-    linearTree.processTopDown(op, threaded, grainSize);
+    linearTree.foreachTopDown(op, threaded, grainSize);
 }
 
 
@@ -250,7 +250,7 @@ changeAsymmetricLevelSetBackground(
 {
     tree::NodeManager<TreeOrLeafManagerT> linearTree(tree);
     ChangeLevelSetBackgroundOp<TreeOrLeafManagerT> op(outsideValue, insideValue);
-    linearTree.processTopDown(op, threaded, grainSize);
+    linearTree.foreachTopDown(op, threaded, grainSize);
 }
 
 
@@ -273,6 +273,6 @@ changeLevelSetBackground(
 
 #endif // OPENVDB_TOOLS_CHANGEBACKGROUND_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

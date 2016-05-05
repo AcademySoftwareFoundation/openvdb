@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -32,9 +32,14 @@
 
 
 #include "OpenVDBUtil.h"
+#include <openvdb/math/Math.h>
 
 #include <maya/MGlobal.h>
 
+#include <iomanip> // std::setw, std::setfill, std::left
+#include <sstream> // std::stringstream
+#include <string> // std::string, std::getline
+#include <vector>
 
 namespace openvdb_maya {
 
@@ -207,6 +212,54 @@ updateNodeInfo(std::stringstream& stream, MDataBlock& data, MObject& strAttr)
     MDataHandle strHandle = data.outputValue(strAttr);
     strHandle.set(str);
     data.setClean(strAttr);
+}
+
+
+void
+insertFrameNumber(std::string& str, const MTime& time, int numberingScheme)
+{
+    size_t pos = str.find_first_of("#");
+    if (pos != std::string::npos) {
+
+        size_t length = str.find_last_of("#") + 1 - pos;
+
+        // Current frame value
+        const double frame = time.as(MTime::uiUnit());
+
+        // Frames per second
+        const MTime dummy(1.0, MTime::kSeconds);
+        const double fps = dummy.as(MTime::uiUnit());
+
+        // Ticks per frame
+        const double tpf = 6000.0 / fps;
+        const int tpfDigits = int(std::log10(int(tpf)) + 1);
+
+        const int wholeFrame = int(frame);
+        std::stringstream ss;
+        ss << std::setw(int(length)) << std::setfill('0');
+
+        if (numberingScheme == 1) { // Fractional frame values
+            ss << wholeFrame;
+
+            std::stringstream stream;
+            stream << frame;
+            std::string tmpStr = stream.str();;
+            tmpStr = tmpStr.substr(tmpStr.find('.'));
+            if (!tmpStr.empty()) ss << tmpStr;
+
+        } else if (numberingScheme == 2) { // Global ticks
+            int ticks = int(openvdb::math::Round(frame * tpf));
+            ss << ticks;
+        } else { // Frame.SubTick
+            ss << wholeFrame;
+            const int frameTick = (openvdb::math::Round(frame - double(wholeFrame)) * tpf);
+            if (frameTick > 0) {
+                ss << "." << std::setw(tpfDigits) << std::setfill('0') << frameTick;
+            }
+        }
+
+        str.replace(pos, length, ss.str());
+    }
 }
 
 
@@ -611,6 +664,6 @@ void WireBoxBuilder::add(GLuint boxIndex, const openvdb::CoordBBox& bbox, const 
 } // namespace util
 
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

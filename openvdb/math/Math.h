@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -336,7 +336,7 @@ inline bool
 isApproxZero(const Type& x)
 {
     const Type tolerance = Type(zeroVal<Type>() + Tolerance<Type>::value());
-    return x < tolerance && x > -tolerance;
+    return !(x > tolerance) && !(x < -tolerance);
 }
 
 /// Return @c true if @a x is equal to zero to within the given tolerance.
@@ -344,7 +344,7 @@ template<typename Type>
 inline bool
 isApproxZero(const Type& x, const Type& tolerance)
 {
-    return x < tolerance && x > -tolerance;
+    return !(x > tolerance) && !(x < -tolerance);
 }
 
 
@@ -807,7 +807,7 @@ inline int Ceil(long double x) { return int(RoundUp(x)); }
 //@}
 
 
-/// Return @a x if it is greater in magnitude than @a delta.  Otherwise, return zero.
+/// Return @a x if it is greater or equal in magnitude than @a delta.  Otherwise, return zero.
 template<typename Type>
 inline Type Chop(Type x, Type delta) { return (Abs(x) < delta ? zeroVal<Type>() : x); }
 
@@ -907,6 +907,6 @@ MaxIndex(const Vec3T& v)
 
 #endif // OPENVDB_MATH_MATH_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

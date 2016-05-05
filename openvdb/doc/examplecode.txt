@@ -6,7 +6,7 @@ This section provides code snippets and some complete programs that
 illustrate how to use OpenVDB and how to perform common tasks.
 
 
-@section sCookbookContents
+@section sCookbookContents Contents
 - @ref sHelloWorld
   - @ref sCompilingHelloWorld
 - @ref sAllocatingGrids
@@ -1019,14 +1019,14 @@ gridA = copyOfGridA->deepCopy();
 gridB = copyOfGridB->deepCopy();
 
 // Compute the intersection (A n B) of the two level sets.
-openvdb::tools::csgIntersection(gridA, gridB);
+openvdb::tools::csgIntersection(*gridA, *gridB);
 
 // Restore the original level sets.
 gridA = copyOfGridA->deepCopy();
 gridB = copyOfGridB->deepCopy();
 
 // Compute the difference (A / B) of the two level sets.
-openvdb::tools::csgDifference(gridA, gridB);
+openvdb::tools::csgDifference(*gridA, *gridB);
 @endcode
 
 

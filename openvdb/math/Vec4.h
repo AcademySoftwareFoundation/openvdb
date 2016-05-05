@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -531,6 +531,14 @@ isFinite(const Vec4<T>& v)
     return isFinite(v[0]) && isFinite(v[1]) && isFinite(v[2]) && isFinite(v[3]);
 }
 
+/// Return @c true if all components are exactly equal to zero.
+template<typename T>
+inline bool
+isZero(const Vec4<T>& v)
+{
+    return isZero(v[0]) && isZero(v[1]) && isZero(v[2]) && isZero(v[3]);
+}
+
 template<typename T>
 inline Vec4<T>
 Abs(const Vec4<T>& v)
@@ -581,6 +589,6 @@ typedef Vec4<double>    Vec4d;
 
 #endif // OPENVDB_MATH_VEC4_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

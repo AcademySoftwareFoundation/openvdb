@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -85,6 +85,8 @@ template <typename T>
 inline uint16_t
 QuantizedUnitVec::pack(const Vec3<T>& vec)
 {
+    if (math::isZero(vec)) return 0;
+
     uint16_t data = 0;
     T x(vec[0]), y(vec[1]), z(vec[2]);
 
@@ -159,6 +161,6 @@ QuantizedUnitVec::flipSignBits(uint16_t& v)
 
 #endif // OPENVDB_MATH_QUANTIZED_UNIT_VEC_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

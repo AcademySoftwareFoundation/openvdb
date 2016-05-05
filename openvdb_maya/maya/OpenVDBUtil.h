@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -49,6 +49,7 @@
 #include <maya/MDataBlock.h>
 #include <maya/MDataHandle.h>
 #include <maya/MFnPluginData.h>
+#include <maya/MTime.h>
 
 #if defined(__APPLE__) || defined(MACOSX)
 #include <OpenGL/gl.h>
@@ -117,6 +118,20 @@ bool getSelectedGrids(GridCPtrVec& grids, const std::string& selection,
 /// @return @c false if no matching grids were found.
 bool getSelectedGrids(GridCPtrVec& grids, const std::string& selection,
     const OpenVDBData& inputVdb);
+
+
+/// @brief   Replaces a sequence of pound signs (#) with the current
+///          frame number.
+///
+/// @details The number of pound signs defines the zero padding width.
+///          For example '###' for frame 5 would produce "name.005.type"
+///
+/// @note   Supports three numbering schemes:
+///             0 = Frame.SubTick
+///             1 = Fractional frame values
+///             2 = Global ticks
+void
+insertFrameNumber(std::string& str, const MTime& time, int numberingScheme = 0);
 
 
 ////////////////////////////////////////
@@ -1067,6 +1082,6 @@ processTypedVectorGrid(GridPtrType grid, OpType& op)
 
 #endif // OPENVDB_MAYA_UTIL_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

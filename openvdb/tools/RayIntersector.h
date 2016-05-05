@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -540,6 +540,7 @@ class LinearSearchImpl
 {
 public:
     typedef math::Ray<RealT>              RayT;
+    typedef math::Vec3<RealT>             VecT;
     typedef typename GridT::ValueType     ValueT;
     typedef typename GridT::ConstAccessor AccessorT;
     typedef math::BoxStencil<GridT>       StencilT;
@@ -586,16 +587,16 @@ public:
 
     /// @brief Get the intersection point in index space.
     /// @param xyz The position in index space of the intersection.
-    inline void getIndexPos(Vec3d& xyz) const { xyz = mRay(mTime); }
+    inline void getIndexPos(VecT& xyz) const { xyz = mRay(mTime); }
 
     /// @brief Get the intersection point in world space.
     /// @param xyz The position in world space of the intersection.
-    inline void getWorldPos(Vec3d& xyz) const { xyz = mStencil.grid().indexToWorld(mRay(mTime)); }
+    inline void getWorldPos(VecT& xyz) const { xyz = mStencil.grid().indexToWorld(mRay(mTime)); }
 
     /// @brief Get the intersection point and normal in world space
     /// @param xyz The position in world space of the intersection.
     /// @param nml The surface normal in world space of the intersection.
-    inline void getWorldPosAndNml(Vec3d& xyz, Vec3d& nml)
+    inline void getWorldPosAndNml(VecT& xyz, VecT& nml)
     {
         this->getIndexPos(xyz);
         mStencil.moveTo(xyz);
@@ -668,13 +669,13 @@ private:
 
     inline RealT interpTime()
     {
-        assert(math::isApproxLarger(mT[1], mT[0], 1e-6));
+        assert( math::isApproxLarger(mT[1], mT[0], RealT(1e-6) ) );
         return mT[0]+(mT[1]-mT[0])*mV[0]/(mV[0]-mV[1]);
     }
 
     inline RealT interpValue(RealT time)
     {
-        const Vec3R pos = mRay(time);
+        const VecT pos = mRay(time);
         mStencil.moveTo(pos);
         return mStencil.interpolation(pos) - mIsoValue;
     }
@@ -696,6 +697,6 @@ private:
 
 #endif // OPENVDB_TOOLS_RAYINTERSECTOR_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

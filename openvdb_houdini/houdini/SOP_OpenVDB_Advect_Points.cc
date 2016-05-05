@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -801,7 +801,12 @@ SOP_OpenVDBAdvectPoints::evalAdvectionParms(OP_Context& context, AdvectionParms&
     }
 
     evalString(str, "ptnGroup", 0, now);
+
+#if (UT_MAJOR_VERSION_INT >= 15)
+    parms.mPointGroup = parsePointGroups(str,GroupCreator(gdp));
+#else
     parms.mPointGroup = parsePointGroups(str, gdp);
+#endif
 
     if (!parms.mPointGroup && str.length() > 0) {
         addWarning(SOP_MESSAGE, "Point group not found");
@@ -887,6 +892,6 @@ SOP_OpenVDBAdvectPoints::evalAdvectionParms(OP_Context& context, AdvectionParms&
     return true;
 }
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

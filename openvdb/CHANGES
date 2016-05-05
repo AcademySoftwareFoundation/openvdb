@@ -1,6 +1,173 @@
 OpenVDB Version History
 =======================
 
+Version 3.2.0 - In development
+
+    Highlights:
+    - New features: tool to produce and store a sequences of progressively
+      lower resolution grids (mipmaps), an acceleration structure for fast
+      range and nearest-neighbor searches on particles, arbitrary volume
+      and level set specific segmentation tools, a new binary mask grid
+      type and an efficient point to level set conversion scheme.
+    - Optimizations: Threaded grid destruction, morphological dilation,
+      csg operations and fracture tool.
+    - New Houdini nodes: Segment, LOD and Topology To Level Set.
+
+    New features:
+    - Added tools::MultiResGrid a tool to produce and store a sequences
+      of progressively lower resolution grids (mipmaps).
+    - Added tools::ParticleAtlas an acceleration structure for fast range
+      and nearest-neighbor searches on particles, points with radius.
+    - Added tools::segmentActiveVoxels(), which operates on grids of arbitrary
+      type and separates connected components of a grid's active voxels into
+      distinct grids or trees.
+    - Added tools::segmentSDF(), which separates disjoint signed-distance-field
+      surfaces into distinct grids or trees.
+    - Added tools::extractActiveVoxelSegmentMasks(), which constructs a mask
+      for each connected component of a grid's active voxels.
+    - Added threaded level-set CSG tools csgUnionCopy(), csgIntersectionCopy()
+      and csgDifferenceCopy(), which, unlike the existing CSG tools, produce
+      new grids rather than modifying their input grids.  These new tools are
+      faster and use less memory than the existing tools (if only because the
+      input grids never need to be deep-copied).
+    - Added a threaded dilateActiveValues() tool with tile value support.
+    - Added tools::PointsToMask, which activates voxels that intersect
+      points from a given list.
+    - Added a new MaskGrid type that uses a single bit-field to represent both
+      voxel values and states for the leafnode to reduce memory usage.
+    - Added tools::topologyToLevelSet(), which generates a level set from the
+      implicit boundary between active and inactive voxels in an input grid
+      of arbitrary type.
+    - Added tools::LevelSetPlatonic a new tool that produces narrow-band
+      level sets of the five Platonic solids.
+    - Added tools::extractIsosurfaceMask() which masks voxels that intersect the
+      implicit surface defined by the given isovalue.
+    - Added tree::LeafManager::getPreFixSum() for user-managed external buffers.
+    - Added tools::Dense::print().
+    - Added the math::CoordBBox::Iterator class to conveniently iterate over
+      coordinates covered a CoordBBox.
+    - Added bit-wise operations to the CoordBBox class.
+    - Added a new LeafManager constructor to create the structure from an
+      existing array of leafnodes.
+    - Added the templated math::MinMax class to compute the extrema of
+      arbitrary value types.
+    - Added sparseFill and denseFill methods to the Grid, Tree and RootNode classes.
+
+    Improvements:
+    - Improved the performance, parallel scaling and memory usage,
+      of tools::LevelSetFracture and updated to use the new segmentSDF scheme.
+    - Improved the performance of tools::LevelSetAdvection by up to five times.
+    - Improved the performance of Tree::voxelizeActiveTiles by means of multi-threading.
+    - Improved the performance of tools::meshToVolume(), particularly for
+      large narrow-band widths and for signed distance fields with dense
+      interior regions.
+    - Threaded the Tree destructor and the Tree::clear() method.
+    - Added a parameter to tools::signedFloodFill() and to
+      tools::signedFloodFillWithValues() to constrain the flood fill
+      to specific levels of the tree.
+    - Added active tile count to Tree::print.
+    - Improved the API of tools::Dense with non-const access methods.
+    - Added LeafManager::reduce and similar methods to NodeManager.
+      [Contributed by Brett Tully]
+    - Improved constructors of math::Mat3 and math::Mat4.
+    - Added math::Mat3::cofactor().
+    - Added math::Mat3::setRows, math::Mat4::setRows,
+      math::Mat3::setColumns Mat3::setColumns, and
+      math::Mat4::setColumns.
+    - Added util::NodeMask::isConstant method for faster bit processing.
+    - tools::Prune performs an improved estimate of tile values by means of medians.
+
+    Bug fixes:
+    - Fixed a bug in tools::LevelSetAdvection that could cause
+      non-deterministic behavior.
+      [Reported by Jeff Lait]
+    - Fixed a bug that allowed for unexpected implicit conversion
+      between grids of different value types.
+    - Fixed a bug whereby the origins of leaf nodes with value type bool
+      were ignored during equality comparisons.
+    - tools::GridTransformer now correctly handles affine transforms with
+      shear and/or reflection.
+    - Fixed a bug in tools::meshToVolume() that could produce
+      incorrect distances for large narrow-band widths.
+    - Fixed a bug in tools::meshToVolume() that produced different results on
+      machines with different core counts.
+    - Fixed a threading bug in tools::compReplace() that could cause crashes.
+    - Resolved a floating-point exception in math::QuantizedUnitVec::pack()
+      caused by calling the method with a zero-length vector.
+      [Contributed by Rick Hankins]
+    - Fixed a potential threading bug in io::Queue.
+      [Contributed by Josip ¿ume¿ki]
+    - Fixed a possible division-by-zero bug in openvdb/tools/LevelSetAdvect.h.
+      [Contributed by Rick Hankins]
+    - Corrected the outer product method to not return the transpose result.
+      [Contributed by Gergely Klar]
+    - Fixed a memory overallocation issue in tools::VolumeAdvect.
+    - Fix bug in tools::VolumeToMesh failing to clear its state when exiting
+      early.
+      [Contributed by Edward Lam]
+    - Fixed bug in tools::PointIndexIterator::worldSpaceSearchAndUpdate
+      that resulted in missing point indices.
+      [Reported by Rick Hankins]
+    - Fixed Windows build issues in unit tests.
+      [Contributed by Edward Lam and Steven Caron]
+    - Fixed isApproxZero() so that it works correctly when tolerance is zero.
+      [Reported by Joshua Olson]
+    - Fixed bugs in tree::NodeUnion that could cause crashes.
+    - Fixed memory leak in
+      tools::mesh_to_volume_internal::ExpandNarrowband
+      [Reported by Kévin Dietrich]
+    - Fixed parameter type inconsistencies in math/Stencils.h and
+      tools/RayIntersector.h.
+      [Contributed by Kévin Dietrich]
+    - Fixed a bug in the VolumeToMesh tool that produced artifacts for
+      adaptive surface extraction on clipped level sets.
+      [Reported by Jeff Lait]
+
+    API changes:
+    - Deprecated math::Mat3::setBasis and math::Mat4::setBasis.
+    - Renamed math::GudonovsNormSqrd to math::GodunovsNormSqrd
+      [Contributed by Branislav Radjenovic]
+    - Renamed ValueType to PosType in the PointArray interface.
+    - Deprecated tree::Tree::addLeaf(LeafNode&) and added
+      tree::Tree::addLeaf(LeafNode*).
+
+    Python:
+    - Updated the Python module for Python 3 compatibility.
+    - Updated the Python module for Boost 1.60 compatibility, to address
+      "no to_python (by-value) converter found" exceptions.
+
+    Maya:
+    - Fixed bugs related to data ownership, and improved error checking.
+      [Contributed by Crawford Doran]
+    - Updated the Read and Write DAG nodes to support file sequences
+      and subframe evaluation.
+
+    Houdini:
+    - Added a Segment SOP that separates a grid's connected components
+      into distinct grids.
+    - Added a LOD SOP that produces a sequences of progressively lower
+      resolution grids.
+    - Added a Topology To Level Set SOP that generates a narrow-band
+      signed distance field / level set from the interface between active
+      and inactive voxels in an arbitrary grid.
+    - Revamped the From Particles SOP UI and added a more efficient
+      level set conversion method that supports Houdini 15 packed points.
+    - Updated the Rasterize Points SOP with support for frustum transforms,
+      sub region masking and orientation logic that matches the native
+      Copy SOP's orientation.
+    - Updated the Platonic SOP with support for all five Platonic solids.
+    - Added hooks for registering SOP_NodeVDB text callbacks for different
+      grid types.
+      [Contributed by Nick Avramoussis]
+    - The Resample and Combine SOPs now correctly handle affine transforms
+      with shear and/or reflection.
+    - Removed the StaggeredBoxSampler code path in SOP_OpenVDB_Advect because
+      it introduces bias.
+      [Contributed by Fredrik Salomonsson]
+    - Fixed a bug in the Ray SOP whereby the distance attribute was created
+      with the wrong data type.
+      [Contributed by Nick Avramoussis]
+
 Version 3.1.0 - October 1, 2015
 
     Highlights:
@@ -87,7 +254,7 @@ Version 3.1.0 - October 1, 2015
       rather than the square of the magnitude.
     - Fixed parameter type inconsistencies in math/Ray.h and
       tools/RayIntersector.h.
-      [Contributed by KÃ©vin Dietrich]
+      [Contributed by Kévin Dietrich]
     - Fixed incorrect handling of signed values in tools::clip()
       (and the Clip SOP).
 

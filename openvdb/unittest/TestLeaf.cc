@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -31,6 +31,7 @@
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/Exceptions.h>
 #include <openvdb/tree/LeafNode.h>
+#include <openvdb/math/Math.h>// for Random01
 
 class TestLeaf: public CppUnit::TestCase
 {
@@ -364,12 +365,13 @@ TestLeaf::testIsConstant()
         leaf.setValueOn(0, val + 1.01*tol);
         CPPUNIT_ASSERT(!leaf.isConstant(v, stat, tol));
     }
-    {// check newer version (v3.1 and never) with float
-        // Acceptable range: (max+min)/2 +/- tolerance
+    {// check newer version (v3.2 and newer) with float
+        // Acceptable range: max - min <= tolerance
         const float val = 1.0, tol = 0.01f;
         tree::LeafNode<float, 3> leaf(origin, val, true);
         float vmin = 0.0f, vmax = 0.0f;
         bool stat = false;
+        
         CPPUNIT_ASSERT(leaf.isConstant(vmin, vmax, stat, tol));
         CPPUNIT_ASSERT(stat);
         CPPUNIT_ASSERT_EQUAL(val, vmin);
@@ -381,21 +383,16 @@ TestLeaf::testIsConstant()
         leaf.setValueOn(0);
         CPPUNIT_ASSERT(leaf.isConstant(vmin, vmax, stat, tol));
 
-        leaf.setValueOn(0, val + 0.99f*tol);
+        leaf.setValueOn(0, val + tol);
         CPPUNIT_ASSERT(leaf.isConstant(vmin, vmax, stat, tol));
         CPPUNIT_ASSERT_EQUAL(val, vmin);
-        CPPUNIT_ASSERT_EQUAL(val + 0.99f*tol, vmax);
+        CPPUNIT_ASSERT_EQUAL(val + tol, vmax);
         
-        leaf.setValueOn(0, val + 1.99f*tol);
-        CPPUNIT_ASSERT(leaf.isConstant(vmin, vmax, stat, tol));
-        CPPUNIT_ASSERT_EQUAL(val, vmin);
-        CPPUNIT_ASSERT_EQUAL(val + 1.99f*tol, vmax);
-
-        leaf.setValueOn(0, val + 2.01f*tol);
+        leaf.setValueOn(0, val + 1.01f*tol);
         CPPUNIT_ASSERT(!leaf.isConstant(vmin, vmax, stat, tol));
     }
-    {// check newer version (v3.1 and never) with double
-        // Acceptable range: (max+min)/2 +/- tolerance
+    {// check newer version (v3.2 and newer) with double
+        // Acceptable range: (max- min) <= tolerance
         const double val = 1.0, tol = 0.000001;
         tree::LeafNode<double, 3> leaf(origin, val, true);
         double vmin = 0.0, vmax = 0.0;
@@ -411,21 +408,35 @@ TestLeaf::testIsConstant()
         leaf.setValueOn(0);
         CPPUNIT_ASSERT(leaf.isConstant(vmin, vmax, stat, tol));
 
-        leaf.setValueOn(0, val + 0.99*tol);
+        leaf.setValueOn(0, val + tol);
         CPPUNIT_ASSERT(leaf.isConstant(vmin, vmax, stat, tol));
         CPPUNIT_ASSERT_EQUAL(val, vmin);
-        CPPUNIT_ASSERT_EQUAL(val + 0.99*tol, vmax);
+        CPPUNIT_ASSERT_EQUAL(val + tol, vmax);
         
-        leaf.setValueOn(0, val + 1.99*tol);
-        CPPUNIT_ASSERT(leaf.isConstant(vmin, vmax, stat, tol));
-        CPPUNIT_ASSERT_EQUAL(val, vmin);
-        CPPUNIT_ASSERT_EQUAL(val + 1.99*tol, vmax);
-
-        leaf.setValueOn(0, val + 2.01*tol);
+        leaf.setValueOn(0, val + 1.01*tol);
         CPPUNIT_ASSERT(!leaf.isConstant(vmin, vmax, stat, tol));
+    }
+    {// check newer version (v3.2 and newer) with float and random values
+        typedef tree::LeafNode<float,3> LeafNodeT;
+        const float val = 1.0, tol = 1.0f;
+        LeafNodeT leaf(origin, val, true);
+        float min = 2.0f, max = -min;
+        math::Random01 r(145);// random values in the range [0,1]
+        for (Index i=0; i<LeafNodeT::NUM_VALUES; ++i) {
+            const float v = float(r());
+            if (v < min) min = v;
+            if (v > max) max = v;
+            leaf.setValueOnly(i, v);
+        }
+        float vmin = 0.0f, vmax = 0.0f;
+        bool stat = false;
+        CPPUNIT_ASSERT(leaf.isConstant(vmin, vmax, stat, tol));
+        CPPUNIT_ASSERT(stat);
+        CPPUNIT_ASSERT(math::isApproxEqual(min, vmin));
+        CPPUNIT_ASSERT(math::isApproxEqual(max, vmax));
     }
 }
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -45,7 +45,6 @@ typedef std::vector<std::string> StringVec;
 
 const char* INDENT = "   ";
 const char* gProgName = "";
-
 
 void
 usage(int exitStatus = EXIT_FAILURE)
@@ -99,10 +98,11 @@ bytesAsString(openvdb::Index64 n)
 
 
 std::string
-coordAsString(const openvdb::Coord ijk, const std::string& sep)
+coordAsString(const openvdb::Coord ijk, const std::string& sep,
+              const std::string& start, const std::string& stop)
 {
     std::ostringstream ostr;
-    ostr << ijk[0] << sep << ijk[1] << sep << ijk[2];
+    ostr << start << ijk[0] << sep << ijk[1] << sep << ijk[2] << stop;
     return ostr.str();
 }
 
@@ -222,8 +222,9 @@ printShortListing(const StringVec& filenames, bool metadata)
             // Print the grid's bounding box and dimensions.
             openvdb::CoordBBox bbox = grid->evalActiveVoxelBoundingBox();
             std::string
-                boxStr = coordAsString(bbox.min()," ") + "  " + coordAsString(bbox.max()," "),
-                dimStr = coordAsString(bbox.extents(), "x");
+                boxStr = coordAsString(bbox.min(), ",", "(", ")") + "->" +
+                         coordAsString(bbox.max(), ",", "(", ")"),
+                dimStr = coordAsString(bbox.extents(), "x", "", "");
             boxStr += std::string(
                 std::max(1, int(40 - boxStr.size() - dimStr.size())), ' ') + dimStr;
             std::cout << " " << std::left << std::setw(40) << boxStr;
@@ -344,6 +345,6 @@ main(int argc, char *argv[])
     return exitStatus;
 }
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

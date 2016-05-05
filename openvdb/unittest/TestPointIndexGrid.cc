@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -29,63 +29,25 @@
 ///////////////////////////////////////////////////////////////////////////
 
 #include <cppunit/extensions/HelperMacros.h>
-#include <openvdb/math/Math.h> // for math::Random01
 #include <openvdb/tools/PointIndexGrid.h>
 
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include "util.h" // for genPoints
 
 
-class TestPointIndexGrid: public CppUnit::TestCase
+struct TestPointIndexGrid: public CppUnit::TestCase
 {
-public:
     CPPUNIT_TEST_SUITE(TestPointIndexGrid);
     CPPUNIT_TEST(testPointIndexGrid);
     CPPUNIT_TEST(testPointIndexFilter);
+    CPPUNIT_TEST(testWorldSpaceSearchAndUpdate);
     CPPUNIT_TEST_SUITE_END();
 
     void testPointIndexGrid();
     void testPointIndexFilter();
-
-private:
-    // Generate random points by uniformly distributing points
-    // on a unit-sphere.
-    void genPoints(const int numPoints, std::vector<openvdb::Vec3R>& points) const
-    {
-        // init
-        openvdb::math::Random01 randNumber(0);
-        const int n = int(std::sqrt(double(numPoints)));
-        const double xScale = (2.0 * M_PI) / double(n);
-        const double yScale = M_PI / double(n);
-
-        double x, y, theta, phi;
-        openvdb::Vec3R pos;
-
-        points.reserve(n*n);
-
-        // loop over a [0 to n) x [0 to n) grid.
-        for (int a = 0; a < n; ++a) {
-            for (int b = 0; b < n; ++b) {
-
-                // jitter, move to random pos. inside the current cell
-                x = double(a) + randNumber();
-                y = double(b) + randNumber();
-
-                // remap to a lat/long map
-                theta = y * yScale; // [0 to PI]
-                phi   = x * xScale; // [0 to 2PI]
-
-                // convert to cartesian coordinates on a unit sphere.
-                // spherical coordinate triplet (r=1, theta, phi)
-                pos[0] = std::sin(theta)*std::cos(phi);
-                pos[1] = std::sin(theta)*std::sin(phi);
-                pos[2] = std::cos(theta);
-
-                points.push_back(pos);
-            }
-        }
-    }
+    void testWorldSpaceSearchAndUpdate();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestPointIndexGrid);
@@ -97,9 +59,9 @@ namespace {
 class PointList
 {
 public:
-    typedef openvdb::Vec3R value_type;
+    typedef openvdb::Vec3R  PosType;
 
-    PointList(const std::vector<openvdb::Vec3R>& points)
+    PointList(const std::vector<PosType>& points)
         : mPoints(&points)
     {
     }
@@ -108,12 +70,12 @@ public:
         return mPoints->size();
     }
 
-    void getPos(size_t n, openvdb::Vec3R& xyz) const {
+    void getPos(size_t n, PosType& xyz) const {
         xyz = (*mPoints)[n];
     }
 
 protected:
-    std::vector<openvdb::Vec3R> const * const mPoints;
+    std::vector<PosType> const * const mPoints;
 }; // PointList
 
 
@@ -170,7 +132,7 @@ TestPointIndexGrid::testPointIndexGrid()
     // generate points
 
     std::vector<openvdb::Vec3R> points;
-    genPoints(40000, points);
+    unittest_util::genPoints(40000, points);
 
     PointList pointList(points);
 
@@ -301,7 +263,7 @@ TestPointIndexGrid::testPointIndexFilter()
             openvdb::math::Transform::createLinearTransform(voxelSize);
 
     std::vector<openvdb::Vec3d> points;
-    genPoints(pointCount, points);
+    unittest_util::genPoints(pointCount, points);
 
     PointList pointList(points);
 
@@ -333,6 +295,53 @@ TestPointIndexGrid::testPointIndexFilter()
 }
 
 
-// Copyright (c) 2012-2015 DreamWorks Animation LLC
+void
+TestPointIndexGrid::testWorldSpaceSearchAndUpdate()
+{
+    // Create random particles in a cube.
+    openvdb::math::Rand01<> rnd(0);
+
+    const size_t N = 1000000;
+    std::vector<openvdb::Vec3d> pos;
+    pos.reserve(N);
+
+    // Create a box to query points.
+    openvdb::BBoxd wsBBox(openvdb::Vec3d(0.25), openvdb::Vec3d(0.75));
+
+    std::set<size_t> indexListA;
+
+    for (size_t i = 0; i < N; ++i) {
+        openvdb::Vec3d p(rnd(), rnd(), rnd());
+        pos.push_back(p);
+
+        if (wsBBox.isInside(p)) {
+            indexListA.insert(i);
+        }
+    }
+
+    // Create a point index grid
+    const double dx = 0.025;
+    openvdb::math::Transform::Ptr transform = openvdb::math::Transform::createLinearTransform(dx);
+
+    PointList pointArray(pos);
+    openvdb::tools::PointIndexGrid::Ptr pointIndexGrid
+        = openvdb::tools::createPointIndexGrid<openvdb::tools::PointIndexGrid, PointList>(pointArray, *transform);
+
+    // Search for points within the box.
+    openvdb::tools::PointIndexGrid::ConstAccessor acc = pointIndexGrid->getConstAccessor();
+
+    openvdb::tools::PointIndexIterator<openvdb::tools::PointIndexTree> pointIndexIter;
+    pointIndexIter.worldSpaceSearchAndUpdate<PointList>(wsBBox, acc, pointArray, pointIndexGrid->transform());
+
+    std::set<size_t> indexListB;
+    for (; pointIndexIter; ++pointIndexIter) {
+        indexListB.insert(*pointIndexIter);
+    }
+
+    CPPUNIT_ASSERT_EQUAL(indexListA.size(), indexListB.size());
+}
+
+
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
