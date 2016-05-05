@@ -80,6 +80,8 @@ static RE_ShaderHandle thePointShader("particle/GL32/point.prog");
 static RE_ShaderHandle thePointShader("basic/GL32/const_color.prog");
 #endif
 
+static RE_ShaderHandle theLineShader("basic/GL32/wire_color.prog");
+
 /// @note The render hook guard should not be required..
 
 // Declare this at file scope to ensure thread-safe initialization.
@@ -159,6 +161,8 @@ public:
 #endif
 
 protected:
+    void computeCentroid(const openvdb::tools::PointDataGrid& grid);
+
     void updatePosBuffer(  RE_Render* r,
                         const openvdb::tools::PointDataGrid& grid,
                         const RE_CacheVersion& version);
@@ -187,6 +191,7 @@ private:
     RE_Geometry *myGeo;
     RE_Geometry *myWire;
     bool mDefaultPointColor;
+    openvdb::Vec3f mCentroid;
 };
 
 
@@ -248,10 +253,11 @@ GR_PrimVDBPoints::GR_PrimVDBPoints(
     const char *cache_name,
     const GEO_Primitive*)
     : GR_Primitive(info,cache_name, GA_PrimCompat::TypeMask(0))
+    , myGeo(NULL)
+    , myWire(NULL)
+    , mDefaultPointColor(true)
+    , mCentroid(openvdb::Vec3f(0, 0, 0))
 {
-    myGeo = NULL;
-    myWire = NULL;
-    mDefaultPointColor = true;
 }
 
 
@@ -293,11 +299,13 @@ struct FillGPUBuffersPosition {
                             const LeafOffsets& leafOffsets,
                             const PointDataTreeType& pointDataTree,
                             const openvdb::math::Transform& transform,
+                            const openvdb::Vec3f& positionOffset,
                             const unsigned attributeIndex)
         : mBuffer(buffer)
         , mPointDataTree(pointDataTree)
         , mLeafOffsets(leafOffsets)
         , mTransform(transform)
+        , mPositionOffset(positionOffset)
         , mAttributeIndex(attributeIndex) { }
 
     void operator()(const tbb::blocked_range<size_t>& range) const
@@ -331,7 +339,7 @@ struct FillGPUBuffersPosition {
                 {
                     if (!uniform)   positionVoxelSpace = handle->get(openvdb::Index64(*iter));
                     const openvdb::Vec3f positionIndexSpace = positionVoxelSpace + gridIndexSpace;
-                    const openvdb::Vec3f positionWorldSpace = mTransform.indexToWorld(positionIndexSpace);
+                    const openvdb::Vec3f positionWorldSpace = mTransform.indexToWorld(positionIndexSpace) - mPositionOffset;
 
                     mBuffer[leafOffset + offset] = UT_Vector3H(
                         positionWorldSpace.x(), positionWorldSpace.y(), positionWorldSpace.z());
@@ -348,6 +356,7 @@ struct FillGPUBuffersPosition {
     const LeafOffsets&                  mLeafOffsets;
     const PointDataTreeType&            mPointDataTree;
     const openvdb::math::Transform&     mTransform;
+    const openvdb::Vec3f                mPositionOffset;
     const unsigned                      mAttributeIndex;
 }; // class FillGPUBuffersPosition
 
@@ -496,10 +505,12 @@ struct FillGPUBuffersLeafBoxes
 {
     FillGPUBuffersLeafBoxes(UT_Vector3H* buffer,
                          const std::vector<openvdb::Coord>& coords,
-                         const openvdb::math::Transform& transform)
+                         const openvdb::math::Transform& transform,
+                         const openvdb::Vec3f& positionOffset)
         : mBuffer(buffer)
         , mCoords(coords)
-        , mTransform(transform) { }
+        , mTransform(transform)
+        , mPositionOffset(positionOffset) { }
 
     void operator()(const tbb::blocked_range<size_t>& range) const
     {
@@ -513,21 +524,21 @@ struct FillGPUBuffersLeafBoxes
 
             corners.clear();
 
-            const openvdb::Vec3f pos000 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 0.0, 0.0));
+            const openvdb::Vec3f pos000 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 0.0, 0.0)) - mPositionOffset;
             corners.push_back(UT_Vector3H(pos000.x(), pos000.y(), pos000.z()));
-            const openvdb::Vec3f pos001 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 0.0, 8.0));
+            const openvdb::Vec3f pos001 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 0.0, 8.0)) - mPositionOffset;
             corners.push_back(UT_Vector3H(pos001.x(), pos001.y(), pos001.z()));
-            const openvdb::Vec3f pos010 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 8.0, 0.0));
+            const openvdb::Vec3f pos010 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 8.0, 0.0)) - mPositionOffset;
             corners.push_back(UT_Vector3H(pos010.x(), pos010.y(), pos010.z()));
-            const openvdb::Vec3f pos011 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 8.0, 8.0));
+            const openvdb::Vec3f pos011 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 8.0, 8.0)) - mPositionOffset;
             corners.push_back(UT_Vector3H(pos011.x(), pos011.y(), pos011.z()));
-            const openvdb::Vec3f pos100 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 0.0, 0.0));
+            const openvdb::Vec3f pos100 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 0.0, 0.0)) - mPositionOffset;
             corners.push_back(UT_Vector3H(pos100.x(), pos100.y(), pos100.z()));
-            const openvdb::Vec3f pos101 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 0.0, 8.0));
+            const openvdb::Vec3f pos101 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 0.0, 8.0)) - mPositionOffset;
             corners.push_back(UT_Vector3H(pos101.x(), pos101.y(), pos101.z()));
-            const openvdb::Vec3f pos110 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 8.0, 0.0));
+            const openvdb::Vec3f pos110 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 8.0, 0.0)) - mPositionOffset;
             corners.push_back(UT_Vector3H(pos110.x(), pos110.y(), pos110.z()));
-            const openvdb::Vec3f pos111 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 8.0, 8.0));
+            const openvdb::Vec3f pos111 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 8.0, 8.0)) - mPositionOffset;
             corners.push_back(UT_Vector3H(pos111.x(), pos111.y(), pos111.z()));
 
             openvdb::Index64 offset = n*8*3;
@@ -560,9 +571,26 @@ struct FillGPUBuffersLeafBoxes
     UT_Vector3H*                        mBuffer;
     const std::vector<openvdb::Coord>&  mCoords;
     const openvdb::math::Transform&     mTransform;
+    const openvdb::Vec3f                mPositionOffset;
 }; // class FillGPUBuffersLeafBoxes
 
 } // namespace gr_primitive_internal
+
+void
+GR_PrimVDBPoints::computeCentroid(const openvdb::tools::PointDataGrid& grid)
+{
+    // compute the leaf bounding box in index space
+
+    openvdb::CoordBBox coordBBox;
+    if (!grid.tree().evalLeafBoundingBox(coordBBox)) {
+        mCentroid = openvdb::Vec3f(0, 0, 0);
+        return;
+    }
+
+    // get the centroid and convert to world space
+
+    mCentroid = grid.transform().indexToWorld(coordBBox.getCenter());
+}
 
 void
 GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
@@ -655,6 +683,7 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
                                                   offsets,
                                                   grid.tree(),
                                                   grid.transform(),
+                                                  mCentroid,
                                                   positionIndex);
 
         const tbb::blocked_range<size_t> range(0, offsets.size());
@@ -754,7 +783,7 @@ GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
             coords.push_back(leaf.origin());
         }
 
-        FillGPUBuffersLeafBoxes fill(data, coords, grid.transform());
+        FillGPUBuffersLeafBoxes fill(data, coords, grid.transform(), mCentroid);
         const tbb::blocked_range<size_t> range(0, coords.size());
         tbb::parallel_for(range, fill);
 
@@ -801,6 +830,7 @@ GR_PrimVDBPoints::update(RE_Render *r,
     typedef openvdb::tools::PointDataGrid PointDataGrid;
     const PointDataGrid& pointDataGrid = static_cast<const PointDataGrid&>(*grid);
 
+    computeCentroid(pointDataGrid);
     updatePosBuffer(r, pointDataGrid, p.geo_version);
     updateWireBuffer(r, pointDataGrid, p.geo_version);
 
@@ -1045,6 +1075,56 @@ GR_PrimVDBPoints::removeBuffer(const std::string& name)
     myGeo->clearAttribute(name.c_str());
 }
 
+namespace {
+
+void patchVertexShader(RE_Render* r, RE_ShaderHandle& shader)
+{
+    // check if the point shader has already been patched
+
+    r->pushShader();
+    r->bindShader(shader);
+
+    RE_ShaderStage* patchedVertexShader = shader->getShader("pointOffset", RE_SHADER_VERTEX);
+
+    if (patchedVertexShader) {
+        r->popShader();
+    }
+    else {
+        // retrieve the vertex shader source
+
+        UT_String vertexSource;
+        shader->getShaderSource(r, vertexSource, RE_SHADER_VERTEX);
+
+        r->popShader();
+
+        // patch the shader to add a uniform offset to the position
+
+        vertexSource.substitute("void main()", "uniform vec3 offset;\n\nvoid main()", /*all=*/false);
+        vertexSource.substitute("vec4(P, 1.0)", "vec4(P + offset, 1.0)", /*all=*/false);
+
+        // move the version up to the top of the file
+
+        vertexSource.substitute("#version ", "// #version");
+        vertexSource.insert(0, "#version 150\n");
+
+        // remove the existing shader and add the patched one
+
+        shader->clearShaders(r, RE_SHADER_VERTEX);
+
+        UT_String message;
+
+        const bool success = shader->addShader(r, RE_SHADER_VERTEX, vertexSource, "pointOffset", 150, &message);
+
+        if (!success) {
+            std::cerr << message.toStdString() << std::endl;
+        }
+
+        assert(success);
+    }
+}
+
+} // namespace
+
 void
 GR_PrimVDBPoints::render(RE_Render *r,
              GR_RenderMode,
@@ -1058,14 +1138,26 @@ GR_PrimVDBPoints::render(RE_Render *r,
 
     if (!gl3)   return;
 
-    r->pushShader();
-    r->bindShader(thePointShader);
-
     const GR_CommonDispOption& commonOpts = dopts->common();
 
     // draw points
 
     if (myGeo) {
+
+        // patch the shader at run-time to add an offset (does nothing if already patched)
+
+        patchVertexShader(r, thePointShader);
+
+        // bind the shader
+
+        r->pushShader();
+        r->bindShader(thePointShader);
+
+        // bind the position offset
+
+        UT_Vector3F positionOffset(mCentroid.x(), mCentroid.y(), mCentroid.z());
+        thePointShader->bindVector(r, "offset", positionOffset);
+
         // for default point colors, use white if dark viewport background, black otherwise
 
         if (mDefaultPointColor) {
@@ -1078,20 +1170,34 @@ GR_PrimVDBPoints::render(RE_Render *r,
         r->pushPointSize(commonOpts.pointSize());
         myGeo->draw(r, RE_GEO_WIRE_IDX);
         r->popPointSize();
+        r->popShader();
     }
 
     // draw leaf bboxes
 
     if (myWire) {
+        // patch the shader at run-time to add an offset (does nothing if already patched)
+
+        patchVertexShader(r, theLineShader);
+
+        // bind the shader
+
+        r->pushShader();
+        r->bindShader(theLineShader);
+
+        // bind the position offset
+
+        UT_Vector3F positionOffset(mCentroid.x(), mCentroid.y(), mCentroid.z());
+        theLineShader->bindVector(r, "offset", positionOffset);
+
         fpreal32 constcol[3] = { 0.6, 0.6, 0.6 };
         myWire->createConstAttribute(r, "Cd", RE_GPU_FLOAT32, 3, constcol);
 
         r->pushLineWidth(commonOpts.wireWidth());
         myWire->draw(r, RE_GEO_WIRE_IDX);
         r->popLineWidth();
+        r->popShader();
     }
-
-    r->popShader();
 }
 
 
