@@ -165,6 +165,9 @@ Bug fixes:
 - Fixed parameter type inconsistencies in @link math/Stencils.h@endlink and
   @link tools/RayIntersector.h@endlink.
   <I>[Contributed by K&eacute;vin&nbsp;Dietrich]</I>
+- Fixed a bug in the @vdblink::tools::VolumeToMesh VolumeToMesh@endlink tool that
+  produced artifacts for adaptive surface extraction on clipped level sets.
+  <I>[Reported by Jeff&nbsp;Lait]</I>
 
 @par
 API changes:

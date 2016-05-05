@@ -27,32 +27,38 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
+//
+/// @file   VolumeToMesh.h
+///
+/// @brief  Extract polygonal surfaces from scalar volumes.
+///
+/// @author Mihai Alden
+
 
 #ifndef OPENVDB_TOOLS_VOLUME_TO_MESH_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_VOLUME_TO_MESH_HAS_BEEN_INCLUDED
 
 #include <openvdb/Platform.h> // for OPENVDB_HAS_CXX11
-#include <openvdb/tree/ValueAccessor.h>
-#include <openvdb/util/Util.h> // for COORD_OFFSETS
 #include <openvdb/math/Operators.h> // for ISGradient
 #include <openvdb/tools/Morphology.h> // for dilateVoxels()
 #include <openvdb/tree/LeafManager.h>
+#include <openvdb/tree/ValueAccessor.h>
+#include <openvdb/util/Util.h> // for COORD_OFFSETS
 #include "Prune.h" // for pruneInactive
 
 #include <boost/scoped_array.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/type_traits/is_scalar.hpp>
 #include <boost/utility/enable_if.hpp>
+
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 
-#include <vector>
+#include <map>
 #include <memory> // for auto_ptr/unique_ptr
-
-
-//////////
-
+#include <set>
+#include <vector>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -1126,41 +1132,30 @@ public:
     typedef typename IntTreeT::LeafNodeType IntLeafT;
 
     CountRegions(IntTreeT& idxTree, std::vector<size_t>& regions)
-    : mIdxAcc(idxTree)
-    , mRegions(regions)
+        : mIdxAcc(idxTree)
+        , mRegions(regions)
     {
     }
 
     template <typename LeafNodeType>
     void operator()(LeafNodeType &leaf, size_t leafIndex) const
     {
+        const IntLeafT* idxLeaf = mIdxAcc.probeConstLeaf(leaf.origin());
+        if (!idxLeaf) return;
 
-        size_t regions = 0;
+        std::set<int> uniqueRegions;
+        size_t points = 0;
 
-        IntLeafT tmpLeaf(*mIdxAcc.probeConstLeaf(leaf.origin()));
-
-        typename IntLeafT::ValueOnIter iter = tmpLeaf.beginValueOn();
-        for (; iter; ++iter) {
-            if(iter.getValue() == 0) {
-                iter.setValueOff();
-                regions += size_t(sEdgeGroupTable[(SIGNS & leaf.getValue(iter.pos()))][0]);
+        for (typename IntLeafT::ValueOnCIter it = idxLeaf->cbeginValueOn(); it; ++it) {
+            const int id = it.getValue();
+            if (id == 0) {
+                points += size_t(sEdgeGroupTable[(SIGNS & leaf.getValue(it.pos()))][0]);
+            } else if (id != int(util::INVALID_IDX)) {
+                uniqueRegions.insert(id);
             }
         }
 
-        int onVoxelCount = int(tmpLeaf.onVoxelCount());
-        while (onVoxelCount > 0) {
-            ++regions;
-            iter = tmpLeaf.beginValueOn();
-            int regionId = iter.getValue();
-            for (; iter; ++iter) {
-                if (iter.getValue() == regionId) {
-                    iter.setValueOff();
-                    --onVoxelCount;
-                }
-            }
-        }
-
-        mRegions[leafIndex] = regions;
+        mRegions[leafIndex] = points + uniqueRegions.size();
     }
 
 private:
@@ -1744,14 +1739,13 @@ template <typename TreeT, typename LeafManagerT>
 void
 GenPoints<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size_t>& range) const
 {
-    typename IntTreeT::LeafNodeType::ValueOnIter iter;
-    unsigned char signs, refSigns;
-    Index offset;
+    typedef std::vector<Index>          IndexArray;
+    typedef std::map<int, IndexArray >  IndexArrayMap;
+
     Coord ijk, coord;
     std::vector<Vec3d> points(4);
     std::vector<bool> weightedPointMask(4);
     std::vector<double> values(8), refValues(8);
-
 
     IntAccessorT idxAcc(mIdxTree);
 
@@ -1765,14 +1759,12 @@ GenPoints<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size_t>& ran
     boost::scoped_ptr<AccessorT> refDistAcc;
     if (mRefDistTreePt) refDistAcc.reset(new AccessorT(*mRefDistTreePt));
 
-
     for (size_t n = range.begin(); n != range.end(); ++n) {
 
         coord = mSignLeafs.leaf(n).origin();
 
         const typename TreeT::LeafNodeType *leafPt = mDistAcc.probeConstLeaf(coord);
         typename IntTreeT::LeafNodeType *idxLeafPt = idxAcc.probeLeaf(coord);
-
 
         // reference data leafs
         const typename Int16TreeT::LeafNodeType *refSignLeafPt = NULL;
@@ -1784,27 +1776,28 @@ GenPoints<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size_t>& ran
         const typename TreeT::LeafNodeType *refDistLeafPt = NULL;
         if (refDistAcc) refDistLeafPt = refDistAcc->probeConstLeaf(coord);
 
-
-        // generate cell points
-        size_t ptnIdx = mIndices[n];
         coord.offset(TreeT::LeafNodeType::DIM - 1);
 
+        size_t ptnIdx = mIndices[n];
+        IndexArrayMap regions;
 
+        for (typename IntTreeT::LeafNodeType::ValueOnIter it = idxLeafPt->beginValueOn(); it; ++it) {
 
-        for (iter = idxLeafPt->beginValueOn(); iter; ++iter) {
+            const Index offset = it.pos();
 
-            if(iter.getValue() != 0) continue;
+            const int id = int(it.getValue());
+            if (id != 0) {
+                if (id != int(util::INVALID_IDX)) {
+                    regions[id].push_back(offset);
+                }
+                continue;
+            }
 
-            iter.setValue(static_cast<typename IntTreeT::ValueType>(ptnIdx));
-            iter.setValueOff();
-            offset = iter.pos();
-            ijk = iter.getCoord();
-
-            const bool inclusiveCell = ijk[0] < coord[0] && ijk[1] < coord[1] && ijk[2] < coord[2];
+            idxLeafPt->setValueOnly(offset, static_cast<typename IntTreeT::ValueType>(ptnIdx));
 
             const Int16& flags = mSignLeafs.leaf(n).getValue(offset);
-            signs    = uint8_t(SIGNS & flags);
-            refSigns = 0;
+            uint8_t signs = uint8_t(SIGNS & flags);
+            uint8_t refSigns = 0;
 
             if ((flags & SEAM) && refSignLeafPt && refIdxLeafPt) {
                 if (refSignLeafPt->isValueOn(offset)) {
@@ -1812,10 +1805,11 @@ GenPoints<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size_t>& ran
                 }
             }
 
+            ijk = it.getCoord();
+            const bool inclusiveCell = ijk[0] < coord[0] && ijk[1] < coord[1] && ijk[2] < coord[2];
 
             if (inclusiveCell) collectCornerValues(*leafPt, offset, values);
             else collectCornerValues(mDistAcc, ijk, values);
-
 
             points.clear();
             weightedPointMask.clear();
@@ -1831,14 +1825,12 @@ GenPoints<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size_t>& ran
                     mIsovalue, refIdxLeafPt->getValue(offset), *mSeamPointsPt);
             }
 
-
             for (size_t i = 0, I = points.size(); i < I; ++i) {
 
                 // offset by cell-origin
                 points[i][0] += double(ijk[0]);
                 points[i][1] += double(ijk[1]);
                 points[i][2] += double(ijk[2]);
-
 
                 points[i] = mTransform.indexToWorld(points[i]);
 
@@ -1855,25 +1847,20 @@ GenPoints<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size_t>& ran
         }
 
         // generate collapsed region points
-        int onVoxelCount = int(idxLeafPt->onVoxelCount());
-        while (onVoxelCount > 0) {
+        for (IndexArrayMap::iterator it = regions.begin(); it != regions.end(); ++it) {
 
-            iter = idxLeafPt->beginValueOn();
-            int regionId = iter.getValue(), count = 0;
+            Vec3d avg(0.0), point(0.0);
+            int count = 0;
 
-            Vec3d avg(0.0), point;
+            const IndexArray& voxels = it->second;
+            for (size_t i = 0, I = voxels.size(); i < I; ++i) {
 
-            for (; iter; ++iter) {
-                if (iter.getValue() != regionId) continue;
+                const Index offset = voxels[i];
+                ijk = idxLeafPt->origin() + IntTreeT::LeafNodeType::offsetToLocalCoord(offset);
 
-                iter.setValue(static_cast<typename IntTreeT::ValueType>(ptnIdx));
-                iter.setValueOff();
-                --onVoxelCount;
+                idxLeafPt->setValueOnly(offset, static_cast<typename IntTreeT::ValueType>(ptnIdx));
 
-                ijk = iter.getCoord();
-                offset = iter.pos();
-
-                signs = uint8_t(SIGNS & mSignLeafs.leaf(n).getValue(offset));
+                unsigned char signs = uint8_t(SIGNS & mSignLeafs.leaf(n).getValue(offset));
 
                 if (ijk[0] < coord[0] && ijk[1] < coord[1] && ijk[2] < coord[2]) {
                     collectCornerValues(*leafPt, offset, values);
@@ -1890,7 +1877,6 @@ GenPoints<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size_t>& ran
 
                 ++count;
             }
-
 
             if (count > 1) {
                 double w = 1.0 / double(count);
@@ -2223,9 +2209,51 @@ MergeVoxelRegions<TreeT, LeafManagerT>::operator()(const tbb::blocked_range<size
 
         // Mask off ambiguous voxels
         for (iter = mSignLeafs.leaf(n).cbeginValueOn(); iter; ++iter) {
-            unsigned char signs = static_cast<unsigned char>(SIGNS & int(iter.getValue()));
+
+            const Int16 flags = iter.getValue();
+            const unsigned char signs = static_cast<unsigned char>(SIGNS & int(flags));
             if (!sAdaptable[signs] || sEdgeGroupTable[signs][0] > 1) {
                 mask.setActiveState(iter.getCoord() & ~1u, true);
+            } else if (flags & EDGES) {
+
+                bool maskRegion = false;
+
+                ijk = iter.getCoord();
+                if (!idxAcc.isValueOn(ijk)) maskRegion = true;
+
+                if (!maskRegion && flags & XEDGE) {
+                    ijk[1] -= 1;
+                    if (!maskRegion && !idxAcc.isValueOn(ijk)) maskRegion = true;
+                    ijk[2] -= 1;
+                    if (!maskRegion && !idxAcc.isValueOn(ijk)) maskRegion = true;
+                    ijk[1] += 1;
+                    if (!maskRegion && !idxAcc.isValueOn(ijk)) maskRegion = true;
+                    ijk[2] += 1;
+                }
+
+                if (!maskRegion && flags & YEDGE) {
+                    ijk[2] -= 1;
+                    if (!maskRegion && !idxAcc.isValueOn(ijk)) maskRegion = true;
+                    ijk[0] -= 1;
+                    if (!maskRegion && !idxAcc.isValueOn(ijk)) maskRegion = true;
+                    ijk[2] += 1;
+                    if (!maskRegion && !idxAcc.isValueOn(ijk)) maskRegion = true;
+                    ijk[0] += 1;
+                }
+
+                if (!maskRegion && flags & ZEDGE) {
+                    ijk[1] -= 1;
+                    if (!maskRegion && !idxAcc.isValueOn(ijk)) maskRegion = true;
+                    ijk[0] -= 1;
+                    if (!maskRegion && !idxAcc.isValueOn(ijk)) maskRegion = true;
+                    ijk[1] += 1;
+                    if (!maskRegion && !idxAcc.isValueOn(ijk)) maskRegion = true;
+                    ijk[0] += 1;
+                }
+
+                if (maskRegion) {
+                    mask.setActiveState(iter.getCoord() & ~1u, true);
+                }
             }
         }
 
@@ -2291,7 +2319,7 @@ struct UniformPrimBuilder
         mIdx = 0;
     }
 
-    void addPrim(const Vec4I& verts, bool reverse, char flags = 0)
+    void addPrim(const Vec4i& verts, bool reverse, char flags = 0)
     {
         if (!reverse) {
             mPolygonPool->quad(mIdx) = verts;
@@ -2332,7 +2360,7 @@ struct AdaptivePrimBuilder
         mTriangleIdx = 0;
     }
 
-    void addPrim(const Vec4I& verts, bool reverse, char flags = 0)
+    void addPrim(const Vec4i& verts, bool reverse, char flags = 0)
     {
         if (verts[0] != verts[1] && verts[0] != verts[2] && verts[0] != verts[3]
             && verts[1] != verts[2] && verts[1] != verts[3] && verts[2] != verts[3]) {
@@ -2378,7 +2406,7 @@ struct AdaptivePrimBuilder
 
 private:
 
-    void addQuad(const Vec4I& verts, bool reverse)
+    void addQuad(const Vec4i& verts, bool reverse)
     {
         if (!reverse) {
             mPolygonPool->quad(mQuadIdx) = verts;
@@ -2415,63 +2443,48 @@ private:
 
 template<typename SignAccT, typename IdxAccT, typename PrimBuilder>
 inline void
-constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord& ijk,
-    const SignAccT& signAcc, const IdxAccT& idxAcc, PrimBuilder& mesher, Index32 pointListSize)
+constructPolygons(Int16 flags, Int16 refFlags, const Vec3i& offsets, const Coord& ijk,
+    const SignAccT& signAcc, const IdxAccT& idxAcc, PrimBuilder& mesher)
 {
-    const Index32 v0 = idxAcc.getValue(ijk);
-    if (v0 == util::INVALID_IDX) return;
+    int v0 = util::INVALID_IDX;
+    const bool isActive = idxAcc.probeValue(ijk, v0);
+    if (isActive == false || v0 == int(util::INVALID_IDX)) return;
 
     char tag[2];
     tag[0] = (flags & SEAM) ? POLYFLAG_FRACTURE_SEAM : 0;
     tag[1] = tag[0] | char(POLYFLAG_EXTERIOR);
 
     const bool isInside = flags & INSIDE;
-
-    Coord coord;
-    openvdb::Vec4I quad;
-    unsigned char cell;
-    Index32 tmpIdx = 0;
+    Coord coord = ijk;
+    openvdb::Vec4i quad(0,0,0,0);
 
     if (flags & XEDGE) {
 
         quad[0] = v0 + offsets[0];
 
         // i, j-1, k
-        coord[0] = ijk[0];
-        coord[1] = ijk[1] - 1;
-        coord[2] = ijk[2];
-
-        quad[1] = idxAcc.getValue(coord);
-        cell = uint8_t(SIGNS & signAcc.getValue(coord));
-        if (sEdgeGroupTable[cell][0] > 1) {
-            tmpIdx = quad[1] + Index32(sEdgeGroupTable[cell][5] - 1);
-            if (tmpIdx < pointListSize) quad[1] = tmpIdx;
-        }
+        coord[1]--;
+        bool activeValues = idxAcc.probeValue(coord, quad[1]);
+        uint8_t cell = uint8_t(SIGNS & signAcc.getValue(coord));
+        quad[1] += sEdgeGroupTable[cell][0] > 1 ? sEdgeGroupTable[cell][5] - 1 : 0;
 
         // i, j-1, k-1
-        coord[2] -= 1;
-
-        quad[2] = idxAcc.getValue(coord);
+        coord[2]--;
+        activeValues = activeValues && idxAcc.probeValue(coord, quad[2]);
         cell = uint8_t(SIGNS & signAcc.getValue(coord));
-        if (sEdgeGroupTable[cell][0] > 1) {
-            tmpIdx = quad[2] + Index32(sEdgeGroupTable[cell][7] - 1);
-            if (tmpIdx < pointListSize) quad[2] = tmpIdx;
-        }
+        quad[2] += sEdgeGroupTable[cell][0] > 1 ? sEdgeGroupTable[cell][7] - 1 : 0;
 
         // i, j, k-1
-        coord[1] = ijk[1];
-
-        quad[3] = idxAcc.getValue(coord);
+        coord[1]++;
+        activeValues = activeValues && idxAcc.probeValue(coord, quad[3]);
         cell = uint8_t(SIGNS & signAcc.getValue(coord));
-        if (sEdgeGroupTable[cell][0] > 1) {
-            tmpIdx = quad[3] + Index32(sEdgeGroupTable[cell][3] - 1);
-            if (tmpIdx < pointListSize) quad[3] = tmpIdx;
-        }
+        quad[3] += sEdgeGroupTable[cell][0] > 1 ? sEdgeGroupTable[cell][3] - 1 : 0;
 
-        if (quad[1] != util::INVALID_IDX &&
-            quad[2] != util::INVALID_IDX && quad[3] != util::INVALID_IDX) {
+        if (activeValues) {
             mesher.addPrim(quad, isInside, tag[bool(refFlags & XEDGE)]);
         }
+
+        coord[2]++; // i, j, k
     }
 
 
@@ -2480,81 +2493,54 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec4i& offsets, const Coord
         quad[0] = v0 + offsets[1];
 
         // i, j, k-1
-        coord[0] = ijk[0];
-        coord[1] = ijk[1];
-        coord[2] = ijk[2] - 1;
-
-        quad[1] = idxAcc.getValue(coord);
-        cell = uint8_t(SIGNS & signAcc.getValue(coord));
-        if (sEdgeGroupTable[cell][0] > 1) {
-            tmpIdx = quad[1] + Index32(sEdgeGroupTable[cell][12] - 1);
-            if (tmpIdx < pointListSize) quad[1] = tmpIdx;
-        }
+        coord[2]--;
+        bool activeValues = idxAcc.probeValue(coord, quad[1]);
+        uint8_t cell = uint8_t(SIGNS & signAcc.getValue(coord));
+        quad[1] += sEdgeGroupTable[cell][0] > 1 ? sEdgeGroupTable[cell][12] - 1 : 0;
 
         // i-1, j, k-1
-        coord[0] -= 1;
-
-        quad[2] = idxAcc.getValue(coord);
+        coord[0]--;
+        activeValues = activeValues && idxAcc.probeValue(coord, quad[2]);
         cell = uint8_t(SIGNS & signAcc.getValue(coord));
-        if (sEdgeGroupTable[cell][0] > 1) {
-            tmpIdx = quad[2] + Index32(sEdgeGroupTable[cell][11] - 1);
-            if (tmpIdx < pointListSize) quad[2] = tmpIdx;
-        }
+        quad[2] += sEdgeGroupTable[cell][0] > 1 ? sEdgeGroupTable[cell][11] - 1 : 0;
 
         // i-1, j, k
-        coord[2] = ijk[2];
-
-        quad[3] = idxAcc.getValue(coord);
+        coord[2]++;
+        activeValues = activeValues && idxAcc.probeValue(coord, quad[3]);
         cell = uint8_t(SIGNS & signAcc.getValue(coord));
-        if (sEdgeGroupTable[cell][0] > 1) {
-            tmpIdx = quad[3] + Index32(sEdgeGroupTable[cell][10] - 1);
-            if (tmpIdx < pointListSize) quad[3] = tmpIdx;
-        }
+        quad[3] += sEdgeGroupTable[cell][0] > 1 ? sEdgeGroupTable[cell][10] - 1 : 0;
 
-        if (quad[1] != util::INVALID_IDX &&
-            quad[2] != util::INVALID_IDX && quad[3] != util::INVALID_IDX) {
+        if (activeValues) {
             mesher.addPrim(quad, isInside, tag[bool(refFlags & YEDGE)]);
         }
+
+        coord[0]++; // i, j, k
     }
+
 
     if (flags & ZEDGE) {
 
         quad[0] = v0 + offsets[2];
 
         // i, j-1, k
-        coord[0] = ijk[0];
-        coord[1] = ijk[1] - 1;
-        coord[2] = ijk[2];
-
-        quad[1] = idxAcc.getValue(coord);
-        cell = uint8_t(SIGNS & signAcc.getValue(coord));
-        if (sEdgeGroupTable[cell][0] > 1) {
-            tmpIdx = quad[1] + Index32(sEdgeGroupTable[cell][8] - 1);
-            if (tmpIdx < pointListSize) quad[1] = tmpIdx;
-        }
+        coord[1]--;
+        bool activeValues = idxAcc.probeValue(coord, quad[1]);
+        uint8_t cell = uint8_t(SIGNS & signAcc.getValue(coord));
+        quad[1] += sEdgeGroupTable[cell][0] > 1 ? sEdgeGroupTable[cell][8] - 1 : 0;
 
         // i-1, j-1, k
-        coord[0] -= 1;
-
-        quad[2] = idxAcc.getValue(coord);
+        coord[0]--;
+        activeValues = activeValues && idxAcc.probeValue(coord, quad[2]);
         cell = uint8_t(SIGNS & signAcc.getValue(coord));
-        if (sEdgeGroupTable[cell][0] > 1) {
-            tmpIdx = quad[2] + Index32(sEdgeGroupTable[cell][6] - 1);
-            if (tmpIdx < pointListSize) quad[2] = tmpIdx;
-        }
+        quad[2] += sEdgeGroupTable[cell][0] > 1 ? sEdgeGroupTable[cell][6] - 1 : 0;
 
         // i-1, j, k
-        coord[1] = ijk[1];
-
-        quad[3] = idxAcc.getValue(coord);
+        coord[1]++;
+        activeValues = activeValues && idxAcc.probeValue(coord, quad[3]);
         cell = uint8_t(SIGNS & signAcc.getValue(coord));
-        if (sEdgeGroupTable[cell][0] > 1) {
-            tmpIdx = quad[3] + Index32(sEdgeGroupTable[cell][2] - 1);
-            if (tmpIdx < pointListSize) quad[3] = tmpIdx;
-        }
+        quad[3] += sEdgeGroupTable[cell][0] > 1 ? sEdgeGroupTable[cell][2] - 1 : 0;
 
-        if (quad[1] != util::INVALID_IDX &&
-            quad[2] != util::INVALID_IDX && quad[3] != util::INVALID_IDX) {
+        if (activeValues) {
             mesher.addPrim(quad, !isInside, tag[bool(refFlags & ZEDGE)]);
         }
     }
@@ -2578,7 +2564,7 @@ public:
 
 
     GenPolygons(const LeafManagerT& signLeafs, const Int16TreeT& signTree,
-        const IntTreeT& idxTree, PolygonPoolList& polygons, Index32 pointListSize);
+        const IntTreeT& idxTree, PolygonPoolList& polygons);
 
     void run(bool threaded = true);
 
@@ -2595,21 +2581,17 @@ private:
     const Int16TreeT& mSignTree;
     const IntTreeT& mIdxTree;
     const PolygonPoolList& mPolygonPoolList;
-    const Index32 mPointListSize;
-
     const Int16TreeT *mRefSignTree;
  };
 
 
 template<typename LeafManagerT, typename PrimBuilder>
 GenPolygons<LeafManagerT, PrimBuilder>::GenPolygons(const LeafManagerT& signLeafs,
-    const Int16TreeT& signTree, const IntTreeT& idxTree, PolygonPoolList& polygons,
-    Index32 pointListSize)
+    const Int16TreeT& signTree, const IntTreeT& idxTree, PolygonPoolList& polygons)
     : mSignLeafs(signLeafs)
     , mSignTree(signTree)
     , mIdxTree(idxTree)
     , mPolygonPoolList(polygons)
-    , mPointListSize(pointListSize)
     , mRefSignTree(NULL)
 {
 }
@@ -2668,7 +2650,7 @@ GenPolygons<LeafManagerT, PrimBuilder>::operator()(
         const typename Int16TreeT::LeafNodeType *refSignLeafPt = NULL;
         if (refSignAcc) refSignLeafPt = refSignAcc->probeConstLeaf(origin);
 
-        Vec4i offsets;
+        Vec3i offsets;
 
         iter = mSignLeafs.leaf(n).cbeginValueOn();
         for (; iter; ++iter) {
@@ -2696,11 +2678,9 @@ GenPolygons<LeafManagerT, PrimBuilder>::operator()(
             }
 
             if (ijk[0] > origin[0] && ijk[1] > origin[1] && ijk[2] > origin[2]) {
-                constructPolygons(flags, refFlags, offsets, ijk,
-                    *signleafPt, *idxLeafPt, mesher, mPointListSize);
+                constructPolygons(flags, refFlags, offsets, ijk, *signleafPt, *idxLeafPt, mesher);
             } else {
-                constructPolygons(flags, refFlags, offsets, ijk,
-                    signAcc, idxAcc, mesher, mPointListSize);
+                constructPolygons(flags, refFlags, offsets, ijk, signAcc, idxAcc, mesher);
             }
         }
 
@@ -4072,7 +4052,6 @@ VolumeToMesh::operator()(const GridT& distGrid)
         seamMask.topologyUnion(*adaptivityMaskPt);
     }
 
-
     // Collect auxiliary data
     {
         DistLeafManagerT distLeafs(distTree);
@@ -4181,7 +4160,6 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
     }
 
-
     // Collect auxiliary data from active tiles
     internal::tileData(distTree, *signTreePt, *idxTreePt, static_cast<double>(isovalue));
 
@@ -4237,7 +4215,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
     }
 
 
-    std::vector<size_t> regions(signLeafs.leafCount(), 0);    
+    std::vector<size_t> regions(signLeafs.leafCount(), 0);
     if (regions.empty()) {
         mPointListSize = 0;
         mPoints.reset();
@@ -4271,7 +4249,6 @@ VolumeToMesh::operator()(const GridT& distGrid)
     } else {
         signLeafs.foreach(internal::CountPoints(regions));
     }
-
 
     {
         mPointListSize = 0;
@@ -4327,9 +4304,9 @@ VolumeToMesh::operator()(const GridT& distGrid)
         }
     }
 
-
     internal::GenPoints<DistTreeT, Int16LeafManagerT>
         pointOp(signLeafs, distTree, *idxTreePt, mPoints, regions, transform, mIsovalue);
+
 
 
     if (mSeamPointListSize != 0) {
@@ -4340,15 +4317,13 @@ VolumeToMesh::operator()(const GridT& distGrid)
 
     pointOp.run();
 
-
     mPolygonPoolListSize = signLeafs.leafCount();
     mPolygons.reset(new PolygonPool[mPolygonPoolListSize]);
-
 
     if (adaptive) {
 
         internal::GenPolygons<Int16LeafManagerT, internal::AdaptivePrimBuilder>
-            mesher(signLeafs, *signTreePt, *idxTreePt, mPolygons, Index32(mPointListSize));
+            mesher(signLeafs, *signTreePt, *idxTreePt, mPolygons);
 
         mesher.setRefSignTree(refSignTreePt);
         mesher.run();
@@ -4356,7 +4331,7 @@ VolumeToMesh::operator()(const GridT& distGrid)
     } else {
 
         internal::GenPolygons<Int16LeafManagerT, internal::UniformPrimBuilder>
-            mesher(signLeafs, *signTreePt, *idxTreePt, mPolygons, Index32(mPointListSize));
+            mesher(signLeafs, *signTreePt, *idxTreePt, mPolygons);
 
         mesher.setRefSignTree(refSignTreePt);
         mesher.run();
