@@ -203,7 +203,7 @@ template<typename TreeT, typename ValueT> struct IndexIterTraits;
 
 template<typename TreeT>
 struct IndexIterTraits<TreeT, typename TreeT::LeafNodeType::ValueAllCIter> {
-    typedef IndexIter Iterator;
+    typedef typename TreeT::LeafNodeType::IndexAllIter Iterator;
     static Iterator begin(const typename TreeT::LeafNodeType& leaf) {
         return Iterator(leaf.beginIndexAll());
     }

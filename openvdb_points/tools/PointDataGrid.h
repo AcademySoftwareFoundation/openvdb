@@ -477,11 +477,13 @@ public:
         const PointDataLeafNode, const ValueType, ChildAll> ChildAllCIter;
 
     typedef openvdb::tools::IndexIter IndexIter;
+    typedef ValueIndexIter<ValueAllCIter> IndexAllIter;
     typedef ValueIndexIter<ValueOnCIter> IndexOnIter;
     typedef ValueIndexIter<ValueOffCIter> IndexOffIter;
 
     /// @brief Leaf index iterator
-    IndexIter beginIndexAll() const;
+    IndexIter beginIndex() const;
+    IndexAllIter beginIndexAll() const;
     IndexOnIter beginIndexOn() const;
     IndexOffIter beginIndexOff() const;
     /// @brief Leaf index iterator from voxel
@@ -769,11 +771,19 @@ PointDataLeafNode<T, Log2Dim>::groupWriteHandle(const Name& name)
 
 template<typename T, Index Log2Dim>
 inline IndexIter
-PointDataLeafNode<T, Log2Dim>::beginIndexAll() const
+PointDataLeafNode<T, Log2Dim>::beginIndex() const
 {
     const ValueType start = 0;
     const ValueType end = this->getValue(NUM_VOXELS - 1);
     return IndexIter(start, end);
+}
+
+template<typename T, Index Log2Dim>
+inline typename PointDataLeafNode<T, Log2Dim>::IndexAllIter
+PointDataLeafNode<T, Log2Dim>::beginIndexAll() const
+{
+    ValueAllCIter iter = this->cbeginValueAll();
+    return IndexAllIter(iter);
 }
 
 template<typename T, Index Log2Dim>
@@ -813,7 +823,7 @@ template<typename T, Index Log2Dim>
 inline Index64
 PointDataLeafNode<T, Log2Dim>::pointCount() const
 {
-    return iterCount(this->beginIndexAll());
+    return iterCount(this->beginIndex());
 }
 
 template<typename T, Index Log2Dim>
@@ -838,7 +848,7 @@ template<typename T, Index Log2Dim>
 inline Index64
 PointDataLeafNode<T, Log2Dim>::groupPointCount(const Name& groupName) const
 {
-    IndexIter indexIter = this->beginIndexAll();
+    IndexIter indexIter = this->beginIndex();
     GroupFilter filter(GroupFilter::create(*this, GroupFilter::Data(groupName)));
     FilterIndexIter<IndexIter, GroupFilter> filterIndexIter(indexIter, filter);
     return iterCount(filterIndexIter);

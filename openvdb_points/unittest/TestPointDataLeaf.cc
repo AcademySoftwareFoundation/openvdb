@@ -50,6 +50,7 @@ public:
     CPPUNIT_TEST(testAttributes);
     CPPUNIT_TEST(testTopologyCopy);
     CPPUNIT_TEST(testEquivalence);
+    CPPUNIT_TEST(testIterators);
     CPPUNIT_TEST(testIO);
     CPPUNIT_TEST(testSwap);
     CPPUNIT_TEST(testCopyOnWrite);
@@ -63,6 +64,7 @@ public:
     void testAttributes();
     void testTopologyCopy();
     void testEquivalence();
+    void testIterators();
     void testIO();
     void testSwap();
     void testCopyOnWrite();
@@ -787,6 +789,75 @@ TestPointDataLeaf::testEquivalence()
         leaf2.setValueOn(10);
 
         CPPUNIT_ASSERT(leaf != leaf2);
+    }
+}
+
+
+void
+TestPointDataLeaf::testIterators()
+{
+    using namespace openvdb;
+    using namespace openvdb::tools;
+
+    // Define and register some common attribute types
+
+    typedef TypedAttributeArray<float>    AttributeS;
+
+    AttributeS::registerType();
+
+    // create a descriptor
+
+    typedef AttributeSet::Descriptor Descriptor;
+
+    Descriptor::Inserter names;
+    names.add("density", AttributeS::attributeType());
+
+    Descriptor::Ptr descrA = Descriptor::create(names.vec);
+
+    // create a leaf and initialize attributes using this descriptor
+
+    const size_t size = LeafType::NUM_VOXELS;
+
+    LeafType leaf(openvdb::Coord(0, 0, 0));
+    leaf.initializeAttributes(descrA, /*arrayLength=*/size/2);
+
+    { // uniform monotonic offsets, only even active
+        int offset = 0;
+
+        for (size_t i = 0; i < size; i++)
+        {
+            if ((i % 2) == 0) {
+                leaf.setOffsetOn(i, ++offset);
+            }
+            else {
+                leaf.setOffsetOnly(i, ++offset);
+                leaf.setValueOff(i);
+            }
+        }
+    }
+
+    { // test index on
+        LeafType::IndexOnIter iterOn(leaf.beginIndexOn());
+        CPPUNIT_ASSERT_EQUAL(iterCount(iterOn), Index64(size/2));
+        for (int i = 0; iterOn; ++iterOn, i += 2)       CPPUNIT_ASSERT_EQUAL(*iterOn, Index32(i));
+    }
+
+    { // test index off
+        LeafType::IndexOffIter iterOff(leaf.beginIndexOff());
+        CPPUNIT_ASSERT_EQUAL(iterCount(iterOff), Index64(size/2));
+        for (int i = 1; iterOff; ++iterOff, i += 2)     CPPUNIT_ASSERT_EQUAL(*iterOff, Index32(i));
+    }
+
+    { // test index all
+        LeafType::IndexAllIter iterAll(leaf.beginIndexAll());
+        CPPUNIT_ASSERT_EQUAL(iterCount(iterAll), Index64(size));
+        for (int i = 0; iterAll; ++iterAll, ++i)        CPPUNIT_ASSERT_EQUAL(*iterAll, Index32(i));
+    }
+
+    { // test index
+        LeafType::IndexIter iter(leaf.beginIndex());
+        CPPUNIT_ASSERT_EQUAL(iterCount(iter), Index64(size));
+        for (int i = 0; iter; ++iter, ++i)              CPPUNIT_ASSERT_EQUAL(*iter, Index32(i));
     }
 }
 
