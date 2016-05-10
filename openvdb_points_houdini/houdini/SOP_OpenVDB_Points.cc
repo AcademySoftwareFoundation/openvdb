@@ -1329,8 +1329,6 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
 
             if (vdbIt) {
                 convertPointDataGrid(*gdp, vdbIt);
-            } else {
-                addError(SOP_MESSAGE, "No VDBs found");
             }
 
             return error();

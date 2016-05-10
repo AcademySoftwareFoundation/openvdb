@@ -200,7 +200,6 @@ SOP_OpenVDB_Points_Load::cookMySop(OP_Context& context)
 
         // Handle no vdbs
         if (!vdbIt) {
-            addError(SOP_MESSAGE, "No VDBs found.");
             return error();
         }
 
