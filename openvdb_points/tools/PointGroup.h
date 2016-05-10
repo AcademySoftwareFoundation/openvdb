@@ -143,7 +143,7 @@ struct CopyGroupOp {
             GroupHandle sourceGroup = leaf->groupHandle(mSourceIndex);
             GroupWriteHandle targetGroup = leaf->groupWriteHandle(mTargetIndex);
 
-            for (IndexIter iter = leaf->beginIndexAll(); iter; ++iter) {
+            for (IndexIter iter = leaf->beginIndex(); iter; ++iter) {
                 const bool groupOn = sourceGroup.get(*iter);
                 targetGroup.set(*iter, groupOn);
             }
