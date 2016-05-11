@@ -336,13 +336,15 @@ houdinisops: $(HOUDINI_SOP_SO_NAMES) houdini/SOP_OpenVDB.svg
 	    cp -f houdini/SOP_OpenVDB.svg $(HOUDINI_DESTDIR)/../config/Icons/; \
 	fi
 
-install: houdinisops
+install_lib: houdinisops
 	mkdir -p $(DESTDIR)/include/openvdb_houdini
 	@echo "Created $(DESTDIR)/include/openvdb_houdini"
 	mkdir -p $(DESTDIR)/include/houdini_utils
 	@echo "Created $(DESTDIR)/include/houdini_utils"
 	cp -f $(LIBHOUDINI_INCLUDE_NAMES) $(DESTDIR)/include/openvdb_houdini/
 	@#
+
+install: install_lib
 
 # TODO: This accumulates all source file dependencies into a single file
 # containing a rule for each *.o file.  Consider generating a separate
