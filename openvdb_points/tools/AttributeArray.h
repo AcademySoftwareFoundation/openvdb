@@ -80,14 +80,14 @@ bool canCompress();
 /// @brief Retrieves the uncompressed size of buffer when uncompressed
 ///
 /// @param buffer the compressed buffer
-int uncompressedSize(const char* buffer);
+size_t uncompressedSize(const char* buffer);
 
 /// @brief Retrieves the compressed size of buffer when compressed
 ///
 /// @param buffer the uncompressed buffer
 /// @param typeSize the size of the data type
 /// @param uncompressedBytes number of uncompressed bytes
-int compressedSize(const char* buffer, const size_t typeSize, const int uncompressedBytes);
+size_t compressedSize(const char* buffer, const size_t typeSize, const size_t uncompressedBytes);
 
 /// @brief Compress and return the compressed buffer.
 ///
@@ -97,7 +97,7 @@ int compressedSize(const char* buffer, const size_t typeSize, const int uncompre
 /// @param compressedBytes number of compressed bytes (written to this variable)
 /// @param cleanup if true, the supplied buffer will be deleted prior to allocating new memory
 char* compress( char* buffer, const size_t typeSize,
-                const int uncompressedBytes, int& compressedBytes,
+                const size_t uncompressedBytes, size_t& compressedBytes,
                 const bool cleanup = false);
 
 /// @brief Compress and return the compressed buffer.
@@ -109,14 +109,14 @@ char* compress( char* buffer, const size_t typeSize,
 ///
 /// @note Unlike the non-const buffer version, the buffer will never be deleted.
 char* compress( const char* buffer, const size_t typeSize,
-                const int uncompressedBytes, int& compressedBytes);
+                const size_t uncompressedBytes, size_t& compressedBytes);
 
 /// @brief Decompress and return the uncompressed buffer.
 ///
 /// @param buffer the buffer to decompress
 /// @param expectedBytes the number of bytes expected once the buffer is decompressed
 /// @param cleanup if true, the supplied buffer will be deleted prior to allocating new memory
-char* decompress(char* buffer, const int expectedBytes, const bool cleanup = false);
+char* decompress(char* buffer, const size_t expectedBytes, const bool cleanup = false);
 
 /// @brief Decompress and return the uncompressed buffer.
 ///
@@ -124,7 +124,7 @@ char* decompress(char* buffer, const int expectedBytes, const bool cleanup = fal
 /// @param expectedBytes the number of bytes expected once the buffer is decompressed
 ///
 /// @note Unlike the non-const buffer version, the buffer will never be deleted.
-char* decompress(const char* buffer, const int expectedBytes);
+char* decompress(const char* buffer, const size_t expectedBytes);
 
 } // namespace attribute_compression
 
@@ -1150,14 +1150,14 @@ TypedAttributeArray<ValueType_, Codec_>::compress()
         this->doLoadUnsafe();
 
         const size_t typeSize = sizeof(typename Codec_::StorageType);
-        const int inBytes = int(mSize * sizeof(StorageType));
-        int outBytes;
+        const size_t inBytes = mSize * sizeof(StorageType);
+        size_t outBytes;
         char* charBuffer = reinterpret_cast<char*>(mData);
         char* buffer = compress(charBuffer, typeSize, inBytes, outBytes, /*cleanup=*/true);
 
         if (buffer) {
             mData = reinterpret_cast<StorageType*>(buffer);
-            mCompressedBytes = size_t(outBytes);
+            mCompressedBytes = outBytes;
             return true;
         }
     }
@@ -1304,7 +1304,7 @@ TypedAttributeArray<ValueType_, Codec_>::read(std::istream& is)
 
         // decompress buffer
 
-        const int inBytes = int(mSize * sizeof(StorageType));
+        const size_t inBytes = mSize * sizeof(StorageType);
         char* newBuffer = decompress(buffer, inBytes, /*cleanup=*/true);
         if (newBuffer)  buffer = newBuffer;
     }
@@ -1331,7 +1331,7 @@ TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os) const
     Index64 size(mSize);
 
     boost::scoped_array<char> compressedBuffer;
-    int compressedBytes = 0;
+    size_t compressedBytes = 0;
 
     this->doLoad();
 
@@ -1347,7 +1347,7 @@ TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os) const
     {
         const char* charBuffer = reinterpret_cast<const char*>(mData);
         const size_t typeSize = sizeof(typename Codec_::StorageType);
-        const int inBytes = int(mSize * sizeof(StorageType));
+        const size_t inBytes = mSize * sizeof(StorageType);
         compressedBuffer.reset(compress(charBuffer, typeSize, inBytes, compressedBytes));
         if (compressedBuffer)   flags |= WRITEDISKCOMPRESS;
     }
@@ -1401,7 +1401,7 @@ TypedAttributeArray<ValueType_, Codec_>::doLoadUnsafe() const
 
         // decompress buffer
 
-        const int inBytes = int(mSize * sizeof(StorageType));
+        const size_t inBytes = mSize * sizeof(StorageType);
         char* newBuffer = decompress(buffer, inBytes, /*cleanup=*/true);
         if (newBuffer)  buffer = newBuffer;
     }

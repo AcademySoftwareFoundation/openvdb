@@ -209,6 +209,37 @@ TestAttributeArray::testCompression()
 
     const int count = 256;
 
+    { // invalid buffer (out of range)
+
+        // compress
+
+        int* smallBuffer = new int[256];
+        size_t invalidBytes = INT_MAX - 1;
+
+        size_t testCompressedBytes = compressedSize(reinterpret_cast<char*>(smallBuffer), sizeof(int), invalidBytes);
+
+        CPPUNIT_ASSERT_EQUAL(testCompressedBytes, size_t(0));
+
+        char* buffer = compress(reinterpret_cast<char*>(smallBuffer), sizeof(int), invalidBytes, testCompressedBytes, /*cleanup=*/ false);
+
+        CPPUNIT_ASSERT(!buffer);
+        CPPUNIT_ASSERT_EQUAL(testCompressedBytes, size_t(0));
+
+        // decompress
+
+#ifdef OPENVDB_USE_BLOSC
+        for (int i = 0; i < 256; i++)   smallBuffer[i] = i;
+
+        char* compressedBuffer = compress(reinterpret_cast<char*>(smallBuffer), sizeof(int), 256 * sizeof(int), testCompressedBytes, /*cleanup=*/ true);
+
+        buffer = decompress(reinterpret_cast<char*>(compressedBuffer), invalidBytes - 16, /*cleanup=*/ false);
+
+        CPPUNIT_ASSERT(!buffer);
+
+        CPPUNIT_ASSERT_THROW(decompress(reinterpret_cast<char*>(compressedBuffer), 256 * sizeof(int) + 1, /*cleanup=*/ true), openvdb::RuntimeError);
+#endif
+    }
+
     { // with cleanup
         // compress
 
@@ -218,8 +249,10 @@ TestAttributeArray::testCompression()
             uncompressedBuffer[i] = i / 2;
         }
 
-        int uncompressedBytes = 256 * sizeof(int);
-        int compressedBytes;
+        size_t uncompressedBytes = 256 * sizeof(int);
+        size_t compressedBytes;
+
+        size_t testCompressedBytes = compressedSize(reinterpret_cast<char*>(uncompressedBuffer), sizeof(int), uncompressedBytes);
 
         char* compressedBuffer = compress(  reinterpret_cast<char*>(uncompressedBuffer), sizeof(int),
                                             uncompressedBytes, compressedBytes, /*cleanup=*/ true);
@@ -227,6 +260,7 @@ TestAttributeArray::testCompression()
 #ifdef OPENVDB_USE_BLOSC
         CPPUNIT_ASSERT(compressedBytes < uncompressedBytes);
         CPPUNIT_ASSERT(compressedBuffer);
+        CPPUNIT_ASSERT_EQUAL(testCompressedBytes, compressedBytes);
 
         // uncompressedSize
 
@@ -241,6 +275,7 @@ TestAttributeArray::testCompression()
         delete[] newUncompressedBuffer;
 #else
         CPPUNIT_ASSERT(!compressedBuffer);
+        CPPUNIT_ASSERT_EQUAL(testCompressedBytes, size_t(0));
 
         // uncompressedSize
 
@@ -267,8 +302,8 @@ TestAttributeArray::testCompression()
             uncompressedBuffer[i] = i / 2;
         }
 
-        int uncompressedBytes = 256 * sizeof(int);
-        int compressedBytes;
+        size_t uncompressedBytes = 256 * sizeof(int);
+        size_t compressedBytes;
 
         const char* compressedBuffer = compress(reinterpret_cast<const char*>(uncompressedBuffer), sizeof(int),
                                                 uncompressedBytes, compressedBytes);

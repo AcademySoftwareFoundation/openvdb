@@ -59,7 +59,7 @@ bool canCompress()
 }
 
 
-int uncompressedSize(const char* buffer)
+size_t uncompressedSize(const char* buffer)
 {
     size_t bytes, _1, _2;
     blosc_cbuffer_sizes(buffer, &bytes, &_1, &_2);
@@ -67,10 +67,11 @@ int uncompressedSize(const char* buffer)
 }
 
 
-int compressedSize( const char* buffer, const size_t typeSize, const int uncompressedBytes)
+size_t compressedSize( const char* buffer, const size_t typeSize, const size_t uncompressedBytes)
 {
-    int tempBytes = uncompressedBytes + BLOSC_MAX_OVERHEAD;
-    boost::scoped_array<char> outBuf(new char[tempBytes]);
+    size_t tempBytes = uncompressedBytes + BLOSC_MAX_OVERHEAD;
+    const bool outOfRange = tempBytes > BLOSC_MAX_BUFFERSIZE;
+    boost::scoped_array<char> outBuf(outOfRange ? new char[1] : new char[tempBytes]);
 
     int compressedBytes = blosc_compress_ctx(
         /*clevel=*/9, // 0 (no compression) to 9 (maximum compression)
@@ -92,17 +93,18 @@ int compressedSize( const char* buffer, const size_t typeSize, const int uncompr
         return 0;
     }
 
-    return compressedBytes;
+    return size_t(compressedBytes);
 }
 
 
 char* compress( char* buffer, const size_t typeSize,
-                const int uncompressedBytes, int& compressedBytes, const bool cleanup)
+                const size_t uncompressedBytes, size_t& compressedBytes, const bool cleanup)
 {
-    int tempBytes = uncompressedBytes + BLOSC_MAX_OVERHEAD;
-    boost::scoped_array<char> outBuf(new char[tempBytes]);
+    size_t tempBytes = uncompressedBytes + BLOSC_MAX_OVERHEAD;
+    const bool outOfRange = tempBytes > BLOSC_MAX_BUFFERSIZE;
+    boost::scoped_array<char> outBuf(outOfRange ? new char[1] : new char[tempBytes]);
 
-    compressedBytes = blosc_compress_ctx(
+    int _compressedBytes = blosc_compress_ctx(
         /*clevel=*/9, // 0 (no compression) to 9 (maximum compression)
         /*doshuffle=*/true,
         /*typesize=*/typeSize,
@@ -114,10 +116,10 @@ char* compress( char* buffer, const size_t typeSize,
         /*blocksize=*/256,
         /*numthreads=*/1);
 
-    if (compressedBytes <= 0) {
+    if (_compressedBytes <= 0) {
         std::ostringstream ostr;
         ostr << "Blosc failed to compress " << uncompressedBytes << " byte" << (uncompressedBytes == 1 ? "" : "s");
-        if (compressedBytes < 0) ostr << " (internal error " << compressedBytes << ")";
+        if (_compressedBytes < 0) ostr << " (internal error " << _compressedBytes << ")";
         OPENVDB_LOG_DEBUG(ostr.str());
         return 0;
     }
@@ -126,27 +128,34 @@ char* compress( char* buffer, const size_t typeSize,
 
     if (cleanup)    delete[] buffer;
 
+    compressedBytes = size_t(_compressedBytes);
+
     char* outData = new char[compressedBytes];
-    std::memcpy(outData, outBuf.get(), size_t(compressedBytes));
+    std::memcpy(outData, outBuf.get(), compressedBytes);
     return outData;
 }
 
 
-char* decompress(char* buffer, const int expectedBytes, const bool cleanup)
+char* decompress(char* buffer, const size_t expectedBytes, const bool cleanup)
 {
-    int tempBytes = expectedBytes + BLOSC_MAX_OVERHEAD;
-    boost::scoped_array<char> tempBuffer(new char[tempBytes]);
+    size_t tempBytes = expectedBytes + BLOSC_MAX_OVERHEAD;
+    const bool outOfRange = tempBytes > BLOSC_MAX_BUFFERSIZE;
+    if (outOfRange)     tempBytes = 1;
+    boost::scoped_array<char> tempBuffer(outOfRange ? new char[1] : new char[tempBytes]);
 
-    const int uncompressedBytes = blosc_decompress_ctx( /*src=*/buffer,
-                                                        /*dest=*/tempBuffer.get(),
-                                                        tempBytes,
-                                                        /*numthreads=*/1);
+    const int _uncompressedBytes = blosc_decompress_ctx(  /*src=*/buffer,
+                                                            /*dest=*/tempBuffer.get(),
+                                                            tempBytes,
+                                                            /*numthreads=*/1);
 
-    if (uncompressedBytes < 1) {
-        OPENVDB_LOG_DEBUG("blosc_decompress() returned error code " << uncompressedBytes);
+    if (_uncompressedBytes < 1) {
+        OPENVDB_LOG_DEBUG("blosc_decompress() returned error code " << _uncompressedBytes);
         return 0;
     }
-    if (uncompressedBytes != Int64(expectedBytes)) {
+
+    size_t uncompressedBytes = size_t(_uncompressedBytes);
+
+    if (uncompressedBytes != expectedBytes) {
         OPENVDB_THROW(RuntimeError, "Expected to decompress " << expectedBytes
             << " byte" << (expectedBytes == 1 ? "" : "s") << ", got "
             << uncompressedBytes << " byte" << (uncompressedBytes == 1 ? "" : "s"));
@@ -157,7 +166,7 @@ char* decompress(char* buffer, const int expectedBytes, const bool cleanup)
     if (cleanup)    delete[] buffer;
 
     char* newBuffer = new char[uncompressedBytes];
-    std::memcpy(newBuffer, tempBuffer.get(), size_t(uncompressedBytes));
+    std::memcpy(newBuffer, tempBuffer.get(), uncompressedBytes);
 
     return newBuffer;
 }
@@ -173,27 +182,27 @@ bool canCompress()
 }
 
 
-int uncompressedSize(const char*)
+size_t uncompressedSize(const char*)
 {
     OPENVDB_THROW(RuntimeError, "Can't extract compressed data without the blosc library.");
 }
 
 
-int compressedSize(const char*, const size_t, const int)
+size_t compressedSize(const char*, const size_t, const size_t)
 {
     OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
     return 0;
 }
 
 
-char* compress(char*, const size_t, const int, int&, const bool)
+char* compress(char*, const size_t, const size_t, size_t&, const bool)
 {
     OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
     return 0;
 }
 
 
-char* decompress(char*, const int, const bool)
+char* decompress(char*, const size_t, const bool)
 {
     OPENVDB_THROW(RuntimeError, "Can't extract compressed data without the blosc library.");
 }
@@ -202,14 +211,14 @@ char* decompress(char*, const int, const bool)
 #endif // OPENVDB_USE_BLOSC
 
 
-char* compress(  const char* buffer, const size_t typeSize,
-                        const int uncompressedBytes, int& compressedBytes)
+char* compress( const char* buffer, const size_t typeSize,
+                const size_t uncompressedBytes, size_t& compressedBytes)
 {
     return compress(const_cast<char*>(buffer), typeSize, uncompressedBytes, compressedBytes, /*cleanup=*/false);
 }
 
 
-char* decompress(const char* buffer, const int expectedBytes)
+char* decompress(const char* buffer, const size_t expectedBytes)
 {
     return decompress(const_cast<char*>(buffer), expectedBytes, /*cleanup=*/false);
 }
