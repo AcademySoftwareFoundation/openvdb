@@ -141,7 +141,7 @@ char* decompress(char* buffer, const size_t expectedBytes, const bool cleanup)
     size_t tempBytes = expectedBytes + BLOSC_MAX_OVERHEAD;
     const bool outOfRange = tempBytes > BLOSC_MAX_BUFFERSIZE;
     if (outOfRange)     tempBytes = 1;
-    boost::scoped_array<char> tempBuffer(outOfRange ? new char[1] : new char[tempBytes]);
+    boost::scoped_array<char> tempBuffer(new char[tempBytes]);
 
     const int _uncompressedBytes = blosc_decompress_ctx(  /*src=*/buffer,
                                                             /*dest=*/tempBuffer.get(),
