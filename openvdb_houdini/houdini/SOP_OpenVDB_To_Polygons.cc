@@ -43,6 +43,7 @@
 
 #include <openvdb/tools/VolumeToMesh.h>
 #include <openvdb/tools/MeshToVolume.h>
+#include <openvdb/tools/Morphology.h>
 #include <openvdb/tools/LevelSetUtil.h>
 #include <openvdb/tools/Prune.h>
 #include <openvdb/math/Operators.h>
@@ -108,8 +109,6 @@ public:
 
     virtual int isRefInput(unsigned i) const { return (i > 0); }
 
-    void checkActivePart(float time);
-
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
     virtual bool updateParmsFlags();
@@ -123,39 +122,6 @@ protected:
         hvdb::Interrupter& boss,
         const fpreal time);
 };
-
-
-////////////////////////////////////////
-
-
-namespace {
-
-// Callback to check partition limit
-int
-checkActivePartCB(void* data, int /*idx*/, float time, const PRM_Template*)
-{
-    SOP_OpenVDB_To_Polygons* sop = static_cast<SOP_OpenVDB_To_Polygons*>(data);
-    if (sop == NULL) return 0;
-    sop->checkActivePart(time);
-    return 1;
-}
-
-} // namespace
-
-
-void
-SOP_OpenVDB_To_Polygons::checkActivePart(float time)
-{
-    const int partitions = evalInt("automaticpartitions", 0, time);
-    const int activepart = evalInt("activepart", 0, time);
-
-    if (activepart > partitions) {
-        setInt("activepart", 0, time, partitions);
-    }
-}
-
-
-////////////////////////////////////////
 
 
 void
@@ -204,18 +170,6 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "keepvdbname", "Preserve VDB Name")
         .setHelpText("Mark each primitive with the corresponding VDB name."));
-
-    parms.add(hutil::ParmFactory(PRM_INT_J, "automaticpartitions", "Automatic Partitions")
-        .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 20)
-        .setHelpText("Subdivide volume and mesh into disjoint parts.")
-        .setDefault(PRMoneDefaults)
-        .setCallbackFunc(&checkActivePartCB));
-
-    parms.add(hutil::ParmFactory(PRM_INT_J, "activepart", "Active Part")
-        .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 20)
-        .setHelpText("Specific partition to mesh.")
-        .setDefault(PRMzeroDefaults)
-        .setCallbackFunc(&checkActivePartCB));
 
 
     //////////
@@ -303,6 +257,8 @@ newSopOperator(OP_OperatorTable* table)
     hutil::ParmList obsoleteParms;
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "smoothseams", "Smooth Seams"));
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "invertmask", "").setDefault(PRMoneDefaults));
+    obsoleteParms.add(hutil::ParmFactory(PRM_INT_J, "automaticpartitions", ""));
+    obsoleteParms.add(hutil::ParmFactory(PRM_INT_J, "activepart", ""));
 
     hvdb::OpenVDBOpFactory("OpenVDB To Polygons", SOP_OpenVDB_To_Polygons::factory, parms, *table)
         .setObsoleteParms(obsoleteParms)
@@ -380,9 +336,6 @@ SOP_OpenVDB_To_Polygons::updateParmsFlags()
 
     const bool adaptivitymask = bool(evalInt("adaptivityfield", 0, 0));
     changed |= enableParm("adaptivityfieldname", maskexists && adaptivitymask);
-
-    const bool partition = evalInt("automaticpartitions", 0, 0) > 1;
-    changed |= enableParm("activepart", partition);
 
     return changed;
 }
@@ -684,11 +637,6 @@ SOP_OpenVDB_To_Polygons::cookMySop(OP_Context& context)
 
         // Setup level set mesher
         openvdb::tools::VolumeToMesh mesher(iso, adaptivity);
-
-        // Slicing options
-        mesher.partition(
-            evalInt("automaticpartitions", 0, time),
-            evalInt("activepart", 0, time) - 1);
 
         // Check mask input
         const GU_Detail* maskGeo = inputGeo(2);

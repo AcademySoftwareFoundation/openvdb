@@ -14,8 +14,8 @@ Highlights:
   range and nearest-neighbor searches on particles, arbitrary volume
   and level set specific segmentation tools, a new binary mask grid
   type and an efficient point to level set conversion scheme.
-- Optimizations: threaded grid destruction, morphological dilation,
-  csg operations and fracture tool.
+- Optimizations: Faster volume to mesh conversion and threaded grid
+  destruction, morphological dilation, csg operations and fracture tool.
 - New Houdini nodes: Segment, LOD and Topology To Level Set.
 
 @par
@@ -76,6 +76,9 @@ New features:
 
 @par
 Improvements:
+- Complete overhaul of the @vdblink::tools::VolumeToMesh VolumeToMesh@endlink tool
+  brings significant performance improvements and enhanced region masking,
+  tile support and bool volume surfacing.
 - Improved the performance, parallel scaling and memory usage,
   of @vdblink::tools::LevelSetFracture tools::LevelSetFracture@endlink and
   updated to use the new @vdblink::tools::segmentSDF() segmentSDF@endlink scheme.

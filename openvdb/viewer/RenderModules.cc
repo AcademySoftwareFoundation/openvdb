@@ -30,6 +30,7 @@
 
 #include "RenderModules.h"
 
+#include <openvdb/tools/Morphology.h>
 #include <openvdb/tools/Prune.h>
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/util/logging.h>

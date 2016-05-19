@@ -9,8 +9,8 @@ Version 3.2.0 - In development
       range and nearest-neighbor searches on particles, arbitrary volume
       and level set specific segmentation tools, a new binary mask grid
       type and an efficient point to level set conversion scheme.
-    - Optimizations: Threaded grid destruction, morphological dilation,
-      csg operations and fracture tool.
+    - Optimizations: Faster volume to mesh conversion and threaded grid
+      destruction, morphological dilation, csg operations and fracture tool.
     - New Houdini nodes: Segment, LOD and Topology To Level Set.
 
     New features:
@@ -54,6 +54,9 @@ Version 3.2.0 - In development
     - Added sparseFill and denseFill methods to the Grid, Tree and RootNode classes.
 
     Improvements:
+    - Complete overhaul of the VolumeToMesh tool brings significant performance
+      improvements and enhanced region masking, tile support and bool volume
+      surfacing.
     - Improved the performance, parallel scaling and memory usage,
       of tools::LevelSetFracture and updated to use the new segmentSDF scheme.
     - Improved the performance of tools::LevelSetAdvection by up to five times.
