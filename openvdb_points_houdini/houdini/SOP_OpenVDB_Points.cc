@@ -1477,7 +1477,8 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
 
         // Set group membership in tree
 
-        std::vector<bool> inGroup(ptGeo->getNumPoints(), false);
+        const int64_t numPoints = ptGeo->getNumPoints();
+        std::vector<bool> inGroup(numPoints, false);
 
         for (GA_ElementGroupTable::iterator it = elementGroups.beginTraverse(),
                                             itEnd = elementGroups.endTraverse(); it != itEnd; ++it)
@@ -1487,8 +1488,9 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
             GA_Offset start, end;
             GA_Range range(**it);
             for (GA_Iterator rangeIt = range.begin(); rangeIt.blockAdvance(start, end); ) {
+                end = std::min(end, numPoints);
                 for (GA_Offset off = start; off < end; ++off) {
-                    assert(off < inGroup.size());
+                    assert(off < numPoints);
                     inGroup[off] = true;
                 }
             }
