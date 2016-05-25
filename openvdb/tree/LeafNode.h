@@ -165,7 +165,7 @@ public:
         bool empty() const { return !mData || this->isOutOfCore(); }
 #endif
         /// Allocate memory for this buffer if it has not already been allocated.
-        bool allocate() { if (mData == NULL) mData = new ValueType[SIZE]; return !this->empty(); }
+        bool allocate() { if (mData == NULL) mData = new ValueType[SIZE]; return true; }
 
         /// Populate this buffer with a constant value.
         void fill(const ValueType& val)

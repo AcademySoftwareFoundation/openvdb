@@ -316,6 +316,8 @@ populateIndexTree(VIndexTreeType& result)
     LeafMgrT leafManager(result);
     const size_t leafCount = leafManager.leafCount();
 
+    if(leafCount == 0) return;
+
     // Count the number of active voxels in each leaf node.
     boost::scoped_array<VIndex> perLeafCount(new VIndex[leafCount]);
     VIndex* perLeafCountPtr = perLeafCount.get();

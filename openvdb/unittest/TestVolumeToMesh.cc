@@ -32,7 +32,6 @@
 
 #include <openvdb/tools/VolumeToMesh.h>
 #include <openvdb/Exceptions.h>
-#include <openvdb/tree/LeafManager.h>
 
 #include <vector>
 
@@ -40,12 +39,12 @@ class TestVolumeToMesh: public CppUnit::TestCase
 {
 public:
     CPPUNIT_TEST_SUITE(TestVolumeToMesh);
-    CPPUNIT_TEST(testAuxData);
-    CPPUNIT_TEST(testConversion);
+    CPPUNIT_TEST(testAuxiliaryDataCollection);
+    CPPUNIT_TEST(testUniformMeshing);
     CPPUNIT_TEST_SUITE_END();
 
-    void testAuxData();
-    void testConversion();
+    void testAuxiliaryDataCollection();
+    void testUniformMeshing();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestVolumeToMesh);
@@ -55,85 +54,102 @@ CPPUNIT_TEST_SUITE_REGISTRATION(TestVolumeToMesh);
 
 
 void
-TestVolumeToMesh::testAuxData()
+TestVolumeToMesh::testAuxiliaryDataCollection()
 {
-    typedef openvdb::tree::Tree4<float, 5, 4, 3>::Type Tree543f;
-    Tree543f::Ptr tree(new Tree543f(0));
+    typedef openvdb::tree::Tree4<float, 5, 4, 3>::Type  FloatTreeType;
+    typedef FloatTreeType::ValueConverter<bool>::Type   BoolTreeType;
 
-    // create one voxel with 3 upwind edges (that have a sign change)
-    tree->setValue(openvdb::Coord(0,0,0), -1);
-    tree->setValue(openvdb::Coord(1,0,0),  1);
-    tree->setValue(openvdb::Coord(0,1,0),  1);
-    tree->setValue(openvdb::Coord(0,0,1),  1);
+    const float iso = 0.0f;
+    const openvdb::Coord ijk(0,0,0);
 
-    typedef openvdb::tree::LeafManager<const Tree543f> LeafManager;
+    FloatTreeType inputTree(1.0f);
+    inputTree.setValue(ijk, -1.0f);
 
-    LeafManager leafs(*tree);
+    BoolTreeType intersectionTree(false);
 
-    CPPUNIT_ASSERT(openvdb::tools::internal::needsActiveVoxePadding(leafs, 0.0, 1.0));
+    openvdb::tools::volume_to_mesh_internal::identifySurfaceIntersectingVoxels(
+        intersectionTree, inputTree, iso);
 
-    openvdb::tools::internal::SignData<Tree543f, LeafManager> op(*tree, leafs, 0.0);
-    op.run();
+    CPPUNIT_ASSERT_EQUAL(size_t(8), size_t(intersectionTree.activeVoxelCount()));
 
-    CPPUNIT_ASSERT(op.signTree()->activeVoxelCount() == 1);
-    CPPUNIT_ASSERT(op.signTree()->activeVoxelCount() == op.idxTree()->activeVoxelCount());
+    typedef FloatTreeType::ValueConverter<openvdb::Int16>::Type   Int16TreeType;
+    typedef FloatTreeType::ValueConverter<openvdb::Index32>::Type Index32TreeType;
 
+    Int16TreeType signFlagsTree(0);
+    Index32TreeType pointIndexTree(99999);
 
-    int flags = int(op.signTree()->getValue(openvdb::Coord(0,0,0)));
+    openvdb::tools::volume_to_mesh_internal::computeAuxiliaryData(
+         signFlagsTree, pointIndexTree, intersectionTree, inputTree, iso);
 
-    CPPUNIT_ASSERT(bool(flags & openvdb::tools::internal::INSIDE));
-    CPPUNIT_ASSERT(bool(flags & openvdb::tools::internal::EDGES));
-    CPPUNIT_ASSERT(bool(flags & openvdb::tools::internal::XEDGE));
-    CPPUNIT_ASSERT(bool(flags & openvdb::tools::internal::YEDGE));
-    CPPUNIT_ASSERT(bool(flags & openvdb::tools::internal::ZEDGE));
+    const int flags = int(signFlagsTree.getValue(ijk));
 
-
-    tree->setValueOff(openvdb::Coord(0,0,1), -1);
-    op.run();
-
-    CPPUNIT_ASSERT(op.signTree()->activeVoxelCount() == 1);
-    CPPUNIT_ASSERT(op.signTree()->activeVoxelCount() == op.idxTree()->activeVoxelCount());
-
-    flags = int(op.signTree()->getValue(openvdb::Coord(0,0,0)));
-
-    CPPUNIT_ASSERT(bool(flags & openvdb::tools::internal::INSIDE));
-    CPPUNIT_ASSERT(bool(flags & openvdb::tools::internal::EDGES));
-    CPPUNIT_ASSERT(bool(flags & openvdb::tools::internal::XEDGE));
-    CPPUNIT_ASSERT(bool(flags & openvdb::tools::internal::YEDGE));
-    CPPUNIT_ASSERT(!bool(flags & openvdb::tools::internal::ZEDGE));
+    CPPUNIT_ASSERT(bool(flags & openvdb::tools::volume_to_mesh_internal::INSIDE));
+    CPPUNIT_ASSERT(bool(flags & openvdb::tools::volume_to_mesh_internal::EDGES));
+    CPPUNIT_ASSERT(bool(flags & openvdb::tools::volume_to_mesh_internal::XEDGE));
+    CPPUNIT_ASSERT(bool(flags & openvdb::tools::volume_to_mesh_internal::YEDGE));
+    CPPUNIT_ASSERT(bool(flags & openvdb::tools::volume_to_mesh_internal::ZEDGE));
 }
 
 
 void
-TestVolumeToMesh::testConversion()
+TestVolumeToMesh::testUniformMeshing()
 {
-    using namespace openvdb;
+    typedef openvdb::tree::Tree4<float, 5, 4, 3>::Type  FloatTreeType;
+    typedef openvdb::Grid<FloatTreeType>                FloatGridType;
 
-    typedef tree::Tree4<float, 5, 4, 3>::Type Tree543f;
-    typedef Grid<Tree543f> GridType;
+    FloatGridType grid(1.0f);
 
-    GridType::Ptr grid = createGrid<GridType>(/*background=*/1);
+    // test voxel region meshing
 
-    grid->fill(CoordBBox(Coord(0), Coord(7)), 0.0);
-    grid->fill(CoordBBox(Coord(1), Coord(6)), -1.0);
+    openvdb::CoordBBox bbox(openvdb::Coord(1), openvdb::Coord(6));
 
-    std::vector<Vec3s> points;
-    std::vector<Vec4I> quads;
-    std::vector<Vec3I> triangles;
+    grid.tree().fill(bbox, -1.0f);
 
-    openvdb::tools::volumeToMesh(*grid, points, quads);
-    CPPUNIT_ASSERT(points.size() >= 4);
-    CPPUNIT_ASSERT(!quads.empty());
-    /// @todo validate output
+    std::vector<openvdb::Vec3s> points;
+    std::vector<openvdb::Vec4I> quads;
+    std::vector<openvdb::Vec3I> triangles;
+
+    openvdb::tools::volumeToMesh(grid, points, quads);
+
+    CPPUNIT_ASSERT(!points.empty());
+    CPPUNIT_ASSERT_EQUAL(size_t(216), quads.size());
+
 
     points.clear();
     quads.clear();
     triangles.clear();
+    grid.clear();
 
-    tools::volumeToMesh(*grid, points, triangles, quads, /*isovalue=*/0.01, /*adaptivity=*/0);
-    CPPUNIT_ASSERT(points.size() >= 3);
-    CPPUNIT_ASSERT(!triangles.empty() || !quads.empty());
-    /// @todo validate output
+
+    // test tile region meshing
+
+    grid.tree().addTile(FloatTreeType::LeafNodeType::LEVEL + 1, openvdb::Coord(0), -1.0f, true);
+
+    openvdb::tools::volumeToMesh(grid, points, quads);
+
+    CPPUNIT_ASSERT(!points.empty());
+    CPPUNIT_ASSERT_EQUAL(size_t(384), quads.size());
+
+
+    points.clear();
+    quads.clear();
+    triangles.clear();
+    grid.clear();
+
+
+    // test tile region and bool volume meshing
+
+    typedef FloatTreeType::ValueConverter<bool>::Type   BoolTreeType;
+    typedef openvdb::Grid<BoolTreeType>                 BoolGridType;
+
+    BoolGridType maskGrid(false);
+
+    maskGrid.tree().addTile(BoolTreeType::LeafNodeType::LEVEL + 1, openvdb::Coord(0), true, true);
+
+    openvdb::tools::volumeToMesh(maskGrid, points, quads);
+
+    CPPUNIT_ASSERT(!points.empty());
+    CPPUNIT_ASSERT_EQUAL(size_t(384), quads.size());
 }
 
 // Copyright (c) 2012-2016 DreamWorks Animation LLC

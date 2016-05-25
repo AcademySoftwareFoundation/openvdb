@@ -50,6 +50,7 @@
 
 #include <tbb/task_group.h>
 
+
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
@@ -229,12 +230,12 @@ topologyToLevelSet(const GridT& grid, int halfWidth, int closingSteps, int dilat
     MaskTreeT maskTree( grid.tree(), false/*background*/, openvdb::TopologyCopy() );
 
     // Morphological closing operation.
-    dilateActiveValues( maskTree, closingSteps + dilation, tools::NN_FACE, tools::IGNORE_TILES);
-    erodeVoxels(  maskTree, closingSteps);
+    dilateActiveValues( maskTree, closingSteps + dilation, tools::NN_FACE, tools::IGNORE_TILES );
+    erodeVoxels( maskTree, closingSteps );
 
     // Generate a volume with an implicit zero crossing at the boundary
     // between active and inactive values in the input grid.
-    const float background = static_cast<float>(grid.voxelSize()[0]) * halfWidth;
+    const float background = float(grid.voxelSize()[0]) * float(halfWidth);
     typename FloatTreeT::Ptr lsTree(
         new FloatTreeT( maskTree, /*out=*/background, /*in=*/-background, openvdb::TopologyCopy() ) );
 

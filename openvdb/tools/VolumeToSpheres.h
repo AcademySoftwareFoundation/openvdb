@@ -130,8 +130,9 @@ class ClosestSurfacePoint
 {
 public:
     typedef typename GridT::TreeType TreeT;
-    typedef typename TreeT::template ValueConverter<int>::Type IntTreeT;
-    typedef typename TreeT::template ValueConverter<Int16>::Type Int16TreeT;
+    typedef typename TreeT::template ValueConverter<bool>::Type     BoolTreeT;
+    typedef typename TreeT::template ValueConverter<Index32>::Type  Index32TreeT;
+    typedef typename TreeT::template ValueConverter<Int16>::Type    Int16TreeT;
 
 
     ClosestSurfacePoint();
@@ -179,22 +180,22 @@ public:
 
     /// @{
     /// @brief Tree accessors
-    const IntTreeT& indexTree() const { return *mIdxTreePt; }
+    const Index32TreeT& indexTree() const { return *mIdxTreePt; }
     const Int16TreeT& signTree() const { return *mSignTreePt; }
     /// @}
 
 private:
-    typedef typename IntTreeT::LeafNodeType IntLeafT;
+    typedef typename Index32TreeT::LeafNodeType Index32LeafT;
     typedef std::pair<size_t, size_t> IndexRange;
 
     bool mIsInitialized;
     std::vector<Vec4R> mLeafBoundingSpheres, mNodeBoundingSpheres;
     std::vector<IndexRange> mLeafRanges;
-    std::vector<const IntLeafT*> mLeafNodes;
+    std::vector<const Index32LeafT*> mLeafNodes;
     PointList mSurfacePointList;
     size_t mPointListSize, mMaxNodeLeafs;
     float mMaxRadiusSqr;
-    typename IntTreeT::Ptr mIdxTreePt;
+    typename Index32TreeT::Ptr mIdxTreePt;
     typename Int16TreeT::Ptr mSignTreePt;
 
     bool search(std::vector<Vec3R>&, std::vector<float>&, bool transformPoints);
@@ -227,13 +228,13 @@ private:
 };
 
 
-template<typename IntLeafT>
+template<typename Index32LeafT>
 class LeafBS
 {
 public:
 
     LeafBS(std::vector<Vec4R>& leafBoundingSpheres,
-        const std::vector<const IntLeafT*>& leafNodes,
+        const std::vector<const Index32LeafT*>& leafNodes,
         const math::Transform& transform,
         const PointList& surfacePointList);
 
@@ -244,15 +245,15 @@ public:
 
 private:
     std::vector<Vec4R>& mLeafBoundingSpheres;
-    const std::vector<const IntLeafT*>& mLeafNodes;
+    const std::vector<const Index32LeafT*>& mLeafNodes;
     const math::Transform& mTransform;
     const PointList& mSurfacePointList;
 };
 
-template<typename IntLeafT>
-LeafBS<IntLeafT>::LeafBS(
+template<typename Index32LeafT>
+LeafBS<Index32LeafT>::LeafBS(
     std::vector<Vec4R>& leafBoundingSpheres,
-    const std::vector<const IntLeafT*>& leafNodes,
+    const std::vector<const Index32LeafT*>& leafNodes,
     const math::Transform& transform,
     const PointList& surfacePointList)
     : mLeafBoundingSpheres(leafBoundingSpheres)
@@ -262,9 +263,9 @@ LeafBS<IntLeafT>::LeafBS(
 {
 }
 
-template<typename IntLeafT>
+template<typename Index32LeafT>
 void
-LeafBS<IntLeafT>::run(bool threaded)
+LeafBS<Index32LeafT>::run(bool threaded)
 {
     if (threaded) {
         tbb::parallel_for(tbb::blocked_range<size_t>(0, mLeafNodes.size()), *this);
@@ -273,11 +274,11 @@ LeafBS<IntLeafT>::run(bool threaded)
     }
 }
 
-template<typename IntLeafT>
+template<typename Index32LeafT>
 void
-LeafBS<IntLeafT>::operator()(const tbb::blocked_range<size_t>& range) const
+LeafBS<Index32LeafT>::operator()(const tbb::blocked_range<size_t>& range) const
 {
-    typename IntLeafT::ValueOnCIter iter;
+    typename Index32LeafT::ValueOnCIter iter;
     Vec3s avg;
 
     for (size_t n = range.begin(); n != range.end(); ++n) {
@@ -397,7 +398,7 @@ NodeBS::operator()(const tbb::blocked_range<size_t>& range) const
 ////////////////////////////////////////
 
 
-template<typename IntLeafT>
+template<typename Index32LeafT>
 class ClosestPointDist
 {
 public:
@@ -407,7 +408,7 @@ public:
         std::vector<Vec3R>& instancePoints,
         std::vector<float>& instanceDistances,
         const PointList& surfacePointList,
-        const std::vector<const IntLeafT*>& leafNodes,
+        const std::vector<const Index32LeafT*>& leafNodes,
         const std::vector<IndexRange>& leafRanges,
         const std::vector<Vec4R>& leafBoundingSpheres,
         const std::vector<Vec4R>& nodeBoundingSpheres,
@@ -422,7 +423,7 @@ public:
 
 private:
 
-    void evalLeaf(size_t index, const IntLeafT& leaf) const;
+    void evalLeaf(size_t index, const Index32LeafT& leaf) const;
     void evalNode(size_t pointIndex, size_t nodeIndex) const;
 
 
@@ -431,7 +432,7 @@ private:
 
     const PointList& mSurfacePointList;
 
-    const std::vector<const IntLeafT*>& mLeafNodes;
+    const std::vector<const Index32LeafT*>& mLeafNodes;
     const std::vector<IndexRange>& mLeafRanges;
     const std::vector<Vec4R>& mLeafBoundingSpheres;
     const std::vector<Vec4R>& mNodeBoundingSpheres;
@@ -443,12 +444,12 @@ private:
 };
 
 
-template<typename IntLeafT>
-ClosestPointDist<IntLeafT>::ClosestPointDist(
+template<typename Index32LeafT>
+ClosestPointDist<Index32LeafT>::ClosestPointDist(
     std::vector<Vec3R>& instancePoints,
     std::vector<float>& instanceDistances,
     const PointList& surfacePointList,
-    const std::vector<const IntLeafT*>& leafNodes,
+    const std::vector<const Index32LeafT*>& leafNodes,
     const std::vector<IndexRange>& leafRanges,
     const std::vector<Vec4R>& leafBoundingSpheres,
     const std::vector<Vec4R>& nodeBoundingSpheres,
@@ -469,9 +470,9 @@ ClosestPointDist<IntLeafT>::ClosestPointDist(
 }
 
 
-template<typename IntLeafT>
+template<typename Index32LeafT>
 void
-ClosestPointDist<IntLeafT>::run(bool threaded)
+ClosestPointDist<Index32LeafT>::run(bool threaded)
 {
     if (threaded) {
         tbb::parallel_for(tbb::blocked_range<size_t>(0, mInstancePoints.size()), *this);
@@ -480,11 +481,11 @@ ClosestPointDist<IntLeafT>::run(bool threaded)
     }
 }
 
-template<typename IntLeafT>
+template<typename Index32LeafT>
 void
-ClosestPointDist<IntLeafT>::evalLeaf(size_t index, const IntLeafT& leaf) const
+ClosestPointDist<Index32LeafT>::evalLeaf(size_t index, const Index32LeafT& leaf) const
 {
-    typename IntLeafT::ValueOnCIter iter;
+    typename Index32LeafT::ValueOnCIter iter;
     const Vec3s center = mInstancePoints[index];
     size_t& closestPointIndex = const_cast<size_t&>(mClosestPointIndex);
 
@@ -501,9 +502,9 @@ ClosestPointDist<IntLeafT>::evalLeaf(size_t index, const IntLeafT& leaf) const
 }
 
 
-template<typename IntLeafT>
+template<typename Index32LeafT>
 void
-ClosestPointDist<IntLeafT>::evalNode(size_t pointIndex, size_t nodeIndex) const
+ClosestPointDist<Index32LeafT>::evalNode(size_t pointIndex, size_t nodeIndex) const
 {
     const Vec3R& pos = mInstancePoints[pointIndex];
     float minDist = mInstanceDistances[pointIndex];
@@ -543,9 +544,9 @@ ClosestPointDist<IntLeafT>::evalNode(size_t pointIndex, size_t nodeIndex) const
 }
 
 
-template<typename IntLeafT>
+template<typename Index32LeafT>
 void
-ClosestPointDist<IntLeafT>::operator()(const tbb::blocked_range<size_t>& range) const
+ClosestPointDist<Index32LeafT>::operator()(const tbb::blocked_range<size_t>& range) const
 {
     Vec3R center;
     for (size_t n = range.begin(); n != range.end(); ++n) {
@@ -720,9 +721,9 @@ fillWithSpheres(
     typedef typename GridT::TreeType TreeT;
     typedef typename GridT::ValueType ValueT;
 
-    typedef typename TreeT::template ValueConverter<bool>::Type BoolTreeT;
-    typedef typename TreeT::template ValueConverter<int>::Type IntTreeT;
-    typedef typename TreeT::template ValueConverter<Int16>::Type Int16TreeT;
+    typedef typename TreeT::template ValueConverter<bool>::Type     BoolTreeT;
+    typedef typename TreeT::template ValueConverter<Index32>::Type  Index32TreeT;
+    typedef typename TreeT::template ValueConverter<Int16>::Type    Int16TreeT;
 
     typedef boost::mt11213b RandGen;
     RandGen mtRand(/*seed=*/0);
@@ -771,8 +772,9 @@ fillWithSpheres(
 
         for (; leafIt; ++leafIt) {
             for (it = leafIt->cbeginValueOn(); it; ++it) {
-                const int flags = it.getValue();
-                if (!(0xE00 & flags) && (flags & 0x100)) {
+
+                const int flags = int(it.getValue());
+                if (!(volume_to_mesh_internal::EDGES & flags) && (volume_to_mesh_internal::INSIDE & flags)) {
                     instancePoints.push_back(transform.indexToWorld(it.getCoord()));
                 }
 
@@ -861,9 +863,9 @@ ClosestSurfacePoint<GridT>::initialize(
     const GridT& grid, float isovalue, InterrupterT* interrupter)
 {
     mIsInitialized = false;
-    typedef tree::LeafManager<const TreeT> LeafManagerT;
-    typedef tree::LeafManager<IntTreeT>    IntLeafManagerT;
-    typedef tree::LeafManager<Int16TreeT>  Int16LeafManagerT;
+    typedef tree::LeafManager<const TreeT>      LeafManagerT;
+    typedef tree::LeafManager<Index32TreeT>     Index32LeafManagerT;
+    typedef tree::LeafManager<Int16TreeT>       Int16LeafManagerT;
     typedef typename GridT::ValueType ValueT;
 
     const TreeT& tree = grid.tree();
@@ -871,41 +873,50 @@ ClosestSurfacePoint<GridT>::initialize(
 
     { // Extract surface point cloud
 
-        {
-            LeafManagerT leafs(tree);
-            internal::SignData<TreeT, LeafManagerT>
-                signDataOp(tree, leafs, ValueT(isovalue));
+        mSignTreePt.reset(new Int16TreeT(0));
+        mIdxTreePt.reset(new Index32TreeT(boost::integer_traits<Index32>::const_max));
 
-            signDataOp.run();
-
-            mSignTreePt = signDataOp.signTree();
-            mIdxTreePt = signDataOp.idxTree();
-        }
+        BoolTreeT mask(false);
+        volume_to_mesh_internal::identifySurfaceIntersectingVoxels(mask, tree, ValueT(isovalue));
+        volume_to_mesh_internal::computeAuxiliaryData(*mSignTreePt, *mIdxTreePt, mask, tree, ValueT(isovalue));
 
         if (interrupter && interrupter->wasInterrupted()) return;
 
-        Int16LeafManagerT signLeafs(*mSignTreePt);
+        // count unique points
 
-        std::vector<size_t> regions(signLeafs.leafCount(), 0);
-        signLeafs.foreach(internal::CountPoints(regions));
+        typedef typename Int16TreeT::LeafNodeType   Int16LeafNodeType;
+        typedef typename Index32TreeT::LeafNodeType Index32LeafNodeType;
 
-        mPointListSize = 0;
-        for (size_t tmp = 0, n = 0, N = regions.size(); n < N; ++n) {
-            tmp = regions[n];
-            regions[n] = mPointListSize;
-            mPointListSize += tmp;
+        std::vector<Int16LeafNodeType*> signFlagsLeafNodes;
+        mSignTreePt->getNodes(signFlagsLeafNodes);
+
+        const tbb::blocked_range<size_t> auxiliaryLeafNodeRange(0, signFlagsLeafNodes.size());
+
+        boost::scoped_array<Index32> leafNodeOffsets(new Index32[signFlagsLeafNodes.size()]);
+
+        tbb::parallel_for(auxiliaryLeafNodeRange,
+            volume_to_mesh_internal::LeafNodePointCount<Int16LeafNodeType::LOG2DIM>
+                (signFlagsLeafNodes, leafNodeOffsets));
+
+        {
+            Index32 pointCount = 0;
+            for (size_t n = 0, N = signFlagsLeafNodes.size(); n < N; ++n) {
+                const Index32 tmp = leafNodeOffsets[n];
+                leafNodeOffsets[n] = pointCount;
+                pointCount += tmp;
+            }
+
+            mPointListSize = size_t(pointCount);
+            mSurfacePointList.reset(new Vec3s[mPointListSize]);
         }
 
-        if (mPointListSize == 0) return;
 
-        mSurfacePointList.reset(new Vec3s[mPointListSize]);
+        std::vector<Index32LeafNodeType*> pointIndexLeafNodes;
+        mIdxTreePt->getNodes(pointIndexLeafNodes);
 
-        internal::GenPoints<TreeT, Int16LeafManagerT>
-            pointOp(signLeafs, tree, *mIdxTreePt, mSurfacePointList, regions, transform, isovalue);
-
-        pointOp.run();
-
-        mIdxTreePt->topologyUnion(*mSignTreePt);
+        tbb::parallel_for(auxiliaryLeafNodeRange,
+            volume_to_mesh_internal::ComputePoints<TreeT>(mSurfacePointList.get(), tree, pointIndexLeafNodes,
+                signFlagsLeafNodes, leafNodeOffsets, transform, ValueT(isovalue)));
     }
 
     if (interrupter && interrupter->wasInterrupted()) return;
@@ -925,22 +936,20 @@ ClosestSurfacePoint<GridT>::initialize(
     mMaxRadiusSqr *= mMaxRadiusSqr;
 
 
-    IntLeafManagerT idxLeafs(*mIdxTreePt);
+    Index32LeafManagerT idxLeafs(*mIdxTreePt);
 
+    typedef typename Index32TreeT::RootNodeType Index32RootNodeT;
+    typedef typename Index32RootNodeT::NodeChainType Index32NodeChainT;
+    BOOST_STATIC_ASSERT(boost::mpl::size<Index32NodeChainT>::value > 1);
+    typedef typename boost::mpl::at<Index32NodeChainT, boost::mpl::int_<1> >::type Index32InternalNodeT;
 
-    typedef typename IntTreeT::RootNodeType IntRootNodeT;
-    typedef typename IntRootNodeT::NodeChainType IntNodeChainT;
-    BOOST_STATIC_ASSERT(boost::mpl::size<IntNodeChainT>::value > 1);
-    typedef typename boost::mpl::at<IntNodeChainT, boost::mpl::int_<1> >::type IntInternalNodeT;
+    typename Index32TreeT::NodeCIter nIt = mIdxTreePt->cbeginNode();
+    nIt.setMinDepth(Index32TreeT::NodeCIter::LEAF_DEPTH - 1);
+    nIt.setMaxDepth(Index32TreeT::NodeCIter::LEAF_DEPTH - 1);
 
+    std::vector<const Index32InternalNodeT*> internalNodes;
 
-    typename IntTreeT::NodeCIter nIt = mIdxTreePt->cbeginNode();
-    nIt.setMinDepth(IntTreeT::NodeCIter::LEAF_DEPTH - 1);
-    nIt.setMaxDepth(IntTreeT::NodeCIter::LEAF_DEPTH - 1);
-
-    std::vector<const IntInternalNodeT*> internalNodes;
-
-    const IntInternalNodeT* node = NULL;
+    const Index32InternalNodeT* node = NULL;
     for (; nIt; ++nIt) {
         nIt.getNode(node);
         if (node) internalNodes.push_back(node);
@@ -949,10 +958,10 @@ ClosestSurfacePoint<GridT>::initialize(
     std::vector<IndexRange>().swap(mLeafRanges);
     mLeafRanges.resize(internalNodes.size());
 
-    std::vector<const IntLeafT*>().swap(mLeafNodes);
+    std::vector<const Index32LeafT*>().swap(mLeafNodes);
     mLeafNodes.reserve(idxLeafs.leafCount());
 
-    typename IntInternalNodeT::ChildOnCIter leafIt;
+    typename Index32InternalNodeT::ChildOnCIter leafIt;
     mMaxNodeLeafs = 0;
     for (size_t n = 0, N = internalNodes.size(); n < N; ++n) {
 
@@ -972,7 +981,7 @@ ClosestSurfacePoint<GridT>::initialize(
     std::vector<Vec4R>().swap(mLeafBoundingSpheres);
     mLeafBoundingSpheres.resize(mLeafNodes.size());
 
-    internal::LeafBS<IntLeafT> leafBS(
+    internal::LeafBS<Index32LeafT> leafBS(
         mLeafBoundingSpheres, mLeafNodes, transform, mSurfacePointList);
     leafBS.run();
 
@@ -996,7 +1005,7 @@ ClosestSurfacePoint<GridT>::search(std::vector<Vec3R>& points,
     distances.clear();
     distances.resize(points.size(), mMaxRadiusSqr);
 
-    internal::ClosestPointDist<IntLeafT> cpd(points, distances, mSurfacePointList,
+    internal::ClosestPointDist<Index32LeafT> cpd(points, distances, mSurfacePointList,
         mLeafNodes, mLeafRanges, mLeafBoundingSpheres, mNodeBoundingSpheres,
         mMaxNodeLeafs, transformPoints);
 

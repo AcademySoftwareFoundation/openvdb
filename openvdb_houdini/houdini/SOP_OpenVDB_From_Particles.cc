@@ -425,7 +425,7 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "closing", "Closing")
               .setDefault(PRMoneDefaults)
-              .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 10)
+              .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
               .setHelpText("Number of morphological closing iterations "
                   "used to fill gaps in the active voxel region."));
 
@@ -697,6 +697,13 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
         mTime = context.getTime();
         mVoxelSize = float(evalFloat("voxelsize", 0, mTime));
 
+        if (mVoxelSize < 1e-5) {
+            std::ostringstream ostr;
+            ostr << "The voxel size ("<< mVoxelSize << ") is too small.";
+            addError(SOP_MESSAGE, ostr.str().c_str());
+            return error();
+        }
+
         const bool outputLevelSetGrid   = bool(evalInt("distancevdb",   0, mTime));
         const bool outputFogVolumeGrid  = bool(evalInt("fogvdb",  0, mTime));
         const bool outputMaskVolumeGrid = bool(evalInt("maskvdb", 0, mTime));
@@ -789,7 +796,7 @@ SOP_OpenVDB_From_Particles::cookMySop(OP_Context& context)
             int dilation = evalInt("dilation", 0, mTime);
             int closing = evalInt("closing", 0, mTime);
             int smoothing = evalInt("smoothing", 0, mTime);
-            int bandWidth = int(background);
+            int bandWidth = int(std::ceil(background / mVoxelSize));
             openvdb::MaskGrid::Ptr pointMaskGrid;
 
             if (doSphereConversion) {

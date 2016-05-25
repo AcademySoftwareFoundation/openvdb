@@ -81,35 +81,35 @@ class NodeUnionImpl</*ValueIsClass=*/true, ValueT, ChildT>
 {
 private:
     union { ChildT* child; ValueT* value; } mUnion;
-    bool mHasValue;
+    bool mHasChild;
 
 public:
-    NodeUnionImpl() : mHasValue(false) { this->setChild(NULL); }
-    NodeUnionImpl(const NodeUnionImpl& other) : mHasValue(false)
+    NodeUnionImpl() : mHasChild(true) { this->setChild(NULL); }
+    NodeUnionImpl(const NodeUnionImpl& other) : mHasChild(true)
     {
-        if (other.mHasValue) {
-            this->setValue(other.getValue());
-        } else {
+        if (other.mHasChild) {
             this->setChild(other.getChild());
+        } else {
+            this->setValue(other.getValue());
         }
     }
     NodeUnionImpl& operator=(const NodeUnionImpl& other)
     {
-        if (other.mHasValue) {
-            this->setValue(other.getValue());
-        } else {
+        if (other.mHasChild) {
             this->setChild(other.getChild());
+        } else {
+            this->setValue(other.getValue());
         } 
         return *this;
     }
     ~NodeUnionImpl() { this->setChild(NULL); }
 
-    ChildT* getChild() const { return mHasValue ? NULL : mUnion.child; }
+    ChildT* getChild() const { return mHasChild ? mUnion.child : NULL; }
     void setChild(ChildT* child)
     {
-        if (mHasValue) delete mUnion.value;
+        if (!mHasChild) delete mUnion.value;
         mUnion.child = child;
-        mHasValue = false;
+        mHasChild = true;
     }
 
     const ValueT& getValue() const { return *mUnion.value; }
@@ -118,9 +118,9 @@ public:
     {
         /// @todo To minimize storage across nodes, intern and reuse
         /// common values, using, e.g., boost::flyweight.
-        if (mHasValue) delete mUnion.value;
+        if (!mHasChild) delete mUnion.value;
         mUnion.value = new ValueT(val);
-        mHasValue = true;
+        mHasChild = false;
     }
 };
 
