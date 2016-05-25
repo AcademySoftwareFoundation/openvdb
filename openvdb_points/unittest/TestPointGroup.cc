@@ -51,15 +51,39 @@ public:
     CPPUNIT_TEST(testAppendDrop);
     CPPUNIT_TEST(testCompact);
     CPPUNIT_TEST(testSet);
+    CPPUNIT_TEST(testFilter);
 
     CPPUNIT_TEST_SUITE_END();
 
     void testAppendDrop();
     void testCompact();
     void testSet();
+    void testFilter();
 }; // class TestPointGroup
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestPointGroup);
+
+////////////////////////////////////////
+
+
+class FirstFilter
+{
+public:
+    struct Data { };
+
+    FirstFilter() { }
+
+    template <typename LeafT>
+    static FirstFilter create(const LeafT&, const Data&) {
+        return FirstFilter();
+    }
+
+    template <typename IterT>
+    bool valid(const IterT& iter) const {
+        return *iter == 0;
+    }
+}; // class FirstFilter
+
 
 ////////////////////////////////////////
 
@@ -412,6 +436,155 @@ TestPointGroup::testSet()
             CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(6));
             CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "test"), Index64(4));
         }
+    }
+}
+
+
+void
+TestPointGroup::testFilter()
+{
+    using namespace openvdb;
+    using namespace openvdb::tools;
+
+    typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
+
+    typedef PointIndexGrid PointIndexGrid;
+
+    const float voxelSize(1.0);
+    math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
+    PointDataGrid::Ptr grid;
+
+    { // four points in the same leaf
+        std::vector<Vec3s> positions;
+        positions.push_back(Vec3s(1, 1, 1));
+        positions.push_back(Vec3s(1, 2, 1));
+        positions.push_back(Vec3s(2, 1, 1));
+        positions.push_back(Vec3s(2, 2, 1));
+        positions.push_back(Vec3s(100, 100, 100));
+        positions.push_back(Vec3s(100, 101, 100));
+
+        const PointAttributeVector<Vec3s> pointList(positions);
+
+        PointIndexGrid::Ptr pointIndexGrid =
+            openvdb::tools::createPointIndexGrid<PointIndexGrid>(pointList, *transform);
+
+        grid = createPointDataGrid<PointDataGrid>(  *pointIndexGrid, pointList,
+                                                    AttributeVec3s::attributeType(), *transform);
+    }
+
+    PointDataTree& tree = grid->tree();
+
+    { // first point filter
+        appendGroup(tree, "first");
+
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(6));
+        CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "first"), Index64(0));
+
+        FirstFilter::Data data;
+
+        setGroupByFilter<PointDataTree, FirstFilter>(tree, "first", data);
+
+        PointDataTree::LeafCIter iter = tree.cbeginLeaf();
+
+        for ( ; iter; ++iter) {
+            CPPUNIT_ASSERT_EQUAL(iter->groupPointCount("first"), Index64(1));
+        }
+
+        CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "first"), Index64(2));
+    }
+
+    const openvdb::BBoxd bbox(openvdb::Vec3d(0, 1.5, 0), openvdb::Vec3d(101, 100.5, 101));
+
+    { // bbox filter
+        appendGroup(tree, "bbox");
+
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(6));
+        CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "bbox"), Index64(0));
+
+        BBoxFilter::Data data(*transform, bbox);
+
+        setGroupByFilter<PointDataTree, BBoxFilter>(tree, "bbox", data);
+
+        CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "bbox"), Index64(3));
+    }
+
+    { // first point filter and bbox filter (intersection of the above two filters)
+        appendGroup(tree, "first_bbox");
+
+        CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(6));
+        CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "first_bbox"), Index64(0));
+
+        typedef BinaryFilter<FirstFilter, BBoxFilter>   FirstBBoxFilter;
+
+        FirstFilter::Data firstData;
+        BBoxFilter::Data bboxData(*transform, bbox);
+        FirstBBoxFilter::Data data(firstData, bboxData);
+
+        setGroupByFilter<PointDataTree, FirstBBoxFilter>(tree, "first_bbox", data);
+
+        CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "first_bbox"), Index64(1));
+
+        std::vector<Vec3f> positions;
+
+        for (PointDataTree::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
+            typedef PointDataTree::LeafNodeType::IndexOnIter IndexOnIter;
+            GroupFilter filter(GroupFilter::create(*iter, GroupFilter::Data("first_bbox")));
+            FilterIndexIter<IndexOnIter, GroupFilter> filterIndexIter(iter->beginIndexOn(), filter);
+
+            AttributeHandle<Vec3f>::Ptr handle = AttributeHandle<Vec3f>::create(iter->attributeArray("P"));
+
+            for ( ; filterIndexIter; ++filterIndexIter) {
+                const openvdb::Coord ijk = filterIndexIter.indexIter().getCoord();
+                positions.push_back(handle->get(*filterIndexIter) + ijk.asVec3d());
+            }
+        }
+
+        CPPUNIT_ASSERT_EQUAL(positions.size(), size_t(1));
+        CPPUNIT_ASSERT_EQUAL(positions[0], Vec3f(100, 100, 100));
+    }
+
+    { // add 1000 points in three leafs (positions aren't important)
+
+        std::vector<Vec3s> positions;
+        for (int i = 0; i < 1000; i++) {
+            positions.push_back(openvdb::Vec3f(1, 1, 1));
+        }
+        for (int i = 0; i < 1000; i++) {
+            positions.push_back(openvdb::Vec3f(1, 1, 9));
+        }
+        for (int i = 0; i < 1000; i++) {
+            positions.push_back(openvdb::Vec3f(9, 9, 9));
+        }
+
+        const PointAttributeVector<Vec3s> pointList(positions);
+
+        PointIndexGrid::Ptr pointIndexGrid =
+            openvdb::tools::createPointIndexGrid<PointIndexGrid>(pointList, *transform);
+
+        grid = createPointDataGrid<PointDataGrid>(  *pointIndexGrid, pointList,
+                                                    AttributeVec3s::attributeType(), *transform);
+
+        PointDataTree& newTree = grid->tree();
+
+        CPPUNIT_ASSERT_EQUAL(pointCount(newTree), size_t(3000));
+
+        // random - maximum
+
+        appendGroup(newTree, "random_maximum");
+
+        const size_t target = 1001;
+
+        setGroupByRandomTarget(newTree, "random_maximum", target);
+
+        CPPUNIT_ASSERT_EQUAL(groupPointCount(newTree, "random_maximum"), target);
+
+        // random - percentage
+
+        appendGroup(newTree, "random_percentage");
+
+        setGroupByRandomPercentage(newTree, "random_percentage", 33.333333f);
+
+        CPPUNIT_ASSERT_EQUAL(groupPointCount(newTree, "random_percentage"), size_t(1000));
     }
 }
 

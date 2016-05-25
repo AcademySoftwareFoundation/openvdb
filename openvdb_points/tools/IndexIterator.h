@@ -204,6 +204,7 @@ template<typename TreeT, typename ValueT> struct IndexIterTraits;
 template<typename TreeT>
 struct IndexIterTraits<TreeT, typename TreeT::LeafNodeType::ValueAllCIter> {
     typedef typename TreeT::LeafNodeType::IndexAllIter Iterator;
+    static bool dense() { return true; }
     static Iterator begin(const typename TreeT::LeafNodeType& leaf) {
         return Iterator(leaf.beginIndexAll());
     }
@@ -212,6 +213,7 @@ struct IndexIterTraits<TreeT, typename TreeT::LeafNodeType::ValueAllCIter> {
 template<typename TreeT>
 struct IndexIterTraits<TreeT, typename TreeT::LeafNodeType::ValueOnCIter> {
     typedef typename TreeT::LeafNodeType::IndexOnIter Iterator;
+    static bool dense() { return false; }
     static Iterator begin(const typename TreeT::LeafNodeType& leaf) {
         return Iterator(leaf.beginIndexOn());
     }
@@ -220,6 +222,7 @@ struct IndexIterTraits<TreeT, typename TreeT::LeafNodeType::ValueOnCIter> {
 template<typename TreeT>
 struct IndexIterTraits<TreeT, typename TreeT::LeafNodeType::ValueOffCIter> {
     typedef typename TreeT::LeafNodeType::IndexOffIter Iterator;
+    static bool dense() { return false; }
     static Iterator begin(const typename TreeT::LeafNodeType& leaf) {
         return Iterator(leaf.beginIndexOff());
     }
