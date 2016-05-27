@@ -107,7 +107,7 @@ public:
     void process(GridT& grid)
     {
         typedef openvdb::tools::DiscreteField<VelocityGridT, SamplerT> FieldT;
-        FieldT field(mVelGrid);
+        const FieldT field(mVelGrid);
 
         openvdb::tools::LevelSetAdvection<GridT, FieldT, hvdb::Interrupter>
             advection(grid, field, &mBoss);
@@ -134,6 +134,9 @@ public:
     }
 
 private:
+    AdvectOp(const AdvectOp&);// undefined
+    AdvectOp& operator=(const AdvectOp&);// undefined
+    
     AdvectionParms& mParms;
     const VelocityGridT& mVelGrid;
     hvdb::Interrupter& mBoss;

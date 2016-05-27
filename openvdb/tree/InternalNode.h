@@ -74,13 +74,13 @@ public:
     typedef util::NodeMask<Log2Dim>               NodeMaskType;
 
     static const Index
-        LOG2DIM      = Log2Dim,
-        TOTAL        = Log2Dim + ChildNodeType::TOTAL,
-        DIM          = 1 << TOTAL,
-        NUM_VALUES   = 1 << (3 * Log2Dim),
+        LOG2DIM      = Log2Dim,// Log2 of tile count in one dimension
+        TOTAL        = Log2Dim + ChildNodeType::TOTAL,// Log2 of voxel count in one dimension 
+        DIM          = 1 << TOTAL,// Total voxel count in one dimension 
+        NUM_VALUES   = 1 << (3 * Log2Dim),// Total voxels count represented by this node
         LEVEL        = 1 + ChildNodeType::LEVEL; // level 0 = leaf
     static const Index64
-        NUM_VOXELS   = uint64_t(1) << (3 * TOTAL); // total # of voxels represented by this node
+        NUM_VOXELS   = uint64_t(1) << (3 * TOTAL); // total voxel count represented by this node
 
     /// @brief ValueConverter<T>::Type is the type of an InternalNode having the same
     /// child hierarchy and dimensions as this node but a different value type, T.
@@ -100,11 +100,19 @@ public:
     };
 
 
+    /// @brief Default constructor
+    /// @warning The resulting InternNode is un-initialized
     InternalNode() {}
 
+    /// @brief Constructor of an InternalNode with dense inactive tiles of the specified value.
+    /// @param offValue Background value used for inactive values
     explicit InternalNode(const ValueType& offValue);
 
-    InternalNode(const Coord&, const ValueType& fillValue, bool active = false);
+    /// @brief Constructs an InternalNode with dense tiles
+    /// @param origin    The location in index space of the fist tile value
+    /// @param fillValue Value assigned to all the tiles
+    /// @param active    State assigned to all the tiles
+    InternalNode(const Coord& origin, const ValueType& fillValue, bool active = false);
 
 #ifndef OPENVDB_2_ABI_COMPATIBLE
     InternalNode(PartialCreate, const Coord&, const ValueType& fillValue, bool active = false);
@@ -149,6 +157,7 @@ protected:
     // The following class templates implement the iterator interfaces specified in Iterator.h
     // by providing getItem(), setItem() and/or modifyItem() methods.
 
+    // Sparse iterator that visits child nodes of an InternNode
     template<typename NodeT, typename ChildT, typename MaskIterT, typename TagT>
     struct ChildIter: public SparseIteratorBase<
         MaskIterT, ChildIter<NodeT, ChildT, MaskIterT, TagT>, NodeT, ChildT>
@@ -169,6 +178,7 @@ protected:
         // Note: modifyItem() isn't implemented, since it's not useful for child node pointers.
     };// ChildIter
 
+    // Sparse iterator that visits tile values of an InternNode
     template<typename NodeT, typename ValueT, typename MaskIterT, typename TagT>
     struct ValueIter: public SparseIteratorBase<
         MaskIterT, ValueIter<NodeT, ValueT, MaskIterT, TagT>, NodeT, ValueT>
@@ -190,6 +200,7 @@ protected:
         }
     };// ValueIter
 
+    // Dense iterator that visits both tiles and child nodes of an InternNode
     template<typename NodeT, typename ChildT, typename ValueT, typename TagT>
     struct DenseIter: public DenseIteratorBase<
         MaskDenseIterator, DenseIter<NodeT, ChildT, ValueT, TagT>, NodeT, ChildT, ValueT>
@@ -265,9 +276,18 @@ public:
     ValueAllIter   beginValueAll() { return ValueAllIter(mChildMask.beginOff(), this); }
 
 
+    /// @return The dimension of this InternNode
+    /// @details The number of voxels in one coordinate direction covered by this node
     static Index dim() { return DIM; }
+    /// @return The level of this node
+    /// @details Level 0 is by definition the level of the leaf nodes
     static Index getLevel() { return LEVEL; }
+    /// @brief Populated an stil::vector with the dimension of all the
+    /// nodes in the branch starting with this node.
     static void getNodeLog2Dims(std::vector<Index>& dims);
+    /// @return The dimension of the child nodes of this node.
+    /// @details The number of voxels in one coordinate direction
+    /// covered by a child node of this node.
     static Index getChildDim() { return ChildNodeType::DIM; }
 
     /// Return the linear table offset of the given global or local coordinates.
@@ -304,6 +324,7 @@ public:
     /// spanned by the node regardless of its content.
     CoordBBox getNodeBoundingBox() const { return CoordBBox::createCube(mOrigin, DIM); }
 
+    /// @return True if this node contains no child nodes.
     bool isEmpty() const { return mChildMask.isOff(); }
 
     /// Return @c true if all of this node's table entries have the same active state

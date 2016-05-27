@@ -125,6 +125,8 @@ Version 3.2.0 - In development
     - Fixed a bug in the VolumeToMesh tool that produced artifacts for
       adaptive surface extraction on clipped level sets.
       [Reported by Jeff Lait]
+    - Corrected empty grid background value in tools::meshToVolume().
+      [Contributed by Jeff Lait]
 
     API changes:
     - Deprecated math::Mat3::setBasis and math::Mat4::setBasis.

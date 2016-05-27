@@ -171,6 +171,9 @@ Bug fixes:
 - Fixed a bug in the @vdblink::tools::VolumeToMesh VolumeToMesh@endlink tool that
   produced artifacts for adaptive surface extraction on clipped level sets.
   <I>[Reported by Jeff&nbsp;Lait]</I>
+- Corrected empty grid background value in
+  @vdblink::tools::meshToVolume() mesh-to-volume converter@endlink
+  <I>[Contributed by Jeff&nbsp;Lait]</I>
 
 @par
 API changes:

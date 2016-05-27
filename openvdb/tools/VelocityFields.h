@@ -154,16 +154,16 @@ inline math::Vec3<ScalarT>
 EnrightField<ScalarT>::operator() (const Vec3d& xyz, ValueType time) const
 {
     const ScalarT pi = boost::math::constants::pi<ScalarT>();
-    const ScalarT phase = pi / ScalarT(3.0);
+    const ScalarT phase = pi / ScalarT(3);
     const ScalarT Px =  pi * ScalarT(xyz[0]), Py = pi * ScalarT(xyz[1]), Pz = pi * ScalarT(xyz[2]);
-    const ScalarT tr =  cos(ScalarT(time) * phase);
-    const ScalarT a  =  sin(ScalarT(2.0)*Py);
-    const ScalarT b  = -sin(ScalarT(2.0)*Px);
-    const ScalarT c  =  sin(ScalarT(2.0)*Pz);
+    const ScalarT tr =  math::Cos(ScalarT(time) * phase);
+    const ScalarT a  =  math::Sin(ScalarT(2)*Py);
+    const ScalarT b  = -math::Sin(ScalarT(2)*Px);
+    const ScalarT c  =  math::Sin(ScalarT(2)*Pz);
     return math::Vec3<ScalarT>(
-        tr * ( ScalarT(2) * math::Pow2(sin(Px)) * a * c ),
-        tr * ( b * math::Pow2(sin(Py)) * c ),
-        tr * ( b * a * math::Pow2(sin(Pz)) ));
+                               tr * ( ScalarT(2) * math::Pow2(math::Sin(Px)) * a * c ),
+                               tr * ( b * math::Pow2(math::Sin(Py)) * c ),
+                               tr * ( b * a * math::Pow2(math::Sin(Pz)) ));
 }
 
 
