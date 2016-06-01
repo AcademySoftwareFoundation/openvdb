@@ -79,6 +79,8 @@ Version 3.2.0 - In development
       math::Mat4::setColumns.
     - Added util::NodeMask::isConstant method for faster bit processing.
     - tools::Prune performs an improved estimate of tile values by means of medians.
+    - Added toggle to switch between cell centered and node centered transforms to
+      tools::PointPartitioner.
 
     Bug fixes:
     - Fixed a bug in tools::LevelSetAdvection that could cause

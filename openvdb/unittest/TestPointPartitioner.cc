@@ -91,6 +91,9 @@ TestPointPartitioner::testPartitioner()
 
     CPPUNIT_ASSERT(!partitioner->empty());
 
+    // The default interpretation should be cell-centered.
+    CPPUNIT_ASSERT(partitioner->usingCellCenteredTransform());
+
     const size_t expectedPageCount = pointCount / (1u << PointPartitioner::LOG2DIM);
 
     CPPUNIT_ASSERT_EQUAL(expectedPageCount, partitioner->size());

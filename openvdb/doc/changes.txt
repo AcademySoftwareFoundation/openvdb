@@ -111,6 +111,8 @@ Improvements:
   method for faster bit processing.
 - @vdblink::tools::prune tools::prune@endlink performs an improved estimate
   of tile values by means of medians.
+- Added toggle to switch between cell centered and node centered transforms
+  to @vdblink::tools::PointPartitioner tools::PointPartitioner@endlink
 
 @par
 Bug fixes:
