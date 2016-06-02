@@ -504,10 +504,10 @@ public:
     ///                otherwise mark them as inactive.
     ///
     /// @note This operation generates a dense representation of the
-    ///       filled box. This implies that active tiles are voxelized, i.e. only active 
+    ///       filled box. This implies that active tiles are voxelized, i.e. only active
     ///       voxels are generated from this fill operation.
     void denseFill(const CoordBBox& bbox, const ValueType& value, bool active = true);
-    
+
     /// @brief Reduce the memory footprint of this tree by replacing with tiles
     /// any nodes whose values are all the same (optionally to within a tolerance)
     /// and have the same active state.
@@ -679,7 +679,7 @@ public:
     ///
     /// @param threaded if true, this operation is multi-threaded (over the internal nodes).
     ///
-    /// @warning This method can explode the tree's memory footprint, especially if it 
+    /// @warning This method can explode the tree's memory footprint, especially if it
     /// contains active tiles at the upper levels, e.g. root level!
     void voxelizeActiveTiles(bool threaded = true);
 
@@ -1219,16 +1219,17 @@ protected:
     /// that this tree is about to be deleted.
     void releaseAllAccessors();
 
-    // TBB body object used to deallocates leafnodes in parallel.
-    struct DeallocateLeafNodes {
-        DeallocateLeafNodes(std::vector<LeafNodeType*>& nodes)
+    // TBB body object used to deallocates nodes in parallel.
+    template<typename NodeType>
+    struct DeallocateNodes {
+        DeallocateNodes(std::vector<NodeType*>& nodes)
             : mNodes(nodes.empty() ? NULL : &nodes.front()) { }
         void operator()(const tbb::blocked_range<size_t>& range) const {
             for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
                 delete mNodes[n]; mNodes[n] = NULL;
             }
         }
-        LeafNodeType ** const mNodes;
+        NodeType ** const mNodes;
     };
 
     //
@@ -1484,10 +1485,17 @@ Tree<RootNodeType>::clear()
 {
     std::vector<LeafNodeType*> leafnodes;
     this->stealNodes(leafnodes);
-    mRoot.clear();
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, leafnodes.size()),
-        DeallocateLeafNodes(leafnodes));
+        DeallocateNodes<LeafNodeType>(leafnodes));
+
+    std::vector<typename RootNodeType::ChildNodeType*> internalNodes;
+    this->stealNodes(internalNodes);
+
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, internalNodes.size()),
+        DeallocateNodes<typename RootNodeType::ChildNodeType>(internalNodes));
+
+    mRoot.clear();
 
     this->clearAllAccessors();
 }
