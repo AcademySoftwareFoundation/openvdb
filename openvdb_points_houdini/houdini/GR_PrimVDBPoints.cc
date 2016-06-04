@@ -74,6 +74,7 @@
 #define THIS_HOOK_NAME "GUI_PrimVDBPointsHook"
 #define THIS_PRIMITIVE_NAME "GR_PrimVDBPoints"
 
+static RE_ShaderHandle thePixelShader("particle/GL32/pixel.prog");
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
 static RE_ShaderHandle thePointShader("particle/GL32/point.prog");
 #else
@@ -906,6 +907,7 @@ GR_PrimVDBPoints::update(RE_Render *r,
     // patch the shaders at run-time to add an offset (does nothing if already patched)
 
     patchVertexShader(r, theLineShader);
+    patchVertexShader(r, thePixelShader);
     patchVertexShader(r, thePointShader);
 
     const GT_PrimVDB& gt_primVDB = static_cast<const GT_PrimVDB&>(*primh);
@@ -1180,15 +1182,19 @@ GR_PrimVDBPoints::render(RE_Render *r,
 
     if (myGeo) {
 
+        const bool pointDisplay = commonOpts.particleDisplayType() == GR_PARTICLE_POINTS;
+
+        RE_ShaderHandle& shader = pointDisplay ? thePointShader : thePixelShader;
+
         // bind the shader
 
         r->pushShader();
-        r->bindShader(thePointShader);
+        r->bindShader(shader);
 
         // bind the position offset
 
         UT_Vector3F positionOffset(mCentroid.x(), mCentroid.y(), mCentroid.z());
-        thePointShader->bindVector(r, "offset", positionOffset);
+        shader->bindVector(r, "offset", positionOffset);
 
         // for default point colors, use white if dark viewport background, black otherwise
 
@@ -1199,9 +1205,9 @@ GR_PrimVDBPoints::render(RE_Render *r,
             myGeo->createConstAttribute(r, "Cd", RE_GPU_FLOAT32, 3, (darkBackground ? white : black));
         }
 
-        r->pushPointSize(commonOpts.pointSize());
+        if (pointDisplay)   r->pushPointSize(commonOpts.pointSize());
         myGeo->draw(r, RE_GEO_WIRE_IDX);
-        r->popPointSize();
+        if (pointDisplay)   r->popPointSize();
         r->popShader();
     }
 
