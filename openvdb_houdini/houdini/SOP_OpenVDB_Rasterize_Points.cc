@@ -2727,7 +2727,7 @@ rasterize(RasterizationSettings& settings, std::vector<openvdb::GridBase::Ptr>& 
     if (settings.exportPointMask) {
 
         typedef openvdb::Grid<BoolTreeType> BoolGridType;
-        typename BoolGridType::Ptr exportMask = BoolGridType::create();
+        BoolGridType::Ptr exportMask = BoolGridType::create();
 
         exportMask->setTransform(settings.transform->copy());
         exportMask->setName("pointmask");
