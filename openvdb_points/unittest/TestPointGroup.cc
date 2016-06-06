@@ -566,13 +566,13 @@ TestPointGroup::testFilter()
 
         PointDataTree& newTree = grid->tree();
 
-        CPPUNIT_ASSERT_EQUAL(pointCount(newTree), size_t(3000));
+        CPPUNIT_ASSERT_EQUAL(pointCount(newTree), Index64(3000));
 
         // random - maximum
 
         appendGroup(newTree, "random_maximum");
 
-        const size_t target = 1001;
+        const Index64 target = 1001;
 
         setGroupByRandomTarget(newTree, "random_maximum", target);
 
@@ -584,7 +584,7 @@ TestPointGroup::testFilter()
 
         setGroupByRandomPercentage(newTree, "random_percentage", 33.333333f);
 
-        CPPUNIT_ASSERT_EQUAL(groupPointCount(newTree, "random_percentage"), size_t(1000));
+        CPPUNIT_ASSERT_EQUAL(groupPointCount(newTree, "random_percentage"), Index64(1000));
     }
 }
 
