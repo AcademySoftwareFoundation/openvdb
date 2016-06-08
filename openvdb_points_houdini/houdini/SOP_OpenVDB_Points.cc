@@ -865,10 +865,10 @@ convertPointDataGrid(GU_Detail& detail, openvdb_houdini::VdbPrimCIterator& vdbIt
 {
     typedef PointDataTree::LeafNodeType             PointDataLeaf;
 
-    GU_Detail geo;
-
     // Mesh each VDB primitive independently
     for (; vdbIt; ++vdbIt) {
+
+        GU_Detail geo;
 
         const GridBase& baseGrid = vdbIt->getGrid();
         if (!baseGrid.isType<PointDataGrid>()) continue;
@@ -993,9 +993,9 @@ convertPointDataGrid(GU_Detail& detail, openvdb_houdini::VdbPrimCIterator& vdbIt
 
             convertPointDataGridGroup(pointGroup, leafOffsets, index);
         }
-    }
 
-    detail.merge(geo);
+        detail.merge(geo);
+    }
 }
 
 
