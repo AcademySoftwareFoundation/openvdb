@@ -225,6 +225,13 @@ TestIndexFilter::testMultiGroupFilter()
 
     // test multi group iteration
 
+    { // all (implicit, no include or exclude)
+        std::vector<Name> include;
+        std::vector<Name> exclude;
+        std::vector<int> indices; indices += 0, 1, 2, 3, 4;
+        CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
+    }
+
     { // all include
         std::vector<Name> include; include += "all";
         std::vector<Name> exclude;
@@ -234,6 +241,13 @@ TestIndexFilter::testMultiGroupFilter()
 
     { // all exclude
         std::vector<Name> include;
+        std::vector<Name> exclude; exclude += "all";
+        std::vector<int> indices;
+        CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
+    }
+
+    { // all include and exclude
+        std::vector<Name> include; include += "all";
         std::vector<Name> exclude; exclude += "all";
         std::vector<int> indices;
         CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
@@ -250,6 +264,13 @@ TestIndexFilter::testMultiGroupFilter()
         std::vector<Name> include; include += "odd";
         std::vector<Name> exclude;
         std::vector<int> indices; indices += 1, 3;
+        CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
+    }
+
+    { // odd include and exclude
+        std::vector<Name> include; include += "odd";
+        std::vector<Name> exclude; exclude += "odd";
+        std::vector<int> indices;
         CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 
