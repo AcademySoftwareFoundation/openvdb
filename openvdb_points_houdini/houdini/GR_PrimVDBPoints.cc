@@ -74,6 +74,7 @@
 #define THIS_HOOK_NAME "GUI_PrimVDBPointsHook"
 #define THIS_PRIMITIVE_NAME "GR_PrimVDBPoints"
 
+static RE_ShaderHandle thePixelShader("particle/GL32/pixel.prog");
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
 static RE_ShaderHandle thePointShader("particle/GL32/point.prog");
 #else
@@ -246,6 +247,61 @@ GUI_PrimVDBPointsHook::createPrimitive(
 
     return NULL;
 }
+
+
+////////////////////////////////////////
+
+
+namespace {
+
+void patchVertexShader(RE_Render* r, RE_ShaderHandle& shader)
+{
+    // check if the point shader has already been patched
+
+    r->pushShader();
+    r->bindShader(shader);
+
+    RE_ShaderStage* patchedVertexShader = shader->getShader("pointOffset", RE_SHADER_VERTEX);
+
+    if (patchedVertexShader) {
+        r->popShader();
+    }
+    else {
+
+        // retrieve the vertex shader source
+
+        UT_String vertexSource;
+        shader->getShaderSource(r, vertexSource, RE_SHADER_VERTEX);
+
+        r->popShader();
+
+        // patch the shader to add a uniform offset to the position
+
+        vertexSource.substitute("void main()", "uniform vec3 offset;\n\nvoid main()", /*all=*/false);
+        vertexSource.substitute("vec4(P, 1.0)", "vec4(P + offset, 1.0)", /*all=*/false);
+
+        // move the version up to the top of the file
+
+        vertexSource.substitute("#version ", "// #version");
+        vertexSource.insert(0, "#version 150\n");
+
+        // remove the existing shader and add the patched one
+
+        shader->clearShaders(r, RE_SHADER_VERTEX);
+
+        UT_String message;
+
+        const bool success = shader->addShader(r, RE_SHADER_VERTEX, vertexSource, "pointOffset", 150, &message);
+
+        if (!success) {
+            std::cerr << message.toStdString() << std::endl;
+        }
+
+        assert(success);
+    }
+}
+
+} // namespace
 
 
 ////////////////////////////////////////
@@ -848,6 +904,12 @@ GR_PrimVDBPoints::update(RE_Render *r,
              const GT_PrimitiveHandle &primh,
              const GR_UpdateParms &p)
 {
+    // patch the shaders at run-time to add an offset (does nothing if already patched)
+
+    patchVertexShader(r, theLineShader);
+    patchVertexShader(r, thePixelShader);
+    patchVertexShader(r, thePointShader);
+
     const GT_PrimVDB& gt_primVDB = static_cast<const GT_PrimVDB&>(*primh);
 
     const openvdb::GridBase* grid =
@@ -1101,56 +1163,6 @@ GR_PrimVDBPoints::removeBuffer(const std::string& name)
     myGeo->clearAttribute(name.c_str());
 }
 
-namespace {
-
-void patchVertexShader(RE_Render* r, RE_ShaderHandle& shader)
-{
-    // check if the point shader has already been patched
-
-    r->pushShader();
-    r->bindShader(shader);
-
-    RE_ShaderStage* patchedVertexShader = shader->getShader("pointOffset", RE_SHADER_VERTEX);
-
-    if (patchedVertexShader) {
-        r->popShader();
-    }
-    else {
-        // retrieve the vertex shader source
-
-        UT_String vertexSource;
-        shader->getShaderSource(r, vertexSource, RE_SHADER_VERTEX);
-
-        r->popShader();
-
-        // patch the shader to add a uniform offset to the position
-
-        vertexSource.substitute("void main()", "uniform vec3 offset;\n\nvoid main()", /*all=*/false);
-        vertexSource.substitute("vec4(P, 1.0)", "vec4(P + offset, 1.0)", /*all=*/false);
-
-        // move the version up to the top of the file
-
-        vertexSource.substitute("#version ", "// #version");
-        vertexSource.insert(0, "#version 150\n");
-
-        // remove the existing shader and add the patched one
-
-        shader->clearShaders(r, RE_SHADER_VERTEX);
-
-        UT_String message;
-
-        const bool success = shader->addShader(r, RE_SHADER_VERTEX, vertexSource, "pointOffset", 150, &message);
-
-        if (!success) {
-            std::cerr << message.toStdString() << std::endl;
-        }
-
-        assert(success);
-    }
-}
-
-} // namespace
-
 void
 GR_PrimVDBPoints::render(RE_Render *r,
              GR_RenderMode,
@@ -1170,19 +1182,19 @@ GR_PrimVDBPoints::render(RE_Render *r,
 
     if (myGeo) {
 
-        // patch the shader at run-time to add an offset (does nothing if already patched)
+        const bool pointDisplay = commonOpts.particleDisplayType() == GR_PARTICLE_POINTS;
 
-        patchVertexShader(r, thePointShader);
+        RE_ShaderHandle& shader = pointDisplay ? thePointShader : thePixelShader;
 
         // bind the shader
 
         r->pushShader();
-        r->bindShader(thePointShader);
+        r->bindShader(shader);
 
         // bind the position offset
 
         UT_Vector3F positionOffset(mCentroid.x(), mCentroid.y(), mCentroid.z());
-        thePointShader->bindVector(r, "offset", positionOffset);
+        shader->bindVector(r, "offset", positionOffset);
 
         // for default point colors, use white if dark viewport background, black otherwise
 
@@ -1193,18 +1205,15 @@ GR_PrimVDBPoints::render(RE_Render *r,
             myGeo->createConstAttribute(r, "Cd", RE_GPU_FLOAT32, 3, (darkBackground ? white : black));
         }
 
-        r->pushPointSize(commonOpts.pointSize());
+        if (pointDisplay)   r->pushPointSize(commonOpts.pointSize());
         myGeo->draw(r, RE_GEO_WIRE_IDX);
-        r->popPointSize();
+        if (pointDisplay)   r->popPointSize();
         r->popShader();
     }
 
     // draw leaf bboxes
 
     if (myWire) {
-        // patch the shader at run-time to add an offset (does nothing if already patched)
-
-        patchVertexShader(r, theLineShader);
 
         // bind the shader
 
