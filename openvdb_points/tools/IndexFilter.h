@@ -150,7 +150,8 @@ public:
 
     template <typename IterT>
     bool valid(const IterT& iter) const {
-        bool includeValid = false;
+        // accept no include filters as valid
+        bool includeValid = mIncludeHandles.size() == 0;
         for (HandleVector::const_iterator   it = mIncludeHandles.begin(),
                                             itEnd = mIncludeHandles.end(); it != itEnd; ++it) {
             if (it->get(*iter)) {
