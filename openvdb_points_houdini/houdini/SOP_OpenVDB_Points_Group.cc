@@ -80,6 +80,7 @@ struct GroupParms {
         , mSDFMin(0.0f)
         , mSDFMax(0.0f)
         , mEnableViewport(false)
+        , mAddViewport(false)
         , mViewportGroupName("")
     {
     }
@@ -113,6 +114,7 @@ struct GroupParms {
     float                                       mSDFMax;
     // viewport parms
     bool                                        mEnableViewport;
+    bool                                        mAddViewport;
     std::string                                 mViewportGroupName;
 };
 
@@ -145,6 +147,7 @@ public:
 
     void performGroupFiltering(PointDataGrid& outputGrid, const GroupParms& parms);
     void setViewportMetadata(PointDataGrid& outputGrid, const GroupParms& parms);
+    void removeViewportMetadata(PointDataGrid& outputGrid);
 
 protected:
     virtual OP_ERROR cookMySop(OP_Context&);
@@ -423,8 +426,11 @@ SOP_OpenVDB_Points_Group::cookMySop(OP_Context& context)
 
             // Set viewport metadata if no group being created (copy grid first to ensure metadata is deep copied)
             if (!parms.mEnable) {
-                PointDataGrid::Ptr outputGrid = openvdb::gridPtrCast<PointDataGrid>(vdbPrim->getGrid().copyGrid());
-                setViewportMetadata(*outputGrid, parms);
+                if (parms.mEnableViewport) {
+                    PointDataGrid::Ptr outputGrid = openvdb::gridPtrCast<PointDataGrid>(vdbPrim->getGrid().copyGrid());
+                    if (parms.mAddViewport)     setViewportMetadata(*outputGrid, parms);
+                    else                        removeViewportMetadata(*outputGrid);
+                }
                 continue;
             }
 
@@ -440,7 +446,10 @@ SOP_OpenVDB_Points_Group::cookMySop(OP_Context& context)
             performGroupFiltering(*outputGrid, parms);
 
             // attach group viewport metadata to the grid
-            setViewportMetadata(*outputGrid, parms);
+            if (parms.mEnableViewport) {
+                if (parms.mAddViewport)     setViewportMetadata(*outputGrid, parms);
+                else                        removeViewportMetadata(*outputGrid);
+            }
         }
 
         return error();
@@ -663,6 +672,7 @@ SOP_OpenVDB_Points_Group::evalGroupParms(OP_Context& context, GroupParms& parms)
     // viewport
 
     parms.mEnableViewport = evalInt("enableviewport", 0, time);
+    parms.mAddViewport = evalInt("viewportoperation", 0, time) == 0;
 
     UT_String viewportGroupNameStr;
     evalString(viewportGroupNameStr, "viewportgroupname", 0, time);
@@ -672,7 +682,7 @@ SOP_OpenVDB_Points_Group::evalGroupParms(OP_Context& context, GroupParms& parms)
         viewportGroupName = "_";
     }
 
-    parms.mViewportGroupName = groupName;
+    parms.mViewportGroupName = viewportGroupName;
 
     return error();
 }
@@ -864,6 +874,13 @@ void
 SOP_OpenVDB_Points_Group::setViewportMetadata(PointDataGrid& outputGrid, const GroupParms& parms)
 {
     outputGrid.insertMeta(openvdb::META_GROUP_VIEWPORT, StringMetadata(parms.mViewportGroupName));
+}
+
+
+void
+SOP_OpenVDB_Points_Group::removeViewportMetadata(PointDataGrid& outputGrid)
+{
+    outputGrid.removeMeta(openvdb::META_GROUP_VIEWPORT);
 }
 
 
