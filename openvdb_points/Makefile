@@ -185,7 +185,7 @@ ifneq (,$(and $(LOG4CPLUS_LIB_DIR),$(LOG4CPLUS_INCL_DIR),$(LOG4CPLUS_LIB)))
     has_log4cplus := yes
 endif
 
-INCLDIRS := -I . -I .. -isystem $(OPENVDB_INCL_DIR) -isystem $(BOOST_INCL_DIR) -isystem $(ILMBASE_INCL_DIR) -isystem $(TBB_INCL_DIR)
+INCLDIRS := -I .. -isystem $(OPENVDB_INCL_DIR) -isystem $(BOOST_INCL_DIR) -isystem $(ILMBASE_INCL_DIR) -isystem $(TBB_INCL_DIR)
 ifeq (yes,$(has_blosc))
     INCLDIRS += -isystem $(BLOSC_INCL_DIR)
 endif

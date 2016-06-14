@@ -151,7 +151,7 @@ else
     QUIET := > /dev/null
 endif
 
-INCLDIRS := -I . -I .. -I $(OPENVDB_INCL_DIR) -I $(OPENVDB_POINTS_INCL_DIR) -isystem $(BOOST_INCL_DIR) -isystem $(HALF_INCL_DIR) -isystem $(TBB_INCL_DIR)
+INCLDIRS := -I .. -I $(OPENVDB_INCL_DIR) -I $(OPENVDB_POINTS_INCL_DIR) -isystem $(BOOST_INCL_DIR) -isystem $(HALF_INCL_DIR) -isystem $(TBB_INCL_DIR)
 HCUSTOM_INCLDIRS := $(subst isystem,I,$(INCLDIRS))
 
 CXXFLAGS += -pthread $(OPTIMIZE) $(INCLDIRS) -DIGNORE_HDK_DEPRECATIONS
@@ -163,6 +163,8 @@ ifdef MBSD
     # Darwin ld treats undefined symbols as errors by default;
     # change to runtime resolution, like Linux.
     CXXFLAGS += -undefined dynamic_lookup
+    # Lots of unused typedefs from Boost so disable this for Clang
+    HCUSTOM_EXTRA_CFLAGS += -Wno-unused-local-typedef
 endif
 
 ifneq (,$(strip $(wildcard $(HOUDINI_INCL_DIR))))
@@ -310,11 +312,6 @@ ALL_TARGETS := \
 
 all: depend houdinisops
 
-# Create an openvdb_houdini/ symlink to the houdini/ subdirectory,
-# to mirror the DWA directory structure.
-openvdb_houdini:
-	ln -f -s houdini openvdb_houdini
-
 ifeq (no,$(strip $(shared)))
 # Link SOPs against static OpenVDB libraries.
 $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
@@ -338,11 +335,9 @@ houdinisops: $(HOUDINI_SOP_SO_NAMES) houdini/SOP_OpenVDB.svg
 	fi
 
 install_lib: houdinisops
-	mkdir -p $(DESTDIR)/include/openvdb_houdini
-	@echo "Created $(DESTDIR)/include/openvdb_houdini"
-	mkdir -p $(DESTDIR)/include/houdini_utils
-	@echo "Created $(DESTDIR)/include/houdini_utils"
-	cp -f $(LIBHOUDINI_INCLUDE_NAMES) $(DESTDIR)/include/openvdb_houdini/
+	mkdir -p $(DESTDIR)/include/openvdb_points_houdini
+	@echo "Created $(DESTDIR)/include/openvdb_points_houdini"
+	cp -f $(LIBHOUDINI_INCLUDE_NAMES) $(DESTDIR)/include/openvdb_points_houdini/
 	@#
 
 install: install_lib
