@@ -49,10 +49,12 @@ public:
     CPPUNIT_TEST_SUITE(TestPointCount);
     CPPUNIT_TEST(testCount);
     CPPUNIT_TEST(testGroup);
+    CPPUNIT_TEST(testOffsets);
     CPPUNIT_TEST_SUITE_END();
 
     void testCount();
     void testGroup();
+    void testOffsets();
 
 }; // class TestPointCount
 
@@ -439,6 +441,172 @@ TestPointCount::testGroup()
         CPPUNIT_ASSERT_EQUAL(pointCount(tree2), Index64(7));
     }
 }
+
+
+void
+TestPointCount::testOffsets()
+{
+    using namespace openvdb;
+    using namespace openvdb::tools;
+    using namespace openvdb::math;
+
+    typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
+
+    const float voxelSize(1.0);
+    math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
+
+    // five points across four leafs
+
+    std::vector<Vec3s> positions;
+    positions.push_back(Vec3s(1, 1, 1));
+    positions.push_back(Vec3s(1, 101, 1));
+    positions.push_back(Vec3s(2, 101, 1));
+    positions.push_back(Vec3s(101, 1, 1));
+    positions.push_back(Vec3s(101, 101, 1));
+
+    PointDataGrid::Ptr grid = createPointDataGrid<PointDataGrid>(positions, AttributeVec3s::attributeType(), *transform);
+    PointDataTree& tree = grid->tree();
+
+    { // all point offsets
+        std::vector<Index64> pointOffsets;
+        Index64 total = getPointOffsets(pointOffsets, tree);
+
+        CPPUNIT_ASSERT_EQUAL(pointOffsets.size(), size_t(4));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[0], Index64(1));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[1], Index64(3));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[2], Index64(4));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[3], Index64(5));
+        CPPUNIT_ASSERT_EQUAL(total, Index64(5));
+    }
+
+    { // all point offsets when using a non-existant exclude group
+
+        std::vector<Index64> pointOffsets;
+
+        std::vector<Name> includeGroups;
+        std::vector<Name> excludeGroups; excludeGroups.push_back("empty");
+
+        Index64 total = getPointOffsets(pointOffsets, tree, includeGroups, excludeGroups);
+
+        CPPUNIT_ASSERT_EQUAL(pointOffsets.size(), size_t(4));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[0], Index64(1));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[1], Index64(3));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[2], Index64(4));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[3], Index64(5));
+        CPPUNIT_ASSERT_EQUAL(total, Index64(5));
+    }
+
+    appendGroup(tree, "test");
+
+    // add one point to the group from the leaf that contains two points
+
+    PointDataTree::LeafIter iter = ++tree.beginLeaf();
+    GroupWriteHandle groupHandle = iter->groupWriteHandle("test");
+    groupHandle.set(0, true);
+
+    { // include this group
+        std::vector<Index64> pointOffsets;
+
+        std::vector<Name> includeGroups; includeGroups.push_back("test");
+        std::vector<Name> excludeGroups;
+
+        Index64 total = getPointOffsets(pointOffsets, tree, includeGroups, excludeGroups);
+
+        CPPUNIT_ASSERT_EQUAL(pointOffsets.size(), size_t(4));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[0], Index64(0));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[1], Index64(1));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[2], Index64(1));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[3], Index64(1));
+        CPPUNIT_ASSERT_EQUAL(total, Index64(1));
+    }
+
+    { // exclude this group
+        std::vector<Index64> pointOffsets;
+
+        std::vector<Name> includeGroups;
+        std::vector<Name> excludeGroups; excludeGroups.push_back("test");
+
+        Index64 total = getPointOffsets(pointOffsets, tree, includeGroups, excludeGroups);
+
+        CPPUNIT_ASSERT_EQUAL(pointOffsets.size(), size_t(4));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[0], Index64(1));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[1], Index64(2));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[2], Index64(3));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[3], Index64(4));
+        CPPUNIT_ASSERT_EQUAL(total, Index64(4));
+    }
+
+    // setup temp directory
+
+    std::string tempDir(std::getenv("TMPDIR"));
+    if (tempDir.empty())    tempDir = P_tmpdir;
+
+    std::string filename;
+
+    // write out grid to a temp file
+    {
+        filename = tempDir + "/openvdb_test_point_load";
+
+        io::File fileOut(filename);
+
+        GridCPtrVec grids;
+        grids.push_back(grid);
+
+        fileOut.write(grids);
+    }
+
+    // test point offsets for a delay-loaded grid
+    {
+        io::File fileIn(filename);
+        fileIn.open();
+
+        GridPtrVecPtr grids = fileIn.getGrids();
+
+        fileIn.close();
+
+        CPPUNIT_ASSERT_EQUAL(grids->size(), size_t(1));
+
+        PointDataGrid::Ptr inputGrid = GridBase::grid<PointDataGrid>((*grids)[0]);
+
+        CPPUNIT_ASSERT(inputGrid);
+
+        PointDataTree& inputTree = inputGrid->tree();
+
+        std::vector<Index64> pointOffsets;
+        std::vector<Name> includeGroups;
+        std::vector<Name> excludeGroups;
+
+        Index64 total = getPointOffsets(pointOffsets, inputTree, includeGroups, excludeGroups, /*inCoreOnly=*/true);
+
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+        CPPUNIT_ASSERT_EQUAL(pointOffsets.size(), size_t(4));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[0], Index64(0));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[1], Index64(0));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[2], Index64(0));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[3], Index64(0));
+        CPPUNIT_ASSERT_EQUAL(total, Index64(0));
+#else
+        CPPUNIT_ASSERT_EQUAL(pointOffsets.size(), size_t(4));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[0], Index64(1));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[1], Index64(3));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[2], Index64(4));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[3], Index64(5));
+        CPPUNIT_ASSERT_EQUAL(total, Index64(5));
+#endif
+
+        pointOffsets.clear();
+
+        total = getPointOffsets(pointOffsets, inputTree, includeGroups, excludeGroups, /*inCoreOnly=*/false);
+
+        CPPUNIT_ASSERT_EQUAL(pointOffsets.size(), size_t(4));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[0], Index64(1));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[1], Index64(3));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[2], Index64(4));
+        CPPUNIT_ASSERT_EQUAL(pointOffsets[3], Index64(5));
+        CPPUNIT_ASSERT_EQUAL(total, Index64(5));
+    }
+}
+
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestPointCount);
 
