@@ -501,28 +501,9 @@ SOP_OpenVDB_Points_Group::evalGroupParms(OP_Context& context, GroupParms& parms)
 
     UT_String pointsGroupStr;
     evalString(pointsGroupStr, "vdbpointsgroup", 0, time);
-    std::stringstream pointGroupsStream(pointsGroupStr.toStdString());
+    const std::string pointsGroup = pointsGroupStr.toStdString();
 
-    std::istream_iterator<std::string> it(pointGroupsStream);
-    std::istream_iterator<std::string> end;
-    std::vector<std::string> groups(it, end);
-
-    for (std::vector<std::string>::const_iterator it = groups.begin(), itEnd = groups.end(); it != itEnd; ++it)
-    {
-        std::string group = *it;
-        const bool negate = group.length() > 1 && group[0] == '^';
-        if (negate) group = group.substr(1, group.length()-1);
-
-        if (group.empty())  continue;
-
-        if (!AttributeSet::Descriptor::validGroupName(group)) {
-            addError(SOP_MESSAGE, ("VDB Points group name contains invalid characters - " + group).c_str());
-            return error();
-        }
-
-        if (negate)     parms.mExcludeGroups.push_back(group);
-        else            parms.mIncludeGroups.push_back(group);
-    }
+    openvdb::tools::parsePointGroups(parms.mIncludeGroups, parms.mExcludeGroups, pointsGroup);
 
     if (parms.mIncludeGroups.size() > 0 || parms.mExcludeGroups.size() > 0) {
         parms.mOpGroup = true;
