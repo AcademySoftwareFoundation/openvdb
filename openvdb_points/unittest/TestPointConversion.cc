@@ -34,9 +34,9 @@
 #include <openvdb_points/tools/PointDataGrid.h>
 #include <openvdb_points/tools/PointAttribute.h>
 #include <openvdb_points/tools/PointConversion.h>
+#include <openvdb_points/tools/PointCount.h>
+#include <openvdb_points/tools/PointGroup.h>
 #include <openvdb_points/openvdb.h>
-
-#include <boost/ptr_container/ptr_vector.hpp>
 
 using namespace openvdb;
 using namespace openvdb::tools;
@@ -44,7 +44,6 @@ using namespace openvdb::tools;
 class TestPointConversion: public CppUnit::TestCase
 {
 public:
-
     virtual void setUp() { openvdb::initialize(); openvdb::points::initialize(); }
     virtual void tearDown() { openvdb::uninitialize(); openvdb::points::uninitialize(); }
 
@@ -59,65 +58,92 @@ public:
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestPointConversion);
 
-// simple data structure for storing a point with position and id
 
-struct Point
+// Simple Attribute Wrapper
+template <typename T>
+struct AttributeWrapper
 {
-    Point(const Vec3f pos, const int id)
-        : position(pos), id(id) { }
+    typedef T ValueType;
+    typedef T PosType;
+    typedef T value_type;
 
-    Vec3f position;
+    struct Handle
+    {
+        Handle(AttributeWrapper<T>& attribute)
+            : mBuffer(attribute.mAttribute) { }
+
+        template <typename ValueType>
+        void set(openvdb::Index offset, const ValueType& value) {
+            mBuffer[offset] = value;
+        }
+
+        template <typename ValueType>
+        void set(openvdb::Index offset, const openvdb::math::Vec3<ValueType>& value) {
+            mBuffer[offset] = value;
+        }
+
+    private:
+        std::vector<T>& mBuffer;
+    }; // struct Handle
+
+    AttributeWrapper() { }
+
+    void expand() { }
+    void compact() { }
+
+    void resize(const size_t n) { mAttribute.resize(n); }
+    size_t size() const { return mAttribute.size(); }
+
+    std::vector<T>& buffer() { return mAttribute; }
+
+    template <typename ValueT>
+    void get(size_t n, ValueT& value) const { value = mAttribute[n]; }
+    template <typename ValueT>
+    void getPos(size_t n, ValueT& value) const { this->get<ValueT>(n, value); }
+
+private:
+    std::vector<T> mAttribute;
+}; // struct AttributeWrapper
+
+
+struct GroupWrapper
+{
+    GroupWrapper() { }
+
+    void setOffsetOn(openvdb::Index index) {
+        mGroup[index] = short(1);
+    }
+
+    void finalize() { }
+
+    void resize(const size_t n) { mGroup.resize(n, short(0)); }
+    size_t size() const { return mGroup.size(); }
+
+    std::vector<short>& buffer() { return mGroup; }
+
+private:
+    std::vector<short> mGroup;
+}; // struct GroupWrapper
+
+
+struct PointData
+{
     int id;
-};
+    Vec3f position;
+    float uniform;
+    short group;
 
-// sort points by id
+    bool operator<(const PointData& other) const { return id < other.id; }
+}; // PointData
 
-inline bool operator<(const Point& lhs, const Point& rhs) {
-    return lhs.id < rhs.id;
-}
-
-typedef boost::ptr_vector<Point> PointData;
-
-
-// wrapper to retrieve position
-class PointPosition
-{
-public:
-    typedef openvdb::Vec3f PosType;
-    typedef openvdb::Vec3f value_type;
-
-    PointPosition(const PointData& pointData)
-        : mPointData(pointData) { }
-
-    size_t size() const { return mPointData.size(); }
-    void getPos(size_t n, openvdb::Vec3f& xyz) const { xyz = mPointData[n].position; }
-
-private:
-    const PointData& mPointData;
-};
-
-// wrapper to retrieve id
-class PointId
-{
-public:
-    typedef int PosType;
-    typedef int value_type;
-
-    PointId(const PointData& pointData)
-        : mPointData(pointData) { }
-
-    size_t size() const { return mPointData.size(); }
-
-    template <typename T>
-    void get(size_t n, T& value) const { value = mPointData[n].id; }
-
-private:
-    const PointData& mPointData;
-};
 
 // Generate random points by uniformly distributing points
 // on a unit-sphere.
-void genPoints(const int numPoints, const double scale, PointData& points)
+void genPoints( const int numPoints, const double scale,
+                AttributeWrapper<Vec3f>& position,
+                AttributeWrapper<int>& id,
+                AttributeWrapper<float>& uniform,
+                GroupWrapper& group)
 {
     // init
     openvdb::math::Random01 randNumber(0);
@@ -128,9 +154,16 @@ void genPoints(const int numPoints, const double scale, PointData& points)
     double x, y, theta, phi;
     openvdb::Vec3f pos;
 
-    points.reserve(n*n);
+    position.resize(n*n);
+    id.resize(n*n);
+    uniform.resize(n*n);
+    group.resize(n*n);
 
-    int id = 0;
+    AttributeWrapper<Vec3f>::Handle positionHandle(position);
+    AttributeWrapper<int>::Handle idHandle(id);
+    AttributeWrapper<float>::Handle uniformHandle(uniform);
+
+    int i = 0;
 
     // loop over a [0 to n) x [0 to n) grid.
     for (int a = 0; a < n; ++a) {
@@ -150,89 +183,16 @@ void genPoints(const int numPoints, const double scale, PointData& points)
             pos[1] = std::sin(theta)*std::sin(phi)*scale;
             pos[2] = std::cos(theta)*scale;
 
-            points.push_back(new Point(pos, id++));
+            positionHandle.set(i, pos);
+            idHandle.set(i, i);
+            uniformHandle.set(i, 100.0f);
+
+            // add points with even id to the group
+            if ((i % 2) == 0)   group.setOffsetOn(i);
+
+            i++;
         }
     }
-}
-
-class PointAttribute
-{
-public:
-    typedef boost::shared_ptr<PointAttribute> Ptr;
-
-    static Ptr create(  const Name& name,
-                        const NamePair& type,
-                        PointData& points) { return Ptr(new PointAttribute(name, type, points)); }
-
-    PointAttribute(const Name& name,
-                   const NamePair& type,
-                   PointData& points)
-        : mName(name)
-        , mType(type)
-        , mPoints(points) { }
-
-    const Name& name() const { return mName; }
-    const NamePair& type() const { return mType; }
-
-    size_t size() const { return mPoints.size(); }
-
-    // comparison function to enable sorting by name
-
-    bool
-    operator<(const PointAttribute& rhs) {
-        return this->name() < rhs.name();
-    }
-
-public:
-    template <typename attributeT>
-    struct Accessor
-    {
-        typedef boost::shared_ptr<Accessor<attributeT> > Ptr;
-
-        friend class PointAttribute;
-
-    public:
-        // a point can only store P (vector attr) and id (scalar attr)
-        // so we just hard code these into the access functions
-
-        template<typename T> typename boost::enable_if_c<VecTraits<T>::IsVec, void>::type
-        getValue(size_t n, T& value) const {
-            for (unsigned i = 0; i < VecTraits<T>::Size; ++i) {
-                value[i] = mPoints[n].position[i];
-            }
-        }
-
-        template<typename T> typename boost::disable_if_c<VecTraits<T>::IsVec, void>::type
-        getValue(size_t n, T& value) const {
-            value = mPoints[n].id;
-        }
-
-    protected:
-        Accessor(const PointData& points)
-            : mPoints(points) { }
-
-    private:
-        const PointData& mPoints;
-    }; // Accessor
-
-    template <typename AttributeT>
-    typename Accessor<AttributeT>::Ptr
-    getAccessor() const
-    {
-        return typename Accessor<AttributeT>::Ptr(new Accessor<AttributeT>(mPoints));
-    }
-
-private:
-    const Name mName;
-    const NamePair mType;
-    const PointData& mPoints;
-}; // PointAttribute
-
-// comparison function to enable sorting PointAttribute shared pointers
-
-inline bool
-operator<(const PointAttribute::Ptr& lhs, const PointAttribute::Ptr& rhs) {
-    return lhs->name() < rhs->name();
 }
 
 
@@ -244,99 +204,171 @@ TestPointConversion::testPointConversion()
 {
     // Define and register some common attribute types
     typedef TypedAttributeArray<int32_t>        AttributeI;
+    typedef TypedAttributeArray<float>          AttributeF;
     typedef TypedAttributeArray<openvdb::Vec3s> AttributeVec3s;
 
     AttributeI::registerType();
+    AttributeF::registerType();
     AttributeVec3s::registerType();
 
     // generate points
 
-    PointData data;
-
     const unsigned long count(40000);
 
-    genPoints(count, /*scale=*/ 100.0, data);
+    AttributeWrapper<Vec3f> position;
+    AttributeWrapper<int> id;
+    AttributeWrapper<float> uniform;
+    GroupWrapper group;
 
-    CPPUNIT_ASSERT_EQUAL(data.size(), count);
+    genPoints(count, /*scale=*/ 100.0, position, id, uniform, group);
 
-    PointPosition pointPos(data);
+    CPPUNIT_ASSERT_EQUAL(position.size(), count);
+    CPPUNIT_ASSERT_EQUAL(id.size(), count);
+    CPPUNIT_ASSERT_EQUAL(uniform.size(), count);
+    CPPUNIT_ASSERT_EQUAL(group.size(), count);
 
     // convert point positions into a Point Data Grid
 
     const float voxelSize = 1.0f;
     openvdb::math::Transform::Ptr transform(openvdb::math::Transform::createLinearTransform(voxelSize));
 
-    PointIndexGrid::Ptr pointIndexGrid = createPointIndexGrid<PointIndexGrid>(pointPos, *transform);
-    PointDataGrid::Ptr pointDataGrid = createPointDataGrid<PointDataGrid>(*pointIndexGrid, pointPos,
+    PointIndexGrid::Ptr pointIndexGrid = createPointIndexGrid<PointIndexGrid>(position, *transform);
+    PointDataGrid::Ptr pointDataGrid = createPointDataGrid<PointDataGrid>(*pointIndexGrid, position,
                                             AttributeVec3s::attributeType(), *transform);
+
+    PointIndexTree& indexTree = pointIndexGrid->tree();
+    PointDataTree& tree = pointDataGrid->tree();
 
     // add id and populate
 
     AttributeSet::Util::NameAndType nameAndType("id", AttributeI::attributeType());
 
-    appendAttribute(pointDataGrid->tree(), nameAndType);
+    appendAttribute(tree, nameAndType);
+    populateAttribute(tree, pointIndexGrid->tree(), "id", id);
 
-    PointId pointId(data);
+    // add uniform and populate
 
-    populateAttribute(pointDataGrid->tree(), pointIndexGrid->tree(), "id", pointId);
+    AttributeSet::Util::NameAndType nameAndType2("uniform", AttributeF::attributeType());
 
-    CPPUNIT_ASSERT_EQUAL(pointIndexGrid->tree().leafCount(), pointDataGrid->tree().leafCount());
+    appendAttribute(tree, nameAndType2);
+    populateAttribute(tree, pointIndexGrid->tree(), "uniform", uniform);
+
+    // add group and set membership
+
+    appendGroup(tree, "test");
+    setGroup(tree, indexTree, group.buffer(), "test");
+
+    CPPUNIT_ASSERT_EQUAL(indexTree.leafCount(), tree.leafCount());
 
     // create accessor and iterator for Point Data Tree
 
-    const PointDataTree& tree = pointDataGrid->tree();
-
     PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
 
-    // convert points back into original data structure
-
-    CPPUNIT_ASSERT_EQUAL((unsigned long) 2, leafIter->attributeSet().size());
+    CPPUNIT_ASSERT_EQUAL((unsigned long) 4, leafIter->attributeSet().size());
 
     CPPUNIT_ASSERT(leafIter->attributeSet().find("id") != AttributeSet::INVALID_POS);
+    CPPUNIT_ASSERT(leafIter->attributeSet().find("uniform") != AttributeSet::INVALID_POS);
     CPPUNIT_ASSERT(leafIter->attributeSet().find("P") != AttributeSet::INVALID_POS);
 
-    PointData newData;
+    const size_t idIndex = leafIter->attributeSet().find("id");
+    const size_t uniformIndex = leafIter->attributeSet().find("uniform");
+    const AttributeSet::Descriptor::GroupIndex groupIndex = leafIter->attributeSet().groupIndex("test");
 
-    for (; leafIter; ++leafIter) {
+    // convert back into linear point attribute data
 
-        AttributeHandle<Vec3f>::Ptr posHandle = AttributeHandle<Vec3f>::create(leafIter->attributeArray("P"));
-        AttributeHandle<int32_t>::Ptr idHandle = AttributeHandle<int32_t>::create(leafIter->attributeArray("id"));
+    AttributeWrapper<Vec3f> outputPosition;
+    AttributeWrapper<int> outputId;
+    AttributeWrapper<float> outputUniform;
+    GroupWrapper outputGroup;
 
-        for (PointDataTree::LeafNodeType::ValueOnCIter valueIter = leafIter->cbeginValueOn(); valueIter; ++valueIter) {
+    outputPosition.resize(position.size());
+    outputId.resize(id.size());
+    outputUniform.resize(uniform.size());
+    outputGroup.resize(group.size());
 
-            Coord ijk = valueIter.getCoord();
-            Vec3d xyz = ijk.asVec3d();
+    std::vector<Index64> pointOffsets;
+    getPointOffsets(pointOffsets, tree);
 
-            for (IndexIter iter = leafIter->beginIndex(ijk); iter; ++iter) {
+    convertPointDataGridPosition(outputPosition, *pointDataGrid, pointOffsets);
+    convertPointDataGridAttribute(outputId, tree, pointOffsets, idIndex);
+    convertPointDataGridAttribute(outputUniform, tree, pointOffsets, uniformIndex);
+    convertPointDataGridGroup(outputGroup, tree, pointOffsets, groupIndex);
 
-                // retrieve position in index space and translate into world space
+    // pack and sort the new buffers based on id
 
-                Vec3d pos = Vec3d(posHandle->get(*iter)) + xyz;
-                pos = transform->indexToWorld(pos);
+    std::vector<PointData> pointData;
 
-                // retrieve id
+    pointData.resize(count);
 
-                const int id = idHandle->get(*iter);
-
-                newData.push_back(new Point(pos, id));
-            }
-        }
+    for (unsigned int i = 0; i < count; i++) {
+        pointData[i].id = outputId.buffer()[i];
+        pointData[i].position = outputPosition.buffer()[i];
+        pointData[i].uniform = outputUniform.buffer()[i];
+        pointData[i].group = outputGroup.buffer()[i];
     }
 
-    CPPUNIT_ASSERT_EQUAL(data.size(), newData.size());
+    std::sort(pointData.begin(), pointData.end());
 
-    // sort new point array by id
-
-    std::sort(newData.begin(), newData.end());
-
-    // confirm values match
+    // compare old and new buffers
 
     for (unsigned int i = 0; i < count; i++)
     {
-        CPPUNIT_ASSERT_EQUAL(data[i].id, newData[i].id);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(data[i].position.x(), newData[i].position.x(), /*tolerance=*/1e-6);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(data[i].position.y(), newData[i].position.y(), /*tolerance=*/1e-6);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(data[i].position.z(), newData[i].position.z(), /*tolerance=*/1e-6);
+        CPPUNIT_ASSERT_EQUAL(id.buffer()[i], pointData[i].id);
+        CPPUNIT_ASSERT_EQUAL(group.buffer()[i], pointData[i].group);
+        CPPUNIT_ASSERT_EQUAL(uniform.buffer()[i], pointData[i].uniform);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(position.buffer()[i].x(), pointData[i].position.x(), /*tolerance=*/1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(position.buffer()[i].y(), pointData[i].position.y(), /*tolerance=*/1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(position.buffer()[i].z(), pointData[i].position.z(), /*tolerance=*/1e-6);
+    }
+
+    // convert based on even group
+
+    const unsigned long halfCount = count / 2;
+
+    outputPosition.resize(halfCount);
+    outputId.resize(halfCount);
+    outputUniform.resize(halfCount);
+    outputGroup.resize(halfCount);
+
+    std::vector<Name> includeGroups;
+    includeGroups.push_back("test");
+
+    pointOffsets.clear();
+    getPointOffsets(pointOffsets, tree, includeGroups);
+
+    convertPointDataGridPosition(outputPosition, *pointDataGrid, pointOffsets, includeGroups);
+    convertPointDataGridAttribute(outputId, tree, pointOffsets, idIndex, includeGroups);
+    convertPointDataGridAttribute(outputUniform, tree, pointOffsets, uniformIndex, includeGroups);
+    convertPointDataGridGroup(outputGroup, tree, pointOffsets, groupIndex, includeGroups);
+
+    CPPUNIT_ASSERT_EQUAL(outputPosition.size(), size_t(halfCount));
+    CPPUNIT_ASSERT_EQUAL(outputId.size(), size_t(halfCount));
+    CPPUNIT_ASSERT_EQUAL(outputUniform.size(), size_t(halfCount));
+    CPPUNIT_ASSERT_EQUAL(outputGroup.size(), size_t(halfCount));
+
+    pointData.clear();
+
+    for (unsigned int i = 0; i < halfCount; i++) {
+        PointData data;
+        data.id = outputId.buffer()[i];
+        data.position = outputPosition.buffer()[i];
+        data.uniform = outputUniform.buffer()[i];
+        data.group = outputGroup.buffer()[i];
+        pointData.push_back(data);
+    }
+
+    std::sort(pointData.begin(), pointData.end());
+
+    // compare old and new buffers
+
+    for (unsigned int i = 0; i < halfCount; i++)
+    {
+        CPPUNIT_ASSERT_EQUAL(id.buffer()[i*2], pointData[i].id);
+        CPPUNIT_ASSERT_EQUAL(group.buffer()[i*2], pointData[i].group);
+        CPPUNIT_ASSERT_EQUAL(uniform.buffer()[i*2], pointData[i].uniform);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(position.buffer()[i*2].x(), pointData[i].position.x(), /*tolerance=*/1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(position.buffer()[i*2].y(), pointData[i].position.y(), /*tolerance=*/1e-6);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(position.buffer()[i*2].z(), pointData[i].position.z(), /*tolerance=*/1e-6);
     }
 }
 
