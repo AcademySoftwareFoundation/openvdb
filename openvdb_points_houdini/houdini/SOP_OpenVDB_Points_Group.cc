@@ -40,6 +40,7 @@
 #include <openvdb_points/tools/PointGroup.h>
 
 #include "SOP_NodeVDBPoints.h"
+#include "Utils.h"
 
 #include <openvdb_houdini/Utils.h>
 #include <houdini_utils/geometry.h>
@@ -52,6 +53,7 @@ using namespace openvdb::tools;
 using namespace openvdb::math;
 
 namespace hvdb = openvdb_houdini;
+namespace hvdbp = openvdb_points_houdini;
 namespace hutil = houdini_utils;
 
 

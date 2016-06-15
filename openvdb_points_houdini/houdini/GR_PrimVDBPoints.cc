@@ -43,6 +43,8 @@
 #include <openvdb/Types.h>
 #include <openvdb_points/tools/PointDataGrid.h>
 #include <openvdb_points/tools/PointCount.h>
+#include <openvdb_points/tools/PointConversion.h>
+
 #include <boost/algorithm/string/predicate.hpp>
 
 #if (UT_VERSION_INT < 0x0f000000) // earlier than 15.0.0
@@ -671,6 +673,67 @@ GR_PrimVDBPoints::computeCentroid(const openvdb::tools::PointDataGrid& grid)
     mCentroid = grid.transform().indexToWorld(coordBBox.getCenter());
 }
 
+struct PositionAttribute
+{
+    typedef Vec3f ValueType;
+
+    struct Handle
+    {
+        Handle(PositionAttribute& attribute)
+            : mBuffer(attribute.mBuffer)
+            , mPositionOffset(attribute.mPositionOffset) { }
+
+        void set(openvdb::Index offset, const ValueType& value) {
+            const ValueType transformedValue = value - mPositionOffset;
+            mBuffer[offset] = UT_Vector3H(transformedValue.x(), transformedValue.y(), transformedValue.z());
+        }
+
+    private:
+        UT_Vector3H* mBuffer;
+        ValueType& mPositionOffset;
+    }; // struct Handle
+
+    PositionAttribute(UT_Vector3H* buffer, const ValueType& positionOffset)
+        : mBuffer(buffer)
+        , mPositionOffset(positionOffset) { }
+
+    void expand() { }
+    void compact() { }
+
+private:
+    UT_Vector3H* mBuffer;
+    ValueType mPositionOffset;
+}; // struct PositionAttribute
+
+template <typename T>
+struct VectorAttribute
+{
+    typedef T ValueType;
+
+    struct Handle
+    {
+        Handle(VectorAttribute& attribute)
+            : mBuffer(attribute.mBuffer) { }
+
+        template <typename ValueType>
+        void set(openvdb::Index offset, const openvdb::math::Vec3<ValueType>& value) {
+            mBuffer[offset] = UT_Vector3H(float(value.x()), float(value.y()), float(value.z()));
+        }
+
+    private:
+        UT_Vector3H* mBuffer;
+    }; // struct Handle
+
+    VectorAttribute(UT_Vector3H* buffer)
+        : mBuffer(buffer) { }
+
+    void expand() { }
+    void compact() { }
+
+private:
+    UT_Vector3H* mBuffer;
+}; // struct VectorAttribute
+
 void
 GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
              const openvdb::tools::PointDataGrid& grid,
@@ -732,44 +795,19 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
 
     if (posGeo->getCacheVersion() != version)
     {
-        // build cumulative leaf offset array
-
-        typedef std::vector<std::pair<const LeafNode*, openvdb::Index64> > LeafOffsets;
-
-        LeafOffsets offsets;
-
-        openvdb::Index64 cumulativeOffset = 0;
-
-        for (; iter; ++iter) {
-            const LeafNode& leaf = *iter;
-
-            // skip out-of-core leaf nodes (used when delay loading VDBs)
-            if (leaf.buffer().isOutOfCore())    continue;
-
-            const openvdb::Index64 count = useGroup ? leaf.groupPointCount(groupName) : leaf.pointCount();
-
-            offsets.push_back(LeafOffsets::value_type(&leaf, cumulativeOffset));
-
-            cumulativeOffset += count;
-        }
-
         using gr_primitive_internal::FillGPUBuffersPosition;
 
         // map() returns a pointer to the GL buffer
         UT_Vector3H *pdata = static_cast<UT_Vector3H*>(posGeo->map(r));
 
-        FillGPUBuffersPosition< TreeType,
-                                openvdb::Vec3f,
-                                UT_Vector3H> fill(pdata,
-                                                  offsets,
-                                                  grid.tree(),
-                                                  grid.transform(),
-                                                  mCentroid,
-                                                  positionIndex,
-                                                  useGroup ? groupName : "");
+        std::vector<Name> includeGroups;
+        if (useGroup)   includeGroups.push_back(groupName);
 
-        const tbb::blocked_range<size_t> range(0, offsets.size());
-        tbb::parallel_for(range, fill);
+        std::vector<Index64> pointOffsets;
+        getPointOffsets(pointOffsets, grid.tree(), includeGroups);
+
+        PositionAttribute positionAttribute(pdata, mCentroid);
+        convertPointDataGridPosition(positionAttribute, grid, pointOffsets, includeGroups);
 
         // unmap the buffer so it can be used by GL and set the cache version
 
@@ -969,52 +1007,29 @@ GR_PrimVDBPoints::updateVec3Buffer( RE_Render* r,
 
     if (bufferGeo->getCacheVersion() != version)
     {
-        // build cumulative leaf offset array
+        // check if group viewport is in use
 
-        typedef std::vector<std::pair<const LeafNode*, openvdb::Index64> > LeafOffsets;
-
-        LeafOffsets offsets;
-
-        openvdb::Index64 cumulativeOffset = 0;
-
-        for (; iter; ++iter) {
-            const LeafNode& leaf = *iter;
-
-            // skip out-of-core leaf nodes (used when delay loading VDBs)
-            if (leaf.buffer().isOutOfCore())    continue;
-
-            const openvdb::Index64 count = leaf.pointCount();
-
-            offsets.push_back(LeafOffsets::value_type(&leaf, cumulativeOffset));
-
-            cumulativeOffset += count;
+        std::string groupName = "";
+        if (openvdb::StringMetadata::ConstPtr s = grid.getMetadata<openvdb::StringMetadata>(openvdb::META_GROUP_VIEWPORT)) {
+            groupName = s->value();
         }
-
-        using gr_primitive_internal::FillGPUBuffersVec3;
+        const bool useGroup = !groupName.empty() && descriptor.hasGroup(groupName);
 
         UT_Vector3H *data = static_cast<UT_Vector3H*>(bufferGeo->map(r));
 
-        if (type == "vec3s") {
-            FillGPUBuffersVec3< TreeType,
-                                openvdb::Vec3f,
-                                UT_Vector3H> fill(data,
-                                                      offsets,
-                                                      grid.tree(),
-                                                      index);
+        std::vector<Name> includeGroups;
+        if (useGroup)   includeGroups.push_back(groupName);
 
-            const tbb::blocked_range<size_t> range(0, offsets.size());
-            tbb::parallel_for(range, fill);
+        std::vector<Index64> pointOffsets;
+        getPointOffsets(pointOffsets, grid.tree(), includeGroups);
+
+        if (type == "vec3s") {
+            VectorAttribute<Vec3f> typedAttribute(data);
+            convertPointDataGridAttribute(typedAttribute, grid.tree(), pointOffsets, index, includeGroups);
         }
         else if (type == "vec3h") {
-            FillGPUBuffersVec3< TreeType,
-                                openvdb::math::Vec3<half>,
-                                UT_Vector3H> fill(data,
-                                      offsets,
-                                      grid.tree(),
-                                      index);
-
-            const tbb::blocked_range<size_t> range(0, offsets.size());
-            tbb::parallel_for(range, fill);
+            VectorAttribute<openvdb::math::Vec3<half> > typedAttribute(data);
+            convertPointDataGridAttribute(typedAttribute, grid.tree(), pointOffsets, index, includeGroups);
         }
 
         // unmap the buffer so it can be used by GL and set the cache version
