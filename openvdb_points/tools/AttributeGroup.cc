@@ -139,6 +139,14 @@ bool GroupWriteHandle::collapse(bool on)
 }
 
 
+bool GroupWriteHandle::compact()
+{
+    GroupAttributeArray& array(const_cast<GroupAttributeArray&>(mArray));
+
+    return array.compact();
+}
+
+
 ////////////////////////////////////////
 
 

@@ -157,6 +157,9 @@ public:
     /// The return value indicates if the group array ends up being uniform.
     bool collapse(bool on);
 
+    /// Compact the existing array to become uniform if all values are identical
+    bool compact();
+
 }; // class GroupWriteHandle
 
 
