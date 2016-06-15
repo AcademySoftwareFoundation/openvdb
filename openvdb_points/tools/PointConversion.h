@@ -293,6 +293,10 @@ struct PopulateAttributeOp {
 
                 index++;
             }
+
+            // attempt to compact the array
+
+            attributeWriteHandle->compact();
         }
     }
 

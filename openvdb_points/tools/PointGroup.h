@@ -258,6 +258,10 @@ struct SetGroupFromIndexOp
                     index++;
                 }
             }
+
+            // attempt to compact the array
+
+            group.compact();
         }
     }
 
@@ -314,6 +318,10 @@ struct SetGroupByFilterOp
                     group.set(*filterIndexIter, true);
                 }
             }
+
+            // attempt to compact the array
+
+            group.compact();
         }
     }
 
