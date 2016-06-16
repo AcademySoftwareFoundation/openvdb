@@ -114,6 +114,16 @@ inline void setGroup(   PointDataTree& tree,
                         const Name& group,
                         const bool remove = false);
 
+/// @brief Sets membership for the specified group for all points (on/off).
+///
+/// @param tree         the PointDataTree.
+/// @param group        the name of the group.
+/// @param member       true / false for membership of the group.
+template <typename PointDataTree>
+inline void setGroup(   PointDataTree& tree,
+                        const Name& group,
+                        const bool member = true);
+
 /// @brief Sets group membership based on a provided filter.
 ///
 /// @param tree          the PointDataTree.
@@ -714,7 +724,7 @@ inline void setGroup(   PointDataTree& tree,
 template <typename PointDataTree>
 inline void setGroup(   PointDataTree& tree,
                         const Name& group,
-                        const bool member = true)
+                        const bool member)
 {
     typedef AttributeSet::Descriptor Descriptor;
     typedef typename tree::template LeafManager<PointDataTree> LeafManagerT;
