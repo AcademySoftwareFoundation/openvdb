@@ -2912,7 +2912,7 @@ getAttributeNames(
 
         const std::string& name = *it;
 
-        GA_ROAttributeRef attr = geo.findFloatTuple(GA_ATTRIB_POINT, name.c_str(), 1);
+        GA_ROAttributeRef attr = geo.findFloatTuple(GA_ATTRIB_POINT, name.c_str(), 1, 1);
 
         if (attr.isValid()) {
 
