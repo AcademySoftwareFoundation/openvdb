@@ -365,13 +365,13 @@ TestPointGroup::testSet()
     CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(6));
     CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "test"), Index64(0));
 
-    std::vector<bool> membership;
-    membership.push_back(true);
-    membership.push_back(false);
-    membership.push_back(true);
-    membership.push_back(true);
-    membership.push_back(false);
-    membership.push_back(true);
+    std::vector<short> membership;
+    membership.push_back(short(1));
+    membership.push_back(short(0));
+    membership.push_back(short(1));
+    membership.push_back(short(1));
+    membership.push_back(short(0));
+    membership.push_back(short(1));
 
     // copy tree for descriptor sharing test
 

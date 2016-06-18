@@ -104,13 +104,15 @@ inline void compactGroups(PointDataTree& tree);
 ///
 /// @param tree          the PointDataTree.
 /// @param indexTree     the PointIndexTree.
-/// @param membership    @c true if the point is in the group.
+/// @param membership    @c 1 if the point is in the group, 0 otherwise.
 /// @param group         the name of the group.
 /// @param remove        if @c true also perform removal of points from the group.
+///
+/// @note vector<bool> is not thread-safe on concurrent write, so use vector<short> instead
 template <typename PointDataTree, typename PointIndexTree>
 inline void setGroup(   PointDataTree& tree,
                         const PointIndexTree& indexTree,
-                        const std::vector<bool>& membership,
+                        const std::vector<short>& membership,
                         const Name& group,
                         const bool remove = false);
 
@@ -217,10 +219,10 @@ struct SetGroupFromIndexOp
     typedef typename PointIndexTree::LeafNodeType       PointIndexLeafNode;
     typedef typename PointIndexLeafNode::IndexArray     IndexArray;
     typedef AttributeSet::Descriptor::GroupIndex        GroupIndex;
-    typedef std::vector<bool>                           BoolArray;
+    typedef std::vector<short>                          MembershipArray;
 
     SetGroupFromIndexOp(const PointIndexTree& indexTree,
-                        const BoolArray& membership,
+                        const MembershipArray& membership,
                         const GroupIndex& index)
         : mIndexTree(indexTree)
         , mMembership(membership)
@@ -249,14 +251,10 @@ struct SetGroupFromIndexOp
             for (typename IndexArray::const_iterator it = indices.begin(),
                                                      it_end = indices.end(); it != it_end; ++it)
             {
-                if (Remove) {
-                    group.set(index++, mMembership.at(*it));
-                }
-                else {
-                    if (mMembership.at(*it))    group.set(index, true);
+                if (Remove)                                 group.set(index, mMembership[*it]);
+                else if (mMembership[*it] == short(1))      group.set(index, short(1));
 
-                    index++;
-                }
+                index++;
             }
 
             // attempt to compact the array
@@ -268,7 +266,7 @@ struct SetGroupFromIndexOp
     //////////
 
     const PointIndexTree& mIndexTree;
-    const BoolArray& mMembership;
+    const MembershipArray& mMembership;
     const GroupIndex mIndex;
 }; // struct SetGroupFromIndexOp
 
@@ -685,7 +683,7 @@ inline void compactGroups(PointDataTree& tree)
 template <typename PointDataTree, typename PointIndexTree>
 inline void setGroup(   PointDataTree& tree,
                         const PointIndexTree& indexTree,
-                        const std::vector<bool>& membership,
+                        const std::vector<short>& membership,
                         const Name& group,
                         const bool remove)
 {

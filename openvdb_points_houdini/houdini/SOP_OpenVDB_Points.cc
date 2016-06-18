@@ -1478,7 +1478,7 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
         // Set group membership in tree
 
         const int64_t numPoints = ptGeo->getNumPoints();
-        std::vector<bool> inGroup(numPoints, false);
+        std::vector<short> inGroup(numPoints, short(0));
 
         for (GA_ElementGroupTable::iterator it = elementGroups.beginTraverse(),
                                             itEnd = elementGroups.endTraverse(); it != itEnd; ++it)
@@ -1491,14 +1491,14 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
                 end = std::min(end, numPoints);
                 for (GA_Offset off = start; off < end; ++off) {
                     assert(off < numPoints);
-                    inGroup[off] = true;
+                    inGroup[off] = short(1);
                 }
             }
 
             const Name groupName = (*it)->getName().toStdString();
             setGroup(tree, indexTree, inGroup, groupName);
 
-            std::fill(inGroup.begin(), inGroup.end(), false);
+            std::fill(inGroup.begin(), inGroup.end(), short(0));
         }
 
         // Add other attributes to PointDataGrid
