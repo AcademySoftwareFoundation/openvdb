@@ -44,6 +44,7 @@
 #include <openvdb_points/tools/AttributeSet.h>
 #include <openvdb_points/tools/PointDataGrid.h>
 #include <openvdb_points/tools/PointAttribute.h>
+#include <openvdb_points/tools/IndexFilter.h>
 
 #include <boost/ptr_container/ptr_vector.hpp>
 
@@ -74,6 +75,20 @@ Index64 activePointCount(const PointDataTreeT& tree, const bool inCoreOnly = fal
 /// @param inCoreOnly if true, points in out-of-core leaf nodes are not counted
 template <typename PointDataTreeT>
 Index64 inactivePointCount(const PointDataTreeT& tree, const bool inCoreOnly = false);
+
+
+/// @brief Populate an array of cumulative point offsets per leaf node.
+/// @param pointOffsets     array of offsets to be populated.
+/// @param tree             PointDataTree from which to populate the offsets.
+/// @param includeGroups    the group of names to include.
+/// @param excludeGroups    the group of names to exclude.
+/// @param inCoreOnly       if true, points in out-of-core leaf nodes are ignored
+/// @note returns the final cumulative point offset.
+template <typename PointDataTreeT>
+Index64 getPointOffsets(std::vector<Index64>& pointOffsets, const PointDataTreeT& tree,
+                     const std::vector<Name>& includeGroups = std::vector<Name>(),
+                     const std::vector<Name>& excludeGroups = std::vector<Name>(),
+                     const bool inCoreOnly = true);
 
 
 /// @brief Total points in the group in the PointDataTree
@@ -200,6 +215,8 @@ Index64 pointCount(const PointDataTreeT& tree, const bool inCoreOnly)
     for (typename PointDataTreeT::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
 #ifndef OPENVDB_2_ABI_COMPATIBLE
         if (inCoreOnly && iter->buffer().isOutOfCore())     continue;
+#else
+        (void) inCoreOnly; // unused variable
 #endif
         size += iter->pointCount();
     }
@@ -215,6 +232,8 @@ Index64 activePointCount(const PointDataTreeT& tree, const bool inCoreOnly)
     for (typename PointDataTreeT::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
 #ifndef OPENVDB_2_ABI_COMPATIBLE
         if (inCoreOnly && iter->buffer().isOutOfCore())     continue;
+#else
+        (void) inCoreOnly; // unused variable
 #endif
         size += iter->onPointCount();
     }
@@ -230,6 +249,8 @@ Index64 inactivePointCount(const PointDataTreeT& tree, const bool inCoreOnly)
     for (typename PointDataTreeT::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
 #ifndef OPENVDB_2_ABI_COMPATIBLE
         if (inCoreOnly && iter->buffer().isOutOfCore())     continue;
+#else
+        (void) inCoreOnly; // unused variable
 #endif
         size += iter->offPointCount();
     }
@@ -258,6 +279,52 @@ Index64 inactiveGroupPointCount(const PointDataTreeT& tree, const Name& name, co
 {
     GroupFilter::Data groupFilterData(name);
     return point_count_internal::filterInactivePointCount<PointDataTreeT, GroupFilter>(tree, groupFilterData, inCoreOnly);
+}
+
+
+template <typename PointDataTreeT>
+Index64 getPointOffsets(std::vector<Index64>& pointOffsets, const PointDataTreeT& tree,
+                     const std::vector<Name>& includeGroups, const std::vector<Name>& excludeGroups,
+                     const bool inCoreOnly)
+{
+    typedef typename PointDataTreeT::LeafNodeType LeafNode;
+    typedef typename LeafNode::IndexOnIter IndexOnIter;
+
+    const bool useGroup = includeGroups.size() > 0 || excludeGroups.size() > 0;
+
+    tree::LeafManager<const PointDataTreeT> leafManager(tree);
+    const size_t leafCount = leafManager.leafCount();
+
+    pointOffsets.reserve(leafCount);
+
+    Index64 pointOffset = 0;
+    for (size_t n = 0; n < leafCount; n++)
+    {
+        const LeafNode& leaf = leafManager.leaf(n);
+
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+        // skip out-of-core leafs
+        if (inCoreOnly && leaf.buffer().isOutOfCore()) {
+            pointOffsets.push_back(pointOffset);
+            continue;
+        }
+#else
+        (void) inCoreOnly; // unused variable
+#endif
+
+        if (useGroup) {
+            IndexOnIter iter = leaf.beginIndexOn();
+            MultiGroupFilter::Data data(includeGroups, excludeGroups);
+            const MultiGroupFilter filter = MultiGroupFilter::create(leaf, data);
+            FilterIndexIter<IndexOnIter, MultiGroupFilter> filterIndexIter(iter, filter);
+            pointOffset += iterCount(filterIndexIter);
+        }
+        else {
+            pointOffset += leaf.onPointCount();
+        }
+        pointOffsets.push_back(pointOffset);
+    }
+    return pointOffset;
 }
 
 

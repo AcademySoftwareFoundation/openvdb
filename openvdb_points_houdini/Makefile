@@ -193,6 +193,7 @@ endif
 
 LIBHOUDINI_INCLUDE_NAMES := \
 	houdini/SOP_NodeVDBPoints.h \
+	houdini/Utils.h \
 #
 HOUDINI_SOP_SRC_NAMES := \
 	houdini/GR_PrimVDBPoints.cc \
