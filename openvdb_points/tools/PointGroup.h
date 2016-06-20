@@ -62,6 +62,13 @@ inline void parsePointGroups(   std::vector<std::string>& includeGroups,
                                 std::vector<std::string>& excludeGroups,
                                 const std::string& groupStr);
 
+/// @brief Delete any group that is not present in the Descriptor.
+///
+/// @param groups        the vector of group names.
+/// @param descriptor    the descriptor that holds the group map.
+inline void deleteMissingPointGroups(   std::vector<std::string>& groups,
+                                        const AttributeSet::Descriptor& descriptor);
+
 /// @brief Appends a new empty group to the VDB tree.
 ///
 /// @param tree          the PointDataTree to be appended to.
@@ -488,6 +495,20 @@ inline void parsePointGroups(   std::vector<std::string>& includeGroups,
 
         if (negate)     excludeGroups.push_back(group);
         else            includeGroups.push_back(group);
+    }
+}
+
+
+////////////////////////////////////////
+
+
+inline void deleteMissingPointGroups(   std::vector<std::string>& groups,
+                                        const AttributeSet::Descriptor& descriptor)
+{
+    for (std::vector<std::string>::iterator it = groups.begin(); it != groups.end(); )
+    {
+        if (!descriptor.hasGroup(*it))  it = groups.erase(it);
+        else                            ++it;
     }
 }
 

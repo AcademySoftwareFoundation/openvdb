@@ -46,6 +46,7 @@
 #include <openvdb_points/tools/AttributeSet.h>
 #include <openvdb_points/tools/IndexFilter.h>
 #include <openvdb_points/tools/PointDataGrid.h>
+#include <openvdb_points/tools/PointGroup.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -756,6 +757,19 @@ convertPointDataGridPosition(   PositionAttribute& positionAttribute,
 
     const TreeType& tree = grid.tree();
     typename TreeType::LeafCIter iter = tree.cbeginLeaf();
+
+    if (!iter)  return;
+
+    // for efficiency, keep only groups that are present in the Descriptor
+
+    const AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
+
+    std::vector<Name> newIncludeGroups(includeGroups);
+    std::vector<Name> newExcludeGroups(excludeGroups);
+
+    deleteMissingPointGroups(newIncludeGroups, descriptor);
+    deleteMissingPointGroups(newExcludeGroups, descriptor);
+
     LeafManagerT leafManager(tree);
 
     const size_t positionIndex = iter->attributeSet().find("P");
@@ -763,7 +777,7 @@ convertPointDataGridPosition(   PositionAttribute& positionAttribute,
     positionAttribute.expand();
     ConvertPointDataGridPositionOp<TreeType, PositionAttribute> convert(
                     positionAttribute, pointOffsets, grid.transform(), positionIndex,
-                    includeGroups, excludeGroups, inCoreOnly);
+                    newIncludeGroups, newExcludeGroups, inCoreOnly);
     tbb::parallel_for(leafManager.leafRange(), convert);
     positionAttribute.compact();
 }
@@ -786,13 +800,26 @@ convertPointDataGridAttribute(  TypedAttribute& attribute,
 
     using point_conversion_internal::ConvertPointDataGridAttributeOp;
 
-    // typename PointDataTreeT::LeafCIter iter = tree.cbeginLeaf();
+    typename PointDataTreeT::LeafCIter iter = tree.cbeginLeaf();
+
+    if (!iter)  return;
+
+    // for efficiency, keep only groups that are present in the Descriptor
+
+    const AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
+
+    std::vector<Name> newIncludeGroups(includeGroups);
+    std::vector<Name> newExcludeGroups(excludeGroups);
+
+    deleteMissingPointGroups(newIncludeGroups, descriptor);
+    deleteMissingPointGroups(newExcludeGroups, descriptor);
+
     LeafManagerT leafManager(tree);
 
     attribute.expand();
     ConvertPointDataGridAttributeOp<PointDataTreeT, TypedAttribute> convert(
                     attribute, pointOffsets, arrayIndex,
-                    includeGroups, excludeGroups, inCoreOnly);
+                    newIncludeGroups, newExcludeGroups, inCoreOnly);
     tbb::parallel_for(leafManager.leafRange(), convert);
     attribute.compact();
 }
@@ -815,12 +842,25 @@ convertPointDataGridGroup(  Group& group,
 
     using point_conversion_internal::ConvertPointDataGridGroupOp;
 
-    // typename PointDataTreeT::LeafCIter iter = tree.cbeginLeaf();
+    typename PointDataTreeT::LeafCIter iter = tree.cbeginLeaf();
+
+    if (!iter)  return;
+
+    // for efficiency, keep only groups that are present in the Descriptor
+
+    const AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
+
+    std::vector<Name> newIncludeGroups(includeGroups);
+    std::vector<Name> newExcludeGroups(excludeGroups);
+
+    deleteMissingPointGroups(newIncludeGroups, descriptor);
+    deleteMissingPointGroups(newExcludeGroups, descriptor);
+
     LeafManagerT leafManager(tree);
 
     ConvertPointDataGridGroupOp<PointDataTree, Group> convert(
                     group, pointOffsets, index,
-                    includeGroups, excludeGroups, inCoreOnly);
+                    newIncludeGroups, newExcludeGroups, inCoreOnly);
     tbb::parallel_for(leafManager.leafRange(), convert);
 
     // must call this after modifying point groups in parallel

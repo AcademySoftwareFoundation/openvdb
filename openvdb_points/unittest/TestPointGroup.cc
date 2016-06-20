@@ -185,6 +185,52 @@ TestPointGroup::testParse()
         std::vector<std::string> excludeGroups;
         CPPUNIT_ASSERT_THROW(parsePointGroups(includeGroups, excludeGroups, "group$1"), RuntimeError);
     }
+
+    { // no groups, empty Descriptor
+        std::vector<std::string> groups;
+        AttributeSet::Descriptor descriptor;
+        deleteMissingPointGroups(groups, descriptor);
+        CPPUNIT_ASSERT(testStringVector(groups));
+    }
+
+    { // one group, empty Descriptor
+        std::vector<std::string> groups;
+        groups.push_back("group1");
+        AttributeSet::Descriptor descriptor;
+        deleteMissingPointGroups(groups, descriptor);
+        CPPUNIT_ASSERT(testStringVector(groups));
+    }
+
+    { // one group, Descriptor with same group
+        std::vector<std::string> groups;
+        groups.push_back("group1");
+        AttributeSet::Descriptor descriptor;
+        descriptor.setGroup("group1", 0);
+        deleteMissingPointGroups(groups, descriptor);
+        CPPUNIT_ASSERT(testStringVector(groups, "group1"));
+    }
+
+    { // one group, Descriptor with different group
+        std::vector<std::string> groups;
+        groups.push_back("group1");
+        AttributeSet::Descriptor descriptor;
+        descriptor.setGroup("group2", 0);
+        deleteMissingPointGroups(groups, descriptor);
+        CPPUNIT_ASSERT(testStringVector(groups));
+    }
+
+    { // three groups, Descriptor with three groups, one different
+        std::vector<std::string> groups;
+        groups.push_back("group1");
+        groups.push_back("group3");
+        groups.push_back("group4");
+        AttributeSet::Descriptor descriptor;
+        descriptor.setGroup("group1", 0);
+        descriptor.setGroup("group2", 0);
+        descriptor.setGroup("group4", 0);
+        deleteMissingPointGroups(groups, descriptor);
+        CPPUNIT_ASSERT(testStringVector(groups, "group1", "group4"));
+    }
 }
 
 
