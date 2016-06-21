@@ -554,6 +554,8 @@ public:
 
     AttributeHandle(const AttributeArray& array, const bool preserveCompression = true);
 
+    size_t size() const { return mArray->size(); }
+
     bool isUniform() const;
 
     T get(Index n) const;

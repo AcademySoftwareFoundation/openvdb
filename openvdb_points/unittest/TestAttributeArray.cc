@@ -770,6 +770,8 @@ TestAttributeArray::testAttributeHandle()
 
         AttributeHandleRWI handle(*array);
 
+        CPPUNIT_ASSERT_EQUAL(handle.size(), array->size());
+
         CPPUNIT_ASSERT_EQUAL(handle.get(0), 0);
         CPPUNIT_ASSERT_EQUAL(handle.get(10), 0);
 
