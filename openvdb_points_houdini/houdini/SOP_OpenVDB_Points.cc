@@ -472,11 +472,7 @@ convertPointDataGridToHoudini(GU_Detail& detail, hvdb::VdbPrimCIterator& vdbIt,
         std::vector<Index64> pointOffsets;
         Index64 total = getPointOffsets(pointOffsets, tree, includeGroups, excludeGroups);
 
-#if (UT_VERSION_INT < 0x0c0500F5) // earlier than 12.5.245
-        for (size_t n = 0, N = total; n < N; ++n) geo.appendPointOffset();
-#else
         geo.appendPointBlock(total);
-#endif
 
         hvdbp::HoudiniWriteAttribute<Vec3f> positionAttribute(*geo.getP());
         convertPointDataGridPosition(positionAttribute, grid, pointOffsets,
