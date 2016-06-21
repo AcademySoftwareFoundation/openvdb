@@ -22,8 +22,9 @@ env:
   - ABI=2 BLOSC=no RELEASE=no HOUDINI_BUILD=none
   - ABI=3 BLOSC=no RELEASE=no HOUDINI_BUILD=none
   - ABI=3 BLOSC=yes RELEASE=no HOUDINI_BUILD=none
-  - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_BUILD=houdini-14.0.395-linux_x86_64_gcc4.8
-  - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_BUILD=houdini-15.0.244.16-linux_x86_64_gcc4.8
+  - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_BUILD=houdini-14.0.444-linux_x86_64_gcc4.8
+  - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_BUILD=houdini-15.0.297-linux_x86_64_gcc4.8
+  - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_BUILD=houdini-15.5.480-linux_x86_64_gcc4.8
 
 before_install:
   - pip install --user codecov

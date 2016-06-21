@@ -59,7 +59,7 @@ if [ "$TASK" = "pre_install" ]; then
         wget http://www.openvdb.org/download/openvdb_3_1_0_houdini.zip
         unzip openvdb_3_1_0_houdini.zip
         # download and unpack houdini headers and libraries from public FTP
-        wget ftp://ftp.sidefx.com/public/Houdini`echo $HOUDINI_BUILD | cut -d'-' -f 2 | cut -d'.' -f 1,2`/$HOUDINI_BUILD.tar.gz
+        wget ftp://ftp.sidefx.com/public/$HOUDINI_BUILD.tar.gz
         tar -xzf $HOUDINI_BUILD.tar.gz
         ln -s $HOUDINI_BUILD hou
         cd hou
