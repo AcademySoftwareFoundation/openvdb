@@ -118,6 +118,7 @@ populateAttribute(  PointDataTreeT& tree, const PointIndexTreeT& pointIndexTree,
 /// @param positionAttribute    the position attribute to be populated.
 /// @param grid                 the PointDataGrid to be converted.
 /// @param pointOffsets         a vector of cumulative point offsets for each leaf
+/// @param startOffset          a value to shift all the point offsets by
 /// @param includeGroups        a vector of VDB Points groups to be included (default is all)
 /// @param excludeGroups        a vector of VDB Points groups to be excluded (default is none)
 /// @param inCoreOnly           true if out-of-core leaf nodes are to be ignored
@@ -128,6 +129,7 @@ inline void
 convertPointDataGridPosition(   PositionAttribute& positionAttribute,
                                 const PointDataGridT& grid,
                                 const std::vector<Index64>& pointOffsets,
+                                const Index64 startOffset,
                                 const std::vector<Name>& includeGroups = std::vector<Name>(),
                                 const std::vector<Name>& excludeGroups = std::vector<Name>(),
                                 const bool inCoreOnly = true);
@@ -138,6 +140,7 @@ convertPointDataGridPosition(   PositionAttribute& positionAttribute,
 /// @param attribute            the attribute to be populated.
 /// @param tree                 the PointDataTree to be converted.
 /// @param pointOffsets         a vector of cumulative point offsets for each leaf.
+/// @param startOffset          a value to shift all the point offsets by
 /// @param arrayIndex           the index in the Descriptor of the array to be converted.
 /// @param includeGroups        a vector of VDB Points groups to be included (default is all)
 /// @param excludeGroups        a vector of VDB Points groups to be excluded (default is none)
@@ -149,6 +152,7 @@ inline void
 convertPointDataGridAttribute(  TypedAttribute& attribute,
                                 const PointDataTreeT& tree,
                                 const std::vector<Index64>& pointOffsets,
+                                const Index64 startOffset,
                                 const unsigned arrayIndex,
                                 const std::vector<Name>& includeGroups = std::vector<Name>(),
                                 const std::vector<Name>& excludeGroups = std::vector<Name>(),
@@ -160,6 +164,7 @@ convertPointDataGridAttribute(  TypedAttribute& attribute,
 /// @param group                the group to be populated.
 /// @param tree                 the PointDataTree to be converted.
 /// @param pointOffsets         a vector of cumulative point offsets for each leaf
+/// @param startOffset          a value to shift all the point offsets by
 /// @param index                the group index to be converted.
 /// @param includeGroups        a vector of VDB Points groups to be included (default is all)
 /// @param excludeGroups        a vector of VDB Points groups to be excluded (default is none)
@@ -171,6 +176,7 @@ inline void
 convertPointDataGridGroup(  Group& group,
                             const PointDataTreeT& tree,
                             const std::vector<Index64>& pointOffsets,
+                            const Index64 startOffset,
                             const AttributeSet::Descriptor::GroupIndex index,
                             const std::vector<Name>& includeGroups = std::vector<Name>(),
                             const std::vector<Name>& excludeGroups = std::vector<Name>(),
@@ -384,6 +390,7 @@ struct ConvertPointDataGridPositionOp {
 
     ConvertPointDataGridPositionOp( Attribute& attribute,
                                     const std::vector<Index64>& pointOffsets,
+                                    const Index64 startOffset,
                                     const math::Transform& transform,
                                     const size_t index,
                                     const std::vector<Name>& includeGroups = std::vector<Name>(),
@@ -391,6 +398,7 @@ struct ConvertPointDataGridPositionOp {
                                     const bool inCoreOnly = true)
         : mAttribute(attribute)
         , mPointOffsets(pointOffsets)
+        , mStartOffset(startOffset)
         , mTransform(transform)
         , mIndex(index)
         , mIncludeGroups(includeGroups)
@@ -416,7 +424,9 @@ struct ConvertPointDataGridPositionOp {
             if (mInCoreOnly && leaf->buffer().isOutOfCore())    continue;
 #endif
 
-            Index64 offset = leaf.pos() > 0 ? mPointOffsets[leaf.pos() - 1] : 0;
+            Index64 offset = mStartOffset;
+
+            if (leaf.pos() > 0)     offset += mPointOffsets[leaf.pos() - 1];
 
             typename AttributeHandle<ValueType>::Ptr handle =
                     AttributeHandle<ValueType>::create(leaf->template constAttributeArray(mIndex));
@@ -448,6 +458,7 @@ struct ConvertPointDataGridPositionOp {
 
     Attribute&                              mAttribute;
     const std::vector<Index64>&             mPointOffsets;
+    const Index64                           mStartOffset;
     const math::Transform&                  mTransform;
     const size_t                            mIndex;
     const std::vector<std::string>&         mIncludeGroups;
@@ -466,12 +477,14 @@ struct ConvertPointDataGridAttributeOp {
 
     ConvertPointDataGridAttributeOp(Attribute& attribute,
                                     const std::vector<Index64>& pointOffsets,
+                                    const Index64 startOffset,
                                     const size_t index,
                                     const std::vector<Name>& includeGroups = std::vector<Name>(),
                                     const std::vector<Name>& excludeGroups = std::vector<Name>(),
                                     const bool inCoreOnly = true)
         : mAttribute(attribute)
         , mPointOffsets(pointOffsets)
+        , mStartOffset(startOffset)
         , mIndex(index)
         , mIncludeGroups(includeGroups)
         , mExcludeGroups(excludeGroups)
@@ -491,7 +504,9 @@ struct ConvertPointDataGridAttributeOp {
             if (mInCoreOnly && leaf->buffer().isOutOfCore())    continue;
 #endif
 
-            Index64 offset = leaf.pos() > 0 ? mPointOffsets[leaf.pos() - 1] : 0;
+            Index64 offset = mStartOffset;
+
+            if (leaf.pos() > 0)     offset += mPointOffsets[leaf.pos() - 1];
 
             typename AttributeHandle<ValueType>::Ptr handle =
                     AttributeHandle<ValueType>::create(leaf->template constAttributeArray(mIndex));
@@ -536,6 +551,7 @@ struct ConvertPointDataGridAttributeOp {
 
     Attribute&                              mAttribute;
     const std::vector<Index64>&             mPointOffsets;
+    const Index64                           mStartOffset;
     const size_t                            mIndex;
     const std::vector<std::string>&         mIncludeGroups;
     const std::vector<std::string>&         mExcludeGroups;
@@ -553,12 +569,14 @@ struct ConvertPointDataGridGroupOp {
 
     ConvertPointDataGridGroupOp(Group& group,
                                 const std::vector<Index64>& pointOffsets,
+                                const Index64 startOffset,
                                 const AttributeSet::Descriptor::GroupIndex index,
                                 const std::vector<Name>& includeGroups = std::vector<Name>(),
                                 const std::vector<Name>& excludeGroups = std::vector<Name>(),
                                 const bool inCoreOnly = true)
         : mGroup(group)
         , mPointOffsets(pointOffsets)
+        , mStartOffset(startOffset)
         , mIndex(index)
         , mIncludeGroups(includeGroups)
         , mExcludeGroups(excludeGroups)
@@ -576,7 +594,9 @@ struct ConvertPointDataGridGroupOp {
             if (mInCoreOnly && leaf->buffer().isOutOfCore())    continue;
 #endif
 
-            Index64 offset = leaf.pos() > 0 ? mPointOffsets[leaf.pos() - 1] : 0;
+            Index64 offset = mStartOffset;
+
+            if (leaf.pos() > 0)     offset += mPointOffsets[leaf.pos() - 1];
 
             const AttributeArray& array = leaf->constAttributeArray(mIndex.first);
             const GroupType bitmask = GroupType(1) << mIndex.second;
@@ -636,6 +656,7 @@ struct ConvertPointDataGridGroupOp {
 
     Group&                                  mGroup;
     const std::vector<Index64>&             mPointOffsets;
+    const Index64                           mStartOffset;
     const GroupIndex                        mIndex;
     const std::vector<std::string>&         mIncludeGroups;
     const std::vector<std::string>&         mExcludeGroups;
@@ -746,6 +767,7 @@ inline void
 convertPointDataGridPosition(   PositionAttribute& positionAttribute,
                                 const PointDataGridT& grid,
                                 const std::vector<Index64>& pointOffsets,
+                                const Index64 startOffset,
                                 const std::vector<Name>& includeGroups,
                                 const std::vector<Name>& excludeGroups,
                                 const bool inCoreOnly)
@@ -776,7 +798,7 @@ convertPointDataGridPosition(   PositionAttribute& positionAttribute,
 
     positionAttribute.expand();
     ConvertPointDataGridPositionOp<TreeType, PositionAttribute> convert(
-                    positionAttribute, pointOffsets, grid.transform(), positionIndex,
+                    positionAttribute, pointOffsets, startOffset, grid.transform(), positionIndex,
                     newIncludeGroups, newExcludeGroups, inCoreOnly);
     tbb::parallel_for(leafManager.leafRange(), convert);
     positionAttribute.compact();
@@ -791,6 +813,7 @@ inline void
 convertPointDataGridAttribute(  TypedAttribute& attribute,
                                 const PointDataTreeT& tree,
                                 const std::vector<Index64>& pointOffsets,
+                                const Index64 startOffset,
                                 const unsigned arrayIndex,
                                 const std::vector<Name>& includeGroups,
                                 const std::vector<Name>& excludeGroups,
@@ -818,7 +841,7 @@ convertPointDataGridAttribute(  TypedAttribute& attribute,
 
     attribute.expand();
     ConvertPointDataGridAttributeOp<PointDataTreeT, TypedAttribute> convert(
-                    attribute, pointOffsets, arrayIndex,
+                    attribute, pointOffsets, startOffset, arrayIndex,
                     newIncludeGroups, newExcludeGroups, inCoreOnly);
     tbb::parallel_for(leafManager.leafRange(), convert);
     attribute.compact();
@@ -833,6 +856,7 @@ inline void
 convertPointDataGridGroup(  Group& group,
                             const PointDataTreeT& tree,
                             const std::vector<Index64>& pointOffsets,
+                            const Index64 startOffset,
                             const AttributeSet::Descriptor::GroupIndex index,
                             const std::vector<Name>& includeGroups,
                             const std::vector<Name>& excludeGroups,
@@ -859,7 +883,7 @@ convertPointDataGridGroup(  Group& group,
     LeafManagerT leafManager(tree);
 
     ConvertPointDataGridGroupOp<PointDataTree, Group> convert(
-                    group, pointOffsets, index,
+                    group, pointOffsets, startOffset, index,
                     newIncludeGroups, newExcludeGroups, inCoreOnly);
     tbb::parallel_for(leafManager.leafRange(), convert);
 
