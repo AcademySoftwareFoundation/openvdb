@@ -345,10 +345,10 @@ TestPointConversion::testPointConversion()
     convertPointDataGridAttribute(outputUniform, tree, pointOffsets, startOffset, uniformIndex, includeGroups);
     convertPointDataGridGroup(outputGroup, tree, pointOffsets, startOffset, groupIndex, includeGroups);
 
-    CPPUNIT_ASSERT_EQUAL(outputPosition.size() - startOffset, size_t(halfCount));
-    CPPUNIT_ASSERT_EQUAL(outputId.size() - startOffset, size_t(halfCount));
-    CPPUNIT_ASSERT_EQUAL(outputUniform.size() - startOffset, size_t(halfCount));
-    CPPUNIT_ASSERT_EQUAL(outputGroup.size() - startOffset, size_t(halfCount));
+    CPPUNIT_ASSERT_EQUAL(size_t(outputPosition.size() - startOffset), size_t(halfCount));
+    CPPUNIT_ASSERT_EQUAL(size_t(outputId.size() - startOffset), size_t(halfCount));
+    CPPUNIT_ASSERT_EQUAL(size_t(outputUniform.size() - startOffset), size_t(halfCount));
+    CPPUNIT_ASSERT_EQUAL(size_t(outputGroup.size() - startOffset), size_t(halfCount));
 
     pointData.clear();
 
