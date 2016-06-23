@@ -281,18 +281,22 @@ TestPointConversion::testPointConversion()
     AttributeWrapper<float> outputUniform;
     GroupWrapper outputGroup;
 
-    outputPosition.resize(position.size());
-    outputId.resize(id.size());
-    outputUniform.resize(uniform.size());
-    outputGroup.resize(group.size());
+    // test offset the whole point block by an arbitrary amount
+
+    Index64 startOffset = 10;
+
+    outputPosition.resize(startOffset + position.size());
+    outputId.resize(startOffset + id.size());
+    outputUniform.resize(startOffset + uniform.size());
+    outputGroup.resize(startOffset + group.size());
 
     std::vector<Index64> pointOffsets;
     getPointOffsets(pointOffsets, tree);
 
-    convertPointDataGridPosition(outputPosition, *pointDataGrid, pointOffsets);
-    convertPointDataGridAttribute(outputId, tree, pointOffsets, idIndex);
-    convertPointDataGridAttribute(outputUniform, tree, pointOffsets, uniformIndex);
-    convertPointDataGridGroup(outputGroup, tree, pointOffsets, groupIndex);
+    convertPointDataGridPosition(outputPosition, *pointDataGrid, pointOffsets, startOffset);
+    convertPointDataGridAttribute(outputId, tree, pointOffsets, startOffset, idIndex);
+    convertPointDataGridAttribute(outputUniform, tree, pointOffsets, startOffset, uniformIndex);
+    convertPointDataGridGroup(outputGroup, tree, pointOffsets, startOffset, groupIndex);
 
     // pack and sort the new buffers based on id
 
@@ -301,10 +305,10 @@ TestPointConversion::testPointConversion()
     pointData.resize(count);
 
     for (unsigned int i = 0; i < count; i++) {
-        pointData[i].id = outputId.buffer()[i];
-        pointData[i].position = outputPosition.buffer()[i];
-        pointData[i].uniform = outputUniform.buffer()[i];
-        pointData[i].group = outputGroup.buffer()[i];
+        pointData[i].id = outputId.buffer()[startOffset + i];
+        pointData[i].position = outputPosition.buffer()[startOffset + i];
+        pointData[i].uniform = outputUniform.buffer()[startOffset + i];
+        pointData[i].group = outputGroup.buffer()[startOffset + i];
     }
 
     std::sort(pointData.begin(), pointData.end());
@@ -325,10 +329,10 @@ TestPointConversion::testPointConversion()
 
     const unsigned long halfCount = count / 2;
 
-    outputPosition.resize(halfCount);
-    outputId.resize(halfCount);
-    outputUniform.resize(halfCount);
-    outputGroup.resize(halfCount);
+    outputPosition.resize(startOffset + halfCount);
+    outputId.resize(startOffset + halfCount);
+    outputUniform.resize(startOffset + halfCount);
+    outputGroup.resize(startOffset + halfCount);
 
     std::vector<Name> includeGroups;
     includeGroups.push_back("test");
@@ -336,24 +340,24 @@ TestPointConversion::testPointConversion()
     pointOffsets.clear();
     getPointOffsets(pointOffsets, tree, includeGroups);
 
-    convertPointDataGridPosition(outputPosition, *pointDataGrid, pointOffsets, includeGroups);
-    convertPointDataGridAttribute(outputId, tree, pointOffsets, idIndex, includeGroups);
-    convertPointDataGridAttribute(outputUniform, tree, pointOffsets, uniformIndex, includeGroups);
-    convertPointDataGridGroup(outputGroup, tree, pointOffsets, groupIndex, includeGroups);
+    convertPointDataGridPosition(outputPosition, *pointDataGrid, pointOffsets, startOffset, includeGroups);
+    convertPointDataGridAttribute(outputId, tree, pointOffsets, startOffset, idIndex, includeGroups);
+    convertPointDataGridAttribute(outputUniform, tree, pointOffsets, startOffset, uniformIndex, includeGroups);
+    convertPointDataGridGroup(outputGroup, tree, pointOffsets, startOffset, groupIndex, includeGroups);
 
-    CPPUNIT_ASSERT_EQUAL(outputPosition.size(), size_t(halfCount));
-    CPPUNIT_ASSERT_EQUAL(outputId.size(), size_t(halfCount));
-    CPPUNIT_ASSERT_EQUAL(outputUniform.size(), size_t(halfCount));
-    CPPUNIT_ASSERT_EQUAL(outputGroup.size(), size_t(halfCount));
+    CPPUNIT_ASSERT_EQUAL(outputPosition.size() - startOffset, size_t(halfCount));
+    CPPUNIT_ASSERT_EQUAL(outputId.size() - startOffset, size_t(halfCount));
+    CPPUNIT_ASSERT_EQUAL(outputUniform.size() - startOffset, size_t(halfCount));
+    CPPUNIT_ASSERT_EQUAL(outputGroup.size() - startOffset, size_t(halfCount));
 
     pointData.clear();
 
     for (unsigned int i = 0; i < halfCount; i++) {
         PointData data;
-        data.id = outputId.buffer()[i];
-        data.position = outputPosition.buffer()[i];
-        data.uniform = outputUniform.buffer()[i];
-        data.group = outputGroup.buffer()[i];
+        data.id = outputId.buffer()[startOffset + i];
+        data.position = outputPosition.buffer()[startOffset + i];
+        data.uniform = outputUniform.buffer()[startOffset + i];
+        data.group = outputGroup.buffer()[startOffset + i];
         pointData.push_back(data);
     }
 
