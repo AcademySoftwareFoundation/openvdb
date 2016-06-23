@@ -554,6 +554,8 @@ public:
 
     AttributeHandle(const AttributeArray& array, const bool preserveCompression = true);
 
+    virtual ~AttributeHandle() { }
+
     size_t size() const { return mArray->size(); }
 
     bool isUniform() const;
@@ -584,6 +586,8 @@ public:
     static Ptr create(AttributeArray& array);
 
     AttributeWriteHandle(AttributeArray& array);
+
+    virtual ~AttributeWriteHandle() { }
 
     /// @brief  If this array is uniform, replace it with an array of length size().
     /// @param  fill if true, assign the uniform value to each element of the array.
