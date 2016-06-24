@@ -40,9 +40,12 @@
 
 #include <openvdb/math/Vec3.h>
 #include <openvdb/Types.h>
+#include <openvdb_points/tools/PointCount.h>
+#include <openvdb_points/tools/PointConversion.h>
 
 #include <GA/GA_Attribute.h>
 #include <GA/GA_Handle.h>
+#include <GU/GU_Detail.h>
 #include <GA/GA_AIFTuple.h>
 #include <GA/GA_ElementGroup.h>
 #include <GA/GA_Iterator.h>
@@ -54,6 +57,18 @@ namespace openvdb_points_houdini {
 typedef std::vector<GA_Offset> OffsetList;
 typedef boost::shared_ptr<OffsetList> OffsetListPtr;
 
+/// @brief  Converts a VDB Points grid into Houdini points and appends to a Houdini Detail
+///
+/// @param  detail          GU_Detail to append the converted points and attributes to
+/// @param  grid            grid containing the points that will be converted
+/// @param  includeGroups   a vector of VDB Points groups to be included (default is all)
+/// @param  excludeGroups   a vector of VDB Points groups to be excluded (default is none)
+
+void
+convertPointDataGridToHoudini(GU_Detail& detail,
+                              const openvdb::tools::PointDataGrid& grid,
+                              const std::vector<std::string>& includeGroups,
+                              const std::vector<std::string>& excludeGroups);
 
 namespace {
 
@@ -102,6 +117,98 @@ inline half attributeValue(const GA_Attribute& attribute, GA_Offset n, unsigned 
     return attributeValue<half, float>(attribute, n, i);
 }
 
+template<typename ValueType, typename HoudiniType>
+typename boost::enable_if_c<openvdb::VecTraits<ValueType>::IsVec, void>::type
+getValues(HoudiniType* values, const ValueType& value)
+{
+    for (unsigned i = 0; i < openvdb::VecTraits<ValueType>::Size; ++i) {
+        values[i] = value(i);
+    }
+}
+
+template<typename ValueType, typename HoudiniType>
+typename boost::disable_if_c<openvdb::VecTraits<ValueType>::IsVec, void>::type
+getValues(HoudiniType* values, const ValueType& value)
+{
+    values[0] = value;
+}
+
+template <typename ValueType, typename HoudiniType>
+GA_Defaults
+gaDefaultsFromDescriptorTyped(const openvdb::tools::AttributeSet::Descriptor& descriptor, const openvdb::Name& name)
+{
+    const int size = openvdb::VecTraits<ValueType>::Size;
+
+    boost::scoped_array<HoudiniType> values(new HoudiniType[size]);
+    ValueType defaultValue = descriptor.getDefaultValue<ValueType>(name);
+
+    getValues<ValueType, HoudiniType>(values.get(), defaultValue);
+
+    return GA_Defaults(values.get(), size);
+}
+
+inline GA_Defaults
+gaDefaultsFromDescriptor(const openvdb::tools::AttributeSet::Descriptor& descriptor, const openvdb::Name& name)
+{
+    const size_t pos = descriptor.find(name);
+
+    if (pos == openvdb::tools::AttributeSet::INVALID_POS)   return GA_Defaults(0);
+
+    const openvdb::Name type = descriptor.type(pos).first;
+
+    if (type == "bool")             return gaDefaultsFromDescriptorTyped<bool, int32>(descriptor, name);
+    else if (type == "int16")       return gaDefaultsFromDescriptorTyped<int16_t, int32>(descriptor, name);
+    else if (type == "int32")       return gaDefaultsFromDescriptorTyped<int32_t, int32>(descriptor, name);
+    else if (type == "int64")       return gaDefaultsFromDescriptorTyped<int64_t, int64>(descriptor, name);
+    else if (type == "half")        return gaDefaultsFromDescriptorTyped<half, fpreal32>(descriptor, name);
+    else if (type == "float")       return gaDefaultsFromDescriptorTyped<float, fpreal32>(descriptor, name);
+    else if (type == "double")      return gaDefaultsFromDescriptorTyped<double, fpreal64>(descriptor, name);
+    else if (type == "vec3h")       return gaDefaultsFromDescriptorTyped<openvdb::math::Vec3<half>, fpreal32>(descriptor, name);
+    else if (type == "vec3s")       return gaDefaultsFromDescriptorTyped<openvdb::math::Vec3<float>, fpreal32>(descriptor, name);
+    else if (type == "vec3d")       return gaDefaultsFromDescriptorTyped<openvdb::math::Vec3<double>, fpreal64>(descriptor, name);
+
+    return GA_Defaults(0);
+}
+
+inline GA_Storage
+gaStorageFromAttrString(const openvdb::Name& type)
+{
+    if (type == "bool")             return GA_STORE_BOOL;
+    else if (type == "int16")       return GA_STORE_INT16;
+    else if (type == "int32")       return GA_STORE_INT32;
+    else if (type == "int64")       return GA_STORE_INT64;
+    else if (type == "half")        return GA_STORE_REAL16;
+    else if (type == "float")       return GA_STORE_REAL32;
+    else if (type == "double")      return GA_STORE_REAL64;
+    else if (type == "vec3h")       return GA_STORE_REAL16;
+    else if (type == "vec3s")       return GA_STORE_REAL32;
+    else if (type == "vec3d")       return GA_STORE_REAL64;
+
+    return GA_STORE_INVALID;
+}
+
+inline unsigned
+widthFromAttrString(const openvdb::Name& type)
+{
+    if (type == "bool" ||
+        type == "int16" ||
+        type == "int32" ||
+        type == "int64" ||
+        type == "half" ||
+        type == "float" ||
+        type == "double")
+    {
+        return 1;
+    }
+    else if (type == "vec3h" ||
+             type == "vec3s" ||
+             type == "vec3d")
+    {
+        return 3;
+    }
+
+    return 0;
+}
 
 } // namespace
 
@@ -217,6 +324,131 @@ private:
     GA_PointGroup& mGroup;
 }; // HoudiniGroup
 
+
+///////////////////////////////////////
+
+
+void
+convertPointDataGridToHoudini(GU_Detail& detail,
+                              const openvdb::tools::PointDataGrid& grid,
+                              const std::vector<std::string>& includeGroups,
+                              const std::vector<std::string>& excludeGroups)
+{
+
+    const openvdb::tools::PointDataTree& tree = grid.tree();
+
+    openvdb::tools::PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
+    if (!leafIter) return;
+
+    // position attribute is mandatory
+    const openvdb::tools::AttributeSet& attributeSet = leafIter->attributeSet();
+    const openvdb::tools::AttributeSet::Descriptor& descriptor = attributeSet.descriptor();
+    const bool hasPosition = descriptor.find("P") != openvdb::tools::AttributeSet::INVALID_POS;
+    if (!hasPosition)   return;
+
+    // obtain cumulative point offsets and total points
+    std::vector<openvdb::Index64> pointOffsets;
+    openvdb::Index64 total = getPointOffsets(pointOffsets, tree, includeGroups, excludeGroups);
+
+    // a block's global offset is needed to transform its point offsets to global offsets
+    openvdb::Index64 startOffset = detail.appendPointBlock(total);
+
+    HoudiniWriteAttribute<openvdb::Vec3f> positionAttribute(*detail.getP());
+    convertPointDataGridPosition(positionAttribute, grid, pointOffsets,
+                                 startOffset, includeGroups, excludeGroups);
+
+    // add other point attributes to the hdk detail
+    const openvdb::tools::AttributeSet::Descriptor::NameToPosMap& nameToPosMap = descriptor.map();
+
+    for (openvdb::tools::AttributeSet::Descriptor::ConstIterator    it = nameToPosMap.begin(),
+                                                                    itEnd = nameToPosMap.end(); it != itEnd; ++it) {
+
+        const openvdb::Name& name = it->first;
+        const openvdb::Name& type = descriptor.type(it->second).first;
+
+        // position handled explicitly
+        if (name == "P")    continue;
+
+        // don't convert group attributes
+        if (descriptor.hasGroup(name))  continue;
+
+        GA_RWAttributeRef attributeRef = detail.findPointAttribute(name.c_str());
+
+        if(attributeRef.isInvalid()){
+            // if the attribute doesn't exist on the detail try to create it
+            const GA_Storage storage = gaStorageFromAttrString(type);
+            const unsigned width = widthFromAttrString(type);
+            const GA_Defaults defaults = (name == "pscale") ? GA_Defaults(0.05) : gaDefaultsFromDescriptor(descriptor, name);
+            attributeRef = detail.addTuple(storage, GA_ATTRIB_POINT, name.c_str(), width, defaults);
+            // if we failed to create it, give up
+            if (attributeRef.isInvalid()) continue;
+        }
+
+        const unsigned index = it->second;
+
+        if (type == "bool") {
+            HoudiniWriteAttribute<bool> attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
+        }
+        else if (type == "int16") {
+            HoudiniWriteAttribute<int16_t> attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
+        }
+        else if (type == "int32") {
+            HoudiniWriteAttribute<int32_t> attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
+        }
+        else if (type == "int64") {
+            HoudiniWriteAttribute<int64_t> attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
+        }
+        else if (type == "half") {
+            HoudiniWriteAttribute<half> attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
+        }
+        else if (type == "float") {
+            HoudiniWriteAttribute<float> attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
+        }
+        else if (type == "double") {
+            HoudiniWriteAttribute<double> attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
+        }
+        else if (type == "vec3h") {
+            HoudiniWriteAttribute<openvdb::math::Vec3<half> > attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
+        }
+        else if (type == "vec3s") {
+            HoudiniWriteAttribute<openvdb::math::Vec3<float> > attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
+        }
+        else if (type == "vec3d") {
+            HoudiniWriteAttribute<openvdb::math::Vec3<double> > attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
+        }
+        else {
+            throw std::runtime_error("Unknown Attribute Type for Conversion: " + type);
+        }
+    }
+
+    // add point groups to the hdk detail
+    const openvdb::tools::AttributeSet::Descriptor::NameToPosMap& groupMap = descriptor.groupMap();
+
+    for (openvdb::tools::AttributeSet::Descriptor::ConstIterator    it = groupMap.begin(),
+                                                                    itEnd = groupMap.end(); it != itEnd; ++it) {
+        const openvdb::Name& name = it->first;
+
+        assert(!name.empty());
+
+        GA_PointGroup* pointGroup = detail.findPointGroup(name.c_str());
+        if (!pointGroup) pointGroup = detail.newPointGroup(name.c_str());
+
+        const openvdb::tools::AttributeSet::Descriptor::GroupIndex index = attributeSet.groupIndex(name);
+
+        HoudiniGroup group(*pointGroup);
+        convertPointDataGridGroup(group, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
+    }
+}
 
 } // namespace openvdb_points_houdini
 

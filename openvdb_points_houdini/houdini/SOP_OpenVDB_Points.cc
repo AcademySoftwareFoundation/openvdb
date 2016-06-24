@@ -229,46 +229,6 @@ attrStringTypeFromGAAttribute(GA_Attribute const * attribute)
     throw std::runtime_error(ss.str());
 }
 
-inline GA_Storage
-gaStorageFromAttrString(const Name& type)
-{
-    if (type == "bool")             return GA_STORE_BOOL;
-    else if (type == "int16")       return GA_STORE_INT16;
-    else if (type == "int32")         return GA_STORE_INT32;
-    else if (type == "int64")        return GA_STORE_INT64;
-    else if (type == "half")        return GA_STORE_REAL16;
-    else if (type == "float")       return GA_STORE_REAL32;
-    else if (type == "double")      return GA_STORE_REAL64;
-    else if (type == "vec3h")       return GA_STORE_REAL16;
-    else if (type == "vec3s")       return GA_STORE_REAL32;
-    else if (type == "vec3d")       return GA_STORE_REAL64;
-
-    return GA_STORE_INVALID;
-}
-
-inline unsigned
-widthFromAttrString(const Name& type)
-{
-    if (type == "bool" ||
-        type == "int16" ||
-        type == "int32" ||
-        type == "int64" ||
-        type == "half" ||
-        type == "float" ||
-        type == "double")
-    {
-        return 1;
-    }
-    else if (type == "vec3h" ||
-             type == "vec3s" ||
-             type == "vec3d")
-    {
-        return 3;
-    }
-
-    return 0;
-}
-
 /// @brief Translate the default value of a GA_Defaults into default Metadata
 template <typename ValueType>
 Metadata::Ptr
@@ -359,64 +319,6 @@ defaultMetadataFromGAAttribute(GA_Attribute const * attribute)
     throw std::runtime_error(ss.str());
 }
 
-
-template<typename ValueType, typename HoudiniType>
-typename boost::enable_if_c<VecTraits<ValueType>::IsVec, void>::type
-getValues(HoudiniType* values, const ValueType& value)
-{
-    for (unsigned i = 0; i < VecTraits<ValueType>::Size; ++i) {
-        values[i] = value(i);
-    }
-}
-
-
-template<typename ValueType, typename HoudiniType>
-typename boost::disable_if_c<VecTraits<ValueType>::IsVec, void>::type
-getValues(HoudiniType* values, const ValueType& value)
-{
-    values[0] = value;
-}
-
-
-template <typename ValueType, typename HoudiniType>
-GA_Defaults
-gaDefaultsFromDescriptorTyped(const AttributeSet::Descriptor& descriptor, const Name name)
-{
-    const int size = openvdb::VecTraits<ValueType>::Size;
-
-    boost::scoped_array<HoudiniType> values(new HoudiniType[size]);
-    ValueType defaultValue = descriptor.getDefaultValue<ValueType>(name);
-
-    getValues<ValueType, HoudiniType>(values.get(), defaultValue);
-
-    return GA_Defaults(values.get(), size);
-}
-
-
-inline GA_Defaults
-gaDefaultsFromDescriptor(const AttributeSet::Descriptor& descriptor, const Name name)
-{
-    const size_t pos = descriptor.find(name);
-
-    if (pos == AttributeSet::INVALID_POS)   return GA_Defaults(0);
-
-    const Name type = descriptor.type(pos).first;
-
-    if (type == "bool")             return gaDefaultsFromDescriptorTyped<bool, int32>(descriptor, name);
-    else if (type == "int16")       return gaDefaultsFromDescriptorTyped<int16_t, int32>(descriptor, name);
-    else if (type == "int32")       return gaDefaultsFromDescriptorTyped<int32_t, int32>(descriptor, name);
-    else if (type == "int64")       return gaDefaultsFromDescriptorTyped<int64_t, int64>(descriptor, name);
-    else if (type == "half")        return gaDefaultsFromDescriptorTyped<half, fpreal32>(descriptor, name);
-    else if (type == "float")       return gaDefaultsFromDescriptorTyped<float, fpreal32>(descriptor, name);
-    else if (type == "double")      return gaDefaultsFromDescriptorTyped<double, fpreal64>(descriptor, name);
-    else if (type == "vec3h")       return gaDefaultsFromDescriptorTyped<Vec3<half>, fpreal32>(descriptor, name);
-    else if (type == "vec3s")       return gaDefaultsFromDescriptorTyped<Vec3<float>, fpreal32>(descriptor, name);
-    else if (type == "vec3d")       return gaDefaultsFromDescriptorTyped<Vec3<double>, fpreal64>(descriptor, name);
-
-    return GA_Defaults(0);
-}
-
-
 ////////////////////////////////////////
 
 
@@ -435,141 +337,6 @@ struct AttributeInfo
 }; // struct AttributeInfo
 
 typedef std::vector<AttributeInfo> AttributeInfoVec;
-
-
-////////////////////////////////////////
-
-
-inline void
-convertPointDataGridToHoudini(GU_Detail& detail, hvdb::VdbPrimCIterator& vdbIt,
-                            const std::vector<std::string>& includeGroups, const std::vector<std::string>& excludeGroups)
-{
-    typedef PointDataTree::LeafNodeType             PointDataLeaf;
-
-    // Mesh each VDB primitive independently
-    for (; vdbIt; ++vdbIt) {
-
-        GU_Detail geo;
-
-        const GridBase& baseGrid = vdbIt->getGrid();
-        if (!baseGrid.isType<PointDataGrid>()) continue;
-
-        const PointDataGrid& grid = static_cast<const PointDataGrid&>(baseGrid);
-        const PointDataTree& tree = grid.tree();
-
-        PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
-        if (!leafIter) continue;
-
-        // position attribute is mandatory
-
-        const AttributeSet& attributeSet = leafIter->attributeSet();
-        const AttributeSet::Descriptor& descriptor = attributeSet.descriptor();
-        const bool hasPosition = descriptor.find("P") != AttributeSet::INVALID_POS;
-        if (!hasPosition)   continue;
-
-        // obtain cumulative point offsets and total points
-
-        std::vector<Index64> pointOffsets;
-        Index64 total = getPointOffsets(pointOffsets, tree, includeGroups, excludeGroups);
-
-        Index64 startOffset = geo.appendPointBlock(total);
-
-        hvdbp::HoudiniWriteAttribute<Vec3f> positionAttribute(*geo.getP());
-        convertPointDataGridPosition(positionAttribute, grid, pointOffsets,
-                                     startOffset, includeGroups, excludeGroups);
-
-        // add other point attributes to the hdk detail
-        const AttributeSet::Descriptor::NameToPosMap& nameToPosMap = descriptor.map();
-
-        for (AttributeSet::Descriptor::ConstIterator it = nameToPosMap.begin(), it_end = nameToPosMap.end();
-            it != it_end; ++it) {
-
-            const Name& name = it->first;
-
-            const Name& type = descriptor.type(it->second).first;
-
-            // position handled explicitly
-            if (name == "P")    continue;
-
-            const unsigned index = it->second;
-
-            // don't convert group attributes
-            if (descriptor.hasGroup(name))  continue;
-
-            const GA_Storage storage = gaStorageFromAttrString(type);
-            const unsigned width = widthFromAttrString(type);
-            const GA_Defaults defaults = gaDefaultsFromDescriptor(descriptor, name);
-
-            GA_RWAttributeRef attributeRef = geo.addTuple(storage, GA_ATTRIB_POINT, name.c_str(), width, defaults);
-            if (attributeRef.isInvalid()) continue;
-
-            if (type == "bool") {
-                hvdbp::HoudiniWriteAttribute<bool> attribute(*attributeRef.getAttribute());
-                convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
-            }
-            else if (type == "int16") {
-                hvdbp::HoudiniWriteAttribute<int16_t> attribute(*attributeRef.getAttribute());
-                convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
-            }
-            else if (type == "int32") {
-                hvdbp::HoudiniWriteAttribute<int32_t> attribute(*attributeRef.getAttribute());
-                convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
-            }
-            else if (type == "int64") {
-                hvdbp::HoudiniWriteAttribute<int64_t> attribute(*attributeRef.getAttribute());
-                convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
-            }
-            else if (type == "half") {
-                hvdbp::HoudiniWriteAttribute<half> attribute(*attributeRef.getAttribute());
-                convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
-            }
-            else if (type == "float") {
-                hvdbp::HoudiniWriteAttribute<float> attribute(*attributeRef.getAttribute());
-                convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
-            }
-            else if (type == "double") {
-                hvdbp::HoudiniWriteAttribute<double> attribute(*attributeRef.getAttribute());
-                convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
-            }
-            else if (type == "vec3h") {
-                hvdbp::HoudiniWriteAttribute<Vec3<half> > attribute(*attributeRef.getAttribute());
-                convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
-            }
-            else if (type == "vec3s") {
-                hvdbp::HoudiniWriteAttribute<Vec3<float> > attribute(*attributeRef.getAttribute());
-                convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
-            }
-            else if (type == "vec3d") {
-                hvdbp::HoudiniWriteAttribute<Vec3<double> > attribute(*attributeRef.getAttribute());
-                convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
-            }
-            else {
-                throw std::runtime_error("Unknown Attribute Type for Conversion: " + type);
-            }
-        }
-
-        // add point groups to the hdk detail
-        const AttributeSet::Descriptor::NameToPosMap& groupMap = descriptor.groupMap();
-
-        for (AttributeSet::Descriptor::ConstIterator    it = groupMap.begin(),
-                                                        itEnd = groupMap.end(); it != itEnd; ++it) {
-            const Name& name = it->first;
-
-            assert(!name.empty());
-
-            GA_PointGroup* pointGroup = geo.findPointGroup(name.c_str());
-            if (!pointGroup) pointGroup = geo.newPointGroup(name.c_str());
-
-            const AttributeSet::Descriptor::GroupIndex index = attributeSet.groupIndex(name);
-
-            hvdbp::HoudiniGroup group(*pointGroup);
-            convertPointDataGridGroup(group, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
-        }
-
-        detail.merge(geo);
-    }
-}
-
 
 ///////////////////////////////////////
 
@@ -1064,10 +831,19 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
             std::vector<std::string> excludeGroups;
             openvdb::tools::parsePointGroups(includeGroups, excludeGroups, pointsGroup);
 
-            hvdb::VdbPrimCIterator vdbIt(ptGeo, group);
+            // Mesh each VDB primitive independently
+            for (hvdb::VdbPrimCIterator vdbIt(ptGeo, group); vdbIt; ++vdbIt) {
 
-            if (vdbIt) {
-                convertPointDataGridToHoudini(*gdp, vdbIt, includeGroups, excludeGroups);
+                GU_Detail geo;
+
+                const GridBase& baseGrid = vdbIt->getGrid();
+                if (!baseGrid.isType<PointDataGrid>()) continue;
+
+                const PointDataGrid& grid = static_cast<const PointDataGrid&>(baseGrid);
+
+                hvdbp::convertPointDataGridToHoudini(geo, grid, includeGroups, excludeGroups);
+
+                gdp->merge(geo);
             }
 
             return error();
