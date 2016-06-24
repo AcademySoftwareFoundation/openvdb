@@ -374,13 +374,14 @@ convertPointDataGridToHoudini(GU_Detail& detail,
 
         GA_RWAttributeRef attributeRef = detail.findPointAttribute(name.c_str());
 
-        if(attributeRef.isInvalid()){
-            // if the attribute doesn't exist on the detail try to create it
+        // create the attribute if it doesn't already exist in the detail
+        if (attributeRef.isInvalid()) {
+
             const GA_Storage storage = gaStorageFromAttrString(type);
             const unsigned width = widthFromAttrString(type);
-            const GA_Defaults defaults = (name == "pscale") ? GA_Defaults(0.05) : gaDefaultsFromDescriptor(descriptor, name);
+            const GA_Defaults defaults = gaDefaultsFromDescriptor(descriptor, name);
+
             attributeRef = detail.addTuple(storage, GA_ATTRIB_POINT, name.c_str(), width, defaults);
-            // if we failed to create it, give up
             if (attributeRef.isInvalid()) continue;
         }
 
