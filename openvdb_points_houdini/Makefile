@@ -168,7 +168,8 @@ ifdef MBSD
 endif
 
 ifneq (,$(strip $(wildcard $(HOUDINI_INCL_DIR))))
-    HOUDINI_CXXFLAGS := $(shell hcustom -c)
+    # Disable no unused local typedefs introduced by hcustom
+    HOUDINI_CXXFLAGS := $(shell hcustom -c | sed 's/-Wno-unused-local-typedefs//g')
     HOUDINI_LDFLAGS := $(shell hcustom -m)
 endif
 
