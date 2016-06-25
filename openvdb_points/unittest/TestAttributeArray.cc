@@ -111,6 +111,7 @@ public:
     CPPUNIT_TEST_SUITE(TestAttributeArray);
     CPPUNIT_TEST(testFixedPointConversion);
     CPPUNIT_TEST(testCompression);
+    CPPUNIT_TEST(testRegistry);
     CPPUNIT_TEST(testAttributeArray);
     CPPUNIT_TEST(testAttributeHandle);
     CPPUNIT_TEST(testDelayedLoad);
@@ -120,6 +121,7 @@ public:
 
     void testFixedPointConversion();
     void testCompression();
+    void testRegistry();
     void testAttributeArray();
     void testAttributeHandle();
     void testDelayedLoad();
@@ -199,6 +201,49 @@ TestAttributeArray::testFixedPointConversion()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(worldSpaceValue.y(), newWorldSpaceValue.y(), /*tolerance=*/1e-6);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(worldSpaceValue.z(), newWorldSpaceValue.z(), /*tolerance=*/1e-6);
 
+    }
+}
+
+namespace {
+
+static AttributeArray::Ptr factory1(size_t) { return AttributeArray::Ptr(); }
+static AttributeArray::Ptr factory2(size_t) { return AttributeArray::Ptr(); }
+
+} // namespace
+
+void
+TestAttributeArray::testRegistry()
+{
+    using namespace openvdb;
+    using namespace openvdb::tools;
+
+    typedef TypedAttributeArray<float> AttributeF;
+
+    AttributeArray::clearRegistry();
+
+    { // cannot create AttributeArray that is not registered
+        CPPUNIT_ASSERT(!AttributeArray::isRegistered(AttributeF::attributeType()));
+        CPPUNIT_ASSERT_THROW(AttributeArray::create(AttributeF::attributeType(), size_t(5)), LookupError);
+    }
+
+    // manually register the type and factory
+
+    AttributeArray::registerType(AttributeF::attributeType(), factory1);
+
+    { // cannot re-register an already registered AttributeArray
+        CPPUNIT_ASSERT(AttributeArray::isRegistered(AttributeF::attributeType()));
+        CPPUNIT_ASSERT_THROW(AttributeArray::registerType(AttributeF::attributeType(), factory2), KeyError);
+    }
+
+    { // un-registering
+        AttributeArray::unregisterType(AttributeF::attributeType());
+        CPPUNIT_ASSERT(!AttributeArray::isRegistered(AttributeF::attributeType()));
+    }
+
+    { // clearing registry
+        AttributeArray::registerType(AttributeF::attributeType(), factory1);
+        AttributeArray::clearRegistry();
+        CPPUNIT_ASSERT(!AttributeArray::isRegistered(AttributeF::attributeType()));
     }
 }
 
@@ -451,6 +496,10 @@ TestAttributeArray::testAttributeArray()
 
         AttributeArrayI attr(count);
 
+        IndexIter iter = attr.beginIndex();
+
+        CPPUNIT_ASSERT_EQUAL(iterCount(iter), Index64(count));
+
         CPPUNIT_ASSERT_EQUAL(attr.get(0), 0);
         CPPUNIT_ASSERT_EQUAL(attr.get(10), 0);
 
@@ -543,6 +592,12 @@ TestAttributeArray::testAttributeArray()
         attr.setTransient(false);
         CPPUNIT_ASSERT(!attr.isTransient());
         CPPUNIT_ASSERT(attr.isHidden());
+
+        attr.setHidden(false);
+        CPPUNIT_ASSERT(!attr.isTransient());
+        CPPUNIT_ASSERT(!attr.isHidden());
+
+        attr.setHidden(true);
 
         { // test copy construction
             AttributeArrayI attrB(attr);

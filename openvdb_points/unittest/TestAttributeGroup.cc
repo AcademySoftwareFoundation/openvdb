@@ -132,6 +132,22 @@ TestAttributeGroup::testAttributeGroup()
         CPPUNIT_ASSERT_EQUAL(attr.isGroup(), attrB.isGroup());
     }
 
+    { // casting
+        TypedAttributeArray<float> floatAttr(4);
+        AttributeArray& floatArray = floatAttr;
+        const AttributeArray& constFloatArray = floatAttr;
+
+        CPPUNIT_ASSERT_THROW(GroupAttributeArray::cast(floatArray), TypeError);
+        CPPUNIT_ASSERT_THROW(GroupAttributeArray::cast(constFloatArray), TypeError);
+
+        GroupAttributeArray groupAttr(4);
+        AttributeArray& groupArray = groupAttr;
+        const AttributeArray& constGroupArray = groupAttr;
+
+        CPPUNIT_ASSERT_NO_THROW(GroupAttributeArray::cast(groupArray));
+        CPPUNIT_ASSERT_NO_THROW(GroupAttributeArray::cast(constGroupArray));
+    }
+
     { // IO
         const size_t count = 50;
         GroupAttributeArray attrA(count);

@@ -56,6 +56,8 @@
 #include <string>
 
 
+class TestAttributeArray;
+
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
@@ -328,6 +330,8 @@ public:
     bool operator!=(const AttributeArray& other) const { return !this->operator==(other); }
 
 private:
+    friend class ::TestAttributeArray;
+
     /// Virtual function used by the comparison operator to perform
     /// comparisons on inherited types
     virtual bool isEqual(const AttributeArray& other) const = 0;
