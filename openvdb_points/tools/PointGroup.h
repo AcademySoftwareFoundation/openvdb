@@ -53,15 +53,6 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
-/// @brief Parse and extract groups to include and exclude from the input string.
-///
-/// @param includeGroups the vector of group names to include.
-/// @param excludeGroups the vector of group names to exclude.
-/// @param groupStr      the input string from which to extract the group names.
-inline void parsePointGroups(   std::vector<std::string>& includeGroups,
-                                std::vector<std::string>& excludeGroups,
-                                const std::string& groupStr);
-
 /// @brief Delete any group that is not present in the Descriptor.
 ///
 /// @param groups        the vector of group names.
@@ -462,41 +453,6 @@ private:
 
 
 } // namespace point_group_internal
-
-
-////////////////////////////////////////
-
-
-inline void parsePointGroups(   std::vector<std::string>& includeGroups,
-                                std::vector<std::string>& excludeGroups,
-                                const std::string& groupStr)
-{
-    std::stringstream pointGroupsStream(groupStr);
-
-    std::istream_iterator<std::string> it(pointGroupsStream);
-    std::istream_iterator<std::string> end;
-    std::vector<std::string> groups(it, end);
-
-    for (std::vector<std::string>::const_iterator   it = groups.begin(),
-                                                    itEnd = groups.end(); it != itEnd; ++it)
-    {
-        std::string group = *it;
-
-        if (group == "^") {
-            throw RuntimeError("Negate character (^) has no VDB Points group name");
-        }
-
-        const bool negate = group.length() > 0 && group[0] == '^';
-        if (negate) group = group.substr(1, group.length()-1);
-
-        if (!AttributeSet::Descriptor::validGroupName(group)) {
-            throw RuntimeError(std::string("VDB Points group name contains invalid characters - ") + group);
-        }
-
-        if (negate)     excludeGroups.push_back(group);
-        else            includeGroups.push_back(group);
-    }
-}
 
 
 ////////////////////////////////////////

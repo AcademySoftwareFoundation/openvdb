@@ -59,16 +59,18 @@ typedef boost::shared_ptr<OffsetList> OffsetListPtr;
 
 /// @brief  Converts a VDB Points grid into Houdini points and appends to a Houdini Detail
 ///
-/// @param  detail          GU_Detail to append the converted points and attributes to
-/// @param  grid            grid containing the points that will be converted
-/// @param  includeGroups   a vector of VDB Points groups to be included (default is all)
-/// @param  excludeGroups   a vector of VDB Points groups to be excluded (default is none)
+/// @param  detail              GU_Detail to append the converted points and attributes to
+/// @param  grid                grid containing the points that will be converted
+/// @param  attributes          a vector of VDB Points attributes to be included (empty vector defaults to all)
+/// @param  includeGroups       a vector of VDB Points groups to be included (empty vector defaults to all)
+/// @param  excludeGroups       a vector of VDB Points groups to be excluded (empty vector defaults to none)
 
 void
 convertPointDataGridToHoudini(GU_Detail& detail,
                               const openvdb::tools::PointDataGrid& grid,
-                              const std::vector<std::string>& includeGroups,
-                              const std::vector<std::string>& excludeGroups);
+                              const std::vector<std::string>& attributes = std::vector<std::string>(),
+                              const std::vector<std::string>& includeGroups = std::vector<std::string>(),
+                              const std::vector<std::string>& excludeGroups = std::vector<std::string>());
 
 namespace {
 
@@ -327,13 +329,17 @@ private:
 
 ///////////////////////////////////////
 
-
 void
 convertPointDataGridToHoudini(GU_Detail& detail,
                               const openvdb::tools::PointDataGrid& grid,
+                              const std::vector<std::string>& attributes,
                               const std::vector<std::string>& includeGroups,
                               const std::vector<std::string>& excludeGroups)
 {
+
+    // sort for binary search
+    std::vector<std::string> sortedAttributes(attributes);
+    std::sort(sortedAttributes.begin(), sortedAttributes.end());
 
     const openvdb::tools::PointDataTree& tree = grid.tree();
 
@@ -369,6 +375,9 @@ convertPointDataGridToHoudini(GU_Detail& detail,
         // position handled explicitly
         if (name == "P")    continue;
 
+        // filter attributes
+        if (!sortedAttributes.empty() && !std::binary_search(sortedAttributes.begin(), sortedAttributes.end(), name))   continue;
+
         // don't convert group attributes
         if (descriptor.hasGroup(name))  continue;
 
@@ -378,11 +387,20 @@ convertPointDataGridToHoudini(GU_Detail& detail,
         if (attributeRef.isInvalid()) {
 
             const GA_Storage storage = gaStorageFromAttrString(type);
+
+            if (storage == GA_STORE_INVALID)    continue;
+
             const unsigned width = widthFromAttrString(type);
             const GA_Defaults defaults = gaDefaultsFromDescriptor(descriptor, name);
 
             attributeRef = detail.addTuple(storage, GA_ATTRIB_POINT, name.c_str(), width, defaults);
-            if (attributeRef.isInvalid()) continue;
+
+            // '|' and ':' characters are valid in OpenVDB Points names but will make Houdini Attribute names invalid
+            if (attributeRef.isInvalid()){
+                OPENVDB_THROW(  openvdb::RuntimeError,
+                                "Unable to create Houdini Points Attribute with name '" + name +
+                                "'. '|' and ':' characters are not supported by Houdini.");
+            }
         }
 
         const unsigned index = it->second;
