@@ -130,13 +130,16 @@ endif
 
 HOUDINI_INCL_DIR := $(HT)/include
 # Flags to be passed to the hcustom build script
-HCUSTOM_FLAGS := -i $(HOUDINI_DESTDIR)
+HOUDINI_INSTALL := -i $(HOUDINI_DESTDIR)
+MANTRA_INSTALL := -i $(HOUDINI_DESTDIR)/mantra
+HCUSTOM_FLAGS :=
 ifeq (yes,$(strip $(verbose)))
     HCUSTOM_FLAGS += -e
 endif
 # Extra flags to be passed through hcustom to the compiler or linker
 HCUSTOM_EXTRA_CFLAGS := -DIGNORE_HDK_DEPRECATIONS
 HCUSTOM_EXTRA_LDFLAGS :=
+HCUSTOM_MANTRA_LDFLAGS := -lHoudiniRAY
 
 ifeq (yes,$(strip $(debug)))
     OPTIMIZE := -g
@@ -197,11 +200,16 @@ LIBHOUDINI_INCLUDE_NAMES := \
 #
 HOUDINI_SOP_SRC_NAMES := \
 	houdini/GR_PrimVDBPoints.cc \
+	houdini/SHOP_OpenVDB_Points.cc \
 	houdini/SOP_OpenVDB_Points.cc \
 	houdini/SOP_OpenVDB_Points_Group.cc \
 	houdini/SOP_OpenVDB_Points_Load.cc \
 #
+MANTRA_VRAY_SRC_NAMES := \
+	houdini/VRAY_OpenVDB_Points.cc \
+#
 HOUDINI_SOP_NAMES := $(basename $(notdir $(HOUDINI_SOP_SRC_NAMES)))
+MANTRA_VRAY_NAMES := $(basename $(notdir $(MANTRA_VRAY_SRC_NAMES)))
 
 # Replace filenames of the form "houdini/<name>.cc" with
 # "$(DWA_HOUDINI_SOP_SRC_DIR)/<name>/<name>.cc"
@@ -214,11 +222,17 @@ ALL_INCLUDE_FILES := \
 HOUDINI_SRC_FILES := \
     $(HOUDINI_SOP_SRC_NAMES) \
 #
-ALL_SRC_FILES := $(HOUDINI_SRC_FILES)
+MANTRA_SRC_FILES := \
+    $(MANTRA_VRAY_SRC_NAMES) \
+#
+ALL_SRC_FILES := $(HOUDINI_SRC_FILES) $(MANTRA_SRC_FILES)
 
 HOUDINI_SOP_OBJ_NAMES := $(HOUDINI_SOP_SRC_NAMES:.cc=.o)
 HOUDINI_SOP_SO_NAMES := $(addprefix $(HOUDINI_DESTDIR)/,\
     $(notdir $(HOUDINI_SOP_SRC_NAMES:.cc=.so)))
+MANTRA_VRAY_OBJ_NAMES := $(MANTRA_VRAY_SRC_NAMES:.cc=.o)
+MANTRA_VRAY_SO_NAMES := $(addprefix $(HOUDINI_DESTDIR)/mantra/,\
+    $(notdir $(MANTRA_VRAY_SRC_NAMES:.cc=.so)))
 
 LIB_MAJOR_VERSION=$(shell grep 'define OPENVDB_POINTS_LIBRARY_MAJOR_VERSION_NUMBER ' \
     $(OPENVDB_POINTS_INCL_DIR)/openvdb_points/version.h | sed 's/[^0-9]*//g')
@@ -247,7 +261,8 @@ endif # shared
 
 # Environment variables to pass to hcustom
 HCUSTOM_EXPORT :=
-ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)$(HCUSTOM_EXTRA_LDFLAGS)))
+HCUSTOM_MANTRA_EXPORT :=
+ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)$(HCUSTOM_EXTRA_LDFLAGS)$(HCUSTOM_MANTRA_LDFLAGS)))
     # Prior to Houdini 13.0.548 and 14.0.105, the only way to pass extra compiler flags
     # to hcustom was to append them to the compiler name and pass the result in the
     # environment variable HOUDINI_CC.
@@ -278,19 +293,25 @@ ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)$(HCUSTOM_EXTRA_LDFLAGS)))
             $(error Cannot determine which C++ compiler to use with hcustom; please specify a compiler by setting $$(CXX))
         endif
         HCUSTOM_EXPORT := HOUDINI_CC='\"$(HOUDINI_CC) $(HCUSTOM_EXTRA_CFLAGS) $(HCUSTOM_EXTRA_LDFLAGS)\"'
+        HCUSTOM_MANTRA_EXPORT := HOUDINI_CC='\"$(HOUDINI_CC) $(HCUSTOM_EXTRA_CFLAGS) $(HCUSTOM_EXTRA_LDFLAGS) $(HCUSTOM_MANTRA_LDFLAGS) \"'
     else
 	# From Houdini 13.0.548 and 14.0.105 on, hcustom recognizes
 	# the environment variables HCUSTOM_CFLAGS and HCUSTOM_LDFLAGS.
 	ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)))
 	    HCUSTOM_EXPORT += HCUSTOM_CFLAGS="$(strip $(HCUSTOM_EXTRA_CFLAGS))"
+	    HCUSTOM_MANTRA_EXPORT += HCUSTOM_CFLAGS="$(strip $(HCUSTOM_EXTRA_CFLAGS))"
 	endif
 	ifneq (,$(strip $(HCUSTOM_EXTRA_LDFLAGS)))
 	    HCUSTOM_EXPORT += HCUSTOM_LDFLAGS="$(strip $(HCUSTOM_EXTRA_LDFLAGS))"
+	    HCUSTOM_MANTRA_EXPORT += HCUSTOM_LDFLAGS="$(strip $(HCUSTOM_EXTRA_LDFLAGS)) $(strip $(HCUSTOM_MANTRA_LDFLAGS))"
 	endif
     endif
 endif
 ifneq (,$(strip $(HCUSTOM_EXPORT)))
     HCUSTOM_EXPORT := export $(HCUSTOM_EXPORT);
+endif
+ifneq (,$(strip $(HCUSTOM_MANTRA_EXPORT)))
+    HCUSTOM_MANTRA_EXPORT := export $(HCUSTOM_MANTRA_EXPORT);
 endif
 
 DEPEND := houdini_deps
@@ -313,6 +334,11 @@ ALL_TARGETS := \
 
 all: depend houdinisops
 
+# Create an openvdb_houdini/ symlink to the houdini/ subdirectory,
+# to mirror the DWA directory structure.
+openvdb_houdini:
+	ln -f -s houdini openvdb_houdini
+
 ifeq (no,$(strip $(shared)))
 # Link SOPs against static OpenVDB libraries.
 $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
@@ -328,6 +354,7 @@ $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
 endif
 
 $(HOUDINI_SOP_SO_NAMES): $(HOUDINI_DESTDIR)/%.so: houdini/%.o
+$(MANTRA_VRAY_SO_NAMES): $(HOUDINI_DESTDIR)/mantra/%.so: houdini/%.o
 
 houdinisops: $(HOUDINI_SOP_SO_NAMES) houdini/SOP_OpenVDB.svg
 	if [ -d "$(HOUDINI_DESTDIR)/../config/Icons" ]; \
@@ -335,10 +362,18 @@ houdinisops: $(HOUDINI_SOP_SO_NAMES) houdini/SOP_OpenVDB.svg
 	    cp -f houdini/SOP_OpenVDB.svg $(HOUDINI_DESTDIR)/../config/Icons/; \
 	fi
 
-install_lib: houdinisops
-	mkdir -p $(DESTDIR)/include/openvdb_points_houdini
-	@echo "Created $(DESTDIR)/include/openvdb_points_houdini"
-	cp -f $(LIBHOUDINI_INCLUDE_NAMES) $(DESTDIR)/include/openvdb_points_houdini/
+mantradsos: $(MANTRA_VRAY_SO_NAMES)
+	if [ -d "$(HOUDINI_DESTDIR)/../.." ]; \
+	then \
+	    cp -f houdini/VRAYprocedural $(HOUDINI_DESTDIR)/../../; \
+	fi
+
+install_lib: houdinisops mantradsos
+	mkdir -p $(DESTDIR)/include/openvdb_houdini
+	@echo "Created $(DESTDIR)/include/openvdb_houdini"
+	mkdir -p $(DESTDIR)/include/houdini_utils
+	@echo "Created $(DESTDIR)/include/houdini_utils"
+	cp -f $(LIBHOUDINI_INCLUDE_NAMES) $(DESTDIR)/include/openvdb_houdini/
 	@#
 
 install: install_lib
@@ -349,7 +384,7 @@ install: install_lib
 $(DEPEND): $(ALL_INCLUDE_FILES) $(ALL_SRC_FILES)
 	@echo "Generating dependencies because of $(call list_deps)"
 	$(RM) $(DEPEND)
-	for f in $(HOUDINI_SRC_FILES); \
+	for f in $(HOUDINI_SRC_FILES) $(MANTRA_SRC_FILES); \
 		do $(CXX) $(CXXFLAGS) $(HOUDINI_CXXFLAGS) -O0 \
 			-MM $$f -MT `echo $$f | sed 's%\.[^.]*%.o%'` \
 			-isystem $(HOUDINI_INCL_DIR) >> $(DEPEND); \
@@ -360,7 +395,9 @@ depend: $(DEPEND)
 clean:
 	$(RM) $(ALL_TARGETS) $(DEPEND)
 	$(RM) $(HOUDINI_SOP_OBJ_NAMES) $(HOUDINI_SOP_SO_NAMES)
+	$(RM) $(MANTRA_VRAY_OBJ_NAMES) $(MANTRA_VRAY_SO_NAMES)
 	$(RM) $(HOUDINI_DESTDIR)/../config/Icons/SOP_OpenVDB.svg
+	$(RM) $(HOUDINI_DESTDIR)/../../VRAYprocedural
 
 ifneq ($(strip $(wildcard $(DEPEND))),)
     include $(DEPEND)
