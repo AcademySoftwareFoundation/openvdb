@@ -30,7 +30,7 @@
 //
 /// @file SHOP_OpenVDB_Points.cc
 ///
-/// @author Dan Bailey
+/// @authors Dan Bailey, Richard Kwok
 ///
 /// @brief The Delayed Load Procedural SHOP for OpenVDB Points.
 
@@ -64,6 +64,7 @@ public:
 
 protected:
     virtual OP_ERROR cookMe(OP_Context&);
+    virtual bool updateParmsFlags();
 }; // class SHOP_OpenVDB_Points
 
 
@@ -100,6 +101,21 @@ SHOP_OpenVDB_Points::buildShaderString(UT_String &result, fpreal now,
     ss << " file \"" << fileStr.toStdString() << "\"";
     ss << " groupmask \"" << groupMaskStr.toStdString() << "\"";
     ss << " attrmask \"" << attrMaskStr.toStdString() << "\"";
+    ss << " speedtocolor " << evalInt("speedtocolor", 0, now);
+    ss << " maxspeed " << evalFloat("maxspeed", 0, now);
+
+    // write the speed/color ramp into the ifd
+    UT_Ramp ramp;
+    updateRampFromMultiParm(now, getParm("function"), ramp);
+
+    ss << " ramp \"";
+    for(int n = 0, N = ramp.getNodeCount(); n < N; n++){
+        const UT_ColorNode* rampNode = ramp.getNode(n);
+        ss << rampNode->t << " ";
+        ss << rampNode->rgba.r << " " << rampNode->rgba.g << " " <<  rampNode->rgba.b << " ";
+        ss << static_cast<int>(rampNode->basis) << " ";
+    }
+    ss << "\"";
 
     result = ss.str();
     return true;
@@ -111,6 +127,24 @@ SHOP_OpenVDB_Points::cookMe(OP_Context& context)
     return SHOP_Node::cookMe(context);
 }
 
+bool
+SHOP_OpenVDB_Points::updateParmsFlags()
+{
+    bool changed = false;
+
+    const bool speedToColor = evalInt("speedtocolor", 0, 0);
+
+    changed |= enableParm("sep1", speedToColor);
+    changed |= setVisibleState("sep1", speedToColor);
+
+    changed |= enableParm("maxspeed", speedToColor);
+    changed |= setVisibleState("maxspeed", speedToColor);
+
+    changed |= enableParm("function", speedToColor);
+    changed |= setVisibleState("function", speedToColor);
+
+    return changed;
+}
 
 ////////////////////////////////////////
 
@@ -134,6 +168,20 @@ newShopOperator(OP_OperatorTable *table)
     parms.add(hutil::ParmFactory(PRM_STRING, "attrmask", "Attribute Mask")
         .setDefault("")
         .setHelpText("Specify VDB Points Attributes to use. (Default is all attributes)"));
+
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "speedtocolor", "Map Speed To Color")
+    .setDefault(PRMzeroDefaults)
+    .setHelpText("Replaces the 'Cd' point attribute with colors mapped from the 'v' point attribute using a ramp."));
+
+    parms.add(hutil::ParmFactory(PRM_SEPARATOR, "sep1", ""));
+
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "maxspeed", "Max Speed")
+        .setDefault(1.0f)
+        .setHelpText("Reference for 1.0 on the color gradient."));
+
+    parms.add(hutil::ParmFactory(PRM_MULTITYPE_RAMP_RGB, "function", "Speed to Color Function")
+        .setDefault(PRMtwoDefaults)
+        .setHelpText("Function mapping speeds between 0 and 1 to a color."));
 
     //////////
     // Register this operator.
