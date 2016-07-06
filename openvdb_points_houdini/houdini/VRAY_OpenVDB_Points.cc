@@ -75,6 +75,8 @@ private:
     std::vector<Name>                           mExcludeGroups;
     UT_String                                   mAttrStr;
     std::vector<tools::PointDataGrid::Ptr>      mGridPtrs;
+    float                                       mPreBlur;
+    float                                       mPostBlur;
 
 }; // class VRAY_OpenVDB_Points
 
@@ -276,6 +278,18 @@ VRAY_OpenVDB_Points::initialize(const UT_BoundingBox *)
     import("file", mFilename);
     import("attrmask", mAttrStr);
 
+    float fps;
+    import("global:fps", &fps, 1);
+
+    float shutter[2];
+    import("camera:shutter", shutter, 2);
+
+    int velocityBlur;
+    import("object:velocityblur", &velocityBlur, 1);
+
+    mPreBlur = velocityBlur ? -shutter[0]/fps : 0;
+    mPostBlur = velocityBlur ? shutter[1]/fps : 0;
+
     // save the grids so that we only read the file once
     try
     {
@@ -387,6 +401,8 @@ VRAY_OpenVDB_Points::render()
         const tools::PointDataGrid::Ptr grid = *iter;
         hvdbp::convertPointDataGridToHoudini(*gdp, *grid, validAttributes, mIncludeGroups, mExcludeGroups);
     }
+
+    geo.addVelocityBlur(mPreBlur, mPostBlur);
 
     // Create a geometry object in mantra
     VRAY_ProceduralChildPtr obj = createChild();
