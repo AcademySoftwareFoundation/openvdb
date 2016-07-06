@@ -71,7 +71,8 @@ public:
 private:
     UT_BoundingBox                              mBox;
     UT_String                                   mFilename;
-    UT_String                                   mGroupStr;
+    std::vector<Name>                           mIncludeGroups;
+    std::vector<Name>                           mExcludeGroups;
     UT_String                                   mAttrStr;
     std::vector<tools::PointDataGrid::Ptr>      mGridPtrs;
 
@@ -79,56 +80,43 @@ private:
 
 ////////////////////////////////////////
 
-// TODO: this bbox could be optimized further by considering group masks,
-//       currently it assumes all groups are included
-
 template <typename PointDataTreeT>
 struct GenerateBBoxOp {
 
     typedef typename PointDataTreeT::LeafNodeType                          PointDataLeaf;
+    typedef typename PointDataLeaf::IndexOnIter                            IndexOnIter;
     typedef typename tree::LeafManager<const PointDataTreeT>::LeafRange    LeafRangeT;
 
-    GenerateBBoxOp(const math::Transform& transform)
+    GenerateBBoxOp( const math::Transform& transform,
+                    const std::vector<Name>& includeGroups,
+                    const std::vector<Name>& excludeGroups)
         : mTransform(transform)
-        , mBbox() { }
+        , mBbox()
+        , mIncludeGroups(includeGroups)
+        , mExcludeGroups(excludeGroups) { }
 
     GenerateBBoxOp(const GenerateBBoxOp& parent, tbb::split)
         : mTransform(parent.mTransform)
-        , mBbox(parent.mBbox) { }
+        , mBbox(parent.mBbox)
+        , mIncludeGroups(parent.mIncludeGroups)
+        , mExcludeGroups(parent.mExcludeGroups) { }
 
     void operator()(const LeafRangeT& range) {
 
         for (typename LeafRangeT::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
 
-            const PointDataLeaf& leaf = *leafIter;
+            const tools::AttributeSet::Descriptor& descriptor = leafIter->attributeSet().descriptor();
 
-            tools::AttributeHandle<Vec3f>::Ptr positionHandle =
-                tools::AttributeHandle<Vec3f>::create(leaf.constAttributeArray("P"));
+            size_t pscaleIndex = descriptor.find("pscale");
+            if (pscaleIndex != tools::AttributeSet::INVALID_POS) {
 
-            tools::AttributeHandle<float>::Ptr pscaleHandle;
-            if (leaf.attributeSet().find("pscale") != tools::AttributeSet::INVALID_POS) {
-                pscaleHandle = tools::AttributeHandle<float>::create(leaf.constAttributeArray("pscale"));
-            }
+                std::string pscaleType = descriptor.type(pscaleIndex).first;
 
-            bool pscaleIsUniform = true;
-            float uniformPscale = DEFAULT_PSCALE;
-            if (pscaleHandle)
-            {
-                pscaleIsUniform = pscaleHandle->isUniform();
-                uniformPscale = pscaleHandle->get(0);
-            }
-
-            // combine the bounds of every point on this leaf into an index-space bbox
-            for (typename PointDataLeaf::IndexOnIter iter = leaf.beginIndexOn(); iter; ++iter) {
-
-                double pscale = double(pscaleIsUniform ? uniformPscale : pscaleHandle->get(*iter));
-
-                // the pscale attribute is converted from world space to index space
-                Vec3d radius = mTransform.worldToIndex(Vec3d(pscale));
-                Vec3d position = iter.getCoord().asVec3d() + Vec3d(positionHandle->get(*iter));
-
-                mBbox.expand(position - radius);
-                mBbox.expand(position + radius);
+                if (pscaleType == typeNameAsString<float>())        expandBBox<float>(*leafIter, pscaleIndex);
+                else if (pscaleType == typeNameAsString<half>())    expandBBox<half>(*leafIter, pscaleIndex);
+                else {
+                    throw TypeError("Unsupported pscale type - " + pscaleType);
+                }
             }
         }
     }
@@ -137,10 +125,75 @@ struct GenerateBBoxOp {
         mBbox.expand(rhs.mBbox);
     }
 
+    template <typename PscaleType>
+    void expandBBox(const PointDataLeaf& leaf, size_t pscaleIndex) {
+
+        tools::AttributeHandle<Vec3f>::Ptr positionHandle =
+            tools::AttributeHandle<Vec3f>::create(leaf.constAttributeArray("P"));
+
+        // expandBBox will not pick up a pscale handle unless the attribute type matches the template type
+
+        typename tools::AttributeHandle<PscaleType>::Ptr pscaleHandle;
+        if (pscaleIndex != tools::AttributeSet::INVALID_POS) {
+            if (leaf.attributeSet().descriptor().type(pscaleIndex).first == typeNameAsString<PscaleType>()) {
+                pscaleHandle = tools::AttributeHandle<PscaleType>::create(leaf.constAttributeArray(pscaleIndex));
+            }
+        }
+
+        // uniform value is in world space
+        bool pscaleIsUniform = true;
+        PscaleType uniformPscale(DEFAULT_PSCALE);
+
+        if (pscaleHandle) {
+            pscaleIsUniform = pscaleHandle->isUniform();
+            uniformPscale = pscaleHandle->get(0);
+        }
+
+        // combine the bounds of every point on this leaf into an index-space bbox
+
+        if (!mIncludeGroups.empty() || !mExcludeGroups.empty()) {
+
+            tools::MultiGroupFilter::Data data(mIncludeGroups, mExcludeGroups);
+            const tools::MultiGroupFilter filter = tools::MultiGroupFilter::create(leaf, data);
+            tools::FilterIndexIter<IndexOnIter, tools::MultiGroupFilter> iter(leaf.beginIndexOn(), filter);
+
+            for (; iter; ++iter) {
+
+                double pscale = double(pscaleIsUniform ? uniformPscale : pscaleHandle->get(*iter));
+
+                // pscale needs to be transformed to index space
+                Vec3d radius = mTransform.worldToIndex(Vec3d(pscale));
+                Vec3d position = iter.indexIter().getCoord().asVec3d() + positionHandle->get(*iter);
+
+                mBbox.expand(position - radius);
+                mBbox.expand(position + radius);
+            }
+        }
+        else {
+
+            IndexOnIter iter = leaf.beginIndexOn();
+
+            for (; iter; ++iter) {
+
+                double pscale = double(pscaleIsUniform ? uniformPscale : pscaleHandle->get(*iter));
+
+                // pscale needs to be transformed to index space
+                Vec3d radius = mTransform.worldToIndex(Vec3d(pscale));
+                Vec3d position = iter.getCoord().asVec3d() + positionHandle->get(*iter);
+
+                mBbox.expand(position - radius);
+                mBbox.expand(position + radius);
+
+            }
+        }
+    }
+
     /////////////
 
     const math::Transform&      mTransform;
     BBoxd                       mBbox;
+    const std::vector<Name>&    mIncludeGroups;
+    const std::vector<Name>&    mExcludeGroups;
 
 }; // GenerateBBoxOp
 
@@ -148,7 +201,9 @@ namespace {
 
 template <typename PointDataGridT>
 inline BBoxd
-getBoundingBox(const std::vector<typename PointDataGridT::Ptr>& gridPtrs)
+getBoundingBox( const std::vector<typename PointDataGridT::Ptr>& gridPtrs,
+                const std::vector<Name>& includeGroups,
+                const std::vector<Name>& excludeGroups)
 {
     typedef typename PointDataGridT::TreeType                       PointDataTree;
     typedef typename PointDataGridT::Ptr                            PointDataGridPtr;
@@ -164,8 +219,10 @@ getBoundingBox(const std::vector<typename PointDataGridT::Ptr>& gridPtrs)
         tree::LeafManager<const PointDataTree> leafManager(grid->tree());
 
         // size and combine the boxes for each leaf in the tree via a reduction
-        GenerateBBoxOp<PointDataTree> generateBbox(grid->transform());
+        GenerateBBoxOp<PointDataTree> generateBbox(grid->transform(), includeGroups, excludeGroups);
         tbb::parallel_reduce(leafManager.leafRange(), generateBbox);
+
+        if (generateBbox.mBbox.empty())     continue;
 
         // all the bounds must be unioned in world space
         BBoxd gridBounds = grid->transform().indexToWorld(generateBbox.mBbox);
@@ -217,7 +274,6 @@ VRAY_OpenVDB_Points::initialize(const UT_BoundingBox *)
 {
 
     import("file", mFilename);
-    import("groupmask", mGroupStr);
     import("attrmask", mAttrStr);
 
     // save the grids so that we only read the file once
@@ -245,10 +301,15 @@ VRAY_OpenVDB_Points::initialize(const UT_BoundingBox *)
         return 0;
     }
 
+    // extract which groups to include and exclude
+    UT_String groupStr;
+    import("groupmask", groupStr);
+    tools::AttributeSet::Descriptor::parseNames(mIncludeGroups, mExcludeGroups, groupStr.toStdString());
+
     // get openvdb bounds and convert to houdini bounds
-    BBoxd vdbBox = ::getBoundingBox<tools::PointDataGrid>(mGridPtrs);
-    mBox.setBounds(vdbBox.min().x(), vdbBox.min().y(), vdbBox.min().z(),
-                   vdbBox.max().x(), vdbBox.max().y(), vdbBox.max().z());
+    BBoxd vdbBox = ::getBoundingBox<tools::PointDataGrid>(mGridPtrs, mIncludeGroups, mExcludeGroups);
+    mBox.setBounds(vdbBox.min().x(), vdbBox.min().y(), vdbBox.min().z()
+                  ,vdbBox.max().x(), vdbBox.max().y(), vdbBox.max().z());
 
     return 1;
 }
@@ -270,11 +331,6 @@ VRAY_OpenVDB_Points::render()
     VRAY_ProceduralGeo  geo = createGeometry();
 
     GU_Detail* gdp = geo.get();
-
-    // extract which groups to include and exclude
-    std::vector<Name> includeGroups;
-    std::vector<Name> excludeGroups;
-    tools::AttributeSet::Descriptor::parseNames(includeGroups, excludeGroups, mGroupStr.toStdString());
 
     // extract which attributes to include and exclude
     std::vector<Name> includeAttributes;
@@ -329,7 +385,7 @@ VRAY_OpenVDB_Points::render()
                                     endIter = mGridPtrs.end(); iter != endIter; ++iter) {
 
         const tools::PointDataGrid::Ptr grid = *iter;
-        hvdbp::convertPointDataGridToHoudini(*gdp, *grid, validAttributes, includeGroups, excludeGroups);
+        hvdbp::convertPointDataGridToHoudini(*gdp, *grid, validAttributes, mIncludeGroups, mExcludeGroups);
     }
 
     // Create a geometry object in mantra
