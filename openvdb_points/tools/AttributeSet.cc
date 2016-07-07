@@ -32,6 +32,7 @@
 ///
 /// @authors Dan Bailey, Mihai Alden, Peter Cucka
 
+#include <boost/algorithm/string/predicate.hpp> // for boost::starts_with()
 
 #include <openvdb_points/tools/AttributeGroup.h>
 #include <openvdb_points/tools/AttributeSet.h>
@@ -625,6 +626,8 @@ AttributeSet::Descriptor::find(const std::string& name) const
 size_t
 AttributeSet::Descriptor::rename(const std::string& fromName, const std::string& toName)
 {
+    if (!validName(toName))  throw RuntimeError("Attribute name contains invalid characters - " + toName);
+
     size_t pos = INVALID_POS;
 
     // check if the new name is already used.
@@ -764,6 +767,8 @@ AttributeSet::Descriptor::pruneUnusedDefaultValues()
 size_t
 AttributeSet::Descriptor::insert(const std::string& name, const NamePair& typeName)
 {
+    if (!validName(name))  throw RuntimeError("Attribute name contains invalid characters - " + name);
+
     size_t pos = INVALID_POS;
     NameToPosMap::iterator it = mNameMap.find(name);
     if (it != mNameMap.end()) {
@@ -789,9 +794,7 @@ AttributeSet::Descriptor::create(const NameAndTypeVec& attrs)
     Ptr descr(new Descriptor());
     for (size_t n = 0, N = attrs.size(); n < N; ++n) {
         const std::string& name = attrs[n].name;
-        if (name.length() > 0) {
-            descr->insert(name, attrs[n].type);
-        }
+        descr->insert(name, attrs[n].type);
     }
     return descr;
 }
@@ -885,19 +888,13 @@ AttributeSet::Descriptor::appendTo(NameAndTypeVec& attrs) const
 bool
 AttributeSet::Descriptor::hasGroup(const Name& group) const
 {
-    if (!validGroupName(group)) {
-        OPENVDB_THROW(KeyError, ("Invalid group name - " + group).c_str());
-    }
-
     return mGroupMap.find(group) != mGroupMap.end();
 }
 
 void
 AttributeSet::Descriptor::setGroup(const Name& group, const size_t offset)
 {
-    if (!validGroupName(group)) {
-        OPENVDB_THROW(KeyError, ("Invalid group name - " + group).c_str());
-    }
+    if (!validName(group))  throw RuntimeError("Group name contains invalid characters - " + group);
 
     mGroupMap[group] = offset;
 }
@@ -905,10 +902,6 @@ AttributeSet::Descriptor::setGroup(const Name& group, const size_t offset)
 void
 AttributeSet::Descriptor::dropGroup(const Name& group)
 {
-    if (!validGroupName(group)) {
-        OPENVDB_THROW(KeyError, ("Invalid group name - " + group).c_str());
-    }
-
     mGroupMap.erase(group);
 }
 
@@ -928,6 +921,48 @@ AttributeSet::Descriptor::uniqueName(const Name& name) const
         if (this->find(ss.str()) == INVALID_POS)    break;
     }
     return ss.str();
+}
+
+bool
+AttributeSet::Descriptor::validName(const Name& name)
+{
+    struct Internal {
+        static bool isNotValidChar(int c) { return !(isalnum(c) || (c == '_') || (c == '|') || (c == ':')); }
+    };
+    if (name.empty())   return false;
+    return std::find_if(name.begin(), name.end(), Internal::isNotValidChar) == name.end();
+}
+
+void
+AttributeSet::Descriptor::parseNames(   std::vector<std::string>& includeNames,
+                                        std::vector<std::string>& excludeNames,
+                                        const std::string& nameStr)
+{
+    bool includeAll = false;
+
+    std::stringstream tokenStream(nameStr);
+
+    Name token;
+    while (tokenStream >> token) {
+
+        bool negate = boost::starts_with(token, "^") || boost::starts_with(token, "!");
+
+        if (negate) {
+            if (token.length() < 2) throw RuntimeError("Negate character (^) must prefix a name.");
+            token = token.substr(1, token.length()-1);
+            if (!validName(token))  throw RuntimeError("Name contains invalid characters - " + token);
+            excludeNames.push_back(token);
+        }
+        else if (!includeAll) {
+            if (token == "*") {
+                includeAll = true;
+                includeNames.clear();
+                continue;
+            }
+            if (!validName(token))  throw RuntimeError("Name contains invalid characters - " + token);
+            includeNames.push_back(token);
+        }
+    }
 }
 
 void
@@ -979,6 +1014,7 @@ AttributeSet::Descriptor::read(std::istream& is)
 
     for(Index64 n = 0; n < arraylength; ++n) {
         nameAndOffset.first = readString(is);
+        if (!validName(nameAndOffset.first))  throw IoError("Attribute name contains invalid characters - " + nameAndOffset.first);
         is.read(reinterpret_cast<char*>(&nameAndOffset.second), sizeof(Index64));
         mNameMap.insert(nameAndOffset);
     }
@@ -988,6 +1024,7 @@ AttributeSet::Descriptor::read(std::istream& is)
 
     for(Index64 n = 0; n < grouplength; ++n) {
         nameAndOffset.first = readString(is);
+        if (!validName(nameAndOffset.first))  throw IoError("Group name contains invalid characters - " + nameAndOffset.first);
         is.read(reinterpret_cast<char*>(&nameAndOffset.second), sizeof(Index64));
         mGroupMap.insert(nameAndOffset);
     }

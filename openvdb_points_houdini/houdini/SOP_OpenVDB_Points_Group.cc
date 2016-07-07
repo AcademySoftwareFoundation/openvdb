@@ -505,7 +505,7 @@ SOP_OpenVDB_Points_Group::evalGroupParms(OP_Context& context, GroupParms& parms)
     evalString(pointsGroupStr, "vdbpointsgroup", 0, time);
     const std::string pointsGroup = pointsGroupStr.toStdString();
 
-    openvdb::tools::parsePointGroups(parms.mIncludeGroups, parms.mExcludeGroups, pointsGroup);
+    openvdb::tools::AttributeSet::Descriptor::parseNames(parms.mIncludeGroups, parms.mExcludeGroups, pointsGroup);
 
     if (parms.mIncludeGroups.size() > 0 || parms.mExcludeGroups.size() > 0) {
         parms.mOpGroup = true;
@@ -527,7 +527,7 @@ SOP_OpenVDB_Points_Group::evalGroupParms(OP_Context& context, GroupParms& parms)
         addWarning(SOP_MESSAGE, "Cannot create a group with an empty name, changing to _");
         groupName = "_";
     }
-    else if (!AttributeSet::Descriptor::validGroupName(groupName)) {
+    else if (!AttributeSet::Descriptor::validName(groupName)) {
         addError(SOP_MESSAGE, ("Group name contains invalid characters - " + groupName).c_str());
         return error();
     }

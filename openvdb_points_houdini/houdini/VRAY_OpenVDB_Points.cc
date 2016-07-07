@@ -72,6 +72,7 @@ private:
     UT_BoundingBox                              mBox;
     UT_String                                   mFilename;
     UT_String                                   mGroupStr;
+    UT_String                                   mAttrStr;
     std::vector<tools::PointDataGrid::Ptr>      mGridPtrs;
 
 }; // class VRAY_OpenVDB_Points
@@ -179,6 +180,7 @@ getBoundingBox(const std::vector<typename PointDataGridT::Ptr>& gridPtrs)
 static VRAY_ProceduralArg   theArgs[] = {
     VRAY_ProceduralArg("file", "string", ""),
     VRAY_ProceduralArg("groupmask", "string", ""),
+    VRAY_ProceduralArg("attrmask", "string", ""),
     VRAY_ProceduralArg()
 };
 
@@ -216,6 +218,7 @@ VRAY_OpenVDB_Points::initialize(const UT_BoundingBox *)
 
     import("file", mFilename);
     import("groupmask", mGroupStr);
+    import("attrmask", mAttrStr);
 
     // save the grids so that we only read the file once
     try
@@ -259,7 +262,9 @@ VRAY_OpenVDB_Points::getBoundingBox(UT_BoundingBox &box)
 void
 VRAY_OpenVDB_Points::render()
 {
-    typedef std::vector<tools::PointDataGrid::Ptr>::const_iterator PointDataGridPtrVecCIter;
+    typedef std::vector<tools::PointDataGrid::Ptr>::const_iterator  PointDataGridPtrVecCIter;
+    typedef openvdb::tools::AttributeSet                            AttributeSet;
+    typedef AttributeSet::Descriptor                                Descriptor;
 
     /// Allocate geometry and extract the GU_Detail
     VRAY_ProceduralGeo  geo = createGeometry();
@@ -269,28 +274,62 @@ VRAY_OpenVDB_Points::render()
     // extract which groups to include and exclude
     std::vector<Name> includeGroups;
     std::vector<Name> excludeGroups;
-    tools::parsePointGroups(includeGroups, excludeGroups, mGroupStr.toStdString());
+    tools::AttributeSet::Descriptor::parseNames(includeGroups, excludeGroups, mGroupStr.toStdString());
+
+    // extract which attributes to include and exclude
+    std::vector<Name> includeAttributes;
+    std::vector<Name> excludeAttributes;
+    tools::AttributeSet::Descriptor::parseNames(includeAttributes, excludeAttributes, mAttrStr.toStdString());
+
+    // if nothing was explicitly included or excluded: "all attributes" is implied with an empty vector
+    // if nothing was explicitly included but something was explicitly excluded: add all attributes but then remove the excluded
+    // if something was explicitly included: add only explicitly included attributes and then removed any excluded
+
+    if (includeAttributes.empty() && !excludeAttributes.empty()) {
+
+        // add all attributes
+        for (PointDataGridPtrVecCIter   iter = mGridPtrs.begin(),
+                                        endIter = mGridPtrs.end(); iter != endIter; ++iter) {
+
+            const tools::PointDataGrid::Ptr grid = *iter;
+
+            tools::PointDataTree::LeafCIter leafIter = grid->tree().cbeginLeaf();
+            if (!leafIter) continue;
+
+            const AttributeSet& attributeSet = leafIter->attributeSet();
+            const Descriptor& descriptor = attributeSet.descriptor();
+            const Descriptor::NameToPosMap& nameToPosMap = descriptor.map();
+
+            for (Descriptor::ConstIterator  nameIter = nameToPosMap.begin(),
+                                            nameIterEnd = nameToPosMap.end(); nameIter != nameIterEnd; ++nameIter) {
+
+                includeAttributes.push_back(nameIter->first);
+            }
+        }
+    }
+
+    // sort, and then remove any duplicates
+    std::sort(includeAttributes.begin(), includeAttributes.end());
+    std::sort(excludeAttributes.begin(), excludeAttributes.end());
+    includeAttributes.erase(std::unique(includeAttributes.begin(), includeAttributes.end()), includeAttributes.end());
+    excludeAttributes.erase(std::unique(excludeAttributes.begin(), excludeAttributes.end()), excludeAttributes.end());
+
+    // make a vector (validAttributes) of all elements that are in includeAttributes but are NOT in excludeAttributes
+    std::vector<Name> validAttributes(includeAttributes.size());
+    std::vector<Name>::iterator pastEndIter = std::set_difference(includeAttributes.begin(), includeAttributes.end(),
+        excludeAttributes.begin(), excludeAttributes.end(), validAttributes.begin());
+    validAttributes.resize(pastEndIter - validAttributes.begin());
 
     // if any of the grids are going to add a pscale, set the default here
-    for (PointDataGridPtrVecCIter   iter = mGridPtrs.begin(),
-                                    endIter = mGridPtrs.end(); iter != endIter; ++iter) {
-
-        const tools::PointDataGrid::Ptr grid = *iter;
-
-        tools::PointDataTree::LeafCIter leafIter = grid->tree().cbeginLeaf();
-        if (!leafIter) continue;
-
-        if (leafIter->hasAttribute("pscale")) {
-            gdp->addTuple(GA_STORE_REAL32, GA_ATTRIB_POINT, "pscale", 1, GA_Defaults(DEFAULT_PSCALE));
-            break;
-        }
+    if (std::binary_search(validAttributes.begin(), validAttributes.end(), "pscale")) {
+        gdp->addTuple(GA_STORE_REAL32, GA_ATTRIB_POINT, "pscale", 1, GA_Defaults(DEFAULT_PSCALE));
     }
 
     for (PointDataGridPtrVecCIter   iter = mGridPtrs.begin(),
                                     endIter = mGridPtrs.end(); iter != endIter; ++iter) {
 
         const tools::PointDataGrid::Ptr grid = *iter;
-        hvdbp::convertPointDataGridToHoudini(*gdp, *grid, includeGroups, excludeGroups);
+        hvdbp::convertPointDataGridToHoudini(*gdp, *grid, validAttributes, includeGroups, excludeGroups);
     }
 
     // Create a geometry object in mantra

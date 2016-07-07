@@ -48,7 +48,7 @@ public:
     virtual void tearDown() { openvdb::uninitialize(); openvdb::points::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestPointGroup);
-    CPPUNIT_TEST(testParse);
+    CPPUNIT_TEST(testDescriptor);
     CPPUNIT_TEST(testAppendDrop);
     CPPUNIT_TEST(testCompact);
     CPPUNIT_TEST(testSet);
@@ -56,7 +56,7 @@ public:
 
     CPPUNIT_TEST_SUITE_END();
 
-    void testParse();
+    void testDescriptor();
     void testAppendDrop();
     void testCompact();
     void testSet();
@@ -116,75 +116,9 @@ namespace {
 
 
 void
-TestPointGroup::testParse()
+TestPointGroup::testDescriptor()
 {
-    { // empty string (by convention interpreted as all)
-        std::vector<std::string> includeGroups;
-        std::vector<std::string> excludeGroups;
-        parsePointGroups(includeGroups, excludeGroups, "");
-        CPPUNIT_ASSERT(testStringVector(includeGroups));
-        CPPUNIT_ASSERT(testStringVector(excludeGroups));
-    }
-
-    { // one include group
-        std::vector<std::string> includeGroups;
-        std::vector<std::string> excludeGroups;
-        parsePointGroups(includeGroups, excludeGroups, "group1");
-        CPPUNIT_ASSERT(testStringVector(includeGroups, "group1"));
-        CPPUNIT_ASSERT(testStringVector(excludeGroups));
-    }
-
-    { // two include groups
-        std::vector<std::string> includeGroups;
-        std::vector<std::string> excludeGroups;
-        parsePointGroups(includeGroups, excludeGroups, "group1 group2");
-        CPPUNIT_ASSERT(testStringVector(includeGroups, "group1", "group2"));
-        CPPUNIT_ASSERT(testStringVector(excludeGroups));
-    }
-
-    { // one include, one exclude group
-        std::vector<std::string> includeGroups;
-        std::vector<std::string> excludeGroups;
-        parsePointGroups(includeGroups, excludeGroups, "group1 ^group2");
-        CPPUNIT_ASSERT(testStringVector(includeGroups, "group1"));
-        CPPUNIT_ASSERT(testStringVector(excludeGroups, "group2"));
-    }
-
-    { // one include, one exclude group
-        std::vector<std::string> includeGroups;
-        std::vector<std::string> excludeGroups;
-        parsePointGroups(includeGroups, excludeGroups, "^group1 group2");
-        CPPUNIT_ASSERT(testStringVector(includeGroups, "group2"));
-        CPPUNIT_ASSERT(testStringVector(excludeGroups, "group1"));
-    }
-
-    { // two exclude groups
-        std::vector<std::string> includeGroups;
-        std::vector<std::string> excludeGroups;
-        parsePointGroups(includeGroups, excludeGroups, "^group1 ^group2");
-        CPPUNIT_ASSERT(testStringVector(includeGroups));
-        CPPUNIT_ASSERT(testStringVector(excludeGroups, "group1", "group2"));
-    }
-
-    { // two include groups, two exclude groups
-        std::vector<std::string> includeGroups;
-        std::vector<std::string> excludeGroups;
-        parsePointGroups(includeGroups, excludeGroups, "group1 ^group2 ^group3 group4");
-        CPPUNIT_ASSERT(testStringVector(includeGroups, "group1", "group4"));
-        CPPUNIT_ASSERT(testStringVector(excludeGroups, "group2", "group3"));
-    }
-
-    { // two include groups, one isolated negate character
-        std::vector<std::string> includeGroups;
-        std::vector<std::string> excludeGroups;
-        CPPUNIT_ASSERT_THROW(parsePointGroups(includeGroups, excludeGroups, "group1 ^ group2"), RuntimeError);
-    }
-
-    { // invalid character in group name
-        std::vector<std::string> includeGroups;
-        std::vector<std::string> excludeGroups;
-        CPPUNIT_ASSERT_THROW(parsePointGroups(includeGroups, excludeGroups, "group$1"), RuntimeError);
-    }
+    // test missing groups deletion
 
     { // no groups, empty Descriptor
         std::vector<std::string> groups;

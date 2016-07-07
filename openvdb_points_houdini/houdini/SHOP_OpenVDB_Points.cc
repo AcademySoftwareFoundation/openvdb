@@ -92,10 +92,14 @@ SHOP_OpenVDB_Points::buildShaderString(UT_String &result, fpreal now,
     UT_String groupMaskStr = "";
     evalString(groupMaskStr, "groupmask", 0, now);
 
+    UT_String attrMaskStr = "";
+    evalString(attrMaskStr, "attrmask", 0, now);
+
     std::stringstream ss;
     ss << SHOP_OpenVDB_Points::nodeName();
     ss << " file \"" << fileStr.toStdString() << "\"";
     ss << " groupmask \"" << groupMaskStr.toStdString() << "\"";
+    ss << " attrmask \"" << attrMaskStr.toStdString() << "\"";
 
     result = ss.str();
     return true;
@@ -125,7 +129,11 @@ newShopOperator(OP_OperatorTable *table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "groupmask", "Group Mask")
         .setDefault("")
-        .setHelpText("Specify VDB Points Groups to use."));
+        .setHelpText("Specify VDB Points Groups to use. (Default is all groups)"));
+
+    parms.add(hutil::ParmFactory(PRM_STRING, "attrmask", "Attribute Mask")
+        .setDefault("")
+        .setHelpText("Specify VDB Points Attributes to use. (Default is all attributes)"));
 
     //////////
     // Register this operator.

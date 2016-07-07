@@ -829,7 +829,10 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
 
             std::vector<std::string> includeGroups;
             std::vector<std::string> excludeGroups;
-            openvdb::tools::parsePointGroups(includeGroups, excludeGroups, pointsGroup);
+            openvdb::tools::AttributeSet::Descriptor::parseNames(includeGroups, excludeGroups, pointsGroup);
+
+            // passing an empty vector of attribute names implies that all attributes should be converted
+            const std::vector<std::string> emptyNameVector;
 
             // Mesh each VDB primitive independently
             for (hvdb::VdbPrimCIterator vdbIt(ptGeo, group); vdbIt; ++vdbIt) {
@@ -841,7 +844,7 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
 
                 const PointDataGrid& grid = static_cast<const PointDataGrid&>(baseGrid);
 
-                hvdbp::convertPointDataGridToHoudini(geo, grid, includeGroups, excludeGroups);
+                hvdbp::convertPointDataGridToHoudini(geo, grid, emptyNameVector, includeGroups, excludeGroups);
 
                 gdp->merge(geo);
             }
