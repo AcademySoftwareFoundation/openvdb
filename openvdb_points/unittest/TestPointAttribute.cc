@@ -30,6 +30,7 @@
 
 
 #include <cppunit/extensions/HelperMacros.h>
+#include <openvdb_points/tools/AttributeArrayString.h>
 #include <openvdb_points/tools/PointAttribute.h>
 #include <openvdb_points/tools/PointConversion.h>
 #include <openvdb_points/openvdb.h>
@@ -240,13 +241,15 @@ TestPointAttribute::testAppendDrop()
     }
 
     { // append attributes marked as hidden, transient and group
-        appendAttribute(tree, Descriptor::NameAndType("testHidden", AttributeF::attributeType()), Metadata::Ptr(), true, false, false);
-        appendAttribute(tree, Descriptor::NameAndType("testTransient", AttributeF::attributeType()), Metadata::Ptr(), false, true, false);
-        appendAttribute(tree, Descriptor::NameAndType("testGroup", GroupAttributeArray::attributeType()), Metadata::Ptr(), false, false, true);
+        appendAttribute(tree, Descriptor::NameAndType("testHidden", AttributeF::attributeType()), Metadata::Ptr(), true, false);
+        appendAttribute(tree, Descriptor::NameAndType("testTransient", AttributeF::attributeType()), Metadata::Ptr(), false, true);
+        appendAttribute(tree, Descriptor::NameAndType("testGroup", GroupAttributeArray::attributeType()), Metadata::Ptr(), false, false);
+        appendAttribute(tree, Descriptor::NameAndType("testString", StringAttributeArray::attributeType()), Metadata::Ptr(), false, false);
 
         const AttributeArray& arrayHidden = leafIter->attributeArray("testHidden");
         const AttributeArray& arrayTransient = leafIter->attributeArray("testTransient");
         const AttributeArray& arrayGroup = leafIter->attributeArray("testGroup");
+        const AttributeArray& arrayString = leafIter->attributeArray("testString");
 
         CPPUNIT_ASSERT(arrayHidden.isHidden());
         CPPUNIT_ASSERT(!arrayTransient.isHidden());
@@ -255,10 +258,17 @@ TestPointAttribute::testAppendDrop()
         CPPUNIT_ASSERT(!arrayHidden.isTransient());
         CPPUNIT_ASSERT(arrayTransient.isTransient());
         CPPUNIT_ASSERT(!arrayGroup.isTransient());
+        CPPUNIT_ASSERT(!arrayString.isTransient());
 
         CPPUNIT_ASSERT(!isGroup(arrayHidden));
         CPPUNIT_ASSERT(!isGroup(arrayTransient));
         CPPUNIT_ASSERT(isGroup(arrayGroup));
+        CPPUNIT_ASSERT(!isGroup(arrayString));
+
+        CPPUNIT_ASSERT(!isString(arrayHidden));
+        CPPUNIT_ASSERT(!isString(arrayTransient));
+        CPPUNIT_ASSERT(!isString(arrayGroup));
+        CPPUNIT_ASSERT(isString(arrayString));
     }
 }
 
