@@ -47,12 +47,14 @@ public:
     virtual void tearDown() { openvdb::uninitialize(); openvdb::points::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestAttributeArrayString);
+    CPPUNIT_TEST(testStringMetaInserter);
     CPPUNIT_TEST(testStringAttribute);
     CPPUNIT_TEST(testStringAttributeHandle);
     CPPUNIT_TEST(testStringAttributeWriteHandle);
 
     CPPUNIT_TEST_SUITE_END();
 
+    void testStringMetaInserter();
     void testStringAttribute();
     void testStringAttributeHandle();
     void testStringAttributeWriteHandle();
@@ -78,6 +80,109 @@ matchingNamePairs(const openvdb::NamePair& lhs,
 }
 
 } // namespace
+
+
+////////////////////////////////////////
+
+
+void
+TestAttributeArrayString::testStringMetaInserter()
+{
+    using namespace openvdb;
+    using namespace openvdb::tools;
+
+    MetaMap metadata;
+
+    StringMetaInserter inserter(metadata);
+
+    { // insert one value
+        inserter.insert("test");
+        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(1));
+        StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:0");
+        CPPUNIT_ASSERT(meta);
+        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test"));
+    }
+
+    { // insert another value
+        inserter.insert("test2");
+        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(2));
+        StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:0");
+        CPPUNIT_ASSERT(meta);
+        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test"));
+        meta = metadata.getMetadata<StringMetadata>("string:1");
+        CPPUNIT_ASSERT(meta);
+        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test2"));
+    }
+
+    // remove a value and reset the cache
+
+    metadata.removeMeta("string:1");
+    inserter.resetCache();
+
+    { // re-insert value
+        inserter.insert("test3");
+        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(2));
+        StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:0");
+        CPPUNIT_ASSERT(meta);
+        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test"));
+        meta = metadata.getMetadata<StringMetadata>("string:1");
+        CPPUNIT_ASSERT(meta);
+        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test3"));
+    }
+
+    { // insert and remove to create a gap
+        inserter.insert("test4");
+        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(3));
+        metadata.removeMeta("string:1");
+        inserter.resetCache();
+        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(2));
+        StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:0");
+        CPPUNIT_ASSERT(meta);
+        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test"));
+        meta = metadata.getMetadata<StringMetadata>("string:2");
+        CPPUNIT_ASSERT(meta);
+        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test4"));
+    }
+
+    { // insert to fill gap
+        inserter.insert("test10");
+        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(3));
+        StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:0");
+        CPPUNIT_ASSERT(meta);
+        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test"));
+        meta = metadata.getMetadata<StringMetadata>("string:1");
+        CPPUNIT_ASSERT(meta);
+        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test10"));
+        meta = metadata.getMetadata<StringMetadata>("string:2");
+        CPPUNIT_ASSERT(meta);
+        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test4"));
+    }
+
+    { // insert existing value
+        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(3));
+        inserter.insert("test10");
+        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(3));
+    }
+
+    metadata.removeMeta("string:0");
+    metadata.removeMeta("string:2");
+    inserter.resetCache();
+
+    { // insert other value and string metadata
+        metadata.insertMeta("int:1", Int32Metadata(5));
+        metadata.insertMeta("irrelevant", StringMetadata("irrelevant"));
+        inserter.resetCache();
+        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(3));
+        inserter.insert("test15");
+        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(4));
+        StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:0");
+        CPPUNIT_ASSERT(meta);
+        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test15"));
+        meta = metadata.getMetadata<StringMetadata>("string:1");
+        CPPUNIT_ASSERT(meta);
+        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test10"));
+    }
+}
 
 
 ////////////////////////////////////////

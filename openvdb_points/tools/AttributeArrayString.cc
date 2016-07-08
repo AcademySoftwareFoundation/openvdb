@@ -84,6 +84,75 @@ namespace {
 
 ////////////////////////////////////////
 
+
+// StringMetaInserter implementation
+
+
+StringMetaInserter::StringMetaInserter(MetaMap& metadata)
+    : mMetadata(metadata)
+{
+    // populate the cache
+    resetCache();
+}
+
+
+void StringMetaInserter::insert(const Name& name)
+{
+    // name already exists, so do nothing
+
+    if (std::binary_search(mValues.begin(), mValues.end(), name))  return;
+
+    // find first unused index in the cache
+
+    Index index = 1;
+    for (std::vector<Index>::iterator   it = mIndices.begin(),
+                                        itEnd = mIndices.end(); it != itEnd; ++it) {
+        if (*it != index)    break;
+        ++index;
+    }
+
+    // now insert into metadata
+
+    const Name key = getStringKey(index);
+    mMetadata.insertMeta(key, StringMetadata(name));
+
+    // finally update the caches (insertion sort)
+
+    mIndices.insert(std::upper_bound(mIndices.begin(), mIndices.end(), index), index);
+    mValues.insert(std::upper_bound(mValues.begin(), mValues.end(), name), name);
+}
+
+
+void StringMetaInserter::resetCache()
+{
+    mIndices.clear();
+    mValues.clear();
+
+    for (MetaMap::ConstMetaIterator it = mMetadata.beginMeta(),
+                                    itEnd = mMetadata.endMeta(); it != itEnd; ++it) {
+        const Name& key = it->first;
+        const Metadata::Ptr meta = it->second;
+
+        // ensure the metadata is StringMetadata and key starts "string:"
+        if (!isStringMeta(key, meta))   continue;
+
+        // extract index and add to cache
+        Index index = getStringIndex(key);
+        mIndices.push_back(index);
+
+        // extract value from metadata and add to cache
+        StringMetadata* stringMeta = static_cast<StringMetadata*>(meta.get());
+        assert(stringMeta);
+        mValues.push_back(stringMeta->value());
+    }
+
+    std::sort(mIndices.begin(), mIndices.end());
+    std::sort(mValues.begin(), mValues.end());
+}
+
+
+////////////////////////////////////////
+
 // StringAttributeHandle implementation
 
 

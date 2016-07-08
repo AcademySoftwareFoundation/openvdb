@@ -71,6 +71,27 @@ typedef TypedAttributeArray<StringIndexType, StringAttributeCodec<StringIndexTyp
 ////////////////////////////////////////
 
 
+class StringMetaInserter
+{
+public:
+    StringMetaInserter(MetaMap& metadata);
+
+    /// Insert the string into the metadata
+    void insert(const Name& name);
+
+    /// Reset the cache from the metadata
+    void resetCache();
+
+private:
+    MetaMap& mMetadata;
+    std::vector<Index> mIndices;
+    std::vector<Name> mValues;
+}; // StringMetaInserter
+
+
+////////////////////////////////////////
+
+
 template<typename StorageType_>
 inline void
 StringAttributeCodec<StorageType_>::decode(const StorageType& data, ValueType& val)
