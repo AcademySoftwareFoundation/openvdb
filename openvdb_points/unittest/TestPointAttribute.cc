@@ -104,7 +104,7 @@ TestPointAttribute::testAppendDrop()
     { // append an attribute, check descriptors are as expected, default value test
         appendAttribute(tree,   Descriptor::NameAndType("id", AttributeI::attributeType()),
                                 /*defaultValue*/TypedMetadata<AttributeI::ValueType>(AttributeI::ValueType(10)).copy(),
-                                /*hidden=*/false, /*transient=*/false, /*group=*/false);
+                                /*hidden=*/false, /*transient=*/false);
 
         CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(2));
         CPPUNIT_ASSERT(attributeSet.descriptor() == attributeSet4.descriptor());
@@ -256,9 +256,9 @@ TestPointAttribute::testAppendDrop()
         CPPUNIT_ASSERT(arrayTransient.isTransient());
         CPPUNIT_ASSERT(!arrayGroup.isTransient());
 
-        CPPUNIT_ASSERT(!GroupAttributeArray::isGroup(arrayHidden));
-        CPPUNIT_ASSERT(!GroupAttributeArray::isGroup(arrayTransient));
-        CPPUNIT_ASSERT(GroupAttributeArray::isGroup(arrayGroup));
+        CPPUNIT_ASSERT(!isGroup(arrayHidden));
+        CPPUNIT_ASSERT(!isGroup(arrayTransient));
+        CPPUNIT_ASSERT(isGroup(arrayGroup));
     }
 }
 

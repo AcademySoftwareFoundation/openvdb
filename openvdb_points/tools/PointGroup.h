@@ -356,9 +356,11 @@ public:
     /// that can be stored without increasing the number of group attribute arrays
     size_t unusedGroups() const
     {
+        const Descriptor& descriptor = mAttributeSet.descriptor();
+
         // compute total slots (one slot per bit of the group attributes)
 
-        const size_t groupAttributes = mAttributeSet.size(AttributeArray::GROUP);
+        const size_t groupAttributes = descriptor.count<GroupAttributeArray>();
 
         if (groupAttributes == 0)   return 0;
 
@@ -416,7 +418,7 @@ public:
                                         itEnd = map.end(); it != itEnd; ++it) {
 
             const AttributeArray* array = mAttributeSet.getConst(it->first);
-            if (GroupAttributeArray::isGroup(*array)) {
+            if (isGroup(*array)) {
                 indices.push_back(it->second);
             }
         }
@@ -510,7 +512,7 @@ inline void appendGroup(PointDataTree& tree, const Name& group)
         // insert new group attribute
 
         AppendAttributeOp<PointDataTree> append(tree, groupAttribute, descriptor,
-                                                /*hidden=*/false, /*transient=*/false, /*group=*/true);
+                                                /*hidden=*/false, /*transient=*/false);
         tbb::parallel_for(typename tree::template LeafManager<PointDataTree>(tree).leafRange(), append);
     }
     else {

@@ -115,9 +115,6 @@ public:
     /// Return the number of attributes in this set.
     size_t size() const { return mAttrs.size(); }
 
-    /// Return the number of attributes with this flag set
-    size_t size(const uint16_t flag) const;
-
     /// Return the number of bytes of memory used by this attribute set.
     size_t memUsage() const;
 
@@ -301,6 +298,10 @@ public:
     /// Return the number of attributes in this descriptor.
     size_t size() const { return mTypes.size(); }
 
+    /// Return the number of attributes with this attribute type
+    template <typename AttributeArrayType>
+    size_t count() const;
+
     /// Return the number of bytes of memory used by this attribute set.
     size_t memUsage() const;
 
@@ -381,6 +382,19 @@ private:
     NameToPosMap                mGroupMap;
     MetaMap                     mMetadata;
 }; // class Descriptor
+
+
+template <typename AttributeArrayType>
+size_t AttributeSet::Descriptor::count() const
+{
+    size_t count = 0;
+    for (std::vector<NamePair>::const_iterator  it = mTypes.begin(),
+                                                itEnd = mTypes.end(); it != itEnd; ++it) {
+        const NamePair& type = *it;
+        if (type == AttributeArrayType::attributeType())    count++;
+    }
+    return count;
+}
 
 
 template <typename ValueType>

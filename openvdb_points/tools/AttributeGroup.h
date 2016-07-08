@@ -54,60 +54,42 @@ typedef uint8_t GroupType;
 ////////////////////////////////////////
 
 
-class GroupAttributeArray : public TypedAttributeArray<GroupType, NullAttributeCodec<GroupType> >
+struct GroupAttributeCodec
 {
-public:
-    /// Default constructor, always constructs a uniform attribute.
-    explicit GroupAttributeArray(   size_t n = 1,
-                                    const ValueType& uniformValue = zeroVal<ValueType>());
-    /// Deep copy constructor (optionally decompress during copy).
-    GroupAttributeArray(const GroupAttributeArray& array,
-                        const bool decompress = false);
-
-    /// Cast an AttributeArray to GroupAttributeArray
-    static GroupAttributeArray& cast(AttributeArray& attributeArray);
-
-    /// Cast an AttributeArray to GroupAttributeArray
-    static const GroupAttributeArray& cast(const AttributeArray& attributeArray);
-
-    /// Return @c true if the AttributeArray provided is a group
-    static bool isGroup(const AttributeArray& attributeArray);
-
-    /// @brief Specify whether this attribute is for tracking group membership
-    /// @note  Attributes are not group attributes by default.
-    void setGroup(bool state);
-    /// Return @c true if this attribute is for tracking groups
-    bool isGroup() const { return bool(mFlags & GROUP); }
-
-}; // class GroupAttributeArray
+    typedef GroupType StorageType;
+    typedef GroupType ValueType;
+    static void decode(const StorageType&, ValueType&);
+    static void encode(const ValueType&, StorageType&);
+    static const char* name() { return "grp"; }
+};
 
 
-inline GroupAttributeArray&
-GroupAttributeArray::cast(AttributeArray& attributeArray)
+typedef TypedAttributeArray<GroupType, GroupAttributeCodec> GroupAttributeArray;
+
+
+////////////////////////////////////////
+
+
+inline void
+GroupAttributeCodec::decode(const StorageType& data, ValueType& val)
 {
-    if (!attributeArray.isType<GroupAttributeArray>()) {
-        OPENVDB_THROW(TypeError, "Invalid Attribute Type");
-    }
-    return static_cast<GroupAttributeArray&>(attributeArray);
+    val = data;
 }
 
 
-inline const GroupAttributeArray&
-GroupAttributeArray::cast(const AttributeArray& attributeArray)
+inline void
+GroupAttributeCodec::encode(const ValueType& val, StorageType& data)
 {
-    if (!attributeArray.isType<GroupAttributeArray>()) {
-        OPENVDB_THROW(TypeError, "Invalid Attribute Type");
-    }
-    return static_cast<const GroupAttributeArray&>(attributeArray);
+    data = val;
 }
 
 
-inline bool
-GroupAttributeArray::isGroup(const AttributeArray& attributeArray)
-{
-    if (!attributeArray.isType<GroupAttributeArray>())  return false;
+////////////////////////////////////////
 
-    return GroupAttributeArray::cast(attributeArray).isGroup();
+
+inline bool isGroup(const AttributeArray& array)
+{
+    return array.isType<GroupAttributeArray>();
 }
 
 

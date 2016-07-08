@@ -44,32 +44,6 @@ namespace tools {
 
 ////////////////////////////////////////
 
-// GroupAttributeArray implementation
-
-
-GroupAttributeArray::GroupAttributeArray(size_t n, const ValueType& uniformValue)
-    : TypedAttributeArray<GroupType, NullAttributeCodec<GroupType> >(n, uniformValue)
-{
-    this->setGroup(true);
-}
-
-
-GroupAttributeArray::GroupAttributeArray(const GroupAttributeArray& array, const bool decompress)
-        : TypedAttributeArray<GroupType, NullAttributeCodec<GroupType> >(array, decompress)
-{
-    this->setGroup(true);
-}
-
-
-void GroupAttributeArray::setGroup(bool state)
-{
-    if (state) mFlags |= Int16(GROUP);
-    else mFlags &= ~Int16(GROUP);
-}
-
-
-////////////////////////////////////////
-
 // GroupHandle implementation
 
 
@@ -77,7 +51,7 @@ GroupHandle::GroupHandle(const GroupAttributeArray& array, const GroupType& offs
         : mArray(array)
         , mBitMask(GroupType(1) << offset)
 {
-    assert(mArray.isGroup());
+    assert(isGroup(mArray));
 }
 
 
@@ -86,7 +60,7 @@ GroupHandle::GroupHandle(const GroupAttributeArray& array, const GroupType& bitM
     : mArray(array)
     , mBitMask(bitMask)
 {
-    assert(mArray.isGroup());
+    assert(isGroup(mArray));
 }
 
 
@@ -104,6 +78,7 @@ bool GroupHandle::get(Index n) const
 GroupWriteHandle::GroupWriteHandle(GroupAttributeArray& array, const GroupType& offset)
     : GroupHandle(array, offset)
 {
+    assert(isGroup(mArray));
 }
 
 

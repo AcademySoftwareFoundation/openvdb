@@ -178,39 +178,6 @@ fixedPointToFloatingPoint(const math::Vec3<IntegerT>& v)
 
 ////////////////////////////////////////
 
-// Attribute codec schemes
-
-template<typename StorageType_>
-struct NullAttributeCodec
-{
-    typedef StorageType_ StorageType;
-    template<typename ValueType> static void decode(const StorageType&, ValueType&);
-    template<typename ValueType> static void encode(const StorageType&, ValueType&);
-    static const char* name() { return "null"; }
-};
-
-
-template<typename IntType>
-struct FixedPointAttributeCodec
-{
-    typedef IntType StorageType;
-    template<typename ValueType> static void decode(const StorageType&, ValueType&);
-    template<typename ValueType> static void encode(const ValueType&, StorageType&);
-    static const char* name() { return "fxpt"; }
-};
-
-
-struct UnitVecAttributeCodec
-{
-    typedef uint16_t StorageType;
-    template<typename T> static void decode(const StorageType&, math::Vec3<T>&);
-    template<typename T> static void encode(const math::Vec3<T>&, StorageType&);
-    static const char* name() { return "uvec"; }
-};
-
-
-////////////////////////////////////////
-
 
 /// Base class for storing attribute data
 class AttributeArray
@@ -222,7 +189,7 @@ protected:
     typedef boost::shared_ptr<AccessorBase>             AccessorBasePtr;
 
 public:
-    enum Flag { TRANSIENT = 0x1, HIDDEN = 0x2, GROUP=0x4, WRITEUNIFORM=0x8,
+    enum Flag { TRANSIENT = 0x1, HIDDEN = 0x2, WRITEUNIFORM=0x8,
                 WRITEMEMCOMPRESS=0x10, WRITEDISKCOMPRESS=0x20, OUTOFCORE=0x40 };
 
 #ifndef OPENVDB_2_ABI_COMPATIBLE
@@ -378,6 +345,39 @@ struct AttributeArray::Accessor : public AttributeArray::AccessorBase
     ValuePtr  mCollapser;
     ValuePtr  mFiller;
 }; // struct AttributeArray::Accessor
+
+
+////////////////////////////////////////
+
+// Attribute codec schemes
+
+template<typename StorageType_>
+struct NullAttributeCodec
+{
+    typedef StorageType_ StorageType;
+    template<typename ValueType> static void decode(const StorageType&, ValueType&);
+    template<typename ValueType> static void encode(const StorageType&, ValueType&);
+    static const char* name() { return "null"; }
+};
+
+
+template<typename IntType>
+struct FixedPointAttributeCodec
+{
+    typedef IntType StorageType;
+    template<typename ValueType> static void decode(const StorageType&, ValueType&);
+    template<typename ValueType> static void encode(const ValueType&, StorageType&);
+    static const char* name() { return "fxpt"; }
+};
+
+
+struct UnitVecAttributeCodec
+{
+    typedef uint16_t StorageType;
+    template<typename T> static void decode(const StorageType&, math::Vec3<T>&);
+    template<typename T> static void encode(const math::Vec3<T>&, StorageType&);
+    static const char* name() { return "uvec"; }
+};
 
 
 ////////////////////////////////////////

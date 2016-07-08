@@ -601,7 +601,7 @@ struct ConvertPointDataGridGroupOp {
             const AttributeArray& array = leaf->constAttributeArray(mIndex.first);
             const GroupType bitmask = GroupType(1) << mIndex.second;
 
-            assert(GroupAttributeArray::isGroup(array));
+            assert(isGroup(array));
 
             const GroupAttributeArray& groupArray = GroupAttributeArray::cast(array);
 

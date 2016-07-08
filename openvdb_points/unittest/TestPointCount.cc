@@ -258,7 +258,7 @@ TestPointCount::testGroup()
 
         AttributeArray& array = leafIter->attributeArray(index.first);
 
-        CPPUNIT_ASSERT(GroupAttributeArray::isGroup(array));
+        CPPUNIT_ASSERT(isGroup(array));
 
         GroupAttributeArray& groupArray = GroupAttributeArray::cast(array);
 
@@ -406,7 +406,7 @@ TestPointCount::testGroup()
 
         AttributeArray& array = leafIter->attributeArray(index.first);
 
-        CPPUNIT_ASSERT(GroupAttributeArray::isGroup(array));
+        CPPUNIT_ASSERT(isGroup(array));
 
         GroupAttributeArray& groupArray = GroupAttributeArray::cast(array);
 
@@ -430,7 +430,7 @@ TestPointCount::testGroup()
 
         AttributeArray& array = leafIter->attributeArray(index.first);
 
-        CPPUNIT_ASSERT(GroupAttributeArray::isGroup(array));
+        CPPUNIT_ASSERT(isGroup(array));
 
         GroupAttributeArray& groupArray = GroupAttributeArray::cast(array);
 

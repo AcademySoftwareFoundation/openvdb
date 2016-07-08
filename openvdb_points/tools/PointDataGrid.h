@@ -734,7 +734,7 @@ inline GroupHandle
 PointDataLeafNode<T, Log2Dim>::groupHandle(const AttributeSet::Descriptor::GroupIndex& index) const
 {
     const AttributeArray& array = this->attributeArray(index.first);
-    assert(GroupAttributeArray::isGroup(array));
+    assert(isGroup(array));
 
     const GroupAttributeArray& groupArray = GroupAttributeArray::cast(array);
 
@@ -754,7 +754,7 @@ inline GroupWriteHandle
 PointDataLeafNode<T, Log2Dim>::groupWriteHandle(const AttributeSet::Descriptor::GroupIndex& index)
 {
     AttributeArray& array = this->attributeArray(index.first);
-    assert(GroupAttributeArray::isGroup(array));
+    assert(isGroup(array));
 
     GroupAttributeArray& groupArray = GroupAttributeArray::cast(array);
 

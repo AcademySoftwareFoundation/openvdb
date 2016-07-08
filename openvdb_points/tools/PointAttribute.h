@@ -41,6 +41,7 @@
 
 #include <openvdb/openvdb.h>
 
+#include <openvdb_points/tools/AttributeArrayString.h>
 #include <openvdb_points/tools/AttributeSet.h>
 #include <openvdb_points/tools/AttributeGroup.h>
 #include <openvdb_points/tools/PointDataGrid.h>
@@ -58,14 +59,12 @@ namespace tools {
 /// @param defaultValue  metadata default attribute value
 /// @param hidden        mark attribute as hidden
 /// @param transient     mark attribute as transient
-/// @param group         mark attribute as group
 template <typename PointDataTree>
 inline void appendAttribute(PointDataTree& tree,
                             const AttributeSet::Util::NameAndType& newAttribute,
                             Metadata::Ptr defaultValue = Metadata::Ptr(),
                             const bool hidden = false,
-                            const bool transient = false,
-                            const bool group = false);
+                            const bool transient = false);
 
 /// @brief Drops attributes from the VDB tree.
 ///
@@ -155,14 +154,12 @@ struct AppendAttributeOp {
                         const NameAndType& newAttribute,
                         AttributeSet::DescriptorPtr& descriptor,
                         const bool hidden = false,
-                        const bool transient = false,
-                        const bool group = false)
+                        const bool transient = false)
         : mTree(tree)
         , mNewAttribute(newAttribute)
         , mDescriptor(descriptor)
         , mHidden(hidden)
-        , mTransient(transient)
-        , mGroup(group) { }
+        , mTransient(transient) { }
 
     void operator()(const LeafRangeT& range) const {
 
@@ -174,10 +171,6 @@ struct AppendAttributeOp {
 
             if (mHidden)      attribute->setHidden(true);
             if (mTransient)   attribute->setTransient(true);
-
-            if (mGroup) {
-                GroupAttributeArray::cast(*attribute).setGroup(true);
-            }
         }
     }
 
@@ -188,7 +181,6 @@ struct AppendAttributeOp {
     AttributeSet::DescriptorPtr&    mDescriptor;
     const bool                      mHidden;
     const bool                      mTransient;
-    const bool                      mGroup;
 }; // class AppendAttributeOp
 
 
@@ -291,7 +283,7 @@ template <typename PointDataTree>
 inline void appendAttribute(PointDataTree& tree,
                             const AttributeSet::Util::NameAndType& newAttribute,
                             Metadata::Ptr defaultValue,
-                            const bool hidden, const bool transient, const bool group)
+                            const bool hidden, const bool transient)
 {
     typedef AttributeSet::Util::NameAndTypeVec                    NameAndTypeVec;
     typedef AttributeSet::Descriptor                              Descriptor;
@@ -325,7 +317,7 @@ inline void appendAttribute(PointDataTree& tree,
 
     // insert attributes using the new descriptor
 
-    AppendAttributeOp<PointDataTree> append(tree, newAttribute, newDescriptor, hidden, transient, group);
+    AppendAttributeOp<PointDataTree> append(tree, newAttribute, newDescriptor, hidden, transient);
     tbb::parallel_for(typename tree::template LeafManager<PointDataTree>(tree).leafRange(), append);
 }
 
@@ -453,7 +445,7 @@ inline void renameAttributes(   PointDataTree& tree,
         const AttributeArray* array = attributeSet.getConst(oldName);
         assert(array);
 
-        if (GroupAttributeArray::isGroup(*array)) {
+        if (isGroup(*array)) {
             OPENVDB_THROW(KeyError, "Cannot rename group attribute - " << oldName << ".");
         }
 
