@@ -335,10 +335,10 @@ ALL_TARGETS := \
 
 all: depend houdinisops
 
-# Create an openvdb_houdini/ symlink to the houdini/ subdirectory,
+# Create an openvdb_points_houdini/ symlink to the houdini/ subdirectory,
 # to mirror the DWA directory structure.
-openvdb_houdini:
-	ln -f -s houdini openvdb_houdini
+openvdb_points_houdini:
+	ln -f -s houdini openvdb_points_houdini
 
 ifeq (no,$(strip $(shared)))
 # Link SOPs against static OpenVDB libraries.
@@ -386,11 +386,11 @@ mantradsos: $(MANTRA_VRAY_SO_NAMES)
 	fi
 
 install_lib: houdinisops mantradsos
-	mkdir -p $(DESTDIR)/include/openvdb_houdini
-	@echo "Created $(DESTDIR)/include/openvdb_houdini"
+	mkdir -p $(DESTDIR)/include/openvdb_points_houdini
+	@echo "Created $(DESTDIR)/include/openvdb_points_houdini"
 	mkdir -p $(DESTDIR)/include/houdini_utils
 	@echo "Created $(DESTDIR)/include/houdini_utils"
-	cp -f $(LIBHOUDINI_INCLUDE_NAMES) $(DESTDIR)/include/openvdb_houdini/
+	cp -f $(LIBHOUDINI_INCLUDE_NAMES) $(DESTDIR)/include/openvdb_points_houdini/
 	@#
 
 install: install_lib
