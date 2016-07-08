@@ -354,6 +354,22 @@ $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
 	        -L. -lopenvdb_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) -L$(OPENVDB_POINTS_LIB_DIR) $(OPENVDB_POINTS_LIB) $< $(QUIET)
 endif
 
+ifeq (no,$(strip $(shared)))
+# Link SOPs against static OpenVDB libraries.
+$(MANTRA_VRAY_OBJ_NAMES): %.o: %.cc
+	@echo "Building $(HOUDINI_DESTDIR)/mantra/$(@:.o=.so) because of $(call list_deps)"
+	@mkdir -p $(HOUDINI_DESTDIR)/mantra
+	$(HCUSTOM_MANTRA_EXPORT) $(HB)/hcustom $(MANTRA_INSTALL) $(HCUSTOM_FLAGS) $(HCUSTOM_INCLDIRS) $(LIBS) \
+	        -L. -lopenvdb_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) -L$(OPENVDB_POINTS_LIB_DIR) $(OPENVDB_POINTS_LIB) $< $(QUIET)
+else
+# Link SOPs against shared OpenVDB libraries.
+$(MANTRA_VRAY_OBJ_NAMES): %.o: %.cc
+	@echo "Building $(HOUDINI_DESTDIR)/$(@:.o=.so) because of $(call list_deps)"
+	@mkdir -p $(HOUDINI_DESTDIR)/mantra
+	$(HCUSTOM_MANTRA_EXPORT) $(HB)/hcustom $(MANTRA_INSTALL) $(HCUSTOM_FLAGS) $(HCUSTOM_INCLDIRS) $(LIBS) \
+ 	        -L. -lopenvdb_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) -L$(OPENVDB_POINTS_LIB_DIR) $(OPENVDB_POINTS_LIB) $< $(QUIET)
+ endif
+
 $(HOUDINI_SOP_SO_NAMES): $(HOUDINI_DESTDIR)/%.so: houdini/%.o
 $(MANTRA_VRAY_SO_NAMES): $(HOUDINI_DESTDIR)/mantra/%.so: houdini/%.o
 
