@@ -454,7 +454,7 @@ TestIndexFilter::testAttributeHashFilter()
 
     CPPUNIT_ASSERT_EQUAL(tree.leafCount(), Index32(2));
 
-    appendAttribute(tree, AttributeSet::Descriptor::NameAndType("id", AttributeI::attributeType()));
+    appendAttribute<AttributeI>(tree, "id");
 
     const size_t index = tree.cbeginLeaf()->attributeSet().descriptor().find("id");
 

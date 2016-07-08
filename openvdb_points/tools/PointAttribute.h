@@ -55,13 +55,13 @@ namespace tools {
 /// @brief Appends a new attribute to the VDB tree.
 ///
 /// @param tree          the PointDataTree to be appended to.
-/// @param newAttribute  name and type for the new attribute.
+/// @param name          name for the new attribute.
 /// @param defaultValue  metadata default attribute value
 /// @param hidden        mark attribute as hidden
 /// @param transient     mark attribute as transient
-template <typename PointDataTree>
+template <typename AttributeType, typename PointDataTree>
 inline void appendAttribute(PointDataTree& tree,
-                            const AttributeSet::Util::NameAndType& newAttribute,
+                            const Name& name,
                             Metadata::Ptr defaultValue = Metadata::Ptr(),
                             const bool hidden = false,
                             const bool transient = false);
@@ -143,7 +143,7 @@ inline void bloscCompressAttribute( PointDataTree& tree,
 
 namespace point_attribute_internal {
 
-template<typename PointDataTreeType>
+template<typename AttributeType, typename PointDataTreeType>
 struct AppendAttributeOp {
 
     typedef typename tree::LeafManager<PointDataTreeType>       LeafManagerT;
@@ -151,12 +151,10 @@ struct AppendAttributeOp {
     typedef AttributeSet::Descriptor::NameAndType               NameAndType;
 
     AppendAttributeOp(  PointDataTreeType& tree,
-                        const NameAndType& newAttribute,
                         AttributeSet::DescriptorPtr& descriptor,
                         const bool hidden = false,
                         const bool transient = false)
         : mTree(tree)
-        , mNewAttribute(newAttribute)
         , mDescriptor(descriptor)
         , mHidden(hidden)
         , mTransient(transient) { }
@@ -167,7 +165,7 @@ struct AppendAttributeOp {
 
             const AttributeSet::Descriptor& expected = leaf->attributeSet().descriptor();
 
-            AttributeArray::Ptr attribute = leaf->appendAttribute(mNewAttribute, expected, mDescriptor);
+            AttributeArray::Ptr attribute = leaf->template appendAttribute<AttributeType>(expected, mDescriptor);
 
             if (mHidden)      attribute->setHidden(true);
             if (mTransient)   attribute->setTransient(true);
@@ -177,7 +175,6 @@ struct AppendAttributeOp {
     //////////
 
     PointDataTreeType&              mTree;
-    const NameAndType&              mNewAttribute;
     AttributeSet::DescriptorPtr&    mDescriptor;
     const bool                      mHidden;
     const bool                      mTransient;
@@ -279,13 +276,12 @@ struct BloscCompressAttributesOp {
 ////////////////////////////////////////
 
 
-template <typename PointDataTree>
+template <typename AttributeType, typename PointDataTree>
 inline void appendAttribute(PointDataTree& tree,
-                            const AttributeSet::Util::NameAndType& newAttribute,
+                            const Name& name,
                             Metadata::Ptr defaultValue,
                             const bool hidden, const bool transient)
 {
-    typedef AttributeSet::Util::NameAndTypeVec                    NameAndTypeVec;
     typedef AttributeSet::Descriptor                              Descriptor;
 
     using point_attribute_internal::AppendAttributeOp;
@@ -297,27 +293,26 @@ inline void appendAttribute(PointDataTree& tree,
     // do not append a non-unique attribute
 
     const Descriptor& descriptor = iter->attributeSet().descriptor();
-    const size_t index = descriptor.find(newAttribute.name);
+    const size_t index = descriptor.find(name);
 
     if (index != AttributeSet::INVALID_POS) {
-        OPENVDB_THROW(KeyError, "Cannot append an attribute with a non-unique name - " << newAttribute.name << ".");
+        OPENVDB_THROW(KeyError, "Cannot append an attribute with a non-unique name - " << name << ".");
     }
 
     // create a new attribute descriptor
-    NameAndTypeVec vec;
-    vec.push_back(newAttribute);
 
-    Descriptor::Ptr newDescriptor = descriptor.duplicateAppend(vec);
+    AttributeSet::Util::NameAndType nameAndType(name, AttributeType::attributeType());
+    Descriptor::Ptr newDescriptor = descriptor.duplicateAppend(nameAndType);
 
     // store the attribute default value in the descriptor metadata
 
     if (defaultValue) {
-        newDescriptor->setDefaultValue(newAttribute.name, *defaultValue);
+        newDescriptor->setDefaultValue(name, *defaultValue);
     }
 
     // insert attributes using the new descriptor
 
-    AppendAttributeOp<PointDataTree> append(tree, newAttribute, newDescriptor, hidden, transient);
+    AppendAttributeOp<AttributeType, PointDataTree> append(tree, newDescriptor, hidden, transient);
     tbb::parallel_for(typename tree::template LeafManager<PointDataTree>(tree).leafRange(), append);
 }
 

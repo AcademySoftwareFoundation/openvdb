@@ -505,14 +505,14 @@ inline void appendGroup(PointDataTree& tree, const Name& group)
 
         // find a new internal group name
 
-        const NameAndType groupAttribute(descriptor->uniqueName("__group"), GroupAttributeArray::attributeType());
+        const Name groupName = descriptor->uniqueName("__group");
+        const NameAndType groupAttribute(groupName, GroupAttributeArray::attributeType());
 
         descriptor = descriptor->duplicateAppend(groupAttribute);
 
         // insert new group attribute
 
-        AppendAttributeOp<PointDataTree> append(tree, groupAttribute, descriptor,
-                                                /*hidden=*/false, /*transient=*/false);
+        AppendAttributeOp<GroupAttributeArray, PointDataTree> append(tree, descriptor);
         tbb::parallel_for(typename tree::template LeafManager<PointDataTree>(tree).leafRange(), append);
     }
     else {

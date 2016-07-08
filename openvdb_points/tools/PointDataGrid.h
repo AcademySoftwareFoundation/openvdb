@@ -211,8 +211,8 @@ public:
     /// @param attribute Name and type of the attribute to append.
     /// @param expected Existing descriptor is expected to match this parameter.
     /// @param replacement New descriptor to replace the existing one.
-    AttributeArray::Ptr appendAttribute(const AttributeSet::Util::NameAndType& attribute,
-                                        const Descriptor& expected, Descriptor::Ptr& replacement);
+    template <typename AttributeType>
+    AttributeArray::Ptr appendAttribute(const Descriptor& expected, Descriptor::Ptr& replacement);
     /// @brief Drop list of attributes.
     /// @param pos vector of attribute indices to drop
     /// @param expected Existing descriptor is expected to match this parameter.
@@ -581,11 +581,11 @@ PointDataLeafNode<T, Log2Dim>::hasAttribute(const Name& attributeName) const
 }
 
 template<typename T, Index Log2Dim>
+template <typename AttributeType>
 inline AttributeArray::Ptr
-PointDataLeafNode<T, Log2Dim>::appendAttribute(const AttributeSet::Util::NameAndType& attribute,
-                     const Descriptor& expected, Descriptor::Ptr& replacement)
+PointDataLeafNode<T, Log2Dim>::appendAttribute(const Descriptor& expected, Descriptor::Ptr& replacement)
 {
-    return mAttributeSet->appendAttribute(attribute, expected, replacement);
+    return mAttributeSet->appendAttribute<AttributeType>(expected, replacement);
 }
 
 template<typename T, Index Log2Dim>

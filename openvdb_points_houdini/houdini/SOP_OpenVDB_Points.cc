@@ -36,6 +36,7 @@
 
 
 #include <openvdb_points/openvdb.h>
+#include <openvdb_points/tools/AttributeArrayString.h>
 #include <openvdb_points/tools/PointDataGrid.h>
 #include <openvdb_points/tools/PointAttribute.h>
 #include <openvdb_points/tools/PointConversion.h>
@@ -90,103 +91,16 @@ positionAttrTypeFromCompression(const int compression)
     return TypedAttributeArray<Vec3<float> >::attributeType();
 }
 
-/// @brief Translate the type of a GA_Attribute into our AttrType
-inline NamePair
-attrTypeFromGAAttribute(GA_Attribute const * attribute, const int compression = 0)
-{
-    if (!attribute) {
-        std::stringstream ss; ss << "Invalid attribute - " << attribute->getName();
-        throw std::runtime_error(ss.str());
-    }
-
-    const GA_AIFTuple* tupleAIF = attribute->getAIFTuple();
-
-    if (!tupleAIF) {
-        std::stringstream ss; ss << "Invalid attribute type - " << attribute->getName();
-        throw std::runtime_error(ss.str());
-    }
-
-    const GA_Storage storage = tupleAIF->getStorage(attribute);
-
-    const int16_t width = static_cast<int16_t>(tupleAIF->getTupleSize(attribute));
-
-    if (width == 1)
-    {
-        if (storage == GA_STORE_BOOL) {
-            return TypedAttributeArray<bool>::attributeType();
-        }
-        else if (storage == GA_STORE_INT16) {
-            return TypedAttributeArray<int16_t>::attributeType();
-        }
-        else if (storage == GA_STORE_INT32) {
-            return TypedAttributeArray<int32_t>::attributeType();
-        }
-        else if (storage == GA_STORE_INT64) {
-            return TypedAttributeArray<int64_t>::attributeType();
-        }
-        else if (storage == GA_STORE_REAL16) {
-            return TypedAttributeArray<half>::attributeType();
-        }
-        else if (storage == GA_STORE_REAL32)
-        {
-            if (compression == NONE) {
-                return TypedAttributeArray<float>::attributeType();
-            }
-            else if (compression == TRUNCATE_16) {
-                return TypedAttributeArray<float, NullAttributeCodec<half> >::attributeType();
-            }
-        }
-        else if (storage == GA_STORE_REAL64) {
-            return TypedAttributeArray<double>::attributeType();
-        }
-    }
-    else if (width == 2)
-    {
-        if (storage == GA_STORE_REAL16) {
-            return TypedAttributeArray<Vec2<half> >::attributeType();
-        }
-        else if (storage == GA_STORE_REAL32)
-        {
-            return TypedAttributeArray<Vec2<float> >::attributeType();
-        }
-        else if (storage == GA_STORE_REAL64) {
-            return TypedAttributeArray<Vec2<double> >::attributeType();
-        }
-    }
-    else if (width == 3 || width == 4)
-    {
-        // note: process 4-component vectors as 3-component vectors for now
-
-        if (storage == GA_STORE_REAL16) {
-            return TypedAttributeArray<Vec3<half> >::attributeType();
-        }
-        else if (storage == GA_STORE_REAL32)
-        {
-            if (compression == NONE) {
-                return TypedAttributeArray<Vec3<float> >::attributeType();
-            }
-            else if (compression == TRUNCATE_16) {
-                return TypedAttributeArray<Vec3<float>, NullAttributeCodec<Vec3<half> > >::attributeType();
-            }
-            else if (compression == UNIT_VECTOR) {
-                return TypedAttributeArray<Vec3<float>, UnitVecAttributeCodec>::attributeType();
-            }
-        }
-        else if (storage == GA_STORE_REAL64) {
-            return TypedAttributeArray<Vec3<double> >::attributeType();
-        }
-    }
-
-    std::stringstream ss; ss << "Unknown attribute type - " << attribute->getName();
-    throw std::runtime_error(ss.str());
-}
-
 inline Name
 attrStringTypeFromGAAttribute(GA_Attribute const * attribute)
 {
     if (!attribute) {
         std::stringstream ss; ss << "Invalid attribute - " << attribute->getName();
         throw std::runtime_error(ss.str());
+    }
+
+    if (attribute->getAIFStringTuple()) {
+        return "string";
     }
 
     const GA_AIFTuple* tupleAIF = attribute->getAIFTuple();
@@ -229,26 +143,43 @@ attrStringTypeFromGAAttribute(GA_Attribute const * attribute)
     throw std::runtime_error(ss.str());
 }
 
-/// @brief Translate the default value of a GA_Defaults into default Metadata
-template <typename ValueType>
-Metadata::Ptr
-defaultMetadataFromGADefault(const GA_Defaults& defaults)
+template <typename AttributeType>
+void
+convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree, const openvdb::Name& name,
+                            const GA_Attribute* const attribute, const GA_Defaults& defaults, const int compression = 0)
 {
+    typedef typename AttributeType::ValueType ValueType;
+
     ValueType value = hvdb::evalAttrDefault<ValueType>(defaults, 0);
 
-    // return empty metadata if default is zero
-    if (math::isZero<ValueType>(value))     return Metadata::Ptr();
+    // empty metadata if default is zero
+    Metadata::Ptr defaultValue;
+    if (!math::isZero<ValueType>(value)) {
+        defaultValue = TypedMetadata<ValueType>(value).copy();
+    }
 
-    return TypedMetadata<ValueType>(value).copy();
+    appendAttribute<AttributeType, PointDataTree>(tree, name, defaultValue);
+
+    hvdbp::HoudiniReadAttribute<ValueType> houdiniAttribute(*attribute);
+    populateAttribute(tree, indexTree, name, houdiniAttribute);
 }
 
-/// @brief Translate the default value of a GA_Attribute into default Metadata
-inline Metadata::Ptr
-defaultMetadataFromGAAttribute(GA_Attribute const * attribute)
+void
+convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree,
+                            const openvdb::Name& name, const GA_Attribute* const attribute, const int compression = 0)
 {
     if (!attribute) {
         std::stringstream ss; ss << "Invalid attribute - " << attribute->getName();
         throw std::runtime_error(ss.str());
+    }
+
+    // explicitly handle string attributes
+
+    if (attribute->getAIFStringTuple()) {
+        appendAttribute<StringAttributeArray, PointDataTree>(tree, name);
+        hvdbp::HoudiniReadAttribute<openvdb::Name> houdiniAttribute(*attribute);
+        populateAttribute(tree, indexTree, name, houdiniAttribute);
+        return;
     }
 
     const GA_AIFTuple* tupleAIF = attribute->getAIFTuple();
@@ -258,46 +189,52 @@ defaultMetadataFromGAAttribute(GA_Attribute const * attribute)
         throw std::runtime_error(ss.str());
     }
 
-    const GA_Defaults& defaults = tupleAIF->getDefaults(attribute);
-
     const GA_Storage storage = tupleAIF->getStorage(attribute);
+    const GA_Defaults& defaults = tupleAIF->getDefaults(attribute);
 
     const int16_t width = static_cast<int16_t>(tupleAIF->getTupleSize(attribute));
 
     if (width == 1)
     {
         if (storage == GA_STORE_BOOL) {
-            return defaultMetadataFromGADefault<bool>(defaults);
+            convertAttributeFromHoudini<TypedAttributeArray<bool> >(tree, indexTree, name, attribute, defaults, compression);
         }
         else if (storage == GA_STORE_INT16) {
-            return defaultMetadataFromGADefault<int16_t>(defaults);
+            convertAttributeFromHoudini<TypedAttributeArray<int16_t> >(tree, indexTree, name, attribute, defaults, compression);
         }
         else if (storage == GA_STORE_INT32) {
-            return defaultMetadataFromGADefault<int32_t>(defaults);
+            convertAttributeFromHoudini<TypedAttributeArray<int32_t> >(tree, indexTree, name, attribute, defaults, compression);
         }
         else if (storage == GA_STORE_INT64) {
-            return defaultMetadataFromGADefault<int64_t>(defaults);
+            convertAttributeFromHoudini<TypedAttributeArray<int64_t> >(tree, indexTree, name, attribute, defaults, compression);
         }
         else if (storage == GA_STORE_REAL16) {
-            return defaultMetadataFromGADefault<half>(defaults);
+            convertAttributeFromHoudini<TypedAttributeArray<half> >(tree, indexTree, name, attribute, defaults, compression);
         }
-        else if (storage == GA_STORE_REAL32) {
-            return defaultMetadataFromGADefault<float>(defaults);
+        else if (storage == GA_STORE_REAL32)
+        {
+            if (compression == NONE) {
+                convertAttributeFromHoudini<TypedAttributeArray<float> >(tree, indexTree, name, attribute, defaults, compression);
+            }
+            else if (compression == TRUNCATE_16) {
+                convertAttributeFromHoudini<TypedAttributeArray<float,
+                                            NullAttributeCodec<half> > >(tree, indexTree, name, attribute, defaults, compression);
+            }
         }
         else if (storage == GA_STORE_REAL64) {
-            return defaultMetadataFromGADefault<double>(defaults);
+            convertAttributeFromHoudini<TypedAttributeArray<double> >(tree, indexTree, name, attribute, defaults, compression);
         }
     }
     else if (width == 2)
     {
         if (storage == GA_STORE_REAL16) {
-            return defaultMetadataFromGADefault<Vec2<half> >(defaults);
+            convertAttributeFromHoudini<TypedAttributeArray<Vec2<half> > >(tree, indexTree, name, attribute, defaults, compression);
         }
         else if (storage == GA_STORE_REAL32) {
-            return defaultMetadataFromGADefault<Vec2<float> >(defaults);
+            convertAttributeFromHoudini<TypedAttributeArray<Vec2<float> > >(tree, indexTree, name, attribute, defaults, compression);
         }
         else if (storage == GA_STORE_REAL64) {
-            return defaultMetadataFromGADefault<Vec2<double> >(defaults);
+            convertAttributeFromHoudini<TypedAttributeArray<Vec2<double> > >(tree, indexTree, name, attribute, defaults, compression);
         }
     }
     else if (width == 3 || width == 4)
@@ -305,19 +242,33 @@ defaultMetadataFromGAAttribute(GA_Attribute const * attribute)
         // note: process 4-component vectors as 3-component vectors for now
 
         if (storage == GA_STORE_REAL16) {
-            return defaultMetadataFromGADefault<Vec3<half> >(defaults);
+            convertAttributeFromHoudini<TypedAttributeArray<Vec3<half> > >(tree, indexTree, name, attribute, defaults, compression);
         }
-        else if (storage == GA_STORE_REAL32) {
-            return defaultMetadataFromGADefault<Vec3<float> >(defaults);
+        else if (storage == GA_STORE_REAL32)
+        {
+            if (compression == NONE) {
+                convertAttributeFromHoudini<TypedAttributeArray<Vec3<float> > >(tree, indexTree, name, attribute, defaults, compression);
+            }
+            else if (compression == TRUNCATE_16) {
+                convertAttributeFromHoudini<TypedAttributeArray<Vec3<float>,
+                                            NullAttributeCodec<Vec3<half> > > >(tree, indexTree, name, attribute, defaults, compression);
+            }
+            else if (compression == UNIT_VECTOR) {
+                convertAttributeFromHoudini<TypedAttributeArray<Vec3<float>,
+                                            UnitVecAttributeCodec> >(tree, indexTree, name, attribute, defaults, compression);
+            }
         }
         else if (storage == GA_STORE_REAL64) {
-            return defaultMetadataFromGADefault<Vec3<double> >(defaults);
+            convertAttributeFromHoudini<TypedAttributeArray<Vec3<double> > >(tree, indexTree, name, attribute, defaults, compression);
         }
     }
-
-    std::stringstream ss; ss << "Unknown attribute type - " << attribute->getName();
-    throw std::runtime_error(ss.str());
+    else
+    {
+        std::stringstream ss; ss << "Unknown attribute type - " << name;
+        throw std::runtime_error(ss.str());
+    }
 }
+
 
 ////////////////////////////////////////
 
@@ -337,6 +288,7 @@ struct AttributeInfo
 }; // struct AttributeInfo
 
 typedef std::vector<AttributeInfo> AttributeInfoVec;
+
 
 ///////////////////////////////////////
 
@@ -366,6 +318,16 @@ createPointDataGrid(const GU_Detail& ptGeo, const openvdb::NamePair& positionAtt
 
     PointIndexTree& indexTree = pointIndexGrid->tree();
     PointDataTree& tree = pointDataGrid->tree();
+    PointDataTree::LeafIter leafIter = tree.beginLeaf();
+
+    if (!leafIter)  return pointDataGrid;
+
+    // Swap with a new Descriptor to retrieve writeable Metadata
+
+    const AttributeSet::Descriptor& descriptor = leafIter->attributeSet().descriptor();
+    AttributeSet::Descriptor::Ptr newDescriptor(new AttributeSet::Descriptor(descriptor));
+    MetaMap& metadata = newDescriptor->getMetadata();
+    leafIter->resetDescriptor(newDescriptor);
 
     // Append (empty) groups to tree
 
@@ -426,72 +388,23 @@ createPointDataGrid(const GU_Detail& ptGeo, const openvdb::NamePair& positionAtt
 
         if (!gaAttribute)             continue;
 
-        // Append the new attribute to the PointDataGrid
-        AttributeSet::Util::NameAndType nameAndType(name,
-                                attrTypeFromGAAttribute(gaAttribute, compression));
-        Metadata::Ptr defaultMetadata = defaultMetadataFromGAAttribute(gaAttribute);
+        const GA_AIFSharedStringTuple* sharedStringTupleAIF = gaAttribute->getAIFSharedStringTuple();
+        const bool isString = bool(sharedStringTupleAIF);
 
-        appendAttribute(tree, nameAndType, defaultMetadata);
+        // Extract all the string values from the string table and insert them
+        // into the Descriptor Metadata
+        if (isString)
+        {
+            // Iterate over the strings in the table and insert them into the Metadata
+            StringMetaInserter inserter(metadata);
+            for (GA_AIFSharedStringTuple::iterator  it = sharedStringTupleAIF->begin(gaAttribute),
+                                                    itEnd = sharedStringTupleAIF->end(); !(it == itEnd); ++it) {
 
-        const openvdb::Name type = nameAndType.type.first;
+                inserter.insert(Name(it.getString()));
+            }
+        }
 
-        hvdbp::OffsetListPtr offsets;
-
-        if (type == "bool") {
-            hvdbp::HoudiniReadAttribute<bool> attribute(*gaAttribute, offsets);
-            populateAttribute(tree, indexTree, name, attribute);
-        }
-        else if (type == "int16") {
-            hvdbp::HoudiniReadAttribute<int16_t> attribute(*gaAttribute, offsets);
-            populateAttribute(tree, indexTree, name, attribute);
-        }
-        else if (type == "int32") {
-            hvdbp::HoudiniReadAttribute<int32_t> attribute(*gaAttribute, offsets);
-            populateAttribute(tree, indexTree, name, attribute);
-        }
-        else if (type == "int64") {
-            hvdbp::HoudiniReadAttribute<int64_t> attribute(*gaAttribute, offsets);
-            populateAttribute(tree, indexTree, name, attribute);
-        }
-        else if (type == "half") {
-            hvdbp::HoudiniReadAttribute<half> attribute(*gaAttribute, offsets);
-            populateAttribute(tree, indexTree, name, attribute);
-        }
-        else if (type == "float") {
-            hvdbp::HoudiniReadAttribute<float> attribute(*gaAttribute, offsets);
-            populateAttribute(tree, indexTree, name, attribute);
-        }
-        else if (type == "double") {
-            hvdbp::HoudiniReadAttribute<double> attribute(*gaAttribute, offsets);
-            populateAttribute(tree, indexTree, name, attribute);
-        }
-        else if (type == "vec2h") {
-            hvdbp::HoudiniReadAttribute<Vec2<half> > attribute(*gaAttribute, offsets);
-            populateAttribute(tree, indexTree, name, attribute);
-        }
-        else if (type == "vec2s") {
-            hvdbp::HoudiniReadAttribute<Vec2<float> > attribute(*gaAttribute, offsets);
-            populateAttribute(tree, indexTree, name, attribute);
-        }
-        else if (type == "vec2d") {
-            hvdbp::HoudiniReadAttribute<Vec2<double> > attribute(*gaAttribute, offsets);
-            populateAttribute(tree, indexTree, name, attribute);
-        }
-        else if (type == "vec3h") {
-            hvdbp::HoudiniReadAttribute<Vec3<half> > attribute(*gaAttribute, offsets);
-            populateAttribute(tree, indexTree, name, attribute);
-        }
-        else if (type == "vec3s") {
-            hvdbp::HoudiniReadAttribute<Vec3<float> > attribute(*gaAttribute, offsets);
-            populateAttribute(tree, indexTree, name, attribute);
-        }
-        else if (type == "vec3d") {
-            hvdbp::HoudiniReadAttribute<Vec3<double> > attribute(*gaAttribute, offsets);
-            populateAttribute(tree, indexTree, name, attribute);
-        }
-        else {
-            throw std::runtime_error("Unknown Attribute Type for Conversion: " + type);
-        }
+        convertAttributeFromHoudini(tree, indexTree, name, gaAttribute, compression);
     }
 
     // Attempt to compact attributes

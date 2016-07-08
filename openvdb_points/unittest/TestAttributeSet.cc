@@ -331,11 +331,6 @@ TestAttributeSet::testAttributeSetDescriptor()
         Descriptor::NameAndType invalidAttr("test1!", AttributeS::attributeType());
         CPPUNIT_ASSERT_THROW(descr->duplicateAppend(invalidAttr), openvdb::RuntimeError);
 
-        Descriptor::Inserter names;
-        names.add(invalidAttr);
-        CPPUNIT_ASSERT_THROW(Descriptor::create(names.vec), openvdb::RuntimeError);
-        CPPUNIT_ASSERT_THROW(descr->duplicateAppend(names.vec), openvdb::RuntimeError);
-
         const openvdb::Index64 offset(0);
         const openvdb::Index64 zeroLength(0);
         const openvdb::Index64 oneLength(1);
@@ -585,8 +580,7 @@ TestAttributeSet::testAttributeSet()
         attrSetB.makeUnique(0);
         attrSetB.makeUnique(1);
 
-        Descriptor::NameAndTypeVec newAttributes;
-        newAttributes.push_back(Descriptor::NameAndType("test", AttributeS::attributeType()));
+        Descriptor::NameAndType nameAndType("test", AttributeS::attributeType());
 
         Descriptor::Ptr targetDescr = Descriptor::create(Descriptor::Inserter()
             .add("pos", AttributeVec3s::attributeType())
@@ -594,7 +588,7 @@ TestAttributeSet::testAttributeSet()
             .add("test", AttributeS::attributeType())
             .vec);
 
-        Descriptor::Ptr descrB = attrSetB.descriptor().duplicateAppend(newAttributes);
+        Descriptor::Ptr descrB = attrSetB.descriptor().duplicateAppend(nameAndType);
 
         openvdb::TypedMetadata<AttributeS::ValueType> defaultValueTest(5);
 
@@ -630,7 +624,7 @@ TestAttributeSet::testAttributeSet()
             attrSetC.makeUnique(0);
             attrSetC.makeUnique(1);
 
-            attrSetC.appendAttribute(newAttributes[0], defaultValueTest.copy());
+            attrSetC.appendAttribute<AttributeS>("test", defaultValueTest.copy());
 
             CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *descrB));
         }
@@ -640,7 +634,7 @@ TestAttributeSet::testAttributeSet()
             attrSetC.makeUnique(0);
             attrSetC.makeUnique(1);
 
-            attrSetC.appendAttribute(newAttributes[0], attrSetC.descriptor(), descrB);
+            attrSetC.appendAttribute<AttributeS>(attrSetC.descriptor(), descrB);
 
             CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
         }
