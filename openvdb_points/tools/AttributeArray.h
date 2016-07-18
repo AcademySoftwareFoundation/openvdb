@@ -612,13 +612,6 @@ public:
 }; // class AttributeWriteHandle
 
 
-typedef AttributeHandle<float> AttributeHandleROF;
-typedef AttributeWriteHandle<float> AttributeHandleRWF;
-
-typedef AttributeHandle<Vec3f> AttributeHandleROVec3f;
-typedef AttributeWriteHandle<Vec3f> AttributeHandleRWVec3f;
-
-
 ////////////////////////////////////////
 
 

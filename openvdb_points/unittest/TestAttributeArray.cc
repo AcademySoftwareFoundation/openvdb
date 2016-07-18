@@ -879,7 +879,7 @@ TestAttributeArray::testAttributeHandle()
     {
         AttributeArray* array = attrSet.get(0);
 
-        AttributeHandleRWVec3f handle(*array);
+        AttributeWriteHandle<Vec3f> handle(*array);
 
         handle.set(5, Vec3f(10));
 
@@ -891,7 +891,7 @@ TestAttributeArray::testAttributeHandle()
 
         array->compress();
 
-        AttributeHandleRWF handle(*array);
+        AttributeWriteHandle<float> handle(*array);
 
         handle.set(6, float(11));
 
@@ -905,7 +905,7 @@ TestAttributeArray::testAttributeHandle()
         CPPUNIT_ASSERT(array->isCompressed());
 
         {
-            AttributeHandleROF handleRO(*array);
+            AttributeHandle<float> handleRO(*array);
 
             CPPUNIT_ASSERT(array->isCompressed());
 
@@ -917,7 +917,7 @@ TestAttributeArray::testAttributeHandle()
         CPPUNIT_ASSERT(array->isCompressed());
 
         {
-            AttributeHandleROF handleRO(*array, /*preserveCompression=*/false);
+            AttributeHandle<float> handleRO(*array, /*preserveCompression=*/false);
 
             // AttributeHandle uncompresses data on construction
 
