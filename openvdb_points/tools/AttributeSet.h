@@ -80,10 +80,11 @@ public:
     {
         /// Attribute and type name pair.
         struct NameAndType {
-            NameAndType(const std::string& n, const NamePair& t)
-                : name(n), type(t) {}
+            NameAndType(const std::string& n, const NamePair& t, const Index s = 1)
+                : name(n), type(t), stride(s) {}
             Name name;
             NamePair type;
+            Index stride;
         };
 
         typedef std::vector<NameAndType> NameAndTypeVec;
@@ -180,13 +181,15 @@ public:
     /// Append attribute @a attribute (simple method)
     template <typename AttributeType>
     AttributeArray::Ptr appendAttribute(const Name& name,
+                                        const Index stride = 1,
                                         Metadata::Ptr defaultValue = Metadata::Ptr());
 
     /// Append attribute @a attribute (descriptor-sharing)
     /// Requires current descriptor to match @a expected
     /// On append, current descriptor is replaced with @a replacement
     template <typename AttributeType>
-    AttributeArray::Ptr appendAttribute(const Descriptor& expected, DescriptorPtr& replacement);
+    AttributeArray::Ptr appendAttribute(const Descriptor& expected, DescriptorPtr& replacement,
+                                        const Index stride = 1);
 
     /// Drop attributes with @a pos indices (simple method)
     /// Creates a new descriptor for this attribute set
@@ -406,6 +409,7 @@ size_t AttributeSet::Descriptor::count() const
 template <typename AttributeType>
 AttributeArray::Ptr
 AttributeSet::appendAttribute(  const Name& name,
+                                const Index stride,
                                 Metadata::Ptr defaultValue)
 {
     AttributeSet::Util::NameAndType nameAndType(name, AttributeType::attributeType());
@@ -415,13 +419,13 @@ AttributeSet::appendAttribute(  const Name& name,
     // store the attribute default value in the descriptor metadata
     if (defaultValue)   descriptor->setDefaultValue(name, *defaultValue);
 
-    return this->appendAttribute<AttributeType>(*mDescr, descriptor);
+    return this->appendAttribute<AttributeType>(*mDescr, descriptor, stride);
 }
 
 
 template <typename AttributeType>
 AttributeArray::Ptr
-AttributeSet::appendAttribute(const Descriptor& expected, DescriptorPtr& replacement)
+AttributeSet::appendAttribute(const Descriptor& expected, DescriptorPtr& replacement, const Index stride)
 {
     // ensure the descriptor is as expected
     if (*mDescr != expected) {
@@ -440,7 +444,7 @@ AttributeSet::appendAttribute(const Descriptor& expected, DescriptorPtr& replace
 
     // append the new array
 
-    AttributeArray::Ptr array = AttributeType::create(arrayLength);
+    AttributeArray::Ptr array = AttributeType::create(arrayLength, stride);
 
     mAttrs.push_back(array);
 

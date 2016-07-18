@@ -114,6 +114,7 @@ public:
     CPPUNIT_TEST(testRegistry);
     CPPUNIT_TEST(testAttributeArray);
     CPPUNIT_TEST(testAttributeHandle);
+    CPPUNIT_TEST(testStrided);
     CPPUNIT_TEST(testDelayedLoad);
     CPPUNIT_TEST(testProfile);
 
@@ -124,6 +125,7 @@ public:
     void testRegistry();
     void testAttributeArray();
     void testAttributeHandle();
+    void testStrided();
     void testDelayedLoad();
     void testProfile();
 }; // class TestAttributeArray
@@ -206,8 +208,8 @@ TestAttributeArray::testFixedPointConversion()
 
 namespace {
 
-static AttributeArray::Ptr factory1(size_t) { return AttributeArray::Ptr(); }
-static AttributeArray::Ptr factory2(size_t) { return AttributeArray::Ptr(); }
+static AttributeArray::Ptr factory1(size_t, Index) { return AttributeArray::Ptr(); }
+static AttributeArray::Ptr factory2(size_t, Index) { return AttributeArray::Ptr(); }
 
 } // namespace
 
@@ -957,6 +959,155 @@ TestAttributeArray::testAttributeHandle()
 }
 
 void
+TestAttributeArray::testStrided()
+{
+    typedef openvdb::tools::TypedAttributeArray<int> AttributeArrayI;
+    typedef AttributeHandle<int> NonStridedHandle;
+    typedef AttributeHandle<int, /*Strided=*/true> StridedHandle;
+    typedef AttributeWriteHandle<int, /*Strided=*/true> StridedWriteHandle;
+    typedef AttributeHandle<int, /*Strided=*/true, /*Interleaved=*/true> InterleavedHandle;
+    typedef AttributeWriteHandle<int, /*Strided=*/true, /*Interleaved=*/true> InterleavedWriteHandle;
+
+    { // non-strided array
+        AttributeArrayI::Ptr array = AttributeArrayI::create(/*n=*/2, /*stride=*/1);
+        CPPUNIT_ASSERT(!array->isStrided());
+        CPPUNIT_ASSERT_EQUAL(array->stride(), Index(1));
+        CPPUNIT_ASSERT_EQUAL(array->size(), size_t(2));
+        // cannot create a StridedAttributeHandle with a stride of 1
+        CPPUNIT_ASSERT_THROW(StridedHandle::create(*array), openvdb::TypeError);
+        CPPUNIT_ASSERT_THROW(StridedWriteHandle::create(*array), openvdb::TypeError);
+    }
+
+    { // strided array
+        AttributeArrayI::Ptr array = AttributeArrayI::create(/*n=*/2, /*stride=*/3);
+
+        CPPUNIT_ASSERT(array->isStrided());
+        CPPUNIT_ASSERT_EQUAL(array->stride(), Index(3));
+        CPPUNIT_ASSERT_EQUAL(array->size(), size_t(2));
+        CPPUNIT_ASSERT(array->isUniform());
+
+        CPPUNIT_ASSERT_EQUAL(array->get(0), 0);
+        CPPUNIT_ASSERT_EQUAL(array->get(5), 0);
+        CPPUNIT_ASSERT_THROW(array->get(6), IndexError); // out-of-range
+
+        // cannot create a non-strided AttributeHandle for a strided array
+        CPPUNIT_ASSERT_THROW(NonStridedHandle::create(*array), TypeError);
+        CPPUNIT_ASSERT_THROW(InterleavedHandle::create(*array), TypeError);
+        CPPUNIT_ASSERT_THROW(InterleavedWriteHandle::create(*array), TypeError);
+        CPPUNIT_ASSERT_NO_THROW(StridedHandle::create(*array));
+        CPPUNIT_ASSERT_NO_THROW(StridedWriteHandle::create(*array));
+
+        array->collapse(10);
+
+        CPPUNIT_ASSERT_EQUAL(array->get(0), int(10));
+        CPPUNIT_ASSERT_EQUAL(array->get(5), int(10));
+
+        array->expand();
+
+        CPPUNIT_ASSERT_EQUAL(array->get(0), int(10));
+        CPPUNIT_ASSERT_EQUAL(array->get(5), int(10));
+
+        array->collapse(0);
+
+        CPPUNIT_ASSERT_EQUAL(array->get(0), int(0));
+        CPPUNIT_ASSERT_EQUAL(array->get(5), int(0));
+
+        StridedWriteHandle writeHandle(*array);
+
+        writeHandle.set(0, 2, 5);
+        writeHandle.set(1, 1, 10);
+
+        CPPUNIT_ASSERT_EQUAL(writeHandle.stride(), Index(3));
+        CPPUNIT_ASSERT_EQUAL(writeHandle.size(), size_t(2));
+
+        // non-interleaved: 0 0 5 0 10 0
+
+        CPPUNIT_ASSERT_EQUAL(array->get(2), 5);
+        CPPUNIT_ASSERT_EQUAL(array->get(4), 10);
+
+        CPPUNIT_ASSERT_EQUAL(writeHandle.get(0, 2), 5);
+        CPPUNIT_ASSERT_EQUAL(writeHandle.get(1, 1), 10);
+
+        StridedHandle handle(*array);
+
+        CPPUNIT_ASSERT_EQUAL(handle.get(0, 2), 5);
+        CPPUNIT_ASSERT_EQUAL(handle.get(1, 1), 10);
+
+        CPPUNIT_ASSERT_EQUAL(handle.stride(), Index(3));
+        CPPUNIT_ASSERT_EQUAL(handle.size(), size_t(2));
+
+#ifdef OPENVDB_2_ABI_COMPATIBLE
+        size_t arrayMem = 48;
+#else
+        size_t arrayMem = 64;
+#endif
+
+        CPPUNIT_ASSERT_EQUAL(array->memUsage(), sizeof(int) * /*size*/3 * /*stride*/2 + arrayMem);
+    }
+
+    { // strided, interleaved array
+        AttributeArrayI::Ptr array = AttributeArrayI::create(/*n=*/2, /*stride=*/3);
+        array->setInterleaved(true);
+
+        CPPUNIT_ASSERT(array->isStrided());
+        CPPUNIT_ASSERT(array->isInterleaved());
+        CPPUNIT_ASSERT_EQUAL(array->stride(), Index(3));
+        CPPUNIT_ASSERT_EQUAL(array->size(), size_t(2));
+        CPPUNIT_ASSERT(array->isUniform());
+
+        array->setInterleaved(false);
+
+        CPPUNIT_ASSERT(!array->isInterleaved());
+
+        array->setInterleaved(true);
+
+        CPPUNIT_ASSERT_EQUAL(array->get(0), 0);
+        CPPUNIT_ASSERT_EQUAL(array->get(5), 0);
+        CPPUNIT_ASSERT_THROW(array->get(6), IndexError); // out-of-range
+
+        CPPUNIT_ASSERT_EQUAL(array->get(4), 0);
+        CPPUNIT_ASSERT_EQUAL(array->get(3), 0);
+
+        CPPUNIT_ASSERT_THROW(StridedHandle::create(*array), TypeError);
+        CPPUNIT_ASSERT_THROW(StridedWriteHandle::create(*array), TypeError);
+        CPPUNIT_ASSERT_NO_THROW(InterleavedHandle::create(*array));
+        CPPUNIT_ASSERT_NO_THROW(InterleavedWriteHandle::create(*array));
+
+        InterleavedWriteHandle writeHandle(*array);
+
+        CPPUNIT_ASSERT_EQUAL(array->get(4), 0);
+        CPPUNIT_ASSERT_EQUAL(array->get(3), 0);
+
+        CPPUNIT_ASSERT_EQUAL(array->get(4), 0);
+        CPPUNIT_ASSERT_EQUAL(array->get(3), 0);
+
+        writeHandle.set(0, 2, 5);
+        writeHandle.set(1, 1, 10);
+
+        // interleaved: 0 0 0 10 5 0
+
+        CPPUNIT_ASSERT_EQUAL(array->get(4), 5);
+        CPPUNIT_ASSERT_EQUAL(array->get(3), 10);
+
+        CPPUNIT_ASSERT_EQUAL(writeHandle.get(0, 2), 5);
+        CPPUNIT_ASSERT_EQUAL(writeHandle.get(1, 1), 10);
+
+        InterleavedHandle handle(*array);
+
+        CPPUNIT_ASSERT_EQUAL(handle.get(0, 2), 5);
+        CPPUNIT_ASSERT_EQUAL(handle.get(1, 1), 10);
+
+#ifdef OPENVDB_2_ABI_COMPATIBLE
+        size_t arrayMem = 48;
+#else
+        size_t arrayMem = 64;
+#endif
+
+        CPPUNIT_ASSERT_EQUAL(array->memUsage(), sizeof(int) * /*size*/3 * /*stride*/2 + arrayMem);
+    }
+}
+
+void
 TestAttributeArray::testDelayedLoad()
 {
     using namespace openvdb;
@@ -1022,6 +1173,30 @@ TestAttributeArray::testDelayedLoad()
 
             for (unsigned i = 0; i < unsigned(count); ++i) {
                 CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrB.get(i));
+            }
+        }
+
+        // read in using delayed load and check fill()
+        {
+            AttributeArrayI attrB;
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            attrB.read(filein);
+
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+            CPPUNIT_ASSERT(attrB.isOutOfCore());
+#endif
+
+            CPPUNIT_ASSERT(!attrB.isUniform());
+
+            attrB.fill(5);
+
+            CPPUNIT_ASSERT(!attrB.isOutOfCore());
+
+            for (unsigned i = 0; i < unsigned(count); ++i) {
+                CPPUNIT_ASSERT_EQUAL(5, attrB.get(i));
             }
         }
 
@@ -1158,10 +1333,90 @@ TestAttributeArray::testDelayedLoad()
         std::remove(mappedFile->filename().c_str());
         std::remove(filename.c_str());
 
-        // write out compressed attribute array to a temp file
+        AttributeArrayI attrUniform(count);
+
+        // write out uniform attribute array to a temp file
         {
             std::ofstream fileout;
             filename = tempDir + "/openvdb_delayed2";
+            fileout.open(filename.c_str());
+            io::setDataCompression(fileout, io::COMPRESS_BLOSC);
+
+            attrUniform.write(fileout);
+
+            fileout.close();
+        }
+
+        // abuse File being a friend of MappedFile to get around the private constructor
+
+        proxy = new ProxyMappedFile(filename);
+        mappedFile.reset(reinterpret_cast<io::MappedFile*>(proxy));
+
+        // read in using delayed load and check fill()
+        {
+            AttributeArrayI attrB;
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            attrB.read(filein);
+
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+            CPPUNIT_ASSERT(attrB.isOutOfCore());
+#endif
+
+            CPPUNIT_ASSERT(attrB.isUniform());
+
+            attrB.fill(5);
+
+            CPPUNIT_ASSERT(attrB.isUniform());
+
+            CPPUNIT_ASSERT(!attrB.isOutOfCore());
+
+            for (unsigned i = 0; i < unsigned(count); ++i) {
+                CPPUNIT_ASSERT_EQUAL(5, attrB.get(i));
+            }
+        }
+
+        AttributeArrayI attrStrided(count, /*stride=*/3);
+
+        CPPUNIT_ASSERT(attrStrided.isStrided());
+        CPPUNIT_ASSERT_EQUAL(attrStrided.stride(), Index(3));
+
+        // write out strided attribute array to a temp file
+        {
+            std::ofstream fileout;
+            filename = tempDir + "/openvdb_delayed3";
+            fileout.open(filename.c_str());
+            io::setDataCompression(fileout, io::COMPRESS_BLOSC);
+
+            attrStrided.write(fileout);
+
+            fileout.close();
+        }
+
+        // abuse File being a friend of MappedFile to get around the private constructor
+
+        proxy = new ProxyMappedFile(filename);
+        mappedFile.reset(reinterpret_cast<io::MappedFile*>(proxy));
+
+        // read in using delayed load and check fill()
+        {
+            AttributeArrayI attrB;
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            attrB.read(filein);
+
+            CPPUNIT_ASSERT(attrB.isStrided());
+            CPPUNIT_ASSERT_EQUAL(attrB.stride(), Index(3));
+        }
+
+        // write out compressed attribute array to a temp file
+        {
+            std::ofstream fileout;
+            filename = tempDir + "/openvdb_delayed4";
             fileout.open(filename.c_str());
             io::setDataCompression(fileout, io::COMPRESS_BLOSC);
 

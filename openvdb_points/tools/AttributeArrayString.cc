@@ -265,7 +265,7 @@ void StringAttributeWriteHandle::fill(const Name& name)
 void StringAttributeWriteHandle::set(Index n, const Name& name)
 {
     Index index = getIndex(name);
-    mWriteHandle.set(n, index);
+    mWriteHandle.set(n, /*stride*/0, index);
 }
 
 

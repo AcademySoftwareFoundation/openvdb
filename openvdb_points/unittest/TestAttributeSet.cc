@@ -624,7 +624,7 @@ TestAttributeSet::testAttributeSet()
             attrSetC.makeUnique(0);
             attrSetC.makeUnique(1);
 
-            attrSetC.appendAttribute<AttributeS>("test", defaultValueTest.copy());
+            attrSetC.appendAttribute<AttributeS>("test", /*stride=*/1, defaultValueTest.copy());
 
             CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *descrB));
         }
