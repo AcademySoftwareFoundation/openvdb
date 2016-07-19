@@ -47,6 +47,8 @@ Version 3.2.0 - In development
     - Added the math::CoordBBox::Iterator class to conveniently iterate over
       coordinates covered a CoordBBox.
     - Added bit-wise operations to the CoordBBox class.
+    - New component wise constructor for the math::CoordBBox class as well as the
+      method math::CoordBBox::getCornerPoints.
     - Added a new LeafManager constructor to create the structure from an
       existing array of leafnodes.
     - Added the templated math::MinMax class to compute the extrema of
@@ -129,6 +131,8 @@ Version 3.2.0 - In development
       [Reported by Jeff Lait]
     - Corrected empty grid background value in tools::meshToVolume().
       [Contributed by Jeff Lait]
+    - Fixed a bug in tools::volumeToMesh that could produce NaNs.
+      [Reported by Rick Hankins]
 
     API changes:
     - Deprecated math::Mat3::setBasis and math::Mat4::setBasis.
@@ -174,6 +178,9 @@ Version 3.2.0 - In development
     - Fixed a bug in the Ray SOP whereby the distance attribute was created
       with the wrong data type.
       [Contributed by Nick Avramoussis]
+    - The From Polygon SOP now allows the user the either specify the voxel 
+      count along an axis or the voxel size in world units (the only option
+      in the past).
 
 Version 3.1.0 - October 1, 2015
 

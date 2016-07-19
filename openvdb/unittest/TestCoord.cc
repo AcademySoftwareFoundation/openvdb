@@ -62,6 +62,8 @@ TestCoord::testCoord()
     Coord xyz2 = -xyz;
     CPPUNIT_ASSERT_EQUAL(Coord(1, -2, -4), xyz2);
 
+    CPPUNIT_ASSERT_EQUAL(Coord(1, 2, 4), openvdb::math::Abs(xyz));
+
     xyz2 = -xyz2;
     CPPUNIT_ASSERT_EQUAL(xyz, xyz2);
 
@@ -144,6 +146,13 @@ TestCoord::testCoordBBox()
     {// Construct bbox from min and max
         const openvdb::Coord min(-1,-2,30), max(20,30,55);
         openvdb::CoordBBox b(min, max);
+        CPPUNIT_ASSERT_EQUAL(min, b.min());
+        CPPUNIT_ASSERT_EQUAL(max, b.max());
+    }
+    {// Construct bbox from components of min and max
+        const openvdb::Coord min(-1,-2,30), max(20,30,55);
+        openvdb::CoordBBox b(min[0], min[1], min[2],
+                             max[0], max[1], max[2]);
         CPPUNIT_ASSERT_EQUAL(min, b.min());
         CPPUNIT_ASSERT_EQUAL(max, b.max());
     }
@@ -325,6 +334,24 @@ TestCoord::testCoordBBox()
         CPPUNIT_ASSERT_EQUAL(openvdb::CoordBBox(min<<1,max<<1), b<<1UL);
         CPPUNIT_ASSERT_EQUAL(openvdb::CoordBBox(min&1,max&1), b&1);
         CPPUNIT_ASSERT_EQUAL(openvdb::CoordBBox(min|1,max|1), b|1);
+    }
+
+    {// test getCornerPoints
+        const openvdb::CoordBBox bbox(1, 2, 3, 4, 5, 6);
+        openvdb::Coord a[10];
+        bbox.getCornerPoints(a);
+        //for (int i=0; i<8; ++i) { 
+        //    std::cerr << "#"<<i<<" = ("<<a[i][0]<<","<<a[i][1]<<","<<a[i][2]<<")\n";
+        //}
+        CPPUNIT_ASSERT_EQUAL( a[0], openvdb::Coord(1, 2, 3) );
+        CPPUNIT_ASSERT_EQUAL( a[1], openvdb::Coord(1, 2, 6) );
+        CPPUNIT_ASSERT_EQUAL( a[2], openvdb::Coord(1, 5, 3) );
+        CPPUNIT_ASSERT_EQUAL( a[3], openvdb::Coord(1, 5, 6) );
+        CPPUNIT_ASSERT_EQUAL( a[4], openvdb::Coord(4, 2, 3) );
+        CPPUNIT_ASSERT_EQUAL( a[5], openvdb::Coord(4, 2, 6) );
+        CPPUNIT_ASSERT_EQUAL( a[6], openvdb::Coord(4, 5, 3) );
+        CPPUNIT_ASSERT_EQUAL( a[7], openvdb::Coord(4, 5, 6) );
+        for (int i=1; i<8; ++i) CPPUNIT_ASSERT( a[i-1] < a[i] );
     }
 }
 

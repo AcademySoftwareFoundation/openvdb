@@ -64,7 +64,11 @@ New features:
   @vdblink::tools::Dense Dense@endlink grid class.
 - Added the @vdblink::math::CoordBBox::Iterator CoordBBox::Iterator@endlink
   class to conveniently iterate over coordinates covered a CoordBBox.
-- Added bit-wise operations to the @vdblink::math::CoordBBox CoordBBox@endlink class.
+- Added bit-wise operations to the @vdblink::math::CoordBBox CoordBBox@endlink
+  class.
+- New component wise constructor for the @vdblink::math::CoordBBox
+  CoordBBox@endlink class as well as the method
+  @vdblink::math::CoordBBox::getCornerPoints CoordBBox::getCornerPoints@endlink. 
 - Added a new @vdblink::tree::LeafManager LeafManager@endlink constructor to
   create the structure from an existing array of leafnodes.
 - Added active tile count to @vdblink::tree::Tree::print Tree::print@endlink.
@@ -176,6 +180,8 @@ Bug fixes:
 - Corrected empty grid background value in
   @vdblink::tools::meshToVolume() mesh-to-volume converter@endlink
   <I>[Contributed by Jeff&nbsp;Lait]</I>
+- Fixed a bug in @vdblink::tools::volumeToMesh volume-to-mesh converter@endlink
+  that could produce NaNs.<I>[Reported by Rick Hankins]</I>
 
 @par
 API changes:
@@ -225,6 +231,9 @@ Houdini:
   <I>[Contributed by Fredrik&nbsp;Salomonsson]</I>
 - Fixed a bug in the Ray SOP whereby the distance attribute was created
   with the wrong data type. <I>[Contributed by Nick&nbsp;Avramoussis]</I>
+- The From Polygon SOP now allows the user the either specify the voxel 
+  count along an axis or the voxel size in world units (the only option
+  in the past).
 
 
 @htmlonly <a name="v3_1_0_changes"></a>@endhtmlonly

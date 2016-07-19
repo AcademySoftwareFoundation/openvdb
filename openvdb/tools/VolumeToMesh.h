@@ -47,6 +47,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/type_traits/is_scalar.hpp>
 #include <boost/utility/enable_if.hpp>
+#include <boost/math/special_functions/fpclassify.hpp> // for isfinite
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
@@ -1684,6 +1685,16 @@ ComputePoints<InputTreeType>::operator()(const tbb::blocked_range<size_t>& range
             for (size_t i = 0, I = points.size(); i < I; ++i) {
 
                 Vec3d& point = points[i];
+
+                // Checks for both NaN and inf vertex positions, i.e. any value that is not finite.
+                if (!boost::math::isfinite(point[0]) ||
+                    !boost::math::isfinite(point[1]) ||
+                    !boost::math::isfinite(point[2])) {
+                    OPENVDB_THROW(ValueError, "VolumeToMesh encountered NaNs or infs in the input VDB!"
+                                  " Hint: Check the input and consider using the \"Diagnostics\" tool "
+                                  "to detect and resolve the NaNs.");
+                }
+                
                 point += xyz;
                 point = mTransform.indexToWorld(point);
 

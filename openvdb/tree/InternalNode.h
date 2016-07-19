@@ -31,8 +31,6 @@
 /// @file InternalNode.h
 ///
 /// @brief Internal table nodes for OpenVDB trees
-///
-/// @todo Multi-thred topologyDifference
 
 #ifndef OPENVDB_TREE_INTERNALNODE_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_INTERNALNODE_HAS_BEEN_INCLUDED

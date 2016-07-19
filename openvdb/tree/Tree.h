@@ -29,6 +29,8 @@
 ///////////////////////////////////////////////////////////////////////////
 //
 /// @file tree/Tree.h
+///
+/// @todo Optimize Tree::evalMinMax
 
 #ifndef OPENVDB_TREE_TREE_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_TREE_HAS_BEEN_INCLUDED

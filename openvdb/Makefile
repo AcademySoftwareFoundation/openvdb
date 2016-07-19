@@ -166,7 +166,7 @@ BOOST_PYTHON_LIB := -lboost_python-gcc41-mt-python26-1_46_1
 NUMPY_INCL_DIR := /rel/map/generic-2013.22/include
 # The Epydoc executable
 # (leave blank if Epydoc is unavailable)
-EPYDOC := epydoc
+EPYDOC := /rel/map/generic_default-2014.24.237/bin/epydoc
 # Set PYTHON_WRAP_ALL_GRID_TYPES to "yes" to specify that the Python module
 # should expose (almost) all of the grid types defined in openvdb.h
 # Otherwise, only FloatGrid, BoolGrid and Vec3SGrid will be exposed
@@ -249,6 +249,8 @@ endif
 ifeq (yes,$(has_log4cplus))
     INCLDIRS += -isystem $(LOG4CPLUS_INCL_DIR)
 endif
+
+CXXFLAGS += -std=c++0x
 
 CXXFLAGS += -pthread $(OPTIMIZE) $(INCLDIRS)
 ifeq (yes,$(has_blosc))

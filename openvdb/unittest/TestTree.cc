@@ -596,6 +596,39 @@ evalMinMaxTest<openvdb::StringTree>()
     CPPUNIT_ASSERT_EQUAL(pangolin, maxVal);
 }
 
+/// Specialization for Coord trees
+template<>
+void
+evalMinMaxTest<openvdb::Coord>()
+{
+    typedef openvdb::tree::Tree4<openvdb::Coord,5,4,3>::Type  CoordTree;
+    const openvdb::Coord backg(5,4,-6), a(5,4,-7), b(5,5,-6);
+
+    CoordTree tree(backg);
+
+    // No set voxels (defaults to min = max = zero)
+    openvdb::Coord minVal=openvdb::Coord::max(), maxVal=openvdb::Coord::min();
+    tree.evalMinMax(minVal, maxVal);
+    CPPUNIT_ASSERT_EQUAL(openvdb::Coord(0), minVal);
+    CPPUNIT_ASSERT_EQUAL(openvdb::Coord(0), maxVal);
+
+    // Only one set voxel
+    tree.setValue(openvdb::Coord(0, 0, 0), a);
+    minVal=openvdb::Coord::max();
+    maxVal=openvdb::Coord::min();
+    tree.evalMinMax(minVal, maxVal);
+    CPPUNIT_ASSERT_EQUAL(a, minVal);
+    CPPUNIT_ASSERT_EQUAL(a, maxVal);
+
+    // Multiple set voxels
+    tree.setValue(openvdb::Coord(-10, -10, -10), b);
+    minVal=openvdb::Coord::max();
+    maxVal=openvdb::Coord::min();
+    tree.evalMinMax(minVal, maxVal);
+    CPPUNIT_ASSERT_EQUAL(a, minVal);
+    CPPUNIT_ASSERT_EQUAL(b, maxVal);
+}    
+
 } // unnamed namespace
 
 void
@@ -607,6 +640,7 @@ TestTree::testEvalMinMax()
     evalMinMaxTest<openvdb::Vec3STree>();
     evalMinMaxTest<openvdb::Vec2ITree>();
     evalMinMaxTest<openvdb::StringTree>();
+    evalMinMaxTest<openvdb::Coord>();
 }
 
 
