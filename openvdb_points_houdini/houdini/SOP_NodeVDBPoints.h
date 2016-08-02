@@ -40,6 +40,7 @@
 
 #include <openvdb/openvdb.h>
 #include <openvdb/Platform.h>
+#include <openvdb_points/tools/AttributeArrayString.h>
 #include <openvdb_points/tools/PointDataGrid.h>
 #include <openvdb_points/tools/PointCount.h>
 
@@ -269,7 +270,7 @@ public:
             for (AttributeSet::Descriptor::ConstIterator it = nameToPosMap.begin(), it_end = nameToPosMap.end();
                     it != it_end; ++it) {
                 const openvdb::tools::AttributeArray& array = iter->attributeArray(it->second);
-                if (openvdb::tools::GroupAttributeArray::isGroup(array))    continue;
+                if (isGroup(array))    continue;
 
                 if (first) {
                     first = false;
@@ -279,14 +280,20 @@ public:
                 }
                 const openvdb::NamePair& type = descriptor->type(it->second);
 
+                const openvdb::Name valueType = type.first;
+                const openvdb::Name codecType = type.second;
+
                 // if no value compression, hide the codec from the middle-click output
 
-                if (boost::starts_with(type.second, "null_") &&
-                    boost::ends_with(type.second, type.first)) {
-                    infoStr << it->first << "[" << type.first << "]";
+                if (   boost::starts_with(codecType, "null_") &&
+                            boost::ends_with(codecType, valueType)) {
+                    infoStr << it->first << "[" << valueType << "]";
+                }
+                else if (isString(array)) {
+                    infoStr << it->first << "[str]";
                 }
                 else {
-                    infoStr << it->first << "[" << type.first << "_" << type.second << "]";
+                    infoStr << it->first << "[" << valueType << "_" << codecType << "]";
                 }
             }
 

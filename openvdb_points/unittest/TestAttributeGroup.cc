@@ -97,31 +97,24 @@ TestAttributeGroup::testAttributeGroup()
 
         CPPUNIT_ASSERT(!attr.isTransient());
         CPPUNIT_ASSERT(!attr.isHidden());
-        CPPUNIT_ASSERT(attr.isGroup());
+        CPPUNIT_ASSERT(isGroup(attr));
 
         attr.setTransient(true);
         CPPUNIT_ASSERT(attr.isTransient());
         CPPUNIT_ASSERT(!attr.isHidden());
-        CPPUNIT_ASSERT(attr.isGroup());
+        CPPUNIT_ASSERT(isGroup(attr));
 
         attr.setHidden(true);
         CPPUNIT_ASSERT(attr.isTransient());
         CPPUNIT_ASSERT(attr.isHidden());
-        CPPUNIT_ASSERT(attr.isGroup());
+        CPPUNIT_ASSERT(isGroup(attr));
 
         attr.setTransient(false);
         CPPUNIT_ASSERT(!attr.isTransient());
         CPPUNIT_ASSERT(attr.isHidden());
-        CPPUNIT_ASSERT(attr.isGroup());
-
-        attr.setGroup(false);
-        CPPUNIT_ASSERT(!attr.isTransient());
-        CPPUNIT_ASSERT(attr.isHidden());
-        CPPUNIT_ASSERT(!attr.isGroup());
+        CPPUNIT_ASSERT(isGroup(attr));
 
         GroupAttributeArray attrB(attr);
-
-        attr.setGroup(true);
 
         CPPUNIT_ASSERT(matchingNamePairs(attr.type(), attrB.type()));
         CPPUNIT_ASSERT_EQUAL(attr.size(), attrB.size());
@@ -129,7 +122,7 @@ TestAttributeGroup::testAttributeGroup()
         CPPUNIT_ASSERT_EQUAL(attr.isUniform(), attrB.isUniform());
         CPPUNIT_ASSERT_EQUAL(attr.isTransient(), attrB.isTransient());
         CPPUNIT_ASSERT_EQUAL(attr.isHidden(), attrB.isHidden());
-        CPPUNIT_ASSERT_EQUAL(attr.isGroup(), attrB.isGroup());
+        CPPUNIT_ASSERT_EQUAL(isGroup(attr), isGroup(attrB));
     }
 
     { // casting
@@ -157,7 +150,6 @@ TestAttributeGroup::testAttributeGroup()
         }
 
         attrA.setHidden(true);
-        attrA.setGroup(true);
 
         std::ostringstream ostr(std::ios_base::binary);
         attrA.write(ostr);
@@ -173,7 +165,7 @@ TestAttributeGroup::testAttributeGroup()
         CPPUNIT_ASSERT_EQUAL(attrA.isUniform(), attrB.isUniform());
         CPPUNIT_ASSERT_EQUAL(attrA.isTransient(), attrB.isTransient());
         CPPUNIT_ASSERT_EQUAL(attrA.isHidden(), attrB.isHidden());
-        CPPUNIT_ASSERT_EQUAL(attrA.isGroup(), attrB.isGroup());
+        CPPUNIT_ASSERT_EQUAL(isGroup(attrA), isGroup(attrB));
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
             CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrB.get(i));
@@ -189,7 +181,6 @@ TestAttributeGroup::testAttributeGroupHandle()
     using namespace openvdb::tools;
 
     GroupAttributeArray attr(4);
-    attr.setGroup(true);
     GroupHandle handle(attr, 3);
 
     CPPUNIT_ASSERT_EQUAL(handle.size(), (unsigned long) 4);
@@ -388,7 +379,6 @@ TestAttributeGroup::testAttributeGroupFilter()
     typedef FilterIndexIter<IndexIter, GroupFilter> IndexGroupAllIter;
 
     GroupAttributeArray attrGroup(4);
-    attrGroup.setGroup(true);
     const Index32 size = attrGroup.size();
 
     { // group values all zero

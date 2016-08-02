@@ -331,11 +331,6 @@ TestAttributeSet::testAttributeSetDescriptor()
         Descriptor::NameAndType invalidAttr("test1!", AttributeS::attributeType());
         CPPUNIT_ASSERT_THROW(descr->duplicateAppend(invalidAttr), openvdb::RuntimeError);
 
-        Descriptor::Inserter names;
-        names.add(invalidAttr);
-        CPPUNIT_ASSERT_THROW(Descriptor::create(names.vec), openvdb::RuntimeError);
-        CPPUNIT_ASSERT_THROW(descr->duplicateAppend(names.vec), openvdb::RuntimeError);
-
         const openvdb::Index64 offset(0);
         const openvdb::Index64 zeroLength(0);
         const openvdb::Index64 oneLength(1);
@@ -585,8 +580,7 @@ TestAttributeSet::testAttributeSet()
         attrSetB.makeUnique(0);
         attrSetB.makeUnique(1);
 
-        Descriptor::NameAndTypeVec newAttributes;
-        newAttributes.push_back(Descriptor::NameAndType("test", AttributeS::attributeType()));
+        Descriptor::NameAndType nameAndType("test", AttributeS::attributeType());
 
         Descriptor::Ptr targetDescr = Descriptor::create(Descriptor::Inserter()
             .add("pos", AttributeVec3s::attributeType())
@@ -594,7 +588,7 @@ TestAttributeSet::testAttributeSet()
             .add("test", AttributeS::attributeType())
             .vec);
 
-        Descriptor::Ptr descrB = attrSetB.descriptor().duplicateAppend(newAttributes);
+        Descriptor::Ptr descrB = attrSetB.descriptor().duplicateAppend(nameAndType);
 
         openvdb::TypedMetadata<AttributeS::ValueType> defaultValueTest(5);
 
@@ -630,7 +624,7 @@ TestAttributeSet::testAttributeSet()
             attrSetC.makeUnique(0);
             attrSetC.makeUnique(1);
 
-            attrSetC.appendAttribute(newAttributes[0], defaultValueTest.copy());
+            attrSetC.appendAttribute<AttributeS>("test", defaultValueTest.copy());
 
             CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *descrB));
         }
@@ -640,7 +634,7 @@ TestAttributeSet::testAttributeSet()
             attrSetC.makeUnique(0);
             attrSetC.makeUnique(1);
 
-            attrSetC.appendAttribute(newAttributes[0], attrSetC.descriptor(), descrB);
+            attrSetC.appendAttribute<AttributeS>(attrSetC.descriptor(), descrB);
 
             CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
         }
@@ -835,25 +829,6 @@ TestAttributeSet::testAttributeSet()
     openvdb::MetaMap& meta = attrSetA.descriptor().getMetadata();
     meta.insertMeta("exampleMeta", openvdb::FloatMetadata(2.0));
 
-    { // flag size test
-        Descriptor::Ptr descr = Descriptor::create(Descriptor::Inserter()
-            .add("hidden1", AttributeI::attributeType())
-            .add("group1", GroupAttributeArray::attributeType())
-            .add("hidden2", AttributeI::attributeType())
-            .vec);
-
-        AttributeSet attrSet(descr);
-
-        GroupAttributeArray::cast(*attrSet.get("group1")).setGroup(true);
-
-        attrSet.get("hidden1")->setHidden(true);
-        attrSet.get("hidden2")->setHidden(true);
-
-        CPPUNIT_ASSERT_EQUAL(attrSet.size(AttributeArray::TRANSIENT), size_t(0));
-        CPPUNIT_ASSERT_EQUAL(attrSet.size(AttributeArray::GROUP), size_t(1));
-        CPPUNIT_ASSERT_EQUAL(attrSet.size(AttributeArray::HIDDEN), size_t(2));
-    }
-
     { // I/O test
         std::ostringstream ostr(std::ios_base::binary);
         attrSetA.write(ostr);
@@ -933,10 +908,6 @@ TestAttributeSet::testAttributeSetGroups()
             .vec);
 
         AttributeSet attrSet(descr);
-
-        GroupAttributeArray::cast(*attrSet.get("group1")).setGroup(true);
-        GroupAttributeArray::cast(*attrSet.get("group2")).setGroup(true);
-        GroupAttributeArray::cast(*attrSet.get("group3")).setGroup(true);
 
         std::stringstream ss;
         for (int i = 0; i < 17; i++) {

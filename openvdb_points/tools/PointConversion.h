@@ -43,6 +43,7 @@
 
 #include <openvdb/tools/PointIndexGrid.h>
 
+#include <openvdb_points/tools/AttributeArrayString.h>
 #include <openvdb_points/tools/AttributeSet.h>
 #include <openvdb_points/tools/IndexFilter.h>
 #include <openvdb_points/tools/PointDataGrid.h>
@@ -212,6 +213,44 @@ private:
 
 namespace point_conversion_internal {
 
+
+// ConversionTraits to create the relevant Attribute Handles from a LeafNode
+template <typename T> struct ConversionTraits
+{
+    typedef AttributeHandle<T> Handle;
+    typedef AttributeWriteHandle<T> WriteHandle;
+    static T zero() { return T(0); }
+    template <typename LeafT>
+    static typename Handle::Ptr handleFromLeaf(LeafT& leaf, Index index) {
+        const AttributeArray& array = leaf.constAttributeArray(index);
+        return Handle::create(array);
+    }
+    template <typename LeafT>
+    static typename WriteHandle::Ptr writeHandleFromLeaf(LeafT& leaf, Index index) {
+        AttributeArray& array = leaf.attributeArray(index);
+        return WriteHandle::create(array);
+    }
+}; // ConversionTraits
+template <> struct ConversionTraits<openvdb::Name>
+{
+    typedef StringAttributeHandle Handle;
+    typedef StringAttributeWriteHandle WriteHandle;
+    static openvdb::Name zero() { return ""; }
+    template <typename LeafT>
+    static typename Handle::Ptr handleFromLeaf(LeafT& leaf, Index index) {
+        const AttributeArray& array = leaf.constAttributeArray(index);
+        const AttributeSet::Descriptor& descriptor = leaf.attributeSet().descriptor();
+        return Handle::create(array, descriptor.getMetadata());
+    }
+    template <typename LeafT>
+    static typename WriteHandle::Ptr writeHandleFromLeaf(LeafT& leaf, Index index) {
+        AttributeArray& array = leaf.attributeArray(index);
+        const AttributeSet::Descriptor& descriptor = leaf.attributeSet().descriptor();
+        return WriteHandle::create(array, descriptor.getMetadata());
+    }
+}; // ConversionTraits<openvdb::Name>
+
+
 template<typename PointDataTreeType, typename PointIndexTreeType>
 struct InitialiseAttributesOp {
 
@@ -324,20 +363,19 @@ template<   typename PointDataTreeType,
             typename AttributeListType>
 struct PopulateAttributeOp {
 
-    typedef typename tree::LeafManager<PointDataTreeType> LeafManagerT;
-    typedef typename LeafManagerT::LeafRange LeafRangeT;
-
-    typedef typename PointIndexTreeType::LeafNodeType PointIndexLeafNode;
-    typedef typename PointIndexLeafNode::IndexArray IndexArray;
-
-    typedef typename AttributeListType::value_type ValueType;
+    typedef typename tree::LeafManager<PointDataTreeType>       LeafManagerT;
+    typedef typename LeafManagerT::LeafRange                    LeafRangeT;
+    typedef typename PointIndexTreeType::LeafNodeType           PointIndexLeafNode;
+    typedef typename PointIndexLeafNode::IndexArray             IndexArray;
+    typedef typename AttributeListType::value_type              ValueType;
+    typedef typename ConversionTraits<ValueType>::WriteHandle   HandleT;
 
     PopulateAttributeOp(const PointIndexTreeType& pointIndexTree,
                         const AttributeListType& data,
-                        const openvdb::Name& attributeName)
+                        const size_t index)
         : mPointIndexTree(pointIndexTree)
         , mData(data)
-        , mAttributeName(attributeName) { }
+        , mIndex(index) { }
 
     void operator()(const typename LeafManagerT::LeafRange& range) const {
 
@@ -349,8 +387,7 @@ struct PopulateAttributeOp {
 
             if (!pointIndexLeaf)    continue;
 
-            typename AttributeWriteHandle<ValueType>::Ptr attributeWriteHandle =
-                AttributeWriteHandle<ValueType>::create(leaf->attributeArray(mAttributeName));
+            typename HandleT::Ptr attributeWriteHandle = ConversionTraits<ValueType>::writeHandleFromLeaf(*leaf, mIndex);
 
             Index64 index = 0;
 
@@ -376,7 +413,7 @@ struct PopulateAttributeOp {
 
     const PointIndexTreeType&   mPointIndexTree;
     const AttributeListType&    mData;
-    const openvdb::Name&        mAttributeName;
+    const size_t                mIndex;
 };
 
 template<typename PointDataTreeType, typename Attribute>
@@ -466,12 +503,14 @@ struct ConvertPointDataGridPositionOp {
     const bool                              mInCoreOnly;
 }; // ConvertPointDataGridPositionOp
 
+
 template<typename PointDataTreeType, typename Attribute>
 struct ConvertPointDataGridAttributeOp {
 
     typedef typename PointDataTreeType::LeafNodeType            LeafNode;
     typedef typename LeafNode::IndexOnIter                      IndexOnIter;
     typedef typename Attribute::ValueType                       ValueType;
+    typedef typename ConversionTraits<ValueType>::Handle        HandleT;
     typedef typename tree::LeafManager<const PointDataTreeType> LeafManagerT;
     typedef typename LeafManagerT::LeafRange                    LeafRangeT;
 
@@ -508,11 +547,12 @@ struct ConvertPointDataGridAttributeOp {
 
             if (leaf.pos() > 0)     offset += mPointOffsets[leaf.pos() - 1];
 
-            typename AttributeHandle<ValueType>::Ptr handle =
-                    AttributeHandle<ValueType>::create(leaf->template constAttributeArray(mIndex));
+            typename HandleT::Ptr handle = ConversionTraits<ValueType>::handleFromLeaf(*leaf, mIndex);
 
             const bool uniform = handle->isUniform();
-            ValueType uniformValue = uniform ? ValueType(handle->get(0)) : ValueType(0);
+
+            ValueType uniformValue = ConversionTraits<ValueType>::zero();
+            if (uniform)    uniformValue = ValueType(handle->get(0));
 
             IndexOnIter iter = leaf->beginIndexOn();
 
@@ -601,7 +641,7 @@ struct ConvertPointDataGridGroupOp {
             const AttributeArray& array = leaf->constAttributeArray(mIndex.first);
             const GroupType bitmask = GroupType(1) << mIndex.second;
 
-            assert(GroupAttributeArray::isGroup(array));
+            assert(isGroup(array));
 
             const GroupAttributeArray& groupArray = GroupAttributeArray::cast(array);
 
@@ -749,11 +789,21 @@ populateAttribute(  PointDataTreeT& tree, const PointIndexTreeT& pointIndexTree,
 {
     using point_conversion_internal::PopulateAttributeOp;
 
+    typename PointDataTreeT::LeafCIter iter = tree.cbeginLeaf();
+
+    if (!iter)  return;
+
+    const size_t index = iter->attributeSet().find(attributeName);
+
+    if (index == AttributeSet::INVALID_POS) {
+        OPENVDB_THROW(KeyError, "Attribute not found to populate - " << attributeName << ".");
+    }
+
     // populate attribute
 
     PopulateAttributeOp<PointDataTreeT,
                         PointIndexTreeT,
-                        PointArrayT> populate(pointIndexTree, data, attributeName);
+                        PointArrayT> populate(pointIndexTree, data, index);
 
     tbb::parallel_for(typename tree::template LeafManager<PointDataTree>(tree).leafRange(), populate);
 }

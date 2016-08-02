@@ -123,18 +123,6 @@ AttributeSet::memUsage() const
 
 
 size_t
-AttributeSet::size(const uint16_t flag) const
-{
-    size_t count = 0;
-    for (AttrArrayVec::const_iterator   it = mAttrs.begin(),
-                                        itEnd = mAttrs.end(); it != itEnd; ++it) {
-        if ((*it)->flags() & flag)  count++;
-    }
-    return count;
-}
-
-
-size_t
 AttributeSet::find(const std::string& name) const
 {
     return mDescr->find(name);
@@ -234,7 +222,7 @@ AttributeSet::groupOffset(const Util::GroupIndex& index) const
         OPENVDB_THROW(LookupError, "Out of range group index.")
     }
 
-    if (!GroupAttributeArray::isGroup(*mAttrs[index.first])) {
+    if (!isGroup(*mAttrs[index.first])) {
         OPENVDB_THROW(LookupError, "Group index invalid.")
     }
 
@@ -242,7 +230,7 @@ AttributeSet::groupOffset(const Util::GroupIndex& index) const
 
     size_t relativeIndex = 0;
     for (unsigned i = 0; i < mAttrs.size(); i++) {
-        if (i < index.first && GroupAttributeArray::isGroup(*mAttrs[i]))    relativeIndex++;
+        if (i < index.first && isGroup(*mAttrs[i]))    relativeIndex++;
     }
 
     const size_t GROUP_BITS = sizeof(GroupType) * CHAR_BIT;
@@ -271,7 +259,7 @@ AttributeSet::groupIndex(const size_t offset) const
 
     std::vector<unsigned> groups;
     for (unsigned i = 0; i < mAttrs.size(); i++) {
-        if (GroupAttributeArray::isGroup(*mAttrs[i]))      groups.push_back(i);
+        if (isGroup(*mAttrs[i]))      groups.push_back(i);
     }
 
     if (offset >= groups.size() * GROUP_BITS) {
@@ -309,51 +297,6 @@ AttributeSet::makeUnique(size_t pos)
     if (!mAttrs[pos].unique()) {
         mAttrs[pos] = mAttrs[pos]->copy();
     }
-}
-
-
-AttributeArray::Ptr
-AttributeSet::appendAttribute(  const Descriptor::NameAndType& attribute,
-                                Metadata::Ptr defaultValue)
-{
-    Descriptor::NameAndTypeVec vec;
-    vec.push_back(attribute);
-
-    Descriptor::Ptr descriptor = mDescr->duplicateAppend(vec);
-
-    // store the attribute default value in the descriptor metadata
-    if (defaultValue)   descriptor->setDefaultValue(attribute.name, *defaultValue);
-
-    return this->appendAttribute(attribute, *mDescr, descriptor);
-}
-
-
-AttributeArray::Ptr
-AttributeSet::appendAttribute(const Descriptor::NameAndType& attribute,
-                              const Descriptor& expected, DescriptorPtr& replacement)
-{
-    // ensure the descriptor is as expected
-    if (*mDescr != expected) {
-        OPENVDB_THROW(LookupError, "Cannot append attributes as descriptors do not match.")
-    }
-
-    const size_t offset = mDescr->size();
-
-    mDescr = replacement;
-
-    assert(mDescr->size() >= offset);
-
-    // extract the array length from the first attribute array if it exists
-
-    const size_t arrayLength = offset > 0 ? this->get(0)->size() : 1;
-
-    // append the new array
-
-    AttributeArray::Ptr array = AttributeArray::create(attribute.type, arrayLength);
-
-    mAttrs.push_back(array);
-
-    return array;
 }
 
 
@@ -830,17 +773,6 @@ AttributeSet::Descriptor::duplicateAppend(const NameAndType& attribute) const
     return Descriptor::create(attributes.vec, mGroupMap, mMetadata);
 }
 
-
-AttributeSet::Descriptor::Ptr
-AttributeSet::Descriptor::duplicateAppend(const NameAndTypeVec& vec) const
-{
-    Inserter attributes;
-
-    this->appendTo(attributes.vec);
-    attributes.add(vec);
-
-    return Descriptor::create(attributes.vec, mGroupMap, mMetadata);
-}
 
 AttributeSet::Descriptor::Ptr
 AttributeSet::Descriptor::duplicateDrop(const std::vector<size_t>& pos) const

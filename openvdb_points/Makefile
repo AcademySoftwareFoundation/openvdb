@@ -237,6 +237,7 @@ endif
 
 INCLUDE_NAMES := \
     tools/AttributeArray.h \
+    tools/AttributeArrayString.h \
     tools/AttributeGroup.h \
     tools/AttributeSet.h \
     tools/IndexFilter.h \
@@ -254,6 +255,7 @@ INCLUDE_NAMES := \
 
 SRC_NAMES := \
     tools/AttributeArray.cc \
+    tools/AttributeArrayString.cc \
     tools/AttributeGroup.cc \
     tools/AttributeSet.cc \
     openvdb.cc \
@@ -267,6 +269,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestIndexFilter.cc \
     unittest/TestIndexIterator.cc \
     unittest/TestAttributeArray.cc \
+    unittest/TestAttributeArrayString.cc \
     unittest/TestAttributeSet.cc \
     unittest/TestAttributeGroup.cc \
     unittest/TestPointAttribute.cc \
