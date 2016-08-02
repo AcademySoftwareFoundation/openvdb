@@ -327,13 +327,13 @@ ALL_TARGETS := \
 
 .SUFFIXES: .o .cc
 
-.PHONY: all clean depend houdinisops install
+.PHONY: all clean depend houdinisops mantradsos install
 
 .cc.o:
 	@echo "Building $@ because of $(call list_deps)"
 	$(CXX) -c $(CXXFLAGS) -fPIC -o $@ $<
 
-all: depend houdinisops
+all: depend houdinisops mantradsos
 
 # Create an openvdb_points_houdini/ symlink to the houdini/ subdirectory,
 # to mirror the DWA directory structure.
