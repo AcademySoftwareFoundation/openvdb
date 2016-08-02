@@ -81,12 +81,8 @@ TestPointCount::testCount()
 
     // add a new leaf to a tree and re-test
 
-    LeafType* leafPtr = new LeafType(openvdb::Coord(0, 0, 0));
+    LeafType* leafPtr = tree.touchLeaf(openvdb::Coord(0, 0, 0));
     LeafType& leaf(*leafPtr);
-
-    // on adding, tree now obtains ownership and is reponsible for deletion
-
-    tree.addLeaf(leaf);
 
     CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(0));
 
@@ -173,12 +169,10 @@ TestPointCount::testCount()
 
     // add a new non-empty leaf and check totalPointCount is correct
 
-    LeafType* leaf2Ptr = new LeafType(openvdb::Coord(0, 0, 8));
+    LeafType* leaf2Ptr = tree.touchLeaf(openvdb::Coord(0, 0, 8));
     LeafType& leaf2(*leaf2Ptr);
 
     // on adding, tree now obtains ownership and is reponsible for deletion
-
-    tree.addLeaf(leaf2);
 
     for (unsigned int i = 0; i < LeafType::SIZE; i++) {
         leaf2.setOffsetOn(i, i);
