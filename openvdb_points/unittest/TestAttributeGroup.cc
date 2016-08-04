@@ -32,6 +32,8 @@
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb_points/tools/AttributeArray.h>
 #include <openvdb_points/tools/AttributeGroup.h>
+#include <openvdb_points/tools/IndexIterator.h>
+#include <openvdb_points/tools/IndexFilter.h>
 
 #include <openvdb_points/openvdb.h>
 #include <openvdb/openvdb.h>
@@ -376,13 +378,13 @@ TestAttributeGroup::testAttributeGroupFilter()
     using namespace openvdb;
     using namespace openvdb::tools;
 
-    typedef FilterIndexIter<IndexIter, GroupFilter> IndexGroupAllIter;
+    typedef IndexIter<ValueVoxelCIter, GroupFilter> IndexGroupAllIter;
 
     GroupAttributeArray attrGroup(4);
     const Index32 size = attrGroup.size();
 
     { // group values all zero
-        IndexIter indexIter(0, size);
+        ValueVoxelCIter indexIter(0, size);
         GroupFilter filter(GroupHandle(attrGroup, 0));
         IndexGroupAllIter iter(indexIter, filter);
 
@@ -398,7 +400,7 @@ TestAttributeGroup::testAttributeGroupFilter()
 
     // index iterator only valid in groups 3 and 6
     {
-        IndexIter indexIter(0, size);
+        ValueVoxelCIter indexIter(0, size);
 
         CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 0))));
         CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 1))));
@@ -413,11 +415,11 @@ TestAttributeGroup::testAttributeGroupFilter()
     attrGroup.set(1, bitmask);
     attrGroup.set(3, bitmask);
 
-    typedef FilterIndexIter<IndexIter, GroupNotFilter> IndexNotGroupAllIter;
+    typedef IndexIter<ValueVoxelCIter, GroupNotFilter> IndexNotGroupAllIter;
 
     // index iterator only not valid in groups 3 and 6
     {
-        IndexIter indexIter(0, size);
+        ValueVoxelCIter indexIter(0, size);
 
         CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 0))));
         CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 1))));
@@ -434,7 +436,7 @@ TestAttributeGroup::testAttributeGroupFilter()
     attrGroup.set(3, GroupType(0));
 
     { // index in group next
-        IndexIter indexIter(0, size);
+        ValueVoxelCIter indexIter(0, size);
         IndexGroupAllIter iter(indexIter, GroupFilter(GroupHandle(attrGroup, 3)));
 
         CPPUNIT_ASSERT(iter);
@@ -447,7 +449,7 @@ TestAttributeGroup::testAttributeGroupFilter()
     }
 
     { // index in group prefix ++
-        IndexIter indexIter(0, size);
+        ValueVoxelCIter indexIter(0, size);
         IndexGroupAllIter iter(indexIter, GroupFilter(GroupHandle(attrGroup, 3)));
 
         CPPUNIT_ASSERT(iter);
@@ -461,7 +463,7 @@ TestAttributeGroup::testAttributeGroupFilter()
     }
 
     { // index in group postfix ++/--
-        IndexIter indexIter(0, size);
+        ValueVoxelCIter indexIter(0, size);
         IndexGroupAllIter iter(indexIter, GroupFilter(GroupHandle(attrGroup, 3)));
 
         CPPUNIT_ASSERT(iter);
@@ -475,7 +477,7 @@ TestAttributeGroup::testAttributeGroupFilter()
     }
 
     { // index not in group next
-        IndexIter indexIter(0, size);
+        ValueVoxelCIter indexIter(0, size);
         IndexNotGroupAllIter iter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 3)));
 
         CPPUNIT_ASSERT(iter);
@@ -488,7 +490,7 @@ TestAttributeGroup::testAttributeGroupFilter()
     }
 
     { // index not in group prefix ++
-        IndexIter indexIter(0, size);
+        ValueVoxelCIter indexIter(0, size);
         IndexNotGroupAllIter iter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 3)));
 
         CPPUNIT_ASSERT(iter);
@@ -502,7 +504,7 @@ TestAttributeGroup::testAttributeGroupFilter()
     }
 
     { // index not in group postfix ++
-        IndexIter indexIter(0, size);
+        ValueVoxelCIter indexIter(0, size);
         IndexNotGroupAllIter iter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 3)));
 
         CPPUNIT_ASSERT(iter);

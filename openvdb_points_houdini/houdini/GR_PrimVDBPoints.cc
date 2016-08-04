@@ -400,31 +400,24 @@ struct FillGPUBuffersPosition {
 
             openvdb::Index64 offset = 0;
 
-            for (typename LeafNode::ValueOnCIter value=leaf->cbeginValueOn(); value; ++value) {
+            if (useGroup) {
+                GroupFilter::Data data(mGroupName);
 
-                openvdb::Coord ijk = value.getCoord();
+                IndexIter<typename LeafNode::ValueOnCIter, GroupFilter> iter = leaf->template beginIndexOn<GroupFilter>(data);
 
-                const openvdb::Vec3f gridIndexSpace = ijk.asVec3d();
-
-                openvdb::tools::IndexIter iter = leaf->beginIndex(ijk);
-
-                if (useGroup) {
-                    const GroupFilter filter = GroupFilter::create(*leaf, GroupFilter::Data(mGroupName));
-                    openvdb::tools::FilterIndexIter<openvdb::tools::IndexIter, GroupFilter> filterIndexIter(iter, filter);
-
-                    for (; filterIndexIter; ++filterIndexIter)
-                    {
-                        if (!uniform)   positionVoxelSpace = handle->get(openvdb::Index64(*filterIndexIter));
-                        mBuffer[leafOffset + offset++] = voxelSpaceToUTVector(positionVoxelSpace, gridIndexSpace, mTransform);
-                    }
+                for (; iter; ++iter)
+                {
+                    if (!uniform)   positionVoxelSpace = handle->get(openvdb::Index64(*iter));
+                    mBuffer[leafOffset + offset++] = voxelSpaceToUTVector(positionVoxelSpace, iter.getCoord().asVec3d(), mTransform);
                 }
-                else {
+            }
+            else {
+                typename LeafNode::IndexOnIter iter = leaf->beginIndexOn();
 
-                    for (; iter; ++iter)
-                    {
-                        if (!uniform)   positionVoxelSpace = handle->get(openvdb::Index64(*iter));
-                        mBuffer[leafOffset + offset++] = voxelSpaceToUTVector(positionVoxelSpace, gridIndexSpace, mTransform);
-                    }
+                for (; iter; ++iter)
+                {
+                    if (!uniform)   positionVoxelSpace = handle->get(openvdb::Index64(*iter));
+                    mBuffer[leafOffset + offset++] = voxelSpaceToUTVector(positionVoxelSpace, iter.getCoord().asVec3d(), mTransform);
                 }
             }
         }
@@ -481,19 +474,14 @@ struct FillGPUBuffersVec3 {
 
             openvdb::Index64 offset = 0;
 
-            for (typename LeafNode::ValueOnCIter value=leaf->cbeginValueOn(); value; ++value) {
+            typename LeafNode::IndexOnIter iter = leaf->beginIndexOn();
 
-                openvdb::Coord ijk = value.getCoord();
+            for (; iter; ++iter)
+            {
+                if (!uniform)   color = handle->get(*iter);
+                mBuffer[leafOffset + offset] = HoudiniBufferType(color.x(), color.y(), color.z());
 
-                openvdb::tools::IndexIter iter = leaf->beginIndex(ijk);
-
-                for (; iter; ++iter)
-                {
-                    if (!uniform)   color = handle->get(*iter);
-                    mBuffer[leafOffset + offset] = HoudiniBufferType(color.x(), color.y(), color.z());
-
-                    offset++;
-                }
+                offset++;
             }
         }
     }
@@ -553,22 +541,18 @@ struct FillGPUBuffersId {
 
             openvdb::Index64 offset = 0;
 
-            for (typename LeafNode::ValueOnCIter value=leaf->cbeginValueOn(); value; ++value) {
 
-                openvdb::Coord ijk = value.getCoord();
+            typename LeafNode::IndexOnIter iter = leaf->beginIndexOn();
 
-                openvdb::tools::IndexIter iter = leaf->beginIndex(ijk);
-
-                for (; iter; ++iter)
-                {
-                    if (!uniform) {
-                        const long id = handle->get(*iter);
-                        scalarValue = id <= maxId ? HoudiniBufferType(id) : HoudiniBufferType(0);
-                    }
-                    mBuffer[leafOffset + offset] = scalarValue;
-
-                    offset++;
+            for (; iter; ++iter)
+            {
+                if (!uniform) {
+                    const long id = handle->get(*iter);
+                    scalarValue = id <= maxId ? HoudiniBufferType(id) : HoudiniBufferType(0);
                 }
+                mBuffer[leafOffset + offset] = scalarValue;
+
+                offset++;
             }
         }
     }

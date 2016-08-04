@@ -47,14 +47,12 @@ class TestIndexIterator: public CppUnit::TestCase
 {
 public:
     CPPUNIT_TEST_SUITE(TestIndexIterator);
-    CPPUNIT_TEST(testIndexIterator);
     CPPUNIT_TEST(testValueIndexIterator);
     CPPUNIT_TEST(testFilterIndexIterator);
     CPPUNIT_TEST(testProfile);
 
     CPPUNIT_TEST_SUITE_END();
 
-    void testIndexIterator();
     void testValueIndexIterator();
     void testFilterIndexIterator();
     void testProfile();
@@ -65,96 +63,6 @@ CPPUNIT_TEST_SUITE_REGISTRATION(TestIndexIterator);
 
 ////////////////////////////////////////
 
-
-void
-TestIndexIterator::testIndexIterator()
-{
-    using namespace openvdb;
-    using namespace openvdb::tools;
-
-    { // empty iterator
-        IndexIter iter;
-
-        CPPUNIT_ASSERT(!iter);
-        CPPUNIT_ASSERT(!iter.next());
-    }
-
-    { // throw on attempt to retrieve coord
-        IndexIter iter(0, 3);
-
-        CPPUNIT_ASSERT_THROW(iter.getCoord(), openvdb::RuntimeError);
-        openvdb::Coord xyz;
-        CPPUNIT_ASSERT_THROW(iter.getCoord(xyz), openvdb::RuntimeError);
-    }
-
-    { // index iterator next
-        IndexIter iter(0, 3);
-
-        CPPUNIT_ASSERT(iter);
-        CPPUNIT_ASSERT_EQUAL(*iter, Index32(0));
-
-        CPPUNIT_ASSERT(iter.next());
-        CPPUNIT_ASSERT_EQUAL(*iter, Index32(1));
-
-        CPPUNIT_ASSERT(iter.next());
-        CPPUNIT_ASSERT_EQUAL(*iter, Index32(2));
-
-        CPPUNIT_ASSERT(!iter.next());
-    }
-
-    { // index iterator prefix ++
-        IndexIter iter(0, 3);
-        IndexIter old;
-
-        CPPUNIT_ASSERT(iter);
-        CPPUNIT_ASSERT_EQUAL(*iter, Index32(0));
-
-        old = ++iter;
-        CPPUNIT_ASSERT_EQUAL(*old, Index32(1));
-        CPPUNIT_ASSERT_EQUAL(*iter, Index32(1));
-
-        old = ++iter;
-        CPPUNIT_ASSERT_EQUAL(*old, Index32(2));
-        CPPUNIT_ASSERT_EQUAL(*iter, Index32(2));
-
-        CPPUNIT_ASSERT(!iter.next());
-    }
-
-    { // index iterator postfix ++
-        IndexIter iter(0, 3);
-        IndexIter old;
-
-        CPPUNIT_ASSERT(iter);
-        CPPUNIT_ASSERT_EQUAL(*iter, Index32(0));
-
-        old = iter++;
-        CPPUNIT_ASSERT_EQUAL(*old, Index32(0));
-        CPPUNIT_ASSERT_EQUAL(*iter, Index32(1));
-
-        old = iter++;
-        CPPUNIT_ASSERT_EQUAL(*old, Index32(1));
-        CPPUNIT_ASSERT_EQUAL(*iter, Index32(2));
-
-        CPPUNIT_ASSERT(!iter.next());
-    }
-
-    { // overflow iterator ++
-        IndexIter iter;
-
-        iter++;
-        iter++;
-
-        CPPUNIT_ASSERT(!iter);
-    }
-
-    { // index iterator equality
-        IndexIter iter(0, 5);
-
-        CPPUNIT_ASSERT(iter == IndexIter(0, 3));
-        CPPUNIT_ASSERT(iter != IndexIter(1, 3));
-        CPPUNIT_ASSERT(iter == IndexIter(0, 4));
-    }
-}
 
 void
 TestIndexIterator::testValueIndexIterator()
@@ -176,14 +84,14 @@ TestIndexIterator::testValueIndexIterator()
 
         ValueOnIter valueIter = leafNode.beginValueOn();
 
-        ValueIndexIter<ValueOnIter> iter(valueIter);
+        IndexIter<ValueOnIter, NullFilter>::ValueIndexIter iter(valueIter);
 
         CPPUNIT_ASSERT(iter);
 
         CPPUNIT_ASSERT_EQUAL(iterCount(iter), Index64(size));
 
         // check assignment operator
-        ValueIndexIter<ValueOnIter> iter2 = iter;
+        IndexIter<ValueOnIter, NullFilter>::ValueIndexIter iter2 = iter;
         CPPUNIT_ASSERT_EQUAL(iterCount(iter2), Index64(size));
 
         ++iter;
@@ -196,7 +104,7 @@ TestIndexIterator::testValueIndexIterator()
 
         // check iterators retrieval
         CPPUNIT_ASSERT_EQUAL(iter.valueIter().getCoord(), openvdb::Coord(0, 0, 1));
-        CPPUNIT_ASSERT_EQUAL(iter.indexIter().end(), Index32(2));
+        CPPUNIT_ASSERT_EQUAL(iter.end(), Index32(2));
 
         ++iter;
 
@@ -207,7 +115,7 @@ TestIndexIterator::testValueIndexIterator()
 
         // check iterators retrieval
         CPPUNIT_ASSERT_EQUAL(iter.valueIter().getCoord(), openvdb::Coord(0, 1, 0));
-        CPPUNIT_ASSERT_EQUAL(iter.indexIter().end(), Index32(3));
+        CPPUNIT_ASSERT_EQUAL(iter.end(), Index32(3));
     }
 
     { // one per even voxel offsets, only these active
@@ -228,7 +136,7 @@ TestIndexIterator::testValueIndexIterator()
         {
             ValueOnIter valueIter = leafNode.beginValueOn();
 
-            ValueIndexIter<ValueOnIter> iter(valueIter);
+            IndexIter<ValueOnIter, NullFilter>::ValueIndexIter iter(valueIter);
 
             CPPUNIT_ASSERT(iter);
 
@@ -254,7 +162,7 @@ TestIndexIterator::testValueIndexIterator()
         {
             ValueOnIter valueIter = leafNode.beginValueOn();
 
-            ValueIndexIter<ValueOnIter> iter(valueIter);
+            IndexIter<ValueOnIter, NullFilter>::ValueIndexIter iter(valueIter);
 
             CPPUNIT_ASSERT(iter);
 
@@ -280,7 +188,7 @@ TestIndexIterator::testValueIndexIterator()
         {
             ValueOnIter valueIter = leafNode.beginValueOn();
 
-            ValueIndexIter<ValueOnIter> iter(valueIter);
+            IndexIter<ValueOnIter, NullFilter>::ValueIndexIter iter(valueIter);
 
             CPPUNIT_ASSERT(iter);
 
@@ -297,7 +205,7 @@ TestIndexIterator::testValueIndexIterator()
 
         ValueOnIter valueIter = leafNode.beginValueOn();
 
-        ValueIndexIter<ValueOnIter> iter(valueIter);
+        IndexIter<ValueOnIter, NullFilter>::ValueIndexIter iter(valueIter);
 
         CPPUNIT_ASSERT(!iter);
 
@@ -343,8 +251,8 @@ TestIndexIterator::testFilterIndexIterator()
 
     { // index iterator with even filter
         EvenIndexFilter filter;
-        IndexIter indexIter(0, 5);
-        FilterIndexIter<IndexIter, EvenIndexFilter> iter(indexIter, filter);
+        ValueVoxelCIter indexIter(0, 5);
+        IndexIter<ValueVoxelCIter, EvenIndexFilter> iter(indexIter, filter);
 
         CPPUNIT_ASSERT(iter);
         CPPUNIT_ASSERT_EQUAL(*iter, Index32(0));
@@ -357,37 +265,20 @@ TestIndexIterator::testFilterIndexIterator()
 
         CPPUNIT_ASSERT(!iter.next());
 
-        CPPUNIT_ASSERT_EQUAL(iter.indexIter().end(), Index32(5));
+        CPPUNIT_ASSERT_EQUAL(iter.end(), Index32(5));
         CPPUNIT_ASSERT_EQUAL(filter.valid(ConstantIter(1)), iter.filter().valid(ConstantIter(1)));
         CPPUNIT_ASSERT_EQUAL(filter.valid(ConstantIter(2)), iter.filter().valid(ConstantIter(2)));
     }
 
     { // index iterator with odd filter
         OddIndexFilter filter;
-        IndexIter indexIter(0, 5);
-        FilterIndexIter<IndexIter, OddIndexFilter> iter(indexIter, filter);
+        ValueVoxelCIter indexIter(0, 5);
+        IndexIter<ValueVoxelCIter, OddIndexFilter> iter(indexIter, filter);
 
         CPPUNIT_ASSERT_EQUAL(*iter, Index32(1));
 
         CPPUNIT_ASSERT(iter.next());
         CPPUNIT_ASSERT_EQUAL(*iter, Index32(3));
-
-        CPPUNIT_ASSERT(!iter.next());
-    }
-
-    { // index iterator where the beginning and end are adjusted
-        EvenIndexFilter filter;
-        IndexIter indexIter(0, 5);
-        FilterIndexIter<IndexIter, EvenIndexFilter> iter(indexIter, filter);
-
-        iter++;
-        iter++;
-
-        CPPUNIT_ASSERT_EQUAL(*iter, Index32(4));
-
-        iter.reset(1, 3);
-
-        CPPUNIT_ASSERT_EQUAL(*iter, Index32(2));
 
         CPPUNIT_ASSERT(!iter.next());
     }
@@ -422,7 +313,7 @@ TestIndexIterator::testProfile()
     { // index iterator
         ProfileTimer timer("IndexIter: sum");
         volatile int sum = 0;
-        IndexIter iter(0, elements);
+        ValueVoxelCIter iter(0, elements);
         for (; iter; ++iter) {
             sum += *iter;
         }
@@ -459,7 +350,7 @@ TestIndexIterator::testProfile()
         ProfileTimer timer("ValueIndexIter: sum");
         volatile int sum = 0;
         LeafNode::ValueAllCIter indexIter(leafNode.cbeginValueAll());
-        ValueIndexIter<LeafNode::ValueAllCIter> iter(indexIter);
+        IndexIter<LeafNode::ValueAllCIter, NullFilter>::ValueIndexIter iter(indexIter);
         for (; iter; ++iter) {
             sum += *iter;
         }

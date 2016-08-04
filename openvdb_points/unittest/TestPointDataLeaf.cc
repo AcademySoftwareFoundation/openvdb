@@ -873,11 +873,6 @@ TestPointDataLeaf::testIterators()
         for (int i = 0; iterAll; ++iterAll, ++i)        CPPUNIT_ASSERT_EQUAL(*iterAll, Index32(i));
     }
 
-    { // test index
-        LeafType::IndexIter iter(leaf.beginIndex());
-        CPPUNIT_ASSERT_EQUAL(iterCount(iter), Index64(size));
-        for (int i = 0; iter; ++iter, ++i)              CPPUNIT_ASSERT_EQUAL(*iter, Index32(i));
-    }
 }
 
 

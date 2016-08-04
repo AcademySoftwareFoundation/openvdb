@@ -464,24 +464,19 @@ namespace resource
             const openvdb::tools::AttributeHandle<openvdb::Vec3f>::Ptr positionHandle =
                 openvdb::tools::AttributeHandle<openvdb::Vec3f>::create(leaf->attributeArray("P"));
 
-            for (PointDataTree::LeafNodeType::ValueOnCIter value = leaf->cbeginValueOn(); value; ++value)
+            for (PointDataTree::LeafNodeType::IndexOnIter iter = leaf->beginIndexOn(); iter; ++iter)
             {
-                const openvdb::Coord ijk = value.getCoord();
+                const openvdb::Vec3i gridIndexSpace = iter.getCoord().asVec3i();
 
-                const openvdb::Vec3i gridIndexSpace = ijk.asVec3i();
+                const openvdb::Vec3f positionVoxelSpace = positionHandle->get(*iter);
+                const openvdb::Vec3f positionIndexSpace = positionVoxelSpace + gridIndexSpace;
+                const openvdb::Vec3f positionWorldSpace = transform.indexToWorld(positionIndexSpace);
 
-                for (openvdb::tools::IndexIter iter = leaf->beginIndex(ijk); iter; ++iter) {
+                array[arrayIndex][0] = positionWorldSpace[0];
+                array[arrayIndex][1] = positionWorldSpace[1];
+                array[arrayIndex][2] = positionWorldSpace[2];
 
-                    const openvdb::Vec3f positionVoxelSpace = positionHandle->get(*iter);
-                    const openvdb::Vec3f positionIndexSpace = positionVoxelSpace + gridIndexSpace;
-                    const openvdb::Vec3f positionWorldSpace = transform.indexToWorld(positionIndexSpace);
-
-                    array[arrayIndex][0] = positionWorldSpace[0];
-                    array[arrayIndex][1] = positionWorldSpace[1];
-                    array[arrayIndex][2] = positionWorldSpace[2];
-
-                    arrayIndex++;
-                }
+                arrayIndex++;
             }
         }
 
@@ -511,22 +506,17 @@ namespace resource
                 const openvdb::tools::AttributeHandle<openvdb::Vec3f>::Ptr velocityHandle =
                     openvdb::tools::AttributeHandle<openvdb::Vec3f>::create(leaf->attributeArray("v"));
 
-                for (PointDataTree::LeafNodeType::ValueOnCIter value = leaf->cbeginValueOn(); value; ++value)
+                for (PointDataTree::LeafNodeType::IndexOnIter iter = leaf->beginIndexOn(); iter; ++iter)
                 {
-                    const openvdb::Coord ijk = value.getCoord();
+                    // VDB Points resource uses index-space velocity so need to revert this back to world-space
 
-                    for (openvdb::tools::IndexIter iter = leaf->beginIndex(ijk); iter; ++iter) {
+                    const openvdb::Vec3f velocity = transform.indexToWorld(velocityHandle->get(*iter));
 
-                        // VDB Points resource uses index-space velocity so need to revert this back to world-space
+                    array[arrayIndex][0] = velocity.x();
+                    array[arrayIndex][1] = velocity.y();
+                    array[arrayIndex][2] = velocity.z();
 
-                        const openvdb::Vec3f velocity = transform.indexToWorld(velocityHandle->get(*iter));
-
-                        array[arrayIndex][0] = velocity.x();
-                        array[arrayIndex][1] = velocity.y();
-                        array[arrayIndex][2] = velocity.z();
-
-                        arrayIndex++;
-                    }
+                    arrayIndex++;
                 }
             }
 

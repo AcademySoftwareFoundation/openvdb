@@ -58,12 +58,12 @@ public:
 
 }; // class TestPointCount
 
+using namespace openvdb;
+
 using openvdb::tools::PointDataTree;
 using openvdb::tools::PointDataGrid;
 typedef PointDataTree::LeafNodeType     LeafType;
 typedef LeafType::ValueType             ValueType;
-using openvdb::Index;
-using openvdb::Index64;
 
 
 void
@@ -91,19 +91,25 @@ TestPointCount::testCount()
     leaf.setOffsetOn(0, 4);
     leaf.setOffsetOn(1, 7);
 
-    CPPUNIT_ASSERT_EQUAL(int(*leaf.beginIndex(0)), 0);
-    CPPUNIT_ASSERT_EQUAL(int(leaf.beginIndex(0).end()), 4);
+    ValueVoxelCIter voxelIter = leaf.beginValueVoxel(openvdb::Coord(0, 0, 0));
 
-    CPPUNIT_ASSERT_EQUAL(int(*leaf.beginIndex(1)), 4);
-    CPPUNIT_ASSERT_EQUAL(int(leaf.beginIndex(1).end()), 7);
+    IndexIter<ValueVoxelCIter, NullFilter> testIter(voxelIter, NullFilter());
+
+    leaf.beginIndexVoxel(openvdb::Coord(0, 0, 0));
+
+    CPPUNIT_ASSERT_EQUAL(int(*leaf.beginIndexVoxel(openvdb::Coord(0, 0, 0))), 0);
+    CPPUNIT_ASSERT_EQUAL(int(leaf.beginIndexVoxel(openvdb::Coord(0, 0, 0)).end()), 4);
+
+    CPPUNIT_ASSERT_EQUAL(int(*leaf.beginIndexVoxel(openvdb::Coord(0, 0, 1))), 4);
+    CPPUNIT_ASSERT_EQUAL(int(leaf.beginIndexVoxel(openvdb::Coord(0, 0, 1)).end()), 7);
 
     {
-        IndexIter iter = leaf.beginIndex(openvdb::Coord(0, 0, 0));
+        LeafType::IndexVoxelIter iter = leaf.beginIndexVoxel(openvdb::Coord(0, 0, 0));
 
         CPPUNIT_ASSERT_EQUAL(int(*iter), 0);
         CPPUNIT_ASSERT_EQUAL(int(iter.end()), 4);
 
-        IndexIter iter2 = leaf.beginIndex(openvdb::Coord(0, 0, 1));
+        LeafType::IndexVoxelIter iter2 = leaf.beginIndexVoxel(openvdb::Coord(0, 0, 1));
 
         CPPUNIT_ASSERT_EQUAL(int(*iter2), 4);
         CPPUNIT_ASSERT_EQUAL(int(iter2.end()), 7);
@@ -114,7 +120,7 @@ TestPointCount::testCount()
 
         leaf.setValueOff(1);
 
-        IndexIter iter3 = leaf.beginIndex(openvdb::Coord(0, 0, 1));
+        LeafType::IndexVoxelIter iter3 = leaf.beginIndexVoxel(openvdb::Coord(0, 0, 1));
 
         CPPUNIT_ASSERT_EQUAL(iterCount(iter3), Index64(7 - 4));
 

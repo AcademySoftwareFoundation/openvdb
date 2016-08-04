@@ -89,7 +89,6 @@ template <typename PointDataTreeT>
 struct GenerateBBoxOp {
 
     typedef typename PointDataTreeT::LeafNodeType                          PointDataLeaf;
-    typedef typename PointDataLeaf::IndexOnIter                            IndexOnIter;
     typedef typename tree::LeafManager<const PointDataTreeT>::LeafRange    LeafRangeT;
 
     GenerateBBoxOp( const math::Transform& transform,
@@ -159,8 +158,7 @@ struct GenerateBBoxOp {
         if (!mIncludeGroups.empty() || !mExcludeGroups.empty()) {
 
             tools::MultiGroupFilter::Data data(mIncludeGroups, mExcludeGroups);
-            const tools::MultiGroupFilter filter = tools::MultiGroupFilter::create(leaf, data);
-            tools::FilterIndexIter<IndexOnIter, tools::MultiGroupFilter> iter(leaf.beginIndexOn(), filter);
+            tools::IndexIter<typename PointDataLeaf::ValueOnCIter, tools::MultiGroupFilter> iter = leaf.template beginIndexOn<tools::MultiGroupFilter>(data);
 
             for (; iter; ++iter) {
 
@@ -168,7 +166,7 @@ struct GenerateBBoxOp {
 
                 // pscale needs to be transformed to index space
                 Vec3d radius = mTransform.worldToIndex(Vec3d(pscale));
-                Vec3d position = iter.indexIter().getCoord().asVec3d() + positionHandle->get(*iter);
+                Vec3d position = iter.getCoord().asVec3d() + positionHandle->get(*iter);
 
                 mBbox.expand(position - radius);
                 mBbox.expand(position + radius);
@@ -176,7 +174,7 @@ struct GenerateBBoxOp {
         }
         else {
 
-            IndexOnIter iter = leaf.beginIndexOn();
+            typename PointDataLeaf::IndexOnIter iter = leaf.beginIndexOn();
 
             for (; iter; ++iter) {
 
@@ -259,8 +257,7 @@ struct PopulateColorFromVelocityOp {
             if (!mIncludeGroups.empty() || !mExcludeGroups.empty()) {
 
                 MultiGroupFilter::Data data(mIncludeGroups, mExcludeGroups);
-                const MultiGroupFilter filter = MultiGroupFilter::create(leaf, data);
-                tools::FilterIndexIter<IndexOnIter, MultiGroupFilter> iter(leaf.beginIndexOn(), filter);
+                tools::IndexIter<typename LeafNode::ValueOnCIter, tools::MultiGroupFilter> iter = leaf.template beginIndexOn<tools::MultiGroupFilter>(data);
 
                 for (; iter; ++iter) {
 

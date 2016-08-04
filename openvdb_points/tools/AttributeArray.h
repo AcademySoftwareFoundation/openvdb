@@ -299,8 +299,6 @@ public:
     /// @brief Retrieve the attribute array flags
     uint16_t flags() const { return mFlags; }
 
-    IndexIter beginIndex() const;
-
     /// Read attribute metadata and buffers from a stream.
     virtual void read(std::istream&) = 0;
     /// Write attribute metadata and buffers to a stream.

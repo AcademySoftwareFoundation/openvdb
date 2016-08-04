@@ -126,10 +126,7 @@ template <  typename PointDataTreeT,
 struct PointCountOp
 {
     typedef typename tree::LeafManager<const PointDataTreeT>    LeafManagerT;
-    typedef IndexIterTraits<PointDataTreeT, ValueIterT>         IndexIteratorFromLeafT;
-    typedef typename IndexIteratorFromLeafT::Iterator           IndexIterator;
     typedef typename FilterT::Data                              FilterDataT;
-    typedef FilterIndexIter<IndexIterator, FilterT>             Iterator;
 
     PointCountOp(const FilterDataT& filterData,
                  const bool inCoreOnly = false)
@@ -142,9 +139,8 @@ struct PointCountOp
 #ifndef OPENVDB_2_ABI_COMPATIBLE
             if (mInCoreOnly && leaf->buffer().isOutOfCore())     continue;
 #endif
-            IndexIterator indexIterator(IndexIteratorFromLeafT::begin(*leaf));
-            FilterT filter(FilterT::create(*leaf, mFilterData));
-            Iterator iter(indexIterator, filter);
+
+            IndexIter<ValueIterT, FilterT> iter = leaf->template beginIndex<ValueIterT, FilterT>(mFilterData);
             size += iterCount(iter);
         }
 
@@ -288,7 +284,6 @@ Index64 getPointOffsets(std::vector<Index64>& pointOffsets, const PointDataTreeT
                      const bool inCoreOnly)
 {
     typedef typename PointDataTreeT::LeafNodeType LeafNode;
-    typedef typename LeafNode::IndexOnIter IndexOnIter;
 
     const bool useGroup = includeGroups.size() > 0 || excludeGroups.size() > 0;
 
@@ -313,10 +308,10 @@ Index64 getPointOffsets(std::vector<Index64>& pointOffsets, const PointDataTreeT
 #endif
 
         if (useGroup) {
-            IndexOnIter iter = leaf.beginIndexOn();
+            typename LeafNode::ValueOnCIter iter = leaf.beginValueOn();
             MultiGroupFilter::Data data(includeGroups, excludeGroups);
             const MultiGroupFilter filter = MultiGroupFilter::create(leaf, data);
-            FilterIndexIter<IndexOnIter, MultiGroupFilter> filterIndexIter(iter, filter);
+            IndexIter<typename LeafNode::ValueOnCIter, MultiGroupFilter> filterIndexIter(iter, filter);
             pointOffset += iterCount(filterIndexIter);
         }
         else {

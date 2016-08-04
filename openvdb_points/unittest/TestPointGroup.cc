@@ -610,14 +610,13 @@ TestPointGroup::testFilter()
         std::vector<Vec3f> positions;
 
         for (PointDataTree::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
-            typedef PointDataTree::LeafNodeType::IndexOnIter IndexOnIter;
-            GroupFilter filter(GroupFilter::create(*iter, GroupFilter::Data("first_bbox")));
-            FilterIndexIter<IndexOnIter, GroupFilter> filterIndexIter(iter->beginIndexOn(), filter);
+            GroupFilter::Data data("first_bbox");
+            IndexIter<PointDataTree::LeafNodeType::ValueOnCIter, GroupFilter> filterIndexIter = iter->beginIndexOn<GroupFilter>(data);
 
             AttributeHandle<Vec3f>::Ptr handle = AttributeHandle<Vec3f>::create(iter->attributeArray("P"));
 
             for ( ; filterIndexIter; ++filterIndexIter) {
-                const openvdb::Coord ijk = filterIndexIter.indexIter().getCoord();
+                const openvdb::Coord ijk = filterIndexIter.getCoord();
                 positions.push_back(handle->get(*filterIndexIter) + ijk.asVec3d());
             }
         }
