@@ -285,7 +285,8 @@ public:
     /// Read attribute metadata and buffers from a stream.
     virtual void read(std::istream&) = 0;
     /// Write attribute metadata and buffers to a stream.
-    virtual void write(std::ostream&) const = 0;
+    /// @param outputTransient if true, write out transient attributes
+    virtual void write(std::ostream&, bool outputTransient = false) const = 0;
 
     /// Ensures all data is in-core
     virtual void loadData() const = 0;
@@ -499,7 +500,8 @@ public:
     /// Read attribute data from a stream.
     virtual void read(std::istream& is);
     /// Write attribute data to a stream.
-    virtual void write(std::ostream& os) const;
+    /// @param outputTransient if true, write out transient attributes
+    virtual void write(std::ostream&, bool outputTransient = false) const;
 
     /// Return @c true if this buffer's values have not yet been read from disk.
     inline bool isOutOfCore() const;
@@ -1324,11 +1326,11 @@ TypedAttributeArray<ValueType_, Codec_>::read(std::istream& is)
 
 template<typename ValueType_, typename Codec_>
 void
-TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os) const
+TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os, bool outputTransient) const
 {
     using attribute_compression::compress;
 
-    if (this->isTransient())    return;
+    if (!outputTransient && this->isTransient())    return;
 
     Int16 flags(mFlags);
     Index64 size(mSize);

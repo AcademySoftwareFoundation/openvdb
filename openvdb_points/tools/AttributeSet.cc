@@ -392,10 +392,10 @@ AttributeSet::read(std::istream& is)
 
 
 void
-AttributeSet::write(std::ostream& os) const
+AttributeSet::write(std::ostream& os, bool outputTransient) const
 {
-    this->writeMetadata(os);
-    this->writeAttributes(os);
+    this->writeMetadata(os, outputTransient);
+    this->writeAttributes(os, outputTransient);
 }
 
 
@@ -407,26 +407,29 @@ AttributeSet::readMetadata(std::istream& is)
 
 
 void
-AttributeSet::writeMetadata(std::ostream& os) const
+AttributeSet::writeMetadata(std::ostream& os, bool outputTransient) const
 {
     // build a vector of all attribute arrays that have a transient flag
+    // unless also writing transient attributes
 
-    std::vector<size_t> transient;
+    std::vector<size_t> transientArrays;
 
-    for (size_t i = 0; i < size(); i++) {
-        const AttributeArray* array = this->getConst(i);
-        if (array->isTransient()) {
-            transient.push_back(i);
+    if (!outputTransient) {
+        for (size_t i = 0; i < size(); i++) {
+            const AttributeArray* array = this->getConst(i);
+            if (array->isTransient()) {
+                transientArrays.push_back(i);
+            }
         }
     }
 
     // write out a descriptor without transient attributes
 
-    if (transient.empty()) {
+    if (transientArrays.empty()) {
         mDescr->write(os);
     }
     else {
-        Descriptor::Ptr descr = mDescr->duplicateDrop(transient);
+        Descriptor::Ptr descr = mDescr->duplicateDrop(transientArrays);
         descr->write(os);
     }
 }
@@ -449,10 +452,10 @@ AttributeSet::readAttributes(std::istream& is)
 
 
 void
-AttributeSet::writeAttributes(std::ostream& os) const
+AttributeSet::writeAttributes(std::ostream& os, bool outputTransient) const
 {
     for (size_t n = 0, N = mAttrs.size(); n < N; ++n) {
-        mAttrs[n]->write(os);
+        mAttrs[n]->write(os, outputTransient);
     }
 }
 
