@@ -854,6 +854,15 @@ TestAttributeSet::testAttributeSet()
         // ensures transient attribute is not written out
 
         CPPUNIT_ASSERT_EQUAL(attrSetB.size(), size_t(1));
+
+        std::ostringstream ostr2(std::ios_base::binary);
+        attrSetA.write(ostr2, /*transient=*/true);
+
+        AttributeSet attrSetC;
+        std::istringstream istr2(ostr2.str(), std::ios_base::binary);
+        attrSetC.read(istr2);
+
+        CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(2));
     }
 }
 

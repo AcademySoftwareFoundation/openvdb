@@ -213,17 +213,20 @@ public:
     /// Read the entire set from a stream.
     void read(std::istream&);
     /// Write the entire set to a stream.
-    void write(std::ostream&) const;
+    /// @param outputTransient if true, write out transient attributes
+    void write(std::ostream&, bool outputTransient = false) const;
 
     /// This will read the attribute descriptor from a stream, but no attribute data.
     void readMetadata(std::istream&);
     /// This will write the attribute descriptor to a stream, but no attribute data.
-    void writeMetadata(std::ostream&) const;
+    /// @param outputTransient if true, write out transient attributes
+    void writeMetadata(std::ostream&, bool outputTransient = false) const;
 
     /// Read attribute data from a stream.
     void readAttributes(std::istream&);
     /// Write attribute data to a stream.
-    void writeAttributes(std::ostream&) const;
+    /// @param outputTransient if true, write out transient attributes
+    void writeAttributes(std::ostream&, bool outputTransient = false) const;
 
     /// Compare the descriptors and attribute arrays on the attribute sets
     /// Exit early if the descriptors do not match

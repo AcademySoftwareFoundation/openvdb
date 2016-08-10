@@ -764,6 +764,11 @@ TestAttributeArray::testAttributeArray()
         attrC.write(ostrC);
 
         CPPUNIT_ASSERT_EQUAL(ostrC.str().size(), size_t(0));
+
+        std::ostringstream ostrD(std::ios_base::binary);
+        attrC.write(ostrD, /*transient=*/true);
+
+        CPPUNIT_ASSERT(ostrD.str().size() != size_t(0));
     }
 
     // Registry
