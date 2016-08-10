@@ -153,6 +153,8 @@ endif
 INCLDIRS := -I . -I .. -isystem $(BOOST_INCL_DIR) -isystem $(ILMBASE_INCL_DIR) -isystem $(TBB_INCL_DIR)
 HCUSTOM_INCLDIRS := $(subst isystem,I,$(INCLDIRS))
 
+CXXFLAGS += -std=c++0x
+
 CXXFLAGS += -pthread $(OPTIMIZE) $(INCLDIRS) -DIGNORE_HDK_DEPRECATIONS
 ifeq (2,$(strip $(abi)))
     CXXFLAGS += -DOPENVDB_2_ABI_COMPATIBLE

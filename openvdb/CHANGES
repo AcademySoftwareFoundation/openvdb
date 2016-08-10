@@ -1,7 +1,7 @@
 OpenVDB Version History
 =======================
 
-Version 3.2.0 - In development
+Version 3.2.0 - August 10, 2016
 
     Highlights:
     - New features: tool to produce and store a sequences of progressively
@@ -30,7 +30,7 @@ Version 3.2.0 - In development
       new grids rather than modifying their input grids.  These new tools are
       faster and use less memory than the existing tools (if only because the
       input grids never need to be deep-copied).
-    - Added a threaded dilateActiveValues() tool with tile value support.
+    - Added a threaded dilateActiveValues() tool with tile value support.
     - Added tools::PointsToMask, which activates voxels that intersect
       points from a given list.
     - Added a new MaskGrid type that uses a single bit-field to represent both
@@ -49,7 +49,7 @@ Version 3.2.0 - In development
     - Added bit-wise operations to the CoordBBox class.
     - New component wise constructor for the math::CoordBBox class as well as the
       method math::CoordBBox::getCornerPoints.
-    - Added a new LeafManager constructor to create the structure from an
+    - Added a new LeafManager constructor to create the structure from an
       existing array of leafnodes.
     - Added the templated math::MinMax class to compute the extrema of
       arbitrary value types.
@@ -60,7 +60,7 @@ Version 3.2.0 - In development
       improvements and enhanced region masking, tile support and bool volume
       surfacing.
     - Improved the performance, parallel scaling and memory usage,
-      of tools::LevelSetFracture and updated to use the new segmentSDF scheme.
+      of tools::LevelSetFracture and updated to use the new segmentSDF scheme.
     - Improved the performance of tools::LevelSetAdvection by up to five times.
     - Improved the performance of Tree::voxelizeActiveTiles by means of multi-threading.
     - Improved the performance of tools::meshToVolume(), particularly for
@@ -133,6 +133,9 @@ Version 3.2.0 - In development
       [Contributed by Jeff Lait]
     - Fixed a bug in tools::volumeToMesh that could produce NaNs.
       [Reported by Rick Hankins]
+    - Fixed a bug in the "Advect Points SOP" that could cause a crash when
+      the input grids were of incorrect type.
+      [Reported by SideFX]
 
     API changes:
     - Deprecated math::Mat3::setBasis and math::Mat4::setBasis.
@@ -178,9 +181,15 @@ Version 3.2.0 - In development
     - Fixed a bug in the Ray SOP whereby the distance attribute was created
       with the wrong data type.
       [Contributed by Nick Avramoussis]
-    - The From Polygon SOP now allows the user the either specify the voxel 
+    - The From Polygon SOP now allows the user to either specify the voxel 
       count along an axis or the voxel size in world units (the only option
       in the past).
+
+    Known issues:
+    - A vector Grid/Tree (or any Grid/Tree with a non-POD ValueType) is known to 
+      be slow to construct and delete! This performance issue is easy to fix, but 
+      since it introduces an ABI incompatibility it will have to go in a future
+      major release (most likely v4.0).
 
 Version 3.1.0 - October 1, 2015
 

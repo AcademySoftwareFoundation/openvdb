@@ -317,13 +317,39 @@ newSopOperator(OP_OperatorTable* table)
         .setHelpText("References the first/selected grid's transform. The "
             "narrow band width can also be matched if the reference "
             "grid is a level set."));
+    
+    {// Voxel size or voxel count menu
+        std::vector<std::string> items;
+        items.push_back("worldVoxelSize");
+        items.push_back("Size In World Units");
+        items.push_back("countX");
+        items.push_back("Count Along X Axis");
+        items.push_back("countY");
+        items.push_back("Count Along Y Axis");
+        items.push_back("countZ");
+        items.push_back("Count Along Z Axis");
+        items.push_back("countLongest");
+        items.push_back("Count Along Longest Axis");
 
+        parms.add(hutil::ParmFactory(PRM_STRING, "sizeOrCount", "Voxel")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setDefault(4, ::strdup(items[4].c_str()))
+            .setHelpText("Specify the voxel size in world units or voxel count along an axis"));
+    }// Voxel size or voxel count menu           
+     
     parms.add(hutil::ParmFactory(PRM_FLT_J, "voxelSize", "Voxel Size")
         .setDefault(PRMpointOneDefaults)
-        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 5));
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 5)
+        .setHelpText("Specify the voxel size in world units."));
+
+    parms.add(hutil::ParmFactory(PRM_INT_J, "voxelCount", "Voxel Count")
+        .setDefault(100)
+        .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 500)
+        .setHelpText("Specify the voxel count along an axis. Note the resulting voxel count "
+                     "might be off by one voxel due to round-off errors during the conversion process."));          
 
     // Narrow-band width {
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldSpaceUnits", "Use World Space for Band")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "worldSpaceUnits", "Use World Space Units for Narrow Band")
         .setCallbackFunc(&convertUnitsCB));
 
     //   voxel space units
@@ -534,12 +560,20 @@ SOP_OpenVDB_From_Polygons::updateParmsFlags()
 
     // Transform
     changed |= enableParm("group", refexists);
-    changed |= enableParm("voxelSize", !refexists);
 
     // Conversion
     const bool wsUnits = bool(evalInt("worldSpaceUnits", 0, time));
     const bool fillInterior = bool(evalInt("fillInterior", 0, time));
     const bool unsignedDist = bool(evalInt("unsignedDist", 0, time));
+
+    // Voxel size or voxel count menu
+    UT_String str;
+    evalString(str, "sizeOrCount", 0, time);
+    const bool countMenu =  str != "worldVoxelSize";
+    changed |= setVisibleState("voxelSize", !countMenu);
+    changed |= setVisibleState("voxelCount", countMenu);
+    changed |= enableParm("voxelSize", !countMenu && !refexists);
+    changed |= enableParm("voxelCount", countMenu && !refexists);
 
     changed |= enableParm("interiorBandWidth",
         !wsUnits && !fillInterior && !unsignedDist);
@@ -660,8 +694,7 @@ SOP_OpenVDB_From_Polygons::cookMySop(OP_Context& context)
             addWarning(SOP_MESSAGE, "No output selected");
             return error();
         }
-
-        mVoxelSize = static_cast<float>(evalFloat("voxelSize", 0, time));
+       
         openvdb::math::Transform::Ptr transform;
 
         float inBand = std::numeric_limits<float>::max(), exBand = 0.0;
@@ -690,10 +723,28 @@ SOP_OpenVDB_From_Polygons::cookMySop(OP_Context& context)
                 return error();
             }
 
-        } else {
+        } else {// derive the voxel size and define output grid's transform
+            
+            UT_String str;
+            evalString(str, "sizeOrCount", 0, time);
+            if ( str == "worldVoxelSize" ) {
+                mVoxelSize = static_cast<float>(evalFloat("voxelSize", 0, time));
+            } else {
+                const float dim = static_cast<float>(evalInt("voxelCount", 0, time));
+                UT_BoundingBox bbox;
+                inputGdp->getCachedBounds(bbox);
+                const float size = str == "countX" ? bbox.xsize() : str == "countY" ? bbox.ysize() :
+                                   str == "countZ" ? bbox.ysize() : bbox.sizeMax();
+                if ( evalInt("worldSpaceUnits", 0, time) ) {
+                    const float w = static_cast<float>(evalFloat("exteriorBandWidthWS", 0, time)); 
+                    mVoxelSize = (size + 2.0f*w)/dim;
+                } else {
+                    const float w = static_cast<float>(evalInt("exteriorBandWidth", 0, time));
+                    mVoxelSize = size/std::max(1.0f, dim - 2.0f*w);
+                }
+            }
             // Create a new transform
-            transform =
-                openvdb::math::Transform::createLinearTransform(mVoxelSize);
+            transform = openvdb::math::Transform::createLinearTransform(mVoxelSize);
         }
 
         if (mVoxelSize < 1e-5) {
