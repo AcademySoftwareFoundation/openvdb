@@ -6,7 +6,8 @@ TASK="$1"
 ABI="$2"
 BLOSC="$3"
 RELEASE="$4"
-HOUDINI_BUILD="$5"
+HOUDINI_MAJOR="$5"
+HOUDINI_BUILD="$6"
 
 COMMON_ARGS="DESTDIR=/tmp/OpenVDB_3_1_0 CONCURRENT_MALLOC_LIB= DOXYGEN= LOG4CPLUS_INCL_DIR= PYTHON_INCL_DIR= GLFW_INCL_DIR="
 
@@ -59,7 +60,7 @@ if [ "$TASK" = "pre_install" ]; then
         wget http://www.openvdb.org/download/openvdb_3_1_0_houdini.zip
         unzip openvdb_3_1_0_houdini.zip
         # download and unpack houdini headers and libraries from public FTP
-        wget ftp://ftp.sidefx.com/public/$HOUDINI_BUILD.tar.gz
+        wget ftp://ftp.sidefx.com/indie/$HOUDINI_MAJOR/$HOUDINI_BUILD.tar.gz
         tar -xzf $HOUDINI_BUILD.tar.gz
         ln -s $HOUDINI_BUILD hou
         cd hou
