@@ -285,8 +285,7 @@ public:
 
                 // if no value compression, hide the codec from the middle-click output
 
-                if (   boost::starts_with(codecType, "null_") &&
-                            boost::ends_with(codecType, valueType)) {
+                if (codecType == "null") {
                     infoStr << it->first << "[" << valueType << "]";
                 }
                 else if (isString(array)) {

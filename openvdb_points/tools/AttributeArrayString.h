@@ -71,7 +71,7 @@ struct StringCodec
 
     template<typename StorageType> static void decode(const StorageType&, ValueType&);
     template<typename StorageType> static void encode(const ValueType&, StorageType&);
-    static const char* name() { return "str"; }
+    static const char* name() { return Truncate ? "str_trnc" : "str"; }
 };
 
 
@@ -163,10 +163,11 @@ class StringAttributeWriteHandle : public StringAttributeHandle
 public:
     typedef boost::shared_ptr<StringAttributeWriteHandle> Ptr;
 
-    static Ptr create(AttributeArray& array, const MetaMap& metadata);
+    static Ptr create(AttributeArray& array, const MetaMap& metadata, const bool expand = true);
 
     StringAttributeWriteHandle( AttributeArray& array,
-                                const MetaMap& metadata);
+                                const MetaMap& metadata,
+                                const bool expand = true);
 
     /// @brief  If this array is uniform, replace it with an array of length size().
     /// @param  fill if true, assign the uniform value to each element of the array.

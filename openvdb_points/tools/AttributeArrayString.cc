@@ -213,16 +213,17 @@ void StringAttributeHandle::get(Name& name, Index n) const
 // StringAttributeWriteHandle implementation
 
 StringAttributeWriteHandle::Ptr
-StringAttributeWriteHandle::create(AttributeArray& array, const MetaMap& metadata)
+StringAttributeWriteHandle::create(AttributeArray& array, const MetaMap& metadata, const bool expand)
 {
-    return StringAttributeWriteHandle::Ptr(new StringAttributeWriteHandle(array, metadata));
+    return StringAttributeWriteHandle::Ptr(new StringAttributeWriteHandle(array, metadata, expand));
 }
 
 
 StringAttributeWriteHandle::StringAttributeWriteHandle(AttributeArray& array,
-                                                       const MetaMap& metadata)
+                                                       const MetaMap& metadata,
+                                                       const bool expand)
     : StringAttributeHandle(array, metadata, /*preserveCompression=*/ false)
-    , mWriteHandle(array)
+    , mWriteHandle(array, expand)
 {
     // populate the cache
     resetCache();

@@ -113,6 +113,7 @@ public:
     CPPUNIT_TEST(testCompression);
     CPPUNIT_TEST(testRegistry);
     CPPUNIT_TEST(testAttributeArray);
+    CPPUNIT_TEST(testAccessorEval);
     CPPUNIT_TEST(testAttributeHandle);
     CPPUNIT_TEST(testStrided);
     CPPUNIT_TEST(testDelayedLoad);
@@ -124,6 +125,7 @@ public:
     void testCompression();
     void testRegistry();
     void testAttributeArray();
+    void testAccessorEval();
     void testAttributeHandle();
     void testStrided();
     void testDelayedLoad();
@@ -435,6 +437,31 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT_THROW(typedAttr.get(100, value), openvdb::IndexError);
         CPPUNIT_ASSERT_THROW(typedAttr.get(100), openvdb::IndexError);
     }
+
+#ifdef NDEBUG
+    { // test setUnsafe and getUnsafe on uniform arrays
+        AttributeArrayD::Ptr attr(new AttributeArrayD(50));
+
+        CPPUNIT_ASSERT_EQUAL(size_t(50), attr->size());
+        attr->collapse(5.0);
+        CPPUNIT_ASSERT(attr->isUniform());
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(attr->getUnsafe(10), 5.0, /*tolerance=*/double(0.0));
+        CPPUNIT_ASSERT(attr->isUniform());
+
+        // this is expected behaviour because for performance reasons, array is not implicitly expanded
+
+        attr->setUnsafe(10, 15.0);
+        CPPUNIT_ASSERT(attr->isUniform());
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(attr->getUnsafe(5), 15.0, /*tolerance=*/double(0.0));
+
+        attr->expand();
+        CPPUNIT_ASSERT(!attr->isUniform());
+        attr->setUnsafe(10, 25.0);
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(attr->getUnsafe(5), 15.0, /*tolerance=*/double(0.0));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(attr->getUnsafe(10), 25.0, /*tolerance=*/double(0.0));
+    }
+#endif
 
     typedef openvdb::tools::FixedPointCodec<false> FixedPointCodec;
     typedef openvdb::tools::TypedAttributeArray<double, FixedPointCodec> AttributeArrayC;
@@ -796,6 +823,78 @@ TestAttributeArray::testAttributeArray()
 
 
 void
+TestAttributeArray::testAccessorEval()
+{
+    typedef TypedAttributeArray<float>      AttributeF;
+
+    struct TestAccessor
+    {
+        static float getterError(const AttributeArray* /*array*/, const Index /*n*/) {
+            OPENVDB_THROW(NotImplementedError, "");
+        }
+        static void setterError(AttributeArray* /*array*/, const Index /*n*/, const float& /*value*/) {
+            OPENVDB_THROW(NotImplementedError, "");
+        }
+
+        static float testGetter(const AttributeArray* array, const Index n) {
+            return AccessorEval<UnknownCodec, float>::get(&getterError, array, n);
+        }
+        static void testSetter(AttributeArray* array, const Index n, const float& value) {
+            AccessorEval<UnknownCodec, float>::set(&setterError, array, n, value);
+        }
+    };
+
+    { // test get and set (NullCodec)
+        AttributeF::Ptr attr = AttributeF::create(10);
+        attr->collapse(5.0f);
+        attr->expand();
+
+        AttributeArray& array = *attr;
+
+        // explicit codec is used here so getter and setter are not called
+
+        AttributeWriteHandle<float, NullCodec> writeHandle(array);
+
+        writeHandle.mSetter = TestAccessor::setterError;
+
+        writeHandle.set(4, 15.0f);
+
+        AttributeHandle<float, NullCodec> handle(array);
+
+        handle.mGetter = TestAccessor::getterError;
+
+        const float result1 = handle.get(4);
+        const float result2 = handle.get(6);
+
+        CPPUNIT_ASSERT_EQUAL(result1, 15.0f);
+        CPPUNIT_ASSERT_EQUAL(result2, 5.0f);
+    }
+
+    { // test get and set (UnknownCodec)
+        AttributeF::Ptr attr = AttributeF::create(10);
+        attr->collapse(5.0f);
+        attr->expand();
+
+        AttributeArray& array = *attr;
+
+        // unknown codec is used here so getter and setter are called
+
+        AttributeWriteHandle<float, UnknownCodec> writeHandle(array);
+
+        writeHandle.mSetter = TestAccessor::setterError;
+
+        CPPUNIT_ASSERT_THROW(writeHandle.set(4, 15.0f), NotImplementedError);
+
+        AttributeHandle<float, UnknownCodec> handle(array);
+
+        handle.mGetter = TestAccessor::getterError;
+
+        CPPUNIT_ASSERT_THROW(handle.get(4), NotImplementedError);
+    }
+}
+
+
+void
 TestAttributeArray::testAttributeHandle()
 {
     using namespace openvdb;
@@ -830,14 +929,16 @@ TestAttributeArray::testAttributeHandle()
     {
         AttributeArray* array = attrSet.get(2);
 
+        AttributeHandleRWI nonExpandingHandle(*array, /*expand=*/false);
+        CPPUNIT_ASSERT(nonExpandingHandle.isUniform());
+
         AttributeHandleRWI handle(*array);
+        CPPUNIT_ASSERT(!handle.isUniform());
 
         CPPUNIT_ASSERT_EQUAL(handle.size(), array->size());
 
         CPPUNIT_ASSERT_EQUAL(handle.get(0), 0);
         CPPUNIT_ASSERT_EQUAL(handle.get(10), 0);
-
-        CPPUNIT_ASSERT(handle.isUniform());
 
         handle.set(0, 10);
         CPPUNIT_ASSERT(!handle.isUniform());
@@ -963,10 +1064,10 @@ TestAttributeArray::testStrided()
 {
     typedef openvdb::tools::TypedAttributeArray<int> AttributeArrayI;
     typedef AttributeHandle<int> NonStridedHandle;
-    typedef AttributeHandle<int, /*Strided=*/true> StridedHandle;
-    typedef AttributeWriteHandle<int, /*Strided=*/true> StridedWriteHandle;
-    typedef AttributeHandle<int, /*Strided=*/true, /*Interleaved=*/true> InterleavedHandle;
-    typedef AttributeWriteHandle<int, /*Strided=*/true, /*Interleaved=*/true> InterleavedWriteHandle;
+    typedef AttributeHandle<int, /*CodecType=*/UnknownCodec, /*Strided=*/true> StridedHandle;
+    typedef AttributeWriteHandle<int, /*CodecType=*/UnknownCodec, /*Strided=*/true> StridedWriteHandle;
+    typedef AttributeHandle<int, /*CodecType=*/UnknownCodec, /*Strided=*/true, /*Interleaved=*/true> InterleavedHandle;
+    typedef AttributeWriteHandle<int, /*CodecType=*/UnknownCodec, /*Strided=*/true, /*Interleaved=*/true> InterleavedWriteHandle;
 
     { // non-strided array
         AttributeArrayI::Ptr array = AttributeArrayI::create(/*n=*/2, /*stride=*/1);
@@ -1589,18 +1690,20 @@ template <typename AttrT>
 void set(const Name& prefix, AttrT& attr)
 {
     ProfileTimer timer(prefix + ": set");
-    for (size_t i = 0; i < attr.size(); i++) {
-        attr.set(i, typename AttrT::ValueType(i));
+    const size_t size = attr.size();
+    for (size_t i = 0; i < size; i++) {
+        attr.setUnsafe(i, typename AttrT::ValueType(i));
     }
 }
 
-template <typename AttrT>
+template <typename CodecT, typename AttrT>
 void setH(const Name& prefix, AttrT& attr)
 {
     typedef typename AttrT::ValueType ValueType;
     ProfileTimer timer(prefix + ": setHandle");
-    AttributeWriteHandle<ValueType> handle(attr);
-    for (size_t i = 0; i < attr.size(); i++) {
+    AttributeWriteHandle<ValueType, CodecT> handle(attr);
+    const size_t size = attr.size();
+    for (size_t i = 0; i < size; i++) {
         handle.set(i, ValueType(i));
     }
 }
@@ -1610,34 +1713,21 @@ void sum(const Name& prefix, const AttrT& attr)
 {
     ProfileTimer timer(prefix + ": sum");
     typename AttrT::ValueType sum = 0;
-    for (size_t i = 0; i < attr.size(); i++) {
-        sum += attr.get(i);
+    const size_t size = attr.size();
+    for (size_t i = 0; i < size; i++) {
+        sum += attr.getUnsafe(i);
     }
     // prevent compiler optimisations removing computation
     CPPUNIT_ASSERT(sum);
 }
 
-template <typename AttrT>
+template <typename CodecT, typename AttrT>
 void sumH(const Name& prefix, const AttrT& attr)
 {
     ProfileTimer timer(prefix + ": sumHandle");
     typedef typename AttrT::ValueType ValueType;
     ValueType sum = 0;
-    AttributeHandle<ValueType> handle(attr);
-    for (size_t i = 0; i < attr.size(); i++) {
-        sum += handle.get(i);
-    }
-    // prevent compiler optimisations removing computation
-    CPPUNIT_ASSERT(sum);
-}
-
-template <typename AttrT>
-void sumWH(const Name& prefix, AttrT& attr)
-{
-    ProfileTimer timer(prefix + ": sumWriteHandle");
-    typedef typename AttrT::ValueType ValueType;
-    ValueType sum = 0;
-    AttributeWriteHandle<ValueType> handle(attr);
+    AttributeHandle<ValueType, CodecT> handle(attr);
     for (size_t i = 0; i < attr.size(); i++) {
         sum += handle.get(i);
     }
@@ -1662,11 +1752,11 @@ TestAttributeArray::testProfile()
     ///////////////////////////////////////////////////
 
 #ifdef PROFILE
-    const int elements(1000 * 1000 * 1000);
+    const size_t elements(1000 * 1000 * 1000);
 
     std::cerr << std::endl;
 #else
-    const int elements(10 * 1000 * 1000);
+    const size_t elements(10 * 1000 * 1000);
 #endif
 
     // std::vector
@@ -1679,15 +1769,15 @@ TestAttributeArray::testProfile()
         }
         {
             ProfileTimer timer("Vector<float>: set");
-            for (int i = 0; i < elements; i++) {
+            for (size_t i = 0; i < elements; i++) {
                 values[i] = float(i);
             }
         }
         {
             ProfileTimer timer("Vector<float>: sum");
             float sum = 0;
-            for (int i = 0; i < elements; i++) {
-                sum += values[i];
+            for (size_t i = 0; i < elements; i++) {
+                sum += float(values[i]);
             }
             // to prevent optimisation clean up
             CPPUNIT_ASSERT(sum);
@@ -1717,27 +1807,50 @@ TestAttributeArray::testProfile()
         profile::sum("AttributeArray<float, fp8>", attr);
     }
 
-    // AttributeHandle
+    // AttributeHandle (UnknownCodec)
 
     {
         AttributeArrayF attr(elements);
         profile::expand("AttributeHandle<float>", attr);
-        profile::setH("AttributeHandle<float>", attr);
-        profile::sumH("AttributeHandle<float>", attr);
+        profile::setH<UnknownCodec>("AttributeHandle<float>", attr);
+        profile::sumH<UnknownCodec>("AttributeHandle<float>", attr);
     }
 
     {
         AttributeArrayF16 attr(elements);
         profile::expand("AttributeHandle<float, fp16>", attr);
-        profile::setH("AttributeHandle<float, fp16>", attr);
-        profile::sumH("AttributeHandle<float, fp16>", attr);
+        profile::setH<UnknownCodec>("AttributeHandle<float, fp16>", attr);
+        profile::sumH<UnknownCodec>("AttributeHandle<float, fp16>", attr);
     }
 
     {
         AttributeArrayF8 attr(elements);
         profile::expand("AttributeHandle<float, fp8>", attr);
-        profile::setH("AttributeHandle<float, fp8>", attr);
-        profile::sumH("AttributeHandle<float, fp8>", attr);
+        profile::setH<UnknownCodec>("AttributeHandle<float, fp8>", attr);
+        profile::sumH<UnknownCodec>("AttributeHandle<float, fp8>", attr);
+    }
+
+    // AttributeHandle (explicit codec)
+
+    {
+        AttributeArrayF attr(elements);
+        profile::expand("AttributeHandle<float>", attr);
+        profile::setH<NullCodec>("AttributeHandle<float, Codec>", attr);
+        profile::sumH<NullCodec>("AttributeHandle<float, Codec>", attr);
+    }
+
+    {
+        AttributeArrayF16 attr(elements);
+        profile::expand("AttributeHandle<float, fp16>", attr);
+        profile::setH<FixedPointCodec<false> >("AttributeHandle<float, fp16, Codec>", attr);
+        profile::sumH<FixedPointCodec<false> >("AttributeHandle<float, fp16, Codec>", attr);
+    }
+
+    {
+        AttributeArrayF8 attr(elements);
+        profile::expand("AttributeHandle<float, fp8>", attr);
+        profile::setH<FixedPointCodec<true> >("AttributeHandle<float, fp8, Codec>", attr);
+        profile::sumH<FixedPointCodec<true> >("AttributeHandle<float, fp8, Codec>", attr);
     }
 }
 
