@@ -78,12 +78,10 @@ inline NamePair
 positionAttrTypeFromCompression(const int compression)
 {
     if (compression > 0 && compression + FIXED_POSITION_16 - 1 == FIXED_POSITION_16) {
-        return TypedAttributeArray<Vec3<float>,
-                            FixedPointAttributeCodec<Vec3<uint16_t> > >::attributeType();
+        return TypedAttributeArray<Vec3<float>, FixedPointCodec<false> >::attributeType();
     }
     else if (compression > 0 && compression + FIXED_POSITION_16 - 1 == FIXED_POSITION_8) {
-        return TypedAttributeArray<Vec3<float>,
-                            FixedPointAttributeCodec<Vec3<uint8_t> > >::attributeType();
+        return TypedAttributeArray<Vec3<float>, FixedPointCodec<true> >::attributeType();
     }
 
     // compression == NONE
@@ -218,7 +216,7 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
             }
             else if (compression == TRUNCATE_16) {
                 convertAttributeFromHoudini<TypedAttributeArray<float,
-                                            NullAttributeCodec<half> > >(tree, indexTree, name, attribute, defaults, compression);
+                                            TruncateCodec> >(tree, indexTree, name, attribute, defaults, compression);
             }
         }
         else if (storage == GA_STORE_REAL64) {
@@ -251,11 +249,11 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
             }
             else if (compression == TRUNCATE_16) {
                 convertAttributeFromHoudini<TypedAttributeArray<Vec3<float>,
-                                            NullAttributeCodec<Vec3<half> > > >(tree, indexTree, name, attribute, defaults, compression);
+                                            TruncateCodec> >(tree, indexTree, name, attribute, defaults, compression);
             }
             else if (compression == UNIT_VECTOR) {
                 convertAttributeFromHoudini<TypedAttributeArray<Vec3<float>,
-                                            UnitVecAttributeCodec> >(tree, indexTree, name, attribute, defaults, compression);
+                                            UnitVecCodec> >(tree, indexTree, name, attribute, defaults, compression);
             }
         }
         else if (storage == GA_STORE_REAL64) {
@@ -622,7 +620,7 @@ newSopOperator(OP_OperatorTable* table)
         const char* items[] = {
             "none", "None",
             "truncate", "16-bit Truncate",
-            UnitVecAttributeCodec::name(), "Unit Vector",
+            UnitVecCodec::name(), "Unit Vector",
             NULL
         };
 

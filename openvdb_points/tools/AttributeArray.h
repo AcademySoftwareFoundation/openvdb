@@ -369,31 +369,78 @@ struct AttributeArray::Accessor : public AttributeArray::AccessorBase
 
 ////////////////////////////////////////
 
+
+namespace attribute_traits
+{
+    template <typename T> struct TruncateTrait { };
+    template <> struct TruncateTrait<float> { typedef half Type; };
+    template <> struct TruncateTrait<int> { typedef short Type; };
+
+    template <typename T> struct TruncateTrait<math::Vec3<T> > {
+        typedef math::Vec3<typename TruncateTrait<T>::Type> Type;
+    };
+
+    template <bool OneByte, typename T> struct UIntTypeTrait { };
+    template<typename T> struct UIntTypeTrait</*OneByte=*/true, T> { typedef uint8_t Type; };
+    template<typename T> struct UIntTypeTrait</*OneByte=*/false, T> { typedef uint16_t Type; };
+    template<typename T> struct UIntTypeTrait</*OneByte=*/true, math::Vec3<T> > {
+        typedef math::Vec3<uint8_t> Type;
+    };
+    template<typename T> struct UIntTypeTrait</*OneByte=*/false, math::Vec3<T> > {
+        typedef math::Vec3<uint16_t> Type;
+    };
+}
+
+
+////////////////////////////////////////
+
+
 // Attribute codec schemes
 
-template<typename StorageType_>
-struct NullAttributeCodec
+struct UnknownCodec { };
+
+
+struct NullCodec
 {
-    typedef StorageType_ StorageType;
-    template<typename ValueType> static void decode(const StorageType&, ValueType&);
-    template<typename ValueType> static void encode(const StorageType&, ValueType&);
+    template <typename T>
+    struct Storage { typedef T Type; };
+
+    template<typename ValueType> static void decode(const ValueType&, ValueType&);
+    template<typename ValueType> static void encode(const ValueType&, ValueType&);
     static const char* name() { return "null"; }
 };
 
 
-template<typename IntType>
-struct FixedPointAttributeCodec
+struct TruncateCodec
 {
-    typedef IntType StorageType;
-    template<typename ValueType> static void decode(const StorageType&, ValueType&);
-    template<typename ValueType> static void encode(const ValueType&, StorageType&);
+    template <typename T>
+    struct Storage { typedef typename attribute_traits::TruncateTrait<T>::Type Type; };
+
+    template<typename StorageType, typename ValueType> static void decode(const StorageType&, ValueType&);
+    template<typename StorageType, typename ValueType> static void encode(const ValueType&, StorageType&);
+    static const char* name() { return "trunc"; }
+};
+
+
+template <bool OneByte>
+struct FixedPointCodec
+{
+    template <typename T>
+    struct Storage { typedef typename attribute_traits::UIntTypeTrait<OneByte, T>::Type Type; };
+
+    template<typename StorageType, typename ValueType> static void decode(const StorageType&, ValueType&);
+    template<typename StorageType, typename ValueType> static void encode(const ValueType&, StorageType&);
     static const char* name() { return "fxpt"; }
 };
 
 
-struct UnitVecAttributeCodec
+struct UnitVecCodec
 {
     typedef uint16_t StorageType;
+
+    template <typename T>
+    struct Storage { typedef StorageType Type; };
+
     template<typename T> static void decode(const StorageType&, math::Vec3<T>&);
     template<typename T> static void encode(const math::Vec3<T>&, StorageType&);
     static const char* name() { return "uvec"; }
@@ -404,16 +451,16 @@ struct UnitVecAttributeCodec
 
 
 /// Typed class for storing attribute data
-template<typename ValueType_, typename Codec_ = NullAttributeCodec<ValueType_> >
+template<typename ValueType_, typename Codec_ = NullCodec>
 class TypedAttributeArray: public AttributeArray
 {
 public:
-    typedef boost::shared_ptr<TypedAttributeArray>          Ptr;
-    typedef boost::shared_ptr<const TypedAttributeArray>    ConstPtr;
+    typedef boost::shared_ptr<TypedAttributeArray>              Ptr;
+    typedef boost::shared_ptr<const TypedAttributeArray>        ConstPtr;
 
-    typedef ValueType_                  ValueType;
-    typedef Codec_                      Codec;
-    typedef typename Codec::StorageType StorageType;
+    typedef ValueType_                                          ValueType;
+    typedef Codec_                                              Codec;
+    typedef typename Codec::template Storage<ValueType>::Type   StorageType;
 
     //////////
 
@@ -658,28 +705,42 @@ public:
 // Attribute codec implementation
 
 
-template<typename StorageType_>
 template<typename ValueType>
 inline void
-NullAttributeCodec<StorageType_>::decode(const StorageType& data, ValueType& val)
+NullCodec::decode(const ValueType& data, ValueType& val)
+{
+    val = data;
+}
+
+
+template<typename ValueType>
+inline void
+NullCodec::encode(const ValueType& val, ValueType& data)
+{
+    data = val;
+}
+
+
+template<typename StorageType, typename ValueType>
+inline void
+TruncateCodec::decode(const StorageType& data, ValueType& val)
 {
     val = static_cast<ValueType>(data);
 }
 
 
-template<typename StorageType_>
-template<typename ValueType>
+template<typename StorageType, typename ValueType>
 inline void
-NullAttributeCodec<StorageType_>::encode(const StorageType& val, ValueType& data)
+TruncateCodec::encode(const ValueType& val, StorageType& data)
 {
     data = static_cast<StorageType>(val);
 }
 
 
-template<typename IntType>
-template<typename ValueType>
+template<bool OneByte>
+template<typename StorageType, typename ValueType>
 inline void
-FixedPointAttributeCodec<IntType>::decode(const StorageType& data, ValueType& val)
+FixedPointCodec<OneByte>::decode(const StorageType& data, ValueType& val)
 {
     val = fixedPointToFloatingPoint<ValueType>(data);
 
@@ -689,10 +750,10 @@ FixedPointAttributeCodec<IntType>::decode(const StorageType& data, ValueType& va
 }
 
 
-template<typename IntType>
-template<typename ValueType>
+template<bool OneByte>
+template<typename StorageType, typename ValueType>
 inline void
-FixedPointAttributeCodec<IntType>::encode(const ValueType& val, StorageType& data)
+FixedPointCodec<OneByte>::encode(const ValueType& val, StorageType& data)
 {
     // shift value range to be -0.5 => 0.5 (as this is most commonly used for position)
 
@@ -704,7 +765,7 @@ FixedPointAttributeCodec<IntType>::encode(const ValueType& val, StorageType& dat
 
 template<typename T>
 inline void
-UnitVecAttributeCodec::decode(const StorageType& data, math::Vec3<T>& val)
+UnitVecCodec::decode(const StorageType& data, math::Vec3<T>& val)
 {
     val = math::QuantizedUnitVec::unpack(data);
 }
@@ -712,7 +773,7 @@ UnitVecAttributeCodec::decode(const StorageType& data, math::Vec3<T>& val)
 
 template<typename T>
 inline void
-UnitVecAttributeCodec::encode(const math::Vec3<T>& val, StorageType& data)
+UnitVecCodec::encode(const math::Vec3<T>& val, StorageType& data)
 {
     data = math::QuantizedUnitVec::pack(val);
 }
@@ -1177,7 +1238,7 @@ TypedAttributeArray<ValueType_, Codec_>::compress()
 
         this->doLoadUnsafe();
 
-        const size_t typeSize = sizeof(typename Codec_::StorageType);
+        const size_t typeSize = sizeof(StorageType);
         const size_t inBytes = mSize * sizeof(StorageType);
         size_t outBytes;
         char* charBuffer = reinterpret_cast<char*>(mData);
@@ -1391,7 +1452,7 @@ TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os, bool outputTran
     else if (io::getDataCompression(os) & io::COMPRESS_BLOSC)
     {
         const char* charBuffer = reinterpret_cast<const char*>(mData);
-        const size_t typeSize = sizeof(typename Codec_::StorageType);
+        const size_t typeSize = sizeof(StorageType);
         const size_t inBytes = mSize * sizeof(StorageType);
         compressedBuffer.reset(compress(charBuffer, typeSize, inBytes, compressedBytes));
         if (compressedBuffer)   flags |= WRITEDISKCOMPRESS;

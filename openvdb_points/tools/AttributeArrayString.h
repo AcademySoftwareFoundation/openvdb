@@ -54,18 +54,28 @@ namespace tools {
 typedef uint32_t StringIndexType;
 
 
-template<typename StorageType_>
-struct StringAttributeCodec
+namespace attribute_traits
 {
-    typedef StorageType_ StorageType;
+    template <bool Truncate> struct StringTypeTrait { typedef StringIndexType Type; };
+    template<> struct StringTypeTrait</*Truncate=*/true> { typedef uint16_t Type; };
+}
+
+
+template <bool Truncate>
+struct StringCodec
+{
     typedef StringIndexType ValueType;
-    static void decode(const StorageType&, ValueType&);
-    static void encode(const ValueType&, StorageType&);
+
+    template <typename T>
+    struct Storage { typedef typename attribute_traits::StringTypeTrait<Truncate>::Type Type; };
+
+    template<typename StorageType> static void decode(const StorageType&, ValueType&);
+    template<typename StorageType> static void encode(const ValueType&, StorageType&);
     static const char* name() { return "str"; }
 };
 
 
-typedef TypedAttributeArray<StringIndexType, StringAttributeCodec<StringIndexType> > StringAttributeArray;
+typedef TypedAttributeArray<StringIndexType, StringCodec<false> > StringAttributeArray;
 
 
 ////////////////////////////////////////
@@ -92,17 +102,19 @@ private:
 ////////////////////////////////////////
 
 
-template<typename StorageType_>
+template <bool Truncate>
+template<typename StorageType>
 inline void
-StringAttributeCodec<StorageType_>::decode(const StorageType& data, ValueType& val)
+StringCodec<Truncate>::decode(const StorageType& data, ValueType& val)
 {
     val = static_cast<ValueType>(data);
 }
 
 
-template<typename StorageType_>
+template <bool Truncate>
+template<typename StorageType>
 inline void
-StringAttributeCodec<StorageType_>::encode(const ValueType& val, StorageType& data)
+StringCodec<Truncate>::encode(const ValueType& val, StorageType& data)
 {
     data = static_cast<ValueType>(val);
 }

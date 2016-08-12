@@ -54,31 +54,35 @@ typedef uint8_t GroupType;
 ////////////////////////////////////////
 
 
-struct GroupAttributeCodec
+struct GroupCodec
 {
     typedef GroupType StorageType;
     typedef GroupType ValueType;
+
+    template <typename T>
+    struct Storage { typedef StorageType Type; };
+
     static void decode(const StorageType&, ValueType&);
     static void encode(const ValueType&, StorageType&);
     static const char* name() { return "grp"; }
 };
 
 
-typedef TypedAttributeArray<GroupType, GroupAttributeCodec> GroupAttributeArray;
+typedef TypedAttributeArray<GroupType, GroupCodec> GroupAttributeArray;
 
 
 ////////////////////////////////////////
 
 
 inline void
-GroupAttributeCodec::decode(const StorageType& data, ValueType& val)
+GroupCodec::decode(const StorageType& data, ValueType& val)
 {
     val = data;
 }
 
 
 inline void
-GroupAttributeCodec::encode(const ValueType& val, StorageType& data)
+GroupCodec::encode(const ValueType& val, StorageType& data)
 {
     data = val;
 }
