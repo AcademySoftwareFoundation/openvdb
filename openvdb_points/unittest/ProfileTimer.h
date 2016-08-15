@@ -64,7 +64,7 @@ public:
 #ifdef PROFILE
         // padd string to 50 characters
         std::string newMsg(msg);
-        newMsg.insert(newMsg.end(), 50 - newMsg.size(), ' ');
+        if (newMsg.size() < 50)     newMsg.insert(newMsg.end(), 50 - newMsg.size(), ' ');
         std::cerr << newMsg << " ... ";
 #endif
         mT0 = tbb::tick_count::now();
