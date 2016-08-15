@@ -952,9 +952,9 @@ template<typename ValueType_, typename Codec_>
 typename TypedAttributeArray<ValueType_, Codec_>::ValueType
 TypedAttributeArray<ValueType_, Codec_>::getUnsafe(Index n) const
 {
+    assert(n < mSize * mStride);
     assert(!this->isOutOfCore());
     assert(!this->isCompressed());
-    assert(n < mSize * mStride);
 
     ValueType val;
     Codec::decode(/*in=*/mData[mIsUniform ? 0 : n], /*out=*/val);
@@ -966,9 +966,9 @@ template<typename ValueType_, typename Codec_>
 typename TypedAttributeArray<ValueType_, Codec_>::ValueType
 TypedAttributeArray<ValueType_, Codec_>::get(Index n) const
 {
+    if (n >= mSize * mStride)           OPENVDB_THROW(IndexError, "Out-of-range access.");
     if (this->isOutOfCore())            this->doLoad();
     if (this->isCompressed())           const_cast<TypedAttributeArray*>(this)->decompress();
-    if (n >= mSize * mStride)           OPENVDB_THROW(IndexError, "Out-of-range access.");
 
     return this->getUnsafe(n);
 }
@@ -979,13 +979,7 @@ template<typename T>
 void
 TypedAttributeArray<ValueType_, Codec_>::getUnsafe(Index n, T& val) const
 {
-    assert(!this->isOutOfCore());
-    assert(!this->isCompressed());
-    assert(n < mSize * mStride);
-
-    ValueType tmp;
-    Codec::decode(/*in=*/mData[mIsUniform ? 0 : n], /*out=*/tmp);
-    val = static_cast<T>(tmp);
+    val = static_cast<T>(this->getUnsafe(n));
 }
 
 
@@ -994,11 +988,7 @@ template<typename T>
 void
 TypedAttributeArray<ValueType_, Codec_>::get(Index n, T& val) const
 {
-    if (this->isOutOfCore())            this->doLoad();
-    if (this->isCompressed())           const_cast<TypedAttributeArray*>(this)->decompress();
-    if (n >= mSize * mStride)           OPENVDB_THROW(IndexError, "Out-of-range access.");
-
-    this->getUnsafe(n, val);
+    val = static_cast<T>(this->get(n));
 }
 
 
@@ -1014,9 +1004,9 @@ template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::setUnsafe(Index n, const ValueType& val)
 {
+    assert(n < mSize * mStride);
     assert(!this->isOutOfCore());
     assert(!this->isCompressed());
-    assert(n < mSize * mStride);
 
     if (mIsUniform)     this->expand();
 
@@ -1028,9 +1018,9 @@ template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::set(Index n, const ValueType& val)
 {
+    if (n >= mSize * mStride)           OPENVDB_THROW(IndexError, "Out-of-range access.");
     if (this->isOutOfCore())            this->doLoad();
     if (this->isCompressed())           this->decompress();
-    if (n >= mSize * mStride)           OPENVDB_THROW(IndexError, "Out-of-range access.");
 
     this->setUnsafe(n, val);
 }
@@ -1041,14 +1031,9 @@ template<typename T>
 void
 TypedAttributeArray<ValueType_, Codec_>::setUnsafe(Index n, const T& val)
 {
-    assert(!this->isOutOfCore());
-    assert(!this->isCompressed());
-    assert(n < mSize * mStride);
 
     if (mIsUniform)     this->expand();
-
-    const ValueType tmp = static_cast<ValueType>(val);
-    Codec::encode(/*in=*/tmp, /*out=*/mData[n]);
+    this->setUnsafe(n, static_cast<ValueType>(val));
 }
 
 
@@ -1057,11 +1042,7 @@ template<typename T>
 void
 TypedAttributeArray<ValueType_, Codec_>::set(Index n, const T& val)
 {
-    if (this->isOutOfCore())            this->doLoad();
-    if (this->isCompressed())           this->decompress();
-    if (n >= mSize * mStride)           OPENVDB_THROW(IndexError, "Out-of-range access.");
-
-    this->setUnsafe(n, val);
+    this->set(n, static_cast<ValueType>(val));
 }
 
 
