@@ -326,7 +326,7 @@ struct PopulatePositionAttributeOp {
             if (!pointIndexLeaf)    continue;
 
             typename AttributeWriteHandle<Vec3f>::Ptr attributeWriteHandle =
-                AttributeWriteHandle<Vec3f>::create(leaf->template attributeArray("P"));
+                AttributeWriteHandle<Vec3f>::create(leaf->attributeArray("P"));
 
             Index64 index = 0;
 
@@ -466,7 +466,7 @@ struct ConvertPointDataGridPositionOp {
             if (leaf.pos() > 0)     offset += mPointOffsets[leaf.pos() - 1];
 
             typename AttributeHandle<ValueType>::Ptr handle =
-                    AttributeHandle<ValueType>::create(leaf->template constAttributeArray(mIndex));
+                    AttributeHandle<ValueType>::create(leaf->constAttributeArray(mIndex));
 
             IndexOnIter iter = leaf->beginIndexOn();
 
