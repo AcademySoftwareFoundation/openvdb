@@ -297,6 +297,9 @@ void StringAttributeWriteHandle::resetCache()
 
 Index StringAttributeWriteHandle::getIndex(const Name& name)
 {
+    // zero used for an empty string
+    if (name.empty())   return Index(0);
+
     ValueMap::const_iterator it = mCache.find(name);
 
     if (it == mCache.end()) {

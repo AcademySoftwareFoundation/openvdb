@@ -399,8 +399,8 @@ createPointDataGrid(const GU_Detail& ptGeo, const openvdb::NamePair& positionAtt
             StringMetaInserter inserter(metadata);
             for (GA_AIFSharedStringTuple::iterator  it = sharedStringTupleAIF->begin(gaAttribute),
                                                     itEnd = sharedStringTupleAIF->end(); !(it == itEnd); ++it) {
-
-                inserter.insert(Name(it.getString()));
+                Name str(it.getString());
+                if (!str.empty())   inserter.insert(str);
             }
         }
 

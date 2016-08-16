@@ -440,6 +440,11 @@ TestAttributeArrayString::testStringAttributeWriteHandle()
         handle.collapse();
         CPPUNIT_ASSERT_EQUAL(handle.get(0), Name(""));
     }
+
+    { // empty string tests
+        handle.collapse("");
+        CPPUNIT_ASSERT_EQUAL(handle.get(0), Name(""));
+    }
 }
 
 
