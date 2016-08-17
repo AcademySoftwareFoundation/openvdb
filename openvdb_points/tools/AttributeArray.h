@@ -346,7 +346,7 @@ protected:
 
 
 /// Accessor base class for AttributeArray storage where type is not available
-struct AttributeArray::AccessorBase { };
+struct AttributeArray::AccessorBase { virtual ~AccessorBase() { } };
 
 /// Templated Accessor stores typed function pointers used in binding
 /// AttributeHandles
@@ -655,6 +655,12 @@ protected:
 
 private:
     friend class ::TestAttributeArray;
+
+    template <bool IsUnknownCodec>
+    typename boost::enable_if_c<IsUnknownCodec, bool>::type compatibleType() const;
+
+    template <bool IsUnknownCodec>
+    typename boost::enable_if_c<!IsUnknownCodec, bool>::type compatibleType() const;
 
     template <bool IsUnknownCodec>
     typename boost::enable_if_c<IsUnknownCodec, ValueType>::type get(Index index) const;
@@ -1653,6 +1659,10 @@ AttributeHandle<ValueType, CodecType, Strided, Interleaved>::AttributeHandle(con
         OPENVDB_THROW(TypeError, "Handle can only be bound to an AttributeArray of stride 1.");
     }
 
+    if (!this->compatibleType<boost::is_same<CodecType, UnknownCodec>::value>()) {
+        OPENVDB_THROW(TypeError, "Cannot bind handle due to incompatible type of AttributeArray.");
+    }
+
     // load data if delay-loaded
 
     mArray->loadData();
@@ -1679,14 +1689,30 @@ AttributeHandle<ValueType, CodecType, Strided, Interleaved>::AttributeHandle(con
 
     AttributeArray::Accessor<ValueType>* typedAccessor = static_cast<AttributeArray::Accessor<ValueType>*>(accessor.get());
 
-    if (!typedAccessor) {
-        OPENVDB_THROW(RuntimeError, "Cannot bind AttributeHandle due to mis-matching types.");
-    }
-
     mGetter = typedAccessor->mGetter;
     mSetter = typedAccessor->mSetter;
     mCollapser = typedAccessor->mCollapser;
     mFiller = typedAccessor->mFiller;
+}
+
+template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+template <bool IsUnknownCodec>
+typename boost::enable_if_c<IsUnknownCodec, bool>::type
+AttributeHandle<ValueType, CodecType, Strided, Interleaved>::compatibleType() const
+{
+    // if codec is unknown, just check the value type
+
+    return mArray->hasValueType<ValueType>();
+}
+
+template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+template <bool IsUnknownCodec>
+typename boost::enable_if_c<!IsUnknownCodec, bool>::type
+AttributeHandle<ValueType, CodecType, Strided, Interleaved>::compatibleType() const
+{
+    // if the codec is known, check the value type and codec
+
+    return mArray->isType<TypedAttributeArray<ValueType, CodecType> >();
 }
 
 template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>

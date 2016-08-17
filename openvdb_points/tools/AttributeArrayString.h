@@ -150,8 +150,8 @@ public:
     void get(Name& name, Index n) const;
 
 protected:
-    AttributeHandle<StringIndexType>    mHandle;
-    const MetaMap&                      mMetadata;
+    AttributeHandle<StringIndexType, StringCodec<false> >   mHandle;
+    const MetaMap&                                          mMetadata;
 }; // class StringAttributeHandle
 
 
@@ -199,8 +199,8 @@ private:
 
     typedef std::map<std::string, Index>    ValueMap;
 
-    ValueMap                                mCache;
-    AttributeWriteHandle<StringIndexType>   mWriteHandle;
+    ValueMap                                                    mCache;
+    AttributeWriteHandle<StringIndexType, StringCodec<false> >  mWriteHandle;
 }; // class StringAttributeWriteHandle
 
 
