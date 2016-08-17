@@ -435,6 +435,7 @@ TestAttributeArrayString::testStringAttributeWriteHandle()
         handle.collapse("testA");
         CPPUNIT_ASSERT(handle.isUniform());
         CPPUNIT_ASSERT_EQUAL(handle.get(0), Name("testA"));
+        handle.expand();
         handle.set(2, "testB");
         CPPUNIT_ASSERT(!handle.isUniform());
         handle.collapse();

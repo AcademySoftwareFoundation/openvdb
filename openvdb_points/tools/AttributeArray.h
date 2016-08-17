@@ -189,8 +189,14 @@ protected:
     typedef boost::shared_ptr<AccessorBase>             AccessorBasePtr;
 
 public:
-    enum Flag { TRANSIENT = 0x1, HIDDEN = 0x2, WRITEUNIFORM=0x8,
-                WRITEMEMCOMPRESS=0x10, WRITEDISKCOMPRESS=0x20, OUTOFCORE=0x40 };
+    enum Flag { TRANSIENT = 0x1, /// by default not written to disk
+                HIDDEN = 0x2, /// hidden from UIs or iterators
+                WRITESTRIDED=0x4, /// (serialization only) - mark as strided
+                WRITEUNIFORM=0x8, /// (serialization only) - mark as uniform
+                WRITEMEMCOMPRESS=0x10, /// (serialization only) - mark as compressed in-memory
+                WRITEDISKCOMPRESS=0x20, /// (serialization only) - mark as compressed on-disk
+                OUTOFCORE=0x40, /// data not yet loaded from disk
+                INTERLEAVED=0x80 }; /// for strided attributes only, interleave values
 
 #ifndef OPENVDB_2_ABI_COMPATIBLE
     struct FileInfo
@@ -206,9 +212,9 @@ public:
     typedef boost::shared_ptr<AttributeArray>           Ptr;
     typedef boost::shared_ptr<const AttributeArray>     ConstPtr;
 
-    template <typename> friend class AttributeHandle;
+    typedef Ptr (*FactoryMethod)(size_t, Index);
 
-    typedef Ptr (*FactoryMethod)(size_t);
+    template <typename ValueType, typename CodecType, bool Strided, bool Interleaved> friend class AttributeHandle;
 
     AttributeArray() : mCompressedBytes(0), mFlags(0) {}
     virtual ~AttributeArray() {}
@@ -222,11 +228,24 @@ public:
     /// Return the length of this array.
     virtual size_t size() const = 0;
 
+    /// Return the stride of this array.
+    virtual Index stride() const = 0;
+
+    /// Return true if the array is strided.
+    virtual bool isStrided() const = 0;
+
+    /// @brief Specify whether the array elements are interleaved in memory
+    /// @note this means nothing if the array is not also strided.
+    virtual void setInterleaved(bool state);
+    /// Return true if the array is interleaved.
+    /// @note this means nothing if the array is not also strided.
+    virtual bool isInterleaved() const { return bool(mFlags & INTERLEAVED); }
+
     /// Return the number of bytes of memory used by this attribute.
     virtual size_t memUsage() const = 0;
 
-    /// Create a new attribute array of the given (registered) type and length.
-    static Ptr create(const NamePair& type, size_t length);
+    /// Create a new attribute array of the given (registered) type, length and stride.
+    static Ptr create(const NamePair& type, size_t length, Index stride = 1);
     /// Return @c true if the given attribute type name is registered.
     static bool isRegistered(const NamePair& type);
     /// Clear the attribute type registry.
@@ -327,7 +346,7 @@ protected:
 
 
 /// Accessor base class for AttributeArray storage where type is not available
-struct AttributeArray::AccessorBase { };
+struct AttributeArray::AccessorBase { virtual ~AccessorBase() { } };
 
 /// Templated Accessor stores typed function pointers used in binding
 /// AttributeHandles
@@ -350,31 +369,78 @@ struct AttributeArray::Accessor : public AttributeArray::AccessorBase
 
 ////////////////////////////////////////
 
+
+namespace attribute_traits
+{
+    template <typename T> struct TruncateTrait { };
+    template <> struct TruncateTrait<float> { typedef half Type; };
+    template <> struct TruncateTrait<int> { typedef short Type; };
+
+    template <typename T> struct TruncateTrait<math::Vec3<T> > {
+        typedef math::Vec3<typename TruncateTrait<T>::Type> Type;
+    };
+
+    template <bool OneByte, typename T> struct UIntTypeTrait { };
+    template<typename T> struct UIntTypeTrait</*OneByte=*/true, T> { typedef uint8_t Type; };
+    template<typename T> struct UIntTypeTrait</*OneByte=*/false, T> { typedef uint16_t Type; };
+    template<typename T> struct UIntTypeTrait</*OneByte=*/true, math::Vec3<T> > {
+        typedef math::Vec3<uint8_t> Type;
+    };
+    template<typename T> struct UIntTypeTrait</*OneByte=*/false, math::Vec3<T> > {
+        typedef math::Vec3<uint16_t> Type;
+    };
+}
+
+
+////////////////////////////////////////
+
+
 // Attribute codec schemes
 
-template<typename StorageType_>
-struct NullAttributeCodec
+struct UnknownCodec { };
+
+
+struct NullCodec
 {
-    typedef StorageType_ StorageType;
-    template<typename ValueType> static void decode(const StorageType&, ValueType&);
-    template<typename ValueType> static void encode(const StorageType&, ValueType&);
+    template <typename T>
+    struct Storage { typedef T Type; };
+
+    template<typename ValueType> static void decode(const ValueType&, ValueType&);
+    template<typename ValueType> static void encode(const ValueType&, ValueType&);
     static const char* name() { return "null"; }
 };
 
 
-template<typename IntType>
-struct FixedPointAttributeCodec
+struct TruncateCodec
 {
-    typedef IntType StorageType;
-    template<typename ValueType> static void decode(const StorageType&, ValueType&);
-    template<typename ValueType> static void encode(const ValueType&, StorageType&);
-    static const char* name() { return "fxpt"; }
+    template <typename T>
+    struct Storage { typedef typename attribute_traits::TruncateTrait<T>::Type Type; };
+
+    template<typename StorageType, typename ValueType> static void decode(const StorageType&, ValueType&);
+    template<typename StorageType, typename ValueType> static void encode(const ValueType&, StorageType&);
+    static const char* name() { return "trnc"; }
 };
 
 
-struct UnitVecAttributeCodec
+template <bool OneByte>
+struct FixedPointCodec
+{
+    template <typename T>
+    struct Storage { typedef typename attribute_traits::UIntTypeTrait<OneByte, T>::Type Type; };
+
+    template<typename StorageType, typename ValueType> static void decode(const StorageType&, ValueType&);
+    template<typename StorageType, typename ValueType> static void encode(const ValueType&, StorageType&);
+    static const char* name() { return OneByte ? "fxpt8" : "fxpt16"; }
+};
+
+
+struct UnitVecCodec
 {
     typedef uint16_t StorageType;
+
+    template <typename T>
+    struct Storage { typedef StorageType Type; };
+
     template<typename T> static void decode(const StorageType&, math::Vec3<T>&);
     template<typename T> static void encode(const math::Vec3<T>&, StorageType&);
     static const char* name() { return "uvec"; }
@@ -385,21 +451,21 @@ struct UnitVecAttributeCodec
 
 
 /// Typed class for storing attribute data
-template<typename ValueType_, typename Codec_ = NullAttributeCodec<ValueType_> >
+template<typename ValueType_, typename Codec_ = NullCodec>
 class TypedAttributeArray: public AttributeArray
 {
 public:
-    typedef boost::shared_ptr<TypedAttributeArray>          Ptr;
-    typedef boost::shared_ptr<const TypedAttributeArray>    ConstPtr;
+    typedef boost::shared_ptr<TypedAttributeArray>              Ptr;
+    typedef boost::shared_ptr<const TypedAttributeArray>        ConstPtr;
 
-    typedef ValueType_                  ValueType;
-    typedef Codec_                      Codec;
-    typedef typename Codec::StorageType StorageType;
+    typedef ValueType_                                          ValueType;
+    typedef Codec_                                              Codec;
+    typedef typename Codec::template Storage<ValueType>::Type   StorageType;
 
     //////////
 
     /// Default constructor, always constructs a uniform attribute.
-    explicit TypedAttributeArray(size_t n = 1,
+    explicit TypedAttributeArray(size_t n = 1, Index stride = 1,
         const ValueType& uniformValue = zeroVal<ValueType>());
     /// Deep copy constructor (optionally decompress during copy).
     TypedAttributeArray(const TypedAttributeArray&, bool uncompress = false);
@@ -414,8 +480,8 @@ public:
     /// Return an uncompressed copy of this attribute (will just return a copy if not compressed).
     virtual AttributeArray::Ptr copyUncompressed() const;
 
-    /// Return a new attribute array of the given length @a n with uniform value zero.
-    static Ptr create(size_t n);
+    /// Return a new attribute array of the given length @a n and @a stride with uniform value zero.
+    static Ptr create(size_t n, Index stride = 1);
 
     /// Cast an AttributeArray to TypedAttributeArray<T>
     static TypedAttributeArray& cast(AttributeArray& attributeArray);
@@ -436,7 +502,13 @@ public:
     static void unregisterType();
 
     /// Return the length of this array.
-    virtual size_t size() const { return mSize; };
+    virtual size_t size() const { return mSize; }
+
+    /// Return the stride of this array.
+    virtual Index stride() const { return mStride; }
+
+    /// Return true if stride is greater than one.
+    virtual bool isStrided() const { return mStride > 1; }
 
     /// Return the number of bytes of memory used by this attribute.
     virtual size_t memUsage() const;
@@ -525,15 +597,16 @@ private:
     virtual bool isEqual(const AttributeArray& other) const;
 
     size_t arrayMemUsage() const;
-    void allocate(const size_t size);
+    void allocate(const size_t size, const Index stride);
     void deallocate();
 
     /// Helper function for use with registerType()
-    static AttributeArray::Ptr factory(size_t n) { return TypedAttributeArray::create(n); }
+    static AttributeArray::Ptr factory(size_t n, Index stride) { return TypedAttributeArray::create(n, stride); }
 
     static tbb::atomic<const NamePair*> sTypeName;
     StorageType*    mData;
     size_t          mSize;
+    Index           mStride;
     bool            mIsUniform;
     tbb::spin_mutex mMutex;
 }; // class TypedAttributeArray
@@ -544,16 +617,17 @@ private:
 
 /// AttributeHandles provide access to specific TypedAttributeArray methods without needing
 /// to know the compression codec, however these methods also incur the cost of a function pointer
-template <typename T>
+template <typename ValueType, typename CodecType = UnknownCodec, bool Strided = false, bool Interleaved = false>
 class AttributeHandle
 {
 public:
-    typedef boost::shared_ptr<AttributeHandle<T> > Ptr;
+    typedef AttributeHandle<ValueType, CodecType, Strided, Interleaved>     Handle;
+    typedef boost::shared_ptr<Handle>                                       Ptr;
 
 protected:
-    typedef T (*GetterPtr)(const AttributeArray* array, const Index n);
-    typedef void (*SetterPtr)(AttributeArray* array, const Index n, const T& value);
-    typedef void (*ValuePtr)(AttributeArray* array, const T& value);
+    typedef ValueType (*GetterPtr)(const AttributeArray* array, const Index n);
+    typedef void (*SetterPtr)(AttributeArray* array, const Index n, const ValueType& value);
+    typedef void (*ValuePtr)(AttributeArray* array, const ValueType& value);
 
 public:
     static Ptr create(const AttributeArray& array, const bool preserveCompression = true);
@@ -562,13 +636,16 @@ public:
 
     virtual ~AttributeHandle() { }
 
-    size_t size() const { return mArray->size(); }
+    Index stride() const { return mStride; }
+    size_t size() const { return mSize; }
 
     bool isUniform() const;
 
-    T get(Index n) const;
+    ValueType get(Index n, Index m = 0) const;
 
 protected:
+    Index index(Index n, Index m) const;
+
     const AttributeArray* mArray;
 
     GetterPtr mGetter;
@@ -577,21 +654,42 @@ protected:
     ValuePtr  mFiller;
 
 private:
+    friend class ::TestAttributeArray;
+
+    template <bool IsUnknownCodec>
+    typename boost::enable_if_c<IsUnknownCodec, bool>::type compatibleType() const;
+
+    template <bool IsUnknownCodec>
+    typename boost::enable_if_c<!IsUnknownCodec, bool>::type compatibleType() const;
+
+    template <bool IsUnknownCodec>
+    typename boost::enable_if_c<IsUnknownCodec, ValueType>::type get(Index index) const;
+
+    template <bool IsUnknownCodec>
+    typename boost::enable_if_c<!IsUnknownCodec, ValueType>::type get(Index index) const;
+
     // local copy of AttributeArray (to preserve compression)
     AttributeArray::Ptr mLocalArray;
+
+    Index mStride;
+    Index mSize;
 }; // class AttributeHandle
 
 
+////////////////////////////////////////
+
+
 /// Write-able version of AttributeHandle
-template <typename T>
-class AttributeWriteHandle : public AttributeHandle<T>
+template <typename ValueType, typename CodecType = UnknownCodec, bool Strided = false, bool Interleaved = false>
+class AttributeWriteHandle : public AttributeHandle<ValueType, CodecType, Strided, Interleaved>
 {
 public:
-    typedef boost::shared_ptr<AttributeWriteHandle<T> > Ptr;
+    typedef AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>    Handle;
+    typedef boost::shared_ptr<Handle>                                           Ptr;
 
-    static Ptr create(AttributeArray& array);
+    static Ptr create(AttributeArray& array, const bool expand = true);
 
-    AttributeWriteHandle(AttributeArray& array);
+    AttributeWriteHandle(AttributeArray& array, const bool expand = true);
 
     virtual ~AttributeWriteHandle() { }
 
@@ -601,16 +699,26 @@ public:
 
     /// Replace the existing array with a uniform value (zero if none provided).
     void collapse();
-    void collapse(const T& uniformValue);
+    void collapse(const ValueType& uniformValue);
 
     /// Compact the existing array to become uniform if all values are identical
     bool compact();
 
     /// @brief Fill the existing array with the given value.
     /// @note Identical to collapse() except a non-uniform array will not become uniform.
-    void fill(const T& value);
+    void fill(const ValueType& value);
 
-    void set(Index n, const T& value);
+    void set(Index n, const ValueType& value);
+    void set(Index n, Index m, const ValueType& value);
+
+private:
+    friend class ::TestAttributeArray;
+
+    template <bool IsUnknownCodec>
+    typename boost::enable_if_c<IsUnknownCodec, void>::type set(Index index, const ValueType& value) const;
+
+    template <bool IsUnknownCodec>
+    typename boost::enable_if_c<!IsUnknownCodec, void>::type set(Index index, const ValueType& value) const;
 }; // class AttributeWriteHandle
 
 
@@ -620,28 +728,42 @@ public:
 // Attribute codec implementation
 
 
-template<typename StorageType_>
 template<typename ValueType>
 inline void
-NullAttributeCodec<StorageType_>::decode(const StorageType& data, ValueType& val)
+NullCodec::decode(const ValueType& data, ValueType& val)
+{
+    val = data;
+}
+
+
+template<typename ValueType>
+inline void
+NullCodec::encode(const ValueType& val, ValueType& data)
+{
+    data = val;
+}
+
+
+template<typename StorageType, typename ValueType>
+inline void
+TruncateCodec::decode(const StorageType& data, ValueType& val)
 {
     val = static_cast<ValueType>(data);
 }
 
 
-template<typename StorageType_>
-template<typename ValueType>
+template<typename StorageType, typename ValueType>
 inline void
-NullAttributeCodec<StorageType_>::encode(const StorageType& val, ValueType& data)
+TruncateCodec::encode(const ValueType& val, StorageType& data)
 {
     data = static_cast<StorageType>(val);
 }
 
 
-template<typename IntType>
-template<typename ValueType>
+template<bool OneByte>
+template<typename StorageType, typename ValueType>
 inline void
-FixedPointAttributeCodec<IntType>::decode(const StorageType& data, ValueType& val)
+FixedPointCodec<OneByte>::decode(const StorageType& data, ValueType& val)
 {
     val = fixedPointToFloatingPoint<ValueType>(data);
 
@@ -651,10 +773,10 @@ FixedPointAttributeCodec<IntType>::decode(const StorageType& data, ValueType& va
 }
 
 
-template<typename IntType>
-template<typename ValueType>
+template<bool OneByte>
+template<typename StorageType, typename ValueType>
 inline void
-FixedPointAttributeCodec<IntType>::encode(const ValueType& val, StorageType& data)
+FixedPointCodec<OneByte>::encode(const ValueType& val, StorageType& data)
 {
     // shift value range to be -0.5 => 0.5 (as this is most commonly used for position)
 
@@ -666,7 +788,7 @@ FixedPointAttributeCodec<IntType>::encode(const ValueType& val, StorageType& dat
 
 template<typename T>
 inline void
-UnitVecAttributeCodec::decode(const StorageType& data, math::Vec3<T>& val)
+UnitVecCodec::decode(const StorageType& data, math::Vec3<T>& val)
 {
     val = math::QuantizedUnitVec::unpack(data);
 }
@@ -674,7 +796,7 @@ UnitVecAttributeCodec::decode(const StorageType& data, math::Vec3<T>& val)
 
 template<typename T>
 inline void
-UnitVecAttributeCodec::encode(const math::Vec3<T>& val, StorageType& data)
+UnitVecCodec::encode(const math::Vec3<T>& val, StorageType& data)
 {
     data = math::QuantizedUnitVec::pack(val);
 }
@@ -690,14 +812,16 @@ tbb::atomic<const NamePair*> TypedAttributeArray<ValueType_, Codec_>::sTypeName;
 
 template<typename ValueType_, typename Codec_>
 TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(
-    size_t n, const ValueType& uniformValue)
+    size_t n, Index stride, const ValueType& uniformValue)
     : AttributeArray()
     , mData(new StorageType[1])
     , mSize(n)
+    , mStride(stride)
     , mIsUniform(true)
     , mMutex()
 {
     mSize = std::max(size_t(1), mSize);
+    mStride = std::max(Index(1), mStride);
     Codec::encode(uniformValue, mData[0]);
 }
 
@@ -707,6 +831,7 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttribut
     : AttributeArray(rhs)
     , mData(NULL)
     , mSize(rhs.mSize)
+    , mStride(rhs.mStride)
     , mIsUniform(rhs.mIsUniform)
     , mMutex()
 {
@@ -718,7 +843,7 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttribut
     if (!this->isCompressed())  uncompress = false;
 
     if (mIsUniform) {
-        this->allocate(1);
+        this->allocate(1, 1);
         mData[0] = rhs.mData[0];
     } else if (this->isOutOfCore()) {
         // do nothing
@@ -738,8 +863,8 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttribut
         assert(buffer);
         mData = reinterpret_cast<StorageType*>(buffer);
     } else {
-        this->allocate(mSize);
-        memcpy(mData, rhs.mData, mSize * sizeof(StorageType));
+        this->allocate(mSize, mStride);
+        memcpy(mData, rhs.mData, this->arrayMemUsage());
     }
 }
 
@@ -756,10 +881,11 @@ TypedAttributeArray<ValueType_, Codec_>::operator=(const TypedAttributeArray& rh
         mFlags = rhs.mFlags;
         mCompressedBytes = rhs.mCompressedBytes;
         mSize = rhs.mSize;
+        mStride = rhs.mStride;
         mIsUniform = rhs.mIsUniform;
 
         if (mIsUniform) {
-            this->allocate(1);
+            this->allocate(1, 1);
             mData[0] = rhs.mData[0];
 #ifndef OPENVDB_2_ABI_COMPATIBLE
         } else if (rhs.isOutOfCore()) {
@@ -770,8 +896,8 @@ TypedAttributeArray<ValueType_, Codec_>::operator=(const TypedAttributeArray& rh
             memcpy(buffer, rhs.mData, mCompressedBytes);
             mData = reinterpret_cast<StorageType*>(buffer);
         } else {
-            this->allocate(mSize);
-            memcpy(mData, rhs.mData, mSize * sizeof(StorageType));
+            this->allocate(mSize, mStride);
+            memcpy(mData, rhs.mData, arrayMemUsage());
         }
     }
 }
@@ -782,10 +908,7 @@ inline const NamePair&
 TypedAttributeArray<ValueType_, Codec_>::attributeType()
 {
     if (sTypeName == NULL) {
-        std::ostringstream ostr1, ostr2;
-        ostr1 << typeNameAsString<ValueType>();
-        ostr2 << Codec::name() << "_" << typeNameAsString<StorageType>();
-        NamePair* s = new NamePair(ostr1.str(), ostr2.str());
+        NamePair* s = new NamePair(typeNameAsString<ValueType>(), Codec::name());
         if (sTypeName.compare_and_swap(s, NULL) != NULL) delete s;
     }
     return *sTypeName;
@@ -818,9 +941,9 @@ TypedAttributeArray<ValueType_, Codec_>::unregisterType()
 
 template<typename ValueType_, typename Codec_>
 inline typename TypedAttributeArray<ValueType_, Codec_>::Ptr
-TypedAttributeArray<ValueType_, Codec_>::create(size_t n)
+TypedAttributeArray<ValueType_, Codec_>::create(size_t n, Index stride)
 {
-    return Ptr(new TypedAttributeArray(n));
+    return Ptr(new TypedAttributeArray(n, stride));
 }
 
 template<typename ValueType_, typename Codec_>
@@ -867,16 +990,16 @@ TypedAttributeArray<ValueType_, Codec_>::arrayMemUsage() const
     if (this->isOutOfCore())        return 0;
     if (this->isCompressed())       return mCompressedBytes;
 
-    return mSize * sizeof(StorageType);
+    return mSize * mStride * sizeof(StorageType);
 }
 
 
 template<typename ValueType_, typename Codec_>
 void
-TypedAttributeArray<ValueType_, Codec_>::allocate(const size_t size)
+TypedAttributeArray<ValueType_, Codec_>::allocate(const size_t size, const Index stride)
 {
     assert(!mData);
-    mData = new StorageType[size];
+    mData = new StorageType[size * stride];
 }
 
 
@@ -910,9 +1033,9 @@ template<typename ValueType_, typename Codec_>
 typename TypedAttributeArray<ValueType_, Codec_>::ValueType
 TypedAttributeArray<ValueType_, Codec_>::getUnsafe(Index n) const
 {
-    assert(!this->isCompressed());
+    assert(n < mSize * mStride);
     assert(!this->isOutOfCore());
-    assert(n < this->size());
+    assert(!this->isCompressed());
 
     ValueType val;
     Codec::decode(/*in=*/mData[mIsUniform ? 0 : n], /*out=*/val);
@@ -924,9 +1047,9 @@ template<typename ValueType_, typename Codec_>
 typename TypedAttributeArray<ValueType_, Codec_>::ValueType
 TypedAttributeArray<ValueType_, Codec_>::get(Index n) const
 {
+    if (n >= mSize * mStride)           OPENVDB_THROW(IndexError, "Out-of-range access.");
+    if (this->isOutOfCore())            this->doLoad();
     if (this->isCompressed())           const_cast<TypedAttributeArray*>(this)->decompress();
-    else if (this->isOutOfCore())       this->doLoad();
-    else if (n >= this->size())         OPENVDB_THROW(IndexError, "Out-of-range access.");
 
     return this->getUnsafe(n);
 }
@@ -937,13 +1060,7 @@ template<typename T>
 void
 TypedAttributeArray<ValueType_, Codec_>::getUnsafe(Index n, T& val) const
 {
-    assert(!this->isCompressed());
-    assert(!this->isOutOfCore());
-    assert(n < this->size());
-
-    ValueType tmp;
-    Codec::decode(/*in=*/mData[mIsUniform ? 0 : n], /*out=*/tmp);
-    val = static_cast<T>(tmp);
+    val = static_cast<T>(this->getUnsafe(n));
 }
 
 
@@ -952,11 +1069,7 @@ template<typename T>
 void
 TypedAttributeArray<ValueType_, Codec_>::get(Index n, T& val) const
 {
-    if (this->isCompressed())           const_cast<TypedAttributeArray*>(this)->decompress();
-    else if (this->isOutOfCore())       this->doLoad();
-    else if (n >= this->size())         OPENVDB_THROW(IndexError, "Out-of-range access.");
-
-    this->getUnsafe(n, val);
+    val = static_cast<T>(this->get(n));
 }
 
 
@@ -972,13 +1085,15 @@ template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::setUnsafe(Index n, const ValueType& val)
 {
-    assert(!this->isCompressed());
+    assert(n < mSize * mStride);
     assert(!this->isOutOfCore());
-    assert(n < this->size());
+    assert(!this->isCompressed());
+    assert(!this->isUniform());
 
-    if (mIsUniform)     this->expand();
+    // this unsafe method assumes the data is not uniform, however if it is, this redirects the index
+    // to zero, which is marginally less efficient but ensures not writing to an illegal address
 
-    Codec::encode(/*in=*/val, /*out=*/mData[n]);
+    Codec::encode(/*in=*/val, /*out=*/mData[mIsUniform ? 0 : n]);
 }
 
 
@@ -986,9 +1101,10 @@ template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::set(Index n, const ValueType& val)
 {
+    if (n >= mSize * mStride)           OPENVDB_THROW(IndexError, "Out-of-range access.");
+    if (this->isOutOfCore())            this->doLoad();
     if (this->isCompressed())           this->decompress();
-    else if (this->isOutOfCore())       this->doLoad();
-    else if (n >= this->size())         OPENVDB_THROW(IndexError, "Out-of-range access.");
+    if (this->isUniform())              this->expand();
 
     this->setUnsafe(n, val);
 }
@@ -999,14 +1115,7 @@ template<typename T>
 void
 TypedAttributeArray<ValueType_, Codec_>::setUnsafe(Index n, const T& val)
 {
-    assert(!this->isCompressed());
-    assert(!this->isOutOfCore());
-    assert(n < this->size());
-
-    if (mIsUniform)     this->expand();
-
-    const ValueType tmp = static_cast<ValueType>(val);
-    Codec::encode(/*in=*/tmp, /*out=*/mData[n]);
+    this->setUnsafe(n, static_cast<ValueType>(val));
 }
 
 
@@ -1015,11 +1124,7 @@ template<typename T>
 void
 TypedAttributeArray<ValueType_, Codec_>::set(Index n, const T& val)
 {
-    if (this->isCompressed())           this->decompress();
-    else if (this->isOutOfCore())       this->doLoad();
-    else if (n >= this->size())         OPENVDB_THROW(IndexError, "Out-of-range access.");
-
-    this->setUnsafe(n, val);
+    this->set(n, static_cast<ValueType>(val));
 }
 
 
@@ -1055,14 +1160,14 @@ TypedAttributeArray<ValueType_, Codec_>::expand(bool fill)
     {
         tbb::spin_mutex::scoped_lock lock(mMutex);
         this->deallocate();
-        this->allocate(mSize);
+        this->allocate(mSize, mStride);
     }
 
     mCompressedBytes = 0;
     mIsUniform = false;
 
     if (fill) {
-        for (size_t i = 0; i < mSize; ++i)  mData[i] = val;
+        for (size_t i = 0; i < mSize * mStride; ++i)  mData[i] = val;
     }
 }
 
@@ -1075,7 +1180,7 @@ TypedAttributeArray<ValueType_, Codec_>::compact()
 
     // compaction is not possible if any values are different
     const ValueType_ val = this->get(0);
-    for (size_t i = 1; i < size(); i++) {
+    for (size_t i = 1; i < mSize * mStride; i++) {
         if (this->get(i) != val)    return false;
     }
 
@@ -1099,7 +1204,7 @@ TypedAttributeArray<ValueType_, Codec_>::collapse(const ValueType& uniformValue)
     if (!mIsUniform) {
         tbb::spin_mutex::scoped_lock lock(mMutex);
         this->deallocate();
-        this->allocate(1);
+        this->allocate(1, 1);
         mIsUniform = true;
     }
     Codec::encode(uniformValue, mData[0]);
@@ -1121,7 +1226,7 @@ TypedAttributeArray<ValueType_, Codec_>::fill(const ValueType& value)
     if (this->isOutOfCore()) {
         tbb::spin_mutex::scoped_lock lock(mMutex);
         this->deallocate();
-        this->allocate(mSize);
+        this->allocate(mSize, mStride);
     }
 
     const size_t size = mIsUniform ? 1 : mSize;
@@ -1154,7 +1259,7 @@ TypedAttributeArray<ValueType_, Codec_>::compress()
 
         this->doLoadUnsafe();
 
-        const size_t typeSize = sizeof(typename Codec_::StorageType);
+        const size_t typeSize = sizeof(StorageType);
         const size_t inBytes = mSize * sizeof(StorageType);
         size_t outBytes;
         char* charBuffer = reinterpret_cast<char*>(mData);
@@ -1272,6 +1377,17 @@ TypedAttributeArray<ValueType_, Codec_>::read(std::istream& is)
     mIsUniform = mFlags & WRITEUNIFORM;
     mCompressedBytes = mFlags & WRITEMEMCOMPRESS ? bytes : Index64(0);
 
+    // read strided value (set to 1 if array is not strided)
+
+    if (mFlags & WRITESTRIDED) {
+        Index stride = Index(0);
+        is.read(reinterpret_cast<char*>(&stride), sizeof(Index));
+        mStride = stride;
+    }
+    else {
+        mStride = 1;
+    }
+
     // clear uniform and compress flags
 
     mFlags &= Int16(~WRITEUNIFORM & ~WRITEMEMCOMPRESS);
@@ -1334,11 +1450,17 @@ TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os, bool outputTran
 
     Int16 flags(mFlags);
     Index64 size(mSize);
+    Index stride(mStride);
 
     boost::scoped_array<char> compressedBuffer;
     size_t compressedBytes = 0;
 
     this->doLoad();
+
+    if (isStrided())
+    {
+        flags |= WRITESTRIDED;
+    }
 
     if (mIsUniform)
     {
@@ -1351,7 +1473,7 @@ TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os, bool outputTran
     else if (io::getDataCompression(os) & io::COMPRESS_BLOSC)
     {
         const char* charBuffer = reinterpret_cast<const char*>(mData);
-        const size_t typeSize = sizeof(typename Codec_::StorageType);
+        const size_t typeSize = sizeof(StorageType);
         const size_t inBytes = mSize * sizeof(StorageType);
         compressedBuffer.reset(compress(charBuffer, typeSize, inBytes, compressedBytes));
         if (compressedBuffer)   flags |= WRITEDISKCOMPRESS;
@@ -1366,6 +1488,8 @@ TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os, bool outputTran
     os.write(reinterpret_cast<const char*>(&bytes), sizeof(Index64));
     os.write(reinterpret_cast<const char*>(&flags), sizeof(Int16));
     os.write(reinterpret_cast<const char*>(&size), sizeof(Index64));
+
+    if (isStrided())    os.write(reinterpret_cast<const char*>(&stride), sizeof(Index));
 
     if (compressedBuffer)   os.write(reinterpret_cast<const char*>(compressedBuffer.get()), compressedBytes);
     else                    os.write(reinterpret_cast<const char*>(mData), this->arrayMemUsage());
@@ -1459,19 +1583,86 @@ TypedAttributeArray<ValueType_, Codec_>::isEqual(const AttributeArray& other) co
 
 ////////////////////////////////////////
 
+
+/// Accessor to call unsafe get and set methods based on templated Codec and Value
+template <typename CodecType, typename ValueType>
+struct AccessorEval
+{
+    typedef ValueType (*GetterPtr)(const AttributeArray* array, const Index n);
+    typedef void (*SetterPtr)(AttributeArray* array, const Index n, const ValueType& value);
+
+    /// Getter that calls to TypedAttributeArray::getUnsafe()
+    /// @note Functor argument is provided but not required for the generic case
+    static ValueType get(GetterPtr /*functor*/, const AttributeArray* array, const Index n) {
+        return TypedAttributeArray<ValueType, CodecType>::getUnsafe(array, n);
+    }
+
+    /// Getter that calls to TypedAttributeArray::setUnsafe()
+    /// @note Functor argument is provided but not required for the generic case
+    static void set(SetterPtr /*functor*/, AttributeArray* array, const Index n, const ValueType& value) {
+        TypedAttributeArray<ValueType, CodecType>::setUnsafe(array, n, value);
+    }
+};
+
+
+/// Partial specialization when Codec is not known at compile-time to use the supplied functor instead
+template <typename ValueType>
+struct AccessorEval<UnknownCodec, ValueType>
+{
+    typedef ValueType (*GetterPtr)(const AttributeArray* array, const Index n);
+    typedef void (*SetterPtr)(AttributeArray* array, const Index n, const ValueType& value);
+
+    /// Getter that calls the supplied functor
+    static ValueType get(GetterPtr functor, const AttributeArray* array, const Index n) {
+        return (*functor)(array, n);
+    }
+
+    /// Setter that calls the supplied functor
+    static void set(SetterPtr functor, AttributeArray* array, const Index n, const ValueType& value) {
+        (*functor)(array, n, value);
+    }
+};
+
+
+////////////////////////////////////////
+
 // AttributeHandle implementation
 
-template <typename T>
-typename AttributeHandle<T>::Ptr
-AttributeHandle<T>::create(const AttributeArray& array, const bool preserveCompression)
+template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+typename AttributeHandle<ValueType, CodecType, Strided, Interleaved>::Ptr
+AttributeHandle<ValueType, CodecType, Strided, Interleaved>::create(const AttributeArray& array, const bool preserveCompression)
 {
-    return typename AttributeHandle<T>::Ptr(new AttributeHandle<T>(array, preserveCompression));
+    return  typename AttributeHandle<ValueType, CodecType, Strided, Interleaved>::Ptr(
+            new AttributeHandle<ValueType, CodecType, Strided, Interleaved>(array, preserveCompression));
 }
 
-template <typename T>
-AttributeHandle<T>::AttributeHandle(const AttributeArray& array, const bool preserveCompression)
+template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+AttributeHandle<ValueType, CodecType, Strided, Interleaved>::AttributeHandle(const AttributeArray& array, const bool preserveCompression)
     : mArray(&array)
+    , mStride(array.stride())
+    , mSize(array.size())
 {
+    // check compatibility of array with handle
+
+    if (Strided) {
+        if (!array.isStrided()) {
+            OPENVDB_THROW(TypeError, "Handle can only be bound to an AttributeArray of stride > 1.");
+        }
+        else if (Interleaved && !array.isInterleaved()) {
+            OPENVDB_THROW(TypeError, "Handle can only be bound to an interleaved AttributeArray.");
+        }
+        else if (!Interleaved && array.isInterleaved()) {
+            OPENVDB_THROW(TypeError, "Handle can only be bound to a non-interleaved AttributeArray.");
+        }
+    }
+    else if (array.isStrided()) {
+        OPENVDB_THROW(TypeError, "Handle can only be bound to an AttributeArray of stride 1.");
+    }
+
+    if (!this->compatibleType<boost::is_same<CodecType, UnknownCodec>::value>()) {
+        OPENVDB_THROW(TypeError, "Cannot bind handle due to incompatible type of AttributeArray.");
+    }
+
     // load data if delay-loaded
 
     mArray->loadData();
@@ -1496,11 +1687,7 @@ AttributeHandle<T>::AttributeHandle(const AttributeArray& array, const bool pres
     AttributeArray::AccessorBasePtr accessor = mArray->getAccessor();
     assert(accessor);
 
-    AttributeArray::Accessor<T>* typedAccessor = static_cast<AttributeArray::Accessor<T>*>(accessor.get());
-
-    if (!typedAccessor) {
-        OPENVDB_THROW(RuntimeError, "Cannot bind AttributeHandle due to mis-matching types.");
-    }
+    AttributeArray::Accessor<ValueType>* typedAccessor = static_cast<AttributeArray::Accessor<ValueType>*>(accessor.get());
 
     mGetter = typedAccessor->mGetter;
     mSetter = typedAccessor->mSetter;
@@ -1508,69 +1695,150 @@ AttributeHandle<T>::AttributeHandle(const AttributeArray& array, const bool pres
     mFiller = typedAccessor->mFiller;
 }
 
-
-template <typename T>
-T AttributeHandle<T>::get(Index n) const
+template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+template <bool IsUnknownCodec>
+typename boost::enable_if_c<IsUnknownCodec, bool>::type
+AttributeHandle<ValueType, CodecType, Strided, Interleaved>::compatibleType() const
 {
-    return mGetter(mArray, n);
+    // if codec is unknown, just check the value type
+
+    return mArray->hasValueType<ValueType>();
 }
 
-template <typename T>
-bool AttributeHandle<T>::isUniform() const
+template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+template <bool IsUnknownCodec>
+typename boost::enable_if_c<!IsUnknownCodec, bool>::type
+AttributeHandle<ValueType, CodecType, Strided, Interleaved>::compatibleType() const
+{
+    // if the codec is known, check the value type and codec
+
+    return mArray->isType<TypedAttributeArray<ValueType, CodecType> >();
+}
+
+template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+Index AttributeHandle<ValueType, CodecType, Strided, Interleaved>::index(Index n, Index m) const
+{
+    if (Strided) {
+        if (Interleaved)    return m * mSize + n;
+        else                return n * mStride + m;
+    }
+    return n;
+}
+
+template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+ValueType AttributeHandle<ValueType, CodecType, Strided, Interleaved>::get(Index n, Index m) const
+{
+    return this->get<boost::is_same<CodecType, UnknownCodec>::value>(this->index(n, m));
+}
+
+template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+template <bool IsUnknownCodec>
+typename boost::enable_if_c<IsUnknownCodec, ValueType>::type
+AttributeHandle<ValueType, CodecType, Strided, Interleaved>::get(Index index) const
+{
+    // if the codec is unknown, use the getter functor
+
+    return (*mGetter)(mArray, index);
+}
+
+template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+template <bool IsUnknownCodec>
+typename boost::enable_if_c<!IsUnknownCodec, ValueType>::type
+AttributeHandle<ValueType, CodecType, Strided, Interleaved>::get(Index index) const
+{
+    // if the codec is known, call the method on the attribute array directly
+
+    return TypedAttributeArray<ValueType, CodecType>::getUnsafe(mArray, index);
+}
+
+template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+bool AttributeHandle<ValueType, CodecType, Strided, Interleaved>::isUniform() const
 {
     return mArray->isUniform();
 }
+
 
 ////////////////////////////////////////
 
 // AttributeWriteHandle implementation
 
-template <typename T>
-typename AttributeWriteHandle<T>::Ptr
-AttributeWriteHandle<T>::create(AttributeArray& array)
+template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+typename AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::Ptr
+AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::create(AttributeArray& array, const bool expand)
 {
-    return typename AttributeWriteHandle<T>::Ptr(new AttributeWriteHandle<T>(array));
+    return  typename AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::Ptr(
+            new AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>(array, expand));
 }
 
-template <typename T>
-AttributeWriteHandle<T>::AttributeWriteHandle(AttributeArray& array)
-    : AttributeHandle<T>(array, /*preserveCompression = */ false) { }
-
-template <typename T>
-void AttributeWriteHandle<T>::set(Index n, const T& value)
+template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::AttributeWriteHandle(AttributeArray& array, const bool expand)
+    : AttributeHandle<ValueType, CodecType, Strided, Interleaved>(array, /*preserveCompression = */ false)
 {
-    this->mSetter(const_cast<AttributeArray*>(this->mArray), n, value);
+    if (expand)     array.expand();
 }
 
-template <typename T>
-void AttributeWriteHandle<T>::expand(const bool fill)
+template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+void AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::set(Index n, const ValueType& value)
+{
+    this->set<boost::is_same<CodecType, UnknownCodec>::value>(this->index(n, 0), value);
+}
+
+template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+void AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::set(Index n, Index m, const ValueType& value)
+{
+    this->set<boost::is_same<CodecType, UnknownCodec>::value>(this->index(n, m), value);
+}
+
+template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+void AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::expand(const bool fill)
 {
     const_cast<AttributeArray*>(this->mArray)->expand(fill);
 }
 
-template <typename T>
-void AttributeWriteHandle<T>::collapse()
+template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+void AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::collapse()
 {
     const_cast<AttributeArray*>(this->mArray)->collapse();
 }
 
-template <typename T>
-bool AttributeWriteHandle<T>::compact()
+template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+bool AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::compact()
 {
     return const_cast<AttributeArray*>(this->mArray)->compact();
 }
 
-template <typename T>
-void AttributeWriteHandle<T>::collapse(const T& uniformValue)
+template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+void AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::collapse(const ValueType& uniformValue)
 {
     this->mCollapser(const_cast<AttributeArray*>(this->mArray), uniformValue);
 }
 
-template <typename T>
-void AttributeWriteHandle<T>::fill(const T& value)
+template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+void AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::fill(const ValueType& value)
 {
     this->mFiller(const_cast<AttributeArray*>(this->mArray), value);
 }
+
+template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+template <bool IsUnknownCodec>
+typename boost::enable_if_c<IsUnknownCodec, void>::type
+AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::set(Index index, const ValueType& value) const
+{
+    // if the codec is unknown, use the setter functor
+
+    (*this->mSetter)(const_cast<AttributeArray*>(this->mArray), index, value);
+}
+
+template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+template <bool IsUnknownCodec>
+typename boost::enable_if_c<!IsUnknownCodec, void>::type
+AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::set(Index index, const ValueType& value) const
+{
+    // if the codec is known, call the method on the attribute array directly
+
+    TypedAttributeArray<ValueType, CodecType>::setUnsafe(const_cast<AttributeArray*>(this->mArray), index, value);
+}
+
 
 } // namespace tools
 

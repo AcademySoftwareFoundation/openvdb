@@ -99,7 +99,7 @@ AttributeSet::AttributeSet(const DescriptorPtr& descr, size_t arrayLength)
     for (Descriptor::ConstIterator it = mDescr->map().begin(),
         end = mDescr->map().end(); it != end; ++it) {
         const size_t pos = it->second;
-        mAttrs[pos] = AttributeArray::create(mDescr->type(pos), arrayLength);
+        mAttrs[pos] = AttributeArray::create(mDescr->type(pos), arrayLength, 1);
     }
 }
 
@@ -445,7 +445,8 @@ AttributeSet::readAttributes(std::istream& is)
     AttrArrayVec(mDescr->size()).swap(mAttrs); // allocate vector
 
     for (size_t n = 0, N = mAttrs.size(); n < N; ++n) {
-        mAttrs[n] = AttributeArray::create(mDescr->type(n), 1);
+        // size and stride are defined when read from disk
+        mAttrs[n] = AttributeArray::create(mDescr->type(n), /*size*/1, /*stride*/1);
         mAttrs[n]->read(is);
     }
 }

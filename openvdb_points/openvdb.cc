@@ -81,17 +81,17 @@ initialize()
 
     // truncate compression
 
-    TypedAttributeArray<float, NullAttributeCodec<half> >::registerType();
-    TypedAttributeArray<Vec3<float>, NullAttributeCodec<Vec3<half> > >::registerType();
+    TypedAttributeArray<float, TruncateCodec>::registerType();
+    TypedAttributeArray<Vec3<float>, TruncateCodec>::registerType();
 
     // fixed point compression
 
-    TypedAttributeArray<Vec3<float>, FixedPointAttributeCodec<Vec3<uint8_t> > >::registerType();
-    TypedAttributeArray<Vec3<float>, FixedPointAttributeCodec<Vec3<uint16_t> > >::registerType();
+    TypedAttributeArray<Vec3<float>, FixedPointCodec<true> >::registerType();
+    TypedAttributeArray<Vec3<float>, FixedPointCodec<false> >::registerType();
 
     // unit vector compression
 
-    TypedAttributeArray<Vec3<float>, UnitVecAttributeCodec>::registerType();
+    TypedAttributeArray<Vec3<float>, UnitVecCodec>::registerType();
 
     // Register types associated with point data grids.
     Metadata::registerType(typeNameAsString<PointDataIndex32>(), Int32Metadata::createMetadata);
