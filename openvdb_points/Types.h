@@ -40,6 +40,11 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 
+// add zeroVal identity explicit instantiation for quaternions
+
+template<> inline math::Quat<float> zeroVal<math::Quat<float> >() { return math::Quat<float>::identity(); }
+template<> inline math::Quat<double> zeroVal<math::Quat<double> >() { return math::Quat<double>::identity(); }
+
 // add some extra typeNameAsString specializations
 
 template<> inline const char* typeNameAsString<half>()                   { return "half"; }
@@ -50,6 +55,8 @@ template<> inline const char* typeNameAsString<math::Vec2<half> >()      { retur
 template<> inline const char* typeNameAsString<math::Vec3<half> >()      { return "vec3h"; }
 template<> inline const char* typeNameAsString<math::Vec3<uint8_t> >()   { return "vec3u8"; }
 template<> inline const char* typeNameAsString<math::Vec3<uint16_t> >()  { return "vec3u16"; }
+template<> inline const char* typeNameAsString<math::Quat<float> >()     { return "quats"; }
+template<> inline const char* typeNameAsString<math::Quat<double> >()    { return "quatd"; }
 
 
 ////////////////////////////////////////
