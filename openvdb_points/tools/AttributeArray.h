@@ -621,6 +621,7 @@ class AttributeHandle
 public:
     typedef AttributeHandle<ValueType, CodecType, Strided, Interleaved>     Handle;
     typedef boost::shared_ptr<Handle>                                       Ptr;
+    typedef boost::scoped_ptr<Handle>                                       ScopedPtr;
 
 protected:
     typedef ValueType (*GetterPtr)(const AttributeArray* array, const Index n);
@@ -684,6 +685,7 @@ class AttributeWriteHandle : public AttributeHandle<ValueType, CodecType, Stride
 public:
     typedef AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>    Handle;
     typedef boost::shared_ptr<Handle>                                           Ptr;
+    typedef boost::scoped_ptr<Handle>                                           ScopedPtr;
 
     static Ptr create(AttributeArray& array, const bool expand = true);
 

@@ -64,13 +64,10 @@ inline Index64 iterCount(const IterT& iter);
 class NullFilter
 {
 public:
-    struct Data { };
-
-    template <typename LeafT>
-    static NullFilter create(const LeafT& /*leaf*/, const Data& /*data*/)   { return NullFilter(); }
-
-    template <typename IterT>
-    static bool valid(const IterT& /*iter*/) { return true; }
+    NullFilter() { }
+    static bool initialized() { return true; }
+    template <typename LeafT> void reset(const LeafT&) { }
+    template <typename IterT> static bool valid(const IterT&) { return true; }
 }; // class NullFilter
 
 
@@ -212,9 +209,24 @@ public:
     }; // ValueIndexIter
 
     IndexIter(const IteratorT& iterator, const FilterT& filter)
-        : mIterator(iterator), mFilter(filter) { if (mIterator) { this->reset(*mIterator, mIterator.end()); } }
+        : mIterator(iterator)
+        , mFilter(filter)
+    {
+        if (!mFilter.initialized()) {
+            OPENVDB_THROW(RuntimeError, "Filter needs to be initialized before constructing the iterator.");
+        }
+        if (mIterator) {
+            this->reset(*mIterator, mIterator.end());
+        }
+    }
     IndexIter(const IndexIter& other)
-        : mIterator(other.mIterator), mFilter(other.mFilter) { }
+        : mIterator(other.mIterator)
+        , mFilter(other.mFilter)
+    {
+        if (!mFilter.initialized()) {
+            OPENVDB_THROW(RuntimeError, "Filter needs to be initialized before constructing the iterator.");
+        }
+    }
 
     Index32 end() const { return mIterator.end(); }
 

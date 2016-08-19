@@ -142,7 +142,7 @@ inline void setGroup(   PointDataTree& tree,
 template <typename PointDataTree, typename FilterT>
 inline void setGroupByFilter(   PointDataTree& tree,
                                 const Name& group,
-                                const typename FilterT::Data& filterData);
+                                const FilterT& filter);
 
 
 ////////////////////////////////////////
@@ -285,11 +285,10 @@ struct SetGroupByFilterOp
     typedef typename LeafManagerT::LeafRange            LeafRangeT;
     typedef typename PointDataTree::LeafNodeType        LeafNodeT;
     typedef AttributeSet::Descriptor::GroupIndex        GroupIndex;
-    typedef typename FilterT::Data                      FilterDataT;
 
-    SetGroupByFilterOp( const GroupIndex& index, const FilterDataT& filterData)
+    SetGroupByFilterOp( const GroupIndex& index, const FilterT& filter)
         : mIndex(index)
-        , mFilterData(filterData) { }
+        , mFilter(filter) { }
 
     void operator()(const typename LeafManagerT::LeafRange& range) const
     {
@@ -299,7 +298,7 @@ struct SetGroupByFilterOp
 
             GroupWriteHandle group(leaf->groupWriteHandle(mIndex));
 
-            IndexIter<IterT, FilterT> iter = leaf->template beginIndex<IterT, FilterT>(mFilterData);
+            IndexIter<IterT, FilterT> iter = leaf->template beginIndex<IterT, FilterT>(mFilter);
 
             for (; iter; ++iter) {
                 group.set(*iter, true);
@@ -314,7 +313,7 @@ struct SetGroupByFilterOp
     //////////
 
     const GroupIndex mIndex;
-    const FilterDataT mFilterData;
+    const FilterT mFilter;
 }; // struct SetGroupByFilterOp
 
 
@@ -767,7 +766,7 @@ inline void setGroup(   PointDataTree& tree,
 template <typename PointDataTree, typename FilterT>
 inline void setGroupByFilter(   PointDataTree& tree,
                                 const Name& group,
-                                const typename FilterT::Data& filterData)
+                                const FilterT& filter)
 {
     typedef AttributeSet::Descriptor Descriptor;
     typedef typename tree::template LeafManager<PointDataTree> LeafManagerT;
@@ -789,7 +788,7 @@ inline void setGroupByFilter(   PointDataTree& tree,
 
     // set membership using filter
 
-    SetGroupByFilterOp<PointDataTree, FilterT> set(index, filterData);
+    SetGroupByFilterOp<PointDataTree, FilterT> set(index, filter);
     tbb::parallel_for(LeafManagerT(tree).leafRange(), set);
 }
 
@@ -803,12 +802,11 @@ inline void setGroupByRandomTarget( PointDataTree& tree,
                                     const Index64 targetPoints,
                                     const unsigned int seed = 0)
 {
-    typedef RandomLeafFilter<boost::mt11213b> RandomFilter;
+    typedef RandomLeafFilter<PointDataTree, boost::mt11213b> RandomFilter;
 
-    RandomFilter::Data data;
-    data.populateByTargetPoints(tree, targetPoints, seed);
+    RandomFilter filter(tree, targetPoints, seed);
 
-    setGroupByFilter<PointDataTree, RandomFilter>(tree, group, data);
+    setGroupByFilter<PointDataTree, RandomFilter>(tree, group, filter);
 }
 
 
@@ -821,12 +819,14 @@ inline void setGroupByRandomPercentage( PointDataTree& tree,
                                         const float percentage = 10.0f,
                                         const unsigned int seed = 0)
 {
-    typedef RandomLeafFilter<boost::mt11213b> RandomFilter;
+    typedef RandomLeafFilter<PointDataTree, boost::mt11213b> RandomFilter;
 
-    RandomFilter::Data data;
-    data.populateByPercentagePoints(tree, percentage, seed);
+    const int currentPoints = pointCount(tree);
+    const int targetPoints = int(math::Round((percentage * currentPoints)/100.0f));
 
-    setGroupByFilter<PointDataTree, RandomFilter>(tree, group, data);
+    RandomFilter filter(tree, targetPoints, seed);
+
+    setGroupByFilter<PointDataTree, RandomFilter>(tree, group, filter);
 }
 
 

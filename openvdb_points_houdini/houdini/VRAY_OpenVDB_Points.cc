@@ -157,8 +157,8 @@ struct GenerateBBoxOp {
 
         if (!mIncludeGroups.empty() || !mExcludeGroups.empty()) {
 
-            tools::MultiGroupFilter::Data data(mIncludeGroups, mExcludeGroups);
-            tools::IndexIter<typename PointDataLeaf::ValueOnCIter, tools::MultiGroupFilter> iter = leaf.template beginIndexOn<tools::MultiGroupFilter>(data);
+            tools::MultiGroupFilter filter(mIncludeGroups, mExcludeGroups);
+            tools::IndexIter<typename PointDataLeaf::ValueOnCIter, tools::MultiGroupFilter> iter = leaf.beginIndexOn(filter);
 
             for (; iter; ++iter) {
 
@@ -256,8 +256,8 @@ struct PopulateColorFromVelocityOp {
 
             if (!mIncludeGroups.empty() || !mExcludeGroups.empty()) {
 
-                MultiGroupFilter::Data data(mIncludeGroups, mExcludeGroups);
-                tools::IndexIter<typename LeafNode::ValueOnCIter, tools::MultiGroupFilter> iter = leaf.template beginIndexOn<tools::MultiGroupFilter>(data);
+                MultiGroupFilter filter(mIncludeGroups, mExcludeGroups);
+                tools::IndexIter<typename LeafNode::ValueOnCIter, tools::MultiGroupFilter> iter = leaf.beginIndexOn(filter);
 
                 for (; iter; ++iter) {
 

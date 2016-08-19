@@ -216,6 +216,7 @@ TestIndexIterator::testValueIndexIterator()
 
 struct EvenIndexFilter
 {
+    static bool initialized() { return true; }
     template <typename IterT>
     bool valid(const IterT& iter) const {
         return ((*iter) % 2) == 0;
@@ -225,6 +226,7 @@ struct EvenIndexFilter
 
 struct OddIndexFilter
 {
+    static bool initialized() { return true; }
     OddIndexFilter() : mFilter() { }
     template <typename IterT>
     bool valid(const IterT& iter) const {

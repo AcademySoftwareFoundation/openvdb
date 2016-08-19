@@ -360,16 +360,38 @@ TestAttributeGroup::testAttributeGroupHandle()
 class GroupNotFilter
 {
 public:
-    GroupNotFilter(const GroupHandle& handle)
-        : mFilter(handle) { }
+    GroupNotFilter()
+        : mFilter("") { }
+
+    inline bool initialized() const { return mFilter.initialized(); }
+
+    template <typename LeafT>
+    void reset(const LeafT& leaf) {
+        mFilter.reset(leaf);
+    }
 
     template <typename IterT>
     bool valid(const IterT& iter) const {
         return !mFilter.valid(iter);
     }
+
 private:
-    const GroupFilter mFilter;
+    GroupFilter mFilter;
 }; // class GroupNotFilter
+
+
+struct HandleWrapper
+{
+    HandleWrapper(const GroupHandle& handle)
+        : mHandle(handle) { }
+
+    GroupHandle groupHandle(const Name& /*name*/) const {
+        return mHandle;
+    }
+
+private:
+    const GroupHandle mHandle;
+}; // struct HandleWrapper
 
 
 void
@@ -385,7 +407,8 @@ TestAttributeGroup::testAttributeGroupFilter()
 
     { // group values all zero
         ValueVoxelCIter indexIter(0, size);
-        GroupFilter filter(GroupHandle(attrGroup, 0));
+        GroupFilter filter("");
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 0)));
         IndexGroupAllIter iter(indexIter, filter);
 
         CPPUNIT_ASSERT(!iter);
@@ -402,14 +425,24 @@ TestAttributeGroup::testAttributeGroupFilter()
     {
         ValueVoxelCIter indexIter(0, size);
 
-        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 0))));
-        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 1))));
-        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 2))));
-        CPPUNIT_ASSERT(IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 3))));
-        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 4))));
-        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 5))));
-        CPPUNIT_ASSERT(IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 6))));
-        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 7))));
+        GroupFilter filter("");
+
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 0)));
+        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 1)));
+        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 2)));
+        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
+        CPPUNIT_ASSERT(IndexGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 4)));
+        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 5)));
+        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 6)));
+        CPPUNIT_ASSERT(IndexGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 7)));
+        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, filter));
     }
 
     attrGroup.set(1, bitmask);
@@ -421,23 +454,36 @@ TestAttributeGroup::testAttributeGroupFilter()
     {
         ValueVoxelCIter indexIter(0, size);
 
-        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 0))));
-        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 1))));
-        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 2))));
-        CPPUNIT_ASSERT(!IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 3))));
-        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 4))));
-        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 5))));
-        CPPUNIT_ASSERT(!IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 6))));
-        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 7))));
+        GroupNotFilter filter;
+
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 0)));
+        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 1)));
+        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 2)));
+        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
+        CPPUNIT_ASSERT(!IndexNotGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 4)));
+        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 5)));
+        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 6)));
+        CPPUNIT_ASSERT(!IndexNotGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 7)));
+        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, filter));
     }
 
     // clear group membership for attributes 1 and 3
+
     attrGroup.set(1, GroupType(0));
     attrGroup.set(3, GroupType(0));
 
     { // index in group next
         ValueVoxelCIter indexIter(0, size);
-        IndexGroupAllIter iter(indexIter, GroupFilter(GroupHandle(attrGroup, 3)));
+        GroupFilter filter("");
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
+        IndexGroupAllIter iter(indexIter, filter);
 
         CPPUNIT_ASSERT(iter);
         CPPUNIT_ASSERT_EQUAL(*iter, Index32(0));
@@ -450,7 +496,9 @@ TestAttributeGroup::testAttributeGroupFilter()
 
     { // index in group prefix ++
         ValueVoxelCIter indexIter(0, size);
-        IndexGroupAllIter iter(indexIter, GroupFilter(GroupHandle(attrGroup, 3)));
+        GroupFilter filter("");
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
+        IndexGroupAllIter iter(indexIter, filter);
 
         CPPUNIT_ASSERT(iter);
         CPPUNIT_ASSERT_EQUAL(*iter, Index32(0));
@@ -464,7 +512,9 @@ TestAttributeGroup::testAttributeGroupFilter()
 
     { // index in group postfix ++/--
         ValueVoxelCIter indexIter(0, size);
-        IndexGroupAllIter iter(indexIter, GroupFilter(GroupHandle(attrGroup, 3)));
+        GroupFilter filter("");
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
+        IndexGroupAllIter iter(indexIter, filter);
 
         CPPUNIT_ASSERT(iter);
         CPPUNIT_ASSERT_EQUAL(*iter, Index32(0));
@@ -478,7 +528,9 @@ TestAttributeGroup::testAttributeGroupFilter()
 
     { // index not in group next
         ValueVoxelCIter indexIter(0, size);
-        IndexNotGroupAllIter iter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 3)));
+        GroupNotFilter filter;
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
+        IndexNotGroupAllIter iter(indexIter, filter);
 
         CPPUNIT_ASSERT(iter);
         CPPUNIT_ASSERT_EQUAL(*iter, Index32(1));
@@ -491,7 +543,9 @@ TestAttributeGroup::testAttributeGroupFilter()
 
     { // index not in group prefix ++
         ValueVoxelCIter indexIter(0, size);
-        IndexNotGroupAllIter iter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 3)));
+        GroupNotFilter filter;
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
+        IndexNotGroupAllIter iter(indexIter, filter);
 
         CPPUNIT_ASSERT(iter);
         CPPUNIT_ASSERT_EQUAL(*iter, Index32(1));
@@ -505,7 +559,9 @@ TestAttributeGroup::testAttributeGroupFilter()
 
     { // index not in group postfix ++
         ValueVoxelCIter indexIter(0, size);
-        IndexNotGroupAllIter iter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 3)));
+        GroupNotFilter filter;
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
+        IndexNotGroupAllIter iter(indexIter, filter);
 
         CPPUNIT_ASSERT(iter);
         CPPUNIT_ASSERT_EQUAL(*iter, Index32(1));

@@ -401,9 +401,9 @@ struct FillGPUBuffersPosition {
             openvdb::Index64 offset = 0;
 
             if (useGroup) {
-                GroupFilter::Data data(mGroupName);
+                GroupFilter filter(mGroupName);
 
-                IndexIter<typename LeafNode::ValueOnCIter, GroupFilter> iter = leaf->template beginIndexOn<GroupFilter>(data);
+                IndexIter<typename LeafNode::ValueOnCIter, GroupFilter> iter = leaf->beginIndexOn(filter);
 
                 for (; iter; ++iter)
                 {
