@@ -541,10 +541,6 @@ template<typename T, Index Log2Dim>
 inline void
 PointDataLeafNode<T, Log2Dim>::initializeAttributes(const Descriptor::Ptr& descriptor, const size_t arrayLength)
 {
-    if (descriptor->size() == 0) {
-        OPENVDB_THROW(IndexError, "Cannot initialize attributes with an empty Descriptor");
-    }
-
     mAttributeSet.reset(new AttributeSet(descriptor, arrayLength));
 }
 
@@ -552,7 +548,7 @@ template<typename T, Index Log2Dim>
 inline void
 PointDataLeafNode<T, Log2Dim>::clearAttributes(const bool updateValueMask)
 {
-    mAttributeSet.reset(new AttributeSet(mAttributeSet->descriptorPtr(), 0));
+    mAttributeSet.reset(new AttributeSet(*mAttributeSet, 0));
 
     // zero voxel values
 

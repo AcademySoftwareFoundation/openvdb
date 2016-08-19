@@ -96,6 +96,21 @@ AttributeSet::AttributeSet(const DescriptorPtr& descr, size_t arrayLength)
     : mDescr(descr)
     , mAttrs(descr->size(), AttributeArray::Ptr())
 {
+    if (descr->size() != 1 ||
+        descr->find("P") == INVALID_POS ||
+        descr->valueType(0) != typeNameAsString<Vec3f>())
+    {
+        OPENVDB_THROW(IndexError, "AttributeSet construction from Descriptor only allowed with one Vec3f position attribute.");
+    }
+
+    mAttrs[0] = AttributeArray::create(mDescr->type(0), arrayLength, 1);
+}
+
+
+AttributeSet::AttributeSet(const AttributeSet& attrSet, size_t arrayLength)
+    : mDescr(attrSet.descriptorPtr())
+    , mAttrs(attrSet.descriptor().size(), AttributeArray::Ptr())
+{
     for (Descriptor::ConstIterator it = mDescr->map().begin(),
         end = mDescr->map().end(); it != end; ++it) {
         const size_t pos = it->second;
@@ -306,9 +321,7 @@ AttributeSet::appendAttribute(  const Name& name,
                                 const Index stride,
                                 Metadata::Ptr defaultValue)
 {
-    AttributeSet::Util::NameAndType nameAndType(name, type);
-
-    Descriptor::Ptr descriptor = mDescr->duplicateAppend(nameAndType);
+    Descriptor::Ptr descriptor = mDescr->duplicateAppend(name, type);
 
     // store the attribute default value in the descriptor metadata
     if (defaultValue)   descriptor->setDefaultValue(name, *defaultValue);
@@ -800,23 +813,16 @@ AttributeSet::Descriptor::insert(const std::string& name, const NamePair& typeNa
     return pos;
 }
 
-
-AttributeSet::Descriptor::Ptr
-AttributeSet::Descriptor::create(const NameAndTypeVec& attrs)
-{
-    Ptr descr(new Descriptor());
-    for (size_t n = 0, N = attrs.size(); n < N; ++n) {
-        const std::string& name = attrs[n].name;
-        descr->insert(name, attrs[n].type);
-    }
-    return descr;
-}
-
 AttributeSet::Descriptor::Ptr
 AttributeSet::Descriptor::create(const NameAndTypeVec& attrs,
-                                 const NameToPosMap& groupMap, const MetaMap& metadata)
+                                 const NameToPosMap& groupMap,
+                                 const MetaMap& metadata)
 {
-    Ptr newDescriptor(create(attrs));
+    Ptr newDescriptor(new Descriptor());
+    for (size_t n = 0, N = attrs.size(); n < N; ++n) {
+        const std::string& name = attrs[n].name;
+        newDescriptor->insert(name, attrs[n].type);
+    }
 
     newDescriptor->mGroupMap = groupMap;
     newDescriptor->mMetadata = metadata;
@@ -833,12 +839,12 @@ AttributeSet::Descriptor::create(const NamePair& positionType)
 }
 
 AttributeSet::Descriptor::Ptr
-AttributeSet::Descriptor::duplicateAppend(const NameAndType& attribute) const
+AttributeSet::Descriptor::duplicateAppend(const Name& name, const NamePair& type) const
 {
     Inserter attributes;
 
     this->appendTo(attributes.vec);
-    attributes.add(attribute);
+    attributes.add(NameAndType(name, type));
 
     return Descriptor::create(attributes.vec, mGroupMap, mMetadata);
 }

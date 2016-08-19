@@ -148,7 +148,6 @@ struct AppendAttributeOp {
 
     typedef typename tree::LeafManager<PointDataTreeType>       LeafManagerT;
     typedef typename LeafManagerT::LeafRange                    LeafRangeT;
-    typedef AttributeSet::Descriptor::NameAndType               NameAndType;
 
     AppendAttributeOp(  PointDataTreeType& tree,
                         AttributeSet::DescriptorPtr& descriptor,
@@ -304,8 +303,7 @@ inline void appendAttribute(PointDataTree& tree,
 
     // create a new attribute descriptor
 
-    AttributeSet::Util::NameAndType nameAndType(name, AttributeType::attributeType());
-    Descriptor::Ptr newDescriptor = descriptor.duplicateAppend(nameAndType);
+    Descriptor::Ptr newDescriptor = descriptor.duplicateAppend(name, AttributeType::attributeType());
 
     // store the attribute default value in the descriptor metadata
 

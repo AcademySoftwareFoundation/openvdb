@@ -180,17 +180,18 @@ TestIndexFilter::testMultiGroupFilter()
     using namespace openvdb::tools;
 
     typedef PointDataTree::LeafNodeType LeafNode;
+    typedef openvdb::tools::TypedAttributeArray<Vec3f>    AttributeVec3f;
     typedef openvdb::tools::TypedAttributeArray<float>    AttributeS;
 
+    AttributeVec3f::registerType();
     AttributeS::registerType();
     GroupAttributeArray::registerType();
 
     PointDataTree tree;
     LeafNode* leaf = tree.touchLeaf(openvdb::Coord(0, 0, 0));
 
-    AttributeSet::Descriptor::Inserter names;
-    names.add("density", AttributeS::attributeType());
-    AttributeSet::Descriptor::Ptr descriptor = AttributeSet::Descriptor::create(names.vec);
+    typedef AttributeSet::Descriptor Descriptor;
+    Descriptor::Ptr descriptor = Descriptor::create(AttributeVec3f::attributeType());
 
     const size_t size = 5;
 

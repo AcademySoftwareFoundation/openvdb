@@ -190,22 +190,21 @@ void
 TestAttributeSet::testAttributeSetDescriptor()
 {
     // Define and register some common attribute types
+    typedef openvdb::tools::TypedAttributeArray<openvdb::Vec3f>      AttributeVec3f;
     typedef openvdb::tools::TypedAttributeArray<float>      AttributeS;
-    typedef openvdb::tools::TypedAttributeArray<double>     AttributeD;
     typedef openvdb::tools::TypedAttributeArray<int32_t>    AttributeI;
 
     typedef openvdb::tools::AttributeSet::Descriptor Descriptor;
 
-    Descriptor::Inserter names;
-    names.add("density", AttributeS::attributeType());
-    names.add("id", AttributeI::attributeType());
+    Descriptor::Ptr descrA = Descriptor::create(AttributeVec3f::attributeType());
 
-    Descriptor::Ptr descrA = Descriptor::create(names.vec);
+    descrA = descrA->duplicateAppend("density", AttributeS::attributeType());
+    descrA = descrA->duplicateAppend("id", AttributeI::attributeType());
 
-    Descriptor::Ptr descrB = Descriptor::create(Descriptor::Inserter()
-        .add("density", AttributeS::attributeType())
-        .add("id", AttributeI::attributeType())
-        .vec);
+    Descriptor::Ptr descrB = Descriptor::create(AttributeVec3f::attributeType());
+
+    descrB = descrB->duplicateAppend("density", AttributeS::attributeType());
+    descrB = descrB->duplicateAppend("id", AttributeI::attributeType());
 
     CPPUNIT_ASSERT_EQUAL(descrA->size(), descrB->size());
 
@@ -237,6 +236,11 @@ TestAttributeSet::testAttributeSetDescriptor()
 
     CPPUNIT_ASSERT(descrB->hasSameAttributes(descrC));
 
+    Descriptor::Inserter names;
+    names.add("P", AttributeVec3f::attributeType());
+    names.add("density", AttributeS::attributeType());
+    names.add("id", AttributeI::attributeType());
+
     // rebuild NameAndTypeVec
 
     Descriptor::NameAndTypeVec rebuildNames;
@@ -252,29 +256,32 @@ TestAttributeSet::testAttributeSetDescriptor()
         CPPUNIT_ASSERT_EQUAL(itA->type.second, itB->type.second);
     }
 
-    // hasSameAttributes
+    Descriptor::NameToPosMap groupMap;
+    openvdb::MetaMap metadata;
+
+    // hasSameAttributes (note: uses protected create methods)
     {
         Descriptor::Ptr descr1 = Descriptor::create(Descriptor::Inserter()
-                .add("pos", AttributeD::attributeType())
+                .add("P", AttributeVec3f::attributeType())
                 .add("test", AttributeI::attributeType())
                 .add("id", AttributeI::attributeType())
-                .vec);
+                .vec, groupMap, metadata);
 
         // test same names with different types, should be false
         Descriptor::Ptr descr2 = Descriptor::create(Descriptor::Inserter()
-                .add("pos", AttributeD::attributeType())
+                .add("P", AttributeVec3f::attributeType())
                 .add("test", AttributeS::attributeType())
                 .add("id", AttributeI::attributeType())
-                .vec);
+                .vec, groupMap, metadata);
 
         CPPUNIT_ASSERT(!descr1->hasSameAttributes(*descr2));
 
         // test different names, should be false
         Descriptor::Ptr descr3 = Descriptor::create(Descriptor::Inserter()
-                .add("pos", AttributeD::attributeType())
+                .add("P", AttributeVec3f::attributeType())
                 .add("test2", AttributeI::attributeType())
                 .add("id", AttributeI::attributeType())
-                .vec);
+                .vec, groupMap, metadata);
 
         CPPUNIT_ASSERT(!descr1->hasSameAttributes(*descr3));
 
@@ -282,28 +289,27 @@ TestAttributeSet::testAttributeSetDescriptor()
         Descriptor::Ptr descr4 = Descriptor::create(Descriptor::Inserter()
                 .add("test", AttributeI::attributeType())
                 .add("id", AttributeI::attributeType())
-                .add("pos", AttributeD::attributeType())
-                .vec);
+                .add("P", AttributeVec3f::attributeType())
+                .vec, groupMap, metadata);
 
         CPPUNIT_ASSERT(descr1->hasSameAttributes(*descr4));
     }
 
     { // Test uniqueName
         Descriptor::Inserter names;
-        Descriptor::Ptr emptyDescr = Descriptor::create(names.vec);
+        Descriptor::Ptr emptyDescr = Descriptor::create(AttributeVec3f::attributeType());
         const openvdb::Name uniqueNameEmpty = emptyDescr->uniqueName("test");
         CPPUNIT_ASSERT_EQUAL(uniqueNameEmpty, openvdb::Name("test0"));
 
         names.add("test", AttributeS::attributeType());
         names.add("test1", AttributeI::attributeType());
 
-        Descriptor::Ptr descr1 = Descriptor::create(names.vec);
+        Descriptor::Ptr descr1 = Descriptor::create(names.vec, groupMap, metadata);
 
         const openvdb::Name uniqueName1 = descr1->uniqueName("test");
         CPPUNIT_ASSERT_EQUAL(uniqueName1, openvdb::Name("test0"));
 
-        const Descriptor::NameAndType newAttr(uniqueName1, AttributeI::attributeType());
-        Descriptor::Ptr descr2 = descr1->duplicateAppend(newAttr);
+        Descriptor::Ptr descr2 = descr1->duplicateAppend(uniqueName1, AttributeI::attributeType());
 
         const openvdb::Name uniqueName2 = descr2->uniqueName("test");
         CPPUNIT_ASSERT_EQUAL(uniqueName2, openvdb::Name("test2"));
@@ -324,12 +330,12 @@ TestAttributeSet::testAttributeSetDescriptor()
     }
 
     { // Test enforcement of valid names
-        Descriptor::Ptr descr = Descriptor::create(Descriptor::Inserter().add("test1", AttributeS::attributeType()).vec);
+        Descriptor::Ptr descr = Descriptor::create(Descriptor::Inserter().add("test1", AttributeS::attributeType()).vec, groupMap, metadata);
         CPPUNIT_ASSERT_THROW(descr->rename("test1", "test1!"), openvdb::RuntimeError);
         CPPUNIT_ASSERT_THROW(descr->setGroup("group1!", 1), openvdb::RuntimeError);
 
         Descriptor::NameAndType invalidAttr("test1!", AttributeS::attributeType());
-        CPPUNIT_ASSERT_THROW(descr->duplicateAppend(invalidAttr), openvdb::RuntimeError);
+        CPPUNIT_ASSERT_THROW(descr->duplicateAppend(invalidAttr.name, invalidAttr.type), openvdb::RuntimeError);
 
         const openvdb::Index64 offset(0);
         const openvdb::Index64 zeroLength(0);
@@ -519,30 +525,42 @@ TestAttributeSet::testAttributeSet()
     typedef openvdb::tools::AttributeSet AttributeSet;
     typedef openvdb::tools::AttributeSet::Descriptor Descriptor;
 
+    Descriptor::NameToPosMap groupMap;
+    openvdb::MetaMap metadata;
+
+    { // error on invalid construction
+        CPPUNIT_ASSERT_THROW(AttributeSet(Descriptor::Ptr(new Descriptor), size_t(1)), openvdb::IndexError);
+        CPPUNIT_ASSERT_THROW(AttributeSet(Descriptor::create(AttributeS::attributeType()), size_t(1)), openvdb::IndexError);
+
+        Descriptor::Ptr invalidDescr = Descriptor::create(AttributeVec3s::attributeType());
+        invalidDescr = invalidDescr->duplicateAppend("test", AttributeVec3s::attributeType());
+        CPPUNIT_ASSERT_THROW(AttributeSet attrSet(invalidDescr), openvdb::IndexError);
+        invalidDescr = Descriptor::Ptr(new Descriptor)->duplicateAppend("P2", AttributeVec3s::attributeType());
+        CPPUNIT_ASSERT_THROW(AttributeSet attrSet(invalidDescr), openvdb::IndexError);
+        invalidDescr = Descriptor::Ptr(new Descriptor)->duplicateAppend("P", AttributeS::attributeType());
+        CPPUNIT_ASSERT_THROW(AttributeSet attrSet(invalidDescr), openvdb::IndexError);
+    }
+
     // construct
 
-    Descriptor::Ptr descr = Descriptor::create(Descriptor::Inserter()
-        .add("pos", AttributeVec3s::attributeType())
-        .add("id", AttributeI::attributeType())
-        .vec);
-
+    Descriptor::Ptr descr = Descriptor::create(AttributeVec3s::attributeType());
     AttributeSet attrSetA(descr, /*arrayLength=*/50);
+
+    attrSetA.appendAttribute("id", AttributeI::attributeType());
 
     // check equality against duplicate array
 
-    Descriptor::Ptr descr2 = Descriptor::create(Descriptor::Inserter()
-        .add("pos", AttributeVec3s::attributeType())
-        .add("id", AttributeI::attributeType())
-        .vec);
-
+    Descriptor::Ptr descr2 = Descriptor::create(AttributeVec3s::attributeType());
     AttributeSet attrSetA2(descr2, /*arrayLength=*/50);
+
+    attrSetA2.appendAttribute("id", AttributeI::attributeType());
 
     CPPUNIT_ASSERT(attrSetA == attrSetA2);
 
     // expand uniform values and check equality
 
-    attrSetA.get("pos")->expand();
-    attrSetA2.get("pos")->expand();
+    attrSetA.get("P")->expand();
+    attrSetA2.get("P")->expand();
 
     CPPUNIT_ASSERT(attrSetA == attrSetA2);
 
@@ -580,15 +598,13 @@ TestAttributeSet::testAttributeSet()
         attrSetB.makeUnique(0);
         attrSetB.makeUnique(1);
 
-        Descriptor::NameAndType nameAndType("test", AttributeS::attributeType());
-
         Descriptor::Ptr targetDescr = Descriptor::create(Descriptor::Inserter()
-            .add("pos", AttributeVec3s::attributeType())
+            .add("P", AttributeVec3s::attributeType())
             .add("id", AttributeI::attributeType())
             .add("test", AttributeS::attributeType())
-            .vec);
+            .vec, groupMap, metadata);
 
-        Descriptor::Ptr descrB = attrSetB.descriptor().duplicateAppend(nameAndType);
+        Descriptor::Ptr descrB = attrSetB.descriptor().duplicateAppend("test", AttributeS::attributeType());
 
         openvdb::TypedMetadata<AttributeS::ValueType> defaultValueTest(5);
 
@@ -614,7 +630,7 @@ TestAttributeSet::testAttributeSet()
 
         // ensure attribute order persists
 
-        CPPUNIT_ASSERT_EQUAL(descrB->find("pos"), size_t(0));
+        CPPUNIT_ASSERT_EQUAL(descrB->find("P"), size_t(0));
         CPPUNIT_ASSERT_EQUAL(descrB->find("id"), size_t(1));
         CPPUNIT_ASSERT_EQUAL(descrB->find("test"), size_t(2));
 
@@ -643,13 +659,13 @@ TestAttributeSet::testAttributeSet()
 
         openvdb::TypedMetadata<AttributeVec3s::ValueType> defaultValuePos(AttributeVec3s::ValueType(1, 3, 1));
 
-        descrB->setDefaultValue("pos", defaultValuePos);
+        descrB->setDefaultValue("P", defaultValuePos);
 
         {
-            openvdb::Metadata::Ptr meta = descrB->getMetadata()["default:pos"];
+            openvdb::Metadata::Ptr meta = descrB->getMetadata()["default:P"];
             CPPUNIT_ASSERT(meta);
             CPPUNIT_ASSERT(meta->typeName() == "vec3s");
-            CPPUNIT_ASSERT_EQUAL(descrB->getDefaultValue<AttributeVec3s::ValueType>("pos"), defaultValuePos.value());
+            CPPUNIT_ASSERT_EQUAL(descrB->getDefaultValue<AttributeVec3s::ValueType>("P"), defaultValuePos.value());
         }
 
         // remove default value
@@ -663,22 +679,22 @@ TestAttributeSet::testAttributeSet()
 
     { // attribute removal
 
-        Descriptor::Ptr descr = Descriptor::create(Descriptor::Inserter()
-            .add("pos", AttributeVec3s::attributeType())
-            .add("test", AttributeI::attributeType())
-            .add("id", AttributeL::attributeType())
-            .add("test2", AttributeI::attributeType())
-            .add("id2", AttributeL::attributeType())
-            .add("test3", AttributeI::attributeType())
-            .vec);
-
-        Descriptor::Ptr targetDescr = Descriptor::create(Descriptor::Inserter()
-            .add("pos", AttributeVec3s::attributeType())
-            .add("id", AttributeL::attributeType())
-            .add("id2", AttributeL::attributeType())
-            .vec);
+        Descriptor::Ptr descr = Descriptor::create(AttributeVec3s::attributeType());
 
         AttributeSet attrSetB(descr, /*arrayLength=*/50);
+
+        attrSetB.appendAttribute("test", AttributeI::attributeType());
+        attrSetB.appendAttribute("id", AttributeL::attributeType());
+        attrSetB.appendAttribute("test2", AttributeI::attributeType());
+        attrSetB.appendAttribute("id2", AttributeL::attributeType());
+        attrSetB.appendAttribute("test3", AttributeI::attributeType());
+
+        descr = attrSetB.descriptorPtr();
+
+        Descriptor::Ptr targetDescr = Descriptor::create(AttributeVec3s::attributeType());
+
+        targetDescr = targetDescr->duplicateAppend("id", AttributeL::attributeType());
+        targetDescr = targetDescr->duplicateAppend("id2", AttributeL::attributeType());
 
         // add some default values
 
@@ -778,22 +794,23 @@ TestAttributeSet::testAttributeSet()
     CPPUNIT_ASSERT_EQUAL(size_t(10), attrSetA.get(1)->size());
 
     { // reorder attribute set
-        Descriptor::Ptr descr1 = Descriptor::create(Descriptor::Inserter()
-                .add("pos", AttributeVec3s::attributeType())
-                .add("test", AttributeI::attributeType())
-                .add("id", AttributeI::attributeType())
-                .add("test2", AttributeI::attributeType())
-                .vec);
-
-        Descriptor::Ptr descr2 = Descriptor::create(Descriptor::Inserter()
-                .add("test2", AttributeI::attributeType())
-                .add("test", AttributeI::attributeType())
-                .add("pos", AttributeVec3s::attributeType())
-                .add("id", AttributeI::attributeType())
-                .vec);
+        Descriptor::Ptr descr1 = Descriptor::create(AttributeVec3s::attributeType());
 
         AttributeSet attrSetA(descr1);
+
+        attrSetA.appendAttribute("test", AttributeI::attributeType());
+        attrSetA.appendAttribute("id", AttributeI::attributeType());
+        attrSetA.appendAttribute("test2", AttributeI::attributeType());
+
+        descr1 = attrSetA.descriptorPtr();
+
+        Descriptor::Ptr descr2 = Descriptor::create(AttributeVec3s::attributeType());
+
         AttributeSet attrSetB(descr2);
+
+        attrSetB.appendAttribute("test2", AttributeI::attributeType());
+        attrSetB.appendAttribute("test", AttributeI::attributeType());
+        attrSetB.appendAttribute("id", AttributeI::attributeType());
 
         CPPUNIT_ASSERT(attrSetA != attrSetB);
 
@@ -803,15 +820,9 @@ TestAttributeSet::testAttributeSet()
     }
 
     { // metadata test
-        Descriptor::Ptr descr1 = Descriptor::create(Descriptor::Inserter()
-            .add("pos", AttributeVec3s::attributeType())
-            .add("id", AttributeI::attributeType())
-            .vec);
+        Descriptor::Ptr descr1 = Descriptor::create(AttributeVec3s::attributeType());
 
-        Descriptor::Ptr descr2 = Descriptor::create(Descriptor::Inserter()
-            .add("pos", AttributeVec3s::attributeType())
-            .add("id", AttributeI::attributeType())
-            .vec);
+        Descriptor::Ptr descr2 = Descriptor::create(AttributeVec3s::attributeType());
 
         openvdb::MetaMap& meta = descr1->getMetadata();
         meta.insertMeta("exampleMeta", openvdb::FloatMetadata(2.0));
@@ -879,21 +890,23 @@ TestAttributeSet::testAttributeSetGroups()
 
     typedef AttributeSet::Descriptor Descriptor;
 
+    Descriptor::NameToPosMap groupMap;
+    openvdb::MetaMap metadata;
+
     // construct
 
-    Descriptor::Ptr descr = Descriptor::create(Descriptor::Inserter()
-        .add("pos", AttributeVec3s::attributeType())
-        .add("id", AttributeI::attributeType())
-        .vec);
+    Descriptor::Ptr descr = Descriptor::create(AttributeVec3s::attributeType());
 
     AttributeSet attrSet(descr, /*arrayLength=*/3);
+
+    attrSet.appendAttribute("id", AttributeI::attributeType());
 
     {
         CPPUNIT_ASSERT(!descr->hasGroup("test1"));
     }
 
     { // group offset
-        Descriptor::Ptr descr(new Descriptor);
+        Descriptor::Ptr descr = Descriptor::create(AttributeVec3s::attributeType());
 
         descr->setGroup("test1", 1);
 
@@ -906,17 +919,19 @@ TestAttributeSet::testAttributeSetGroups()
     }
 
     { // group index
-        Descriptor::Ptr descr = Descriptor::create(Descriptor::Inserter()
-            .add("test", AttributeI::attributeType())
-            .add("test2", AttributeI::attributeType())
-            .add("group1", GroupAttributeArray::attributeType())
-            .add("test3", AttributeI::attributeType())
-            .add("group2", GroupAttributeArray::attributeType())
-            .add("test4", AttributeI::attributeType())
-            .add("group3", GroupAttributeArray::attributeType())
-            .vec);
+        Descriptor::Ptr descr = Descriptor::create(AttributeVec3s::attributeType());
 
         AttributeSet attrSet(descr);
+
+        attrSet.appendAttribute("test", AttributeI::attributeType());
+        attrSet.appendAttribute("test2", AttributeI::attributeType());
+        attrSet.appendAttribute("group1", GroupAttributeArray::attributeType());
+        attrSet.appendAttribute("test3", AttributeI::attributeType());
+        attrSet.appendAttribute("group2", GroupAttributeArray::attributeType());
+        attrSet.appendAttribute("test4", AttributeI::attributeType());
+        attrSet.appendAttribute("group3", GroupAttributeArray::attributeType());
+
+        descr = attrSet.descriptorPtr();
 
         std::stringstream ss;
         for (int i = 0; i < 17; i++) {
@@ -926,25 +941,25 @@ TestAttributeSet::testAttributeSetGroups()
         }
 
         Descriptor::GroupIndex index15 = attrSet.groupIndex(15);
-        CPPUNIT_ASSERT_EQUAL(index15.first, size_t(4));
+        CPPUNIT_ASSERT_EQUAL(index15.first, size_t(5));
         CPPUNIT_ASSERT_EQUAL(index15.second, uint8_t(7));
 
         CPPUNIT_ASSERT_EQUAL(attrSet.groupOffset(index15), size_t(15));
         CPPUNIT_ASSERT_EQUAL(attrSet.groupOffset("test15"), size_t(15));
 
         Descriptor::GroupIndex index15b = attrSet.groupIndex("test15");
-        CPPUNIT_ASSERT_EQUAL(index15b.first, size_t(4));
+        CPPUNIT_ASSERT_EQUAL(index15b.first, size_t(5));
         CPPUNIT_ASSERT_EQUAL(index15b.second, uint8_t(7));
 
         Descriptor::GroupIndex index16 = attrSet.groupIndex(16);
-        CPPUNIT_ASSERT_EQUAL(index16.first, size_t(6));
+        CPPUNIT_ASSERT_EQUAL(index16.first, size_t(7));
         CPPUNIT_ASSERT_EQUAL(index16.second, uint8_t(0));
 
         CPPUNIT_ASSERT_EQUAL(attrSet.groupOffset(index16), size_t(16));
         CPPUNIT_ASSERT_EQUAL(attrSet.groupOffset("test16"), size_t(16));
 
         Descriptor::GroupIndex index16b = attrSet.groupIndex("test16");
-        CPPUNIT_ASSERT_EQUAL(index16b.first, size_t(6));
+        CPPUNIT_ASSERT_EQUAL(index16b.first, size_t(7));
         CPPUNIT_ASSERT_EQUAL(index16b.second, uint8_t(0));
 
         // check out of range exception

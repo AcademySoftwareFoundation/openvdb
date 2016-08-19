@@ -51,6 +51,9 @@
 #include <openvdb_points/tools/AttributeArray.h>
 
 
+class TestAttributeSet;
+
+
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
@@ -98,6 +101,9 @@ public:
 
     /// Construct from the given descriptor
     explicit AttributeSet(const DescriptorPtr&, size_t arrayLength = 1);
+
+    /// Construct from the given AttributeSet
+    AttributeSet(const AttributeSet&, size_t arrayLength);
 
     /// Shallow copy constructor, the descriptor and attribute arrays will be shared.
     AttributeSet(const AttributeSet&);
@@ -287,18 +293,11 @@ public:
     /// Copy constructor
     Descriptor(const Descriptor&);
 
-    /// Create a new descriptor from the given attribute and type name pairs.
-    static Ptr create(const NameAndTypeVec&);
-
-    /// Create a new descriptor from the given attribute and type name pairs
-    /// and copy the group maps and metamap.
-    static Ptr create(const NameAndTypeVec&, const NameToPosMap&, const MetaMap&);
-
     /// Create a new descriptor from a position attribute type and assumes "P" (for convenience).
     static Ptr create(const NamePair&);
 
     /// Create a new descriptor as a duplicate with a new attribute appended
-    Ptr duplicateAppend(const NameAndType& attribute) const;
+    Ptr duplicateAppend(const Name& name, const NamePair& type) const;
 
     /// Create a new descriptor as a duplicate with existing attributes dropped
     Ptr duplicateDrop(const std::vector<size_t>& pos) const;
@@ -353,9 +352,6 @@ public:
     /// Return a reference to the name-to-position group map.
     const NameToPosMap& groupMap() const { return mGroupMap; }
 
-    /// Append to a vector of names and types from this Descriptor in position order
-    void appendTo(NameAndTypeVec& attrs) const;
-
     /// Return @c true if group exists
     bool hasGroup(const Name& group) const;
     /// Define a group name to offset mapping
@@ -381,8 +377,18 @@ public:
     /// Unserialize this transform from the given stream.
     void read(std::istream&);
 
-private:
+protected:
+    /// Append to a vector of names and types from this Descriptor in position order
+    void appendTo(NameAndTypeVec& attrs) const;
+
+    /// Create a new descriptor from the given attribute and type name pairs
+    /// and copy the group maps and metamap.
+    static Ptr create(const NameAndTypeVec&, const NameToPosMap&, const MetaMap&);
+
     size_t insert(const std::string& name, const NamePair& typeName);
+
+private:
+    friend class ::TestAttributeSet;
 
     NameToPosMap                mNameMap;
     std::vector<NamePair>       mTypes;

@@ -918,15 +918,13 @@ TestAttributeArray::testAttributeHandle()
     // create a Descriptor and AttributeSet
 
     typedef AttributeSet::Descriptor Descriptor;
-
-    Descriptor::Ptr descr = Descriptor::create(Descriptor::Inserter()
-        .add("pos", AttributeVec3f::attributeType())
-        .add("truncate", AttributeFH::attributeType())
-        .add("int", AttributeI::attributeType())
-        .vec);
+    Descriptor::Ptr descr = Descriptor::create(AttributeVec3f::attributeType());
 
     unsigned count = 50;
     AttributeSet attrSet(descr, /*arrayLength=*/count);
+
+    attrSet.appendAttribute("truncate", AttributeFH::attributeType());
+    attrSet.appendAttribute("int", AttributeI::attributeType());
 
     // check uniform value implementation
 
