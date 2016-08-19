@@ -79,6 +79,14 @@ initialize()
     GroupAttributeArray::registerType();
     StringAttributeArray::registerType();
 
+    // matrix and quaternion attributes
+
+    TypedAttributeArray<math::Mat4<float> >::registerType();
+    TypedAttributeArray<math::Mat4<double> >::registerType();
+
+    TypedAttributeArray<math::Quat<float> >::registerType();
+    TypedAttributeArray<math::Quat<double> >::registerType();
+
     // truncate compression
 
     TypedAttributeArray<float, TruncateCodec>::registerType();

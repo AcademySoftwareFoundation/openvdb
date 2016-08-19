@@ -117,6 +117,8 @@ public:
     CPPUNIT_TEST(testAttributeHandle);
     CPPUNIT_TEST(testStrided);
     CPPUNIT_TEST(testDelayedLoad);
+    CPPUNIT_TEST(testQuaternions);
+    CPPUNIT_TEST(testMatrices);
     CPPUNIT_TEST(testProfile);
 
     CPPUNIT_TEST_SUITE_END();
@@ -129,6 +131,8 @@ public:
     void testAttributeHandle();
     void testStrided();
     void testDelayedLoad();
+    void testQuaternions();
+    void testMatrices();
     void testProfile();
 }; // class TestAttributeArray
 
@@ -1674,6 +1678,86 @@ TestAttributeArray::testDelayedLoad()
         std::remove(filename.c_str());
     }
 }
+
+
+void
+TestAttributeArray::testQuaternions()
+{
+    using namespace openvdb;
+
+    typedef TypedAttributeArray<math::Quat<float> >         AttributeQF;
+    typedef TypedAttributeArray<QuatR>                      AttributeQD;
+
+    AttributeQF::registerType();
+    AttributeQD::registerType();
+
+    CPPUNIT_ASSERT(AttributeQF::attributeType().first == "quats");
+    CPPUNIT_ASSERT(AttributeQD::attributeType().first == "quatd");
+
+    AttributeQF test(/*size=*/5);
+
+    AttributeQD orient(/*size=*/10);
+
+    { // set some quaternion values
+        AttributeWriteHandle<QuatR> orientHandle(orient);
+
+        orientHandle.set(4, QuatR(1, 2, 3, 4));
+        orientHandle.set(7, QuatR::zero());
+    }
+
+    { // get some quaternion values
+        AttributeHandle<QuatR> orientHandle(orient);
+
+        CPPUNIT_ASSERT_EQUAL(orientHandle.get(3), QuatR::identity());
+        CPPUNIT_ASSERT_EQUAL(orientHandle.get(4), QuatR(1, 2, 3, 4));
+        CPPUNIT_ASSERT_EQUAL(orientHandle.get(7), QuatR::zero());
+    }
+
+    { // create a quaternion array with a zero uniform value
+        AttributeQD zero(/*size=*/10, /*stride=*/1, QuatR::zero());
+
+        CPPUNIT_ASSERT_EQUAL(zero.get(5), QuatR::zero());
+    }
+}
+
+
+void
+TestAttributeArray::testMatrices()
+{
+    using namespace openvdb;
+
+    typedef TypedAttributeArray<Mat4d>      AttributeM;
+
+    AttributeM::registerType();
+
+    CPPUNIT_ASSERT(AttributeM::attributeType().first == "mat4d");
+
+    AttributeM matrix(/*size=*/10);
+
+    Mat4d testMatrix(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
+
+    { // set some matrix values
+        AttributeWriteHandle<Mat4d> matrixHandle(matrix);
+
+        matrixHandle.set(4, testMatrix);
+        matrixHandle.set(7, Mat4d::zero());
+    }
+
+    { // get some matrix values
+        AttributeHandle<Mat4d> matrixHandle(matrix);
+
+        CPPUNIT_ASSERT_EQUAL(matrixHandle.get(3), Mat4d::identity());
+        CPPUNIT_ASSERT_EQUAL(matrixHandle.get(4), testMatrix);
+        CPPUNIT_ASSERT_EQUAL(matrixHandle.get(7), Mat4d::zero());
+    }
+
+    { // create a matrix array with a zero uniform value
+        AttributeM zero(/*size=*/10, /*stride=*/1, Mat4d::zero());
+
+        CPPUNIT_ASSERT_EQUAL(zero.get(5), Mat4d::zero());
+    }
+}
+
 
 namespace profile {
 
