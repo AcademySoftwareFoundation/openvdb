@@ -67,7 +67,7 @@ namespace hutil = houdini_utils;
 enum COMPRESSION_TYPE
 {
     NONE = 0,
-    TRUNCATE_16,
+    TRUNCATE,
     UNIT_VECTOR,
     FIXED_POSITION_16,
     FIXED_POSITION_8
@@ -118,21 +118,14 @@ attrStringTypeFromGAAttribute(GA_Attribute const * attribute)
         else if (storage == GA_STORE_INT16)     return "int16";
         else if (storage == GA_STORE_INT32)     return "int32";
         else if (storage == GA_STORE_INT64)     return "int64";
-        else if (storage == GA_STORE_REAL16)    return "half";
         else if (storage == GA_STORE_REAL32)    return "float";
         else if (storage == GA_STORE_REAL64)    return "double";
-    }
-    else if (width == 2)
-    {
-        if (storage == GA_STORE_REAL16)         return "vec2h";
-        else if (storage == GA_STORE_REAL32)    return "vec2s";
-        else if (storage == GA_STORE_REAL64)    return "vec2d";
     }
     else if (width == 3 || width == 4)
     {
         // note: process 4-component vectors as 3-component vectors for now
 
-        if (storage == GA_STORE_REAL16)         return "vec3h";
+        if (storage == GA_STORE_INT32)          return "vec3i";
         else if (storage == GA_STORE_REAL32)    return "vec3s";
         else if (storage == GA_STORE_REAL64)    return "vec3d";
     }
@@ -206,15 +199,19 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
         else if (storage == GA_STORE_INT64) {
             convertAttributeFromHoudini<TypedAttributeArray<int64_t> >(tree, indexTree, name, attribute, defaults, compression);
         }
-        else if (storage == GA_STORE_REAL16) {
-            convertAttributeFromHoudini<TypedAttributeArray<half> >(tree, indexTree, name, attribute, defaults, compression);
+        else if (storage == GA_STORE_REAL16)
+        {
+            // implicitly convert 16-bit float into truncated 32-bit float
+
+            convertAttributeFromHoudini<TypedAttributeArray<float,
+                                        TruncateCodec> >(tree, indexTree, name, attribute, defaults, compression);
         }
         else if (storage == GA_STORE_REAL32)
         {
             if (compression == NONE) {
                 convertAttributeFromHoudini<TypedAttributeArray<float> >(tree, indexTree, name, attribute, defaults, compression);
             }
-            else if (compression == TRUNCATE_16) {
+            else if (compression == TRUNCATE) {
                 convertAttributeFromHoudini<TypedAttributeArray<float,
                                             TruncateCodec> >(tree, indexTree, name, attribute, defaults, compression);
             }
@@ -223,31 +220,26 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
             convertAttributeFromHoudini<TypedAttributeArray<double> >(tree, indexTree, name, attribute, defaults, compression);
         }
     }
-    else if (width == 2)
-    {
-        if (storage == GA_STORE_REAL16) {
-            convertAttributeFromHoudini<TypedAttributeArray<Vec2<half> > >(tree, indexTree, name, attribute, defaults, compression);
-        }
-        else if (storage == GA_STORE_REAL32) {
-            convertAttributeFromHoudini<TypedAttributeArray<Vec2<float> > >(tree, indexTree, name, attribute, defaults, compression);
-        }
-        else if (storage == GA_STORE_REAL64) {
-            convertAttributeFromHoudini<TypedAttributeArray<Vec2<double> > >(tree, indexTree, name, attribute, defaults, compression);
-        }
-    }
     else if (width == 3 || width == 4)
     {
         // note: process 4-component vectors as 3-component vectors for now
 
-        if (storage == GA_STORE_REAL16) {
-            convertAttributeFromHoudini<TypedAttributeArray<Vec3<half> > >(tree, indexTree, name, attribute, defaults, compression);
+        if (storage == GA_STORE_INT32) {
+            convertAttributeFromHoudini<TypedAttributeArray<Vec3<int> > >(tree, indexTree, name, attribute, defaults, compression);
+        }
+        else if (storage == GA_STORE_REAL16)
+        {
+            // implicitly convert 16-bit float into truncated 32-bit float
+
+            convertAttributeFromHoudini<TypedAttributeArray<Vec3<float>,
+                                        TruncateCodec> >(tree, indexTree, name, attribute, defaults, compression);
         }
         else if (storage == GA_STORE_REAL32)
         {
             if (compression == NONE) {
                 convertAttributeFromHoudini<TypedAttributeArray<Vec3<float> > >(tree, indexTree, name, attribute, defaults, compression);
             }
-            else if (compression == TRUNCATE_16) {
+            else if (compression == TRUNCATE) {
                 convertAttributeFromHoudini<TypedAttributeArray<Vec3<float>,
                                             TruncateCodec> >(tree, indexTree, name, attribute, defaults, compression);
             }
@@ -822,7 +814,7 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
                     ss <<   "Invalid value compression for attribute - " << attributeName << ". " <<
                             "Disabling compression for this attribute.";
 
-                    if (valueCompression == TRUNCATE_16)
+                    if (valueCompression == TRUNCATE)
                     {
                         if (type != "float" && type != "vec3s") {
                             valueCompression = 0;

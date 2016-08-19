@@ -182,10 +182,9 @@ gaDefaultsFromDescriptor(const openvdb::tools::AttributeSet::Descriptor& descrip
     else if (type == "int16")       return gaDefaultsFromDescriptorTyped<int16_t, int32>(descriptor, name);
     else if (type == "int32")       return gaDefaultsFromDescriptorTyped<int32_t, int32>(descriptor, name);
     else if (type == "int64")       return gaDefaultsFromDescriptorTyped<int64_t, int64>(descriptor, name);
-    else if (type == "half")        return gaDefaultsFromDescriptorTyped<half, fpreal32>(descriptor, name);
     else if (type == "float")       return gaDefaultsFromDescriptorTyped<float, fpreal32>(descriptor, name);
     else if (type == "double")      return gaDefaultsFromDescriptorTyped<double, fpreal64>(descriptor, name);
-    else if (type == "vec3h")       return gaDefaultsFromDescriptorTyped<openvdb::math::Vec3<half>, fpreal32>(descriptor, name);
+    else if (type == "vec3i")       return gaDefaultsFromDescriptorTyped<openvdb::math::Vec3<int>, int32>(descriptor, name);
     else if (type == "vec3s")       return gaDefaultsFromDescriptorTyped<openvdb::math::Vec3<float>, fpreal32>(descriptor, name);
     else if (type == "vec3d")       return gaDefaultsFromDescriptorTyped<openvdb::math::Vec3<double>, fpreal64>(descriptor, name);
 
@@ -200,10 +199,9 @@ gaStorageFromAttrString(const openvdb::Name& type)
     else if (type == "int16")       return GA_STORE_INT16;
     else if (type == "int32")       return GA_STORE_INT32;
     else if (type == "int64")       return GA_STORE_INT64;
-    else if (type == "half")        return GA_STORE_REAL16;
     else if (type == "float")       return GA_STORE_REAL32;
     else if (type == "double")      return GA_STORE_REAL64;
-    else if (type == "vec3h")       return GA_STORE_REAL16;
+    else if (type == "vec3i")       return GA_STORE_INT32;
     else if (type == "vec3s")       return GA_STORE_REAL32;
     else if (type == "vec3d")       return GA_STORE_REAL64;
 
@@ -218,13 +216,12 @@ widthFromAttrString(const openvdb::Name& type)
         type == "int16" ||
         type == "int32" ||
         type == "int64" ||
-        type == "half" ||
         type == "float" ||
         type == "double")
     {
         return 1;
     }
-    else if (type == "vec3h" ||
+    else if (type == "vec3i" ||
              type == "vec3s" ||
              type == "vec3d")
     {
@@ -448,10 +445,6 @@ convertPointDataGridToHoudini(GU_Detail& detail,
             HoudiniWriteAttribute<int64_t> attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
         }
-        else if (type == "half") {
-            HoudiniWriteAttribute<half> attribute(*attributeRef.getAttribute());
-            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
-        }
         else if (type == "float") {
             HoudiniWriteAttribute<float> attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
@@ -460,8 +453,8 @@ convertPointDataGridToHoudini(GU_Detail& detail,
             HoudiniWriteAttribute<double> attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
         }
-        else if (type == "vec3h") {
-            HoudiniWriteAttribute<openvdb::math::Vec3<half> > attribute(*attributeRef.getAttribute());
+        else if (type == "vec3i") {
+            HoudiniWriteAttribute<openvdb::math::Vec3<int> > attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
         }
         else if (type == "vec3s") {

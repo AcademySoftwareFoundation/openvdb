@@ -358,12 +358,12 @@ Geometry_OpenVDBPoints::create( const PointDataGrid::Ptr& grid,
 
     // check attribute types are valid
 
-    if (velocityType != "vec3s" && velocityType != "vec3h") {
+    if (velocityType != "vec3s") {
         std::cerr << "Invalid Velocity Type: " << velocityType << std::endl;
         return 0;
     }
 
-    if (radiusType != "float" && radiusType != "half") {
+    if (radiusType != "float") {
         std::cerr << "Invalid Radius Type: " << radiusType << std::endl;
         return 0;
     }
@@ -657,15 +657,6 @@ void Geometry_OpenVDBPoints::intersect_primitive(
 {
     if (m_velocityType == "vec3s" && m_radiusType == "float") {
         intersect_typed_primitive<Vec3f, float>(eval_ctx, id, raytrace_ctx);
-    }
-    else if (m_velocityType == "vec3s" && m_radiusType == "half") {
-        intersect_typed_primitive<Vec3f, half>(eval_ctx, id, raytrace_ctx);
-    }
-    else if (m_velocityType == "vec3h" && m_radiusType == "float") {
-        intersect_typed_primitive<math::Vec3<half>, float>(eval_ctx, id, raytrace_ctx);
-    }
-    else if (m_velocityType == "vec3h" && m_radiusType == "half") {
-        intersect_typed_primitive<math::Vec3<half>, half>(eval_ctx, id, raytrace_ctx);
     }
 }
 

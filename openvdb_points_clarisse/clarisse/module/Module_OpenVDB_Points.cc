@@ -417,10 +417,7 @@ namespace resource
 
             // only floating point property types are supported
 
-            if (type.first != "float" &&
-                type.first != "half" &&
-                type.first != "vec3s" &&
-                type.first != "vec3h")   continue;
+            if (type.first != "float" && type.first != "vec3s")   continue;
 
             properties.add(new GeometryProperty_OpenVDBPoints(data, it->first, type.first));
         }
