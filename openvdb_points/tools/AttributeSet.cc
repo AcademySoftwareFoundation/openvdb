@@ -114,7 +114,13 @@ AttributeSet::AttributeSet(const AttributeSet& attrSet, size_t arrayLength)
     for (Descriptor::ConstIterator it = mDescr->map().begin(),
         end = mDescr->map().end(); it != end; ++it) {
         const size_t pos = it->second;
-        mAttrs[pos] = AttributeArray::create(mDescr->type(pos), arrayLength, 1);
+        AttributeArray::Ptr array = AttributeArray::create(mDescr->type(pos), arrayLength, 1);
+
+        // transfer hidden and transient flags
+        if (attrSet.getConst(pos)->isHidden())      array->setHidden(true);
+        if (attrSet.getConst(pos)->isTransient())   array->setTransient(true);
+
+        mAttrs[pos] = array;
     }
 }
 

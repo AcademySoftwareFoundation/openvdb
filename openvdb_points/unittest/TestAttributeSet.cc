@@ -541,6 +541,17 @@ TestAttributeSet::testAttributeSet()
         CPPUNIT_ASSERT_THROW(AttributeSet attrSet(invalidDescr), openvdb::IndexError);
     }
 
+    { // transfer of flags on construction
+        AttributeSet attrSet(Descriptor::create(AttributeVec3s::attributeType()));
+        AttributeArray::Ptr array1 = attrSet.appendAttribute("hidden", AttributeS::attributeType());
+        array1->setHidden(true);
+        AttributeArray::Ptr array2 = attrSet.appendAttribute("transient", AttributeS::attributeType());
+        array2->setTransient(true);
+        AttributeSet attrSet2(attrSet, size_t(1));
+        CPPUNIT_ASSERT(attrSet2.getConst("hidden")->isHidden());
+        CPPUNIT_ASSERT(attrSet2.getConst("transient")->isTransient());
+    }
+
     // construct
 
     Descriptor::Ptr descr = Descriptor::create(AttributeVec3s::attributeType());
