@@ -624,7 +624,7 @@ TestAttributeSet::testAttributeSet()
             attrSetC.makeUnique(0);
             attrSetC.makeUnique(1);
 
-            attrSetC.appendAttribute<AttributeS>("test", /*stride=*/1, defaultValueTest.copy());
+            attrSetC.appendAttribute("test", AttributeS::attributeType(), /*stride=*/1, defaultValueTest.copy());
 
             CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *descrB));
         }
@@ -634,7 +634,7 @@ TestAttributeSet::testAttributeSet()
             attrSetC.makeUnique(0);
             attrSetC.makeUnique(1);
 
-            attrSetC.appendAttribute<AttributeS>(attrSetC.descriptor(), descrB);
+            attrSetC.appendAttribute(attrSetC.descriptor(), descrB, size_t(2));
 
             CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
         }

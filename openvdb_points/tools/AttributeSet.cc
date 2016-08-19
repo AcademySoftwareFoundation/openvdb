@@ -300,6 +300,59 @@ AttributeSet::makeUnique(size_t pos)
 }
 
 
+AttributeArray::Ptr
+AttributeSet::appendAttribute(  const Name& name,
+                                const NamePair& type,
+                                const Index stride,
+                                Metadata::Ptr defaultValue)
+{
+    AttributeSet::Util::NameAndType nameAndType(name, type);
+
+    Descriptor::Ptr descriptor = mDescr->duplicateAppend(nameAndType);
+
+    // store the attribute default value in the descriptor metadata
+    if (defaultValue)   descriptor->setDefaultValue(name, *defaultValue);
+
+    // extract the index from the descriptor
+    const size_t pos = descriptor->find(name);
+
+    return this->appendAttribute(*mDescr, descriptor, pos, stride);
+}
+
+
+AttributeArray::Ptr
+AttributeSet::appendAttribute(  const Descriptor& expected, DescriptorPtr& replacement,
+                                const size_t pos, const Index stride)
+{
+    // ensure the descriptor is as expected
+    if (*mDescr != expected) {
+        OPENVDB_THROW(LookupError, "Cannot append attributes as descriptors do not match.")
+    }
+
+    const size_t offset = mDescr->size();
+
+    mDescr = replacement;
+
+    assert(mDescr->size() >= offset);
+
+    // extract the array length from the first attribute array if it exists
+
+    const size_t arrayLength = offset > 0 ? this->get(0)->size() : 1;
+
+    // extract the type from the descriptor
+
+    const NamePair& type = replacement->type(pos);
+
+    // append the new array
+
+    AttributeArray::Ptr array = AttributeArray::create(type, arrayLength, stride);
+
+    mAttrs.push_back(array);
+
+    return array;
+}
+
+
 void
 AttributeSet::dropAttributes(const std::vector<size_t>& pos)
 {
@@ -538,6 +591,19 @@ AttributeSet::Descriptor::hasSameAttributes(const Descriptor& rhs) const
     }
 
     return std::equal(mGroupMap.begin(), mGroupMap.end(), rhs.mGroupMap.begin());
+}
+
+
+size_t
+AttributeSet::Descriptor::count(const NamePair& matchType) const
+{
+    size_t count = 0;
+    for (std::vector<NamePair>::const_iterator  it = mTypes.begin(),
+                                                itEnd = mTypes.end(); it != itEnd; ++it) {
+        const NamePair& type = *it;
+        if (type == matchType)    count++;
+    }
+    return count;
 }
 
 

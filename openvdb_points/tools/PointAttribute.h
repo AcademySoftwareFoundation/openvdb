@@ -152,10 +152,12 @@ struct AppendAttributeOp {
 
     AppendAttributeOp(  PointDataTreeType& tree,
                         AttributeSet::DescriptorPtr& descriptor,
+                        const size_t pos,
                         const bool hidden = false,
                         const bool transient = false)
         : mTree(tree)
         , mDescriptor(descriptor)
+        , mPos(pos)
         , mHidden(hidden)
         , mTransient(transient) { }
 
@@ -165,7 +167,7 @@ struct AppendAttributeOp {
 
             const AttributeSet::Descriptor& expected = leaf->attributeSet().descriptor();
 
-            AttributeArray::Ptr attribute = leaf->template appendAttribute<AttributeType>(expected, mDescriptor);
+            AttributeArray::Ptr attribute = leaf->appendAttribute(expected, mDescriptor, mPos);
 
             if (mHidden)      attribute->setHidden(true);
             if (mTransient)   attribute->setTransient(true);
@@ -176,6 +178,7 @@ struct AppendAttributeOp {
 
     PointDataTreeType&              mTree;
     AttributeSet::DescriptorPtr&    mDescriptor;
+    const size_t                    mPos;
     const bool                      mHidden;
     const bool                      mTransient;
 }; // class AppendAttributeOp
@@ -310,9 +313,13 @@ inline void appendAttribute(PointDataTree& tree,
         newDescriptor->setDefaultValue(name, *defaultValue);
     }
 
+    // extract new pos
+
+    const size_t pos = newDescriptor->find(name);
+
     // insert attributes using the new descriptor
 
-    AppendAttributeOp<AttributeType, PointDataTree> append(tree, newDescriptor, hidden, transient);
+    AppendAttributeOp<AttributeType, PointDataTree> append(tree, newDescriptor, pos, hidden, transient);
     tbb::parallel_for(typename tree::template LeafManager<PointDataTree>(tree).leafRange(), append);
 }
 

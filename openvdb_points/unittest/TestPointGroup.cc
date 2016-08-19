@@ -300,12 +300,12 @@ TestPointGroup::testAppendDrop()
         appendGroup(tree, "test2");
 
         CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().groupMap().size(), size_t(2));
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().count<GroupAttributeArray>(), size_t(1));
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().count(GroupAttributeArray::attributeType()), size_t(1));
 
         dropGroups(tree);
 
         CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().groupMap().size(), size_t(0));
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().count<GroupAttributeArray>(), size_t(0));
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().count(GroupAttributeArray::attributeType()), size_t(0));
     }
 }
 
@@ -342,7 +342,7 @@ TestPointGroup::testCompact()
         }
 
         CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().groupMap().size(), size_t(8));
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().count<GroupAttributeArray>(), size_t(1));
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().count(GroupAttributeArray::attributeType()), size_t(1));
 
         appendGroup(tree, "test8");
 
@@ -351,7 +351,7 @@ TestPointGroup::testCompact()
         CPPUNIT_ASSERT(attributeSet.descriptor().hasGroup("test8"));
 
         CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().groupMap().size(), size_t(9));
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().count<GroupAttributeArray>(), size_t(2));
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().count(GroupAttributeArray::attributeType()), size_t(2));
     }
 
     { // drop first attribute then compact
@@ -359,7 +359,7 @@ TestPointGroup::testCompact()
 
         CPPUNIT_ASSERT(!attributeSet.descriptor().hasGroup("test5"));
         CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().groupMap().size(), size_t(8));
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().count<GroupAttributeArray>(), size_t(2));
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().count(GroupAttributeArray::attributeType()), size_t(2));
 
         compactGroups(tree);
 
@@ -367,7 +367,7 @@ TestPointGroup::testCompact()
         CPPUNIT_ASSERT(attributeSet.descriptor().hasGroup("test7"));
         CPPUNIT_ASSERT(attributeSet.descriptor().hasGroup("test8"));
         CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().groupMap().size(), size_t(8));
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().count<GroupAttributeArray>(), size_t(1));
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().count(GroupAttributeArray::attributeType()), size_t(1));
     }
 
     { // append seventeen groups, drop most of them, then compact
@@ -378,7 +378,7 @@ TestPointGroup::testCompact()
         }
 
         CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().groupMap().size(), size_t(17));
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().count<GroupAttributeArray>(), size_t(3));
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().count(GroupAttributeArray::attributeType()), size_t(3));
 
         // delete all but 0, 5, 9, 15
 
@@ -390,7 +390,7 @@ TestPointGroup::testCompact()
         }
 
         CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().groupMap().size(), size_t(4));
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().count<GroupAttributeArray>(), size_t(3));
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().count(GroupAttributeArray::attributeType()), size_t(3));
 
         // make a copy
 
@@ -401,12 +401,12 @@ TestPointGroup::testCompact()
         compactGroups(tree);
 
         CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().groupMap().size(), size_t(4));
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().count<GroupAttributeArray>(), size_t(1));
+        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().count(GroupAttributeArray::attributeType()), size_t(1));
 
         // check descriptor has been deep copied
 
         CPPUNIT_ASSERT_EQUAL(tree2.cbeginLeaf()->attributeSet().descriptor().groupMap().size(), size_t(4));
-        CPPUNIT_ASSERT_EQUAL(tree2.cbeginLeaf()->attributeSet().descriptor().count<GroupAttributeArray>(), size_t(3));
+        CPPUNIT_ASSERT_EQUAL(tree2.cbeginLeaf()->attributeSet().descriptor().count(GroupAttributeArray::attributeType()), size_t(3));
     }
 }
 

@@ -179,17 +179,16 @@ public:
     void makeUnique(size_t pos);
 
     /// Append attribute @a attribute (simple method)
-    template <typename AttributeType>
     AttributeArray::Ptr appendAttribute(const Name& name,
+                                        const NamePair& type,
                                         const Index stride = 1,
                                         Metadata::Ptr defaultValue = Metadata::Ptr());
 
     /// Append attribute @a attribute (descriptor-sharing)
     /// Requires current descriptor to match @a expected
     /// On append, current descriptor is replaced with @a replacement
-    template <typename AttributeType>
     AttributeArray::Ptr appendAttribute(const Descriptor& expected, DescriptorPtr& replacement,
-                                        const Index stride = 1);
+                                        const size_t pos, const Index stride = 1);
 
     /// Drop attributes with @a pos indices (simple method)
     /// Creates a new descriptor for this attribute set
@@ -308,8 +307,7 @@ public:
     size_t size() const { return mTypes.size(); }
 
     /// Return the number of attributes with this attribute type
-    template <typename AttributeArrayType>
-    size_t count() const;
+    size_t count(const NamePair& type) const;
 
     /// Return the number of bytes of memory used by this attribute set.
     size_t memUsage() const;
@@ -391,65 +389,6 @@ private:
     NameToPosMap                mGroupMap;
     MetaMap                     mMetadata;
 }; // class Descriptor
-
-
-template <typename AttributeArrayType>
-size_t AttributeSet::Descriptor::count() const
-{
-    size_t count = 0;
-    for (std::vector<NamePair>::const_iterator  it = mTypes.begin(),
-                                                itEnd = mTypes.end(); it != itEnd; ++it) {
-        const NamePair& type = *it;
-        if (type == AttributeArrayType::attributeType())    count++;
-    }
-    return count;
-}
-
-
-template <typename AttributeType>
-AttributeArray::Ptr
-AttributeSet::appendAttribute(  const Name& name,
-                                const Index stride,
-                                Metadata::Ptr defaultValue)
-{
-    AttributeSet::Util::NameAndType nameAndType(name, AttributeType::attributeType());
-
-    Descriptor::Ptr descriptor = mDescr->duplicateAppend(nameAndType);
-
-    // store the attribute default value in the descriptor metadata
-    if (defaultValue)   descriptor->setDefaultValue(name, *defaultValue);
-
-    return this->appendAttribute<AttributeType>(*mDescr, descriptor, stride);
-}
-
-
-template <typename AttributeType>
-AttributeArray::Ptr
-AttributeSet::appendAttribute(const Descriptor& expected, DescriptorPtr& replacement, const Index stride)
-{
-    // ensure the descriptor is as expected
-    if (*mDescr != expected) {
-        OPENVDB_THROW(LookupError, "Cannot append attributes as descriptors do not match.")
-    }
-
-    const size_t offset = mDescr->size();
-
-    mDescr = replacement;
-
-    assert(mDescr->size() >= offset);
-
-    // extract the array length from the first attribute array if it exists
-
-    const size_t arrayLength = offset > 0 ? this->get(0)->size() : 1;
-
-    // append the new array
-
-    AttributeArray::Ptr array = AttributeType::create(arrayLength, stride);
-
-    mAttrs.push_back(array);
-
-    return array;
-}
 
 
 template <typename ValueType>

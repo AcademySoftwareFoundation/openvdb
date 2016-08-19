@@ -360,7 +360,7 @@ public:
 
         // compute total slots (one slot per bit of the group attributes)
 
-        const size_t groupAttributes = descriptor.count<GroupAttributeArray>();
+        const size_t groupAttributes = descriptor.count(GroupAttributeArray::attributeType());
 
         if (groupAttributes == 0)   return 0;
 
@@ -510,9 +510,11 @@ inline void appendGroup(PointDataTree& tree, const Name& group)
 
         descriptor = descriptor->duplicateAppend(groupAttribute);
 
+        const size_t pos = descriptor->find(groupName);
+
         // insert new group attribute
 
-        AppendAttributeOp<GroupAttributeArray, PointDataTree> append(tree, descriptor);
+        AppendAttributeOp<GroupAttributeArray, PointDataTree> append(tree, descriptor, pos);
         tbb::parallel_for(typename tree::template LeafManager<PointDataTree>(tree).leafRange(), append);
     }
     else {
