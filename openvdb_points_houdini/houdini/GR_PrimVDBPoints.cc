@@ -683,7 +683,7 @@ struct PositionAttribute
             : mBuffer(attribute.mBuffer)
             , mPositionOffset(attribute.mPositionOffset) { }
 
-        void set(openvdb::Index offset, const ValueType& value) {
+        void set(openvdb::Index offset, openvdb::Index /*stride*/, const ValueType& value) {
             const ValueType transformedValue = value - mPositionOffset;
             mBuffer[offset] = UT_Vector3H(transformedValue.x(), transformedValue.y(), transformedValue.z());
         }
@@ -716,7 +716,7 @@ struct VectorAttribute
             : mBuffer(attribute.mBuffer) { }
 
         template <typename ValueType>
-        void set(openvdb::Index offset, const openvdb::math::Vec3<ValueType>& value) {
+        void set(openvdb::Index offset, openvdb::Index /*stride*/, const openvdb::math::Vec3<ValueType>& value) {
             mBuffer[offset] = UT_Vector3H(float(value.x()), float(value.y()), float(value.z()));
         }
 
@@ -1027,7 +1027,7 @@ GR_PrimVDBPoints::updateVec3Buffer( RE_Render* r,
         if (type == "vec3s") {
             VectorAttribute<Vec3f> typedAttribute(data);
             convertPointDataGridAttribute(typedAttribute, grid.tree(), pointOffsets,
-                                         /*startOffset=*/ 0, index, includeGroups);
+                                         /*startOffset=*/ 0, index, /*stride=*/1, includeGroups);
         }
 
         // unmap the buffer so it can be used by GL and set the cache version

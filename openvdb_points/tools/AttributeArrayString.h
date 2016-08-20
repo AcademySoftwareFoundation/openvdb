@@ -146,8 +146,8 @@ public:
     size_t size() const { return mHandle.size(); }
     bool isUniform() const { return mHandle.isUniform(); }
 
-    Name get(Index n) const;
-    void get(Name& name, Index n) const;
+    Name get(Index n, Index m = 0) const;
+    void get(Name& name, Index n, Index m = 0) const;
 
 protected:
     AttributeHandle<StringIndexType, StringCodec<false> >   mHandle;
@@ -188,6 +188,7 @@ public:
 
     /// Set the value of the index to @param name
     void set(Index n, const Name& name);
+    void set(Index n, Index m, const Name& name);
 
     /// Reset the value cache from the metadata
     void resetCache();

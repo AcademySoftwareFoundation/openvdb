@@ -101,8 +101,7 @@ TestPointAttribute::testAppendDrop()
     CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(1));
 
     { // append an attribute, different initial values and collapse
-        appendAttribute<AttributeI>(tree,  "id",
-                                    /*uniformValue*/zeroVal<AttributeI::ValueType>());
+        appendAttribute<AttributeI>(tree,  "id");
 
         CPPUNIT_ASSERT(tree.beginLeaf()->hasAttribute("id"));
 
@@ -112,32 +111,53 @@ TestPointAttribute::testAppendDrop()
 
         dropAttribute(tree, "id");
 
-        appendAttribute<AttributeI>(tree,  "id",
+        appendAttribute<AttributeI>(tree,  "id", /*stride*/1,
                                     AttributeI::ValueType(10));
 
         CPPUNIT_ASSERT(tree.beginLeaf()->hasAttribute("id"));
 
-        array = tree.beginLeaf()->attributeArray("id");
-        CPPUNIT_ASSERT(array.isUniform());
-        CPPUNIT_ASSERT_EQUAL(AttributeI::cast(array).get(0), AttributeI::ValueType(10));
+        AttributeArray& array2 = tree.beginLeaf()->attributeArray("id");
+        CPPUNIT_ASSERT(array2.isUniform());
+        CPPUNIT_ASSERT_EQUAL(AttributeI::cast(array2).get(0), AttributeI::ValueType(10));
 
-        array.expand();
-        CPPUNIT_ASSERT(!array.isUniform());
+        array2.expand();
+        CPPUNIT_ASSERT(!array2.isUniform());
 
         collapseAttribute<AttributeI>(tree, "id", AttributeI::ValueType(50));
 
-        array = tree.beginLeaf()->attributeArray("id");
-        CPPUNIT_ASSERT(array.isUniform());
-        CPPUNIT_ASSERT_EQUAL(AttributeI::cast(array).get(0), AttributeI::ValueType(50));
+        AttributeArray& array3 = tree.beginLeaf()->attributeArray("id");
+        CPPUNIT_ASSERT(array3.isUniform());
+        CPPUNIT_ASSERT_EQUAL(AttributeI::cast(array3).get(0), AttributeI::ValueType(50));
+
+        dropAttribute(tree, "id");
+    }
+
+    { // append a strided attribute
+        appendAttribute<AttributeI>(tree, "id", /*stride=*/1);
+
+        AttributeArray& array = tree.beginLeaf()->attributeArray("id");
+        CPPUNIT_ASSERT(!array.isStrided());
+        CPPUNIT_ASSERT_EQUAL(array.stride(), Index(1));
+
+        dropAttribute(tree, "id");
+
+        appendAttribute<AttributeI>(tree, "id", /*stride=*/10);
+
+        CPPUNIT_ASSERT(tree.beginLeaf()->hasAttribute("id"));
+
+        AttributeArray& array2 = tree.beginLeaf()->attributeArray("id");
+        CPPUNIT_ASSERT(array2.isStrided());
+        CPPUNIT_ASSERT_EQUAL(array2.stride(), Index(10));
 
         dropAttribute(tree, "id");
     }
 
     { // append an attribute, check descriptors are as expected, default value test
         appendAttribute<AttributeI>(tree,  "id",
-                                /*uniformValue*/zeroVal<AttributeI::ValueType>(),
-                                /*defaultValue*/TypedMetadata<AttributeI::ValueType>(AttributeI::ValueType(10)).copy(),
-                                /*hidden=*/false, /*transient=*/false);
+                                    /*stride=*/1,
+                                    /*uniformValue*/zeroVal<AttributeI::ValueType>(),
+                                    /*defaultValue*/TypedMetadata<AttributeI::ValueType>(AttributeI::ValueType(10)).copy(),
+                                    /*hidden=*/false, /*transient=*/false);
 
         CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(2));
         CPPUNIT_ASSERT(attributeSet.descriptor() == attributeSet4.descriptor());
@@ -273,10 +293,10 @@ TestPointAttribute::testAppendDrop()
     }
 
     { // append attributes marked as hidden, transient, group and string
-        appendAttribute<AttributeF>(tree, "testHidden", zeroVal<AttributeF::ValueType>(), Metadata::Ptr(), true, false);
-        appendAttribute<AttributeF>(tree, "testTransient", zeroVal<AttributeF::ValueType>(), Metadata::Ptr(), false, true);
-        appendAttribute<GroupAttributeArray>(tree, "testGroup", zeroVal<GroupAttributeArray::ValueType>(), Metadata::Ptr(), false, false);
-        appendAttribute<StringAttributeArray>(tree, "testString", zeroVal<StringAttributeArray::ValueType>(), Metadata::Ptr(), false, false);
+        appendAttribute<AttributeF>(tree, "testHidden", /*stride=*/1, zeroVal<AttributeF::ValueType>(), Metadata::Ptr(), true, false);
+        appendAttribute<AttributeF>(tree, "testTransient", /*stride=*/1, zeroVal<AttributeF::ValueType>(), Metadata::Ptr(), false, true);
+        appendAttribute<GroupAttributeArray>(tree, "testGroup", /*stride=*/1, zeroVal<GroupAttributeArray::ValueType>(), Metadata::Ptr(), false, false);
+        appendAttribute<StringAttributeArray>(tree, "testString", /*stride=*/1, zeroVal<StringAttributeArray::ValueType>(), Metadata::Ptr(), false, false);
 
         const AttributeArray& arrayHidden = leafIter->attributeArray("testHidden");
         const AttributeArray& arrayTransient = leafIter->attributeArray("testTransient");
@@ -328,7 +348,7 @@ TestPointAttribute::testRename()
 
     const openvdb::TypedMetadata<float> defaultValue(5.0f);
 
-    appendAttribute<AttributeF>(tree, "test1", zeroVal<AttributeF::ValueType>(), defaultValue.copy());
+    appendAttribute<AttributeF>(tree, "test1", /*stride=*/1, zeroVal<AttributeF::ValueType>(), defaultValue.copy());
     appendAttribute<AttributeI>(tree, "id");
     appendAttribute<AttributeF>(tree, "test2");
 
@@ -376,7 +396,8 @@ TestPointAttribute::testRename()
     }
 
     { // don't rename group attributes
-        appendAttribute<GroupAttributeArray>(tree, "testGroup", zeroVal<GroupAttributeArray::ValueType>(), Metadata::Ptr());
+        appendAttribute<GroupAttributeArray>(tree, "testGroup", /*stride=*/1,
+                                            zeroVal<GroupAttributeArray::ValueType>(), Metadata::Ptr());
         CPPUNIT_ASSERT_THROW(renameAttribute(tree, "testGroup", "testGroup2"), openvdb::KeyError);
     }
 

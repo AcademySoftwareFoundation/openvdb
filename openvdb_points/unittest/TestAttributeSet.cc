@@ -557,6 +557,8 @@ TestAttributeSet::testAttributeSet()
     Descriptor::Ptr descr = Descriptor::create(AttributeVec3s::attributeType());
     AttributeSet attrSetA(descr, /*arrayLength=*/50);
 
+    CPPUNIT_ASSERT_THROW(attrSetA.appendAttribute("id", AttributeI::attributeType(), /*stride=*/0), openvdb::ValueError);
+
     attrSetA.appendAttribute("id", AttributeI::attributeType());
 
     // check equality against duplicate array

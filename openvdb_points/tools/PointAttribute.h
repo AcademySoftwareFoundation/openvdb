@@ -56,6 +56,7 @@ namespace tools {
 ///
 /// @param tree          the PointDataTree to be appended to.
 /// @param name          name for the new attribute.
+/// @param stride        the stride of the attribute
 /// @param uniformValue  the initial value of the attribute
 /// @param defaultValue  metadata default attribute value
 /// @param hidden        mark attribute as hidden
@@ -63,6 +64,7 @@ namespace tools {
 template <typename AttributeType, typename PointDataTree>
 inline void appendAttribute(PointDataTree& tree,
                             const Name& name,
+                            const Index stride = 1,
                             const typename AttributeType::ValueType& uniformValue =
                                                 zeroVal<typename AttributeType::ValueType>(),
                             Metadata::Ptr defaultValue = Metadata::Ptr(),
@@ -74,6 +76,8 @@ inline void appendAttribute(PointDataTree& tree,
 ///
 /// @param tree          the PointDataTree to be appended to.
 /// @param name          name for the new attribute.
+/// @param type          the type of the attibute.
+/// @param stride        the stride of the attribute
 /// @param defaultValue  metadata default attribute value
 /// @param hidden        mark attribute as hidden
 /// @param transient     mark attribute as transient
@@ -81,6 +85,7 @@ template <typename PointDataTree>
 inline void appendAttribute(PointDataTree& tree,
                             const Name& name,
                             const NamePair& type,
+                            const Index stride = 1,
                             Metadata::Ptr defaultValue = Metadata::Ptr(),
                             const bool hidden = false,
                             const bool transient = false);
@@ -182,11 +187,13 @@ struct AppendAttributeOp {
     AppendAttributeOp(  PointDataTreeType& tree,
                         AttributeSet::DescriptorPtr& descriptor,
                         const size_t pos,
+                        const Index stride = 1,
                         const bool hidden = false,
                         const bool transient = false)
         : mTree(tree)
         , mDescriptor(descriptor)
         , mPos(pos)
+        , mStride(stride)
         , mHidden(hidden)
         , mTransient(transient) { }
 
@@ -196,7 +203,7 @@ struct AppendAttributeOp {
 
             const AttributeSet::Descriptor& expected = leaf->attributeSet().descriptor();
 
-            AttributeArray::Ptr attribute = leaf->appendAttribute(expected, mDescriptor, mPos);
+            AttributeArray::Ptr attribute = leaf->appendAttribute(expected, mDescriptor, mPos, mStride);
 
             if (mHidden)      attribute->setHidden(true);
             if (mTransient)   attribute->setTransient(true);
@@ -208,6 +215,7 @@ struct AppendAttributeOp {
     PointDataTreeType&              mTree;
     AttributeSet::DescriptorPtr&    mDescriptor;
     const size_t                    mPos;
+    const Index                     mStride;
     const bool                      mHidden;
     const bool                      mTransient;
 }; // class AppendAttributeOp
@@ -346,6 +354,7 @@ template <typename PointDataTree>
 inline void appendAttribute(PointDataTree& tree,
                             const Name& name,
                             const NamePair& type,
+                            const Index stride,
                             Metadata::Ptr defaultValue,
                             const bool hidden,
                             const bool transient)
@@ -384,7 +393,7 @@ inline void appendAttribute(PointDataTree& tree,
     // insert attributes using the new descriptor
 
     typename tree::template LeafManager<PointDataTree> leafManager(tree);
-    AppendAttributeOp<PointDataTree> append(tree, newDescriptor, pos, hidden, transient);
+    AppendAttributeOp<PointDataTree> append(tree, newDescriptor, pos, stride, hidden, transient);
     tbb::parallel_for(leafManager.leafRange(), append);
 }
 
@@ -395,12 +404,13 @@ inline void appendAttribute(PointDataTree& tree,
 template <typename AttributeType, typename PointDataTree>
 inline void appendAttribute(PointDataTree& tree,
                             const Name& name,
+                            const Index stride,
                             const typename AttributeType::ValueType& uniformValue,
                             Metadata::Ptr defaultValue,
                             const bool hidden,
                             const bool transient)
 {
-    appendAttribute(tree, name, AttributeType::attributeType(), defaultValue, hidden, transient);
+    appendAttribute(tree, name, AttributeType::attributeType(), stride, defaultValue, hidden, transient);
 
     if (uniformValue != zeroVal<typename AttributeType::ValueType>()) {
         collapseAttribute<AttributeType>(tree, name, uniformValue);

@@ -111,7 +111,8 @@ createPointDataGrid(const std::vector<ValueT>& positions,
 template <typename PointDataTreeT, typename PointIndexTreeT, typename PointArrayT>
 inline void
 populateAttribute(  PointDataTreeT& tree, const PointIndexTreeT& pointIndexTree,
-                    const openvdb::Name& attributeName, const PointArrayT& data);
+                    const openvdb::Name& attributeName, const PointArrayT& data,
+                    const Index stride = 1);
 
 
 /// @brief Convert the position attribute from a Point Data Grid
@@ -155,6 +156,7 @@ convertPointDataGridAttribute(  TypedAttribute& attribute,
                                 const std::vector<Index64>& pointOffsets,
                                 const Index64 startOffset,
                                 const unsigned arrayIndex,
+                                const Index stride = 1,
                                 const std::vector<Name>& includeGroups = std::vector<Name>(),
                                 const std::vector<Name>& excludeGroups = std::vector<Name>(),
                                 const bool inCoreOnly = true);
@@ -201,7 +203,7 @@ public:
     void getPos(size_t n, ValueType& xyz) const { xyz = mData[n]; }
 
     template <typename T>
-    void get(size_t n, T& value) const { value = mData[n]; }
+    void get(T& value, size_t n) const { value = mData[n]; }
 
 private:
     const std::vector<value_type>& mData;
@@ -215,10 +217,10 @@ namespace point_conversion_internal {
 
 
 // ConversionTraits to create the relevant Attribute Handles from a LeafNode
-template <typename T> struct ConversionTraits
+template <bool Stride, typename T> struct ConversionTraits
 {
-    typedef AttributeHandle<T> Handle;
-    typedef AttributeWriteHandle<T> WriteHandle;
+    typedef AttributeHandle<T, UnknownCodec, Stride> Handle;
+    typedef AttributeWriteHandle<T, UnknownCodec, Stride> WriteHandle;
     static T zero() { return T(0); }
     template <typename LeafT>
     static typename Handle::Ptr handleFromLeaf(LeafT& leaf, Index index) {
@@ -231,7 +233,7 @@ template <typename T> struct ConversionTraits
         return WriteHandle::create(array);
     }
 }; // ConversionTraits
-template <> struct ConversionTraits<openvdb::Name>
+template <> struct ConversionTraits<false, openvdb::Name>
 {
     typedef StringAttributeHandle Handle;
     typedef StringAttributeWriteHandle WriteHandle;
@@ -360,22 +362,25 @@ struct PopulatePositionAttributeOp {
 
 template<   typename PointDataTreeType,
             typename PointIndexTreeType,
-            typename AttributeListType>
+            typename AttributeListType,
+            bool Stride = false>
 struct PopulateAttributeOp {
 
-    typedef typename tree::LeafManager<PointDataTreeType>       LeafManagerT;
-    typedef typename LeafManagerT::LeafRange                    LeafRangeT;
-    typedef typename PointIndexTreeType::LeafNodeType           PointIndexLeafNode;
-    typedef typename PointIndexLeafNode::IndexArray             IndexArray;
-    typedef typename AttributeListType::value_type              ValueType;
-    typedef typename ConversionTraits<ValueType>::WriteHandle   HandleT;
+    typedef typename tree::LeafManager<PointDataTreeType>               LeafManagerT;
+    typedef typename LeafManagerT::LeafRange                            LeafRangeT;
+    typedef typename PointIndexTreeType::LeafNodeType                   PointIndexLeafNode;
+    typedef typename PointIndexLeafNode::IndexArray                     IndexArray;
+    typedef typename AttributeListType::value_type                      ValueType;
+    typedef typename ConversionTraits<Stride, ValueType>::WriteHandle   HandleT;
 
     PopulateAttributeOp(const PointIndexTreeType& pointIndexTree,
                         const AttributeListType& data,
-                        const size_t index)
+                        const size_t index,
+                        const Index stride = 1)
         : mPointIndexTree(pointIndexTree)
         , mData(data)
-        , mIndex(index) { }
+        , mIndex(index)
+        , mStride(stride) { }
 
     void operator()(const typename LeafManagerT::LeafRange& range) const {
 
@@ -387,7 +392,7 @@ struct PopulateAttributeOp {
 
             if (!pointIndexLeaf)    continue;
 
-            typename HandleT::Ptr attributeWriteHandle = ConversionTraits<ValueType>::writeHandleFromLeaf(*leaf, mIndex);
+            typename HandleT::Ptr attributeWriteHandle = ConversionTraits<Stride, ValueType>::writeHandleFromLeaf(*leaf, mIndex);
 
             Index64 index = 0;
 
@@ -396,10 +401,16 @@ struct PopulateAttributeOp {
             for (typename IndexArray::const_iterator it = indices.begin(), it_end = indices.end(); it != it_end; ++it)
             {
                 ValueType value;
-                mData.template get<ValueType>(*it, value);
-
-                attributeWriteHandle->set(index, value);
-
+                if (Stride) {
+                    for (Index i = 0; i < mStride; i++) {
+                        mData.template get<ValueType>(value, *it, i);
+                        attributeWriteHandle->set(index, i, value);
+                    }
+                }
+                else {
+                    mData.template get<ValueType>(value, *it);
+                    attributeWriteHandle->set(index, 0, value);
+                }
                 index++;
             }
 
@@ -414,6 +425,7 @@ struct PopulateAttributeOp {
     const PointIndexTreeType&   mPointIndexTree;
     const AttributeListType&    mData;
     const size_t                mIndex;
+    const Index                 mStride;
 };
 
 template<typename PointDataTreeType, typename Attribute>
@@ -478,14 +490,14 @@ struct ConvertPointDataGridPositionOp {
                 for (; filterIndexIter; ++filterIndexIter) {
                     const Vec3d xyz = filterIndexIter.indexIter().getCoord().asVec3d();
                     const Vec3d pos = handle->get(Index64(*filterIndexIter));
-                    pHandle.set(offset++, mTransform.indexToWorld(pos + xyz));
+                    pHandle.set(offset++, /*stride=*/ 0, mTransform.indexToWorld(pos + xyz));
                 }
             }
             else {
                 for (; iter; ++iter) {
                     const Vec3d xyz = iter.getCoord().asVec3d();
                     const Vec3d pos = handle->get(Index64(*iter));
-                    pHandle.set(offset++, mTransform.indexToWorld(pos + xyz));
+                    pHandle.set(offset++, /*stride=*/ 0, mTransform.indexToWorld(pos + xyz));
                 }
             }
         }
@@ -504,13 +516,13 @@ struct ConvertPointDataGridPositionOp {
 }; // ConvertPointDataGridPositionOp
 
 
-template<typename PointDataTreeType, typename Attribute>
+template<typename PointDataTreeType, typename Attribute, bool Stride = false>
 struct ConvertPointDataGridAttributeOp {
 
     typedef typename PointDataTreeType::LeafNodeType            LeafNode;
     typedef typename LeafNode::IndexOnIter                      IndexOnIter;
     typedef typename Attribute::ValueType                       ValueType;
-    typedef typename ConversionTraits<ValueType>::Handle        HandleT;
+    typedef typename ConversionTraits<Stride, ValueType>::Handle HandleT;
     typedef typename tree::LeafManager<const PointDataTreeType> LeafManagerT;
     typedef typename LeafManagerT::LeafRange                    LeafRangeT;
 
@@ -518,6 +530,7 @@ struct ConvertPointDataGridAttributeOp {
                                     const std::vector<Index64>& pointOffsets,
                                     const Index64 startOffset,
                                     const size_t index,
+                                    const Index stride = 1,
                                     const std::vector<Name>& includeGroups = std::vector<Name>(),
                                     const std::vector<Name>& excludeGroups = std::vector<Name>(),
                                     const bool inCoreOnly = true)
@@ -525,6 +538,7 @@ struct ConvertPointDataGridAttributeOp {
         , mPointOffsets(pointOffsets)
         , mStartOffset(startOffset)
         , mIndex(index)
+        , mStride(stride)
         , mIncludeGroups(includeGroups)
         , mExcludeGroups(excludeGroups)
         , mInCoreOnly(inCoreOnly) { }
@@ -547,11 +561,11 @@ struct ConvertPointDataGridAttributeOp {
 
             if (leaf.pos() > 0)     offset += mPointOffsets[leaf.pos() - 1];
 
-            typename HandleT::Ptr handle = ConversionTraits<ValueType>::handleFromLeaf(*leaf, mIndex);
+            typename HandleT::Ptr handle = ConversionTraits<Stride, ValueType>::handleFromLeaf(*leaf, mIndex);
 
             const bool uniform = handle->isUniform();
 
-            ValueType uniformValue = ConversionTraits<ValueType>::zero();
+            ValueType uniformValue = ConversionTraits<Stride, ValueType>::zero();
             if (uniform)    uniformValue = ValueType(handle->get(0));
 
             IndexOnIter iter = leaf->beginIndexOn();
@@ -563,24 +577,36 @@ struct ConvertPointDataGridAttributeOp {
 
                 if (uniform) {
                     for (; filterIndexIter; ++filterIndexIter) {
-                        pHandle.set(offset++, uniformValue);
+                        for (Index i = 0; i < mStride; i++) {
+                            pHandle.set(offset, i, uniformValue);
+                        }
+                        offset++;
                     }
                 }
                 else {
                     for (; filterIndexIter; ++filterIndexIter) {
-                        pHandle.set(offset++, handle->get(Index64(*filterIndexIter)));
+                        for (Index i = 0; i < mStride; i++) {
+                            pHandle.set(offset, i, handle->get(Index64(*filterIndexIter), /*stride=*/i));
+                        }
+                        offset++;
                     }
                 }
             }
             else {
                 if (uniform) {
                     for (; iter; ++iter) {
-                        pHandle.set(offset++, uniformValue);
+                        for (Index i = 0; i < mStride; i++) {
+                            pHandle.set(offset, i, uniformValue);
+                        }
+                        offset++;
                     }
                 }
                 else {
                     for (; iter; ++iter) {
-                        pHandle.set(offset++, handle->get(Index64(*iter)));
+                        for (Index i = 0; i < mStride; i++) {
+                            pHandle.set(offset, i, handle->get(Index64(*iter), /*stride=*/i));
+                        }
+                        offset++;
                     }
                 }
             }
@@ -593,6 +619,7 @@ struct ConvertPointDataGridAttributeOp {
     const std::vector<Index64>&             mPointOffsets;
     const Index64                           mStartOffset;
     const size_t                            mIndex;
+    const Index                             mStride;
     const std::vector<std::string>&         mIncludeGroups;
     const std::vector<std::string>&         mExcludeGroups;
     const bool                              mInCoreOnly;
@@ -785,7 +812,7 @@ createPointDataGrid(const std::vector<ValueT>& positions,
 template <typename PointDataTreeT, typename PointIndexTreeT, typename PointArrayT>
 inline void
 populateAttribute(  PointDataTreeT& tree, const PointIndexTreeT& pointIndexTree,
-                    const openvdb::Name& attributeName, const PointArrayT& data)
+                    const openvdb::Name& attributeName, const PointArrayT& data, const Index stride)
 {
     using point_conversion_internal::PopulateAttributeOp;
 
@@ -801,11 +828,21 @@ populateAttribute(  PointDataTreeT& tree, const PointIndexTreeT& pointIndexTree,
 
     // populate attribute
 
-    PopulateAttributeOp<PointDataTreeT,
-                        PointIndexTreeT,
-                        PointArrayT> populate(pointIndexTree, data, index);
+    typename tree::template LeafManager<PointDataTreeT> leafManager(tree);
 
-    tbb::parallel_for(typename tree::template LeafManager<PointDataTree>(tree).leafRange(), populate);
+    if (stride == 1) {
+        PopulateAttributeOp<PointDataTreeT,
+                            PointIndexTreeT,
+                            PointArrayT> populate(pointIndexTree, data, index);
+        tbb::parallel_for(leafManager.leafRange(), populate);
+    }
+    else {
+        PopulateAttributeOp<PointDataTreeT,
+                            PointIndexTreeT,
+                            PointArrayT,
+                            /*stride=*/true> populate(pointIndexTree, data, index, stride);
+        tbb::parallel_for(leafManager.leafRange(), populate);
+    }
 }
 
 
@@ -865,6 +902,7 @@ convertPointDataGridAttribute(  TypedAttribute& attribute,
                                 const std::vector<Index64>& pointOffsets,
                                 const Index64 startOffset,
                                 const unsigned arrayIndex,
+                                const Index stride,
                                 const std::vector<Name>& includeGroups,
                                 const std::vector<Name>& excludeGroups,
                                 const bool inCoreOnly)
@@ -890,10 +928,18 @@ convertPointDataGridAttribute(  TypedAttribute& attribute,
     LeafManagerT leafManager(tree);
 
     attribute.expand();
-    ConvertPointDataGridAttributeOp<PointDataTreeT, TypedAttribute> convert(
-                    attribute, pointOffsets, startOffset, arrayIndex,
-                    newIncludeGroups, newExcludeGroups, inCoreOnly);
-    tbb::parallel_for(leafManager.leafRange(), convert);
+    if (stride == 1) {
+        ConvertPointDataGridAttributeOp<PointDataTreeT, TypedAttribute> convert(
+                        attribute, pointOffsets, startOffset, arrayIndex, stride,
+                        newIncludeGroups, newExcludeGroups, inCoreOnly);
+        tbb::parallel_for(leafManager.leafRange(), convert);
+    }
+    else {
+        ConvertPointDataGridAttributeOp<PointDataTreeT, TypedAttribute, /*Stride=*/true> convert(
+                        attribute, pointOffsets, startOffset, arrayIndex, stride,
+                        newIncludeGroups, newExcludeGroups, inCoreOnly);
+        tbb::parallel_for(leafManager.leafRange(), convert);
+    }
     attribute.compact();
 }
 

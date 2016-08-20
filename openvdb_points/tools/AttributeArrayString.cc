@@ -175,17 +175,17 @@ StringAttributeHandle::StringAttributeHandle(const AttributeArray& array,
 }
 
 
-Name StringAttributeHandle::get(Index n) const
+Name StringAttributeHandle::get(Index n, Index m) const
 {
     Name name;
-    this->get(name, n);
+    this->get(name, n, m);
     return name;
 }
 
 
-void StringAttributeHandle::get(Name& name, Index n) const
+void StringAttributeHandle::get(Name& name, Index n, Index m) const
 {
-    StringIndexType index = mHandle.get(n);
+    StringIndexType index = mHandle.get(n, m);
 
     // index zero is reserved for an empty string
 
@@ -267,6 +267,13 @@ void StringAttributeWriteHandle::set(Index n, const Name& name)
 {
     Index index = getIndex(name);
     mWriteHandle.set(n, /*stride*/0, index);
+}
+
+
+void StringAttributeWriteHandle::set(Index n, Index m, const Name& name)
+{
+    Index index = getIndex(name);
+    mWriteHandle.set(n, m, index);
 }
 
 

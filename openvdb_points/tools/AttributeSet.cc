@@ -327,6 +327,10 @@ AttributeSet::appendAttribute(  const Name& name,
                                 const Index stride,
                                 Metadata::Ptr defaultValue)
 {
+    if (stride < 1) {
+        OPENVDB_THROW(ValueError, "Cannot append attributes with a stride of less than one.")
+    }
+
     Descriptor::Ptr descriptor = mDescr->duplicateAppend(name, type);
 
     // store the attribute default value in the descriptor metadata
