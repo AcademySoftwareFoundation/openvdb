@@ -283,17 +283,25 @@ public:
                 const openvdb::Name valueType = type.first;
                 const openvdb::Name codecType = type.second;
 
+                infoStr << it->first << "[";
+
                 // if no value compression, hide the codec from the middle-click output
 
                 if (codecType == "null") {
                     infoStr << it->first << "[" << valueType << "]";
                 }
                 else if (isString(array)) {
-                    infoStr << it->first << "[str]";
+                    infoStr << "str";
                 }
                 else {
-                    infoStr << it->first << "[" << valueType << "_" << codecType << "]";
+                    infoStr << valueType << "_" << codecType;
                 }
+
+                if (array.isStrided()) {
+                    infoStr << "[" << array.stride() << "]";
+                }
+
+                infoStr << "]";
             }
 
             if (first)  infoStr << "<none>";
