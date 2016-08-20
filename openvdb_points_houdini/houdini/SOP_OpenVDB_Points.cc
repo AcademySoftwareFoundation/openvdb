@@ -149,7 +149,7 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
         defaultValue = TypedMetadata<ValueType>(value).copy();
     }
 
-    appendAttribute<AttributeType, PointDataTree>(tree, name, defaultValue);
+    appendAttribute<AttributeType, PointDataTree>(tree, name, zeroVal<typename AttributeType::ValueType>(), defaultValue);
 
     hvdbp::HoudiniReadAttribute<ValueType> houdiniAttribute(*attribute);
     populateAttribute(tree, indexTree, name, houdiniAttribute);

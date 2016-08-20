@@ -511,7 +511,7 @@ inline void appendGroup(PointDataTree& tree, const Name& group)
 
         // insert new group attribute
 
-        AppendAttributeOp<GroupAttributeArray, PointDataTree> append(tree, descriptor, pos);
+        AppendAttributeOp<PointDataTree> append(tree, descriptor, pos);
         tbb::parallel_for(typename tree::template LeafManager<PointDataTree>(tree).leafRange(), append);
     }
     else {
