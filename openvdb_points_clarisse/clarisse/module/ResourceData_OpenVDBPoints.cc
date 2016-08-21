@@ -207,9 +207,6 @@ void localise(PointDataGrid::Ptr& grid)
         if (type.first == "vec3s") {
             tbb::parallel_for(range, ConvertVelocityToIndexSpaceOp<Vec3f>(velocityIndex, transform));
         }
-        else if (type.first == "vec3h") {
-            tbb::parallel_for(range, ConvertVelocityToIndexSpaceOp<math::Vec3<half> >(velocityIndex, transform));
-        }
         else {
             std::cerr << "Unsupported type for velocity - " << type.first << std::endl;
         }
@@ -224,9 +221,6 @@ void localise(PointDataGrid::Ptr& grid)
 
         if (type.first == "float") {
             tbb::parallel_for(range, ConvertScalarToIndexSpaceOp<float>(pscaleIndex, transform));
-        }
-        else if (type.first == "half") {
-            tbb::parallel_for(range, ConvertScalarToIndexSpaceOp<half>(pscaleIndex, transform));
         }
         else {
             std::cerr << "Unsupported type for pscale - " << type.first << std::endl;

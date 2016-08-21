@@ -61,9 +61,7 @@ GeometryProperty_OpenVDBPoints::GeometryProperty_OpenVDBPoints( const ResourceDa
     , m_type(type)
 {
     if (m_type == "float")           set_evaluate_callbacks(extract_value_long, extract_value_float<float>);
-    else if (m_type == "half")       set_evaluate_callbacks(extract_value_long, extract_value_float<half>);
     else if (m_type == "vec3s")      set_evaluate_callbacks(extract_value_long, extract_value_float<Vec3f>);
-    else if (m_type == "vec3h")      set_evaluate_callbacks(extract_value_long, extract_value_float<math::Vec3<half> >);
 }
 
 GeometryProperty_OpenVDBPoints::~GeometryProperty_OpenVDBPoints()
@@ -94,12 +92,6 @@ template <typename ValueType>
 void setValues(double* values, const ValueType& value, const unsigned int& value_count)
 {
     for (unsigned i = 0; i < value_count; i++)   values[i] = (double) value;
-}
-
-template <>
-void setValues(double* values, const math::Vec3<half>& value, const unsigned int& value_count)
-{
-    for (unsigned i = 0; i < value_count; i++)   values[i] = (double) value[i];
 }
 
 template <>
