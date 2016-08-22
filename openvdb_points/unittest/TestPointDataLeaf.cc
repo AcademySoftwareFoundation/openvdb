@@ -320,21 +320,17 @@ TestPointDataLeaf::testOffsets()
     // test offset validation
 
     {
-        typedef openvdb::tools::TypedAttributeArray<float>    AttributeS;
-        typedef openvdb::tools::TypedAttributeArray<int32_t>  AttributeI;
-        typedef openvdb::tools::AttributeSet::Descriptor      Descriptor;
-
-        Descriptor::Inserter names;
+        typedef openvdb::tools::TypedAttributeArray<openvdb::Vec3s> AttributeVec3s;
+        typedef openvdb::tools::TypedAttributeArray<float>          AttributeS;
+        typedef openvdb::tools::AttributeSet::Descriptor            Descriptor;
 
         // empty Descriptor should throw on leaf node initialize
-        Descriptor::Ptr emptyDescriptor = Descriptor::create(names.vec);
+        Descriptor::Ptr emptyDescriptor(new Descriptor);
         LeafType* emptyLeafNode = new LeafType();
         CPPUNIT_ASSERT_THROW(emptyLeafNode->initializeAttributes(emptyDescriptor, 5), openvdb::IndexError);
 
         // create a non-empty Descriptor
-        names.add("density", AttributeS::attributeType());
-        names.add("id", AttributeI::attributeType());
-        Descriptor::Ptr descriptor = Descriptor::create(names.vec);
+        Descriptor::Ptr descriptor = Descriptor::create(AttributeVec3s::attributeType());
 
         // ensure validateOffsets succeeds for monotonically increasing offsets that fully
         // utilise the underlying attribute arrays
@@ -343,6 +339,9 @@ TestPointDataLeaf::testOffsets()
             const size_t numAttributes = 1;
             LeafType* leafNode = new LeafType();
             leafNode->initializeAttributes(descriptor, numAttributes);
+
+            descriptor = descriptor->duplicateAppend("density", AttributeS::attributeType());
+            leafNode->appendAttribute(leafNode->attributeSet().descriptor(), descriptor, descriptor->find("density"));
 
             std::vector<LeafType::ValueType> offsets;
             offsets.resize(LeafType::SIZE);
@@ -372,11 +371,16 @@ TestPointDataLeaf::testOffsets()
         {
             using openvdb::tools::AttributeSet;
 
+            descriptor = Descriptor::create(AttributeVec3s::attributeType());
+
             const size_t numAttributes = 1;
             LeafType* leafNode = new LeafType();
             leafNode->initializeAttributes(descriptor, numAttributes);
 
-            AttributeSet* newSet = new AttributeSet(descriptor, numAttributes);
+            descriptor = descriptor->duplicateAppend("density", AttributeS::attributeType());
+            leafNode->appendAttribute(leafNode->attributeSet().descriptor(), descriptor, descriptor->find("density"));
+
+            AttributeSet* newSet = new AttributeSet(leafNode->attributeSet(), numAttributes);
             newSet->replace("density", AttributeS::create(numAttributes+1));
             leafNode->swap(newSet);
 
@@ -393,9 +397,14 @@ TestPointDataLeaf::testOffsets()
         // equal to size of attribute arrays)
 
         {
+            descriptor = Descriptor::create(AttributeVec3s::attributeType());
+
             const size_t numAttributes = 1;
             LeafType* leafNode = new LeafType();
             leafNode->initializeAttributes(descriptor, numAttributes);
+
+            descriptor = descriptor->duplicateAppend("density", AttributeS::attributeType());
+            leafNode->appendAttribute(leafNode->attributeSet().descriptor(), descriptor, descriptor->find("density"));
 
             std::vector<LeafType::ValueType> offsets;
             offsets.resize(LeafType::SIZE);
@@ -409,9 +418,14 @@ TestPointDataLeaf::testOffsets()
         // ensure validateOffsets detects out-of-bounds offset values
 
         {
+            descriptor = Descriptor::create(AttributeVec3s::attributeType());
+
             const size_t numAttributes = 1;
             LeafType* leafNode = new LeafType();
             leafNode->initializeAttributes(descriptor, numAttributes);
+
+            descriptor = descriptor->duplicateAppend("density", AttributeS::attributeType());
+            leafNode->appendAttribute(leafNode->attributeSet().descriptor(), descriptor, descriptor->find("density"));
 
             std::vector<LeafType::ValueType> offsets;
             offsets.resize(LeafType::SIZE);
@@ -494,21 +508,17 @@ TestPointDataLeaf::testAttributes()
     using namespace openvdb::tools;
 
     // Define and register some common attribute types
-    typedef openvdb::tools::TypedAttributeArray<float>    AttributeS;
-    typedef openvdb::tools::TypedAttributeArray<int32_t>  AttributeI;
+    typedef openvdb::tools::TypedAttributeArray<openvdb::Vec3s>     AttributeVec3s;
+    typedef openvdb::tools::TypedAttributeArray<int32_t>            AttributeI;
 
-    AttributeS::registerType();
+    AttributeVec3s::registerType();
     AttributeI::registerType();
 
     // create a descriptor
 
     typedef openvdb::tools::AttributeSet::Descriptor Descriptor;
 
-    Descriptor::Inserter names;
-    names.add("density", AttributeS::attributeType());
-    names.add("id", AttributeI::attributeType());
-
-    Descriptor::Ptr descrA = Descriptor::create(names.vec);
+    Descriptor::Ptr descrA = Descriptor::create(AttributeVec3s::attributeType());
 
     // create a leaf and initialize attributes using this descriptor
 
@@ -517,6 +527,9 @@ TestPointDataLeaf::testAttributes()
     CPPUNIT_ASSERT_EQUAL(leaf.attributeSet().size(), size_t(0));
 
     leaf.initializeAttributes(descrA, /*arrayLength=*/100);
+
+    descrA = descrA->duplicateAppend("id", AttributeI::attributeType());
+    leaf.appendAttribute(leaf.attributeSet().descriptor(), descrA, descrA->find("id"));
 
     CPPUNIT_ASSERT_EQUAL(leaf.attributeSet().size(), size_t(2));
 
@@ -564,7 +577,7 @@ TestPointDataLeaf::testAttributes()
     // test leaf returns expected result for hasAttribute()
 
     CPPUNIT_ASSERT(leaf.hasAttribute(/*pos*/0));
-    CPPUNIT_ASSERT(leaf.hasAttribute("density"));
+    CPPUNIT_ASSERT(leaf.hasAttribute("P"));
 
     CPPUNIT_ASSERT(leaf.hasAttribute(/*pos*/1));
     CPPUNIT_ASSERT(leaf.hasAttribute("id"));
@@ -576,13 +589,13 @@ TestPointDataLeaf::testAttributes()
 
     const LeafType* constLeaf = &leaf;
 
-    CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray(/*pos*/0).type(), AttributeS::attributeType()));
-    CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray("density").type(), AttributeS::attributeType()));
+    CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray(/*pos*/0).type(), AttributeVec3s::attributeType()));
+    CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray("P").type(), AttributeVec3s::attributeType()));
     CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray(/*pos*/1).type(), AttributeI::attributeType()));
     CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray("id").type(), AttributeI::attributeType()));
 
-    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray(/*pos*/0).type(), AttributeS::attributeType()));
-    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray("density").type(), AttributeS::attributeType()));
+    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray(/*pos*/0).type(), AttributeVec3s::attributeType()));
+    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray("P").type(), AttributeVec3s::attributeType()));
     CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray(/*pos*/1).type(), AttributeI::attributeType()));
     CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray("id").type(), AttributeI::attributeType()));
 
@@ -597,18 +610,18 @@ TestPointDataLeaf::testAttributes()
     // test leaf can be successfully cast to TypedAttributeArray and check types
 
     CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray(/*pos=*/0).type(),
-                         AttributeS::attributeType()));
-    CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray("density").type(),
-                         AttributeS::attributeType()));
+                         AttributeVec3s::attributeType()));
+    CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray("P").type(),
+                         AttributeVec3s::attributeType()));
     CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray(/*pos=*/1).type(),
                          AttributeI::attributeType()));
     CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray("id").type(),
                          AttributeI::attributeType()));
 
     CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray(/*pos=*/0).type(),
-                         AttributeS::attributeType()));
-    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray("density").type(),
-                         AttributeS::attributeType()));
+                         AttributeVec3s::attributeType()));
+    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray("P").type(),
+                         AttributeVec3s::attributeType()));
     CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray(/*pos=*/1).type(),
                          AttributeI::attributeType()));
     CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray("id").type(),
@@ -624,7 +637,7 @@ TestPointDataLeaf::testAttributes()
 
     // check memory usage = attribute set + base leaf
 
-    leaf.initializeAttributes(descrA, /*arrayLength=*/100);
+    // leaf.initializeAttributes(descrA, /*arrayLength=*/100);
 
     const LeafType::BaseLeaf& baseLeaf = static_cast<LeafType::BaseLeaf&>(leaf);
 
@@ -722,26 +735,30 @@ TestPointDataLeaf::testEquivalence()
 
     // Define and register some common attribute types
 
-    typedef TypedAttributeArray<float>    AttributeS;
-    typedef TypedAttributeArray<int32_t>  AttributeI;
+    typedef TypedAttributeArray<openvdb::Vec3s>     AttributeVec3s;
+    typedef TypedAttributeArray<float>              AttributeF;
+    typedef TypedAttributeArray<int32_t>            AttributeI;
 
-    AttributeS::registerType();
+    AttributeVec3s::registerType();
+    AttributeF::registerType();
     AttributeI::registerType();
 
     // create a descriptor
 
     typedef AttributeSet::Descriptor Descriptor;
 
-    Descriptor::Inserter names;
-    names.add("density", AttributeS::attributeType());
-    names.add("id", AttributeI::attributeType());
-
-    Descriptor::Ptr descrA = Descriptor::create(names.vec);
+    Descriptor::Ptr descrA = Descriptor::create(AttributeVec3s::attributeType());
 
     // create a leaf and initialize attributes using this descriptor
 
     LeafType leaf(openvdb::Coord(0, 0, 0));
     leaf.initializeAttributes(descrA, /*arrayLength=*/100);
+
+    descrA = descrA->duplicateAppend("density", AttributeF::attributeType());
+    leaf.appendAttribute(leaf.attributeSet().descriptor(), descrA, descrA->find("density"));
+
+    descrA = descrA->duplicateAppend("id", AttributeI::attributeType());
+    leaf.appendAttribute(leaf.attributeSet().descriptor(), descrA, descrA->find("id"));
 
     // manually activate some voxels
 
@@ -801,18 +818,17 @@ TestPointDataLeaf::testIterators()
 
     // Define and register some common attribute types
 
-    typedef TypedAttributeArray<float>    AttributeS;
+    typedef TypedAttributeArray<openvdb::Vec3s>     AttributeVec3s;
+    typedef TypedAttributeArray<float>              AttributeF;
 
-    AttributeS::registerType();
+    AttributeVec3s::registerType();
+    AttributeF::registerType();
 
     // create a descriptor
 
     typedef AttributeSet::Descriptor Descriptor;
 
-    Descriptor::Inserter names;
-    names.add("density", AttributeS::attributeType());
-
-    Descriptor::Ptr descrA = Descriptor::create(names.vec);
+    Descriptor::Ptr descrA = Descriptor::create(AttributeVec3s::attributeType());
 
     // create a leaf and initialize attributes using this descriptor
 
@@ -820,6 +836,9 @@ TestPointDataLeaf::testIterators()
 
     LeafType leaf(openvdb::Coord(0, 0, 0));
     leaf.initializeAttributes(descrA, /*arrayLength=*/size/2);
+
+    descrA = descrA->duplicateAppend("density", AttributeF::attributeType());
+    leaf.appendAttribute(leaf.attributeSet().descriptor(), descrA, descrA->find("density"));
 
     { // uniform monotonic offsets, only even active
         int offset = 0;
@@ -869,26 +888,27 @@ TestPointDataLeaf::testIO()
 
     // Define and register some common attribute types
 
-    typedef TypedAttributeArray<float>    AttributeS;
-    typedef TypedAttributeArray<int32_t>  AttributeI;
+    typedef TypedAttributeArray<openvdb::Vec3s>     AttributeVec3s;
+    typedef TypedAttributeArray<float>              AttributeF;
 
-    AttributeS::registerType();
-    AttributeI::registerType();
+    AttributeVec3s::registerType();
+    AttributeF::registerType();
 
     // create a descriptor
 
     typedef AttributeSet::Descriptor Descriptor;
 
-    Descriptor::Inserter names;
-    names.add("density", AttributeS::attributeType());
-    names.add("id", AttributeI::attributeType());
-
-    Descriptor::Ptr descrA = Descriptor::create(names.vec);
+    Descriptor::Ptr descrA = Descriptor::create(AttributeVec3s::attributeType());
 
     // create a leaf and initialize attributes using this descriptor
 
+    const size_t size = LeafType::NUM_VOXELS;
+
     LeafType leaf(openvdb::Coord(0, 0, 0));
-    leaf.initializeAttributes(descrA, /*arrayLength=*/100);
+    leaf.initializeAttributes(descrA, /*arrayLength=*/size/2);
+
+    descrA = descrA->duplicateAppend("density", AttributeF::attributeType());
+    leaf.appendAttribute(leaf.attributeSet().descriptor(), descrA, descrA->find("density"));
 
     // manually activate some voxels
 
@@ -966,21 +986,18 @@ TestPointDataLeaf::testSwap()
 
     // Define and register some common attribute types
 
-    typedef TypedAttributeArray<float>    AttributeS;
-    typedef TypedAttributeArray<int32_t>  AttributeI;
+    typedef TypedAttributeArray<openvdb::Vec3s>     AttributeVec3s;
+    typedef TypedAttributeArray<float>              AttributeF;
+    typedef TypedAttributeArray<int>                AttributeI;
 
-    AttributeS::registerType();
-    AttributeI::registerType();
+    AttributeVec3s::registerType();
+    AttributeF::registerType();
 
     // create a descriptor
 
     typedef AttributeSet::Descriptor Descriptor;
 
-    Descriptor::Inserter names;
-    names.add("density", AttributeS::attributeType());
-    names.add("id", AttributeI::attributeType());
-
-    Descriptor::Ptr descrA = Descriptor::create(names.vec);
+    Descriptor::Ptr descrA = Descriptor::create(AttributeVec3s::attributeType());
 
     // create a leaf and initialize attributes using this descriptor
 
@@ -988,14 +1005,28 @@ TestPointDataLeaf::testSwap()
     LeafType leaf(openvdb::Coord(0, 0, 0));
     leaf.initializeAttributes(descrA, /*arrayLength=*/initialArrayLength);
 
+    descrA = descrA->duplicateAppend("density", AttributeF::attributeType());
+    leaf.appendAttribute(leaf.attributeSet().descriptor(), descrA, descrA->find("density"));
+
+    descrA = descrA->duplicateAppend("id", AttributeI::attributeType());
+    leaf.appendAttribute(leaf.attributeSet().descriptor(), descrA, descrA->find("id"));
+
     // swap out the underlying attribute set with a new attribute set with a matching
     // descriptor
 
     CPPUNIT_ASSERT_EQUAL(initialArrayLength, leaf.attributeSet().get("density")->size());
     CPPUNIT_ASSERT_EQUAL(initialArrayLength, leaf.attributeSet().get("id")->size());
 
+    descrA = Descriptor::create(AttributeVec3s::attributeType());
+
     const size_t newArrayLength = initialArrayLength / 2;
-    leaf.swap(new AttributeSet(descrA, /*arrayLength*/newArrayLength));
+
+    AttributeSet* newAttributeSet(new AttributeSet(descrA, /*arrayLength*/newArrayLength));
+
+    newAttributeSet->appendAttribute("density", AttributeF::attributeType());
+    newAttributeSet->appendAttribute("id", AttributeI::attributeType());
+
+    leaf.swap(newAttributeSet);
 
     CPPUNIT_ASSERT_EQUAL(newArrayLength, leaf.attributeSet().get("density")->size());
     CPPUNIT_ASSERT_EQUAL(newArrayLength, leaf.attributeSet().get("id")->size());
@@ -1006,9 +1037,10 @@ TestPointDataLeaf::testSwap()
 
     // ensure we refuse to swap when the descriptors do not match
 
-    names.add("extra", AttributeS::attributeType());
-    Descriptor::Ptr descrB = Descriptor::create(names.vec);
+    Descriptor::Ptr descrB = Descriptor::create(AttributeVec3s::attributeType());
     AttributeSet* attributeSet = new AttributeSet(descrB, newArrayLength);
+
+    attributeSet->appendAttribute("extra", AttributeF::attributeType());
 
     CPPUNIT_ASSERT_THROW(leaf.swap(attributeSet), openvdb::ValueError);
     delete attributeSet;
@@ -1020,28 +1052,31 @@ TestPointDataLeaf::testCopyOnWrite()
     using namespace openvdb::tools;
 
     // Define and register some common attribute types
-    typedef openvdb::tools::TypedAttributeArray<float>    AttributeS;
 
-    AttributeS::registerType();
+    typedef TypedAttributeArray<openvdb::Vec3s>     AttributeVec3s;
+    typedef TypedAttributeArray<float>              AttributeF;
+
+    AttributeVec3s::registerType();
+    AttributeF::registerType();
 
     // create a descriptor
 
-    typedef openvdb::tools::AttributeSet::Descriptor Descriptor;
+    typedef AttributeSet::Descriptor Descriptor;
 
-    Descriptor::Inserter names;
-    names.add("density", AttributeS::attributeType());
-
-    Descriptor::Ptr descrA = Descriptor::create(names.vec);
+    Descriptor::Ptr descrA = Descriptor::create(AttributeVec3s::attributeType());
 
     // create a leaf and initialize attributes using this descriptor
 
+    const size_t initialArrayLength = 100;
     LeafType leaf(openvdb::Coord(0, 0, 0));
+    leaf.initializeAttributes(descrA, /*arrayLength=*/initialArrayLength);
 
-    leaf.initializeAttributes(descrA, /*arrayLength=*/100);
+    descrA = descrA->duplicateAppend("density", AttributeF::attributeType());
+    leaf.appendAttribute(leaf.attributeSet().descriptor(), descrA, descrA->find("density"));
 
     const AttributeSet& attributeSet = leaf.attributeSet();
 
-    CPPUNIT_ASSERT_EQUAL(attributeSet.size(), size_t(1));
+    CPPUNIT_ASSERT_EQUAL(attributeSet.size(), size_t(2));
 
     // ensure attribute arrays are shared between leaf nodes until write
 
@@ -1049,40 +1084,40 @@ TestPointDataLeaf::testCopyOnWrite()
 
     const AttributeSet& attributeSetCopy = leafCopy.attributeSet();
 
-    CPPUNIT_ASSERT(attributeSet.isShared(/*pos=*/0));
-    CPPUNIT_ASSERT(attributeSetCopy.isShared(/*pos=*/0));
+    CPPUNIT_ASSERT(attributeSet.isShared(/*pos=*/1));
+    CPPUNIT_ASSERT(attributeSetCopy.isShared(/*pos=*/1));
 
     // test that from a const leaf, accesses to the attribute arrays do not
     // make then unique
 
-    const AttributeArray* constArray = attributeSetCopy.getConst(/*pos=*/0);
+    const AttributeArray* constArray = attributeSetCopy.getConst(/*pos=*/1);
     CPPUNIT_ASSERT(constArray);
 
-    CPPUNIT_ASSERT(attributeSet.isShared(/*pos=*/0));
-    CPPUNIT_ASSERT(attributeSetCopy.isShared(/*pos=*/0));
+    CPPUNIT_ASSERT(attributeSet.isShared(/*pos=*/1));
+    CPPUNIT_ASSERT(attributeSetCopy.isShared(/*pos=*/1));
 
-    constArray = attributeSetCopy.get(/*pos=*/0);
+    constArray = attributeSetCopy.get(/*pos=*/1);
 
-    CPPUNIT_ASSERT(attributeSet.isShared(/*pos=*/0));
-    CPPUNIT_ASSERT(attributeSetCopy.isShared(/*pos=*/0));
+    CPPUNIT_ASSERT(attributeSet.isShared(/*pos=*/1));
+    CPPUNIT_ASSERT(attributeSetCopy.isShared(/*pos=*/1));
 
-    constArray = &(leafCopy.attributeArray(/*pos=*/0));
+    constArray = &(leafCopy.attributeArray(/*pos=*/1));
 
-    CPPUNIT_ASSERT(attributeSet.isShared(/*pos=*/0));
-    CPPUNIT_ASSERT(attributeSetCopy.isShared(/*pos=*/0));
+    CPPUNIT_ASSERT(attributeSet.isShared(/*pos=*/1));
+    CPPUNIT_ASSERT(attributeSetCopy.isShared(/*pos=*/1));
 
     constArray = &(leafCopy.attributeArray("density"));
 
-    CPPUNIT_ASSERT(attributeSet.isShared(/*pos=*/0));
-    CPPUNIT_ASSERT(attributeSetCopy.isShared(/*pos=*/0));
+    CPPUNIT_ASSERT(attributeSet.isShared(/*pos=*/1));
+    CPPUNIT_ASSERT(attributeSetCopy.isShared(/*pos=*/1));
 
     // test makeUnique is called from non const getters
 
-    AttributeArray* attributeArray = &(leaf.attributeArray(/*pos=*/0));
+    AttributeArray* attributeArray = &(leaf.attributeArray(/*pos=*/1));
     CPPUNIT_ASSERT(attributeArray);
 
-    CPPUNIT_ASSERT(!attributeSet.isShared(/*pos=*/0));
-    CPPUNIT_ASSERT(!attributeSetCopy.isShared(/*pos=*/0));
+    CPPUNIT_ASSERT(!attributeSet.isShared(/*pos=*/1));
+    CPPUNIT_ASSERT(!attributeSetCopy.isShared(/*pos=*/1));
 }
 
 
@@ -1092,8 +1127,10 @@ TestPointDataLeaf::testCopyDescriptor()
     using namespace openvdb::tools;
 
     // Define and register some common attribute types
-    typedef openvdb::tools::TypedAttributeArray<float>    AttributeS;
+    typedef openvdb::tools::TypedAttributeArray<openvdb::Vec3s>     AttributeVec3s;
+    typedef openvdb::tools::TypedAttributeArray<float>              AttributeS;
 
+    AttributeVec3s::registerType();
     AttributeS::registerType();
 
     typedef PointDataTree::LeafNodeType LeafNode;
@@ -1110,7 +1147,7 @@ TestPointDataLeaf::testCopyDescriptor()
     Descriptor::Inserter names;
     names.add("density", AttributeS::attributeType());
 
-    Descriptor::Ptr descrA = Descriptor::create(names.vec);
+    Descriptor::Ptr descrA = Descriptor::create(AttributeVec3s::attributeType());
 
     // initialize attributes using this descriptor
 

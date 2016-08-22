@@ -51,6 +51,9 @@
 #include <openvdb_points/tools/AttributeArray.h>
 
 
+class TestAttributeSet;
+
+
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
@@ -98,6 +101,9 @@ public:
 
     /// Construct from the given descriptor
     explicit AttributeSet(const DescriptorPtr&, size_t arrayLength = 1);
+
+    /// Construct from the given AttributeSet
+    AttributeSet(const AttributeSet&, size_t arrayLength);
 
     /// Shallow copy constructor, the descriptor and attribute arrays will be shared.
     AttributeSet(const AttributeSet&);
@@ -179,17 +185,16 @@ public:
     void makeUnique(size_t pos);
 
     /// Append attribute @a attribute (simple method)
-    template <typename AttributeType>
     AttributeArray::Ptr appendAttribute(const Name& name,
+                                        const NamePair& type,
                                         const Index stride = 1,
                                         Metadata::Ptr defaultValue = Metadata::Ptr());
 
     /// Append attribute @a attribute (descriptor-sharing)
     /// Requires current descriptor to match @a expected
     /// On append, current descriptor is replaced with @a replacement
-    template <typename AttributeType>
     AttributeArray::Ptr appendAttribute(const Descriptor& expected, DescriptorPtr& replacement,
-                                        const Index stride = 1);
+                                        const size_t pos, const Index stride = 1);
 
     /// Drop attributes with @a pos indices (simple method)
     /// Creates a new descriptor for this attribute set
@@ -288,18 +293,11 @@ public:
     /// Copy constructor
     Descriptor(const Descriptor&);
 
-    /// Create a new descriptor from the given attribute and type name pairs.
-    static Ptr create(const NameAndTypeVec&);
-
-    /// Create a new descriptor from the given attribute and type name pairs
-    /// and copy the group maps and metamap.
-    static Ptr create(const NameAndTypeVec&, const NameToPosMap&, const MetaMap&);
-
     /// Create a new descriptor from a position attribute type and assumes "P" (for convenience).
     static Ptr create(const NamePair&);
 
     /// Create a new descriptor as a duplicate with a new attribute appended
-    Ptr duplicateAppend(const NameAndType& attribute) const;
+    Ptr duplicateAppend(const Name& name, const NamePair& type) const;
 
     /// Create a new descriptor as a duplicate with existing attributes dropped
     Ptr duplicateDrop(const std::vector<size_t>& pos) const;
@@ -308,8 +306,7 @@ public:
     size_t size() const { return mTypes.size(); }
 
     /// Return the number of attributes with this attribute type
-    template <typename AttributeArrayType>
-    size_t count() const;
+    size_t count(const NamePair& type) const;
 
     /// Return the number of bytes of memory used by this attribute set.
     size_t memUsage() const;
@@ -355,9 +352,6 @@ public:
     /// Return a reference to the name-to-position group map.
     const NameToPosMap& groupMap() const { return mGroupMap; }
 
-    /// Append to a vector of names and types from this Descriptor in position order
-    void appendTo(NameAndTypeVec& attrs) const;
-
     /// Return @c true if group exists
     bool hasGroup(const Name& group) const;
     /// Define a group name to offset mapping
@@ -383,73 +377,24 @@ public:
     /// Unserialize this transform from the given stream.
     void read(std::istream&);
 
-private:
+protected:
+    /// Append to a vector of names and types from this Descriptor in position order
+    void appendTo(NameAndTypeVec& attrs) const;
+
+    /// Create a new descriptor from the given attribute and type name pairs
+    /// and copy the group maps and metamap.
+    static Ptr create(const NameAndTypeVec&, const NameToPosMap&, const MetaMap&);
+
     size_t insert(const std::string& name, const NamePair& typeName);
+
+private:
+    friend class ::TestAttributeSet;
 
     NameToPosMap                mNameMap;
     std::vector<NamePair>       mTypes;
     NameToPosMap                mGroupMap;
     MetaMap                     mMetadata;
 }; // class Descriptor
-
-
-template <typename AttributeArrayType>
-size_t AttributeSet::Descriptor::count() const
-{
-    size_t count = 0;
-    for (std::vector<NamePair>::const_iterator  it = mTypes.begin(),
-                                                itEnd = mTypes.end(); it != itEnd; ++it) {
-        const NamePair& type = *it;
-        if (type == AttributeArrayType::attributeType())    count++;
-    }
-    return count;
-}
-
-
-template <typename AttributeType>
-AttributeArray::Ptr
-AttributeSet::appendAttribute(  const Name& name,
-                                const Index stride,
-                                Metadata::Ptr defaultValue)
-{
-    AttributeSet::Util::NameAndType nameAndType(name, AttributeType::attributeType());
-
-    Descriptor::Ptr descriptor = mDescr->duplicateAppend(nameAndType);
-
-    // store the attribute default value in the descriptor metadata
-    if (defaultValue)   descriptor->setDefaultValue(name, *defaultValue);
-
-    return this->appendAttribute<AttributeType>(*mDescr, descriptor, stride);
-}
-
-
-template <typename AttributeType>
-AttributeArray::Ptr
-AttributeSet::appendAttribute(const Descriptor& expected, DescriptorPtr& replacement, const Index stride)
-{
-    // ensure the descriptor is as expected
-    if (*mDescr != expected) {
-        OPENVDB_THROW(LookupError, "Cannot append attributes as descriptors do not match.")
-    }
-
-    const size_t offset = mDescr->size();
-
-    mDescr = replacement;
-
-    assert(mDescr->size() >= offset);
-
-    // extract the array length from the first attribute array if it exists
-
-    const size_t arrayLength = offset > 0 ? this->get(0)->size() : 1;
-
-    // append the new array
-
-    AttributeArray::Ptr array = AttributeType::create(arrayLength, stride);
-
-    mAttrs.push_back(array);
-
-    return array;
-}
 
 
 template <typename ValueType>

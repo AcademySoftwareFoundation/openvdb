@@ -211,8 +211,11 @@ public:
     /// @param attribute Name and type of the attribute to append.
     /// @param expected Existing descriptor is expected to match this parameter.
     /// @param replacement New descriptor to replace the existing one.
-    template <typename AttributeType>
-    AttributeArray::Ptr appendAttribute(const Descriptor& expected, Descriptor::Ptr& replacement);
+    /// @param pos Index of the new attribute in the descriptor replacement.
+    /// @param stride Stride of the attribute array.
+    AttributeArray::Ptr appendAttribute(const Descriptor& expected, Descriptor::Ptr& replacement,
+                                        const size_t pos, const Index stride = 1);
+
     /// @brief Drop list of attributes.
     /// @param pos vector of attribute indices to drop
     /// @param expected Existing descriptor is expected to match this parameter.
@@ -541,10 +544,6 @@ template<typename T, Index Log2Dim>
 inline void
 PointDataLeafNode<T, Log2Dim>::initializeAttributes(const Descriptor::Ptr& descriptor, const size_t arrayLength)
 {
-    if (descriptor->size() == 0) {
-        OPENVDB_THROW(IndexError, "Cannot initialize attributes with an empty Descriptor");
-    }
-
     mAttributeSet.reset(new AttributeSet(descriptor, arrayLength));
 }
 
@@ -552,7 +551,7 @@ template<typename T, Index Log2Dim>
 inline void
 PointDataLeafNode<T, Log2Dim>::clearAttributes(const bool updateValueMask)
 {
-    mAttributeSet.reset(new AttributeSet(mAttributeSet->descriptorPtr(), 0));
+    mAttributeSet.reset(new AttributeSet(*mAttributeSet, 0));
 
     // zero voxel values
 
@@ -581,11 +580,11 @@ PointDataLeafNode<T, Log2Dim>::hasAttribute(const Name& attributeName) const
 }
 
 template<typename T, Index Log2Dim>
-template <typename AttributeType>
 inline AttributeArray::Ptr
-PointDataLeafNode<T, Log2Dim>::appendAttribute(const Descriptor& expected, Descriptor::Ptr& replacement)
+PointDataLeafNode<T, Log2Dim>::appendAttribute( const Descriptor& expected, Descriptor::Ptr& replacement,
+                                                const size_t pos, const Index stride)
 {
-    return mAttributeSet->appendAttribute<AttributeType>(expected, replacement);
+    return mAttributeSet->appendAttribute(expected, replacement, pos, stride);
 }
 
 template<typename T, Index Log2Dim>

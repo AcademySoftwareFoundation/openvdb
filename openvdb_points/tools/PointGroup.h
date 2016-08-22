@@ -156,7 +156,6 @@ struct CopyGroupOp {
 
     typedef typename tree::LeafManager<PointDataTreeType>       LeafManagerT;
     typedef typename LeafManagerT::LeafRange                    LeafRangeT;
-    typedef AttributeSet::Descriptor::NameAndType               NameAndType;
     typedef AttributeSet::Descriptor::GroupIndex                GroupIndex;
 
     CopyGroupOp(PointDataTreeType& tree,
@@ -360,7 +359,7 @@ public:
 
         // compute total slots (one slot per bit of the group attributes)
 
-        const size_t groupAttributes = descriptor.count<GroupAttributeArray>();
+        const size_t groupAttributes = descriptor.count(GroupAttributeArray::attributeType());
 
         if (groupAttributes == 0)   return 0;
 
@@ -478,7 +477,6 @@ template <typename PointDataTree>
 inline void appendGroup(PointDataTree& tree, const Name& group)
 {
     typedef AttributeSet::Descriptor                              Descriptor;
-    typedef AttributeSet::Util::NameAndType                       NameAndType;
 
     using point_attribute_internal::AppendAttributeOp;
     using point_group_internal::GroupInfo;
@@ -506,13 +504,14 @@ inline void appendGroup(PointDataTree& tree, const Name& group)
         // find a new internal group name
 
         const Name groupName = descriptor->uniqueName("__group");
-        const NameAndType groupAttribute(groupName, GroupAttributeArray::attributeType());
 
-        descriptor = descriptor->duplicateAppend(groupAttribute);
+        descriptor = descriptor->duplicateAppend(groupName, GroupAttributeArray::attributeType());
+
+        const size_t pos = descriptor->find(groupName);
 
         // insert new group attribute
 
-        AppendAttributeOp<GroupAttributeArray, PointDataTree> append(tree, descriptor);
+        AppendAttributeOp<PointDataTree> append(tree, descriptor, pos);
         tbb::parallel_for(typename tree::template LeafManager<PointDataTree>(tree).leafRange(), append);
     }
     else {

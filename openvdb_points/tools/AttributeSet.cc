@@ -96,10 +96,31 @@ AttributeSet::AttributeSet(const DescriptorPtr& descr, size_t arrayLength)
     : mDescr(descr)
     , mAttrs(descr->size(), AttributeArray::Ptr())
 {
+    if (descr->size() != 1 ||
+        descr->find("P") == INVALID_POS ||
+        descr->valueType(0) != typeNameAsString<Vec3f>())
+    {
+        OPENVDB_THROW(IndexError, "AttributeSet construction from Descriptor only allowed with one Vec3f position attribute.");
+    }
+
+    mAttrs[0] = AttributeArray::create(mDescr->type(0), arrayLength, 1);
+}
+
+
+AttributeSet::AttributeSet(const AttributeSet& attrSet, size_t arrayLength)
+    : mDescr(attrSet.descriptorPtr())
+    , mAttrs(attrSet.descriptor().size(), AttributeArray::Ptr())
+{
     for (Descriptor::ConstIterator it = mDescr->map().begin(),
         end = mDescr->map().end(); it != end; ++it) {
         const size_t pos = it->second;
-        mAttrs[pos] = AttributeArray::create(mDescr->type(pos), arrayLength, 1);
+        AttributeArray::Ptr array = AttributeArray::create(mDescr->type(pos), arrayLength, 1);
+
+        // transfer hidden and transient flags
+        if (attrSet.getConst(pos)->isHidden())      array->setHidden(true);
+        if (attrSet.getConst(pos)->isTransient())   array->setTransient(true);
+
+        mAttrs[pos] = array;
     }
 }
 
@@ -297,6 +318,61 @@ AttributeSet::makeUnique(size_t pos)
     if (!mAttrs[pos].unique()) {
         mAttrs[pos] = mAttrs[pos]->copy();
     }
+}
+
+
+AttributeArray::Ptr
+AttributeSet::appendAttribute(  const Name& name,
+                                const NamePair& type,
+                                const Index stride,
+                                Metadata::Ptr defaultValue)
+{
+    if (stride < 1) {
+        OPENVDB_THROW(ValueError, "Cannot append attributes with a stride of less than one.")
+    }
+
+    Descriptor::Ptr descriptor = mDescr->duplicateAppend(name, type);
+
+    // store the attribute default value in the descriptor metadata
+    if (defaultValue)   descriptor->setDefaultValue(name, *defaultValue);
+
+    // extract the index from the descriptor
+    const size_t pos = descriptor->find(name);
+
+    return this->appendAttribute(*mDescr, descriptor, pos, stride);
+}
+
+
+AttributeArray::Ptr
+AttributeSet::appendAttribute(  const Descriptor& expected, DescriptorPtr& replacement,
+                                const size_t pos, const Index stride)
+{
+    // ensure the descriptor is as expected
+    if (*mDescr != expected) {
+        OPENVDB_THROW(LookupError, "Cannot append attributes as descriptors do not match.")
+    }
+
+    const size_t offset = mDescr->size();
+
+    mDescr = replacement;
+
+    assert(mDescr->size() >= offset);
+
+    // extract the array length from the first attribute array if it exists
+
+    const size_t arrayLength = offset > 0 ? this->get(0)->size() : 1;
+
+    // extract the type from the descriptor
+
+    const NamePair& type = replacement->type(pos);
+
+    // append the new array
+
+    AttributeArray::Ptr array = AttributeArray::create(type, arrayLength, stride);
+
+    mAttrs.push_back(array);
+
+    return array;
 }
 
 
@@ -542,6 +618,19 @@ AttributeSet::Descriptor::hasSameAttributes(const Descriptor& rhs) const
 
 
 size_t
+AttributeSet::Descriptor::count(const NamePair& matchType) const
+{
+    size_t count = 0;
+    for (std::vector<NamePair>::const_iterator  it = mTypes.begin(),
+                                                itEnd = mTypes.end(); it != itEnd; ++it) {
+        const NamePair& type = *it;
+        if (type == matchType)    count++;
+    }
+    return count;
+}
+
+
+size_t
 AttributeSet::Descriptor::memUsage() const
 {
     size_t bytes = sizeof(NameToPosMap::mapped_type) * this->size();
@@ -734,23 +823,16 @@ AttributeSet::Descriptor::insert(const std::string& name, const NamePair& typeNa
     return pos;
 }
 
-
-AttributeSet::Descriptor::Ptr
-AttributeSet::Descriptor::create(const NameAndTypeVec& attrs)
-{
-    Ptr descr(new Descriptor());
-    for (size_t n = 0, N = attrs.size(); n < N; ++n) {
-        const std::string& name = attrs[n].name;
-        descr->insert(name, attrs[n].type);
-    }
-    return descr;
-}
-
 AttributeSet::Descriptor::Ptr
 AttributeSet::Descriptor::create(const NameAndTypeVec& attrs,
-                                 const NameToPosMap& groupMap, const MetaMap& metadata)
+                                 const NameToPosMap& groupMap,
+                                 const MetaMap& metadata)
 {
-    Ptr newDescriptor(create(attrs));
+    Ptr newDescriptor(new Descriptor());
+    for (size_t n = 0, N = attrs.size(); n < N; ++n) {
+        const std::string& name = attrs[n].name;
+        newDescriptor->insert(name, attrs[n].type);
+    }
 
     newDescriptor->mGroupMap = groupMap;
     newDescriptor->mMetadata = metadata;
@@ -767,12 +849,12 @@ AttributeSet::Descriptor::create(const NamePair& positionType)
 }
 
 AttributeSet::Descriptor::Ptr
-AttributeSet::Descriptor::duplicateAppend(const NameAndType& attribute) const
+AttributeSet::Descriptor::duplicateAppend(const Name& name, const NamePair& type) const
 {
     Inserter attributes;
 
     this->appendTo(attributes.vec);
-    attributes.add(attribute);
+    attributes.add(NameAndType(name, type));
 
     return Descriptor::create(attributes.vec, mGroupMap, mMetadata);
 }
