@@ -120,12 +120,6 @@ struct GroupParms {
     std::string                                 mViewportGroupName;
 };
 
-template <typename FilterT>
-void filter(PointDataTree& tree, const std::string& groupName, typename FilterT::Data& data)
-{
-    setGroupByFilter<PointDataTree, FilterT>(tree, groupName, data);
-}
-
 } // namespace
 
 
@@ -749,7 +743,7 @@ SOP_OpenVDB_Points_Group::performGroupFiltering(PointDataGrid& outputGrid, const
 
     typedef AttributeHashFilter<boost::mt11213b, int> HashIFilter;
     typedef AttributeHashFilter<boost::mt11213b, long> HashLFilter;
-    typedef RandomLeafFilter<boost::mt11213b> LeafFilter;
+    typedef RandomLeafFilter<PointDataGrid::TreeType, boost::mt11213b> LeafFilter;
     typedef LevelSetFilter<FloatGrid> LSFilter;
 
     // composite typedefs (a combination of the above five filters)
@@ -782,43 +776,42 @@ SOP_OpenVDB_Points_Group::performGroupFiltering(PointDataGrid& outputGrid, const
     openvdb::math::Transform& transform = outputGrid.transform();
     const std::string groupName = parms.mGroupName;
 
+    int targetPoints = parms.mCount;
+    if (parms.mOpLeaf && !parms.mCountMode) {
+        targetPoints = int(math::Round((parms.mPercent * pointCount(tree))/100.0f));
+    }
+
     // build filter data
 
-    MultiGroupFilter::Data groupData(parms.mIncludeGroups, parms.mExcludeGroups);
-    BBoxFilter::Data bboxData(transform, parms.mBBox);
-    HashIFilter::Data hashIData(parms.mHashAttributeIndex, parms.mPercent);
-    HashLFilter::Data hashLData(parms.mHashAttributeIndex, parms.mPercent);
-    LeafFilter::Data leafData;
-    LSFilter::Data lsData(*parms.mLevelSetGrid, transform, parms.mSDFMin, parms.mSDFMax);
-
-    // populate leaf map for performing leaf filtering
-    if (parms.mOpLeaf) {
-        if (parms.mCountMode)   leafData.populateByTargetPoints<PointDataTree>(tree, parms.mCount);
-        else                    leafData.populateByPercentagePoints<PointDataTree>(tree, parms.mPercent);
-    }
+    MultiGroupFilter groupFilter(parms.mIncludeGroups, parms.mExcludeGroups);
+    BBoxFilter bboxFilter(transform, parms.mBBox);
+    HashIFilter hashIFilter(parms.mHashAttributeIndex, parms.mPercent);
+    HashLFilter hashLFilter(parms.mHashAttributeIndex, parms.mPercent);
+    LeafFilter leafFilter(tree, targetPoints);
+    LSFilter lsFilter(*parms.mLevelSetGrid, transform, parms.mSDFMin, parms.mSDFMax);
 
     // build composite filter data
 
-    GroupHashI::Data groupHashIData(groupData, hashIData);
-    GroupHashL::Data groupHashLData(groupData, hashLData);
-    GroupLeaf::Data groupLeafData(groupData, leafData);
-    GroupLS::Data groupLSData(groupData, lsData);
-    GroupBBox::Data groupBBoxData(groupData, bboxData);
-    LSHashI::Data lsHashIData(lsData, hashIData);
-    LSHashL::Data lsHashLData(lsData, hashLData);
-    LSLeaf::Data lsLeafData(lsData, leafData);
+    GroupHashI groupHashIFilter(groupFilter, hashIFilter);
+    GroupHashL groupHashLFilter(groupFilter, hashLFilter);
+    GroupLeaf groupLeafFilter(groupFilter, leafFilter);
+    GroupLS groupLSFilter(groupFilter, lsFilter);
+    GroupBBox groupBBoxFilter(groupFilter, bboxFilter);
+    LSHashI lsHashIFilter(lsFilter, hashIFilter);
+    LSHashL lsHashLFilter(lsFilter, hashLFilter);
+    LSLeaf lsLeafFilter(lsFilter, leafFilter);
 
-    GroupBBoxHashI::Data groupBBoxHashIData(groupBBoxData, hashIData);
-    GroupBBoxHashL::Data groupBBoxHashLData(groupBBoxData, hashLData);
-    GroupBBoxLS::Data groupBBoxLSData(groupBBoxData, lsData);
-    GroupBBoxLeaf::Data groupBBoxLeafData(groupBBoxData, leafData);
-    GroupLSHashI::Data groupLSHashIData(groupLSData, hashIData);
-    GroupLSHashL::Data groupLSHashLData(groupLSData, hashLData);
-    GroupLSLeaf::Data groupLSLeafData(groupLSData, leafData);
+    GroupBBoxHashI groupBBoxHashIFilter(groupBBoxFilter, hashIFilter);
+    GroupBBoxHashL groupBBoxHashLFilter(groupBBoxFilter, hashLFilter);
+    GroupBBoxLS groupBBoxLSFilter(groupBBoxFilter, lsFilter);
+    GroupBBoxLeaf groupBBoxLeafFilter(groupBBoxFilter, leafFilter);
+    GroupLSHashI groupLSHashIFilter(groupLSFilter, hashIFilter);
+    GroupLSHashL groupLSHashLFilter(groupLSFilter, hashLFilter);
+    GroupLSLeaf groupLSLeafFilter(groupLSFilter, leafFilter);
 
-    GroupBBoxLSHashI::Data groupBBoxLSHashIData(groupBBoxData, lsHashIData);
-    GroupBBoxLSHashL::Data groupBBoxLSHashLData(groupBBoxData, lsHashLData);
-    GroupBBoxLSLeaf::Data groupBBoxLSLeafData(groupBBoxData, lsLeafData);
+    GroupBBoxLSHashI groupBBoxLSHashIFilter(groupBBoxFilter, lsHashIFilter);
+    GroupBBoxLSHashL groupBBoxLSHashLFilter(groupBBoxFilter, lsHashLFilter);
+    GroupBBoxLSLeaf groupBBoxLSLeafFilter(groupBBoxFilter, lsLeafFilter);
 
     // append the group
 
@@ -828,24 +821,22 @@ SOP_OpenVDB_Points_Group::performGroupFiltering(PointDataGrid& outputGrid, const
 
     const GroupParms& p = parms;
 
-    // mOpGroup
-
-    if (p.mOpBBox && p.mOpLS && p.mOpHashI)         filter<GroupBBoxLSHashI>(tree, groupName, groupBBoxLSHashIData);
-    else if (p.mOpBBox && p.mOpLS && p.mOpHashL)    filter<GroupBBoxLSHashL>(tree, groupName, groupBBoxLSHashLData);
-    else if (p.mOpBBox && p.mOpLS && p.mOpLeaf)     filter<GroupBBoxLSLeaf>(tree, groupName, groupBBoxLSLeafData);
-    else if (p.mOpBBox && p.mOpHashI)               filter<GroupBBoxHashI>(tree, groupName, groupBBoxHashIData);
-    else if (p.mOpBBox && p.mOpHashL)               filter<GroupBBoxHashL>(tree, groupName, groupBBoxHashLData);
-    else if (p.mOpBBox && p.mOpLeaf)                filter<GroupBBoxLeaf>(tree, groupName, groupBBoxLeafData);
-    else if (p.mOpBBox && p.mOpLS)                  filter<GroupBBoxLS>(tree, groupName, groupBBoxLSData);
-    else if (p.mOpLS && p.mOpHashI)                 filter<GroupLSHashI>(tree, groupName, groupLSHashIData);
-    else if (p.mOpLS && p.mOpHashL)                 filter<GroupLSHashL>(tree, groupName, groupLSHashLData);
-    else if (p.mOpLS && p.mOpLeaf)                  filter<GroupLSLeaf>(tree, groupName, groupLSLeafData);
-    else if (p.mOpBBox)                             filter<GroupBBox>(tree, groupName, groupBBoxData);
-    else if (p.mOpLS)                               filter<GroupLS>(tree, groupName, groupLSData);
-    else if (p.mOpHashI)                            filter<GroupHashI>(tree, groupName, groupHashIData);
-    else if (p.mOpHashL)                            filter<GroupHashL>(tree, groupName, groupHashLData);
-    else if (p.mOpLeaf)                             filter<GroupLeaf>(tree, groupName, groupLeafData);
-    else if (p.mOpGroup)                            filter<MultiGroupFilter>(tree, groupName, groupData);
+    if (p.mOpBBox && p.mOpLS && p.mOpHashI)         setGroupByFilter(tree, groupName, groupBBoxLSHashIFilter);
+    else if (p.mOpBBox && p.mOpLS && p.mOpHashL)    setGroupByFilter(tree, groupName, groupBBoxLSHashLFilter);
+    else if (p.mOpBBox && p.mOpLS && p.mOpLeaf)     setGroupByFilter(tree, groupName, groupBBoxLSLeafFilter);
+    else if (p.mOpBBox && p.mOpHashI)               setGroupByFilter(tree, groupName, groupBBoxHashIFilter);
+    else if (p.mOpBBox && p.mOpHashL)               setGroupByFilter(tree, groupName, groupBBoxHashLFilter);
+    else if (p.mOpBBox && p.mOpLeaf)                setGroupByFilter(tree, groupName, groupBBoxLeafFilter);
+    else if (p.mOpBBox && p.mOpLS)                  setGroupByFilter(tree, groupName, groupBBoxLSFilter);
+    else if (p.mOpLS && p.mOpHashI)                 setGroupByFilter(tree, groupName, groupLSHashIFilter);
+    else if (p.mOpLS && p.mOpHashL)                 setGroupByFilter(tree, groupName, groupLSHashLFilter);
+    else if (p.mOpLS && p.mOpLeaf)                  setGroupByFilter(tree, groupName, groupLSLeafFilter);
+    else if (p.mOpBBox)                             setGroupByFilter(tree, groupName, groupBBoxFilter);
+    else if (p.mOpLS)                               setGroupByFilter(tree, groupName, groupLSFilter);
+    else if (p.mOpHashI)                            setGroupByFilter(tree, groupName, groupHashIFilter);
+    else if (p.mOpHashL)                            setGroupByFilter(tree, groupName, groupHashLFilter);
+    else if (p.mOpLeaf)                             setGroupByFilter(tree, groupName, groupLeafFilter);
+    else if (p.mOpGroup)                            setGroupByFilter(tree, groupName, groupFilter);
     else                                            setGroup<PointDataTree>(tree, groupName);
 }
 

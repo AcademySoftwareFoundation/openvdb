@@ -103,6 +103,8 @@ inline bool isGroup(const AttributeArray& array)
 class GroupHandle
 {
 public:
+    typedef boost::shared_ptr<GroupHandle> Ptr;
+
     // Dummy class that distinguishes an offset from a bitmask on construction
     struct BitMask { };
 
@@ -128,6 +130,7 @@ protected:
 class GroupWriteHandle : public GroupHandle
 {
 public:
+    typedef boost::shared_ptr<GroupWriteHandle> Ptr;
 
     GroupWriteHandle(GroupAttributeArray& array, const GroupType& offset);
 
@@ -156,28 +159,25 @@ public:
 class GroupFilter
 {
 public:
-    struct Data
-    {
-        Data(const Name& _attribute)
-            : attribute(_attribute) { }
-        const Name attribute;
-    };
+    explicit GroupFilter(const Name& attribute)
+        : mAttribute(attribute) { }
 
-    GroupFilter(const GroupHandle& handle)
-        : mHandle(handle) { }
+    inline bool initialized() const { return bool(mHandle); }
 
     template <typename LeafT>
-    static GroupFilter create(const LeafT& leaf, const Data& data) {
-        return GroupFilter(leaf.groupHandle(data.attribute));
+    void reset(const LeafT& leaf) {
+        mHandle.reset(new GroupHandle(leaf.groupHandle(mAttribute)));
     }
 
     template <typename IterT>
     bool valid(const IterT& iter) const {
-        return mHandle.get(*iter);
+        assert(mHandle);
+        return mHandle->get(*iter);
     }
 
 private:
-    const GroupHandle mHandle;
+    const Name mAttribute;
+    GroupHandle::Ptr mHandle;
 }; // class GroupFilter
 
 

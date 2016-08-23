@@ -159,6 +159,7 @@ matchingNamePairs(const openvdb::NamePair& lhs,
 
 ////////////////////////////////////////
 
+
 void
 TestAttributeArray::testFixedPointConversion()
 {
@@ -529,9 +530,7 @@ TestAttributeArray::testAttributeArray()
 
         AttributeArrayI attr(count);
 
-        IndexIter iter = attr.beginIndex();
-
-        CPPUNIT_ASSERT_EQUAL(iterCount(iter), Index64(count));
+        CPPUNIT_ASSERT_EQUAL(attr.size(), size_t(count));
 
         CPPUNIT_ASSERT_EQUAL(attr.get(0), 0);
         CPPUNIT_ASSERT_EQUAL(attr.get(10), 0);

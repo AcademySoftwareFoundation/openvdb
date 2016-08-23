@@ -41,6 +41,7 @@
 
 #include <openvdb/openvdb.h>
 
+#include <openvdb_points/tools/IndexIterator.h> // FilterTraits
 #include <openvdb_points/tools/IndexFilter.h> // FilterTraits
 #include <openvdb_points/tools/AttributeSet.h>
 #include <openvdb_points/tools/PointDataGrid.h>
@@ -141,7 +142,7 @@ inline void setGroup(   PointDataTree& tree,
 template <typename PointDataTree, typename FilterT>
 inline void setGroupByFilter(   PointDataTree& tree,
                                 const Name& group,
-                                const typename FilterT::Data& filterData);
+                                const FilterT& filter);
 
 
 ////////////////////////////////////////
@@ -172,7 +173,7 @@ struct CopyGroupOp {
             GroupHandle sourceGroup = leaf->groupHandle(mSourceIndex);
             GroupWriteHandle targetGroup = leaf->groupWriteHandle(mTargetIndex);
 
-            for (IndexIter iter = leaf->beginIndex(); iter; ++iter) {
+            for (typename PointDataTreeType::LeafNodeType::IndexAllIter iter = leaf->beginIndexAll(); iter; ++iter) {
                 const bool groupOn = sourceGroup.get(*iter);
                 targetGroup.set(*iter, groupOn);
             }
@@ -283,13 +284,11 @@ struct SetGroupByFilterOp
     typedef typename tree::LeafManager<PointDataTree>   LeafManagerT;
     typedef typename LeafManagerT::LeafRange            LeafRangeT;
     typedef typename PointDataTree::LeafNodeType        LeafNodeT;
-    typedef IndexIterTraits<PointDataTree, IterT>       IndexIterTraitT;
     typedef AttributeSet::Descriptor::GroupIndex        GroupIndex;
-    typedef typename FilterT::Data                      FilterDataT;
 
-    SetGroupByFilterOp( const GroupIndex& index, const FilterDataT& filterData)
+    SetGroupByFilterOp( const GroupIndex& index, const FilterT& filter)
         : mIndex(index)
-        , mFilterData(filterData) { }
+        , mFilter(filter) { }
 
     void operator()(const typename LeafManagerT::LeafRange& range) const
     {
@@ -299,28 +298,10 @@ struct SetGroupByFilterOp
 
             GroupWriteHandle group(leaf->groupWriteHandle(mIndex));
 
-            // create the filter
+            IndexIter<IterT, FilterT> iter = leaf->template beginIndex<IterT, FilterT>(mFilter);
 
-            FilterT filter(FilterT::create(*leaf, mFilterData));
-
-            // if the voxel coord is not required and we're using a dense All iterator
-            // iterate over the attribute arrays directly for faster performance
-
-            if (!FilterTraits<FilterT>::RequiresCoord && IndexIterTraitT::dense()) {
-                IndexIter iter = leaf->beginIndex();
-                FilterIndexIter<IndexIter, FilterT> filterIndexIter(iter, filter);
-
-                for (; filterIndexIter; ++filterIndexIter) {
-                    group.set(*filterIndexIter, true);
-                }
-            }
-            else {
-                typename IndexIterTraitT::Iterator iter = IndexIterTraitT::begin(*leaf);
-                FilterIndexIter<typename IndexIterTraitT::Iterator, FilterT> filterIndexIter(iter, filter);
-
-                for (; filterIndexIter; ++filterIndexIter) {
-                    group.set(*filterIndexIter, true);
-                }
+            for (; iter; ++iter) {
+                group.set(*iter, true);
             }
 
             // attempt to compact the array
@@ -332,7 +313,7 @@ struct SetGroupByFilterOp
     //////////
 
     const GroupIndex mIndex;
-    const FilterDataT mFilterData;
+    const FilterT mFilter;
 }; // struct SetGroupByFilterOp
 
 
@@ -785,7 +766,7 @@ inline void setGroup(   PointDataTree& tree,
 template <typename PointDataTree, typename FilterT>
 inline void setGroupByFilter(   PointDataTree& tree,
                                 const Name& group,
-                                const typename FilterT::Data& filterData)
+                                const FilterT& filter)
 {
     typedef AttributeSet::Descriptor Descriptor;
     typedef typename tree::template LeafManager<PointDataTree> LeafManagerT;
@@ -807,7 +788,7 @@ inline void setGroupByFilter(   PointDataTree& tree,
 
     // set membership using filter
 
-    SetGroupByFilterOp<PointDataTree, FilterT> set(index, filterData);
+    SetGroupByFilterOp<PointDataTree, FilterT> set(index, filter);
     tbb::parallel_for(LeafManagerT(tree).leafRange(), set);
 }
 
@@ -821,12 +802,11 @@ inline void setGroupByRandomTarget( PointDataTree& tree,
                                     const Index64 targetPoints,
                                     const unsigned int seed = 0)
 {
-    typedef RandomLeafFilter<boost::mt11213b> RandomFilter;
+    typedef RandomLeafFilter<PointDataTree, boost::mt11213b> RandomFilter;
 
-    RandomFilter::Data data;
-    data.populateByTargetPoints(tree, targetPoints, seed);
+    RandomFilter filter(tree, targetPoints, seed);
 
-    setGroupByFilter<PointDataTree, RandomFilter>(tree, group, data);
+    setGroupByFilter<PointDataTree, RandomFilter>(tree, group, filter);
 }
 
 
@@ -839,12 +819,14 @@ inline void setGroupByRandomPercentage( PointDataTree& tree,
                                         const float percentage = 10.0f,
                                         const unsigned int seed = 0)
 {
-    typedef RandomLeafFilter<boost::mt11213b> RandomFilter;
+    typedef RandomLeafFilter<PointDataTree, boost::mt11213b> RandomFilter;
 
-    RandomFilter::Data data;
-    data.populateByPercentagePoints(tree, percentage, seed);
+    const int currentPoints = pointCount(tree);
+    const int targetPoints = int(math::Round((percentage * currentPoints)/100.0f));
 
-    setGroupByFilter<PointDataTree, RandomFilter>(tree, group, data);
+    RandomFilter filter(tree, targetPoints, seed);
+
+    setGroupByFilter<PointDataTree, RandomFilter>(tree, group, filter);
 }
 
 

@@ -238,54 +238,49 @@ struct ComputeBBoxPerPrimitiveOp {
 
             Geometry_OpenVDBPoints::LeafBVHTree& bvhTree = bvhTrees[id];
 
-            for (PointDataLeafNode::ValueOnCIter value = leaf->cbeginValueOn(); value; ++value)
+            for (PointDataLeafNode::IndexOnIter iter = leaf->beginIndexOn(); iter; ++iter)
             {
-                Coord ijk = value.getCoord();
+                Vec3f positionValue;
+                Vec3f velocityValue;
+                float radiusValue;
 
-                const Vec3i gridIndexSpace = ijk.asVec3i();
+                const Coord ijk = iter.getCoord();
+                const Vec3f gridIndexSpace = ijk.asVec3d();
 
-                for (IndexIter iter = leaf->beginIndex(ijk); iter; ++iter) {
+                positionValue = positionHandle->get(*iter);
 
-                    Vec3f positionValue;
-                    Vec3f velocityValue;
-                    float radiusValue;
+                if (velocityHandle)  velocityValue = velocityHandle->get(*iter);
+                else                 velocityValue = Vec3f(0, 0, 0);
 
-                    positionValue = positionHandle->get(*iter);
+                if (radiusHandle && !mOverrideRadius)
+                {
+                    radiusValue = radiusHandle->get(*iter);
 
-                    if (velocityHandle)  velocityValue = velocityHandle->get(*iter);
-                    else                 velocityValue = Vec3f(0, 0, 0);
+                    // scale and convert to index space
 
-                    if (radiusHandle && !mOverrideRadius)
-                    {
-                        radiusValue = radiusHandle->get(*iter);
+                    radiusValue *= mRadius;
+                }
+                else
+                {
+                    radiusValue = mRadius;
+                }
 
-                        // scale and convert to index space
+                const Vec3f positionVoxelSpace(positionValue[0], positionValue[1], positionValue[2]);
+                const Vec3f positionIndexSpace = positionVoxelSpace + gridIndexSpace;
 
-                        radiusValue *= mRadius;
-                    }
-                    else
-                    {
-                        radiusValue = mRadius;
-                    }
+                if (velocityHandle)
+                {
+                    // offset position for beginning and end of velocity vector
 
-                    const Vec3f positionVoxelSpace(positionValue[0], positionValue[1], positionValue[2]);
-                    const Vec3f positionIndexSpace = positionVoxelSpace + gridIndexSpace;
+                    bvhTree.expand</*isT0=*/false>(ijk, positionIndexSpace - velocityValue * mBackwardOffset, radiusValue);
+                    bvhTree.expand</*isT0=*/true>(ijk, positionIndexSpace + velocityValue * mForwardOffset, radiusValue);
+                }
+                else
+                {
+                    // offset position for radius
 
-                    if (velocityHandle)
-                    {
-                        // offset position for beginning and end of velocity vector
-
-                        bvhTree.expand</*isT0=*/false>(ijk, positionIndexSpace - velocityValue * mBackwardOffset, radiusValue);
-                        bvhTree.expand</*isT0=*/true>(ijk, positionIndexSpace + velocityValue * mForwardOffset, radiusValue);
-                    }
-                    else
-                    {
-                        // offset position for radius
-
-                        bvhTree.expand</*isT0=*/false>(ijk, positionIndexSpace, radiusValue);
-                        bvhTree.expand</*isT0=*/true>(ijk, positionIndexSpace, radiusValue);
-                    }
-
+                    bvhTree.expand</*isT0=*/false>(ijk, positionIndexSpace, radiusValue);
+                    bvhTree.expand</*isT0=*/true>(ijk, positionIndexSpace, radiusValue);
                 }
             }
 
@@ -767,7 +762,7 @@ void Geometry_OpenVDBPoints::intersect_typed_primitive(
             Vec3f position(0.0f);
             double radius(1.0);
 
-            for (IndexIter iter = leaf.beginIndex(ijk); iter; ++iter) {
+            for (PointDataLeaf::IndexVoxelIter iter = leaf.beginIndexVoxel(ijk); iter; ++iter) {
 
                 Vec3f positionValue;
                 RadiusType radiusValue;

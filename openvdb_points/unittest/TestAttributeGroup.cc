@@ -32,6 +32,8 @@
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb_points/tools/AttributeArray.h>
 #include <openvdb_points/tools/AttributeGroup.h>
+#include <openvdb_points/tools/IndexIterator.h>
+#include <openvdb_points/tools/IndexFilter.h>
 
 #include <openvdb_points/openvdb.h>
 #include <openvdb/openvdb.h>
@@ -358,16 +360,38 @@ TestAttributeGroup::testAttributeGroupHandle()
 class GroupNotFilter
 {
 public:
-    GroupNotFilter(const GroupHandle& handle)
-        : mFilter(handle) { }
+    GroupNotFilter()
+        : mFilter("") { }
+
+    inline bool initialized() const { return mFilter.initialized(); }
+
+    template <typename LeafT>
+    void reset(const LeafT& leaf) {
+        mFilter.reset(leaf);
+    }
 
     template <typename IterT>
     bool valid(const IterT& iter) const {
         return !mFilter.valid(iter);
     }
+
 private:
-    const GroupFilter mFilter;
+    GroupFilter mFilter;
 }; // class GroupNotFilter
+
+
+struct HandleWrapper
+{
+    HandleWrapper(const GroupHandle& handle)
+        : mHandle(handle) { }
+
+    GroupHandle groupHandle(const Name& /*name*/) const {
+        return mHandle;
+    }
+
+private:
+    const GroupHandle mHandle;
+}; // struct HandleWrapper
 
 
 void
@@ -376,14 +400,15 @@ TestAttributeGroup::testAttributeGroupFilter()
     using namespace openvdb;
     using namespace openvdb::tools;
 
-    typedef FilterIndexIter<IndexIter, GroupFilter> IndexGroupAllIter;
+    typedef IndexIter<ValueVoxelCIter, GroupFilter> IndexGroupAllIter;
 
     GroupAttributeArray attrGroup(4);
     const Index32 size = attrGroup.size();
 
     { // group values all zero
-        IndexIter indexIter(0, size);
-        GroupFilter filter(GroupHandle(attrGroup, 0));
+        ValueVoxelCIter indexIter(0, size);
+        GroupFilter filter("");
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 0)));
         IndexGroupAllIter iter(indexIter, filter);
 
         CPPUNIT_ASSERT(!iter);
@@ -398,44 +423,67 @@ TestAttributeGroup::testAttributeGroupFilter()
 
     // index iterator only valid in groups 3 and 6
     {
-        IndexIter indexIter(0, size);
+        ValueVoxelCIter indexIter(0, size);
 
-        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 0))));
-        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 1))));
-        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 2))));
-        CPPUNIT_ASSERT(IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 3))));
-        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 4))));
-        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 5))));
-        CPPUNIT_ASSERT(IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 6))));
-        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, GroupFilter(GroupHandle(attrGroup, 7))));
+        GroupFilter filter("");
+
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 0)));
+        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 1)));
+        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 2)));
+        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
+        CPPUNIT_ASSERT(IndexGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 4)));
+        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 5)));
+        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 6)));
+        CPPUNIT_ASSERT(IndexGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 7)));
+        CPPUNIT_ASSERT(!IndexGroupAllIter(indexIter, filter));
     }
 
     attrGroup.set(1, bitmask);
     attrGroup.set(3, bitmask);
 
-    typedef FilterIndexIter<IndexIter, GroupNotFilter> IndexNotGroupAllIter;
+    typedef IndexIter<ValueVoxelCIter, GroupNotFilter> IndexNotGroupAllIter;
 
     // index iterator only not valid in groups 3 and 6
     {
-        IndexIter indexIter(0, size);
+        ValueVoxelCIter indexIter(0, size);
 
-        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 0))));
-        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 1))));
-        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 2))));
-        CPPUNIT_ASSERT(!IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 3))));
-        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 4))));
-        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 5))));
-        CPPUNIT_ASSERT(!IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 6))));
-        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 7))));
+        GroupNotFilter filter;
+
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 0)));
+        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 1)));
+        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 2)));
+        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
+        CPPUNIT_ASSERT(!IndexNotGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 4)));
+        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 5)));
+        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 6)));
+        CPPUNIT_ASSERT(!IndexNotGroupAllIter(indexIter, filter));
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 7)));
+        CPPUNIT_ASSERT(IndexNotGroupAllIter(indexIter, filter));
     }
 
     // clear group membership for attributes 1 and 3
+
     attrGroup.set(1, GroupType(0));
     attrGroup.set(3, GroupType(0));
 
     { // index in group next
-        IndexIter indexIter(0, size);
-        IndexGroupAllIter iter(indexIter, GroupFilter(GroupHandle(attrGroup, 3)));
+        ValueVoxelCIter indexIter(0, size);
+        GroupFilter filter("");
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
+        IndexGroupAllIter iter(indexIter, filter);
 
         CPPUNIT_ASSERT(iter);
         CPPUNIT_ASSERT_EQUAL(*iter, Index32(0));
@@ -447,8 +495,10 @@ TestAttributeGroup::testAttributeGroupFilter()
     }
 
     { // index in group prefix ++
-        IndexIter indexIter(0, size);
-        IndexGroupAllIter iter(indexIter, GroupFilter(GroupHandle(attrGroup, 3)));
+        ValueVoxelCIter indexIter(0, size);
+        GroupFilter filter("");
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
+        IndexGroupAllIter iter(indexIter, filter);
 
         CPPUNIT_ASSERT(iter);
         CPPUNIT_ASSERT_EQUAL(*iter, Index32(0));
@@ -461,8 +511,10 @@ TestAttributeGroup::testAttributeGroupFilter()
     }
 
     { // index in group postfix ++/--
-        IndexIter indexIter(0, size);
-        IndexGroupAllIter iter(indexIter, GroupFilter(GroupHandle(attrGroup, 3)));
+        ValueVoxelCIter indexIter(0, size);
+        GroupFilter filter("");
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
+        IndexGroupAllIter iter(indexIter, filter);
 
         CPPUNIT_ASSERT(iter);
         CPPUNIT_ASSERT_EQUAL(*iter, Index32(0));
@@ -475,8 +527,10 @@ TestAttributeGroup::testAttributeGroupFilter()
     }
 
     { // index not in group next
-        IndexIter indexIter(0, size);
-        IndexNotGroupAllIter iter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 3)));
+        ValueVoxelCIter indexIter(0, size);
+        GroupNotFilter filter;
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
+        IndexNotGroupAllIter iter(indexIter, filter);
 
         CPPUNIT_ASSERT(iter);
         CPPUNIT_ASSERT_EQUAL(*iter, Index32(1));
@@ -488,8 +542,10 @@ TestAttributeGroup::testAttributeGroupFilter()
     }
 
     { // index not in group prefix ++
-        IndexIter indexIter(0, size);
-        IndexNotGroupAllIter iter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 3)));
+        ValueVoxelCIter indexIter(0, size);
+        GroupNotFilter filter;
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
+        IndexNotGroupAllIter iter(indexIter, filter);
 
         CPPUNIT_ASSERT(iter);
         CPPUNIT_ASSERT_EQUAL(*iter, Index32(1));
@@ -502,8 +558,10 @@ TestAttributeGroup::testAttributeGroupFilter()
     }
 
     { // index not in group postfix ++
-        IndexIter indexIter(0, size);
-        IndexNotGroupAllIter iter(indexIter, GroupNotFilter(GroupHandle(attrGroup, 3)));
+        ValueVoxelCIter indexIter(0, size);
+        GroupNotFilter filter;
+        filter.reset(HandleWrapper(GroupHandle(attrGroup, 3)));
+        IndexNotGroupAllIter iter(indexIter, filter);
 
         CPPUNIT_ASSERT(iter);
         CPPUNIT_ASSERT_EQUAL(*iter, Index32(1));

@@ -60,173 +60,72 @@ inline Index64 iterCount(const IterT& iter);
 ////////////////////////////////////////
 
 
-/// @brief A forward iterator over array indices
-class IndexIter
+/// @brief A no-op filter that can be used when iterating over all indices
+class NullFilter
 {
 public:
-    IndexIter()
-        : mEnd(0), mItem(0) {}
-    IndexIter(Index32 item, Index32 end)
-        : mEnd(end), mItem(item) {}
-    IndexIter(const IndexIter& other)
-        : mEnd(other.mEnd), mItem(other.mItem) { }
-
-    inline Index32 end() const { return mEnd; }
-
-    /// @brief Reset the begining and end of the iterator.
-    inline void reset(Index32 item, Index32 end) {
-        mItem = item;
-        mEnd = end;
-    }
-
-    /// @brief  Returns the item to which this iterator is currently pointing.
-    inline Index32 operator*() { assert(this->test()); return mItem; }
-    inline Index32 operator*() const { assert(this->test()); return mItem; }
-
-    /// @brief  Return @c true if this iterator is not yet exhausted.
-    inline operator bool() const { return mItem < mEnd; }
-    inline bool test() const { return mItem < mEnd; }
-
-    /// @brief  Advance to the next (valid) item (prefix).
-    inline IndexIter& operator++() {
-        ++mItem;
-        return *this;
-    }
-
-    /// @brief  Advance to the next (valid) item (postfix).
-    inline IndexIter operator++(int /*dummy*/) {
-        IndexIter newIterator(*this);
-        this->operator++();
-        return newIterator;
-    }
-
-    /// @brief  Advance to the next (valid) item.
-    inline bool next() { this->operator++(); return this->test(); }
-    inline bool increment() { this->next(); return this->test(); }
-
-    /// Throw an error as Coord methods are not available on this iterator
-    inline Coord getCoord() const { OPENVDB_THROW(RuntimeError, "IndexIter does not provide a valid Coord, use a ValueIndexIter instead."); }
-    /// Throw an error as Coord methods are not available on this iterator
-    inline void getCoord(Coord&) const { OPENVDB_THROW(RuntimeError, "IndexIter does not provide a valid Coord, use a ValueIndexIter instead."); }
-
-    /// @brief Equality operators
-    inline bool operator==(const IndexIter& other) const { return mItem == other.mItem; }
-    inline bool operator!=(const IndexIter& other) const { return !this->operator==(other); }
-
-private:
-    Index32 mEnd, mItem;
-}; // class IndexIter
+    NullFilter() { }
+    static bool initialized() { return true; }
+    template <typename LeafT> void reset(const LeafT&) { }
+    template <typename IterT> static bool valid(const IterT&) { return true; }
+}; // class NullFilter
 
 
-/// @brief A forward iterator over array indices from a value iterator (such as ValueOnCIter)
-template <typename ValueIterT>
-class ValueIndexIter
+/// @brief A forward iterator over array indices in a single voxel
+class ValueVoxelCIter
 {
 public:
-    ValueIndexIter(ValueIterT& iter)
-        : mIndexIter(), mIter(iter), mParent(&mIter.parent())
+    struct Parent
     {
-        if (mIter) {
-            assert(mParent);
-            Index32 start = mIter.offset() > 0 ? Index32(mParent->getValue(mIter.offset() - 1)) : Index32(0);
-            mIndexIter.reset(start, *mIter);
-            if (!mIndexIter.test())   this->operator++();
-        }
-    }
-    ValueIndexIter(const ValueIndexIter& other)
-        : mIndexIter(other.mIndexIter), mIter(other.mIter), mParent(other.mParent) { assert(mParent); }
+        Parent(): mOffset(0) { }
+        explicit Parent(Index32 offset): mOffset(offset) { }
+        Index32 getValue(unsigned /*offset*/) const { return mOffset; }
+    private:
+        Index32 mOffset;
+    }; // struct Parent
 
-    inline Index32 end() const { return mIndexIter.end(); }
+    typedef Parent NodeType;
 
-    inline void reset(Index32 item, Index32 end) {
-        mIndexIter.reset(item, end);
-    }
+    ValueVoxelCIter()
+        : mOffset(0), mParent(), mValid(true) {}
+    ValueVoxelCIter(Index32 prevOffset, Index32 offset)
+        : mOffset(offset), mParent(prevOffset), mValid(true) {}
+    ValueVoxelCIter(const ValueVoxelCIter& other)
+        : mOffset(other.mOffset), mParent(other.mParent), mValid(other.mValid) { }
 
     /// @brief  Returns the item to which this iterator is currently pointing.
-    inline Index32 operator*() { assert(mIter); return *mIndexIter; }
-    inline Index32 operator*() const { assert(mIter); return *mIndexIter; }
-
-    /// @brief  Return @c true if this iterator is not yet exhausted.
-    inline operator bool() const { return mIter; }
-    inline bool test() const { return mIter; }
+    inline Index32 operator*() { return mOffset; }
+    inline Index32 operator*() const { return mOffset; }
 
     /// @brief  Advance to the next (valid) item (prefix).
-    inline ValueIndexIter& operator++() {
-        mIndexIter.next();
-        while (!mIndexIter.test() && mIter.next()) {
-            assert(mParent);
-            mIndexIter.reset(mParent->getValue(mIter.offset() - 1), *mIter);
-        }
+    ValueVoxelCIter& operator++() {
+        mValid = false;
         return *this;
     }
 
-    /// @brief  Advance to the next (valid) item (postfix).
-    inline ValueIndexIter operator++(int /*dummy*/) {
-        IndexIter newIterator(*this);
-        this->operator++();
-        return newIterator;
-    }
+    inline operator bool() const { return mValid; }
+    inline bool test() const { return mValid; }
+    inline Index32 end() const { return mOffset+1; }
 
-    /// @brief  Advance to the next (valid) item.
+    inline void reset(Index32 /*item*/, Index32 /*end*/) { }
+
+    Parent& parent() { return mParent; }
+    Index32 offset() { return mOffset; }
     inline bool next() { this->operator++(); return this->test(); }
-    inline bool increment() { this->next(); return this->test(); }
 
-    /// Return the coordinates of the item to which the value iterator is pointing.
-    inline Coord getCoord() const { assert(mIter); return mIter.getCoord(); }
-    /// Return in @a xyz the coordinates of the item to which the value iterator is pointing.
-    inline void getCoord(Coord& xyz) const { assert(mIter); xyz = mIter.getCoord(); }
-
-    /// Return the const index iterator
-    inline const IndexIter& indexIter() const { return mIndexIter; }
-    /// Return the const value iterator
-    inline const ValueIterT& valueIter() const { return mIter; }
+    /// @brief For efficiency, Coord assumed to be readily available when iterating over indices of a single voxel
+    inline Coord getCoord() const { OPENVDB_THROW(RuntimeError, "ValueVoxelCIter does not provide a valid Coord."); }
+    inline void getCoord(Coord& /*coord*/) const { OPENVDB_THROW(RuntimeError, "ValueVoxelCIter does not provide a valid Coord."); }
 
     /// @brief Equality operators
-    bool operator==(const ValueIndexIter& other) const { return *mIndexIter == *other.mIndexIter; }
-    bool operator!=(const ValueIndexIter& other) const { return !this->operator==(other); }
+    inline bool operator==(const ValueVoxelCIter& other) const { return mOffset == other.mOffset; }
+    inline bool operator!=(const ValueVoxelCIter& other) const { return !this->operator==(other); }
 
 private:
-    IndexIter mIndexIter;
-    ValueIterT mIter;
-    const typename ValueIterT::NodeType* mParent;
-}; // ValueIndexIter
-
-
-/// IndexIterTraits provides the following for iterators of the three value
-/// types, i.e., for {Value}{On,Off,All}{CIter}:
-/// - a begin(leaf) function that returns an index iterator or an index value
-///   iterator for the leaf provided,
-///   eg IndexIterTraits<Tree, Tree::LeafNodeType::ValueOn>::begin(leaf) returns
-///   leaf.beginIndexOn()
-/// - an Iterator typedef that aliases to the index iterator for this value type
-template<typename TreeT, typename ValueT> struct IndexIterTraits;
-
-template<typename TreeT>
-struct IndexIterTraits<TreeT, typename TreeT::LeafNodeType::ValueAllCIter> {
-    typedef typename TreeT::LeafNodeType::IndexAllIter Iterator;
-    static bool dense() { return true; }
-    static Iterator begin(const typename TreeT::LeafNodeType& leaf) {
-        return Iterator(leaf.beginIndexAll());
-    }
-};
-
-template<typename TreeT>
-struct IndexIterTraits<TreeT, typename TreeT::LeafNodeType::ValueOnCIter> {
-    typedef typename TreeT::LeafNodeType::IndexOnIter Iterator;
-    static bool dense() { return false; }
-    static Iterator begin(const typename TreeT::LeafNodeType& leaf) {
-        return Iterator(leaf.beginIndexOn());
-    }
-};
-
-template<typename TreeT>
-struct IndexIterTraits<TreeT, typename TreeT::LeafNodeType::ValueOffCIter> {
-    typedef typename TreeT::LeafNodeType::IndexOffIter Iterator;
-    static bool dense() { return false; }
-    static Iterator begin(const typename TreeT::LeafNodeType& leaf) {
-        return Iterator(leaf.beginIndexOff());
-    }
-};
+    Index32 mOffset;
+    Parent mParent;
+    mutable bool mValid;
+}; // class ValueVoxelCIter
 
 
 /// @brief A forward iterator over array indices with filtering
@@ -242,20 +141,99 @@ struct IndexIterTraits<TreeT, typename TreeT::LeafNodeType::ValueOffCIter> {
 /// };
 ///
 template <typename IteratorT, typename FilterT>
-class FilterIndexIter
+class IndexIter
 {
 public:
-    FilterIndexIter(const IteratorT& iterator, const FilterT& filter)
-        : mIterator(iterator), mFilter(filter) { if (mIterator) { this->reset(*mIterator, mIterator.end()); } }
-    FilterIndexIter(const FilterIndexIter& other)
-        : mIterator(other.mIterator), mFilter(other.mFilter) { }
+    /// @brief A forward iterator over array indices from a value iterator (such as ValueOnCIter)
+    class ValueIndexIter
+    {
+    public:
+        ValueIndexIter(const IteratorT& iter)
+            : mEnd(0), mItem(0), mIter(iter), mParent(&mIter.parent())
+        {
+            if (mIter) {
+                assert(mParent);
+                Index32 start = mIter.offset() > 0 ? Index32(mParent->getValue(mIter.offset() - 1)) : Index32(0);
+                this->reset(start, *mIter);
+                if (mItem >= mEnd)   this->operator++();
+            }
+        }
+        ValueIndexIter(const ValueIndexIter& other)
+            : mEnd(other.mEnd), mItem(other.mItem), mIter(other.mIter), mParent(other.mParent) { assert(mParent); }
+
+        inline Index32 end() const { return mEnd; }
+
+        inline void reset(Index32 item, Index32 end) {
+            mItem = item;
+            mEnd = end;
+        }
+
+        /// @brief  Returns the item to which this iterator is currently pointing.
+        inline Index32 operator*() { assert(mIter); return mItem; }
+        inline Index32 operator*() const { assert(mIter); return mItem; }
+
+        /// @brief  Return @c true if this iterator is not yet exhausted.
+        inline operator bool() const { return mIter; }
+        inline bool test() const { return mIter; }
+
+        /// @brief  Advance to the next (valid) item (prefix).
+        inline ValueIndexIter& operator++() {
+            ++mItem;
+            while (mItem >= mEnd && mIter.next()) {
+                assert(mParent);
+                this->reset(mParent->getValue(mIter.offset() - 1), *mIter);
+            }
+            return *this;
+        }
+
+        /// @brief  Advance to the next (valid) item.
+        inline bool next() { this->operator++(); return this->test(); }
+        inline bool increment() { this->next(); return this->test(); }
+
+        /// Return the coordinates of the item to which the value iterator is pointing.
+        inline Coord getCoord() const { assert(mIter); return mIter.getCoord(); }
+        /// Return in @a xyz the coordinates of the item to which the value iterator is pointing.
+        inline void getCoord(Coord& xyz) const { assert(mIter); xyz = mIter.getCoord(); }
+
+        /// Return the const value iterator
+        inline const IteratorT& valueIter() const { return mIter; }
+
+        /// @brief Equality operators
+        bool operator==(const ValueIndexIter& other) const { return mItem == other.mItem; }
+        bool operator!=(const ValueIndexIter& other) const { return !this->operator==(other); }
+
+    private:
+        Index32 mEnd, mItem;
+        IteratorT mIter;
+        const typename IteratorT::NodeType* mParent;
+    }; // ValueIndexIter
+
+    IndexIter(const IteratorT& iterator, const FilterT& filter)
+        : mIterator(iterator)
+        , mFilter(filter)
+    {
+        if (!mFilter.initialized()) {
+            OPENVDB_THROW(RuntimeError, "Filter needs to be initialized before constructing the iterator.");
+        }
+        if (mIterator) {
+            this->reset(*mIterator, mIterator.end());
+        }
+    }
+    IndexIter(const IndexIter& other)
+        : mIterator(other.mIterator)
+        , mFilter(other.mFilter)
+    {
+        if (!mFilter.initialized()) {
+            OPENVDB_THROW(RuntimeError, "Filter needs to be initialized before constructing the iterator.");
+        }
+    }
 
     Index32 end() const { return mIterator.end(); }
 
     /// @brief Reset the begining and end of the iterator.
     void reset(Index32 begin, Index32 end) {
         mIterator.reset(begin, end);
-        while (mIterator.test() && !mFilter.template valid<IteratorT>(mIterator)) {
+        while (mIterator.test() && !mFilter.template valid<ValueIndexIter>(mIterator)) {
             ++mIterator;
         }
     }
@@ -269,10 +247,10 @@ public:
     bool test() const { return mIterator.test(); }
 
     /// @brief  Advance to the next (valid) item (prefix).
-    FilterIndexIter& operator++() {
+    IndexIter& operator++() {
         while (true) {
             ++mIterator;
-            if (!mIterator.test() || mFilter.template valid<IteratorT>(mIterator)) {
+            if (!mIterator.test() || mFilter.template valid<ValueIndexIter>(mIterator)) {
                 break;
             }
         }
@@ -280,8 +258,8 @@ public:
     }
 
     /// @brief  Advance to the next (valid) item (postfix).
-    FilterIndexIter operator++(int /*dummy*/) {
-        FilterIndexIter newIterator(*this);
+    IndexIter operator++(int /*dummy*/) {
+        IndexIter newIterator(*this);
         this->operator++();
         return newIterator;
     }
@@ -290,19 +268,22 @@ public:
     bool next() { this->operator++(); return this->test(); }
     bool increment() { this->next(); return this->test(); }
 
-    /// Return the const index iterator
-    inline const IteratorT& indexIter() const { return mIterator; }
     /// Return the const filter
     inline const FilterT& filter() const { return mFilter; }
 
+    /// Return the coordinates of the item to which the value iterator is pointing.
+    inline Coord getCoord() const { assert(mIterator); return mIterator.getCoord(); }
+    /// Return in @a xyz the coordinates of the item to which the value iterator is pointing.
+    inline void getCoord(Coord& xyz) const { assert(mIterator); xyz = mIterator.getCoord(); }
+
     /// @brief Equality operators
-    bool operator==(const FilterIndexIter& other) const { return mIterator == other.mIterator; }
-    bool operator!=(const FilterIndexIter& other) const { return !this->operator==(other); }
+    bool operator==(const IndexIter& other) const { return mIterator == other.mIterator; }
+    bool operator!=(const IndexIter& other) const { return !this->operator==(other); }
 
 private:
-    IteratorT mIterator;
-    const FilterT mFilter;
-}; // class FilterIndexIter
+    ValueIndexIter mIterator;
+    FilterT mFilter;
+}; // class IndexIter
 
 
 ////////////////////////////////////////
@@ -313,25 +294,6 @@ inline Index64 iterCount(const IterT& iter)
 {
     Index64 size = 0;
     for (IterT newIter(iter); newIter; ++newIter, ++size) { }
-    return size;
-}
-
-
-template <>
-inline Index64 iterCount(const IndexIter& iter)
-{
-    return iter ? iter.end() - *iter : 0;
-}
-
-
-template <typename T>
-inline Index64 iterCount(const ValueIndexIter<T>& iter)
-{
-    T newIter(iter.valueIter());
-    Index64 size = 0;
-    for ( ; newIter; ++newIter) {
-        size += *newIter - (newIter.offset() == 0 ? Index32(0) : Index32(newIter.parent().getValue(newIter.offset() - 1)));
-    }
     return size;
 }
 

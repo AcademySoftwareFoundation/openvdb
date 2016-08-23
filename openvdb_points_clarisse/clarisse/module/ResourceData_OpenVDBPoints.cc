@@ -106,14 +106,9 @@ struct ConvertVelocityToIndexSpaceOp {
                 velocityWriteHandle->collapse(velocity);
             }
             else {
-                for (PointDataLeafNode::ValueOnCIter value = leaf->cbeginValueOn(); value; ++value)
-                {
-                    Coord ijk = value.getCoord();
-
-                    for (IndexIter iter = leaf->beginIndex(ijk); iter; ++iter) {
-                        const VelocityType velocity = mTransform.worldToIndex(velocityWriteHandle->get(*iter));
-                        velocityWriteHandle->set(*iter, velocity);
-                    }
+                for (PointDataLeafNode::IndexOnIter iter = leaf->beginIndexOn(); iter; ++iter) {
+                    const VelocityType velocity = mTransform.worldToIndex(velocityWriteHandle->get(*iter));
+                    velocityWriteHandle->set(*iter, velocity);
                 }
             }
         }
@@ -148,15 +143,10 @@ struct ConvertScalarToIndexSpaceOp {
                 scalarWriteHandle->collapse(transformedScalar);
             }
             else {
-                for (PointDataLeafNode::ValueOnCIter value = leaf->cbeginValueOn(); value; ++value)
-                {
-                    Coord ijk = value.getCoord();
-
-                    for (IndexIter iter = leaf->beginIndex(ijk); iter; ++iter) {
-                        const ScalarType scalar = scalarWriteHandle->get(*iter);
-                        const ScalarType transformedScalar = scalar / mTransform.voxelSize()[0];
-                        scalarWriteHandle->set(*iter, transformedScalar);
-                    }
+                for (PointDataLeafNode::IndexOnIter iter = leaf->beginIndexOn(); iter; ++iter) {
+                    const ScalarType scalar = scalarWriteHandle->get(*iter);
+                    const ScalarType transformedScalar = scalar / mTransform.voxelSize()[0];
+                    scalarWriteHandle->set(*iter, transformedScalar);
                 }
             }
         }

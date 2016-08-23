@@ -431,11 +431,11 @@ struct PopulateAttributeOp {
 template<typename PointDataTreeType, typename Attribute>
 struct ConvertPointDataGridPositionOp {
 
-    typedef typename PointDataTreeType::LeafNodeType            LeafNode;
-    typedef typename LeafNode::IndexOnIter                      IndexOnIter;
-    typedef typename Attribute::ValueType                       ValueType;
-    typedef typename tree::LeafManager<const PointDataTreeType> LeafManagerT;
-    typedef typename LeafManagerT::LeafRange                    LeafRangeT;
+    typedef typename PointDataTreeType::LeafNodeType                        LeafNode;
+    typedef typename Attribute::ValueType                                   ValueType;
+    typedef typename tree::LeafManager<const PointDataTreeType>             LeafManagerT;
+    typedef typename LeafManagerT::LeafRange                                LeafRangeT;
+    typedef IndexIter<typename LeafNode::ValueOnCIter, MultiGroupFilter>    IndexIterT;
 
     ConvertPointDataGridPositionOp( Attribute& attribute,
                                     const std::vector<Index64>& pointOffsets,
@@ -480,20 +480,18 @@ struct ConvertPointDataGridPositionOp {
             typename AttributeHandle<ValueType>::Ptr handle =
                     AttributeHandle<ValueType>::create(leaf->constAttributeArray(mIndex));
 
-            IndexOnIter iter = leaf->beginIndexOn();
-
             if (useGroups) {
-                MultiGroupFilter::Data data(mIncludeGroups, mExcludeGroups);
-                const MultiGroupFilter filter = MultiGroupFilter::create(*leaf, data);
-                FilterIndexIter<IndexOnIter, MultiGroupFilter> filterIndexIter(iter, filter);
+                IndexIterT iter = leaf->beginIndexOn(MultiGroupFilter(mIncludeGroups, mExcludeGroups));
 
-                for (; filterIndexIter; ++filterIndexIter) {
-                    const Vec3d xyz = filterIndexIter.indexIter().getCoord().asVec3d();
-                    const Vec3d pos = handle->get(Index64(*filterIndexIter));
+                for (; iter; ++iter) {
+                    const Vec3d xyz = iter.getCoord().asVec3d();
+                    const Vec3d pos = handle->get(Index64(*iter));
                     pHandle.set(offset++, /*stride=*/ 0, mTransform.indexToWorld(pos + xyz));
                 }
             }
             else {
+                typename LeafNode::IndexOnIter iter = leaf->beginIndexOn();
+
                 for (; iter; ++iter) {
                     const Vec3d xyz = iter.getCoord().asVec3d();
                     const Vec3d pos = handle->get(Index64(*iter));
@@ -519,12 +517,12 @@ struct ConvertPointDataGridPositionOp {
 template<typename PointDataTreeType, typename Attribute, bool Stride = false>
 struct ConvertPointDataGridAttributeOp {
 
-    typedef typename PointDataTreeType::LeafNodeType            LeafNode;
-    typedef typename LeafNode::IndexOnIter                      IndexOnIter;
-    typedef typename Attribute::ValueType                       ValueType;
-    typedef typename ConversionTraits<Stride, ValueType>::Handle HandleT;
-    typedef typename tree::LeafManager<const PointDataTreeType> LeafManagerT;
-    typedef typename LeafManagerT::LeafRange                    LeafRangeT;
+    typedef typename PointDataTreeType::LeafNodeType                        LeafNode;
+    typedef typename Attribute::ValueType                                   ValueType;
+    typedef typename ConversionTraits<Stride, ValueType>::Handle            HandleT;
+    typedef typename tree::LeafManager<const PointDataTreeType>             LeafManagerT;
+    typedef typename LeafManagerT::LeafRange                                LeafRangeT;
+    typedef IndexIter<typename LeafNode::ValueOnCIter, MultiGroupFilter>    IndexIterT;
 
     ConvertPointDataGridAttributeOp(Attribute& attribute,
                                     const std::vector<Index64>& pointOffsets,
@@ -568,15 +566,11 @@ struct ConvertPointDataGridAttributeOp {
             ValueType uniformValue = ConversionTraits<Stride, ValueType>::zero();
             if (uniform)    uniformValue = ValueType(handle->get(0));
 
-            IndexOnIter iter = leaf->beginIndexOn();
-
             if (useGroups) {
-                MultiGroupFilter::Data data(mIncludeGroups, mExcludeGroups);
-                const MultiGroupFilter filter = MultiGroupFilter::create(*leaf, data);
-                FilterIndexIter<IndexOnIter, MultiGroupFilter> filterIndexIter(iter, filter);
+                IndexIterT iter = leaf->beginIndexOn(MultiGroupFilter(mIncludeGroups, mExcludeGroups));
 
                 if (uniform) {
-                    for (; filterIndexIter; ++filterIndexIter) {
+                    for (; iter; ++iter) {
                         for (Index i = 0; i < mStride; i++) {
                             pHandle.set(offset, i, uniformValue);
                         }
@@ -584,15 +578,17 @@ struct ConvertPointDataGridAttributeOp {
                     }
                 }
                 else {
-                    for (; filterIndexIter; ++filterIndexIter) {
+                    for (; iter; ++iter) {
                         for (Index i = 0; i < mStride; i++) {
-                            pHandle.set(offset, i, handle->get(Index64(*filterIndexIter), /*stride=*/i));
+                            pHandle.set(offset, i, handle->get(Index64(*iter)));
                         }
                         offset++;
                     }
                 }
             }
             else {
+                typename LeafNode::IndexOnIter iter = leaf->beginIndexOn();
+
                 if (uniform) {
                     for (; iter; ++iter) {
                         for (Index i = 0; i < mStride; i++) {
@@ -628,11 +624,11 @@ struct ConvertPointDataGridAttributeOp {
 template<typename PointDataTreeType, typename Group>
 struct ConvertPointDataGridGroupOp {
 
-    typedef typename PointDataTreeType::LeafNodeType            LeafNode;
-    typedef typename LeafNode::IndexOnIter                      IndexOnIter;
-    typedef AttributeSet::Descriptor::GroupIndex                GroupIndex;
-    typedef typename tree::LeafManager<const PointDataTreeType> LeafManagerT;
-    typedef typename LeafManagerT::LeafRange                    LeafRangeT;
+    typedef typename PointDataTreeType::LeafNodeType                        LeafNode;
+    typedef AttributeSet::Descriptor::GroupIndex                            GroupIndex;
+    typedef typename tree::LeafManager<const PointDataTreeType>             LeafManagerT;
+    typedef typename LeafManagerT::LeafRange                                LeafRangeT;
+    typedef IndexIter<typename LeafNode::ValueOnCIter, MultiGroupFilter>    IndexIterT;
 
     ConvertPointDataGridGroupOp(Group& group,
                                 const std::vector<Index64>& pointOffsets,
@@ -672,8 +668,6 @@ struct ConvertPointDataGridGroupOp {
 
             const GroupAttributeArray& groupArray = GroupAttributeArray::cast(array);
 
-            IndexOnIter iter = leaf->beginIndexOn();
-
             const bool uniform = groupArray.isUniform();
 
             if (uniform) {
@@ -681,19 +675,17 @@ struct ConvertPointDataGridGroupOp {
             }
 
             if (useGroups) {
-                MultiGroupFilter::Data data(mIncludeGroups, mExcludeGroups);
-                const MultiGroupFilter filter = MultiGroupFilter::create(*leaf, data);
-                FilterIndexIter<IndexOnIter, MultiGroupFilter> filterIndexIter(iter, filter);
+                IndexIterT iter = leaf->beginIndexOn(MultiGroupFilter(mIncludeGroups, mExcludeGroups));
 
                 if (uniform) {
-                    for (; filterIndexIter; ++filterIndexIter) {
+                    for (; iter; ++iter) {
                         mGroup.setOffsetOn(offset);
                         offset++;
                     }
                 }
                 else {
-                    for (; filterIndexIter; ++filterIndexIter) {
-                        if (groupArray.get(*filterIndexIter) & bitmask) {
+                    for (; iter; ++iter) {
+                        if (groupArray.get(*iter) & bitmask) {
                             mGroup.setOffsetOn(offset);
                         }
                         offset++;
@@ -701,6 +693,8 @@ struct ConvertPointDataGridGroupOp {
                 }
             }
             else {
+                typename LeafNode::IndexOnIter iter = leaf->beginIndexOn();
+
                 if (uniform) {
                     for (; iter; ++iter) {
                         mGroup.setOffsetOn(offset);

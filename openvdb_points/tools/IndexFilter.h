@@ -52,6 +52,8 @@
 #include <boost/random/uniform_real_distribution.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
 
+class TestIndexFilter;
+
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
@@ -116,40 +118,41 @@ public:
     typedef std::vector<Name> NameVector;
     typedef boost::ptr_vector<GroupHandle> HandleVector;
 
-    struct Data
-    {
-        Data(   const NameVector& _include,
-                const NameVector& _exclude)
-            : include(_include)
-            , exclude(_exclude) { }
-        const NameVector include;
-        const NameVector exclude;
-    };
+    MultiGroupFilter(   const NameVector& include,
+                        const NameVector& exclude)
+        : mInclude(include)
+        , mExclude(exclude)
+        , mInitialized(false) { }
 
-    MultiGroupFilter(   const HandleVector& includeHandles,
-                        const HandleVector& excludeHandles)
-        : mIncludeHandles(includeHandles)
-        , mExcludeHandles(excludeHandles) { }
+    MultiGroupFilter(   const MultiGroupFilter& filter)
+        : mInclude(filter.mInclude)
+        , mExclude(filter.mExclude)
+        , mIncludeHandles(filter.mIncludeHandles)
+        , mExcludeHandles(filter.mExcludeHandles)
+        , mInitialized(filter.mInitialized) { }
+
+    inline bool initialized() const { return mInitialized; }
 
     template <typename LeafT>
-    static MultiGroupFilter create(const LeafT& leaf, const Data& data) {
-        HandleVector include;
-        HandleVector exclude;
-        for (NameVector::const_iterator  it = data.include.begin(),
-                                                itEnd = data.include.end(); it != itEnd; ++it) {
+    void reset(const LeafT& leaf) {
+        mIncludeHandles.clear();
+        mExcludeHandles.clear();
+        for (NameVector::const_iterator it = mInclude.begin(),
+                                        itEnd = mInclude.end(); it != itEnd; ++it) {
             if (!leaf.attributeSet().descriptor().hasGroup(*it))    continue;
-            include.push_back(new GroupHandle(leaf.groupHandle(*it)));
+            mIncludeHandles.push_back(new GroupHandle(leaf.groupHandle(*it)));
         }
-        for (NameVector::const_iterator  it = data.exclude.begin(),
-                                                itEnd = data.exclude.end(); it != itEnd; ++it) {
+        for (NameVector::const_iterator     it = mExclude.begin(),
+                                            itEnd = mExclude.end(); it != itEnd; ++it) {
             if (!leaf.attributeSet().descriptor().hasGroup(*it))    continue;
-            exclude.push_back(new GroupHandle(leaf.groupHandle(*it)));
+            mExcludeHandles.push_back(new GroupHandle(leaf.groupHandle(*it)));
         }
-        return MultiGroupFilter(include, exclude);
+        mInitialized = true;
     }
 
     template <typename IterT>
     bool valid(const IterT& iter) const {
+        assert(mInitialized);
         // accept no include filters as valid
         bool includeValid = mIncludeHandles.size() == 0;
         for (HandleVector::const_iterator   it = mIncludeHandles.begin(),
@@ -168,89 +171,80 @@ public:
     }
 
 private:
+    const NameVector mInclude;
+    const NameVector mExclude;
     HandleVector mIncludeHandles;
     HandleVector mExcludeHandles;
+    bool mInitialized;
 }; // class MultiGroupFilter
 
 
 // Random index filtering per leaf
-template <typename RandGenT>
+template <typename PointDataTreeT, typename RandGenT>
 class RandomLeafFilter
 {
 public:
-    struct Data
-    {
-        typedef std::pair<Index, Index> SeedCountPair;
-        typedef std::map<openvdb::Coord, SeedCountPair> LeafMap;
+    typedef std::pair<Index, Index> SeedCountPair;
+    typedef std::map<openvdb::Coord, SeedCountPair> LeafMap;
 
-        Data() { }
-
-        template <typename PointDataTreeT>
-        void populateByTargetPoints(const PointDataTreeT& tree,
-                                    const Index64 targetPoints,
-                                    const unsigned int seed = 0)
-        {
-            const Index64 currentPoints = pointCount(tree);
-            const float factor = targetPoints > currentPoints ? 1.0f : float(targetPoints) / float(currentPoints);
-
-            math::RandInt<unsigned int, boost::mt19937> randGen(seed, 0, std::numeric_limits<unsigned int>::max()-1);
-
-            Index32 leafCounter = 0;
-            float totalPointsFloat = 0.0f;
-            int totalPoints = 0;
-            for (typename PointDataTreeT::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
-                // for the last leaf - use the remaining points to reach the target points
-                if (leafCounter + 1 == tree.leafCount()) {
-                    const int leafPoints = targetPoints - totalPoints;
-                    leafMap[iter->origin()] = SeedCountPair(randGen(), leafPoints);
-                    break;
-                }
-                totalPointsFloat += factor * iter->pointCount();
-                const int leafPoints = math::Floor(totalPointsFloat);
-                totalPointsFloat -= leafPoints;
-                totalPoints += leafPoints;
-
-                leafMap[iter->origin()] = SeedCountPair(randGen(), leafPoints);
-
-                leafCounter++;
-            }
-        }
-
-        template <typename PointDataTreeT>
-        void populateByPercentagePoints(const PointDataTreeT& tree,
-                                        const float percentage = 10.0f,
-                                        const unsigned int seed = 0)
-        {
-            const int currentPoints = pointCount(tree);
-            const int targetPoints = int(math::Round((percentage * currentPoints)/100.0f));
-
-            populateByTargetPoints(tree, targetPoints, seed);
-        }
-
-        LeafMap leafMap;
-    }; // struct Data
-
-    RandomLeafFilter(const unsigned int seed, const Index count, const Index total)
-        : mIndices()
-        , mCount(count)
+    RandomLeafFilter(   const PointDataTreeT& tree,
+                        const Index64 targetPoints,
+                        const unsigned int seed = 0)
+        : mCount(0)
         , mSubsetOffset(-1)
         , mNextIndex(-1)
     {
-        using index_filter_internal::generateRandomSubset;
-        generateRandomSubset<RandGenT, int>(mIndices, seed, count, total);
+        Index64 currentPoints = 0;
+        for (typename PointDataTreeT::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
+            currentPoints += iter->pointCount();
+        }
+
+        const float factor = targetPoints > currentPoints ? 1.0f : float(targetPoints) / float(currentPoints);
+
+        math::RandInt<unsigned int, boost::mt19937> randGen(seed, 0, std::numeric_limits<unsigned int>::max()-1);
+
+        Index32 leafCounter = 0;
+        float totalPointsFloat = 0.0f;
+        int totalPoints = 0;
+        for (typename PointDataTreeT::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
+            // for the last leaf - use the remaining points to reach the target points
+            if (leafCounter + 1 == tree.leafCount()) {
+                const int leafPoints = targetPoints - totalPoints;
+                mLeafMap[iter->origin()] = SeedCountPair(randGen(), leafPoints);
+                break;
+            }
+            totalPointsFloat += factor * iter->pointCount();
+            const int leafPoints = math::Floor(totalPointsFloat);
+            totalPointsFloat -= leafPoints;
+            totalPoints += leafPoints;
+
+            mLeafMap[iter->origin()] = SeedCountPair(randGen(), leafPoints);
+
+            leafCounter++;
+        }
     }
 
+    inline bool initialized() const { return mNextIndex == -1; }
+
     template <typename LeafT>
-    static RandomLeafFilter create(const LeafT& leaf, const Data& data) {
-        const typename Data::LeafMap::const_iterator it = data.leafMap.find(leaf.origin());
-        if (it == data.leafMap.end()) {
+    void reset(const LeafT& leaf) {
+        using index_filter_internal::generateRandomSubset;
+
+        const LeafMap::const_iterator it = mLeafMap.find(leaf.origin());
+        if (it == mLeafMap.end()) {
             OPENVDB_THROW(openvdb::KeyError, "Cannot find leaf origin in map for random filter - " << leaf.origin());
         }
-        const typename Data::SeedCountPair& value = it->second;
+
+        const SeedCountPair& value = it->second;
         const unsigned int seed = (unsigned int) value.first;
         const Index total = leaf.pointCount();
-        const Index count = std::min(value.second, total);
-        return RandomLeafFilter(seed, count, total);
+        mCount = std::min(value.second, total);
+
+        mIndices.clear();
+        generateRandomSubset<RandGenT, int>(mIndices, seed, mCount, total);
+
+        mSubsetOffset = -1;
+        mNextIndex = -1;
     }
 
     inline void next() const {
@@ -267,7 +261,11 @@ public:
         return mNextIndex == index;
     }
 
+protected:
+    friend class ::TestIndexFilter;
+
 private:
+    LeafMap mLeafMap;
     std::vector<int> mIndices;
     int mCount;
     mutable int mSubsetOffset;
@@ -280,39 +278,45 @@ template <typename RandGenT, typename IntType>
 class AttributeHashFilter
 {
 public:
-    struct Data
+    typedef AttributeHandle<IntType> Handle;
+
+    AttributeHashFilter(const size_t index,
+                        const double percentage,
+                        const unsigned int seed = 0)
+        : mIndex(index)
+        , mFactor(percentage / 100.0)
+        , mSeed(seed) { }
+
+    AttributeHashFilter(const AttributeHashFilter& filter)
+        : mIndex(filter.mIndex)
+        , mFactor(filter.mFactor)
+        , mSeed(filter.mSeed)
     {
-        Data(const size_t _index, const double _percentage, const unsigned int _seed = 0)
-            : index(_index)
-            , factor(_percentage / 100.0)
-            , seed(_seed) { }
+        if (filter.mIdHandle)   mIdHandle.reset(new Handle(*filter.mIdHandle));
+    }
 
-        const size_t index;
-        const double factor;
-        const unsigned int seed;
-    };
-
-    AttributeHashFilter(const Data& data,
-                        const typename AttributeHandle<IntType>::Ptr& idHandle)
-        : mData(data)
-        , mIdHandle(idHandle) { }
+    inline bool initialized() const { return bool(mIdHandle); }
 
     template <typename LeafT>
-    static AttributeHashFilter create(const LeafT& leaf, const Data& data) {
-        return AttributeHashFilter(data, AttributeHandle<IntType>::create(leaf.constAttributeArray(data.index)));
+    void reset(const LeafT& leaf) {
+        assert(leaf.hasAttribute(mIndex));
+        mIdHandle.reset(new Handle(leaf.constAttributeArray(mIndex)));
     }
 
     template <typename IterT>
     bool valid(const IterT& iter) const {
+        assert(mIdHandle);
         const IntType id = mIdHandle->get(*iter);
-        const unsigned int seed = mData.seed + (unsigned int) id;
+        const unsigned int seed = mSeed + (unsigned int) id;
         math::Rand01<double, RandGenT> randGen(seed);
-        return randGen() < mData.factor;
+        return randGen() < mFactor;
     }
 
 private:
-    const Data& mData;
-    const typename AttributeHandle<IntType>::Ptr mIdHandle;
+    const size_t mIndex;
+    const double mFactor;
+    const unsigned int mSeed;
+    typename Handle::ScopedPtr mIdHandle;
 }; // class AttributeHashFilter
 
 
@@ -321,38 +325,38 @@ class LevelSetFilter
 {
 public:
     typedef typename LevelSetGridT::ValueType ValueT;
+    typedef AttributeHandle<openvdb::Vec3f> Handle;
 
-    struct Data
+    LevelSetFilter( const LevelSetGridT& grid,
+                    const math::Transform& transform,
+                    const ValueT min,
+                    const ValueT max)
+        : mAccessor(grid.getConstAccessor())
+        , mLevelSetTransform(grid.transform())
+        , mTransform(transform)
+        , mMin(min)
+        , mMax(max) { }
+
+    LevelSetFilter(const LevelSetFilter& filter)
+        : mAccessor(filter.mAccessor)
+        , mLevelSetTransform(filter.mLevelSetTransform)
+        , mTransform(filter.mTransform)
+        , mMin(filter.mMin)
+        , mMax(filter.mMax)
     {
-        Data(const LevelSetGridT& _grid, const math::Transform& _transform,
-             const ValueT _min, const ValueT _max)
-            : accessor(_grid.getConstAccessor())
-            , levelSetTransform(_grid.transform())
-            , transform(_transform)
-            , min(_min)
-            , max(_max) { }
+        if (filter.mPositionHandle)    mPositionHandle.reset(new Handle(*filter.mPositionHandle));
+    }
 
-        // not a reference to ensure const-accessor is unique per-thread
-        const typename LevelSetGridT::ConstAccessor accessor;
-        const math::Transform& levelSetTransform;
-        const math::Transform& transform;
-        const ValueT min;
-        const ValueT max;
-    };
-
-    LevelSetFilter(const Data& data,
-                   const AttributeHandle<openvdb::Vec3f>::Ptr& positionHandle)
-        : mData(&data)
-        , mPositionHandle(positionHandle) { }
+    inline bool initialized() const { return bool(mPositionHandle); }
 
     template <typename LeafT>
-    static LevelSetFilter create(const LeafT& leaf, const Data& data) {
-        return LevelSetFilter(data, AttributeHandle<openvdb::Vec3f>::create(leaf.constAttributeArray("P")));
+    void reset(const LeafT& leaf) {
+        mPositionHandle.reset(new Handle(leaf.constAttributeArray("P")));
     }
 
     template <typename IterT>
     bool valid(const IterT& iter) const {
-        assert(mData);
+        assert(mPositionHandle);
         assert(iter);
 
         const openvdb::Coord ijk = iter.getCoord();
@@ -362,21 +366,26 @@ public:
         const openvdb::Vec3f& pointVoxelSpace = mPositionHandle->get(*iter);
 
         // Compute point position in index space
-        const openvdb::Vec3f pointWorldSpace = mData->transform.indexToWorld(pointVoxelSpace + voxelIndexSpace);
-        const openvdb::Vec3f pointIndexSpace = mData->levelSetTransform.worldToIndex(pointWorldSpace);
+        const openvdb::Vec3f pointWorldSpace = mTransform.indexToWorld(pointVoxelSpace + voxelIndexSpace);
+        const openvdb::Vec3f pointIndexSpace = mLevelSetTransform.worldToIndex(pointWorldSpace);
 
         // Perform level-set sampling
-        const typename LevelSetGridT::ValueType value = BoxSampler::sample(mData->accessor, pointIndexSpace);
+        const typename LevelSetGridT::ValueType value = BoxSampler::sample(mAccessor, pointIndexSpace);
 
         // if min is greater than max, we invert so that values are valid outside of the range (not inside)
-        const bool invert = mData->min > mData->max;
+        const bool invert = mMin > mMax;
 
-        return invert ? (value < mData->max || value > mData->min) : (value < mData->max && value > mData->min);
+        return invert ? (value < mMax || value > mMin) : (value < mMax && value > mMin);
     }
 
 private:
-    const Data* mData;
-    AttributeHandle<openvdb::Vec3f>::Ptr mPositionHandle;
+    // not a reference to ensure const-accessor is unique per-thread
+    const typename LevelSetGridT::ConstAccessor mAccessor;
+    const math::Transform& mLevelSetTransform;
+    const math::Transform& mTransform;
+    const ValueT mMin;
+    const ValueT mMax;
+    Handle::ScopedPtr mPositionHandle;
 }; // class LevelSetFilter
 
 
@@ -384,29 +393,30 @@ private:
 class BBoxFilter
 {
 public:
-    struct Data
-    {
-        Data(const openvdb::math::Transform& _transform,
-             const openvdb::BBoxd& _bboxWS)
-            : transform(_transform)
-            , bbox(transform.worldToIndex(_bboxWS)) { }
-        const openvdb::math::Transform& transform;
-        const openvdb::BBoxd bbox;
-    };
+    typedef AttributeHandle<openvdb::Vec3f> Handle;
 
-    BBoxFilter( const Data& data,
-                const AttributeHandle<openvdb::Vec3f>::Ptr& positionHandle)
-        : mData(&data)
-        , mPositionHandle(positionHandle) { }
+    BBoxFilter(const openvdb::math::Transform& transform,
+             const openvdb::BBoxd& bboxWS)
+            : mTransform(transform)
+            , mBbox(transform.worldToIndex(bboxWS)) { }
+
+    BBoxFilter(const BBoxFilter& filter)
+        : mTransform(filter.mTransform)
+        , mBbox(filter.mBbox)
+    {
+        if (filter.mPositionHandle)     mPositionHandle.reset(new Handle(*filter.mPositionHandle));
+    }
+
+    inline bool initialized() const { return bool(mPositionHandle); }
 
     template <typename LeafT>
-    static BBoxFilter create(const LeafT& leaf, const Data& data) {
-        return BBoxFilter(data, AttributeHandle<openvdb::Vec3f>::create(leaf.constAttributeArray("P")));
+    void reset(const LeafT& leaf) {
+        mPositionHandle.reset(new Handle(leaf.constAttributeArray("P")));
     }
 
     template <typename IterT>
     bool valid(const IterT& iter) const {
-        assert(mData);
+        assert(mPositionHandle);
 
         const openvdb::Coord ijk = iter.getCoord();
         const openvdb::Vec3f voxelIndexSpace = ijk.asVec3d();
@@ -417,12 +427,13 @@ public:
         // Compute point position in index space
         const openvdb::Vec3f pointIndexSpace = pointVoxelSpace + voxelIndexSpace;
 
-        return mData->bbox.isInside(pointIndexSpace);
+        return mBbox.isInside(pointIndexSpace);
     }
 
 private:
-    const Data* mData;
-    const AttributeHandle<openvdb::Vec3f>::Ptr mPositionHandle;
+    const openvdb::math::Transform& mTransform;
+    const openvdb::BBoxd mBbox;
+    Handle::ScopedPtr mPositionHandle;
 }; // class BBoxFilter
 
 
@@ -431,27 +442,17 @@ template <typename T1, typename T2, bool And = true>
 class BinaryFilter
 {
 public:
-    typedef BinaryFilter<T1, T2, And> FilterT;
-
-    struct Data
-    {
-        Data(const typename T1::Data& _filterData1,
-             const typename T2::Data& _filterData2)
-            : filterData1(_filterData1)
-            , filterData2(_filterData2) { }
-        typename T1::Data filterData1;
-        typename T2::Data filterData2;
-    };
-
-    BinaryFilter(  const T1& filter1,
-                const T2& filter2)
+    BinaryFilter(   const T1& filter1,
+                    const T2& filter2)
         : mFilter1(filter1)
         , mFilter2(filter2) { }
 
+    inline bool initialized() const { return mFilter1.initialized() && mFilter2.initialized(); }
+
     template <typename LeafT>
-    static FilterT create(const LeafT& leaf, const Data& data) {
-        return FilterT( T1::create(leaf, data.filterData1),
-                        T2::create(leaf, data.filterData2));
+    void reset(const LeafT& leaf) {
+        mFilter1.reset(leaf);
+        mFilter2.reset(leaf);
     }
 
     template <typename IterT>
@@ -461,8 +462,8 @@ public:
     }
 
 private:
-    const T1 mFilter1;
-    const T2 mFilter2;
+    T1 mFilter1;
+    T2 mFilter2;
 }; // class BinaryFilter
 
 

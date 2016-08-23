@@ -174,9 +174,6 @@ public:
     /// @note see offset description for groupOffset()
     Util::GroupIndex groupIndex(const size_t offset) const;
 
-    /// Create an iterator for iterating through point indices
-    IndexIter beginIndex() const;
-
     /// Return true if the attribute array stored at position @a pos is shared.
     bool isShared(size_t pos) const;
     /// @brief  If the attribute array stored at position @a pos is shared,

@@ -71,17 +71,12 @@ CPPUNIT_TEST_SUITE_REGISTRATION(TestPointGroup);
 class FirstFilter
 {
 public:
-    struct Data { };
+    static bool initialized() { return true; }
 
-    FirstFilter() { }
+    template <typename LeafT> void reset(const LeafT&) { }
 
-    template <typename LeafT>
-    static FirstFilter create(const LeafT&, const Data&) {
-        return FirstFilter();
-    }
-
-    template <typename IterT>
-    bool valid(const IterT& iter) const {
+    template <typename IterT> bool valid(const IterT& iter) const
+    {
         return *iter == 0;
     }
 }; // class FirstFilter
@@ -563,9 +558,9 @@ TestPointGroup::testFilter()
         CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(6));
         CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "first"), Index64(0));
 
-        FirstFilter::Data data;
+        FirstFilter filter;
 
-        setGroupByFilter<PointDataTree, FirstFilter>(tree, "first", data);
+        setGroupByFilter<PointDataTree, FirstFilter>(tree, "first", filter);
 
         PointDataTree::LeafCIter iter = tree.cbeginLeaf();
 
@@ -584,9 +579,9 @@ TestPointGroup::testFilter()
         CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(6));
         CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "bbox"), Index64(0));
 
-        BBoxFilter::Data data(*transform, bbox);
+        BBoxFilter filter(*transform, bbox);
 
-        setGroupByFilter<PointDataTree, BBoxFilter>(tree, "bbox", data);
+        setGroupByFilter<PointDataTree, BBoxFilter>(tree, "bbox", filter);
 
         CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "bbox"), Index64(3));
     }
@@ -599,25 +594,24 @@ TestPointGroup::testFilter()
 
         typedef BinaryFilter<FirstFilter, BBoxFilter>   FirstBBoxFilter;
 
-        FirstFilter::Data firstData;
-        BBoxFilter::Data bboxData(*transform, bbox);
-        FirstBBoxFilter::Data data(firstData, bboxData);
+        FirstFilter firstFilter;
+        BBoxFilter bboxFilter(*transform, bbox);
+        FirstBBoxFilter filter(firstFilter, bboxFilter);
 
-        setGroupByFilter<PointDataTree, FirstBBoxFilter>(tree, "first_bbox", data);
+        setGroupByFilter<PointDataTree, FirstBBoxFilter>(tree, "first_bbox", filter);
 
         CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "first_bbox"), Index64(1));
 
         std::vector<Vec3f> positions;
 
         for (PointDataTree::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
-            typedef PointDataTree::LeafNodeType::IndexOnIter IndexOnIter;
-            GroupFilter filter(GroupFilter::create(*iter, GroupFilter::Data("first_bbox")));
-            FilterIndexIter<IndexOnIter, GroupFilter> filterIndexIter(iter->beginIndexOn(), filter);
+            GroupFilter filter("first_bbox");
+            IndexIter<PointDataTree::LeafNodeType::ValueOnCIter, GroupFilter> filterIndexIter = iter->beginIndexOn(filter);
 
             AttributeHandle<Vec3f>::Ptr handle = AttributeHandle<Vec3f>::create(iter->attributeArray("P"));
 
             for ( ; filterIndexIter; ++filterIndexIter) {
-                const openvdb::Coord ijk = filterIndexIter.indexIter().getCoord();
+                const openvdb::Coord ijk = filterIndexIter.getCoord();
                 positions.push_back(handle->get(*filterIndexIter) + ijk.asVec3d());
             }
         }

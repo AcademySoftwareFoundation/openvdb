@@ -35,6 +35,7 @@
 #include <openvdb_points/tools/PointAttribute.h>
 #include <openvdb_points/tools/PointConversion.h>
 #include <openvdb_points/tools/PointGroup.h>
+#include <openvdb_points/tools/PointCount.h>
 
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/assign/std/vector.hpp> // until C++11
@@ -97,18 +98,13 @@ template <bool LessThan>
 class ThresholdFilter
 {
 public:
-    struct Data
-    {
-        Data(const int _threshold) : threshold(_threshold) { }
-        const int threshold;
-    };
+    ThresholdFilter(const int threshold)
+        : mThreshold(threshold) { }
 
-    ThresholdFilter(const int threshold) : mThreshold(threshold) { }
+    static bool initialized() { return true; }
 
     template <typename LeafT>
-    static ThresholdFilter create(const LeafT&, const Data& data) {
-        return ThresholdFilter(data.threshold);
-    }
+    void reset(const LeafT&) { }
 
     template <typename IterT>
     bool valid(const IterT& iter) const {
@@ -158,10 +154,10 @@ multiGroupMatches(  const LeafT& leaf, const Index32 size,
                     const std::vector<Name>& include, const std::vector<Name>& exclude,
                     const std::vector<int>& indices)
 {
-    typedef FilterIndexIter<IndexIter, MultiGroupFilter> IndexGroupIter;
-    IndexIter indexIter(0, size);
-    MultiGroupFilter::Data data(include, exclude);
-    MultiGroupFilter filter = MultiGroupFilter::create(leaf, data);
+    typedef IndexIter<ValueVoxelCIter, MultiGroupFilter> IndexGroupIter;
+    ValueVoxelCIter indexIter(0, size);
+    MultiGroupFilter filter(include, exclude);
+    filter.reset(leaf);
     IndexGroupIter iter(indexIter, filter);
     for (unsigned i = 0; i < indices.size(); ++i, ++iter) {
         if (!iter)                                  return false;
@@ -201,6 +197,20 @@ TestIndexFilter::testMultiGroupFilter()
     appendGroup(tree, "odd");
     appendGroup(tree, "all");
     appendGroup(tree, "first");
+
+    { // construction, copy construction
+        std::vector<Name> includeGroups;
+        std::vector<Name> excludeGroups;
+        MultiGroupFilter filter(includeGroups, excludeGroups);
+        CPPUNIT_ASSERT(!filter.initialized());
+        MultiGroupFilter filter2 = filter;
+        CPPUNIT_ASSERT(!filter2.initialized());
+
+        filter.reset(*leaf);
+        CPPUNIT_ASSERT(filter.initialized());
+        MultiGroupFilter filter3 = filter;
+        CPPUNIT_ASSERT(filter3.initialized());
+    }
 
     // group population
 
@@ -368,16 +378,29 @@ TestIndexFilter::testRandomLeafFilter()
     }
 
     { // RandomLeafFilter
-        typedef RandomLeafFilter<boost::mt11213b> RandFilter;
+        typedef RandomLeafFilter<PointDataTree, boost::mt11213b> RandFilter;
 
-        RandFilter::Data data;
+        PointDataTree tree;
 
-        data.leafMap[Coord(0, 0, 0)] = std::pair<Index, Index>(0, 10);
-        data.leafMap[Coord(0, 0, 8)] = std::pair<Index, Index>(1, 1);
-        data.leafMap[Coord(0, 8, 0)] = std::pair<Index, Index>(2, 50);
+        RandFilter filter(tree, 0);
+
+        filter.mLeafMap[Coord(0, 0, 0)] = std::pair<Index, Index>(0, 10);
+        filter.mLeafMap[Coord(0, 0, 8)] = std::pair<Index, Index>(1, 1);
+        filter.mLeafMap[Coord(0, 8, 0)] = std::pair<Index, Index>(2, 50);
+
+        { // construction, copy construction
+            CPPUNIT_ASSERT(filter.initialized());
+            RandFilter filter2 = filter;
+            CPPUNIT_ASSERT(filter2.initialized());
+
+            filter.reset(OriginLeaf(Coord(0, 0, 0), 10));
+            CPPUNIT_ASSERT(filter.initialized());
+            RandFilter filter3 = filter;
+            CPPUNIT_ASSERT(filter3.initialized());
+        }
 
         { // all 10 values
-            RandFilter filter = RandFilter::create(OriginLeaf(Coord(0, 0, 0), 10), data);
+            filter.reset(OriginLeaf(Coord(0, 0, 0), 10));
             std::vector<int> values;
 
             for (SimpleIter iter; *iter < 100; ++iter) {
@@ -392,7 +415,7 @@ TestIndexFilter::testRandomLeafFilter()
         }
 
         { // 50 of 100
-            RandFilter filter = RandFilter::create(OriginLeaf(Coord(0, 8, 0), 100), data);
+            filter.reset(OriginLeaf(Coord(0, 8, 0), 100));
             std::vector<int> values;
 
             for (SimpleIter iter; *iter < 100; ++iter) {
@@ -418,7 +441,7 @@ void setId(PointDataTree& tree, const size_t index, const std::vector<int>& ids)
     for (PointDataTree::LeafIter leafIter = tree.beginLeaf(); leafIter; ++leafIter) {
         AttributeWriteHandle<int>::Ptr id = AttributeWriteHandle<int>::create(leafIter->attributeArray(index));
 
-        for (PointDataTree::LeafNodeType::IndexIter iter = leafIter->beginIndex(); iter; ++iter) {
+        for (PointDataTree::LeafNodeType::IndexAllIter iter = leafIter->beginIndexAll(); iter; ++iter) {
             if (offset >= int(ids.size()))   throw std::runtime_error("Out of range");
 
             id->set(*iter, ids[offset++]);
@@ -469,13 +492,25 @@ TestIndexFilter::testAttributeHashFilter()
 
     typedef AttributeHashFilter<boost::mt11213b, int> HashFilter;
 
+    { // construction, copy construction
+        HashFilter filter(index, 0.0f);
+        CPPUNIT_ASSERT(!filter.initialized());
+        HashFilter filter2 = filter;
+        CPPUNIT_ASSERT(!filter2.initialized());
+
+        filter.reset(*tree.cbeginLeaf());
+        CPPUNIT_ASSERT(filter.initialized());
+        HashFilter filter3 = filter;
+        CPPUNIT_ASSERT(filter3.initialized());
+    }
+
     { // zero percent
-        HashFilter::Data data(index, 0.0f);
+        HashFilter filter(index, 0.0f);
 
         PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
 
-        PointDataTree::LeafNodeType::IndexIter indexIter = leafIter->beginIndex();
-        HashFilter filter = HashFilter::create(*leafIter, data);
+        PointDataTree::LeafNodeType::IndexAllIter indexIter = leafIter->beginIndexAll();
+        filter.reset(*leafIter);
 
         CPPUNIT_ASSERT(!filter.valid(indexIter));
         ++indexIter;
@@ -484,22 +519,22 @@ TestIndexFilter::testAttributeHashFilter()
         CPPUNIT_ASSERT(!indexIter);
         ++leafIter;
 
-        indexIter = leafIter->beginIndex();
-        HashFilter filter2 = HashFilter::create(*leafIter, data);
-        CPPUNIT_ASSERT(!filter2.valid(indexIter));
+        indexIter = leafIter->beginIndexAll();
+        filter.reset(*leafIter);
+        CPPUNIT_ASSERT(!filter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(!filter2.valid(indexIter));
+        CPPUNIT_ASSERT(!filter.valid(indexIter));
         ++indexIter;
         CPPUNIT_ASSERT(!indexIter);
     }
 
     { // one hundred percent
-        HashFilter::Data data(index, 100.0f);
+        HashFilter filter(index, 100.0f);
 
         PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
 
-        PointDataTree::LeafNodeType::IndexIter indexIter = leafIter->beginIndex();
-        HashFilter filter = HashFilter::create(*leafIter, data);
+        PointDataTree::LeafNodeType::IndexAllIter indexIter = leafIter->beginIndexAll();
+        filter.reset(*leafIter);
 
         CPPUNIT_ASSERT(filter.valid(indexIter));
         ++indexIter;
@@ -508,22 +543,22 @@ TestIndexFilter::testAttributeHashFilter()
         CPPUNIT_ASSERT(!indexIter);
         ++leafIter;
 
-        indexIter = leafIter->beginIndex();
-        HashFilter filter2 = HashFilter::create(*leafIter, data);
-        CPPUNIT_ASSERT(filter2.valid(indexIter));
+        indexIter = leafIter->beginIndexAll();
+        filter.reset(*leafIter);
+        CPPUNIT_ASSERT(filter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(filter2.valid(indexIter));
+        CPPUNIT_ASSERT(filter.valid(indexIter));
         ++indexIter;
         CPPUNIT_ASSERT(!indexIter);
     }
 
     { // fifty percent
-        HashFilter::Data data(index, 50.0f);
+        HashFilter filter(index, 50.0f);
 
         PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
 
-        PointDataTree::LeafNodeType::IndexIter indexIter = leafIter->beginIndex();
-        HashFilter filter = HashFilter::create(*leafIter, data);
+        PointDataTree::LeafNodeType::IndexAllIter indexIter = leafIter->beginIndexAll();
+        filter.reset(*leafIter);
 
         CPPUNIT_ASSERT(!filter.valid(indexIter));
         ++indexIter;
@@ -532,22 +567,22 @@ TestIndexFilter::testAttributeHashFilter()
         CPPUNIT_ASSERT(!indexIter);
         ++leafIter;
 
-        indexIter = leafIter->beginIndex();
-        HashFilter filter2 = HashFilter::create(*leafIter, data);
-        CPPUNIT_ASSERT(filter2.valid(indexIter));
+        indexIter = leafIter->beginIndexAll();
+        filter.reset(*leafIter);
+        CPPUNIT_ASSERT(filter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(!filter2.valid(indexIter));
+        CPPUNIT_ASSERT(!filter.valid(indexIter));
         ++indexIter;
         CPPUNIT_ASSERT(!indexIter);
     }
 
     { // fifty percent, new seed
-        HashFilter::Data data(index, 50.0f, /*seed=*/100);
+        HashFilter filter(index, 50.0f, /*seed=*/100);
 
         PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
 
-        PointDataTree::LeafNodeType::IndexIter indexIter = leafIter->beginIndex();
-        HashFilter filter = HashFilter::create(*leafIter, data);
+        PointDataTree::LeafNodeType::IndexAllIter indexIter = leafIter->beginIndexAll();
+        filter.reset(*leafIter);
 
         CPPUNIT_ASSERT(filter.valid(indexIter));
         ++indexIter;
@@ -556,11 +591,11 @@ TestIndexFilter::testAttributeHashFilter()
         CPPUNIT_ASSERT(!indexIter);
         ++leafIter;
 
-        indexIter = leafIter->beginIndex();
-        HashFilter filter2 = HashFilter::create(*leafIter, data);
-        CPPUNIT_ASSERT(!filter2.valid(indexIter));
+        indexIter = leafIter->beginIndexAll();
+        filter.reset(*leafIter);
+        CPPUNIT_ASSERT(!filter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(filter2.valid(indexIter));
+        CPPUNIT_ASSERT(filter.valid(indexIter));
         ++indexIter;
         CPPUNIT_ASSERT(!indexIter);
     }
@@ -610,11 +645,23 @@ TestIndexFilter::testLevelSetFilter()
 
     typedef LevelSetFilter<FloatGrid> LSFilter;
 
+    { // construction, copy construction
+        LSFilter filter(*sphere, points->transform(), -4.0f, 4.0f);
+        CPPUNIT_ASSERT(!filter.initialized());
+        LSFilter filter2 = filter;
+        CPPUNIT_ASSERT(!filter2.initialized());
+
+        filter.reset(* points->tree().cbeginLeaf());
+        CPPUNIT_ASSERT(filter.initialized());
+        LSFilter filter3 = filter;
+        CPPUNIT_ASSERT(filter3.initialized());
+    }
+
     { // capture both points near origin
-        LSFilter::Data data(*sphere, points->transform(), -4.0f, 4.0f);
+        LSFilter filter(*sphere, points->transform(), -4.0f, 4.0f);
         PointDataGrid::TreeType::LeafCIter leafIter = points->tree().cbeginLeaf();
         PointDataGrid::TreeType::LeafNodeType::IndexOnIter iter = leafIter->beginIndexOn();
-        LSFilter filter = LSFilter::create(*leafIter, data);
+        filter.reset(*leafIter);
 
         CPPUNIT_ASSERT(filter.valid(iter));
         ++iter;
@@ -624,7 +671,7 @@ TestIndexFilter::testLevelSetFilter()
 
         ++leafIter;
         iter = leafIter->beginIndexOn();
-        filter = LSFilter::create(*leafIter, data);
+        filter.reset(*leafIter);
 
         CPPUNIT_ASSERT(iter);
         CPPUNIT_ASSERT(!filter.valid(iter));
@@ -633,10 +680,10 @@ TestIndexFilter::testLevelSetFilter()
     }
 
     { // capture just the inner-most point
-        LSFilter::Data data(*sphere, points->transform(), -0.3f, -0.25f);
+        LSFilter filter(*sphere, points->transform(), -0.3f, -0.25f);
         PointDataGrid::TreeType::LeafCIter leafIter = points->tree().cbeginLeaf();
         PointDataGrid::TreeType::LeafNodeType::IndexOnIter iter = leafIter->beginIndexOn();
-        LSFilter filter = LSFilter::create(*leafIter, data);
+        filter.reset(*leafIter);
 
         CPPUNIT_ASSERT(filter.valid(iter));
         ++iter;
@@ -646,7 +693,7 @@ TestIndexFilter::testLevelSetFilter()
 
         ++leafIter;
         iter = leafIter->beginIndexOn();
-        filter = LSFilter::create(*leafIter, data);
+        filter.reset(*leafIter);
 
         CPPUNIT_ASSERT(iter);
         CPPUNIT_ASSERT(!filter.valid(iter));
@@ -655,10 +702,10 @@ TestIndexFilter::testLevelSetFilter()
     }
 
     { // capture everything but the second point (min > max)
-        LSFilter::Data data(*sphere, points->transform(), -0.25f, -0.3f);
+        LSFilter filter(*sphere, points->transform(), -0.25f, -0.3f);
         PointDataGrid::TreeType::LeafCIter leafIter = points->tree().cbeginLeaf();
         PointDataGrid::TreeType::LeafNodeType::IndexOnIter iter = leafIter->beginIndexOn();
-        LSFilter filter = LSFilter::create(*leafIter, data);
+        filter.reset(*leafIter);
 
         CPPUNIT_ASSERT(!filter.valid(iter));
         ++iter;
@@ -668,7 +715,7 @@ TestIndexFilter::testLevelSetFilter()
 
         ++leafIter;
         iter = leafIter->beginIndexOn();
-        filter = LSFilter::create(*leafIter, data);
+        filter.reset(*leafIter);
 
         CPPUNIT_ASSERT(iter);
         CPPUNIT_ASSERT(filter.valid(iter));
@@ -700,10 +747,10 @@ TestIndexFilter::testLevelSetFilter()
     }
 
     { // capture only the last point using a different transform and a new sphere
-        LSFilter::Data data(*sphere, points->transform(), 0.5f, 1.0f);
+        LSFilter filter(*sphere, points->transform(), 0.5f, 1.0f);
         PointDataGrid::TreeType::LeafCIter leafIter = points->tree().cbeginLeaf();
         PointDataGrid::TreeType::LeafNodeType::IndexOnIter iter = leafIter->beginIndexOn();
-        LSFilter filter = LSFilter::create(*leafIter, data);
+        filter.reset(*leafIter);
 
         CPPUNIT_ASSERT(!filter.valid(iter));
         ++iter;
@@ -711,7 +758,7 @@ TestIndexFilter::testLevelSetFilter()
 
         ++leafIter;
         iter = leafIter->beginIndexOn();
-        filter = LSFilter::create(*leafIter, data);
+        filter.reset(*leafIter);
 
         CPPUNIT_ASSERT(!filter.valid(iter));
         ++iter;
@@ -719,7 +766,7 @@ TestIndexFilter::testLevelSetFilter()
 
         ++leafIter;
         iter = leafIter->beginIndexOn();
-        filter = LSFilter::create(*leafIter, data);
+        filter.reset(*leafIter);
 
         CPPUNIT_ASSERT(iter);
         CPPUNIT_ASSERT(filter.valid(iter));
@@ -736,7 +783,7 @@ TestIndexFilter::testBBoxFilter()
     using namespace openvdb::tools;
 
     typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
-    typedef PointDataTree::LeafNodeType::ValueOnCIter ValueOnCIter;
+    typedef PointDataTree::LeafNodeType::IndexOnIter IndexOnIter;
 
     AttributeVec3s::registerType();
 
@@ -756,34 +803,52 @@ TestIndexFilter::testBBoxFilter()
 
     // build some bounding box filters to test
 
-    BBoxFilter::Data data1 = BBoxFilter::Data(*transform, BBoxd(Vec3d(0.5, 0.5, 0.5), Vec3d(1.5, 1.5, 1.5)));
-    BBoxFilter::Data data2 = BBoxFilter::Data(*transform, BBoxd(Vec3d(0.5, 0.5, 0.5), Vec3d(1.5, 2.01, 1.5)));
-    BBoxFilter::Data data3 = BBoxFilter::Data(*transform, BBoxd(Vec3d(0.5, 0.5, 0.5), Vec3d(11, 11, 1.5)));
-    BBoxFilter::Data data4 = BBoxFilter::Data(*transform, BBoxd(Vec3d(-10, 0, 0), Vec3d(11, 1.2, 1.2)));
+    BBoxFilter filter1(*transform, BBoxd(Vec3d(0.5, 0.5, 0.5), Vec3d(1.5, 1.5, 1.5)));
+    BBoxFilter filter2(*transform, BBoxd(Vec3d(0.5, 0.5, 0.5), Vec3d(1.5, 2.01, 1.5)));
+    BBoxFilter filter3(*transform, BBoxd(Vec3d(0.5, 0.5, 0.5), Vec3d(11, 11, 1.5)));
+    BBoxFilter filter4(*transform, BBoxd(Vec3d(-10, 0, 0), Vec3d(11, 1.2, 1.2)));
+
+    { // construction, copy construction
+        CPPUNIT_ASSERT(!filter1.initialized());
+        BBoxFilter filter5 = filter1;
+        CPPUNIT_ASSERT(!filter5.initialized());
+
+        filter1.reset(*tree.cbeginLeaf());
+        CPPUNIT_ASSERT(filter1.initialized());
+        BBoxFilter filter6 = filter1;
+        CPPUNIT_ASSERT(filter6.initialized());
+    }
 
     // leaf 1
 
     PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
 
     {
-        ValueOnCIter valueIter(leafIter->beginValueOn());
-        ValueIndexIter<ValueOnCIter> iter(valueIter);
+        IndexOnIter iter(leafIter->beginIndexOn());
 
         // point 1
 
-        CPPUNIT_ASSERT(BBoxFilter::create(*leafIter, data1).valid(iter));
-        CPPUNIT_ASSERT(BBoxFilter::create(*leafIter, data2).valid(iter));
-        CPPUNIT_ASSERT(BBoxFilter::create(*leafIter, data3).valid(iter));
-        CPPUNIT_ASSERT(BBoxFilter::create(*leafIter, data4).valid(iter));
+        filter1.reset(*leafIter);
+        CPPUNIT_ASSERT(filter1.valid(iter));
+        filter2.reset(*leafIter);
+        CPPUNIT_ASSERT(filter2.valid(iter));
+        filter3.reset(*leafIter);
+        CPPUNIT_ASSERT(filter3.valid(iter));
+        filter4.reset(*leafIter);
+        CPPUNIT_ASSERT(filter4.valid(iter));
 
         ++iter;
 
         // point 2
 
-        CPPUNIT_ASSERT(!BBoxFilter::create(*leafIter, data1).valid(iter));
-        CPPUNIT_ASSERT(BBoxFilter::create(*leafIter, data2).valid(iter));
-        CPPUNIT_ASSERT(BBoxFilter::create(*leafIter, data3).valid(iter));
-        CPPUNIT_ASSERT(!BBoxFilter::create(*leafIter, data4).valid(iter));
+        filter1.reset(*leafIter);
+        CPPUNIT_ASSERT(!filter1.valid(iter));
+        filter2.reset(*leafIter);
+        CPPUNIT_ASSERT(filter2.valid(iter));
+        filter3.reset(*leafIter);
+        CPPUNIT_ASSERT(filter3.valid(iter));
+        filter4.reset(*leafIter);
+        CPPUNIT_ASSERT(!filter4.valid(iter));
 
         ++iter;
         CPPUNIT_ASSERT(!iter);
@@ -794,15 +859,18 @@ TestIndexFilter::testBBoxFilter()
     // leaf 2
 
     {
-        ValueOnCIter valueIter(leafIter->beginValueOn());
-        ValueIndexIter<ValueOnCIter> iter(valueIter);
+        IndexOnIter iter(leafIter->beginIndexOn());
 
         // point 3
 
-        CPPUNIT_ASSERT(!BBoxFilter::create(*leafIter, data1).valid(iter));
-        CPPUNIT_ASSERT(!BBoxFilter::create(*leafIter, data2).valid(iter));
-        CPPUNIT_ASSERT(BBoxFilter::create(*leafIter, data3).valid(iter));
-        CPPUNIT_ASSERT(!BBoxFilter::create(*leafIter, data4).valid(iter));
+        filter1.reset(*leafIter);
+        CPPUNIT_ASSERT(!filter1.valid(iter));
+        filter2.reset(*leafIter);
+        CPPUNIT_ASSERT(!filter2.valid(iter));
+        filter3.reset(*leafIter);
+        CPPUNIT_ASSERT(filter3.valid(iter));
+        filter4.reset(*leafIter);
+        CPPUNIT_ASSERT(!filter4.valid(iter));
 
         ++iter;
         CPPUNIT_ASSERT(!iter);
@@ -810,14 +878,42 @@ TestIndexFilter::testBBoxFilter()
 }
 
 
+struct NeedsInitializeFilter
+{
+    NeedsInitializeFilter() : mInitialized(false) { }
+    inline bool initialized() const { return mInitialized; }
+    template <typename LeafT>
+    void reset(const LeafT&) { mInitialized = true; }
+private:
+    bool mInitialized;
+};
+
+
 void
 TestIndexFilter::testBinaryFilter()
 {
+    { // construction, copy construction
+        typedef BinaryFilter<NeedsInitializeFilter, NeedsInitializeFilter, /*And=*/true> InitializeBinaryFilter;
+
+        NeedsInitializeFilter needs1;
+        NeedsInitializeFilter needs2;
+        InitializeBinaryFilter filter(needs1, needs2);
+        CPPUNIT_ASSERT(!filter.initialized());
+        InitializeBinaryFilter filter2 = filter;
+        CPPUNIT_ASSERT(!filter2.initialized());
+
+        filter.reset(OriginLeaf(Coord(0, 0, 0)));
+        CPPUNIT_ASSERT(filter.initialized());
+        InitializeBinaryFilter filter3 = filter;
+        CPPUNIT_ASSERT(filter3.initialized());
+    }
+
     typedef ThresholdFilter<true> LessThanFilter;
     typedef ThresholdFilter<false> GreaterThanFilter;
 
     { // less than
-        LessThanFilter filter = LessThanFilter::create(OriginLeaf(Coord(0, 0, 0)), LessThanFilter::Data(5));
+        LessThanFilter filter(5);
+        filter.reset(OriginLeaf(Coord(0, 0, 0)));
         std::vector<int> values;
 
         for (SimpleIter iter; *iter < 100; ++iter) {
@@ -832,7 +928,8 @@ TestIndexFilter::testBinaryFilter()
     }
 
     { // greater than
-        GreaterThanFilter filter = GreaterThanFilter::create(OriginLeaf(Coord(0, 0, 0)), GreaterThanFilter::Data(94));
+        GreaterThanFilter filter(94);
+        filter.reset(OriginLeaf(Coord(0, 0, 0)));
         std::vector<int> values;
 
         for (SimpleIter iter; *iter < 100; ++iter) {
@@ -850,8 +947,9 @@ TestIndexFilter::testBinaryFilter()
     { // binary and
         typedef BinaryFilter<LessThanFilter, GreaterThanFilter, /*And=*/true> RangeFilter;
 
-        RangeFilter::Data data(LessThanFilter::Data(55), GreaterThanFilter::Data(45));
-        RangeFilter filter = RangeFilter::create(OriginLeaf(Coord(0, 0, 0)), data);
+        RangeFilter filter(LessThanFilter(55), GreaterThanFilter(45));
+
+        filter.reset(OriginLeaf(Coord(0, 0, 0)));
 
         std::vector<int> values;
 
@@ -870,8 +968,8 @@ TestIndexFilter::testBinaryFilter()
     { // binary or
         typedef BinaryFilter<LessThanFilter, GreaterThanFilter, /*And=*/false> HeadTailFilter;
 
-        HeadTailFilter::Data data(LessThanFilter::Data(5), GreaterThanFilter::Data(95));
-        HeadTailFilter filter = HeadTailFilter::create(OriginLeaf(Coord(0, 0, 0)), data);
+        HeadTailFilter filter(LessThanFilter(5), GreaterThanFilter(95));
+        filter.reset(OriginLeaf(Coord(0, 0, 0)));
 
         std::vector<int> values;
 

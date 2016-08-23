@@ -299,8 +299,6 @@ public:
     /// @brief Retrieve the attribute array flags
     uint16_t flags() const { return mFlags; }
 
-    IndexIter beginIndex() const;
-
     /// Read attribute metadata and buffers from a stream.
     virtual void read(std::istream&) = 0;
     /// Write attribute metadata and buffers to a stream.
@@ -623,6 +621,7 @@ class AttributeHandle
 public:
     typedef AttributeHandle<ValueType, CodecType, Strided, Interleaved>     Handle;
     typedef boost::shared_ptr<Handle>                                       Ptr;
+    typedef boost::scoped_ptr<Handle>                                       ScopedPtr;
 
 protected:
     typedef ValueType (*GetterPtr)(const AttributeArray* array, const Index n);
@@ -686,6 +685,7 @@ class AttributeWriteHandle : public AttributeHandle<ValueType, CodecType, Stride
 public:
     typedef AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>    Handle;
     typedef boost::shared_ptr<Handle>                                           Ptr;
+    typedef boost::scoped_ptr<Handle>                                           ScopedPtr;
 
     static Ptr create(AttributeArray& array, const bool expand = true);
 

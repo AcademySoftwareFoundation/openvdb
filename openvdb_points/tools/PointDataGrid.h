@@ -453,6 +453,10 @@ protected:
     friend class tree::IteratorBase<MaskDenseIterator, PointDataLeafNode>;
 
 public:
+    /// @brief Leaf value voxel iterator
+    ValueVoxelCIter beginValueVoxel(const Coord& ijk) const;
+
+public:
 
     typedef typename BaseLeaf::template ValueIter<
         MaskOnIterator, PointDataLeafNode, const ValueType, ValueOn> ValueOnIter;
@@ -479,19 +483,33 @@ public:
     typedef typename BaseLeaf::template DenseIter<
         const PointDataLeafNode, const ValueType, ChildAll> ChildAllCIter;
 
-    typedef openvdb::tools::IndexIter IndexIter;
-    typedef ValueIndexIter<ValueAllCIter> IndexAllIter;
-    typedef ValueIndexIter<ValueOnCIter> IndexOnIter;
-    typedef ValueIndexIter<ValueOffCIter> IndexOffIter;
+    typedef IndexIter<ValueVoxelCIter, NullFilter>    IndexVoxelIter;
+    typedef IndexIter<ValueAllCIter, NullFilter>      IndexAllIter;
+    typedef IndexIter<ValueOnCIter, NullFilter>       IndexOnIter;
+    typedef IndexIter<ValueOffCIter, NullFilter>      IndexOffIter;
 
     /// @brief Leaf index iterator
-    IndexIter beginIndex() const;
     IndexAllIter beginIndexAll() const;
     IndexOnIter beginIndexOn() const;
     IndexOffIter beginIndexOff() const;
+
+    template<typename IterT, typename FilterT>
+    IndexIter<IterT, FilterT> beginIndex(const FilterT& filter) const;
+
+    /// @brief Filtered leaf index iterator
+    template<typename FilterT>
+    IndexIter<ValueAllCIter, FilterT> beginIndexAll(const FilterT& filter) const;
+    template<typename FilterT>
+    IndexIter<ValueOnCIter, FilterT> beginIndexOn(const FilterT& filter) const;
+    template<typename FilterT>
+    IndexIter<ValueOffCIter, FilterT> beginIndexOff(const FilterT& filter) const;
+
     /// @brief Leaf index iterator from voxel
-    IndexIter beginIndex(const unsigned index) const;
-    IndexIter beginIndex(const Coord& ijk) const;
+    IndexVoxelIter beginIndexVoxel(const Coord& ijk) const;
+
+    /// @brief Filtered leaf index iterator from voxel
+    template<typename FilterT>
+    IndexIter<ValueVoxelCIter, FilterT> beginIndexVoxel(const Coord& ijk) const;
 
 #define VMASK_ this->getValueMask()
     ValueOnCIter  cbeginValueOn() const  { return ValueOnCIter(VMASK_.beginOn(), this); }
@@ -769,60 +787,94 @@ PointDataLeafNode<T, Log2Dim>::groupWriteHandle(const Name& name)
 }
 
 template<typename T, Index Log2Dim>
-inline IndexIter
-PointDataLeafNode<T, Log2Dim>::beginIndex() const
+template<typename ValueIterT, typename FilterT>
+inline IndexIter<ValueIterT, FilterT>
+PointDataLeafNode<T, Log2Dim>::beginIndex(const FilterT& filter) const
 {
-    const ValueType start = 0;
-    const ValueType end = this->getValue(NUM_VOXELS - 1);
-    return IndexIter(start, end);
+    typedef tree::IterTraits<LeafNodeType, ValueIterT> IterTraitsT;
+
+    // construct the value iterator and reset the filter to use this leaf
+
+    ValueIterT valueIter = IterTraitsT::begin(*this);
+    FilterT newFilter(filter);
+    newFilter.reset(*this);
+
+    return IndexIter<ValueIterT, FilterT>(valueIter, newFilter);
 }
 
 template<typename T, Index Log2Dim>
-inline typename PointDataLeafNode<T, Log2Dim>::IndexAllIter
+template<typename FilterT>
+inline IndexIter<typename PointDataLeafNode<T, Log2Dim>::ValueAllCIter, FilterT>
+PointDataLeafNode<T, Log2Dim>::beginIndexAll(const FilterT& filter) const
+{
+    return this->beginIndex<ValueAllCIter, FilterT>(filter);
+}
+
+template<typename T, Index Log2Dim>
+template<typename FilterT>
+inline IndexIter<typename PointDataLeafNode<T, Log2Dim>::ValueOnCIter, FilterT>
+PointDataLeafNode<T, Log2Dim>::beginIndexOn(const FilterT& filter) const
+{
+    return this->beginIndex<ValueOnCIter, FilterT>(filter);
+}
+
+template<typename T, Index Log2Dim>
+template<typename FilterT>
+inline IndexIter<typename PointDataLeafNode<T, Log2Dim>::ValueOffCIter, FilterT>
+PointDataLeafNode<T, Log2Dim>::beginIndexOff(const FilterT& filter) const
+{
+    return this->beginIndex<ValueOffCIter, FilterT>(filter);
+}
+
+template<typename T, Index Log2Dim>
+inline IndexIter<typename PointDataLeafNode<T, Log2Dim>::ValueAllCIter, NullFilter>
 PointDataLeafNode<T, Log2Dim>::beginIndexAll() const
 {
-    ValueAllCIter iter = this->cbeginValueAll();
-    return IndexAllIter(iter);
+    NullFilter filter;
+    return this->beginIndex<ValueAllCIter, NullFilter>(filter);
 }
 
 template<typename T, Index Log2Dim>
 inline typename PointDataLeafNode<T, Log2Dim>::IndexOnIter
 PointDataLeafNode<T, Log2Dim>::beginIndexOn() const
 {
-    ValueOnCIter iter = this->cbeginValueOn();
-    return IndexOnIter(iter);
+    NullFilter filter;
+    return this->beginIndex<ValueOnCIter, NullFilter>(filter);
 }
 
 template<typename T, Index Log2Dim>
 inline typename PointDataLeafNode<T, Log2Dim>::IndexOffIter
 PointDataLeafNode<T, Log2Dim>::beginIndexOff() const
 {
-    ValueOffCIter iter = this->cbeginValueOff();
-    return IndexOffIter(iter);
+    NullFilter filter;
+    return this->beginIndex<ValueOffCIter, NullFilter>(filter);
 }
 
 template<typename T, Index Log2Dim>
-inline IndexIter
-PointDataLeafNode<T, Log2Dim>::beginIndex(const unsigned index) const
+inline ValueVoxelCIter
+PointDataLeafNode<T, Log2Dim>::beginValueVoxel(const Coord& ijk) const
 {
+    const Index index = LeafNodeType::coordToOffset(ijk);
     assert(index < BaseLeaf::SIZE);
     const ValueType end = this->getValue(index);
     const ValueType start = (index == 0) ? ValueType(0) : this->getValue(index - 1);
-    return IndexIter(start, end);
+    return ValueVoxelCIter(start, end);
 }
 
 template<typename T, Index Log2Dim>
-inline IndexIter
-PointDataLeafNode<T, Log2Dim>::beginIndex(const Coord& ijk) const
+inline typename PointDataLeafNode<T, Log2Dim>::IndexVoxelIter
+PointDataLeafNode<T, Log2Dim>::beginIndexVoxel(const Coord& ijk) const
 {
-    return this->beginIndex(LeafNodeType::coordToOffset(ijk));
+    ValueVoxelCIter iter = this->beginValueVoxel(ijk);
+
+    return IndexVoxelIter(iter, NullFilter());
 }
 
 template<typename T, Index Log2Dim>
 inline Index64
 PointDataLeafNode<T, Log2Dim>::pointCount() const
 {
-    return iterCount(this->beginIndex());
+    return iterCount(this->beginIndexAll());
 }
 
 template<typename T, Index Log2Dim>
@@ -847,10 +899,8 @@ template<typename T, Index Log2Dim>
 inline Index64
 PointDataLeafNode<T, Log2Dim>::groupPointCount(const Name& groupName) const
 {
-    IndexIter indexIter = this->beginIndex();
-    GroupFilter filter(GroupFilter::create(*this, GroupFilter::Data(groupName)));
-    FilterIndexIter<IndexIter, GroupFilter> filterIndexIter(indexIter, filter);
-    return iterCount(filterIndexIter);
+    GroupFilter filter(groupName);
+    return iterCount(this->beginIndexAll(filter));
 }
 
 template<typename T, Index Log2Dim>
