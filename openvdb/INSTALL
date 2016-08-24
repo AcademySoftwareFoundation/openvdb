@@ -25,7 +25,7 @@ Other compilers or versions might work but have not been tested.
 
 Optional:
 
-- Doxygen 1.8.7 (www.stack.nl/~dimitri/doxygen/), for documentation
+- Doxygen 1.8.8 (www.stack.nl/~dimitri/doxygen/), for documentation
 
 - CppUnit (www.freedesktop.org/wiki/Software/cppunit), version 1.10 or later
   (Linux: yum install cppunit-devel)
