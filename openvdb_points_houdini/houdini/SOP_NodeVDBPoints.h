@@ -288,7 +288,7 @@ public:
                 // if no value compression, hide the codec from the middle-click output
 
                 if (codecType == "null") {
-                    infoStr << it->first << "[" << valueType << "]";
+                    infoStr << valueType;
                 }
                 else if (isString(array)) {
                     infoStr << "str";
