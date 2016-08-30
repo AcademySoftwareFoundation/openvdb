@@ -471,7 +471,7 @@ TestIndexFilter::testAttributeHashFilter()
     const float voxelSize(1.0);
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
 
-    PointDataGrid::Ptr grid = createPointDataGrid<PointDataGrid>(positions, AttributeVec3s::attributeType(), *transform);
+    PointDataGrid::Ptr grid = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
     PointDataTree& tree = grid->tree();
 
     // four points, two leafs
@@ -625,7 +625,7 @@ TestIndexFilter::testLevelSetFilter()
         const double voxelSize(1.0);
         math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
 
-        points = createPointDataGrid<PointDataGrid>(positions, AttributeVec3s::attributeType(), *transform);
+        points = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
     }
 
     // create a sphere levelset
@@ -732,7 +732,7 @@ TestIndexFilter::testLevelSetFilter()
         const double voxelSize(0.25);
         math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
 
-        points = createPointDataGrid<PointDataGrid>(positions, AttributeVec3s::attributeType(), *transform);
+        points = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
     }
 
     {
@@ -795,7 +795,7 @@ TestIndexFilter::testBBoxFilter()
     const float voxelSize(0.5);
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
 
-    PointDataGrid::Ptr grid = createPointDataGrid<PointDataGrid>(positions, AttributeVec3s::attributeType(), *transform);
+    PointDataGrid::Ptr grid = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
     PointDataTree& tree = grid->tree();
 
     // check one leaf per point

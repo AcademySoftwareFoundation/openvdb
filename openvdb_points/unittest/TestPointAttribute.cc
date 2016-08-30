@@ -67,7 +67,6 @@ CPPUNIT_TEST_SUITE_REGISTRATION(TestPointAttribute);
 void
 TestPointAttribute::testAppendDrop()
 {
-    typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
     typedef TypedAttributeArray<float>   AttributeF;
     typedef TypedAttributeArray<int>     AttributeI;
 
@@ -80,7 +79,7 @@ TestPointAttribute::testAppendDrop()
     const float voxelSize(1.0);
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
 
-    PointDataGrid::Ptr grid = createPointDataGrid<PointDataGrid>(positions, AttributeVec3s::attributeType(), *transform);
+    PointDataGrid::Ptr grid = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
     PointDataTree& tree = grid->tree();
 
     // check one leaf per point
@@ -327,7 +326,6 @@ TestPointAttribute::testAppendDrop()
 void
 TestPointAttribute::testRename()
 {
-    typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
     typedef TypedAttributeArray<float>   AttributeF;
     typedef TypedAttributeArray<int>     AttributeI;
 
@@ -340,7 +338,7 @@ TestPointAttribute::testRename()
     const float voxelSize(1.0);
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
 
-    PointDataGrid::Ptr grid = createPointDataGrid<PointDataGrid>(positions, AttributeVec3s::attributeType(), *transform);
+    PointDataGrid::Ptr grid = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
     PointDataTree& tree = grid->tree();
 
     // check one leaf per point
@@ -413,7 +411,6 @@ TestPointAttribute::testRename()
 void
 TestPointAttribute::testBloscCompress()
 {
-    typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
     typedef TypedAttributeArray<int>     AttributeI;
 
     std::vector<Vec3s> positions;
@@ -427,7 +424,7 @@ TestPointAttribute::testBloscCompress()
     const float voxelSize(1.0);
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
 
-    PointDataGrid::Ptr grid = createPointDataGrid<PointDataGrid>(positions, AttributeVec3s::attributeType(), *transform);
+    PointDataGrid::Ptr grid = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
     PointDataTree& tree = grid->tree();
 
     // check two leaves

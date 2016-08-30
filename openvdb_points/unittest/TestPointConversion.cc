@@ -263,8 +263,7 @@ TestPointConversion::testPointConversion()
     openvdb::math::Transform::Ptr transform(openvdb::math::Transform::createLinearTransform(voxelSize));
 
     PointIndexGrid::Ptr pointIndexGrid = createPointIndexGrid<PointIndexGrid>(position, *transform);
-    PointDataGrid::Ptr pointDataGrid = createPointDataGrid<PointDataGrid>(*pointIndexGrid, position,
-                                            AttributeVec3s::attributeType(), *transform);
+    PointDataGrid::Ptr pointDataGrid = createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid, position, *transform);
 
     PointIndexTree& indexTree = pointIndexGrid->tree();
     PointDataTree& tree = pointDataGrid->tree();
@@ -474,8 +473,7 @@ TestPointConversion::testStride()
     openvdb::math::Transform::Ptr transform(openvdb::math::Transform::createLinearTransform(voxelSize));
 
     PointIndexGrid::Ptr pointIndexGrid = createPointIndexGrid<PointIndexGrid>(position, *transform);
-    PointDataGrid::Ptr pointDataGrid = createPointDataGrid<PointDataGrid>(*pointIndexGrid, position,
-                                            AttributeVec3s::attributeType(), *transform);
+    PointDataGrid::Ptr pointDataGrid = createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid, position, *transform);
 
     PointIndexTree& indexTree = pointIndexGrid->tree();
     PointDataTree& tree = pointDataGrid->tree();
