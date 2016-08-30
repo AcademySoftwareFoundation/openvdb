@@ -133,12 +133,13 @@ attrStringTypeFromGAAttribute(GA_Attribute const * attribute)
     throw std::runtime_error(ss.str());
 }
 
-template <typename AttributeType>
+template <typename AttributeType, bool Strided>
 void
 convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree, const openvdb::Name& name,
-                            const GA_Attribute* const attribute, const GA_Defaults& defaults, const Index stride)
+                            const GA_Attribute* const attribute, const GA_Defaults& defaults, const Index stride = 1)
 {
     typedef typename AttributeType::ValueType ValueType;
+    typedef hvdbp::HoudiniReadAttribute<ValueType> HoudiniAttribute;
 
     ValueType value = hvdb::evalAttrDefault<ValueType>(defaults, 0);
 
@@ -150,8 +151,15 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
 
     appendAttribute<AttributeType, PointDataTree>(tree, name, stride, zeroVal<typename AttributeType::ValueType>(), defaultValue);
 
-    hvdbp::HoudiniReadAttribute<ValueType> houdiniAttribute(*attribute);
-    populateAttribute(tree, indexTree, name, houdiniAttribute, stride);
+    HoudiniAttribute houdiniAttribute(*attribute);
+    if (Strided) {
+        assert(stride > 1);
+        populateAttribute<PointDataTree, PointIndexTree, HoudiniAttribute, true>(tree, indexTree, name, houdiniAttribute, stride);
+    }
+    else {
+        assert(stride == 1);
+        populateAttribute<PointDataTree, PointIndexTree, HoudiniAttribute, false>(tree, indexTree, name, houdiniAttribute);
+    }
 }
 
 void
@@ -163,12 +171,14 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
         throw std::runtime_error(ss.str());
     }
 
+    typedef hvdbp::HoudiniReadAttribute<openvdb::Name> HoudiniStringAttribute;
+
     // explicitly handle string attributes
 
     if (attribute->getAIFStringTuple()) {
         appendAttribute<StringAttributeArray, PointDataTree>(tree, name);
-        hvdbp::HoudiniReadAttribute<openvdb::Name> houdiniAttribute(*attribute);
-        populateAttribute(tree, indexTree, name, houdiniAttribute);
+        HoudiniStringAttribute houdiniAttribute(*attribute);
+        populateAttribute<PointDataTree, PointIndexTree, HoudiniStringAttribute, false>(tree, indexTree, name, houdiniAttribute);
         return;
     }
 
@@ -185,36 +195,36 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
     if (width == 1)
     {
         if (storage == GA_STORE_BOOL) {
-            convertAttributeFromHoudini<TypedAttributeArray<bool> >(tree, indexTree, name, attribute, defaults, compression);
+            convertAttributeFromHoudini<TypedAttributeArray<bool>, false>(tree, indexTree, name, attribute, defaults);
         }
         else if (storage == GA_STORE_INT16) {
-            convertAttributeFromHoudini<TypedAttributeArray<int16_t> >(tree, indexTree, name, attribute, defaults, compression);
+            convertAttributeFromHoudini<TypedAttributeArray<int16_t>, false>(tree, indexTree, name, attribute, defaults);
         }
         else if (storage == GA_STORE_INT32) {
-            convertAttributeFromHoudini<TypedAttributeArray<int32_t> >(tree, indexTree, name, attribute, defaults, compression);
+            convertAttributeFromHoudini<TypedAttributeArray<int32_t>, false>(tree, indexTree, name, attribute, defaults);
         }
         else if (storage == GA_STORE_INT64) {
-            convertAttributeFromHoudini<TypedAttributeArray<int64_t> >(tree, indexTree, name, attribute, defaults, compression);
+            convertAttributeFromHoudini<TypedAttributeArray<int64_t>, false>(tree, indexTree, name, attribute, defaults);
         }
         else if (storage == GA_STORE_REAL16)
         {
             // implicitly convert 16-bit float into truncated 32-bit float
 
             convertAttributeFromHoudini<TypedAttributeArray<float,
-                                        TruncateCodec> >(tree, indexTree, name, attribute, defaults, compression);
+                                        TruncateCodec>, false>(tree, indexTree, name, attribute, defaults);
         }
         else if (storage == GA_STORE_REAL32)
         {
             if (compression == NONE) {
-                convertAttributeFromHoudini<TypedAttributeArray<float> >(tree, indexTree, name, attribute, defaults, compression);
+                convertAttributeFromHoudini<TypedAttributeArray<float>, false>(tree, indexTree, name, attribute, defaults);
             }
             else if (compression == TRUNCATE) {
                 convertAttributeFromHoudini<TypedAttributeArray<float,
-                                            TruncateCodec> >(tree, indexTree, name, attribute, defaults, compression);
+                                            TruncateCodec>, false>(tree, indexTree, name, attribute, defaults);
             }
         }
         else if (storage == GA_STORE_REAL64) {
-            convertAttributeFromHoudini<TypedAttributeArray<double> >(tree, indexTree, name, attribute, defaults, compression);
+            convertAttributeFromHoudini<TypedAttributeArray<double>, false>(tree, indexTree, name, attribute, defaults);
         }
     }
     else if (width == 3 || width == 4)
@@ -222,75 +232,58 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
         // note: process 4-component vectors as 3-component vectors for now
 
         if (storage == GA_STORE_INT32) {
-            convertAttributeFromHoudini<TypedAttributeArray<Vec3<int> > >(tree, indexTree, name, attribute, defaults, compression);
+            convertAttributeFromHoudini<TypedAttributeArray<Vec3<int> >, false>(tree, indexTree, name, attribute, defaults);
         }
         else if (storage == GA_STORE_REAL16)
         {
             // implicitly convert 16-bit float into truncated 32-bit float
 
             convertAttributeFromHoudini<TypedAttributeArray<Vec3<float>,
-                                        TruncateCodec> >(tree, indexTree, name, attribute, defaults, compression);
+                                        TruncateCodec>, false>(tree, indexTree, name, attribute, defaults);
         }
         else if (storage == GA_STORE_REAL32)
         {
             if (compression == NONE) {
-                convertAttributeFromHoudini<TypedAttributeArray<Vec3<float> > >(tree, indexTree, name, attribute, defaults, compression);
+                convertAttributeFromHoudini<TypedAttributeArray<Vec3<float> >, false>(tree, indexTree, name, attribute, defaults);
             }
             else if (compression == TRUNCATE) {
                 convertAttributeFromHoudini<TypedAttributeArray<Vec3<float>,
-                                            TruncateCodec> >(tree, indexTree, name, attribute, defaults, compression);
+                                            TruncateCodec>, false>(tree, indexTree, name, attribute, defaults);
             }
             else if (compression == UNIT_VECTOR) {
                 convertAttributeFromHoudini<TypedAttributeArray<Vec3<float>,
-                                            UnitVecCodec> >(tree, indexTree, name, attribute, defaults, compression);
+                                            UnitVecCodec>, false>(tree, indexTree, name, attribute, defaults);
             }
         }
         else if (storage == GA_STORE_REAL64) {
-            convertAttributeFromHoudini<TypedAttributeArray<Vec3<double> > >(tree, indexTree, name, attribute, defaults, compression);
+            convertAttributeFromHoudini<TypedAttributeArray<Vec3<double> >, false>(tree, indexTree, name, attribute, defaults);
         }
     }
-    else if (width == 3 && storage == GA_STORE_REAL16) {
-        convertAttributeFromHoudini<TypedAttributeArray<Vec3<half> > >(tree, indexTree, name, attribute, defaults, 1);
-    }
-    else if (width == 3 && storage == GA_STORE_REAL32 && compression == NONE) {
-        convertAttributeFromHoudini<TypedAttributeArray<Vec3<float> > >(tree, indexTree, name, attribute, defaults, 1);
-    }
-    else if (width == 3 && storage == GA_STORE_REAL32 && compression == TRUNCATE) {
-        convertAttributeFromHoudini<TypedAttributeArray<Vec3<float>,
-                                    TruncateCodec> >(tree, indexTree, name, attribute, defaults, 1);
-    }
-    else if (width == 3 && storage == GA_STORE_REAL32 && compression == UNIT_VECTOR) {
-        convertAttributeFromHoudini<TypedAttributeArray<Vec3<float>,
-                                    UnitVecCodec> >(tree, indexTree, name, attribute, defaults, 1);
-    }
-    else if (width == 3 && storage == GA_STORE_REAL64) {
-        convertAttributeFromHoudini<TypedAttributeArray<Vec3<double> > >(tree, indexTree, name, attribute, defaults, 1);
-    }
     else if (storage == GA_STORE_BOOL) {
-        convertAttributeFromHoudini<TypedAttributeArray<bool> >(tree, indexTree, name, attribute, defaults, width);
+        convertAttributeFromHoudini<TypedAttributeArray<bool>, true>(tree, indexTree, name, attribute, defaults, width);
     }
     else if (storage == GA_STORE_INT16) {
-        convertAttributeFromHoudini<TypedAttributeArray<int16_t> >(tree, indexTree, name, attribute, defaults, width);
+        convertAttributeFromHoudini<TypedAttributeArray<int16_t>, true>(tree, indexTree, name, attribute, defaults, width);
     }
     else if (storage == GA_STORE_INT32) {
-        convertAttributeFromHoudini<TypedAttributeArray<int32_t> >(tree, indexTree, name, attribute, defaults, width);
+        convertAttributeFromHoudini<TypedAttributeArray<int32_t>, true>(tree, indexTree, name, attribute, defaults, width);
     }
     else if (storage == GA_STORE_INT64) {
-        convertAttributeFromHoudini<TypedAttributeArray<int64_t> >(tree, indexTree, name, attribute, defaults, width);
+        convertAttributeFromHoudini<TypedAttributeArray<int64_t>, true>(tree, indexTree, name, attribute, defaults, width);
     }
     else if (storage == GA_STORE_REAL16) {
         convertAttributeFromHoudini<TypedAttributeArray<float,
-                                    TruncateCodec> >(tree, indexTree, name, attribute, defaults, width);
+                                    TruncateCodec>, true>(tree, indexTree, name, attribute, defaults, width);
     }
     else if (storage == GA_STORE_REAL32 && compression == NONE) {
-        convertAttributeFromHoudini<TypedAttributeArray<float> >(tree, indexTree, name, attribute, defaults, width);
+        convertAttributeFromHoudini<TypedAttributeArray<float>, true>(tree, indexTree, name, attribute, defaults, width);
     }
     else if (storage == GA_STORE_REAL32 && compression == TRUNCATE) {
         convertAttributeFromHoudini<TypedAttributeArray<float,
-                                    TruncateCodec> >(tree, indexTree, name, attribute, defaults, width);
+                                    TruncateCodec>, true>(tree, indexTree, name, attribute, defaults, width);
     }
     else if (storage == GA_STORE_REAL64) {
-        convertAttributeFromHoudini<TypedAttributeArray<double> >(tree, indexTree, name, attribute, defaults, width);
+        convertAttributeFromHoudini<TypedAttributeArray<double>, true>(tree, indexTree, name, attribute, defaults, width);
     }
     else {
         std::stringstream ss; ss << "Unknown attribute type - " << name;
@@ -327,6 +320,8 @@ PointDataGrid::Ptr
 createPointDataGrid(const GU_Detail& ptGeo, const openvdb::NamePair& positionAttributeType,
                     const AttributeInfoVec& attributes, const openvdb::math::Transform& transform)
 {
+    typedef hvdbp::HoudiniReadAttribute<openvdb::Vec3d> HoudiniPositionAttribute;
+
     // store point group information
 
     const GA_ElementGroupTable& elementGroups = ptGeo.getElementGroupTable(GA_ATTRIB_POINT);
@@ -336,7 +331,7 @@ createPointDataGrid(const GU_Detail& ptGeo, const openvdb::NamePair& positionAtt
     const GA_Attribute& positionAttribute = *ptGeo.getP();
 
     hvdbp::OffsetListPtr offsets;
-    hvdbp::HoudiniReadAttribute<openvdb::Vec3d> points(positionAttribute, offsets);
+    HoudiniPositionAttribute points(positionAttribute, offsets);
 
     // Create PointIndexGrid used for consistent index ordering in all attribute conversion
 

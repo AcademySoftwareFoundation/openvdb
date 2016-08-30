@@ -108,7 +108,7 @@ createPointDataGrid(const std::vector<ValueT>& positions,
 /// @note   A @c PointIndexGrid to the points must be supplied to perform this
 ///         operation. This is required to ensure the same point index ordering.
 
-template <typename PointDataTreeT, typename PointIndexTreeT, typename PointArrayT>
+template <typename PointDataTreeT, typename PointIndexTreeT, typename PointArrayT, bool Strided>
 inline void
 populateAttribute(  PointDataTreeT& tree, const PointIndexTreeT& pointIndexTree,
                     const openvdb::Name& attributeName, const PointArrayT& data,
@@ -803,7 +803,7 @@ createPointDataGrid(const std::vector<ValueT>& positions,
 ////////////////////////////////////////
 
 
-template <typename PointDataTreeT, typename PointIndexTreeT, typename PointArrayT>
+template <typename PointDataTreeT, typename PointIndexTreeT, typename PointArrayT, bool Strided>
 inline void
 populateAttribute(  PointDataTreeT& tree, const PointIndexTreeT& pointIndexTree,
                     const openvdb::Name& attributeName, const PointArrayT& data, const Index stride)
@@ -824,17 +824,18 @@ populateAttribute(  PointDataTreeT& tree, const PointIndexTreeT& pointIndexTree,
 
     typename tree::template LeafManager<PointDataTreeT> leafManager(tree);
 
-    if (stride == 1) {
+    if (Strided) {
         PopulateAttributeOp<PointDataTreeT,
                             PointIndexTreeT,
-                            PointArrayT> populate(pointIndexTree, data, index);
+                            PointArrayT,
+                            /*stride=*/true> populate(pointIndexTree, data, index, stride);
         tbb::parallel_for(leafManager.leafRange(), populate);
     }
     else {
         PopulateAttributeOp<PointDataTreeT,
                             PointIndexTreeT,
                             PointArrayT,
-                            /*stride=*/true> populate(pointIndexTree, data, index, stride);
+                            /*stride=*/false> populate(pointIndexTree, data, index, stride);
         tbb::parallel_for(leafManager.leafRange(), populate);
     }
 }
