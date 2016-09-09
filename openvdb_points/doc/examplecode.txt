@@ -123,12 +123,8 @@ int main()
     // Introduce a typedef for our position attribute (note no compression codec here)
     typedef TypedAttributeArray<openvdb::Vec3f> PositionAttribute;
 
-    // Create a list of names and attribute types (in this case, just position)
-    AttributeSet::Descriptor::NameAndTypeVec attributes;
-    attributes.push_back(AttributeSet::Descriptor::NameAndType("P", PositionAttribute::attributeType()));
-
-    // Create an AttributeSet Descriptor for this list
-    AttributeSet::Descriptor::Ptr descriptor = AttributeSet::Descriptor::create(attributes);
+    // Create an AttributeSet Descriptor with the position type
+    AttributeSet::Descriptor::Ptr descriptor = AttributeSet::Descriptor::create(PositionAttribute::attributeType());
 
     // Touch a leaf at the origin to create it and confirm just one leaf
     PointDataTree::LeafNodeType* leaf = grid->tree().touchLeaf(openvdb::Coord(0, 0, 0));
@@ -174,8 +170,8 @@ int main()
     // Retrieve the grid transform
     const openvdb::math::Transform& transform = grid->transform();
 
-    // Create an IndexIter for accessing the co-ordinate (4, 0, 0)
-    IndexIter indexIter = leaf->beginIndex(ijk);
+    // Create an IndexVoxelIter for accessing the co-ordinate (4, 0, 0)
+    PointDataTree::LeafNodeType::IndexVoxelIter indexIter = leaf->beginIndexVoxel(ijk);
 
     // Iterate over all the points in the (4, 0, 0) voxel
     for (; indexIter; ++indexIter) {
@@ -272,9 +268,7 @@ int main()
     std::cout << "Adding pscale attribute" << std::endl;
 
     // Add a new pscale attribute
-    AttributeSet::Util::NameAndType pscaleAttribute("pscale", TypedAttributeArray<float>::attributeType());
-
-    appendAttribute(pointDataGrid->tree(), pscaleAttribute);
+    appendAttribute<TypedAttributeArray<float> >(pointDataGrid->tree(), "pscale");
 
     // Create some point pscale values
     std::vector<float> pscales;
@@ -286,7 +280,8 @@ int main()
     const PointAttributeVector<float> pscalesList(pscales);
 
     // Now populate the pscale attribute according to these values
-    populateAttribute(pointDataGrid->tree(), pointIndexGrid->tree(), "pscale", pscalesList);
+    populateAttribute<PointDataTree, PointIndexTree, PointAttributeVector<float>, false>(
+                    pointDataGrid->tree(), pointIndexGrid->tree(), "pscale", pscalesList);
 
     // Output the number of attributes stored in this leaf node
     std::cout << "Attributes: " << iter->attributeSet().descriptor().size() << std::endl;
