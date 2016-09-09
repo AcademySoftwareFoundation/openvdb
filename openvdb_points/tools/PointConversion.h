@@ -196,8 +196,10 @@ public:
     typedef ValueType PosType;
     typedef ValueType value_type;
 
-    PointAttributeVector(const std::vector<value_type>& data)
-        : mData(data) { }
+    PointAttributeVector(const std::vector<value_type>& data,
+                         const Index stride = 1)
+        : mData(data)
+        , mStride(stride) { }
 
     size_t size() const { return mData.size(); }
     void getPos(size_t n, ValueType& xyz) const { xyz = mData[n]; }
@@ -205,8 +207,12 @@ public:
     template <typename T>
     void get(T& value, size_t n) const { value = mData[n]; }
 
+    template <typename T>
+    void get(T& value, size_t n, openvdb::Index m) const { value = mData[n * mStride + m]; }
+
 private:
     const std::vector<value_type>& mData;
+    const Index mStride;
 }; // PointAttributeVector
 
 
@@ -824,20 +830,11 @@ populateAttribute(  PointDataTreeT& tree, const PointIndexTreeT& pointIndexTree,
 
     typename tree::template LeafManager<PointDataTreeT> leafManager(tree);
 
-    if (Strided) {
-        PopulateAttributeOp<PointDataTreeT,
-                            PointIndexTreeT,
-                            PointArrayT,
-                            /*stride=*/true> populate(pointIndexTree, data, index, stride);
-        tbb::parallel_for(leafManager.leafRange(), populate);
-    }
-    else {
-        PopulateAttributeOp<PointDataTreeT,
-                            PointIndexTreeT,
-                            PointArrayT,
-                            /*stride=*/false> populate(pointIndexTree, data, index, stride);
-        tbb::parallel_for(leafManager.leafRange(), populate);
-    }
+    PopulateAttributeOp<PointDataTreeT,
+                        PointIndexTreeT,
+                        PointArrayT,
+                        Strided> populate(pointIndexTree, data, index, stride);
+    tbb::parallel_for(leafManager.leafRange(), populate);
 }
 
 
