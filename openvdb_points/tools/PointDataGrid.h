@@ -458,6 +458,32 @@ public:
 
 public:
 
+#ifdef _MSC_VER
+    typedef typename BaseLeaf::ValueIter<
+        MaskOnIterator, PointDataLeafNode, const ValueType, ValueOn> ValueOnIter;
+    typedef typename BaseLeaf::ValueIter<
+        MaskOnIterator, const PointDataLeafNode, const ValueType, ValueOn> ValueOnCIter;
+    typedef typename BaseLeaf::ValueIter<
+        MaskOffIterator, PointDataLeafNode, const ValueType, ValueOff> ValueOffIter;
+    typedef typename BaseLeaf::ValueIter<
+        MaskOffIterator,const PointDataLeafNode,const ValueType,ValueOff> ValueOffCIter;
+    typedef typename BaseLeaf::ValueIter<
+        MaskDenseIterator, PointDataLeafNode, const ValueType, ValueAll> ValueAllIter;
+    typedef typename BaseLeaf::ValueIter<
+        MaskDenseIterator,const PointDataLeafNode,const ValueType,ValueAll> ValueAllCIter;
+    typedef typename BaseLeaf::ChildIter<
+        MaskOnIterator, PointDataLeafNode, ChildOn> ChildOnIter;
+    typedef typename BaseLeaf::ChildIter<
+        MaskOnIterator, const PointDataLeafNode, ChildOn> ChildOnCIter;
+    typedef typename BaseLeaf::ChildIter<
+        MaskOffIterator, PointDataLeafNode, ChildOff> ChildOffIter;
+    typedef typename BaseLeaf::ChildIter<
+        MaskOffIterator, const PointDataLeafNode, ChildOff> ChildOffCIter;
+    typedef typename BaseLeaf::DenseIter<
+        PointDataLeafNode, ValueType, ChildAll> ChildAllIter;
+    typedef typename BaseLeaf::DenseIter<
+        const PointDataLeafNode, const ValueType, ChildAll> ChildAllCIter;
+#else
     typedef typename BaseLeaf::template ValueIter<
         MaskOnIterator, PointDataLeafNode, const ValueType, ValueOn> ValueOnIter;
     typedef typename BaseLeaf::template ValueIter<
@@ -482,6 +508,7 @@ public:
         PointDataLeafNode, ValueType, ChildAll> ChildAllIter;
     typedef typename BaseLeaf::template DenseIter<
         const PointDataLeafNode, const ValueType, ChildAll> ChildAllCIter;
+#endif
 
     typedef IndexIter<ValueVoxelCIter, NullFilter>    IndexVoxelIter;
     typedef IndexIter<ValueAllCIter, NullFilter>      IndexAllIter;
