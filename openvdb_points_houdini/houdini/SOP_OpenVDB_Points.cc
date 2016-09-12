@@ -50,6 +50,17 @@
 
 #include <openvdb_houdini/AttributeTransferUtil.h>
 
+#if (UT_MAJOR_VERSION_INT >= 15)
+    #include <GU/GU_PackedContext.h>
+#endif
+
+#if (UT_MAJOR_VERSION_INT >= 14)
+    #include <GU/GU_PrimPacked.h>
+    #include <GU/GU_PackedGeometry.h>
+    #include <GU/GU_PackedFragment.h>
+    #include <GU/GU_DetailHandle.h>
+#endif
+
 #include <CH/CH_Manager.h>
 #include <GA/GA_Types.h> // for GA_ATTRIB_POINT
 #include <SYS/SYS_Types.h> // for int32, float32, etc
@@ -68,26 +79,8 @@ enum COMPRESSION_TYPE
 {
     NONE = 0,
     TRUNCATE,
-    UNIT_VECTOR,
-    FIXED_POSITION_16,
-    FIXED_POSITION_8
+    UNIT_VECTOR
 };
-
-/// @brief Translate the type of a GA_Attribute into a position Attribute Type
-inline NamePair
-positionAttrTypeFromCompression(const int compression)
-{
-    if (compression > 0 && compression + FIXED_POSITION_16 - 1 == FIXED_POSITION_16) {
-        return TypedAttributeArray<Vec3<float>, FixedPointCodec<false> >::attributeType();
-    }
-    else if (compression > 0 && compression + FIXED_POSITION_16 - 1 == FIXED_POSITION_8) {
-        return TypedAttributeArray<Vec3<float>, FixedPointCodec<true> >::attributeType();
-    }
-
-    // compression == NONE
-
-    return TypedAttributeArray<Vec3<float> >::attributeType();
-}
 
 inline Name
 attrStringTypeFromGAAttribute(GA_Attribute const * attribute)
@@ -111,7 +104,15 @@ attrStringTypeFromGAAttribute(GA_Attribute const * attribute)
 
     const int16_t width = static_cast<int16_t>(tupleAIF->getTupleSize(attribute));
 
-    if (width == 1)
+    if (width == 3 || width == 4)
+    {
+        // note: process 4-component vectors as 3-component vectors for now
+
+        if (storage == GA_STORE_INT32)          return "vec3i";
+        else if (storage == GA_STORE_REAL32)    return "vec3s";
+        else if (storage == GA_STORE_REAL64)    return "vec3d";
+    }
+    else
     {
         if (storage == GA_STORE_BOOL)           return "bool";
         else if (storage == GA_STORE_INT16)     return "int16";
@@ -119,14 +120,6 @@ attrStringTypeFromGAAttribute(GA_Attribute const * attribute)
         else if (storage == GA_STORE_INT64)     return "int64";
         else if (storage == GA_STORE_REAL32)    return "float";
         else if (storage == GA_STORE_REAL64)    return "double";
-    }
-    else if (width == 3 || width == 4)
-    {
-        // note: process 4-component vectors as 3-component vectors for now
-
-        if (storage == GA_STORE_INT32)          return "vec3i";
-        else if (storage == GA_STORE_REAL32)    return "vec3s";
-        else if (storage == GA_STORE_REAL64)    return "vec3d";
     }
 
     std::stringstream ss; ss << "Unknown attribute type - " << attribute->getName();
@@ -295,21 +288,7 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
 ////////////////////////////////////////
 
 
-struct AttributeInfo
-{
-    AttributeInfo(const Name& name,
-                  const int valueCompression,
-                  const bool bloscCompression)
-        : name(name)
-        , valueCompression(valueCompression)
-        , bloscCompression(bloscCompression) { }
-
-    Name name;
-    int valueCompression;
-    bool bloscCompression;
-}; // struct AttributeInfo
-
-typedef std::vector<AttributeInfo> AttributeInfoVec;
+typedef std::map<Name, std::pair<int, bool> > AttributeInfoMap;
 
 
 ///////////////////////////////////////
@@ -317,8 +296,8 @@ typedef std::vector<AttributeInfo> AttributeInfoVec;
 
 inline
 PointDataGrid::Ptr
-createPointDataGrid(const GU_Detail& ptGeo, const openvdb::NamePair& positionAttributeType,
-                    const AttributeInfoVec& attributes, const openvdb::math::Transform& transform)
+createPointDataGrid(const GU_Detail& ptGeo, const int compression,
+                    const AttributeInfoMap& attributes, const openvdb::math::Transform& transform)
 {
     typedef hvdbp::HoudiniReadAttribute<openvdb::Vec3d> HoudiniPositionAttribute;
 
@@ -339,8 +318,17 @@ createPointDataGrid(const GU_Detail& ptGeo, const openvdb::NamePair& positionAtt
 
     // Create PointDataGrid using position attribute
 
-    PointDataGrid::Ptr pointDataGrid = createPointDataGrid<PointDataGrid>(
-                            *pointIndexGrid, points, positionAttributeType, transform);
+    PointDataGrid::Ptr pointDataGrid;
+
+    if (compression == 1 /*FIXED_POSITION_16*/) {
+        pointDataGrid = createPointDataGrid<FixedPointCodec<false>, PointDataGrid>(*pointIndexGrid, points, transform);
+    }
+    else if (compression == 2 /*FIXED_POSITION_8*/) {
+        pointDataGrid = createPointDataGrid<FixedPointCodec<true>, PointDataGrid>(*pointIndexGrid, points, transform);
+    }
+    else /*NONE*/ {
+        pointDataGrid = createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid, points, transform);
+    }
 
     PointIndexTree& indexTree = pointIndexGrid->tree();
     PointDataTree& tree = pointDataGrid->tree();
@@ -396,11 +384,11 @@ createPointDataGrid(const GU_Detail& ptGeo, const openvdb::NamePair& positionAtt
 
     // Add other attributes to PointDataGrid
 
-    for (AttributeInfoVec::const_iterator it = attributes.begin(),
+    for (AttributeInfoMap::const_iterator it = attributes.begin(),
                                           it_end = attributes.end(); it != it_end; ++it)
     {
-        const openvdb::Name name = it->name;
-        const int compression = it->valueCompression;
+        const openvdb::Name name = it->first;
+        const int compression = it->second.first;
 
         // skip position as this has already been added
 
@@ -439,12 +427,12 @@ createPointDataGrid(const GU_Detail& ptGeo, const openvdb::NamePair& positionAtt
 
     // Apply blosc compression to attributes
 
-    for (AttributeInfoVec::const_iterator   it = attributes.begin(),
+    for (AttributeInfoMap::const_iterator   it = attributes.begin(),
                                             it_end = attributes.end(); it != it_end; ++it)
     {
-        if (!it->bloscCompression)  continue;
+        if (!it->second.second)  continue;
 
-        bloscCompressAttribute(tree, it->name);
+        bloscCompressAttribute(tree, it->first);
     }
 
     return pointDataGrid;
@@ -821,7 +809,36 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
         }
 
         UT_String attrName;
-        AttributeInfoVec attributes;
+        AttributeInfoMap attributes;
+
+        GU_Detail nonConstDetail;
+        const GU_Detail* detail;
+
+        // unpack any packed primitives
+
+        for (GA_Iterator it(ptGeo->getPrimitiveRange()); !it.atEnd(); ++it)
+        {
+            GA_Offset offset = *it;
+
+            const GA_Primitive* primitive = ptGeo->getPrimitive(offset);
+            if (!primitive || !GU_PrimPacked::isPackedPrimitive(*primitive)) continue;
+
+            const GU_PrimPacked* packedPrimitive = static_cast<const GU_PrimPacked*>(primitive);
+
+            packedPrimitive->unpack(nonConstDetail);
+        }
+
+        if (ptGeo->getNumPoints() > 0 && nonConstDetail.getNumPoints() == 0) {
+            // only unpacked points exist so just use the input gdp
+
+            detail = ptGeo;
+        }
+        else {
+            // merge unpacked and packed point data
+
+            nonConstDetail.mergePoints(*ptGeo);
+            detail = &nonConstDetail;
+        }
 
         if (evalInt("mode", 0, time) != 0) {
             // Transfer point attributes.
@@ -830,7 +847,7 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
                     evalStringInst("attribute#", &i, attrName, 0, 0);
                     Name attributeName = Name(attrName);
 
-                    GA_ROAttributeRef attrRef = ptGeo->findPointAttribute(attributeName.c_str());
+                    GA_ROAttributeRef attrRef = detail->findPointAttribute(attributeName.c_str());
 
                     if (!attrRef.isValid()) continue;
 
@@ -867,12 +884,13 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
 
                     const bool bloscCompression = evalIntInst("blosccompression#", &i, 0, 0);
 
-                    attributes.push_back(AttributeInfo(attributeName, valueCompression, bloscCompression));
+                    attributes[attributeName] = std::pair<int, bool>(valueCompression, bloscCompression);
                 }
             }
         } else {
+
             // point attribute names
-            GA_AttributeDict::iterator iter = ptGeo->pointAttribs().begin(GA_SCOPE_PUBLIC);
+            GA_AttributeDict::iterator iter = detail->pointAttribs().begin(GA_SCOPE_PUBLIC);
 
             if (!iter.atEnd()) {
                 for (; !iter.atEnd(); ++iter) {
@@ -884,7 +902,7 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
                         if (attrName == "P") continue;
 
                         // when converting all attributes apply no compression
-                        attributes.push_back(AttributeInfo(attrName, 0, false));
+                        attributes[attrName] = std::pair<int, bool>(0, false);
                     }
                 }
             }
@@ -894,10 +912,7 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
 
         const int positionCompression = evalInt("poscompression", 0, time);
 
-        const openvdb::NamePair positionAttributeType =
-                    positionAttrTypeFromCompression(positionCompression);
-
-        PointDataGrid::Ptr pointDataGrid = createPointDataGrid(*ptGeo, positionAttributeType, attributes, *transform);
+        PointDataGrid::Ptr pointDataGrid = createPointDataGrid(*detail, positionCompression, attributes, *transform);
 
         UT_String nameStr = "";
         evalString(nameStr, "name", 0, time);

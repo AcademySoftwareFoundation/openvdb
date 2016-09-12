@@ -197,7 +197,6 @@ TestPointCount::testGroup()
     using namespace openvdb::tools;
     using namespace openvdb::math;
 
-    typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
     typedef AttributeSet::Descriptor   Descriptor;
 
     // four points in the same leaf
@@ -211,7 +210,7 @@ TestPointCount::testGroup()
     const float voxelSize(1.0);
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
 
-    PointDataGrid::Ptr grid = createPointDataGrid<PointDataGrid>(positions, AttributeVec3s::attributeType(), *transform);
+    PointDataGrid::Ptr grid = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
     PointDataTree& tree = grid->tree();
 
     // setup temp directory
@@ -389,7 +388,7 @@ TestPointCount::testGroup()
     positions.push_back(Vec3s(1, 20, 1));
     positions.push_back(Vec3s(1, 1, 20));
 
-    grid = createPointDataGrid<PointDataGrid>(positions, AttributeVec3s::attributeType(), *transform);
+    grid = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
     PointDataTree& tree2 = grid->tree();
 
     CPPUNIT_ASSERT_EQUAL(tree2.leafCount(), Index32(4));
@@ -450,7 +449,6 @@ TestPointCount::testOffsets()
     using namespace openvdb::tools;
     using namespace openvdb::math;
 
-    typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
 
     const float voxelSize(1.0);
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
@@ -464,7 +462,7 @@ TestPointCount::testOffsets()
     positions.push_back(Vec3s(101, 1, 1));
     positions.push_back(Vec3s(101, 101, 1));
 
-    PointDataGrid::Ptr grid = createPointDataGrid<PointDataGrid>(positions, AttributeVec3s::attributeType(), *transform);
+    PointDataGrid::Ptr grid = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
     PointDataTree& tree = grid->tree();
 
     { // all point offsets

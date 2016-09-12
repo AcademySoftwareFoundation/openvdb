@@ -69,8 +69,6 @@ TestPointLoad::testLoad()
     using namespace openvdb;
     using namespace openvdb::tools;
 
-    typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
-
     std::string tempDir(std::getenv("TMPDIR"));
     if (tempDir.empty())    tempDir = P_tmpdir;
 
@@ -90,7 +88,7 @@ TestPointLoad::testLoad()
     positions.push_back(Vec3s(1, 20, 1));
     positions.push_back(Vec3s(1, 1, 20));
 
-    PointDataGrid::Ptr grid = createPointDataGrid<PointDataGrid>(positions, AttributeVec3s::attributeType(), *transform);
+    PointDataGrid::Ptr grid = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
     PointDataTree& tree2 = grid->tree();
 
     CPPUNIT_ASSERT_EQUAL(tree2.leafCount(), Index32(4));

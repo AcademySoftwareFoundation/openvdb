@@ -73,11 +73,10 @@ namespace tools {
 /// @note   A @c PointIndexGrid to the points must be supplied to perform this
 ///         operation. Typically this is built implicitly by the PointDataGrid constructor.
 
-template<typename PointDataGridT, typename PositionArrayT, typename PointIndexGridT>
+template <typename CompressionT, typename PointDataGridT, typename PositionArrayT, typename PointIndexGridT>
 inline typename PointDataGridT::Ptr
 createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT& positions,
-                    const openvdb::NamePair& positionType, const math::Transform& xform,
-                    Metadata::Ptr positionDefaultValue = Metadata::Ptr());
+                    const math::Transform& xform, Metadata::Ptr positionDefaultValue = Metadata::Ptr());
 
 
 /// @brief  Convenience method to create a @c PointDataGrid from a std::vector of
@@ -91,10 +90,9 @@ createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT&
 /// @note   This method implicitly wraps the std::vector for a Point-Partitioner compatible
 ///         data structure and creates the required @c PointIndexGrid to the points.
 
-template <typename PointDataGridT, typename ValueT>
+template <typename CompressionT, typename PointDataGridT, typename ValueT>
 inline typename PointDataGridT::Ptr
-createPointDataGrid(const std::vector<ValueT>& positions,
-                    const openvdb::NamePair& positionType, const math::Transform& xform,
+createPointDataGrid(const std::vector<ValueT>& positions, const math::Transform& xform,
                     Metadata::Ptr positionDefaultValue = Metadata::Ptr());
 
 
@@ -737,19 +735,21 @@ struct ConvertPointDataGridGroupOp {
 ////////////////////////////////////////
 
 
-template<typename PointDataGridT, typename PositionArrayT, typename PointIndexGridT>
+template<typename CompressionT, typename PointDataGridT, typename PositionArrayT, typename PointIndexGridT>
 inline typename PointDataGridT::Ptr
 createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT& positions,
-                    const openvdb::NamePair& positionType, const math::Transform& xform,
-                    Metadata::Ptr positionDefaultValue)
+                    const math::Transform& xform, Metadata::Ptr positionDefaultValue)
 {
     typedef typename PointDataGridT::TreeType                       PointDataTreeT;
     typedef typename PointIndexGridT::TreeType                      PointIndexTreeT;
     typedef typename tree::template LeafManager<PointDataTreeT>     LeafManagerT;
     typedef typename LeafManagerT::LeafRange                        LeafRangeT;
+    typedef TypedAttributeArray<Vec3f, CompressionT>                PositionAttributeT;
 
     using point_conversion_internal::InitialiseAttributesOp;
     using point_conversion_internal::PopulatePositionAttributeOp;
+
+    const NamePair positionType = PositionAttributeT::attributeType();
 
     // construct the Tree using a topology copy of the PointIndexGrid
 
@@ -792,17 +792,16 @@ createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT&
 ////////////////////////////////////////
 
 
-template <typename PointDataGridT, typename ValueT>
+template <typename CompressionT, typename PointDataGridT, typename ValueT>
 inline typename PointDataGridT::Ptr
 createPointDataGrid(const std::vector<ValueT>& positions,
-                    const openvdb::NamePair& positionType,
                     const math::Transform& xform,
                     Metadata::Ptr positionDefaultValue)
 {
     const PointAttributeVector<ValueT> pointList(positions);
 
     PointIndexGrid::Ptr pointIndexGrid = createPointIndexGrid<PointIndexGrid>(pointList, xform);
-    return createPointDataGrid<PointDataGridT>(*pointIndexGrid, pointList, positionType, xform, positionDefaultValue);
+    return createPointDataGrid<CompressionT, PointDataGridT>(*pointIndexGrid, pointList, xform, positionDefaultValue);
 }
 
 

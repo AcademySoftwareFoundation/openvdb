@@ -169,8 +169,6 @@ TestPointGroup::testDescriptor()
 void
 TestPointGroup::testAppendDrop()
 {
-	typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
-
     std::vector<Vec3s> positions;
     positions.push_back(Vec3s(1, 1, 1));
     positions.push_back(Vec3s(1, 10, 1));
@@ -180,7 +178,7 @@ TestPointGroup::testAppendDrop()
     const float voxelSize(1.0);
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
 
-    PointDataGrid::Ptr grid = createPointDataGrid<PointDataGrid>(positions, AttributeVec3s::attributeType(), *transform);
+    PointDataGrid::Ptr grid = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
     PointDataTree& tree = grid->tree();
 
     // check one leaf per point
@@ -308,15 +306,13 @@ TestPointGroup::testAppendDrop()
 void
 TestPointGroup::testCompact()
 {
-    typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
-
     std::vector<Vec3s> positions;
     positions.push_back(Vec3s(1, 1, 1));
 
     const float voxelSize(1.0);
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
 
-    PointDataGrid::Ptr grid = createPointDataGrid<PointDataGrid>(positions, AttributeVec3s::attributeType(), *transform);
+    PointDataGrid::Ptr grid = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
     PointDataTree& tree = grid->tree();
 
     // check one leaf
@@ -412,8 +408,6 @@ TestPointGroup::testSet()
     using namespace openvdb;
     using namespace openvdb::tools;
 
-    typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
-
     typedef PointIndexGrid PointIndexGrid;
 
     // four points in the same leaf
@@ -434,8 +428,7 @@ TestPointGroup::testSet()
     PointIndexGrid::Ptr pointIndexGrid =
         openvdb::tools::createPointIndexGrid<PointIndexGrid>(pointList, *transform);
 
-    PointDataGrid::Ptr grid = createPointDataGrid<PointDataGrid>(*pointIndexGrid, pointList,
-                                                                 AttributeVec3s::attributeType(), *transform);
+    PointDataGrid::Ptr grid = createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid, pointList, *transform);
     PointDataTree& tree = grid->tree();
 
     appendGroup(tree, "test");
@@ -524,8 +517,6 @@ TestPointGroup::testFilter()
     using namespace openvdb;
     using namespace openvdb::tools;
 
-    typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
-
     typedef PointIndexGrid PointIndexGrid;
 
     const float voxelSize(1.0);
@@ -546,8 +537,7 @@ TestPointGroup::testFilter()
         PointIndexGrid::Ptr pointIndexGrid =
             openvdb::tools::createPointIndexGrid<PointIndexGrid>(pointList, *transform);
 
-        grid = createPointDataGrid<PointDataGrid>(  *pointIndexGrid, pointList,
-                                                    AttributeVec3s::attributeType(), *transform);
+        grid = createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid, pointList, *transform);
     }
 
     PointDataTree& tree = grid->tree();
@@ -638,8 +628,7 @@ TestPointGroup::testFilter()
         PointIndexGrid::Ptr pointIndexGrid =
             openvdb::tools::createPointIndexGrid<PointIndexGrid>(pointList, *transform);
 
-        grid = createPointDataGrid<PointDataGrid>(  *pointIndexGrid, pointList,
-                                                    AttributeVec3s::attributeType(), *transform);
+        grid = createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid, pointList, *transform);
 
         PointDataTree& newTree = grid->tree();
 
