@@ -93,7 +93,7 @@ const uint32_t OPENVDB_LIBRARY_VERSION = OPENVDB_LIBRARY_VERSION_NUMBER;
 /// @brief The current version number of the VDB file format
 /// @details  This can be used to enable various backwards compatability switches
 /// or to reject files that cannot be read.
-const uint32_t OPENVDB_FILE_VERSION = 223;
+const uint32_t OPENVDB_FILE_VERSION = 224;
 
 /// Notable file format version numbers
 enum {
@@ -109,12 +109,17 @@ enum {
     OPENVDB_FILE_VERSION_FLOAT_FRUSTUM_BBOX = 221,
     OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION = 222,
     OPENVDB_FILE_VERSION_BLOSC_COMPRESSION = 223,
-    OPENVDB_FILE_VERSION_POINT_INDEX_GRID = 223
+    OPENVDB_FILE_VERSION_POINT_INDEX_GRID = 223,
+    OPENVDB_FILE_VERSION_MULTIPLE_LEAF_BUFFERS = 224
 };
 
 
 /// Library performs I/O seeking instead of reading where possible.
 #define OPENVDB_HAS_SEEKABLE_IO
+
+
+/// Library supports reading and writing using multiple passes per leaf.
+#define OPENVDB_HAS_MULTIPLE_LEAF_BUFFERS
 
 
 /// Return a library version number string of the form "<major>.<minor>.<patch>".

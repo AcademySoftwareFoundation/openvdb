@@ -74,11 +74,23 @@ namespace io {
 ///     the value buffers of internal and leaf nodes are Blosc-compressed.<br>
 ///     Blosc is much faster than ZLIB and produces comparable file sizes.
 /// </dl>
+///
+/// <dt><tt>COMPRESS_MULTIPLE_LEAF_BUFFERS</tt>
+/// <dd>Write out grids using multiple buffers for each leaf to allow for contiguously
+///     storing blocks of data that are commonly read at different times through lazy
+///     loading. If using a seekable file such as .vdb, this significantly reduces disk
+///     head seeking and thus accelerates reading a subset of the leaf data. A typical
+///     use case is to load just the grid topology. To write out grids using this technique,
+///     each grid type must be registered to allow multiple leaf buffer writing.
+///     @note Disabled by default for all OpenVDB grids, define the environment variable
+///     @c OPENVDB_DISABLE_DELAYED_LOAD to disable unconditionally.
+/// </dl>
 enum {
-    COMPRESS_NONE           = 0,
-    COMPRESS_ZIP            = 0x1,
-    COMPRESS_ACTIVE_MASK    = 0x2,
-    COMPRESS_BLOSC          = 0x4
+    COMPRESS_NONE                       = 0,
+    COMPRESS_ZIP                        = 0x1,
+    COMPRESS_ACTIVE_MASK                = 0x2,
+    COMPRESS_BLOSC                      = 0x4,
+    COMPRESS_MULTIPLE_LEAF_BUFFERS      = 0x8
 };
 
 /// Return a string describing the given compression flags.

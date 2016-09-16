@@ -55,6 +55,9 @@
 #                       (some OpenVDB 3.x features will be disabled)
 #   shared=no           link executables against static OpenVDB libraries
 #                       (default: link against shared libraries)
+#   multibuffer=no      build with the ability to write out leaf node buffers
+#                       in multiple passes for faster delayed-load reading
+#                       (default: disabled)
 #   debug=yes           build with debugging symbols and without optimization
 #   verbose=yes         run commands (e.g., doxygen) in verbose mode
 
@@ -261,6 +264,9 @@ ifeq (yes,$(has_log4cplus))
 endif
 ifeq (2,$(strip $(abi)))
     CXXFLAGS += -DOPENVDB_2_ABI_COMPATIBLE
+endif
+ifeq (yes,$(strip $(multibuffer)))
+    CXXFLAGS += -DOPENVDB_USE_MULTIPLE_LEAF_BUFFERS
 endif
 ifneq (2,$(strip $(GLFW_MAJOR_VERSION)))
     CXXFLAGS += -DOPENVDB_USE_GLFW_3

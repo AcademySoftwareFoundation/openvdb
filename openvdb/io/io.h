@@ -94,6 +94,12 @@ public:
     bool seekable() const;
     void setSeekable(bool);
 
+    bool leafBufferCount() const;
+    void setLeafBufferCount(bool);
+
+    uint32_t leafBuffer() const;
+    void setLeafBuffer(uint32_t);
+
     //@{
     /// @brief Return a (reference to a) copy of the metadata of the grid currently
     /// being read or written.
@@ -268,6 +274,12 @@ OPENVDB_API void setStreamMetadataPtr(std::ios_base&,
 /// @brief Dissociate the given stream from its metadata object (if it has one)
 /// and return a shared pointer to the object.
 OPENVDB_API boost::shared_ptr<StreamMetadata> clearStreamMetadataPtr(std::ios_base&);
+
+/// @brief Return @c true if the grid name is registered to use multiple leaf buffer
+/// passes on write.
+OPENVDB_API bool multipleLeafBuffers(const std::string& name);
+/// @brief Register a grid name to use multiple leaf buffer passes on write.
+OPENVDB_API void registerMultipleLeafBuffers(const std::string& name);
 
 } // namespace io
 } // namespace OPENVDB_VERSION_NAME
