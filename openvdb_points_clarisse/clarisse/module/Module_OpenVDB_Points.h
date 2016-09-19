@@ -35,32 +35,57 @@
 /// @brief OpenVDB Points Module for Clarisse
 ///
 
+
+#ifndef OPENVDB_CLARISSE_MODULE_OPENVDB_POINTS_HAS_BEEN_INCLUDED
+#define OPENVDB_CLARISSE_MODULE_OPENVDB_POINTS_HAS_BEEN_INCLUDED
+
+
 #include <of_object.h>
 #include <resource_data.h>
 
+
+#include "ResourceData_OpenVDBPoints.h"
+
+
 ////////////////////////////////////////
 
 
-namespace resource
+class Geometry_OpenVDBPoints;
+class ParticleCloud;
+
+
+////////////////////////////////////////
+
+
+namespace openvdb_points
 {
-    // create a ResourceData_OpenVDBPoints object from parameters on the OpenVDBPoints node
-    // @param localise      if true, pscale and v attributes will be transformed to index-space on resource creation
-    // @param cacheLeaves   if true, leaves are cached to a local array to reduce tree traversal time
-    ResourceData* create_vdb_grid(OfObject& object, const bool localise = true, const bool cacheLeaves = true);
+    /// Create a ResourceData_OpenVDBPoints object from parameters on the OpenVDBPoints node
+    /// @param application      used for adding progress bars
+    /// @param filename         the filename of the VDB
+    /// @param gridname         the name of the VDB grid to use
+    /// @param localise         if true, pscale and v attributes will be transformed to index-space on resource creation
+    /// @param cacheLeaves      if true, leaves are cached to a local array to reduce tree traversal time
+    ResourceData_OpenVDBPoints* create_vdb_grid(    OfApp& application, const CoreString& filename, const CoreString& gridname,
+                                                    const bool localise = true, const bool cacheLeaves = true);
 
-    // create a Geometry_OpenVDBPoints object from a ResourceData_OpenVDBPoints object
-    // and parameters on the OpenVDBPoints node
-    ResourceData* create_openvdb_points_geometry(OfObject& object);
+    /// Create a Clarisse ParticleCloud object from a ResourceData_OpenVDBPoints object
+    /// @param application      used for adding progress bars
+    /// @param data             the ResourceData_OpenVDBPoints
+    ParticleCloud* create_clarisse_particle_cloud(  OfApp& application, ResourceData_OpenVDBPoints& data);
 
-    // create a property array of GeometryProperty_OpenVDBPoints objects from a Geometry_OpenVDBPoints node
+    /// Create a Geometry_OpenVDBPoints object from a ResourceData_OpenVDBPoints object
+    /// and parameters on the OpenVDBPoints node
+    Geometry_OpenVDBPoints* create_openvdb_points_geometry(OfObject& object);
+
+    /// Create a property array of GeometryProperty_OpenVDBPoints objects from a Geometry_OpenVDBPoints node
     ResourceData* create_openvdb_points_geometry_property(OfObject& object);
-
-    // create a Clarisse ParticleCloud object from a ResourceData_OpenVDBPoints object
-    ResourceData* create_clarisse_particle_cloud(OfObject& object);
-} // namespace resource
+} // namespace openvdb_points
 
 
 ////////////////////////////////////////
+
+
+#endif // OPENVDB_CLARISSE_MODULE_OPENVDB_POINTS_HAS_BEEN_INCLUDED
 
 
 // Copyright (c) 2015-2016 Double Negative Visual Effects
