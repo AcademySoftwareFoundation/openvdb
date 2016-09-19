@@ -32,8 +32,6 @@
 ///
 /// @author Dan Bailey
 ///
-/// @brief OpenVDB Points Module for Clarisse
-///
 
 #include <openvdb/openvdb.h>
 #include <openvdb/Types.h>
@@ -62,6 +60,7 @@
 
 #include "Geometry_OpenVDBPoints.cma"
 
+#include "Module_OpenVDB_Points.h"
 #include "ResourceData_OpenVDBPoints.h"
 #include "Geometry_OpenVDBPoints.h"
 #include "GeometryProperty_OpenVDBPoints.h"
@@ -106,17 +105,10 @@ void registerVDBPoints(OfApp& app, CoreVector<OfClass *>& new_classes)
 
 namespace resource
 {
+    // define the resource id to use for VDB grids
     enum {
         RESOURCE_ID_VDB_GRID = ModuleGeometry::RESOURCE_ID_COUNT,
     };
-
-    ResourceData* create_vdb_grid(OfObject& object);
-
-    ResourceData* create_openvdb_points_geometry(OfObject& object);
-
-    ResourceData* create_openvdb_points_geometry_property(OfObject& object);
-
-    ResourceData* create_clarisse_particle_cloud(OfObject& object);
 } // namespace resource
 
 

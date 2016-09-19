@@ -209,6 +209,7 @@ LIBCLARISSE_INCLUDE_NAMES := \
 	clarisse/module/Geometry_OpenVDBPoints.h \
 	clarisse/module/GeometryProperty_OpenVDBPoints.h \
 	clarisse/module/ResourceData_OpenVDBPoints.h \
+	clarisse/module/Module_OpenVDB_Points.h \
 #
 LIBCLARISSE_SRC_NAMES := \
 	clarisse/module/Geometry_OpenVDBPoints.cc \
