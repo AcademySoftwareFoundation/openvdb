@@ -69,9 +69,9 @@ class ResourceData_OpenVDBPoints : public ResourceData
 public:
     typedef openvdb::tools::PointDataTree::LeafNodeType PointDataLeaf;
 
-    static ResourceData_OpenVDBPoints* create(const openvdb::tools::PointDataGrid::Ptr& grid);
+    static ResourceData_OpenVDBPoints* create(const openvdb::tools::PointDataGrid::Ptr& grid, const bool cacheLeaves = true);
 
-    ResourceData_OpenVDBPoints(const openvdb::tools::PointDataGrid::Ptr& grid);
+    ResourceData_OpenVDBPoints(const openvdb::tools::PointDataGrid::Ptr& grid, const bool cacheLeaves);
 
     const openvdb::tools::PointDataGrid::Ptr grid() const;
 
@@ -86,6 +86,7 @@ private:
     const openvdb::tools::AttributeSet::Descriptor::Ptr m_descriptor;
 
     std::vector<PointDataLeaf*> m_leaves;
+    bool m_cachedLeaves;
 }; // ResourceData_OpenVDBPoints
 
 #endif // OPENVDB_CLARISSE_RESOURCEDATA_OPENVDBPOINTS_HAS_BEEN_INCLUDED

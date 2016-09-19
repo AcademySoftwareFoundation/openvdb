@@ -44,7 +44,9 @@
 namespace resource
 {
     // create a ResourceData_OpenVDBPoints object from parameters on the OpenVDBPoints node
-    ResourceData* create_vdb_grid(OfObject& object);
+    // @param localise      if true, pscale and v attributes will be transformed to index-space on resource creation
+    // @param cacheLeaves   if true, leaves are cached to a local array to reduce tree traversal time
+    ResourceData* create_vdb_grid(OfObject& object, const bool localise = true, const bool cacheLeaves = true);
 
     // create a Geometry_OpenVDBPoints object from a ResourceData_OpenVDBPoints object
     // and parameters on the OpenVDBPoints node

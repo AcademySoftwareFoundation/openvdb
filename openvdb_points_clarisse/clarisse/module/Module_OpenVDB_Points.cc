@@ -232,7 +232,7 @@ IX_MODULE_CLBK::create_resource(OfObject& object,
 
     if (resource_id == resource::RESOURCE_ID_VDB_GRID)
     {
-        return resource::create_vdb_grid(object);
+        return resource::create_vdb_grid(object, /*localise=*/true, /*cacheLeaves=*/true);
     }
     else if (resource_id == ModuleGeometry::RESOURCE_ID_GEOMETRY)
     {
@@ -258,7 +258,7 @@ IX_MODULE_CLBK::create_resource(OfObject& object,
 namespace resource
 {
     ResourceData*
-    create_vdb_grid(OfObject& object)
+    create_vdb_grid(OfObject& object, const bool localise, const bool cacheLeaves)
     {
         const CoreString filename = object.get_attribute("output_filename")->get_string();
         const CoreString gridname = object.get_attribute("grid")->get_string();
@@ -299,17 +299,19 @@ namespace resource
 
         if (error)  return 0;
 
-        // localising velocity and radius
+        if (localise) {
+            // localising velocity and radius
 
-        AppProgressBar* localise_progress_bar = object.get_application().create_progress_bar(CoreString("Localising Velocity and Radius for ") + gridname);
+            AppProgressBar* localise_progress_bar = object.get_application().create_progress_bar(CoreString("Localising Velocity and Radius for ") + gridname);
 
-        openvdb_points::localise(grid);
+            openvdb_points::localise(grid);
 
-        localise_progress_bar->destroy();
+            localise_progress_bar->destroy();
+        }
 
         // create the resource
 
-        resourceData = ResourceData_OpenVDBPoints::create(grid);
+        resourceData = ResourceData_OpenVDBPoints::create(grid, cacheLeaves);
 
         // if radius is available on the grid, enable the option to override it
 

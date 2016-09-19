@@ -225,27 +225,31 @@ void localise(PointDataGrid::Ptr& grid)
 
 
 ResourceData_OpenVDBPoints*
-ResourceData_OpenVDBPoints::create(const PointDataGrid::Ptr& grid)
+ResourceData_OpenVDBPoints::create(const PointDataGrid::Ptr& grid, const bool cacheLeaves)
 {
-    return new ResourceData_OpenVDBPoints(grid);
+    return new ResourceData_OpenVDBPoints(grid, cacheLeaves);
 }
 
 
-ResourceData_OpenVDBPoints::ResourceData_OpenVDBPoints(const PointDataGrid::Ptr& grid)
+ResourceData_OpenVDBPoints::ResourceData_OpenVDBPoints(const PointDataGrid::Ptr& grid, const bool cacheLeaves)
     : m_grid(grid)
     , m_descriptor(grid->tree().cbeginLeaf()->attributeSet().descriptorPtr())
+    , m_leaves()
+    , m_cachedLeaves(cacheLeaves)
 {
-    PointDataTree& tree = m_grid->tree();
+    if (m_cachedLeaves) {
+        PointDataTree& tree = m_grid->tree();
 
-    // cache the grid leaves in an array
+        // cache the grid leaves in an array
 
-    PointDataTree::LeafIter iter = tree.beginLeaf();
+        PointDataTree::LeafIter iter = tree.beginLeaf();
 
-    for (; iter; ++iter)
-    {
-        PointDataLeaf& leaf = *iter;
+        for (; iter; ++iter)
+        {
+            PointDataLeaf& leaf = *iter;
 
-        m_leaves.push_back(&leaf);
+            m_leaves.push_back(&leaf);
+        }
     }
 }
 
@@ -260,6 +264,8 @@ ResourceData_OpenVDBPoints::grid() const
 const PointDataTree::LeafNodeType*
 ResourceData_OpenVDBPoints::leaf(const unsigned int id) const
 {
+    assert(m_cachedLeaves);
+
     return (id < m_leaves.size()) ? m_leaves[id] : 0;
 }
 
