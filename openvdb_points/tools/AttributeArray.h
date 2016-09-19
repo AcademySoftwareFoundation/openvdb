@@ -1572,6 +1572,7 @@ TypedAttributeArray<ValueType_, Codec_>::isEqual(const AttributeArray& other) co
        *this->sTypeName != *otherT->sTypeName) return false;
 
     this->doLoad();
+    otherT->doLoad();
 
     const StorageType *target = this->mData, *source = otherT->mData;
     if (!target && !source) return true;
