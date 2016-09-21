@@ -195,19 +195,19 @@ TestTools::testDilateVoxels()
         tree->fill(CoordBBox(Coord(0), Coord(leafDim - 1)), 1.0);
         CPPUNIT_ASSERT_EQUAL(Index32(0), tree->leafCount());
         CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
-        
+        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
+
         tree->setValue(Coord(leafDim, leafDim - 1, leafDim - 1), 1.0);
-        
+
         CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim + 1),
                              tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
+        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
 
         openvdb::tools::dilateVoxels(*tree);
 
         CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim + 1 + 5),
                              tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
+        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
     }
     {
         // Set and dilate a single voxel at each of the eight corners of a leaf node.
@@ -519,14 +519,14 @@ TestTools::testDilateActiveValues()
         tree->fill(CoordBBox(Coord(0), Coord(leafDim - 1)), 1.0);
         CPPUNIT_ASSERT_EQUAL(Index32(0), tree->leafCount());
         CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
-        
+        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
+
         // This has no effect
         openvdb::tools::dilateActiveValues(*tree, 1, openvdb::tools::NN_FACE, openvdb::tools::IGNORE_TILES);
 
         CPPUNIT_ASSERT_EQUAL(Index32(0), tree->leafCount());
         CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
+        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
     }
     {
         // Create an active, leaf node-sized tile.
@@ -534,15 +534,15 @@ TestTools::testDilateActiveValues()
         tree->fill(CoordBBox(Coord(0), Coord(leafDim - 1)), 1.0);
         CPPUNIT_ASSERT_EQUAL(Index32(0), tree->leafCount());
         CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
+        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
 
         // Adds 6 faces of voxels, each of size leafDim^2
         openvdb::tools::dilateActiveValues(*tree, 1, openvdb::tools::NN_FACE, openvdb::tools::EXPAND_TILES);
 
         CPPUNIT_ASSERT_EQUAL(Index32(1+6), tree->leafCount());
         CPPUNIT_ASSERT_EQUAL(Index64((leafDim + 6) * leafDim * leafDim), tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(0UL, tree->activeTileCount());
-        
+        CPPUNIT_ASSERT_EQUAL(Index64(0), tree->activeTileCount());
+
     }
     {
         // Create an active, leaf node-sized tile.
@@ -550,15 +550,15 @@ TestTools::testDilateActiveValues()
         tree->fill(CoordBBox(Coord(0), Coord(leafDim - 1)), 1.0);
         CPPUNIT_ASSERT_EQUAL(Index32(0), tree->leafCount());
         CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
+        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
 
         // Adds 6 faces of voxels, each of size leafDim^2
         openvdb::tools::dilateActiveValues(*tree, 1, openvdb::tools::NN_FACE, openvdb::tools::PRESERVE_TILES);
 
         CPPUNIT_ASSERT_EQUAL(Index32(6), tree->leafCount());
         CPPUNIT_ASSERT_EQUAL(Index64((leafDim + 6) * leafDim * leafDim), tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
-        
+        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
+
     }
     {
         // Set and dilate a single voxel at each of the eight corners of a leaf node.

@@ -2030,13 +2030,13 @@ TestTree::testFill()
          openvdb::Grid<TreeT>::Ptr grid = openvdb::Grid<TreeT>::create(outside);
          TreeT& tree = grid->tree();
          CPPUNIT_ASSERT(!tree.hasActiveTiles());
-         CPPUNIT_ASSERT_EQUAL(size_t(0), tree.activeVoxelCount());
+         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(0), tree.activeVoxelCount());
          for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
              ASSERT_DOUBLES_EXACTLY_EQUAL(outside, tree.getValue(*ijk));
          }
          tree.sparseFill(bbox, inside, /*state*/true);
          CPPUNIT_ASSERT(tree.hasActiveTiles());
-         CPPUNIT_ASSERT_EQUAL(size_t(bbox.volume()), tree.activeVoxelCount());
+         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(bbox.volume()), tree.activeVoxelCount());
           for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
              ASSERT_DOUBLES_EXACTLY_EQUAL(inside, tree.getValue(*ijk));
          }
@@ -2045,13 +2045,13 @@ TestTree::testFill()
          openvdb::Grid<TreeT>::Ptr grid = openvdb::Grid<TreeT>::create(outside);
          TreeT& tree = grid->tree();
          CPPUNIT_ASSERT(!tree.hasActiveTiles());
-         CPPUNIT_ASSERT_EQUAL(size_t(0), tree.activeVoxelCount());
+         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(0), tree.activeVoxelCount());
          for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
              ASSERT_DOUBLES_EXACTLY_EQUAL(outside, tree.getValue(*ijk));
          }
          tree.denseFill(bbox, inside, /*state*/true);
          CPPUNIT_ASSERT(!tree.hasActiveTiles());
-         CPPUNIT_ASSERT_EQUAL(size_t(bbox.volume()), tree.activeVoxelCount());
+         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(bbox.volume()), tree.activeVoxelCount());
          for (openvdb::CoordBBox::Iterator<true> ijk(bbox); ijk; ++ijk) {
              ASSERT_DOUBLES_EXACTLY_EQUAL(inside, tree.getValue(*ijk));
          }
