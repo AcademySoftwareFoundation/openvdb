@@ -43,7 +43,7 @@ class "OpenVDBPoints" "Geometry"
     {
         long "mode"
         {
-            value 0
+            value 1
             preset "Native OpenVDB Points"  "0"
             preset "Clarisse Particle Cloud"  "1"
             doc "Native OpenVDB Points can be ray-traced directly, Clarisse Particle Cloud is typically used as an input to the Scatterer."
