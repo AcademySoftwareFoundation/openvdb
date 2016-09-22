@@ -71,7 +71,9 @@ namespace openvdb_points
     /// Create a Clarisse ParticleCloud object from a ResourceData_OpenVDBPoints object
     /// @param application      used for adding progress bars
     /// @param data             the ResourceData_OpenVDBPoints
-    ParticleCloud* create_clarisse_particle_cloud(  OfApp& application, ResourceData_OpenVDBPoints& data);
+    /// @param loadVelocities if true and v attribute available, store velocities on point cloud
+    ParticleCloud* create_clarisse_particle_cloud(  OfApp& application, ResourceData_OpenVDBPoints& data,
+                                                    const bool loadVelocities = false);
 
     /// Create a Geometry_OpenVDBPoints object from a ResourceData_OpenVDBPoints object
     /// and parameters on the OpenVDBPoints node

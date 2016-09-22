@@ -139,6 +139,7 @@ IX_MODULE_CLBK::init_class(OfClass& cls)
     geo_attrs.add("explicit_radius");
     geo_attrs.add("override_radius");
     geo_attrs.add("radius_scale");
+    geo_attrs.add("enable_motion_blur");
     geo_attrs.add("mode");
 
     cls.set_resource_attrs(ModuleGeometry::RESOURCE_ID_GEOMETRY, geo_attrs);
@@ -258,7 +259,18 @@ IX_MODULE_CLBK::create_resource(OfObject& object,
             ResourceData_OpenVDBPoints* data = (ResourceData_OpenVDBPoints*) module->get_resource(openvdb_points::RESOURCE_ID_VDB_GRID);
             if (!data) return 0;
 
-            return openvdb_points::create_clarisse_particle_cloud(application, *data);
+            const OfAttr* const motion_blur_attr = object.get_attribute("enable_motion_blur");
+            const bool enable_motion_blur = motion_blur_attr ? motion_blur_attr->get_bool() : false;
+
+            ParticleCloud* particleCloud = openvdb_points::create_clarisse_particle_cloud(application, *data, /*load_velocities=*/enable_motion_blur);
+            if (!particleCloud)     return 0;
+
+            // enable motion blur only if velocities present on the point cloud
+            const GeometryPointCloud* geometryPointCloud = particleCloud->get_point_cloud();
+            if (geometryPointCloud && geometryPointCloud->has_velocities() && enable_motion_blur)   module->require_motion_blur(true);
+            else                                                                                    module->require_motion_blur(false);
+
+            return particleCloud;
         }
     }
     else if (resource_id == ModuleGeometry::RESOURCE_ID_GEOMETRY_PROPERTIES)
@@ -423,7 +435,7 @@ namespace openvdb_points
     }
 
     ParticleCloud*
-    create_clarisse_particle_cloud(OfApp& application, ResourceData_OpenVDBPoints& data)
+    create_clarisse_particle_cloud(OfApp& application, ResourceData_OpenVDBPoints& data, const bool loadVelocities)
     {
         const openvdb::tools::PointDataGrid::Ptr grid = data.grid();
 
@@ -483,9 +495,9 @@ namespace openvdb_points
 
         cloud_progress_bar->destroy();
 
-        // load the velocities
+        // load the velocities (only if v attribute exists)
 
-        if (tree.cbeginLeaf()->hasAttribute("v"))
+        if (loadVelocities && tree.cbeginLeaf()->hasAttribute("v"))
         {
             AppProgressBar* velocity_progress_bar = application.create_progress_bar(CoreString("Loading Velocities into Point Cloud"));
 
