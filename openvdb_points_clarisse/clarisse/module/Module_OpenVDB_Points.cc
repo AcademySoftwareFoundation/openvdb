@@ -128,6 +128,7 @@ IX_MODULE_CLBK::init_class(OfClass& cls)
     CoreVector<CoreString> data_attrs;
     data_attrs.add("filename");
     data_attrs.add("grid");
+    data_attrs.add("mode");
     cls.add_resource(openvdb_points::RESOURCE_ID_VDB_GRID, data_attrs, deps, "vdb_points_data");
 
     deps.add(openvdb_points::RESOURCE_ID_VDB_GRID);
@@ -140,7 +141,6 @@ IX_MODULE_CLBK::init_class(OfClass& cls)
     geo_attrs.add("override_radius");
     geo_attrs.add("radius_scale");
     geo_attrs.add("enable_motion_blur");
-    geo_attrs.add("mode");
 
     cls.set_resource_attrs(ModuleGeometry::RESOURCE_ID_GEOMETRY, geo_attrs);
     cls.set_resource_deps(ModuleGeometry::RESOURCE_ID_GEOMETRY, deps);
@@ -237,8 +237,10 @@ IX_MODULE_CLBK::create_resource(OfObject& object,
     {
         const CoreString filename = object.get_attribute("output_filename")->get_string();
         const CoreString gridname = object.get_attribute("grid")->get_string();
+        const bool native = mode == 0;
 
-        ResourceData_OpenVDBPoints* resourceData = openvdb_points::create_vdb_grid(application, filename, gridname);
+        ResourceData_OpenVDBPoints* resourceData = openvdb_points::create_vdb_grid(application, filename, gridname,
+                                                                    /*localise=*/native, /*cacheLeaves=*/native);
 
         // explicitly override radius if not supplied in the grid
         const bool overrideRadius = resourceData->attribute_type("pscale") == "";
@@ -510,9 +512,7 @@ namespace openvdb_points
 
                 for (PointDataTree::LeafNodeType::IndexOnIter iter = leaf->beginIndexOn(); iter; ++iter)
                 {
-                    // VDB Points resource uses index-space velocity so need to revert this back to world-space
-
-                    const openvdb::Vec3f velocity = transform.indexToWorld(velocityHandle->get(*iter));
+                    const openvdb::Vec3f velocity = velocityHandle->get(*iter);
 
                     array[arrayIndex][0] = velocity.x();
                     array[arrayIndex][1] = velocity.y();
