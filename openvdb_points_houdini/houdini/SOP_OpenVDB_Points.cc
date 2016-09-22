@@ -82,50 +82,6 @@ enum COMPRESSION_TYPE
     UNIT_VECTOR
 };
 
-inline Name
-attrStringTypeFromGAAttribute(GA_Attribute const * attribute)
-{
-    if (!attribute) {
-        std::stringstream ss; ss << "Invalid attribute - " << attribute->getName();
-        throw std::runtime_error(ss.str());
-    }
-
-    if (attribute->getAIFStringTuple()) {
-        return "string";
-    }
-
-    const GA_AIFTuple* tupleAIF = attribute->getAIFTuple();
-    if (!tupleAIF) {
-        std::stringstream ss; ss << "Invalid attribute type - " << attribute->getName();
-        throw std::runtime_error(ss.str());
-    }
-
-    const GA_Storage storage = tupleAIF->getStorage(attribute);
-
-    const int16_t width = static_cast<int16_t>(tupleAIF->getTupleSize(attribute));
-
-    if (width == 3 || width == 4)
-    {
-        // note: process 4-component vectors as 3-component vectors for now
-
-        if (storage == GA_STORE_INT32)          return "vec3i";
-        else if (storage == GA_STORE_REAL32)    return "vec3s";
-        else if (storage == GA_STORE_REAL64)    return "vec3d";
-    }
-    else
-    {
-        if (storage == GA_STORE_BOOL)           return "bool";
-        else if (storage == GA_STORE_INT16)     return "int16";
-        else if (storage == GA_STORE_INT32)     return "int32";
-        else if (storage == GA_STORE_INT64)     return "int64";
-        else if (storage == GA_STORE_REAL32)    return "float";
-        else if (storage == GA_STORE_REAL64)    return "double";
-    }
-
-    std::stringstream ss; ss << "Unknown attribute type - " << attribute->getName();
-    throw std::runtime_error(ss.str());
-}
-
 template <typename AttributeType, bool Strided>
 void
 convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree, const openvdb::Name& name,
@@ -855,34 +811,51 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
 
                     if (!attribute) continue;
 
-                    const Name type(attrStringTypeFromGAAttribute(attribute));
+                    // only tuple and string tuple attributes are supported
 
-                    int valueCompression = 0;
+                    const GA_AIFTuple* tupleAIF = attribute->getAIFTuple();
+                    const GA_AIFStringTuple* stringAIF = attribute->getAIFStringTuple();
 
-                    // when converting specific attributes apply chosen compression.
-
-                    valueCompression = evalIntInst("valuecompression#", &i, 0, 0);
-
-                    std::stringstream ss;
-                    ss <<   "Invalid value compression for attribute - " << attributeName << ". " <<
-                            "Disabling compression for this attribute.";
-
-                    if (valueCompression == TRUNCATE)
-                    {
-                        if (type != "float" && type != "vec3s") {
-                            valueCompression = 0;
-                            addWarning(SOP_MESSAGE, ss.str().c_str());
-                        }
-                    }
-                    else if (valueCompression == UNIT_VECTOR)
-                    {
-                        if (type != "vec3s") {
-                            valueCompression = 0;
-                            addWarning(SOP_MESSAGE, ss.str().c_str());
-                        }
+                    if (!tupleAIF && !stringAIF) {
+                        std::stringstream ss; ss << "Invalid attribute type - " << attribute->getName();
+                        throw std::runtime_error(ss.str());
                     }
 
                     const bool bloscCompression = evalIntInst("blosccompression#", &i, 0, 0);
+                    int valueCompression = evalIntInst("valuecompression#", &i, 0, 0);
+
+                    // check value compression compatibility with attribute type
+
+                    if (valueCompression != NONE)
+                    {
+                        if (stringAIF) {
+                            // disable value compression for strings and add a SOP warning
+
+                            std::stringstream ss; ss << "Value compression not supported on string attributes. "
+                                                        "Disabling compression for attribute \"" << attributeName << "\".";
+                            valueCompression = NONE;
+                            addWarning(SOP_MESSAGE, ss.str().c_str());
+                        }
+                        else if (tupleAIF) {
+                            // disable value compression for incompatible types and add a SOP warning
+
+                            const GA_Storage storage = tupleAIF->getStorage(attribute);
+                            const int16_t width = static_cast<int16_t>(tupleAIF->getTupleSize(attribute));
+
+                            if (valueCompression == TRUNCATE && storage != GA_STORE_REAL32) {
+                                std::stringstream ss; ss << "Truncate value compression only supported for 32-bit floating-point attributes. "
+                                                            "Disabling compression for attribute \"" << attributeName << "\".";
+                                valueCompression = NONE;
+                                addWarning(SOP_MESSAGE, ss.str().c_str());
+                            }
+                            if (valueCompression == UNIT_VECTOR && storage != GA_STORE_REAL32 && width != 3) {
+                                std::stringstream ss; ss << "Unit Vector value compression only supported for vector 3 x 32-bit floating-point attributes. "
+                                                            "Disabling compression for attribute \"" << attributeName << "\".";
+                                valueCompression = NONE;
+                                addWarning(SOP_MESSAGE, ss.str().c_str());
+                            }
+                        }
+                    }
 
                     attributes[attributeName] = std::pair<int, bool>(valueCompression, bloscCompression);
                 }

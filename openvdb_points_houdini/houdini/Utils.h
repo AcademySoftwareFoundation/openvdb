@@ -375,7 +375,9 @@ convertPointDataGridToHoudini(GU_Detail& detail,
 
         const openvdb::Name& name = it->first;
 
-        openvdb::Name type = descriptor.type(it->second).first;
+        const openvdb::NamePair& type = descriptor.type(it->second);
+        openvdb::Name valueType = type.first;
+        openvdb::Name codec = type.second;
 
         // position handled explicitly
         if (name == "P")    continue;
@@ -392,18 +394,31 @@ convertPointDataGridToHoudini(GU_Detail& detail,
 
         // explicitly handle string attribute type
         const openvdb::tools::AttributeArray& array = leafIter->attributeArray(it->second);
-        if (isString(array))   type = "string";
+        if (isString(array))   valueType = "string";
 
         const openvdb::Index stride = array.stride();
+
+        const bool truncate = codec == openvdb::tools::TruncateCodec::name();
 
         // create the attribute if it doesn't already exist in the detail
         if (attributeRef.isInvalid()) {
 
-            const GA_Storage storage = gaStorageFromAttrString(type);
+            GA_Storage storage(GA_STORE_INVALID);
 
-            if (storage == GA_STORE_INVALID)    continue;
+            if (valueType == "string")                                  storage = GA_STORE_STRING;
+            else if (valueType == "bool")                               storage = GA_STORE_BOOL;
+            else if (valueType == "int16")                              storage = GA_STORE_INT16;
+            else if (valueType == "int32" || valueType == "vec3i")      storage = GA_STORE_INT32;
+            else if (valueType == "int64")                              storage = GA_STORE_INT64;
+            else if (valueType == "float" || valueType == "vec3s") {
+                // truncated float values are converted back to half
+                if (truncate)                                           storage = GA_STORE_REAL16;
+                else                                                    storage = GA_STORE_REAL32;
+            }
+            else if (valueType == "double")                             storage = GA_STORE_REAL64;
+            else                                                        continue;
 
-            const bool isVector = boost::starts_with(type, "vec3");
+            const bool isVector = boost::starts_with(valueType, "vec3");
             const unsigned width = isVector ? 3 : array.stride();
             const GA_Defaults defaults = gaDefaultsFromDescriptor(descriptor, name);
 
@@ -417,48 +432,48 @@ convertPointDataGridToHoudini(GU_Detail& detail,
             }
         }
 
-        if (type == "string") {
+        if (valueType == "string") {
             HoudiniWriteAttribute<openvdb::Name> attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups);
         }
-        else if (type == "bool") {
+        else if (valueType == "bool") {
             HoudiniWriteAttribute<bool> attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups);
         }
-        else if (type == "int16") {
+        else if (valueType == "int16") {
             HoudiniWriteAttribute<int16_t> attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups);
         }
-        else if (type == "int32") {
+        else if (valueType == "int32") {
             HoudiniWriteAttribute<int32_t> attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups);
         }
-        else if (type == "int64") {
+        else if (valueType == "int64") {
             HoudiniWriteAttribute<int64_t> attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups);
         }
-        else if (type == "float") {
+        else if (valueType == "float") {
             HoudiniWriteAttribute<float> attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups);
         }
-        else if (type == "double") {
+        else if (valueType == "double") {
             HoudiniWriteAttribute<double> attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups);
         }
-        else if (type == "vec3i") {
+        else if (valueType == "vec3i") {
             HoudiniWriteAttribute<openvdb::math::Vec3<int> > attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups);
         }
-        else if (type == "vec3s") {
+        else if (valueType == "vec3s") {
             HoudiniWriteAttribute<openvdb::math::Vec3<float> > attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups);
         }
-        else if (type == "vec3d") {
+        else if (valueType == "vec3d") {
             HoudiniWriteAttribute<openvdb::math::Vec3<double> > attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups);
         }
         else {
-            throw std::runtime_error("Unknown Attribute Type for Conversion: " + type);
+            throw std::runtime_error("Unknown Attribute Type for Conversion: " + valueType);
         }
     }
 
