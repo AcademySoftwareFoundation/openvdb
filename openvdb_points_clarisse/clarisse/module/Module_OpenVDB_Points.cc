@@ -193,20 +193,33 @@ IX_MODULE_CLBK::on_attribute_change(OfObject& object,
         const std::string filename = object.get_attribute("filename")->get_string().get_data();
         object.get_attribute("output_filename")->set_string(filename.c_str());
     }
-    else if (attr_name == "override_radius")
+    else if (attr_name == "mode")
     {
-        // adjust whether radius attributes are read-only based on override
-
-        if (attr.get_bool())
+        if (attr.get_long() == /*native*/0)
         {
-            object.get_attribute("explicit_radius")->set_read_only(false);
-            object.get_attribute("radius_scale")->set_read_only(true);
+            // if native, read-only property based on whether radius is being overridden
+
+            object.get_attribute("override_radius")->set_read_only(false);
+            const bool override = object.get_attribute("override_radius")->get_bool();
+            object.get_attribute("explicit_radius")->set_read_only(!override);
+            object.get_attribute("radius_scale")->set_read_only(override);
         }
         else
         {
+            // otherwise, all radius attributes are read-only
+
+            object.get_attribute("override_radius")->set_read_only(true);
+            object.get_attribute("radius_scale")->set_read_only(true);
             object.get_attribute("explicit_radius")->set_read_only(true);
-            object.get_attribute("radius_scale")->set_read_only(false);
         }
+    }
+    else if (attr_name == "override_radius")
+    {
+        // read-only property based on whether radius is being overridden
+
+        const bool override = attr.get_bool();
+        object.get_attribute("explicit_radius")->set_read_only(!override);
+        object.get_attribute("radius_scale")->set_read_only(override);
     }
 }
 
