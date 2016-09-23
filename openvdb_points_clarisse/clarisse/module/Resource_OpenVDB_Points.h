@@ -53,6 +53,7 @@
 class Geometry_OpenVDBPoints;
 class ParticleCloud;
 class GeometryPropertyCollection;
+class GeometryPointPropertyCollection;
 
 
 ////////////////////////////////////////
@@ -77,6 +78,12 @@ namespace openvdb_points
     ParticleCloud*
     create_clarisse_particle_cloud( OfApp& application, ResourceData_OpenVDBPoints& data,
                                     const bool loadVelocities = false);
+
+    /// Create a Clarisse GeometryPointPropertyCollection from a ResourceData_OpenVDBPoints object
+    /// @param application      used for adding progress bars
+    /// @param data             the ResourceData_OpenVDBPoints
+    GeometryPointPropertyCollection*
+    create_clarisse_particle_cloud_geometry_property(OfApp& application, ResourceData_OpenVDBPoints& data);
 
     /// Create a Geometry_OpenVDBPoints object from a ResourceData_OpenVDBPoints object
     /// @param application      used for adding progress bars

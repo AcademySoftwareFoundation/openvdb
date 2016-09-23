@@ -46,6 +46,7 @@
 #include <module_geometry.h>
 #include <module_object.h>
 #include <geometry_point_cloud.h>
+#include <geometry_point_property_collection.h>
 #include <geometry_property_collection.h>
 #include <particle_cloud.h>
 #include <app_object.h>
@@ -293,7 +294,12 @@ IX_MODULE_CLBK::create_resource(OfObject& object,
 
         if (!data)  return 0;
 
-        return openvdb_points::create_openvdb_points_geometry_property(application, *data);
+        if (mode == 0) {
+            return create_openvdb_points_geometry_property(application, *data);
+        }
+        else if (mode == 1) {
+            return create_clarisse_particle_cloud_geometry_property(application, *data);
+        }
     }
 
     return 0;

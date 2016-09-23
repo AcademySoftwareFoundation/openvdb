@@ -41,9 +41,15 @@
 
 #include <iostream>
 
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/utility/enable_if.hpp>
+
 #include <particle_cloud.h>
 #include <geometry_point_cloud.h>
+#include <geometry_property.h>
 #include <geometry_property_collection.h>
+#include <geometry_point_property.h>
+#include <geometry_point_property_collection.h>
 #include <of_app.h>
 #include <sys_filesystem.h>
 #include <app_progress_bar.h>
@@ -61,223 +67,426 @@ using namespace openvdb::tools;
 
 ////////////////////////////////////////
 
-
 namespace openvdb_points
 {
-    ResourceData_OpenVDBPoints*
-    create_vdb_grid(OfApp& application, const CoreString& filename, const CoreString& gridname, const bool doLocalise, const bool cacheLeaves)
+
+namespace resource_internal
+{
+
+class PropertyDataInfo : public GeometryProperty::LoadDataInfo
+{
+public:
+    PropertyDataInfo(
+        const ResourceData_OpenVDBPoints& resourceData,
+        GeometryPointProperty* property,
+        GeometryPointPropertyCollection* propertyCollection)
+    : mResourceData(resourceData)
+    , mProperty(property)
+    , mPropertyCollection(propertyCollection) {}
+
+    unsigned int extent() const { return mProperty->get_value_extent(); }
+    size_t size() const { return mProperty->get_value_extent() * mProperty->get_value_count(); }
+    PointDataGrid::ConstPtr grid() const { return mResourceData.grid(); }
+    std::string name() const { return mProperty->get_name().get_data(); }
+    bool isPosition() const { return name() == "P"; }
+
+    template <typename T>
+    void set_values(const unsigned int& sampleIndex, const CoreArray<T>& values)
     {
-        // early exit if file does not exist on disk
+        ResourceProperty* const data = new ResourceProperty(this->name().c_str());
+        data->init(mProperty->get_value_type(), this->extent(), mProperty->get_value_count());
+        data->set_values(values.get_data());
 
-        if (!SysFilesystem::file_exists(filename))      return 0;
+        if(!mProperty->init(sampleIndex, data))     delete data;
+        else                                        mPropertyCollection->advert_memory_changed();
+    }
 
-        AppProgressBar* read_progress_bar = application.create_progress_bar(CoreString("Loading VDB Points Data: ") + filename + " " + gridname);
+private:
+    const ResourceData_OpenVDBPoints&       mResourceData;
+    GeometryPointProperty* const            mProperty;
+    GeometryPointPropertyCollection* const  mPropertyCollection;
+}; // class PropertyDataInfo
 
-        // attempt to open and load the VDB grid from the file
+template<typename ValueType>
+static typename boost::enable_if_c<openvdb::VecTraits<ValueType>::IsVec>::type
+indexToWorld(ValueType& value, const openvdb::Coord& ijk, const openvdb::math::Transform& transform) {
+    value = transform.indexToWorld(value + ijk.asVec3s());
+}
 
-        PointDataGrid::Ptr grid;
+template<typename ValueType>
+static typename boost::disable_if_c<openvdb::VecTraits<ValueType>::IsVec>::type
+indexToWorld(ValueType& value, const openvdb::Coord& ijk, const openvdb::math::Transform& transform) {}
 
-        int error = 0;
+// @TODO support mat and quaternions
 
-        try {
-            grid = load(filename.get_data(), gridname.get_data());
+template<typename ValueType>
+static typename boost::enable_if_c<openvdb::VecTraits<ValueType>::IsVec>::type
+setValue(CoreArray<typename openvdb::VecTraits<ValueType>::ElementType>& values, unsigned int& index, const ValueType& value)
+{
+    for(size_t i = 0; i < openvdb::VecTraits<ValueType>::Size; ++i)
+        values[index++] = value[i];
+}
+
+template<typename ValueType>
+static typename boost::disable_if_c<openvdb::VecTraits<ValueType>::IsVec>::type
+setValue(CoreArray<ValueType>& values, unsigned int& index, const ValueType& value)
+{
+    values[index++] = value;
+}
+
+// Helper for deferred property loading using attribute data from the VDB Grid.
+
+template<typename ValueType>
+static void buildProperty(const unsigned int& sampleIndex, GeometryProperty::LoadDataInfo* loadInfo)
+{
+    typedef openvdb::tools::AttributeHandle<ValueType>           HandleType;
+    typedef openvdb::tools::PointDataTree::LeafNodeType          LeafNodeType;
+    typedef typename openvdb::VecTraits<ValueType>::ElementType  ElementType;
+
+    PropertyDataInfo* const info = (PropertyDataInfo*)loadInfo;
+
+    const std::string name = info->name();
+    const size_t size = info->size();
+
+    // @TODO remove this assert when mats are supported
+
+    assert(info->extent() == openvdb::VecTraits<ValueType>::Size);
+
+    CoreArray<ElementType> values(size);
+    unsigned int index = 0;
+
+    const openvdb::tools::PointDataGrid::ConstPtr grid = info->grid();
+
+    for (openvdb::tools::PointDataTree::LeafCIter leafIter = grid->tree().cbeginLeaf(); leafIter; ++leafIter)
+    {
+        typename HandleType::Ptr handle = HandleType::create(leafIter->constAttributeArray(name));
+
+        for (LeafNodeType::IndexOnIter indexIter = leafIter->beginIndexOn(); indexIter; ++indexIter) {
+
+            ValueType value = handle->get(*indexIter);
+
+            // Transform position to world space
+            if(info->isPosition()) indexToWorld(value, indexIter.getCoord(), grid->transform());
+            setValue(values, index, value);
         }
-        catch (const openvdb::IoError& e) {
-            std::cerr << "ERROR: Unable to open VDB file (" << filename.get_data() << "): " << e.what() << "\n";
-            error = 1;
-        }
-        catch (const openvdb::KeyError& e) {
-            std::cerr << "ERROR: Unable to retrieve grid (" << gridname.get_data() << ") from VDB file: " << e.what() << "\n";
-            error = 1;
-        }
-        catch (const std::exception& e) {
-            std::cerr << "ERROR: Unknown error accessing (" << gridname.get_data() << "): " << e.what() << "\n";
-            error = 1;
-        }
+    }
 
-        if (!grid)  error = 1;
+    assert(index == size);
 
-        read_progress_bar->destroy();
+    info->set_values(sampleIndex, values);
+}
 
-        if (error)  return 0;
+} // namespace resource_internal
 
-        // localising velocity and radius
 
-        if(doLocalise)
+////////////////////////////////////////
+
+
+ResourceData_OpenVDBPoints*
+create_vdb_grid(OfApp& application, const CoreString& filename, const CoreString& gridname, const bool doLocalise, const bool cacheLeaves)
+{
+    // early exit if file does not exist on disk
+
+    if (!SysFilesystem::file_exists(filename))      return 0;
+
+    AppProgressBar* read_progress_bar = application.create_progress_bar(CoreString("Loading VDB Points Data: ") + filename + " " + gridname);
+
+    // attempt to open and load the VDB grid from the file
+
+    PointDataGrid::Ptr grid;
+
+    int error = 0;
+    std::stringstream ostr;
+
+    try {
+        grid = load(filename.get_data(), gridname.get_data());
+    }
+    catch (const openvdb::IoError& e) {
+        ostr << "ERROR: Unable to open VDB file (" << filename.get_data() << "): " << e.what() << std::endl;
+        LOG_ERROR(ostr.str().c_str());
+        error = 1;
+    }
+    catch (const openvdb::KeyError& e) {
+        ostr << "ERROR: Unable to retrieve grid (" << gridname.get_data() << ") from VDB file: " << e.what() << std::endl;
+        LOG_ERROR(ostr.str().c_str());
+        error = 1;
+    }
+    catch (const std::exception& e) {
+        ostr << "ERROR: Unknown error accessing (" << gridname.get_data() << "): " << e.what() << std::endl;
+        LOG_ERROR(ostr.str().c_str());
+        error = 1;
+    }
+
+    if (!grid)  error = 1;
+
+    read_progress_bar->destroy();
+
+    if (error)  return 0;
+
+    // localising velocity and radius
+
+    if(doLocalise)
+    {
+        AppProgressBar* localise_progress_bar = application.create_progress_bar(CoreString("Localising Velocity and Radius for ") + gridname);
+
+        localise(grid);
+
+        localise_progress_bar->destroy();
+    }
+
+    // create the resource
+
+    return ResourceData_OpenVDBPoints::create(grid, cacheLeaves);
+}
+
+Geometry_OpenVDBPoints*
+create_openvdb_points_geometry(OfApp& application, ResourceData_OpenVDBPoints& data, const double fps, const bool overrideRadius, const double radius)
+{
+    PointDataGrid::Ptr grid = data.grid();
+
+    if (!grid)  return 0;
+    if (!grid->tree().cbeginLeaf())     return 0;
+
+    // check descriptor for velocity and radius (pscale)
+
+    PointDataTree::LeafCIter iter = grid->tree().cbeginLeaf();
+
+    assert(iter);
+
+    // retrieve motion blur length and direction
+
+    const double motionBlurLength = application.get_motion_blur_length();
+    const int motionBlurDirection = application.get_motion_blur_direction();
+    const AppBase::MotionBlurDirectionMode motionBlurMode =
+                        application.get_motion_blur_direction_mode_from_value(motionBlurDirection);
+
+    Geometry_OpenVDBPoints* geometry = Geometry_OpenVDBPoints::create(  grid, overrideRadius, radius,
+                                                                        fps, motionBlurLength, motionBlurMode);
+
+    if (geometry)
+    {
+        AppProgressBar* acc_progress_bar = application.create_progress_bar(CoreString("Computing VDB Point Acceleration Structures"));
+
+        geometry->computeAccelerationStructures();
+
+        acc_progress_bar->destroy();
+    }
+
+    return geometry;
+}
+
+GeometryPropertyCollection*
+create_openvdb_points_geometry_property(OfApp& application, ResourceData_OpenVDBPoints& data)
+{
+    GeometryPropertyCollection *property_array = new GeometryPropertyCollection;
+
+    CoreVector<GeometryProperty*> properties;
+
+    PointDataGrid::Ptr grid = data.grid();
+
+    if (!grid)  return property_array;
+
+    const PointDataTree& tree = grid->tree();
+
+    PointDataTree::LeafCIter iter = tree.cbeginLeaf();
+
+    if (!iter)  return property_array;
+
+    const AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
+
+    for (AttributeSet::Descriptor::ConstIterator it = descriptor.map().begin(),
+        end = descriptor.map().end(); it != end; ++it) {
+
+        const openvdb::NamePair& type = descriptor.type(it->second);
+
+        // only floating point property types are supported
+
+        if (type.first != "float" && type.first != "vec3s")   continue;
+
+        properties.add(new GeometryProperty_OpenVDBPoints(&data, it->first, type.first));
+    }
+
+    property_array->set(properties);
+
+    return property_array;
+}
+
+ParticleCloud*
+create_clarisse_particle_cloud(OfApp& application, ResourceData_OpenVDBPoints& data, const bool loadVelocities)
+{
+    const PointDataGrid::Ptr grid = data.grid();
+
+    if (!grid)                  return new ParticleCloud();
+
+    const PointDataTree& tree = grid->tree();
+
+
+    if (!tree.cbeginLeaf())     return new ParticleCloud();
+
+    const openvdb::Index64 size = activePointCount(tree);
+
+    if (size == 0)              return new ParticleCloud();
+
+    CoreArray<GMathVec3f> array(size);
+
+    // load Clarisse particle positions
+
+    AppProgressBar* convert_progress_bar = application.create_progress_bar(CoreString("Converting Point Positions into Clarisse"));
+
+    const openvdb::math::Transform& transform = grid->transform();
+
+    unsigned arrayIndex = 0;
+
+    for (PointDataTree::LeafCIter leaf = tree.cbeginLeaf(); leaf; ++leaf)
+    {
+        const AttributeHandle<openvdb::Vec3f>::Ptr positionHandle =
+            AttributeHandle<openvdb::Vec3f>::create(leaf->constAttributeArray("P"));
+
+        for (PointDataTree::LeafNodeType::IndexOnIter iter = leaf->beginIndexOn(); iter; ++iter)
         {
-            AppProgressBar* localise_progress_bar = application.create_progress_bar(CoreString("Localising Velocity and Radius for ") + gridname);
+            const openvdb::Vec3f positionVoxelSpace = positionHandle->get(*iter);
+            const openvdb::Vec3d positionIndexSpace = positionVoxelSpace + iter.getCoord().asVec3d();
+            const openvdb::Vec3d positionWorldSpace = transform.indexToWorld(positionIndexSpace);
 
-            localise(grid);
+            array[arrayIndex][0] = positionWorldSpace[0];
+            array[arrayIndex][1] = positionWorldSpace[1];
+            array[arrayIndex][2] = positionWorldSpace[2];
 
-            localise_progress_bar->destroy();
+            arrayIndex++;
         }
-
-        // create the resource
-
-        return ResourceData_OpenVDBPoints::create(grid, cacheLeaves);
     }
 
-    Geometry_OpenVDBPoints*
-    create_openvdb_points_geometry(OfApp& application, ResourceData_OpenVDBPoints& data, const double fps, const bool overrideRadius, const double radius)
+    convert_progress_bar->destroy();
+
+    // construct the point cloud
+
+    AppProgressBar* cloud_progress_bar = application.create_progress_bar(CoreString("Creating Clarisse Point Cloud"));
+
+    GeometryPointCloud pointCloud;
+
+    pointCloud.init(array.get_count());
+    pointCloud.init_positions(array.get_data());
+
+    cloud_progress_bar->destroy();
+
+    // load the velocities (only if v attribute exists)
+
+    if (loadVelocities && tree.cbeginLeaf()->hasAttribute("v"))
     {
-        PointDataGrid::Ptr grid = data.grid();
+        AppProgressBar* velocity_progress_bar = application.create_progress_bar(CoreString("Loading Velocities into Point Cloud"));
 
-        if (!grid)  return 0;
-        if (!grid->tree().cbeginLeaf())     return 0;
-
-        // check descriptor for velocity and radius (pscale)
-
-        PointDataTree::LeafCIter iter = grid->tree().cbeginLeaf();
-
-        assert(iter);
-
-        // retrieve motion blur length and direction
-
-        const double motionBlurLength = application.get_motion_blur_length();
-        const int motionBlurDirection = application.get_motion_blur_direction();
-        const AppBase::MotionBlurDirectionMode motionBlurMode =
-                            application.get_motion_blur_direction_mode_from_value(motionBlurDirection);
-
-        Geometry_OpenVDBPoints* geometry = Geometry_OpenVDBPoints::create(  grid, overrideRadius, radius,
-                                                                            fps, motionBlurLength, motionBlurMode);
-
-        if (geometry)
-        {
-            AppProgressBar* acc_progress_bar = application.create_progress_bar(CoreString("Computing VDB Point Acceleration Structures"));
-
-            geometry->computeAccelerationStructures();
-
-            acc_progress_bar->destroy();
-        }
-
-        return geometry;
-    }
-
-    GeometryPropertyCollection*
-    create_openvdb_points_geometry_property(OfApp& application, ResourceData_OpenVDBPoints& data)
-    {
-        GeometryPropertyCollection *property_array = new GeometryPropertyCollection;
-
-        CoreVector<GeometryProperty*> properties;
-
-        PointDataGrid::Ptr grid = data.grid();
-
-        if (!grid)  return property_array;
-
-        const PointDataTree& tree = grid->tree();
-
-        PointDataTree::LeafCIter iter = tree.cbeginLeaf();
-
-        if (!iter)  return property_array;
-
-        const AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
-
-        for (AttributeSet::Descriptor::ConstIterator it = descriptor.map().begin(),
-            end = descriptor.map().end(); it != end; ++it) {
-
-            const openvdb::NamePair& type = descriptor.type(it->second);
-
-            // only floating point property types are supported
-
-            if (type.first != "float" && type.first != "vec3s")   continue;
-
-            properties.add(new GeometryProperty_OpenVDBPoints(&data, it->first, type.first));
-        }
-
-        property_array->set(properties);
-
-        return property_array;
-    }
-
-    ParticleCloud*
-    create_clarisse_particle_cloud(OfApp& application, ResourceData_OpenVDBPoints& data, const bool loadVelocities)
-    {
-        const PointDataGrid::Ptr grid = data.grid();
-
-        if (!grid)                  return new ParticleCloud();
-
-        const PointDataTree& tree = grid->tree();
-
-        if (!tree.cbeginLeaf())     return new ParticleCloud();
-
-        const openvdb::Index64 size = pointCount(tree);
-
-        if (size == 0)              return new ParticleCloud();
-
-        CoreArray<GMathVec3d> array(size);
-
-        // load Clarisse particle positions
-
-        AppProgressBar* convert_progress_bar = application.create_progress_bar(CoreString("Converting Point Positions into Clarisse"));
-
-        const openvdb::math::Transform& transform = grid->transform();
-
-        unsigned arrayIndex = 0;
+        arrayIndex = 0;
 
         for (PointDataTree::LeafCIter leaf = tree.cbeginLeaf(); leaf; ++leaf)
         {
-            const AttributeHandle<openvdb::Vec3f>::Ptr positionHandle =
-                AttributeHandle<openvdb::Vec3f>::create(leaf->constAttributeArray("P"));
+            const AttributeHandle<openvdb::Vec3f>::Ptr velocityHandle =
+                AttributeHandle<openvdb::Vec3f>::create(leaf->constAttributeArray("v"));
 
             for (PointDataTree::LeafNodeType::IndexOnIter iter = leaf->beginIndexOn(); iter; ++iter)
             {
-                const openvdb::Vec3f positionVoxelSpace = positionHandle->get(*iter);
-                const openvdb::Vec3d positionIndexSpace = positionVoxelSpace + iter.getCoord().asVec3d();
-                const openvdb::Vec3d positionWorldSpace = transform.indexToWorld(positionIndexSpace);
+                const openvdb::Vec3f velocity = velocityHandle->get(*iter);
 
-                array[arrayIndex][0] = positionWorldSpace[0];
-                array[arrayIndex][1] = positionWorldSpace[1];
-                array[arrayIndex][2] = positionWorldSpace[2];
+                array[arrayIndex][0] = velocity.x();
+                array[arrayIndex][1] = velocity.y();
+                array[arrayIndex][2] = velocity.z();
 
                 arrayIndex++;
             }
         }
 
-        convert_progress_bar->destroy();
+        pointCloud.init_velocities(array.get_data());
 
-        // construct the point cloud
+        velocity_progress_bar->destroy();
+    }
 
-        AppProgressBar* cloud_progress_bar = application.create_progress_bar(CoreString("Creating Clarisse Point Cloud"));
+    return new ParticleCloud(pointCloud);
+}
 
-        GeometryPointCloud pointCloud;
 
-        pointCloud.init(array.get_count());
-        pointCloud.init_positions(array.get_data());
+GeometryPointPropertyCollection*
+create_clarisse_particle_cloud_geometry_property(OfApp& application, ResourceData_OpenVDBPoints& data)
+{
+    using resource_internal::PropertyDataInfo;
+    using resource_internal::buildProperty;
 
-        cloud_progress_bar->destroy();
+    GeometryPointPropertyCollection* collection = new GeometryPointPropertyCollection;
 
-        // load the velocities (only if v attribute exists)
+    openvdb::tools::PointDataGrid::Ptr grid = data.grid();
 
-        if (loadVelocities && tree.cbeginLeaf()->hasAttribute("v"))
-        {
-            AppProgressBar* velocity_progress_bar = application.create_progress_bar(CoreString("Loading Velocities into Point Cloud"));
+    if(!grid)  return collection;
 
-            arrayIndex = 0;
+    const openvdb::tools::PointDataTree& tree = grid->tree();
+    const openvdb::tools::PointDataTree::LeafCIter iter = tree.cbeginLeaf();
 
-            for (PointDataTree::LeafCIter leaf = tree.cbeginLeaf(); leaf; ++leaf)
-            {
-                const AttributeHandle<openvdb::Vec3f>::Ptr velocityHandle =
-                    AttributeHandle<openvdb::Vec3f>::create(leaf->constAttributeArray("v"));
+    if(!iter) return collection;
 
-                for (PointDataTree::LeafNodeType::IndexOnIter iter = leaf->beginIndexOn(); iter; ++iter)
-                {
-                    const openvdb::Vec3f velocity = velocityHandle->get(*iter);
+    const unsigned int numPoints = activePointCount(tree);
 
-                    array[arrayIndex][0] = velocity.x();
-                    array[arrayIndex][1] = velocity.y();
-                    array[arrayIndex][2] = velocity.z();
+    if(numPoints == 0) return collection;
 
-                    arrayIndex++;
-                }
-            }
+    CoreVector<GeometryPointProperty*> properties;
 
-            pointCloud.init_velocities(array.get_data());
+    const openvdb::tools::AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
 
-            velocity_progress_bar->destroy();
+    for (openvdb::tools::AttributeSet::Descriptor::ConstIterator it = descriptor.map().begin(),
+        end = descriptor.map().end(); it != end; ++it)
+    {
+        const openvdb::Name name = it->first;
+
+        // don't expose group attributes as properties
+        if (descriptor.hasGroup(name))  continue;
+
+        const openvdb::Name& valueType = descriptor.valueType(it->second);
+        ResourceProperty::Type resourceType(ResourceProperty::TYPE_COUNT);
+
+        if (valueType == "bool")         resourceType = ResourceProperty::TYPE_INT_8;
+        else if (valueType == "int16")   resourceType = ResourceProperty::TYPE_INT_16;
+        else if (valueType == "int32")   resourceType = ResourceProperty::TYPE_INT_32;
+        else if (valueType == "int64")   resourceType = ResourceProperty::TYPE_INT_64;
+        else if (valueType == "float")   resourceType = ResourceProperty::TYPE_FLOAT_32;
+        else if (valueType == "double")  resourceType = ResourceProperty::TYPE_FLOAT_64;
+        else if (valueType == "vec3i")   resourceType = ResourceProperty::TYPE_INT_32;
+        else if (valueType == "vec3s")   resourceType = ResourceProperty::TYPE_FLOAT_32;
+        else if (valueType == "vec3d")   resourceType = ResourceProperty::TYPE_FLOAT_64;
+        else {
+            std::ostringstream ostr;
+            ostr << "Unsupported Attribute \"" << name << "\" with type \"" << valueType << "\". Skipping.";
+            LOG_ERROR(ostr.str().c_str());
+            continue;
         }
 
-        return new ParticleCloud(pointCloud);
+        const size_t resourceSize = boost::starts_with(valueType, "vec3") ? 3 : 1;
+
+        GeometryPointProperty* property = new GeometryPointProperty(name.c_str(), GMathTimeSampling(0), resourceType, numPoints, resourceSize, 0);
+        PropertyDataInfo* info = new PropertyDataInfo(data, property, collection);
+
+        if (valueType == "bool")         property->set_deferred_loading(&buildProperty<bool>, info);
+        else if (valueType == "int16")   property->set_deferred_loading(&buildProperty<int16_t>, info);
+        else if (valueType == "int32")   property->set_deferred_loading(&buildProperty<int32_t>, info);
+        else if (valueType == "int64")   property->set_deferred_loading(&buildProperty<int64_t>, info);
+        else if (valueType == "float")   property->set_deferred_loading(&buildProperty<float>, info);
+        else if (valueType == "double")  property->set_deferred_loading(&buildProperty<double>, info);
+        else if (valueType == "vec3i")   property->set_deferred_loading(&buildProperty<openvdb::Vec3i>, info);
+        else if (valueType == "vec3s")   property->set_deferred_loading(&buildProperty<openvdb::Vec3s>, info);
+        else if (valueType == "vec3d")   property->set_deferred_loading(&buildProperty<openvdb::Vec3d>, info);
+        else {
+            std::ostringstream ostr;
+            ostr << "Internal Error: Unsupport function callback for attribute type \"" << valueType << "\"";
+            LOG_ERROR(ostr.str().c_str());
+            delete info;
+            delete property;
+            continue;
+        }
+
+        properties.add(property);
     }
+
+    collection->set(properties);
+
+    return collection;
+}
+
+
 } // namespace openvdb_points
 
 
