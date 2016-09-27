@@ -61,15 +61,41 @@
 #include "Resource_OpenVDB_Points.h"
 
 
-using namespace openvdb;
-using namespace openvdb::tools;
+////////////////////////////////////////
+
+
+namespace openvdb {
+OPENVDB_USE_VERSION_NAMESPACE
+namespace OPENVDB_VERSION_NAME {
+
+// add VecTraits specialization for Quat<T> and Mat<SIZE, T> as the following
+// classes only need to know about the container size and type to flatten them
+
+template<typename T> struct VecTraits<math::Quat<T> > {
+    static const bool IsVec = true;
+    static const int Size = 4;
+    typedef T ElementType;
+};
+
+template<unsigned SIZE, typename T> struct VecTraits<math::Mat<SIZE, T> > {
+    static const bool IsVec = true;
+    static const int Size = SIZE*SIZE;
+    typedef T ElementType;
+};
+
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
 
 
 ////////////////////////////////////////
 
+
+using namespace openvdb;
+using namespace openvdb::tools;
+
+
 namespace openvdb_points
 {
-
 namespace resource_internal
 {
 
@@ -108,16 +134,14 @@ private:
 }; // class PropertyDataInfo
 
 template<typename ValueType>
-static typename boost::enable_if_c<openvdb::VecTraits<ValueType>::IsVec>::type
+static typename boost::enable_if_c<openvdb::VecTraits<ValueType>::Size==3>::type
 indexToWorld(ValueType& value, const openvdb::Coord& ijk, const openvdb::math::Transform& transform) {
     value = transform.indexToWorld(value + ijk.asVec3s());
 }
 
 template<typename ValueType>
-static typename boost::disable_if_c<openvdb::VecTraits<ValueType>::IsVec>::type
+static typename boost::disable_if_c<openvdb::VecTraits<ValueType>::Size==3>::type
 indexToWorld(ValueType& value, const openvdb::Coord& ijk, const openvdb::math::Transform& transform) {}
-
-// @TODO support mat and quaternions
 
 template<typename ValueType>
 static typename boost::enable_if_c<openvdb::VecTraits<ValueType>::IsVec>::type
@@ -147,10 +171,6 @@ static void buildProperty(const unsigned int& sampleIndex, GeometryProperty::Loa
 
     const std::string name = info->name();
     const size_t size = info->size();
-
-    // @TODO remove this assert when mats are supported
-
-    assert(info->extent() == openvdb::VecTraits<ValueType>::Size);
 
     CoreArray<ElementType> values(size);
     unsigned int index = 0;
@@ -448,6 +468,10 @@ create_clarisse_particle_cloud_geometry_property(OfApp& application, ResourceDat
         else if (valueType == "vec3i")   resourceType = ResourceProperty::TYPE_INT_32;
         else if (valueType == "vec3s")   resourceType = ResourceProperty::TYPE_FLOAT_32;
         else if (valueType == "vec3d")   resourceType = ResourceProperty::TYPE_FLOAT_64;
+        else if (valueType == "mat4s")   resourceType = ResourceProperty::TYPE_FLOAT_32;
+        else if (valueType == "mat4d")   resourceType = ResourceProperty::TYPE_FLOAT_64;
+        else if (valueType == "quats")   resourceType = ResourceProperty::TYPE_FLOAT_32;
+        else if (valueType == "quatd")   resourceType = ResourceProperty::TYPE_FLOAT_64;
         else {
             std::ostringstream ostr;
             ostr << "Unsupported Attribute \"" << name << "\" with type \"" << valueType << "\". Skipping.";
@@ -455,7 +479,11 @@ create_clarisse_particle_cloud_geometry_property(OfApp& application, ResourceDat
             continue;
         }
 
-        const size_t resourceSize = boost::starts_with(valueType, "vec3") ? 3 : 1;
+        size_t resourceSize(1);
+
+        if (boost::starts_with(valueType, "vec3"))          resourceSize = 3;
+        else if (boost::starts_with(valueType, "quat"))     resourceSize = 4;
+        else if (boost::starts_with(valueType, "mat4"))     resourceSize = 4*4;
 
         GeometryPointProperty* property = new GeometryPointProperty(name.c_str(), GMathTimeSampling(0), resourceType, numPoints, resourceSize, 0);
         PropertyDataInfo* info = new PropertyDataInfo(data, property, collection);
@@ -469,6 +497,10 @@ create_clarisse_particle_cloud_geometry_property(OfApp& application, ResourceDat
         else if (valueType == "vec3i")   property->set_deferred_loading(&buildProperty<openvdb::Vec3i>, info);
         else if (valueType == "vec3s")   property->set_deferred_loading(&buildProperty<openvdb::Vec3s>, info);
         else if (valueType == "vec3d")   property->set_deferred_loading(&buildProperty<openvdb::Vec3d>, info);
+        else if (valueType == "mat4s")   property->set_deferred_loading(&buildProperty<openvdb::math::Mat4<float> >, info);
+        else if (valueType == "mat4d")   property->set_deferred_loading(&buildProperty<openvdb::math::Mat4<double> >, info);
+        else if (valueType == "quats")   property->set_deferred_loading(&buildProperty<openvdb::math::Quat<float> >, info);
+        else if (valueType == "quatd")   property->set_deferred_loading(&buildProperty<openvdb::math::Quat<double> >, info);
         else {
             std::ostringstream ostr;
             ostr << "Internal Error: Unsupport function callback for attribute type \"" << valueType << "\"";
