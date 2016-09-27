@@ -177,10 +177,6 @@ ifneq (,$(strip $(wildcard $(CLARISSE_INCL_DIR))))
     CLARISSE_LDFLAGS :=
 endif
 
-ifneq ("$(wildcard $(CLARISSE_INCL_DIR)/geometry_property_collection.h)","")
-    CLARISSE_CXXFLAGS += -DCLARISSE_R3_OR_HIGHER
-endif
-
 ifneq ("$(wildcard $(CLARISSE_INCL_DIR)/ctx_scene_object.h)","")
     CLARISSE_CXXFLAGS += -DCLARISSE_R4_OR_HIGHER
 endif
@@ -209,12 +205,13 @@ LIBCLARISSE_INCLUDE_NAMES := \
 	clarisse/module/Geometry_OpenVDBPoints.h \
 	clarisse/module/GeometryProperty_OpenVDBPoints.h \
 	clarisse/module/ResourceData_OpenVDBPoints.h \
-	clarisse/module/Module_OpenVDB_Points.h \
+	clarisse/module/Resource_OpenVDB_Points.h \
 #
 LIBCLARISSE_SRC_NAMES := \
 	clarisse/module/Geometry_OpenVDBPoints.cc \
 	clarisse/module/GeometryProperty_OpenVDBPoints.cc \
 	clarisse/module/ResourceData_OpenVDBPoints.cc \
+	clarisse/module/Resource_OpenVDB_Points.cc \
 #
 LIBCLARISSE_CID_NAMES := \
 	clarisse/module/Geometry_OpenVDBPoints.cid \

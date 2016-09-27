@@ -28,16 +28,16 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 //
-/// @file Module_OpenVDB_Points.h
+/// @file Resource_OpenVDB_Points.h
 ///
 /// @author Dan Bailey
 ///
-/// @brief OpenVDB Points Module for Clarisse
+/// @brief OpenVDB Points Resource for Clarisse
 ///
 
 
-#ifndef OPENVDB_CLARISSE_MODULE_OPENVDB_POINTS_HAS_BEEN_INCLUDED
-#define OPENVDB_CLARISSE_MODULE_OPENVDB_POINTS_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_CLARISSE_RESOURCE_OPENVDB_POINTS_HAS_BEEN_INCLUDED
+#define OPENVDB_CLARISSE_RESOURCE_OPENVDB_POINTS_HAS_BEEN_INCLUDED
 
 
 #include <of_object.h>
@@ -52,6 +52,8 @@
 
 class Geometry_OpenVDBPoints;
 class ParticleCloud;
+class GeometryPropertyCollection;
+class GeometryPointPropertyCollection;
 
 
 ////////////////////////////////////////
@@ -65,27 +67,46 @@ namespace openvdb_points
     /// @param gridname         the name of the VDB grid to use
     /// @param localise         if true, pscale and v attributes will be transformed to index-space on resource creation
     /// @param cacheLeaves      if true, leaves are cached to a local array to reduce tree traversal time
-    ResourceData_OpenVDBPoints* create_vdb_grid(    OfApp& application, const CoreString& filename, const CoreString& gridname,
-                                                    const bool localise = true, const bool cacheLeaves = true);
+    ResourceData_OpenVDBPoints*
+    create_vdb_grid(OfApp& application, const CoreString& filename, const CoreString& gridname,
+                    const bool localise = true, const bool cacheLeaves = true);
 
     /// Create a Clarisse ParticleCloud object from a ResourceData_OpenVDBPoints object
     /// @param application      used for adding progress bars
     /// @param data             the ResourceData_OpenVDBPoints
-    ParticleCloud* create_clarisse_particle_cloud(  OfApp& application, ResourceData_OpenVDBPoints& data);
+    /// @param loadVelocities if true and v attribute available, store velocities on point cloud
+    ParticleCloud*
+    create_clarisse_particle_cloud( OfApp& application, ResourceData_OpenVDBPoints& data,
+                                    const bool loadVelocities = false);
+
+    /// Create a Clarisse GeometryPointPropertyCollection from a ResourceData_OpenVDBPoints object
+    /// @param application      used for adding progress bars
+    /// @param data             the ResourceData_OpenVDBPoints
+    GeometryPointPropertyCollection*
+    create_clarisse_particle_cloud_geometry_property(OfApp& application, ResourceData_OpenVDBPoints& data);
 
     /// Create a Geometry_OpenVDBPoints object from a ResourceData_OpenVDBPoints object
-    /// and parameters on the OpenVDBPoints node
-    Geometry_OpenVDBPoints* create_openvdb_points_geometry(OfObject& object);
+    /// @param application      used for adding progress bars
+    /// @param data             the ResourceData_OpenVDBPoints
+    /// @param fps              frames / second
+    /// @param overrideRadius   if true, radius parameter is interpreted as an explicit value otherwise as a scale
+    /// @param radius           an explicit or scale value depending on the value of overrideRadius
+    Geometry_OpenVDBPoints*
+    create_openvdb_points_geometry( OfApp& application, ResourceData_OpenVDBPoints& data,
+                                    const double fps, const bool overrideRadius, const double radius);
 
     /// Create a property array of GeometryProperty_OpenVDBPoints objects from a Geometry_OpenVDBPoints node
-    ResourceData* create_openvdb_points_geometry_property(OfObject& object);
+    /// @param application      used for adding progress bars
+    /// @param data             the ResourceData_OpenVDBPoints
+    GeometryPropertyCollection*
+    create_openvdb_points_geometry_property(OfApp& application, ResourceData_OpenVDBPoints& data);
 } // namespace openvdb_points
 
 
 ////////////////////////////////////////
 
 
-#endif // OPENVDB_CLARISSE_MODULE_OPENVDB_POINTS_HAS_BEEN_INCLUDED
+#endif // OPENVDB_CLARISSE_RESOURCE_OPENVDB_POINTS_HAS_BEEN_INCLUDED
 
 
 // Copyright (c) 2015-2016 Double Negative Visual Effects

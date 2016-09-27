@@ -37,7 +37,6 @@
 #include <openvdb/Types.h>
 #include <openvdb_points/openvdb.h>
 #include <openvdb_points/tools/PointDataGrid.h>
-#include <openvdb_points/tools/PointCount.h>
 
 #include <iostream>
 
@@ -46,24 +45,25 @@
 #include <dso_export.h>
 #include <module_geometry.h>
 #include <module_object.h>
-#include <particle_cloud.h>
 #include <geometry_point_cloud.h>
+#include <geometry_point_property_collection.h>
+#include <geometry_property_collection.h>
+#include <particle_cloud.h>
 #include <app_object.h>
 #include <of_app.h>
 #include <of_class.h>
 #include <sys_filesystem.h>
-#include <app_progress_bar.h>
-
-#ifdef CLARISSE_R3_OR_HIGHER
-#include <geometry_property_collection.h>
-#endif
 
 #include "Geometry_OpenVDBPoints.cma"
 
-#include "Module_OpenVDB_Points.h"
 #include "ResourceData_OpenVDBPoints.h"
 #include "Geometry_OpenVDBPoints.h"
 #include "GeometryProperty_OpenVDBPoints.h"
+
+#include "Resource_OpenVDB_Points.h"
+
+
+using namespace openvdb_points;
 
 
 ////////////////////////////////////////
@@ -103,13 +103,13 @@ void registerVDBPoints(OfApp& app, CoreVector<OfClass *>& new_classes)
 ////////////////////////////////////////
 
 
-namespace openvdb_points
+namespace
 {
     // define the resource id to use for VDB grids
     enum {
         RESOURCE_ID_VDB_GRID = ModuleGeometry::RESOURCE_ID_COUNT,
     };
-} // namespace openvdb_points
+} // unnamed namespace
 
 
 ////////////////////////////////////////
@@ -128,9 +128,10 @@ IX_MODULE_CLBK::init_class(OfClass& cls)
     CoreVector<CoreString> data_attrs;
     data_attrs.add("filename");
     data_attrs.add("grid");
-    cls.add_resource(openvdb_points::RESOURCE_ID_VDB_GRID, data_attrs, deps, "vdb_points_data");
+    data_attrs.add("mode");
+    cls.add_resource(RESOURCE_ID_VDB_GRID, data_attrs, deps, "vdb_points_data");
 
-    deps.add(openvdb_points::RESOURCE_ID_VDB_GRID);
+    deps.add(RESOURCE_ID_VDB_GRID);
 
     cls.set_resource_attrs(ModuleGeometry::RESOURCE_ID_GEOMETRY_PROPERTIES, data_attrs);
     cls.set_resource_deps(ModuleGeometry::RESOURCE_ID_GEOMETRY_PROPERTIES, deps);
@@ -139,7 +140,7 @@ IX_MODULE_CLBK::init_class(OfClass& cls)
     geo_attrs.add("explicit_radius");
     geo_attrs.add("override_radius");
     geo_attrs.add("radius_scale");
-    geo_attrs.add("mode");
+    geo_attrs.add("enable_motion_blur");
 
     cls.set_resource_attrs(ModuleGeometry::RESOURCE_ID_GEOMETRY, geo_attrs);
     cls.set_resource_deps(ModuleGeometry::RESOURCE_ID_GEOMETRY, deps);
@@ -186,26 +187,39 @@ IX_MODULE_CLBK::on_attribute_change(OfObject& object,
                                     int& dirtiness,
                                     const int& dirtiness_flags)
 {
-    CoreString attr_name = attr.get_name();
+    const CoreString attr_name = attr.get_name();
     if (attr_name == "filename")
     {
         const std::string filename = object.get_attribute("filename")->get_string().get_data();
         object.get_attribute("output_filename")->set_string(filename.c_str());
     }
-    else if (attr_name == "override_radius")
+    else if (attr_name == "mode")
     {
-        // adjust whether radius attributes are read-only based on override
-
-        if (attr.get_bool())
+        if (attr.get_long() == /*native*/0)
         {
-            object.get_attribute("explicit_radius")->set_read_only(false);
-            object.get_attribute("radius_scale")->set_read_only(true);
+            // if native, read-only property based on whether radius is being overridden
+
+            object.get_attribute("override_radius")->set_read_only(false);
+            const bool override = object.get_attribute("override_radius")->get_bool();
+            object.get_attribute("explicit_radius")->set_read_only(!override);
+            object.get_attribute("radius_scale")->set_read_only(override);
         }
         else
         {
+            // otherwise, all radius attributes are read-only
+
+            object.get_attribute("override_radius")->set_read_only(true);
+            object.get_attribute("radius_scale")->set_read_only(true);
             object.get_attribute("explicit_radius")->set_read_only(true);
-            object.get_attribute("radius_scale")->set_read_only(false);
         }
+    }
+    else if (attr_name == "override_radius")
+    {
+        // read-only property based on whether radius is being overridden
+
+        const bool override = attr.get_bool();
+        object.get_attribute("explicit_radius")->set_read_only(!override);
+        object.get_attribute("radius_scale")->set_read_only(override);
     }
 }
 
@@ -232,12 +246,16 @@ IX_MODULE_CLBK::create_resource(OfObject& object,
 
     const long mode = object.get_attribute("mode")->get_long();
 
-    if (resource_id == openvdb_points::RESOURCE_ID_VDB_GRID)
+    if (resource_id == RESOURCE_ID_VDB_GRID)
     {
         const CoreString filename = object.get_attribute("output_filename")->get_string();
         const CoreString gridname = object.get_attribute("grid")->get_string();
+        const bool native = mode == 0;
 
-        ResourceData_OpenVDBPoints* resourceData = openvdb_points::create_vdb_grid(application, filename, gridname);
+        ResourceData_OpenVDBPoints* resourceData = create_vdb_grid(application, filename, gridname,
+                                                                    /*localise=*/native, /*cacheLeaves=*/native);
+
+        if (!resourceData)  return 0;
 
         // explicitly override radius if not supplied in the grid
         const bool overrideRadius = resourceData->attribute_type("pscale") == "";
@@ -251,273 +269,54 @@ IX_MODULE_CLBK::create_resource(OfObject& object,
     else if (resource_id == ModuleGeometry::RESOURCE_ID_GEOMETRY)
     {
         if (mode == 0) {
-            return openvdb_points::create_openvdb_points_geometry(object);
+            ModuleGeometry* module = (ModuleGeometry*) object.get_module();
+            ResourceData_OpenVDBPoints* data = (ResourceData_OpenVDBPoints*) module->get_resource(RESOURCE_ID_VDB_GRID);
+            if (!data) return 0;
+
+            const double fps = object.get_factory().get_time().get_fps();
+            const bool override_radius = object.get_attribute("override_radius")->get_bool();
+            const double radius_explicit = object.get_attribute("explicit_radius")->get_double();
+            const double radius_scale = object.get_attribute("radius_scale")->get_double();
+            const double radius = override_radius ? radius_explicit : radius_scale;
+
+            return create_openvdb_points_geometry(application, *data, fps, override_radius, radius);
         }
         else if (mode == 1) {
             ModuleGeometry* module = (ModuleGeometry*) object.get_module();
-            ResourceData_OpenVDBPoints* data = (ResourceData_OpenVDBPoints*) module->get_resource(openvdb_points::RESOURCE_ID_VDB_GRID);
+            ResourceData_OpenVDBPoints* data = (ResourceData_OpenVDBPoints*) module->get_resource(RESOURCE_ID_VDB_GRID);
             if (!data) return 0;
 
-            return openvdb_points::create_clarisse_particle_cloud(application, *data);
+            const OfAttr* const motion_blur_attr = object.get_attribute("enable_motion_blur");
+            const bool enable_motion_blur = motion_blur_attr ? motion_blur_attr->get_bool() : false;
+
+            ParticleCloud* particleCloud = create_clarisse_particle_cloud(application, *data, /*load_velocities=*/enable_motion_blur);
+            if (!particleCloud)     return 0;
+
+            // enable motion blur only if velocities present on the point cloud
+            const GeometryPointCloud* geometryPointCloud = particleCloud->get_point_cloud();
+            if (geometryPointCloud && geometryPointCloud->has_velocities() && enable_motion_blur)   module->require_motion_blur(true);
+            else                                                                                    module->require_motion_blur(false);
+
+            return particleCloud;
         }
     }
     else if (resource_id == ModuleGeometry::RESOURCE_ID_GEOMETRY_PROPERTIES)
     {
-        return openvdb_points::create_openvdb_points_geometry_property(object);
+        ModuleGeometry* module = (ModuleGeometry*) object.get_module();
+        ResourceData_OpenVDBPoints* data = (ResourceData_OpenVDBPoints*) module->get_resource(RESOURCE_ID_VDB_GRID);
+
+        if (!data)  return 0;
+
+        if (mode == 0) {
+            return create_openvdb_points_geometry_property(application, *data);
+        }
+        else if (mode == 1) {
+            return create_clarisse_particle_cloud_geometry_property(application, *data);
+        }
     }
 
     return 0;
 }
-
-
-////////////////////////////////////////
-
-
-namespace openvdb_points
-{
-    ResourceData_OpenVDBPoints*
-    create_vdb_grid(OfApp& application, const CoreString& filename, const CoreString& gridname, const bool localise, const bool cacheLeaves)
-    {
-        // early exit if file does not exist on disk
-
-        if (!SysFilesystem::file_exists(filename))      return 0;
-
-        AppProgressBar* read_progress_bar = application.create_progress_bar(CoreString("Loading VDB Points Data: ") + filename + " " + gridname);
-
-        // attempt to open and load the VDB grid from the file
-
-        openvdb::tools::PointDataGrid::Ptr grid;
-
-        int error = 0;
-
-        try {
-            grid = openvdb_points::load(filename.get_data(), gridname.get_data());
-        }
-        catch (const openvdb::IoError& e) {
-            std::cerr << "ERROR: Unable to open VDB file (" << filename.get_data() << "): " << e.what() << "\n";
-            error = 1;
-        }
-        catch (const openvdb::KeyError& e) {
-            std::cerr << "ERROR: Unable to retrieve grid (" << gridname.get_data() << ") from VDB file: " << e.what() << "\n";
-            error = 1;
-        }
-        catch (const std::exception& e) {
-            std::cerr << "ERROR: Unknown error accessing (" << gridname.get_data() << "): " << e.what() << "\n";
-            error = 1;
-        }
-
-        if (!grid)  error = 1;
-
-        read_progress_bar->destroy();
-
-        if (error)  return 0;
-
-        if (localise) {
-            // localising velocity and radius
-
-            AppProgressBar* localise_progress_bar = application.create_progress_bar(CoreString("Localising Velocity and Radius for ") + gridname);
-
-            openvdb_points::localise(grid);
-
-            localise_progress_bar->destroy();
-        }
-
-        // create the resource
-
-        return ResourceData_OpenVDBPoints::create(grid, cacheLeaves);
-    }
-
-    Geometry_OpenVDBPoints*
-    create_openvdb_points_geometry(OfObject& object)
-    {
-        ModuleGeometry* module = (ModuleGeometry*) object.get_module();
-        ResourceData_OpenVDBPoints* data = (ResourceData_OpenVDBPoints*) module->get_resource(openvdb_points::RESOURCE_ID_VDB_GRID);
-
-        if (!data)  return 0;
-
-        const bool override_radius = object.get_attribute("override_radius")->get_bool();
-        const double radius = object.get_attribute("explicit_radius")->get_double();
-        const double radius_scale = object.get_attribute("radius_scale")->get_double();
-
-        openvdb::tools::PointDataGrid::Ptr grid = data->grid();
-
-        if (!grid)  return 0;
-        if (!grid->tree().cbeginLeaf())     return 0;
-
-        // check descriptor for velocity and radius (pscale)
-
-        openvdb::tools::PointDataTree::LeafCIter iter = grid->tree().cbeginLeaf();
-
-        assert(iter);
-
-        // retrieve fps, motion blur length and direction
-
-        const OfApp& application = object.get_application();
-
-        const double fps = object.get_factory().get_time().get_fps();
-        const double motionBlurLength = application.get_motion_blur_length();
-        const int motionBlurDirection = application.get_motion_blur_direction();
-        const AppBase::MotionBlurDirectionMode motionBlurMode =
-                            application.get_motion_blur_direction_mode_from_value(motionBlurDirection);
-
-        const double radiusArg = override_radius ? radius : radius_scale;
-
-        Geometry_OpenVDBPoints* geometry = Geometry_OpenVDBPoints::create(  grid, override_radius, radiusArg,
-                                                                            fps, motionBlurLength, motionBlurMode);
-
-        if (geometry)
-        {
-            AppProgressBar* acc_progress_bar = object.get_application().create_progress_bar(CoreString("Computing VDB Point Acceleration Structures"));
-
-            geometry->computeAccelerationStructures();
-
-            acc_progress_bar->destroy();
-        }
-
-        return geometry;
-    }
-
-    ResourceData*
-    create_openvdb_points_geometry_property(OfObject& object)
-    {
-#ifdef CLARISSE_R3_OR_HIGHER
-        GeometryPropertyCollection *property_array = new GeometryPropertyCollection;
-#else
-        GeometryPropertyArray *property_array = new GeometryPropertyArray;
-#endif
-
-        CoreVector<GeometryProperty*> properties;
-
-        ModuleGeometry* module = (ModuleGeometry*) object.get_module();
-        ResourceData_OpenVDBPoints* data = (ResourceData_OpenVDBPoints*) module->get_resource(openvdb_points::RESOURCE_ID_VDB_GRID);
-
-        if (!data)  return property_array;
-
-        openvdb::tools::PointDataGrid::Ptr grid = data->grid();
-
-        if (!grid)      return property_array;
-
-        const openvdb::tools::PointDataTree& tree = grid->tree();
-
-        openvdb::tools::PointDataTree::LeafCIter iter = tree.cbeginLeaf();
-
-        if (!iter)  return property_array;
-
-        const openvdb::tools::AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
-
-        for (openvdb::tools::AttributeSet::Descriptor::ConstIterator it = descriptor.map().begin(),
-            end = descriptor.map().end(); it != end; ++it) {
-
-            const openvdb::NamePair& type = descriptor.type(it->second);
-
-            // only floating point property types are supported
-
-            if (type.first != "float" && type.first != "vec3s")   continue;
-
-            properties.add(new GeometryProperty_OpenVDBPoints(data, it->first, type.first));
-        }
-
-        property_array->set(properties);
-
-        return property_array;
-    }
-
-    ParticleCloud*
-    create_clarisse_particle_cloud(OfApp& application, ResourceData_OpenVDBPoints& data)
-    {
-        const openvdb::tools::PointDataGrid::Ptr grid = data.grid();
-
-        if (!grid)                          return new ParticleCloud();
-        if (!grid->tree().cbeginLeaf())     return new ParticleCloud();
-
-        typedef openvdb::tools::PointDataTree PointDataTree;
-
-        const openvdb::math::Transform& transform = grid->transform();
-        const PointDataTree& tree = grid->tree();
-
-        const openvdb::Index64 size = openvdb::tools::pointCount(grid->tree());
-
-        if (size == 0)                      return new ParticleCloud();
-
-        CoreArray<GMathVec3d> array;
-
-        array.resize(size);
-
-        // load Clarisse particle positions
-
-        AppProgressBar* convert_progress_bar = application.create_progress_bar(CoreString("Converting Point Positions into Clarisse"));
-
-        unsigned arrayIndex = 0;
-
-        for (PointDataTree::LeafCIter leaf = tree.cbeginLeaf(); leaf; ++leaf)
-        {
-            const openvdb::tools::AttributeHandle<openvdb::Vec3f>::Ptr positionHandle =
-                openvdb::tools::AttributeHandle<openvdb::Vec3f>::create(leaf->attributeArray("P"));
-
-            for (PointDataTree::LeafNodeType::IndexOnIter iter = leaf->beginIndexOn(); iter; ++iter)
-            {
-                const openvdb::Vec3i gridIndexSpace = iter.getCoord().asVec3i();
-
-                const openvdb::Vec3f positionVoxelSpace = positionHandle->get(*iter);
-                const openvdb::Vec3f positionIndexSpace = positionVoxelSpace + gridIndexSpace;
-                const openvdb::Vec3f positionWorldSpace = transform.indexToWorld(positionIndexSpace);
-
-                array[arrayIndex][0] = positionWorldSpace[0];
-                array[arrayIndex][1] = positionWorldSpace[1];
-                array[arrayIndex][2] = positionWorldSpace[2];
-
-                arrayIndex++;
-            }
-        }
-
-        convert_progress_bar->destroy();
-
-        // construct the point cloud
-
-        AppProgressBar* cloud_progress_bar = application.create_progress_bar(CoreString("Creating Clarisse Point Cloud"));
-
-        GeometryPointCloud pointCloud;
-
-        pointCloud.init(array.get_count());
-        pointCloud.init_positions(array.get_data());
-
-        cloud_progress_bar->destroy();
-
-        // load the velocities
-
-        if (tree.cbeginLeaf()->hasAttribute("v"))
-        {
-            AppProgressBar* velocity_progress_bar = application.create_progress_bar(CoreString("Loading Velocities into Point Cloud"));
-
-            arrayIndex = 0;
-
-            for (PointDataTree::LeafCIter leaf = tree.cbeginLeaf(); leaf; ++leaf)
-            {
-                const openvdb::tools::AttributeHandle<openvdb::Vec3f>::Ptr velocityHandle =
-                    openvdb::tools::AttributeHandle<openvdb::Vec3f>::create(leaf->attributeArray("v"));
-
-                for (PointDataTree::LeafNodeType::IndexOnIter iter = leaf->beginIndexOn(); iter; ++iter)
-                {
-                    // VDB Points resource uses index-space velocity so need to revert this back to world-space
-
-                    const openvdb::Vec3f velocity = transform.indexToWorld(velocityHandle->get(*iter));
-
-                    array[arrayIndex][0] = velocity.x();
-                    array[arrayIndex][1] = velocity.y();
-                    array[arrayIndex][2] = velocity.z();
-
-                    arrayIndex++;
-                }
-            }
-
-            pointCloud.init_velocities(array.get_data());
-
-            velocity_progress_bar->destroy();
-        }
-
-        return new ParticleCloud(pointCloud);
-    }
-} // namespace openvdb_points
 
 
 ////////////////////////////////////////
