@@ -594,7 +594,7 @@ private:
     /// Compare the this data to another attribute array. Used by the base class comparison operator
     virtual bool isEqual(const AttributeArray& other) const;
 
-    size_t arrayMemUsage() const;
+    size_t arrayMemUsage(const bool maximum=false) const;
     void allocate(const size_t size, const Index stride);
     void deallocate();
 
@@ -984,11 +984,16 @@ TypedAttributeArray<ValueType_, Codec_>::copyUncompressed() const
 
 template<typename ValueType_, typename Codec_>
 size_t
-TypedAttributeArray<ValueType_, Codec_>::arrayMemUsage() const
+TypedAttributeArray<ValueType_, Codec_>::arrayMemUsage(const bool maximum) const
 {
-    if (mIsUniform)                 return sizeof(StorageType);
-    if (this->isOutOfCore())        return 0;
-    if (this->isCompressed())       return mCompressedBytes;
+    // if maximum requested, ignore whether uniform, out-of-core or compressed
+
+    if (!maximum)
+    {
+        if (mIsUniform)                 return sizeof(StorageType);
+        if (this->isOutOfCore())        return 0;
+        if (this->isCompressed())       return mCompressedBytes;
+    }
 
     return mSize * mStride * sizeof(StorageType);
 }
@@ -1260,7 +1265,7 @@ TypedAttributeArray<ValueType_, Codec_>::compress()
         this->doLoadUnsafe();
 
         const size_t typeSize = sizeof(StorageType);
-        const size_t inBytes = mSize * sizeof(StorageType);
+        const size_t inBytes = this->arrayMemUsage();
         size_t outBytes;
         char* charBuffer = reinterpret_cast<char*>(mData);
         char* buffer = compress(charBuffer, typeSize, inBytes, outBytes, /*cleanup=*/true);
@@ -1425,7 +1430,7 @@ TypedAttributeArray<ValueType_, Codec_>::read(std::istream& is)
 
         // decompress buffer
 
-        const size_t inBytes = mSize * sizeof(StorageType);
+        const size_t inBytes = this->arrayMemUsage(/*maximum=*/true);
         char* newBuffer = decompress(buffer, inBytes, /*cleanup=*/true);
         if (newBuffer)  buffer = newBuffer;
     }
@@ -1474,7 +1479,7 @@ TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os, bool outputTran
     {
         const char* charBuffer = reinterpret_cast<const char*>(mData);
         const size_t typeSize = sizeof(StorageType);
-        const size_t inBytes = mSize * sizeof(StorageType);
+        const size_t inBytes = this->arrayMemUsage();
         compressedBuffer.reset(compress(charBuffer, typeSize, inBytes, compressedBytes));
         if (compressedBuffer)   flags |= WRITEDISKCOMPRESS;
     }
@@ -1530,7 +1535,7 @@ TypedAttributeArray<ValueType_, Codec_>::doLoadUnsafe() const
 
         // decompress buffer
 
-        const size_t inBytes = mSize * sizeof(StorageType);
+        const size_t inBytes = this->arrayMemUsage(/*maximum=*/true);
         char* newBuffer = decompress(buffer, inBytes, /*cleanup=*/true);
         if (newBuffer)  buffer = newBuffer;
     }

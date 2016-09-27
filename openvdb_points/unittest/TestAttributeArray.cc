@@ -1206,6 +1206,21 @@ TestAttributeArray::testStrided()
 #endif
 
         CPPUNIT_ASSERT_EQUAL(array->memUsage(), sizeof(int) * /*size*/3 * /*stride*/2 + arrayMem);
+
+        std::ostringstream ostr(std::ios_base::binary);
+        io::setDataCompression(ostr, io::COMPRESS_BLOSC);
+
+        array->write(ostr);
+
+        AttributeArrayI attrB;
+
+        std::istringstream istr(ostr.str(), std::ios_base::binary);
+        attrB.read(istr);
+
+        InterleavedHandle handle2(attrB);
+
+        CPPUNIT_ASSERT_EQUAL(handle2.get(0, 2), 5);
+        CPPUNIT_ASSERT_EQUAL(handle2.get(1, 1), 10);
     }
 }
 
