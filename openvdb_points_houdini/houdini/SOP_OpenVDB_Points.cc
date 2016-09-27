@@ -82,6 +82,16 @@ enum COMPRESSION_TYPE
     UNIT_VECTOR
 };
 
+template <typename AttributeType, typename HoudiniOffsetAttribute>
+void
+convertSegmentsFromHoudini( PointDataTree& tree, const PointIndexTree& indexTree, const openvdb::Name& name,
+                            const size_t count, HoudiniOffsetAttribute& houdiniOffsets)
+{
+    appendAttribute<AttributeType, PointDataTree>(tree, name, count);
+
+    populateAttribute<PointDataTree, PointIndexTree, HoudiniOffsetAttribute, true>(tree, indexTree, name, houdiniOffsets, count);
+}
+
 template <typename AttributeType, bool Strided>
 void
 convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree, const openvdb::Name& name,
@@ -250,12 +260,31 @@ typedef std::map<Name, std::pair<int, bool> > AttributeInfoMap;
 ///////////////////////////////////////
 
 
+MetaMap& getWritableMetadata(PointDataTree& tree)
+{
+    // Copy existing Descriptor to retrieve writeable Metadata
+
+    const AttributeSet::Descriptor& descriptor = tree.cbeginLeaf()->attributeSet().descriptor();
+    AttributeSet::Descriptor::Ptr newDescriptor(new AttributeSet::Descriptor(descriptor));
+    MetaMap& metadata = newDescriptor->getMetadata();
+
+    // Reset all leaves to hold the new Descriptor
+
+    for (PointDataTree::LeafIter leafReplaceIter = tree.beginLeaf(); leafReplaceIter; ++leafReplaceIter) {
+        leafReplaceIter->resetDescriptor(newDescriptor);
+    }
+
+    return metadata;
+}
+
+
 inline
 PointDataGrid::Ptr
 createPointDataGrid(const GU_Detail& ptGeo, const int compression,
                     const AttributeInfoMap& attributes, const openvdb::math::Transform& transform)
 {
     typedef hvdbp::HoudiniReadAttribute<openvdb::Vec3d> HoudiniPositionAttribute;
+    typedef hvdbp::HoudiniOffsetAttribute<openvdb::Vec3f> HoudiniOffsetAttribute;
 
     // store point group information
 
@@ -266,6 +295,34 @@ createPointDataGrid(const GU_Detail& ptGeo, const int compression,
     const GA_Attribute& positionAttribute = *ptGeo.getP();
 
     hvdbp::OffsetListPtr offsets;
+    hvdbp::OffsetPairListPtr offsetPairs;
+
+    size_t vertexCount = 0;
+
+    for (GA_Iterator primitiveIt(ptGeo.getPrimitiveRange()); !primitiveIt.atEnd(); ++primitiveIt) {
+        const GA_Primitive* primitive = ptGeo.getPrimitiveList().get(*primitiveIt);
+
+        if (primitive->getTypeId() != GA_PRIMNURBCURVE) continue;
+
+        vertexCount = primitive->getVertexCount();
+
+        if (vertexCount == 0)  continue;
+
+        if (!offsets)   offsets.reset(new hvdbp::OffsetList);
+
+        GA_Offset firstOffset = primitive->getPointOffset(0);
+        offsets->push_back(firstOffset);
+
+        if (vertexCount > 1) {
+            if (!offsetPairs)   offsetPairs.reset(new hvdbp::OffsetPairList);
+
+            for (size_t i = 1; i < vertexCount; i++) {
+                GA_Offset offset = primitive->getPointOffset(i);
+                offsetPairs->push_back(hvdbp::OffsetPair(firstOffset, offset));
+            }
+        }
+    }
+
     HoudiniPositionAttribute points(positionAttribute, offsets);
 
     // Create PointIndexGrid used for consistent index ordering in all attribute conversion
@@ -291,13 +348,6 @@ createPointDataGrid(const GU_Detail& ptGeo, const int compression,
     PointDataTree::LeafIter leafIter = tree.beginLeaf();
 
     if (!leafIter)  return pointDataGrid;
-
-    // Swap with a new Descriptor to retrieve writeable Metadata
-
-    const AttributeSet::Descriptor& descriptor = leafIter->attributeSet().descriptor();
-    AttributeSet::Descriptor::Ptr newDescriptor(new AttributeSet::Descriptor(descriptor));
-    MetaMap& metadata = newDescriptor->getMetadata();
-    leafIter->resetDescriptor(newDescriptor);
 
     // Append (empty) groups to tree
 
@@ -338,6 +388,17 @@ createPointDataGrid(const GU_Detail& ptGeo, const int compression,
         std::fill(inGroup.begin(), inGroup.end(), short(0));
     }
 
+    // Add curve segments to PointDataGrid
+
+    if (offsetPairs) {
+
+        HoudiniOffsetAttribute segments(positionAttribute, offsetPairs, vertexCount-1);
+
+        convertSegmentsFromHoudini<TypedAttributeArray<Vec3f>, HoudiniOffsetAttribute>(tree, indexTree, "segments", vertexCount-1, segments);
+
+        getWritableMetadata(tree).insertMeta("nurbscurve", StringMetadata("segments"));
+    }
+
     // Add other attributes to PointDataGrid
 
     for (AttributeInfoMap::const_iterator it = attributes.begin(),
@@ -366,7 +427,7 @@ createPointDataGrid(const GU_Detail& ptGeo, const int compression,
         if (isString)
         {
             // Iterate over the strings in the table and insert them into the Metadata
-            StringMetaInserter inserter(metadata);
+            StringMetaInserter inserter(getWritableMetadata(tree));
             for (GA_AIFSharedStringTuple::iterator  it = sharedStringTupleAIF->begin(gaAttribute),
                                                     itEnd = sharedStringTupleAIF->end(); !(it == itEnd); ++it) {
                 Name str(it.getString());
@@ -726,6 +787,21 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
                 if (!baseGrid.isType<PointDataGrid>()) continue;
 
                 const PointDataGrid& grid = static_cast<const PointDataGrid&>(baseGrid);
+
+                // add a warning to the SOP if grid contains curves - conversion to Houdini currently not supported
+
+                PointDataTree::LeafCIter iter = grid.tree().cbeginLeaf();
+
+                if (iter) {
+                    const AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
+                    const Metadata::ConstPtr meta = descriptor.getMetadata()["nurbscurve"];
+                    if (meta) {
+                        addWarning(SOP_MESSAGE, "VDB Points grid contains curves, conversion back to Houdini curves is currently not supported. \
+                                                Converting curve roots into Houdini points instead.");
+                    }
+                }
+
+                // perform conversion
 
                 hvdbp::convertPointDataGridToHoudini(geo, grid, emptyNameVector, includeGroups, excludeGroups);
 

@@ -60,6 +60,10 @@ namespace openvdb_points_houdini {
 typedef std::vector<GA_Offset> OffsetList;
 typedef boost::shared_ptr<OffsetList> OffsetListPtr;
 
+typedef std::pair<GA_Offset, GA_Offset> OffsetPair;
+typedef std::vector<OffsetPair> OffsetPairList;
+typedef boost::shared_ptr<OffsetPairList> OffsetPairListPtr;
+
 /// @brief  Converts a VDB Points grid into Houdini points and appends to a Houdini Detail
 ///
 /// @param  detail              GU_Detail to append the converted points and attributes to
@@ -307,6 +311,52 @@ private:
     const GA_Attribute& mAttribute;
     OffsetListPtr mOffsets;
 }; // HoudiniReadAttribute
+
+
+////////////////////////////////////////
+
+
+template <typename T>
+struct HoudiniOffsetAttribute
+{
+    typedef T value_type;
+    typedef T PosType;
+
+    HoudiniOffsetAttribute(const GA_Attribute& attribute, OffsetPairListPtr offsetPairs, openvdb::Index stride)
+        : mAttribute(attribute)
+        , mOffsetPairs(offsetPairs)
+        , mStride(stride) { }
+
+    template <typename ValueType> typename boost::disable_if_c<openvdb::VecTraits<ValueType>::IsVec, void>::type
+    get(ValueType& value, size_t n, openvdb::Index offset = 0) const { }
+
+    template <typename ValueType> typename boost::enable_if_c<openvdb::VecTraits<ValueType>::IsVec, void>::type
+    get(ValueType& value, size_t n, openvdb::Index offset = 0) const
+    {
+        typedef typename openvdb::VecTraits<ValueType>::ElementType ElementType;
+
+        const OffsetPair& pair = (*mOffsetPairs)[n * mStride + offset];
+
+        GA_Offset offset1(pair.first);
+        GA_Offset offset2(pair.second);
+
+        value[0] = readAttributeValue<ElementType>(mAttribute, offset2, 0);
+        value[1] = readAttributeValue<ElementType>(mAttribute, offset2, 1);
+        value[2] = readAttributeValue<ElementType>(mAttribute, offset2, 2);
+
+        value[0] -= readAttributeValue<ElementType>(mAttribute, offset1, 0);
+        value[1] -= readAttributeValue<ElementType>(mAttribute, offset1, 1);
+        value[2] -= readAttributeValue<ElementType>(mAttribute, offset1, 2);
+    }
+
+    size_t size() const { return mOffsetPairs->size(); }
+    openvdb::Index stride() const { return mStride; }
+
+private:
+    const GA_Attribute& mAttribute;
+    OffsetPairListPtr mOffsetPairs;
+    openvdb::Index mStride;
+};
 
 
 ////////////////////////////////////////
