@@ -54,7 +54,7 @@
 #include <of_class.h>
 #include <sys_filesystem.h>
 
-#include "Geometry_OpenVDBPoints.cma"
+#include "Module_OpenVDB_Points.cma"
 
 #include "ResourceData_OpenVDBPoints.h"
 #include "Geometry_OpenVDBPoints.h"

@@ -214,7 +214,7 @@ LIBCLARISSE_SRC_NAMES := \
 	clarisse/module/Resource_OpenVDB_Points.cc \
 #
 LIBCLARISSE_CID_NAMES := \
-	clarisse/module/Geometry_OpenVDBPoints.cid \
+	clarisse/module/Module_OpenVDB_Points.cid \
 #
 CLARISSE_MODULE_SRC_NAMES := \
 	clarisse/module/Module_OpenVDB_Points.cc \
