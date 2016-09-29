@@ -489,9 +489,7 @@ dilateVoxels26N( openvdb::tree::LeafManager<TreeType>& manager,
 }
 
 template< typename TreeType>
-inline void erodeVoxels26N( TreeType& tree, 
-                            const int count,
-                            const bool threaded = true )
+inline void erodeVoxels26N( TreeType& tree, const int count, const bool threaded )
 {
     Morphology26N<TreeType> m(tree);
     m.erodeVoxels26N( count, threaded );
@@ -501,7 +499,7 @@ template< typename TreeType>
 inline void 
 erodeVoxels26N( openvdb::tree::LeafManager<TreeType>& manager,
                 const int count,
-                const bool threaded = true )
+                const bool threaded )
 {
     Morphology26N<TreeType> m( manager );
     m.erodeVoxels26N( count, threaded );
