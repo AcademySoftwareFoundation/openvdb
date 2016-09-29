@@ -44,6 +44,8 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/utility/enable_if.hpp>
 
+#include <tbb/parallel_for.h>
+
 #include <particle_cloud.h>
 #include <geometry_point_cloud.h>
 #include <geometry_property.h>
@@ -104,17 +106,23 @@ class PropertyDataInfo : public GeometryProperty::LoadDataInfo
 public:
     PropertyDataInfo(
         const ResourceData_OpenVDBPoints& resourceData,
-        GeometryPointProperty* property,
-        GeometryPointPropertyCollection* propertyCollection)
+        GeometryPointProperty* const property,
+        GeometryPointPropertyCollection* const propertyCollection,
+        OfApp* const application)
     : mResourceData(resourceData)
     , mProperty(property)
-    , mPropertyCollection(propertyCollection) {}
+    , mPropertyCollection(propertyCollection)
+    , mApplication(application) {}
 
     unsigned int extent() const { return mProperty->get_value_extent(); }
     size_t size() const { return mProperty->get_value_extent() * mProperty->get_value_count(); }
     PointDataGrid::ConstPtr grid() const { return mResourceData.grid(); }
     std::string name() const { return mProperty->get_name().get_data(); }
     bool isPosition() const { return name() == "P"; }
+
+    AppProgressBar* createProgressBar(const std::string msg) {
+        return mApplication ? mApplication->create_progress_bar(CoreString(msg.c_str())) : NULL;
+    }
 
     template <typename T>
     void set_values(const unsigned int& sampleIndex, const CoreArray<T>& values)
@@ -131,17 +139,25 @@ private:
     const ResourceData_OpenVDBPoints&       mResourceData;
     GeometryPointProperty* const            mProperty;
     GeometryPointPropertyCollection* const  mPropertyCollection;
+    OfApp* const                            mApplication;
 }; // class PropertyDataInfo
 
 template<typename ValueType>
 static typename boost::enable_if_c<openvdb::VecTraits<ValueType>::Size==3>::type
 indexToWorld(ValueType& value, const openvdb::Coord& ijk, const openvdb::math::Transform& transform) {
-    value = transform.indexToWorld(value + ijk.asVec3s());
+    value = transform.indexToWorld(value + ijk.asVec3d());
 }
 
 template<typename ValueType>
 static typename boost::disable_if_c<openvdb::VecTraits<ValueType>::Size==3>::type
 indexToWorld(ValueType& value, const openvdb::Coord& ijk, const openvdb::math::Transform& transform) {}
+
+void setValue(CoreArray<GMathVec3f>& values, unsigned int& index, const openvdb::Vec3f& value)
+{
+    values[index][0] = value[0];
+    values[index][1] = value[1];
+    values[index++][2] = value[2];
+}
 
 template<typename ValueType>
 static typename boost::enable_if_c<openvdb::VecTraits<ValueType>::IsVec>::type
@@ -158,42 +174,93 @@ setValue(CoreArray<ValueType>& values, unsigned int& index, const ValueType& val
     values[index++] = value;
 }
 
+template<typename AttributeValueType, typename ArrayValueType, bool ConvertToWorld = false>
+struct PopulateArrayFromAttribute
+{
+    typedef openvdb::tools::PointDataTree                    PointDataTree;
+    typedef openvdb::tree::LeafManager<const PointDataTree>  LeafManagerT;
+
+    PopulateArrayFromAttribute(CoreArray<ArrayValueType>& array,
+                               const std::string& attributeName,
+                               const std::vector<openvdb::Index64>& offsets,
+                               const openvdb::math::Transform* const transform = NULL)
+        : mArray(array)
+        , mAttributeName(attributeName)
+        , mPointOffsets(offsets)
+        , mTransform(transform) {}
+
+    void operator()(const LeafManagerT::LeafRange& range) const
+    {
+        for (LeafManagerT::LeafRange::Iterator leaf = range.begin(); leaf; ++leaf)
+        {
+            const typename AttributeHandle<AttributeValueType>::Ptr handle =
+                AttributeHandle<AttributeValueType>::create(leaf->constAttributeArray(mAttributeName));
+
+            unsigned int offset = static_cast<unsigned int>(mPointOffsets[leaf.pos()]);
+
+            for (PointDataTree::LeafNodeType::IndexAllIter iter = leaf->beginIndexAll(); iter; ++iter)
+            {
+                AttributeValueType value = handle->get(*iter);
+
+                if(ConvertToWorld) {
+                    assert(mTransform);
+                    indexToWorld(value, iter.getCoord(), *mTransform);
+                }
+
+                setValue(mArray, offset, value);
+            }
+        }
+    }
+
+private:
+
+    CoreArray<ArrayValueType>&             mArray;
+    const std::string                      mAttributeName;
+    const std::vector<openvdb::Index64>&   mPointOffsets;
+    const openvdb::math::Transform* const  mTransform;
+};
+
 // Helper for deferred property loading using attribute data from the VDB Grid.
 
 template<typename ValueType>
 static void buildProperty(const unsigned int& sampleIndex, GeometryProperty::LoadDataInfo* loadInfo)
 {
-    typedef openvdb::tools::AttributeHandle<ValueType>           HandleType;
-    typedef openvdb::tools::PointDataTree::LeafNodeType          LeafNodeType;
     typedef typename openvdb::VecTraits<ValueType>::ElementType  ElementType;
 
     PropertyDataInfo* const info = (PropertyDataInfo*)loadInfo;
-
     const std::string name = info->name();
-    const size_t size = info->size();
 
-    CoreArray<ElementType> values(size);
-    unsigned int index = 0;
+    AppProgressBar* const progressBar = info->createProgressBar("Extracting VDB Points Attribute \"" + name + "\"");
 
     const openvdb::tools::PointDataGrid::ConstPtr grid = info->grid();
+    const openvdb::tools::PointDataTree& tree = grid->tree();
 
-    for (openvdb::tools::PointDataTree::LeafCIter leafIter = grid->tree().cbeginLeaf(); leafIter; ++leafIter)
-    {
-        typename HandleType::Ptr handle = HandleType::create(leafIter->constAttributeArray(name));
+    // create the offset array but instead of representing the number of points
+    // per leaf, push back a 0 value so that the offsets correspond to the starting
+    // offset
 
-        for (LeafNodeType::IndexOnIter indexIter = leafIter->beginIndexOn(); indexIter; ++indexIter) {
+    std::vector<openvdb::Index64> pointOffsets;
+    pointOffsets.push_back(0);
 
-            ValueType value = handle->get(*indexIter);
+    openvdb::tools::getPointOffsets(pointOffsets, tree, std::vector<openvdb::Name>(), std::vector<openvdb::Name>(), false);
 
-            // Transform position to world space
-            if(info->isPosition()) indexToWorld(value, indexIter.getCoord(), grid->transform());
-            setValue(values, index, value);
-        }
+    openvdb::tree::LeafManager<const openvdb::tools::PointDataTree> leafManager(tree);
+
+    assert(info->size() = pointOffsets.back());
+    CoreArray<ElementType> values(info->size());
+
+    if(info->isPosition()) {
+        PopulateArrayFromAttribute<ValueType, ElementType, true> populateOp(values, name, pointOffsets, &grid->transform());
+        tbb::parallel_for(leafManager.leafRange(), populateOp);
+    }
+    else {
+        PopulateArrayFromAttribute<ValueType, ElementType, false> populateOp(values, name, pointOffsets);
+        tbb::parallel_for(leafManager.leafRange(), populateOp);
     }
 
-    assert(index == size);
-
     info->set_values(sampleIndex, values);
+
+    if(progressBar) progressBar->destroy();
 }
 
 } // namespace resource_internal
@@ -349,31 +416,24 @@ create_clarisse_particle_cloud(OfApp& application, ResourceData_OpenVDBPoints& d
 
     CoreArray<GMathVec3f> array(size);
 
+    // create the offset array but instead of representing the number of points
+    // per leaf, push back a 0 value so that the offsets correspond to the starting
+    // offset
+
+    AppProgressBar* const convert_progress_bar = application.create_progress_bar(CoreString("Converting Point Positions into Clarisse"));
+
+    std::vector<openvdb::Index64> pointOffsets;
+    pointOffsets.push_back(0);
+
+    openvdb::tools::getPointOffsets(pointOffsets, tree, std::vector<openvdb::Name>(), std::vector<openvdb::Name>(), false);
+
+    openvdb::tree::LeafManager<const openvdb::tools::PointDataTree> leafManager(tree);
+
     // load Clarisse particle positions
 
-    AppProgressBar* convert_progress_bar = application.create_progress_bar(CoreString("Converting Point Positions into Clarisse"));
-
-    const openvdb::math::Transform& transform = grid->transform();
-
-    unsigned arrayIndex = 0;
-
-    for (PointDataTree::LeafCIter leaf = tree.cbeginLeaf(); leaf; ++leaf)
     {
-        const AttributeHandle<openvdb::Vec3f>::Ptr positionHandle =
-            AttributeHandle<openvdb::Vec3f>::create(leaf->constAttributeArray("P"));
-
-        for (PointDataTree::LeafNodeType::IndexOnIter iter = leaf->beginIndexOn(); iter; ++iter)
-        {
-            const openvdb::Vec3f positionVoxelSpace = positionHandle->get(*iter);
-            const openvdb::Vec3d positionIndexSpace = positionVoxelSpace + iter.getCoord().asVec3d();
-            const openvdb::Vec3d positionWorldSpace = transform.indexToWorld(positionIndexSpace);
-
-            array[arrayIndex][0] = positionWorldSpace[0];
-            array[arrayIndex][1] = positionWorldSpace[1];
-            array[arrayIndex][2] = positionWorldSpace[2];
-
-            arrayIndex++;
-        }
+        resource_internal::PopulateArrayFromAttribute<openvdb::Vec3f, GMathVec3f, true> populateOp(array, "P", pointOffsets, &grid->transform());
+        tbb::parallel_for(leafManager.leafRange(), populateOp);
     }
 
     convert_progress_bar->destroy();
@@ -393,26 +453,10 @@ create_clarisse_particle_cloud(OfApp& application, ResourceData_OpenVDBPoints& d
 
     if (loadVelocities && tree.cbeginLeaf()->hasAttribute("v"))
     {
-        AppProgressBar* velocity_progress_bar = application.create_progress_bar(CoreString("Loading Velocities into Point Cloud"));
+        AppProgressBar* const velocity_progress_bar = application.create_progress_bar(CoreString("Loading Velocities into Point Cloud"));
 
-        arrayIndex = 0;
-
-        for (PointDataTree::LeafCIter leaf = tree.cbeginLeaf(); leaf; ++leaf)
-        {
-            const AttributeHandle<openvdb::Vec3f>::Ptr velocityHandle =
-                AttributeHandle<openvdb::Vec3f>::create(leaf->constAttributeArray("v"));
-
-            for (PointDataTree::LeafNodeType::IndexOnIter iter = leaf->beginIndexOn(); iter; ++iter)
-            {
-                const openvdb::Vec3f velocity = velocityHandle->get(*iter);
-
-                array[arrayIndex][0] = velocity.x();
-                array[arrayIndex][1] = velocity.y();
-                array[arrayIndex][2] = velocity.z();
-
-                arrayIndex++;
-            }
-        }
+        resource_internal::PopulateArrayFromAttribute<openvdb::Vec3f, GMathVec3f, false> populateOp(array, "v", pointOffsets);
+        tbb::parallel_for(leafManager.leafRange(), populateOp);
 
         pointCloud.init_velocities(array.get_data());
 
@@ -445,6 +489,8 @@ create_clarisse_particle_cloud_geometry_property(OfApp& application, ResourceDat
     if(numPoints == 0) return collection;
 
     CoreVector<GeometryPointProperty*> properties;
+
+    AppProgressBar* property_progress_bar = application.create_progress_bar(CoreString("Parsing VDB Points Attributes"));
 
     const openvdb::tools::AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
 
@@ -486,7 +532,7 @@ create_clarisse_particle_cloud_geometry_property(OfApp& application, ResourceDat
         else if (boost::starts_with(valueType, "mat4"))     resourceSize = 4*4;
 
         GeometryPointProperty* property = new GeometryPointProperty(name.c_str(), GMathTimeSampling(0), resourceType, numPoints, resourceSize, 0);
-        PropertyDataInfo* info = new PropertyDataInfo(data, property, collection);
+        PropertyDataInfo* info = new PropertyDataInfo(data, property, collection, &application);
 
         if (valueType == "bool")         property->set_deferred_loading(&buildProperty<bool>, info);
         else if (valueType == "int16")   property->set_deferred_loading(&buildProperty<int16_t>, info);
@@ -514,6 +560,8 @@ create_clarisse_particle_cloud_geometry_property(OfApp& application, ResourceDat
     }
 
     collection->set(properties);
+
+    property_progress_bar->destroy();
 
     return collection;
 }
