@@ -48,7 +48,7 @@
 # Note that the OpenVDB library and these Maya plugins must be built
 # against compatible versions of the Boost, OpenEXR and TBB libraries.
 #
-
+MAYA_LOCATION := $(PACKAGES_DIR)/maya/$(MAYA_VERSION)
 # MAYA_LOCATION should be set to the directory where Maya is installed.
 ifeq (,$(MAYA_LOCATION))
 $(warning Warning: $$(MAYA_LOCATION) is not set)
@@ -58,27 +58,31 @@ endif
 # The directory into which to install libraries and header files
 # (it is recommended that this match the DESTDIR in the OpenVDB
 # library makefile)
-DESTDIR := /tmp/OpenVDB
+DESTDIR := $(INSTALL_BASE)
 
 # The directory into which to install Maya plugins, scripts, etc.
-MAYA_DESTDIR := $(DESTDIR)/maya
+MAYA_DESTDIR := $(DESTDIR)/maya/$(MAYA_VERSION)
 
 # The parent directory of the openvdb/ header directory
 OPENVDB_INCL_DIR := $(DESTDIR)/include
 # The directory containing libopenvdb
 OPENVDB_LIB_DIR := $(DESTDIR)/lib
+ifeq ($(suffix),yes)
+OPENVDB_LIB := -lopenvdb_m$(MAYA_VERSION)
+else
 OPENVDB_LIB := -lopenvdb
+endif
 
 # The parent directory of the boost/ header directory
-BOOST_INCL_DIR :=
+BOOST_INCL_DIR := $(PACKAGES_DIR)/boost/$(BOOST_VERSION)/include
 # The directory containing libboost_iostreams, libboost_system, etc.
-BOOST_LIB_DIR :=
+BOOST_LIB_DIR := $(PACKAGES_DIR)/boost/$(BOOST_VERSION)/lib
 BOOST_LIB := -lboost_iostreams -lboost_system
 
 # The parent directory of the OpenEXR/ header directory (which contains half.h)
-ILMBASE_INCL_DIR :=
+ILMBASE_INCL_DIR := $(PACKAGES_DIR)/ilmbase/$(EXR_VERSION)/include
 # The directory containing libHalf
-ILMBASE_LIB_DIR :=
+ILMBASE_LIB_DIR := $(PACKAGES_DIR)/ilmbase/$(EXR_VERSION)/lib
 HALF_LIB := -lHalf
 
 # The parent directory of the tbb/ header directory
@@ -136,6 +140,7 @@ INCLDIRS := \
     -I $(ILMBASE_INCL_DIR) \
     -I $(TBB_INCL_DIR) \
     -I $(MAYA_INCL_DIR) \
+    -I $(ILMBASE_LIB_DIR)/OpenEXR \
 #
 
 CXXFLAGS += -pthread $(OPTIMIZE) $(INCLDIRS)

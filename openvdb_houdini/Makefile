@@ -65,21 +65,35 @@
 ifeq (,$(HFS))
 $(warning Warning: $$(HFS) is not set; did you source houdini_setup?)
 endif
+# if use_houdini_libs=yes and suffix=yes add use suffix
+# h<Major>.<Minor> for the openvdb library. For example for houdini
+# 14.0.xxx it will look for libopenvdb_h14.0.so
+ifneq ($(and $(filter yes, $(use_houdini_libs)),$(filter yes, $(suffix))), )
+OPENVDB_SUFFIX ?= h$(HOUDINI_MAJOR_RELEASE).$(HOUDINI_MINOR_RELEASE)
+endif
 
+# ABI version for the library
+# H13 is incompatible with abi=3 
+# H14 is incompatible with abi=2
+abi ?= 3
+
+# Check if houdini version is greater than or equal to 15
+# Since cent6 gcc version is too old to build 15.
+include ../if_houdini_ge_15.mk
 
 # The directory into which to install libraries and header files
 # (it's recommended that this match the DESTDIR in the OpenVDB
 # library makefile)
-DESTDIR := /tmp/OpenVDB
+DESTDIR := $(INSTALL_BASE)/houdini/$(HOUDINI_VERSION)
 
 # The directory into which to install Houdini SOPs
-HOUDINI_DESTDIR := $(HIH)/dso
+HOUDINI_DESTDIR := $(DESTDIR)/dso
 
 # The parent directory of the openvdb/ header directory
-OPENVDB_INCL_DIR := $(DESTDIR)/include
+OPENVDB_INCL_DIR := $(INSTALL_BASE)/include
 # The directory containing libopenvdb
-OPENVDB_LIB_DIR := $(DESTDIR)/lib
-OPENVDB_LIB := -lopenvdb
+OPENVDB_LIB_DIR := $(INSTALL_BASE)/lib
+OPENVDB_LIB := -lopenvdb$(if $(OPENVDB_SUFFIX),_$(OPENVDB_SUFFIX))
 
 # The parent directory of the boost/ header directory
 BOOST_INCL_DIR := $(HT)/include
@@ -142,6 +156,7 @@ ifeq (yes,$(strip $(debug)))
     HCUSTOM_FLAGS += -g
 else
     OPTIMIZE := -O3 -DNDEBUG
+    HCUSTOM_EXTRA_CFLAGS += -DNDEBUG
 endif
 
 ifeq (yes,$(strip $(verbose)))
@@ -186,6 +201,13 @@ LIBS_RPATH := \
 ifdef LINUX
     LIBS += -lrt
     LIBS_RPATH += -lrt
+endif
+
+ifdef using_newer_gcc
+    CXXFLAGS += -O3 -DNDEBUG
+    HCUSTOM_EXTRA_CFLAGS += -std=c++11 -D__GXX_EXPERIMENTAL_CXX0X__ 
+    HCUSTOM_EXTRA_CFLAGS += -O3 -DNDEBUG
+    HOUDINI_CC := $(CXX)
 endif
 
 LIBHOUDINI_INCLUDE_NAMES := \
