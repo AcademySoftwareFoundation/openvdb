@@ -372,10 +372,13 @@ ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)$(HCUSTOM_EXTRA_LDFLAGS)))
         # From Houdini 13.0.548 and 14.0.105 on, hcustom recognizes
         # the environment variables HCUSTOM_CFLAGS and HCUSTOM_LDFLAGS.
         ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)))
-            HCUSTOM_EXPORT += HCUSTOM_CFLAGS=$(strip $(HCUSTOM_EXTRA_CFLAGS))
+            HCUSTOM_EXPORT += HCUSTOM_CFLAGS="$(strip $(HCUSTOM_EXTRA_CFLAGS))"
         endif
         ifneq (,$(strip $(HCUSTOM_EXTRA_LDFLAGS)))
-            HCUSTOM_EXPORT += HCUSTOM_LDFLAGS=$(strip $(HCUSTOM_EXTRA_LDFLAGS))
+            HCUSTOM_EXPORT += HCUSTOM_LDFLAGS="$(strip $(HCUSTOM_EXTRA_LDFLAGS))"
+        endif
+        ifneq (,$(strip $(HOUDINI_CC)))
+          export HOUDINI_CC
         endif
     endif
 endif
