@@ -313,10 +313,10 @@ ALL_TARGETS := \
 
 all: depend clarisselib clarissemodules
 
-# Create an openvdb_clarisse/ symlink to the clarisse/ subdirectory,
+# Create an openvdb_points_clarisse/ symlink to the clarisse/ subdirectory,
 # to mirror the DWA directory structure.
-openvdb_clarisse:
-	ln -f -s clarisse openvdb_clarisse
+openvdb_points_clarisse:
+	ln -f -s clarisse openvdb_points_clarisse
 
 $(LIBCLARISSE_CMA_NAMES): %.cma: %.cid
 	@echo "Building $@ because of $(call list_deps)"
@@ -359,9 +359,9 @@ $(CLARISSE_MODULE_SO_NAMES): $(CLARISSE_DESTDIR)/%.so: clarisse/module/%.o
 clarissemodules: $(CLARISSE_MODULE_SO_NAMES)
 
 install: clarisselib clarissemodules
-	mkdir -p $(DESTDIR)/include/openvdb_clarisse
-	@echo "Created $(DESTDIR)/include/openvdb_clarisse"
-	cp -f $(LIBCLARISSE_INCLUDE_NAMES) $(DESTDIR)/include/openvdb_clarisse/
+	mkdir -p $(DESTDIR)/include/openvdb_points_clarisse
+	@echo "Created $(DESTDIR)/include/openvdb_points_clarisse"
+	cp -f $(LIBCLARISSE_INCLUDE_NAMES) $(DESTDIR)/include/openvdb_points_clarisse/
 	@#
 	mkdir -p $(DESTDIR)/lib
 	@echo "Created $(DESTDIR)/lib/"
