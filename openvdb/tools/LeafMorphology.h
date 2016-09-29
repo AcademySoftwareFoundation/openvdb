@@ -346,31 +346,31 @@ dilate26N( const Size count )
 }
 
 template< typename _TreeType >
-void dilateLeafs6N( _TreeType& tree, const size_t iterations = 1 )
+void dilateLeafs6N( _TreeType& tree, const size_t iterations )
 {
     LeafMorphology<_TreeType>( tree ).dilate6N( iterations );
 }
 
 template< typename _TreeType >
-void dilateLeafs8N( _TreeType& tree, const size_t iterations = 1 )
+void dilateLeafs8N( _TreeType& tree, const size_t iterations )
 {
     LeafMorphology<_TreeType>( tree ).dilate8N( iterations );
 }
 
 template< typename _TreeType >
-void dilateLeafs12N( _TreeType& tree, const size_t iterations = 1 )
+void dilateLeafs12N( _TreeType& tree, const size_t iterations )
 {
     LeafMorphology<_TreeType>( tree ).dilate12N( iterations );
 }
 
 template< typename _TreeType >
-void dilateLeafs18N( _TreeType& tree, const size_t iterations = 1 )
+void dilateLeafs18N( _TreeType& tree, const size_t iterations )
 {
     LeafMorphology<_TreeType>( tree ).dilate18N( iterations );
 }
 
 template< typename _TreeType >
-void dilateLeafs26N( _TreeType& tree, const size_t iterations = 1 )
+void dilateLeafs26N( _TreeType& tree, const size_t iterations )
 {
     LeafMorphology<_TreeType>( tree ).dilate26N( iterations );
 }
