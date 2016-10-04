@@ -282,6 +282,9 @@ ifdef MBSD
     else ifeq ($(DARWIN_OS_MAJOR_VER),15)
 	# El Capitan
 	MACOSX_SDK := MacOSX10.11
+    else ifeq ($(DARWIN_OS_MAJOR_VER),16)
+	# El Capitan
+	MACOSX_SDK := MacOSX10.12
     else
         $(error Unknown MacOSX Darwin major version $(DARWIN_OS_MAJOR_VER))
     endif
