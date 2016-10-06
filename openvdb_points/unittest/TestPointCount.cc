@@ -66,6 +66,18 @@ typedef PointDataTree::LeafNodeType     LeafType;
 typedef LeafType::ValueType             ValueType;
 
 
+struct NotZeroFilter
+{
+    NotZeroFilter() { }
+    static bool initialized() { return true; }
+    template <typename LeafT>
+    void reset(const LeafT&) { }
+    template <typename IterT>
+    bool valid(const IterT& iter) const {
+        return *iter != 0;
+    }
+};
+
 void
 TestPointCount::testCount()
 {
@@ -102,6 +114,11 @@ TestPointCount::testCount()
 
     CPPUNIT_ASSERT_EQUAL(int(*leaf.beginIndexVoxel(openvdb::Coord(0, 0, 1))), 4);
     CPPUNIT_ASSERT_EQUAL(int(leaf.beginIndexVoxel(openvdb::Coord(0, 0, 1)).end()), 7);
+
+    // test filtered, index voxel iterator
+
+    CPPUNIT_ASSERT_EQUAL(int(*leaf.beginIndexVoxel(openvdb::Coord(0, 0, 0), NotZeroFilter())), 1);
+    CPPUNIT_ASSERT_EQUAL(int(leaf.beginIndexVoxel(openvdb::Coord(0, 0, 0), NotZeroFilter()).end()), 4);
 
     {
         LeafType::IndexVoxelIter iter = leaf.beginIndexVoxel(openvdb::Coord(0, 0, 0));

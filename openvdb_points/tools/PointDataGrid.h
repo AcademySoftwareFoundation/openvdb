@@ -536,7 +536,7 @@ public:
 
     /// @brief Filtered leaf index iterator from voxel
     template<typename FilterT>
-    IndexIter<ValueVoxelCIter, FilterT> beginIndexVoxel(const Coord& ijk) const;
+    IndexIter<ValueVoxelCIter, FilterT> beginIndexVoxel(const Coord& ijk, const FilterT& filter) const;
 
 #define VMASK_ this->getValueMask()
     ValueOnCIter  cbeginValueOn() const  { return ValueOnCIter(VMASK_.beginOn(), this); }
@@ -893,8 +893,18 @@ inline typename PointDataLeafNode<T, Log2Dim>::IndexVoxelIter
 PointDataLeafNode<T, Log2Dim>::beginIndexVoxel(const Coord& ijk) const
 {
     ValueVoxelCIter iter = this->beginValueVoxel(ijk);
-
     return IndexVoxelIter(iter, NullFilter());
+}
+
+template<typename T, Index Log2Dim>
+template<typename FilterT>
+inline IndexIter<ValueVoxelCIter, FilterT>
+PointDataLeafNode<T, Log2Dim>::beginIndexVoxel(const Coord& ijk, const FilterT& filter) const
+{
+    ValueVoxelCIter iter = this->beginValueVoxel(ijk);
+    FilterT newFilter(filter);
+    newFilter.reset(*this);
+    return IndexIter<ValueVoxelCIter, FilterT>(iter, newFilter);
 }
 
 template<typename T, Index Log2Dim>
