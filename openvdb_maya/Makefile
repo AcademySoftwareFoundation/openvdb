@@ -34,8 +34,8 @@
 #   depend              recompute source file header dependencies
 #
 # Options:
-#   abi=2               build for compatibility with the OpenVDB 2.x Grid ABI
-#                       (some OpenVDB 3.x features will be disabled)
+#   abi=3               build for compatibility with the OpenVDB 3.x Grid ABI
+#                       (some OpenVDB 4.x features will be disabled)
 #   bits=32|64          build for 32-bit or 64-bit environments (default: 64)
 #   debug=yes           build with debugging symbols and without optimization
 #   verbose=yes         run commands in verbose mode
@@ -132,15 +132,17 @@ endif
 INCLDIRS := \
     -I . \
     -I $(OPENVDB_INCL_DIR) \
-    -I $(BOOST_INCL_DIR) \
-    -I $(ILMBASE_INCL_DIR) \
-    -I $(TBB_INCL_DIR) \
-    -I $(MAYA_INCL_DIR) \
+    -isystem $(BOOST_INCL_DIR) \
+    -isystem $(ILMBASE_INCL_DIR) \
+    -isystem $(TBB_INCL_DIR) \
+    -isystem $(MAYA_INCL_DIR) \
 #
 
+CXXFLAGS += -std=c++0x
+
 CXXFLAGS += -pthread $(OPTIMIZE) $(INCLDIRS)
-ifeq (2,$(strip $(abi)))
-    CXXFLAGS += -DOPENVDB_2_ABI_COMPATIBLE
+ifeq (3,$(strip $(abi)))
+    CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE
 endif
 # From $(MAYA_LOCATION)/devkit/plug-ins/buildconfig:
 CXXFLAGS += \
@@ -289,7 +291,7 @@ $(DEPEND): $(ALL_INCLUDE_FILES) $(ALL_SRC_FILES)
 	$(RM) $(DEPEND)
 	for f in $(ALL_SRC_FILES); \
 		do $(CXX) $(CXXFLAGS) -O0 -MM $$f -MT `echo $$f | sed 's%\.[^.]*%.o%'` \
-			-I $(MAYA_INCL_DIR) >> $(DEPEND); \
+			-isystem $(MAYA_INCL_DIR) >> $(DEPEND); \
 	done
 
 depend: $(DEPEND)

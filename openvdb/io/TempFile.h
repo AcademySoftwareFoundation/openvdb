@@ -27,14 +27,14 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @file TempFile.h
 
 #ifndef OPENVDB_IO_TEMPFILE_HAS_BEEN_INCLUDED
 #define OPENVDB_IO_TEMPFILE_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h>
-#include <boost/scoped_ptr.hpp>
+#include <memory>
 #include <ostream>
 
 
@@ -67,7 +67,7 @@ public:
 
 private:
     struct TempFileImpl;
-    boost::scoped_ptr<TempFileImpl> mImpl;
+    std::unique_ptr<TempFileImpl> mImpl;
 };
 
 } // namespace io

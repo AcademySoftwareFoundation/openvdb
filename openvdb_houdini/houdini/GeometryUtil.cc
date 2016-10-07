@@ -276,11 +276,13 @@ frustumTransformFromCamera(
         OBJ_Node *meobj = node.getCreator()->castToOBJNode();
         if (meobj) {
             node.addExtraInput(meobj, OP_INTEREST_DATA);
-            if (!cam.getRelativeTransform(*meobj, M, context))
+            if (!cam.getRelativeTransform(*meobj, M, context)) {
                 node.addTransformError(cam, "relative");
+            }
         } else {
-            if (!((OP_Node *)&cam)->getWorldTransform(M, context))
+            if (!static_cast<OP_Node*>(&cam)->getWorldTransform(M, context)) {
                 node.addTransformError(cam, "world");
+            }
         }
 
         for (unsigned i = 0; i < 4; ++i) {

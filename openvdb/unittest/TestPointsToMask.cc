@@ -28,11 +28,11 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-#include <cppunit/extensions/HelperMacros.h>
+#include <openvdb/openvdb.h>
 #include <openvdb/math/Math.h> // for math::Random01
 #include <openvdb/tools/PointsToMask.h>
 #include <openvdb/util/CpuTimer.h>
-
+#include <cppunit/extensions/HelperMacros.h>
 #include <vector>
 #include <algorithm>
 #include <cmath>
@@ -197,9 +197,6 @@ TestPointsToMask::testPointsToMask()
         CPPUNIT_ASSERT_EQUAL( voxelCount, grid->activeVoxelCount() );
     }
 }
-
-
-
 
 // Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

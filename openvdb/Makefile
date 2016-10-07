@@ -51,8 +51,8 @@
 #   test                run tests
 #
 # Options:
-#   abi=2               build for compatibility with the OpenVDB 2.x Grid ABI
-#                       (some OpenVDB 3.x features will be disabled)
+#   abi=3               build for compatibility with the OpenVDB 3.x Grid ABI
+#                       (some OpenVDB 4.x features will be disabled)
 #   shared=no           link executables against static OpenVDB libraries
 #                       (default: link against shared libraries)
 #   debug=yes           build with debugging symbols and without optimization
@@ -250,7 +250,7 @@ ifeq (yes,$(has_log4cplus))
     INCLDIRS += -isystem $(LOG4CPLUS_INCL_DIR)
 endif
 
-CXXFLAGS += -std=c++0x
+CXXFLAGS += -std=c++11
 
 CXXFLAGS += -pthread $(OPTIMIZE) $(INCLDIRS)
 ifeq (yes,$(has_blosc))
@@ -259,8 +259,8 @@ endif
 ifeq (yes,$(has_log4cplus))
     CXXFLAGS += -DOPENVDB_USE_LOG4CPLUS
 endif
-ifeq (2,$(strip $(abi)))
-    CXXFLAGS += -DOPENVDB_2_ABI_COMPATIBLE
+ifeq (3,$(strip $(abi)))
+    CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE
 endif
 ifneq (2,$(strip $(GLFW_MAJOR_VERSION)))
     CXXFLAGS += -DOPENVDB_USE_GLFW_3
@@ -331,9 +331,7 @@ INCLUDE_NAMES := \
     math/Vec3.h \
     math/Vec4.h \
     Metadata.h \
-    metadata/Metadata.h \
-    metadata/MetaMap.h \
-    metadata/StringMetadata.h \
+    MetaMap.h \
     openvdb.h \
     Platform.h \
     PlatformConfig.h \
@@ -418,8 +416,8 @@ SRC_NAMES := \
     math/Proximity.cc \
     math/QuantizedUnitVec.cc \
     math/Transform.cc \
-    metadata/Metadata.cc \
-    metadata/MetaMap.cc \
+    Metadata.cc \
+    MetaMap.cc \
     openvdb.cc \
     Platform.cc \
     util/Formats.cc \

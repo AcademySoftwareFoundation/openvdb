@@ -32,7 +32,7 @@
 ///
 /// @author Mihai Alden
 ///
-/// @decription Rasterize points into density and attribute grids.
+/// @brief  Rasterize points into density and attribute grids.
 ///
 /// @note   This SOP has a accompanying creation script that adds a default VOP
 ///         subnetwork and UI parameters for cloud and velocity field modeling.
@@ -108,7 +108,7 @@ namespace {
 
 
 inline hvdb::GridCPtr
-getMaskVDB(const GU_Detail * geoPt, const GA_PrimitiveGroup *group = NULL)
+getMaskVDB(const GU_Detail * geoPt, const GA_PrimitiveGroup *group = nullptr)
 {
     if (geoPt) {
         hvdb::VdbPrimCIterator vdbIt(geoPt, group);
@@ -208,9 +208,9 @@ linearBlend(double a, double b, double w) { return a * w + b * (1.0 - w); }
 template <typename MaskTreeType>
 inline void
 bboxClip(MaskTreeType& mask, const openvdb::BBoxd& bbox, bool invertMask,
-    const openvdb::math::Transform& maskXform, const openvdb::math::Transform * srcXform = NULL)
+    const openvdb::math::Transform& maskXform, const openvdb::math::Transform* srcXform = nullptr)
 {
-    typedef typename MaskTreeType::ValueType    ValueType;
+    typedef typename MaskTreeType::ValueType ValueType;
     const ValueType offVal = ValueType(0);
     const ValueType onVal = ValueType(1);
 
@@ -324,7 +324,8 @@ struct PointCache
     typedef openvdb::Vec3s                  PosType;
     typedef PosType::value_type             ScalarType;
 
-    PointCache(const GU_Detail& detail, const float radiusScale, const GA_PointGroup* group = NULL)
+    PointCache(const GU_Detail& detail, const float radiusScale,
+        const GA_PointGroup* group = nullptr)
         : mIndexMap(&detail.getP()->getIndexMap())
         , mSize(mIndexMap->indexSize())
         , mOffsets()
@@ -634,8 +635,8 @@ struct PointIndexGridCollection
     typedef PointIndexTree::ValueConverter<bool>::Type  BoolTreeType;
 
     PointIndexGridCollection(const GU_Detail& detail, const float radiusScale,
-        const float minVoxelSize, const GA_PointGroup* group = NULL,
-        hvdb::Interrupter* interrupter = NULL)
+        const float minVoxelSize, const GA_PointGroup* group = nullptr,
+        hvdb::Interrupter* interrupter = nullptr)
         : mPointCacheArray() , mIdxGridArray(), mMinRadiusArray(), mMaxRadiusArray()
     {
         mPointCacheArray.push_back(PointCache::Ptr(new PointCache(detail, radiusScale, group)));
@@ -772,8 +773,8 @@ struct ConstructCandidateVoxelMask
     ConstructCandidateVoxelMask(BoolTreeType& maskTree, const PointCache& points,
         const std::vector<const PointIndexLeafNode*>& pointIndexLeafNodes,
         const openvdb::math::Transform& xform,
-        const openvdb::CoordBBox * clipBox = NULL,
-        hvdb::Interrupter* interrupter = NULL)
+        const openvdb::CoordBBox * clipBox = nullptr,
+        hvdb::Interrupter* interrupter = nullptr)
         : mMaskTree(false)
         , mMaskTreePt(&maskTree)
         , mMaskAccessor(*mMaskTreePt)
@@ -804,7 +805,7 @@ struct ConstructCandidateVoxelMask
         PosType pos, bboxMin, bboxMax, pMin, pMax;
         ScalarType radius(0.0);
 
-        const PointIndexType *pointIdxPt = NULL, *endIdxPt = NULL;
+        const PointIndexType *pointIdxPt = nullptr, *endIdxPt = nullptr;
 
         std::vector<PointIndexType> largeParticleIndices;
         double leafnodeSize = mXform.voxelSize()[0] * double(PointIndexLeafNode::DIM);
@@ -1130,7 +1131,7 @@ struct CullFrustumLeafNodes
         std::vector<MaskLeafNodeType*>& nodes,
         const openvdb::math::Transform& xform)
         : mIdxGridCollection(&idxGridCollection)
-        , mNodes(nodes.empty() ? NULL : &nodes.front())
+        , mNodes(nodes.empty() ? nullptr : &nodes.front())
         , mXform(xform)
     {
     }
@@ -1215,7 +1216,7 @@ maskRegionOfInterest(PointIndexGridCollection::BoolTreeType& mask,
     const PointIndexGridCollection& idxGridCollection,
     const openvdb::math::Transform& volumeTransform,
     bool clipToFrustum = false,
-    hvdb::Interrupter* interrupter = NULL)
+    hvdb::Interrupter* interrupter = nullptr)
 {
     typedef PointIndexGridCollection::BoolTreeType::LeafNodeType BoolLeafNodeType;
 
@@ -1288,7 +1289,7 @@ struct FillActiveValues
     typedef typename NodeType::ValueType ValueType;
 
     FillActiveValues(std::vector<NodeType*>& nodes, ValueType val)
-        : mNodes(nodes.empty() ? NULL : &nodes.front()), mValue(val)
+        : mNodes(nodes.empty() ? nullptr : &nodes.front()), mValue(val)
     {
     }
 
@@ -1423,8 +1424,8 @@ struct WeightedAverageOp
     /////
 
     WeightedAverageOp(const GA_Attribute& attrib, boost::scoped_array<LeafNodeType*>& nodes)
-        : mHandle(&attrib), mNodes(nodes.get()), mNode(NULL), mNodeVoxelData(NULL)
-        , mNodeOffset(0), mValue(ScalarType(0.0)), mVaryingDataBuffer(NULL), mVaryingData(false)
+        : mHandle(&attrib), mNodes(nodes.get()), mNode(nullptr), mNodeVoxelData(nullptr)
+        , mNodeOffset(0), mValue(ScalarType(0.0)), mVaryingDataBuffer(nullptr), mVaryingData(false)
     {
     }
 
@@ -1476,7 +1477,7 @@ struct WeightedAverageOp
         }
 
         mNodes[mNodeOffset] = mNode;
-        mNode = NULL;
+        mNode = nullptr;
     }
 
 
@@ -1519,7 +1520,7 @@ struct DensityOp
     /////
 
     DensityOp(const GA_Attribute& attrib, boost::scoped_array<LeafNodeType*>& nodes)
-        : mPosHandle(&attrib), mNodes(nodes.get()), mNode(NULL), mNodeOffset(0)
+        : mPosHandle(&attrib), mNodes(nodes.get()), mNode(nullptr), mNodeOffset(0)
     {
     }
 
@@ -1541,7 +1542,7 @@ struct DensityOp
     {
         mNode->topologyUnion(maskNode);
         mNodes[mNodeOffset] = mNode;
-        mNode = NULL;
+        mNode = nullptr;
     }
 
 private:
@@ -1617,7 +1618,7 @@ struct Attribute
 
         if (nodeCount > mNodeCount) {
             mNodes.reset(new LeafNodeType*[nodeCount]);
-            for (size_t n = 0; n < nodeCount; ++n) mNodes[n] = NULL;
+            for (size_t n = 0; n < nodeCount; ++n) mNodes[n] = nullptr;
         }
 
         mNodeCount = nodeCount;
@@ -1631,7 +1632,7 @@ struct Attribute
         for (size_t n = 0; n < mNodeCount; ++n) {
             if (mNodes[n]) {
                 mOutputNodes.push_back(mNodes[n]);
-                mNodes[n] = NULL;
+                mNodes[n] = nullptr;
             }
         }
     }
@@ -1687,7 +1688,7 @@ struct Attribute
     {
         typename GridType::Ptr grid= GridType::create();
 
-        IFOPopulateTree op(grid->tree(), mOutputNodes.empty() ? NULL : &mOutputNodes.front());
+        IFOPopulateTree op(grid->tree(), mOutputNodes.empty() ? nullptr : &mOutputNodes.front());
 
         tbb::parallel_reduce(tbb::blocked_range<size_t>(0, mOutputNodes.size()), op);
 
@@ -1720,7 +1721,7 @@ struct Attribute
         clearNodes();
 
         for (size_t n = 0, N = mOutputNodes.size(); n < N; ++n) {
-            if (mOutputNodes[n] != NULL) delete mOutputNodes[n];
+            if (mOutputNodes[n] != nullptr) delete mOutputNodes[n];
         }
     }
 
@@ -1729,12 +1730,12 @@ private:
     void clearNodes()
     {
         for (size_t n = 0; n < mNodeCount; ++n) {
-            if (mNodes[n] != NULL) delete mNodes[n];
+            if (mNodes[n] != nullptr) delete mNodes[n];
         }
     }
 
     Attribute(const GA_Attribute& attrib, const std::string& name, const Transform& transform)
-        : mAttrib(&attrib), mName(name), mNodeCount(0), mNodes(NULL)
+        : mAttrib(&attrib), mName(name), mNodeCount(0), mNodes(nullptr)
         , mOutputNodes(), mTransform(transform)
     {
     }
@@ -1754,7 +1755,7 @@ private:
             for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
                 if (mNodes[n]) {
                     mAccessor.addLeaf(mNodes[n]);
-                    mNodes[n] = NULL;
+                    mNodes[n] = nullptr;
                 }
             }
         }
@@ -1919,11 +1920,11 @@ struct VEXProgram {
     bool isTimeDependant() const { return mIsTimeDependant; }
 
     CVEX_Value* findInput(const char *name, CVEX_Type type) {
-        return mVEXLoaded ? mCVEX.findInput(name, type) : NULL;
+        return mVEXLoaded ? mCVEX.findInput(name, type) : nullptr;
     }
 
     CVEX_Value* findOutput(const char *name, CVEX_Type type) {
-        return mVEXLoaded ? mCVEX.findOutput(name, type) : NULL;
+        return mVEXLoaded ? mCVEX.findOutput(name, type) : nullptr;
     }
 
     //////////
@@ -2043,15 +2044,15 @@ struct RasterizePoints
         DensityTreatment treatment,
         const float densityScale = 1.0,
         const float solidRatio = 0.0,
-        hvdb::Interrupter* interrupter = NULL)
+        hvdb::Interrupter* interrupter = nullptr)
         : mDetail(&detail)
         , mIdxGridCollection(&idxGridCollection)
         , mRegionMaskNodes(&regionMaskLeafNodes.front())
         , mInterrupter(interrupter)
-        , mDensityAttribute(NULL)
-        , mVectorAttributes(NULL)
-        , mFloatAttributes(NULL)
-        , mVEXContext(NULL)
+        , mDensityAttribute(nullptr)
+        , mVectorAttributes(nullptr)
+        , mFloatAttributes(nullptr)
+        , mVEXContext(nullptr)
         , mVolumeXform(volumeXform)
         , mDensityScale(densityScale)
         , mSolidRatio(solidRatio)
@@ -2201,9 +2202,9 @@ struct RasterizePoints
                 if (densityAttribute) densityAttribute->endNodeProcessing(maskNode);
 
                 if (transferAttributes) {
-                    for (size_t n = 0; n < BoolLeafNodeType::SIZE; ++n) {
-                        voxelWeightArray[n] =
-                            voxelWeightArray[n] > 0.0f ? 1.0f / voxelWeightArray[n] : 0.0f;
+                    for (size_t nn = 0; nn < BoolLeafNodeType::SIZE; ++nn) {
+                        voxelWeightArray[nn] =
+                            voxelWeightArray[nn] > 0.0f ? 1.0f / voxelWeightArray[nn] : 0.0f;
                     }
 
                     for (size_t i = 0, I = vecAttributes.size(); i < I; ++i) {
@@ -2243,9 +2244,9 @@ private:
 
         bool hasNonzeroDensityValues = false;
 
-        VEXProgram * cvex = mVEXContext ? &mVEXContext->getThereadLocalVEXProgram() : NULL;
-        ScalarType * const densityData = densityAttribute ? densityAttribute->data() : NULL;
-        const bool exportDensity = densityData != NULL;
+        VEXProgram * cvex = mVEXContext ? &mVEXContext->getThereadLocalVEXProgram() : nullptr;
+        ScalarType * const densityData = densityAttribute ? densityAttribute->data() : nullptr;
+        const bool exportDensity = densityData != nullptr;
         const float * pointRadiusData = pointCache.radiusData();
         const openvdb::Vec3s * pointPosData = pointCache.posData();
 
@@ -2316,7 +2317,8 @@ private:
 
                 for (ijk[1] = pMin[1]; ijk[1] <= pMax[1]; ++ijk[1]) {
 
-                    yPos = xPos + ((ijk[1] & (BoolLeafNodeType::DIM - 1u)) << BoolLeafNodeType::LOG2DIM);
+                    yPos = xPos + ((ijk[1] & (BoolLeafNodeType::DIM - 1u))
+                        << BoolLeafNodeType::LOG2DIM);
                     ySqr = localPos[1] - double(ijk[1]);
                     ySqr *= ySqr;
 
@@ -2331,8 +2333,8 @@ private:
                         if (distSqr < radiusSqr) {
                             const float dist = std::sqrt(distSqr) - solidRadius;
 
-                            const float weight =
-                                dist > 0.0f ? densityScale * (1.0f - invResidualRadius * dist) : 1.0f;
+                            const float weight = dist > 0.0f ?
+                                densityScale * (1.0f - invResidualRadius * dist) : 1.0f;
 
                             if (weight > 0.0f) densitySamples.push_back(DensitySample(weight, pos));
                         }
@@ -2344,8 +2346,9 @@ private:
 
             // Apply VEX shader program to density samples
             if (cvex && !densitySamples.empty()) {
-                hasNonzeroDensityValues |= executeVEXShader(*cvex, densitySamples, exportDensity,
-                    vecAttributes, floatAttributes, nodeBoundingBox.min(), xyz, radius, pointOffset);
+                hasNonzeroDensityValues |= executeVEXShader(*cvex, densitySamples,
+                    exportDensity, vecAttributes, floatAttributes, nodeBoundingBox.min(),
+                    xyz, radius, pointOffset);
             }
 
             // Transfer density data to leafnode buffer
@@ -2416,10 +2419,10 @@ private:
                 coord += nodeOrigin;
                 ws = mVolumeXform.indexToWorld(coord);
 
-                UT_Vector3& point = data[n];
-                point[0] = float(ws[0]);
-                point[1] = float(ws[1]);
-                point[2] = float(ws[2]);
+                UT_Vector3& pointRef = data[n];
+                pointRef[0] = float(ws[0]);
+                pointRef[1] = float(ws[1]);
+                pointRef[2] = float(ws[2]);
             }
 #if (UT_VERSION_INT >= 0x0d000000) // 13.0.0 or later
             val->setTypedData(data, numValues);
@@ -2500,7 +2503,7 @@ private:
         bool hasNonzeroDensityValues = false, runProcess = false;
 
 
-        fpreal32* densityScales = NULL;
+        fpreal32* densityScales = nullptr;
 
         if (exportDensity) {
             if (CVEX_Value* val = cvex.findOutput("output", CVEX_TYPE_FLOAT)) {
@@ -2595,7 +2598,7 @@ struct RasterizationSettings
         , pointsGeo(&geo)
         , pointGroup(group)
         , interrupter(&in)
-        , vexContext(NULL)
+        , vexContext(nullptr)
         , scalarAttributeNames()
         , vectorAttributeNames()
         , maskGrid()
@@ -2646,15 +2649,18 @@ applyClippingMask(PointIndexGridCollection::BoolTreeType& mask, RasterizationSet
             openvdb::CoordBBox maskBBox;
             mask.evalActiveVoxelBoundingBox(maskBBox);
 
-            openvdb::Vec3d locVoxelSize = computeFrustumVoxelSize(maskBBox.min().z(), *settings.transform);
+            openvdb::Vec3d locVoxelSize = computeFrustumVoxelSize(
+                maskBBox.min().z(), *settings.transform);
             openvdb::Vec3d nearPlaneVoxelSize = settings.transform->voxelSize();
 
             const double weight = double(settings.getFrustumQuality());
             double voxelSize = linearBlend(nearPlaneVoxelSize.x(), locVoxelSize.x(), weight);
 
-            openvdb::math::Transform::Ptr xform = openvdb::math::Transform::createLinearTransform(voxelSize);
+            openvdb::math::Transform::Ptr xform =
+                openvdb::math::Transform::createLinearTransform(voxelSize);
 
-            bboxClip(mask, *settings.maskBBox, settings.invertMask, *settings.transform, xform.get());
+            bboxClip(mask, *settings.maskBBox, settings.invertMask,
+                *settings.transform, xform.get());
        }
 
     } else if (settings.maskGrid) {
@@ -2712,7 +2718,8 @@ rasterize(RasterizationSettings& settings, std::vector<openvdb::GridBase::Ptr>& 
         if (a) scalarAttributes.push_back(a);
     }
 
-    const bool doTransfer = densityAttribute || !vectorAttributes.empty() || !scalarAttributes.empty();
+    const bool doTransfer = (densityAttribute || !vectorAttributes.empty()
+        || !scalarAttributes.empty());
     if (!(doTransfer || settings.exportPointMask) || settings.wasInterrupted()) return;
 
     // create region of interest mask
@@ -2890,7 +2897,7 @@ getAttributeNames(
     std::vector<std::string>& scalarAttribNames,
     std::vector<std::string>& vectorAttribNames,
     bool createVelocityAttribtue,
-    UT_ErrorManager* log = NULL)
+    UT_ErrorManager* log = nullptr)
 {
     if (attributeNames.empty() && !createVelocityAttribtue) {
         return;
@@ -2941,9 +2948,10 @@ getAttributeNames(
 }
 
 
-/// Returns a NULL pointer if geoPt is NULL or if no reference vdb is found.
+/// Returns a null pointer if geoPt is null or if no reference vdb is found.
 inline openvdb::math::Transform::Ptr
-getReferenceTransform(const GU_Detail * geoPt, const GA_PrimitiveGroup *group = NULL, UT_ErrorManager* log = NULL)
+getReferenceTransform(const GU_Detail* geoPt, const GA_PrimitiveGroup* group = nullptr,
+    UT_ErrorManager* log = nullptr)
 {
     if (geoPt) {
         hvdb::VdbPrimCIterator vdbIt(geoPt, group);
@@ -2972,14 +2980,14 @@ lookupAttrInput(const PRM_SpareData* spare)
 
 
 inline void
-populateMeshMenu(void *data, PRM_Name *choicenames, int themenusize,
-    const PRM_SpareData *spare, const PRM_Parm *parm)
+populateMeshMenu(void* data, PRM_Name* choicenames, int themenusize,
+    const PRM_SpareData* spare, const PRM_Parm*)
 {
     choicenames[0].setToken(0);
     choicenames[0].setLabel(0);
 
-    SOP_Node* sop = CAST_SOPNODE((OP_Node *)data);
-    if (sop == NULL) return;
+    SOP_Node* sop = CAST_SOPNODE(static_cast<OP_Node*>(data));
+    if (sop == nullptr) return;
 
     size_t count = 0;
 
@@ -3067,7 +3075,9 @@ struct SOP_OpenVDB_Rasterize_Points: public hvdb::SOP_NodeVDB
     virtual void opChanged(OP_EventType reason, void *data = 0);
 
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
-    virtual bool hasVexShaderParameter(const char* name) { return mCodeGenerator.hasShaderParameter(name); }
+    virtual bool hasVexShaderParameter(const char* name) {
+        return mCodeGenerator.hasShaderParameter(name);
+    }
 #endif
 
     virtual int isRefInput(unsigned i) const { return i > 0; }
@@ -3145,7 +3155,7 @@ SOP_OpenVDB_Rasterize_Points::ensureSpareParmsAreUpdatedSubclass()
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
@@ -3192,7 +3202,7 @@ newSopOperator(OP_OperatorTable* table)
         const char* items[] = {
             "add",  "Accumulate",
             "max",  "Maximum",
-            NULL
+            nullptr
         };
 
         parms.add(hutil::ParmFactory(PRM_ORD, "compositing", "Density Merge")
@@ -3251,13 +3261,13 @@ SOP_OpenVDB_Rasterize_Points::updateParmsFlags()
 {
     bool changed = false;
 
-    const bool refexists = getInput(1) != NULL;
+    const bool refexists = getInput(1) != nullptr;
     changed |= enableParm("voxelsize", !refexists);
     changed |= enableParm("transformvdb", refexists);
     changed |= enableParm("cliptofrustum", refexists);
     changed |= enableParm("frustumquality", refexists);
 
-    const bool maskexists = getInput(2) != NULL;
+    const bool maskexists = getInput(2) != nullptr;
     changed |= enableParm("maskvdb", maskexists);
     changed |= enableParm("invertmask", maskexists);
 
@@ -3290,7 +3300,8 @@ SOP_OpenVDB_Rasterize_Points::factory(OP_Network* net, const char* name, OP_Oper
     return new SOP_OpenVDB_Rasterize_Points(net, name, op);
 }
 
-SOP_OpenVDB_Rasterize_Points::SOP_OpenVDB_Rasterize_Points(OP_Network* net, const char* name, OP_Operator* op)
+SOP_OpenVDB_Rasterize_Points::SOP_OpenVDB_Rasterize_Points(OP_Network* net,
+    const char* name, OP_Operator* op)
     : hvdb::SOP_NodeVDB(net, name, op)
     , mCodeGenerator(this, new VOP_LanguageContextTypeList(VOP_LANGUAGE_VEX,
         VOPconvertToContextType(VEX_CVEX_CONTEXT)), 1, 1)
@@ -3330,7 +3341,7 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
         const fpreal frustumQuality = (evalFloat("frustumquality", 0, time) - 1.0) / 9.0;
 
         const GU_Detail* pointsGeo = inputGeo(0);
-        const GA_PointGroup* pointGroup = NULL;
+        const GA_PointGroup* pointGroup = nullptr;
 
         {
             UT_String groupStr;
@@ -3343,7 +3354,7 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
         }
 
         const GU_Detail* refGeo = inputGeo(1);
-        const GA_PrimitiveGroup* refGroup = NULL;
+        const GA_PrimitiveGroup* refGroup = nullptr;
 
         if (refGeo) {
             UT_String groupStr;
@@ -3356,7 +3367,7 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
         }
 
         const GU_Detail* maskGeo = inputGeo(2);
-        const GA_PrimitiveGroup* maskGroup = NULL;
+        const GA_PrimitiveGroup* maskGroup = nullptr;
         bool expectingVDBMask = false;
 
         if (maskGeo) {
@@ -3394,8 +3405,9 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
                 scalarAttribNames, vectorAttribNames, createVelocityAttribtue, log);
         }
 
-        if (exportPointMask || createDensity || !scalarAttribNames.empty() || !vectorAttribNames.empty()) {
-
+        if (exportPointMask || createDensity || !scalarAttribNames.empty()
+            || !vectorAttribNames.empty())
+        {
             hvdb::Interrupter boss("Rasterize Points");
 
             // Set rasterization settings
@@ -3424,10 +3436,12 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
             settings.densityScale = float(densityScale);
             settings.particleScale = float(particleScale);
             settings.solidRatio = float(solidRatio);
-            settings.transform = xform ? xform : openvdb::math::Transform::createLinearTransform(double(voxelSize));
+            settings.transform = xform ?
+                xform : openvdb::math::Transform::createLinearTransform(double(voxelSize));
             settings.vectorAttributeNames.swap(vectorAttribNames);
             settings.scalarAttributeNames.swap(scalarAttribNames);
-            settings.treatment = compositing == 0 ? RasterizePoints::ACCUMULATE : RasterizePoints::MAXIMUM;
+            settings.treatment = compositing == 0 ?
+                RasterizePoints::ACCUMULATE : RasterizePoints::MAXIMUM;
             settings.setFrustumQuality(float(frustumQuality));
             settings.clipToFrustum = clipToFrustum;
             settings.maskBBox = maskBBox;

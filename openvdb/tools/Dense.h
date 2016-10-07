@@ -27,7 +27,7 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @file Dense.h
 ///
 /// @brief This file defines a simple dense grid and efficient
@@ -41,10 +41,10 @@
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/Exceptions.h>
 #include <openvdb/util/Formats.h>
-#include <tbb/parallel_for.h>
-#include <boost/scoped_array.hpp>
-#include <boost/scoped_ptr.hpp>
 #include "Prune.h"
+#include <boost/scoped_array.hpp>
+#include <tbb/parallel_for.h>
+#include <memory>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -206,10 +206,10 @@ template<typename ValueT, MemoryLayout Layout = LayoutZYX>
 class Dense : public DenseBase<ValueT, Layout>
 {
 public:
-    typedef ValueT ValueType;
-    typedef DenseBase<ValueT, Layout> BaseT;
-    typedef boost::shared_ptr<Dense> Ptr;
-    typedef boost::shared_ptr<const Dense> ConstPtr;
+    using ValueType = ValueT;
+    using BaseT = DenseBase<ValueT, Layout>;
+    using Ptr = SharedPtr<Dense>;
+    using ConstPtr = SharedPtr<const Dense>;
 
     /// @brief Construct a dense grid with a given range of coordinates.
     ///
@@ -296,14 +296,16 @@ public:
         mData[BaseT::coordToOffset(i,j,k)] = value;
     }
 
-    /// @brief Return a const reference to the value of the voxel at unsigned index coordinates (i, j, k).
+    /// @brief Return a const reference to the value of the voxel
+    /// at unsigned index coordinates (i, j, k).
     /// @note This is somewhat slower than using an array offset.
     inline const ValueT& getValue(size_t i, size_t j, size_t k) const
     {
         return mData[BaseT::coordToOffset(i,j,k)];
     }
 
-    /// @brief Return a non-const reference to the value of the voxel at unsigned index coordinates (i, j, k).
+    /// @brief Return a non-const reference to the value of the voxel
+    /// at unsigned index coordinates (i, j, k).
     /// @note This is somewhat slower than using an array offset.
     inline ValueT& getValue(size_t i, size_t j, size_t k)
     {
@@ -324,7 +326,8 @@ public:
         return mData[this->coordToOffset(xyz)];
     }
 
-    /// @brief Return a non-const reference to the value of the voxel at the given signed coordinates.
+    /// @brief Return a non-const reference to the value of the voxel
+    /// at the given signed coordinates.
     /// @note This is slower than using either an array offset or unsigned index coordinates.
     inline ValueT& getValue(const Coord& xyz)
     {
@@ -377,11 +380,10 @@ public:
         os << "  Number of voxels:       " << util::formattedInt(this->valueCount()) << "\n";
         os << "  Bounding box of voxels: " << BaseT::mBBox << "\n";
         os << "  Memory layout:          " << (Layout == LayoutZYX ? "ZYX (" : "XYZ (dis")
-           << "similar to VDB)\n";        
+           << "similar to VDB)\n";
     }
-    
-private:
 
+private:
     /// @brief Private method to initialize the dense value array.
     void init()
     {
@@ -409,9 +411,9 @@ template<typename _TreeT, typename _DenseT = Dense<typename _TreeT::ValueType> >
 class CopyToDense
 {
 public:
-    typedef _DenseT                      DenseT;
-    typedef _TreeT                       TreeT;
-    typedef typename TreeT::ValueType    ValueT;
+    using DenseT = _DenseT;
+    using TreeT = _TreeT;
+    using ValueT = typename TreeT::ValueType;
 
     CopyToDense(const TreeT& tree, DenseT& dense)
         : mRoot(&(tree.root())), mDense(&dense) {}
@@ -442,8 +444,8 @@ template<typename DenseT, typename GridOrTreeT>
 void
 copyToDense(const GridOrTreeT& sparse, DenseT& dense, bool serial)
 {
-    typedef TreeAdapter<GridOrTreeT> Adapter;
-    typedef typename Adapter::TreeType TreeT;
+    using Adapter = TreeAdapter<GridOrTreeT>;
+    using TreeT = typename Adapter::TreeType;
 
     CopyToDense<TreeT, DenseT> op(Adapter::constTree(sparse), dense);
     op.copy(serial);
@@ -466,18 +468,18 @@ template<typename _TreeT, typename _DenseT = Dense<typename _TreeT::ValueType> >
 class CopyFromDense
 {
 public:
-    typedef _DenseT                      DenseT;
-    typedef _TreeT                       TreeT;
-    typedef typename TreeT::ValueType    ValueT;
-    typedef typename TreeT::LeafNodeType LeafT;
-    typedef tree::ValueAccessor<TreeT>   AccessorT;
+    using DenseT = _DenseT;
+    using TreeT = _TreeT;
+    using ValueT = typename TreeT::ValueType;
+    using LeafT = typename TreeT::LeafNodeType;
+    using AccessorT = tree::ValueAccessor<TreeT>;
 
     CopyFromDense(const DenseT& dense, TreeT& tree, const ValueT& tolerance)
         : mDense(&dense),
           mTree(&tree),
-          mBlocks(NULL),
+          mBlocks(nullptr),
           mTolerance(tolerance),
-          mAccessor(tree.empty() ? NULL : new AccessorT(tree))
+          mAccessor(tree.empty() ? nullptr : new AccessorT(tree))
     {
     }
     CopyFromDense(const CopyFromDense& other)
@@ -485,7 +487,7 @@ public:
           mTree(other.mTree),
           mBlocks(other.mBlocks),
           mTolerance(other.mTolerance),
-          mAccessor(other.mAccessor.get() == NULL ? NULL : new AccessorT(*mTree))
+          mAccessor(other.mAccessor.get() == nullptr ? nullptr : new AccessorT(*mTree))
     {
     }
 
@@ -527,7 +529,7 @@ public:
             }
         }
         delete mBlocks;
-        mBlocks = NULL;
+        mBlocks = nullptr;
 
         tools::pruneTiles(*mTree, mTolerance);//multi-threaded
     }
@@ -544,7 +546,7 @@ public:
             Block& block = (*mBlocks)[m];
             const CoordBBox &bbox = block.bbox;
 
-            if (mAccessor.get() == NULL) {//i.e. empty target tree
+            if (mAccessor.get() == nullptr) {//i.e. empty target tree
                 leaf->fill(mTree->background(), false);
             } else {//account for existing leaf nodes in the target tree
                 if (const LeafT* target = mAccessor->probeConstLeaf(bbox.min())) {
@@ -573,14 +575,14 @@ private:
         CoordBBox               bbox;
         LeafT*                  leaf;
         std::pair<ValueT, bool> tile;
-        Block(const CoordBBox& b) : bbox(b), leaf(NULL) {}
+        Block(const CoordBBox& b) : bbox(b), leaf(nullptr) {}
     };
 
-    const DenseT*                mDense;
-    TreeT*                       mTree;
-    std::vector<Block>*          mBlocks;
-    ValueT                       mTolerance;
-    boost::scoped_ptr<AccessorT> mAccessor;
+    const DenseT*              mDense;
+    TreeT*                     mTree;
+    std::vector<Block>*        mBlocks;
+    ValueT                     mTolerance;
+    std::unique_ptr<AccessorT> mAccessor;
 };// CopyFromDense
 
 
@@ -590,8 +592,8 @@ void
 copyFromDense(const DenseT& dense, GridOrTreeT& sparse,
     const typename GridOrTreeT::ValueType& tolerance, bool serial)
 {
-    typedef TreeAdapter<GridOrTreeT> Adapter;
-    typedef typename Adapter::TreeType TreeT;
+    using Adapter = TreeAdapter<GridOrTreeT>;
+    using TreeT = typename Adapter::TreeType;
 
     CopyFromDense<TreeT, DenseT> op(dense, Adapter::tree(sparse), tolerance);
     op.copy(serial);

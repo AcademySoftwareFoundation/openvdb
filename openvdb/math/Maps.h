@@ -27,8 +27,8 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
-/// @file Maps.h
+
+/// @file math/Maps.h
 
 #ifndef OPENVDB_MATH_MAPS_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_MAPS_HAS_BEEN_INCLUDED
@@ -41,7 +41,6 @@
 #include <openvdb/io/io.h> // for io::getFormatVersion()
 #include <openvdb/util/Name.h>
 #include <openvdb/Types.h>
-#include <boost/shared_ptr.hpp>
 #include <map>
 
 namespace openvdb {
@@ -66,11 +65,11 @@ class NonlinearFrustumMap;
 
 template<typename T1, typename T2> class CompoundMap;
 
-typedef CompoundMap<UnitaryMap, TranslationMap>                     UnitaryAndTranslationMap;
-typedef CompoundMap<CompoundMap<UnitaryMap, ScaleMap>, UnitaryMap>  SpectralDecomposedMap;
-typedef SpectralDecomposedMap                                       SymmetricMap;
-typedef CompoundMap<SymmetricMap, UnitaryAndTranslationMap>         FullyDecomposedMap;
-typedef CompoundMap<SymmetricMap, UnitaryMap>                       PolarDecomposedMap;
+using UnitaryAndTranslationMap = CompoundMap<UnitaryMap, TranslationMap>;
+using SpectralDecomposedMap    = CompoundMap<CompoundMap<UnitaryMap, ScaleMap>, UnitaryMap>;
+using SymmetricMap             = SpectralDecomposedMap;
+using FullyDecomposedMap       = CompoundMap<SymmetricMap, UnitaryAndTranslationMap>;
+using PolarDecomposedMap       = CompoundMap<SymmetricMap, UnitaryMap>;
 
 
 ////////////////////////////////////////
@@ -123,12 +122,12 @@ template<typename T> struct is_diagonal_jacobian {
 
 /// @brief Create a SymmetricMap from a symmetric matrix.
 /// Decomposes the map into Rotation Diagonal Rotation^T
-OPENVDB_API boost::shared_ptr<SymmetricMap> createSymmetricMap(const Mat3d& m);
+OPENVDB_API SharedPtr<SymmetricMap> createSymmetricMap(const Mat3d& m);
 
 
 /// @brief General decomposition of a Matrix into a Unitary (e.g. rotation)
 /// following a Symmetric (e.g. stretch & shear)
-OPENVDB_API boost::shared_ptr<FullyDecomposedMap> createFullyDecomposedMap(const Mat4d& m);
+OPENVDB_API SharedPtr<FullyDecomposedMap> createFullyDecomposedMap(const Mat4d& m);
 
 
 /// @brief Decomposes a general linear into translation following polar decomposition.
@@ -141,11 +140,11 @@ OPENVDB_API boost::shared_ptr<FullyDecomposedMap> createFullyDecomposedMap(const
 ///
 /// @note: the Symmetric is automatically decomposed into Q D Q^T, where
 /// Q is rotation and D is diagonal.
-OPENVDB_API boost::shared_ptr<PolarDecomposedMap> createPolarDecomposedMap(const Mat3d& m);
+OPENVDB_API SharedPtr<PolarDecomposedMap> createPolarDecomposedMap(const Mat3d& m);
 
 
 /// @brief reduces an AffineMap to a ScaleMap or a ScaleTranslateMap when it can
-OPENVDB_API boost::shared_ptr<MapBase> simplify(boost::shared_ptr<AffineMap> affine);
+OPENVDB_API SharedPtr<MapBase> simplify(SharedPtr<AffineMap> affine);
 
 /// @brief Returns the left pseudoInverse of the input matrix when the 3x3 part is symmetric
 /// otherwise it zeros the 3x3 and reverses the translation.
@@ -159,13 +158,14 @@ OPENVDB_API Mat4d approxInverse(const Mat4d& mat);
 class OPENVDB_API MapBase
 {
 public:
-    typedef boost::shared_ptr<MapBase>       Ptr;
-    typedef boost::shared_ptr<const MapBase> ConstPtr;
-    typedef Ptr (*MapFactory)();
+    using Ptr = SharedPtr<MapBase>;
+    using ConstPtr = SharedPtr<const MapBase>;
+    using MapFactory = Ptr (*)();
 
-    virtual ~MapBase(){}
+    MapBase(const MapBase&) = default;
+    virtual ~MapBase() = default;
 
-    virtual boost::shared_ptr<AffineMap> getAffineMap() const = 0;
+    virtual SharedPtr<AffineMap> getAffineMap() const = 0;
 
     /// Return the name of this map's concrete type (e.g., @c "AffineMap").
     virtual Name type() const = 0;
@@ -286,7 +286,7 @@ protected:
 class OPENVDB_API MapRegistry
 {
 public:
-    typedef std::map<Name, MapBase::MapFactory> MapDictionary;
+    using MapDictionary = std::map<Name, MapBase::MapFactory>;
 
     static MapRegistry* instance();
 
@@ -324,8 +324,8 @@ private:
 class OPENVDB_API AffineMap: public MapBase
 {
 public:
-    typedef boost::shared_ptr<AffineMap>       Ptr;
-    typedef boost::shared_ptr<const AffineMap> ConstPtr;
+    using Ptr = SharedPtr<AffineMap>;
+    using ConstPtr = SharedPtr<const AffineMap>;
 
     AffineMap():
         mMatrix(Mat4d::identity()),
@@ -375,14 +375,14 @@ public:
         updateAcceleration();
     }
 
-    ~AffineMap() {}
+    ~AffineMap() override = default;
 
     /// Return a MapBase::Ptr to a new AffineMap
     static MapBase::Ptr create() { return MapBase::Ptr(new AffineMap()); }
     /// Return a MapBase::Ptr to a deep copy of this map
-    MapBase::Ptr copy() const { return MapBase::Ptr(new AffineMap(*this)); }
+    MapBase::Ptr copy() const override { return MapBase::Ptr(new AffineMap(*this)); }
 
-    MapBase::Ptr inverseMap() const { return MapBase::Ptr(new AffineMap(mMatrixInv)); }
+    MapBase::Ptr inverseMap() const override { return MapBase::Ptr(new AffineMap(mMatrixInv)); }
 
     static bool isRegistered() { return MapRegistry::isRegistered(AffineMap::mapType()); }
 
@@ -393,26 +393,26 @@ public:
             AffineMap::create);
     }
 
-    Name type() const { return mapType(); }
+    Name type() const override { return mapType(); }
     static Name mapType() { return Name("AffineMap"); }
 
     /// Return @c true (an AffineMap is always linear).
-    bool isLinear() const { return true; }
+    bool isLinear() const override { return true; }
 
     /// Return @c false ( test if this is unitary with translation )
-    bool hasUniformScale() const
+    bool hasUniformScale() const override
     {
         Mat3d mat = mMatrix.getMat3();
         const double det = mat.det();
         if (isApproxEqual(det, double(0))) {
             return false;
         } else {
-            mat *= (1.f / pow(std::abs(det),1./3.));
+            mat *= (1.0 / pow(std::abs(det), 1.0/3.0));
             return isUnitary(mat);
         }
     }
 
-    virtual bool isEqual(const MapBase& other) const { return isEqualBase(*this, other); }
+    bool isEqual(const MapBase& other) const override { return isEqualBase(*this, other); }
 
     bool operator==(const AffineMap& other) const
     {
@@ -437,25 +437,31 @@ public:
         return *this;
     }
     /// Return the image of @c in under the map
-    Vec3d applyMap(const Vec3d& in) const { return in * mMatrix; }
+    Vec3d applyMap(const Vec3d& in) const override { return in * mMatrix; }
     /// Return the pre-image of @c in under the map
-    Vec3d applyInverseMap(const Vec3d& in) const {return in * mMatrixInv; }
+    Vec3d applyInverseMap(const Vec3d& in) const override {return in * mMatrixInv; }
 
     /// Return the Jacobian of the map applied to @a in.
-    Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const { return applyJacobian(in); }
+    Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const override { return applyJacobian(in); }
     /// Return the Jacobian of the map applied to @a in.
-    Vec3d applyJacobian(const Vec3d& in) const { return mMatrix.transform3x3(in); }
+    Vec3d applyJacobian(const Vec3d& in) const override { return mMatrix.transform3x3(in); }
 
-    /// Return the Inverse Jacobian of the map applied to @a in. (i.e. inverse map with out translation)
-    Vec3d applyInverseJacobian(const Vec3d& in, const Vec3d&) const { return applyInverseJacobian(in); }
-    /// Return the Inverse Jacobian of the map applied to @a in. (i.e. inverse map with out translation)
-    Vec3d applyInverseJacobian(const Vec3d& in) const { return mMatrixInv.transform3x3(in); }
+    /// @brief Return the Inverse Jacobian of the map applied to @a in
+    /// (i.e. inverse map with out translation)
+    Vec3d applyInverseJacobian(const Vec3d& in, const Vec3d&) const override {
+        return applyInverseJacobian(in);
+    }
+    /// @brief Return the Inverse Jacobian of the map applied to @a in
+    /// (i.e. inverse map with out translation)
+    Vec3d applyInverseJacobian(const Vec3d& in) const override {
+        return mMatrixInv.transform3x3(in);
+    }
 
     /// Return the Jacobian Transpose of the map applied to @a in.
     /// This tranforms range-space gradients to domain-space gradients
-    Vec3d applyJT(const Vec3d& in, const Vec3d&) const { return applyJT(in); }
+    Vec3d applyJT(const Vec3d& in, const Vec3d&) const override { return applyJT(in); }
     /// Return the Jacobian Transpose of the map applied to @a in.
-    Vec3d applyJT(const Vec3d& in) const {
+    Vec3d applyJT(const Vec3d& in) const override {
         const double* m = mMatrix.asPointer();
         return Vec3d( m[ 0] * in[0] + m[ 1] * in[1] + m[ 2] * in[2],
                       m[ 4] * in[0] + m[ 5] * in[1] + m[ 6] * in[2],
@@ -463,26 +469,26 @@ public:
     }
 
     /// Return the transpose of the inverse Jacobian of the map applied to @a in.
-    Vec3d applyIJT(const Vec3d& in, const Vec3d&) const { return applyIJT(in); }
+    Vec3d applyIJT(const Vec3d& in, const Vec3d&) const override { return applyIJT(in); }
     /// Return the transpose of the inverse Jacobian of the map applied to @c in
-    Vec3d applyIJT(const Vec3d& in) const { return in * mJacobianInv; }
+    Vec3d applyIJT(const Vec3d& in) const override { return in * mJacobianInv; }
     /// Return the Jacobian Curvature: zero for a linear map
-    Mat3d applyIJC(const Mat3d& m) const {
+    Mat3d applyIJC(const Mat3d& m) const override {
         return mJacobianInv.transpose()* m * mJacobianInv;
     }
-    Mat3d applyIJC(const Mat3d& in, const Vec3d& , const Vec3d& ) const {
+    Mat3d applyIJC(const Mat3d& in, const Vec3d& , const Vec3d& ) const override {
         return applyIJC(in);
     }
     /// Return the determinant of the Jacobian, ignores argument
-    double determinant(const Vec3d& ) const { return determinant(); }
+    double determinant(const Vec3d& ) const override { return determinant(); }
     /// Return the determinant of the Jacobian
-    double determinant() const { return mDeterminant; }
+    double determinant() const override { return mDeterminant; }
 
     //@{
     /// @brief Return the lengths of the images of the segments
     /// (0,0,0)-(1,0,0), (0,0,0)-(0,1,0) and (0,0,0)-(0,0,1).
-    Vec3d voxelSize() const { return mVoxelSize; }
-    Vec3d voxelSize(const Vec3d&) const { return voxelSize(); }
+    Vec3d voxelSize() const override { return mVoxelSize; }
+    Vec3d voxelSize(const Vec3d&) const override { return voxelSize(); }
     //@}
 
     /// Return @c true if the underlying matrix is approximately an identity
@@ -548,20 +554,11 @@ public:
 
 
     /// read serialization
-    void read(std::istream& is)
-    {
-        mMatrix.read(is);
-        updateAcceleration();
-    }
-
+    void read(std::istream& is) override { mMatrix.read(is); updateAcceleration(); }
     /// write serialization
-    void write(std::ostream& os) const
-    {
-        mMatrix.write(os);
-    }
-
+    void write(std::ostream& os) const override { mMatrix.write(os); }
     /// string serialization, useful for debugging
-    std::string str() const
+    std::string str() const override
     {
         std::ostringstream buffer;
         buffer << " - mat4:\n" << mMatrix.str() << std::endl;
@@ -570,13 +567,13 @@ public:
     }
 
     /// on-demand decomposition of the affine map
-    boost::shared_ptr<FullyDecomposedMap> createDecomposedMap()
+    SharedPtr<FullyDecomposedMap> createDecomposedMap()
     {
         return createFullyDecomposedMap(mMatrix);
     }
 
     /// Return AffineMap::Ptr to  a deep copy of the current AffineMap
-    AffineMap::Ptr getAffineMap() const { return AffineMap::Ptr(new AffineMap(*this)); }
+    AffineMap::Ptr getAffineMap() const override { return AffineMap::Ptr(new AffineMap(*this)); }
 
     /// Return AffineMap::Ptr to the inverse of this map
     AffineMap::Ptr inverse() const { return AffineMap::Ptr(new AffineMap(mMatrixInv)); }
@@ -585,25 +582,25 @@ public:
     //@{
     /// @brief  Return a MapBase::Ptr to a new map that is the result
     /// of prepending the appropraite operation.
-    MapBase::Ptr preRotate(double radians, Axis axis = X_AXIS) const
+    MapBase::Ptr preRotate(double radians, Axis axis = X_AXIS) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPreRotation(axis, radians);
         return simplify(affineMap);
     }
-    MapBase::Ptr preTranslate(const Vec3d& t) const
+    MapBase::Ptr preTranslate(const Vec3d& t) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPreTranslation(t);
-        return boost::static_pointer_cast<MapBase, AffineMap>(affineMap);
+        return StaticPtrCast<MapBase, AffineMap>(affineMap);
     }
-    MapBase::Ptr preScale(const Vec3d& s) const
+    MapBase::Ptr preScale(const Vec3d& s) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPreScale(s);
-        return boost::static_pointer_cast<MapBase, AffineMap>(affineMap);
+        return StaticPtrCast<MapBase, AffineMap>(affineMap);
     }
-    MapBase::Ptr preShear(double shear, Axis axis0, Axis axis1) const
+    MapBase::Ptr preShear(double shear, Axis axis0, Axis axis1) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPreShear(axis0, axis1, shear);
@@ -615,25 +612,25 @@ public:
     //@{
     /// @brief  Return a MapBase::Ptr to a new map that is the result
     /// of postfixing the appropraite operation.
-    MapBase::Ptr postRotate(double radians, Axis axis = X_AXIS) const
+    MapBase::Ptr postRotate(double radians, Axis axis = X_AXIS) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPostRotation(axis, radians);
         return simplify(affineMap);
     }
-    MapBase::Ptr postTranslate(const Vec3d& t) const
+    MapBase::Ptr postTranslate(const Vec3d& t) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPostTranslation(t);
-        return boost::static_pointer_cast<MapBase, AffineMap>(affineMap);
+        return StaticPtrCast<MapBase, AffineMap>(affineMap);
     }
-    MapBase::Ptr postScale(const Vec3d& s) const
+    MapBase::Ptr postScale(const Vec3d& s) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPostScale(s);
-        return boost::static_pointer_cast<MapBase, AffineMap>(affineMap);
+        return StaticPtrCast<MapBase, AffineMap>(affineMap);
     }
-    MapBase::Ptr postShear(double shear, Axis axis0, Axis axis1) const
+    MapBase::Ptr postShear(double shear, Axis axis0, Axis axis1) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPostShear(axis0, axis1, shear);
@@ -685,8 +682,8 @@ private:
 class OPENVDB_API ScaleMap: public MapBase
 {
 public:
-    typedef boost::shared_ptr<ScaleMap>       Ptr;
-    typedef boost::shared_ptr<const ScaleMap> ConstPtr;
+    using Ptr = SharedPtr<ScaleMap>;
+    using ConstPtr = SharedPtr<const ScaleMap>;
 
     ScaleMap(): MapBase(), mScaleValues(Vec3d(1,1,1)), mVoxelSize(Vec3d(1,1,1)),
                 mScaleValuesInverse(Vec3d(1,1,1)),
@@ -716,14 +713,16 @@ public:
     {
     }
 
-    ~ScaleMap() {}
+    ~ScaleMap() override = default;
 
     /// Return a MapBase::Ptr to a new ScaleMap
     static MapBase::Ptr create() { return MapBase::Ptr(new ScaleMap()); }
     /// Return a MapBase::Ptr to a deep copy of this map
-    MapBase::Ptr copy() const { return MapBase::Ptr(new ScaleMap(*this)); }
+    MapBase::Ptr copy() const override { return MapBase::Ptr(new ScaleMap(*this)); }
 
-    MapBase::Ptr inverseMap() const { return MapBase::Ptr(new ScaleMap(mScaleValuesInverse)); }
+    MapBase::Ptr inverseMap() const override {
+        return MapBase::Ptr(new ScaleMap(mScaleValuesInverse));
+    }
 
     static bool isRegistered() { return MapRegistry::isRegistered(ScaleMap::mapType()); }
 
@@ -734,14 +733,14 @@ public:
             ScaleMap::create);
     }
 
-    Name type() const { return mapType(); }
+    Name type() const override { return mapType(); }
     static Name mapType() { return Name("ScaleMap"); }
 
     /// Return @c true (a ScaleMap is always linear).
-    bool isLinear() const { return true; }
+    bool isLinear() const override { return true; }
 
     /// Return @c true if the values have the same magitude (eg. -1, 1, -1 would be a rotation).
-    bool hasUniformScale() const
+    bool hasUniformScale() const override
     {
         bool value = isApproxEqual(
             std::abs(mScaleValues.x()), std::abs(mScaleValues.y()), double(5e-7));
@@ -751,7 +750,7 @@ public:
     }
 
     /// Return the image of @c in under the map
-    Vec3d applyMap(const Vec3d& in) const
+    Vec3d applyMap(const Vec3d& in) const override
     {
         return Vec3d(
             in.x() * mScaleValues.x(),
@@ -759,7 +758,7 @@ public:
             in.z() * mScaleValues.z());
     }
     /// Return the pre-image of @c in under the map
-    Vec3d applyInverseMap(const Vec3d& in) const
+    Vec3d applyInverseMap(const Vec3d& in) const override
     {
         return Vec3d(
             in.x() * mScaleValuesInverse.x(),
@@ -767,30 +766,32 @@ public:
             in.z() * mScaleValuesInverse.z());
     }
     /// Return the Jacobian of the map applied to @a in.
-    Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const { return applyJacobian(in); }
+    Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const override { return applyJacobian(in); }
     /// Return the Jacobian of the map applied to @a in.
-    Vec3d applyJacobian(const Vec3d& in) const { return applyMap(in); }
+    Vec3d applyJacobian(const Vec3d& in) const override { return applyMap(in); }
 
-    /// Return the Inverse Jacobian of the map applied to @a in. (i.e. inverse map with out translation)
-    Vec3d applyInverseJacobian(const Vec3d& in, const Vec3d&) const { return applyInverseJacobian(in); }
-    /// Return the Inverse Jacobian of the map applied to @a in. (i.e. inverse map with out translation)
-    Vec3d applyInverseJacobian(const Vec3d& in) const { return applyInverseMap(in); }
+    /// @brief Return the Inverse Jacobian of the map applied to @a in
+    /// (i.e. inverse map with out translation)
+    Vec3d applyInverseJacobian(const Vec3d& in, const Vec3d&) const override {
+        return applyInverseJacobian(in);
+    }
+    /// @brief Return the Inverse Jacobian of the map applied to @a in
+    /// (i.e. inverse map with out translation)
+    Vec3d applyInverseJacobian(const Vec3d& in) const override { return applyInverseMap(in); }
 
+    /// @brief Return the Jacobian Transpose of the map applied to @a in.
+    /// @details This tranforms range-space gradients to domain-space gradients
+    Vec3d applyJT(const Vec3d& in, const Vec3d&) const override { return applyJT(in); }
     /// Return the Jacobian Transpose of the map applied to @a in.
-    /// This tranforms range-space gradients to domain-space gradients
-    Vec3d applyJT(const Vec3d& in, const Vec3d&) const { return applyJT(in); }
-    /// Return the Jacobian Transpose of the map applied to @a in.
-    Vec3d applyJT(const Vec3d& in) const { return applyMap(in); }
-
-
+    Vec3d applyJT(const Vec3d& in) const override { return applyMap(in); }
 
     /// @brief Return the transpose of the inverse Jacobian of the map applied to @a in.
     /// @details Ignores second argument
-    Vec3d applyIJT(const Vec3d& in, const Vec3d&) const { return applyIJT(in);}
+    Vec3d applyIJT(const Vec3d& in, const Vec3d&) const override { return applyIJT(in);}
     /// Return the transpose of the inverse Jacobian of the map applied to @c in
-    Vec3d applyIJT(const Vec3d& in) const { return applyInverseMap(in); }
+    Vec3d applyIJT(const Vec3d& in) const override { return applyInverseMap(in); }
     /// Return the Jacobian Curvature: zero for a linear map
-    Mat3d applyIJC(const Mat3d& in) const
+    Mat3d applyIJC(const Mat3d& in) const override
     {
         Mat3d tmp;
         for (int i = 0; i < 3; i++) {
@@ -801,11 +802,15 @@ public:
         }
         return tmp;
     }
-    Mat3d applyIJC(const Mat3d& in, const Vec3d&, const Vec3d&) const { return applyIJC(in); }
+    Mat3d applyIJC(const Mat3d& in, const Vec3d&, const Vec3d&) const override {
+        return applyIJC(in);
+    }
     /// Return the product of the scale values, ignores argument
-    double determinant(const Vec3d&) const { return determinant(); }
+    double determinant(const Vec3d&) const override { return determinant(); }
     /// Return the product of the scale values
-    double determinant() const { return mScaleValues.x() * mScaleValues.y() * mScaleValues.z(); }
+    double determinant() const override {
+        return mScaleValues.x() * mScaleValues.y() * mScaleValues.z();
+    }
 
     /// Return the scale values that define the map
     const Vec3d& getScale() const {return mScaleValues;}
@@ -818,16 +823,15 @@ public:
     const Vec3d& getInvScale() const { return mScaleValuesInverse; }
 
     //@{
-    /// @brief Returns the lengths of the images
-    /// of the segments
+    /// @brief Return the lengths of the images of the segments
     /// \f$(0,0,0)-(1,0,0)\f$, \f$(0,0,0)-(0,1,0)\f$, \f$(0,0,0)-(0,0,1)\f$
-    /// this is equivalent to the absolute values of the scale values
-    Vec3d voxelSize() const { return mVoxelSize; }
-    Vec3d voxelSize(const Vec3d&) const { return voxelSize(); }
+    /// @details This is equivalent to the absolute values of the scale values
+    Vec3d voxelSize() const override { return mVoxelSize; }
+    Vec3d voxelSize(const Vec3d&) const override { return voxelSize(); }
     //@}
 
     /// read serialization
-    void read(std::istream& is)
+    void read(std::istream& is) override
     {
         mScaleValues.read(is);
         mVoxelSize.read(is);
@@ -836,7 +840,7 @@ public:
         mInvTwiceScale.read(is);
     }
     /// write serialization
-    void write(std::ostream& os) const
+    void write(std::ostream& os) const override
     {
         mScaleValues.write(os);
         mVoxelSize.write(os);
@@ -845,7 +849,7 @@ public:
         mInvTwiceScale.write(os);
     }
     /// string serialization, useful for debuging
-    std::string str() const
+    std::string str() const override
     {
         std::ostringstream buffer;
         buffer << " - scale: " << mScaleValues << std::endl;
@@ -853,7 +857,7 @@ public:
         return buffer.str();
     }
 
-    virtual bool isEqual(const MapBase& other) const { return isEqualBase(*this, other); }
+    bool isEqual(const MapBase& other) const override { return isEqualBase(*this, other); }
 
     bool operator==(const ScaleMap& other) const
     {
@@ -865,7 +869,7 @@ public:
     bool operator!=(const ScaleMap& other) const { return !(*this == other); }
 
     /// Return a AffineMap equivalent to this map
-    AffineMap::Ptr getAffineMap() const
+    AffineMap::Ptr getAffineMap() const override
     {
         return AffineMap::Ptr(new AffineMap(math::scale<Mat4d>(mScaleValues)));
     }
@@ -875,18 +879,16 @@ public:
     //@{
     /// @brief  Return a MapBase::Ptr to a new map that is the result
     /// of prepending the appropraite operation to the existing map
-    MapBase::Ptr preRotate(double radians, Axis axis) const
+    MapBase::Ptr preRotate(double radians, Axis axis) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPreRotation(axis, radians);
         return simplify(affineMap);
     }
 
-    MapBase::Ptr preTranslate(const Vec3d& tr) const;
-
-    MapBase::Ptr preScale(const Vec3d& v) const;
-
-    MapBase::Ptr preShear(double shear, Axis axis0, Axis axis1) const
+    MapBase::Ptr preTranslate(const Vec3d&) const override;
+    MapBase::Ptr preScale(const Vec3d&) const override;
+    MapBase::Ptr preShear(double shear, Axis axis0, Axis axis1) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPreShear(axis0, axis1, shear);
@@ -898,18 +900,15 @@ public:
     //@{
     /// @brief  Return a MapBase::Ptr to a new map that is the result
     /// of prepending the appropraite operation to the existing map.
-    MapBase::Ptr postRotate(double radians, Axis axis) const
+    MapBase::Ptr postRotate(double radians, Axis axis) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPostRotation(axis, radians);
         return simplify(affineMap);
     }
-
-    MapBase::Ptr postTranslate(const Vec3d& tr) const;
-
-    MapBase::Ptr postScale(const Vec3d& v) const;
-
-    MapBase::Ptr postShear(double shear, Axis axis0, Axis axis1) const
+    MapBase::Ptr postTranslate(const Vec3d&) const override;
+    MapBase::Ptr postScale(const Vec3d&) const override;
+    MapBase::Ptr postShear(double shear, Axis axis0, Axis axis1) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPostShear(axis0, axis1, shear);
@@ -927,20 +926,20 @@ private:
 class OPENVDB_API UniformScaleMap: public ScaleMap
 {
 public:
-    typedef boost::shared_ptr<UniformScaleMap>       Ptr;
-    typedef boost::shared_ptr<const UniformScaleMap> ConstPtr;
+    using Ptr = SharedPtr<UniformScaleMap>;
+    using ConstPtr = SharedPtr<const UniformScaleMap>;
 
     UniformScaleMap(): ScaleMap(Vec3d(1,1,1)) {}
     UniformScaleMap(double scale): ScaleMap(Vec3d(scale, scale, scale)) {}
     UniformScaleMap(const UniformScaleMap& other): ScaleMap(other) {}
-    ~UniformScaleMap() {}
+    ~UniformScaleMap() override = default;
 
     /// Return a MapBase::Ptr to a new UniformScaleMap
     static MapBase::Ptr create() { return MapBase::Ptr(new UniformScaleMap()); }
     /// Return a MapBase::Ptr to a deep copy of this map
-    MapBase::Ptr copy() const { return MapBase::Ptr(new UniformScaleMap(*this)); }
+    MapBase::Ptr copy() const override { return MapBase::Ptr(new UniformScaleMap(*this)); }
 
-    MapBase::Ptr inverseMap() const
+    MapBase::Ptr inverseMap() const override
     {
         const Vec3d& invScale = getInvScale();
         return MapBase::Ptr(new UniformScaleMap( invScale[0]));
@@ -954,21 +953,21 @@ public:
             UniformScaleMap::create);
     }
 
-    Name type() const { return mapType(); }
+    Name type() const override { return mapType(); }
     static Name mapType() { return Name("UniformScaleMap"); }
 
-    virtual bool isEqual(const MapBase& other) const { return isEqualBase(*this, other); }
+    bool isEqual(const MapBase& other) const override { return isEqualBase(*this, other); }
 
     bool operator==(const UniformScaleMap& other) const { return ScaleMap::operator==(other); }
     bool operator!=(const UniformScaleMap& other) const { return !(*this == other); }
 
-    /// Return a MapBase::Ptr to a UniformScaleTraslateMap that is the result of
+    /// @brief Return a MapBase::Ptr to a UniformScaleTraslateMap that is the result of
     /// pre-translation on this map
-    MapBase::Ptr preTranslate(const Vec3d& tr) const;
+    MapBase::Ptr preTranslate(const Vec3d&) const override;
 
-    /// Return a MapBase::Ptr to a UniformScaleTraslateMap that is the result of
+    /// @brief Return a MapBase::Ptr to a UniformScaleTraslateMap that is the result of
     /// post-translation on this map
-    MapBase::Ptr postTranslate(const Vec3d& tr) const;
+    MapBase::Ptr postTranslate(const Vec3d&) const override;
 
 }; // class UniformScaleMap
 
@@ -999,22 +998,24 @@ ScaleMap::postScale(const Vec3d& v) const
 class OPENVDB_API TranslationMap: public MapBase
 {
 public:
-    typedef boost::shared_ptr<TranslationMap>       Ptr;
-    typedef boost::shared_ptr<const TranslationMap> ConstPtr;
+    using Ptr = SharedPtr<TranslationMap>;
+    using ConstPtr = SharedPtr<const TranslationMap>;
 
     // default constructor is a translation by zero.
     TranslationMap(): MapBase(), mTranslation(Vec3d(0,0,0)) {}
     TranslationMap(const Vec3d& t): MapBase(), mTranslation(t) {}
     TranslationMap(const TranslationMap& other): MapBase(), mTranslation(other.mTranslation) {}
 
-    ~TranslationMap() {}
+    ~TranslationMap() override = default;
 
     /// Return a MapBase::Ptr to a new TranslationMap
     static MapBase::Ptr create() { return MapBase::Ptr(new TranslationMap()); }
     /// Return a MapBase::Ptr to a deep copy of this map
-    MapBase::Ptr copy() const { return MapBase::Ptr(new TranslationMap(*this)); }
+    MapBase::Ptr copy() const override { return MapBase::Ptr(new TranslationMap(*this)); }
 
-    MapBase::Ptr inverseMap() const { return MapBase::Ptr(new TranslationMap(-mTranslation)); }
+    MapBase::Ptr inverseMap() const override {
+        return MapBase::Ptr(new TranslationMap(-mTranslation));
+    }
 
     static bool isRegistered() { return MapRegistry::isRegistered(TranslationMap::mapType()); }
 
@@ -1025,72 +1026,78 @@ public:
             TranslationMap::create);
     }
 
-    Name type() const { return mapType(); }
+    Name type() const override { return mapType(); }
     static Name mapType() { return Name("TranslationMap"); }
 
     /// Return @c true (a TranslationMap is always linear).
-    bool isLinear() const { return true; }
+    bool isLinear() const override { return true; }
 
     /// Return @c false (by convention true)
-    bool hasUniformScale() const { return true; }
+    bool hasUniformScale() const override { return true; }
 
     /// Return the image of @c in under the map
-    Vec3d applyMap(const Vec3d& in) const { return in + mTranslation; }
+    Vec3d applyMap(const Vec3d& in) const override { return in + mTranslation; }
     /// Return the pre-image of @c in under the map
-    Vec3d applyInverseMap(const Vec3d& in) const { return in - mTranslation; }
+    Vec3d applyInverseMap(const Vec3d& in) const override { return in - mTranslation; }
     /// Return the Jacobian of the map applied to @a in.
-    Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const { return applyJacobian(in); }
+    Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const override { return applyJacobian(in); }
     /// Return the Jacobian of the map applied to @a in.
-    Vec3d applyJacobian(const Vec3d& in) const { return in; }
+    Vec3d applyJacobian(const Vec3d& in) const override { return in; }
 
-    /// Return the Inverse Jacobian of the map applied to @a in. (i.e. inverse map with out translation)
-    Vec3d applyInverseJacobian(const Vec3d& in, const Vec3d&) const { return applyInverseJacobian(in); }
-    /// Return the Inverse Jacobian of the map applied to @a in. (i.e. inverse map with out translation)
-    Vec3d applyInverseJacobian(const Vec3d& in) const { return in; }
+    /// @brief Return the Inverse Jacobian of the map applied to @a in
+    /// (i.e. inverse map with out translation)
+    Vec3d applyInverseJacobian(const Vec3d& in, const Vec3d&) const override {
+        return applyInverseJacobian(in);
+    }
+    /// @brief Return the Inverse Jacobian of the map applied to @a in
+    /// (i.e. inverse map with out translation)
+    Vec3d applyInverseJacobian(const Vec3d& in) const override { return in; }
 
 
+    /// @brief Return the Jacobian Transpose of the map applied to @a in.
+    /// @details This tranforms range-space gradients to domain-space gradients
+    Vec3d applyJT(const Vec3d& in, const Vec3d&) const override { return applyJT(in); }
     /// Return the Jacobian Transpose of the map applied to @a in.
-    /// This tranforms range-space gradients to domain-space gradients
-    Vec3d applyJT(const Vec3d& in, const Vec3d&) const { return applyJT(in); }
-    /// Return the Jacobian Transpose of the map applied to @a in.
-    Vec3d applyJT(const Vec3d& in) const { return in; }
+    Vec3d applyJT(const Vec3d& in) const override { return in; }
 
     /// @brief Return the transpose of the inverse Jacobian (Identity for TranslationMap)
     /// of the map applied to @c in, ignores second argument
-    Vec3d applyIJT(const Vec3d& in, const Vec3d& ) const { return applyIJT(in);}
+    Vec3d applyIJT(const Vec3d& in, const Vec3d& ) const override { return applyIJT(in);}
     /// @brief Return the transpose of the inverse Jacobian (Identity for TranslationMap)
     /// of the map applied to @c in
-    Vec3d applyIJT(const Vec3d& in) const {return in;}
+    Vec3d applyIJT(const Vec3d& in) const override {return in;}
     /// Return the Jacobian Curvature: zero for a linear map
-    Mat3d applyIJC(const Mat3d& mat) const {return mat;}
-    Mat3d applyIJC(const Mat3d& mat, const Vec3d&, const Vec3d&) const { return applyIJC(mat); }
+    Mat3d applyIJC(const Mat3d& mat) const override {return mat;}
+    Mat3d applyIJC(const Mat3d& mat, const Vec3d&, const Vec3d&) const override {
+        return applyIJC(mat);
+    }
 
     /// Return @c 1
-    double determinant(const Vec3d& ) const { return determinant(); }
+    double determinant(const Vec3d& ) const override { return determinant(); }
     /// Return @c 1
-    double determinant() const { return 1.0; }
+    double determinant() const override { return 1.0; }
 
     /// Return \f$ (1,1,1) \f$
-    Vec3d voxelSize() const { return Vec3d(1,1,1);}
+    Vec3d voxelSize() const override { return Vec3d(1,1,1);}
     /// Return \f$ (1,1,1) \f$
-    Vec3d voxelSize(const Vec3d&) const { return voxelSize();}
+    Vec3d voxelSize(const Vec3d&) const override { return voxelSize();}
 
     /// Return the translation vector
     const Vec3d& getTranslation() const { return mTranslation; }
-    /// read serialization
-    void read(std::istream& is) { mTranslation.read(is); }
-    /// write serialization
-    void write(std::ostream& os) const { mTranslation.write(os); }
 
+    /// read serialization
+    void read(std::istream& is) override { mTranslation.read(is); }
+    /// write serialization
+    void write(std::ostream& os) const override { mTranslation.write(os); }
     /// string serialization, useful for debuging
-    std::string str() const
+    std::string str() const override
     {
         std::ostringstream buffer;
         buffer << " - translation: " << mTranslation << std::endl;
         return buffer.str();
     }
 
-    virtual bool isEqual(const MapBase& other) const { return isEqualBase(*this, other); }
+    bool isEqual(const MapBase& other) const override { return isEqualBase(*this, other); }
 
     bool operator==(const TranslationMap& other) const
     {
@@ -1101,7 +1108,7 @@ public:
     bool operator!=(const TranslationMap& other) const { return !(*this == other); }
 
     /// Return AffineMap::Ptr to an AffineMap equivalent to *this
-    AffineMap::Ptr getAffineMap() const
+    AffineMap::Ptr getAffineMap() const override
     {
         Mat4d matrix(Mat4d::identity());
         matrix.setTranslation(mTranslation);
@@ -1113,21 +1120,21 @@ public:
     //@{
     /// @brief Return a MapBase::Ptr to a new map that is the result
     /// of prepending the appropriate operation.
-    MapBase::Ptr preRotate(double radians, Axis axis) const
+    MapBase::Ptr preRotate(double radians, Axis axis) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPreRotation(axis, radians);
         return simplify(affineMap);
 
     }
-    MapBase::Ptr preTranslate(const Vec3d& t) const
+    MapBase::Ptr preTranslate(const Vec3d& t) const override
     {
         return MapBase::Ptr(new TranslationMap(t + mTranslation));
     }
 
-    MapBase::Ptr preScale(const Vec3d& v) const;
+    MapBase::Ptr preScale(const Vec3d& v) const override;
 
-    MapBase::Ptr preShear(double shear, Axis axis0, Axis axis1) const
+    MapBase::Ptr preShear(double shear, Axis axis0, Axis axis1) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPreShear(axis0, axis1, shear);
@@ -1138,21 +1145,21 @@ public:
     //@{
     /// @brief Return a MapBase::Ptr to a new map that is the result
     /// of postfixing the appropriate operation.
-    MapBase::Ptr postRotate(double radians, Axis axis) const
+    MapBase::Ptr postRotate(double radians, Axis axis) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPostRotation(axis, radians);
         return simplify(affineMap);
 
     }
-    MapBase::Ptr postTranslate(const Vec3d& t) const
+    MapBase::Ptr postTranslate(const Vec3d& t) const override
     { // post and pre are the same for this
         return MapBase::Ptr(new TranslationMap(t + mTranslation));
     }
 
-    MapBase::Ptr postScale(const Vec3d& v) const;
+    MapBase::Ptr postScale(const Vec3d& v) const override;
 
-    MapBase::Ptr postShear(double shear, Axis axis0, Axis axis1) const
+    MapBase::Ptr postShear(double shear, Axis axis0, Axis axis1) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPostShear(axis0, axis1, shear);
@@ -1174,8 +1181,8 @@ private:
 class OPENVDB_API ScaleTranslateMap: public MapBase
 {
 public:
-    typedef boost::shared_ptr<ScaleTranslateMap>       Ptr;
-    typedef boost::shared_ptr<const ScaleTranslateMap> ConstPtr;
+    using Ptr = SharedPtr<ScaleTranslateMap>;
+    using ConstPtr = SharedPtr<const ScaleTranslateMap>;
 
     ScaleTranslateMap():
         MapBase(),
@@ -1226,14 +1233,14 @@ public:
         mInvTwiceScale(other.mInvTwiceScale)
     {}
 
-    ~ScaleTranslateMap() {}
+    ~ScaleTranslateMap() override = default;
 
     /// Return a MapBase::Ptr to a new ScaleTranslateMap
     static MapBase::Ptr create() { return MapBase::Ptr(new ScaleTranslateMap()); }
     /// Return a MapBase::Ptr to a deep copy of this map
-    MapBase::Ptr copy() const { return MapBase::Ptr(new ScaleTranslateMap(*this)); }
+    MapBase::Ptr copy() const override { return MapBase::Ptr(new ScaleTranslateMap(*this)); }
 
-    MapBase::Ptr inverseMap() const
+    MapBase::Ptr inverseMap() const override
     {
         return MapBase::Ptr(new ScaleTranslateMap(
             mScaleValuesInverse, -mScaleValuesInverse * mTranslation));
@@ -1248,15 +1255,15 @@ public:
             ScaleTranslateMap::create);
     }
 
-    Name type() const { return mapType(); }
+    Name type() const override { return mapType(); }
     static Name mapType() { return Name("ScaleTranslateMap"); }
 
     /// Return @c true (a ScaleTranslateMap is always linear).
-    bool isLinear() const { return true; }
+    bool isLinear() const override { return true; }
 
     /// @brief Return @c true if the scale values have the same magnitude
     /// (eg. -1, 1, -1 would be a rotation).
-    bool hasUniformScale() const
+    bool hasUniformScale() const override
     {
         bool value = isApproxEqual(
             std::abs(mScaleValues.x()), std::abs(mScaleValues.y()), double(5e-7));
@@ -1266,7 +1273,7 @@ public:
     }
 
     /// Return the image of @c under the map
-    Vec3d applyMap(const Vec3d& in) const
+    Vec3d applyMap(const Vec3d& in) const override
     {
         return Vec3d(
             in.x() * mScaleValues.x() + mTranslation.x(),
@@ -1274,7 +1281,7 @@ public:
             in.z() * mScaleValues.z() + mTranslation.z());
     }
     /// Return the pre-image of @c under the map
-    Vec3d applyInverseMap(const Vec3d& in) const
+    Vec3d applyInverseMap(const Vec3d& in) const override
     {
         return Vec3d(
             (in.x() - mTranslation.x() ) * mScaleValuesInverse.x(),
@@ -1283,26 +1290,28 @@ public:
     }
 
     /// Return the Jacobian of the map applied to @a in.
-    Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const { return applyJacobian(in); }
+    Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const override { return applyJacobian(in); }
     /// Return the Jacobian of the map applied to @a in.
-    Vec3d applyJacobian(const Vec3d& in) const { return in * mScaleValues; }
+    Vec3d applyJacobian(const Vec3d& in) const override { return in * mScaleValues; }
 
-    /// Return the Inverse Jacobian of the map applied to @a in. (i.e. inverse map with out translation)
-    Vec3d applyInverseJacobian(const Vec3d& in, const Vec3d&) const { return applyInverseJacobian(in); }
-    /// Return the Inverse Jacobian of the map applied to @a in. (i.e. inverse map with out translation)
-    Vec3d applyInverseJacobian(const Vec3d& in) const { return in * mScaleValuesInverse; }
+    /// @brief Return the Inverse Jacobian of the map applied to @a in
+    /// (i.e. inverse map with out translation)
+    Vec3d applyInverseJacobian(const Vec3d& in, const Vec3d&) const override { return applyInverseJacobian(in); }
+    /// @brief Return the Inverse Jacobian of the map applied to @a in
+    /// (i.e. inverse map with out translation)
+    Vec3d applyInverseJacobian(const Vec3d& in) const override { return in * mScaleValuesInverse; }
 
+    /// @brief Return the Jacobian Transpose of the map applied to @a in.
+    /// @details This tranforms range-space gradients to domain-space gradients
+    Vec3d applyJT(const Vec3d& in, const Vec3d&) const override { return applyJT(in); }
     /// Return the Jacobian Transpose of the map applied to @a in.
-    /// This tranforms range-space gradients to domain-space gradients
-    Vec3d applyJT(const Vec3d& in, const Vec3d&) const { return applyJT(in); }
-    /// Return the Jacobian Transpose of the map applied to @a in.
-    Vec3d applyJT(const Vec3d& in) const { return applyJacobian(in); }
+    Vec3d applyJT(const Vec3d& in) const override { return applyJacobian(in); }
 
     /// @brief Return the transpose of the inverse Jacobian of the map applied to @a in
     /// @details Ignores second argument
-    Vec3d applyIJT(const Vec3d& in, const Vec3d& ) const { return applyIJT(in);}
+    Vec3d applyIJT(const Vec3d& in, const Vec3d&) const override { return applyIJT(in);}
     /// Return the transpose of the inverse Jacobian of the map applied to @c in
-    Vec3d applyIJT(const Vec3d& in) const
+    Vec3d applyIJT(const Vec3d& in) const override
     {
         return Vec3d(
             in.x() * mScaleValuesInverse.x(),
@@ -1310,7 +1319,7 @@ public:
             in.z() * mScaleValuesInverse.z());
     }
     /// Return the Jacobian Curvature: zero for a linear map
-    Mat3d applyIJC(const Mat3d& in) const
+    Mat3d applyIJC(const Mat3d& in) const override
     {
         Mat3d tmp;
         for (int i=0; i<3; i++){
@@ -1321,17 +1330,20 @@ public:
         }
         return tmp;
     }
-    Mat3d applyIJC(const Mat3d& in, const Vec3d&, const Vec3d& ) const { return applyIJC(in); }
+    Mat3d applyIJC(const Mat3d& in, const Vec3d&, const Vec3d& ) const override {
+        return applyIJC(in);
+    }
 
     /// Return the product of the scale values, ignores argument
-    double determinant(const Vec3d& ) const { return determinant(); }
+    double determinant(const Vec3d&) const override { return determinant(); }
     /// Return the product of the scale values
-    double determinant() const { return mScaleValues.x()*mScaleValues.y()*mScaleValues.z(); }
+    double determinant() const override {
+        return mScaleValues.x() * mScaleValues.y() * mScaleValues.z();
+    }
     /// Return the absolute values of the scale values
-    Vec3d voxelSize() const { return mVoxelSize;}
-    /// Return the absolute values of the scale values, ignores
-    ///argument
-    Vec3d voxelSize(const Vec3d&) const { return voxelSize();}
+    Vec3d voxelSize() const override { return mVoxelSize;}
+    /// Return the absolute values of the scale values, ignores argument
+    Vec3d voxelSize(const Vec3d&) const override { return voxelSize();}
 
     /// Returns the scale values
     const Vec3d& getScale() const { return mScaleValues; }
@@ -1346,7 +1358,7 @@ public:
     const Vec3d& getInvScale() const {return mScaleValuesInverse; }
 
     /// read serialization
-    void read(std::istream& is)
+    void read(std::istream& is) override
     {
         mTranslation.read(is);
         mScaleValues.read(is);
@@ -1356,7 +1368,7 @@ public:
         mInvTwiceScale.read(is);
     }
     /// write serialization
-    void write(std::ostream& os) const
+    void write(std::ostream& os) const override
     {
         mTranslation.write(os);
         mScaleValues.write(os);
@@ -1366,7 +1378,7 @@ public:
         mInvTwiceScale.write(os);
     }
     /// string serialization, useful for debuging
-    std::string str() const
+    std::string str() const override
     {
         std::ostringstream buffer;
         buffer << " - translation: " << mTranslation << std::endl;
@@ -1375,7 +1387,7 @@ public:
         return buffer.str();
     }
 
-    virtual bool isEqual(const MapBase& other) const { return isEqualBase(*this, other); }
+    bool isEqual(const MapBase& other) const override { return isEqualBase(*this, other); }
 
     bool operator==(const ScaleTranslateMap& other) const
     {
@@ -1388,7 +1400,7 @@ public:
     bool operator!=(const ScaleTranslateMap& other) const { return !(*this == other); }
 
     /// Return AffineMap::Ptr to an AffineMap equivalent to *this
-    AffineMap::Ptr getAffineMap() const
+    AffineMap::Ptr getAffineMap() const override
     {
         AffineMap::Ptr affineMap(new AffineMap(math::scale<Mat4d>(mScaleValues)));
         affineMap->accumPostTranslation(mTranslation);
@@ -1398,13 +1410,13 @@ public:
     //@{
     /// @brief  Return a MapBase::Ptr to a new map that is the result
     /// of prepending the appropraite operation.
-    MapBase::Ptr preRotate(double radians, Axis axis) const
+    MapBase::Ptr preRotate(double radians, Axis axis) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPreRotation(axis, radians);
         return simplify(affineMap);
     }
-    MapBase::Ptr preTranslate(const Vec3d& t) const
+    MapBase::Ptr preTranslate(const Vec3d& t) const override
     {
         const Vec3d& s = mScaleValues;
         const Vec3d scaled_trans( t.x() * s.x(),
@@ -1413,9 +1425,9 @@ public:
         return MapBase::Ptr( new ScaleTranslateMap(mScaleValues, mTranslation + scaled_trans));
     }
 
-    MapBase::Ptr preScale(const Vec3d& v) const;
+    MapBase::Ptr preScale(const Vec3d& v) const override;
 
-    MapBase::Ptr preShear(double shear, Axis axis0, Axis axis1) const
+    MapBase::Ptr preShear(double shear, Axis axis0, Axis axis1) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPreShear(axis0, axis1, shear);
@@ -1426,20 +1438,20 @@ public:
     //@{
     /// @brief  Return a MapBase::Ptr to a new map that is the result
     /// of postfixing the appropraite operation.
-    MapBase::Ptr postRotate(double radians, Axis axis) const
+    MapBase::Ptr postRotate(double radians, Axis axis) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPostRotation(axis, radians);
         return simplify(affineMap);
     }
-    MapBase::Ptr postTranslate(const Vec3d& t) const
+    MapBase::Ptr postTranslate(const Vec3d& t) const override
     {
         return MapBase::Ptr( new ScaleTranslateMap(mScaleValues, mTranslation + t));
     }
 
-    MapBase::Ptr postScale(const Vec3d& v) const;
+    MapBase::Ptr postScale(const Vec3d& v) const override;
 
-    MapBase::Ptr postShear(double shear, Axis axis0, Axis axis1) const
+    MapBase::Ptr postShear(double shear, Axis axis0, Axis axis1) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPostShear(axis0, axis1, shear);
@@ -1477,8 +1489,8 @@ ScaleMap::preTranslate(const Vec3d& t) const
 class OPENVDB_API UniformScaleTranslateMap: public ScaleTranslateMap
 {
 public:
-    typedef boost::shared_ptr<UniformScaleTranslateMap>       Ptr;
-    typedef boost::shared_ptr<const UniformScaleTranslateMap> ConstPtr;
+    using Ptr = SharedPtr<UniformScaleTranslateMap>;
+    using ConstPtr = SharedPtr<const UniformScaleTranslateMap>;
 
     UniformScaleTranslateMap():ScaleTranslateMap(Vec3d(1,1,1), Vec3d(0,0,0)) {}
     UniformScaleTranslateMap(double scale, const Vec3d& translate):
@@ -1487,14 +1499,14 @@ public:
         ScaleTranslateMap(scale.getScale(), translate.getTranslation()) {}
 
     UniformScaleTranslateMap(const UniformScaleTranslateMap& other):ScaleTranslateMap(other) {}
-    ~UniformScaleTranslateMap() {}
+    ~UniformScaleTranslateMap() override = default;
 
     /// Return a MapBase::Ptr to a new UniformScaleTranslateMap
     static MapBase::Ptr create() { return MapBase::Ptr(new UniformScaleTranslateMap()); }
     /// Return a MapBase::Ptr to a deep copy of this map
-    MapBase::Ptr copy() const { return MapBase::Ptr(new UniformScaleTranslateMap(*this)); }
+    MapBase::Ptr copy() const override { return MapBase::Ptr(new UniformScaleTranslateMap(*this)); }
 
-    MapBase::Ptr inverseMap() const
+    MapBase::Ptr inverseMap() const override
     {
         const Vec3d& scaleInv = getInvScale();
         const Vec3d& trans = getTranslation();
@@ -1509,14 +1521,13 @@ public:
     static void registerMap()
     {
         MapRegistry::registerMap(
-                                 UniformScaleTranslateMap::mapType(),
-                                 UniformScaleTranslateMap::create);
+            UniformScaleTranslateMap::mapType(), UniformScaleTranslateMap::create);
     }
 
-    Name type() const { return mapType(); }
+    Name type() const override { return mapType(); }
     static Name mapType() { return Name("UniformScaleTranslateMap"); }
 
-    virtual bool isEqual(const MapBase& other) const { return isEqualBase(*this, other); }
+    bool isEqual(const MapBase& other) const override { return isEqualBase(*this, other); }
 
     bool operator==(const UniformScaleTranslateMap& other) const
     {
@@ -1526,7 +1537,7 @@ public:
 
     /// @brief Return a MapBase::Ptr to a UniformScaleTranslateMap that is
     /// the result of prepending translation on this map.
-    MapBase::Ptr preTranslate(const Vec3d& t) const
+    MapBase::Ptr preTranslate(const Vec3d& t) const override
     {
         const double scale = this->getScale().x();
         const Vec3d  new_trans = this->getTranslation() + scale * t;
@@ -1535,7 +1546,7 @@ public:
 
     /// @brief Return a MapBase::Ptr to a UniformScaleTranslateMap that is
     /// the result of postfixing translation on this map.
-    MapBase::Ptr postTranslate(const Vec3d& t) const
+    MapBase::Ptr postTranslate(const Vec3d& t) const override
     {
         const double scale = this->getScale().x();
         return MapBase::Ptr( new UniformScaleTranslateMap(scale, this->getTranslation() + t));
@@ -1620,8 +1631,8 @@ ScaleTranslateMap::postScale(const Vec3d& v) const
 class OPENVDB_API UnitaryMap: public MapBase
 {
 public:
-    typedef boost::shared_ptr<UnitaryMap>       Ptr;
-    typedef boost::shared_ptr<const UnitaryMap> ConstPtr;
+    using Ptr = SharedPtr<UnitaryMap>;
+    using ConstPtr = SharedPtr<const UnitaryMap>;
 
     /// default constructor makes an Idenity.
     UnitaryMap(): mAffineMap(Mat4d::identity())
@@ -1690,13 +1701,14 @@ public:
     {
     }
 
-    ~UnitaryMap() {}
+    ~UnitaryMap() override = default;
+
     /// Return a MapBase::Ptr to a new UnitaryMap
     static MapBase::Ptr create() { return MapBase::Ptr(new UnitaryMap()); }
     /// Returns a MapBase::Ptr to a deep copy of *this
-    MapBase::Ptr copy() const { return MapBase::Ptr(new UnitaryMap(*this)); }
+    MapBase::Ptr copy() const override { return MapBase::Ptr(new UnitaryMap(*this)); }
 
-    MapBase::Ptr inverseMap() const
+    MapBase::Ptr inverseMap() const override
     {
         return MapBase::Ptr(new UnitaryMap(mAffineMap.getMat4().inverse()));
     }
@@ -1711,17 +1723,17 @@ public:
     }
 
     /// Return @c UnitaryMap
-    Name type() const { return mapType(); }
+    Name type() const override { return mapType(); }
     /// Return @c UnitaryMap
     static Name mapType() { return Name("UnitaryMap"); }
 
     /// Return @c true (a UnitaryMap is always linear).
-    bool isLinear() const { return true; }
+    bool isLinear() const override { return true; }
 
     /// Return @c false (by convention true)
-    bool hasUniformScale() const { return true; }
+    bool hasUniformScale() const override { return true; }
 
-    virtual bool isEqual(const MapBase& other) const { return isEqualBase(*this, other); }
+    bool isEqual(const MapBase& other) const override { return isEqualBase(*this, other); }
 
     bool operator==(const UnitaryMap& other) const
     {
@@ -1732,130 +1744,146 @@ public:
 
     bool operator!=(const UnitaryMap& other) const { return !(*this == other); }
     /// Return the image of @c in under the map
-    Vec3d applyMap(const Vec3d& in) const { return mAffineMap.applyMap(in); }
+    Vec3d applyMap(const Vec3d& in) const override { return mAffineMap.applyMap(in); }
     /// Return the pre-image of @c in under the map
-    Vec3d applyInverseMap(const Vec3d& in) const { return mAffineMap.applyInverseMap(in); }
+    Vec3d applyInverseMap(const Vec3d& in) const override { return mAffineMap.applyInverseMap(in); }
 
-    Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const { return applyJacobian(in); }
+    Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const override { return applyJacobian(in); }
     /// Return the Jacobian of the map applied to @a in.
-    Vec3d applyJacobian(const Vec3d& in) const { return mAffineMap.applyJacobian(in); }
+    Vec3d applyJacobian(const Vec3d& in) const override { return mAffineMap.applyJacobian(in); }
 
-    /// Return the Inverse Jacobian of the map applied to @a in. (i.e. inverse map with out translation)
-    Vec3d applyInverseJacobian(const Vec3d& in, const Vec3d&) const { return applyInverseJacobian(in); }
-    /// Return the Inverse Jacobian of the map applied to @a in. (i.e. inverse map with out translation)
-    Vec3d applyInverseJacobian(const Vec3d& in) const { return mAffineMap.applyInverseJacobian(in); }
+    /// @brief Return the Inverse Jacobian of the map applied to @a in
+    /// (i.e. inverse map with out translation)
+    Vec3d applyInverseJacobian(const Vec3d& in, const Vec3d&) const override {
+        return applyInverseJacobian(in);
+    }
+    /// @brief Return the Inverse Jacobian of the map applied to @a in
+    /// (i.e. inverse map with out translation)
+    Vec3d applyInverseJacobian(const Vec3d& in) const override {
+        return mAffineMap.applyInverseJacobian(in);
+    }
 
-
+    /// @brief Return the Jacobian Transpose of the map applied to @a in.
+    /// @details This tranforms range-space gradients to domain-space gradients
+    Vec3d applyJT(const Vec3d& in, const Vec3d&) const override { return applyJT(in); }
     /// Return the Jacobian Transpose of the map applied to @a in.
-    /// This tranforms range-space gradients to domain-space gradients
-    Vec3d applyJT(const Vec3d& in, const Vec3d&) const { return applyJT(in); }
-    /// Return the Jacobian Transpose of the map applied to @a in.
-    Vec3d applyJT(const Vec3d& in) const {
-        // The transpose of the unitary map is its inverse
-        return applyInverseMap(in);
+    Vec3d applyJT(const Vec3d& in) const override {
+        return applyInverseMap(in); // the transpose of the unitary map is its inverse
     }
 
 
     /// @brief Return the transpose of the inverse Jacobian of the map applied to @a in
     /// @details Ignores second argument
-    Vec3d applyIJT(const Vec3d& in, const Vec3d& ) const { return applyIJT(in);}
+    Vec3d applyIJT(const Vec3d& in, const Vec3d& ) const override { return applyIJT(in);}
     /// Return the transpose of the inverse Jacobian of the map applied to @c in
-    Vec3d applyIJT(const Vec3d& in) const { return mAffineMap.applyIJT(in); }
+    Vec3d applyIJT(const Vec3d& in) const override { return mAffineMap.applyIJT(in); }
     /// Return the Jacobian Curvature: zero for a linear map
-    Mat3d applyIJC(const Mat3d& in) const { return mAffineMap.applyIJC(in); }
-    Mat3d applyIJC(const Mat3d& in, const Vec3d&, const Vec3d& ) const { return applyIJC(in); }
+    Mat3d applyIJC(const Mat3d& in) const override { return mAffineMap.applyIJC(in); }
+    Mat3d applyIJC(const Mat3d& in, const Vec3d&, const Vec3d& ) const override {
+        return applyIJC(in);
+    }
+
     /// Return the determinant of the Jacobian, ignores argument
-    double determinant(const Vec3d& ) const { return determinant(); }
+    double determinant(const Vec3d&) const override { return determinant(); }
     /// Return the determinant of the Jacobian
-    double determinant() const { return mAffineMap.determinant(); }
+    double determinant() const override { return mAffineMap.determinant(); }
 
 
     /// @brief Returns the lengths of the images
     /// of the segments
     /// \f$(0,0,0)-(1,0,0)\f$, \f$(0,0,0)-(0,1,0)\f$,
     /// \f$(0,0,0)-(0,0,1)\f$
-    Vec3d voxelSize() const { return mAffineMap.voxelSize();}
-    Vec3d voxelSize(const Vec3d&) const { return voxelSize();}
+    Vec3d voxelSize() const override { return mAffineMap.voxelSize();}
+    Vec3d voxelSize(const Vec3d&) const override { return voxelSize();}
 
     /// read serialization
-    void read(std::istream& is)
+    void read(std::istream& is) override
     {
         mAffineMap.read(is);
     }
 
     /// write serialization
-    void write(std::ostream& os) const
+    void write(std::ostream& os) const override
     {
         mAffineMap.write(os);
     }
     /// string serialization, useful for debuging
-    std::string str() const
+    std::string str() const override
     {
         std::ostringstream buffer;
         buffer << mAffineMap.str();
         return buffer.str();
     }
     /// Return AffineMap::Ptr to an AffineMap equivalent to *this
-    AffineMap::Ptr getAffineMap() const { return AffineMap::Ptr(new AffineMap(mAffineMap)); }
+    AffineMap::Ptr getAffineMap() const override {
+        return AffineMap::Ptr(new AffineMap(mAffineMap));
+    }
 
-    //@{
-    /// @brief  Return a MapBase::Ptr to a new map that is the result
-    /// of prepending the appropraite operation.
-    MapBase::Ptr preRotate(double radians, Axis axis) const
+    /// @brief Return a MapBase::Ptr to a new map that is the result
+    /// of prepending the given rotation.
+    MapBase::Ptr preRotate(double radians, Axis axis) const override
     {
         UnitaryMap first(axis, radians);
         UnitaryMap::Ptr unitaryMap(new UnitaryMap(first, *this));
-        return boost::static_pointer_cast<MapBase, UnitaryMap>(unitaryMap);
+        return StaticPtrCast<MapBase, UnitaryMap>(unitaryMap);
     }
-    MapBase::Ptr preTranslate(const Vec3d& t) const
+    /// @brief Return a MapBase::Ptr to a new map that is the result
+    /// of prepending the given translation.
+    MapBase::Ptr preTranslate(const Vec3d& t) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPreTranslation(t);
         return simplify(affineMap);
     }
-    MapBase::Ptr preScale(const Vec3d& v) const
+    /// @brief Return a MapBase::Ptr to a new map that is the result
+    /// of prepending the given scale.
+    MapBase::Ptr preScale(const Vec3d& v) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPreScale(v);
         return simplify(affineMap);
     }
-    MapBase::Ptr preShear(double shear, Axis axis0, Axis axis1) const
+    /// @brief Return a MapBase::Ptr to a new map that is the result
+    /// of prepending the given shear.
+    MapBase::Ptr preShear(double shear, Axis axis0, Axis axis1) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPreShear(axis0, axis1, shear);
         return simplify(affineMap);
     }
-    //@}
 
-
-    //@{
-    /// @brief  Return a MapBase::Ptr to a new map that is the result
-    /// of postfixing the appropraite operation.
-    MapBase::Ptr postRotate(double radians, Axis axis) const
+    /// @brief Return a MapBase::Ptr to a new map that is the result
+    /// of appending the given rotation.
+    MapBase::Ptr postRotate(double radians, Axis axis) const override
     {
         UnitaryMap second(axis, radians);
         UnitaryMap::Ptr unitaryMap(new UnitaryMap(*this, second));
-        return boost::static_pointer_cast<MapBase, UnitaryMap>(unitaryMap);
+        return StaticPtrCast<MapBase, UnitaryMap>(unitaryMap);
     }
-    MapBase::Ptr postTranslate(const Vec3d& t) const
+    /// @brief Return a MapBase::Ptr to a new map that is the result
+    /// of appending the given translation.
+    MapBase::Ptr postTranslate(const Vec3d& t) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPostTranslation(t);
         return simplify(affineMap);
     }
-    MapBase::Ptr postScale(const Vec3d& v) const
+    /// @brief Return a MapBase::Ptr to a new map that is the result
+    /// of appending the given scale.
+    MapBase::Ptr postScale(const Vec3d& v) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPostScale(v);
         return simplify(affineMap);
     }
-    MapBase::Ptr postShear(double shear, Axis axis0, Axis axis1) const
+    /// @brief Return a MapBase::Ptr to a new map that is the result
+    /// of appending the given shear.
+    MapBase::Ptr postShear(double shear, Axis axis0, Axis axis1) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
         affineMap->accumPostShear(axis0, axis1, shear);
         return simplify(affineMap);
     }
-    //@}
 
 private:
     AffineMap  mAffineMap;
@@ -1874,8 +1902,8 @@ private:
 class OPENVDB_API NonlinearFrustumMap: public MapBase
 {
 public:
-    typedef boost::shared_ptr<NonlinearFrustumMap>       Ptr;
-    typedef boost::shared_ptr<const NonlinearFrustumMap> ConstPtr;
+    using Ptr = SharedPtr<NonlinearFrustumMap>;
+    using ConstPtr = SharedPtr<const NonlinearFrustumMap>;
 
     NonlinearFrustumMap():
         MapBase(),
@@ -1996,16 +2024,17 @@ public:
         init();
     }
 
-    ~NonlinearFrustumMap(){}
+    ~NonlinearFrustumMap() override = default;
+
     /// Return a MapBase::Ptr to a new NonlinearFrustumMap
     static MapBase::Ptr create() { return MapBase::Ptr(new NonlinearFrustumMap()); }
     /// Return a MapBase::Ptr to a deep copy of this map
-    MapBase::Ptr copy() const { return MapBase::Ptr(new NonlinearFrustumMap(*this)); }
+    MapBase::Ptr copy() const override { return MapBase::Ptr(new NonlinearFrustumMap(*this)); }
 
     /// @brief Not implemented, since there is currently no map type that can
     /// represent the inverse of a frustum
     /// @throw NotImplementedError
-    MapBase::Ptr inverseMap() const
+    MapBase::Ptr inverseMap() const override
     {
         OPENVDB_THROW(NotImplementedError,
             "inverseMap() is not implemented for NonlinearFrustumMap");
@@ -2019,15 +2048,15 @@ public:
             NonlinearFrustumMap::create);
     }
     /// Return @c NonlinearFrustumMap
-    Name type() const { return mapType(); }
+    Name type() const override { return mapType(); }
     /// Return @c NonlinearFrustumMap
     static Name mapType() { return Name("NonlinearFrustumMap"); }
 
     /// Return @c false (a NonlinearFrustumMap is never linear).
-    bool isLinear() const { return false; }
+    bool isLinear() const override { return false; }
 
     /// Return @c false (by convention false)
-    bool hasUniformScale() const { return false; }
+    bool hasUniformScale() const override { return false; }
 
     /// Return @c true if the map is equivalent to an identity
     bool isIdentity() const
@@ -2049,7 +2078,7 @@ public:
         return true;
     }
 
-    virtual bool isEqual(const MapBase& other) const { return isEqualBase(*this, other); }
+    bool isEqual(const MapBase& other) const override { return isEqualBase(*this, other); }
 
     bool operator==(const NonlinearFrustumMap& other) const
     {
@@ -2076,20 +2105,20 @@ public:
     bool operator!=(const NonlinearFrustumMap& other) const { return !(*this == other); }
 
     /// Return the image of @c in under the map
-    Vec3d applyMap(const Vec3d& in) const
+    Vec3d applyMap(const Vec3d& in) const override
     {
         return mSecondMap.applyMap(applyFrustumMap(in));
     }
 
     /// Return the pre-image of @c in under the map
-    Vec3d applyInverseMap(const Vec3d& in) const
+    Vec3d applyInverseMap(const Vec3d& in) const override
     {
         return applyFrustumInverseMap(mSecondMap.applyInverseMap(in));
     }
     /// Return the Jacobian of the linear second map applied to @c in
-    Vec3d applyJacobian(const Vec3d& in) const { return mSecondMap.applyJacobian(in); }
+    Vec3d applyJacobian(const Vec3d& in) const override { return mSecondMap.applyJacobian(in); }
     /// Return the Jacobian defined at @c isloc applied to @c in
-    Vec3d applyJacobian(const Vec3d& in, const Vec3d& isloc) const
+    Vec3d applyJacobian(const Vec3d& in, const Vec3d& isloc) const override
     {
         // Move the center of the x-face of the bbox
         // to the origin in index space.
@@ -2112,10 +2141,13 @@ public:
     }
 
 
-    /// Return the Inverse Jacobian of the map applied to @a in. (i.e. inverse map with out translation)
-    Vec3d applyInverseJacobian(const Vec3d& in) const { return mSecondMap.applyInverseJacobian(in); }
+    /// @brief Return the Inverse Jacobian of the map applied to @a in
+    /// (i.e. inverse map with out translation)
+    Vec3d applyInverseJacobian(const Vec3d& in) const override {
+        return mSecondMap.applyInverseJacobian(in);
+    }
     /// Return the Inverse Jacobian defined at @c isloc of the map applied to @a in.
-    Vec3d applyInverseJacobian(const Vec3d& in, const Vec3d& isloc) const {
+    Vec3d applyInverseJacobian(const Vec3d& in, const Vec3d& isloc) const override {
 
         // Move the center of the x-face of the bbox
         // to the origin in index space.
@@ -2140,12 +2172,9 @@ public:
         return out;
     }
 
-
-
-    /// Return the Jacobian Transpose of the map applied to vector @c in at @c indexloc.
-    /// This tranforms range-space gradients to domain-space gradients.
-    ///
-    Vec3d applyJT(const Vec3d& in, const Vec3d& isloc) const {
+    /// @brief Return the Jacobian Transpose of the map applied to vector @c in at @c indexloc.
+    /// @details This tranforms range-space gradients to domain-space gradients.
+    Vec3d applyJT(const Vec3d& in, const Vec3d& isloc) const override {
         const Vec3d tmp = mSecondMap.applyJT(in);
         // Move the center of the x-face of the bbox
         // to the origin in index space.
@@ -2167,12 +2196,12 @@ public:
                      mDepthOnLz * tmp.z());
     }
     /// Return the Jacobian Transpose of the second map applied to @c in.
-    Vec3d applyJT(const Vec3d& in) const {
+    Vec3d applyJT(const Vec3d& in) const override {
         return mSecondMap.applyJT(in);
     }
 
     /// Return the transpose of the inverse Jacobian of the linear second map applied to @c in
-    Vec3d applyIJT(const Vec3d& in) const { return mSecondMap.applyIJT(in); }
+    Vec3d applyIJT(const Vec3d& in) const override { return mSecondMap.applyIJT(in); }
 
     // the Jacobian of the nonlinear part of the transform is a sparse matrix
     // Jacobian^(-T) =
@@ -2182,7 +2211,7 @@ public:
     //        (  -(x-xo)g/(sLx)   -(y-yo)g/(sLx)  Lz/(Depth Lx)   )
     /// Return the transpose of the inverse Jacobain (at @c locW applied to @c in.
     /// @c ijk is the location in the pre-image space (e.g. index space)
-    Vec3d applyIJT(const Vec3d& d1_is, const Vec3d& ijk) const
+    Vec3d applyIJT(const Vec3d& d1_is, const Vec3d& ijk) const override
     {
         const Vec3d loc = applyFrustumMap(ijk);
         const double s = mGamma * loc.z() + 1.;
@@ -2218,12 +2247,12 @@ public:
     }
 
     /// Return the Jacobian Curvature for the linear second map
-    Mat3d applyIJC(const Mat3d& in) const { return mSecondMap.applyIJC(in); }
+    Mat3d applyIJC(const Mat3d& in) const override { return mSecondMap.applyIJC(in); }
     /// Return the Jacobian Curvature: all the second derivatives in range space
     /// @param d2_is second derivative matrix computed in index space
     /// @param d1_is gradient computed in index space
     /// @param ijk  the index space location where the result is computed
-    Mat3d applyIJC(const Mat3d& d2_is, const Vec3d& d1_is, const Vec3d& ijk) const
+    Mat3d applyIJC(const Mat3d& d2_is, const Vec3d& d1_is, const Vec3d& ijk) const override
     {
         const Vec3d loc = applyFrustumMap(ijk);
 
@@ -2293,11 +2322,11 @@ public:
     }
 
     /// Return the determinant of the Jacobian of linear second map
-    double determinant() const {return mSecondMap.determinant();} // no implementation
+    double determinant() const override {return mSecondMap.determinant();} // no implementation
 
     /// Return the determinate of the Jacobian evaluated at @c loc
     /// @c loc is a location in the pre-image space (e.g., index space)
-    double determinant(const Vec3d& loc) const
+    double determinant(const Vec3d& loc) const override
     {
         double s = mGamma * loc.z() + 1.0;
         double frustum_determinant = s * s * mDepthOnLzLxLx;
@@ -2305,7 +2334,7 @@ public:
     }
 
     /// Return the size of a voxel at the center of the near plane
-    Vec3d voxelSize() const
+    Vec3d voxelSize() const override
     {
         const Vec3d loc( 0.5*(mBBox.min().x() + mBBox.max().x()),
                          0.5*(mBBox.min().y() + mBBox.max().y()),
@@ -2319,7 +2348,7 @@ public:
     /// from @a loc to @a loc + (1,0,0), from @a loc to @a loc + (0,1,0)
     /// and from @a loc to @a loc + (0,0,1)
     /// @param loc  a location in the pre-image space (e.g., index space)
-    Vec3d voxelSize(const Vec3d& loc) const
+    Vec3d voxelSize(const Vec3d& loc) const override
     {
         Vec3d out, pos = applyMap(loc);
         out(0) = (applyMap(loc + Vec3d(1,0,0)) - pos).length();
@@ -2328,7 +2357,7 @@ public:
         return out;
     }
 
-    AffineMap::Ptr getAffineMap() const { return mSecondMap.getAffineMap(); }
+    AffineMap::Ptr getAffineMap() const override { return mSecondMap.getAffineMap(); }
 
     /// set the taper value, the ratio of nearplane width / far plane width
     void setTaper(double t) { mTaper = t; init();}
@@ -2354,7 +2383,7 @@ public:
     bool hasSimpleAffine() const { return mHasSimpleAffine; }
 
     /// read serialization
-    void read(std::istream& is)
+    void read(std::istream& is) override
     {
         // for backward compatibility with earlier version
         if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_FLOAT_FRUSTUM_BBOX ) {
@@ -2384,7 +2413,7 @@ public:
     }
 
     /// write serialization
-    void write(std::ostream& os) const
+    void write(std::ostream& os) const override
     {
         mBBox.write(os);
         os.write(reinterpret_cast<const char*>(&mTaper), sizeof(double));
@@ -2395,7 +2424,7 @@ public:
     }
 
     /// string serialization, useful for debuging
-    std::string str() const
+    std::string str() const override
     {
         std::ostringstream buffer;
         buffer << " - taper: " << mTaper << std::endl;
@@ -2405,55 +2434,63 @@ public:
         return buffer.str();
     }
 
-    //@{
     /// @brief Return a MapBase::Ptr to a new map that is the result
-    /// of prepending the appropriate operation to the linear part of this map
-    MapBase::Ptr preRotate(double radians, Axis axis = X_AXIS) const
+    /// of prepending the given rotation to the linear part of this map
+    MapBase::Ptr preRotate(double radians, Axis axis = X_AXIS) const override
     {
         return MapBase::Ptr(
             new NonlinearFrustumMap(mBBox, mTaper, mDepth, mSecondMap.preRotate(radians, axis)));
     }
-    MapBase::Ptr preTranslate(const Vec3d& t) const
+    /// @brief Return a MapBase::Ptr to a new map that is the result
+    /// of prepending the given translation to the linear part of this map
+    MapBase::Ptr preTranslate(const Vec3d& t) const override
     {
         return MapBase::Ptr(
             new NonlinearFrustumMap(mBBox, mTaper, mDepth, mSecondMap.preTranslate(t)));
     }
-    MapBase::Ptr preScale(const Vec3d& s) const
+    /// @brief Return a MapBase::Ptr to a new map that is the result
+    /// of prepending the given scale to the linear part of this map
+    MapBase::Ptr preScale(const Vec3d& s) const override
     {
         return MapBase::Ptr(
             new NonlinearFrustumMap(mBBox, mTaper, mDepth, mSecondMap.preScale(s)));
     }
-    MapBase::Ptr preShear(double shear, Axis axis0, Axis axis1) const
+    /// @brief Return a MapBase::Ptr to a new map that is the result
+    /// of prepending the given shear to the linear part of this map
+    MapBase::Ptr preShear(double shear, Axis axis0, Axis axis1) const override
     {
         return MapBase::Ptr(new NonlinearFrustumMap(
             mBBox, mTaper, mDepth, mSecondMap.preShear(shear, axis0, axis1)));
     }
-    //@}
 
-    //@{
     /// @brief Return a MapBase::Ptr to a new map that is the result
-    /// of postfixing the appropiate operation to the linear part of this map.
-    MapBase::Ptr postRotate(double radians, Axis axis = X_AXIS) const
+    /// of appending the given rotation to the linear part of this map.
+    MapBase::Ptr postRotate(double radians, Axis axis = X_AXIS) const override
     {
         return MapBase::Ptr(
             new NonlinearFrustumMap(mBBox, mTaper, mDepth, mSecondMap.postRotate(radians, axis)));
     }
-    MapBase::Ptr postTranslate(const Vec3d& t) const
+    /// @brief Return a MapBase::Ptr to a new map that is the result
+    /// of appending the given translation to the linear part of this map.
+    MapBase::Ptr postTranslate(const Vec3d& t) const override
     {
         return MapBase::Ptr(
             new NonlinearFrustumMap(mBBox, mTaper, mDepth, mSecondMap.postTranslate(t)));
     }
-    MapBase::Ptr postScale(const Vec3d& s) const
+    /// @brief Return a MapBase::Ptr to a new map that is the result
+    /// of appending the given scale to the linear part of this map.
+    MapBase::Ptr postScale(const Vec3d& s) const override
     {
         return MapBase::Ptr(
             new NonlinearFrustumMap(mBBox, mTaper, mDepth, mSecondMap.postScale(s)));
     }
-    MapBase::Ptr postShear(double shear, Axis axis0, Axis axis1) const
+    /// @brief Return a MapBase::Ptr to a new map that is the result
+    /// of appending the given shear to the linear part of this map.
+    MapBase::Ptr postShear(double shear, Axis axis0, Axis axis1) const override
     {
         return MapBase::Ptr(new NonlinearFrustumMap(
             mBBox, mTaper, mDepth, mSecondMap.postShear(shear, axis0, axis1)));
     }
-    //@}
 
 private:
     void init()
@@ -2566,10 +2603,10 @@ template<typename FirstMapType, typename SecondMapType>
 class CompoundMap
 {
 public:
-    typedef CompoundMap<FirstMapType, SecondMapType>    MyType;
+    using MyType = CompoundMap<FirstMapType, SecondMapType>;
 
-    typedef boost::shared_ptr<MyType>       Ptr;
-    typedef boost::shared_ptr<const MyType> ConstPtr;
+    using Ptr = SharedPtr<MyType>;
+    using ConstPtr = SharedPtr<const MyType>;
 
 
     CompoundMap() { updateAffineMatrix(); }

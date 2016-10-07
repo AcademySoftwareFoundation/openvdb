@@ -27,7 +27,7 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @author Ken Museth
 ///
 /// @file LevelSetTracker.h
@@ -42,7 +42,7 @@
 #include <tbb/parallel_for.h>
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
-#include <boost/type_traits/is_floating_point.hpp>
+#include <type_traits>
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/math/FiniteDifference.h>
@@ -75,7 +75,8 @@ public:
     typedef typename LeafManagerType::LeafRange  LeafRange;
     typedef typename LeafManagerType::BufferType BufferType;
     typedef typename TreeType::template ValueConverter<ValueMask>::Type MaskTreeType;
-    BOOST_STATIC_ASSERT(boost::is_floating_point<ValueType>::value);
+    static_assert(std::is_floating_point<ValueType>::value,
+        "LevelSetTracker requires a level set grid with floating-point values");
 
     /// Lightweight struct that stores the state of the LevelSetTracker
     struct State {
@@ -91,7 +92,7 @@ public:
 
     /// @brief Main constructor
     /// @throw RuntimeError if the grid is not a level set
-    LevelSetTracker(GridT& grid, InterruptT* interrupt = NULL);
+    LevelSetTracker(GridT& grid, InterruptT* interrupt = nullptr);
 
     virtual ~LevelSetTracker() { delete mLeafs; }
 
@@ -101,7 +102,7 @@ public:
     void normalize(const MaskType* mask);
 
     /// @brief Iterative normalization, i.e. solving the Eikonal equation
-    void normalize() { this->normalize<MaskTreeType>(NULL); }
+    void normalize() { this->normalize<MaskTreeType>(nullptr); }
 
     /// @brief Track the level set interface, i.e. rebuild and normalize the
     /// narrow band of the level set.
@@ -397,6 +398,7 @@ normalize(const MaskT* mask)
         this->normalize1<math::WENO5_BIAS,   MaskT>(mask); break;
     case math::HJWENO5_BIAS:
         this->normalize1<math::HJWENO5_BIAS, MaskT>(mask); break;
+    case math::UNKNOWN_BIAS:
     default:
         OPENVDB_THROW(ValueError, "Spatial difference scheme not supported!");
     }
@@ -415,6 +417,7 @@ normalize1(const MaskT* mask)
         this->normalize2<SpatialScheme, math::TVD_RK2, MaskT>(mask); break;
     case math::TVD_RK3:
         this->normalize2<SpatialScheme, math::TVD_RK3, MaskT>(mask); break;
+    case math::UNKNOWN_TIS:
     default:
         OPENVDB_THROW(ValueError, "Temporal integration scheme not supported!");
     }
@@ -551,6 +554,7 @@ normalize()
             // Cook and swap buffer 0 and 2 such that Phi_t3(0) and Phi_t2(2)
             this->cook("Normalizing level set using TVD_RK3 (step 3 of 3)", 2);
             break;
+        case math::UNKNOWN_TIS:
         default:
             OPENVDB_THROW(ValueError, "Temporal integration scheme not supported!");
         }
@@ -623,7 +627,7 @@ euler(const LeafRange& range, Index phiBuffer, Index resultBuffer)
     for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
         const ValueType* phi = leafIter.buffer(phiBuffer).data();
         ValueType* result = leafIter.buffer(resultBuffer).data();
-        if (mMask == NULL) {
+        if (mMask == nullptr) {
             for (VoxelIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 stencil.moveTo(iter);
                 this->eval<Nominator, Denominator>(stencil, phi, result, iter.pos());

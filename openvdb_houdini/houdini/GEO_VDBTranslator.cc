@@ -232,7 +232,7 @@ fileSaveVDB(const GEO_Detail *geogdp, OutputT os)
 
             // Create a new grid that shares the primitive's tree and transform
             // and then transfer primitive attributes to the new grid as metadata.
-            GridPtr grid = vdb->getGrid().copyGrid();
+            GridPtr grid = openvdb::ConstPtrCast<Grid>(vdb->getGrid().copyGrid());
             GU_PrimVDB::createMetadataFromGridAttrs(*grid, *vdb, *gdp);
             grid->removeMeta("is_vdb");
 
@@ -304,6 +304,9 @@ GEO_VDBTranslator::fileSaveToFile(const GEO_Detail *geogdp, std::ostream &,
 }
 
 } // unnamed namespace
+
+
+void new_VDBGeometryIO(void*);
 
 void
 new_VDBGeometryIO(void *)

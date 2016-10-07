@@ -27,7 +27,7 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @file tree/Tree.h
 ///
 /// @todo Optimize Tree::evalMinMax
@@ -35,15 +35,8 @@
 #ifndef OPENVDB_TREE_TREE_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_TREE_HAS_BEEN_INCLUDED
 
-#include <iostream>
-#include <sstream>
-#include <vector>
-#include <boost/shared_ptr.hpp>
-#include <boost/cstdint.hpp>
-#include <tbb/atomic.h>
-#include <tbb/concurrent_hash_map.h>
 #include <openvdb/Types.h>
-#include <openvdb/metadata/Metadata.h>
+#include <openvdb/Metadata.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/math/BBox.h>
 #include <openvdb/util/Formats.h>
@@ -54,6 +47,12 @@
 #include "LeafNode.h"
 #include "TreeIterator.h"
 #include "ValueAccessor.h"
+#include <tbb/atomic.h>
+#include <tbb/concurrent_hash_map.h>
+#include <cstdint>
+#include <iostream>
+#include <sstream>
+#include <vector>
 
 
 namespace openvdb {
@@ -65,11 +64,13 @@ namespace tree {
 class OPENVDB_API TreeBase
 {
 public:
-    typedef boost::shared_ptr<TreeBase> Ptr;
-    typedef boost::shared_ptr<const TreeBase> ConstPtr;
+    using Ptr = SharedPtr<TreeBase>;
+    using ConstPtr = SharedPtr<const TreeBase>;
 
-    TreeBase() {}
-    virtual ~TreeBase() {}
+    TreeBase() = default;
+    TreeBase(const TreeBase&) = default;
+    TreeBase& operator=(const TreeBase&) = delete; // disallow assignment
+    virtual ~TreeBase() = default;
 
     /// Return the name of this tree's type.
     virtual const Name& type() const = 0;
@@ -190,11 +191,6 @@ public:
     ///                      4: include minimum and maximum voxel values
     /// @warning @a verboseLevel 4 forces loading of any unallocated nodes.
     virtual void print(std::ostream& os = std::cout, int verboseLevel = 1) const;
-
-private:
-    // Disallow copying of instances of this class.
-    //TreeBase(const TreeBase& other);
-    TreeBase& operator=(const TreeBase& other);
 };
 
 
@@ -205,13 +201,13 @@ template<typename _RootNodeType>
 class Tree: public TreeBase
 {
 public:
-    typedef boost::shared_ptr<Tree> Ptr;
-    typedef boost::shared_ptr<const Tree> ConstPtr;
+    using Ptr = SharedPtr<Tree>;
+    using ConstPtr = SharedPtr<const Tree>;
 
-    typedef _RootNodeType                        RootNodeType;
-    typedef typename RootNodeType::ValueType     ValueType;
-    typedef typename RootNodeType::BuildType     BuildType;
-    typedef typename RootNodeType::LeafNodeType  LeafNodeType;
+    using RootNodeType = _RootNodeType;
+    using ValueType = typename RootNodeType::ValueType;
+    using BuildType = typename RootNodeType::BuildType;
+    using LeafNodeType = typename RootNodeType::LeafNodeType;
 
     static const Index DEPTH = RootNodeType::LEVEL + 1;
 
@@ -223,11 +219,13 @@ public:
     /// to write "typename SourceTree::template ValueConverter<T>::Type".
     template<typename OtherValueType>
     struct ValueConverter {
-        typedef Tree<typename RootNodeType::template ValueConverter<OtherValueType>::Type> Type;
+        using Type = Tree<typename RootNodeType::template ValueConverter<OtherValueType>::Type>;
     };
 
 
     Tree() {}
+
+    Tree& operator=(const Tree&) = delete; // disallow assignment
 
     /// Deep copy constructor
     Tree(const Tree& other): TreeBase(other), mRoot(other.mRoot)
@@ -286,18 +284,18 @@ public:
     /// Empty tree constructor
     Tree(const ValueType& background): mRoot(background) {}
 
-    virtual ~Tree() { this->clear(); releaseAllAccessors(); }
+    ~Tree() override { this->clear(); releaseAllAccessors(); }
 
     /// Return a pointer to a deep copy of this tree
-    virtual TreeBase::Ptr copy() const { return TreeBase::Ptr(new Tree(*this)); }
+    TreeBase::Ptr copy() const override { return TreeBase::Ptr(new Tree(*this)); }
 
     /// Return the name of the type of a voxel's value (e.g., "float" or "vec3d")
-    virtual Name valueType() const { return typeNameAsString<ValueType>(); }
+    Name valueType() const override { return typeNameAsString<ValueType>(); }
 
     /// Return the name of this type of tree.
     static const Name& treeType();
     /// Return the name of this type of tree.
-    virtual const Name& type() const { return this->treeType(); }
+    const Name& type() const override { return this->treeType(); }
 
     bool operator==(const Tree&) const { OPENVDB_THROW(NotImplementedError, ""); }
     bool operator!=(const Tree&) const { OPENVDB_THROW(NotImplementedError, ""); }
@@ -317,10 +315,10 @@ public:
     template<typename OtherRootNodeType>
     bool hasSameTopology(const Tree<OtherRootNodeType>& other) const;
 
-    virtual bool evalLeafBoundingBox(CoordBBox& bbox) const;
-    virtual bool evalActiveVoxelBoundingBox(CoordBBox& bbox) const;
-    virtual bool evalActiveVoxelDim(Coord& dim) const;
-    virtual bool evalLeafDim(Coord& dim) const;
+    bool evalLeafBoundingBox(CoordBBox& bbox) const override;
+    bool evalActiveVoxelBoundingBox(CoordBBox& bbox) const override;
+    bool evalActiveVoxelDim(Coord& dim) const override;
+    bool evalLeafDim(Coord& dim) const override;
 
     /// @brief Traverse the type hierarchy of nodes, and return, in @a dims, a list
     /// of the Log2Dims of nodes in order from RootNode to LeafNode.
@@ -334,27 +332,27 @@ public:
     /// @brief Read the tree topology from a stream.
     ///
     /// This will read the tree structure and tile values, but not voxel data.
-    virtual void readTopology(std::istream&, bool saveFloatAsHalf = false);
+    void readTopology(std::istream&, bool saveFloatAsHalf = false) override;
     /// @brief Write the tree topology to a stream.
     ///
     /// This will write the tree structure and tile values, but not voxel data.
-    virtual void writeTopology(std::ostream&, bool saveFloatAsHalf = false) const;
+    void writeTopology(std::ostream&, bool saveFloatAsHalf = false) const override;
     /// Read all data buffers for this tree.
-    virtual void readBuffers(std::istream&, bool saveFloatAsHalf = false);
+    void readBuffers(std::istream&, bool saveFloatAsHalf = false) override;
 #ifndef OPENVDB_2_ABI_COMPATIBLE
     /// Read all of this tree's data buffers that intersect the given bounding box.
-    virtual void readBuffers(std::istream&, const CoordBBox&, bool saveFloatAsHalf = false);
+    void readBuffers(std::istream&, const CoordBBox&, bool saveFloatAsHalf = false) override;
     /// @brief Read all of this tree's data buffers that are not yet resident in memory
     /// (because delayed loading is in effect).
     /// @details If this tree was read from a memory-mapped file, this operation
     /// disconnects the tree from the file.
     /// @sa clipUnallocatedNodes, io::File::open, io::MappedFile
-    virtual void readNonresidentBuffers() const;
+    void readNonresidentBuffers() const override;
 #endif
     /// Write out all data buffers for this tree.
-    virtual void writeBuffers(std::ostream&, bool saveFloatAsHalf = false) const;
+    void writeBuffers(std::ostream&, bool saveFloatAsHalf = false) const override;
 
-    virtual void print(std::ostream& os = std::cout, int verboseLevel = 1) const;
+    void print(std::ostream& os = std::cout, int verboseLevel = 1) const override;
 
 
     //
@@ -363,26 +361,26 @@ public:
     /// @brief Return the depth of this tree.
     ///
     /// A tree with only a root node and leaf nodes has depth 2, for example.
-    virtual Index treeDepth() const { return DEPTH; }
+    Index treeDepth() const override { return DEPTH; }
     /// Return the number of leaf nodes.
-    virtual Index32 leafCount() const { return mRoot.leafCount(); }
+    Index32 leafCount() const override { return mRoot.leafCount(); }
     /// Return the number of non-leaf nodes.
-    virtual Index32 nonLeafCount() const { return mRoot.nonLeafCount(); }
+    Index32 nonLeafCount() const override { return mRoot.nonLeafCount(); }
     /// Return the number of active voxels stored in leaf nodes.
-    virtual Index64 activeLeafVoxelCount() const { return mRoot.onLeafVoxelCount(); }
+    Index64 activeLeafVoxelCount() const override { return mRoot.onLeafVoxelCount(); }
     /// Return the number of inactive voxels stored in leaf nodes.
-    virtual Index64 inactiveLeafVoxelCount() const { return mRoot.offLeafVoxelCount(); }
+    Index64 inactiveLeafVoxelCount() const override { return mRoot.offLeafVoxelCount(); }
     /// Return the total number of active voxels.
-    virtual Index64 activeVoxelCount() const { return mRoot.onVoxelCount(); }
+    Index64 activeVoxelCount() const override { return mRoot.onVoxelCount(); }
     /// Return the number of inactive voxels within the bounding box of all active voxels.
-    virtual Index64 inactiveVoxelCount() const;
+    Index64 inactiveVoxelCount() const override;
     /// Return the total number of active tiles.
-    Index64 activeTileCount() const { return mRoot.onTileCount(); }
+    Index64 activeTileCount() const override { return mRoot.onTileCount(); }
 
     /// Return the minimum and maximum active values in this tree.
     void evalMinMax(ValueType &min, ValueType &max) const;
 
-    virtual Index64 memUsage() const { return sizeof(*this) + mRoot.memUsage(); }
+    Index64 memUsage() const override { return sizeof(*this) + mRoot.memUsage(); }
 
 
     //
@@ -480,7 +478,7 @@ public:
     /// @details Typically, unallocated nodes are leaf nodes whose voxel buffers
     /// are not yet resident in memory because delayed loading is in effect.
     /// @sa readNonresidentBuffers, io::File::open
-    virtual void clipUnallocatedNodes();
+    void clipUnallocatedNodes() override;
 #endif
 
     //@{
@@ -538,7 +536,7 @@ public:
 
     /// @brief Return a pointer to the node of type @c NodeT that contains voxel (x, y, z)
     /// and replace it with a tile of the specified value and state.
-    /// If no such node exists, leave the tree unchanged and return @c NULL.
+    /// If no such node exists, leave the tree unchanged and return @c nullptr.
     /// @note The caller takes ownership of the node and is responsible for deleting it.
     template<typename NodeT>
     NodeT* stealNode(const Coord& xyz, const ValueType& value, bool active);
@@ -552,7 +550,7 @@ public:
 
     //@{
     /// @brief Return a pointer to the node of type @c NodeType that contains
-    /// voxel (x, y, z).  If no such node exists, return NULL.
+    /// voxel (x, y, z).  If no such node exists, return @c nullptr.
     template<typename NodeType> NodeType* probeNode(const Coord& xyz);
     template<typename NodeType> const NodeType* probeConstNode(const Coord& xyz) const;
     template<typename NodeType> const NodeType* probeNode(const Coord& xyz) const;
@@ -560,7 +558,7 @@ public:
 
     //@{
     /// @brief Return a pointer to the leaf node that contains voxel (x, y, z).
-    /// If no such node exists, return NULL.
+    /// If no such node exists, return @c nullptr.
     LeafNodeType* probeLeaf(const Coord& xyz);
     const LeafNodeType* probeConstLeaf(const Coord& xyz) const;
     const LeafNodeType* probeLeaf(const Coord& xyz) const { return this->probeConstLeaf(xyz); }
@@ -570,14 +568,14 @@ public:
     /// @brief Adds all nodes of a certain type to a container with the following API:
     /// @code
     /// struct ArrayT {
-    ///    typedef value_type;// defines the type of nodes to be added to the array
-    ///    void push_back(value_type nodePtr);// method that add nodes to the array
+    ///    using value_type = ...;             // the type of node to be added to the array
+    ///    void push_back(value_type nodePtr); // add a node to the array
     /// };
     /// @endcode
     /// @details An example of a wrapper around a c-style array is:
     /// @code
     /// struct MyArray {
-    ///    typedef LeafType* value_type;
+    ///    using value_type = LeafType*;
     ///    value_type* ptr;
     ///    MyArray(value_type* array) : ptr(array) {}
     ///    void push_back(value_type leaf) { *ptr++ = leaf; }
@@ -597,14 +595,14 @@ public:
     /// adds them to a container with the following API:
     /// @code
     /// struct ArrayT {
-    ///    typedef value_type;// defines the type of nodes to be added to the array
-    ///    void push_back(value_type nodePtr);// method that add nodes to the array
+    ///    using value_type = ...;             // the type of node to be added to the array
+    ///    void push_back(value_type nodePtr); // add a node to the array
     /// };
     /// @endcode
     /// @details An example of a wrapper around a c-style array is:
     /// @code
     /// struct MyArray {
-    ///    typedef LeafType* value_type;
+    ///    using value_type = LeafType*;
     ///    value_type* ptr;
     ///    MyArray(value_type* array) : ptr(array) {}
     ///    void push_back(value_type leaf) { *ptr++ = leaf; }
@@ -665,7 +663,7 @@ public:
 
     /// @brief Return this tree's background value wrapped as metadata.
     /// @note Query the metadata object for the value's type.
-    virtual Metadata::Ptr getBackgroundValue() const;
+    Metadata::Ptr getBackgroundValue() const override;
 
     /// @brief Return this tree's background value.
     ///
@@ -675,7 +673,7 @@ public:
     const ValueType& background() const { return mRoot.background(); }
 
     /// Min and max are both inclusive.
-    virtual void getIndexRange(CoordBBox& bbox) const { mRoot.getIndexRange(bbox); }
+    void getIndexRange(CoordBBox& bbox) const override { mRoot.getIndexRange(bbox); }
 
     /// @brief Densify active tiles, i.e., replace them with leaf-level active voxels.
     ///
@@ -1013,7 +1011,7 @@ public:
     ///     template<typename TreeT>
     ///     struct PrintTreeVisitor
     ///     {
-    ///         typedef typename TreeT::RootNodeType RootT;
+    ///         using RootT = typename TreeT::RootNodeType;
     ///         bool visitedRoot;
     ///
     ///         PrintTreeVisitor(): visitedRoot(false) {}
@@ -1027,7 +1025,7 @@ public:
     ///             }
     ///             typename IterT::NonConstValueType value;
     ///             typename IterT::ChildNodeType* child = iter.probeChild(value);
-    ///             if (child == NULL) {
+    ///             if (child == nullptr) {
     ///                 std::cout << "Tile with value " << value << std::endl;
     ///                 return true; // no child to visit, so stop descending
     ///             }
@@ -1152,14 +1150,14 @@ public:
 
     //@{
     /// Iterator over all nodes in this tree
-    typedef NodeIteratorBase<Tree, typename RootNodeType::ChildOnIter>        NodeIter;
-    typedef NodeIteratorBase<const Tree, typename RootNodeType::ChildOnCIter> NodeCIter;
+    using NodeIter = NodeIteratorBase<Tree, typename RootNodeType::ChildOnIter>;
+    using NodeCIter = NodeIteratorBase<const Tree, typename RootNodeType::ChildOnCIter>;
     //@}
 
     //@{
     /// Iterator over all leaf nodes in this tree
-    typedef LeafIteratorBase<Tree, typename RootNodeType::ChildOnIter>        LeafIter;
-    typedef LeafIteratorBase<const Tree, typename RootNodeType::ChildOnCIter> LeafCIter;
+    using LeafIter = LeafIteratorBase<Tree, typename RootNodeType::ChildOnIter>;
+    using LeafCIter = LeafIteratorBase<const Tree, typename RootNodeType::ChildOnCIter>;
     //@}
 
     //@{
@@ -1176,12 +1174,12 @@ public:
     LeafCIter cbeginLeaf() const { return LeafCIter(*this); }
     //@}
 
-    typedef TreeValueIteratorBase<Tree, typename RootNodeType::ValueAllIter> ValueAllIter;
-    typedef TreeValueIteratorBase<const Tree, typename RootNodeType::ValueAllCIter> ValueAllCIter;
-    typedef TreeValueIteratorBase<Tree, typename RootNodeType::ValueOnIter> ValueOnIter;
-    typedef TreeValueIteratorBase<const Tree, typename RootNodeType::ValueOnCIter> ValueOnCIter;
-    typedef TreeValueIteratorBase<Tree, typename RootNodeType::ValueOffIter> ValueOffIter;
-    typedef TreeValueIteratorBase<const Tree, typename RootNodeType::ValueOffCIter> ValueOffCIter;
+    using ValueAllIter = TreeValueIteratorBase<Tree, typename RootNodeType::ValueAllIter>;
+    using ValueAllCIter = TreeValueIteratorBase<const Tree, typename RootNodeType::ValueAllCIter>;
+    using ValueOnIter = TreeValueIteratorBase<Tree, typename RootNodeType::ValueOnIter>;
+    using ValueOnCIter = TreeValueIteratorBase<const Tree, typename RootNodeType::ValueOnCIter>;
+    using ValueOffIter = TreeValueIteratorBase<Tree, typename RootNodeType::ValueOffIter>;
+    using ValueOffCIter = TreeValueIteratorBase<const Tree, typename RootNodeType::ValueOffCIter>;
 
     //@{
     /// Return an iterator over all values (tile and voxel) across all nodes.
@@ -1211,11 +1209,8 @@ public:
 
 
 protected:
-    typedef tbb::concurrent_hash_map<ValueAccessorBase<Tree, true>*, bool> AccessorRegistry;
-    typedef tbb::concurrent_hash_map<ValueAccessorBase<const Tree, true>*, bool> ConstAccessorRegistry;
-
-    // Disallow assignment of instances of this class.
-    Tree& operator=(const Tree&);
+    using AccessorRegistry = tbb::concurrent_hash_map<ValueAccessorBase<Tree, true>*, bool>;
+    using ConstAccessorRegistry = tbb::concurrent_hash_map<ValueAccessorBase<const Tree, true>*, bool>;
 
     /// @brief Notify all registered accessors, by calling ValueAccessor::release(),
     /// that this tree is about to be deleted.
@@ -1225,10 +1220,10 @@ protected:
     template<typename NodeType>
     struct DeallocateNodes {
         DeallocateNodes(std::vector<NodeType*>& nodes)
-            : mNodes(nodes.empty() ? NULL : &nodes.front()) { }
+            : mNodes(nodes.empty() ? nullptr : &nodes.front()) { }
         void operator()(const tbb::blocked_range<size_t>& range) const {
             for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
-                delete mNodes[n]; mNodes[n] = NULL;
+                delete mNodes[n]; mNodes[n] = nullptr;
             }
         }
         NodeType ** const mNodes;
@@ -1254,7 +1249,7 @@ tbb::atomic<const Name*> Tree<_RootNodeType>::sTreeTypeName;
 /// @note This is NOT the standard tree configuration (Tree4 is).
 template<typename T, Index N1=4, Index N2=3>
 struct Tree3 {
-    typedef Tree<RootNode<InternalNode<LeafNode<T, N2>, N1> > > Type;
+    using Type = Tree<RootNode<InternalNode<LeafNode<T, N2>, N1>>>;
 };
 
 
@@ -1264,7 +1259,7 @@ struct Tree3 {
 /// @note This is the standard tree configuration.
 template<typename T, Index N1=5, Index N2=4, Index N3=3>
 struct Tree4 {
-    typedef Tree<RootNode<InternalNode<InternalNode<LeafNode<T, N3>, N2>, N1> > > Type;
+    using Type = Tree<RootNode<InternalNode<InternalNode<LeafNode<T, N3>, N2>, N1>>>;
 };
 
 /// @brief Tree5<T, N1, N2, N3, N4>::Type is the type of a five-level tree
@@ -1273,8 +1268,8 @@ struct Tree4 {
 /// @note This is NOT the standard tree configuration (Tree4 is).
 template<typename T, Index N1=6, Index N2=5, Index N3=4, Index N4=3>
 struct Tree5 {
-    typedef Tree<RootNode<InternalNode<InternalNode<InternalNode<LeafNode<T, N4>, N3>, N2>, N1> > >
-        Type;
+    using Type =
+        Tree<RootNode<InternalNode<InternalNode<InternalNode<LeafNode<T, N4>, N3>, N2>, N1>>>;
 };
 
 
@@ -1562,7 +1557,7 @@ template<typename RootNodeType>
 inline void
 Tree<RootNodeType>::releaseAllAccessors()
 {
-    mAccessorRegistry.erase(NULL);
+    mAccessorRegistry.erase(nullptr);
     for (typename AccessorRegistry::iterator it = mAccessorRegistry.begin();
         it != mAccessorRegistry.end(); ++it)
     {
@@ -1570,7 +1565,7 @@ Tree<RootNodeType>::releaseAllAccessors()
     }
     mAccessorRegistry.clear();
 
-    mAccessorRegistry.erase(NULL);
+    mAccessorRegistry.erase(nullptr);
     for (typename ConstAccessorRegistry::iterator it = mConstAccessorRegistry.begin();
         it != mConstAccessorRegistry.end(); ++it)
     {
@@ -1822,7 +1817,7 @@ Tree<RootNodeType>::getBackgroundValue() const
 {
     Metadata::Ptr result;
     if (Metadata::isRegisteredType(valueType())) {
-        typedef TypedMetadata<ValueType> MetadataT;
+        using MetadataT = TypedMetadata<ValueType>;
         result = Metadata::createMetadata(valueType());
         if (result->typeName() == MetadataT::staticTypeName()) {
             MetadataT* m = static_cast<MetadataT*>(result.get());
@@ -2060,7 +2055,7 @@ inline void
 Tree<RootNodeType>::visit2(OtherTreeType& other, VisitorOp& op)
 {
     this->clearAllAccessors();
-    typedef typename OtherTreeType::RootNodeType OtherRootNodeType;
+    using OtherRootNodeType = typename OtherTreeType::RootNodeType;
     mRoot.template visit2<OtherRootNodeType, VisitorOp>(other.root(), op);
 }
 
@@ -2070,7 +2065,7 @@ template<typename OtherTreeType, typename VisitorOp>
 inline void
 Tree<RootNodeType>::visit2(OtherTreeType& other, VisitorOp& op) const
 {
-    typedef typename OtherTreeType::RootNodeType OtherRootNodeType;
+    using OtherRootNodeType = typename OtherTreeType::RootNodeType;
     mRoot.template visit2<OtherRootNodeType, VisitorOp>(other.root(), op);
 }
 
@@ -2083,7 +2078,7 @@ inline void
 Tree<RootNodeType>::visit2(OtherTreeType& other, const VisitorOp& op)
 {
     this->clearAllAccessors();
-    typedef typename OtherTreeType::RootNodeType OtherRootNodeType;
+    using OtherRootNodeType = typename OtherTreeType::RootNodeType;
     mRoot.template visit2<OtherRootNodeType, const VisitorOp>(other.root(), op);
 }
 
@@ -2095,7 +2090,7 @@ template<typename OtherTreeType, typename VisitorOp>
 inline void
 Tree<RootNodeType>::visit2(OtherTreeType& other, const VisitorOp& op) const
 {
-    typedef typename OtherTreeType::RootNodeType OtherRootNodeType;
+    using OtherRootNodeType = typename OtherTreeType::RootNodeType;
     mRoot.template visit2<OtherRootNodeType, const VisitorOp>(other.root(), op);
 }
 
@@ -2107,7 +2102,7 @@ template<typename RootNodeType>
 inline const Name&
 Tree<RootNodeType>::treeType()
 {
-    if (sTreeTypeName == NULL) {
+    if (sTreeTypeName == nullptr) {
         std::vector<Index> dims;
         Tree::getNodeLog2Dims(dims);
         std::ostringstream ostr;
@@ -2116,7 +2111,7 @@ Tree<RootNodeType>::treeType()
             ostr << "_" << dims[i];
         }
         Name* s = new Name(ostr.str());
-        if (sTreeTypeName.compare_and_swap(s, NULL) != NULL) delete s;
+        if (sTreeTypeName.compare_and_swap(s, nullptr) != nullptr) delete s;
     }
     return *sTreeTypeName;
 }
@@ -2272,7 +2267,7 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
 
 #ifndef OPENVDB_2_ABI_COMPATIBLE
         if (it.getLevel() == 0) {
-            const LeafNodeType* leaf = NULL;
+            const LeafNodeType* leaf = nullptr;
             it.getNode(leaf);
             if (leaf && !leaf->isAllocated()) ++unallocatedLeafCount;
         }

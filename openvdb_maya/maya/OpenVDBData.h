@@ -28,6 +28,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+/// @file OpenVDBData.h
 /// @author FX R&D OpenVDB team
 
 
@@ -65,14 +66,14 @@ public:
     /// @brief clears this container and duplicates the @c rhs grid container.
     void duplicate(const OpenVDBData& rhs);
 
-    /// @brief adds the given grid at the end of the grid container.
-    void insert(const openvdb::GridBase::Ptr&);
-
-    /// @brief adds a shallow-copy of the given grid at the end of the grid container.
+    /// @brief Append the given grid to this container.
+    void insert(const openvdb::GridBase::ConstPtr&);
+    /// @brief Append a shallow copy of the given grid to this container.
     void insert(const openvdb::GridBase&);
-
-    /// @brief adds shallow-copies of the given grids at the end of the grid container.
+    /// @brief Append shallow copies of the given grids to this container.
     void insert(const openvdb::GridPtrVec&);
+    /// @brief Append shallow copies of the given grids to this container.
+    void insert(const openvdb::GridCPtrVec&);
 
 
     void write(const openvdb::io::File& file,
@@ -80,7 +81,7 @@ public:
 
 
     /// @{
-    /// required maya interface methods
+    // required maya interface methods
     static void* creator();
 
     virtual MStatus readASCII(const MArgList&, unsigned&);
@@ -98,7 +99,7 @@ public:
     /// @}
 
 private:
-    openvdb::GridPtrVecPtr mGrids;
+    openvdb::GridCPtrVec mGrids;
 };
 
 

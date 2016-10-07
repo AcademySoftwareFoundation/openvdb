@@ -99,6 +99,15 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_INT_J, "seed", "Random Seed")
         .setDefault(PRMzeroDefaults));
 
+    // Spread           
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "spread", "Spread")
+        .setDefault(PRMoneDefaults)
+        .setHelpText("Defines how far each point may be displaced from the center "
+              "of its voxel or tile. A value of zero means that the point is "
+              "placed exactly at the center. A value of one means that the "
+              "point can be placed randomly anywhere inside the voxel or tile.")
+        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_RESTRICTED, 1.0));
+
     parms.add(hutil::ParmFactory(PRM_SEPARATOR, "sep1", ""));
 
     // Mode for point scattering
@@ -271,6 +280,7 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
         gdp->clearAndDestroy();
 
         const int seed = evalInt("seed", /*idx=*/0, time);
+        const double spread = evalFloat("spread", 0, time);
         const bool verbose   = evalInt("verbose", /*idx=*/0, time) != 0;
         const openvdb::Index64 pointCount = evalInt("count", 0, time);
         const float density  = static_cast<float>(evalFloat("density", 0, time));
@@ -315,7 +325,7 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
             if (pmode == 0) { // fixed point count
 
                 openvdb::tools::UniformPointScatter<PointAccessor, RandGen, hvdb::Interrupter>
-                    scatter(points, pointCount, mtRand, &boss);
+                    scatter(points, pointCount, mtRand, spread, &boss);
 
                 if (interior && isSignedDistance) {
                     processLSInterior(gridType, grid, scatter);
@@ -329,7 +339,7 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
 
                 if (evalInt("multiply", 0, time) != 0) { // local density
                     openvdb::tools::NonUniformPointScatter<PointAccessor,RandGen,hvdb::Interrupter>
-                        scatter(points, density, mtRand, &boss);
+                        scatter(points, density, mtRand, spread, &boss);
 
 
                     if (interior && isSignedDistance) {
@@ -346,7 +356,7 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
 
                 } else { // global density
                     openvdb::tools::UniformPointScatter<PointAccessor, RandGen, hvdb::Interrupter>
-                        scatter(points, density, mtRand, &boss);
+                        scatter(points, density, mtRand, spread, &boss);
 
                     if (interior && isSignedDistance) {
                         processLSInterior(gridType, grid, scatter);
@@ -360,7 +370,7 @@ SOP_OpenVDB_Scatter::cookMySop(OP_Context& context)
             } else if (pmode == 2) { // points per voxel
 
                 openvdb::tools::DenseUniformPointScatter<PointAccessor, RandGen, hvdb::Interrupter>
-                    scatter(points, ptsPerVox, mtRand, &boss);
+                    scatter(points, ptsPerVox, mtRand, spread, &boss);
 
                 if (interior && isSignedDistance) {
                     processLSInterior(gridType, grid, scatter);

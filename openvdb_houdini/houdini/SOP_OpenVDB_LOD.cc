@@ -32,8 +32,7 @@
 ///
 /// @author FX R&D OpenVDB team
 ///
-/// @brief Produces a sequences of progressively lower resolution grids.
-
+/// @brief Generate one or more levels of a volume mipmap.
 
 #include <houdini_utils/ParmFactory.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
@@ -86,14 +85,17 @@ newSopOperator(OP_OperatorTable* table)
         };
 
         parms.add(hutil::ParmFactory(PRM_ORD, "lod", "LOD Mode")
-                  .setDefault(PRMzeroDefaults)
-                  .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+            .setDefault(PRMzeroDefaults)
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
 
+
+
     parms.add(hutil::ParmFactory(PRM_FLT_J, "level", "Level")
-              .setDefault(PRMoneDefaults)
-              .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 10.0)
-              .setHelpText("Specify what floating-point level to produce."));
+        .setDefault(PRMoneDefaults)
+        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 10.0)
+        .setHelpText("Specify which level to produce.\n"
+            "Level 0 is the highest-resolution level."));
 
     {
         std::vector<fpreal> defaultRange;
@@ -102,23 +104,25 @@ newSopOperator(OP_OperatorTable* table)
         defaultRange.push_back(fpreal(1.0)); // step
 
         parms.add(hutil::ParmFactory(PRM_FLT_J, "range", "Range")
-                  .setDefault(defaultRange)
-                  .setVectorSize(3)
-                  .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 10.0)
-                  .setHelpText("Specify the inclusive range [start, end, step]"));
+            .setDefault(defaultRange)
+            .setVectorSize(3)
+            .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_UI, 10.0)
+            .setHelpText("Specify the inclusive range [start, end, step]"));
     }
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "count", "Count")
-              .setDefault(PRMtwoDefaults)
-              .setRange(PRM_RANGE_RESTRICTED, 2, PRM_RANGE_UI, 10)
-              .setHelpText("Number of leves in the LOD pyramid. Each level is a power of two smaller than the previous."));
+        .setDefault(PRMtwoDefaults)
+        .setRange(PRM_RANGE_RESTRICTED, 2, PRM_RANGE_UI, 10)
+        .setHelpText("Number of levels\n"
+            "Each level is half the resolution of the previous level."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "reuse", "Preserve Grid Names")
-              .setHelpText("Reuse the name of the input VDB grid. Only available when a single Level is generated.")
-              .setDefault(PRMzeroDefaults));
+        .setHelpText("Reuse the name of the input VDB grid.\n"
+            "Only available when a single Level is generated.")
+        .setDefault(PRMzeroDefaults));
 
     hvdb::OpenVDBOpFactory("OpenVDB LOD", SOP_OpenVDB_LOD::factory, parms, *table)
-              .addInput("VDBs");
+        .addInput("VDBs");
 }
 
 
@@ -155,7 +159,9 @@ SOP_OpenVDB_LOD::SOP_OpenVDB_LOD(OP_Network* net,
 {
 }
 
+
 ////////////////////////////////////////
+
 
 namespace {
 
@@ -233,8 +239,8 @@ isValidRange(float start, float end, float step)
     return !(start > end);
 }
 
-
 }//unnamed namespace
+
 
 ////////////////////////////////////////
 
@@ -341,7 +347,6 @@ SOP_OpenVDB_LOD::cookMySop(OP_Context& context)
         } else {
             addError(SOP_MESSAGE, "Invalid LOD option.");
         }
-
 
         if (!skipped.empty()) {
             addWarning(SOP_MESSAGE, ("Unable to process grid(s): " +

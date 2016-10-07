@@ -1,6 +1,75 @@
 OpenVDB Version History
 =======================
 
+Version 4.0.0 - In development
+
+    Highlights:
+    - Introduced some C++11 constructs.  A C++11-compatible compiler
+      is now required.
+    - Vector-valued grids are now much faster to construct and destroy.
+
+      This change and other changes in this release (see "ABI changes" below)
+      alter the grid ABI so that it is incompatible with earlier versions
+      of the OpenVDB library, such as the ones in Houdini 15.0 and 15.5.
+      Define the macro OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
+      to disable these changes and preserve ABI compatibility.
+
+    New features:
+    - Added an option to the point scattering tools to specify how far
+      each point may be displaced from the center of its host voxel or tile.
+    - Added a toggle to tools::clip() to invert the clipping mask.
+
+    Improvements:
+    - Vector-valued grids are now much faster to construct and destroy.
+    - Changed math::Coord's data representation to facilitate C++11
+      uniform initialization.
+    - Made many small changes to address type conversion and other warnings
+      reported by newer compilers, including Clang 3.8.
+
+    Bug fixes:
+    - Fixed a bug that caused topology operations (union, intersection
+      and difference) on MaskGrids to sometimes produce incorrect results.
+      (MaskGrids are used internally in a number of tools.)
+    - Changed GridBase::copyGrid() and Grid::copy() to close
+      const-correctness holes.
+
+    ABI changes:
+    - Added a NodeUnion template specialization for non-POD value types
+      that significantly expedites construction and destruction
+      of vector-valued grids.
+    - Changed math::Coord's internal data representation.
+    - Replaced occurrences of boost::shared_ptr with std::shared_ptr.
+    - Changed GridBase::copyGrid() and Grid::copy() to close
+      const-correctness holes.
+
+    API changes:
+    - Introduced some C++11 constructs.  A C++11-compatible compiler
+      is now required.
+    - Added a parameter to the point scattering tools that controls the
+      displacement of each point from the center of its host voxel or tile.
+      The default behavior, as before, is to allow each point to be placed
+      (randomly) anywhere within its voxel or tile.
+    - Renamed LeafManager::getPreFixSum() to LeafManager::getPrefixSum().
+    - Dropped the CopyPolicy enum and added GridBase::copyGridWithNewTree()
+      and Grid::copyWithNewTree() in order to close const-correctness holes
+      that allowed newly-constructed, non-const grids to share their trees
+      with existing const grids.  (Where that behavior is still required,
+      use a ConstPtrCast.)
+
+    Houdini:
+    - Certain changes in this release (see "ABI changes" above) alter
+      the grid ABI so that it is incompatible with earlier versions of
+      the OpenVDB library, such as the ones in Houdini 15.0 and 15.5.
+      Define the macro OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
+      to disable these changes and preserve ABI compatibility.
+    - Introduced some C++11 constructs that are incompatible with
+      versions of Houdini older than 15.0.
+    - Added a toggle to the Clip SOP to invert the clipping mask.
+    - Added a slider to the Scatter SOP to specify how far each point
+      may be displaced from the center of its host voxel or tile.
+      
+
+
 Version 3.2.0 - August 10, 2016
 
     Highlights:
@@ -40,15 +109,14 @@ Version 3.2.0 - August 10, 2016
       of arbitrary type.
     - Added tools::LevelSetPlatonic a new tool that produces narrow-band
       level sets of the five Platonic solids.
-    - Added tools::extractIsosurfaceMask() which masks voxels that intersect the
-      implicit surface defined by the given isovalue.
+    - Added tools::extractIsosurfaceMask() which masks voxels that intersect
+      the implicit surface defined by the given isovalue.
     - Added tree::LeafManager::getPreFixSum() for user-managed external buffers.
     - Added tools::Dense::print().
     - Added the math::CoordBBox::Iterator class to conveniently iterate over
       coordinates covered a CoordBBox.
-    - Added bit-wise operations to the CoordBBox class.
-    - New component wise constructor for the math::CoordBBox class as well as the
-      method math::CoordBBox::getCornerPoints.
+    - Added bit-wise operations, a component-wise constructor, and a
+      getCornerPoints() method to the CoordBBox class.
     - Added a new LeafManager constructor to create the structure from an
       existing array of leafnodes.
     - Added the templated math::MinMax class to compute the extrema of
@@ -62,7 +130,8 @@ Version 3.2.0 - August 10, 2016
     - Improved the performance, parallel scaling and memory usage,
       of tools::LevelSetFracture and updated to use the new segmentSDF scheme.
     - Improved the performance of tools::LevelSetAdvection by up to five times.
-    - Improved the performance of Tree::voxelizeActiveTiles by means of multi-threading.
+    - Improved the performance of Tree::voxelizeActiveTiles by means of
+      multithreading.
     - Improved the performance of tools::meshToVolume(), particularly for
       large narrow-band widths and for signed distance fields with dense
       interior regions.
@@ -80,9 +149,10 @@ Version 3.2.0 - August 10, 2016
       math::Mat3::setColumns Mat3::setColumns, and
       math::Mat4::setColumns.
     - Added util::NodeMask::isConstant method for faster bit processing.
-    - tools::Prune performs an improved estimate of tile values by means of medians.
-    - Added toggle to switch between cell centered and node centered transforms to
-      tools::PointPartitioner.
+    - For better robustness, tools::Prune now uses the median of voxel values
+      when replacing voxels with a tile.
+    - Added a toggle to tools::PointPartitioner to select between
+      cell-centered and node-centered transforms.
 
     Bug fixes:
     - Fixed a bug in tools::LevelSetAdvection that could cause
@@ -185,11 +255,6 @@ Version 3.2.0 - August 10, 2016
       count along an axis or the voxel size in world units (the only option
       in the past).
 
-    Known issues:
-    - A vector Grid/Tree (or any Grid/Tree with a non-POD ValueType) is known to 
-      be slow to construct and delete! This performance issue is easy to fix, but 
-      since it introduces an ABI incompatibility it will have to go in a future
-      major release (most likely v4.0).
 
 Version 3.1.0 - October 1, 2015
 

@@ -97,7 +97,7 @@ fillWithSpheres(
     float maxRadius = std::numeric_limits<float>::max(),
     float isovalue = 0.0,
     int instanceCount = 10000,
-    InterrupterT* interrupter = NULL);
+    InterrupterT* interrupter = nullptr);
 
 
 /// @brief  @c fillWithSpheres method variant that automatically infers
@@ -150,7 +150,7 @@ public:
     /// @param interrupter      a pointer adhering to the util::NullInterrupter interface.
     ///
     template<typename InterrupterT>
-    void initialize(const GridT& grid, float isovalue = 0.0, InterrupterT* interrupter = NULL);
+    void initialize(const GridT& grid, float isovalue = 0.0, InterrupterT* interrupter = nullptr);
 
 
     /// @brief  @c initialize method variant that automatically infers
@@ -722,7 +722,6 @@ fillWithSpheres(
     typedef typename GridT::ValueType ValueT;
 
     typedef typename TreeT::template ValueConverter<bool>::Type     BoolTreeT;
-    typedef typename TreeT::template ValueConverter<Index32>::Type  Index32TreeT;
     typedef typename TreeT::template ValueConverter<Int16>::Type    Int16TreeT;
 
     typedef boost::mt11213b RandGen;
@@ -752,7 +751,7 @@ fillWithSpheres(
         internal::PointAccessor ptnAcc(instancePoints);
 
         UniformPointScatter<internal::PointAccessor, RandGen, InterrupterT> scatter(
-            ptnAcc, Index64(addNBPoints ? (instances / 2) : instances), mtRand, interrupter);
+            ptnAcc, Index64(addNBPoints ? (instances / 2) : instances), mtRand, 1.0, interrupter);
 
         scatter(*interiorMaskPtr);
     }
@@ -774,7 +773,9 @@ fillWithSpheres(
             for (it = leafIt->cbeginValueOn(); it; ++it) {
 
                 const int flags = int(it.getValue());
-                if (!(volume_to_mesh_internal::EDGES & flags) && (volume_to_mesh_internal::INSIDE & flags)) {
+                if (!(volume_to_mesh_internal::EDGES & flags)
+                    && (volume_to_mesh_internal::INSIDE & flags))
+                {
                     instancePoints.push_back(transform.indexToWorld(it.getCoord()));
                 }
 
@@ -852,7 +853,7 @@ template<typename GridT>
 void
 ClosestSurfacePoint<GridT>::initialize(const GridT& grid, float isovalue)
 {
-    initialize<GridT, util::NullInterrupter>(grid, isovalue, NULL);
+    initialize<GridT, util::NullInterrupter>(grid, isovalue, nullptr);
 }
 
 
@@ -863,10 +864,8 @@ ClosestSurfacePoint<GridT>::initialize(
     const GridT& grid, float isovalue, InterrupterT* interrupter)
 {
     mIsInitialized = false;
-    typedef tree::LeafManager<const TreeT>      LeafManagerT;
-    typedef tree::LeafManager<Index32TreeT>     Index32LeafManagerT;
-    typedef tree::LeafManager<Int16TreeT>       Int16LeafManagerT;
-    typedef typename GridT::ValueType ValueT;
+    typedef tree::LeafManager<Index32TreeT> Index32LeafManagerT;
+    typedef typename GridT::ValueType       ValueT;
 
     const TreeT& tree = grid.tree();
     const math::Transform& transform = grid.transform();
@@ -878,7 +877,8 @@ ClosestSurfacePoint<GridT>::initialize(
 
         BoolTreeT mask(false);
         volume_to_mesh_internal::identifySurfaceIntersectingVoxels(mask, tree, ValueT(isovalue));
-        volume_to_mesh_internal::computeAuxiliaryData(*mSignTreePt, *mIdxTreePt, mask, tree, ValueT(isovalue));
+        volume_to_mesh_internal::computeAuxiliaryData(
+            *mSignTreePt, *mIdxTreePt, mask, tree, ValueT(isovalue));
 
         if (interrupter && interrupter->wasInterrupted()) return;
 
@@ -914,9 +914,9 @@ ClosestSurfacePoint<GridT>::initialize(
         std::vector<Index32LeafNodeType*> pointIndexLeafNodes;
         mIdxTreePt->getNodes(pointIndexLeafNodes);
 
-        tbb::parallel_for(auxiliaryLeafNodeRange,
-            volume_to_mesh_internal::ComputePoints<TreeT>(mSurfacePointList.get(), tree, pointIndexLeafNodes,
-                signFlagsLeafNodes, leafNodeOffsets, transform, ValueT(isovalue)));
+        tbb::parallel_for(auxiliaryLeafNodeRange, volume_to_mesh_internal::ComputePoints<TreeT>(
+            mSurfacePointList.get(), tree, pointIndexLeafNodes,
+            signFlagsLeafNodes, leafNodeOffsets, transform, ValueT(isovalue)));
     }
 
     if (interrupter && interrupter->wasInterrupted()) return;
@@ -941,7 +941,8 @@ ClosestSurfacePoint<GridT>::initialize(
     typedef typename Index32TreeT::RootNodeType Index32RootNodeT;
     typedef typename Index32RootNodeT::NodeChainType Index32NodeChainT;
     BOOST_STATIC_ASSERT(boost::mpl::size<Index32NodeChainT>::value > 1);
-    typedef typename boost::mpl::at<Index32NodeChainT, boost::mpl::int_<1> >::type Index32InternalNodeT;
+    typedef typename boost::mpl::at<Index32NodeChainT, boost::mpl::int_<1> >::type
+        Index32InternalNodeT;
 
     typename Index32TreeT::NodeCIter nIt = mIdxTreePt->cbeginNode();
     nIt.setMinDepth(Index32TreeT::NodeCIter::LEAF_DEPTH - 1);
@@ -949,7 +950,7 @@ ClosestSurfacePoint<GridT>::initialize(
 
     std::vector<const Index32InternalNodeT*> internalNodes;
 
-    const Index32InternalNodeT* node = NULL;
+    const Index32InternalNodeT* node = nullptr;
     for (; nIt; ++nIt) {
         nIt.getNode(node);
         if (node) internalNodes.push_back(node);

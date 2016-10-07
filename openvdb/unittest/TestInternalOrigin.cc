@@ -65,7 +65,7 @@ TestInternalOrigin::test()
     FloatTree4 tree(0.0f);
     std::set<openvdb::Coord>::iterator iter=indices.begin();
     for (int n = 0; iter != indices.end(); ++n, ++iter) {
-        tree.setValue(*iter, float(1.0 + float(n) * 0.5f));
+        tree.setValue(*iter, float(1.0 + double(n) * 0.5));
     }
 
     openvdb::Coord C3, G;

@@ -38,7 +38,14 @@
 #include <openvdb/util/logging.h>
 
 // Boost.Interprocess uses a header-only portion of Boost.DateTime
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-macros"
+#endif
 #define BOOST_DATE_TIME_NO_LIB
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 #include <boost/interprocess/file_mapping.hpp>
 #include <boost/interprocess/mapped_region.hpp>
 #include <boost/iostreams/device/array.hpp>
@@ -136,7 +143,7 @@ StreamState::StreamState(): magicNumber(std::ios_base::xalloc())
         }
     }
 
-    if (existingArray >= 0 && std::cout.pword(existingArray) != NULL) {
+    if (existingArray >= 0 && std::cout.pword(existingArray) != nullptr) {
         // If a lower-numbered entry was found to contain the magic number,
         // a coexisting version of this library must have registered it.
         // In that case, the corresponding pointer should point to an existing
@@ -184,7 +191,7 @@ StreamState::~StreamState()
 {
     // Ensure that this StreamState struct can no longer be accessed.
     std::cout.iword(magicNumber) = 0;
-    std::cout.pword(magicNumber) = NULL;
+    std::cout.pword(magicNumber) = nullptr;
 }
 
 } // unnamed namespace
@@ -200,7 +207,7 @@ struct StreamMetadata::Impl
         , mLibraryVersion(OPENVDB_LIBRARY_MAJOR_VERSION, OPENVDB_LIBRARY_MINOR_VERSION)
         , mCompression(COMPRESS_NONE)
         , mGridClass(GRID_UNKNOWN)
-        , mBackgroundPtr(NULL)
+        , mBackgroundPtr(nullptr)
         , mHalfFloat(false)
         , mWriteGridStats(false)
     {
@@ -423,7 +430,7 @@ public:
 
         if (void* fh = open_existing_file(filename, boost::interprocess::read_only)) {
             struct { unsigned long lo, hi; } mtime; // Windows FILETIME struct
-            if (GetFileTime(fh, NULL, NULL, &mtime)) {
+            if (GetFileTime(fh, nullptr, nullptr, &mtime)) {
                 result = (Index64(mtime.hi) << 32) | mtime.lo;
             }
             close_file(fh);
@@ -469,7 +476,7 @@ MappedFile::filename() const
 }
 
 
-boost::shared_ptr<std::streambuf>
+SharedPtr<std::streambuf>
 MappedFile::createBuffer() const
 {
     if (!mImpl->mAutoDelete && mImpl->mLastWriteTime > 0) {
@@ -482,9 +489,9 @@ MappedFile::createBuffer() const
         }
     }
 
-    return boost::shared_ptr<std::streambuf>(
-        new boost::iostreams::stream_buffer<boost::iostreams::array_source>(
-            static_cast<const char*>(mImpl->mRegion.get_address()), mImpl->mRegion.get_size()));
+    return SharedPtr<std::streambuf>{
+        new boost::iostreams::stream_buffer<boost::iostreams::array_source>{
+            static_cast<const char*>(mImpl->mRegion.get_address()), mImpl->mRegion.get_size()}};
 }
 
 
@@ -498,7 +505,7 @@ MappedFile::setNotifier(const Notifier& notifier)
 void
 MappedFile::clearNotifier()
 {
-    mImpl->mNotifier.clear();
+    mImpl->mNotifier = nullptr;
 }
 
 
@@ -716,7 +723,8 @@ Archive::setGridCompression(std::ostream& os, const GridBase& grid) const
             // ZLIB compression is not used on level sets or fog volumes.
             c = c & ~COMPRESS_ZIP;
             break;
-        default:
+        case GRID_STAGGERED:
+        case GRID_UNKNOWN:
             break;
     }
     io::setDataCompression(os, c);
@@ -855,7 +863,7 @@ StreamMetadata::Ptr
 clearStreamMetadataPtr(std::ios_base& strm)
 {
     StreamMetadata::Ptr result = getStreamMetadataPtr(strm);
-    strm.pword(sStreamState.metadata) = NULL;
+    strm.pword(sStreamState.metadata) = nullptr;
     return result;
 }
 
@@ -966,7 +974,7 @@ Archive::writeHeader(std::ostream& os, bool seekable) const
 
     // 6) Generate a new random 16-byte (128-bit) uuid and write it to the stream.
     boost::mt19937 ran;
-    ran.seed(static_cast<boost::mt19937::result_type>(time(NULL)));
+    ran.seed(static_cast<boost::mt19937::result_type>(time(nullptr)));
     boost::uuids::basic_random_generator<boost::mt19937> gen(&ran);
     mUuid = gen(); // mUuid is mutable
     os << mUuid;
@@ -1026,7 +1034,7 @@ Archive::isDelayedLoadingEnabled()
 #ifdef OPENVDB_2_ABI_COMPATIBLE
     return false;
 #else
-    return (NULL == std::getenv("OPENVDB_DISABLE_DELAYED_LOAD"));
+    return (nullptr == std::getenv("OPENVDB_DISABLE_DELAYED_LOAD"));
 #endif
 }
 
@@ -1073,7 +1081,7 @@ doReadGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is, const
     io::setStreamMetadataPtr(is, streamMetadata, /*transfer=*/false);
 
     io::setGridClass(is, GRID_UNKNOWN);
-    io::setGridBackgroundValuePtr(is, NULL);
+    io::setGridBackgroundValuePtr(is, nullptr);
 
     grid->readMeta(is);
 
@@ -1295,9 +1303,9 @@ Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
         grid->writeMeta(os);
     } else {
         // Compute and add grid statistics metadata.
-        GridBase::Ptr copyOfGrid = grid->copyGrid(); // shallow copy
-        copyOfGrid->addStatsMetadata();
-        copyOfGrid->insertMeta(GridBase::META_FILE_COMPRESSION,
+        const auto copyOfGrid = grid->copyGrid(); // shallow copy
+        ConstPtrCast<GridBase>(copyOfGrid)->addStatsMetadata();
+        ConstPtrCast<GridBase>(copyOfGrid)->insertMeta(GridBase::META_FILE_COMPRESSION,
             StringMetadata(compressionToString(getDataCompression(os))));
         copyOfGrid->writeMeta(os);
     }

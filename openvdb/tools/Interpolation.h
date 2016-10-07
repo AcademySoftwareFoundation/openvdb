@@ -27,7 +27,7 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @file Interpolation.h
 ///
 /// Sampler classes such as PointSampler and BoxSampler that are intended for use
@@ -67,14 +67,14 @@
 #ifndef OPENVDB_TOOLS_INTERPOLATION_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_INTERPOLATION_HAS_BEEN_INCLUDED
 
-#include <cmath>
-#include <boost/shared_ptr.hpp>
 #include <openvdb/version.h> // for OPENVDB_VERSION_NAME
 #include <openvdb/Platform.h> // for round()
 #include <openvdb/math/Math.h>// for SmoothUnitStep
 #include <openvdb/math/Transform.h> // for Transform
 #include <openvdb/Grid.h>
 #include <openvdb/tree/ValueAccessor.h>
+#include <cmath>
+#include <type_traits>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -89,7 +89,7 @@ namespace tools {
 template <size_t Order, bool Staggered = false>
 struct Sampler
 {
-    BOOST_STATIC_ASSERT(Order < 3);
+    static_assert(Order < 3, "Samplers of order higher than 2 are not supported");
     static const char* name();
     static int radius();
     static bool mipmap();
@@ -165,7 +165,7 @@ struct BoxSampler
     static typename TreeT::ValueType sample(const TreeT& inTree, const Vec3R& inCoord);
 
     /// @brief Import all eight values from @a inTree to support
-    /// tri-linear interpolation. 
+    /// tri-linear interpolation.
     template<class ValueT, class TreeT, size_t N>
     static inline void getValues(ValueT (&data)[N][N][N], const TreeT& inTree, Coord ijk);
 
@@ -310,11 +310,11 @@ template<typename GridOrTreeType, typename SamplerType>
 class GridSampler
 {
 public:
-    typedef boost::shared_ptr<GridSampler>                      Ptr;
-    typedef typename GridOrTreeType::ValueType                  ValueType;
-    typedef typename TreeAdapter<GridOrTreeType>::GridType      GridType;
-    typedef typename TreeAdapter<GridOrTreeType>::TreeType      TreeType;
-    typedef typename TreeAdapter<GridOrTreeType>::AccessorType  AccessorType;
+    using Ptr = SharedPtr<GridSampler>;
+    using ValueType = typename GridOrTreeType::ValueType;
+    using GridType = typename TreeAdapter<GridOrTreeType>::GridType;
+    using TreeType = typename TreeAdapter<GridOrTreeType>::TreeType;
+    using AccessorType = typename TreeAdapter<GridOrTreeType>::AccessorType;
 
      /// @param grid  a grid to be sampled
     explicit GridSampler(const GridType& grid)
@@ -392,11 +392,11 @@ template<typename TreeT, typename SamplerType>
 class GridSampler<tree::ValueAccessor<TreeT>, SamplerType>
 {
 public:
-    typedef boost::shared_ptr<GridSampler>      Ptr;
-    typedef typename TreeT::ValueType           ValueType;
-    typedef TreeT                               TreeType;
-    typedef Grid<TreeType>                      GridType;
-    typedef typename tree::ValueAccessor<TreeT> AccessorType;
+    using Ptr = SharedPtr<GridSampler>;
+    using ValueType = typename TreeT::ValueType;
+    using TreeType = TreeT;
+    using GridType = Grid<TreeType>;
+    using AccessorType = typename tree::ValueAccessor<TreeT>;
 
     /// @param acc  a ValueAccessor to be sampled
     /// @param transform is used when sampling world space locations.
@@ -472,10 +472,10 @@ template<typename GridOrTreeT,
 class DualGridSampler
 {
 public:
-    typedef typename GridOrTreeT::ValueType               ValueType;
-    typedef typename TreeAdapter<GridOrTreeT>::GridType   GridType;
-    typedef typename TreeAdapter<GridOrTreeT>::TreeType   TreeType;
-    typedef typename TreeAdapter<GridType>::AccessorType  AccessorType;
+    using ValueType = typename GridOrTreeT::ValueType;
+    using GridType = typename TreeAdapter<GridOrTreeT>::GridType;
+    using TreeType = typename TreeAdapter<GridOrTreeT>::TreeType;
+    using AccessorType = typename TreeAdapter<GridType>::AccessorType;
 
     /// @brief Grid and transform constructor.
     /// @param sourceGrid Source grid.
@@ -524,10 +524,10 @@ template<typename TreeT,
 class DualGridSampler<tree::ValueAccessor<TreeT>, SamplerT>
 {
     public:
-    typedef typename TreeT::ValueType ValueType;
-    typedef TreeT                     TreeType;
-    typedef Grid<TreeType>            GridType;
-    typedef typename tree::ValueAccessor<TreeT> AccessorType;
+    using ValueType = typename TreeT::ValueType;
+    using TreeType = TreeT;
+    using GridType = Grid<TreeType>;
+    using AccessorType = typename tree::ValueAccessor<TreeT>;
 
     /// @brief ValueAccessor and transform constructor.
     /// @param sourceAccessor ValueAccessor into the source grid.
@@ -570,11 +570,12 @@ template <typename GridT,
 class AlphaMask
 {
 public:
-    BOOST_STATIC_ASSERT(boost::is_floating_point<FloatT>::value);
-    typedef GridT    GridType;
-    typedef MaskT    MaskType;
-    typedef SamplerT SamlerType;
-    typedef FloatT   FloatType;
+    static_assert(std::is_floating_point<FloatT>::value,
+        "AlphaMask requires a floating-point value type");
+    using GridType = GridT;
+    using MaskType = MaskT;
+    using SamlerType = SamplerT;
+    using FloatType = FloatT;
 
     AlphaMask(const GridT& grid, const MaskT& mask, FloatT min, FloatT max, bool invert)
         : mAcc(mask.tree())
@@ -595,7 +596,7 @@ public:
     }
 
 protected:
-    typedef typename MaskType::ConstAccessor AccT;
+    using AccT = typename MaskType::ConstAccessor;
     AccT mAcc;
     tools::DualGridSampler<AccT, SamplerT> mSampler;
     const FloatT mMin, mInvNorm;
@@ -762,7 +763,7 @@ inline bool
 BoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
                    typename TreeT::ValueType& result)
 {
-    typedef typename TreeT::ValueType ValueT;
+    using ValueT = typename TreeT::ValueType;
 
     const Vec3i inIdx = local_util::floorVec3(inCoord);
     const Vec3R uvw = inCoord - inIdx;
@@ -783,7 +784,7 @@ template<class TreeT>
 inline typename TreeT::ValueType
 BoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 {
-    typedef typename TreeT::ValueType ValueT;
+    using ValueT = typename TreeT::ValueType;
 
     const Vec3i inIdx = local_util::floorVec3(inCoord);
     const Vec3R uvw = inCoord - inIdx;
@@ -793,7 +794,7 @@ BoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
     ValueT data[2][2][2];
 
     BoxSampler::getValues(data, inTree, Coord(inIdx));
-   
+
     return BoxSampler::trilinearInterpolation(data, uvw);
 }
 
@@ -849,7 +850,7 @@ inline bool
 QuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
     typename TreeT::ValueType& result)
 {
-    typedef typename TreeT::ValueType ValueT;
+    using ValueT = typename TreeT::ValueType;
 
     const Vec3i inIdx = local_util::floorVec3(inCoord), inLoIdx = inIdx - Vec3i(1, 1, 1);
     const Vec3R uvw = inCoord - inIdx;
@@ -875,7 +876,7 @@ template<class TreeT>
 inline typename TreeT::ValueType
 QuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 {
-    typedef typename TreeT::ValueType ValueT;
+    using ValueT = typename TreeT::ValueType;
 
     const Vec3i inIdx = local_util::floorVec3(inCoord), inLoIdx = inIdx - Vec3i(1, 1, 1);
     const Vec3R uvw = inCoord - inIdx;
@@ -903,7 +904,7 @@ inline bool
 StaggeredPointSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
                               typename TreeT::ValueType& result)
 {
-    typedef typename TreeT::ValueType ValueType;
+    using ValueType = typename TreeT::ValueType;
 
     ValueType tempX, tempY, tempZ;
     bool active = false;
@@ -923,7 +924,7 @@ template<class TreeT>
 inline typename TreeT::ValueType
 StaggeredPointSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 {
-    typedef typename TreeT::ValueType ValueT;
+    using ValueT = typename TreeT::ValueType;
 
     const ValueT tempX = PointSampler::sample<TreeT>(inTree, inCoord + Vec3R(0.5, 0.0, 0.0));
     const ValueT tempY = PointSampler::sample<TreeT>(inTree, inCoord + Vec3R(0.0, 0.5, 0.0));
@@ -941,7 +942,7 @@ inline bool
 StaggeredBoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
                             typename TreeT::ValueType& result)
 {
-    typedef typename TreeT::ValueType ValueType;
+    using ValueType = typename TreeT::ValueType;
 
     ValueType tempX, tempY, tempZ;
     tempX = tempY = tempZ = zeroVal<ValueType>();
@@ -962,7 +963,7 @@ template<class TreeT>
 inline typename TreeT::ValueType
 StaggeredBoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 {
-    typedef typename TreeT::ValueType ValueT;
+    using ValueT = typename TreeT::ValueType;
 
     const ValueT tempX = BoxSampler::sample<TreeT>(inTree, inCoord + Vec3R(0.5, 0.0, 0.0));
     const ValueT tempY = BoxSampler::sample<TreeT>(inTree, inCoord + Vec3R(0.0, 0.5, 0.0));
@@ -980,7 +981,7 @@ inline bool
 StaggeredQuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
     typename TreeT::ValueType& result)
 {
-    typedef typename TreeT::ValueType ValueType;
+    using ValueType = typename TreeT::ValueType;
 
     ValueType tempX, tempY, tempZ;
     bool active = false;
@@ -1000,7 +1001,7 @@ template<class TreeT>
 inline typename TreeT::ValueType
 StaggeredQuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 {
-    typedef typename TreeT::ValueType ValueT;
+    using ValueT = typename TreeT::ValueType;
 
     const ValueT tempX = QuadraticSampler::sample<TreeT>(inTree, inCoord + Vec3R(0.5, 0.0, 0.0));
     const ValueT tempY = QuadraticSampler::sample<TreeT>(inTree, inCoord + Vec3R(0.0, 0.5, 0.0));

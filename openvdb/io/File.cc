@@ -27,15 +27,15 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
-/// @file File.cc
+
+/// @file io/File.cc
 
 #include "File.h"
 
 #include "TempFile.h"
 #include <openvdb/Exceptions.h>
 #include <openvdb/util/logging.h>
-#include <boost/cstdint.hpp>
+#include <cstdint>
 #include <boost/iostreams/copy.hpp>
 #ifndef _MSC_VER
 #include <sys/types.h>
@@ -101,7 +101,7 @@ struct File::Impl
     {
         Index64 result = DEFAULT_COPY_MAX_BYTES;
         if (const char* s = std::getenv("OPENVDB_DELAYED_LOAD_COPY_MAX_BYTES")) {
-            char* endptr = NULL;
+            char* endptr = nullptr;
             result = std::strtoul(s, &endptr, /*base=*/10);
         }
         return result;
@@ -113,9 +113,9 @@ struct File::Impl
     // The memory-mapped file
     MappedFile::Ptr mFileMapping;
     // The buffer for the input stream, if it is a memory-mapped file
-    boost::shared_ptr<std::streambuf> mStreamBuf;
+    SharedPtr<std::streambuf> mStreamBuf;
     // The file stream that is open for reading
-    boost::scoped_ptr<std::istream> mInStream;
+    std::unique_ptr<std::istream> mInStream;
     // File-level stream metadata (file format, compression, etc.)
     StreamMetadata::Ptr mStreamMetadata;
     // Flag indicating if we have read in the global information (header,
@@ -175,10 +175,10 @@ File::operator=(const File& other)
 }
 
 
-boost::shared_ptr<Archive>
+SharedPtr<Archive>
 File::copy() const
 {
-    return boost::shared_ptr<Archive>(new File(*this));
+    return SharedPtr<Archive>{new File{*this}};
 }
 
 
@@ -303,8 +303,8 @@ File::open(bool delayLoad, const MappedFile::Notifier& notifier)
     mImpl->mInStream.reset();
 
     // Open the file.
-    boost::scoped_ptr<std::istream> newStream;
-    boost::shared_ptr<std::streambuf> newStreamBuf;
+    std::unique_ptr<std::istream> newStream;
+    SharedPtr<std::streambuf> newStreamBuf;
     MappedFile::Ptr newFileMapping;
     if (!delayLoad || !Archive::isDelayedLoadingEnabled()) {
         newStream.reset(new std::ifstream(
@@ -343,7 +343,7 @@ File::open(bool delayLoad, const MappedFile::Notifier& notifier)
         } catch (std::exception& e) {
             std::ostringstream ostr;
             ostr << "could not open file " << filename();
-            if (e.what() != NULL) ostr << " (" << e.what() << ")";
+            if (e.what() != nullptr) ostr << " (" << e.what() << ")";
             OPENVDB_THROW(IoError, ostr.str());
         }
     }
@@ -389,8 +389,8 @@ File::open(bool delayLoad, const MappedFile::Notifier& notifier)
         mImpl->mNamedGrids.clear();
 
         // Stream in the entire contents of the file and append all grids to mGrids.
-        const boost::int32_t gridCount = readGridCount(inputStream());
-        for (boost::int32_t i = 0; i < gridCount; ++i) {
+        const int32_t gridCount = readGridCount(inputStream());
+        for (int32_t i = 0; i < gridCount; ++i) {
             GridDescriptor gd;
             gd.read(inputStream());
 
@@ -531,7 +531,11 @@ File::readAllGridMetadata()
         // have already been streamed in and stored in mGrids.
         for (size_t i = 0, N = mImpl->mGrids->size(); i < N; ++i) {
             // Return copies of the grids, but with empty trees.
+#ifdef OPENVDB_3_ABI_COMPATIBLE
             ret->push_back((*mImpl->mGrids)[i]->copyGrid(/*treePolicy=*/CP_NEW));
+#else
+            ret->push_back((*mImpl->mGrids)[i]->copyGridWithNewTree());
+#endif
         }
     } else {
         // Read just the metadata and transforms for all grids.
@@ -542,7 +546,11 @@ File::readAllGridMetadata()
             // (As of 0.98.0, at least, it would suffice to just const cast
             // the grid pointers returned by readGridPartial(), but shallow
             // copying the grids helps to ensure future compatibility.)
+#ifdef OPENVDB_3_ABI_COMPATIBLE
             ret->push_back(grid->copyGrid(/*treePolicy=*/CP_NEW));
+#else
+            ret->push_back(grid->copyGridWithNewTree());
+#endif
         }
     }
     return ret;
@@ -571,7 +579,11 @@ File::readGridMetadata(const Name& name)
         const GridDescriptor& gd = it->second;
         ret = readGridPartial(gd, /*readTopology=*/false);
     }
+#ifdef OPENVDB_3_ABI_COMPATIBLE
     return ret->copyGrid(/*treePolicy=*/CP_NEW);
+#else
+    return ret->copyGridWithNewTree();
+#endif
 }
 
 
@@ -590,7 +602,7 @@ File::readGridPartial(const Name& name)
         // Retrieve the grid from mGrids, which should already contain
         // the entire contents of the file.
         if (GridBase::Ptr grid = readGrid(name)) {
-            ret = boost::const_pointer_cast<const GridBase>(grid);
+            ret = ConstPtrCast<const GridBase>(grid);
         }
     } else {
         NameMapCIter it = findDescriptor(name);
@@ -614,8 +626,8 @@ File::readGridPartial(const Name& name)
             if (GridBase::ConstPtr parent =
                 readGridPartial(parentIt->second, /*readTopology=*/true))
             {
-                boost::const_pointer_cast<GridBase>(ret)->setTree(
-                    boost::const_pointer_cast<GridBase>(parent)->baseTreePtr());
+                ConstPtrCast<GridBase>(ret)->setTree(
+                    ConstPtrCast<GridBase>(parent)->baseTreePtr());
             }
         }
     }
@@ -751,7 +763,7 @@ File::readGridDescriptors(std::istream& is)
 
     gridDescriptors().clear();
 
-    for (boost::int32_t i = 0, N = readGridCount(is); i < N; ++i) {
+    for (int32_t i = 0, N = readGridCount(is); i < N; ++i) {
         // Read the grid descriptor.
         GridDescriptor gd;
         gd.read(is);

@@ -28,8 +28,9 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+/// @file OpenVDBUtil.cc
+///
 /// @author FX R&D OpenVDB team
-
 
 #include "OpenVDBUtil.h"
 #include <openvdb/math/Math.h>
@@ -252,7 +253,8 @@ insertFrameNumber(std::string& str, const MTime& time, int numberingScheme)
             ss << ticks;
         } else { // Frame.SubTick
             ss << wholeFrame;
-            const int frameTick = (openvdb::math::Round(frame - double(wholeFrame)) * tpf);
+            const int frameTick = static_cast<int>(
+                openvdb::math::Round(frame - double(wholeFrame)) * tpf);
             if (frameTick > 0) {
                 ss << "." << std::setw(tpfDigits) << std::setfill('0') << frameTick;
             }
@@ -336,7 +338,7 @@ BufferObject::genIndexBuffer(const std::vector<GLuint>& v, GLenum primType)
     // release buffer
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-    mPrimNum = v.size();
+    mPrimNum = static_cast<GLsizei>(v.size());
     mPrimType = primType;
 }
 
@@ -414,7 +416,7 @@ ShaderProgram::setVertShader(const std::string& s)
     mVertShader = glCreateShader(GL_VERTEX_SHADER);
     if (glIsShader(mVertShader) == GL_FALSE) throw "Error: Unable to create shader program.";
 
-    GLint length = s.length();
+    GLint length = static_cast<GLint>(s.length());
     const char *str = s.c_str();
     glShaderSource(mVertShader, 1, &str, &length);
 
@@ -428,7 +430,7 @@ ShaderProgram::setFragShader(const std::string& s)
     mFragShader = glCreateShader(GL_FRAGMENT_SHADER);
     if (glIsShader(mFragShader) == GL_FALSE) throw "Error: Unable to create shader program.";
 
-    GLint length = s.length();
+    GLint length = static_cast<GLint>(s.length());
     const char *str = s.c_str();
     glShaderSource(mFragShader, 1, &str, &length);
 
@@ -464,7 +466,7 @@ ShaderProgram::build(const std::vector<GLchar*>& attributes)
     if (glIsProgram(mProgram) == GL_FALSE) throw "Error: Unable to create shader program.";
 
 
-    for (GLuint n = 0, N = attributes.size(); n < N; ++n) {
+    for (GLuint n = 0, N = static_cast<GLuint>(attributes.size()); n < N; ++n) {
         glBindAttribLocation(mProgram, n, attributes[n]);
     }
 
@@ -548,69 +550,69 @@ void WireBoxBuilder::add(GLuint boxIndex, const openvdb::CoordBBox& bbox, const 
 
     // corner 1
     openvdb::Vec3d ptn = mXForm->indexToWorld(min);
-    (*mPoints)[ptnOffset++] = ptn[0];
-    (*mPoints)[ptnOffset++] = ptn[1];
-    (*mPoints)[ptnOffset++] = ptn[2];
+    (*mPoints)[ptnOffset++] = static_cast<GLfloat>(ptn[0]);
+    (*mPoints)[ptnOffset++] = static_cast<GLfloat>(ptn[1]);
+    (*mPoints)[ptnOffset++] = static_cast<GLfloat>(ptn[2]);
 
     // corner 2
     ptn.x() = min.x();
     ptn.y() = min.y();
     ptn.z() = max.z();
     ptn = mXForm->indexToWorld(ptn);
-    (*mPoints)[ptnOffset++] = ptn[0];
-    (*mPoints)[ptnOffset++] = ptn[1];
-    (*mPoints)[ptnOffset++] = ptn[2];
+    (*mPoints)[ptnOffset++] = static_cast<GLfloat>(ptn[0]);
+    (*mPoints)[ptnOffset++] = static_cast<GLfloat>(ptn[1]);
+    (*mPoints)[ptnOffset++] = static_cast<GLfloat>(ptn[2]);
 
     // corner 3
     ptn.x() = max.x();
     ptn.y() = min.y();
     ptn.z() = max.z();
     ptn = mXForm->indexToWorld(ptn);
-    (*mPoints)[ptnOffset++] = ptn[0];
-    (*mPoints)[ptnOffset++] = ptn[1];
-    (*mPoints)[ptnOffset++] = ptn[2];
+    (*mPoints)[ptnOffset++] = static_cast<GLfloat>(ptn[0]);
+    (*mPoints)[ptnOffset++] = static_cast<GLfloat>(ptn[1]);
+    (*mPoints)[ptnOffset++] = static_cast<GLfloat>(ptn[2]);
 
     // corner 4
     ptn.x() = max.x();
     ptn.y() = min.y();
     ptn.z() = min.z();
     ptn = mXForm->indexToWorld(ptn);
-    (*mPoints)[ptnOffset++] = ptn[0];
-    (*mPoints)[ptnOffset++] = ptn[1];
-    (*mPoints)[ptnOffset++] = ptn[2];
+    (*mPoints)[ptnOffset++] = static_cast<GLfloat>(ptn[0]);
+    (*mPoints)[ptnOffset++] = static_cast<GLfloat>(ptn[1]);
+    (*mPoints)[ptnOffset++] = static_cast<GLfloat>(ptn[2]);
 
     // corner 5
     ptn.x() = min.x();
     ptn.y() = max.y();
     ptn.z() = min.z();
     ptn = mXForm->indexToWorld(ptn);
-    (*mPoints)[ptnOffset++] = ptn[0];
-    (*mPoints)[ptnOffset++] = ptn[1];
-    (*mPoints)[ptnOffset++] = ptn[2];
+    (*mPoints)[ptnOffset++] = static_cast<GLfloat>(ptn[0]);
+    (*mPoints)[ptnOffset++] = static_cast<GLfloat>(ptn[1]);
+    (*mPoints)[ptnOffset++] = static_cast<GLfloat>(ptn[2]);
 
     // corner 6
     ptn.x() = min.x();
     ptn.y() = max.y();
     ptn.z() = max.z();
     ptn = mXForm->indexToWorld(ptn);
-    (*mPoints)[ptnOffset++] = ptn[0];
-    (*mPoints)[ptnOffset++] = ptn[1];
-    (*mPoints)[ptnOffset++] = ptn[2];
+    (*mPoints)[ptnOffset++] = static_cast<GLfloat>(ptn[0]);
+    (*mPoints)[ptnOffset++] = static_cast<GLfloat>(ptn[1]);
+    (*mPoints)[ptnOffset++] = static_cast<GLfloat>(ptn[2]);
 
     // corner 7
     ptn = mXForm->indexToWorld(max);
-    (*mPoints)[ptnOffset++] = ptn[0];
-    (*mPoints)[ptnOffset++] = ptn[1];
-    (*mPoints)[ptnOffset++] = ptn[2];
+    (*mPoints)[ptnOffset++] = static_cast<GLfloat>(ptn[0]);
+    (*mPoints)[ptnOffset++] = static_cast<GLfloat>(ptn[1]);
+    (*mPoints)[ptnOffset++] = static_cast<GLfloat>(ptn[2]);
 
     // corner 8
     ptn.x() = max.x();
     ptn.y() = max.y();
     ptn.z() = min.z();
     ptn = mXForm->indexToWorld(ptn);
-    (*mPoints)[ptnOffset++] = ptn[0];
-    (*mPoints)[ptnOffset++] = ptn[1];
-    (*mPoints)[ptnOffset] = ptn[2];
+    (*mPoints)[ptnOffset++] = static_cast<GLfloat>(ptn[0]);
+    (*mPoints)[ptnOffset++] = static_cast<GLfloat>(ptn[1]);
+    (*mPoints)[ptnOffset] = static_cast<GLfloat>(ptn[2]);
 
     for (int n = 0; n < 8; ++n) {
         (*mColors)[colorOffset++] = color[0];

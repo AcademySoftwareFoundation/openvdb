@@ -31,10 +31,11 @@
 #ifndef OPENVDB_MATH_VEC2_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_VEC2_HAS_BEEN_INCLUDED
 
-#include <cmath>
 #include <openvdb/Exceptions.h>
 #include "Math.h"
 #include "Tuple.h"
+#include <cmath>
+#include <type_traits>
 
 
 namespace openvdb {
@@ -54,7 +55,7 @@ public:
     /// Trivial constructor, the vector is NOT initialized
     Vec2() {}
 
-    /// Constructor with one argument, e.g.   Vec2f v(0);
+    /// @brief Construct a vector all of whose components have the given value.
     explicit Vec2(T val) { this->mm[0] = this->mm[1] = val; }
 
     /// Constructor with two arguments, e.g.   Vec2f v(1,2,3);
@@ -78,6 +79,16 @@ public:
     {
         this->mm[0] = static_cast<T>(t[0]);
         this->mm[1] = static_cast<T>(t[1]);
+    }
+
+    /// @brief Construct a vector all of whose components have the given value,
+    /// which may be of an arithmetic type different from this vector's value type.
+    /// @details Type conversion warnings are suppressed.
+    template<typename Other>
+    explicit Vec2(Other val,
+        typename std::enable_if<std::is_arithmetic<Other>::value, Conversion>::type = Conversion{})
+    {
+        this->mm[0] = this->mm[1] = static_cast<T>(val);
     }
 
     /// Reference to the component, e.g.   v.x() = 4.5f;
@@ -206,10 +217,25 @@ public:
         return *this;
     }
 
+    /// Return a reference to itself after log has been
+    /// applied to all the vector components.
+    inline const Vec2<T>& log()
+    {
+        this->mm[0] = std::log(this->mm[0]);
+        this->mm[1] = std::log(this->mm[1]);
+        return *this;
+    }
+
     /// Return the sum of all the vector components.
     inline T sum() const
     {
         return this->mm[0] + this->mm[1];
+    }
+
+    /// Return the product of all the vector components.
+    inline T product() const
+    {
+        return this->mm[0] * this->mm[1];
     }
 
     /// this = normalized this
@@ -238,6 +264,13 @@ public:
             OPENVDB_THROW(ArithmeticError, "Normalizing null 2-vector");
         }
         return *this / len;
+    }
+
+    /// return normalized this, or (1, 0) if this is null vector
+    Vec2<T> unitSafe() const
+    {
+        T l2 = lengthSqr();
+        return l2 ? *this/static_cast<T>(sqrt(l2)) : Vec2<T>(1,0);
     }
 
     /// Returns v, where \f$v_i *= scalar\f$ for \f$i \in [0, 1]\f$
@@ -353,6 +386,7 @@ public:
 
     /// Predefined constants, e.g.   Vec2f v = Vec2f::xNegAxis();
     static Vec2<T> zero() { return Vec2<T>(0, 0); }
+    static Vec2<T> ones() { return Vec2<T>(1, 1); }
 };
 
 
@@ -536,6 +570,11 @@ inline Vec2<T> maxComponent(const Vec2<T> &v1, const Vec2<T> &v2)
 /// the components of the input vector.
 template <typename T>
 inline Vec2<T> Exp(Vec2<T> v) { return v.exp(); }
+
+/// @brief Return a vector with log applied to each of
+/// the components of the input vector.
+template <typename T>
+inline Vec2<T> Log(Vec2<T> v) { return v.log(); }
 
 typedef Vec2<int32_t>   Vec2i;
 typedef Vec2<uint32_t>  Vec2ui;

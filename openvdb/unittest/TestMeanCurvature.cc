@@ -28,23 +28,20 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-#include <sstream>
-#include <cppunit/extensions/HelperMacros.h>
 #include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/math/Stencils.h>
 #include <openvdb/math/Operators.h>
 #include <openvdb/tools/GridOperators.h>
 #include "util.h" // for unittest_util::makeSphere()
+#include <cppunit/extensions/HelperMacros.h>
 
-#define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
-    CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
 
 class TestMeanCurvature: public CppUnit::TestFixture
 {
 public:
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
+    void setUp() override { openvdb::initialize(); }
+    void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestMeanCurvature);
     CPPUNIT_TEST(testISMeanCurvature);                    // MeanCurvature in Index Space

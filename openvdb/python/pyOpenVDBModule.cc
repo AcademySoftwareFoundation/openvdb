@@ -395,6 +395,14 @@ PYOPENVDB_CATCH(openvdb::ValueError,            PyExc_ValueError)
 ////////////////////////////////////////
 
 
+py::object readFromFile(const std::string&, const std::string&);
+py::tuple readAllFromFile(const std::string&);
+py::dict readFileMetadata(const std::string&);
+py::object readGridMetadataFromFile(const std::string&, const std::string&);
+py::list readAllGridMetadataFromFile(const std::string&);
+void writeToFile(const std::string&, py::object, py::object);
+
+
 py::object
 readFromFile(const std::string& filename, const std::string& gridName)
 {
@@ -579,8 +587,10 @@ struct VecTypeDescr
 
 #ifdef DWA_OPENVDB
 #define PY_OPENVDB_MODULE_NAME  _openvdb
+extern "C" { void init_openvdb(); }
 #else
 #define PY_OPENVDB_MODULE_NAME  pyopenvdb
+extern "C" { void initpyopenvdb(); }
 #endif
 
 BOOST_PYTHON_MODULE(PY_OPENVDB_MODULE_NAME)

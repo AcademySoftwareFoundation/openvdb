@@ -52,7 +52,7 @@ namespace openvdb_houdini {
 ///
 /// // Create a new, empty output grid of the same (so far, unknown) type
 /// // as the input grid and with the same transform and metadata.
-/// GridPtr outGrid = inGrid.copyGrid(openvdb::CP_NEW);
+/// GridPtr outGrid = inGrid.copyGridWithNewTree();
 ///
 /// // Initialize a GridTransformer with the parameters of an affine transform.
 /// openvdb::tools::GridTransformer xform(pivot, scale, rotate, ...);
@@ -116,7 +116,7 @@ private:
 ///
 /// // Create a new, empty output grid of the same (so far, unknown) type
 /// // as the input grid and with the same transform and metadata.
-/// GridPtr outGrid = inGrid.copyGrid(openvdb::CP_NEW);
+/// GridPtr outGrid = inGrid.copyGridWithNewTree();
 ///
 /// // Resolve the input grid's type and resample it into the output grid,
 /// // using a trilinear sampling kernel.
@@ -168,7 +168,7 @@ private:
 ///
 /// // Create a new, empty output grid of the same (so far, unknown) type as
 /// // the input grid and with the same metadata, but with a different transform.
-/// GridPtr outGrid = inGrid.copyGrid(openvdb::CP_NEW);
+/// GridPtr outGrid = inGrid.copyGridWithNewTree();
 /// outGrid->setTransform(myTransform);
 ///
 /// // Resolve the input grid's type and resample it into the output grid,

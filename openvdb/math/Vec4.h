@@ -31,11 +31,12 @@
 #ifndef OPENVDB_MATH_VEC4_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_VEC4_HAS_BEEN_INCLUDED
 
-#include <cmath>
 #include <openvdb/Exceptions.h>
 #include "Math.h"
 #include "Tuple.h"
 #include "Vec3.h"
+#include <cmath>
+#include <type_traits>
 
 
 namespace openvdb {
@@ -55,7 +56,7 @@ public:
     /// Trivial constructor, the vector is NOT initialized
     Vec4() {}
 
-    /// Constructor with one argument, e.g.   Vec4f v(0);
+    /// @brief Construct a vector all of whose components have the given value.
     explicit Vec4(T val) { this->mm[0] = this->mm[1] = this->mm[2] = this->mm[3] = val; }
 
     /// Constructor with four arguments, e.g.   Vec4f v(1,2,3,4);
@@ -85,6 +86,16 @@ public:
         this->mm[1] = static_cast<T>(v[1]);
         this->mm[2] = static_cast<T>(v[2]);
         this->mm[3] = static_cast<T>(v[3]);
+    }
+
+    /// @brief Construct a vector all of whose components have the given value,
+    /// which may be of an arithmetic type different from this vector's value type.
+    /// @details Type conversion warnings are suppressed.
+    template<typename Other>
+    explicit Vec4(Other val,
+        typename std::enable_if<std::is_arithmetic<Other>::value, Conversion>::type = Conversion{})
+    {
+        this->mm[0] = this->mm[1] = this->mm[2] = this->mm[3] = static_cast<T>(val);
     }
 
     /// Reference to the component, e.g.   v.x() = 4.5f;
@@ -236,7 +247,7 @@ public:
             + this->mm[2]*this->mm[2] + this->mm[3]*this->mm[3]);
     }
 
-    /// Return a reference to itsef after the exponent has been
+    /// Return a reference to itself after the exponent has been
     /// applied to all the vector components.
     inline const Vec4<T>& exp()
     {
@@ -247,12 +258,28 @@ public:
         return *this;
     }
 
+    /// Return a reference to itself after log has been
+    /// applied to all the vector components.
+    inline const Vec4<T>& log()
+    {
+        this->mm[0] = std::log(this->mm[0]);
+        this->mm[1] = std::log(this->mm[1]);
+        this->mm[2] = std::log(this->mm[2]);
+        this->mm[3] = std::log(this->mm[3]);
+        return *this;
+    }
+
     /// Return the sum of all the vector components.
     inline T sum() const
     {
         return this->mm[0] + this->mm[1] + this->mm[2] + this->mm[3];
     }
 
+    /// Return the product of all the vector components.
+    inline T product() const
+    {
+        return this->mm[0] * this->mm[1] * this->mm[2] * this->mm[3];
+    }
 
     /// this = normalized this
     bool normalize(T eps=1.0e-8)
@@ -280,6 +307,13 @@ public:
             throw ArithmeticError("Normalizing null 4-vector");
         }
         return *this / len;
+    }
+
+    /// return normalized this, or (1, 0, 0, 0) if this is null vector
+    Vec4<T> unitSafe() const
+    {
+        T l2 = lengthSqr();
+        return l2 ? *this / static_cast<T>(sqrt(l2)) : Vec4<T>(1, 0, 0, 0);
     }
 
     /// Returns v, where \f$v_i *= scalar\f$ for \f$i \in [0, 3]\f$
@@ -400,6 +434,7 @@ public:
     /// Predefined constants, e.g.   Vec4f v = Vec4f::xNegAxis();
     static Vec4<T> zero() { return Vec4<T>(0, 0, 0, 0); }
     static Vec4<T> origin() { return Vec4<T>(0, 0, 0, 1); }
+    static Vec4<T> ones() { return Vec4<T>(1, 1, 1, 1); }
 };
 
 /// Equality operator, does exact floating point comparisons
@@ -577,6 +612,11 @@ inline Vec4<T> maxComponent(const Vec4<T> &v1, const Vec4<T> &v2)
 /// the components of the input vector.
 template <typename T>
 inline Vec4<T> Exp(Vec4<T> v) { return v.exp(); }
+
+/// @brief Return a vector with log applied to each of
+/// the components of the input vector.
+template <typename T>
+inline Vec4<T> Log(Vec4<T> v) { return v.log(); }
 
 typedef Vec4<int32_t>   Vec4i;
 typedef Vec4<uint32_t>  Vec4ui;

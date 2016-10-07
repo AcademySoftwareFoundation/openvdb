@@ -408,7 +408,10 @@ SOP_OpenVDB_Noise::applyNoise(
                 cvdb::tools::BoxSampler::sample<TreeType>(maskGrid->tree(), voxelPt, result);
 
                 // for the gradient of the maskGrid
-                cvdb::Coord mask_ijk((int)voxelPt[0], (int)voxelPt[1], (int)voxelPt[2]);
+                cvdb::Coord mask_ijk(
+                    static_cast<int>(voxelPt[0]),
+                    static_cast<int>(voxelPt[1]),
+                    static_cast<int>(voxelPt[2]));
                 maskStencil.moveTo(mask_ijk);
                 // normal alignment
                 Vec3Type grid_grad = Gradient::result(map, stencil);

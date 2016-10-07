@@ -28,6 +28,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+/// @file OpenVDBData.cc
 /// @author FX R&D OpenVDB team
 
 
@@ -59,9 +60,7 @@ OpenVDBData::creator()
 }
 
 
-OpenVDBData::OpenVDBData()
-    : MPxData()
-    , mGrids(new openvdb::GridPtrVec())
+OpenVDBData::OpenVDBData(): MPxData()
 {
 }
 
@@ -74,15 +73,13 @@ OpenVDBData::~OpenVDBData()
 void
 OpenVDBData::copy(const MPxData& other)
 {
-    if(other.typeId() == OpenVDBData::id) {
-
+    if (other.typeId() == OpenVDBData::id) {
         const OpenVDBData& rhs = static_cast<const OpenVDBData&>(other);
-
-        if (mGrids.get() == rhs.mGrids.get()) return;
-
-        // shallow-copy the grids from the rhs container.
-        mGrids->clear();
-        insert(*rhs.mGrids);
+        if (&mGrids != &rhs.mGrids) {
+            // shallow-copy the grids from the rhs container.
+            mGrids.clear();
+            insert(rhs.mGrids);
+        }
     }
 }
 
@@ -118,7 +115,9 @@ OpenVDBData::writeASCII(ostream&)
 MStatus
 OpenVDBData::readBinary(istream& in, unsigned)
 {
-    mGrids = openvdb::io::Stream(in).getGrids();
+    auto grids = openvdb::io::Stream(in).getGrids();
+    mGrids.clear();
+    insert(*grids);
     return in.fail() ? MS::kFailure : MS::kSuccess;
 }
 
@@ -126,7 +125,7 @@ OpenVDBData::readBinary(istream& in, unsigned)
 MStatus
 OpenVDBData::writeBinary(ostream& out)
 {
-    openvdb::io::Stream(out).write(*mGrids);
+    openvdb::io::Stream(out).write(mGrids);
     return out.fail() ? MS::kFailure : MS::kSuccess;
 }
 
@@ -137,55 +136,62 @@ OpenVDBData::writeBinary(ostream& out)
 size_t
 OpenVDBData::numberOfGrids() const
 {
-    return mGrids->size();
+    return mGrids.size();
 }
 
 
 const openvdb::GridBase&
 OpenVDBData::grid(size_t index) const
 {
-    return *((*mGrids)[index]);
+    return *(mGrids[index]);
 }
 
 
 openvdb::GridBase::ConstPtr
 OpenVDBData::gridPtr(size_t index) const
 {
-    return (*mGrids)[index];
+    return mGrids[index];
 }
 
 
 void
 OpenVDBData::duplicate(const OpenVDBData& rhs)
 {
-    mGrids->clear();
-    openvdb::GridPtrVec::const_iterator it = rhs.mGrids->begin();
-    for ( ; it != rhs.mGrids->end(); ++it) {
-        mGrids->push_back((*it)->copyGrid());
+    mGrids.clear();
+    for (const auto& gridPtr: rhs.mGrids) {
+        mGrids.push_back(gridPtr->copyGrid());
     }
 }
 
 void
-OpenVDBData::insert(const openvdb::GridBase::Ptr& grid)
+OpenVDBData::insert(const openvdb::GridBase::ConstPtr& grid)
 {
-    mGrids->push_back(grid);
+    mGrids.push_back(grid);
 }
 
 
 void
 OpenVDBData::insert(const openvdb::GridBase& grid)
 {
-     mGrids->push_back(grid.copyGrid());
+     mGrids.push_back(grid.copyGrid());
 }
 
 
 void
 OpenVDBData::insert(const openvdb::GridPtrVec& rhs)
 {
-    openvdb::GridPtrVec& lhs = *mGrids;
-    lhs.reserve(lhs.size() + rhs.size());
-    for (openvdb::GridPtrVec::const_iterator it = rhs.begin(); it != rhs.end(); ++it) {
-        lhs.push_back((*it)->copyGrid());
+    mGrids.reserve(mGrids.size() + rhs.size());
+    for (const auto& gridPtr: rhs) {
+        mGrids.push_back(gridPtr->copyGrid());
+    }
+}
+
+void
+OpenVDBData::insert(const openvdb::GridCPtrVec& rhs)
+{
+    mGrids.reserve(mGrids.size() + rhs.size());
+    for (const auto& gridPtr: rhs) {
+        mGrids.push_back(gridPtr->copyGrid());
     }
 }
 
@@ -194,7 +200,7 @@ void
 OpenVDBData::write(const openvdb::io::File& file,
     const openvdb::MetaMap& metadata) const
 {
-    file.write(*mGrids, metadata);
+    file.write(mGrids, metadata);
 }
 
 

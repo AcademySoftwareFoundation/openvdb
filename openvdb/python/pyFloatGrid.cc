@@ -35,6 +35,9 @@
 #include "pyGrid.h"
 
 
+void exportFloatGrid();
+
+
 /// Create a Python wrapper for each supported Grid type.
 void
 exportFloatGrid()

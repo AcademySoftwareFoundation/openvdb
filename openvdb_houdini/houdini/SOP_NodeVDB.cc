@@ -97,7 +97,8 @@ struct LockedInfoTextRegistry
 static Mutex theInitInfoTextRegistryMutex;
 
 // Global function for accessing the regsitry
-static LockedInfoTextRegistry* getInfoTextRegistry()
+static LockedInfoTextRegistry*
+getInfoTextRegistry()
 {
     Lock lock(theInitInfoTextRegistryMutex);
 
@@ -116,7 +117,13 @@ __pragma(warning(default:1711))
     return registry;
 }
 
-void registerGridSpecificInfoText(const std::string& gridType, ApplyGridSpecificInfoText callback)
+
+void registerGridSpecificInfoText(const std::string&, ApplyGridSpecificInfoText);
+ApplyGridSpecificInfoText getGridSpecificInfoText(const std::string&);
+
+
+void
+registerGridSpecificInfoText(const std::string& gridType, ApplyGridSpecificInfoText callback)
 {
     LockedInfoTextRegistry *registry = getInfoTextRegistry();
     Lock lock(registry->mMutex);
@@ -131,7 +138,8 @@ void registerGridSpecificInfoText(const std::string& gridType, ApplyGridSpecific
 ///        specific function has been registered for the given grid type.
 /// @note  The @c defaultNodeSpecificInfoText method is always returned
 ///        prior to Houdini 14.
-ApplyGridSpecificInfoText getGridSpecificInfoText(const std::string& gridType)
+ApplyGridSpecificInfoText
+getGridSpecificInfoText(const std::string& gridType)
 {
     LockedInfoTextRegistry *registry = getInfoTextRegistry();
     Lock lock(registry->mMutex);
@@ -338,9 +346,10 @@ SOP_NodeVDB::isSourceStealable(const unsigned index, OP_Context& context) const
 {
 #if (UT_VERSION_INT >= 0x0d000000) // 13.0 or later
     struct Local {
-        static inline OP_Node* nextStealableInput(const unsigned index, const fpreal now, const OP_Node* node)
+        static inline OP_Node* nextStealableInput(
+            const unsigned idx, const fpreal now, const OP_Node* node)
         {
-            OP_Node* input = node->getInput(index);
+            OP_Node* input = node->getInput(idx);
             while (input) {
                 OP_Node* passThrough = input->getPassThroughNode(now);
                 if (!passThrough) break;

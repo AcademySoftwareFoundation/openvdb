@@ -31,13 +31,11 @@
 #include <sstream>
 #include <algorithm>// for std::sort
 #include <cppunit/extensions/HelperMacros.h>
-#include <boost/random/mersenne_twister.hpp>
 #include <tbb/atomic.h>
 #include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/ChangeBackground.h>
 #include <openvdb/tools/Diagnostics.h>
-#include <openvdb/tools/Clip.h>
 #include <openvdb/tools/GridOperators.h>
 #include <openvdb/tools/Filter.h>
 #include <openvdb/tools/LevelSetUtil.h>
@@ -96,7 +94,6 @@ public:
     CPPUNIT_TEST(testAccumulate);
     CPPUNIT_TEST(testUtil);
     CPPUNIT_TEST(testVectorTransformer);
-    CPPUNIT_TEST(testClipping);
 
     CPPUNIT_TEST_SUITE_END();
 
@@ -124,7 +121,6 @@ public:
     void testAccumulate();
     void testUtil();
     void testVectorTransformer();
-    void testClipping();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestTools);
@@ -195,19 +191,19 @@ TestTools::testDilateVoxels()
         tree->fill(CoordBBox(Coord(0), Coord(leafDim - 1)), 1.0);
         CPPUNIT_ASSERT_EQUAL(Index32(0), tree->leafCount());
         CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
-        
+        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
+
         tree->setValue(Coord(leafDim, leafDim - 1, leafDim - 1), 1.0);
-        
+
         CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim + 1),
                              tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
+        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
 
         openvdb::tools::dilateVoxels(*tree);
 
         CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim + 1 + 5),
                              tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
+        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
     }
     {
         // Set and dilate a single voxel at each of the eight corners of a leaf node.
@@ -519,14 +515,14 @@ TestTools::testDilateActiveValues()
         tree->fill(CoordBBox(Coord(0), Coord(leafDim - 1)), 1.0);
         CPPUNIT_ASSERT_EQUAL(Index32(0), tree->leafCount());
         CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
-        
+        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
+
         // This has no effect
         openvdb::tools::dilateActiveValues(*tree, 1, openvdb::tools::NN_FACE, openvdb::tools::IGNORE_TILES);
 
         CPPUNIT_ASSERT_EQUAL(Index32(0), tree->leafCount());
         CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
+        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
     }
     {
         // Create an active, leaf node-sized tile.
@@ -534,15 +530,15 @@ TestTools::testDilateActiveValues()
         tree->fill(CoordBBox(Coord(0), Coord(leafDim - 1)), 1.0);
         CPPUNIT_ASSERT_EQUAL(Index32(0), tree->leafCount());
         CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
+        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
 
         // Adds 6 faces of voxels, each of size leafDim^2
         openvdb::tools::dilateActiveValues(*tree, 1, openvdb::tools::NN_FACE, openvdb::tools::EXPAND_TILES);
 
         CPPUNIT_ASSERT_EQUAL(Index32(1+6), tree->leafCount());
         CPPUNIT_ASSERT_EQUAL(Index64((leafDim + 6) * leafDim * leafDim), tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(0UL, tree->activeTileCount());
-        
+        CPPUNIT_ASSERT_EQUAL(Index64(0), tree->activeTileCount());
+
     }
     {
         // Create an active, leaf node-sized tile.
@@ -550,15 +546,15 @@ TestTools::testDilateActiveValues()
         tree->fill(CoordBBox(Coord(0), Coord(leafDim - 1)), 1.0);
         CPPUNIT_ASSERT_EQUAL(Index32(0), tree->leafCount());
         CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
+        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
 
         // Adds 6 faces of voxels, each of size leafDim^2
         openvdb::tools::dilateActiveValues(*tree, 1, openvdb::tools::NN_FACE, openvdb::tools::PRESERVE_TILES);
 
         CPPUNIT_ASSERT_EQUAL(Index32(6), tree->leafCount());
         CPPUNIT_ASSERT_EQUAL(Index64((leafDim + 6) * leafDim * leafDim), tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(1UL, tree->activeTileCount());
-        
+        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
+
     }
     {
         // Set and dilate a single voxel at each of the eight corners of a leaf node.
@@ -842,7 +838,7 @@ TestTools::testDilateActiveValues()
         }
     }
 #endif
-    
+
 }
 
 void
@@ -1280,7 +1276,7 @@ void
 TestTools::testLevelSetPlatonic()
 {
     using namespace openvdb;
-    
+
     const float scale = 0.5f;
     const Vec3f center(1.0f, 2.0f, 3.0f);
     const float voxelSize = 0.025f, width = 2.0f, background = width*voxelSize;
@@ -1291,7 +1287,7 @@ TestTools::testLevelSetPlatonic()
     // The tests below are not particularly good (a visual inspection
     // in Houdini is much better) but at least it exercises the code
     // and performs an elementary suite of tests.
-    
+
     {// test tetrahedron
         FloatGrid::Ptr ls = tools::createLevelSetTetrahedron<FloatGrid>(scale, center,
                                                                         voxelSize, width);
@@ -1337,7 +1333,7 @@ TestTools::testLevelSetPlatonic()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(background, ls->background(), 1e-6);
         CPPUNIT_ASSERT_DOUBLES_EQUAL(ls->background(),ls->tree().getValue(Coord(0)), 1e-6);
     }
-    
+
 }// testLevelSetPlatonic
 
 void
@@ -2183,7 +2179,7 @@ TestTools::testVolumeAdvect()
         CPPUNIT_ASSERT_EQUAL(1, a.spatialOrder());
         CPPUNIT_ASSERT_EQUAL(3, a.temporalOrder());
         CPPUNIT_ASSERT(!a.isLimiterOn());
-            
+
         a.setIntegrator(tools::Scheme::RK4);
         CPPUNIT_ASSERT_EQUAL(1, a.spatialOrder());
         CPPUNIT_ASSERT_EQUAL(4, a.temporalOrder());
@@ -2198,13 +2194,13 @@ TestTools::testVolumeAdvect()
         CPPUNIT_ASSERT_EQUAL(2, a.spatialOrder());
         CPPUNIT_ASSERT_EQUAL(2, a.temporalOrder());
         CPPUNIT_ASSERT( a.isLimiterOn());
-        
+
         a.setLimiter(tools::Scheme::NO_LIMITER);
         CPPUNIT_ASSERT_EQUAL(2, a.spatialOrder());
         CPPUNIT_ASSERT_EQUAL(2, a.temporalOrder());
         CPPUNIT_ASSERT(!a.isLimiterOn());
     }
-    
+
     {//test RK4 advect without a mask
         GridT::Ptr density0 = GridT::create(0.0f), density1;
         density0->fill(CoordBBox(Coord(0),Coord(6)), 1.0f);
@@ -2212,7 +2208,7 @@ TestTools::testVolumeAdvect()
         CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(24,3,3)), 0.0f);
         CPPUNIT_ASSERT( density0->tree().isValueOn(Coord( 3,3,3)));
         CPPUNIT_ASSERT(!density0->tree().isValueOn(Coord(24,3,3)));
-        
+
         AdvT a(velocity);
         a.setIntegrator(tools::Scheme::RK4);
         for (int i=1; i<=240; ++i) {
@@ -2226,7 +2222,7 @@ TestTools::testVolumeAdvect()
             //file.write(grids);
             density0 = density1;
         }
-        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(3,3,3)), 0.0f); 
+        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(3,3,3)), 0.0f);
         CPPUNIT_ASSERT(density0->tree().getValue(Coord(24,3,3)) > 0.0f);
         CPPUNIT_ASSERT(!density0->tree().isValueOn(Coord( 3,3,3)));
         CPPUNIT_ASSERT( density0->tree().isValueOn(Coord(24,3,3)));
@@ -2238,7 +2234,7 @@ TestTools::testVolumeAdvect()
         CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(24,3,3)), 0.0f);
         CPPUNIT_ASSERT( density0->tree().isValueOn(Coord( 3,3,3)));
         CPPUNIT_ASSERT(!density0->tree().isValueOn(Coord(24,3,3)));
-        
+
         AdvT a(velocity);
         a.setIntegrator(tools::Scheme::BFECC);
         for (int i=1; i<=240; ++i) {
@@ -2252,7 +2248,7 @@ TestTools::testVolumeAdvect()
             //file.write(grids);
             density0 = density1;
         }
-        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(3,3,3)), 0.0f); 
+        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(3,3,3)), 0.0f);
         CPPUNIT_ASSERT(density0->tree().getValue(Coord(24,3,3)) > 0.0f);
         CPPUNIT_ASSERT(!density0->tree().isValueOn(Coord( 3,3,3)));
         CPPUNIT_ASSERT( density0->tree().isValueOn(Coord(24,3,3)));
@@ -2267,7 +2263,7 @@ TestTools::testVolumeAdvect()
 
         BoolGrid::Ptr mask = BoolGrid::create(false);
         mask->fill(CoordBBox(Coord(4,0,0),Coord(30,8,8)), true);
-        
+
         AdvT a(velocity);
         a.setGrainSize(0);
         a.setIntegrator(tools::Scheme::MAC);
@@ -2292,7 +2288,7 @@ TestTools::testVolumeAdvect()
 
     /*
     {//benchmark on a sphere
-        util::CpuTimer timer; 
+        util::CpuTimer timer;
         GridT::Ptr density0 = GridT::create(0.0f), density1;
         density0->fill(CoordBBox(Coord(0), Coord(600)), 1.0f);
         timer.start("densify");
@@ -2304,7 +2300,7 @@ TestTools::testVolumeAdvect()
         //a.setIntegrator(tools::Scheme::MAC);
         //a.setIntegrator(tools::Scheme::BFECC);
         a.setIntegrator(tools::Scheme::RK4);
-        
+
         for (int i=1; i<=10; ++i) {
             timer.start("Volume Advection");
             density1 = a.advect<GridT, SamplerT>(*density0, 0.1f);
@@ -2710,100 +2706,31 @@ TestTools::testVectorTransformer()
 ////////////////////////////////////////
 
 
-// See also TestGrid::testClipping()
-void
-TestTools::testClipping()
-{
-    using namespace openvdb;
-
-    FloatGrid cube(0.f);
-    cube.fill(CoordBBox(Coord(-10), Coord(10)), /*value=*/5.f, /*active=*/true);
-
-    struct Local {
-        static void validate(const FloatGrid& clipped)
-        {
-            const CoordBBox bbox = clipped.evalActiveVoxelBoundingBox();
-            CPPUNIT_ASSERT_EQUAL(4, bbox.min().x());
-            CPPUNIT_ASSERT_EQUAL(4, bbox.min().y());
-            CPPUNIT_ASSERT_EQUAL(-6, bbox.min().z());
-            CPPUNIT_ASSERT_EQUAL(4, bbox.max().x());
-            CPPUNIT_ASSERT_EQUAL(4, bbox.max().y());
-            CPPUNIT_ASSERT_EQUAL(6, bbox.max().z());
-            CPPUNIT_ASSERT_EQUAL(6 + 6 + 1, int(clipped.activeVoxelCount()));
-            CPPUNIT_ASSERT_EQUAL(2, int(clipped.constTree().leafCount()));
-
-            FloatGrid::ConstAccessor acc = clipped.getConstAccessor();
-            const float bg = clipped.background();
-            Coord xyz;
-            int &x = xyz[0], &y = xyz[1], &z = xyz[2];
-            for (x = -10; x <= 10; ++x) {
-                for (y = -10; y <= 10; ++y) {
-                    for (z = -10; z <= 10; ++z) {
-                        if (x == 4 && y == 4 && z >= -6 && z <= 6) {
-                            CPPUNIT_ASSERT_EQUAL(5.f, acc.getValue(Coord(4, 4, z)));
-                        } else {
-                            CPPUNIT_ASSERT_EQUAL(bg, acc.getValue(Coord(x, y, z)));
-                        }
-                    }
-                }
-            }
-        }
-    };
-
-    {
-        // Test clipping against a bounding box.
-        BBoxd clipBox(Vec3d(4.0, 4.0, -6.0), Vec3d(4.9, 4.9, 6.0));
-        FloatGrid::Ptr clipped = tools::clip(cube, clipBox);
-        Local::validate(*clipped);
-    }
-    {
-        // Test clipping against a mask grid.
-        MaskGrid mask(false);
-        mask.fill(CoordBBox(Coord(4, 4, -6), Coord(4, 4, 6)), true, true);
-        FloatGrid::Ptr clipped = tools::clip(cube, mask);
-        Local::validate(*clipped);
-    }
-    {
-        // Test clipping against a boolean mask grid.
-        BoolGrid mask(false);
-        mask.fill(CoordBBox(Coord(4, 4, -6), Coord(4, 4, 6)), true, true);
-        FloatGrid::Ptr clipped = tools::clip(cube, mask);
-        Local::validate(*clipped);
-    }
-    {
-        // Test clipping against a non-boolean mask grid.
-        Int32Grid mask(0);
-        mask.fill(CoordBBox(Coord(4, 4, -6), Coord(4, 4, 6)), -5, true);
-        FloatGrid::Ptr clipped = tools::clip(cube, mask);
-        Local::validate(*clipped);
-    }
-}
-
 void
 TestTools::testPrune()
 {
     /// @todo Add more unit-tests!
-    
+
     using namespace openvdb;
 
     {// try prunning a tree with const values
         const float value = 5.345f;
-    
+
         FloatTree tree(value);
         CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
         CPPUNIT_ASSERT_EQUAL(Index32(1), tree.nonLeafCount()); // root node
         CPPUNIT_ASSERT(tree.empty());
-        
+
         tree.fill(CoordBBox(Coord(-10), Coord(10)), value, /*active=*/false);
         CPPUNIT_ASSERT(!tree.empty());
-        
+
         tools::prune(tree);
-        
+
         CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
         CPPUNIT_ASSERT_EQUAL(Index32(1), tree.nonLeafCount()); // root node
         CPPUNIT_ASSERT(tree.empty());
     }
-    
+
     {// Prune a tree with a single leaf node with random values in the range [0,1]
         typedef tree::LeafNode<float,3> LeafNodeT;
         const float val = 1.0, tol = 1.1f;
@@ -2840,7 +2767,7 @@ TestTools::testPrune()
 
         ASSERT_DOUBLES_EXACTLY_EQUAL(median, tree.getValue(Coord(0)));
     }
-    
+
     /*
     {// Bechmark serial prune
         util::CpuTimer timer;
@@ -2849,7 +2776,7 @@ TestTools::testPrune()
         sourceFile.open(false);//disable delayed loading
         FloatGrid::Ptr grid = gridPtrCast<FloatGrid>(sourceFile.getGrids()->at(0));
         const Index32 leafCount = grid->tree().leafCount();
-        
+
         timer.start("\nSerial tolerance prune");
         grid->tree().prune();
         timer.stop();

@@ -27,7 +27,7 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @file   MeshToVolume.h
 ///
 /// @brief  Convert polygonal meshes that consist of quads and/or triangles
@@ -39,7 +39,6 @@
 ///         mesh surface normals / polygon orientation.
 ///
 /// @author Mihai Alden
-
 
 #ifndef OPENVDB_TOOLS_MESH_TO_VOLUME_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_MESH_TO_VOLUME_HAS_BEEN_INCLUDED
@@ -63,15 +62,16 @@
 #include <tbb/task_group.h>
 #include <tbb/task_scheduler_init.h>
 
-#include <boost/integer_traits.hpp> // const_max
-#include <boost/math/special_functions/fpclassify.hpp> // for isfinite
+#include <boost/integer_traits.hpp> // for const_max
 #include <boost/scoped_array.hpp>
 
-#include <algorithm> // for std::sort
+#include <algorithm> // for std::sort()
+#include <cmath> // for std::isfinite(), std::isnan()
 #include <deque>
 #include <limits>
-#include <memory> // for auto_ptr/unique_ptr
+#include <memory>
 #include <sstream>
+#include <type_traits>
 #include <vector>
 
 namespace openvdb {
@@ -144,7 +144,7 @@ meshToVolume(
   float exteriorBandWidth = 3.0f,
   float interiorBandWidth = 3.0f,
   int flags = 0,
-  typename GridType::template ValueConverter<Int32>::Type * polygonIndexGrid = NULL);
+  typename GridType::template ValueConverter<Int32>::Type * polygonIndexGrid = nullptr);
 
 
 /// @brief  Convert polygonal meshes that consist of quads and/or triangles into
@@ -171,7 +171,7 @@ meshToVolume(
     float exteriorBandWidth = 3.0f,
     float interiorBandWidth = 3.0f,
     int flags = 0,
-    typename GridType::template ValueConverter<Int32>::Type * polygonIndexGrid = NULL);
+    typename GridType::template ValueConverter<Int32>::Type * polygonIndexGrid = nullptr);
 
 
 ////////////////////////////////////////
@@ -192,9 +192,9 @@ struct QuadAndTriangleDataAdapter {
 
     QuadAndTriangleDataAdapter(const std::vector<PointType>& points,
         const std::vector<PolygonType>& polygons)
-        : mPointArray(points.empty() ? NULL : &points[0])
+        : mPointArray(points.empty() ? nullptr : &points[0])
         , mPointArraySize(points.size())
-        , mPolygonArray(polygons.empty() ? NULL : &polygons[0])
+        , mPolygonArray(polygons.empty() ? nullptr : &polygons[0])
         , mPolygonArraySize(polygons.size())
     {
     }
@@ -492,8 +492,8 @@ public:
         Index32 mXPrim, mYPrim, mZPrim;
     };
 
-    typedef tree::Tree4<EdgeData, 5, 4, 3>::Type    TreeType;
-    typedef tree::ValueAccessor<TreeType>           Accessor;
+    using TreeType = tree::Tree4<EdgeData, 5, 4, 3>::Type;
+    using Accessor = tree::ValueAccessor<TreeType>;
 
 
     //////////
@@ -535,18 +535,6 @@ private:
 // Internal utility objects and implementation details
 
 namespace mesh_to_volume_internal {
-
-
-template<typename T>
-struct UniquePtr
-{
-#ifdef OPENVDB_HAS_CXX11
-    typedef std::unique_ptr<T>  type;
-#else
-    typedef std::auto_ptr<T>    type;
-#endif
-};
-
 
 template<typename PointType>
 struct TransformPoints {
@@ -599,10 +587,10 @@ class CombineLeafNodes
 {
 public:
 
-    typedef typename TreeType::template ValueConverter<Int32>::Type     Int32TreeType;
+    using Int32TreeType = typename TreeType::template ValueConverter<Int32>::Type;
 
-    typedef typename TreeType::LeafNodeType         LeafNodeType;
-    typedef typename Int32TreeType::LeafNodeType    Int32LeafNodeType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
+    using Int32LeafNodeType = typename Int32TreeType::LeafNodeType;
 
     CombineLeafNodes(TreeType& lhsDistTree, Int32TreeType& lhsIdxTree,
         LeafNodeType ** rhsDistNodes, Int32LeafNodeType ** rhsIdxNodes)
@@ -618,8 +606,8 @@ public:
         tree::ValueAccessor<TreeType> distAcc(*mDistTree);
         tree::ValueAccessor<Int32TreeType> idxAcc(*mIdxTree);
 
-        typedef typename LeafNodeType::ValueType DistValueType;
-        typedef typename Int32LeafNodeType::ValueType IndexValueType;
+        using DistValueType = typename LeafNodeType::ValueType;
+        using IndexValueType = typename Int32LeafNodeType::ValueType;
 
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
 
@@ -673,10 +661,10 @@ private:
 template<typename TreeType>
 struct StashOriginAndStoreOffset
 {
-    typedef typename TreeType::LeafNodeType LeafNodeType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
 
     StashOriginAndStoreOffset(std::vector<LeafNodeType*>& nodes, Coord* coordinates)
-        : mNodes(nodes.empty() ? NULL : &nodes[0]), mCoordinates(coordinates)
+        : mNodes(nodes.empty() ? nullptr : &nodes[0]), mCoordinates(coordinates)
     {
     }
 
@@ -696,10 +684,10 @@ struct StashOriginAndStoreOffset
 template<typename TreeType>
 struct RestoreOrigin
 {
-    typedef typename TreeType::LeafNodeType LeafNodeType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
 
     RestoreOrigin(std::vector<LeafNodeType*>& nodes, const Coord* coordinates)
-        : mNodes(nodes.empty() ? NULL : &nodes[0]), mCoordinates(coordinates)
+        : mNodes(nodes.empty() ? nullptr : &nodes[0]), mCoordinates(coordinates)
     {
     }
 
@@ -719,7 +707,7 @@ template<typename TreeType>
 class ComputeNodeConnectivity
 {
 public:
-    typedef typename TreeType::LeafNodeType LeafNodeType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
 
     ComputeNodeConnectivity(const TreeType& tree, const Coord* coordinates,
         size_t* offsets, size_t numNodes, const CoordBBox& bbox)
@@ -730,6 +718,11 @@ public:
         , mBBox(bbox)
     {
     }
+
+    ComputeNodeConnectivity(const ComputeNodeConnectivity&) = default;
+
+    // Disallow assignment
+    ComputeNodeConnectivity& operator=(const ComputeNodeConnectivity&) = delete;
 
     void operator()(const tbb::blocked_range<size_t>& range) const {
 
@@ -754,8 +747,9 @@ public:
         }
     }
 
-    size_t findNeighbourNode(tree::ValueAccessor<const TreeType>& acc, const Coord& start, const Coord& step) const {
-
+    size_t findNeighbourNode(tree::ValueAccessor<const TreeType>& acc,
+        const Coord& start, const Coord& step) const
+    {
         Coord ijk = start + step;
         CoordBBox bbox(mBBox);
 
@@ -770,9 +764,6 @@ public:
 
 
 private:
-    // Disallow assignment
-    ComputeNodeConnectivity& operator=(const ComputeNodeConnectivity&);
-
     TreeType    const * const mTree;
     Coord       const * const mCoordinates;
     size_t            * const mOffsets;
@@ -787,11 +778,11 @@ struct LeafNodeConnectivityTable {
 
     enum { INVALID_OFFSET = boost::integer_traits<size_t>::const_max };
 
-    typedef typename TreeType::LeafNodeType LeafNodeType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
 
     LeafNodeConnectivityTable(TreeType& tree)
         : mLeafNodes()
-        , mOffsets(NULL)
+        , mOffsets(nullptr)
     {
         mLeafNodes.reserve(tree.leafCount());
         tree.getNodes(mLeafNodes);
@@ -806,14 +797,15 @@ struct LeafNodeConnectivityTable {
         // stash the leafnode origin coordinate and temporarily store the
         // linear offset in the origin.x variable.
         boost::scoped_array<Coord> coordinates(new Coord[mLeafNodes.size()]);
-        tbb::parallel_for(range, StashOriginAndStoreOffset<TreeType>(mLeafNodes, coordinates.get()));
+        tbb::parallel_for(range,
+            StashOriginAndStoreOffset<TreeType>(mLeafNodes, coordinates.get()));
 
         // build the leafnode offset table
         mOffsets.reset(new size_t[mLeafNodes.size() * 6]);
 
 
-        tbb::parallel_for(range,
-            ComputeNodeConnectivity<TreeType>(tree, coordinates.get(), mOffsets.get(), mLeafNodes.size(), bbox));
+        tbb::parallel_for(range, ComputeNodeConnectivity<TreeType>(
+            tree, coordinates.get(), mOffsets.get(), mLeafNodes.size(), bbox));
 
         // restore the leafnode origin coordinate
         tbb::parallel_for(range, RestoreOrigin<TreeType>(mLeafNodes, coordinates.get()));
@@ -847,12 +839,13 @@ public:
 
     enum Axis { X_AXIS = 0, Y_AXIS = 1, Z_AXIS = 2 };
 
-    typedef typename TreeType::ValueType            ValueType;
-    typedef typename TreeType::LeafNodeType         LeafNodeType;
-    typedef LeafNodeConnectivityTable<TreeType>     ConnectivityTable;
+    using ValueType = typename TreeType::ValueType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
+    using ConnectivityTable = LeafNodeConnectivityTable<TreeType>;
 
-    SweepExteriorSign(Axis axis, const std::vector<size_t>& startNodeIndices, ConnectivityTable& connectivity)
-        : mStartNodeIndices(startNodeIndices.empty() ? NULL : &startNodeIndices[0])
+    SweepExteriorSign(Axis axis, const std::vector<size_t>& startNodeIndices,
+        ConnectivityTable& connectivity)
+        : mStartNodeIndices(startNodeIndices.empty() ? nullptr : &startNodeIndices[0])
         , mConnectivity(&connectivity)
         , mAxis(axis)
     {
@@ -972,8 +965,8 @@ template<typename LeafNodeType>
 inline void
 seedFill(LeafNodeType& node)
 {
-    typedef typename LeafNodeType::ValueType ValueType;
-    typedef std::deque<Index> Queue;
+    using ValueType = typename LeafNodeType::ValueType;
+    using Queue = std::deque<Index>;
 
 
     ValueType* data = node.buffer().data();
@@ -1050,7 +1043,7 @@ scanFill(LeafNodeType& node)
 {
     bool updatedNode = false;
 
-    typedef typename LeafNodeType::ValueType ValueType;
+    using ValueType = typename LeafNodeType::ValueType;
     ValueType* data = node.buffer().data();
 
     Coord ijk(0, 0, 0);
@@ -1084,17 +1077,23 @@ scanFill(LeafNodeType& node)
                     dist = ValueType(-dist);
 
                 // i, j + 1, k
-                } else if (ijk[1] != (LeafNodeType::DIM - 1) && data[pos + LeafNodeType::DIM] < ValueType(0.0)) {
+                } else if (ijk[1] != (LeafNodeType::DIM - 1)
+                    && data[pos + LeafNodeType::DIM] < ValueType(0.0))
+                {
                     updatedSign = true;
                     dist = ValueType(-dist);
 
                 // i - 1, j, k
-                } else if (ijk[0] != 0 && data[pos - LeafNodeType::DIM * LeafNodeType::DIM] < ValueType(0.0)) {
+                } else if (ijk[0] != 0
+                    && data[pos - LeafNodeType::DIM * LeafNodeType::DIM] < ValueType(0.0))
+                {
                     updatedSign = true;
                     dist = ValueType(-dist);
 
                 // i + 1, j, k
-                } else if (ijk[0] != (LeafNodeType::DIM - 1) && data[pos + LeafNodeType::DIM * LeafNodeType::DIM] < ValueType(0.0)) {
+                } else if (ijk[0] != (LeafNodeType::DIM - 1)
+                    && data[pos + LeafNodeType::DIM * LeafNodeType::DIM] < ValueType(0.0))
+                {
                     updatedSign = true;
                     dist = ValueType(-dist);
                 }
@@ -1112,11 +1111,11 @@ template<typename TreeType>
 class SeedFillExteriorSign
 {
 public:
-    typedef typename TreeType::ValueType            ValueType;
-    typedef typename TreeType::LeafNodeType         LeafNodeType;
+    using ValueType = typename TreeType::ValueType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
 
     SeedFillExteriorSign(std::vector<LeafNodeType*>& nodes, bool* changedNodeMask)
-        : mNodes(nodes.empty() ? NULL : &nodes[0])
+        : mNodes(nodes.empty() ? nullptr : &nodes[0])
         , mChangedNodeMask(changedNodeMask)
     {
     }
@@ -1166,11 +1165,12 @@ template<typename TreeType>
 class SyncVoxelMask
 {
 public:
-    typedef typename TreeType::ValueType            ValueType;
-    typedef typename TreeType::LeafNodeType         LeafNodeType;
+    using ValueType = typename TreeType::ValueType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
 
-    SyncVoxelMask(std::vector<LeafNodeType*>& nodes, const bool* changedNodeMask,  bool* changedVoxelMask)
-        : mNodes(nodes.empty() ? NULL : &nodes[0])
+    SyncVoxelMask(std::vector<LeafNodeType*>& nodes,
+        const bool* changedNodeMask,  bool* changedVoxelMask)
+        : mNodes(nodes.empty() ? nullptr : &nodes[0])
         , mChangedNodeMask(changedNodeMask)
         , mChangedVoxelMask(changedVoxelMask)
     {
@@ -1204,11 +1204,12 @@ template<typename TreeType>
 class SeedPoints
 {
 public:
-    typedef typename TreeType::ValueType            ValueType;
-    typedef typename TreeType::LeafNodeType         LeafNodeType;
-    typedef LeafNodeConnectivityTable<TreeType>     ConnectivityTable;
+    using ValueType = typename TreeType::ValueType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
+    using ConnectivityTable = LeafNodeConnectivityTable<TreeType>;
 
-    SeedPoints(ConnectivityTable& connectivity, bool* changedNodeMask, bool* nodeMask, bool* changedVoxelMask)
+    SeedPoints(ConnectivityTable& connectivity,
+        bool* changedNodeMask, bool* nodeMask, bool* changedVoxelMask)
         : mConnectivity(&connectivity)
         , mChangedNodeMask(changedNodeMask)
         , mNodeMask(nodeMask)
@@ -1241,7 +1242,8 @@ public:
 
     bool processZ(const size_t n, bool firstFace) const
     {
-        const size_t offset = firstFace ? mConnectivity->offsetsPrevZ()[n] : mConnectivity->offsetsNextZ()[n];
+        const size_t offset =
+            firstFace ? mConnectivity->offsetsPrevZ()[n] : mConnectivity->offsetsNextZ()[n];
         if (offset != ConnectivityTable::INVALID_OFFSET && mChangedNodeMask[offset]) {
 
             bool* mask = &mChangedVoxelMask[n * LeafNodeType::SIZE];
@@ -1250,7 +1252,8 @@ public:
             const ValueType* rhsData = mConnectivity->nodes()[offset]->buffer().data();
 
             const Index lastOffset = LeafNodeType::DIM - 1;
-            const Index lhsOffset = firstFace ? 0 : lastOffset, rhsOffset = firstFace ? lastOffset : 0;
+            const Index lhsOffset =
+                firstFace ? 0 : lastOffset, rhsOffset = firstFace ? lastOffset : 0;
 
             Index tmpPos(0), pos(0);
             bool changedValue = false;
@@ -1277,7 +1280,8 @@ public:
 
     bool processY(const size_t n, bool firstFace) const
     {
-        const size_t offset = firstFace ? mConnectivity->offsetsPrevY()[n] : mConnectivity->offsetsNextY()[n];
+        const size_t offset =
+            firstFace ? mConnectivity->offsetsPrevY()[n] : mConnectivity->offsetsNextY()[n];
         if (offset != ConnectivityTable::INVALID_OFFSET && mChangedNodeMask[offset]) {
 
             bool* mask = &mChangedVoxelMask[n * LeafNodeType::SIZE];
@@ -1286,7 +1290,8 @@ public:
             const ValueType* rhsData = mConnectivity->nodes()[offset]->buffer().data();
 
             const Index lastOffset = LeafNodeType::DIM * (LeafNodeType::DIM - 1);
-            const Index lhsOffset = firstFace ? 0 : lastOffset, rhsOffset = firstFace ? lastOffset : 0;
+            const Index lhsOffset =
+                firstFace ? 0 : lastOffset, rhsOffset = firstFace ? lastOffset : 0;
 
             Index tmpPos(0), pos(0);
             bool changedValue = false;
@@ -1313,7 +1318,8 @@ public:
 
     bool processX(const size_t n, bool firstFace) const
     {
-        const size_t offset = firstFace ? mConnectivity->offsetsPrevX()[n] : mConnectivity->offsetsNextX()[n];
+        const size_t offset =
+            firstFace ? mConnectivity->offsetsPrevX()[n] : mConnectivity->offsetsNextX()[n];
         if (offset != ConnectivityTable::INVALID_OFFSET && mChangedNodeMask[offset]) {
 
             bool* mask = &mChangedVoxelMask[n * LeafNodeType::SIZE];
@@ -1321,8 +1327,9 @@ public:
             const ValueType* lhsData = mConnectivity->nodes()[n]->buffer().data();
             const ValueType* rhsData = mConnectivity->nodes()[offset]->buffer().data();
 
-            const Index lastOffset =  LeafNodeType::DIM * LeafNodeType::DIM * (LeafNodeType::DIM - 1);
-            const Index lhsOffset = firstFace ? 0 : lastOffset, rhsOffset = firstFace ? lastOffset : 0;
+            const Index lastOffset =  LeafNodeType::DIM * LeafNodeType::DIM * (LeafNodeType::DIM-1);
+            const Index lhsOffset =
+                firstFace ? 0 : lastOffset, rhsOffset = firstFace ? lastOffset : 0;
 
             Index tmpPos(0), pos(0);
             bool changedValue = false;
@@ -1359,20 +1366,20 @@ public:
 template<typename TreeType, typename MeshDataAdapter>
 struct ComputeIntersectingVoxelSign
 {
-    typedef typename TreeType::ValueType                            ValueType;
-    typedef typename TreeType::LeafNodeType                         LeafNodeType;
-    typedef typename TreeType::template ValueConverter<Int32>::Type Int32TreeType;
-    typedef typename Int32TreeType::LeafNodeType                    Int32LeafNodeType;
+    using ValueType = typename TreeType::ValueType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
+    using Int32TreeType = typename TreeType::template ValueConverter<Int32>::Type;
+    using Int32LeafNodeType = typename Int32TreeType::LeafNodeType;
 
-    typedef std::pair<boost::shared_array<Vec3d>, boost::shared_array<bool> >   LocalData;
-    typedef tbb::enumerable_thread_specific<LocalData>                          LocalDataTable;
+    using LocalData = std::pair<boost::shared_array<Vec3d>, boost::shared_array<bool> >;
+    using LocalDataTable = tbb::enumerable_thread_specific<LocalData>;
 
     ComputeIntersectingVoxelSign(
         std::vector<LeafNodeType*>& distNodes,
         const TreeType& distTree,
         const Int32TreeType& indexTree,
         const MeshDataAdapter& mesh)
-        : mDistNodes(distNodes.empty() ? NULL : &distNodes[0])
+        : mDistNodes(distNodes.empty() ? nullptr : &distNodes[0])
         , mDistTree(&distTree)
         , mIndexTree(&indexTree)
         , mMesh(&mesh)
@@ -1437,14 +1444,15 @@ struct ComputeIntersectingVoxelSign
 
                 for (nijk[0] = bbox.min()[0]; nijk[0] <= bbox.max()[0] && !flipSign; ++nijk[0]) {
                     xPos = (nijk[0] & (LeafNodeType::DIM - 1u)) << (2 * LeafNodeType::LOG2DIM);
-                    for (nijk[1] = bbox.min()[1]; nijk[1] <= bbox.max()[1] && !flipSign; ++nijk[1]) {
-                        yPos = xPos + ((nijk[1] & (LeafNodeType::DIM - 1u)) << LeafNodeType::LOG2DIM);
+                    for (nijk[1]=bbox.min()[1]; nijk[1] <= bbox.max()[1] && !flipSign; ++nijk[1]) {
+                        yPos = xPos + ((nijk[1] & (LeafNodeType::DIM-1u)) << LeafNodeType::LOG2DIM);
                         for (nijk[2] = bbox.min()[2]; nijk[2] <= bbox.max()[2]; ++nijk[2]) {
                             pos = yPos + (nijk[2] & (LeafNodeType::DIM - 1u));
 
                             const Int32& polyIdx = idxData[pos];
 
-                            if (polyIdx == Int32(util::INVALID_IDX) || !(data[pos] < -0.75)) continue;
+                            if (polyIdx == Int32(util::INVALID_IDX) || !(data[pos] < -0.75))
+                                continue;
 
                             const Index pointIndex = pos * 2;
 
@@ -1482,7 +1490,7 @@ struct ComputeIntersectingVoxelSign
                     for (Int32 m = 0; m < 26; ++m) {
                         nijk = ijk + util::COORD_OFFSETS[m];
 
-                        if (!bbox.isInside(nijk) && distAcc.probeValue(nijk, nval) && nval < -0.75) {
+                        if (!bbox.isInside(nijk) && distAcc.probeValue(nijk, nval) && nval<-0.75) {
                             nxyz[0] = double(nijk[0]);
                             nxyz[1] = double(nijk[1]);
                             nxyz[2] = double(nijk[2]);
@@ -1540,7 +1548,7 @@ private:
     Int32TreeType   const * const mIndexTree;
     MeshDataAdapter const * const mMesh;
 
-    boost::shared_ptr<LocalDataTable> mLocalDataTable;
+    SharedPtr<LocalDataTable> mLocalDataTable;
 }; // ComputeIntersectingVoxelSign
 
 
@@ -1551,7 +1559,7 @@ template<typename LeafNodeType>
 inline void
 maskNodeInternalNeighbours(const Index pos, bool (&mask)[26])
 {
-    typedef LeafNodeType NodeT;
+    using NodeT = LeafNodeType;
 
     const Coord ijk = NodeT::offsetToLocalCoord(pos);
 
@@ -1619,7 +1627,7 @@ template<typename Compare, typename LeafNodeType>
 inline bool
 checkNeighbours(const Index pos, const typename LeafNodeType::ValueType * data, bool (&mask)[26])
 {
-    typedef LeafNodeType NodeT;
+    using NodeT = LeafNodeType;
 
     // i, j, k - 1
     if (mask[5] && Compare::check(data[pos - 1]))                                         return true;
@@ -1695,14 +1703,14 @@ checkNeighbours(const Coord& ijk, AccessorType& acc, bool (&mask)[26])
 template<typename TreeType>
 struct ValidateIntersectingVoxels
 {
-    typedef typename TreeType::ValueType            ValueType;
-    typedef typename TreeType::LeafNodeType         LeafNodeType;
+    using ValueType = typename TreeType::ValueType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
 
     struct IsNegative { static bool check(const ValueType v) { return v < ValueType(0.0); } };
 
     ValidateIntersectingVoxels(TreeType& tree, std::vector<LeafNodeType*>& nodes)
         : mTree(&tree)
-        , mNodes(nodes.empty() ? NULL : &nodes[0])
+        , mNodes(nodes.empty() ? nullptr : &nodes[0])
     {
     }
 
@@ -1747,15 +1755,15 @@ struct ValidateIntersectingVoxels
 template<typename TreeType>
 struct RemoveSelfIntersectingSurface
 {
-    typedef typename TreeType::ValueType            ValueType;
-    typedef typename TreeType::LeafNodeType         LeafNodeType;
-    typedef typename TreeType::template ValueConverter<Int32>::Type Int32TreeType;
+    using ValueType = typename TreeType::ValueType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
+    using Int32TreeType = typename TreeType::template ValueConverter<Int32>::Type;
 
     struct Comp { static bool check(const ValueType v) { return !(v > ValueType(0.75)); } };
 
     RemoveSelfIntersectingSurface(std::vector<LeafNodeType*>& nodes,
         TreeType& distTree, Int32TreeType& indexTree)
-        : mNodes(nodes.empty() ? NULL : &nodes[0])
+        : mNodes(nodes.empty() ? nullptr : &nodes[0])
         , mDistTree(&distTree)
         , mIndexTree(&indexTree)
     {
@@ -1787,7 +1795,7 @@ struct RemoveSelfIntersectingSurface
 
                 const bool hasBoundaryNeighbour =
                     checkNeighbours<Comp, LeafNodeType>(pos, data, neighbourMask) ||
-                    checkNeighbours<Comp>(distNode.offsetToGlobalCoord(pos), distAcc, neighbourMask);
+                    checkNeighbours<Comp>(distNode.offsetToGlobalCoord(pos),distAcc,neighbourMask);
 
                 if (!hasBoundaryNeighbour) {
                     distNode.setValueOff(pos);
@@ -1813,7 +1821,7 @@ struct ReleaseChildNodes
 
     void operator()(const tbb::blocked_range<size_t>& range) const {
 
-        typedef typename NodeType::NodeMaskType NodeMaskType;
+        using NodeMaskType = typename NodeType::NodeMaskType;
 
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
             const_cast<NodeMaskType&>(mNodes[n]->getChildMask()).setOff();
@@ -1828,22 +1836,22 @@ template<typename TreeType>
 inline void
 releaseLeafNodes(TreeType& tree)
 {
-    typedef typename TreeType::RootNodeType         RootNodeType;
-    typedef typename RootNodeType::NodeChainType    NodeChainType;
-    typedef typename boost::mpl::at<NodeChainType, boost::mpl::int_<1> >::type InternalNodeType;
+    using RootNodeType = typename TreeType::RootNodeType;
+    using NodeChainType = typename RootNodeType::NodeChainType;
+    using InternalNodeType = typename boost::mpl::at<NodeChainType, boost::mpl::int_<1> >::type;
 
     std::vector<InternalNodeType*> nodes;
     tree.getNodes(nodes);
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
-        ReleaseChildNodes<InternalNodeType>(nodes.empty() ? NULL : &nodes[0]));
+        ReleaseChildNodes<InternalNodeType>(nodes.empty() ? nullptr : &nodes[0]));
 }
 
 
 template<typename TreeType>
 struct StealUniqueLeafNodes
 {
-    typedef typename TreeType::LeafNodeType LeafNodeType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
 
     StealUniqueLeafNodes(TreeType& lhsTree, TreeType& rhsTree,
         std::vector<LeafNodeType*>& overlappingNodes)
@@ -1885,8 +1893,8 @@ inline void
 combineData(DistTreeType& lhsDist, IndexTreeType& lhsIdx,
     DistTreeType& rhsDist, IndexTreeType& rhsIdx)
 {
-    typedef typename DistTreeType::LeafNodeType     DistLeafNodeType;
-    typedef typename IndexTreeType::LeafNodeType    IndexLeafNodeType;
+    using DistLeafNodeType = typename DistTreeType::LeafNodeType;
+    using IndexLeafNodeType = typename IndexTreeType::LeafNodeType;
 
     std::vector<DistLeafNodeType*>  overlappingDistNodes;
     std::vector<IndexLeafNodeType*> overlappingIdxNodes;
@@ -1900,7 +1908,8 @@ combineData(DistTreeType& lhsDist, IndexTreeType& lhsIdx,
     // Combine overlapping leaf nodes
     if (!overlappingDistNodes.empty() && !overlappingIdxNodes.empty()) {
         tbb::parallel_for(tbb::blocked_range<size_t>(0, overlappingDistNodes.size()),
-            CombineLeafNodes<DistTreeType>(lhsDist, lhsIdx, &overlappingDistNodes[0], &overlappingIdxNodes[0]));
+            CombineLeafNodes<DistTreeType>(lhsDist, lhsIdx,
+                &overlappingDistNodes[0], &overlappingIdxNodes[0]));
     }
 }
 
@@ -1913,15 +1922,15 @@ combineData(DistTreeType& lhsDist, IndexTreeType& lhsIdx,
 template<typename TreeType>
 struct VoxelizationData {
 
-    typedef boost::scoped_ptr<VoxelizationData>                         Ptr;
-    typedef typename TreeType::ValueType                                ValueType;
+    using Ptr = std::unique_ptr<VoxelizationData>;
+    using ValueType = typename TreeType::ValueType;
 
-    typedef typename TreeType::template ValueConverter<Int32>::Type         Int32TreeType;
-    typedef typename TreeType::template ValueConverter<unsigned char>::Type UCharTreeType;
+    using Int32TreeType = typename TreeType::template ValueConverter<Int32>::Type;
+    using UCharTreeType = typename TreeType::template ValueConverter<unsigned char>::Type;
 
-    typedef tree::ValueAccessor<TreeType>       FloatTreeAcc;
-    typedef tree::ValueAccessor<Int32TreeType>  Int32TreeAcc;
-    typedef tree::ValueAccessor<UCharTreeType>  UCharTreeAcc;
+    using FloatTreeAcc = tree::ValueAccessor<TreeType>;
+    using Int32TreeAcc = tree::ValueAccessor<Int32TreeType>;
+    using UCharTreeAcc = tree::ValueAccessor<UCharTreeType>;
 
 
     VoxelizationData()
@@ -1967,12 +1976,12 @@ class VoxelizePolygons
 {
 public:
 
-    typedef VoxelizationData<TreeType>                                          VoxelizationDataType;
-    typedef tbb::enumerable_thread_specific<typename VoxelizationDataType::Ptr> DataTable;
+    using VoxelizationDataType = VoxelizationData<TreeType>;
+    using DataTable = tbb::enumerable_thread_specific<typename VoxelizationDataType::Ptr>;
 
     VoxelizePolygons(DataTable& dataTable,
         const MeshDataAdapter& mesh,
-        Interrupter* interrupter = NULL)
+        Interrupter* interrupter = nullptr)
         : mDataTable(&dataTable)
         , mMesh(&mesh)
         , mInterrupter(interrupter)
@@ -2024,7 +2033,8 @@ private:
     {
         enum { POLYGON_LIMIT = 1000 };
 
-        SubTask(const Triangle& prim, DataTable& dataTable, int subdivisionCount, size_t polygonCount)
+        SubTask(const Triangle& prim, DataTable& dataTable,
+            int subdivisionCount, size_t polygonCount)
             : mLocalDataTable(&dataTable)
             , mPrim(prim)
             , mSubdivisionCount(subdivisionCount)
@@ -2069,7 +2079,8 @@ private:
     void evalTriangle(const Triangle& prim, VoxelizationDataType& data) const
     {
         const size_t polygonCount = mMesh->polygonCount();
-        const int subdivisionCount = polygonCount < SubTask::POLYGON_LIMIT ? evalSubdivisionCount(prim) : 0;
+        const int subdivisionCount =
+            polygonCount < SubTask::POLYGON_LIMIT ? evalSubdivisionCount(prim) : 0;
 
         if (subdivisionCount <= 0) {
             voxelizeTriangle(prim, data);
@@ -2147,10 +2158,10 @@ private:
     {
         Vec3d uvw, voxelCenter(ijk[0], ijk[1], ijk[2]);
 
-        typedef typename TreeType::ValueType ValueType;
+        using ValueType = typename TreeType::ValueType;
 
         const ValueType dist = ValueType((voxelCenter -
-                closestPointOnTriangleToPoint(prim.a, prim.c, prim.b, voxelCenter, uvw)).lengthSqr());
+            closestPointOnTriangleToPoint(prim.a, prim.c, prim.b, voxelCenter, uvw)).lengthSqr());
 
         const ValueType oldDist = data.distAcc.getValue(ijk);
 
@@ -2178,15 +2189,15 @@ private:
 template<typename TreeType>
 struct DiffLeafNodeMask
 {
-    typedef typename tree::ValueAccessor<TreeType>  AccessorType;
-    typedef typename TreeType::LeafNodeType         LeafNodeType;
+    using AccessorType = typename tree::ValueAccessor<TreeType>;
+    using LeafNodeType = typename TreeType::LeafNodeType;
 
-    typedef typename TreeType::template ValueConverter<bool>::Type  BoolTreeType;
-    typedef typename BoolTreeType::LeafNodeType                     BoolLeafNodeType;
+    using BoolTreeType = typename TreeType::template ValueConverter<bool>::Type;
+    using BoolLeafNodeType = typename BoolTreeType::LeafNodeType;
 
     DiffLeafNodeMask(const TreeType& rhsTree,
         std::vector<BoolLeafNodeType*>& lhsNodes)
-        : mRhsTree(&rhsTree), mLhsNodes(lhsNodes.empty() ? NULL : &lhsNodes[0])
+        : mRhsTree(&rhsTree), mLhsNodes(lhsNodes.empty() ? nullptr : &lhsNodes[0])
     {
     }
 
@@ -2213,8 +2224,8 @@ template<typename LeafNodeTypeA, typename LeafNodeTypeB>
 struct UnionValueMasks
 {
     UnionValueMasks(std::vector<LeafNodeTypeA*>& nodesA, std::vector<LeafNodeTypeB*>& nodesB)
-        : mNodesA(nodesA.empty() ? NULL : &nodesA[0])
-        , mNodesB(nodesB.empty() ? NULL : &nodesB[0])
+        : mNodesA(nodesA.empty() ? nullptr : &nodesA[0])
+        , mNodesB(nodesB.empty() ? nullptr : &nodesB[0])
     {
     }
 
@@ -2233,14 +2244,15 @@ private:
 template<typename TreeType>
 struct ConstructVoxelMask
 {
-    typedef typename TreeType::LeafNodeType                         LeafNodeType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
 
-    typedef typename TreeType::template ValueConverter<bool>::Type  BoolTreeType;
-    typedef typename BoolTreeType::LeafNodeType                     BoolLeafNodeType;
+    using BoolTreeType = typename TreeType::template ValueConverter<bool>::Type;
+    using BoolLeafNodeType = typename BoolTreeType::LeafNodeType;
 
-    ConstructVoxelMask(BoolTreeType& maskTree, const TreeType& tree, std::vector<LeafNodeType*>& nodes)
+    ConstructVoxelMask(BoolTreeType& maskTree, const TreeType& tree,
+        std::vector<LeafNodeType*>& nodes)
         : mTree(&tree)
-        , mNodes(nodes.empty() ? NULL : &nodes[0])
+        , mNodes(nodes.empty() ? nullptr : &nodes[0])
         , mLocalMaskTree(false)
         , mMaskTree(&maskTree)
     {
@@ -2256,7 +2268,7 @@ struct ConstructVoxelMask
 
     void operator()(const tbb::blocked_range<size_t>& range)
     {
-        typedef typename LeafNodeType::ValueOnCIter Iterator;
+        using Iterator = typename LeafNodeType::ValueOnCIter;
 
         tree::ValueAccessor<const TreeType> acc(*mTree);
         tree::ValueAccessor<BoolTreeType> maskAcc(*mMaskTree);
@@ -2345,13 +2357,13 @@ private:
 template<typename TreeType, typename MeshDataAdapter>
 struct ExpandNarrowband
 {
-    typedef typename TreeType::ValueType                            ValueType;
-    typedef typename TreeType::LeafNodeType                         LeafNodeType;
-    typedef typename LeafNodeType::NodeMaskType                     NodeMaskType;
-    typedef typename TreeType::template ValueConverter<Int32>::Type Int32TreeType;
-    typedef typename Int32TreeType::LeafNodeType                    Int32LeafNodeType;
-    typedef typename TreeType::template ValueConverter<bool>::Type  BoolTreeType;
-    typedef typename BoolTreeType::LeafNodeType                     BoolLeafNodeType;
+    using ValueType = typename TreeType::ValueType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
+    using NodeMaskType = typename LeafNodeType::NodeMaskType;
+    using Int32TreeType = typename TreeType::template ValueConverter<Int32>::Type;
+    using Int32LeafNodeType = typename Int32TreeType::LeafNodeType;
+    using BoolTreeType = typename TreeType::template ValueConverter<bool>::Type;
+    using BoolLeafNodeType = typename BoolTreeType::LeafNodeType;
 
     struct Fragment
     {
@@ -2379,7 +2391,7 @@ struct ExpandNarrowband
         ValueType exteriorBandWidth,
         ValueType interiorBandWidth,
         ValueType voxelSize)
-        : mMaskNodes(maskNodes.empty() ? NULL : &maskNodes[0])
+        : mMaskNodes(maskNodes.empty() ? nullptr : &maskNodes[0])
         , mMaskTree(&maskTree)
         , mDistTree(&distTree)
         , mIndexTree(&indexTree)
@@ -2435,8 +2447,8 @@ struct ExpandNarrowband
         std::vector<Fragment> fragments;
         fragments.reserve(256);
 
-        typename UniquePtr<LeafNodeType>::type      newDistNodePt;
-        typename UniquePtr<Int32LeafNodeType>::type newIndexNodePt;
+        std::unique_ptr<LeafNodeType> newDistNodePt;
+        std::unique_ptr<Int32LeafNodeType> newIndexNodePt;
 
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
 
@@ -2671,7 +2683,7 @@ private:
     bool
     updateVoxel(const Coord& ijk, const Int32 manhattanLimit,
         const std::vector<Fragment>& fragments,
-        LeafNodeType& distLeaf, Int32LeafNodeType& idxLeaf, bool* updatedLeafNodes = NULL)
+        LeafNodeType& distLeaf, Int32LeafNodeType& idxLeaf, bool* updatedLeafNodes = nullptr)
     {
         Int32 closestPrimIdx = 0;
         const ValueType distance = computeDistance(ijk, manhattanLimit, fragments, closestPrimIdx);
@@ -2716,7 +2728,7 @@ private:
 
 template<typename TreeType>
 struct AddNodes {
-    typedef typename TreeType::LeafNodeType LeafNodeType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
 
     AddNodes(TreeType& tree, std::vector<LeafNodeType*>& nodes)
         : mTree(&tree) , mNodes(&nodes)
@@ -2774,8 +2786,8 @@ expandNarrowband(
 template<typename TreeType>
 struct TransformValues
 {
-    typedef typename TreeType::LeafNodeType   LeafNodeType;
-    typedef typename TreeType::ValueType      ValueType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
+    using ValueType = typename TreeType::ValueType;
 
     TransformValues(std::vector<LeafNodeType*>& nodes,
         ValueType voxelSize, bool unsignedDist)
@@ -2812,12 +2824,12 @@ private:
 template<typename TreeType>
 struct InactivateValues
 {
-    typedef typename TreeType::LeafNodeType   LeafNodeType;
-    typedef typename TreeType::ValueType      ValueType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
+    using ValueType = typename TreeType::ValueType;
 
     InactivateValues(std::vector<LeafNodeType*>& nodes,
         ValueType exBandWidth, ValueType inBandWidth)
-        : mNodes(nodes.empty() ? NULL : &nodes[0])
+        : mNodes(nodes.empty() ? nullptr : &nodes[0])
         , mExBandWidth(exBandWidth)
         , mInBandWidth(inBandWidth)
     {
@@ -2857,11 +2869,11 @@ private:
 template<typename TreeType>
 struct OffsetValues
 {
-    typedef typename TreeType::LeafNodeType   LeafNodeType;
-    typedef typename TreeType::ValueType      ValueType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
+    using ValueType = typename TreeType::ValueType;
 
     OffsetValues(std::vector<LeafNodeType*>& nodes, ValueType offset)
-        : mNodes(nodes.empty() ? NULL : &nodes[0]), mOffset(offset)
+        : mNodes(nodes.empty() ? nullptr : &nodes[0]), mOffset(offset)
     {
     }
 
@@ -2889,12 +2901,13 @@ private:
 template<typename TreeType>
 struct Renormalize
 {
-    typedef typename TreeType::LeafNodeType     LeafNodeType;
-    typedef typename TreeType::ValueType        ValueType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
+    using ValueType = typename TreeType::ValueType;
 
-    Renormalize(const TreeType& tree, const std::vector<LeafNodeType*>& nodes, ValueType* buffer, ValueType voxelSize)
+    Renormalize(const TreeType& tree, const std::vector<LeafNodeType*>& nodes,
+        ValueType* buffer, ValueType voxelSize)
         : mTree(&tree)
-        , mNodes(nodes.empty() ? NULL : &nodes[0])
+        , mNodes(nodes.empty() ? nullptr : &nodes[0])
         , mBuffer(buffer)
         , mVoxelSize(voxelSize)
     {
@@ -2902,7 +2915,7 @@ struct Renormalize
 
     void operator()(const tbb::blocked_range<size_t>& range) const
     {
-        typedef math::Vec3<ValueType>   Vec3Type;
+        using Vec3Type = math::Vec3<ValueType>;
 
         tree::ValueAccessor<const TreeType> acc(*mTree);
 
@@ -2952,11 +2965,11 @@ private:
 template<typename TreeType>
 struct MinCombine
 {
-    typedef typename TreeType::LeafNodeType   LeafNodeType;
-    typedef typename TreeType::ValueType      ValueType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
+    using ValueType = typename TreeType::ValueType;
 
     MinCombine(std::vector<LeafNodeType*>& nodes, const ValueType* buffer)
-        : mNodes(nodes.empty() ? NULL : &nodes[0]), mBuffer(buffer)
+        : mNodes(nodes.empty() ? nullptr : &nodes[0]), mBuffer(buffer)
     {
     }
 
@@ -2993,7 +3006,7 @@ template <typename FloatTreeT>
 inline void
 traceExteriorBoundaries(FloatTreeT& tree)
 {
-    typedef mesh_to_volume_internal::LeafNodeConnectivityTable<FloatTreeT> ConnectivityTable;
+    using ConnectivityTable = mesh_to_volume_internal::LeafNodeConnectivityTable<FloatTreeT>;
 
     ConnectivityTable nodeConnectivity(tree);
 
@@ -3013,7 +3026,7 @@ traceExteriorBoundaries(FloatTreeT& tree)
         }
     }
 
-    typedef mesh_to_volume_internal::SweepExteriorSign<FloatTreeT> SweepingOp;
+    using SweepingOp = mesh_to_volume_internal::SweepExteriorSign<FloatTreeT>;
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, zStartNodes.size()),
         SweepingOp(SweepingOp::Z_AXIS, zStartNodes, nodeConnectivity));
@@ -3041,8 +3054,9 @@ traceExteriorBoundaries(FloatTreeT& tree)
         tbb::parallel_for(nodeRange, mesh_to_volume_internal::SeedFillExteriorSign<FloatTreeT>(
             nodeConnectivity.nodes(), changedNodeMaskA.get()));
 
-        tbb::parallel_for(nodeRange, mesh_to_volume_internal::SeedPoints<FloatTreeT>(nodeConnectivity,
-            changedNodeMaskA.get(), changedNodeMaskB.get(), changedVoxelMask.get()));
+        tbb::parallel_for(nodeRange, mesh_to_volume_internal::SeedPoints<FloatTreeT>(
+            nodeConnectivity, changedNodeMaskA.get(), changedNodeMaskB.get(),
+            changedVoxelMask.get()));
 
         changedNodeMaskA.swap(changedNodeMaskB);
 
@@ -3075,15 +3089,15 @@ meshToVolume(
   int flags,
   typename GridType::template ValueConverter<Int32>::Type * polygonIndexGrid)
 {
-    typedef typename GridType::Ptr              GridTypePtr;
-    typedef typename GridType::TreeType         TreeType;
-    typedef typename TreeType::LeafNodeType     LeafNodeType;
-    typedef typename GridType::ValueType        ValueType;
+    using GridTypePtr = typename GridType::Ptr;
+    using TreeType = typename GridType::TreeType;
+    using LeafNodeType = typename TreeType::LeafNodeType;
+    using ValueType = typename GridType::ValueType;
 
-    typedef typename GridType::template ValueConverter<Int32>::Type  Int32GridType;
-    typedef typename Int32GridType::TreeType                         Int32TreeType;
+    using Int32GridType = typename GridType::template ValueConverter<Int32>::Type;
+    using Int32TreeType = typename Int32GridType::TreeType;
 
-    typedef typename TreeType::template ValueConverter<bool>::Type   BoolTreeType;
+    using BoolTreeType = typename TreeType::template ValueConverter<bool>::Type;
 
     //////////
 
@@ -3097,7 +3111,7 @@ meshToVolume(
 
     // Note: inf interior width is all right, this value makes the converter fill
     // interior regions with distance values.
-    if (!boost::math::isfinite(exteriorWidth) || boost::math::isnan(interiorWidth)) {
+    if (!std::isfinite(exteriorWidth) || std::isnan(interiorWidth)) {
         std::stringstream msg;
         msg << "Illegal narrow band width: exterior = " << exteriorWidth
             << ", interior = " << interiorWidth;
@@ -3107,7 +3121,7 @@ meshToVolume(
 
     const ValueType voxelSize = ValueType(transform.voxelSize()[0]);
 
-    if (!boost::math::isfinite(voxelSize) || math::isZero(voxelSize)) {
+    if (!std::isfinite(voxelSize) || math::isZero(voxelSize)) {
         std::stringstream msg;
         msg << "Illegal transform, voxel size = " << voxelSize;
         OPENVDB_LOG_DEBUG(msg.str());
@@ -3127,7 +3141,7 @@ meshToVolume(
     const bool renormalizeValues = (flags & DISABLE_RENORMALIZATION) == 0;
     const bool trimNarrowBand = (flags & DISABLE_NARROW_BAND_TRIMMING) == 0;
 
-    Int32GridType* indexGrid = NULL;
+    Int32GridType* indexGrid = nullptr;
 
     typename Int32GridType::Ptr temporaryIndexGrid;
 
@@ -3157,11 +3171,12 @@ meshToVolume(
     // Voxelize mesh
 
     {
-        typedef mesh_to_volume_internal::VoxelizationData<TreeType> VoxelizationDataType;
-        typedef tbb::enumerable_thread_specific<typename VoxelizationDataType::Ptr> DataTable;
+        using VoxelizationDataType = mesh_to_volume_internal::VoxelizationData<TreeType>;
+        using DataTable = tbb::enumerable_thread_specific<typename VoxelizationDataType::Ptr>;
 
         DataTable data;
-        typedef mesh_to_volume_internal::VoxelizePolygons<TreeType, MeshDataAdapter, Interrupter> Voxelizer;
+        using Voxelizer =
+            mesh_to_volume_internal::VoxelizePolygons<TreeType, MeshDataAdapter, Interrupter>;
 
         const tbb::blocked_range<size_t> polygonRange(0, mesh.polygonCount());
 
@@ -3194,7 +3209,8 @@ meshToVolume(
 
         const tbb::blocked_range<size_t> nodeRange(0, nodes.size());
 
-        typedef mesh_to_volume_internal::ComputeIntersectingVoxelSign<TreeType, MeshDataAdapter> SignOp;
+        using SignOp =
+            mesh_to_volume_internal::ComputeIntersectingVoxelSign<TreeType, MeshDataAdapter>;
 
         tbb::parallel_for(nodeRange, SignOp(nodes, distTree, indexTree, mesh));
 
@@ -3385,8 +3401,8 @@ meshToVolume(
 
 /// @internal This overload is enabled only for grids with a scalar, floating-point ValueType.
 template<typename GridType, typename Interrupter>
-inline typename boost::enable_if<boost::is_floating_point<typename GridType::ValueType>,
-typename GridType::Ptr>::type
+inline typename std::enable_if<std::is_floating_point<typename GridType::ValueType>::value,
+    typename GridType::Ptr>::type
 doMeshConversion(
     Interrupter& interrupter,
     const openvdb::math::Transform& xform,
@@ -3448,15 +3464,16 @@ doMeshConversion(
     QuadAndTriangleDataAdapter<Vec3s, Vec4I>
         mesh(indexSpacePoints.get(), numPoints, prims.get(), numPrimitives);
 
-    return meshToVolume<GridType>(interrupter, mesh, xform, exBandWidth, inBandWidth, conversionFlags);
+    return meshToVolume<GridType>(interrupter, mesh, xform,
+        exBandWidth, inBandWidth, conversionFlags);
 }
 
 
 /// @internal This overload is enabled only for grids that do not have a scalar,
 /// floating-point ValueType.
 template<typename GridType, typename Interrupter>
-inline typename boost::disable_if<boost::is_floating_point<typename GridType::ValueType>,
-typename GridType::Ptr>::type
+inline typename std::enable_if<!std::is_floating_point<typename GridType::ValueType>::value,
+    typename GridType::Ptr>::type
 doMeshConversion(
     Interrupter&,
     const math::Transform& /*xform*/,
@@ -3689,7 +3706,7 @@ private:
     const std::vector<Vec4I>& mPolygonList;
 
     // Used internally for acceleration
-    typedef TreeType::ValueConverter<Int32>::Type IntTreeT;
+    using IntTreeT = TreeType::ValueConverter<Int32>::Type;
     IntTreeT mLastPrimTree;
     tree::ValueAccessor<IntTreeT> mLastPrimAccessor;
 }; // class MeshToVoxelEdgeData::GenEdgeData
@@ -3735,10 +3752,10 @@ MeshToVoxelEdgeData::GenEdgeData::run(bool threaded)
 inline void
 MeshToVoxelEdgeData::GenEdgeData::join(GenEdgeData& rhs)
 {
-    typedef TreeType::RootNodeType       RootNodeType;
-    typedef RootNodeType::NodeChainType  NodeChainType;
-    BOOST_STATIC_ASSERT(boost::mpl::size<NodeChainType>::value > 1);
-    typedef boost::mpl::at<NodeChainType, boost::mpl::int_<1> >::type InternalNodeType;
+    using RootNodeType = TreeType::RootNodeType;
+    using NodeChainType = RootNodeType::NodeChainType;
+    static_assert(boost::mpl::size<NodeChainType>::value > 1, "expected tree height > 1");
+    using InternalNodeType = boost::mpl::at<NodeChainType, boost::mpl::int_<1> >::type;
 
     Coord ijk;
     Index offset;

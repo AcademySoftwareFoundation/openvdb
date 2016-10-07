@@ -38,18 +38,19 @@ PROJECT_NAME           = "OpenVDB"
 # could be handy for archiving the generated documentation or if some version
 # control system is used.
 
-PROJECT_NUMBER         = 3.2.0
+PROJECT_NUMBER         = 4.0.0
 
-ALIASES += vdbnamespace="openvdb::v3_2_0"
-PREDEFINED = OPENVDB_VERSION_NAME=v3_2_0
+ALIASES += vdbnamespace="openvdb::v4_0_0"
+PREDEFINED = OPENVDB_VERSION_NAME=v4_0_0
 
 PREDEFINED += __declspec(x):= __attribute__(x):=
+PREDEFINED += OPENVDB_STATIC_SPECIALIZATION=""
 #EXPAND_AS_DEFINED = \
 #    OPENVDB_API \
 #    OPENVDB_HOUDINI_API \
 #    OPENVDB_EXPORT \
 #    OPENVDB_IMPORT \
-#    OPENVDB_DEPRECATED
+#    OPENVDB_DEPRECATED \
 #    OPENVDB_STATIC_SPECIALIZATION
 
 # Using the PROJECT_BRIEF tag one can provide an optional one line description
@@ -776,7 +777,6 @@ WARN_LOGFILE           =
 INPUT                  = . \
                          io \
                          math \
-                         metadata \
                          python/pyopenvdb.h \
                          tools \
                          tree \

@@ -41,8 +41,8 @@
 #   depend              recompute source file header dependencies
 #
 # Options:
-#   abi=2               build for compatibility with the OpenVDB 2.x Grid ABI
-#                       (some OpenVDB 3.x features will be disabled)
+#   abi=3               build for compatibility with the OpenVDB 3.x Grid ABI
+#                       (some OpenVDB 4.x features will be disabled)
 #   shared=no           link executables against static OpenVDB libraries
 #                       (default: link against shared libraries)
 #   debug=yes           build with debugging symbols and without optimization
@@ -156,9 +156,9 @@ HCUSTOM_INCLDIRS := $(subst isystem,I,$(INCLDIRS))
 CXXFLAGS += -std=c++0x
 
 CXXFLAGS += -pthread $(OPTIMIZE) $(INCLDIRS) -DIGNORE_HDK_DEPRECATIONS
-ifeq (2,$(strip $(abi)))
-    CXXFLAGS += -DOPENVDB_2_ABI_COMPATIBLE
-    HCUSTOM_EXTRA_CFLAGS += -DOPENVDB_2_ABI_COMPATIBLE
+ifeq (3,$(strip $(abi)))
+    CXXFLAGS += -DOPENVDB_3_ABI_COMPATIBLE
+    HCUSTOM_EXTRA_CFLAGS += -DOPENVDB_3_ABI_COMPATIBLE
 endif
 ifdef MBSD
     # Darwin ld treats undefined symbols as errors by default;
@@ -316,46 +316,12 @@ endif # shared
 # Environment variables to pass to hcustom
 HCUSTOM_EXPORT :=
 ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)$(HCUSTOM_EXTRA_LDFLAGS)))
-    # Prior to Houdini 13.0.548 and 14.0.105, the only way to pass extra compiler flags
-    # to hcustom was to append them to the compiler name and pass the result in the
-    # environment variable HOUDINI_CC.
-    ifeq (use_houdini_cc,$(shell test \
-        \( $(HOUDINI_MAJOR_RELEASE) -lt 13 \) \
-        -o \( \( $(HOUDINI_MAJOR_RELEASE) -eq 13 \) -a \( $(HOUDINI_BUILD_VERSION) -lt 548 \) \) \
-        -o \( \( $(HOUDINI_MAJOR_RELEASE) -eq 14 \) -a \( $(HOUDINI_MINOR_RELEASE) -eq 0 \) \
-            -a \( $(HOUDINI_BUILD_VERSION) -lt 105 \) \) \
-        && echo use_houdini_cc))
-        ifeq (,$(strip $(HOUDINI_CC)))
-            # If HOUDINI_CC is not set, set it to CXX if CXX is set, otherwise set it to
-            # something platform-appropriate.  (This replicates the logic in hcustom.)
-            ifneq (,$(strip $(CXX)))
-                HOUDINI_CC = $(CXX)
-            else
-                ifdef LINUX
-                    HOUDINI_CC = g++
-                else ifdef MBSD
-                    HOUDINI_CC = clang++
-                #else ifdef WINDOWS_NT  # TODO
-                #    HOUDINI_CC =
-                else
-                    HOUDINI_CC =
-                endif
-            endif
-        endif
-        ifeq (,$(strip $(HOUDINI_CC)))
-            $(error Cannot determine which C++ compiler to use with hcustom; please specify a compiler by setting $$(CXX))
-        endif
-        HCUSTOM_EXPORT := HOUDINI_CC='$(HOUDINI_CC) $(HCUSTOM_EXTRA_CFLAGS) $(HCUSTOM_EXTRA_LDFLAGS)'
-    else
-        # From Houdini 13.0.548 and 14.0.105 on, hcustom recognizes
-        # the environment variables HCUSTOM_CFLAGS and HCUSTOM_LDFLAGS.
-        ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)))
-            HCUSTOM_EXPORT += HCUSTOM_CFLAGS=$(strip $(HCUSTOM_EXTRA_CFLAGS))
-        endif
-        ifneq (,$(strip $(HCUSTOM_EXTRA_LDFLAGS)))
-            HCUSTOM_EXPORT += HCUSTOM_LDFLAGS=$(strip $(HCUSTOM_EXTRA_LDFLAGS))
-        endif
-    endif
+	ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)))
+		HCUSTOM_EXPORT += HCUSTOM_CFLAGS="$(strip $(HCUSTOM_EXTRA_CFLAGS))"
+	endif
+	ifneq (,$(strip $(HCUSTOM_EXTRA_LDFLAGS)))
+		HCUSTOM_EXPORT += HCUSTOM_LDFLAGS="$(strip $(HCUSTOM_EXTRA_LDFLAGS))"
+	endif
 endif
 ifneq (,$(strip $(HCUSTOM_EXPORT)))
     HCUSTOM_EXPORT := export $(HCUSTOM_EXPORT);

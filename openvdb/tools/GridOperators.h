@@ -27,7 +27,7 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @file GridOperators.h
 ///
 /// @brief Applies an operator on an input grid to produce an output
@@ -90,14 +90,14 @@ template<typename GridType> inline
 typename ScalarToVectorConverter<GridType>::Type::Ptr
 cpt(const GridType& grid, bool threaded = true)
 {
-    return cpt<GridType, util::NullInterrupter>(grid, threaded, NULL);
+    return cpt<GridType, util::NullInterrupter>(grid, threaded, nullptr);
 }
 
 template<typename GridType, typename MaskT> inline
 typename ScalarToVectorConverter<GridType>::Type::Ptr
 cpt(const GridType& grid, const MaskT& mask, bool threaded = true)
 {
-    return cpt<GridType, MaskT, util::NullInterrupter>(grid, mask, threaded, NULL);
+    return cpt<GridType, MaskT, util::NullInterrupter>(grid, mask, threaded, nullptr);
 }
 
 
@@ -118,14 +118,14 @@ template<typename GridType> inline
 typename GridType::Ptr
 curl(const GridType& grid, bool threaded = true)
 {
-    return curl<GridType, util::NullInterrupter>(grid, threaded, NULL);
+    return curl<GridType, util::NullInterrupter>(grid, threaded, nullptr);
 }
 
 template<typename GridType, typename MaskT> inline
 typename GridType::Ptr
 curl(const GridType& grid, const MaskT& mask, bool threaded = true)
 {
-    return curl<GridType, MaskT, util::NullInterrupter>(grid, mask, threaded, NULL);
+    return curl<GridType, MaskT, util::NullInterrupter>(grid, mask, threaded, nullptr);
 }
 
 
@@ -147,14 +147,14 @@ template<typename GridType> inline
 typename VectorToScalarConverter<GridType>::Type::Ptr
 divergence(const GridType& grid, bool threaded = true)
 {
-    return divergence<GridType, util::NullInterrupter>(grid, threaded, NULL);
+    return divergence<GridType, util::NullInterrupter>(grid, threaded, nullptr);
 }
 
 template<typename GridType, typename MaskT> inline
 typename VectorToScalarConverter<GridType>::Type::Ptr
 divergence(const GridType& grid, const MaskT& mask, bool threaded = true)
 {
-    return divergence<GridType, MaskT, util::NullInterrupter>(grid, mask, threaded, NULL);
+    return divergence<GridType, MaskT, util::NullInterrupter>(grid, mask, threaded, nullptr);
 }
 
 
@@ -176,14 +176,14 @@ template<typename GridType> inline
 typename ScalarToVectorConverter<GridType>::Type::Ptr
 gradient(const GridType& grid, bool threaded = true)
 {
-    return gradient<GridType, util::NullInterrupter>(grid, threaded, NULL);
+    return gradient<GridType, util::NullInterrupter>(grid, threaded, nullptr);
 }
 
 template<typename GridType, typename MaskT> inline
 typename ScalarToVectorConverter<GridType>::Type::Ptr
 gradient(const GridType& grid, const MaskT& mask, bool threaded = true)
 {
-    return gradient<GridType, MaskT, util::NullInterrupter>(grid, mask, threaded, NULL);
+    return gradient<GridType, MaskT, util::NullInterrupter>(grid, mask, threaded, nullptr);
 }
 
 
@@ -204,14 +204,14 @@ template<typename GridType> inline
 typename GridType::Ptr
 laplacian(const GridType& grid, bool threaded = true)
 {
-    return laplacian<GridType, util::NullInterrupter>(grid, threaded, NULL);
+    return laplacian<GridType, util::NullInterrupter>(grid, threaded, nullptr);
 }
 
 template<typename GridType, typename MaskT> inline
 typename GridType::Ptr
 laplacian(const GridType& grid, const MaskT mask, bool threaded = true)
 {
-    return laplacian<GridType, MaskT, util::NullInterrupter>(grid, mask, threaded, NULL);
+    return laplacian<GridType, MaskT, util::NullInterrupter>(grid, mask, threaded, nullptr);
 }
 
 
@@ -232,14 +232,14 @@ template<typename GridType> inline
 typename GridType::Ptr
 meanCurvature(const GridType& grid, bool threaded = true)
 {
-    return meanCurvature<GridType, util::NullInterrupter>(grid, threaded, NULL);
+    return meanCurvature<GridType, util::NullInterrupter>(grid, threaded, nullptr);
 }
 
 template<typename GridType, typename MaskT> inline
 typename GridType::Ptr
 meanCurvature(const GridType& grid, const MaskT& mask, bool threaded = true)
 {
-    return meanCurvature<GridType, MaskT, util::NullInterrupter>(grid, mask, threaded, NULL);
+    return meanCurvature<GridType, MaskT, util::NullInterrupter>(grid, mask, threaded, nullptr);
 }
 
 
@@ -261,14 +261,14 @@ template<typename GridType> inline
 typename VectorToScalarConverter<GridType>::Type::Ptr
 magnitude(const GridType& grid, bool threaded = true)
 {
-    return magnitude<GridType, util::NullInterrupter>(grid, threaded, NULL);
+    return magnitude<GridType, util::NullInterrupter>(grid, threaded, nullptr);
 }
 
 template<typename GridType, typename MaskT> inline
 typename VectorToScalarConverter<GridType>::Type::Ptr
 magnitude(const GridType& grid, const MaskT& mask, bool threaded = true)
 {
-    return magnitude<GridType, MaskT, util::NullInterrupter>(grid, mask, threaded, NULL);
+    return magnitude<GridType, MaskT, util::NullInterrupter>(grid, mask, threaded, nullptr);
 }
 
 
@@ -289,14 +289,14 @@ template<typename GridType> inline
 typename GridType::Ptr
 normalize(const GridType& grid, bool threaded = true)
 {
-    return normalize<GridType, util::NullInterrupter>(grid, threaded, NULL);
+    return normalize<GridType, util::NullInterrupter>(grid, threaded, nullptr);
 }
 
 template<typename GridType, typename MaskT> inline
 typename GridType::Ptr
 normalize(const GridType& grid, const MaskT& mask, bool threaded = true)
 {
-    return normalize<GridType, MaskT, util::NullInterrupter>(grid, mask, threaded, NULL);
+    return normalize<GridType, MaskT, util::NullInterrupter>(grid, mask, threaded, nullptr);
 }
 
 
@@ -338,12 +338,14 @@ public:
     typedef typename tree::LeafManager<OutTreeT>  LeafManagerT;
 
     GridOperator(const InGridT& grid, const MaskGridType* mask, const MapT& map,
-        InterruptT* interrupt = NULL):
+        InterruptT* interrupt = nullptr):
         mAcc(grid.getConstAccessor()), mMap(map), mInterrupt(interrupt), mMask(mask)
     {
     }
+    GridOperator(const GridOperator&) = default;
+    GridOperator& operator=(const GridOperator&) = default;
+    virtual ~GridOperator() = default;
 
-    virtual ~GridOperator() {}
     typename OutGridT::Ptr process(bool threaded = true)
     {
         if (mInterrupt) mInterrupt->start("Processing grid");
@@ -421,12 +423,12 @@ public:
     typedef InGridT                                         InGridType;
     typedef typename ScalarToVectorConverter<InGridT>::Type OutGridType;
 
-    Cpt(const InGridType& grid, InterruptT* interrupt = NULL):
-        mInputGrid(grid), mInterrupt(interrupt), mMask(NULL)
+    Cpt(const InGridType& grid, InterruptT* interrupt = nullptr):
+        mInputGrid(grid), mInterrupt(interrupt), mMask(nullptr)
     {
     }
 
-    Cpt(const InGridType& grid, const MaskGridType& mask, InterruptT* interrupt = NULL):
+    Cpt(const InGridType& grid, const MaskGridType& mask, InterruptT* interrupt = nullptr):
         mInputGrid(grid), mInterrupt(interrupt), mMask(&mask)
     {
     }
@@ -509,12 +511,12 @@ public:
     typedef GridT  InGridType;
     typedef GridT  OutGridType;
 
-    Curl(const GridT& grid, InterruptT* interrupt = NULL):
-        mInputGrid(grid), mInterrupt(interrupt), mMask(NULL)
+    Curl(const GridT& grid, InterruptT* interrupt = nullptr):
+        mInputGrid(grid), mInterrupt(interrupt), mMask(nullptr)
     {
     }
 
-    Curl(const GridT& grid, const MaskGridType& mask, InterruptT* interrupt = NULL):
+    Curl(const GridT& grid, const MaskGridType& mask, InterruptT* interrupt = nullptr):
         mInputGrid(grid), mInterrupt(interrupt), mMask(&mask)
     {
     }
@@ -570,12 +572,12 @@ public:
     typedef InGridT                                         InGridType;
     typedef typename VectorToScalarConverter<InGridT>::Type OutGridType;
 
-    Divergence(const InGridT& grid, InterruptT* interrupt = NULL):
-        mInputGrid(grid), mInterrupt(interrupt), mMask(NULL)
+    Divergence(const InGridT& grid, InterruptT* interrupt = nullptr):
+        mInputGrid(grid), mInterrupt(interrupt), mMask(nullptr)
     {
     }
 
-    Divergence(const InGridT& grid, const MaskGridType& mask, InterruptT* interrupt = NULL):
+    Divergence(const InGridT& grid, const MaskGridType& mask, InterruptT* interrupt = nullptr):
         mInputGrid(grid), mInterrupt(interrupt), mMask(&mask)
     {
     }
@@ -637,12 +639,12 @@ public:
     typedef InGridT                                         InGridType;
     typedef typename ScalarToVectorConverter<InGridT>::Type OutGridType;
 
-    Gradient(const InGridT& grid, InterruptT* interrupt = NULL):
-        mInputGrid(grid), mInterrupt(interrupt), mMask(NULL)
+    Gradient(const InGridT& grid, InterruptT* interrupt = nullptr):
+        mInputGrid(grid), mInterrupt(interrupt), mMask(nullptr)
     {
     }
 
-    Gradient(const InGridT& grid, const MaskGridType& mask, InterruptT* interrupt = NULL):
+    Gradient(const InGridT& grid, const MaskGridType& mask, InterruptT* interrupt = nullptr):
         mInputGrid(grid), mInterrupt(interrupt), mMask(&mask)
     {
     }
@@ -697,12 +699,12 @@ public:
     typedef GridT  InGridType;
     typedef GridT  OutGridType;
 
-    Laplacian(const GridT& grid, InterruptT* interrupt = NULL):
-        mInputGrid(grid), mInterrupt(interrupt), mMask(NULL)
+    Laplacian(const GridT& grid, InterruptT* interrupt = nullptr):
+        mInputGrid(grid), mInterrupt(interrupt), mMask(nullptr)
     {
     }
 
-    Laplacian(const GridT& grid, const MaskGridType& mask, InterruptT* interrupt = NULL):
+    Laplacian(const GridT& grid, const MaskGridType& mask, InterruptT* interrupt = nullptr):
         mInputGrid(grid), mInterrupt(interrupt), mMask(&mask)
     {
     }
@@ -756,12 +758,12 @@ public:
     typedef GridT  InGridType;
     typedef GridT  OutGridType;
 
-    MeanCurvature(const GridT& grid, InterruptT* interrupt = NULL):
-        mInputGrid(grid), mInterrupt(interrupt), mMask(NULL)
+    MeanCurvature(const GridT& grid, InterruptT* interrupt = nullptr):
+        mInputGrid(grid), mInterrupt(interrupt), mMask(nullptr)
     {
     }
 
-    MeanCurvature(const GridT& grid, const MaskGridType& mask, InterruptT* interrupt = NULL):
+    MeanCurvature(const GridT& grid, const MaskGridType& mask, InterruptT* interrupt = nullptr):
         mInputGrid(grid), mInterrupt(interrupt), mMask(&mask)
     {
     }
@@ -815,12 +817,12 @@ public:
     typedef InGridT                                         InGridType;
     typedef typename VectorToScalarConverter<InGridT>::Type OutGridType;
 
-    Magnitude(const InGridType& grid, InterruptT* interrupt = NULL):
-        mInputGrid(grid), mInterrupt(interrupt), mMask(NULL)
+    Magnitude(const InGridType& grid, InterruptT* interrupt = nullptr):
+        mInputGrid(grid), mInterrupt(interrupt), mMask(nullptr)
     {
     }
 
-    Magnitude(const InGridType& grid, const MaskGridType& mask, InterruptT* interrupt = NULL):
+    Magnitude(const InGridType& grid, const MaskGridType& mask, InterruptT* interrupt = nullptr):
         mInputGrid(grid), mInterrupt(interrupt), mMask(&mask)
     {
     }
@@ -879,12 +881,12 @@ public:
     typedef GridT  InGridType;
     typedef GridT  OutGridType;
 
-    Normalize(const GridT& grid, InterruptT* interrupt = NULL):
-        mInputGrid(grid), mInterrupt(interrupt), mMask(NULL)
+    Normalize(const GridT& grid, InterruptT* interrupt = nullptr):
+        mInputGrid(grid), mInterrupt(interrupt), mMask(nullptr)
     {
     }
 
-    Normalize(const GridT& grid, const MaskGridType& mask, InterruptT* interrupt = NULL):
+    Normalize(const GridT& grid, const MaskGridType& mask, InterruptT* interrupt = nullptr):
         mInputGrid(grid), mInterrupt(interrupt), mMask(&mask)
     {
     }

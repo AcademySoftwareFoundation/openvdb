@@ -28,10 +28,6 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-#include <boost/bind.hpp>
-#include <boost/uuid/uuid_generators.hpp>
-#include <cppunit/extensions/HelperMacros.h>
-#include <tbb/tbb_thread.h> // for tbb::this_tbb_thread::sleep()
 #include <openvdb/Exceptions.h>
 #include <openvdb/io/File.h>
 #include <openvdb/io/Queue.h>
@@ -42,11 +38,17 @@
 #include <openvdb/version.h>
 #include <openvdb/openvdb.h>
 #include "util.h" // for unittest_util::makeSphere()
+#include <boost/scoped_array.hpp>
+#include <cppunit/extensions/HelperMacros.h>
+#include <tbb/tbb_thread.h> // for tbb::this_tbb_thread::sleep()
+#include <algorithm> // for std::sort()
 #include <cstdio> // for remove() and rename()
 #include <fstream>
+#include <functional> // for std::bind()
 #include <iostream>
 #include <map>
 #include <set>
+#include <sstream>
 #include <vector>
 #include <sys/types.h> // for stat()
 #include <sys/stat.h>
@@ -62,8 +64,8 @@
 class TestFile: public CppUnit::TestCase
 {
 public:
-    virtual void setUp() {}
-    virtual void tearDown() { openvdb::uninitialize(); }
+    void setUp() override {}
+    void tearDown() override { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestFile);
     CPPUNIT_TEST(testHeader);
@@ -173,8 +175,8 @@ TestFile::testWriteGrid()
     using namespace openvdb;
     using namespace openvdb::io;
 
-    typedef Int32Tree TreeType;
-    typedef Grid<TreeType> GridType;
+    using TreeType = Int32Tree;
+    using GridType = Grid<TreeType>;
 
     File file("something.vdb2");
 
@@ -275,8 +277,8 @@ TestFile::testWriteGrid()
     // Read in the data blocks.
     gd2.seekToBlocks(istr);
     gd2_grid->readBuffers(istr);
-    TreeType::Ptr tree2 = boost::dynamic_pointer_cast<TreeType>(gd2_grid->baseTreePtr());
-    CPPUNIT_ASSERT(tree2.get() != NULL);
+    TreeType::Ptr tree2 = DynamicPtrCast<TreeType>(gd2_grid->baseTreePtr());
+    CPPUNIT_ASSERT(tree2.get() != nullptr);
     CPPUNIT_ASSERT_EQUAL(10, tree2->getValue(Coord(10, 1, 2)));
     CPPUNIT_ASSERT_EQUAL(5, tree2->getValue(Coord(0, 0, 0)));
 
@@ -296,8 +298,8 @@ TestFile::testWriteMultipleGrids()
     using namespace openvdb;
     using namespace openvdb::io;
 
-    typedef Int32Tree TreeType;
-    typedef Grid<TreeType> GridType;
+    using TreeType = Int32Tree;
+    using GridType = Grid<TreeType>;
 
     File file("something.vdb2");
 
@@ -385,8 +387,8 @@ TestFile::testWriteMultipleGrids()
     // Read in the data blocks.
     gd_in.seekToBlocks(istr);
     gd_in_grid->readBuffers(istr);
-    TreeType::Ptr grid_in = boost::dynamic_pointer_cast<TreeType>(gd_in_grid->baseTreePtr());
-    CPPUNIT_ASSERT(grid_in.get() != NULL);
+    TreeType::Ptr grid_in = DynamicPtrCast<TreeType>(gd_in_grid->baseTreePtr());
+    CPPUNIT_ASSERT(grid_in.get() != nullptr);
     CPPUNIT_ASSERT_EQUAL(10, grid_in->getValue(Coord(10, 1, 2)));
     CPPUNIT_ASSERT_EQUAL(5, grid_in->getValue(Coord(0, 0, 0)));
     CPPUNIT_ASSERT_EQUAL(1, grid_in->getValue(Coord(1000, 1000, 16000)));
@@ -429,9 +431,8 @@ TestFile::testWriteMultipleGrids()
     // Read in the data blocks.
     gd2_in.seekToBlocks(istr);
     gd2_in_grid->readBuffers(istr);
-    TreeType::Ptr grid2_in =
-        boost::dynamic_pointer_cast<TreeType>(gd2_in_grid->baseTreePtr());
-    CPPUNIT_ASSERT(grid2_in.get() != NULL);
+    TreeType::Ptr grid2_in = DynamicPtrCast<TreeType>(gd2_in_grid->baseTreePtr());
+    CPPUNIT_ASSERT(grid2_in.get() != nullptr);
     CPPUNIT_ASSERT_EQUAL(50, grid2_in->getValue(Coord(1000, 1000, 1000)));
     CPPUNIT_ASSERT_EQUAL(10, grid2_in->getValue(Coord(0, 0, 0)));
     CPPUNIT_ASSERT_EQUAL(2, grid2_in->getValue(Coord(100000, 100000, 16000)));
@@ -450,24 +451,24 @@ TestFile::testWriteFloatAsHalf()
     using namespace openvdb;
     using namespace openvdb::io;
 
-    typedef Vec3STree TreeType;
-    typedef Grid<TreeType> GridType;
+    using TreeType = Vec3STree;
+    using GridType = Grid<TreeType>;
 
     // Register all grid types.
     initialize();
     // Ensure that the registry is cleared on exit.
     struct Local { static void uninitialize(char*) { openvdb::uninitialize(); } };
-    boost::shared_ptr<char> onExit((char*)(0), Local::uninitialize);
+    SharedPtr<char> onExit(nullptr, Local::uninitialize);
 
     // Create two test grids.
     GridType::Ptr grid1 = createGrid<GridType>(/*bg=*/Vec3s(1, 1, 1));
     TreeType& tree1 = grid1->tree();
-    CPPUNIT_ASSERT(grid1.get() != NULL);
+    CPPUNIT_ASSERT(grid1.get() != nullptr);
     grid1->setTransform(math::Transform::createLinearTransform(0.1));
     grid1->setName("grid1");
 
     GridType::Ptr grid2 = createGrid<GridType>(/*bg=*/Vec3s(2, 2, 2));
-    CPPUNIT_ASSERT(grid2.get() != NULL);
+    CPPUNIT_ASSERT(grid2.get() != nullptr);
     TreeType& tree2 = grid2->tree();
     grid2->setTransform(math::Transform::createLinearTransform(0.2));
     // Flag this grid for 16-bit float output.
@@ -502,14 +503,14 @@ TestFile::testWriteFloatAsHalf()
             bgrid2 = vdbFile.readGrid("grid2");
         vdbFile.close();
 
-        CPPUNIT_ASSERT(bgrid1.get() != NULL);
+        CPPUNIT_ASSERT(bgrid1.get() != nullptr);
         CPPUNIT_ASSERT(bgrid1->isType<GridType>());
-        CPPUNIT_ASSERT(bgrid2.get() != NULL);
+        CPPUNIT_ASSERT(bgrid2.get() != nullptr);
         CPPUNIT_ASSERT(bgrid2->isType<GridType>());
 
-        const TreeType& btree1 = boost::static_pointer_cast<GridType>(bgrid1)->tree();
+        const TreeType& btree1 = StaticPtrCast<GridType>(bgrid1)->tree();
         CPPUNIT_ASSERT_EQUAL(Vec3s(10, 10, 10), btree1.getValue(Coord(10, 10, 10)));
-        const TreeType& btree2 = boost::static_pointer_cast<GridType>(bgrid2)->tree();
+        const TreeType& btree2 = StaticPtrCast<GridType>(bgrid2)->tree();
         CPPUNIT_ASSERT_EQUAL(Vec3s(10, 10, 10), btree2.getValue(Coord(10, 10, 10)));
     }
 }
@@ -528,7 +529,7 @@ TestFile::testWriteInstancedGrids()
     // We will not be able to remove something.vdb2 on Windows if the pointers
     // are still referencing data opened by the "file" variable.
     const char* filename = "something.vdb2";
-    boost::shared_ptr<const char> scopedFile(filename, ::remove);
+    SharedPtr<const char> scopedFile(filename, ::remove);
 
     // Create grids.
     Int32Tree::Ptr tree1(new Int32Tree(1));
@@ -580,40 +581,40 @@ TestFile::testWriteInstancedGrids()
     meta = file.getMetadata();
 
     // Verify the metadata.
-    CPPUNIT_ASSERT(meta.get() != NULL);
+    CPPUNIT_ASSERT(meta.get() != nullptr);
     CPPUNIT_ASSERT_EQUAL(2, int(meta->metaCount()));
     CPPUNIT_ASSERT_EQUAL(std::string("Einstein"), meta->metaValue<std::string>("author"));
     CPPUNIT_ASSERT_EQUAL(2009, meta->metaValue<int32_t>("year"));
 
     // Verify the grids.
-    CPPUNIT_ASSERT(grids.get() != NULL);
+    CPPUNIT_ASSERT(grids.get() != nullptr);
     CPPUNIT_ASSERT_EQUAL(4, int(grids->size()));
 
     GridBase::Ptr grid = findGridByName(*grids, "density");
-    CPPUNIT_ASSERT(grid.get() != NULL);
+    CPPUNIT_ASSERT(grid.get() != nullptr);
     Int32Tree::Ptr density = gridPtrCast<Int32Grid>(grid)->treePtr();
-    CPPUNIT_ASSERT(density.get() != NULL);
+    CPPUNIT_ASSERT(density.get() != nullptr);
 
     grid.reset();
     grid = findGridByName(*grids, "density_copy");
-    CPPUNIT_ASSERT(grid.get() != NULL);
-    CPPUNIT_ASSERT(gridPtrCast<Int32Grid>(grid)->treePtr().get() != NULL);
+    CPPUNIT_ASSERT(grid.get() != nullptr);
+    CPPUNIT_ASSERT(gridPtrCast<Int32Grid>(grid)->treePtr().get() != nullptr);
     // Verify that "density_copy" is an instance of (i.e., shares a tree with) "density".
     CPPUNIT_ASSERT_EQUAL(density, gridPtrCast<Int32Grid>(grid)->treePtr());
 
     grid.reset();
     grid = findGridByName(*grids, "");
-    CPPUNIT_ASSERT(grid.get() != NULL);
+    CPPUNIT_ASSERT(grid.get() != nullptr);
     FloatTree::Ptr temperature = gridPtrCast<FloatGrid>(grid)->treePtr();
-    CPPUNIT_ASSERT(temperature.get() != NULL);
+    CPPUNIT_ASSERT(temperature.get() != nullptr);
 
     grid.reset();
     for (GridPtrVec::reverse_iterator it = grids->rbegin(); !grid && it != grids->rend(); ++it) {
         // Search for the second unnamed grid starting from the end of the list.
         if ((*it)->getName() == "") grid = *it;
     }
-    CPPUNIT_ASSERT(grid.get() != NULL);
-    CPPUNIT_ASSERT(gridPtrCast<FloatGrid>(grid)->treePtr().get() != NULL);
+    CPPUNIT_ASSERT(grid.get() != nullptr);
+    CPPUNIT_ASSERT(gridPtrCast<FloatGrid>(grid)->treePtr().get() != nullptr);
     // Verify that the second unnamed grid is an instance of the first.
     CPPUNIT_ASSERT_EQUAL(temperature, gridPtrCast<FloatGrid>(grid)->treePtr());
 
@@ -630,27 +631,27 @@ TestFile::testWriteInstancedGrids()
     CPPUNIT_ASSERT_EQUAL(4, int(grids->size()));
 
     grid = findGridByName(*grids, "density");
-    CPPUNIT_ASSERT(grid.get() != NULL);
+    CPPUNIT_ASSERT(grid.get() != nullptr);
     density = gridPtrCast<Int32Grid>(grid)->treePtr();
-    CPPUNIT_ASSERT(density.get() != NULL);
+    CPPUNIT_ASSERT(density.get() != nullptr);
     grid = findGridByName(*grids, "density_copy");
-    CPPUNIT_ASSERT(grid.get() != NULL);
-    CPPUNIT_ASSERT(gridPtrCast<Int32Grid>(grid)->treePtr().get() != NULL);
+    CPPUNIT_ASSERT(grid.get() != nullptr);
+    CPPUNIT_ASSERT(gridPtrCast<Int32Grid>(grid)->treePtr().get() != nullptr);
     // Verify that "density_copy" is *not* an instance of "density".
     CPPUNIT_ASSERT(gridPtrCast<Int32Grid>(grid)->treePtr() != density);
 
     // Verify that the two unnamed grids are not instances of each other.
     grid = findGridByName(*grids, "");
-    CPPUNIT_ASSERT(grid.get() != NULL);
+    CPPUNIT_ASSERT(grid.get() != nullptr);
     temperature = gridPtrCast<FloatGrid>(grid)->treePtr();
-    CPPUNIT_ASSERT(temperature.get() != NULL);
+    CPPUNIT_ASSERT(temperature.get() != nullptr);
     grid.reset();
     for (GridPtrVec::reverse_iterator it = grids->rbegin(); !grid && it != grids->rend(); ++it) {
         // Search for the second unnamed grid starting from the end of the list.
         if ((*it)->getName() == "") grid = *it;
     }
-    CPPUNIT_ASSERT(grid.get() != NULL);
-    CPPUNIT_ASSERT(gridPtrCast<FloatGrid>(grid)->treePtr().get() != NULL);
+    CPPUNIT_ASSERT(grid.get() != nullptr);
+    CPPUNIT_ASSERT(gridPtrCast<FloatGrid>(grid)->treePtr().get() != nullptr);
     CPPUNIT_ASSERT(gridPtrCast<FloatGrid>(grid)->treePtr() != temperature);
 
     // Rewrite with instancing disabled, then reread with instancing enabled.
@@ -660,7 +661,7 @@ TestFile::testWriteInstancedGrids()
         /// no longer a need for delayed load from the old file, replace it
         /// with the new file.
         const char* tempFilename = "somethingelse.vdb";
-        boost::shared_ptr<const char> scopedTempFile(tempFilename, ::remove);
+        SharedPtr<const char> scopedTempFile(tempFilename, ::remove);
         io::File vdbFile(tempFilename);
         vdbFile.setInstancingEnabled(false);
         vdbFile.write(*grids, *meta);
@@ -676,26 +677,26 @@ TestFile::testWriteInstancedGrids()
 
     // Verify that "density_copy" is not an instance of "density".
     grid = findGridByName(*grids, "density");
-    CPPUNIT_ASSERT(grid.get() != NULL);
+    CPPUNIT_ASSERT(grid.get() != nullptr);
     density = gridPtrCast<Int32Grid>(grid)->treePtr();
-    CPPUNIT_ASSERT(density.get() != NULL);
+    CPPUNIT_ASSERT(density.get() != nullptr);
     grid = findGridByName(*grids, "density_copy");
-    CPPUNIT_ASSERT(grid.get() != NULL);
-    CPPUNIT_ASSERT(gridPtrCast<Int32Grid>(grid)->treePtr().get() != NULL);
+    CPPUNIT_ASSERT(grid.get() != nullptr);
+    CPPUNIT_ASSERT(gridPtrCast<Int32Grid>(grid)->treePtr().get() != nullptr);
     CPPUNIT_ASSERT(gridPtrCast<Int32Grid>(grid)->treePtr() != density);
 
     // Verify that the two unnamed grids are not instances of each other.
     grid = findGridByName(*grids, "");
-    CPPUNIT_ASSERT(grid.get() != NULL);
+    CPPUNIT_ASSERT(grid.get() != nullptr);
     temperature = gridPtrCast<FloatGrid>(grid)->treePtr();
-    CPPUNIT_ASSERT(temperature.get() != NULL);
+    CPPUNIT_ASSERT(temperature.get() != nullptr);
     grid.reset();
     for (GridPtrVec::reverse_iterator it = grids->rbegin(); !grid && it != grids->rend(); ++it) {
         // Search for the second unnamed grid starting from the end of the list.
         if ((*it)->getName() == "") grid = *it;
     }
-    CPPUNIT_ASSERT(grid.get() != NULL);
-    CPPUNIT_ASSERT(gridPtrCast<FloatGrid>(grid)->treePtr().get() != NULL);
+    CPPUNIT_ASSERT(grid.get() != nullptr);
+    CPPUNIT_ASSERT(gridPtrCast<FloatGrid>(grid)->treePtr().get() != nullptr);
     CPPUNIT_ASSERT(gridPtrCast<FloatGrid>(grid)->treePtr() != temperature);
 }
 
@@ -706,8 +707,8 @@ TestFile::testReadGridDescriptors()
     using namespace openvdb;
     using namespace openvdb::io;
 
-    typedef Int32Grid GridType;
-    typedef GridType::TreeType TreeType;
+    using GridType = Int32Grid;
+    using TreeType = GridType::TreeType;
 
     File file("something.vdb2");
 
@@ -735,7 +736,7 @@ TestFile::testReadGridDescriptors()
 
     // Write out the number of grids.
     int32_t gridCount = 2;
-    ostr.write((char*)&gridCount, sizeof(int32_t));
+    ostr.write(reinterpret_cast<char*>(&gridCount), sizeof(int32_t));
     // Write out the grids.
     file.writeGrid(gd, grid, ostr, /*seekable=*/true);
     file.writeGrid(gd2, grid2, ostr, /*seekable=*/true);
@@ -790,7 +791,7 @@ TestFile::testGridNaming()
     using namespace openvdb;
     using namespace openvdb::io;
 
-    typedef Int32Tree TreeType;
+    using TreeType = Int32Tree;
 
     // Register data types.
     openvdb::initialize();
@@ -816,7 +817,7 @@ TestFile::testGridNaming()
     }
 
     const char* filename = "testGridNaming.vdb2";
-    boost::shared_ptr<const char> scopedFile(filename, ::remove);
+    SharedPtr<const char> scopedFile(filename, ::remove);
 
     // Test first with grid instancing disabled, then with instancing enabled.
     for (int instancing = 0; instancing <= 1; ++instancing) {
@@ -853,7 +854,7 @@ TestFile::testGridNaming()
 
             // Partially read the current grid.
             GridBase::ConstPtr grid = file.readGridPartial(name);
-            CPPUNIT_ASSERT(grid.get() != NULL);
+            CPPUNIT_ASSERT(grid.get() != nullptr);
 
             // Verify that the grid is named "grid".
             CPPUNIT_ASSERT_EQUAL(openvdb::Name("grid"), grid->getName());
@@ -862,21 +863,21 @@ TestFile::testGridNaming()
 
             // Fully read the current grid.
             grid = file.readGrid(name);
-            CPPUNIT_ASSERT(grid.get() != NULL);
+            CPPUNIT_ASSERT(grid.get() != nullptr);
             CPPUNIT_ASSERT_EQUAL(openvdb::Name("grid"), grid->getName());
             CPPUNIT_ASSERT_EQUAL((n < 0 ? 0 : n), grid->metaValue<openvdb::Int32>("index"));
         }
 
         // Read all three grids at once.
         GridPtrVecPtr allGrids = file.getGrids();
-        CPPUNIT_ASSERT(allGrids.get() != NULL);
+        CPPUNIT_ASSERT(allGrids.get() != nullptr);
         CPPUNIT_ASSERT_EQUAL(3, int(allGrids->size()));
 
         GridBase::ConstPtr firstGrid;
         std::vector<int> indices;
         for (GridPtrVecCIter i = allGrids->begin(), e = allGrids->end(); i != e; ++i) {
             GridBase::ConstPtr grid = *i;
-            CPPUNIT_ASSERT(grid.get() != NULL);
+            CPPUNIT_ASSERT(grid.get() != nullptr);
 
             indices.push_back(grid->metaValue<openvdb::Int32>("index"));
 
@@ -909,20 +910,20 @@ TestFile::testGridNaming()
 
         // Verify that the grid can be read and that its index is 0.
         GridBase::ConstPtr grid = file.readGrid(weirdName);
-        CPPUNIT_ASSERT(grid.get() != NULL);
+        CPPUNIT_ASSERT(grid.get() != nullptr);
         CPPUNIT_ASSERT_EQUAL(weirdName, grid->getName());
         CPPUNIT_ASSERT_EQUAL(0, grid->metaValue<openvdb::Int32>("index"));
 
         // Verify that the other grids can still be read successfully.
         grid = file.readGrid("grid[0]");
-        CPPUNIT_ASSERT(grid.get() != NULL);
+        CPPUNIT_ASSERT(grid.get() != nullptr);
         CPPUNIT_ASSERT_EQUAL(openvdb::Name("grid"), grid->getName());
         // Because there are now only two grids named "grid", the one with
         // index 1 is now "grid[0]".
         CPPUNIT_ASSERT_EQUAL(1, grid->metaValue<openvdb::Int32>("index"));
 
         grid = file.readGrid("grid[1]");
-        CPPUNIT_ASSERT(grid.get() != NULL);
+        CPPUNIT_ASSERT(grid.get() != nullptr);
         CPPUNIT_ASSERT_EQUAL(openvdb::Name("grid"), grid->getName());
         // Because there are now only two grids named "grid", the one with
         // index 2 is now "grid[1]".
@@ -941,7 +942,7 @@ TestFile::testEmptyFile()
     using namespace openvdb::io;
 
     const char* filename = "testEmptyFile.vdb2";
-    boost::shared_ptr<const char> scopedFile(filename, ::remove);
+    SharedPtr<const char> scopedFile(filename, ::remove);
 
     {
         File file(filename);
@@ -953,10 +954,10 @@ TestFile::testEmptyFile()
     GridPtrVecPtr grids = file.getGrids();
     MetaMap::Ptr meta = file.getMetadata();
 
-    CPPUNIT_ASSERT(grids.get() != NULL);
+    CPPUNIT_ASSERT(grids.get() != nullptr);
     CPPUNIT_ASSERT(grids->empty());
 
-    CPPUNIT_ASSERT(meta.get() != NULL);
+    CPPUNIT_ASSERT(meta.get() != nullptr);
     CPPUNIT_ASSERT_EQUAL(0, int(meta->metaCount()));
 }
 
@@ -967,10 +968,10 @@ TestFile::testEmptyGridIO()
     using namespace openvdb;
     using namespace openvdb::io;
 
-    typedef Int32Grid GridType;
+    using GridType = Int32Grid;
 
     const char* filename = "something.vdb2";
-    boost::shared_ptr<const char> scopedFile(filename, ::remove);
+    SharedPtr<const char> scopedFile(filename, ::remove);
 
     File file(filename);
 
@@ -992,7 +993,7 @@ TestFile::testEmptyGridIO()
 
     // Write out the number of grids.
     int32_t gridCount = 2;
-    ostr.write((char*)&gridCount, sizeof(int32_t));
+    ostr.write(reinterpret_cast<char*>(&gridCount), sizeof(int32_t));
     // Write out the grids.
     file.writeGrid(gd, grid, ostr, /*seekable=*/true);
     file.writeGrid(gd2, grid2, ostr, /*seekable=*/true);
@@ -1033,7 +1034,7 @@ TestFile::testEmptyGridIO()
     gd_grid->readTransform(istr);
     gd_grid->readTopology(istr);
     CPPUNIT_ASSERT_EQUAL(gd.gridName(), file2gd.gridName());
-    CPPUNIT_ASSERT(gd_grid.get() != NULL);
+    CPPUNIT_ASSERT(gd_grid.get() != nullptr);
     CPPUNIT_ASSERT_EQUAL(0, int(gd_grid->baseTree().leafCount()));
     //CPPUNIT_ASSERT_EQUAL(8, int(gd_grid->baseTree().nonLeafCount()));
     CPPUNIT_ASSERT_EQUAL(4, int(gd_grid->baseTree().treeDepth()));
@@ -1051,7 +1052,7 @@ TestFile::testEmptyGridIO()
     gd_grid->readTransform(istr);
     gd_grid->readTopology(istr);
     CPPUNIT_ASSERT_EQUAL(gd2.gridName(), file2gd.gridName());
-    CPPUNIT_ASSERT(gd_grid.get() != NULL);
+    CPPUNIT_ASSERT(gd_grid.get() != nullptr);
     CPPUNIT_ASSERT_EQUAL(0, int(gd_grid->baseTree().leafCount()));
     //CPPUNIT_ASSERT_EQUAL(8, int(gd_grid->nonLeafCount()));
     CPPUNIT_ASSERT_EQUAL(4, int(gd_grid->baseTree().treeDepth()));
@@ -1070,10 +1071,10 @@ TestFile::testOpen()
 {
     using namespace openvdb;
 
-    typedef openvdb::FloatGrid FloatGrid;
-    typedef openvdb::Int32Grid IntGrid;
-    typedef FloatGrid::TreeType FloatTree;
-    typedef Int32Grid::TreeType IntTree;
+    using FloatGrid = openvdb::FloatGrid;
+    using IntGrid = openvdb::Int32Grid;
+    using FloatTree = FloatGrid::TreeType;
+    using IntTree = Int32Grid::TreeType;
 
     // Create a VDB to write.
 
@@ -1181,7 +1182,7 @@ TestFile::testOpen()
     // Test closing the file.
     vdbfile.close();
     CPPUNIT_ASSERT(vdbfile.isOpen() == false);
-    CPPUNIT_ASSERT(vdbfile.fileMetadata().get() == NULL);
+    CPPUNIT_ASSERT(vdbfile.fileMetadata().get() == nullptr);
     CPPUNIT_ASSERT_EQUAL(0, int(vdbfile.gridDescriptors().size()));
     CPPUNIT_ASSERT_THROW(vdbfile.inputStream(), openvdb::IoError);
 
@@ -1195,7 +1196,7 @@ TestFile::testNonVdbOpen()
     std::ofstream file("dummy.vdb2", std::ios_base::binary);
 
     int64_t something = 1;
-    file.write((char*)&something, sizeof(int64_t));
+    file.write(reinterpret_cast<char*>(&something), sizeof(int64_t));
 
     file.close();
 
@@ -1251,10 +1252,10 @@ TestFile::testReadAll()
 {
     using namespace openvdb;
 
-    typedef openvdb::FloatGrid FloatGrid;
-    typedef openvdb::Int32Grid IntGrid;
-    typedef FloatGrid::TreeType FloatTree;
-    typedef Int32Grid::TreeType IntTree;
+    using FloatGrid = openvdb::FloatGrid;
+    using IntGrid = openvdb::Int32Grid;
+    using FloatTree = FloatGrid::TreeType;
+    using IntTree = Int32Grid::TreeType;
 
     // Create a vdb to write.
 
@@ -1314,15 +1315,15 @@ TestFile::testReadAll()
     GridBase::Ptr grid;
     grid.reset();
     grid = findGridByName(*grids2, "density");
-    CPPUNIT_ASSERT(grid.get() != NULL);
+    CPPUNIT_ASSERT(grid.get() != nullptr);
     IntTree::Ptr density = gridPtrCast<IntGrid>(grid)->treePtr();
-    CPPUNIT_ASSERT(density.get() != NULL);
+    CPPUNIT_ASSERT(density.get() != nullptr);
 
     grid.reset();
     grid = findGridByName(*grids2, "temperature");
-    CPPUNIT_ASSERT(grid.get() != NULL);
+    CPPUNIT_ASSERT(grid.get() != nullptr);
     FloatTree::Ptr temperature = gridPtrCast<FloatGrid>(grid)->treePtr();
-    CPPUNIT_ASSERT(temperature.get() != NULL);
+    CPPUNIT_ASSERT(temperature.get() != nullptr);
 
     CPPUNIT_ASSERT_DOUBLES_EQUAL(5, density->getValue(Coord(0, 0, 0)), /*tolerance=*/0);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(6, density->getValue(Coord(100, 0, 0)), /*tolerance=*/0);
@@ -1368,13 +1369,13 @@ TestFile::testWriteOpenFile()
     meta = vdbfile2.getMetadata();
 
     // Ensure we have the metadata.
-    CPPUNIT_ASSERT(meta.get() != NULL);
+    CPPUNIT_ASSERT(meta.get() != nullptr);
     CPPUNIT_ASSERT_EQUAL(2, int(meta->metaCount()));
     CPPUNIT_ASSERT(meta->metaValue<std::string>("author") == "Einstein");
     CPPUNIT_ASSERT_EQUAL(2009, meta->metaValue<int32_t>("year"));
 
     // Ensure we got the grids.
-    CPPUNIT_ASSERT(grids.get() != NULL);
+    CPPUNIT_ASSERT(grids.get() != nullptr);
     CPPUNIT_ASSERT_EQUAL(0, int(grids->size()));
 
     // Cannot write an open file.
@@ -1399,7 +1400,7 @@ TestFile::testReadGridMetadata()
     openvdb::initialize();
 
     const char* filename = "testReadGridMetadata.vdb2";
-    boost::shared_ptr<const char> scopedFile(filename, ::remove);
+    SharedPtr<const char> scopedFile(filename, ::remove);
 
     // Create grids
     Int32Grid::Ptr igrid = createGrid<Int32Grid>(/*bg=*/1);
@@ -1462,17 +1463,17 @@ TestFile::testReadGridMetadata()
 
         // Read all grids and store them in a list.
         GridPtrVecPtr gridMetadata = vdbfile.readAllGridMetadata();
-        CPPUNIT_ASSERT(gridMetadata.get() != NULL);
+        CPPUNIT_ASSERT(gridMetadata.get() != nullptr);
         CPPUNIT_ASSERT_EQUAL(2, int(gridMetadata->size()));
 
         // Read individual grids and append them to the list.
         GridBase::Ptr grid = vdbfile.readGridMetadata("igrid");
-        CPPUNIT_ASSERT(grid.get() != NULL);
+        CPPUNIT_ASSERT(grid.get() != nullptr);
         CPPUNIT_ASSERT_EQUAL(std::string("igrid"), grid->getName());
         gridMetadata->push_back(grid);
 
         grid = vdbfile.readGridMetadata("fgrid");
-        CPPUNIT_ASSERT(grid.get() != NULL);
+        CPPUNIT_ASSERT(grid.get() != nullptr);
         CPPUNIT_ASSERT_EQUAL(std::string("fgrid"), grid->getName());
         gridMetadata->push_back(grid);
 
@@ -1480,9 +1481,9 @@ TestFile::testReadGridMetadata()
         for (size_t i = 0, N = gridMetadata->size(); i < N; ++i) {
             grid = (*gridMetadata)[i];
 
-            CPPUNIT_ASSERT(grid.get() != NULL);
+            CPPUNIT_ASSERT(grid.get() != nullptr);
             CPPUNIT_ASSERT(grid->getName() == "igrid" || grid->getName() == "fgrid");
-            CPPUNIT_ASSERT(grid->baseTreePtr().get() != NULL);
+            CPPUNIT_ASSERT(grid->baseTreePtr().get() != nullptr);
 
             // Since we didn't read the grid's topology, the tree should be empty.
             CPPUNIT_ASSERT_EQUAL(0, int(grid->constBaseTreePtr()->leafCount()));
@@ -1530,10 +1531,10 @@ TestFile::testReadGridPartial()
 {
     using namespace openvdb;
 
-    typedef openvdb::FloatGrid FloatGrid;
-    typedef openvdb::Int32Grid IntGrid;
-    typedef FloatGrid::TreeType FloatTree;
-    typedef Int32Grid::TreeType IntTree;
+    using FloatGrid = openvdb::FloatGrid;
+    using IntGrid = openvdb::Int32Grid;
+    using FloatTree = FloatGrid::TreeType;
+    using IntTree = Int32Grid::TreeType;
 
     // Create grids
     IntGrid::Ptr grid = createGrid<IntGrid>(/*bg=*/1);
@@ -1583,11 +1584,11 @@ TestFile::testReadGridPartial()
 
     GridBase::ConstPtr density = vdbfile2.readGridPartial("density");
 
-    CPPUNIT_ASSERT(density.get() != NULL);
+    CPPUNIT_ASSERT(density.get() != nullptr);
 
     IntTree::ConstPtr typedDensity = gridConstPtrCast<IntGrid>(density)->treePtr();
 
-    CPPUNIT_ASSERT(typedDensity.get() != NULL);
+    CPPUNIT_ASSERT(typedDensity.get() != nullptr);
 
     // the following should cause a compiler error.
     // typedDensity->setValue(0, 0, 0, 0);
@@ -1608,10 +1609,10 @@ TestFile::testReadGrid()
 {
     using namespace openvdb;
 
-    typedef openvdb::FloatGrid FloatGrid;
-    typedef openvdb::Int32Grid IntGrid;
-    typedef FloatGrid::TreeType FloatTree;
-    typedef Int32Grid::TreeType IntTree;
+    using FloatGrid = openvdb::FloatGrid;
+    using IntGrid = openvdb::Int32Grid;
+    using FloatTree = FloatGrid::TreeType;
+    using IntTree = Int32Grid::TreeType;
 
     // Create a vdb to write.
 
@@ -1664,11 +1665,11 @@ TestFile::testReadGrid()
     // Get Temperature
     GridBase::Ptr temperature = vdbfile2.readGrid("temperature");
 
-    CPPUNIT_ASSERT(temperature.get() != NULL);
+    CPPUNIT_ASSERT(temperature.get() != nullptr);
 
     FloatTree::Ptr typedTemperature = gridPtrCast<FloatGrid>(temperature)->treePtr();
 
-    CPPUNIT_ASSERT(typedTemperature.get() != NULL);
+    CPPUNIT_ASSERT(typedTemperature.get() != nullptr);
 
     CPPUNIT_ASSERT_DOUBLES_EQUAL(10, typedTemperature->getValue(Coord(0, 0, 0)), 0);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(11, typedTemperature->getValue(Coord(0, 100, 0)), 0);
@@ -1676,11 +1677,11 @@ TestFile::testReadGrid()
     // Get Density
     GridBase::Ptr density = vdbfile2.readGrid("density");
 
-    CPPUNIT_ASSERT(density.get() != NULL);
+    CPPUNIT_ASSERT(density.get() != nullptr);
 
     IntTree::Ptr typedDensity = gridPtrCast<IntGrid>(density)->treePtr();
 
-    CPPUNIT_ASSERT(typedDensity.get() != NULL);
+    CPPUNIT_ASSERT(typedDensity.get() != nullptr);
 
     CPPUNIT_ASSERT_DOUBLES_EQUAL(5,typedDensity->getValue(Coord(0, 0, 0)), /*tolerance=*/0);
     CPPUNIT_ASSERT_DOUBLES_EQUAL(6,typedDensity->getValue(Coord(100, 0, 0)), /*tolerance=*/0);
@@ -1707,7 +1708,7 @@ validateClippedGrid(const GridT& clipped, const typename GridT::ValueType& fg)
 {
     using namespace openvdb;
 
-    typedef typename GridT::ValueType ValueT;
+    using ValueT = typename GridT::ValueType;
 
     const CoordBBox bbox = clipped.evalActiveVoxelBoundingBox();
     CPPUNIT_ASSERT_EQUAL(4, bbox.min().x());
@@ -1772,7 +1773,7 @@ TestFile::testReadClippedGrid()
     srcGrids.push_back(vgrid);
 
     const char* filename = "testReadClippedGrid.vdb";
-    boost::shared_ptr<const char> scopedFile(filename, ::remove);
+    SharedPtr<const char> scopedFile(filename, ::remove);
 
     enum { OUTPUT_TO_FILE = 0, OUTPUT_TO_STREAM = 1 };
     for (int outputMethod = OUTPUT_TO_FILE; outputMethod <= OUTPUT_TO_STREAM; ++outputMethod)
@@ -1796,17 +1797,17 @@ TestFile::testReadClippedGrid()
         // Read and clip each grid.
 
         CPPUNIT_ASSERT_NO_THROW(grid = vdbfile.readGrid("bgrid", clipBox));
-        CPPUNIT_ASSERT(grid.get() != NULL);
+        CPPUNIT_ASSERT(grid.get() != nullptr);
         CPPUNIT_ASSERT_NO_THROW(bgrid = gridPtrCast<BoolGrid>(grid));
         validateClippedGrid(*bgrid, bfg);
 
         CPPUNIT_ASSERT_NO_THROW(grid = vdbfile.readGrid("fgrid", clipBox));
-        CPPUNIT_ASSERT(grid.get() != NULL);
+        CPPUNIT_ASSERT(grid.get() != nullptr);
         CPPUNIT_ASSERT_NO_THROW(fgrid = gridPtrCast<FloatGrid>(grid));
         validateClippedGrid(*fgrid, ffg);
 
         CPPUNIT_ASSERT_NO_THROW(grid = vdbfile.readGrid("vgrid", clipBox));
-        CPPUNIT_ASSERT(grid.get() != NULL);
+        CPPUNIT_ASSERT(grid.get() != nullptr);
         CPPUNIT_ASSERT_NO_THROW(vgrid = gridPtrCast<Vec3SGrid>(grid));
         validateClippedGrid(*vgrid, vfg);
     }
@@ -1824,8 +1825,8 @@ TestFile::testMultipleBufferIO()
     using namespace openvdb;
     using namespace openvdb::io;
 
-    typedef Int32Grid GridType;
-    typedef GridType::TreeType TreeType;
+    using GridType = Int32Grid;
+    using TreeType = GridType::TreeType;
 
     File file("something.vdb2");
 
@@ -1855,7 +1856,7 @@ TestFile::testMultipleBufferIO()
 
     GridBase::Ptr temperature = file2.readGrid("temperature");
 
-    CPPUNIT_ASSERT(temperature.get() != NULL);
+    CPPUNIT_ASSERT(temperature.get() != nullptr);
 
     // Clear registries.
     GridBase::clearRegistry();
@@ -1871,10 +1872,10 @@ TestFile::testHasGrid()
     using namespace openvdb;
     using namespace openvdb::io;
 
-    typedef openvdb::FloatGrid FloatGrid;
-    typedef openvdb::Int32Grid IntGrid;
-    typedef FloatGrid::TreeType FloatTree;
-    typedef Int32Grid::TreeType IntTree;
+    using FloatGrid = openvdb::FloatGrid;
+    using IntGrid = openvdb::Int32Grid;
+    using FloatTree = FloatGrid::TreeType;
+    using IntTree = Int32Grid::TreeType;
 
     // Create a vdb to write.
 
@@ -1956,9 +1957,9 @@ TestFile::testNameIterator()
     using namespace openvdb;
     using namespace openvdb::io;
 
-    typedef openvdb::FloatGrid FloatGrid;
-    typedef FloatGrid::TreeType FloatTree;
-    typedef Int32Grid::TreeType IntTree;
+    using FloatGrid = openvdb::FloatGrid;
+    using FloatTree = FloatGrid::TreeType;
+    using IntTree = Int32Grid::TreeType;
 
     // Create trees.
     IntTree::Ptr itree(new IntTree(1));
@@ -1994,7 +1995,7 @@ TestFile::testNameIterator()
     openvdb::initialize();
 
     const char* filename = "testNameIterator.vdb2";
-    boost::shared_ptr<const char> scopedFile(filename, ::remove);
+    SharedPtr<const char> scopedFile(filename, ::remove);
 
     // Write the grids out to a file.
     {
@@ -2040,7 +2041,7 @@ TestFile::testCompression()
     using namespace openvdb;
     using namespace openvdb::io;
 
-    typedef openvdb::Int32Grid IntGrid;
+    using IntGrid = openvdb::Int32Grid;
 
     // Register types.
     openvdb::initialize();
@@ -2069,7 +2070,7 @@ TestFile::testCompression()
     grids.push_back(fogGrid);
 
     const char* filename = "testCompression.vdb2";
-    boost::shared_ptr<const char> scopedFile(filename, ::remove);
+    SharedPtr<const char> scopedFile(filename, ::remove);
 
     size_t uncompressedSize = 0;
     {
@@ -2120,7 +2121,7 @@ TestFile::testCompression()
             // Verify that the original and input grids are equal.
             {
                 const IntGrid::Ptr grid = gridPtrCast<IntGrid>((*inGrids)[0]);
-                CPPUNIT_ASSERT(grid.get() != NULL);
+                CPPUNIT_ASSERT(grid.get() != nullptr);
                 CPPUNIT_ASSERT_EQUAL(int(intGrid->getGridClass()), int(grid->getGridClass()));
 
                 CPPUNIT_ASSERT(grid->tree().hasSameTopology(intGrid->tree()));
@@ -2150,7 +2151,7 @@ TestFile::testCompression()
                 const FloatGrid::Ptr
                     grid = gridPtrCast<FloatGrid>((*inGrids)[idx]),
                     refGrid = gridPtrCast<FloatGrid>(grids[idx]);
-                CPPUNIT_ASSERT(grid.get() != NULL);
+                CPPUNIT_ASSERT(grid.get() != nullptr);
                 CPPUNIT_ASSERT_EQUAL(int(refGrid->getGridClass()), int(grid->getGridClass()));
 
                 CPPUNIT_ASSERT(grid->tree().hasSameTopology(refGrid->tree()));
@@ -2195,7 +2196,8 @@ struct TestAsyncHelper
 
     io::Queue::Notifier notifier()
     {
-        return boost::bind(&TestAsyncHelper::validate, this, _1, _2);
+        return std::bind(&TestAsyncHelper::validate, this,
+            std::placeholders::_1, std::placeholders::_2);
     }
 
     void insert(io::Queue::Id id, const std::string& filename)
@@ -2263,7 +2265,7 @@ TestFile::testAsync()
     {
         // Write a reference file without using asynchronous I/O.
         const char* filename = "testAsyncref.vdb";
-        boost::shared_ptr<const char> scopedFile(filename, ::remove);
+        SharedPtr<const char> scopedFile(filename, ::remove);
         io::File f(filename);
         f.write(grids, fileMetadata);
 
@@ -2333,7 +2335,7 @@ TestFile::testAsync()
         io::Queue queue(/*capacity=*/1);
         queue.setTimeout(0/*sec*/);
 
-        boost::shared_ptr<const char>
+        SharedPtr<const char>
             scopedFile1("testAsyncIOa.vdb", ::remove),
             scopedFile2("testAsyncIOb.vdb", ::remove);
         std::ofstream
@@ -2418,7 +2420,7 @@ TestFile::testBlosc()
         outdata(new char[decompbufbytes]);
 
     for (int compcode = 0; compcode <= BLOSC_ZLIB; ++compcode) {
-        char* compname = NULL;
+        char* compname = nullptr;
         if (0 > blosc_compcode_to_compname(compcode, &compname)) continue;
         /// @todo This changes the compressor setting globally.
         if (blosc_set_compressor(compname) < 0) continue;

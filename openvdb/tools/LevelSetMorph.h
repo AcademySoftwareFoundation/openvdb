@@ -27,9 +27,7 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
-///////////////////////////////////////////////////////////////////////////
-//
+
 /// @author Ken Museth
 ///
 /// @file LevelSetMorph.h
@@ -60,9 +58,9 @@ namespace tools {
 /// class Interrupter {
 ///   ...
 /// public:
-///   void start(const char* name = NULL)// called when computations begin
-///   void end()                         // called when computations end
-///   bool wasInterrupted(int percent=-1)// return true to break computation
+///   void start(const char* name = nullptr) // called when computations begin
+///   void end()                             // called when computations end
+///   bool wasInterrupted(int percent=-1)    // return true to break computation
 /// };
 /// @endcode
 ///
@@ -83,12 +81,10 @@ public:
     typedef typename TrackerT::ValueType       ValueType;
 
     /// Main constructor
-    LevelSetMorphing(GridT& sourceGrid,
-                     const GridT& targetGrid,
-                     InterruptT* interrupt = NULL)
+    LevelSetMorphing(GridT& sourceGrid, const GridT& targetGrid, InterruptT* interrupt = nullptr)
         : mTracker(sourceGrid, interrupt)
         , mTarget(&targetGrid)
-        , mMask(NULL)
+        , mMask(nullptr)
         , mSpatialScheme(math::HJWENO5_BIAS)
         , mTemporalScheme(math::TVD_RK2)
         , mMinMask(0)
@@ -280,6 +276,10 @@ LevelSetMorphing<GridT, InterruptT>::advect(ValueType time0, ValueType time1)
     //return this->advect1<math::WENO5_BIAS  >(time0, time1);
     case math::HJWENO5_BIAS:
         return this->advect1<math::HJWENO5_BIAS>(time0, time1);
+    case math::SECOND_BIAS:
+    case math::THIRD_BIAS:
+    case math::WENO5_BIAS:
+    case math::UNKNOWN_BIAS:
     default:
         OPENVDB_THROW(ValueError, "Spatial difference scheme not supported!");
     }
@@ -298,6 +298,7 @@ LevelSetMorphing<GridT, InterruptT>::advect1(ValueType time0, ValueType time1)
         return this->advect2<SpatialScheme, math::TVD_RK2>(time0, time1);
     case math::TVD_RK3:
         return this->advect2<SpatialScheme, math::TVD_RK3>(time0, time1);
+    case math::UNKNOWN_TIS:
     default:
         OPENVDB_THROW(ValueError, "Temporal integration scheme not supported!");
     }
@@ -449,6 +450,7 @@ advect(ValueType time0, ValueType time1)
             // Cook and swap buffer 0 and 2 such that Phi_t3(0) and Phi_t2(2)
             this->cook(PARALLEL_FOR, 2);
             break;
+        case math::UNKNOWN_TIS:
         default:
             OPENVDB_THROW(ValueError, "Temporal integration scheme not supported!");
         }//end of compile-time resolved switch
@@ -479,7 +481,7 @@ sampleSpeed(ValueType time0, ValueType time1, Index speedBuffer)
 
     const math::Transform& xform  = mParent->mTracker.grid().transform();
     if (mParent->mTarget->transform() == xform &&
-        (mParent->mMask == NULL || mParent->mMask->transform() == xform)) {
+        (mParent->mMask == nullptr || mParent->mMask->transform() == xform)) {
         mTask = boost::bind(&Morph::sampleAlignedSpeed, _1, _2, speedBuffer);
     } else {
         mTask = boost::bind(&Morph::sampleXformedSpeed, _1, _2, speedBuffer);
@@ -508,7 +510,7 @@ sampleXformedSpeed(const LeafRange& range, Index speedBuffer)
 
     typename GridT::ConstAccessor targetAcc = mParent->mTarget->getAccessor();
     SamplerT target(targetAcc, mParent->mTarget->transform());
-    if (mParent->mMask == NULL) {
+    if (mParent->mMask == nullptr) {
         for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
             ValueType* speed = leafIter.buffer(speedBuffer).data();
             bool isZero = true;
@@ -555,7 +557,7 @@ sampleAlignedSpeed(const LeafRange& range, Index speedBuffer)
 
     typename GridT::ConstAccessor target = mParent->mTarget->getAccessor();
 
-    if (mParent->mMask == NULL) {
+    if (mParent->mMask == nullptr) {
         for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
             ValueType* speed = leafIter.buffer(speedBuffer).data();
             bool isZero = true;

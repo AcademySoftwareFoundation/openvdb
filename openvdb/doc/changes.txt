@@ -2,6 +2,95 @@
 
 @page changes Release Notes
 
+@htmlonly <a name="v4_0_0_changes"></a>@endhtmlonly
+@par
+<B>Version 4.0.0</B> - <I>In development</I>
+@par
+Highlights:
+- Vector-valued grids are now much faster to construct and destroy.<BR><BR>
+  @b Note:
+  This change and other changes in this release
+  (see @ref v4_0_0_ABI_changes "ABI changes" below) alter the grid&nbsp;ABI
+  so that it is incompatible with earlier versions of the OpenVDB library,
+  such as the ones in Houdini&nbsp;15.0 and&nbsp;15.5.
+  Define the macro @c OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
+  to disable these changes and preserve ABI compatibility.<BR><BR>
+- Introduced some C++11 constructs.
+  A&nbsp;C++11-compatible compiler is now required.
+
+@par
+New features:
+- Added an option to the @link PointScatter.h point scattering@endlink tools
+  to specify how far each point may be displaced from the center of its
+  host voxel or tile.
+- Added a toggle to the @vdblink::tools::clip() clip@endlink tool
+  to invert the clipping mask.
+
+@par
+Improvements:
+- Vector-valued grids are now much faster to construct and destroy.
+- Changed @vdblink::math::Coord Coord@endlink's data representation
+  to facilitate C++11 uniform initialization.
+- Made many small changes to address type conversion and other warnings
+  reported by newer compilers, including Clang&nbsp;3.8.
+@par
+Bug fixes:
+- Fixed a bug that caused topology operations
+  (@vdblink::Grid::topologyUnion() union@endlink,
+  @vdblink::Grid::topologyIntersection() intersection@endlink
+  and @vdblink::Grid::topologyDifference() difference@endlink) on
+  @vdblink::MaskGrid MaskGrids@endlink to sometimes produce incorrect results.
+  (MaskGrids are used internally in a number of tools.)
+- Changed @vdblink::GridBase::copyGrid() GridBase::copyGrid@endlink and
+  @vdblink::Grid::copy() Grid::copy@endlink to close const-correctness holes.
+
+@anchor v4_0_0_ABI_changes
+@par
+ABI changes:
+- Added a @vdblink::tree::NodeUnion NodeUnion@endlink template specialization
+  for non-POD value types that significantly expedites construction and
+  destruction of vector-valued grids.
+- Changed @vdblink::math::Coord Coord@endlink's data representation
+  to facilitate C++11 uniform initialization.
+- Replaced occurrences of <TT>boost::shared_ptr</TT> with
+  <TT>std::shared_ptr</TT>.
+- Changed @vdblink::GridBase::copyGrid() GridBase::copyGrid@endlink and
+  @vdblink::Grid::copy() Grid::copy@endlink to close const-correctness holes.
+
+@par
+API changes:
+- Introduced some C++11 constructs.
+  A&nbsp;C++11-compatible compiler is now required.
+- Added a parameter to the @link PointScatter.h point scattering@endlink
+  tools that controls the displacement of each point from the center of
+  its host voxel or tile.
+  The default behavior, as before, is to allow each point to be placed
+  (randomly) anywhere within its voxel or tile.
+- Renamed @c LeafManager::getPreFixSum to
+  @vdblink::tree::LeafManager::getPrefixSum()
+  LeafManager::getPrefixSum@endlink.
+- Dropped the @c CopyPolicy enum and added
+  @vdblink::GridBase::copyGridWithNewTree() GridBase::copyGridWithNewTree@endlink
+  and @vdblink::Grid::copyWithNewTree() Grid::copyWithNewTree@endlink in order
+  to close const-correctness holes that allowed newly-constructed,
+  non-<TT>const</TT> grids to share their trees with existing
+  <TT>const</TT> grids.  (Where that behavior is still required, use a
+  @vdblink::ConstPtrCast ConstPtrCast@endlink.)
+
+@par
+Houdini:
+- Certain changes in this release (see @ref v4_0_0_ABI_changes "ABI changes"
+  above) alter the grid&nbsp;ABI so that it is incompatible with earlier
+  versions of the OpenVDB library, such as the ones in Houdini&nbsp;15.0
+  and&nbsp;15.5.
+  Define the macro @c OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
+  to disable these changes and preserve ABI compatibility.
+- Introduced some C++11 constructs that are incompatible with
+  versions of Houdini older than&nbsp;15.0.
+- Added a toggle to the Clip SOP to invert the clipping mask.
+- Added a slider to the Scatter SOP to specify how far each point
+  may be displaced from the center of its host voxel or tile.
+
 
 @htmlonly <a name="v3_2_0_changes"></a>@endhtmlonly
 @par
@@ -57,7 +146,7 @@ New features:
 - Added @vdblink::tools::extractIsosurfaceMask() extractIsosurfaceMask@endlink
   which masks voxels that intersect the implicit surface defined by the
   given isovalue.
-- Added a @vdblink::tree::LeafManager::getPreFixSum() getPreFixSum@endlink
+- Added a @vdblink::tree::LeafManager::getPrefixSum() getPrefixSum@endlink
   method to the @vdblink::tree::LeafManager LeafManager@endlink, for
   user-managed external buffers.
 - Added a @vdblink::tools::Dense::print() print@endlink method to the
@@ -1803,7 +1892,7 @@ API changes:
 - @vdblink::tools::GridTransformer tools::GridTransformer@endlink
   and @vdblink::tools::GridResampler tools::GridResampler@endlink
   now correctly (but not yet efficiently) process tiles in sparse grids.
-- Added an optional @vdblink::CopyPolicy CopyPolicy@endlink argument
+- Added an optional @c CopyPolicy argument
   to @vdblink::GridBase::copyGrid() GridBase::copyGrid@endlink
   and to @vdblink::Grid::copy() Grid::copy@endlink that specifies
   whether and how the grid&rsquo;s tree should be copied.

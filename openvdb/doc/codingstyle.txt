@@ -115,7 +115,6 @@ condition (e.g., <TT>if (grid.empty())</TT>,
 
 @subsection sGeneral General
 -# Code must compile without any warning messages.
-if closely related.
 -# Prefer the C++ Standard Library to the C Standard Library.
 -# Restrict variables to the smallest scopes possible, and avoid defining
 local variables before giving them values.  Prefer declarations inside
@@ -275,6 +274,7 @@ but not exception specifications.
 -# Use C++ casts (<TT>static_cast&lt;int&gt;(x)</TT> or <TT>int(x)</TT>),
 not C casts (<TT>(int)x</TT>).
 -# Multiple variables of the same data type may be declared on the same line
+if closely related.
 -# Library code must never deliberately terminate the application in response
 to an error condition.
 -# Avoid using malloc/free when new/delete can be used instead.

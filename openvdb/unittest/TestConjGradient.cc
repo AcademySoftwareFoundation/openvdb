@@ -218,23 +218,23 @@ TestConjGradient::testVectorDotProduct()
     // Test small vector - runs in series
     {
         const size_t length = 1000;
-        VectorType aVec(length, 2.f);
-        VectorType bVec(length, 3.f);
+        VectorType aVec(length, 2.0);
+        VectorType bVec(length, 3.0);
 
         VectorType::ValueType result = aVec.dot(bVec);
-        
-        CPPUNIT_ASSERT_DOUBLES_EQUAL( result, 6.f * length, 1.e-7);
-    } 
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(result, 6.0 * length, 1.0e-7);
+    }
     // Test long vector  - runs in parallel
     {
         const size_t length = 10034502;
-        VectorType aVec(length, 2.f);
-        VectorType bVec(length, 3.f);
+        VectorType aVec(length, 2.0);
+        VectorType bVec(length, 3.0);
 
         VectorType::ValueType result = aVec.dot(bVec);
-        
-        CPPUNIT_ASSERT_DOUBLES_EQUAL( result, 6.f * length, 1.e-7);
-    } 
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(result, 6.0 * length, 1.0e-7);
+    }
 }
 
 // Copyright (c) 2012-2016 DreamWorks Animation LLC

@@ -48,7 +48,8 @@ class OPENVDB_API GridDescriptor
 public:
     GridDescriptor();
     GridDescriptor(const Name& name, const Name& gridType, bool saveFloatAsHalf = false);
-
+    GridDescriptor(const GridDescriptor&) = default;
+    GridDescriptor& operator=(const GridDescriptor&) = default;
     ~GridDescriptor();
 
     const Name& gridType() const { return mGridType; }

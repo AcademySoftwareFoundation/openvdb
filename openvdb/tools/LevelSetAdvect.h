@@ -46,7 +46,7 @@
 #include "VelocityFields.h" // for EnrightField
 #include <openvdb/math/FiniteDifference.h>
 #include <boost/math/constants/constants.hpp>
-#include <openvdb/util/CpuTimer.h>
+//#include <openvdb/util/CpuTimer.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -76,7 +76,7 @@ namespace tools {
 /// typically depends on the transformation of that grid. This design
 /// is chosen for performance reasons. Finally we will assume that the
 /// functor method is NOT threadsafe (typically uses a ValueAccessor)
-/// and that its lightweight enough that we can copy it per thread.    
+/// and that its lightweight enough that we can copy it per thread.
 ///
 /// The @c InterruptType template argument below refers to any class
 /// with the following interface:
@@ -117,34 +117,41 @@ public:
 
     virtual ~LevelSetAdvection() {}
 
-    /// @return the spatial finite difference scheme
+    /// @brief Return the spatial finite difference scheme
     math::BiasedGradientScheme getSpatialScheme() const { return mSpatialScheme; }
     /// @brief Set the spatial finite difference scheme
     void setSpatialScheme(math::BiasedGradientScheme scheme) { mSpatialScheme = scheme; }
 
-    /// @return the temporal integration scheme
+    /// @brief Return the temporal integration scheme
     math::TemporalIntegrationScheme getTemporalScheme() const { return mTemporalScheme; }
     /// @brief Set the spatial finite difference scheme
     void setTemporalScheme(math::TemporalIntegrationScheme scheme) { mTemporalScheme = scheme; }
 
-    /// @return the spatial finite difference scheme
-    math::BiasedGradientScheme getTrackerSpatialScheme() const { return mTracker.getSpatialScheme(); }
+    /// @brief Return the spatial finite difference scheme
+    math::BiasedGradientScheme getTrackerSpatialScheme() const {
+        return mTracker.getSpatialScheme();
+    }
     /// @brief Set the spatial finite difference scheme
-    void setTrackerSpatialScheme(math::BiasedGradientScheme scheme) { mTracker.setSpatialScheme(scheme); }
-
-    /// @return the temporal integration scheme
-    math::TemporalIntegrationScheme getTrackerTemporalScheme() const { return mTracker.getTemporalScheme(); }
+    void setTrackerSpatialScheme(math::BiasedGradientScheme scheme) {
+        mTracker.setSpatialScheme(scheme);
+    }
+    /// @brief Return the temporal integration scheme
+    math::TemporalIntegrationScheme getTrackerTemporalScheme() const {
+        return mTracker.getTemporalScheme();
+    }
     /// @brief Set the spatial finite difference scheme
-    void setTrackerTemporalScheme(math::TemporalIntegrationScheme scheme) { mTracker.setTemporalScheme(scheme); }
+    void setTrackerTemporalScheme(math::TemporalIntegrationScheme scheme) {
+        mTracker.setTemporalScheme(scheme);
+    }
 
-    /// @return The number of normalizations performed per track or
+    /// @brief Return The number of normalizations performed per track or
     /// normalize call.
     int  getNormCount() const { return mTracker.getNormCount(); }
     /// @brief Set the number of normalizations performed per track or
     /// normalize call.
     void setNormCount(int n) { mTracker.setNormCount(n); }
 
-    /// @return the grain-size used for multi-threading
+    /// @brief Return the grain-size used for multi-threading
     int  getGrainSize() const { return mTracker.getGrainSize(); }
     /// @brief Set the grain-size used for multi-threading.
     /// @note A grain size of 0 or less disables multi-threading!
@@ -157,7 +164,6 @@ public:
     size_t advect(ValueType time0, ValueType time1);
 
 private:
-
     // disallow copy construction and copy by assinment!
     LevelSetAdvection(const LevelSetAdvection&);// not implemented
     LevelSetAdvection& operator=(const LevelSetAdvection&);// not implemented
@@ -212,7 +218,7 @@ private:
         typename boost::function<void (Advect*, const LeafRange&)> mTask;
         const bool         mIsMaster;
     }; // end of private Advect struct
-    
+
     template<math::BiasedGradientScheme SpatialScheme>
     size_t advect1(ValueType time0, ValueType time1);
 
@@ -232,6 +238,7 @@ private:
     math::TemporalIntegrationScheme mTemporalScheme;
 
 };//end of LevelSetAdvection
+
 
 template<typename GridT, typename FieldT, typename InterruptT>
 inline size_t
@@ -254,6 +261,7 @@ LevelSetAdvection<GridT, FieldT, InterruptT>::advect(ValueType time0, ValueType 
     return 0;
 }
 
+
 template<typename GridT, typename FieldT, typename InterruptT>
 template<math::BiasedGradientScheme SpatialScheme>
 inline size_t
@@ -272,9 +280,9 @@ LevelSetAdvection<GridT, FieldT, InterruptT>::advect1(ValueType time0, ValueType
     return 0;
 }
 
+
 template<typename GridT, typename FieldT, typename InterruptT>
-template<math::BiasedGradientScheme SpatialScheme,
-         math::TemporalIntegrationScheme TemporalScheme>
+template<math::BiasedGradientScheme SpatialScheme, math::TemporalIntegrationScheme TemporalScheme>
 inline size_t
 LevelSetAdvection<GridT, FieldT, InterruptT>::advect2(ValueType time0, ValueType time1)
 {
@@ -282,7 +290,8 @@ LevelSetAdvection<GridT, FieldT, InterruptT>::advect2(ValueType time0, ValueType
     if (trans.mapType() == math::UniformScaleMap::mapType()) {
         return this->advect3<SpatialScheme, TemporalScheme, math::UniformScaleMap>(time0, time1);
     } else if (trans.mapType() == math::UniformScaleTranslateMap::mapType()) {
-        return this->advect3<SpatialScheme, TemporalScheme, math::UniformScaleTranslateMap>(time0, time1);
+        return this->advect3<SpatialScheme, TemporalScheme, math::UniformScaleTranslateMap>(
+            time0, time1);
     } else if (trans.mapType() == math::UnitaryMap::mapType()) {
         return this->advect3<SpatialScheme, TemporalScheme, math::UnitaryMap    >(time0, time1);
     } else if (trans.mapType() == math::TranslationMap::mapType()) {
@@ -293,10 +302,12 @@ LevelSetAdvection<GridT, FieldT, InterruptT>::advect2(ValueType time0, ValueType
     return 0;
 }
 
+
 template<typename GridT, typename FieldT, typename InterruptT>
-template<math::BiasedGradientScheme SpatialScheme,
-         math::TemporalIntegrationScheme TemporalScheme,
-         typename MapT>
+template<
+    math::BiasedGradientScheme SpatialScheme,
+    math::TemporalIntegrationScheme TemporalScheme,
+    typename MapT>
 inline size_t
 LevelSetAdvection<GridT, FieldT, InterruptT>::advect3(ValueType time0, ValueType time1)
 {
@@ -309,8 +320,10 @@ LevelSetAdvection<GridT, FieldT, InterruptT>::advect3(ValueType time0, ValueType
 
 
 template<typename GridT, typename FieldT, typename InterruptT>
-template <typename MapT, math::BiasedGradientScheme SpatialScheme,
-          math::TemporalIntegrationScheme TemporalScheme>
+template<
+    typename MapT,
+    math::BiasedGradientScheme SpatialScheme,
+    math::TemporalIntegrationScheme TemporalScheme>
 inline
 LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
@@ -324,9 +337,12 @@ Advect(LevelSetAdvection& parent)
 {
 }
 
+
 template<typename GridT, typename FieldT, typename InterruptT>
-template <typename MapT, math::BiasedGradientScheme SpatialScheme,
-          math::TemporalIntegrationScheme TemporalScheme>
+template<
+    typename MapT,
+    math::BiasedGradientScheme SpatialScheme,
+    math::TemporalIntegrationScheme TemporalScheme>
 inline
 LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
@@ -339,10 +355,13 @@ Advect(const Advect& other)
     , mIsMaster(false)
 {
 }
-   
+
+
 template<typename GridT, typename FieldT, typename InterruptT>
-template <typename MapT, math::BiasedGradientScheme SpatialScheme,
-          math::TemporalIntegrationScheme TemporalScheme>
+template<
+    typename MapT,
+    math::BiasedGradientScheme SpatialScheme,
+    math::TemporalIntegrationScheme TemporalScheme>
 inline size_t
 LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
@@ -357,7 +376,7 @@ advect(ValueType time0, ValueType time1)
         //timer.start( "\nallocate buffers" );
         mParent.mTracker.leafs().rebuildAuxBuffers(TemporalScheme == math::TVD_RK3 ? 2 : 1);
         //timer.stop();
-        
+
         const ValueType dt = this->sampleField(time0, time1);
         if ( math::isZero(dt) ) break;//V is essentially zero so terminate
 
@@ -412,7 +431,7 @@ advect(ValueType time0, ValueType time1)
             OPENVDB_THROW(ValueError, "Temporal integration scheme not supported!");
         }//end of compile-time resolved switch
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
-            
+
         time0 += isForward ? dt : -dt;
         ++countCFL;
         mParent.mTracker.leafs().removeAuxBuffers();
@@ -423,9 +442,12 @@ advect(ValueType time0, ValueType time1)
     return countCFL;//number of CLF propagation steps
 }
 
+
 template<typename GridT, typename FieldT, typename InterruptT>
-template<typename MapT, math::BiasedGradientScheme SpatialScheme,
-	math::TemporalIntegrationScheme TemporalScheme>
+template<
+    typename MapT,
+    math::BiasedGradientScheme SpatialScheme,
+    math::TemporalIntegrationScheme TemporalScheme>
 inline typename GridT::ValueType
 LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
@@ -435,8 +457,8 @@ sampleField(ValueType time0, ValueType time1)
     const size_t leafCount = mParent.mTracker.leafs().leafCount();
     if (leafCount==0) return ValueType(0.0);
 
-    // Compute the pre-fix sum of offsets to active voxels
-    size_t size=0, voxelCount=mParent.mTracker.leafs().getPreFixSum(mOffsets, size, grainSize);
+    // Compute the prefix sum of offsets to active voxels
+    size_t size=0, voxelCount=mParent.mTracker.leafs().getPrefixSum(mOffsets, size, grainSize);
 
     // Sample the velocity field
     if (mParent.mField.transform() == mParent.mTracker.grid().transform()) {
@@ -451,7 +473,9 @@ sampleField(ValueType time0, ValueType time1)
     // Find the extrema of the magnitude of the velocities
     ValueType maxAbsV = 0;
     VectorType* v = mVelocity;
-    for (size_t i=0; i<voxelCount; ++i, ++v) maxAbsV = math::Max(maxAbsV, ValueType(v->lengthSqr()));
+    for (size_t i = 0; i < voxelCount; ++i, ++v) {
+        maxAbsV = math::Max(maxAbsV, ValueType(v->lengthSqr()));
+    }
 
     // Compute the CFL number
     if (math::isApproxZero(maxAbsV, math::Delta<ValueType>::value())) return ValueType(0);
@@ -465,10 +489,13 @@ sampleField(ValueType time0, ValueType time1)
     return math::Min(dt, ValueType(CFL*dx/math::Sqrt(maxAbsV)));
 }
 
+
 template<typename GridT, typename FieldT, typename InterruptT>
-template <typename MapT, math::BiasedGradientScheme SpatialScheme,
-          math::TemporalIntegrationScheme TemporalScheme>
-template <bool Aligned>
+template<
+    typename MapT,
+    math::BiasedGradientScheme SpatialScheme,
+    math::TemporalIntegrationScheme TemporalScheme>
+template<bool Aligned>
 inline void
 LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
@@ -489,23 +516,29 @@ sample(const LeafRange& range, ValueType time0, ValueType time1)
     }
 }
 
+
 template<typename GridT, typename FieldT, typename InterruptT>
-template <typename MapT, math::BiasedGradientScheme SpatialScheme,
-          math::TemporalIntegrationScheme TemporalScheme>
+template<
+    typename MapT,
+    math::BiasedGradientScheme SpatialScheme,
+    math::TemporalIntegrationScheme TemporalScheme>
 inline void
 LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
 clearField()
 {
-    delete [] mOffsets; 
+    delete [] mOffsets;
     delete [] mVelocity;
     mOffsets  = NULL;
     mVelocity = NULL;
 }
 
+
 template<typename GridT, typename FieldT, typename InterruptT>
-template <typename MapT, math::BiasedGradientScheme SpatialScheme,
-          math::TemporalIntegrationScheme TemporalScheme>
+template<
+    typename MapT,
+    math::BiasedGradientScheme SpatialScheme,
+    math::TemporalIntegrationScheme TemporalScheme>
 inline void
 LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
@@ -523,11 +556,14 @@ cook(const char* msg, size_t swapBuffer)
     mParent.mTracker.endInterrupter();
 }
 
+
 // Convex combination of Phi and a forward Euler advection steps:
 // Phi(result) = alpha * Phi(phi) + (1-alpha) * (Phi(0) - dt * V.Grad(0));
 template<typename GridT, typename FieldT, typename InterruptT>
-template<typename MapT, math::BiasedGradientScheme SpatialScheme,
-         math::TemporalIntegrationScheme TemporalScheme>
+template<
+    typename MapT,
+    math::BiasedGradientScheme SpatialScheme,
+    math::TemporalIntegrationScheme TemporalScheme>
 template <int Nominator, int Denominator>
 inline void
 LevelSetAdvection<GridT, FieldT, InterruptT>::
@@ -552,7 +588,8 @@ euler(const LeafRange& range, ValueType dt, Index phiBuffer, Index resultBuffer)
         for (VoxelIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter, ++vel) {
             const Index i = voxelIter.pos();
             stencil.moveTo(voxelIter);
-            const ValueType a = stencil.getValue() - dt * vel->dot(GradT::result(map, stencil, *vel));
+            const ValueType a =
+                stencil.getValue() - dt * vel->dot(GradT::result(map, stencil, *vel));
             result[i] = Nominator ? Alpha * phi[i] + Beta * a : a;
         }//loop over active voxels in the leaf of the mask
     }//loop over leafs of the level set

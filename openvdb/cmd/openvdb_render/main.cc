@@ -173,7 +173,7 @@ std::ostream& operator<<(std::ostream& os, const RenderOpts& opts) { return opts
 
 
 void
-usage(int exitStatus = EXIT_FAILURE)
+usage [[noreturn]] (int exitStatus = EXIT_FAILURE)
 {
     RenderOpts opts; // default options
     const double fov = openvdb::tools::PerspectiveCamera::focalLengthToFieldOfView(

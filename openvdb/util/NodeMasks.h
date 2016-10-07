@@ -170,17 +170,19 @@ FindHighestOn(Index32 v)
 
 
 /// Base class for the bit mask iterators
-template <typename NodeMask>
+template<typename NodeMask>
 class BaseMaskIterator
 {
 protected:
-    Index32          mPos;//bit position
-    const NodeMask*  mParent;//this iterator can't change the parent_mask!
+    Index32 mPos; // bit position
+    const NodeMask* mParent; // this iterator can't change the parent_mask!
+
 public:
-    BaseMaskIterator() : mPos(NodeMask::SIZE), mParent(NULL) {}
-    BaseMaskIterator(Index32 pos,const NodeMask *parent) : mPos(pos), mParent(parent)
+    BaseMaskIterator(): mPos(NodeMask::SIZE), mParent(nullptr) {}
+    BaseMaskIterator(const BaseMaskIterator&) = default;
+    BaseMaskIterator(Index32 pos, const NodeMask* parent): mPos(pos), mParent(parent)
     {
-        assert( (parent==NULL && pos==0 ) ||  (parent!=NULL && pos<=NodeMask::SIZE) );
+        assert((parent == nullptr && pos == 0) || (parent != nullptr && pos <= NodeMask::SIZE));
     }
     bool operator==(const BaseMaskIterator &iter) const {return mPos == iter.mPos;}
     bool operator!=(const BaseMaskIterator &iter) const {return mPos != iter.mPos;}
@@ -189,14 +191,10 @@ public:
     {
         mPos = iter.mPos; mParent = iter.mParent; return *this;
     }
-    Index32 offset() const {return mPos;}
-    Index32 pos() const {return mPos;}
-    bool test() const
-    {
-        assert(mPos  <= NodeMask::SIZE);
-        return (mPos != NodeMask::SIZE);
-    }
-    operator bool() const {return this->test();}
+    Index32 offset() const { return mPos; }
+    Index32 pos() const { return mPos; }
+    bool test() const { assert(mPos <= NodeMask::SIZE); return (mPos != NodeMask::SIZE); }
+    operator bool() const { return this->test(); }
 }; // class BaseMaskIterator
 
 
@@ -213,7 +211,7 @@ public:
     OnMaskIterator(Index32 pos,const NodeMask *parent) : BaseType(pos,parent) {}
     void increment()
     {
-        assert(mParent != NULL);
+        assert(mParent != nullptr);
         mPos = mParent->findNextOn(mPos+1);
         assert(mPos <= NodeMask::SIZE);
     }
@@ -244,7 +242,7 @@ public:
     OffMaskIterator(Index32 pos,const NodeMask *parent) : BaseType(pos,parent) {}
     void increment()
     {
-        assert(mParent != NULL);
+        assert(mParent != nullptr);
         mPos=mParent->findNextOff(mPos+1);
         assert(mPos <= NodeMask::SIZE);
     }
@@ -276,7 +274,7 @@ public:
     DenseMaskIterator(Index32 pos,const NodeMask *parent) : BaseType(pos,parent) {}
     void increment()
     {
-        assert(mParent != NULL);
+        assert(mParent != nullptr);
         mPos += 1;//careful - the increment might go beyond the end
         assert(mPos<= NodeMask::SIZE);
     }
@@ -365,7 +363,7 @@ public:
     //
     // Bitwise logical operations
     //
-    
+
     /// @brief Apply a functor to the words of the this and the other mask.
     ///
     /// @details An example that implements the "operator&=" method:
@@ -405,7 +403,7 @@ public:
         for (Index32 n = WORD_COUNT; n--;  ++w1, ++w2) *w1 &= *w2;
         return *this;
     }
-    /// @brief Bitwise union 
+    /// @brief Bitwise union
     const NodeMask& operator|=(const NodeMask& other)
     {
         Word *w1 = mWords;
@@ -433,7 +431,7 @@ public:
     NodeMask operator&(const NodeMask& other) const { NodeMask m(*this); m &= other; return m; }
     NodeMask operator|(const NodeMask& other) const { NodeMask m(*this); m |= other; return m; }
     NodeMask operator^(const NodeMask& other) const { NodeMask m(*this); m ^= other; return m; }
-   
+
     /// Return the byte size of this NodeMask
     static Index32 memUsage() { return static_cast<Index32>(WORD_COUNT*sizeof(Word)); }
     /// Return the total number of on bits
@@ -526,7 +524,7 @@ public:
         if ( !isOn && mWords[0] != Word(0)) return false;//early out
         const Word *w = mWords + 1, *n = mWords + WORD_COUNT;
         while( w<n && *w == mWords[0] ) ++w;
-        return w == n; 
+        return w == n;
     }
     Index32 findFirstOn() const
     {
@@ -662,7 +660,7 @@ public:
     //
     // Bitwise logical operations
     //
-    
+
     /// @brief Apply a functor to the words of the this and the other mask.
     ///
     /// @details An example that implements the "operator&=" method:
@@ -694,13 +692,13 @@ public:
         mByte &= other.mByte;
         return *this;
     }
-    /// @brief Bitwise union 
+    /// @brief Bitwise union
     const NodeMask& operator|=(const NodeMask& other)
     {
         mByte |= other.mByte;
         return *this;
     }
-    /// @brief Bitwise difference 
+    /// @brief Bitwise difference
     const NodeMask& operator-=(const NodeMask& other)
     {
         mByte &= static_cast<Byte>(~other.mByte);
@@ -924,7 +922,7 @@ public:
         mWord |= other.mWord;
         return *this;
     }
-    /// @brief Bitwise difference 
+    /// @brief Bitwise difference
     const NodeMask& operator-=(const NodeMask& other)
     {
         mWord &= ~other.mWord;
@@ -986,7 +984,7 @@ public:
         return 0 != (mWord & (UINT64_C(0x01) << (n & 63)));
     }
     /// Return true if the <i>n</i>th bit is off
-    bool isOff(Index32 n) const {return !this->isOn(n); } 
+    bool isOff(Index32 n) const {return !this->isOn(n); }
     /// Return true if all the bits are on
     bool isOn() const { return mWord == UINT64_C(0xFFFFFFFFFFFFFFFF); }
     /// Return true if all the bits are off
@@ -996,7 +994,7 @@ public:
     /// returns true - else it is undefined.
     bool isConstant(bool &isOn) const
     {   isOn = this->isOn();
-        return isOn || this->isOff(); 
+        return isOn || this->isOff();
     }
     Index32 findFirstOn() const { return mWord ? FindLowestOn(mWord) : 64; }
     Index32 findFirstOff() const
@@ -1072,7 +1070,7 @@ protected:
     Index32  *mBits;
 
 public:
-    RootNodeMask(): mBitSize(0), mIntSize(0), mBits(NULL) {}
+    RootNodeMask(): mBitSize(0), mIntSize(0), mBits(nullptr) {}
     RootNodeMask(Index32 bit_size):
         mBitSize(bit_size), mIntSize(((bit_size-1)>>5)+1), mBits(new Index32[mIntSize])
     {
@@ -1115,11 +1113,10 @@ public:
         Index32             mBitSize;
         const RootNodeMask* mParent;//this iterator can't change the parent_mask!
     public:
-        BaseIterator() : mPos(0), mBitSize(0), mParent(NULL) {}
-        BaseIterator(Index32 pos,const RootNodeMask *parent)
-            : mPos(pos), mBitSize(parent->getBitSize()), mParent(parent) {
-            assert( pos<=mBitSize );
-        }
+        BaseIterator() : mPos(0), mBitSize(0), mParent(nullptr) {}
+        BaseIterator(const BaseIterator&) = default;
+        BaseIterator(Index32 pos, const RootNodeMask* parent):
+            mPos(pos), mBitSize(parent->getBitSize()), mParent(parent) { assert(pos <= mBitSize); }
         bool operator==(const BaseIterator &iter) const {return mPos == iter.mPos;}
         bool operator!=(const BaseIterator &iter) const {return mPos != iter.mPos;}
         bool operator< (const BaseIterator &iter) const {return mPos <  iter.mPos;}
@@ -1153,7 +1150,7 @@ public:
         OnIterator() : BaseIterator() {}
         OnIterator(Index32 pos,const RootNodeMask *parent) : BaseIterator(pos,parent) {}
         void increment() {
-            assert(mParent!=NULL);
+            assert(mParent != nullptr);
             mPos=mParent->findNextOn(mPos+1);
             assert(mPos <= mBitSize);
         }
@@ -1181,7 +1178,7 @@ public:
         OffIterator() : BaseIterator()  {}
         OffIterator(Index32 pos,const RootNodeMask *parent) : BaseIterator(pos,parent) {}
         void increment() {
-            assert(mParent!=NULL);
+            assert(mParent != nullptr);
             mPos=mParent->findNextOff(mPos+1);
             assert(mPos <= mBitSize);
         }
@@ -1209,7 +1206,7 @@ public:
         DenseIterator() : BaseIterator() {}
         DenseIterator(Index32 pos,const RootNodeMask *parent) : BaseIterator(pos,parent) {}
         void increment() {
-            assert(mParent!=NULL);
+            assert(mParent != nullptr);
             mPos += 1;//carefull - the increament might go beyond the end
             assert(mPos<= mBitSize);
         }
@@ -1370,11 +1367,11 @@ public:
 
     void save(std::ostream& os) const {
         assert(mBits);
-        os.write((const char *)mBits,mIntSize*sizeof(Index32));
+        os.write(reinterpret_cast<const char*>(mBits), mIntSize * sizeof(Index32));
     }
     void load(std::istream& is) {
         assert(mBits);
-        is.read((char *)mBits,mIntSize*sizeof(Index32));
+        is.read(reinterpret_cast<char*>(mBits), mIntSize * sizeof(Index32));
     }
     /// @brief simple print method for debugging
     void printInfo(std::ostream& os=std::cout) const {

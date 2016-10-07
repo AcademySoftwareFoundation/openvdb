@@ -164,12 +164,12 @@ public:
              OPENVDB_THROW(ArithmeticError,
                 "A non-rotation matrix can not be used to construct a quaternion");
         }
-        if (!isApproxEqual(rot.det(), (T1)1)) { // rule out reflection
+        if (!isApproxEqual(rot.det(), T1(1))) { // rule out reflection
              OPENVDB_THROW(ArithmeticError,
                 "A reflection matrix can not be used to construct a quaternion");
         }
 
-        T trace = (T)rot.trace();
+        T trace(rot.trace());
         if (trace > 0) {
 
             T q_w = 0.5 * std::sqrt(trace+1);
@@ -581,13 +581,8 @@ public:
 
     friend Quat slerp<>(const Quat &q1, const Quat &q2, T t, T tolerance);
 
-
-    void write(std::ostream& os) const {
-        os.write((char*)&mm, sizeof(T)*4);
-    }
-    void read(std::istream& is) {
-        is.read((char*)&mm, sizeof(T)*4);
-    }
+    void write(std::ostream& os) const { os.write(static_cast<char*>(&mm), sizeof(T) * 4); }
+    void read(std::istream& is) { is.read(static_cast<char*>(&mm), sizeof(T) * 4); }
 
 protected:
     T mm[4];
@@ -652,7 +647,6 @@ typedef Quat<double> Quatd;
 
 #endif //OPENVDB_MATH_QUAT_H_HAS_BEEN_INCLUDED
 
-// ---------------------------------------------------------------------------
 // Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

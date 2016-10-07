@@ -172,6 +172,7 @@ class BufferObject
 {
 public:
     BufferObject();
+    BufferObject(const BufferObject&) = default;
     ~BufferObject();
 
     void render() const;
@@ -351,7 +352,8 @@ public:
 
         WireBoxBuilder boxBuilder(grid->constTransform(), indices, points, colors);
 
-        boxBuilder.add(0, grid->evalActiveVoxelBoundingBox(), openvdb::Vec3s(0.045, 0.045, 0.045));
+        boxBuilder.add(0, grid->evalActiveVoxelBoundingBox(),
+            openvdb::Vec3s(0.045f, 0.045f, 0.045f));
 
         // store the sorted min/max points.
         mMin[0] = std::numeric_limits<float>::max();
@@ -410,13 +412,14 @@ public:
         iter.setMaxDepth(GridType::TreeType::NodeCIter::LEAF_DEPTH - 1);
 
         const openvdb::Vec3s nodeColor[2] = {
-            openvdb::Vec3s(0.0432, 0.33, 0.0411023), // first internal node level
-            openvdb::Vec3s(0.871, 0.394, 0.01916) // intermediate internal node levels
+            openvdb::Vec3s(0.0432f, 0.33f, 0.0411023f), // first internal node level
+            openvdb::Vec3s(0.871f, 0.394f, 0.01916f) // intermediate internal node levels
         };
 
         for ( ; iter; ++iter) {
             iter.getBoundingBox(bbox);
-            boxBuilder.add(boxIndex++, bbox, nodeColor[(iter.getLevel() == 1)]);
+            boxBuilder.add(static_cast<GLuint>(boxIndex++), bbox,
+                nodeColor[(iter.getLevel() == 1)]);
 
         } // end node iteration
 
@@ -450,7 +453,7 @@ public:
         std::vector<GLfloat> colors(N);
 
         WireBoxBuilder boxBuilder(grid->constTransform(), indices, points, colors);
-        const openvdb::Vec3s color(0.00608299, 0.279541, 0.625); // leaf node color
+        const openvdb::Vec3s color(0.00608299f, 0.279541f, 0.625f); // leaf node color
 
         tbb::parallel_for(leafs.getRange(), LeafOp<TreeType>(leafs, boxBuilder, color));
 
@@ -481,7 +484,7 @@ protected:
                 max[0] = min[0] + offset;
                 max[1] = min[1] + offset;
                 max[2] = min[2] + offset;
-                mBoxBuilder->add(n, bbox, mColor);
+                mBoxBuilder->add(static_cast<GLuint>(n), bbox, mColor);
             }
         }
 
@@ -522,18 +525,16 @@ public:
 
         WireBoxBuilder boxBuilder(grid->constTransform(), indices, points, colors);
 
-        const openvdb::Vec3s color(0.9, 0.3, 0.3);
+        const openvdb::Vec3s color(0.9f, 0.3f, 0.3f);
         openvdb::CoordBBox bbox;
         size_t boxIndex = 0;
-
-
 
         typename TreeType::ValueOnCIter iter(grid->tree());
         iter.setMaxDepth(maxDepth);
 
         for ( ; iter; ++iter) {
             iter.getBoundingBox(bbox);
-            boxBuilder.add(boxIndex++, bbox, color);
+            boxBuilder.add(static_cast<GLuint>(boxIndex++), bbox, color);
         } // end tile iteration
 
 
@@ -564,7 +565,6 @@ public:
         std::vector<GLfloat> normals(mesher.pointListSize() * 3);
 
         openvdb::tree::ValueAccessor<const typename GridType::TreeType> acc(grid->tree());
-        typedef openvdb::math::Gradient<openvdb::math::GenericMap, openvdb::math::CD_2ND> Gradient;
         openvdb::math::GenericMap map(grid->transform());
         openvdb::Coord ijk;
 
@@ -604,10 +604,10 @@ public:
                 const double length = normal.length();
                 if (length > 1.0e-7) normal *= (1.0 / length);
 
-                for (size_t v = 0; v < 4; ++v) {
-                    normals[quad[v]*3]    = -normal[0];
-                    normals[quad[v]*3+1]  = -normal[1];
-                    normals[quad[v]*3+2]  = -normal[2];
+                for (int v = 0; v < 4; ++v) {
+                    normals[quad[v]*3]    = static_cast<GLfloat>(-normal[0]);
+                    normals[quad[v]*3+1]  = static_cast<GLfloat>(-normal[1]);
+                    normals[quad[v]*3+2]  = static_cast<GLfloat>(-normal[2]);
                 }
             }
         }
@@ -695,7 +695,7 @@ public:
                 ++index;
 
                 int r = int(std::floor(mVoxelsPerLeaf / activeVoxels));
-                for (int i = 1, I = mVoxelsPerLeaf - 2; i < I; ++i) {
+                for (int i = 1, I = static_cast<int>(mVoxelsPerLeaf) - 2; i < I; ++i) {
                     pos = mTransform->indexToWorld(coords[i * r]);
                     insertPoint(pos, index);
                     ++index;
@@ -709,9 +709,9 @@ private:
     {
         (*mIndices)[index] = index;
         const unsigned element = index * 3;
-        (*mPoints)[element    ] = pos[0];
-        (*mPoints)[element + 1] = pos[1];
-        (*mPoints)[element + 2] = pos[2];
+        (*mPoints)[element    ] = static_cast<GLfloat>(pos[0]);
+        (*mPoints)[element + 1] = static_cast<GLfloat>(pos[1]);
+        (*mPoints)[element + 2] = static_cast<GLfloat>(pos[2]);
     }
 
     std::vector<GLfloat> *mPoints;
@@ -784,7 +784,7 @@ public:
     {
         openvdb::Coord ijk;
         openvdb::Vec3d pos, tmpNormal, normal(0.0, -1.0, 0.0);
-        openvdb::Vec3s color(0.9, 0.3, 0.3);
+        openvdb::Vec3s color(0.9f, 0.3f, 0.3f);
         float w = 0.0;
 
         size_t e1, e2, e3, voxelNum = 0;
@@ -810,14 +810,14 @@ public:
                     color = mColorMap[1];
                 } else {
                     w = (float(value) - mOffset[1]) * mScale[1];
-                    color = w * mColorMap[0] + (1.0 - w) * mColorMap[1];
+                    color = openvdb::Vec3s{w * mColorMap[0] + (1.0 - w) * mColorMap[1]};
                 }
             } else {
                 if (mIsLevelSet) {
                     color = mColorMap[2];
                 } else {
                     w = (float(value) - mOffset[0]) * mScale[0];
-                    color = w * mColorMap[2] + (1.0 - w) * mColorMap[3];
+                    color = openvdb::Vec3s{w * mColorMap[2] + (1.0 - w) * mColorMap[3]};
                 }
             }
 
@@ -839,9 +839,9 @@ public:
                 }
                 ++voxelNum;
 
-                (*mNormals)[e1] = normal[0];
-                (*mNormals)[e2] = normal[1];
-                (*mNormals)[e3] = normal[2];
+                (*mNormals)[e1] = static_cast<GLfloat>(normal[0]);
+                (*mNormals)[e2] = static_cast<GLfloat>(normal[1]);
+                (*mNormals)[e3] = static_cast<GLfloat>(normal[2]);
             }
         }
     }
@@ -851,9 +851,9 @@ private:
     void init()
     {
         mOffset[0] = float(std::min(mZeroValue, mMinValue));
-        mScale[0] = 1.0 / float(std::abs(std::max(mZeroValue, mMaxValue) - mOffset[0]));
+        mScale[0] = 1.f / float(std::abs(std::max(mZeroValue, mMaxValue) - mOffset[0]));
         mOffset[1] = float(std::min(mZeroValue, mMinValue));
-        mScale[1] = 1.0 / float(std::abs(std::max(mZeroValue, mMaxValue) - mOffset[1]));
+        mScale[1] = 1.f / float(std::abs(std::max(mZeroValue, mMaxValue) - mOffset[1]));
     }
 
     std::vector<GLfloat> *mPoints;
@@ -878,10 +878,10 @@ public:
 
     ActiveVoxelGeo(BufferObject& pointBuffer)
         : mPointBuffer(&pointBuffer)
-        , mColorMinPosValue(0.3, 0.9, 0.3) // green
-        , mColorMaxPosValue(0.9, 0.3, 0.3) // red
-        , mColorMinNegValue(0.9, 0.9, 0.3) // yellow
-        , mColorMaxNegValue(0.3, 0.3, 0.9) // blue
+        , mColorMinPosValue(0.3f, 0.9f, 0.3f) // green
+        , mColorMaxPosValue(0.9f, 0.3f, 0.3f) // red
+        , mColorMinNegValue(0.9f, 0.9f, 0.3f) // yellow
+        , mColorMaxNegValue(0.3f, 0.3f, 0.9f) // blue
     { }
 
     void setColorMinPosValue(const openvdb::Vec3s& c) { mColorMinPosValue = c; }
@@ -904,7 +904,6 @@ public:
 
         typedef typename GridType::ValueType ValueType;
         typedef typename GridType::TreeType TreeType;
-        typedef typename TreeType::template ValueConverter<bool>::Type BoolTreeT;
 
         const TreeType& tree = grid->tree();
         const bool isLevelSetGrid = grid->getGridClass() == openvdb::GRID_LEVEL_SET;

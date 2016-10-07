@@ -31,25 +31,23 @@
 #ifndef OPENVDB_GRID_HAS_BEEN_INCLUDED
 #define OPENVDB_GRID_HAS_BEEN_INCLUDED
 
+#include "Exceptions.h"
+#include "MetaMap.h"
+#include "Types.h"
+#include "math/Transform.h"
+#include "tree/Tree.h"
+#include "util/Name.h"
 #include <iostream>
 #include <set>
+#include <type_traits>
 #include <vector>
-#include <boost/static_assert.hpp>
-#include <boost/type_traits/remove_const.hpp>
-#include <boost/type_traits/is_floating_point.hpp>
-#include <openvdb/Types.h>
-#include <openvdb/util/Name.h>
-#include <openvdb/math/Transform.h>
-#include <openvdb/tree/Tree.h>
-#include <openvdb/metadata/MetaMap.h>
-#include <openvdb/Exceptions.h>
 
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 
-typedef tree::TreeBase TreeBase;
+using TreeBase = tree::TreeBase;
 
 template<typename> class Grid; // forward declaration
 
@@ -103,18 +101,29 @@ typename GridType::Ptr createLevelSet(
 class OPENVDB_API GridBase: public MetaMap
 {
 public:
-    typedef boost::shared_ptr<GridBase> Ptr;
-    typedef boost::shared_ptr<const GridBase> ConstPtr;
+    using Ptr      = SharedPtr<GridBase>;
+    using ConstPtr = SharedPtr<const GridBase>;
 
-    typedef Ptr (*GridFactory)();
+    using GridFactory = Ptr (*)();
 
 
-    virtual ~GridBase() {}
+    ~GridBase() override {}
 
+#ifdef OPENVDB_3_ABI_COMPATIBLE
     /// @brief Return a new grid of the same type as this grid and whose
     /// metadata and transform are deep copies of this grid's.
     virtual GridBase::Ptr copyGrid(CopyPolicy treePolicy = CP_SHARE) const = 0;
-
+#else
+    //@{
+    /// @brief Return a new grid of the same type as this grid whose metadata and
+    /// transform are deep copies of this grid's and whose tree is shared with this grid.
+    virtual GridBase::Ptr copyGrid() = 0;
+    virtual GridBase::ConstPtr copyGrid() const = 0;
+    //@}
+    /// @brief Return a new grid of the same type as this grid whose metadata and
+    /// transform are deep copies of this grid's and whose tree is default-constructed.
+    virtual GridBase::Ptr copyGridWithNewTree() const = 0;
+#endif
     /// Return a new grid whose metadata, transform and tree are deep copies of this grid's.
     virtual GridBase::Ptr deepCopyGrid() const = 0;
 
@@ -400,8 +409,13 @@ protected:
     /// @brief Deep copy another grid's metadata and transform.
     GridBase(const GridBase& other): MetaMap(other), mTransform(other.mTransform->copy()) {}
 
+#ifdef OPENVDB_3_ABI_COMPATIBLE
     /// @brief Copy another grid's metadata but share its transform.
     GridBase(const GridBase& other, ShallowCopy): MetaMap(other), mTransform(other.mTransform) {}
+#else
+    /// @brief Copy another grid's metadata but share its transform.
+    GridBase(GridBase& other, ShallowCopy): MetaMap(other), mTransform(other.mTransform) {}
+#endif
 
     /// Register a grid type along with a factory function.
     static void registerGrid(const Name& type, GridFactory);
@@ -417,25 +431,25 @@ private:
 ////////////////////////////////////////
 
 
-typedef std::vector<GridBase::Ptr>      GridPtrVec;
-typedef GridPtrVec::iterator            GridPtrVecIter;
-typedef GridPtrVec::const_iterator      GridPtrVecCIter;
-typedef boost::shared_ptr<GridPtrVec>   GridPtrVecPtr;
+using GridPtrVec       = std::vector<GridBase::Ptr>;
+using GridPtrVecIter   = GridPtrVec::iterator;
+using GridPtrVecCIter  = GridPtrVec::const_iterator;
+using GridPtrVecPtr    = SharedPtr<GridPtrVec>;
 
-typedef std::vector<GridBase::ConstPtr> GridCPtrVec;
-typedef GridCPtrVec::iterator           GridCPtrVecIter;
-typedef GridCPtrVec::const_iterator     GridCPtrVecCIter;
-typedef boost::shared_ptr<GridCPtrVec>  GridCPtrVecPtr;
+using GridCPtrVec      = std::vector<GridBase::ConstPtr>;
+using GridCPtrVecIter  = GridCPtrVec::iterator;
+using GridCPtrVecCIter = GridCPtrVec::const_iterator;
+using GridCPtrVecPtr   = SharedPtr<GridCPtrVec>;
 
-typedef std::set<GridBase::Ptr>         GridPtrSet;
-typedef GridPtrSet::iterator            GridPtrSetIter;
-typedef GridPtrSet::const_iterator      GridPtrSetCIter;
-typedef boost::shared_ptr<GridPtrSet>   GridPtrSetPtr;
+using GridPtrSet       = std::set<GridBase::Ptr>;
+using GridPtrSetIter   = GridPtrSet::iterator;
+using GridPtrSetCIter  = GridPtrSet::const_iterator;
+using GridPtrSetPtr    = SharedPtr<GridPtrSet>;
 
-typedef std::set<GridBase::ConstPtr>    GridCPtrSet;
-typedef GridCPtrSet::iterator           GridCPtrSetIter;
-typedef GridCPtrSet::const_iterator     GridCPtrSetCIter;
-typedef boost::shared_ptr<GridCPtrSet>  GridCPtrSetPtr;
+using GridCPtrSet      = std::set<GridBase::ConstPtr>;
+using GridCPtrSetIter  = GridCPtrSet::iterator;
+using GridCPtrSetCIter = GridCPtrSet::const_iterator;
+using GridCPtrSetPtr   = SharedPtr<GridCPtrSet>;
 
 
 /// @brief Predicate functor that returns @c true for grids that have a specified name
@@ -451,7 +465,7 @@ template<typename GridPtrContainerT>
 inline typename GridPtrContainerT::value_type
 findGridByName(const GridPtrContainerT& container, const Name& name)
 {
-    typedef typename GridPtrContainerT::value_type GridPtrT;
+    using GridPtrT = typename GridPtrContainerT::value_type;
     typename GridPtrContainerT::const_iterator it =
         std::find_if(container.begin(), container.end(), GridNamePred(name));
     return (it == container.end() ? GridPtrT() : *it);
@@ -462,7 +476,7 @@ template<typename KeyT, typename GridPtrT>
 inline GridPtrT
 findGridByName(const std::map<KeyT, GridPtrT>& container, const Name& name)
 {
-    typedef std::map<KeyT, GridPtrT> GridPtrMapT;
+    using GridPtrMapT = std::map<KeyT, GridPtrT>;
     for (typename GridPtrMapT::const_iterator it = container.begin(), end = container.end();
         it != end; ++it)
     {
@@ -482,26 +496,26 @@ template<typename _TreeType>
 class Grid: public GridBase
 {
 public:
-    typedef boost::shared_ptr<Grid>                       Ptr;
-    typedef boost::shared_ptr<const Grid>                 ConstPtr;
+    using Ptr                 = SharedPtr<Grid>;
+    using ConstPtr            = SharedPtr<const Grid>;
 
-    typedef _TreeType                                     TreeType;
-    typedef typename _TreeType::Ptr                       TreePtrType;
-    typedef typename _TreeType::ConstPtr                  ConstTreePtrType;
-    typedef typename _TreeType::ValueType                 ValueType;
-    typedef typename _TreeType::BuildType                 BuildType;
+    using TreeType            = _TreeType;
+    using TreePtrType         = typename _TreeType::Ptr;
+    using ConstTreePtrType    = typename _TreeType::ConstPtr;
+    using ValueType           = typename _TreeType::ValueType;
+    using BuildType           = typename _TreeType::BuildType;
 
-    typedef typename _TreeType::ValueOnIter               ValueOnIter;
-    typedef typename _TreeType::ValueOnCIter              ValueOnCIter;
-    typedef typename _TreeType::ValueOffIter              ValueOffIter;
-    typedef typename _TreeType::ValueOffCIter             ValueOffCIter;
-    typedef typename _TreeType::ValueAllIter              ValueAllIter;
-    typedef typename _TreeType::ValueAllCIter             ValueAllCIter;
+    using ValueOnIter         = typename _TreeType::ValueOnIter;
+    using ValueOnCIter        = typename _TreeType::ValueOnCIter;
+    using ValueOffIter        = typename _TreeType::ValueOffIter;
+    using ValueOffCIter       = typename _TreeType::ValueOffCIter;
+    using ValueAllIter        = typename _TreeType::ValueAllIter;
+    using ValueAllCIter       = typename _TreeType::ValueAllCIter;
 
-    typedef typename tree::ValueAccessor<_TreeType, true>        Accessor;
-    typedef typename tree::ValueAccessor<const _TreeType, true>  ConstAccessor;
-    typedef typename tree::ValueAccessor<_TreeType, false>       UnsafeAccessor;
-    typedef typename tree::ValueAccessor<const _TreeType, false> ConstUnsafeAccessor;
+    using Accessor            = typename tree::ValueAccessor<_TreeType, true>;
+    using ConstAccessor       = typename tree::ValueAccessor<const _TreeType, true>;
+    using UnsafeAccessor      = typename tree::ValueAccessor<_TreeType, false>;
+    using ConstUnsafeAccessor = typename tree::ValueAccessor<const _TreeType, false>;
 
     /// @brief ValueConverter<T>::Type is the type of a grid having the same
     /// hierarchy as this grid but a different value type, T.
@@ -511,7 +525,7 @@ public:
     /// to write "typename SourceGrid::template ValueConverter<T>::Type".
     template<typename OtherValueType>
     struct ValueConverter {
-        typedef Grid<typename TreeType::template ValueConverter<OtherValueType>::Type> Type;
+        using Type = Grid<typename TreeType::template ValueConverter<OtherValueType>::Type>;
     };
 
     /// Return a new grid with the given background value.
@@ -543,14 +557,24 @@ public:
     /// or if this grid's ValueType is not constructible from the other grid's ValueType.
     template<typename OtherTreeType>
     explicit Grid(const Grid<OtherTreeType>&);
+#ifdef OPENVDB_3_ABI_COMPATIBLE
     /// Deep copy another grid's metadata, but share its tree and transform.
     Grid(const Grid&, ShallowCopy);
+#else
+    /// Deep copy another grid's metadata and transform, but share its tree.
+    Grid(Grid&, ShallowCopy);
+#endif
     /// @brief Deep copy another grid's metadata and transform, but construct a new tree
     /// with background value zero.
     explicit Grid(const GridBase&);
 
-    virtual ~Grid() {}
+    ~Grid() override {}
 
+    /// Disallow assignment, since it wouldn't be obvious whether the copy is deep or shallow.
+    Grid& operator=(const Grid&) = delete;
+
+
+#ifdef OPENVDB_3_ABI_COMPATIBLE
     //@{
     /// @brief Return a new grid of the same type as this grid and whose
     /// metadata and transform are deep copies of this grid's.
@@ -558,16 +582,31 @@ public:
     /// if @c CP_SHARE, the new grid shares this grid's tree and transform;
     /// if @c CP_COPY, the new grid's tree is a deep copy of this grid's tree and transform
     Ptr copy(CopyPolicy treePolicy = CP_SHARE) const;
-    virtual GridBase::Ptr copyGrid(CopyPolicy treePolicy = CP_SHARE) const;
+    GridBase::Ptr copyGrid(CopyPolicy treePolicy = CP_SHARE) const override;
     //@}
+#else
+    //@{
+    /// @brief Return a new grid of the same type as this grid whose metadata and
+    /// transform are deep copies of this grid's and whose tree is shared with this grid.
+    Ptr copy();
+    ConstPtr copy() const;
+    //@}
+    /// @brief Return a new grid of the same type as this grid whose metadata and
+    /// transform are deep copies of this grid's and whose tree is default-constructed.
+    Ptr copyWithNewTree() const;
+
+    GridBase::Ptr copyGrid() override;
+    GridBase::ConstPtr copyGrid() const override;
+    GridBase::Ptr copyGridWithNewTree() const override;
+#endif
     //@{
     /// Return a new grid whose metadata, transform and tree are deep copies of this grid's.
     Ptr deepCopy() const { return Ptr(new Grid(*this)); }
-    virtual GridBase::Ptr deepCopyGrid() const { return this->deepCopy(); }
+    GridBase::Ptr deepCopyGrid() const override { return this->deepCopy(); }
     //@}
 
     /// Return the name of this grid's type.
-    virtual Name type() const { return this->gridType(); }
+    Name type() const override { return this->gridType(); }
     /// Return the name of this type of grid.
     static Name gridType() { return TreeType::treeType(); }
 
@@ -576,7 +615,7 @@ public:
     // Voxel access methods
     //
     /// Return the name of the type of a voxel's value (e.g., "float" or "vec3d").
-    virtual Name valueType() const { return tree().valueType(); }
+    Name valueType() const override { return tree().valueType(); }
 
     /// @brief Return this grid's background value.
     ///
@@ -584,9 +623,9 @@ public:
     const ValueType& background() const { return mTree->background(); }
 
     /// Return @c true if this grid contains only inactive background voxels.
-    virtual bool empty() const { return tree().empty(); }
+    bool empty() const override { return tree().empty(); }
     /// Empty this grid, so that all voxels become inactive background voxels.
-    virtual void clear() { tree().clear(); }
+    void clear() override { tree().clear(); }
 
     /// @brief Return an accessor that provides random read and write access
     /// to this grid's voxels. The accessor is safe in the sense that
@@ -648,32 +687,28 @@ public:
     /// representation of the filled box.  Follow fill operations with a prune()
     /// operation for optimal sparseness.
     void sparseFill(const CoordBBox& bbox, const ValueType& value, bool active = true);
-    void fill(const CoordBBox& bbox, const ValueType& value, bool active = true)
-    {
-        this->sparseFill(bbox, value, active);
-    }
+    void fill(const CoordBBox& bbox, const ValueType& value, bool active = true);
     //@}
-    
+
     /// @brief Set all voxels within a given axis-aligned box to a constant value.
     /// @param bbox    inclusive coordinates of opposite corners of an axis-aligned box.
     /// @param value   the value to which to set voxels within the box.
     /// @param active  if true, mark voxels within the box as active,
     ///                otherwise mark them as inactive.
-    ///
-    /// @note This operation generates a dense representation of the
-    ///       filled box. This implies that active tiles are voxelized, i.e. only active 
-    ///       voxels are generated from this fill operation.
+    /// @note This operation generates a dense representation of the filled box.
+    /// This implies that active tiles are voxelized, i.e., only active voxels
+    /// are generated from this fill operation.
     void denseFill(const CoordBBox& bbox, const ValueType& value, bool active = true);
 
     /// Reduce the memory footprint of this grid by increasing its sparseness.
-    virtual void pruneGrid(float tolerance = 0.0);
+    void pruneGrid(float tolerance = 0.0) override;
 
 #ifndef OPENVDB_2_ABI_COMPATIBLE
     /// @brief Clip this grid to the given index-space bounding box.
     /// @details Voxels that lie outside the bounding box are set to the background.
     /// @warning Clipping a level set will likely produce a grid that is
     /// no longer a valid level set.
-    virtual void clip(const CoordBBox&);
+    void clip(const CoordBBox&) override;
 #endif
 
     /// @brief Efficiently merge another grid into this grid using one of several schemes.
@@ -731,15 +766,15 @@ public:
     // Statistics
     //
     /// Return the number of active voxels.
-    virtual Index64 activeVoxelCount() const { return tree().activeVoxelCount(); }
+    Index64 activeVoxelCount() const override { return tree().activeVoxelCount(); }
     /// Return the axis-aligned bounding box of all active voxels.
-    virtual CoordBBox evalActiveVoxelBoundingBox() const;
+    CoordBBox evalActiveVoxelBoundingBox() const override;
     /// Return the dimensions of the axis-aligned bounding box of all active voxels.
-    virtual Coord evalActiveVoxelDim() const;
+    Coord evalActiveVoxelDim() const override;
 
     /// Return the number of bytes of memory used by this grid.
     /// @todo Add transform().memUsage()
-    virtual Index64 memUsage() const { return tree().memUsage(); }
+    Index64 memUsage() const override { return tree().memUsage(); }
 
 
     //
@@ -751,7 +786,7 @@ public:
     TreePtrType treePtr() { return mTree; }
     ConstTreePtrType treePtr() const { return mTree; }
     ConstTreePtrType constTreePtr() const { return mTree; }
-    virtual TreeBase::ConstPtr constBaseTreePtr() const { return mTree; }
+    TreeBase::ConstPtr constBaseTreePtr() const override { return mTree; }
     //@}
     //@{
     /// @brief Return a reference to this grid's tree, which might be
@@ -768,11 +803,11 @@ public:
     /// @throw TypeError if the tree is not of type TreeType
     /// @note Invalidates all references previously returned by baseTree(),
     /// constBaseTree(), tree() or constTree().
-    virtual void setTree(TreeBase::Ptr);
+    void setTree(TreeBase::Ptr) override;
 
     /// @brief Associate a new, empty tree with this grid, in place of its existing tree.
     /// @note The new tree has the same background value as the existing tree.
-    virtual void newTree();
+    void newTree() override;
 
 
     //
@@ -780,28 +815,28 @@ public:
     //
     /// @brief Read the grid topology from a stream.
     /// This will read only the grid structure, not the actual data buffers.
-    virtual void readTopology(std::istream&);
+    void readTopology(std::istream&) override;
     /// @brief Write the grid topology to a stream.
     /// This will write only the grid structure, not the actual data buffers.
-    virtual void writeTopology(std::ostream&) const;
+    void writeTopology(std::ostream&) const override;
 
     /// Read all data buffers for this grid.
-    virtual void readBuffers(std::istream&);
+    void readBuffers(std::istream&) override;
 #ifndef OPENVDB_2_ABI_COMPATIBLE
     /// Read all of this grid's data buffers that intersect the given index-space bounding box.
-    virtual void readBuffers(std::istream&, const CoordBBox&);
+    void readBuffers(std::istream&, const CoordBBox&) override;
     /// @brief Read all of this grid's data buffers that are not yet resident in memory
     /// (because delayed loading is in effect).
     /// @details If this grid was read from a memory-mapped file, this operation
     /// disconnects the grid from the file.
     /// @sa io::File::open, io::MappedFile
-    virtual void readNonresidentBuffers() const;
+    void readNonresidentBuffers() const override;
 #endif
     /// Write out all data buffers for this grid.
-    virtual void writeBuffers(std::ostream&) const;
+    void writeBuffers(std::ostream&) const override;
 
     /// Output a human-readable description of this grid.
-    virtual void print(std::ostream& = std::cout, int verboseLevel = 1) const;
+    void print(std::ostream& = std::cout, int verboseLevel = 1) const override;
 
 
     //
@@ -816,9 +851,6 @@ public:
 
 
 private:
-    /// Disallow assignment, since it wouldn't be obvious whether the copy is deep or shallow.
-    Grid& operator=(const Grid& other);
-
     /// Helper function for use with registerGrid()
     static GridBase::Ptr factory() { return Grid::create(); }
 
@@ -897,20 +929,20 @@ deepCopyTypedGrid(const GridBase& grid)
 template<typename _TreeType>
 struct TreeAdapter
 {
-    typedef _TreeType                           TreeType;
-    typedef typename boost::remove_const<TreeType>::type NonConstTreeType;
-    typedef typename TreeType::Ptr              TreePtrType;
-    typedef typename TreeType::ConstPtr         ConstTreePtrType;
-    typedef typename NonConstTreeType::Ptr      NonConstTreePtrType;
-    typedef Grid<TreeType>                      GridType;
-    typedef Grid<NonConstTreeType>              NonConstGridType;
-    typedef typename GridType::Ptr              GridPtrType;
-    typedef typename NonConstGridType::Ptr      NonConstGridPtrType;
-    typedef typename GridType::ConstPtr         ConstGridPtrType;
-    typedef typename TreeType::ValueType        ValueType;
-    typedef typename tree::ValueAccessor<TreeType>         AccessorType;
-    typedef typename tree::ValueAccessor<const TreeType>   ConstAccessorType;
-    typedef typename tree::ValueAccessor<NonConstTreeType> NonConstAccessorType;
+    using TreeType             = _TreeType;
+    using NonConstTreeType     = typename std::remove_const<TreeType>::type;
+    using TreePtrType          = typename TreeType::Ptr;
+    using ConstTreePtrType     = typename TreeType::ConstPtr;
+    using NonConstTreePtrType  = typename NonConstTreeType::Ptr;
+    using GridType             = Grid<TreeType>;
+    using NonConstGridType     = Grid<NonConstTreeType>;
+    using GridPtrType          = typename GridType::Ptr;
+    using NonConstGridPtrType  = typename NonConstGridType::Ptr;
+    using ConstGridPtrType     = typename GridType::ConstPtr;
+    using ValueType            = typename TreeType::ValueType;
+    using AccessorType         = typename tree::ValueAccessor<TreeType>;
+    using ConstAccessorType    = typename tree::ValueAccessor<const TreeType>;
+    using NonConstAccessorType = typename tree::ValueAccessor<NonConstTreeType>;
 
     static TreeType& tree(TreeType& t) { return t; }
     static TreeType& tree(GridType& g) { return g.tree(); }
@@ -927,20 +959,20 @@ struct TreeAdapter
 template<typename _TreeType>
 struct TreeAdapter<Grid<_TreeType> >
 {
-    typedef _TreeType                           TreeType;
-    typedef typename boost::remove_const<TreeType>::type NonConstTreeType;
-    typedef typename TreeType::Ptr              TreePtrType;
-    typedef typename TreeType::ConstPtr         ConstTreePtrType;
-    typedef typename NonConstTreeType::Ptr      NonConstTreePtrType;
-    typedef Grid<TreeType>                      GridType;
-    typedef Grid<NonConstTreeType>              NonConstGridType;
-    typedef typename GridType::Ptr              GridPtrType;
-    typedef typename NonConstGridType::Ptr      NonConstGridPtrType;
-    typedef typename GridType::ConstPtr         ConstGridPtrType;
-    typedef typename TreeType::ValueType        ValueType;
-    typedef typename tree::ValueAccessor<TreeType>         AccessorType;
-    typedef typename tree::ValueAccessor<const TreeType>   ConstAccessorType;
-    typedef typename tree::ValueAccessor<NonConstTreeType> NonConstAccessorType;
+    using TreeType             = _TreeType;
+    using NonConstTreeType     = typename std::remove_const<TreeType>::type;
+    using TreePtrType          = typename TreeType::Ptr;
+    using ConstTreePtrType     = typename TreeType::ConstPtr;
+    using NonConstTreePtrType  = typename NonConstTreeType::Ptr;
+    using GridType             = Grid<TreeType>;
+    using NonConstGridType     = Grid<NonConstTreeType>;
+    using GridPtrType          = typename GridType::Ptr;
+    using NonConstGridPtrType  = typename NonConstGridType::Ptr;
+    using ConstGridPtrType     = typename GridType::ConstPtr;
+    using ValueType            = typename TreeType::ValueType;
+    using AccessorType         = typename tree::ValueAccessor<TreeType>;
+    using ConstAccessorType    = typename tree::ValueAccessor<const TreeType>;
+    using NonConstAccessorType = typename tree::ValueAccessor<NonConstTreeType>;
 
     static TreeType& tree(TreeType& t) { return t; }
     static TreeType& tree(GridType& g) { return g.tree(); }
@@ -956,20 +988,20 @@ struct TreeAdapter<Grid<_TreeType> >
 template<typename _TreeType>
 struct TreeAdapter<tree::ValueAccessor<_TreeType> >
 {
-    typedef _TreeType                           TreeType;
-    typedef typename boost::remove_const<TreeType>::type NonConstTreeType;
-    typedef typename TreeType::Ptr              TreePtrType;
-    typedef typename TreeType::ConstPtr         ConstTreePtrType;
-    typedef typename NonConstTreeType::Ptr      NonConstTreePtrType;
-    typedef Grid<TreeType>                      GridType;
-    typedef Grid<NonConstTreeType>              NonConstGridType;
-    typedef typename GridType::Ptr              GridPtrType;
-    typedef typename NonConstGridType::Ptr      NonConstGridPtrType;
-    typedef typename GridType::ConstPtr         ConstGridPtrType;
-    typedef typename TreeType::ValueType        ValueType;
-    typedef typename tree::ValueAccessor<TreeType>         AccessorType;
-    typedef typename tree::ValueAccessor<const TreeType>   ConstAccessorType;
-    typedef typename tree::ValueAccessor<NonConstTreeType> NonConstAccessorType;
+    using TreeType             = _TreeType;
+    using NonConstTreeType     = typename std::remove_const<TreeType>::type;
+    using TreePtrType          = typename TreeType::Ptr;
+    using ConstTreePtrType     = typename TreeType::ConstPtr;
+    using NonConstTreePtrType  = typename NonConstTreeType::Ptr;
+    using GridType             = Grid<TreeType>;
+    using NonConstGridType     = Grid<NonConstTreeType>;
+    using GridPtrType          = typename GridType::Ptr;
+    using NonConstGridPtrType  = typename NonConstGridType::Ptr;
+    using ConstGridPtrType     = typename GridType::ConstPtr;
+    using ValueType            = typename TreeType::ValueType;
+    using AccessorType         = typename tree::ValueAccessor<TreeType>;
+    using ConstAccessorType    = typename tree::ValueAccessor<const TreeType>;
+    using NonConstAccessorType = typename tree::ValueAccessor<NonConstTreeType>;
 
     static TreeType& tree(TreeType& t) { return t; }
     static TreeType& tree(GridType& g) { return g.tree(); }
@@ -993,10 +1025,10 @@ template<typename GridType>
 inline typename GridType::Ptr
 GridBase::grid(const GridBase::Ptr& grid)
 {
-    // The string comparison on type names is slower than a dynamic_pointer_cast, but
-    // it is safer when pointers cross dso boundaries, as they do in many Houdini nodes.
+    // The string comparison on type names is slower than a dynamic pointer cast, but
+    // it is safer when pointers cross DSO boundaries, as they do in many Houdini nodes.
     if (grid && grid->type() == GridType::gridType()) {
-        return boost::static_pointer_cast<GridType>(grid);
+        return StaticPtrCast<GridType>(grid);
     }
     return typename GridType::Ptr();
 }
@@ -1006,8 +1038,8 @@ template<typename GridType>
 inline typename GridType::ConstPtr
 GridBase::grid(const GridBase::ConstPtr& grid)
 {
-    return boost::const_pointer_cast<const GridType>(
-        GridBase::grid<GridType>(boost::const_pointer_cast<GridBase>(grid)));
+    return ConstPtrCast<const GridType>(
+        GridBase::grid<GridType>(ConstPtrCast<GridBase>(grid)));
 }
 
 
@@ -1015,7 +1047,7 @@ template<typename GridType>
 inline typename GridType::ConstPtr
 GridBase::constGrid(const GridBase::Ptr& grid)
 {
-    return boost::const_pointer_cast<const GridType>(GridBase::grid<GridType>(grid));
+    return ConstPtrCast<const GridType>(GridBase::grid<GridType>(grid));
 }
 
 
@@ -1023,15 +1055,15 @@ template<typename GridType>
 inline typename GridType::ConstPtr
 GridBase::constGrid(const GridBase::ConstPtr& grid)
 {
-    return boost::const_pointer_cast<const GridType>(
-        GridBase::grid<GridType>(boost::const_pointer_cast<GridBase>(grid)));
+    return ConstPtrCast<const GridType>(
+        GridBase::grid<GridType>(ConstPtrCast<GridBase>(grid)));
 }
 
 
 inline TreeBase::Ptr
 GridBase::baseTreePtr()
 {
-    return boost::const_pointer_cast<TreeBase>(this->constBaseTreePtr());
+    return ConstPtrCast<TreeBase>(this->constBaseTreePtr());
 }
 
 
@@ -1068,7 +1100,7 @@ inline Grid<TreeT>::Grid(TreePtrType tree): mTree(tree)
 template<typename TreeT>
 inline Grid<TreeT>::Grid(const Grid& other):
     GridBase(other),
-    mTree(boost::static_pointer_cast<TreeType>(other.mTree->copy()))
+    mTree(StaticPtrCast<TreeType>(other.mTree->copy()))
 {
 }
 
@@ -1082,12 +1114,21 @@ inline Grid<TreeT>::Grid(const Grid<OtherTreeType>& other):
 }
 
 
+#ifdef OPENVDB_3_ABI_COMPATIBLE
 template<typename TreeT>
 inline Grid<TreeT>::Grid(const Grid& other, ShallowCopy):
     GridBase(other, ShallowCopy()),
     mTree(other.mTree)
 {
 }
+#else
+template<typename TreeT>
+inline Grid<TreeT>::Grid(Grid& other, ShallowCopy):
+    GridBase(other),
+    mTree(other.mTree)
+{
+}
+#endif
 
 
 template<typename TreeT>
@@ -1137,6 +1178,8 @@ Grid<TreeT>::create(const GridBase& other)
 ////////////////////////////////////////
 
 
+#ifdef OPENVDB_3_ABI_COMPATIBLE
+
 template<typename TreeT>
 inline typename Grid<TreeT>::Ptr
 Grid<TreeT>::copy(CopyPolicy treePolicy) const
@@ -1165,6 +1208,57 @@ Grid<TreeT>::copyGrid(CopyPolicy treePolicy) const
     return this->copy(treePolicy);
 }
 
+#else // !OPENVDB_3_ABI_COMPATIBLE
+
+template<typename TreeT>
+inline typename Grid<TreeT>::ConstPtr
+Grid<TreeT>::copy() const
+{
+    return ConstPtr{new Grid{*const_cast<Grid*>(this), ShallowCopy{}}};
+}
+
+template<typename TreeT>
+inline typename Grid<TreeT>::Ptr
+Grid<TreeT>::copy()
+{
+    return Ptr{new Grid{*this, ShallowCopy{}}};
+}
+
+
+template<typename TreeT>
+inline typename Grid<TreeT>::Ptr
+Grid<TreeT>::copyWithNewTree() const
+{
+    Ptr result{new Grid{*const_cast<Grid*>(this), ShallowCopy{}}};
+    result->newTree();
+    return result;
+}
+
+
+template<typename TreeT>
+inline GridBase::Ptr
+Grid<TreeT>::copyGrid()
+{
+    return this->copy();
+}
+
+template<typename TreeT>
+inline GridBase::ConstPtr
+Grid<TreeT>::copyGrid() const
+{
+    return this->copy();
+}
+
+
+template<typename TreeT>
+inline GridBase::Ptr
+Grid<TreeT>::copyGridWithNewTree() const
+{
+    return this->copyWithNewTree();
+}
+
+#endif // OPENVDB_3_ABI_COMPATIBLE
+
 
 ////////////////////////////////////////
 
@@ -1178,7 +1272,7 @@ Grid<TreeT>::setTree(TreeBase::Ptr tree)
         OPENVDB_THROW(TypeError, "Cannot assign a tree of type "
             + tree->type() + " to a grid of type " + this->type());
     }
-    mTree = boost::static_pointer_cast<TreeType>(tree);
+    mTree = StaticPtrCast<TreeType>(tree);
 }
 
 
@@ -1198,6 +1292,14 @@ inline void
 Grid<TreeT>::sparseFill(const CoordBBox& bbox, const ValueType& value, bool active)
 {
     tree().sparseFill(bbox, value, active);
+}
+
+
+template<typename TreeT>
+inline void
+Grid<TreeT>::fill(const CoordBBox& bbox, const ValueType& value, bool active)
+{
+    this->sparseFill(bbox, value, active);
 }
 
 template<typename TreeT>
@@ -1395,7 +1497,7 @@ template<typename TreePtrType>
 inline typename Grid<typename TreePtrType::element_type>::Ptr
 createGrid(TreePtrType tree)
 {
-    typedef typename TreePtrType::element_type TreeType;
+    using TreeType = typename TreePtrType::element_type;
     return Grid<TreeType>::create(tree);
 }
 
@@ -1404,10 +1506,11 @@ template<typename GridType>
 typename GridType::Ptr
 createLevelSet(Real voxelSize, Real halfWidth)
 {
-    typedef typename GridType::ValueType ValueType;
+    using ValueType = typename GridType::ValueType;
 
     // GridType::ValueType is required to be a floating-point scalar.
-    BOOST_STATIC_ASSERT(boost::is_floating_point<ValueType>::value);
+    static_assert(std::is_floating_point<ValueType>::value,
+        "level-set grids must be floating-point-valued");
 
     typename GridType::Ptr grid = GridType::create(
         /*background=*/static_cast<ValueType>(voxelSize * halfWidth));

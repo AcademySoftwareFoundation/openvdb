@@ -174,6 +174,11 @@ private:
 
 // Callback functions that update the near and far parameters
 
+int updateNearFarCallback(void*, int, float, const PRM_Template*);
+int updateNearPlaneCallback(void*, int, float, const PRM_Template*);
+int updateFarPlaneCallback(void*, int, float, const PRM_Template*);
+
+
 int
 updateNearFarCallback(void* data, int /*idx*/, float time, const PRM_Template*)
 {

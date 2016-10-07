@@ -27,19 +27,13 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @file GridTransformer.h
 /// @author Peter Cucka
 
 #ifndef OPENVDB_TOOLS_GRIDTRANSFORMER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_GRIDTRANSFORMER_HAS_BEEN_INCLUDED
 
-#include <cmath>
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
-#include <boost/shared_ptr.hpp>
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_reduce.h>
 #include <openvdb/Grid.h>
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h> // for isApproxEqual()
@@ -49,6 +43,10 @@
 #include "LevelSetRebuild.h" // for doLevelSetRebuild()
 #include "SignedFloodFill.h" // for signedFloodFill
 #include "Prune.h" // for pruneLevelSet
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_reduce.h>
+#include <cmath>
+#include <functional>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -120,7 +118,7 @@ template<typename Sampler, typename TreeT>
 class TileSampler: public Sampler
 {
 public:
-    typedef typename TreeT::ValueType ValueT;
+    using ValueT = typename TreeT::ValueType;
 
     /// @param b        the index-space bounding box of a particular grid tile
     /// @param tileVal  the tile's value
@@ -187,8 +185,8 @@ public:
 class GridResampler
 {
 public:
-    typedef boost::shared_ptr<GridResampler> Ptr;
-    typedef boost::function<bool (void)> InterruptFunc;
+    using Ptr = SharedPtr<GridResampler>;
+    using InterruptFunc = std::function<bool (void)>;
 
     GridResampler(): mThreaded(true), mTransformTiles(true) {}
     virtual ~GridResampler() {}
@@ -255,7 +253,7 @@ private:
 class GridTransformer: public GridResampler
 {
 public:
-    typedef boost::shared_ptr<GridTransformer> Ptr;
+    using Ptr = SharedPtr<GridTransformer>;
 
     GridTransformer(const Mat4R& xform);
     GridTransformer(
@@ -265,7 +263,7 @@ public:
         const Vec3R& translate,
         const std::string& xformOrder = "tsr",
         const std::string& rotationOrder = "zyx");
-    virtual ~GridTransformer() {}
+    ~GridTransformer() override = default;
 
     const Mat4R& getTransform() const { return mTransform; }
 
@@ -491,7 +489,7 @@ resampleToMatch(const GridType& inGrid, GridType& outGrid, Interrupter& interrup
 
         // If the output grid is a level set, resample the input grid to have the output grid's
         // background value.  Otherwise, preserve the input grid's background value.
-        typedef typename GridType::ValueType ValueT;
+        using ValueT = typename GridType::ValueType;
         const ValueT halfWidth = ((outGrid.getGridClass() == openvdb::GRID_LEVEL_SET)
             ? ValueT(outGrid.background() * (1.0 / outGrid.voxelSize()[0]))
             : ValueT(inGrid.background() * (1.0 / inGrid.voxelSize()[0])));
@@ -673,7 +671,7 @@ template<typename InterrupterType>
 void
 GridResampler::setInterrupter(InterrupterType& interrupter)
 {
-    mInterrupt = boost::bind(&InterrupterType::wasInterrupted,
+    mInterrupt = std::bind(&InterrupterType::wasInterrupted,
         /*this=*/&interrupter, /*percent=*/-1);
 }
 
@@ -756,12 +754,12 @@ template<class Sampler, class TreeT, typename Transformer>
 class GridResampler::RangeProcessor
 {
 public:
-    typedef typename TreeT::LeafCIter LeafIterT;
-    typedef typename TreeT::ValueAllCIter TileIterT;
-    typedef typename tree::IteratorRange<LeafIterT> LeafRange;
-    typedef typename tree::IteratorRange<TileIterT> TileRange;
-    typedef typename tree::ValueAccessor<const TreeT> InTreeAccessor;
-    typedef typename tree::ValueAccessor<TreeT> OutTreeAccessor;
+    using LeafIterT = typename TreeT::LeafCIter;
+    using TileIterT = typename TreeT::ValueAllCIter;
+    using LeafRange = typename tree::IteratorRange<LeafIterT>;
+    using TileRange = typename tree::IteratorRange<TileIterT>;
+    using InTreeAccessor = typename tree::ValueAccessor<const TreeT>;
+    using OutTreeAccessor = typename tree::ValueAccessor<TreeT>;
 
     RangeProcessor(const Transformer& xform, const CoordBBox& b, const TreeT& inT, TreeT& outT):
         mIsRoot(true), mXform(xform), mBBox(b),
@@ -868,11 +866,11 @@ void
 GridResampler::applyTransform(const Transformer& xform,
     const GridT& inGrid, GridT& outGrid) const
 {
-    typedef typename GridT::TreeType TreeT;
+    using TreeT = typename GridT::TreeType;
     const TreeT& inTree = inGrid.tree();
     TreeT& outTree = outGrid.tree();
 
-    typedef RangeProcessor<Sampler, TreeT, Transformer> RangeProc;
+    using RangeProc = RangeProcessor<Sampler, TreeT, Transformer>;
 
     const GridClass gridClass = inGrid.getGridClass();
 
@@ -937,7 +935,7 @@ GridResampler::transformBBox(
     const InterruptFunc& interrupt,
     const Sampler& sampler)
 {
-    typedef typename OutTreeT::ValueType ValueT;
+    using ValueT = typename OutTreeT::ValueType;
 
     // Transform the corners of the input tree's bounding box
     // and compute the enclosing bounding box in the output tree.
