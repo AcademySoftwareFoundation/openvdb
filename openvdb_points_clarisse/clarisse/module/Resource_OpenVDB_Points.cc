@@ -163,8 +163,10 @@ template<typename ValueType>
 static typename boost::enable_if_c<openvdb::VecTraits<ValueType>::IsVec>::type
 setValue(CoreArray<typename openvdb::VecTraits<ValueType>::ElementType>& values, unsigned int& index, const ValueType& value)
 {
-    for(size_t i = 0; i < openvdb::VecTraits<ValueType>::Size; ++i)
-        values[index++] = value[i];
+    for(size_t i = 0; i < openvdb::VecTraits<ValueType>::Size; ++i) {
+        values[(index * openvdb::VecTraits<ValueType>::Size) + i] = value[i];
+    }
+    index++;
 }
 
 template<typename ValueType>
