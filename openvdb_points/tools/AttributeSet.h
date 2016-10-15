@@ -43,7 +43,6 @@
 #include <openvdb/MetaMap.h>
 
 #include <boost/integer_traits.hpp> // integer_traits
-#include <boost/shared_ptr.hpp> // shared_ptr
 
 #include <vector>
 #include <cctype> // isalnum
@@ -69,13 +68,13 @@ class AttributeSet
 public:
     enum { INVALID_POS = boost::integer_traits<size_t>::const_max };
 
-    typedef boost::shared_ptr<AttributeSet> Ptr;
-    typedef boost::shared_ptr<const AttributeSet> ConstPtr;
+    typedef SharedPtr<AttributeSet> Ptr;
+    typedef SharedPtr<const AttributeSet> ConstPtr;
 
     class Descriptor;
 
-    typedef boost::shared_ptr<Descriptor> DescriptorPtr;
-    typedef boost::shared_ptr<const Descriptor> DescriptorConstPtr;
+    typedef SharedPtr<Descriptor> DescriptorPtr;
+    typedef SharedPtr<const Descriptor> DescriptorConstPtr;
 
     //////////
 
@@ -258,7 +257,7 @@ private:
 class AttributeSet::Descriptor
 {
 public:
-    typedef boost::shared_ptr<Descriptor> Ptr;
+    typedef SharedPtr<Descriptor> Ptr;
 
     typedef Util::NameAndType             NameAndType;
     typedef Util::NameAndTypeVec          NameAndTypeVec;

@@ -71,7 +71,7 @@ size_t compressedSize( const char* buffer, const size_t typeSize, const size_t u
 {
     size_t tempBytes = uncompressedBytes + BLOSC_MAX_OVERHEAD;
     const bool outOfRange = tempBytes > BLOSC_MAX_BUFFERSIZE;
-    boost::scoped_array<char> outBuf(outOfRange ? new char[1] : new char[tempBytes]);
+    const std::unique_ptr<char[]> outBuf(outOfRange ? new char[1] : new char[tempBytes]);
 
     int compressedBytes = blosc_compress_ctx(
         /*clevel=*/9, // 0 (no compression) to 9 (maximum compression)
@@ -102,7 +102,7 @@ char* compress( char* buffer, const size_t typeSize,
 {
     size_t tempBytes = uncompressedBytes + BLOSC_MAX_OVERHEAD;
     const bool outOfRange = tempBytes > BLOSC_MAX_BUFFERSIZE;
-    boost::scoped_array<char> outBuf(outOfRange ? new char[1] : new char[tempBytes]);
+    const std::unique_ptr<char[]> outBuf(outOfRange ? new char[1] : new char[tempBytes]);
 
     int _compressedBytes = blosc_compress_ctx(
         /*clevel=*/9, // 0 (no compression) to 9 (maximum compression)
@@ -141,7 +141,7 @@ char* decompress(char* buffer, const size_t expectedBytes, const bool cleanup)
     size_t tempBytes = expectedBytes + BLOSC_MAX_OVERHEAD;
     const bool outOfRange = tempBytes > BLOSC_MAX_BUFFERSIZE;
     if (outOfRange)     tempBytes = 1;
-    boost::scoped_array<char> tempBuffer(new char[tempBytes]);
+    const std::unique_ptr<char[]> tempBuffer(new char[tempBytes]);
 
     const int _uncompressedBytes = blosc_decompress_ctx(  /*src=*/buffer,
                                                             /*dest=*/tempBuffer.get(),

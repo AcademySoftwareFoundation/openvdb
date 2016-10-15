@@ -186,7 +186,7 @@ protected:
     struct AccessorBase;
     template <typename T> struct Accessor;
 
-    typedef boost::shared_ptr<AccessorBase>             AccessorBasePtr;
+    typedef SharedPtr<AccessorBase>             AccessorBasePtr;
 
 public:
     enum Flag { TRANSIENT = 0x1, /// by default not written to disk
@@ -205,12 +205,12 @@ public:
         std::streamoff bufpos;
         Index64 bytes;
         io::MappedFile::Ptr mapping;
-        boost::shared_ptr<io::StreamMetadata> meta;
+        SharedPtr<io::StreamMetadata> meta;
     };
 #endif
 
-    typedef boost::shared_ptr<AttributeArray>           Ptr;
-    typedef boost::shared_ptr<const AttributeArray>     ConstPtr;
+    typedef SharedPtr<AttributeArray>           Ptr;
+    typedef SharedPtr<const AttributeArray>     ConstPtr;
 
     typedef Ptr (*FactoryMethod)(size_t, Index);
 
@@ -335,7 +335,7 @@ protected:
 
     /// Out-of-core data
 #ifndef OPENVDB_2_ABI_COMPATIBLE
-    boost::shared_ptr<FileInfo> mFileInfo;
+    SharedPtr<FileInfo> mFileInfo;
 #endif
 }; // class AttributeArray
 
@@ -453,8 +453,8 @@ template<typename ValueType_, typename Codec_ = NullCodec>
 class TypedAttributeArray: public AttributeArray
 {
 public:
-    typedef boost::shared_ptr<TypedAttributeArray>              Ptr;
-    typedef boost::shared_ptr<const TypedAttributeArray>        ConstPtr;
+    typedef SharedPtr<TypedAttributeArray>              Ptr;
+    typedef SharedPtr<const TypedAttributeArray>        ConstPtr;
 
     typedef ValueType_                                          ValueType;
     typedef Codec_                                              Codec;
@@ -620,8 +620,8 @@ class AttributeHandle
 {
 public:
     typedef AttributeHandle<ValueType, CodecType, Strided, Interleaved>     Handle;
-    typedef boost::shared_ptr<Handle>                                       Ptr;
-    typedef boost::scoped_ptr<Handle>                                       ScopedPtr;
+    typedef SharedPtr<Handle>                                               Ptr;
+    typedef std::unique_ptr<Handle>                                         UniquePtr;
 
 protected:
     typedef ValueType (*GetterPtr)(const AttributeArray* array, const Index n);
@@ -684,8 +684,8 @@ class AttributeWriteHandle : public AttributeHandle<ValueType, CodecType, Stride
 {
 public:
     typedef AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>    Handle;
-    typedef boost::shared_ptr<Handle>                                           Ptr;
-    typedef boost::scoped_ptr<Handle>                                           ScopedPtr;
+    typedef SharedPtr<Handle>                                                   Ptr;
+    typedef std::unique_ptr<Handle>                                             ScopedPtr;
 
     static Ptr create(AttributeArray& array, const bool expand = true);
 
@@ -1519,7 +1519,7 @@ TypedAttributeArray<ValueType_, Codec_>::doLoadUnsafe() const
 
     FileInfo& info = *(self->mFileInfo);
 
-    boost::shared_ptr<std::streambuf> buf = info.mapping->createBuffer();
+    SharedPtr<std::streambuf> buf = info.mapping->createBuffer();
     std::istream is(buf.get());
 
     const Index64 bytes = info.bytes;

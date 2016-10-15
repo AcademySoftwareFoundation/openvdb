@@ -58,11 +58,11 @@ namespace openvdb_points_houdini {
 
 
 typedef std::vector<GA_Offset> OffsetList;
-typedef boost::shared_ptr<OffsetList> OffsetListPtr;
+typedef openvdb::SharedPtr<OffsetList> OffsetListPtr;
 
 typedef std::pair<GA_Offset, GA_Offset> OffsetPair;
 typedef std::vector<OffsetPair> OffsetPairList;
-typedef boost::shared_ptr<OffsetPairList> OffsetPairListPtr;
+typedef openvdb::SharedPtr<OffsetPairList> OffsetPairListPtr;
 
 /// @brief  Converts a VDB Points grid into Houdini points and appends to a Houdini Detail
 ///

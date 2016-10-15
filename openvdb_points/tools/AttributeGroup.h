@@ -103,7 +103,7 @@ inline bool isGroup(const AttributeArray& array)
 class GroupHandle
 {
 public:
-    typedef boost::shared_ptr<GroupHandle> Ptr;
+    typedef SharedPtr<GroupHandle> Ptr;
 
     // Dummy class that distinguishes an offset from a bitmask on construction
     struct BitMask { };
@@ -130,7 +130,7 @@ protected:
 class GroupWriteHandle : public GroupHandle
 {
 public:
-    typedef boost::shared_ptr<GroupWriteHandle> Ptr;
+    typedef SharedPtr<GroupWriteHandle> Ptr;
 
     GroupWriteHandle(GroupAttributeArray& array, const GroupType& offset);
 

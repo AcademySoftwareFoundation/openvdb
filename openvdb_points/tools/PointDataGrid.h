@@ -101,11 +101,7 @@ namespace point_data_grid_internal {
 template<typename T>
 struct UniquePtr
 {
-#ifdef OPENVDB_HAS_CXX11
     typedef std::unique_ptr<T>  type;
-#else
-    typedef std::auto_ptr<T>    type;
-#endif
 };
 }
 
@@ -115,7 +111,7 @@ class PointDataLeafNode : public tree::LeafNode<T, Log2Dim> {
 
 public:
     typedef PointDataLeafNode<T, Log2Dim>           LeafNodeType;
-    typedef boost::shared_ptr<PointDataLeafNode>    Ptr;
+    typedef SharedPtr<PointDataLeafNode>            Ptr;
 
     typedef T                                       ValueType;
     typedef std::pair<ValueType, ValueType>         ValueTypePair;

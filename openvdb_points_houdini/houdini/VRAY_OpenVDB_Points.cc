@@ -422,7 +422,7 @@ VRAY_OpenVDB_Points::initialize(const UT_BoundingBox *)
 
             GridBase::Ptr baseGrid = file.readGridMetadata(*iter);
             if (baseGrid->isType<tools::PointDataGrid>()) {
-                tools::PointDataGrid::Ptr grid = boost::static_pointer_cast<tools::PointDataGrid>(file.readGrid(*iter));
+                tools::PointDataGrid::Ptr grid = StaticPtrCast<tools::PointDataGrid>(file.readGrid(*iter));
                 assert(grid);
                 mGridPtrs.push_back(grid);
             }

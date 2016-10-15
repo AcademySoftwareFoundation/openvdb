@@ -91,14 +91,14 @@ private:
             }
         }
 
-        typedef boost::function<void(std::string /*filename*/)> Notifier;
+        typedef std::function<void(std::string /*filename*/)> Notifier;
         boost::interprocess::file_mapping mMap;
         boost::interprocess::mapped_region mRegion;
         bool mAutoDelete;
         Notifier mNotifier;
         mutable tbb::atomic<openvdb::Index64> mLastWriteTime;
     }; // class Impl
-    boost::scoped_ptr<Impl> mImpl;
+    std::unique_ptr<Impl> mImpl;
 }; // class ProxyMappedFile
 
 
@@ -1262,7 +1262,7 @@ TestAttributeArray::testDelayedLoad()
         // abuse File being a friend of MappedFile to get around the private constructor
 
         ProxyMappedFile* proxy = new ProxyMappedFile(filename);
-        boost::shared_ptr<io::MappedFile> mappedFile(reinterpret_cast<io::MappedFile*>(proxy));
+        SharedPtr<io::MappedFile> mappedFile(reinterpret_cast<io::MappedFile*>(proxy));
 
         // read in using delayed load and check manual loading of data
         {

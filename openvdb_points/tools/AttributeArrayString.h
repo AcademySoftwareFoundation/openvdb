@@ -135,7 +135,7 @@ inline bool isString(const AttributeArray& array)
 class StringAttributeHandle
 {
 public:
-    typedef boost::shared_ptr<StringAttributeHandle> Ptr;
+    typedef SharedPtr<StringAttributeHandle> Ptr;
 
     static Ptr create(const AttributeArray& array, const MetaMap& metadata, const bool preserveCompression = true);
 
@@ -161,7 +161,7 @@ protected:
 class StringAttributeWriteHandle : public StringAttributeHandle
 {
 public:
-    typedef boost::shared_ptr<StringAttributeWriteHandle> Ptr;
+    typedef SharedPtr<StringAttributeWriteHandle> Ptr;
 
     static Ptr create(AttributeArray& array, const MetaMap& metadata, const bool expand = true);
 
