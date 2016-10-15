@@ -802,7 +802,7 @@ inline void setGroupByRandomTarget( PointDataTree& tree,
                                     const Index64 targetPoints,
                                     const unsigned int seed = 0)
 {
-    typedef RandomLeafFilter<PointDataTree, boost::mt11213b> RandomFilter;
+    typedef RandomLeafFilter<PointDataTree, std::mt19937> RandomFilter;
 
     RandomFilter filter(tree, targetPoints, seed);
 
@@ -819,7 +819,7 @@ inline void setGroupByRandomPercentage( PointDataTree& tree,
                                         const float percentage = 10.0f,
                                         const unsigned int seed = 0)
 {
-    typedef RandomLeafFilter<PointDataTree, boost::mt11213b> RandomFilter;
+    typedef RandomLeafFilter<PointDataTree, std::mt19937> RandomFilter;
 
     const int currentPoints = pointCount(tree);
     const int targetPoints = int(math::Round((percentage * currentPoints)/100.0f));

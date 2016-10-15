@@ -39,6 +39,8 @@
 #ifndef OPENVDB_TOOLS_INDEX_FILTER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_INDEX_FILTER_HAS_BEEN_INCLUDED
 
+#include <random> // std::mt19937
+
 #include <openvdb/version.h>
 #include <openvdb/Types.h>
 
@@ -49,7 +51,6 @@
 #include <openvdb_points/tools/AttributeArray.h>
 #include <openvdb_points/tools/AttributeGroup.h>
 
-#include <boost/random/uniform_real_distribution.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
 
 class TestIndexFilter;
@@ -65,18 +66,6 @@ namespace tools {
 
 namespace index_filter_internal {
 
-template <typename RandGenT, typename IntType>
-struct RandGen
-{
-    RandGen(const unsigned int _seed, const IntType _length) : randGen(_seed, 0, _length-1), length(_length) { }
-    IntType operator()(IntType) {
-        IntType result = randGen();
-        assert(result >= 0 && result < length);
-        return result;
-    }
-    openvdb::math::RandInt<IntType, RandGenT> randGen;
-    IntType length;
-};
 
 // generate a random subset of n indices from the range [0:m]
 template <typename RandGenT, typename IntType>
@@ -95,8 +84,10 @@ void generateRandomSubset(std::vector<IntType>& values, const unsigned int seed,
     for (int i = 0; i < int(m); i++)    values.push_back(i);
 
     // shuffle indices using random generator
-    RandGen<RandGenT, IntType> randGen(seed, m);
-    std::random_shuffle(values.begin(), values.end(), randGen);
+
+    RandGenT randGen(seed);
+    std::uniform_int_distribution<IntType> dist(0, m);
+    std::shuffle(values.begin(), values.end(), randGen);
 
     // resize the container to n elements (does not reduce capacity)
     values.resize(n);
@@ -201,7 +192,8 @@ public:
 
         const float factor = targetPoints > currentPoints ? 1.0f : float(targetPoints) / float(currentPoints);
 
-        math::RandInt<unsigned int, boost::mt19937> randGen(seed, 0, std::numeric_limits<unsigned int>::max()-1);
+        std::mt19937 generator(seed);
+        std::uniform_int_distribution<unsigned int> dist(0, std::numeric_limits<unsigned int>::max()-1);
 
         Index32 leafCounter = 0;
         float totalPointsFloat = 0.0f;
@@ -210,7 +202,7 @@ public:
             // for the last leaf - use the remaining points to reach the target points
             if (leafCounter + 1 == tree.leafCount()) {
                 const int leafPoints = targetPoints - totalPoints;
-                mLeafMap[iter->origin()] = SeedCountPair(randGen(), leafPoints);
+                mLeafMap[iter->origin()] = SeedCountPair(dist(generator), leafPoints);
                 break;
             }
             totalPointsFloat += factor * iter->pointCount();
@@ -218,7 +210,7 @@ public:
             totalPointsFloat -= leafPoints;
             totalPoints += leafPoints;
 
-            mLeafMap[iter->origin()] = SeedCountPair(randGen(), leafPoints);
+            mLeafMap[iter->origin()] = SeedCountPair(dist(generator), leafPoints);
 
             leafCounter++;
         }
@@ -308,8 +300,9 @@ public:
         assert(mIdHandle);
         const IntType id = mIdHandle->get(*iter);
         const unsigned int seed = mSeed + (unsigned int) id;
-        math::Rand01<double, RandGenT> randGen(seed);
-        return randGen() < mFactor;
+        RandGenT generator(seed);
+        std::uniform_real_distribution<double> dist(0.0, 1.0);
+        return dist(generator) < mFactor;
     }
 
 private:
