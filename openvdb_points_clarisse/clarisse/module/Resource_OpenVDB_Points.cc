@@ -47,6 +47,7 @@
 #include <tbb/parallel_for.h>
 
 #include <particle_cloud.h>
+#include <curve_mesh.h>
 #include <geometry_point_cloud.h>
 #include <geometry_property.h>
 #include <geometry_property_collection.h>
@@ -566,6 +567,103 @@ create_clarisse_particle_cloud_geometry_property(OfApp& application, ResourceDat
     property_progress_bar->destroy();
 
     return collection;
+}
+
+
+CurveMesh*
+create_clarisse_curve_mesh(OfApp& application, ResourceData_OpenVDBPoints& data)
+{
+    const PointDataGrid::Ptr grid = data.grid();
+
+    if (!grid)                  return new CurveMesh();
+
+    const PointDataTree& tree = grid->tree();
+
+    if (!tree.cbeginLeaf())     return new CurveMesh();
+
+    const openvdb::Index64 curves = activePointCount(tree);
+
+    if (curves == 0)              return new CurveMesh();
+
+    AppProgressBar* convert_progress_bar = application.create_progress_bar(CoreString("Converting Curves for Clarisse"));
+
+    const openvdb::Index segments = tree.beginLeaf()->constAttributeArray("segments").stride();
+    const openvdb::Index vertices = segments + 1;
+    const openvdb::Index64 size = curves * vertices;
+
+    CoreArray<unsigned int> vertex_count(curves);
+    CoreArray<GMathVec3f> array(size);
+
+    // extract curve root positions
+
+    AppProgressBar* convert_roots_progress_bar = application.create_progress_bar(CoreString("Converting Curve Roots for Clarisse"));
+
+    const openvdb::math::Transform& transform = grid->transform();
+
+    unsigned index = 0;
+
+    for (PointDataTree::LeafCIter leaf = tree.cbeginLeaf(); leaf; ++leaf)
+    {
+        const AttributeHandle<openvdb::Vec3f>::Ptr positionHandle =
+            AttributeHandle<openvdb::Vec3f>::create(leaf->constAttributeArray("P"));
+
+        for (PointDataTree::LeafNodeType::IndexOnIter iter = leaf->beginIndexOn(); iter; ++iter)
+        {
+            const openvdb::Vec3f positionVoxelSpace = positionHandle->get(*iter);
+            const openvdb::Vec3d positionIndexSpace = positionVoxelSpace + iter.getCoord().asVec3d();
+            const openvdb::Vec3d positionWorldSpace = transform.indexToWorld(positionIndexSpace);
+
+            const unsigned rootIndex = index * vertices;
+
+            array[rootIndex][0] = positionWorldSpace[0];
+            array[rootIndex][1] = positionWorldSpace[1];
+            array[rootIndex][2] = positionWorldSpace[2];
+
+            vertex_count[index] = vertices;
+
+            index++;
+        }
+    }
+
+    convert_roots_progress_bar->destroy();
+
+    // convert curve segment offset data into curve vertices
+
+    AppProgressBar* convert_vertices_progress_bar = application.create_progress_bar(CoreString("Converting Curve Vertices for Clarisse"));
+
+    index = 0;
+
+    for (PointDataTree::LeafCIter leaf = tree.cbeginLeaf(); leaf; ++leaf)
+    {
+        const AttributeHandle<openvdb::Vec3f, UnknownCodec, true>::Ptr segmentsHandle =
+            AttributeHandle<openvdb::Vec3f, UnknownCodec, true>::create(leaf->constAttributeArray("segments"));
+
+        for (PointDataTree::LeafNodeType::IndexOnIter iter = leaf->beginIndexOn(); iter; ++iter)
+        {
+            for (openvdb::Index i = 0; i < segments; i++)
+            {
+                const openvdb::Vec3f offset = segmentsHandle->get(*iter, i);
+
+                const unsigned rootIndex = index * vertices;
+                const unsigned vertexIndex = rootIndex + i + 1;
+
+                array[vertexIndex][0] = array[rootIndex][0] + offset[0];
+                array[vertexIndex][1] = array[rootIndex][1] + offset[1];
+                array[vertexIndex][2] = array[rootIndex][2] + offset[2];
+            }
+
+            index++;
+        }
+    }
+
+    convert_vertices_progress_bar->destroy();
+
+    CurveMesh* curveMesh = new CurveMesh;
+    curveMesh->init(vertex_count, array.get_data());
+
+    convert_progress_bar->destroy();
+
+    return curveMesh;
 }
 
 

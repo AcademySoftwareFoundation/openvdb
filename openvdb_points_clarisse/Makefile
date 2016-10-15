@@ -215,9 +215,11 @@ LIBCLARISSE_SRC_NAMES := \
 #
 LIBCLARISSE_CID_NAMES := \
 	clarisse/module/Module_OpenVDB_Points.cid \
+	clarisse/module/Module_OpenVDB_Curves.cid \
 #
 CLARISSE_MODULE_SRC_NAMES := \
 	clarisse/module/Module_OpenVDB_Points.cc \
+	clarisse/module/Module_OpenVDB_Curves.cc \
 #
 LIBCLARISSE_CMA_NAMES := $(LIBCLARISSE_CID_NAMES:.cid=.cma)
 CLARISSE_MODULE_NAMES := $(basename $(notdir $(CLARISSE_MODULE_SRC_NAMES)))
