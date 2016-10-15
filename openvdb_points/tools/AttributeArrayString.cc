@@ -36,7 +36,7 @@
 #include <openvdb_points/tools/AttributeArrayString.h>
 
 #include <openvdb/Metadata.h>
-#include <openvdb/metadata/MetaMap.h>
+#include <openvdb/MetaMap.h>
 
 #include <boost/algorithm/string/predicate.hpp> // startswith
 

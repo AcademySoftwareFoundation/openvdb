@@ -40,7 +40,7 @@
 #define OPENVDB_TOOLS_ATTRIBUTE_SET_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h>
-#include <openvdb/metadata/MetaMap.h>
+#include <openvdb/MetaMap.h>
 
 #include <boost/integer_traits.hpp> // integer_traits
 #include <boost/shared_ptr.hpp> // shared_ptr
