@@ -741,9 +741,9 @@ SOP_OpenVDB_Points_Group::performGroupFiltering(PointDataGrid& outputGrid, const
 {
     // filter typedefs
 
-    typedef AttributeHashFilter<boost::mt11213b, int> HashIFilter;
-    typedef AttributeHashFilter<boost::mt11213b, long> HashLFilter;
-    typedef RandomLeafFilter<PointDataGrid::TreeType, boost::mt11213b> LeafFilter;
+    typedef AttributeHashFilter<std::mt19937, int> HashIFilter;
+    typedef AttributeHashFilter<std::mt19937_64, long> HashLFilter;
+    typedef RandomLeafFilter<PointDataGrid::TreeType, std::mt19937> LeafFilter;
     typedef LevelSetFilter<FloatGrid> LSFilter;
 
     // composite typedefs (a combination of the above five filters)

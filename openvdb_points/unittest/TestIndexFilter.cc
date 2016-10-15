@@ -325,13 +325,13 @@ TestIndexFilter::testRandomLeafFilter()
         std::vector<int> values;
         std::vector<int> values2;
 
-        index_filter_internal::generateRandomSubset<boost::mt19937, int>(values, /*seed*/(unsigned) 0, 1, 20);
+        index_filter_internal::generateRandomSubset<std::mt19937, int>(values, /*seed*/(unsigned) 0, 1, 20);
 
         CPPUNIT_ASSERT_EQUAL(values.size(), size_t(1));
 
         // different seed
 
-        index_filter_internal::generateRandomSubset<boost::mt19937, int>(values2, /*seed*/(unsigned) 1, 1, 20);
+        index_filter_internal::generateRandomSubset<std::mt19937, int>(values2, /*seed*/(unsigned) 1, 1, 20);
 
         CPPUNIT_ASSERT_EQUAL(values2.size(), size_t(1));
         CPPUNIT_ASSERT(values[0] != values2[0]);
@@ -340,7 +340,7 @@ TestIndexFilter::testRandomLeafFilter()
 
         std::vector<long> values3;
 
-        index_filter_internal::generateRandomSubset<boost::mt19937, long>(values3, /*seed*/(unsigned) 0, 1, 20);
+        index_filter_internal::generateRandomSubset<std::mt19937, long>(values3, /*seed*/(unsigned) 0, 1, 20);
 
         CPPUNIT_ASSERT_EQUAL(values3.size(), size_t(1));
         CPPUNIT_ASSERT(values[0] == values3[0]);
@@ -349,7 +349,7 @@ TestIndexFilter::testRandomLeafFilter()
 
         values.clear();
 
-        index_filter_internal::generateRandomSubset<boost::mt11213b, int>(values, /*seed*/(unsigned) 1, 1, 20);
+        index_filter_internal::generateRandomSubset<std::mt19937_64, int>(values, /*seed*/(unsigned) 1, 1, 20);
 
         CPPUNIT_ASSERT_EQUAL(values.size(), size_t(1));
         CPPUNIT_ASSERT(values[0] != values2[0]);
@@ -358,13 +358,13 @@ TestIndexFilter::testRandomLeafFilter()
 
         values.clear();
 
-        index_filter_internal::generateRandomSubset<boost::mt19937, int>(values, /*seed*/(unsigned) 0, 0, 20);
+        index_filter_internal::generateRandomSubset<std::mt19937, int>(values, /*seed*/(unsigned) 0, 0, 20);
 
         CPPUNIT_ASSERT_EQUAL(values.size(), size_t(0));
 
         // all values
 
-        index_filter_internal::generateRandomSubset<boost::mt19937, int>(values, /*seed*/(unsigned) 0, 1000, 1000);
+        index_filter_internal::generateRandomSubset<std::mt19937, int>(values, /*seed*/(unsigned) 0, 1000, 1000);
 
         CPPUNIT_ASSERT_EQUAL(values.size(), size_t(1000));
 
@@ -378,7 +378,7 @@ TestIndexFilter::testRandomLeafFilter()
     }
 
     { // RandomLeafFilter
-        typedef RandomLeafFilter<PointDataTree, boost::mt11213b> RandFilter;
+        typedef RandomLeafFilter<PointDataTree, std::mt19937> RandFilter;
 
         PointDataTree tree;
 
@@ -490,7 +490,7 @@ TestIndexFilter::testAttributeHashFilter()
     ids.push_back(4);
     setId(tree, index, ids);
 
-    typedef AttributeHashFilter<boost::mt11213b, int> HashFilter;
+    typedef AttributeHashFilter<std::mt19937, int> HashFilter;
 
     { // construction, copy construction
         HashFilter filter(index, 0.0f);
@@ -562,7 +562,7 @@ TestIndexFilter::testAttributeHashFilter()
 
         CPPUNIT_ASSERT(!filter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(!filter.valid(indexIter));
+        CPPUNIT_ASSERT(filter.valid(indexIter));
         ++indexIter;
         CPPUNIT_ASSERT(!indexIter);
         ++leafIter;
@@ -584,7 +584,7 @@ TestIndexFilter::testAttributeHashFilter()
         PointDataTree::LeafNodeType::IndexAllIter indexIter = leafIter->beginIndexAll();
         filter.reset(*leafIter);
 
-        CPPUNIT_ASSERT(filter.valid(indexIter));
+        CPPUNIT_ASSERT(!filter.valid(indexIter));
         ++indexIter;
         CPPUNIT_ASSERT(filter.valid(indexIter));
         ++indexIter;
@@ -593,7 +593,7 @@ TestIndexFilter::testAttributeHashFilter()
 
         indexIter = leafIter->beginIndexAll();
         filter.reset(*leafIter);
-        CPPUNIT_ASSERT(!filter.valid(indexIter));
+        CPPUNIT_ASSERT(filter.valid(indexIter));
         ++indexIter;
         CPPUNIT_ASSERT(filter.valid(indexIter));
         ++indexIter;
