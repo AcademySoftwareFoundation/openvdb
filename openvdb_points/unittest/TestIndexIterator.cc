@@ -35,10 +35,10 @@
 #include <openvdb/Types.h>
 #include <openvdb/tree/LeafNode.h>
 
-#include "ProfileTimer.h"
-
 #include <sstream>
 #include <iostream>
+#include <tbb/tick_count.h>
+#include <iomanip>//for setprecision
 
 using namespace openvdb;
 using namespace openvdb::tools;
@@ -59,6 +59,58 @@ public:
 }; // class TestIndexIterator
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestIndexIterator);
+
+
+////////////////////////////////////////
+
+
+/// @brief Functionality similar to openvdb::util::CpuTimer except with prefix padding and no decimals.
+///
+/// @code
+///    ProfileTimer timer("algorithm 1");
+///    // code to be timed goes here
+///    timer.stop();
+/// @endcode
+class ProfileTimer
+{
+public:
+    /// @brief Prints message and starts timer.
+    ///
+    /// @note Should normally be followed by a call to stop()
+    ProfileTimer(const std::string& msg)
+    {
+        (void)msg;
+#ifdef PROFILE
+        // padd string to 50 characters
+        std::string newMsg(msg);
+        if (newMsg.size() < 50)     newMsg.insert(newMsg.end(), 50 - newMsg.size(), ' ');
+        std::cerr << newMsg << " ... ";
+#endif
+        mT0 = tbb::tick_count::now();
+    }
+
+    ~ProfileTimer() { this->stop(); }
+
+    /// Return Time diference in milliseconds since construction or start was called.
+    inline double delta() const
+    {
+        tbb::tick_count::interval_t dt = tbb::tick_count::now() - mT0;
+        return 1000.0*dt.seconds();
+    }
+
+    /// @brief Print time in milliseconds since construction or start was called.
+    inline void stop() const
+    {
+#ifdef PROFILE
+        std::stringstream ss;
+        ss << std::setw(6) << ::round(this->delta());
+        std::cerr << "completed in " << ss.str() << " ms\n";
+#endif
+    }
+
+private:
+    tbb::tick_count mT0;
+};// ProfileTimer
 
 
 ////////////////////////////////////////
