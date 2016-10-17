@@ -89,6 +89,7 @@ public:
     CPPUNIT_TEST(testReadClippedGrid);
 #endif
     CPPUNIT_TEST(testMultipleBufferIO);
+    CPPUNIT_TEST(testMultipleLeafBufferIO);
     CPPUNIT_TEST(testHasGrid);
     CPPUNIT_TEST(testNameIterator);
     CPPUNIT_TEST(testReadOldFileFormat);
@@ -120,6 +121,7 @@ public:
     void testReadClippedGrid();
 #endif
     void testMultipleBufferIO();
+    void testMultipleLeafBufferIO();
     void testHasGrid();
     void testNameIterator();
     void testReadOldFileFormat();
@@ -156,7 +158,14 @@ TestFile::testHeader()
 
     CPPUNIT_ASSERT(!unique);//reading same file again
 
-    CPPUNIT_ASSERT_EQUAL(openvdb::OPENVDB_FILE_VERSION, file.fileVersion());
+    uint32_t version = openvdb::OPENVDB_FILE_VERSION;
+
+#ifndef OPENVDB_USE_MULTIPLE_LEAF_BUFFERS
+    if (version == openvdb::OPENVDB_FILE_VERSION_MULTIPLE_LEAF_BUFFERS) {
+        version = openvdb::OPENVDB_FILE_VERSION_MULTIPLE_LEAF_BUFFERS - 1;
+    }
+#endif
+    CPPUNIT_ASSERT_EQUAL(version, file.fileVersion());
     CPPUNIT_ASSERT_EQUAL(openvdb::OPENVDB_LIBRARY_MAJOR_VERSION, file.libraryVersion().first);
     CPPUNIT_ASSERT_EQUAL(openvdb::OPENVDB_LIBRARY_MINOR_VERSION, file.libraryVersion().second);
     CPPUNIT_ASSERT_EQUAL(uuid_str, file.getUniqueTag());
@@ -1141,8 +1150,16 @@ TestFile::testOpen()
     CPPUNIT_ASSERT(!vdbfile.open());//opening the same file
 
     CPPUNIT_ASSERT(vdbfile.isOpen());
-    CPPUNIT_ASSERT_EQUAL(OPENVDB_FILE_VERSION, vdbfile.fileVersion());
-    CPPUNIT_ASSERT_EQUAL(OPENVDB_FILE_VERSION, io::getFormatVersion(vdbfile.inputStream()));
+
+    uint32_t version = OPENVDB_FILE_VERSION;
+#ifndef OPENVDB_USE_MULTIPLE_LEAF_BUFFERS
+    if (version == OPENVDB_FILE_VERSION_MULTIPLE_LEAF_BUFFERS) {
+        version = OPENVDB_FILE_VERSION_MULTIPLE_LEAF_BUFFERS - 1;
+    }
+#endif
+
+    CPPUNIT_ASSERT_EQUAL(version, vdbfile.fileVersion());
+    CPPUNIT_ASSERT_EQUAL(version, io::getFormatVersion(vdbfile.inputStream()));
     CPPUNIT_ASSERT_EQUAL(OPENVDB_LIBRARY_MAJOR_VERSION, vdbfile.libraryVersion().first);
     CPPUNIT_ASSERT_EQUAL(OPENVDB_LIBRARY_MINOR_VERSION, vdbfile.libraryVersion().second);
     CPPUNIT_ASSERT_EQUAL(OPENVDB_LIBRARY_MAJOR_VERSION,
@@ -1863,6 +1880,238 @@ TestFile::testMultipleBufferIO()
     math::MapRegistry::clear();
 
     remove("something.vdb2");
+}
+
+
+namespace {
+
+template<typename T, openvdb::Index Log2Dim> struct MultiBufferLeafNode; // forward declaration
+
+typedef openvdb::PointIndex<openvdb::Index32, 1000> MultiBufferIndex;
+
+/// Point index tree configured to match the default OpenVDB tree configuration
+typedef openvdb::tree::Tree<openvdb::tree::RootNode<openvdb::tree::InternalNode<openvdb::tree::InternalNode
+    <MultiBufferLeafNode<MultiBufferIndex, 3>, 4>, 5> > > MultiBufferTree;
+
+/// Point index grid
+typedef openvdb::Grid<MultiBufferTree> MultiBufferGrid;
+
+template<typename T, openvdb::Index Log2Dim>
+struct MultiBufferLeafNode : public openvdb::tree::LeafNode<T, Log2Dim>
+{
+    // The following had to be copied from the LeafNode class
+    // to make the derived class compatible with the tree structure.
+
+    typedef MultiBufferLeafNode<T, Log2Dim>             LeafNodeType;
+    typedef boost::shared_ptr<MultiBufferLeafNode>      Ptr;
+    typedef openvdb::tree::LeafNode<T, Log2Dim>         BaseLeaf;
+    typedef openvdb::util::NodeMask<Log2Dim>            NodeMaskType;
+    typedef T                                           ValueType;
+    typedef typename BaseLeaf::template ValueIter<
+        typename NodeMaskType::OnIterator, const MultiBufferLeafNode, const ValueType, typename BaseLeaf::ValueOn> ValueOnCIter;
+    typedef typename BaseLeaf::template ChildIter<
+        typename NodeMaskType::OnIterator, MultiBufferLeafNode, typename BaseLeaf::ChildOn> ChildOnIter;
+    typedef typename BaseLeaf::template ChildIter<
+        typename NodeMaskType::OnIterator, const MultiBufferLeafNode, typename BaseLeaf::ChildOn> ChildOnCIter;
+
+    ValueOnCIter  cbeginValueOn() const  { return ValueOnCIter(this->getValueMask().beginOn(), this); }
+    ChildOnCIter  cbeginChildOn() const  { return ChildOnCIter(this->getValueMask().endOn(), this); }
+    ChildOnIter    beginChildOn()        { return ChildOnIter(this->getValueMask().endOn(), this); }
+
+    MultiBufferLeafNode() : BaseLeaf() {}
+    explicit MultiBufferLeafNode(const openvdb::Coord& coords, const T& value, bool active = false)
+        : BaseLeaf(coords, value, active) { }
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    MultiBufferLeafNode(openvdb::PartialCreate, const openvdb::Coord& coords, const T& value, bool active = false)
+        : BaseLeaf(openvdb::PartialCreate(), coords, value, active) { }
+#endif
+    MultiBufferLeafNode(const MultiBufferLeafNode& rhs) : BaseLeaf(rhs) {}
+
+    // Methods in use for reading and writing multiple buffers
+
+    int numberOfPasses;
+    std::vector<int> readPasses;
+    std::vector<int>* writePasses;
+
+    void readBuffers(std::istream& is, const openvdb::CoordBBox&, bool fromHalf = false) { this->readBuffers(is, fromHalf); }
+
+    void readBuffers(std::istream& is, bool fromHalf = false)
+    {
+        const openvdb::io::StreamMetadata::Ptr meta = openvdb::io::getStreamMetadataPtr(is);
+        if (!meta)  OPENVDB_THROW(openvdb::IoError, "Cannot write out a MultiBufferLeaf without StreamMetadata.");
+
+        const uint32_t pass = meta->leafBuffer();
+
+        // read in origin and pass
+
+        openvdb::Coord origin;
+        uint32_t readPass;
+
+        is.read(reinterpret_cast<char*>(&origin), sizeof(openvdb::Coord));
+        is.read(reinterpret_cast<char*>(&readPass), sizeof(uint32_t));
+
+        // store each pass
+
+        const_cast<std::vector<int>&>(readPasses).push_back(readPass);
+
+        CPPUNIT_ASSERT_EQUAL(origin, this->origin());
+        CPPUNIT_ASSERT_EQUAL(pass, readPass);
+    }
+
+    void writeBuffers(std::ostream& os, bool toHalf = false) const
+    {
+        const openvdb::io::StreamMetadata::Ptr meta = openvdb::io::getStreamMetadataPtr(os);
+        if (!meta)  OPENVDB_THROW(openvdb::IoError, "Cannot read in a MultiBufferLeaf without StreamMetadata.");
+
+        const uint32_t pass = meta->leafBuffer();
+
+        // leaf traversal analysis deduces the number of passes to perform for this leaf
+        // then updates the leaf traversal value to ensure all passes will be written
+
+        if (meta->leafBufferCount()) {
+            if (numberOfPasses > pass)  meta->setLeafBuffer(numberOfPasses);
+            return;
+        }
+
+        // store each pass
+
+        CPPUNIT_ASSERT(writePasses);
+        const_cast<std::vector<int>&>(*writePasses).push_back(pass);
+
+        // write out origin and pass
+
+        const openvdb::Coord origin(this->origin());
+
+        os.write(reinterpret_cast<const char*>(&origin), sizeof(openvdb::Coord));
+        os.write(reinterpret_cast<const char*>(&pass), sizeof(uint32_t));
+    }
+}; // struct MultiBufferLeafNode
+
+} // namespace
+
+
+void
+TestFile::testMultipleLeafBufferIO()
+{
+#ifndef OPENVDB_USE_MULTIPLE_LEAF_BUFFERS
+    return;
+#endif
+
+    using namespace openvdb;
+    using namespace openvdb::tools;
+    using namespace openvdb::io;
+
+    // Register grid and transform.
+    openvdb::initialize();
+    MultiBufferGrid::registerGrid();
+
+    // Create a multi-buffer grid
+
+    MultiBufferGrid::Ptr grid = openvdb::createGrid<MultiBufferGrid>();
+    grid->setName("test");
+    MultiBufferGrid::TreeType& tree = grid->tree();
+    tree.setValue(Coord(0, 0, 0), 5);
+    tree.setValue(Coord(0, 10, 0), 5);
+
+    CPPUNIT_ASSERT_EQUAL(tree.leafCount(), openvdb::Index32(2));
+
+    GridPtrVec grids;
+    grids.push_back(grid);
+
+    // vector to assign as write passes (to ensure blocked ordering)
+
+    std::vector<int> writePasses;
+
+    // define maximum number of passes
+    {
+        MultiBufferGrid::TreeType::LeafIter leafIter = tree.beginLeaf();
+        leafIter->numberOfPasses = 3;
+        leafIter->writePasses = &writePasses;
+        ++leafIter;
+        leafIter->numberOfPasses = 2;
+        leafIter->writePasses = &writePasses;
+    }
+
+    // Write a single buffer VDB (multi-buffer I/O is not registered)
+    {
+        File file("singlebuffer.vdb");
+
+        std::ostringstream ostr(std::ios_base::binary);
+
+        // write the vdb to the file.
+        file.write(grids);
+
+        CPPUNIT_ASSERT_EQUAL(writePasses.size(), size_t(2));
+        CPPUNIT_ASSERT_EQUAL(writePasses[0], 0);
+        CPPUNIT_ASSERT_EQUAL(writePasses[1], 0);
+    }
+
+    // Read a single buffer VDB (multi-buffer I/O is not registered)
+    {
+        // read into a different grid.
+        File file2("singlebuffer.vdb");
+        file2.open();
+
+        // read the vdb from the file.
+        MultiBufferGrid::Ptr multiGrid = GridBase::grid<MultiBufferGrid>(file2.readGrid("test"));
+
+        MultiBufferGrid::TreeType::LeafIter leafIter = multiGrid->tree().beginLeaf();
+        CPPUNIT_ASSERT_EQUAL(leafIter->readPasses.size(), size_t(1));
+        CPPUNIT_ASSERT_EQUAL(leafIter->readPasses[0], 0);
+        ++leafIter;
+        CPPUNIT_ASSERT_EQUAL(leafIter->readPasses.size(), size_t(1));
+        CPPUNIT_ASSERT_EQUAL(leafIter->readPasses[0], 0);
+    }
+
+    remove("singlebuffer.vdb");
+
+    // Register MultiBufferLeafNode as using multiple leaf buffer I/O passes
+    io::registerMultipleLeafBuffers(MultiBufferGrid::gridType());
+
+    // Clear the pass data
+    writePasses.clear();
+
+    // Write a multiple buffer VDB
+    {
+        File file("multibuffer.vdb");
+
+        std::ostringstream ostr(std::ios_base::binary);
+
+        // write the vdb to the file.
+        file.write(grids);
+
+        // check write is blocked
+        CPPUNIT_ASSERT_EQUAL(writePasses.size(), size_t(6));
+        CPPUNIT_ASSERT_EQUAL(writePasses[0], 0);
+        CPPUNIT_ASSERT_EQUAL(writePasses[1], 0);
+        CPPUNIT_ASSERT_EQUAL(writePasses[2], 1);
+        CPPUNIT_ASSERT_EQUAL(writePasses[3], 1);
+        CPPUNIT_ASSERT_EQUAL(writePasses[4], 2);
+        CPPUNIT_ASSERT_EQUAL(writePasses[5], 2);
+    }
+
+    // Read a multiple buffer VDB
+    {
+        // read into a different grid.
+        File file2("multibuffer.vdb");
+        file2.open();
+
+        // read the vdb from the file.
+        MultiBufferGrid::Ptr multiGrid = GridBase::grid<MultiBufferGrid>(file2.readGrid("test"));
+
+        MultiBufferGrid::TreeType::LeafIter leafIter = multiGrid->tree().beginLeaf();
+        CPPUNIT_ASSERT_EQUAL(leafIter->readPasses.size(), size_t(3));
+        CPPUNIT_ASSERT_EQUAL(leafIter->readPasses[0], 0);
+        CPPUNIT_ASSERT_EQUAL(leafIter->readPasses[1], 1);
+        CPPUNIT_ASSERT_EQUAL(leafIter->readPasses[2], 2);
+        ++leafIter;
+        CPPUNIT_ASSERT_EQUAL(leafIter->readPasses.size(), size_t(3));
+        CPPUNIT_ASSERT_EQUAL(leafIter->readPasses[0], 0);
+        CPPUNIT_ASSERT_EQUAL(leafIter->readPasses[1], 1);
+        CPPUNIT_ASSERT_EQUAL(leafIter->readPasses[2], 2);
+    }
+
+    remove("multibuffer.vdb");
 }
 
 

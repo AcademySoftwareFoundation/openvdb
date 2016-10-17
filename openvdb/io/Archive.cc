@@ -56,6 +56,7 @@
 #include <boost/version.hpp> // for BOOST_VERSION
 
 #include <tbb/atomic.h>
+#include <tbb/mutex.h>
 
 #ifdef _MSC_VER
 #include <boost/interprocess/detail/os_file_functions.hpp> // open_existing_file(), close_file()
@@ -95,6 +96,51 @@ const uint32_t Archive::DEFAULT_COMPRESSION_FLAGS = (COMPRESS_ZIP | COMPRESS_ACT
 
 
 namespace {
+
+
+typedef tbb::mutex Mutex;
+typedef Mutex::scoped_lock Lock;
+
+struct MultipleLeafBufferRegistry {
+    MultipleLeafBufferRegistry() {}
+    Mutex mMutex;
+    std::set<Name> mGrids;
+};
+
+// Declare this at file scope to ensure thread-safe initialization.
+Mutex sInitMultipleLeafBuffer;
+
+
+// Global function for accessing the registry
+MultipleLeafBufferRegistry*
+getMultipleLeafBufferRegistry()
+{
+    Lock lock(sInitMultipleLeafBuffer);
+
+    static MultipleLeafBufferRegistry* registry = NULL;
+
+    if (registry == NULL) {
+
+#ifdef __ICC
+// Disable ICC "assignment to statically allocated variable" warning.
+// This assignment is mutex-protected and therefore thread-safe.
+__pragma(warning(disable:1711))
+#endif
+
+        registry = new MultipleLeafBufferRegistry();
+
+#ifdef __ICC
+__pragma(warning(default:1711))
+#endif
+
+    }
+
+    return registry;
+}
+
+
+////////////////////////////////////////
+
 
 // Indices into a stream's internal extensible array of values used by readers and writers
 struct StreamState
@@ -210,6 +256,9 @@ struct StreamMetadata::Impl
         , mBackgroundPtr(nullptr)
         , mHalfFloat(false)
         , mWriteGridStats(false)
+        , mSeekable(false)
+        , mLeafBufferCount(false)
+        , mLeafBuffer(0)
     {
     }
 
@@ -220,6 +269,9 @@ struct StreamMetadata::Impl
     const void* mBackgroundPtr; ///< @todo use Metadata::Ptr?
     bool mHalfFloat;
     bool mWriteGridStats;
+    bool mSeekable;
+    bool mLeafBufferCount;
+    uint32_t mLeafBuffer;
     MetaMap mGridMetadata;
     AuxDataMap mAuxData;
 }; // struct StreamMetadata
@@ -280,6 +332,9 @@ uint32_t        StreamMetadata::gridClass() const       { return mImpl->mGridCla
 const void*     StreamMetadata::backgroundPtr() const   { return mImpl->mBackgroundPtr; }
 bool            StreamMetadata::halfFloat() const       { return mImpl->mHalfFloat; }
 bool            StreamMetadata::writeGridStats() const  { return mImpl->mWriteGridStats; }
+bool            StreamMetadata::seekable() const        { return mImpl->mSeekable; }
+bool            StreamMetadata::leafBufferCount() const { return mImpl->mLeafBufferCount; }
+uint32_t        StreamMetadata::leafBuffer() const      { return mImpl->mLeafBuffer; }
 MetaMap&        StreamMetadata::gridMetadata()          { return mImpl->mGridMetadata; }
 const MetaMap&  StreamMetadata::gridMetadata() const    { return mImpl->mGridMetadata; }
 
@@ -293,7 +348,9 @@ void StreamMetadata::setGridClass(uint32_t c)           { mImpl->mGridClass = c;
 void StreamMetadata::setBackgroundPtr(const void* ptr)  { mImpl->mBackgroundPtr = ptr; }
 void StreamMetadata::setHalfFloat(bool b)               { mImpl->mHalfFloat = b; }
 void StreamMetadata::setWriteGridStats(bool b)          { mImpl->mWriteGridStats = b; }
-
+void StreamMetadata::setSeekable(bool b)                { mImpl->mSeekable = b; }
+void StreamMetadata::setLeafBufferCount(bool b)         { mImpl->mLeafBufferCount = b; }
+void StreamMetadata::setLeafBuffer(uint32_t m)          { mImpl->mLeafBuffer = m; }
 
 std::string
 StreamMetadata::str() const
@@ -309,6 +366,9 @@ StreamMetadata::str() const
     if (gridMetadata().metaCount() != 0) {
         ostr << "grid_metadata:\n" << gridMetadata().str(/*indent=*/"    ");
     }
+    ostr << "seekable: " << (seekable() ? "true" : "false") << "\n";
+    ostr << "leaf_buffer: " << leafBuffer() << "\n";
+    ostr << "leaf_buffer_count: " << (leafBufferCount() ? "true" : "false") << "\n";
     return ostr.str();
 }
 
@@ -727,6 +787,17 @@ Archive::setGridCompression(std::ostream& os, const GridBase& grid) const
         case GRID_UNKNOWN:
             break;
     }
+
+#ifdef OPENVDB_USE_MULTIPLE_LEAF_BUFFERS
+    if (NULL == std::getenv("OPENVDB_DISABLE_MULTIPLE_LEAF_BUFFERS"))
+    {
+        // Enable multi-buffer compression if registered for this grid type
+        if (multipleLeafBuffers(grid.type())) {
+            c = c | COMPRESS_MULTIPLE_LEAF_BUFFERS;
+        }
+    }
+#endif
+
     io::setDataCompression(os, c);
 
     os.write(reinterpret_cast<const char*>(&c), sizeof(uint32_t));
@@ -957,6 +1028,14 @@ Archive::writeHeader(std::ostream& os, bool seekable) const
 
     // 2) Write the file format version number.
     uint32_t version = OPENVDB_FILE_VERSION;
+    // use previous file version if multiple leaf buffers is disabled
+#ifdef OPENVDB_USE_MULTIPLE_LEAF_BUFFERS
+    if (OPENVDB_FILE_VERSION == OPENVDB_FILE_VERSION_MULTIPLE_LEAF_BUFFERS &&
+        (NULL != std::getenv("OPENVDB_DISABLE_MULTIPLE_LEAF_BUFFERS")))
+#endif
+    {
+        version = OPENVDB_FILE_VERSION - 1;
+    }
     os.write(reinterpret_cast<char*>(&version), sizeof(uint32_t));
 
     // 3) Write the library version numbers.
@@ -1048,13 +1127,30 @@ void
 doReadGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is, const BoxType& bbox)
 {
     struct Local {
-        static void readBuffers(GridBase& g, std::istream& istrm, NoBBox) { g.readBuffers(istrm); }
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-        static void readBuffers(GridBase& g, std::istream& istrm, const CoordBBox& indexBBox) {
+#ifdef OPENVDB_2_ABI_COMPATIBLE
+        static void readBuffers(GridBase& g, std::istream& istrm, NoBBox) {
+            g.readBuffers(istrm);
+        }
+#else
+        static void doReadBuffers(GridBase& g, std::istream& istrm, NoBBox) {
+            g.readBuffers(istrm);
+        }
+        static void doReadBuffers(GridBase& g, std::istream& istrm, const CoordBBox& indexBBox) {
             g.readBuffers(istrm, indexBBox);
         }
-        static void readBuffers(GridBase& g, std::istream& istrm, const BBoxd& worldBBox) {
+        static void doReadBuffers(GridBase& g, std::istream& istrm, const BBoxd& worldBBox) {
             g.readBuffers(istrm, g.constTransform().worldToIndexNodeCentered(worldBBox));
+        }
+        static void readBuffers(GridBase& g, std::istream& istrm, const BoxType& bbox) {
+            io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(istrm);
+            uint16_t passes = 1;
+            if (io::getDataCompression(istrm) & COMPRESS_MULTIPLE_LEAF_BUFFERS) {
+                istrm.read(reinterpret_cast<char*>(&passes), sizeof(uint16_t));
+            }
+            for (uint32_t pass = 0; pass < uint32_t(passes); ++pass) {
+                meta->setLeafBuffer(pass);
+                Local::doReadBuffers(g, istrm, bbox);
+            }
         }
 #endif
     };
@@ -1317,8 +1413,22 @@ Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
     // Now we know the grid block storage position.
     if (seekable) gd.setBlockPos(os.tellp());
 
+    // Determine how many leaf buffer passes are required for this grid
+    uint16_t passes = 1;
+    if (getDataCompression(os) & io::COMPRESS_MULTIPLE_LEAF_BUFFERS) {
+        streamMetadata->setLeafBufferCount(true);
+        streamMetadata->setLeafBuffer(0);
+        grid->writeBuffers(os);
+        passes = streamMetadata->leafBuffer();
+        os.write(reinterpret_cast<const char*>(&passes), sizeof(uint16_t));
+        streamMetadata->setLeafBufferCount(false);
+    }
+
     // Save out the data blocks of the grid.
-    grid->writeBuffers(os);
+    for (uint32_t pass = 0; pass < uint32_t(passes); ++pass) {
+        streamMetadata->setLeafBuffer(pass);
+        grid->writeBuffers(os);
+    }
 
     // Now we know the end position of this grid.
     if (seekable) gd.setEndPos(os.tellp());
@@ -1374,6 +1484,30 @@ Archive::writeGridInstance(GridDescriptor& gd, GridBase::ConstPtr grid,
         gd.seekToEnd(os);
     }
 }
+
+
+////////////////////////////////////////
+
+
+bool
+multipleLeafBuffers(const std::string& name)
+{
+    MultipleLeafBufferRegistry* registry = getMultipleLeafBufferRegistry();
+    Lock lock(registry->mMutex);
+
+    return (registry->mGrids.find(name) != registry->mGrids.end());
+}
+
+
+void
+registerMultipleLeafBuffers(const std::string& name)
+{
+    MultipleLeafBufferRegistry* registry = getMultipleLeafBufferRegistry();
+    Lock lock(registry->mMutex);
+
+    registry->mGrids.insert(name);
+}
+
 
 } // namespace io
 } // namespace OPENVDB_VERSION_NAME
