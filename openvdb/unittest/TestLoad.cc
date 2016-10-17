@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -8,8 +8,8 @@
 // Redistributions of source code must retain the above copyright
 // and license notice and the following restrictions and disclaimer.
 //
-// *     Neither the name of Double Negative Visual Effects nor the names
-// of its contributors may be used to endorse or promote products derived
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
 // from this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
@@ -31,12 +31,12 @@
 
 #include <cppunit/extensions/HelperMacros.h>
 
-#include <openvdb_points/openvdb.h>
-#include <openvdb_points/tools/PointDataGrid.h>
-#include <openvdb_points/tools/PointConversion.h>
-#include <openvdb_points/tools/Load.h>
-#include <openvdb_points/tools/AttributeArray.h>
-#include <openvdb_points/tools/AttributeSet.h>
+#include <openvdb/openvdb.h>
+#include <openvdb/tools/Load.h>
+#include <openvdb/points/PointDataGrid.h>
+#include <openvdb/points/PointConversion.h>
+#include <openvdb/points/AttributeArray.h>
+#include <openvdb/points/AttributeSet.h>
 #include <openvdb/Types.h>
 #include <openvdb/math/Transform.h>
 #include <openvdb/io/File.h>
@@ -46,8 +46,8 @@
 class TestLoad: public CppUnit::TestCase
 {
 public:
-    virtual void setUp() { openvdb::initialize(); openvdb::points::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); openvdb::points::uninitialize(); }
+    virtual void setUp() { openvdb::initialize(); }
+    virtual void tearDown() { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestLoad);
     CPPUNIT_TEST(testLoad);
@@ -67,7 +67,7 @@ void
 TestLoad::testLoad()
 {
     using namespace openvdb;
-    using namespace openvdb::tools;
+    using namespace openvdb::points;
 
     std::string tempDir(std::getenv("TMPDIR"));
     if (tempDir.empty())    tempDir = P_tmpdir;
@@ -130,7 +130,7 @@ TestLoad::testLoad()
         CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore()); ++leafIter;
         CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore());
 
-        loadGrid(*grid);
+        tools::loadGrid(*grid);
 
         leafIter = grid->tree().cbeginLeaf();
 #endif
@@ -170,7 +170,7 @@ TestLoad::testLoad()
 
         BBoxd bbox(Vec3i(0, 0, 0), Vec3i(4, 30, 4));
 
-        loadGrid(*grid, bbox);
+        tools::loadGrid(*grid, bbox);
 
         leafIter = grid->tree().cbeginLeaf();
 
@@ -213,7 +213,7 @@ TestLoad::testLoad()
         mask->tree().touchLeaf(Coord(0, 0, 0));
         mask->tree().touchLeaf(Coord(1, 1, 20));
 
-        loadGrid(*grid, *mask);
+        tools::loadGrid(*grid, *mask);
 
         leafIter = grid->tree().cbeginLeaf();
 
@@ -233,6 +233,6 @@ TestLoad::testLoad()
 
 
 
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

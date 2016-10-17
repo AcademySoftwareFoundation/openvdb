@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -8,8 +8,8 @@
 // Redistributions of source code must retain the above copyright
 // and license notice and the following restrictions and disclaimer.
 //
-// *     Neither the name of Double Negative Visual Effects nor the names
-// of its contributors may be used to endorse or promote products derived
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
 // from this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
@@ -30,25 +30,24 @@
 
 
 #include <cppunit/extensions/HelperMacros.h>
-#include <openvdb_points/tools/AttributeArray.h>
-#include <openvdb_points/tools/AttributeGroup.h>
-#include <openvdb_points/tools/IndexIterator.h>
-#include <openvdb_points/tools/IndexFilter.h>
+#include <openvdb/points/AttributeArray.h>
+#include <openvdb/points/AttributeGroup.h>
+#include <openvdb/points/IndexIterator.h>
+#include <openvdb/points/IndexFilter.h>
 
-#include <openvdb_points/openvdb.h>
 #include <openvdb/openvdb.h>
 
 #include <iostream>
 #include <sstream>
 
 using namespace openvdb;
-using namespace openvdb::tools;
+using namespace openvdb::points;
 
 class TestAttributeGroup: public CppUnit::TestCase
 {
 public:
-    virtual void setUp() { openvdb::initialize(); openvdb::points::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); openvdb::points::uninitialize(); }
+    virtual void setUp() { openvdb::initialize(); }
+    virtual void tearDown() { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestAttributeGroup);
     CPPUNIT_TEST(testAttributeGroup);
@@ -89,9 +88,6 @@ matchingNamePairs(const openvdb::NamePair& lhs,
 void
 TestAttributeGroup::testAttributeGroup()
 {
-    using namespace openvdb;
-    using namespace openvdb::tools;
-
     { // Typed class API
 
         const size_t count = 50;
@@ -179,9 +175,6 @@ TestAttributeGroup::testAttributeGroup()
 void
 TestAttributeGroup::testAttributeGroupHandle()
 {
-    using namespace openvdb;
-    using namespace openvdb::tools;
-
     GroupAttributeArray attr(4);
     GroupHandle handle(attr, 3);
 
@@ -397,10 +390,7 @@ private:
 void
 TestAttributeGroup::testAttributeGroupFilter()
 {
-    using namespace openvdb;
-    using namespace openvdb::tools;
-
-    using IndexGroupAllIter = IndexIter<ValueVoxelCIter, GroupFilter>;
+    typedef IndexIter<ValueVoxelCIter, GroupFilter> IndexGroupAllIter;
 
     GroupAttributeArray attrGroup(4);
     const Index32 size = attrGroup.size();
@@ -575,6 +565,6 @@ TestAttributeGroup::testAttributeGroupFilter()
 }
 
 
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

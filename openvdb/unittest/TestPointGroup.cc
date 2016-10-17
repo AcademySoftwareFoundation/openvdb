@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -8,8 +8,8 @@
 // Redistributions of source code must retain the above copyright
 // and license notice and the following restrictions and disclaimer.
 //
-// *     Neither the name of Double Negative Visual Effects nor the names
-// of its contributors may be used to endorse or promote products derived
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
 // from this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
@@ -30,22 +30,21 @@
 
 
 #include <cppunit/extensions/HelperMacros.h>
-#include <openvdb_points/tools/PointGroup.h>
-#include <openvdb_points/tools/PointCount.h>
-#include <openvdb_points/tools/PointConversion.h>
-#include <openvdb_points/openvdb.h>
+#include <openvdb/points/PointGroup.h>
+#include <openvdb/points/PointCount.h>
+#include <openvdb/points/PointConversion.h>
 
 #include <iostream>
 #include <sstream>
 
 using namespace openvdb;
-using namespace openvdb::tools;
+using namespace openvdb::points;
 
 class TestPointGroup: public CppUnit::TestCase
 {
 public:
-    virtual void setUp() { openvdb::initialize(); openvdb::points::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); openvdb::points::uninitialize(); }
+    virtual void setUp() { openvdb::initialize(); }
+    virtual void tearDown() { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestPointGroup);
     CPPUNIT_TEST(testDescriptor);
@@ -390,9 +389,6 @@ TestPointGroup::testCompact()
 void
 TestPointGroup::testSet()
 {
-    using namespace openvdb;
-    using namespace openvdb::tools;
-
     // four points in the same leaf
 
     std::vector<Vec3s> positions =  {
@@ -409,8 +405,8 @@ TestPointGroup::testSet()
 
     const PointAttributeVector<Vec3s> pointList(positions);
 
-    PointIndexGrid::Ptr pointIndexGrid =
-        openvdb::tools::createPointIndexGrid<PointIndexGrid>(pointList, *transform);
+    openvdb::tools::PointIndexGrid::Ptr pointIndexGrid =
+        openvdb::tools::createPointIndexGrid<openvdb::tools::PointIndexGrid>(pointList, *transform);
 
     PointDataGrid::Ptr grid = createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid, pointList, *transform);
     PointDataTree& tree = grid->tree();
@@ -491,9 +487,6 @@ TestPointGroup::testSet()
 void
 TestPointGroup::testFilter()
 {
-    using namespace openvdb;
-    using namespace openvdb::tools;
-
     const float voxelSize(1.0);
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
     PointDataGrid::Ptr grid;
@@ -510,8 +503,8 @@ TestPointGroup::testFilter()
 
         const PointAttributeVector<Vec3s> pointList(positions);
 
-        PointIndexGrid::Ptr pointIndexGrid =
-            openvdb::tools::createPointIndexGrid<PointIndexGrid>(pointList, *transform);
+        openvdb::tools::PointIndexGrid::Ptr pointIndexGrid =
+            openvdb::tools::createPointIndexGrid<openvdb::tools::PointIndexGrid>(pointList, *transform);
 
         grid = createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid, pointList, *transform);
     }
@@ -594,8 +587,8 @@ TestPointGroup::testFilter()
 
         const PointAttributeVector<Vec3s> pointList(positions);
 
-        PointIndexGrid::Ptr pointIndexGrid =
-            openvdb::tools::createPointIndexGrid<PointIndexGrid>(pointList, *transform);
+        openvdb::tools::PointIndexGrid::Ptr pointIndexGrid =
+            openvdb::tools::createPointIndexGrid<openvdb::tools::PointIndexGrid>(pointList, *transform);
 
         grid = createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid, pointList, *transform);
 
@@ -624,6 +617,6 @@ TestPointGroup::testFilter()
 }
 
 
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

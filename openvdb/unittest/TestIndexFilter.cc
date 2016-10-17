@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -8,8 +8,8 @@
 // Redistributions of source code must retain the above copyright
 // and license notice and the following restrictions and disclaimer.
 //
-// *     Neither the name of Double Negative Visual Effects nor the names
-// of its contributors may be used to endorse or promote products derived
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
 // from this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
@@ -30,19 +30,19 @@
 
 
 #include <cppunit/extensions/HelperMacros.h>
-#include <openvdb_points/tools/IndexIterator.h>
-#include <openvdb_points/tools/IndexFilter.h>
-#include <openvdb_points/tools/PointAttribute.h>
-#include <openvdb_points/tools/PointConversion.h>
-#include <openvdb_points/tools/PointGroup.h>
-#include <openvdb_points/tools/PointCount.h>
+#include <openvdb/points/IndexIterator.h>
+#include <openvdb/points/IndexFilter.h>
+#include <openvdb/points/PointAttribute.h>
+#include <openvdb/points/PointConversion.h>
+#include <openvdb/points/PointGroup.h>
+#include <openvdb/points/PointCount.h>
 
 #include <sstream>
 #include <iostream>
 #include <utility>
 
 using namespace openvdb;
-using namespace openvdb::tools;
+using namespace openvdb::points;
 
 class TestIndexFilter: public CppUnit::TestCase
 {
@@ -168,12 +168,9 @@ multiGroupMatches(  const LeafT& leaf, const Index32 size,
 void
 TestIndexFilter::testMultiGroupFilter()
 {
-    using namespace openvdb;
-    using namespace openvdb::tools;
-
     using LeafNode          = PointDataTree::LeafNodeType;
-    using AttributeVec3f    = openvdb::tools::TypedAttributeArray<Vec3f>;
-    using AttributeS        = openvdb::tools::TypedAttributeArray<float>;
+    using AttributeVec3f    = TypedAttributeArray<Vec3f>;
+    using AttributeS        = TypedAttributeArray<float>;
 
     AttributeVec3f::registerType();
     AttributeS::registerType();
@@ -314,9 +311,6 @@ TestIndexFilter::testMultiGroupFilter()
 void
 TestIndexFilter::testRandomLeafFilter()
 {
-    using namespace openvdb;
-    using namespace openvdb::tools;
-
     { // generateRandomSubset
         std::vector<int> values = index_filter_internal::generateRandomSubset<std::mt19937, int>(/*seed*/(unsigned) 0, 1, 20);
 
@@ -440,9 +434,6 @@ void setId(PointDataTree& tree, const size_t index, const std::vector<int>& ids)
 void
 TestIndexFilter::testAttributeHashFilter()
 {
-    using namespace openvdb;
-    using namespace openvdb::tools;
-
     using AttributeVec3s    = TypedAttributeArray<Vec3s>;
     using AttributeI        = TypedAttributeArray<int>;
 
@@ -584,9 +575,6 @@ TestIndexFilter::testAttributeHashFilter()
 void
 TestIndexFilter::testLevelSetFilter()
 {
-    using namespace openvdb;
-    using namespace openvdb::tools;
-
     using AttributeVec3s = TypedAttributeArray<Vec3s>;
 
     AttributeVec3s::registerType();
@@ -752,9 +740,6 @@ TestIndexFilter::testLevelSetFilter()
 void
 TestIndexFilter::testBBoxFilter()
 {
-    using namespace openvdb;
-    using namespace openvdb::tools;
-
     using AttributeVec3s = TypedAttributeArray<Vec3s>;
 
     AttributeVec3s::registerType();
@@ -958,6 +943,6 @@ TestIndexFilter::testBinaryFilter()
 }
 
 
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

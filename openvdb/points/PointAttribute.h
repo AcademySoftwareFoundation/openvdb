@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -8,8 +8,8 @@
 // Redistributions of source code must retain the above copyright
 // and license notice and the following restrictions and disclaimer.
 //
-// *     Neither the name of Double Negative Visual Effects nor the names
-// of its contributors may be used to endorse or promote products derived
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
 // from this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
@@ -36,21 +36,21 @@
 ///
 
 
-#ifndef OPENVDB_TOOLS_POINT_ATTRIBUTE_HAS_BEEN_INCLUDED
-#define OPENVDB_TOOLS_POINT_ATTRIBUTE_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_POINTS_POINT_ATTRIBUTE_HAS_BEEN_INCLUDED
+#define OPENVDB_POINTS_POINT_ATTRIBUTE_HAS_BEEN_INCLUDED
 
 #include <openvdb/openvdb.h>
 
-#include <openvdb_points/tools/AttributeArrayString.h>
-#include <openvdb_points/tools/AttributeSet.h>
-#include <openvdb_points/tools/AttributeGroup.h>
-#include <openvdb_points/tools/PointDataGrid.h>
+#include <openvdb/points/AttributeArrayString.h>
+#include <openvdb/points/AttributeSet.h>
+#include <openvdb/points/AttributeGroup.h>
+#include <openvdb/points/PointDataGrid.h>
 
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
-namespace tools {
+namespace points {
 
 namespace point_attribute_internal {
 
@@ -798,14 +798,14 @@ inline void bloscCompressAttribute( PointDataTree& tree,
 ////////////////////////////////////////
 
 
-} // namespace tools
+} // namespace points
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
 
-#endif // OPENVDB_TOOLS_POINT_ATTRIBUTE_HAS_BEEN_INCLUDED
+#endif // OPENVDB_POINTS_POINT_ATTRIBUTE_HAS_BEEN_INCLUDED
 
 
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

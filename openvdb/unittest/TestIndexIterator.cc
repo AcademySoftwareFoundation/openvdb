@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -8,8 +8,8 @@
 // Redistributions of source code must retain the above copyright
 // and license notice and the following restrictions and disclaimer.
 //
-// *     Neither the name of Double Negative Visual Effects nor the names
-// of its contributors may be used to endorse or promote products derived
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
 // from this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
@@ -30,7 +30,7 @@
 
 
 #include <cppunit/extensions/HelperMacros.h>
-#include <openvdb_points/tools/IndexIterator.h>
+#include <openvdb/points/IndexIterator.h>
 
 #include <openvdb/Types.h>
 #include <openvdb/tree/LeafNode.h>
@@ -41,7 +41,7 @@
 #include <iomanip>//for setprecision
 
 using namespace openvdb;
-using namespace openvdb::tools;
+using namespace openvdb::points;
 
 class TestIndexIterator: public CppUnit::TestCase
 {
@@ -119,7 +119,6 @@ private:
 void
 TestIndexIterator::testValueIndexIterator()
 {
-    using namespace openvdb;
     using namespace openvdb::tree;
 
     using LeafNode      = LeafNode<unsigned, 1>;
@@ -300,9 +299,6 @@ struct ConstantIter
 void
 TestIndexIterator::testFilterIndexIterator()
 {
-    using namespace openvdb;
-    using namespace openvdb::tools;
-
     { // index iterator with even filter
         EvenIndexFilter filter;
         ValueVoxelCIter indexIter(0, 5);
@@ -341,10 +337,8 @@ TestIndexIterator::testFilterIndexIterator()
 void
 TestIndexIterator::testProfile()
 {
-    using namespace openvdb;
     using namespace openvdb::util;
     using namespace openvdb::math;
-    using namespace openvdb::tools;
     using namespace openvdb::tree;
 
 #ifdef PROFILE
@@ -412,6 +406,6 @@ TestIndexIterator::testProfile()
     }
 }
 
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

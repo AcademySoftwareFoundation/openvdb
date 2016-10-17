@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -8,8 +8,8 @@
 // Redistributions of source code must retain the above copyright
 // and license notice and the following restrictions and disclaimer.
 //
-// *     Neither the name of Double Negative Visual Effects nor the names
-// of its contributors may be used to endorse or promote products derived
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
 // from this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
@@ -35,15 +35,16 @@
 /// @brief Converts points to OpenVDB points.
 
 
-#include <openvdb_points/openvdb.h>
-#include <openvdb_points/tools/AttributeArrayString.h>
-#include <openvdb_points/tools/PointDataGrid.h>
-#include <openvdb_points/tools/PointAttribute.h>
-#include <openvdb_points/tools/PointConversion.h>
-#include <openvdb_points/tools/PointGroup.h>
+#include <openvdb/openvdb.h>
+#include <openvdb/points/AttributeArrayString.h>
+#include <openvdb/points/PointDataGrid.h>
+#include <openvdb/points/PointAttribute.h>
+#include <openvdb/points/PointConversion.h>
+#include <openvdb/points/PointGroup.h>
 
 #include "Utils.h"
 #include "SOP_NodeVDBPoints.h"
+#include "PointUtils.h"
 
 #include <houdini_utils/geometry.h>
 #include <houdini_utils/ParmFactory.h>
@@ -66,7 +67,7 @@
 #include <SYS/SYS_Types.h> // for int32, float32, etc
 
 using namespace openvdb;
-using namespace openvdb::tools;
+using namespace openvdb::points;
 using namespace openvdb::math;
 
 namespace openvdb_houdini {
@@ -130,7 +131,6 @@ namespace openvdb_houdini {
 }
 
 namespace hvdb = openvdb_houdini;
-namespace hvdbp = openvdb_points_houdini;
 namespace hutil = houdini_utils;
 
 enum COMPRESSION_TYPE
@@ -189,13 +189,13 @@ attributeTupleSize(const GA_Attribute* const attribute)
 
 template <typename ValueType, typename CodecType = NullCodec>
 void
-convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree, const openvdb::Name& name,
+convertAttributeFromHoudini(PointDataTree& tree, const tools::PointIndexTree& indexTree, const openvdb::Name& name,
                             const GA_Attribute* const attribute, const GA_Defaults& defaults, const Index stride = 1)
 {
     static_assert(!std::is_base_of<AttributeArray, ValueType>::value, "ValueType must not be derived from AttributeArray");
     static_assert(!std::is_same<ValueType, openvdb::Name>::value, "ValueType must not be openvdb::Name/std::string");
 
-    using HoudiniAttribute = hvdbp::HoudiniReadAttribute<ValueType>;
+    using HoudiniAttribute = hvdb::HoudiniReadAttribute<ValueType>;
 
     ValueType value = hvdb::evalAttrDefault<ValueType>(defaults, 0);
 
@@ -208,14 +208,14 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
     appendAttribute<ValueType, CodecType>(tree, name, zeroVal<ValueType>(), stride, /*constantstride=*/true, defaultValue);
 
     HoudiniAttribute houdiniAttribute(*attribute);
-    populateAttribute<PointDataTree, PointIndexTree, HoudiniAttribute>(tree, indexTree, name, houdiniAttribute, stride);
+    populateAttribute<PointDataTree, tools::PointIndexTree, HoudiniAttribute>(tree, indexTree, name, houdiniAttribute, stride);
 }
 
 void
-convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree,
+convertAttributeFromHoudini(PointDataTree& tree, const tools::PointIndexTree& indexTree,
                             const openvdb::Name& name, const GA_Attribute* const attribute, const int compression = 0)
 {
-    using HoudiniStringAttribute = hvdbp::HoudiniReadAttribute<openvdb::Name>;
+    using HoudiniStringAttribute = hvdb::HoudiniReadAttribute<openvdb::Name>;
 
     if (!attribute) {
         std::stringstream ss; ss << "Invalid attribute - " << attribute->getName();
@@ -237,7 +237,7 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
     if (storage == GA_STORE_STRING) {
         appendAttribute<Name>(tree, name);
         HoudiniStringAttribute houdiniAttribute(*attribute);
-        populateAttribute<PointDataTree, PointIndexTree, HoudiniStringAttribute>(tree, indexTree, name, houdiniAttribute);
+        populateAttribute<PointDataTree, tools::PointIndexTree, HoudiniStringAttribute>(tree, indexTree, name, houdiniAttribute);
         return;
     }
 
@@ -386,7 +386,7 @@ PointDataGrid::Ptr
 createPointDataGrid(const GU_Detail& ptGeo, const int compression,
                     const AttributeInfoMap& attributes, const openvdb::math::Transform& transform)
 {
-    using HoudiniPositionAttribute = hvdbp::HoudiniReadAttribute<openvdb::Vec3d>;
+    using HoudiniPositionAttribute = hvdb::HoudiniReadAttribute<openvdb::Vec3d>;
 
     // store point group information
 
@@ -396,8 +396,8 @@ createPointDataGrid(const GU_Detail& ptGeo, const int compression,
 
     const GA_Attribute& positionAttribute = *ptGeo.getP();
 
-    hvdbp::OffsetListPtr offsets;
-    hvdbp::OffsetPairListPtr offsetPairs;
+    hvdb::OffsetListPtr offsets;
+    hvdb::OffsetPairListPtr offsetPairs;
 
     size_t vertexCount = 0;
 
@@ -410,17 +410,17 @@ createPointDataGrid(const GU_Detail& ptGeo, const int compression,
 
         if (vertexCount == 0)  continue;
 
-        if (!offsets)   offsets.reset(new hvdbp::OffsetList);
+        if (!offsets)   offsets.reset(new hvdb::OffsetList);
 
         GA_Offset firstOffset = primitive->getPointOffset(0);
         offsets->push_back(firstOffset);
 
         if (vertexCount > 1) {
-            if (!offsetPairs)   offsetPairs.reset(new hvdbp::OffsetPairList);
+            if (!offsetPairs)   offsetPairs.reset(new hvdb::OffsetPairList);
 
             for (size_t i = 1; i < vertexCount; i++) {
                 GA_Offset offset = primitive->getPointOffset(i);
-                offsetPairs->push_back(hvdbp::OffsetPair(firstOffset, offset));
+                offsetPairs->push_back(hvdb::OffsetPair(firstOffset, offset));
             }
         }
     }
@@ -429,7 +429,7 @@ createPointDataGrid(const GU_Detail& ptGeo, const int compression,
 
     // Create PointIndexGrid used for consistent index ordering in all attribute conversion
 
-    PointIndexGrid::Ptr pointIndexGrid = createPointIndexGrid<PointIndexGrid>(points, transform);
+    tools::PointIndexGrid::Ptr pointIndexGrid = tools::createPointIndexGrid<tools::PointIndexGrid>(points, transform);
 
     // Create PointDataGrid using position attribute
 
@@ -445,7 +445,7 @@ createPointDataGrid(const GU_Detail& ptGeo, const int compression,
         pointDataGrid = createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid, points, transform);
     }
 
-    PointIndexTree& indexTree = pointIndexGrid->tree();
+    tools::PointIndexTree& indexTree = pointIndexGrid->tree();
     PointDataTree& tree = pointDataGrid->tree();
     PointDataTree::LeafIter leafIter = tree.beginLeaf();
 
@@ -550,7 +550,7 @@ template<typename ValueType>
 Metadata::Ptr
 createTypedMetadataFromAttribute(const GA_Attribute* const attribute, const uint32_t component = 0)
 {
-    using HoudiniAttribute = hvdbp::HoudiniReadAttribute<ValueType>;
+    using HoudiniAttribute = hvdb::HoudiniReadAttribute<ValueType>;
 
     ValueType value;
     HoudiniAttribute::get(*attribute, value, /*offset*/0, component);
@@ -562,7 +562,7 @@ void
 populateHoudiniDetailAttribute(GA_RWAttributeRef& attrib, const openvdb::MetaMap& metaMap,
                                const Name& key, const int index)
 {
-    using WriteHandleType = typename hvdbp::GAHandleTraits<ValueType>::RW;
+    using WriteHandleType = typename hvdb::GAHandleTraits<ValueType>::RW;
     using TypedMetadataT = TypedMetadata<ValueType>;
 
     typename TypedMetadataT::ConstPtr typedMetadata = metaMap.getMetadata<TypedMetadataT>(key);
@@ -570,7 +570,7 @@ populateHoudiniDetailAttribute(GA_RWAttributeRef& attrib, const openvdb::MetaMap
 
     const ValueType& value = typedMetadata->value();
     WriteHandleType handle(attrib.getAttribute());
-    hvdbp::writeAttributeValue<WriteHandleType, ValueType>(handle, GA_Offset(0), index, value);
+    hvdb::writeAttributeValue<WriteHandleType, ValueType>(handle, GA_Offset(0), index, value);
 }
 
 void
@@ -650,7 +650,7 @@ convertGlobalMetadataToHoudini(GU_Detail& detail, const openvdb::MetaMap& metaMa
 
         if (attribute.isInvalid())
         {
-            const GA_Storage storage = hvdbp::gaStorageFromAttrString(type);
+            const GA_Storage storage = hvdb::gaStorageFromAttrString(type);
 
             if (storage == GA_STORE_INVALID) {
                 throw std::runtime_error("Invalid attribute storage type \"" + name + "\".");
@@ -808,7 +808,7 @@ const PRM_ChoiceList PrimAttrMenu(
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    points::initialize();
+    openvdb::initialize();
 
     if (table == nullptr) return;
 
@@ -1095,7 +1095,7 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
 
             std::vector<std::string> includeGroups;
             std::vector<std::string> excludeGroups;
-            openvdb::tools::AttributeSet::Descriptor::parseNames(includeGroups, excludeGroups, pointsGroup);
+            openvdb::points::AttributeSet::Descriptor::parseNames(includeGroups, excludeGroups, pointsGroup);
 
             // passing an empty vector of attribute names implies that all attributes should be converted
             const std::vector<std::string> emptyNameVector;
@@ -1112,7 +1112,7 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
 
                 // perform conversion
 
-                hvdbp::convertPointDataGridToHoudini(geo, grid, emptyNameVector, includeGroups, excludeGroups);
+                hvdb::convertPointDataGridToHoudini(geo, grid, emptyNameVector, includeGroups, excludeGroups);
 
                 const MetaMap& metaMap = grid;
                 std::vector<std::string> warnings;
@@ -1169,12 +1169,12 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
 
         if (transformMode == TRANSFORM_TARGET_POINTS)
         {
-            using HoudiniPositionAttribute = hvdbp::HoudiniReadAttribute<openvdb::Vec3R>;
+            using HoudiniPositionAttribute = hvdb::HoudiniReadAttribute<openvdb::Vec3R>;
 
             const int pointsPerVoxel(evalInt("pointspervoxel", 0, time));
             HoudiniPositionAttribute positions(*(ptGeo->getP()));
 
-            const float voxelSize = openvdb::tools::computeVoxelSize<HoudiniPositionAttribute, hvdb::Interrupter>(
+            const float voxelSize = openvdb::points::computeVoxelSize<HoudiniPositionAttribute, hvdb::Interrupter>(
                     positions, pointsPerVoxel, matrix, /*rounding*/ 5, &mBoss);
 
             matrix.preScale(Vec3d(voxelSize) / math::getScale(matrix));
@@ -1461,6 +1461,6 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
 
 ////////////////////////////////////////
 
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

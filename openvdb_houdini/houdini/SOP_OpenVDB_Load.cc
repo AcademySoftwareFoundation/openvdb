@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -8,8 +8,8 @@
 // Redistributions of source code must retain the above copyright
 // and license notice and the following restrictions and disclaimer.
 //
-// *     Neither the name of Double Negative Visual Effects nor the names
-// of its contributors may be used to endorse or promote products derived
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
 // from this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
@@ -35,9 +35,9 @@
 /// @brief Explicitly loads OpenVDB Leaf Nodes that are delay-loaded.
 
 
-#include <openvdb_points/openvdb.h>
-#include <openvdb_points/tools/PointDataGrid.h>
-#include <openvdb_points/tools/Load.h>
+#include <openvdb/openvdb.h>
+#include <openvdb/points/PointDataGrid.h>
+#include <openvdb/tools/Load.h>
 
 #include <openvdb/tools/LevelSetUtil.h> // sdfInteriorMask
 
@@ -48,7 +48,7 @@
 #include <houdini_utils/ParmFactory.h>
 
 using namespace openvdb;
-using namespace openvdb::tools;
+using namespace openvdb::points;
 using namespace openvdb::math;
 
 namespace hvdb = openvdb_houdini;
@@ -85,7 +85,7 @@ private:
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    points::initialize();
+    openvdb::initialize();
 
     if (table == nullptr) return;
 
@@ -217,8 +217,7 @@ struct LoadLeafNodesOp
 OP_ERROR
 SOP_OpenVDB_Load::cookMySop(OP_Context& context)
 {
-    using PointDataGrid = tools::PointDataGrid;
-
+    using PointDataGrid = points::PointDataGrid;
     try {
         hutil::ScopedInputLock lock(*this, context);
         // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
@@ -346,6 +345,6 @@ SOP_OpenVDB_Load::cookMySop(OP_Context& context)
 
 ////////////////////////////////////////
 
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

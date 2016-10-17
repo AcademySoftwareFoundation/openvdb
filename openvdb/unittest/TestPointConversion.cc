@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -8,8 +8,8 @@
 // Redistributions of source code must retain the above copyright
 // and license notice and the following restrictions and disclaimer.
 //
-// *     Neither the name of Double Negative Visual Effects nor the names
-// of its contributors may be used to endorse or promote products derived
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
 // from this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
@@ -31,21 +31,20 @@
 
 #include <cppunit/extensions/HelperMacros.h>
 
-#include <openvdb_points/tools/PointDataGrid.h>
-#include <openvdb_points/tools/PointAttribute.h>
-#include <openvdb_points/tools/PointConversion.h>
-#include <openvdb_points/tools/PointCount.h>
-#include <openvdb_points/tools/PointGroup.h>
-#include <openvdb_points/openvdb.h>
+#include <openvdb/points/PointDataGrid.h>
+#include <openvdb/points/PointAttribute.h>
+#include <openvdb/points/PointConversion.h>
+#include <openvdb/points/PointCount.h>
+#include <openvdb/points/PointGroup.h>
 
 using namespace openvdb;
-using namespace openvdb::tools;
+using namespace openvdb::points;
 
 class TestPointConversion: public CppUnit::TestCase
 {
 public:
-    virtual void setUp() { openvdb::initialize(); openvdb::points::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); openvdb::points::uninitialize(); }
+    virtual void setUp() { openvdb::initialize(); }
+    virtual void tearDown() { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestPointConversion);
     CPPUNIT_TEST(testPointConversion);
@@ -264,21 +263,21 @@ TestPointConversion::testPointConversion()
     const float voxelSize = 1.0f;
     openvdb::math::Transform::Ptr transform(openvdb::math::Transform::createLinearTransform(voxelSize));
 
-    PointIndexGrid::Ptr pointIndexGrid = createPointIndexGrid<PointIndexGrid>(position, *transform);
+    tools::PointIndexGrid::Ptr pointIndexGrid = tools::createPointIndexGrid<tools::PointIndexGrid>(position, *transform);
     PointDataGrid::Ptr pointDataGrid = createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid, position, *transform);
 
-    PointIndexTree& indexTree = pointIndexGrid->tree();
+    tools::PointIndexTree& indexTree = pointIndexGrid->tree();
     PointDataTree& tree = pointDataGrid->tree();
 
     // add id and populate
 
     appendAttribute<int>(tree, "id");
-    populateAttribute<PointDataTree, PointIndexTree, AttributeWrapper<int>>(tree, indexTree, "id", id);
+    populateAttribute<PointDataTree, tools::PointIndexTree, AttributeWrapper<int>>(tree, indexTree, "id", id);
 
     // add uniform and populate
 
     appendAttribute<float>(tree, "uniform");
-    populateAttribute<PointDataTree, PointIndexTree, AttributeWrapper<float>>(tree, indexTree, "uniform", uniform);
+    populateAttribute<PointDataTree, tools::PointIndexTree, AttributeWrapper<float>>(tree, indexTree, "uniform", uniform);
 
     // add string and populate
 
@@ -298,7 +297,7 @@ TestPointConversion::testPointConversion()
     inserter.insert("testA");
     inserter.insert("testB");
 
-    populateAttribute<PointDataTree, PointIndexTree, AttributeWrapper<openvdb::Name>>(tree, indexTree, "string", string);
+    populateAttribute<PointDataTree, tools::PointIndexTree, AttributeWrapper<openvdb::Name>>(tree, indexTree, "string", string);
 
     // add group and set membership
 
@@ -502,21 +501,21 @@ TestPointConversion::testStride()
     const float voxelSize = 1.0f;
     openvdb::math::Transform::Ptr transform(openvdb::math::Transform::createLinearTransform(voxelSize));
 
-    PointIndexGrid::Ptr pointIndexGrid = createPointIndexGrid<PointIndexGrid>(position, *transform);
+    tools::PointIndexGrid::Ptr pointIndexGrid = tools::createPointIndexGrid<tools::PointIndexGrid>(position, *transform);
     PointDataGrid::Ptr pointDataGrid = createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid, position, *transform);
 
-    PointIndexTree& indexTree = pointIndexGrid->tree();
+    tools::PointIndexTree& indexTree = pointIndexGrid->tree();
     PointDataTree& tree = pointDataGrid->tree();
 
     // add id and populate
 
     appendAttribute<int>(tree, "id");
-    populateAttribute<PointDataTree, PointIndexTree, AttributeWrapper<int>>(tree, indexTree, "id", id);
+    populateAttribute<PointDataTree, tools::PointIndexTree, AttributeWrapper<int>>(tree, indexTree, "id", id);
 
     // add xyz and populate
 
     appendAttribute<int>(tree, "xyz", 0, /*stride=*/3);
-    populateAttribute<PointDataTree, PointIndexTree, AttributeWrapper<int>>(tree, indexTree, "xyz", xyz, /*stride=*/3);
+    populateAttribute<PointDataTree, tools::PointIndexTree, AttributeWrapper<int>>(tree, indexTree, "xyz", xyz, /*stride=*/3);
 
     // create accessor and iterator for Point Data Tree
 
@@ -592,7 +591,7 @@ TestPointConversion::testComputeVoxelSize()
         static PointDataGrid::Ptr genPointsGrid(const float voxelSize, const AttributeWrapper<Vec3f>& positions)
         {
             math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
-            PointIndexGrid::Ptr pointIndexGrid = createPointIndexGrid<PointIndexGrid>(positions, *transform);
+            tools::PointIndexGrid::Ptr pointIndexGrid = tools::createPointIndexGrid<tools::PointIndexGrid>(positions, *transform);
             return createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid, positions, *transform);
         }
     };
@@ -977,6 +976,6 @@ TestPointConversion::testComputeVoxelSize()
     }
 }
 
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

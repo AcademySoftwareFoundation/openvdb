@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -8,8 +8,8 @@
 // Redistributions of source code must retain the above copyright
 // and license notice and the following restrictions and disclaimer.
 //
-// *     Neither the name of Double Negative Visual Effects nor the names
-// of its contributors may be used to endorse or promote products derived
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
 // from this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
@@ -30,21 +30,20 @@
 
 
 #include <cppunit/extensions/HelperMacros.h>
-#include <openvdb_points/tools/AttributeArrayString.h>
+#include <openvdb/points/AttributeArrayString.h>
 
-#include <openvdb_points/openvdb.h>
 #include <openvdb/openvdb.h>
 
 #include <iostream>
 
 using namespace openvdb;
-using namespace openvdb::tools;
+using namespace openvdb::points;
 
 class TestAttributeArrayString: public CppUnit::TestCase
 {
 public:
-    virtual void setUp() { openvdb::initialize(); openvdb::points::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); openvdb::points::uninitialize(); }
+    virtual void setUp() { openvdb::initialize(); }
+    virtual void tearDown() { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestAttributeArrayString);
     CPPUNIT_TEST(testStringMetaInserter);
@@ -88,9 +87,6 @@ matchingNamePairs(const openvdb::NamePair& lhs,
 void
 TestAttributeArrayString::testStringMetaInserter()
 {
-    using namespace openvdb;
-    using namespace openvdb::tools;
-
     MetaMap metadata;
 
     StringMetaInserter inserter(metadata);
@@ -191,9 +187,6 @@ TestAttributeArrayString::testStringMetaInserter()
 void
 TestAttributeArrayString::testStringAttribute()
 {
-    using namespace openvdb;
-    using namespace openvdb::tools;
-
     { // Typed class API
 
         const Index count = 50;
@@ -265,9 +258,6 @@ TestAttributeArrayString::testStringAttribute()
 void
 TestAttributeArrayString::testStringAttributeHandle()
 {
-    using namespace openvdb;
-    using namespace openvdb::tools;
-
     MetaMap metadata;
 
     StringAttributeArray attr(4);
@@ -352,9 +342,6 @@ TestAttributeArrayString::testStringAttributeHandle()
 void
 TestAttributeArrayString::testStringAttributeWriteHandle()
 {
-    using namespace openvdb;
-    using namespace openvdb::tools;
-
     MetaMap metadata;
 
     StringAttributeArray attr(4);
@@ -449,6 +436,6 @@ TestAttributeArrayString::testStringAttributeWriteHandle()
 }
 
 
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

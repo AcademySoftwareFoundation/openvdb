@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -8,8 +8,8 @@
 // Redistributions of source code must retain the above copyright
 // and license notice and the following restrictions and disclaimer.
 //
-// *     Neither the name of Double Negative Visual Effects nor the names
-// of its contributors may be used to endorse or promote products derived
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
 // from this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
@@ -35,12 +35,12 @@
 /// @brief Add and remove point groups.
 
 
-#include <openvdb_points/openvdb.h>
-#include <openvdb_points/tools/PointDataGrid.h>
-#include <openvdb_points/tools/PointGroup.h>
+#include <openvdb/openvdb.h>
+#include <openvdb/points/PointDataGrid.h>
+#include <openvdb/points/PointGroup.h>
 
 #include "SOP_NodeVDBPoints.h"
-#include "Utils.h"
+#include "PointUtils.h"
 
 #include <openvdb_houdini/Utils.h>
 #include <houdini_utils/geometry.h>
@@ -49,11 +49,10 @@
 #include <sstream>
 
 using namespace openvdb;
-using namespace openvdb::tools;
+using namespace openvdb::points;
 using namespace openvdb::math;
 
 namespace hvdb = openvdb_houdini;
-namespace hvdbp = openvdb_points_houdini;
 namespace hutil = houdini_utils;
 
 
@@ -80,7 +79,7 @@ struct GroupParms {
     float                                       mPercent            = 0.0f;
     long                                        mCount              = 0L;
     std::string                                 mHashAttribute      = "";
-    size_t                                      mHashAttributeIndex = openvdb::tools::AttributeSet::INVALID_POS;
+    size_t                                      mHashAttributeIndex = openvdb::points::AttributeSet::INVALID_POS;
     // bbox parms
     openvdb::BBoxd                              mBBox;
     // level set parms
@@ -112,7 +111,7 @@ public:
     bool updateParmsFlags() override;
 
     OP_ERROR evalGroupParms(OP_Context&, GroupParms&);
-    OP_ERROR evalGridGroupParms(const openvdb::tools::PointDataGrid& grid, OP_Context& context, GroupParms& parms);
+    OP_ERROR evalGridGroupParms(const PointDataGrid& grid, OP_Context& context, GroupParms& parms);
 
     void performGroupFiltering(PointDataGrid& outputGrid, const GroupParms& parms);
     void setViewportMetadata(PointDataGrid& outputGrid, const GroupParms& parms);
@@ -136,7 +135,7 @@ static PRM_Default fiveThousandDefault(5000);
 void
 newSopOperator(OP_OperatorTable* table)
 {
-    points::initialize();
+    openvdb::initialize();
 
     if (table == nullptr) return;
 
@@ -364,7 +363,7 @@ SOP_OpenVDB_Points_Group::SOP_OpenVDB_Points_Group(OP_Network* net,
 OP_ERROR
 SOP_OpenVDB_Points_Group::cookMySop(OP_Context& context)
 {
-    using PointDataGrid = openvdb::tools::PointDataGrid;
+    using PointDataGrid = openvdb::points::PointDataGrid;
 
     try {
         hutil::ScopedInputLock lock(*this, context);
@@ -472,7 +471,7 @@ SOP_OpenVDB_Points_Group::evalGroupParms(OP_Context& context, GroupParms& parms)
     evalString(pointsGroupStr, "vdbpointsgroup", 0, time);
     const std::string pointsGroup = pointsGroupStr.toStdString();
 
-    openvdb::tools::AttributeSet::Descriptor::parseNames(parms.mIncludeGroups, parms.mExcludeGroups, pointsGroup);
+    AttributeSet::Descriptor::parseNames(parms.mIncludeGroups, parms.mExcludeGroups, pointsGroup);
 
     if (parms.mIncludeGroups.size() > 0 || parms.mExcludeGroups.size() > 0) {
         parms.mOpGroup = true;
@@ -818,19 +817,19 @@ SOP_OpenVDB_Points_Group::performGroupFiltering(PointDataGrid& outputGrid, const
 void
 SOP_OpenVDB_Points_Group::setViewportMetadata(PointDataGrid& outputGrid, const GroupParms& parms)
 {
-    outputGrid.insertMeta(openvdb::META_GROUP_VIEWPORT, StringMetadata(parms.mViewportGroupName));
+    outputGrid.insertMeta(openvdb_houdini::META_GROUP_VIEWPORT, StringMetadata(parms.mViewportGroupName));
 }
 
 
 void
 SOP_OpenVDB_Points_Group::removeViewportMetadata(PointDataGrid& outputGrid)
 {
-    outputGrid.removeMeta(openvdb::META_GROUP_VIEWPORT);
+    outputGrid.removeMeta(openvdb_houdini::META_GROUP_VIEWPORT);
 }
 
 
 ////////////////////////////////////////
 
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

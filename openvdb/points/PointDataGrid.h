@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -8,8 +8,8 @@
 // Redistributions of source code must retain the above copyright
 // and license notice and the following restrictions and disclaimer.
 //
-// *     Neither the name of Double Negative Visual Effects nor the names
-// of its contributors may be used to endorse or promote products derived
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
 // from this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
@@ -38,8 +38,8 @@
 ///
 
 
-#ifndef OPENVDB_TOOLS_POINT_DATA_GRID_HAS_BEEN_INCLUDED
-#define OPENVDB_TOOLS_POINT_DATA_GRID_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_POINTS_POINT_DATA_GRID_HAS_BEEN_INCLUDED
+#define OPENVDB_POINTS_POINT_DATA_GRID_HAS_BEEN_INCLUDED
 
 #include <openvdb/Grid.h>
 #include <openvdb/tree/Tree.h>
@@ -47,8 +47,8 @@
 
 #include <openvdb/tools/PointIndexGrid.h>
 
-#include <openvdb_points/tools/AttributeSet.h>
-#include <openvdb_points/tools/AttributeGroup.h>
+#include <openvdb/points/AttributeSet.h>
+#include <openvdb/points/AttributeGroup.h>
 
 #include <type_traits> // std::is_same
 #include <utility> // std::pair, std::make_pair
@@ -201,7 +201,7 @@ namespace tree {
 ////////////////////////////////////////
 
 
-namespace tools {
+namespace points {
 
 
 // forward declaration
@@ -1529,7 +1529,7 @@ setStreamingMode(PointDataTreeT& tree, bool on)
 }
 
 
-} // namespace tools
+} // namespace points
 
 ////////////////////////////////////////
 
@@ -1539,16 +1539,16 @@ namespace tree
 /// Helper metafunction used to implement LeafNode::SameConfiguration
 /// (which, as an inner class, can't be independently specialized)
 template<Index Dim1, typename T2>
-struct SameLeafConfig<Dim1, tools::PointDataLeafNode<T2, Dim1>> { static const bool value = true; };
+struct SameLeafConfig<Dim1, points::PointDataLeafNode<T2, Dim1>> { static const bool value = true; };
 
 } // namespace tree
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
 
-#endif // OPENVDB_TOOLS_POINT_DATA_GRID_HAS_BEEN_INCLUDED
+#endif // OPENVDB_POINTS_POINT_DATA_GRID_HAS_BEEN_INCLUDED
 
 
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -8,8 +8,8 @@
 // Redistributions of source code must retain the above copyright
 // and license notice and the following restrictions and disclaimer.
 //
-// *     Neither the name of Double Negative Visual Effects nor the names
-// of its contributors may be used to endorse or promote products derived
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
 // from this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
@@ -37,18 +37,18 @@
 ///
 
 
-#ifndef OPENVDB_TOOLS_ATTRIBUTE_ARRAY_HAS_BEEN_INCLUDED
-#define OPENVDB_TOOLS_ATTRIBUTE_ARRAY_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_POINTS_ATTRIBUTE_ARRAY_HAS_BEEN_INCLUDED
+#define OPENVDB_POINTS_ATTRIBUTE_ARRAY_HAS_BEEN_INCLUDED
 
-#include <openvdb_points/Types.h>
+#include <openvdb/Types.h>
 #include <openvdb/math/QuantizedUnitVec.h>
 #include <openvdb/util/Name.h>
 #include <openvdb/util/logging.h>
 #include <openvdb/io/io.h> // MappedFile
 #include <openvdb/io/Compression.h> // COMPRESS_BLOSC
 
-#include <openvdb_points/tools/IndexIterator.h>
-#include <openvdb_points/tools/StreamCompression.h>
+#include <openvdb/points/IndexIterator.h>
+#include <openvdb/points/StreamCompression.h>
 
 #include <tbb/spin_mutex.h>
 #include <tbb/atomic.h>
@@ -67,7 +67,7 @@ namespace OPENVDB_VERSION_NAME {
 
 using NamePair = std::pair<Name, Name>;
 
-namespace tools {
+namespace points {
 
 
 ////////////////////////////////////////
@@ -2023,15 +2023,15 @@ AttributeWriteHandle<ValueType, CodecType>::set(Index index, const ValueType& va
 }
 
 
-} // namespace tools
+} // namespace points
 
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
 
-#endif // OPENVDB_TOOLS_ATTRIBUTE_ARRAY_HAS_BEEN_INCLUDED
+#endif // OPENVDB_POINTS_ATTRIBUTE_ARRAY_HAS_BEEN_INCLUDED
 
 
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

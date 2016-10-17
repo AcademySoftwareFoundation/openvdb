@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -8,8 +8,8 @@
 // Redistributions of source code must retain the above copyright
 // and license notice and the following restrictions and disclaimer.
 //
-// *     Neither the name of Double Negative Visual Effects nor the names
-// of its contributors may be used to endorse or promote products derived
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
 // from this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
@@ -38,11 +38,11 @@
 #define OPENVDB_HOUDINI_POINT_UTILS_HAS_BEEN_INCLUDED
 
 
-#include <openvdb_points/tools/AttributeArrayString.h>
 #include <openvdb/math/Vec3.h>
 #include <openvdb/Types.h>
-#include <openvdb_points/tools/PointCount.h>
-#include <openvdb_points/tools/PointConversion.h>
+#include <openvdb/points/AttributeArrayString.h>
+#include <openvdb/points/PointCount.h>
+#include <openvdb/points/PointConversion.h>
 
 #include <GA/GA_Attribute.h>
 #include <GA/GA_Handle.h>
@@ -52,7 +52,7 @@
 #include <GA/GA_Iterator.h>
 
 
-namespace openvdb_points_houdini {
+namespace openvdb_houdini {
 
 
 using OffsetList = std::vector<GA_Offset>;
@@ -61,6 +61,10 @@ using OffsetListPtr = std::shared_ptr<OffsetList>;
 using OffsetPair = std::pair<GA_Offset, GA_Offset>;
 using OffsetPairList = std::vector<OffsetPair>;
 using OffsetPairListPtr = std::shared_ptr<OffsetPairList>;
+
+// metadata name for viewport groups
+
+const std::string META_GROUP_VIEWPORT = "group_viewport";
 
 /// @brief  Converts a VDB Points grid into Houdini points and appends to a Houdini Detail
 ///
@@ -72,7 +76,7 @@ using OffsetPairListPtr = std::shared_ptr<OffsetPairList>;
 
 void
 convertPointDataGridToHoudini(GU_Detail& detail,
-                              const openvdb::tools::PointDataGrid& grid,
+                              const openvdb::points::PointDataGrid& grid,
                               const std::vector<std::string>& attributes = {},
                               const std::vector<std::string>& includeGroups = {},
                               const std::vector<std::string>& excludeGroups = {});
@@ -291,7 +295,7 @@ void getValues(fpreal64* values, const openvdb::math::Mat4<double>& value)
 
 template <typename ValueType, typename HoudiniType>
 GA_Defaults
-gaDefaultsFromDescriptorTyped(const openvdb::tools::AttributeSet::Descriptor& descriptor, const openvdb::Name& name)
+gaDefaultsFromDescriptorTyped(const openvdb::points::AttributeSet::Descriptor& descriptor, const openvdb::Name& name)
 {
     const int size = SizeTraits<ValueType>::Size;
 
@@ -304,11 +308,11 @@ gaDefaultsFromDescriptorTyped(const openvdb::tools::AttributeSet::Descriptor& de
 }
 
 inline GA_Defaults
-gaDefaultsFromDescriptor(const openvdb::tools::AttributeSet::Descriptor& descriptor, const openvdb::Name& name)
+gaDefaultsFromDescriptor(const openvdb::points::AttributeSet::Descriptor& descriptor, const openvdb::Name& name)
 {
     const size_t pos = descriptor.find(name);
 
-    if (pos == openvdb::tools::AttributeSet::INVALID_POS)   return GA_Defaults(0);
+    if (pos == openvdb::points::AttributeSet::INVALID_POS)   return GA_Defaults(0);
 
     const openvdb::Name type = descriptor.type(pos).first;
 
@@ -463,22 +467,22 @@ private:
 
 void
 convertPointDataGridToHoudini(GU_Detail& detail,
-                              const openvdb::tools::PointDataGrid& grid,
+                              const openvdb::points::PointDataGrid& grid,
                               const std::vector<std::string>& attributes,
                               const std::vector<std::string>& includeGroups,
                               const std::vector<std::string>& excludeGroups)
 {
-    using openvdb_points_houdini::HoudiniWriteAttribute;
+    using openvdb_houdini::HoudiniWriteAttribute;
 
-    const openvdb::tools::PointDataTree& tree = grid.tree();
+    const openvdb::points::PointDataTree& tree = grid.tree();
 
     auto leafIter = tree.cbeginLeaf();
     if (!leafIter) return;
 
     // position attribute is mandatory
-    const openvdb::tools::AttributeSet& attributeSet = leafIter->attributeSet();
-    const openvdb::tools::AttributeSet::Descriptor& descriptor = attributeSet.descriptor();
-    const bool hasPosition = descriptor.find("P") != openvdb::tools::AttributeSet::INVALID_POS;
+    const openvdb::points::AttributeSet& attributeSet = leafIter->attributeSet();
+    const openvdb::points::AttributeSet::Descriptor& descriptor = attributeSet.descriptor();
+    const bool hasPosition = descriptor.find("P") != openvdb::points::AttributeSet::INVALID_POS;
     if (!hasPosition)   return;
 
     // sort for binary search
@@ -496,7 +500,7 @@ convertPointDataGridToHoudini(GU_Detail& detail,
     convertPointDataGridPosition(positionAttribute, grid, pointOffsets, startOffset, includeGroups, excludeGroups);
 
     // add other point attributes to the hdk detail
-    const openvdb::tools::AttributeSet::Descriptor::NameToPosMap& nameToPosMap = descriptor.map();
+    const openvdb::points::AttributeSet::Descriptor::NameToPosMap& nameToPosMap = descriptor.map();
 
     for (const auto& namePos : nameToPosMap) {
 
@@ -514,16 +518,16 @@ convertPointDataGridToHoudini(GU_Detail& detail,
 
         const unsigned index = namePos.second;
 
-        const openvdb::tools::AttributeArray& array = leafIter->constAttributeArray(index);
+        const openvdb::points::AttributeArray& array = leafIter->constAttributeArray(index);
         const unsigned stride = array.stride();
 
         const openvdb::NamePair& type = descriptor.type(index);
-        const openvdb::Name valueType(openvdb::tools::isString(array) ? "string" : type.first);
+        const openvdb::Name valueType(openvdb::points::isString(array) ? "string" : type.first);
 
         // create the attribute if it doesn't already exist in the detail
         if (attributeRef.isInvalid()) {
 
-            const bool truncate(type.second == openvdb::tools::TruncateCodec::name());
+            const bool truncate(type.second == openvdb::points::TruncateCodec::name());
 
             GA_Storage storage(gaStorageFromAttrString(valueType));
             if (storage == GA_STORE_INVALID) continue;
@@ -629,7 +633,7 @@ convertPointDataGridToHoudini(GU_Detail& detail,
     }
 
     // add point groups to the hdk detail
-    const openvdb::tools::AttributeSet::Descriptor::NameToPosMap& groupMap = descriptor.groupMap();
+    const openvdb::points::AttributeSet::Descriptor::NameToPosMap& groupMap = descriptor.groupMap();
 
     for (const auto& namePos : groupMap) {
         const openvdb::Name& name = namePos.first;
@@ -639,17 +643,17 @@ convertPointDataGridToHoudini(GU_Detail& detail,
         GA_PointGroup* pointGroup = detail.findPointGroup(name.c_str());
         if (!pointGroup) pointGroup = detail.newPointGroup(name.c_str());
 
-        const openvdb::tools::AttributeSet::Descriptor::GroupIndex index = attributeSet.groupIndex(name);
+        const openvdb::points::AttributeSet::Descriptor::GroupIndex index = attributeSet.groupIndex(name);
 
         HoudiniGroup group(*pointGroup);
         convertPointDataGridGroup(group, tree, pointOffsets, startOffset, index, includeGroups, excludeGroups);
     }
 }
 
-} // namespace openvdb_points_houdini
+} // namespace openvdb_houdini
 
 #endif // OPENVDB_HOUDINI_POINT_UTILS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -8,8 +8,8 @@
 // Redistributions of source code must retain the above copyright
 // and license notice and the following restrictions and disclaimer.
 //
-// *     Neither the name of Double Negative Visual Effects nor the names
-// of its contributors may be used to endorse or promote products derived
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
 // from this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
@@ -40,12 +40,13 @@
 
 #include <openvdb/openvdb.h>
 #include <openvdb/Platform.h>
-#include <openvdb_points/tools/AttributeArrayString.h>
-#include <openvdb_points/tools/PointDataGrid.h>
-#include <openvdb_points/tools/PointCount.h>
+#include <openvdb/points/AttributeArrayString.h>
+#include <openvdb/points/PointDataGrid.h>
+#include <openvdb/points/PointCount.h>
 
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb_houdini/Utils.h>
+#include <openvdb_houdini/PointUtils.h>
 
 #include <houdini_utils/ParmFactory.h>
 
@@ -88,7 +89,7 @@ public:
 #if (OPENVDB_LIBRARY_VERSION_NUMBER < 0x03020000) // earlier than OpenVDB 3.2
         // do nothing
 #else
-        node_info_text::registerGridSpecificInfoText<openvdb::tools::PointDataGrid>(&pointDataGridSpecificInfoText);
+        node_info_text::registerGridSpecificInfoText<openvdb::points::PointDataGrid>(&pointDataGridSpecificInfoText);
 #endif // OPENVDB_LIBRARY_VERSION_NUMBER
     }
 
@@ -126,7 +127,7 @@ public:
             const openvdb::GridBase& grid = it->getGrid();
 
             // ignore openvdb point grids
-            if (dynamic_cast<const openvdb::tools::PointDataGrid*>(&grid))  continue;
+            if (dynamic_cast<const openvdb::points::PointDataGrid*>(&grid))  continue;
 
             openvdb::Coord dim = grid.evalActiveVoxelDim();
             const UT_String gridName = it.getPrimitiveName();
@@ -166,7 +167,7 @@ public:
             const openvdb::GridBase& grid = it->getGrid();
 
             // ignore non openvdb point grids
-            if (!dynamic_cast<const openvdb::tools::PointDataGrid*>(&grid))  continue;
+            if (!dynamic_cast<const openvdb::points::PointDataGrid*>(&grid))  continue;
 
             const UT_String gridName = it.getPrimitiveName();
 
@@ -195,9 +196,9 @@ public:
     static void
     pointDataGridSpecificInfoText(std::ostream& infoStr, const openvdb::GridBase& grid)
     {
-        typedef openvdb::tools::PointDataGrid PointDataGrid;
-        typedef openvdb::tools::PointDataTree PointDataTree;
-        typedef openvdb::tools::AttributeSet AttributeSet;
+        typedef openvdb::points::PointDataGrid PointDataGrid;
+        typedef openvdb::points::PointDataTree PointDataTree;
+        typedef openvdb::points::AttributeSet AttributeSet;
 
         const PointDataGrid* pointDataGrid = dynamic_cast<const PointDataGrid*>(&grid);
 
@@ -216,7 +217,7 @@ public:
         }
 
         std::string viewportGroupName = "";
-        if (openvdb::StringMetadata::ConstPtr stringMeta = grid.getMetadata<openvdb::StringMetadata>(openvdb::META_GROUP_VIEWPORT)) {
+        if (openvdb::StringMetadata::ConstPtr stringMeta = grid.getMetadata<openvdb::StringMetadata>(openvdb_houdini::META_GROUP_VIEWPORT)) {
             viewportGroupName = stringMeta->value();
         }
 
@@ -269,7 +270,7 @@ public:
             first = true;
             for (AttributeSet::Descriptor::ConstIterator it = nameToPosMap.begin(), it_end = nameToPosMap.end();
                     it != it_end; ++it) {
-                const openvdb::tools::AttributeArray& array = iter->constAttributeArray(it->second);
+                const openvdb::points::AttributeArray& array = iter->constAttributeArray(it->second);
                 if (isGroup(array))    continue;
 
                 if (first) {
@@ -316,6 +317,6 @@ public:
 
 #endif // OPENVDB_HOUDINI_SOP_NODEVDB_POINTS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

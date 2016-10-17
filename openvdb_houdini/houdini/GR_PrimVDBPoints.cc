@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -8,8 +8,8 @@
 // Redistributions of source code must retain the above copyright
 // and license notice and the following restrictions and disclaimer.
 //
-// *     Neither the name of Double Negative Visual Effects nor the names
-// of its contributors may be used to endorse or promote products derived
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
 // from this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
@@ -41,9 +41,10 @@
 #include <openvdb/Grid.h>
 #include <openvdb/Platform.h>
 #include <openvdb/Types.h>
-#include <openvdb_points/tools/PointDataGrid.h>
-#include <openvdb_points/tools/PointCount.h>
-#include <openvdb_points/tools/PointConversion.h>
+#include <openvdb/points/PointDataGrid.h>
+#include <openvdb/points/PointCount.h>
+#include <openvdb/points/PointConversion.h>
+#include <openvdb_houdini/PointUtils.h>
 
 #if (UT_VERSION_INT < 0x0f000000) // earlier than 15.0.0
 #if defined(__APPLE__) || defined(MACOSX)
@@ -88,7 +89,7 @@ static bool renderHookRegistered = false;
 
 
 using namespace openvdb;
-using namespace openvdb::tools;
+using namespace openvdb::points;
 
 ////////////////////////////////////////
 
@@ -162,25 +163,25 @@ public:
 #endif
 
 protected:
-    void computeCentroid(const openvdb::tools::PointDataGrid& grid);
+    void computeCentroid(const openvdb::points::PointDataGrid& grid);
 
     void updatePosBuffer(  RE_Render* r,
-                        const openvdb::tools::PointDataGrid& grid,
+                        const openvdb::points::PointDataGrid& grid,
                         const RE_CacheVersion& version);
 
     void updateWireBuffer(    RE_Render* r,
-                        const openvdb::tools::PointDataGrid& grid,
+                        const openvdb::points::PointDataGrid& grid,
                         const RE_CacheVersion& version);
 
     bool updateVec3Buffer(   RE_Render* r,
-                            const openvdb::tools::PointDataGrid& grid,
+                            const openvdb::points::PointDataGrid& grid,
                             const std::string& name,
                             const RE_CacheVersion& version);
 
     bool updateVec3Buffer(   RE_Render* r, const std::string& name, const RE_CacheVersion& version);
 
     bool updateIdBuffer(    RE_Render* r,
-                            const openvdb::tools::PointDataGrid& grid,
+                            const openvdb::points::PointDataGrid& grid,
                             const std::string& name,
                             const RE_CacheVersion& version);
 
@@ -238,7 +239,7 @@ GUI_PrimVDBPointsHook::createPrimitive(
     const GT_PrimVDB* gtPrimVDB = static_cast<const GT_PrimVDB*>(gt_prim.get());
     const GEO_PrimVDB* primVDB = gtPrimVDB->getGeoPrimitive();
 
-    if (primVDB->getGrid().isType<openvdb::tools::PointDataGrid>()) {
+    if (primVDB->getGrid().isType<openvdb::points::PointDataGrid>()) {
         return new GR_PrimVDBPoints(info, cache_name, geo_prim);
     }
 
@@ -372,7 +373,7 @@ struct FillGPUBuffersPosition {
             const LeafNode* leaf = mLeafOffsets[n].first;
             const openvdb::Index64 leafOffset = mLeafOffsets[n].second;
 
-            auto handle = openvdb::tools::AttributeHandle<AttributeType>::create(
+            auto handle = openvdb::points::AttributeHandle<AttributeType>::create(
                     leaf->template constAttributeArray(mAttributeIndex));
 
             openvdb::Vec3f positionVoxelSpace;
@@ -445,7 +446,7 @@ struct FillGPUBuffersVec3 {
             const LeafNode* leaf = mLeafOffsets[n].first;
             const openvdb::Index64 leafOffset = mLeafOffsets[n].second;
 
-            auto handle = openvdb::tools::AttributeHandle<AttributeType>::create(
+            auto handle = openvdb::points::AttributeHandle<AttributeType>::create(
                     leaf->template constAttributeArray(mAttributeIndex));
 
             openvdb::Vec3f color;
@@ -506,7 +507,7 @@ struct FillGPUBuffersId {
             const LeafNode* leaf = mLeafOffsets[n].first;
             const openvdb::Index64 leafOffset = mLeafOffsets[n].second;
 
-            auto handle = openvdb::tools::AttributeHandle<AttributeType>::create(
+            auto handle = openvdb::points::AttributeHandle<AttributeType>::create(
                     leaf->template constAttributeArray(mAttributeIndex));
 
             HoudiniBufferType scalarValue;
@@ -623,7 +624,7 @@ struct FillGPUBuffersLeafBoxes
 } // namespace gr_primitive_internal
 
 void
-GR_PrimVDBPoints::computeCentroid(const openvdb::tools::PointDataGrid& grid)
+GR_PrimVDBPoints::computeCentroid(const openvdb::points::PointDataGrid& grid)
 {
     // compute the leaf bounding box in index space
 
@@ -706,7 +707,7 @@ private:
 
 void
 GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
-             const openvdb::tools::PointDataGrid& grid,
+             const openvdb::points::PointDataGrid& grid,
              const RE_CacheVersion& version)
 {
     bool gl3 = (getRenderVersion() >= GR_RENDER_GL3);
@@ -716,10 +717,10 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
         myGeo.reset(new RE_Geometry);
     myGeo->cacheBuffers(getCacheName());
 
-    using GridType = openvdb::tools::PointDataGrid;
+    using GridType = openvdb::points::PointDataGrid;
     using TreeType = GridType::TreeType;
     using LeafNode = TreeType::LeafNodeType;
-    using AttributeSet = openvdb::tools::AttributeSet;
+    using AttributeSet = openvdb::points::AttributeSet;
 
     const TreeType& tree = grid.tree();
 
@@ -732,7 +733,7 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
     // check if group viewport is in use
 
     std::string groupName = "";
-    if (openvdb::StringMetadata::ConstPtr s = grid.getMetadata<openvdb::StringMetadata>(openvdb::META_GROUP_VIEWPORT)) {
+    if (openvdb::StringMetadata::ConstPtr s = grid.getMetadata<openvdb::StringMetadata>(openvdb_houdini::META_GROUP_VIEWPORT)) {
         groupName = s->value();
     }
     const bool useGroup = !groupName.empty() && descriptor.hasGroup(groupName);
@@ -821,7 +822,7 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
 
 void
 GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
-             const openvdb::tools::PointDataGrid& grid,
+             const openvdb::points::PointDataGrid& grid,
              const RE_CacheVersion& version)
 {
     bool gl3 = (getRenderVersion() >= GR_RENDER_GL3);
@@ -831,10 +832,10 @@ GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
         myWire.reset(new RE_Geometry);
     myWire->cacheBuffers(getCacheName());
 
-    using GridType = openvdb::tools::PointDataGrid;
+    using GridType = openvdb::points::PointDataGrid;
     using TreeType = GridType::TreeType;
     using LeafNode = TreeType::LeafNodeType;
-    using AttributeSet = openvdb::tools::AttributeSet;
+    using AttributeSet = openvdb::points::AttributeSet;
 
     const TreeType& tree = grid.tree();
 
@@ -931,7 +932,8 @@ GR_PrimVDBPoints::update(RE_Render *r,
     const openvdb::GridBase* grid =
         const_cast<GT_PrimVDB&>((static_cast<const GT_PrimVDB&>(gt_primVDB))).getGrid();
 
-    using PointDataGrid = openvdb::tools::PointDataGrid;
+    using PointDataGrid = openvdb::points::PointDataGrid;
+
     const PointDataGrid& pointDataGrid = static_cast<const PointDataGrid&>(*grid);
 
     computeCentroid(pointDataGrid);
@@ -943,17 +945,17 @@ GR_PrimVDBPoints::update(RE_Render *r,
 
 bool
 GR_PrimVDBPoints::updateVec3Buffer( RE_Render* r,
-                                    const openvdb::tools::PointDataGrid& grid,
+                                    const openvdb::points::PointDataGrid& grid,
                                     const std::string& name,
                                     const RE_CacheVersion& version)
 {
     // Initialize the geometry with the proper name for the GL cache
     if (!myGeo)     return false;
 
-    using GridType = openvdb::tools::PointDataGrid;
+    using GridType = openvdb::points::PointDataGrid;
     using TreeType = GridType::TreeType;
     using LeafNode = TreeType::LeafNodeType;
-    using AttributeSet = openvdb::tools::AttributeSet;
+    using AttributeSet = openvdb::points::AttributeSet;
 
     const TreeType& tree = grid.tree();
 
@@ -988,7 +990,7 @@ GR_PrimVDBPoints::updateVec3Buffer( RE_Render* r,
         // check if group viewport is in use
 
         std::string groupName = "";
-        if (openvdb::StringMetadata::ConstPtr s = grid.getMetadata<openvdb::StringMetadata>(openvdb::META_GROUP_VIEWPORT)) {
+        if (openvdb::StringMetadata::ConstPtr s = grid.getMetadata<openvdb::StringMetadata>(openvdb_houdini::META_GROUP_VIEWPORT)) {
             groupName = s->value();
         }
         const bool useGroup = !groupName.empty() && descriptor.hasGroup(groupName);
@@ -1026,7 +1028,7 @@ GR_PrimVDBPoints::updateVec3Buffer(RE_Render* r, const std::string& name, const 
     const openvdb::GridBase* grid =
         const_cast<GT_PrimVDB&>((static_cast<const GT_PrimVDB&>(gt_primVDB))).getGrid();
 
-    using PointDataGrid = openvdb::tools::PointDataGrid;
+    using PointDataGrid = openvdb::points::PointDataGrid;
     const PointDataGrid& pointDataGrid = static_cast<const PointDataGrid&>(*grid);
 
     return updateVec3Buffer(r, pointDataGrid, name, version);
@@ -1034,17 +1036,17 @@ GR_PrimVDBPoints::updateVec3Buffer(RE_Render* r, const std::string& name, const 
 
 bool
 GR_PrimVDBPoints::updateIdBuffer(   RE_Render* r,
-                                    const openvdb::tools::PointDataGrid& grid,
+                                    const openvdb::points::PointDataGrid& grid,
                                     const std::string& name,
                                     const RE_CacheVersion& version)
 {
     // Initialize the geometry with the proper name for the GL cache
     if (!myGeo)     return false;
 
-    using GridType = openvdb::tools::PointDataGrid;
+    using GridType = openvdb::points::PointDataGrid;
     using TreeType = GridType::TreeType;
     using LeafNode = TreeType::LeafNodeType;
-    using AttributeSet = openvdb::tools::AttributeSet;
+    using AttributeSet = openvdb::points::AttributeSet;
 
     const TreeType& tree = grid.tree();
 
@@ -1143,7 +1145,7 @@ GR_PrimVDBPoints::updateIdBuffer(RE_Render* r, const std::string& name, const RE
     const openvdb::GridBase* grid =
         const_cast<GT_PrimVDB&>((static_cast<const GT_PrimVDB&>(gt_primVDB))).getGrid();
 
-    using PointDataGrid = openvdb::tools::PointDataGrid;
+    using PointDataGrid = openvdb::points::PointDataGrid;
     const PointDataGrid& pointDataGrid = static_cast<const PointDataGrid&>(*grid);
 
     return updateIdBuffer(r, pointDataGrid, name, version);
@@ -1316,6 +1318,6 @@ GR_PrimVDBPoints::renderDecoration(RE_Render* r, GR_Decoration decor, const GR_D
 
 #endif // 13.0.0 or later
 
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

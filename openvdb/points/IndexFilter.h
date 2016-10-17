@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -8,8 +8,8 @@
 // Redistributions of source code must retain the above copyright
 // and license notice and the following restrictions and disclaimer.
 //
-// *     Neither the name of Double Negative Visual Effects nor the names
-// of its contributors may be used to endorse or promote products derived
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
 // from this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
@@ -36,8 +36,8 @@
 ///
 
 
-#ifndef OPENVDB_TOOLS_INDEX_FILTER_HAS_BEEN_INCLUDED
-#define OPENVDB_TOOLS_INDEX_FILTER_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_POINTS_INDEX_FILTER_HAS_BEEN_INCLUDED
+#define OPENVDB_POINTS_INDEX_FILTER_HAS_BEEN_INCLUDED
 
 #include <random> // std::mt19937
 
@@ -47,9 +47,9 @@
 #include <openvdb/math/Transform.h>
 #include <openvdb/tools/Interpolation.h>
 
-#include <openvdb_points/tools/IndexIterator.h>
-#include <openvdb_points/tools/AttributeArray.h>
-#include <openvdb_points/tools/AttributeGroup.h>
+#include <openvdb/points/IndexIterator.h>
+#include <openvdb/points/AttributeArray.h>
+#include <openvdb/points/AttributeGroup.h>
 
 #include <boost/ptr_container/ptr_vector.hpp>
 
@@ -58,7 +58,7 @@ class TestIndexFilter;
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
-namespace tools {
+namespace points {
 
 
 ////////////////////////////////////////
@@ -352,7 +352,7 @@ public:
         const openvdb::Vec3f pointIndexSpace = mLevelSetTransform.worldToIndex(pointWorldSpace);
 
         // Perform level-set sampling
-        const typename LevelSetGridT::ValueType value = BoxSampler::sample(mAccessor, pointIndexSpace);
+        const typename LevelSetGridT::ValueType value = tools::BoxSampler::sample(mAccessor, pointIndexSpace);
 
         // if min is greater than max, we invert so that values are valid outside of the range (not inside)
         const bool invert = mMin > mMax;
@@ -474,14 +474,14 @@ struct FilterTraits<BinaryFilter<T0, T1, And>> {
 ////////////////////////////////////////
 
 
-} // namespace tools
+} // namespace points
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
 
-#endif // OPENVDB_TOOLS_INDEX_FILTER_HAS_BEEN_INCLUDED
+#endif // OPENVDB_POINTS_INDEX_FILTER_HAS_BEEN_INCLUDED
 
 
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

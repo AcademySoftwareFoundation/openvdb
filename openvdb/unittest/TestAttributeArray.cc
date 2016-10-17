@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -8,8 +8,8 @@
 // Redistributions of source code must retain the above copyright
 // and license notice and the following restrictions and disclaimer.
 //
-// *     Neither the name of Double Negative Visual Effects nor the names
-// of its contributors may be used to endorse or promote products derived
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
 // from this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
@@ -30,8 +30,8 @@
 
 
 #include <cppunit/extensions/HelperMacros.h>
-#include <openvdb_points/tools/AttributeArray.h>
-#include <openvdb_points/tools/AttributeSet.h>
+#include <openvdb/points/AttributeArray.h>
+#include <openvdb/points/AttributeSet.h>
 #include <openvdb/Types.h>
 #include <openvdb/math/Transform.h>
 #include <openvdb/io/File.h>
@@ -151,7 +151,7 @@ private:
 
 
 using namespace openvdb;
-using namespace openvdb::tools;
+using namespace openvdb::points;
 
 class TestAttributeArray: public CppUnit::TestCase
 {
@@ -269,9 +269,6 @@ static AttributeArray::Ptr factory2(Index, Index, bool) { return AttributeArray:
 void
 TestAttributeArray::testRegistry()
 {
-    using namespace openvdb;
-    using namespace openvdb::tools;
-
     using AttributeF = TypedAttributeArray<float>;
 
     AttributeArray::clearRegistry();
@@ -305,17 +302,17 @@ TestAttributeArray::testRegistry()
 void
 TestAttributeArray::testAttributeArray()
 {
-    using AttributeArrayF = openvdb::tools::TypedAttributeArray<float>;
-    using AttributeArrayD = openvdb::tools::TypedAttributeArray<double>;
+    using AttributeArrayF = TypedAttributeArray<float>;
+    using AttributeArrayD = TypedAttributeArray<double>;
 
     {
-        openvdb::tools::AttributeArray::Ptr attr(new AttributeArrayD(50));
+        AttributeArray::Ptr attr(new AttributeArrayD(50));
 
         CPPUNIT_ASSERT_EQUAL(attr->size(), Index(50));
     }
 
     {
-        openvdb::tools::AttributeArray::Ptr attr(new AttributeArrayD(50));
+        AttributeArray::Ptr attr(new AttributeArrayD(50));
 
         CPPUNIT_ASSERT_EQUAL(Index(50), attr->size());
 
@@ -367,13 +364,12 @@ TestAttributeArray::testAttributeArray()
     }
 #endif
 
-    using FixedPointCodec = openvdb::tools::FixedPointCodec<false>;
-    using AttributeArrayC = openvdb::tools::TypedAttributeArray<double, FixedPointCodec>;
+    using AttributeArrayC = TypedAttributeArray<double, FixedPointCodec<false>>;
 
     { // test hasValueType()
-        openvdb::tools::AttributeArray::Ptr attrC(new AttributeArrayC(50));
-        openvdb::tools::AttributeArray::Ptr attrD(new AttributeArrayD(50));
-        openvdb::tools::AttributeArray::Ptr attrF(new AttributeArrayF(50));
+        AttributeArray::Ptr attrC(new AttributeArrayC(50));
+        AttributeArray::Ptr attrD(new AttributeArrayD(50));
+        AttributeArray::Ptr attrF(new AttributeArrayF(50));
 
         CPPUNIT_ASSERT(attrD->hasValueType<double>());
         CPPUNIT_ASSERT(attrC->hasValueType<double>());
@@ -385,7 +381,7 @@ TestAttributeArray::testAttributeArray()
     }
 
     {
-        openvdb::tools::AttributeArray::Ptr attr(new AttributeArrayC(50));
+        AttributeArray::Ptr attr(new AttributeArrayC(50));
 
         AttributeArrayC& typedAttr = static_cast<AttributeArrayC&>(*attr);
 
@@ -405,11 +401,11 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.2), value2, /*tolerance=*/double(0.0001));
     }
 
-    using AttributeArrayI = openvdb::tools::TypedAttributeArray<int32_t>;
+    using AttributeArrayI = TypedAttributeArray<int32_t>;
 
     { // Base class API
 
-        openvdb::tools::AttributeArray::Ptr attr(new AttributeArrayI(50));
+        AttributeArray::Ptr attr(new AttributeArrayI(50));
 
         CPPUNIT_ASSERT_EQUAL(Index(50), attr->size());
 
@@ -608,10 +604,8 @@ TestAttributeArray::testAttributeArray()
         }
     }
 
-    using FixedPointCodec = openvdb::tools::FixedPointCodec<false>;
-
     { // Fixed codec (position range)
-        openvdb::tools::AttributeArray::Ptr attr1(new AttributeArrayC(50));
+        AttributeArray::Ptr attr1(new AttributeArrayC(50));
 
         AttributeArrayC& fixedPoint = static_cast<AttributeArrayC&>(*attr1);
 
@@ -628,11 +622,11 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.5), fixedPoint.get(3), /*tolerance=*/double(0.0001));
     }
 
-    using UnitFixedPointCodec8 = openvdb::tools::FixedPointCodec<false, openvdb::tools::UnitRange>;
-    using AttributeArrayUFxpt8 = openvdb::tools::TypedAttributeArray<float, UnitFixedPointCodec8>;
+    using UnitFixedPointCodec8 = FixedPointCodec<false, UnitRange>;
+    using AttributeArrayUFxpt8 = TypedAttributeArray<float, UnitFixedPointCodec8>;
 
     { // 8-bit fixed codec (unit range)
-        openvdb::tools::AttributeArray::Ptr attr1(new AttributeArrayUFxpt8(50));
+        AttributeArray::Ptr attr1(new AttributeArrayUFxpt8(50));
 
         AttributeArrayUFxpt8& fixedPoint = static_cast<AttributeArrayUFxpt8&>(*attr1);
 
@@ -649,11 +643,11 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(double(1.0), fixedPoint.get(3), /*tolerance=*/double(0.0001));
     }
 
-    using UnitFixedPointCodec16 = openvdb::tools::FixedPointCodec<false, openvdb::tools::UnitRange>;
-    using AttributeArrayUFxpt16 = openvdb::tools::TypedAttributeArray<float, UnitFixedPointCodec16>;
+    using UnitFixedPointCodec16 = FixedPointCodec<false, UnitRange>;
+    using AttributeArrayUFxpt16 = TypedAttributeArray<float, UnitFixedPointCodec16>;
 
     { // 16-bit fixed codec (unit range)
-        openvdb::tools::AttributeArray::Ptr attr1(new AttributeArrayUFxpt16(50));
+        AttributeArray::Ptr attr1(new AttributeArrayUFxpt16(50));
 
         AttributeArrayUFxpt16& fixedPoint = static_cast<AttributeArrayUFxpt16&>(*attr1);
 
@@ -670,10 +664,10 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(double(1.0), fixedPoint.get(3), /*tolerance=*/double(0.0001));
     }
 
-    using AttributeArrayU = openvdb::tools::TypedAttributeArray<openvdb::Vec3f, openvdb::tools::UnitVecCodec>;
+    using AttributeArrayU = TypedAttributeArray<openvdb::Vec3f, UnitVecCodec>;
 
     { // UnitVec codec test
-        openvdb::tools::AttributeArray::Ptr attr1(new AttributeArrayU(50));
+        AttributeArray::Ptr attr1(new AttributeArrayU(50));
 
         AttributeArrayU& unitVec = static_cast<AttributeArrayU&>(*attr1);
 
@@ -747,14 +741,11 @@ TestAttributeArray::testAttributeArray()
     // Registry
     AttributeArrayI::registerType();
 
-    openvdb::tools::AttributeArray::Ptr attr =
-        openvdb::tools::AttributeArray::create(
+    AttributeArray::Ptr attr =
+        AttributeArray::create(
             AttributeArrayI::attributeType(), 34);
 
     { // Casting
-        using namespace openvdb;
-        using namespace openvdb::tools;
-
         AttributeArray::Ptr array = TypedAttributeArray<float>::create(0);
         CPPUNIT_ASSERT_NO_THROW(TypedAttributeArray<float>::cast(*array));
         CPPUNIT_ASSERT_THROW(TypedAttributeArray<int>::cast(*array), TypeError);
@@ -841,8 +832,6 @@ TestAttributeArray::testAccessorEval()
 void
 TestAttributeArray::testAttributeHandle()
 {
-    using namespace openvdb;
-    using namespace openvdb::tools;
     using namespace openvdb::math;
 
     using AttributeI            = TypedAttributeArray<int>;
@@ -1004,7 +993,7 @@ TestAttributeArray::testAttributeHandle()
 void
 TestAttributeArray::testStrided()
 {
-    using AttributeArrayI       = openvdb::tools::TypedAttributeArray<int>;
+    using AttributeArrayI       = TypedAttributeArray<int>;
     using StridedHandle         = AttributeHandle<int, /*CodecType=*/UnknownCodec>;
     using StridedWriteHandle    = AttributeWriteHandle<int, /*CodecType=*/UnknownCodec>;
 
@@ -1108,9 +1097,6 @@ TestAttributeArray::testStrided()
 void
 TestAttributeArray::testDelayedLoad()
 {
-    using namespace openvdb;
-    using namespace openvdb::tools;
-
     using AttributeArrayI = TypedAttributeArray<int>;
 
     AttributeArrayI::registerType();
@@ -1727,8 +1713,6 @@ TestAttributeArray::testDelayedLoad()
 void
 TestAttributeArray::testQuaternions()
 {
-    using namespace openvdb;
-
     using AttributeQF = TypedAttributeArray<math::Quat<float>>;
     using AttributeQD = TypedAttributeArray<QuatR>;
 
@@ -1768,9 +1752,7 @@ TestAttributeArray::testQuaternions()
 void
 TestAttributeArray::testMatrices()
 {
-    using namespace openvdb;
-
-    using AttributeM = TypedAttributeArray<Mat4d>;
+    typedef TypedAttributeArray<Mat4d>      AttributeM;
 
     AttributeM::registerType();
 
@@ -1866,10 +1848,8 @@ void sumH(const Name& prefix, const AttrT& attr)
 void
 TestAttributeArray::testProfile()
 {
-    using namespace openvdb;
     using namespace openvdb::util;
     using namespace openvdb::math;
-    using namespace openvdb::tools;
 
     using AttributeArrayF   = TypedAttributeArray<float>;
     using AttributeArrayF16 = TypedAttributeArray<float, FixedPointCodec<false>>;
@@ -1980,6 +1960,6 @@ TestAttributeArray::testProfile()
     }
 }
 
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

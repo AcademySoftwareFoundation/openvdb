@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -8,8 +8,8 @@
 // Redistributions of source code must retain the above copyright
 // and license notice and the following restrictions and disclaimer.
 //
-// *     Neither the name of Double Negative Visual Effects nor the names
-// of its contributors may be used to endorse or promote products derived
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
 // from this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
@@ -30,9 +30,8 @@
 
 
 #include <cppunit/extensions/HelperMacros.h>
-#include <openvdb_points/tools/AttributeGroup.h>
-#include <openvdb_points/tools/AttributeSet.h>
-#include <openvdb_points/openvdb.h>
+#include <openvdb/points/AttributeGroup.h>
+#include <openvdb/points/AttributeSet.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/Types.h>
 #include <openvdb/Metadata.h>
@@ -43,8 +42,8 @@
 class TestAttributeSet: public CppUnit::TestCase
 {
 public:
-    virtual void setUp() { openvdb::initialize(); openvdb::points::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); openvdb::points::uninitialize(); }
+    virtual void setUp() { openvdb::initialize(); }
+    virtual void tearDown() { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestAttributeSet);
     CPPUNIT_TEST(testAttributeSetDescriptor);
@@ -64,17 +63,18 @@ CPPUNIT_TEST_SUITE_REGISTRATION(TestAttributeSet);
 ////////////////////////////////////////
 
 
+using namespace openvdb;
+using namespace openvdb::points;
+
 namespace {
 
 bool
-matchingAttributeSets(const openvdb::tools::AttributeSet& lhs,
-    const openvdb::tools::AttributeSet& rhs)
+matchingAttributeSets(const AttributeSet& lhs,
+    const AttributeSet& rhs)
 {
     if (lhs.size() != rhs.size()) return false;
     if (lhs.memUsage() != rhs.memUsage()) return false;
     if (lhs.descriptor() != rhs.descriptor()) return false;
-
-    using AttributeArray = openvdb::tools::AttributeArray;
 
     for (size_t n = 0, N = lhs.size(); n < N; ++n) {
 
@@ -92,8 +92,8 @@ matchingAttributeSets(const openvdb::tools::AttributeSet& lhs,
 }
 
 bool
-attributeSetMatchesDescriptor(  const openvdb::tools::AttributeSet& attrSet,
-                                const openvdb::tools::AttributeSet::Descriptor& descriptor)
+attributeSetMatchesDescriptor(  const AttributeSet& attrSet,
+                                const AttributeSet::Descriptor& descriptor)
 {
     if (descriptor.size() != attrSet.size())    return false;
 
@@ -180,11 +180,11 @@ void
 TestAttributeSet::testAttributeSetDescriptor()
 {
     // Define and register some common attribute types
-    using AttributeVec3f    = openvdb::tools::TypedAttributeArray<openvdb::Vec3f>;
-    using AttributeS        = openvdb::tools::TypedAttributeArray<float>;
-    using AttributeI        = openvdb::tools::TypedAttributeArray<int32_t>;
+    using AttributeVec3f    = TypedAttributeArray<openvdb::Vec3f>;
+    using AttributeS        = TypedAttributeArray<float>;
+    using AttributeI        = TypedAttributeArray<int32_t>;
 
-    using Descriptor        = openvdb::tools::AttributeSet::Descriptor;
+    using Descriptor        = AttributeSet::Descriptor;
 
     { // error on invalid construction
         Descriptor::Ptr invalidDescr = Descriptor::create(AttributeVec3f::attributeType());
@@ -507,18 +507,13 @@ TestAttributeSet::testAttributeSetDescriptor()
 void
 TestAttributeSet::testAttributeSet()
 {
-    using namespace openvdb::tools;
-
-    using AttributeArray    = openvdb::tools::AttributeArray;
-
     // Define and register some common attribute types
-    using AttributeS        = openvdb::tools::TypedAttributeArray<float>;
-    using AttributeI        = openvdb::tools::TypedAttributeArray<int32_t>;
-    using AttributeL        = openvdb::tools::TypedAttributeArray<int64_t>;
-    using AttributeVec3s    = openvdb::tools::TypedAttributeArray<openvdb::Vec3s>;
+    using AttributeS        = TypedAttributeArray<float>;
+    using AttributeI        = TypedAttributeArray<int32_t>;
+    using AttributeL        = TypedAttributeArray<int64_t>;
+    using AttributeVec3s    = TypedAttributeArray<Vec3s>;
 
-    using AttributeSet      = openvdb::tools::AttributeSet;
-    using Descriptor        = openvdb::tools::AttributeSet::Descriptor;
+    using Descriptor        = AttributeSet::Descriptor;
 
     Descriptor::NameToPosMap groupMap;
     openvdb::MetaMap metadata;
@@ -895,9 +890,6 @@ TestAttributeSet::testAttributeSet()
 void
 TestAttributeSet::testAttributeSetGroups()
 {
-    using namespace openvdb;
-    using namespace openvdb::tools;
-
     // Define and register some common attribute types
     using AttributeI        = TypedAttributeArray<int32_t>;
     using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
@@ -984,6 +976,6 @@ TestAttributeSet::testAttributeSetGroups()
 }
 
 
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

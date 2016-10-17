@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -8,8 +8,8 @@
 // Redistributions of source code must retain the above copyright
 // and license notice and the following restrictions and disclaimer.
 //
-// *     Neither the name of Double Negative Visual Effects nor the names
-// of its contributors may be used to endorse or promote products derived
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
 // from this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
@@ -31,17 +31,19 @@
 
 #include <cppunit/extensions/HelperMacros.h>
 
-#include <openvdb_points/tools/PointDataGrid.h>
-#include <openvdb_points/openvdb.h>
+#include <openvdb/points/PointDataGrid.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/io/io.h>
+
+using namespace openvdb;
+using namespace openvdb::points;
 
 class TestPointDataLeaf: public CppUnit::TestCase
 {
 public:
 
-    virtual void setUp() { openvdb::initialize(); openvdb::points::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); openvdb::points::uninitialize(); }
+    virtual void setUp() { openvdb::initialize(); }
+    virtual void tearDown() { openvdb::uninitialize(); }
 
     CPPUNIT_TEST_SUITE(TestPointDataLeaf);
     CPPUNIT_TEST(testEmptyLeaf);
@@ -77,13 +79,9 @@ private:
 
 }; // class TestPointDataLeaf
 
-using openvdb::tools::PointDataTree;
-using openvdb::tools::PointDataGrid;
 using LeafType = PointDataTree::LeafNodeType;
 using ValueType = LeafType::ValueType;
 using BufferType = LeafType::Buffer;
-using openvdb::Index;
-using openvdb::Index64;
 
 namespace {
 
@@ -110,7 +108,7 @@ zeroLeafValues(const LeafType* leafNode)
 bool
 noAttributeData(const LeafType* leafNode)
 {
-    const openvdb::tools::AttributeSet& attributeSet = leafNode->attributeSet();
+    const AttributeSet& attributeSet = leafNode->attributeSet();
 
     return attributeSet.size() == 0 && attributeSet.descriptor().size() == 0;
 }
@@ -197,8 +195,6 @@ std::vector<openvdb::Vec3R> genPoints(const int numPoints)
 void
 TestPointDataLeaf::testEmptyLeaf()
 {
-    using namespace openvdb::tools;
-
     // empty leaf construction
 
     {
@@ -323,9 +319,9 @@ TestPointDataLeaf::testOffsets()
     // test offset validation
 
     {
-        using AttributeVec3s    = openvdb::tools::TypedAttributeArray<openvdb::Vec3s>;
-        using AttributeS        = openvdb::tools::TypedAttributeArray<float>;
-        using Descriptor        = openvdb::tools::AttributeSet::Descriptor;
+        using AttributeVec3s    = TypedAttributeArray<Vec3s>;
+        using AttributeS        = TypedAttributeArray<float>;
+        using Descriptor        = AttributeSet::Descriptor;
 
         // empty Descriptor should throw on leaf node initialize
         auto emptyDescriptor = std::make_shared<Descriptor>();
@@ -370,8 +366,6 @@ TestPointDataLeaf::testOffsets()
         // ensure validateOffsets detects inconsistent attribute array sizes
 
         {
-            using openvdb::tools::AttributeSet;
-
             descriptor = Descriptor::create(AttributeVec3s::attributeType());
 
             const size_t numAttributes = 1;
@@ -503,18 +497,16 @@ TestPointDataLeaf::testMonotonicity()
 void
 TestPointDataLeaf::testAttributes()
 {
-    using namespace openvdb::tools;
-
     // Define and register some common attribute types
-    using AttributeVec3s    = openvdb::tools::TypedAttributeArray<openvdb::Vec3s>;
-    using AttributeI        = openvdb::tools::TypedAttributeArray<int32_t>;
+    using AttributeVec3s    = TypedAttributeArray<Vec3s>;
+    using AttributeI        = TypedAttributeArray<int32_t>;
 
     AttributeVec3s::registerType();
     AttributeI::registerType();
 
     // create a descriptor
 
-    using Descriptor = openvdb::tools::AttributeSet::Descriptor;
+    using Descriptor = AttributeSet::Descriptor;
 
     Descriptor::Ptr descrA = Descriptor::create(AttributeVec3s::attributeType());
 
@@ -728,8 +720,6 @@ TestPointDataLeaf::testTopologyCopy()
 void
 TestPointDataLeaf::testEquivalence()
 {
-    using namespace openvdb::tools;
-
     // Define and register some common attribute types
 
     using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
@@ -810,9 +800,6 @@ TestPointDataLeaf::testEquivalence()
 void
 TestPointDataLeaf::testIterators()
 {
-    using namespace openvdb;
-    using namespace openvdb::tools;
-
     // Define and register some common attribute types
 
     using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
@@ -1046,9 +1033,6 @@ TestPointDataLeaf::testReadWriteCompression()
 void
 TestPointDataLeaf::testIO()
 {
-    using namespace openvdb;
-    using namespace openvdb::tools;
-
     // Define and register some common attribute types
 
     using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
@@ -1204,8 +1188,6 @@ TestPointDataLeaf::testIO()
 void
 TestPointDataLeaf::testSwap()
 {
-    using namespace openvdb::tools;
-
     // Define and register some common attribute types
 
     using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
@@ -1273,8 +1255,6 @@ TestPointDataLeaf::testSwap()
 void
 TestPointDataLeaf::testCopyOnWrite()
 {
-    using namespace openvdb::tools;
-
     // Define and register some common attribute types
 
     using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
@@ -1348,11 +1328,9 @@ TestPointDataLeaf::testCopyOnWrite()
 void
 TestPointDataLeaf::testCopyDescriptor()
 {
-    using namespace openvdb::tools;
-
     // Define and register some common attribute types
-    using AttributeVec3s    = openvdb::tools::TypedAttributeArray<openvdb::Vec3s>;
-    using AttributeS        = openvdb::tools::TypedAttributeArray<float>;
+    using AttributeVec3s    = TypedAttributeArray<Vec3s>;
+    using AttributeS        = TypedAttributeArray<float>;
 
     AttributeVec3s::registerType();
     AttributeS::registerType();
@@ -1366,7 +1344,7 @@ TestPointDataLeaf::testCopyDescriptor()
 
     // create a descriptor
 
-    using Descriptor = openvdb::tools::AttributeSet::Descriptor;
+    using Descriptor = AttributeSet::Descriptor;
 
     Descriptor::Inserter names;
     names.add("density", AttributeS::attributeType());
@@ -1411,6 +1389,6 @@ CPPUNIT_TEST_SUITE_REGISTRATION(TestPointDataLeaf);
 ////////////////////////////////////////
 
 
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

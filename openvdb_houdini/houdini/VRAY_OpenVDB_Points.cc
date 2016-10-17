@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -8,8 +8,8 @@
 // Redistributions of source code must retain the above copyright
 // and license notice and the following restrictions and disclaimer.
 //
-// *     Neither the name of Double Negative Visual Effects nor the names
-// of its contributors may be used to endorse or promote products derived
+// *     Neither the name of DreamWorks Animation nor the names of
+// its contributors may be used to endorse or promote products derived
 // from this software without specific prior written permission.
 //
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
@@ -44,15 +44,16 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/io/File.h>
 
-#include <openvdb_points/openvdb.h>
-#include <openvdb_points/tools/PointDataGrid.h>
-#include <openvdb_points/tools/PointGroup.h>
+#include <openvdb/openvdb.h>
+#include <openvdb/points/PointDataGrid.h>
+#include <openvdb/points/PointGroup.h>
 
-#include "Utils.h"
+#include "PointUtils.h"
 
 using namespace openvdb;
+using namespace openvdb::points;
 
-namespace hvdbp = openvdb_points_houdini;
+namespace hvdb = openvdb_houdini;
 
 // mantra renders points with a world-space radius of 0.05 by default
 static const float DEFAULT_PSCALE = 0.05f;
@@ -74,7 +75,7 @@ private:
     std::vector<Name>                           mIncludeGroups;
     std::vector<Name>                           mExcludeGroups;
     UT_String                                   mAttrStr;
-    std::vector<tools::PointDataGrid::Ptr>      mGridPtrs;
+    std::vector<PointDataGrid::Ptr>             mGridPtrs;
     float                                       mPreBlur;
     float                                       mPostBlur;
     bool                                        mSpeedToColor;
@@ -108,10 +109,10 @@ struct GenerateBBoxOp {
 
         for (auto leafIter = range.begin(); leafIter; ++leafIter) {
 
-            const tools::AttributeSet::Descriptor& descriptor = leafIter->attributeSet().descriptor();
+            const AttributeSet::Descriptor& descriptor = leafIter->attributeSet().descriptor();
 
             size_t pscaleIndex = descriptor.find("pscale");
-            if (pscaleIndex != tools::AttributeSet::INVALID_POS) {
+            if (pscaleIndex != AttributeSet::INVALID_POS) {
 
                 std::string pscaleType = descriptor.type(pscaleIndex).first;
 
@@ -131,14 +132,14 @@ struct GenerateBBoxOp {
     template <typename PscaleType>
     void expandBBox(const PointDataLeaf& leaf, size_t pscaleIndex) {
 
-        auto positionHandle = tools::AttributeHandle<Vec3f>::create(leaf.constAttributeArray("P"));
+        auto positionHandle = points::AttributeHandle<Vec3f>::create(leaf.constAttributeArray("P"));
 
         // expandBBox will not pick up a pscale handle unless the attribute type matches the template type
 
-        typename tools::AttributeHandle<PscaleType>::Ptr pscaleHandle;
-        if (pscaleIndex != tools::AttributeSet::INVALID_POS) {
+        typename AttributeHandle<PscaleType>::Ptr pscaleHandle;
+        if (pscaleIndex != AttributeSet::INVALID_POS) {
             if (leaf.attributeSet().descriptor().type(pscaleIndex).first == typeNameAsString<PscaleType>()) {
-                pscaleHandle = tools::AttributeHandle<PscaleType>::create(leaf.constAttributeArray(pscaleIndex));
+                pscaleHandle = AttributeHandle<PscaleType>::create(leaf.constAttributeArray(pscaleIndex));
             }
         }
 
@@ -155,7 +156,7 @@ struct GenerateBBoxOp {
 
         if (!mIncludeGroups.empty() || !mExcludeGroups.empty()) {
 
-            tools::MultiGroupFilter filter(mIncludeGroups, mExcludeGroups);
+            points::MultiGroupFilter filter(mIncludeGroups, mExcludeGroups);
             auto iter = leaf.beginIndexOn(filter);
 
             for (; iter; ++iter) {
@@ -208,7 +209,7 @@ struct PopulateColorFromVelocityOp {
     using IndexOnIter       = typename LeafNode::IndexOnIter;
     using LeafManagerT      = typename tree::LeafManager<PointDataTreeT>;
     using LeafRangeT        = typename LeafManagerT::LeafRange;
-    using MultiGroupFilter  = tools::MultiGroupFilter;
+    using MultiGroupFilter  = points::MultiGroupFilter;
 
     PopulateColorFromVelocityOp(    const size_t colorIndex,
                                     const size_t velocityIndex,
@@ -243,9 +244,9 @@ struct PopulateColorFromVelocityOp {
 
             auto& leaf = *leafIter;
 
-            auto colorHandle = tools::AttributeWriteHandle<ColorVec3T>::create(leaf.attributeArray(mColorIndex));
+            auto colorHandle = points::AttributeWriteHandle<ColorVec3T>::create(leaf.attributeArray(mColorIndex));
 
-            auto velocityHandle = tools::AttributeWriteHandle<VelocityVec3T>::create(leaf.attributeArray(mVelocityIndex));
+            auto velocityHandle = points::AttributeWriteHandle<VelocityVec3T>::create(leaf.attributeArray(mVelocityIndex));
 
             const bool uniform = velocityHandle->isUniform();
             const ColorVec3T uniformColor = getColorFromRamp(velocityHandle->get(0));
@@ -348,7 +349,6 @@ getProceduralArgs(const char *)
 VRAY_OpenVDB_Points::VRAY_OpenVDB_Points()
 {
     openvdb::initialize();
-    openvdb::points::initialize();
 }
 
 const char *
@@ -408,8 +408,8 @@ VRAY_OpenVDB_Points::initialize(const UT_BoundingBox *)
         for (auto iter = file.beginName(), endIter = file.endName(); iter != endIter; ++iter) {
 
             GridBase::Ptr baseGrid = file.readGridMetadata(*iter);
-            if (baseGrid->isType<tools::PointDataGrid>()) {
-                auto grid = StaticPtrCast<tools::PointDataGrid>(file.readGrid(*iter));
+            if (baseGrid->isType<points::PointDataGrid>()) {
+                auto grid = StaticPtrCast<points::PointDataGrid>(file.readGrid(*iter));
                 assert(grid);
                 mGridPtrs.push_back(grid);
             }
@@ -426,10 +426,10 @@ VRAY_OpenVDB_Points::initialize(const UT_BoundingBox *)
     // extract which groups to include and exclude
     UT_String groupStr;
     import("groupmask", groupStr);
-    tools::AttributeSet::Descriptor::parseNames(mIncludeGroups, mExcludeGroups, groupStr.toStdString());
+    AttributeSet::Descriptor::parseNames(mIncludeGroups, mExcludeGroups, groupStr.toStdString());
 
     // get openvdb bounds and convert to houdini bounds
-    BBoxd vdbBox = ::getBoundingBox<tools::PointDataGrid>(mGridPtrs, mIncludeGroups, mExcludeGroups);
+    BBoxd vdbBox = ::getBoundingBox<PointDataGrid>(mGridPtrs, mIncludeGroups, mExcludeGroups);
     mBox.setBounds(vdbBox.min().x(), vdbBox.min().y(), vdbBox.min().z()
                   ,vdbBox.max().x(), vdbBox.max().y(), vdbBox.max().z());
 
@@ -445,9 +445,9 @@ VRAY_OpenVDB_Points::getBoundingBox(UT_BoundingBox &box)
 void
 VRAY_OpenVDB_Points::render()
 {
-    using PointDataTree     = tools::PointDataGrid::TreeType;
-    using PointDataGridPtr  = tools::PointDataGrid::Ptr;
-    using AttributeSet      = tools::AttributeSet;
+    using PointDataTree     = points::PointDataGrid::TreeType;
+    using PointDataGridPtr  = points::PointDataGrid::Ptr;
+    using AttributeSet      = points::AttributeSet;
     using Descriptor        = AttributeSet::Descriptor;
 
     /// Allocate geometry and extract the GU_Detail
@@ -458,7 +458,7 @@ VRAY_OpenVDB_Points::render()
     // extract which attributes to include and exclude
     std::vector<Name> includeAttributes;
     std::vector<Name> excludeAttributes;
-    tools::AttributeSet::Descriptor::parseNames(includeAttributes, excludeAttributes, mAttrStr.toStdString());
+    AttributeSet::Descriptor::parseNames(includeAttributes, excludeAttributes, mAttrStr.toStdString());
 
     // if nothing was included or excluded: "all attributes" is implied with an empty vector
     // if nothing was included but something was explicitly excluded: add all attributes but then remove the excluded
@@ -527,7 +527,7 @@ VRAY_OpenVDB_Points::render()
 
                 // create new Cd attribute of supported type if one did not previously exist
                 if (colorIndex == AttributeSet::INVALID_POS) {
-                    openvdb::tools::appendAttribute<Vec3H>(tree, "Cd");
+                    openvdb::points::appendAttribute<Vec3H>(tree, "Cd");
                     colorIndex = leafIter->attributeSet().find("Cd");
                 }
 
@@ -562,7 +562,7 @@ VRAY_OpenVDB_Points::render()
 
     for (const auto grid : mGridPtrs) {
 
-        hvdbp::convertPointDataGridToHoudini(*gdp, *grid, validAttributes, mIncludeGroups, mExcludeGroups);
+        hvdb::convertPointDataGridToHoudini(*gdp, *grid, validAttributes, mIncludeGroups, mExcludeGroups);
     }
 
     geo.addVelocityBlur(mPreBlur, mPostBlur);
@@ -577,6 +577,6 @@ VRAY_OpenVDB_Points::render()
 
 ////////////////////////////////////////
 
-// Copyright (c) 2015-2016 Double Negative Visual Effects
+// Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
