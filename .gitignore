@@ -1,0 +1,42 @@
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Compiled Dynamic libraries
+*.so
+*.so.*
+*/*.so.*
+*.dylib
+*.dylib.*
+*/*.dylib.*
+*.dll
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Symlinked Directory
+openvdb_houdini/openvdb_houdini
+openvdb_houdini/houdini_utils
+
+# Dependencies
+openvdb/dependencies
+openvdb_houdini/houdini_deps
+
+# Binaries
+openvdb/vdb_test
+openvdb/vdb_print
+openvdb/vdb_render
+openvdb/openvdb_viewer
+
+# Doxygen
+openvdb/doc/html
