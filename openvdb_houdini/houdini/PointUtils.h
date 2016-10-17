@@ -28,14 +28,14 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 //
-/// @file Utils.h
+/// @file PointUtils.h
 ///
 /// @authors Dan Bailey, Nick Avramoussis, Richard Kwok
 ///
 /// @brief Utility classes and functions for OpenVDB Points Houdini plugins
 
-#ifndef OPENVDB_POINTS_HOUDINI_UTILS_HAS_BEEN_INCLUDED
-#define OPENVDB_POINTS_HOUDINI_UTILS_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_HOUDINI_POINT_UTILS_HAS_BEEN_INCLUDED
+#define OPENVDB_HOUDINI_POINT_UTILS_HAS_BEEN_INCLUDED
 
 
 #include <openvdb_points/tools/AttributeArrayString.h>
@@ -648,7 +648,7 @@ convertPointDataGridToHoudini(GU_Detail& detail,
 
 } // namespace openvdb_points_houdini
 
-#endif // OPENVDB_POINTS_HOUDINI_UTILS_HAS_BEEN_INCLUDED
+#endif // OPENVDB_HOUDINI_POINT_UTILS_HAS_BEEN_INCLUDED
 
 // Copyright (c) 2015-2016 Double Negative Visual Effects
 // All rights reserved. This software is distributed under the
