@@ -47,8 +47,8 @@ IF ( OPENVDB_ENABLE_RPATH )
   # Use $ORIGIN for relative referencing
   # The second $ORIGIN is present because there is another shared library
   # specific to the SOPs that is not use elsewhere
-  # SET(CMAKE_INSTALL_RPATH "$ORIGIN/../../lib:$ORIGIN")
-  SET(CMAKE_INSTALL_RPATH "$ORIGIN")
+  SET(CMAKE_INSTALL_RPATH "$ORIGIN/../../lib:$ORIGIN")
+  # SET(CMAKE_INSTALL_RPATH "$ORIGIN")
 
 ENDIF ( OPENVDB_ENABLE_RPATH )
 
@@ -63,6 +63,10 @@ ADD_LIBRARY ( openvdb_houdini SHARED
   houdini/SOP_NodeVDB.cc
   houdini/UT_VDBUtils.cc
   houdini/Utils.cc
+  )
+
+TARGET_LINK_LIBRARIES ( openvdb_houdini
+  openvdb_shared
   )
 
 SET ( OPENVDB_SOP_NAMES "" )
@@ -117,7 +121,7 @@ FOREACH ( SOP_NAME ${OPENVDB_SOP_NAMES} )
 
   TARGET_LINK_LIBRARIES ( ${SOP_NAME}
     openvdb_houdini
-    openvdb_static
+    openvdb_shared
     )
 
   INSTALL ( TARGETS
