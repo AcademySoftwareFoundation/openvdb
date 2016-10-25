@@ -41,6 +41,7 @@
 
 #include <openvdb_points/tools/AttributeArray.h>
 
+#include <memory>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -48,7 +49,7 @@ namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
 
-typedef uint8_t GroupType;
+using GroupType = uint8_t;
 
 
 ////////////////////////////////////////
@@ -56,11 +57,11 @@ typedef uint8_t GroupType;
 
 struct GroupCodec
 {
-    typedef GroupType StorageType;
-    typedef GroupType ValueType;
+    using StorageType   = GroupType;
+    using ValueType     = GroupType;
 
     template <typename T>
-    struct Storage { typedef StorageType Type; };
+    struct Storage { using Type = StorageType; };
 
     static void decode(const StorageType&, ValueType&);
     static void encode(const ValueType&, StorageType&);
@@ -68,7 +69,7 @@ struct GroupCodec
 };
 
 
-typedef TypedAttributeArray<GroupType, GroupCodec> GroupAttributeArray;
+using GroupAttributeArray = TypedAttributeArray<GroupType, GroupCodec>;
 
 
 ////////////////////////////////////////
@@ -103,12 +104,12 @@ inline bool isGroup(const AttributeArray& array)
 class GroupHandle
 {
 public:
-    typedef SharedPtr<GroupHandle> Ptr;
+    using Ptr = std::shared_ptr<GroupHandle>;
 
     // Dummy class that distinguishes an offset from a bitmask on construction
     struct BitMask { };
 
-    typedef std::pair<size_t, uint8_t> GroupIndex;
+    using GroupIndex = std::pair<size_t, uint8_t>;
 
     GroupHandle(const GroupAttributeArray& array, const GroupType& offset);
     GroupHandle(const GroupAttributeArray& array, const GroupType& bitMask, BitMask);
@@ -130,7 +131,7 @@ protected:
 class GroupWriteHandle : public GroupHandle
 {
 public:
-    typedef SharedPtr<GroupWriteHandle> Ptr;
+    using Ptr = std::shared_ptr<GroupWriteHandle>;
 
     GroupWriteHandle(GroupAttributeArray& array, const GroupType& offset);
 
