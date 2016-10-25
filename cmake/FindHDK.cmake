@@ -17,7 +17,7 @@ GET_FILENAME_COMPONENT ( HDK_PACKAGE_DIR ${CMAKE_CURRENT_LIST_FILE} PATH)
 # MESSAGE ( "HDK_PACKAGE_DIR ${HDK_PACKAGE_DIR}" )
 
 SET ( HDK_VERSION_IN_SYS_SYS_VERSION_H ON )
-OPTION ( HDK_AUTO_GENERATE_SESITAG "Automatically generate <Target>_sesitag.C and add to SOP being built" ON )
+OPTION ( HDK_AUTO_GENERATE_SESITAG "Automatically generate <Target>_sesitag.C and add to SOP being built" OFF )
 
 # Houdini 15 and above defines version in SYS/SYS_Version.h
 SET ( HDK_VERSION_FILE_PATH "toolkit/include/SYS/SYS_Version.h" )
