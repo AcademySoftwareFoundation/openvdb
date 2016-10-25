@@ -38,8 +38,6 @@
 #include <openvdb/Metadata.h>
 #include <openvdb/MetaMap.h>
 
-#include <boost/algorithm/string/predicate.hpp> // startswith
-
 #include <sstream>
 
 namespace openvdb {
@@ -55,7 +53,7 @@ namespace {
         // ensure the metadata is StringMetadata
         if (meta->typeName() != "string")           return false;
         // string attribute metadata must have a key that starts "string:"
-        if (!boost::starts_with(key, "string:"))    return false;
+        if (key.compare(0, 7, "string:") != 0)      return false;
 
         return true;
     }
@@ -105,9 +103,8 @@ void StringMetaInserter::insert(const Name& name)
     // find first unused index in the cache
 
     Index index = 1;
-    for (std::vector<Index>::iterator   it = mIndices.begin(),
-                                        itEnd = mIndices.end(); it != itEnd; ++it) {
-        if (*it != index)    break;
+    for (auto it = mIndices.begin(), itEnd = mIndices.end(); it != itEnd; ++it) {
+        if (*it != index)   break;
         ++index;
     }
 
@@ -128,8 +125,7 @@ void StringMetaInserter::resetCache()
     mIndices.clear();
     mValues.clear();
 
-    for (MetaMap::ConstMetaIterator it = mMetadata.beginMeta(),
-                                    itEnd = mMetadata.endMeta(); it != itEnd; ++it) {
+    for (auto it = mMetadata.beginMeta(), itEnd = mMetadata.endMeta(); it != itEnd; ++it) {
         const Name& key = it->first;
         const Metadata::Ptr meta = it->second;
 
@@ -159,7 +155,7 @@ void StringMetaInserter::resetCache()
 StringAttributeHandle::Ptr
 StringAttributeHandle::create(const AttributeArray& array, const MetaMap& metadata, const bool preserveCompression)
 {
-    return StringAttributeHandle::Ptr(new StringAttributeHandle(array, metadata, preserveCompression));
+    return std::make_shared<StringAttributeHandle>(array, metadata, preserveCompression);
 }
 
 
@@ -215,7 +211,7 @@ void StringAttributeHandle::get(Name& name, Index n, Index m) const
 StringAttributeWriteHandle::Ptr
 StringAttributeWriteHandle::create(AttributeArray& array, const MetaMap& metadata, const bool expand)
 {
-    return StringAttributeWriteHandle::Ptr(new StringAttributeWriteHandle(array, metadata, expand));
+    return std::make_shared<StringAttributeWriteHandle>(array, metadata, expand);
 }
 
 
@@ -283,15 +279,14 @@ void StringAttributeWriteHandle::resetCache()
 
     // re-populate the cache
 
-    for (MetaMap::ConstMetaIterator it = mMetadata.beginMeta(),
-                                    itEnd = mMetadata.endMeta(); it != itEnd; ++it) {
+    for (auto it = mMetadata.beginMeta(), itEnd = mMetadata.endMeta(); it != itEnd; ++it) {
         const Name& key = it->first;
         const Metadata::Ptr meta = it->second;
 
         // ensure the metadata is StringMetadata and key starts "string:"
         if (!isStringMeta(key, meta))   continue;
 
-        StringMetadata* stringMeta = dynamic_cast<StringMetadata*>(meta.get());
+        auto stringMeta = dynamic_cast<StringMetadata*>(meta.get());
         assert(stringMeta);
 
         // remove "string:"
@@ -308,7 +303,7 @@ Index StringAttributeWriteHandle::getIndex(const Name& name)
     // zero used for an empty string
     if (name.empty())   return Index(0);
 
-    ValueMap::const_iterator it = mCache.find(name);
+    auto it = mCache.find(name);
 
     if (it == mCache.end()) {
         OPENVDB_THROW(LookupError, "String does not exist in Metadata, insert it and reset the cache - \"" << name << "\".");

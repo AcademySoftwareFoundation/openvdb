@@ -41,6 +41,7 @@
 
 #include <openvdb_points/tools/AttributeArray.h>
 
+#include <memory>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -51,23 +52,23 @@ namespace tools {
 ////////////////////////////////////////
 
 
-typedef uint32_t StringIndexType;
+using StringIndexType = uint32_t;
 
 
 namespace attribute_traits
 {
-    template <bool Truncate> struct StringTypeTrait { typedef StringIndexType Type; };
-    template<> struct StringTypeTrait</*Truncate=*/true> { typedef uint16_t Type; };
+    template <bool Truncate> struct StringTypeTrait { using Type = StringIndexType; };
+    template<> struct StringTypeTrait</*Truncate=*/true> { using Type = uint16_t; };
 }
 
 
 template <bool Truncate>
 struct StringCodec
 {
-    typedef StringIndexType ValueType;
+    using ValueType = StringIndexType;
 
     template <typename T>
-    struct Storage { typedef typename attribute_traits::StringTypeTrait<Truncate>::Type Type; };
+    struct Storage { using Type = typename attribute_traits::StringTypeTrait<Truncate>::Type; };
 
     template<typename StorageType> static void decode(const StorageType&, ValueType&);
     template<typename StorageType> static void encode(const ValueType&, StorageType&);
@@ -75,7 +76,7 @@ struct StringCodec
 };
 
 
-typedef TypedAttributeArray<StringIndexType, StringCodec<false> > StringAttributeArray;
+using StringAttributeArray = TypedAttributeArray<StringIndexType, StringCodec<false>>;
 
 
 ////////////////////////////////////////
@@ -135,7 +136,7 @@ inline bool isString(const AttributeArray& array)
 class StringAttributeHandle
 {
 public:
-    typedef SharedPtr<StringAttributeHandle> Ptr;
+    using Ptr = std::shared_ptr<StringAttributeHandle>;//SharedPtr<StringAttributeHandle>;
 
     static Ptr create(const AttributeArray& array, const MetaMap& metadata, const bool preserveCompression = true);
 
@@ -150,7 +151,7 @@ public:
     void get(Name& name, Index n, Index m = 0) const;
 
 protected:
-    AttributeHandle<StringIndexType, StringCodec<false> >   mHandle;
+    AttributeHandle<StringIndexType, StringCodec<false>>    mHandle;
     const MetaMap&                                          mMetadata;
 }; // class StringAttributeHandle
 
@@ -161,7 +162,7 @@ protected:
 class StringAttributeWriteHandle : public StringAttributeHandle
 {
 public:
-    typedef SharedPtr<StringAttributeWriteHandle> Ptr;
+    using Ptr = std::shared_ptr<StringAttributeWriteHandle>;//SharedPtr<StringAttributeWriteHandle>;
 
     static Ptr create(AttributeArray& array, const MetaMap& metadata, const bool expand = true);
 
@@ -198,10 +199,10 @@ private:
     /// @note throws if name does not exist in cache
     Index getIndex(const Name& name);
 
-    typedef std::map<std::string, Index>    ValueMap;
+    using ValueMap = std::map<std::string, Index>;
 
     ValueMap                                                    mCache;
-    AttributeWriteHandle<StringIndexType, StringCodec<false> >  mWriteHandle;
+    AttributeWriteHandle<StringIndexType, StringCodec<false>>   mWriteHandle;
 }; // class StringAttributeWriteHandle
 
 
