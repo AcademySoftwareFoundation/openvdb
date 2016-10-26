@@ -72,7 +72,7 @@ namespace {
             vec.erase(vec.begin() + (*it));
         }
     }
-    
+
     // return true if a string begins with a particular substring
     bool startsWith(const std::string& str, const std::string& prefix)
     {
@@ -806,7 +806,7 @@ AttributeSet::Descriptor::create(const NameAndTypeVec& attrs,
                                  const MetaMap& metadata)
 {
     auto newDescriptor = std::make_shared<Descriptor>();
-    
+
     for (const NameAndType& attr : attrs) {
         newDescriptor->insert(attr.name, attr.type);
     }

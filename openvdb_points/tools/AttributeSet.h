@@ -69,7 +69,7 @@ public:
     enum { INVALID_POS = std::numeric_limits<size_t>::max() };
 
     using Ptr                   = std::shared_ptr<AttributeSet>;
-    using ConstPtr              = std::shared_ptr<const AttributeSet>; 
+    using ConstPtr              = std::shared_ptr<const AttributeSet>;
 
     class Descriptor;
 
@@ -109,7 +109,7 @@ public:
 
     /// Disallow copy assignment, since it wouldn't be obvious whether the copy is deep or shallow.
     AttributeSet& operator=(const AttributeSet&) = delete;
-    
+
     //@{
     /// @brief  Return a reference to this attribute set's descriptor, which might
     ///         be shared with other sets.
