@@ -51,9 +51,9 @@
 #include <tbb/spin_mutex.h>
 #include <tbb/atomic.h>
 
-#include <boost/scoped_array.hpp>
-
+#include <memory>
 #include <string>
+#include <type_traits>
 
 
 class TestAttributeArray;
@@ -63,8 +63,8 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 
 
-// Add new typedef for a Name pair
-typedef std::pair<Name, Name> NamePair;
+// Add new alias for a Name pair
+using NamePair = std::pair<Name, Name>;
 
 namespace tools {
 
@@ -139,7 +139,7 @@ template <typename IntegerT, typename FloatT>
 inline IntegerT
 floatingPointToFixedPoint(const FloatT s)
 {
-    BOOST_STATIC_ASSERT(boost::is_unsigned<IntegerT>::value);
+    static_assert(std::is_unsigned<IntegerT>::value, "IntegerT must be unsigned");
     if (FloatT(0.0) > s) return std::numeric_limits<IntegerT>::min();
     else if (FloatT(1.0) <= s) return std::numeric_limits<IntegerT>::max();
     return IntegerT(std::floor(s * FloatT(std::numeric_limits<IntegerT>::max())));
@@ -150,10 +150,9 @@ template <typename FloatT, typename IntegerT>
 inline FloatT
 fixedPointToFloatingPoint(const IntegerT s)
 {
-    BOOST_STATIC_ASSERT(boost::is_unsigned<IntegerT>::value);
+    static_assert(std::is_unsigned<IntegerT>::value, "IntegerT must be unsigned");
     return FloatT(s) / FloatT((std::numeric_limits<IntegerT>::max()));
 }
-
 
 template <typename IntegerVectorT, typename FloatT>
 inline IntegerVectorT
@@ -186,38 +185,37 @@ protected:
     struct AccessorBase;
     template <typename T> struct Accessor;
 
-    typedef SharedPtr<AccessorBase>             AccessorBasePtr;
+    using AccessorBasePtr = std::shared_ptr<AccessorBase>;
 
 public:
-    enum Flag { TRANSIENT = 0x1, /// by default not written to disk
-                HIDDEN = 0x2, /// hidden from UIs or iterators
-                WRITESTRIDED=0x4, /// (serialization only) - mark as strided
-                WRITEUNIFORM=0x8, /// (serialization only) - mark as uniform
-                WRITEMEMCOMPRESS=0x10, /// (serialization only) - mark as compressed in-memory
-                WRITEDISKCOMPRESS=0x20, /// (serialization only) - mark as compressed on-disk
-                OUTOFCORE=0x40, /// data not yet loaded from disk
-                INTERLEAVED=0x80 }; /// for strided attributes only, interleave values
+    enum Flag { TRANSIENT = 0x1,            /// by default not written to disk
+                HIDDEN = 0x2,               /// hidden from UIs or iterators
+                WRITESTRIDED = 0x4,         /// (serialization only) - mark as strided
+                WRITEUNIFORM = 0x8,         /// (serialization only) - mark as uniform
+                WRITEMEMCOMPRESS = 0x10,    /// (serialization only) - mark as compressed in-memory
+                WRITEDISKCOMPRESS = 0x20,   /// (serialization only) - mark as compressed on-disk
+                OUTOFCORE = 0x40,           /// data not yet loaded from disk
+                INTERLEAVED = 0x80 };       /// for strided attributes only, interleave values
 
 #ifndef OPENVDB_2_ABI_COMPATIBLE
     struct FileInfo
     {
-        FileInfo(): bufpos(0), bytes(0) {}
-        std::streamoff bufpos;
-        Index64 bytes;
+        std::streamoff bufpos = 0;
+        Index64 bytes = 0;
         io::MappedFile::Ptr mapping;
         SharedPtr<io::StreamMetadata> meta;
     };
 #endif
 
-    typedef SharedPtr<AttributeArray>           Ptr;
-    typedef SharedPtr<const AttributeArray>     ConstPtr;
+    using Ptr = SharedPtr<AttributeArray>;
+    using ConstPtr = SharedPtr<const AttributeArray>;
 
-    typedef Ptr (*FactoryMethod)(size_t, Index);
+    using FactoryMethod = Ptr (*)(size_t, Index);
 
     template <typename ValueType, typename CodecType, bool Strided, bool Interleaved> friend class AttributeHandle;
 
-    AttributeArray() : mCompressedBytes(0), mFlags(0) {}
-    virtual ~AttributeArray() {}
+    AttributeArray() = default;
+    virtual ~AttributeArray() = default;
 
     /// Return a copy of this attribute.
     virtual AttributeArray::Ptr copy() const = 0;
@@ -259,7 +257,7 @@ public:
 
     /// Return @c true if this attribute has a value type the same as the template parameter
     template<typename ValueType>
-    bool hasValueType() const { return this->type().first == typeNameAsString<ValueType>();}
+    bool hasValueType() const { return this->type().first == typeNameAsString<ValueType>(); }
 
     /// Set value at given index @a n from @a sourceIndex of another @a sourceArray
     virtual void set(const Index n, const AttributeArray& sourceArray, const Index sourceIndex) = 0;
@@ -330,8 +328,8 @@ protected:
     /// Remove a attribute type from the registry.
     static void unregisterType(const NamePair& type);
 
-    size_t mCompressedBytes;
-    uint16_t mFlags;
+    size_t mCompressedBytes = 0;
+    uint16_t mFlags = 0;
 
     /// Out-of-core data
 #ifndef OPENVDB_2_ABI_COMPATIBLE
@@ -344,16 +342,16 @@ protected:
 
 
 /// Accessor base class for AttributeArray storage where type is not available
-struct AttributeArray::AccessorBase { virtual ~AccessorBase() { } };
+struct AttributeArray::AccessorBase { virtual ~AccessorBase() = default; };
 
 /// Templated Accessor stores typed function pointers used in binding
 /// AttributeHandles
 template <typename T>
 struct AttributeArray::Accessor : public AttributeArray::AccessorBase
 {
-    typedef T (*GetterPtr)(const AttributeArray* array, const Index n);
-    typedef void (*SetterPtr)(AttributeArray* array, const Index n, const T& value);
-    typedef void (*ValuePtr)(AttributeArray* array, const T& value);
+    using GetterPtr = T (*)(const AttributeArray* array, const Index n);
+    using SetterPtr = void (*)(AttributeArray* array, const Index n, const T& value);
+    using ValuePtr  = void (*)(AttributeArray* array, const T& value);
 
     Accessor(GetterPtr getter, SetterPtr setter, ValuePtr collapser, ValuePtr filler) :
         mGetter(getter), mSetter(setter), mCollapser(collapser), mFiller(filler) { }
@@ -371,21 +369,21 @@ struct AttributeArray::Accessor : public AttributeArray::AccessorBase
 namespace attribute_traits
 {
     template <typename T> struct TruncateTrait { };
-    template <> struct TruncateTrait<float> { typedef half Type; };
-    template <> struct TruncateTrait<int> { typedef short Type; };
+    template <> struct TruncateTrait<float> { using Type = half; };
+    template <> struct TruncateTrait<int> { using Type = short; };
 
-    template <typename T> struct TruncateTrait<math::Vec3<T> > {
-        typedef math::Vec3<typename TruncateTrait<T>::Type> Type;
+    template <typename T> struct TruncateTrait<math::Vec3<T>> {
+        using Type = math::Vec3<typename TruncateTrait<T>::Type>;
     };
 
     template <bool OneByte, typename T> struct UIntTypeTrait { };
-    template<typename T> struct UIntTypeTrait</*OneByte=*/true, T> { typedef uint8_t Type; };
-    template<typename T> struct UIntTypeTrait</*OneByte=*/false, T> { typedef uint16_t Type; };
-    template<typename T> struct UIntTypeTrait</*OneByte=*/true, math::Vec3<T> > {
-        typedef math::Vec3<uint8_t> Type;
+    template<typename T> struct UIntTypeTrait</*OneByte=*/true, T> { using Type = uint8_t; };
+    template<typename T> struct UIntTypeTrait</*OneByte=*/false, T> { using Type = uint16_t; };
+    template<typename T> struct UIntTypeTrait</*OneByte=*/true, math::Vec3<T>> {
+        using Type = math::Vec3<uint8_t>;
     };
-    template<typename T> struct UIntTypeTrait</*OneByte=*/false, math::Vec3<T> > {
-        typedef math::Vec3<uint16_t> Type;
+    template<typename T> struct UIntTypeTrait</*OneByte=*/false, math::Vec3<T>> {
+        using Type = math::Vec3<uint16_t>;
     };
 }
 
@@ -401,7 +399,7 @@ struct UnknownCodec { };
 struct NullCodec
 {
     template <typename T>
-    struct Storage { typedef T Type; };
+    struct Storage { using Type = T; };
 
     template<typename ValueType> static void decode(const ValueType&, ValueType&);
     template<typename ValueType> static void encode(const ValueType&, ValueType&);
@@ -412,7 +410,7 @@ struct NullCodec
 struct TruncateCodec
 {
     template <typename T>
-    struct Storage { typedef typename attribute_traits::TruncateTrait<T>::Type Type; };
+    struct Storage { using Type = typename attribute_traits::TruncateTrait<T>::Type; };
 
     template<typename StorageType, typename ValueType> static void decode(const StorageType&, ValueType&);
     template<typename StorageType, typename ValueType> static void encode(const ValueType&, StorageType&);
@@ -424,7 +422,7 @@ template <bool OneByte>
 struct FixedPointCodec
 {
     template <typename T>
-    struct Storage { typedef typename attribute_traits::UIntTypeTrait<OneByte, T>::Type Type; };
+    struct Storage { using Type = typename attribute_traits::UIntTypeTrait<OneByte, T>::Type; };
 
     template<typename StorageType, typename ValueType> static void decode(const StorageType&, ValueType&);
     template<typename StorageType, typename ValueType> static void encode(const ValueType&, StorageType&);
@@ -434,10 +432,10 @@ struct FixedPointCodec
 
 struct UnitVecCodec
 {
-    typedef uint16_t StorageType;
+    using StorageType = uint16_t;
 
     template <typename T>
-    struct Storage { typedef StorageType Type; };
+    struct Storage { using Type = StorageType; };
 
     template<typename T> static void decode(const StorageType&, math::Vec3<T>&);
     template<typename T> static void encode(const math::Vec3<T>&, StorageType&);
@@ -453,12 +451,12 @@ template<typename ValueType_, typename Codec_ = NullCodec>
 class TypedAttributeArray: public AttributeArray
 {
 public:
-    typedef SharedPtr<TypedAttributeArray>              Ptr;
-    typedef SharedPtr<const TypedAttributeArray>        ConstPtr;
+    using Ptr           = SharedPtr<TypedAttributeArray>;
+    using ConstPtr      = SharedPtr<const TypedAttributeArray>;
 
-    typedef ValueType_                                          ValueType;
-    typedef Codec_                                              Codec;
-    typedef typename Codec::template Storage<ValueType>::Type   StorageType;
+    using ValueType     = ValueType_;
+    using Codec         = Codec_;
+    using StorageType   = typename Codec::template Storage<ValueType>::Type;
 
     //////////
 
@@ -602,10 +600,10 @@ private:
     static AttributeArray::Ptr factory(size_t n, Index stride) { return TypedAttributeArray::create(n, stride); }
 
     static tbb::atomic<const NamePair*> sTypeName;
-    StorageType*    mData;
+    StorageType*    mData = nullptr;
     size_t          mSize;
     Index           mStride;
-    bool            mIsUniform;
+    bool            mIsUniform = false;
     tbb::spin_mutex mMutex;
 }; // class TypedAttributeArray
 
@@ -619,21 +617,21 @@ template <typename ValueType, typename CodecType = UnknownCodec, bool Strided = 
 class AttributeHandle
 {
 public:
-    typedef AttributeHandle<ValueType, CodecType, Strided, Interleaved>     Handle;
-    typedef SharedPtr<Handle>                                               Ptr;
-    typedef std::unique_ptr<Handle>                                         UniquePtr;
+    using Handle    = AttributeHandle<ValueType, CodecType, Strided, Interleaved>;
+    using Ptr       = SharedPtr<Handle>;
+    using UniquePtr = std::unique_ptr<Handle>;
 
 protected:
-    typedef ValueType (*GetterPtr)(const AttributeArray* array, const Index n);
-    typedef void (*SetterPtr)(AttributeArray* array, const Index n, const ValueType& value);
-    typedef void (*ValuePtr)(AttributeArray* array, const ValueType& value);
+    using GetterPtr = ValueType (*)(const AttributeArray* array, const Index n);
+    using SetterPtr = void (*)(AttributeArray* array, const Index n, const ValueType& value);
+    using ValuePtr  = void (*)(AttributeArray* array, const ValueType& value);
 
 public:
     static Ptr create(const AttributeArray& array, const bool preserveCompression = true);
 
     AttributeHandle(const AttributeArray& array, const bool preserveCompression = true);
 
-    virtual ~AttributeHandle() { }
+    virtual ~AttributeHandle() = default;
 
     Index stride() const { return mStride; }
     size_t size() const { return mSize; }
@@ -656,16 +654,16 @@ private:
     friend class ::TestAttributeArray;
 
     template <bool IsUnknownCodec>
-    typename boost::enable_if_c<IsUnknownCodec, bool>::type compatibleType() const;
+    typename std::enable_if<IsUnknownCodec, bool>::type compatibleType() const;
 
     template <bool IsUnknownCodec>
-    typename boost::enable_if_c<!IsUnknownCodec, bool>::type compatibleType() const;
+    typename std::enable_if<!IsUnknownCodec, bool>::type compatibleType() const;
 
     template <bool IsUnknownCodec>
-    typename boost::enable_if_c<IsUnknownCodec, ValueType>::type get(Index index) const;
+    typename std::enable_if<IsUnknownCodec, ValueType>::type get(Index index) const;
 
     template <bool IsUnknownCodec>
-    typename boost::enable_if_c<!IsUnknownCodec, ValueType>::type get(Index index) const;
+    typename std::enable_if<!IsUnknownCodec, ValueType>::type get(Index index) const;
 
     // local copy of AttributeArray (to preserve compression)
     AttributeArray::Ptr mLocalArray;
@@ -683,15 +681,15 @@ template <typename ValueType, typename CodecType = UnknownCodec, bool Strided = 
 class AttributeWriteHandle : public AttributeHandle<ValueType, CodecType, Strided, Interleaved>
 {
 public:
-    typedef AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>    Handle;
-    typedef SharedPtr<Handle>                                                   Ptr;
-    typedef std::unique_ptr<Handle>                                             ScopedPtr;
+    using Handle    = AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>;
+    using Ptr       = SharedPtr<Handle>;
+    using ScopedPtr = std::unique_ptr<Handle>;
 
     static Ptr create(AttributeArray& array, const bool expand = true);
 
     AttributeWriteHandle(AttributeArray& array, const bool expand = true);
 
-    virtual ~AttributeWriteHandle() { }
+    virtual ~AttributeWriteHandle() = default;
 
     /// @brief  If this array is uniform, replace it with an array of length size().
     /// @param  fill if true, assign the uniform value to each element of the array.
@@ -715,10 +713,10 @@ private:
     friend class ::TestAttributeArray;
 
     template <bool IsUnknownCodec>
-    typename boost::enable_if_c<IsUnknownCodec, void>::type set(Index index, const ValueType& value) const;
+    typename std::enable_if<IsUnknownCodec, void>::type set(Index index, const ValueType& value) const;
 
     template <bool IsUnknownCodec>
-    typename boost::enable_if_c<!IsUnknownCodec, void>::type set(Index index, const ValueType& value) const;
+    typename std::enable_if<!IsUnknownCodec, void>::type set(Index index, const ValueType& value) const;
 }; // class AttributeWriteHandle
 
 
@@ -813,12 +811,10 @@ tbb::atomic<const NamePair*> TypedAttributeArray<ValueType_, Codec_>::sTypeName;
 template<typename ValueType_, typename Codec_>
 TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(
     size_t n, Index stride, const ValueType& uniformValue)
-    : AttributeArray()
-    , mData(new StorageType[1])
+    : mData(new StorageType[1])
     , mSize(n)
     , mStride(stride)
     , mIsUniform(true)
-    , mMutex()
 {
     mSize = std::max(size_t(1), mSize);
     mStride = std::max(Index(1), mStride);
@@ -829,11 +825,9 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(
 template<typename ValueType_, typename Codec_>
 TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs, bool uncompress)
     : AttributeArray(rhs)
-    , mData(NULL)
     , mSize(rhs.mSize)
     , mStride(rhs.mStride)
     , mIsUniform(rhs.mIsUniform)
-    , mMutex()
 {
     using attribute_compression::decompress;
     using attribute_compression::uncompressedSize;
@@ -907,9 +901,9 @@ template<typename ValueType_, typename Codec_>
 inline const NamePair&
 TypedAttributeArray<ValueType_, Codec_>::attributeType()
 {
-    if (sTypeName == NULL) {
+    if (sTypeName == nullptr) {
         NamePair* s = new NamePair(typeNameAsString<ValueType>(), Codec::name());
-        if (sTypeName.compare_and_swap(s, NULL) != NULL) delete s;
+        if (sTypeName.compare_and_swap(s, nullptr) != nullptr) delete s;
     }
     return *sTypeName;
 }
@@ -1021,7 +1015,7 @@ TypedAttributeArray<ValueType_, Codec_>::deallocate()
 #endif
     if (mData) {
         delete[] mData;
-        mData = NULL;
+        mData = nullptr;
     }
 }
 
@@ -1030,7 +1024,7 @@ template<typename ValueType_, typename Codec_>
 size_t
 TypedAttributeArray<ValueType_, Codec_>::memUsage() const
 {
-    return sizeof(*this) + (mData != NULL ? this->arrayMemUsage() : 0);
+    return sizeof(*this) + (mData != nullptr ? this->arrayMemUsage() : 0);
 }
 
 
@@ -1405,7 +1399,7 @@ TypedAttributeArray<ValueType_, Codec_>::read(std::istream& is)
     // If this array is being read from a memory-mapped file, delay loading of its data
     // until the data is actually accessed.
     io::MappedFile::Ptr mappedFile = io::getMappedFilePtr(is);
-    const bool delayLoad = (mappedFile.get() != NULL);
+    const bool delayLoad = (mappedFile.get() != nullptr);
 
     if (delayLoad) {
         this->setOutOfCore(true);
@@ -1457,7 +1451,7 @@ TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os, bool outputTran
     Index64 size(mSize);
     Index stride(mStride);
 
-    boost::scoped_array<char> compressedBuffer;
+    std::unique_ptr<char[]> compressedBuffer;
     size_t compressedBytes = 0;
 
     this->doLoad();
@@ -1515,7 +1509,7 @@ TypedAttributeArray<ValueType_, Codec_>::doLoadUnsafe() const
     TypedAttributeArray<ValueType_, Codec_>* self = const_cast<TypedAttributeArray<ValueType_, Codec_>*>(this);
 
     assert(self->mFileInfo);
-    assert(self->mFileInfo->mapping.get() != NULL);
+    assert(self->mFileInfo->mapping.get() != nullptr);
 
     FileInfo& info = *(self->mFileInfo);
 
@@ -1594,8 +1588,8 @@ TypedAttributeArray<ValueType_, Codec_>::isEqual(const AttributeArray& other) co
 template <typename CodecType, typename ValueType>
 struct AccessorEval
 {
-    typedef ValueType (*GetterPtr)(const AttributeArray* array, const Index n);
-    typedef void (*SetterPtr)(AttributeArray* array, const Index n, const ValueType& value);
+    using GetterPtr = ValueType (*)(const AttributeArray* array, const Index n);
+    using SetterPtr = void (*)(AttributeArray* array, const Index n, const ValueType& value);
 
     /// Getter that calls to TypedAttributeArray::getUnsafe()
     /// @note Functor argument is provided but not required for the generic case
@@ -1615,8 +1609,8 @@ struct AccessorEval
 template <typename ValueType>
 struct AccessorEval<UnknownCodec, ValueType>
 {
-    typedef ValueType (*GetterPtr)(const AttributeArray* array, const Index n);
-    typedef void (*SetterPtr)(AttributeArray* array, const Index n, const ValueType& value);
+    using GetterPtr = ValueType (*)(const AttributeArray* array, const Index n);
+    using SetterPtr = void (*)(AttributeArray* array, const Index n, const ValueType& value);
 
     /// Getter that calls the supplied functor
     static ValueType get(GetterPtr functor, const AttributeArray* array, const Index n) {
@@ -1665,7 +1659,7 @@ AttributeHandle<ValueType, CodecType, Strided, Interleaved>::AttributeHandle(con
         OPENVDB_THROW(TypeError, "Handle can only be bound to an AttributeArray of stride 1.");
     }
 
-    if (!this->compatibleType<boost::is_same<CodecType, UnknownCodec>::value>()) {
+    if (!this->compatibleType<std::is_same<CodecType, UnknownCodec>::value>()) {
         OPENVDB_THROW(TypeError, "Cannot bind handle due to incompatible type of AttributeArray.");
     }
 
@@ -1703,7 +1697,7 @@ AttributeHandle<ValueType, CodecType, Strided, Interleaved>::AttributeHandle(con
 
 template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
 template <bool IsUnknownCodec>
-typename boost::enable_if_c<IsUnknownCodec, bool>::type
+typename std::enable_if<IsUnknownCodec, bool>::type
 AttributeHandle<ValueType, CodecType, Strided, Interleaved>::compatibleType() const
 {
     // if codec is unknown, just check the value type
@@ -1713,12 +1707,12 @@ AttributeHandle<ValueType, CodecType, Strided, Interleaved>::compatibleType() co
 
 template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
 template <bool IsUnknownCodec>
-typename boost::enable_if_c<!IsUnknownCodec, bool>::type
+typename std::enable_if<!IsUnknownCodec, bool>::type
 AttributeHandle<ValueType, CodecType, Strided, Interleaved>::compatibleType() const
 {
     // if the codec is known, check the value type and codec
 
-    return mArray->isType<TypedAttributeArray<ValueType, CodecType> >();
+    return mArray->isType<TypedAttributeArray<ValueType, CodecType>>();
 }
 
 template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
@@ -1734,12 +1728,12 @@ Index AttributeHandle<ValueType, CodecType, Strided, Interleaved>::index(Index n
 template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
 ValueType AttributeHandle<ValueType, CodecType, Strided, Interleaved>::get(Index n, Index m) const
 {
-    return this->get<boost::is_same<CodecType, UnknownCodec>::value>(this->index(n, m));
+    return this->get<std::is_same<CodecType, UnknownCodec>::value>(this->index(n, m));
 }
 
 template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
 template <bool IsUnknownCodec>
-typename boost::enable_if_c<IsUnknownCodec, ValueType>::type
+typename std::enable_if<IsUnknownCodec, ValueType>::type
 AttributeHandle<ValueType, CodecType, Strided, Interleaved>::get(Index index) const
 {
     // if the codec is unknown, use the getter functor
@@ -1749,7 +1743,7 @@ AttributeHandle<ValueType, CodecType, Strided, Interleaved>::get(Index index) co
 
 template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
 template <bool IsUnknownCodec>
-typename boost::enable_if_c<!IsUnknownCodec, ValueType>::type
+typename std::enable_if<!IsUnknownCodec, ValueType>::type
 AttributeHandle<ValueType, CodecType, Strided, Interleaved>::get(Index index) const
 {
     // if the codec is known, call the method on the attribute array directly
@@ -1786,13 +1780,13 @@ AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::AttributeWrite
 template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
 void AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::set(Index n, const ValueType& value)
 {
-    this->set<boost::is_same<CodecType, UnknownCodec>::value>(this->index(n, 0), value);
+    this->set<std::is_same<CodecType, UnknownCodec>::value>(this->index(n, 0), value);
 }
 
 template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
 void AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::set(Index n, Index m, const ValueType& value)
 {
-    this->set<boost::is_same<CodecType, UnknownCodec>::value>(this->index(n, m), value);
+    this->set<std::is_same<CodecType, UnknownCodec>::value>(this->index(n, m), value);
 }
 
 template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
@@ -1827,7 +1821,7 @@ void AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::fill(cons
 
 template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
 template <bool IsUnknownCodec>
-typename boost::enable_if_c<IsUnknownCodec, void>::type
+typename std::enable_if<IsUnknownCodec, void>::type
 AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::set(Index index, const ValueType& value) const
 {
     // if the codec is unknown, use the setter functor
@@ -1837,7 +1831,7 @@ AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::set(Index inde
 
 template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
 template <bool IsUnknownCodec>
-typename boost::enable_if_c<!IsUnknownCodec, void>::type
+typename std::enable_if<!IsUnknownCodec, void>::type
 AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::set(Index index, const ValueType& value) const
 {
     // if the codec is known, call the method on the attribute array directly

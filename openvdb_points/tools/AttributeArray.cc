@@ -232,8 +232,7 @@ char* decompress(const char* buffer, const size_t expectedBytes)
 
 namespace {
 
-typedef std::map<NamePair, AttributeArray::FactoryMethod> AttributeFactoryMap;
-typedef AttributeFactoryMap::const_iterator AttributeFactoryMapCIter;
+using AttributeFactoryMap = std::map<NamePair, AttributeArray::FactoryMethod>;
 
 struct LockedAttributeRegistry
 {
@@ -286,7 +285,7 @@ AttributeArray::create(const NamePair& type, size_t length, Index stride)
     LockedAttributeRegistry* registry = getAttributeRegistry();
     tbb::spin_mutex::scoped_lock lock(registry->mMutex);
 
-    AttributeFactoryMapCIter iter = registry->mMap.find(type);
+    auto iter = registry->mMap.find(type);
 
     if (iter == registry->mMap.end()) {
         OPENVDB_THROW(LookupError, "Cannot create attribute of unregistered type " << type.first << "_" << type.second);
@@ -320,7 +319,7 @@ AttributeArray::registerType(const NamePair& type, FactoryMethod factory)
     LockedAttributeRegistry* registry = getAttributeRegistry();
     tbb::spin_mutex::scoped_lock lock(registry->mMutex);
 
-    AttributeFactoryMapCIter iter = registry->mMap.find(type);
+    auto iter = registry->mMap.find(type);
 
     if (iter == registry->mMap.end()) {
         registry->mMap[type] = factory;

@@ -42,10 +42,10 @@
 #include <openvdb/version.h>
 #include <openvdb/MetaMap.h>
 
-#include <boost/integer_traits.hpp> // integer_traits
-
-#include <vector>
 #include <cctype> // isalnum
+#include <limits>
+#include <memory>
+#include <vector>
 
 #include <openvdb_points/tools/AttributeArray.h>
 
@@ -66,15 +66,15 @@ namespace tools {
 class AttributeSet
 {
 public:
-    enum { INVALID_POS = boost::integer_traits<size_t>::const_max };
+    enum { INVALID_POS = std::numeric_limits<size_t>::max() };
 
-    typedef SharedPtr<AttributeSet> Ptr;
-    typedef SharedPtr<const AttributeSet> ConstPtr;
+    using Ptr                   = std::shared_ptr<AttributeSet>;
+    using ConstPtr              = std::shared_ptr<const AttributeSet>; 
 
     class Descriptor;
 
-    typedef SharedPtr<Descriptor> DescriptorPtr;
-    typedef SharedPtr<const Descriptor> DescriptorConstPtr;
+    using DescriptorPtr         = std::shared_ptr<Descriptor>;
+    using DescriptorConstPtr    = std::shared_ptr<const Descriptor>;
 
     //////////
 
@@ -89,9 +89,9 @@ public:
             Index stride;
         };
 
-        typedef std::vector<NameAndType> NameAndTypeVec;
-        typedef std::map<std::string, size_t> NameToPosMap;
-        typedef std::pair<size_t, uint8_t> GroupIndex;
+        using NameAndTypeVec    = std::vector<NameAndType>;
+        using NameToPosMap      = std::map<std::string, size_t>;
+        using GroupIndex        = std::pair<size_t, uint8_t>;
     };
 
     //////////
@@ -107,6 +107,9 @@ public:
     /// Shallow copy constructor, the descriptor and attribute arrays will be shared.
     AttributeSet(const AttributeSet&);
 
+    /// Disallow copy assignment, since it wouldn't be obvious whether the copy is deep or shallow.
+    AttributeSet& operator=(const AttributeSet&) = delete;
+    
     //@{
     /// @brief  Return a reference to this attribute set's descriptor, which might
     ///         be shared with other sets.
@@ -238,10 +241,7 @@ public:
     bool operator!=(const AttributeSet& other) const { return !this->operator==(other); }
 
 private:
-    /// Disallow assignment, since it wouldn't be obvious whether the copy is deep or shallow.
-    AttributeSet& operator=(const AttributeSet&);
-
-    typedef std::vector<AttributeArray::Ptr> AttrArrayVec;
+    using AttrArrayVec = std::vector<AttributeArray::Ptr>;
 
     DescriptorPtr mDescr;
     AttrArrayVec  mAttrs;
@@ -257,13 +257,13 @@ private:
 class AttributeSet::Descriptor
 {
 public:
-    typedef SharedPtr<Descriptor> Ptr;
+    using Ptr               = std::shared_ptr<Descriptor>;
 
-    typedef Util::NameAndType             NameAndType;
-    typedef Util::NameAndTypeVec          NameAndTypeVec;
-    typedef Util::GroupIndex              GroupIndex;
-    typedef Util::NameToPosMap            NameToPosMap;
-    typedef NameToPosMap::const_iterator  ConstIterator;
+    using NameAndType       = Util::NameAndType;
+    using NameAndTypeVec    = Util::NameAndTypeVec;
+    using GroupIndex        = Util::GroupIndex;
+    using NameToPosMap      = Util::NameToPosMap;
+    using ConstIterator     = NameToPosMap::const_iterator;
 
     /// Utility method to construct a NameAndType sequence.
     struct Inserter {
@@ -397,8 +397,6 @@ template <typename ValueType>
 ValueType
 AttributeSet::Descriptor::getDefaultValue(const Name& name) const
 {
-    typedef typename TypedMetadata<ValueType>::ConstPtr MetadataPtr;
-
     const size_t pos = find(name);
     if (pos == INVALID_POS) {
         OPENVDB_THROW(LookupError, "Cannot find attribute name to set default value.")
@@ -407,7 +405,7 @@ AttributeSet::Descriptor::getDefaultValue(const Name& name) const
     std::stringstream ss;
     ss << "default:" << name;
 
-    MetadataPtr metadata = mMetadata.getMetadata<TypedMetadata<ValueType> >(ss.str());
+    auto metadata = mMetadata.getMetadata<TypedMetadata<ValueType>>(ss.str());
 
     if (metadata)   return metadata->value();
 
