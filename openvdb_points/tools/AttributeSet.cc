@@ -32,15 +32,11 @@
 ///
 /// @authors Dan Bailey, Mihai Alden, Peter Cucka
 
-#include <boost/algorithm/string/predicate.hpp> // for boost::starts_with()
-
 #include <openvdb_points/tools/AttributeGroup.h>
 #include <openvdb_points/tools/AttributeSet.h>
 
 #include <algorithm> // std::equal
 #include <string>
-
-#include <boost/algorithm/string/predicate.hpp> // boost::starts_with
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -72,10 +68,15 @@ namespace {
 
         // erase elements from the back
 
-        for (std::vector<size_t>::const_iterator    it = toRemove.begin();
-                                                    it != toRemove.end(); ++it) {
+        for (auto it = toRemove.cbegin(); it != toRemove.cend(); ++it) {
             vec.erase(vec.begin() + (*it));
         }
+    }
+    
+    // return true if a string begins with a particular substring
+    bool startsWith(const std::string& str, const std::string& prefix)
+    {
+        return str.compare(0, prefix.length(), prefix) == 0;
     }
 }
 
@@ -111,8 +112,7 @@ AttributeSet::AttributeSet(const AttributeSet& attrSet, size_t arrayLength)
     : mDescr(attrSet.descriptorPtr())
     , mAttrs(attrSet.descriptor().size(), AttributeArray::Ptr())
 {
-    for (Descriptor::ConstIterator it = mDescr->map().begin(),
-        end = mDescr->map().end(); it != end; ++it) {
+    for (auto it = mDescr->map().cbegin(), end = mDescr->map().cend(); it != end; ++it) {
         const size_t pos = it->second;
         AttributeArray::Ptr array = AttributeArray::create(mDescr->type(pos), arrayLength, 1);
 
@@ -178,7 +178,7 @@ AttributeSet::getConst(const std::string& name) const
 {
     const size_t pos = this->find(name);
     if (pos < mAttrs.size()) return this->getConst(pos);
-    return NULL;
+    return nullptr;
 }
 
 
@@ -194,7 +194,7 @@ AttributeSet::get(const std::string& name)
 {
     const size_t pos = this->find(name);
     if (pos < mAttrs.size()) return this->get(pos);
-    return NULL;
+    return nullptr;
 }
 
 
@@ -250,7 +250,7 @@ AttributeSet::groupOffset(const Util::GroupIndex& index) const
     // find the relative index in the group attribute arrays
 
     size_t relativeIndex = 0;
-    for (unsigned i = 0; i < mAttrs.size(); i++) {
+    for (size_t i = 0; i < mAttrs.size(); i++) {
         if (i < index.first && isGroup(*mAttrs[i]))    relativeIndex++;
     }
 
@@ -279,7 +279,7 @@ AttributeSet::groupIndex(const size_t offset) const
     const size_t GROUP_BITS = sizeof(GroupType) * CHAR_BIT;
 
     std::vector<unsigned> groups;
-    for (unsigned i = 0; i < mAttrs.size(); i++) {
+    for (size_t i = 0; i < mAttrs.size(); i++) {
         if (isGroup(*mAttrs[i]))      groups.push_back(i);
     }
 
@@ -427,8 +427,7 @@ AttributeSet::reorderAttributes(const DescriptorPtr& replacement)
     AttrArrayVec attrs(replacement->size());
 
     // compute target indices for attributes from the given decriptor
-    for (Descriptor::ConstIterator it = mDescr->map().begin(),
-        end = mDescr->map().end(); it != end; ++it) {
+    for (auto it = mDescr->map().cbegin(), end = mDescr->map().cend(); it != end; ++it) {
         const size_t index = replacement->find(it->first);
         attrs[index] = AttributeArray::Ptr(mAttrs[it->second]);
     }
@@ -523,8 +522,8 @@ AttributeSet::readAttributes(std::istream& is)
 void
 AttributeSet::writeAttributes(std::ostream& os, bool outputTransient) const
 {
-    for (size_t n = 0, N = mAttrs.size(); n < N; ++n) {
-        mAttrs[n]->write(os, outputTransient);
+    for (auto attr : mAttrs) {
+        attr->write(os, outputTransient);
     }
 }
 
@@ -546,10 +545,6 @@ AttributeSet::operator==(const AttributeSet& other) const {
 
 
 AttributeSet::Descriptor::Descriptor()
-    : mNameMap()
-    , mTypes()
-    , mGroupMap()
-    , mMetadata()
 {
 }
 
@@ -596,8 +591,7 @@ AttributeSet::Descriptor::hasSameAttributes(const Descriptor& rhs) const
         return false;
     }
 
-    for (NameToPosMap::const_iterator it = mNameMap.begin(),
-        end = mNameMap.end(); it != end; ++it) {
+    for (auto it = mNameMap.cbegin(), end = mNameMap.cend(); it != end; ++it) {
         const size_t index = rhs.find(it->first);
 
         if (index == INVALID_POS) return false;
@@ -612,13 +606,7 @@ AttributeSet::Descriptor::hasSameAttributes(const Descriptor& rhs) const
 size_t
 AttributeSet::Descriptor::count(const NamePair& matchType) const
 {
-    size_t count = 0;
-    for (std::vector<NamePair>::const_iterator  it = mTypes.begin(),
-                                                itEnd = mTypes.end(); it != itEnd; ++it) {
-        const NamePair& type = *it;
-        if (type == matchType)    count++;
-    }
-    return count;
+    return std::count(mTypes.begin(), mTypes.end(), matchType);
 }
 
 
@@ -626,14 +614,13 @@ size_t
 AttributeSet::Descriptor::memUsage() const
 {
     size_t bytes = sizeof(NameToPosMap::mapped_type) * this->size();
-    for (NameToPosMap::const_iterator it = mNameMap.begin(),
-        end = mNameMap.end(); it != end; ++it) {
+    for (auto it = mNameMap.cbegin(), end = mNameMap.cend(); it != end; ++it) {
         bytes += it->first.capacity();
     }
 
-    for (size_t n = 0, N = mTypes.size(); n < N; ++n) {
-         bytes += mTypes[n].first.capacity();
-         bytes += mTypes[n].second.capacity();
+    for (const NamePair& type : mTypes) {
+         bytes += type.first.capacity();
+         bytes += type.second.capacity();
     }
 
     return sizeof(*this) + bytes;
@@ -643,7 +630,7 @@ AttributeSet::Descriptor::memUsage() const
 size_t
 AttributeSet::Descriptor::find(const std::string& name) const
 {
-    NameToPosMap::const_iterator it = mNameMap.find(name);
+    auto it = mNameMap.find(name);
     if (it != mNameMap.end()) {
         return it->second;
     }
@@ -659,7 +646,7 @@ AttributeSet::Descriptor::rename(const std::string& fromName, const std::string&
     size_t pos = INVALID_POS;
 
     // check if the new name is already used.
-    NameToPosMap::iterator it = mNameMap.find(toName);
+    auto it = mNameMap.find(toName);
     if (it != mNameMap.end()) return pos;
 
     it = mNameMap.find(fromName);
@@ -769,12 +756,11 @@ AttributeSet::Descriptor::pruneUnusedDefaultValues()
 
     std::vector<Name> metaToErase;
 
-    for (MetaMap::ConstMetaIterator it = mMetadata.beginMeta(),
-                                    itEnd = mMetadata.endMeta(); it != itEnd; ++it) {
+    for (auto it = mMetadata.beginMeta(), itEnd = mMetadata.endMeta(); it != itEnd; ++it) {
         const Name name = it->first;
 
         // ignore non-default metadata
-        if (!boost::starts_with(name, "default:"))   continue;
+        if (!startsWith(name, "default:"))   continue;
 
         const Name defaultName = name.substr(8, it->first.size() - 8);
 
@@ -785,9 +771,8 @@ AttributeSet::Descriptor::pruneUnusedDefaultValues()
 
     // remove this metadata
 
-    for (std::vector<Name>::const_iterator  it = metaToErase.begin(),
-                                            endIt = metaToErase.end(); it != endIt; ++it) {
-        mMetadata.removeMeta(*it);
+    for (const Name& name : metaToErase) {
+        mMetadata.removeMeta(name);
     }
 }
 
@@ -798,7 +783,7 @@ AttributeSet::Descriptor::insert(const std::string& name, const NamePair& typeNa
     if (!validName(name))  throw RuntimeError("Attribute name contains invalid characters - " + name);
 
     size_t pos = INVALID_POS;
-    NameToPosMap::iterator it = mNameMap.find(name);
+    auto it = mNameMap.find(name);
     if (it != mNameMap.end()) {
         pos = it->second;
     } else {
@@ -820,10 +805,10 @@ AttributeSet::Descriptor::create(const NameAndTypeVec& attrs,
                                  const NameToPosMap& groupMap,
                                  const MetaMap& metadata)
 {
-    Ptr newDescriptor(new Descriptor());
-    for (size_t n = 0, N = attrs.size(); n < N; ++n) {
-        const std::string& name = attrs[n].name;
-        newDescriptor->insert(name, attrs[n].type);
+    auto newDescriptor = std::make_shared<Descriptor>();
+    
+    for (const NameAndType& attr : attrs) {
+        newDescriptor->insert(attr.name, attr.type);
     }
 
     newDescriptor->mGroupMap = groupMap;
@@ -835,7 +820,7 @@ AttributeSet::Descriptor::create(const NameAndTypeVec& attrs,
 AttributeSet::Descriptor::Ptr
 AttributeSet::Descriptor::create(const NamePair& positionType)
 {
-    Ptr descr(new Descriptor());
+    auto descr = std::make_shared<Descriptor>();
     descr->insert("P", positionType);
     return descr;
 }
@@ -876,21 +861,17 @@ AttributeSet::Descriptor::appendTo(NameAndTypeVec& attrs) const
 {
     // build a std::map<pos, name> (ie key and value swapped)
 
-    typedef std::map<size_t, std::string> PosToNameMap;
+    using PosToNameMap = std::map<size_t, std::string>;
 
     PosToNameMap posToNameMap;
 
-    for (NameToPosMap::const_iterator   it = mNameMap.begin(),
-                                        endIt = mNameMap.end(); it != endIt; ++it) {
-
+    for (auto it = mNameMap.cbegin(), endIt = mNameMap.cend(); it != endIt; ++it) {
         posToNameMap[it->second] = it->first;
     }
 
     // std::map is sorted by key, so attributes can now be inserted in position order
 
-    for (PosToNameMap::const_iterator   it = posToNameMap.begin(),
-                                        endIt = posToNameMap.end(); it != endIt; ++it) {
-
+    for (auto it = posToNameMap.cbegin(), endIt = posToNameMap.cend(); it != endIt; ++it) {
         attrs.push_back(NameAndType(it->second, this->type(it->first)));
     }
 }
@@ -936,11 +917,9 @@ AttributeSet::Descriptor::uniqueName(const Name& name) const
 bool
 AttributeSet::Descriptor::validName(const Name& name)
 {
-    struct Internal {
-        static bool isNotValidChar(int c) { return !(isalnum(c) || (c == '_') || (c == '|') || (c == ':')); }
-    };
     if (name.empty())   return false;
-    return std::find_if(name.begin(), name.end(), Internal::isNotValidChar) == name.end();
+    return std::find_if(name.begin(), name.end(),
+            [&](int c) { return !(isalnum(c) || (c == '_') || (c == '|') || (c == ':')); } ) == name.end();
 }
 
 void
@@ -955,7 +934,7 @@ AttributeSet::Descriptor::parseNames(   std::vector<std::string>& includeNames,
     Name token;
     while (tokenStream >> token) {
 
-        bool negate = boost::starts_with(token, "^") || boost::starts_with(token, "!");
+        bool negate = startsWith(token, "^") || startsWith(token, "!");
 
         if (negate) {
             if (token.length() < 2) throw RuntimeError("Negate character (^) must prefix a name.");
@@ -981,13 +960,12 @@ AttributeSet::Descriptor::write(std::ostream& os) const
     const Index64 arraylength = Index64(mTypes.size());
     os.write(reinterpret_cast<const char*>(&arraylength), sizeof(Index64));
 
-    for(Index64 n = 0; n < arraylength; ++n) {
-        writeString(os, mTypes[n].first);
-        writeString(os, mTypes[n].second);
+    for (const NamePair& np : mTypes) {
+        writeString(os, np.first);
+        writeString(os, np.second);
     }
 
-    NameToPosMap::const_iterator it = mNameMap.begin(), endIt = mNameMap.end();
-    for (; it != endIt; ++it) {
+    for (auto it = mNameMap.begin(), endIt = mNameMap.end(); it != endIt; ++it) {
         writeString(os, it->first);
         os.write(reinterpret_cast<const char*>(&it->second), sizeof(Index64));
     }
@@ -995,8 +973,7 @@ AttributeSet::Descriptor::write(std::ostream& os) const
     const Index64 grouplength = Index64(mGroupMap.size());
     os.write(reinterpret_cast<const char*>(&grouplength), sizeof(Index64));
 
-    NameToPosMap::const_iterator groupIt = mGroupMap.begin(), endGroupIt = mGroupMap.end();
-    for (; groupIt != endGroupIt; ++groupIt) {
+    for (auto groupIt = mGroupMap.cbegin(), endGroupIt = mGroupMap.cend(); groupIt != endGroupIt; ++groupIt) {
         writeString(os, groupIt->first);
         os.write(reinterpret_cast<const char*>(&groupIt->second), sizeof(Index64));
     }
@@ -1013,16 +990,15 @@ AttributeSet::Descriptor::read(std::istream& is)
 
     std::vector<NamePair>(size_t(arraylength)).swap(mTypes);
 
-    for(Index64 n = 0; n < arraylength; ++n) {
-        const Name type1 = readString(is);
-        const Name type2 = readString(is);
-        mTypes[n] = NamePair(type1, type2);
+    for (NamePair& np : mTypes) {
+        np.first = readString(is);
+        np.second = readString(is);
     }
 
     mNameMap.clear();
     std::pair<std::string, size_t> nameAndOffset;
 
-    for(Index64 n = 0; n < arraylength; ++n) {
+    for (Index64 n = 0; n < arraylength; ++n) {
         nameAndOffset.first = readString(is);
         if (!validName(nameAndOffset.first))  throw IoError("Attribute name contains invalid characters - " + nameAndOffset.first);
         is.read(reinterpret_cast<char*>(&nameAndOffset.second), sizeof(Index64));
@@ -1032,7 +1008,7 @@ AttributeSet::Descriptor::read(std::istream& is)
     Index64 grouplength = 0;
     is.read(reinterpret_cast<char*>(&grouplength), sizeof(Index64));
 
-    for(Index64 n = 0; n < grouplength; ++n) {
+    for (Index64 n = 0; n < grouplength; ++n) {
         nameAndOffset.first = readString(is);
         if (!validName(nameAndOffset.first))  throw IoError("Group name contains invalid characters - " + nameAndOffset.first);
         is.read(reinterpret_cast<char*>(&nameAndOffset.second), sizeof(Index64));
