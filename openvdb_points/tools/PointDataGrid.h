@@ -52,12 +52,127 @@
 
 #include <utility> // std::pair, std::make_pair
 
+#ifdef OPENVDB_USE_BLOSC
+#include <blosc.h>
+#endif
 
 class TestPointDataLeaf;
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
+
+namespace io
+{
+
+/// @brief openvdb::io::readCompressedValues specialized on PointDataIndex32 arrays to
+/// ignore the value mask, use a larger block size and use 16-bit size instead of 64-bit
+template<>
+inline void
+readCompressedValues(   std::istream& is, PointDataIndex32* destBuf, Index destCount,
+                        const util::NodeMask<3>& /*valueMask*/, bool /*fromHalf*/)
+{
+    static_assert(sizeof(PointDataIndex32) == sizeof(Index32),
+                    "Size of PointDataIndex32 expected to match size of Index32");
+
+    const int destBytes = destCount*sizeof(Index32);
+    const int maximumBytes = std::numeric_limits<uint16_t>::max();
+    if (destBytes >= maximumBytes) {
+        OPENVDB_THROW(openvdb::IoError, "Cannot read more than " <<
+                                maximumBytes << " bytes in voxel values.")
+    }
+
+    uint16_t bytes16;
+    is.read(reinterpret_cast<char*>(&bytes16), sizeof(uint16_t));
+
+    if (bytes16 == std::numeric_limits<uint16_t>::max()) { // uncompressed
+        if (destBuf == nullptr) {
+            is.seekg(destBytes, std::ios_base::cur);
+        }
+        else {
+            is.read(reinterpret_cast<char*>(destBuf), destBytes);
+        }
+    }
+    else {
+        if (destBuf == nullptr) {
+            is.seekg(int(bytes16), std::ios_base::cur);
+        }
+        else {
+#ifndef OPENVDB_USE_BLOSC
+            OPENVDB_THROW(IoError, "Blosc decoding is not supported");
+#else
+            std::unique_ptr<char[]> bloscBuffer(new char[int(bytes16)]);
+            is.read(bloscBuffer.get(), bytes16);
+            const int numUncompressedBytes = blosc_decompress_ctx(  /*src=*/bloscBuffer.get(),
+                                                                    /*dest=*/destBuf,
+                                                                    /*destsize=*/destBytes,
+                                                                    /*numthreads=*/1);
+            if (numUncompressedBytes < 1) {
+                OPENVDB_THROW(IoError, "blosc_decompress() returned error code "
+                                            << numUncompressedBytes);
+            }
+            if (numUncompressedBytes != destBytes) {
+                OPENVDB_THROW(IoError, "Expected to decompress " << destBytes
+                    << " byte" << (destBytes == 1 ? "" : "s") << ", got "
+                    << numUncompressedBytes << " byte" << (numUncompressedBytes == 1 ? "" : "s"));
+            }
+#endif
+        }
+    }
+}
+
+/// @brief openvdb::io::writeCompressedValues specialized on PointDataIndex32 arrays to
+/// ignore the value mask, use a larger block size and use 16-bit size instead of 64-bit
+template<>
+inline void
+writeCompressedValues(  std::ostream& os, PointDataIndex32* srcBuf, Index srcCount,
+                        const util::NodeMask<3>& /*valueMask*/,
+                        const util::NodeMask<3>& /*childMask*/, bool /*toHalf*/)
+{
+    static_assert(sizeof(PointDataIndex32) == sizeof(Index32),
+                    "Size of PointDataIndex32 expected to match size of Index32");
+
+    const int srcBytes = srcCount*sizeof(Index32);
+    const int maximumBytes = std::numeric_limits<uint16_t>::max();
+    if (srcBytes >= maximumBytes) {
+        OPENVDB_THROW(openvdb::IoError, "Cannot write more than " <<
+                                maximumBytes << " bytes in voxel values.")
+    }
+
+    int bloscBytes = 0;
+    std::unique_ptr<char[]> bloscBuffer;
+#ifdef OPENVDB_USE_BLOSC
+    size_t tempBytes = srcBytes + BLOSC_MAX_OVERHEAD;
+    if (tempBytes < BLOSC_MAX_BUFFERSIZE) {
+        bloscBuffer.reset(new char[tempBytes]);
+
+        bloscBytes = blosc_compress_ctx(/*clevel=*/9, // 0 (no compression) to 9 (maximum compression)
+                                        /*doshuffle=*/true,
+                                        /*typesize=*/sizeof(Index32),
+                                        /*srcsize=*/srcBytes,
+                                        /*src=*/reinterpret_cast<const char*>(srcBuf),
+                                        /*dest=*/bloscBuffer.get(),
+                                        /*destsize=*/tempBytes,
+                                        BLOSC_LZ4_COMPNAME,
+                                        /*blocksize=*/srcBytes,
+                                        /*numthreads=*/1);
+    }
+#endif
+
+    if (bloscBytes > 0) {
+        uint16_t bytes16(bloscBytes); // clamp to 16-bit unsigned integer
+        os.write(reinterpret_cast<const char*>(&bytes16), sizeof(uint16_t));
+        os.write(reinterpret_cast<const char*>(bloscBuffer.get()), bloscBytes);
+    }
+    else {
+        uint16_t bytes16(maximumBytes); // max value indicates uncompressed
+        os.write(reinterpret_cast<const char*>(&bytes16), sizeof(uint16_t));
+        os.write(reinterpret_cast<const char*>(srcBuf), srcBytes);
+    }
+}
+
+} // namespace io
+
 
 // forward declaration
 namespace tree {

@@ -51,6 +51,7 @@ public:
     CPPUNIT_TEST(testTopologyCopy);
     CPPUNIT_TEST(testEquivalence);
     CPPUNIT_TEST(testIterators);
+    CPPUNIT_TEST(testReadWriteCompression);
     CPPUNIT_TEST(testIO);
     CPPUNIT_TEST(testSwap);
     CPPUNIT_TEST(testCopyOnWrite);
@@ -65,6 +66,7 @@ public:
     void testTopologyCopy();
     void testEquivalence();
     void testIterators();
+    void testReadWriteCompression();
     void testIO();
     void testSwap();
     void testCopyOnWrite();
@@ -873,6 +875,108 @@ TestPointDataLeaf::testIterators()
         for (int i = 0; iterAll; ++iterAll, ++i)        CPPUNIT_ASSERT_EQUAL(*iterAll, Index32(i));
     }
 
+}
+
+
+void
+TestPointDataLeaf::testReadWriteCompression()
+{
+    using namespace openvdb;
+
+    util::NodeMask<3> valueMask;
+    util::NodeMask<3> childMask;
+
+    {  // simple read/write test
+        std::stringstream ss;
+
+        Index count = 8*8*8;
+        std::unique_ptr<PointDataIndex32[]> srcBuf(new PointDataIndex32[count]);
+
+        for (Index i = 0; i < count; i++)  srcBuf[i] = i;
+
+        {
+            io::writeCompressedValues(ss, srcBuf.get(), count, valueMask, childMask, false);
+
+            std::unique_ptr<PointDataIndex32[]> destBuf(new PointDataIndex32[count]);
+
+            io::readCompressedValues(ss, destBuf.get(), count, valueMask, false);
+
+            for (Index i = 0; i < count; i++) {
+                CPPUNIT_ASSERT_EQUAL(srcBuf.get()[i], destBuf.get()[i]);
+            }
+        }
+
+#ifndef OPENVDB_USE_BLOSC
+        { // write to indicate Blosc compression
+            ss.str("");
+
+            uint16_t bytes16(100); // clamp to 16-bit unsigned integer
+            ss.write(reinterpret_cast<const char*>(&bytes16), sizeof(uint16_t));
+
+            std::unique_ptr<PointDataIndex32[]> destBuf(new PointDataIndex32[count]);
+            CPPUNIT_ASSERT_THROW(io::readCompressedValues(ss, destBuf.get(), count, valueMask, false), IoError);
+        }
+#endif
+
+#ifdef OPENVDB_USE_BLOSC
+        { // mis-matching destination bytes cause decompression failures
+            std::unique_ptr<PointDataIndex32[]> destBuf(new PointDataIndex32[count]);
+
+            ss.str("");
+            io::writeCompressedValues(ss, srcBuf.get(), count, valueMask, childMask, false);
+            CPPUNIT_ASSERT_THROW(io::readCompressedValues(ss, destBuf.get(), count+1, valueMask, false), IoError);
+
+            ss.str("");
+            io::writeCompressedValues(ss, srcBuf.get(), count, valueMask, childMask, false);
+            CPPUNIT_ASSERT_THROW(io::readCompressedValues(ss, destBuf.get(), 1, valueMask, false), IoError);
+        }
+#endif
+
+        { // seek
+            ss.str("");
+
+            io::writeCompressedValues(ss, srcBuf.get(), count, valueMask, childMask, false);
+
+            int test(10772832);
+            ss.write(reinterpret_cast<const char*>(&test), sizeof(int));
+
+            PointDataIndex32* buf = nullptr;
+
+            io::readCompressedValues(ss, buf, count, valueMask, false);
+            int test2;
+            ss.read(reinterpret_cast<char*>(&test2), sizeof(int));
+
+            CPPUNIT_ASSERT_EQUAL(test, test2);
+        }
+    }
+
+    { // two values for non-compressible example
+        std::stringstream ss;
+
+        Index count = 2;
+        std::unique_ptr<PointDataIndex32[]> srcBuf(new PointDataIndex32[count]);
+
+        for (Index i = 0; i < count; i++)  srcBuf[i] = i;
+
+        io::writeCompressedValues(ss, srcBuf.get(), count, valueMask, childMask, false);
+
+        std::unique_ptr<PointDataIndex32[]> destBuf(new PointDataIndex32[count]);
+
+        io::readCompressedValues(ss, destBuf.get(), count, valueMask, false);
+
+        for (Index i = 0; i < count; i++) {
+            CPPUNIT_ASSERT_EQUAL(srcBuf.get()[i], destBuf.get()[i]);
+        }
+    }
+
+    { // throw at limit of 16-bit
+        std::stringstream ss;
+        PointDataIndex32* buf = nullptr;
+        Index count = std::numeric_limits<uint16_t>::max();
+
+        CPPUNIT_ASSERT_THROW(io::writeCompressedValues(ss, buf, count, valueMask, childMask, false), IoError);
+        CPPUNIT_ASSERT_THROW(io::readCompressedValues(ss, buf, count, valueMask, false), IoError);
+    }
 }
 
 
