@@ -103,8 +103,8 @@ void StringMetaInserter::insert(const Name& name)
     // find first unused index in the cache
 
     Index index = 1;
-    for (auto it = mIndices.begin(), itEnd = mIndices.end(); it != itEnd; ++it) {
-        if (*it != index)   break;
+    for (const Index& idx : mIndices) {
+        if (idx != index)   break;
         ++index;
     }
 

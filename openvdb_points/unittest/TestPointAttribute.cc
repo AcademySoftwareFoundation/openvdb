@@ -67,14 +67,10 @@ CPPUNIT_TEST_SUITE_REGISTRATION(TestPointAttribute);
 void
 TestPointAttribute::testAppendDrop()
 {
-    typedef TypedAttributeArray<float>   AttributeF;
-    typedef TypedAttributeArray<int>     AttributeI;
+    using AttributeF = TypedAttributeArray<float>;
+    using AttributeI = TypedAttributeArray<int>;
 
-    std::vector<Vec3s> positions;
-    positions.push_back(Vec3s(1, 1, 1));
-    positions.push_back(Vec3s(1, 10, 1));
-    positions.push_back(Vec3s(10, 1, 1));
-    positions.push_back(Vec3s(10, 10, 1));
+    std::vector<Vec3s> positions{{1, 1, 1}, {1, 10, 1}, {10, 1, 1}, {10, 10, 1}};
 
     const float voxelSize(1.0);
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
@@ -87,7 +83,7 @@ TestPointAttribute::testAppendDrop()
 
     // retrieve first and last leaf attribute sets
 
-    PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
+    auto leafIter = tree.cbeginLeaf();
     const AttributeSet& attributeSet = leafIter->attributeSet();
 
     ++leafIter;
@@ -180,8 +176,7 @@ TestPointAttribute::testAppendDrop()
     }
 
     { // drop an attribute by index, check ordering remains consistent
-        std::vector<size_t> indices;
-        indices.push_back(2);
+        std::vector<size_t> indices{2};
 
         dropAttributes(tree, indices);
 
@@ -194,9 +189,7 @@ TestPointAttribute::testAppendDrop()
     }
 
     { // drop attributes by index, check ordering remains consistent
-        std::vector<size_t> indices;
-        indices.push_back(1);
-        indices.push_back(3);
+        std::vector<size_t> indices{1, 3};
 
         dropAttributes(tree, indices);
 
@@ -207,8 +200,7 @@ TestPointAttribute::testAppendDrop()
     }
 
     { // drop last non-position attribute
-        std::vector<size_t> indices;
-        indices.push_back(1);
+        std::vector<size_t> indices{1};
 
         dropAttributes(tree, indices);
 
@@ -216,8 +208,7 @@ TestPointAttribute::testAppendDrop()
     }
 
     { // attempt (and fail) to drop position
-        std::vector<size_t> indices;
-        indices.push_back(0);
+        std::vector<size_t> indices{0};
 
         CPPUNIT_ASSERT_THROW(dropAttributes(tree, indices), openvdb::KeyError);
 
@@ -235,8 +226,7 @@ TestPointAttribute::testAppendDrop()
     }
 
     { // attempt (and fail) to drop non-existing attribute
-        std::vector<Name> names;
-        names.push_back("test1000");
+        std::vector<Name> names{"test1000"};
 
         CPPUNIT_ASSERT_THROW(dropAttributes(tree, names), openvdb::KeyError);
 
@@ -244,9 +234,7 @@ TestPointAttribute::testAppendDrop()
     }
 
     { // drop by name
-        std::vector<Name> names;
-        names.push_back("test1");
-        names.push_back("test2");
+        std::vector<Name> names{"test1", "test2"};
 
         dropAttributes(tree, names);
 
@@ -260,8 +248,7 @@ TestPointAttribute::testAppendDrop()
     }
 
     { // attempt (and fail) to drop position
-        std::vector<Name> names;
-        names.push_back("P");
+        std::vector<Name> names{"P"};
 
         CPPUNIT_ASSERT_THROW(dropAttributes(tree, names), openvdb::KeyError);
 
@@ -326,14 +313,10 @@ TestPointAttribute::testAppendDrop()
 void
 TestPointAttribute::testRename()
 {
-    typedef TypedAttributeArray<float>   AttributeF;
-    typedef TypedAttributeArray<int>     AttributeI;
+    using AttributeF = TypedAttributeArray<float>;
+    using AttributeI = TypedAttributeArray<int>;
 
-    std::vector<Vec3s> positions;
-    positions.push_back(Vec3s(1, 1, 1));
-    positions.push_back(Vec3s(1, 10, 1));
-    positions.push_back(Vec3s(10, 1, 1));
-    positions.push_back(Vec3s(10, 10, 1));
+    std::vector<Vec3s> positions{{1, 1, 1}, {1, 10, 1}, {10, 1, 1}, {10, 10, 1}};
 
     const float voxelSize(1.0);
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
@@ -352,7 +335,7 @@ TestPointAttribute::testRename()
 
     // retrieve first and last leaf attribute sets
 
-    PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
+    auto leafIter = tree.cbeginLeaf();
     const AttributeSet& attributeSet = leafIter->attributeSet();
     ++leafIter;
     const AttributeSet& attributeSet4 = leafIter->attributeSet();
@@ -378,11 +361,8 @@ TestPointAttribute::testRename()
     }
 
     { // rename multiple attributes
-        std::vector<Name> oldNames;
-        std::vector<Name> newNames;
-        oldNames.push_back("test1");
-        oldNames.push_back("test2");
-        newNames.push_back("test1renamed");
+        std::vector<Name> oldNames{"test1", "test2"};
+        std::vector<Name> newNames{"test1renamed"};
 
         CPPUNIT_ASSERT_THROW(renameAttributes(tree, oldNames, newNames), openvdb::ValueError);
 
@@ -411,14 +391,14 @@ TestPointAttribute::testRename()
 void
 TestPointAttribute::testBloscCompress()
 {
-    typedef TypedAttributeArray<int>     AttributeI;
+    using AttributeI = TypedAttributeArray<int>;
 
     std::vector<Vec3s> positions;
     for (float i = 1; i < 6; i+= 0.1) {
-        positions.push_back(Vec3s(1, i, 1));
-        positions.push_back(Vec3s(1, 1, i));
-        positions.push_back(Vec3s(10, i, 1));
-        positions.push_back(Vec3s(10, 1, i));
+        positions.emplace_back(1, i, 1);
+        positions.emplace_back(1, 1, i);
+        positions.emplace_back(10, i, 1);
+        positions.emplace_back(10, 1, i);
     }
 
     const float voxelSize(1.0);
@@ -432,8 +412,8 @@ TestPointAttribute::testBloscCompress()
 
     // retrieve first and last leaf attribute sets
 
-    PointDataTree::LeafIter leafIter = tree.beginLeaf();
-    PointDataTree::LeafIter leafIter2 = ++tree.beginLeaf();
+    auto leafIter = tree.beginLeaf();
+    auto leafIter2 = ++tree.beginLeaf();
 
     { // append an attribute, check descriptors are as expected
         appendAttribute<AttributeI>(tree, "compact");
@@ -441,7 +421,7 @@ TestPointAttribute::testBloscCompress()
         appendAttribute<AttributeI>(tree, "id2");
     }
 
-    typedef AttributeWriteHandle<int> AttributeHandleRWI;
+    using AttributeHandleRWI = AttributeWriteHandle<int>;
 
     { // set some id values (leaf 1)
         AttributeHandleRWI handleCompact(leafIter->attributeArray("compact"));

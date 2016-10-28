@@ -47,8 +47,6 @@
 #include <openvdb_points/tools/PointDataGrid.h>
 #include <openvdb_points/tools/PointAttribute.h>
 
-#include <boost/ptr_container/ptr_vector.hpp>
-
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
@@ -155,9 +153,9 @@ namespace point_group_internal {
 template<typename PointDataTreeType>
 struct CopyGroupOp {
 
-    typedef typename tree::LeafManager<PointDataTreeType>       LeafManagerT;
-    typedef typename LeafManagerT::LeafRange                    LeafRangeT;
-    typedef AttributeSet::Descriptor::GroupIndex                GroupIndex;
+    using LeafManagerT  = typename tree::LeafManager<PointDataTreeType>;
+    using LeafRangeT    = typename LeafManagerT::LeafRange;
+    using GroupIndex    = AttributeSet::Descriptor::GroupIndex;
 
     CopyGroupOp(PointDataTreeType& tree,
                 const GroupIndex& targetIndex,
@@ -168,12 +166,12 @@ struct CopyGroupOp {
 
     void operator()(const typename LeafManagerT::LeafRange& range) const {
 
-        for (typename LeafManagerT::LeafRange::Iterator leaf=range.begin(); leaf; ++leaf) {
+        for (auto leaf = range.begin(); leaf; ++leaf) {
 
             GroupHandle sourceGroup = leaf->groupHandle(mSourceIndex);
             GroupWriteHandle targetGroup = leaf->groupWriteHandle(mTargetIndex);
 
-            for (typename PointDataTreeType::LeafNodeType::IndexAllIter iter = leaf->beginIndexAll(); iter; ++iter) {
+            for (auto iter = leaf->beginIndexAll(); iter; ++iter) {
                 const bool groupOn = sourceGroup.get(*iter);
                 targetGroup.set(*iter, groupOn);
             }
@@ -192,15 +190,15 @@ struct CopyGroupOp {
 template <typename PointDataTree, bool Member>
 struct SetGroupOp
 {
-    typedef typename tree::LeafManager<PointDataTree>   LeafManagerT;
-    typedef AttributeSet::Descriptor::GroupIndex        GroupIndex;
+    using LeafManagerT  = typename tree::LeafManager<PointDataTree>;
+    using GroupIndex    = AttributeSet::Descriptor::GroupIndex;
 
     SetGroupOp(const AttributeSet::Descriptor::GroupIndex& index)
         : mIndex(index) { }
 
     void operator()(const typename LeafManagerT::LeafRange& range) const
     {
-        for (typename LeafManagerT::LeafRange::Iterator leaf=range.begin(); leaf; ++leaf) {
+        for (auto leaf = range.begin(); leaf; ++leaf) {
 
             // obtain the group attribute array
 
@@ -221,12 +219,12 @@ struct SetGroupOp
 template <typename PointDataTree, typename PointIndexTree, bool Remove>
 struct SetGroupFromIndexOp
 {
-    typedef typename tree::LeafManager<PointDataTree>   LeafManagerT;
-    typedef typename LeafManagerT::LeafRange            LeafRangeT;
-    typedef typename PointIndexTree::LeafNodeType       PointIndexLeafNode;
-    typedef typename PointIndexLeafNode::IndexArray     IndexArray;
-    typedef AttributeSet::Descriptor::GroupIndex        GroupIndex;
-    typedef std::vector<short>                          MembershipArray;
+    using LeafManagerT          = typename tree::LeafManager<PointDataTree>;
+    using LeafRangeT            = typename LeafManagerT::LeafRange;
+    using PointIndexLeafNode    = typename PointIndexTree::LeafNodeType;
+    using IndexArray            = typename PointIndexLeafNode::IndexArray;
+    using GroupIndex            = AttributeSet::Descriptor::GroupIndex;
+    using MembershipArray       = std::vector<short>;
 
     SetGroupFromIndexOp(const PointIndexTree& indexTree,
                         const MembershipArray& membership,
@@ -237,7 +235,7 @@ struct SetGroupFromIndexOp
 
     void operator()(const typename LeafManagerT::LeafRange& range) const
     {
-        for (typename LeafManagerT::LeafRange::Iterator leaf=range.begin(); leaf; ++leaf) {
+        for (auto leaf = range.begin(); leaf; ++leaf) {
 
             // obtain the PointIndexLeafNode (using the origin of the current leaf)
 
@@ -255,11 +253,9 @@ struct SetGroupFromIndexOp
 
             const IndexArray& indices = pointIndexLeaf->indices();
 
-            for (typename IndexArray::const_iterator it = indices.begin(),
-                                                     it_end = indices.end(); it != it_end; ++it)
-            {
-                if (Remove)                                 group.set(index, mMembership[*it]);
-                else if (mMembership[*it] == short(1))      group.set(index, short(1));
+            for (const Index64& i : indices) {
+                if (Remove)                                 group.set(index, mMembership[i]);
+                else if (mMembership[i] == short(1))        group.set(index, short(1));
 
                 index++;
             }
@@ -281,10 +277,10 @@ struct SetGroupFromIndexOp
 template <typename PointDataTree, typename FilterT, typename IterT = typename PointDataTree::LeafNodeType::ValueAllCIter>
 struct SetGroupByFilterOp
 {
-    typedef typename tree::LeafManager<PointDataTree>   LeafManagerT;
-    typedef typename LeafManagerT::LeafRange            LeafRangeT;
-    typedef typename PointDataTree::LeafNodeType        LeafNodeT;
-    typedef AttributeSet::Descriptor::GroupIndex        GroupIndex;
+    using LeafManagerT  = typename tree::LeafManager<PointDataTree>;
+    using LeafRangeT    = typename LeafManagerT::LeafRange;
+    using LeafNodeT     = typename PointDataTree::LeafNodeType;
+    using GroupIndex    = AttributeSet::Descriptor::GroupIndex;
 
     SetGroupByFilterOp( const GroupIndex& index, const FilterT& filter)
         : mIndex(index)
@@ -292,13 +288,13 @@ struct SetGroupByFilterOp
 
     void operator()(const typename LeafManagerT::LeafRange& range) const
     {
-        for (typename LeafManagerT::LeafRange::Iterator leaf=range.begin(); leaf; ++leaf) {
+        for (auto leaf = range.begin(); leaf; ++leaf) {
 
             // obtain the group attribute array
 
             GroupWriteHandle group(leaf->groupWriteHandle(mIndex));
 
-            IndexIter<IterT, FilterT> iter = leaf->template beginIndex<IterT, FilterT>(mFilter);
+            auto iter = leaf->template beginIndex<IterT, FilterT>(mFilter);
 
             for (; iter; ++iter) {
                 group.set(*iter, true);
@@ -324,7 +320,7 @@ struct SetGroupByFilterOp
 class GroupInfo
 {
 public:
-    typedef AttributeSet::Descriptor Descriptor;
+    using Descriptor = AttributeSet::Descriptor;
 
     GroupInfo(const AttributeSet& attributeSet)
         : mAttributeSet(attributeSet) { }
@@ -370,9 +366,9 @@ public:
         // build a list of group indices
 
         std::vector<size_t> indices;
-        for (Descriptor::ConstIterator  it = groupMap.begin(),
-                                        endIt = groupMap.end(); it != endIt; ++it) {
-            indices.push_back(it->second);
+        indices.reserve(groupMap.size());
+        for (const auto& namePos : groupMap) {
+            indices.push_back(namePos.second);
         }
 
         std::sort(indices.begin(), indices.end());
@@ -380,28 +376,29 @@ public:
         // return first index not present
 
         size_t offset = 0;
-        for (std::vector<size_t>::const_iterator    it = indices.begin(),
-                                                    endIt = indices.end(); it != endIt; ++it) {
-            if (*it != offset)     break;
+        for (const size_t& index : indices) {
+            if (index != offset)     break;
             offset++;
         }
 
         return offset;
     }
 
-    /// Fill the @p indices vector with the indices correlating to the group attribute arrays
-    void populateGroupIndices(std::vector<size_t>& indices) const
+    /// Return vector of indices correlating to the group attribute arrays
+    std::vector<size_t> populateGroupIndices() const
     {
+        std::vector<size_t> indices;
+
         const Descriptor::NameToPosMap& map = mAttributeSet.descriptor().map();
 
-        for (Descriptor::ConstIterator  it = map.begin(),
-                                        itEnd = map.end(); it != itEnd; ++it) {
-
-            const AttributeArray* array = mAttributeSet.getConst(it->first);
+        for (const auto& namePos : map) {
+            const AttributeArray* array = mAttributeSet.getConst(namePos.first);
             if (isGroup(*array)) {
-                indices.push_back(it->second);
+                indices.push_back(namePos.second);
             }
         }
+
+        return indices;
     }
 
     /// Determine if a move is required to efficiently compact the data and store the
@@ -412,16 +409,13 @@ public:
 
         const Descriptor::NameToPosMap& groupMap = mAttributeSet.descriptor().groupMap();
 
-        typedef Descriptor::NameToPosMap::const_reverse_iterator ReverseMapIterator;
-
-        for (ReverseMapIterator it = groupMap.rbegin(),
-                                itEnd = groupMap.rend(); it != itEnd; ++it) {
+        for (const auto& namePos : groupMap) {
 
             // move only required if source comes after the target
 
-            if (it->second >= targetOffset) {
-                sourceName = it->first;
-                sourceOffset = it->second;
+            if (namePos.second >= targetOffset) {
+                sourceName = namePos.first;
+                sourceOffset = namePos.second;
                 return true;
             }
         }
@@ -443,8 +437,7 @@ private:
 inline void deleteMissingPointGroups(   std::vector<std::string>& groups,
                                         const AttributeSet::Descriptor& descriptor)
 {
-    for (std::vector<std::string>::iterator it = groups.begin(); it != groups.end(); )
-    {
+    for (auto it = groups.begin(); it != groups.end();) {
         if (!descriptor.hasGroup(*it))  it = groups.erase(it);
         else                            ++it;
     }
@@ -457,7 +450,7 @@ inline void deleteMissingPointGroups(   std::vector<std::string>& groups,
 template <typename PointDataTree>
 inline void appendGroup(PointDataTree& tree, const Name& group)
 {
-    typedef AttributeSet::Descriptor                              Descriptor;
+    using Descriptor = AttributeSet::Descriptor;
 
     using point_attribute_internal::AppendAttributeOp;
     using point_group_internal::GroupInfo;
@@ -466,7 +459,7 @@ inline void appendGroup(PointDataTree& tree, const Name& group)
         OPENVDB_THROW(KeyError, "Cannot use an empty group name as a key.");
     }
 
-    typename PointDataTree::LeafCIter iter = tree.cbeginLeaf();
+    auto iter = tree.cbeginLeaf();
 
     if (!iter)  return;
 
@@ -526,9 +519,8 @@ inline void appendGroups(PointDataTree& tree,
     // TODO: could be more efficient by appending multiple groups at once
     // instead of one-by-one, however this is likely not that common a use case
 
-    for (std::vector<Name>::const_iterator  it = groups.begin(),
-                                            itEnd = groups.end(); it != itEnd; ++it) {
-        appendGroup(tree, *it);
+    for (const Name& name : groups) {
+        appendGroup(tree, name);
     }
 }
 
@@ -539,13 +531,13 @@ inline void appendGroups(PointDataTree& tree,
 template <typename PointDataTree>
 inline void dropGroup(PointDataTree& tree, const Name& group, const bool compact)
 {
-    typedef AttributeSet::Descriptor                              Descriptor;
+    using Descriptor = AttributeSet::Descriptor;
 
     if (group.empty()) {
         OPENVDB_THROW(KeyError, "Cannot use an empty group name as a key.");
     }
 
-    typename PointDataTree::LeafCIter iter = tree.cbeginLeaf();
+    auto iter = tree.cbeginLeaf();
 
     if (!iter)  return;
 
@@ -573,9 +565,8 @@ template <typename PointDataTree>
 inline void dropGroups( PointDataTree& tree,
                         const std::vector<Name>& groups)
 {
-    for (std::vector<Name>::const_iterator  it = groups.begin(),
-                                            itEnd = groups.end(); it != itEnd; ++it) {
-        dropGroup(tree, *it, /*compact=*/false);
+    for (const Name& name : groups) {
+        dropGroup(tree, name, /*compact=*/false);
     }
 
     // compaction done once for efficiency
@@ -590,11 +581,11 @@ inline void dropGroups( PointDataTree& tree,
 template <typename PointDataTree>
 inline void dropGroups( PointDataTree& tree)
 {
-    typedef AttributeSet::Descriptor        Descriptor;
+    using Descriptor = AttributeSet::Descriptor;
 
     using point_group_internal::GroupInfo;
 
-    typename PointDataTree::LeafCIter iter = tree.cbeginLeaf();
+    auto iter = tree.cbeginLeaf();
 
     if (!iter)  return;
 
@@ -610,8 +601,7 @@ inline void dropGroups( PointDataTree& tree)
 
     // find all indices for group attribute arrays
 
-    std::vector<size_t> indices;
-    groupInfo.populateGroupIndices(indices);
+    std::vector<size_t> indices = groupInfo.populateGroupIndices();
 
     // drop these attributes arrays
 
@@ -625,13 +615,13 @@ inline void dropGroups( PointDataTree& tree)
 template <typename PointDataTree>
 inline void compactGroups(PointDataTree& tree)
 {
-    typedef AttributeSet::Descriptor                              Descriptor;
-    typedef Descriptor::GroupIndex                                GroupIndex;
+    using Descriptor = AttributeSet::Descriptor;
+    using GroupIndex = Descriptor::GroupIndex;
 
     using point_group_internal::CopyGroupOp;
     using point_group_internal::GroupInfo;
 
-    typename PointDataTree::LeafCIter iter = tree.cbeginLeaf();
+    auto iter = tree.cbeginLeaf();
 
     if (!iter)  return;
 
@@ -667,8 +657,7 @@ inline void compactGroups(PointDataTree& tree)
 
     // drop unused attribute arrays
 
-    std::vector<size_t> indices;
-    groupInfo.populateGroupIndices(indices);
+    std::vector<size_t> indices = groupInfo.populateGroupIndices();
 
     const size_t totalAttributesToDrop = groupInfo.unusedGroups() / groupInfo.groupBits();
 
@@ -690,8 +679,8 @@ inline void setGroup(   PointDataTree& tree,
                         const Name& group,
                         const bool remove)
 {
-    typedef AttributeSet::Descriptor Descriptor;
-    typedef typename tree::template LeafManager<PointDataTree> LeafManagerT;
+    using Descriptor    = AttributeSet::Descriptor;
+    using LeafManagerT  = typename tree::template LeafManager<PointDataTree>;
 
     if (membership.size() != pointCount(tree)) {
         OPENVDB_THROW(LookupError, "Membership vector size must match number of points.");
@@ -699,7 +688,7 @@ inline void setGroup(   PointDataTree& tree,
 
     using point_group_internal::SetGroupFromIndexOp;
 
-    typename PointDataTree::LeafCIter iter = tree.cbeginLeaf();
+    auto iter = tree.cbeginLeaf();
 
     if (!iter)  return;
 
@@ -735,12 +724,12 @@ inline void setGroup(   PointDataTree& tree,
                         const Name& group,
                         const bool member)
 {
-    typedef AttributeSet::Descriptor Descriptor;
-    typedef typename tree::template LeafManager<PointDataTree> LeafManagerT;
+    using Descriptor    = AttributeSet::Descriptor;
+    using LeafManagerT  = typename tree::template LeafManager<PointDataTree>;
 
     using point_group_internal::SetGroupOp;
 
-    typename PointDataTree::LeafCIter iter = tree.cbeginLeaf();
+    auto iter = tree.cbeginLeaf();
 
     if (!iter)  return;
 
@@ -768,12 +757,12 @@ inline void setGroupByFilter(   PointDataTree& tree,
                                 const Name& group,
                                 const FilterT& filter)
 {
-    typedef AttributeSet::Descriptor Descriptor;
-    typedef typename tree::template LeafManager<PointDataTree> LeafManagerT;
+    using Descriptor    = AttributeSet::Descriptor;
+    using LeafManagerT  = typename tree::template LeafManager<PointDataTree>;
 
     using point_group_internal::SetGroupByFilterOp;
 
-    typename PointDataTree::LeafCIter iter = tree.cbeginLeaf();
+    auto iter = tree.cbeginLeaf();
 
     if (!iter)  return;
 
@@ -802,7 +791,7 @@ inline void setGroupByRandomTarget( PointDataTree& tree,
                                     const Index64 targetPoints,
                                     const unsigned int seed = 0)
 {
-    typedef RandomLeafFilter<PointDataTree, std::mt19937> RandomFilter;
+    using RandomFilter = RandomLeafFilter<PointDataTree, std::mt19937>;
 
     RandomFilter filter(tree, targetPoints, seed);
 
@@ -819,7 +808,7 @@ inline void setGroupByRandomPercentage( PointDataTree& tree,
                                         const float percentage = 10.0f,
                                         const unsigned int seed = 0)
 {
-    typedef RandomLeafFilter<PointDataTree, std::mt19937> RandomFilter;
+    using RandomFilter =  RandomLeafFilter<PointDataTree, std::mt19937>;
 
     const int currentPoints = pointCount(tree);
     const int targetPoints = int(math::Round((percentage * currentPoints)/100.0f));

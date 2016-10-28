@@ -181,8 +181,8 @@ namespace point_attribute_internal {
 template<typename PointDataTreeType>
 struct AppendAttributeOp {
 
-    typedef typename tree::LeafManager<PointDataTreeType>       LeafManagerT;
-    typedef typename LeafManagerT::LeafRange                    LeafRangeT;
+    using LeafManagerT  = typename tree::LeafManager<PointDataTreeType>;
+    using LeafRangeT    = typename LeafManagerT::LeafRange;
 
     AppendAttributeOp(  PointDataTreeType& tree,
                         AttributeSet::DescriptorPtr& descriptor,
@@ -199,8 +199,7 @@ struct AppendAttributeOp {
 
     void operator()(const LeafRangeT& range) const {
 
-        for (typename LeafRangeT::Iterator leaf=range.begin(); leaf; ++leaf) {
-
+        for (auto leaf = range.begin(); leaf; ++leaf) {
             const AttributeSet::Descriptor& expected = leaf->attributeSet().descriptor();
 
             AttributeArray::Ptr attribute = leaf->appendAttribute(expected, mDescriptor, mPos, mStride);
@@ -227,8 +226,8 @@ struct AppendAttributeOp {
 template <typename AttributeType, typename PointDataTreeType>
 struct CollapseAttributeOp {
 
-    typedef typename tree::LeafManager<PointDataTreeType>       LeafManagerT;
-    typedef typename LeafManagerT::LeafRange                    LeafRangeT;
+    using LeafManagerT  = typename tree::LeafManager<PointDataTreeType>;
+    using LeafRangeT    = typename LeafManagerT::LeafRange;
 
     CollapseAttributeOp(PointDataTreeType& tree,
                         const size_t pos,
@@ -239,8 +238,7 @@ struct CollapseAttributeOp {
 
     void operator()(const LeafRangeT& range) const {
 
-        for (typename LeafRangeT::Iterator leaf=range.begin(); leaf; ++leaf) {
-
+        for (auto leaf = range.begin(); leaf; ++leaf) {
             assert(leaf->hasAttribute(mPos));
             AttributeArray& array = leaf->attributeArray(mPos);
             AttributeType::collapse(&array, mUniformValue);
@@ -261,9 +259,9 @@ struct CollapseAttributeOp {
 template<typename PointDataTreeType>
 struct DropAttributesOp {
 
-    typedef typename tree::LeafManager<PointDataTreeType>       LeafManagerT;
-    typedef typename LeafManagerT::LeafRange                    LeafRangeT;
-    typedef std::vector<size_t>                                 Indices;
+    using LeafManagerT  = typename tree::LeafManager<PointDataTreeType>;
+    using LeafRangeT    = typename LeafManagerT::LeafRange;
+    using Indices       = std::vector<size_t>;
 
     DropAttributesOp(   PointDataTreeType& tree,
                         const Indices& indices,
@@ -274,7 +272,7 @@ struct DropAttributesOp {
 
     void operator()(const LeafRangeT& range) const {
 
-        for (typename LeafRangeT::Iterator leaf=range.begin(); leaf; ++leaf) {
+        for (auto leaf = range.begin(); leaf; ++leaf) {
 
             const AttributeSet::Descriptor& expected = leaf->attributeSet().descriptor();
 
@@ -296,13 +294,11 @@ struct DropAttributesOp {
 template<typename PointDataTreeType>
 struct CompactAttributesOp {
 
-    typedef typename tree::LeafManager<PointDataTreeType>       LeafManagerT;
-    typedef typename LeafManagerT::LeafRange                    LeafRangeT;
-
-    CompactAttributesOp() { }
+    using LeafManagerT  = typename tree::LeafManager<PointDataTreeType>;
+    using LeafRangeT    = typename LeafManagerT::LeafRange;
 
     void operator()(const LeafRangeT& range) const {
-        for (typename LeafRangeT::Iterator leaf=range.begin(); leaf; ++leaf) {
+        for (auto leaf = range.begin(); leaf; ++leaf) {
             leaf->compactAttributes();
         }
     }
@@ -315,9 +311,9 @@ struct CompactAttributesOp {
 template<typename PointDataTreeType>
 struct BloscCompressAttributesOp {
 
-    typedef typename tree::LeafManager<PointDataTreeType>       LeafManagerT;
-    typedef typename LeafManagerT::LeafRange                    LeafRangeT;
-    typedef std::vector<size_t>                                 Indices;
+    using LeafManagerT  = typename tree::LeafManager<PointDataTreeType>;
+    using LeafRangeT    = typename LeafManagerT::LeafRange;
+    using Indices       = std::vector<size_t>;
 
     BloscCompressAttributesOp(  PointDataTreeType& tree,
                                 const Indices& indices)
@@ -326,12 +322,11 @@ struct BloscCompressAttributesOp {
 
     void operator()(const LeafRangeT& range) const {
 
-        for (typename LeafRangeT::Iterator leaf=range.begin(); leaf; ++leaf) {
+        for (auto leaf = range.begin(); leaf; ++leaf) {
 
-            for (Indices::const_iterator    it = mIndices.begin(),
-                                            itEnd = mIndices.end(); it != itEnd; ++it) {
+            for (const size_t index : mIndices) {
 
-                AttributeArray& array = leaf->attributeArray(*it);
+                AttributeArray& array = leaf->attributeArray(index);
                 array.compress();
             }
         }
@@ -359,11 +354,11 @@ inline void appendAttribute(PointDataTree& tree,
                             const bool hidden,
                             const bool transient)
 {
-    typedef AttributeSet::Descriptor    Descriptor;
+    using Descriptor = AttributeSet::Descriptor;
 
     using point_attribute_internal::AppendAttributeOp;
 
-    typename PointDataTree::LeafCIter iter = tree.cbeginLeaf();
+    auto iter = tree.cbeginLeaf();
 
     if (!iter)  return;
 
@@ -392,7 +387,7 @@ inline void appendAttribute(PointDataTree& tree,
 
     // insert attributes using the new descriptor
 
-    typename tree::template LeafManager<PointDataTree> leafManager(tree);
+    tree::LeafManager<PointDataTree> leafManager(tree);
     AppendAttributeOp<PointDataTree> append(tree, newDescriptor, pos, stride, hidden, transient);
     tbb::parallel_for(leafManager.leafRange(), append);
 }
@@ -426,12 +421,12 @@ inline void collapseAttribute(  PointDataTree& tree,
                                 const Name& name,
                                 const typename AttributeType::ValueType& uniformValue)
 {
-    typedef typename tree::LeafManager<PointDataTree>       LeafManagerT;
-    typedef AttributeSet::Descriptor                        Descriptor;
+    using LeafManagerT  = typename tree::LeafManager<PointDataTree>;
+    using Descriptor    = AttributeSet::Descriptor;
 
     using point_attribute_internal::CollapseAttributeOp;
 
-    typename PointDataTree::LeafCIter iter = tree.cbeginLeaf();
+    auto iter = tree.cbeginLeaf();
 
     if (!iter)  return;
 
@@ -457,12 +452,12 @@ template <typename PointDataTree>
 inline void dropAttributes( PointDataTree& tree,
                             const std::vector<size_t>& indices)
 {
-    typedef typename tree::LeafManager<PointDataTree>       LeafManagerT;
-    typedef AttributeSet::Descriptor                        Descriptor;
+    using LeafManagerT  = typename tree::LeafManager<PointDataTree>;
+    using Descriptor    = AttributeSet::Descriptor;
 
     using point_attribute_internal::DropAttributesOp;
 
-    typename PointDataTree::LeafCIter iter = tree.cbeginLeaf();
+    auto iter = tree.cbeginLeaf();
 
     if (!iter)  return;
 
@@ -490,7 +485,7 @@ template <typename PointDataTree>
 inline void dropAttributes( PointDataTree& tree,
                             const std::vector<Name>& names)
 {
-    typename PointDataTree::LeafCIter iter = tree.cbeginLeaf();
+    auto iter = tree.cbeginLeaf();
 
     if (!iter)  return;
 
@@ -499,12 +494,12 @@ inline void dropAttributes( PointDataTree& tree,
 
     std::vector<size_t> indices;
 
-    for (std::vector<Name>::const_iterator it = names.begin(), itEnd = names.end(); it != itEnd; ++it) {
-        const size_t index = descriptor.find(*it);
+    for (const Name& name : names) {
+        const size_t index = descriptor.find(name);
 
         // do not attempt to drop an attribute that does not exist
         if (index == AttributeSet::INVALID_POS) {
-            OPENVDB_THROW(KeyError, "Cannot drop an attribute that does not exist - " << *it << ".");
+            OPENVDB_THROW(KeyError, "Cannot drop an attribute that does not exist - " << name << ".");
         }
 
         indices.push_back(index);
@@ -521,8 +516,7 @@ template <typename PointDataTree>
 inline void dropAttribute(  PointDataTree& tree,
                             const size_t& index)
 {
-    std::vector<size_t> indices;
-    indices.push_back(index);
+    std::vector<size_t> indices{index};
     dropAttributes(tree, indices);
 }
 
@@ -531,8 +525,7 @@ template <typename PointDataTree>
 inline void dropAttribute(  PointDataTree& tree,
                             const Name& name)
 {
-    std::vector<Name> names;
-    names.push_back(name);
+    std::vector<Name> names{name};
     dropAttributes(tree, names);
 }
 
@@ -549,23 +542,23 @@ inline void renameAttributes(   PointDataTree& tree,
         OPENVDB_THROW(ValueError, "Mis-matching sizes of name vectors, cannot rename attributes.");
     }
 
-    typedef AttributeSet::Descriptor                        Descriptor;
+    using Descriptor = AttributeSet::Descriptor;
 
-    typename PointDataTree::LeafIter iter = tree.beginLeaf();
+    auto iter = tree.beginLeaf();
 
     if (!iter)  return;
 
     const AttributeSet& attributeSet = iter->attributeSet();
     const Descriptor& descriptor = attributeSet.descriptor();
-    AttributeSet::DescriptorPtr newDescriptor(new Descriptor(descriptor));
+    auto newDescriptor = std::make_shared<Descriptor>(descriptor);
 
     for (size_t i = 0; i < oldNames.size(); i++) {
-        const Name oldName(oldNames[i]);
+        const Name& oldName = oldNames[i];
         if (descriptor.find(oldName) == AttributeSet::INVALID_POS) {
             OPENVDB_THROW(KeyError, "Cannot find requested attribute - " << oldName << ".");
         }
 
-        const Name newName(newNames[i]);
+        const Name& newName = newNames[i];
         if (descriptor.find(newName) != AttributeSet::INVALID_POS) {
             OPENVDB_THROW(KeyError, "Cannot rename attribute as new name already exists - " << newName << ".");
         }
@@ -591,11 +584,7 @@ inline void renameAttribute(PointDataTree& tree,
                             const Name& oldName,
                             const Name& newName)
 {
-    std::vector<Name> oldNames;
-    std::vector<Name> newNames;
-    oldNames.push_back(oldName);
-    newNames.push_back(newName);
-    renameAttributes(tree, oldNames, newNames);
+    renameAttributes(tree, {oldName}, {newName});
 }
 
 
@@ -605,11 +594,11 @@ inline void renameAttribute(PointDataTree& tree,
 template <typename PointDataTree>
 inline void compactAttributes(PointDataTree& tree)
 {
-    typedef typename tree::LeafManager<PointDataTree>       LeafManagerT;
+    using LeafManagerT = typename tree::LeafManager<PointDataTree>;
 
     using point_attribute_internal::CompactAttributesOp;
 
-    typename PointDataTree::LeafIter iter = tree.beginLeaf();
+    auto iter = tree.beginLeaf();
     if (!iter)  return;
 
     tbb::parallel_for(LeafManagerT(tree).leafRange(), CompactAttributesOp<PointDataTree>());
@@ -625,10 +614,10 @@ inline void bloscCompressAttribute( PointDataTree& tree,
 {
     using point_attribute_internal::BloscCompressAttributesOp;
 
-    typedef typename tree::LeafManager<PointDataTree>       LeafManagerT;
-    typedef AttributeSet::Descriptor                        Descriptor;
+    using LeafManagerT  = typename tree::LeafManager<PointDataTree>;
+    using Descriptor    = AttributeSet::Descriptor;
 
-    typename PointDataTree::LeafCIter iter = tree.cbeginLeaf();
+    auto iter = tree.cbeginLeaf();
 
     if (!iter)  return;
 
@@ -643,8 +632,7 @@ inline void bloscCompressAttribute( PointDataTree& tree,
 
     // blosc compress attributes
 
-    std::vector<size_t> indices;
-    indices.push_back(index);
+    std::vector<size_t> indices{index};
 
     tbb::parallel_for(LeafManagerT(tree).leafRange(), BloscCompressAttributesOp<PointDataTree>(tree, indices));
 }

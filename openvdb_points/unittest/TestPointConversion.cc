@@ -65,9 +65,9 @@ CPPUNIT_TEST_SUITE_REGISTRATION(TestPointConversion);
 template <typename T>
 struct AttributeWrapper
 {
-    typedef T ValueType;
-    typedef T PosType;
-    typedef T value_type;
+    using ValueType     = T;
+    using PosType       = T;
+    using value_type    = T;
 
     struct Handle
     {
@@ -113,7 +113,7 @@ private:
 
 struct GroupWrapper
 {
-    GroupWrapper() { }
+    GroupWrapper() = default;
 
     void setOffsetOn(openvdb::Index index) {
         mGroup[index] = short(1);
@@ -229,9 +229,9 @@ void
 TestPointConversion::testPointConversion()
 {
     // Define and register some common attribute types
-    typedef TypedAttributeArray<int32_t>        AttributeI;
-    typedef TypedAttributeArray<float>          AttributeF;
-    typedef TypedAttributeArray<openvdb::Vec3s> AttributeVec3s;
+    using AttributeI        = TypedAttributeArray<int32_t>;
+    using AttributeF        = TypedAttributeArray<float>;
+    using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
 
     AttributeI::registerType();
     AttributeF::registerType();
@@ -350,9 +350,7 @@ TestPointConversion::testPointConversion()
 
     // pack and sort the new buffers based on id
 
-    std::vector<PointData> pointData;
-
-    pointData.resize(count);
+    std::vector<PointData> pointData(count);
 
     for (unsigned int i = 0; i < count; i++) {
         pointData[i].id = outputId.buffer()[startOffset + i];
@@ -387,8 +385,7 @@ TestPointConversion::testPointConversion()
     outputString.resize(startOffset + halfCount);
     outputGroup.resize(startOffset + halfCount);
 
-    std::vector<Name> includeGroups;
-    includeGroups.push_back("test");
+    std::vector<Name> includeGroups{"test"};
 
     pointOffsets.clear();
     getPointOffsets(pointOffsets, tree, includeGroups);
@@ -441,9 +438,9 @@ void
 TestPointConversion::testStride()
 {
     // Define and register some common attribute types
-    typedef TypedAttributeArray<int32_t>        AttributeI;
-    typedef TypedAttributeArray<float>          AttributeF;
-    typedef TypedAttributeArray<openvdb::Vec3s> AttributeVec3s;
+    using AttributeI        = TypedAttributeArray<int32_t>;
+    using AttributeF        = TypedAttributeArray<float>;
+    using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
 
     AttributeI::registerType();
     AttributeF::registerType();

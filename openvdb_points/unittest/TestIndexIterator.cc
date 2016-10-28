@@ -70,8 +70,8 @@ TestIndexIterator::testValueIndexIterator()
     using namespace openvdb;
     using namespace openvdb::tree;
 
-    typedef LeafNode<unsigned, 1> LeafNode;
-    typedef LeafNode::ValueOnIter ValueOnIter;
+    using LeafNode      = LeafNode<unsigned, 1>;
+    using ValueOnIter   = LeafNode::ValueOnIter;
 
     const int size = LeafNode::SIZE;
 
@@ -91,7 +91,7 @@ TestIndexIterator::testValueIndexIterator()
         CPPUNIT_ASSERT_EQUAL(iterCount(iter), Index64(size));
 
         // check assignment operator
-        IndexIter<ValueOnIter, NullFilter>::ValueIndexIter iter2 = iter;
+        auto iter2 = iter;
         CPPUNIT_ASSERT_EQUAL(iterCount(iter2), Index64(size));
 
         ++iter;
@@ -322,7 +322,7 @@ TestIndexIterator::testProfile()
         CPPUNIT_ASSERT(sum);
     }
 
-    typedef LeafNode<unsigned, 3> LeafNode;
+    using LeafNode = LeafNode<unsigned, 3>;
     LeafNode leafNode;
 
     const int size = LeafNode::SIZE;
@@ -335,7 +335,7 @@ TestIndexIterator::testProfile()
     { // manual value iteration
         ProfileTimer timer("ValueIteratorManual: sum");
         volatile int sum = 0;
-        LeafNode::ValueOnCIter indexIter(leafNode.cbeginValueOn());
+        auto indexIter(leafNode.cbeginValueOn());
         int offset = 0;
         for (; indexIter; ++indexIter) {
             int start = offset > 0 ? leafNode.getValue(offset - 1) : 0;
@@ -351,7 +351,7 @@ TestIndexIterator::testProfile()
     { // value on iterator (all on)
         ProfileTimer timer("ValueIndexIter: sum");
         volatile int sum = 0;
-        LeafNode::ValueAllCIter indexIter(leafNode.cbeginValueAll());
+        auto indexIter(leafNode.cbeginValueAll());
         IndexIter<LeafNode::ValueAllCIter, NullFilter>::ValueIndexIter iter(indexIter);
         for (; iter; ++iter) {
             sum += *iter;

@@ -64,7 +64,6 @@ inline Index64 iterCount(const IterT& iter);
 class NullFilter
 {
 public:
-    NullFilter() { }
     static bool initialized() { return true; }
     template <typename LeafT> void reset(const LeafT&) { }
     template <typename IterT> static bool valid(const IterT&) { return true; }
@@ -77,19 +76,18 @@ class ValueVoxelCIter
 public:
     struct Parent
     {
-        Parent(): mOffset(0) { }
+        Parent() = default;
         explicit Parent(Index32 offset): mOffset(offset) { }
         Index32 getValue(unsigned /*offset*/) const { return mOffset; }
     private:
-        Index32 mOffset;
+        Index32 mOffset = 0;
     }; // struct Parent
 
-    typedef Parent NodeType;
+    using NodeType = Parent;
 
-    ValueVoxelCIter()
-        : mOffset(0), mParent(), mValid(true) {}
+    ValueVoxelCIter() = default;
     ValueVoxelCIter(Index32 prevOffset, Index32 offset)
-        : mOffset(offset), mParent(prevOffset), mValid(true) {}
+        : mOffset(offset), mParent(prevOffset) { }
     ValueVoxelCIter(const ValueVoxelCIter& other)
         : mOffset(other.mOffset), mParent(other.mParent), mValid(other.mValid) { }
 
@@ -122,9 +120,9 @@ public:
     inline bool operator!=(const ValueVoxelCIter& other) const { return !this->operator==(other); }
 
 private:
-    Index32 mOffset;
+    Index32 mOffset = 0;
     Parent mParent;
-    mutable bool mValid;
+    mutable bool mValid = true;
 }; // class ValueVoxelCIter
 
 
@@ -149,7 +147,7 @@ public:
     {
     public:
         ValueIndexIter(const IteratorT& iter)
-            : mEnd(0), mItem(0), mIter(iter), mParent(&mIter.parent())
+            : mIter(iter), mParent(&mIter.parent())
         {
             if (mIter) {
                 assert(mParent);
@@ -203,7 +201,8 @@ public:
         bool operator!=(const ValueIndexIter& other) const { return !this->operator==(other); }
 
     private:
-        Index32 mEnd, mItem;
+        Index32 mEnd = 0;
+        Index32 mItem = 0;
         IteratorT mIter;
         const typename IteratorT::NodeType* mParent;
     }; // ValueIndexIter

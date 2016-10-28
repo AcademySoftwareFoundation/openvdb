@@ -45,8 +45,8 @@ namespace points {
 using namespace openvdb::tools;
 using namespace openvdb::math;
 
-typedef tbb::mutex Mutex;
-typedef Mutex::scoped_lock Lock;
+using Mutex = tbb::mutex;
+using Lock  = Mutex::scoped_lock;
 
 // Declare this at file scope to ensure thread-safe initialization.
 Mutex sInitMutex;

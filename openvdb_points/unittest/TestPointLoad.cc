@@ -79,14 +79,15 @@ TestPointLoad::testLoad()
 
     // create a tree with multiple points, four leaves
 
-    std::vector<Vec3s> positions;
-    positions.push_back(Vec3s(1, 1, 1));
-    positions.push_back(Vec3s(1, 2, 1));
-    positions.push_back(Vec3s(2, 1, 1));
-    positions.push_back(Vec3s(2, 2, 1));
-    positions.push_back(Vec3s(20, 1, 1));
-    positions.push_back(Vec3s(1, 20, 1));
-    positions.push_back(Vec3s(1, 1, 20));
+    std::vector<Vec3s> positions =  {
+                                        {1, 1, 1},
+                                        {1, 2, 1},
+                                        {2, 1, 1},
+                                        {2, 2, 1},
+                                        {20, 1, 1},
+                                        {1, 20, 1},
+                                        {1, 1, 20}
+                                    };
 
     PointDataGrid::Ptr grid = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
     PointDataTree& tree2 = grid->tree();
@@ -99,8 +100,7 @@ TestPointLoad::testLoad()
 
         io::File fileOut(filename);
 
-        GridCPtrVec grids;
-        grids.push_back(grid);
+        GridCPtrVec grids{grid};
 
         fileOut.write(grids);
     }

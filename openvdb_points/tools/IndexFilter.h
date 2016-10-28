@@ -69,31 +69,28 @@ namespace index_filter_internal {
 
 // generate a random subset of n indices from the range [0:m]
 template <typename RandGenT, typename IntType>
-void generateRandomSubset(std::vector<IntType>& values, const unsigned int seed, const IntType n, const IntType m)
+std::vector<IntType>
+generateRandomSubset(const unsigned int seed, const IntType n, const IntType m)
 {
-    if (n <= 0)     return;
+    if (n <= 0)     return std::vector<IntType>();
 
-    if (n >= m) {
-        values.reserve(n);
-        for (int i = 0; i < int(m); i++)    values.push_back(IntType(i));
-        return;
-    }
-
-    // reserve and fill vector with ascending indices
-    values.reserve(m);
-    for (int i = 0; i < int(m); i++)    values.push_back(i);
+    // fill vector with ascending indices
+    std::vector<IntType> values(m);
+    std::iota(values.begin(), values.end(), 0);
+    if (n >= m) return values;
 
     // shuffle indices using random generator
 
     RandGenT randGen(seed);
-    std::uniform_int_distribution<IntType> dist(0, m);
     std::shuffle(values.begin(), values.end(), randGen);
 
-    // resize the container to n elements (does not reduce capacity)
+    // resize the container to n elements
     values.resize(n);
 
     // sort the subset of the indices vector that will be used
     std::sort(values.begin(), values.end());
+
+    return values;
 }
 
 
@@ -106,14 +103,13 @@ void generateRandomSubset(std::vector<IntType>& values, const unsigned int seed,
 class MultiGroupFilter
 {
 public:
-    typedef std::vector<Name> NameVector;
-    typedef boost::ptr_vector<GroupHandle> HandleVector;
+    using NameVector    = std::vector<Name>;
+    using HandleVector  = boost::ptr_vector<GroupHandle>;
 
     MultiGroupFilter(   const NameVector& include,
                         const NameVector& exclude)
         : mInclude(include)
-        , mExclude(exclude)
-        , mInitialized(false) { }
+        , mExclude(exclude) { }
 
     MultiGroupFilter(   const MultiGroupFilter& filter)
         : mInclude(filter.mInclude)
@@ -128,15 +124,15 @@ public:
     void reset(const LeafT& leaf) {
         mIncludeHandles.clear();
         mExcludeHandles.clear();
-        for (NameVector::const_iterator it = mInclude.begin(),
-                                        itEnd = mInclude.end(); it != itEnd; ++it) {
-            if (!leaf.attributeSet().descriptor().hasGroup(*it))    continue;
-            mIncludeHandles.push_back(new GroupHandle(leaf.groupHandle(*it)));
+        for (const Name& name : mInclude) {
+            if (leaf.attributeSet().descriptor().hasGroup(name)) {
+                mIncludeHandles.push_back(new GroupHandle(leaf.groupHandle(name)));
+            }
         }
-        for (NameVector::const_iterator     it = mExclude.begin(),
-                                            itEnd = mExclude.end(); it != itEnd; ++it) {
-            if (!leaf.attributeSet().descriptor().hasGroup(*it))    continue;
-            mExcludeHandles.push_back(new GroupHandle(leaf.groupHandle(*it)));
+        for (const Name& name : mExclude) {
+            if (leaf.attributeSet().descriptor().hasGroup(name)) {
+                mExcludeHandles.push_back(new GroupHandle(leaf.groupHandle(name)));
+            }
         }
         mInitialized = true;
     }
@@ -145,18 +141,16 @@ public:
     bool valid(const IterT& iter) const {
         assert(mInitialized);
         // accept no include filters as valid
-        bool includeValid = mIncludeHandles.size() == 0;
-        for (HandleVector::const_iterator   it = mIncludeHandles.begin(),
-                                            itEnd = mIncludeHandles.end(); it != itEnd; ++it) {
-            if (it->get(*iter)) {
+        bool includeValid = mIncludeHandles.empty();
+        for (const GroupHandle& handle : mIncludeHandles) {
+            if (handle.get(*iter)) {
                 includeValid = true;
                 break;
             }
         }
         if (!includeValid)          return false;
-        for (HandleVector::const_iterator   it = mExcludeHandles.begin(),
-                                            itEnd = mExcludeHandles.end(); it != itEnd; ++it) {
-            if (it->get(*iter))     return false;
+        for (const GroupHandle& handle : mExcludeHandles) {
+            if (handle.get(*iter))  return false;
         }
         return true;
     }
@@ -166,7 +160,7 @@ private:
     const NameVector mExclude;
     HandleVector mIncludeHandles;
     HandleVector mExcludeHandles;
-    bool mInitialized;
+    bool mInitialized = false;
 }; // class MultiGroupFilter
 
 
@@ -175,30 +169,26 @@ template <typename PointDataTreeT, typename RandGenT>
 class RandomLeafFilter
 {
 public:
-    typedef std::pair<Index, Index> SeedCountPair;
-    typedef std::map<openvdb::Coord, SeedCountPair> LeafMap;
+    using SeedCountPair = std::pair<Index, Index>;
+    using LeafMap       = std::map<openvdb::Coord, SeedCountPair>;
 
     RandomLeafFilter(   const PointDataTreeT& tree,
                         const Index64 targetPoints,
-                        const unsigned int seed = 0)
-        : mCount(0)
-        , mSubsetOffset(-1)
-        , mNextIndex(-1)
-    {
+                        const unsigned int seed = 0) {
         Index64 currentPoints = 0;
-        for (typename PointDataTreeT::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
+        for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
             currentPoints += iter->pointCount();
         }
 
         const float factor = targetPoints > currentPoints ? 1.0f : float(targetPoints) / float(currentPoints);
 
         std::mt19937 generator(seed);
-        std::uniform_int_distribution<unsigned int> dist(0, std::numeric_limits<unsigned int>::max()-1);
+        std::uniform_int_distribution<unsigned int> dist(0, std::numeric_limits<unsigned int>::max() - 1);
 
         Index32 leafCounter = 0;
         float totalPointsFloat = 0.0f;
         int totalPoints = 0;
-        for (typename PointDataTreeT::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
+        for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
             // for the last leaf - use the remaining points to reach the target points
             if (leafCounter + 1 == tree.leafCount()) {
                 const int leafPoints = targetPoints - totalPoints;
@@ -222,7 +212,7 @@ public:
     void reset(const LeafT& leaf) {
         using index_filter_internal::generateRandomSubset;
 
-        const LeafMap::const_iterator it = mLeafMap.find(leaf.origin());
+        auto it = mLeafMap.find(leaf.origin());
         if (it == mLeafMap.end()) {
             OPENVDB_THROW(openvdb::KeyError, "Cannot find leaf origin in map for random filter - " << leaf.origin());
         }
@@ -232,8 +222,7 @@ public:
         const Index total = leaf.pointCount();
         mCount = std::min(value.second, total);
 
-        mIndices.clear();
-        generateRandomSubset<RandGenT, int>(mIndices, seed, mCount, total);
+        mIndices = generateRandomSubset<RandGenT, int>(seed, mCount, total);
 
         mSubsetOffset = -1;
         mNextIndex = -1;
@@ -259,9 +248,9 @@ protected:
 private:
     LeafMap mLeafMap;
     std::vector<int> mIndices;
-    int mCount;
-    mutable int mSubsetOffset;
-    mutable int mNextIndex;
+    int mCount = 0;
+    mutable int mSubsetOffset = -1;
+    mutable int mNextIndex = -1;
 }; // class RandomLeafFilter
 
 
@@ -270,7 +259,7 @@ template <typename RandGenT, typename IntType>
 class AttributeHashFilter
 {
 public:
-    typedef AttributeHandle<IntType> Handle;
+    using Handle = AttributeHandle<IntType>;
 
     AttributeHashFilter(const size_t index,
                         const double percentage,
@@ -317,8 +306,8 @@ template <typename LevelSetGridT>
 class LevelSetFilter
 {
 public:
-    typedef typename LevelSetGridT::ValueType ValueT;
-    typedef AttributeHandle<openvdb::Vec3f> Handle;
+    using ValueT = typename LevelSetGridT::ValueType;
+    using Handle = AttributeHandle<openvdb::Vec3f>;
 
     LevelSetFilter( const LevelSetGridT& grid,
                     const math::Transform& transform,
@@ -386,7 +375,7 @@ private:
 class BBoxFilter
 {
 public:
-    typedef AttributeHandle<openvdb::Vec3f> Handle;
+    using Handle = AttributeHandle<openvdb::Vec3f>;
 
     BBoxFilter(const openvdb::math::Transform& transform,
              const openvdb::BBoxd& bboxWS)
@@ -472,11 +461,11 @@ struct FilterTraits<BBoxFilter> {
     static const bool RequiresCoord = true;
 };
 template <typename T>
-struct FilterTraits<LevelSetFilter<T> > {
+struct FilterTraits<LevelSetFilter<T>> {
     static const bool RequiresCoord = true;
 };
 template <typename T0, typename T1, bool And>
-struct FilterTraits<BinaryFilter<T0, T1, And> > {
+struct FilterTraits<BinaryFilter<T0, T1, And>> {
     static const bool RequiresCoord =   FilterTraits<T0>::RequiresCoord ||
                                         FilterTraits<T1>::RequiresCoord;
 };

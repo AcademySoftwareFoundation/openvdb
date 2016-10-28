@@ -62,13 +62,13 @@ using namespace openvdb;
 
 using openvdb::tools::PointDataTree;
 using openvdb::tools::PointDataGrid;
-typedef PointDataTree::LeafNodeType     LeafType;
-typedef LeafType::ValueType             ValueType;
+using LeafType  = PointDataTree::LeafNodeType;
+using ValueType = LeafType::ValueType;
 
 
 struct NotZeroFilter
 {
-    NotZeroFilter() { }
+    NotZeroFilter() = default;
     static bool initialized() { return true; }
     template <typename LeafT>
     void reset(const LeafT&) { }
@@ -214,15 +214,11 @@ TestPointCount::testGroup()
     using namespace openvdb::tools;
     using namespace openvdb::math;
 
-    typedef AttributeSet::Descriptor   Descriptor;
+    using Descriptor = AttributeSet::Descriptor;
 
     // four points in the same leaf
 
-    std::vector<Vec3s> positions;
-    positions.push_back(Vec3s(1, 1, 1));
-    positions.push_back(Vec3s(1, 2, 1));
-    positions.push_back(Vec3s(2, 1, 1));
-    positions.push_back(Vec3s(2, 2, 1));
+    std::vector<Vec3s> positions{{1, 1, 1}, {1, 2, 1}, {2, 1, 1}, {2, 2, 1}};
 
     const float voxelSize(1.0);
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
@@ -336,8 +332,7 @@ TestPointCount::testGroup()
 
             io::File fileOut(filename);
 
-            GridCPtrVec grids;
-            grids.push_back(grid);
+            GridCPtrVec grids{grid};
 
             fileOut.write(grids);
         }
@@ -401,9 +396,9 @@ TestPointCount::testGroup()
 
     // create a tree with multiple leaves
 
-    positions.push_back(Vec3s(20, 1, 1));
-    positions.push_back(Vec3s(1, 20, 1));
-    positions.push_back(Vec3s(1, 1, 20));
+    positions.emplace_back(20, 1, 1);
+    positions.emplace_back(1, 20, 1);
+    positions.emplace_back(1, 1, 20);
 
     grid = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
     PointDataTree& tree2 = grid->tree();
@@ -472,12 +467,7 @@ TestPointCount::testOffsets()
 
     // five points across four leafs
 
-    std::vector<Vec3s> positions;
-    positions.push_back(Vec3s(1, 1, 1));
-    positions.push_back(Vec3s(1, 101, 1));
-    positions.push_back(Vec3s(2, 101, 1));
-    positions.push_back(Vec3s(101, 1, 1));
-    positions.push_back(Vec3s(101, 101, 1));
+    std::vector<Vec3s> positions{{1, 1, 1}, {1, 101, 1}, {2, 101, 1}, {101, 1, 1}, {101, 101, 1}};
 
     PointDataGrid::Ptr grid = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
     PointDataTree& tree = grid->tree();
@@ -499,7 +489,7 @@ TestPointCount::testOffsets()
         std::vector<Index64> pointOffsets;
 
         std::vector<Name> includeGroups;
-        std::vector<Name> excludeGroups; excludeGroups.push_back("empty");
+        std::vector<Name> excludeGroups{"empty"};
 
         Index64 total = getPointOffsets(pointOffsets, tree, includeGroups, excludeGroups);
 
@@ -522,7 +512,7 @@ TestPointCount::testOffsets()
     { // include this group
         std::vector<Index64> pointOffsets;
 
-        std::vector<Name> includeGroups; includeGroups.push_back("test");
+        std::vector<Name> includeGroups{"test"};
         std::vector<Name> excludeGroups;
 
         Index64 total = getPointOffsets(pointOffsets, tree, includeGroups, excludeGroups);
@@ -539,7 +529,7 @@ TestPointCount::testOffsets()
         std::vector<Index64> pointOffsets;
 
         std::vector<Name> includeGroups;
-        std::vector<Name> excludeGroups; excludeGroups.push_back("test");
+        std::vector<Name> excludeGroups{"test"};
 
         Index64 total = getPointOffsets(pointOffsets, tree, includeGroups, excludeGroups);
 
@@ -564,8 +554,7 @@ TestPointCount::testOffsets()
 
         io::File fileOut(filename);
 
-        GridCPtrVec grids;
-        grids.push_back(grid);
+        GridCPtrVec grids{grid};
 
         fileOut.write(grids);
     }

@@ -123,16 +123,14 @@ TestPointGroup::testDescriptor()
     }
 
     { // one group, empty Descriptor
-        std::vector<std::string> groups;
-        groups.push_back("group1");
+        std::vector<std::string> groups{"group1"};
         AttributeSet::Descriptor descriptor;
         deleteMissingPointGroups(groups, descriptor);
         CPPUNIT_ASSERT(testStringVector(groups));
     }
 
     { // one group, Descriptor with same group
-        std::vector<std::string> groups;
-        groups.push_back("group1");
+        std::vector<std::string> groups{"group1"};
         AttributeSet::Descriptor descriptor;
         descriptor.setGroup("group1", 0);
         deleteMissingPointGroups(groups, descriptor);
@@ -140,8 +138,7 @@ TestPointGroup::testDescriptor()
     }
 
     { // one group, Descriptor with different group
-        std::vector<std::string> groups;
-        groups.push_back("group1");
+        std::vector<std::string> groups{"group1"};
         AttributeSet::Descriptor descriptor;
         descriptor.setGroup("group2", 0);
         deleteMissingPointGroups(groups, descriptor);
@@ -149,10 +146,7 @@ TestPointGroup::testDescriptor()
     }
 
     { // three groups, Descriptor with three groups, one different
-        std::vector<std::string> groups;
-        groups.push_back("group1");
-        groups.push_back("group3");
-        groups.push_back("group4");
+        std::vector<std::string> groups{"group1", "group3", "group4"};
         AttributeSet::Descriptor descriptor;
         descriptor.setGroup("group1", 0);
         descriptor.setGroup("group2", 0);
@@ -169,11 +163,7 @@ TestPointGroup::testDescriptor()
 void
 TestPointGroup::testAppendDrop()
 {
-    std::vector<Vec3s> positions;
-    positions.push_back(Vec3s(1, 1, 1));
-    positions.push_back(Vec3s(1, 10, 1));
-    positions.push_back(Vec3s(10, 1, 1));
-    positions.push_back(Vec3s(10, 10, 1));
+    std::vector<Vec3s> positions{{1, 1, 1}, {1, 10, 1}, {10, 1, 1}, {10, 10, 1}};
 
     const float voxelSize(1.0);
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
@@ -217,9 +207,7 @@ TestPointGroup::testAppendDrop()
     }
 
     { // append multiple groups
-        std::vector<Name> names;
-        names.push_back("test2");
-        names.push_back("test3");
+        std::vector<Name> names{"test2", "test3"};
 
         appendGroups(tree, names);
 
@@ -252,9 +240,7 @@ TestPointGroup::testAppendDrop()
     }
 
     { // drop multiple groups
-        std::vector<Name> names;
-        names.push_back("test");
-        names.push_back("test3");
+        std::vector<Name> names{"test", "test3"};
 
         dropGroups(tree, names);
 
@@ -306,8 +292,7 @@ TestPointGroup::testAppendDrop()
 void
 TestPointGroup::testCompact()
 {
-    std::vector<Vec3s> positions;
-    positions.push_back(Vec3s(1, 1, 1));
+    std::vector<Vec3s> positions{{1, 1, 1}};
 
     const float voxelSize(1.0);
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
@@ -408,17 +393,16 @@ TestPointGroup::testSet()
     using namespace openvdb;
     using namespace openvdb::tools;
 
-    typedef PointIndexGrid PointIndexGrid;
-
     // four points in the same leaf
 
-    std::vector<Vec3s> positions;
-    positions.push_back(Vec3s(1, 1, 1));
-    positions.push_back(Vec3s(1, 2, 1));
-    positions.push_back(Vec3s(2, 1, 1));
-    positions.push_back(Vec3s(2, 2, 1));
-    positions.push_back(Vec3s(100, 100, 100));
-    positions.push_back(Vec3s(100, 101, 100));
+    std::vector<Vec3s> positions =  {
+                                        {1, 1, 1},
+                                        {1, 2, 1},
+                                        {2, 1, 1},
+                                        {2, 2, 1},
+                                        {100, 100, 100},
+                                        {100, 101, 100}
+                                    };
 
     const float voxelSize(1.0);
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
@@ -436,13 +420,7 @@ TestPointGroup::testSet()
     CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(6));
     CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "test"), Index64(0));
 
-    std::vector<short> membership;
-    membership.push_back(short(1));
-    membership.push_back(short(0));
-    membership.push_back(short(1));
-    membership.push_back(short(1));
-    membership.push_back(short(0));
-    membership.push_back(short(1));
+    std::vector<short> membership{1, 0, 1, 1, 0, 1};
 
     // copy tree for descriptor sharing test
 
@@ -475,8 +453,7 @@ TestPointGroup::testSet()
 
             io::File fileOut(filename);
 
-            GridCPtrVec grids;
-            grids.push_back(grid);
+            GridCPtrVec grids{grid};
 
             fileOut.write(grids);
         }
@@ -517,20 +494,19 @@ TestPointGroup::testFilter()
     using namespace openvdb;
     using namespace openvdb::tools;
 
-    typedef PointIndexGrid PointIndexGrid;
-
     const float voxelSize(1.0);
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
     PointDataGrid::Ptr grid;
 
     { // four points in the same leaf
-        std::vector<Vec3s> positions;
-        positions.push_back(Vec3s(1, 1, 1));
-        positions.push_back(Vec3s(1, 2, 1));
-        positions.push_back(Vec3s(2, 1, 1));
-        positions.push_back(Vec3s(2, 2, 1));
-        positions.push_back(Vec3s(100, 100, 100));
-        positions.push_back(Vec3s(100, 101, 100));
+        std::vector<Vec3s> positions =  {
+                                            {1, 1, 1},
+                                            {1, 2, 1},
+                                            {2, 1, 1},
+                                            {2, 2, 1},
+                                            {100, 100, 100},
+                                            {100, 101, 100}
+                                        };
 
         const PointAttributeVector<Vec3s> pointList(positions);
 
@@ -552,7 +528,7 @@ TestPointGroup::testFilter()
 
         setGroupByFilter<PointDataTree, FirstFilter>(tree, "first", filter);
 
-        PointDataTree::LeafCIter iter = tree.cbeginLeaf();
+        auto iter = tree.cbeginLeaf();
 
         for ( ; iter; ++iter) {
             CPPUNIT_ASSERT_EQUAL(iter->groupPointCount("first"), Index64(1));
@@ -582,7 +558,7 @@ TestPointGroup::testFilter()
         CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(6));
         CPPUNIT_ASSERT_EQUAL(groupPointCount(tree, "first_bbox"), Index64(0));
 
-        typedef BinaryFilter<FirstFilter, BBoxFilter>   FirstBBoxFilter;
+        using FirstBBoxFilter = BinaryFilter<FirstFilter, BBoxFilter>;
 
         FirstFilter firstFilter;
         BBoxFilter bboxFilter(*transform, bbox);
@@ -594,11 +570,11 @@ TestPointGroup::testFilter()
 
         std::vector<Vec3f> positions;
 
-        for (PointDataTree::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
+        for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
             GroupFilter filter("first_bbox");
-            IndexIter<PointDataTree::LeafNodeType::ValueOnCIter, GroupFilter> filterIndexIter = iter->beginIndexOn(filter);
+            auto filterIndexIter = iter->beginIndexOn(filter);
 
-            AttributeHandle<Vec3f>::Ptr handle = AttributeHandle<Vec3f>::create(iter->attributeArray("P"));
+            auto handle = AttributeHandle<Vec3f>::create(iter->attributeArray("P"));
 
             for ( ; filterIndexIter; ++filterIndexIter) {
                 const openvdb::Coord ijk = filterIndexIter.getCoord();
@@ -612,16 +588,9 @@ TestPointGroup::testFilter()
 
     { // add 1000 points in three leafs (positions aren't important)
 
-        std::vector<Vec3s> positions;
-        for (int i = 0; i < 1000; i++) {
-            positions.push_back(openvdb::Vec3f(1, 1, 1));
-        }
-        for (int i = 0; i < 1000; i++) {
-            positions.push_back(openvdb::Vec3f(1, 1, 9));
-        }
-        for (int i = 0; i < 1000; i++) {
-            positions.push_back(openvdb::Vec3f(9, 9, 9));
-        }
+        std::vector<Vec3s> positions(1000, {1, 1, 1});
+        positions.insert(positions.end(), 1000, {1, 1, 9});
+        positions.insert(positions.end(), 1000, {9, 9, 9});
 
         const PointAttributeVector<Vec3s> pointList(positions);
 

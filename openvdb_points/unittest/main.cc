@@ -79,7 +79,7 @@ usage(const char* progName)
 static void
 dump(CppUnit::Test* test)
 {
-    if (test == NULL) {
+    if (test == nullptr) {
         std::cerr << "Error: no tests found\n";
         return;
     }
@@ -193,8 +193,7 @@ main(int argc, char *argv[])
 #else
     log4cplus::BasicConfigurator::doConfigure();
 
-    std::vector<char*> args;
-    args.push_back(argv[0]);
+    std::vector<char*> args{argv[0]};
 
     log4cplus::Logger log = log4cplus::Logger::getInstance(LOG4CPLUS_TEXT("main"));
     log.setLogLevel(log4cplus::FATAL_LOG_LEVEL);

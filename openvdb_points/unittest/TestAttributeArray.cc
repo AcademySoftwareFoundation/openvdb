@@ -81,7 +81,6 @@ private:
         Impl(const std::string& filename)
             : mMap(filename.c_str(), boost::interprocess::read_only)
             , mRegion(mMap, boost::interprocess::read_only)
-            , mAutoDelete(false)
         {
             mLastWriteTime = 0;
             const char* regionFilename = mMap.get_name();
@@ -91,10 +90,10 @@ private:
             }
         }
 
-        typedef std::function<void(std::string /*filename*/)> Notifier;
+        using Notifier = std::function<void(std::string /*filename*/)>;
         boost::interprocess::file_mapping mMap;
         boost::interprocess::mapped_region mRegion;
-        bool mAutoDelete;
+        bool mAutoDelete = false;
         Notifier mNotifier;
         mutable tbb::atomic<openvdb::Index64> mLastWriteTime;
     }; // class Impl
@@ -195,7 +194,7 @@ TestAttributeArray::testFixedPointConversion()
         const float voxelSpaceValueY = indexSpaceValue.y() - math::Round(indexSpaceValue.y()) + 0.5f;
         const float voxelSpaceValueZ = indexSpaceValue.z() - math::Round(indexSpaceValue.z()) + 0.5f;
         const openvdb::Vec3f voxelSpaceValue(voxelSpaceValueX, voxelSpaceValueY, voxelSpaceValueZ);
-        const openvdb::math::Vec3<uint32_t> intValue = floatingPointToFixedPoint<openvdb::math::Vec3<uint32_t> >(voxelSpaceValue);
+        const openvdb::math::Vec3<uint32_t> intValue = floatingPointToFixedPoint<openvdb::math::Vec3<uint32_t>>(voxelSpaceValue);
 
         // convert back to floating-point value (vector)
 
@@ -226,7 +225,7 @@ TestAttributeArray::testRegistry()
     using namespace openvdb;
     using namespace openvdb::tools;
 
-    typedef TypedAttributeArray<float> AttributeF;
+    using AttributeF = TypedAttributeArray<float>;
 
     AttributeArray::clearRegistry();
 
@@ -406,8 +405,8 @@ TestAttributeArray::testCompression()
 void
 TestAttributeArray::testAttributeArray()
 {
-    typedef openvdb::tools::TypedAttributeArray<float> AttributeArrayF;
-    typedef openvdb::tools::TypedAttributeArray<double> AttributeArrayD;
+    using AttributeArrayF = openvdb::tools::TypedAttributeArray<float>;
+    using AttributeArrayD = openvdb::tools::TypedAttributeArray<double>;
 
     {
         openvdb::tools::AttributeArray::Ptr attr(new AttributeArrayD(50));
@@ -468,8 +467,8 @@ TestAttributeArray::testAttributeArray()
     }
 #endif
 
-    typedef openvdb::tools::FixedPointCodec<false> FixedPointCodec;
-    typedef openvdb::tools::TypedAttributeArray<double, FixedPointCodec> AttributeArrayC;
+    using FixedPointCodec = openvdb::tools::FixedPointCodec<false>;
+    using AttributeArrayC = openvdb::tools::TypedAttributeArray<double, FixedPointCodec>;
 
     { // test hasValueType()
         openvdb::tools::AttributeArray::Ptr attrC(new AttributeArrayC(50));
@@ -506,7 +505,7 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.2), value2, /*tolerance=*/double(0.0001));
     }
 
-    typedef openvdb::tools::TypedAttributeArray<int32_t> AttributeArrayI;
+    using AttributeArrayI = openvdb::tools::TypedAttributeArray<int32_t>;
 
     { // Base class API
 
@@ -708,8 +707,8 @@ TestAttributeArray::testAttributeArray()
             }
         }
     }
-
-    typedef openvdb::tools::FixedPointCodec<false> FixedPointCodec;
+    
+    using FixedPointCodec = openvdb::tools::FixedPointCodec<false>;
 
     { // Fixed codec range
         openvdb::tools::AttributeArray::Ptr attr1(new AttributeArrayC(50));
@@ -729,7 +728,7 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.5), fixedPoint.get(3), /*tolerance=*/double(0.0001));
     }
 
-    typedef openvdb::tools::TypedAttributeArray<openvdb::Vec3f, openvdb::tools::UnitVecCodec> AttributeArrayU;
+    using AttributeArrayU = openvdb::tools::TypedAttributeArray<openvdb::Vec3f, openvdb::tools::UnitVecCodec>;
 
     { // UnitVec codec test
         openvdb::tools::AttributeArray::Ptr attr1(new AttributeArrayU(50));
@@ -828,7 +827,7 @@ TestAttributeArray::testAttributeArray()
 void
 TestAttributeArray::testAccessorEval()
 {
-    typedef TypedAttributeArray<float>      AttributeF;
+    using AttributeF = TypedAttributeArray<float>;
 
     struct TestAccessor
     {
@@ -904,11 +903,11 @@ TestAttributeArray::testAttributeHandle()
     using namespace openvdb::tools;
     using namespace openvdb::math;
 
-    typedef TypedAttributeArray<int>                        AttributeI;
-    typedef TypedAttributeArray<float, TruncateCodec>       AttributeFH;
-    typedef TypedAttributeArray<Vec3f>                      AttributeVec3f;
+    using AttributeI            = TypedAttributeArray<int>;
+    using AttributeFH           = TypedAttributeArray<float, TruncateCodec>;
+    using AttributeVec3f        = TypedAttributeArray<Vec3f>;
 
-    typedef AttributeWriteHandle<int> AttributeHandleRWI;
+    using AttributeHandleRWI    = AttributeWriteHandle<int>;
 
     AttributeI::registerType();
     AttributeFH::registerType();
@@ -916,7 +915,7 @@ TestAttributeArray::testAttributeHandle()
 
     // create a Descriptor and AttributeSet
 
-    typedef AttributeSet::Descriptor Descriptor;
+    using Descriptor = AttributeSet::Descriptor;
     Descriptor::Ptr descr = Descriptor::create(AttributeVec3f::attributeType());
 
     unsigned count = 50;
@@ -1063,12 +1062,12 @@ TestAttributeArray::testAttributeHandle()
 void
 TestAttributeArray::testStrided()
 {
-    typedef openvdb::tools::TypedAttributeArray<int> AttributeArrayI;
-    typedef AttributeHandle<int> NonStridedHandle;
-    typedef AttributeHandle<int, /*CodecType=*/UnknownCodec, /*Strided=*/true> StridedHandle;
-    typedef AttributeWriteHandle<int, /*CodecType=*/UnknownCodec, /*Strided=*/true> StridedWriteHandle;
-    typedef AttributeHandle<int, /*CodecType=*/UnknownCodec, /*Strided=*/true, /*Interleaved=*/true> InterleavedHandle;
-    typedef AttributeWriteHandle<int, /*CodecType=*/UnknownCodec, /*Strided=*/true, /*Interleaved=*/true> InterleavedWriteHandle;
+    using AttributeArrayI           = openvdb::tools::TypedAttributeArray<int>;
+    using NonStridedHandle          = AttributeHandle<int>;
+    using StridedHandle             = AttributeHandle<int, /*CodecType=*/UnknownCodec, /*Strided=*/true>;
+    using StridedWriteHandle        = AttributeWriteHandle<int, /*CodecType=*/UnknownCodec, /*Strided=*/true>;
+    using InterleavedHandle         = AttributeHandle<int, /*CodecType=*/UnknownCodec, /*Strided=*/true, /*Interleaved=*/true>;
+    using InterleavedWriteHandle    = AttributeWriteHandle<int, /*CodecType=*/UnknownCodec, /*Strided=*/true, /*Interleaved=*/true>;
 
     { // non-strided array
         AttributeArrayI::Ptr array = AttributeArrayI::create(/*n=*/2, /*stride=*/1);
@@ -1230,7 +1229,7 @@ TestAttributeArray::testDelayedLoad()
     using namespace openvdb;
     using namespace openvdb::tools;
 
-    typedef TypedAttributeArray<int>    AttributeArrayI;
+    using AttributeArrayI = TypedAttributeArray<int>;
 
     AttributeArrayI::registerType();
 
@@ -1697,8 +1696,8 @@ TestAttributeArray::testQuaternions()
 {
     using namespace openvdb;
 
-    typedef TypedAttributeArray<math::Quat<float> >         AttributeQF;
-    typedef TypedAttributeArray<QuatR>                      AttributeQD;
+    using AttributeQF = TypedAttributeArray<math::Quat<float>>;
+    using AttributeQD = TypedAttributeArray<QuatR>;
 
     AttributeQF::registerType();
     AttributeQD::registerType();
@@ -1738,7 +1737,7 @@ TestAttributeArray::testMatrices()
 {
     using namespace openvdb;
 
-    typedef TypedAttributeArray<Mat4d>      AttributeM;
+    using AttributeM = TypedAttributeArray<Mat4d>;
 
     AttributeM::registerType();
 
@@ -1773,7 +1772,7 @@ TestAttributeArray::testMatrices()
 
 namespace profile {
 
-typedef openvdb::util::ProfileTimer ProfileTimer;
+using ProfileTimer = openvdb::util::ProfileTimer;
 
 template <typename AttrT>
 void expand(const Name& prefix, AttrT& attr)
@@ -1795,7 +1794,7 @@ void set(const Name& prefix, AttrT& attr)
 template <typename CodecT, typename AttrT>
 void setH(const Name& prefix, AttrT& attr)
 {
-    typedef typename AttrT::ValueType ValueType;
+    using ValueType = typename AttrT::ValueType;
     ProfileTimer timer(prefix + ": setHandle");
     AttributeWriteHandle<ValueType, CodecT> handle(attr);
     const size_t size = attr.size();
@@ -1821,7 +1820,7 @@ template <typename CodecT, typename AttrT>
 void sumH(const Name& prefix, const AttrT& attr)
 {
     ProfileTimer timer(prefix + ": sumHandle");
-    typedef typename AttrT::ValueType ValueType;
+    using ValueType = typename AttrT::ValueType;
     ValueType sum = 0;
     AttributeHandle<ValueType, CodecT> handle(attr);
     for (size_t i = 0; i < attr.size(); i++) {
@@ -1841,9 +1840,9 @@ TestAttributeArray::testProfile()
     using namespace openvdb::math;
     using namespace openvdb::tools;
 
-    typedef TypedAttributeArray<float>                              AttributeArrayF;
-    typedef TypedAttributeArray<float, FixedPointCodec<false> >     AttributeArrayF16;
-    typedef TypedAttributeArray<float, FixedPointCodec<true> >      AttributeArrayF8;
+    using AttributeArrayF   = TypedAttributeArray<float>;
+    using AttributeArrayF16 = TypedAttributeArray<float, FixedPointCodec<false>>;
+    using AttributeArrayF8  = TypedAttributeArray<float, FixedPointCodec<true>>;
 
     ///////////////////////////////////////////////////
 
@@ -1938,15 +1937,15 @@ TestAttributeArray::testProfile()
     {
         AttributeArrayF16 attr(elements);
         profile::expand("AttributeHandle<float, fp16>", attr);
-        profile::setH<FixedPointCodec<false> >("AttributeHandle<float, fp16, Codec>", attr);
-        profile::sumH<FixedPointCodec<false> >("AttributeHandle<float, fp16, Codec>", attr);
+        profile::setH<FixedPointCodec<false>>("AttributeHandle<float, fp16, Codec>", attr);
+        profile::sumH<FixedPointCodec<false>>("AttributeHandle<float, fp16, Codec>", attr);
     }
 
     {
         AttributeArrayF8 attr(elements);
         profile::expand("AttributeHandle<float, fp8>", attr);
-        profile::setH<FixedPointCodec<true> >("AttributeHandle<float, fp8, Codec>", attr);
-        profile::sumH<FixedPointCodec<true> >("AttributeHandle<float, fp8, Codec>", attr);
+        profile::setH<FixedPointCodec<true>>("AttributeHandle<float, fp8, Codec>", attr);
+        profile::sumH<FixedPointCodec<true>>("AttributeHandle<float, fp8, Codec>", attr);
     }
 }
 

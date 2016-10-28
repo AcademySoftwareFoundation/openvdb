@@ -40,8 +40,6 @@
 #include <iostream>
 #include <sstream>
 
-#include <boost/algorithm/string/predicate.hpp> // boost::startswith
-
 class TestAttributeSet: public CppUnit::TestCase
 {
 public:
@@ -76,7 +74,7 @@ matchingAttributeSets(const openvdb::tools::AttributeSet& lhs,
     if (lhs.memUsage() != rhs.memUsage()) return false;
     if (lhs.descriptor() != rhs.descriptor()) return false;
 
-    typedef openvdb::tools::AttributeArray AttributeArray;
+    using AttributeArray = openvdb::tools::AttributeArray;
 
     for (size_t n = 0, N = lhs.size(); n < N; ++n) {
 
@@ -108,23 +106,20 @@ attributeSetMatchesDescriptor(  const openvdb::tools::AttributeSet& attrSet,
 
     std::vector<openvdb::Name> defaultKeys;
 
-    for (openvdb::MetaMap::ConstMetaIterator    it = meta1.beginMeta(),
-                                                itEnd = meta1.endMeta(); it != itEnd; ++it)
+    for (auto it = meta1.beginMeta(), itEnd = meta1.endMeta(); it != itEnd; ++it)
     {
-        const openvdb::Name name = it->first;
+        const openvdb::Name& name = it->first;
 
-        if (boost::starts_with(name, "default:")) {
+        if (name.compare(0, 8, "default:") == 0) {
             defaultKeys.push_back(name);
         }
     }
 
-    for (openvdb::MetaMap::ConstMetaIterator    it = meta2.beginMeta(),
-                                                itEnd = meta2.endMeta(); it != itEnd; ++it)
+    for (auto it = meta2.beginMeta(), itEnd = meta2.endMeta(); it != itEnd; ++it)
     {
-        const openvdb::Name name = it->first;
+        const openvdb::Name& name = it->first;
 
-        if (boost::starts_with(name, "default:"))
-        {
+        if (name.compare(0, 8, "default:") == 0) {
             if (std::find(defaultKeys.begin(), defaultKeys.end(), name) != defaultKeys.end()) {
                 defaultKeys.push_back(name);
             }
@@ -133,10 +128,7 @@ attributeSetMatchesDescriptor(  const openvdb::tools::AttributeSet& attrSet,
 
     // compare metadata value from each metamap
 
-    for (std::vector<openvdb::Name>::const_iterator it = defaultKeys.begin(),
-                                                    itEnd = defaultKeys.end(); it != itEnd; ++it) {
-        const openvdb::Name name = *it;
-
+    for (const openvdb::Name& name : defaultKeys) {
         openvdb::Metadata::ConstPtr metaValue1 = meta1[name];
         openvdb::Metadata::ConstPtr metaValue2 = meta2[name];
 
@@ -148,12 +140,10 @@ attributeSetMatchesDescriptor(  const openvdb::tools::AttributeSet& attrSet,
 
     // ensure descriptor and attributes are still in sync
 
-    for (openvdb::tools::AttributeSet::Descriptor::ConstIterator  it = attrSet.descriptor().map().begin(),
-                                    itEnd = attrSet.descriptor().map().end(); it != itEnd; ++it)
-    {
-        const size_t pos = descriptor.find(it->first);
+    for (const auto& namePos : attrSet.descriptor().map()) { 
+        const size_t pos = descriptor.find(namePos.first);
 
-        if (pos != size_t(it->second))  return false;
+        if (pos != size_t(namePos.second))  return false;
         if (descriptor.type(pos) != attrSet.get(pos)->type())   return false;
     }
 
@@ -162,7 +152,7 @@ attributeSetMatchesDescriptor(  const openvdb::tools::AttributeSet& attrSet,
 
 bool testStringVector(std::vector<std::string>& input)
 {
-    return input.size() == 0;
+    return input.empty();
 }
 
 bool testStringVector(std::vector<std::string>& input, const std::string& name1)
@@ -190,11 +180,11 @@ void
 TestAttributeSet::testAttributeSetDescriptor()
 {
     // Define and register some common attribute types
-    typedef openvdb::tools::TypedAttributeArray<openvdb::Vec3f>      AttributeVec3f;
-    typedef openvdb::tools::TypedAttributeArray<float>      AttributeS;
-    typedef openvdb::tools::TypedAttributeArray<int32_t>    AttributeI;
+    using AttributeVec3f    = openvdb::tools::TypedAttributeArray<openvdb::Vec3f>;
+    using AttributeS        = openvdb::tools::TypedAttributeArray<float>;
+    using AttributeI        = openvdb::tools::TypedAttributeArray<int32_t>;
 
-    typedef openvdb::tools::AttributeSet::Descriptor Descriptor;
+    using Descriptor        = openvdb::tools::AttributeSet::Descriptor;
 
     Descriptor::Ptr descrA = Descriptor::create(AttributeVec3f::attributeType());
 
@@ -248,9 +238,9 @@ TestAttributeSet::testAttributeSetDescriptor()
 
     CPPUNIT_ASSERT_EQUAL(rebuildNames.size(), names.vec.size());
 
-    for (Descriptor::NameAndTypeVec::const_iterator itA = rebuildNames.begin(), itB = names.vec.begin(),
-                                                    itEndA = rebuildNames.end(), itEndB = names.vec.end();
-                                                    itA != itEndA && itB != itEndB; ++itA, ++itB) {
+    for (auto itA = rebuildNames.cbegin(), itB = names.vec.cbegin(),
+              itEndA = rebuildNames.cend(), itEndB = names.vec.cend();
+              itA != itEndA && itB != itEndB; ++itA, ++itB) {
         CPPUNIT_ASSERT_EQUAL(itA->name, itB->name);
         CPPUNIT_ASSERT_EQUAL(itA->type.first, itB->type.first);
         CPPUNIT_ASSERT_EQUAL(itA->type.second, itB->type.second);
@@ -514,16 +504,16 @@ TestAttributeSet::testAttributeSet()
 {
     using namespace openvdb::tools;
 
-    typedef openvdb::tools::AttributeArray AttributeArray;
+    using AttributeArray    = openvdb::tools::AttributeArray;
 
     // Define and register some common attribute types
-    typedef openvdb::tools::TypedAttributeArray<float>          AttributeS;
-    typedef openvdb::tools::TypedAttributeArray<int32_t>        AttributeI;
-    typedef openvdb::tools::TypedAttributeArray<int64_t>        AttributeL;
-    typedef openvdb::tools::TypedAttributeArray<openvdb::Vec3s> AttributeVec3s;
+    using AttributeS        = openvdb::tools::TypedAttributeArray<float>;
+    using AttributeI        = openvdb::tools::TypedAttributeArray<int32_t>;
+    using AttributeL        = openvdb::tools::TypedAttributeArray<int64_t>;
+    using AttributeVec3s    = openvdb::tools::TypedAttributeArray<openvdb::Vec3s>;
 
-    typedef openvdb::tools::AttributeSet AttributeSet;
-    typedef openvdb::tools::AttributeSet::Descriptor Descriptor;
+    using AttributeSet      = openvdb::tools::AttributeSet;
+    using Descriptor        = openvdb::tools::AttributeSet::Descriptor;
 
     Descriptor::NameToPosMap groupMap;
     openvdb::MetaMap metadata;
@@ -720,10 +710,7 @@ TestAttributeSet::testAttributeSet()
 
         descr->setDefaultValue("id", defaultThree);
 
-        std::vector<size_t> toDrop;
-        toDrop.push_back(descr->find("test"));
-        toDrop.push_back(descr->find("test2"));
-        toDrop.push_back(descr->find("test3"));
+        std::vector<size_t> toDrop{descr->find("test"), descr->find("test2"), descr->find("test3")};
 
         CPPUNIT_ASSERT_EQUAL(toDrop[0], size_t(1));
         CPPUNIT_ASSERT_EQUAL(toDrop[1], size_t(3));
@@ -757,10 +744,7 @@ TestAttributeSet::testAttributeSet()
         }
 
         { // reverse removal order
-            std::vector<size_t> toDropReverse;
-            toDropReverse.push_back(descr->find("test3"));
-            toDropReverse.push_back(descr->find("test2"));
-            toDropReverse.push_back(descr->find("test"));
+            std::vector<size_t> toDropReverse{descr->find("test3"), descr->find("test2"), descr->find("test")};
 
             AttributeSet attrSetC(attrSetB);
 
@@ -898,10 +882,10 @@ TestAttributeSet::testAttributeSetGroups()
     using namespace openvdb::tools;
 
     // Define and register some common attribute types
-    typedef TypedAttributeArray<int32_t>        AttributeI;
-    typedef TypedAttributeArray<openvdb::Vec3s> AttributeVec3s;
+    using AttributeI        = TypedAttributeArray<int32_t>;
+    using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
 
-    typedef AttributeSet::Descriptor Descriptor;
+    using Descriptor        = AttributeSet::Descriptor;
 
     Descriptor::NameToPosMap groupMap;
     openvdb::MetaMap metadata;

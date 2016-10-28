@@ -50,6 +50,7 @@
 #include <openvdb_points/tools/AttributeSet.h>
 #include <openvdb_points/tools/AttributeGroup.h>
 
+#include <type_traits> // std::is_same
 #include <utility> // std::pair, std::make_pair
 
 #ifdef OPENVDB_USE_BLOSC
@@ -190,12 +191,12 @@ namespace tools {
 template<typename T, Index Log2Dim> class PointDataLeafNode;
 
 /// @brief Point index tree configured to match the default VDB configurations.
-typedef tree::Tree<tree::RootNode<tree::InternalNode<tree::InternalNode
-    <PointDataLeafNode<PointDataIndex32, 3>, 4>, 5> > > PointDataTree;
+using PointDataTree = tree::Tree<tree::RootNode<tree::InternalNode<tree::InternalNode
+    <PointDataLeafNode<PointDataIndex32, 3>, 4>, 5>>>;
 
 
 /// @brief Point data grid.
-typedef Grid<PointDataTree> PointDataGrid;
+using PointDataGrid = Grid<PointDataTree>;
 
 
 /// @brief  Deep copy the descriptor across all leaf nodes.
@@ -216,8 +217,9 @@ namespace point_data_grid_internal {
 template<typename T>
 struct UniquePtr
 {
-    typedef std::unique_ptr<T>  type;
+    using type = std::unique_ptr<T>;
 };
+
 }
 
 
@@ -225,22 +227,22 @@ template <typename T, Index Log2Dim>
 class PointDataLeafNode : public tree::LeafNode<T, Log2Dim> {
 
 public:
-    typedef PointDataLeafNode<T, Log2Dim>           LeafNodeType;
-    typedef SharedPtr<PointDataLeafNode>            Ptr;
+    using LeafNodeType  = PointDataLeafNode<T, Log2Dim>;
+    using Ptr           = std::shared_ptr<PointDataLeafNode>;
 
-    typedef T                                       ValueType;
-    typedef std::pair<ValueType, ValueType>         ValueTypePair;
-    typedef std::vector<ValueType>                  IndexArray;
+    using ValueType     = T;
+    using ValueTypePair = std::pair<ValueType, ValueType>;
+    using IndexArray    = std::vector<ValueType>;
 
-    typedef AttributeSet::Descriptor                Descriptor;
+    using Descriptor    = AttributeSet::Descriptor;
 
     ////////////////////////////////////////
 
     // The following methods had to be copied from the LeafNode class
     // to make the derived PointDataLeafNode class compatible with the tree structure.
 
-    typedef tree::LeafNode<T, Log2Dim>    BaseLeaf;
-    typedef util::NodeMask<Log2Dim> NodeMaskType;
+    using BaseLeaf      = tree::LeafNode<T, Log2Dim>;
+    using NodeMaskType  = util::NodeMask<Log2Dim>;
 
     using BaseLeaf::LOG2DIM;
     using BaseLeaf::TOTAL;
@@ -252,10 +254,9 @@ public:
 
     /// Default constructor
     PointDataLeafNode()
-        : BaseLeaf()
-        , mAttributeSet(new AttributeSet) { }
+        : mAttributeSet(new AttributeSet) { }
 
-    ~PointDataLeafNode() { }
+    ~PointDataLeafNode() = default;
 
     /// Construct using deep copy of other PointDataLeafNode
     explicit PointDataLeafNode(const PointDataLeafNode& other)
@@ -430,7 +431,7 @@ public:
     NodeT* probeNodeAndCache(const Coord&, AccessorT&)
     {
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (!(boost::is_same<NodeT,PointDataLeafNode>::value)) return NULL;
+        if (!(std::is_same<NodeT,PointDataLeafNode>::value)) return nullptr;
         return reinterpret_cast<NodeT*>(this);
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
@@ -451,7 +452,7 @@ public:
     const NodeT* probeConstNodeAndCache(const Coord&, AccessorT&) const
     {
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (!(boost::is_same<NodeT,PointDataLeafNode>::value)) return NULL;
+        if (!(std::is_same<NodeT,PointDataLeafNode>::value)) return nullptr;
         return reinterpret_cast<const NodeT*>(this);
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
@@ -539,21 +540,21 @@ public:
 
     friend class ::TestPointDataLeaf;
 
-    typedef typename BaseLeaf::ValueOn ValueOn;
-    typedef typename BaseLeaf::ValueOff ValueOff;
-    typedef typename BaseLeaf::ValueAll ValueAll;
+    using ValueOn   = typename BaseLeaf::ValueOn;
+    using ValueOff  = typename BaseLeaf::ValueOff;
+    using ValueAll  = typename BaseLeaf::ValueAll;
 
 private:
     point_data_grid_internal::UniquePtr<AttributeSet>::type mAttributeSet;
 
 protected:
-    typedef typename BaseLeaf::ChildOn ChildOn;
-    typedef typename BaseLeaf::ChildOff ChildOff;
-    typedef typename BaseLeaf::ChildAll ChildAll;
+    using ChildOn           = typename BaseLeaf::ChildOn;
+    using ChildOff          = typename BaseLeaf::ChildOff;
+    using ChildAll          = typename BaseLeaf::ChildAll;
 
-    typedef typename NodeMaskType::OnIterator    MaskOnIterator;
-    typedef typename NodeMaskType::OffIterator   MaskOffIterator;
-    typedef typename NodeMaskType::DenseIterator MaskDenseIterator;
+    using MaskOnIterator    = typename NodeMaskType::OnIterator;
+    using MaskOffIterator   = typename NodeMaskType::OffIterator;
+    using MaskDenseIterator = typename NodeMaskType::DenseIterator;
 
     // During topology-only construction, access is needed
     // to protected/private members of other template instances.
@@ -570,61 +571,61 @@ public:
 public:
 
 #ifdef _MSC_VER
-    typedef typename BaseLeaf::ValueIter<
-        MaskOnIterator, PointDataLeafNode, const ValueType, ValueOn> ValueOnIter;
-    typedef typename BaseLeaf::ValueIter<
-        MaskOnIterator, const PointDataLeafNode, const ValueType, ValueOn> ValueOnCIter;
-    typedef typename BaseLeaf::ValueIter<
-        MaskOffIterator, PointDataLeafNode, const ValueType, ValueOff> ValueOffIter;
-    typedef typename BaseLeaf::ValueIter<
-        MaskOffIterator,const PointDataLeafNode,const ValueType,ValueOff> ValueOffCIter;
-    typedef typename BaseLeaf::ValueIter<
-        MaskDenseIterator, PointDataLeafNode, const ValueType, ValueAll> ValueAllIter;
-    typedef typename BaseLeaf::ValueIter<
-        MaskDenseIterator,const PointDataLeafNode,const ValueType,ValueAll> ValueAllCIter;
-    typedef typename BaseLeaf::ChildIter<
-        MaskOnIterator, PointDataLeafNode, ChildOn> ChildOnIter;
-    typedef typename BaseLeaf::ChildIter<
-        MaskOnIterator, const PointDataLeafNode, ChildOn> ChildOnCIter;
-    typedef typename BaseLeaf::ChildIter<
-        MaskOffIterator, PointDataLeafNode, ChildOff> ChildOffIter;
-    typedef typename BaseLeaf::ChildIter<
-        MaskOffIterator, const PointDataLeafNode, ChildOff> ChildOffCIter;
-    typedef typename BaseLeaf::DenseIter<
-        PointDataLeafNode, ValueType, ChildAll> ChildAllIter;
-    typedef typename BaseLeaf::DenseIter<
-        const PointDataLeafNode, const ValueType, ChildAll> ChildAllCIter;
+    using ValueOnIter = typename BaseLeaf::ValueIter<
+        MaskOnIterator, PointDataLeafNode, const ValueType, ValueOn>;
+    using ValueOnCIter = typename BaseLeaf::ValueIter<
+        MaskOnIterator, const PointDataLeafNode, const ValueType, ValueOn>;
+    using ValueOffIter = typename BaseLeaf::ValueIter<
+        MaskOffIterator, PointDataLeafNode, const ValueType, ValueOff>;
+    using ValueOffCIter = typename BaseLeaf::ValueIter<
+        MaskOffIterator,const PointDataLeafNode,const ValueType,ValueOff>;
+    using ValueAllIter = typename BaseLeaf::ValueIter<
+        MaskDenseIterator, PointDataLeafNode, const ValueType, ValueAll>;
+    using ValueAllCIter = typename BaseLeaf::ValueIter<
+        MaskDenseIterator,const PointDataLeafNode,const ValueType,ValueAll>;
+    using ChildOnIter = typename BaseLeaf::ChildIter<
+        MaskOnIterator, PointDataLeafNode, ChildOn>;
+    using ChildOnCIter = typename BaseLeaf::ChildIter<
+        MaskOnIterator, const PointDataLeafNode, ChildOn>;
+    using ChildOffIter = typename BaseLeaf::ChildIter<
+        MaskOffIterator, PointDataLeafNode, ChildOff>;
+    using ChildOffCIter = typename BaseLeaf::ChildIter<
+        MaskOffIterator, const PointDataLeafNode, ChildOff>;
+    using ChildAllIter = typename BaseLeaf::DenseIter<
+        PointDataLeafNode, ValueType, ChildAll>;
+    using ChildAllCIter = typename BaseLeaf::DenseIter<
+        const PointDataLeafNode, const ValueType, ChildAll>;
 #else
-    typedef typename BaseLeaf::template ValueIter<
-        MaskOnIterator, PointDataLeafNode, const ValueType, ValueOn> ValueOnIter;
-    typedef typename BaseLeaf::template ValueIter<
-        MaskOnIterator, const PointDataLeafNode, const ValueType, ValueOn> ValueOnCIter;
-    typedef typename BaseLeaf::template ValueIter<
-        MaskOffIterator, PointDataLeafNode, const ValueType, ValueOff> ValueOffIter;
-    typedef typename BaseLeaf::template ValueIter<
-        MaskOffIterator,const PointDataLeafNode,const ValueType,ValueOff> ValueOffCIter;
-    typedef typename BaseLeaf::template ValueIter<
-        MaskDenseIterator, PointDataLeafNode, const ValueType, ValueAll> ValueAllIter;
-    typedef typename BaseLeaf::template ValueIter<
-        MaskDenseIterator,const PointDataLeafNode,const ValueType,ValueAll> ValueAllCIter;
-    typedef typename BaseLeaf::template ChildIter<
-        MaskOnIterator, PointDataLeafNode, ChildOn> ChildOnIter;
-    typedef typename BaseLeaf::template ChildIter<
-        MaskOnIterator, const PointDataLeafNode, ChildOn> ChildOnCIter;
-    typedef typename BaseLeaf::template ChildIter<
-        MaskOffIterator, PointDataLeafNode, ChildOff> ChildOffIter;
-    typedef typename BaseLeaf::template ChildIter<
-        MaskOffIterator, const PointDataLeafNode, ChildOff> ChildOffCIter;
-    typedef typename BaseLeaf::template DenseIter<
-        PointDataLeafNode, ValueType, ChildAll> ChildAllIter;
-    typedef typename BaseLeaf::template DenseIter<
-        const PointDataLeafNode, const ValueType, ChildAll> ChildAllCIter;
+    using ValueOnIter = typename BaseLeaf::template ValueIter<
+        MaskOnIterator, PointDataLeafNode, const ValueType, ValueOn>;
+    using ValueOnCIter = typename BaseLeaf::template ValueIter<
+        MaskOnIterator, const PointDataLeafNode, const ValueType, ValueOn>;
+    using ValueOffIter = typename BaseLeaf::template ValueIter<
+        MaskOffIterator, PointDataLeafNode, const ValueType, ValueOff>;
+    using ValueOffCIter = typename BaseLeaf::template ValueIter<
+        MaskOffIterator,const PointDataLeafNode,const ValueType,ValueOff>;
+    using ValueAllIter = typename BaseLeaf::template ValueIter<
+        MaskDenseIterator, PointDataLeafNode, const ValueType, ValueAll>;
+    using ValueAllCIter = typename BaseLeaf::template ValueIter<
+        MaskDenseIterator,const PointDataLeafNode,const ValueType,ValueAll>;
+    using ChildOnIter = typename BaseLeaf::template ChildIter<
+        MaskOnIterator, PointDataLeafNode, ChildOn>;
+    using ChildOnCIter = typename BaseLeaf::template ChildIter<
+        MaskOnIterator, const PointDataLeafNode, ChildOn>;
+    using ChildOffIter = typename BaseLeaf::template ChildIter<
+        MaskOffIterator, PointDataLeafNode, ChildOff>;
+    using ChildOffCIter = typename BaseLeaf::template ChildIter<
+        MaskOffIterator, const PointDataLeafNode, ChildOff>;
+    using ChildAllIter = typename BaseLeaf::template DenseIter<
+        PointDataLeafNode, ValueType, ChildAll>;
+    using ChildAllCIter = typename BaseLeaf::template DenseIter<
+        const PointDataLeafNode, const ValueType, ChildAll>;
 #endif
 
-    typedef IndexIter<ValueVoxelCIter, NullFilter>    IndexVoxelIter;
-    typedef IndexIter<ValueAllCIter, NullFilter>      IndexAllIter;
-    typedef IndexIter<ValueOnCIter, NullFilter>       IndexOnIter;
-    typedef IndexIter<ValueOffCIter, NullFilter>      IndexOffIter;
+    using IndexVoxelIter    = IndexIter<ValueVoxelCIter, NullFilter>;
+    using IndexAllIter      = IndexIter<ValueAllCIter, NullFilter>;
+    using IndexOnIter       =  IndexIter<ValueOnCIter, NullFilter>;
+    using IndexOffIter      = IndexIter<ValueOffCIter, NullFilter>;
 
     /// @brief Leaf index iterator
     IndexAllIter beginIndexAll() const;
@@ -929,7 +930,7 @@ template<typename ValueIterT, typename FilterT>
 inline IndexIter<ValueIterT, FilterT>
 PointDataLeafNode<T, Log2Dim>::beginIndex(const FilterT& filter) const
 {
-    typedef tree::IterTraits<LeafNodeType, ValueIterT> IterTraitsT;
+    using IterTraitsT = tree::IterTraits<LeafNodeType, ValueIterT>;
 
     // construct the value iterator and reset the filter to use this leaf
 
@@ -1135,11 +1136,11 @@ template <typename PointDataTreeT>
 inline void
 makeDescriptorUnique(PointDataTreeT& tree)
 {
-    typename PointDataTreeT::LeafIter leafIter = tree.beginLeaf();
+    auto leafIter = tree.beginLeaf();
     if (!leafIter)  return;
 
     const AttributeSet::Descriptor& descriptor = leafIter->attributeSet().descriptor();
-    AttributeSet::Descriptor::Ptr newDescriptor(new AttributeSet::Descriptor(descriptor));
+    auto newDescriptor = std::make_shared<AttributeSet::Descriptor>(descriptor);
     for (; leafIter; ++leafIter) {
         leafIter->resetDescriptor(newDescriptor);
     }
@@ -1156,7 +1157,7 @@ namespace tree
 /// Helper metafunction used to implement LeafNode::SameConfiguration
 /// (which, as an inner class, can't be independently specialized)
 template<Index Dim1, typename T2>
-struct SameLeafConfig<Dim1, tools::PointDataLeafNode<T2, Dim1> > { static const bool value = true; };
+struct SameLeafConfig<Dim1, tools::PointDataLeafNode<T2, Dim1>> { static const bool value = true; };
 
 } // namespace tree
 } // namespace OPENVDB_VERSION_NAME

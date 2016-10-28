@@ -100,11 +100,11 @@ void loadPoints(PointDataGridT&)
 template <typename PointDataGridT, typename MaskGridT>
 void loadPoints(PointDataGridT& grid, const MaskGridT& mask)
 {
-    typedef typename PointDataGridT::TreeType PointDataTreeT;
+    using PointDataTreeT = typename PointDataGridT::TreeType;
 
     tree::ValueAccessor<const PointDataTreeT> pointsAcc(grid.constTree());
 
-    typename MaskGridT::TreeType::LeafCIter leafIter = mask.constTree().cbeginLeaf();
+    auto leafIter = mask.constTree().cbeginLeaf();
 
     for (; leafIter; ++leafIter) {
         const Coord& ijk = leafIter->origin();
@@ -121,7 +121,7 @@ void loadPoints(PointDataGridT& grid, const MaskGridT& mask)
 template <typename PointDataGridT>
 void loadPoints(PointDataGridT& grid, const BBoxd& bbox)
 {
-    typedef typename PointDataGridT::template ValueConverter<bool>::Type BoolGridT;
+    using BoolGridT = typename PointDataGridT::template ValueConverter<bool>::Type;
 
     // Transform the world-space bounding box into the source grid's index space.
     Vec3d idxMin, idxMax;
@@ -134,10 +134,10 @@ void loadPoints(PointDataGridT& grid, const BBoxd& bbox)
     clipMask.fill(region, /*value=*/true, /*active=*/true);
 
     // MaskGrid introduced in OpenVDB 3.2
-    typedef BoolGrid MaskType;
+    using MaskType = BoolGrid;
 
     // Convert the input grid to a mask grid (with the same tree configuration).
-    MaskType::Ptr pointsMask = MaskType::create(/*background=*/false);
+    auto pointsMask = MaskType::create(/*background=*/false);
     pointsMask->topologyUnion(grid);
     pointsMask->topologyIntersection(clipMask);
 

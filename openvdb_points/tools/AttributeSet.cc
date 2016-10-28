@@ -112,8 +112,8 @@ AttributeSet::AttributeSet(const AttributeSet& attrSet, size_t arrayLength)
     : mDescr(attrSet.descriptorPtr())
     , mAttrs(attrSet.descriptor().size(), AttributeArray::Ptr())
 {
-    for (auto it = mDescr->map().cbegin(), end = mDescr->map().cend(); it != end; ++it) {
-        const size_t pos = it->second;
+    for (const auto& namePos : mDescr->map()) {
+        const size_t& pos = namePos.second;
         AttributeArray::Ptr array = AttributeArray::create(mDescr->type(pos), arrayLength, 1);
 
         // transfer hidden and transient flags
@@ -427,9 +427,9 @@ AttributeSet::reorderAttributes(const DescriptorPtr& replacement)
     AttrArrayVec attrs(replacement->size());
 
     // compute target indices for attributes from the given decriptor
-    for (auto it = mDescr->map().cbegin(), end = mDescr->map().cend(); it != end; ++it) {
-        const size_t index = replacement->find(it->first);
-        attrs[index] = AttributeArray::Ptr(mAttrs[it->second]);
+    for (const auto& namePos : mDescr->map()) {
+        const size_t index = replacement->find(namePos.first);
+        attrs[index] = AttributeArray::Ptr(mAttrs[namePos.second]);
     }
 
     // copy the ordering to the member attributes vector and update descriptor to be target
@@ -591,12 +591,12 @@ AttributeSet::Descriptor::hasSameAttributes(const Descriptor& rhs) const
         return false;
     }
 
-    for (auto it = mNameMap.cbegin(), end = mNameMap.cend(); it != end; ++it) {
-        const size_t index = rhs.find(it->first);
+    for (const auto& namePos : mNameMap) {
+        const size_t index = rhs.find(namePos.first);
 
         if (index == INVALID_POS) return false;
 
-        if (mTypes[it->second] != rhs.mTypes[index]) return false;
+        if (mTypes[namePos.second] != rhs.mTypes[index]) return false;
     }
 
     return std::equal(mGroupMap.begin(), mGroupMap.end(), rhs.mGroupMap.begin());
@@ -614,8 +614,8 @@ size_t
 AttributeSet::Descriptor::memUsage() const
 {
     size_t bytes = sizeof(NameToPosMap::mapped_type) * this->size();
-    for (auto it = mNameMap.cbegin(), end = mNameMap.cend(); it != end; ++it) {
-        bytes += it->first.capacity();
+    for (const auto& namePos : mNameMap) {
+        bytes += namePos.first.capacity();
     }
 
     for (const NamePair& type : mTypes) {
@@ -865,14 +865,14 @@ AttributeSet::Descriptor::appendTo(NameAndTypeVec& attrs) const
 
     PosToNameMap posToNameMap;
 
-    for (auto it = mNameMap.cbegin(), endIt = mNameMap.cend(); it != endIt; ++it) {
-        posToNameMap[it->second] = it->first;
+    for (const auto& namePos : mNameMap) {
+        posToNameMap[namePos.second] = namePos.first;
     }
 
     // std::map is sorted by key, so attributes can now be inserted in position order
 
-    for (auto it = posToNameMap.cbegin(), endIt = posToNameMap.cend(); it != endIt; ++it) {
-        attrs.push_back(NameAndType(it->second, this->type(it->first)));
+    for (const auto& posName : posToNameMap) {
+        attrs.emplace_back(posName.second, this->type(posName.first));
     }
 }
 

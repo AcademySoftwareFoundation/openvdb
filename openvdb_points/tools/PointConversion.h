@@ -49,6 +49,8 @@
 #include <openvdb_points/tools/PointDataGrid.h>
 #include <openvdb_points/tools/PointGroup.h>
 
+#include <type_traits>
+
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
@@ -191,8 +193,8 @@ convertPointDataGridGroup(  Group& group,
 template<typename ValueType>
 class PointAttributeVector {
 public:
-    typedef ValueType PosType;
-    typedef ValueType value_type;
+    using PosType = ValueType;
+    using value_type= ValueType;
 
     PointAttributeVector(const std::vector<value_type>& data,
                          const Index stride = 1)
@@ -223,8 +225,8 @@ namespace point_conversion_internal {
 // ConversionTraits to create the relevant Attribute Handles from a LeafNode
 template <bool Stride, typename T> struct ConversionTraits
 {
-    typedef AttributeHandle<T, UnknownCodec, Stride> Handle;
-    typedef AttributeWriteHandle<T, UnknownCodec, Stride> WriteHandle;
+    using Handle = AttributeHandle<T, UnknownCodec, Stride>;
+    using WriteHandle = AttributeWriteHandle<T, UnknownCodec, Stride>;
     static T zero() { return T(0); }
     template <typename LeafT>
     static typename Handle::Ptr handleFromLeaf(LeafT& leaf, Index index) {
@@ -239,8 +241,8 @@ template <bool Stride, typename T> struct ConversionTraits
 }; // ConversionTraits
 template <> struct ConversionTraits<false, openvdb::Name>
 {
-    typedef StringAttributeHandle Handle;
-    typedef StringAttributeWriteHandle WriteHandle;
+    using Handle = StringAttributeHandle;
+    using WriteHandle = StringAttributeWriteHandle;
     static openvdb::Name zero() { return ""; }
     template <typename LeafT>
     static typename Handle::Ptr handleFromLeaf(LeafT& leaf, Index index) {
@@ -260,11 +262,11 @@ template <> struct ConversionTraits<false, openvdb::Name>
 template<typename PointDataTreeType, typename PointIndexTreeType>
 struct InitialiseAttributesOp {
 
-    typedef typename tree::LeafManager<PointDataTreeType> LeafManagerT;
-    typedef typename LeafManagerT::LeafRange LeafRangeT;
+    using LeafManagerT          = typename tree::LeafManager<PointDataTreeType>;
+    using LeafRangeT            = typename LeafManagerT::LeafRange;
 
-    typedef typename PointIndexTreeType::LeafNodeType PointIndexLeafNode;
-    typedef typename PointIndexLeafNode::IndexArray IndexArray;
+    using PointIndexLeafNode    = typename PointIndexTreeType::LeafNodeType;
+    using IndexArray            = typename PointIndexLeafNode::IndexArray;
 
     InitialiseAttributesOp( PointDataTreeType& tree,
                             const PointIndexTreeType& pointIndexTree,
@@ -274,7 +276,7 @@ struct InitialiseAttributesOp {
         , mAttributeDescriptor(attributeDescriptor) { }
 
     void operator()(const typename LeafManagerT::LeafRange& range) const {
-        for (typename LeafManagerT::LeafRange::Iterator leaf=range.begin(); leaf; ++leaf) {
+        for (auto leaf = range.begin(); leaf; ++leaf) {
 
             // obtain the PointIndexLeafNode (using the origin of the current leaf)
 
@@ -283,8 +285,6 @@ struct InitialiseAttributesOp {
             if (!pointIndexLeaf)    continue;
 
             // initialise the attribute storage
-
-            pointIndexLeaf->indices();
 
             const IndexArray& indices = pointIndexLeaf->indices();
 
@@ -306,13 +306,13 @@ template<   typename PointDataTreeType,
             typename PositionListType>
 struct PopulatePositionAttributeOp {
 
-    typedef typename tree::LeafManager<PointDataTreeType> LeafManagerT;
-    typedef typename LeafManagerT::LeafRange LeafRangeT;
+    using LeafManagerT          = typename tree::LeafManager<PointDataTreeType>;
+    using LeafRangeT            = typename LeafManagerT::LeafRange;
 
-    typedef typename PointIndexTreeType::LeafNodeType PointIndexLeafNode;
-    typedef typename PointIndexLeafNode::IndexArray IndexArray;
+    using PointIndexLeafNode    = typename PointIndexTreeType::LeafNodeType;
+    using IndexArray            = typename PointIndexLeafNode::IndexArray;
 
-    typedef typename PositionListType::value_type ValueType;
+    using ValueType             = typename PositionListType::value_type;
 
     PopulatePositionAttributeOp(const PointIndexTreeType& pointIndexTree,
                                 const math::Transform& transform,
@@ -323,7 +323,7 @@ struct PopulatePositionAttributeOp {
 
     void operator()(const typename LeafManagerT::LeafRange& range) const {
 
-        for (typename LeafManagerT::LeafRange::Iterator leaf=range.begin(); leaf; ++leaf) {
+        for (auto leaf = range.begin(); leaf; ++leaf) {
 
             // obtain the PointIndexLeafNode (using the origin of the current leaf)
 
@@ -331,17 +331,16 @@ struct PopulatePositionAttributeOp {
 
             if (!pointIndexLeaf)    continue;
 
-            typename AttributeWriteHandle<Vec3f>::Ptr attributeWriteHandle =
-                AttributeWriteHandle<Vec3f>::create(leaf->attributeArray("P"));
+            auto attributeWriteHandle = AttributeWriteHandle<Vec3f>::create(leaf->attributeArray("P"));
 
             Index64 index = 0;
 
             const IndexArray& indices = pointIndexLeaf->indices();
 
-            for (typename IndexArray::const_iterator it = indices.begin(), it_end = indices.end(); it != it_end; ++it)
+            for (const Index64& i : indices)
             {
                 ValueType positionWorldSpace;
-                mPositions.getPos(*it, positionWorldSpace);
+                mPositions.getPos(i, positionWorldSpace);
 
                 const ValueType positionIndexSpace = mTransform.worldToIndex(positionWorldSpace);
 
@@ -370,12 +369,12 @@ template<   typename PointDataTreeType,
             bool Stride = false>
 struct PopulateAttributeOp {
 
-    typedef typename tree::LeafManager<PointDataTreeType>               LeafManagerT;
-    typedef typename LeafManagerT::LeafRange                            LeafRangeT;
-    typedef typename PointIndexTreeType::LeafNodeType                   PointIndexLeafNode;
-    typedef typename PointIndexLeafNode::IndexArray                     IndexArray;
-    typedef typename AttributeListType::value_type                      ValueType;
-    typedef typename ConversionTraits<Stride, ValueType>::WriteHandle   HandleT;
+    using LeafManagerT          = typename tree::LeafManager<PointDataTreeType>;
+    using LeafRangeT            = typename LeafManagerT::LeafRange;
+    using PointIndexLeafNode    = typename PointIndexTreeType::LeafNodeType;
+    using IndexArray            = typename PointIndexLeafNode::IndexArray;
+    using ValueType             = typename AttributeListType::value_type;
+    using HandleT               = typename ConversionTraits<Stride, ValueType>::WriteHandle;
 
     PopulateAttributeOp(const PointIndexTreeType& pointIndexTree,
                         const AttributeListType& data,
@@ -388,7 +387,7 @@ struct PopulateAttributeOp {
 
     void operator()(const typename LeafManagerT::LeafRange& range) const {
 
-        for (typename LeafManagerT::LeafRange::Iterator leaf=range.begin(); leaf; ++leaf) {
+        for (auto leaf = range.begin(); leaf; ++leaf) {
 
             // obtain the PointIndexLeafNode (using the origin of the current leaf)
 
@@ -402,17 +401,17 @@ struct PopulateAttributeOp {
 
             const IndexArray& indices = pointIndexLeaf->indices();
 
-            for (typename IndexArray::const_iterator it = indices.begin(), it_end = indices.end(); it != it_end; ++it)
+            for (const Index64& leafIndex : indices)
             {
                 ValueType value;
                 if (Stride) {
                     for (Index i = 0; i < mStride; i++) {
-                        mData.template get<ValueType>(value, *it, i);
+                        mData.template get<ValueType>(value, leafIndex, i);
                         attributeWriteHandle->set(index, i, value);
                     }
                 }
                 else {
-                    mData.template get<ValueType>(value, *it);
+                    mData.template get<ValueType>(value, leafIndex);
                     attributeWriteHandle->set(index, 0, value);
                 }
                 index++;
@@ -435,11 +434,10 @@ struct PopulateAttributeOp {
 template<typename PointDataTreeType, typename Attribute>
 struct ConvertPointDataGridPositionOp {
 
-    typedef typename PointDataTreeType::LeafNodeType                        LeafNode;
-    typedef typename Attribute::ValueType                                   ValueType;
-    typedef typename tree::LeafManager<const PointDataTreeType>             LeafManagerT;
-    typedef typename LeafManagerT::LeafRange                                LeafRangeT;
-    typedef IndexIter<typename LeafNode::ValueOnCIter, MultiGroupFilter>    IndexIterT;
+    using LeafNode      = typename PointDataTreeType::LeafNodeType;
+    using ValueType     = typename Attribute::ValueType;
+    using LeafManagerT  = typename tree::LeafManager<const PointDataTreeType>;
+    using LeafRangeT    = typename LeafManagerT::LeafRange;
 
     ConvertPointDataGridPositionOp( Attribute& attribute,
                                     const std::vector<Index64>& pointOffsets,
@@ -459,8 +457,9 @@ struct ConvertPointDataGridPositionOp {
         , mInCoreOnly(inCoreOnly)
     {
         // only accept Vec3f as ValueType
-        BOOST_STATIC_ASSERT(VecTraits<ValueType>::Size == 3 &&
-                            boost::is_floating_point<typename ValueType::ValueType>::value);
+        static_assert(VecTraits<ValueType>::Size == 3 &&
+                      std::is_floating_point<typename ValueType::ValueType>::value,
+                      "ValueType is not Vec3f");
     }
 
     void operator()(const LeafRangeT& range) const {
@@ -469,7 +468,7 @@ struct ConvertPointDataGridPositionOp {
 
         typename Attribute::Handle pHandle(mAttribute);
 
-        for (typename LeafRangeT::Iterator leaf=range.begin(); leaf; ++leaf) {
+        for (auto leaf = range.begin(); leaf; ++leaf) {
 
             assert(leaf.pos() < mPointOffsets.size());
 
@@ -481,11 +480,10 @@ struct ConvertPointDataGridPositionOp {
 
             if (leaf.pos() > 0)     offset += mPointOffsets[leaf.pos() - 1];
 
-            typename AttributeHandle<ValueType>::Ptr handle =
-                    AttributeHandle<ValueType>::create(leaf->constAttributeArray(mIndex));
+            auto handle = AttributeHandle<ValueType>::create(leaf->constAttributeArray(mIndex));
 
             if (useGroups) {
-                IndexIterT iter = leaf->beginIndexOn(MultiGroupFilter(mIncludeGroups, mExcludeGroups));
+                auto iter = leaf->beginIndexOn(MultiGroupFilter(mIncludeGroups, mExcludeGroups));
 
                 for (; iter; ++iter) {
                     const Vec3d xyz = iter.getCoord().asVec3d();
@@ -494,7 +492,7 @@ struct ConvertPointDataGridPositionOp {
                 }
             }
             else {
-                typename LeafNode::IndexOnIter iter = leaf->beginIndexOn();
+                auto iter = leaf->beginIndexOn();
 
                 for (; iter; ++iter) {
                     const Vec3d xyz = iter.getCoord().asVec3d();
@@ -521,12 +519,11 @@ struct ConvertPointDataGridPositionOp {
 template<typename PointDataTreeType, typename Attribute, bool Stride = false>
 struct ConvertPointDataGridAttributeOp {
 
-    typedef typename PointDataTreeType::LeafNodeType                        LeafNode;
-    typedef typename Attribute::ValueType                                   ValueType;
-    typedef typename ConversionTraits<Stride, ValueType>::Handle            HandleT;
-    typedef typename tree::LeafManager<const PointDataTreeType>             LeafManagerT;
-    typedef typename LeafManagerT::LeafRange                                LeafRangeT;
-    typedef IndexIter<typename LeafNode::ValueOnCIter, MultiGroupFilter>    IndexIterT;
+    using LeafNode      = typename PointDataTreeType::LeafNodeType;
+    using ValueType     = typename Attribute::ValueType;
+    using HandleT       = typename ConversionTraits<Stride, ValueType>::Handle;
+    using LeafManagerT  = typename tree::LeafManager<const PointDataTreeType>;
+    using LeafRangeT    = typename LeafManagerT::LeafRange;
 
     ConvertPointDataGridAttributeOp(Attribute& attribute,
                                     const std::vector<Index64>& pointOffsets,
@@ -551,7 +548,7 @@ struct ConvertPointDataGridAttributeOp {
 
         typename Attribute::Handle pHandle(mAttribute);
 
-        for (typename LeafRangeT::Iterator leaf=range.begin(); leaf; ++leaf) {
+        for (auto leaf = range.begin(); leaf; ++leaf) {
 
             assert(leaf.pos() < mPointOffsets.size());
 
@@ -571,7 +568,7 @@ struct ConvertPointDataGridAttributeOp {
             if (uniform)    uniformValue = ValueType(handle->get(0));
 
             if (useGroups) {
-                IndexIterT iter = leaf->beginIndexOn(MultiGroupFilter(mIncludeGroups, mExcludeGroups));
+                auto iter = leaf->beginIndexOn(MultiGroupFilter(mIncludeGroups, mExcludeGroups));
 
                 if (uniform) {
                     for (; iter; ++iter) {
@@ -591,7 +588,7 @@ struct ConvertPointDataGridAttributeOp {
                 }
             }
             else {
-                typename LeafNode::IndexOnIter iter = leaf->beginIndexOn();
+                auto iter = leaf->beginIndexOn();
 
                 if (uniform) {
                     for (; iter; ++iter) {
@@ -628,11 +625,10 @@ struct ConvertPointDataGridAttributeOp {
 template<typename PointDataTreeType, typename Group>
 struct ConvertPointDataGridGroupOp {
 
-    typedef typename PointDataTreeType::LeafNodeType                        LeafNode;
-    typedef AttributeSet::Descriptor::GroupIndex                            GroupIndex;
-    typedef typename tree::LeafManager<const PointDataTreeType>             LeafManagerT;
-    typedef typename LeafManagerT::LeafRange                                LeafRangeT;
-    typedef IndexIter<typename LeafNode::ValueOnCIter, MultiGroupFilter>    IndexIterT;
+    using LeafNode      = typename PointDataTreeType::LeafNodeType;
+    using GroupIndex    = AttributeSet::Descriptor::GroupIndex;
+    using LeafManagerT  = typename tree::LeafManager<const PointDataTreeType>;
+    using LeafRangeT    = typename LeafManagerT::LeafRange;
 
     ConvertPointDataGridGroupOp(Group& group,
                                 const std::vector<Index64>& pointOffsets,
@@ -653,7 +649,7 @@ struct ConvertPointDataGridGroupOp {
 
         const bool useGroups = !mIncludeGroups.empty() || !mExcludeGroups.empty();
 
-        for (typename LeafRangeT::Iterator leaf=range.begin(); leaf; ++leaf) {
+        for (auto leaf = range.begin(); leaf; ++leaf) {
 
             assert(leaf.pos() < mPointOffsets.size());
 
@@ -679,7 +675,7 @@ struct ConvertPointDataGridGroupOp {
             }
 
             if (useGroups) {
-                IndexIterT iter = leaf->beginIndexOn(MultiGroupFilter(mIncludeGroups, mExcludeGroups));
+                auto iter = leaf->beginIndexOn(MultiGroupFilter(mIncludeGroups, mExcludeGroups));
 
                 if (uniform) {
                     for (; iter; ++iter) {
@@ -697,7 +693,7 @@ struct ConvertPointDataGridGroupOp {
                 }
             }
             else {
-                typename LeafNode::IndexOnIter iter = leaf->beginIndexOn();
+                auto iter = leaf->beginIndexOn();
 
                 if (uniform) {
                     for (; iter; ++iter) {
@@ -740,11 +736,11 @@ inline typename PointDataGridT::Ptr
 createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT& positions,
                     const math::Transform& xform, Metadata::Ptr positionDefaultValue)
 {
-    typedef typename PointDataGridT::TreeType                       PointDataTreeT;
-    typedef typename PointIndexGridT::TreeType                      PointIndexTreeT;
-    typedef typename tree::template LeafManager<PointDataTreeT>     LeafManagerT;
-    typedef typename LeafManagerT::LeafRange                        LeafRangeT;
-    typedef TypedAttributeArray<Vec3f, CompressionT>                PositionAttributeT;
+    using PointDataTreeT        = typename PointDataGridT::TreeType;
+    using PointIndexTreeT       = typename PointIndexGridT::TreeType;
+    using LeafManagerT          = typename tree::LeafManager<PointDataTreeT>;
+    using LeafRangeT            = typename LeafManagerT::LeafRange;
+    using PositionAttributeT    = TypedAttributeArray<Vec3f, CompressionT>;
 
     using point_conversion_internal::InitialiseAttributesOp;
     using point_conversion_internal::PopulatePositionAttributeOp;
@@ -761,7 +757,7 @@ createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT&
 
     // create attribute descriptor from position type
 
-    AttributeSet::Descriptor::Ptr descriptor = AttributeSet::Descriptor::create(positionType);
+    auto descriptor = AttributeSet::Descriptor::create(positionType);
 
     // add default value for position if provided
 
@@ -783,7 +779,7 @@ createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT&
 
     tbb::parallel_for(leafRange, populate);
 
-    typename PointDataGridT::Ptr grid = PointDataGridT::create(treePtr);
+    auto grid = PointDataGridT::create(treePtr);
     grid->setTransform(xform.copy());
     return grid;
 }
@@ -815,7 +811,7 @@ populateAttribute(  PointDataTreeT& tree, const PointIndexTreeT& pointIndexTree,
 {
     using point_conversion_internal::PopulateAttributeOp;
 
-    typename PointDataTreeT::LeafCIter iter = tree.cbeginLeaf();
+    auto iter = tree.cbeginLeaf();
 
     if (!iter)  return;
 
@@ -827,7 +823,7 @@ populateAttribute(  PointDataTreeT& tree, const PointIndexTreeT& pointIndexTree,
 
     // populate attribute
 
-    typename tree::template LeafManager<PointDataTreeT> leafManager(tree);
+    typename tree::LeafManager<PointDataTreeT> leafManager(tree);
 
     PopulateAttributeOp<PointDataTreeT,
                         PointIndexTreeT,
@@ -850,13 +846,13 @@ convertPointDataGridPosition(   PositionAttribute& positionAttribute,
                                 const std::vector<Name>& excludeGroups,
                                 const bool inCoreOnly)
 {
-    typedef typename PointDataGridT::TreeType           TreeType;
-    typedef typename tree::LeafManager<const TreeType>  LeafManagerT;
+    using TreeType      = typename PointDataGridT::TreeType;
+    using LeafManagerT  = typename tree::LeafManager<const TreeType>;
 
     using point_conversion_internal::ConvertPointDataGridPositionOp;
 
     const TreeType& tree = grid.tree();
-    typename TreeType::LeafCIter iter = tree.cbeginLeaf();
+    auto iter = tree.cbeginLeaf();
 
     if (!iter)  return;
 
@@ -898,11 +894,11 @@ convertPointDataGridAttribute(  TypedAttribute& attribute,
                                 const std::vector<Name>& excludeGroups,
                                 const bool inCoreOnly)
 {
-    typedef typename tree::LeafManager<const PointDataTreeT>  LeafManagerT;
+    using LeafManagerT = typename tree::LeafManager<const PointDataTreeT>;
 
     using point_conversion_internal::ConvertPointDataGridAttributeOp;
 
-    typename PointDataTreeT::LeafCIter iter = tree.cbeginLeaf();
+    auto iter = tree.cbeginLeaf();
 
     if (!iter)  return;
 
@@ -949,11 +945,11 @@ convertPointDataGridGroup(  Group& group,
                             const std::vector<Name>& excludeGroups,
                             const bool inCoreOnly)
 {
-    typedef typename tree::LeafManager<const PointDataTreeT>  LeafManagerT;
+    using LeafManagerT= typename tree::LeafManager<const PointDataTreeT>;
 
     using point_conversion_internal::ConvertPointDataGridGroupOp;
 
-    typename PointDataTreeT::LeafCIter iter = tree.cbeginLeaf();
+    auto iter = tree.cbeginLeaf();
 
     if (!iter)  return;
 

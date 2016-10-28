@@ -73,51 +73,14 @@ public:
     void testCopyDescriptor();
 
 private:
-    // Generate random points by uniformly distributing points
-    // on a unit-sphere.
-    // (borrowed from PointIndexGrid unit test)
-    void genPoints(const int numPoints, std::vector<openvdb::Vec3R>& points) const
-    {
-        // init
-        openvdb::math::Random01 randNumber(0);
-        const int n = int(std::sqrt(double(numPoints)));
-        const double xScale = (2.0 * M_PI) / double(n);
-        const double yScale = M_PI / double(n);
-
-        double x, y, theta, phi;
-        openvdb::Vec3R pos;
-
-        points.reserve(n*n);
-
-        // loop over a [0 to n) x [0 to n) grid.
-        for (int a = 0; a < n; ++a) {
-            for (int b = 0; b < n; ++b) {
-
-                // jitter, move to random pos. inside the current cell
-                x = double(a) + randNumber();
-                y = double(b) + randNumber();
-
-                // remap to a lat/long map
-                theta = y * yScale; // [0 to PI]
-                phi   = x * xScale; // [0 to 2PI]
-
-                // convert to cartesian coordinates on a unit sphere.
-                // spherical coordinate triplet (r=1, theta, phi)
-                pos[0] = std::sin(theta)*std::cos(phi);
-                pos[1] = std::sin(theta)*std::sin(phi);
-                pos[2] = std::cos(theta);
-
-                points.push_back(pos);
-            }
-        }
-    }
+    
 }; // class TestPointDataLeaf
 
 using openvdb::tools::PointDataTree;
 using openvdb::tools::PointDataGrid;
-typedef PointDataTree::LeafNodeType     LeafType;
-typedef LeafType::ValueType             ValueType;
-typedef LeafType::Buffer                BufferType;
+using LeafType = PointDataTree::LeafNodeType;
+using ValueType = LeafType::ValueType;
+using BufferType = LeafType::Buffer;
 using openvdb::Index;
 using openvdb::Index64;
 
@@ -156,7 +119,7 @@ monotonicOffsets(const LeafType& leafNode)
 {
     int previous = -1;
 
-    for (LeafType::ValueOnCIter iter = leafNode.cbeginValueOn(); iter; ++iter) {
+    for (auto iter = leafNode.cbeginValueOn(); iter; ++iter) {
         if (previous > int(*iter))  return false;
         previous = int(*iter);
     }
@@ -169,8 +132,8 @@ monotonicOffsets(const LeafType& leafNode)
 class PointList
 {
 public:
-    typedef openvdb::Vec3R PosType;
-    typedef openvdb::Vec3R value_type;
+    using PosType       = openvdb::Vec3R;
+    using value_type    = openvdb::Vec3R;
 
     PointList(const std::vector<openvdb::Vec3R>& points)
         : mPoints(&points)
@@ -188,6 +151,45 @@ public:
 protected:
     std::vector<openvdb::Vec3R> const * const mPoints;
 }; // PointList
+
+// Generate random points by uniformly distributing points
+// on a unit-sphere.
+// (borrowed from PointIndexGrid unit test)
+std::vector<openvdb::Vec3R> genPoints(const int numPoints)
+{
+    // init
+    openvdb::math::Random01 randNumber(0);
+    const int n = int(std::sqrt(double(numPoints)));
+    const double xScale = (2.0 * M_PI) / double(n);
+    const double yScale = M_PI / double(n);
+
+    double x, y, theta, phi;
+
+    std::vector<openvdb::Vec3R> points;
+    points.reserve(n*n);
+
+    // loop over a [0 to n) x [0 to n) grid.
+    for (int a = 0; a < n; ++a) {
+        for (int b = 0; b < n; ++b) {
+
+            // jitter, move to random pos. inside the current cell
+            x = double(a) + randNumber();
+            y = double(b) + randNumber();
+
+            // remap to a lat/long map
+            theta = y * yScale; // [0 to PI]
+            phi   = x * xScale; // [0 to 2PI]
+
+            // convert to cartesian coordinates on a unit sphere.
+            // spherical coordinate triplet (r=1, theta, phi)
+            points.emplace_back(    std::sin(theta)*std::cos(phi),
+                                    std::sin(theta)*std::sin(phi),
+                                    std::cos(theta) );
+        }
+    }
+
+    return points;
+}
 
 } // namespace
 
@@ -273,8 +275,7 @@ TestPointDataLeaf::testOffsets()
             leafNode->setOffsetOn(i, 10);
         }
 
-        std::vector<LeafType::ValueType> newOffsets;
-        newOffsets.resize(LeafType::SIZE);
+        std::vector<LeafType::ValueType> newOffsets(LeafType::SIZE);
 
         leafNode->setOffsets(newOffsets, /*updateValueMask*/false);
 
@@ -295,8 +296,7 @@ TestPointDataLeaf::testOffsets()
             leafNode->setOffsetOn(i, 10);
         }
 
-        std::vector<LeafType::ValueType> newOffsets;
-        newOffsets.resize(LeafType::SIZE);
+        std::vector<LeafType::ValueType> newOffsets(LeafType::SIZE);
 
         leafNode->setOffsets(newOffsets, /*updateValueMask*/true);
 
@@ -322,12 +322,12 @@ TestPointDataLeaf::testOffsets()
     // test offset validation
 
     {
-        typedef openvdb::tools::TypedAttributeArray<openvdb::Vec3s> AttributeVec3s;
-        typedef openvdb::tools::TypedAttributeArray<float>          AttributeS;
-        typedef openvdb::tools::AttributeSet::Descriptor            Descriptor;
+        using AttributeVec3s    = openvdb::tools::TypedAttributeArray<openvdb::Vec3s>;
+        using AttributeS        = openvdb::tools::TypedAttributeArray<float>;
+        using Descriptor        = openvdb::tools::AttributeSet::Descriptor;
 
         // empty Descriptor should throw on leaf node initialize
-        Descriptor::Ptr emptyDescriptor(new Descriptor);
+        auto emptyDescriptor = std::make_shared<Descriptor>();
         LeafType* emptyLeafNode = new LeafType();
         CPPUNIT_ASSERT_THROW(emptyLeafNode->initializeAttributes(emptyDescriptor, 5), openvdb::IndexError);
 
@@ -345,8 +345,7 @@ TestPointDataLeaf::testOffsets()
             descriptor = descriptor->duplicateAppend("density", AttributeS::attributeType());
             leafNode->appendAttribute(leafNode->attributeSet().descriptor(), descriptor, descriptor->find("density"));
 
-            std::vector<LeafType::ValueType> offsets;
-            offsets.resize(LeafType::SIZE);
+            std::vector<LeafType::ValueType> offsets(LeafType::SIZE);
             offsets.back() = numAttributes;
             leafNode->setOffsets(offsets);
 
@@ -359,8 +358,7 @@ TestPointDataLeaf::testOffsets()
         {
             LeafType* leafNode = new LeafType();
 
-            std::vector<LeafType::ValueType> offsets;
-            offsets.resize(LeafType::SIZE);
+            std::vector<LeafType::ValueType> offsets(LeafType::SIZE);
             *offsets.begin() = 1;
             leafNode->setOffsets(offsets);
 
@@ -386,8 +384,7 @@ TestPointDataLeaf::testOffsets()
             newSet->replace("density", AttributeS::create(numAttributes+1));
             leafNode->swap(newSet);
 
-            std::vector<LeafType::ValueType> offsets;
-            offsets.resize(LeafType::SIZE);
+            std::vector<LeafType::ValueType> offsets(LeafType::SIZE);
             offsets.back() = numAttributes;
             leafNode->setOffsets(offsets);
 
@@ -408,8 +405,7 @@ TestPointDataLeaf::testOffsets()
             descriptor = descriptor->duplicateAppend("density", AttributeS::attributeType());
             leafNode->appendAttribute(leafNode->attributeSet().descriptor(), descriptor, descriptor->find("density"));
 
-            std::vector<LeafType::ValueType> offsets;
-            offsets.resize(LeafType::SIZE);
+            std::vector<LeafType::ValueType> offsets(LeafType::SIZE);
             offsets.back() = numAttributes - 1;
             leafNode->setOffsets(offsets);
 
@@ -429,8 +425,7 @@ TestPointDataLeaf::testOffsets()
             descriptor = descriptor->duplicateAppend("density", AttributeS::attributeType());
             leafNode->appendAttribute(leafNode->attributeSet().descriptor(), descriptor, descriptor->find("density"));
 
-            std::vector<LeafType::ValueType> offsets;
-            offsets.resize(LeafType::SIZE);
+            std::vector<LeafType::ValueType> offsets(LeafType::SIZE);
             offsets.back() = numAttributes + 1;
             leafNode->setOffsets(offsets);
 
@@ -510,15 +505,15 @@ TestPointDataLeaf::testAttributes()
     using namespace openvdb::tools;
 
     // Define and register some common attribute types
-    typedef openvdb::tools::TypedAttributeArray<openvdb::Vec3s>     AttributeVec3s;
-    typedef openvdb::tools::TypedAttributeArray<int32_t>            AttributeI;
+    using AttributeVec3s    = openvdb::tools::TypedAttributeArray<openvdb::Vec3s>;
+    using AttributeI        = openvdb::tools::TypedAttributeArray<int32_t>;
 
     AttributeVec3s::registerType();
     AttributeI::registerType();
 
     // create a descriptor
 
-    typedef openvdb::tools::AttributeSet::Descriptor Descriptor;
+    using Descriptor = openvdb::tools::AttributeSet::Descriptor;
 
     Descriptor::Ptr descrA = Descriptor::create(AttributeVec3s::attributeType());
 
@@ -655,7 +650,7 @@ TestPointDataLeaf::testTopologyCopy()
     // test topology copy from a float Leaf
 
     {
-        typedef openvdb::FloatTree::LeafNodeType FloatLeaf;
+        using FloatLeaf = openvdb::FloatTree::LeafNodeType;
 
         // create a float leaf and activate some values
 
@@ -703,19 +698,18 @@ TestPointDataLeaf::testTopologyCopy()
         const openvdb::math::Transform::Ptr transform =
                 openvdb::math::Transform::createLinearTransform(voxelSize);
 
-        std::vector<openvdb::Vec3R> points;
-        genPoints(40000, points);
+        std::vector<openvdb::Vec3R> points = genPoints(40000);
 
         PointList pointList(points);
 
         // construct point index grid
 
-        typedef openvdb::tools::PointIndexGrid PointIndexGrid;
+        using PointIndexGrid = openvdb::tools::PointIndexGrid;
 
         PointIndexGrid::Ptr pointGridPtr =
             openvdb::tools::createPointIndexGrid<PointIndexGrid>(pointList, *transform);
 
-        PointIndexGrid::TreeType::LeafCIter iter = pointGridPtr->tree().cbeginLeaf();
+        auto iter = pointGridPtr->tree().cbeginLeaf();
 
         CPPUNIT_ASSERT(iter);
 
@@ -737,9 +731,9 @@ TestPointDataLeaf::testEquivalence()
 
     // Define and register some common attribute types
 
-    typedef TypedAttributeArray<openvdb::Vec3s>     AttributeVec3s;
-    typedef TypedAttributeArray<float>              AttributeF;
-    typedef TypedAttributeArray<int32_t>            AttributeI;
+    using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
+    using AttributeF        = TypedAttributeArray<float>;
+    using AttributeI        = TypedAttributeArray<int32_t>;
 
     AttributeVec3s::registerType();
     AttributeF::registerType();
@@ -747,7 +741,7 @@ TestPointDataLeaf::testEquivalence()
 
     // create a descriptor
 
-    typedef AttributeSet::Descriptor Descriptor;
+    using Descriptor = AttributeSet::Descriptor;
 
     Descriptor::Ptr descrA = Descriptor::create(AttributeVec3s::attributeType());
 
@@ -820,15 +814,15 @@ TestPointDataLeaf::testIterators()
 
     // Define and register some common attribute types
 
-    typedef TypedAttributeArray<openvdb::Vec3s>     AttributeVec3s;
-    typedef TypedAttributeArray<float>              AttributeF;
+    using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
+    using AttributeF        = TypedAttributeArray<float>;
 
     AttributeVec3s::registerType();
     AttributeF::registerType();
 
     // create a descriptor
 
-    typedef AttributeSet::Descriptor Descriptor;
+    using Descriptor = AttributeSet::Descriptor;
 
     Descriptor::Ptr descrA = Descriptor::create(AttributeVec3s::attributeType());
 
@@ -987,15 +981,15 @@ TestPointDataLeaf::testIO()
 
     // Define and register some common attribute types
 
-    typedef TypedAttributeArray<openvdb::Vec3s>     AttributeVec3s;
-    typedef TypedAttributeArray<float>              AttributeF;
+    using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
+    using AttributeF        = TypedAttributeArray<float>;
 
     AttributeVec3s::registerType();
     AttributeF::registerType();
 
     // create a descriptor
 
-    typedef AttributeSet::Descriptor Descriptor;
+    using Descriptor = AttributeSet::Descriptor;
 
     Descriptor::Ptr descrA = Descriptor::create(AttributeVec3s::attributeType());
 
@@ -1085,16 +1079,16 @@ TestPointDataLeaf::testSwap()
 
     // Define and register some common attribute types
 
-    typedef TypedAttributeArray<openvdb::Vec3s>     AttributeVec3s;
-    typedef TypedAttributeArray<float>              AttributeF;
-    typedef TypedAttributeArray<int>                AttributeI;
+    using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
+    using AttributeF        = TypedAttributeArray<float>;
+    using AttributeI        = TypedAttributeArray<int>;
 
     AttributeVec3s::registerType();
     AttributeF::registerType();
 
     // create a descriptor
 
-    typedef AttributeSet::Descriptor Descriptor;
+    using Descriptor = AttributeSet::Descriptor;
 
     Descriptor::Ptr descrA = Descriptor::create(AttributeVec3s::attributeType());
 
@@ -1152,15 +1146,15 @@ TestPointDataLeaf::testCopyOnWrite()
 
     // Define and register some common attribute types
 
-    typedef TypedAttributeArray<openvdb::Vec3s>     AttributeVec3s;
-    typedef TypedAttributeArray<float>              AttributeF;
+    using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
+    using AttributeF        = TypedAttributeArray<float>;
 
     AttributeVec3s::registerType();
     AttributeF::registerType();
 
     // create a descriptor
 
-    typedef AttributeSet::Descriptor Descriptor;
+    using Descriptor = AttributeSet::Descriptor;
 
     Descriptor::Ptr descrA = Descriptor::create(AttributeVec3s::attributeType());
 
@@ -1226,13 +1220,13 @@ TestPointDataLeaf::testCopyDescriptor()
     using namespace openvdb::tools;
 
     // Define and register some common attribute types
-    typedef openvdb::tools::TypedAttributeArray<openvdb::Vec3s>     AttributeVec3s;
-    typedef openvdb::tools::TypedAttributeArray<float>              AttributeS;
+    using AttributeVec3s    = openvdb::tools::TypedAttributeArray<openvdb::Vec3s>;
+    using AttributeS        = openvdb::tools::TypedAttributeArray<float>;
 
     AttributeVec3s::registerType();
     AttributeS::registerType();
 
-    typedef PointDataTree::LeafNodeType LeafNode;
+    using LeafNode = PointDataTree::LeafNodeType;
 
     PointDataTree tree;
 
@@ -1241,7 +1235,7 @@ TestPointDataLeaf::testCopyDescriptor()
 
     // create a descriptor
 
-    typedef openvdb::tools::AttributeSet::Descriptor Descriptor;
+    using Descriptor = openvdb::tools::AttributeSet::Descriptor;
 
     Descriptor::Inserter names;
     names.add("density", AttributeS::attributeType());

@@ -400,7 +400,7 @@ TestAttributeGroup::testAttributeGroupFilter()
     using namespace openvdb;
     using namespace openvdb::tools;
 
-    typedef IndexIter<ValueVoxelCIter, GroupFilter> IndexGroupAllIter;
+    using IndexGroupAllIter = IndexIter<ValueVoxelCIter, GroupFilter>;
 
     GroupAttributeArray attrGroup(4);
     const Index32 size = attrGroup.size();
@@ -448,7 +448,7 @@ TestAttributeGroup::testAttributeGroupFilter()
     attrGroup.set(1, bitmask);
     attrGroup.set(3, bitmask);
 
-    typedef IndexIter<ValueVoxelCIter, GroupNotFilter> IndexNotGroupAllIter;
+    using IndexNotGroupAllIter = IndexIter<ValueVoxelCIter, GroupNotFilter>;
 
     // index iterator only not valid in groups 3 and 6
     {

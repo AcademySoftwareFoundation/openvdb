@@ -272,11 +272,11 @@ public:
             vec.push_back(nameAndType); return *this;
         }
         Inserter& add(const Name& name, const NamePair& type) {
-            vec.push_back(NameAndType(name, type)); return *this;
+            vec.emplace_back(name, type); return *this;
         }
         Inserter& add(const NameAndTypeVec& other) {
             for (NameAndTypeVec::const_iterator it = other.begin(), itEnd = other.end(); it != itEnd; ++it) {
-                vec.push_back(NameAndType(it->name, it->type));
+                vec.emplace_back(it->name, it->type);
             }
             return *this;
         }

@@ -251,9 +251,9 @@ getAttributeRegistry()
 {
     tbb::spin_mutex::scoped_lock lock(sInitAttributeRegistryMutex);
 
-    static LockedAttributeRegistry* registry = NULL;
+    static LockedAttributeRegistry* registry = nullptr;
 
-    if (registry == NULL) {
+    if (registry == nullptr) {
 
 #ifdef __ICC
 // Disable ICC "assignment to statically allocated variable" warning.

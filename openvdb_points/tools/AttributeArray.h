@@ -467,14 +467,18 @@ public:
     TypedAttributeArray(const TypedAttributeArray&, bool uncompress = false);
     /// Deep copy assignment operator.
     TypedAttributeArray& operator=(const TypedAttributeArray&);
+    /// Move constructor disabled.
+    TypedAttributeArray(TypedAttributeArray&&) = delete;
+    /// Move assignment operator disabled.
+    TypedAttributeArray& operator=(TypedAttributeArray&&) = delete;
 
     virtual ~TypedAttributeArray() { this->deallocate(); }
 
     /// Return a copy of this attribute.
-    virtual AttributeArray::Ptr copy() const;
+    virtual AttributeArray::Ptr copy() const override;
 
     /// Return an uncompressed copy of this attribute (will just return a copy if not compressed).
-    virtual AttributeArray::Ptr copyUncompressed() const;
+    virtual AttributeArray::Ptr copyUncompressed() const override;
 
     /// Return a new attribute array of the given length @a n and @a stride with uniform value zero.
     static Ptr create(size_t n, Index stride = 1);
@@ -488,7 +492,7 @@ public:
     /// Return the name of this attribute's type (includes codec)
     static const NamePair& attributeType();
     /// Return the name of this attribute's type.
-    virtual const NamePair& type() const { return attributeType(); }
+    virtual const NamePair& type() const override { return attributeType(); }
 
     /// Return @c true if this attribute type is registered.
     static bool isRegistered();
@@ -498,16 +502,16 @@ public:
     static void unregisterType();
 
     /// Return the length of this array.
-    virtual size_t size() const { return mSize; }
+    virtual size_t size() const override { return mSize; }
 
     /// Return the stride of this array.
-    virtual Index stride() const { return mStride; }
+    virtual Index stride() const override { return mStride; }
 
     /// Return true if stride is greater than one.
-    virtual bool isStrided() const { return mStride > 1; }
+    virtual bool isStrided() const override { return mStride > 1; }
 
     /// Return the number of bytes of memory used by this attribute.
-    virtual size_t memUsage() const;
+    virtual size_t memUsage() const override;
 
     /// Return the value at index @a n (assumes uncompressed and in-core)
     ValueType getUnsafe(Index n) const;
@@ -536,18 +540,18 @@ public:
     static void setUnsafe(AttributeArray* array, const Index n, const ValueType& value);
 
     /// Set value at given index @a n from @a sourceIndex of another @a sourceArray
-    virtual void set(const Index n, const AttributeArray& sourceArray, const Index sourceIndex);
+    virtual void set(const Index n, const AttributeArray& sourceArray, const Index sourceIndex) override;
 
     /// Return @c true if this array is stored as a single uniform value.
-    virtual bool isUniform() const { return mIsUniform; }
+    virtual bool isUniform() const override { return mIsUniform; }
     /// @brief  Replace the single value storage with an array of length size().
     /// @note   Non-uniform attributes are unchanged.
     /// @param  fill toggle to initialize the array elements with the pre-expanded value.
-    virtual void expand(bool fill = true);
+    virtual void expand(bool fill = true) override;
     /// Replace the existing array with a uniform zero value.
-    virtual void collapse();
+    virtual void collapse() override;
     /// Compact the existing array to become uniform if all values are identical
-    virtual bool compact();
+    virtual bool compact() override;
 
     /// Replace the existing array with the given uniform value.
     void collapse(const ValueType& uniformValue);
@@ -561,24 +565,24 @@ public:
     static void fill(AttributeArray* array, const ValueType& value);
 
     /// Compress the attribute array.
-    virtual bool compress();
+    virtual bool compress() override;
     /// Uncompress the attribute array.
-    virtual bool decompress();
+    virtual bool decompress() override;
 
     /// Read attribute data from a stream.
     virtual void read(std::istream& is);
     /// Write attribute data to a stream.
     /// @param outputTransient if true, write out transient attributes
-    virtual void write(std::ostream&, bool outputTransient = false) const;
+    virtual void write(std::ostream&, bool outputTransient = false) const override;
 
     /// Return @c true if this buffer's values have not yet been read from disk.
     inline bool isOutOfCore() const;
 
     /// Ensures all data is in-core
-    virtual void loadData() const;
+    virtual void loadData() const override;
 
 protected:
-    virtual AccessorBasePtr getAccessor() const;
+    virtual AccessorBasePtr getAccessor() const override;
 
 private:
     /// Load data from memory-mapped file.
@@ -590,7 +594,7 @@ private:
     inline void setOutOfCore(const bool);
 
     /// Compare the this data to another attribute array. Used by the base class comparison operator
-    virtual bool isEqual(const AttributeArray& other) const;
+    virtual bool isEqual(const AttributeArray& other) const override;
 
     size_t arrayMemUsage(const bool maximum=false) const;
     void allocate(const size_t size, const Index stride);

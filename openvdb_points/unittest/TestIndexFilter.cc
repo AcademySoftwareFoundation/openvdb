@@ -37,11 +37,9 @@
 #include <openvdb_points/tools/PointGroup.h>
 #include <openvdb_points/tools/PointCount.h>
 
-#include <boost/random/mersenne_twister.hpp>
-#include <boost/assign/std/vector.hpp> // until C++11
-
 #include <sstream>
 #include <iostream>
+#include <utility>
 
 using namespace openvdb;
 using namespace openvdb::tools;
@@ -130,7 +128,7 @@ template<class GridType>
 inline void
 makeSphere(const openvdb::Coord& dim, const openvdb::Vec3f& center, float radius, GridType& grid)
 {
-    typedef typename GridType::ValueType ValueT;
+    using ValueT = typename GridType::ValueType;
     const ValueT zero = openvdb::zeroVal<ValueT>();
 
     typename GridType::Accessor acc = grid.getAccessor();
@@ -154,7 +152,7 @@ multiGroupMatches(  const LeafT& leaf, const Index32 size,
                     const std::vector<Name>& include, const std::vector<Name>& exclude,
                     const std::vector<int>& indices)
 {
-    typedef IndexIter<ValueVoxelCIter, MultiGroupFilter> IndexGroupIter;
+    using IndexGroupIter = IndexIter<ValueVoxelCIter, MultiGroupFilter>;
     ValueVoxelCIter indexIter(0, size);
     MultiGroupFilter filter(include, exclude);
     filter.reset(leaf);
@@ -170,14 +168,12 @@ multiGroupMatches(  const LeafT& leaf, const Index32 size,
 void
 TestIndexFilter::testMultiGroupFilter()
 {
-    using namespace boost::assign; // bring 'operator+=()' into scope
-
     using namespace openvdb;
     using namespace openvdb::tools;
 
-    typedef PointDataTree::LeafNodeType LeafNode;
-    typedef openvdb::tools::TypedAttributeArray<Vec3f>    AttributeVec3f;
-    typedef openvdb::tools::TypedAttributeArray<float>    AttributeS;
+    using LeafNode          = PointDataTree::LeafNodeType;
+    using AttributeVec3f    = openvdb::tools::TypedAttributeArray<Vec3f>;
+    using AttributeS        = openvdb::tools::TypedAttributeArray<float>;
 
     AttributeVec3f::registerType();
     AttributeS::registerType();
@@ -186,7 +182,7 @@ TestIndexFilter::testMultiGroupFilter()
     PointDataTree tree;
     LeafNode* leaf = tree.touchLeaf(openvdb::Coord(0, 0, 0));
 
-    typedef AttributeSet::Descriptor Descriptor;
+    using Descriptor = AttributeSet::Descriptor;
     Descriptor::Ptr descriptor = Descriptor::create(AttributeVec3f::attributeType());
 
     const size_t size = 5;
@@ -239,77 +235,77 @@ TestIndexFilter::testMultiGroupFilter()
     { // all (implicit, no include or exclude)
         std::vector<Name> include;
         std::vector<Name> exclude;
-        std::vector<int> indices; indices += 0, 1, 2, 3, 4;
+        std::vector<int> indices{0, 1, 2, 3, 4};
         CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 
     { // all include
-        std::vector<Name> include; include += "all";
+        std::vector<Name> include{"all"};
         std::vector<Name> exclude;
-        std::vector<int> indices; indices += 0, 1, 2, 3, 4;
+        std::vector<int> indices{0, 1, 2, 3, 4};
         CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 
     { // all exclude
         std::vector<Name> include;
-        std::vector<Name> exclude; exclude += "all";
+        std::vector<Name> exclude{"all"};
         std::vector<int> indices;
         CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 
     { // all include and exclude
-        std::vector<Name> include; include += "all";
-        std::vector<Name> exclude; exclude += "all";
+        std::vector<Name> include{"all"};
+        std::vector<Name> exclude{"all"};
         std::vector<int> indices;
         CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 
     { // even include
-        std::vector<Name> include; include += "even";
+        std::vector<Name> include{"even"};
         std::vector<Name> exclude;
-        std::vector<int> indices; indices += 0, 2, 4;
+        std::vector<int> indices{0, 2, 4};
         CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 
     { // odd include
-        std::vector<Name> include; include += "odd";
+        std::vector<Name> include{"odd"};
         std::vector<Name> exclude;
-        std::vector<int> indices; indices += 1, 3;
+        std::vector<int> indices{1, 3};
         CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 
     { // odd include and exclude
-        std::vector<Name> include; include += "odd";
-        std::vector<Name> exclude; exclude += "odd";
+        std::vector<Name> include{"odd"};
+        std::vector<Name> exclude{"odd"};
         std::vector<int> indices;
         CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 
     { // odd and first include
-        std::vector<Name> include; include += "odd", "first";
+        std::vector<Name> include{"odd", "first"};
         std::vector<Name> exclude;
-        std::vector<int> indices; indices += 0, 1, 3;
+        std::vector<int> indices{0, 1, 3};
         CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 
     { // even include, first exclude
-        std::vector<Name> include; include += "even";
-        std::vector<Name> exclude; exclude += "first";
-        std::vector<int> indices; indices += 2, 4;
+        std::vector<Name> include{"even"};
+        std::vector<Name> exclude{"first"};
+        std::vector<int> indices{2, 4};
         CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 
     { // all include, first and odd exclude
-        std::vector<Name> include; include += "all";
-        std::vector<Name> exclude; exclude += "first", "odd";
-        std::vector<int> indices; indices += 2, 4;
+        std::vector<Name> include{"all"};
+        std::vector<Name> exclude{"first", "odd"};
+        std::vector<int> indices{2, 4};
         CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 
     { // odd and first include, even exclude
-        std::vector<Name> include; include += "odd", "first";
-        std::vector<Name> exclude; exclude += "even";
-        std::vector<int> indices; indices += 1, 3;
+        std::vector<Name> include{"odd", "first"};
+        std::vector<Name> exclude{"even"};
+        std::vector<int> indices{1, 3};
         CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 }
@@ -322,49 +318,40 @@ TestIndexFilter::testRandomLeafFilter()
     using namespace openvdb::tools;
 
     { // generateRandomSubset
-        std::vector<int> values;
-        std::vector<int> values2;
-
-        index_filter_internal::generateRandomSubset<std::mt19937, int>(values, /*seed*/(unsigned) 0, 1, 20);
+        std::vector<int> values = index_filter_internal::generateRandomSubset<std::mt19937, int>(/*seed*/(unsigned) 0, 1, 20);
 
         CPPUNIT_ASSERT_EQUAL(values.size(), size_t(1));
 
         // different seed
 
-        index_filter_internal::generateRandomSubset<std::mt19937, int>(values2, /*seed*/(unsigned) 1, 1, 20);
+        std::vector<int> values2 = index_filter_internal::generateRandomSubset<std::mt19937, int>(/*seed*/(unsigned) 1, 1, 20);
 
         CPPUNIT_ASSERT_EQUAL(values2.size(), size_t(1));
         CPPUNIT_ASSERT(values[0] != values2[0]);
 
         // different integer type
 
-        std::vector<long> values3;
-
-        index_filter_internal::generateRandomSubset<std::mt19937, long>(values3, /*seed*/(unsigned) 0, 1, 20);
+        std::vector<long> values3 = index_filter_internal::generateRandomSubset<std::mt19937, long>(/*seed*/(unsigned) 0, 1, 20);
 
         CPPUNIT_ASSERT_EQUAL(values3.size(), size_t(1));
         CPPUNIT_ASSERT(values[0] == values3[0]);
 
         // different random number generator
 
-        values.clear();
-
-        index_filter_internal::generateRandomSubset<std::mt19937_64, int>(values, /*seed*/(unsigned) 1, 1, 20);
+        values = index_filter_internal::generateRandomSubset<std::mt19937_64, int>(/*seed*/(unsigned) 1, 1, 20);
 
         CPPUNIT_ASSERT_EQUAL(values.size(), size_t(1));
         CPPUNIT_ASSERT(values[0] != values2[0]);
 
         // no values
 
-        values.clear();
-
-        index_filter_internal::generateRandomSubset<std::mt19937, int>(values, /*seed*/(unsigned) 0, 0, 20);
+        values = index_filter_internal::generateRandomSubset<std::mt19937, int>(/*seed*/(unsigned) 0, 0, 20);
 
         CPPUNIT_ASSERT_EQUAL(values.size(), size_t(0));
 
         // all values
 
-        index_filter_internal::generateRandomSubset<std::mt19937, int>(values, /*seed*/(unsigned) 0, 1000, 1000);
+        values = index_filter_internal::generateRandomSubset<std::mt19937, int>(/*seed*/(unsigned) 0, 1000, 1000);
 
         CPPUNIT_ASSERT_EQUAL(values.size(), size_t(1000));
 
@@ -378,15 +365,15 @@ TestIndexFilter::testRandomLeafFilter()
     }
 
     { // RandomLeafFilter
-        typedef RandomLeafFilter<PointDataTree, std::mt19937> RandFilter;
+        using RandFilter = RandomLeafFilter<PointDataTree, std::mt19937>;
 
         PointDataTree tree;
 
         RandFilter filter(tree, 0);
 
-        filter.mLeafMap[Coord(0, 0, 0)] = std::pair<Index, Index>(0, 10);
-        filter.mLeafMap[Coord(0, 0, 8)] = std::pair<Index, Index>(1, 1);
-        filter.mLeafMap[Coord(0, 8, 0)] = std::pair<Index, Index>(2, 50);
+        filter.mLeafMap[Coord(0, 0, 0)] = std::make_pair(0, 10);
+        filter.mLeafMap[Coord(0, 0, 8)] = std::make_pair(1, 1);
+        filter.mLeafMap[Coord(0, 8, 0)] = std::make_pair(2, 50);
 
         { // construction, copy construction
             CPPUNIT_ASSERT(filter.initialized());
@@ -427,7 +414,7 @@ TestIndexFilter::testRandomLeafFilter()
             // ensure no duplicates
 
             std::sort(values.begin(), values.end());
-            std::vector<int>::const_iterator it = std::adjacent_find(values.begin(), values.end());
+            auto it = std::adjacent_find(values.begin(), values.end());
 
             CPPUNIT_ASSERT(it == values.end());
         }
@@ -438,10 +425,10 @@ TestIndexFilter::testRandomLeafFilter()
 void setId(PointDataTree& tree, const size_t index, const std::vector<int>& ids)
 {
     int offset = 0;
-    for (PointDataTree::LeafIter leafIter = tree.beginLeaf(); leafIter; ++leafIter) {
-        AttributeWriteHandle<int>::Ptr id = AttributeWriteHandle<int>::create(leafIter->attributeArray(index));
+    for (auto leafIter = tree.beginLeaf(); leafIter; ++leafIter) {
+        auto id = AttributeWriteHandle<int>::create(leafIter->attributeArray(index));
 
-        for (PointDataTree::LeafNodeType::IndexAllIter iter = leafIter->beginIndexAll(); iter; ++iter) {
+        for (auto iter = leafIter->beginIndexAll(); iter; ++iter) {
             if (offset >= int(ids.size()))   throw std::runtime_error("Out of range");
 
             id->set(*iter, ids[offset++]);
@@ -456,17 +443,13 @@ TestIndexFilter::testAttributeHashFilter()
     using namespace openvdb;
     using namespace openvdb::tools;
 
-    typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
-    typedef TypedAttributeArray<int>     AttributeI;
+    using AttributeVec3s    = TypedAttributeArray<Vec3s>;
+    using AttributeI        = TypedAttributeArray<int>;
 
     AttributeVec3s::registerType();
     AttributeI::registerType();
 
-    std::vector<Vec3s> positions;
-    positions.push_back(Vec3s(1, 1, 1));
-    positions.push_back(Vec3s(2, 2, 2));
-    positions.push_back(Vec3s(11, 11, 11));
-    positions.push_back(Vec3s(12, 12, 12));
+    std::vector<Vec3s> positions{{1, 1, 1}, {2, 2, 2}, {11, 11, 11}, {12, 12, 12}};
 
     const float voxelSize(1.0);
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
@@ -483,14 +466,10 @@ TestIndexFilter::testAttributeHashFilter()
     const size_t index = tree.cbeginLeaf()->attributeSet().descriptor().find("id");
 
     // ascending integers, block one
-    std::vector<int> ids;
-    ids.push_back(1);
-    ids.push_back(2);
-    ids.push_back(3);
-    ids.push_back(4);
+    std::vector<int> ids{1, 2, 3, 4};
     setId(tree, index, ids);
 
-    typedef AttributeHashFilter<std::mt19937, int> HashFilter;
+    using HashFilter = AttributeHashFilter<std::mt19937, int>;
 
     { // construction, copy construction
         HashFilter filter(index, 0.0f);
@@ -507,9 +486,9 @@ TestIndexFilter::testAttributeHashFilter()
     { // zero percent
         HashFilter filter(index, 0.0f);
 
-        PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
+        auto leafIter = tree.cbeginLeaf();
 
-        PointDataTree::LeafNodeType::IndexAllIter indexIter = leafIter->beginIndexAll();
+        auto indexIter = leafIter->beginIndexAll();
         filter.reset(*leafIter);
 
         CPPUNIT_ASSERT(!filter.valid(indexIter));
@@ -531,9 +510,9 @@ TestIndexFilter::testAttributeHashFilter()
     { // one hundred percent
         HashFilter filter(index, 100.0f);
 
-        PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
+        auto leafIter = tree.cbeginLeaf();
 
-        PointDataTree::LeafNodeType::IndexAllIter indexIter = leafIter->beginIndexAll();
+        auto indexIter = leafIter->beginIndexAll();
         filter.reset(*leafIter);
 
         CPPUNIT_ASSERT(filter.valid(indexIter));
@@ -555,9 +534,9 @@ TestIndexFilter::testAttributeHashFilter()
     { // fifty percent
         HashFilter filter(index, 50.0f);
 
-        PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
+        auto leafIter = tree.cbeginLeaf();
 
-        PointDataTree::LeafNodeType::IndexAllIter indexIter = leafIter->beginIndexAll();
+        auto indexIter = leafIter->beginIndexAll();
         filter.reset(*leafIter);
 
         CPPUNIT_ASSERT(!filter.valid(indexIter));
@@ -579,9 +558,9 @@ TestIndexFilter::testAttributeHashFilter()
     { // fifty percent, new seed
         HashFilter filter(index, 50.0f, /*seed=*/100);
 
-        PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
+        auto leafIter = tree.cbeginLeaf();
 
-        PointDataTree::LeafNodeType::IndexAllIter indexIter = leafIter->beginIndexAll();
+        auto indexIter = leafIter->beginIndexAll();
         filter.reset(*leafIter);
 
         CPPUNIT_ASSERT(!filter.valid(indexIter));
@@ -608,7 +587,7 @@ TestIndexFilter::testLevelSetFilter()
     using namespace openvdb;
     using namespace openvdb::tools;
 
-    typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
+    using AttributeVec3s = TypedAttributeArray<Vec3s>;
 
     AttributeVec3s::registerType();
 
@@ -617,10 +596,7 @@ TestIndexFilter::testLevelSetFilter()
     PointDataGrid::Ptr points;
 
     {
-        std::vector<Vec3s> positions;
-        positions.push_back(Vec3s(1, 1, 1));
-        positions.push_back(Vec3s(1, 2, 1));
-        positions.push_back(Vec3s(10.1, 10, 1));
+        std::vector<Vec3s> positions{{1, 1, 1}, {1, 2, 1}, {10.1, 10, 1}};
 
         const double voxelSize(1.0);
         math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
@@ -643,7 +619,7 @@ TestIndexFilter::testLevelSetFilter()
         makeSphere<FloatGrid>(dim, center, radius, *sphere);
     }
 
-    typedef LevelSetFilter<FloatGrid> LSFilter;
+    using LSFilter = LevelSetFilter<FloatGrid>;
 
     { // construction, copy construction
         LSFilter filter(*sphere, points->transform(), -4.0f, 4.0f);
@@ -659,8 +635,8 @@ TestIndexFilter::testLevelSetFilter()
 
     { // capture both points near origin
         LSFilter filter(*sphere, points->transform(), -4.0f, 4.0f);
-        PointDataGrid::TreeType::LeafCIter leafIter = points->tree().cbeginLeaf();
-        PointDataGrid::TreeType::LeafNodeType::IndexOnIter iter = leafIter->beginIndexOn();
+        auto leafIter = points->tree().cbeginLeaf();
+        auto iter = leafIter->beginIndexOn();
         filter.reset(*leafIter);
 
         CPPUNIT_ASSERT(filter.valid(iter));
@@ -681,8 +657,8 @@ TestIndexFilter::testLevelSetFilter()
 
     { // capture just the inner-most point
         LSFilter filter(*sphere, points->transform(), -0.3f, -0.25f);
-        PointDataGrid::TreeType::LeafCIter leafIter = points->tree().cbeginLeaf();
-        PointDataGrid::TreeType::LeafNodeType::IndexOnIter iter = leafIter->beginIndexOn();
+        auto leafIter = points->tree().cbeginLeaf();
+        auto iter = leafIter->beginIndexOn();
         filter.reset(*leafIter);
 
         CPPUNIT_ASSERT(filter.valid(iter));
@@ -703,8 +679,8 @@ TestIndexFilter::testLevelSetFilter()
 
     { // capture everything but the second point (min > max)
         LSFilter filter(*sphere, points->transform(), -0.25f, -0.3f);
-        PointDataGrid::TreeType::LeafCIter leafIter = points->tree().cbeginLeaf();
-        PointDataGrid::TreeType::LeafNodeType::IndexOnIter iter = leafIter->beginIndexOn();
+        auto leafIter = points->tree().cbeginLeaf();
+        auto iter = leafIter->beginIndexOn();
         filter.reset(*leafIter);
 
         CPPUNIT_ASSERT(!filter.valid(iter));
@@ -724,10 +700,7 @@ TestIndexFilter::testLevelSetFilter()
     }
 
     {
-        std::vector<Vec3s> positions;
-        positions.push_back(Vec3s(1, 1, 1));
-        positions.push_back(Vec3s(1, 2, 1));
-        positions.push_back(Vec3s(10.1, 10, 1));
+        std::vector<Vec3s> positions{{1, 1, 1}, {1, 2, 1}, {10.1, 10, 1}};
 
         const double voxelSize(0.25);
         math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
@@ -748,8 +721,8 @@ TestIndexFilter::testLevelSetFilter()
 
     { // capture only the last point using a different transform and a new sphere
         LSFilter filter(*sphere, points->transform(), 0.5f, 1.0f);
-        PointDataGrid::TreeType::LeafCIter leafIter = points->tree().cbeginLeaf();
-        PointDataGrid::TreeType::LeafNodeType::IndexOnIter iter = leafIter->beginIndexOn();
+        auto leafIter = points->tree().cbeginLeaf();
+        auto iter = leafIter->beginIndexOn();
         filter.reset(*leafIter);
 
         CPPUNIT_ASSERT(!filter.valid(iter));
@@ -782,15 +755,11 @@ TestIndexFilter::testBBoxFilter()
     using namespace openvdb;
     using namespace openvdb::tools;
 
-    typedef TypedAttributeArray<Vec3s>   AttributeVec3s;
-    typedef PointDataTree::LeafNodeType::IndexOnIter IndexOnIter;
+    using AttributeVec3s = TypedAttributeArray<Vec3s>;
 
     AttributeVec3s::registerType();
 
-    std::vector<Vec3s> positions;
-    positions.push_back(Vec3s(1, 1, 1));
-    positions.push_back(Vec3s(1, 2, 1));
-    positions.push_back(Vec3s(10.1, 10, 1));
+    std::vector<Vec3s> positions{{1, 1, 1}, {1, 2, 1}, {10.1, 10, 1}};
 
     const float voxelSize(0.5);
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
@@ -803,10 +772,10 @@ TestIndexFilter::testBBoxFilter()
 
     // build some bounding box filters to test
 
-    BBoxFilter filter1(*transform, BBoxd(Vec3d(0.5, 0.5, 0.5), Vec3d(1.5, 1.5, 1.5)));
-    BBoxFilter filter2(*transform, BBoxd(Vec3d(0.5, 0.5, 0.5), Vec3d(1.5, 2.01, 1.5)));
-    BBoxFilter filter3(*transform, BBoxd(Vec3d(0.5, 0.5, 0.5), Vec3d(11, 11, 1.5)));
-    BBoxFilter filter4(*transform, BBoxd(Vec3d(-10, 0, 0), Vec3d(11, 1.2, 1.2)));
+    BBoxFilter filter1(*transform, BBoxd({0.5, 0.5, 0.5}, {1.5, 1.5, 1.5}));
+    BBoxFilter filter2(*transform, BBoxd({0.5, 0.5, 0.5}, {1.5, 2.01, 1.5}));
+    BBoxFilter filter3(*transform, BBoxd({0.5, 0.5, 0.5}, {11, 11, 1.5}));
+    BBoxFilter filter4(*transform, BBoxd({-10, 0, 0}, {11, 1.2, 1.2}));
 
     { // construction, copy construction
         CPPUNIT_ASSERT(!filter1.initialized());
@@ -821,10 +790,10 @@ TestIndexFilter::testBBoxFilter()
 
     // leaf 1
 
-    PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
+    auto leafIter = tree.cbeginLeaf();
 
     {
-        IndexOnIter iter(leafIter->beginIndexOn());
+        auto iter(leafIter->beginIndexOn());
 
         // point 1
 
@@ -859,7 +828,7 @@ TestIndexFilter::testBBoxFilter()
     // leaf 2
 
     {
-        IndexOnIter iter(leafIter->beginIndexOn());
+        auto iter(leafIter->beginIndexOn());
 
         // point 3
 
@@ -880,12 +849,11 @@ TestIndexFilter::testBBoxFilter()
 
 struct NeedsInitializeFilter
 {
-    NeedsInitializeFilter() : mInitialized(false) { }
     inline bool initialized() const { return mInitialized; }
     template <typename LeafT>
     void reset(const LeafT&) { mInitialized = true; }
 private:
-    bool mInitialized;
+    bool mInitialized = false;
 };
 
 
@@ -893,7 +861,7 @@ void
 TestIndexFilter::testBinaryFilter()
 {
     { // construction, copy construction
-        typedef BinaryFilter<NeedsInitializeFilter, NeedsInitializeFilter, /*And=*/true> InitializeBinaryFilter;
+        using InitializeBinaryFilter = BinaryFilter<NeedsInitializeFilter, NeedsInitializeFilter, /*And=*/true>;
 
         NeedsInitializeFilter needs1;
         NeedsInitializeFilter needs2;
@@ -908,8 +876,8 @@ TestIndexFilter::testBinaryFilter()
         CPPUNIT_ASSERT(filter3.initialized());
     }
 
-    typedef ThresholdFilter<true> LessThanFilter;
-    typedef ThresholdFilter<false> GreaterThanFilter;
+    using LessThanFilter    = ThresholdFilter<true>;
+    using GreaterThanFilter = ThresholdFilter<false>;
 
     { // less than
         LessThanFilter filter(5);
@@ -945,7 +913,7 @@ TestIndexFilter::testBinaryFilter()
     }
 
     { // binary and
-        typedef BinaryFilter<LessThanFilter, GreaterThanFilter, /*And=*/true> RangeFilter;
+        using RangeFilter = BinaryFilter<LessThanFilter, GreaterThanFilter, /*And=*/true>;
 
         RangeFilter filter(LessThanFilter(55), GreaterThanFilter(45));
 
@@ -966,7 +934,7 @@ TestIndexFilter::testBinaryFilter()
     }
 
     { // binary or
-        typedef BinaryFilter<LessThanFilter, GreaterThanFilter, /*And=*/false> HeadTailFilter;
+        using HeadTailFilter = BinaryFilter<LessThanFilter, GreaterThanFilter, /*And=*/false>;
 
         HeadTailFilter filter(LessThanFilter(5), GreaterThanFilter(95));
         filter.reset(OriginLeaf(Coord(0, 0, 0)));

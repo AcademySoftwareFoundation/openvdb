@@ -125,7 +125,7 @@ template <  typename PointDataTreeT,
             typename FilterT>
 struct PointCountOp
 {
-    typedef typename tree::LeafManager<const PointDataTreeT>    LeafManagerT;
+    using LeafManagerT = typename tree::LeafManager<const PointDataTreeT>;
 
     PointCountOp(const FilterT& filter,
                  const bool inCoreOnly = false)
@@ -134,12 +134,12 @@ struct PointCountOp
 
     Index64 operator()(const typename LeafManagerT::LeafRange& range, Index64 size) const {
 
-        for (typename LeafManagerT::LeafRange::Iterator leaf = range.begin(); leaf; ++leaf) {
+        for (auto leaf = range.begin(); leaf; ++leaf) {
 #ifndef OPENVDB_2_ABI_COMPATIBLE
             if (mInCoreOnly && leaf->buffer().isOutOfCore())     continue;
 #endif
 
-            IndexIter<ValueIterT, FilterT> iter = leaf->template beginIndex<ValueIterT, FilterT>(mFilter);
+            auto iter = leaf->template beginIndex<ValueIterT, FilterT>(mFilter);
             size += iterCount(iter);
         }
 
@@ -161,7 +161,7 @@ Index64 threadedFilterPointCount(   const PointDataTreeT& tree,
                                     const FilterT& filter,
                                     const bool inCoreOnly = false)
 {
-    typedef point_count_internal::PointCountOp< PointDataTreeT, ValueIterT, FilterT> PointCountOp;
+    using PointCountOp = point_count_internal::PointCountOp< PointDataTreeT, ValueIterT, FilterT>;
 
     typename tree::LeafManager<const PointDataTreeT> leafManager(tree);
     const PointCountOp pointCountOp(filter, inCoreOnly);
@@ -174,7 +174,7 @@ Index64 filterPointCount(const PointDataTreeT& tree,
                          const FilterT& filter,
                          const bool inCoreOnly = false)
 {
-    typedef typename PointDataTreeT::LeafNodeType::ValueAllCIter ValueIterT;
+    using ValueIterT = typename PointDataTreeT::LeafNodeType::ValueAllCIter;
     return threadedFilterPointCount<  PointDataTreeT, FilterT, ValueIterT>(tree, filter, inCoreOnly);
 }
 
@@ -184,7 +184,7 @@ Index64 filterActivePointCount( const PointDataTreeT& tree,
                                 const FilterT& filter,
                                 const bool inCoreOnly = false)
 {
-    typedef typename PointDataTreeT::LeafNodeType::ValueOnCIter ValueIterT;
+    using ValueIterT = typename PointDataTreeT::LeafNodeType::ValueOnCIter;
     return threadedFilterPointCount<  PointDataTreeT, FilterT, ValueIterT>(tree, filter, inCoreOnly);
 }
 
@@ -194,7 +194,7 @@ Index64 filterInactivePointCount(   const PointDataTreeT& tree,
                                     const FilterT& filter,
                                     const bool inCoreOnly = false)
 {
-    typedef typename PointDataTreeT::LeafNodeType::ValueOffCIter ValueIterT;
+    using ValueIterT = typename PointDataTreeT::LeafNodeType::ValueOffCIter;
     return threadedFilterPointCount<  PointDataTreeT, FilterT, ValueIterT>(tree, filter, inCoreOnly);
 }
 
@@ -207,7 +207,7 @@ Index64 pointCount(const PointDataTreeT& tree, const bool inCoreOnly)
 {
     (void) inCoreOnly;
     Index64 size = 0;
-    for (typename PointDataTreeT::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
+    for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
 #ifndef OPENVDB_2_ABI_COMPATIBLE
         if (inCoreOnly && iter->buffer().isOutOfCore())     continue;
 #else
@@ -224,7 +224,7 @@ Index64 activePointCount(const PointDataTreeT& tree, const bool inCoreOnly)
 {
     (void) inCoreOnly;
     Index64 size = 0;
-    for (typename PointDataTreeT::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
+    for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
 #ifndef OPENVDB_2_ABI_COMPATIBLE
         if (inCoreOnly && iter->buffer().isOutOfCore())     continue;
 #else
@@ -241,7 +241,7 @@ Index64 inactivePointCount(const PointDataTreeT& tree, const bool inCoreOnly)
 {
     (void) inCoreOnly;
     Index64 size = 0;
-    for (typename PointDataTreeT::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter) {
+    for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
 #ifndef OPENVDB_2_ABI_COMPATIBLE
         if (inCoreOnly && iter->buffer().isOutOfCore())     continue;
 #else
@@ -282,7 +282,7 @@ Index64 getPointOffsets(std::vector<Index64>& pointOffsets, const PointDataTreeT
                      const std::vector<Name>& includeGroups, const std::vector<Name>& excludeGroups,
                      const bool inCoreOnly)
 {
-    typedef typename PointDataTreeT::LeafNodeType LeafNode;
+    using LeafNode = typename PointDataTreeT::LeafNodeType;
 
     const bool useGroup = includeGroups.size() > 0 || excludeGroups.size() > 0;
 
@@ -307,7 +307,7 @@ Index64 getPointOffsets(std::vector<Index64>& pointOffsets, const PointDataTreeT
 #endif
 
         if (useGroup) {
-            typename LeafNode::ValueOnCIter iter = leaf.beginValueOn();
+            auto iter = leaf.beginValueOn();
             MultiGroupFilter filter(includeGroups, excludeGroups);
             filter.reset(leaf);
             IndexIter<typename LeafNode::ValueOnCIter, MultiGroupFilter> filterIndexIter(iter, filter);
