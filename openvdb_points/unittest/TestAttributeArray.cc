@@ -326,6 +326,30 @@ TestAttributeArray::testCompression()
         CPPUNIT_ASSERT_EQUAL(compressedBytes, size_t(0));
     }
 
+    { // padded buffer
+        const int paddedCount = 16;
+
+        std::unique_ptr<int[]> newTest(new int[paddedCount]);
+        for (int i = 0; i < paddedCount; i++)  newTest.get()[i] = i;
+
+#ifdef OPENVDB_USE_BLOSC
+        size_t compressedBytes;
+        std::unique_ptr<char[]> compressedBuffer = compress(reinterpret_cast<char*>(newTest.get()), paddedCount*sizeof(int), compressedBytes);
+
+        CPPUNIT_ASSERT(compressedBuffer);
+
+        CPPUNIT_ASSERT(compressedBytes > 0 && compressedBytes < (paddedCount*sizeof(int)));
+
+        std::unique_ptr<char[]> uncompressedBuffer = decompress(reinterpret_cast<char*>(compressedBuffer.get()), paddedCount*sizeof(int));
+
+        CPPUNIT_ASSERT(uncompressedBuffer);
+
+        for (int i = 0; i < paddedCount; i++) {
+            CPPUNIT_ASSERT_EQUAL((reinterpret_cast<int*>(uncompressedBuffer.get()))[i], newTest[i]);
+        }
+#endif
+    }
+
     { // invalid buffer (out of range)
 
         // compress

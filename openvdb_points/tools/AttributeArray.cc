@@ -55,7 +55,11 @@ namespace attribute_compression {
 
 // This is the minimum number of bytes below which Blosc compression is not used to
 // avoid unecessary computation, as Blosc offers minimal compression until this limit
-static const int BLOSC_MINIMUM_BYTES = 128;
+static const int BLOSC_MINIMUM_BYTES = 48;
+
+// This is the minimum number of bytes below which the array is padded with zeros up
+// to this number of bytes to allow Blosc to perform compression with small arrays
+static const int BLOSC_PAD_BYTES = 128;
 
 
 bool canCompress()
@@ -74,13 +78,27 @@ size_t uncompressedSize(const char* buffer)
 
 std::unique_ptr<char[]> compress(const char* buffer, const size_t uncompressedBytes, size_t& compressedBytes, const bool resize)
 {
-    // no Blosc compression performed below this limit
-    if (uncompressedBytes <= BLOSC_MINIMUM_BYTES) {
+    std::unique_ptr<char[]> paddedBuffer;
+
+    size_t inputBytes = uncompressedBytes;
+
+    if (inputBytes <= BLOSC_MINIMUM_BYTES) {
+        // no Blosc compression performed below this limit
         compressedBytes = 0;
         return nullptr;
     }
+    else if (inputBytes < BLOSC_PAD_BYTES) {
+        // input array padded with zeros below this limit to improve compression
+        paddedBuffer.reset(new char[BLOSC_PAD_BYTES]);
+        std::memcpy(paddedBuffer.get(), buffer, inputBytes);
+        for (int i = inputBytes; i < BLOSC_PAD_BYTES; i++) {
+            paddedBuffer.get()[i] = 0;
+        }
+        buffer = paddedBuffer.get();
+        inputBytes = BLOSC_PAD_BYTES;
+    }
 
-    size_t tempBytes = uncompressedBytes + BLOSC_MAX_OVERHEAD;
+    size_t tempBytes = inputBytes + BLOSC_MAX_OVERHEAD;
     const bool outOfRange = tempBytes > BLOSC_MAX_BUFFERSIZE;
     std::unique_ptr<char[]> outBuffer(outOfRange ? new char[1] : new char[tempBytes]);
 
@@ -88,12 +106,12 @@ std::unique_ptr<char[]> compress(const char* buffer, const size_t uncompressedBy
         /*clevel=*/9, // 0 (no compression) to 9 (maximum compression)
         /*doshuffle=*/true,
         /*typesize=*/sizeof(float), // hard-coded to 4-bytes for better compression
-        /*srcsize=*/uncompressedBytes,
+        /*srcsize=*/inputBytes,
         /*src=*/buffer,
         /*dest=*/outBuffer.get(),
         /*destsize=*/tempBytes,
         BLOSC_LZ4_COMPNAME,
-        /*blocksize=*/uncompressedBytes,
+        /*blocksize=*/inputBytes,
         /*numthreads=*/1);
 
     if (_compressedBytes <= 0) {
@@ -137,22 +155,26 @@ size_t compressedSize( const char* buffer, const size_t uncompressedBytes)
 
 std::unique_ptr<char[]> decompress(const char* buffer, const size_t expectedBytes, const bool resize)
 {
-    size_t tempBytes = expectedBytes + BLOSC_MAX_OVERHEAD;
+    size_t uncompressedBytes = uncompressedSize(buffer);
+    size_t tempBytes = uncompressedBytes + BLOSC_MAX_OVERHEAD;
     const bool outOfRange = tempBytes > BLOSC_MAX_BUFFERSIZE;
     if (outOfRange)     tempBytes = 1;
     std::unique_ptr<char[]> outBuffer(new char[tempBytes]);
 
-    const int uncompressedBytes = blosc_decompress_ctx( /*src=*/buffer,
-                                                        /*dest=*/outBuffer.get(),
-                                                        tempBytes,
-                                                        /*numthreads=*/1);
+    uncompressedBytes = blosc_decompress_ctx(   /*src=*/buffer,
+                                                /*dest=*/outBuffer.get(),
+                                                tempBytes,
+                                                /*numthreads=*/1);
 
     if (uncompressedBytes < 1) {
         OPENVDB_LOG_DEBUG("blosc_decompress() returned error code " << uncompressedBytes);
         return nullptr;
     }
 
-    if (uncompressedBytes != expectedBytes) {
+    if (uncompressedBytes == BLOSC_PAD_BYTES && expectedBytes <= BLOSC_PAD_BYTES) {
+        // padded array to improve compression
+    }
+    else if (uncompressedBytes != expectedBytes) {
         OPENVDB_THROW(RuntimeError, "Expected to decompress " << expectedBytes
             << " byte" << (expectedBytes == 1 ? "" : "s") << ", got "
             << uncompressedBytes << " byte" << (uncompressedBytes == 1 ? "" : "s"));
@@ -162,8 +184,8 @@ std::unique_ptr<char[]> decompress(const char* buffer, const size_t expectedByte
     // (resize can be skipped if the buffer is only temporary)
 
     if (resize) {
-        std::unique_ptr<char[]> newBuffer(new char[uncompressedBytes]);
-        std::memcpy(newBuffer.get(), outBuffer.get(), uncompressedBytes);
+        std::unique_ptr<char[]> newBuffer(new char[expectedBytes]);
+        std::memcpy(newBuffer.get(), outBuffer.get(), expectedBytes);
         outBuffer.reset(newBuffer.release());
     }
 
