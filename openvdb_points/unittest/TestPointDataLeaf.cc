@@ -73,7 +73,7 @@ public:
     void testCopyDescriptor();
 
 private:
-    
+
 }; // class TestPointDataLeaf
 
 using openvdb::tools::PointDataTree;

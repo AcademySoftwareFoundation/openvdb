@@ -140,7 +140,7 @@ attributeSetMatchesDescriptor(  const openvdb::tools::AttributeSet& attrSet,
 
     // ensure descriptor and attributes are still in sync
 
-    for (const auto& namePos : attrSet.descriptor().map()) { 
+    for (const auto& namePos : attrSet.descriptor().map()) {
         const size_t pos = descriptor.find(namePos.first);
 
         if (pos != size_t(namePos.second))  return false;
