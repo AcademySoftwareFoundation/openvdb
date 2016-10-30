@@ -262,53 +262,22 @@ TestAttributeArray::testCompression()
 
     const int count = 256;
 
-    { // invalid buffer (out of range)
-
+    { // valid buffer
         // compress
 
-        int* smallBuffer = new int[256];
-        size_t invalidBytes = INT_MAX - 1;
-
-        size_t testCompressedBytes = compressedSize(reinterpret_cast<char*>(smallBuffer), sizeof(int), invalidBytes);
-
-        CPPUNIT_ASSERT_EQUAL(testCompressedBytes, size_t(0));
-
-        char* buffer = compress(reinterpret_cast<char*>(smallBuffer), sizeof(int), invalidBytes, testCompressedBytes, /*cleanup=*/ false);
-
-        CPPUNIT_ASSERT(!buffer);
-        CPPUNIT_ASSERT_EQUAL(testCompressedBytes, size_t(0));
-
-        // decompress
-
-#ifdef OPENVDB_USE_BLOSC
-        for (int i = 0; i < 256; i++)   smallBuffer[i] = i;
-
-        char* compressedBuffer = compress(reinterpret_cast<char*>(smallBuffer), sizeof(int), 256 * sizeof(int), testCompressedBytes, /*cleanup=*/ true);
-
-        buffer = decompress(reinterpret_cast<char*>(compressedBuffer), invalidBytes - 16, /*cleanup=*/ false);
-
-        CPPUNIT_ASSERT(!buffer);
-
-        CPPUNIT_ASSERT_THROW(decompress(reinterpret_cast<char*>(compressedBuffer), 256 * sizeof(int) + 1, /*cleanup=*/ true), openvdb::RuntimeError);
-#endif
-    }
-
-    { // with cleanup
-        // compress
-
-        int* uncompressedBuffer = new int[count];
+        std::unique_ptr<int[]> uncompressedBuffer(new int[count]);
 
         for (int i = 0; i < count; i++) {
-            uncompressedBuffer[i] = i / 2;
+            uncompressedBuffer.get()[i] = i / 2;
         }
 
-        size_t uncompressedBytes = 256 * sizeof(int);
+        size_t uncompressedBytes = count * sizeof(int);
         size_t compressedBytes;
 
-        size_t testCompressedBytes = compressedSize(reinterpret_cast<char*>(uncompressedBuffer), sizeof(int), uncompressedBytes);
+        size_t testCompressedBytes = compressedSize(reinterpret_cast<char*>(uncompressedBuffer.get()), uncompressedBytes);
 
-        char* compressedBuffer = compress(  reinterpret_cast<char*>(uncompressedBuffer), sizeof(int),
-                                            uncompressedBytes, compressedBytes, /*cleanup=*/ true);
+        std::unique_ptr<char[]> compressedBuffer = compress(  reinterpret_cast<char*>(uncompressedBuffer.get()),
+                                            uncompressedBytes, compressedBytes);
 
 #ifdef OPENVDB_USE_BLOSC
         CPPUNIT_ASSERT(compressedBytes < uncompressedBytes);
@@ -317,88 +286,125 @@ TestAttributeArray::testCompression()
 
         // uncompressedSize
 
-        CPPUNIT_ASSERT_EQUAL(uncompressedBytes, uncompressedSize(compressedBuffer));
+        CPPUNIT_ASSERT_EQUAL(uncompressedBytes, uncompressedSize(compressedBuffer.get()));
 
         // decompress
 
-        char* newUncompressedBuffer = decompress(compressedBuffer, uncompressedBytes, /*cleanup=*/ true);
+        std::unique_ptr<char[]> newUncompressedBuffer = decompress(compressedBuffer.get(), uncompressedBytes);
+
+        // incorrect number of expected bytes
+        CPPUNIT_ASSERT_THROW(newUncompressedBuffer = decompress(compressedBuffer.get(), 1), openvdb::RuntimeError);
 
         CPPUNIT_ASSERT(newUncompressedBuffer);
-
-        delete[] newUncompressedBuffer;
 #else
         CPPUNIT_ASSERT(!compressedBuffer);
         CPPUNIT_ASSERT_EQUAL(testCompressedBytes, size_t(0));
 
         // uncompressedSize
 
-        CPPUNIT_ASSERT_THROW(uncompressedSize(compressedBuffer), openvdb::RuntimeError);
+        CPPUNIT_ASSERT_THROW(uncompressedSize(compressedBuffer.get()), openvdb::RuntimeError);
 
         // decompress
 
-        char* newUncompressedBuffer = 0;
-        CPPUNIT_ASSERT_THROW(   newUncompressedBuffer = decompress(compressedBuffer, uncompressedBytes,
-                                                        /*cleanup=*/ true), openvdb::RuntimeError);
+        std::unique_ptr<char[]> newUncompressedBuffer;
+        CPPUNIT_ASSERT_THROW(newUncompressedBuffer = decompress(compressedBuffer.get(), uncompressedBytes), openvdb::RuntimeError);
 
         CPPUNIT_ASSERT(!newUncompressedBuffer);
-
-        delete[] uncompressedBuffer;
 #endif
     }
 
-    { // without cleanup
-        // compress
+    { // one value (below minimum bytes)
+        std::unique_ptr<int[]> uncompressedBuffer(new int[1]);
+        uncompressedBuffer.get()[0] = 10;
 
-        int* uncompressedBuffer = new int[count];
-
-        for (int i = 0; i < count; i++) {
-            uncompressedBuffer[i] = i / 2;
-        }
-
-        size_t uncompressedBytes = 256 * sizeof(int);
         size_t compressedBytes;
 
-        const char* compressedBuffer = compress(reinterpret_cast<const char*>(uncompressedBuffer), sizeof(int),
-                                                uncompressedBytes, compressedBytes);
+        std::unique_ptr<char[]> compressedBuffer = compress(reinterpret_cast<char*>(uncompressedBuffer.get()),
+                                                            sizeof(int), compressedBytes);
+
+        CPPUNIT_ASSERT(!compressedBuffer);
+        CPPUNIT_ASSERT_EQUAL(compressedBytes, size_t(0));
+    }
+
+    { // padded buffer
+        const int paddedCount = 16;
+
+        std::unique_ptr<int[]> newTest(new int[paddedCount]);
+        for (int i = 0; i < paddedCount; i++)  newTest.get()[i] = i;
 
 #ifdef OPENVDB_USE_BLOSC
-        CPPUNIT_ASSERT(compressedBytes < uncompressedBytes);
+        size_t compressedBytes;
+        std::unique_ptr<char[]> compressedBuffer = compress(reinterpret_cast<char*>(newTest.get()), paddedCount*sizeof(int), compressedBytes);
+
         CPPUNIT_ASSERT(compressedBuffer);
 
-        // uncompressedSize
+        CPPUNIT_ASSERT(compressedBytes > 0 && compressedBytes < (paddedCount*sizeof(int)));
 
-        CPPUNIT_ASSERT_EQUAL(uncompressedBytes, uncompressedSize(compressedBuffer));
+        std::unique_ptr<char[]> uncompressedBuffer = decompress(reinterpret_cast<char*>(compressedBuffer.get()), paddedCount*sizeof(int));
 
-        // decompress
+        CPPUNIT_ASSERT(uncompressedBuffer);
 
-        const char* newUncompressedBuffer = decompress(compressedBuffer, uncompressedBytes);
-
-        CPPUNIT_ASSERT(newUncompressedBuffer);
-
-        for (int i = 0; i < count; i++) {
-            CPPUNIT_ASSERT_EQUAL(uncompressedBuffer[i], reinterpret_cast<const int*>(newUncompressedBuffer)[i]);
+        for (int i = 0; i < paddedCount; i++) {
+            CPPUNIT_ASSERT_EQUAL((reinterpret_cast<int*>(uncompressedBuffer.get()))[i], newTest[i]);
         }
+#endif
+    }
 
-        delete[] uncompressedBuffer;
-        delete[] compressedBuffer;
-        delete[] newUncompressedBuffer;
-#else
-        CPPUNIT_ASSERT(!compressedBuffer);
+    { // invalid buffer (out of range)
 
-        // uncompressedSize
+        // compress
 
-        CPPUNIT_ASSERT_THROW(uncompressedSize(compressedBuffer), openvdb::RuntimeError);
+        std::vector<int> smallBuffer;
+        smallBuffer.reserve(count);
+
+        for (int i = 0; i < count; i++)     smallBuffer[i] = i;
+
+        size_t invalidBytes = INT_MAX - 1;
+
+        size_t testCompressedBytes = compressedSize(reinterpret_cast<char*>(&smallBuffer[0]), invalidBytes);
+
+        CPPUNIT_ASSERT_EQUAL(testCompressedBytes, size_t(0));
+
+        std::unique_ptr<char[]> buffer = compress(reinterpret_cast<char*>(&smallBuffer[0]), invalidBytes, testCompressedBytes);
+
+        CPPUNIT_ASSERT(!buffer);
+        CPPUNIT_ASSERT_EQUAL(testCompressedBytes, size_t(0));
 
         // decompress
 
-        char* newUncompressedBuffer = 0;
-        CPPUNIT_ASSERT_THROW(   newUncompressedBuffer = decompress(compressedBuffer, uncompressedBytes),
-                                                        openvdb::RuntimeError);
+#ifdef OPENVDB_USE_BLOSC
+        std::unique_ptr<char[]> compressedBuffer = compress(reinterpret_cast<char*>(&smallBuffer[0]), count * sizeof(int), testCompressedBytes);
 
-        CPPUNIT_ASSERT(!newUncompressedBuffer);
+        CPPUNIT_ASSERT_THROW(buffer = decompress(reinterpret_cast<char*>(compressedBuffer.get()), invalidBytes - 16), openvdb::RuntimeError);
 
-        delete[] uncompressedBuffer;
+        CPPUNIT_ASSERT(!buffer);
+
+        CPPUNIT_ASSERT_THROW(decompress(reinterpret_cast<char*>(compressedBuffer.get()), count * sizeof(int) + 1), openvdb::RuntimeError);
 #endif
+    }
+
+    { // uncompressible buffer
+        const int uncompressedCount = 32;
+
+        std::vector<int> values;
+        values.reserve(uncompressedCount); // 128 bytes
+
+        for (int i = 0; i < uncompressedCount; i++)     values.push_back(i*10000);
+
+        std::random_shuffle(values.begin(), values.end());
+
+        std::unique_ptr<int[]> uncompressedBuffer(new int[values.size()]);
+
+        for (size_t i = 0; i < values.size(); i++)     uncompressedBuffer.get()[i] = values[i];
+
+        size_t uncompressedBytes = values.size() * sizeof(int);
+        size_t compressedBytes;
+
+        std::unique_ptr<char[]> compressedBuffer = compress(reinterpret_cast<char*>(uncompressedBuffer.get()),
+                                                            uncompressedBytes, compressedBytes);
+
+        CPPUNIT_ASSERT(!compressedBuffer);
+        CPPUNIT_ASSERT_EQUAL(compressedBytes, size_t(0));
     }
 }
 
@@ -707,7 +713,7 @@ TestAttributeArray::testAttributeArray()
             }
         }
     }
-    
+
     using FixedPointCodec = openvdb::tools::FixedPointCodec<false>;
 
     { // Fixed codec range
@@ -918,7 +924,7 @@ TestAttributeArray::testAttributeHandle()
     using Descriptor = AttributeSet::Descriptor;
     Descriptor::Ptr descr = Descriptor::create(AttributeVec3f::attributeType());
 
-    unsigned count = 50;
+    unsigned count = 500;
     AttributeSet attrSet(descr, /*arrayLength=*/count);
 
     attrSet.appendAttribute("truncate", AttributeFH::attributeType());

@@ -53,6 +53,15 @@ namespace attribute_compression {
 #ifdef OPENVDB_USE_BLOSC
 
 
+// This is the minimum number of bytes below which Blosc compression is not used to
+// avoid unecessary computation, as Blosc offers minimal compression until this limit
+static const int BLOSC_MINIMUM_BYTES = 48;
+
+// This is the minimum number of bytes below which the array is padded with zeros up
+// to this number of bytes to allow Blosc to perform compression with small arrays
+static const int BLOSC_PAD_BYTES = 128;
+
+
 bool canCompress()
 {
     return true;
@@ -67,53 +76,42 @@ size_t uncompressedSize(const char* buffer)
 }
 
 
-size_t compressedSize( const char* buffer, const size_t typeSize, const size_t uncompressedBytes)
+std::unique_ptr<char[]> compress(const char* buffer, const size_t uncompressedBytes, size_t& compressedBytes, const bool resize)
 {
-    size_t tempBytes = uncompressedBytes + BLOSC_MAX_OVERHEAD;
-    const bool outOfRange = tempBytes > BLOSC_MAX_BUFFERSIZE;
-    const std::unique_ptr<char[]> outBuf(outOfRange ? new char[1] : new char[tempBytes]);
+    std::unique_ptr<char[]> paddedBuffer;
 
-    int compressedBytes = blosc_compress_ctx(
-        /*clevel=*/9, // 0 (no compression) to 9 (maximum compression)
-        /*doshuffle=*/true,
-        /*typesize=*/typeSize,
-        /*srcsize=*/uncompressedBytes,
-        /*src=*/buffer,
-        /*dest=*/outBuf.get(),
-        /*destsize=*/tempBytes,
-        BLOSC_LZ4_COMPNAME,
-        /*blocksize=*/256,
-        /*numthreads=*/1);
+    size_t inputBytes = uncompressedBytes;
 
-    if (compressedBytes <= 0) {
-        std::ostringstream ostr;
-        ostr << "Blosc failed to compress " << uncompressedBytes << " byte" << (uncompressedBytes == 1 ? "" : "s");
-        if (compressedBytes < 0) ostr << " (internal error " << compressedBytes << ")";
-        OPENVDB_LOG_DEBUG(ostr.str());
-        return 0;
+    if (inputBytes <= BLOSC_MINIMUM_BYTES) {
+        // no Blosc compression performed below this limit
+        compressedBytes = 0;
+        return nullptr;
+    }
+    else if (inputBytes < BLOSC_PAD_BYTES) {
+        // input array padded with zeros below this limit to improve compression
+        paddedBuffer.reset(new char[BLOSC_PAD_BYTES]);
+        std::memcpy(paddedBuffer.get(), buffer, inputBytes);
+        for (int i = inputBytes; i < BLOSC_PAD_BYTES; i++) {
+            paddedBuffer.get()[i] = 0;
+        }
+        buffer = paddedBuffer.get();
+        inputBytes = BLOSC_PAD_BYTES;
     }
 
-    return size_t(compressedBytes);
-}
-
-
-char* compress( char* buffer, const size_t typeSize,
-                const size_t uncompressedBytes, size_t& compressedBytes, const bool cleanup)
-{
-    size_t tempBytes = uncompressedBytes + BLOSC_MAX_OVERHEAD;
+    size_t tempBytes = inputBytes + BLOSC_MAX_OVERHEAD;
     const bool outOfRange = tempBytes > BLOSC_MAX_BUFFERSIZE;
-    const std::unique_ptr<char[]> outBuf(outOfRange ? new char[1] : new char[tempBytes]);
+    std::unique_ptr<char[]> outBuffer(outOfRange ? new char[1] : new char[tempBytes]);
 
     int _compressedBytes = blosc_compress_ctx(
         /*clevel=*/9, // 0 (no compression) to 9 (maximum compression)
         /*doshuffle=*/true,
-        /*typesize=*/typeSize,
-        /*srcsize=*/uncompressedBytes,
+        /*typesize=*/sizeof(float), // hard-coded to 4-bytes for better compression
+        /*srcsize=*/inputBytes,
         /*src=*/buffer,
-        /*dest=*/outBuf.get(),
+        /*dest=*/outBuffer.get(),
         /*destsize=*/tempBytes,
         BLOSC_LZ4_COMPNAME,
-        /*blocksize=*/256,
+        /*blocksize=*/inputBytes,
         /*numthreads=*/1);
 
     if (_compressedBytes <= 0) {
@@ -121,54 +119,77 @@ char* compress( char* buffer, const size_t typeSize,
         ostr << "Blosc failed to compress " << uncompressedBytes << " byte" << (uncompressedBytes == 1 ? "" : "s");
         if (_compressedBytes < 0) ostr << " (internal error " << _compressedBytes << ")";
         OPENVDB_LOG_DEBUG(ostr.str());
-        return 0;
+        compressedBytes = 0;
+        return nullptr;
     }
 
-    // optionally cleanup compressed buffer if requested (prior to allocating new uncompressed buffer)
+    compressedBytes = _compressedBytes;
 
-    if (cleanup)    delete[] buffer;
+    // fail if compression does not result in a smaller buffer
 
-    compressedBytes = size_t(_compressedBytes);
+    if (compressedBytes >= uncompressedBytes) {
+        compressedBytes = 0;
+        return nullptr;
+    }
 
-    char* outData = new char[compressedBytes];
-    std::memcpy(outData, outBuf.get(), compressedBytes);
-    return outData;
+    // buffer size is larger due to Blosc overhead so resize
+    // (resize can be skipped if the buffer is only temporary)
+
+    if (resize) {
+        std::unique_ptr<char[]> newBuffer(new char[compressedBytes]);
+        std::memcpy(newBuffer.get(), outBuffer.get(), compressedBytes);
+        outBuffer.reset(newBuffer.release());
+    }
+
+    return outBuffer;
 }
 
 
-char* decompress(char* buffer, const size_t expectedBytes, const bool cleanup)
+size_t compressedSize( const char* buffer, const size_t uncompressedBytes)
 {
-    size_t tempBytes = expectedBytes + BLOSC_MAX_OVERHEAD;
+    size_t compressedBytes;
+    compress(buffer, uncompressedBytes, compressedBytes, /*resize=*/false);
+    return compressedBytes;
+}
+
+
+std::unique_ptr<char[]> decompress(const char* buffer, const size_t expectedBytes, const bool resize)
+{
+    size_t uncompressedBytes = uncompressedSize(buffer);
+    size_t tempBytes = uncompressedBytes + BLOSC_MAX_OVERHEAD;
     const bool outOfRange = tempBytes > BLOSC_MAX_BUFFERSIZE;
     if (outOfRange)     tempBytes = 1;
-    const std::unique_ptr<char[]> tempBuffer(new char[tempBytes]);
+    std::unique_ptr<char[]> outBuffer(new char[tempBytes]);
 
-    const int _uncompressedBytes = blosc_decompress_ctx(  /*src=*/buffer,
-                                                            /*dest=*/tempBuffer.get(),
-                                                            tempBytes,
-                                                            /*numthreads=*/1);
+    uncompressedBytes = blosc_decompress_ctx(   /*src=*/buffer,
+                                                /*dest=*/outBuffer.get(),
+                                                tempBytes,
+                                                /*numthreads=*/1);
 
-    if (_uncompressedBytes < 1) {
-        OPENVDB_LOG_DEBUG("blosc_decompress() returned error code " << _uncompressedBytes);
-        return 0;
+    if (uncompressedBytes < 1) {
+        OPENVDB_LOG_DEBUG("blosc_decompress() returned error code " << uncompressedBytes);
+        return nullptr;
     }
 
-    size_t uncompressedBytes = size_t(_uncompressedBytes);
-
-    if (uncompressedBytes != expectedBytes) {
+    if (uncompressedBytes == BLOSC_PAD_BYTES && expectedBytes <= BLOSC_PAD_BYTES) {
+        // padded array to improve compression
+    }
+    else if (uncompressedBytes != expectedBytes) {
         OPENVDB_THROW(RuntimeError, "Expected to decompress " << expectedBytes
             << " byte" << (expectedBytes == 1 ? "" : "s") << ", got "
             << uncompressedBytes << " byte" << (uncompressedBytes == 1 ? "" : "s"));
     }
 
-    // optionally cleanup compressed buffer if requested (prior to allocating new uncompressed buffer)
+    // buffer size is larger due to Blosc overhead so resize
+    // (resize can be skipped if the buffer is only temporary)
 
-    if (cleanup)    delete[] buffer;
+    if (resize) {
+        std::unique_ptr<char[]> newBuffer(new char[expectedBytes]);
+        std::memcpy(newBuffer.get(), outBuffer.get(), expectedBytes);
+        outBuffer.reset(newBuffer.release());
+    }
 
-    char* newBuffer = new char[uncompressedBytes];
-    std::memcpy(newBuffer, tempBuffer.get(), uncompressedBytes);
-
-    return newBuffer;
+    return outBuffer;
 }
 
 
@@ -188,40 +209,28 @@ size_t uncompressedSize(const char*)
 }
 
 
-size_t compressedSize(const char*, const size_t, const size_t)
+std::unique_ptr<char[]> compress(const char*, const size_t, size_t& compressedBytes, const bool)
+{
+    OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
+    compressedBytes = 0;
+    return nullptr;
+}
+
+
+size_t compressedSize(const char*, const size_t)
 {
     OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
     return 0;
 }
 
 
-char* compress(char*, const size_t, const size_t, size_t&, const bool)
-{
-    OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
-    return 0;
-}
-
-
-char* decompress(char*, const size_t, const bool)
+std::unique_ptr<char[]> decompress(const char*, const size_t, const bool)
 {
     OPENVDB_THROW(RuntimeError, "Can't extract compressed data without the blosc library.");
 }
 
 
 #endif // OPENVDB_USE_BLOSC
-
-
-char* compress( const char* buffer, const size_t typeSize,
-                const size_t uncompressedBytes, size_t& compressedBytes)
-{
-    return compress(const_cast<char*>(buffer), typeSize, uncompressedBytes, compressedBytes, /*cleanup=*/false);
-}
-
-
-char* decompress(const char* buffer, const size_t expectedBytes)
-{
-    return decompress(const_cast<char*>(buffer), expectedBytes, /*cleanup=*/false);
-}
 
 
 } // namespace attribute_compression
