@@ -553,7 +553,7 @@ public:
     virtual bool decompress() override;
 
     /// Read attribute data from a stream.
-    virtual void read(std::istream& is);
+    virtual void read(std::istream&) override;
     /// Write attribute data to a stream.
     /// @param outputTransient if true, write out transient attributes
     virtual void write(std::ostream&, bool outputTransient = false) const override;
