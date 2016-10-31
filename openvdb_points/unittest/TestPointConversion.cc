@@ -239,7 +239,7 @@ TestPointConversion::testPointConversion()
 
     // generate points
 
-    const unsigned long count(40000);
+    const unsigned long count(4000000);
 
     AttributeWrapper<Vec3f> position(1);
     AttributeWrapper<int> xyz(1);
@@ -305,9 +305,37 @@ TestPointConversion::testPointConversion()
 
     CPPUNIT_ASSERT_EQUAL(indexTree.leafCount(), tree.leafCount());
 
+    // read/write grid to a temp file
+
+    std::string tempDir(std::getenv("TMPDIR"));
+    if (tempDir.empty())    tempDir = P_tmpdir;
+
+    std::string filename = tempDir + "/openvdb_test_point_conversion";
+
+    io::File fileOut(filename);
+
+    GridCPtrVec grids;
+    grids.push_back(pointDataGrid);
+
+    fileOut.write(grids);
+
+    fileOut.close();
+
+    io::File fileIn(filename);
+    fileIn.open();
+
+    GridPtrVecPtr readGrids = fileIn.getGrids();
+
+    fileIn.close();
+
+    CPPUNIT_ASSERT_EQUAL(readGrids->size(), size_t(1));
+
+    pointDataGrid = GridBase::grid<PointDataGrid>((*readGrids)[0]);
+    PointDataTree& inputTree = pointDataGrid->tree();
+
     // create accessor and iterator for Point Data Tree
 
-    PointDataTree::LeafCIter leafCIter = tree.cbeginLeaf();
+    PointDataTree::LeafCIter leafCIter = inputTree.cbeginLeaf();
 
     CPPUNIT_ASSERT_EQUAL((unsigned long) 5, leafCIter->attributeSet().size());
 
@@ -339,14 +367,17 @@ TestPointConversion::testPointConversion()
     outputString.resize(startOffset + string.size());
     outputGroup.resize(startOffset + group.size());
 
-    std::vector<Index64> pointOffsets;
-    getPointOffsets(pointOffsets, tree);
+    std::vector<Name> includeGroups;
+    std::vector<Name> excludeGroups;
 
-    convertPointDataGridPosition(outputPosition, *pointDataGrid, pointOffsets, startOffset);
-    convertPointDataGridAttribute(outputId, tree, pointOffsets, startOffset, idIndex);
-    convertPointDataGridAttribute(outputUniform, tree, pointOffsets, startOffset, uniformIndex);
-    convertPointDataGridAttribute(outputString, tree, pointOffsets, startOffset, stringIndex);
-    convertPointDataGridGroup(outputGroup, tree, pointOffsets, startOffset, groupIndex);
+    std::vector<Index64> pointOffsets;
+    getPointOffsets(pointOffsets, inputTree, includeGroups, excludeGroups, false);
+
+    convertPointDataGridPosition(outputPosition, *pointDataGrid, pointOffsets, startOffset, includeGroups, excludeGroups, false);
+    convertPointDataGridAttribute(outputId, inputTree, pointOffsets, startOffset, idIndex, 1, includeGroups, excludeGroups, false);
+    convertPointDataGridAttribute(outputUniform, inputTree, pointOffsets, startOffset, uniformIndex, 1, includeGroups, excludeGroups, false);
+    convertPointDataGridAttribute(outputString, inputTree, pointOffsets, startOffset, stringIndex, 1, includeGroups, excludeGroups, false);
+    convertPointDataGridGroup(outputGroup, inputTree, pointOffsets, startOffset, groupIndex, includeGroups, excludeGroups, false);
 
     // pack and sort the new buffers based on id
 
@@ -385,16 +416,16 @@ TestPointConversion::testPointConversion()
     outputString.resize(startOffset + halfCount);
     outputGroup.resize(startOffset + halfCount);
 
-    std::vector<Name> includeGroups{"test"};
+    includeGroups.push_back("test");
 
     pointOffsets.clear();
-    getPointOffsets(pointOffsets, tree, includeGroups);
+    getPointOffsets(pointOffsets, inputTree, includeGroups, excludeGroups, false);
 
-    convertPointDataGridPosition(outputPosition, *pointDataGrid, pointOffsets, startOffset, includeGroups);
-    convertPointDataGridAttribute(outputId, tree, pointOffsets, startOffset, idIndex, /*stride*/1, includeGroups);
-    convertPointDataGridAttribute(outputUniform, tree, pointOffsets, startOffset, uniformIndex, /*stride*/1, includeGroups);
-    convertPointDataGridAttribute(outputString, tree, pointOffsets, startOffset, stringIndex, /*stride*/1, includeGroups);
-    convertPointDataGridGroup(outputGroup, tree, pointOffsets, startOffset, groupIndex, includeGroups);
+    convertPointDataGridPosition(outputPosition, *pointDataGrid, pointOffsets, startOffset, includeGroups, excludeGroups, false);
+    convertPointDataGridAttribute(outputId, inputTree, pointOffsets, startOffset, idIndex, /*stride*/1, includeGroups, excludeGroups, false);
+    convertPointDataGridAttribute(outputUniform, inputTree, pointOffsets, startOffset, uniformIndex, /*stride*/1, includeGroups, excludeGroups, false);
+    convertPointDataGridAttribute(outputString, inputTree, pointOffsets, startOffset, stringIndex, /*stride*/1, includeGroups, excludeGroups, false);
+    convertPointDataGridGroup(outputGroup, inputTree, pointOffsets, startOffset, groupIndex, includeGroups, excludeGroups, false);
 
     CPPUNIT_ASSERT_EQUAL(size_t(outputPosition.size() - startOffset), size_t(halfCount));
     CPPUNIT_ASSERT_EQUAL(size_t(outputId.size() - startOffset), size_t(halfCount));
