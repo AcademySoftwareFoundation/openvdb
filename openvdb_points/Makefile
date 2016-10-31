@@ -250,6 +250,7 @@ INCLUDE_NAMES := \
     tools/PointCount.h \
     tools/PointGroup.h \
     tools/PointLoad.h \
+    tools/StreamCompression.h \
     Types.h \
     openvdb.h \
     version.h \
@@ -260,6 +261,7 @@ SRC_NAMES := \
     tools/AttributeArrayString.cc \
     tools/AttributeGroup.cc \
     tools/AttributeSet.cc \
+    tools/StreamCompression.cc \
     openvdb.cc \
 #
 
@@ -280,6 +282,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestPointDataLeaf.cc \
     unittest/TestPointGroup.cc \
     unittest/TestPointLoad.cc \
+    unittest/TestStreamCompression.cc \
 #
 
 DOC_FILES := 	doc/doc.txt \

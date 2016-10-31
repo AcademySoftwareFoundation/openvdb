@@ -47,6 +47,7 @@
 #include <openvdb/io/Compression.h> // COMPRESS_BLOSC
 
 #include <openvdb_points/tools/IndexIterator.h>
+#include <openvdb_points/tools/StreamCompression.h>
 
 #include <tbb/spin_mutex.h>
 #include <tbb/atomic.h>
@@ -67,51 +68,6 @@ namespace OPENVDB_VERSION_NAME {
 using NamePair = std::pair<Name, Name>;
 
 namespace tools {
-
-
-////////////////////////////////////////
-
-// Attribute Compression methods
-
-
-namespace attribute_compression {
-
-/// @brief Returns true if compression is available
-bool canCompress();
-
-/// @brief Retrieves the uncompressed size of buffer when uncompressed
-///
-/// @param buffer the compressed buffer
-size_t uncompressedSize(const char* buffer);
-
-/// @brief Compress and return the compressed buffer.
-///
-/// @param buffer               the buffer to compress
-/// @param uncompressedBytes    number of uncompressed bytes
-/// @param compressedBytes      number of compressed bytes (written to this variable)
-/// @param resize               the compressed buffer will be exactly resized to remove the
-///                             portion used for Blosc overhead, for efficiency this can be
-///                             skipped if it is known that the resulting buffer is temporary
-std::unique_ptr<char[]> compress(   const char* buffer, const size_t uncompressedBytes,
-                                    size_t& compressedBytes, const bool resize = true);
-
-/// @brief Convenience wrapper to retrieve the compressed size of buffer when compressed
-///
-/// @param buffer the uncompressed buffer
-/// @param uncompressedBytes number of uncompressed bytes
-size_t compressedSize(const char* buffer, const size_t uncompressedBytes);
-
-/// @brief Decompress and return the uncompressed buffer.
-///
-/// @param buffer the buffer to decompress
-/// @param expectedBytes the number of bytes expected once the buffer is decompressed
-/// @param resize               the compressed buffer will be exactly resized to remove the
-///                             portion used for Blosc overhead, for efficiency this can be
-///                             skipped if it is known that the resulting buffer is temporary
-std::unique_ptr<char[]> decompress( const char* buffer, const size_t expectedBytes,
-                                    const bool resize = true);
-
-} // namespace attribute_compression
 
 
 ////////////////////////////////////////
@@ -838,9 +794,6 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttribut
     , mStride(rhs.mStride)
     , mIsUniform(rhs.mIsUniform)
 {
-    using attribute_compression::decompress;
-    using attribute_compression::uncompressedSize;
-
     // disable uncompress if data is not compressed
 
     if (!this->isCompressed())  uncompress = false;
@@ -855,8 +808,8 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttribut
         if (uncompress) {
             rhs.doLoad();
             const char* charBuffer = reinterpret_cast<const char*>(rhs.mData.get());
-            size_t uncompressedBytes = uncompressedSize(charBuffer);
-            buffer = decompress(charBuffer, uncompressedBytes);
+            size_t uncompressedBytes = compression::bloscUncompressedSize(charBuffer);
+            buffer = compression::bloscDecompress(charBuffer, uncompressedBytes);
         }
         if (buffer)     mCompressedBytes = 0;
         else {
@@ -1254,10 +1207,7 @@ template<typename ValueType_, typename Codec_>
 inline bool
 TypedAttributeArray<ValueType_, Codec_>::compress()
 {
-    using attribute_compression::canCompress;
-    using attribute_compression::compress;
-
-    if (!canCompress())     return false;
+    if (!compression::bloscCanCompress())     return false;
 
     if (!mIsUniform && !this->isCompressed()) {
 
@@ -1268,7 +1218,7 @@ TypedAttributeArray<ValueType_, Codec_>::compress()
         const size_t inBytes = this->arrayMemUsage();
         size_t outBytes;
         const char* charBuffer = reinterpret_cast<const char*>(mData.get());
-        std::unique_ptr<char[]> buffer = compress(charBuffer, inBytes, outBytes);
+        std::unique_ptr<char[]> buffer = compression::bloscCompress(charBuffer, inBytes, outBytes);
         if (buffer) {
             mData.reset(reinterpret_cast<StorageType*>(buffer.release()));
             mCompressedBytes = outBytes;
@@ -1284,16 +1234,13 @@ template<typename ValueType_, typename Codec_>
 inline bool
 TypedAttributeArray<ValueType_, Codec_>::decompress()
 {
-    using attribute_compression::decompress;
-    using attribute_compression::uncompressedSize;
-
     tbb::spin_mutex::scoped_lock lock(mMutex);
 
     if (this->isCompressed()) {
         this->doLoadUnsafe();
         const char* charBuffer = reinterpret_cast<const char*>(this->mData.get());
-        size_t uncompressedBytes = uncompressedSize(charBuffer);
-        std::unique_ptr<char[]> buffer = decompress(charBuffer, uncompressedBytes);
+        size_t uncompressedBytes = compression::bloscUncompressedSize(charBuffer);
+        std::unique_ptr<char[]> buffer = compression::bloscDecompress(charBuffer, uncompressedBytes);
         if (buffer) {
             mData.reset(reinterpret_cast<StorageType*>(buffer.release()));
             mCompressedBytes = 0;
@@ -1359,8 +1306,6 @@ template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::read(std::istream& is)
 {
-    using attribute_compression::decompress;
-
     // read data
 
     Index64 bytes = Index64(0);
@@ -1430,7 +1375,7 @@ TypedAttributeArray<ValueType_, Codec_>::read(std::istream& is)
         // decompress buffer
 
         const size_t inBytes = this->arrayMemUsage(/*maximum=*/true);
-        std::unique_ptr<char[]> newBuffer = decompress(buffer.get(), inBytes);
+        std::unique_ptr<char[]> newBuffer = compression::bloscDecompress(buffer.get(), inBytes);
         if (newBuffer)  buffer.reset(newBuffer.release());
     }
 
@@ -1448,8 +1393,6 @@ template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os, bool outputTransient) const
 {
-    using attribute_compression::compress;
-
     if (!outputTransient && this->isTransient())    return;
 
     Int16 flags(mFlags);
@@ -1478,7 +1421,7 @@ TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os, bool outputTran
     {
         const char* charBuffer = reinterpret_cast<const char*>(mData.get());
         const size_t inBytes = this->arrayMemUsage();
-        compressedBuffer = compress(charBuffer, inBytes, compressedBytes, /*resize=*/false);
+        compressedBuffer = compression::bloscCompress(charBuffer, inBytes, compressedBytes, /*resize=*/false);
         if (compressedBuffer)   flags |= WRITEDISKCOMPRESS;
     }
 
@@ -1503,8 +1446,6 @@ template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::doLoadUnsafe() const
 {
-    using attribute_compression::decompress;
-
 #ifndef OPENVDB_2_ABI_COMPATIBLE
     if (!(this->isOutOfCore()))     return;
 
@@ -1534,7 +1475,7 @@ TypedAttributeArray<ValueType_, Codec_>::doLoadUnsafe() const
         // decompress buffer
 
         const size_t inBytes = this->arrayMemUsage(/*maximum=*/true);
-        std::unique_ptr<char[]> newBuffer = decompress(buffer.get(), inBytes);
+        std::unique_ptr<char[]> newBuffer = compression::bloscDecompress(buffer.get(), inBytes);
         if (newBuffer)  buffer.reset(newBuffer.release());
     }
 
