@@ -376,6 +376,8 @@ AttributeArray::setHidden(bool state)
 
 bool
 AttributeArray::operator==(const AttributeArray& other) const {
+    this->loadData();
+    other.loadData();
     if(this->mCompressedBytes != other.mCompressedBytes ||
        this->mFlags != other.mFlags) return false;
     return this->isEqual(other);
