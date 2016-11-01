@@ -7,6 +7,7 @@
 <B>Version 4.0.0</B> - <I>In development</I>
 @par
 Highlights:
+- Added cmake build suport [Contributed by Nicholas Yue]
 - Introduced some C++11 constructs.
   A&nbsp;C++11-compatible compiler is now required.
 - Vector-valued grids are now much faster to construct and destroy.<BR><BR>

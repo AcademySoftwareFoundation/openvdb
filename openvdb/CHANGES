@@ -4,6 +4,7 @@ OpenVDB Version History
 Version 4.0.0 - In development
 
     Highlights:
+    - Added cmake build support [Contributed by Nicholas Yue]
     - Introduced some C++11 constructs.  A C++11-compatible compiler
       is now required.
     - Vector-valued grids are now much faster to construct and destroy.
