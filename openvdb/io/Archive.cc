@@ -202,24 +202,16 @@ StreamState::~StreamState()
 
 struct StreamMetadata::Impl
 {
-    Impl()
-        : mFileVersion(OPENVDB_FILE_VERSION)
-        , mLibraryVersion(OPENVDB_LIBRARY_MAJOR_VERSION, OPENVDB_LIBRARY_MINOR_VERSION)
-        , mCompression(COMPRESS_NONE)
-        , mGridClass(GRID_UNKNOWN)
-        , mBackgroundPtr(nullptr)
-        , mHalfFloat(false)
-        , mWriteGridStats(false)
-    {
-    }
-
-    uint32_t mFileVersion;
-    VersionId mLibraryVersion;
-    uint32_t mCompression;
-    uint32_t mGridClass;
-    const void* mBackgroundPtr; ///< @todo use Metadata::Ptr?
-    bool mHalfFloat;
-    bool mWriteGridStats;
+    uint32_t mFileVersion = OPENVDB_FILE_VERSION;
+    VersionId mLibraryVersion = { OPENVDB_LIBRARY_MAJOR_VERSION, OPENVDB_LIBRARY_MINOR_VERSION };
+    uint32_t mCompression = COMPRESS_NONE;
+    uint32_t mGridClass = GRID_UNKNOWN;
+    const void* mBackgroundPtr = nullptr; ///< @todo use Metadata::Ptr?
+    bool mHalfFloat = false;
+    bool mWriteGridStats = false;
+    bool mSeekable = false;
+    bool mCountingPasses = false;
+    uint32_t mPass = 0;
     MetaMap mGridMetadata;
     AuxDataMap mAuxData;
 }; // struct StreamMetadata
@@ -280,6 +272,9 @@ uint32_t        StreamMetadata::gridClass() const       { return mImpl->mGridCla
 const void*     StreamMetadata::backgroundPtr() const   { return mImpl->mBackgroundPtr; }
 bool            StreamMetadata::halfFloat() const       { return mImpl->mHalfFloat; }
 bool            StreamMetadata::writeGridStats() const  { return mImpl->mWriteGridStats; }
+bool            StreamMetadata::seekable() const        { return mImpl->mSeekable; }
+bool            StreamMetadata::countingPasses() const  { return mImpl->mCountingPasses; }
+uint32_t        StreamMetadata::pass() const            { return mImpl->mPass; }
 MetaMap&        StreamMetadata::gridMetadata()          { return mImpl->mGridMetadata; }
 const MetaMap&  StreamMetadata::gridMetadata() const    { return mImpl->mGridMetadata; }
 
@@ -293,18 +288,24 @@ void StreamMetadata::setGridClass(uint32_t c)           { mImpl->mGridClass = c;
 void StreamMetadata::setBackgroundPtr(const void* ptr)  { mImpl->mBackgroundPtr = ptr; }
 void StreamMetadata::setHalfFloat(bool b)               { mImpl->mHalfFloat = b; }
 void StreamMetadata::setWriteGridStats(bool b)          { mImpl->mWriteGridStats = b; }
-
+void StreamMetadata::setSeekable(bool b)                { mImpl->mSeekable = b; }
+void StreamMetadata::setCountingPasses(bool b)          { mImpl->mCountingPasses = b; }
+void StreamMetadata::setPass(uint32_t i)                { mImpl->mPass = i; }
 
 std::string
 StreamMetadata::str() const
 {
     std::ostringstream ostr;
+    ostr << std::boolalpha;
     ostr << "version: " << libraryVersion().first << "." << libraryVersion().second
         << "/" << fileVersion() << "\n";
     ostr << "class: " << GridBase::gridClassToString(static_cast<GridClass>(gridClass())) << "\n";
     ostr << "compression: " << compressionToString(compression()) << "\n";
-    ostr << "half_float: " << (halfFloat() ? "true" : "false") << "\n";
-    ostr << "write_grid_stats_metadata: " << (writeGridStats() ? "true" : "false") << "\n";
+    ostr << "half_float: " << halfFloat() << "\n";
+    ostr << "seekable: " << seekable() << "\n";
+    ostr << "pass: " << pass() << "\n";
+    ostr << "counting_passes: " << countingPasses() << "\n";
+    ostr << "write_grid_stats_metadata: " << writeGridStats() << "\n";
     if (!auxData().empty()) ostr << auxData();
     if (gridMetadata().metaCount() != 0) {
         ostr << "grid_metadata:\n" << gridMetadata().str(/*indent=*/"    ");

@@ -7,6 +7,8 @@
 <B>Version 4.0.0</B> - <I>In development</I>
 @par
 Highlights:
+- Introduced some C++11 constructs.
+  A&nbsp;C++11-compatible compiler is now required.
 - Vector-valued grids are now much faster to construct and destroy.<BR><BR>
   @b Note:
   This change and other changes in this release
@@ -15,8 +17,6 @@ Highlights:
   such as the ones in Houdini&nbsp;15.0 and&nbsp;15.5.
   Define the macro @c OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
   to disable these changes and preserve ABI compatibility.<BR><BR>
-- Introduced some C++11 constructs.
-  A&nbsp;C++11-compatible compiler is now required.
 
 @par
 New features:
@@ -25,12 +25,20 @@ New features:
   host voxel or tile.
 - Added a toggle to the @vdblink::tools::clip() clip@endlink tool
   to invert the clipping mask.
+- Custom leaf node implementations may now optimize their file layout
+  by inheriting from @vdblink::io::MultiPass io::MultiPass@endlink.
+  Voxel data for grids with such leaf nodes will be written and read in
+  multiple passes, allowing blocks of related data to be stored contiguously.
+  <I>[Contributed by Double&nbsp;Negative]</I>
 
 @par
 Improvements:
 - Vector-valued grids are now much faster to construct and destroy.
 - Changed @vdblink::math::Coord Coord@endlink's data representation
   to facilitate C++11 uniform initialization.
+- Delayed loading from @vdblink::io::File io::Files@endlink is now faster
+  due to the use of seeks instead of reads.
+  <I>[Contributed by Double&nbsp;Negative]</I>
 - Made many small changes to address type conversion and other warnings
   reported by newer compilers, including Clang&nbsp;3.8.
 @par

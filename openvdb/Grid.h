@@ -34,9 +34,11 @@
 #include "Exceptions.h"
 #include "MetaMap.h"
 #include "Types.h"
+#include "io/io.h"
 #include "math/Transform.h"
 #include "tree/Tree.h"
 #include "util/Name.h"
+#include <cassert>
 #include <iostream>
 #include <set>
 #include <type_traits>
@@ -838,6 +840,11 @@ public:
     /// Output a human-readable description of this grid.
     void print(std::ostream& = std::cout, int verboseLevel = 1) const override;
 
+    /// @brief Return @c true if grids of this type require multiple I/O passes
+    /// to read and write data buffers.
+    /// @sa HasMultiPassIO
+    static inline bool hasMultiPassIO();
+
 
     //
     // Registry methods
@@ -1016,6 +1023,34 @@ struct TreeAdapter<tree::ValueAccessor<_TreeType> >
 };
 
 //@}
+
+
+////////////////////////////////////////
+
+
+/// @brief Metafunction that specifies whether a given leaf node, tree, or grid type
+/// requires multiple passes to read and write voxel data
+/// @details Multi-pass I/O allows one to optimize the data layout of leaf nodes
+/// for certain access patterns during delayed loading.
+/// @sa io::MultiPass
+template<typename LeafNodeType>
+struct HasMultiPassIO {
+    static const bool value = std::is_base_of<io::MultiPass, LeafNodeType>::value;
+};
+
+// Partial specialization for Tree types
+template<typename RootNodeType>
+struct HasMultiPassIO<tree::Tree<RootNodeType>> {
+    // A tree is multi-pass if its (root node's) leaf node type is multi-pass.
+    static const bool value = HasMultiPassIO<typename RootNodeType::LeafNodeType>::value;
+};
+
+// Partial specialization for Grid types
+template<typename TreeType>
+struct HasMultiPassIO<Grid<TreeType>> {
+    // A grid is multi-pass if its tree's leaf node type is multi-pass.
+    static const bool value = HasMultiPassIO<typename TreeType::LeafNodeType>::value;
+};
 
 
 ////////////////////////////////////////
@@ -1418,17 +1453,41 @@ template<typename TreeT>
 inline void
 Grid<TreeT>::readBuffers(std::istream& is)
 {
-    tree().readBuffers(is, saveFloatAsHalf());
+    if (!hasMultiPassIO() || (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_MULTIPASS_IO)) {
+        tree().readBuffers(is, saveFloatAsHalf());
+    } else {
+        uint16_t numPasses = 1;
+        is.read(reinterpret_cast<char*>(&numPasses), sizeof(uint16_t));
+        const io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(is);
+        assert(bool(meta));
+        for (uint32_t pass = 0; pass < uint32_t(numPasses); ++pass) {
+            meta->setPass(pass);
+            tree().readBuffers(is, saveFloatAsHalf());
+        }
+    }
 }
 
 
 #ifndef OPENVDB_2_ABI_COMPATIBLE
 
+/// @todo Refactor this and the readBuffers() above
+/// once support for ABI 2 compatibility is dropped.
 template<typename TreeT>
 inline void
 Grid<TreeT>::readBuffers(std::istream& is, const CoordBBox& bbox)
 {
-    tree().readBuffers(is, bbox, saveFloatAsHalf());
+    if (!hasMultiPassIO() || (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_MULTIPASS_IO)) {
+        tree().readBuffers(is, bbox, saveFloatAsHalf());
+    } else {
+        uint16_t numPasses = 1;
+        is.read(reinterpret_cast<char*>(&numPasses), sizeof(uint16_t));
+        const io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(is);
+        assert(bool(meta));
+        for (uint32_t pass = 0; pass < uint32_t(numPasses); ++pass) {
+            meta->setPass(pass);
+            tree().readBuffers(is, bbox, saveFloatAsHalf());
+        }
+    }
 }
 
 
@@ -1446,7 +1505,35 @@ template<typename TreeT>
 inline void
 Grid<TreeT>::writeBuffers(std::ostream& os) const
 {
-    tree().writeBuffers(os, saveFloatAsHalf());
+    if (!hasMultiPassIO()) {
+        tree().writeBuffers(os, saveFloatAsHalf());
+    } else {
+        // Determine how many leaf buffer passes are required for this grid
+        const io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(os);
+        assert(bool(meta));
+        uint16_t numPasses = 1;
+        meta->setCountingPasses(true);
+        meta->setPass(0);
+        tree().writeBuffers(os, saveFloatAsHalf());
+        numPasses = static_cast<uint16_t>(meta->pass());
+        os.write(reinterpret_cast<const char*>(&numPasses), sizeof(uint16_t));
+        meta->setCountingPasses(false);
+
+        // Save out the data blocks of the grid.
+        for (uint32_t pass = 0; pass < uint32_t(numPasses); ++pass) {
+            meta->setPass(pass);
+            tree().writeBuffers(os, saveFloatAsHalf());
+        }
+    }
+}
+
+
+//static
+template<typename TreeT>
+inline bool
+Grid<TreeT>::hasMultiPassIO()
+{
+    return HasMultiPassIO<Grid>::value;
 }
 
 

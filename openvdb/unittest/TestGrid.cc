@@ -76,6 +76,7 @@ class ProxyTree: public openvdb::TreeBase
 public:
     using ValueType = int;
     using BuildType = int;
+    using LeafNodeType = void;
     using ValueAllCIter = void;
     using ValueAllIter = void;
     using ValueOffCIter = void;
