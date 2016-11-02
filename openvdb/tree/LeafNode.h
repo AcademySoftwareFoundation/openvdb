@@ -33,13 +33,9 @@
 
 #include <openvdb/Types.h>
 #include <openvdb/util/NodeMasks.h>
+#include <openvdb/tree/LeafBuffer.h>
 #include <openvdb/io/Compression.h> // for io::readData(), etc.
 #include "Iterator.h"
-#include <tbb/blocked_range.h>
-#include <tbb/spin_mutex.h>
-#include <tbb/parallel_for.h>
-#include <algorithm> // for std::swap
-#include <cstring> // for std::memcpy()
 #include <iostream>
 #include <memory>
 #include <type_traits>
@@ -66,6 +62,7 @@ class LeafNode
 public:
     using BuildType = T;
     using ValueType = T;
+    using Buffer = LeafBuffer<ValueType, Log2Dim>;
     using LeafNodeType = LeafNode<ValueType, Log2Dim>;
     using NodeMaskType = util::NodeMask<Log2Dim>;
     using Ptr = SharedPtr<LeafNode>;
@@ -90,281 +87,6 @@ public:
     struct SameConfiguration {
         static const bool value = SameLeafConfig<LOG2DIM, OtherNodeType>::value;
     };
-
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-    struct FileInfo
-    {
-        FileInfo(): bufpos(0) , maskpos(0) {}
-        std::streamoff bufpos;
-        std::streamoff maskpos;
-        io::MappedFile::Ptr mapping;
-        SharedPtr<io::StreamMetadata> meta;
-    };
-#endif
-
-    /// @brief Array of fixed size @f$2^{3 \times {\rm Log2Dim}}@f$ that stores
-    /// the voxel values of a LeafNode
-    class Buffer
-    {
-    public:
-#ifdef OPENVDB_2_ABI_COMPATIBLE
-        /// Default constructor
-        Buffer(): mData(new ValueType[SIZE]) {}
-        /// Construct a buffer populated with the specified value.
-        explicit Buffer(const ValueType& val): mData(new ValueType[SIZE]) { this->fill(val); }
-        /// Copy constructor
-        Buffer(const Buffer& other): mData(new ValueType[SIZE]) { *this = other; }
-        /// Destructor
-        ~Buffer() { delete[] mData; }
-
-        /// Return @c true if this buffer's values have not yet been read from disk.
-        bool isOutOfCore() const { return false; }
-        /// Return @c true if memory for this buffer has not yet been allocated.
-        bool empty() const { return (mData == nullptr); }
-#else
-        using WordType = ValueType;
-        static const Index WORD_COUNT = SIZE;
-        /// Default constructor
-        Buffer(): mData(new ValueType[SIZE]), mOutOfCore(0) {}
-        /// Construct a buffer populated with the specified value.
-        explicit Buffer(const ValueType& val): mData(new ValueType[SIZE]), mOutOfCore(0)
-        {
-            this->fill(val);
-        }
-        /// Copy constructor
-        Buffer(const Buffer& other): mData(nullptr), mOutOfCore(other.mOutOfCore)
-        {
-            if (other.isOutOfCore()) {
-                mFileInfo = new FileInfo(*other.mFileInfo);
-            } else {
-                this->allocate();
-                ValueType* target = mData;
-                const ValueType* source = other.mData;
-                Index n = SIZE;
-                while (n--) *target++ = *source++;
-            }
-        }
-        /// Construct a buffer but don't allocate memory for the full array of values.
-        Buffer(PartialCreate, const ValueType&): mData(nullptr), mOutOfCore(0) {}
-        /// Destructor
-        ~Buffer()
-        {
-            if (this->isOutOfCore()) {
-                this->detachFromFile();
-            } else {
-                this->deallocate();
-            }
-        }
-
-        /// Return @c true if this buffer's values have not yet been read from disk.
-        bool isOutOfCore() const { return bool(mOutOfCore); }
-        /// Return @c true if memory for this buffer has not yet been allocated.
-        bool empty() const { return !mData || this->isOutOfCore(); }
-#endif
-        /// Allocate memory for this buffer if it has not already been allocated.
-        bool allocate() { if (mData == nullptr) mData = new ValueType[SIZE]; return true; }
-
-        /// Populate this buffer with a constant value.
-        void fill(const ValueType& val)
-        {
-            this->detachFromFile();
-            if (mData != nullptr) {
-                ValueType* target = mData;
-                Index n = SIZE;
-                while (n--) *target++ = val;
-            }
-        }
-
-        /// Return a const reference to the i'th element of this buffer.
-        const ValueType& getValue(Index i) const { return this->at(i); }
-        /// Return a const reference to the i'th element of this buffer.
-        const ValueType& operator[](Index i) const { return this->at(i); }
-        /// Set the i'th value of this buffer to the specified value.
-        void setValue(Index i, const ValueType& val)
-        {
-            assert(i < SIZE);
-#ifdef OPENVDB_2_ABI_COMPATIBLE
-            mData[i] = val;
-#else
-            this->loadValues();
-            if (mData) mData[i] = val;
-#endif
-        }
-
-        /// Copy the other buffer's values into this buffer.
-        Buffer& operator=(const Buffer& other)
-        {
-            if (&other != this) {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-                if (this->isOutOfCore()) {
-                    this->detachFromFile();
-                } else {
-                    if (other.isOutOfCore()) this->deallocate();
-                }
-                if (other.isOutOfCore()) {
-                    mOutOfCore = other.mOutOfCore;
-                    mFileInfo = new FileInfo(*other.mFileInfo);
-                } else {
-#endif
-                    this->allocate();
-                    ValueType* target = mData;
-                    const ValueType* source = other.mData;
-                    Index n = SIZE;
-                    while (n--) *target++ = *source++;
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-                }
-#endif
-            }
-            return *this;
-        }
-
-        /// @brief Return @c true if the contents of the other buffer
-        /// exactly equal the contents of this buffer.
-        bool operator==(const Buffer& other) const
-        {
-            this->loadValues();
-            other.loadValues();
-            const ValueType *target = mData, *source = other.mData;
-            if (!target && !source) return true;
-            if (!target || !source) return false;
-            Index n = SIZE;
-            while (n && math::isExactlyEqual(*target++, *source++)) --n;
-            return n == 0;
-        }
-        /// @brief Return @c true if the contents of the other buffer
-        /// are not exactly equal to the contents of this buffer.
-        bool operator!=(const Buffer& other) const { return !(other == *this); }
-
-        /// Exchange this buffer's values with the other buffer's values.
-        void swap(Buffer& other)
-        {
-            std::swap(mData, other.mData);
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-            std::swap(mOutOfCore, other.mOutOfCore);
-#endif
-        }
-
-        /// Return the memory footprint of this buffer in bytes.
-        Index memUsage() const
-        {
-            size_t n = sizeof(*this);
-#ifdef OPENVDB_2_ABI_COMPATIBLE
-            if (mData) n += SIZE * sizeof(ValueType);
-#else
-            if (this->isOutOfCore()) n += sizeof(FileInfo);
-            else if (mData) n += SIZE * sizeof(ValueType);
-#endif
-            return static_cast<Index>(n);
-        }
-        /// Return the number of values contained in this buffer.
-        static Index size() { return SIZE; }
-
-        /// @brief Return a const pointer to the array of voxel values.
-        /// @details This method guarantees that the buffer is allocated and loaded.
-        /// @warning This method should only be used by experts seeking low-level optimizations.
-        const ValueType* data() const
-        {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-            this->loadValues();
-            if (mData == nullptr) {
-                Buffer* self = const_cast<Buffer*>(this);
-                // This lock will be contended at most once.
-                tbb::spin_mutex::scoped_lock lock(self->mMutex);
-                if (mData == nullptr) self->mData = new ValueType[SIZE];
-            }
-#endif
-            return mData;
-        }
-
-        /// @brief Return a pointer to the array of voxel values.
-        /// @details This method guarantees that the buffer is allocated and loaded.
-        /// @warning This method should only be used by experts seeking low-level optimizations.
-        ValueType* data()
-        {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-            this->loadValues();
-            if (mData == nullptr) {
-                // This lock will be contended at most once.
-                tbb::spin_mutex::scoped_lock lock(mMutex);
-                if (mData == nullptr) mData = new ValueType[SIZE];
-            }
-#endif
-            return mData;
-        }
-
-    private:
-        /// If this buffer is empty, return zero, otherwise return the value at index @ i.
-        const ValueType& at(Index i) const
-        {
-            assert(i < SIZE);
-#ifdef OPENVDB_2_ABI_COMPATIBLE
-            return mData[i];
-#else
-            this->loadValues();
-            // We can't use the ternary operator here, otherwise Visual C++ returns
-            // a reference to a temporary.
-            if (mData) return mData[i]; else return sZero;
-#endif
-        }
-
-        /// @brief Return a non-const reference to the value at index @a i.
-        /// @details This method is private since it makes assumptions about the
-        /// buffer's memory layout.  Buffers associated with custom leaf node types
-        /// (e.g., a bool buffer implemented as a bitmask) might not be able to
-        /// return non-const references to their values.
-        ValueType& operator[](Index i) { return const_cast<ValueType&>(this->at(i)); }
-
-        bool deallocate()
-        {
-            if (mData != nullptr && !this->isOutOfCore()) {
-                delete[] mData;
-                mData = nullptr;
-                return true;
-            }
-            return false;
-        }
-
-#ifdef OPENVDB_2_ABI_COMPATIBLE
-        void setOutOfCore(bool) {}
-        void loadValues() const {}
-        void doLoad() const {}
-        bool detachFromFile() { return false; }
-#else
-        inline void setOutOfCore(bool b) { mOutOfCore = b; }
-        // To facilitate inlining in the common case in which the buffer is in-core,
-        // the loading logic is split into a separate function, doLoad().
-        inline void loadValues() const { if (this->isOutOfCore()) this->doLoad(); }
-        inline void doLoad() const;
-        inline bool detachFromFile()
-        {
-            if (this->isOutOfCore()) {
-                delete mFileInfo;
-                mFileInfo = nullptr;
-                this->setOutOfCore(false);
-                return true;
-            }
-            return false;
-        }
-#endif
-
-        friend class ::TestLeaf;
-        // Allow the parent LeafNode to access this buffer's data pointer.
-        friend class LeafNode;
-
-#ifdef OPENVDB_2_ABI_COMPATIBLE
-        ValueType* mData;
-#else
-        union {
-            ValueType* mData;
-            FileInfo*  mFileInfo;
-        };
-        Index32 mOutOfCore; // currently interpreted as bool; extra bits reserved for future use
-        tbb::spin_mutex mMutex; // 1 byte
-        //int8_t mReserved[3]; // padding for alignment
-
-        static const ValueType sZero;
-#endif
-    }; // class Buffer
 
 
     /// Default constructor
@@ -1144,12 +866,6 @@ private:
 }; // end of LeafNode class
 
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-template<typename T, Index Log2Dim>
-const T LeafNode<T, Log2Dim>::Buffer::sZero = zeroVal<T>();
-#endif
-
-
 ////////////////////////////////////////
 
 
@@ -1552,48 +1268,6 @@ LeafNode<T, Log2Dim>::writeTopology(std::ostream& os, bool /*toHalf*/) const
 ////////////////////////////////////////
 
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-template<typename T, Index Log2Dim>
-inline void
-LeafNode<T, Log2Dim>::Buffer::doLoad() const
-{
-    if (!this->isOutOfCore()) return;
-
-    Buffer* self = const_cast<Buffer*>(this);
-
-    // This lock will be contended at most once, after which this buffer
-    // will no longer be out-of-core.
-    tbb::spin_mutex::scoped_lock lock(self->mMutex);
-    if (!this->isOutOfCore()) return;
-
-    std::unique_ptr<FileInfo> info(self->mFileInfo);
-    assert(info.get() != nullptr);
-    assert(info->mapping.get() != nullptr);
-    assert(info->meta.get() != nullptr);
-
-    /// @todo For now, we have to clear the mData pointer in order for allocate() to take effect.
-    self->mData = nullptr;
-    self->allocate();
-
-    SharedPtr<std::streambuf> buf = info->mapping->createBuffer();
-    std::istream is(buf.get());
-
-    io::setStreamMetadataPtr(is, info->meta, /*transfer=*/true);
-
-    NodeMaskType mask;
-    is.seekg(info->maskpos);
-    mask.load(is);
-
-    is.seekg(info->bufpos);
-    io::readCompressedValues(is, self->mData, SIZE, mask, io::getHalfFloat(is));
-
-    self->setOutOfCore(false);
-}
-#endif
-
-
-////////////////////////////////////////
-
 
 template<typename T, Index Log2Dim>
 inline void
@@ -1659,7 +1333,7 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
 
         if (delayLoad) {
             mBuffer.setOutOfCore(true);
-            mBuffer.mFileInfo = new FileInfo;
+            mBuffer.mFileInfo = new typename Buffer::FileInfo;
             mBuffer.mFileInfo->meta = meta;
             mBuffer.mFileInfo->bufpos = is.tellg();
             mBuffer.mFileInfo->mapping = mappedFile;
