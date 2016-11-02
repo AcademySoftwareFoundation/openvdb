@@ -1185,11 +1185,7 @@ TestAttributeArray::testStrided()
         CPPUNIT_ASSERT_EQUAL(handle.stride(), Index(3));
         CPPUNIT_ASSERT_EQUAL(handle.size(), size_t(2));
 
-#ifdef OPENVDB_2_ABI_COMPATIBLE
-        size_t arrayMem = 48;
-#else
         size_t arrayMem = 64;
-#endif
 
         CPPUNIT_ASSERT_EQUAL(array->memUsage(), sizeof(int) * /*size*/3 * /*stride*/2 + arrayMem);
     }
@@ -1246,11 +1242,7 @@ TestAttributeArray::testStrided()
         CPPUNIT_ASSERT_EQUAL(handle.get(0, 2), 5);
         CPPUNIT_ASSERT_EQUAL(handle.get(1, 1), 10);
 
-#ifdef OPENVDB_2_ABI_COMPATIBLE
-        size_t arrayMem = 48;
-#else
         size_t arrayMem = 64;
-#endif
 
         CPPUNIT_ASSERT_EQUAL(array->memUsage(), sizeof(int) * /*size*/3 * /*stride*/2 + arrayMem);
 
@@ -1327,10 +1319,9 @@ TestAttributeArray::testDelayedLoad()
             CPPUNIT_ASSERT_EQUAL(attrA.isHidden(), attrB.isHidden());
             CPPUNIT_ASSERT_EQUAL(attrA.isCompressed(), attrB.isCompressed());
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
             CPPUNIT_ASSERT(attrB.isOutOfCore());
             attrB.loadData();
-#endif
+
             CPPUNIT_ASSERT(!attrB.isOutOfCore());
 
             CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
@@ -1349,9 +1340,7 @@ TestAttributeArray::testDelayedLoad()
 
             attrB.read(filein);
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
             CPPUNIT_ASSERT(attrB.isOutOfCore());
-#endif
 
             CPPUNIT_ASSERT(!attrB.isUniform());
 
@@ -1373,9 +1362,7 @@ TestAttributeArray::testDelayedLoad()
 
             attrB.read(filein);
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
             CPPUNIT_ASSERT(attrB.isOutOfCore());
-#endif
 
             attrB.get(0);
 
@@ -1395,9 +1382,7 @@ TestAttributeArray::testDelayedLoad()
 
             attrB.read(filein);
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
             CPPUNIT_ASSERT(attrB.isOutOfCore());
-#endif
 
             CPPUNIT_ASSERT(!attrB.isCompressed());
 
@@ -1407,9 +1392,7 @@ TestAttributeArray::testDelayedLoad()
             CPPUNIT_ASSERT(!attrB.isOutOfCore());
             CPPUNIT_ASSERT(attrB.isCompressed());
 #else
-#ifndef OPENVDB_2_ABI_COMPATIBLE
             CPPUNIT_ASSERT(attrB.isOutOfCore());
-#endif
             CPPUNIT_ASSERT(!attrB.isCompressed());
 #endif
         }
@@ -1423,14 +1406,11 @@ TestAttributeArray::testDelayedLoad()
 
             attrB.read(filein);
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
             CPPUNIT_ASSERT(attrB.isOutOfCore());
-#endif
 
             AttributeArrayI attrC(attrB);
             AttributeArrayI attrD = attrB;
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
             CPPUNIT_ASSERT(attrB.isOutOfCore());
             CPPUNIT_ASSERT(attrC.isOutOfCore());
             CPPUNIT_ASSERT(attrD.isOutOfCore());
@@ -1438,7 +1418,6 @@ TestAttributeArray::testDelayedLoad()
             attrB.loadData();
             attrC.loadData();
             attrD.loadData();
-#endif
 
             CPPUNIT_ASSERT(!attrB.isOutOfCore());
             CPPUNIT_ASSERT(!attrC.isOutOfCore());
@@ -1460,9 +1439,7 @@ TestAttributeArray::testDelayedLoad()
 
             attrB.read(filein);
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
             CPPUNIT_ASSERT(attrB.isOutOfCore());
-#endif
 
             AttributeHandle<int> handle(attrB);
 
@@ -1478,9 +1455,7 @@ TestAttributeArray::testDelayedLoad()
 
             attrB.read(filein);
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
             CPPUNIT_ASSERT(attrB.isOutOfCore());
-#endif
 
             CPPUNIT_ASSERT(!attrB.isUniform());
 
@@ -1525,9 +1500,7 @@ TestAttributeArray::testDelayedLoad()
 
             attrB.read(filein);
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
             CPPUNIT_ASSERT(attrB.isOutOfCore());
-#endif
 
             CPPUNIT_ASSERT(attrB.isUniform());
 
@@ -1608,10 +1581,8 @@ TestAttributeArray::testDelayedLoad()
             CPPUNIT_ASSERT(attrB.isCompressed());
 #endif
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
             CPPUNIT_ASSERT(attrB.isOutOfCore());
             attrB.loadData();
-#endif
 
             CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
 
@@ -1629,9 +1600,7 @@ TestAttributeArray::testDelayedLoad()
 
             attrB.read(filein);
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
             CPPUNIT_ASSERT(attrB.isOutOfCore());
-#endif
 
             attrB.get(0);
 
@@ -1652,16 +1621,12 @@ TestAttributeArray::testDelayedLoad()
 
             attrB.read(filein);
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
             CPPUNIT_ASSERT(attrB.isOutOfCore());
-#endif
             CPPUNIT_ASSERT(attrB.isCompressed());
 
             attrB.compress();
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
             CPPUNIT_ASSERT(attrB.isOutOfCore());
-#endif
             CPPUNIT_ASSERT(attrB.isCompressed());
         }
 
@@ -1674,14 +1639,11 @@ TestAttributeArray::testDelayedLoad()
 
             attrB.read(filein);
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
             CPPUNIT_ASSERT(attrB.isOutOfCore());
-#endif
 
             AttributeArrayI attrC(attrB);
             AttributeArrayI attrD = attrB;
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
             CPPUNIT_ASSERT(attrB.isOutOfCore());
             CPPUNIT_ASSERT(attrC.isOutOfCore());
             CPPUNIT_ASSERT(attrD.isOutOfCore());
@@ -1689,7 +1651,6 @@ TestAttributeArray::testDelayedLoad()
             attrB.loadData();
             attrC.loadData();
             attrD.loadData();
-#endif
 
             CPPUNIT_ASSERT(!attrB.isOutOfCore());
             CPPUNIT_ASSERT(!attrC.isOutOfCore());
@@ -1711,9 +1672,7 @@ TestAttributeArray::testDelayedLoad()
 
             attrB.read(filein);
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
             CPPUNIT_ASSERT(attrB.isOutOfCore());
-#endif
 
             CPPUNIT_ASSERT(attrB.isCompressed());
 
