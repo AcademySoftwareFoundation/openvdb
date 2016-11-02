@@ -1118,6 +1118,8 @@ protected:
     void setValueMaskOn(Index n)  { mValueMask.setOn(n); }
     void setValueMaskOff(Index n) { mValueMask.setOff(n); }
 
+    inline void skipCompressedValues(bool seekable, std::istream&, bool fromHalf);
+
     /// Compute the origin of the leaf node that contains the voxel with the given coordinates.
     static void evalNodeOrigin(Coord& xyz) { xyz &= ~(DIM - 1); }
 
@@ -1595,6 +1597,22 @@ LeafNode<T, Log2Dim>::Buffer::doLoad() const
 
 template<typename T, Index Log2Dim>
 inline void
+LeafNode<T,Log2Dim>::skipCompressedValues(bool seekable, std::istream& is, bool fromHalf)
+{
+    if (seekable) {
+        // Seek over voxel values.
+        io::readCompressedValues<ValueType, NodeMaskType>(
+            is, nullptr, SIZE, mValueMask, fromHalf);
+    } else {
+        // Read and discard voxel values.
+        Buffer temp;
+        io::readCompressedValues(is, temp.mData, SIZE, mValueMask, fromHalf);
+    }
+}
+
+
+template<typename T, Index Log2Dim>
+inline void
 LeafNode<T,Log2Dim>::readBuffers(std::istream& is, bool fromHalf)
 {
     this->readBuffers(is, CoordBBox::inf(), fromHalf);
@@ -1605,12 +1623,21 @@ template<typename T, Index Log2Dim>
 inline void
 LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bool fromHalf)
 {
+    SharedPtr<io::StreamMetadata> meta = io::getStreamMetadataPtr(is);
+    const bool seekable = meta && meta->seekable();
+
 #ifndef OPENVDB_2_ABI_COMPATIBLE
     std::streamoff maskpos = is.tellg();
 #endif
 
-    // Read in the value mask.
-    mValueMask.load(is);
+    if (seekable) {
+        // Seek over the value mask.
+        mValueMask.seek(is);
+    }
+    else {
+        // Read in the value mask.
+        mValueMask.load(is);
+    }
 
     int8_t numBuffers = 1;
     if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
@@ -1624,9 +1651,7 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
     CoordBBox nodeBBox = this->getNodeBoundingBox();
     if (!clipBBox.hasOverlap(nodeBBox)) {
         // This node lies completely outside the clipping region.
-        // Read and discard its voxel values.
-        Buffer temp;
-        io::readCompressedValues(is, temp.mData, SIZE, mValueMask, fromHalf);
+        skipCompressedValues(seekable, is, fromHalf);
         mValueMask.setOff();
         mBuffer.setOutOfCore(false);
     } else {
@@ -1641,17 +1666,14 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
         if (delayLoad) {
             mBuffer.setOutOfCore(true);
             mBuffer.mFileInfo = new FileInfo;
+            mBuffer.mFileInfo->meta = meta;
             mBuffer.mFileInfo->bufpos = is.tellg();
             mBuffer.mFileInfo->mapping = mappedFile;
             // Save the offset to the value mask, because the in-memory copy
             // might change before the value buffer gets read.
             mBuffer.mFileInfo->maskpos = maskpos;
-
-            mBuffer.mFileInfo->meta = io::getStreamMetadataPtr(is);
-
-            // Read and discard voxel values.
-            Buffer temp;
-            io::readCompressedValues(is, temp.mData, SIZE, mValueMask, fromHalf);
+            // Skip over voxel values.
+            skipCompressedValues(seekable, is, fromHalf);
         } else {
 #endif
             mBuffer.allocate();

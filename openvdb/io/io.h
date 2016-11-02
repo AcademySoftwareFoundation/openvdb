@@ -91,9 +91,18 @@ public:
     bool writeGridStats() const;
     void setWriteGridStats(bool);
 
+    bool seekable() const;
+    void setSeekable(bool);
+
+    bool countingPasses() const;
+    void setCountingPasses(bool);
+
+    uint32_t pass() const;
+    void setPass(uint32_t);
+
     //@{
-    /// @brief Return a (reference to a) copy of the metadata of the grid currently
-    /// being read or written.
+    /// @brief Return a (reference to a) copy of the metadata of the grid
+    /// currently being read or written.
     /// @details Some grid metadata might duplicate information returned by
     /// gridClass(), backgroundPtr() and other accessors, but those values
     /// are not guaranteed to be kept in sync.
@@ -121,6 +130,14 @@ private:
 std::ostream& operator<<(std::ostream&, const StreamMetadata&);
 
 std::ostream& operator<<(std::ostream&, const StreamMetadata::AuxDataMap&);
+
+
+////////////////////////////////////////
+
+
+/// @brief Leaf nodes that require multi-pass I/O must inherit from this struct.
+/// @sa Grid::hasMultiPassIO()
+struct MultiPass {};
 
 
 ////////////////////////////////////////

@@ -4,6 +4,7 @@ OpenVDB Version History
 Version 4.0.0 - In development
 
     Highlights:
+    - Added cmake build support [Contributed by Nicholas Yue]
     - Introduced some C++11 constructs.  A C++11-compatible compiler
       is now required.
     - Vector-valued grids are now much faster to construct and destroy.
@@ -18,11 +19,19 @@ Version 4.0.0 - In development
     - Added an option to the point scattering tools to specify how far
       each point may be displaced from the center of its host voxel or tile.
     - Added a toggle to tools::clip() to invert the clipping mask.
+    - Custom leaf node implementations may now optimize their file layout
+      by inheriting from io::MultiPass.  Voxel data for grids with such
+      leaf nodes will be written and read in multiple passes, allowing
+      blocks of related data to be stored contiguously.
+      [Contributed by Double Negative]
 
     Improvements:
     - Vector-valued grids are now much faster to construct and destroy.
     - Changed math::Coord's data representation to facilitate C++11
       uniform initialization.
+    - Delayed loading from io::Files is now faster due to the use of seeks
+      instead of reads.
+      [Contributed by Double Negative]
     - Made many small changes to address type conversion and other warnings
       reported by newer compilers, including Clang 3.8.
 
@@ -173,7 +182,7 @@ Version 3.2.0 - August 10, 2016
       caused by calling the method with a zero-length vector.
       [Contributed by Rick Hankins]
     - Fixed a potential threading bug in io::Queue.
-      [Contributed by Josip ¿ume¿ki]
+      [Contributed by Josip Sumecki]
     - Fixed a possible division-by-zero bug in openvdb/tools/LevelSetAdvect.h.
       [Contributed by Rick Hankins]
     - Corrected the outer product method to not return the transpose result.
