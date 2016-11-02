@@ -190,8 +190,8 @@ public:
     };
 #endif
 
-    using Ptr = SharedPtr<AttributeArray>;
-    using ConstPtr = SharedPtr<const AttributeArray>;
+    using Ptr           = std::shared_ptr<AttributeArray>;
+    using ConstPtr      = std::shared_ptr<const AttributeArray>;
 
     using FactoryMethod = Ptr (*)(size_t, Index);
 
@@ -434,8 +434,8 @@ template<typename ValueType_, typename Codec_ = NullCodec>
 class TypedAttributeArray: public AttributeArray
 {
 public:
-    using Ptr           = SharedPtr<TypedAttributeArray>;
-    using ConstPtr      = SharedPtr<const TypedAttributeArray>;
+    using Ptr           = std::shared_ptr<TypedAttributeArray>;
+    using ConstPtr      = std::shared_ptr<const TypedAttributeArray>;
 
     using ValueType     = ValueType_;
     using Codec         = Codec_;
@@ -605,7 +605,7 @@ class AttributeHandle
 {
 public:
     using Handle    = AttributeHandle<ValueType, CodecType, Strided, Interleaved>;
-    using Ptr       = SharedPtr<Handle>;
+    using Ptr       = std::shared_ptr<Handle>;
     using UniquePtr = std::unique_ptr<Handle>;
 
 protected:
@@ -669,7 +669,7 @@ class AttributeWriteHandle : public AttributeHandle<ValueType, CodecType, Stride
 {
 public:
     using Handle    = AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>;
-    using Ptr       = SharedPtr<Handle>;
+    using Ptr       = std::shared_ptr<Handle>;
     using ScopedPtr = std::unique_ptr<Handle>;
 
     static Ptr create(AttributeArray& array, const bool expand = true);
