@@ -88,7 +88,6 @@ namespace {
 
 AttributeSet::AttributeSet()
     : mDescr(new Descriptor())
-    , mAttrs()
 {
 }
 
@@ -136,8 +135,8 @@ size_t
 AttributeSet::memUsage() const
 {
     size_t bytes = sizeof(*this) + mDescr->memUsage();
-    for (size_t n = 0, N = mAttrs.size(); n < N; ++n) {
-        bytes += mAttrs[n]->memUsage();
+    for (const auto& attr : mAttrs) {
+        bytes += attr->memUsage();
     }
     return bytes;
 }
