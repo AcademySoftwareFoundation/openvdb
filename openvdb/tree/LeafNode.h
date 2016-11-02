@@ -1630,8 +1630,14 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
     std::streamoff maskpos = is.tellg();
 #endif
 
-    // Read in the value mask.
-    mValueMask.load(is);
+    if (seekable) {
+        // Seek over the value mask.
+        mValueMask.seek(is);
+    }
+    else {
+        // Read in the value mask.
+        mValueMask.load(is);
+    }
 
     int8_t numBuffers = 1;
     if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
