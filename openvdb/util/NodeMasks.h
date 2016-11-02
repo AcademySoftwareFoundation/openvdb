@@ -564,6 +564,9 @@ public:
     void load(std::istream& is) {
         is.read(reinterpret_cast<char*>(mWords), this->memUsage());
     }
+    void seek(std::istream& is) const {
+        is.seekg(this->memUsage(), std::ios_base::cur);
+    }
     /// @brief simple print method for debugging
     void printInfo(std::ostream& os=std::cout) const
     {
@@ -804,6 +807,7 @@ public:
         os.write(reinterpret_cast<const char*>(&mByte), 1);
     }
     void load(std::istream& is) { is.read(reinterpret_cast<char*>(&mByte), 1); }
+    void seek(std::istream& is) const { is.seekg(1, std::ios_base::cur); }
     /// @brief simple print method for debugging
     void printInfo(std::ostream& os=std::cout) const
     {
@@ -1022,6 +1026,7 @@ public:
         os.write(reinterpret_cast<const char*>(&mWord), 8);
     }
     void load(std::istream& is) { is.read(reinterpret_cast<char*>(&mWord), 8); }
+    void seek(std::istream& is) const { is.seekg(8, std::ios_base::cur); }
     /// @brief simple print method for debugging
     void printInfo(std::ostream& os=std::cout) const
     {
@@ -1372,6 +1377,10 @@ public:
     void load(std::istream& is) {
         assert(mBits);
         is.read(reinterpret_cast<char*>(mBits), mIntSize * sizeof(Index32));
+    }
+    void seek(std::istream& is) const {
+        assert(mBits);
+        is.seekg(mIntSize * sizeof(Index32), std::ios_base::cur);
     }
     /// @brief simple print method for debugging
     void printInfo(std::ostream& os=std::cout) const {
