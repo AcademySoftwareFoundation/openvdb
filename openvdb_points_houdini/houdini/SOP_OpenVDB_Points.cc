@@ -65,8 +65,6 @@
 #include <GA/GA_Types.h> // for GA_ATTRIB_POINT
 #include <SYS/SYS_Types.h> // for int32, float32, etc
 
-#include <boost/ptr_container/ptr_vector.hpp>
-
 using namespace openvdb;
 using namespace openvdb::tools;
 using namespace openvdb::math;
@@ -105,7 +103,7 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
     static_assert(!std::is_base_of<AttributeArray, ValueType>::value, "ValueType must not be derived from AttributeArray");
     static_assert(!std::is_same<ValueType, openvdb::Name>::value, "ValueType must not be openvdb::Name/std::string");
 
-    typedef hvdbp::HoudiniReadAttribute<ValueType> HoudiniAttribute;
+    using HoudiniAttribute = hvdbp::HoudiniReadAttribute<ValueType>;
 
     ValueType value = hvdb::evalAttrDefault<ValueType>(defaults, 0);
 
@@ -137,7 +135,7 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
         throw std::runtime_error(ss.str());
     }
 
-    typedef hvdbp::HoudiniReadAttribute<openvdb::Name> HoudiniStringAttribute;
+    using HoudiniStringAttribute = hvdbp::HoudiniReadAttribute<openvdb::Name>;
 
     // explicitly handle string attributes
 
@@ -266,7 +264,7 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
 ////////////////////////////////////////
 
 
-typedef std::map<Name, std::pair<int, bool> > AttributeInfoMap;
+using AttributeInfoMap = std::map<Name, std::pair<int, bool>>;
 
 
 ///////////////////////////////////////
@@ -277,8 +275,8 @@ PointDataGrid::Ptr
 createPointDataGrid(const GU_Detail& ptGeo, const int compression,
                     const AttributeInfoMap& attributes, const openvdb::math::Transform& transform)
 {
-    typedef hvdbp::HoudiniReadAttribute<openvdb::Vec3d> HoudiniPositionAttribute;
-    typedef hvdbp::HoudiniOffsetAttribute<openvdb::Vec3f> HoudiniOffsetAttribute;
+    using HoudiniPositionAttribute = hvdbp::HoudiniReadAttribute<openvdb::Vec3d>;
+    using HoudiniOffsetAttribute = hvdbp::HoudiniOffsetAttribute<openvdb::Vec3f>;
 
     // store point group information
 
@@ -348,8 +346,7 @@ createPointDataGrid(const GU_Detail& ptGeo, const int compression,
     std::vector<Name> groupNames;
     groupNames.reserve(elementGroups.entries());
 
-    for (GA_ElementGroupTable::iterator it = elementGroups.beginTraverse(),
-                                        itEnd = elementGroups.endTraverse(); it != itEnd; ++it)
+    for (auto it = elementGroups.beginTraverse(), itEnd = elementGroups.endTraverse(); it != itEnd; ++it)
     {
         groupNames.push_back((*it)->getName().toStdString());
     }
@@ -361,8 +358,7 @@ createPointDataGrid(const GU_Detail& ptGeo, const int compression,
     const int64_t numPoints = ptGeo.getNumPoints();
     std::vector<short> inGroup(numPoints, short(0));
 
-    for (GA_ElementGroupTable::iterator it = elementGroups.beginTraverse(),
-                                        itEnd = elementGroups.endTraverse(); it != itEnd; ++it)
+    for (auto it = elementGroups.beginTraverse(), itEnd = elementGroups.endTraverse(); it != itEnd; ++it)
     {
         // insert group offsets
 
@@ -396,11 +392,10 @@ createPointDataGrid(const GU_Detail& ptGeo, const int compression,
 
     // Add other attributes to PointDataGrid
 
-    for (AttributeInfoMap::const_iterator it = attributes.begin(),
-                                          it_end = attributes.end(); it != it_end; ++it)
+    for (const auto& attrInfo : attributes)
     {
-        const openvdb::Name name = it->first;
-        const int compression = it->second.first;
+        const openvdb::Name name = attrInfo.first;
+        const int compression = attrInfo.second.first;
 
         // skip position as this has already been added
 
@@ -439,12 +434,11 @@ createPointDataGrid(const GU_Detail& ptGeo, const int compression,
 
     // Apply blosc compression to attributes
 
-    for (AttributeInfoMap::const_iterator   it = attributes.begin(),
-                                            it_end = attributes.end(); it != it_end; ++it)
+    for (const auto& attrInfo : attributes)
     {
-        if (!it->second.second)  continue;
+        if (!attrInfo.second.second)  continue;
 
-        bloscCompressAttribute(tree, it->first);
+        bloscCompressAttribute(tree, attrInfo.first);
     }
 
     return pointDataGrid;
@@ -458,16 +452,16 @@ class SOP_OpenVDB_Points: public hvdb::SOP_NodeVDBPoints
 {
 public:
     SOP_OpenVDB_Points(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Points() {}
+    virtual ~SOP_OpenVDB_Points() = default;
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    virtual int isRefInput(unsigned i ) const { return (i == 1); }
+    virtual int isRefInput(unsigned i ) const override { return (i == 1); }
 
 protected:
 
-    virtual OP_ERROR cookMySop(OP_Context&);
-    virtual bool updateParmsFlags();
+    virtual OP_ERROR cookMySop(OP_Context&) override;
+    virtual bool updateParmsFlags() override;
 
 private:
     hvdb::Interrupter mBoss;
@@ -492,11 +486,11 @@ inline void
 sopBuildAttrMenu(void* data, PRM_Name* menuEntries, int themenusize,
     const PRM_SpareData* spare, const PRM_Parm*)
 {
-    if (data == NULL || menuEntries == NULL || spare == NULL) return;
+    if (data == nullptr || menuEntries == nullptr || spare == nullptr) return;
 
     SOP_Node* sop = CAST_SOPNODE((OP_Node *)data);
 
-    if (sop == NULL) {
+    if (sop == nullptr) {
         // terminate and quit
         menuEntries[0].setToken(0);
         menuEntries[0].setLabel(0);
@@ -516,7 +510,7 @@ sopBuildAttrMenu(void* data, PRM_Name* menuEntries, int themenusize,
     if (gdp) {
 
         // point attribute names
-        GA_AttributeDict::iterator iter = gdp->pointAttribs().begin(GA_SCOPE_PUBLIC);
+        auto iter = gdp->pointAttribs().begin(GA_SCOPE_PUBLIC);
 
         if (!iter.atEnd() && menuIdx != menuEnd) {
 
@@ -559,7 +553,7 @@ newSopOperator(OP_OperatorTable* table)
 {
     points::initialize();
 
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
@@ -567,7 +561,7 @@ newSopOperator(OP_OperatorTable* table)
         const char* items[] = {
             "vdb", "Houdini points to VDB points",
             "hdk", "VDB points to Houdini points",
-            NULL
+            nullptr
         };
 
         parms.add(hutil::ParmFactory(PRM_ORD, "conversion", "Conversion")
@@ -608,7 +602,7 @@ newSopOperator(OP_OperatorTable* table)
             "none", "None",
             "int16", "16-bit fixed point",
             "int8", "8-bit fixed point",
-            NULL
+            nullptr
         };
 
         parms.add(hutil::ParmFactory(PRM_ORD, "poscompression", "Position Compression")
@@ -625,7 +619,7 @@ newSopOperator(OP_OperatorTable* table)
         const char* items[] = {
             "all", "All Attributes",
             "spec", "Specific Attributes",
-            NULL
+            nullptr
     };
 
     parms.add(hutil::ParmFactory(PRM_ORD, "mode", "Mode")
@@ -651,7 +645,7 @@ newSopOperator(OP_OperatorTable* table)
             UnitVecCodec::name(), "Unit Vector",
             FixedPointCodec<true, UnitRange>::name(), "8-bit Unit",
             FixedPointCodec<false, UnitRange>::name(), "16-bit Unit",
-            NULL
+            nullptr
         };
 
         attrParms.add(hutil::ParmFactory(PRM_ORD, "valuecompression#", "Value Compression")
@@ -787,7 +781,7 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
 
                 // add a warning to the SOP if grid contains curves - conversion to Houdini currently not supported
 
-                PointDataTree::LeafCIter iter = grid.tree().cbeginLeaf();
+                auto iter = grid.tree().cbeginLeaf();
 
                 if (iter) {
                     const AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
@@ -944,7 +938,7 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
         } else {
 
             // point attribute names
-            GA_AttributeDict::iterator iter = detail->pointAttribs().begin(GA_SCOPE_PUBLIC);
+            auto iter = detail->pointAttribs().begin(GA_SCOPE_PUBLIC);
 
             if (!iter.atEnd()) {
                 for (; !iter.atEnd(); ++iter) {
@@ -974,7 +968,7 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
 
         mBoss.end();
 
-    } catch (std::exception& e) {
+    } catch (const std::exception& e) {
         addError(SOP_MESSAGE, e.what());
     }
     return error();

@@ -62,15 +62,15 @@ class SOP_OpenVDB_Points_Load: public hvdb::SOP_NodeVDBPoints
 {
 public:
     SOP_OpenVDB_Points_Load(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Points_Load() {}
+    virtual ~SOP_OpenVDB_Points_Load() = default;
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    virtual int isRefInput(unsigned input) const { return (input == 1); }
+    virtual int isRefInput(unsigned input) const override { return (input == 1); }
 
 protected:
-    virtual bool updateParmsFlags();
-    virtual OP_ERROR cookMySop(OP_Context&);
+    virtual bool updateParmsFlags() override;
+    virtual OP_ERROR cookMySop(OP_Context&) override;
 
 private:
     hvdb::Interrupter mBoss;
@@ -87,7 +87,7 @@ newSopOperator(OP_OperatorTable* table)
 {
     points::initialize();
 
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
@@ -147,7 +147,7 @@ namespace {
 
 struct MaskOp
 {
-    typedef openvdb::BoolGrid MaskType;
+    using MaskType = openvdb::BoolGrid;
 
     template<typename GridType>
     void operator()(const GridType& grid)
@@ -176,7 +176,7 @@ struct MaskOp
 OP_ERROR
 SOP_OpenVDB_Points_Load::cookMySop(OP_Context& context)
 {
-    typedef openvdb::tools::PointDataGrid PointDataGrid;
+    using PointDataGrid = openvdb::tools::PointDataGrid;
 
     try {
         hutil::ScopedInputLock lock(*this, context);
@@ -210,12 +210,12 @@ SOP_OpenVDB_Points_Load::cookMySop(OP_Context& context)
             }
 
             GU_PrimVDB* vdbPrim = *vdbIt;
-            openvdb::GridBase::Ptr inGrid = vdbPrim->getGridPtr();
+            auto inGrid = vdbPrim->getGridPtr();
 
             if (!inGrid->isType<PointDataGrid>()) continue;
-            PointDataGrid::Ptr pointDataGrid = openvdb::gridPtrCast<PointDataGrid>(inGrid);
+            auto pointDataGrid = openvdb::gridPtrCast<PointDataGrid>(inGrid);
 
-            openvdb::tools::PointDataTree::LeafCIter leafIter = pointDataGrid->tree().cbeginLeaf();
+            auto leafIter = pointDataGrid->tree().cbeginLeaf();
             if (!leafIter) continue;
 
             // early exit if no delayed leaves (avoids redundant deep copy)
@@ -235,7 +235,7 @@ SOP_OpenVDB_Points_Load::cookMySop(OP_Context& context)
             // deep copy the VDB tree if it is not already unique
             vdbPrim->makeGridUnique();
 
-            PointDataGrid::Ptr outputGrid = openvdb::gridPtrCast<PointDataGrid>(vdbPrim->getGridPtr());
+            auto outputGrid = openvdb::gridPtrCast<PointDataGrid>(vdbPrim->getGridPtr());
 
             if (!outputGrid) {
                 addError(SOP_MESSAGE, "Failed to duplicate VDB Points");
@@ -301,7 +301,7 @@ SOP_OpenVDB_Points_Load::cookMySop(OP_Context& context)
 
         return error();
 
-    } catch (std::exception& e) {
+    } catch (const std::exception& e) {
         addError(SOP_MESSAGE, e.what());
     }
     return error();

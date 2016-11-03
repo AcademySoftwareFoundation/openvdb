@@ -45,8 +45,6 @@
 #include <openvdb_points/tools/PointCount.h>
 #include <openvdb_points/tools/PointConversion.h>
 
-#include <boost/algorithm/string/predicate.hpp>
-
 #if (UT_VERSION_INT < 0x0f000000) // earlier than 15.0.0
 #if defined(__APPLE__) || defined(MACOSX)
 #include <GLUT/glut.h>
@@ -72,9 +70,6 @@
 
 ////////////////////////////////////////
 
-
-#define THIS_HOOK_NAME "GUI_PrimVDBPointsHook"
-#define THIS_PRIMITIVE_NAME "GR_PrimVDBPoints"
 
 static RE_ShaderHandle thePixelShader("particle/GL32/pixel.prog");
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
@@ -103,7 +98,7 @@ class OPENVDB_HOUDINI_API GUI_PrimVDBPointsHook : public GUI_PrimitiveHook
 {
 public:
     GUI_PrimVDBPointsHook() : GUI_PrimitiveHook("VDB Points") { }
-    virtual ~GUI_PrimVDBPointsHook() { }
+    virtual ~GUI_PrimVDBPointsHook() = default;
 
     /// This is called when a new GR_Primitive is required for a VDB Points primitive.
     virtual GR_Primitive* createPrimitive(
@@ -111,7 +106,7 @@ public:
         const GEO_Primitive* geo_prim,
         const GR_RenderInfo* info,
         const char* cache_name,
-        GR_PrimAcceptResult& processed);
+        GR_PrimAcceptResult& processed) override;
 }; // class GUI_PrimVDBPointsHook
 
 
@@ -126,25 +121,25 @@ public:
                      const char *cache_name,
                      const GEO_Primitive* geo_prim);
 
-    virtual ~GR_PrimVDBPoints();
+    virtual ~GR_PrimVDBPoints() = default;
 
-    virtual const char *className() const { return "GR_PrimVDBPoints"; }
+    virtual const char *className() const override { return "GR_PrimVDBPoints"; }
 
     /// See if the tetra primitive can be consumed by this primitive.
     virtual GR_PrimAcceptResult acceptPrimitive(GT_PrimitiveType t,
                                                 int geo_type,
                                                 const GT_PrimitiveHandle &ph,
-                                                const GEO_Primitive *prim);
+                                                const GEO_Primitive *prim) override;
 
     /// This should reset any lists of primitives.
-    virtual void resetPrimitives() { }
+    virtual void resetPrimitives() override { }
 
     /// Called whenever the parent detail is changed, draw modes are changed,
     /// selection is changed, or certain volatile display options are changed
     /// (such as level of detail).
     virtual void update(RE_Render *r,
                         const GT_PrimitiveHandle &primh,
-                        const GR_UpdateParms &p);
+                        const GR_UpdateParms &p) override;
 
     /// Called whenever the primitive is required to render, which may be more
     /// than one time per viewport redraw (beauty, shadow passes, wireframe-over)
@@ -154,16 +149,16 @@ public:
                         GR_RenderMode render_mode,
                         GR_RenderFlags flags,
                         const GR_DisplayOption *opt,
-                        const RE_MaterialList  *materials);
+                        const RE_MaterialList  *materials) override;
 
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
     virtual void renderInstances(RE_Render*, GR_RenderMode, GR_RenderFlags,
-                                 const GR_DisplayOption*, const RE_MaterialList*, int) {}
+                                 const GR_DisplayOption*, const RE_MaterialList*, int) override {}
 
     virtual int renderPick(RE_Render*, const GR_DisplayOption*, unsigned int,
-                           GR_PickStyle, bool) { return 0; }
+                           GR_PickStyle, bool) override { return 0; }
 
-    virtual void renderDecoration(RE_Render*, GR_Decoration, const GR_DecorationParms&);
+    virtual void renderDecoration(RE_Render*, GR_Decoration, const GR_DecorationParms&) override;
 #endif
 
 protected:
@@ -194,11 +189,11 @@ protected:
     void removeBuffer(const std::string& name);
 
 private:
-    RE_Geometry *myGeo;
-    RE_Geometry *myWire;
-    bool mCurves;
-    bool mDefaultPointColor;
-    openvdb::Vec3f mCentroid;
+    std::unique_ptr<RE_Geometry> myGeo;
+    std::unique_ptr<RE_Geometry> myWire;
+    bool mCurves = false;
+    bool mDefaultPointColor = true;
+    openvdb::Vec3f mCentroid{0, 0, 0};
 };
 
 
@@ -238,7 +233,7 @@ GUI_PrimVDBPointsHook::createPrimitive(
     GR_PrimAcceptResult&)
 {
     if (gt_prim->getPrimitiveType() != GT_PRIM_VDB_VOLUME) {
-        return NULL;
+        return nullptr;
     }
 
     const GT_PrimVDB* gtPrimVDB = static_cast<const GT_PrimVDB*>(gt_prim.get());
@@ -248,7 +243,7 @@ GUI_PrimVDBPointsHook::createPrimitive(
         return new GR_PrimVDBPoints(info, cache_name, geo_prim);
     }
 
-    return NULL;
+    return nullptr;
 }
 
 
@@ -314,20 +309,8 @@ GR_PrimVDBPoints::GR_PrimVDBPoints(
     const GR_RenderInfo *info,
     const char *cache_name,
     const GEO_Primitive*)
-    : GR_Primitive(info,cache_name, GA_PrimCompat::TypeMask(0))
-    , myGeo(NULL)
-    , myWire(NULL)
-    , mCurves(false)
-    , mDefaultPointColor(true)
-    , mCentroid(openvdb::Vec3f(0, 0, 0))
+    : GR_Primitive(info, cache_name, GA_PrimCompat::TypeMask(0))
 {
-}
-
-
-GR_PrimVDBPoints::~GR_PrimVDBPoints()
-{
-    delete myGeo;
-    delete myWire;
 }
 
 
@@ -352,11 +335,11 @@ template<   typename PointDataTreeType,
             typename HoudiniBufferType>
 struct FillGPUBuffersPosition {
 
-    typedef typename PointDataTreeType::LeafNodeType LeafNode;
-    typedef typename openvdb::tree::LeafManager<PointDataTreeType> LeafManagerT;
-    typedef typename LeafManagerT::LeafRange LeafRangeT;
+    using LeafNode = typename PointDataTreeType::LeafNodeType;
+    using LeafManagerT = typename openvdb::tree::LeafManager<PointDataTreeType>;
+    using LeafRangeT = typename LeafManagerT::LeafRange;
 
-    typedef std::vector<std::pair<const LeafNode*, openvdb::Index64> > LeafOffsets;
+    using LeafOffsets = std::vector<std::pair<const LeafNode*, openvdb::Index64>>;
 
     FillGPUBuffersPosition( HoudiniBufferType* buffer,
                             const LeafOffsets& leafOffsets,
@@ -390,8 +373,7 @@ struct FillGPUBuffersPosition {
             const LeafNode* leaf = mLeafOffsets[n].first;
             const openvdb::Index64 leafOffset = mLeafOffsets[n].second;
 
-            typename openvdb::tools::AttributeHandle<AttributeType>::Ptr handle =
-                openvdb::tools::AttributeHandle<AttributeType>::create(
+            auto handle = openvdb::tools::AttributeHandle<AttributeType>::create(
                     leaf->template attributeArray(mAttributeIndex));
 
             openvdb::Vec3f positionVoxelSpace;
@@ -405,7 +387,7 @@ struct FillGPUBuffersPosition {
             if (useGroup) {
                 GroupFilter filter(mGroupName);
 
-                IndexIter<typename LeafNode::ValueOnCIter, GroupFilter> iter = leaf->beginIndexOn(filter);
+                auto iter = leaf->beginIndexOn(filter);
 
                 for (; iter; ++iter)
                 {
@@ -414,7 +396,7 @@ struct FillGPUBuffersPosition {
                 }
             }
             else {
-                typename LeafNode::IndexOnIter iter = leaf->beginIndexOn();
+                auto iter = leaf->beginIndexOn();
 
                 for (; iter; ++iter)
                 {
@@ -442,11 +424,11 @@ template<   typename PointDataTreeType,
             typename HoudiniBufferType>
 struct FillGPUBuffersVec3 {
 
-    typedef typename PointDataTreeType::LeafNodeType LeafNode;
-    typedef typename openvdb::tree::LeafManager<PointDataTreeType> LeafManagerT;
-    typedef typename LeafManagerT::LeafRange LeafRangeT;
+    using LeafNode = typename PointDataTreeType::LeafNodeType;
+    using LeafManagerT = typename openvdb::tree::LeafManager<PointDataTreeType>;
+    using LeafRangeT = typename LeafManagerT::LeafRange;
 
-    typedef std::vector<std::pair<const LeafNode*, openvdb::Index64> > LeafOffsets;
+    using LeafOffsets = std::vector<std::pair<const LeafNode*, openvdb::Index64>>;
 
     FillGPUBuffersVec3( HoudiniBufferType* buffer,
                             const LeafOffsets& leafOffsets,
@@ -464,8 +446,7 @@ struct FillGPUBuffersVec3 {
             const LeafNode* leaf = mLeafOffsets[n].first;
             const openvdb::Index64 leafOffset = mLeafOffsets[n].second;
 
-            typename openvdb::tools::AttributeHandle<AttributeType>::Ptr handle =
-                openvdb::tools::AttributeHandle<AttributeType>::create(
+            auto handle = openvdb::tools::AttributeHandle<AttributeType>::create(
                     leaf->template attributeArray(mAttributeIndex));
 
             openvdb::Vec3f color;
@@ -476,7 +457,7 @@ struct FillGPUBuffersVec3 {
 
             openvdb::Index64 offset = 0;
 
-            typename LeafNode::IndexOnIter iter = leaf->beginIndexOn();
+            auto iter = leaf->beginIndexOn();
 
             for (; iter; ++iter)
             {
@@ -502,11 +483,11 @@ template<   typename PointDataTreeType,
             typename HoudiniBufferType>
 struct FillGPUBuffersId {
 
-    typedef typename PointDataTreeType::LeafNodeType LeafNode;
-    typedef typename openvdb::tree::LeafManager<PointDataTreeType> LeafManagerT;
-    typedef typename LeafManagerT::LeafRange LeafRangeT;
+    using LeafNode = typename PointDataTreeType::LeafNodeType;
+    using LeafManagerT = typename openvdb::tree::LeafManager<PointDataTreeType>;
+    using LeafRangeT = typename LeafManagerT::LeafRange;
 
-    typedef std::vector<std::pair<const LeafNode*, openvdb::Index64> > LeafOffsets;
+    using LeafOffsets = std::vector<std::pair<const LeafNode*, openvdb::Index64>>;
 
     FillGPUBuffersId( HoudiniBufferType* buffer,
                             const LeafOffsets& leafOffsets,
@@ -526,8 +507,7 @@ struct FillGPUBuffersId {
             const LeafNode* leaf = mLeafOffsets[n].first;
             const openvdb::Index64 leafOffset = mLeafOffsets[n].second;
 
-            typename openvdb::tools::AttributeHandle<AttributeType>::Ptr handle =
-                openvdb::tools::AttributeHandle<AttributeType>::create(
+            auto handle = openvdb::tools::AttributeHandle<AttributeType>::create(
                     leaf->template attributeArray(mAttributeIndex));
 
             HoudiniBufferType scalarValue;
@@ -544,7 +524,7 @@ struct FillGPUBuffersId {
             openvdb::Index64 offset = 0;
 
 
-            typename LeafNode::IndexOnIter iter = leaf->beginIndexOn();
+            auto iter = leaf->beginIndexOn();
 
             for (; iter; ++iter)
             {
@@ -592,21 +572,21 @@ struct FillGPUBuffersLeafBoxes
             corners.clear();
 
             const openvdb::Vec3f pos000 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 0.0, 0.0)) - mPositionOffset;
-            corners.push_back(UT_Vector3H(pos000.x(), pos000.y(), pos000.z()));
+            corners.emplace_back(pos000.x(), pos000.y(), pos000.z());
             const openvdb::Vec3f pos001 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 0.0, 8.0)) - mPositionOffset;
-            corners.push_back(UT_Vector3H(pos001.x(), pos001.y(), pos001.z()));
+            corners.emplace_back(pos001.x(), pos001.y(), pos001.z());
             const openvdb::Vec3f pos010 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 8.0, 0.0)) - mPositionOffset;
-            corners.push_back(UT_Vector3H(pos010.x(), pos010.y(), pos010.z()));
+            corners.emplace_back(pos010.x(), pos010.y(), pos010.z());
             const openvdb::Vec3f pos011 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(0.0, 8.0, 8.0)) - mPositionOffset;
-            corners.push_back(UT_Vector3H(pos011.x(), pos011.y(), pos011.z()));
+            corners.emplace_back(pos011.x(), pos011.y(), pos011.z());
             const openvdb::Vec3f pos100 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 0.0, 0.0)) - mPositionOffset;
-            corners.push_back(UT_Vector3H(pos100.x(), pos100.y(), pos100.z()));
+            corners.emplace_back(pos100.x(), pos100.y(), pos100.z());
             const openvdb::Vec3f pos101 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 0.0, 8.0)) - mPositionOffset;
-            corners.push_back(UT_Vector3H(pos101.x(), pos101.y(), pos101.z()));
+            corners.emplace_back(pos101.x(), pos101.y(), pos101.z());
             const openvdb::Vec3f pos110 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 8.0, 0.0)) - mPositionOffset;
-            corners.push_back(UT_Vector3H(pos110.x(), pos110.y(), pos110.z()));
+            corners.emplace_back(pos110.x(), pos110.y(), pos110.z());
             const openvdb::Vec3f pos111 = mTransform.indexToWorld(origin.asVec3d() + openvdb::Vec3f(8.0, 8.0, 8.0)) - mPositionOffset;
-            corners.push_back(UT_Vector3H(pos111.x(), pos111.y(), pos111.z()));
+            corners.emplace_back(pos111.x(), pos111.y(), pos111.z());
 
             openvdb::Index64 offset = n*8*3;
 
@@ -661,7 +641,7 @@ GR_PrimVDBPoints::computeCentroid(const openvdb::tools::PointDataGrid& grid)
 
 struct PositionAttribute
 {
-    typedef Vec3f ValueType;
+    using ValueType = Vec3f;
 
     struct Handle
     {
@@ -702,7 +682,7 @@ private:
 
 struct OffsetAttribute
 {
-    typedef Vec3f ValueType;
+    using ValueType = Vec3f;
 
     struct Handle
     {
@@ -744,7 +724,7 @@ private:
 template <typename T>
 struct VectorAttribute
 {
-    typedef T ValueType;
+    using ValueType = T;
 
     struct Handle
     {
@@ -779,19 +759,19 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
 
     // Initialize the geometry with the proper name for the GL cache
     if (!myGeo)
-        myGeo = new RE_Geometry;
+        myGeo.reset(new RE_Geometry);
     myGeo->cacheBuffers(getCacheName());
 
-    typedef openvdb::tools::PointDataGrid GridType;
-    typedef GridType::TreeType TreeType;
-    typedef TreeType::LeafNodeType LeafNode;
-    typedef openvdb::tools::AttributeSet AttributeSet;
+    using GridType = openvdb::tools::PointDataGrid;
+    using TreeType = GridType::TreeType;
+    using LeafNode = TreeType::LeafNodeType;
+    using AttributeSet = openvdb::tools::AttributeSet;
 
     const TreeType& tree = grid.tree();
 
     if (tree.leafCount() == 0)  return;
 
-    TreeType::LeafCIter iter = tree.cbeginLeaf();
+    auto iter = tree.cbeginLeaf();
 
     const AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
 
@@ -912,13 +892,13 @@ GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
 
     // Initialize the geometry with the proper name for the GL cache
     if (!myWire)
-        myWire = new RE_Geometry;
+        myWire.reset(new RE_Geometry);
     myWire->cacheBuffers(getCacheName());
 
-    typedef openvdb::tools::PointDataGrid GridType;
-    typedef GridType::TreeType TreeType;
-    typedef TreeType::LeafNodeType LeafNode;
-    typedef openvdb::tools::AttributeSet AttributeSet;
+    using GridType = openvdb::tools::PointDataGrid;
+    using TreeType = GridType::TreeType;
+    using LeafNode = TreeType::LeafNodeType;
+    using AttributeSet = openvdb::tools::AttributeSet;
 
     const TreeType& tree = grid.tree();
 
@@ -1015,7 +995,7 @@ GR_PrimVDBPoints::update(RE_Render *r,
     const openvdb::GridBase* grid =
         const_cast<GT_PrimVDB&>((static_cast<const GT_PrimVDB&>(gt_primVDB))).getGrid();
 
-    typedef openvdb::tools::PointDataGrid PointDataGrid;
+    using PointDataGrid = openvdb::tools::PointDataGrid;
     const PointDataGrid& pointDataGrid = static_cast<const PointDataGrid&>(*grid);
 
     computeCentroid(pointDataGrid);
@@ -1034,10 +1014,10 @@ GR_PrimVDBPoints::updateVec3Buffer( RE_Render* r,
     // Initialize the geometry with the proper name for the GL cache
     if (!myGeo)     return false;
 
-    typedef openvdb::tools::PointDataGrid GridType;
-    typedef GridType::TreeType TreeType;
-    typedef TreeType::LeafNodeType LeafNode;
-    typedef openvdb::tools::AttributeSet AttributeSet;
+    using GridType = openvdb::tools::PointDataGrid;
+    using TreeType = GridType::TreeType;
+    using LeafNode = TreeType::LeafNodeType;
+    using AttributeSet = openvdb::tools::AttributeSet;
 
     const TreeType& tree = grid.tree();
 
@@ -1108,7 +1088,7 @@ GR_PrimVDBPoints::updateVec3Buffer(RE_Render* r, const std::string& name, const 
     const openvdb::GridBase* grid =
         const_cast<GT_PrimVDB&>((static_cast<const GT_PrimVDB&>(gt_primVDB))).getGrid();
 
-    typedef openvdb::tools::PointDataGrid PointDataGrid;
+    using PointDataGrid = openvdb::tools::PointDataGrid;
     const PointDataGrid& pointDataGrid = static_cast<const PointDataGrid&>(*grid);
 
     return updateVec3Buffer(r, pointDataGrid, name, version);
@@ -1123,10 +1103,10 @@ GR_PrimVDBPoints::updateIdBuffer(   RE_Render* r,
     // Initialize the geometry with the proper name for the GL cache
     if (!myGeo)     return false;
 
-    typedef openvdb::tools::PointDataGrid GridType;
-    typedef GridType::TreeType TreeType;
-    typedef TreeType::LeafNodeType LeafNode;
-    typedef openvdb::tools::AttributeSet AttributeSet;
+    using GridType = openvdb::tools::PointDataGrid;
+    using TreeType = GridType::TreeType;
+    using LeafNode = TreeType::LeafNodeType;
+    using AttributeSet = openvdb::tools::AttributeSet;
 
     const TreeType& tree = grid.tree();
 
@@ -1136,7 +1116,7 @@ GR_PrimVDBPoints::updateIdBuffer(   RE_Render* r,
 
     if (numPoints == 0)         return false;
 
-    TreeType::LeafCIter iter = tree.cbeginLeaf();
+    auto iter = tree.cbeginLeaf();
 
     const AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
 
@@ -1160,7 +1140,7 @@ GR_PrimVDBPoints::updateIdBuffer(   RE_Render* r,
     {
         // build cumulative leaf offset array
 
-        typedef std::vector<std::pair<const LeafNode*, openvdb::Index64> > LeafOffsets;
+        using LeafOffsets = std::vector<std::pair<const LeafNode*, openvdb::Index64>>;
 
         LeafOffsets offsets;
 
@@ -1225,7 +1205,7 @@ GR_PrimVDBPoints::updateIdBuffer(RE_Render* r, const std::string& name, const RE
     const openvdb::GridBase* grid =
         const_cast<GT_PrimVDB&>((static_cast<const GT_PrimVDB&>(gt_primVDB))).getGrid();
 
-    typedef openvdb::tools::PointDataGrid PointDataGrid;
+    using PointDataGrid = openvdb::tools::PointDataGrid;
     const PointDataGrid& pointDataGrid = static_cast<const PointDataGrid&>(*grid);
 
     return updateIdBuffer(r, pointDataGrid, name, version);
@@ -1386,7 +1366,7 @@ GR_PrimVDBPoints::renderDecoration(RE_Render* r, GR_Decoration decor, const GR_D
         decor == GR_POINT_POSITION ||
         decor == GR_POINT_VELOCITY)
     {
-        drawDecorationForGeo(r, myGeo, decor, p.opts, p.render_flags,
+        drawDecorationForGeo(r, myGeo.get(), decor, p.opts, p.render_flags,
                  p.overlay, p.override_vis, p.instance_group,
                  GR_SELECT_NONE);
     }

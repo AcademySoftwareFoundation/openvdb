@@ -60,13 +60,13 @@ static const float DEFAULT_PSCALE = 0.05f;
 class VRAY_OpenVDB_Points : public VRAY_Procedural {
 public:
     VRAY_OpenVDB_Points();
-    virtual ~VRAY_OpenVDB_Points();
+    virtual ~VRAY_OpenVDB_Points() = default;
 
-    virtual const char  *className() const;
+    virtual const char  *className() const override;
 
-    virtual int      initialize(const UT_BoundingBox *);
-    virtual void     getBoundingBox(UT_BoundingBox &box);
-    virtual void     render();
+    virtual int      initialize(const UT_BoundingBox *) override;
+    virtual void     getBoundingBox(UT_BoundingBox &box) override;
+    virtual void     render() override;
 
 private:
     UT_BoundingBox                              mBox;
@@ -88,14 +88,13 @@ private:
 template <typename PointDataTreeT>
 struct GenerateBBoxOp {
 
-    typedef typename PointDataTreeT::LeafNodeType                          PointDataLeaf;
-    typedef typename tree::LeafManager<const PointDataTreeT>::LeafRange    LeafRangeT;
+    using PointDataLeaf = typename PointDataTreeT::LeafNodeType;
+    using LeafRangeT    = typename tree::LeafManager<const PointDataTreeT>::LeafRange;
 
     GenerateBBoxOp( const math::Transform& transform,
                     const std::vector<Name>& includeGroups,
                     const std::vector<Name>& excludeGroups)
         : mTransform(transform)
-        , mBbox()
         , mIncludeGroups(includeGroups)
         , mExcludeGroups(excludeGroups) { }
 
@@ -107,7 +106,7 @@ struct GenerateBBoxOp {
 
     void operator()(const LeafRangeT& range) {
 
-        for (typename LeafRangeT::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
+        for (auto leafIter = range.begin(); leafIter; ++leafIter) {
 
             const tools::AttributeSet::Descriptor& descriptor = leafIter->attributeSet().descriptor();
 
@@ -132,8 +131,7 @@ struct GenerateBBoxOp {
     template <typename PscaleType>
     void expandBBox(const PointDataLeaf& leaf, size_t pscaleIndex) {
 
-        tools::AttributeHandle<Vec3f>::Ptr positionHandle =
-            tools::AttributeHandle<Vec3f>::create(leaf.constAttributeArray("P"));
+        auto positionHandle = tools::AttributeHandle<Vec3f>::create(leaf.constAttributeArray("P"));
 
         // expandBBox will not pick up a pscale handle unless the attribute type matches the template type
 
@@ -158,7 +156,7 @@ struct GenerateBBoxOp {
         if (!mIncludeGroups.empty() || !mExcludeGroups.empty()) {
 
             tools::MultiGroupFilter filter(mIncludeGroups, mExcludeGroups);
-            tools::IndexIter<typename PointDataLeaf::ValueOnCIter, tools::MultiGroupFilter> iter = leaf.beginIndexOn(filter);
+            auto iter = leaf.beginIndexOn(filter);
 
             for (; iter; ++iter) {
 
@@ -174,7 +172,7 @@ struct GenerateBBoxOp {
         }
         else {
 
-            typename PointDataLeaf::IndexOnIter iter = leaf.beginIndexOn();
+            auto iter = leaf.beginIndexOn();
 
             for (; iter; ++iter) {
 
@@ -206,11 +204,11 @@ struct GenerateBBoxOp {
 template <typename PointDataTreeT, typename ColorVec3T, typename VelocityVec3T>
 struct PopulateColorFromVelocityOp {
 
-    typedef typename PointDataTreeT::LeafNodeType           LeafNode;
-    typedef typename LeafNode::IndexOnIter                  IndexOnIter;
-    typedef typename tree::LeafManager<PointDataTreeT>      LeafManagerT;
-    typedef typename LeafManagerT::LeafRange                LeafRangeT;
-    typedef tools::MultiGroupFilter                         MultiGroupFilter;
+    using LeafNode          = typename PointDataTreeT::LeafNodeType;
+    using IndexOnIter       = typename LeafNode::IndexOnIter;
+    using LeafManagerT      = typename tree::LeafManager<PointDataTreeT>;
+    using LeafRangeT        = typename LeafManagerT::LeafRange;
+    using MultiGroupFilter  = tools::MultiGroupFilter;
 
     PopulateColorFromVelocityOp(    const size_t colorIndex,
                                     const size_t velocityIndex,
@@ -241,15 +239,13 @@ struct PopulateColorFromVelocityOp {
 
     void operator()(LeafRangeT& range) const{
 
-        for (typename LeafRangeT::Iterator leafIter=range.begin(); leafIter; ++leafIter) {
+        for (auto leafIter = range.begin(); leafIter; ++leafIter) {
 
-            typename PointDataTreeT::LeafNodeType& leaf = *leafIter;
+            auto& leaf = *leafIter;
 
-            typename tools::AttributeWriteHandle<ColorVec3T>::Ptr colorHandle =
-                tools::AttributeWriteHandle<ColorVec3T>::create(leaf.attributeArray(mColorIndex));
+            auto colorHandle = tools::AttributeWriteHandle<ColorVec3T>::create(leaf.attributeArray(mColorIndex));
 
-            typename tools::AttributeWriteHandle<VelocityVec3T>::Ptr velocityHandle =
-                tools::AttributeWriteHandle<VelocityVec3T>::create(leaf.attributeArray(mVelocityIndex));
+            auto velocityHandle = tools::AttributeWriteHandle<VelocityVec3T>::create(leaf.attributeArray(mVelocityIndex));
 
             const bool uniform = velocityHandle->isUniform();
             const ColorVec3T uniformColor = getColorFromRamp(velocityHandle->get(0));
@@ -257,7 +253,7 @@ struct PopulateColorFromVelocityOp {
             if (!mIncludeGroups.empty() || !mExcludeGroups.empty()) {
 
                 MultiGroupFilter filter(mIncludeGroups, mExcludeGroups);
-                tools::IndexIter<typename LeafNode::ValueOnCIter, tools::MultiGroupFilter> iter = leaf.beginIndexOn(filter);
+                auto iter = leaf.beginIndexOn(filter);
 
                 for (; iter; ++iter) {
 
@@ -267,7 +263,7 @@ struct PopulateColorFromVelocityOp {
             }
             else {
 
-                IndexOnIter iter = leaf.beginIndexOn();
+                auto iter = leaf.beginIndexOn();
 
                 for (; iter; ++iter) {
 
@@ -302,16 +298,12 @@ getBoundingBox( const std::vector<typename PointDataGridT::Ptr>& gridPtrs,
                 const std::vector<Name>& includeGroups,
                 const std::vector<Name>& excludeGroups)
 {
-    typedef typename PointDataGridT::TreeType                       PointDataTree;
-    typedef typename PointDataGridT::Ptr                            PointDataGridPtr;
-    typedef typename std::vector<PointDataGridPtr>::const_iterator  PointDataGridPtrVecCIter;
+    using PointDataTree     = typename PointDataGridT::TreeType;
+    using PointDataGridPtr  = typename PointDataGridT::Ptr;
 
     BBoxd worldBounds;
 
-    for (PointDataGridPtrVecCIter   iter = gridPtrs.begin(),
-                                    endIter = gridPtrs.end(); iter != endIter; ++iter) {
-
-        const PointDataGridPtr grid = *iter;
+    for (const auto grid : gridPtrs) {
 
         tree::LeafManager<const PointDataTree> leafManager(grid->tree());
 
@@ -357,10 +349,6 @@ VRAY_OpenVDB_Points::VRAY_OpenVDB_Points()
 {
     openvdb::initialize();
     openvdb::points::initialize();
-}
-
-VRAY_OpenVDB_Points::~VRAY_OpenVDB_Points()
-{
 }
 
 const char *
@@ -417,12 +405,11 @@ VRAY_OpenVDB_Points::initialize(const UT_BoundingBox *)
         io::File file(mFilename.toStdString());
         file.open();
 
-        for (io::File::NameIterator     iter = file.beginName(),
-                                        endIter = file.endName(); iter != endIter; ++iter) {
+        for (auto iter = file.beginName(), endIter = file.endName(); iter != endIter; ++iter) {
 
             GridBase::Ptr baseGrid = file.readGridMetadata(*iter);
             if (baseGrid->isType<tools::PointDataGrid>()) {
-                tools::PointDataGrid::Ptr grid = StaticPtrCast<tools::PointDataGrid>(file.readGrid(*iter));
+                auto grid = StaticPtrCast<tools::PointDataGrid>(file.readGrid(*iter));
                 assert(grid);
                 mGridPtrs.push_back(grid);
             }
@@ -430,7 +417,7 @@ VRAY_OpenVDB_Points::initialize(const UT_BoundingBox *)
 
         file.close();
     }
-    catch (IoError& e)
+    catch (const IoError& e)
     {
         OPENVDB_LOG_ERROR(e.what() << " (" << mFilename << ")");
         return 0;
@@ -458,12 +445,10 @@ VRAY_OpenVDB_Points::getBoundingBox(UT_BoundingBox &box)
 void
 VRAY_OpenVDB_Points::render()
 {
-    typedef tools::PointDataGrid::TreeType                  PointDataTree;
-    typedef tools::PointDataGrid::Ptr                       PointDataGridPtr;
-    typedef std::vector<PointDataGridPtr>::iterator         PointDataGridPtrVecIter;
-    typedef std::vector<PointDataGridPtr>::const_iterator   PointDataGridPtrVecCIter;
-    typedef tools::AttributeSet                             AttributeSet;
-    typedef AttributeSet::Descriptor                        Descriptor;
+    using PointDataTree     = tools::PointDataGrid::TreeType;
+    using PointDataGridPtr  = tools::PointDataGrid::Ptr;
+    using AttributeSet      = tools::AttributeSet;
+    using Descriptor        = AttributeSet::Descriptor;
 
     /// Allocate geometry and extract the GU_Detail
     VRAY_ProceduralGeo  geo = createGeometry();
@@ -482,22 +467,18 @@ VRAY_OpenVDB_Points::render()
     if (includeAttributes.empty() && !excludeAttributes.empty()) {
 
         // add all attributes
-        for (PointDataGridPtrVecCIter   iter = mGridPtrs.begin(),
-                                        endIter = mGridPtrs.end(); iter != endIter; ++iter) {
+        for (const auto grid : mGridPtrs) {
 
-            const tools::PointDataGrid::Ptr grid = *iter;
-
-            tools::PointDataTree::LeafCIter leafIter = grid->tree().cbeginLeaf();
+            auto leafIter = grid->tree().cbeginLeaf();
             if (!leafIter) continue;
 
             const AttributeSet& attributeSet = leafIter->attributeSet();
             const Descriptor& descriptor = attributeSet.descriptor();
             const Descriptor::NameToPosMap& nameToPosMap = descriptor.map();
 
-            for (Descriptor::ConstIterator  nameIter = nameToPosMap.begin(),
-                                            nameIterEnd = nameToPosMap.end(); nameIter != nameIterEnd; ++nameIter) {
+            for (const auto& namePos : nameToPosMap) {
 
-                includeAttributes.push_back(nameIter->first);
+                includeAttributes.push_back(namePos.first);
             }
         }
     }
@@ -510,7 +491,7 @@ VRAY_OpenVDB_Points::render()
 
     // make a vector (validAttributes) of all elements that are in includeAttributes but are NOT in excludeAttributes
     std::vector<Name> validAttributes(includeAttributes.size());
-    std::vector<Name>::iterator pastEndIter = std::set_difference(includeAttributes.begin(), includeAttributes.end(),
+    auto pastEndIter = std::set_difference(includeAttributes.begin(), includeAttributes.end(),
         excludeAttributes.begin(), excludeAttributes.end(), validAttributes.begin());
     validAttributes.resize(pastEndIter - validAttributes.begin());
 
@@ -521,14 +502,11 @@ VRAY_OpenVDB_Points::render()
 
     // map speed to color if requested
     if (mSpeedToColor) {
-        for (PointDataGridPtrVecIter    iter = mGridPtrs.begin(),
-                                        endIter = mGridPtrs.end(); iter != endIter; ++iter) {
-
-            PointDataGridPtr grid = *iter;
+        for (const auto grid : mGridPtrs) {
 
             PointDataTree& tree = grid->tree();
 
-            PointDataTree::LeafIter leafIter = tree.beginLeaf();
+            auto leafIter = tree.beginLeaf();
             if (!leafIter) continue;
 
             size_t velocityIndex = leafIter->attributeSet().find("v");
@@ -582,10 +560,8 @@ VRAY_OpenVDB_Points::render()
         }
     }
 
-    for (PointDataGridPtrVecCIter   iter = mGridPtrs.begin(),
-                                    endIter = mGridPtrs.end(); iter != endIter; ++iter) {
+    for (const auto grid : mGridPtrs) {
 
-        const PointDataGridPtr grid = *iter;
         hvdbp::convertPointDataGridToHoudini(*gdp, *grid, validAttributes, mIncludeGroups, mExcludeGroups);
     }
 

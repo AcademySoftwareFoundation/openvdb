@@ -53,18 +53,18 @@ public:
     static const char* nodeName() { return "openvdb_points"; }
 
     SHOP_OpenVDB_Points(OP_Network *parent, const char *name, OP_Operator *entry);
-    virtual ~SHOP_OpenVDB_Points() {}
+    virtual ~SHOP_OpenVDB_Points() = default;
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
     virtual bool    buildShaderString(UT_String &result, fpreal now,
                     const UT_Options *options,
                     OP_Node *obj=0, OP_Node *sop=0,
-                    SHOP_TYPE interpretType = SHOP_INVALID);
+                    SHOP_TYPE interpretType = SHOP_INVALID) override;
 
 protected:
-    virtual OP_ERROR cookMe(OP_Context&);
-    virtual bool updateParmsFlags();
+    virtual OP_ERROR cookMe(OP_Context&) override;
+    virtual bool updateParmsFlags() override;
 }; // class SHOP_OpenVDB_Points
 
 
@@ -153,7 +153,7 @@ SHOP_OpenVDB_Points::updateParmsFlags()
 void
 newShopOperator(OP_OperatorTable *table)
 {
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
