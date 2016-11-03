@@ -401,7 +401,25 @@ struct TruncateCodec
 };
 
 
-template <bool OneByte>
+// Fixed-point codec range for voxel-space positions [-0.5,0.5]
+struct PositionRange
+{
+    static const char* name() { return "fxpt"; }
+    template <typename ValueType> static ValueType encode(const ValueType& value) { return value + ValueType(0.5); }
+    template <typename ValueType> static ValueType decode(const ValueType& value) { return value - ValueType(0.5); }
+};
+
+
+// Fixed-point codec range for unsigned values in the unit range [0.0,1.0]
+struct UnitRange
+{
+    static const char* name() { return "ufxpt"; }
+    template <typename ValueType> static ValueType encode(const ValueType& value) { return value; }
+    template <typename ValueType> static ValueType decode(const ValueType& value) { return value; }
+};
+
+
+template <bool OneByte, typename Range=PositionRange>
 struct FixedPointCodec
 {
     template <typename T>
@@ -409,7 +427,11 @@ struct FixedPointCodec
 
     template<typename StorageType, typename ValueType> static void decode(const StorageType&, ValueType&);
     template<typename StorageType, typename ValueType> static void encode(const ValueType&, StorageType&);
-    static const char* name() { return OneByte ? "fxpt8" : "fxpt16"; }
+
+    static const char* name() {
+        static const std::string Name = std::string(Range::name()) + (OneByte ? "8" : "16");
+        return Name.c_str();
+    }
 };
 
 
@@ -745,27 +767,27 @@ TruncateCodec::encode(const ValueType& val, StorageType& data)
 }
 
 
-template<bool OneByte>
+template <bool OneByte, typename Range>
 template<typename StorageType, typename ValueType>
 inline void
-FixedPointCodec<OneByte>::decode(const StorageType& data, ValueType& val)
+FixedPointCodec<OneByte, Range>::decode(const StorageType& data, ValueType& val)
 {
     val = fixedPointToFloatingPoint<ValueType>(data);
 
     // shift value range to be -0.5 => 0.5 (as this is most commonly used for position)
 
-    val -= ValueType(0.5);
+    val = Range::template decode<ValueType>(val);
 }
 
 
-template<bool OneByte>
+template <bool OneByte, typename Range>
 template<typename StorageType, typename ValueType>
 inline void
-FixedPointCodec<OneByte>::encode(const ValueType& val, StorageType& data)
+FixedPointCodec<OneByte, Range>::encode(const ValueType& val, StorageType& data)
 {
     // shift value range to be -0.5 => 0.5 (as this is most commonly used for position)
 
-    const ValueType newVal = val + ValueType(0.5);
+    const ValueType newVal = Range::template encode<ValueType>(val);
 
     data = floatingPointToFixedPoint<StorageType>(newVal);
 }

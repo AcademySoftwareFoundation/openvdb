@@ -90,8 +90,11 @@ initialize()
 
     // fixed point compression
 
-    TypedAttributeArray<Vec3<float>, FixedPointCodec<true> >::registerType();
-    TypedAttributeArray<Vec3<float>, FixedPointCodec<false> >::registerType();
+    TypedAttributeArray<float, FixedPointCodec<true, UnitRange> >::registerType();
+    TypedAttributeArray<float, FixedPointCodec<false, UnitRange> >::registerType();
+
+    TypedAttributeArray<Vec3<float>, FixedPointCodec<true, PositionRange> >::registerType();
+    TypedAttributeArray<Vec3<float>, FixedPointCodec<false, PositionRange> >::registerType();
 
     // unit vector compression
 

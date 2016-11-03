@@ -79,7 +79,9 @@ enum COMPRESSION_TYPE
 {
     NONE = 0,
     TRUNCATE,
-    UNIT_VECTOR
+    UNIT_VECTOR,
+    UNIT_FIXED_POINT_8,
+    UNIT_FIXED_POINT_16,
 };
 
 template <typename AttributeType, typename HoudiniOffsetAttribute>
@@ -181,6 +183,14 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
                 convertAttributeFromHoudini<TypedAttributeArray<float,
                                             TruncateCodec>, false>(tree, indexTree, name, attribute, defaults);
             }
+            else if (compression == UNIT_FIXED_POINT_8) {
+                convertAttributeFromHoudini<TypedAttributeArray<float,
+                                            FixedPointCodec<true, UnitRange> >, false>(tree, indexTree, name, attribute, defaults);
+            }
+            else if (compression == UNIT_FIXED_POINT_16) {
+                convertAttributeFromHoudini<TypedAttributeArray<float,
+                                            FixedPointCodec<false, UnitRange> >, false>(tree, indexTree, name, attribute, defaults);
+            }
         }
         else if (storage == GA_STORE_REAL64) {
             convertAttributeFromHoudini<TypedAttributeArray<double>, false>(tree, indexTree, name, attribute, defaults);
@@ -240,6 +250,14 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
     else if (storage == GA_STORE_REAL32 && compression == TRUNCATE) {
         convertAttributeFromHoudini<TypedAttributeArray<float,
                                     TruncateCodec>, true>(tree, indexTree, name, attribute, defaults, width);
+    }
+    else if (storage == GA_STORE_REAL32 && compression == UNIT_FIXED_POINT_8) {
+        convertAttributeFromHoudini<TypedAttributeArray<float,
+                                    FixedPointCodec<true, UnitRange> >, true>(tree, indexTree, name, attribute, defaults, width);
+    }
+    else if (storage == GA_STORE_REAL32 && compression == UNIT_FIXED_POINT_16) {
+        convertAttributeFromHoudini<TypedAttributeArray<float,
+                                    FixedPointCodec<false, UnitRange> >, true>(tree, indexTree, name, attribute, defaults, width);
     }
     else if (storage == GA_STORE_REAL64) {
         convertAttributeFromHoudini<TypedAttributeArray<double>, true>(tree, indexTree, name, attribute, defaults, width);
@@ -654,6 +672,8 @@ newSopOperator(OP_OperatorTable* table)
             "none", "None",
             "truncate", "16-bit Truncate",
             UnitVecCodec::name(), "Unit Vector",
+            FixedPointCodec<true, UnitRange>::name(), "8-bit Unit",
+            FixedPointCodec<false, UnitRange>::name(), "16-bit Unit",
             NULL
         };
 
@@ -924,8 +944,16 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
                                 valueCompression = NONE;
                                 addWarning(SOP_MESSAGE, ss.str().c_str());
                             }
-                            if (valueCompression == UNIT_VECTOR && storage != GA_STORE_REAL32 && width != 3) {
+                            if (valueCompression == UNIT_VECTOR && (storage != GA_STORE_REAL32 || width != 3)) {
                                 std::stringstream ss; ss << "Unit Vector value compression only supported for vector 3 x 32-bit floating-point attributes. "
+                                                            "Disabling compression for attribute \"" << attributeName << "\".";
+                                valueCompression = NONE;
+                                addWarning(SOP_MESSAGE, ss.str().c_str());
+                            }
+
+                            const bool isUnit = valueCompression == UNIT_FIXED_POINT_8 || valueCompression == UNIT_FIXED_POINT_16;
+                            if (isUnit && (storage != GA_STORE_REAL32 || width != 1)) {
+                                std::stringstream ss; ss << "Unit compression only supported for scalar 32-bit floating-point attributes. "
                                                             "Disabling compression for attribute \"" << attributeName << "\".";
                                 valueCompression = NONE;
                                 addWarning(SOP_MESSAGE, ss.str().c_str());

@@ -716,12 +716,12 @@ TestAttributeArray::testAttributeArray()
 
     using FixedPointCodec = openvdb::tools::FixedPointCodec<false>;
 
-    { // Fixed codec range
+    { // Fixed codec (position range)
         openvdb::tools::AttributeArray::Ptr attr1(new AttributeArrayC(50));
 
         AttributeArrayC& fixedPoint = static_cast<AttributeArrayC&>(*attr1);
 
-        // fixed point range is -0.5 => 0.5
+        // position range is -0.5 => 0.5
 
         fixedPoint.set(0, -0.6);
         fixedPoint.set(1, -0.4);
@@ -732,6 +732,48 @@ TestAttributeArray::testAttributeArray()
         CPPUNIT_ASSERT_DOUBLES_EQUAL(double(-0.4), fixedPoint.get(1), /*tolerance=*/double(0.0001));
         CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.4), fixedPoint.get(2), /*tolerance=*/double(0.0001));
         CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.5), fixedPoint.get(3), /*tolerance=*/double(0.0001));
+    }
+
+    using UnitFixedPointCodec8 = openvdb::tools::FixedPointCodec<false, openvdb::tools::UnitRange>;
+    using AttributeArrayUFxpt8 = openvdb::tools::TypedAttributeArray<float, UnitFixedPointCodec8>;
+
+    { // 8-bit fixed codec (unit range)
+        openvdb::tools::AttributeArray::Ptr attr1(new AttributeArrayUFxpt8(50));
+
+        AttributeArrayUFxpt8& fixedPoint = static_cast<AttributeArrayUFxpt8&>(*attr1);
+
+        // unit range is 0.0 => 1.0
+
+        fixedPoint.set(0, -0.2);
+        fixedPoint.set(1, 0.3);
+        fixedPoint.set(2, 0.6);
+        fixedPoint.set(3, 1.1);
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.0), fixedPoint.get(0), /*tolerance=*/double(0.0001));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.3), fixedPoint.get(1), /*tolerance=*/double(0.0001));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.6), fixedPoint.get(2), /*tolerance=*/double(0.0001));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(1.0), fixedPoint.get(3), /*tolerance=*/double(0.0001));
+    }
+
+    using UnitFixedPointCodec16 = openvdb::tools::FixedPointCodec<false, openvdb::tools::UnitRange>;
+    using AttributeArrayUFxpt16 = openvdb::tools::TypedAttributeArray<float, UnitFixedPointCodec16>;
+
+    { // 16-bit fixed codec (unit range)
+        openvdb::tools::AttributeArray::Ptr attr1(new AttributeArrayUFxpt16(50));
+
+        AttributeArrayUFxpt16& fixedPoint = static_cast<AttributeArrayUFxpt16&>(*attr1);
+
+        // unit range is 0.0 => 1.0
+
+        fixedPoint.set(0, -0.2);
+        fixedPoint.set(1, 0.3);
+        fixedPoint.set(2, 0.6);
+        fixedPoint.set(3, 1.1);
+
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.0), fixedPoint.get(0), /*tolerance=*/double(0.0001));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.3), fixedPoint.get(1), /*tolerance=*/double(0.0001));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.6), fixedPoint.get(2), /*tolerance=*/double(0.0001));
+        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(1.0), fixedPoint.get(3), /*tolerance=*/double(0.0001));
     }
 
     using AttributeArrayU = openvdb::tools::TypedAttributeArray<openvdb::Vec3f, openvdb::tools::UnitVecCodec>;
