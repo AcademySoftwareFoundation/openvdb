@@ -225,6 +225,14 @@ gaStorageFromAttrString(const openvdb::Name& type)
     return GA_STORE_INVALID;
 }
 
+inline GA_TypeInfo
+gaTypeInfoFromAttrString(const openvdb::Name& type)
+{
+    if (type == "vec3s" || type == "vec3d")     return GA_TYPE_VECTOR;
+
+    return GA_TYPE_VOID;
+}
+
 } // namespace
 
 
