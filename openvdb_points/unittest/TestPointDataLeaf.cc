@@ -382,7 +382,7 @@ TestPointDataLeaf::testOffsets()
 
             AttributeSet* newSet = new AttributeSet(leafNode->attributeSet(), numAttributes);
             newSet->replace("density", AttributeS::create(numAttributes+1));
-            leafNode->swap(newSet);
+            leafNode->replaceAttributeSet(newSet);
 
             std::vector<LeafType::ValueType> offsets(LeafType::SIZE);
             offsets.back() = numAttributes;
@@ -1119,24 +1119,26 @@ TestPointDataLeaf::testSwap()
     newAttributeSet->appendAttribute("density", AttributeF::attributeType());
     newAttributeSet->appendAttribute("id", AttributeI::attributeType());
 
-    leaf.swap(newAttributeSet);
+    leaf.replaceAttributeSet(newAttributeSet);
 
     CPPUNIT_ASSERT_EQUAL(newArrayLength, leaf.attributeSet().get("density")->size());
     CPPUNIT_ASSERT_EQUAL(newArrayLength, leaf.attributeSet().get("id")->size());
 
     // ensure we refuse to swap when the attribute set is null
 
-    CPPUNIT_ASSERT_THROW(leaf.swap(0), openvdb::ValueError);
+    CPPUNIT_ASSERT_THROW(leaf.replaceAttributeSet(nullptr), openvdb::ValueError);
 
-    // ensure we refuse to swap when the descriptors do not match
+    // ensure we refuse to swap when the descriptors do not match, unless we explicitly allow a mismatch.
 
     Descriptor::Ptr descrB = Descriptor::create(AttributeVec3s::attributeType());
     AttributeSet* attributeSet = new AttributeSet(descrB, newArrayLength);
 
     attributeSet->appendAttribute("extra", AttributeF::attributeType());
 
-    CPPUNIT_ASSERT_THROW(leaf.swap(attributeSet), openvdb::ValueError);
-    delete attributeSet;
+    CPPUNIT_ASSERT_THROW(leaf.replaceAttributeSet(attributeSet), openvdb::ValueError);
+
+    leaf.replaceAttributeSet(attributeSet, true);
+    CPPUNIT_ASSERT_EQUAL(const_cast<AttributeSet*>(&leaf.attributeSet()), attributeSet);
 }
 
 void

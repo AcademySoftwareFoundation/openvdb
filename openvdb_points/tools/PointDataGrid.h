@@ -346,10 +346,13 @@ public:
     /// @brief Compact all attributes in attribute set.
     void compactAttributes();
 
-    /// @brief Swap the underlying attribute set with the given @a attributeSet.
+    /// @brief Replace the underlying attribute set with the given @a attributeSet.
     /// This leaf will assume ownership of the given attribute set. The descriptors must
     /// match and the voxel offsets values will need updating if the point order is different.
-    void swap(AttributeSet* attributeSet);
+    /// @param allowMismatchingDescriptors Whether or not the old and new descriptors must match
+    /// for the replacement to be allowed. If @c false and the descriptors do not match then
+    /// @c ValueError is thrown.
+    void replaceAttributeSet(AttributeSet* attributeSet, bool allowMismatchingDescriptors = false);
 
     /// @brief Replace the descriptor with a new one
     /// The new Descriptor must exactly match the old one
@@ -780,13 +783,13 @@ PointDataLeafNode<T, Log2Dim>::compactAttributes()
 
 template<typename T, Index Log2Dim>
 inline void
-PointDataLeafNode<T, Log2Dim>::swap(AttributeSet* attributeSet)
+PointDataLeafNode<T, Log2Dim>::replaceAttributeSet(AttributeSet* attributeSet, bool allowMismatchingDescriptors)
 {
     if (!attributeSet) {
-        OPENVDB_THROW(ValueError, "Cannot swap with a null attribute set");
+        OPENVDB_THROW(ValueError, "Cannot replace with a null attribute set");
     }
 
-    if (mAttributeSet->descriptor() != attributeSet->descriptor()) {
+    if (!allowMismatchingDescriptors && mAttributeSet->descriptor() != attributeSet->descriptor()) {
         OPENVDB_THROW(ValueError, "Attribute set descriptors are not equal.");
     }
 
