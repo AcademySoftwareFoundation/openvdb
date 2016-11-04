@@ -1118,6 +1118,13 @@ protected:
     void setValueMaskOn(Index n)  { mValueMask.setOn(n); }
     void setValueMaskOff(Index n) { mValueMask.setOff(n); }
 
+    // Performs the voxel buffer write only (not the value mask write)
+    inline void doWriteBuffers(std::ostream& os, bool toHalf) const;
+
+    // Performs the voxel buffer read. Only reads the value mask if maskpos != -1.
+    inline void doReadBuffers(  std::istream&, std::streamoff maskpos,
+                                const CoordBBox& clipBBox, bool fromHalf);
+
     inline void skipCompressedValues(bool seekable, std::istream&, bool fromHalf);
 
     /// Compute the origin of the leaf node that contains the voxel with the given coordinates.
@@ -1581,8 +1588,10 @@ LeafNode<T, Log2Dim>::Buffer::doLoad() const
     io::setStreamMetadataPtr(is, info->meta, /*transfer=*/true);
 
     NodeMaskType mask;
-    is.seekg(info->maskpos);
-    mask.load(is);
+    if (info->maskpos != -1) {
+        is.seekg(info->maskpos);
+        mask.load(is);
+    }
 
     is.seekg(info->bufpos);
     io::readCompressedValues(is, self->mData, SIZE, mask, io::getHalfFloat(is));
@@ -1621,32 +1630,14 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, bool fromHalf)
 
 template<typename T, Index Log2Dim>
 inline void
-LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bool fromHalf)
+LeafNode<T,Log2Dim>::doReadBuffers(std::istream& is, std::streamoff maskpos, const CoordBBox& clipBBox, bool fromHalf)
 {
     SharedPtr<io::StreamMetadata> meta = io::getStreamMetadataPtr(is);
     const bool seekable = meta && meta->seekable();
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-    std::streamoff maskpos = is.tellg();
+#ifdef OPENVDB_2_ABI_COMPATIBLE
+    (void) maskpos; // no-op to prevent unused variable warning
 #endif
-
-    if (seekable) {
-        // Seek over the value mask.
-        mValueMask.seek(is);
-    }
-    else {
-        // Read in the value mask.
-        mValueMask.load(is);
-    }
-
-    int8_t numBuffers = 1;
-    if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
-        // Read in the origin.
-        is.read(reinterpret_cast<char*>(&mOrigin), sizeof(Coord::ValueType) * 3);
-
-        // Read in the number of buffers, which should now always be one.
-        is.read(reinterpret_cast<char*>(&numBuffers), sizeof(int8_t));
-    }
 
     CoordBBox nodeBBox = this->getNodeBoundingBox();
     if (!clipBBox.hasOverlap(nodeBBox)) {
@@ -1690,6 +1681,37 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
         }
 #endif
     }
+}
+
+
+template<typename T, Index Log2Dim>
+inline void
+LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bool fromHalf)
+{
+    SharedPtr<io::StreamMetadata> meta = io::getStreamMetadataPtr(is);
+    const bool seekable = meta && meta->seekable();
+
+    std::streamoff maskpos = is.tellg();
+
+    if (seekable) {
+        // Seek over the value mask.
+        mValueMask.seek(is);
+    }
+    else {
+        // Read in the value mask.
+        mValueMask.load(is);
+    }
+
+    int8_t numBuffers = 1;
+    if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
+        // Read in the origin.
+        is.read(reinterpret_cast<char*>(&mOrigin), sizeof(Coord::ValueType) * 3);
+
+        // Read in the number of buffers, which should now always be one.
+        is.read(reinterpret_cast<char*>(&numBuffers), sizeof(int8_t));
+    }
+
+    this->doReadBuffers(is, maskpos, clipBBox, fromHalf);
 
     if (numBuffers > 1) {
         // Read in and discard auxiliary buffers that were created with earlier
@@ -1709,15 +1731,24 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
 
 template<typename T, Index Log2Dim>
 inline void
+LeafNode<T, Log2Dim>::doWriteBuffers(std::ostream& os, bool toHalf) const
+{
+    mBuffer.loadValues();
+
+    io::writeCompressedValues(os, mBuffer.mData, SIZE,
+        mValueMask, /*childMask=*/NodeMaskType(), toHalf);
+}
+
+
+template<typename T, Index Log2Dim>
+inline void
 LeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
 {
     // Write out the value mask.
     mValueMask.save(os);
 
-    mBuffer.loadValues();
-
-    io::writeCompressedValues(os, mBuffer.mData, SIZE,
-        mValueMask, /*childMask=*/NodeMaskType(), toHalf);
+    // Write out the buffer data.
+    this->doWriteBuffers(os, toHalf);
 }
 
 
