@@ -268,11 +268,9 @@ struct InitialiseAttributesOp {
     using PointIndexLeafNode    = typename PointIndexTreeType::LeafNodeType;
     using IndexArray            = typename PointIndexLeafNode::IndexArray;
 
-    InitialiseAttributesOp( PointDataTreeType& tree,
-                            const PointIndexTreeType& pointIndexTree,
+    InitialiseAttributesOp( const PointIndexTreeType& pointIndexTree,
                             const AttributeSet::Descriptor::Ptr& attributeDescriptor)
-        : mTree(tree)
-        , mPointIndexTree(pointIndexTree)
+        : mPointIndexTree(pointIndexTree)
         , mAttributeDescriptor(attributeDescriptor) { }
 
     void operator()(const typename LeafManagerT::LeafRange& range) const {
@@ -296,7 +294,6 @@ struct InitialiseAttributesOp {
 
     //////////
 
-    const PointDataTreeType&                mTree;
     const PointIndexTreeType&               mPointIndexTree;
     const AttributeSet::Descriptor::Ptr&    mAttributeDescriptor;
 };
@@ -766,7 +763,7 @@ createPointDataGrid(const PointIndexGridT& pointIndexGrid, const PositionArrayT&
     // create point attribute storage on each leaf
 
     InitialiseAttributesOp<PointDataTreeT, PointIndexTreeT> initialise(
-                                *treePtr, pointIndexGrid.tree(), descriptor);
+                                pointIndexGrid.tree(), descriptor);
     tbb::parallel_for(leafRange, initialise);
 
     // populate position attribute

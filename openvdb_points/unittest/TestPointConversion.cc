@@ -270,17 +270,17 @@ TestPointConversion::testPointConversion()
 
     // add id and populate
 
-    appendAttribute<AttributeI>(tree, "id");
+    appendAttribute<int>(tree, "id");
     populateAttribute<PointDataTree, PointIndexTree, AttributeWrapper<int>, false>(tree, indexTree, "id", id);
 
     // add uniform and populate
 
-    appendAttribute<AttributeF>(tree, "uniform");
+    appendAttribute<float>(tree, "uniform");
     populateAttribute<PointDataTree, PointIndexTree, AttributeWrapper<float>, false>(tree, indexTree, "uniform", uniform);
 
     // add string and populate
 
-    appendAttribute<StringAttributeArray>(tree, "string");
+    appendAttribute<Name>(tree, "string");
 
     // extract the metadata and reset the descriptors
     PointDataTree::LeafIter leafIter = tree.beginLeaf();
@@ -477,12 +477,12 @@ TestPointConversion::testStride()
 
     // add id and populate
 
-    appendAttribute<AttributeI>(tree, "id");
+    appendAttribute<int>(tree, "id");
     populateAttribute<PointDataTree, PointIndexTree, AttributeWrapper<int>, false>(tree, indexTree, "id", id);
 
     // add xyz and populate
 
-    appendAttribute<AttributeI>(tree, "xyz", /*stride=*/3);
+    appendAttribute<int>(tree, "xyz", 0, /*stride=*/3);
     populateAttribute<PointDataTree, PointIndexTree, AttributeWrapper<int>, true>(tree, indexTree, "xyz", xyz, /*stride=*/3);
 
     // create accessor and iterator for Point Data Tree

@@ -203,9 +203,11 @@ using PointDataGrid = Grid<PointDataTree>;
 ///
 /// @param  tree the PointDataTree.
 ///
+/// @return the new descriptor.
+///
 /// @note This method will fail if the Descriptors in the tree are not all identical.
 template <typename PointDataTreeT>
-inline void
+inline AttributeSet::Descriptor::Ptr
 makeDescriptorUnique(PointDataTreeT& tree);
 
 
@@ -624,7 +626,7 @@ public:
 
     using IndexVoxelIter    = IndexIter<ValueVoxelCIter, NullFilter>;
     using IndexAllIter      = IndexIter<ValueAllCIter, NullFilter>;
-    using IndexOnIter       =  IndexIter<ValueOnCIter, NullFilter>;
+    using IndexOnIter       = IndexIter<ValueOnCIter, NullFilter>;
     using IndexOffIter      = IndexIter<ValueOffCIter, NullFilter>;
 
     /// @brief Leaf index iterator
@@ -1133,17 +1135,19 @@ PointDataLeafNode<T, Log2Dim>::memUsage() const
 
 
 template <typename PointDataTreeT>
-inline void
+inline AttributeSet::Descriptor::Ptr
 makeDescriptorUnique(PointDataTreeT& tree)
 {
     auto leafIter = tree.beginLeaf();
-    if (!leafIter)  return;
+    if (!leafIter)  return nullptr;
 
     const AttributeSet::Descriptor& descriptor = leafIter->attributeSet().descriptor();
     auto newDescriptor = std::make_shared<AttributeSet::Descriptor>(descriptor);
     for (; leafIter; ++leafIter) {
         leafIter->resetDescriptor(newDescriptor);
     }
+
+    return newDescriptor;
 }
 
 

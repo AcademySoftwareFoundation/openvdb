@@ -1262,7 +1262,8 @@ TestPointDataLeaf::testCopyDescriptor()
 
     // call makeDescriptorUnique and ensure that descriptors are no longer shared
 
-    makeDescriptorUnique(tree2);
+    Descriptor::Ptr newDescriptor = makeDescriptorUnique(tree2);
+    CPPUNIT_ASSERT(newDescriptor);
 
     descrA->setGroup("test2", size_t(2));
 

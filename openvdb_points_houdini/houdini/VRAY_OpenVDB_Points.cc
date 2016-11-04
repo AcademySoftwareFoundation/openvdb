@@ -549,7 +549,7 @@ VRAY_OpenVDB_Points::render()
 
                 // create new Cd attribute of supported type if one did not previously exist
                 if (colorIndex == AttributeSet::INVALID_POS) {
-                    openvdb::tools::appendAttribute<openvdb::tools::TypedAttributeArray<Vec3H> >(tree, "Cd");
+                    openvdb::tools::appendAttribute<Vec3H>(tree, "Cd");
                     colorIndex = leafIter->attributeSet().find("Cd");
                 }
 

@@ -157,11 +157,9 @@ struct CopyGroupOp {
     using LeafRangeT    = typename LeafManagerT::LeafRange;
     using GroupIndex    = AttributeSet::Descriptor::GroupIndex;
 
-    CopyGroupOp(PointDataTreeType& tree,
-                const GroupIndex& targetIndex,
+    CopyGroupOp(const GroupIndex& targetIndex,
                 const GroupIndex& sourceIndex)
-        : mTree(tree)
-        , mTargetIndex(targetIndex)
+        : mTargetIndex(targetIndex)
         , mSourceIndex(sourceIndex) { }
 
     void operator()(const typename LeafManagerT::LeafRange& range) const {
@@ -180,7 +178,6 @@ struct CopyGroupOp {
 
     //////////
 
-    PointDataTreeType&      mTree;
     const GroupIndex        mTargetIndex;
     const GroupIndex        mSourceIndex;
 };
@@ -485,7 +482,7 @@ inline void appendGroup(PointDataTree& tree, const Name& group)
 
         // insert new group attribute
 
-        AppendAttributeOp<PointDataTree> append(tree, descriptor, pos);
+        AppendAttributeOp<PointDataTree> append(descriptor, pos);
         tbb::parallel_for(typename tree::template LeafManager<PointDataTree>(tree).leafRange(), append);
     }
     else {
@@ -649,7 +646,7 @@ inline void compactGroups(PointDataTree& tree)
         const GroupIndex sourceIndex = attributeSet.groupIndex(sourceOffset);
         const GroupIndex targetIndex = attributeSet.groupIndex(targetOffset);
 
-        CopyGroupOp<PointDataTree> copy(tree, targetIndex, sourceIndex);
+        CopyGroupOp<PointDataTree> copy(targetIndex, sourceIndex);
         tbb::parallel_for(typename tree::template LeafManager<PointDataTree>(tree).leafRange(), copy);
 
         descriptor->setGroup(sourceName, targetOffset);
