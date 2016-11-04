@@ -227,12 +227,8 @@ public:
 
     size_t size() const { return mData.size(); }
     void getPos(size_t n, ValueType& xyz) const { xyz = mData[n]; }
-
-    template <typename T>
-    void get(T& value, size_t n) const { value = mData[n]; }
-
-    template <typename T>
-    void get(T& value, size_t n, openvdb::Index m) const { value = mData[n * mStride + m]; }
+    void get(ValueType& value, size_t n) const { value = mData[n]; }
+    void get(ValueType& value, size_t n, openvdb::Index m) const { value = mData[n * mStride + m]; }
 
 private:
     const std::vector<value_type>& mData;

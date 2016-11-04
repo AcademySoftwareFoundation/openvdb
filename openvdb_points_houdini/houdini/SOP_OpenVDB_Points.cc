@@ -123,31 +123,33 @@ void
 convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree,
                             const openvdb::Name& name, const GA_Attribute* const attribute, const int compression = 0)
 {
+    using HoudiniStringAttribute = hvdbp::HoudiniReadAttribute<openvdb::Name>;
+
     if (!attribute) {
         std::stringstream ss; ss << "Invalid attribute - " << attribute->getName();
         throw std::runtime_error(ss.str());
     }
 
-    using HoudiniStringAttribute = hvdbp::HoudiniReadAttribute<openvdb::Name>;
+    GA_Storage storage(GA_STORE_INVALID);
+    int16_t width(1);
+    attributeType(attribute, storage, width);
+
+    if (storage == GA_STORE_INVALID) {
+        std::stringstream ss; ss << "Invalid attribute type - " << attribute->getName();
+        throw std::runtime_error(ss.str());
+    }
 
     // explicitly handle string attributes
 
-    if (attribute->getAIFStringTuple()) {
+    if (storage == GA_STORE_STRING) {
         appendAttribute<Name>(tree, name);
         HoudiniStringAttribute houdiniAttribute(*attribute);
         populateAttribute<PointDataTree, PointIndexTree, HoudiniStringAttribute>(tree, indexTree, name, houdiniAttribute);
         return;
     }
 
-    const GA_AIFTuple* tupleAIF = attribute->getAIFTuple();
-    if (!tupleAIF) {
-        std::stringstream ss; ss << "Invalid attribute type - " << attribute->getName();
-        throw std::runtime_error(ss.str());
-    }
-
-    GA_Defaults defaults = tupleAIF->getDefaults(attribute);
-    GA_Storage storage = tupleAIF->getStorage(attribute);
-    const int16_t width = static_cast<int16_t>(tupleAIF->getTupleSize(attribute));
+    const GA_AIFTuple* const tupleAIF = attribute->getAIFTuple();
+    const GA_Defaults defaults = tupleAIF->getDefaults(attribute);
 
     if (width == 1)
     {
@@ -387,8 +389,7 @@ createPointDataGrid(const GU_Detail& ptGeo, const int compression,
 
     for (const auto& attrInfo : attributes)
     {
-        const openvdb::Name name = attrInfo.first;
-        const int compression = attrInfo.second.first;
+        const openvdb::Name& name = attrInfo.first;
 
         // skip position as this has already been added
 
@@ -417,6 +418,8 @@ createPointDataGrid(const GU_Detail& ptGeo, const int compression,
                 if (!str.empty())   inserter.insert(str);
             }
         }
+
+        const int compression = attrInfo.second.first;
 
         convertAttributeFromHoudini(tree, indexTree, name, gaAttribute, compression);
     }
@@ -932,7 +935,7 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
                     evalStringInst("attribute#", &i, attrName, 0, 0);
                     Name attributeName = Name(attrName);
 
-                    GA_ROAttributeRef attrRef = detail->findPointAttribute(attributeName.c_str());
+                    const GA_ROAttributeRef attrRef = detail->findPointAttribute(attributeName.c_str());
 
                     if (!attrRef.isValid()) continue;
 

@@ -81,75 +81,80 @@ namespace {
 
 /// @brief Houdini GA Handle Traits
 ///
-template <typename T> struct GAHandleTraits { typedef GA_RWHandleF RW; };
-template <typename T> struct GAHandleTraits<openvdb::math::Vec3<T> > { typedef GA_RWHandleV3 RW; };
-template <> struct GAHandleTraits<bool> { typedef GA_RWHandleI RW; };
-template <> struct GAHandleTraits<int16_t> { typedef GA_RWHandleI RW; };
-template <> struct GAHandleTraits<int32_t> { typedef GA_RWHandleI RW; };
-template <> struct GAHandleTraits<int64_t> { typedef GA_RWHandleI RW; };
-template <> struct GAHandleTraits<half> { typedef GA_RWHandleF RW; };
-template <> struct GAHandleTraits<float> { typedef GA_RWHandleF RW; };
-template <> struct GAHandleTraits<double> { typedef GA_RWHandleF RW; };
-template <> struct GAHandleTraits<openvdb::Name> { typedef GA_RWHandleS RW; };
+template <typename T> struct GAHandleTraits                     { typedef GA_RWHandleF RW;   typedef GA_ROHandleF RO;  };
+template <> struct GAHandleTraits<openvdb::math::Vec3<int> >    { typedef GA_RWHandleV3 RW;  typedef GA_ROHandleV3 RO; };
+template <> struct GAHandleTraits<openvdb::math::Vec3<float> >  { typedef GA_RWHandleV3 RW;  typedef GA_ROHandleV3 RO; };
+template <> struct GAHandleTraits<openvdb::math::Vec3<double> > { typedef GA_RWHandleV3D RW; typedef GA_ROHandleV3D RO; };
+template <> struct GAHandleTraits<bool>          { typedef GA_RWHandleI RW; typedef GA_ROHandleI RO; };
+template <> struct GAHandleTraits<int16_t>       { typedef GA_RWHandleI RW; typedef GA_ROHandleI RO; };
+template <> struct GAHandleTraits<int32_t>       { typedef GA_RWHandleI RW; typedef GA_ROHandleI RO; };
+template <> struct GAHandleTraits<int64_t>       { typedef GA_RWHandleI RW; typedef GA_ROHandleI RO; };
+template <> struct GAHandleTraits<half>          { typedef GA_RWHandleF RW; typedef GA_ROHandleF RO; };
+template <> struct GAHandleTraits<float>         { typedef GA_RWHandleF RW; typedef GA_ROHandleF RO; };
+template <> struct GAHandleTraits<double>        { typedef GA_RWHandleF RW; typedef GA_ROHandleF RO; };
+template <> struct GAHandleTraits<openvdb::Name> { typedef GA_RWHandleS RW; typedef GA_ROHandleS RO; };
 
 
 ////////////////////////////////////////
 
 
-template <typename T, typename T0>
-inline T readAttributeValue(const GA_Attribute& attribute, GA_Offset n, openvdb::Index offset)
-{
-    T0 tmp;
-    const GA_AIFTuple* aifTuple = attribute.getAIFTuple();
-    const GA_AIFNumericArray* aifArray = attribute.getAIFNumericArray();
-    if (aifTuple)       aifTuple->get(&attribute, n, tmp, offset);
-    else if (aifArray) {
-        UT_Array<T0> data;
-        aifArray->get(&attribute, n, data);
-        tmp = data(offset);
-    }
-    else                throw std::runtime_error("Unrecognised readAttribute AIF");
-    return static_cast<T>(tmp);
-}
-
-template <typename T>
-inline T readAttributeValue(const GA_Attribute& attribute, GA_Offset n, openvdb::Index offset) {
-    return readAttributeValue<T, T>(attribute, n, offset);
+template <typename HandleType, typename ValueType>
+inline ValueType
+readAttributeValue(const HandleType& handle, const GA_Offset offset, const openvdb::Index component = 0) {
+    return ValueType(handle.get(offset, component));
 }
 template <>
-inline bool readAttributeValue(const GA_Attribute& attribute, GA_Offset n, openvdb::Index offset) {
-    return readAttributeValue<bool, int>(attribute, n, offset);
+inline openvdb::math::Vec3<float>
+readAttributeValue(const GA_ROHandleV3& handle, const GA_Offset offset, const openvdb::Index component) {
+    openvdb::math::Vec3<float> dstValue;
+    const UT_Vector3F value(handle.get(offset, component));
+    dstValue[0] = value[0]; dstValue[1] = value[1]; dstValue[2] = value[2];
+    return dstValue;
 }
 template <>
-inline short readAttributeValue(const GA_Attribute& attribute, GA_Offset n, openvdb::Index offset) {
-    return readAttributeValue<short, int>(attribute, n, offset);
+inline openvdb::math::Vec3<int>
+readAttributeValue(const GA_ROHandleV3& handle, const GA_Offset offset, const openvdb::Index component) {
+    openvdb::math::Vec3<int> dstValue;
+    const UT_Vector3 value(handle.get(offset, component));
+    dstValue[0] = value[0]; dstValue[1] = value[1]; dstValue[2] = value[2];
+    return dstValue;
 }
 template <>
-inline long readAttributeValue(const GA_Attribute& attribute, GA_Offset n, openvdb::Index offset) {
-    return readAttributeValue<long, int>(attribute, n, offset);
+inline openvdb::math::Vec3<double>
+readAttributeValue(const GA_ROHandleV3D& handle, const GA_Offset offset, const openvdb::Index component) {
+    openvdb::math::Vec3<double> dstValue;
+    const UT_Vector3D value(handle.get(offset, component));
+    dstValue[0] = value[0]; dstValue[1] = value[1]; dstValue[2] = value[2];
+    return dstValue;
 }
 template <>
-inline half readAttributeValue(const GA_Attribute& attribute, GA_Offset n, openvdb::Index offset) {
-    return readAttributeValue<half, float>(attribute, n, offset);
-}
-template <>
-inline openvdb::Name readAttributeValue(const GA_Attribute& attribute, GA_Offset n, openvdb::Index offset) {
-    return openvdb::Name(attribute.getAIFStringTuple()->getString(&attribute, n, offset));
+inline openvdb::Name
+readAttributeValue(const GA_ROHandleS& handle, const GA_Offset offset, const openvdb::Index component) {
+    return openvdb::Name(UT_String(handle.get(offset, component)).toStdString());
 }
 
 
 template <typename HandleType, typename ValueType>
-inline void writeAttributeValue(const HandleType& handle, GA_Offset n, const openvdb::Index offset, const ValueType& value) {
-    handle.set(n, offset, value);
+inline void writeAttributeValue(const HandleType& handle, const GA_Offset offset, const openvdb::Index component, const ValueType& value) {
+    handle.set(offset, component, value);
 }
-template <typename HandleType, typename ValueType>
-inline void writeAttributeValue(const HandleType& handle, GA_Offset n, const openvdb::Index offset, const openvdb::math::Vec3<ValueType>& value) {
-    handle.set(n, offset, UT_Vector3(value.x(), value.y(), value.z()));
+template <>
+void writeAttributeValue(const GA_RWHandleV3& handle, const GA_Offset offset, const openvdb::Index component, const openvdb::math::Vec3<int>& value) {
+    handle.set(offset, component, UT_Vector3F(value.x(), value.y(), value.z()));
 }
-template <typename HandleType>
-inline void writeAttributeValue(const HandleType& handle, GA_Offset n, const openvdb::Index offset, const openvdb::Name& value) {
-    handle.set(n, offset, value.c_str());
+template <>
+void writeAttributeValue(const GA_RWHandleV3& handle, const GA_Offset offset, const openvdb::Index component, const openvdb::math::Vec3<float>& value) {
+    handle.set(offset, component, UT_Vector3(value.x(), value.y(), value.z()));
 }
+template <>
+void writeAttributeValue(const GA_RWHandleV3D& handle, const GA_Offset offset, const openvdb::Index component, const openvdb::math::Vec3<double>& value) {
+    handle.set(offset, component, UT_Vector3D(value.x(), value.y(), value.z()));
+}
+template <>
+inline void writeAttributeValue(const GA_RWHandleS& handle, const GA_Offset offset, const openvdb::Index component, const openvdb::Name& value) {
+    handle.set(offset, component, value.c_str());
+}
+
 
 template<typename ValueType, typename HoudiniType>
 typename std::enable_if<openvdb::VecTraits<ValueType>::IsVec, void>::type
@@ -240,7 +245,7 @@ struct HoudiniWriteAttribute
 
         template <typename ValueType>
         void set(openvdb::Index offset, openvdb::Index stride, const ValueType& value) {
-            writeAttributeValue(mHandle, GA_Offset(offset), stride, value);
+            writeAttributeValue(mHandle, GA_Offset(offset), stride, T(value));
         }
 
     private:
@@ -271,33 +276,29 @@ private:
 template <typename T>
 struct HoudiniReadAttribute
 {
-    using value_type = T;
-    using PosType = T;
+    typedef T value_type;
+    typedef T PosType;
+    typedef typename GAHandleTraits<T>::RO ReadHandleType;
 
-    explicit HoudiniReadAttribute(const GA_Attribute& attribute, OffsetListPtr offsets = nullptr)
-        : mAttribute(attribute)
+    explicit HoudiniReadAttribute(const GA_Attribute& attribute, OffsetListPtr offsets = OffsetListPtr())
+        : mHandle(&attribute)
+        , mAttribute(attribute)
         , mOffsets(offsets) { }
 
-    // Return the value of the nth point in the array (scalar type only)
-    template <typename ValueType> typename std::enable_if<!openvdb::VecTraits<ValueType>::IsVec, void>::type
-    get(ValueType& value, size_t n, openvdb::Index offset = 0) const
+    static void get(const GA_Attribute& attribute, T& value, const size_t offset, const openvdb::Index component)
     {
-        value = readAttributeValue<ValueType>(mAttribute, getOffset(n), offset);
+        const ReadHandleType handle(&attribute);
+        value = readAttributeValue<ReadHandleType, T>(handle, offset, component);
     }
 
-    // Return the value of the nth point in the array (vector type only)
-    // note offset parameter is ignored for vector types
-    template <typename ValueType> typename std::enable_if<openvdb::VecTraits<ValueType>::IsVec, void>::type
-    get(ValueType& value, size_t n, openvdb::Index offset = 0) const
+    // Return the value of the nth point in the array (scalar type only)
+    void get(T& value, const size_t n, const openvdb::Index component = 0) const
     {
-        using ElementType = typename openvdb::VecTraits<ValueType>::ElementType;
-        for (unsigned i = 0; i < openvdb::VecTraits<ValueType>::Size; ++i) {
-            value[i] = readAttributeValue<ElementType>(mAttribute, getOffset(n), i);
-        }
+        value = readAttributeValue<ReadHandleType, T>(mHandle, getOffset(n), component);
     }
 
     // Only provided to match the required interface for the PointPartitioner
-    void getPos(size_t n, T& xyz) const { return this->get<T>(xyz, n); }
+    void getPos(size_t n, T& xyz) const { return this->get(xyz, n); }
 
     size_t size() const { return mOffsets ? mOffsets->size() : mAttribute.getIndexMap().indexSize(); }
 
@@ -306,8 +307,9 @@ private:
         return mOffsets ? (*mOffsets)[n] : mAttribute.getIndexMap().offsetFromIndex(GA_Index(n));
     }
 
-    const GA_Attribute& mAttribute;
-    OffsetListPtr mOffsets;
+    const ReadHandleType   mHandle;
+    const GA_Attribute&    mAttribute;
+    OffsetListPtr          mOffsets;
 }; // HoudiniReadAttribute
 
 
@@ -319,38 +321,31 @@ struct HoudiniOffsetAttribute
 {
     using value_type = T;
     using PosType = T;
+    typedef typename GAHandleTraits<T>::RO ReadHandleType;
 
     HoudiniOffsetAttribute(const GA_Attribute& attribute, OffsetPairListPtr offsetPairs, openvdb::Index stride)
         : mAttribute(attribute)
+        , mHandle(&attribute)
         , mOffsetPairs(offsetPairs)
         , mStride(stride) { }
 
-    template <typename ValueType> typename std::enable_if<!openvdb::VecTraits<ValueType>::IsVec, void>::type
-    get(ValueType& value, size_t n, openvdb::Index offset = 0) const { }
-
-    template <typename ValueType> typename std::enable_if<openvdb::VecTraits<ValueType>::IsVec, void>::type
-    get(ValueType& value, size_t n, openvdb::Index offset = 0) const
+    template <typename ValueType>
+    void get(ValueType& value, size_t n, openvdb::Index offset = 0) const
     {
-        using ElementType = typename openvdb::VecTraits<ValueType>::ElementType;
-
         const OffsetPair& pair = (*mOffsetPairs)[n * mStride + offset];
 
         GA_Offset offset1(pair.first);
         GA_Offset offset2(pair.second);
 
-        value[0] = readAttributeValue<ElementType>(mAttribute, offset2, 0);
-        value[1] = readAttributeValue<ElementType>(mAttribute, offset2, 1);
-        value[2] = readAttributeValue<ElementType>(mAttribute, offset2, 2);
-
-        value[0] -= readAttributeValue<ElementType>(mAttribute, offset1, 0);
-        value[1] -= readAttributeValue<ElementType>(mAttribute, offset1, 1);
-        value[2] -= readAttributeValue<ElementType>(mAttribute, offset1, 2);
+        value = readAttributeValue<ReadHandleType, ValueType>(mHandle, offset2);
+        value -= readAttributeValue<ReadHandleType, ValueType>(mHandle, offset1);
     }
 
     size_t size() const { return mOffsetPairs->size(); }
     openvdb::Index stride() const { return mStride; }
 
 private:
+    const ReadHandleType mHandle;
     const GA_Attribute& mAttribute;
     OffsetPairListPtr mOffsetPairs;
     openvdb::Index mStride;
@@ -389,10 +384,6 @@ convertPointDataGridToHoudini(GU_Detail& detail,
 {
     using openvdb_points_houdini::HoudiniWriteAttribute;
 
-    // sort for binary search
-    std::vector<std::string> sortedAttributes(attributes);
-    std::sort(sortedAttributes.begin(), sortedAttributes.end());
-
     const openvdb::tools::PointDataTree& tree = grid.tree();
 
     auto leafIter = tree.cbeginLeaf();
@@ -404,16 +395,19 @@ convertPointDataGridToHoudini(GU_Detail& detail,
     const bool hasPosition = descriptor.find("P") != openvdb::tools::AttributeSet::INVALID_POS;
     if (!hasPosition)   return;
 
+    // sort for binary search
+    std::vector<std::string> sortedAttributes(attributes);
+    std::sort(sortedAttributes.begin(), sortedAttributes.end());
+
     // obtain cumulative point offsets and total points
     std::vector<openvdb::Index64> pointOffsets;
-    openvdb::Index64 total = getPointOffsets(pointOffsets, tree, includeGroups, excludeGroups);
+    const openvdb::Index64 total = getPointOffsets(pointOffsets, tree, includeGroups, excludeGroups);
 
     // a block's global offset is needed to transform its point offsets to global offsets
-    openvdb::Index64 startOffset = detail.appendPointBlock(total);
+    const openvdb::Index64 startOffset = detail.appendPointBlock(total);
 
     HoudiniWriteAttribute<openvdb::Vec3f> positionAttribute(*detail.getP());
-    convertPointDataGridPosition(positionAttribute, grid, pointOffsets,
-                                 startOffset, includeGroups, excludeGroups);
+    convertPointDataGridPosition(positionAttribute, grid, pointOffsets, startOffset, includeGroups, excludeGroups);
 
     // add other point attributes to the hdk detail
     const openvdb::tools::AttributeSet::Descriptor::NameToPosMap& nameToPosMap = descriptor.map();
@@ -421,58 +415,44 @@ convertPointDataGridToHoudini(GU_Detail& detail,
     for (const auto& namePos : nameToPosMap) {
 
         const openvdb::Name& name = namePos.first;
-
-        const openvdb::NamePair& type = descriptor.type(namePos.second);
-        openvdb::Name valueType = type.first;
-        openvdb::Name codec = type.second;
-
         // position handled explicitly
         if (name == "P")    continue;
 
         // filter attributes
         if (!sortedAttributes.empty() && !std::binary_search(sortedAttributes.begin(), sortedAttributes.end(), name))   continue;
 
-        const unsigned index = namePos.second;
-
         // don't convert group attributes
         if (descriptor.hasGroup(name))  continue;
 
         GA_RWAttributeRef attributeRef = detail.findPointAttribute(name.c_str());
 
-        // explicitly handle string attribute type
-        const openvdb::tools::AttributeArray& array = leafIter->constAttributeArray(namePos.second);
-        if (isString(array))   valueType = "string";
+        const unsigned index = namePos.second;
 
+        const openvdb::tools::AttributeArray& array = leafIter->constAttributeArray(index);
         const openvdb::Index stride = array.stride();
 
-        const bool truncate = codec == openvdb::tools::TruncateCodec::name();
+        const openvdb::NamePair& type = descriptor.type(index);
+        const openvdb::Name valueType(openvdb::tools::isString(array) ? "string" : type.first);
 
         // create the attribute if it doesn't already exist in the detail
         if (attributeRef.isInvalid()) {
 
-            GA_Storage storage(GA_STORE_INVALID);
+            const bool truncate(type.second == openvdb::tools::TruncateCodec::name());
 
-            if (valueType == "string")                                  storage = GA_STORE_STRING;
-            else if (valueType == "bool")                               storage = GA_STORE_BOOL;
-            else if (valueType == "int16")                              storage = GA_STORE_INT16;
-            else if (valueType == "int32" || valueType == "vec3i")      storage = GA_STORE_INT32;
-            else if (valueType == "int64")                              storage = GA_STORE_INT64;
-            else if (valueType == "float" || valueType == "vec3s") {
-                // truncated float values are converted back to half
-                if (truncate)                                           storage = GA_STORE_REAL16;
-                else                                                    storage = GA_STORE_REAL32;
+            GA_Storage storage(gaStorageFromAttrString(valueType));
+            if (storage == GA_STORE_INVALID) continue;
+            if (storage == GA_STORE_REAL32 && truncate) {
+                storage = GA_STORE_REAL16;
             }
-            else if (valueType == "double")                             storage = GA_STORE_REAL64;
-            else                                                        continue;
 
             const bool isVector = valueType.compare(0, 4, "vec3") == 0;
-            const unsigned width = isVector ? 3 : array.stride();
+            const unsigned width = isVector ? 3 : stride;
             const GA_Defaults defaults = gaDefaultsFromDescriptor(descriptor, name);
 
             attributeRef = detail.addTuple(storage, GA_ATTRIB_POINT, name.c_str(), width, defaults);
 
             // '|' and ':' characters are valid in OpenVDB Points names but will make Houdini Attribute names invalid
-            if (attributeRef.isInvalid()){
+            if (attributeRef.isInvalid()) {
                 OPENVDB_THROW(  openvdb::RuntimeError,
                                 "Unable to create Houdini Points Attribute with name '" + name +
                                 "'. '|' and ':' characters are not supported by Houdini.");
