@@ -98,7 +98,7 @@ MAYA_SET_LIBRARY_PROPERTIES ( openvdb_maya )
 INSTALL ( TARGETS
   openvdb_maya
   DESTINATION
-  ./maya/plug-ins
+  maya${MAYA_VERSION_NUMBER}/plug-ins
   )
 
 INSTALL ( FILES
@@ -112,5 +112,12 @@ INSTALL ( FILES
   maya/AEOpenVDBVisualizeTemplate.mel
   maya/AEOpenVDBWriteTemplate.mel
   DESTINATION
-  ./maya/scripts
+  maya${MAYA_VERSION_NUMBER}/scripts
   )
+
+INSTALL ( CODE
+  "                                                                                                                                         
+  FILE (WRITE ${CMAKE_INSTALL_PREFIX}/maya${MAYA_VERSION_NUMBER}/openvdb.mod \"+ openvdb any ${CMAKE_INSTALL_PREFIX}/maya${MAYA_VERSION_NUMBER}\n\")
+  "
+  COMPONENT Runtime
+)
