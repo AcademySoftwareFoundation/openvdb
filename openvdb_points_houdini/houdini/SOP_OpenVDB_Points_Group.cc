@@ -60,64 +60,37 @@ namespace hutil = houdini_utils;
 namespace {
 
 struct GroupParms {
-
-    GroupParms()
-        : mEnable(false)
-        , mGroupName("")
-        , mGroup(NULL)
-        , mOpGroup(false)
-        , mOpLeaf(false)
-        , mOpHashI(false)
-        , mOpHashL(false)
-        , mOpBBox(false)
-        , mOpLS(false)
-        , mCountMode(false)
-        , mHashMode(false)
-        , mPercent(0.0f)
-        , mCount(0)
-        , mHashAttribute("")
-        , mHashAttributeIndex(openvdb::tools::AttributeSet::INVALID_POS)
-        , mBBox()
-        , mLevelSetGrid(FloatGrid::create(0))
-        , mSDFMin(0.0f)
-        , mSDFMax(0.0f)
-        , mEnableViewport(false)
-        , mAddViewport(false)
-        , mViewportGroupName("")
-    {
-    }
-
     // global parms
-    bool                                        mEnable;
-    std::string                                 mGroupName;
-    const GA_PrimitiveGroup *                   mGroup;
+    bool                                        mEnable             = false;
+    std::string                                 mGroupName          = "";
+    const GA_PrimitiveGroup *                   mGroup              = nullptr;
     // operation flags
-    bool                                        mOpGroup;
-    bool                                        mOpLeaf;
-    bool                                        mOpHashI;
-    bool                                        mOpHashL;
-    bool                                        mOpBBox;
-    bool                                        mOpLS;
+    bool                                        mOpGroup            = false;
+    bool                                        mOpLeaf             = false;
+    bool                                        mOpHashI            = false;
+    bool                                        mOpHashL            = false;
+    bool                                        mOpBBox             = false;
+    bool                                        mOpLS               = false;
     // group parms
     std::vector<std::string>                    mIncludeGroups;
     std::vector<std::string>                    mExcludeGroups;
     // number parms
-    bool                                        mCountMode;
-    bool                                        mHashMode;
-    float                                       mPercent;
-    long                                        mCount;
-    std::string                                 mHashAttribute;
-    size_t                                      mHashAttributeIndex;
+    bool                                        mCountMode          = false;
+    bool                                        mHashMode           = false;
+    float                                       mPercent            = 0.0f;
+    long                                        mCount              = 0L;
+    std::string                                 mHashAttribute      = "";
+    size_t                                      mHashAttributeIndex = openvdb::tools::AttributeSet::INVALID_POS;
     // bbox parms
     openvdb::BBoxd                              mBBox;
     // level set parms
-    openvdb::FloatGrid::ConstPtr                mLevelSetGrid;
-    float                                       mSDFMin;
-    float                                       mSDFMax;
+    openvdb::FloatGrid::ConstPtr                mLevelSetGrid       = FloatGrid::create(0);
+    float                                       mSDFMin             = 0.0f;
+    float                                       mSDFMax             = 0.0f;
     // viewport parms
-    bool                                        mEnableViewport;
-    bool                                        mAddViewport;
-    std::string                                 mViewportGroupName;
+    bool                                        mEnableViewport     = false;
+    bool                                        mAddViewport        = false;
+    std::string                                 mViewportGroupName  = "";
 };
 
 } // namespace
@@ -130,11 +103,11 @@ class SOP_OpenVDB_Points_Group: public hvdb::SOP_NodeVDBPoints
 {
 public:
     SOP_OpenVDB_Points_Group(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Points_Group() {}
+    virtual ~SOP_OpenVDB_Points_Group() = default;
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    virtual int isRefInput(unsigned i) const { return (i > 0); }
+    virtual int isRefInput(unsigned i) const override { return (i > 0); }
 
     bool updateParmsFlags();
 
@@ -146,7 +119,7 @@ public:
     void removeViewportMetadata(PointDataGrid& outputGrid);
 
 protected:
-    virtual OP_ERROR cookMySop(OP_Context&);
+    virtual OP_ERROR cookMySop(OP_Context&) override;
 
 private:
     hvdb::Interrupter mBoss;
@@ -165,7 +138,7 @@ newSopOperator(OP_OperatorTable* table)
 {
     points::initialize();
 
-    if (table == NULL) return;
+    if (table == nullptr) return;
 
     hutil::ParmList parms;
 
@@ -199,7 +172,7 @@ newSopOperator(OP_OperatorTable* table)
         const char* items[] = {
             "percentage",       "Percentage",
             "total",            "Total",
-            NULL
+            nullptr
         };
         parms.add(hutil::ParmFactory(PRM_ORD, "numbermode", "Mode")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
@@ -237,7 +210,7 @@ newSopOperator(OP_OperatorTable* table)
         const char* items[] = {
             "boundingbox",      "Bounding Box",
             "boundingobject",   "Bounding Object",
-            NULL
+            nullptr
         };
         parms.add(hutil::ParmFactory(PRM_ORD, "boundingmode", "Mode")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
@@ -303,7 +276,7 @@ newSopOperator(OP_OperatorTable* table)
         const char* items[] = {
             "addviewportgroup",      "Add Viewport Group",
             "removeviewportgroup",   "Remove Viewport Group",
-            NULL
+            nullptr
         };
         parms.add(hutil::ParmFactory(PRM_ORD, "viewportoperation", "Operation")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
@@ -391,7 +364,7 @@ SOP_OpenVDB_Points_Group::SOP_OpenVDB_Points_Group(OP_Network* net,
 OP_ERROR
 SOP_OpenVDB_Points_Group::cookMySop(OP_Context& context)
 {
-    typedef openvdb::tools::PointDataGrid PointDataGrid;
+    using PointDataGrid = openvdb::tools::PointDataGrid;
 
     try {
         hutil::ScopedInputLock lock(*this, context);
@@ -416,14 +389,14 @@ SOP_OpenVDB_Points_Group::cookMySop(OP_Context& context)
 
             // only process if grid is a PointDataGrid with leaves
             if(!openvdb::gridConstPtrCast<PointDataGrid>(vdbPrim->getConstGridPtr())) continue;
-            PointDataGrid::ConstPtr pointDataGrid = openvdb::gridConstPtrCast<PointDataGrid>(vdbPrim->getConstGridPtr());
-            openvdb::tools::PointDataTree::LeafCIter leafIter = pointDataGrid->tree().cbeginLeaf();
+            auto pointDataGrid = openvdb::gridConstPtrCast<PointDataGrid>(vdbPrim->getConstGridPtr());
+            auto leafIter = pointDataGrid->tree().cbeginLeaf();
             if (!leafIter) continue;
 
             // Set viewport metadata if no group being created (copy grid first to ensure metadata is deep copied)
             if (!parms.mEnable) {
                 if (parms.mEnableViewport) {
-                    PointDataGrid::Ptr outputGrid = openvdb::gridPtrCast<PointDataGrid>(vdbPrim->getGrid().copyGrid());
+                    auto outputGrid = openvdb::gridPtrCast<PointDataGrid>(vdbPrim->getGrid().copyGrid());
                     if (parms.mAddViewport)     setViewportMetadata(*outputGrid, parms);
                     else                        removeViewportMetadata(*outputGrid);
                 }
@@ -436,7 +409,7 @@ SOP_OpenVDB_Points_Group::cookMySop(OP_Context& context)
             // deep copy the VDB tree if it is not already unique
             vdbPrim->makeGridUnique();
 
-            PointDataGrid::Ptr outputGrid = openvdb::gridPtrCast<PointDataGrid>(vdbPrim->getGridPtr());
+            auto outputGrid = openvdb::gridPtrCast<PointDataGrid>(vdbPrim->getGridPtr());
 
             // filter and create the point group in the grid
             performGroupFiltering(*outputGrid, parms);
@@ -450,7 +423,7 @@ SOP_OpenVDB_Points_Group::cookMySop(OP_Context& context)
 
         return error();
 
-    } catch (std::exception& e) {
+    } catch (const std::exception& e) {
         addError(SOP_MESSAGE, e.what());
     }
     return error();
@@ -550,7 +523,7 @@ SOP_OpenVDB_Points_Group::evalGroupParms(OP_Context& context, GroupParms& parms)
 
             // retrieve bounding object
 
-            const GA_PrimitiveGroup* boundsGroup = NULL;
+            const GA_PrimitiveGroup* boundsGroup = nullptr;
             UT_String boundingObjectStr;
             evalString(boundingObjectStr, "boundingname", 0, time);
     #if (UT_MAJOR_VERSION_INT >= 15)
@@ -601,7 +574,7 @@ SOP_OpenVDB_Points_Group::evalGroupParms(OP_Context& context, GroupParms& parms)
         // retrieve level set grid
 
         UT_String levelSetStr;
-        const GA_PrimitiveGroup* levelSetGroup = NULL;
+        const GA_PrimitiveGroup* levelSetGroup = nullptr;
         evalString(levelSetStr, "levelsetname", 0, time);
 #if (UT_MAJOR_VERSION_INT >= 15)
         levelSetGroup = parsePrimitiveGroups(
@@ -671,7 +644,7 @@ SOP_OpenVDB_Points_Group::evalGroupParms(OP_Context& context, GroupParms& parms)
 OP_ERROR
 SOP_OpenVDB_Points_Group::evalGridGroupParms(const PointDataGrid& grid, OP_Context& context, GroupParms& parms)
 {
-    openvdb::tools::PointDataTree::LeafCIter leafIter = grid.tree().cbeginLeaf();
+    auto leafIter = grid.tree().cbeginLeaf();
 
     if (!leafIter)  return error();
 
@@ -688,18 +661,16 @@ SOP_OpenVDB_Points_Group::evalGridGroupParms(const PointDataGrid& grid, OP_Conte
 
     if (parms.mOpGroup)
     {
-        for (std::vector<Name>::const_iterator  it = parms.mIncludeGroups.begin(),
-                                                itEnd = parms.mIncludeGroups.end(); it != itEnd; ++it) {
-            if (!descriptor.hasGroup(*it)) {
-                addError(SOP_MESSAGE, ("Unable to find VDB Points group - " + *it).c_str());
+        for (const std::string& name : parms.mIncludeGroups) {
+            if (!descriptor.hasGroup(name)) {
+                addError(SOP_MESSAGE, ("Unable to find VDB Points group - " + name).c_str());
                 return error();
             }
         }
 
-        for (std::vector<Name>::const_iterator  it = parms.mExcludeGroups.begin(),
-                                                itEnd = parms.mExcludeGroups.end(); it != itEnd; ++it) {
-            if (!descriptor.hasGroup(*it)) {
-                addError(SOP_MESSAGE, ("Unable to find VDB Points group - " + *it).c_str());
+        for (const std::string& name : parms.mExcludeGroups) {
+            if (!descriptor.hasGroup(name)) {
+                addError(SOP_MESSAGE, ("Unable to find VDB Points group - " + name).c_str());
                 return error();
             }
         }
@@ -741,34 +712,34 @@ SOP_OpenVDB_Points_Group::performGroupFiltering(PointDataGrid& outputGrid, const
 {
     // filter typedefs
 
-    typedef AttributeHashFilter<std::mt19937, int> HashIFilter;
-    typedef AttributeHashFilter<std::mt19937_64, long> HashLFilter;
-    typedef RandomLeafFilter<PointDataGrid::TreeType, std::mt19937> LeafFilter;
-    typedef LevelSetFilter<FloatGrid> LSFilter;
+    using HashIFilter = AttributeHashFilter<std::mt19937, int>;
+    using HashLFilter = AttributeHashFilter<std::mt19937_64, long>;
+    using LeafFilter = RandomLeafFilter<PointDataGrid::TreeType, std::mt19937>;
+    using LSFilter = LevelSetFilter<FloatGrid>;
 
     // composite typedefs (a combination of the above five filters)
     // the group filter is always included because it's cheap to execute
 
-    typedef BinaryFilter<MultiGroupFilter, HashIFilter> GroupHashI;
-    typedef BinaryFilter<MultiGroupFilter, HashLFilter> GroupHashL;
-    typedef BinaryFilter<MultiGroupFilter, LeafFilter> GroupLeaf;
-    typedef BinaryFilter<MultiGroupFilter, LSFilter> GroupLS;
-    typedef BinaryFilter<MultiGroupFilter, BBoxFilter> GroupBBox;
-    typedef BinaryFilter<LSFilter, HashIFilter> LSHashI;
-    typedef BinaryFilter<LSFilter, HashLFilter> LSHashL;
-    typedef BinaryFilter<LSFilter, LeafFilter> LSLeaf;
+    using GroupHashI = BinaryFilter<MultiGroupFilter, HashIFilter>;
+    using GroupHashL = BinaryFilter<MultiGroupFilter, HashLFilter>;
+    using GroupLeaf = BinaryFilter<MultiGroupFilter, LeafFilter>;
+    using GroupLS = BinaryFilter<MultiGroupFilter, LSFilter>;
+    using GroupBBox = BinaryFilter<MultiGroupFilter, BBoxFilter>;
+    using LSHashI = BinaryFilter<LSFilter, HashIFilter>;
+    using LSHashL = BinaryFilter<LSFilter, HashLFilter>;
+    using LSLeaf = BinaryFilter<LSFilter, LeafFilter>;
 
-    typedef BinaryFilter<GroupBBox, HashIFilter> GroupBBoxHashI;
-    typedef BinaryFilter<GroupBBox, HashLFilter> GroupBBoxHashL;
-    typedef BinaryFilter<GroupBBox, LSFilter> GroupBBoxLS;
-    typedef BinaryFilter<GroupBBox, LeafFilter> GroupBBoxLeaf;
-    typedef BinaryFilter<GroupLS, HashIFilter> GroupLSHashI;
-    typedef BinaryFilter<GroupLS, HashLFilter> GroupLSHashL;
-    typedef BinaryFilter<GroupLS, LeafFilter> GroupLSLeaf;
+    using GroupBBoxHashI = BinaryFilter<GroupBBox, HashIFilter>;
+    using GroupBBoxHashL = BinaryFilter<GroupBBox, HashLFilter>;
+    using GroupBBoxLS = BinaryFilter<GroupBBox, LSFilter>;
+    using GroupBBoxLeaf = BinaryFilter<GroupBBox, LeafFilter>;
+    using GroupLSHashI = BinaryFilter<GroupLS, HashIFilter>;
+    using GroupLSHashL = BinaryFilter<GroupLS, HashLFilter>;
+    using GroupLSLeaf = BinaryFilter<GroupLS, LeafFilter>;
 
-    typedef BinaryFilter<GroupBBox, LSHashI> GroupBBoxLSHashI;
-    typedef BinaryFilter<GroupBBox, LSHashL> GroupBBoxLSHashL;
-    typedef BinaryFilter<GroupBBox, LSLeaf> GroupBBoxLSLeaf;
+    using GroupBBoxLSHashI = BinaryFilter<GroupBBox, LSHashI>;
+    using GroupBBoxLSHashL = BinaryFilter<GroupBBox, LSHashL>;
+    using GroupBBoxLSLeaf = BinaryFilter<GroupBBox, LSLeaf>;
 
     // grid data
 

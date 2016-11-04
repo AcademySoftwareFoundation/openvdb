@@ -44,8 +44,6 @@
 #include <openvdb_points/tools/PointCount.h>
 #include <openvdb_points/tools/PointConversion.h>
 
-#include <boost/algorithm/string/predicate.hpp> // startswith
-
 #include <GA/GA_Attribute.h>
 #include <GA/GA_Handle.h>
 #include <GU/GU_Detail.h>
@@ -57,12 +55,12 @@
 namespace openvdb_points_houdini {
 
 
-typedef std::vector<GA_Offset> OffsetList;
-typedef openvdb::SharedPtr<OffsetList> OffsetListPtr;
+using OffsetList = std::vector<GA_Offset>;
+using OffsetListPtr = std::shared_ptr<OffsetList>;
 
-typedef std::pair<GA_Offset, GA_Offset> OffsetPair;
-typedef std::vector<OffsetPair> OffsetPairList;
-typedef openvdb::SharedPtr<OffsetPairList> OffsetPairListPtr;
+using OffsetPair = std::pair<GA_Offset, GA_Offset>;
+using OffsetPairList = std::vector<OffsetPair>;
+using OffsetPairListPtr = std::shared_ptr<OffsetPairList>;
 
 /// @brief  Converts a VDB Points grid into Houdini points and appends to a Houdini Detail
 ///
@@ -75,9 +73,9 @@ typedef openvdb::SharedPtr<OffsetPairList> OffsetPairListPtr;
 void
 convertPointDataGridToHoudini(GU_Detail& detail,
                               const openvdb::tools::PointDataGrid& grid,
-                              const std::vector<std::string>& attributes = std::vector<std::string>(),
-                              const std::vector<std::string>& includeGroups = std::vector<std::string>(),
-                              const std::vector<std::string>& excludeGroups = std::vector<std::string>());
+                              const std::vector<std::string>& attributes = {},
+                              const std::vector<std::string>& includeGroups = {},
+                              const std::vector<std::string>& excludeGroups = {});
 
 namespace {
 
@@ -154,7 +152,7 @@ inline void writeAttributeValue(const HandleType& handle, GA_Offset n, const ope
 }
 
 template<typename ValueType, typename HoudiniType>
-typename boost::enable_if_c<openvdb::VecTraits<ValueType>::IsVec, void>::type
+typename std::enable_if<openvdb::VecTraits<ValueType>::IsVec, void>::type
 getValues(HoudiniType* values, const ValueType& value)
 {
     for (unsigned i = 0; i < openvdb::VecTraits<ValueType>::Size; ++i) {
@@ -163,7 +161,7 @@ getValues(HoudiniType* values, const ValueType& value)
 }
 
 template<typename ValueType, typename HoudiniType>
-typename boost::disable_if_c<openvdb::VecTraits<ValueType>::IsVec, void>::type
+typename std::enable_if<!openvdb::VecTraits<ValueType>::IsVec, void>::type
 getValues(HoudiniType* values, const ValueType& value)
 {
     values[0] = value;
@@ -175,7 +173,7 @@ gaDefaultsFromDescriptorTyped(const openvdb::tools::AttributeSet::Descriptor& de
 {
     const int size = openvdb::VecTraits<ValueType>::Size;
 
-    boost::scoped_array<HoudiniType> values(new HoudiniType[size]);
+    std::unique_ptr<HoudiniType[]> values(new HoudiniType[size]);
     ValueType defaultValue = descriptor.getDefaultValue<ValueType>(name);
 
     getValues<ValueType, HoudiniType>(values.get(), defaultValue);
@@ -233,7 +231,7 @@ gaStorageFromAttrString(const openvdb::Name& type)
 template <typename T>
 struct HoudiniWriteAttribute
 {
-    typedef T ValueType;
+    using ValueType = T;
 
     struct Handle
     {
@@ -273,15 +271,15 @@ private:
 template <typename T>
 struct HoudiniReadAttribute
 {
-    typedef T value_type;
-    typedef T PosType;
+    using value_type = T;
+    using PosType = T;
 
-    explicit HoudiniReadAttribute(const GA_Attribute& attribute, OffsetListPtr offsets = OffsetListPtr())
+    explicit HoudiniReadAttribute(const GA_Attribute& attribute, OffsetListPtr offsets = nullptr)
         : mAttribute(attribute)
         , mOffsets(offsets) { }
 
     // Return the value of the nth point in the array (scalar type only)
-    template <typename ValueType> typename boost::disable_if_c<openvdb::VecTraits<ValueType>::IsVec, void>::type
+    template <typename ValueType> typename std::enable_if<!openvdb::VecTraits<ValueType>::IsVec, void>::type
     get(ValueType& value, size_t n, openvdb::Index offset = 0) const
     {
         value = readAttributeValue<ValueType>(mAttribute, getOffset(n), offset);
@@ -289,10 +287,10 @@ struct HoudiniReadAttribute
 
     // Return the value of the nth point in the array (vector type only)
     // note offset parameter is ignored for vector types
-    template <typename ValueType> typename boost::enable_if_c<openvdb::VecTraits<ValueType>::IsVec, void>::type
+    template <typename ValueType> typename std::enable_if<openvdb::VecTraits<ValueType>::IsVec, void>::type
     get(ValueType& value, size_t n, openvdb::Index offset = 0) const
     {
-        typedef typename openvdb::VecTraits<ValueType>::ElementType ElementType;
+        using ElementType = typename openvdb::VecTraits<ValueType>::ElementType;
         for (unsigned i = 0; i < openvdb::VecTraits<ValueType>::Size; ++i) {
             value[i] = readAttributeValue<ElementType>(mAttribute, getOffset(n), i);
         }
@@ -319,21 +317,21 @@ private:
 template <typename T>
 struct HoudiniOffsetAttribute
 {
-    typedef T value_type;
-    typedef T PosType;
+    using value_type = T;
+    using PosType = T;
 
     HoudiniOffsetAttribute(const GA_Attribute& attribute, OffsetPairListPtr offsetPairs, openvdb::Index stride)
         : mAttribute(attribute)
         , mOffsetPairs(offsetPairs)
         , mStride(stride) { }
 
-    template <typename ValueType> typename boost::disable_if_c<openvdb::VecTraits<ValueType>::IsVec, void>::type
+    template <typename ValueType> typename std::enable_if<!openvdb::VecTraits<ValueType>::IsVec, void>::type
     get(ValueType& value, size_t n, openvdb::Index offset = 0) const { }
 
-    template <typename ValueType> typename boost::enable_if_c<openvdb::VecTraits<ValueType>::IsVec, void>::type
+    template <typename ValueType> typename std::enable_if<openvdb::VecTraits<ValueType>::IsVec, void>::type
     get(ValueType& value, size_t n, openvdb::Index offset = 0) const
     {
-        typedef typename openvdb::VecTraits<ValueType>::ElementType ElementType;
+        using ElementType = typename openvdb::VecTraits<ValueType>::ElementType;
 
         const OffsetPair& pair = (*mOffsetPairs)[n * mStride + offset];
 
@@ -397,7 +395,7 @@ convertPointDataGridToHoudini(GU_Detail& detail,
 
     const openvdb::tools::PointDataTree& tree = grid.tree();
 
-    openvdb::tools::PointDataTree::LeafCIter leafIter = tree.cbeginLeaf();
+    auto leafIter = tree.cbeginLeaf();
     if (!leafIter) return;
 
     // position attribute is mandatory
@@ -420,12 +418,11 @@ convertPointDataGridToHoudini(GU_Detail& detail,
     // add other point attributes to the hdk detail
     const openvdb::tools::AttributeSet::Descriptor::NameToPosMap& nameToPosMap = descriptor.map();
 
-    for (openvdb::tools::AttributeSet::Descriptor::ConstIterator    it = nameToPosMap.begin(),
-                                                                    itEnd = nameToPosMap.end(); it != itEnd; ++it) {
+    for (const auto& namePos : nameToPosMap) {
 
-        const openvdb::Name& name = it->first;
+        const openvdb::Name& name = namePos.first;
 
-        const openvdb::NamePair& type = descriptor.type(it->second);
+        const openvdb::NamePair& type = descriptor.type(namePos.second);
         openvdb::Name valueType = type.first;
         openvdb::Name codec = type.second;
 
@@ -435,7 +432,7 @@ convertPointDataGridToHoudini(GU_Detail& detail,
         // filter attributes
         if (!sortedAttributes.empty() && !std::binary_search(sortedAttributes.begin(), sortedAttributes.end(), name))   continue;
 
-        const unsigned index = it->second;
+        const unsigned index = namePos.second;
 
         // don't convert group attributes
         if (descriptor.hasGroup(name))  continue;
@@ -443,7 +440,7 @@ convertPointDataGridToHoudini(GU_Detail& detail,
         GA_RWAttributeRef attributeRef = detail.findPointAttribute(name.c_str());
 
         // explicitly handle string attribute type
-        const openvdb::tools::AttributeArray& array = leafIter->attributeArray(it->second);
+        const openvdb::tools::AttributeArray& array = leafIter->attributeArray(namePos.second);
         if (isString(array))   valueType = "string";
 
         const openvdb::Index stride = array.stride();
@@ -468,7 +465,7 @@ convertPointDataGridToHoudini(GU_Detail& detail,
             else if (valueType == "double")                             storage = GA_STORE_REAL64;
             else                                                        continue;
 
-            const bool isVector = boost::starts_with(valueType, "vec3");
+            const bool isVector = valueType.compare(0, 4, "vec3") == 0;
             const unsigned width = isVector ? 3 : array.stride();
             const GA_Defaults defaults = gaDefaultsFromDescriptor(descriptor, name);
 
@@ -530,9 +527,8 @@ convertPointDataGridToHoudini(GU_Detail& detail,
     // add point groups to the hdk detail
     const openvdb::tools::AttributeSet::Descriptor::NameToPosMap& groupMap = descriptor.groupMap();
 
-    for (openvdb::tools::AttributeSet::Descriptor::ConstIterator    it = groupMap.begin(),
-                                                                    itEnd = groupMap.end(); it != itEnd; ++it) {
-        const openvdb::Name& name = it->first;
+    for (const auto& namePos : groupMap) {
+        const openvdb::Name& name = namePos.first;
 
         assert(!name.empty());
 
