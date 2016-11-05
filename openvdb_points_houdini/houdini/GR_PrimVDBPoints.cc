@@ -374,7 +374,7 @@ struct FillGPUBuffersPosition {
             const openvdb::Index64 leafOffset = mLeafOffsets[n].second;
 
             auto handle = openvdb::tools::AttributeHandle<AttributeType>::create(
-                    leaf->template attributeArray(mAttributeIndex));
+                    leaf->template constAttributeArray(mAttributeIndex));
 
             openvdb::Vec3f positionVoxelSpace;
 
@@ -447,7 +447,7 @@ struct FillGPUBuffersVec3 {
             const openvdb::Index64 leafOffset = mLeafOffsets[n].second;
 
             auto handle = openvdb::tools::AttributeHandle<AttributeType>::create(
-                    leaf->template attributeArray(mAttributeIndex));
+                    leaf->template constAttributeArray(mAttributeIndex));
 
             openvdb::Vec3f color;
 
@@ -508,7 +508,7 @@ struct FillGPUBuffersId {
             const openvdb::Index64 leafOffset = mLeafOffsets[n].second;
 
             auto handle = openvdb::tools::AttributeHandle<AttributeType>::create(
-                    leaf->template attributeArray(mAttributeIndex));
+                    leaf->template constAttributeArray(mAttributeIndex));
 
             HoudiniBufferType scalarValue;
 
