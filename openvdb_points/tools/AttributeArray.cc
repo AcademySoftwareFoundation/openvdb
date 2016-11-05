@@ -161,14 +161,6 @@ AttributeArray::unregisterType(const NamePair& type)
 
 
 void
-AttributeArray::setInterleaved(bool state)
-{
-    if (state)  mFlags |= Int16(INTERLEAVED);
-    else mFlags &= ~Int16(INTERLEAVED);
-}
-
-
-void
 AttributeArray::setTransient(bool state)
 {
     if (state) mFlags |= Int16(TRANSIENT);

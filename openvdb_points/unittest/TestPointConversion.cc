@@ -271,12 +271,12 @@ TestPointConversion::testPointConversion()
     // add id and populate
 
     appendAttribute<int>(tree, "id");
-    populateAttribute<PointDataTree, PointIndexTree, AttributeWrapper<int>, false>(tree, indexTree, "id", id);
+    populateAttribute<PointDataTree, PointIndexTree, AttributeWrapper<int>>(tree, indexTree, "id", id);
 
     // add uniform and populate
 
     appendAttribute<float>(tree, "uniform");
-    populateAttribute<PointDataTree, PointIndexTree, AttributeWrapper<float>, false>(tree, indexTree, "uniform", uniform);
+    populateAttribute<PointDataTree, PointIndexTree, AttributeWrapper<float>>(tree, indexTree, "uniform", uniform);
 
     // add string and populate
 
@@ -296,7 +296,7 @@ TestPointConversion::testPointConversion()
     inserter.insert("testA");
     inserter.insert("testB");
 
-    populateAttribute<PointDataTree, PointIndexTree, AttributeWrapper<openvdb::Name>, false>(tree, indexTree, "string", string);
+    populateAttribute<PointDataTree, PointIndexTree, AttributeWrapper<openvdb::Name>>(tree, indexTree, "string", string);
 
     // add group and set membership
 
@@ -509,12 +509,12 @@ TestPointConversion::testStride()
     // add id and populate
 
     appendAttribute<int>(tree, "id");
-    populateAttribute<PointDataTree, PointIndexTree, AttributeWrapper<int>, false>(tree, indexTree, "id", id);
+    populateAttribute<PointDataTree, PointIndexTree, AttributeWrapper<int>>(tree, indexTree, "id", id);
 
     // add xyz and populate
 
     appendAttribute<int>(tree, "xyz", 0, /*stride=*/3);
-    populateAttribute<PointDataTree, PointIndexTree, AttributeWrapper<int>, true>(tree, indexTree, "xyz", xyz, /*stride=*/3);
+    populateAttribute<PointDataTree, PointIndexTree, AttributeWrapper<int>>(tree, indexTree, "xyz", xyz, /*stride=*/3);
 
     // create accessor and iterator for Point Data Tree
 
