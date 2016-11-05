@@ -109,7 +109,7 @@ public:
 
     virtual int isRefInput(unsigned i) const override { return (i > 0); }
 
-    bool updateParmsFlags();
+    bool updateParmsFlags() override;
 
     OP_ERROR evalGroupParms(OP_Context&, GroupParms&);
     OP_ERROR evalGridGroupParms(const openvdb::tools::PointDataGrid& grid, OP_Context& context, GroupParms& parms);
