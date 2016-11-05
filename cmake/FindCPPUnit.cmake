@@ -25,41 +25,41 @@
 # LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 #
 
-# yue.nicholas@gmail.com
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
+#-*-cmake-*-
+# - Find CPPUNIT
+#
+# Author : Nicholas Yue yue.nicholas@gmail.com
+#
+# This auxiliary CMake file helps in find the CPPUNIT headers and libraries
+#
+# CPPUNIT_FOUND                  set if CPPUNIT is found.
+# CPPUNIT_INCLUDE_DIR            CPPUNIT's include directory
+# CPPUNIT_cppunit_LIBRARY        CPPUNIT libraries
 
-PROJECT ( OpenVDB )
+FIND_PACKAGE ( PackageHandleStandardArgs )
 
-ENABLE_TESTING()
+FIND_PATH( CPPUNIT_LOCATION include/cppunit/Test.h
+  "$ENV{CPPUNIT_ROOT}"
+  NO_DEFAULT_PATH
+  NO_CMAKE_ENVIRONMENT_PATH
+  NO_CMAKE_PATH
+  NO_SYSTEM_ENVIRONMENT_PATH
+  NO_CMAKE_SYSTEM_PATH
+  )
 
-OPTION ( OPENVDB_BUILD_PYTHON_MODULE "Build the pyopenvdb Python module" ON )
-OPTION ( OPENVDB_BUILD_HOUDINI_SOPS "Build the Houdini SOPs" OFF )
-OPTION ( OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF )
-OPTION ( OPENVDB_ENABLE_RPATH "Build with RPATH information" ON )
-OPTION ( OPENVDB_ENABLE_3_ABI_COMPATIBLE "Build with OpenVDB v3 ABI" ON )
+FIND_PACKAGE_HANDLE_STANDARD_ARGS ( CPPUnit
+  REQUIRED_VARS CPPUNIT_LOCATION
+  )
 
-IF ( APPLE )
-  IF ( OPENVDB_BUILD_HOUDINI_SOPS AND OPENVDB_BUILD_MAYA_PLUGIN )
-	MESSAGE ( FATAL_ERROR "On OSX, Houdini linked with libc++ whereas Maya is linked with libstdc++, the different runtimes are not mutually compatible, build them Houdini SOPs and Maya plugins separately with the requisite DCC's compiler" )
+IF ( CPPUNIT_FOUND )
+  
+  SET( CPPUNIT_INCLUDE_DIR "${CPPUNIT_LOCATION}/include" CACHE STRING "CPPUNIT include directory")
+  IF (CPPUnit_USE_STATIC_LIBS)
+	SET( CPPUNIT_LIBRARY_NAME libcppunit.a)
+  ELSE ()
+	SET( CPPUNIT_LIBRARY_NAME cppunit)
   ENDIF ()
-ENDIF ()
-
-LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
-
-SET ( OPENVDB_TOP_LEVEL_DIR ${PROJECT_SOURCE_DIR} CACHE PATH "OpenVDB Top Level Directory to share among sub projects" )
-
-INCLUDE_DIRECTORIES ( ${OPENVDB_TOP_LEVEL_DIR} ) # To make sure we pick up headers from this version of OpenVDB we are building
-
-IF ( OPENVDB_ENABLE_3_ABI_COMPATIBLE )
-  ADD_DEFINITIONS ( -DOPENVDB_3_ABI_COMPATIBLE )
-ENDIF ()
-
-ADD_SUBDIRECTORY ( openvdb )
-
-IF ( OPENVDB_BUILD_HOUDINI_SOPS )
-  ADD_SUBDIRECTORY ( openvdb_houdini )
-ENDIF ()
-
-IF ( OPENVDB_BUILD_MAYA_PLUGIN )
-  ADD_SUBDIRECTORY ( openvdb_maya )
-ENDIF ()
+  FIND_LIBRARY ( CPPUnit_cppunit_LIBRARY ${CPPUNIT_LIBRARY_NAME}
+	PATHS ${CPPUNIT_LOCATION}/lib )
+  
+ENDIF ( CPPUNIT_FOUND )

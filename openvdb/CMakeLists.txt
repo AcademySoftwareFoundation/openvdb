@@ -46,30 +46,58 @@ ENDIF ()
 IF (WIN32)
   FIND_PACKAGE ( GLEW REQUIRED )
 ENDIF()
+
+# Determine OpenVDB version
+#define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 4
+#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 0
+#define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 0
+SET ( OPENVDB_VERSION_FILE ${CMAKE_CURRENT_SOURCE_DIR}/version.h )
+
+FILE ( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_major_version_str REGEX "^#define[\t ]+OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER[\t ]+.*")
+FILE ( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_minor_version_str REGEX "^#define[\t ]+OPENVDB_LIBRARY_MINOR_VERSION_NUMBER[\t ]+.*")
+FILE ( STRINGS "${OPENVDB_VERSION_FILE}" openvdb_build_version_str REGEX "^#define[\t ]+OPENVDB_LIBRARY_PATCH_VERSION_NUMBER[\t ]+.*")
+
+STRING (REGEX REPLACE "^.*OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
+  _openvdb_major_version_number "${openvdb_major_version_str}")
+STRING (REGEX REPLACE "^.*OPENVDB_LIBRARY_MINOR_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
+  _openvdb_minor_version_number "${openvdb_minor_version_str}")
+STRING (REGEX REPLACE "^.*OPENVDB_LIBRARY_PATCH_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
+  _openvdb_build_version_number "${openvdb_build_version_str}")
+
+SET ( OPENVDB_MAJOR_VERSION_NUMBER ${_openvdb_major_version_number} CACHE STRING "OpenVDB major version number" )
+SET ( OPENVDB_MINOR_VERSION_NUMBER ${_openvdb_minor_version_number} CACHE STRING "OpenVDB minor version number" )
+SET ( OPENVDB_BUILD_VERSION_NUMBER ${_openvdb_build_version_number} CACHE STRING "OpenVDB build version number" )
+
+# MESSAGE ( "OPENVDB_VERSION_FILE = ${OPENVDB_VERSION_FILE}")
+# MESSAGE ( "OPENVDB_MAJOR_VERSION_NUMBER = ${OPENVDB_MAJOR_VERSION_NUMBER}" )
+# MESSAGE ( "OPENVDB_MINOR_VERSION_NUMBER = ${OPENVDB_MINOR_VERSION_NUMBER}" )
+# MESSAGE ( "OPENVDB_BUILD_VERSION_NUMBER = ${OPENVDB_BUILD_VERSION_NUMBER}" )
+
 IF (OPENVDB_BUILD_PYTHON_MODULE)
   FIND_PACKAGE ( PythonInterp REQUIRED )
   FIND_PACKAGE ( PythonLibs REQUIRED )
   SET ( OPENVDB_BOOST_PYTHON_LIBRARY_COMPONENT_NAME python )
   INCLUDE_DIRECTORIES ( ${PYTHON_INCLUDE_DIR} )
-  MESSAGE ( "PYTHONLIBS_VERSION_STRING = ${PYTHONLIBS_VERSION_STRING}" )
+  # MESSAGE ( "PYTHONLIBS_VERSION_STRING = ${PYTHONLIBS_VERSION_STRING}" )
 
   STRING(REPLACE "." ";" VERSION_LIST ${PYTHONLIBS_VERSION_STRING})
   LIST(GET VERSION_LIST 0 OPENVDB_PYTHON_VERSION_MAJOR)
   LIST(GET VERSION_LIST 1 OPENVDB_PYTHON_VERSION_MINOR)
   LIST(GET VERSION_LIST 2 OPENVDB_PYTHON_VERSION_PATCH)
 
-  MESSAGE ( "OPENVDB_PYTHON_VERSION_MAJOR = ${OPENVDB_PYTHON_VERSION_MAJOR}" )
-  MESSAGE ( "OPENVDB_PYTHON_VERSION_MINOR = ${OPENVDB_PYTHON_VERSION_MINOR}" )
+  # MESSAGE ( "OPENVDB_PYTHON_VERSION_MAJOR = ${OPENVDB_PYTHON_VERSION_MAJOR}" )
+  # MESSAGE ( "OPENVDB_PYTHON_VERSION_MINOR = ${OPENVDB_PYTHON_VERSION_MINOR}" )
 
 ENDIF ()
 FIND_PACKAGE ( Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams system thread ${OPENVDB_BOOST_PYTHON_LIBRARY_COMPONENT_NAME} )
 FIND_PACKAGE ( ILMBase REQUIRED )
 FIND_PACKAGE ( OpenEXR REQUIRED )
 FIND_PACKAGE ( TBB REQUIRED )
-# FIND_PACKAGE ( ZLIB REQUIRED )
+FIND_PACKAGE ( ZLIB REQUIRED )
 FIND_PACKAGE ( OpenGL REQUIRED )
 FIND_PACKAGE ( Blosc REQUIRED )
 FIND_PACKAGE ( Doxygen REQUIRED )
+FIND_PACKAGE ( CPPUnit REQUIRED )
 
 IF (APPLE)
   FIND_LIBRARY ( COCOA_LIBRARY Cocoa )
@@ -95,6 +123,7 @@ IF (WIN32)
 ENDIF ()
 
 INCLUDE_DIRECTORIES ( ${BLOSC_INCLUDE_DIR} )
+INCLUDE_DIRECTORIES ( ${CPPUNIT_INCLUDE_DIR} )
 
 IF (WIN32)
   ADD_DEFINITIONS ( -D_WIN32 -DNOMINMAX -DHALF_EXPORTS -DOPENVDB_DLL )
@@ -157,8 +186,16 @@ TARGET_LINK_LIBRARIES ( openvdb_shared
   ${BLOSC_blosc_LIBRARY} 
   )
 
-SET_TARGET_PROPERTIES ( openvdb_static openvdb_shared
+SET_TARGET_PROPERTIES ( openvdb_static
   PROPERTIES OUTPUT_NAME openvdb
+  )
+
+SET_TARGET_PROPERTIES(
+  openvdb_shared
+  PROPERTIES
+  OUTPUT_NAME openvdb
+  SOVERSION ${OPENVDB_MAJOR_VERSION_NUMBER}.${OPENVDB_MINOR_VERSION_NUMBER}
+  VERSION ${OPENVDB_MAJOR_VERSION_NUMBER}.${OPENVDB_MINOR_VERSION_NUMBER}.${OPENVDB_BUILD_VERSION_NUMBER}
   )
 
 SET ( VDB_PRINT_SOURCE_FILES  cmd/openvdb_print/main.cc )
@@ -224,9 +261,95 @@ TARGET_LINK_LIBRARIES ( vdb_view
   )
 ENDIF ()
 
-IF ( OPENVDB_BUILD_PYTHON_MODULE )
+ADD_EXECUTABLE ( vdb_test
+  unittest/main.cc
+  unittest/TestBBox.cc
+  unittest/TestConjGradient.cc
+  unittest/TestCoord.cc
+  unittest/TestCpt.cc
+  unittest/TestCurl.cc
+  unittest/TestDense.cc
+  unittest/TestDenseSparseTools.cc
+  unittest/TestDiagnostics.cc
+  unittest/TestDivergence.cc
+  unittest/TestDoubleMetadata.cc
+  unittest/TestExceptions.cc
+  unittest/TestFile.cc
+  unittest/TestFloatMetadata.cc
+  unittest/TestGradient.cc
+  unittest/TestGrid.cc
+  unittest/TestGridBbox.cc
+  unittest/TestGridDescriptor.cc
+  unittest/TestGridIO.cc
+  unittest/TestGridTransformer.cc
+  unittest/TestInit.cc
+  unittest/TestInt32Metadata.cc
+  unittest/TestInt64Metadata.cc
+  unittest/TestInternalOrigin.cc
+  unittest/TestLaplacian.cc
+  unittest/TestLeaf.cc
+  unittest/TestLeafBool.cc
+  unittest/TestLeafManager.cc
+  unittest/TestLeafMask.cc
+  unittest/TestLeafIO.cc
+  unittest/TestLeafOrigin.cc
+  unittest/TestLevelSetRayIntersector.cc
+  unittest/TestLevelSetUtil.cc
+  unittest/TestLinearInterp.cc
+  unittest/TestMaps.cc
+  unittest/TestMat4Metadata.cc
+  unittest/TestMath.cc
+  unittest/TestMeanCurvature.cc
+  unittest/TestMeshToVolume.cc
+  unittest/TestMetadata.cc
+  unittest/TestMetadataIO.cc
+  unittest/TestMetaMap.cc
+  unittest/TestMultiResGrid.cc
+  unittest/TestName.cc
+  unittest/TestNodeIterator.cc
+  unittest/TestNodeManager.cc
+  unittest/TestNodeMask.cc
+  unittest/TestParticleAtlas.cc
+  unittest/TestParticlesToLevelSet.cc
+  unittest/TestPointIndexGrid.cc
+  unittest/TestPointPartitioner.cc
+  unittest/TestPointsToMask.cc
+  unittest/TestPoissonSolver.cc
+  unittest/TestPrePostAPI.cc
+  unittest/TestQuadraticInterp.cc
+  unittest/TestQuantizedUnitVec.cc
+  unittest/TestQuat.cc
+  unittest/TestRay.cc
+  unittest/TestStats.cc
+  unittest/TestStream.cc
+  unittest/TestStringMetadata.cc
+  unittest/TestTools.cc
+  unittest/TestTopologyToLevelSet.cc
+  unittest/TestTransform.cc
+  unittest/TestTree.cc
+  unittest/TestTreeCombine.cc
+  unittest/TestTreeGetSetValues.cc
+  unittest/TestTreeIterators.cc
+  unittest/TestTreeVisitor.cc
+  unittest/TestUtil.cc
+  unittest/TestValueAccessor.cc
+  unittest/TestVec2Metadata.cc
+  unittest/TestVec3Metadata.cc
+  unittest/TestVolumeRayIntersector.cc
+  unittest/TestVolumeToMesh.cc
+  )
 
-  SET ( OPENVDB_PYTHON_MODULE_SOURCE_FILES
+TARGET_LINK_LIBRARIES ( vdb_test
+  ${CPPUnit_cppunit_LIBRARY}
+  openvdb_static
+  ${BLOSC_blosc_LIBRARY}
+  )
+
+ADD_TEST ( vdb_unit_test vdb_test )
+
+IF ( OPENVDB_BUILD_PYTHON_MODULE )
+ 
+ SET ( OPENVDB_PYTHON_MODULE_SOURCE_FILES
     python/pyFloatGrid.cc
     python/pyIntGrid.cc
     python/pyMetadata.cc
@@ -263,6 +386,9 @@ IF ( OPENVDB_BUILD_PYTHON_MODULE )
     PREFIX ""
     )
 
+  ADD_TEST ( pytest ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/python/test/TestOpenVDB.py )
+  SET_TESTS_PROPERTIES ( pytest PROPERTIES ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}")
+
   INSTALL ( TARGETS
 	pyopenvdb
 	DESTINATION
@@ -282,7 +408,9 @@ ADD_CUSTOM_TARGET ( doc
   COMMENT "Generating API documentation with Doxygen" VERBATIM
 )
 
-INSTALL ( DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doc/html/ DESTINATION doc)
+IF ( EXISTS ${CMAKE_CURRENT_BINARY_DIR}/doc/html )
+  INSTALL ( DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doc/html/ DESTINATION doc)
+ENDIF ()
 
 # Installation
 IF ( NOT WIN32 )
