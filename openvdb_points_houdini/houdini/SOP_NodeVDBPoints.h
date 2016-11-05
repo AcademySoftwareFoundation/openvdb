@@ -269,7 +269,7 @@ public:
             first = true;
             for (AttributeSet::Descriptor::ConstIterator it = nameToPosMap.begin(), it_end = nameToPosMap.end();
                     it != it_end; ++it) {
-                const openvdb::tools::AttributeArray& array = iter->attributeArray(it->second);
+                const openvdb::tools::AttributeArray& array = iter->constAttributeArray(it->second);
                 if (isGroup(array))    continue;
 
                 if (first) {

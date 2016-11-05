@@ -440,7 +440,7 @@ convertPointDataGridToHoudini(GU_Detail& detail,
         GA_RWAttributeRef attributeRef = detail.findPointAttribute(name.c_str());
 
         // explicitly handle string attribute type
-        const openvdb::tools::AttributeArray& array = leafIter->attributeArray(namePos.second);
+        const openvdb::tools::AttributeArray& array = leafIter->constAttributeArray(namePos.second);
         if (isString(array))   valueType = "string";
 
         const openvdb::Index stride = array.stride();
