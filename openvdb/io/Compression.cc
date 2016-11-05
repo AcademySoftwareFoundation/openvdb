@@ -164,13 +164,13 @@ bloscToStream(std::ostream& os, const char* data, size_t valSize, size_t numVals
     outBytes = blosc_compress_ctx(
         /*clevel=*/9, // 0 (no compression) to 9 (maximum compression)
         /*doshuffle=*/true,
-        /*typesize=*/valSize, ///< @todo use size that gives best compression?
+        /*typesize=*/sizeof(float), // hard-coded to 4-bytes for optimal compression
         /*srcsize=*/inBytes,
         /*src=*/data,
         /*dest=*/compressedData.get(),
         /*destsize=*/outBytes,
         BLOSC_LZ4_COMPNAME,
-        /*blocksize=*/256,
+        /*blocksize=*/inBytes,
         /*numthreads=*/1);
 
     if (outBytes <= 0) {
