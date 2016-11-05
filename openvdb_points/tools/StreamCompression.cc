@@ -252,6 +252,14 @@ size_t bloscUncompressedSize(const char*)
 }
 
 
+void bloscCompress( char*, size_t& compressedBytes, const size_t,
+                    const char*, const size_t)
+{
+    OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
+    compressedBytes = 0;
+}
+
+
 std::unique_ptr<char[]> bloscCompress(const char*, const size_t, size_t& compressedBytes, const bool)
 {
     OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
@@ -264,6 +272,12 @@ size_t bloscCompressedSize(const char*, const size_t)
 {
     OPENVDB_LOG_DEBUG("Can't compress array data without the blosc library.");
     return 0;
+}
+
+
+void bloscDecompress(char*, const size_t, const size_t, const char*)
+{
+    OPENVDB_THROW(RuntimeError, "Can't extract compressed data without the blosc library.");
 }
 
 
