@@ -528,6 +528,10 @@ TestAttributeSet::testAttributeSet()
         descr = descr->duplicateAppend("test", AttributeI::attributeType());
         AttributeSet attrSet(descr);
         CPPUNIT_ASSERT_EQUAL(attrSet.size(), size_t(2));
+
+        Descriptor::Ptr newDescr = Descriptor::create(AttributeVec3s::attributeType());
+        CPPUNIT_ASSERT_THROW(attrSet.resetDescriptor(newDescr), openvdb::LookupError);
+        CPPUNIT_ASSERT_NO_THROW(attrSet.resetDescriptor(newDescr, /*allowMismatchingDescriptors=*/true));
     }
 
     { // transfer of flags on construction

@@ -433,10 +433,10 @@ AttributeSet::reorderAttributes(const DescriptorPtr& replacement)
 
 
 void
-AttributeSet::resetDescriptor(const DescriptorPtr& replacement)
+AttributeSet::resetDescriptor(const DescriptorPtr& replacement, const bool allowMismatchingDescriptors)
 {
     // ensure the descriptors match
-    if (*mDescr != *replacement) {
+    if (!allowMismatchingDescriptors && *mDescr != *replacement) {
         OPENVDB_THROW(LookupError, "Cannot swap descriptor as replacement does not match.")
     }
 
