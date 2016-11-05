@@ -955,21 +955,15 @@ TestAttributeArray::testAttributeHandle()
 void
 TestAttributeArray::testStrided()
 {
-    using AttributeArrayI           = openvdb::tools::TypedAttributeArray<int>;
-    using NonStridedHandle          = AttributeHandle<int>;
-    using StridedHandle             = AttributeHandle<int, /*CodecType=*/UnknownCodec, /*Strided=*/true>;
-    using StridedWriteHandle        = AttributeWriteHandle<int, /*CodecType=*/UnknownCodec, /*Strided=*/true>;
-    using InterleavedHandle         = AttributeHandle<int, /*CodecType=*/UnknownCodec, /*Strided=*/true, /*Interleaved=*/true>;
-    using InterleavedWriteHandle    = AttributeWriteHandle<int, /*CodecType=*/UnknownCodec, /*Strided=*/true, /*Interleaved=*/true>;
+    using AttributeArrayI       = openvdb::tools::TypedAttributeArray<int>;
+    using StridedHandle         = AttributeHandle<int, /*CodecType=*/UnknownCodec>;
+    using StridedWriteHandle    = AttributeWriteHandle<int, /*CodecType=*/UnknownCodec>;
 
     { // non-strided array
         AttributeArrayI::Ptr array = AttributeArrayI::create(/*n=*/2, /*stride=*/1);
         CPPUNIT_ASSERT(!array->isStrided());
         CPPUNIT_ASSERT_EQUAL(array->stride(), Index(1));
         CPPUNIT_ASSERT_EQUAL(array->size(), size_t(2));
-        // cannot create a StridedAttributeHandle with a stride of 1
-        CPPUNIT_ASSERT_THROW(StridedHandle::create(*array), openvdb::TypeError);
-        CPPUNIT_ASSERT_THROW(StridedWriteHandle::create(*array), openvdb::TypeError);
     }
 
     { // strided array
@@ -984,10 +978,6 @@ TestAttributeArray::testStrided()
         CPPUNIT_ASSERT_EQUAL(array->get(5), 0);
         CPPUNIT_ASSERT_THROW(array->get(6), IndexError); // out-of-range
 
-        // cannot create a non-strided AttributeHandle for a strided array
-        CPPUNIT_ASSERT_THROW(NonStridedHandle::create(*array), TypeError);
-        CPPUNIT_ASSERT_THROW(InterleavedHandle::create(*array), TypeError);
-        CPPUNIT_ASSERT_THROW(InterleavedWriteHandle::create(*array), TypeError);
         CPPUNIT_ASSERT_NO_THROW(StridedHandle::create(*array));
         CPPUNIT_ASSERT_NO_THROW(StridedWriteHandle::create(*array));
 
@@ -1033,78 +1023,6 @@ TestAttributeArray::testStrided()
         size_t arrayMem = 64;
 
         CPPUNIT_ASSERT_EQUAL(array->memUsage(), sizeof(int) * /*size*/3 * /*stride*/2 + arrayMem);
-    }
-
-    { // strided, interleaved array
-        AttributeArrayI::Ptr array = AttributeArrayI::create(/*n=*/2, /*stride=*/3);
-        array->setInterleaved(true);
-
-        CPPUNIT_ASSERT(array->isStrided());
-        CPPUNIT_ASSERT(array->isInterleaved());
-        CPPUNIT_ASSERT_EQUAL(array->stride(), Index(3));
-        CPPUNIT_ASSERT_EQUAL(array->size(), size_t(2));
-        CPPUNIT_ASSERT(array->isUniform());
-
-        array->setInterleaved(false);
-
-        CPPUNIT_ASSERT(!array->isInterleaved());
-
-        array->setInterleaved(true);
-
-        CPPUNIT_ASSERT_EQUAL(array->get(0), 0);
-        CPPUNIT_ASSERT_EQUAL(array->get(5), 0);
-        CPPUNIT_ASSERT_THROW(array->get(6), IndexError); // out-of-range
-
-        CPPUNIT_ASSERT_EQUAL(array->get(4), 0);
-        CPPUNIT_ASSERT_EQUAL(array->get(3), 0);
-
-        CPPUNIT_ASSERT_THROW(StridedHandle::create(*array), TypeError);
-        CPPUNIT_ASSERT_THROW(StridedWriteHandle::create(*array), TypeError);
-        CPPUNIT_ASSERT_NO_THROW(InterleavedHandle::create(*array));
-        CPPUNIT_ASSERT_NO_THROW(InterleavedWriteHandle::create(*array));
-
-        InterleavedWriteHandle writeHandle(*array);
-
-        CPPUNIT_ASSERT_EQUAL(array->get(4), 0);
-        CPPUNIT_ASSERT_EQUAL(array->get(3), 0);
-
-        CPPUNIT_ASSERT_EQUAL(array->get(4), 0);
-        CPPUNIT_ASSERT_EQUAL(array->get(3), 0);
-
-        writeHandle.set(0, 2, 5);
-        writeHandle.set(1, 1, 10);
-
-        // interleaved: 0 0 0 10 5 0
-
-        CPPUNIT_ASSERT_EQUAL(array->get(4), 5);
-        CPPUNIT_ASSERT_EQUAL(array->get(3), 10);
-
-        CPPUNIT_ASSERT_EQUAL(writeHandle.get(0, 2), 5);
-        CPPUNIT_ASSERT_EQUAL(writeHandle.get(1, 1), 10);
-
-        InterleavedHandle handle(*array);
-
-        CPPUNIT_ASSERT_EQUAL(handle.get(0, 2), 5);
-        CPPUNIT_ASSERT_EQUAL(handle.get(1, 1), 10);
-
-        size_t arrayMem = 64;
-
-        CPPUNIT_ASSERT_EQUAL(array->memUsage(), sizeof(int) * /*size*/3 * /*stride*/2 + arrayMem);
-
-        std::ostringstream ostr(std::ios_base::binary);
-        io::setDataCompression(ostr, io::COMPRESS_BLOSC);
-
-        array->write(ostr);
-
-        AttributeArrayI attrB;
-
-        std::istringstream istr(ostr.str(), std::ios_base::binary);
-        attrB.read(istr);
-
-        InterleavedHandle handle2(attrB);
-
-        CPPUNIT_ASSERT_EQUAL(handle2.get(0, 2), 5);
-        CPPUNIT_ASSERT_EQUAL(handle2.get(1, 1), 10);
     }
 }
 

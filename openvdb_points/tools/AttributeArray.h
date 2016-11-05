@@ -133,8 +133,7 @@ public:
                 WRITEUNIFORM = 0x8,         /// (serialization only) - mark as uniform
                 WRITEMEMCOMPRESS = 0x10,    /// (serialization only) - mark as compressed in-memory
                 WRITEDISKCOMPRESS = 0x20,   /// (serialization only) - mark as compressed on-disk
-                OUTOFCORE = 0x40,           /// data not yet loaded from disk
-                INTERLEAVED = 0x80 };       /// for strided attributes only, interleave values
+                OUTOFCORE = 0x40 };         /// data not yet loaded from disk
 
 #ifndef OPENVDB_2_ABI_COMPATIBLE
     struct FileInfo
@@ -151,7 +150,7 @@ public:
 
     using FactoryMethod = Ptr (*)(size_t, Index);
 
-    template <typename ValueType, typename CodecType, bool Strided, bool Interleaved> friend class AttributeHandle;
+    template <typename ValueType, typename CodecType> friend class AttributeHandle;
 
     AttributeArray() = default;
     virtual ~AttributeArray() = default;
@@ -170,13 +169,6 @@ public:
 
     /// Return true if the array is strided.
     virtual bool isStrided() const = 0;
-
-    /// @brief Specify whether the array elements are interleaved in memory
-    /// @note this means nothing if the array is not also strided.
-    virtual void setInterleaved(bool state);
-    /// Return true if the array is interleaved.
-    /// @note this means nothing if the array is not also strided.
-    virtual bool isInterleaved() const { return bool(mFlags & INTERLEAVED); }
 
     /// Return the number of bytes of memory used by this attribute.
     virtual size_t memUsage() const = 0;
@@ -578,11 +570,11 @@ private:
 
 /// AttributeHandles provide access to specific TypedAttributeArray methods without needing
 /// to know the compression codec, however these methods also incur the cost of a function pointer
-template <typename ValueType, typename CodecType = UnknownCodec, bool Strided = false, bool Interleaved = false>
+template <typename ValueType, typename CodecType = UnknownCodec>
 class AttributeHandle
 {
 public:
-    using Handle    = AttributeHandle<ValueType, CodecType, Strided, Interleaved>;
+    using Handle    = AttributeHandle<ValueType, CodecType>;
     using Ptr       = std::shared_ptr<Handle>;
     using UniquePtr = std::unique_ptr<Handle>;
 
@@ -642,11 +634,11 @@ private:
 
 
 /// Write-able version of AttributeHandle
-template <typename ValueType, typename CodecType = UnknownCodec, bool Strided = false, bool Interleaved = false>
-class AttributeWriteHandle : public AttributeHandle<ValueType, CodecType, Strided, Interleaved>
+template <typename ValueType, typename CodecType = UnknownCodec>
+class AttributeWriteHandle : public AttributeHandle<ValueType, CodecType>
 {
 public:
-    using Handle    = AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>;
+    using Handle    = AttributeWriteHandle<ValueType, CodecType>;
     using Ptr       = std::shared_ptr<Handle>;
     using ScopedPtr = std::unique_ptr<Handle>;
 
@@ -1573,37 +1565,20 @@ struct AccessorEval<UnknownCodec, ValueType>
 
 // AttributeHandle implementation
 
-template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
-typename AttributeHandle<ValueType, CodecType, Strided, Interleaved>::Ptr
-AttributeHandle<ValueType, CodecType, Strided, Interleaved>::create(const AttributeArray& array, const bool preserveCompression)
+template <typename ValueType, typename CodecType>
+typename AttributeHandle<ValueType, CodecType>::Ptr
+AttributeHandle<ValueType, CodecType>::create(const AttributeArray& array, const bool preserveCompression)
 {
-    return  typename AttributeHandle<ValueType, CodecType, Strided, Interleaved>::Ptr(
-            new AttributeHandle<ValueType, CodecType, Strided, Interleaved>(array, preserveCompression));
+    return  typename AttributeHandle<ValueType, CodecType>::Ptr(
+            new AttributeHandle<ValueType, CodecType>(array, preserveCompression));
 }
 
-template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
-AttributeHandle<ValueType, CodecType, Strided, Interleaved>::AttributeHandle(const AttributeArray& array, const bool preserveCompression)
+template <typename ValueType, typename CodecType>
+AttributeHandle<ValueType, CodecType>::AttributeHandle(const AttributeArray& array, const bool preserveCompression)
     : mArray(&array)
     , mStride(array.stride())
     , mSize(array.size())
 {
-    // check compatibility of array with handle
-
-    if (Strided) {
-        if (!array.isStrided()) {
-            OPENVDB_THROW(TypeError, "Handle can only be bound to an AttributeArray of stride > 1.");
-        }
-        else if (Interleaved && !array.isInterleaved()) {
-            OPENVDB_THROW(TypeError, "Handle can only be bound to an interleaved AttributeArray.");
-        }
-        else if (!Interleaved && array.isInterleaved()) {
-            OPENVDB_THROW(TypeError, "Handle can only be bound to a non-interleaved AttributeArray.");
-        }
-    }
-    else if (array.isStrided()) {
-        OPENVDB_THROW(TypeError, "Handle can only be bound to an AttributeArray of stride 1.");
-    }
-
     if (!this->compatibleType<std::is_same<CodecType, UnknownCodec>::value>()) {
         OPENVDB_THROW(TypeError, "Cannot bind handle due to incompatible type of AttributeArray.");
     }
@@ -1640,64 +1615,63 @@ AttributeHandle<ValueType, CodecType, Strided, Interleaved>::AttributeHandle(con
     mFiller = typedAccessor->mFiller;
 }
 
-template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+template <typename ValueType, typename CodecType>
 template <bool IsUnknownCodec>
 typename std::enable_if<IsUnknownCodec, bool>::type
-AttributeHandle<ValueType, CodecType, Strided, Interleaved>::compatibleType() const
+AttributeHandle<ValueType, CodecType>::compatibleType() const
 {
     // if codec is unknown, just check the value type
 
     return mArray->hasValueType<ValueType>();
 }
 
-template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+template <typename ValueType, typename CodecType>
 template <bool IsUnknownCodec>
 typename std::enable_if<!IsUnknownCodec, bool>::type
-AttributeHandle<ValueType, CodecType, Strided, Interleaved>::compatibleType() const
+AttributeHandle<ValueType, CodecType>::compatibleType() const
 {
     // if the codec is known, check the value type and codec
 
     return mArray->isType<TypedAttributeArray<ValueType, CodecType>>();
 }
 
-template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
-Index AttributeHandle<ValueType, CodecType, Strided, Interleaved>::index(Index n, Index m) const
+template <typename ValueType, typename CodecType>
+Index AttributeHandle<ValueType, CodecType>::index(Index n, Index m) const
 {
-    if (Strided) {
-        if (Interleaved)    return m * mSize + n;
-        else                return n * mStride + m;
+    if (mStride > 1) {
+        return n * mStride + m;
     }
     return n;
 }
 
-template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
-ValueType AttributeHandle<ValueType, CodecType, Strided, Interleaved>::get(Index n, Index m) const
+template <typename ValueType, typename CodecType>
+ValueType AttributeHandle<ValueType, CodecType>::get(Index n, Index m) const
 {
     return this->get<std::is_same<CodecType, UnknownCodec>::value>(this->index(n, m));
 }
 
-template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+template <typename ValueType, typename CodecType>
 template <bool IsUnknownCodec>
 typename std::enable_if<IsUnknownCodec, ValueType>::type
-AttributeHandle<ValueType, CodecType, Strided, Interleaved>::get(Index index) const
+AttributeHandle<ValueType, CodecType>::get(Index index) const
 {
     // if the codec is unknown, use the getter functor
 
     return (*mGetter)(mArray, index);
 }
 
-template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+template <typename ValueType, typename CodecType>
 template <bool IsUnknownCodec>
 typename std::enable_if<!IsUnknownCodec, ValueType>::type
-AttributeHandle<ValueType, CodecType, Strided, Interleaved>::get(Index index) const
+AttributeHandle<ValueType, CodecType>::get(Index index) const
 {
     // if the codec is known, call the method on the attribute array directly
 
     return TypedAttributeArray<ValueType, CodecType>::getUnsafe(mArray, index);
 }
 
-template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
-bool AttributeHandle<ValueType, CodecType, Strided, Interleaved>::isUniform() const
+template <typename ValueType, typename CodecType>
+bool AttributeHandle<ValueType, CodecType>::isUniform() const
 {
     return mArray->isUniform();
 }
@@ -1707,77 +1681,77 @@ bool AttributeHandle<ValueType, CodecType, Strided, Interleaved>::isUniform() co
 
 // AttributeWriteHandle implementation
 
-template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
-typename AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::Ptr
-AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::create(AttributeArray& array, const bool expand)
+template <typename ValueType, typename CodecType>
+typename AttributeWriteHandle<ValueType, CodecType>::Ptr
+AttributeWriteHandle<ValueType, CodecType>::create(AttributeArray& array, const bool expand)
 {
-    return  typename AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::Ptr(
-            new AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>(array, expand));
+    return  typename AttributeWriteHandle<ValueType, CodecType>::Ptr(
+            new AttributeWriteHandle<ValueType, CodecType>(array, expand));
 }
 
-template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
-AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::AttributeWriteHandle(AttributeArray& array, const bool expand)
-    : AttributeHandle<ValueType, CodecType, Strided, Interleaved>(array, /*preserveCompression = */ false)
+template <typename ValueType, typename CodecType>
+AttributeWriteHandle<ValueType, CodecType>::AttributeWriteHandle(AttributeArray& array, const bool expand)
+    : AttributeHandle<ValueType, CodecType>(array, /*preserveCompression = */ false)
 {
     if (expand)     array.expand();
 }
 
-template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
-void AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::set(Index n, const ValueType& value)
+template <typename ValueType, typename CodecType>
+void AttributeWriteHandle<ValueType, CodecType>::set(Index n, const ValueType& value)
 {
     this->set<std::is_same<CodecType, UnknownCodec>::value>(this->index(n, 0), value);
 }
 
-template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
-void AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::set(Index n, Index m, const ValueType& value)
+template <typename ValueType, typename CodecType>
+void AttributeWriteHandle<ValueType, CodecType>::set(Index n, Index m, const ValueType& value)
 {
     this->set<std::is_same<CodecType, UnknownCodec>::value>(this->index(n, m), value);
 }
 
-template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
-void AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::expand(const bool fill)
+template <typename ValueType, typename CodecType>
+void AttributeWriteHandle<ValueType, CodecType>::expand(const bool fill)
 {
     const_cast<AttributeArray*>(this->mArray)->expand(fill);
 }
 
-template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
-void AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::collapse()
+template <typename ValueType, typename CodecType>
+void AttributeWriteHandle<ValueType, CodecType>::collapse()
 {
     const_cast<AttributeArray*>(this->mArray)->collapse();
 }
 
-template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
-bool AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::compact()
+template <typename ValueType, typename CodecType>
+bool AttributeWriteHandle<ValueType, CodecType>::compact()
 {
     return const_cast<AttributeArray*>(this->mArray)->compact();
 }
 
-template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
-void AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::collapse(const ValueType& uniformValue)
+template <typename ValueType, typename CodecType>
+void AttributeWriteHandle<ValueType, CodecType>::collapse(const ValueType& uniformValue)
 {
     this->mCollapser(const_cast<AttributeArray*>(this->mArray), uniformValue);
 }
 
-template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
-void AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::fill(const ValueType& value)
+template <typename ValueType, typename CodecType>
+void AttributeWriteHandle<ValueType, CodecType>::fill(const ValueType& value)
 {
     this->mFiller(const_cast<AttributeArray*>(this->mArray), value);
 }
 
-template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+template <typename ValueType, typename CodecType>
 template <bool IsUnknownCodec>
 typename std::enable_if<IsUnknownCodec, void>::type
-AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::set(Index index, const ValueType& value) const
+AttributeWriteHandle<ValueType, CodecType>::set(Index index, const ValueType& value) const
 {
     // if the codec is unknown, use the setter functor
 
     (*this->mSetter)(const_cast<AttributeArray*>(this->mArray), index, value);
 }
 
-template <typename ValueType, typename CodecType, bool Strided, bool Interleaved>
+template <typename ValueType, typename CodecType>
 template <bool IsUnknownCodec>
 typename std::enable_if<!IsUnknownCodec, void>::type
-AttributeWriteHandle<ValueType, CodecType, Strided, Interleaved>::set(Index index, const ValueType& value) const
+AttributeWriteHandle<ValueType, CodecType>::set(Index index, const ValueType& value) const
 {
     // if the codec is known, call the method on the attribute array directly
 

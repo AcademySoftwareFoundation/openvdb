@@ -92,7 +92,7 @@ convertSegmentsFromHoudini( PointDataTree& tree, const PointIndexTree& indexTree
 
     appendAttribute<ValueType>(tree, name, zeroVal<ValueType>(), count);
 
-    populateAttribute<PointDataTree, PointIndexTree, HoudiniOffsetAttribute, true>(tree, indexTree, name, houdiniOffsets, count);
+    populateAttribute<PointDataTree, PointIndexTree, HoudiniOffsetAttribute>(tree, indexTree, name, houdiniOffsets, count);
 }
 
 template <typename ValueType, bool Strided, typename CodecType = NullCodec>
@@ -116,14 +116,7 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
     appendAttribute<ValueType, CodecType>(tree, name, zeroVal<ValueType>(), stride, defaultValue);
 
     HoudiniAttribute houdiniAttribute(*attribute);
-    if (Strided) {
-        assert(stride > 1);
-        populateAttribute<PointDataTree, PointIndexTree, HoudiniAttribute, true>(tree, indexTree, name, houdiniAttribute, stride);
-    }
-    else {
-        assert(stride == 1);
-        populateAttribute<PointDataTree, PointIndexTree, HoudiniAttribute, false>(tree, indexTree, name, houdiniAttribute);
-    }
+    populateAttribute<PointDataTree, PointIndexTree, HoudiniAttribute>(tree, indexTree, name, houdiniAttribute, stride);
 }
 
 void
@@ -142,7 +135,7 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
     if (attribute->getAIFStringTuple()) {
         appendAttribute<Name>(tree, name);
         HoudiniStringAttribute houdiniAttribute(*attribute);
-        populateAttribute<PointDataTree, PointIndexTree, HoudiniStringAttribute, false>(tree, indexTree, name, houdiniAttribute);
+        populateAttribute<PointDataTree, PointIndexTree, HoudiniStringAttribute>(tree, indexTree, name, houdiniAttribute);
         return;
     }
 
