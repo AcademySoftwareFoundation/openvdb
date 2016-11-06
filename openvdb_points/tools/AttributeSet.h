@@ -98,11 +98,20 @@ public:
 
     AttributeSet();
 
-    /// Construct from the given descriptor
-    explicit AttributeSet(const DescriptorPtr&, size_t arrayLength = 1);
+    /// Construct a new AttributeSet from the given AttributeSet.
+    /// @param attributeSet the old attribute set
+    /// @param arrayLength the desired length of the arrays in the new AttributeSet
+    /// @note This constructor is typically used to resize an existing AttributeSet as
+    ///       it transfers attribute metadata such as hidden and transient flags
+    AttributeSet(const AttributeSet& attributeSet, size_t arrayLength);
 
-    /// Construct from the given AttributeSet
-    AttributeSet(const AttributeSet&, size_t arrayLength);
+    /// Construct a new AttributeSet from the given Descriptor.
+    /// @param descriptor stored in the new AttributeSet and used in construction
+    /// @param arrayLength the desired length of the arrays in the new AttributeSet
+    /// @note Descriptors do not store attribute metadata such as hidden and transient flags
+    ///       which live on the AttributeArrays, so for constructing from an existing AttributeSet
+    ///       use the AttributeSet(const AttributeSet&, size_t) constructor instead
+    explicit AttributeSet(const DescriptorPtr& descriptor, size_t arrayLength = 1);
 
     /// Shallow copy constructor, the descriptor and attribute arrays will be shared.
     AttributeSet(const AttributeSet&);

@@ -186,6 +186,11 @@ TestAttributeSet::testAttributeSetDescriptor()
 
     using Descriptor        = openvdb::tools::AttributeSet::Descriptor;
 
+    { // error on invalid construction
+        Descriptor::Ptr invalidDescr = Descriptor::create(AttributeVec3f::attributeType());
+        CPPUNIT_ASSERT_THROW(invalidDescr->duplicateAppend("P", AttributeS::attributeType()), openvdb::KeyError);
+    }
+
     Descriptor::Ptr descrA = Descriptor::create(AttributeVec3f::attributeType());
 
     descrA = descrA->duplicateAppend("density", AttributeS::attributeType());
@@ -518,17 +523,11 @@ TestAttributeSet::testAttributeSet()
     Descriptor::NameToPosMap groupMap;
     openvdb::MetaMap metadata;
 
-    { // error on invalid construction
-        CPPUNIT_ASSERT_THROW(AttributeSet(Descriptor::Ptr(new Descriptor), size_t(1)), openvdb::IndexError);
-        CPPUNIT_ASSERT_THROW(AttributeSet(Descriptor::create(AttributeS::attributeType()), size_t(1)), openvdb::IndexError);
-
-        Descriptor::Ptr invalidDescr = Descriptor::create(AttributeVec3s::attributeType());
-        invalidDescr = invalidDescr->duplicateAppend("test", AttributeVec3s::attributeType());
-        CPPUNIT_ASSERT_THROW(AttributeSet attrSet(invalidDescr), openvdb::IndexError);
-        invalidDescr = Descriptor::Ptr(new Descriptor)->duplicateAppend("P2", AttributeVec3s::attributeType());
-        CPPUNIT_ASSERT_THROW(AttributeSet attrSet(invalidDescr), openvdb::IndexError);
-        invalidDescr = Descriptor::Ptr(new Descriptor)->duplicateAppend("P", AttributeS::attributeType());
-        CPPUNIT_ASSERT_THROW(AttributeSet attrSet(invalidDescr), openvdb::IndexError);
+    { // construction
+        Descriptor::Ptr descr = Descriptor::create(AttributeVec3s::attributeType());
+        descr = descr->duplicateAppend("test", AttributeI::attributeType());
+        AttributeSet attrSet(descr);
+        CPPUNIT_ASSERT_EQUAL(attrSet.size(), size_t(2));
     }
 
     { // transfer of flags on construction
