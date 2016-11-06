@@ -138,7 +138,7 @@ convertPointDataGridPosition(   PositionAttribute& positionAttribute,
                                 const Index64 startOffset,
                                 const std::vector<Name>& includeGroups = std::vector<Name>(),
                                 const std::vector<Name>& excludeGroups = std::vector<Name>(),
-                                const bool inCoreOnly = true);
+                                const bool inCoreOnly = false);
 
 
 /// @brief Convert the attribute from a PointDataGrid
@@ -163,7 +163,7 @@ convertPointDataGridAttribute(  TypedAttribute& attribute,
                                 const Index stride = 1,
                                 const std::vector<Name>& includeGroups = std::vector<Name>(),
                                 const std::vector<Name>& excludeGroups = std::vector<Name>(),
-                                const bool inCoreOnly = true);
+                                const bool inCoreOnly = false);
 
 
 /// @brief Convert the group from a PointDataGrid
@@ -187,7 +187,7 @@ convertPointDataGridGroup(  Group& group,
                             const AttributeSet::Descriptor::GroupIndex index,
                             const std::vector<Name>& includeGroups = std::vector<Name>(),
                             const std::vector<Name>& excludeGroups = std::vector<Name>(),
-                            const bool inCoreOnly = true);
+                            const bool inCoreOnly = false);
 
 /// @ brief Given a container of world space positions and a target points per voxel, compute a uniform
 ///         voxel size that would best represent the storage of the points in a VDB grid. This voxel
@@ -460,7 +460,7 @@ struct ConvertPointDataGridPositionOp {
                                     const size_t index,
                                     const std::vector<Name>& includeGroups = std::vector<Name>(),
                                     const std::vector<Name>& excludeGroups = std::vector<Name>(),
-                                    const bool inCoreOnly = true)
+                                    const bool inCoreOnly = false)
         : mAttribute(attribute)
         , mPointOffsets(pointOffsets)
         , mStartOffset(startOffset)
@@ -486,9 +486,7 @@ struct ConvertPointDataGridPositionOp {
 
             assert(leaf.pos() < mPointOffsets.size());
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
             if (mInCoreOnly && leaf->buffer().isOutOfCore())    continue;
-#endif
 
             Index64 offset = mStartOffset;
 
@@ -546,7 +544,7 @@ struct ConvertPointDataGridAttributeOp {
                                     const Index stride = 1,
                                     const std::vector<Name>& includeGroups = std::vector<Name>(),
                                     const std::vector<Name>& excludeGroups = std::vector<Name>(),
-                                    const bool inCoreOnly = true)
+                                    const bool inCoreOnly = false)
         : mAttribute(attribute)
         , mPointOffsets(pointOffsets)
         , mStartOffset(startOffset)
@@ -566,9 +564,7 @@ struct ConvertPointDataGridAttributeOp {
 
             assert(leaf.pos() < mPointOffsets.size());
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
             if (mInCoreOnly && leaf->buffer().isOutOfCore())    continue;
-#endif
 
             Index64 offset = mStartOffset;
 
@@ -650,7 +646,7 @@ struct ConvertPointDataGridGroupOp {
                                 const AttributeSet::Descriptor::GroupIndex index,
                                 const std::vector<Name>& includeGroups = std::vector<Name>(),
                                 const std::vector<Name>& excludeGroups = std::vector<Name>(),
-                                const bool inCoreOnly = true)
+                                const bool inCoreOnly = false)
         : mGroup(group)
         , mPointOffsets(pointOffsets)
         , mStartOffset(startOffset)
@@ -667,9 +663,7 @@ struct ConvertPointDataGridGroupOp {
 
             assert(leaf.pos() < mPointOffsets.size());
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
             if (mInCoreOnly && leaf->buffer().isOutOfCore())    continue;
-#endif
 
             Index64 offset = mStartOffset;
 
