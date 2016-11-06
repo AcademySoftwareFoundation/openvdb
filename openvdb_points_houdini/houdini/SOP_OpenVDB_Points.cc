@@ -140,7 +140,7 @@ convertSegmentsFromHoudini( PointDataTree& tree, const PointIndexTree& indexTree
     populateAttribute<PointDataTree, PointIndexTree, HoudiniOffsetAttribute>(tree, indexTree, name, houdiniOffsets, count);
 }
 
-template <typename ValueType, bool Strided, typename CodecType = NullCodec>
+template <typename ValueType, typename CodecType = NullCodec>
 void
 convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree, const openvdb::Name& name,
                             const GA_Attribute* const attribute, const GA_Defaults& defaults, const Index stride = 1)
@@ -194,110 +194,85 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
         return;
     }
 
-    const GA_AIFTuple* const tupleAIF = attribute->getAIFTuple();
-    const GA_Defaults defaults = tupleAIF->getDefaults(attribute);
-
-    if (width == 1)
-    {
-        if (storage == GA_STORE_BOOL) {
-            convertAttributeFromHoudini<bool, false>(tree, indexTree, name, attribute, defaults);
-        }
-        else if (storage == GA_STORE_INT16) {
-            convertAttributeFromHoudini<int16_t, false>(tree, indexTree, name, attribute, defaults);
-        }
-        else if (storage == GA_STORE_INT32) {
-            convertAttributeFromHoudini<int32_t, false>(tree, indexTree, name, attribute, defaults);
-        }
-        else if (storage == GA_STORE_INT64) {
-            convertAttributeFromHoudini<int64_t, false>(tree, indexTree, name, attribute, defaults);
-        }
-        else if (storage == GA_STORE_REAL16)
-        {
-            // implicitly convert 16-bit float into truncated 32-bit float
-
-            convertAttributeFromHoudini<float, false, TruncateCodec>(tree, indexTree, name, attribute, defaults);
-        }
-        else if (storage == GA_STORE_REAL32)
-        {
-            if (compression == NONE) {
-                convertAttributeFromHoudini<float, false>(tree, indexTree, name, attribute, defaults);
-            }
-            else if (compression == TRUNCATE) {
-                convertAttributeFromHoudini<float, false, TruncateCodec>(tree, indexTree, name, attribute, defaults);
-            }
-            else if (compression == UNIT_FIXED_POINT_8) {
-                convertAttributeFromHoudini<float, false, FixedPointCodec<true, UnitRange>>(tree, indexTree, name, attribute, defaults);
-            }
-            else if (compression == UNIT_FIXED_POINT_16) {
-                convertAttributeFromHoudini<float, false, FixedPointCodec<false, UnitRange>>(tree, indexTree, name, attribute, defaults);
-            }
-        }
-        else if (storage == GA_STORE_REAL64) {
-            convertAttributeFromHoudini<double, false>(tree, indexTree, name, attribute, defaults);
-        }
+    const GA_AIFTuple* tupleAIF = attribute->getAIFTuple();
+    if (!tupleAIF) {
+        std::stringstream ss; ss << "Invalid attribute type - " << attribute->getName();
+        throw std::runtime_error(ss.str());
     }
-    else if (width == 3 || width == 4)
-    {
-        // note: process 4-component vectors as 3-component vectors for now
 
+    GA_Defaults defaults = tupleAIF->getDefaults(attribute);
+    const GA_TypeInfo typeInfo(attribute->getOptions().typeInfo());
+
+    const bool isVector = width == 3 && (typeInfo == GA_TYPE_VECTOR ||
+                                         typeInfo == GA_TYPE_NORMAL ||
+                                         typeInfo == GA_TYPE_COLOR);
+
+    if (isVector)
+    {
         if (storage == GA_STORE_INT32) {
-            convertAttributeFromHoudini<Vec3<int>, false>(tree, indexTree, name, attribute, defaults);
+            convertAttributeFromHoudini<Vec3<int>>(tree, indexTree, name, attribute, defaults);
         }
         else if (storage == GA_STORE_REAL16)
         {
             // implicitly convert 16-bit float into truncated 32-bit float
 
-            convertAttributeFromHoudini<Vec3<float>, false, TruncateCodec>(tree, indexTree, name, attribute, defaults);
+            convertAttributeFromHoudini<Vec3<float>, TruncateCodec>(tree, indexTree, name, attribute, defaults);
         }
         else if (storage == GA_STORE_REAL32)
         {
             if (compression == NONE) {
-                convertAttributeFromHoudini<Vec3<float>, false>(tree, indexTree, name, attribute, defaults);
+                convertAttributeFromHoudini<Vec3<float>>(tree, indexTree, name, attribute, defaults);
             }
             else if (compression == TRUNCATE) {
-                convertAttributeFromHoudini<Vec3<float>, false, TruncateCodec>(tree, indexTree, name, attribute, defaults);
+                convertAttributeFromHoudini<Vec3<float>, TruncateCodec>(tree, indexTree, name, attribute, defaults);
             }
             else if (compression == UNIT_VECTOR) {
-                convertAttributeFromHoudini<Vec3<float>, false, UnitVecCodec>(tree, indexTree, name, attribute, defaults);
+                convertAttributeFromHoudini<Vec3<float>, UnitVecCodec>(tree, indexTree, name, attribute, defaults);
             }
         }
         else if (storage == GA_STORE_REAL64) {
-            convertAttributeFromHoudini<Vec3<double>, false>(tree, indexTree, name, attribute, defaults);
+            convertAttributeFromHoudini<Vec3<double>>(tree, indexTree, name, attribute, defaults);
+        }
+        else {
+            std::stringstream ss; ss << "Unknown vector attribute type - " << name;
+            throw std::runtime_error(ss.str());
         }
     }
-    else if (storage == GA_STORE_BOOL) {
-        convertAttributeFromHoudini<bool, true>(tree, indexTree, name, attribute, defaults, width);
-    }
-    else if (storage == GA_STORE_INT16) {
-        convertAttributeFromHoudini<int16_t, true>(tree, indexTree, name, attribute, defaults, width);
-    }
-    else if (storage == GA_STORE_INT32) {
-        convertAttributeFromHoudini<int32_t, true>(tree, indexTree, name, attribute, defaults, width);
-    }
-    else if (storage == GA_STORE_INT64) {
-        convertAttributeFromHoudini<int64_t, true>(tree, indexTree, name, attribute, defaults, width);
-    }
-    else if (storage == GA_STORE_REAL16) {
-        convertAttributeFromHoudini<float, true, TruncateCodec>(tree, indexTree, name, attribute, defaults, width);
-    }
-    else if (storage == GA_STORE_REAL32 && compression == NONE) {
-        convertAttributeFromHoudini<float, true>(tree, indexTree, name, attribute, defaults, width);
-    }
-    else if (storage == GA_STORE_REAL32 && compression == TRUNCATE) {
-        convertAttributeFromHoudini<float, true, TruncateCodec>(tree, indexTree, name, attribute, defaults, width);
-    }
-    else if (storage == GA_STORE_REAL32 && compression == UNIT_FIXED_POINT_8) {
-        convertAttributeFromHoudini<float, true, FixedPointCodec<true, UnitRange>>(tree, indexTree, name, attribute, defaults, width);
-    }
-    else if (storage == GA_STORE_REAL32 && compression == UNIT_FIXED_POINT_16) {
-        convertAttributeFromHoudini<float, true, FixedPointCodec<false, UnitRange>>(tree, indexTree, name, attribute, defaults, width);
-    }
-    else if (storage == GA_STORE_REAL64) {
-        convertAttributeFromHoudini<double, true>(tree, indexTree, name, attribute, defaults, width);
-    }
     else {
-        std::stringstream ss; ss << "Unknown attribute type - " << name;
-        throw std::runtime_error(ss.str());
+        if (storage == GA_STORE_BOOL) {
+            convertAttributeFromHoudini<bool>(tree, indexTree, name, attribute, defaults, width);
+        }
+        else if (storage == GA_STORE_INT16) {
+            convertAttributeFromHoudini<int16_t>(tree, indexTree, name, attribute, defaults, width);
+        }
+        else if (storage == GA_STORE_INT32) {
+            convertAttributeFromHoudini<int32_t>(tree, indexTree, name, attribute, defaults, width);
+        }
+        else if (storage == GA_STORE_INT64) {
+            convertAttributeFromHoudini<int64_t>(tree, indexTree, name, attribute, defaults, width);
+        }
+        else if (storage == GA_STORE_REAL16) {
+            convertAttributeFromHoudini<float, TruncateCodec>(tree, indexTree, name, attribute, defaults, width);
+        }
+        else if (storage == GA_STORE_REAL32 && compression == NONE) {
+            convertAttributeFromHoudini<float>(tree, indexTree, name, attribute, defaults, width);
+        }
+        else if (storage == GA_STORE_REAL32 && compression == TRUNCATE) {
+            convertAttributeFromHoudini<float, TruncateCodec>(tree, indexTree, name, attribute, defaults, width);
+        }
+        else if (storage == GA_STORE_REAL32 && compression == UNIT_FIXED_POINT_8) {
+            convertAttributeFromHoudini<float, FixedPointCodec<true, UnitRange>>(tree, indexTree, name, attribute, defaults, width);
+        }
+        else if (storage == GA_STORE_REAL32 && compression == UNIT_FIXED_POINT_16) {
+            convertAttributeFromHoudini<float, FixedPointCodec<false, UnitRange>>(tree, indexTree, name, attribute, defaults, width);
+        }
+        else if (storage == GA_STORE_REAL64) {
+            convertAttributeFromHoudini<double>(tree, indexTree, name, attribute, defaults, width);
+        }
+        else {
+            std::stringstream ss; ss << "Unknown attribute type - " << name;
+            throw std::runtime_error(ss.str());
+        }
     }
 }
 
@@ -1166,6 +1141,11 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
                     const int16_t width(attributeTupleSize(attribute));
                     assert(width > 0);
 
+                    const GA_TypeInfo typeInfo(attribute->getOptions().typeInfo());
+                    const bool isVector = width == 3 && (   typeInfo == GA_TYPE_VECTOR ||
+                                                            typeInfo == GA_TYPE_NORMAL ||
+                                                            typeInfo == GA_TYPE_COLOR);
+
                     const bool bloscCompression = evalIntInst("blosccompression#", &i, 0, 0);
                     int valueCompression = evalIntInst("valuecompression#", &i, 0, 0);
 
@@ -1191,7 +1171,7 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
                                 addWarning(SOP_MESSAGE, ss.str().c_str());
                             }
 
-                            if (valueCompression == UNIT_VECTOR && (storage != GA_STORE_REAL32 || width != 3)) {
+                            if (valueCompression == UNIT_VECTOR && (storage != GA_STORE_REAL32 || !isVector)) {
                                 std::stringstream ss; ss << "Unit Vector value compression only supported for vector 3 x 32-bit floating-point attributes. "
                                                             "Disabling compression for attribute \"" << attributeName << "\".";
                                 valueCompression = NONE;

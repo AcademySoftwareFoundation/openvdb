@@ -437,7 +437,7 @@ convertPointDataGridToHoudini(GU_Detail& detail,
         const unsigned index = namePos.second;
 
         const openvdb::tools::AttributeArray& array = leafIter->constAttributeArray(index);
-        const openvdb::Index stride = array.stride();
+        const unsigned stride = array.stride();
 
         const openvdb::NamePair& type = descriptor.type(index);
         const openvdb::Name valueType(openvdb::tools::isString(array) ? "string" : type.first);
@@ -453,11 +453,20 @@ convertPointDataGridToHoudini(GU_Detail& detail,
                 storage = GA_STORE_REAL16;
             }
 
+            unsigned width = stride;
             const bool isVector = valueType.compare(0, 4, "vec3") == 0;
-            const unsigned width = isVector ? 3 : stride;
+            if (isVector)   width = 3;
+
             const GA_Defaults defaults = gaDefaultsFromDescriptor(descriptor, name);
 
             attributeRef = detail.addTuple(storage, GA_ATTRIB_POINT, name.c_str(), width, defaults);
+
+            // apply type info to some recognised types
+            if (isVector) {
+                if (name == "Cd")       attributeRef->getOptions().setTypeInfo(GA_TYPE_COLOR);
+                else if (name == "v")   attributeRef->getOptions().setTypeInfo(GA_TYPE_VECTOR);
+                else if (name == "N")   attributeRef->getOptions().setTypeInfo(GA_TYPE_NORMAL);
+            }
 
             // '|' and ':' characters are valid in OpenVDB Points names but will make Houdini Attribute names invalid
             if (attributeRef.isInvalid()) {
