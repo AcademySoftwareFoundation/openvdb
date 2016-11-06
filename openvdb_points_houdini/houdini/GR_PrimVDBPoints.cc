@@ -834,19 +834,23 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
         UT_Vector3H *pdata = static_cast<UT_Vector3H*>(posGeo->map(r));
 
         std::vector<Name> includeGroups;
+        std::vector<Name> excludeGroups;
         if (useGroup)   includeGroups.push_back(groupName);
 
         std::vector<Index64> pointOffsets;
-        getPointOffsets(pointOffsets, grid.tree(), includeGroups);
+        getPointOffsets(pointOffsets, grid.tree(),
+                        includeGroups, excludeGroups, /*inCoreOnly=*/true);
 
         PositionAttribute positionAttribute(pdata, mCentroid, stride, mCurves);
         convertPointDataGridPosition(positionAttribute, grid, pointOffsets,
-                                    /*startOffset=*/ 0, includeGroups);
+                                    /*startOffset=*/ 0, includeGroups, excludeGroups,
+                                    /*inCoreOnly=*/true);
 
         if (mCurves) {
             OffsetAttribute offsetAttribute(pdata, stride, true);
             convertPointDataGridAttribute(  offsetAttribute, grid.tree(), pointOffsets,
-                                            /*startOffset=*/ 0, segmentsIndex, /*stride*/stride-1, includeGroups);
+                                            /*startOffset=*/ 0, segmentsIndex, /*stride*/stride-1,
+                                            includeGroups, excludeGroups, /*inCoreOnly=*/true);
         }
 
         // unmap the buffer so it can be used by GL and set the cache version
@@ -1060,15 +1064,17 @@ GR_PrimVDBPoints::updateVec3Buffer( RE_Render* r,
         UT_Vector3H *data = static_cast<UT_Vector3H*>(bufferGeo->map(r));
 
         std::vector<Name> includeGroups;
+        std::vector<Name> excludeGroups;
         if (useGroup)   includeGroups.push_back(groupName);
 
         std::vector<Index64> pointOffsets;
-        getPointOffsets(pointOffsets, grid.tree(), includeGroups);
+        getPointOffsets(pointOffsets, grid.tree(), includeGroups, excludeGroups, /*inCoreOnly=*/true);
 
         if (type == "vec3s") {
             VectorAttribute<Vec3f> typedAttribute(data);
-            convertPointDataGridAttribute(typedAttribute, grid.tree(), pointOffsets,
-                                         /*startOffset=*/ 0, index, /*stride=*/1, includeGroups);
+            convertPointDataGridAttribute(  typedAttribute, grid.tree(), pointOffsets,
+                                            /*startOffset=*/ 0, index, /*stride=*/1,
+                                            includeGroups, excludeGroups, /*inCoreOnly=*/true);
         }
 
         // unmap the buffer so it can be used by GL and set the cache version

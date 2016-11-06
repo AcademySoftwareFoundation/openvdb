@@ -88,7 +88,7 @@ template <typename PointDataTreeT>
 Index64 getPointOffsets(std::vector<Index64>& pointOffsets, const PointDataTreeT& tree,
                      const std::vector<Name>& includeGroups = std::vector<Name>(),
                      const std::vector<Name>& excludeGroups = std::vector<Name>(),
-                     const bool inCoreOnly = true);
+                     const bool inCoreOnly = false);
 
 
 /// @brief Total points in the group in the PointDataTree
@@ -135,10 +135,7 @@ struct PointCountOp
     Index64 operator()(const typename LeafManagerT::LeafRange& range, Index64 size) const {
 
         for (auto leaf = range.begin(); leaf; ++leaf) {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
             if (mInCoreOnly && leaf->buffer().isOutOfCore())     continue;
-#endif
-
             auto iter = leaf->template beginIndex<ValueIterT, FilterT>(mFilter);
             size += iterCount(iter);
         }
@@ -208,11 +205,7 @@ Index64 pointCount(const PointDataTreeT& tree, const bool inCoreOnly)
     (void) inCoreOnly;
     Index64 size = 0;
     for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
         if (inCoreOnly && iter->buffer().isOutOfCore())     continue;
-#else
-        (void) inCoreOnly; // unused variable
-#endif
         size += iter->pointCount();
     }
     return size;
@@ -225,11 +218,7 @@ Index64 activePointCount(const PointDataTreeT& tree, const bool inCoreOnly)
     (void) inCoreOnly;
     Index64 size = 0;
     for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
         if (inCoreOnly && iter->buffer().isOutOfCore())     continue;
-#else
-        (void) inCoreOnly; // unused variable
-#endif
         size += iter->onPointCount();
     }
     return size;
@@ -242,11 +231,7 @@ Index64 inactivePointCount(const PointDataTreeT& tree, const bool inCoreOnly)
     (void) inCoreOnly;
     Index64 size = 0;
     for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
         if (inCoreOnly && iter->buffer().isOutOfCore())     continue;
-#else
-        (void) inCoreOnly; // unused variable
-#endif
         size += iter->offPointCount();
     }
     return size;
@@ -296,15 +281,11 @@ Index64 getPointOffsets(std::vector<Index64>& pointOffsets, const PointDataTreeT
     {
         const LeafNode& leaf = leafManager.leaf(n);
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
         // skip out-of-core leafs
         if (inCoreOnly && leaf.buffer().isOutOfCore()) {
             pointOffsets.push_back(pointOffset);
             continue;
         }
-#else
-        (void) inCoreOnly; // unused variable
-#endif
 
         if (useGroup) {
             auto iter = leaf.beginValueOn();
