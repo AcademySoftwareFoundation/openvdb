@@ -706,6 +706,13 @@ template<typename T, Index Log2Dim>
 inline void
 PointDataLeafNode<T, Log2Dim>::initializeAttributes(const Descriptor::Ptr& descriptor, const size_t arrayLength)
 {
+    if (descriptor->size() != 1 ||
+        descriptor->find("P") == AttributeSet::INVALID_POS ||
+        descriptor->valueType(0) != typeNameAsString<Vec3f>())
+    {
+        OPENVDB_THROW(IndexError, "Initializing attributes only allowed with one Vec3f position attribute.");
+    }
+
     mAttributeSet.reset(new AttributeSet(descriptor, arrayLength));
 }
 

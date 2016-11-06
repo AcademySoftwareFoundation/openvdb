@@ -92,21 +92,6 @@ AttributeSet::AttributeSet()
 }
 
 
-AttributeSet::AttributeSet(const DescriptorPtr& descr, size_t arrayLength)
-    : mDescr(descr)
-    , mAttrs(descr->size(), AttributeArray::Ptr())
-{
-    if (descr->size() != 1 ||
-        descr->find("P") == INVALID_POS ||
-        descr->valueType(0) != typeNameAsString<Vec3f>())
-    {
-        OPENVDB_THROW(IndexError, "AttributeSet construction from Descriptor only allowed with one Vec3f position attribute.");
-    }
-
-    mAttrs[0] = AttributeArray::create(mDescr->type(0), arrayLength, 1);
-}
-
-
 AttributeSet::AttributeSet(const AttributeSet& attrSet, size_t arrayLength)
     : mDescr(attrSet.descriptorPtr())
     , mAttrs(attrSet.descriptor().size(), AttributeArray::Ptr())
@@ -120,6 +105,17 @@ AttributeSet::AttributeSet(const AttributeSet& attrSet, size_t arrayLength)
         if (attrSet.getConst(pos)->isTransient())   array->setTransient(true);
 
         mAttrs[pos] = array;
+    }
+}
+
+
+AttributeSet::AttributeSet(const DescriptorPtr& descr, size_t arrayLength)
+    : mDescr(descr)
+    , mAttrs(descr->size(), AttributeArray::Ptr())
+{
+    for (const auto& namePos : mDescr->map()) {
+        const size_t& pos = namePos.second;
+        mAttrs[pos] = AttributeArray::create(mDescr->type(pos), arrayLength, 1);
     }
 }
 
@@ -784,6 +780,9 @@ AttributeSet::Descriptor::insert(const std::string& name, const NamePair& typeNa
     size_t pos = INVALID_POS;
     auto it = mNameMap.find(name);
     if (it != mNameMap.end()) {
+        if (it->first != typeName.first) {
+            OPENVDB_THROW(KeyError, "Cannot insert into a Descriptor with a duplicate name, but different type.")
+        }
         pos = it->second;
     } else {
 
