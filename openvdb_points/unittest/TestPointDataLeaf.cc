@@ -34,6 +34,7 @@
 #include <openvdb_points/tools/PointDataGrid.h>
 #include <openvdb_points/openvdb.h>
 #include <openvdb/openvdb.h>
+#include <openvdb/io/io.h>
 
 class TestPointDataLeaf: public CppUnit::TestCase
 {
@@ -880,6 +881,9 @@ TestPointDataLeaf::testReadWriteCompression()
     util::NodeMask<3> valueMask;
     util::NodeMask<3> childMask;
 
+    io::StreamMetadata::Ptr nullMetadata;
+    io::StreamMetadata::Ptr streamMetadata(new io::StreamMetadata);
+
     {  // simple read/write test
         std::stringstream ss;
 
@@ -900,15 +904,80 @@ TestPointDataLeaf::testReadWriteCompression()
             }
         }
 
-#ifndef OPENVDB_USE_BLOSC
-        { // write to indicate Blosc compression
+        const char* charBuffer = reinterpret_cast<const char*>(srcBuf.get());
+        size_t referenceBytes = compression::bloscCompressedSize(charBuffer, count*sizeof(PointDataIndex32));
+
+        {
             ss.str("");
 
-            uint16_t bytes16(100); // clamp to 16-bit unsigned integer
-            ss.write(reinterpret_cast<const char*>(&bytes16), sizeof(uint16_t));
+            io::setStreamMetadataPtr(ss, streamMetadata);
+
+            io::writeCompressedValuesSize(ss, srcBuf.get(), count);
+            io::writeCompressedValues(ss, srcBuf.get(), count, valueMask, childMask, false);
+            int magic = 1924674;
+            ss.write(reinterpret_cast<const char*>(&magic), sizeof(int));
 
             std::unique_ptr<PointDataIndex32[]> destBuf(new PointDataIndex32[count]);
-            CPPUNIT_ASSERT_THROW(io::readCompressedValues(ss, destBuf.get(), count, valueMask, false), IoError);
+
+            uint16_t size;
+            ss.read(reinterpret_cast<char*>(&size), sizeof(uint16_t));
+            if (size == std::numeric_limits<uint16_t>::max())   size = 0;
+
+            CPPUNIT_ASSERT_EQUAL(size_t(size), referenceBytes);
+
+            io::readCompressedValues(ss, destBuf.get(), count, valueMask, false);
+
+            int magic2;
+            ss.read(reinterpret_cast<char*>(&magic2), sizeof(int));
+
+            CPPUNIT_ASSERT_EQUAL(magic, magic2);
+
+            for (Index i = 0; i < count; i++) {
+                CPPUNIT_ASSERT_EQUAL(srcBuf.get()[i], destBuf.get()[i]);
+            }
+
+            io::setStreamMetadataPtr(ss, nullMetadata);
+        }
+
+        { // repeat but using nullptr for destination to force seek behaviour
+            ss.str("");
+
+            io::setStreamMetadataPtr(ss, streamMetadata);
+
+            io::writeCompressedValuesSize(ss, srcBuf.get(), count);
+            io::writeCompressedValues(ss, srcBuf.get(), count, valueMask, childMask, false);
+            int magic = 3829250;
+            ss.write(reinterpret_cast<const char*>(&magic), sizeof(int));
+
+            uint16_t size;
+            ss.read(reinterpret_cast<char*>(&size), sizeof(uint16_t));
+            uint16_t actualSize(size);
+            if (size == std::numeric_limits<uint16_t>::max())   actualSize = 0;
+
+            CPPUNIT_ASSERT_EQUAL(size_t(actualSize), referenceBytes);
+
+            streamMetadata->setPass(size);
+
+            PointDataIndex32* forceSeek = nullptr;
+            io::readCompressedValues(ss, forceSeek, count, valueMask, false);
+
+            int magic2;
+            ss.read(reinterpret_cast<char*>(&magic2), sizeof(int));
+
+            CPPUNIT_ASSERT_EQUAL(magic, magic2);
+
+            io::setStreamMetadataPtr(ss, nullMetadata);
+        }
+
+#ifndef OPENVDB_USE_BLOSC
+        { // write to indicate Blosc compression
+            std::stringstream ssInvalid;
+
+            uint16_t bytes16(100); // clamp to 16-bit unsigned integer
+            ssInvalid.write(reinterpret_cast<const char*>(&bytes16), sizeof(uint16_t));
+
+            std::unique_ptr<PointDataIndex32[]> destBuf(new PointDataIndex32[count]);
+            CPPUNIT_ASSERT_THROW(io::readCompressedValues(ssInvalid, destBuf.get(), count, valueMask, false), RuntimeError);
         }
 #endif
 
@@ -918,11 +987,11 @@ TestPointDataLeaf::testReadWriteCompression()
 
             ss.str("");
             io::writeCompressedValues(ss, srcBuf.get(), count, valueMask, childMask, false);
-            CPPUNIT_ASSERT_THROW(io::readCompressedValues(ss, destBuf.get(), count+1, valueMask, false), IoError);
+            CPPUNIT_ASSERT_THROW(io::readCompressedValues(ss, destBuf.get(), count+1, valueMask, false), RuntimeError);
 
             ss.str("");
             io::writeCompressedValues(ss, srcBuf.get(), count, valueMask, childMask, false);
-            CPPUNIT_ASSERT_THROW(io::readCompressedValues(ss, destBuf.get(), 1, valueMask, false), IoError);
+            CPPUNIT_ASSERT_THROW(io::readCompressedValues(ss, destBuf.get(), 1, valueMask, false), RuntimeError);
         }
 #endif
 
@@ -977,6 +1046,7 @@ TestPointDataLeaf::testReadWriteCompression()
 void
 TestPointDataLeaf::testIO()
 {
+    using namespace openvdb;
     using namespace openvdb::tools;
 
     // Define and register some common attribute types
@@ -1045,18 +1115,38 @@ TestPointDataLeaf::testIO()
     {
         LeafType leaf2(openvdb::Coord(0, 0, 0));
 
+        io::StreamMetadata::Ptr streamMetadata(new io::StreamMetadata);
+
         std::ostringstream ostr(std::ios_base::binary);
+        io::setStreamMetadataPtr(ostr, streamMetadata);
+        io::setDataCompression(ostr, io::COMPRESS_BLOSC);
         leaf.writeTopology(ostr);
-        leaf.writeBuffers(ostr);
+        for (Index b = 0; b < leaf.buffers(); b++) {
+            streamMetadata->setPass(b);
+            leaf.writeBuffers(ostr);
+        }
+        { // error checking
+            streamMetadata->setPass(1000);
+            leaf.writeBuffers(ostr);
+
+            io::StreamMetadata::Ptr meta;
+            io::setStreamMetadataPtr(ostr, meta);
+            CPPUNIT_ASSERT_THROW(leaf.writeBuffers(ostr), openvdb::IoError);
+        }
 
         std::istringstream istr(ostr.str(), std::ios_base::binary);
+        io::setStreamMetadataPtr(istr, streamMetadata);
+        io::setDataCompression(istr, io::COMPRESS_BLOSC);
 
         // Since the input stream doesn't include a VDB header with file format version info,
         // tag the input stream explicitly with the current version number.
-        openvdb::io::setCurrentVersion(istr);
+        io::setCurrentVersion(istr);
 
         leaf2.readTopology(istr);
-        leaf2.readBuffers(istr);
+        for (Index b = 0; b < leaf.buffers(); b++) {
+            streamMetadata->setPass(b);
+            leaf2.readBuffers(istr);
+        }
 
         // check topology matches
 
@@ -1068,6 +1158,45 @@ TestPointDataLeaf::testIO()
 
         CPPUNIT_ASSERT_EQUAL(leaf2.getValue(4), ValueType(20));
         CPPUNIT_ASSERT_EQUAL(leaf2.attributeSet().size(), size_t(2));
+    }
+
+    { // test multi-buffer IO
+        // create a new grid with a single origin leaf
+
+        PointDataGrid::Ptr grid = PointDataGrid::create();
+        grid->setName("points");
+        grid->tree().addLeaf(new LeafType(leaf));
+
+        openvdb::GridCPtrVec grids;
+        grids.push_back(grid);
+
+        // write to file
+
+        {
+            io::File file("leaf.vdb");
+            file.write(grids);
+            file.close();
+        }
+
+        // read grids from file (using delayed loading)
+
+        PointDataGrid::Ptr gridFromDisk;
+
+        {
+            io::File file("leaf.vdb");
+            file.open();
+            openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
+            file.close();
+
+            gridFromDisk = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
+        }
+
+        LeafType* leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
+        CPPUNIT_ASSERT(leafFromDisk);
+
+        CPPUNIT_ASSERT(leaf == *leafFromDisk);
+
+        remove("leaf.vdb");
     }
 }
 

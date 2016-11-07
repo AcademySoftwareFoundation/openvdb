@@ -32,17 +32,34 @@
 ///
 /// @authors Dan Bailey
 ///
-/// @brief Lossless block compression schemes such as Blosc.
+/// @brief Convenience wrappers to using Blosc and reading and writing of Paged data.
+///
+/// Blosc is most effective with large (> ~256KB) blocks of data. Writing the entire
+/// data block contiguously would provide the most optimal compression, however would
+/// limit the ability to use delayed-loading as the whole block would be required to
+/// be loaded from disk at once. To balance these two competing factors, Paging is used
+/// to write out blocks of data that are a reasonable size for Blosc. These Pages are
+/// loaded lazily, tracking the input stream pointers and creating Handles that reference
+/// portions of the buffer. When the Page buffer is accessed, the data will be read from
+/// the stream.
 ///
 
 
 #ifndef OPENVDB_TOOLS_STREAM_COMPRESSION_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_STREAM_COMPRESSION_HAS_BEEN_INCLUDED
 
-#include <openvdb/io/Compression.h> // COMPRESS_BLOSC
+#include <tbb/spin_mutex.h>
 
 #include <memory>
 #include <string>
+
+#ifdef OPENVDB_USE_BLOSC
+#include <blosc.h>
+#endif
+
+#include <openvdb/io/io.h>
+
+class TestStreamCompression;
 
 
 namespace openvdb {
@@ -114,6 +131,182 @@ void bloscDecompress(   char* uncompressedBuffer, const size_t expectedBytes,
 ///                             skipped if it is known that the resulting buffer is temporary
 std::unique_ptr<char[]> bloscDecompress(const char* buffer, const size_t expectedBytes,
                                         const bool resize = true);
+
+
+////////////////////////////////////////
+
+
+// 1MB = 1048576 Bytes
+static const int PageSize = 1024 * 1024;
+
+
+/// @brief Stores a variable-size, compressed, delayed-load Page of data
+/// that is loaded into memory when accessed. Access to the Page is
+/// thread-safe as loading and decompressing the data is protected by a mutex.
+class Page
+{
+private:
+    struct Info
+    {
+        io::MappedFile::Ptr mappedFile;
+        SharedPtr<io::StreamMetadata> meta;
+        std::streamoff filepos;
+        long compressedBytes;
+        long uncompressedBytes;
+    }; // Info
+
+public:
+    using Ptr = std::shared_ptr<Page>;
+
+    Page() = default;
+
+    /// @brief load the Page into memory
+    void load() const;
+
+    /// @brief Uncompressed bytes of the Paged data, available
+    /// when the header has been read.
+    long uncompressedBytes() const;
+
+    /// @brief Retrieves a data pointer at the specific @param index
+    /// @note Will force a Page load when called.
+    const char* buffer(const int index) const;
+
+    /// @brief Read the Page header
+    void readHeader(std::istream& is);
+
+    /// @brief Read the Page buffers. If @param delayed is true, stream
+    /// pointers will be stored to load the data lazily.
+    void readBuffers(std::istream&is, bool delayed);
+
+    /// @brief Test if the data is out-of-core
+    bool isOutOfCore() const;
+
+private:
+    /// @brief Convenience method to store a copy of the supplied buffer
+    void copy(const std::unique_ptr<char[]>& temp, int pageSize);
+
+    /// @brief Decompress and store the supplied data
+    void decompress(const std::unique_ptr<char[]>& temp);
+
+    /// @brief Thread-safe loading of the data
+    void doLoad() const;
+
+    std::unique_ptr<Info> mInfo = std::unique_ptr<Info>(new Info);
+    std::unique_ptr<char[]> mData;
+    tbb::spin_mutex mMutex;
+}; // class Page
+
+
+/// @brief A PageHandle holds a shared ptr to a Page and a specific stream
+/// pointer to a point within the decompressed Page buffer
+class PageHandle
+{
+public:
+    using Ptr = std::shared_ptr<PageHandle>;
+
+    /// @brief Create the page handle
+    /// @param page a shared ptr to the page that stores the buffer
+    /// @param index start position of the buffer to be read
+    /// @param size total size of the buffer to be read in bytes
+    PageHandle(const Page::Ptr& page, const int index, const int size);
+
+    /// @brief Retrieve a reference to the stored page
+    Page& page();
+
+    /// @brief Read and return the buffer, loading and decompressing
+    /// the Page if necessary.
+    std::unique_ptr<char[]> read();
+
+protected:
+    friend class ::TestStreamCompression;
+
+private:
+    Page::Ptr mPage;
+    int mIndex = -1;
+    int mSize = 0;
+}; // class PageHandle
+
+
+/// @brief A Paging wrapper to std::istream that is responsible for reading
+/// from a given input stream and creating Page objects and PageHandles that
+/// reference those pages for delayed reading.
+class PagedInputStream
+{
+public:
+    using Ptr = std::shared_ptr<PagedInputStream>;
+
+    PagedInputStream() = default;
+
+    explicit PagedInputStream(std::istream& is);
+
+    /// @brief Size-only mode tags the stream as only reading size data.
+    void setSizeOnly(bool sizeOnly) { mSizeOnly = sizeOnly; }
+    bool sizeOnly() const { return mSizeOnly; }
+
+    // @brief Set and get the input stream
+    std::istream& getInputStream() { assert(mIs); return *mIs; }
+    void setInputStream(std::istream& is) { mIs = &is; }
+
+    /// @brief Creates a PageHandle to access the next @param n bytes of the Page.
+    PageHandle::Ptr createHandle(std::streamsize n);
+
+    /// @brief Takes a @param pageHandle and updates the referenced page with the
+    /// current stream pointer position and if @param delayed is false performs
+    /// an immediate read of the data.
+    void read(PageHandle::Ptr& pageHandle, std::streamsize n, bool delayed = true);
+
+private:
+    int mByteIndex = 0;
+    int mUncompressedBytes = 0;
+    std::istream* mIs = nullptr;
+    Page::Ptr mPage;
+    bool mSizeOnly = false;
+}; // class PagedInputStream
+
+
+/// @brief A Paging wrapper to std::ostream that is responsible for writing
+/// from a given output stream at intervals set by the PageSize. As Pages are
+/// variable in size, they are flushed to disk as soon as sufficiently large.
+class PagedOutputStream
+{
+public:
+    using Ptr = std::shared_ptr<PagedOutputStream>;
+
+    PagedOutputStream() = default;
+
+    explicit PagedOutputStream(std::ostream& os);
+
+    /// @brief Size-only mode tags the stream as only writing size data.
+    void setSizeOnly(bool sizeOnly) { mSizeOnly = sizeOnly; }
+    bool sizeOnly() const { return mSizeOnly; }
+
+    /// @brief Set and get the output stream
+    std::ostream& getOutputStream() { assert(mOs); return *mOs; }
+    void setOutputStream(std::ostream& os) { mOs = &os; }
+
+    /// @brief Writes the given @param str buffer of size @param n
+    PagedOutputStream& write(const char* str, std::streamsize n);
+
+    /// @brief Manually flushes the current page to disk if non-zero
+    void flush();
+
+private:
+    /// @brief Compress the @param buffer of @param size bytes and write
+    /// out to the stream.
+    void compressAndWrite(const char* buffer, size_t size);
+
+    /// @brief Resize the internal page buffer to @param size bytes
+    void resize(size_t size);
+
+    std::unique_ptr<char[]> mData = std::unique_ptr<char[]>(new char[PageSize]);
+#ifdef OPENVDB_USE_BLOSC
+    std::unique_ptr<char[]> mCompressedData = std::unique_ptr<char[]>(new char[PageSize + BLOSC_MAX_OVERHEAD]);
+#endif
+    size_t mCapacity = PageSize;
+    int mBytes = 0;
+    std::ostream* mOs = nullptr;
+    bool mSizeOnly = false;
+}; // class PagedOutputStream
 
 
 } // namespace compression

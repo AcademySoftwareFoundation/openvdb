@@ -64,7 +64,6 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 
 
-// Add new alias for a Name pair
 using NamePair = std::pair<Name, Name>;
 
 namespace tools {
@@ -127,25 +126,19 @@ protected:
     using AccessorBasePtr = std::shared_ptr<AccessorBase>;
 
 public:
-    enum Flag { TRANSIENT = 0x1,            /// by default not written to disk
-                HIDDEN = 0x2,               /// hidden from UIs or iterators
-                WRITESTRIDED = 0x4,         /// (serialization only) - mark as strided
-                WRITEUNIFORM = 0x8,         /// (serialization only) - mark as uniform
-                WRITEMEMCOMPRESS = 0x10,    /// (serialization only) - mark as compressed in-memory
-                WRITEDISKCOMPRESS = 0x20,   /// (serialization only) - mark as compressed on-disk
-                OUTOFCORE = 0x40,           /// data not yet loaded from disk
-                CONSTANTSTRIDE = 0x80       /// constant stride
-            };
-
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-    struct FileInfo
-    {
-        std::streamoff bufpos = 0;
-        Index64 bytes = 0;
-        io::MappedFile::Ptr mapping;
-        SharedPtr<io::StreamMetadata> meta;
+    enum Flag {
+        TRANSIENT = 0x1,            /// by default not written to disk
+        HIDDEN = 0x2,               /// hidden from UIs or iterators
+        OUTOFCORE = 0x4,            /// data not yet loaded from disk
+        CONSTANTSTRIDE = 0x8        /// stride size does not vary in the array
     };
-#endif
+
+    enum SerializationFlag {
+        WRITESTRIDED = 0x1,         /// data is marked as strided when written
+        WRITEUNIFORM = 0x2,         /// data is marked as uniform when written
+        WRITEMEMCOMPRESS = 0x4,     /// data is marked as compressed in-memory when written
+        WRITEPAGED = 0x8            /// data is written out in pages
+    };
 
     using Ptr           = std::shared_ptr<AttributeArray>;
     using ConstPtr      = std::shared_ptr<const AttributeArray>;
@@ -240,7 +233,27 @@ public:
     virtual void read(std::istream&) = 0;
     /// Write attribute metadata and buffers to a stream.
     /// @param outputTransient if true, write out transient attributes
-    virtual void write(std::ostream&, bool outputTransient = false) const = 0;
+    virtual void write(std::ostream&, bool outputTransient) const = 0;
+    /// Write attribute metadata and buffers to a stream, don't write transient attributes.
+    virtual void write(std::ostream&) const = 0;
+
+    /// Read attribute metadata from a stream.
+    virtual void readMetadata(std::istream&) = 0;
+    /// Write attribute metadata to a stream.
+    /// @param outputTransient if true, write out transient attributes
+    virtual void writeMetadata(std::ostream&, bool outputTransient, bool paged) const = 0;
+
+    /// Read attribute buffers from a stream.
+    virtual void readBuffers(std::istream&) = 0;
+    /// Write attribute buffers to a stream.
+    /// @param outputTransient if true, write out transient attributes
+    virtual void writeBuffers(std::ostream&, bool outputTransient) const = 0;
+
+    /// Read attribute buffers from a paged stream.
+    virtual void readPagedBuffers(compression::PagedInputStream&) = 0;
+    /// Write attribute buffers to a paged stream.
+    /// @param outputTransient if true, write out transient attributes
+    virtual void writePagedBuffers(compression::PagedOutputStream&, bool outputTransient) const = 0;
 
     /// Ensures all data is in-core
     virtual void loadData() const = 0;
@@ -272,11 +285,10 @@ protected:
 
     size_t mCompressedBytes = 0;
     uint16_t mFlags = 0;
+    uint16_t mSerializationFlags = 0;
 
-    /// Out-of-core data
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-    SharedPtr<FileInfo> mFileInfo;
-#endif
+    /// used for out-of-core, paged reading
+    compression::PageHandle::Ptr mPageHandle;
 }; // class AttributeArray
 
 
@@ -445,7 +457,7 @@ public:
     virtual AttributeArray::Ptr copyUncompressed() const override;
 
     /// Return a new attribute array of the given length @a n and @a stride with uniform value zero.
-    static Ptr create(Index n, Index stride = 1, bool constantStride = true);
+    static Ptr create(Index n, Index strideOrTotalSize = 1, bool constantStride = true);
 
     /// Cast an AttributeArray to TypedAttributeArray<T>
     static TypedAttributeArray& cast(AttributeArray& attributeArray);
@@ -542,7 +554,27 @@ public:
     virtual void read(std::istream&) override;
     /// Write attribute data to a stream.
     /// @param outputTransient if true, write out transient attributes
-    virtual void write(std::ostream&, bool outputTransient = false) const override;
+    virtual void write(std::ostream&, bool outputTransient) const override;
+    /// Write attribute data to a stream, don't write transient attributes.
+    virtual void write(std::ostream&) const override;
+
+    /// Read attribute metadata from a stream.
+    virtual void readMetadata(std::istream&) override;
+    /// Write attribute metadata to a stream.
+    /// @param outputTransient if true, write out transient attributes
+    virtual void writeMetadata(std::ostream&, bool outputTransient, bool paged) const override;
+
+    /// Read attribute buffers from a stream.
+    virtual void readBuffers(std::istream&) override;
+    /// Write attribute buffers to a stream.
+    /// @param outputTransient if true, write out transient attributes
+    virtual void writeBuffers(std::ostream&, bool outputTransient) const override;
+
+    /// Read attribute buffers from a paged stream.
+    virtual void readPagedBuffers(compression::PagedInputStream&) override;
+    /// Write attribute buffers to a paged stream.
+    /// @param outputTransient if true, write out transient attributes
+    virtual void writePagedBuffers(compression::PagedOutputStream&, bool outputTransient) const override;
 
     /// Return @c true if this buffer's values have not yet been read from disk.
     inline bool isOutOfCore() const;
@@ -557,7 +589,10 @@ private:
     /// Load data from memory-mapped file.
     inline void doLoad() const;
     /// Load data from memory-mapped file (unsafe as this function is not protected by a mutex).
-    inline void doLoadUnsafe() const;
+    /// @param compression if true, loading previously compressed data will re-compressed it
+    inline void doLoadUnsafe(const bool compression = true) const;
+    /// Compress in-core data assuming mutex is locked
+    inline bool compressUnsafe();
 
     /// Toggle out-of-core state
     inline void setOutOfCore(const bool);
@@ -570,14 +605,14 @@ private:
     void deallocate();
 
     /// Helper function for use with registerType()
-    static AttributeArray::Ptr factory(Index n, Index stride, bool constantStride) {
-        return TypedAttributeArray::create(n, stride, constantStride);
+    static AttributeArray::Ptr factory(Index n, Index strideOrTotalSize, bool constantStride) {
+        return TypedAttributeArray::create(n, strideOrTotalSize, constantStride);
     }
 
     static tbb::atomic<const NamePair*> sTypeName;
     std::unique_ptr<StorageType[]>      mData;
-    Index                             mSize;
-    Index                             mStrideOrTotalSize;
+    Index                               mSize;
+    Index                               mStrideOrTotalSize;
     bool                                mIsUniform = false;
     tbb::spin_mutex                     mMutex;
 }; // class TypedAttributeArray
@@ -608,7 +643,7 @@ public:
 
     virtual ~AttributeHandle() = default;
 
-    Index stride() const { return mStride; }
+    Index stride() const { return mStrideOrTotalSize; }
     Index size() const { return mSize; }
 
     bool isUniform() const;
@@ -644,7 +679,7 @@ private:
     // local copy of AttributeArray (to preserve compression)
     AttributeArray::Ptr mLocalArray;
 
-    Index mStride;
+    Index mStrideOrTotalSize;
     Index mSize;
 }; // class AttributeHandle
 
@@ -861,6 +896,7 @@ TypedAttributeArray<ValueType_, Codec_>::operator=(const TypedAttributeArray& rh
         this->deallocate();
 
         mFlags = rhs.mFlags;
+        mSerializationFlags = rhs.mSerializationFlags;
         mCompressedBytes = rhs.mCompressedBytes;
         mSize = rhs.mSize;
         mStrideOrTotalSize = rhs.mStrideOrTotalSize;
@@ -869,10 +905,8 @@ TypedAttributeArray<ValueType_, Codec_>::operator=(const TypedAttributeArray& rh
         if (mIsUniform) {
             this->allocate();
             mData.get()[0] = rhs.mData.get()[0];
-#ifndef OPENVDB_2_ABI_COMPATIBLE
         } else if (rhs.isOutOfCore()) {
-            mFileInfo = rhs.mFileInfo;
-#endif
+            mPageHandle = rhs.mPageHandle;
         } else if (this->isCompressed()) {
             std::unique_ptr<char[]> buffer(new char[mCompressedBytes]);
             std::memcpy(buffer.get(), rhs.mData.get(), mCompressedBytes);
@@ -995,13 +1029,11 @@ template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::deallocate()
 {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
     // detach from file if delay-loaded
     if (this->isOutOfCore()) {
         this->setOutOfCore(false);
-        this->mFileInfo.reset();
+        this->mPageHandle.reset();
     }
-#endif
     if (mData)      mData.reset();
 }
 
@@ -1239,9 +1271,30 @@ TypedAttributeArray<ValueType_, Codec_>::compress()
 
         tbb::spin_mutex::scoped_lock lock(mMutex);
 
-        this->doLoadUnsafe();
+        this->doLoadUnsafe(/*compression=*/false);
 
-        const size_t inBytes = this->arrayMemUsage();
+        if (this->isCompressed())   return true;
+
+        return this->compressUnsafe();
+    }
+
+    return false;
+}
+
+
+template<typename ValueType_, typename Codec_>
+inline bool
+TypedAttributeArray<ValueType_, Codec_>::compressUnsafe()
+{
+    if (!compression::bloscCanCompress())     return false;
+    if (mIsUniform)                           return false;
+
+    // assumes mutex is locked and data is not out-of-core
+
+    const bool writeCompress = (mSerializationFlags & WRITEMEMCOMPRESS);
+    const size_t inBytes = writeCompress ? mCompressedBytes : this->arrayMemUsage();
+
+    if (inBytes > 0) {
         size_t outBytes;
         const char* charBuffer = reinterpret_cast<const char*>(mData.get());
         std::unique_ptr<char[]> buffer = compression::bloscCompress(charBuffer, inBytes, outBytes);
@@ -1261,6 +1314,13 @@ inline bool
 TypedAttributeArray<ValueType_, Codec_>::decompress()
 {
     tbb::spin_mutex::scoped_lock lock(mMutex);
+
+    const bool writeCompress = (mSerializationFlags & WRITEMEMCOMPRESS);
+
+    if (writeCompress) {
+        this->doLoadUnsafe(/*compression=*/false);
+        return true;
+    }
 
     if (this->isCompressed()) {
         this->doLoadUnsafe();
@@ -1282,11 +1342,7 @@ template<typename ValueType_, typename Codec_>
 bool
 TypedAttributeArray<ValueType_, Codec_>::isOutOfCore() const
 {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
     return (mFlags & OUTOFCORE);
-#else
-    return false;
-#endif
 }
 
 
@@ -1294,12 +1350,8 @@ template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::setOutOfCore(const bool b)
 {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
     if (b)  mFlags |= OUTOFCORE;
     else    mFlags &= ~OUTOFCORE;
-#else
-    (void) b;
-#endif
 }
 
 
@@ -1307,7 +1359,6 @@ template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::doLoad() const
 {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
     if (!(this->isOutOfCore()))     return;
 
     TypedAttributeArray<ValueType_, Codec_>* self = const_cast<TypedAttributeArray<ValueType_, Codec_>*>(this);
@@ -1316,7 +1367,6 @@ TypedAttributeArray<ValueType_, Codec_>::doLoad() const
     // will no longer be out-of-core.
     tbb::spin_mutex::scoped_lock lock(self->mMutex);
     this->doLoadUnsafe();
-#endif
 }
 
 
@@ -1332,30 +1382,41 @@ template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::read(std::istream& is)
 {
+    this->readMetadata(is);
+    this->readBuffers(is);
+}
+
+
+template<typename ValueType_, typename Codec_>
+void
+TypedAttributeArray<ValueType_, Codec_>::readMetadata(std::istream& is)
+{
     // read data
 
     Index64 bytes = Index64(0);
     is.read(reinterpret_cast<char*>(&bytes), sizeof(Index64));
-    bytes = bytes - /*flags*/sizeof(Int16) - /*size*/sizeof(Index64);
+    bytes = bytes - /*flags*/sizeof(Int16) - /*size*/sizeof(Index);
 
-    Int16 flags = Int16(0);
-    is.read(reinterpret_cast<char*>(&flags), sizeof(Int16));
+    uint8_t flags = uint8_t(0);
+    is.read(reinterpret_cast<char*>(&flags), sizeof(uint8_t));
     mFlags = flags;
 
-    Index64 size = Index64(0);
-    is.read(reinterpret_cast<char*>(&size), sizeof(Index64));
-    mSize = size;
+    uint8_t serializationFlags = uint8_t(0);
+    is.read(reinterpret_cast<char*>(&serializationFlags), sizeof(uint8_t));
+    mSerializationFlags = serializationFlags;
 
-    std::unique_ptr<char[]> buffer(new char[bytes]);
+    Index size = Index(0);
+    is.read(reinterpret_cast<char*>(&size), sizeof(Index));
+    mSize = size;
 
     // read uniform and compressed state
 
-    mIsUniform = mFlags & WRITEUNIFORM;
-    mCompressedBytes = mFlags & WRITEMEMCOMPRESS ? bytes : Index64(0);
+    mIsUniform = mSerializationFlags & WRITEUNIFORM;
+    mCompressedBytes = bytes;
 
     // read strided value (set to 1 if array is not strided)
 
-    if (mFlags & WRITESTRIDED) {
+    if (mSerializationFlags & WRITESTRIDED) {
         Index stride = Index(0);
         is.read(reinterpret_cast<char*>(&stride), sizeof(Index));
         mStrideOrTotalSize = stride;
@@ -1363,40 +1424,40 @@ TypedAttributeArray<ValueType_, Codec_>::read(std::istream& is)
     else {
         mStrideOrTotalSize = 1;
     }
+}
 
-    // clear uniform and compress flags
 
-    mFlags &= Int16(~WRITEUNIFORM & ~WRITEMEMCOMPRESS);
+template<typename ValueType_, typename Codec_>
+void
+TypedAttributeArray<ValueType_, Codec_>::readBuffers(std::istream& is)
+{
+    if ((mSerializationFlags & WRITEPAGED)) {
+        // use readBuffers(PagedInputStream&) for paged buffers
+        OPENVDB_THROW(IoError, "Cannot read paged AttributeArray buffers.");
+    }
 
     tbb::spin_mutex::scoped_lock lock(mMutex);
 
     this->deallocate();
 
-#ifndef OPENVDB_2_ABI_COMPATIBLE
-    // If this array is being read from a memory-mapped file, delay loading of its data
-    // until the data is actually accessed.
-    io::MappedFile::Ptr mappedFile = io::getMappedFilePtr(is);
-    const bool delayLoad = (mappedFile.get() != nullptr);
+    uint8_t bloscCompressed(0);
+    if (!mIsUniform)    is.read(reinterpret_cast<char*>(&bloscCompressed), sizeof(uint8_t));
 
-    if (delayLoad) {
-        this->setOutOfCore(true);
-        mFileInfo.reset(new FileInfo);
-        mFileInfo->bufpos = is.tellg();
-        mFileInfo->mapping = mappedFile;
-        mFileInfo->bytes = bytes;
-        mFileInfo->meta = io::getStreamMetadataPtr(is);
+    std::unique_ptr<char[]> buffer(new char[mCompressedBytes]);
+    is.read(buffer.get(), mCompressedBytes);
 
-        // read and discard buffer
-        is.read(buffer.get(), bytes);
-        return;
+    if (mIsUniform) {
+        // zero compressed bytes as uniform values are not compressed in memory
+        mCompressedBytes = Index64(0);
     }
-#endif
-
-    is.read(buffer.get(), bytes);
+    else if (!(mSerializationFlags & WRITEMEMCOMPRESS)) {
+        // zero compressed bytes if not compressed in memory
+        mCompressedBytes = Index64(0);
+    }
 
     // compressed on-disk
 
-    if (mFlags & WRITEDISKCOMPRESS) {
+    if (bloscCompressed == uint8_t(1)) {
 
         // decompress buffer
 
@@ -1411,7 +1472,67 @@ TypedAttributeArray<ValueType_, Codec_>::read(std::istream& is)
 
     // clear all write flags
 
-    mFlags &= Int16(~WRITEDISKCOMPRESS);
+    if (mIsUniform)     mSerializationFlags &= uint8_t(~WRITEUNIFORM & ~WRITEMEMCOMPRESS & ~WRITEPAGED);
+    else                mSerializationFlags &= uint8_t(~WRITEUNIFORM & ~WRITEPAGED);
+}
+
+
+template<typename ValueType_, typename Codec_>
+void
+TypedAttributeArray<ValueType_, Codec_>::readPagedBuffers(compression::PagedInputStream& is)
+{
+    if (!(mSerializationFlags & WRITEPAGED)) {
+        if (!is.sizeOnly()) this->readBuffers(is.getInputStream());
+        return;
+    }
+
+    // If this array is being read from a memory-mapped file, delay loading of its data
+    // until the data is actually accessed.
+    io::MappedFile::Ptr mappedFile = io::getMappedFilePtr(is.getInputStream());
+    const bool delayLoad = (mappedFile.get() != nullptr);
+
+    if (is.sizeOnly())
+    {
+        mPageHandle = is.createHandle(mCompressedBytes);
+        return;
+    }
+
+    assert(mPageHandle);
+
+    tbb::spin_mutex::scoped_lock lock(mMutex);
+
+    this->deallocate();
+
+    this->setOutOfCore(delayLoad);
+    is.read(mPageHandle, mCompressedBytes, delayLoad);
+
+    if (!delayLoad) {
+        std::unique_ptr<char[]> buffer = mPageHandle->read();
+        mData.reset(reinterpret_cast<StorageType*>(buffer.release()));
+    }
+
+    // zero compressed bytes as not compressed in memory
+
+    if (mIsUniform) {
+        // zero compressed bytes as uniform values are not compressed in memory
+        mCompressedBytes = Index64(0);
+    }
+    else if (!(mSerializationFlags & WRITEMEMCOMPRESS)) {
+        mCompressedBytes = Index64(0);
+    }
+
+    // clear all write flags
+
+    if (mIsUniform)     mSerializationFlags &= uint8_t(~WRITEUNIFORM & ~WRITEMEMCOMPRESS & ~WRITEPAGED);
+    else                mSerializationFlags &= uint8_t(~WRITEUNIFORM & ~WRITEPAGED);
+}
+
+
+template<typename ValueType_, typename Codec_>
+void
+TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os) const
+{
+    this->write(os, /*outputTransient=*/false);
 }
 
 
@@ -1419,101 +1540,185 @@ template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os, bool outputTransient) const
 {
-    if (!outputTransient && this->isTransient())    return;
-
-    Int16 flags(mFlags);
-    Index64 size(mSize);
-    Index stride(mStrideOrTotalSize);
-    bool strideOfOne(this->stride() == 1);
-
-    std::unique_ptr<char[]> compressedBuffer;
-    size_t compressedBytes = 0;
-
-    this->doLoad();
-
-    if (!strideOfOne)
-    {
-        flags |= WRITESTRIDED;
-    }
-
-    if (mIsUniform)
-    {
-        flags |= WRITEUNIFORM;
-    }
-    else if (this->isCompressed())
-    {
-        flags |= WRITEMEMCOMPRESS;
-    }
-    else if (io::getDataCompression(os) & io::COMPRESS_BLOSC)
-    {
-        const char* charBuffer = reinterpret_cast<const char*>(mData.get());
-        const size_t inBytes = this->arrayMemUsage();
-        compressedBuffer = compression::bloscCompress(charBuffer, inBytes, compressedBytes, /*resize=*/false);
-        if (compressedBuffer)   flags |= WRITEDISKCOMPRESS;
-    }
-
-    Index64 bytes = /*flags*/ sizeof(Int16) + /*size*/ sizeof(Index64);
-
-    bytes += compressedBuffer ? compressedBytes : this->arrayMemUsage();
-
-    // write data
-
-    os.write(reinterpret_cast<const char*>(&bytes), sizeof(Index64));
-    os.write(reinterpret_cast<const char*>(&flags), sizeof(Int16));
-    os.write(reinterpret_cast<const char*>(&size), sizeof(Index64));
-
-    if (!strideOfOne)       os.write(reinterpret_cast<const char*>(&stride), sizeof(Index));
-
-    if (compressedBuffer)   os.write(reinterpret_cast<const char*>(compressedBuffer.get()), compressedBytes);
-    else                    os.write(reinterpret_cast<const char*>(mData.get()), this->arrayMemUsage());
+    this->writeMetadata(os, outputTransient, /*paged=*/false);
+    this->writeBuffers(os, outputTransient);
 }
 
 
 template<typename ValueType_, typename Codec_>
 void
-TypedAttributeArray<ValueType_, Codec_>::doLoadUnsafe() const
+TypedAttributeArray<ValueType_, Codec_>::writeMetadata(std::ostream& os, bool outputTransient, bool paged) const
 {
-#ifndef OPENVDB_2_ABI_COMPATIBLE
+    if (!outputTransient && this->isTransient())    return;
+
+    uint8_t flags(mFlags);
+    uint8_t serializationFlags(mSerializationFlags);
+    Index size(mSize);
+    Index stride(mStrideOrTotalSize);
+    bool strideOfOne(this->stride() == 1);
+
+    bool bloscCompression = io::getDataCompression(os) & io::COMPRESS_BLOSC;
+
+    size_t compressedBytes = 0;
+
+    if (!strideOfOne)
+    {
+        serializationFlags |= WRITESTRIDED;
+    }
+
+    if (mIsUniform)
+    {
+        serializationFlags |= WRITEUNIFORM;
+        if (bloscCompression && paged)      serializationFlags |= WRITEPAGED;
+    }
+    else if (bloscCompression && paged)
+    {
+        serializationFlags |= WRITEPAGED;
+        if (this->isCompressed()) {
+            serializationFlags |= WRITEMEMCOMPRESS;
+            const char* charBuffer = reinterpret_cast<const char*>(mData.get());
+            compressedBytes = compression::bloscUncompressedSize(charBuffer);
+        }
+    }
+    else if (this->isCompressed())
+    {
+        serializationFlags |= WRITEMEMCOMPRESS;
+        compressedBytes = mCompressedBytes;
+    }
+    else if (bloscCompression)
+    {
+        this->doLoad();
+
+        const char* charBuffer = reinterpret_cast<const char*>(mData.get());
+        const size_t inBytes = this->arrayMemUsage();
+        compressedBytes = compression::bloscCompressedSize(charBuffer, inBytes);
+    }
+
+    Index64 bytes = /*flags*/ sizeof(Int16) + /*size*/ sizeof(Index);
+
+    bytes += (compressedBytes > 0) ? compressedBytes : this->arrayMemUsage();
+
+    // write data
+
+    os.write(reinterpret_cast<const char*>(&bytes), sizeof(Index64));
+    os.write(reinterpret_cast<const char*>(&flags), sizeof(uint8_t));
+    os.write(reinterpret_cast<const char*>(&serializationFlags), sizeof(uint8_t));
+    os.write(reinterpret_cast<const char*>(&size), sizeof(Index));
+
+    // write strided
+    if (!strideOfOne)       os.write(reinterpret_cast<const char*>(&stride), sizeof(Index));
+}
+
+
+template<typename ValueType_, typename Codec_>
+void
+TypedAttributeArray<ValueType_, Codec_>::writeBuffers(std::ostream& os, bool outputTransient) const
+{
+    if (!outputTransient && this->isTransient())    return;
+
+    this->doLoad();
+
+    if (this->isUniform()) {
+        os.write(reinterpret_cast<const char*>(mData.get()), sizeof(StorageType));
+    }
+    else if (this->isCompressed())
+    {
+        uint8_t bloscCompressed(0);
+        os.write(reinterpret_cast<const char*>(&bloscCompressed), sizeof(uint8_t));
+        os.write(reinterpret_cast<const char*>(mData.get()), mCompressedBytes);
+    }
+    else if (io::getDataCompression(os) & io::COMPRESS_BLOSC)
+    {
+        std::unique_ptr<char[]> compressedBuffer;
+        size_t compressedBytes = 0;
+        const char* charBuffer = reinterpret_cast<const char*>(mData.get());
+        const size_t inBytes = this->arrayMemUsage();
+        compressedBuffer = compression::bloscCompress(charBuffer, inBytes, compressedBytes);
+        if (compressedBuffer) {
+            uint8_t bloscCompressed(1);
+            os.write(reinterpret_cast<const char*>(&bloscCompressed), sizeof(uint8_t));
+            os.write(reinterpret_cast<const char*>(compressedBuffer.get()), compressedBytes);
+        }
+        else {
+            uint8_t bloscCompressed(0);
+            os.write(reinterpret_cast<const char*>(&bloscCompressed), sizeof(uint8_t));
+            os.write(reinterpret_cast<const char*>(mData.get()), inBytes);
+        }
+    }
+    else
+    {
+        uint8_t bloscCompressed(0);
+        os.write(reinterpret_cast<const char*>(&bloscCompressed), sizeof(uint8_t));
+        os.write(reinterpret_cast<const char*>(mData.get()), this->arrayMemUsage());
+    }
+}
+
+
+template<typename ValueType_, typename Codec_>
+void
+TypedAttributeArray<ValueType_, Codec_>::writePagedBuffers(compression::PagedOutputStream& os, bool outputTransient) const
+{
+    if (!outputTransient && this->isTransient())    return;
+
+    // paged compression only available when Blosc is enabled
+    bool bloscCompression = io::getDataCompression(os.getOutputStream()) & io::COMPRESS_BLOSC;
+    if (!bloscCompression) {
+        if (!os.sizeOnly())   this->writeBuffers(os.getOutputStream(), outputTransient);
+        return;
+    }
+
+    this->doLoad();
+
+    const char* buffer;
+    size_t bytes;
+
+    std::unique_ptr<char[]> uncompressedBuffer;
+    if (this->isCompressed()) {
+        // paged streams require uncompressed buffers, so locally decompress
+
+        const char* charBuffer = reinterpret_cast<const char*>(this->mData.get());
+        bytes = compression::bloscUncompressedSize(charBuffer);
+        uncompressedBuffer = compression::bloscDecompress(charBuffer, bytes);
+        buffer = reinterpret_cast<const char*>(uncompressedBuffer.get());
+    }
+    else {
+        buffer = reinterpret_cast<const char*>(mData.get());
+        bytes = this->arrayMemUsage();
+    }
+
+    os.write(buffer, bytes);
+}
+
+
+template<typename ValueType_, typename Codec_>
+void
+TypedAttributeArray<ValueType_, Codec_>::doLoadUnsafe(const bool compression) const
+{
     if (!(this->isOutOfCore()))     return;
 
     // this function expects the mutex to already be locked
 
     TypedAttributeArray<ValueType_, Codec_>* self = const_cast<TypedAttributeArray<ValueType_, Codec_>*>(this);
 
-    assert(self->mFileInfo);
-    assert(self->mFileInfo->mapping.get() != nullptr);
+    assert(self->mPageHandle);
 
-    FileInfo& info = *(self->mFileInfo);
-
-    SharedPtr<std::streambuf> buf = info.mapping->createBuffer();
-    std::istream is(buf.get());
-
-    const Index64 bytes = info.bytes;
-
-    is.seekg(info.bufpos);
-
-    std::unique_ptr<char[]> buffer(new char[bytes]);
-    is.read(buffer.get(), bytes);
-
-    // compressed on-disk
-
-    if (mFlags & WRITEDISKCOMPRESS) {
-
-        // decompress buffer
-
-        const size_t inBytes = this->dataSize() * sizeof(StorageType);
-        std::unique_ptr<char[]> newBuffer = compression::bloscDecompress(buffer.get(), inBytes);
-        if (newBuffer)  buffer.reset(newBuffer.release());
-    }
-
-    // set data to buffer
+    std::unique_ptr<char[]> buffer = self->mPageHandle->read();
 
     self->mData.reset(reinterpret_cast<StorageType*>(buffer.release()));
 
-    // clear write and out-of-core flags
+    self->mPageHandle.reset();
 
-    self->mFlags &= Int16(~WRITEDISKCOMPRESS & ~OUTOFCORE);
-#endif
+    // if data was compressed prior to being written to disk, re-compress
+
+    if (self->mSerializationFlags & WRITEMEMCOMPRESS) {
+        if (compression)    self->compressUnsafe();
+        else                self->mCompressedBytes = 0;
+    }
+
+    // clear all write and out-of-core flags
+
+    self->mFlags &= uint8_t(~OUTOFCORE);
+    self->mSerializationFlags &= uint8_t(~WRITEUNIFORM & ~WRITEMEMCOMPRESS & ~WRITEPAGED);
 }
 
 
@@ -1612,7 +1817,7 @@ AttributeHandle<ValueType, CodecType>::create(const AttributeArray& array, const
 template <typename ValueType, typename CodecType>
 AttributeHandle<ValueType, CodecType>::AttributeHandle(const AttributeArray& array, const bool preserveCompression)
     : mArray(&array)
-    , mStride(array.hasConstantStride() ? array.stride() : 1)
+    , mStrideOrTotalSize(array.hasConstantStride() ? array.stride() : 1)
     , mSize(array.hasConstantStride() ? array.size() : array.dataSize())
 {
     if (!this->compatibleType<std::is_same<CodecType, UnknownCodec>::value>()) {
@@ -1674,8 +1879,8 @@ AttributeHandle<ValueType, CodecType>::compatibleType() const
 template <typename ValueType, typename CodecType>
 Index AttributeHandle<ValueType, CodecType>::index(Index n, Index m) const
 {
-    Index index = n * mStride + m;
-    assert(index < (mSize * mStride));
+    Index index = n * mStrideOrTotalSize + m;
+    assert(index < (mSize * mStrideOrTotalSize));
     return index;
 }
 

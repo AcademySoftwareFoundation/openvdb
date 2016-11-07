@@ -73,21 +73,36 @@ inline void
 readCompressedValues(   std::istream& is, PointDataIndex32* destBuf, Index destCount,
                         const util::NodeMask<3>& /*valueMask*/, bool /*fromHalf*/)
 {
-    static_assert(sizeof(PointDataIndex32) == sizeof(Index32),
-                    "Size of PointDataIndex32 expected to match size of Index32");
+    using compression::bloscDecompress;
 
-    const int destBytes = destCount*sizeof(Index32);
-    const int maximumBytes = std::numeric_limits<uint16_t>::max();
+    const bool seek = destBuf == nullptr;
+
+    const size_t destBytes = destCount*sizeof(PointDataIndex32);
+    const size_t maximumBytes = std::numeric_limits<uint16_t>::max();
     if (destBytes >= maximumBytes) {
         OPENVDB_THROW(openvdb::IoError, "Cannot read more than " <<
                                 maximumBytes << " bytes in voxel values.")
     }
 
     uint16_t bytes16;
-    is.read(reinterpret_cast<char*>(&bytes16), sizeof(uint16_t));
 
-    if (bytes16 == std::numeric_limits<uint16_t>::max()) { // uncompressed
-        if (destBuf == nullptr) {
+    const io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(is);
+
+    if (seek && meta) {
+        // buffer size temporarily stored in the StreamMetadata pass
+        // to avoid having to perform an expensive disk read for 2-bytes
+        bytes16 = static_cast<uint16_t>(meta->pass());
+        // seek over size of the compressed buffer
+        is.seekg(sizeof(uint16_t), std::ios_base::cur);
+    }
+    else {
+        // otherwise read from disk
+        is.read(reinterpret_cast<char*>(&bytes16), sizeof(uint16_t));
+    }
+
+    if (bytes16 == std::numeric_limits<uint16_t>::max()) {
+        // read or seek uncompressed data
+        if (seek) {
             is.seekg(destBytes, std::ios_base::cur);
         }
         else {
@@ -95,29 +110,18 @@ readCompressedValues(   std::istream& is, PointDataIndex32* destBuf, Index destC
         }
     }
     else {
-        if (destBuf == nullptr) {
+        // read or seek uncompressed data
+        if (seek) {
             is.seekg(int(bytes16), std::ios_base::cur);
         }
         else {
-#ifndef OPENVDB_USE_BLOSC
-            OPENVDB_THROW(IoError, "Blosc decoding is not supported");
-#else
+            // decompress into the destination buffer
             std::unique_ptr<char[]> bloscBuffer(new char[int(bytes16)]);
             is.read(bloscBuffer.get(), bytes16);
-            const int numUncompressedBytes = blosc_decompress_ctx(  /*src=*/bloscBuffer.get(),
-                                                                    /*dest=*/destBuf,
-                                                                    /*destsize=*/destBytes,
-                                                                    /*numthreads=*/1);
-            if (numUncompressedBytes < 1) {
-                OPENVDB_THROW(IoError, "blosc_decompress() returned error code "
-                                            << numUncompressedBytes);
-            }
-            if (numUncompressedBytes != destBytes) {
-                OPENVDB_THROW(IoError, "Expected to decompress " << destBytes
-                    << " byte" << (destBytes == 1 ? "" : "s") << ", got "
-                    << numUncompressedBytes << " byte" << (numUncompressedBytes == 1 ? "" : "s"));
-            }
-#endif
+            std::unique_ptr<char[]> buffer = bloscDecompress(   bloscBuffer.get(),
+                                                                destBytes,
+                                                                /*resize=*/false);
+            std::memcpy(destBuf, buffer.get(), destBytes);
         }
     }
 }
@@ -130,45 +134,58 @@ writeCompressedValues(  std::ostream& os, PointDataIndex32* srcBuf, Index srcCou
                         const util::NodeMask<3>& /*valueMask*/,
                         const util::NodeMask<3>& /*childMask*/, bool /*toHalf*/)
 {
-    static_assert(sizeof(PointDataIndex32) == sizeof(Index32),
-                    "Size of PointDataIndex32 expected to match size of Index32");
+    using compression::bloscCompress;
 
-    const int srcBytes = srcCount*sizeof(Index32);
-    const int maximumBytes = std::numeric_limits<uint16_t>::max();
+    const size_t srcBytes = srcCount*sizeof(PointDataIndex32);
+    const size_t maximumBytes = std::numeric_limits<uint16_t>::max();
     if (srcBytes >= maximumBytes) {
         OPENVDB_THROW(openvdb::IoError, "Cannot write more than " <<
                                 maximumBytes << " bytes in voxel values.")
     }
 
-    int bloscBytes = 0;
-    std::unique_ptr<char[]> bloscBuffer;
-#ifdef OPENVDB_USE_BLOSC
-    size_t tempBytes = srcBytes + BLOSC_MAX_OVERHEAD;
-    if (tempBytes < BLOSC_MAX_BUFFERSIZE) {
-        bloscBuffer.reset(new char[tempBytes]);
+    const char* charBuffer = reinterpret_cast<const char*>(srcBuf);
 
-        bloscBytes = blosc_compress_ctx(/*clevel=*/9, // 0 (no compression) to 9 (maximum compression)
-                                        /*doshuffle=*/true,
-                                        /*typesize=*/sizeof(Index32),
-                                        /*srcsize=*/srcBytes,
-                                        /*src=*/reinterpret_cast<const char*>(srcBuf),
-                                        /*dest=*/bloscBuffer.get(),
-                                        /*destsize=*/tempBytes,
-                                        BLOSC_LZ4_COMPNAME,
-                                        /*blocksize=*/srcBytes,
-                                        /*numthreads=*/1);
-    }
-#endif
+    size_t compressedBytes;
+    std::unique_ptr<char[]> buffer = bloscCompress( charBuffer, srcBytes,
+                                                    compressedBytes, /*resize=*/false);
 
-    if (bloscBytes > 0) {
-        uint16_t bytes16(bloscBytes); // clamp to 16-bit unsigned integer
+    if (compressedBytes > 0) {
+        uint16_t bytes16(compressedBytes); // clamp to 16-bit unsigned integer
         os.write(reinterpret_cast<const char*>(&bytes16), sizeof(uint16_t));
-        os.write(reinterpret_cast<const char*>(bloscBuffer.get()), bloscBytes);
+        os.write(reinterpret_cast<const char*>(buffer.get()), compressedBytes);
     }
     else {
         uint16_t bytes16(maximumBytes); // max value indicates uncompressed
         os.write(reinterpret_cast<const char*>(&bytes16), sizeof(uint16_t));
         os.write(reinterpret_cast<const char*>(srcBuf), srcBytes);
+    }
+}
+
+template <typename T>
+inline void
+writeCompressedValuesSize(std::ostream& os, const T* srcBuf, Index srcCount)
+{
+    using compression::bloscCompressedSize;
+
+    const size_t srcBytes = srcCount*sizeof(T);
+    const size_t maximumBytes = std::numeric_limits<uint16_t>::max();
+    if (srcBytes >= maximumBytes) {
+        OPENVDB_THROW(openvdb::IoError, "Cannot write more than " <<
+                                maximumBytes << " bytes in voxel values.")
+    }
+
+    const char* charBuffer = reinterpret_cast<const char*>(srcBuf);
+
+    // calculate voxel buffer size after compression
+    size_t compressedBytes = bloscCompressedSize(charBuffer, srcBytes);
+
+    if (compressedBytes > 0) {
+        uint16_t bytes16(compressedBytes); // clamp to 16-bit unsigned integer
+        os.write(reinterpret_cast<const char*>(&bytes16), sizeof(uint16_t));
+    }
+    else {
+        uint16_t bytes16(maximumBytes); // max value indicates uncompressed
+        os.write(reinterpret_cast<const char*>(&bytes16), sizeof(uint16_t));
     }
 }
 
@@ -213,20 +230,9 @@ makeDescriptorUnique(PointDataTreeT& tree);
 
 ////////////////////////////////////////
 
-// Internal utility methods
-namespace point_data_grid_internal {
-
-template<typename T>
-struct UniquePtr
-{
-    using type = std::unique_ptr<T>;
-};
-
-}
-
 
 template <typename T, Index Log2Dim>
-class PointDataLeafNode : public tree::LeafNode<T, Log2Dim> {
+class PointDataLeafNode : public tree::LeafNode<T, Log2Dim>, io::MultiPass {
 
 public:
     using LeafNodeType  = PointDataLeafNode<T, Log2Dim>;
@@ -470,6 +476,8 @@ public:
     void readTopology(std::istream& is, bool fromHalf = false);
     void writeTopology(std::ostream& os, bool toHalf = false) const;
 
+    Index buffers() const;
+
     void readBuffers(std::istream& is, bool fromHalf = false);
     void readBuffers(std::istream& is, const CoordBBox&, bool fromHalf = false);
     void writeBuffers(std::ostream& os, bool toHalf = false) const;
@@ -558,7 +566,8 @@ public:
     using ValueAll  = typename BaseLeaf::ValueAll;
 
 private:
-    point_data_grid_internal::UniquePtr<AttributeSet>::type mAttributeSet;
+    std::unique_ptr<AttributeSet> mAttributeSet;
+    uint16_t mVoxelBufferSize = 0;
 
 protected:
     using ChildOn           = typename BaseLeaf::ChildOn;
@@ -1115,31 +1124,341 @@ PointDataLeafNode<T, Log2Dim>::writeTopology(std::ostream& os, bool toHalf) cons
 }
 
 template<typename T, Index Log2Dim>
-inline void
-PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, bool fromHalf)
+inline Index
+PointDataLeafNode<T, Log2Dim>::buffers() const
 {
-    BaseLeaf::readBuffers(is, fromHalf);
-
-    mAttributeSet->read(is);
+    return Index(   /*voxel buffer sizes*/          1 +
+                    /*voxel buffers*/               1 +
+                    /*attribute metadata*/          1 +
+                    /*attribute uniform values*/    mAttributeSet->size() +
+                    /*attribute buffers*/           mAttributeSet->size() +
+                    /*cleanup*/                     1);
 }
 
 template<typename T, Index Log2Dim>
 inline void
-PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& bbox, bool fromHalf)
+PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, bool fromHalf)
 {
-    // Read and clip voxel values (no clipping yet).
-    BaseLeaf::readBuffers(is, bbox, fromHalf);
+    this->readBuffers(is, CoordBBox::inf(), fromHalf);
+}
 
-    mAttributeSet->read(is);
+template<typename T, Index Log2Dim>
+inline void
+PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& /*bbox*/, bool fromHalf)
+{
+    struct Local
+    {
+        static compression::PagedInputStream& getOrInsertPagedStream(   const io::StreamMetadata::AuxDataMap& auxData,
+                                                                        const Index index)
+        {
+            std::string key("paged:" + std::to_string(index));
+            auto it = auxData.find(key);
+            if (it != auxData.end()) {
+                return *(boost::any_cast<compression::PagedInputStream::Ptr>(it->second));
+            }
+            else {
+                compression::PagedInputStream::Ptr pagedStream = std::make_shared<compression::PagedInputStream>();
+                (const_cast<io::StreamMetadata::AuxDataMap&>(auxData))[key] = pagedStream;
+                return *pagedStream;
+            }
+        }
+
+        static bool hasMatchingDescriptor(const io::StreamMetadata::AuxDataMap& auxData)
+        {
+            std::string matchingKey("hasMatchingDescriptor");
+            auto itMatching = auxData.find(matchingKey);
+            return itMatching != auxData.end();
+        }
+
+        static void clearMatchingDescriptor(const io::StreamMetadata::AuxDataMap& auxData)
+        {
+            std::string matchingKey("hasMatchingDescriptor");
+            std::string descriptorKey("descriptorPtr");
+            auto itMatching = auxData.find(matchingKey);
+            auto itDescriptor = auxData.find(descriptorKey);
+            if (itMatching != auxData.end())    (const_cast<io::StreamMetadata::AuxDataMap&>(auxData)).erase(itMatching);
+            if (itDescriptor != auxData.end())  (const_cast<io::StreamMetadata::AuxDataMap&>(auxData)).erase(itDescriptor);
+        }
+
+        static void insertDescriptor(   const io::StreamMetadata::AuxDataMap& auxData,
+                                        const Descriptor::Ptr descriptor)
+        {
+            std::string descriptorKey("descriptorPtr");
+            std::string matchingKey("hasMatchingDescriptor");
+            auto itMatching = auxData.find(matchingKey);
+            if (itMatching == auxData.end()) {
+                // if matching bool is not found, insert "true" and the descriptor
+                (const_cast<io::StreamMetadata::AuxDataMap&>(auxData))[matchingKey] = true;
+                (const_cast<io::StreamMetadata::AuxDataMap&>(auxData))[descriptorKey] = descriptor;
+            }
+        }
+
+        static AttributeSet::Descriptor::Ptr retrieveMatchingDescriptor(const io::StreamMetadata::AuxDataMap& auxData)
+        {
+            std::string descriptorKey("descriptorPtr");
+            auto itDescriptor = auxData.find(descriptorKey);
+            assert(itDescriptor != auxData.end());
+            const Descriptor::Ptr descriptor = boost::any_cast<AttributeSet::Descriptor::Ptr>(itDescriptor->second);
+            return descriptor;
+        }
+    };
+
+    const io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(is);
+
+    if (!meta) {
+        OPENVDB_THROW(IoError, "Cannot read in a PointDataLeaf without StreamMetadata.");
+    }
+
+    const Index pass = meta->pass();
+
+    const Index attributes = (this->buffers() - 4) / 2;
+
+    if (pass == 0) {
+        // pass 0 - voxel data sizes
+        is.read(reinterpret_cast<char*>(&mVoxelBufferSize), sizeof(uint16_t));
+        Local::clearMatchingDescriptor(meta->auxData());
+    }
+    else if (pass == 1) {
+        // pass 1 - descriptor and attribute metadata
+        if (Local::hasMatchingDescriptor(meta->auxData())) {
+            AttributeSet::Descriptor::Ptr descriptor = Local::retrieveMatchingDescriptor(meta->auxData());
+            mAttributeSet->resetDescriptor(descriptor, /*allowMismatchingDescriptors=*/true);
+        }
+        else {
+            uint8_t header;
+            is.read(reinterpret_cast<char*>(&header), sizeof(uint8_t));
+            mAttributeSet->readDescriptor(is);
+            if (header == uint8_t(1)) {
+                AttributeSet::DescriptorPtr descriptor = mAttributeSet->descriptorPtr();
+                Local::insertDescriptor(meta->auxData(), descriptor);
+            }
+        }
+        mAttributeSet->readMetadata(is);
+    }
+    else if (pass < (attributes + 2)) {
+        // pass 2...n+2 - attribute uniform values
+        const size_t attributeIndex = pass - 2;
+        AttributeArray* array = mAttributeSet->get(attributeIndex);
+        if (array) {
+            compression::PagedInputStream& pagedStream =
+                    Local::getOrInsertPagedStream(meta->auxData(), attributeIndex);
+            pagedStream.setInputStream(is);
+            pagedStream.setSizeOnly(true);
+            array->readPagedBuffers(pagedStream);
+        }
+    }
+    else if (pass == attributes + 2) {
+        // pass n+2 - voxel data
+
+        // StreamMetadata pass variable used to temporarily store voxel buffer size
+        io::StreamMetadata& nonConstMeta = const_cast<io::StreamMetadata&>(*meta);
+        nonConstMeta.setPass(mVoxelBufferSize);
+
+        // readBuffers() calls readCompressedValues specialization above
+        BaseLeaf::readBuffers(is, fromHalf);
+
+        // pass now reset to original value
+        nonConstMeta.setPass(pass);
+    }
+    else if (pass < (attributes*2 + 3)) {
+        // pass n+2..2n+2 - attribute buffers
+        const size_t attributeIndex = pass - attributes - 3;
+        AttributeArray* array = mAttributeSet->get(attributeIndex);
+        if (array) {
+            compression::PagedInputStream& pagedStream =
+                    Local::getOrInsertPagedStream(meta->auxData(), attributeIndex);
+            pagedStream.setInputStream(is);
+            pagedStream.setSizeOnly(false);
+            array->readPagedBuffers(pagedStream);
+        }
+    }
 }
 
 template<typename T, Index Log2Dim>
 inline void
 PointDataLeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
 {
-    BaseLeaf::writeBuffers(os, toHalf);
+    struct Local
+    {
+        static void destroyPagedStream(const io::StreamMetadata::AuxDataMap& auxData, const Index index)
+        {
+            // if paged stream exists, flush and delete it
+            std::string key("paged:" + std::to_string(index));
+            auto it = auxData.find(key);
+            if (it != auxData.end()) {
+                compression::PagedOutputStream& stream = *(boost::any_cast<compression::PagedOutputStream::Ptr>(it->second));
+                stream.flush();
+                (const_cast<io::StreamMetadata::AuxDataMap&>(auxData)).erase(it);
+            }
+        }
 
-    mAttributeSet->write(os);
+        static compression::PagedOutputStream& getOrInsertPagedStream(  const io::StreamMetadata::AuxDataMap& auxData,
+                                                                        const Index index)
+        {
+            std::string key("paged:" + std::to_string(index));
+            auto it = auxData.find(key);
+            if (it != auxData.end()) {
+                return *(boost::any_cast<compression::PagedOutputStream::Ptr>(it->second));
+            }
+            else {
+                compression::PagedOutputStream::Ptr pagedStream = std::make_shared<compression::PagedOutputStream>();
+                (const_cast<io::StreamMetadata::AuxDataMap&>(auxData))[key] = pagedStream;
+                return *pagedStream;
+            }
+        }
+
+        static void insertDescriptor(   const io::StreamMetadata::AuxDataMap& auxData,
+                                        const Descriptor::Ptr descriptor)
+        {
+            std::string descriptorKey("descriptorPtr");
+            std::string matchingKey("hasMatchingDescriptor");
+            auto itMatching = auxData.find(matchingKey);
+            auto itDescriptor = auxData.find(descriptorKey);
+            if (itMatching == auxData.end()) {
+                // if matching bool is not found, insert "true" and the descriptor
+                (const_cast<io::StreamMetadata::AuxDataMap&>(auxData))[matchingKey] = true;
+                assert(itDescriptor == auxData.end());
+                (const_cast<io::StreamMetadata::AuxDataMap&>(auxData))[descriptorKey] = descriptor;
+            }
+            else {
+                // if matching bool is found and is false, early exit (a previous descriptor did not match)
+                bool matching = boost::any_cast<bool>(itMatching->second);
+                if (!matching)    return;
+                assert(itDescriptor != auxData.end());
+                // if matching bool is true, check whether the existing descriptor matches the current one and set
+                // matching bool to false if not
+                const Descriptor::Ptr existingDescriptor = boost::any_cast<AttributeSet::Descriptor::Ptr>(itDescriptor->second);
+                if (*existingDescriptor != *descriptor) {
+                    (const_cast<io::StreamMetadata::AuxDataMap&>(auxData))[matchingKey] = false;
+                }
+            }
+        }
+
+        static bool hasMatchingDescriptor(const io::StreamMetadata::AuxDataMap& auxData)
+        {
+            std::string matchingKey("hasMatchingDescriptor");
+            auto itMatching = auxData.find(matchingKey);
+            // if matching key is not found, no matching descriptor
+            if (itMatching == auxData.end())                return false;
+            // if matching key is found and is false, no matching descriptor
+            if (!boost::any_cast<bool>(itMatching->second)) return false;
+            return true;
+        }
+
+        static AttributeSet::Descriptor::Ptr retrieveMatchingDescriptor(const io::StreamMetadata::AuxDataMap& auxData)
+        {
+            std::string descriptorKey("descriptorPtr");
+            auto itDescriptor = auxData.find(descriptorKey);
+            // if matching key is true, however descriptor is not found, it has already been retrieved
+            if (itDescriptor == auxData.end())              return nullptr;
+            // otherwise remove it and return it
+            const Descriptor::Ptr descriptor = boost::any_cast<AttributeSet::Descriptor::Ptr>(itDescriptor->second);
+            (const_cast<io::StreamMetadata::AuxDataMap&>(auxData)).erase(itDescriptor);
+            return descriptor;
+        }
+
+        static void clearMatchingDescriptor(const io::StreamMetadata::AuxDataMap& auxData)
+        {
+            std::string matchingKey("hasMatchingDescriptor");
+            std::string descriptorKey("descriptorPtr");
+            auto itMatching = auxData.find(matchingKey);
+            auto itDescriptor = auxData.find(descriptorKey);
+            if (itMatching != auxData.end())    (const_cast<io::StreamMetadata::AuxDataMap&>(auxData)).erase(itMatching);
+            if (itDescriptor != auxData.end())  (const_cast<io::StreamMetadata::AuxDataMap&>(auxData)).erase(itDescriptor);
+        }
+    };
+
+    const io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(os);
+
+    if (!meta) {
+        OPENVDB_THROW(IoError, "Cannot write out a PointDataLeaf without StreamMetadata.");
+    }
+
+    const Index pass = meta->pass();
+
+    // leaf traversal analysis deduces the number of passes to perform for this leaf
+    // then updates the leaf traversal value to ensure all passes will be written
+
+    if (meta->countingPasses()) {
+        const Index requiredPasses = this->buffers();
+        if (requiredPasses > pass) {
+            meta->setPass(requiredPasses);
+        }
+        return;
+    }
+
+    const Index attributes = (this->buffers() - 4) / 2;
+
+    if (pass == 0) {
+        // pass 0 - voxel data sizes
+        io::writeCompressedValuesSize(os, this->buffer().data(), SIZE);
+        // track if descriptor is shared or not
+        Local::insertDescriptor(meta->auxData(), mAttributeSet->descriptorPtr());
+    }
+    else if (pass == 1) {
+        // pass 1 - descriptor and attribute metadata
+        bool matchingDescriptor = Local::hasMatchingDescriptor(meta->auxData());
+        if (matchingDescriptor) {
+            AttributeSet::Descriptor::Ptr descriptor = Local::retrieveMatchingDescriptor(meta->auxData());
+            if (descriptor) {
+                // write a header to indicate a shared descriptor
+                uint8_t header(1);
+                os.write(reinterpret_cast<const char*>(&header), sizeof(uint8_t));
+                mAttributeSet->writeDescriptor(os, /*transient=*/false);
+            }
+        }
+        else {
+            // write a header to indicate a non-shared descriptor
+            uint8_t header(0);
+            os.write(reinterpret_cast<const char*>(&header), sizeof(uint8_t));
+            mAttributeSet->writeDescriptor(os, /*transient=*/false);
+        }
+        mAttributeSet->writeMetadata(os, /*transient=*/false, /*paged=*/true);
+    }
+    else if (pass < attributes + 2) {
+        // pass 2...n+2 - attribute buffer sizes
+        const size_t attributeIndex = pass - 2;
+        // destroy previous paged stream
+        if (pass > 2) {
+            Local::destroyPagedStream(meta->auxData(), attributeIndex-1);
+        }
+        const AttributeArray* array = mAttributeSet->getConst(attributeIndex);
+        if (array) {
+            compression::PagedOutputStream& pagedStream =
+                Local::getOrInsertPagedStream(meta->auxData(), attributeIndex);
+            pagedStream.setOutputStream(os);
+            pagedStream.setSizeOnly(true);
+            array->writePagedBuffers(pagedStream, /*outputTransient*/false);
+        }
+    }
+    else if (pass == attributes + 2) {
+        const size_t attributeIndex = pass - 3;
+        Local::destroyPagedStream(meta->auxData(), attributeIndex);
+        // pass n+2 - voxel data
+        BaseLeaf::writeBuffers(os, toHalf);
+    }
+    else if (pass < (attributes*2 + 3)) {
+        // pass n+3...2n+3 - attribute buffers
+        const size_t attributeIndex = pass - attributes - 3;
+        // destroy previous paged stream
+        if (pass > attributes + 2) {
+            Local::destroyPagedStream(meta->auxData(), attributeIndex-1);
+        }
+        const AttributeArray* array = mAttributeSet->getConst(attributeIndex);
+        if (array) {
+            compression::PagedOutputStream& pagedStream =
+                Local::getOrInsertPagedStream(meta->auxData(), attributeIndex);
+            pagedStream.setOutputStream(os);
+            pagedStream.setSizeOnly(false);
+            array->writePagedBuffers(pagedStream, /*outputTransient*/false);
+        }
+    }
+    else if (pass < buffers()) {
+        Local::clearMatchingDescriptor(meta->auxData());
+        // pass 2n+3 - cleanup last paged stream
+        const size_t attributeIndex = pass - attributes - 4;
+        Local::destroyPagedStream(meta->auxData(), attributeIndex);
+    }
 }
 
 template<typename T, Index Log2Dim>
