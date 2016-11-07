@@ -477,6 +477,12 @@ public:
 
     Index64 memUsage() const;
 
+    void evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels = true) const;
+
+    /// @brief Return the bounding box of this node, i.e., the full index space
+    /// spanned by this leaf node.
+    CoordBBox getNodeBoundingBox() const;
+
     ////////////////////////////////////////
 
     // Disable all write methods to avoid unintentional changes
@@ -1143,6 +1149,19 @@ PointDataLeafNode<T, Log2Dim>::memUsage() const
     return BaseLeaf::memUsage() + mAttributeSet->memUsage();
 }
 
+template<typename T, Index Log2Dim>
+inline void
+PointDataLeafNode<T, Log2Dim>::evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels) const
+{
+    BaseLeaf::evalActiveBoundingBox(bbox, visitVoxels);
+}
+
+template<typename T, Index Log2Dim>
+inline CoordBBox
+PointDataLeafNode<T, Log2Dim>::getNodeBoundingBox() const
+{
+    return BaseLeaf::getNodeBoundingBox();
+}
 
 ////////////////////////////////////////
 
