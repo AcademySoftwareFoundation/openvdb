@@ -32,6 +32,67 @@
 #include <cppunit/extensions/HelperMacros.h>
 #include <openvdb_points/tools/StreamCompression.h>
 
+#include <openvdb/io/Compression.h> // io::COMPRESS_BLOSC
+
+// Boost.Interprocess uses a header-only portion of Boost.DateTime
+#define BOOST_DATE_TIME_NO_LIB
+#include <boost/interprocess/file_mapping.hpp>
+#include <boost/interprocess/mapped_region.hpp>
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
+#include <boost/system/error_code.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
+#include <boost/version.hpp> // for BOOST_VERSION
+
+#include <tbb/atomic.h>
+
+#ifdef _MSC_VER
+#include <boost/interprocess/detail/os_file_functions.hpp> // open_existing_file(), close_file()
+extern "C" __declspec(dllimport) bool __stdcall GetFileTime(
+    void* fh, void* ctime, void* atime, void* mtime);
+// boost::interprocess::detail was renamed to boost::interprocess::ipcdetail in Boost 1.48.
+// Ensure that both namespaces exist.
+namespace boost { namespace interprocess { namespace detail {} namespace ipcdetail {} } }
+#else
+#include <sys/types.h> // for struct stat
+#include <sys/stat.h> // for stat()
+#include <unistd.h> // for unlink()
+#endif
+
+/// @brief io::MappedFile has a private constructor, so this unit tests uses a matching proxy
+class ProxyMappedFile
+{
+public:
+    explicit ProxyMappedFile(const std::string& filename)
+        : mImpl(new Impl(filename)) { }
+
+private:
+    class Impl
+    {
+    public:
+        Impl(const std::string& filename)
+            : mMap(filename.c_str(), boost::interprocess::read_only)
+            , mRegion(mMap, boost::interprocess::read_only)
+        {
+            mLastWriteTime = 0;
+            const char* regionFilename = mMap.get_name();
+            struct stat info;
+            if (0 == ::stat(regionFilename, &info)) {
+                mLastWriteTime = openvdb::Index64(info.st_mtime);
+            }
+        }
+
+        using Notifier = std::function<void(std::string /*filename*/)>;
+        boost::interprocess::file_mapping mMap;
+        boost::interprocess::mapped_region mRegion;
+        bool mAutoDelete = false;
+        Notifier mNotifier;
+        mutable tbb::atomic<openvdb::Index64> mLastWriteTime;
+    }; // class Impl
+    std::unique_ptr<Impl> mImpl;
+}; // class ProxyMappedFile
+
 using namespace openvdb;
 using namespace openvdb::compression;
 
@@ -40,10 +101,12 @@ class TestStreamCompression: public CppUnit::TestCase
 public:
     CPPUNIT_TEST_SUITE(TestStreamCompression);
     CPPUNIT_TEST(testBlosc);
+    CPPUNIT_TEST(testPagedStreams);
 
     CPPUNIT_TEST_SUITE_END();
 
     void testBlosc();
+    void testPagedStreams();
 }; // class TestStreamCompression
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestStreamCompression);
@@ -200,6 +263,315 @@ TestStreamCompression::testBlosc()
 
         CPPUNIT_ASSERT(!compressedBuffer);
         CPPUNIT_ASSERT_EQUAL(compressedBytes, size_t(0));
+    }
+}
+
+
+void
+TestStreamCompression::testPagedStreams()
+{
+    { // one small value
+        std::ostringstream ostr(std::ios_base::binary);
+        PagedOutputStream ostream(ostr);
+
+        int foo = 5;
+        ostream.write(reinterpret_cast<const char*>(&foo), sizeof(int));
+        CPPUNIT_ASSERT_EQUAL(ostr.tellp(), std::streampos(0));
+
+        ostream.flush();
+        CPPUNIT_ASSERT_EQUAL(ostr.tellp(), std::streampos(sizeof(int)));
+    }
+
+    { // small values up to page threshold
+        std::ostringstream ostr(std::ios_base::binary);
+        PagedOutputStream ostream(ostr);
+
+        for (int i = 0; i < PageSize; i++) {
+            uint8_t oneByte = 255;
+            ostream.write(reinterpret_cast<const char*>(&oneByte), sizeof(uint8_t));
+        }
+        CPPUNIT_ASSERT_EQUAL(ostr.tellp(), std::streampos(0));
+
+        std::vector<uint8_t> values;
+        values.assign(PageSize, uint8_t(255));
+        size_t compressedSize = compression::bloscCompressedSize(reinterpret_cast<const char*>(&values[0]),
+                                                                 PageSize);
+
+        uint8_t oneMoreByte(255);
+        ostream.write(reinterpret_cast<const char*>(&oneMoreByte), sizeof(char));
+
+        if (compressedSize == 0) {
+            CPPUNIT_ASSERT_EQUAL(ostr.tellp(), std::streampos(PageSize));
+        }
+        else {
+            CPPUNIT_ASSERT_EQUAL(ostr.tellp(), std::streampos(compressedSize));
+        }
+    }
+
+    { // one large block at exactly page threshold
+        std::ostringstream ostr(std::ios_base::binary);
+        PagedOutputStream ostream(ostr);
+
+        std::vector<uint8_t> values;
+        values.assign(PageSize, uint8_t(255));
+        ostream.write(reinterpret_cast<const char*>(&values[0]), values.size());
+
+        CPPUNIT_ASSERT_EQUAL(ostr.tellp(), std::streampos(0));
+    }
+
+    { // two large blocks at page threshold + 1 byte
+        std::ostringstream ostr(std::ios_base::binary);
+        PagedOutputStream ostream(ostr);
+
+        std::vector<uint8_t> values;
+        values.assign(PageSize + 1, uint8_t(255));
+        ostream.write(reinterpret_cast<const char*>(&values[0]), values.size());
+
+        size_t compressedSize = compression::bloscCompressedSize(   reinterpret_cast<const char*>(&values[0]),
+                                                                    values.size());
+
+#ifndef OPENVDB_USE_BLOSC
+        compressedSize = values.size();
+#endif
+
+        CPPUNIT_ASSERT_EQUAL(ostr.tellp(), std::streampos(compressedSize));
+
+        ostream.write(reinterpret_cast<const char*>(&values[0]), values.size());
+
+        CPPUNIT_ASSERT_EQUAL(ostr.tellp(), std::streampos(compressedSize * 2));
+
+        uint8_t oneMoreByte(255);
+        ostream.write(reinterpret_cast<const char*>(&oneMoreByte), sizeof(uint8_t));
+
+        ostream.flush();
+
+        CPPUNIT_ASSERT_EQUAL(ostr.tellp(), std::streampos(compressedSize * 2 + 1));
+    }
+
+    { // one full page
+        std::stringstream ss(std::ios_base::out | std::ios_base::in | std::ios_base::binary);
+
+        // write
+
+        PagedOutputStream ostreamSizeOnly(ss);
+        ostreamSizeOnly.setSizeOnly(true);
+
+        CPPUNIT_ASSERT_EQUAL(ss.tellp(), std::streampos(0));
+
+        std::vector<uint8_t> values;
+        values.resize(PageSize);
+        std::iota(values.begin(), values.end(), 0); // ascending integer values
+        ostreamSizeOnly.write(reinterpret_cast<const char*>(&values[0]), values.size());
+        ostreamSizeOnly.flush();
+
+#ifdef OPENVDB_USE_BLOSC
+        // two integers - compressed size and uncompressed size
+        CPPUNIT_ASSERT_EQUAL(ss.tellp(), std::streampos(sizeof(int)*2));
+#else
+        // one integer - uncompressed size
+        CPPUNIT_ASSERT_EQUAL(ss.tellp(), std::streampos(sizeof(int)));
+#endif
+
+        PagedOutputStream ostream(ss);
+        ostream.write(reinterpret_cast<const char*>(&values[0]), values.size());
+        ostream.flush();
+
+#ifdef OPENVDB_USE_BLOSC
+        CPPUNIT_ASSERT_EQUAL(ss.tellp(), std::streampos(4452));
+#else
+        CPPUNIT_ASSERT_EQUAL(ss.tellp(), std::streampos(PageSize+sizeof(int)));
+#endif
+
+        // read
+
+        CPPUNIT_ASSERT_EQUAL(ss.tellg(), std::streampos(0));
+
+        PagedInputStream istream(ss);
+        istream.setSizeOnly(true);
+
+        PageHandle::Ptr handle = istream.createHandle(values.size());
+
+#ifdef OPENVDB_USE_BLOSC
+        // two integers - compressed size and uncompressed size
+        CPPUNIT_ASSERT_EQUAL(ss.tellg(), std::streampos(sizeof(int)*2));
+#else
+        // one integer - uncompressed size
+        CPPUNIT_ASSERT_EQUAL(ss.tellg(), std::streampos(sizeof(int)));
+#endif
+
+        istream.read(handle, values.size(), false);
+
+#ifdef OPENVDB_USE_BLOSC
+        CPPUNIT_ASSERT_EQUAL(ss.tellg(), std::streampos(4452));
+#else
+        CPPUNIT_ASSERT_EQUAL(ss.tellg(), std::streampos(PageSize+sizeof(int)));
+#endif
+
+        std::unique_ptr<uint8_t[]> newValues(reinterpret_cast<uint8_t*>(handle->read().release()));
+
+        CPPUNIT_ASSERT(newValues);
+
+        for (size_t i = 0; i < values.size(); i++) {
+            CPPUNIT_ASSERT_EQUAL(values[i], newValues.get()[i]);
+        }
+    }
+
+    std::string tempDir(std::getenv("TMPDIR"));
+    if (tempDir.empty())    tempDir = P_tmpdir;
+
+    {
+        std::string filename = tempDir + "/openvdb_page1";
+        io::StreamMetadata::Ptr streamMetadata(new io::StreamMetadata);
+
+        { // ascending values up to 10 million written in blocks of PageSize/3
+            std::ofstream fileout;
+            fileout.open(filename.c_str());
+
+            io::setStreamMetadataPtr(fileout, streamMetadata);
+            io::setDataCompression(fileout, openvdb::io::COMPRESS_BLOSC);
+
+            std::vector<uint8_t> values;
+            values.resize(10*1000*1000);
+            std::iota(values.begin(), values.end(), 0); // ascending integer values
+
+            // write page sizes
+
+            PagedOutputStream ostreamSizeOnly(fileout);
+            ostreamSizeOnly.setSizeOnly(true);
+
+            CPPUNIT_ASSERT_EQUAL(fileout.tellp(), std::streampos(0));
+
+            int increment = PageSize/3;
+
+            for (size_t i = 0; i < values.size(); i += increment) {
+                if (size_t(i+increment) > values.size()) {
+                    ostreamSizeOnly.write(reinterpret_cast<const char*>(&values[0]+i), values.size() - i);
+                }
+                else {
+                    ostreamSizeOnly.write(reinterpret_cast<const char*>(&values[0]+i), increment);
+                }
+            }
+            ostreamSizeOnly.flush();
+
+    #ifdef OPENVDB_USE_BLOSC
+            int pages = (fileout.tellp() / (sizeof(int)*2));
+    #else
+            int pages = (fileout.tellp() / (sizeof(int)));
+    #endif
+
+            CPPUNIT_ASSERT_EQUAL(pages, 10);
+
+            // write
+
+            PagedOutputStream ostream(fileout);
+
+            for (size_t i = 0; i < values.size(); i += increment) {
+                if (size_t(i+increment) > values.size()) {
+                    ostream.write(reinterpret_cast<const char*>(&values[0]+i), values.size() - i);
+                }
+                else {
+                    ostream.write(reinterpret_cast<const char*>(&values[0]+i), increment);
+                }
+            }
+
+            ostream.flush();
+
+    #ifdef OPENVDB_USE_BLOSC
+            CPPUNIT_ASSERT_EQUAL(fileout.tellp(), std::streampos(42724));
+    #else
+            CPPUNIT_ASSERT_EQUAL(fileout.tellp(), std::streampos(values.size()+sizeof(int)*pages));
+    #endif
+
+            // abuse File being a friend of MappedFile to get around the private constructor
+            ProxyMappedFile* proxy = new ProxyMappedFile(filename);
+            SharedPtr<io::MappedFile> mappedFile(reinterpret_cast<io::MappedFile*>(proxy));
+
+            // read
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setStreamMetadataPtr(filein, streamMetadata);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            CPPUNIT_ASSERT_EQUAL(filein.tellg(), std::streampos(0));
+
+            PagedInputStream istreamSizeOnly(filein);
+            istreamSizeOnly.setSizeOnly(true);
+
+            std::vector<PageHandle::Ptr> handles;
+
+            for (size_t i = 0; i < values.size(); i += increment) {
+                if (size_t(i+increment) > values.size()) {
+                    handles.push_back(istreamSizeOnly.createHandle(values.size() - i));
+                }
+                else {
+                    handles.push_back(istreamSizeOnly.createHandle(increment));
+                }
+            }
+
+    #ifdef OPENVDB_USE_BLOSC
+            // two integers - compressed size and uncompressed size
+            CPPUNIT_ASSERT_EQUAL(filein.tellg(), std::streampos(pages*sizeof(int)*2));
+    #else
+            // one integer - uncompressed size
+            CPPUNIT_ASSERT_EQUAL(filein.tellg(), std::streampos(pages*sizeof(int)));
+    #endif
+
+            PagedInputStream istream(filein);
+
+            int pageHandle = 0;
+
+            for (size_t i = 0; i < values.size(); i += increment) {
+                if (size_t(i+increment) > values.size()) {
+                    istream.read(handles[pageHandle++], values.size() - i);
+                }
+                else {
+                    istream.read(handles[pageHandle++], increment);
+                }
+            }
+
+            // first three handles live in the same page
+
+            Page& page0 = handles[0]->page();
+            Page& page1 = handles[1]->page();
+            Page& page2 = handles[2]->page();
+            Page& page3 = handles[3]->page();
+
+            CPPUNIT_ASSERT(page0.isOutOfCore());
+            CPPUNIT_ASSERT(page1.isOutOfCore());
+            CPPUNIT_ASSERT(page2.isOutOfCore());
+            CPPUNIT_ASSERT(page3.isOutOfCore());
+
+            handles[0]->read();
+
+            // store the Page shared_ptr
+
+            Page::Ptr page = handles[0]->mPage;
+
+            // verify use count is four (one plus three handles)
+
+            CPPUNIT_ASSERT_EQUAL(page.use_count(), long(4));
+
+            // on reading from the first handle, all pages referenced in the first three handles are in-core
+
+            CPPUNIT_ASSERT(!page0.isOutOfCore());
+            CPPUNIT_ASSERT(!page1.isOutOfCore());
+            CPPUNIT_ASSERT(!page2.isOutOfCore());
+            CPPUNIT_ASSERT(page3.isOutOfCore());
+
+            handles[1]->read();
+
+            CPPUNIT_ASSERT(handles[0]->mPage);
+
+            handles[2]->read();
+
+            handles.erase(handles.begin());
+            handles.erase(handles.begin());
+            handles.erase(handles.begin());
+
+            // after all three handles have been read, page should have just one use count (itself)
+
+            CPPUNIT_ASSERT_EQUAL(page.use_count(), long(1));
+        }
     }
 }
 

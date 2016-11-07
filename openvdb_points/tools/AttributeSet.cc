@@ -342,7 +342,7 @@ AttributeSet::appendAttribute(  const Descriptor& expected, DescriptorPtr& repla
 
     // extract the array length from the first attribute array if it exists
 
-    const size_t arrayLength = offset > 0 ? this->get(0)->size() : 1;
+    const Index arrayLength = offset > 0 ? this->get(0)->size() : 1;
 
     // extract the type from the descriptor
 
@@ -447,6 +447,7 @@ AttributeSet::resetDescriptor(const DescriptorPtr& replacement, const bool allow
 void
 AttributeSet::read(std::istream& is)
 {
+    this->readDescriptor(is);
     this->readMetadata(is);
     this->readAttributes(is);
 }
@@ -455,20 +456,21 @@ AttributeSet::read(std::istream& is)
 void
 AttributeSet::write(std::ostream& os, bool outputTransient) const
 {
+    this->writeDescriptor(os, outputTransient);
     this->writeMetadata(os, outputTransient);
     this->writeAttributes(os, outputTransient);
 }
 
 
 void
-AttributeSet::readMetadata(std::istream& is)
+AttributeSet::readDescriptor(std::istream& is)
 {
     mDescr->read(is);
 }
 
 
 void
-AttributeSet::writeMetadata(std::ostream& os, bool outputTransient) const
+AttributeSet::writeDescriptor(std::ostream& os, bool outputTransient) const
 {
     // build a vector of all attribute arrays that have a transient flag
     // unless also writing transient attributes
@@ -497,18 +499,34 @@ AttributeSet::writeMetadata(std::ostream& os, bool outputTransient) const
 
 
 void
-AttributeSet::readAttributes(std::istream& is)
+AttributeSet::readMetadata(std::istream& is)
 {
-    if (!mDescr) {
-        OPENVDB_THROW(IllegalValueException, "Attribute set descriptor not defined.");
-    }
-
     AttrArrayVec(mDescr->size()).swap(mAttrs); // allocate vector
 
     for (size_t n = 0, N = mAttrs.size(); n < N; ++n) {
-        // size and stride are defined when read from disk
-        mAttrs[n] = AttributeArray::create(mDescr->type(n), /*size*/1, /*stride*/1);
-        mAttrs[n]->read(is);
+        mAttrs[n] = AttributeArray::create(mDescr->type(n), 1, 1);
+        mAttrs[n]->readMetadata(is);
+    }
+}
+
+
+void
+AttributeSet::writeMetadata(std::ostream& os, bool outputTransient, bool paged) const
+{
+    // write attribute metadata
+
+    for (size_t i = 0; i < size(); i++) {
+        const AttributeArray* array = this->getConst(i);
+        array->writeMetadata(os, outputTransient, paged);
+    }
+}
+
+
+void
+AttributeSet::readAttributes(std::istream& is)
+{
+    for (size_t i = 0; i < mAttrs.size(); i++) {
+        mAttrs[i]->readBuffers(is);
     }
 }
 
@@ -517,7 +535,7 @@ void
 AttributeSet::writeAttributes(std::ostream& os, bool outputTransient) const
 {
     for (auto attr : mAttrs) {
-        attr->write(os, outputTransient);
+        attr->writeBuffers(os, outputTransient);
     }
 }
 

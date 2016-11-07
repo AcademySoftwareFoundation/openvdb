@@ -293,6 +293,322 @@ std::unique_ptr<char[]> bloscDecompress(const char*, const size_t, const bool)
 ////////////////////////////////////////
 
 
+void Page::load() const
+{
+    this->doLoad();
+}
+
+
+long Page::uncompressedBytes() const
+{
+    assert(mInfo);
+    return mInfo->uncompressedBytes;
+}
+
+
+const char* Page::buffer(const int index) const
+{
+    if (this->isOutOfCore())   this->load();
+
+    return mData.get() + index;
+}
+
+
+void Page::readHeader(std::istream& is)
+{
+    assert(mInfo);
+
+    // read the (compressed) size of the page
+    int compressedSize;
+    is.read(reinterpret_cast<char*>(&compressedSize), sizeof(int));
+
+    int uncompressedSize;
+    // if uncompressed, read the (compressed) size of the page
+    if (compressedSize > 0)     is.read(reinterpret_cast<char*>(&uncompressedSize), sizeof(int));
+    else                        uncompressedSize = -compressedSize;
+
+    assert(compressedSize != 0);
+    assert(uncompressedSize != 0);
+
+    mInfo->compressedBytes = compressedSize;
+    mInfo->uncompressedBytes = uncompressedSize;
+}
+
+
+void Page::readBuffers(std::istream&is, bool delayed)
+{
+    assert(mInfo);
+
+    bool isCompressed = mInfo->compressedBytes > 0;
+
+    io::MappedFile::Ptr mappedFile = io::getMappedFilePtr(is);
+
+    if (delayed && mappedFile) {
+        SharedPtr<io::StreamMetadata> meta = io::getStreamMetadataPtr(is);
+        assert(meta);
+
+        std::streamoff filepos = is.tellg();
+
+        // seek over the page
+        is.seekg((isCompressed ? mInfo->compressedBytes : -mInfo->compressedBytes), std::ios_base::cur);
+
+        mInfo->mappedFile = mappedFile;
+        mInfo->meta = meta;
+        mInfo->filepos = filepos;
+
+        assert(mInfo->mappedFile);
+    }
+    else {
+        std::unique_ptr<char[]> buffer(new char[(isCompressed ? mInfo->compressedBytes : -mInfo->compressedBytes)]);
+        is.read(buffer.get(), (isCompressed ? mInfo->compressedBytes : -mInfo->compressedBytes));
+
+        if (mInfo->compressedBytes > 0)     this->decompress(buffer);
+        else                                this->copy(buffer, -mInfo->compressedBytes);
+        mInfo.reset();
+    }
+}
+
+
+bool Page::isOutOfCore() const
+{
+    return bool(mInfo);
+}
+
+
+void Page::copy(const std::unique_ptr<char[]>& temp, int pageSize)
+{
+    mData.reset(new char[pageSize]);
+    std::memcpy(mData.get(), temp.get(), pageSize);
+}
+
+
+void Page::decompress(const std::unique_ptr<char[]>& temp)
+{
+    size_t uncompressedBytes = bloscUncompressedSize(temp.get());
+    size_t tempBytes = uncompressedBytes;
+#ifdef OPENVDB_USE_BLOSC
+    tempBytes += uncompressedBytes;
+#endif
+    mData.reset(new char[tempBytes]);
+
+    bloscDecompress(mData.get(), uncompressedBytes, tempBytes, temp.get());
+}
+
+
+void Page::doLoad() const
+{
+    if (!this->isOutOfCore())  return;
+
+    Page* self = const_cast<Page*>(this);
+
+    // This lock will be contended at most once, after which this buffer
+    // will no longer be out-of-core.
+    tbb::spin_mutex::scoped_lock lock(self->mMutex);
+    if (!this->isOutOfCore()) return;
+
+    assert(self->mInfo);
+
+    int compressedBytes = self->mInfo->compressedBytes;
+    bool compressed = compressedBytes > 0;
+    if (!compressed) compressedBytes = -compressedBytes;
+
+    assert(compressedBytes);
+
+    std::unique_ptr<char[]> temp(new char[compressedBytes]);
+
+    assert(self->mInfo->mappedFile);
+    SharedPtr<std::streambuf> buf = self->mInfo->mappedFile->createBuffer();
+    assert(buf);
+
+    std::istream is(buf.get());
+    io::setStreamMetadataPtr(is, self->mInfo->meta, /*transfer=*/true);
+    is.seekg(self->mInfo->filepos);
+
+    is.read(temp.get(), compressedBytes);
+
+    if (compressed)     self->decompress(temp);
+    else                self->copy(temp, compressedBytes);
+
+    self->mInfo.reset();
+}
+
+
+////////////////////////////////////////
+
+
+PageHandle::PageHandle( const Page::Ptr& page, const int index, const int size)
+    : mPage(page)
+    , mIndex(index)
+    , mSize(size)
+{
+}
+
+
+Page& PageHandle::page()
+{
+    assert(mPage);
+    return *mPage;
+}
+
+
+std::unique_ptr<char[]> PageHandle::read()
+{
+    assert(mIndex >= 0);
+    assert(mSize > 0);
+    std::unique_ptr<char[]> buffer(new char[mSize]);
+    std::memcpy(buffer.get(), mPage->buffer(mIndex), mSize);
+    return buffer;
+}
+
+
+////////////////////////////////////////
+
+
+PagedInputStream::PagedInputStream(std::istream& is)
+    : mIs(&is)
+{
+}
+
+
+PageHandle::Ptr PagedInputStream::createHandle(std::streamsize n)
+{
+    assert(mByteIndex <= mUncompressedBytes);
+
+    if (mByteIndex == mUncompressedBytes) {
+
+        mPage = std::make_shared<Page>();
+        mPage->readHeader(*mIs);
+        mUncompressedBytes = mPage->uncompressedBytes();
+        mByteIndex = 0;
+    }
+
+    PageHandle::Ptr pageHandle = std::make_shared<PageHandle>(mPage, mByteIndex, n);
+
+    mByteIndex += int(n);
+
+    return pageHandle;
+}
+
+
+void PagedInputStream::read(PageHandle::Ptr& pageHandle, std::streamsize n, bool delayed)
+{
+    assert(mByteIndex <= mUncompressedBytes);
+
+    Page& page = pageHandle->page();
+
+    if (mByteIndex == mUncompressedBytes) {
+        mUncompressedBytes = page.uncompressedBytes();
+        page.readBuffers(*mIs, delayed);
+        mByteIndex = 0;
+    }
+
+    mByteIndex += int(n);
+}
+
+
+////////////////////////////////////////
+
+
+PagedOutputStream::PagedOutputStream(std::ostream& os)
+    : mOs(&os)
+{
+}
+
+
+PagedOutputStream& PagedOutputStream::write(const char* str, std::streamsize n)
+{
+    if (n > PageSize) {
+        this->flush();
+        // write out the block as if a whole page
+        this->compressAndWrite(str, size_t(n));
+    }
+    else {
+        // if the size of this block will overflow the page, flush to disk
+        if ((int(n) + mBytes) > PageSize) {
+            this->flush();
+        }
+
+        // store and increment the data in the current page
+        std::memcpy(mData.get() + mBytes, str, n);
+        mBytes += int(n);
+    }
+
+    return *this;
+}
+
+
+void PagedOutputStream::flush()
+{
+    this->compressAndWrite(mData.get(), mBytes);
+    mBytes = 0;
+}
+
+
+void PagedOutputStream::compressAndWrite(const char* buffer, size_t size)
+{
+    if (size == 0)  return;
+
+    assert(size < std::numeric_limits<int>::max());
+
+    this->resize(size);
+
+    size_t compressedBytes(0);
+    if (mSizeOnly) {
+#ifdef OPENVDB_USE_BLOSC
+        compressedBytes = bloscCompressedSize(buffer, size);
+#endif
+    }
+    else {
+#ifdef OPENVDB_USE_BLOSC
+        bloscCompress(mCompressedData.get(), compressedBytes, mCapacity + BLOSC_MAX_OVERHEAD, buffer, size);
+#endif
+    }
+
+    if (compressedBytes == 0) {
+        int uncompressedBytes(-size);
+        if (mSizeOnly) {
+            mOs->write(reinterpret_cast<const char*>(&uncompressedBytes), sizeof(int));
+        }
+        else {
+            mOs->write(buffer, size);
+        }
+    }
+    else {
+        if (mSizeOnly) {
+            mOs->write(reinterpret_cast<const char*>(&compressedBytes), sizeof(int));
+            mOs->write(reinterpret_cast<const char*>(&size), sizeof(int));
+        }
+        else {
+#ifdef OPENVDB_USE_BLOSC
+            mOs->write(mCompressedData.get(), compressedBytes);
+#else
+            OPENVDB_THROW(RuntimeError, "Cannot write out compressed data without Blosc.");
+#endif
+        }
+    }
+}
+
+
+void PagedOutputStream::resize(size_t size)
+{
+    // grow the capacity if not sufficient space
+    size_t requiredSize = size;
+    if (size < BLOSC_PAD_BYTES && size >= BLOSC_MINIMUM_BYTES) {
+        requiredSize = BLOSC_PAD_BYTES;
+    }
+    if (requiredSize > mCapacity) {
+        mCapacity = requiredSize;
+        mData.reset(new char[mCapacity]);
+#ifdef OPENVDB_USE_BLOSC
+        mCompressedData.reset(new char[mCapacity + BLOSC_MAX_OVERHEAD]);
+#endif
+    }
+}
+
+
+////////////////////////////////////////
+
+
 } // namespace compression
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

@@ -235,15 +235,21 @@ public:
     /// @param outputTransient if true, write out transient attributes
     void write(std::ostream&, bool outputTransient = false) const;
 
-    /// This will read the attribute descriptor from a stream, but no attribute data.
-    void readMetadata(std::istream&);
-    /// This will write the attribute descriptor to a stream, but no attribute data.
+    /// This will read the attribute descriptor from a stream.
+    void readDescriptor(std::istream&);
+    /// This will write the attribute descriptor to a stream.
     /// @param outputTransient if true, write out transient attributes
-    void writeMetadata(std::ostream&, bool outputTransient = false) const;
+    void writeDescriptor(std::ostream&, bool outputTransient = false) const;
 
-    /// Read attribute data from a stream.
+    /// This will read the attribute metadata from a stream.
+    void readMetadata(std::istream&);
+    /// This will write the attribute metadata to a stream.
+    /// @param outputTransient if true, write out transient attributes
+    void writeMetadata(std::ostream&, bool outputTransient = false, bool paged = false) const;
+
+    /// This will read the attribute data from a stream.
     void readAttributes(std::istream&);
-    /// Write attribute data to a stream.
+    /// This will write the attribute data to a stream.
     /// @param outputTransient if true, write out transient attributes
     void writeAttributes(std::ostream&, bool outputTransient = false) const;
 
