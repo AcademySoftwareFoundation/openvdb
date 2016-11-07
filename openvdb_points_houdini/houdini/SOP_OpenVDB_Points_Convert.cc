@@ -28,7 +28,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 //
-/// @file SOP_OpenVDB_Points.cc
+/// @file SOP_OpenVDB_Points_Convert.cc
 ///
 /// @author Dan Bailey
 ///
@@ -723,13 +723,13 @@ convertGlobalMetadataToHoudini(GU_Detail& detail, const openvdb::MetaMap& metaMa
 ////////////////////////////////////////
 
 
-class SOP_OpenVDB_Points: public hvdb::SOP_NodeVDBPoints
+class SOP_OpenVDB_Points_Convert: public hvdb::SOP_NodeVDBPoints
 {
 public:
     enum { TRANSFORM_TARGET_POINTS = 0, TRANSFORM_VOXEL_SIZE, TRANSFORM_REF_GRID };
 
-    SOP_OpenVDB_Points(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Points() = default;
+    SOP_OpenVDB_Points_Convert(OP_Network*, const char* name, OP_Operator*);
+    virtual ~SOP_OpenVDB_Points_Convert() = default;
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
@@ -742,7 +742,7 @@ protected:
 
 private:
     hvdb::Interrupter mBoss;
-}; // class SOP_OpenVDB_Points
+}; // class SOP_OpenVDB_Points_Convert
 
 
 
@@ -974,8 +974,8 @@ newSopOperator(OP_OperatorTable* table)
     //////////
     // Register this operator.
 
-    hvdb::OpenVDBOpFactory("OpenVDB Points",
-        SOP_OpenVDB_Points::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("OpenVDB Points Convert",
+        SOP_OpenVDB_Points_Convert::factory, parms, *table)
         .addInput("Points to Convert")
         .addOptionalInput("Optional Reference VDB (for transform)");
 }
@@ -985,14 +985,14 @@ newSopOperator(OP_OperatorTable* table)
 
 
 OP_Node*
-SOP_OpenVDB_Points::factory(OP_Network* net,
+SOP_OpenVDB_Points_Convert::factory(OP_Network* net,
     const char* name, OP_Operator* op)
 {
-    return new SOP_OpenVDB_Points(net, name, op);
+    return new SOP_OpenVDB_Points_Convert(net, name, op);
 }
 
 
-SOP_OpenVDB_Points::SOP_OpenVDB_Points(OP_Network* net,
+SOP_OpenVDB_Points_Convert::SOP_OpenVDB_Points_Convert(OP_Network* net,
     const char* name, OP_Operator* op)
     : hvdb::SOP_NodeVDBPoints(net, name, op)
     , mBoss("Converting points")
@@ -1005,7 +1005,7 @@ SOP_OpenVDB_Points::SOP_OpenVDB_Points(OP_Network* net,
 
 // Enable or disable parameters in the UI.
 bool
-SOP_OpenVDB_Points::updateParmsFlags()
+SOP_OpenVDB_Points_Convert::updateParmsFlags()
 {
     bool changed = false;
 
@@ -1052,7 +1052,7 @@ SOP_OpenVDB_Points::updateParmsFlags()
 
 
 OP_ERROR
-SOP_OpenVDB_Points::cookMySop(OP_Context& context)
+SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
 {
     try {
         hutil::ScopedInputLock lock(*this, context);
