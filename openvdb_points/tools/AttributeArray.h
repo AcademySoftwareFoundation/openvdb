@@ -236,7 +236,7 @@ public:
     bool hasConstantStride() const { return bool(mFlags & CONSTANTSTRIDE); }
 
     /// @brief Retrieve the attribute array flags
-    uint16_t flags() const { return mFlags; }
+    uint8_t flags() const { return mFlags; }
 
     /// Read attribute metadata and buffers from a stream.
     virtual void read(std::istream&) = 0;
@@ -293,8 +293,8 @@ protected:
     static void unregisterType(const NamePair& type);
 
     size_t mCompressedBytes = 0;
-    uint16_t mFlags = 0;
-    uint16_t mSerializationFlags = 0;
+    uint8_t mFlags = 0;
+    uint8_t mSerializationFlags = 0;
 
     /// used for out-of-core, paged reading
     compression::PageHandle::Ptr mPageHandle;
