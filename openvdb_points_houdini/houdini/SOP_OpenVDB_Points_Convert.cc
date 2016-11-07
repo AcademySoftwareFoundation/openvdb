@@ -278,6 +278,12 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
             else if (compression == UNIT_VECTOR) {
                 convertAttributeFromHoudini<Vec3<float>, UnitVecCodec>(tree, indexTree, name, attribute, defaults);
             }
+            else if (compression == UNIT_FIXED_POINT_8) {
+                convertAttributeFromHoudini<Vec3<float>, FixedPointCodec<true, UnitRange>>(tree, indexTree, name, attribute, defaults);
+            }
+            else if (compression == UNIT_FIXED_POINT_16) {
+                convertAttributeFromHoudini<Vec3<float>, FixedPointCodec<false, UnitRange>>(tree, indexTree, name, attribute, defaults);
+            }
         }
         else if (storage == GA_STORE_REAL64) {
             convertAttributeFromHoudini<Vec3<double>>(tree, indexTree, name, attribute, defaults);
@@ -887,7 +893,7 @@ newSopOperator(OP_OperatorTable* table)
         };
 
         parms.add(hutil::ParmFactory(PRM_ORD, "poscompression", "Position Compression")
-            .setDefault(PRMzeroDefaults)
+            .setDefault(PRMoneDefaults)
             .setHelpText("The position attribute compression setting.")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
@@ -945,6 +951,35 @@ newSopOperator(OP_OperatorTable* table)
         .setMultiparms(attrParms)
         .setDefault(PRMzeroDefaults));
 
+    parms.add(hutil::ParmFactory(PRM_LABEL, "attributespacer", ""));
+
+    {
+        const char* items[] = {
+            "none", "None",
+            UnitVecCodec::name(), "Unit Vector",
+            nullptr
+    };
+
+    parms.add(hutil::ParmFactory(PRM_ORD, "normalcompression", "Normal Compression")
+        .setDefault(PRMoneDefaults)
+        .setHelpText("All normal attributes will use this compression codec.")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+    }
+
+    {
+        const char* items[] = {
+            "none", "None",
+            FixedPointCodec<false, UnitRange>::name(), "16-bit Unit",
+            FixedPointCodec<true, UnitRange>::name(), "8-bit Unit",
+            nullptr
+    };
+
+    parms.add(hutil::ParmFactory(PRM_ORD, "colorcompression", "Color Compression")
+        .setDefault(PRMtwoDefaults)
+        .setHelpText("All color attributes will use this compression codec.")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+    }
+
     //////////
     // Register this operator.
 
@@ -990,6 +1025,9 @@ SOP_OpenVDB_Points_Convert::updateParmsFlags()
     changed |= enableParm("group", !toVdbPoints);
     changed |= setVisibleState("group", !toVdbPoints);
 
+    changed |= enableParm("vdbpointsgroup", !toVdbPoints);
+    changed |= setVisibleState("vdbpointsgroup", !toVdbPoints);
+
     changed |= enableParm("name", toVdbPoints);
     changed |= setVisibleState("name", toVdbPoints);
 
@@ -1017,6 +1055,12 @@ SOP_OpenVDB_Points_Convert::updateParmsFlags()
 
     changed |= enableParm("attrList", toVdbPoints && !convertAll);
     changed |= setVisibleState("attrList", toVdbPoints && !convertAll);
+
+    changed |= enableParm("normalcompression", toVdbPoints && convertAll);
+    changed |= setVisibleState("normalcompression", toVdbPoints && convertAll);
+
+    changed |= enableParm("colorcompression", toVdbPoints && convertAll);
+    changed |= setVisibleState("colorcompression", toVdbPoints && convertAll);
 
     return changed;
 }
@@ -1245,8 +1289,8 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
                             }
 
                             const bool isUnit = valueCompression == UNIT_FIXED_POINT_8 || valueCompression == UNIT_FIXED_POINT_16;
-                            if (isUnit && (storage != GA_STORE_REAL32 || width != 1)) {
-                                std::stringstream ss; ss << "Unit compression only supported for scalar 32-bit floating-point attributes. "
+                            if (isUnit && (storage != GA_STORE_REAL32 || (width != 1 && !isVector))) {
+                                std::stringstream ss; ss << "Unit compression only supported for scalar and vector 3 x 32-bit floating-point attributes. "
                                                             "Disabling compression for attribute \"" << attributeName << "\".";
                                 valueCompression = NONE;
                                 addWarning(SOP_MESSAGE, ss.str().c_str());
@@ -1262,6 +1306,9 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
             // point attribute names
             auto iter = detail->pointAttribs().begin(GA_SCOPE_PUBLIC);
 
+            const int normalCompression = evalInt("normalcompression", 0, time);
+            const int colorCompression = evalInt("colorcompression", 0, time);
+
             if (!iter.atEnd()) {
                 for (; !iter.atEnd(); ++iter) {
                     const char* str = (*iter)->getName();
@@ -1271,8 +1318,41 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
 
                         if (attrName == "P") continue;
 
+                        const Name attributeName = Name(attrName);
+
+                        const GA_ROAttributeRef attrRef = detail->findPointAttribute(attributeName.c_str());
+
+                        if (!attrRef.isValid()) continue;
+
+                        const GA_Attribute* const attribute = attrRef.getAttribute();
+
+                        if (!attribute) continue;
+
+                        const GA_Storage storage(attributeStorageType(attribute));
+
+                        // only tuple and string tuple attributes are supported
+
+                        if (storage == GA_STORE_INVALID) {
+                            std::stringstream ss; ss << "Invalid attribute type - " << attributeName;
+                            throw std::runtime_error(ss.str());
+                        }
+
+                        const int16_t width(attributeTupleSize(attribute));
+                        assert(width > 0);
+
+                        const GA_TypeInfo typeInfo(attribute->getOptions().typeInfo());
+
+                        const bool isNormal = width == 3 && typeInfo == GA_TYPE_NORMAL;
+                        const bool isColor = width == 3 && typeInfo == GA_TYPE_COLOR;
+
+                        int valueCompression = NONE;
+
+                        if (isNormal && normalCompression == 1)         valueCompression = UNIT_VECTOR;
+                        else if (isColor && colorCompression == 1)      valueCompression = UNIT_FIXED_POINT_16;
+                        else if (isColor && colorCompression == 2)      valueCompression = UNIT_FIXED_POINT_8;
+
                         // when converting all attributes apply no compression
-                        attributes[attrName] = std::pair<int, bool>(0, false);
+                        attributes[attrName] = std::pair<int, bool>(valueCompression, false);
                     }
                 }
             }

@@ -298,7 +298,7 @@ public:
                 }
 
                 if (!array.hasConstantStride()) {
-                    infoStr << ", dynamic[" << array.dataSize() << "]";
+                    infoStr << "[dynamic]";
                 }
                 else if (array.stride() > 1) {
                     infoStr << "[" << array.stride() << "]";
