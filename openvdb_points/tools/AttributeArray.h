@@ -130,7 +130,8 @@ public:
         TRANSIENT = 0x1,            /// by default not written to disk
         HIDDEN = 0x2,               /// hidden from UIs or iterators
         OUTOFCORE = 0x4,            /// data not yet loaded from disk
-        CONSTANTSTRIDE = 0x8        /// stride size does not vary in the array
+        CONSTANTSTRIDE = 0x8,       /// stride size does not vary in the array
+        STREAMING = 0x10            /// streaming mode collapses attributes when first accessed
     };
 
     enum SerializationFlag {
@@ -222,6 +223,14 @@ public:
     void setTransient(bool state);
     /// Return @c true if this attribute is not serialized during stream output.
     bool isTransient() const { return bool(mFlags & TRANSIENT); }
+
+    /// @brief Specify whether this attribute is to be streamed off disk, in which
+    ///        case, the attributes are collapsed after being first loaded leaving them
+    ///        in a destroyed state.
+    ///  @note This operation is not thread-safe.
+    void setStreaming(bool state);
+    /// Return @c true if this attribute is in streaming mode.
+    bool isStreaming() const { return bool(mFlags & STREAMING); }
 
     /// Return @c true if this attribute has a constant stride
     bool hasConstantStride() const { return bool(mFlags & CONSTANTSTRIDE); }
@@ -641,7 +650,7 @@ public:
 
     AttributeHandle(const AttributeArray& array, const bool preserveCompression = true);
 
-    virtual ~AttributeHandle() = default;
+    virtual ~AttributeHandle();
 
     Index stride() const { return mStrideOrTotalSize; }
     Index size() const { return mSize; }
@@ -681,6 +690,7 @@ private:
 
     Index mStrideOrTotalSize;
     Index mSize;
+    bool mCollapseOnDestruction;
 }; // class AttributeHandle
 
 
@@ -1819,6 +1829,7 @@ AttributeHandle<ValueType, CodecType>::AttributeHandle(const AttributeArray& arr
     : mArray(&array)
     , mStrideOrTotalSize(array.hasConstantStride() ? array.stride() : 1)
     , mSize(array.hasConstantStride() ? array.size() : array.dataSize())
+    , mCollapseOnDestruction(preserveCompression && array.isStreaming())
 {
     if (!this->compatibleType<std::is_same<CodecType, UnknownCodec>::value>()) {
         OPENVDB_THROW(TypeError, "Cannot bind handle due to incompatible type of AttributeArray.");
@@ -1833,7 +1844,7 @@ AttributeHandle<ValueType, CodecType>::AttributeHandle(const AttributeArray& arr
 
     if (array.isCompressed())
     {
-        if (preserveCompression) {
+        if (preserveCompression && !array.isStreaming()) {
             mLocalArray = array.copyUncompressed();
             mLocalArray->decompress();
             mArray = mLocalArray.get();
@@ -1854,6 +1865,13 @@ AttributeHandle<ValueType, CodecType>::AttributeHandle(const AttributeArray& arr
     mSetter = typedAccessor->mSetter;
     mCollapser = typedAccessor->mCollapser;
     mFiller = typedAccessor->mFiller;
+}
+
+template <typename ValueType, typename CodecType>
+AttributeHandle<ValueType, CodecType>::~AttributeHandle()
+{
+    // if enabled, attribute is collapsed on destruction of the handle to save memory
+    if (mCollapseOnDestruction)  const_cast<AttributeArray*>(this->mArray)->collapse();
 }
 
 template <typename ValueType, typename CodecType>

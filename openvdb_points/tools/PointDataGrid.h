@@ -228,6 +228,20 @@ inline AttributeSet::Descriptor::Ptr
 makeDescriptorUnique(PointDataTreeT& tree);
 
 
+/// @brief  Toggle the streaming mode on all attributes in the tree to collapse the attributes
+///         after deconstructing a bound AttributeHandle to each array. This results in better
+///         memory efficiency when the data is streamed into another data structure
+///         (typically for rendering).
+///
+/// @param  tree the PointDataTree.
+/// @param  on @c true to enable streaming
+///
+/// @note   Multiple threads cannot safely access the same AttributeArray when using streaming.
+template <typename PointDataTreeT>
+inline void
+setStreamingMode(PointDataTreeT& tree, bool on = true);
+
+
 ////////////////////////////////////////
 
 
@@ -1499,6 +1513,19 @@ makeDescriptorUnique(PointDataTreeT& tree)
     }
 
     return newDescriptor;
+}
+
+
+template <typename PointDataTreeT>
+inline void
+setStreamingMode(PointDataTreeT& tree, bool on)
+{
+    auto leafIter = tree.beginLeaf();
+    for (; leafIter; ++leafIter) {
+        for (size_t i = 0; i < leafIter->attributeSet().size(); i++) {
+            leafIter->attributeArray(i).setStreaming(on);
+        }
+    }
 }
 
 
