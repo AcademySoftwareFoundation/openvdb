@@ -249,7 +249,7 @@ INCLUDE_NAMES := \
     tools/PointConversion.h \
     tools/PointCount.h \
     tools/PointGroup.h \
-    tools/PointLoad.h \
+    tools/Load.h \
     tools/StreamCompression.h \
     Types.h \
     openvdb.h \
@@ -281,7 +281,7 @@ UNITTEST_SRC_NAMES := \
     unittest/TestPointCount.cc \
     unittest/TestPointDataLeaf.cc \
     unittest/TestPointGroup.cc \
-    unittest/TestPointLoad.cc \
+    unittest/TestLoad.cc \
     unittest/TestStreamCompression.cc \
 #
 

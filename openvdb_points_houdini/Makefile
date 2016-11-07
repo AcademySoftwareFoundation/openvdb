@@ -204,7 +204,7 @@ HOUDINI_SOP_SRC_NAMES := \
 	houdini/SHOP_OpenVDB_Points.cc \
 	houdini/SOP_OpenVDB_Points_Convert.cc \
 	houdini/SOP_OpenVDB_Points_Group.cc \
-	houdini/SOP_OpenVDB_Points_Load.cc \
+	houdini/SOP_OpenVDB_Load.cc \
 #
 MANTRA_VRAY_SRC_NAMES := \
 	houdini/VRAY_OpenVDB_Points.cc \

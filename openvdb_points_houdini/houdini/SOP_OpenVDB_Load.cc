@@ -28,16 +28,16 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 //
-/// @file SOP_OpenVDB_Points_Load.cc
+/// @file SOP_OpenVDB_Load.cc
 ///
 /// @author Dan Bailey
 ///
-/// @brief Explicitly loads OpenVDB points that are delay-loaded.
+/// @brief Explicitly loads OpenVDB Leaf Nodes that are delay-loaded.
 
 
 #include <openvdb_points/openvdb.h>
 #include <openvdb_points/tools/PointDataGrid.h>
-#include <openvdb_points/tools/PointLoad.h>
+#include <openvdb_points/tools/Load.h>
 
 #include <openvdb/tools/LevelSetUtil.h> // sdfInteriorMask
 
@@ -58,11 +58,11 @@ namespace hutil = houdini_utils;
 ////////////////////////////////////////
 
 
-class SOP_OpenVDB_Points_Load: public hvdb::SOP_NodeVDBPoints
+class SOP_OpenVDB_Load: public hvdb::SOP_NodeVDBPoints
 {
 public:
-    SOP_OpenVDB_Points_Load(OP_Network*, const char* name, OP_Operator*);
-    virtual ~SOP_OpenVDB_Points_Load() = default;
+    SOP_OpenVDB_Load(OP_Network*, const char* name, OP_Operator*);
+    virtual ~SOP_OpenVDB_Load() = default;
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
@@ -74,7 +74,7 @@ protected:
 
 private:
     hvdb::Interrupter mBoss;
-}; // class SOP_OpenVDB_Points_Load
+}; // class SOP_OpenVDB_Load
 
 
 
@@ -109,15 +109,15 @@ newSopOperator(OP_OperatorTable* table)
     //////////
     // Register this operator.
 
-    hvdb::OpenVDBOpFactory("OpenVDB Points Load",
-        SOP_OpenVDB_Points_Load::factory, parms, *table)
-        .addInput("VDB Points")
+    hvdb::OpenVDBOpFactory("OpenVDB Load",
+        SOP_OpenVDB_Load::factory, parms, *table)
+        .addInput("VDBs")
         .addOptionalInput("Mask VDB or Bounding Geometry");
 }
 
 
 bool
-SOP_OpenVDB_Points_Load::updateParmsFlags()
+SOP_OpenVDB_Load::updateParmsFlags()
 {
     bool changed = false;
     changed |= enableParm("mask", evalInt("usemask", 0, 0) != 0);
@@ -129,14 +129,14 @@ SOP_OpenVDB_Points_Load::updateParmsFlags()
 
 
 OP_Node*
-SOP_OpenVDB_Points_Load::factory(OP_Network* net,
+SOP_OpenVDB_Load::factory(OP_Network* net,
     const char* name, OP_Operator* op)
 {
-    return new SOP_OpenVDB_Points_Load(net, name, op);
+    return new SOP_OpenVDB_Load(net, name, op);
 }
 
 
-SOP_OpenVDB_Points_Load::SOP_OpenVDB_Points_Load(OP_Network* net,
+SOP_OpenVDB_Load::SOP_OpenVDB_Load(OP_Network* net,
     const char* name, OP_Operator* op)
     : hvdb::SOP_NodeVDBPoints(net, name, op)
 {
@@ -145,26 +145,67 @@ SOP_OpenVDB_Points_Load::SOP_OpenVDB_Points_Load(OP_Network* net,
 
 namespace {
 
-struct MaskOp
+struct HasOutOfCoreLeafNodesOp
 {
-    using MaskType = openvdb::BoolGrid;
+    HasOutOfCoreLeafNodesOp()
+        : mHasDelayedLeaves(false) {};
 
     template<typename GridType>
     void operator()(const GridType& grid)
     {
-        maskGrid = MaskType::create(false);
-        maskGrid->setTransform(grid.transform().copy());
+        auto leafIter = grid.tree().cbeginLeaf();
 
-        if (openvdb::GRID_LEVEL_SET == grid.getGridClass()) {
-            BoolGrid::Ptr boolGrid = openvdb::tools::sdfInteriorMask(grid);
-            maskGrid->tree().topologyUnion(boolGrid->tree());
-        }
-        else {
-            maskGrid->tree().topologyUnion(grid.tree());
+        for (; leafIter; ++leafIter)
+        {
+            if (leafIter->buffer().isOutOfCore()) {
+                mHasDelayedLeaves = true;
+                return;
+            }
         }
     }
 
-    MaskType::Ptr maskGrid;
+    bool mHasDelayedLeaves;
+};
+
+struct MaskOp
+{
+    MaskOp() : mMaskGrid() {}
+
+    template<typename GridType>
+    void operator()(const GridType& grid)
+    {
+        mMaskGrid = MaskGrid::create();
+        mMaskGrid->setTransform(grid.transform().copy());
+
+        if (openvdb::GRID_LEVEL_SET == grid.getGridClass()) {
+            BoolGrid::Ptr boolGrid = tools::sdfInteriorMask(grid);
+            mMaskGrid->tree().topologyUnion(boolGrid->tree());
+        }
+        else {
+            mMaskGrid->tree().topologyUnion(grid.tree());
+        }
+
+        mMaskGrid->tree().voxelizeActiveTiles();
+    }
+
+    MaskGrid::Ptr mMaskGrid;
+};
+
+struct LoadLeafNodesOp
+{
+    LoadLeafNodesOp()
+        : mMask(), mBBox(nullptr) {}
+
+    template<typename GridType>
+    void operator()(GridType& grid)
+    {
+        if (!mMask && !mBBox)   tools::loadGrid(grid);
+        else if (mMask)         tools::loadGrid(grid, *mMask);
+        else if (mBBox)         tools::loadGrid(grid, *mBBox);
+    }
+
+    MaskGrid::ConstPtr  mMask;
+    const BBoxd*        mBBox;
 };
 
 } // unnamed namespace
@@ -174,81 +215,68 @@ struct MaskOp
 
 
 OP_ERROR
-SOP_OpenVDB_Points_Load::cookMySop(OP_Context& context)
+SOP_OpenVDB_Load::cookMySop(OP_Context& context)
 {
-    using PointDataGrid = openvdb::tools::PointDataGrid;
+    using PointDataGrid = tools::PointDataGrid;
 
     try {
         hutil::ScopedInputLock lock(*this, context);
+        // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
+        if (duplicateSourceStealable(0, context) >= UT_ERROR_ABORT) return error();
+
+        UT_AutoInterrupt progress("Processing OpenVDB Load");
+
         const fpreal time = context.getTime();
 
         const GU_Detail* maskGeo = inputGeo(1);
-
-        // This does a shallow copy of VDB-grids and deep copy of native Houdini primitives.
-        duplicateSourceStealable(0, context);
-
-        UT_AutoInterrupt progress("Processing Points Load");
-
-        const bool useMask = evalInt("usemask", 0, time);
+        const bool useMask = maskGeo ? evalInt("usemask", 0, time) : false;
 
         // Get the group of grids to surface.
         UT_String groupStr;
         evalString(groupStr, "group", 0, time);
         const GA_PrimitiveGroup* group = matchGroup(*gdp, groupStr.toStdString());
 
-        hvdb::VdbPrimIterator vdbIt(gdp, group);
-
-        // Handle no vdbs
-        if (!vdbIt) {
-            return error();
-        }
-
-        for (; vdbIt; ++vdbIt) {
+        for (hvdb::VdbPrimIterator vdbIt(gdp, group); vdbIt; ++vdbIt) {
 
             if (progress.wasInterrupted()) {
                 throw std::runtime_error("processing was interrupted");
             }
 
             GU_PrimVDB* vdbPrim = *vdbIt;
-            auto inGrid = vdbPrim->getGridPtr();
-
-            if (!inGrid->isType<PointDataGrid>()) continue;
-            auto pointDataGrid = openvdb::gridPtrCast<PointDataGrid>(inGrid);
-
-            auto leafIter = pointDataGrid->tree().cbeginLeaf();
-            if (!leafIter) continue;
+            if (!vdbPrim) continue;
 
             // early exit if no delayed leaves (avoids redundant deep copy)
 
-            bool hasDelayedLeaves = false;
-
-            for (; leafIter; ++leafIter)
             {
-                if (leafIter->buffer().isOutOfCore()) {
-                    hasDelayedLeaves = true;
-                    break;
+                const GridBase::ConstPtr inGrid = vdbPrim->getConstGridPtr();
+                if (!inGrid) {
+                    addError(SOP_MESSAGE, "Failed to duplicate VDB Grids");
+                    return error();
                 }
-            }
 
-            if (!hasDelayedLeaves)  continue;
+                HasOutOfCoreLeafNodesOp op;
+                if (inGrid->isType<PointDataGrid>()) {
+                    UT_VDBUtils::callTypedGrid<PointDataGrid>(*inGrid, op);
+                }
+                else {
+                    // ignore boolean grids which cannot be delay loaded
+                    GEOvdbProcessTypedGrid(*vdbPrim, op, /*makeUnique*/false);
+                }
+                if (!op.mHasDelayedLeaves) continue;
+            }
 
             // deep copy the VDB tree if it is not already unique
+
             vdbPrim->makeGridUnique();
 
-            auto outputGrid = openvdb::gridPtrCast<PointDataGrid>(vdbPrim->getGridPtr());
+            // get the mask input if there is one, otherwise calculate
+            // the input bounding box
 
-            if (!outputGrid) {
-                addError(SOP_MESSAGE, "Failed to duplicate VDB Points");
-                return error();
-            }
+            MaskGrid::ConstPtr mask;
+            BBoxd bbox;
 
-            // load all points if mask is not provided as an input
-            if (!maskGeo) {
-                openvdb::tools::loadPoints(*outputGrid);
-                return error();
-            }
-
-            if (useMask) {
+            if (useMask)
+            {
                 UT_String maskStr;
                 evalString(maskStr, "mask", 0, time);
 #if (UT_MAJOR_VERSION_INT >= 15)
@@ -259,33 +287,29 @@ SOP_OpenVDB_Points_Load::cookMySop(OP_Context& context)
                     maskStr.buffer(), const_cast<GU_Detail*>(maskGeo));
 #endif
                 hvdb::VdbPrimCIterator maskIt(maskGeo, maskGroup);
-                if (!maskIt) {
+
+                if(maskIt)
+                {
+                    MaskOp op;
+                    const GridBase::ConstPtr maskGrid = maskIt->getConstGridPtr();
+
+                    if (maskGrid->isType<PointDataGrid>()) {
+                        UT_VDBUtils::callTypedGrid<PointDataGrid>(*maskGrid, op);
+                    }
+                    else {
+                        GEOvdbProcessTypedGridTopology(**maskIt, op);
+                    }
+
+                    mask = op.mMaskGrid;
+                }
+                else
+                {
                     addWarning(SOP_MESSAGE, "Mask VDB not found.");
-                    openvdb::tools::loadPoints(*outputGrid);
-                    return error();
                 }
-                // load points based on topology, explicitly include grid types not
-                // handled in GEOvdbProcessTypedGridTopology()
-                MaskOp op;
-                MaskOp::MaskType::Ptr maskGrid;
-                const openvdb::GridBase& grid(maskIt->getConstGrid());
-                if (grid.isType<MaskOp::MaskType>()) {
-                    UT_VDBUtils::callTypedGrid<MaskOp::MaskType>(grid, op);
-                    maskGrid = op.maskGrid;
-                }
-                else if (grid.isType<PointDataGrid>()) {
-                    UT_VDBUtils::callTypedGrid<PointDataGrid>(grid, op);
-                    maskGrid = op.maskGrid;
-                }
-                else {
-                    GEOvdbProcessTypedGridTopology(**maskIt, op);
-                    maskGrid = op.maskGrid;
-                }
-                openvdb::tools::loadPoints(*outputGrid, *maskGrid);
             }
-            else {
+            else if (maskGeo)
+            {
                 // implicitly compute mask from bounding box of input geo
-                openvdb::BBoxd bbox;
                 UT_BoundingBox box;
                 maskGeo->computeQuickBounds(box);
 
@@ -295,7 +319,19 @@ SOP_OpenVDB_Points_Load::cookMySop(OP_Context& context)
                 bbox.max()[0] = box.xmax();
                 bbox.max()[1] = box.ymax();
                 bbox.max()[2] = box.zmax();
-                openvdb::tools::loadPoints(*outputGrid, bbox);
+            }
+
+            LoadLeafNodesOp op;
+            op.mMask = mask;
+            op.mBBox = maskGeo ? &bbox : nullptr;
+
+            const GridBase::Ptr inGrid = vdbPrim->getGridPtr();
+
+            if (inGrid->isType<PointDataGrid>()) {
+                UT_VDBUtils::callTypedGrid<PointDataGrid>(*inGrid, op);
+            }
+            else {
+                GEOvdbProcessTypedGridTopology(*vdbPrim, op, /*makeUnique*/false);
             }
         }
 

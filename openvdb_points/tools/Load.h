@@ -30,14 +30,14 @@
 //
 /// @author Dan Bailey
 ///
-/// @file PointLoad.h
+/// @file Load.h
 ///
-/// @brief  Various point loading methods using a VDB Point Grid.
+/// @brief Explicitly load delay-loaded VDB leaf data by accessing the buffers.
 ///
 
 
-#ifndef OPENVDB_TOOLS_POINT_LOAD_HAS_BEEN_INCLUDED
-#define OPENVDB_TOOLS_POINT_LOAD_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_TOOLS_LOAD_HAS_BEEN_INCLUDED
+#define OPENVDB_TOOLS_LOAD_HAS_BEEN_INCLUDED
 
 #include <openvdb/openvdb.h>
 
@@ -54,94 +54,80 @@ namespace tools {
 ///
 /// @param grid  the Grid to be loaded.
 /// @note This method wraps readNonresidentBuffers().
-template <typename PointDataGridT>
-void loadPoints(PointDataGridT& grid);
+template <typename GridType>
+void loadGrid(GridType& grid);
 
 
 /// @brief Loads all leaf node voxel data in the given grid that
 /// overlap with mask grid leaf nodes.
 ///
 /// @param grid  the Grid to be loaded.
-/// @param mask  the mask to denote region of points to load
-template <typename PointDataGridT, typename MaskGridT>
-void loadPoints(PointDataGridT& grid, const MaskGridT& mask);
+/// @param mask  the mask to denote region of data to load
+template <typename GridType, typename MaskGridT>
+void loadGrid(GridType& grid, const MaskGridT& mask);
 
 
 /// @brief Load the leaf node voxel data in the given grid that
 /// overlap with a world-space bounding box.
 ///
 /// @param grid  the Grid to be loaded.
-/// @param bbox  the bbox to denote region of points to load
+/// @param bbox  the bbox to denote region of data to load
 ///
 /// @note Does not clip to the bounding box, leaf nodes with any
 /// overlap will be loaded.
-template <typename PointDataGridT>
-void loadPoints(PointDataGridT& grid, const BBoxd& bbox);
+template <typename GridType>
+void loadGrid(GridType& grid, const BBoxd& bbox);
 
 
 ////////////////////////////////////////
 
 
 #ifndef OPENVDB_2_ABI_COMPATIBLE
-template <typename PointDataGridT>
-void loadPoints(PointDataGridT& grid)
+template <typename GridType>
+void loadGrid(GridType& grid)
 {
     grid.constTree().readNonresidentBuffers();
 }
 #else
-template <typename PointDataGridT>
-void loadPoints(PointDataGridT&)
+template <typename GridType>
+void loadGrid(GridType&)
 {
     // out-of-core not supported with ABI 2
 }
 #endif
 
 
-template <typename PointDataGridT, typename MaskGridT>
-void loadPoints(PointDataGridT& grid, const MaskGridT& mask)
+template <typename GridType, typename MaskGridT>
+void loadGrid(GridType& grid, const MaskGridT& mask)
 {
-    using PointDataTreeT = typename PointDataGridT::TreeType;
-
-    tree::ValueAccessor<const PointDataTreeT> pointsAcc(grid.constTree());
+    const typename GridType::ConstAccessor accessor(grid.getConstAccessor());
 
     auto leafIter = mask.constTree().cbeginLeaf();
 
     for (; leafIter; ++leafIter) {
-        const Coord& ijk = leafIter->origin();
-        const typename PointDataTreeT::LeafNodeType* leaf = pointsAcc.probeConstLeaf(ijk);
+        const auto* leaf = accessor.probeConstLeaf(leafIter->origin());
 
-        if (!leaf)  continue;
-
-        // load out of core leaf nodes
-        if (leaf->buffer().isOutOfCore())    leaf->buffer().data();
+        // load out of core leaf nodes by touching the data buffer.
+        // Note that this has no effect on boolean or mask grid types
+        if (leaf)  leaf->buffer().data();
     }
 }
 
 
-template <typename PointDataGridT>
-void loadPoints(PointDataGridT& grid, const BBoxd& bbox)
+template <typename GridType>
+void loadGrid(GridType& grid, const BBoxd& bbox)
 {
-    using BoolGridT = typename PointDataGridT::template ValueConverter<bool>::Type;
-
     // Transform the world-space bounding box into the source grid's index space.
     Vec3d idxMin, idxMax;
     math::calculateBounds(grid.constTransform(), bbox.min(), bbox.max(), idxMin, idxMax);
-    CoordBBox region(Coord::floor(idxMin), Coord::floor(idxMax));
+    const CoordBBox region(Coord::floor(idxMin), Coord::floor(idxMax));
 
-    // Construct a boolean mask grid that is true inside the index-space bounding box
-    // and false everywhere else.
-    BoolGridT clipMask(/*background=*/false);
-    clipMask.fill(region, /*value=*/true, /*active=*/true);
+    // Construct a mask grid that is active inside the index-space bounding box
+    MaskGrid clipMask(/*background=*/false);
+    clipMask.setTransform(grid.transformPtr());
+    clipMask.denseFill(region, /*value=*/true);
 
-    // MaskGrid introduced in OpenVDB 3.2
-    using MaskType = BoolGrid;
-
-    // Convert the input grid to a mask grid (with the same tree configuration).
-    auto pointsMask = MaskType::create(/*background=*/false);
-    pointsMask->topologyUnion(grid);
-    pointsMask->topologyIntersection(clipMask);
-
-    loadPoints(grid, *pointsMask);
+    loadGrid(grid, clipMask);
 }
 
 
@@ -153,7 +139,7 @@ void loadPoints(PointDataGridT& grid, const BBoxd& bbox)
 } // namespace openvdb
 
 
-#endif // OPENVDB_TOOLS_POINT_LOAD_HAS_BEEN_INCLUDED
+#endif // OPENVDB_TOOLS_LOAD_HAS_BEEN_INCLUDED
 
 
 // Copyright (c) 2015-2016 Double Negative Visual Effects
