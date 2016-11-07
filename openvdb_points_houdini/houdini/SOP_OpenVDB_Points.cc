@@ -69,6 +69,66 @@ using namespace openvdb;
 using namespace openvdb::tools;
 using namespace openvdb::math;
 
+namespace openvdb_houdini {
+    template <> inline openvdb::math::Quat<float>
+    evalAttrDefault<openvdb::math::Quat<float>>(const GA_Defaults& defaults, int)
+    {
+        openvdb::math::Quat<float> quat;
+        fpreal32 value;
+
+        for (int i = 0; i < 4; i++) {
+            defaults.get(i, value);
+            quat[i] = float(value);
+        }
+
+        return quat;
+    }
+
+    template <> inline openvdb::math::Quat<double>
+    evalAttrDefault<openvdb::math::Quat<double>>(const GA_Defaults& defaults, int)
+    {
+        openvdb::math::Quat<double> quat;
+        fpreal64 value;
+
+        for (int i = 0; i < 4; i++) {
+            defaults.get(i, value);
+            quat[i] = double(value);
+        }
+
+        return quat;
+    }
+
+    template <> inline openvdb::math::Mat4<float>
+    evalAttrDefault<openvdb::math::Mat4<float>>(const GA_Defaults& defaults, int)
+    {
+        openvdb::math::Mat4<float> mat;
+        fpreal64 value;
+        float* data = mat.asPointer();
+
+        for (int i = 0; i < 16; i++) {
+            defaults.get(i, value);
+            data[i] = float(value);
+        }
+
+        return mat;
+    }
+
+    template <> inline openvdb::math::Mat4<double>
+    evalAttrDefault<openvdb::math::Mat4<double>>(const GA_Defaults& defaults, int)
+    {
+        openvdb::math::Mat4<double> mat;
+        fpreal64 value;
+        double* data = mat.asPointer();
+
+        for (int i = 0; i < 16; i++) {
+            defaults.get(i, value);
+            data[i] = double(value);
+        }
+
+        return mat;
+    }
+}
+
 namespace hvdb = openvdb_houdini;
 namespace hvdbp = openvdb_points_houdini;
 namespace hutil = houdini_utils;
@@ -206,6 +266,8 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
     const bool isVector = width == 3 && (typeInfo == GA_TYPE_VECTOR ||
                                          typeInfo == GA_TYPE_NORMAL ||
                                          typeInfo == GA_TYPE_COLOR);
+    const bool isQuaternion = width == 4 && (typeInfo == GA_TYPE_QUATERNION);
+    const bool isMatrix = width == 16 && (typeInfo == GA_TYPE_TRANSFORM);
 
     if (isVector)
     {
@@ -235,6 +297,46 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
         }
         else {
             std::stringstream ss; ss << "Unknown vector attribute type - " << name;
+            throw std::runtime_error(ss.str());
+        }
+    }
+    else if (isQuaternion)
+    {
+        if (storage == GA_STORE_REAL16)
+        {
+            // implicitly convert 16-bit float into 32-bit float
+
+            convertAttributeFromHoudini<Quat<float>>(tree, indexTree, name, attribute, defaults);
+        }
+        else if (storage == GA_STORE_REAL32)
+        {
+            convertAttributeFromHoudini<Quat<float>>(tree, indexTree, name, attribute, defaults);
+        }
+        else if (storage == GA_STORE_REAL64) {
+            convertAttributeFromHoudini<Quat<double>>(tree, indexTree, name, attribute, defaults);
+        }
+        else {
+            std::stringstream ss; ss << "Unknown quaternion attribute type - " << name;
+            throw std::runtime_error(ss.str());
+        }
+    }
+    else if (isMatrix)
+    {
+        if (storage == GA_STORE_REAL16)
+        {
+            // implicitly convert 16-bit float into 32-bit float
+
+            convertAttributeFromHoudini<Mat4<float>>(tree, indexTree, name, attribute, defaults);
+        }
+        else if (storage == GA_STORE_REAL32)
+        {
+            convertAttributeFromHoudini<Mat4<float>>(tree, indexTree, name, attribute, defaults);
+        }
+        else if (storage == GA_STORE_REAL64) {
+            convertAttributeFromHoudini<Mat4<double>>(tree, indexTree, name, attribute, defaults);
+        }
+        else {
+            std::stringstream ss; ss << "Unknown matrix attribute type - " << name;
             throw std::runtime_error(ss.str());
         }
     }
@@ -1142,9 +1244,12 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
                     assert(width > 0);
 
                     const GA_TypeInfo typeInfo(attribute->getOptions().typeInfo());
-                    const bool isVector = width == 3 && (   typeInfo == GA_TYPE_VECTOR ||
-                                                            typeInfo == GA_TYPE_NORMAL ||
-                                                            typeInfo == GA_TYPE_COLOR);
+
+                    const bool isVector = width == 3 && (typeInfo == GA_TYPE_VECTOR ||
+                                                         typeInfo == GA_TYPE_NORMAL ||
+                                                         typeInfo == GA_TYPE_COLOR);
+                    const bool isQuaternion = width == 4 && (typeInfo == GA_TYPE_QUATERNION);
+                    const bool isMatrix = width == 16 && (typeInfo == GA_TYPE_TRANSFORM);
 
                     const bool bloscCompression = evalIntInst("blosccompression#", &i, 0, 0);
                     int valueCompression = evalIntInst("valuecompression#", &i, 0, 0);
@@ -1164,7 +1269,7 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
                         else {
                             // disable value compression for incompatible types and add a SOP warning
 
-                            if (valueCompression == TRUNCATE && storage != GA_STORE_REAL32) {
+                            if (valueCompression == TRUNCATE && (storage != GA_STORE_REAL32 || isQuaternion || isMatrix)) {
                                 std::stringstream ss; ss << "Truncate value compression only supported for 32-bit floating-point attributes. "
                                                             "Disabling compression for attribute \"" << attributeName << "\".";
                                 valueCompression = NONE;
@@ -1231,7 +1336,11 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
             const int16_t width(attributeTupleSize(attribute));
             const GA_TypeInfo typeInfo(attribute->getOptions().typeInfo());
 
-            const bool isVector(typeInfo == GA_TYPE_VECTOR && width == 3);
+            const bool isVector = width == 3 && (typeInfo == GA_TYPE_VECTOR ||
+                                                 typeInfo == GA_TYPE_NORMAL ||
+                                                 typeInfo == GA_TYPE_COLOR);
+            const bool isQuaternion = width == 4 && (typeInfo == GA_TYPE_QUATERNION);
+            const bool isMatrix = width == 16 && (typeInfo == GA_TYPE_TRANSFORM);
 
             if (isVector) {
                 if (storage == GA_STORE_REAL16)         metadata = createTypedMetadataFromAttribute<Vec3<float> >(attribute);
@@ -1245,6 +1354,28 @@ SOP_OpenVDB_Points::cookMySop(OP_Context& context)
                 }
                 assert(metadata);
                 pointDataGrid->insertMeta(name, *metadata);
+            }
+            else if (isQuaternion) {
+                if (storage == GA_STORE_REAL16)         metadata = createTypedMetadataFromAttribute<Quat<float>>(attribute);
+                else if (storage == GA_STORE_REAL32)    metadata = createTypedMetadataFromAttribute<Quat<float>>(attribute);
+                else if (storage == GA_STORE_REAL64)    metadata = createTypedMetadataFromAttribute<Quat<double>>(attribute);
+                else {
+                    std::stringstream ss; ss << "Detail attribute \"" << attribute->getName() << "\" " <<
+                                                "unsupported quaternion type for metadata conversion.";
+                    addWarning(SOP_MESSAGE, ss.str().c_str());
+                    continue;
+                }
+            }
+            else if (isMatrix) {
+                if (storage == GA_STORE_REAL16)         metadata = createTypedMetadataFromAttribute<Mat4<float>>(attribute);
+                else if (storage == GA_STORE_REAL32)    metadata = createTypedMetadataFromAttribute<Mat4<float>>(attribute);
+                else if (storage == GA_STORE_REAL64)    metadata = createTypedMetadataFromAttribute<Mat4<double>>(attribute);
+                else {
+                    std::stringstream ss; ss << "Detail attribute \"" << attribute->getName() << "\" " <<
+                                                "unsupported matrix type for metadata conversion.";
+                    addWarning(SOP_MESSAGE, ss.str().c_str());
+                    continue;
+                }
             }
             else {
                 for (int i = 0; i < width; i++) {

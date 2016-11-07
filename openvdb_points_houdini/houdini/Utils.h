@@ -85,6 +85,10 @@ template <typename T> struct GAHandleTraits                     { typedef GA_RWH
 template <> struct GAHandleTraits<openvdb::math::Vec3<int> >    { typedef GA_RWHandleV3 RW;  typedef GA_ROHandleV3 RO; };
 template <> struct GAHandleTraits<openvdb::math::Vec3<float> >  { typedef GA_RWHandleV3 RW;  typedef GA_ROHandleV3 RO; };
 template <> struct GAHandleTraits<openvdb::math::Vec3<double> > { typedef GA_RWHandleV3D RW; typedef GA_ROHandleV3D RO; };
+template <> struct GAHandleTraits<openvdb::math::Quat<float> >  { typedef GA_RWHandleQ RW;  typedef GA_ROHandleQ RO; };
+template <> struct GAHandleTraits<openvdb::math::Quat<double> > { typedef GA_RWHandleQD RW; typedef GA_ROHandleQD RO; };
+template <> struct GAHandleTraits<openvdb::math::Mat4<float> >  { typedef GA_RWHandleM4 RW;  typedef GA_ROHandleM4 RO; };
+template <> struct GAHandleTraits<openvdb::math::Mat4<double> > { typedef GA_RWHandleM4D RW; typedef GA_ROHandleM4D RO; };
 template <> struct GAHandleTraits<bool>          { typedef GA_RWHandleI RW; typedef GA_ROHandleI RO; };
 template <> struct GAHandleTraits<int16_t>       { typedef GA_RWHandleI RW; typedef GA_ROHandleI RO; };
 template <> struct GAHandleTraits<int32_t>       { typedef GA_RWHandleI RW; typedef GA_ROHandleI RO; };
@@ -96,6 +100,16 @@ template <> struct GAHandleTraits<openvdb::Name> { typedef GA_RWHandleS RW; type
 
 
 ////////////////////////////////////////
+
+template<typename T> struct SizeTraits                          {
+    static const int Size = openvdb::VecTraits<T>::Size;
+};
+template<typename T> struct SizeTraits<openvdb::math::Quat<T> > {
+    static const int Size = 4;
+};
+template<unsigned SIZE, typename T> struct SizeTraits<openvdb::math::Mat<SIZE, T> > {
+    static const int Size = SIZE*SIZE;
+};
 
 
 template <typename HandleType, typename ValueType>
@@ -128,6 +142,36 @@ readAttributeValue(const GA_ROHandleV3D& handle, const GA_Offset offset, const o
     return dstValue;
 }
 template <>
+inline openvdb::math::Quat<float>
+readAttributeValue(const GA_ROHandleQ& handle, const GA_Offset offset, const openvdb::Index component) {
+    openvdb::math::Quat<float> dstValue;
+    const UT_QuaternionF value(handle.get(offset, component));
+    dstValue[0] = value[0]; dstValue[1] = value[1]; dstValue[2] = value[2]; dstValue[3] = value[3];
+    return dstValue;
+}
+template <>
+inline openvdb::math::Quat<double>
+readAttributeValue(const GA_ROHandleQD& handle, const GA_Offset offset, const openvdb::Index component) {
+    openvdb::math::Quat<double> dstValue;
+    const UT_QuaternionD value(handle.get(offset, component));
+    dstValue[0] = value[0]; dstValue[1] = value[1]; dstValue[2] = value[2]; dstValue[3] = value[3];
+    return dstValue;
+}
+template <>
+inline openvdb::math::Mat4<float>
+readAttributeValue(const GA_ROHandleM4& handle, const GA_Offset offset, const openvdb::Index component) {
+    const UT_Matrix4F value(handle.get(offset, component));
+    openvdb::math::Mat4<float> dstValue(value.data());
+    return dstValue;
+}
+template <>
+inline openvdb::math::Mat4<double>
+readAttributeValue(const GA_ROHandleM4D& handle, const GA_Offset offset, const openvdb::Index component) {
+    const UT_Matrix4D value(handle.get(offset, component));
+    openvdb::math::Mat4<double> dstValue(value.data());
+    return dstValue;
+}
+template <>
 inline openvdb::Name
 readAttributeValue(const GA_ROHandleS& handle, const GA_Offset offset, const openvdb::Index component) {
     return openvdb::Name(UT_String(handle.get(offset, component)).toStdString());
@@ -151,32 +195,105 @@ void writeAttributeValue(const GA_RWHandleV3D& handle, const GA_Offset offset, c
     handle.set(offset, component, UT_Vector3D(value.x(), value.y(), value.z()));
 }
 template <>
+void writeAttributeValue(const GA_RWHandleQ& handle, const GA_Offset offset, const openvdb::Index component, const openvdb::math::Quat<float>& value) {
+    handle.set(offset, component, UT_QuaternionF(value.x(), value.y(), value.z(), value.w()));
+}
+template <>
+void writeAttributeValue(const GA_RWHandleQD& handle, const GA_Offset offset, const openvdb::Index component, const openvdb::math::Quat<double>& value) {
+    handle.set(offset, component, UT_QuaternionD(value.x(), value.y(), value.z(), value.w()));
+}
+template <>
+void writeAttributeValue(const GA_RWHandleM4& handle, const GA_Offset offset, const openvdb::Index component, const openvdb::math::Mat4<float>& value) {
+    const float* data(value.asPointer());
+    handle.set(offset, component, UT_Matrix4F(data[0], data[1], data[2], data[3],
+                                              data[4], data[5], data[6], data[7],
+                                              data[8], data[9], data[10], data[11],
+                                              data[12], data[13], data[14], data[15]));
+}
+template <>
+void writeAttributeValue(const GA_RWHandleM4D& handle, const GA_Offset offset, const openvdb::Index component, const openvdb::math::Mat4<double>& value) {
+    const double* data(value.asPointer());
+    handle.set(offset, component, UT_Matrix4D(data[0], data[1], data[2], data[3],
+                                               data[4], data[5], data[6], data[7],
+                                               data[8], data[9], data[10], data[11],
+                                               data[12], data[13], data[14], data[15]));
+}
+
+template <>
 inline void writeAttributeValue(const GA_RWHandleS& handle, const GA_Offset offset, const openvdb::Index component, const openvdb::Name& value) {
     handle.set(offset, component, value.c_str());
 }
 
 
 template<typename ValueType, typename HoudiniType>
-typename std::enable_if<openvdb::VecTraits<ValueType>::IsVec, void>::type
-getValues(HoudiniType* values, const ValueType& value)
+void getValues(HoudiniType* values, const ValueType& value)
 {
-    for (unsigned i = 0; i < openvdb::VecTraits<ValueType>::Size; ++i) {
+    values[0] = value;
+}
+
+template<>
+void getValues(int32* values, const openvdb::math::Vec3<int>& value)
+{
+    for (unsigned i = 0; i < 3; ++i) {
         values[i] = value(i);
     }
 }
 
-template<typename ValueType, typename HoudiniType>
-typename std::enable_if<!openvdb::VecTraits<ValueType>::IsVec, void>::type
-getValues(HoudiniType* values, const ValueType& value)
+template<>
+void getValues(fpreal32* values, const openvdb::math::Vec3<float>& value)
 {
-    values[0] = value;
+    for (unsigned i = 0; i < 3; ++i) {
+        values[i] = value(i);
+    }
+}
+
+template<>
+void getValues(fpreal64* values, const openvdb::math::Vec3<double>& value)
+{
+    for (unsigned i = 0; i < 3; ++i) {
+        values[i] = value(i);
+    }
+}
+
+template<>
+void getValues(fpreal32* values, const openvdb::math::Quat<float>& value)
+{
+    for (unsigned i = 0; i < 4; ++i) {
+        values[i] = value(i);
+    }
+}
+
+template<>
+void getValues(fpreal64* values, const openvdb::math::Quat<double>& value)
+{
+    for (unsigned i = 0; i < 4; ++i) {
+        values[i] = value(i);
+    }
+}
+
+template<>
+void getValues(fpreal32* values, const openvdb::math::Mat4<float>& value)
+{
+    const float* data = value.asPointer();
+    for (unsigned i = 0; i < 16; ++i) {
+        values[i] = data[i];
+    }
+}
+
+template<>
+void getValues(fpreal64* values, const openvdb::math::Mat4<double>& value)
+{
+    const double* data = value.asPointer();
+    for (unsigned i = 0; i < 16; ++i) {
+        values[i] = data[i];
+    }
 }
 
 template <typename ValueType, typename HoudiniType>
 GA_Defaults
 gaDefaultsFromDescriptorTyped(const openvdb::tools::AttributeSet::Descriptor& descriptor, const openvdb::Name& name)
 {
-    const int size = openvdb::VecTraits<ValueType>::Size;
+    const int size = SizeTraits<ValueType>::Size;
 
     std::unique_ptr<HoudiniType[]> values(new HoudiniType[size]);
     ValueType defaultValue = descriptor.getDefaultValue<ValueType>(name);
@@ -204,6 +321,10 @@ gaDefaultsFromDescriptor(const openvdb::tools::AttributeSet::Descriptor& descrip
     else if (type == "vec3i")       return gaDefaultsFromDescriptorTyped<openvdb::math::Vec3<int>, int32>(descriptor, name);
     else if (type == "vec3s")       return gaDefaultsFromDescriptorTyped<openvdb::math::Vec3<float>, fpreal32>(descriptor, name);
     else if (type == "vec3d")       return gaDefaultsFromDescriptorTyped<openvdb::math::Vec3<double>, fpreal64>(descriptor, name);
+    else if (type == "quats")       return gaDefaultsFromDescriptorTyped<openvdb::math::Quat<float>, fpreal32>(descriptor, name);
+    else if (type == "quatd")       return gaDefaultsFromDescriptorTyped<openvdb::math::Quat<double>, fpreal64>(descriptor, name);
+    else if (type == "mat4s")       return gaDefaultsFromDescriptorTyped<openvdb::math::Mat4<float>, fpreal32>(descriptor, name);
+    else if (type == "mat4d")       return gaDefaultsFromDescriptorTyped<openvdb::math::Mat4<double>, fpreal64>(descriptor, name);
 
     return GA_Defaults(0);
 }
@@ -221,16 +342,12 @@ gaStorageFromAttrString(const openvdb::Name& type)
     else if (type == "vec3i")       return GA_STORE_INT32;
     else if (type == "vec3s")       return GA_STORE_REAL32;
     else if (type == "vec3d")       return GA_STORE_REAL64;
+    else if (type == "quats")       return GA_STORE_REAL32;
+    else if (type == "quatd")       return GA_STORE_REAL64;
+    else if (type == "mat4s")       return GA_STORE_REAL32;
+    else if (type == "mat4d")       return GA_STORE_REAL64;
 
     return GA_STORE_INVALID;
-}
-
-inline GA_TypeInfo
-gaTypeInfoFromAttrString(const openvdb::Name& type)
-{
-    if (type == "vec3s" || type == "vec3d")     return GA_TYPE_VECTOR;
-
-    return GA_TYPE_VOID;
 }
 
 } // namespace
@@ -455,7 +572,12 @@ convertPointDataGridToHoudini(GU_Detail& detail,
 
             unsigned width = stride;
             const bool isVector = valueType.compare(0, 4, "vec3") == 0;
-            if (isVector)   width = 3;
+            const bool isQuaternion = valueType.compare(0, 4, "quat") == 0;
+            const bool isMatrix4 = valueType.compare(0, 4, "mat4") == 0;
+
+            if (isVector)               width = 3;
+            else if (isQuaternion)      width = 4;
+            else if (isMatrix4)         width = 16;
 
             const GA_Defaults defaults = gaDefaultsFromDescriptor(descriptor, name);
 
@@ -464,8 +586,16 @@ convertPointDataGridToHoudini(GU_Detail& detail,
             // apply type info to some recognised types
             if (isVector) {
                 if (name == "Cd")       attributeRef->getOptions().setTypeInfo(GA_TYPE_COLOR);
-                else if (name == "v")   attributeRef->getOptions().setTypeInfo(GA_TYPE_VECTOR);
                 else if (name == "N")   attributeRef->getOptions().setTypeInfo(GA_TYPE_NORMAL);
+                else                    attributeRef->getOptions().setTypeInfo(GA_TYPE_VECTOR);
+            }
+
+            if (isQuaternion) {
+                attributeRef->getOptions().setTypeInfo(GA_TYPE_QUATERNION);
+            }
+
+            if (isMatrix4) {
+                attributeRef->getOptions().setTypeInfo(GA_TYPE_TRANSFORM);
             }
 
             // '|' and ':' characters are valid in OpenVDB Points names but will make Houdini Attribute names invalid
@@ -514,6 +644,22 @@ convertPointDataGridToHoudini(GU_Detail& detail,
         }
         else if (valueType == "vec3d") {
             HoudiniWriteAttribute<openvdb::math::Vec3<double> > attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups);
+        }
+        else if (valueType == "quats") {
+            HoudiniWriteAttribute<openvdb::math::Quat<float> > attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups);
+        }
+        else if (valueType == "quatd") {
+            HoudiniWriteAttribute<openvdb::math::Quat<double> > attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups);
+        }
+        else if (valueType == "mat4s") {
+            HoudiniWriteAttribute<openvdb::math::Mat4<float> > attribute(*attributeRef.getAttribute());
+            convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups);
+        }
+        else if (valueType == "mat4d") {
+            HoudiniWriteAttribute<openvdb::math::Mat4<double> > attribute(*attributeRef.getAttribute());
             convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, index, stride, includeGroups, excludeGroups);
         }
         else {

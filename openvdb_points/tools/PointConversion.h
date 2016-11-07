@@ -247,7 +247,7 @@ template <typename T> struct ConversionTraits
 {
     using Handle = AttributeHandle<T, UnknownCodec>;
     using WriteHandle = AttributeWriteHandle<T, UnknownCodec>;
-    static T zero() { return T(0); }
+    static T zero() { return zeroVal<T>(); }
     template <typename LeafT>
     static typename Handle::Ptr handleFromLeaf(LeafT& leaf, Index index) {
         const AttributeArray& array = leaf.constAttributeArray(index);
