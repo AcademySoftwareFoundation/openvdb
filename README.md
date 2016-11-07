@@ -37,7 +37,7 @@ A quick summary of what is being offered:
 
 ##### OpenVDB Points Houdini integration:
 
-* OpenVDB Points SOP - efficiently convert back-and-forth between native Houdini points and OpenVDB Points.
+* OpenVDB Points Convert SOP - efficiently convert back-and-forth between native Houdini points and OpenVDB Points.
 * OpenVDB Points Load SOP - explicitly load delay-loaded OpenVDB Points with optional region filtering.
 * SOP base class - middle-click display in Houdini for attribute data.
 * GR Primitive - Houdini visualization for OpenVDB Points in the viewport.
