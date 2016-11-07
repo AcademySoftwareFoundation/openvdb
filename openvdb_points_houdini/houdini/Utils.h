@@ -30,7 +30,7 @@
 //
 /// @file Utils.h
 ///
-/// @author Dan Bailey
+/// @authors Dan Bailey, Nick Avramoussis, Richard Kwok
 ///
 /// @brief Utility classes and functions for OpenVDB Points Houdini plugins
 

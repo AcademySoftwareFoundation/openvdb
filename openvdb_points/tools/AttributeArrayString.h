@@ -30,7 +30,7 @@
 //
 /// @file AttributeArrayString.h
 ///
-/// @authors Dan Bailey
+/// @author Dan Bailey
 ///
 /// @brief  Attribute array storage for string data using Descriptor Metadata.
 ///

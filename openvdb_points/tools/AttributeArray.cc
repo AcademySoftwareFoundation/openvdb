@@ -29,8 +29,7 @@
 ///////////////////////////////////////////////////////////////////////////
 //
 /// @file AttributeArray.cc
-///
-/// @authors Dan Bailey, Mihai Alden, Peter Cucka
+
 
 #include <map>
 

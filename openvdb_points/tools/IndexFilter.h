@@ -30,7 +30,7 @@
 //
 /// @file IndexFilter.h
 ///
-/// @authors Dan Bailey
+/// @author Dan Bailey
 ///
 /// @brief  Index filters primarily designed to be used with a FilterIndexIter.
 ///

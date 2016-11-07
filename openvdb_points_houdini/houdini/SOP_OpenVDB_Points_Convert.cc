@@ -30,7 +30,7 @@
 //
 /// @file SOP_OpenVDB_Points_Convert.cc
 ///
-/// @author Dan Bailey
+/// @authors Dan Bailey, Nick Avramoussis, James Bird
 ///
 /// @brief Converts points to OpenVDB points.
 

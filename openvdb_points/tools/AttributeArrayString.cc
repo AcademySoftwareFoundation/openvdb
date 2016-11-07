@@ -29,8 +29,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
 /// @file AttributeArrayString.cc
-///
-/// @authors Dan Bailey
 
 
 #include <openvdb_points/tools/AttributeArrayString.h>

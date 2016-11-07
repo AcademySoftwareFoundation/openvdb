@@ -29,8 +29,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
 /// @file AttributeGroup.cc
-///
-/// @authors Dan Bailey
 
 
 #include <openvdb_points/tools/AttributeGroup.h>

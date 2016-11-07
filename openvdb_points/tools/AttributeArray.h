@@ -30,7 +30,8 @@
 //
 /// @file AttributeArray.h
 ///
-/// @authors Dan Bailey, Mihai Alden, Peter Cucka
+/// @authors Dan Bailey, Mihai Alden, Peter Cucka, Nick Avramoussis,
+///          James Bird, Khang Ngo
 ///
 /// @brief  Attribute Array storage templated on type and compression codec.
 ///

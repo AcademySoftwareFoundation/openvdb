@@ -30,7 +30,7 @@
 //
 /// @file StreamCompression.h
 ///
-/// @authors Dan Bailey
+/// @author Dan Bailey
 ///
 /// @brief Convenience wrappers to using Blosc and reading and writing of Paged data.
 ///

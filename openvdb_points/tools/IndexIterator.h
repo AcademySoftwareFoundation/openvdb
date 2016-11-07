@@ -30,7 +30,7 @@
 //
 /// @file IndexIterator.h
 ///
-/// @authors Dan Bailey
+/// @author Dan Bailey
 ///
 /// @brief  Index Iterators.
 ///

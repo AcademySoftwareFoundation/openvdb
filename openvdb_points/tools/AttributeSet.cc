@@ -29,8 +29,7 @@
 ///////////////////////////////////////////////////////////////////////////
 //
 /// @file AttributeSet.cc
-///
-/// @authors Dan Bailey, Mihai Alden, Peter Cucka
+
 
 #include <openvdb_points/tools/AttributeGroup.h>
 #include <openvdb_points/tools/AttributeSet.h>

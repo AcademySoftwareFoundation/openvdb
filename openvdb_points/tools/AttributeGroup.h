@@ -30,7 +30,7 @@
 //
 /// @file AttributeGroup.h
 ///
-/// @authors Dan Bailey
+/// @author Dan Bailey
 ///
 /// @brief  Attribute Group access and filtering for iteration.
 ///
