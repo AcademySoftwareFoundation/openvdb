@@ -34,6 +34,8 @@ cmake -Wno-dev \
 
 
 ## CentOS 6.7
+
+### Build Core
 ```{r, engine='bash', count_lines}
 #!/bin/sh
 rm -f CMakeCache.txt
@@ -55,6 +57,36 @@ cmake \
     -D USE_GLFW3=ON \
     -D Blosc_USE_STATIC_LIBS=ON \
     -D CMAKE_INSTALL_PREFIX=$RHOME/Systems/OpenVDB/4.0.0 \
+    -D _ECLIPSE_VERSION=4.6 \
+    -G "Eclipse CDT4 - Unix Makefiles" \
+    ../nyue_openvdb_git
+```
+### Build Houdini SOPs
+```{r, engine='bash', count_lines}
+#!/bin/sh
+rm -f CMakeCache.txt
+export BLOSC_ROOT=$HT
+export TBB_ROOT=$HT
+export ILMBASE_ROOT=$HT
+export OPENEXR_ROOT=$HT
+export GLFW3_ROOT=$HOME/systems/glfw/v3.2.1
+export CPPUNIT_ROOT=$HOME/systems/cppunit/v1.10.2
+cmake \
+    -D ZLIB_ROOT=$HT \
+    -D BOOST_ROOT=$HT \
+    -D BOOST_LIBRARYDIR=$HDSO \
+    -D ILMBASE_LIBRARYDIR=$HDSO \
+    -D OPENEXR_LIBRARYDIR=$HDSO \
+    -D BLOSC_LIBRARYDIR=$HDSO \
+    -D TBB_LIBRARYDIR=$HDSO \
+    -D ZLIB_LIBRARY=$HDSO/libz.so \
+    -D HDK_AUTO_GENERATE_SESITAG=OFF \
+    -D OPENVDB_BUILD_HOUDINI_SOPS=ON \
+    -D CMAKE_CXX_FLAGS="-fPIC -std=c++11" \
+    -D USE_GLFW3=ON \
+    -D GLFW3_USE_STATIC_LIBS=OFF \
+    -D CMAKE_BUILD_TYPE=Release \
+    -D CMAKE_INSTALL_PREFIX=$HOME/systems/OpenVDB/v4.0.0 \
     -D _ECLIPSE_VERSION=4.6 \
     -G "Eclipse CDT4 - Unix Makefiles" \
     ../nyue_openvdb_git
