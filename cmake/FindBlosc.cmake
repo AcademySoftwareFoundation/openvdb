@@ -32,7 +32,7 @@
 #
 # BLOSC_FOUND            set if Blosc is found.
 # BLOSC_INCLUDE_DIR      Blosc's include directory
-# BLOSC_LIBRARY_DIR      Blosc's library directory
+# BLOSC_LIBRARYDIR      Blosc's library directory
 # BLOSC_LIBRARIES        all Blosc libraries
 
 FIND_PACKAGE ( PackageHandleStandardArgs )
@@ -48,6 +48,9 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS ( Blosc
   )
 
 IF ( BLOSC_FOUND )
+
+  SET ( BLOSC_LIBRARYDIR ${BLOSC_LOCATION}/lib
+    CACHE STRING "Blosc library directories")
   
   # Static library setup
   IF (Blosc_USE_STATIC_LIBS)
@@ -56,7 +59,7 @@ IF ( BLOSC_FOUND )
   ENDIF()
 
   FIND_LIBRARY ( BLOSC_blosc_LIBRARY blosc
-    PATHS ${BLOSC_LOCATION}/lib
+    PATHS ${BLOSC_LIBRARYDIR}
     NO_DEFAULT_PATH
     NO_SYSTEM_ENVIRONMENT_PATH
     )
