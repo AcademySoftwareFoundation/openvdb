@@ -185,7 +185,7 @@ TestAttributeGroup::testAttributeGroupHandle()
     GroupAttributeArray attr(4);
     GroupHandle handle(attr, 3);
 
-    CPPUNIT_ASSERT_EQUAL(handle.size(), (unsigned long) 4);
+    CPPUNIT_ASSERT_EQUAL(handle.size(), Index(4));
     CPPUNIT_ASSERT_EQUAL(handle.size(), attr.size());
 
     // construct bitmasks

@@ -185,7 +185,7 @@ TestIndexFilter::testMultiGroupFilter()
     using Descriptor = AttributeSet::Descriptor;
     Descriptor::Ptr descriptor = Descriptor::create(AttributeVec3f::attributeType());
 
-    const size_t size = 5;
+    const Index size = 5;
 
     leaf->initializeAttributes(descriptor, size);
 

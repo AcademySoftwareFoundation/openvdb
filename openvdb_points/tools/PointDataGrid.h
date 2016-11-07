@@ -310,7 +310,7 @@ public:
     const AttributeSet& attributeSet() const { return *mAttributeSet; }
 
     /// @brief Create a new attribute set. Existing attributes will be removed.
-    void initializeAttributes(const Descriptor::Ptr& descriptor, const size_t arrayLength);
+    void initializeAttributes(const Descriptor::Ptr& descriptor, const Index arrayLength);
     /// @brief Clear the attribute set.
     void clearAttributes(const bool updateValueMask = true);
 
@@ -326,9 +326,11 @@ public:
     /// @param expected Existing descriptor is expected to match this parameter.
     /// @param replacement New descriptor to replace the existing one.
     /// @param pos Index of the new attribute in the descriptor replacement.
-    /// @param stride Stride of the attribute array.
+    /// @param strideOrTotalSize Stride of the attribute array (if constantStride), total size otherwise
+    /// @param constantStride if @c false, stride is interpreted as total size of the array
     AttributeArray::Ptr appendAttribute(const Descriptor& expected, Descriptor::Ptr& replacement,
-                                        const size_t pos, const Index stride = 1);
+                                        const size_t pos, const Index strideOrTotalSize = 1,
+                                        const bool constantStride = true);
 
     /// @brief Drop list of attributes.
     /// @param pos vector of attribute indices to drop
@@ -704,7 +706,7 @@ public:
 
 template<typename T, Index Log2Dim>
 inline void
-PointDataLeafNode<T, Log2Dim>::initializeAttributes(const Descriptor::Ptr& descriptor, const size_t arrayLength)
+PointDataLeafNode<T, Log2Dim>::initializeAttributes(const Descriptor::Ptr& descriptor, const Index arrayLength)
 {
     if (descriptor->size() != 1 ||
         descriptor->find("P") == AttributeSet::INVALID_POS ||
@@ -751,9 +753,10 @@ PointDataLeafNode<T, Log2Dim>::hasAttribute(const Name& attributeName) const
 template<typename T, Index Log2Dim>
 inline AttributeArray::Ptr
 PointDataLeafNode<T, Log2Dim>::appendAttribute( const Descriptor& expected, Descriptor::Ptr& replacement,
-                                                const size_t pos, const Index stride)
+                                                const size_t pos, const Index strideOrTotalSize,
+                                                const bool constantStride)
 {
-    return mAttributeSet->appendAttribute(expected, replacement, pos, stride);
+    return mAttributeSet->appendAttribute(expected, replacement, pos, strideOrTotalSize, constantStride);
 }
 
 template<typename T, Index Log2Dim>

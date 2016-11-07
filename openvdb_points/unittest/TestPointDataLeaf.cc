@@ -533,7 +533,7 @@ TestPointDataLeaf::testAttributes()
     {
         const AttributeArray* array = leaf.attributeSet().get(/*pos=*/0);
 
-        CPPUNIT_ASSERT_EQUAL(array->size(), size_t(100));
+        CPPUNIT_ASSERT_EQUAL(array->size(), Index(100));
     }
 
     // manually set a voxel
@@ -568,8 +568,8 @@ TestPointDataLeaf::testAttributes()
     const AttributeArray* array0 = leaf.attributeSet().get(/*pos=*/0);
     const AttributeArray* array1 = leaf.attributeSet().get(/*pos=*/1);
 
-    CPPUNIT_ASSERT_EQUAL(array0->size(), size_t(1));
-    CPPUNIT_ASSERT_EQUAL(array1->size(), size_t(1));
+    CPPUNIT_ASSERT_EQUAL(array0->size(), Index(1));
+    CPPUNIT_ASSERT_EQUAL(array1->size(), Index(1));
 
     // test leaf returns expected result for hasAttribute()
 
@@ -1094,7 +1094,7 @@ TestPointDataLeaf::testSwap()
 
     // create a leaf and initialize attributes using this descriptor
 
-    const size_t initialArrayLength = 100;
+    const Index initialArrayLength = 100;
     LeafType leaf(openvdb::Coord(0, 0, 0));
     leaf.initializeAttributes(descrA, /*arrayLength=*/initialArrayLength);
 
@@ -1112,7 +1112,7 @@ TestPointDataLeaf::testSwap()
 
     descrA = Descriptor::create(AttributeVec3s::attributeType());
 
-    const size_t newArrayLength = initialArrayLength / 2;
+    const Index newArrayLength = initialArrayLength / 2;
 
     AttributeSet* newAttributeSet(new AttributeSet(descrA, /*arrayLength*/newArrayLength));
 
@@ -1162,7 +1162,7 @@ TestPointDataLeaf::testCopyOnWrite()
 
     // create a leaf and initialize attributes using this descriptor
 
-    const size_t initialArrayLength = 100;
+    const Index initialArrayLength = 100;
     LeafType leaf(openvdb::Coord(0, 0, 0));
     leaf.initializeAttributes(descrA, /*arrayLength=*/initialArrayLength);
 

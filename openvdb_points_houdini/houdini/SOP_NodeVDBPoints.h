@@ -297,7 +297,10 @@ public:
                     infoStr << valueType << "_" << codecType;
                 }
 
-                if (array.isStrided()) {
+                if (!array.hasConstantStride()) {
+                    infoStr << ", dynamic[" << array.dataSize() << "]";
+                }
+                else if (array.stride() > 1) {
                     infoStr << "[" << array.stride() << "]";
                 }
 

@@ -133,7 +133,9 @@ public:
                 WRITEUNIFORM = 0x8,         /// (serialization only) - mark as uniform
                 WRITEMEMCOMPRESS = 0x10,    /// (serialization only) - mark as compressed in-memory
                 WRITEDISKCOMPRESS = 0x20,   /// (serialization only) - mark as compressed on-disk
-                OUTOFCORE = 0x40 };         /// data not yet loaded from disk
+                OUTOFCORE = 0x40,           /// data not yet loaded from disk
+                CONSTANTSTRIDE = 0x80       /// constant stride
+            };
 
 #ifndef OPENVDB_2_ABI_COMPATIBLE
     struct FileInfo
@@ -148,7 +150,7 @@ public:
     using Ptr           = std::shared_ptr<AttributeArray>;
     using ConstPtr      = std::shared_ptr<const AttributeArray>;
 
-    using FactoryMethod = Ptr (*)(size_t, Index);
+    using FactoryMethod = Ptr (*)(Index, Index, bool);
 
     template <typename ValueType, typename CodecType> friend class AttributeHandle;
 
@@ -161,20 +163,23 @@ public:
     /// Return an uncompressed copy of this attribute (will return a copy if not compressed).
     virtual AttributeArray::Ptr copyUncompressed() const = 0;
 
-    /// Return the length of this array.
-    virtual size_t size() const = 0;
+    /// Return the number of elements in this array.
+    /// @note This does not count each data element in a strided array
+    virtual Index size() const = 0;
 
     /// Return the stride of this array.
+    /// @note a return value of zero means a non-constant stride
     virtual Index stride() const = 0;
 
-    /// Return true if the array is strided.
-    virtual bool isStrided() const = 0;
+    /// Return the total number of data elements in this array.
+    /// @note This counts each data element in a strided array
+    virtual Index dataSize() const = 0;
 
     /// Return the number of bytes of memory used by this attribute.
     virtual size_t memUsage() const = 0;
 
     /// Create a new attribute array of the given (registered) type, length and stride.
-    static Ptr create(const NamePair& type, size_t length, Index stride = 1);
+    static Ptr create(const NamePair& type, Index length, Index stride = 1, bool constantStride = true);
     /// Return @c true if the given attribute type name is registered.
     static bool isRegistered(const NamePair& type);
     /// Clear the attribute type registry.
@@ -225,6 +230,9 @@ public:
     /// Return @c true if this attribute is not serialized during stream output.
     bool isTransient() const { return bool(mFlags & TRANSIENT); }
 
+    /// Return @c true if this attribute has a constant stride
+    bool hasConstantStride() const { return bool(mFlags & CONSTANTSTRIDE); }
+
     /// @brief Retrieve the attribute array flags
     uint16_t flags() const { return mFlags; }
 
@@ -251,6 +259,9 @@ private:
     virtual bool isEqual(const AttributeArray& other) const = 0;
 
 protected:
+    /// @brief Specify whether this attribute has a constant stride or not.
+    void setConstantStride(bool state);
+
     /// Obtain an Accessor that stores getter and setter functors.
     virtual AccessorBasePtr getAccessor() const = 0;
 
@@ -414,7 +425,7 @@ public:
     //////////
 
     /// Default constructor, always constructs a uniform attribute.
-    explicit TypedAttributeArray(size_t n = 1, Index stride = 1,
+    explicit TypedAttributeArray(Index n = 1, Index strideOrTotalSize = 1, bool constantStride = true,
         const ValueType& uniformValue = zeroVal<ValueType>());
     /// Deep copy constructor (optionally decompress during copy).
     TypedAttributeArray(const TypedAttributeArray&, bool uncompress = false);
@@ -434,7 +445,7 @@ public:
     virtual AttributeArray::Ptr copyUncompressed() const override;
 
     /// Return a new attribute array of the given length @a n and @a stride with uniform value zero.
-    static Ptr create(size_t n, Index stride = 1);
+    static Ptr create(Index n, Index stride = 1, bool constantStride = true);
 
     /// Cast an AttributeArray to TypedAttributeArray<T>
     static TypedAttributeArray& cast(AttributeArray& attributeArray);
@@ -454,14 +465,19 @@ public:
     /// Remove this attribute type from the registry.
     static void unregisterType();
 
-    /// Return the length of this array.
-    virtual size_t size() const override { return mSize; }
+    /// Return the number of elements in this array.
+    virtual Index size() const override { return mSize; }
 
     /// Return the stride of this array.
-    virtual Index stride() const override { return mStride; }
+    /// @note A return value of zero means a variable stride
+    virtual Index stride() const override {
+        return hasConstantStride() ? mStrideOrTotalSize : 0;
+    }
 
-    /// Return true if stride is greater than one.
-    virtual bool isStrided() const override { return mStride > 1; }
+    /// Return the size of the data in this array.
+    virtual Index dataSize() const override {
+        return hasConstantStride() ? mSize * mStrideOrTotalSize : mStrideOrTotalSize;
+    }
 
     /// Return the number of bytes of memory used by this attribute.
     virtual size_t memUsage() const override;
@@ -549,17 +565,19 @@ private:
     /// Compare the this data to another attribute array. Used by the base class comparison operator
     virtual bool isEqual(const AttributeArray& other) const override;
 
-    size_t arrayMemUsage(const bool maximum=false) const;
-    void allocate(const size_t size, const Index stride);
+    size_t arrayMemUsage() const;
+    void allocate();
     void deallocate();
 
     /// Helper function for use with registerType()
-    static AttributeArray::Ptr factory(size_t n, Index stride) { return TypedAttributeArray::create(n, stride); }
+    static AttributeArray::Ptr factory(Index n, Index stride, bool constantStride) {
+        return TypedAttributeArray::create(n, stride, constantStride);
+    }
 
     static tbb::atomic<const NamePair*> sTypeName;
     std::unique_ptr<StorageType[]>      mData;
-    size_t                              mSize;
-    Index                               mStride;
+    Index                             mSize;
+    Index                             mStrideOrTotalSize;
     bool                                mIsUniform = false;
     tbb::spin_mutex                     mMutex;
 }; // class TypedAttributeArray
@@ -591,9 +609,10 @@ public:
     virtual ~AttributeHandle() = default;
 
     Index stride() const { return mStride; }
-    size_t size() const { return mSize; }
+    Index size() const { return mSize; }
 
     bool isUniform() const;
+    bool hasConstantStride() const;
 
     ValueType get(Index n, Index m = 0) const;
 
@@ -767,14 +786,28 @@ tbb::atomic<const NamePair*> TypedAttributeArray<ValueType_, Codec_>::sTypeName;
 
 template<typename ValueType_, typename Codec_>
 TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(
-    size_t n, Index stride, const ValueType& uniformValue)
+    Index n, Index strideOrTotalSize, bool constantStride, const ValueType& uniformValue)
     : mData(new StorageType[1])
     , mSize(n)
-    , mStride(stride)
+    , mStrideOrTotalSize(strideOrTotalSize)
     , mIsUniform(true)
 {
-    mSize = std::max(size_t(1), mSize);
-    mStride = std::max(Index(1), mStride);
+    if (constantStride) {
+        this->setConstantStride(true);
+        if (strideOrTotalSize == 0) {
+            OPENVDB_THROW(ValueError, "Creating a TypedAttributeArray with a constant stride requires that " \
+                                        "stride to be at least one.")
+        }
+    }
+    else {
+        this->setConstantStride(false);
+        if (mStrideOrTotalSize < n) {
+            OPENVDB_THROW(ValueError, "Creating a TypedAttributeArray with a non-constant stride must have " \
+                                        "a total size of at least the number of elements in the array.")
+        }
+    }
+    mSize = std::max(Index(1), mSize);
+    mStrideOrTotalSize = std::max(Index(1), mStrideOrTotalSize);
     Codec::encode(uniformValue, mData.get()[0]);
 }
 
@@ -783,7 +816,7 @@ template<typename ValueType_, typename Codec_>
 TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs, bool uncompress)
     : AttributeArray(rhs)
     , mSize(rhs.mSize)
-    , mStride(rhs.mStride)
+    , mStrideOrTotalSize(rhs.mStrideOrTotalSize)
     , mIsUniform(rhs.mIsUniform)
 {
     // disable uncompress if data is not compressed
@@ -791,7 +824,7 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttribut
     if (!this->isCompressed())  uncompress = false;
 
     if (mIsUniform) {
-        this->allocate(1, 1);
+        this->allocate();
         mData.get()[0] = rhs.mData.get()[0];
     } else if (this->isOutOfCore()) {
         // do nothing
@@ -812,7 +845,7 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttribut
         assert(buffer);
         mData.reset(reinterpret_cast<StorageType*>(buffer.release()));
     } else {
-        this->allocate(mSize, mStride);
+        this->allocate();
         std::memcpy(mData.get(), rhs.mData.get(), this->arrayMemUsage());
     }
 }
@@ -830,11 +863,11 @@ TypedAttributeArray<ValueType_, Codec_>::operator=(const TypedAttributeArray& rh
         mFlags = rhs.mFlags;
         mCompressedBytes = rhs.mCompressedBytes;
         mSize = rhs.mSize;
-        mStride = rhs.mStride;
+        mStrideOrTotalSize = rhs.mStrideOrTotalSize;
         mIsUniform = rhs.mIsUniform;
 
         if (mIsUniform) {
-            this->allocate(1, 1);
+            this->allocate();
             mData.get()[0] = rhs.mData.get()[0];
 #ifndef OPENVDB_2_ABI_COMPATIBLE
         } else if (rhs.isOutOfCore()) {
@@ -845,7 +878,7 @@ TypedAttributeArray<ValueType_, Codec_>::operator=(const TypedAttributeArray& rh
             std::memcpy(buffer.get(), rhs.mData.get(), mCompressedBytes);
             mData.reset(reinterpret_cast<StorageType*>(buffer.release()));
         } else {
-            this->allocate(mSize, mStride);
+            this->allocate();
             std::memcpy(mData.get(), rhs.mData.get(), arrayMemUsage());
         }
     }
@@ -890,9 +923,9 @@ TypedAttributeArray<ValueType_, Codec_>::unregisterType()
 
 template<typename ValueType_, typename Codec_>
 inline typename TypedAttributeArray<ValueType_, Codec_>::Ptr
-TypedAttributeArray<ValueType_, Codec_>::create(size_t n, Index stride)
+TypedAttributeArray<ValueType_, Codec_>::create(Index n, Index stride, bool constantStride)
 {
-    return Ptr(new TypedAttributeArray(n, stride));
+    return Ptr(new TypedAttributeArray(n, stride, constantStride));
 }
 
 template<typename ValueType_, typename Codec_>
@@ -933,27 +966,28 @@ TypedAttributeArray<ValueType_, Codec_>::copyUncompressed() const
 
 template<typename ValueType_, typename Codec_>
 size_t
-TypedAttributeArray<ValueType_, Codec_>::arrayMemUsage(const bool maximum) const
+TypedAttributeArray<ValueType_, Codec_>::arrayMemUsage() const
 {
-    // if maximum requested, ignore whether uniform, out-of-core or compressed
+    if (this->isOutOfCore())        return 0;
+    if (this->isCompressed())       return mCompressedBytes;
 
-    if (!maximum)
-    {
-        if (mIsUniform)                 return sizeof(StorageType);
-        if (this->isOutOfCore())        return 0;
-        if (this->isCompressed())       return mCompressedBytes;
-    }
-
-    return mSize * mStride * sizeof(StorageType);
+    return (mIsUniform ? 1 : this->dataSize()) * sizeof(StorageType);
 }
 
 
 template<typename ValueType_, typename Codec_>
 void
-TypedAttributeArray<ValueType_, Codec_>::allocate(const size_t size, const Index stride)
+TypedAttributeArray<ValueType_, Codec_>::allocate()
 {
     assert(!mData);
-    mData.reset(new StorageType[size * stride]);
+    if (mIsUniform) {
+        mData.reset(new StorageType[1]);
+    }
+    else {
+        const size_t size(this->dataSize());
+        assert(size > 0);
+        mData.reset(new StorageType[size]);
+    }
 }
 
 
@@ -984,7 +1018,7 @@ template<typename ValueType_, typename Codec_>
 typename TypedAttributeArray<ValueType_, Codec_>::ValueType
 TypedAttributeArray<ValueType_, Codec_>::getUnsafe(Index n) const
 {
-    assert(n < mSize * mStride);
+    assert(n < this->dataSize());
     assert(!this->isOutOfCore());
     assert(!this->isCompressed());
 
@@ -998,7 +1032,7 @@ template<typename ValueType_, typename Codec_>
 typename TypedAttributeArray<ValueType_, Codec_>::ValueType
 TypedAttributeArray<ValueType_, Codec_>::get(Index n) const
 {
-    if (n >= mSize * mStride)           OPENVDB_THROW(IndexError, "Out-of-range access.");
+    if (n >= this->dataSize())           OPENVDB_THROW(IndexError, "Out-of-range access.");
     if (this->isOutOfCore())            this->doLoad();
     if (this->isCompressed())           const_cast<TypedAttributeArray*>(this)->decompress();
 
@@ -1036,7 +1070,7 @@ template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::setUnsafe(Index n, const ValueType& val)
 {
-    assert(n < mSize * mStride);
+    assert(n < this->dataSize());
     assert(!this->isOutOfCore());
     assert(!this->isCompressed());
     assert(!this->isUniform());
@@ -1052,7 +1086,7 @@ template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::set(Index n, const ValueType& val)
 {
-    if (n >= mSize * mStride)           OPENVDB_THROW(IndexError, "Out-of-range access.");
+    if (n >= this->dataSize())           OPENVDB_THROW(IndexError, "Out-of-range access.");
     if (this->isOutOfCore())            this->doLoad();
     if (this->isCompressed())           this->decompress();
     if (this->isUniform())              this->expand();
@@ -1111,14 +1145,14 @@ TypedAttributeArray<ValueType_, Codec_>::expand(bool fill)
     {
         tbb::spin_mutex::scoped_lock lock(mMutex);
         this->deallocate();
-        this->allocate(mSize, mStride);
+        mIsUniform = false;
+        this->allocate();
     }
 
     mCompressedBytes = 0;
-    mIsUniform = false;
 
     if (fill) {
-        for (size_t i = 0; i < mSize * mStride; ++i)  mData.get()[i] = val;
+        for (Index i = 0; i < this->dataSize(); ++i)  mData.get()[i] = val;
     }
 }
 
@@ -1131,7 +1165,7 @@ TypedAttributeArray<ValueType_, Codec_>::compact()
 
     // compaction is not possible if any values are different
     const ValueType_ val = this->get(0);
-    for (size_t i = 1; i < mSize * mStride; i++) {
+    for (Index i = 1; i < this->dataSize(); i++) {
         if (this->get(i) != val)    return false;
     }
 
@@ -1155,8 +1189,8 @@ TypedAttributeArray<ValueType_, Codec_>::collapse(const ValueType& uniformValue)
     if (!mIsUniform) {
         tbb::spin_mutex::scoped_lock lock(mMutex);
         this->deallocate();
-        this->allocate(1, 1);
         mIsUniform = true;
+        this->allocate();
     }
     Codec::encode(uniformValue, mData.get()[0]);
 }
@@ -1177,11 +1211,11 @@ TypedAttributeArray<ValueType_, Codec_>::fill(const ValueType& value)
     if (this->isOutOfCore()) {
         tbb::spin_mutex::scoped_lock lock(mMutex);
         this->deallocate();
-        this->allocate(mSize, mStride);
+        this->allocate();
     }
 
-    const size_t size = mIsUniform ? 1 : mSize;
-    for (size_t i = 0; i < size; ++i)  {
+    const Index size = mIsUniform ? 1 : this->dataSize();
+    for (Index i = 0; i < size; ++i)  {
         Codec::encode(value, mData.get()[i]);
     }
 }
@@ -1324,10 +1358,10 @@ TypedAttributeArray<ValueType_, Codec_>::read(std::istream& is)
     if (mFlags & WRITESTRIDED) {
         Index stride = Index(0);
         is.read(reinterpret_cast<char*>(&stride), sizeof(Index));
-        mStride = stride;
+        mStrideOrTotalSize = stride;
     }
     else {
-        mStride = 1;
+        mStrideOrTotalSize = 1;
     }
 
     // clear uniform and compress flags
@@ -1366,7 +1400,7 @@ TypedAttributeArray<ValueType_, Codec_>::read(std::istream& is)
 
         // decompress buffer
 
-        const size_t inBytes = this->arrayMemUsage(/*maximum=*/true);
+        const size_t inBytes = this->dataSize() * sizeof(StorageType);
         std::unique_ptr<char[]> newBuffer = compression::bloscDecompress(buffer.get(), inBytes);
         if (newBuffer)  buffer.reset(newBuffer.release());
     }
@@ -1389,14 +1423,15 @@ TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os, bool outputTran
 
     Int16 flags(mFlags);
     Index64 size(mSize);
-    Index stride(mStride);
+    Index stride(mStrideOrTotalSize);
+    bool strideOfOne(this->stride() == 1);
 
     std::unique_ptr<char[]> compressedBuffer;
     size_t compressedBytes = 0;
 
     this->doLoad();
 
-    if (isStrided())
+    if (!strideOfOne)
     {
         flags |= WRITESTRIDED;
     }
@@ -1427,7 +1462,7 @@ TypedAttributeArray<ValueType_, Codec_>::write(std::ostream& os, bool outputTran
     os.write(reinterpret_cast<const char*>(&flags), sizeof(Int16));
     os.write(reinterpret_cast<const char*>(&size), sizeof(Index64));
 
-    if (isStrided())    os.write(reinterpret_cast<const char*>(&stride), sizeof(Index));
+    if (!strideOfOne)       os.write(reinterpret_cast<const char*>(&stride), sizeof(Index));
 
     if (compressedBuffer)   os.write(reinterpret_cast<const char*>(compressedBuffer.get()), compressedBytes);
     else                    os.write(reinterpret_cast<const char*>(mData.get()), this->arrayMemUsage());
@@ -1466,7 +1501,7 @@ TypedAttributeArray<ValueType_, Codec_>::doLoadUnsafe() const
 
         // decompress buffer
 
-        const size_t inBytes = this->arrayMemUsage(/*maximum=*/true);
+        const size_t inBytes = this->dataSize() * sizeof(StorageType);
         std::unique_ptr<char[]> newBuffer = compression::bloscDecompress(buffer.get(), inBytes);
         if (newBuffer)  buffer.reset(newBuffer.release());
     }
@@ -1504,6 +1539,7 @@ TypedAttributeArray<ValueType_, Codec_>::isEqual(const AttributeArray& other) co
     const TypedAttributeArray<ValueType_, Codec_>* const otherT = dynamic_cast<const TypedAttributeArray<ValueType_, Codec_>* >(&other);
     if(!otherT) return false;
     if(this->mSize != otherT->mSize ||
+       this->mStrideOrTotalSize != otherT->mStrideOrTotalSize ||
        this->mIsUniform != otherT->mIsUniform ||
        *this->sTypeName != *otherT->sTypeName) return false;
 
@@ -1576,8 +1612,8 @@ AttributeHandle<ValueType, CodecType>::create(const AttributeArray& array, const
 template <typename ValueType, typename CodecType>
 AttributeHandle<ValueType, CodecType>::AttributeHandle(const AttributeArray& array, const bool preserveCompression)
     : mArray(&array)
-    , mStride(array.stride())
-    , mSize(array.size())
+    , mStride(array.hasConstantStride() ? array.stride() : 1)
+    , mSize(array.hasConstantStride() ? array.size() : array.dataSize())
 {
     if (!this->compatibleType<std::is_same<CodecType, UnknownCodec>::value>()) {
         OPENVDB_THROW(TypeError, "Cannot bind handle due to incompatible type of AttributeArray.");
@@ -1638,10 +1674,9 @@ AttributeHandle<ValueType, CodecType>::compatibleType() const
 template <typename ValueType, typename CodecType>
 Index AttributeHandle<ValueType, CodecType>::index(Index n, Index m) const
 {
-    if (mStride > 1) {
-        return n * mStride + m;
-    }
-    return n;
+    Index index = n * mStride + m;
+    assert(index < (mSize * mStride));
+    return index;
 }
 
 template <typename ValueType, typename CodecType>
@@ -1676,6 +1711,11 @@ bool AttributeHandle<ValueType, CodecType>::isUniform() const
     return mArray->isUniform();
 }
 
+template <typename ValueType, typename CodecType>
+bool AttributeHandle<ValueType, CodecType>::hasConstantStride() const
+{
+    return mArray->hasConstantStride();
+}
 
 ////////////////////////////////////////
 

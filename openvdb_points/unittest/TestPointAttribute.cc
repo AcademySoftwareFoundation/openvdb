@@ -138,7 +138,6 @@ TestPointAttribute::testAppendDrop()
         appendAttribute<int>(tree, "id", 0, /*stride=*/1);
 
         AttributeArray& array = tree.beginLeaf()->attributeArray("id");
-        CPPUNIT_ASSERT(!array.isStrided());
         CPPUNIT_ASSERT_EQUAL(array.stride(), Index(1));
 
         dropAttribute(tree, "id");
@@ -148,7 +147,6 @@ TestPointAttribute::testAppendDrop()
         CPPUNIT_ASSERT(tree.beginLeaf()->hasAttribute("id"));
 
         AttributeArray& array2 = tree.beginLeaf()->attributeArray("id");
-        CPPUNIT_ASSERT(array2.isStrided());
         CPPUNIT_ASSERT_EQUAL(array2.stride(), Index(10));
 
         dropAttribute(tree, "id");
@@ -158,6 +156,7 @@ TestPointAttribute::testAppendDrop()
         appendAttribute<int>(tree,  "id",
                                 /*uniformValue*/0,
                                 /*stride=*/1,
+                                /*constantStride=*/true,
                                 /*defaultValue*/TypedMetadata<int>(10).copy(),
                                 /*hidden=*/false, /*transient=*/false);
 
@@ -286,9 +285,9 @@ TestPointAttribute::testAppendDrop()
     }
 
     { // append attributes marked as hidden, transient, group and string
-        appendAttribute<float>(tree, "testHidden", 0, /*stride=*/1, Metadata::Ptr(), true, false);
-        appendAttribute<float>(tree, "testTransient", 0, /*stride=*/1, Metadata::Ptr(), false, true);
-        appendAttribute<Name>(tree, "testString", "", /*stride=*/1, Metadata::Ptr(), false, false);
+        appendAttribute<float>(tree, "testHidden", 0, /*stride=*/1, /*constantStride=*/true, Metadata::Ptr(), true, false);
+        appendAttribute<float>(tree, "testTransient", 0, /*stride=*/1, /*constantStride=*/true, Metadata::Ptr(), false, true);
+        appendAttribute<Name>(tree, "testString", "", /*stride=*/1, /*constantStride=*/true, Metadata::Ptr(), false, false);
 
         const AttributeArray& arrayHidden = leafIter->attributeArray("testHidden");
         const AttributeArray& arrayTransient = leafIter->attributeArray("testTransient");
@@ -341,7 +340,7 @@ TestPointAttribute::testRename()
 
     const openvdb::TypedMetadata<float> defaultValue(5.0f);
 
-    appendAttribute<float>(tree, "test1", 0, /*stride=*/1, defaultValue.copy());
+    appendAttribute<float>(tree, "test1", 0, /*stride=*/1, /*constantStride=*/true, defaultValue.copy());
     appendAttribute<int>(tree, "id");
     appendAttribute<float>(tree, "test2");
 

@@ -109,12 +109,12 @@ public:
     // Dummy class that distinguishes an offset from a bitmask on construction
     struct BitMask { };
 
-    using GroupIndex = std::pair<size_t, uint8_t>;
+    using GroupIndex = std::pair<Index, uint8_t>;
 
     GroupHandle(const GroupAttributeArray& array, const GroupType& offset);
     GroupHandle(const GroupAttributeArray& array, const GroupType& bitMask, BitMask);
 
-    size_t size() const { return mArray.size(); }
+    Index size() const { return mArray.size(); }
     bool isUniform() const { return mArray.isUniform(); }
 
     bool get(Index n) const;

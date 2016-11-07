@@ -196,7 +196,7 @@ TestAttributeArrayString::testStringAttribute()
 
     { // Typed class API
 
-        const size_t count = 50;
+        const Index count = 50;
         StringAttributeArray attr(count);
 
         CPPUNIT_ASSERT(!attr.isTransient());
@@ -230,7 +230,7 @@ TestAttributeArrayString::testStringAttribute()
     }
 
     { // IO
-        const size_t count = 50;
+        const Index count = 50;
         StringAttributeArray attrA(count);
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
@@ -273,7 +273,7 @@ TestAttributeArrayString::testStringAttributeHandle()
     StringAttributeArray attr(4);
     StringAttributeHandle handle(attr, metadata);
 
-    CPPUNIT_ASSERT_EQUAL(handle.size(), (unsigned long) 4);
+    CPPUNIT_ASSERT_EQUAL(handle.size(), Index(4));
     CPPUNIT_ASSERT_EQUAL(handle.size(), attr.size());
 
     { // index 0 should always be an empty string
