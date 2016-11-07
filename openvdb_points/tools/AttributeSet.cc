@@ -92,7 +92,7 @@ AttributeSet::AttributeSet()
 }
 
 
-AttributeSet::AttributeSet(const AttributeSet& attrSet, size_t arrayLength)
+AttributeSet::AttributeSet(const AttributeSet& attrSet, Index arrayLength)
     : mDescr(attrSet.descriptorPtr())
     , mAttrs(attrSet.descriptor().size(), AttributeArray::Ptr())
 {
@@ -109,7 +109,7 @@ AttributeSet::AttributeSet(const AttributeSet& attrSet, size_t arrayLength)
 }
 
 
-AttributeSet::AttributeSet(const DescriptorPtr& descr, size_t arrayLength)
+AttributeSet::AttributeSet(const DescriptorPtr& descr, Index arrayLength)
     : mDescr(descr)
     , mAttrs(descr->size(), AttributeArray::Ptr())
 {
@@ -311,13 +311,10 @@ AttributeSet::makeUnique(size_t pos)
 AttributeArray::Ptr
 AttributeSet::appendAttribute(  const Name& name,
                                 const NamePair& type,
-                                const Index stride,
+                                const Index strideOrTotalSize,
+                                const bool constantStride,
                                 Metadata::Ptr defaultValue)
 {
-    if (stride < 1) {
-        OPENVDB_THROW(ValueError, "Cannot append attributes with a stride of less than one.")
-    }
-
     Descriptor::Ptr descriptor = mDescr->duplicateAppend(name, type);
 
     // store the attribute default value in the descriptor metadata
@@ -326,24 +323,22 @@ AttributeSet::appendAttribute(  const Name& name,
     // extract the index from the descriptor
     const size_t pos = descriptor->find(name);
 
-    return this->appendAttribute(*mDescr, descriptor, pos, stride);
+    return this->appendAttribute(*mDescr, descriptor, pos, strideOrTotalSize, constantStride);
 }
 
 
 AttributeArray::Ptr
 AttributeSet::appendAttribute(  const Descriptor& expected, DescriptorPtr& replacement,
-                                const size_t pos, const Index stride)
+                                const size_t pos, const Index strideOrTotalSize, const bool constantStride)
 {
     // ensure the descriptor is as expected
     if (*mDescr != expected) {
         OPENVDB_THROW(LookupError, "Cannot append attributes as descriptors do not match.")
     }
 
+    assert(replacement->size() >= mDescr->size());
+
     const size_t offset = mDescr->size();
-
-    mDescr = replacement;
-
-    assert(mDescr->size() >= offset);
 
     // extract the array length from the first attribute array if it exists
 
@@ -355,7 +350,11 @@ AttributeSet::appendAttribute(  const Descriptor& expected, DescriptorPtr& repla
 
     // append the new array
 
-    AttributeArray::Ptr array = AttributeArray::create(type, arrayLength, stride);
+    AttributeArray::Ptr array = AttributeArray::create(type, arrayLength, strideOrTotalSize, constantStride);
+
+    // if successful, update Descriptor and append the created array
+
+    mDescr = replacement;
 
     mAttrs.push_back(array);
 

@@ -105,7 +105,7 @@ bool GroupWriteHandle::collapse(bool on)
         return true;
     }
 
-    for (size_t i = 0; i < array.size(); i++) {
+    for (Index i = 0; i < array.size(); i++) {
         if (on)     array.set(i, array.get(i) | mBitMask);
         else        array.set(i, array.get(i) & ~mBitMask);
     }

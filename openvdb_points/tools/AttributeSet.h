@@ -103,15 +103,15 @@ public:
     /// @param arrayLength the desired length of the arrays in the new AttributeSet
     /// @note This constructor is typically used to resize an existing AttributeSet as
     ///       it transfers attribute metadata such as hidden and transient flags
-    AttributeSet(const AttributeSet& attributeSet, size_t arrayLength);
+    AttributeSet(const AttributeSet& attributeSet, Index arrayLength);
 
     /// Construct a new AttributeSet from the given Descriptor.
     /// @param descriptor stored in the new AttributeSet and used in construction
     /// @param arrayLength the desired length of the arrays in the new AttributeSet
     /// @note Descriptors do not store attribute metadata such as hidden and transient flags
     ///       which live on the AttributeArrays, so for constructing from an existing AttributeSet
-    ///       use the AttributeSet(const AttributeSet&, size_t) constructor instead
-    explicit AttributeSet(const DescriptorPtr& descriptor, size_t arrayLength = 1);
+    ///       use the AttributeSet(const AttributeSet&, Index) constructor instead
+    explicit AttributeSet(const DescriptorPtr& descriptor, Index arrayLength = 1);
 
     /// Shallow copy constructor, the descriptor and attribute arrays will be shared.
     AttributeSet(const AttributeSet&);
@@ -195,14 +195,16 @@ public:
     /// Append attribute @a attribute (simple method)
     AttributeArray::Ptr appendAttribute(const Name& name,
                                         const NamePair& type,
-                                        const Index stride = 1,
+                                        const Index strideOrTotalSize = 1,
+                                        const bool constantStride = true,
                                         Metadata::Ptr defaultValue = Metadata::Ptr());
 
     /// Append attribute @a attribute (descriptor-sharing)
     /// Requires current descriptor to match @a expected
     /// On append, current descriptor is replaced with @a replacement
     AttributeArray::Ptr appendAttribute(const Descriptor& expected, DescriptorPtr& replacement,
-                                        const size_t pos, const Index stride = 1);
+                                        const size_t pos, const Index strideOrTotalSize = 1,
+                                        const bool constantStride = true);
 
     /// Drop attributes with @a pos indices (simple method)
     /// Creates a new descriptor for this attribute set

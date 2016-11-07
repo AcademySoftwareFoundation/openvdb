@@ -543,10 +543,23 @@ TestAttributeSet::testAttributeSet()
 
     // construct
 
+    { // invalid append
+        Descriptor::Ptr descr = Descriptor::create(AttributeVec3s::attributeType());
+        AttributeSet invalidAttrSetA(descr, /*arrayLength=*/50);
+
+        CPPUNIT_ASSERT_THROW(invalidAttrSetA.appendAttribute("id", AttributeI::attributeType(),
+                                    /*stride=*/0, /*constantStride=*/true), openvdb::ValueError);
+        CPPUNIT_ASSERT(invalidAttrSetA.find("id") == AttributeSet::INVALID_POS);
+        CPPUNIT_ASSERT_THROW(invalidAttrSetA.appendAttribute("id", AttributeI::attributeType(),
+                                    /*stride=*/49, /*constantStride=*/false), openvdb::ValueError);
+        CPPUNIT_ASSERT_NO_THROW(invalidAttrSetA.appendAttribute("testStride1", AttributeI::attributeType(),
+                                    /*stride=*/50, /*constantStride=*/false));
+        CPPUNIT_ASSERT_NO_THROW(invalidAttrSetA.appendAttribute("testStride2", AttributeI::attributeType(),
+                                    /*stride=*/51, /*constantStride=*/false));
+    }
+
     Descriptor::Ptr descr = Descriptor::create(AttributeVec3s::attributeType());
     AttributeSet attrSetA(descr, /*arrayLength=*/50);
-
-    CPPUNIT_ASSERT_THROW(attrSetA.appendAttribute("id", AttributeI::attributeType(), /*stride=*/0), openvdb::ValueError);
 
     attrSetA.appendAttribute("id", AttributeI::attributeType());
 
@@ -567,8 +580,8 @@ TestAttributeSet::testAttributeSet()
     CPPUNIT_ASSERT(attrSetA == attrSetA2);
 
     CPPUNIT_ASSERT_EQUAL(size_t(2), attrSetA.size());
-    CPPUNIT_ASSERT_EQUAL(size_t(50), attrSetA.get(0)->size());
-    CPPUNIT_ASSERT_EQUAL(size_t(50), attrSetA.get(1)->size());
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index(50), attrSetA.get(0)->size());
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index(50), attrSetA.get(1)->size());
 
     { // copy
         CPPUNIT_ASSERT(!attrSetA.isShared(0));
@@ -642,7 +655,8 @@ TestAttributeSet::testAttributeSet()
             attrSetC.makeUnique(0);
             attrSetC.makeUnique(1);
 
-            attrSetC.appendAttribute("test", AttributeS::attributeType(), /*stride=*/1, defaultValueTest.copy());
+            attrSetC.appendAttribute("test", AttributeS::attributeType(), /*stride=*/1,
+                                        /*constantStride=*/true, defaultValueTest.copy());
 
             CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *descrB));
         }
@@ -787,7 +801,7 @@ TestAttributeSet::testAttributeSet()
     AttributeArray::Ptr intAttr(new AttributeI(10));
     CPPUNIT_ASSERT(attrSetA.replace(1, intAttr) != AttributeSet::INVALID_POS);
 
-    CPPUNIT_ASSERT_EQUAL(size_t(10), attrSetA.get(1)->size());
+    CPPUNIT_ASSERT_EQUAL(openvdb::Index(10), attrSetA.get(1)->size());
 
     { // reorder attribute set
         Descriptor::Ptr descr1 = Descriptor::create(AttributeVec3s::attributeType());

@@ -144,7 +144,7 @@ public:
                             const MetaMap& metadata,
                             const bool preserveCompression = true);
 
-    size_t size() const { return mHandle.size(); }
+    Index size() const { return mHandle.size(); }
     bool isUniform() const { return mHandle.isUniform(); }
 
     Name get(Index n, Index m = 0) const;

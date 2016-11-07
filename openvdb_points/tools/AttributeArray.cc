@@ -99,7 +99,7 @@ __pragma(warning(default:1711))
 
 
 AttributeArray::Ptr
-AttributeArray::create(const NamePair& type, size_t length, Index stride)
+AttributeArray::create(const NamePair& type, Index length, Index stride, bool constantStride)
 {
     LockedAttributeRegistry* registry = getAttributeRegistry();
     tbb::spin_mutex::scoped_lock lock(registry->mMutex);
@@ -110,7 +110,7 @@ AttributeArray::create(const NamePair& type, size_t length, Index stride)
         OPENVDB_THROW(LookupError, "Cannot create attribute of unregistered type " << type.first << "_" << type.second);
     }
 
-    return (iter->second)(length, stride);
+    return (iter->second)(length, stride, constantStride);
 }
 
 
@@ -173,6 +173,14 @@ AttributeArray::setHidden(bool state)
 {
     if (state) mFlags |= Int16(HIDDEN);
     else mFlags &= ~Int16(HIDDEN);
+}
+
+
+void
+AttributeArray::setConstantStride(bool state)
+{
+    if (state) mFlags |= Int16(CONSTANTSTRIDE);
+    else mFlags &= ~Int16(CONSTANTSTRIDE);
 }
 
 

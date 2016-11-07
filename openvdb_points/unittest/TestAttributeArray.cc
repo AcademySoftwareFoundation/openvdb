@@ -212,8 +212,8 @@ TestAttributeArray::testFixedPointConversion()
 
 namespace {
 
-static AttributeArray::Ptr factory1(size_t, Index) { return AttributeArray::Ptr(); }
-static AttributeArray::Ptr factory2(size_t, Index) { return AttributeArray::Ptr(); }
+static AttributeArray::Ptr factory1(Index, Index, bool) { return AttributeArray::Ptr(); }
+static AttributeArray::Ptr factory2(Index, Index, bool) { return AttributeArray::Ptr(); }
 
 } // namespace
 
@@ -229,7 +229,7 @@ TestAttributeArray::testRegistry()
 
     { // cannot create AttributeArray that is not registered
         CPPUNIT_ASSERT(!AttributeArray::isRegistered(AttributeF::attributeType()));
-        CPPUNIT_ASSERT_THROW(AttributeArray::create(AttributeF::attributeType(), size_t(5)), LookupError);
+        CPPUNIT_ASSERT_THROW(AttributeArray::create(AttributeF::attributeType(), Index(5)), LookupError);
     }
 
     // manually register the type and factory
@@ -262,13 +262,13 @@ TestAttributeArray::testAttributeArray()
     {
         openvdb::tools::AttributeArray::Ptr attr(new AttributeArrayD(50));
 
-        CPPUNIT_ASSERT_EQUAL(attr->size(), size_t(50));
+        CPPUNIT_ASSERT_EQUAL(attr->size(), Index(50));
     }
 
     {
         openvdb::tools::AttributeArray::Ptr attr(new AttributeArrayD(50));
 
-        CPPUNIT_ASSERT_EQUAL(size_t(50), attr->size());
+        CPPUNIT_ASSERT_EQUAL(Index(50), attr->size());
 
         AttributeArrayD& typedAttr = static_cast<AttributeArrayD&>(*attr);
 
@@ -297,7 +297,7 @@ TestAttributeArray::testAttributeArray()
     { // test setUnsafe and getUnsafe on uniform arrays
         AttributeArrayD::Ptr attr(new AttributeArrayD(50));
 
-        CPPUNIT_ASSERT_EQUAL(size_t(50), attr->size());
+        CPPUNIT_ASSERT_EQUAL(Index(50), attr->size());
         attr->collapse(5.0);
         CPPUNIT_ASSERT(attr->isUniform());
 
@@ -362,7 +362,7 @@ TestAttributeArray::testAttributeArray()
 
         openvdb::tools::AttributeArray::Ptr attr(new AttributeArrayI(50));
 
-        CPPUNIT_ASSERT_EQUAL(size_t(50), attr->size());
+        CPPUNIT_ASSERT_EQUAL(Index(50), attr->size());
 
         CPPUNIT_ASSERT_EQUAL((sizeof(AttributeArrayI) + sizeof(int)), attr->memUsage());
 
@@ -374,13 +374,13 @@ TestAttributeArray::testAttributeArray()
 
     { // Typed class API
 
-        const size_t count = 50;
+        const Index count = 50;
         const size_t uniformMemUsage = sizeof(AttributeArrayI) + sizeof(int);
         const size_t expandedMemUsage = sizeof(AttributeArrayI) + count * sizeof(int);
 
         AttributeArrayI attr(count);
 
-        CPPUNIT_ASSERT_EQUAL(attr.size(), size_t(count));
+        CPPUNIT_ASSERT_EQUAL(attr.size(), Index(count));
 
         CPPUNIT_ASSERT_EQUAL(attr.get(0), 0);
         CPPUNIT_ASSERT_EQUAL(attr.get(10), 0);
@@ -650,7 +650,7 @@ TestAttributeArray::testAttributeArray()
     }
 
     { // IO
-        const size_t count = 50;
+        const Index count = 50;
         AttributeArrayI attrA(count);
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
@@ -961,17 +961,20 @@ TestAttributeArray::testStrided()
 
     { // non-strided array
         AttributeArrayI::Ptr array = AttributeArrayI::create(/*n=*/2, /*stride=*/1);
-        CPPUNIT_ASSERT(!array->isStrided());
+        CPPUNIT_ASSERT(array->hasConstantStride());
         CPPUNIT_ASSERT_EQUAL(array->stride(), Index(1));
-        CPPUNIT_ASSERT_EQUAL(array->size(), size_t(2));
+        CPPUNIT_ASSERT_EQUAL(array->size(), Index(2));
+        CPPUNIT_ASSERT_EQUAL(array->dataSize(), Index(2));
     }
 
     { // strided array
         AttributeArrayI::Ptr array = AttributeArrayI::create(/*n=*/2, /*stride=*/3);
 
-        CPPUNIT_ASSERT(array->isStrided());
+        CPPUNIT_ASSERT(array->hasConstantStride());
+
         CPPUNIT_ASSERT_EQUAL(array->stride(), Index(3));
-        CPPUNIT_ASSERT_EQUAL(array->size(), size_t(2));
+        CPPUNIT_ASSERT_EQUAL(array->size(), Index(2));
+        CPPUNIT_ASSERT_EQUAL(array->dataSize(), Index(6));
         CPPUNIT_ASSERT(array->isUniform());
 
         CPPUNIT_ASSERT_EQUAL(array->get(0), 0);
@@ -1002,7 +1005,7 @@ TestAttributeArray::testStrided()
         writeHandle.set(1, 1, 10);
 
         CPPUNIT_ASSERT_EQUAL(writeHandle.stride(), Index(3));
-        CPPUNIT_ASSERT_EQUAL(writeHandle.size(), size_t(2));
+        CPPUNIT_ASSERT_EQUAL(writeHandle.size(), Index(2));
 
         // non-interleaved: 0 0 5 0 10 0
 
@@ -1013,16 +1016,43 @@ TestAttributeArray::testStrided()
         CPPUNIT_ASSERT_EQUAL(writeHandle.get(1, 1), 10);
 
         StridedHandle handle(*array);
+        CPPUNIT_ASSERT(handle.hasConstantStride());
 
         CPPUNIT_ASSERT_EQUAL(handle.get(0, 2), 5);
         CPPUNIT_ASSERT_EQUAL(handle.get(1, 1), 10);
 
         CPPUNIT_ASSERT_EQUAL(handle.stride(), Index(3));
-        CPPUNIT_ASSERT_EQUAL(handle.size(), size_t(2));
+        CPPUNIT_ASSERT_EQUAL(handle.size(), Index(2));
 
         size_t arrayMem = 64;
 
         CPPUNIT_ASSERT_EQUAL(array->memUsage(), sizeof(int) * /*size*/3 * /*stride*/2 + arrayMem);
+    }
+
+    { // dynamic stride
+        AttributeArrayI::Ptr array = AttributeArrayI::create(/*n=*/2, /*stride=*/7, /*constantStride=*/false);
+
+        CPPUNIT_ASSERT(!array->hasConstantStride());
+
+        // zero indicates dynamic striding
+        CPPUNIT_ASSERT_EQUAL(array->stride(), Index(0));
+        CPPUNIT_ASSERT_EQUAL(array->size(), Index(2));
+        // the actual array size
+        CPPUNIT_ASSERT_EQUAL(array->dataSize(), Index(7));
+        CPPUNIT_ASSERT(array->isUniform());
+
+        CPPUNIT_ASSERT_EQUAL(array->get(0), 0);
+        CPPUNIT_ASSERT_EQUAL(array->get(6), 0);
+        CPPUNIT_ASSERT_THROW(array->get(7), IndexError); // out-of-range
+
+        CPPUNIT_ASSERT_NO_THROW(StridedHandle::create(*array));
+        CPPUNIT_ASSERT_NO_THROW(StridedWriteHandle::create(*array));
+
+        // handle is bound as if a linear array with stride 1
+        StridedHandle handle(*array);
+        CPPUNIT_ASSERT(!handle.hasConstantStride());
+        CPPUNIT_ASSERT_EQUAL(handle.stride(), Index(1));
+        CPPUNIT_ASSERT_EQUAL(handle.size(), array->dataSize());
     }
 }
 
@@ -1040,7 +1070,7 @@ TestAttributeArray::testDelayedLoad()
     if (tempDir.empty())    tempDir = P_tmpdir;
 
     { // IO
-        const size_t count = 50;
+        const Index count = 50;
         AttributeArrayI attrA(count);
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
@@ -1280,7 +1310,6 @@ TestAttributeArray::testDelayedLoad()
 
         AttributeArrayI attrStrided(count, /*stride=*/3);
 
-        CPPUNIT_ASSERT(attrStrided.isStrided());
         CPPUNIT_ASSERT_EQUAL(attrStrided.stride(), Index(3));
 
         // write out strided attribute array to a temp file
@@ -1309,7 +1338,6 @@ TestAttributeArray::testDelayedLoad()
 
             attrB.read(filein);
 
-            CPPUNIT_ASSERT(attrB.isStrided());
             CPPUNIT_ASSERT_EQUAL(attrB.stride(), Index(3));
         }
 
@@ -1495,7 +1523,7 @@ TestAttributeArray::testQuaternions()
     }
 
     { // create a quaternion array with a zero uniform value
-        AttributeQD zero(/*size=*/10, /*stride=*/1, QuatR::zero());
+        AttributeQD zero(/*size=*/10, /*stride=*/1, /*constantStride=*/true, QuatR::zero());
 
         CPPUNIT_ASSERT_EQUAL(zero.get(5), QuatR::zero());
     }
@@ -1533,7 +1561,7 @@ TestAttributeArray::testMatrices()
     }
 
     { // create a matrix array with a zero uniform value
-        AttributeM zero(/*size=*/10, /*stride=*/1, Mat4d::zero());
+        AttributeM zero(/*size=*/10, /*stride=*/1, /*constantStride*/true, Mat4d::zero());
 
         CPPUNIT_ASSERT_EQUAL(zero.get(5), Mat4d::zero());
     }
@@ -1555,8 +1583,8 @@ template <typename AttrT>
 void set(const Name& prefix, AttrT& attr)
 {
     ProfileTimer timer(prefix + ": set");
-    const size_t size = attr.size();
-    for (size_t i = 0; i < size; i++) {
+    const Index size = attr.size();
+    for (Index i = 0; i < size; i++) {
         attr.setUnsafe(i, typename AttrT::ValueType(i));
     }
 }
@@ -1567,8 +1595,8 @@ void setH(const Name& prefix, AttrT& attr)
     using ValueType = typename AttrT::ValueType;
     ProfileTimer timer(prefix + ": setHandle");
     AttributeWriteHandle<ValueType, CodecT> handle(attr);
-    const size_t size = attr.size();
-    for (size_t i = 0; i < size; i++) {
+    const Index size = attr.size();
+    for (Index i = 0; i < size; i++) {
         handle.set(i, ValueType(i));
     }
 }
@@ -1578,8 +1606,8 @@ void sum(const Name& prefix, const AttrT& attr)
 {
     ProfileTimer timer(prefix + ": sum");
     typename AttrT::ValueType sum = 0;
-    const size_t size = attr.size();
-    for (size_t i = 0; i < size; i++) {
+    const Index size = attr.size();
+    for (Index i = 0; i < size; i++) {
         sum += attr.getUnsafe(i);
     }
     // prevent compiler optimisations removing computation
@@ -1593,7 +1621,7 @@ void sumH(const Name& prefix, const AttrT& attr)
     using ValueType = typename AttrT::ValueType;
     ValueType sum = 0;
     AttributeHandle<ValueType, CodecT> handle(attr);
-    for (size_t i = 0; i < attr.size(); i++) {
+    for (Index i = 0; i < attr.size(); i++) {
         sum += handle.get(i);
     }
     // prevent compiler optimisations removing computation

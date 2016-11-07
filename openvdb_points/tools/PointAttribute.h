@@ -74,7 +74,8 @@ template <typename PointDataTree>
 inline void appendAttribute(PointDataTree& tree,
                             const Name& name,
                             const NamePair& type,
-                            const Index stride = 1,
+                            const Index strideOrTotalSize = 1,
+                            const bool constantStride = true,
                             Metadata::Ptr defaultValue = Metadata::Ptr(),
                             const bool hidden = false,
                             const bool transient = false);
@@ -92,7 +93,8 @@ inline void appendAttribute(PointDataTree& tree,
                             const std::string& name,
                             const ValueType& uniformValue =
                                 point_attribute_internal::DefaultValue<ValueType>::value(),
-                            const Index stride = 1,
+                            const Index strideOrTotalSize = 1,
+                            const bool constantStride = true,
                             Metadata::Ptr defaultValue = Metadata::Ptr(),
                             const bool hidden = false,
                             const bool transient = false);
@@ -111,7 +113,8 @@ inline void appendAttribute(PointDataTree& tree,
                             const std::string& name,
                             const ValueType& uniformValue =
                                 point_attribute_internal::DefaultValue<ValueType>::value(),
-                            const Index stride = 1,
+                            const Index strideOrTotalSize = 1,
+                            const bool constantStride = true,
                             Metadata::Ptr defaultValue = Metadata::Ptr(),
                             const bool hidden = false,
                             const bool transient = false);
@@ -212,12 +215,14 @@ struct AppendAttributeOp {
 
     AppendAttributeOp(  AttributeSet::DescriptorPtr& descriptor,
                         const size_t pos,
-                        const Index stride = 1,
+                        const Index strideOrTotalSize = 1,
+                        const bool constantStride = true,
                         const bool hidden = false,
                         const bool transient = false)
         : mDescriptor(descriptor)
         , mPos(pos)
-        , mStride(stride)
+        , mStrideOrTotalSize(strideOrTotalSize)
+        , mConstantStride(constantStride)
         , mHidden(hidden)
         , mTransient(transient) { }
 
@@ -226,7 +231,8 @@ struct AppendAttributeOp {
         for (auto leaf = range.begin(); leaf; ++leaf) {
             const AttributeSet::Descriptor& expected = leaf->attributeSet().descriptor();
 
-            AttributeArray::Ptr attribute = leaf->appendAttribute(expected, mDescriptor, mPos, mStride);
+            AttributeArray::Ptr attribute = leaf->appendAttribute(expected, mDescriptor, mPos,
+                                                                  mStrideOrTotalSize, mConstantStride);
 
             if (mHidden)      attribute->setHidden(true);
             if (mTransient)   attribute->setTransient(true);
@@ -237,7 +243,8 @@ struct AppendAttributeOp {
 
     AttributeSet::DescriptorPtr&    mDescriptor;
     const size_t                    mPos;
-    const Index                     mStride;
+    const Index                     mStrideOrTotalSize;
+    const bool                      mConstantStride;
     const bool                      mHidden;
     const bool                      mTransient;
 }; // class AppendAttributeOp
@@ -467,7 +474,8 @@ template <typename PointDataTree>
 inline void appendAttribute(PointDataTree& tree,
                             const Name& name,
                             const NamePair& type,
-                            const Index stride,
+                            const Index strideOrTotalSize,
+                            const bool constantStride,
                             Metadata::Ptr defaultValue,
                             const bool hidden,
                             const bool transient)
@@ -506,7 +514,8 @@ inline void appendAttribute(PointDataTree& tree,
     // insert attributes using the new descriptor
 
     tree::LeafManager<PointDataTree> leafManager(tree);
-    AppendAttributeOp<PointDataTree> append(newDescriptor, pos, stride, hidden, transient);
+    AppendAttributeOp<PointDataTree> append(newDescriptor, pos, strideOrTotalSize,
+                                            constantStride, hidden, transient);
     tbb::parallel_for(leafManager.leafRange(), append);
 }
 
@@ -518,7 +527,8 @@ template <typename ValueType, typename CodecType, typename PointDataTree>
 inline void appendAttribute(PointDataTree& tree,
                             const std::string& name,
                             const ValueType& uniformValue,
-                            const Index stride,
+                            const Index strideOrTotalSize,
+                            const bool constantStride,
                             Metadata::Ptr defaultValue,
                             const bool hidden,
                             const bool transient)
@@ -529,7 +539,8 @@ inline void appendAttribute(PointDataTree& tree,
     using point_attribute_internal::DefaultValue;
     using point_attribute_internal::MetadataStorage;
 
-    appendAttribute(tree, name, AttributeTypeConversion<ValueType, CodecType>::type(), stride, defaultValue, hidden, transient);
+    appendAttribute(tree, name, AttributeTypeConversion<ValueType, CodecType>::type(),
+                    strideOrTotalSize, constantStride, defaultValue, hidden, transient);
 
     if (uniformValue != DefaultValue<ValueType>::value()) {
         MetadataStorage<PointDataTree, ValueType>::add(tree, uniformValue);
@@ -545,14 +556,16 @@ template <typename ValueType, typename PointDataTree>
 inline void appendAttribute(PointDataTree& tree,
                             const std::string& name,
                             const ValueType& uniformValue,
-                            const Index stride,
+                            const Index strideOrTotalSize,
+                            const bool constantStride,
                             Metadata::Ptr defaultValue,
                             const bool hidden,
                             const bool transient)
 {
     static_assert(!std::is_base_of<AttributeArray, ValueType>::value, "ValueType must not be derived from AttributeArray");
 
-    appendAttribute<ValueType, NullCodec>(tree, name, uniformValue, stride, defaultValue, hidden, transient);
+    appendAttribute<ValueType, NullCodec>(tree, name, uniformValue, strideOrTotalSize,
+                                          constantStride, defaultValue, hidden, transient);
 }
 
 
