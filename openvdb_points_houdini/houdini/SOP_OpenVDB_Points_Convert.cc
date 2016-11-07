@@ -187,19 +187,6 @@ attributeTupleSize(const GA_Attribute* const attribute)
     return int16_t(0);
 }
 
-template <typename ValueType, typename HoudiniOffsetAttribute>
-void
-convertSegmentsFromHoudini( PointDataTree& tree, const PointIndexTree& indexTree, const openvdb::Name& name,
-                            const size_t count, HoudiniOffsetAttribute& houdiniOffsets)
-{
-    static_assert(!std::is_base_of<AttributeArray, ValueType>::value, "ValueType must not be derived from AttributeArray");
-    static_assert(!std::is_same<ValueType, openvdb::Name>::value, "ValueType must not be openvdb::Name/std::string");
-
-    appendAttribute<ValueType>(tree, name, zeroVal<ValueType>(), count);
-
-    populateAttribute<PointDataTree, PointIndexTree, HoudiniOffsetAttribute>(tree, indexTree, name, houdiniOffsets, count);
-}
-
 template <typename ValueType, typename CodecType = NullCodec>
 void
 convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree, const openvdb::Name& name,
@@ -394,7 +381,6 @@ createPointDataGrid(const GU_Detail& ptGeo, const int compression,
                     const AttributeInfoMap& attributes, const openvdb::math::Transform& transform)
 {
     using HoudiniPositionAttribute = hvdbp::HoudiniReadAttribute<openvdb::Vec3d>;
-    using HoudiniOffsetAttribute = hvdbp::HoudiniOffsetAttribute<openvdb::Vec3f>;
 
     // store point group information
 
@@ -494,18 +480,6 @@ createPointDataGrid(const GU_Detail& ptGeo, const int compression,
         setGroup(tree, indexTree, inGroup, groupName);
 
         std::fill(inGroup.begin(), inGroup.end(), short(0));
-    }
-
-    // Add curve segments to PointDataGrid
-
-    if (offsetPairs) {
-
-        HoudiniOffsetAttribute segments(positionAttribute, offsetPairs, vertexCount-1);
-
-        convertSegmentsFromHoudini<Vec3f, HoudiniOffsetAttribute>(tree, indexTree, "segments", vertexCount-1, segments);
-
-        MetaMap& metadata = makeDescriptorUnique(tree)->getMetadata();
-        metadata.insertMeta("nurbscurve", StringMetadata("segments"));
     }
 
     // Add other attributes to PointDataGrid
@@ -1091,19 +1065,6 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
                 if (!baseGrid.isType<PointDataGrid>()) continue;
 
                 const PointDataGrid& grid = static_cast<const PointDataGrid&>(baseGrid);
-
-                // add a warning to the SOP if grid contains curves - conversion to Houdini currently not supported
-
-                auto iter = grid.tree().cbeginLeaf();
-
-                if (iter) {
-                    const AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
-                    const Metadata::ConstPtr meta = descriptor.getMetadata()["nurbscurve"];
-                    if (meta) {
-                        addWarning(SOP_MESSAGE, "VDB Points grid contains curves, conversion back to Houdini curves is currently not supported. \
-                                                Converting curve roots into Houdini points instead.");
-                    }
-                }
 
                 // perform conversion
 

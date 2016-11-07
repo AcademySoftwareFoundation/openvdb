@@ -191,7 +191,6 @@ protected:
 private:
     std::unique_ptr<RE_Geometry> myGeo;
     std::unique_ptr<RE_Geometry> myWire;
-    bool mCurves = false;
     bool mDefaultPointColor = true;
     openvdb::Vec3f mCentroid{0, 0, 0};
 };
@@ -648,11 +647,10 @@ struct PositionAttribute
         Handle(PositionAttribute& attribute)
             : mBuffer(attribute.mBuffer)
             , mPositionOffset(attribute.mPositionOffset)
-            , mStride(attribute.mStride)
-            , mCurve(attribute.mCurve) { }
+            , mStride(attribute.mStride) { }
 
         void set(openvdb::Index offset, openvdb::Index /*stride*/, const ValueType& value) {
-            const size_t vertices = mCurve ? (mStride * 2 - 2) : mStride;
+            const size_t vertices = mStride;
             const ValueType transformedValue = value - mPositionOffset;
             mBuffer[offset * vertices] = UT_Vector3H(transformedValue.x(), transformedValue.y(), transformedValue.z());
         }
@@ -661,14 +659,12 @@ struct PositionAttribute
         UT_Vector3H* mBuffer;
         ValueType& mPositionOffset;
         Index mStride;
-        bool mCurve;
     }; // struct Handle
 
-    PositionAttribute(UT_Vector3H* buffer, const ValueType& positionOffset, Index stride = 1, bool curve = false)
+    PositionAttribute(UT_Vector3H* buffer, const ValueType& positionOffset, Index stride = 1)
         : mBuffer(buffer)
         , mPositionOffset(positionOffset)
-        , mStride(stride)
-        , mCurve(curve) { }
+        , mStride(stride) { }
 
     void expand() { }
     void compact() { }
@@ -677,49 +673,7 @@ private:
     UT_Vector3H* mBuffer;
     ValueType mPositionOffset;
     Index mStride;
-    bool mCurve;
 }; // struct PositionAttribute
-
-struct OffsetAttribute
-{
-    using ValueType = Vec3f;
-
-    struct Handle
-    {
-        Handle(OffsetAttribute& attribute)
-            : mBuffer(attribute.mBuffer)
-            , mStride(attribute.mStride)
-            , mCurve(attribute.mCurve) { }
-
-        void set(openvdb::Index offset, openvdb::Index i, const ValueType& value) {
-            const size_t vertices = mCurve ? (mStride * 2 - 2) : mStride;
-            const UT_Vector3H& position = mBuffer[offset * vertices];
-            const size_t index = (offset * vertices + i * 2 + 1);
-            mBuffer[index] = UT_Vector3H(position.x() + value.x(), position.y() + value.y(), position.z() + value.z());
-            if (mCurve && i < mStride - 2) {
-                mBuffer[index + 1] = mBuffer[index];
-            }
-        }
-
-    private:
-        UT_Vector3H* mBuffer;
-        Index mStride;
-        bool mCurve;
-    }; // struct Handle
-
-    OffsetAttribute(UT_Vector3H* buffer, Index stride, bool curve = false)
-        : mBuffer(buffer)
-        , mStride(stride)
-        , mCurve(curve) { }
-
-    void expand() { }
-    void compact() { }
-
-private:
-    UT_Vector3H* mBuffer;
-    Index mStride;
-    bool mCurve;
-}; // struct OffsetAttribute
 
 template <typename T>
 struct VectorAttribute
@@ -789,22 +743,7 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
 
     if (numPoints == 0)    return;
 
-    const openvdb::MetaMap& metadata = descriptor.getMetadata();
-    openvdb::StringMetadata::ConstPtr segmentsMetadata = metadata.getMetadata<StringMetadata>("nurbscurve");
-
     size_t stride = 1;
-
-    size_t segmentsIndex = AttributeSet::INVALID_POS;
-
-    mCurves = bool(segmentsMetadata);
-
-    if (segmentsMetadata) {
-        segmentsIndex = descriptor.find(segmentsMetadata->value());
-        const AttributeArray& segmentsAttribute = iter->constAttributeArray(segmentsIndex);
-
-        stride += segmentsAttribute.stride();
-        numPoints *= (stride * 2 - 2);
-    }
 
     // Initialize the number of points in the geometry.
 
@@ -841,17 +780,10 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
         getPointOffsets(pointOffsets, grid.tree(),
                         includeGroups, excludeGroups, /*inCoreOnly=*/true);
 
-        PositionAttribute positionAttribute(pdata, mCentroid, stride, mCurves);
+        PositionAttribute positionAttribute(pdata, mCentroid, stride);
         convertPointDataGridPosition(positionAttribute, grid, pointOffsets,
                                     /*startOffset=*/ 0, includeGroups, excludeGroups,
                                     /*inCoreOnly=*/true);
-
-        if (mCurves) {
-            OffsetAttribute offsetAttribute(pdata, stride, true);
-            convertPointDataGridAttribute(  offsetAttribute, grid.tree(), pointOffsets,
-                                            /*startOffset=*/ 0, segmentsIndex, /*stride*/stride-1,
-                                            includeGroups, excludeGroups, /*inCoreOnly=*/true);
-        }
 
         // unmap the buffer so it can be used by GL and set the cache version
 
@@ -878,7 +810,7 @@ GR_PrimVDBPoints::updatePosBuffer(RE_Render* r,
                             instance.data());
     }
 
-    RE_PrimType primType = mCurves ? RE_PRIM_LINES : RE_PRIM_POINTS;
+    RE_PrimType primType = RE_PRIM_POINTS;
 
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
     myGeo->connectAllPrims(r, RE_GEO_WIRE_IDX, primType, NULL, true);
@@ -1246,8 +1178,7 @@ GR_PrimVDBPoints::render(RE_Render *r,
 
         RE_ShaderHandle* shader;
 
-        if (mCurves)            shader = &theLineShader;
-        else if (pointDisplay)  shader = &thePointShader;
+        if (pointDisplay)       shader = &thePointShader;
         else                    shader = &thePixelShader;
 
         // bind the shader
@@ -1269,13 +1200,11 @@ GR_PrimVDBPoints::render(RE_Render *r,
             myGeo->createConstAttribute(r, "Cd", RE_GPU_FLOAT32, 3, (darkBackground ? white : black));
         }
 
-        if (mCurves)                r->pushLineWidth(commonOpts.wireWidth());
-        else if (pointDisplay)      r->pushPointSize(commonOpts.pointSize());
+        if (pointDisplay)      r->pushPointSize(commonOpts.pointSize());
 
         myGeo->draw(r, RE_GEO_WIRE_IDX);
 
-        if (mCurves)                r->popLineWidth();
-        else if (pointDisplay)      r->popPointSize();
+        if (pointDisplay)      r->popPointSize();
 
         r->popShader();
     }
