@@ -441,45 +441,6 @@ private:
 ////////////////////////////////////////
 
 
-template <typename T>
-struct HoudiniOffsetAttribute
-{
-    using value_type = T;
-    using PosType = T;
-    typedef typename GAHandleTraits<T>::RO ReadHandleType;
-
-    HoudiniOffsetAttribute(const GA_Attribute& attribute, OffsetPairListPtr offsetPairs, openvdb::Index stride)
-        : mAttribute(attribute)
-        , mHandle(&attribute)
-        , mOffsetPairs(offsetPairs)
-        , mStride(stride) { }
-
-    template <typename ValueType>
-    void get(ValueType& value, size_t n, openvdb::Index offset = 0) const
-    {
-        const OffsetPair& pair = (*mOffsetPairs)[n * mStride + offset];
-
-        GA_Offset offset1(pair.first);
-        GA_Offset offset2(pair.second);
-
-        value = readAttributeValue<ReadHandleType, ValueType>(mHandle, offset2);
-        value -= readAttributeValue<ReadHandleType, ValueType>(mHandle, offset1);
-    }
-
-    size_t size() const { return mOffsetPairs->size(); }
-    openvdb::Index stride() const { return mStride; }
-
-private:
-    const ReadHandleType mHandle;
-    const GA_Attribute& mAttribute;
-    OffsetPairListPtr mOffsetPairs;
-    openvdb::Index mStride;
-};
-
-
-////////////////////////////////////////
-
-
 struct HoudiniGroup
 {
     explicit HoudiniGroup(GA_PointGroup& group)

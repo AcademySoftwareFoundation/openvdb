@@ -34,7 +34,7 @@
 #include <openvdb_points/openvdb.h>
 #include <openvdb_points/tools/PointDataGrid.h>
 #include <openvdb_points/tools/PointConversion.h>
-#include <openvdb_points/tools/PointLoad.h>
+#include <openvdb_points/tools/Load.h>
 #include <openvdb_points/tools/AttributeArray.h>
 #include <openvdb_points/tools/AttributeSet.h>
 #include <openvdb/Types.h>
@@ -43,28 +43,28 @@
 
 #include <cstdlib> // for std::getenv(), mkstemp()
 
-class TestPointLoad: public CppUnit::TestCase
+class TestLoad: public CppUnit::TestCase
 {
 public:
     virtual void setUp() { openvdb::initialize(); openvdb::points::initialize(); }
     virtual void tearDown() { openvdb::uninitialize(); openvdb::points::uninitialize(); }
 
-    CPPUNIT_TEST_SUITE(TestPointLoad);
+    CPPUNIT_TEST_SUITE(TestLoad);
     CPPUNIT_TEST(testLoad);
 
     CPPUNIT_TEST_SUITE_END();
 
     void testLoad();
-}; // class TestPointLoad
+}; // class TestLoad
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestPointLoad);
+CPPUNIT_TEST_SUITE_REGISTRATION(TestLoad);
 
 
 ////////////////////////////////////////
 
 
 void
-TestPointLoad::testLoad()
+TestLoad::testLoad()
 {
     using namespace openvdb;
     using namespace openvdb::tools;
@@ -130,7 +130,7 @@ TestPointLoad::testLoad()
         CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore()); ++leafIter;
         CPPUNIT_ASSERT(leafIter->buffer().isOutOfCore());
 
-        loadPoints(*grid);
+        loadGrid(*grid);
 
         leafIter = grid->tree().cbeginLeaf();
 #endif
@@ -170,7 +170,7 @@ TestPointLoad::testLoad()
 
         BBoxd bbox(Vec3i(0, 0, 0), Vec3i(4, 30, 4));
 
-        loadPoints(*grid, bbox);
+        loadGrid(*grid, bbox);
 
         leafIter = grid->tree().cbeginLeaf();
 
@@ -213,7 +213,7 @@ TestPointLoad::testLoad()
         mask->tree().touchLeaf(Coord(0, 0, 0));
         mask->tree().touchLeaf(Coord(1, 1, 20));
 
-        loadPoints(*grid, *mask);
+        loadGrid(*grid, *mask);
 
         leafIter = grid->tree().cbeginLeaf();
 

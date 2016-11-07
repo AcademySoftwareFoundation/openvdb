@@ -187,19 +187,6 @@ attributeTupleSize(const GA_Attribute* const attribute)
     return int16_t(0);
 }
 
-template <typename ValueType, typename HoudiniOffsetAttribute>
-void
-convertSegmentsFromHoudini( PointDataTree& tree, const PointIndexTree& indexTree, const openvdb::Name& name,
-                            const size_t count, HoudiniOffsetAttribute& houdiniOffsets)
-{
-    static_assert(!std::is_base_of<AttributeArray, ValueType>::value, "ValueType must not be derived from AttributeArray");
-    static_assert(!std::is_same<ValueType, openvdb::Name>::value, "ValueType must not be openvdb::Name/std::string");
-
-    appendAttribute<ValueType>(tree, name, zeroVal<ValueType>(), count);
-
-    populateAttribute<PointDataTree, PointIndexTree, HoudiniOffsetAttribute>(tree, indexTree, name, houdiniOffsets, count);
-}
-
 template <typename ValueType, typename CodecType = NullCodec>
 void
 convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree, const openvdb::Name& name,
@@ -290,6 +277,12 @@ convertAttributeFromHoudini(PointDataTree& tree, const PointIndexTree& indexTree
             }
             else if (compression == UNIT_VECTOR) {
                 convertAttributeFromHoudini<Vec3<float>, UnitVecCodec>(tree, indexTree, name, attribute, defaults);
+            }
+            else if (compression == UNIT_FIXED_POINT_8) {
+                convertAttributeFromHoudini<Vec3<float>, FixedPointCodec<true, UnitRange>>(tree, indexTree, name, attribute, defaults);
+            }
+            else if (compression == UNIT_FIXED_POINT_16) {
+                convertAttributeFromHoudini<Vec3<float>, FixedPointCodec<false, UnitRange>>(tree, indexTree, name, attribute, defaults);
             }
         }
         else if (storage == GA_STORE_REAL64) {
@@ -394,7 +387,6 @@ createPointDataGrid(const GU_Detail& ptGeo, const int compression,
                     const AttributeInfoMap& attributes, const openvdb::math::Transform& transform)
 {
     using HoudiniPositionAttribute = hvdbp::HoudiniReadAttribute<openvdb::Vec3d>;
-    using HoudiniOffsetAttribute = hvdbp::HoudiniOffsetAttribute<openvdb::Vec3f>;
 
     // store point group information
 
@@ -494,18 +486,6 @@ createPointDataGrid(const GU_Detail& ptGeo, const int compression,
         setGroup(tree, indexTree, inGroup, groupName);
 
         std::fill(inGroup.begin(), inGroup.end(), short(0));
-    }
-
-    // Add curve segments to PointDataGrid
-
-    if (offsetPairs) {
-
-        HoudiniOffsetAttribute segments(positionAttribute, offsetPairs, vertexCount-1);
-
-        convertSegmentsFromHoudini<Vec3f, HoudiniOffsetAttribute>(tree, indexTree, "segments", vertexCount-1, segments);
-
-        MetaMap& metadata = makeDescriptorUnique(tree)->getMetadata();
-        metadata.insertMeta("nurbscurve", StringMetadata("segments"));
     }
 
     // Add other attributes to PointDataGrid
@@ -913,7 +893,7 @@ newSopOperator(OP_OperatorTable* table)
         };
 
         parms.add(hutil::ParmFactory(PRM_ORD, "poscompression", "Position Compression")
-            .setDefault(PRMzeroDefaults)
+            .setDefault(PRMoneDefaults)
             .setHelpText("The position attribute compression setting.")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
@@ -971,6 +951,35 @@ newSopOperator(OP_OperatorTable* table)
         .setMultiparms(attrParms)
         .setDefault(PRMzeroDefaults));
 
+    parms.add(hutil::ParmFactory(PRM_LABEL, "attributespacer", ""));
+
+    {
+        const char* items[] = {
+            "none", "None",
+            UnitVecCodec::name(), "Unit Vector",
+            nullptr
+    };
+
+    parms.add(hutil::ParmFactory(PRM_ORD, "normalcompression", "Normal Compression")
+        .setDefault(PRMoneDefaults)
+        .setHelpText("All normal attributes will use this compression codec.")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+    }
+
+    {
+        const char* items[] = {
+            "none", "None",
+            FixedPointCodec<false, UnitRange>::name(), "16-bit Unit",
+            FixedPointCodec<true, UnitRange>::name(), "8-bit Unit",
+            nullptr
+    };
+
+    parms.add(hutil::ParmFactory(PRM_ORD, "colorcompression", "Color Compression")
+        .setDefault(PRMtwoDefaults)
+        .setHelpText("All color attributes will use this compression codec.")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+    }
+
     //////////
     // Register this operator.
 
@@ -1016,6 +1025,9 @@ SOP_OpenVDB_Points_Convert::updateParmsFlags()
     changed |= enableParm("group", !toVdbPoints);
     changed |= setVisibleState("group", !toVdbPoints);
 
+    changed |= enableParm("vdbpointsgroup", !toVdbPoints);
+    changed |= setVisibleState("vdbpointsgroup", !toVdbPoints);
+
     changed |= enableParm("name", toVdbPoints);
     changed |= setVisibleState("name", toVdbPoints);
 
@@ -1043,6 +1055,12 @@ SOP_OpenVDB_Points_Convert::updateParmsFlags()
 
     changed |= enableParm("attrList", toVdbPoints && !convertAll);
     changed |= setVisibleState("attrList", toVdbPoints && !convertAll);
+
+    changed |= enableParm("normalcompression", toVdbPoints && convertAll);
+    changed |= setVisibleState("normalcompression", toVdbPoints && convertAll);
+
+    changed |= enableParm("colorcompression", toVdbPoints && convertAll);
+    changed |= setVisibleState("colorcompression", toVdbPoints && convertAll);
 
     return changed;
 }
@@ -1091,19 +1109,6 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
                 if (!baseGrid.isType<PointDataGrid>()) continue;
 
                 const PointDataGrid& grid = static_cast<const PointDataGrid&>(baseGrid);
-
-                // add a warning to the SOP if grid contains curves - conversion to Houdini currently not supported
-
-                auto iter = grid.tree().cbeginLeaf();
-
-                if (iter) {
-                    const AttributeSet::Descriptor& descriptor = iter->attributeSet().descriptor();
-                    const Metadata::ConstPtr meta = descriptor.getMetadata()["nurbscurve"];
-                    if (meta) {
-                        addWarning(SOP_MESSAGE, "VDB Points grid contains curves, conversion back to Houdini curves is currently not supported. \
-                                                Converting curve roots into Houdini points instead.");
-                    }
-                }
 
                 // perform conversion
 
@@ -1284,8 +1289,8 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
                             }
 
                             const bool isUnit = valueCompression == UNIT_FIXED_POINT_8 || valueCompression == UNIT_FIXED_POINT_16;
-                            if (isUnit && (storage != GA_STORE_REAL32 || width != 1)) {
-                                std::stringstream ss; ss << "Unit compression only supported for scalar 32-bit floating-point attributes. "
+                            if (isUnit && (storage != GA_STORE_REAL32 || (width != 1 && !isVector))) {
+                                std::stringstream ss; ss << "Unit compression only supported for scalar and vector 3 x 32-bit floating-point attributes. "
                                                             "Disabling compression for attribute \"" << attributeName << "\".";
                                 valueCompression = NONE;
                                 addWarning(SOP_MESSAGE, ss.str().c_str());
@@ -1301,6 +1306,9 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
             // point attribute names
             auto iter = detail->pointAttribs().begin(GA_SCOPE_PUBLIC);
 
+            const int normalCompression = evalInt("normalcompression", 0, time);
+            const int colorCompression = evalInt("colorcompression", 0, time);
+
             if (!iter.atEnd()) {
                 for (; !iter.atEnd(); ++iter) {
                     const char* str = (*iter)->getName();
@@ -1310,8 +1318,41 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
 
                         if (attrName == "P") continue;
 
+                        const Name attributeName = Name(attrName);
+
+                        const GA_ROAttributeRef attrRef = detail->findPointAttribute(attributeName.c_str());
+
+                        if (!attrRef.isValid()) continue;
+
+                        const GA_Attribute* const attribute = attrRef.getAttribute();
+
+                        if (!attribute) continue;
+
+                        const GA_Storage storage(attributeStorageType(attribute));
+
+                        // only tuple and string tuple attributes are supported
+
+                        if (storage == GA_STORE_INVALID) {
+                            std::stringstream ss; ss << "Invalid attribute type - " << attributeName;
+                            throw std::runtime_error(ss.str());
+                        }
+
+                        const int16_t width(attributeTupleSize(attribute));
+                        assert(width > 0);
+
+                        const GA_TypeInfo typeInfo(attribute->getOptions().typeInfo());
+
+                        const bool isNormal = width == 3 && typeInfo == GA_TYPE_NORMAL;
+                        const bool isColor = width == 3 && typeInfo == GA_TYPE_COLOR;
+
+                        int valueCompression = NONE;
+
+                        if (isNormal && normalCompression == 1)         valueCompression = UNIT_VECTOR;
+                        else if (isColor && colorCompression == 1)      valueCompression = UNIT_FIXED_POINT_16;
+                        else if (isColor && colorCompression == 2)      valueCompression = UNIT_FIXED_POINT_8;
+
                         // when converting all attributes apply no compression
-                        attributes[attrName] = std::pair<int, bool>(0, false);
+                        attributes[attrName] = std::pair<int, bool>(valueCompression, false);
                     }
                 }
             }
