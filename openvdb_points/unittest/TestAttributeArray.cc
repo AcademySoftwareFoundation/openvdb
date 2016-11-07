@@ -1169,6 +1169,66 @@ TestAttributeArray::testDelayedLoad()
             }
         }
 
+        // read in using delayed load and check streaming (write handle)
+        {
+            AttributeArrayI attrB;
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setStreamMetadataPtr(filein, streamMetadata);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            attrB.readMetadata(filein);
+            compression::PagedInputStream inputStream(filein);
+            inputStream.setSizeOnly(true);
+            attrB.readPagedBuffers(inputStream);
+            inputStream.setSizeOnly(false);
+            attrB.readPagedBuffers(inputStream);
+
+            CPPUNIT_ASSERT(attrB.isOutOfCore());
+
+            CPPUNIT_ASSERT(!attrB.isUniform());
+
+            attrB.setStreaming(true);
+
+            {
+                AttributeWriteHandle<int> handle(attrB);
+                CPPUNIT_ASSERT(!attrB.isOutOfCore());
+                CPPUNIT_ASSERT(!attrB.isUniform());
+            }
+
+            CPPUNIT_ASSERT(!attrB.isUniform());
+        }
+
+        // read in using delayed load and check streaming (read handle)
+        {
+            AttributeArrayI attrB;
+
+            std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
+            io::setStreamMetadataPtr(filein, streamMetadata);
+            io::setMappedFilePtr(filein, mappedFile);
+
+            attrB.readMetadata(filein);
+            compression::PagedInputStream inputStream(filein);
+            inputStream.setSizeOnly(true);
+            attrB.readPagedBuffers(inputStream);
+            inputStream.setSizeOnly(false);
+            attrB.readPagedBuffers(inputStream);
+
+            CPPUNIT_ASSERT(attrB.isOutOfCore());
+
+            CPPUNIT_ASSERT(!attrB.isUniform());
+
+            attrB.setStreaming(true);
+
+            {
+                AttributeHandle<int> handle(attrB);
+                CPPUNIT_ASSERT(!attrB.isOutOfCore());
+                CPPUNIT_ASSERT(!attrB.isUniform());
+            }
+
+            CPPUNIT_ASSERT(attrB.isUniform());
+        }
+
         // read in using delayed load and check implicit load through get()
         {
             AttributeArrayI attrB;

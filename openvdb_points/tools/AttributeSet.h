@@ -408,6 +408,7 @@ private:
     std::vector<NamePair>       mTypes;
     NameToPosMap                mGroupMap;
     MetaMap                     mMetadata;
+    int64_t                     mReserved[8];       // for future use
 }; // class Descriptor
 
 

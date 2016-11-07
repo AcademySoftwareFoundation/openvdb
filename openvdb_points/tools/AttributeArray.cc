@@ -177,6 +177,14 @@ AttributeArray::setHidden(bool state)
 
 
 void
+AttributeArray::setStreaming(bool state)
+{
+    if (state) mFlags |= Int16(STREAMING);
+    else mFlags &= ~Int16(STREAMING);
+}
+
+
+void
 AttributeArray::setConstantStride(bool state)
 {
     if (state) mFlags |= Int16(CONSTANTSTRIDE);
