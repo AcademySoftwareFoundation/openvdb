@@ -224,9 +224,10 @@ public:
     /// Replaces own descriptor with @a replacement
     void reorderAttributes(const DescriptorPtr& replacement);
 
-    /// Swap current descriptor with a @a replacement
+    /// Replace the current descriptor with a @a replacement
     /// Note the provided Descriptor must be identical to the replacement
-    void resetDescriptor(const DescriptorPtr& replacement);
+    /// unless @param allowMismatchingDescriptors is true (default is false)
+    void resetDescriptor(const DescriptorPtr& replacement, const bool allowMismatchingDescriptors = false);
 
     /// Read the entire set from a stream.
     void read(std::istream&);
