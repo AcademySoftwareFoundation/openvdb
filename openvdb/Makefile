@@ -380,6 +380,7 @@ INCLUDE_NAMES := \
     tools/VolumeToSpheres.h \
     tree/InternalNode.h \
     tree/Iterator.h \
+    tree/LeafBuffer.h \
     tree/LeafManager.h \
     tree/LeafNode.h \
     tree/LeafNodeBool.h \
