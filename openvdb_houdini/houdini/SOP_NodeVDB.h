@@ -177,6 +177,13 @@ private:
     /// @param index    the index of the input from which to perform this operation
     /// @param context  the current SOP context is used for cook time for network traversal
     bool isSourceStealable(const unsigned index, OP_Context& context) const;
+
+    // /// @brief Adds node specific info text for PointDataGrids to the stream provided
+    // ///
+    // /// @param infoStr  the output stream to add info text to
+    // /// @param grid     if a PointDataGrid, add info text to the stream
+    static void pointDataGridSpecificInfoText(std::ostream& infoStr,
+                                              const openvdb::GridBase& grid);
 };
 
 
