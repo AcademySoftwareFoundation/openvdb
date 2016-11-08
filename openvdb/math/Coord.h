@@ -243,6 +243,11 @@ private:
     Int32 mVec[3];
 }; // class Coord
 
+inline Coord
+Abs(const Coord& xyz)
+{
+    return Coord(Abs(xyz[0]), Abs(xyz[1]), Abs(xyz[2]));
+}    
 
 ////////////////////////////////////////
 
@@ -270,7 +275,7 @@ public:
         /// @note Stops a the last + 1 coordinate of the bounding box
         /// as defined by the template parameter.
         Iterator& operator++() {
-            ZYX ? this->next<2,1,0>() : this->next<0,1,2>();
+            ZYX ? this->next<2,1,0>() : this->next<0,1,2>();//resolved and inlined
             return *this;
         }
         /// @brief Return true if the iterator still points to a valid coordinate
@@ -282,7 +287,7 @@ public:
     private:
         template<size_t a, size_t b, size_t c>
         inline void next() {
-            if ( mPos[a] < mMax[a] )  {//by far this is the most common case
+            if ( mPos[a] < mMax[a] )  {// this is the most common case
                 ++mPos[a];
             } else if ( mPos[b] < mMax[b] )  {
                 mPos[a] = mMin[a];
@@ -300,6 +305,12 @@ public:
     CoordBBox(): mMin(Coord::max()), mMax(Coord::min()) {}
     /// @brief Construct a bounding box with the given @a min and @a max bounds.
     CoordBBox(const Coord& min, const Coord& max): mMin(min), mMax(max) {}
+    /// @brief Construct from individual components of the min and max bounds.
+    CoordBBox(ValueType x_min, ValueType y_min, ValueType z_min,
+              ValueType x_max, ValueType y_max, ValueType z_max)
+        : mMin(x_min, y_min, z_min), mMax(x_max, y_max, z_max)
+    {
+    }
     /// @brief Splitting constructor for use in TBB ranges
     /// @note The other bounding box is assumed to be divisible.
     CoordBBox(CoordBBox& other, const tbb::split&): mMin(other.mMin), mMax(other.mMax)
@@ -427,6 +438,23 @@ public:
     }
     /// Translate this bounding box by @f$(t_x, t_y, t_z)@f$.
     void translate(const Coord& t) { mMin += t; mMax += t; }
+
+    /// @brief Populates an array with the eight corner points of this bounding box.
+    /// @details The ordering of the corner points is lexicographic.
+    /// @warning It is assumed that the pointer can be incremented at
+    /// least seven times, i.e. has storage for eight Coord elements! 
+    void getCornerPoints(Coord *p) const
+    {
+        assert(p != NULL);
+        p->reset(mMin.x(), mMin.y(), mMin.z()); ++p;
+        p->reset(mMin.x(), mMin.y(), mMax.z()); ++p;
+        p->reset(mMin.x(), mMax.y(), mMin.z()); ++p;
+        p->reset(mMin.x(), mMax.y(), mMax.z()); ++p;
+        p->reset(mMax.x(), mMin.y(), mMin.z()); ++p;
+        p->reset(mMax.x(), mMin.y(), mMax.z()); ++p;
+        p->reset(mMax.x(), mMax.y(), mMin.z()); ++p;
+        p->reset(mMax.x(), mMax.y(), mMax.z());
+    }
 
     //@{
     /// @brief Bit-wise operations performed on both the min and max members

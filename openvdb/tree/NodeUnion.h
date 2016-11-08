@@ -99,7 +99,7 @@ public:
             this->setChild(other.getChild());
         } else {
             this->setValue(other.getValue());
-        } 
+        }
         return *this;
     }
     ~NodeUnionImpl() { this->setChild(NULL); }
@@ -116,8 +116,8 @@ public:
     ValueT& getValue() { return *mUnion.value; }
     void setValue(const ValueT& val)
     {
-        /// @todo To minimize storage across nodes, intern and reuse
-        /// common values, using, e.g., boost::flyweight.
+        /// @todo To minimize storage across nodes, intern and
+        /// reuse common values, using, e.g., boost::flyweight.
         if (!mHasChild) delete mUnion.value;
         mUnion.value = new ValueT(val);
         mHasChild = false;

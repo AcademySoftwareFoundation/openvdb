@@ -675,6 +675,24 @@ Min(const Type& a, const Type& b, const Type& c, const Type& d,
 template<typename Type>
 inline Type Exp(const Type& x) { return std::exp(x); }
 
+// ============> Sin <==================
+
+//@{
+/// Return @f$ sin(x) @f$.
+inline float Sin(const float& x) { return sinf(x); }
+
+inline double Sin(const double& x) { return sin(x); }
+//@}
+
+// ============> Cos <==================
+
+//@{
+/// Return @f$ cos(x) @f$.
+inline float Cos(const float& x) { return cosf(x); }
+
+inline double Cos(const double& x) { return cos(x); }
+//@}
+
 
 ////////////////////////////////////////
 

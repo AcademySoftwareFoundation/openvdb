@@ -423,7 +423,10 @@ ifeq (yes,$(has_log4cplus))
     INCLDIRS += $(CXXISYSTEM) $(LOG4CPLUS_INCL_DIR)
 endif
 
-CXXFLAGS += $(OPTIMIZE) $(INCLDIRS)
+CXXFLAGS += -std=c++0x
+
+CXXFLAGS += -pthread $(OPTIMIZE) $(INCLDIRS)
+
 ifeq (yes,$(has_blosc))
     CXXFLAGS += -DOPENVDB_USE_BLOSC
 endif

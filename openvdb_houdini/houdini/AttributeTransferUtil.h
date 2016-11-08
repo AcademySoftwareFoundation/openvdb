@@ -35,7 +35,7 @@
 #ifndef OPENVDB_HOUDINI_ATTRIBUTE_TRANSFER_UTIL_HAS_BEEN_INCLUDED
 #define OPENVDB_HOUDINI_ATTRIBUTE_TRANSFER_UTIL_HAS_BEEN_INCLUDED
 
-#include <openvdb_houdini/Utils.h>
+#include "Utils.h"
 
 #include <openvdb/openvdb.h>
 #include <openvdb/math/Proximity.h>

@@ -5,7 +5,7 @@
 
 @htmlonly <a name="v3_2_0_changes"></a>@endhtmlonly
 @par
-<B>Version 3.2.0</B> - <I>In development</I>
+<B>Version 3.2.0</B> - <I>August 10, 2016</I>
 
 @par
 Highlights:
@@ -16,7 +16,7 @@ Highlights:
   type and an efficient point to level set conversion scheme.
 - Optimizations: Faster volume to mesh conversion and threaded grid
   destruction, morphological dilation, csg operations and fracture tool.
-- New Houdini nodes: Segment, LOD and Topology To Level Set.
+- New Houdini nodes: Segment, LOD and Topology To Level Set.
 
 @par
 New features:
@@ -42,11 +42,11 @@ New features:
   modifying their input grids.
   These new tools are faster and use less memory than the existing tools
   (if only because the input grids never need to be deep-copied).
-- Added a threaded @vdblink::tools::dilateActiveValues dilateActiveValues()@endlink
+- Added a threaded @vdblink::tools::dilateActiveValues dilateActiveValues()@endlink
   tool with tile value support.
 - Added a @vdblink::tools::PointsToMask PointsToMask@endlink tool,
   which activates voxels that intersect points from a given list.
-- Added a new @link openvdb.h MaskGrid@endlink type that uses a single
+- Added a new @link openvdb.h MaskGrid@endlink type that uses a single
   bit-field to represent both voxel values and states for the
   @link tree/LeafNodeMask.h leafnode@endlink to reduce memory usage.
 - Added a @vdblink::tools::topologyToLevelSet() topologyToLevelSet@endlink tool
@@ -64,9 +64,13 @@ New features:
   @vdblink::tools::Dense Dense@endlink grid class.
 - Added the @vdblink::math::CoordBBox::Iterator CoordBBox::Iterator@endlink
   class to conveniently iterate over coordinates covered a CoordBBox.
-- Added bit-wise operations to the @vdblink::math::CoordBBox CoordBBox@endlink class.
-- Added a new @vdblink::tree::LeafManager LeafManager@endlink constructor to
-  create the structure from an existing array of leafnodes.
+- Added bit-wise operations to the @vdblink::math::CoordBBox CoordBBox@endlink
+  class.
+- New component wise constructor for the @vdblink::math::CoordBBox
+  CoordBBox@endlink class as well as the method
+  @vdblink::math::CoordBBox::getCornerPoints CoordBBox::getCornerPoints@endlink. 
+- Added a new @vdblink::tree::LeafManager LeafManager@endlink constructor to
+  create the structure from an existing array of leafnodes.
 - Added active tile count to @vdblink::tree::Tree::print Tree::print@endlink.
 - Added the templated @vdblink::math::MinMax MinMax@endlink class to compute the
   extrema of arbitrary value types.
@@ -81,7 +85,7 @@ Improvements:
   tile support and bool volume surfacing.
 - Improved the performance, parallel scaling and memory usage,
   of @vdblink::tools::LevelSetFracture tools::LevelSetFracture@endlink and
-  updated to use the new @vdblink::tools::segmentSDF() segmentSDF@endlink scheme.
+  updated to use the new @vdblink::tools::segmentSDF() segmentSDF@endlink scheme.
 - Improved the performance of
   @vdblink::tools::LevelSetAdvection tools::LevelSetAdvection@endlink by up to
   five times.
@@ -111,6 +115,8 @@ Improvements:
   method for faster bit processing.
 - @vdblink::tools::prune tools::prune@endlink performs an improved estimate
   of tile values by means of medians.
+- Added toggle to switch between cell centered and node centered transforms
+  to @vdblink::tools::PointPartitioner tools::PointPartitioner@endlink
 
 @par
 Bug fixes:
@@ -157,7 +163,7 @@ Bug fixes:
 - Fixed Windows build issues in unit tests.
   <I>[Contributed by Edward&nbsp;Lam and Steven&nbsp;Caron]</I>
 - Fixed @vdblink::math::isApproxZero() isApproxZero@endlink so that it works
-  correctly when tolerance is zero.
+  correctly when tolerance is zero.
   <I>[Reported by Joshua&nbsp;Olson]</I>
 - Fixed bugs in @vdblink::tree::NodeUnion NodeUnion@endlink that could cause
   crashes.
@@ -171,6 +177,13 @@ Bug fixes:
 - Fixed a bug in the @vdblink::tools::VolumeToMesh VolumeToMesh@endlink tool that
   produced artifacts for adaptive surface extraction on clipped level sets.
   <I>[Reported by Jeff&nbsp;Lait]</I>
+- Corrected empty grid background value in
+  @vdblink::tools::meshToVolume() mesh-to-volume converter@endlink
+  <I>[Contributed by Jeff&nbsp;Lait]</I>
+- Fixed a bug in @vdblink::tools::volumeToMesh volume-to-mesh converter@endlink
+  that could produce NaNs.<I>[Reported by Rick Hankins]</I>
+- Fixed a bug in the "Advect Points SOP" that could cause a crash when
+  the input grids were of incorrect type.<I>[Reported by SideFX]</I>
 
 @par
 API changes:
@@ -220,7 +233,16 @@ Houdini:
   <I>[Contributed by Fredrik&nbsp;Salomonsson]</I>
 - Fixed a bug in the Ray SOP whereby the distance attribute was created
   with the wrong data type. <I>[Contributed by Nick&nbsp;Avramoussis]</I>
+- The From Polygon SOP now allows the user to either specify the voxel 
+  count along an axis or the voxel size in world units (the only option
+  in the past).
 
+@par
+Known issues:
+- A vector Grid/Tree (or any Grid/Tree with a non-POD ValueType) is known to 
+  be slow to construct and delete! This performance issue is easy to fix, but 
+  since it introduces an ABI incompatibility it will have to go in a future
+  major release (most likely v4.0).
 
 @htmlonly <a name="v3_1_0_changes"></a>@endhtmlonly
 @par

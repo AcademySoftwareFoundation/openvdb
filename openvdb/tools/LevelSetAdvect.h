@@ -444,7 +444,7 @@ sampleField(ValueType time0, ValueType time1)
     } else {
         mTask = boost::bind(&Advect::sampleXformed, _1, _2, time0, time1);
     }
-    assert(voxelCount != mParent.mTracker.grid().activeVoxelCount());
+    assert(voxelCount == mParent.mTracker.grid().activeVoxelCount());
     mVelocity = new VectorType[ voxelCount ];
     this->cook("Sampling advection field");
 

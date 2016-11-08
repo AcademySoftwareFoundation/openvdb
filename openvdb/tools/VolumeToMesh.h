@@ -47,10 +47,12 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/type_traits/is_scalar.hpp>
 #include <boost/utility/enable_if.hpp>
+#include <boost/math/special_functions/fpclassify.hpp> // for isfinite
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
+#include <tbb/task_scheduler_init.h>
 
 #include <map>
 #include <memory> // for auto_ptr/unique_ptr
@@ -89,12 +91,14 @@ volumeToMesh(
 
 /// @brief Adaptively mesh any scalar grid that has a continuous isosurface.
 ///
-/// @param grid         a scalar grid to mesh
-/// @param points       output list of world space points
-/// @param triangles    output triangle index list
-/// @param quads        output quad index list
-/// @param isovalue     determines which isosurface to mesh
-/// @param adaptivity   surface adaptivity threshold [0 to 1]
+/// @param grid                       a scalar grid to mesh
+/// @param points                     output list of world space points
+/// @param triangles                  output triangle index list
+/// @param quads                      output quad index list
+/// @param isovalue                   determines which isosurface to mesh
+/// @param adaptivity                 surface adaptivity threshold [0 to 1]
+/// @param relaxDisorientedTriangles  toggle relaxing disoriented triangles during
+///                                   adaptive meshing.
 ///
 /// @throw TypeError if @a grid does not have a scalar value type
 template<typename GridType>
@@ -105,14 +109,15 @@ volumeToMesh(
     std::vector<Vec3I>& triangles,
     std::vector<Vec4I>& quads,
     double isovalue = 0.0,
-    double adaptivity = 0.0);
+    double adaptivity = 0.0,
+    bool relaxDisorientedTriangles = true);
 
 
 ////////////////////////////////////////
 
 
 /// @brief Polygon flags, used for reference based meshing.
-enum { POLYFLAG_EXTERIOR = 0x1, POLYFLAG_FRACTURE_SEAM = 0x2,  POLYFLAG_SUBDIVIDED = 0x4};
+enum { POLYFLAG_EXTERIOR = 0x1, POLYFLAG_FRACTURE_SEAM = 0x2,  POLYFLAG_SUBDIVIDED = 0x4 };
 
 
 /// @brief Collection of quads and triangles
@@ -122,7 +127,6 @@ public:
 
     inline PolygonPool();
     inline PolygonPool(const size_t numQuads, const size_t numTriangles);
-
 
     inline void copy(const PolygonPool& rhs);
 
@@ -187,9 +191,11 @@ typedef boost::scoped_array<PolygonPool>        PolygonPoolList;
 struct VolumeToMesh
 {
 
-    /// @param isovalue         Determines which isosurface to mesh.
-    /// @param adaptivity       Adaptivity threshold [0 to 1]
-    VolumeToMesh(double isovalue = 0, double adaptivity = 0);
+    /// @param isovalue                   Determines which isosurface to mesh.
+    /// @param adaptivity                 Adaptivity threshold [0 to 1]
+    /// @param relaxDisorientedTriangles  Toggle relaxing disoriented triangles during
+    ///                                   adaptive meshing.
+    VolumeToMesh(double isovalue = 0, double adaptivity = 0, bool relaxDisorientedTriangles = true);
 
     //////////
 
@@ -273,7 +279,7 @@ private:
 
     TreeBase::Ptr mRefSignTree, mRefIdxTree;
 
-    bool mInvertSurfaceMask;
+    bool mInvertSurfaceMask, mRelaxDisorientedTriangles;
 
     boost::scoped_array<uint32_t> mQuantizedSeamPoints;
     std::vector<uint8_t> mPointFlags;
@@ -399,6 +405,33 @@ struct UniquePtr
     typedef std::auto_ptr<T>    type;
 #endif
 };
+
+
+template<typename ValueType>
+struct FillArray
+{
+    FillArray(ValueType* array, const ValueType& v) : mArray(array), mValue(v) { }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const {
+        const ValueType v = mValue;
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+            mArray[n] = v;
+        }
+    }
+
+    ValueType * const mArray;
+    const ValueType mValue;
+};
+
+
+template<typename ValueType>
+inline void
+fillArray(ValueType* array, const ValueType& val, const size_t length)
+{
+    const size_t grainSize = length / tbb::task_scheduler_init::default_num_threads();
+    const tbb::blocked_range<size_t> range(0, length, grainSize);
+    tbb::parallel_for(range, FillArray<ValueType>(array, val), tbb::simple_partitioner());
+}
 
 
 /// @brief  Bit-flags used to classify cells.
@@ -598,6 +631,13 @@ unpackPoint(uint32_t data)
 /// @}
 
 ////////////////////////////////////////
+
+template<typename T>
+inline bool isBoolValue() { return false; }
+
+template<>
+inline bool isBoolValue<bool>() { return true; }
+
 
 
 template<typename T>
@@ -1645,6 +1685,16 @@ ComputePoints<InputTreeType>::operator()(const tbb::blocked_range<size_t>& range
             for (size_t i = 0, I = points.size(); i < I; ++i) {
 
                 Vec3d& point = points[i];
+
+                // Checks for both NaN and inf vertex positions, i.e. any value that is not finite.
+                if (!boost::math::isfinite(point[0]) ||
+                    !boost::math::isfinite(point[1]) ||
+                    !boost::math::isfinite(point[2])) {
+                    OPENVDB_THROW(ValueError, "VolumeToMesh encountered NaNs or infs in the input VDB!"
+                                  " Hint: Check the input and consider using the \"Diagnostics\" tool "
+                                  "to detect and resolve the NaNs.");
+                }
+                
                 point += xyz;
                 point = mTransform.indexToWorld(point);
 
@@ -2084,7 +2134,8 @@ struct MergeVoxelRegions
         const std::vector<Index32LeafNodeType*>& pointIndexLeafNodes,
         const std::vector<Int16LeafNodeType*>& signFlagsLeafNodes,
         InputValueType iso,
-        float adaptivity);
+        float adaptivity,
+        bool invertSurfaceOrientation);
 
     void setSpatialAdaptivity(const FloatGridType& grid)
     {
@@ -2115,6 +2166,7 @@ private:
 
     InputValueType mIsovalue;
     float mSurfaceAdaptivity, mInternalAdaptivity;
+    bool mInvertSurfaceOrientation;
 
     FloatTreeType               const *       mSpatialAdaptivityTree;
     BoolTreeType                const *       mMaskTree;
@@ -2130,7 +2182,8 @@ MergeVoxelRegions<InputGridType>::MergeVoxelRegions(
     const std::vector<Index32LeafNodeType*>& pointIndexLeafNodes,
     const std::vector<Int16LeafNodeType*>& signFlagsLeafNodes,
     InputValueType iso,
-    float adaptivity)
+    float adaptivity,
+    bool invertSurfaceOrientation)
     : mInputTree(&inputGrid.tree())
     , mInputTransform(&inputGrid.transform())
     , mPointIndexTree(&pointIndexTree)
@@ -2139,6 +2192,7 @@ MergeVoxelRegions<InputGridType>::MergeVoxelRegions(
     , mIsovalue(iso)
     , mSurfaceAdaptivity(adaptivity)
     , mInternalAdaptivity(adaptivity)
+    , mInvertSurfaceOrientation(invertSurfaceOrientation)
     , mSpatialAdaptivityTree(NULL)
     , mMaskTree(NULL)
     , mRefSignFlagsTree(NULL)
@@ -2179,7 +2233,10 @@ MergeVoxelRegions<InputGridType>::operator()(const tbb::blocked_range<size_t>& r
     Index32TreeAccessor pointIndexAcc(*mPointIndexTree);
 
     BoolLeafNodeType mask;
-    Vec3sLeafNodeType gradients;
+
+    const bool invertGradientDir = mInvertSurfaceOrientation || isBoolValue<InputValueType>();
+    boost::scoped_ptr<Vec3sLeafNodeType> gradientNode;
+
     Coord ijk, end;
     const int LeafDim = InputLeafNodeType::DIM;
 
@@ -2209,15 +2266,20 @@ MergeVoxelRegions<InputGridType>::operator()(const tbb::blocked_range<size_t>& r
         float adaptivity = (refSignFlagsAcc && !refSignFlagsAcc->probeConstLeaf(origin)) ?
             mInternalAdaptivity : mSurfaceAdaptivity;
 
+        bool useGradients = adaptivity < 1.0f;
+
         // Set region adaptivity
         FloatLeafNodeType adaptivityLeaf(origin, adaptivity);
 
         if (spatialAdaptivityAcc) {
+            useGradients = false;
             for (Index offset = 0; offset < FloatLeafNodeType::NUM_VALUES; ++offset) {
                 ijk = adaptivityLeaf.offsetToGlobalCoord(offset);
                 ijk = mSpatialAdaptivityTransform->worldToIndexCellCentered(mInputTransform->indexToWorld(ijk));
                 float weight = spatialAdaptivityAcc->getValue(ijk);
-                adaptivityLeaf.setValueOnly(offset, weight * adaptivity);
+                float adaptivityValue = weight * adaptivity;
+                if (adaptivityValue < 1.0f) useGradients = true;
+                adaptivityLeaf.setValueOnly(offset, adaptivityValue);
             }
         }
 
@@ -2287,13 +2349,27 @@ MergeVoxelRegions<InputGridType>::operator()(const tbb::blocked_range<size_t>& r
         }
 
         // Compute the gradient for the remaining voxels
-        gradients.setValuesOff();
-        for (typename Int16LeafNodeType::ValueOnCIter it = signFlagsNode.cbeginValueOn(); it; ++it) {
-            ijk = it.getCoord();
-            if (!mask.isValueOn(ijk & ~1u)) {
-                Vec3sType dir(math::ISGradient<math::CD_2ND>::result(inputAcc, ijk));
-                dir.normalize();
-                gradients.setValueOn(it.pos(), dir);
+
+        if (useGradients) {
+
+            if (gradientNode) {
+                gradientNode->setValuesOff();
+            } else {
+                gradientNode.reset(new Vec3sLeafNodeType());
+            }
+
+            for (typename Int16LeafNodeType::ValueOnCIter it = signFlagsNode.cbeginValueOn(); it; ++it) {
+                ijk = it.getCoord();
+                if (!mask.isValueOn(ijk & ~1u)) {
+                    Vec3sType dir(math::ISGradient<math::CD_2ND>::result(inputAcc, ijk));
+                    dir.normalize();
+
+                    if (invertGradientDir) {
+                        dir = -dir;
+                    }
+
+                    gradientNode->setValueOn(it.pos(), dir);
+                }
             }
         }
 
@@ -2308,7 +2384,7 @@ MergeVoxelRegions<InputGridType>::operator()(const tbb::blocked_range<size_t>& r
                         adaptivity = adaptivityLeaf.getValue(ijk);
 
                         if (mask.isValueOn(ijk) || isNonManifold(inputAcc, ijk, mIsovalue, dim)
-                            || !isMergable(gradients, ijk, dim, adaptivity)) {
+                            || (useGradients && !isMergable(*gradientNode, ijk, dim, adaptivity)) ) {
                             mask.setActiveState(ijk & coordMask, true);
                         } else {
                             mergeVoxels(pointIndexNode, ijk, dim, regionId++);
@@ -2463,7 +2539,7 @@ private:
 
 template<typename SignAccT, typename IdxAccT, typename PrimBuilder>
 inline void
-constructPolygons(Int16 flags, Int16 refFlags, const Vec3i& offsets, const Coord& ijk,
+constructPolygons(bool invertSurfaceOrientation, Int16 flags, Int16 refFlags, const Vec3i& offsets, const Coord& ijk,
     const SignAccT& signAcc, const IdxAccT& idxAcc, PrimBuilder& mesher)
 {
     typedef typename IdxAccT::ValueType IndexType;
@@ -2476,7 +2552,10 @@ constructPolygons(Int16 flags, Int16 refFlags, const Vec3i& offsets, const Coord
     tag[0] = (flags & SEAM) ? POLYFLAG_FRACTURE_SEAM : 0;
     tag[1] = tag[0] | char(POLYFLAG_EXTERIOR);
 
-    const bool isInside = flags & INSIDE;
+    bool isInside = flags & INSIDE;
+
+    isInside = invertSurfaceOrientation ? !isInside : isInside;
+
     Coord coord = ijk;
     math::Vec4<IndexType> quad(0,0,0,0);
 
@@ -3212,6 +3291,7 @@ IdentifyIntersectingVoxels<InputTreeType>::IdentifyIntersectingVoxels(
     , mIntersectionAccessor(mIntersectionTree) // use local tree.
     , mOffsetData()
     , mOffsets(rhs.mOffsets) // reference data from main instance.
+    , mIsovalue(rhs.mIsovalue)
 {
 }
 
@@ -3963,7 +4043,8 @@ struct ComputePolygons
         const std::vector<Int16LeafNodeType*>& signFlagsLeafNodes,
         const Int16TreeType& signFlagsTree,
         const Index32TreeType& idxTree,
-        PolygonPoolList& polygons);
+        PolygonPoolList& polygons,
+        bool invertSurfaceOrientation);
 
     void setRefSignTree(const Int16TreeType * r) { mRefSignFlagsTree = r; }
 
@@ -3975,6 +4056,7 @@ private:
     Int16TreeType       const *       mRefSignFlagsTree;
     Index32TreeType     const * const mIndexTree;
     PolygonPoolList           * const mPolygonPoolList;
+    bool                        const mInvertSurfaceOrientation;
 }; // struct ComputePolygons
 
 
@@ -3983,12 +4065,14 @@ ComputePolygons<TreeType, PrimBuilder>::ComputePolygons(
     const std::vector<Int16LeafNodeType*>& signFlagsLeafNodes,
     const Int16TreeType& signFlagsTree,
     const Index32TreeType& idxTree,
-    PolygonPoolList& polygons)
+    PolygonPoolList& polygons,
+    bool invertSurfaceOrientation)
     : mSignFlagsLeafNodes(signFlagsLeafNodes.empty() ? NULL : &signFlagsLeafNodes.front())
     , mSignFlagsTree(&signFlagsTree)
     , mRefSignFlagsTree(NULL)
     , mIndexTree(&idxTree)
     , mPolygonPoolList(&polygons)
+    , mInvertSurfaceOrientation(invertSurfaceOrientation)
 {
 }
 
@@ -4000,6 +4084,8 @@ ComputePolygons<InputTreeType, PrimBuilder>::operator()(const tbb::blocked_range
     Int16ValueAccessor signAcc(*mSignFlagsTree);
 
     tree::ValueAccessor<const Index32TreeType> idxAcc(*mIndexTree);
+
+    const bool invertSurfaceOrientation = mInvertSurfaceOrientation;
 
     PrimBuilder mesher;
     size_t edgeCount;
@@ -4063,9 +4149,11 @@ ComputePolygons<InputTreeType, PrimBuilder>::operator()(const tbb::blocked_range
             }
 
             if (ijk[0] > origin[0] && ijk[1] > origin[1] && ijk[2] > origin[2]) {
-                constructPolygons(flags, refFlags, offsets, ijk, *signleafPt, *idxLeafPt, mesher);
+                constructPolygons(invertSurfaceOrientation,
+                    flags, refFlags, offsets, ijk, *signleafPt, *idxLeafPt, mesher);
             } else {
-                constructPolygons(flags, refFlags, offsets, ijk, signAcc, idxAcc, mesher);
+                constructPolygons(invertSurfaceOrientation,
+                    flags, refFlags, offsets, ijk, signAcc, idxAcc, mesher);
             }
         }
 
@@ -4416,6 +4504,159 @@ reviseSeamLineFlags(PolygonPoolList& polygonPoolList, size_t polygonPoolListSize
 }
 
 
+////////////////////////////////////////
+
+
+template<typename InputTreeType>
+struct MaskDisorientedTrianglePoints
+{
+    MaskDisorientedTrianglePoints(const InputTreeType& inputTree, const PolygonPoolList& polygons,
+        const PointList& pointList, boost::scoped_array<uint8_t>& pointMask,
+        const math::Transform& transform, bool invertSurfaceOrientation)
+        : mInputTree(&inputTree)
+        , mPolygonPoolList(&polygons)
+        , mPointList(&pointList)
+        , mPointMask(pointMask.get())
+        , mTransform(transform)
+        , mInvertSurfaceOrientation(invertSurfaceOrientation)
+    {
+    }
+
+    void operator()(const tbb::blocked_range<size_t>& range) const
+    {
+        typedef typename InputTreeType::LeafNodeType::ValueType ValueType;
+
+        tree::ValueAccessor<const InputTreeType> inputAcc(*mInputTree);
+        Vec3s centroid, normal;
+        Coord ijk;
+
+        const bool invertGradientDir = mInvertSurfaceOrientation || isBoolValue<ValueType>();
+
+        for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
+
+            const PolygonPool& polygons = (*mPolygonPoolList)[n];
+
+            for (size_t i = 0, I = polygons.numTriangles(); i < I; ++i) {
+
+                const Vec3I& verts = polygons.triangle(i);
+
+                const Vec3s& v0 = (*mPointList)[verts[0]];
+                const Vec3s& v1 = (*mPointList)[verts[1]];
+                const Vec3s& v2 = (*mPointList)[verts[2]];
+
+                normal = (v2 - v0).cross((v1 - v0));
+                normal.normalize();
+
+                centroid = (v0 + v1 + v2) * (1.0f / 3.0f);
+                ijk = mTransform.worldToIndexCellCentered(centroid);
+
+                Vec3s dir( math::ISGradient<math::CD_2ND>::result(inputAcc, ijk) );
+                dir.normalize();
+
+                if (invertGradientDir) {
+                    dir = -dir;
+                }
+
+                // check if the angle is obtuse
+                if (dir.dot(normal) < -0.5f) {
+                    // Concurrent writes to same memory address can occur, but
+                    // all threads are writing the same value and char is atomic.
+                    // (It is extremely rare that disoriented triangles share points,
+                    // false sharing related performance impacts are not a concern.)
+                    mPointMask[verts[0]] = 1;
+                    mPointMask[verts[1]] = 1;
+                    mPointMask[verts[2]] = 1;
+                }
+
+            } // end triangle loop
+
+        } // end polygon pool loop
+    }
+
+private:
+    InputTreeType   const * const mInputTree;
+    PolygonPoolList const * const mPolygonPoolList;
+    PointList       const * const mPointList;
+    uint8_t               * const mPointMask;
+    math::Transform         const mTransform;
+    bool                    const mInvertSurfaceOrientation;
+}; // struct MaskDisorientedTrianglePoints
+
+
+template<typename InputTree>
+inline void
+relaxDisorientedTriangles(
+    bool invertSurfaceOrientation,
+    const InputTree& inputTree,
+    const math::Transform& transform,
+    PolygonPoolList& polygonPoolList,
+    size_t polygonPoolListSize,
+    PointList& pointList,
+    const size_t pointListSize)
+{
+    const tbb::blocked_range<size_t> polygonPoolListRange(0, polygonPoolListSize);
+
+    boost::scoped_array<uint8_t> pointMask(new uint8_t[pointListSize]);
+    fillArray(pointMask.get(), uint8_t(0), pointListSize);
+
+    tbb::parallel_for(polygonPoolListRange,
+        MaskDisorientedTrianglePoints<InputTree>(
+            inputTree, polygonPoolList, pointList, pointMask, transform, invertSurfaceOrientation));
+
+    boost::scoped_array<uint8_t> pointUpdates(new uint8_t[pointListSize]);
+    fillArray(pointUpdates.get(), uint8_t(0), pointListSize);
+
+    boost::scoped_array<Vec3s> newPoints(new Vec3s[pointListSize]);
+    fillArray(newPoints.get(), Vec3s(0.0f, 0.0f, 0.0f), pointListSize);
+
+    for (size_t n = 0, N = polygonPoolListSize; n < N; ++n) {
+
+        PolygonPool& polygons = polygonPoolList[n];
+
+        for (size_t i = 0, I = polygons.numQuads(); i < I; ++i) {
+            openvdb::Vec4I& verts = polygons.quad(i);
+
+            for (int v = 0; v < 4; ++v) {
+
+                const unsigned pointIdx = verts[v];
+
+                if (pointMask[pointIdx] == 1) {
+
+                    newPoints[pointIdx] +=
+                        pointList[verts[0]] + pointList[verts[1]] +
+                        pointList[verts[2]] + pointList[verts[3]];
+
+                    pointUpdates[pointIdx] = uint8_t(pointUpdates[pointIdx] + 4);
+                }
+            }
+        }
+
+        for (size_t i = 0, I = polygons.numTriangles(); i < I; ++i) {
+            openvdb::Vec3I& verts = polygons.triangle(i);
+
+            for (int v = 0; v < 3; ++v) {
+
+                const unsigned pointIdx = verts[v];
+
+                if (pointMask[pointIdx] == 1) {
+                    newPoints[pointIdx] +=
+                        pointList[verts[0]] + pointList[verts[1]] + pointList[verts[2]];
+
+                    pointUpdates[pointIdx] = uint8_t(pointUpdates[pointIdx] + 3);
+                }
+            }
+        }
+    }
+
+    for (size_t n = 0, N = pointListSize; n < N; ++n) {
+        if (pointUpdates[n] > 0) {
+            const double weight = 1.0 / double(pointUpdates[n]);
+            pointList[n] = newPoints[n] * float(weight);
+        }
+    }
+}
+
+
 } // volume_to_mesh_internal namespace
 
 
@@ -4561,7 +4802,7 @@ PolygonPool::trimTrinagles(const size_t n, bool reallocate)
 ////////////////////////////////////////
 
 
-inline VolumeToMesh::VolumeToMesh(double isovalue, double adaptivity)
+inline VolumeToMesh::VolumeToMesh(double isovalue, double adaptivity, bool relaxDisorientedTriangles)
     : mPoints(NULL)
     , mPolygons()
     , mPointListSize(0)
@@ -4577,6 +4818,7 @@ inline VolumeToMesh::VolumeToMesh(double isovalue, double adaptivity)
     , mRefSignTree(TreeBase::Ptr())
     , mRefIdxTree(TreeBase::Ptr())
     , mInvertSurfaceMask(false)
+    , mRelaxDisorientedTriangles(relaxDisorientedTriangles)
     , mQuantizedSeamPoints(NULL)
     , mPointFlags(0)
 {
@@ -4695,12 +4937,28 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
     typedef typename Index32TreeType::LeafNodeType                          Index32LeafNodeType;
 
 
+    // clear old data
+
+    mPointListSize = 0;
+    mPoints.reset();
+    mPolygonPoolListSize = 0;
+    mPolygons.reset();
+    mPointFlags.clear();
+
+
     // settings
 
     const math::Transform& transform = inputGrid.transform();
     const InputValueType isovalue = InputValueType(mIsovalue);
     const float adaptivityThreshold = float(mPrimAdaptivity);
     const bool adaptive = mPrimAdaptivity > 1e-7 || mSecAdaptivity > 1e-7;
+
+    // The default surface orientation is setup for level set and bool/mask grids.
+    // Boolean grids are handled correctly by their value type.  Signed distance fields,
+    // unsigned distance fields and fog volumes have the same value type but use different
+    // inside value classifications.
+    const bool invertSurfaceOrientation = !volume_to_mesh_internal::isBoolValue<InputValueType>() &&
+        inputGrid.getGridClass() != openvdb::GRID_LEVEL_SET;
 
 
     // references, masks and auxiliary data
@@ -4726,6 +4984,8 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
 
     volume_to_mesh_internal::applySurfaceMask(
         intersectionTree, adaptivityMask, inputGrid, mSurfaceMaskGrid, mInvertSurfaceMask, isovalue);
+
+    if (intersectionTree.empty()) return;
 
     volume_to_mesh_internal::computeAuxiliaryData(
          signFlagsTree, pointIndexTree, intersectionTree, inputTree, isovalue);
@@ -4845,7 +5105,7 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
     if (adaptive) {
 
         volume_to_mesh_internal::MergeVoxelRegions<InputGridType> mergeOp(inputGrid, pointIndexTree,
-            pointIndexLeafNodes, signFlagsLeafNodes, isovalue, adaptivityThreshold);
+            pointIndexLeafNodes, signFlagsLeafNodes, isovalue, adaptivityThreshold, invertSurfaceOrientation);
 
         if (mAdaptivityGrid && mAdaptivityGrid->type() == FloatGridType::gridType()) {
             const FloatGridType * adaptivityGrid = static_cast<const FloatGridType*>(mAdaptivityGrid.get());
@@ -4917,7 +5177,7 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
         typedef volume_to_mesh_internal::AdaptivePrimBuilder PrimBuilder;
 
         volume_to_mesh_internal::ComputePolygons<Int16TreeType, PrimBuilder>
-            op(signFlagsLeafNodes, signFlagsTree, pointIndexTree, mPolygons);
+            op(signFlagsLeafNodes, signFlagsTree, pointIndexTree, mPolygons, invertSurfaceOrientation);
 
         if (referenceMeshing) {
             op.setRefSignTree(refSignFlagsTree);
@@ -4930,7 +5190,7 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
         typedef volume_to_mesh_internal::UniformPrimBuilder PrimBuilder;
 
         volume_to_mesh_internal::ComputePolygons<Int16TreeType, PrimBuilder>
-            op(signFlagsLeafNodes, signFlagsTree, pointIndexTree, mPolygons);
+            op(signFlagsLeafNodes, signFlagsTree, pointIndexTree, mPolygons, invertSurfaceOrientation);
 
         if (referenceMeshing) {
             op.setRefSignTree(refSignFlagsTree);
@@ -4939,12 +5199,24 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
         tbb::parallel_for(auxiliaryLeafNodeRange, op);
     }
 
+
+    signFlagsTree.clear();
+    pointIndexTree.clear();
+
+
+    if (adaptive && mRelaxDisorientedTriangles) {
+        volume_to_mesh_internal::relaxDisorientedTriangles(invertSurfaceOrientation,
+            inputTree, transform, mPolygons, mPolygonPoolListSize, mPoints, mPointListSize);
+    }
+
+
     if (referenceMeshing) {
         volume_to_mesh_internal::subdivideNonplanarSeamLineQuads(
             mPolygons, mPolygonPoolListSize, mPoints, mPointListSize, mPointFlags);
 
         volume_to_mesh_internal::reviseSeamLineFlags(mPolygons, mPolygonPoolListSize, mPointFlags);
     }
+
 }
 
 
@@ -4960,9 +5232,10 @@ doVolumeToMesh(
     std::vector<Vec3I>& triangles,
     std::vector<Vec4I>& quads,
     double isovalue,
-    double adaptivity)
+    double adaptivity,
+    bool relaxDisorientedTriangles)
 {
-    VolumeToMesh mesher(isovalue, adaptivity);
+    VolumeToMesh mesher(isovalue, adaptivity, relaxDisorientedTriangles);
     mesher(grid);
 
     // Preallocate the point list
@@ -5015,7 +5288,8 @@ doVolumeToMesh(
     std::vector<Vec3I>&,
     std::vector<Vec4I>&,
     double,
-    double)
+    double,
+    bool)
 {
     OPENVDB_THROW(TypeError, "volume to mesh conversion is supported only for scalar grids");
 }
@@ -5029,9 +5303,10 @@ volumeToMesh(
     std::vector<Vec3I>& triangles,
     std::vector<Vec4I>& quads,
     double isovalue,
-    double adaptivity)
+    double adaptivity,
+    bool relaxDisorientedTriangles)
 {
-    doVolumeToMesh(grid, points, triangles, quads, isovalue, adaptivity);
+    doVolumeToMesh(grid, points, triangles, quads, isovalue, adaptivity, relaxDisorientedTriangles);
 }
 
 
@@ -5044,7 +5319,7 @@ volumeToMesh(
     double isovalue)
 {
     std::vector<Vec3I> triangles;
-    doVolumeToMesh(grid, points, triangles, quads, isovalue, 0.0);
+    doVolumeToMesh(grid, points, triangles, quads, isovalue, 0.0, true);
 }
 
 
