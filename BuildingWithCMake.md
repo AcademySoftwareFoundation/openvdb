@@ -91,6 +91,39 @@ cmake \
     -G "Eclipse CDT4 - Unix Makefiles" \
     ../nyue_openvdb_git
 ```
+### Build Maya Node
+```{r, engine='bash', count_lines}
+#!/bin/sh
+rm -f CMakeCache.txt
+export ILMBASE_ROOT=$RHOME/Systems/OpenEXR/v2.2.0
+export OPENEXR_ROOT=$RHOME/Systems/OpenEXR/v2.2.0
+export BOOST_ROOT=$RHOME/Systems/boost/v1.61.0
+export GLFW3_ROOT=$RHOME/Systems/glfw/v3.2.1
+export BLOSC_ROOT=$RHOME/Systems/c-blosc/v1.7.0
+export CPPUNIT_ROOT=$RHOME/Systems-gcc48/cppunit/v1.10.2
+export MAYA_LOCATION=/sw/external/autodesk/maya2016-sp5-x64
+export TBB_ROOT=$MAYA_LOCATION
+cmake \
+    -D Tbb_TBB_LIBRARY=$MAYA_LOCATION/lib/libtbb.so \
+    -D Tbb_TBBMALLOC_LIBRARY=$MAYA_LOCATION/lib/libtbbmalloc.so \
+    -D OPENVDB_ENABLE_3_ABI_COMPATIBLE=ON \
+    -D OPENVDB_BUILD_MAYA_PLUGIN=ON \
+    -D OPENVDB_ENABLE_RPATH=ON \
+    -D PYTHON_LIBRARY=/sw/external/COS6/python/2.6.4/lib/libpython2.6.so \
+    -D PYTHON_INCLUDE_DIR=/sw/external/COS6/python/2.6.4/include/python2.6 \
+    -D CMAKE_CXX_COMPILER=/sw/external/COS6/gcc/4.8.2/bin/g++ \
+    -D CMAKE_C_COMPILER=/sw/external/COS6/gcc/4.8.2/bin/gcc \
+    -D CMAKE_CXX_FLAGS=-std=c++11 \
+    -D MINIMUM_BOOST_VERSION=1.52 \
+    -D ILMBASE_NAMESPACE_VERSIONING=OFF \
+    -D OPENEXR_NAMESPACE_VERSIONING=OFF \
+    -D USE_GLFW3=ON \
+    -D Boost_USE_STATIC_LIBS=ON \
+    -D Blosc_USE_STATIC_LIBS=ON \
+    -D CPPUnit_USE_STATIC_LIBS=ON \
+    -D CMAKE_INSTALL_PREFIX=$RHOME/Systems-gcc48/OpenVDB/4.0.0 \
+    ../nyue_openvdb_git
+```
 
 
 ## Windows - Visual Studio 2015 x64
