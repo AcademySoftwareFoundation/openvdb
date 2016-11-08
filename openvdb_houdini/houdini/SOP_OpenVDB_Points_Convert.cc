@@ -43,7 +43,7 @@
 #include <openvdb/points/PointGroup.h>
 
 #include "Utils.h"
-#include "SOP_NodeVDBPoints.h"
+#include "SOP_NodeVDB.h"
 #include "PointUtils.h"
 
 #include <houdini_utils/geometry.h>
@@ -703,7 +703,7 @@ convertGlobalMetadataToHoudini(GU_Detail& detail, const openvdb::MetaMap& metaMa
 ////////////////////////////////////////
 
 
-class SOP_OpenVDB_Points_Convert: public hvdb::SOP_NodeVDBPoints
+class SOP_OpenVDB_Points_Convert: public hvdb::SOP_NodeVDB
 {
 public:
     enum { TRANSFORM_TARGET_POINTS = 0, TRANSFORM_VOXEL_SIZE, TRANSFORM_REF_GRID };
@@ -1003,7 +1003,7 @@ SOP_OpenVDB_Points_Convert::factory(OP_Network* net,
 
 SOP_OpenVDB_Points_Convert::SOP_OpenVDB_Points_Convert(OP_Network* net,
     const char* name, OP_Operator* op)
-    : hvdb::SOP_NodeVDBPoints(net, name, op)
+    : hvdb::SOP_NodeVDB(net, name, op)
     , mBoss("Converting points")
 {
 }

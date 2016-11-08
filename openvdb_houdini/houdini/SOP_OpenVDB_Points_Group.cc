@@ -39,7 +39,7 @@
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointGroup.h>
 
-#include "SOP_NodeVDBPoints.h"
+#include "SOP_NodeVDB.h"
 #include "PointUtils.h"
 
 #include <openvdb_houdini/Utils.h>
@@ -98,7 +98,7 @@ struct GroupParms {
 ////////////////////////////////////////
 
 
-class SOP_OpenVDB_Points_Group: public hvdb::SOP_NodeVDBPoints
+class SOP_OpenVDB_Points_Group: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Points_Group(OP_Network*, const char* name, OP_Operator*);
@@ -352,7 +352,7 @@ SOP_OpenVDB_Points_Group::factory(OP_Network* net,
 
 SOP_OpenVDB_Points_Group::SOP_OpenVDB_Points_Group(OP_Network* net,
     const char* name, OP_Operator* op)
-    : hvdb::SOP_NodeVDBPoints(net, name, op)
+    : hvdb::SOP_NodeVDB(net, name, op)
 {
 }
 

@@ -41,7 +41,7 @@
 
 #include <openvdb/tools/LevelSetUtil.h> // sdfInteriorMask
 
-#include "SOP_NodeVDBPoints.h"
+#include "SOP_NodeVDB.h"
 
 #include <openvdb_houdini/Utils.h>
 #include <houdini_utils/geometry.h>
@@ -58,7 +58,7 @@ namespace hutil = houdini_utils;
 ////////////////////////////////////////
 
 
-class SOP_OpenVDB_Load: public hvdb::SOP_NodeVDBPoints
+class SOP_OpenVDB_Load: public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Load(OP_Network*, const char* name, OP_Operator*);
@@ -138,7 +138,7 @@ SOP_OpenVDB_Load::factory(OP_Network* net,
 
 SOP_OpenVDB_Load::SOP_OpenVDB_Load(OP_Network* net,
     const char* name, OP_Operator* op)
-    : hvdb::SOP_NodeVDBPoints(net, name, op)
+    : hvdb::SOP_NodeVDB(net, name, op)
 {
 }
 
