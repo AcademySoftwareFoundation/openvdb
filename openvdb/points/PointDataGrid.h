@@ -288,14 +288,14 @@ public:
     /// Construct using supplied origin, value and active status
     explicit
     PointDataLeafNode(const Coord& coords, const T& value = zeroVal<T>(), bool active = false)
-        : BaseLeaf(coords, value, active)
-        , mAttributeSet(new AttributeSet) { }
+        : BaseLeaf(coords, zeroVal<T>(), active)
+        , mAttributeSet(new AttributeSet) { assertNonModifiableUnlessZero(value); }
 
     /// Construct using supplied origin, value and active status
     /// use attribute map from another PointDataLeafNode
     PointDataLeafNode(const PointDataLeafNode& other, const Coord& coords, const T& value = zeroVal<T>(), bool active = false)
-        : BaseLeaf(coords, value, active)
-        , mAttributeSet(new AttributeSet(*other.mAttributeSet)) { }
+        : BaseLeaf(coords, zeroVal<T>(), active)
+        , mAttributeSet(new AttributeSet(*other.mAttributeSet)) { assertNonModifiableUnlessZero(value); }
 
     // Copy-construct from a PointIndexLeafNode with the same configuration but a different ValueType.
     template<typename OtherValueType>
@@ -306,9 +306,9 @@ public:
     // Copy-construct from a LeafNode with the same configuration but a different ValueType.
     // Used for topology copies - explicitly sets the value (background) to zeroVal
     template <typename ValueType>
-    PointDataLeafNode(const tree::LeafNode<ValueType, Log2Dim>& other, const T& /*value*/, TopologyCopy)
+    PointDataLeafNode(const tree::LeafNode<ValueType, Log2Dim>& other, const T& value, TopologyCopy)
         : BaseLeaf(other, zeroVal<T>(), TopologyCopy())
-        , mAttributeSet(new AttributeSet) { }
+        , mAttributeSet(new AttributeSet) { assertNonModifiableUnlessZero(value); }
 
     // Copy-construct from a LeafNode with the same configuration but a different ValueType.
     // Used for topology copies - explicitly sets the on and off value (background) to zeroVal
@@ -321,7 +321,7 @@ public:
     PointDataLeafNode(PartialCreate, const Coord& coords,
         const T& value = zeroVal<T>(), bool active = false)
         : BaseLeaf(PartialCreate(), coords, value, active)
-        , mAttributeSet(new AttributeSet) { }
+        , mAttributeSet(new AttributeSet) { assertNonModifiableUnlessZero(value); }
 #endif
 
 public:
@@ -514,6 +514,13 @@ public:
         assert(false && "Cannot modify voxel values in a PointDataTree.");
     }
 
+    // some methods silently ignore attempts to modify the
+    // point-array offsets if a zero value is used
+
+    void assertNonModifiableUnlessZero(const ValueType& value) {
+        if (value != zeroVal<T>())  this->assertNonmodifiable();
+    }
+
     void setActiveState(const Coord& xyz, bool on) { BaseLeaf::setActiveState(xyz, on); }
     void setActiveState(Index offset, bool on) { BaseLeaf::setActiveState(offset, on); }
 
@@ -546,11 +553,12 @@ public:
     template<typename ModifyOp>
     void modifyValueAndActiveState(const Coord&, const ModifyOp&) { assertNonmodifiable(); }
 
-    void clip(const CoordBBox&, const ValueType&) { assertNonmodifiable(); }
+    // clipping is not yet supported
+    void clip(const CoordBBox&, const ValueType& value) { assertNonModifiableUnlessZero(value); }
 
-    void fill(const CoordBBox&, const ValueType&, bool) { assertNonmodifiable(); }
-    void fill(const ValueType&) {}
-    void fill(const ValueType&, bool) { assertNonmodifiable(); }
+    void fill(const CoordBBox&, const ValueType&, bool);
+    void fill(const ValueType& value) { assertNonModifiableUnlessZero(value); }
+    void fill(const ValueType&, bool);
 
     template<typename AccessorT>
     void setValueOnlyAndCache(const Coord&, const ValueType&, AccessorT&) {assertNonmodifiable();}
@@ -566,7 +574,7 @@ public:
     template<typename AccessorT>
     void setActiveStateAndCache(const Coord& xyz, bool on, AccessorT& parent) { BaseLeaf::setActiveStateAndCache(xyz, on, parent); }
 
-    void resetBackground(const ValueType&, const ValueType&) { assertNonmodifiable(); }
+    void resetBackground(const ValueType&, const ValueType& newBackground) { assertNonModifiableUnlessZero(newBackground); }
 
     void signedFloodFill(const ValueType&) { assertNonmodifiable(); }
     void signedFloodFill(const ValueType&, const ValueType&) { assertNonmodifiable(); }
@@ -1494,6 +1502,42 @@ inline CoordBBox
 PointDataLeafNode<T, Log2Dim>::getNodeBoundingBox() const
 {
     return BaseLeaf::getNodeBoundingBox();
+}
+
+template<typename T, Index Log2Dim>
+inline void
+PointDataLeafNode<T, Log2Dim>::fill(const CoordBBox& bbox, const ValueType& value, bool active)
+{
+#ifndef OPENVDB_2_ABI_COMPATIBLE
+    if (!this->allocate()) return;
+#endif
+
+    this->assertNonModifiableUnlessZero(value);
+
+    // active state is permitted to be updated
+
+    for (Int32 x = bbox.min().x(); x <= bbox.max().x(); ++x) {
+        const Index offsetX = (x & (DIM-1u)) << 2*Log2Dim;
+        for (Int32 y = bbox.min().y(); y <= bbox.max().y(); ++y) {
+            const Index offsetXY = offsetX + ((y & (DIM-1u)) << Log2Dim);
+            for (Int32 z = bbox.min().z(); z <= bbox.max().z(); ++z) {
+                const Index offset = offsetXY + (z & (DIM-1u));
+                this->setValueMask(offset, active);
+            }
+        }
+    }
+}
+
+template<typename T, Index Log2Dim>
+inline void
+PointDataLeafNode<T, Log2Dim>::fill(const ValueType& value, bool active)
+{
+    this->assertNonModifiableUnlessZero(value);
+
+    // active state is permitted to be updated
+
+    if (active)                 this->setValuesOn();
+    else                        this->setValuesOff();
 }
 
 ////////////////////////////////////////
