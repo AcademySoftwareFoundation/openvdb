@@ -1171,8 +1171,11 @@ SOP_OpenVDB_Combine::combineGrids(Operation op,
     compOp.bGridName = bGridName;
     compOp.interrupt = hvdb::Interrupter();
 
-    int success = UTvdbProcessTypedGridTopology(
-        UTvdbGetGridType(needA ? *aGrid : *bGrid), aGrid, compOp);
+    int success = 0;
+    UT_VDBType vdbType(UTvdbGetGridType(needA ? *aGrid : *bGrid));
+    if (vdbType != UT_VDB_INVALID) {
+        success = UTvdbProcessTypedGridTopology(vdbType, aGrid, compOp);
+    }
     if (!success || !compOp.outGrid) {
         std::ostringstream ostr;
         if (aGrid->type() == bGrid->type()) {
