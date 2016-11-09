@@ -834,6 +834,11 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_STRING, "vdbpointsgroup", "VDB Points Group")
         .setHelpText("Specify VDB Points Groups to use as an input."));
 
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "incoreonly", "In-core Data Only")
+        .setDefault(PRMoneDefaults)
+        .setHelpText(   "Only convert points that reside in leaf nodes that are in-core. " \
+                        "Disable this to convert all data, regardless of whether it has been loaded off disk or not."));
+
     //  point grid name
     parms.add(hutil::ParmFactory(PRM_STRING, "name", "VDB Name")
         .setDefault("points")
@@ -1028,6 +1033,9 @@ SOP_OpenVDB_Points_Convert::updateParmsFlags()
     changed |= enableParm("vdbpointsgroup", !toVdbPoints);
     changed |= setVisibleState("vdbpointsgroup", !toVdbPoints);
 
+    changed |= enableParm("incoreonly", !toVdbPoints);
+    changed |= setVisibleState("incoreonly", !toVdbPoints);
+
     changed |= enableParm("name", toVdbPoints);
     changed |= setVisibleState("name", toVdbPoints);
 
@@ -1112,7 +1120,9 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
 
                 // perform conversion
 
-                hvdb::convertPointDataGridToHoudini(geo, grid, emptyNameVector, includeGroups, excludeGroups);
+                const bool inCoreOnly = evalInt("incoreonly", 0, time) == 1;
+
+                hvdb::convertPointDataGridToHoudini(geo, grid, emptyNameVector, includeGroups, excludeGroups, inCoreOnly);
 
                 const MetaMap& metaMap = grid;
                 std::vector<std::string> warnings;
