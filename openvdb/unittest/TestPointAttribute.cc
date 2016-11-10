@@ -312,15 +312,6 @@ TestPointAttribute::testAppendDrop()
         CPPUNIT_ASSERT_THROW(collapseAttribute<int>(tree, "unknown", 0), openvdb::KeyError);
         CPPUNIT_ASSERT_THROW(collapseAttribute<Name>(tree, "unknown", "unknown"), openvdb::KeyError);
     }
-
-    { // adding multiple values with MetadataStorage
-        std::vector<Name> names{"test1", "test2", "test3"};
-        const MetaMap& metadataBefore = attributeSet.descriptor().getMetadata();
-        size_t beforeCount = metadataBefore.metaCount();
-        point_attribute_internal::MetadataStorage<PointDataTree, Name>::add(tree, names.cbegin(), names.cend());
-        const MetaMap& metadataAfter = attributeSet.descriptor().getMetadata();
-        CPPUNIT_ASSERT_EQUAL(metadataAfter.metaCount() - beforeCount, names.size());
-    }
 }
 
 void

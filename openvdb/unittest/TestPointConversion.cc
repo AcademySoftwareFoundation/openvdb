@@ -283,19 +283,13 @@ TestPointConversion::testPointConversion()
 
     appendAttribute<Name>(tree, "string");
 
-    // extract the metadata and reset the descriptors
+    // reset the descriptors
     PointDataTree::LeafIter leafIter = tree.beginLeaf();
     const AttributeSet::Descriptor& descriptor = leafIter->attributeSet().descriptor();
-    AttributeSet::Descriptor::Ptr newDescriptor(new AttributeSet::Descriptor(descriptor));
-    MetaMap& metadata = newDescriptor->getMetadata();
+    auto newDescriptor = std::make_shared<AttributeSet::Descriptor>(descriptor);
     for (; leafIter; ++leafIter) {
         leafIter->resetDescriptor(newDescriptor);
     }
-
-    // insert the required strings into the metadata
-    StringMetaInserter inserter(metadata);
-    inserter.insert("testA");
-    inserter.insert("testB");
 
     populateAttribute<PointDataTree, tools::PointIndexTree, AttributeWrapper<openvdb::Name>>(tree, indexTree, "string", string);
 

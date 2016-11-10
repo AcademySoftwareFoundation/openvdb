@@ -438,8 +438,8 @@ struct MetadataStorage
 {
     static void add(PointDataTree&, const ValueType&) { }
 
-    template <typename Iter>
-    static void add(PointDataTree&, Iter, Iter) { }
+    template <typename AttributeListType>
+    static void add(PointDataTree&, const AttributeListType&) { }
 };
 
 
@@ -452,13 +452,15 @@ struct MetadataStorage<PointDataTree, Name>
         inserter.insert(uniformValue);
     }
 
-    template <typename Iter>
-    static void add(PointDataTree& tree, Iter begin, Iter end) {
+    template <typename AttributeListType>
+    static void add(PointDataTree& tree, const AttributeListType& data) {
         MetaMap& metadata = makeDescriptorUnique(tree)->getMetadata();
         StringMetaInserter inserter(metadata);
+        Name value;
 
-        for (Iter it = begin; it != end; ++it) {
-            inserter.insert(*it);
+        for (size_t i = 0; i < data.size(); i++) {
+            data.get(value, i);
+            inserter.insert(value);
         }
     }
 };

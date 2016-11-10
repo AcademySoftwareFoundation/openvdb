@@ -237,7 +237,7 @@ convertAttributeFromHoudini(PointDataTree& tree, const tools::PointIndexTree& in
     if (storage == GA_STORE_STRING) {
         appendAttribute<Name>(tree, name);
         HoudiniStringAttribute houdiniAttribute(*attribute);
-        populateAttribute<PointDataTree, tools::PointIndexTree, HoudiniStringAttribute>(tree, indexTree, name, houdiniAttribute);
+        populateAttribute<PointDataTree, tools::PointIndexTree, HoudiniStringAttribute>(tree, indexTree, name, houdiniAttribute, 1, false);
         return;
     }
 

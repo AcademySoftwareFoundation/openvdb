@@ -48,6 +48,7 @@
 #include <openvdb/points/AttributeArrayString.h>
 #include <openvdb/points/AttributeSet.h>
 #include <openvdb/points/IndexFilter.h>
+#include <openvdb/points/PointAttribute.h>
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointGroup.h>
 
@@ -108,6 +109,7 @@ createPointDataGrid(const std::vector<ValueT>& positions, const math::Transform&
 /// @param  pointIndexTree  a PointIndexTree into the points.
 /// @param  attributeName   the name of the VDB Points attribute to be populated.
 /// @param  data            a wrapper to the attribute data.
+/// @param  insertMetadata  true if strings are to be automatically inserted as metadata.
 ///
 /// @note   A @c PointIndexGrid to the points must be supplied to perform this
 ///         operation. This is required to ensure the same point index ordering.
@@ -116,7 +118,7 @@ template <typename PointDataTreeT, typename PointIndexTreeT, typename PointArray
 inline void
 populateAttribute(  PointDataTreeT& tree, const PointIndexTreeT& pointIndexTree,
                     const openvdb::Name& attributeName, const PointArrayT& data,
-                    const Index stride = 1);
+                    const Index stride = 1, const bool insertMetadata = true);
 
 
 /// @brief Convert the position attribute from a Point Data Grid
@@ -851,9 +853,10 @@ createPointDataGrid(const std::vector<ValueT>& positions,
 template <typename PointDataTreeT, typename PointIndexTreeT, typename PointArrayT>
 inline void
 populateAttribute(  PointDataTreeT& tree, const PointIndexTreeT& pointIndexTree,
-                    const openvdb::Name& attributeName, const PointArrayT& data, const Index stride)
+                    const openvdb::Name& attributeName, const PointArrayT& data, const Index stride, const bool insertMetadata)
 {
     using point_conversion_internal::PopulateAttributeOp;
+    using ValueType = typename PointArrayT::value_type;
 
     auto iter = tree.cbeginLeaf();
 
@@ -864,6 +867,8 @@ populateAttribute(  PointDataTreeT& tree, const PointIndexTreeT& pointIndexTree,
     if (index == AttributeSet::INVALID_POS) {
         OPENVDB_THROW(KeyError, "Attribute not found to populate - " << attributeName << ".");
     }
+
+    if (insertMetadata) point_attribute_internal::MetadataStorage<PointDataTreeT, ValueType>::add(tree, data);
 
     // populate attribute
 
