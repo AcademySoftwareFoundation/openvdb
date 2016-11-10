@@ -1120,9 +1120,33 @@ SOP_OpenVDB_Points_Convert::cookMySop(OP_Context& context)
 
                 const PointDataGrid& grid = static_cast<const PointDataGrid&>(baseGrid);
 
-                // perform conversion
-
                 const bool inCoreOnly = evalInt("incoreonly", 0, time) == 1;
+
+                // sequential pre-fetch of out-of-core data for faster performance
+
+                if (!inCoreOnly) {
+                    PointDataTree::LeafCIter leafIter = grid.tree().cbeginLeaf();
+                    if (leafIter) {
+                        const size_t attributes = leafIter->attributeSet().size();
+                        // load voxel buffer data
+                        for ( ; leafIter; ++leafIter) {
+                            const PointDataTree::LeafNodeType::Buffer& buffer = leafIter->buffer();
+                            buffer.data();
+                        }
+                        // load attribute data
+                        for (size_t pos = 0; pos < attributes; pos++) {
+                            leafIter = grid.tree().cbeginLeaf();
+                            for ( ; leafIter; ++leafIter) {
+                                if (leafIter->hasAttribute(pos)) {
+                                    const AttributeArray& array = leafIter->constAttributeArray(pos);
+                                    array.loadData();
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // perform conversion
 
                 hvdb::convertPointDataGridToHoudini(geo, grid, emptyNameVector, includeGroups, excludeGroups, inCoreOnly);
 
