@@ -1485,8 +1485,11 @@ Grid<TreeT>::readBuffers(std::istream& is, const CoordBBox& bbox)
         assert(bool(meta));
         for (uint32_t pass = 0; pass < uint32_t(numPasses); ++pass) {
             meta->setPass(pass);
-            tree().readBuffers(is, bbox, saveFloatAsHalf());
+            tree().readBuffers(is, CoordBBox::inf(), saveFloatAsHalf());
         }
+        // cannot clip inside readBuffers() when using multiple passes, so instead
+        // use an infinite CoordBBox and clip afterwards
+        tree().clip(bbox);
     }
 }
 
