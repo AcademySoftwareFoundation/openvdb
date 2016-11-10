@@ -301,7 +301,8 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
 
             std::vector<openvdb::Vec4s> spheres;
 
-            if (vdbIt->getGrid().type() == openvdb::FloatGrid::gridType()) {
+            if (vdbIt->getGrid().type() == openvdb::FloatGrid::gridType() &&
+                vdbIt->getGrid().getGridClass() == openvdb::GRID_LEVEL_SET) {
 
                 openvdb::FloatGrid::ConstPtr gridPtr =
                     openvdb::gridConstPtrCast<openvdb::FloatGrid>(vdbIt->getGridPtr());
@@ -310,7 +311,8 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
                     minradius, maxradius, isovalue, scatter, &boss);
 
 
-            } else if (vdbIt->getGrid().type() == openvdb::DoubleGrid::gridType()) {
+            } else if ( vdbIt->getGrid().type() == openvdb::DoubleGrid::gridType() &&
+                        vdbIt->getGrid().getGridClass() == openvdb::GRID_LEVEL_SET) {
 
                 openvdb::DoubleGrid::ConstPtr gridPtr =
                     openvdb::gridConstPtrCast<openvdb::DoubleGrid>(vdbIt->getGridPtr());
@@ -373,7 +375,7 @@ SOP_OpenVDB_To_Spheres::cookMySop(OP_Context& context)
         }
 
         if (!skippedGrids.empty()) {
-            std::string s = "Only scalar (float/double) grids are supported, the following "
+            std::string s = "Only scalar (float/double) levelsets are supported, the following "
                 "were skipped: '" + boost::algorithm::join(skippedGrids, ", ") + "'.";
             addWarning(SOP_MESSAGE, s.c_str());
         }
