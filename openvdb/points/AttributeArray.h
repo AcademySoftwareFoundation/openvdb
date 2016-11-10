@@ -869,15 +869,14 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttribut
 
     if (!this->isCompressed())  uncompress = false;
 
-    if (mIsUniform) {
+    if (this->isOutOfCore()) {
+        // do nothing
+    } else if (mIsUniform) {
         this->allocate();
         mData.get()[0] = rhs.mData.get()[0];
-    } else if (this->isOutOfCore()) {
-        // do nothing
     } else if (this->isCompressed()) {
         std::unique_ptr<char[]> buffer;
         if (uncompress) {
-            rhs.doLoad();
             const char* charBuffer = reinterpret_cast<const char*>(rhs.mData.get());
             size_t uncompressedBytes = compression::bloscUncompressedSize(charBuffer);
             buffer = compression::bloscDecompress(charBuffer, uncompressedBytes);
@@ -913,11 +912,11 @@ TypedAttributeArray<ValueType_, Codec_>::operator=(const TypedAttributeArray& rh
         mStrideOrTotalSize = rhs.mStrideOrTotalSize;
         mIsUniform = rhs.mIsUniform;
 
-        if (mIsUniform) {
+        if (rhs.isOutOfCore()) {
+            mPageHandle = rhs.mPageHandle;
+        } else if (mIsUniform) {
             this->allocate();
             mData.get()[0] = rhs.mData.get()[0];
-        } else if (rhs.isOutOfCore()) {
-            mPageHandle = rhs.mPageHandle;
         } else if (this->isCompressed()) {
             std::unique_ptr<char[]> buffer(new char[mCompressedBytes]);
             std::memcpy(buffer.get(), rhs.mData.get(), mCompressedBytes);

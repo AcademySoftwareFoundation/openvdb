@@ -1098,8 +1098,10 @@ void
 TestAttributeArray::testDelayedLoad()
 {
     using AttributeArrayI = TypedAttributeArray<int>;
+    using AttributeArrayF = TypedAttributeArray<float>;
 
     AttributeArrayI::registerType();
+    AttributeArrayF::registerType();
 
     io::StreamMetadata::Ptr streamMetadata(new io::StreamMetadata);
 
@@ -1113,6 +1115,8 @@ TestAttributeArray::testDelayedLoad()
         for (unsigned i = 0; i < unsigned(count); ++i) {
             attrA.set(i, int(i));
         }
+
+        AttributeArrayF attrA2(count);
 
         std::string filename;
 
@@ -1134,6 +1138,16 @@ TestAttributeArray::testDelayedLoad()
             attrA.writePagedBuffers(outputStream, false);
             outputStream.flush();
 
+            attrA2.writeMetadata(fileout, false, /*paged=*/true);
+            compression::PagedOutputStream outputStreamSize2(fileout);
+            outputStreamSize2.setSizeOnly(true);
+            attrA2.writePagedBuffers(outputStreamSize2, false);
+            outputStreamSize2.flush();
+            compression::PagedOutputStream outputStream2(fileout);
+            outputStream2.setSizeOnly(false);
+            attrA2.writePagedBuffers(outputStream2, false);
+            outputStream2.flush();
+
             fileout.close();
         }
 
@@ -1145,6 +1159,7 @@ TestAttributeArray::testDelayedLoad()
         // read in using delayed load and check manual loading of data
         {
             AttributeArrayI attrB;
+            AttributeArrayF attrB2;
 
             std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
             io::setStreamMetadataPtr(filein, streamMetadata);
@@ -1164,16 +1179,65 @@ TestAttributeArray::testDelayedLoad()
             CPPUNIT_ASSERT_EQUAL(attrA.isHidden(), attrB.isHidden());
             CPPUNIT_ASSERT_EQUAL(attrA.isCompressed(), attrB.isCompressed());
 
+            AttributeArrayI attrBcopy(attrB);
+            AttributeArrayI attrBequal = attrB;
+
             CPPUNIT_ASSERT(attrB.isOutOfCore());
+            CPPUNIT_ASSERT(attrBcopy.isOutOfCore());
+            CPPUNIT_ASSERT(attrBequal.isOutOfCore());
             attrB.loadData();
+            attrBcopy.loadData();
+            attrBequal.loadData();
 
             CPPUNIT_ASSERT(!attrB.isOutOfCore());
+            CPPUNIT_ASSERT(!attrBcopy.isOutOfCore());
+            CPPUNIT_ASSERT(!attrBequal.isOutOfCore());
 
             CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
+            CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrBcopy.memUsage());
+            CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrBequal.memUsage());
 
             for (unsigned i = 0; i < unsigned(count); ++i) {
                 CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrB.get(i));
+                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrBcopy.get(i));
+                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrBequal.get(i));
             }
+
+            attrB2.readMetadata(filein);
+            compression::PagedInputStream inputStream2(filein);
+            inputStream2.setSizeOnly(true);
+            attrB2.readPagedBuffers(inputStream2);
+            inputStream2.setSizeOnly(false);
+            attrB2.readPagedBuffers(inputStream2);
+
+            CPPUNIT_ASSERT(matchingNamePairs(attrA2.type(), attrB2.type()));
+            CPPUNIT_ASSERT_EQUAL(attrA2.size(), attrB2.size());
+            CPPUNIT_ASSERT_EQUAL(attrA2.isUniform(), attrB2.isUniform());
+            CPPUNIT_ASSERT_EQUAL(attrA2.isTransient(), attrB2.isTransient());
+            CPPUNIT_ASSERT_EQUAL(attrA2.isHidden(), attrB2.isHidden());
+            CPPUNIT_ASSERT_EQUAL(attrA2.isCompressed(), attrB2.isCompressed());
+
+            AttributeArrayF attrB2copy(attrB2);
+            AttributeArrayF attrB2equal = attrB2;
+
+            CPPUNIT_ASSERT(attrB2.isOutOfCore());
+            CPPUNIT_ASSERT(attrB2copy.isOutOfCore());
+            CPPUNIT_ASSERT(attrB2equal.isOutOfCore());
+            attrB2.loadData();
+            attrB2copy.loadData();
+            attrB2equal.loadData();
+
+            CPPUNIT_ASSERT(!attrB2.isOutOfCore());
+            CPPUNIT_ASSERT(!attrB2copy.isOutOfCore());
+            CPPUNIT_ASSERT(!attrB2equal.isOutOfCore());
+
+            CPPUNIT_ASSERT_EQUAL(attrA2.memUsage(), attrB2.memUsage());
+            CPPUNIT_ASSERT_EQUAL(attrA2.memUsage(), attrB2copy.memUsage());
+            CPPUNIT_ASSERT_EQUAL(attrA2.memUsage(), attrB2equal.memUsage());
+
+            CPPUNIT_ASSERT_EQUAL(attrA2.get(0), attrB2.get(0));
+            CPPUNIT_ASSERT_EQUAL(attrA2.get(0), attrB2copy.get(0));
+            CPPUNIT_ASSERT_EQUAL(attrA2.get(0), attrB2equal.get(0));
         }
 
         // read in using delayed load and check fill()
