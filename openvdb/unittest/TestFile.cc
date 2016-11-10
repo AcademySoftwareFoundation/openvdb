@@ -1956,6 +1956,7 @@ TestFile::testMultiPassIO()
     // Create a multi-buffer grid.
     const MultiPassGrid::Ptr grid = openvdb::createGrid<MultiPassGrid>();
     grid->setName("test");
+    grid->setTransform(math::Transform::createLinearTransform(1.0));
     MultiPassGrid::TreeType& tree = grid->tree();
     tree.setValue(Coord(0, 0, 0), 5);
     tree.setValue(Coord(0, 10, 0), 5);
@@ -2004,6 +2005,22 @@ TestFile::testMultiPassIO()
         CPPUNIT_ASSERT_EQUAL(0, leafIter->mReadPasses[0]);
         CPPUNIT_ASSERT_EQUAL(1, leafIter->mReadPasses[1]);
         CPPUNIT_ASSERT_EQUAL(2, leafIter->mReadPasses[2]);
+    }
+    {
+        // Verify that when using multi-pass and bbox clipping that each leaf node
+        // is still being read before being clipped
+        io::File file(filename);
+        file.open();
+        const auto newGrid = GridBase::grid<MultiPassGrid>(file.readGrid("test", BBoxd(Vec3d(0), Vec3d(1))));
+        CPPUNIT_ASSERT_EQUAL(Index32(1), newGrid->tree().leafCount());
+
+        auto leafIter = newGrid->tree().beginLeaf();
+        CPPUNIT_ASSERT_EQUAL(3, int(leafIter->mReadPasses.size()));
+        CPPUNIT_ASSERT_EQUAL(0, leafIter->mReadPasses[0]);
+        CPPUNIT_ASSERT_EQUAL(1, leafIter->mReadPasses[1]);
+        CPPUNIT_ASSERT_EQUAL(2, leafIter->mReadPasses[2]);
+        ++leafIter;
+        CPPUNIT_ASSERT(!leafIter); // second leaf node has now been clipped
     }
 
     // Clear the pass data.
