@@ -35,9 +35,6 @@
 
 #include <openvdb/points/AttributeArray.h>
 
-#ifdef OPENVDB_USE_BLOSC
-#include <blosc.h>
-#endif
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

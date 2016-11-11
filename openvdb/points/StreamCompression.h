@@ -53,10 +53,6 @@
 #include <memory>
 #include <string>
 
-#ifdef OPENVDB_USE_BLOSC
-#include <blosc.h>
-#endif
-
 #include <openvdb/io/io.h>
 
 class TestStreamCompression;
@@ -272,7 +268,7 @@ class PagedOutputStream
 public:
     using Ptr = std::shared_ptr<PagedOutputStream>;
 
-    PagedOutputStream() = default;
+    PagedOutputStream();
 
     explicit PagedOutputStream(std::ostream& os);
 
@@ -299,9 +295,7 @@ private:
     void resize(size_t size);
 
     std::unique_ptr<char[]> mData = std::unique_ptr<char[]>(new char[PageSize]);
-#ifdef OPENVDB_USE_BLOSC
-    std::unique_ptr<char[]> mCompressedData = std::unique_ptr<char[]>(new char[PageSize + BLOSC_MAX_OVERHEAD]);
-#endif
+    std::unique_ptr<char[]> mCompressedData = nullptr;
     size_t mCapacity = PageSize;
     int mBytes = 0;
     std::ostream* mOs = nullptr;

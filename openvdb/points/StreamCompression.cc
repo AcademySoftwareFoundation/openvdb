@@ -508,9 +508,20 @@ void PagedInputStream::read(PageHandle::Ptr& pageHandle, std::streamsize n, bool
 ////////////////////////////////////////
 
 
+PagedOutputStream::PagedOutputStream()
+{
+#ifdef OPENVDB_USE_BLOSC
+    mCompressedData.reset(new char[PageSize + BLOSC_MAX_OVERHEAD]);
+#endif
+}
+
+
 PagedOutputStream::PagedOutputStream(std::ostream& os)
     : mOs(&os)
 {
+#ifdef OPENVDB_USE_BLOSC
+    mCompressedData.reset(new char[PageSize + BLOSC_MAX_OVERHEAD]);
+#endif
 }
 
 

@@ -49,13 +49,11 @@
 
 #include <openvdb/points/AttributeSet.h>
 #include <openvdb/points/AttributeGroup.h>
+#include <openvdb/points/StreamCompression.h>
 
 #include <type_traits> // std::is_same
 #include <utility> // std::pair, std::make_pair
 
-#ifdef OPENVDB_USE_BLOSC
-#include <blosc.h>
-#endif
 
 class TestPointDataLeaf;
 

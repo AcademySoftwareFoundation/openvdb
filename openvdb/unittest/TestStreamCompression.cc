@@ -118,6 +118,13 @@ CPPUNIT_TEST_SUITE_REGISTRATION(TestStreamCompression);
 void
 TestStreamCompression::testBlosc()
 {
+    // ensure that the library and unit tests are both built with or without Blosc enabled
+#ifdef OPENVDB_USE_BLOSC
+    CPPUNIT_ASSERT(bloscCanCompress());
+#else
+    CPPUNIT_ASSERT(!bloscCanCompress());
+#endif
+
     const int count = 256;
 
     { // valid buffer
