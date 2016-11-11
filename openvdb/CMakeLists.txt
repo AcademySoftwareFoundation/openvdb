@@ -268,9 +268,7 @@ TARGET_LINK_LIBRARIES ( vdb_view
   )
 ENDIF ()
 
-IF ( OPENVDB_BUILD_UNITTESTS )
-  
-  ADD_EXECUTABLE ( vdb_test
+SET ( UNITTEST_SOURCE_FILES
 	unittest/main.cc
 	unittest/TestBBox.cc
 	unittest/TestConjGradient.cc
@@ -347,8 +345,19 @@ IF ( OPENVDB_BUILD_UNITTESTS )
 	unittest/TestVolumeRayIntersector.cc
 	unittest/TestVolumeToMesh.cc
 	)
-  
-  TARGET_LINK_LIBRARIES ( vdb_test
+
+SET_SOURCE_FILES_PROPERTIES ( ${UNITTEST_SOURCE_FILES}
+  PROPERTIES
+  COMPILE_FLAGS "-DOPENVDB_USE_BLOSC"
+  )
+
+IF ( OPENVDB_BUILD_UNITTESTS )
+
+  ADD_EXECUTABLE ( vdb_test
+  ${UNITTEST_SOURCE_FILES}
+  )
+
+TARGET_LINK_LIBRARIES ( vdb_test
 	${CPPUnit_cppunit_LIBRARY}
 	openvdb_static
 	${BLOSC_blosc_LIBRARY}
