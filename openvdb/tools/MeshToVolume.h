@@ -1156,7 +1156,7 @@ template<typename ValueType>
 inline void
 fillArray(ValueType* array, const ValueType val, const size_t length)
 {
-    const size_t grainSize = length / tbb::task_scheduler_init::default_num_threads();
+    const size_t grainSize = std::max(length / tbb::task_scheduler_init::default_num_threads(), (size_t)(1024));
     const tbb::blocked_range<size_t> range(0, length, grainSize);
     tbb::parallel_for(range, FillArray<ValueType>(array, val), tbb::simple_partitioner());
 }
