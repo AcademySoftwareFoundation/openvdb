@@ -70,12 +70,16 @@
 #include <UT/UT_IStream.h>
 #include <UT/UT_Version.h>
 
+#include <FS/FS_IStreamDevice.h>
+
+#include <GA/GA_Stat.h>
 #include <GU/GU_Detail.h>
 #include <SOP/SOP_Node.h>
 #include <GEO/GEO_IOTranslator.h>
 
 #include <openvdb/io/Stream.h>
 #include <openvdb/io/File.h>
+#include <openvdb/metadata/Metadata.h>
 
 #include <stdio.h>
 #include <iostream>
@@ -99,6 +103,10 @@ public:
     virtual void	getFileExtensions(UT_StringArray &extensions) const;
 
     virtual int		checkMagicNumber(unsigned magic);
+
+    virtual bool	fileStat(const char *filename,
+				GA_Stat &stat,
+				uint level);
 
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
     virtual GA_Detail::IOStatus fileLoad(GEO_Detail *gdp, UT_IStream &is, bool ate_magic);
@@ -145,6 +153,85 @@ GEO_VDBTranslator::checkMagicNumber(unsigned /*magic*/)
     return 0;
 }
 
+bool
+GEO_VDBTranslator::fileStat(const char *filename, GA_Stat &stat, uint level)
+{
+    stat.clear();
+
+    try {
+	openvdb::io::File file(filename);
+
+	file.open(/*delayLoad*/false);
+
+	int		nprim = 0;
+	UT_BoundingBox	bbox;
+	bbox.makeInvalid();
+
+        // Loop over all grids in the file.
+        for (openvdb::io::File::NameIterator nameIter = file.beginName(); nameIter != file.endName(); ++nameIter) 
+	{
+            const std::string& gridName = nameIter.gridName();
+
+	    // Read the grid metadata.
+	    auto grid = file.readGridMetadata(gridName);
+
+	    auto stats = grid->getStatsMetadata();
+
+	    openvdb::Vec3IMetadata::Ptr		meta_minbbox, meta_maxbbox;
+	    UT_BoundingBox			voxelbox;
+
+	    voxelbox.initBounds();
+
+	    meta_minbbox = stats->getMetadata<openvdb::Vec3IMetadata>("file_bbox_min");
+	    meta_maxbbox = stats->getMetadata<openvdb::Vec3IMetadata>("file_bbox_max");
+	    if (meta_minbbox && meta_maxbbox)
+	    {
+		UT_Vector3		minv, maxv;
+		minv = UTvdbConvert(meta_minbbox->value());
+		maxv = UTvdbConvert(meta_maxbbox->value());
+		voxelbox.enlargeBounds(minv);
+		voxelbox.enlargeBounds(maxv);
+		// We need to convert from corner-sampled (as in VDB)
+		// to center-sampled (as our BBOX elsewhere reports)
+		voxelbox.expandBounds(0.5, 0.5, 0.5);
+
+		// Transform
+		UT_Vector3		voxelpts[8];
+		UT_BoundingBox		worldbox;
+
+		worldbox.initBounds();
+		voxelbox.getBBoxPoints(voxelpts);
+		for (int i = 0; i < 8; i++)
+		{
+		    worldbox.enlargeBounds(
+			    UTvdbConvert( grid->indexToWorld(UTvdbConvert(voxelpts[i])) ) );
+		}
+
+		bbox.enlargeBounds(worldbox);
+	    }
+
+	    if (voxelbox.isValid())
+		stat.appendVolume(nprim, gridName.c_str(), voxelbox.size().x(), voxelbox.size().y(), voxelbox.size().z());
+	    else
+		stat.appendVolume(nprim, gridName.c_str(), 0, 0, 0);
+	    nprim++;
+	}
+
+	// Straightforward correspondence:
+	stat.setPointCount(nprim);
+	stat.setVertexCount(nprim);
+	stat.setPrimitiveCount(nprim);
+	stat.setBounds(bbox);
+
+	file.close();
+    } catch (std::exception &e) {
+        cerr << "Stat failure: " << e.what() << "\n";
+        return false;
+    }
+
+    return true;
+}
+
 #if (UT_VERSION_INT >= 0x0e000000) // 14.0.0 or later
 GA_Detail::IOStatus
 GEO_VDBTranslator::fileLoad(GEO_Detail *geogdp, UT_IStream &is, bool /*ate_magic*/)
@@ -155,65 +242,41 @@ GEO_VDBTranslator::fileLoad(GEO_Detail *geogdp, UT_IStream &is, int /*ate_magic*
 {
     UT_WorkBuffer   buf;
     GU_Detail       *gdp = static_cast<GU_Detail*>(geogdp);
+    bool	    ok = true;
 
-    if (!is.isRandomAccessFile(buf)) {
-        cerr << "Error: Attempt to load VDB from non-file source.\n";
-        return false;
-    }
+    // Create a std::stream proxy.
+    FS_IStreamDevice	reader(&is);
+    auto streambuf = new FS_IStreamDeviceBuffer(reader);
+    auto stdstream = new std::istream(streambuf);
 
     try {
         // Create and open a VDB file, but don't read any grids yet.
-        openvdb::io::File file(buf.buffer());
-
-        file.open(/*delayLoad*/false);
+        openvdb::io::Stream file(*stdstream, /*delayLoad*/false);
 
         // Read the file-level metadata into global attributes.
         openvdb::MetaMap::Ptr fileMetadata = file.getMetadata();
-#if !defined(SESI_OPENVDB) && (UT_VERSION_INT >= 0x0c050157)
-        if (!fileMetadata) fileMetadata.reset(new openvdb::MetaMap);
-#else
         if (fileMetadata) {
             GU_PrimVDB::createAttrsFromMetadata(
                 GA_ATTRIB_GLOBAL, GA_Offset(0), *fileMetadata, *geogdp);
         }
-#endif
 
         // Loop over all grids in the file.
-        for (openvdb::io::File::NameIterator nameIter = file.beginName(); nameIter != file.endName(); ++nameIter) {
-            const std::string& gridName = nameIter.gridName();
-
-            if (GridPtr grid = file.readGrid(gridName)) {
-
-#if !defined(SESI_OPENVDB) && (UT_VERSION_INT >= 0x0c050157)
-                // Copy file-level metadata into the grid, then create (if
-                // necessary)
-                // and set a primitive attribute for each metadata item.
-                for (openvdb::MetaMap::ConstMetaIterator fileMetaIt = fileMetadata->beginMeta(),
-                    end = fileMetadata->endMeta(); fileMetaIt != end; ++fileMetaIt)
-                {
-                    // Resolve file- and grid-level metadata name conflicts
-                    // in favor of the grid-level metadata.
-                    if (openvdb::Metadata::Ptr meta = fileMetaIt->second) {
-                        const std::string name = fileMetaIt->first;
-                        if (!(*grid)[name]) {
-                            grid->insertMeta(name, *meta);
-                        }
-                    }
-                }
-#endif
-                // Add a new VDB primitive for this grid.
-                // Note: this clears the grid's metadata.
-                createVdbPrimitive(*gdp, grid);
-            }
+	auto && allgrids = file.getGrids();
+	for (auto && grid : *allgrids)
+	{
+	    // Add a new VDB primitive for this grid.
+	    // Note: this clears the grid's metadata.
+	    createVdbPrimitive(*gdp, grid);
         }
-        file.close();
-
     } catch (std::exception &e) {
         cerr << "Load failure: " << e.what() << "\n";
-        return false;
+        ok = false;
     }
 
-    return true;
+    delete stdstream;
+    delete streambuf;
+
+    return ok;
 }
 
 template <typename FileT, typename OutputT>
