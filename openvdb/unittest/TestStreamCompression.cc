@@ -34,6 +34,8 @@
 
 #include <openvdb/io/Compression.h> // io::COMPRESS_BLOSC
 
+#include <numeric> // std::iota
+
 // Boost.Interprocess uses a header-only portion of Boost.DateTime
 #define BOOST_DATE_TIME_NO_LIB
 #include <boost/interprocess/file_mapping.hpp>
