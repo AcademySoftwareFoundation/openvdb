@@ -264,10 +264,6 @@ SOP_OpenVDB_Load::cookMySop(OP_Context& context)
                 if (!op.mHasDelayedLeaves) continue;
             }
 
-            // deep copy the VDB tree if it is not already unique
-
-            vdbPrim->makeGridUnique();
-
             // get the mask input if there is one, otherwise calculate
             // the input bounding box
 
