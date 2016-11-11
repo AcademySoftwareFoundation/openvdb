@@ -190,7 +190,7 @@ TARGET_LINK_LIBRARIES ( openvdb_shared
   ${Tbb_TBB_LIBRARY}
   ${Ilmbase_HALF_LIBRARY}
   ${ZLIB_LIBRARY}
-  ${BLOSC_blosc_LIBRARY} 
+  ${BLOSC_blosc_LIBRARY}
   )
 
 SET_TARGET_PROPERTIES ( openvdb_static
@@ -217,7 +217,7 @@ ADD_EXECUTABLE ( vdb_print
 
 TARGET_LINK_LIBRARIES ( vdb_print
   openvdb_static
-  ${BLOSC_blosc_LIBRARY} 
+  ${BLOSC_blosc_LIBRARY}
   )
 
 SET ( VDB_RENDER_SOURCE_FILES cmd/openvdb_render/main.cc )
@@ -231,7 +231,7 @@ ADD_EXECUTABLE ( vdb_render
 
 TARGET_LINK_LIBRARIES ( vdb_render
   openvdb_static
-  ${BLOSC_blosc_LIBRARY} 
+  ${BLOSC_blosc_LIBRARY}
   ${Openexr_ILMIMF_LIBRARY}
   ${Ilmbase_ILMTHREAD_LIBRARY}
   ${Ilmbase_IEX_LIBRARY}
@@ -256,7 +256,7 @@ IF (NOT WIN32)
 
 TARGET_LINK_LIBRARIES ( vdb_view
   openvdb_static
-  ${BLOSC_blosc_LIBRARY} 
+  ${BLOSC_blosc_LIBRARY}
   ${OPENGL_gl_LIBRARY}
   ${OPENGL_glu_LIBRARY}
   ${COCOA_LIBRARY}
@@ -353,13 +353,13 @@ IF ( OPENVDB_BUILD_UNITTESTS )
 	openvdb_static
 	${BLOSC_blosc_LIBRARY}
 	)
-  
+
   ADD_TEST ( vdb_unit_test vdb_test )
-  
+
 ENDIF (OPENVDB_BUILD_UNITTESTS)
 
 IF ( OPENVDB_BUILD_PYTHON_MODULE )
- 
+
  SET ( OPENVDB_PYTHON_MODULE_SOURCE_FILES
     python/pyFloatGrid.cc
     python/pyIntGrid.cc
@@ -373,14 +373,14 @@ IF ( OPENVDB_BUILD_PYTHON_MODULE )
 	PROPERTIES
 	COMPILE_FLAGS "-DOPENVDB_PRIVATE -DOPENVDB_USE_BLOSC ${OPENVDB_USE_GLFW_FLAG}"
 	)
-  
+
   ADD_LIBRARY ( pyopenvdb SHARED
 	${OPENVDB_PYTHON_MODULE_SOURCE_FILES}
 	)
 
   TARGET_LINK_LIBRARIES ( pyopenvdb
 	openvdb_static
-	${BLOSC_blosc_LIBRARY} 
+	${BLOSC_blosc_LIBRARY}
 	${OPENGL_gl_LIBRARY}
 	${OPENGL_glu_LIBRARY}
 	${COCOA_LIBRARY}
