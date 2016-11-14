@@ -173,7 +173,7 @@ GEO_VDBTranslator::fileStat(const char *filename, GA_Stat &stat, uint level)
 	bbox.makeInvalid();
 
         // Loop over all grids in the file.
-        for (openvdb::io::File::NameIterator nameIter = file.beginName(); nameIter != file.endName(); ++nameIter) 
+        for (openvdb::io::File::NameIterator nameIter = file.beginName(); nameIter != file.endName(); ++nameIter)
 	{
             const std::string& gridName = nameIter.gridName();
 
