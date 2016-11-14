@@ -158,6 +158,7 @@ GEO_VDBTranslator::checkMagicNumber(unsigned /*magic*/)
     return 0;
 }
 
+#if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
 bool
 GEO_VDBTranslator::fileStat(const char *filename, GA_Stat &stat, uint level)
 {
