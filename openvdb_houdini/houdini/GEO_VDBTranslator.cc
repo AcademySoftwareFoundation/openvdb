@@ -158,6 +158,7 @@ GEO_VDBTranslator::checkMagicNumber(unsigned /*magic*/)
     return 0;
 }
 
+#if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
 bool
 GEO_VDBTranslator::fileStat(const char *filename, GA_Stat &stat, uint level)
 {
@@ -173,7 +174,7 @@ GEO_VDBTranslator::fileStat(const char *filename, GA_Stat &stat, uint level)
 	bbox.makeInvalid();
 
         // Loop over all grids in the file.
-        for (openvdb::io::File::NameIterator nameIter = file.beginName(); nameIter != file.endName(); ++nameIter) 
+        for (openvdb::io::File::NameIterator nameIter = file.beginName(); nameIter != file.endName(); ++nameIter)
 	{
             const std::string& gridName = nameIter.gridName();
 
