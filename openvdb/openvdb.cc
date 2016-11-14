@@ -30,6 +30,10 @@
 
 #include "openvdb.h"
 #include <openvdb/tools/PointIndexGrid.h>
+#include <openvdb/points/AttributeArray.h>
+#include <openvdb/points/AttributeArrayString.h>
+#include <openvdb/points/AttributeGroup.h>
+#include <openvdb/points/PointDataGrid.h>
 #include <tbb/mutex.h>
 #ifdef OPENVDB_USE_LOG4CPLUS
 #include <log4cplus/configurator.h>
@@ -115,6 +119,47 @@ initialize()
     Metadata::registerType(typeNameAsString<PointIndex32>(), Int32Metadata::createMetadata);
     Metadata::registerType(typeNameAsString<PointIndex64>(), Int64Metadata::createMetadata);
     tools::PointIndexGrid::registerGrid();
+
+    // Register attribute arrays with no compression
+    points::TypedAttributeArray<bool>::registerType();
+    points::TypedAttributeArray<int16_t>::registerType();
+    points::TypedAttributeArray<int32_t>::registerType();
+    points::TypedAttributeArray<int64_t>::registerType();
+    points::TypedAttributeArray<float>::registerType();
+    points::TypedAttributeArray<double>::registerType();
+    points::TypedAttributeArray<math::Vec3<int32_t> >::registerType();
+    points::TypedAttributeArray<math::Vec3<float> >::registerType();
+    points::TypedAttributeArray<math::Vec3<double> >::registerType();
+
+    // Register attribute arrays with group and string attribute
+    points::GroupAttributeArray::registerType();
+    points::StringAttributeArray::registerType();
+
+    // Register attribute arrays with matrix and quaternion attributes
+    points::TypedAttributeArray<math::Mat4<float> >::registerType();
+    points::TypedAttributeArray<math::Mat4<double> >::registerType();
+    points::TypedAttributeArray<math::Quat<float> >::registerType();
+    points::TypedAttributeArray<math::Quat<double> >::registerType();
+
+    // Register attribute arrays with truncate compression
+    points::TypedAttributeArray<float, points::TruncateCodec>::registerType();
+    points::TypedAttributeArray<math::Vec3<float>, points::TruncateCodec>::registerType();
+
+    // Register attribute arrays with fixed point compression
+    points::TypedAttributeArray<math::Vec3<float>, points::FixedPointCodec<true> >::registerType();
+    points::TypedAttributeArray<math::Vec3<float>, points::FixedPointCodec<false> >::registerType();
+    points::TypedAttributeArray<math::Vec3<float>, points::FixedPointCodec<true, points::PositionRange> >::registerType();
+    points::TypedAttributeArray<math::Vec3<float>, points::FixedPointCodec<false, points::PositionRange> >::registerType();
+    points::TypedAttributeArray<math::Vec3<float>, points::FixedPointCodec<true, points::UnitRange> >::registerType();
+    points::TypedAttributeArray<math::Vec3<float>, points::FixedPointCodec<false, points::UnitRange> >::registerType();
+
+    // Register attribute arrays with unit vector compression
+    points::TypedAttributeArray<math::Vec3<float>, points::UnitVecCodec>::registerType();
+
+    // Register types associated with point data grids.
+    Metadata::registerType(typeNameAsString<PointDataIndex32>(), Int32Metadata::createMetadata);
+    Metadata::registerType(typeNameAsString<PointDataIndex64>(), Int64Metadata::createMetadata);
+    points::PointDataGrid::registerGrid();
 
 #ifdef OPENVDB_USE_BLOSC
     blosc_init();

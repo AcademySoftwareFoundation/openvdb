@@ -39,6 +39,7 @@
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/tools/Clip.h> // for tools::clip()
 #include <openvdb/tools/LevelSetUtil.h> // for tools::sdfInteriorMask()
+#include <openvdb/points/PointDataGrid.h>
 
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
@@ -279,12 +280,23 @@ SOP_OpenVDB_Clip::cookMySop(OP_Context& context)
             hvdb::GridPtr outGrid;
             if (maskGrid) {
                 MaskClipOp op(maskGrid, inside);
-                GEOvdbProcessTypedGridTopology(**it, op);
-                outGrid = op.outputGrid;
+                if (GEOvdbProcessTypedGridTopology(**it, op)) { // all hdk supported grid types
+                    outGrid = op.outputGrid;
+                } else if (it->getConstGrid().type() == openvdb::points::PointDataGrid::gridType()) { // point data grid
+                    addWarning(SOP_MESSAGE, "only bbox clipping is currently supported for a point data grid");
+                }
             } else {
                 BBoxClipOp op(bbox, inside);
-                GEOvdbProcessTypedGridTopology(**it, op);
-                outGrid = op.outputGrid;
+                if (GEOvdbProcessTypedGridTopology(**it, op)) { // all hdk supported grid types
+                    outGrid = op.outputGrid;
+                } else if (it->getConstGrid().type() == openvdb::points::PointDataGrid::gridType()) { // point data grid
+                    if (inside) {
+                        outGrid = it->getConstGrid().deepCopyGrid();
+                        outGrid->clipGrid(bbox);
+                    } else {
+                        addWarning(SOP_MESSAGE, "only inside mode is currently supported for a point data grid");
+                    }
+                }
             }
 
             // Replace the original VDB primitive with a new primitive that contains

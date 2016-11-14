@@ -40,6 +40,7 @@
 
 #include <openvdb/tools/TopologyToLevelSet.h>
 #include <openvdb/tools/LevelSetUtil.h>
+#include <openvdb/points/PointDataGrid.h>
 
 #include <UT/UT_Interrupt.h>
 #include <GA/GA_Handle.h>
@@ -288,7 +289,10 @@ SOP_OpenVDB_Topology_To_Level_Set::cookMySop(OP_Context& context)
                     openvdb::tools::PointIndexGrid::ConstPtr grid =
                         openvdb::gridConstPtrCast<openvdb::tools::PointIndexGrid>(vdb->getGridPtr());
                     converter(*grid);
-
+                } else if (vdb->getGrid().type() == openvdb::points::PointDataGrid::gridType()) { // point data grid
+                    openvdb::points::PointDataGrid::ConstPtr grid =
+                        openvdb::gridConstPtrCast<openvdb::points::PointDataGrid>(vdb->getGridPtr());
+                    converter(*grid);
                 } else if (vdb->getGrid().type() == openvdb::MaskGrid::gridType()) { // mask grid
                     openvdb::MaskGrid::ConstPtr grid =
                         openvdb::gridConstPtrCast<openvdb::MaskGrid>(vdb->getGridPtr());

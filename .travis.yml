@@ -1,0 +1,41 @@
+# OpenVDB requires Ubuntu Trusty 14.04 or later which Travis does not yet
+# support using the faster Container-based infrastructure
+# (https://docs.travis-ci.com/user/ci-environment/#Virtualization-environments)
+sudo: required
+dist: trusty
+
+language: cpp
+
+# linux-only for now, however Travis also supports Mac OSX
+os: linux
+
+# build with Clang only as GCC is slower and consumes more memory during compilation
+compiler: clang
+
+# setup environment variables for different concurrent builds
+env:
+  # build and run unit tests for ABI=3 and ABI=4
+  - ABI=4 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=none HOUDINI_BUILD=none
+  - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=none HOUDINI_BUILD=none
+
+  # build Houdini plug-ins for H15 and H15.5
+  - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=Houdini15 HOUDINI_BUILD=houdini-15.0.479-linux_x86_64_gcc4.8
+  - ABI=3 BLOSC=yes RELEASE=yes HOUDINI_MAJOR=Houdini15.5 HOUDINI_BUILD=houdini-15.5.540-linux_x86_64_gcc4.8
+
+  # build and run unit tests for ABI=3 and ABI=4 with Blosc disabled
+  - ABI=4 BLOSC=no RELEASE=yes HOUDINI_MAJOR=none HOUDINI_BUILD=none
+  - ABI=3 BLOSC=no RELEASE=yes HOUDINI_MAJOR=none HOUDINI_BUILD=none
+
+  # build (but don't run) unit tests in debug mode for ABI=3 and ABI=4 with and without Blosc
+  - ABI=4 BLOSC=yes RELEASE=no HOUDINI_MAJOR=none HOUDINI_BUILD=none
+  - ABI=3 BLOSC=yes RELEASE=no HOUDINI_MAJOR=none HOUDINI_BUILD=none
+  - ABI=4 BLOSC=no RELEASE=no HOUDINI_MAJOR=none HOUDINI_BUILD=none
+  - ABI=3 BLOSC=no RELEASE=no HOUDINI_MAJOR=none HOUDINI_BUILD=none
+
+# builds and installs all libraries OpenVDB depends on (build will error if this stage does not succeed)
+# (build will error if this stage does not succeed)
+install: bash .travis.run install $ABI $BLOSC $RELEASE $HOUDINI_MAJOR $HOUDINI_BUILD
+
+# builds OpenVDB and OpenVDB Houdini and runs unit tests
+# (build will fail if this stage does not succeed)
+script: bash .travis.run script $ABI $BLOSC $RELEASE $HOUDINI_MAJOR $HOUDINI_BUILD

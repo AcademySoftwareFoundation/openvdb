@@ -33,6 +33,7 @@
 # Targets:
 #   houdinilib          utility library for Houdini OpenVDB SOPs
 #   houdinisops         Houdini OpenVDB SOPs (installed into HOUDINI_DESTDIR)
+#   mantradsos          Mantra OpenVDB Procedurals (installed into HOUDINI_DESTDIR/mantra)
 #
 #   all                 [default target] all of the above
 #   install             install houdinilib into subdirectories of DESTDIR,
@@ -129,13 +130,16 @@ endif
 
 HOUDINI_INCL_DIR := $(HT)/include
 # Flags to be passed to the hcustom build script
-HCUSTOM_FLAGS := -i $(HOUDINI_DESTDIR)
+HOUDINI_INSTALL := -i $(HOUDINI_DESTDIR)
+MANTRA_INSTALL := -i $(HOUDINI_DESTDIR)/mantra
+HCUSTOM_FLAGS :=
 ifeq (yes,$(strip $(verbose)))
     HCUSTOM_FLAGS += -e
 endif
 # Extra flags to be passed through hcustom to the compiler or linker
 HCUSTOM_EXTRA_CFLAGS := -DIGNORE_HDK_DEPRECATIONS
 HCUSTOM_EXTRA_LDFLAGS :=
+HCUSTOM_MANTRA_LDFLAGS := -lHoudiniRAY
 
 ifeq (yes,$(strip $(debug)))
     OPTIMIZE := -g
@@ -198,6 +202,7 @@ LIBHOUDINI_INCLUDE_NAMES := \
     houdini/OP_NodeChain.h \
     houdini/geometry.h \
     houdini/ParmFactory.h \
+    houdini/PointUtils.h \
     houdini/SOP_NodeVDB.h \
     houdini/UT_VDBTools.h \
     houdini/UT_VDBUtils.h \
@@ -222,6 +227,8 @@ HOUDINI_SOP_SCRIPT_NAMES := \
     houdini/DW_OpenVDBRasterizePoints.cmd \
 #
 HOUDINI_SOP_SRC_NAMES := \
+    houdini/GR_PrimVDBPoints.cc \
+    houdini/SHOP_OpenVDB_Points.cc \
     houdini/SOP_OpenVDB_Advect.cc \
     houdini/SOP_OpenVDB_Advect_Points.cc \
     houdini/SOP_OpenVDB_Analysis.cc \
@@ -236,12 +243,15 @@ HOUDINI_SOP_SRC_NAMES := \
     houdini/SOP_OpenVDB_Fracture.cc \
     houdini/SOP_OpenVDB_From_Particles.cc \
     houdini/SOP_OpenVDB_From_Polygons.cc \
+    houdini/SOP_OpenVDB_Load.cc \
     houdini/SOP_OpenVDB_LOD.cc \
     houdini/SOP_OpenVDB_Metadata.cc \
     houdini/SOP_OpenVDB_Morph_Level_Set.cc \
     houdini/SOP_OpenVDB_Noise.cc \
     houdini/SOP_OpenVDB_Occlusion_Mask.cc \
     houdini/SOP_OpenVDB_Platonic.cc \
+    houdini/SOP_OpenVDB_Points_Convert.cc \
+    houdini/SOP_OpenVDB_Points_Group.cc \
     houdini/SOP_OpenVDB_Prune.cc \
     houdini/SOP_OpenVDB_Rasterize_Points.cc \
     houdini/SOP_OpenVDB_Ray.cc \
@@ -263,7 +273,11 @@ HOUDINI_SOP_SRC_NAMES := \
     houdini/SOP_OpenVDB_Visualize.cc \
     houdini/SOP_OpenVDB_Write.cc \
 #
+MANTRA_VRAY_SRC_NAMES += \
+    houdini/VRAY_OpenVDB_Points.cc \
+#
 HOUDINI_SOP_NAMES := $(basename $(notdir $(HOUDINI_SOP_SRC_NAMES)))
+MANTRA_VRAY_NAMES := $(basename $(notdir $(MANTRA_VRAY_SRC_NAMES)))
 
 # Replace filenames of the form "houdini/<name>.cc" with
 # "$(DWA_HOUDINI_SOP_SRC_DIR)/<name>/<name>.cc"
@@ -277,12 +291,18 @@ HOUDINI_SRC_FILES := \
     $(LIBHOUDINI_SRC_NAMES) \
     $(HOUDINI_SOP_SRC_NAMES) \
 #
-ALL_SRC_FILES := $(HOUDINI_SRC_FILES)
+MANTRA_SRC_FILES := \
+    $(MANTRA_VRAY_SRC_NAMES) \
+#
+ALL_SRC_FILES := $(HOUDINI_SRC_FILES) $(MANTRA_SRC_FILES)
 
 LIBHOUDINI_OBJ_NAMES := $(LIBHOUDINI_SRC_NAMES:.cc=.o)
 HOUDINI_SOP_OBJ_NAMES := $(HOUDINI_SOP_SRC_NAMES:.cc=.o)
 HOUDINI_SOP_SO_NAMES := $(addprefix $(HOUDINI_DESTDIR)/,\
     $(notdir $(HOUDINI_SOP_SRC_NAMES:.cc=.so)))
+MANTRA_VRAY_OBJ_NAMES := $(MANTRA_VRAY_SRC_NAMES:.cc=.o)
+MANTRA_VRAY_SO_NAMES := $(addprefix $(HOUDINI_DESTDIR)/mantra/,\
+    $(notdir $(MANTRA_VRAY_SRC_NAMES:.cc=.so)))
 
 LIB_MAJOR_VERSION=$(shell grep 'define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER ' \
     $(OPENVDB_INCL_DIR)/openvdb/version.h | sed 's/[^0-9]*//g')
@@ -315,16 +335,22 @@ endif # shared
 
 # Environment variables to pass to hcustom
 HCUSTOM_EXPORT :=
+HCUSTOM_MANTRA_EXPORT :=
 ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)$(HCUSTOM_EXTRA_LDFLAGS)))
 	ifneq (,$(strip $(HCUSTOM_EXTRA_CFLAGS)))
 		HCUSTOM_EXPORT += HCUSTOM_CFLAGS="$(strip $(HCUSTOM_EXTRA_CFLAGS))"
+		HCUSTOM_MANTRA_EXPORT += HCUSTOM_CFLAGS="$(strip $(HCUSTOM_EXTRA_CFLAGS))"
 	endif
 	ifneq (,$(strip $(HCUSTOM_EXTRA_LDFLAGS)))
 		HCUSTOM_EXPORT += HCUSTOM_LDFLAGS="$(strip $(HCUSTOM_EXTRA_LDFLAGS))"
+	    HCUSTOM_MANTRA_EXPORT += HCUSTOM_LDFLAGS="$(strip $(HCUSTOM_EXTRA_LDFLAGS)) $(strip $(HCUSTOM_MANTRA_LDFLAGS))"
 	endif
 endif
 ifneq (,$(strip $(HCUSTOM_EXPORT)))
     HCUSTOM_EXPORT := export $(HCUSTOM_EXPORT);
+endif
+ifneq (,$(strip $(HCUSTOM_MANTRA_EXPORT)))
+    HCUSTOM_MANTRA_EXPORT := export $(HCUSTOM_MANTRA_EXPORT);
 endif
 
 DEPEND := houdini_deps
@@ -341,13 +367,13 @@ ALL_TARGETS := \
 
 .SUFFIXES: .o .cc
 
-.PHONY: all clean depend houdinisops houdinilib install
+.PHONY: all clean depend houdinisops mantradsos houdinilib install
 
 .cc.o:
 	@echo "Building $@ because of $(call list_deps)"
 	$(CXX) -c $(CXXFLAGS) -fPIC -o $@ $<
 
-all: depend houdinilib houdinisops
+all: depend houdinilib houdinisops mantradsos
 
 # Create an openvdb_houdini/ symlink to the houdini/ subdirectory,
 # to mirror the DWA directory structure.
@@ -393,17 +419,34 @@ ifeq (no,$(strip $(shared)))
 # Link SOPs against static OpenVDB libraries.
 $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
 	@echo "Building $(HOUDINI_DESTDIR)/$(@:.o=.so) because of $(call list_deps)"
-	$(HCUSTOM_EXPORT) $(HB)/hcustom $(HCUSTOM_FLAGS) $(HCUSTOM_INCLDIRS) $(LIBS) \
+	$(HCUSTOM_EXPORT) $(HB)/hcustom $(HOUDINI_INSTALL) $(HCUSTOM_FLAGS) $(HCUSTOM_INCLDIRS) $(LIBS) \
 	    -L. -lopenvdb_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) $< $(QUIET)
 else
 # Link SOPs against shared OpenVDB libraries.
 $(HOUDINI_SOP_OBJ_NAMES): %.o: %.cc
 	@echo "Building $(HOUDINI_DESTDIR)/$(@:.o=.so) because of $(call list_deps)"
-	$(HCUSTOM_EXPORT) $(HB)/hcustom $(HCUSTOM_FLAGS) $(HCUSTOM_INCLDIRS) \
+	$(HCUSTOM_EXPORT) $(HB)/hcustom $(HOUDINI_INSTALL) $(HCUSTOM_FLAGS) $(HCUSTOM_INCLDIRS) $(LIBS) \
 	    -L. -lopenvdb_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) $< $(QUIET)
 endif
 
+ifeq (no,$(strip $(shared)))
+# Link SOPs against static OpenVDB libraries.
+$(MANTRA_VRAY_OBJ_NAMES): %.o: %.cc
+	@echo "Building $(HOUDINI_DESTDIR)/mantra/$(@:.o=.so) because of $(call list_deps)"
+	@mkdir -p $(HOUDINI_DESTDIR)/mantra
+	$(HCUSTOM_MANTRA_EXPORT) $(HB)/hcustom $(MANTRA_INSTALL) $(HCUSTOM_FLAGS) $(HCUSTOM_INCLDIRS) $(LIBS) \
+	    -L. -lopenvdb_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) $< $(QUIET)
+else
+# Link SOPs against shared OpenVDB libraries.
+$(MANTRA_VRAY_OBJ_NAMES): %.o: %.cc
+	@echo "Building $(HOUDINI_DESTDIR)/$(@:.o=.so) because of $(call list_deps)"
+	@mkdir -p $(HOUDINI_DESTDIR)/mantra
+	$(HCUSTOM_MANTRA_EXPORT) $(HB)/hcustom $(MANTRA_INSTALL) $(HCUSTOM_FLAGS) $(HCUSTOM_INCLDIRS) $(LIBS) \
+ 	    -L. -lopenvdb_houdini -L$(OPENVDB_LIB_DIR) $(OPENVDB_LIB) $< $(QUIET)
+endif
+
 $(HOUDINI_SOP_SO_NAMES): $(HOUDINI_DESTDIR)/%.so: houdini/%.o
+$(MANTRA_VRAY_SO_NAMES): $(HOUDINI_DESTDIR)/mantra/%.so: houdini/%.o
 
 houdinisops: $(HOUDINI_SOP_SO_NAMES) $(HOUDINI_SOP_SCRIPT_NAMES) houdini/SOP_OpenVDB.svg
 	if [ -d "$(HOUDINI_DESTDIR)/../config/Icons" ]; \
@@ -417,7 +460,9 @@ houdinisops: $(HOUDINI_SOP_SO_NAMES) $(HOUDINI_SOP_SCRIPT_NAMES) houdini/SOP_Ope
 	fi
 	cp -f $(HOUDINI_SOP_SCRIPT_NAMES) $(HOUDINI_DESTDIR)/../scripts/sop/
 
-install: houdinilib houdinisops
+mantradsos: $(MANTRA_VRAY_SO_NAMES)
+
+install: houdinilib houdinisops mantradsos
 	mkdir -p $(DESTDIR)/include/openvdb_houdini
 	@echo "Created $(DESTDIR)/include/openvdb_houdini"
 	mkdir -p $(DESTDIR)/include/houdini_utils
@@ -445,7 +490,7 @@ install: houdinilib houdinisops
 $(DEPEND): $(ALL_INCLUDE_FILES) $(ALL_SRC_FILES)
 	@echo "Generating dependencies because of $(call list_deps)"
 	$(RM) $(DEPEND)
-	for f in $(HOUDINI_SRC_FILES); \
+	for f in $(HOUDINI_SRC_FILES) $(MANTRA_SRC_FILES); \
 	    do $(CXX) $(CXXFLAGS) $(HOUDINI_CXXFLAGS) -O0 \
 	        -MM $$f -MT `echo $$f | sed 's%\.[^.]*%.o%'` \
 	        -isystem $(HOUDINI_INCL_DIR) >> $(DEPEND); \
@@ -459,6 +504,7 @@ clean:
 	$(RM) $(LIBHOUDINI_SHARED)
 	$(RM) $(LIBHOUDINI_OBJ_NAMES)
 	$(RM) $(HOUDINI_SOP_OBJ_NAMES) $(HOUDINI_SOP_SO_NAMES)
+	$(RM) $(MANTRA_VRAY_OBJ_NAMES) $(MANTRA_VRAY_SO_NAMES)
 	$(RM) $(HOUDINI_DESTDIR)/../config/Icons/SOP_OpenVDB.svg
 	$(RM) $(addprefix $(HOUDINI_DESTDIR)/../scripts/sop/,\
 	    $(notdir $(HOUDINI_SOP_SCRIPT_NAMES)))
