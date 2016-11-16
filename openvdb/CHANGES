@@ -1,13 +1,15 @@
 OpenVDB Version History
 =======================
 
-Version 4.0.0 - In development
+Version 4.0.0 - November 15, 2016
 
     Highlights:
-    - Added cmake build support [Contributed by Nicholas Yue]
+    - Incorporated Double Negative's OpenVDB Points library.
+      See https://github.com/dneg/openvdb_points_dev for details.
     - Introduced some C++11 constructs.  A C++11-compatible compiler
       is now required.
-    - Vector-valued grids are now much faster to construct and destroy.
+    - Blosc-compressed .vdb files are now as much as 20% smaller.
+    - Vector-valued grids are now constructed and destroyed much faster.
 
       This change and other changes in this release (see "ABI changes" below)
       alter the grid ABI so that it is incompatible with earlier versions
@@ -24,9 +26,11 @@ Version 4.0.0 - In development
       leaf nodes will be written and read in multiple passes, allowing
       blocks of related data to be stored contiguously.
       [Contributed by Double Negative]
+    - Added Tree::unallocatedLeafCount(), which returns the number of leaf
+      nodes with unallocated data buffers (typically due to delayed loading).
 
     Improvements:
-    - Vector-valued grids are now much faster to construct and destroy.
+    - Vector-valued grids are now constructed and destroyed much faster.
     - Changed math::Coord's data representation to facilitate C++11
       uniform initialization.
     - Delayed loading from io::Files is now faster due to the use of seeks
@@ -34,6 +38,9 @@ Version 4.0.0 - In development
       [Contributed by Double Negative]
     - Made many small changes to address type conversion and other warnings
       reported by newer compilers, including Clang 3.8.
+    - Improved Blosc compression ratios and write times by increasing
+      the block size.
+      [Contributed by Dan Bailey]
 
     Bug fixes:
     - Fixed a bug that caused topology operations (union, intersection
@@ -41,6 +48,13 @@ Version 4.0.0 - In development
       (MaskGrids are used internally in a number of tools.)
     - Changed GridBase::copyGrid() and Grid::copy() to close
       const-correctness holes.
+    - tools::fillWithSpheres() now returns an empty list of spheres
+      instead of crashing when the user selects an isosurface that lies
+      outside the bounding volume's narrow band.
+      A more comprehensive fix will appear in the next release.
+    - Fixed a null pointer dereference when copying grids that were loaded
+      with io::File::readGridPartial().
+      [Reported by Nick Avramoussis]
 
     ABI changes:
     - Added a NodeUnion template specialization for non-POD value types
@@ -50,20 +64,30 @@ Version 4.0.0 - In development
     - Replaced occurrences of boost::shared_ptr with std::shared_ptr.
     - Changed GridBase::copyGrid() and Grid::copy() to close
       const-correctness holes.
+    - Added virtual function Tree::unallocatedLeafCount().
 
     API changes:
     - Introduced some C++11 constructs.  A C++11-compatible compiler
       is now required.
-    - Added a parameter to the point scattering tools that controls the
+    - Added a parameter to the point scattering tools to control the
       displacement of each point from the center of its host voxel or tile.
       The default behavior, as before, is to allow each point to be placed
       (randomly) anywhere within its voxel or tile.
     - Renamed LeafManager::getPreFixSum() to LeafManager::getPrefixSum().
+    - Made LeafNode::Buffer a top-level class and renamed it to LeafBuffer.
+      [Contributed by Double Negative]
+    - Deprecated io::File::readGridPartial() in favor of delayed loading.
+    - tools::ClosestSurfacePoint::initialize() now returns a boolean
+      indicating whether initialization was successful.
     - Dropped the CopyPolicy enum and added GridBase::copyGridWithNewTree()
       and Grid::copyWithNewTree() in order to close const-correctness holes
       that allowed newly-constructed, non-const grids to share their trees
       with existing const grids.  (Where that behavior is still required,
       use a ConstPtrCast.)
+
+    Python:
+    - Fixed a build issue with Python 3 and NumPy.
+      [Contributed by Jonathan Scruggs]
 
     Houdini:
     - Certain changes in this release (see "ABI changes" above) alter
@@ -73,6 +97,9 @@ Version 4.0.0 - In development
       to disable these changes and preserve ABI compatibility.
     - Introduced some C++11 constructs that are incompatible with
       versions of Houdini older than 15.0.
+    - Fixed a bug in the Rasterize Points SOP that caused vector-valued
+      attributes to be transferred as scalars.
+      [Contributed by Double Negative]
     - Added a toggle to the Clip SOP to invert the clipping mask.
     - Added a slider to the Scatter SOP to specify how far each point
       may be displaced from the center of its host voxel or tile.

@@ -225,7 +225,6 @@ HOUDINI_SOP_SCRIPT_NAMES := \
 #
 HOUDINI_SOP_SRC_NAMES := \
     houdini/GR_PrimVDBPoints.cc \
-    houdini/SHOP_OpenVDB_Points.cc \
     houdini/SOP_OpenVDB_Advect.cc \
     houdini/SOP_OpenVDB_Advect_Points.cc \
     houdini/SOP_OpenVDB_Analysis.cc \
