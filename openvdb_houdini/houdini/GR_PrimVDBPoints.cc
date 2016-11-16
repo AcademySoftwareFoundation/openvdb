@@ -1300,9 +1300,8 @@ GR_PrimVDBPoints::renderDecoration(RE_Render* r, GR_Decoration decor, const GR_D
         decor == GR_POINT_POSITION ||
         decor == GR_POINT_VELOCITY)
     {
-        drawDecorationForGeo(r, myGeo.get(), decor, p.opts, p.render_flags,
-                 p.overlay, p.override_vis, p.instance_group,
-                 GR_SELECT_NONE);
+        // disable viewport decorations for now
+        return;
     }
 
     GR_Primitive::renderDecoration(r, decor, p);

@@ -337,6 +337,8 @@ template<> inline const char* typeNameAsString<Vec3d>()             { return "ve
 template<> inline const char* typeNameAsString<std::string>()       { return "string"; }
 template<> inline const char* typeNameAsString<Mat4s>()             { return "mat4s"; }
 template<> inline const char* typeNameAsString<Mat4d>()             { return "mat4d"; }
+template<> inline const char* typeNameAsString<math::Quats>()       { return "quats"; }
+template<> inline const char* typeNameAsString<math::Quatd>()       { return "quatd"; }
 template<> inline const char* typeNameAsString<PointIndex32>()      { return "ptidx32"; }
 template<> inline const char* typeNameAsString<PointIndex64>()      { return "ptidx64"; }
 template<> inline const char* typeNameAsString<PointDataIndex32>()  { return "ptdataidx32"; }

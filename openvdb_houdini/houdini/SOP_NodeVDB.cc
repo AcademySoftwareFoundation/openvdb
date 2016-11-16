@@ -33,6 +33,7 @@
 
 #include "SOP_NodeVDB.h"
 #include <houdini_utils/geometry.h>
+#include <openvdb_houdini/PointUtils.h>
 
 #include "Utils.h"
 #include "GEO_PrimVDB.h"
@@ -170,6 +171,9 @@ SOP_NodeVDB::SOP_NodeVDB(OP_Network* net, const char* name, OP_Operator* op):
     // Initialize the vdb library
     openvdb::initialize();
 #endif
+
+    // Register grid-specific info text for Point Data Grids
+    node_info_text::registerGridSpecificInfoText<openvdb::points::PointDataGrid>(&pointDataGridSpecificInfoText);
 
     // Set the flag to draw guide geometry
     mySopFlags.setNeedGuide1(true);
