@@ -129,6 +129,25 @@ public:
 #ifdef OPENVDB_USE_BLOSC
     void testBlosc();
 #endif
+
+private:
+    static openvdb::GridBase::ConstPtr
+    doReadGridPartial(openvdb::io::File& file, const std::string& gridName)
+    {
+        /// @todo io::File::readGridPartial() is deprecated as of OpenVDB 4.0.
+        /// For now, suppress deprecation warnings, but once readGridPartial()
+        /// is actually retired, remove this function.
+#ifdef __INTEL_COMPILER
+  _Pragma("warning (push)")
+  _Pragma("warning (disable:1478)")
+#elif defined(__clang__) || defined(__GNUC__)
+  #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+        return file.readGridPartial(gridName);
+#ifdef __INTEL_COMPILER
+  _Pragma("warning (pop)")
+#endif
+    }
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestFile);
@@ -683,6 +702,10 @@ TestFile::testWriteInstancedGrids()
     CPPUNIT_ASSERT(grid.get() != nullptr);
     density = gridPtrCast<Int32Grid>(grid)->treePtr();
     CPPUNIT_ASSERT(density.get() != nullptr);
+#if !defined(OPENVDB_2_ABI_COMPATIBLE) && !defined(OPENVDB_3_ABI_COMPATIBLE)
+    CPPUNIT_ASSERT(density->unallocatedLeafCount() > 0);
+    CPPUNIT_ASSERT_EQUAL(density->leafCount(), density->unallocatedLeafCount());
+#endif
     grid = findGridByName(*grids, "density_copy");
     CPPUNIT_ASSERT(grid.get() != nullptr);
     CPPUNIT_ASSERT(gridPtrCast<Int32Grid>(grid)->treePtr().get() != nullptr);
@@ -856,7 +879,7 @@ TestFile::testGridNaming()
             CPPUNIT_ASSERT(file.hasGrid(name));
 
             // Partially read the current grid.
-            GridBase::ConstPtr grid = file.readGridPartial(name);
+            GridBase::ConstPtr grid = doReadGridPartial(file, name);
             CPPUNIT_ASSERT(grid.get() != nullptr);
 
             // Verify that the grid is named "grid".
@@ -1580,15 +1603,15 @@ TestFile::testReadGridPartial()
 
     io::File vdbfile2("something.vdb2");
 
-    CPPUNIT_ASSERT_THROW(vdbfile2.readGridPartial("density"), openvdb::IoError);
+    CPPUNIT_ASSERT_THROW(doReadGridPartial(vdbfile2, "density"), openvdb::IoError);
 
     vdbfile2.open();
 
     CPPUNIT_ASSERT(vdbfile2.isOpen());
 
-    CPPUNIT_ASSERT_THROW(vdbfile2.readGridPartial("noname"), openvdb::KeyError);
+    CPPUNIT_ASSERT_THROW(doReadGridPartial(vdbfile2, "noname"), openvdb::KeyError);
 
-    GridBase::ConstPtr density = vdbfile2.readGridPartial("density");
+    GridBase::ConstPtr density = doReadGridPartial(vdbfile2, "density");
 
     CPPUNIT_ASSERT(density.get() != nullptr);
 
@@ -1607,6 +1630,13 @@ TestFile::testReadGridPartial()
     vdbfile2.close();
 
     remove("something.vdb2");
+
+    // A partially-read grid should be copyable, although
+    // none of its leaf buffers are allocated.
+    const auto copyOfDensity = density->deepCopyGrid();
+    CPPUNIT_ASSERT(copyOfDensity.get() != nullptr);
+    CPPUNIT_ASSERT(!copyOfDensity->empty());
+    CPPUNIT_ASSERT_EQUAL(density->activeVoxelCount(), copyOfDensity->activeVoxelCount());
 }
 
 
@@ -1660,13 +1690,13 @@ TestFile::testReadGrid()
 
     io::File vdbfile2("something.vdb2");
 
-    CPPUNIT_ASSERT_THROW(vdbfile2.readGridPartial("density"), openvdb::IoError);
+    CPPUNIT_ASSERT_THROW(doReadGridPartial(vdbfile2, "density"), openvdb::IoError);
 
     vdbfile2.open();
 
     CPPUNIT_ASSERT(vdbfile2.isOpen());
 
-    CPPUNIT_ASSERT_THROW(vdbfile2.readGridPartial("noname"), openvdb::KeyError);
+    CPPUNIT_ASSERT_THROW(doReadGridPartial(vdbfile2, "noname"), openvdb::KeyError);
 
     // Get Temperature
     GridBase::Ptr temperature = vdbfile2.readGrid("temperature");
@@ -1860,7 +1890,6 @@ struct MultiPassLeafNode: public openvdb::tree::LeafNode<T, Log2Dim>, openvdb::i
     using ChildOnCIter = typename BaseLeaf::template ChildIter<
         typename NodeMaskType::OnIterator, const MultiPassLeafNode, typename BaseLeaf::ChildOn>;
 
-    MultiPassLeafNode(): BaseLeaf() {}
     MultiPassLeafNode(const openvdb::Coord& coords, const T& value, bool active = false)
         : BaseLeaf(coords, value, active) {}
 #ifndef OPENVDB_2_ABI_COMPATIBLE
@@ -2011,7 +2040,8 @@ TestFile::testMultiPassIO()
         // is still being read before being clipped
         io::File file(filename);
         file.open();
-        const auto newGrid = GridBase::grid<MultiPassGrid>(file.readGrid("test", BBoxd(Vec3d(0), Vec3d(1))));
+        const auto newGrid = GridBase::grid<MultiPassGrid>(
+            file.readGrid("test", BBoxd(Vec3d(0), Vec3d(1))));
         CPPUNIT_ASSERT_EQUAL(Index32(1), newGrid->tree().leafCount());
 
         auto leafIter = newGrid->tree().beginLeaf();

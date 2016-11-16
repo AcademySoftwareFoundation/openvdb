@@ -603,7 +603,7 @@ BOOST_PYTHON_MODULE(PY_OPENVDB_MODULE_NAME)
 #ifdef PY_OPENVDB_USE_NUMPY
     // Initialize NumPy.
 #if PY_MAJOR_VERSION >= 3
-    if (_import_array()) { };
+    if (_import_array()) {}
 #else
     import_array();
 #endif

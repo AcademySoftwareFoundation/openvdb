@@ -2896,39 +2896,30 @@ getAttributeNames(
     const GU_Detail& geo,
     std::vector<std::string>& scalarAttribNames,
     std::vector<std::string>& vectorAttribNames,
-    bool createVelocityAttribtue,
+    bool createVelocityAttribute,
     UT_ErrorManager* log = nullptr)
 {
-    if (attributeNames.empty() && !createVelocityAttribtue) {
+    if (attributeNames.empty() && !createVelocityAttribute) {
         return;
     }
 
     std::vector<std::string> allNames;
-
     boost::algorithm::split(allNames, attributeNames, boost::is_any_of(", "));
 
     std::set<std::string> uniqueNames(allNames.begin(), allNames.end());
 
-    if (createVelocityAttribtue) {
+    if (createVelocityAttribute) {
         uniqueNames.insert("v");
     }
 
     std::vector<std::string> skipped;
 
-    for (std::set<std::string>::iterator it = uniqueNames.begin(); it != uniqueNames.end(); ++it) {
-
-        const std::string& name = *it;
-
+    for (const std::string& name: uniqueNames) {
         GA_ROAttributeRef attr = geo.findFloatTuple(GA_ATTRIB_POINT, name.c_str(), 1, 1);
-
         if (attr.isValid()) {
-
             scalarAttribNames.push_back(name);
-
         } else {
-
             attr = geo.findFloatTuple(GA_ATTRIB_POINT, name.c_str(), 3);
-
             if (attr.isValid()) {
                 vectorAttribNames.push_back(name);
             } else {
@@ -2938,10 +2929,8 @@ getAttributeNames(
     }
 
     if (!skipped.empty() && log) {
-
         log->addWarning(SOP_OPTYPE_NAME, SOP_MESSAGE, ("Unable to rasterize attribute(s): " +
             boost::algorithm::join(skipped, ", ")).c_str());
-
         log->addWarning(SOP_OPTYPE_NAME, SOP_MESSAGE, "Only supporting point-rate attributes "
             "of scalar or vector type with floating-point values.");
     }
@@ -3307,7 +3296,11 @@ SOP_OpenVDB_Rasterize_Points::SOP_OpenVDB_Rasterize_Points(OP_Network* net,
         VOPconvertToContextType(VEX_CVEX_CONTEXT)), 1, 1)
     , mInitialParmNum(this->getParmList()->getEntries())
 {
+#if (UT_VERSION_INT < 0x10000000) // earlier than 16.0.0
+    /// @todo According to OP_Network.h, "all OP_Network sub-class constructors
+    /// should do this".  But setOperatorTable() is private as of Houdini 16.
     setOperatorTable(getOperatorTable(VOP_TABLE_NAME));
+#endif
 }
 
 
@@ -3388,7 +3381,7 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
         const bool exportPointMask = 0 != evalInt("exportpointmask", 0, time);
         const bool createDensity = 0 != evalInt("createdensity", 0, time);
         const bool applyVEX = evalInt("modeling", 0, time);
-        const bool createVelocityAttribtue = applyVEX &&
+        const bool createVelocityAttribute = applyVEX &&
             hasParm("process_velocity") && evalInt("process_velocity", 0, time) == 1;
 
 
@@ -3402,7 +3395,7 @@ SOP_OpenVDB_Rasterize_Points::cookMySop(OP_Context& context)
             evalString(attributeNameStr, "attributes", 0, time);
 
             getAttributeNames(attributeNameStr.toStdString(), *pointsGeo,
-                scalarAttribNames, vectorAttribNames, createVelocityAttribtue, log);
+                scalarAttribNames, vectorAttribNames, createVelocityAttribute, log);
         }
 
         if (exportPointMask || createDensity || !scalarAttribNames.empty()

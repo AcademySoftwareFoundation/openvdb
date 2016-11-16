@@ -285,7 +285,7 @@ UTvdbProcessTypedGrid(UT_VDBType grid_type, GRID_BASE_T grid, OpType& op) \
 	case UT_VDB_VEC3F:  callTypedGrid<Vec3SGrid>(grid, op); break; \
 	case UT_VDB_VEC3D:  callTypedGrid<Vec3DGrid>(grid, op); break; \
 	case UT_VDB_VEC3I:  callTypedGrid<Vec3IGrid>(grid, op); break; \
-	default:	    UT_ASSERT(!"Unknown grid type"); return false; \
+	default: return false; \
     } \
     return true; \
 } \
@@ -305,7 +305,7 @@ UTvdbProcessTypedGridTopology(UT_VDBType grid_type, GRID_BASE_T grid, OpType& op
 	case UT_VDB_VEC3D:  callTypedGrid<Vec3DGrid>(grid, op); break; \
 	case UT_VDB_VEC3I:  callTypedGrid<Vec3IGrid>(grid, op); break; \
 	case UT_VDB_BOOL:   callTypedGrid<BoolGrid>(grid, op); break; \
-	default:	    UT_ASSERT(!"Unknown grid type"); return false; \
+	default: return false; \
     } \
     return true; \
 } \
@@ -409,15 +409,13 @@ UT_VDB_DECL_PROCESS_TYPED_GRID(openvdb::GridBase::Ptr)
     /**/
 #define UTvdbCallAllType(TYPE, FNAME, GRIDBASE, ...)	\
     UTvdbCallScalarType(TYPE, FNAME, GRIDBASE, __VA_ARGS__)		\
-    else UTvdbCallVec3Type(TYPE, FNAME, GRIDBASE, __VA_ARGS__) \
-    else UT_ASSERT(!"Unknown grid type"); \
+    else UTvdbCallVec3Type(TYPE, FNAME, GRIDBASE, __VA_ARGS__); \
     /**/
 #define UTvdbCallAllTopology(TYPE, FNAME, GRIDBASE, ...)	\
     UTvdbCallScalarType(TYPE, FNAME, GRIDBASE, __VA_ARGS__)		\
     else UTvdbCallVec3Type(TYPE, FNAME, GRIDBASE, __VA_ARGS__) \
     else if (TYPE == UT_VDB_BOOL) \
-	UT_VDB_CALL(openvdb::BoolGrid,(void),FNAME,GRIDBASE,__VA_ARGS__) \
-    else UT_ASSERT(!"Unknown grid type"); \
+	UT_VDB_CALL(openvdb::BoolGrid,(void),FNAME,GRIDBASE,__VA_ARGS__); \
     /**/
 //@}
 
@@ -462,15 +460,13 @@ UT_VDB_DECL_PROCESS_TYPED_GRID(openvdb::GridBase::Ptr)
     /**/
 #define UTvdbReturnAllType(TYPE, FNAME, GRIDBASE, ...)	\
     UTvdbReturnScalarType(TYPE, FNAME, GRIDBASE, __VA_ARGS__) \
-    else UTvdbReturnVec3Type(TYPE, FNAME, GRIDBASE, __VA_ARGS__) \
-    else UT_ASSERT(!"Unknown grid type"); \
+    else UTvdbReturnVec3Type(TYPE, FNAME, GRIDBASE, __VA_ARGS__); \
     /**/
 #define UTvdbReturnAllTopology(TYPE, FNAME, GRIDBASE, ...)	\
     UTvdbReturnScalarType(TYPE, FNAME, GRIDBASE, __VA_ARGS__) \
     else UTvdbReturnVec3Type(TYPE, FNAME, GRIDBASE, __VA_ARGS__) \
     else if (TYPE == UT_VDB_BOOL) \
-	UT_VDB_CALL(openvdb::BoolGrid,return,FNAME,GRIDBASE,__VA_ARGS__) \
-    else UT_ASSERT(!"Unknown grid type"); \
+	UT_VDB_CALL(openvdb::BoolGrid,return,FNAME,GRIDBASE,__VA_ARGS__); \
     /**/
 //@}
 

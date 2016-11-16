@@ -76,6 +76,8 @@ using Vec3R = math::Vec3<Real>;
 using Vec3I = math::Vec3<Index32>;
 using Vec3f = math::Vec3<float>;
 using Vec3H = math::Vec3<half>;
+using Vec3U8 = math::Vec3<uint8_t>;
+using Vec3U16 = math::Vec3<uint16_t>;
 using math::Vec3i;
 using math::Vec3s;
 using math::Vec3d;
@@ -323,20 +325,28 @@ enum MergePolicy {
 template<typename T> const char* typeNameAsString()                 { return typeid(T).name(); }
 template<> inline const char* typeNameAsString<bool>()              { return "bool"; }
 template<> inline const char* typeNameAsString<ValueMask>()         { return "mask"; }
+template<> inline const char* typeNameAsString<half>()              { return "half"; }
 template<> inline const char* typeNameAsString<float>()             { return "float"; }
 template<> inline const char* typeNameAsString<double>()            { return "double"; }
+template<> inline const char* typeNameAsString<uint8_t>()           { return "uint8"; }
+template<> inline const char* typeNameAsString<int16_t>()           { return "int16"; }
+template<> inline const char* typeNameAsString<uint16_t>()          { return "uint16"; }
 template<> inline const char* typeNameAsString<int32_t>()           { return "int32"; }
 template<> inline const char* typeNameAsString<uint32_t>()          { return "uint32"; }
 template<> inline const char* typeNameAsString<int64_t>()           { return "int64"; }
 template<> inline const char* typeNameAsString<Vec2i>()             { return "vec2i"; }
 template<> inline const char* typeNameAsString<Vec2s>()             { return "vec2s"; }
 template<> inline const char* typeNameAsString<Vec2d>()             { return "vec2d"; }
+template<> inline const char* typeNameAsString<Vec3U8>()            { return "vec3u8"; }
+template<> inline const char* typeNameAsString<Vec3U16>()           { return "vec3u16"; }
 template<> inline const char* typeNameAsString<Vec3i>()             { return "vec3i"; }
 template<> inline const char* typeNameAsString<Vec3f>()             { return "vec3s"; }
 template<> inline const char* typeNameAsString<Vec3d>()             { return "vec3d"; }
 template<> inline const char* typeNameAsString<std::string>()       { return "string"; }
 template<> inline const char* typeNameAsString<Mat4s>()             { return "mat4s"; }
 template<> inline const char* typeNameAsString<Mat4d>()             { return "mat4d"; }
+template<> inline const char* typeNameAsString<math::Quats>()       { return "quats"; }
+template<> inline const char* typeNameAsString<math::Quatd>()       { return "quatd"; }
 template<> inline const char* typeNameAsString<PointIndex32>()      { return "ptidx32"; }
 template<> inline const char* typeNameAsString<PointIndex64>()      { return "ptidx64"; }
 template<> inline const char* typeNameAsString<PointDataIndex32>()  { return "ptdataidx32"; }

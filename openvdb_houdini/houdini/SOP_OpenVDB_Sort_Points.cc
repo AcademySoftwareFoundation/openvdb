@@ -206,7 +206,12 @@ SOP_OpenVDB_Sort_Points::cookMySop(OP_Context& context)
         for (size_t n = 0; n < numPoints; ++n) gdp->appendPointOffset();
 #endif
 
+#if (UT_VERSION_INT >= 0x10000000) // 16.0.0 or later
+        gdp->cloneMissingAttributes(*srcGeo, GA_ATTRIB_POINT,
+            GA_AttributeFilter::selectAllExcept(nullptr));
+#else
         gdp->cloneMissingAttributes(*srcGeo, GA_ATTRIB_POINT, GA_AttributeFilter::selectAll());
+#endif
 
         GA_PointWrangler ptWrangler(*gdp, *srcGeo,  GA_PointWrangler::INCLUDE_P);
 
@@ -221,7 +226,6 @@ SOP_OpenVDB_Sort_Points::cookMySop(OP_Context& context)
 
     return error();
 }
-
 
 // Copyright (c) 2012-2016 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the

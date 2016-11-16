@@ -4,20 +4,24 @@
 
 @htmlonly <a name="v4_0_0_changes"></a>@endhtmlonly
 @par
-<B>Version 4.0.0</B> - <I>In development</I>
+<B>Version 4.0.0</B> - <I>November 15, 2016</I>
 @par
 Highlights:
-- Added cmake build suport [Contributed by Nicholas Yue]
+- Incorporated Double&nbsp;Negative&rsquo;s
+  <A HREF="https://github.com/dneg/openvdb_points_dev">
+  OpenVDB&nbsp;Points</A> library.
 - Introduced some C++11 constructs.
   A&nbsp;C++11-compatible compiler is now required.
-- Vector-valued grids are now much faster to construct and destroy.<BR><BR>
-  @b Note:
-  This change and other changes in this release
+- Blosc-compressed <TT>.vdb</TT> files are now as much as 20% smaller.
+- Vector-valued grids are now constructed and destroyed much faster.
+  <BLOCKQUOTE>
+  @b Note: This change and other changes in this release
   (see @ref v4_0_0_ABI_changes "ABI changes" below) alter the grid&nbsp;ABI
   so that it is incompatible with earlier versions of the OpenVDB library,
   such as the ones in Houdini&nbsp;15.0 and&nbsp;15.5.
   Define the macro @c OPENVDB_3_ABI_COMPATIBLE when compiling OpenVDB
-  to disable these changes and preserve ABI compatibility.<BR><BR>
+  to disable these changes and preserve ABI compatibility.
+  </BLOCKQUOTE>
 
 @par
 New features:
@@ -30,18 +34,25 @@ New features:
   by inheriting from @vdblink::io::MultiPass io::MultiPass@endlink.
   Voxel data for grids with such leaf nodes will be written and read in
   multiple passes, allowing blocks of related data to be stored contiguously.
-  <I>[Contributed by Double&nbsp;Negative]</I>
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Added @vdblink::tree::Tree::unallocatedLeafCount()
+  Tree::unallocatedLeafCount@endlink, which returns the number of leaf
+  nodes with unallocated data buffers (typically due to delayed loading).
 
 @par
 Improvements:
-- Vector-valued grids are now much faster to construct and destroy.
+- Vector-valued grids are now constructed and destroyed much faster.
 - Changed @vdblink::math::Coord Coord@endlink's data representation
   to facilitate C++11 uniform initialization.
 - Delayed loading from @vdblink::io::File io::Files@endlink is now faster
   due to the use of seeks instead of reads.
-  <I>[Contributed by Double&nbsp;Negative]</I>
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
 - Made many small changes to address type conversion and other warnings
   reported by newer compilers, including Clang&nbsp;3.8.
+- Improved Blosc compression ratios and write times by increasing
+  the block size.
+  <I>[Contributed&nbsp;by&nbsp;Dan&nbsp;Bailey]</I>
+
 @par
 Bug fixes:
 - Fixed a bug that caused topology operations
@@ -52,6 +63,12 @@ Bug fixes:
   (MaskGrids are used internally in a number of tools.)
 - Changed @vdblink::GridBase::copyGrid() GridBase::copyGrid@endlink and
   @vdblink::Grid::copy() Grid::copy@endlink to close const-correctness holes.
+- @vdblink::tools::fillWithSpheres() tools::fillWithSpheres@endlink now
+  returns an empty list of spheres instead of crashing when the user selects
+  an isosurface that lies outside the bounding volume&rsquo;s narrow band.
+- Fixed a null pointer dereference when copying grids that were loaded
+  with @vdblink::io::File::readGridPartial() io::File::readGridPartial@endlink.
+  <I>[Reported&nbsp;by&nbsp;Nick&nbsp;Avramoussis]</I>
 
 @anchor v4_0_0_ABI_changes
 @par
@@ -59,25 +76,35 @@ ABI changes:
 - Added a @vdblink::tree::NodeUnion NodeUnion@endlink template specialization
   for non-POD value types that significantly expedites construction and
   destruction of vector-valued grids.
-- Changed @vdblink::math::Coord Coord@endlink's data representation
+- Changed @vdblink::math::Coord Coord@endlink&rsquo;s data representation
   to facilitate C++11 uniform initialization.
 - Replaced occurrences of <TT>boost::shared_ptr</TT> with
   <TT>std::shared_ptr</TT>.
 - Changed @vdblink::GridBase::copyGrid() GridBase::copyGrid@endlink and
   @vdblink::Grid::copy() Grid::copy@endlink to close const-correctness holes.
+- Added virtual function @vdblink::tree::Tree::unallocatedLeafCount()
+  Tree::unallocatedLeafCount@endlink.
 
 @par
 API changes:
 - Introduced some C++11 constructs.
   A&nbsp;C++11-compatible compiler is now required.
 - Added a parameter to the @link PointScatter.h point scattering@endlink
-  tools that controls the displacement of each point from the center of
+  tools to control the displacement of each point from the center of
   its host voxel or tile.
   The default behavior, as before, is to allow each point to be placed
   (randomly) anywhere within its voxel or tile.
 - Renamed @c LeafManager::getPreFixSum to
   @vdblink::tree::LeafManager::getPrefixSum()
   LeafManager::getPrefixSum@endlink.
+- Made @c LeafNode::Buffer a top-level class and renamed it to
+  @vdblink::tree::LeafBuffer LeafBuffer@endlink.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
+- Deprecated @vdblink::io::File::readGridPartial()
+  io::File::readGridPartial@endlink in favor of delayed loading.
+- @vdblink::tools::ClosestSurfacePoint::initialize()
+  tools::ClosestSurfacePoint::initialize@endlink now returns a boolean
+  indicating whether initialization was successful.
 - Dropped the @c CopyPolicy enum and added
   @vdblink::GridBase::copyGridWithNewTree() GridBase::copyGridWithNewTree@endlink
   and @vdblink::Grid::copyWithNewTree() Grid::copyWithNewTree@endlink in order
@@ -85,6 +112,11 @@ API changes:
   non-<TT>const</TT> grids to share their trees with existing
   <TT>const</TT> grids.  (Where that behavior is still required, use a
   @vdblink::ConstPtrCast ConstPtrCast@endlink.)
+
+@par
+Python:
+- Fixed a build issue with Python&nbsp;3 and NumPy.
+  <I>[Contributed&nbsp;by&nbsp;Jonathan&nbsp;Scruggs]</I>
 
 @par
 Houdini:
@@ -96,6 +128,9 @@ Houdini:
   to disable these changes and preserve ABI compatibility.
 - Introduced some C++11 constructs that are incompatible with
   versions of Houdini older than&nbsp;15.0.
+- Fixed a bug in the Rasterize Points SOP that caused vector-valued attributes
+  to be transferred as scalars.
+  <I>[Contributed&nbsp;by&nbsp;Double&nbsp;Negative]</I>
 - Added a toggle to the Clip SOP to invert the clipping mask.
 - Added a slider to the Scatter SOP to specify how far each point
   may be displaced from the center of its host voxel or tile.
@@ -320,7 +355,7 @@ Houdini:
   conversion method that supports Houdini 15 packed points.
 - Updated the Rasterize Points SOP with support for frustum transforms,
   sub region masking and orientation logic that matches the native
-  Copy SOP's orientation.
+  Copy SOP&rsquo;s orientation.
 - Updated the Platonic SOP with support for all five Platonic solids.
 - Added hooks for registering SOP_NodeVDB text callbacks for different
   grid types. <I>[Contributed by Nick&nbsp;Avramoussis]</I>
@@ -334,13 +369,6 @@ Houdini:
 - The From Polygon SOP now allows the user to either specify the voxel 
   count along an axis or the voxel size in world units (the only option
   in the past).
-
-@par
-Known issues:
-- A vector Grid/Tree (or any Grid/Tree with a non-POD ValueType) is known to 
-  be slow to construct and delete! This performance issue is easy to fix, but 
-  since it introduces an ABI incompatibility it will have to go in a future
-  major release (most likely v4.0).
 
 @htmlonly <a name="v3_1_0_changes"></a>@endhtmlonly
 @par
@@ -394,7 +422,7 @@ New features:
 - Added a @vdblink::tools::createLevelSetBox() tools::createLevelSetBox@endlink
   factory function for level-set grids.
 - Added @vdblink::tools::Dense::offsetToCoord() Dense::offsetToCoord@endlink.
-- Added @vdblink::tree::LeafNode::Buffer::data() LeafNode::Buffer::data@endlink,
+- Added @vdblink::tree::LeafBuffer::data() LeafNode::Buffer::data@endlink,
   which provides direct access to a leaf node&rsquo;s voxel value array,
   avoiding out-of-core overhead.  Use with caution.
 - Added a @vdblink::util::NodeMask::foreach() NodeMask::foreach@endlink method
@@ -641,7 +669,7 @@ Houdini:
   @vdblink::tools::compDiv() tools::compDiv@endlink with integer-valued grids.
 - Fixed kernel normalization in the @vdblink::tools::Filter filter tool@endlink
   so that it is correct for integer-valued grids.
-- Fixed a bug in @vdblink::tree::LeafNode::Buffer::getValue()
+- Fixed a bug in @vdblink::tree::LeafBuffer::getValue()
   LeafNode::Buffer::getValue@endlink whereby Visual C++ would return
   a reference to a temporary.
   <I>[Contributed by SESI]</I>
