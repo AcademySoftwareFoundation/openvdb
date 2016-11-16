@@ -1802,15 +1802,15 @@ TestAttributeArray::testQuaternions()
         AttributeWriteHandle<QuatR> orientHandle(orient);
 
         orientHandle.set(4, QuatR(1, 2, 3, 4));
-        orientHandle.set(7, QuatR::identity());
+        orientHandle.set(7, QuatR::zero());
     }
 
     { // get some quaternion values
         AttributeHandle<QuatR> orientHandle(orient);
 
-        CPPUNIT_ASSERT_EQUAL(orientHandle.get(3), QuatR::zero());
+        CPPUNIT_ASSERT_EQUAL(orientHandle.get(3), QuatR::identity());
         CPPUNIT_ASSERT_EQUAL(orientHandle.get(4), QuatR(1, 2, 3, 4));
-        CPPUNIT_ASSERT_EQUAL(orientHandle.get(7), QuatR::identity());
+        CPPUNIT_ASSERT_EQUAL(orientHandle.get(7), QuatR::zero());
     }
 
     { // create a quaternion array with a zero uniform value
