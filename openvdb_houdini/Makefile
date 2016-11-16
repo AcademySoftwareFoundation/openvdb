@@ -198,6 +198,7 @@ LIBHOUDINI_INCLUDE_NAMES := \
     houdini/OP_NodeChain.h \
     houdini/geometry.h \
     houdini/ParmFactory.h \
+    houdini/PointUtils.h \
     houdini/SOP_NodeVDB.h \
     houdini/UT_VDBTools.h \
     houdini/UT_VDBUtils.h \
@@ -212,6 +213,7 @@ LIBHOUDINI_SRC_NAMES := \
     houdini/GU_VDBPointTools.cc \
     houdini/geometry.cc \
     houdini/ParmFactory.cc \
+    houdini/PointUtils.cc \
     houdini/SOP_NodeVDB.cc \
     houdini/UT_VDBUtils.cc \
     houdini/Utils.cc \
@@ -222,6 +224,7 @@ HOUDINI_SOP_SCRIPT_NAMES := \
     houdini/DW_OpenVDBRasterizePoints.cmd \
 #
 HOUDINI_SOP_SRC_NAMES := \
+    houdini/GR_PrimVDBPoints.cc \
     houdini/SOP_OpenVDB_Advect.cc \
     houdini/SOP_OpenVDB_Advect_Points.cc \
     houdini/SOP_OpenVDB_Analysis.cc \
@@ -242,6 +245,8 @@ HOUDINI_SOP_SRC_NAMES := \
     houdini/SOP_OpenVDB_Noise.cc \
     houdini/SOP_OpenVDB_Occlusion_Mask.cc \
     houdini/SOP_OpenVDB_Platonic.cc \
+    houdini/SOP_OpenVDB_Points_Convert.cc \
+    houdini/SOP_OpenVDB_Points_Group.cc \
     houdini/SOP_OpenVDB_Prune.cc \
     houdini/SOP_OpenVDB_Rasterize_Points.cc \
     houdini/SOP_OpenVDB_Ray.cc \
