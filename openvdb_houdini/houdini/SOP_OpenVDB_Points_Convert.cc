@@ -975,7 +975,7 @@ newSopOperator(OP_OperatorTable* table)
     };
 
     parms.add(hutil::ParmFactory(PRM_ORD, "normalcompression", "Normal Compression")
-        .setDefault(PRMoneDefaults)
+        .setDefault(PRMzeroDefaults)
         .setHelpText("All normal attributes will use this compression codec.")
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
@@ -989,7 +989,7 @@ newSopOperator(OP_OperatorTable* table)
     };
 
     parms.add(hutil::ParmFactory(PRM_ORD, "colorcompression", "Color Compression")
-        .setDefault(PRMtwoDefaults)
+        .setDefault(PRMzeroDefaults)
         .setHelpText("All color attributes will use this compression codec.")
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
