@@ -160,6 +160,11 @@ SET ( OPENVDB_LIBRARY_SOURCE_FILES
   math/Proximity.cc
   math/QuantizedUnitVec.cc
   math/Transform.cc
+  points/AttributeArray.cc
+  points/AttributeArrayString.cc
+  points/AttributeGroup.cc
+  points/AttributeSet.cc
+  points/StreamCompression.cc
   openvdb.cc
   util/Formats.cc
   util/Util.cc
@@ -270,6 +275,10 @@ ENDIF ()
 
 SET ( UNITTEST_SOURCE_FILES
 	unittest/main.cc
+	unittest/TestAttributeArray.cc
+	unittest/TestAttributeArrayString.cc
+	unittest/TestAttributeGroup.cc
+	unittest/TestAttributeSet.cc
 	unittest/TestBBox.cc
 	unittest/TestConjGradient.cc
 	unittest/TestCoord.cc
@@ -289,6 +298,8 @@ SET ( UNITTEST_SOURCE_FILES
 	unittest/TestGridDescriptor.cc
 	unittest/TestGridIO.cc
 	unittest/TestGridTransformer.cc
+	unittest/TestIndexFilter.cc
+	unittest/TestIndexIterator.cc
 	unittest/TestInit.cc
 	unittest/TestInt32Metadata.cc
 	unittest/TestInt64Metadata.cc
@@ -318,6 +329,11 @@ SET ( UNITTEST_SOURCE_FILES
 	unittest/TestNodeMask.cc
 	unittest/TestParticleAtlas.cc
 	unittest/TestParticlesToLevelSet.cc
+	unittest/TestPointAttribute.cc
+	unittest/TestPointConversion.cc
+	unittest/TestPointCount.cc
+	unittest/TestPointDataLeaf.cc
+	unittest/TestPointGroup.cc
 	unittest/TestPointIndexGrid.cc
 	unittest/TestPointPartitioner.cc
 	unittest/TestPointsToMask.cc
@@ -329,6 +345,7 @@ SET ( UNITTEST_SOURCE_FILES
 	unittest/TestRay.cc
 	unittest/TestStats.cc
 	unittest/TestStream.cc
+	unittest/TestStreamCompression.cc
 	unittest/TestStringMetadata.cc
 	unittest/TestTools.cc
 	unittest/TestTopologyToLevelSet.cc
